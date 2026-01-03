@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import type { SerializableClass } from './types';
+import { defineProps, type SerializableClass } from './types';
 
 export class JSONProp {
   parent: Nullable<JSONData>;
@@ -155,7 +155,7 @@ export function getJSONPropClass(): SerializableClass {
       return { obj: new JSONProp(ctx) };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'name',
           type: 'string',
@@ -164,17 +164,17 @@ export function getJSONPropClass(): SerializableClass {
             return !this.parent || this.parent instanceof JSONArray;
           },
           get(this: JSONProp, value) {
-            value.str[0] = this.name;
+            value.str![0] = this.name;
           },
           set(this: JSONProp, value) {
             const data = this.parent;
-            if (data && value.str[0] && !data.value.find((p) => p !== this && p!.name === value.str[0])) {
-              this.name = value.str[0];
+            if (data && value.str![0] && !data.value.find((p) => p !== this && p!.name === value.str![0])) {
+              this.name = value.str![0];
               this.parent!.updateProps();
             }
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -189,7 +189,7 @@ export function getJSONStringClass(): SerializableClass {
       return { obj: new JSONString(ctx) };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'value',
           type: 'string',
@@ -197,16 +197,16 @@ export function getJSONStringClass(): SerializableClass {
             return this.name.startsWith('.');
           },
           get(this: JSONString, value) {
-            value.str[0] = this.value;
+            value.str![0] = this.value;
           },
           set(this: JSONString, value) {
-            if (this.value !== value.str[0]) {
-              this.value = value.str[0];
+            if (this.value !== value.str![0]) {
+              this.value = value.str![0];
               this.parent!.updateProps();
             }
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -221,7 +221,7 @@ export function getJSONNumberClass(): SerializableClass {
       return { obj: new JSONString(ctx) };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'value',
           type: 'float',
@@ -229,16 +229,16 @@ export function getJSONNumberClass(): SerializableClass {
             return this.name.startsWith('.');
           },
           get(this: JSONNumber, value) {
-            value.num[0] = this.value;
+            value.num![0] = this.value;
           },
           set(this: JSONNumber, value) {
-            if (this.value !== value.num[0]) {
-              this.value = value.num[0];
+            if (this.value !== value.num![0]) {
+              this.value = value.num![0];
               this.parent!.updateProps();
             }
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -253,7 +253,7 @@ export function getJSONBoolClass(): SerializableClass {
       return { obj: new JSONBool(ctx) };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'value',
           type: 'bool',
@@ -261,16 +261,16 @@ export function getJSONBoolClass(): SerializableClass {
             return this.name.startsWith('.');
           },
           get(this: JSONBool, value) {
-            value.bool[0] = this.value;
+            value.bool![0] = this.value;
           },
           set(this: JSONBool, value) {
-            if (this.value !== value.bool[0]) {
-              this.value = value.bool[0];
+            if (this.value !== value.bool![0]) {
+              this.value = value.bool![0];
               this.parent!.updateProps();
             }
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -285,7 +285,7 @@ export function getJSONObjectClass(): SerializableClass {
       return { obj: new JSONData(ctx instanceof JSONData ? ctx : null) };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'JSONData',
           type: 'object_array',
@@ -304,10 +304,10 @@ export function getJSONObjectClass(): SerializableClass {
             if (value === null) {
               this.isnull = true;
             } else if (typeof index === 'number' && index >= 0) {
-              this.value[index] = value.object[0] as JSONString | JSONNumber | JSONBool | JSONData;
+              this.value[index] = value.object![0] as JSONString | JSONNumber | JSONBool | JSONData;
               this.updateProps();
             } else {
-              this.value = value.object.slice() as (JSONString | JSONNumber | JSONBool | JSONData)[];
+              this.value = value.object!.slice() as (JSONString | JSONNumber | JSONBool | JSONData)[];
               this.updateProps();
             }
           },
@@ -324,7 +324,7 @@ export function getJSONObjectClass(): SerializableClass {
             this.updateProps();
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -339,7 +339,7 @@ export function getJSONArrayClass(): SerializableClass {
       return { obj: new JSONArray(ctx instanceof JSONData || ctx instanceof JSONArray ? ctx : null) };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'JSONArray',
           type: 'object_array',
@@ -355,7 +355,7 @@ export function getJSONArrayClass(): SerializableClass {
             if (value === null) {
               this.isnull = true;
             } else if (index! >= 0) {
-              this.value[index!] = value.object[0] as
+              this.value[index!] = value.object![0] as
                 | JSONString
                 | JSONNumber
                 | JSONBool
@@ -363,7 +363,7 @@ export function getJSONArrayClass(): SerializableClass {
                 | JSONArray;
               this.updateProps();
             } else {
-              this.value = value.object.slice() as (
+              this.value = value.object!.slice() as (
                 | JSONString
                 | JSONNumber
                 | JSONBool
@@ -399,7 +399,7 @@ export function getJSONArrayClass(): SerializableClass {
             this.updateProps();
           }
         }
-      ];
+      ]);
     }
   };
 }

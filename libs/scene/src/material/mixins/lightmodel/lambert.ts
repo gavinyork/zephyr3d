@@ -38,7 +38,7 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
       worldPos: PBShaderExp,
       normal: PBShaderExp,
       albedo: PBShaderExp
-    ): PBShaderExp {
+    ) {
       const pb = scope.$builder;
       const funcName = 'Z_lambertLight';
       const that = this;
@@ -73,7 +73,7 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$return(this.litColor);
         }
       });
-      return pb.getGlobalScope()[funcName](worldPos, normal, albedo);
+      return pb.getGlobalScope()[funcName](worldPos, normal, albedo) as PBShaderExp;
     }
   } as unknown as T & { new (...args: any[]): IMixinLambert };
 }

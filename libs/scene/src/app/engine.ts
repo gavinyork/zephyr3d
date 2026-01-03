@@ -66,7 +66,7 @@ export class Engine {
     renderable: DRef<IRenderable>;
     hook?: IRenderHook;
   }[];
-  private _loadingScenes: Record<string, Promise<Scene>>[];
+  private _loadingScenes: Partial<Record<string, Promise<Nullable<Scene>>>>;
   /**
    * Creates a new runtime manager.
    *
@@ -81,7 +81,7 @@ export class Engine {
     this._resourceManager = new ResourceManager(VFS);
     this._enabled = enabled ?? true;
     this._activeRenderables = [];
-    this._loadingScenes = [];
+    this._loadingScenes = {};
     this._screen = new ScreenAdapter();
   }
   /**
@@ -140,7 +140,7 @@ export class Engine {
    * @param module - Module identifier to resolve and load.
    * @returns The `RuntimeScript<T>` instance, or `null` if disabled or on failure.
    */
-  async attachScript<T extends Host>(host: Nullable<T>, module: string): Promise<Nullable<RuntimeScript<T>>> {
+  async attachScript<T extends Host>(host: Nullable<T>, module: string) {
     return this._enabled ? await this._scriptingSystem.attachScript(host, module) : null;
   }
   /**
@@ -166,7 +166,7 @@ export class Engine {
    * @param host - Host object to query.
    * @returns Script instances attached to the host, or an empty array.
    */
-  getScriptObjects<T extends RuntimeScript<any>>(host: unknown): T[] {
+  getScriptObjects<T extends RuntimeScript<any>>(host: unknown) {
     return this._scriptingSystem.getScriptObjects(host) as T[];
   }
   /**
@@ -182,12 +182,12 @@ export class Engine {
       this._scriptingSystem.update(deltaTime, elapsedTime);
     }
   }
-  async loadSceneFromFile(path: string): Promise<Scene> {
+  async loadSceneFromFile(path: string) {
     path = this.VFS.normalizePath(path);
     if (!this._loadingScenes[path]) {
       this._loadingScenes[path] = this._loadScene(path);
     }
-    return this._loadingScenes[path];
+    return this._loadingScenes[path]!;
   }
   setRenderable(renderable: Nullable<IRenderable>, layer = 0, hook?: IRenderHook) {
     if (!this._activeRenderables[layer]) {
@@ -198,10 +198,7 @@ export class Engine {
     this._activeRenderables[layer].hook = hook;
     this._activeRenderables[layer].renderable.set(renderable);
   }
-  async readFile<T extends ReadOptions['encoding'] = 'binary'>(
-    path: string,
-    encoding?: T
-  ): Promise<Nullable<T extends 'binary' ? ArrayBuffer : string>> {
+  async readFile<T extends ReadOptions['encoding'] = 'binary'>(path: string, encoding?: T) {
     try {
       const content = await this.VFS.readFile(path, { encoding: encoding ?? 'binary' });
       return content as T extends 'binary' ? ArrayBuffer : string;
@@ -210,7 +207,11 @@ export class Engine {
       return null;
     }
   }
-  async startup(startupScene: string, splashScreen: string, startupScript: string) {
+  async startup(
+    startupScene?: Nullable<string>,
+    splashScreen?: Nullable<string>,
+    startupScript?: Nullable<string>
+  ) {
     const splashScreenLayer = 9999;
     if (splashScreen) {
       const splashScreenScene = await this.loadSceneFromFile(splashScreen);
@@ -252,7 +253,7 @@ export class Engine {
     this.VFS.unmount('/assets/@builtins');
     this.VFS.mount('/assets/@builtins', this._builtinsVFS);
   }
-  private async createBuiltinVFS(): Promise<MemoryFS> {
+  private async createBuiltinVFS() {
     const fs = new MemoryFS();
     const shapeClsMap = {
       '/primitives/box.zmsh': BoxShape,
@@ -285,7 +286,7 @@ export class Engine {
       console.error(`Write file '${path}' failed: ${err}`);
     }
   }
-  private async _loadScene(path: string): Promise<Nullable<Scene>> {
+  private async _loadScene(path: string) {
     try {
       const scene = await this._resourceManager.loadScene(path);
       if (scene) {
@@ -298,7 +299,7 @@ export class Engine {
         }
         const P: Promise<any>[] = [];
         const scripts: string[] = [];
-        scene.rootNode!.iterate((node) => {
+        scene.rootNode.iterate((node) => {
           if (node.script) {
             scripts.push(node.script);
             P.push(this.attachScript(node, node.script));

@@ -1,4 +1,4 @@
-import type { Disposable, GenericConstructor, Nullable } from '@zephyr3d/base';
+import type { Disposable, GenericConstructor, Immutable, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector4 } from '@zephyr3d/base';
 import type { AbstractDevice } from '@zephyr3d/device';
 import type { BindGroup } from '@zephyr3d/device';
@@ -115,10 +115,10 @@ export function mixinDrawable<
         }
       });
     }
-    getDrawableId(): number {
+    getDrawableId() {
       return this._drawableId;
     }
-    getObjectColor(): Vector4 {
+    getObjectColor(): Immutable<Vector4> {
       if (!this._objectColor) {
         const a = (this._drawableId & 0xff) / 255;
         const b = ((this._drawableId >>> 8) & 0xff) / 255;
@@ -128,7 +128,7 @@ export function mixinDrawable<
       }
       return this._objectColor;
     }
-    pushRenderQueueRef(ref: RenderQueueRef): void {
+    pushRenderQueueRef(ref: RenderQueueRef) {
       this.renderQueueRefPrune();
       this._mdRenderQueueRef.push(ref);
     }
@@ -145,12 +145,12 @@ export function mixinDrawable<
         }
       }
     }
-    applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void {
+    applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number) {
       const drawableBindGroup = this.getDrawableBindGroup(getDevice(), true, renderQueue);
       drawableBindGroup.setValue(ShaderHelper.getInstanceDataStrideUniformName(), stride >> 2);
       drawableBindGroup.setValue(ShaderHelper.getInstanceDataOffsetUniformName(), offset >> 2);
     }
-    applyTransformUniforms(renderQueue: RenderQueue): void {
+    applyTransformUniforms(renderQueue: RenderQueue) {
       const instanceInfo = renderQueue.getInstanceInfo(this as unknown as Drawable);
       const currentTag = this.getNode().transformTag;
       if (instanceInfo) {
@@ -214,7 +214,7 @@ export function mixinDrawable<
       }
     }
     /** @internal */
-    bind(ctx: DrawContext): void {
+    bind(ctx: DrawContext) {
       const device = ctx.device;
       const drawableBindGroup = this.getDrawableBindGroup(device, !!ctx.instanceData, ctx.renderQueue!);
       device.setBindGroup(1, drawableBindGroup);
@@ -239,7 +239,7 @@ export function mixinDrawable<
       }
     }
     /** @internal */
-    getDrawableBindGroup(device: AbstractDevice, instancing: boolean, renderQueue: RenderQueue): BindGroup {
+    getDrawableBindGroup(device: AbstractDevice, instancing: boolean, renderQueue: RenderQueue) {
       const skinning = !!(this as unknown as Drawable).getBoneMatrices();
       const morphing = !!(this as unknown as Drawable).getMorphData();
       let bindGroup = instancing

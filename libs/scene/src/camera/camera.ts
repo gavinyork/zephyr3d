@@ -336,28 +336,28 @@ export class Camera extends SceneNode {
   /**
    * Framebuffer clear color, or `null` to disable.
    */
-  get clearColor(): Vector4 {
+  get clearColor() {
     return this._clearColor;
   }
-  set clearColor(v: Vector4) {
+  set clearColor(v) {
     this._clearColor = v?.clone() ?? null;
   }
   /**
    * Framebuffer stencil clear value, disabled when null. Default is 0.
    */
-  get clearDepth(): number {
+  get clearDepth() {
     return this._clearDepth;
   }
-  set clearDepth(v: number) {
+  set clearDepth(v) {
     this._clearDepth = v;
   }
   /**
    * Framebuffer stencil clear value, disabled when null. Default is 0.
    */
-  get clearStencil(): number {
+  get clearStencil() {
     return this._clearStencil;
   }
-  set clearStencil(v: number) {
+  set clearStencil(v) {
     this._clearStencil = v;
   }
   /**
@@ -365,10 +365,10 @@ export class Camera extends SceneNode {
    *
    * Often improves SSR performance with little quality impact when supported.
    */
-  get HiZ(): boolean {
+  get HiZ() {
     return this._HiZ;
   }
-  set HiZ(val: boolean) {
+  set HiZ(val) {
     this._HiZ = !!val;
   }
   /**
@@ -376,35 +376,35 @@ export class Camera extends SceneNode {
    *
    * Tonemap should be disabled when not using HDR backbuffer.
    */
-  get HDR(): boolean {
+  get HDR() {
     return this._HDR;
   }
-  set HDR(val: boolean) {
+  set HDR(val) {
     this._HDR = !!val;
   }
   /**
    * Whether tonemapping is enabled via the post effect.
    */
-  get toneMap(): boolean {
+  get toneMap() {
     return this._postEffectTonemap.get()!.enabled;
   }
-  set toneMap(val: boolean) {
+  set toneMap(val) {
     this._postEffectTonemap.get()!.enabled = !!val;
   }
   /**
    * Whether motion blur is enabled via the post effect.
    */
-  get motionBlur(): boolean {
+  get motionBlur() {
     return this._postEffectMotionBlur.get()!.enabled;
   }
-  set motionBlur(val: boolean) {
+  set motionBlur(val) {
     this._postEffectMotionBlur.get()!.enabled = !!val;
   }
   /** Motion blur strength */
-  get motionBlurStrength(): number {
+  get motionBlurStrength() {
     return this._motionBlurStrength;
   }
-  set motionBlurStrength(val: number) {
+  set motionBlurStrength(val) {
     this._motionBlurStrength = val;
     if (this._postEffectMotionBlur.get()) {
       this._postEffectMotionBlur.get()!.strength = this._motionBlurStrength;
@@ -413,10 +413,10 @@ export class Camera extends SceneNode {
   /**
    * Gets whether Bloom is enabled.
    */
-  get bloom(): boolean {
+  get bloom() {
     return this._postEffectBloom.get()!.enabled;
   }
-  set bloom(val: boolean) {
+  set bloom(val) {
     this._postEffectBloom.get()!.enabled = !!val;
   }
   /**
@@ -425,7 +425,7 @@ export class Camera extends SceneNode {
   get bloomMaxDownsampleLevels() {
     return this._bloomMaxDownsampleLevels;
   }
-  set bloomMaxDownsampleLevels(val: number) {
+  set bloomMaxDownsampleLevels(val) {
     this._bloomMaxDownsampleLevels = val;
     if (this._postEffectBloom.get()) {
       this._postEffectBloom.get()!.maxDownsampleLevel = val;
@@ -437,7 +437,7 @@ export class Camera extends SceneNode {
   get bloomDownsampleLimit() {
     return this._bloomDownsampleLimit;
   }
-  set bloomDownsampleLimit(val: number) {
+  set bloomDownsampleLimit(val) {
     this._bloomDownsampleLimit = val;
     if (this._postEffectBloom.get()) {
       this._postEffectBloom.get()!.downsampleLimit = val;
@@ -449,7 +449,7 @@ export class Camera extends SceneNode {
   get bloomThreshold() {
     return this._bloomThreshold;
   }
-  set bloomThreshold(val: number) {
+  set bloomThreshold(val) {
     this._bloomThreshold = val;
     if (this._postEffectBloom.get()) {
       this._postEffectBloom.get()!.threshold = val;
@@ -461,7 +461,7 @@ export class Camera extends SceneNode {
   get bloomThresholdKnee() {
     return this._bloomThresholdKnee;
   }
-  set bloomThresholdKnee(val: number) {
+  set bloomThresholdKnee(val) {
     this._bloomThresholdKnee = val;
     if (this._postEffectBloom.get()) {
       this._postEffectBloom.get()!.thresholdKnee = val;
@@ -473,7 +473,7 @@ export class Camera extends SceneNode {
   get bloomIntensity() {
     return this._bloomIntensity;
   }
-  set bloomIntensity(val: number) {
+  set bloomIntensity(val) {
     this._bloomIntensity = val;
     if (this._postEffectBloom.get()) {
       this._postEffectBloom.get()!.intensity = val;
@@ -482,19 +482,19 @@ export class Camera extends SceneNode {
   /**
    * Gets whether FXAA is enabled.
    */
-  get FXAA(): boolean {
+  get FXAA() {
     return this._postEffectFXAA.get()!.enabled;
   }
-  set FXAA(val: boolean) {
+  set FXAA(val) {
     this._postEffectFXAA.get()!.enabled = !!val;
   }
   /**
    * Tonemap exposure
    */
-  get toneMapExposure(): number {
+  get toneMapExposure() {
     return this._tonemapExposure;
   }
-  set toneMapExposure(val: number) {
+  set toneMapExposure(val) {
     this._tonemapExposure = val;
     if (this._postEffectTonemap.get()) {
       this._postEffectTonemap.get()!.exposure = val;
@@ -503,138 +503,138 @@ export class Camera extends SceneNode {
   /**
    * Gets whether TAA is enabled.
    */
-  get TAA(): boolean {
+  get TAA() {
     return this._postEffectTAA.get()!.enabled;
   }
-  set TAA(val: boolean) {
+  set TAA(val) {
     this._postEffectTAA.get()!.enabled = !!val;
   }
   /**
    * Gets the debug flag for TAA
    */
-  get TAADebug(): number {
+  get TAADebug() {
     return this._TAADebug;
   }
-  set TAADebug(val: number) {
+  set TAADebug(val) {
     this._TAADebug = val;
   }
   /**
    * Gets whether Screen Space Reflections (SSR) is enabled.
    */
-  get SSR(): boolean {
+  get SSR() {
     return this._postEffectSSR.get()!.enabled;
   }
-  set SSR(val: boolean) {
+  set SSR(val) {
     this._postEffectSSR.get()!.enabled = !!val;
   }
   /**
    * Gets the maximum roughness value for screen space reflections.
    * Controls the cutoff point where surfaces are considered too rough for SSR.
    */
-  get ssrMaxRoughness(): number {
+  get ssrMaxRoughness() {
     return this._ssrMaxRoughness;
   }
-  set ssrMaxRoughness(val: number) {
+  set ssrMaxRoughness(val) {
     this._ssrMaxRoughness = val;
   }
   /**
    * Gets the roughness factor for SSR calculations.
    * Affects how surface roughness influences reflection clarity.
    */
-  get ssrRoughnessFactor(): number {
+  get ssrRoughnessFactor() {
     return this._ssrRoughnessFactor;
   }
-  set ssrRoughnessFactor(val: number) {
+  set ssrRoughnessFactor(val) {
     this._ssrRoughnessFactor = val;
   }
   /**
    * Gets the stride value for SSR ray marching.
    * Controls the step size during ray marching. Larger values improve performance but may miss details.
    */
-  get ssrStride(): number {
+  get ssrStride() {
     return this._ssrStride;
   }
-  set ssrStride(val: number) {
+  set ssrStride(val) {
     this._ssrStride = val;
   }
   /**
    * Gets the maximum distance for SSR ray marching.
    * Defines how far rays will travel when searching for reflection intersections.
    */
-  get ssrMaxDistance(): number {
+  get ssrMaxDistance() {
     return this._ssrParams.x;
   }
-  set ssrMaxDistance(val: number) {
+  set ssrMaxDistance(val) {
     this._ssrParams.x = val;
   }
   /**
    * Gets the number of iterations for SSR ray marching.
    * Higher values provide more accurate reflections but impact performance.
    */
-  get ssrIterations(): number {
+  get ssrIterations() {
     return this._ssrParams.y;
   }
-  set ssrIterations(val: number) {
+  set ssrIterations(val) {
     this._ssrParams.y = val;
   }
   /**
    * Gets the thickness value for SSR calculations.
    * Determines the thickness threshold for surfaces when calculating reflections.
    */
-  get ssrThickness(): number {
+  get ssrThickness() {
     return this._ssrParams.z;
   }
-  set ssrThickness(val: number) {
+  set ssrThickness(val) {
     this._ssrParams.z = val;
   }
   /**
    * Gets whether SSR should calculate thickness automatically.
    * When enabled, the system will dynamically compute surface thickness for reflections.
    */
-  get ssrCalcThickness(): boolean {
+  get ssrCalcThickness() {
     return this._ssrCalcThickness;
   }
-  set ssrCalcThickness(val: boolean) {
+  set ssrCalcThickness(val) {
     this._ssrCalcThickness = !!val;
   }
   /**
    * Gets the blur scale factor for SSR.
    * Controls the overall intensity of the blur effect applied to reflections.
    */
-  get ssrBlurScale(): number {
+  get ssrBlurScale() {
     return this._ssrBlurriness;
   }
-  set ssrBlurScale(val: number) {
+  set ssrBlurScale(val) {
     this._ssrBlurriness = val;
   }
   /**
    * Gets the depth cutoff value for SSR blur.
    * Determines at what depth difference the blur effect should be reduced or eliminated.
    */
-  get ssrBlurDepthCutoff(): number {
+  get ssrBlurDepthCutoff() {
     return this._ssrBlurDepthCutoff;
   }
-  set ssrBlurDepthCutoff(val: number) {
+  set ssrBlurDepthCutoff(val) {
     this._ssrBlurDepthCutoff = val;
   }
   /**
    * Gets the kernel size for the SSR blur effect.
    * Defines the size of the blur kernel. Larger values create softer, more spread-out blur.
    */
-  get ssrBlurKernelSize(): number {
+  get ssrBlurKernelSize() {
     return this._ssrBlurKernelSize;
   }
-  set ssrBlurKernelSize(val: number) {
+  set ssrBlurKernelSize(val) {
     this._ssrBlurKernelSize = val;
   }
   /**
    * Gets the standard deviation for the SSR Gaussian blur.
    * Controls the distribution of the blur effect. Higher values create more pronounced blur.
    */
-  get ssrBlurStdDev(): number {
+  get ssrBlurStdDev() {
     return this._ssrBlurStdDev;
   }
-  set ssrBlurStdDev(val: number) {
+  set ssrBlurStdDev(val) {
     this._ssrBlurStdDev = val;
   }
   /** @internal */
@@ -644,17 +644,17 @@ export class Camera extends SceneNode {
   /**
    * Gets whether SSAO is enabled.
    */
-  get SSAO(): boolean {
+  get SSAO() {
     return this._postEffectSSAO.get()!.enabled;
   }
-  set SSAO(val: boolean) {
+  set SSAO(val) {
     this._postEffectSSAO.get()!.enabled = !!val;
   }
   /** SSAO scale */
   get SSAOScale() {
     return this._SSAOScale;
   }
-  set SSAOScale(val: number) {
+  set SSAOScale(val) {
     this._SSAOScale = val;
     if (this._postEffectSSAO.get()!) {
       this._postEffectSSAO.get()!.scale = val;
@@ -664,7 +664,7 @@ export class Camera extends SceneNode {
   get SSAOBias() {
     return this._SSAOBias;
   }
-  set SSAOBias(val: number) {
+  set SSAOBias(val) {
     this._SSAOBias = val;
     if (this._postEffectSSAO.get()) {
       this._postEffectSSAO.get()!.bias = val;
@@ -674,7 +674,7 @@ export class Camera extends SceneNode {
   get SSAORadius() {
     return this._SSAORadius;
   }
-  set SSAORadius(val: number) {
+  set SSAORadius(val) {
     this._SSAORadius = val;
     if (this._postEffectSSAO.get()) {
       this._postEffectSSAO.get()!.radius = val;
@@ -684,7 +684,7 @@ export class Camera extends SceneNode {
   get SSAOIntensity() {
     return this._SSAOIntensity;
   }
-  set SSAOIntensity(val: number) {
+  set SSAOIntensity(val) {
     this._SSAOIntensity = val;
     if (this._postEffectSSAO.get()) {
       this._postEffectSSAO.get()!.intensity = val;
@@ -694,31 +694,31 @@ export class Camera extends SceneNode {
   get SSAOBlurDepthCutoff() {
     return this._SSAOBlurDepthCutoff;
   }
-  set SSAOBlurDepthCutoff(val: number) {
+  set SSAOBlurDepthCutoff(val) {
     this._SSAOBlurDepthCutoff = val;
     if (this._postEffectSSAO.get()) {
       this._postEffectSSAO.get()!.blurDepthCutoff = val;
     }
   }
   /** Whether to perform a depth pass */
-  get depthPrePass(): boolean {
+  get depthPrePass() {
     return this._depthPrePass;
   }
-  set depthPrePass(val: boolean) {
+  set depthPrePass(val) {
     this._depthPrePass = !!val;
   }
   /** Whether to allow command buffer reuse optimization */
-  get commandBufferReuse(): boolean {
+  get commandBufferReuse() {
     return this._commandBufferReuse;
   }
-  set commandBufferReuse(val: boolean) {
+  set commandBufferReuse(val) {
     this._commandBufferReuse = !!val;
   }
   /** Whether this camera is adapted to screen settins */
   get adapted() {
     return this._adapted;
   }
-  set adapted(val: boolean) {
+  set adapted(val) {
     this._adapted = !!val;
   }
   /** OIT */
@@ -729,10 +729,10 @@ export class Camera extends SceneNode {
     this._oit.set(val);
   }
   /** Clip plane mask */
-  get clipMask(): number {
+  get clipMask() {
     return this._clipMask;
   }
-  set clipMask(val: number) {
+  set clipMask(val) {
     this._clipMask = val;
   }
   /** Viewport used for rendering, if null, use full framebuffer size */
@@ -755,7 +755,7 @@ export class Camera extends SceneNode {
    * @param type - event type, default to ev.type
    * @returns Boolean value indicates whether the event was handled.
    */
-  handleEvent<T extends IBaseEvent<any>>(ev: T, type?: string): boolean {
+  handleEvent<T extends IBaseEvent<any>>(ev: T, type?: string) {
     let handled = false;
     if (this._controller) {
       if (
@@ -798,7 +798,7 @@ export class Camera extends SceneNode {
    * @param y - The y-component of the screen coordinates, relative to the top-left corner of the viewport.
    * @returns The ray originating from the camera position and passing through the given screen coordinates.
    */
-  constructRay(x: number, y: number): Ray {
+  constructRay(x: number, y: number) {
     const width = this.viewport ? this.viewport[2] : getDevice().getViewport().width;
     const height = this.viewport ? this.viewport[3] : getDevice().getViewport().height;
     const ndcX = (2 * x) / width - 1;
@@ -822,7 +822,7 @@ export class Camera extends SceneNode {
    * @param up - The up vector
    * @returns self
    */
-  lookAt(eye: Vector3, target: Vector3, up: Vector3): this {
+  lookAt(eye: Vector3, target: Vector3, up: Vector3) {
     return this.setLocalTransform(Matrix4x4.lookAt(eye, target, up));
   }
   /**
@@ -831,7 +831,7 @@ export class Camera extends SceneNode {
    * @param position - The camera position
    * @returns self
    */
-  lookAtCubeFace(face: CubeFace, position?: Vector3): this {
+  lookAtCubeFace(face: CubeFace, position?: Vector3) {
     return this.setLocalTransform(Matrix4x4.lookAtCubeFace(face, position ?? this.position));
   }
   /**
@@ -842,7 +842,7 @@ export class Camera extends SceneNode {
    * @param zFar - The far clip plane
    * @returns self
    */
-  setPerspective(fovY: number, aspect: number, zNear: number, zFar: number): this {
+  setPerspective(fovY: number, aspect: number, zNear: number, zFar: number) {
     this._projMatrix.perspective(fovY, aspect, zNear, zFar);
     Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
     this._invalidate(true);
@@ -858,7 +858,7 @@ export class Camera extends SceneNode {
    * @param far - Far bound of the frustum.
    * @returns self
    */
-  setOrtho(left: number, right: number, bottom: number, top: number, near: number, far: number): this {
+  setOrtho(left: number, right: number, bottom: number, top: number, near: number, far: number) {
     this._projMatrix.ortho(left, right, bottom, top, near, far);
     Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
     this._invalidate(true);
@@ -868,7 +868,7 @@ export class Camera extends SceneNode {
    * Setup a projection matrix for the camera
    * @param matrix - The projection matrix
    */
-  setProjectionMatrix(matrix: Matrix4x4): void {
+  setProjectionMatrix(matrix: Matrix4x4) {
     if (matrix && matrix !== this._projMatrix) {
       this._projMatrix = matrix;
       Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
@@ -897,7 +897,7 @@ export class Camera extends SceneNode {
     }
     return this._invProjMatrix;
   }
-  getRotationMatrix(): Matrix4x4 {
+  getRotationMatrix() {
     const rotationMatrix = new Matrix4x4();
     this.worldMatrix.decompose(null, rotationMatrix, null);
     const xAxis = rotationMatrix.getRow(0).xyz().scaleBy(-1);
@@ -971,38 +971,38 @@ export class Camera extends SceneNode {
     return true;
   }
   /** Gets the near clip plane of the camera */
-  getNearPlane(): number {
+  getNearPlane() {
     return this.getProjectionMatrix().getNearPlane();
   }
   /** Gets the far clip plane of the camera */
-  getFarPlane(): number {
+  getFarPlane() {
     return this.getProjectionMatrix().getFarPlane();
   }
   /** Gets the vertical field of view of the camera */
-  getFOV(): number {
+  getFOV() {
     return this.getProjectionMatrix().getFov();
   }
   /** Gets the tangent of half of the vertical field of view */
-  getTanHalfFovy(): number {
+  getTanHalfFovy() {
     return this.getProjectionMatrix().getTanHalfFov();
   }
   /** Gets the aspect ratio */
-  getAspect(): number {
+  getAspect() {
     return this.getProjectionMatrix().getAspect();
   }
   /** Returns true if the camera is perspective */
-  isPerspective(): boolean {
+  isPerspective() {
     return this.getProjectionMatrix().isPerspective();
   }
   /** Returns true if the camera is orthographic */
-  isOrtho(): boolean {
+  isOrtho() {
     return this.getProjectionMatrix().isOrtho();
   }
   /**
    * Gets the camera history data which is used in temporal reprojection
    * @returns Camera history data
    */
-  getHistoryData(): CameraHistoryData {
+  getHistoryData() {
     let data = Camera._historyData.get(this);
     if (!data) {
       data = {
@@ -1145,7 +1145,7 @@ export class Camera extends SceneNode {
     }
     scene.dispatchEvent('endrender', scene, this, this._compositor);
   }
-  async pickAsync(posX: number, posY: number): Promise<Nullable<PickResult>> {
+  async pickAsync(posX: number, posY: number) {
     this._pickPosX = posX;
     this._pickPosY = posY;
     if (!this._pickResultPromise) {
@@ -1212,7 +1212,7 @@ export class Camera extends SceneNode {
     return this._prevPosition;
   }
   /** @internal */
-  private setController(controller: Nullable<BaseCameraController>): this {
+  private setController(controller: Nullable<BaseCameraController>) {
     if (this._controller !== controller) {
       if (controller && controller._getCamera() && controller._getCamera() !== this) {
         throw new Error(
@@ -1266,7 +1266,7 @@ export class Camera extends SceneNode {
     this._oit.dispose();
   }
   /** @internal */
-  private posInViewport(x: number, y: number): boolean {
+  private posInViewport(x: number, y: number) {
     let rect = this._interactionRect;
     if (!rect && this.viewport) {
       const cvs = getDevice().canvas;

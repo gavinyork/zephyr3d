@@ -31,13 +31,13 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
   get intersected() {
     return this._intersected;
   }
-  get intersectedDist(): number {
+  get intersectedDist() {
     return this._intersectedDist;
   }
-  get intersectedPoint(): Vector3 {
+  get intersectedPoint() {
     return this._intersectedPoint;
   }
-  visit(target: SceneNode | OctreeNode): boolean {
+  visit(target: SceneNode | OctreeNode) {
     if (target instanceof OctreeNode) {
       return this.visitOctreeNode(target);
     }

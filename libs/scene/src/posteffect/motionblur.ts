@@ -34,11 +34,11 @@ export class MotionBlur extends AbstractPostEffect {
     this._intensity = val;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
-  requireLinearDepthTexture(): boolean {
+  requireLinearDepthTexture() {
     return false;
   }
   /** {@inheritDoc AbstractPostEffect.requireDepthAttachment} */
-  requireDepthAttachment(): boolean {
+  requireDepthAttachment() {
     return false;
   }
   /** {@inheritDoc AbstractPostEffect.apply} */

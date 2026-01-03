@@ -145,7 +145,7 @@ export class ZipFS extends VFS {
    *
    * @param data - ZIP file as Blob, ArrayBuffer, or Uint8Array
    */
-  async initializeFromData(data: Blob | Uint8Array<ArrayBuffer> | ArrayBuffer): Promise<void> {
+  async initializeFromData(data: Blob | Uint8Array<ArrayBuffer> | ArrayBuffer) {
     try {
       let reader: any;
 
@@ -179,7 +179,7 @@ export class ZipFS extends VFS {
    *
    * @returns ZIP file contents as a Uint8Array
    */
-  async getZipData(): Promise<Uint8Array<ArrayBuffer>> {
+  async getZipData() {
     await this.applyVirtualFiles();
 
     if (this.zipWriter && this.isModified) {
@@ -206,7 +206,7 @@ export class ZipFS extends VFS {
    *
    * @returns ZIP file contents as a Blob
    */
-  async getZipBlob(): Promise<Blob> {
+  async getZipBlob() {
     const data = await this.getZipData();
     return new Blob([data], { type: 'application/zip' });
   }
@@ -217,7 +217,7 @@ export class ZipFS extends VFS {
    * @param targetVFS - The file system where to save the ZIP archive
    * @param path - The destination path (including file name)
    */
-  async saveToVFS(targetVFS: VFS, path: string): Promise<void> {
+  async saveToVFS(targetVFS: VFS, path: string) {
     const data = await this.getZipData();
     await targetVFS.writeFile(path, data.buffer);
   }
@@ -228,7 +228,7 @@ export class ZipFS extends VFS {
    *
    * @returns List of all ZIP entries/directories/files
    */
-  async getEntries(): Promise<ZipEntry[]> {
+  async getEntries() {
     const entries: ZipEntry[] = [];
 
     for (const [path, entry] of this.entries) {
@@ -260,7 +260,7 @@ export class ZipFS extends VFS {
   /**
    * Close zip archive and release resources
    */
-  protected async onClose(): Promise<void> {
+  protected async onClose() {
     if (this.zipReader && this.zipReader.close) {
       await this.zipReader.close();
     }
@@ -281,14 +281,14 @@ export class ZipFS extends VFS {
   /**
    * Check whether we have unsaved changes
    */
-  hasUnsavedChanges(): boolean {
+  hasUnsavedChanges() {
     return this.isModified || this.virtualFiles.size > 0;
   }
 
   /**
    * Force all data to be saved
    */
-  async flush(): Promise<void> {
+  async flush() {
     if (this.hasUnsavedChanges()) {
       await this.getZipData();
     }
@@ -297,12 +297,7 @@ export class ZipFS extends VFS {
   /**
    * Get compression state
    */
-  async getCompressionStats(): Promise<{
-    totalEntries: number;
-    totalUncompressedSize: number;
-    totalCompressedSize: number;
-    compressionRatio: number;
-  }> {
+  async getCompressionStats() {
     let totalEntries = 0;
     let totalUncompressedSize = 0;
 
@@ -345,7 +340,7 @@ export class ZipFS extends VFS {
       filter?: (path: string) => boolean;
       progress?: (current: number, total: number, path: string) => void;
     }
-  ): Promise<void> {
+  ) {
     const entries = await this.getEntries();
     const filteredEntries = options?.filter
       ? entries.filter((entry) => options.filter!(entry.path))
@@ -395,7 +390,7 @@ export class ZipFS extends VFS {
       filter?: (path: string) => boolean;
       progress?: (current: number, total: number, path: string) => void;
     }
-  ): Promise<void> {
+  ) {
     if (this._readOnly) {
       throw new VFSError('ZIP file system is read-only', 'EROFS');
     }
@@ -464,11 +459,7 @@ export class ZipFS extends VFS {
   /**
    * Verify ZIP archive
    */
-  async verify(): Promise<{
-    isValid: boolean;
-    errors: string[];
-    warnings: string[];
-  }> {
+  async verify() {
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -506,7 +497,7 @@ export class ZipFS extends VFS {
   }
 
   /** {@inheritDoc VFS._makeDirectory} */
-  protected async _makeDirectory(path: string, recursive: boolean): Promise<void> {
+  protected async _makeDirectory(path: string, recursive: boolean) {
     if (await this._exists(path)) {
       return;
     }
@@ -547,7 +538,7 @@ export class ZipFS extends VFS {
   }
 
   /** {@inheritDoc VFS._readDirectory} */
-  protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
+  protected async _readDirectory(path: string, options?: ListOptions) {
     if (path === '/' && this.entries.size === 0 && this.virtualFiles.size === 0) {
       return [];
     }
@@ -665,7 +656,7 @@ export class ZipFS extends VFS {
   }
 
   /** {@inheritDoc VFS._deleteDirectory} */
-  protected async _deleteDirectory(path: string, recursive: boolean): Promise<void> {
+  protected async _deleteDirectory(path: string, recursive: boolean) {
     const dirExists = await this._exists(path);
     if (!dirExists) {
       throw new VFSError('Directory does not exist', 'ENOENT', path);
@@ -705,7 +696,7 @@ export class ZipFS extends VFS {
   }
 
   /** {@inheritDoc VFS._readFile} */
-  protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
+  protected async _readFile(path: string, options?: ReadOptions) {
     if (this.virtualFiles.has(path)) {
       const virtualFile = this.virtualFiles.get(path)!;
       return this.processFileData(virtualFile.data, options);
@@ -730,11 +721,7 @@ export class ZipFS extends VFS {
   }
 
   /** {@inheritDoc VFS._writeFile} */
-  protected async _writeFile(
-    path: string,
-    data: ArrayBuffer | string,
-    options?: WriteOptions
-  ): Promise<void> {
+  protected async _writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions) {
     const parent = PathUtils.dirname(path);
 
     if (parent !== '/' && !(await this._exists(parent))) {
@@ -837,7 +824,7 @@ export class ZipFS extends VFS {
   }
 
   /** {@inheritDoc VFS._deleteFile} */
-  protected async _deleteFile(path: string): Promise<void> {
+  protected async _deleteFile(path: string) {
     if (!(await this._exists(path))) {
       throw new VFSError(`File does not exist: ${path}`, 'ENOENT', path);
     }
@@ -861,7 +848,7 @@ export class ZipFS extends VFS {
   }
 
   /** {@inheritDoc VFS._exists} */
-  protected async _exists(path: string): Promise<boolean> {
+  protected async _exists(path: string) {
     if (path === '/') {
       return true;
     }
@@ -897,16 +884,16 @@ export class ZipFS extends VFS {
   /**
    * No support for deleting filesystem
    */
-  protected async _deleteFileSystem(): Promise<void> {
+  protected async _deleteFileSystem() {
     return;
   }
   /**
    * No support for deleting database
    */
-  protected async _wipe(): Promise<void> {
+  protected async _wipe() {
     return;
   }
-  protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {
+  protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions) {
     if (this._readOnly) {
       throw new VFSError('ZIP file system is read-only', 'EROFS');
     }
@@ -937,7 +924,7 @@ export class ZipFS extends VFS {
   }
 
   /** {@inheritDoc VFS._stat} */
-  protected async _stat(path: string): Promise<FileStat> {
+  protected async _stat(path: string) {
     if (path === '/') {
       return {
         size: 0,
@@ -1018,7 +1005,7 @@ export class ZipFS extends VFS {
 
     throw new VFSError('Path does not exist', 'ENOENT', path);
   }
-  private initializeEmpty(): void {
+  private initializeEmpty() {
     this.zipData = new Uint8Array(0);
     const writer = new this.zipJS.Uint8ArrayWriter();
     this.zipWriter = new this.zipJS.ZipWriter(writer);
@@ -1026,7 +1013,7 @@ export class ZipFS extends VFS {
     this.virtualFiles.clear();
   }
 
-  private async ensureWriter(): Promise<ZipJSWriter> {
+  private async ensureWriter() {
     if (this._readOnly) {
       throw new VFSError('ZIP file system is read-only', 'EROFS');
     }
@@ -1061,7 +1048,7 @@ export class ZipFS extends VFS {
     return this.zipWriter;
   }
 
-  private async applyVirtualFiles(): Promise<void> {
+  private async applyVirtualFiles() {
     if (this.virtualFiles.size === 0) {
       return;
     }
@@ -1087,7 +1074,7 @@ export class ZipFS extends VFS {
     this.virtualFiles.clear();
     this.isModified = true;
   }
-  private matchesFilter(metadata: FileMetadata, options?: ListOptions): boolean {
+  private matchesFilter(metadata: FileMetadata, options?: ListOptions) {
     if (!options) {
       return true;
     }
@@ -1106,7 +1093,7 @@ export class ZipFS extends VFS {
 
     return true;
   }
-  private processFileData(data: ArrayBuffer | string, options?: ReadOptions): ArrayBuffer | string {
+  private processFileData(data: ArrayBuffer | string, options?: ReadOptions) {
     let processedData = data;
     const requestedEncoding = options?.encoding;
 
@@ -1148,7 +1135,7 @@ export class ZipFS extends VFS {
     targetPath: string,
     sourceStat: FileStat,
     options?: MoveOptions
-  ): Promise<void> {
+  ) {
     const fileData = await this._readFile(sourcePath);
     let originalCreated = sourceStat.created;
 
@@ -1190,7 +1177,7 @@ export class ZipFS extends VFS {
     targetPath: string,
     sourceStat: FileStat,
     options?: MoveOptions
-  ): Promise<void> {
+  ) {
     let originalCreated = sourceStat.created;
 
     const searchPath = sourcePath.slice(1);
@@ -1257,7 +1244,7 @@ export class ZipFS extends VFS {
     }
   }
 
-  private async createDirectoryWithMetadata(path: string, createdTime: Date): Promise<void> {
+  private async createDirectoryWithMetadata(path: string, createdTime: Date) {
     if (await this._exists(path)) {
       return;
     }

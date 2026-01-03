@@ -18,10 +18,10 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
   isTextureVideo(): this is TextureVideo {
     return true;
   }
-  get source(): HTMLVideoElement {
+  get source() {
     return this._source;
   }
-  destroy(): void {
+  destroy() {
     if (this._source && this._callbackId !== null) {
       this._source.cancelVideoFrameCallback(this._callbackId);
     }
@@ -31,14 +31,14 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
     this.loadElement(this._source);
   }
   /** @internal */
-  loadFromElement(el: HTMLVideoElement): void {
+  loadFromElement(el: HTMLVideoElement) {
     this._flags = GPUResourceUsageFlags.TF_NO_MIPMAP;
     this.loadElement(el);
   }
   generateMipmaps() {
     // Does nothing
   }
-  readPixels(
+  async readPixels(
     _x: number,
     _y: number,
     _w: number,
@@ -46,7 +46,7 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
     _faceOrLayer: number,
     _mipLevel: number,
     _buffer: TypedArray
-  ): Promise<void> {
+  ) {
     throw new Error(`Video texture does not support readPixels()`);
   }
   readPixelsToBuffer(
@@ -57,11 +57,11 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
     _faceOrLayer: number,
     _mipLevel: number,
     _buffer: GPUDataBuffer<unknown>
-  ): void {
+  ) {
     throw new Error(`Video texture does not support readPixelsToBuffer()`);
   }
   /** @internal */
-  updateVideoFrame(): boolean {
+  updateVideoFrame() {
     if (this.object && this._source.currentTime > 0 && !this._source.requestVideoFrameCallback) {
       this.update();
       return true;
@@ -69,7 +69,7 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
     return false;
   }
   /** @internal */
-  private update(): void {
+  private update() {
     this.allocInternal('rgba8unorm', this._source.videoWidth, this._source.videoHeight, 1, 1);
     if (!this._device.isContextLost()) {
       const target = textureTargetMap[this._target];
@@ -88,7 +88,7 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
     }
   }
   /** @internal */
-  private loadElement(element: HTMLVideoElement): void {
+  private loadElement(element: HTMLVideoElement) {
     if (this._source && this._callbackId !== null) {
       this._source.cancelVideoFrameCallback(this._callbackId);
       this._callbackId = null;

@@ -270,24 +270,24 @@ export class HttpRequest {
     this._headers = {};
   }
   /** Get the custom URL resolver */
-  get urlResolver(): Nullable<(url: string) => string> {
+  get urlResolver() {
     return this._urlResolver;
   }
-  set urlResolver(resolver: Nullable<(url: string) => string>) {
+  set urlResolver(resolver) {
     this._urlResolver = resolver;
   }
   /** Get the cross origin property */
-  get crossOrigin(): string {
+  get crossOrigin() {
     return this._crossOrigin;
   }
-  set crossOrigin(val: string) {
+  set crossOrigin(val) {
     this._crossOrigin = val;
   }
   /** Get the request headers */
-  get headers(): Record<string, string> {
+  get headers() {
     return this._headers;
   }
-  set headers(val: Record<string, string>) {
+  set headers(val) {
     this._headers = val;
   }
   /**
@@ -295,7 +295,7 @@ export class HttpRequest {
    * @param url - The input url string,
    * @returns The resolved URL string.
    */
-  resolveURL(url: string): string {
+  resolveURL(url: string) {
     if (!HttpRequest._tempElement) {
       HttpRequest._tempElement = document.createElement('a');
     }
@@ -307,7 +307,7 @@ export class HttpRequest {
    * @param url - The remote URL to fetch.
    * @returns The fetch result.
    */
-  async request(url: string): Promise<Nullable<Response>> {
+  async request(url: string) {
     url = this._urlResolver ? this._urlResolver(url) : this.resolveURL(url);
     return url
       ? fetch(url, {
@@ -321,7 +321,7 @@ export class HttpRequest {
    * @param url - The remote URL to fetch.
    * @returns The fetch result.
    */
-  async requestText(url: string): Promise<string> {
+  async requestText(url: string) {
     const response = await this.request(url);
     if (!response?.ok) {
       throw new Error(`Asset download failed: ${url}`);
@@ -333,7 +333,7 @@ export class HttpRequest {
    * @param url - The remote URL to fetch.
    * @returns The fetch result.
    */
-  async requestJson(url: string): Promise<string> {
+  async requestJson(url: string) {
     const response = await this.request(url);
     if (!response?.ok) {
       throw new Error(`Asset download failed: ${url}`);
@@ -345,7 +345,7 @@ export class HttpRequest {
    * @param url - The remote URL to fetch.
    * @returns The fetch result.
    */
-  async requestArrayBuffer(url: string): Promise<ArrayBuffer> {
+  async requestArrayBuffer(url: string) {
     const response = await this.request(url);
     if (!response?.ok) {
       throw new Error(`Asset download failed: ${url}`);
@@ -357,7 +357,7 @@ export class HttpRequest {
    * @param url - The remote URL to fetch.
    * @returns The fetch result.
    */
-  async requestBlob(url: string): Promise<Blob> {
+  async requestBlob(url: string) {
     const arrayBuffer = await this.requestArrayBuffer(url);
     return new Blob([arrayBuffer]);
   }
@@ -425,7 +425,7 @@ export function ASSERT(condition: boolean, message?: string): asserts condition 
  * @returns Base64 string
  * @public
  */
-export function uint8ArrayToBase64(array: Uint8Array): string {
+export function uint8ArrayToBase64(array: Uint8Array) {
   let binaryString = '';
   for (let i = 0; i < array.length; i++) {
     binaryString += String.fromCharCode(array[i]);
@@ -439,7 +439,7 @@ export function uint8ArrayToBase64(array: Uint8Array): string {
  * @returns Base64 string
  * @public
  */
-export function textToBase64(text: string): string {
+export function textToBase64(text: string) {
   const encoder = new TextEncoder();
   const uint8Array = encoder.encode(text);
   return uint8ArrayToBase64(uint8Array);
@@ -451,7 +451,7 @@ export function textToBase64(text: string): string {
  * @returns Original text
  * @public
  */
-export function base64ToText(base64: string): string {
+export function base64ToText(base64: string) {
   const bytes = base64ToUint8Array(base64);
   return new TextDecoder('utf-8').decode(bytes);
 }
@@ -462,7 +462,7 @@ export function base64ToText(base64: string): string {
  * @returns Uint8Array
  * @public
  */
-export function base64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
+export function base64ToUint8Array(base64: string) {
   const binaryString = atob(base64);
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
@@ -535,7 +535,7 @@ export function IS_SUBCLASS_OF<B extends new (...args: any[]) => any, D extends 
  * @returns The RGBA color value.
  * @public
  */
-export function parseColor(input: string): ColorRGBA {
+export function parseColor(input: string) {
   input = input.trim().toLowerCase() as keyof typeof colorNames;
   input = colorNames[input] || input;
   let v: Nullable<ColorRGBA> = null;
@@ -687,7 +687,7 @@ const formatRegex =
  *
  * @public
  */
-export function formatString(format: string, ...args: SprintfArg[]): string {
+export function formatString(format: string, ...args: SprintfArg[]) {
   let out = '';
   let lastIndex = 0;
   let argIndex = 0;

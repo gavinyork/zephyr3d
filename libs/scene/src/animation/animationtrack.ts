@@ -51,16 +51,16 @@ export abstract class AnimationTrack<StateType = unknown> {
   /**
    * Whether this track is embedded (owned inline by a resource/container).
    */
-  get embedded(): boolean {
+  get embedded() {
     return this._embedded;
   }
   /**
    * The `AnimationClip` that owns this track.
    */
-  get animation(): Nullable<AnimationClip> {
+  get animation() {
     return this._animation;
   }
-  set animation(ani: Nullable<AnimationClip>) {
+  set animation(ani) {
     this._animation = ani;
   }
   /**

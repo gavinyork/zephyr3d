@@ -48,7 +48,7 @@ export class VertexData {
    * Creates a new instance of VertexData by copying from this object
    * @returns New instance of VertexData
    */
-  clone(): VertexData {
+  clone() {
     const newVertexData = new VertexData();
     newVertexData._vertexBuffers = this._vertexBuffers.slice();
     newVertexData._indexBuffer = this._indexBuffer;
@@ -57,11 +57,11 @@ export class VertexData {
     return newVertexData;
   }
   /** Vertex buffer information list */
-  get vertexBuffers(): Nullable<VertexBufferInfo>[] {
+  get vertexBuffers() {
     return this._vertexBuffers;
   }
   /** Index buffer */
-  get indexBuffer(): Nullable<IndexBuffer> {
+  get indexBuffer() {
     return this._indexBuffer;
   }
   /** Number of vertices */
@@ -69,10 +69,10 @@ export class VertexData {
     return this._numVertices;
   }
   /** Draw offset */
-  getDrawOffset(): number {
+  getDrawOffset() {
     return this._drawOffset;
   }
-  setDrawOffset(offset: number): void {
+  setDrawOffset(offset: number) {
     if (offset !== this._drawOffset) {
       this._drawOffset = offset;
       this.calcNumVertices();
@@ -83,7 +83,7 @@ export class VertexData {
    * @param semantic - The vertex semantic
    * @returns Vertex buffer of the given semantic
    */
-  getVertexBuffer(semantic: VertexSemantic): Nullable<StructuredBuffer> {
+  getVertexBuffer(semantic: VertexSemantic) {
     return this._vertexBuffers[getVertexAttribByName(semantic)!]?.buffer ?? null;
   }
   /**
@@ -91,14 +91,14 @@ export class VertexData {
    * @param semantic - The vertex semantic
    * @returns Vertex buffer information of the given semantic
    */
-  getVertexBufferInfo(semantic: VertexSemantic): Nullable<VertexBufferInfo> {
+  getVertexBufferInfo(semantic: VertexSemantic) {
     return this._vertexBuffers[getVertexAttribByName(semantic)!] ?? null;
   }
   /**
    * Gets the index buffer
    * @returns The index buffer
    */
-  getIndexBuffer(): Nullable<IndexBuffer> {
+  getIndexBuffer() {
     return this._indexBuffer;
   }
   /**
@@ -107,7 +107,7 @@ export class VertexData {
    * @param stepMode - Step mode of the buffer
    * @returns The buffer that was set
    */
-  setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode): Nullable<StructuredBuffer> {
+  setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode) {
     if (!buffer) {
       return null;
     }
@@ -134,7 +134,7 @@ export class VertexData {
    * @param buffer - Vertex buffer to be removed
    * @returns true if the buffer was successfully removed, otherwise false
    */
-  removeVertexBuffer(buffer: StructuredBuffer): boolean {
+  removeVertexBuffer(buffer: StructuredBuffer) {
     let removed = false;
     for (let loc = 0; loc < this._vertexBuffers.length; loc++) {
       const info = this._vertexBuffers[loc];
@@ -154,9 +154,9 @@ export class VertexData {
    * @param buffer - Index buffer to be set
    * @returns The index buffer that was set
    */
-  setIndexBuffer(buffer: IndexBuffer): IndexBuffer {
+  setIndexBuffer(buffer: Nullable<IndexBuffer>) {
     if (buffer !== this._indexBuffer) {
-      this._indexBuffer = buffer || null;
+      this._indexBuffer = buffer;
     }
     return buffer;
   }
@@ -179,7 +179,7 @@ export class VertexData {
     buffer: StructuredBuffer,
     offset?: number,
     stepMode?: VertexStepMode
-  ): Nullable<StructuredBuffer> {
+  ) {
     if (loc < 0 || loc >= MAX_VERTEX_ATTRIBUTES) {
       throw new Error(`setVertexBuffer() failed: location out of bounds: ${loc}`);
     }

@@ -1,4 +1,4 @@
-import type { SerializableClass, ResourceManager } from '../../serialization';
+import type { ResourceManager } from '../../serialization';
 import { BaseGraphNode } from '../node';
 import type { MaterialBlueprintIR } from './ir';
 
@@ -153,7 +153,7 @@ export class FunctionCallNode extends BaseGraphNode {
    * Uses a custom createFunc to asynchronously load the function blueprint
    * from the file system. The initialization parameter is the blueprint path.
    */
-  static getSerializationCls(manager: ResourceManager): SerializableClass {
+  static getSerializationCls(manager: ResourceManager) {
     return {
       ctor: FunctionCallNode,
       name: 'FunctionCallNode',
@@ -189,7 +189,7 @@ export class FunctionCallNode extends BaseGraphNode {
    * - Input types can be determined
    * - Input types match the function's parameter types
    */
-  protected validate(): string {
+  protected validate() {
     for (let i = 0; i < this._inputs.length; i++) {
       const name = this._inputs[i].name;
       if (!this._inputs[i].inputNode) {
@@ -215,7 +215,7 @@ export class FunctionCallNode extends BaseGraphNode {
    * Returns the type declared by the corresponding FunctionOutputNode
    * in the function's blueprint.
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return this._outs[id - 1].type;
   }
 }
@@ -302,7 +302,7 @@ export class FunctionInputNode extends BaseGraphNode {
    * Serializes the parameter type and name. The type has an enumeration
    * constraint limited to valid shader types.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: FunctionInputNode,
       name: 'FunctionInputNode',
@@ -356,7 +356,7 @@ export class FunctionInputNode extends BaseGraphNode {
    * Function input nodes have no validation requirements as they
    * have no inputs and their type is explicitly set.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -364,7 +364,7 @@ export class FunctionInputNode extends BaseGraphNode {
    *
    * @returns The parameter type
    */
-  protected getType(): string {
+  protected getType() {
     return this._type;
   }
 }
@@ -461,7 +461,7 @@ export class FunctionOutputNode extends BaseGraphNode {
    * Only serializes the output name. The type is inferred at runtime
    * from the connected input node.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: FunctionOutputNode,
       name: 'FunctionOutputNode',
@@ -500,7 +500,7 @@ export class FunctionOutputNode extends BaseGraphNode {
    * - The input is connected (function must return a value)
    * - The input type can be determined
    */
-  protected validate(): string {
+  protected validate() {
     if (!this._inputs[0].inputNode) {
       return 'Missing result';
     }
@@ -520,7 +520,7 @@ export class FunctionOutputNode extends BaseGraphNode {
    * the connected input to find its source type. This allows functions
    * to work with multiple types without explicit type declarations.
    */
-  protected getType(): string {
+  protected getType() {
     return this._inputs[0].inputNode ? this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId!) : '';
   }
 }

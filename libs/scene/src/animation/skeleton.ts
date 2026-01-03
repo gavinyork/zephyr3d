@@ -173,7 +173,7 @@ export class Skeleton extends Disposable {
    *
    * Each matrix is stored in 4 texels (one row per texel, RGBA = 4 floats).
    */
-  get jointTexture(): Texture2D {
+  get jointTexture() {
     return this._jointTexture.get()!;
   }
   /**
@@ -352,11 +352,7 @@ export class Skeleton extends Disposable {
    * @returns Skinned bounding box info used during per-frame updates.
    * @internal
    */
-  getBoundingInfo(data: {
-    positions: Float32Array;
-    blendIndices: TypedArray;
-    weights: TypedArray;
-  }): SkinnedBoundingBox {
+  getBoundingInfo(data: { positions: Float32Array; blendIndices: TypedArray; weights: TypedArray }) {
     const indices = [0, 0, 0, 0, 0, 0];
     let minx = Number.MAX_VALUE;
     let maxx = -Number.MAX_VALUE;

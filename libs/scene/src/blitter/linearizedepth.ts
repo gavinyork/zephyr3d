@@ -14,7 +14,7 @@ export class LinearizeDepthBlitter extends Blitter {
     super();
     this._nearFar = new Vector2();
   }
-  setCameraNearFar(n: number, f: number): this {
+  setCameraNearFar(n: number, f: number) {
     this._nearFar.setXY(n, f);
     return this;
   }
@@ -29,7 +29,7 @@ export class LinearizeDepthBlitter extends Blitter {
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'float' | 'int' | 'uint'
-  ): PBShaderExp {
+  ) {
     scope.$l.nonLinearDepth = this.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType).r;
     return ShaderHelper.nonLinearDepthToLinearNormalized(scope, scope.nonLinearDepth, scope.cameraNearFar);
   }
@@ -37,7 +37,7 @@ export class LinearizeDepthBlitter extends Blitter {
    * {@inheritDoc Blitter.calcHash}
    * @override
    */
-  protected calcHash(): string {
+  protected calcHash() {
     return '';
   }
   /**

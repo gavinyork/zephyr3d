@@ -1,8 +1,8 @@
 import { MeshMaterial } from './meshmaterial';
-import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, PBInsideFunctionScope } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
 import { MaterialVaryingFlags } from '../values';
-import type { Clonable, Vector2 } from '@zephyr3d/base';
+import type { Clonable, Immutable, Vector2 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../render';
 
@@ -46,10 +46,10 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
    *
    * @returns A Vector4 storing \([u0, v0, u1, v1]\).
    */
-  get uvinfo(): Vector4 {
+  get uvinfo(): Immutable<Vector4> {
     return this._uvinfo;
   }
-  set uvinfo(value: Vector4) {
+  set uvinfo(value: Immutable<Vector4>) {
     if (!value.equalsTo(this.uvinfo)) {
       this._uvinfo.set(value);
       this.uniformChanged();
@@ -63,7 +63,7 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
    * @param uvx1 - Right (U) coordinate.
    * @param uvy1 - Top (V) coordinate.
    */
-  setUVInfo(uvx0: number, uvy0: number, uvx1: number, uvy1: number): void {
+  setUVInfo(uvx0: number, uvy0: number, uvx1: number, uvy1: number) {
     this.uvinfo = new Vector4(uvx0, uvy0, uvx1, uvy1);
   }
   /**
@@ -71,10 +71,10 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
    *
    * @returns The current anchor-rotation.
    */
-  get anchorRotation(): Vector4 {
+  get anchorRotation(): Immutable<Vector4> {
     return this._anchorRotation;
   }
-  set anchorRotation(value: Vector4) {
+  set anchorRotation(value: Immutable<Vector4>) {
     if (!value.equalsTo(this._anchorRotation)) {
       this._anchorRotation.set(value);
       this.uniformChanged();
@@ -85,10 +85,10 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
    *
    * @returns The current anchor as a Vector2.
    */
-  get anchor(): Vector2 {
+  get anchor(): Immutable<Vector2> {
     return this._anchorRotation.xy();
   }
-  set anchor(value: Vector2) {
+  set anchor(value: Immutable<Vector2>) {
     if (value.x !== this._anchorRotation.x || value.y !== this._anchorRotation.y) {
       this.anchorRotation = new Vector4(value.x, value.y, this._anchorRotation.z, this._anchorRotation.w);
     }
@@ -98,10 +98,10 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
    *
    * @returns The sprite rotation.
    */
-  get rotation(): number {
+  get rotation() {
     return this._anchorRotation.z;
   }
-  set rotation(value: number) {
+  set rotation(value) {
     if (value !== this._anchorRotation.z) {
       this.anchorRotation = new Vector4(
         this._anchorRotation.x,
@@ -114,10 +114,10 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
   /**
    * Gets the X component of the sprite anchor.
    */
-  get anchorX(): number {
+  get anchorX() {
     return this._anchorRotation.x;
   }
-  set anchorX(value: number) {
+  set anchorX(value) {
     if (this._anchorRotation.x !== value) {
       this.anchorRotation = new Vector4(
         value,
@@ -130,10 +130,10 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
   /**
    * Gets the Y component of the sprite anchor.
    */
-  get anchorY(): number {
+  get anchorY() {
     return this._anchorRotation.y;
   }
-  set anchorY(value: number) {
+  set anchorY(value) {
     if (this._anchorRotation.y !== value) {
       this.anchorRotation = new Vector4(
         this._anchorRotation.x,
@@ -149,7 +149,7 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
    * @param anchorX - X coordinate of the anchor.
    * @param anchorY - Y coordinate of the anchor.
    */
-  setAnchor(anchorX: number, anchorY: number): void {
+  setAnchor(anchorX: number, anchorY: number) {
     if (this._anchorRotation.x !== anchorX || this._anchorRotation.y !== anchorY) {
       this.anchorRotation = new Vector4(anchorX, anchorY, this._anchorRotation.z, this._anchorRotation.w);
     }
@@ -159,7 +159,7 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
    *
    * @returns A new {@link Sprite3DMaterial} instance with the same properties.
    */
-  clone(): Sprite3DMaterial {
+  clone() {
     const other = new Sprite3DMaterial();
     other.copyFrom(this);
     return other;
@@ -169,7 +169,7 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
    *
    * @param other - The source material to copy from.
    */
-  copyFrom(other: this): void {
+  copyFrom(other: this) {
     super.copyFrom(other);
     this.uvinfo = other.uvinfo;
     this.anchorRotation = other.anchorRotation;
@@ -296,7 +296,7 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
    * @param ctx - The current draw context providing rendering state.
    * @param pass - Index of the active render pass.
    */
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (!(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
       bindGroup.setValue('uvinfo', this._uvinfo);
@@ -347,7 +347,7 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
    * @returns A shader expression representing the fragment color.
 
    */
-  protected calcFragmentColor(scope: PBInsideFunctionScope): PBShaderExp {
+  protected calcFragmentColor(scope: PBInsideFunctionScope) {
     return scope.$builder.vec4(scope.$inputs.zVertexUV, 0, 1);
   }
 }

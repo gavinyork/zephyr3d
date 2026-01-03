@@ -8,7 +8,7 @@ import {
   TetrahedronShape,
   TorusShape
 } from '../../../shapes';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 
 /** @internal */
 export function getBoxShapeClass(): SerializableClass {
@@ -17,7 +17,7 @@ export function getBoxShapeClass(): SerializableClass {
     parent: Primitive,
     name: 'BoxShape',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Size',
           type: 'vec3',
@@ -54,7 +54,7 @@ export function getBoxShapeClass(): SerializableClass {
             };
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -66,7 +66,7 @@ export function getBoxFrameShapeClass(): SerializableClass {
     parent: Primitive,
     name: 'BoxFrameShape',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Size',
           type: 'vec3',
@@ -103,7 +103,7 @@ export function getBoxFrameShapeClass(): SerializableClass {
             };
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -115,7 +115,7 @@ export function getTorusShapeClass(): SerializableClass {
     parent: Primitive,
     name: 'TorusShape',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'NumSlices',
           type: 'int',
@@ -176,7 +176,7 @@ export function getTorusShapeClass(): SerializableClass {
             this.options = { ...this.options, radialDetail: Math.max(3, Math.min(100, value.num[0])) };
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -188,7 +188,7 @@ export function getPlaneShapeClass(): SerializableClass {
     parent: Primitive,
     name: 'PlaneShape',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Size',
           type: 'vec2',
@@ -249,7 +249,7 @@ export function getPlaneShapeClass(): SerializableClass {
             this.options = { ...this.options, twoSided: value.bool[0] };
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -261,7 +261,7 @@ export function getCylinderShapeClass(): SerializableClass {
     parent: Primitive,
     name: 'CylinderShape',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Height',
           type: 'float',
@@ -355,7 +355,7 @@ export function getCylinderShapeClass(): SerializableClass {
             this.options = { ...this.options, bottomCap: value.bool[0] };
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -367,7 +367,7 @@ export function getSphereShapeClass(): SerializableClass {
     parent: Primitive,
     name: 'SphereShape',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Radius',
           type: 'float',
@@ -403,7 +403,7 @@ export function getSphereShapeClass(): SerializableClass {
             this.options = { ...this.options, horizonalDetail: Math.max(2, Math.min(value.num[0], 100)) };
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -415,7 +415,7 @@ export function getTetrahedronShapeClass(): SerializableClass {
     parent: Primitive,
     name: 'TetrahedronShape',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Height',
           type: 'float',
@@ -447,7 +447,7 @@ export function getTetrahedronShapeClass(): SerializableClass {
             this.options = { ...this.options, sizeZ: value.num[0] };
           }
         }
-      ];
+      ]);
     }
   };
 }

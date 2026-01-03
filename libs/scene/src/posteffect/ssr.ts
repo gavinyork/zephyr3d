@@ -37,11 +37,11 @@ export class SSR extends AbstractPostEffect {
     this._combineBindGroup = null;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
-  requireLinearDepthTexture(): boolean {
+  requireLinearDepthTexture() {
     return true;
   }
   /** {@inheritDoc AbstractPostEffect.requireDepthAttachment} */
-  requireDepthAttachment(): boolean {
+  requireDepthAttachment() {
     return true;
   }
   /** @internal */
@@ -311,7 +311,7 @@ export class SSR extends AbstractPostEffect {
     device.pool.releaseFrameBuffer(pingpongFramebuffer[1]);
   }
   /** @internal */
-  private _createCombineProgrm(ctx: DrawContext): GPUProgram {
+  private _createCombineProgrm(ctx: DrawContext) {
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         this.flip = pb.int().uniform(0);
@@ -369,7 +369,7 @@ export class SSR extends AbstractPostEffect {
     return program;
   }
   /** @internal */
-  private _createResolveProgram(ctx: DrawContext): GPUProgram {
+  private _createResolveProgram(ctx: DrawContext) {
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         this.flip = pb.int().uniform(0);
@@ -529,7 +529,7 @@ export class SSR extends AbstractPostEffect {
     return program;
   }
   /** @internal */
-  private _createIntersectProgram(ctx: DrawContext, blur: boolean): GPUProgram {
+  private _createIntersectProgram(ctx: DrawContext, blur: boolean) {
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         this.flip = pb.int().uniform(0);

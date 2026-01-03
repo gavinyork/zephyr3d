@@ -43,46 +43,46 @@ export class Bloom extends AbstractPostEffect {
     this._intensity = 1;
   }
   /** The maximum downsample levels */
-  get maxDownsampleLevel(): number {
+  get maxDownsampleLevel() {
     return this._maxDownsampleLevels;
   }
-  set maxDownsampleLevel(val: number) {
+  set maxDownsampleLevel(val) {
     this._maxDownsampleLevels = val;
   }
   /** Downsample resolution limitation */
-  get downsampleLimit(): number {
+  get downsampleLimit() {
     return this._downsampleLimit;
   }
-  set downsampleLimit(val: number) {
+  set downsampleLimit(val) {
     this._downsampleLimit = val;
   }
   /** Bloom threshold */
-  get threshold(): number {
+  get threshold() {
     return this._threshold;
   }
-  set threshold(val: number) {
+  set threshold(val) {
     this._threshold = val;
   }
   /** Bloom threshold knee */
-  get thresholdKnee(): number {
+  get thresholdKnee() {
     return this._thresholdKnee;
   }
-  set thresholdKnee(val: number) {
+  set thresholdKnee(val) {
     this._thresholdKnee = val;
   }
   /** Bloom intensity */
-  get intensity(): number {
+  get intensity() {
     return this._intensity;
   }
-  set intensity(val: number) {
+  set intensity(val) {
     this._intensity = val;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
-  requireLinearDepthTexture(): boolean {
+  requireLinearDepthTexture() {
     return false;
   }
   /** {@inheritDoc AbstractPostEffect.requireDepthAttachment} */
-  requireDepthAttachment(): boolean {
+  requireDepthAttachment() {
     return false;
   }
   /** {@inheritDoc AbstractPostEffect.apply} */

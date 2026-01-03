@@ -9,7 +9,7 @@ const tmpUint32Array = new Uint32Array(tmpArrayBuffer);
  *
  * @public
  */
-export function degree2radian(degree: number): number {
+export function degree2radian(degree: number) {
   return (degree * Math.PI) / 180;
 }
 
@@ -20,7 +20,7 @@ export function degree2radian(degree: number): number {
  *
  * @public
  */
-export function radian2degree(radian: number): number {
+export function radian2degree(radian: number) {
   return (radian * 180) / Math.PI;
 }
 
@@ -31,7 +31,7 @@ export function radian2degree(radian: number): number {
  *
  * @public
  */
-export function toFloat(val: number): number {
+export function toFloat(val: number) {
   tmpFloatArray[0] = val;
   return tmpFloatArray[0];
 }
@@ -44,7 +44,7 @@ export function toFloat(val: number): number {
  *
  * @public
  */
-export function isPowerOf2(value: number): boolean {
+export function isPowerOf2(value: number) {
   return value % 1 === 0 && value >= 0 && (value & (value - 1)) === 0;
 }
 
@@ -56,7 +56,7 @@ export function isPowerOf2(value: number): boolean {
  *
  * @public
  */
-export function nextPowerOf2(value: number): number {
+export function nextPowerOf2(value: number) {
   if (value <= 0) {
     return 1;
   }
@@ -78,7 +78,7 @@ export function nextPowerOf2(value: number): number {
  *
  * @public
  */
-export function halfToFloat(val: number): number {
+export function halfToFloat(val: number) {
   /*
   const s = (val & 0x8000) >> 15;
   const e = (val & 0x7c00) >> 10;
@@ -123,7 +123,7 @@ export function halfToFloat(val: number): number {
  *
  * @public
  */
-export function packFloat3(a: number, b: number, c: number): number {
+export function packFloat3(a: number, b: number, c: number) {
   const ivalues: number[] = [];
   const result: number[] = [];
   tmpFloatArray[0] = a;
@@ -195,7 +195,7 @@ export function packFloat3(a: number, b: number, c: number): number {
  *
  * @public
  */
-export function unpackFloat3<T extends number[] | Float32Array<ArrayBuffer>>(pk: number, result: T): void {
+export function unpackFloat3<T extends number[] | Float32Array<ArrayBuffer>>(pk: number, result: T) {
   /*
   result[0] = halfToFloat((pk & 0x7ff) << 4);
   result[1] = halfToFloat((pk & 0x3ff800) >> 7);
@@ -283,11 +283,7 @@ export function unpackFloat3<T extends number[] | Float32Array<ArrayBuffer>>(pk:
  *
  * @public
  */
-export function weightedAverage<T>(
-  weights: number[],
-  values: T[],
-  funcLerp: (a: T, b: T, w: number) => T
-): T {
+export function weightedAverage<T>(weights: number[], values: T[], funcLerp: (a: T, b: T, w: number) => T) {
   let totalWeight = weights[0];
   let t = values[0];
   for (let i = 1; i < weights.length; i++) {

@@ -14,19 +14,19 @@ const enum QueryState {
 }
 
 interface TimerQuery {
-  createQuery: () => unknown;
+  createQuery: () => WebGLQuery;
   deleteQuery: (query: Nullable<WebGLQuery>) => void;
   isQuery: (query: Nullable<WebGLQuery>) => boolean;
   beginQuery: (target: number, query: WebGLQuery) => void;
   endQuery: (target: number) => void;
-  getQuery: (target: number, pname: number) => unknown;
-  getQueryObject: (query: WebGLQuery, pname: number) => unknown;
-  queryCounter: (query: unknown, target: number) => void;
+  getQuery: (target: number, pname: number) => Nullable<WebGLQuery>;
+  getQueryObject: (query: WebGLQuery, pname: number) => any;
+  queryCounter: (query: WebGLQuery, target: number) => void;
 }
 
 export class GPUTimer implements ITimer {
   private readonly _device: WebGLDevice;
-  private readonly _query: unknown;
+  private readonly _query: Nullable<WebGLQuery>;
   private _state: QueryState;
   private readonly _timerQuery: Nullable<TimerQuery>;
   private _gpuTime: Nullable<number>;
@@ -74,34 +74,35 @@ export class GPUTimer implements ITimer {
     if (this._state === QueryState.QUERY_STATE_QUERYING) {
       this.end();
     }
-    if (this._query) {
-      this._timerQuery!.beginQuery(TIME_ELAPSED_EXT, this._query);
+    if (this._timerQuery && this._query) {
+      this._timerQuery.beginQuery(TIME_ELAPSED_EXT, this._query);
     }
     this._gpuTime = null;
     this._state = QueryState.QUERY_STATE_QUERYING;
   }
   end() {
     if (this._state === QueryState.QUERY_STATE_QUERYING) {
-      if (this._query) {
+      if (this._timerQuery) {
         this._timerQuery!.endQuery(TIME_ELAPSED_EXT);
       }
       this._state = QueryState.QUERY_STATE_FINISHED;
     }
   }
-  ended(): boolean {
+  ended() {
     return this._state !== QueryState.QUERY_STATE_QUERYING;
   }
-  elapsed(): number {
+  elapsed() {
     if (this._state === QueryState.QUERY_STATE_FINISHED) {
       if (
         this._gpuTime === null &&
         this._query &&
-        this._timerQuery!.getQueryObject(this._query, WebGLEnum.QUERY_RESULT_AVAILABLE)
+        this._timerQuery &&
+        this._timerQuery.getQueryObject(this._query, WebGLEnum.QUERY_RESULT_AVAILABLE)
       ) {
         const gpuTimerDisjoint = this._device.context.getParameter(GPU_DISJOINT_EXT);
         if (!gpuTimerDisjoint) {
           this._gpuTime =
-            Number(this._timerQuery!.getQueryObject(this._query, WebGLEnum.QUERY_RESULT)) / 1000000;
+            Number(this._timerQuery.getQueryObject(this._query, WebGLEnum.QUERY_RESULT)) / 1000000;
         }
       }
     }

@@ -749,7 +749,7 @@ export enum GPUResourceUsageFlags {
  * Get vertex attribute index by semantic
  * @public
  */
-export function getVertexAttribByName(name: Nullable<VertexSemantic>): number | undefined {
+export function getVertexAttribByName(name: Nullable<VertexSemantic>) {
   return name ? vertexAttribNameMap[name] : undefined;
 }
 
@@ -757,8 +757,8 @@ export function getVertexAttribByName(name: Nullable<VertexSemantic>): number | 
  * Get vertex semantic by attribute index
  * @public
  */
-export function getVertexAttribName(attrib: number): VertexSemantic {
-  return vertexAttribNameRevMap[attrib];
+export function getVertexAttribName(attrib: number) {
+  return vertexAttribNameRevMap[attrib] as VertexSemantic;
 }
 
 /**
@@ -769,7 +769,7 @@ export function getVertexAttribName(attrib: number): VertexSemantic {
  *
  * @public
  */
-export function matchVertexBuffer(buffer: StructuredBuffer, name: VertexSemantic): boolean {
+export function matchVertexBuffer(buffer: StructuredBuffer, name: VertexSemantic) {
   if (!buffer) {
     return false;
   }
@@ -808,7 +808,7 @@ export function getVertexAttributeFormat(fmt: VertexAttribFormat) {
  *
  * @public
  */
-export function getVertexAttributeIndex(fmt: VertexAttribFormat): number {
+export function getVertexAttributeIndex(fmt: VertexAttribFormat) {
   return vertexAttribFormatMap[fmt][0];
 }
 
@@ -817,7 +817,7 @@ export function getVertexAttributeIndex(fmt: VertexAttribFormat): number {
  *
  * @public
  */
-export function getVertexFormatSize(fmt: VertexAttribFormat): number {
+export function getVertexFormatSize(fmt: VertexAttribFormat) {
   return vertexAttribFormatMap[fmt][2];
 }
 
@@ -826,7 +826,7 @@ export function getVertexFormatSize(fmt: VertexAttribFormat): number {
  *
  * @public
  */
-export function getVertexFormatComponentCount(fmt: VertexAttribFormat): number {
+export function getVertexFormatComponentCount(fmt: VertexAttribFormat) {
   return vertexAttribFormatMap[fmt][4];
 }
 
@@ -839,11 +839,7 @@ export function getVertexFormatComponentCount(fmt: VertexAttribFormat): number {
  *
  * @public
  */
-export function getVertexAttribFormat(
-  semantic: VertexSemantic,
-  type: DataType,
-  count: number
-): Nullable<VertexAttribFormat> {
+export function getVertexAttribFormat(semantic: VertexSemantic, type: DataType, count: number) {
   const loc = getVertexAttribByName(semantic);
   for (const k in vertexAttribFormatMap) {
     const v = vertexAttribFormatMap[k];
@@ -896,7 +892,7 @@ export function getVertexBufferStride(vertexBufferType: Immutable<PBStructTypeIn
 export function getVertexBufferAttribTypeBySemantic(
   vertexBufferType: Immutable<PBStructTypeInfo>,
   semantic: VertexSemantic
-): Nullable<PBPrimitiveTypeInfo> {
+) {
   const k = vertexBufferType.structMembers[0];
   const vertexType = (k.type as PBArrayTypeInfo).elementType;
   if (vertexType.isStructType()) {
@@ -919,10 +915,7 @@ export function getVertexBufferAttribTypeBySemantic(
  *
  * @public
  */
-export function getVertexBufferAttribType(
-  vertexBufferType: Immutable<PBStructTypeInfo>,
-  attrib: number
-): Nullable<PBPrimitiveTypeInfo> {
+export function getVertexBufferAttribType(vertexBufferType: Immutable<PBStructTypeInfo>, attrib: number) {
   const attribName = getVertexAttribName(attrib);
   if (!attribName) {
     return null;
@@ -938,10 +931,7 @@ export function getVertexBufferAttribType(
  *
  * @public
  */
-export function makeVertexBufferType(
-  length: number,
-  ...attributes: VertexAttribFormat[]
-): Nullable<PBStructTypeInfo> {
+export function makeVertexBufferType(length: number, ...attributes: Immutable<VertexAttribFormat[]>) {
   if (attributes.length === 0) {
     return null;
   }
@@ -992,7 +982,7 @@ export const semanticList: string[] = (function () {
 })();
 
 /** @internal */
-export function semanticToAttrib(semantic: number): Nullable<string> {
+export function semanticToAttrib(semantic: number) {
   switch (semantic) {
     case VERTEX_ATTRIB_POSITION:
       return 'a_position';

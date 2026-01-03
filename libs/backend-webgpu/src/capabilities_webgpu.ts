@@ -713,7 +713,7 @@ export class WebGPUTextureCaps implements TextureCaps {
       this._textureFormatInfos['rg16f'].filterable &&
       this._textureFormatInfos['rgba16f'].filterable;
   }
-  calcMemoryUsage(format: TextureFormat, numPixels): number {
+  calcMemoryUsage(format: TextureFormat, numPixels: number) {
     return this._textureFormatInfos[format] ? this._textureFormatInfos[format].size * numPixels : 0;
   }
   getTextureFormatInfo(format: TextureFormat): Immutable<TextureFormatInfoWebGPU> {

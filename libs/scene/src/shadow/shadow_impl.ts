@@ -1,6 +1,6 @@
 import type { PBInsideFunctionScope, PBShaderExp, TextureFormat } from '@zephyr3d/device';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
-import { Nullable } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
 
 /** @internal */
 export abstract class ShadowImpl {

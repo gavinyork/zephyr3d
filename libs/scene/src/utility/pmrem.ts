@@ -64,7 +64,7 @@ function getProgramInfo(type: DistributionType, numSamples: number) {
   return ret;
 }
 
-function createPMREMProgram(type: DistributionType, numSamples: number): GPUProgram {
+function createPMREMProgram(type: DistributionType, numSamples: number) {
   const device = getDevice();
   const pb = device;
   return pb.buildRenderProgram({
@@ -303,7 +303,7 @@ function doPrefilterCubemap(
   dstFramebuffer: FrameBuffer,
   filteringInfo: Vector3,
   numSamples: number
-): void {
+) {
   const device = getDevice();
   const framebuffer = dstFramebuffer;
   framebuffer.setColorAttachmentMipLevel(0, miplevel);
@@ -344,7 +344,7 @@ export function prefilterCubemap(
   destTexture: TextureCube | FrameBuffer,
   numSamples?: number,
   radianceSource?: boolean
-): void {
+) {
   if (!tex || !tex.isTextureCube()) {
     console.error('prefilterCubemap(): source texture must be cube texture');
     return;

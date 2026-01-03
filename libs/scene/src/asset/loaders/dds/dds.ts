@@ -1,5 +1,4 @@
 import type { TextureFormat, TextureMipmapLevelData, TextureMipmapData } from '@zephyr3d/device';
-import type { Nullable, TypedArray } from '@zephyr3d/base';
 
 const DDSHeaderSize = 31; // in DWORD
 const DDSHeaderSizeExtended = 31 + 5; // in DWORD
@@ -117,7 +116,7 @@ interface DDSHeaderDX10 {
   arraySize: number;
 }
 
-function loadDDSHeader(dds: ArrayBuffer, offset: number): Nullable<DDSHeader> {
+function loadDDSHeader(dds: ArrayBuffer, offset: number) {
   const ddsHeader = {} as DDSHeader;
   const header = new Uint32Array(dds, offset, DDSHeaderSize + 1);
   const magic = header[0];
@@ -494,7 +493,7 @@ function getTextureFormat(header: DDSHeader) {
   return legacyDDSMap[index].format;
 }
 
-function getMetaDataFromHeader(header: DDSHeader, metaData?: DDSMetaData): Nullable<DDSMetaData> {
+function getMetaDataFromHeader(header: DDSHeader, metaData?: DDSMetaData) {
   metaData = metaData || ({} as DDSMetaData);
   const fmt = getTextureFormat(header);
   if (!fmt) {
@@ -539,7 +538,7 @@ function getMipmapData(
   height: number,
   format: TextureFormat,
   dataOffset: number
-): Nullable<TypedArray> {
+) {
   switch (format) {
     case 'r16f':
       return new Uint16Array(dds, dataOffset, width * height);
@@ -575,7 +574,7 @@ function getMipmapData(
 }
 
 /** @internal */
-export function getDDSMipLevelsInfo(dds: ArrayBuffer, offset: number): Nullable<DDSMetaData> {
+export function getDDSMipLevelsInfo(dds: ArrayBuffer, offset: number) {
   const ddsHeader = loadDDSHeader(dds, offset);
   if (!ddsHeader) {
     return null;

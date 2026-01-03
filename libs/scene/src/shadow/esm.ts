@@ -5,7 +5,7 @@ import { GaussianBlurBlitter } from '../blitter';
 import { computeShadowMapDepth, filterShadowESM } from '../shaders/shadow';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { LIGHT_TYPE_POINT } from '../values';
-import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
+import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
 import { ShaderHelper } from '../material/shader/helper';
 import { getDevice } from '../app/api';
 import type { Nullable } from '@zephyr3d/base';
@@ -17,10 +17,10 @@ type ESMImplData = {
 
 class BlurBlitter extends GaussianBlurBlitter {
   protected _packFloat = false;
-  get packFloat(): boolean {
+  get packFloat() {
     return this._packFloat;
   }
-  set packFloat(b: boolean) {
+  set packFloat(b) {
     if (this._packFloat !== !!b) {
       this._packFloat = !!b;
       this.invalidateHash();
@@ -33,7 +33,7 @@ class BlurBlitter extends GaussianBlurBlitter {
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'float' | 'int' | 'uint'
-  ): PBShaderExp {
+  ) {
     const pb = scope.$builder;
     const texel = super.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
     if (this.packFloat) {
@@ -42,12 +42,7 @@ class BlurBlitter extends GaussianBlurBlitter {
       return texel;
     }
   }
-  writeTexel(
-    scope: PBInsideFunctionScope,
-    type: BlitType,
-    srcUV: PBShaderExp,
-    texel: PBShaderExp
-  ): PBShaderExp {
+  writeTexel(scope: PBInsideFunctionScope, type: BlitType, srcUV: PBShaderExp, texel: PBShaderExp) {
     const outTexel = super.writeTexel(scope, type, srcUV, texel);
     if (this.packFloat) {
       return encodeNormalizedFloatToRGBA(scope, outTexel.r);
@@ -55,7 +50,7 @@ class BlurBlitter extends GaussianBlurBlitter {
       return outTexel;
     }
   }
-  protected calcHash(): string {
+  protected calcHash() {
     return `${super.calcHash()}-${Number(this.packFloat)}`;
   }
 }
@@ -89,22 +84,22 @@ export class ESM extends ShadowImpl {
     this._blitterH = new BlurBlitter('horizonal', this._kernelSize, 4, 1 / 1024);
     this._blitterV = new BlurBlitter('vertical', this._kernelSize, 4, 1 / 1024);
   }
-  resourceDirty(): boolean {
+  resourceDirty() {
     return this._resourceDirty;
   }
-  get blur(): boolean {
+  get blur() {
     return this._blur;
   }
-  set blur(val: boolean) {
+  set blur(val) {
     if (this._blur !== !!val) {
       this._blur = !!val;
       this._resourceDirty = true;
     }
   }
-  get mipmap(): boolean {
+  get mipmap() {
     return this._mipmap;
   }
-  set mipmap(b: boolean) {
+  set mipmap(b) {
     if (this._mipmap !== !!b) {
       this._mipmap = !!b;
       if (this._blur) {
@@ -112,31 +107,31 @@ export class ESM extends ShadowImpl {
       }
     }
   }
-  get kernelSize(): number {
+  get kernelSize() {
     return this._kernelSize;
   }
-  set kernelSize(val: number) {
+  set kernelSize(val) {
     this._kernelSize = val;
   }
-  get blurSize(): number {
+  get blurSize() {
     return this._blurSize;
   }
-  set blurSize(val: number) {
+  set blurSize(val) {
     this._blurSize = val;
   }
-  get logSpace(): boolean {
+  get logSpace() {
     return this._logSpace;
   }
-  set logSpace(val: boolean) {
+  set logSpace(val) {
     this._logSpace = !!val;
   }
-  getType(): ShadowMode {
-    return 'esm';
+  getType() {
+    return 'esm' as const;
   }
-  getShadowMapBorder(_shadowMapParams: ShadowMapParams): number {
+  getShadowMapBorder(_shadowMapParams: ShadowMapParams) {
     return this._blur ? Math.ceil(((this._kernelSize + 1) / 2) * this._blurSize) : 0;
   }
-  getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType {
+  getShadowMap(shadowMapParams: ShadowMapParams) {
     const implData = shadowMapParams.implData as ESMImplData;
     return (
       implData
@@ -246,16 +241,16 @@ export class ESM extends ShadowImpl {
       );
     }
   }
-  getDepthScale(): number {
+  getDepthScale() {
     return this._depthScale;
   }
-  setDepthScale(val: number) {
+  setDepthScale(val) {
     this._depthScale = val;
   }
-  getShaderHash(): string {
+  getShaderHash() {
     return '';
   }
-  getShadowMapColorFormat(_shadowMapParams: ShadowMapParams): Nullable<TextureFormat> {
+  getShadowMapColorFormat(_shadowMapParams: ShadowMapParams) {
     const device = getDevice();
     return device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
       ? device.type === 'webgl'
@@ -267,14 +262,14 @@ export class ESM extends ShadowImpl {
           : 'r32f'
         : 'rgba8unorm';
   }
-  getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
-    return 'd24s8';
+  getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams) {
+    return 'd24s8' as const;
   }
   computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp
-  ): PBShaderExp {
+  ) {
     return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap!.format);
   }
   computeShadowCSM(
@@ -283,7 +278,7 @@ export class ESM extends ShadowImpl {
     shadowVertex: PBShaderExp,
     NdotL: PBShaderExp,
     split: PBShaderExp
-  ): PBShaderExp {
+  ) {
     const funcNameComputeShadowCSM = 'lib_computeShadowCSM';
     const pb = scope.$builder;
     pb.func(
@@ -318,14 +313,14 @@ export class ESM extends ShadowImpl {
         this.$return(this.shadow);
       }
     );
-    return pb.getGlobalScope()[funcNameComputeShadowCSM](shadowVertex, NdotL, split);
+    return pb.getGlobalScope()[funcNameComputeShadowCSM](shadowVertex, NdotL, split) as PBShaderExp;
   }
   computeShadow(
     shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,
     shadowVertex: PBShaderExp,
     NdotL: PBShaderExp
-  ): PBShaderExp {
+  ) {
     const funcNameComputeShadow = 'lib_computeShadow';
     const pb = scope.$builder;
     pb.func(funcNameComputeShadow, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
@@ -360,9 +355,9 @@ export class ESM extends ShadowImpl {
         this.$return(this.shadow);
       }
     });
-    return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
+    return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL) as PBShaderExp;
   }
-  useNativeShadowMap(_shadowMapParams: ShadowMapParams): boolean {
+  useNativeShadowMap(_shadowMapParams: ShadowMapParams) {
     return false;
   }
 }

@@ -121,7 +121,7 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
    *
    * @returns A new {@link Sprite3DBlueprintMaterial} instance.
    */
-  clone(): Sprite3DBlueprintMaterial {
+  clone() {
     const other = new Sprite3DBlueprintMaterial(this._irFrag, this._uniformValues, this._uniformTextures);
     other.copyFrom(this);
     return other;
@@ -140,7 +140,7 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
    * @param ctx - The current draw context.
    * @param pass - Index of the active render pass.
    */
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)) {
       for (const u of this._uniformValues) {
@@ -166,14 +166,14 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
    * @param scope - The current fragment shader function scope.
    * @returns A shader expression representing the final fragment color.
    */
-  protected calcFragmentColor(scope: PBInsideFunctionScope): PBShaderExp {
+  protected calcFragmentColor(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
     const that = this;
     pb.func('zCalcSpriteColor', [pb.vec3('zWorldPos'), pb.vec2('zVertexUV')], function () {
       const outputs = that._irFrag.create(pb)!;
       this.$return(that.getOutput(outputs, 'Color') as PBShaderExp);
     });
-    return scope.zCalcSpriteColor(scope.$inputs.zWorldPos, scope.$inputs.zVertexUV);
+    return scope.zCalcSpriteColor(scope.$inputs.zWorldPos, scope.$inputs.zVertexUV) as PBShaderExp;
   }
   /**
    * Creates a unique hash string used for program caching.
@@ -185,7 +185,7 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
    *
    * @returns A hash string that identifies this material configuration.
    */
-  protected _createHash(): string {
+  protected _createHash() {
     return `${super._createHash()}:${this._irFrag.hash}`;
   }
   /**
@@ -217,7 +217,7 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
    * This method is intended to be called by the engine's resource management
    * system rather than directly from user code.
    */
-  protected onDispose(): void {
+  protected onDispose() {
     super.onDispose();
     for (const u of this._uniformTextures) {
       u.finalTexture!.dispose();

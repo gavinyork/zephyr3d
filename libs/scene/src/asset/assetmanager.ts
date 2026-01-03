@@ -36,7 +36,6 @@ import { TGALoader } from './loaders/image/tga_Loader';
 import { getDevice, getEngine } from '../app/api';
 import { Material, PBRBluePrintMaterial, Sprite3DBlueprintMaterial } from '../material';
 import type {
-  BlueprintDAG,
   BluePrintEditorState,
   BluePrintUniformTexture,
   BluePrintUniformValue,
@@ -274,7 +273,7 @@ export class AssetManager {
    *
    * @param loader - A concrete texture loader implementation.
    */
-  static addTextureLoader(loader: AbstractTextureLoader): void {
+  static addTextureLoader(loader: AbstractTextureLoader) {
     if (loader) {
       this._textureLoaders.unshift(loader);
     }
@@ -308,7 +307,7 @@ export class AssetManager {
     postProcess?: (text: string) => string,
     httpRequest?: HttpRequest,
     VFSs?: VFS[]
-  ): Promise<string> {
+  ) {
     const hash = httpRequest?.urlResolver?.(url) ?? url;
     let P = this._textDatas[hash];
     if (!P) {
@@ -335,9 +334,9 @@ export class AssetManager {
     VFSs?: VFS[]
   ): Promise<T> {
     const hash = httpRequest?.urlResolver?.(url) ?? url;
-    let P = this._jsonDatas[hash];
+    let P = this._jsonDatas[hash] as Promise<T>;
     if (!P) {
-      P = this.loadJsonData(url, postProcess, VFSs);
+      P = this.loadJsonData<T>(url, postProcess, VFSs);
       this._jsonDatas[hash] = P;
     }
     return P;
@@ -357,7 +356,7 @@ export class AssetManager {
     postProcess?: Nullable<(data: ArrayBuffer) => ArrayBuffer>,
     httpRequest?: Nullable<HttpRequest>,
     VFSs?: VFS[]
-  ): Promise<Nullable<ArrayBuffer>> {
+  ) {
     const hash = httpRequest?.urlResolver?.(url) ?? url;
     let P = this._binaryDatas[hash];
     if (!P) {
@@ -366,7 +365,7 @@ export class AssetManager {
     }
     return P;
   }
-  async fetchBluePrint(url: string, VFSs?: VFS[]): Promise<Nullable<Record<string, MaterialBlueprintIR>>> {
+  async fetchBluePrint(url: string, VFSs?: VFS[]) {
     const hash = url;
     let P = this._bluePrints[hash];
     if (!P) {
@@ -481,7 +480,7 @@ export class AssetManager {
    * @returns A promise that resolves to the SharedModel.
    * @internal
    */
-  async fetchModelData(url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<SharedModel> {
+  async fetchModelData(url: string, options?: ModelFetchOptions, VFSs?: VFS[]) {
     const hash = url;
     let P = this._models[hash];
     if (P instanceof DWeakRef && P.get() && !P.get()!.disposed) {
@@ -508,7 +507,7 @@ export class AssetManager {
    * @param httpRequest - Optional HttpRequest (unused for binary read; present for API symmetry).
    * @returns A promise with the created node group and animation set info.
    */
-  async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<ModelInfo> {
+  async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions, VFSs?: VFS[]) {
     const sharedModel = await this.fetchModelData(url, options, VFSs);
     const node = sharedModel.createSceneNode(scene, !!options?.enableInstancing);
     return { group: node, animationSet: node.animationSet };
@@ -523,7 +522,7 @@ export class AssetManager {
    * @returns A promise that resolves to the loaded (and optionally processed) text.
    * @internal
    */
-  async loadTextData(url: string, postProcess?: (text: string) => string, VFSs?: VFS[]): Promise<string> {
+  async loadTextData(url: string, postProcess?: (text: string) => string, VFSs?: VFS[]) {
     let text = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
     if (postProcess) {
       try {
@@ -544,8 +543,8 @@ export class AssetManager {
    * @returns A promise that resolves to the loaded (and optionally processed) JSON.
    * @internal
    */
-  async loadJsonData(url: string, postProcess?: (json: any) => any, VFSs?: VFS[]): Promise<string> {
-    let json = JSON.parse((await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string);
+  async loadJsonData<T = unknown>(url: string, postProcess?: (json: any) => any, VFSs?: VFS[]): Promise<T> {
+    let json = JSON.parse((await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string) as T;
 
     if (postProcess) {
       try {
@@ -570,7 +569,7 @@ export class AssetManager {
     url: string,
     postProcess?: Nullable<(data: ArrayBuffer) => ArrayBuffer>,
     VFSs?: VFS[]
-  ): Promise<Nullable<ArrayBuffer>> {
+  ) {
     try {
       let data = (await this.readFileFromVFSs(url, { encoding: 'binary' }, VFSs)) as ArrayBuffer;
       if (postProcess) {
@@ -818,7 +817,7 @@ export class AssetManager {
   private rebuildGraphStructure(
     nodes: Record<number, IGraphNode>,
     links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[]
-  ): GraphStructure {
+  ) {
     const gs: GraphStructure = {
       outgoing: {},
       incoming: {}
@@ -847,11 +846,7 @@ export class AssetManager {
     }
     return gs;
   }
-  private collectReachableBackward(
-    gs: GraphStructure,
-    nodes: Record<number, IGraphNode>,
-    roots: number[]
-  ): Set<number> {
+  private collectReachableBackward(gs: GraphStructure, nodes: Record<number, IGraphNode>, roots: number[]) {
     const reachable = new Set<number>();
     const q: number[] = [];
 
@@ -878,10 +873,7 @@ export class AssetManager {
     gs: GraphStructure,
     nodes: Record<number, IGraphNode>,
     roots: number[]
-  ): Nullable<{
-    order: number[];
-    levels: number[][];
-  }> {
+  ) {
     if (!roots || roots.length === 0) {
       return { order: [], levels: [] };
     }
@@ -929,7 +921,7 @@ export class AssetManager {
     nodeMap: Record<number, IGraphNode>,
     roots: number[],
     links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[]
-  ): BlueprintDAG {
+  ) {
     const gs = this.rebuildGraphStructure(nodeMap, links);
     for (const k in gs.incoming) {
       const node = nodeMap[k];
@@ -1035,7 +1027,7 @@ export class AssetManager {
     samplerOptions?: SamplerOptions,
     texture?: Nullable<BaseTexture>,
     VFSs?: VFS[]
-  ): Promise<Nullable<BaseTexture>> {
+  ) {
     const data = (await this.readFileFromVFSs(url, { encoding: 'binary' }, VFSs)) as ArrayBuffer;
     mimeType = mimeType ?? this.vfs.guessMIMEType(url);
     for (const loader of AssetManager._textureLoaders) {
@@ -1070,7 +1062,7 @@ export class AssetManager {
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: Nullable<BaseTexture>
-  ): Promise<Nullable<BaseTexture>> {
+  ) {
     const device = getDevice();
     if (device.type !== 'webgl') {
       return await loader.load(mimeType, data, srgb, samplerOptions, texture);
@@ -1135,7 +1127,7 @@ export class AssetManager {
    * @returns A promise that resolves to the loaded SharedModel.
    * @internal
    */
-  async loadModel(url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<SharedModel> {
+  async loadModel(url: string, options?: ModelFetchOptions, VFSs?: VFS[]) {
     const arrayBuffer = (await this.readFileFromVFSs(url, { encoding: 'binary' }, VFSs)) as ArrayBuffer;
     const mimeType = options?.mimeType || this.vfs.guessMIMEType(url);
     const data = new Blob([arrayBuffer], { type: mimeType });
@@ -1207,7 +1199,7 @@ export class AssetManager {
    * @param name - Built-in texture identifier.
    * @param loader - Factory that creates the built-in texture using the provided AssetManager.
    */
-  static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => BaseTexture): void {
+  static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => BaseTexture) {
     if (loader) {
       this._builtinTextureLoaders[name] = loader;
     } else {
@@ -1226,11 +1218,7 @@ export class AssetManager {
    * @returns A string cache key combining type, URL, and color space choice.
    * @internal
    */
-  private getHash<T extends BaseTexture>(
-    type: string,
-    url: string,
-    options?: TextureFetchOptions<T>
-  ): string {
+  private getHash<T extends BaseTexture>(type: string, url: string, options?: TextureFetchOptions<T>) {
     return `${type}:${url}:${!options?.linearColorSpace}`;
   }
   /**

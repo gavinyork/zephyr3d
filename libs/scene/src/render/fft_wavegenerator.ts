@@ -1,4 +1,4 @@
-import type { AABB, Nullable } from '@zephyr3d/base';
+import type { AABB, Immutable, Nullable } from '@zephyr3d/base';
 import { Disposable, PRNG, Vector2, Vector4 } from '@zephyr3d/base';
 import type { WaveGenerator } from './wavegenerator';
 import type {
@@ -283,7 +283,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   get version() {
     return this._version;
   }
-  clone(): this {
+  clone() {
     return new FFTWaveGenerator(this._params) as this;
   }
   /*
@@ -302,20 +302,20 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     this._version++;
   }
   /** Gets the wave alighment */
-  get alignment(): number {
+  get alignment() {
     return this._params.alignment;
   }
-  set alignment(val: number) {
+  set alignment(val) {
     if (this._params.alignment !== val) {
       this._params.alignment = val;
       this.paramsChanged();
     }
   }
   /** Gets the wind vector */
-  get wind(): Vector2 {
+  get wind(): Immutable<Vector2> {
     return this._params.wind;
   }
-  set wind(val: Vector2) {
+  set wind(val: Immutable<Vector2>) {
     if (val !== this._params.wind && (val.x !== this._params.wind.x || val.y !== this._params.wind.y)) {
       this._params.wind.x = val.x;
       this._params.wind.y = val.y;
@@ -323,20 +323,20 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     }
   }
   /** Gets the foam width */
-  get foamWidth(): number {
+  get foamWidth() {
     return this._params.foamParams.x;
   }
-  set foamWidth(val: number) {
+  set foamWidth(val) {
     if (val !== this._params.foamParams.x) {
       this._params.foamParams.x = val;
       this.paramsChanged();
     }
   }
   /** Gets the foam contrast */
-  get foamContrast(): number {
+  get foamContrast() {
     return this._params.foamParams.y;
   }
-  set foamContrast(val: number) {
+  set foamContrast(val) {
     if (val !== this._params.foamParams.y) {
       this._params.foamParams.y = val;
       this.paramsChanged();
@@ -388,7 +388,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     }
   }
   /** @internal */
-  private static createQuad(): Primitive {
+  private static createQuad() {
     const vertexData = new Float32Array([
       -1, -1, 0, 0.0, 0.0, 1, -1, 0, 1.0, 0.0, 1, 1, 0, 1.0, 1.0, -1, 1, 0, 0.0, 1.0
     ]);
@@ -416,7 +416,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     return tex;
   }
   /** @internal */
-  private generateInitialSpectrum(): void {
+  private generateInitialSpectrum() {
     const device = getDevice();
     const instanceData = this.getInstanceData();
     device.setProgram(FFTWaveGenerator._globals!.programs.h0Program);
@@ -454,7 +454,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     }
   }
   /** @internal */
-  private getNoiseTexture(size: number, randomSeed: number): Texture2D {
+  private getNoiseTexture(size: number, randomSeed: number) {
     const device = getDevice();
     let tex = FFTWaveGenerator._globals!.noiseTextures.get(size);
     if (!tex) {
@@ -482,11 +482,11 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     }
   }
   /** @internal */
-  private reverseBits(v: number, width: number): number {
+  private reverseBits(v: number, width: number) {
     return parseInt(v.toString(2).padStart(width, '0').split('').reverse().join(''), 2);
   }
   /** @internal */
-  private createButterflyTexture(size: number): Float32Array<ArrayBuffer> {
+  private createButterflyTexture(size: number) {
     const width = Math.log2(size);
     const height = size;
     const texture = new Float32Array(width * height * 4);
@@ -524,7 +524,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     return texture;
   }
   /** @internal */
-  private getInstanceData(): WaterInstanceData {
+  private getInstanceData() {
     if (!this._instanceData) {
       const device = getDevice();
       const h0Textures = this.createNTextures(
@@ -615,7 +615,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     num: number,
     name: string,
     linear: boolean
-  ): Texture2D[] | Texture2DArray {
+  ) {
     const options: TextureCreationOptions = {
       samplerOptions: {
         minFilter: linear ? 'linear' : 'nearest',
@@ -640,7 +640,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     }
   }
   /** {@inheritDoc WaveGenerator.update} */
-  update(time: number): void {
+  update(time: number) {
     const device = getDevice();
     device.pushDeviceStates();
     device.setRenderStates(this._updateRenderStates);
@@ -680,7 +680,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     }
   }
   /** @internal */
-  private disposeInstanceData(): void {
+  private disposeInstanceData() {
     if (this._instanceData) {
       this.disposeNTextures(this._instanceData.dataTextures);
       this.disposeNTextures(this._instanceData.h0Textures);
@@ -700,7 +700,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     }
   }
   /** @internal */
-  private generateSpectrum(time: number): void {
+  private generateSpectrum(time: number) {
     const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
@@ -732,7 +732,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     }
   }
   /** @internal */
-  private generateSpectrumTwoPass(time: number): void {
+  private generateSpectrumTwoPass(time: number) {
     const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
@@ -768,7 +768,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     FFTWaveGenerator._globals!.quad.draw();
   }
   /** @internal */
-  private ifft2(): void {
+  private ifft2() {
     const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
@@ -872,7 +872,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     this._ifftTextures = pingPongTextures[pingPong];
   }
   /** @internal */
-  private getFFT2hBindGroup2(device: AbstractDevice, pingpong: number): BindGroup {
+  private getFFT2hBindGroup2(device: AbstractDevice, pingpong: number) {
     let bindGroup = this._fft2hBindGroup2Used[pingpong].pop();
     if (!bindGroup) {
       bindGroup = device.createBindGroup(
@@ -883,7 +883,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     return bindGroup;
   }
   /** @internal */
-  private getFFT2hBindGroup4(device: AbstractDevice, pingpong: number): BindGroup {
+  private getFFT2hBindGroup4(device: AbstractDevice, pingpong: number) {
     let bindGroup = this._fft2hBindGroup4Used[pingpong].pop();
     if (!bindGroup) {
       bindGroup = device.createBindGroup(
@@ -894,7 +894,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     return bindGroup;
   }
   /** @internal */
-  private getFFT2vBindGroup2(device: AbstractDevice, pingpong: number): BindGroup {
+  private getFFT2vBindGroup2(device: AbstractDevice, pingpong: number) {
     let bindGroup = this._fft2vBindGroup2Used[pingpong].pop();
     if (!bindGroup) {
       bindGroup = device.createBindGroup(
@@ -905,7 +905,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     return bindGroup;
   }
   /** @internal */
-  private getFFT2vBindGroup4(device: AbstractDevice, pingpong: number): BindGroup {
+  private getFFT2vBindGroup4(device: AbstractDevice, pingpong: number) {
     let bindGroup = this._fft2vBindGroup4Used[pingpong].pop();
     if (!bindGroup) {
       bindGroup = device.createBindGroup(
@@ -916,7 +916,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     return bindGroup;
   }
   /** @internal */
-  private ifft2TwoPass(): void {
+  private ifft2TwoPass() {
     const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
@@ -1042,7 +1042,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     }
   }
   /** @internal */
-  private postIfft2(): void {
+  private postIfft2() {
     const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
@@ -1075,7 +1075,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     }
   }
   /** @internal */
-  private postIfft2TwoPass(): void {
+  private postIfft2TwoPass() {
     const device = getDevice();
     const instanceData = this.getInstanceData();
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
@@ -1109,7 +1109,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     FFTWaveGenerator._globals!.quad.draw();
   }
   /** {@inheritDoc WaveGenerator.setupUniforms} */
-  setupUniforms(scope: PBGlobalScope, uniformGroup: number): void {
+  setupUniforms(scope: PBGlobalScope, uniformGroup: number) {
     const pb = scope.$builder;
     scope.sizes = pb.vec4().uniform(uniformGroup);
     scope.croppinesses = pb.vec4().uniform(uniformGroup);
@@ -1133,7 +1133,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     inPos: PBShaderExp,
     outPos: PBShaderExp,
     outNormal: PBShaderExp
-  ): void {
+  ) {
     const pb = scope.$builder;
     const that = this;
     pb.func(
@@ -1179,7 +1179,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     scope.calcPositionAndNormal(inPos, outPos, outNormal);
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormal} */
-  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, _vertexNormal: PBShaderExp): PBShaderExp {
+  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, _vertexNormal: PBShaderExp) {
     const pb = scope.$builder;
     const that = this;
     pb.func('calcFragmentNormal', [pb.vec2('xz')], function () {
@@ -1209,10 +1209,10 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       this.$l.normal = pb.normalize(pb.vec3(pb.neg(this.slope.x), 1.0, pb.neg(this.slope.y)));
       this.$return(this.normal);
     });
-    return scope.calcFragmentNormal(xz);
+    return scope.calcFragmentNormal(xz) as PBShaderExp;
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormalAndFoam} */
-  calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
+  calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp) {
     const pb = scope.$builder;
     const that = this;
     pb.func('jacobian', [pb.float('dxdx'), pb.float('dxdz'), pb.float('dzdz')], function () {
@@ -1276,14 +1276,14 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       );
       this.$return(pb.vec4(this.normal, this.foam));
     });
-    return scope.calcNormalAndFoam(xz);
+    return scope.calcNormalAndFoam(xz) as PBShaderExp;
   }
   /** {@inheritDoc WaveGenerator.isOk} */
-  isOk(): boolean {
+  isOk() {
     return this._renderMode !== RENDER_NONE;
   }
   /** {@inheritDoc WaveGenerator.applyWaterBindGroup} */
-  applyWaterBindGroup(bindGroup: BindGroup): void {
+  applyWaterBindGroup(bindGroup: BindGroup) {
     const instanceData = this.getInstanceData();
     const linearRepeatSampler = fetchSampler('repeat_linear_nomip');
     if (this._useComputeShader) {
@@ -1307,7 +1307,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     outAABB.maxPoint.setXYZ(maxX + 8 * disturb, y + 8 * disturb, maxZ + 8 * disturb);
   }
   /** {@inheritDoc WaveGenerator.getHash} */
-  getHash(): string {
+  getHash() {
     return 'FFTWaveGenerator';
   }
   protected onDispose() {

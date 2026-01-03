@@ -6,6 +6,7 @@ import { mixinTextureProps } from '../texture';
 import type { IMixinPBRCommon } from '../pbr/common';
 import { mixinPBRCommon } from '../pbr/common';
 import type { DrawContext } from '../../../render';
+import type { Immutable } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
@@ -63,37 +64,37 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
       this._specularFactor = Vector3.one();
       this._glossinessFactor = 1;
     }
-    copyFrom(other: this): void {
+    copyFrom(other: this) {
       super.copyFrom(other);
       this.specularFactor = other.specularFactor;
       this.glossinessFactor = other.glossinessFactor;
     }
-    get specularFactor(): Vector3 {
+    get specularFactor(): Immutable<Vector3> {
       return this._specularFactor;
     }
-    set specularFactor(val: Vector3) {
+    set specularFactor(val: Immutable<Vector3>) {
       if (!val.equalsTo(this._specularFactor)) {
         this._specularFactor.set(val);
         this.uniformChanged();
       }
     }
-    get glossinessFactor(): number {
+    get glossinessFactor() {
       return this._glossinessFactor;
     }
-    set glossinessFactor(val: number) {
+    set glossinessFactor(val) {
       if (val !== this._glossinessFactor) {
         this._glossinessFactor = val;
         this.uniformChanged();
       }
     }
-    vertexShader(scope: PBFunctionScope): void {
+    vertexShader(scope: PBFunctionScope) {
       super.vertexShader(scope);
       if (this.needFragmentColor() && this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
         scope.$outputs.zSpecularFactor = this.getInstancedUniform(scope, SPECULAR_FACTOR_UNFORM);
         scope.$outputs.zGlossinessFactor = this.getInstancedUniform(scope, GLOSSINESS_FACTOR_UNIFORM);
       }
     }
-    fragmentShader(scope: PBFunctionScope): void {
+    fragmentShader(scope: PBFunctionScope) {
       super.fragmentShader(scope);
       if (this.needFragmentColor() && !(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         const pb = scope.$builder;
@@ -101,7 +102,7 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
         scope.zGlossinessFactor = pb.float().uniform(2);
       }
     }
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx) && !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         bindGroup.setValue('zSpecularFactor', this._specularFactor);
@@ -116,7 +117,7 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
       albedo: PBShaderExp,
       TBN: PBShaderExp,
       outRoughness?: PBShaderExp
-    ): PBShaderExp {
+    ) {
       const pb = scope.$builder;
       const funcName = 'Z_PBRSpecularGlossinessLight';
       const that = this;
@@ -175,9 +176,11 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
           this.$return(pb.add(this.lightingColor, this.emissiveColor));
         }
       );
-      return outRoughness
-        ? pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo, outRoughness)
-        : pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo);
+      return (
+        outRoughness
+          ? pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo, outRoughness)
+          : pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo)
+      ) as PBShaderExp;
     }
     calculateCommonData(
       scope: PBInsideFunctionScope,
@@ -186,7 +189,7 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
       viewVec: PBShaderExp,
       TBN: PBShaderExp,
       data: PBShaderExp
-    ): void {
+    ) {
       super.calculateCommonData(scope, albedo, normal, viewVec, TBN, data);
       const pb = scope.$builder;
       const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);

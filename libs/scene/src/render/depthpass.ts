@@ -30,16 +30,16 @@ export class DepthPass extends RenderPass {
   set transmission(val: boolean) {
     this._transmission = val;
   }
-  get renderBackface(): boolean {
+  get renderBackface() {
     return this._renderBackface;
   }
-  set renderBackface(val: boolean) {
+  set renderBackface(val) {
     this._renderBackface = !!val;
   }
-  get encodeDepth(): boolean {
+  get encodeDepth() {
     return this._encodeDepth;
   }
-  set encodeDepth(val: boolean) {
+  set encodeDepth(val) {
     this._encodeDepth = !!val;
   }
   /** @internal */

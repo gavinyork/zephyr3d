@@ -1,4 +1,4 @@
-import { Nullable } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
 import type { CompareFunc } from './base_types';
 
 /**

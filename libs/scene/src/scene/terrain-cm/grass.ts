@@ -46,7 +46,7 @@ export class GrassInstances extends Disposable {
   get numInstances() {
     return this._instances.length;
   }
-  get instanceBuffer(): StructuredBuffer {
+  get instanceBuffer() {
     return this._instanceBuffer.get()!;
   }
   setBaseVertexBuffer(baseVertexBuffer: StructuredBuffer) {
@@ -122,7 +122,7 @@ export class GrassInstances extends Disposable {
     this._instances.push(...instances);
     this.updateBuffers();
   }
-  protected onDispose(): void {
+  protected onDispose() {
     super.onDispose();
     this._baseVertexBuffer.dispose();
     this._indexBuffer.dispose();
@@ -192,7 +192,7 @@ export class GrassLayer extends Disposable {
    * Add grass blades to this layer in a region
    * @param instances - Grass blade instances to add
    */
-  addInstances(instances: GrassInstanceInfo[]): number {
+  addInstances(instances: GrassInstanceInfo[]) {
     return this._quadtree.get()!.addInstances(instances);
   }
   /**
@@ -326,7 +326,7 @@ export class GrassLayer extends Disposable {
     }
   }
   /** @internal */
-  protected onDispose(): void {
+  protected onDispose() {
     super.onDispose();
     this._material.dispose();
     this._quadtree.dispose();
@@ -380,7 +380,7 @@ export class GrassRenderer extends Disposable {
    * @param albedoMap - Albedo texture of grass blades in this layer
    * @returns Index of the added grass layer
    */
-  addLayer(bladeWidth: number, bladeHeight: number, albedoMap?: Texture2D): number {
+  addLayer(bladeWidth: number, bladeHeight: number, albedoMap?: Texture2D) {
     const layer = new GrassLayer(this._terrain.get()!, bladeWidth, bladeHeight, albedoMap);
     this._layers.push(layer);
     return this._layers.length - 1;
@@ -475,7 +475,7 @@ export class GrassRenderer extends Disposable {
       layer.draw(ctx, this._terrain.get()!.worldRegion, minY - layer.bladeHeight, maxY + layer.bladeHeight);
     }
   }
-  protected onDispose(): void {
+  protected onDispose() {
     super.onDispose();
     this._terrain.dispose();
     for (const layer of this._layers) {
@@ -549,7 +549,7 @@ export class GrassQuadtreeNode extends Disposable {
       }
     }
   }
-  removeInstances(minX: number, minZ: number, maxX: number, maxZ: number, numInstances: number): number {
+  removeInstances(minX: number, minZ: number, maxX: number, maxZ: number, numInstances: number) {
     let n = Math.min(this._grassInstances.get()!.numInstances, numInstances);
     if (n <= 0) {
       return 0;
@@ -568,7 +568,7 @@ export class GrassQuadtreeNode extends Disposable {
     }
     return removed;
   }
-  addInstances(instances: GrassInstanceInfo[]): number {
+  addInstances(instances: GrassInstanceInfo[]) {
     if (instances.length === 0) {
       return 0;
     }
@@ -616,7 +616,7 @@ export class GrassQuadtreeNode extends Disposable {
     }
     return n;
   }
-  protected onDispose(): void {
+  protected onDispose() {
     super.onDispose();
     this._baseVertexBuffer.dispose();
     this._indexBuffer.dispose();

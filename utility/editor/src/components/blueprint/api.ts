@@ -1,9 +1,10 @@
 import type { IGraphNode } from '@zephyr3d/scene';
 import type { NodeEditor } from './nodeeditor';
+import type { Nullable } from '@zephyr3d/base';
 
 export type NodeCategory = {
   name: string;
-  create?: () => IGraphNode;
+  create?: Nullable<() => IGraphNode>;
   children?: NodeCategory[];
 };
 

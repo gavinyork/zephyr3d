@@ -3,6 +3,7 @@ import { getEngine } from '@zephyr3d/scene';
 import { ParticleSystem } from '@zephyr3d/scene';
 import { Mesh } from '@zephyr3d/scene';
 import { Command } from '../core/command';
+import type { Nullable } from '@zephyr3d/base';
 import { ASSERT, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 
@@ -15,8 +16,8 @@ function findNodesByPath(parentNode: SceneNode, path: string): SceneNode[] {
     const part = parts.shift();
     for (let i = result.length - 1; i >= 0; i--) {
       const insert = result[i].children
-        .filter((node) => node.get().persistentId === part)
-        .map((node) => node.get());
+        .filter((node) => node.get()!.persistentId === part)
+        .map((node) => node.get()!);
       result.splice(i, 1, ...insert);
     }
   }
@@ -32,15 +33,15 @@ function findNodeByPath(parentNode: SceneNode, path: string): SceneNode {
 function getNodePath(node: SceneNode) {
   ASSERT(node.attached, 'Node must be attached when calculating node path');
   const parts: string[] = [];
-  const root = node.scene.rootNode;
+  const root = node.scene!.rootNode;
   while (node && node !== root) {
     parts.unshift(node.persistentId);
-    node = node.parent;
+    node = node.parent!;
   }
   return parts.join('/');
 }
 
-export class AddPrefabCommand extends Command<SceneNode> {
+export class AddPrefabCommand extends Command<Nullable<SceneNode>> {
   private readonly _scene: Scene;
   private readonly _prefab: string;
   private _nodeId: string;
@@ -53,7 +54,7 @@ export class AddPrefabCommand extends Command<SceneNode> {
     this._position = new Vector3(position);
   }
   async execute() {
-    let prefab: SceneNode = null;
+    let prefab: Nullable<SceneNode> = null;
     try {
       prefab = await getEngine().resourceManager.instantiatePrefab(this._scene.rootNode, this._prefab);
     } catch (err) {
@@ -63,7 +64,7 @@ export class AddPrefabCommand extends Command<SceneNode> {
       prefab.position.set(this._position);
       if (this._nodeId) {
         // Restore persistent id if redo
-        prefab.persistentId = this._nodeId.split('/').at(-1);
+        prefab.persistentId = this._nodeId.split('/').at(-1)!;
       } else {
         this._nodeId = getNodePath(prefab);
       }
@@ -81,7 +82,7 @@ export class AddPrefabCommand extends Command<SceneNode> {
   }
 }
 
-export class AddAssetCommand extends Command<SceneNode> {
+export class AddAssetCommand extends Command<Nullable<SceneNode>> {
   private readonly _scene: Scene;
   private readonly _asset: string;
   private _nodeId: string;
@@ -94,7 +95,7 @@ export class AddAssetCommand extends Command<SceneNode> {
     this._position = new Vector3(position);
   }
   async execute() {
-    let asset: SceneNode = null;
+    let asset: Nullable<SceneNode> = null;
     try {
       //const model = await importModel(this._asset);
       //asset = await model.createSceneNode(ProjectService.resourceManager, this._scene, false);
@@ -105,7 +106,7 @@ export class AddAssetCommand extends Command<SceneNode> {
     if (asset) {
       asset.position.set(this._position);
       if (this._nodeId) {
-        asset.persistentId = this._nodeId.split('/').at(-1);
+        asset.persistentId = this._nodeId.split('/').at(-1)!;
       } else {
         this._nodeId = getNodePath(asset);
       }
@@ -122,19 +123,19 @@ export class AddAssetCommand extends Command<SceneNode> {
     }
   }
 }
-export class AddChildCommand<T extends SceneNode = SceneNode> extends Command<T> {
+export class AddChildCommand<T extends SceneNode = SceneNode> extends Command<Nullable<T>> {
   private readonly _parentId: string;
-  private readonly _position: Vector3;
+  private readonly _position: Nullable<Vector3>;
   private readonly _scene: Scene;
   private _nodeId: string;
   private readonly _ctor: { new (scene: Scene): T };
   constructor(parentNode: SceneNode, ctor: { new (scene: Scene): T }, position?: Vector3) {
     super('Add child node');
-    this._scene = parentNode.scene;
+    this._scene = parentNode.scene!;
     this._parentId = getNodePath(parentNode);
     this._nodeId = '';
     this._ctor = ctor;
-    this._position = position;
+    this._position = position ?? null;
   }
   async execute() {
     const parent = findNodeByPath(this._scene.rootNode, this._parentId);
@@ -143,13 +144,13 @@ export class AddChildCommand<T extends SceneNode = SceneNode> extends Command<T>
       this._nodeId = '';
       return null;
     }
-    const node = new this._ctor(parent.scene);
+    const node = new this._ctor(parent.scene!);
     node.parent = parent;
     if (this._position) {
       node.position.set(this._position);
     }
     if (this._nodeId) {
-      node.persistentId = this._nodeId.split('/').at(-1);
+      node.persistentId = this._nodeId.split('/').at(-1)!;
     } else {
       this._nodeId = getNodePath(node);
     }
@@ -176,7 +177,7 @@ export class AddParticleSystemCommand extends Command<ParticleSystem> {
     const node = new ParticleSystem(this._scene);
     node.position.set(this._position);
     if (this._nodeId) {
-      node.persistentId = this._nodeId.split('/').at(-1);
+      node.persistentId = this._nodeId.split('/').at(-1)!;
     } else {
       this._nodeId = getNodePath(node);
     }
@@ -203,14 +204,14 @@ export class AddShapeCommand extends Command<Mesh> {
     this._shapeCls = shapeCls;
   }
   async execute() {
-    const shape = await getEngine().resourceManager.fetchPrimitive(this._shapeCls);
-    const material = await getEngine().resourceManager.fetchMaterial<MeshMaterial>(
+    const shape = (await getEngine().resourceManager.fetchPrimitive(this._shapeCls))!;
+    const material = (await getEngine().resourceManager.fetchMaterial<MeshMaterial>(
       '/assets/@builtins/materials/pbr_metallic_roughness.zmtl'
-    );
+    ))!;
     const mesh = new Mesh(this._scene, shape, material);
     mesh.position.set(this._position);
     if (this._nodeId) {
-      mesh.persistentId = this._nodeId.split('/').at(-1);
+      mesh.persistentId = this._nodeId.split('/').at(-1)!;
     } else {
       this._nodeId = getNodePath(mesh);
     }
@@ -231,9 +232,9 @@ export class NodeDeleteCommand extends Command {
   private readonly _parentId: string;
   constructor(node: SceneNode) {
     super('Delete node');
-    this._scene = node.scene;
+    this._scene = node.scene!;
     this._nodeId = getNodePath(node);
-    this._parentId = getNodePath(node.parent);
+    this._parentId = getNodePath(node.parent!);
     this._archive = null;
   }
   async execute(): Promise<void> {
@@ -246,7 +247,7 @@ export class NodeDeleteCommand extends Command {
       const parent = findNodeByPath(this._scene.rootNode, this._parentId);
       const node = await getEngine().resourceManager.deserializeObject<SceneNode>(parent, this._archive);
       if (node) {
-        node.persistentId = this._nodeId.split('/').at(-1);
+        node.persistentId = this._nodeId.split('/').at(-1)!;
         node.parent = parent;
       }
     }
@@ -257,10 +258,10 @@ export class NodeReparentCommand extends Command {
   private readonly _newParentId: string;
   private readonly _scene: Scene;
   private _oldParentId: string;
-  private _oldLocalMatrix: Matrix4x4;
+  private _oldLocalMatrix: Nullable<Matrix4x4>;
   constructor(node: SceneNode, newParent: SceneNode) {
     super('Reparent object');
-    this._scene = node.scene;
+    this._scene = node.scene!;
     this._nodeId = getNodePath(node);
     this._newParentId = getNodePath(newParent);
     this._oldParentId = '';
@@ -270,7 +271,7 @@ export class NodeReparentCommand extends Command {
     const node = findNodeByPath(this._scene.rootNode, this._nodeId);
     const newParent = findNodeByPath(this._scene.rootNode, this._newParentId);
     if (node && newParent) {
-      this._oldParentId = getNodePath(node.parent);
+      this._oldParentId = getNodePath(node.parent!);
       this._oldLocalMatrix = new Matrix4x4(node.localMatrix);
       const newLocalMatrix = Matrix4x4.invertAffine(newParent.worldMatrix).multiplyRight(node.worldMatrix);
       newLocalMatrix.decompose(node.scale, node.rotation, node.position);
@@ -280,7 +281,7 @@ export class NodeReparentCommand extends Command {
   async undo() {
     const node = findNodeByPath(this._scene.rootNode, this._nodeId);
     const oldParent = findNodeByPath(this._scene.rootNode, this._oldParentId);
-    this._oldLocalMatrix.decompose(node.scale, node.rotation, node.position);
+    this._oldLocalMatrix!.decompose(node.scale, node.rotation, node.position);
     node.parent = oldParent;
   }
 }
@@ -291,7 +292,7 @@ export class NodeCloneCommand extends Command<SceneNode> {
   private _newNodeId: string;
   constructor(node: SceneNode) {
     super('Clone node');
-    this._scene = node.scene;
+    this._scene = node.scene!;
     this._nodeId = getNodePath(node);
     this._newNodeId = '';
   }
@@ -300,7 +301,7 @@ export class NodeCloneCommand extends Command<SceneNode> {
     const newNode = await node.clone();
     if (newNode) {
       if (this._newNodeId) {
-        newNode.persistentId = this._newNodeId.split('/').at(-1);
+        newNode.persistentId = this._newNodeId.split('/').at(-1)!;
       } else {
         this._newNodeId = getNodePath(newNode);
       }
@@ -321,7 +322,7 @@ export class NodeTransformCommand extends Command {
   private readonly _newTransform: TRS;
   constructor(node: SceneNode, oldTransform: TRS, newTransform: TRS, desc: string) {
     super(desc);
-    this._scene = node.scene;
+    this._scene = node.scene!;
     this._nodeId = getNodePath(node);
     this._oldTransform = {
       position: new Vector3(oldTransform.position),

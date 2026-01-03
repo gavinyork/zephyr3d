@@ -96,7 +96,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseDown}
    * @override
    */
-  protected _onMouseDown(evt: IControllerPointerDownEvent): boolean {
+  protected _onMouseDown(evt: IControllerPointerDownEvent) {
     if (evt.button === 0) {
       this.mouseDown = true;
       this.lastMouseX = evt.offsetX;
@@ -109,7 +109,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseUp}
    * @override
    */
-  protected _onMouseUp(evt: IControllerPointerUpEvent): boolean {
+  protected _onMouseUp(evt: IControllerPointerUpEvent) {
     if (evt.button === 0 && this.mouseDown) {
       this.mouseDown = false;
       return true;
@@ -120,7 +120,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseMove}
    * @override
    */
-  protected _onMouseMove(evt: IControllerPointerMoveEvent): boolean {
+  protected _onMouseMove(evt: IControllerPointerMoveEvent) {
     const camera = this._getCamera()!;
     if (this.mouseDown) {
       const dx = evt.offsetX - this.lastMouseX;
@@ -166,7 +166,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onKeyDown}
    * @override
    */
-  protected _onKeyDown(evt: IControllerKeydownEvent): boolean {
+  protected _onKeyDown(evt: IControllerKeydownEvent) {
     switch (evt.code) {
       case this.options.controlKeys.up:
         this.keyUp = true;
@@ -195,7 +195,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onKeyUp}
    * @override
    */
-  protected _onKeyUp(evt: IControllerKeyupEvent): boolean {
+  protected _onKeyUp(evt: IControllerKeyupEvent) {
     switch (evt.code) {
       case this.options.controlKeys.up:
         this.keyUp = false;

@@ -1,6 +1,6 @@
 import type { BaseLight } from '../../../scene/light';
 import { DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../../scene/light';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import { AABB, degree2radian, radian2degree, Vector4 } from '@zephyr3d/base';
 import { ClipmapTerrain, Mesh, SceneNode } from '../../../scene';
 import type { ShadowMode } from '../../../shadow';
@@ -12,7 +12,7 @@ export function getPunctualLightClass(): SerializableClass {
     parent: SceneNode,
     name: 'PunctualLight',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Color',
           type: 'rgb',
@@ -133,7 +133,7 @@ export function getPunctualLightClass(): SerializableClass {
           create(this: PunctualLight) {
             const aabb = new AABB();
             aabb.beginExtend();
-            this.scene!.rootNode!.iterate((child) => {
+            this.scene!.rootNode.iterate((child) => {
               if (child instanceof Mesh || child instanceof ClipmapTerrain) {
                 if (child.castShadow) {
                   const bbox = child.getWorldBoundingVolume()!.toAABB();
@@ -403,7 +403,7 @@ export function getPunctualLightClass(): SerializableClass {
             return !!this.castShadow && this.shadow.mode === 'esm' && this.shadow.esmBlur;
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -420,7 +420,7 @@ export function getDirectionalLightClass(): SerializableClass {
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'SunLight',
           type: 'bool',
@@ -432,7 +432,7 @@ export function getDirectionalLightClass(): SerializableClass {
             this.sunLight = value.bool[0];
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -449,7 +449,7 @@ export function getPointLightClass(): SerializableClass {
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Range',
           type: 'float',
@@ -466,7 +466,7 @@ export function getPointLightClass(): SerializableClass {
             this.range = value.num[0];
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -483,7 +483,7 @@ export function getSpotLightClass(): SerializableClass {
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Range',
           type: 'float',
@@ -516,7 +516,7 @@ export function getSpotLightClass(): SerializableClass {
             this.cutoff = Math.cos(degree2radian(value.num[0]) * 0.5);
           }
         }
-      ];
+      ]);
     }
   };
 }

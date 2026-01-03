@@ -15,7 +15,7 @@ import {
   createAPLutProgram,
   atmosphereLUTRendered
 } from '../shaders';
-import type { Nullable } from '@zephyr3d/base';
+import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Disposable, DRef, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { Primitive } from './primitive';
@@ -183,7 +183,7 @@ export class SkyRenderer extends Disposable {
     this._format = null;
   }
   /** @internal */
-  getHash(_ctx: DrawContext): string {
+  getHash(_ctx: DrawContext) {
     return `${this.skyType}:${this.fogType}`;
   }
   /**
@@ -201,10 +201,10 @@ export class SkyRenderer extends Disposable {
     return this._format;
   }
   /** Which type of the sky should be rendered */
-  get skyType(): SkyType {
+  get skyType() {
     return this._skyType;
   }
-  set skyType(val: SkyType) {
+  set skyType(val) {
     if (val !== this._skyType) {
       this._skyType = val;
       this.invalidate();
@@ -235,7 +235,7 @@ export class SkyRenderer extends Disposable {
     }
   }
   /** Baked sky texture */
-  getBakedSkyTexture(ctx: DrawContext): TextureCube {
+  getBakedSkyTexture(ctx: DrawContext) {
     if (this._bakedSkyboxDirty) {
       this.update(ctx);
     }
@@ -244,10 +244,10 @@ export class SkyRenderer extends Disposable {
   /**
    * The color used when sky type is `image`
    */
-  get skyColor(): Vector4 {
+  get skyColor(): Immutable<Vector4> {
     return this._skyColor;
   }
-  set skyColor(val: Vector4) {
+  set skyColor(val: Immutable<Vector4>) {
     if (!val.equalsTo(this._skyColor)) {
       this._skyColor.set(val);
       this.invalidate();
@@ -268,10 +268,10 @@ export class SkyRenderer extends Disposable {
   /**
    * Window weights for SH projection
    */
-  get shWindowWeights(): Vector3 {
+  get shWindowWeights(): Immutable<Vector3> {
     return this._shWindowWeights;
   }
-  set shWindowWeights(weights: Vector3) {
+  set shWindowWeights(weights: Immutable<Vector3>) {
     this._shWindowWeights.set(weights);
     this.invalidate();
   }
@@ -281,7 +281,7 @@ export class SkyRenderer extends Disposable {
   get radianceConvSamples() {
     return this._radianceConvSamples;
   }
-  set radianceConvSamples(val: number) {
+  set radianceConvSamples(val) {
     if (val !== this._radianceConvSamples) {
       this._radianceConvSamples = val;
       this.invalidate();
@@ -293,7 +293,7 @@ export class SkyRenderer extends Disposable {
   get irradianceConvSamples() {
     return this._irradianceConvSamples;
   }
-  set irradianceConvSamples(val: number) {
+  set irradianceConvSamples(val) {
     if (val !== this._irradianceConvSamples) {
       this._irradianceConvSamples = val;
       this.invalidate();
@@ -303,7 +303,7 @@ export class SkyRenderer extends Disposable {
   get aerialPerspectiveDistance() {
     return this._atmosphereParams.apDistance;
   }
-  set aerialPerspectiveDistance(val: number) {
+  set aerialPerspectiveDistance(val) {
     if (val !== this._atmosphereParams.apDistance) {
       this._atmosphereParams.apDistance = val;
       this.invalidate();
@@ -323,17 +323,17 @@ export class SkyRenderer extends Disposable {
   get cameraHeightScale() {
     return this._atmosphereParams.cameraHeightScale;
   }
-  set cameraHeightScale(val: number) {
+  set cameraHeightScale(val) {
     if (val !== this._atmosphereParams.cameraHeightScale) {
       this._atmosphereParams.cameraHeightScale = val;
       this.invalidate();
     }
   }
   /** Height fog color */
-  get heightFogColor() {
+  get heightFogColor(): Immutable<Vector3> {
     return this._heightFogParams.parameter1.xyz();
   }
-  set heightFogColor(val: Vector3) {
+  set heightFogColor(val: Immutable<Vector3>) {
     if (!val.equalsTo(this._heightFogParams.parameter1.xyz())) {
       this._heightFogParams.parameter1.set(val);
       this.invalidate();
@@ -343,7 +343,7 @@ export class SkyRenderer extends Disposable {
   get heightFogDensity() {
     return this._heightFogParams.parameter2.x;
   }
-  set heightFogDensity(val: number) {
+  set heightFogDensity(val) {
     if (val !== this._heightFogParams.parameter2.x) {
       this._heightFogParams.parameter2.x = val;
       this.invalidate();
@@ -353,7 +353,7 @@ export class SkyRenderer extends Disposable {
   get heightFogFalloff() {
     return this._heightFogParams.parameter1.w;
   }
-  set heightFogFalloff(val: number) {
+  set heightFogFalloff(val) {
     if (val !== this._heightFogParams.parameter1.w) {
       this._heightFogParams.parameter1.w = val;
       this.invalidate();
@@ -363,7 +363,7 @@ export class SkyRenderer extends Disposable {
   get heightFogStartHeight() {
     return this._heightFogParams.parameter2.y;
   }
-  set heightFogStartHeight(val: number) {
+  set heightFogStartHeight(val) {
     if (val !== this._heightFogParams.parameter2.y) {
       this._heightFogParams.parameter2.y = val;
       this.invalidate();
@@ -373,7 +373,7 @@ export class SkyRenderer extends Disposable {
   get heightFogStartDistance() {
     return this._heightFogParams.parameter2.z;
   }
-  set heightFogStartDistance(val: number) {
+  set heightFogStartDistance(val) {
     if (val !== this._heightFogParams.parameter2.z) {
       this._heightFogParams.parameter2.z = val;
       this.invalidate();
@@ -383,7 +383,7 @@ export class SkyRenderer extends Disposable {
   get heightFogEndDistance() {
     return this._heightFogParams.parameter2.w;
   }
-  set heightFogEndDistance(val: number) {
+  set heightFogEndDistance(val) {
     if (val !== this._heightFogParams.parameter2.w) {
       this._heightFogParams.parameter2.w = val;
       this.invalidate();
@@ -393,7 +393,7 @@ export class SkyRenderer extends Disposable {
   get heightFogMaxOpacity() {
     return this._heightFogParams.parameter3.x;
   }
-  set heightFogMaxOpacity(val: number) {
+  set heightFogMaxOpacity(val) {
     if (val !== this._heightFogParams.parameter3.x) {
       this._heightFogParams.parameter3.x = val;
       this.invalidate();
@@ -403,7 +403,7 @@ export class SkyRenderer extends Disposable {
   get heightFogAtmosphereContribution() {
     return this._heightFogParams.parameter3.y;
   }
-  set heightFogAtmosphereContribution(val: number) {
+  set heightFogAtmosphereContribution(val) {
     if (val !== this._heightFogParams.parameter3.y) {
       this._heightFogParams.parameter3.y = val;
       this.invalidate();
@@ -413,17 +413,17 @@ export class SkyRenderer extends Disposable {
   get heightFogDirExponent() {
     return this._heightFogParams.parameter3.w;
   }
-  set heightFogDirExponent(val: number) {
+  set heightFogDirExponent(val) {
     if (val !== this._heightFogParams.parameter3.w) {
       this._heightFogParams.parameter3.w = val;
       this.invalidate();
     }
   }
   /** Height fog directional inscattering color */
-  get heightFogDirColor() {
+  get heightFogDirColor(): Immutable<Vector3> {
     return this._heightFogParams.parameter4.xyz();
   }
-  set heightFogDirColor(val: Vector3) {
+  set heightFogDirColor(val: Immutable<Vector3>) {
     if (!val.equalsTo(this._heightFogParams.parameter4.xyz())) {
       this._heightFogParams.parameter4.set(val);
       this.invalidate();
@@ -436,10 +436,10 @@ export class SkyRenderer extends Disposable {
    * This value controls how much cloud should be rendered when the sky type is scatter.
    * Typically, the value should be in the range of 0 to 1.
    */
-  get cloudy(): number {
+  get cloudy() {
     return this._cloudy;
   }
-  set cloudy(val: number) {
+  set cloudy(val) {
     if (val !== this._cloudy && this._skyType === 'scatter') {
       this._cloudy = val;
       this.invalidate();
@@ -448,10 +448,10 @@ export class SkyRenderer extends Disposable {
   /**
    * Intensity of the sky color
    */
-  get cloudIntensity(): number {
+  get cloudIntensity() {
     return this._cloudIntensity;
   }
-  set cloudIntensity(val: number) {
+  set cloudIntensity(val) {
     if (val !== this._cloudIntensity && this._skyType === 'scatter') {
       this._cloudIntensity = val;
       this.invalidate();
@@ -463,16 +463,16 @@ export class SkyRenderer extends Disposable {
    * @remarks
    * This value affects the movement of the cloud
    */
-  get wind(): Vector2 {
+  get wind(): Immutable<Vector2> {
     return this._wind;
   }
-  set wind(val: Vector2) {
+  set wind(val: Immutable<Vector2>) {
     this._wind.set(val);
   }
   /**
    * Radiance map of the sky.
    */
-  get radianceMap(): TextureCube {
+  get radianceMap() {
     if (!this._radianceMap.get()) {
       this._radianceMap.set(getDevice().createCubeTexture(this.envTextureFormat, this._radianceMapWidth)!);
       this._radianceMap.get()!.name = 'SkyRadianceMap';
@@ -497,7 +497,7 @@ export class SkyRenderer extends Disposable {
   /**
    * Irradiance SH coeffecients buffer
    */
-  get irradianceSH(): GPUDataBuffer {
+  get irradianceSH() {
     if (!this._irradianceSH.get()) {
       const buffer = getDevice().createBuffer(4 * 4 * 9, { usage: 'uniform' })!;
       this._irradianceSH.set(buffer);
@@ -507,7 +507,7 @@ export class SkyRenderer extends Disposable {
   /**
    * Irradiance SH coeffecients texture
    */
-  get irradianceSHFB(): FrameBuffer {
+  get irradianceSHFB() {
     if (!this._irradianceSHFB.get()) {
       const device = getDevice();
       const texture = device.createTexture2D('rgba32f', 3, 3, {
@@ -532,10 +532,10 @@ export class SkyRenderer extends Disposable {
     }
   }
   /** @internal */
-  get skyWorldMatrix(): Matrix4x4 {
+  get skyWorldMatrix(): Immutable<Matrix4x4> {
     return this._skyWorldMatrix;
   }
-  set skyWorldMatrix(val: Matrix4x4) {
+  set skyWorldMatrix(val: Immutable<Matrix4x4>) {
     val = val ?? defaultSkyWorldMatrix;
     if (val !== this._skyWorldMatrix) {
       this._skyWorldMatrix = val;
@@ -543,14 +543,14 @@ export class SkyRenderer extends Disposable {
     }
   }
   /** @internal */
-  get mappedFogType(): number {
+  get mappedFogType() {
     return fogTypeMap[this._fogType];
   }
   /** Current fog type */
-  get fogType(): FogType {
+  get fogType() {
     return this._fogType;
   }
-  set fogType(val: FogType) {
+  set fogType(val) {
     if (val !== this._fogType) {
       this._fogType = val;
       this.invalidate();
@@ -560,7 +560,7 @@ export class SkyRenderer extends Disposable {
   get aerialPerspectiveDebug() {
     return this._debugAerialPerspective;
   }
-  set aerialPerspectiveDebug(val: number) {
+  set aerialPerspectiveDebug(val) {
     this._debugAerialPerspective = val;
   }
   /** @internal */
@@ -900,7 +900,7 @@ export class SkyRenderer extends Disposable {
     return t1 < 0 ? t2 : t1;
   }
   /** @internal */
-  sunTransmittance(sunLight: DirectionalLight): Vector3 {
+  sunTransmittance(sunLight: DirectionalLight) {
     const TRANSMITTANCE_SAMPLES = 32;
     const RAYLEIGH_SIGMA = [5.802, 13.558, 33.1];
     const MIE_SIGMA = 3.996;

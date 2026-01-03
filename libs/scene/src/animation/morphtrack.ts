@@ -104,7 +104,7 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
   }
   /** {@inheritDoc AnimationTrack.calculateState} */
 
-  calculateState(target: object, currentTime: number): MorphState {
+  calculateState(target: object, currentTime: number) {
     this._interpolator!.interpolate(currentTime, this._state!.weights);
     calculateMorphBoundingBox(
       this._state!.boundingBox,
@@ -125,7 +125,7 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
     (node as Mesh).setAnimatedBoundingBox(state.boundingBox);
   }
   /** {@inheritDoc AnimationTrack.mixState} */
-  mixState(a: MorphState, b: MorphState, t: number): MorphState {
+  mixState(a: MorphState, b: MorphState, t: number) {
     const state: MorphState = {
       weights: new Float32Array(a.numTargets),
       boundingBox: new BoundingBox(),
@@ -139,11 +139,11 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
     return state;
   }
   /** {@inheritDoc AnimationTrack.getBlendId} */
-  getBlendId(): unknown {
+  getBlendId() {
     return 'node-morph';
   }
   /** {@inheritDoc AnimationTrack.getDuration} */
-  getDuration(): number {
+  getDuration() {
     return this._interpolator?.maxTime ?? 0;
   }
   /** {@inheritDoc AnimationTrack.reset} */

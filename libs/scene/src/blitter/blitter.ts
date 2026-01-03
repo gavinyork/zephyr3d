@@ -89,10 +89,10 @@ export abstract class Blitter {
   /**
    * Whether output color value in gamma color space
    */
-  get srgbOut(): boolean {
+  get srgbOut() {
     return this._srgbOut;
   }
-  set srgbOut(val: boolean) {
+  set srgbOut(val) {
     if (this._srgbOut !== !!val) {
       this._srgbOut = !!val;
       this.invalidateHash();
@@ -110,7 +110,7 @@ export abstract class Blitter {
   /**
    * Program hash code
    */
-  get hash(): string {
+  get hash() {
     if (!this._hash) {
       this._hash = `${this.constructor.name}:${this._srgbOut ? 1 : 0}:${this._flip ? 1 : 0}:${
         this._destRect ? 1 : 0
@@ -121,7 +121,7 @@ export abstract class Blitter {
   /**
    * Force the hash code to be regenerated
    */
-  invalidateHash(): void {
+  invalidateHash() {
     this._hash = null;
   }
   /**
@@ -140,7 +140,7 @@ export abstract class Blitter {
     uv: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'float' | 'int' | 'uint' | 'depth'
-  ): PBShaderExp {
+  ) {
     const pb = scope.$builder;
     if (sampleType === 'float' || sampleType === 'depth') {
       switch (type) {
@@ -180,7 +180,7 @@ export abstract class Blitter {
    * @param texel - The texel to be written
    * @returns The written texel
    */
-  writeTexel(scope: PBInsideFunctionScope, type: BlitType, uv: PBShaderExp, texel: PBShaderExp): PBShaderExp {
+  writeTexel(scope: PBInsideFunctionScope, type: BlitType, uv: PBShaderExp, texel: PBShaderExp) {
     return texel;
   }
   /**
@@ -257,7 +257,7 @@ export abstract class Blitter {
     dest: Nullable<FrameBuffer>,
     layer: number,
     sampler?: Nullable<TextureSampler>
-  ): void {
+  ) {
     const device = getDevice();
     const flip = !dest && device.type === 'webgpu';
     const bilinearFiltering = sampler
@@ -287,7 +287,7 @@ export abstract class Blitter {
     dest: Nullable<FrameBuffer>,
     face: CubeFace,
     sampler?: Nullable<TextureSampler>
-  ): void {
+  ) {
     const device = getDevice();
     const flip = !dest && device.type === 'webgpu';
     const bilinearFiltering = sampler
@@ -409,7 +409,7 @@ export abstract class Blitter {
     dest: BaseTexture | Nullable<FrameBuffer>,
     layer?: number | Nullable<TextureSampler>,
     sampler?: Nullable<TextureSampler>
-  ): void {
+  ) {
     const device = getDevice();
     device.pushDeviceStates();
     if (!dest) {
@@ -478,7 +478,7 @@ const blitProgramCache: {
 let blitPrimitive2D: Nullable<Primitive> = null;
 let blitRenderStates: Nullable<RenderStateSet> = null;
 
-function getBlitPrimitive2D(): Primitive {
+function getBlitPrimitive2D() {
   if (!blitPrimitive2D) {
     blitPrimitive2D = new Primitive();
     blitPrimitive2D.createAndSetVertexBuffer(
@@ -492,7 +492,7 @@ function getBlitPrimitive2D(): Primitive {
   return blitPrimitive2D;
 }
 
-function getBlitRenderStateSet(): RenderStateSet {
+function getBlitRenderStateSet() {
   if (!blitRenderStates) {
     blitRenderStates = getDevice().createRenderStateSet();
     blitRenderStates.useDepthState().enableTest(false).enableWrite(false);
@@ -507,7 +507,7 @@ function getBlitProgram(
   bilinearFiltering: boolean,
   sampleType: 'int' | 'uint' | 'float' | 'depth',
   flip: boolean
-): BlitProgramInfo {
+) {
   const hash = `${type}:${filter.hash}:${bilinearFiltering}:${sampleType}:${flip ? 1 : 0}`;
   let programInfo = blitProgramCache[hash];
   if (programInfo === undefined) {
@@ -525,7 +525,7 @@ function createBlitProgram(
   st: 'int' | 'uint' | 'float' | 'depth',
   flip: boolean,
   scaleBias: boolean
-): BlitProgramInfo {
+) {
   const program = getDevice().buildRenderProgram({
     vertex(pb) {
       this.$inputs.pos = pb.vec2().attrib('position');

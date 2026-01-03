@@ -62,11 +62,11 @@ export abstract class RenderPass extends Disposable {
   /**
    * The render pass type
    */
-  get type(): number {
+  get type() {
     return this._type;
   }
   /** @internal */
-  isAutoFlip(ctx: DrawContext): boolean {
+  isAutoFlip(ctx: DrawContext) {
     return !!(ctx.device.getFramebuffer() && ctx.device.type === 'webgpu');
   }
   /**
@@ -78,7 +78,7 @@ export abstract class RenderPass extends Disposable {
     this.drawScene(ctx, cullCamera ?? ctx.camera, renderQueue);
   }
   /** @internal */
-  protected getGlobalBindGroup(ctx: DrawContext): BindGroup {
+  protected getGlobalBindGroup(ctx: DrawContext) {
     const hash = this.getGlobalBindGroupHash(ctx);
     let bindGroup = this._globalBindGroups[hash];
     if (!bindGroup) {
@@ -126,13 +126,13 @@ export abstract class RenderPass extends Disposable {
    * @param cullCamera - The camera that will be used to cull the scene
    * @returns The cull result
    */
-  cullScene(ctx: DrawContext, cullCamera: Camera): RenderQueue {
+  cullScene(ctx: DrawContext, cullCamera: Camera) {
     const renderQueue = new RenderQueue(this);
     const cullVisitor = new CullVisitor(this, cullCamera, renderQueue);
     if (ctx.scene.octree) {
       ctx.scene.octree.getRootNode().traverse(cullVisitor);
     } else {
-      ctx.scene.rootNode!.traverse(cullVisitor);
+      ctx.scene.rootNode.traverse(cullVisitor);
     }
     renderQueue.end(cullCamera);
     ctx.sunLight = renderQueue.sunLight;

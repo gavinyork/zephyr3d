@@ -1,6 +1,6 @@
 import type { GrassInstanceInfo } from '../../../scene';
 import { GraphNode, type SceneNode } from '../../../scene';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
 import type { Texture2D } from '@zephyr3d/device';
@@ -121,7 +121,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
       return obj.numDetailMaps;
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Resolution',
           type: 'int2',
@@ -443,7 +443,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
             }
           }
         }
-      ];
+      ]);
     }
   };
 }

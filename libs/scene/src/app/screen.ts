@@ -139,7 +139,7 @@ export class ScreenAdapter {
    * @param config - Design resolution configuration. Any missing fields
    *   are filled with default values: 1920×1080 and 'stretch' mode.
    */
-  configure(_config?: ScreenConfig): void {
+  configure(_config?: ScreenConfig) {
     this._config = {
       designWidth: 1920,
       designHeight: 1080,
@@ -163,7 +163,7 @@ export class ScreenAdapter {
     viewportY: number,
     viewportWidth: number,
     viewportHeight: number
-  ): ResolutionTransform {
+  ) {
     const { designWidth, designHeight, scaleMode } = this._config;
 
     // Guard against invalid dimensions.
@@ -331,7 +331,7 @@ export class ScreenAdapter {
    *   written into and returned; otherwise a new {@link Vector2} is allocated.
    * @returns The point in viewport-local coordinates.
    */
-  canvasPosToViewport(canvasPos: Vector2, viewportPosOut?: Vector2): Vector2 {
+  canvasPosToViewport(canvasPos: Vector2, viewportPosOut?: Vector2) {
     return this.transformPoint(this.transform.canvasToViewport, canvasPos, viewportPosOut);
   }
   /**
@@ -347,7 +347,7 @@ export class ScreenAdapter {
    *   written into and returned; otherwise a new {@link Vector2} is allocated.
    * @returns The point in logical (design resolution) coordinates.
    */
-  canvasPosToLogic(canvasPos: Vector2, logicPosOut?: Vector2): Vector2 {
+  canvasPosToLogic(canvasPos: Vector2, logicPosOut?: Vector2) {
     return this.transformPoint(this.transform.canvasToLogic, canvasPos, logicPosOut);
   }
   /**
@@ -364,7 +364,7 @@ export class ScreenAdapter {
    *   written into and returned; otherwise a new {@link Vector2} is allocated.
    * @returns The transformed point.
    */
-  transformPoint(transform: PointTransform, pointIn: Vector2, pointOut?: Vector2): Vector2 {
+  transformPoint(transform: PointTransform, pointIn: Vector2, pointOut?: Vector2) {
     const out = pointOut ?? new Vector2();
     out.x = pointIn.x * transform.scaleX + transform.offsetX;
     out.y = pointIn.y * transform.scaleY + transform.offsetY;

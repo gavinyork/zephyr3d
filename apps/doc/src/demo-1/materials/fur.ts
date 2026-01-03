@@ -79,7 +79,7 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
   set alphaTexture(tex: Texture2D) {
     this._alphaTexture = tex;
   }
-  getQueueType(): number {
+  getQueueType() {
     return QUEUE_TRANSPARENT;
   }
   passToHash(pass: number): string {

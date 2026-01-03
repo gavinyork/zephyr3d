@@ -97,7 +97,7 @@ export function mixinTextureProps<U extends string>(name: U) {
         let texCoord = 0;
         let matrix: Nullable<Matrix4x4> = null;
         Object.defineProperty(this, `${name}Texture`, {
-          get: function (): Nullable<Texture2D> {
+          get: function () {
             return texture.get();
           },
           set: function (newValue: Texture2D) {
@@ -115,7 +115,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           configurable: true
         });
         Object.defineProperty(this, `${name}TextureSampler`, {
-          get: function (): Nullable<TextureSampler> {
+          get: function () {
             return sampler;
           },
           set: function (newValue: TextureSampler) {
@@ -128,7 +128,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           configurable: true
         });
         Object.defineProperty(this, `${name}TexCoordMatrix`, {
-          get: function (): Nullable<Matrix4x4> {
+          get: function () {
             return matrix;
           },
           set: function (newValue: Matrix4x4) {
@@ -140,7 +140,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           configurable: true
         });
         Object.defineProperty(this, `${name}TexCoordIndex`, {
-          get: function (): number {
+          get: function () {
             return texCoord;
           },
           set: function (newValue: number) {
@@ -154,15 +154,15 @@ export function mixinTextureProps<U extends string>(name: U) {
           configurable: true
         });
       }
-      [`sample${capName}Texture`](scope: PBInsideFunctionScope, texCoord?: PBShaderExp): PBShaderExp {
+      [`sample${capName}Texture`](scope: PBInsideFunctionScope, texCoord?: PBShaderExp) {
         const tex = this[`get${capName}TextureUniform`](scope);
         const coord = texCoord ?? this[`get${capName}TexCoord`](scope);
         return scope.$builder.textureSample(tex, coord);
       }
-      [`get${capName}TextureUniform`](scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
+      [`get${capName}TextureUniform`](scope: PBInsideFunctionScope) {
         return scope.$builder.shaderKind === 'fragment' ? scope[`z${capName}Tex`] : null;
       }
-      [`get${capName}TexCoord`](scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
+      [`get${capName}TexCoord`](scope: PBInsideFunctionScope) {
         const texCoord = (this as any)[`${name}TexCoordIndex`];
         if (texCoord < 0) {
           return null;
@@ -182,7 +182,7 @@ export function mixinTextureProps<U extends string>(name: U) {
                 .xy
             : scope.$inputs[`texCoord${texCoord}`];
       }
-      copyFrom(other: any): void {
+      copyFrom(other: any) {
         super.copyFrom(other);
         const that = this as any;
         that[`${name}Texture`] = other[`${name}Texture`];
@@ -190,7 +190,7 @@ export function mixinTextureProps<U extends string>(name: U) {
         that[`${name}TexCoordMatrix`] = other[`${name}TexCoordMatrix`];
         that[`${name}TexCoordIndex`] = other[`${name}TexCoordIndex`];
       }
-      vertexShader(scope: PBFunctionScope): void {
+      vertexShader(scope: PBFunctionScope) {
         super.vertexShader(scope);
         if (vertex || this.needFragmentColor()) {
           const pb = scope.$builder;
@@ -217,7 +217,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           }
         }
       }
-      fragmentShader(scope: PBFunctionScope): void {
+      fragmentShader(scope: PBFunctionScope) {
         super.fragmentShader(scope);
         if (this.needFragmentColor()) {
           const pb = scope.$builder;
@@ -226,7 +226,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           }
         }
       }
-      applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+      applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
         super.applyUniformValues(bindGroup, ctx, pass);
         if (this.needFragmentColor(ctx)) {
           if (this.featureUsed(feature)) {

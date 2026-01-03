@@ -43,7 +43,7 @@ export type AtmosphereParams = {
 };
 
 /** @internal */
-export function getDefaultAtmosphereParams(): AtmosphereParams {
+export function getDefaultAtmosphereParams() {
   return {
     plantRadius: 6360000,
     atmosphereHeight: 60000,
@@ -58,19 +58,14 @@ export function getDefaultAtmosphereParams(): AtmosphereParams {
     lightColor: new Vector4(1, 1, 1, 10),
     cameraAspect: 1,
     cameraHeightScale: 1
-  };
+  } as AtmosphereParams;
 }
 
 const defaultAtmosphereParams = getDefaultAtmosphereParams();
 
 let currentAtmosphereParams: Nullable<AtmosphereParams> = null;
 
-function checkParams(other?: Partial<AtmosphereParams>): {
-  transmittance: boolean;
-  multiScattering: boolean;
-  skyView: boolean;
-  aerialPerspective: boolean;
-} {
+function checkParams(other?: Partial<AtmosphereParams>) {
   const result = {
     transmittance: false,
     multiScattering: false,
@@ -144,7 +139,7 @@ export function rayIntersectSphere(
   fRadius: PBShaderExp,
   f3RayStart: PBShaderExp,
   f3RayDir: PBShaderExp
-): PBShaderExp {
+) {
   const pb = scope.$builder;
   const funcName = 'z_rayIntersectSphere';
   pb.func(
@@ -163,7 +158,7 @@ export function rayIntersectSphere(
       this.$return(this.$choice(pb.lessThan(this.t1, 0), this.t2, this.t1));
     }
   );
-  return scope[funcName](f3Center, fRadius, f3RayStart, f3RayDir);
+  return scope[funcName](f3Center, fRadius, f3RayStart, f3RayDir) as PBShaderExp;
 }
 
 /** @internal */
@@ -452,7 +447,7 @@ export function scattering(
   stParams: PBShaderExp,
   f3Pos: PBShaderExp,
   f3ViewDir: PBShaderExp
-): PBShaderExp {
+) {
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
   const funcName = 'z_scattering';
@@ -469,7 +464,7 @@ export function scattering(
     );
     this.$return(pb.add(this.rayleigh, this.mie));
   });
-  return scope[funcName](stParams, f3Pos, f3ViewDir);
+  return scope[funcName](stParams, f3Pos, f3ViewDir) as PBShaderExp;
 }
 
 /** @internal */
@@ -478,7 +473,7 @@ export function transmittance(
   stParams: PBShaderExp,
   f3P1: PBShaderExp,
   f3P2: PBShaderExp
-): PBShaderExp {
+) {
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
   const funcName = 'z_transmittance';
@@ -504,7 +499,7 @@ export function transmittance(
     });
     this.$return(pb.exp(pb.neg(this.sum)));
   });
-  return scope[funcName](stParams, f3P1, f3P2);
+  return scope[funcName](stParams, f3P1, f3P2) as PBShaderExp;
 }
 
 /** @internal */
@@ -542,7 +537,7 @@ export function transmittanceLutToUV(
       this.$return(pb.vec2(this.x_mu, this.x_r));
     }
   );
-  return scope[funcName](fBottomRadius, fTopRadius, fMu, fR);
+  return scope[funcName](fBottomRadius, fTopRadius, fMu, fR) as PBShaderExp;
 }
 
 /** @internal */
@@ -555,7 +550,7 @@ export function viewDirToUV(scope: PBInsideFunctionScope, f3ViewDir: PBShaderExp
     this.uv = pb.add(this.uv, pb.vec2(0.5));
     this.$return(this.uv);
   });
-  return scope[funcName](f3ViewDir);
+  return scope[funcName](f3ViewDir) as PBShaderExp;
 }
 
 /** @internal */
@@ -570,7 +565,7 @@ export function uvToViewDir(scope: PBInsideFunctionScope, f2UV: PBShaderExp) {
     this.$l.y = pb.cos(this.theta);
     this.$return(pb.vec3(this.x, this.y, this.z));
   });
-  return scope[funcName](f2UV);
+  return scope[funcName](f2UV) as PBShaderExp;
 }
 
 /** @internal */
@@ -579,7 +574,7 @@ export function uvToTransmittanceLut(
   f2UV: PBShaderExp,
   fBottomRadius: PBShaderExp,
   fTopRadius: PBShaderExp
-): PBShaderExp {
+) {
   const pb = scope.$builder;
   const funcName = 'z_uvToTransmittanceLut';
   pb.func(funcName, [pb.vec2('uv'), pb.float('bottomRadius'), pb.float('topRadius')], function () {
@@ -606,7 +601,7 @@ export function uvToTransmittanceLut(
     this.mu = pb.clamp(this.mu, -1, 1);
     this.$return(pb.vec2(this.mu, this.r));
   });
-  return scope[funcName](f2UV, fBottomRadius, fTopRadius);
+  return scope[funcName](f2UV, fBottomRadius, fTopRadius) as PBShaderExp;
 }
 
 function sunBloom(
@@ -634,7 +629,7 @@ function sunBloom(
       this.$return(this.luminance);
     }
   );
-  return scope[funcName](f3ViewDir, f3LightDir, f4LightColorAndIntensity, fSunSolidAngle);
+  return scope[funcName](f3ViewDir, f3LightDir, f4LightColorAndIntensity, fSunSolidAngle) as PBShaderExp;
 }
 
 /** @internal */
@@ -684,7 +679,7 @@ export function skyBox(
       this.$return(pb.vec4(this.rgb, 1));
     }
   );
-  return scope[funcName](stParams, f4SunColor, f3SkyBoxWorldPos, fSunSolidAngle);
+  return scope[funcName](stParams, f4SunColor, f3SkyBoxWorldPos, fSunSolidAngle) as PBShaderExp;
 }
 
 /** @internal */
@@ -735,7 +730,7 @@ export function aerialPerspective(
       this.$return(pb.vec4(this.inscattering, this.transmittance));
     }
   );
-  return scope[funcName](stParams, f2UV, f3CameraPos, f3WorldPos, f3Dim);
+  return scope[funcName](stParams, f2UV, f3CameraPos, f3WorldPos, f3Dim) as PBShaderExp;
 }
 
 /** @internal */
@@ -847,7 +842,7 @@ export function aerialPerspectiveLut(
     this.$l.t = pb.clamp(pb.div(this.t1, pb.max(this.t2, pb.vec3(0.0001))), pb.vec3(0), pb.vec3(1));
     this.$return(pb.vec4(this.color, pb.dot(this.t, pb.vec3(1 / 3, 1 / 3, 1 / 3))));
   });
-  return scope[funcName](stParams, f2UV, f3VoxelDim, CAMERA_POS_Y);
+  return scope[funcName](stParams, f2UV, f3VoxelDim, CAMERA_POS_Y) as PBShaderExp;
 }
 
 /** @internal */
@@ -876,7 +871,7 @@ export function skyViewLut(
     );
     this.$return(pb.vec4(this.rgb, 1));
   });
-  return scope[funcName](stParams, f2UV, CAMERA_POS_Y);
+  return scope[funcName](stParams, f2UV, CAMERA_POS_Y) as PBShaderExp;
 }
 
 /** @internal */
@@ -899,7 +894,7 @@ export function multiScatteringLut(
     this.$l.rgb = integralMultiScattering(this, this.params, this.lightDir, this.p, texTransmittanceLut);
     this.$return(pb.vec4(this.rgb, 1));
   });
-  return scope[funcName](stParams, f2UV);
+  return scope[funcName](stParams, f2UV) as PBShaderExp;
 }
 
 /** @internal */
@@ -921,11 +916,11 @@ export function transmittanceLut(scope: PBInsideFunctionScope, stParams: PBShade
     this.$l.hitPoint = pb.add(this.eyePos, pb.mul(this.viewDir, this.dis));
     this.$return(pb.vec4(transmittance(this, this.params, this.eyePos, this.hitPoint), 1));
   });
-  return scope[funcName](stParams, f2UV);
+  return scope[funcName](stParams, f2UV) as PBShaderExp;
 }
 
 /** @internal */
-export function atmosphereLUTRendered(): boolean {
+export function atmosphereLUTRendered() {
   return !!transmittanceLUT && !!multiScatteringLUT && !!skyViewLUT && !!ApLut;
 }
 
@@ -1008,7 +1003,7 @@ export function getAtmosphereParamsStruct(pb: ProgramBuilder) {
 }
 
 /** @internal */
-export function createTransmittanceLutProgram(device: AbstractDevice): GPUProgram {
+export function createTransmittanceLutProgram(device: AbstractDevice) {
   const program = device.buildRenderProgram({
     vertex(pb) {
       this.flip = pb.int().uniform(0);

@@ -144,7 +144,7 @@ export class Clipmap extends Disposable {
       this.generateTrimMesh();
     }
   }
-  private allocInstanceBuffer(): Float32Array<ArrayBuffer> {
+  private allocInstanceBuffer() {
     if (this._instanceDataPoolSize === 0) {
       const buffer = new Float32Array(this._maxMipLevels * 16 * 4);
       this._instanceDataPool.push(buffer);
@@ -153,7 +153,7 @@ export class Clipmap extends Disposable {
       return this._instanceDataPool[--this._instanceDataPoolSize];
     }
   }
-  private allocNonInstanceBuffer(x: number, y: number, z: number, w: number): Float32Array<ArrayBuffer> {
+  private allocNonInstanceBuffer(x: number, y: number, z: number, w: number) {
     let buffer: Float32Array<ArrayBuffer>;
     if (this._nonInstanceDataPoolSize === 0) {
       buffer = new Float32Array(4);
@@ -167,7 +167,7 @@ export class Clipmap extends Disposable {
     buffer[3] = w;
     return buffer;
   }
-  private allocMipLevelBuffer(): Float32Array<ArrayBuffer> {
+  private allocMipLevelBuffer() {
     if (this._mipLevelDataPoolSize === 0) {
       const buffer = new Float32Array(this._maxMipLevels * 16);
       this._mipLevelDataPool.push(buffer);
@@ -176,7 +176,7 @@ export class Clipmap extends Disposable {
       return this._mipLevelDataPool[--this._mipLevelDataPoolSize];
     }
   }
-  private allocNonInstanceMipLevelBuffer(val: number): Float32Array<ArrayBuffer> {
+  private allocNonInstanceMipLevelBuffer(val: number) {
     let buffer: Float32Array<ArrayBuffer>;
     if (this._nonInstanceMipLevelDataPoolSize === 0) {
       buffer = new Float32Array(1);
@@ -190,7 +190,7 @@ export class Clipmap extends Disposable {
   private patch2d(tileResolution: number, x: number, y: number) {
     return y * (tileResolution + 1) + x;
   }
-  private calcAABB(vertices: Float32Array): AABB {
+  private calcAABB(vertices: Float32Array) {
     let maxX = -Number.MAX_VALUE;
     let maxY = -Number.MAX_VALUE;
     let minX = Number.MAX_VALUE;
@@ -667,7 +667,7 @@ export class Clipmap extends Disposable {
     ctx.calcAABB(ctx.userData, minX, maxX, minZ, maxZ, tmpAABB, level);
     return tmpAABB.getClipStateWithFrustum(camera.frustum) !== ClipState.NOT_CLIPPED;
   }
-  calcLevelAABB(camera: Camera, minMaxWorldPos: Vector4, gridScale: number): AABB[] {
+  calcLevelAABB(camera: Camera, minMaxWorldPos: Vector4, gridScale: number) {
     const mipLevels = this.calcMipLevels(camera, minMaxWorldPos, gridScale);
     camera.getWorldPosition(tmpV3);
 
@@ -763,7 +763,7 @@ export class Clipmap extends Disposable {
     info.numInstances++;
   }
 
-  gather(context: ClipmapGatherContext): PrimitiveInstanceInfo[] {
+  gather(context: ClipmapGatherContext) {
     this._instanceDataPoolSize = this._instanceDataPool.length;
     this._mipLevelDataPoolSize = this._mipLevelDataPool.length;
     this._nonInstanceDataPoolSize = this._nonInstanceDataPool.length;

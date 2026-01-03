@@ -55,14 +55,14 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     this._camera = camera || null;
   }
   /** true if cull with frustum culling, otherwise false. default is true */
-  get frustumCulling(): boolean {
+  get frustumCulling() {
     return !this._skipClipTest;
   }
-  set frustumCulling(val: boolean) {
+  set frustumCulling(val) {
     this._skipClipTest = !val;
   }
   /** Render pass for the culling task */
-  get renderPass(): RenderPass {
+  get renderPass() {
     return this._renderPass;
   }
   /** The result of culling */
@@ -88,7 +88,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
    * Visits a node
    * @param target - The node to be visit
    */
-  visit(target: SceneNode | OctreeNode): unknown {
+  visit(target: SceneNode | OctreeNode) {
     if (target instanceof OctreeNode) {
       return this.visitOctreeNode(target);
     } else if (target.isMesh()) {
@@ -105,6 +105,8 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
       return this.visitPunctualLight(target);
     } else if (target.isBatchGroup()) {
       return this.visitBatchGroup(target);
+    } else {
+      return false;
     }
   }
   /** @internal */
@@ -208,7 +210,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     return false;
   }
   /** @internal */
-  protected getClipStateWithNode(node: GraphNode): ClipState {
+  protected getClipStateWithNode(node: GraphNode) {
     let clipState: ClipState;
     if (this._skipClipTest) {
       clipState = ClipState.A_INSIDE_B;
@@ -221,7 +223,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     return clipState;
   }
   /** @internal */
-  protected getClipStateWithAABB(aabb: AABB): ClipState {
+  protected getClipStateWithAABB(aabb: AABB) {
     return this.camera.clipMask
       ? aabb.getClipStateWithFrustumMask(this.frustum, this.camera.clipMask)
       : aabb.getClipStateWithFrustum(this.frustum);

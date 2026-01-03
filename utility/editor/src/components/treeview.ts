@@ -1,4 +1,4 @@
-import type { EventMap } from '@zephyr3d/base';
+import type { EventMap, Nullable } from '@zephyr3d/base';
 import { Observable } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 
@@ -24,7 +24,7 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
   private static readonly baseFlags =
     ImGui.TreeNodeFlags.OpenOnArrow | ImGui.TreeNodeFlags.SpanAvailWidth | ImGui.TreeNodeFlags.SpanFullWidth;
 
-  private _selectedNode: T;
+  private _selectedNode: Nullable<T>;
   private _openState: Map<string, boolean>; // key = node.persistentId
   private _visibleRows: VisibleRow<T>[];
   private _visibleDirty: boolean;
@@ -32,7 +32,7 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
   private _clipper: ImGui.ListClipper;
   private _data: TreeViewData<T>;
   private _id: string;
-  private _pendingFocusId: string;
+  private _pendingFocusId: Nullable<string>;
 
   constructor(id: string, data: TreeViewData<T>) {
     super();
@@ -47,7 +47,7 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
     this._clipper = new ImGui.ListClipper();
   }
 
-  selectNode(node: T) {
+  selectNode(node: Nullable<T>) {
     if (this._selectedNode !== node) {
       if (this._selectedNode) {
         const nodeDeselected = this._selectedNode;

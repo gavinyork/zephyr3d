@@ -16,17 +16,10 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
   constructor(device: WebGLDevice) {
     super(device, 'cube');
   }
-  init(): void {
+  init() {
     this.loadEmpty(this._format!, this._width, this._mipLevelCount);
   }
-  update(
-    data: TypedArray,
-    xOffset: number,
-    yOffset: number,
-    width: number,
-    height: number,
-    face: CubeFace
-  ): void {
+  update(data: TypedArray, xOffset: number, yOffset: number, width: number, height: number, face: CubeFace) {
     if (this._device.isContextLost()) {
       return;
     }
@@ -61,7 +54,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     y: number,
     width: number,
     height: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
@@ -104,7 +97,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       this.generateMipmaps();
     }
   }
-  createEmpty(format: TextureFormat, size: number, creationFlags?: number): void {
+  createEmpty(format: TextureFormat, size: number, creationFlags?: number) {
     this._flags = Number(creationFlags) || 0;
     if (this._flags & GPUResourceUsageFlags.TF_WRITABLE) {
       console.error(new Error('webgl device does not support storage texture'));
@@ -120,7 +113,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     face: number,
     mipLevel: number,
     buffer: TypedArray
-  ): Promise<void> {
+  ) {
     if (mipLevel < 0 || mipLevel >= this.mipLevelCount) {
       throw new Error(`TextureCube.readPixels(): invalid miplevel: ${mipLevel}`);
     }
@@ -141,7 +134,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     face: number,
     mipLevel: number,
     buffer: GPUDataBuffer
-  ): void {
+  ) {
     if (mipLevel < 0 || mipLevel >= this.mipLevelCount) {
       throw new Error(`TextureCube.readPixels(): invalid miplevel: ${mipLevel}`);
     }
@@ -166,7 +159,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       this._device.context.generateMipmap(target);
     }
   }
-  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number): void {
+  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number) {
     if (!data.isCubemap) {
       console.error('loading cubmap with mipmap data failed: data is not cubemap');
     } else {
@@ -179,7 +172,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     }
   }
   /** @internal */
-  private loadEmpty(format: TextureFormat, size: number, mipLevelCount: number): void {
+  private loadEmpty(format: TextureFormat, size: number, mipLevelCount: number) {
     this.allocInternal(format, size, size, 1, mipLevelCount);
     if (this._mipLevelCount > 1 && !this._device.isContextLost()) {
       this.generateMipmaps();
@@ -230,7 +223,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     }
   }
   */
-  private loadLevels(levels: TextureMipmapData, sRGB: boolean): void {
+  private loadLevels(levels: TextureMipmapData, sRGB: boolean) {
     const format = sRGB ? linearTextureFormatToSRGB(levels.format) : levels.format;
     const width = levels.width;
     const height = levels.height;

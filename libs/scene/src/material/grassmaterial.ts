@@ -42,7 +42,7 @@ export class GrassMaterial
       this._textureSize.setXY(grassTexture.width, grassTexture.height);
     }
   }
-  clone(): GrassMaterial {
+  clone() {
     const other = new GrassMaterial(this._terrainSize, this._terrainNormalMap, this.albedoTexture);
     other.copyFrom(this);
     return other;
@@ -51,24 +51,24 @@ export class GrassMaterial
    * {@inheritDoc MeshMaterial.isTransparentPass}
    * @override
    */
-  isTransparentPass(_pass: number): boolean {
+  isTransparentPass(_pass: number) {
     return false;
   }
   /**
    * {@inheritDoc Material.supportLighting}
    * @override
    */
-  supportLighting(): boolean {
+  supportLighting() {
     return true;
   }
   /**
    * {@inheritDoc Material.supportInstancing}
    * @override
    */
-  supportInstancing(): boolean {
+  supportInstancing() {
     return false;
   }
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setTexture('terrainNormalMap', this._terrainNormalMap);
     bindGroup.setValue('terrainSize', this._terrainSize);
@@ -76,7 +76,7 @@ export class GrassMaterial
       bindGroup.setValue('albedoTextureSize', this._textureSize);
     }
   }
-  vertexShader(scope: PBFunctionScope): void {
+  vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$inputs.pos = pb.vec3().attrib('position');
@@ -104,7 +104,7 @@ export class GrassMaterial
     );
     scope.$outputs.worldNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.normal, 0)).xyz;
   }
-  fragmentShader(scope: PBFunctionScope): void {
+  fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     const pb = scope.$builder;
     const that = this;
@@ -138,12 +138,12 @@ export class GrassMaterial
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
   }
-  apply(ctx: DrawContext): boolean {
+  apply(ctx: DrawContext) {
     this.alphaToCoverage = ctx.device.getFrameBufferSampleCount() > 1;
     this.alphaCutoff = this.alphaToCoverage ? 1 : 0.8;
     return super.apply(ctx);
   }
-  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
+  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext) {
     super.updateRenderStates(pass, stateSet, ctx);
     stateSet.useRasterizerState().setCullMode('none');
   }

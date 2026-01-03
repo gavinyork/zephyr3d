@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 
 export enum ResizeDirection {
@@ -18,7 +19,7 @@ export class DockPannel {
   private _minHeight: number;
   private _maxHeight: number;
   private _resizeDirection: ResizeDirection;
-  private _initialCursorPos: ImGui.ImVec2;
+  private _initialCursorPos: Nullable<ImGui.ImVec2>;
   private _availableHeight: number;
   private readonly _buttonId: string;
   private _renderContent: boolean;
@@ -123,7 +124,7 @@ export class DockPannel {
   }
   endChild() {
     this.endContent();
-    this.renderResizeBar(this._initialCursorPos);
+    this.renderResizeBar(this._initialCursorPos!);
     ImGui.EndChild();
   }
   begin(id: string, extraFlags = 0) {
@@ -148,7 +149,7 @@ export class DockPannel {
   }
   end() {
     this.endContent();
-    this.renderResizeBar(this._initialCursorPos);
+    this.renderResizeBar(this._initialCursorPos!);
     ImGui.End();
   }
   private beginContent(extraFlags = 0) {

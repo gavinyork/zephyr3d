@@ -17,7 +17,7 @@ export class UnlitMaterial
   constructor() {
     super();
   }
-  clone(): UnlitMaterial {
+  clone() {
     const other = new UnlitMaterial();
     other.copyFrom(this);
     return other;

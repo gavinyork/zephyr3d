@@ -27,19 +27,19 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     this._pendingUploads = [];
     this.load(typeof data === 'number' ? null : data);
   }
-  get hash(): Nullable<number> {
+  get hash() {
     return this._object ? this._device.gpuGetObjectHash(this._object) : 0;
   }
   get byteLength() {
     return this._size;
   }
-  get usage(): number {
+  get usage() {
     return this._usage;
   }
-  get gpuUsage(): number {
+  get gpuUsage() {
     return this._gpuUsage;
   }
-  private searchInsertPosition(dstByteOffset: number): number {
+  private searchInsertPosition(dstByteOffset: number) {
     let left = 0;
     let right = this._pendingUploads.length - 1;
     let insertIndex = this._pendingUploads.length;
@@ -55,7 +55,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     }
     return insertIndex;
   }
-  bufferSubData(dstByteOffset: number, data: TypedArray, srcOffset?: number, srcLength?: number): void {
+  bufferSubData(dstByteOffset: number, data: TypedArray, srcOffset?: number, srcLength?: number) {
     srcOffset = Number(srcOffset) || 0;
     dstByteOffset = Number(dstByteOffset) || 0;
     srcLength = Number(srcLength) || data.length - srcOffset;
@@ -115,7 +115,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     dstBuffer?: Nullable<Uint8Array<ArrayBuffer>>,
     offsetInBytes?: number,
     sizeInBytes?: number
-  ): Promise<Uint8Array<ArrayBuffer>> {
+  ) {
     let sourceBuffer: GPUDataBuffer = this;
     offsetInBytes = Number(offsetInBytes) || 0;
     sizeInBytes = Number(sizeInBytes) || this.byteLength - offsetInBytes;
@@ -191,7 +191,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       this._ringBuffer.purge();
     }
   }
-  private load(data?: Nullable<TypedArray>): void {
+  private load(data?: Nullable<TypedArray>) {
     if (this._device.isContextLost()) {
       return;
     }

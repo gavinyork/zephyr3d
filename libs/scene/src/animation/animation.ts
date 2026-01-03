@@ -53,7 +53,7 @@ export class AnimationClip extends Disposable {
   /**
    * Whether this clip is embedded (owned inline by its container/resource).
    */
-  get embedded(): boolean {
+  get embedded() {
     return this._embedded;
   }
   /**
@@ -85,7 +85,7 @@ export class AnimationClip extends Disposable {
   /**
    * The unique name of this clip.
    */
-  get name(): string {
+  get name() {
     return this._name;
   }
   /**
@@ -110,10 +110,10 @@ export class AnimationClip extends Disposable {
    *
    * Automatically extended when adding tracks with longer duration.
    */
-  get timeDuration(): number {
+  get timeDuration() {
     return this._duration;
   }
-  set timeDuration(val: number) {
+  set timeDuration(val) {
     this._duration = val;
   }
   /**
@@ -132,7 +132,7 @@ export class AnimationClip extends Disposable {
    * @param track - The track instance to remove.
    * @returns This clip (for chaining).
    */
-  deleteTrack(track: AnimationTrack): this {
+  deleteTrack(track: AnimationTrack) {
     if (track?.animation !== this) {
       console.error('Cannot delete animation track which is not belongs to THIS animation');
     }
@@ -161,7 +161,7 @@ export class AnimationClip extends Disposable {
    * @param track - Track to add.
    * @returns This clip (for chaining).
    */
-  addTrack(target: object, track: AnimationTrack): this {
+  addTrack(target: object, track: AnimationTrack) {
     if (!track) {
       return this;
     }

@@ -11,7 +11,8 @@ import { applyMaterialMixins, MeshMaterial } from './meshmaterial';
 import type { DrawContext } from '../render';
 import { MaterialVaryingFlags, MAX_TERRAIN_MIPMAP_LEVELS } from '../values';
 import { ShaderHelper } from './shader/helper';
-import { DRef, Nullable, Vector3, Vector4 } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
+import { DRef, Vector3, Vector4 } from '@zephyr3d/base';
 import { mixinLight } from './mixins/lit';
 import { fetchSampler } from '../utility/misc';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
@@ -93,10 +94,10 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   static get MAX_DETAIL_MAP_COUNT() {
     return MAX_DETAIL_MAPS;
   }
-  get debugMode(): TerrainDebugMode {
+  get debugMode() {
     return this.featureUsed<TerrainDebugMode>(ClipmapTerrainMaterial.FEATURE_DEBUG_MODE);
   }
-  set debugMode(mode: TerrainDebugMode) {
+  set debugMode(mode) {
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DEBUG_MODE, mode);
   }
   /** @internal */
@@ -184,7 +185,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this.uniformChanged();
     }
   }
-  getDetailMapUVScale(index: number): number {
+  getDetailMapUVScale(index: number) {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
       console.error('Invalid detail map index');
       return 0;
@@ -201,7 +202,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this.uniformChanged();
     }
   }
-  getDetailMapRoughness(index: number): number {
+  getDetailMapRoughness(index: number) {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
       console.error('Invalid detail map index');
       return 0;
@@ -218,7 +219,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this.uniformChanged();
     }
   }
-  getDetailMap(index: number): Nullable<Texture2D> {
+  getDetailMap(index: number) {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
       console.error('Invalid detail map index');
       return null;
@@ -251,7 +252,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       fb.dispose();
     }
   }
-  getDetailNormalMap(index: number): Nullable<Texture2D> {
+  getDetailNormalMap(index: number) {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
       console.error('Invalid detail map index');
       return null;
@@ -307,22 +308,22 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this.uniformChanged();
     }
   }
-  needSceneColor(): boolean {
+  needSceneColor() {
     return false;
   }
-  needSceneDepth(): boolean {
+  needSceneDepth() {
     return false;
   }
-  supportInstancing(): boolean {
+  supportInstancing() {
     return false;
   }
-  supportLighting(): boolean {
+  supportLighting() {
     return true;
   }
   getMetallicRoughnessTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp = function (scope) {
     return scope.$inputs.uv;
   };
-  sampleDetailNormalMap(scope: PBInsideFunctionScope, index: number, texCoord: PBShaderExp): PBShaderExp {
+  sampleDetailNormalMap(scope: PBInsideFunctionScope, index: number, texCoord: PBShaderExp) {
     const pb = scope.$builder;
     const sample =
       this.drawContext.device.type === 'webgl'
@@ -358,7 +359,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   getNormalTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp = function (scope) {
     return scope.$inputs.uv;
   };
-  calculateAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp {
+  calculateAlbedoColor(scope: PBInsideFunctionScope) {
     const that = this;
     const pb = scope.$builder;
     const funcName = 'getTerrainAlbedo';
@@ -405,7 +406,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         this.$return(pb.vec4(this.color, 1));
       }
     });
-    return pb.getGlobalScope()[funcName]();
+    return pb.getGlobalScope()[funcName]() as PBShaderExp;
   }
   sampleHeightMap(
     scope: PBInsideFunctionScope,
@@ -458,7 +459,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     tangent: PBShaderExp,
     bitangent: PBShaderExp,
     normal: PBShaderExp
-  ): PBShaderExp {
+  ) {
     const that = this;
     const pb = scope.$builder;
     pb.func(
@@ -528,9 +529,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       tangent,
       bitangent,
       normal
-    );
+    ) as PBShaderExp;
   }
-  vertexShader(scope: PBFunctionScope): void {
+  vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$inputs.position = pb.vec3().attrib('position');
@@ -628,7 +629,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     );
     ShaderHelper.resolveMotionVector(scope, scope.$outputs.worldPos, scope.$outputs.worldPos);
   }
-  fragmentShader(scope: PBFunctionScope): void {
+  fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     const pb = scope.$builder;
     scope.region = pb.vec4().uniform(2);
@@ -717,7 +718,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
   }
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setValue('clipmapGridInfo', this._clipmapGridInfo);
     bindGroup.setValue('region', this._region);
@@ -758,7 +759,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       }
     }
   }
-  private createDetailMapInfo(): ClipmapTerrainDetailMapInfo {
+  private createDetailMapInfo() {
     const device = getDevice();
     const isWebGL1 = device.type === 'webgl';
     const detailMap = isWebGL1
@@ -811,7 +812,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     };
   }
 
-  protected onDispose(): void {
+  protected onDispose() {
     super.onDispose();
     this._heightMap.dispose();
     this._levelDataBuffer.dispose();

@@ -41,10 +41,10 @@ export class WebGPURenderPass {
     this._currentScissor = null;
     this._frameBufferInfo = this.createFrameBufferInfo(null);
   }
-  get active(): boolean {
+  get active() {
     return !!this._renderPassEncoder;
   }
-  private createFrameBufferInfo(fb: Nullable<WebGPUFrameBuffer>): FrameBufferInfo {
+  private createFrameBufferInfo(fb: Nullable<WebGPUFrameBuffer>) {
     const info: FrameBufferInfo = !fb
       ? {
           frameBuffer: null,
@@ -71,7 +71,7 @@ export class WebGPURenderPass {
     info.hash = `${info.colorFormats.join('-')}:${info.depthFormat}:${info.sampleCount}`;
     return info;
   }
-  setFramebuffer(fb: WebGPUFrameBuffer): void {
+  setFramebuffer(fb: WebGPUFrameBuffer) {
     if (this._frameBufferInfo.frameBuffer !== fb) {
       this.end();
       this._frameBufferInfo = this.createFrameBufferInfo(fb);
@@ -79,7 +79,7 @@ export class WebGPURenderPass {
       this.setScissor(null);
     }
   }
-  getFramebuffer(): Nullable<WebGPUFrameBuffer> {
+  getFramebuffer() {
     return this._frameBufferInfo.frameBuffer;
   }
   setViewport(vp: Nullable<Immutable<number[] | DeviceViewport>>) {
@@ -119,7 +119,7 @@ export class WebGPURenderPass {
       this._renderPassEncoder.setViewport(vx, this._device.drawingBufferHeight - vy - vh, vw, vh, 0, 1);
     }
   }
-  getViewport(): DeviceViewport {
+  getViewport() {
     return Object.assign({}, this._currentViewport);
   }
   setScissor(scissor: Nullable<Immutable<number[] | DeviceViewport>>) {
@@ -175,7 +175,7 @@ export class WebGPURenderPass {
       this._renderPassEncoder.setScissorRect(vx, this._device.drawingBufferHeight - vy - vh, vw, vh);
     }
   }
-  getScissor(): DeviceViewport {
+  getScissor() {
     return Object.assign({}, this._currentScissor);
   }
   executeRenderBundle(renderBundle: GPURenderBundle) {
@@ -194,7 +194,7 @@ export class WebGPURenderPass {
     first: number,
     count: number,
     numInstances: number
-  ): void {
+  ) {
     const validation = this.validateDraw(program, bindGroups);
     if (validation & VALIDATION_FAILED) {
       return;
@@ -218,7 +218,7 @@ export class WebGPURenderPass {
       numInstances
     );
   }
-  clear(color: Nullable<Vector4>, depth: Nullable<number>, stencil: Nullable<number>): void {
+  clear(color: Nullable<Vector4>, depth: Nullable<number>, stencil: Nullable<number>) {
     if (!this._currentScissor) {
       this.end();
       this.begin(color, depth, stencil);
@@ -231,13 +231,13 @@ export class WebGPURenderPass {
       this._renderPassEncoder!.insertDebugMarker('end clear');
     }
   }
-  getDevice(): WebGPUDevice {
+  getDevice() {
     return this._device;
   }
-  getFrameBufferInfo(): FrameBufferInfo {
+  getFrameBufferInfo() {
     return this._frameBufferInfo;
   }
-  begin(color?: Nullable<TypedArray>, depth?: Nullable<number>, stencil?: Nullable<number>): void {
+  begin(color?: Nullable<TypedArray>, depth?: Nullable<number>, stencil?: Nullable<number>) {
     if (this.active) {
       console.error('WebGPURenderPass.begin() failed: begin() has already been called');
       return;
@@ -391,7 +391,7 @@ export class WebGPURenderPass {
     first: number,
     count: number,
     numInstances: number
-  ): void {
+  ) {
     this.drawInternal(
       this._renderPassEncoder!,
       program,
@@ -418,7 +418,7 @@ export class WebGPURenderPass {
     count: number,
     numInstances: number,
     renderBundleEncoder?: GPURenderBundleEncoder
-  ): void {
+  ) {
     if (
       this.setBindGroupsForRender(
         renderPassEncoder,
@@ -471,7 +471,7 @@ export class WebGPURenderPass {
       }
     }
   }
-  private validateDraw(program: WebGPUProgram, bindGroups: WebGPUBindGroup[]): number {
+  private validateDraw(program: WebGPUProgram, bindGroups: WebGPUBindGroup[]) {
     let validation = 0;
     if (bindGroups) {
       for (let i = 0; i < program.bindGroupLayouts.length; i++) {
@@ -513,7 +513,7 @@ export class WebGPURenderPass {
     bindGroups: WebGPUBindGroup[],
     bindGroupOffsets: Nullable<Nullable<Iterable<number>>[]>,
     renderBundleEncoder?: GPURenderBundleEncoder
-  ): boolean {
+  ) {
     if (bindGroups) {
       for (let i = 0; i < 4; i++) {
         if (i < program.bindGroupLayouts.length) {

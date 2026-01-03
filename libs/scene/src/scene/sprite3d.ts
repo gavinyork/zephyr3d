@@ -1,12 +1,10 @@
 import type { Matrix4x4, Nullable } from '@zephyr3d/base';
 import { applyMixins, DRef, Quaternion, Vector2, Vector3 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
-import type { MeshMaterial } from '../material';
 import type { RenderPass, BatchDrawable, DrawContext, PickTarget } from '../render';
 import { Primitive } from '../render';
 import type { RenderBundle } from '@zephyr3d/device';
 import type { Scene } from './scene';
-import type { BoundingVolume } from '../utility/bounding_volume';
 import { BoundingBox } from '../utility/bounding_volume';
 import { QUEUE_OPAQUE } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
@@ -61,35 +59,35 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   /**
    * {@inheritDoc Drawable.getName}
    */
-  getName(): string {
+  getName() {
     return this._name;
   }
   /**
    * {@inheritDoc BatchDrawable.getInstanceId}
    */
-  getInstanceId(_renderPass: RenderPass): string {
+  getInstanceId(_renderPass: RenderPass) {
     return `${this._instanceHash}:${this.worldMatrixDet >= 0}`;
   }
   /**
    * {@inheritDoc BatchDrawable.getInstanceUniforms}
    */
-  getInstanceUniforms(): Float32Array<ArrayBuffer> {
+  getInstanceUniforms() {
     return this._material.get()!.$instanceUniforms;
   }
   /**
    * {@inheritDoc Drawable.getPickTarget }
    */
-  getPickTarget(): PickTarget {
+  getPickTarget() {
     return this._pickTarget;
   }
   setPickTarget(node: SceneNode, label?: string) {
     this._pickTarget = { node, label };
   }
   /** Material of the mesh */
-  get material(): MeshMaterial {
+  get material() {
     return this._material.get()!;
   }
-  set material(m: MeshMaterial) {
+  set material(m) {
     if (this._material.get() !== m && m instanceof Sprite3DMaterial) {
       this._material.set(m);
       if (m) {
@@ -102,10 +100,10 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
       this._materialChangeTag = null;
     }
   }
-  get anchorX(): number {
+  get anchorX() {
     return this._anchor.x;
   }
-  set anchorX(value: number) {
+  set anchorX(value) {
     if (this._anchor.x !== value) {
       this._anchor.x = value;
       this.invalidateWorldBoundingVolume(false);
@@ -115,10 +113,10 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
       }
     }
   }
-  get anchorY(): number {
+  get anchorY() {
     return this._anchor.y;
   }
-  set anchorY(value: number) {
+  set anchorY(value) {
     if (this._anchor.y !== value) {
       this._anchor.y = value;
       this.invalidateWorldBoundingVolume(false);
@@ -128,19 +126,19 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
       }
     }
   }
-  get uvTopLeft(): Vector2 {
+  get uvTopLeft() {
     const uvinfo = this._material.get()!.uvinfo;
     return new Vector2(uvinfo.x, uvinfo.y);
   }
-  set uvTopLeft(value: Vector2) {
+  set uvTopLeft(value) {
     const uvinfo = this._material.get()!.uvinfo;
     this._material.get()!.setUVInfo(value.x, value.y, uvinfo.z, uvinfo.w);
   }
-  get uvBottomRight(): Vector2 {
+  get uvBottomRight() {
     const uvinfo = this._material.get()!.uvinfo;
     return new Vector2(uvinfo.z, uvinfo.w);
   }
-  set uvBottomRight(value: Vector2) {
+  set uvBottomRight(value) {
     const uvinfo = this._material.get()!.uvinfo;
     this._material.get()!.setUVInfo(uvinfo.x, uvinfo.y, value.x, value.y);
   }
@@ -165,25 +163,25 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   /**
    * {@inheritDoc Drawable.getQueueType}
    */
-  getQueueType(): number {
+  getQueueType() {
     return this.material?.getQueueType() ?? QUEUE_OPAQUE;
   }
   /**
    * {@inheritDoc Drawable.isUnlit}
    */
-  isUnlit(): boolean {
+  isUnlit() {
     return !this.material?.supportLighting();
   }
   /**
    * {@inheritDoc Drawable.needSceneColor}
    */
-  needSceneColor(): boolean {
+  needSceneColor() {
     return this.material?.needSceneColor();
   }
   /**
    * {@inheritDoc Drawable.needSceneDepth}
    */
-  needSceneDepth(): boolean {
+  needSceneDepth() {
     return this.material?.needSceneDepth();
   }
   /**
@@ -216,13 +214,13 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   /**
    * {@inheritDoc Drawable.getMaterial}
    */
-  getMaterial(): MeshMaterial {
+  getMaterial() {
     return this.material;
   }
   /**
    * {@inheritDoc Drawable.getPrimitive}
    */
-  getPrimitive(): Primitive {
+  getPrimitive() {
     let primitive = Sprite3D._primitive.get();
     if (!primitive) {
       primitive = new Primitive();
@@ -242,7 +240,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   /**
    * {@inheritDoc Drawable.getNode}
    */
-  getNode(): SceneNode {
+  getNode() {
     // mesh transform should be ignored when skinned
     return this;
   }
@@ -255,7 +253,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
   /**
    * {@inheritDoc SceneNode.computeWorldBoundingVolume}
    */
-  computeWorldBoundingVolume(): Nullable<BoundingVolume> {
+  computeWorldBoundingVolume() {
     const p = this.worldMatrix.transformPointAffine(Vector3.zero());
     const mat = this._material?.get();
     if (mat) {
@@ -269,7 +267,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
     }
     return null;
   }
-  calculateLocalTransform(outMatrix: Matrix4x4): void {
+  calculateLocalTransform(outMatrix: Matrix4x4) {
     const rot = this.rotation.toEulerAngles().z;
     const rotationZ = Quaternion.fromAxisAngle(Vector3.axisPZ(), rot);
     outMatrix.compose(this._scaling, rotationZ, this._position);
@@ -280,7 +278,7 @@ export class Sprite3D extends applyMixins(GraphNode, mixinDrawable) implements B
 
     //outMatrix.scaling(this.scale).translateLeft(this._position);
   }
-  calculateWorldTransform(outMatrix: Matrix4x4): void {
+  calculateWorldTransform(outMatrix: Matrix4x4) {
     outMatrix.set(this.localMatrix);
     if (this.parent) {
       outMatrix.m03 += this.parent.worldMatrix.m03;

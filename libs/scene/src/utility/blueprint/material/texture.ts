@@ -9,7 +9,7 @@ import type {
 } from '@zephyr3d/device';
 import { DRef } from '@zephyr3d/base';
 import { getDevice } from '../../../app/api';
-import type { PropertyAccessor, SerializableClass } from '../../serialization';
+import { defineProps, type PropertyAccessor, type SerializableClass } from '../../serialization/types';
 
 /**
  * Default 1x1 white 2D texture reference
@@ -113,7 +113,7 @@ export function getDefaultTextureCube(): TextureCube {
  * @internal
  */
 const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseTextureNode>[] {
-  return [
+  return defineProps([
     {
       name: 'Name',
       type: 'string',
@@ -238,7 +238,7 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
         this.filterMip = value.str[0] as TextureFilterMode;
       }
     }
-  ];
+  ]);
 })();
 
 /**
@@ -448,7 +448,7 @@ export class ConstantTexture2DNode extends BaseTextureNode {
       name: 'Texture2DNode',
       noTitle: true,
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'Texture',
             type: 'object',
@@ -474,7 +474,7 @@ export class ConstantTexture2DNode extends BaseTextureNode {
             }
           },
           ...textureNodeProps
-        ];
+        ]);
       }
     };
   }
@@ -570,7 +570,7 @@ export class ConstantTexture2DArrayNode extends BaseTextureNode {
       name: 'Texture2DArrayNode',
       noTitle: true,
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'Texture',
             type: 'object',
@@ -589,7 +589,7 @@ export class ConstantTexture2DArrayNode extends BaseTextureNode {
             }
           },
           ...textureNodeProps
-        ];
+        ]);
       }
     };
   }
@@ -698,7 +698,7 @@ export class ConstantTextureCubeNode extends BaseTextureNode {
       name: 'TextureCubeNode',
       noTitle: true,
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'Texture',
             type: 'object',
@@ -717,7 +717,7 @@ export class ConstantTextureCubeNode extends BaseTextureNode {
             }
           },
           ...textureNodeProps
-        ];
+        ]);
       }
     };
   }
@@ -860,7 +860,7 @@ export class TextureSampleNode extends BaseGraphNode {
       ctor: TextureSampleNode,
       name: 'TextureSampleNode',
       getProps(): PropertyAccessor<TextureSampleNode>[] {
-        return [
+        return defineProps([
           {
             name: 'SamplerType',
             type: 'string',
@@ -877,7 +877,7 @@ export class TextureSampleNode extends BaseGraphNode {
               this.samplerType = value.str[0] as any;
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -1013,7 +1013,7 @@ export class TextureSampleGrad extends BaseGraphNode {
       ctor: TextureSampleNode,
       name: 'TextureSampleNode',
       getProps(): PropertyAccessor<TextureSampleNode>[] {
-        return [
+        return defineProps([
           {
             name: 'SamplerType',
             type: 'string',
@@ -1030,7 +1030,7 @@ export class TextureSampleGrad extends BaseGraphNode {
               this.samplerType = value.str[0] as any;
             }
           }
-        ];
+        ]);
       }
     };
   }

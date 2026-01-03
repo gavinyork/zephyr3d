@@ -1,7 +1,6 @@
-import type { Matrix4x4, Nullable } from '@zephyr3d/base';
+import type { Immutable, Matrix4x4, Nullable } from '@zephyr3d/base';
 import { Vector3, Vector4, DWeakRef, AABB } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
-import type { BoundingVolume } from '../utility/bounding_volume';
 import { BoundingBox } from '../utility/bounding_volume';
 import { ShadowMapper } from '../shadow/shadowmapper';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
@@ -36,14 +35,14 @@ export abstract class BaseLight extends GraphNode {
     this._diffuseIntensity = null;
   }
   /** Gets the light type */
-  get lightType(): number {
+  get lightType() {
     return this._type;
   }
   /** Intensity of the light */
   get intensity() {
     return this._intensity;
   }
-  set intensity(val: number) {
+  set intensity(val) {
     this.setIntensity(val);
   }
   /**
@@ -53,7 +52,7 @@ export abstract class BaseLight extends GraphNode {
    * Gets the position in world space of the light.
    * Light range is encoded into the W component.
    */
-  get positionAndRange(): Vector4 {
+  get positionAndRange(): Immutable<Vector4> {
     if (!this._positionRange) {
       this.computeUniforms();
     }
@@ -92,7 +91,7 @@ export abstract class BaseLight extends GraphNode {
    * The view matrix of the light is used to transform a point
    * from the world space to the light space.
    */
-  get viewMatrix(): Matrix4x4 {
+  get viewMatrix(): Immutable<Matrix4x4> {
     return this.invWorldMatrix;
   }
   /**
@@ -171,11 +170,11 @@ export class PunctualLight extends BaseLight {
     this._shadowMapper = new ShadowMapper(this);
   }
   /** Color of the light */
-  get color(): Vector4 {
+  get color() {
     return this._color.clone();
   }
-  set color(clr: Vector4) {
-    this.setColor(clr);
+  set color(color) {
+    this.setColor(color);
   }
   /**
    * Sets color of the light
@@ -188,10 +187,10 @@ export class PunctualLight extends BaseLight {
     return this;
   }
   /** Whether this light casts shadows */
-  get castShadow(): boolean {
+  get castShadow() {
     return this._castShadow;
   }
-  set castShadow(b: boolean) {
+  set castShadow(b) {
     this.setCastShadow(b);
   }
   /**
@@ -199,13 +198,13 @@ export class PunctualLight extends BaseLight {
    * @param b - true if the light casts shadows
    * @returns self
    */
-  setCastShadow(b: boolean): this {
+  setCastShadow(b: boolean) {
     if (this._castShadow !== !!b) {
       this._castShadow = !!b;
       if (!this.shadow.shadowRegion && this.isDirectionLight()) {
         const aabb = new AABB();
         aabb.beginExtend();
-        this.scene!.rootNode!.iterate((child) => {
+        this.scene!.rootNode.iterate((child) => {
           if (child.isMesh() || child.isClipmapTerrain()) {
             if (child.castShadow) {
               const bbox = child.getWorldBoundingVolume()!.toAABB();
@@ -222,7 +221,7 @@ export class PunctualLight extends BaseLight {
     return this;
   }
   /** The shadow mapper for this light */
-  get shadow(): ShadowMapper {
+  get shadow() {
     return this._shadowMapper;
   }
   /**
@@ -239,7 +238,7 @@ export class PunctualLight extends BaseLight {
     // this._transformCallback(true, false);
   }
   /** @internal */
-  computeUniforms(): void {}
+  computeUniforms() {}
 }
 
 /**
@@ -282,7 +281,7 @@ export class DirectionalLight extends PunctualLight {
   get sunLight(): boolean {
     return DirectionalLight.getSunLight(this.scene!) === this;
   }
-  set sunLight(val: boolean) {
+  set sunLight(val) {
     if (val) {
       DirectionalLight.setSunLight(this.scene!, this);
     } else if (DirectionalLight.getSunLight(this.scene!) === this) {
@@ -537,7 +536,7 @@ export class PointLight extends PunctualLight {
     return true;
   }
   /** @internal */
-  computeBoundingVolume(): BoundingVolume {
+  computeBoundingVolume() {
     const bbox = new BoundingBox();
     bbox.minPoint = new Vector3(-this._range, -this._range, -this._range);
     bbox.maxPoint = new Vector3(this._range, this._range, this._range);
@@ -622,7 +621,7 @@ export class SpotLight extends PunctualLight {
     return true;
   }
   /** @internal */
-  computeBoundingVolume(): BoundingVolume {
+  computeBoundingVolume() {
     const bbox = new BoundingBox();
     const cosCutoff = Math.cos(this._cutoff);
     const r = (this._range / cosCutoff) * Math.sqrt(1 - cosCutoff * cosCutoff);

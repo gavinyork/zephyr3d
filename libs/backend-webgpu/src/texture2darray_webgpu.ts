@@ -7,7 +7,7 @@ import type {
 } from '@zephyr3d/device';
 import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
-import type { Nullable, TypedArray } from '@zephyr3d/base';
+import type { TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 
 export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2DArray<GPUTexture> {
@@ -17,7 +17,7 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
   isTexture2DArray(): this is Texture2DArray {
     return true;
   }
-  init(): void {
+  init() {
     this.loadEmpty(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
   }
   update(
@@ -28,7 +28,7 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     width: number,
     height: number,
     depth: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
@@ -49,7 +49,7 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     srcY: number,
     width: number,
     height: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
@@ -71,17 +71,11 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
       this.uploadImageData(data, srcX, srcY, width, height, destX, destY, 0, destZ);
     }
   }
-  createEmpty(
-    format: TextureFormat,
-    width: number,
-    height: number,
-    depth: number,
-    creationFlags?: number
-  ): void {
+  createEmpty(format: TextureFormat, width: number, height: number, depth: number, creationFlags?: number) {
     this._flags = Number(creationFlags) || 0;
     this.loadEmpty(format, width, height, depth, 0);
   }
-  createWithMipmapData(data: TextureMipmapData, creationFlags?: number): void {
+  createWithMipmapData(data: TextureMipmapData, creationFlags?: number) {
     if (!data.arraySize) {
       console.error('Texture2DArray.createWithMipmapData() failed: Data is not texture array');
     } else {
@@ -95,7 +89,7 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
       }
     }
   }
-  createView(level?: number, face?: number, mipCount?: number): Nullable<GPUTextureView> {
+  createView(level?: number, face?: number, mipCount?: number) {
     return this._object
       ? this._device.gpuCreateTextureView(this._object, {
           dimension: '2d',
@@ -114,7 +108,7 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     layer: number,
     mipLevel: number,
     buffer: TypedArray
-  ): Promise<void> {
+  ) {
     if (layer < 0 || layer >= this._depth) {
       throw new Error(`Texture2DArray.readPixels(): invalid layer: ${layer}`);
     }
@@ -144,7 +138,7 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     layer: number,
     mipLevel: number,
     buffer: GPUDataBuffer
-  ): void {
+  ) {
     if (layer < 0 || layer >= this._depth) {
       throw new Error(`Texture2DArray.readPixelsToBuffer(): invalid layer: ${layer}`);
     }
@@ -159,13 +153,13 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     height: number,
     depth: number,
     numMipLevels: number
-  ): void {
+  ) {
     this.allocInternal(format, width, height, depth, numMipLevels);
     if (this._mipLevelCount > 1 && !this._device.isContextLost()) {
       this.generateMipmaps();
     }
   }
-  private loadLevels(levels: TextureMipmapData): void {
+  private loadLevels(levels: TextureMipmapData) {
     const format = levels.format;
     const width = levels.width;
     const height = levels.height;

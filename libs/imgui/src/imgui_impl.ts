@@ -66,7 +66,7 @@ export class Input {
 }
 
 /*
-function document_on_copy(event: ClipboardEvent): void {
+function document_on_copy(event: ClipboardEvent) {
     if (event.clipboardData) {
         event.clipboardData.setData("text/plain", clipboard_text);
     }
@@ -74,7 +74,7 @@ function document_on_copy(event: ClipboardEvent): void {
     event.preventDefault();
 }
 
-function document_on_cut(event: ClipboardEvent): void {
+function document_on_cut(event: ClipboardEvent) {
     if (event.clipboardData) {
         event.clipboardData.setData("text/plain", clipboard_text);
     }
@@ -82,7 +82,7 @@ function document_on_cut(event: ClipboardEvent): void {
     event.preventDefault();
 }
 
-function document_on_paste(event: ClipboardEvent): void {
+function document_on_paste(event: ClipboardEvent) {
     if (event.clipboardData) {
         clipboard_text = event.clipboardData.getData("text/plain");
     }
@@ -90,9 +90,9 @@ function document_on_paste(event: ClipboardEvent): void {
     event.preventDefault();
 }
 */
-function window_on_resize(): void {}
+function window_on_resize() {}
 
-function window_on_gamepadconnected(event: any /* GamepadEvent */): void {
+function window_on_gamepadconnected(event: any /* GamepadEvent */) {
   console.info(
     'Gamepad connected at index %d: %s. %d buttons, %d axes.',
     event.gamepad.index,
@@ -102,11 +102,11 @@ function window_on_gamepadconnected(event: any /* GamepadEvent */): void {
   );
 }
 
-function window_on_gamepaddisconnected(event: any /* GamepadEvent */): void {
+function window_on_gamepaddisconnected(event: any /* GamepadEvent */) {
   console.info('Gamepad disconnected at index %d: %s.', event.gamepad.index, event.gamepad.id);
 }
 
-function canvas_on_blur(_event: FocusEvent): void {
+function canvas_on_blur(_event: FocusEvent) {
   const io = ImGui.GetIO();
   io.KeyCtrl = false;
   io.KeyShift = false;
@@ -145,7 +145,7 @@ const key_code_to_index: Record<string, number> = {
   KeyZ: 90
 };
 
-export function canvas_on_keydown(event: KeyboardEvent): boolean {
+export function canvas_on_keydown(event: KeyboardEvent) {
   const io = ImGui.GetIO();
   io.KeyCtrl = event.ctrlKey;
   io.KeyShift = event.shiftKey;
@@ -163,7 +163,7 @@ export function canvas_on_keydown(event: KeyboardEvent): boolean {
   return false;
 }
 
-export function canvas_on_keyup(event: KeyboardEvent): boolean {
+export function canvas_on_keyup(event: KeyboardEvent) {
   const io = ImGui.GetIO();
   io.KeyCtrl = event.ctrlKey;
   io.KeyShift = event.shiftKey;
@@ -180,7 +180,7 @@ export function canvas_on_keyup(event: KeyboardEvent): boolean {
   return false;
 }
 
-export function canvas_on_keypress(event: KeyboardEvent): boolean {
+export function canvas_on_keypress(event: KeyboardEvent) {
   const io = ImGui.GetIO();
   io.AddInputCharacter(event.charCode);
   if (wantKeyboard || io.WantCaptureKeyboard || io.WantTextInput) {
@@ -189,7 +189,7 @@ export function canvas_on_keypress(event: KeyboardEvent): boolean {
   return false;
 }
 
-function canvas_on_pointermove(event: PointerEvent): boolean {
+function canvas_on_pointermove(event: PointerEvent) {
   const io = ImGui.GetIO();
   io.MousePos.x = event.offsetX;
   io.MousePos.y = event.offsetY;
@@ -214,7 +214,7 @@ const mouse_button_map: number[] = [
   4
 ];
 
-export function any_pointerdown(): boolean {
+export function any_pointerdown() {
   const io = ImGui.GetIO();
   for (let i = 0; i < io.MouseDown.length; i++) {
     if (io.MouseDown[i]) {
@@ -224,7 +224,7 @@ export function any_pointerdown(): boolean {
   return false;
 }
 
-function canvas_on_pointerdown(event: PointerEvent): boolean {
+function canvas_on_pointerdown(event: PointerEvent) {
   const io = ImGui.GetIO();
   io.MousePos.x = event.offsetX;
   io.MousePos.y = event.offsetY;
@@ -235,7 +235,7 @@ function canvas_on_pointerdown(event: PointerEvent): boolean {
   return false;
 }
 
-function canvas_on_contextmenu(_event: Event): boolean {
+function canvas_on_contextmenu(_event: Event) {
   const io = ImGui.GetIO();
   if (io.WantCaptureMouse) {
     return true;
@@ -243,7 +243,7 @@ function canvas_on_contextmenu(_event: Event): boolean {
   return false;
 }
 
-function canvas_on_pointerup(event: PointerEvent): boolean {
+function canvas_on_pointerup(event: PointerEvent) {
   const io = ImGui.GetIO();
   io.MouseDown[mouse_button_map[event.button]] = false;
   if (io.WantCaptureMouse) {
@@ -252,7 +252,7 @@ function canvas_on_pointerup(event: PointerEvent): boolean {
   return false;
 }
 
-function canvas_on_wheel(event: WheelEvent): boolean {
+function canvas_on_wheel(event: WheelEvent) {
   const io = ImGui.GetIO();
   let scale = 1.0;
   switch (event.deltaMode) {
@@ -282,7 +282,7 @@ export class ITouch {
 }
 export let multi_touch: { [key: number]: ITouch } = {};
 
-function canvas_on_touchstart(event: TouchEvent): void {
+function canvas_on_touchstart(event: TouchEvent) {
   for (let i = 0; i < event.changedTouches.length; i++) {
     const touch = event.changedTouches[i];
     touch_id = touch.identifier;
@@ -294,7 +294,7 @@ function canvas_on_touchstart(event: TouchEvent): void {
   io.MousePos.y = mtouch.y;
   io.MouseDown[0] = true;
 }
-function canvas_on_touchmove(event: TouchEvent): void {
+function canvas_on_touchmove(event: TouchEvent) {
   for (let i = 0; i < event.changedTouches.length; i++) {
     const touch = event.changedTouches[i];
     multi_touch[touch.identifier] = { x: touch.clientX, y: touch.clientY };
@@ -304,7 +304,7 @@ function canvas_on_touchmove(event: TouchEvent): void {
   io.MousePos.x = mtouch.x;
   io.MousePos.y = mtouch.y;
 }
-function canvas_on_touchend(event: TouchEvent): void {
+function canvas_on_touchend(event: TouchEvent) {
   const io = ImGui.GetIO();
   for (let i = 0; i < event.changedTouches.length; i++) {
     const touch = event.changedTouches[i];
@@ -318,13 +318,13 @@ function canvas_on_touchend(event: TouchEvent): void {
     multi_touch = {};
   }
 }
-function canvas_on_touchcancel(event: TouchEvent): void {
+function canvas_on_touchcancel(event: TouchEvent) {
   canvas_on_touchend(event);
 }
 
 export const is_contextlost = false;
 
-export function injectKeyEvent(ev: KeyboardEvent): boolean {
+export function injectKeyEvent(ev: KeyboardEvent) {
   if (ev.type === 'keydown') {
     return canvas_on_keydown(ev);
   } else if (ev.type === 'keyup') {
@@ -335,11 +335,11 @@ export function injectKeyEvent(ev: KeyboardEvent): boolean {
   return false;
 }
 
-export function injectWheelEvent(ev: WheelEvent): boolean {
+export function injectWheelEvent(ev: WheelEvent) {
   return canvas_on_wheel(ev);
 }
 
-export function injectPointerEvent(ev: PointerEvent): boolean {
+export function injectPointerEvent(ev: PointerEvent) {
   if (ev.type === 'pointermove') {
     return canvas_on_pointermove(ev);
   } else if (ev.type === 'pointerdown') {
@@ -375,7 +375,7 @@ function canvas_on_contextrestored(e:Event):void {
 }
 */
 
-export function Init(device: AbstractDevice, glyphSize): void {
+export function Init(device: AbstractDevice, glyphSize: number) {
   const io = ImGui.GetIO();
 
   if (typeof window !== 'undefined') {
@@ -397,11 +397,11 @@ export function Init(device: AbstractDevice, glyphSize): void {
     }
     */
 
-  io.SetClipboardTextFn = (user_data: any, text: string): void => {
+  io.SetClipboardTextFn = (user_data: any, text: string) => {
     clipboard_text = text;
     navigator.clipboard.writeText(clipboard_text);
   };
-  io.GetClipboardTextFn = (_user_data: any): string => {
+  io.GetClipboardTextFn = (_user_data: any) => {
     return clipboard_text;
   };
   io.ClipboardUserData = null;
@@ -452,7 +452,7 @@ export function Init(device: AbstractDevice, glyphSize): void {
   CreateDeviceObjects();
 }
 
-export function NewFrame(time: number): void {
+export function NewFrame(time: number) {
   const io = ImGui.GetIO();
 
   if (io.WantSaveIniSettings) {
@@ -548,7 +548,7 @@ export function NewFrame(time: number): void {
       const buttons_count: number = gamepad.buttons.length;
       const axes_count: number = gamepad.axes.length;
 
-      const MAP_BUTTON = function MAP_BUTTON(NAV_NO: number, BUTTON_NO: number): void {
+      const MAP_BUTTON = function MAP_BUTTON(NAV_NO: number, BUTTON_NO: number) {
         if (!gamepad) {
           return;
         }
@@ -556,7 +556,7 @@ export function NewFrame(time: number): void {
           io.NavInputs[NAV_NO] = 1.0;
         }
       };
-      const MAP_ANALOG = function MAP_ANALOG(NAV_NO: number, AXIS_NO: number, V0: number, V1: number): void {
+      const MAP_ANALOG = function MAP_ANALOG(NAV_NO: number, AXIS_NO: number, V0: number, V1: number) {
         if (!gamepad) {
           return;
         }
@@ -677,7 +677,7 @@ export function addCustomGlyph(charCode: number, font: DeviceFont) {
 }
 
 /** @internal */
-export function calcTextSize(text: string, out?: ImGui.ImVec2): ImGui.ImVec2 {
+export function calcTextSize(text: string, out?: ImGui.ImVec2) {
   const font = ImGui.GetFont();
   const fontName = font.FontSize + 'px ' + font.FontName;
   let deviceFont = fonts[fontName];
@@ -736,7 +736,7 @@ export function font_update(io: ImGui.IO) {
       glyph.U1 = glyphInfo.uMax;
       glyph.V0 = glyphInfo.vMin;
       glyph.V1 = glyphInfo.vMax;
-      glyph.TextureID = glyphManager!.getAtlasTexture(glyphInfo.atlasIndex);
+      glyph.TextureID = glyphManager!.getAtlasTexture(glyphInfo.atlasIndex) ?? null;
       font.GlyphCreated(glyph);
       glyph = font.GlyphToCreate;
     }
@@ -799,7 +799,7 @@ function scroll_update(io: ImGui.IO) {
 }
 
 let dom_input: Input;
-function input_text_update(_io: ImGui.IO): void {
+function input_text_update(_io: ImGui.IO) {
   const activeId = ImGui.GetActiveId();
   const inpId = ImGui.GetInputTextId();
   if (!activeId || activeId != inpId) {
@@ -813,7 +813,7 @@ export function ClearBuffer(color: ImGui.ImVec4) {
   renderer!.device.clearFrameBuffer(new Vector4(color.x, color.y, color.z, color.w), 1, 0);
 }
 
-export function RenderDrawData(draw_data: ImGui.DrawData | null = ImGui.GetDrawData()): void {
+export function RenderDrawData(draw_data: ImGui.DrawData | null = ImGui.GetDrawData()) {
   const io = ImGui.GetIO();
 
   font_update(io);
@@ -836,13 +836,13 @@ export function RenderDrawData(draw_data: ImGui.DrawData | null = ImGui.GetDrawD
   const pos = draw_data.DisplayPos;
   const scissorOld = renderer!.device.getScissor();
   renderer!.beginRender();
-  draw_data.IterateDrawLists((draw_list: ImGui.DrawList): void => {
+  draw_data.IterateDrawLists((draw_list: ImGui.DrawList) => {
     const vx = draw_list.VtxBuffer;
     const ix = draw_list.IdxBuffer;
     const ixU16 = new Uint16Array(ix.buffer.slice(ix.byteOffset, ix.byteOffset + ix.byteLength));
     let indexOffset = 0;
 
-    draw_list.IterateDrawCmds((draw_cmd: ImGui.DrawCmd): void => {
+    draw_list.IterateDrawCmds((draw_cmd: ImGui.DrawCmd) => {
       if (draw_cmd.UserCallback !== null) {
         // User callback (registered via ImDrawList::AddCallback)
         draw_cmd.UserCallback(draw_list, draw_cmd);
@@ -874,7 +874,7 @@ export function RenderDrawData(draw_data: ImGui.DrawData | null = ImGui.GetDrawD
   renderer!.device.setScissor(scissorOld);
 }
 
-export function CreateFontsTexture(): void {
+export function CreateFontsTexture() {
   const io = ImGui.GetIO();
 
   // Backup GL state
@@ -919,17 +919,17 @@ export function setCharCodeMap(map: Record<number, string>) {
   charCodeMap = map;
 }
 
-export function DestroyFontsTexture(): void {
+export function DestroyFontsTexture() {
   const io = ImGui.GetIO();
   io.Fonts.TexID?.dispose();
   io.Fonts.TexID = null;
 }
 
-export function CreateDeviceObjects(): void {
+export function CreateDeviceObjects() {
   CreateFontsTexture();
 }
 
-export function DestroyDeviceObjects(): void {
+export function DestroyDeviceObjects() {
   DestroyFontsTexture();
 }
 
@@ -959,36 +959,29 @@ export class Texture {
   public _height = 1;
 
   constructor(_param?: ITextureParam) {}
-  public Destroy(): void {
+  public Destroy() {
     if (this._texture) {
       this._texture.dispose();
       this._texture = null;
     }
   }
   public Update(
-    src: ImageBitmap | ImageData | HTMLCanvasElement | Uint8Array<ArrayBuffer> | Uint16Array<ArrayBuffer>,
-    param?: any
-  ): void {
-    let w, h;
-    if (src == null) {
-      if (param) {
-        w = param.width;
-        h = param.height;
-      }
+    src: ImageBitmap | ImageData | HTMLCanvasElement | Uint8Array<ArrayBuffer> | Uint16Array<ArrayBuffer>
+  ) {
+    let w: number, h: number;
+    if (!src) {
+      return;
     } else if (src instanceof HTMLVideoElement) {
       const srcVideo = src as HTMLVideoElement;
       if (srcVideo) {
         w = srcVideo.videoWidth;
         h = srcVideo.videoHeight;
+      } else {
+        return;
       }
     } else if (src instanceof Uint8Array || src instanceof Uint16Array) {
-      if (param) {
-        w = param.width;
-        h = param.height;
-      } else {
-        w = this._width;
-        h = this._height;
-      }
+      w = this._width;
+      h = this._height;
     } else {
       w = src.width;
       h = src.height;
@@ -1014,14 +1007,14 @@ export class Texture {
 export class TextureCache {
   public constructor() {}
 
-  public Destroy(): void {
+  public Destroy() {
     Object.entries(this.cache).forEach(([_key, value]) => {
       value.Destroy();
     });
     this.cache = {};
   }
 
-  public async Load(name: string, src: string): Promise<Texture> {
+  public async Load(name: string, src: string) {
     const image = new Image();
     image.crossOrigin = 'anonymous';
     image.src = src;

@@ -51,13 +51,13 @@ export class WaterShaderImpl {
     this._shadingFunc = shadingFunc;
     this._setupUniformsFunc = setupUniformsFunc;
   }
-  setupUniforms(scope: PBGlobalScope): void {
+  setupUniforms(scope: PBGlobalScope) {
     this._setupUniformsFunc?.call(this, scope);
   }
   vertex(scope: PBInsideFunctionScope, pos: PBShaderExp, xz: PBShaderExp, waveGenerator: WaveGenerator) {
     this._vertexFunc?.call(this, scope, pos, xz, waveGenerator);
   }
-  getVertexNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, useComputeShader: boolean): PBShaderExp {
+  getVertexNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, useComputeShader: boolean) {
     const pb = scope.$builder;
     pb.func('getVertexNormal', [pb.vec2('xz')], function () {
       this.$l.uv0 = pb.div(this.xz, this.sizes.x);
@@ -86,7 +86,7 @@ export class WaterShaderImpl {
       this.$l.normal = pb.normalize(pb.vec3(pb.neg(this.slope.x), 1.0, pb.neg(this.slope.y)));
       this.$return(this.normal);
     });
-    return scope.getVertexNormal(xz);
+    return scope.getVertexNormal(xz) as PBShaderExp;
   }
   shading(
     scope: PBInsideFunctionScope,
@@ -95,7 +95,7 @@ export class WaterShaderImpl {
     foamFactor: PBShaderExp,
     discardable: PBShaderExp,
     waveGenerator: WaveGenerator
-  ): PBShaderExp {
+  ) {
     return this._shadingFunc?.call(
       this,
       scope,
@@ -186,10 +186,7 @@ export function createProgramPostFFT2(
   targetFormat: TextureFormat = 'rgba32f',
   limit?: 4 | 2
 ) {
-  function getComputeFunc(
-    useComputeShader: boolean,
-    fmt: TextureFormat
-  ): (this: PBGlobalScope, pb: ProgramBuilder) => void {
+  function getComputeFunc(useComputeShader: boolean, fmt: TextureFormat) {
     return function (this: PBGlobalScope, pb: ProgramBuilder) {
       this.N2 = pb.float().uniform(0);
       if (useComputeShader) {
@@ -290,10 +287,7 @@ export function createProgramHk(
   targetFormat: TextureFormat = 'rgba32f',
   limit?: 4 | 2
 ) {
-  function getComputeFunc(
-    useComputeShader = false,
-    fmt: TextureFormat
-  ): (this: PBGlobalScope, pb: ProgramBuilder) => void {
+  function getComputeFunc(useComputeShader = false, fmt: TextureFormat) {
     return function (this: PBGlobalScope, pb: ProgramBuilder) {
       if (useComputeShader) {
         this.spectrum =
@@ -507,10 +501,7 @@ export function createProgramH0(
   threadGroupSize = 8,
   targetFormat: TextureFormat = 'rgba32f'
 ) {
-  function getComputeFunc(
-    useComputeShader = false,
-    fmt: TextureFormat
-  ): (this: PBGlobalScope, pb: ProgramBuilder) => void {
+  function getComputeFunc(useComputeShader = false, fmt: TextureFormat) {
     return function (this: PBGlobalScope, pb: ProgramBuilder) {
       if (useComputeShader) {
         this.spectrum =
@@ -672,10 +663,7 @@ export function createProgramFFT2V(
   targetFormat: TextureFormat = 'rgba32f',
   limit?: 4 | 2
 ) {
-  function getComputeFunc(
-    useComputeShader: boolean,
-    fmt: TextureFormat
-  ): (this: PBGlobalScope, pb: ProgramBuilder) => void {
+  function getComputeFunc(useComputeShader: boolean, fmt: TextureFormat) {
     return function (this: PBGlobalScope, pb: ProgramBuilder) {
       if (useComputeShader) {
         this.spectrum = pb.tex2DArray().sampleType('unfilterable-float').uniform(0);
@@ -867,10 +855,7 @@ export function createProgramFFT2H(
   targetFormat: TextureFormat = 'rgba32f',
   limit?: 4 | 2
 ) {
-  function getComputeFunc(
-    useComputeShader: boolean,
-    fmt: TextureFormat
-  ): (this: PBGlobalScope, pb: ProgramBuilder) => void {
+  function getComputeFunc(useComputeShader: boolean, fmt: TextureFormat) {
     return function (this: PBGlobalScope, pb: ProgramBuilder) {
       if (useComputeShader) {
         this.spectrum = pb.tex2DArray().sampleType('unfilterable-float').uniform(0);

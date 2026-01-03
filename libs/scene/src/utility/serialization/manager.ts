@@ -616,7 +616,7 @@ export class ResourceManager {
    *
    * @returns The serialized JSON structure.
    */
-  async serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]) {
+  async serializeObject(obj: any, json?: any, asyncTasks?: Nullable<Promise<unknown>[]>) {
     if (obj === null || obj === undefined) {
       return obj;
     }
@@ -651,7 +651,7 @@ export class ResourceManager {
   async serializeObjectProps(
     obj: any,
     json?: any,
-    asyncTasks?: Promise<unknown>[],
+    asyncTasks?: Nullable<Promise<unknown>[]>,
     info?: SerializableClass
   ) {
     if (!info) {
@@ -1243,7 +1243,7 @@ export class ResourceManager {
     obj: T,
     cls: SerializableClass,
     json: object,
-    asyncTasks?: Promise<unknown>[]
+    asyncTasks?: Nullable<Promise<unknown>[]>
   ) {
     const props = this.getPropertiesByClass(cls) ?? [];
     for (const prop of props) {

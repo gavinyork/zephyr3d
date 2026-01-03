@@ -158,20 +158,20 @@ export class GlobMatcher {
   /**
    * Test if a path is a match pattern
    */
-  test(path: string): boolean {
+  test(path: string) {
     return this.regex.test(path);
   }
 
   /**
    * Get original match pattern
    */
-  getPattern(): string {
+  getPattern() {
     return this.pattern;
   }
   /**
    * Compile the match pattern to RegExp
    */
-  private compilePattern(str: string, caseSensitive: boolean): RegExp {
+  private compilePattern(str: string, caseSensitive: boolean) {
     // The regexp we are building, as a string.
     let reStr = '';
 
@@ -356,7 +356,7 @@ export abstract class VFS extends Observable<{
    *
    * @returns Array of mount point paths
    */
-  getSimpleMountPoints(): string[] {
+  getSimpleMountPoints() {
     return Array.from(this.simpleMounts.keys());
   }
 
@@ -365,7 +365,7 @@ export abstract class VFS extends Observable<{
    *
    * @returns True if there are mounted VFS instances, false otherwise
    */
-  hasMounts(): boolean {
+  hasMounts() {
     return this.simpleMounts.size > 0;
   }
 
@@ -374,7 +374,7 @@ export abstract class VFS extends Observable<{
    * @param uri - URL to parse
    * @returns parts of data URL
    */
-  parseDataURI(uri: string): Nullable<RegExpMatchArray> {
+  parseDataURI(uri: string) {
     return uri?.match(/^data:([^;]+)/) ?? null;
   }
   /**
@@ -382,7 +382,7 @@ export abstract class VFS extends Observable<{
    * @param url - URL to check
    * @returns true if the URL is object url, otherwise false
    */
-  isObjectURL(url: string): boolean {
+  isObjectURL(url: string) {
     return typeof url === 'string' && url.startsWith('blob:');
   }
   /**
@@ -390,20 +390,20 @@ export abstract class VFS extends Observable<{
    * @param url - URL to check
    * @returns true if the URL is absolute URL, otherwise false
    */
-  isAbsoluteURL(url: string): boolean {
+  isAbsoluteURL(url: string) {
     return typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'));
   }
   /**
    * Disposes of this file system and cleans up resources. (for IndexedDB only).
    */
-  async deleteFileSystem(): Promise<void> {
+  async deleteFileSystem() {
     await this._deleteFileSystem();
   }
 
   /**
    * Delete entire database (for IndexedDB only).
    */
-  async wipe(): Promise<void> {
+  async wipe() {
     await this._wipe();
   }
 
@@ -418,7 +418,7 @@ export abstract class VFS extends Observable<{
    * console.log(`Current directory: ${cwd}`);
    * ```
    */
-  getCwd(): string {
+  getCwd() {
     return this._cwd;
   }
 
@@ -434,7 +434,7 @@ export abstract class VFS extends Observable<{
    * await fs.chdir('../documents'); // Relative path
    * ```
    */
-  async chdir(path: string): Promise<void> {
+  async chdir(path: string) {
     const normalizedPath = this.normalizePath(path);
 
     // Test directory existence
@@ -463,7 +463,7 @@ export abstract class VFS extends Observable<{
    * await fs.pushd('../other');    // Push /tmp and go to /other
    * ```
    */
-  async pushd(path: string): Promise<void> {
+  async pushd(path: string) {
     this._dirStack.push(this._cwd);
     await this.chdir(path);
   }
@@ -479,7 +479,7 @@ export abstract class VFS extends Observable<{
    * await fs.popd(); // Return to previously pushed directory
    * ```
    */
-  async popd(): Promise<void> {
+  async popd() {
     if (this._dirStack.length === 0) {
       throw new VFSError('Directory stack is empty', 'ENOENT');
     }
@@ -505,7 +505,7 @@ export abstract class VFS extends Observable<{
    * fs.normalizePath('sub/dir');     // -> /home/user/sub/dir
    * ```
    */
-  normalizePath(path: string): string {
+  normalizePath(path: string) {
     if (!path) {
       return this._cwd;
     }
@@ -538,7 +538,7 @@ export abstract class VFS extends Observable<{
    * fs.join('/tmp', 'file.txt');     // -> /tmp/file.txt
    * ```
    */
-  join(...paths: string[]): string {
+  join(...paths: string[]) {
     if (paths.length === 0) {
       return this._cwd;
     }
@@ -557,7 +557,7 @@ export abstract class VFS extends Observable<{
    * @param path - path
    * @returns Directory part of the path
    */
-  dirname(path: string): string {
+  dirname(path: string) {
     return PathUtils.dirname(path);
   }
   /**
@@ -565,7 +565,7 @@ export abstract class VFS extends Observable<{
    * @param path - path to check
    * @returns true if the path is an absolute path
    */
-  isAbsolute(path: string): boolean {
+  isAbsolute(path: string) {
     return PathUtils.isAbsolute(path);
   }
   /**
@@ -574,7 +574,7 @@ export abstract class VFS extends Observable<{
    * @param ext - Optional extension to strip (exact suffix match).
    * @returns The base name of the path.
    */
-  basename(path: string, ext?: string): string {
+  basename(path: string, ext?: string) {
     return PathUtils.basename(path, ext);
   }
   /**
@@ -582,7 +582,7 @@ export abstract class VFS extends Observable<{
    * @param path - path
    * @returns extension file name part of the path
    */
-  extname(path: string): string {
+  extname(path: string) {
     return PathUtils.extname(path);
   }
   /**
@@ -599,7 +599,7 @@ export abstract class VFS extends Observable<{
    * fs.relative('/tmp');             // -> ../../tmp
    * ```
    */
-  relative(path: string, parent?: string): string {
+  relative(path: string, parent?: string) {
     if (this.isObjectURL(path) || this.parseDataURI(path)) {
       // No relative support for ObjectURL and DataURL
       return path;
@@ -615,7 +615,7 @@ export abstract class VFS extends Observable<{
    * @returns true if parentPath is parent directory of path or parent directory is same as path
    *
    */
-  isParentOf(parentPath: string, path: string): boolean {
+  isParentOf(parentPath: string, path: string) {
     let normalizedParentPath = this.normalizePath(parentPath);
     if (normalizedParentPath !== '/' && !normalizedParentPath.endsWith('/')) {
       normalizedParentPath += '/';
@@ -645,7 +645,7 @@ export abstract class VFS extends Observable<{
    * await fs.move('/old_dir', '/new_dir');
    * ```
    */
-  async move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {
+  async move(sourcePath: string, targetPath: string, options?: MoveOptions) {
     const normalizedSource = this.normalizePath(sourcePath);
     const normalizedTarget = this.normalizePath(targetPath);
 
@@ -665,7 +665,7 @@ export abstract class VFS extends Observable<{
       }
 
       if (sourceMount && targetMount && sourceMount.vfs === targetMount.vfs) {
-        return sourceMount.vfs.move(sourceMount.relativePath, targetMount.relativePath, options);
+        sourceMount.vfs.move(sourceMount.relativePath, targetMount.relativePath, options);
       }
     }
 
@@ -690,14 +690,14 @@ export abstract class VFS extends Observable<{
    * @param path - Directory path
    * @param recursive - If true, create parent directory if not exists
    */
-  async makeDirectory(path: string, recursive?: boolean): Promise<void> {
+  async makeDirectory(path: string, recursive?: boolean) {
     const normalizedPath = this.normalizePath(path);
     if (this.simpleMounts.has(normalizedPath)) {
       throw new VFSError('Is a directory', 'EISDIR', normalizedPath);
     }
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
-      return mounted.vfs.makeDirectory(mounted.relativePath, recursive);
+      mounted.vfs.makeDirectory(mounted.relativePath, recursive);
     }
 
     if (this._readOnly) {
@@ -730,11 +730,10 @@ export abstract class VFS extends Observable<{
 
     const entries = await this._readDirectory(normalizedPath, options);
 
-    // 注入直属挂载点
     return this.injectDirectMountDirs(normalizedPath, entries, options);
   }
 
-  async deleteDirectory(path: string, recursive?: boolean): Promise<void> {
+  async deleteDirectory(path: string, recursive?: boolean) {
     const normalizedPath = this.normalizePath(path);
     const exists = await this.exists(normalizedPath);
     if (!exists) {
@@ -756,7 +755,7 @@ export abstract class VFS extends Observable<{
     }
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
-      return mounted.vfs.deleteDirectory(mounted.relativePath, recursive);
+      mounted.vfs.deleteDirectory(mounted.relativePath, recursive);
     }
 
     if (this._readOnly) {
@@ -816,14 +815,14 @@ export abstract class VFS extends Observable<{
    * @param data - Data to be written
    * @param options - Write options
    */
-  async writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions): Promise<void> {
+  async writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions) {
     const normalizedPath = this.normalizePath(path);
     if (this.simpleMounts.has(normalizedPath)) {
       throw new VFSError('Is a directory', 'EISDIR', normalizedPath);
     }
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
-      return mounted.vfs.writeFile(mounted.relativePath, data, options);
+      mounted.vfs.writeFile(mounted.relativePath, data, options);
     }
 
     if (this._readOnly) {
@@ -845,14 +844,14 @@ export abstract class VFS extends Observable<{
    * Deletes a VFS file
    * @param path - File path to delete
    */
-  async deleteFile(path: string): Promise<void> {
+  async deleteFile(path: string) {
     const normalizedPath = this.normalizePath(path);
     if (this.simpleMounts.has(normalizedPath)) {
       throw new VFSError('Is a directory', 'EISDIR', normalizedPath);
     }
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
-      return mounted.vfs.deleteFile(mounted.relativePath);
+      mounted.vfs.deleteFile(mounted.relativePath);
     }
 
     if (this._readOnly) {
@@ -911,11 +910,7 @@ export abstract class VFS extends Observable<{
    * @param dest - Destination file path
    * @param options - Copy options
    */
-  async copyFile(
-    src: string,
-    dest: string,
-    options?: { overwrite?: boolean; targetVFS?: VFS }
-  ): Promise<void> {
+  async copyFile(src: string, dest: string, options?: { overwrite?: boolean; targetVFS?: VFS }) {
     // Detect if we are copying to a mounted VFS
     const destMount = this.getMountedVFS(dest);
     const targetVFS = options?.targetVFS ?? (destMount ? destMount.vfs : this);
@@ -996,7 +991,7 @@ export abstract class VFS extends Observable<{
       targetVFS?: VFS;
       onProgress?: (current: number, total: number) => void;
     }
-  ): Promise<void> {
+  ) {
     // Detect if we are copying to mounted VFS
     const targetMount = this.getMountedVFS(targetDirectory);
     const targetVFS = options?.targetVFS ?? (targetMount ? targetMount.vfs : this);
@@ -1086,7 +1081,7 @@ export abstract class VFS extends Observable<{
    * @param options - Matching options
    * @returns Informations of matching files
    */
-  async glob(pattern: string | string[], options: GlobOptions = {}): Promise<GlobResult[]> {
+  async glob(pattern: string | string[], options: GlobOptions = {}) {
     const {
       recursive = true,
       includeHidden = false,
@@ -1203,7 +1198,7 @@ export abstract class VFS extends Observable<{
     await searchDirectory(normalizedCwd);
     return results;
   }
-  guessMIMEType(path: string): string {
+  guessMIMEType(path: string) {
     const dataUriMatchResult = this.parseDataURI(path);
     if (dataUriMatchResult) {
       return dataUriMatchResult[1];
@@ -1221,7 +1216,7 @@ export abstract class VFS extends Observable<{
    * @param path - The path where to mount the VFS
    * @param vfs - The VFS instance to mount
    */
-  async mount(path: string, vfs: VFS): Promise<void> {
+  async mount(path: string, vfs: VFS) {
     const normalizedPath = PathUtils.normalize(path);
 
     // Register mount
@@ -1252,7 +1247,7 @@ export abstract class VFS extends Observable<{
    * @param path - The path to unmount
    * @returns True if a VFS was unmounted, false otherwise
    */
-  async unmount(path: string): Promise<boolean> {
+  async unmount(path: string) {
     const normalizedPath = PathUtils.normalize(path);
     const vfs = this.simpleMounts.get(normalizedPath);
     if (!vfs) {
@@ -1292,7 +1287,7 @@ export abstract class VFS extends Observable<{
    *
    * @internal
    */
-  protected getMountedVFS(path: string): SimpleMountInfo | null {
+  protected getMountedVFS(path: string) {
     const normalizedPath = PathUtils.normalize(path);
 
     // Use sorted mount path so we can matching the longest path
@@ -1321,7 +1316,7 @@ export abstract class VFS extends Observable<{
     type: 'created' | 'deleted' | 'moved' | 'modified',
     path: string,
     itemType: 'file' | 'directory'
-  ): void {
+  ) {
     this.dispatchEvent('changed', type, path, itemType);
   }
   /**
@@ -1400,11 +1395,7 @@ export abstract class VFS extends Observable<{
   /**
    * Calculate target file path preserving relative directory structure
    */
-  private calculateTargetPath(
-    sourcePattern: string | string[],
-    sourcePath: string,
-    targetDirectory: string
-  ): string {
+  private calculateTargetPath(sourcePattern: string | string[], sourcePath: string, targetDirectory: string) {
     if (Array.isArray(sourcePattern)) {
       // For explicit file list, just use filename
       const fileName = this.basename(sourcePath);
@@ -1429,7 +1420,7 @@ export abstract class VFS extends Observable<{
   /**
    * Expand a glob pattern to a list of matching file paths
    */
-  private async expandGlobPattern(pattern: string, cwd?: string): Promise<string[]> {
+  private async expandGlobPattern(pattern: string, cwd?: string) {
     const matchedFiles: string[] = [];
 
     if (pattern.includes('*') || pattern.includes('?')) {
@@ -1460,7 +1451,7 @@ export abstract class VFS extends Observable<{
   /**
    * Extract the directory part from a glob pattern
    */
-  private extractPatternDirectory(pattern: string): string {
+  private extractPatternDirectory(pattern: string) {
     // Process absolute path
     if (pattern.startsWith('/')) {
       const parts = pattern.substring(1).split('/'); // 移除开头的 /
@@ -1493,7 +1484,7 @@ export abstract class VFS extends Observable<{
       return dirParts.length > 0 ? dirParts.join('/') : '.';
     }
   }
-  private _validateRootRestrictions(sourcePath: string, targetPath: string): void {
+  private _validateRootRestrictions(sourcePath: string, targetPath: string) {
     // Can not move root directory
     if (sourcePath === '/') {
       throw new VFSError('Cannot move root directory', 'EINVAL', sourcePath);
@@ -1522,37 +1513,29 @@ export abstract class VFS extends Observable<{
     }
   }
 
-  private injectDirectMountDirs(
-    dirPath: string,
-    entries: FileMetadata[],
-    options?: ListOptions
-  ): FileMetadata[] {
+  private injectDirectMountDirs(dirPath: string, entries: FileMetadata[], options?: ListOptions) {
     const existing = new Set(entries.map((e) => e.name));
     const parentPrefix = dirPath === '/' ? '/' : dirPath + '/';
 
     for (const mountPath of this.simpleMounts.keys()) {
-      // 必须在当前目录之下
       if (!mountPath.startsWith(parentPrefix)) {
         continue;
       }
       if (mountPath === dirPath) {
         continue;
-      } // 自身
+      }
 
-      // 取相对名
       const remainder = mountPath.slice(parentPrefix.length);
       if (remainder.length === 0) {
         continue;
       }
 
-      // 仅直属子级（remainder 不含 '/'）
       if (remainder.includes('/')) {
         continue;
       }
 
       const name = remainder;
 
-      // 已存在则不注入（本地真实目录优先显示，避免重复）
       if (existing.has(name)) {
         continue;
       }
@@ -1573,11 +1556,7 @@ export abstract class VFS extends Observable<{
     }
     return entries;
   }
-  private async _validateTypeCompatibility(
-    sourcePath: string,
-    targetPath: string,
-    options?: MoveOptions
-  ): Promise<void> {
+  private async _validateTypeCompatibility(sourcePath: string, targetPath: string, options?: MoveOptions) {
     const sourceExists = await this.exists(sourcePath);
     if (!sourceExists) {
       throw new VFSError('Source path does not exist', 'ENOENT', sourcePath);

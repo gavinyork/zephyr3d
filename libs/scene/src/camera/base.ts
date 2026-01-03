@@ -231,14 +231,14 @@ export class BaseCameraController {
    * Called automatically when a camera is attached via `_setCamera`. Subclasses
    * should override this to reset accumulators, velocities, targets, etc.
    */
-  reset(): void {}
+  reset() {}
   /**
    * Handle pointer down (mouse/touch/pen) events.
    *
    * @param evt - The pointer event.
    * @returns `true` if handled and should stop further processing; otherwise `false`.
    */
-  onMouseDown(evt: IControllerPointerDownEvent): boolean {
+  onMouseDown(evt: IControllerPointerDownEvent) {
     return this._onMouseDown(evt);
   }
   /**
@@ -247,7 +247,7 @@ export class BaseCameraController {
    * @param evt - The pointer event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onMouseUp(evt: IControllerPointerUpEvent): boolean {
+  onMouseUp(evt: IControllerPointerUpEvent) {
     return this._onMouseUp(evt);
   }
   /**
@@ -258,7 +258,7 @@ export class BaseCameraController {
    * @param evt - The wheel event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onMouseWheel(evt: IControllerWheelEvent): boolean {
+  onMouseWheel(evt: IControllerWheelEvent) {
     return this._onMouseWheel(evt);
   }
   /**
@@ -269,7 +269,7 @@ export class BaseCameraController {
    * @param evt - The pointer event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onMouseMove(evt: IControllerPointerMoveEvent): boolean {
+  onMouseMove(evt: IControllerPointerMoveEvent) {
     return this._onMouseMove(evt);
   }
   /**
@@ -280,7 +280,7 @@ export class BaseCameraController {
    * @param evt - The keyboard event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onKeyDown(evt: IControllerKeydownEvent): boolean {
+  onKeyDown(evt: IControllerKeydownEvent) {
     return this._onKeyDown(evt);
   }
   /**
@@ -289,7 +289,7 @@ export class BaseCameraController {
    * @param evt - The keyboard event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onKeyUp(evt: IControllerKeyupEvent): boolean {
+  onKeyUp(evt: IControllerKeyupEvent) {
     return this._onKeyUp(evt);
   }
   /**
@@ -302,7 +302,7 @@ export class BaseCameraController {
    *
    * Called once per frame by the owning system.
    */
-  update(): void {}
+  update() {}
   /**
    * Mouse down event handler
    * @param evt - Mouse event

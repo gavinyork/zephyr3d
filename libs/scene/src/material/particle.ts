@@ -43,7 +43,7 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
    *
    * @returns A cloned `ParticleMaterial`.
    */
-  clone(): ParticleMaterial {
+  clone() {
     const other = new ParticleMaterial();
     other.copyFrom(this);
     return other;
@@ -54,7 +54,7 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
    * @param other - The source material to copy from.
    * @returns void
    */
-  copyFrom(other: this): void {
+  copyFrom(other: this) {
     super.copyFrom(other);
     this.jitterPower = other.jitterPower;
     this.aspect = other.aspect;
@@ -292,7 +292,7 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
    * @param pass - The current material pass.
    * @returns void
    */
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setValue('params', this._params);
     if (this.needFragmentColor(ctx)) {

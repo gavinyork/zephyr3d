@@ -57,19 +57,19 @@ export class SceneRenderer {
   /** @internal */
   private static readonly _clusters: ClusteredLight[] = [];
   /** lighting render pass */
-  static get sceneRenderPass(): LightPass {
+  static get sceneRenderPass() {
     return this._scenePass;
   }
   /** depth render pass */
-  static get depthRenderPass(): DepthPass {
+  static get depthRenderPass() {
     return this._depthPass;
   }
   /** shadow map render pass */
-  static get shadowMapRenderPass(): ShadowMapPass {
+  static get shadowMapRenderPass() {
     return this._shadowMapPass;
   }
   /** @internal */
-  static getClusteredLight(): ClusteredLight {
+  static getClusteredLight() {
     if (this._clusters.length > 0) {
       return this._clusters.pop()!;
     }
@@ -85,7 +85,7 @@ export class SceneRenderer {
    * @param camera - The camera that will be used to render the scene
    * @param compositor - The compositor that will be used to apply postprocess effects
    */
-  static renderScene(scene: Scene, camera: Camera): void {
+  static renderScene(scene: Scene, camera: Camera) {
     const device = getDevice();
     const colorFormat =
       camera.HDR && device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
@@ -332,7 +332,7 @@ export class SceneRenderer {
     return depthFramebuffer;
   }
   /** @internal */
-  protected static _renderScene(ctx: DrawContext): void {
+  protected static _renderScene(ctx: DrawContext) {
     const device = ctx.device;
 
     // Cull scene
@@ -441,7 +441,7 @@ export class SceneRenderer {
       ctx.sunLight!.color = sunLightColor;
     }
   }
-  private static _getSkyMotionVectorProgram(ctx: DrawContext): GPUProgram {
+  private static _getSkyMotionVectorProgram(ctx: DrawContext) {
     if (!this._skyMotionVectorProgram) {
       this._skyMotionVectorProgram = ctx.device.buildRenderProgram({
         vertex(pb) {
@@ -529,7 +529,7 @@ export class SceneRenderer {
     ctx.device.popDeviceStates();
   }
   /** @internal */
-  private static decodeNormalizedFloat(rgba: Uint8Array<ArrayBuffer>): number {
+  private static decodeNormalizedFloat(rgba: Uint8Array<ArrayBuffer>) {
     const a = rgba[0] / 255;
     const b = rgba[1] / 255;
     const c = rgba[2] / 255;

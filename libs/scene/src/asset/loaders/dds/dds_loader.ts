@@ -9,7 +9,7 @@ import { getDevice } from '../../../app/api';
  * @internal
  */
 export class DDSLoader extends AbstractTextureLoader {
-  supportMIMEType(mimeType: string): boolean {
+  supportMIMEType(mimeType: string) {
     return mimeType === 'image/dds' || mimeType === 'image/x-dds';
   }
   async load(
@@ -18,7 +18,7 @@ export class DDSLoader extends AbstractTextureLoader {
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: Nullable<BaseTexture>
-  ): Promise<Nullable<BaseTexture>> {
+  ) {
     const arrayBuffer = data instanceof ArrayBuffer ? data : data.buffer;
     const offset = data instanceof ArrayBuffer ? 0 : data.byteOffset;
     const mipmapLevelData = getDDSMipLevelsInfo(arrayBuffer, offset);

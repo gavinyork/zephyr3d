@@ -8,7 +8,7 @@ export class SamplerCache {
     this._device = device;
     this._samplers = {};
   }
-  fetchSampler(options: SamplerOptions): WebGPUTextureSampler {
+  fetchSampler(options: SamplerOptions) {
     const hash = this.hash(options);
     let sampler = this._samplers[hash];
     if (!sampler) {
@@ -17,7 +17,7 @@ export class SamplerCache {
     }
     return sampler;
   }
-  private hash(options: SamplerOptions): string {
+  private hash(options: SamplerOptions) {
     const addressU = options.addressU ? String(options.addressU) : '';
     const addressV = options.addressV ? String(options.addressV) : '';
     const addressW = options.addressW ? String(options.addressW) : '';
@@ -30,7 +30,7 @@ export class SamplerCache {
     const maxAnisotropy = options.maxAnisotropy ? String(options.maxAnisotropy) : '';
     return `${addressU}:${addressV}:${addressW}:${magFilter}:${minFilter}:${mipFilter}:${lodMin}:${lodMax}:${compare}:${maxAnisotropy}`;
   }
-  private createSampler(options: SamplerOptions): WebGPUTextureSampler {
+  private createSampler(options: SamplerOptions) {
     return new WebGPUTextureSampler(this._device, options);
   }
 }

@@ -25,23 +25,23 @@ export class BlinnMaterial
     super();
     this.useFeature(BlinnMaterial.FEATURE_VERTEX_NORMAL, true);
   }
-  clone(): BlinnMaterial {
+  clone() {
     const other = new BlinnMaterial();
     other.copyFrom(this);
     return other;
   }
   /** true if vertex normal attribute presents */
-  get vertexNormal(): boolean {
-    return this.featureUsed(BlinnMaterial.FEATURE_VERTEX_NORMAL);
+  get vertexNormal() {
+    return this.featureUsed<boolean>(BlinnMaterial.FEATURE_VERTEX_NORMAL);
   }
-  set vertexNormal(val: boolean) {
+  set vertexNormal(val) {
     this.useFeature(BlinnMaterial.FEATURE_VERTEX_NORMAL, !!val);
   }
   /** true if vertex normal attribute presents */
-  get vertexTangent(): boolean {
-    return this.featureUsed(BlinnMaterial.FEATURE_VERTEX_TANGENT);
+  get vertexTangent() {
+    return this.featureUsed<boolean>(BlinnMaterial.FEATURE_VERTEX_TANGENT);
   }
-  set vertexTangent(val: boolean) {
+  set vertexTangent(val) {
     this.useFeature(BlinnMaterial.FEATURE_VERTEX_TANGENT, !!val);
   }
   vertexShader(scope: PBFunctionScope) {

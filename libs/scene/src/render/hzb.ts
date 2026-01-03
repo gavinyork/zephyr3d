@@ -189,7 +189,7 @@ float3 hi_z_trace(float3 p, float3 v, in uint camera, out uint iterations) {
 }
 */
 
-function buildHZBProgram(device: AbstractDevice): GPUProgram {
+function buildHZBProgram(device: AbstractDevice) {
   const program = device.buildRenderProgram({
     label: 'HZBBuilder',
     vertex(pb) {
@@ -235,7 +235,7 @@ function buildHiZLevel(
   miplevel: number,
   srcTexture: Texture2D,
   dstTexture: Texture2D
-): void {
+) {
   const sampler = fetchSampler('clamp_nearest');
   const framebuffer = device.pool.fetchTemporalFramebuffer(
     false,

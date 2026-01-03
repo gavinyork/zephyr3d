@@ -65,7 +65,7 @@ export class AABBTree {
     vertices: number[] | TypedArray,
     indices: number[] | TypedArray,
     primitiveType: PrimitiveType
-  ): void {
+  ) {
     this._primitivesInfo = {
       vertices: [],
       indices: null,
@@ -89,7 +89,7 @@ export class AABBTree {
    * @param ray - The ray being traced
    * @returns true if the ray hits the AABB tree, false otherwise
    */
-  rayIntersectionTest(ray: Ray): boolean {
+  rayIntersectionTest(ray: Ray) {
     return this._nodes!.length > 0 ? this._rayIntersectionTest(0, ray) : false;
   }
   /**
@@ -97,21 +97,21 @@ export class AABBTree {
    * @param ray - The ray being traced
    * @returns The distance between the ray origin and the hit point if the ray hits the AABB tree, null otherwise
    */
-  rayIntersectionDistance(ray: Ray): Nullable<number> {
+  rayIntersectionDistance(ray: Ray) {
     return this._nodes!.length > 0 ? this._rayIntersectionDistance(0, ray) : null;
   }
   /**
    * Gets the top level bounding box of the tree
    * @returns The top level bounding box
    */
-  getTopLevelAABB(): Nullable<AABB> {
+  getTopLevelAABB() {
     return this._nodes!.length > 0 ? this._nodes![0].box : null;
   }
   /**
    * Transform the tree by a matrix
    * @param matrix - The transform matrix
    */
-  transform(matrix: Matrix4x4): void {
+  transform(matrix: Matrix4x4) {
     if (matrix && this._primitivesInfo && this._primitivesInfo.vertices) {
       for (const vert of this._primitivesInfo.vertices) {
         matrix.transformPointAffine(vert, vert);
@@ -128,7 +128,7 @@ export class AABBTree {
     }
   }
   /** @internal */
-  private _verifyNode(nodeIndex: number): number {
+  private _verifyNode(nodeIndex: number) {
     const node = this._nodes![nodeIndex];
     if (!node) {
       throw new Error(`AABB tree verification failed: invalid node index: ${nodeIndex}`);
@@ -238,7 +238,7 @@ export class AABBTree {
     triangles: number[],
     triangleMin: [number, number, number][],
     triangleMax: [number, number, number][]
-  ): number {
+  ) {
     const dx = extents.x,
       dy = extents.y,
       dz = extents.z;
@@ -301,7 +301,7 @@ export class AABBTree {
     }
   }
   /** @internal */
-  private _rayIntersectionDistance(nodeIndex: number, ray: Ray): Nullable<number> {
+  private _rayIntersectionDistance(nodeIndex: number, ray: Ray) {
     const node = this._nodes![nodeIndex];
     if (!ray.bboxIntersectionTest(node.box)) {
       return null;
@@ -342,7 +342,7 @@ export class AABBTree {
     return minDist === Number.MAX_VALUE ? null : minDist;
   }
   /** @internal */
-  private _rayIntersectionTest(nodeIndex: number, ray: Ray): boolean {
+  private _rayIntersectionTest(nodeIndex: number, ray: Ray) {
     const node = this._nodes![nodeIndex];
     if (!ray.bboxIntersectionTest(node.box)) {
       return false;
@@ -376,7 +376,7 @@ export class AABBTree {
     return false;
   }
   /** @internal */
-  private _getTriangle(n: number, out: [number, number, number]): Nullable<[number, number, number]> {
+  private _getTriangle(n: number, out: [number, number, number]) {
     const indices = this._primitivesInfo!.indices;
     let v0: number, v1: number, v2: number;
     out = out || [0, 0, 0];

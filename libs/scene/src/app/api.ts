@@ -1,7 +1,4 @@
-import type { AbstractDevice } from '@zephyr3d/device';
 import type { Application } from './app';
-import type { Engine } from './engine';
-import type { InputManager } from '.';
 
 /** @internal */
 export let appInstance: Application;
@@ -19,7 +16,7 @@ export function setApp(app: Application) {
  * @public
  */
 
-export function getApp(): Application {
+export function getApp() {
   return appInstance;
 }
 
@@ -30,8 +27,8 @@ export function getApp(): Application {
  *
  * @public
  */
-export function getEngine(): Engine {
-  return appInstance?.engine ?? null;
+export function getEngine() {
+  return appInstance!.engine!;
 }
 
 /**
@@ -41,8 +38,8 @@ export function getEngine(): Engine {
  *
  * @public
  */
-export function getDevice(): AbstractDevice {
-  return appInstance?.device ?? null;
+export function getDevice() {
+  return appInstance!.device!;
 }
 
 /**
@@ -53,6 +50,6 @@ export function getDevice(): AbstractDevice {
  * @public
  */
 
-export function getInput(): InputManager {
-  return appInstance?.inputManager ?? null;
+export function getInput() {
+  return appInstance!.inputManager!;
 }

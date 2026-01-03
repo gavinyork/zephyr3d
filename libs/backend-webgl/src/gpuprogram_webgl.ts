@@ -1,14 +1,7 @@
 import { WebGLGPUObject } from './gpuobject_webgl';
 import { isWebGL2 } from './utils';
 import { WebGLEnum } from './webgl_enum';
-import type {
-  PBStructTypeInfo,
-  GPUProgram,
-  BindGroupLayout,
-  BindPointInfo,
-  StructuredBuffer,
-  ShaderKind
-} from '@zephyr3d/device';
+import type { PBStructTypeInfo, GPUProgram, BindGroupLayout, ShaderKind } from '@zephyr3d/device';
 import { semanticList } from '@zephyr3d/device';
 import type { WebGLTextureSampler } from './sampler_webgl';
 import type { WebGLBaseTexture } from './basetexture_webgl';
@@ -82,13 +75,13 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     this._vertexAttributes = [...vertexAttributes];
     this.load();
   }
-  get type(): 'render' | 'compute' {
-    return 'render';
+  get type() {
+    return 'render' as const;
   }
-  getCompileError(): Nullable<string> {
+  getCompileError() {
     return this._error;
   }
-  getShaderSource(kind: ShaderKind): Nullable<string> {
+  getShaderSource(kind: ShaderKind) {
     switch (kind) {
       case 'vertex':
         return this._vs;
@@ -98,7 +91,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
         return null;
     }
   }
-  getBindingInfo(name: string): Nullable<BindPointInfo> {
+  getBindingInfo(name: string) {
     for (let group = 0; group < this._bindGroupLayouts.length; group++) {
       const layout = this._bindGroupLayouts[group];
       const bindName = layout.nameMap?.[name] ?? name;
@@ -180,19 +173,15 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
   isProgram(): this is GPUProgram {
     return true;
   }
-  use(): boolean {
+  use() {
     if (this !== this._device.context._currentProgram) {
       if (!this.checkLoad()) {
         return false;
       }
-      /*
-      this._device.context._currentProgram = this;
-      this._device.context.useProgram(this._object);
-      */
     }
     return true;
   }
-  createUniformBuffer(uniform: string): Nullable<StructuredBuffer<unknown>> {
+  createUniformBuffer(uniform: string) {
     const type = this.getBindingInfo(uniform)?.type as PBStructTypeInfo;
     return type ? this.device.createStructuredBuffer(type, { usage: 'uniform' }) : null;
   }
@@ -206,7 +195,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
       this.setUniform(`${name}[${i}]`, value[i]);
     }
   }
-  private load(): void {
+  private load() {
     if (this._device.isContextLost()) {
       return;
     }
@@ -229,7 +218,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     }
     gl.linkProgram(this._object);
   }
-  private checkLoad(): boolean {
+  private checkLoad() {
     if (!this._object) {
       return false;
     }
@@ -446,19 +435,6 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
         this._blockInfo[name] = { index, used, size, uniformIndices };
         gl.uniformBlockBinding(this._object!, index, index);
       }
-      /*
-      const indices: number[] = this._uniformInfo.map(val => val.index);
-      const types = gl.getActiveUniforms(this._object, indices, WebGLEnum.UNIFORM_TYPE);
-      const sizes = gl.getActiveUniforms(this._object, indices, WebGLEnum.UNIFORM_SIZE);
-      const blockIndices = gl.getActiveUniforms(this._object, indices, WebGLEnum.UNIFORM_BLOCK_INDEX);
-      const offsets = gl.getActiveUniforms(this._object, indices, WebGLEnum.UNIFORM_OFFSET);
-      this._uniformInfo.forEach((val, index) => {
-        val.type = types[index];
-        val.size = sizes[index];
-        val.blockIndex = blockIndices[index];
-        val.offset = offsets[index];
-      });
-      */
     }
     return uniformSetters;
   }
@@ -617,10 +593,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
         };
     */
   }
-  private getTypedArrayInfo(type: number): {
-    ctor: TypedArrayConstructor<UniformBlockArray>;
-    elementSize: number;
-  } {
+  private getTypedArrayInfo(type: number) {
     let ctor: Nullable<TypedArrayConstructor<UniformBlockArray>> = null;
     let elementSize = 0;
     switch (type) {

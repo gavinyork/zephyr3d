@@ -175,7 +175,7 @@ export class PBRBluePrintMaterial
    *
    * @returns A new {@link PBRBluePrintMaterial} instance.
    */
-  clone(): PBRBluePrintMaterial {
+  clone() {
     const other = new PBRBluePrintMaterial(
       this._irFrag,
       this._irVertex,
@@ -190,7 +190,7 @@ export class PBRBluePrintMaterial
    *
    * @param scope - The current vertex shader function scope.
    */
-  vertexShader(scope: PBFunctionScope): void {
+  vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$inputs.zVertexPos = pb.vec3().attrib('position');
@@ -237,7 +237,7 @@ export class PBRBluePrintMaterial
    *
    * @param scope - The current fragment shader function scope.
    */
-  fragmentShader(scope: PBFunctionScope): void {
+  fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     const pb = scope.$builder;
     if (this.needFragmentColor()) {
@@ -300,7 +300,7 @@ export class PBRBluePrintMaterial
    * @param ctx - The current draw context.
    * @param pass - Index of the active render pass.
    */
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)) {
       for (const u of this._uniformValues) {
@@ -324,7 +324,7 @@ export class PBRBluePrintMaterial
    *
    * @returns A hash string that uniquely identifies this material configuration.
    */
-  protected _createHash(): string {
+  protected _createHash() {
     return `${super._createHash()}:${this._irFrag.hash}:${this._irVertex.hash}`;
   }
   /**
@@ -356,7 +356,7 @@ export class PBRBluePrintMaterial
    * This method is intended to be called by the engine's resource
    * management system rather than directly by user code.
    */
-  protected onDispose(): void {
+  protected onDispose() {
     super.onDispose();
     for (const u of this._uniformTextures) {
       u.finalTexture!.dispose();

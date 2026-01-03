@@ -40,22 +40,22 @@ export abstract class WebGLGPUObject<T> extends Disposable implements GPUObject<
   get device(): AbstractDevice {
     return this._device;
   }
-  get object(): Nullable<T> {
+  get object() {
     return this._object;
   }
-  get restoreHandler(): Nullable<(obj: GPUObject) => void> {
+  get restoreHandler() {
     return this._restoreHandler;
   }
   set restoreHandler(handler: Nullable<(obj: GPUObject) => void>) {
     this._restoreHandler = handler;
   }
-  get uid(): number {
+  get uid() {
     return this._uid;
   }
-  get cid(): number {
+  get cid() {
     return this._cid;
   }
-  get name(): string {
+  get name() {
     return this._name;
   }
   set name(val: string) {
@@ -101,19 +101,19 @@ export abstract class WebGLGPUObject<T> extends Disposable implements GPUObject<
   isBindGroup(): this is BindGroup {
     return false;
   }
-  reload(): void {
+  reload() {
     if (this.disposed) {
       this._device.restoreObject(this);
       this._cid++;
     }
   }
-  destroy(): void {
+  destroy() {
     throw new Error('Abstract function call: destroy()');
   }
-  restore(): void {
+  restore() {
     throw new Error('Abstract function call: restore()');
   }
-  protected onDispose(): void {
+  protected onDispose() {
     super.onDispose();
     this._device.disposeObject(this, true);
   }

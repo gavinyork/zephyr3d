@@ -48,12 +48,7 @@ export class TAA extends AbstractPostEffect {
     ctx.device.popDeviceStates();
     ctx.device.pool.releaseFrameBuffer(fb);
   }
-  apply(
-    ctx: DrawContext,
-    inputColorTexture: Texture2D,
-    sceneDepthTexture: Texture2D,
-    srgbOutput: boolean
-  ): void {
+  apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const data = ctx.camera.getHistoryData();
     if (
       !data.prevColorTex ||
@@ -106,13 +101,13 @@ export class TAA extends AbstractPostEffect {
     ctx.device.pool.retainTexture(ctx.motionVectorTexture!);
     data.prevMotionVectorTex = ctx.motionVectorTexture!;
   }
-  requireLinearDepthTexture(_ctx: DrawContext): boolean {
+  requireLinearDepthTexture(_ctx: DrawContext) {
     return true;
   }
-  requireDepthAttachment(_ctx: DrawContext): boolean {
+  requireDepthAttachment(_ctx: DrawContext) {
     return true;
   }
-  private static _getSkyMotionVectorProgram(ctx: DrawContext): GPUProgram {
+  private static _getSkyMotionVectorProgram(ctx: DrawContext) {
     if (!this._skyMotionVectorProgram) {
       this._skyMotionVectorProgram = ctx.device.buildRenderProgram({
         vertex(pb) {
@@ -160,7 +155,7 @@ export class TAA extends AbstractPostEffect {
     }
     return this._box;
   }
-  private static _getResolveProgram(ctx: DrawContext, debug: number): GPUProgram {
+  private static _getResolveProgram(ctx: DrawContext, debug: number) {
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         this.flip = pb.int().uniform(0);

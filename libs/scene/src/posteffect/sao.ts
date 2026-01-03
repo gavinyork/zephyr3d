@@ -26,16 +26,16 @@ class DepthLimitAOBlurBlitter extends BilateralBlurBlitter {
     super(finalPhase);
     this._packed = false;
   }
-  get packed(): boolean {
+  get packed() {
     return this._packed;
   }
-  set packed(val: boolean) {
+  set packed(val) {
     if (this._packed !== !!val) {
       this._packed = !!val;
       this.invalidateHash();
     }
   }
-  protected calcHash(): string {
+  protected calcHash() {
     return `${this._packed}:${super.calcHash()}`;
   }
   readTexel(
@@ -45,7 +45,7 @@ class DepthLimitAOBlurBlitter extends BilateralBlurBlitter {
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'float' | 'int' | 'uint' | 'depth'
-  ): PBShaderExp {
+  ) {
     const pb = scope.$builder;
     const texel = super.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
     if (this._packed) {
@@ -54,7 +54,7 @@ class DepthLimitAOBlurBlitter extends BilateralBlurBlitter {
       return pb.vec4(texel.rrr, 1);
     }
   }
-  writeTexel(scope: PBInsideFunctionScope, type: BlitType, uv: PBShaderExp, texel: PBShaderExp): PBShaderExp {
+  writeTexel(scope: PBInsideFunctionScope, type: BlitType, uv: PBShaderExp, texel: PBShaderExp) {
     const pb = scope.$builder;
     const outTexel = super.writeTexel(scope, type, uv, pb.vec4(texel.rrr, 1));
     return this._finalPhase || !this._packed
@@ -105,70 +105,70 @@ export class SAO extends AbstractPostEffect {
     this._blitterV.stdDev = 10;
   }
   /** Scale value */
-  get scale(): number {
+  get scale() {
     return this._saoScale;
   }
-  set scale(val: number) {
+  set scale(val) {
     this._saoScale = val;
   }
   /** Bias value */
-  get bias(): number {
+  get bias() {
     return this._saoBias;
   }
-  set bias(val: number) {
+  set bias(val) {
     this._saoBias = val;
   }
   /** Radius value */
-  get radius(): number {
+  get radius() {
     return this._saoRadius;
   }
-  set radius(val: number) {
+  set radius(val) {
     this._saoRadius = val;
   }
   /** SAO intensity */
-  get intensity(): number {
+  get intensity() {
     return this._saoIntensity;
   }
-  set intensity(val: number) {
+  set intensity(val) {
     this._saoIntensity = val;
   }
   /** Minimum resolution */
-  get minResolution(): number {
+  get minResolution() {
     return this._saoMinResolution;
   }
-  set minResolution(val: number) {
+  set minResolution(val) {
     this._saoMinResolution = val;
   }
   /** Blur kernel size */
-  get blurKernelSize(): number {
+  get blurKernelSize() {
     return this._blitterH.kernelRadius;
   }
-  set blurKernelSize(val: number) {
+  set blurKernelSize(val) {
     val = Math.min(64, Math.max(0, val >> 0));
     this._blitterH.kernelRadius = val;
     this._blitterV.kernelRadius = val;
   }
   /** Gaussian blur stddev value */
-  get blurStdDev(): number {
+  get blurStdDev() {
     return this._blitterH.stdDev;
   }
-  set blurStdDev(val: number) {
+  set blurStdDev(val) {
     this._blitterH.stdDev = val;
     this._blitterV.stdDev = val;
   }
   /** Cutoff of depth limited blur */
-  get blurDepthCutoff(): number {
+  get blurDepthCutoff() {
     return this._saoBlurDepthCutoff;
   }
-  set blurDepthCutoff(val: number) {
+  set blurDepthCutoff(val) {
     this._saoBlurDepthCutoff = val;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
-  requireLinearDepthTexture(): boolean {
+  requireLinearDepthTexture() {
     return true;
   }
   /** {@inheritDoc AbstractPostEffect.requireDepthAttachment} */
-  requireDepthAttachment(): boolean {
+  requireDepthAttachment() {
     return true;
   }
   /** {@inheritDoc AbstractPostEffect.apply} */

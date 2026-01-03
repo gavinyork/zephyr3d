@@ -67,25 +67,25 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     }
     return this._bindGroup;
   }
-  get layoutDescriptor(): Nullable<GPUBindGroupLayoutDescriptor> {
+  get layoutDescriptor() {
     if (!this._bindGroup) {
       this._bindGroup = this._create();
     }
     return this._layoutDesc;
   }
-  get entries(): Nullable<GPUBindGroupEntry[]> {
+  get entries() {
     if (!this._bindGroup) {
       this._bindGroup = this._create();
     }
     return this._entries;
   }
-  getGPUId(): string {
+  getGPUId() {
     return `${this._uid}:${this._gpuId}`;
   }
-  get bufferList(): WebGPUBuffer[] {
+  get bufferList() {
     return this._buffers;
   }
-  get textureList(): WebGPUBaseTexture[] {
+  get textureList() {
     return this._textures;
   }
   invalidate() {
@@ -98,7 +98,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   getDynamicOffsets(): Nullable<Immutable<number[]>> {
     return this._dynamicOffsets;
   }
-  getBuffer(name: string, nocreate = true): Nullable<GPUDataBuffer> {
+  getBuffer(name: string, nocreate = true) {
     return this._getBuffer(
       name,
       GPUResourceUsageFlags.BF_UNIFORM | GPUResourceUsageFlags.BF_STORAGE,
@@ -179,7 +179,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
       }
     }
   }
-  getTexture(name: string): Nullable<BaseTexture> {
+  getTexture(name: string) {
     const entry = this._findTextureLayout(name);
     if (entry) {
       const t = this._resources[name] as [WebGPUBaseTexture, GPUTextureView];
@@ -390,16 +390,12 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     return null;
   }
   /** @internal */
-  private _getBuffer(name: string, usage: number, nocreate = false): Nullable<GPUDataBuffer> {
+  private _getBuffer(name: string, usage: number, nocreate = false) {
     const info = this._getBufferInfo(name, usage, nocreate);
     return info?.[0] ?? null;
   }
   /** @internal */
-  private _getBufferInfo(
-    name: string,
-    usage: number,
-    nocreate = false
-  ): Nullable<[WebGPUBuffer, number, number]> {
+  private _getBufferInfo(name: string, usage: number, nocreate = false) {
     const bindName = this._layout.nameMap?.[name] ?? name;
     for (const entry of this._layout.entries) {
       if (entry.buffer && entry.name === bindName) {
@@ -435,7 +431,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     return null;
   }
   /** @internal */
-  private _create(): Nullable<GPUBindGroup> {
+  private _create() {
     let bindGroup: Nullable<GPUBindGroup> = null;
     this._layoutDesc = null;
     this._entries = null;

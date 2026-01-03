@@ -5,7 +5,7 @@ export class VertexLayoutCache {
   constructor() {
     this._layouts = {};
   }
-  fetchVertexLayout(hash: string): GPUVertexBufferLayout[] {
+  fetchVertexLayout(hash: string) {
     let layouts: GPUVertexBufferLayout[] = this._layouts[hash];
     if (!layouts) {
       layouts = [];

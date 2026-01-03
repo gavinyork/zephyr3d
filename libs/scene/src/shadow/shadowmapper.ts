@@ -177,14 +177,14 @@ export class ShadowMapper {
     this.esmDepthScale = other.esmDepthScale;
   }
   /** The light that is used to generate shadow map */
-  get light(): PunctualLight {
+  get light() {
     return this._light;
   }
   /** Size of the shadow map */
-  get shadowMapSize(): number {
+  get shadowMapSize() {
     return this._config.shadowMapSize;
   }
-  set shadowMapSize(num: number) {
+  set shadowMapSize(num) {
     if (!Number.isInteger(num) || num < 1) {
       console.error(`invalid shadow map size: ${num}`);
       return;
@@ -202,17 +202,17 @@ export class ShadowMapper {
     this._shadowRegion = region;
   }
   /** Maximum distance from the camera, shadow will not be rendered beyond this range */
-  get shadowDistance(): number {
+  get shadowDistance() {
     return this._shadowDistance;
   }
-  set shadowDistance(val: number) {
+  set shadowDistance(val) {
     this._shadowDistance = Math.max(0, val);
   }
   /** Count of the cascades, The maximum value is 4 */
-  get numShadowCascades(): number {
+  get numShadowCascades() {
     return this._config.numCascades;
   }
-  set numShadowCascades(num: number) {
+  set numShadowCascades(num) {
     if (num !== 1 && num !== 2 && num !== 3 && num !== 4) {
       console.error(`invalid shadow cascade number: ${num}`);
       return;
@@ -227,61 +227,49 @@ export class ShadowMapper {
     }
   }
   /** The split lambda for cascaded shadow mapping */
-  get splitLambda(): number {
+  get splitLambda() {
     return this._config.splitLambda;
   }
-  set splitLambda(val: number) {
+  set splitLambda(val) {
     if (this._config.splitLambda !== val) {
       this._config.splitLambda = val;
     }
   }
   /** Depth bias for the shadow map */
-  get depthBias(): number {
+  get depthBias() {
     return this._config.depthBias;
   }
-  set depthBias(val: number) {
+  set depthBias(val) {
     this._config.depthBias = val;
   }
   /** Normal bias for the shadow map */
-  get normalBias(): number {
+  get normalBias() {
     return this._config.normalBias;
   }
-  set normalBias(val: number) {
+  set normalBias(val) {
     this._config.normalBias = val;
   }
   /** Near clip plane */
-  get nearClip(): number {
+  get nearClip() {
     return this._config.nearClip;
   }
-  set nearClip(val: number) {
+  set nearClip(val) {
     if (this._config.nearClip !== val) {
       this._config.nearClip = val;
     }
   }
   /** Shadow map mode */
-  get mode(): ShadowMode {
+  get mode() {
     return this._shadowMode;
   }
-  set mode(mode: ShadowMode) {
+  set mode(mode) {
     if (mode !== this._shadowMode) {
       this._shadowMode = mode;
       this.applyMode(this._shadowMode);
     }
   }
-  /** Generated shadow map */
-  /*
-  get shadowMap(): ShadowMapType {
-    return (this._impl.getShadowMap(this) ?? this._framebuffer?.getColorAttachments()[0] ?? null) as ShadowMapType;
-  }
-  */
-  /** Sampler of the shadow map */
-  /*
-  get shadowMapSampler(): TextureSampler {
-    return this._impl.getShadowMapSampler(this);
-  }
-  */
   /** @internal */
-  getShaderHash(shadowMapParams: ShadowMapParams): string {
+  getShaderHash(shadowMapParams: ShadowMapParams) {
     return `${shadowMapParams.impl!.constructor.name}_${shadowMapParams.impl!.getShaderHash()}_${
       shadowMapParams.lightType
     }_${shadowMapParams.shadowMap!.target}_${Number(shadowMapParams.numShadowCascades > 1)}_${Number(
@@ -290,10 +278,10 @@ export class ShadowMapper {
     )}`;
   }
   /** Sample count for poisson disc PCF */
-  get pdSampleCount(): number {
+  get pdSampleCount() {
     return this._pdSampleCount;
   }
-  set pdSampleCount(val: number) {
+  set pdSampleCount(val) {
     val = Math.min(Math.max(1, Number(val) >> 0), 64);
     if (val !== this._pdSampleCount) {
       this._pdSampleCount = val;
@@ -304,10 +292,10 @@ export class ShadowMapper {
     }
   }
   /** Radius for poisson disc PCF */
-  get pdSampleRadius(): number {
+  get pdSampleRadius() {
     return this._pdSampleRadius;
   }
-  set pdSampleRadius(val: number) {
+  set pdSampleRadius(val) {
     val = Math.max(0, Number(val) >> 0);
     if (val !== this._pdSampleRadius) {
       this._pdSampleRadius = val;
@@ -315,10 +303,10 @@ export class ShadowMapper {
     }
   }
   /** Kernel size for optimized PCF */
-  get pcfKernelSize(): number {
+  get pcfKernelSize() {
     return this._pcfKernelSize;
   }
-  set pcfKernelSize(val: number) {
+  set pcfKernelSize(val) {
     val = val !== 3 && val !== 5 && val !== 7 ? 5 : val;
     if (val !== this._pcfKernelSize) {
       this._pcfKernelSize = val;
@@ -329,10 +317,10 @@ export class ShadowMapper {
     }
   }
   /** Kernel size of VSM */
-  get vsmBlurKernelSize(): number {
+  get vsmBlurKernelSize() {
     return this._vsmBlurKernelSize;
   }
-  set vsmBlurKernelSize(val: number) {
+  set vsmBlurKernelSize(val) {
     val = Math.max(3, Number(val) >> 0) | 1;
     if (val !== this._vsmBlurKernelSize) {
       this._vsmBlurKernelSize = val;
@@ -343,10 +331,10 @@ export class ShadowMapper {
     }
   }
   /** Blur radius for VSM */
-  get vsmBlurRadius(): number {
+  get vsmBlurRadius() {
     return this._vsmBlurRadius;
   }
-  set vsmBlurRadius(val: number) {
+  set vsmBlurRadius(val) {
     val = Math.max(0, Number(val) || 0);
     if (val !== this._vsmBlurRadius) {
       this._vsmBlurRadius = val;
@@ -357,10 +345,10 @@ export class ShadowMapper {
     }
   }
   /** Darkness for VSM */
-  get vsmDarkness(): number {
+  get vsmDarkness() {
     return this._vsmDarkness;
   }
-  set vsmDarkness(val: number) {
+  set vsmDarkness(val) {
     val = Math.min(0.999, Math.max(0, Number(val) || 0));
     if (val !== this._vsmDarkness) {
       this._vsmDarkness = val;
@@ -368,10 +356,10 @@ export class ShadowMapper {
     }
   }
   /** Whether to enable ESM blur */
-  get esmBlur(): boolean {
+  get esmBlur() {
     return this._esmBlur;
   }
-  set esmBlur(val: boolean) {
+  set esmBlur(val) {
     if (!!val !== this.esmBlur) {
       this._esmBlur = !!val;
       const esm = this.asESM();
@@ -381,10 +369,10 @@ export class ShadowMapper {
     }
   }
   /** Kernel size for ESM */
-  get esmBlurKernelSize(): number {
+  get esmBlurKernelSize() {
     return this._esmBlurKernelSize;
   }
-  set esmBlurKernelSize(val: number) {
+  set esmBlurKernelSize(val) {
     val = Math.max(3, Number(val) >> 0) | 1;
     if (val !== this._esmBlurKernelSize) {
       this._esmBlurKernelSize = val;
@@ -395,10 +383,10 @@ export class ShadowMapper {
     }
   }
   /** Blur radius for ESM */
-  get esmBlurRadius(): number {
+  get esmBlurRadius() {
     return this._esmBlurRadius;
   }
-  set esmBlurRadius(val: number) {
+  set esmBlurRadius(val) {
     val = Math.max(0, Number(val) || 0);
     if (val !== this._esmBlurRadius) {
       this._esmBlurRadius = val;
@@ -409,10 +397,10 @@ export class ShadowMapper {
     }
   }
   /** Depth scale for ESM */
-  get esmDepthScale(): number {
+  get esmDepthScale() {
     return this._esmDepthScale;
   }
-  set esmDepthScale(val: number) {
+  set esmDepthScale(val) {
     val = Math.max(0, Number(val) || 0);
     if (val !== this._esmDepthScale) {
       this._esmDepthScale = val;
@@ -425,7 +413,7 @@ export class ShadowMapper {
     scope: PBInsideFunctionScope,
     shadowVertex: PBShaderExp,
     NdotL: PBShaderExp
-  ): PBShaderExp {
+  ) {
     return this._impl!.computeShadow(shadowMapParams, scope, shadowVertex, NdotL);
   }
   /** @internal */
@@ -435,7 +423,7 @@ export class ShadowMapper {
     shadowVertex: PBShaderExp,
     NdotL: PBShaderExp,
     split: PBShaderExp
-  ): PBShaderExp {
+  ) {
     return this._impl!.computeShadowCSM(shadowMapParams, scope, shadowVertex, NdotL, split);
   }
   /** @internal */
@@ -465,7 +453,7 @@ export class ShadowMapper {
     z: PBShaderExp,
     NdotL: PBShaderExp,
     linear: boolean
-  ): PBShaderExp {
+  ) {
     const pb = scope.$builder;
     const depthBiasParam = ShaderHelper.getDepthBiasValues(scope);
     if (shadowMapParams.lightType === LIGHT_TYPE_DIRECTIONAL) {
@@ -483,7 +471,7 @@ export class ShadowMapper {
     scope: PBInsideFunctionScope,
     NdotL: PBShaderExp,
     split: PBShaderExp
-  ): PBShaderExp {
+  ) {
     const pb = scope.$builder;
     const depthBiasParam = ShaderHelper.getDepthBiasValues(scope);
     const splitFlags = pb.vec4(
@@ -502,7 +490,7 @@ export class ShadowMapper {
     format: TextureFormat,
     width: number,
     height: number
-  ): boolean {
+  ) {
     return (
       texture &&
       (texture.target !== target ||
@@ -519,7 +507,7 @@ export class ShadowMapper {
     width: number,
     height: number,
     depth: number
-  ): Texture2D | TextureCube | Texture2DArray {
+  ) {
     const device = getDevice();
     const options: TextureCreationOptions = {
       mipmapping: false
@@ -627,7 +615,7 @@ export class ShadowMapper {
     this._impl!.updateResources(shadowMapParams);
   }
   /** @internal */
-  protected createLightCameraPoint(lightCamera: Camera): void {
+  protected createLightCameraPoint(lightCamera: Camera) {
     //lightCamera.reparent(this._light);
     lightCamera.parent = lightCamera.scene!.rootNode;
     lightCamera.position.setXYZ(0, 0, 0);
@@ -642,7 +630,7 @@ export class ShadowMapper {
     lightCamera.position.set(this._light.positionAndRange.xyz());
   }
   /** @internal */
-  protected createLightCameraSpot(lightCamera: Camera): void {
+  protected createLightCameraSpot(lightCamera: Camera) {
     lightCamera.parent = this._light;
     lightCamera.position.setXYZ(0, 0, 0);
     lightCamera.rotation.identity();
@@ -788,7 +776,7 @@ export class ShadowMapper {
     */
   }
   /** @internal */
-  private static fetchShadowMapParams(): ShadowMapParams {
+  private static fetchShadowMapParams() {
     if (this._shadowMapParams.length > 0) {
       return this._shadowMapParams.pop()!;
     } else {
@@ -838,7 +826,7 @@ export class ShadowMapper {
     cameras.push(camera);
   }
   /** @internal */
-  calcSplitDistances(nearPlane: number, farPlane: number, numCascades: number): number[] {
+  calcSplitDistances(nearPlane: number, farPlane: number, numCascades: number) {
     const result: number[] = [0, 0, 0, 0, 0];
     for (let i = 0; i <= numCascades; ++i) {
       const fIDM = i / numCascades;
@@ -856,7 +844,7 @@ export class ShadowMapper {
     normalBias: number,
     depthScale: number,
     result: Vector4
-  ): void {
+  ) {
     const sizeNear = Math.min(
       camera.getProjectionMatrix().getNearPlaneWidth(),
       camera.getProjectionMatrix().getNearPlaneHeight()
@@ -1093,19 +1081,19 @@ export class ShadowMapper {
     }
   }
   /** @internal */
-  private asVSM(): Nullable<VSM> {
+  private asVSM() {
     return this._impl?.getType() === 'vsm' ? (this._impl as VSM) : null;
   }
   /** @internal */
-  private asESM(): Nullable<ESM> {
+  private asESM() {
     return this._impl?.getType() === 'esm' ? (this._impl as ESM) : null;
   }
   /** @internal */
-  private asPCFPD(): Nullable<PCFPD> {
+  private asPCFPD() {
     return this._impl?.getType() === 'pcf-pd' ? (this._impl as PCFPD) : null;
   }
   /** @internal */
-  private asPCFOPT(): Nullable<PCFOPT> {
+  private asPCFOPT() {
     return this._impl?.getType() === 'pcf-opt' ? (this._impl as PCFOPT) : null;
   }
 }

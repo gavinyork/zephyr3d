@@ -59,10 +59,10 @@ export class WebGLColorState extends WebGLRenderState implements ColorState {
     super();
     this.redMask = this.greenMask = this.blueMask = this.alphaMask = true;
   }
-  clone(): ColorState {
+  clone() {
     return new WebGLColorState().setColorMask(this.redMask, this.greenMask, this.blueMask, this.alphaMask);
   }
-  setColorMask(r: boolean, g: boolean, b: boolean, a: boolean): this {
+  setColorMask(r: boolean, g: boolean, b: boolean, a: boolean) {
     this.redMask = r;
     this.greenMask = g;
     this.blueMask = b;
@@ -96,7 +96,7 @@ export class WebGLBlendingState extends WebGLRenderState implements BlendingStat
     this.rgbEquation = 'add';
     this.alphaEquation = 'add';
   }
-  clone(): BlendingState {
+  clone() {
     const other = new WebGLBlendingState();
     other.enable(this.enabled);
     other.enableAlphaToCoverage(this.alphaToCoverageEnabled);
@@ -105,68 +105,68 @@ export class WebGLBlendingState extends WebGLRenderState implements BlendingStat
     other.setBlendEquation(this.rgbEquation, this.alphaEquation);
     return other;
   }
-  get srcBlendRGB(): BlendFunc {
+  get srcBlendRGB() {
     return blendFuncInvMap[this._srcBlendRGB];
   }
   set srcBlendRGB(val: BlendFunc) {
     this._srcBlendRGB = blendFuncMap[val];
   }
-  get dstBlendRGB(): BlendFunc {
+  get dstBlendRGB() {
     return blendFuncInvMap[this._dstBlendRGB];
   }
   set dstBlendRGB(val: BlendFunc) {
     this._dstBlendRGB = blendFuncMap[val];
   }
-  get srcBlendAlpha(): BlendFunc {
+  get srcBlendAlpha() {
     return blendFuncInvMap[this._srcBlendAlpha];
   }
   set srcBlendAlpha(val: BlendFunc) {
     this._srcBlendAlpha = blendFuncMap[val];
   }
-  get dstBlendAlpha(): BlendFunc {
+  get dstBlendAlpha() {
     return blendFuncInvMap[this._dstBlendAlpha];
   }
   set dstBlendAlpha(val: BlendFunc) {
     this._dstBlendAlpha = blendFuncMap[val];
   }
-  get rgbEquation(): BlendEquation {
+  get rgbEquation() {
     return blendEquationInvMap[this._rgbEquation];
   }
   set rgbEquation(val: BlendEquation) {
     this._rgbEquation = blendEquationMap[val];
   }
-  get alphaEquation(): BlendEquation {
+  get alphaEquation() {
     return blendEquationInvMap[this._alphaEquation];
   }
   set alphaEquation(val: BlendEquation) {
     this._alphaEquation = blendEquationMap[val];
   }
-  enable(b: boolean): this {
+  enable(b: boolean) {
     this.enabled = !!b;
     return this;
   }
-  enableAlphaToCoverage(b: boolean): this {
+  enableAlphaToCoverage(b: boolean) {
     this.alphaToCoverageEnabled = !!b;
     return this;
   }
-  setBlendFunc(src: BlendFunc, dest: BlendFunc): this {
+  setBlendFunc(src: BlendFunc, dest: BlendFunc) {
     this.srcBlendRGB = src;
     this.dstBlendRGB = dest;
     this.srcBlendAlpha = src;
     this.dstBlendAlpha = dest;
     return this;
   }
-  setBlendFuncRGB(src: BlendFunc, dest: BlendFunc): this {
+  setBlendFuncRGB(src: BlendFunc, dest: BlendFunc) {
     this.srcBlendRGB = src;
     this.dstBlendRGB = dest;
     return this;
   }
-  setBlendFuncAlpha(src: BlendFunc, dest: BlendFunc): this {
+  setBlendFuncAlpha(src: BlendFunc, dest: BlendFunc) {
     this.srcBlendAlpha = src;
     this.dstBlendAlpha = dest;
     return this;
   }
-  setBlendEquation(rgb: BlendEquation, alpha: BlendEquation): this {
+  setBlendEquation(rgb: BlendEquation, alpha: BlendEquation) {
     this.rgbEquation = rgb;
     this.alphaEquation = alpha;
     return this;
@@ -199,26 +199,26 @@ export class WebGLRasterizerState extends WebGLRenderState implements Rasterizer
     super();
     this.cullMode = 'back';
   }
-  clone(): RasterizerState {
+  clone() {
     return new WebGLRasterizerState().setCullMode(this.cullMode);
   }
-  get cullMode(): FaceMode {
+  get cullMode() {
     return faceModeInvMap[this._cullMode];
   }
   set cullMode(val: FaceMode) {
     this._cullMode = faceModeMap[val];
   }
-  setCullMode(mode: FaceMode): this {
+  setCullMode(mode: FaceMode) {
     this.cullMode = mode;
     return this;
   }
-  get depthClampEnabled(): boolean {
+  get depthClampEnabled() {
     return false;
   }
   set depthClampEnabled(val: boolean) {
     this.enableDepthClamp(val);
   }
-  enableDepthClamp(enable: boolean): this {
+  enableDepthClamp(enable: boolean) {
     if (enable) {
       console.error('Depth clamp not supported');
     }
@@ -250,7 +250,7 @@ export class WebGLDepthState extends WebGLRenderState implements DepthState {
     this.depthBias = 0;
     this.depthBiasSlopeScale = 0;
   }
-  clone(): DepthState {
+  clone() {
     const other = new WebGLDepthState();
     other.enableTest(this.testEnabled);
     other.enableWrite(this.writeEnabled);
@@ -259,29 +259,29 @@ export class WebGLDepthState extends WebGLRenderState implements DepthState {
     other.setDepthBiasSlopeScale(this.depthBiasSlopeScale);
     return other;
   }
-  get compareFunc(): CompareFunc {
+  get compareFunc() {
     return compareFuncInvMap[this._compareFunc]!;
   }
   set compareFunc(val: CompareFunc) {
     this._compareFunc = compareFuncMap[val];
   }
-  enableTest(b: boolean): this {
+  enableTest(b: boolean) {
     this.testEnabled = b;
     return this;
   }
-  enableWrite(b: boolean): this {
+  enableWrite(b: boolean) {
     this.writeEnabled = b;
     return this;
   }
-  setCompareFunc(func: CompareFunc): this {
+  setCompareFunc(func: CompareFunc) {
     this.compareFunc = func;
     return this;
   }
-  setDepthBias(value: number): this {
+  setDepthBias(value: number) {
     this.depthBias = value;
     return this;
   }
-  setDepthBiasSlopeScale(value: number): this {
+  setDepthBiasSlopeScale(value: number) {
     this.depthBiasSlopeScale = value;
     return this;
   }
@@ -328,7 +328,7 @@ export class WebGLStencilState extends WebGLRenderState implements StencilState 
     this.writeMask = 0xffffffff;
     this.readMask = 0xffffffff;
   }
-  clone(): StencilState {
+  clone() {
     const other = new WebGLStencilState();
     other.enable(this.enabled);
     other.setWriteMask(this.writeMask);
@@ -340,87 +340,87 @@ export class WebGLStencilState extends WebGLRenderState implements StencilState 
     other.setReadMask(this.readMask);
     return other;
   }
-  get failOp(): StencilOp {
+  get failOp() {
     return stencilOpInvMap[this._failOp];
   }
   set failOp(val: StencilOp) {
     this._failOp = stencilOpMap[val];
   }
-  get failOpBack(): StencilOp {
+  get failOpBack() {
     return stencilOpInvMap[this._failOpBack];
   }
   set failOpBack(val: StencilOp) {
     this._failOpBack = stencilOpMap[val];
   }
-  get zFailOp(): StencilOp {
+  get zFailOp() {
     return stencilOpInvMap[this._zFailOp];
   }
   set zFailOp(val: StencilOp) {
     this._zFailOp = stencilOpMap[val];
   }
-  get zFailOpBack(): StencilOp {
+  get zFailOpBack() {
     return stencilOpInvMap[this._zFailOpBack];
   }
   set zFailOpBack(val: StencilOp) {
     this._zFailOpBack = stencilOpMap[val];
   }
-  get passOp(): StencilOp {
+  get passOp() {
     return stencilOpInvMap[this._passOp];
   }
   set passOp(val: StencilOp) {
     this._passOp = stencilOpMap[val];
   }
-  get passOpBack(): StencilOp {
+  get passOpBack() {
     return stencilOpInvMap[this._passOpBack];
   }
   set passOpBack(val: StencilOp) {
     this._passOpBack = stencilOpMap[val];
   }
-  get func(): CompareFunc {
+  get func() {
     return compareFuncInvMap[this._func]!;
   }
   set func(val: CompareFunc) {
     this._func = compareFuncMap[val];
   }
-  get funcBack(): CompareFunc {
+  get funcBack() {
     return compareFuncInvMap[this._funcBack]!;
   }
   set funcBack(val: CompareFunc) {
     this._funcBack = compareFuncMap[val];
   }
-  enable(b: boolean): this {
+  enable(b: boolean) {
     this.enabled = b;
     return this;
   }
-  setWriteMask(mask: number): this {
+  setWriteMask(mask: number) {
     this.writeMask = mask;
     return this;
   }
-  setFrontOp(fail: StencilOp, zfail: StencilOp, zpass: StencilOp): this {
+  setFrontOp(fail: StencilOp, zfail: StencilOp, zpass: StencilOp) {
     this.failOp = fail;
     this.zFailOp = zfail;
     this.passOp = zpass;
     return this;
   }
-  setBackOp(fail: StencilOp, zfail: StencilOp, zpass: StencilOp): this {
+  setBackOp(fail: StencilOp, zfail: StencilOp, zpass: StencilOp) {
     this.failOpBack = fail;
     this.zFailOpBack = zfail;
     this.passOpBack = zpass;
     return this;
   }
-  setFrontCompareFunc(func: CompareFunc): this {
+  setFrontCompareFunc(func: CompareFunc) {
     this.func = func;
     return this;
   }
-  setBackCompareFunc(func: CompareFunc): this {
+  setBackCompareFunc(func: CompareFunc) {
     this.funcBack = func;
     return this;
   }
-  setReference(ref: number): this {
+  setReference(ref: number) {
     this.ref = ref;
     return this;
   }
-  setReadMask(mask: number): this {
+  setReadMask(mask: number) {
     this.readMask = mask;
     return this;
   }
@@ -454,7 +454,7 @@ export class WebGLRenderStateSet implements RenderStateSet {
     this.depthState = null;
     this.stencilState = null;
   }
-  clone(): RenderStateSet {
+  clone() {
     const newStateSet = new WebGLRenderStateSet(this._gl);
     newStateSet.colorState = (this.colorState?.clone() as WebGLColorState) ?? null;
     newStateSet.blendingState = (this.blendingState?.clone() as WebGLBlendingState) ?? null;
@@ -463,7 +463,7 @@ export class WebGLRenderStateSet implements RenderStateSet {
     newStateSet.stencilState = (this.stencilState?.clone() as WebGLStencilState) ?? null;
     return newStateSet;
   }
-  copyFrom(stateSet: RenderStateSet): void {
+  copyFrom(stateSet: RenderStateSet) {
     this.colorState = stateSet.colorState as WebGLColorState;
     this.blendingState = stateSet.blendingState as WebGLBlendingState;
     this.rasterizerState = stateSet.rasterizerState as WebGLRasterizerState;
@@ -498,33 +498,33 @@ export class WebGLRenderStateSet implements RenderStateSet {
       WebGLStencilState.applyDefaults(gl, force);
     }
   }
-  useColorState(state?: ColorState): ColorState {
+  useColorState(state?: ColorState) {
     return (this.colorState = (state as WebGLColorState) ?? this.colorState ?? new WebGLColorState());
   }
   defaultColorState() {
     this.colorState = null;
   }
-  useBlendingState(state?: BlendingState): BlendingState {
+  useBlendingState(state?: BlendingState) {
     return (this.blendingState =
       (state as WebGLBlendingState) ?? this.blendingState ?? new WebGLBlendingState());
   }
   defaultBlendingState() {
     this.blendingState = null;
   }
-  useRasterizerState(state?: RasterizerState): RasterizerState {
+  useRasterizerState(state?: RasterizerState) {
     return (this.rasterizerState =
       (state as WebGLRasterizerState) ?? this.rasterizerState ?? new WebGLRasterizerState());
   }
   defaultRasterizerState() {
     this.rasterizerState = null;
   }
-  useDepthState(state?: DepthState): DepthState {
+  useDepthState(state?: DepthState) {
     return (this.depthState = (state as WebGLDepthState) ?? this.depthState ?? new WebGLDepthState());
   }
   defaultDepthState() {
     this.depthState = null;
   }
-  useStencilState(state?: StencilState): StencilState {
+  useStencilState(state?: StencilState) {
     return (this.stencilState = (state as WebGLStencilState) ?? this.stencilState ?? new WebGLStencilState());
   }
   defaultStencilState() {

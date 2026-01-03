@@ -299,10 +299,10 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._dpr
     );
   }
-  getScaleX(): number {
+  getScaleX() {
     return this._canvas.width / this._canvas.clientWidth;
   }
-  getScaleY(): number {
+  getScaleY() {
     return this._canvas.height / this._canvas.clientHeight;
   }
   abstract getAdapterInfo(): any;
@@ -449,43 +449,43 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     workgroupCountY: number,
     workgroupCountZ: number
   ): void;
-  get backend(): DeviceBackend {
+  get backend() {
     return this._backend;
   }
-  get videoMemoryUsage(): number {
+  get videoMemoryUsage() {
     return this._gpuMemCost;
   }
-  get frameInfo(): FrameInfo {
+  get frameInfo() {
     return this._frameInfo;
   }
-  get isRendering(): boolean {
+  get isRendering() {
     return this._runningLoop !== null;
   }
-  get canvas(): HTMLCanvasElement {
+  get canvas() {
     return this._canvas;
   }
-  get type(): string {
+  get type() {
     return this._backend.typeName();
   }
-  get vSync(): boolean {
+  get vSync() {
     return this._vSync;
   }
-  set vSync(val: boolean) {
+  set vSync(val) {
     this._vSync = !!val;
   }
-  get pool(): Pool {
+  get pool() {
     return this._poolMap.get(this._defaultPoolKey)!;
   }
-  get runLoopFunction(): Nullable<(device: AbstractDevice) => void> {
+  get runLoopFunction() {
     return this._runLoopFunc;
   }
-  get programBuilder(): ProgramBuilder {
+  get programBuilder() {
     return this._programBuilder;
   }
-  poolExists(key: string | symbol): boolean {
+  poolExists(key: string | symbol) {
     return this._poolMap.has(key);
   }
-  getPool(key: string | symbol): Pool {
+  getPool(key: string | symbol) {
     let pool = this._poolMap.get(key);
     if (!pool) {
       pool = new Pool(this, key);
@@ -549,7 +549,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._gpuTimer = null;
     }
   }
-  beginFrame(): boolean {
+  beginFrame() {
     if (this._beginFrameCounter === 0) {
       for (const obj of this._disposeObjectList) {
         obj.destroy();
@@ -562,7 +562,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._poolMap.forEach((pool) => pool.autoRelease());
     return this.onBeginFrame();
   }
-  endFrame(): void {
+  endFrame() {
     if (this._beginFrameCounter > 0) {
       this._beginFrameCounter--;
       if (this._beginFrameCounter === 0) {
@@ -572,18 +572,14 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       }
     }
   }
-  getVertexAttribFormat(
-    semantic: VertexSemantic,
-    dataType: DataType,
-    componentCount: number
-  ): Nullable<VertexAttribFormat> {
+  getVertexAttribFormat(semantic: VertexSemantic, dataType: DataType, componentCount: number) {
     return getVertexAttribFormat(semantic, dataType, componentCount);
   }
   createInterleavedVertexBuffer(
     attribFormats: VertexAttribFormat[],
     data: TypedArray,
     options?: BufferCreationOptions
-  ): Nullable<StructuredBuffer> {
+  ) {
     if (options && options.usage && options.usage !== 'vertex') {
       console.error(`createInterleavedVertexBuffer() failed: options.usage must be 'vertex' or not set`);
       return null;
@@ -615,11 +611,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     return this.createStructuredBuffer(vertexBufferType, opt, data);
   }
-  createVertexBuffer(
-    attribFormat: VertexAttribFormat,
-    data: TypedArray,
-    options?: BufferCreationOptions
-  ): Nullable<StructuredBuffer> {
+  createVertexBuffer(attribFormat: VertexAttribFormat, data: TypedArray, options?: BufferCreationOptions) {
     if (options && options.usage && options.usage !== 'vertex') {
       console.error(`createVertexBuffer() failed: options.usage must be 'vertex' or not set`);
       return null;
@@ -648,18 +640,18 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     return this.createStructuredBuffer(vertexBufferType, opt, data);
   }
-  draw(primitiveType: PrimitiveType, first: number, count: number): void {
+  draw(primitiveType: PrimitiveType, first: number, count: number) {
     this._frameInfo.drawCalls++;
     this._draw(primitiveType, first, count);
   }
-  drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number): void {
+  drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number) {
     this._frameInfo.drawCalls++;
     this._drawInstanced(primitiveType, first, count, numInstances);
   }
   executeRenderBundle(renderBundle: RenderBundle) {
     this._frameInfo.drawCalls += this._executeRenderBundle(renderBundle);
   }
-  compute(workgroupCountX, workgroupCountY, workgroupCountZ): void {
+  compute(workgroupCountX, workgroupCountY, workgroupCountZ) {
     this._frameInfo.computeCalls++;
     this._compute(workgroupCountX, workgroupCountY, workgroupCountZ);
   }
@@ -668,8 +660,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._frameInfo.nextFrameCall.push(f);
     }
   }
-  async runNextFrameAsync(f: () => void | Promise<void>): Promise<void> {
-    return new Promise((resolve) => {
+  async runNextFrameAsync(f: () => void | Promise<void>) {
+    return new Promise<void>((resolve) => {
       if (f) {
         this._frameInfo.nextFrameCall.push(() => {
           const p = f();
@@ -751,10 +743,10 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this.reverseVertexWindingOrder(top.windowOrderReversed);
     }
   }
-  getGPUObjects(): GPUObjectList {
+  getGPUObjects() {
     return this._gpuObjectList;
   }
-  getGPUObjectById(uid: number): Nullable<GPUObject> {
+  getGPUObjectById(uid: number) {
     for (const list of [
       this._gpuObjectList.textures,
       this._gpuObjectList.samplers,
@@ -771,22 +763,22 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     return null;
   }
-  screenXToDevice(val: number): number {
+  screenXToDevice(val: number) {
     return this.getFramebuffer() ? val : Math.round(val * this.getScaleX());
   }
-  deviceXToScreen(val: number): number {
+  deviceXToScreen(val: number) {
     return this.getFramebuffer() ? val : Math.round(val / this.getScaleX());
   }
-  screenYToDevice(val: number): number {
+  screenYToDevice(val: number) {
     return this.getFramebuffer() ? val : Math.round(val * this.getScaleY());
   }
-  deviceYToScreen(val: number): number {
+  deviceYToScreen(val: number) {
     return this.getFramebuffer() ? val : Math.round(val / this.getScaleY());
   }
-  buildRenderProgram(options: PBRenderOptions): Nullable<GPUProgram> {
+  buildRenderProgram(options: PBRenderOptions) {
     return this._programBuilder.buildRenderProgram(options);
   }
-  buildComputeProgram(options: PBComputeOptions): Nullable<GPUProgram> {
+  buildComputeProgram(options: PBComputeOptions) {
     return this._programBuilder.buildComputeProgram(options);
   }
   addGPUObject(obj: GPUObject) {
@@ -836,38 +828,6 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._resizer.init();
     });
   }
-  /*
-  private _onresize() {
-    if (
-      this._canvasClientWidth !== this._canvas.clientWidth ||
-      this._canvasClientHeight !== this._canvas.clientHeight
-    ) {
-      this._canvasClientWidth = this._canvas.clientWidth;
-      this._canvasClientHeight = this._canvas.clientHeight;
-      this.dispatchEvent('resize', this._canvasClientWidth, this._canvasClientHeight);
-    }
-  }
-  private _registerEventHandlers() {
-    const canvas: HTMLCanvasElement = this._canvas;
-    const that = this;
-    if (window.ResizeObserver) {
-      new window.ResizeObserver(() => {
-        that._onresize();
-      }).observe(canvas, {});
-    } else {
-      if (window.MutationObserver) {
-        new MutationObserver(function (mutations) {
-          if (mutations.length > 0) {
-            that._onresize();
-          }
-        }).observe(canvas, { attributes: true, attributeFilter: ['style'] });
-      }
-      window.addEventListener('resize', () => {
-        this._onresize();
-      });
-    }
-  }
-  */
   private updateFrameInfo() {
     this._frameInfo.drawCalls = 0;
     this._frameInfo.computeCalls = 0;
@@ -911,7 +871,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     this._frameInfo.nextFrameCallNext.length = 0;
   }
-  private getGPUObjectList(obj: GPUObject): Nullable<GPUObject[]> {
+  private getGPUObjectList(obj: GPUObject) {
     let list: Nullable<GPUObject[]> = null;
     if (obj.isTexture()) {
       list = this._gpuObjectList.textures;
@@ -951,7 +911,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._disposeObjectList = [];
     }
   }
-  protected reloadAll(): void {
+  protected reloadAll() {
     for (const list of [
       this._gpuObjectList.buffers,
       this._gpuObjectList.textures,
@@ -968,7 +928,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     return;
   }
-  protected parseTextureOptions(options?: TextureCreationOptions): number {
+  protected parseTextureOptions(options?: TextureCreationOptions) {
     const noMipmapFlag = options?.mipmapping === false ? GPUResourceUsageFlags.TF_NO_MIPMAP : 0;
     const writableFlag = options?.writable ? GPUResourceUsageFlags.TF_WRITABLE : 0;
     const dynamicFlag = options?.dynamic ? GPUResourceUsageFlags.DYNAMIC : 0;
@@ -977,7 +937,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     return noMipmapFlag | writableFlag | dynamicFlag;
   }
-  protected parseBufferOptions(options?: BufferCreationOptions, defaultUsage?: BufferUsage): number {
+  protected parseBufferOptions(options?: BufferCreationOptions, defaultUsage?: BufferUsage) {
     options = options ?? {};
     const usage = options.usage ?? defaultUsage;
     let usageFlag: number;

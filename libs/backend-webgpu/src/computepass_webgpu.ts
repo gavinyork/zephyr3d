@@ -14,7 +14,7 @@ export class WebGPUComputePass {
     this._computeCommandEncoder = this._device.device.createCommandEncoder();
     this._computePassEncoder = null;
   }
-  get active(): boolean {
+  get active() {
     return !!this._computePassEncoder;
   }
   compute(
@@ -24,7 +24,7 @@ export class WebGPUComputePass {
     workgroupCountX: number,
     workgroupCountY: number,
     workgroupCountZ: number
-  ): void {
+  ) {
     const validation = this.validateCompute(program, bindGroups);
     if (validation & VALIDATION_FAILED) {
       return;
@@ -44,7 +44,7 @@ export class WebGPUComputePass {
     program: WebGPUProgram,
     bindGroups: WebGPUBindGroup[],
     bindGroupOffsets: Nullable<Iterable<number>>[]
-  ): boolean {
+  ) {
     if (bindGroups) {
       for (let i = 0; i < 4; i++) {
         if (i < program.bindGroupLayouts.length) {
@@ -65,7 +65,7 @@ export class WebGPUComputePass {
     }
     return true;
   }
-  begin(): void {
+  begin() {
     if (this.active) {
       console.error('WebGPUComputePass.begin() failed: WebGPUComputePass.begin() has already been called');
       return;
@@ -81,7 +81,7 @@ export class WebGPUComputePass {
       this._computeCommandEncoder = null;
     }
   }
-  private validateCompute(program: WebGPUProgram, bindGroups: WebGPUBindGroup[]): number {
+  private validateCompute(program: WebGPUProgram, bindGroups: WebGPUBindGroup[]) {
     let validation = 0;
     if (bindGroups) {
       for (let i = 0; i < program.bindGroupLayouts.length; i++) {

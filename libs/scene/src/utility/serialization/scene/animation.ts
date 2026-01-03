@@ -13,7 +13,7 @@ import {
   PropertyTrack
 } from '../../../animation';
 import type { ResourceManager } from '../manager';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import { SceneNode } from '../../../scene';
 import { BoundingBox } from '../../bounding_volume';
 
@@ -55,7 +55,7 @@ export function getInterpolatorClass(): SerializableClass {
       };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Mode',
           type: 'string',
@@ -70,7 +70,7 @@ export function getInterpolatorClass(): SerializableClass {
             value.str[0] = this.target ?? '';
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -81,7 +81,7 @@ export function getMorphTrackClass(): SerializableClass {
     ctor: MorphTargetTrack,
     name: 'MorphTargetTrack',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'TrackName',
           type: 'string',
@@ -190,7 +190,7 @@ export function getMorphTrackClass(): SerializableClass {
             this.target = value.str[0];
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -201,7 +201,7 @@ export function getNodeRotationTrackClass(): SerializableClass {
     ctor: NodeRotationTrack,
     name: 'NodeRotationTrack',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'TrackName',
           type: 'string',
@@ -244,7 +244,7 @@ export function getNodeRotationTrackClass(): SerializableClass {
             this.target = value.str[0];
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -255,7 +255,7 @@ export function getNodeEulerRotationTrackClass(): SerializableClass {
     ctor: NodeEulerRotationTrack,
     name: 'NodeEulerRotationTrack',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'TrackName',
           type: 'string',
@@ -298,7 +298,7 @@ export function getNodeEulerRotationTrackClass(): SerializableClass {
             this.target = value.str[0];
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -309,7 +309,7 @@ export function getNodeTranslationTrackClass(): SerializableClass {
     ctor: NodeTranslationTrack,
     name: 'NodeTranslationTrack',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'TrackName',
           type: 'string',
@@ -352,7 +352,7 @@ export function getNodeTranslationTrackClass(): SerializableClass {
             this.target = value.str[0];
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -363,7 +363,7 @@ export function getNodeScaleTrackClass(): SerializableClass {
     ctor: NodeScaleTrack,
     name: 'NodeScaleTrack',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'TrackName',
           type: 'string',
@@ -406,7 +406,7 @@ export function getNodeScaleTrackClass(): SerializableClass {
             this.target = value.str[0];
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -423,7 +423,7 @@ export function getPropTrackClass(manager: ResourceManager): SerializableClass {
       return manager.getPropertyName(obj.getProp());
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'TrackName',
           type: 'string',
@@ -476,7 +476,7 @@ export function getPropTrackClass(manager: ResourceManager): SerializableClass {
             this.interpolatorAlpha = value.object[1] as Interpolator;
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -563,7 +563,7 @@ export function getAnimationClass(manager: ResourceManager): SerializableClass {
       return obj.name;
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Name',
           type: 'string',
@@ -678,7 +678,7 @@ export function getAnimationClass(manager: ResourceManager): SerializableClass {
             }
           }
         }
-      ];
+      ]);
     }
   };
 }

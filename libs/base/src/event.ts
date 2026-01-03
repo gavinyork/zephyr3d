@@ -83,7 +83,7 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
   /**
    * {@inheritDoc IEventTarget.on}
    */
-  on<K extends keyof X>(type: K, listener: EventListener<X, K>, context?: unknown): void {
+  on<K extends keyof X>(type: K, listener: EventListener<X, K>, context?: unknown) {
     if (listener) {
       this._listeners = this._internalAddEventListener(this._listeners, type, listener, {
         context: context ?? null,
@@ -96,7 +96,7 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
   /**
    * {@inheritDoc IEventTarget.once}
    */
-  once<K extends keyof X>(type: K, listener: EventListener<X, K>, context?: unknown): void {
+  once<K extends keyof X>(type: K, listener: EventListener<X, K>, context?: unknown) {
     if (listener) {
       this._listeners = this._internalAddEventListener(this._listeners, type, listener, {
         context: context ?? null,
@@ -109,7 +109,7 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
   /**
    * {@inheritDoc IEventTarget.off}
    */
-  off<K extends keyof X>(type: K, listener?: Nullable<EventListener<X, K>>, context?: unknown): void {
+  off<K extends keyof X>(type: K, listener?: Nullable<EventListener<X, K>>, context?: unknown) {
     if (listener) {
       this._internalRemoveEventListener(this._listeners, type, listener, context ?? null);
     }
@@ -117,7 +117,7 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
   /**
    * {@inheritDoc IEventTarget.dispatchEvent}
    */
-  dispatchEvent<K extends keyof X>(type: K, ...args: X[K]): void {
+  dispatchEvent<K extends keyof X>(type: K, ...args: X[K]) {
     this._invokeLocalListeners(type, ...args);
   }
   /**
@@ -138,7 +138,7 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
     type: K,
     listener: EventListener<X, K>,
     options: REventHandlerOptions
-  ): Nullable<EventListenerMap<X>> {
+  ) {
     if (typeof type !== 'string') {
       return listenerMap;
     }
@@ -171,7 +171,7 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
     type: K,
     listener: EventListener<X, K>,
     context: unknown
-  ): void {
+  ) {
     if (typeof type !== 'string' || !listenerMap) {
       return;
     }
@@ -200,7 +200,7 @@ export class Observable<X extends EventMap> implements IEventTarget<X> {
    * @param args - The payload to pass to each listener
    * @internal
    */
-  _invokeLocalListeners<K extends keyof X>(type: keyof X, ...args: X[K]): void {
+  _invokeLocalListeners<K extends keyof X>(type: keyof X, ...args: X[K]) {
     if (!this._listeners) {
       return;
     }

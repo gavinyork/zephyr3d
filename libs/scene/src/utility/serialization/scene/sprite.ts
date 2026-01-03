@@ -1,7 +1,7 @@
 import { getEngine } from '../../../app/api';
 import type { MeshMaterial } from '../../../material/meshmaterial';
 import { GraphNode, type SceneNode } from '../../../scene';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import { meshInstanceClsMap } from './common';
 import { Sprite3D } from '../../../scene/sprite3d';
 import { Sprite3DMaterial } from '../../../material/sprite3d';
@@ -20,7 +20,7 @@ export function getSprite3DClass(): SerializableClass {
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Anchor',
           type: 'vec2',
@@ -120,7 +120,7 @@ export function getSprite3DClass(): SerializableClass {
             }
           }
         }
-      ];
+      ]);
     }
   };
 }

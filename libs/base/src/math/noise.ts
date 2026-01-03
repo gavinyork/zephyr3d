@@ -1,17 +1,17 @@
 const primes = [15731, 789221, 1376312589];
 
-function noise1(x: number): number {
+function noise1(x: number) {
   x = (x << 13) ^ x;
   return 1 - ((x * (x * x * primes[0] + primes[1]) + primes[2]) & 0x7fffffff) / 1073741824;
 }
 
-function noise2(x: number, y: number): number {
+function noise2(x: number, y: number) {
   let n = x + y * 57;
   n = (n << 13) ^ n;
   return 1 - ((n * (n * n * primes[0] + primes[1]) + primes[2]) & 0x7fffffff) / 1073741824;
 }
 
-function noise3(x: number, y: number, z: number): number {
+function noise3(x: number, y: number, z: number) {
   const l = x + y * 57;
   const m = y + z * 57;
   let n = l + m * 57;
@@ -19,15 +19,15 @@ function noise3(x: number, y: number, z: number): number {
   return 1 - ((n * (n * n * primes[0] + primes[1]) + primes[2]) & 0x7fffffff) / 1073741824;
 }
 
-function interpolate(a: number, b: number, x: number): number {
+function interpolate(a: number, b: number, x: number) {
   return a + (b - a) * x;
 }
 
-function smoothNoise1(x: number): number {
+function smoothNoise1(x: number) {
   return noise1(x) / 2 + noise1(x - 1) / 4 + noise1(x + 1) / 4;
 }
 
-function smoothNoise2(x: number, y: number): number {
+function smoothNoise2(x: number, y: number) {
   const corners =
     (noise2(x - 1, y - 1) + noise2(x + 1, y - 1) + noise2(x - 1, y + 1) + noise2(x + 1, y + 1)) / 16;
   const sides = (noise2(x - 1, y) + noise2(x + 1, y) + noise2(x, y - 1) + noise2(x, y + 1)) / 8;
@@ -35,7 +35,7 @@ function smoothNoise2(x: number, y: number): number {
   return corners + sides + center;
 }
 
-function smoothNoise3(x: number, y: number, z: number): number {
+function smoothNoise3(x: number, y: number, z: number) {
   let corners: number, sides: number, center: number;
   corners =
     (noise3(x - 1, y - 1, z - 1) +
@@ -68,7 +68,7 @@ function smoothNoise3(x: number, y: number, z: number): number {
   return zm1 / 4 + zo / 2 + zp1 / 4;
 }
 
-function interpolateNoise1(x: number): number {
+function interpolateNoise1(x: number) {
   const ix = Math.floor(x);
   const fract = x - ix;
   const v1 = smoothNoise1(ix);
@@ -76,7 +76,7 @@ function interpolateNoise1(x: number): number {
   return interpolate(v1, v2, fract);
 }
 
-function interpolateNoise2(x: number, y: number): number {
+function interpolateNoise2(x: number, y: number) {
   const ix = Math.floor(x);
   const fractX = x - ix;
   const iy = Math.floor(y);
@@ -90,7 +90,7 @@ function interpolateNoise2(x: number, y: number): number {
   return interpolate(i1, i2, fractY);
 }
 
-function interpolateNoise3(x: number, y: number, z: number): number {
+function interpolateNoise3(x: number, y: number, z: number) {
   const ix = Math.floor(x);
   const fractX = x - ix;
   const iy = Math.floor(y);
@@ -115,12 +115,12 @@ function interpolateNoise3(x: number, y: number, z: number): number {
 }
 
 /** @internal */
-export function perlinNoise1D(x: number, amp: number, freq: number): number {
+export function perlinNoise1D(x: number, amp: number, freq: number) {
   return interpolateNoise1(x * freq) * amp;
 }
 
 /** @internal */
-export function perlinNoise2D(x: number, y: number, amp: number, freqX: number, freqY: number): number {
+export function perlinNoise2D(x: number, y: number, amp: number, freqX: number, freqY: number) {
   return interpolateNoise2(x * freqX, y * freqY) * amp;
 }
 
@@ -133,7 +133,7 @@ export function perlinNoise3D(
   freqX: number,
   freqY: number,
   freqZ: number
-): number {
+) {
   return interpolateNoise3(x * freqX, y * freqY, z * freqZ) * amp;
 }
 
@@ -143,8 +143,8 @@ export function perlinNoise3D(
  * @returns An array of jitters, range [-0.5, 0.5].
  * @public
  */
-export function halton23(length: number): [number, number][] {
-  function halton(base: number, index: number): number {
+export function halton23(length: number) {
+  function halton(base: number, index: number) {
     let result = 0;
     let f = 1;
     while (index > 0) {

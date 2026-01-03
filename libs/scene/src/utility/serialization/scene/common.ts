@@ -5,7 +5,7 @@ import type {
   TextureCube,
   TextureSampler
 } from '@zephyr3d/device';
-import type { PropertyAccessor, SerializableClass } from '../types';
+import { defineProps, type PropertyAccessor, type SerializableClass } from '../types';
 import type { Material, MeshMaterial } from '../../../material';
 import type { Nullable } from '@zephyr3d/base';
 import { Matrix4x4, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
@@ -43,7 +43,9 @@ export function getMeshMaterialInstanceUniformsClass(cls: {
         return obj.materialId;
       },
       getProps() {
-        return (cls as typeof MeshMaterial).INSTANCE_UNIFORMS.filter((u) => !!u.name).map((u) => ({
+        return (cls as typeof MeshMaterial).INSTANCE_UNIFORMS.filter((u) => !!u.name).map<
+          PropertyAccessor<any, 'DUMMY'>
+        >((u) => ({
           name: u.name,
           type: u.type,
           get(this: C, value) {
@@ -51,7 +53,7 @@ export function getMeshMaterialInstanceUniformsClass(cls: {
             if (u.type === 'float') {
               value.num[0] = val;
             } else if (u.type === 'vec2') {
-              value.num[0] = val.x;
+              value.num![0] = val.x;
               value.num[1] = val.y;
             } else if (u.type === 'vec3' || u.type === 'rgb') {
               value.num[0] = val.x;
@@ -98,7 +100,7 @@ export function getTextureProps<T extends Material>(
   phase: number,
   isValid?: (this: T) => boolean
 ): PropertyAccessor<T>[] {
-  return [
+  return defineProps([
     {
       name: name[0].toUpperCase() + name.slice(1),
       type: 'object',
@@ -295,5 +297,5 @@ export function getTextureProps<T extends Material>(
         }
       }
     }
-  ];
+  ]);
 }

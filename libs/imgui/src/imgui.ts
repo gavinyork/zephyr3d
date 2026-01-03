@@ -20,7 +20,7 @@ export interface RGBA extends RGB {
 }
 
 import * as Bind from './bind-imgui';
-import { Nullable } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
 
 //export { Bind };
 

@@ -4,17 +4,17 @@ import type { ShaderAST } from './ast';
 import type { Nullable } from '@zephyr3d/base';
 
 /** @internal */
-export function expValueToString(deviceType: string, value: ExpValueType): string {
+export function expValueToString(deviceType: string, value: ExpValueType) {
   if (typeof value === 'number' || typeof value === 'boolean' || Array.isArray(value)) {
     return `${value}`;
   } else {
-    return value.$ast?.toString(deviceType);
+    return value.$ast?.toString(deviceType) ?? '';
   }
 }
 
 /** @internal */
-export function expValueTypeToString(deviceType: string, type: PBTypeInfo): string {
-  return type?.toTypeName(deviceType);
+export function expValueTypeToString(deviceType: string, type: PBTypeInfo) {
+  return type?.toTypeName(deviceType) ?? '';
 }
 
 /** @internal */
@@ -29,7 +29,7 @@ export class PBValueOutOfRange extends PBError {
     super();
     this.value = value;
   }
-  getMessage(_deviceType: string): string {
+  getMessage(_deviceType: string) {
     return `value out of range: ${this.value}`;
   }
 }
@@ -49,7 +49,7 @@ export class PBTypeCastError extends PBError {
     this.valueType = valueType;
     this.expectedType = expectedType;
   }
-  getMessage(deviceType: string): string {
+  getMessage(deviceType: string) {
     const valueStr = typeof this.value === 'string' ? this.value : expValueToString(deviceType, this.value);
     const valueTypeStr =
       typeof this.valueType === 'string' ? this.valueType : expValueTypeToString(deviceType, this.valueType);
@@ -68,7 +68,7 @@ export class PBParamLengthError extends PBError {
     super();
     this.func = func;
   }
-  getMessage(_deviceType: string): string {
+  getMessage(_deviceType: string) {
     return `wrong argument count for function '${this.func}'`;
   }
 }
@@ -82,7 +82,7 @@ export class PBParamTypeError extends PBError {
     this.func = func;
     this.param = param || null;
   }
-  getMessage(_deviceType: string): string {
+  getMessage(_deviceType: string) {
     return `parameter type error for function '${this.func}': ${this.param}`;
   }
 }
@@ -98,7 +98,7 @@ export class PBParamValueError extends PBError {
     this.param = param ?? null;
     this.reason = reason ?? null;
   }
-  getMessage(_deviceType: string): string {
+  getMessage(_deviceType: string) {
     return `invalid parameter value for function '${this.func}'${this.param ? ': ' + this.param : ''}${
       this.reason ? ': ' + this.reason : ''
     }}`;
@@ -112,7 +112,7 @@ export class PBOverloadingMatchError extends PBError {
     super();
     this.func = func;
   }
-  getMessage(_deviceType: string): string {
+  getMessage(_deviceType: string) {
     return `No matched overloading found for function '${this.func}'`;
   }
 }
@@ -124,7 +124,7 @@ export class PBReferenceValueRequired extends PBError {
     super();
     this.value = value;
   }
-  getMessage(deviceType: string): string {
+  getMessage(deviceType: string) {
     return `'${expValueToString(deviceType, this.value)}' is not a reference type`;
   }
 }
@@ -136,7 +136,7 @@ export class PBPointerValueRequired extends PBError {
     super();
     this.value = value;
   }
-  getMessage(deviceType: string): string {
+  getMessage(deviceType: string) {
     return `'${expValueToString(deviceType, this.value)}' is not a pointer type`;
   }
 }
@@ -146,7 +146,7 @@ export class PBUndeclaredIdentifier extends PBError {
   constructor(identifier: string) {
     super(`undeclared identifier: ${identifier}`);
   }
-  getMessage(_deviceType: string): string {
+  getMessage(_deviceType: string) {
     return this.message;
   }
 }
@@ -158,7 +158,7 @@ export class PBDeviceNotSupport extends PBError {
     super();
     this.feature = feature;
   }
-  getMessage(deviceType: string): string {
+  getMessage(deviceType: string) {
     return `feature not support for ${deviceType} device: ${this.feature}`;
   }
 }
@@ -170,7 +170,7 @@ export class PBNonScopedFunctionCall extends PBError {
     super();
     this.funcName = funcName;
   }
-  getMessage(_deviceType: string): string {
+  getMessage(_deviceType: string) {
     return `function call must be made inside a function scope: ${this.funcName}()`;
   }
 }
@@ -184,7 +184,7 @@ export class PBASTError extends PBError {
     this.ast = ast;
     this.text = text;
   }
-  getMessage(deviceType: string): string {
+  getMessage(deviceType: string) {
     return `${this.text}: ${this.ast.toString(deviceType)}`;
   }
 }
@@ -194,7 +194,7 @@ export class PBInternalError extends PBError {
   constructor(desc: string) {
     super(desc);
   }
-  getMessage(_deviceType: string): string {
+  getMessage(_deviceType: string) {
     return `Internal error: ${this.message}`;
   }
 }

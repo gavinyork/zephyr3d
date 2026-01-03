@@ -1,10 +1,10 @@
 import { SceneNode } from './scene_node';
-import type { Texture2D } from '@zephyr3d/device';
 import type { BatchDrawable } from '../render/drawable';
 import type { Scene } from './scene';
 import type { Camera } from '../camera/camera';
 import type { OctreeNode } from '.';
 import type { Nullable } from '@zephyr3d/base';
+import type { Texture2D } from '@zephyr3d/device';
 
 /**
  * Graph scene node
@@ -32,7 +32,7 @@ export class GraphNode extends SceneNode {
     this._octreeNode = node;
   }
   /** Gets the name */
-  getName(): string {
+  getName() {
     return this._name;
   }
   /**
@@ -45,7 +45,7 @@ export class GraphNode extends SceneNode {
   /**
    * {@inheritDoc Drawable.getNode}
    */
-  getNode(): SceneNode {
+  getNode() {
     return this;
   }
   /**
@@ -57,7 +57,7 @@ export class GraphNode extends SceneNode {
   /**
    * {@inheritDoc Drawable.getSortDistance}
    */
-  getSortDistance(camera: Camera): number {
+  getSortDistance(camera: Camera) {
     const cameraWorldMatrix = camera.worldMatrix;
     const objectWorldMatrix = this.worldMatrix;
     const dx = cameraWorldMatrix.m03 - objectWorldMatrix.m03;
@@ -72,7 +72,7 @@ export class GraphNode extends SceneNode {
     return false;
   }
   /** @internal */
-  protected _visibleChanged(): void {
+  protected _visibleChanged() {
     this._scene?.invalidateNodePlacement(this);
   }
 }

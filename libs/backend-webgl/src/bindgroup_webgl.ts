@@ -40,13 +40,13 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
       }
     }
   }
-  getGPUId(): string {
+  getGPUId() {
     return String(this._uid);
   }
   getLayout(): Immutable<BindGroupLayout> {
     return this._layout;
   }
-  getBuffer(name: string, nocreate = true): Nullable<GPUDataBuffer> {
+  getBuffer(name: string, nocreate = true) {
     return this._getBuffer(name, nocreate);
   }
   getDynamicOffsets(): Nullable<Immutable<number[]>> {
@@ -172,7 +172,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
       }
     }
   }
-  destroy(): void {
+  destroy() {
     this._resources = {};
     this._object = null;
     for (const buffer of this._createdBuffers) {
@@ -180,13 +180,13 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
     }
     this._createdBuffers = [];
   }
-  restore(): void {
+  restore() {
     this._object = {};
   }
   isBindGroup(): this is BindGroup {
     return true;
   }
-  private _getBuffer(name: string, nocreate = false): Nullable<GPUDataBuffer> {
+  private _getBuffer(name: string, nocreate = false) {
     const bindName = this._layout.nameMap?.[name] ?? name;
     for (const entry of this._layout.entries) {
       if (entry.buffer && entry.name === bindName) {

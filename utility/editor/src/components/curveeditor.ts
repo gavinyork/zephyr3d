@@ -1,4 +1,4 @@
-import type { InterpolationMode } from '@zephyr3d/base';
+import type { InterpolationMode, Nullable } from '@zephyr3d/base';
 import { ASSERT, Interpolator, Observable } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 
@@ -30,7 +30,7 @@ export class CurveEditor extends Observable<{
   preview_position: [{ key: number; value: number[] }];
 }> {
   private readonly _points: Point[] = [];
-  private _interpolator: Interpolator = null;
+  private _interpolator: Nullable<Interpolator> = null;
 
   // Settings
   private readonly _settings: CurveSettings;
@@ -40,18 +40,18 @@ export class CurveEditor extends Observable<{
   private _valueRangeEndInput: [number];
 
   // Status
-  private _canvasSize: ImGui.ImVec2;
+  private _canvasSize!: ImGui.ImVec2;
   private _isDragging: boolean;
   private _curveActive: boolean;
   private _selectedPointIndex: number;
   private _cachedCurvePoints: Array<{ x: number; y: number }>;
-  private _curveDirty: boolean;
+  private _curveDirty!: boolean;
   private _currentChannel: number;
-  private _resultBuffer: Float32Array<ArrayBuffer>;
+  private _resultBuffer: Nullable<Float32Array<ArrayBuffer>>;
   private _positionIndicatorTime: number;
   private _isDraggingIndicator: boolean;
   private _showPositionIndicator: boolean;
-  private _changed: boolean;
+  private _changed!: boolean;
   constructor(interpolator?: Interpolator);
   constructor(points?: Point[], settings?: Partial<CurveSettings>);
   constructor(interpolator?: Interpolator, settings?: Partial<CurveSettings>);
@@ -203,10 +203,10 @@ export class CurveEditor extends Observable<{
     if (!this._interpolator || this._points.length < 2) {
       return;
     }
-    this._interpolator.interpolate(this._positionIndicatorTime, this._resultBuffer);
+    this._interpolator.interpolate(this._positionIndicatorTime, this._resultBuffer!);
     this.dispatchEvent('preview_position', {
       key: this._positionIndicatorTime,
-      value: [...this._resultBuffer]
+      value: [...this._resultBuffer!]
     });
   }
   setTimeRange(min: number, max: number): void {
@@ -493,8 +493,8 @@ export class CurveEditor extends Observable<{
       return null;
     }
 
-    this._interpolator.interpolate(time, this._resultBuffer);
-    return this._resultBuffer[this._currentChannel];
+    this._interpolator!.interpolate(time, this._resultBuffer!);
+    return this._resultBuffer![this._currentChannel];
   }
   private drawCurve(drawList: ImGui.ImDrawList, cursorPos: ImGui.ImVec2): void {
     if (this._points.length < 2) {
@@ -576,8 +576,8 @@ export class CurveEditor extends Observable<{
     const step = timeRange / numSegments;
     for (let i = 0; i <= numSegments; i++) {
       const x = this._points[0].x + i * step;
-      interpolator.interpolate(x, this._resultBuffer);
-      this._cachedCurvePoints.push({ x, y: this._resultBuffer[this._currentChannel] });
+      interpolator.interpolate(x, this._resultBuffer!);
+      this._cachedCurvePoints.push({ x, y: this._resultBuffer![this._currentChannel] });
     }
     this._curveDirty = false;
   }
@@ -719,10 +719,10 @@ export class CurveEditor extends Observable<{
     const minTime = this._points[0].x;
     const maxTime = this._points[this._points.length - 1].x;
     time = Math.max(minTime + 0.001, Math.min(maxTime - 0.001, time));
-    this._interpolator.interpolate(time, this._resultBuffer);
+    this._interpolator!.interpolate(time, this._resultBuffer!);
     const newPoint: Point = {
       x: time,
-      value: Array.from({ length: this._interpolator.stride }).map((_, index) => this._resultBuffer[index])
+      value: Array.from({ length: this._interpolator!.stride }).map((_, index) => this._resultBuffer![index])
     };
     this._points.push(newPoint);
     this.sortPoints();
@@ -809,8 +809,8 @@ export class CurveEditor extends Observable<{
     }
   }
   getValue(time: number): number[] {
-    ASSERT(this._interpolator && this._points.length >= 2);
-    this._interpolator.interpolate(time, this._resultBuffer);
-    return [...this._resultBuffer];
+    ASSERT(!!this._interpolator && this._points.length >= 2);
+    this._interpolator.interpolate(time, this._resultBuffer!);
+    return [...this._resultBuffer!];
   }
 }

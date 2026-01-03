@@ -68,13 +68,13 @@ export class ABufferOIT extends Disposable implements OIT {
   /**
    * {@inheritDoc OIT.getType}
    */
-  getType(): string {
+  getType() {
     return ABufferOIT.type;
   }
   /**
    * {@inheritDoc OIT.supportDevice}
    */
-  supportDevice(deviceType: string): boolean {
+  supportDevice(deviceType: string) {
     return deviceType === 'webgpu';
   }
   /**
@@ -86,7 +86,7 @@ export class ABufferOIT extends Disposable implements OIT {
   /**
    * {@inheritDoc OIT.begin}
    */
-  begin(ctx: DrawContext): number {
+  begin(ctx: DrawContext) {
     const device = ctx.device;
     this._savedScissor = device.getScissor();
     const ubAlignment = (ABufferOIT._ubAlignment =
@@ -216,7 +216,7 @@ export class ABufferOIT extends Disposable implements OIT {
   /**
    * {@inheritDoc OIT.calculateHash}
    */
-  calculateHash(): string {
+  calculateHash() {
     return this._hash!;
   }
   /**

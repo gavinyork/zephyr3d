@@ -49,7 +49,7 @@ export async function imGuiInit(
  * Whether a frame is currently rendering
  * @public
  */
-export function imGuiInFrame(): boolean {
+export function imGuiInFrame() {
   return inFrame;
 }
 
@@ -118,7 +118,7 @@ export function imGuiSetFontGlyph(charCode: number, font: Font) {
  *
  * @public
  */
-export function imGuiCalcTextSize(text: string, out?: ImGui.ImVec2): ImGui.ImVec2 {
+export function imGuiCalcTextSize(text: string, out?: ImGui.ImVec2) {
   return ImGui_Impl.calcTextSize(text, out);
 }
 

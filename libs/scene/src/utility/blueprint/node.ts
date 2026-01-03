@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { Observable, type IEventTarget } from '@zephyr3d/base';
 
 /** @internal */
@@ -141,12 +142,12 @@ export type GraphNodeInput = {
    * The source node connected to this input
    * @remarks Undefined if no connection exists
    */
-  inputNode?: IGraphNode;
+  inputNode?: Nullable<IGraphNode>;
   /**
    * The output slot ID of the connected source node
    * @remarks Only valid when inputNode is defined
    */
-  inputId?: number;
+  inputId?: Nullable<number>;
   /**
    * Default value when no connection exists
    * @remarks Can be a single number or an array of numbers for vector types
@@ -501,7 +502,7 @@ export abstract class BaseGraphNode extends Observable<{ changed: [] }> implemen
    * }
    * ```
    */
-  protected validate(): string {
+  protected validate() {
     for (let i = 0; i < this._inputs.length; i++) {
       const input = this._inputs[i];
       if (input.required && !input.inputNode) {

@@ -101,7 +101,7 @@ export interface IRUniformValue {
 export interface BluePrintUniformValue extends IRUniformValue {
   inVertexShader: boolean;
   inFragmentShader: boolean;
-  finalValue?: number | Float32Array<ArrayBuffer>;
+  finalValue?: Nullable<number | Float32Array<ArrayBuffer>>;
 }
 
 /**
@@ -133,9 +133,9 @@ export interface IRUniformTexture {
 export interface BluePrintUniformTexture extends IRUniformTexture {
   inVertexShader: boolean;
   inFragmentShader: boolean;
-  finalTexture?: DRef<BaseTexture>;
+  finalTexture?: Nullable<DRef<BaseTexture>>;
   finalSampler?: TextureSampler;
-  params?: Vector4;
+  params?: Nullable<Vector4>;
 }
 
 /**
@@ -205,7 +205,7 @@ abstract class IRExpression {
    * Called when this expression is referenced by another expression.
    * Reference count is used to determine if a temporary variable is needed.
    */
-  addRef(): this {
+  addRef() {
     this._ref++;
     return this;
   }
@@ -290,7 +290,7 @@ class IRConstantf extends IRExpression {
    * If a parameter name exists, creates a uniform in the global scope.
    * Otherwise, returns the literal value.
    */
-  create(pb: ProgramBuilder): number {
+  create(pb: ProgramBuilder) {
     if (this.name) {
       if (!pb.getGlobalScope()[this.name]) {
         pb.getGlobalScope()[this.name] = pb.float().uniform(2);
@@ -305,7 +305,7 @@ class IRConstantf extends IRExpression {
    * @param node - The graph node
    * @returns Uniform value descriptor if this is a uniform parameter, null otherwise
    */
-  asUniformValue(): Nullable<IRUniformValue> {
+  asUniformValue() {
     return this.name
       ? {
           name: this.name,
@@ -379,14 +379,16 @@ class IRConstantfv extends IRExpression {
    * If a parameter name exists, creates a uniform in the global scope.
    * The vector size is determined by the array length (vec2/vec3/vec4).
    */
-  create(pb: ProgramBuilder): PBShaderExp {
+  create(pb: ProgramBuilder) {
     if (this.name) {
       if (!pb.getGlobalScope()[this.name]) {
         pb.getGlobalScope()[this.name] = pb[`vec${this.value.length}`]().uniform(2);
       }
-      return pb.getGlobalScope()[this.name];
+      return pb.getGlobalScope()[this.name] as PBShaderExp;
     }
-    return Array.isArray(this.value) ? pb[`vec${this.value.length}`](...this.value) : this.value;
+    return (
+      Array.isArray(this.value) ? pb[`vec${this.value.length}`](...this.value) : this.value
+    ) as PBShaderExp;
   }
   /**
    * Converts to a uniform value descriptor
@@ -394,7 +396,7 @@ class IRConstantfv extends IRExpression {
    * @param node - The graph node
    * @returns Uniform value descriptor if this is a uniform parameter, null otherwise
    */
-  asUniformValue(): Nullable<IRUniformValue> {
+  asUniformValue() {
     return this.name
       ? {
           name: this.name,
@@ -430,8 +432,8 @@ class IRConstantbv extends IRExpression {
    *
    * @returns A boolean vector constructor expression
    */
-  create(pb: ProgramBuilder): PBShaderExp {
-    return pb[`bvec${this.value.length}`](...this.value);
+  create(pb: ProgramBuilder) {
+    return pb[`bvec${this.value.length}`](...this.value) as PBShaderExp;
   }
 }
 
@@ -472,8 +474,10 @@ class IRInput extends IRExpression {
    * @param pb - The program builder
    * @returns The shader expression referencing the input variable
    */
-  create(pb: ProgramBuilder): PBShaderExp {
-    return typeof this.func === 'string' ? pb.getCurrentScope()[this.func] : this.func(pb.getCurrentScope());
+  create(pb: ProgramBuilder) {
+    return (
+      typeof this.func === 'string' ? pb.getCurrentScope()[this.func] : this.func(pb.getCurrentScope())
+    ) as PBShaderExp;
   }
 }
 
@@ -536,20 +540,20 @@ class IRFunc extends IRExpression {
    * If referenced multiple times (_ref > 1), stores result in a temporary variable.
    * Otherwise, generates the function call inline.
    */
-  create(pb: ProgramBuilder): PBShaderExp {
+  create(pb: ProgramBuilder) {
     if (this.tmpName) {
-      const exp = pb.getCurrentScope()[this.tmpName];
-      ASSERT(exp, 'expression not exists');
+      const exp = pb.getCurrentScope()[this.tmpName] as PBShaderExp;
+      ASSERT(!!exp, 'expression not exists');
       return exp;
     }
     const params = this.params.map((param) => (param instanceof IRExpression ? param.create(pb) : param));
     const exp = typeof this.func === 'string' ? pb[this.func](...params) : this.func(pb, ...params);
     if (this._ref === 1) {
-      return exp;
+      return exp as PBShaderExp;
     } else {
       this.tmpName = this.getTmpName(pb.getCurrentScope());
       pb.getCurrentScope()[this.tmpName] = exp;
-      return pb.getCurrentScope()[this.tmpName];
+      return pb.getCurrentScope()[this.tmpName] as PBShaderExp;
     }
   }
 }

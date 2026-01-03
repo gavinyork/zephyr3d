@@ -46,44 +46,44 @@ export class PerspectiveCamera extends Camera {
   get autoAspect() {
     return this._autoAspect;
   }
-  set autoAspect(val: boolean) {
+  set autoAspect(val) {
     this._autoAspect = !!val;
   }
   /** The near clip plane */
-  get near(): number {
+  get near() {
     return this._near;
   }
-  set near(val: number) {
+  set near(val) {
     if (val !== this._near) {
       this._near = val;
       this._invalidate(true);
     }
   }
   /** The far clip plane */
-  get far(): number {
+  get far() {
     return this._far;
   }
-  set far(val: number) {
+  set far(val) {
     if (val !== this._far) {
       this._far = val;
       this._invalidate(true);
     }
   }
   /** Radian value indicates the field of view in Y axis */
-  get fovY(): number {
+  get fovY() {
     return this._fovY;
   }
-  set fovY(val: number) {
+  set fovY(val) {
     if (val !== this._fovY) {
       this._fovY = val;
       this._invalidate(true);
     }
   }
   /** Aspect ratio of the perspective transform */
-  get aspect(): number {
+  get aspect() {
     return this._aspect;
   }
-  set aspect(val: number) {
+  set aspect(val) {
     if (val !== this._aspect) {
       this._aspect = val;
       this._invalidate(true);
@@ -106,7 +106,7 @@ export class PerspectiveCamera extends Camera {
   /**
    * {@inheritDoc Camera.setPerspective}
    */
-  setPerspective(fovY: number, aspect: number, zNear: number, zFar: number): this {
+  setPerspective(fovY: number, aspect: number, zNear: number, zFar: number) {
     this._aspect = aspect;
     this._fovY = fovY;
     this._near = zNear;
@@ -127,7 +127,7 @@ export class PerspectiveCamera extends Camera {
    * Setup a projection matrix for the camera
    * @param matrix - The projection matrix
    */
-  setProjectionMatrix(matrix: Matrix4x4): void {
+  setProjectionMatrix(matrix: Matrix4x4) {
     if (matrix !== this._projMatrix) {
       if (matrix?.isPerspective()) {
         super.setProjectionMatrix(matrix);
@@ -150,7 +150,7 @@ export class PerspectiveCamera extends Camera {
     super.render(scene);
   }
   /** @internal */
-  protected _computeProj(): void {
+  protected _computeProj() {
     const h = this._near * Math.tan(this._fovY * 0.5);
     const w = h * this._aspect;
     let left = -w;

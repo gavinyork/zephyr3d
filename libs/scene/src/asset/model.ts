@@ -327,32 +327,32 @@ export class AssetHierarchyNode extends NamedObject {
     this._skeleton = skeleton;
   }
   /** The translation of the node */
-  get position(): Vector3 {
+  get position() {
     return this._position;
   }
-  set position(val: Vector3) {
+  set position(val) {
     this._position = val;
   }
   /** The rotation of the node */
-  get rotation(): Quaternion {
+  get rotation() {
     return this._rotation;
   }
-  set rotation(val: Quaternion) {
+  set rotation(val) {
     this._rotation = val;
   }
   /** The scale of the node */
-  get scaling(): Vector3 {
+  get scaling() {
     return this._scaling;
   }
-  set scaling(val: Vector3) {
+  set scaling(val) {
     this._scaling = val;
   }
   /** true if the node is parent of a mesh node */
-  get meshAttached(): boolean {
+  get meshAttached() {
     return this._meshAttached;
   }
   /** Children of the node */
-  get children(): AssetHierarchyNode[] {
+  get children() {
     return this._children;
   }
   /** The skeleton to which the node belongs if this is a joint node */
@@ -499,33 +499,33 @@ export class SharedModel extends Disposable {
     this._activeScene = -1;
   }
   /** Name of the model */
-  get name(): string {
+  get name() {
     return this._name;
   }
-  set name(val: string) {
+  set name(val) {
     this._name = val;
   }
   /** All scenes that the model contains */
-  get scenes(): AssetScene[] {
+  get scenes() {
     return this._scenes;
   }
   /** All animations that the model contains */
-  get animations(): AssetAnimationData[] {
+  get animations() {
     return this._animations;
   }
   /** All skeletons that the model contains */
-  get skeletons(): AssetSkeleton[] {
+  get skeletons() {
     return this._skeletons;
   }
   /** All nodes that the model contains */
-  get nodes(): AssetHierarchyNode[] {
+  get nodes() {
     return this._nodes;
   }
   /** The active scene of the model */
-  get activeScene(): number {
+  get activeScene() {
     return this._activeScene;
   }
-  set activeScene(val: number) {
+  set activeScene(val) {
     this._activeScene = val;
   }
   /**
@@ -535,7 +535,7 @@ export class SharedModel extends Disposable {
    * @param name - Name of the node
    * @returns The added node
    */
-  addNode(parent: Nullable<AssetHierarchyNode>, index: number, name: string): AssetHierarchyNode {
+  addNode(parent: Nullable<AssetHierarchyNode>, index: number, name: string) {
     const childNode = new AssetHierarchyNode(name, parent);
     this._nodes[index] = childNode;
     return childNode;
@@ -554,7 +554,7 @@ export class SharedModel extends Disposable {
   addAnimation(animation: AssetAnimationData) {
     this._animations.push(animation);
   }
-  createSceneNode(scene: Scene, instancing: boolean): SceneNode {
+  createSceneNode(scene: Scene, instancing: boolean) {
     const group = new SceneNode(scene);
     group.name = this.name;
     const animationSet = group.animationSet;

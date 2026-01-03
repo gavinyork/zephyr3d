@@ -101,18 +101,18 @@ export class Renderer extends Disposable {
   get device() {
     return this._device;
   }
-  get clearBeforeRender(): boolean {
+  get clearBeforeRender() {
     return this._clearBeforeRender;
   }
-  set clearBeforeRender(val: boolean) {
+  set clearBeforeRender(val) {
     this._clearBeforeRender = val;
   }
   /** @internal */
-  getCanvas(): HTMLCanvasElement {
+  getCanvas() {
     return this._device.canvas;
   }
   /** @internal */
-  createTexture(width: number, height: number, color: ColorRGBA, linear: boolean): Texture2D {
+  createTexture(width: number, height: number, color: ColorRGBA, linear: boolean) {
     const tex = this._device.createTexture2D(linear ? 'rgba8unorm' : 'rgba8unorm-srgb', width, height, {
       mipmapping: false
     })!;
@@ -137,7 +137,7 @@ export class Renderer extends Disposable {
     tex.update(pixels, 0, 0, tex.width, tex.height);
   }
   /** @internal */
-  updateTextureWithImage(texture: Texture2D, bitmap: ImageData, x: number, y: number): void {
+  updateTextureWithImage(texture: Texture2D, bitmap: ImageData, x: number, y: number) {
     const originValues = new Uint8Array(bitmap.data.buffer);
     ASSERT(texture.format === 'rgba8unorm');
     texture.update(originValues, x, y, bitmap.width, bitmap.height);
@@ -152,27 +152,27 @@ export class Renderer extends Disposable {
     h: number,
     x: number,
     y: number
-  ): void {
+  ) {
     texture.updateFromElement(ctx.canvas, x, y, cvsOffsetX, cvsOffsetY, w, h);
   }
   /** @internal */
-  getTextureWidth(texture: Texture2D): number {
+  getTextureWidth(texture: Texture2D) {
     return texture.width;
   }
   /** @internal */
-  getTextureHeight(texture: Texture2D): number {
+  getTextureHeight(texture: Texture2D) {
     return texture.height;
   }
   /** @internal */
-  disposeTexture(texture: Texture2D): void {
+  disposeTexture(texture: Texture2D) {
     texture?.dispose();
   }
   /** @internal */
-  setCursorStyle(style: string): void {
+  setCursorStyle(style: string) {
     this.getCanvas().style.cursor = style;
   }
   /** @internal */
-  getCursorStyle(): string {
+  getCursorStyle() {
     return this.getCanvas().style.cursor;
   }
   /** @internal */
@@ -260,7 +260,7 @@ export class Renderer extends Disposable {
     this._textureSampler?.dispose();
   }
   /** @internal */
-  private createStateSet(): RenderStateSet {
+  private createStateSet() {
     const rs = this._device.createRenderStateSet();
     rs.useBlendingState().enable(true).setBlendFunc('one', 'inv-src-alpha');
     rs.useDepthState().enableTest(false).enableWrite(false);
@@ -268,7 +268,7 @@ export class Renderer extends Disposable {
     return rs;
   }
   /** @internal */
-  private createProgram(diffuseMap: boolean): GPUProgram {
+  private createProgram(diffuseMap: boolean) {
     const program = this._device.buildRenderProgram({
       label: 'UI',
       vertex(pb) {

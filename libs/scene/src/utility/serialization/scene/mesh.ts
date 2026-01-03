@@ -2,7 +2,7 @@ import { base64ToUint8Array, uint8ArrayToBase64, Vector3 } from '@zephyr3d/base'
 import { getEngine } from '../../../app/api';
 import type { MeshMaterial } from '../../../material/meshmaterial';
 import { GraphNode, Mesh, type SceneNode } from '../../../scene';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import { BoundingBox } from '../../bounding_volume';
 import { meshInstanceClsMap } from './common';
 
@@ -19,7 +19,7 @@ export function getMeshClass(): SerializableClass {
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'CastShadow',
           type: 'bool',
@@ -251,7 +251,7 @@ export function getMeshClass(): SerializableClass {
             }
           }
         }
-      ];
+      ]);
     }
   };
 }

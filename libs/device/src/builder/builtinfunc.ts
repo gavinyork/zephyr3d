@@ -31,11 +31,7 @@ const genMatrixTypeList = [
   typeinfo.typeMat4
 ];
 
-function matchFunctionOverloadings(
-  pb: ProgramBuilder,
-  name: string,
-  ...args: ExpValueType[]
-): [ASTFunction, ASTExpression[]] {
+function matchFunctionOverloadings(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
   const bit =
     pb.getDevice().type === 'webgl'
       ? MASK_WEBGL1
@@ -55,10 +51,10 @@ function matchFunctionOverloadings(
   }
   return matchResult;
 }
-function callBuiltinChecked(pb: ProgramBuilder, matchResult: [ASTFunction, ASTExpression[]]): PBShaderExp {
+function callBuiltinChecked(pb: ProgramBuilder, matchResult: [ASTFunction, ASTExpression[]]) {
   return pb.$callFunction(matchResult[0].name, matchResult[1], matchResult[0]);
 }
-function callBuiltin(pb: ProgramBuilder, name: string, ...args: ExpValueType[]): PBShaderExp {
+function callBuiltin(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
   return callBuiltinChecked(pb, matchFunctionOverloadings(pb, name, ...args));
 }
 
@@ -67,7 +63,7 @@ function genMatrixType(
   shaderTypeMask: number,
   r: Nullable<typeinfo.PBTypeInfo>,
   args: Nullable<typeinfo.PBPrimitiveTypeInfo>[]
-): [ASTFunction, number][] {
+) {
   const result: [ASTFunction, number][] = [];
   for (let i = 0; i < genMatrixTypeList.length; i++) {
     const returnType = r || genMatrixTypeList[i];
@@ -88,7 +84,7 @@ function genType(
   r: typeinfo.PBTypeInfo | number,
   args: (typeinfo.PBTypeInfo | number)[],
   vecOnly?: boolean
-): [ASTFunction, number][] {
+) {
   if (args.findIndex((val) => typeof val === 'number') < 0) {
     return [
       [
@@ -127,13 +123,13 @@ function genType(
   }
 }
 
-function unaryFunc(a: ASTExpression, op: string, type: typeinfo.PBTypeInfo): PBShaderExp {
+function unaryFunc(a: ASTExpression, op: string, type: typeinfo.PBTypeInfo) {
   const exp = new PBShaderExp('', type);
   exp.$ast = new ASTUnaryFunc(a, op, type);
   return exp;
 }
 
-function binaryFunc(a: ASTExpression, b: ASTExpression, op: string, type: typeinfo.PBTypeInfo): PBShaderExp {
+function binaryFunc(a: ASTExpression, b: ASTExpression, op: string, type: typeinfo.PBTypeInfo) {
   const exp = new PBShaderExp('', type);
   exp.$ast = new ASTBinaryFunc(a, b, op, type);
   return exp;
@@ -3398,7 +3394,7 @@ export type PBBuiltinFunctionOverloadsInfo = {
 /** @internal */
 export function setBuiltinFuncs(cls: typeof ProgramBuilder) {
   for (const k of Object.keys(builtinFunctionsAll)) {
-    cls.prototype[k] = function (this: ProgramBuilder, ...args: ExpValueType[]): PBShaderExp {
+    cls.prototype[k] = function (this: ProgramBuilder, ...args: ExpValueType[]) {
       const normalizeFunc = builtinFunctionsAll?.[k]?.normalizeFunc || callBuiltin;
       return normalizeFunc(this, k, ...args);
     };

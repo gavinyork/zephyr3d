@@ -13,7 +13,7 @@ export function calculateTangentVectors(
   texcoords: number[],
   indices: number[],
   withHandedness: boolean
-): number[] {
+) {
   const numTangentCompnents = withHandedness ? 4 : 3;
   const tangents = Array.from({
     length: (vertices.length / 3) * numTangentCompnents

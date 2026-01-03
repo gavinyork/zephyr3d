@@ -13,13 +13,13 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
     }
     super(device, '3d');
   }
-  get depth(): number {
+  get depth() {
     return this._depth;
   }
   isTexture3D(): this is Texture3D {
     return true;
   }
-  init(): void {
+  init() {
     this.loadEmpty(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
   }
   update(
@@ -30,7 +30,7 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
     width: number,
     height: number,
     depth: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
@@ -56,13 +56,7 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
       data
     );
   }
-  createEmpty(
-    format: TextureFormat,
-    width: number,
-    height: number,
-    depth: number,
-    creationFlags?: number
-  ): void {
+  createEmpty(format: TextureFormat, width: number, height: number, depth: number, creationFlags?: number) {
     this._flags = Number(creationFlags) || 0;
     if (this._flags & GPUResourceUsageFlags.TF_WRITABLE) {
       console.error(new Error('webgl device does not support storage texture'));
@@ -86,7 +80,7 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
     layer: number,
     mipLevel: number,
     buffer: TypedArray
-  ): Promise<void> {
+  ) {
     if (mipLevel !== 0) {
       throw new Error(`Texture3D.readPixels(): parameter mipLevel must be 0`);
     }
@@ -107,7 +101,7 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
     layer: number,
     mipLevel: number,
     buffer: GPUDataBuffer
-  ): void {
+  ) {
     if (mipLevel !== 0) {
       throw new Error(`Texture3D.readPixelsToBuffer(): parameter mipLevel must be 0`);
     }
@@ -120,7 +114,7 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
     this._device.popDeviceStates();
     fb.dispose();
   }
-  createWithMipmapData(data: TextureMipmapData, creationFlags?: number): void {
+  createWithMipmapData(data: TextureMipmapData, creationFlags?: number) {
     if (!data.arraySize) {
       console.error('Texture2DArray.createWithMipmapData() failed: Data is not texture array');
     } else {
@@ -134,7 +128,7 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
       }
     }
   }
-  private loadLevels(levels: TextureMipmapData): void {
+  private loadLevels(levels: TextureMipmapData) {
     const format = levels.format;
     const width = levels.width;
     const height = levels.height;
@@ -209,7 +203,7 @@ export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLT
     height: number,
     depth: number,
     numMipLevels: number
-  ): void {
+  ) {
     this.allocInternal(format, width, height, depth, numMipLevels);
     if (this._mipLevelCount > 1 && !this._device.isContextLost()) {
       this.generateMipmaps();

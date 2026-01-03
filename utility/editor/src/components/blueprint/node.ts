@@ -1,6 +1,7 @@
 import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import type { NodeEditor } from './nodeeditor';
 import type { IGraphNode } from '@zephyr3d/scene';
+import type { Nullable } from '@zephyr3d/base';
 
 export type GraphNodeInput = { id: number; name: string; type: string; value?: any };
 export type GraphNodeOutput = { id: number; name: string; type: string; value?: any };
@@ -15,8 +16,8 @@ const SLOT_RADIUS = 6;
 
 export class GNode {
   private _id: number;
-  private _position: ImGui.ImVec2;
-  private _titleRect: ImGui.ImVec2;
+  private _position: Nullable<ImGui.ImVec2>;
+  private _titleRect: Nullable<ImGui.ImVec2>;
   private _titleBg: number;
   private _errorTitleBg: number;
   private _titleTextColor: number;
@@ -27,7 +28,7 @@ export class GNode {
   private _errorBorderColor: ImGui.ImVec4;
   private _inputCircleColor: number;
   private _outputCircleColor: number;
-  private _size: ImGui.ImVec2;
+  private _size: Nullable<ImGui.ImVec2>;
   private _selected: boolean;
   private _hovered: boolean;
   private _locked: boolean;
@@ -35,7 +36,7 @@ export class GNode {
   private _impl: IGraphNode;
   private _title: string;
 
-  constructor(editor: NodeEditor, position: ImGui.ImVec2, impl: IGraphNode) {
+  constructor(editor: NodeEditor, position: Nullable<ImGui.ImVec2>, impl: IGraphNode) {
     this._id = editor.nextNodeId();
     this._editor = editor;
     this._impl = impl;
@@ -74,7 +75,7 @@ export class GNode {
     if (!this._size) {
       this.calculateSize();
     }
-    return this._size;
+    return this._size!;
   }
   get titleBg() {
     return this._titleBg;
@@ -97,12 +98,12 @@ export class GNode {
   get position() {
     if (!this._position && this._editor.canvasSize) {
       const canvasSize = this._editor.canvasSize;
-      const size = this.size;
+      const size = this.size!;
       const x = Math.max(10, (canvasSize.x - size.x) >> 1);
       const y = Math.max(10, (canvasSize.y - size.y) >> 1);
       this._position = new ImGui.ImVec2(x, y);
     }
-    return this._position;
+    return this._position!;
   }
   get inputs() {
     return this._impl.inputs;
@@ -153,10 +154,10 @@ export class GNode {
     }
 
     const slotY =
-      this.position.y + this.titleRect.y + NODE_PADDING_BOTTOM + slotIndex * SLOT_HEIGHT + SLOT_RADIUS;
+      this.position!.y + this.titleRect!.y + NODE_PADDING_BOTTOM + slotIndex * SLOT_HEIGHT + SLOT_RADIUS;
     const slotX = isOutput
-      ? this.position.x + this.size.x - NODE_PADDING_RIGHT - SLOT_MARGIN - SLOT_RADIUS
-      : this.position.x + NODE_PADDING_LEFT + SLOT_MARGIN + SLOT_RADIUS;
+      ? this.position!.x + this.size!.x - NODE_PADDING_RIGHT - SLOT_MARGIN - SLOT_RADIUS
+      : this.position!.x + NODE_PADDING_LEFT + SLOT_MARGIN + SLOT_RADIUS;
 
     return new ImGui.ImVec2(slotX, slotY);
   }
@@ -185,12 +186,12 @@ export class GNode {
     this._size = new ImGui.ImVec2(minWidth, minHeight);
   }
   draw(drawList: ImGui.DrawList, canvasPos: ImGui.ImVec2) {
-    const nodeScreenPos = this._editor.worldToCanvas(this.position);
+    const nodeScreenPos = this._editor.worldToCanvas(this.position!);
     const nodePos = new ImGui.ImVec2(canvasPos.x + nodeScreenPos.x, canvasPos.y + nodeScreenPos.y);
 
     const nodeSize = new ImGui.ImVec2(
-      this.size.x * this._editor.canvasScale,
-      this.size.y * this._editor.canvasScale
+      this.size!.x * this._editor.canvasScale,
+      this.size!.y * this._editor.canvasScale
     );
 
     const nodeRounding = 6.0;
@@ -205,7 +206,7 @@ export class GNode {
     const nodeRectMin = nodePos;
     const nodeRectMax = new ImGui.ImVec2(nodePos.x + nodeSize.x, nodePos.y + nodeSize.y);
 
-    const titleHeight = this.titleRect.y * this._editor.canvasScale;
+    const titleHeight = this.titleRect!.y * this._editor.canvasScale;
     const titleRectMin = nodePos;
     const titleRectMax = new ImGui.ImVec2(nodePos.x + nodeSize.x, nodePos.y + titleHeight);
 

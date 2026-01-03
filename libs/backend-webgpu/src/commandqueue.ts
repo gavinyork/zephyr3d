@@ -8,7 +8,6 @@ import type { WebGPUVertexLayout } from './vertexlayout_webgpu';
 import type { WebGPURenderStateSet } from './renderstates_webgpu';
 import type { WebGPUBindGroup } from './bindgroup_webgpu';
 import type { WebGPUFrameBuffer } from './framebuffer_webgpu';
-import type { FrameBufferInfo } from './pipeline_cache';
 import type { WebGPUBuffer } from './buffer_webgpu';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';
 import { WebGPUMipmapGenerator } from './utils_webgpu';
@@ -28,10 +27,10 @@ export class CommandQueueImmediate {
     this._computePass = new WebGPUComputePass(device);
     this._drawcallCounter = 0;
   }
-  isBufferUploading(buffer: WebGPUBuffer): boolean {
+  isBufferUploading(buffer: WebGPUBuffer) {
     return !!this._bufferUploads.has(buffer);
   }
-  isTextureUploading(tex: WebGPUBaseTexture): boolean {
+  isTextureUploading(tex: WebGPUBaseTexture) {
     return !!this._textureUploads.has(tex);
   }
   flushUploads() {
@@ -57,8 +56,8 @@ export class CommandQueueImmediate {
   get currentPass(): Nullable<WebGPURenderPass | WebGPUComputePass> {
     return this._renderPass.active ? this._renderPass : this._computePass.active ? this._computePass : null;
   }
-  beginFrame(): void {}
-  endFrame(): void {
+  beginFrame() {}
+  endFrame() {
     this.flush();
   }
   flush() {
@@ -70,16 +69,16 @@ export class CommandQueueImmediate {
       this._computePass.end();
     }
   }
-  setFramebuffer(fb: WebGPUFrameBuffer): void {
+  setFramebuffer(fb: WebGPUFrameBuffer) {
     if (this._renderPass.active) {
       this.flushUploads();
     }
     this._renderPass.setFramebuffer(fb);
   }
-  getFramebuffer(): Nullable<WebGPUFrameBuffer> {
+  getFramebuffer() {
     return this._renderPass.getFramebuffer();
   }
-  getFramebufferInfo(): FrameBufferInfo {
+  getFramebufferInfo() {
     return this._renderPass.getFrameBufferInfo();
   }
   executeRenderBundle(renderBundle: GPURenderBundle) {
@@ -151,7 +150,7 @@ export class CommandQueueImmediate {
     first: number,
     count: number,
     numInstances: number
-  ): void {
+  ) {
     if (this._computePass.active) {
       this.flushUploads();
       this._computePass.end();
@@ -180,7 +179,7 @@ export class CommandQueueImmediate {
     first: number,
     count: number,
     numInstances: number
-  ): void {
+  ) {
     this._drawcallCounter++;
     if (this._computePass.active) {
       this.flushUploads();
@@ -202,16 +201,16 @@ export class CommandQueueImmediate {
   setViewport(vp: Nullable<Immutable<number[] | DeviceViewport>>) {
     this._renderPass.setViewport(vp);
   }
-  getViewport(): DeviceViewport {
+  getViewport() {
     return this._renderPass.getViewport();
   }
   setScissor(scissor: Nullable<Immutable<number[] | DeviceViewport>>) {
     this._renderPass.setScissor(scissor);
   }
-  getScissor(): DeviceViewport {
+  getScissor() {
     return this._renderPass.getScissor();
   }
-  clear(color: Nullable<Vector4>, depth: Nullable<number>, stencil: Nullable<number>): void {
+  clear(color: Nullable<Vector4>, depth: Nullable<number>, stencil: Nullable<number>) {
     this._renderPass.clear(color, depth, stencil);
   }
   finish() {

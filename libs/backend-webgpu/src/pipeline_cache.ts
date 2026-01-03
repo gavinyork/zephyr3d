@@ -48,7 +48,7 @@ export class PipelineCache {
     this._renderPipelines = {};
     this._computePipelines = {};
   }
-  fetchComputePipeline(program: WebGPUProgram): GPUComputePipeline {
+  fetchComputePipeline(program: WebGPUProgram) {
     const hash = this.getComputePipelineHash(program);
     let pipeline = this._computePipelines[hash];
     if (pipeline === undefined) {
@@ -71,7 +71,7 @@ export class PipelineCache {
     stateSet: WebGPURenderStateSet,
     primitiveType: PrimitiveType,
     frameBufferInfo: FrameBufferInfo
-  ): Nullable<GPURenderPipeline> {
+  ) {
     if (!frameBufferInfo.hash) {
       return null;
     }
@@ -123,7 +123,7 @@ export class PipelineCache {
     vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     primitiveType: PrimitiveType
-  ): GPUPrimitiveState {
+  ) {
     const topology = primitiveTypeMap[primitiveType];
     if (!topology) {
       throw new Error(`createPrimitiveState() failed: invalid primitive type: ${primitiveType}`);
@@ -148,7 +148,7 @@ export class PipelineCache {
     }
     return state;
   }
-  private createMultisampleState(sampleCount: number, stateSet: WebGPURenderStateSet): GPUMultisampleState {
+  private createMultisampleState(sampleCount: number, stateSet: WebGPURenderStateSet) {
     return {
       count: sampleCount,
       alphaToCoverageEnabled:
@@ -157,10 +157,7 @@ export class PipelineCache {
           .alphaToCoverageEnabled
     };
   }
-  private createDepthStencilState(
-    depthFormat: GPUTextureFormat | undefined,
-    stateSet: WebGPURenderStateSet
-  ): GPUDepthStencilState | undefined {
+  private createDepthStencilState(depthFormat: GPUTextureFormat | undefined, stateSet: WebGPURenderStateSet) {
     if (!depthFormat) {
       return undefined;
     }
@@ -212,7 +209,7 @@ export class PipelineCache {
     failOp: StencilOp,
     zFailOp: StencilOp,
     passOp: StencilOp
-  ): GPUStencilFaceState {
+  ) {
     return {
       compare: compareFuncMap[func],
       failOp: stencilOpMap[failOp],
@@ -237,7 +234,7 @@ export class PipelineCache {
     }
     return state;
   }
-  private createBlendState(blendingState: rs.WebGPUBlendingState): GPUBlendState {
+  private createBlendState(blendingState: rs.WebGPUBlendingState) {
     return {
       color: this.createBlendComponent(
         blendingState.rgbEquation,
@@ -251,7 +248,7 @@ export class PipelineCache {
       )
     };
   }
-  private createBlendComponent(op: BlendEquation, srcFunc: BlendFunc, dstFunc: BlendFunc): GPUBlendComponent {
+  private createBlendComponent(op: BlendEquation, srcFunc: BlendFunc, dstFunc: BlendFunc) {
     const operation = blendEquationMap[op];
     if (!operation) {
       throw new Error(`createBlendComponent() failed: invalid blend op: ${op}`);
@@ -276,7 +273,7 @@ export class PipelineCache {
     vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     primitiveType: PrimitiveType
-  ): string {
+  ) {
     const programHash = program.hash;
     const vertexHash = vertexData?.getLayouts(program.vertexAttributes)?.layoutHash || '';
     const stateHash = stateSet?.hash || '';
@@ -284,7 +281,7 @@ export class PipelineCache {
       this._device.isWindingOrderReversed()
     )}`;
   }
-  private getComputePipelineHash(program: WebGPUProgram): string {
+  private getComputePipelineHash(program: WebGPUProgram) {
     return program.hash;
   }
 }

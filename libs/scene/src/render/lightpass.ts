@@ -27,10 +27,10 @@ export class LightPass extends RenderPass {
     this._clearColor = Vector4.zero();
   }
   /** @internal */
-  get transmission(): boolean {
+  get transmission() {
     return this._transmission;
   }
-  set transmission(val: boolean) {
+  set transmission(val) {
     this._transmission = val;
   }
   /** @internal */
@@ -183,7 +183,7 @@ export class LightPass extends RenderPass {
           ctx.device.pushDeviceStates();
           ctx.device.setFramebuffer(tmpFramebuffer);
         }
-        ctx.env.sky.skyWorldMatrix = ctx.scene.rootNode!.worldMatrix;
+        ctx.env.sky.skyWorldMatrix = ctx.scene.rootNode.worldMatrix;
         ctx.env.sky.renderSky(ctx);
         if (ctx.env.sky.fogPresents) {
           ctx.env.sky.renderFog(ctx.camera);

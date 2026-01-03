@@ -23,7 +23,6 @@ import { UnlitMaterial } from '../../../material';
 import { ComponentType, GLTFAccessor } from './helpers';
 import { AbstractModelLoader } from '../loader';
 import type {
-  PrimitiveType,
   VertexSemantic,
   GPUDataBuffer,
   Texture2D,
@@ -69,7 +68,7 @@ export interface GLTFContent extends GlTf {
  * @internal
  */
 export class GLTFLoader extends AbstractModelLoader {
-  supportMIMEType(mimeType: string): boolean {
+  supportMIMEType(mimeType: string) {
     return mimeType === 'model/gltf+json' || mimeType === 'model/gltf-binary';
   }
   async load(
@@ -96,7 +95,7 @@ export class GLTFLoader extends AbstractModelLoader {
     buffer: ArrayBuffer,
     VFSs?: VFS[],
     decoderModule?: DecoderModule
-  ): Promise<Nullable<SharedModel>> {
+  ) {
     const jsonChunkType = 0x4e4f534a;
     const binaryChunkType = 0x004e4942;
     let gltf: Nullable<GLTFContent> = null;
@@ -119,11 +118,7 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     return null;
   }
-  async loadJson(
-    url: string,
-    gltf: GLTFContent,
-    dracoDecoderModule?: DecoderModule
-  ): Promise<Nullable<SharedModel>> {
+  async loadJson(url: string, gltf: GLTFContent, dracoDecoderModule?: DecoderModule) {
     // check extensions
     if (
       !dracoDecoderModule &&
@@ -339,7 +334,7 @@ export class GLTFLoader extends AbstractModelLoader {
     return { name, channels, samplers, interpolators, interpolatorTypes, maxTime, nodes };
   }
   /** @internal */
-  private _loadAnimation(gltf: GLTFContent, index: number): AssetAnimationData {
+  private _loadAnimation(gltf: GLTFContent, index: number) {
     const animationInfo = this.getAnimationInfo(gltf, index);
     const animationData: AssetAnimationData = {
       name: animationInfo.name,
@@ -377,7 +372,7 @@ export class GLTFLoader extends AbstractModelLoader {
     nodeIndex: number,
     parent: Nullable<AssetHierarchyNode>,
     model: SharedModel
-  ): AssetHierarchyNode {
+  ) {
     let node: AssetHierarchyNode = gltf._nodes[nodeIndex];
     if (node) {
       if (parent) {
@@ -478,7 +473,7 @@ export class GLTFLoader extends AbstractModelLoader {
     }
   }
   /** @internal */
-  private async _loadMesh(gltf: GLTFContent, meshIndex: number): Promise<Nullable<AssetMeshData>> {
+  private async _loadMesh(gltf: GLTFContent, meshIndex: number) {
     const meshInfo = gltf.meshes && gltf.meshes[meshIndex];
     let mesh: Nullable<AssetMeshData> = null;
     if (meshInfo) {
@@ -622,7 +617,7 @@ export class GLTFLoader extends AbstractModelLoader {
     }
     return mesh;
   }
-  private async _createMaterial(assetMaterial: AssetMaterial): Promise<Nullable<M>> {
+  private async _createMaterial(assetMaterial: AssetMaterial) {
     if (assetMaterial.type === 'unlit') {
       const unlitAssetMaterial = assetMaterial as AssetUnlitMaterial;
       const unlitMaterial = new UnlitMaterial();
@@ -858,7 +853,7 @@ export class GLTFLoader extends AbstractModelLoader {
     vertexColor: boolean,
     vertexNormal: boolean,
     useTangent: boolean
-  ): Promise<Nullable<M>> {
+  ) {
     let assetMaterial: Nullable<AssetMaterial> = null;
     let pbrMetallicRoughness: Nullable<AssetPBRMaterialMR> = null;
     let pbrSpecularGlossness: Nullable<AssetPBRMaterialSG> = null;
@@ -1062,11 +1057,7 @@ export class GLTFLoader extends AbstractModelLoader {
     return await this._createMaterial(assetMaterial);
   }
   /** @internal */
-  private async _loadTexture(
-    gltf: GLTFContent,
-    info: Partial<TextureInfo>,
-    sRGB: boolean
-  ): Promise<MaterialTextureInfo> {
+  private async _loadTexture(gltf: GLTFContent, info: Partial<TextureInfo>, sRGB: boolean) {
     const mt: MaterialTextureInfo = {
       texture: null,
       sampler: null,
@@ -1202,7 +1193,7 @@ export class GLTFLoader extends AbstractModelLoader {
     return mt;
   }
   /** @internal */
-  private _primitiveType(type: number): Nullable<PrimitiveType> {
+  private _primitiveType(type: number) {
     switch (type) {
       case 0: // GL_POINTS
         return 'point-list';
@@ -1451,7 +1442,7 @@ export class GLTFLoader extends AbstractModelLoader {
     return buffer;
   }
   /** @internal */
-  private isGLB(data: ArrayBuffer): boolean {
+  private isGLB(data: ArrayBuffer) {
     if (data.byteLength > 12) {
       const p = new Uint32Array(data, 0, 3);
       if (p[0] === 0x46546c67 && p[1] === 2 && p[2] === data.byteLength) {
@@ -1461,10 +1452,7 @@ export class GLTFLoader extends AbstractModelLoader {
     return false;
   }
   /** @internal */
-  private getGLBChunkInfo(
-    data: ArrayBuffer,
-    offset: number
-  ): { start: number; length: number; type: number } {
+  private getGLBChunkInfo(data: ArrayBuffer, offset: number) {
     const header = new Uint32Array(data, offset, 2);
     const start = offset + 8;
     const length = header[0];
@@ -1472,7 +1460,7 @@ export class GLTFLoader extends AbstractModelLoader {
     return { start, length, type };
   }
   /** @internal */
-  private getGLBChunkInfos(data: ArrayBuffer): { start: number; length: number; type: number }[] {
+  private getGLBChunkInfos(data: ArrayBuffer) {
     const infos: { start: number; length: number; type: number }[] = [];
     let offset = 12;
     while (offset < data.byteLength) {

@@ -1,5 +1,3 @@
-import type { Nullable } from './utils';
-
 /**
  * The list iterator class
  * @public
@@ -24,7 +22,7 @@ export class ListIterator<T = unknown> {
    *
    * @public
    */
-  valid(): boolean {
+  valid() {
     return this._node !== this._dl.head;
   }
   /**
@@ -36,7 +34,7 @@ export class ListIterator<T = unknown> {
    *
    * @public
    */
-  next(): ListIterator<T> {
+  next() {
     if (!this.valid()) {
       throw new Error('ListIterator.next(): iterator is invalid');
     }
@@ -52,7 +50,7 @@ export class ListIterator<T = unknown> {
    *
    * @public
    */
-  getNext(): ListIterator<T> {
+  getNext() {
     if (!this.valid()) {
       throw new Error('ListIterator.getNext(): iterator is invalid');
     }
@@ -67,7 +65,7 @@ export class ListIterator<T = unknown> {
    *
    * @public
    */
-  prev(): ListIterator<T> {
+  prev() {
     if (!this.valid()) {
       throw new Error('ListIterator.prev(): iterator is invalid');
     }
@@ -83,18 +81,18 @@ export class ListIterator<T = unknown> {
    *
    * @public
    */
-  getPrev(): ListIterator<T> {
+  getPrev() {
     if (!this.valid()) {
       throw new Error('ListIterator.getPrev(): iterator is invalid');
     }
     return new ListIterator<T>(this._dl, this._reverse ? this._node.next : this._node.prev, this._reverse);
   }
   /** @internal */
-  get node(): ListNodeImpl {
+  get node() {
     return this._node;
   }
   /** @internal */
-  set node(n: ListNodeImpl) {
+  set node(n) {
     this._node = n;
   }
   /**
@@ -104,7 +102,7 @@ export class ListIterator<T = unknown> {
    *
    * @public
    */
-  get reversed(): boolean {
+  get reversed() {
     return this._reverse;
   }
   /**
@@ -114,7 +112,7 @@ export class ListIterator<T = unknown> {
    *
    * @public
    */
-  get list(): List<T> {
+  get list() {
     return this._dl;
   }
   /**
@@ -124,7 +122,7 @@ export class ListIterator<T = unknown> {
    *
    * @public
    */
-  get data(): T {
+  get data() {
     if (!this.valid()) {
       throw new Error('ListIterator.data: iterator is invalid');
     }
@@ -154,7 +152,7 @@ export class List<T = unknown> {
     this._length = 0;
   }
   /** @internal */
-  get head(): ListNodeImpl {
+  get head() {
     return this._head;
   }
   /**
@@ -162,13 +160,13 @@ export class List<T = unknown> {
    *
    * @returns The number of elements in the linked list
    */
-  get length(): number {
+  get length() {
     return this._length;
   }
   /**
    * Remove all elements in the linked list
    */
-  clear(): void {
+  clear() {
     while (this._length > 0) {
       this.remove(this.begin());
     }
@@ -181,7 +179,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  append(data: T): ListIterator<T> {
+  append(data: T) {
     return this._insertAt(data, this._head);
   }
   /**
@@ -192,7 +190,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  prepend(data: T): ListIterator<T> {
+  prepend(data: T) {
     return this._insertAt(data, this._head.next);
   }
   /**
@@ -202,7 +200,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  remove(it: ListIterator<T>): void {
+  remove(it: ListIterator<T>) {
     if (it.valid() && it.list === this) {
       const node = it.node;
       it.next();
@@ -217,7 +215,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  insert(data: T, at: ListIterator<T>): Nullable<ListIterator<T>> {
+  insert(data: T, at: ListIterator<T>) {
     if (at.list === this) {
       if (at.valid()) {
         if (at.reversed) {
@@ -237,7 +235,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  forEach(callback: (data: T) => void): void {
+  forEach(callback: (data: T) => void) {
     if (callback) {
       for (let it = this.begin(); it.valid(); it.next()) {
         callback(it.data);
@@ -250,7 +248,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  forEachReverse(callback: (data: T) => void): void {
+  forEachReverse(callback: (data: T) => void) {
     if (callback) {
       for (let it = this.rbegin(); it.valid(); it.next()) {
         callback(it.data);
@@ -265,7 +263,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  front(): T {
+  front() {
     if (this.length === 0) {
       throw new Error('List.front(): list is empty');
     }
@@ -279,7 +277,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  back(): T {
+  back() {
     if (this.length === 0) {
       throw new Error('List.back(): list is empty');
     }
@@ -291,7 +289,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  begin(): ListIterator<T> {
+  begin() {
     return new ListIterator(this, this._length > 0 ? this._head.next : this._head, false);
   }
   /**
@@ -300,7 +298,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  end(): ListIterator<T> {
+  end() {
     return new ListIterator(this, this._head, false);
   }
   /**
@@ -309,7 +307,7 @@ export class List<T = unknown> {
    *
    * @public
    */
-  rbegin(): ListIterator<T> {
+  rbegin() {
     return new ListIterator(this, this._length > 0 ? this._head.prev : this._head, true);
   }
   /**
@@ -318,17 +316,17 @@ export class List<T = unknown> {
    *
    * @public
    */
-  rend(): ListIterator<T> {
+  rend() {
     return new ListIterator(this, this._head, true);
   }
   /** @internal */
-  private _remove(node: ListNodeImpl): void {
+  private _remove(node: ListNodeImpl) {
     node.prev.next = node.next;
     node.next.prev = node.prev;
     this._length--;
   }
   /** @internal */
-  private _insertAt(data: T, node: ListNodeImpl): ListIterator<T> {
+  private _insertAt(data: T, node: ListNodeImpl) {
     const newNode = new ListNode(data);
     newNode.next = node;
     newNode.prev = node.prev;

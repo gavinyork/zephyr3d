@@ -8,7 +8,7 @@ const tmpUint32Array = new Uint32Array(tmpArrayBuffer);
  * @returns float32 value
  * @public
  */
-export function half2float(f16: number): number {
+export function half2float(f16: number) {
   let mantissa = f16 & 0x3ff;
   let exponent = f16 & 0x7c00;
   if (exponent === 0x7c00) {
@@ -35,7 +35,7 @@ export function half2float(f16: number): number {
  * @returns float16 value
  * @public
  */
-export function float2half(f32: number): number {
+export function float2half(f32: number) {
   tmpFloatArray[0] = f32;
   let ivalue = tmpUint32Array[0];
   let result: number;

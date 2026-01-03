@@ -60,7 +60,7 @@ export class UploadRingBuffer {
     dstOffset: number,
     uploadSize: number,
     allowOverlap?: boolean
-  ): UploadBuffer {
+  ) {
     const size = (uploadSize + 3) & ~3;
     const mappedBuffer = this.fetchBufferMapped(size, !!allowOverlap);
     if (src) {
@@ -77,7 +77,7 @@ export class UploadRingBuffer {
     mappedBuffer.offset = (mappedBuffer.offset + 7) & ~7;
     return upload;
   }
-  beginUploads(): number {
+  beginUploads() {
     for (let i = this._bufferList.length - 1; i >= 0; i--) {
       const buffer = this._bufferList[i];
       if (buffer.used) {
@@ -114,7 +114,7 @@ export class UploadRingBuffer {
     }
     this._unmappedBufferList = [];
   }
-  fetchBufferMapped(size: number, allowOverlap: boolean): MappedBuffer {
+  fetchBufferMapped(size: number, allowOverlap: boolean) {
     for (const buffer of this._bufferList) {
       if (allowOverlap || buffer.size - buffer.offset >= size) {
         buffer.used = true;

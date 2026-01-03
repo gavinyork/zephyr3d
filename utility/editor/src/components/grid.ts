@@ -10,7 +10,7 @@ import {
   type SerializableClass
 } from '@zephyr3d/scene';
 import { FontGlyph } from '../core/fontglyph';
-import type { GenericConstructor } from '@zephyr3d/base';
+import type { GenericConstructor, Nullable, RequireOptionals } from '@zephyr3d/base';
 import { AABB, ASSERT, degree2radian, Observable, Quaternion, radian2degree } from '@zephyr3d/base';
 import { RotationEditor } from './rotationeditor';
 import { Dialog } from '../views/dlg/dlg';
@@ -22,7 +22,7 @@ interface Property<T extends {}> {
   path: string;
   name: string;
   object: any;
-  value: PropertyAccessor<T>;
+  value: Nullable<PropertyAccessor<T>>;
 }
 
 class PropertyGroup {
@@ -31,13 +31,13 @@ class PropertyGroup {
   index: number;
   selected: [number];
   count: number;
-  value: PropertyValue;
-  parent: PropertyGroup;
+  value: RequireOptionals<PropertyValue>;
+  parent: Nullable<PropertyGroup>;
   path: string;
-  property: Property<any>;
+  property: Nullable<Property<any>>;
   currentType: number;
-  objectTypes: SerializableClass[];
-  prop: PropertyAccessor<any>;
+  objectTypes: Nullable<Nullable<SerializableClass>[]>;
+  prop: Nullable<PropertyAccessor<any>>;
   properties: (PropertyGroup | { name: string; property: Property<any> })[];
   rawProperties: {
     name: string;
@@ -116,7 +116,7 @@ class PropertyGroup {
     if (value.options?.group) {
       group = this.findOrAddGroup(value.options.group);
     }
-    const tmpProperty: PropertyValue = {
+    const tmpProperty = {
       num: [0, 0, 0, 0],
       str: [''],
       bool: [false],
@@ -166,7 +166,7 @@ class PropertyGroup {
   }
   findOrAddGroup(name: string) {
     const parts = name.split('/');
-    const firstPart = parts.shift();
+    const firstPart = parts.shift()!;
     let parent = this.properties.find(
       (p) => p instanceof PropertyGroup && p.name === firstPart
     ) as PropertyGroup;
@@ -176,13 +176,13 @@ class PropertyGroup {
     }
     let group = parent;
     while (parts.length > 0) {
-      const part = parts.shift();
+      const part = parts.shift()!;
       group = group.subgroups.find((g) => g.name === part) ?? group.addGroup(part);
     }
     return group;
   }
   getObject() {
-    let group: PropertyGroup = this;
+    let group: Nullable<PropertyGroup> = this;
     while (group) {
       if (group.value.object[0]) {
         return group.value.object[0];
@@ -191,7 +191,13 @@ class PropertyGroup {
     }
     return null;
   }
-  setObject(obj: any, prop?: PropertyAccessor<any>, parentObj?: any, index?: number, count?: number) {
+  setObject(
+    obj: any,
+    prop?: PropertyAccessor<any>,
+    parentObj?: any,
+    index?: Nullable<number>,
+    count?: number
+  ) {
     if (this.value.object[0] !== obj || this.prop !== prop) {
       const resourceManager = getEngine().resourceManager;
       this.value.object[0] = obj ?? null;
@@ -205,11 +211,11 @@ class PropertyGroup {
         this.path = `${this.path}/${this.prop.name}${typeof index === 'number' ? `[${index}]` : ''}`;
       }
       this.objectTypes =
-        prop?.options?.objectTypes?.length > 0
-          ? (prop.options.objectTypes.map((ctor) => resourceManager.getClassByConstructor(ctor)) ?? [])
+        prop?.options?.objectTypes?.length! > 0
+          ? (prop!.options!.objectTypes!.map((ctor) => resourceManager.getClassByConstructor(ctor)) ?? [])
           : null;
-      if (this.objectTypes?.length > 0 && this.prop.isNullable?.call(obj, this.index)) {
-        this.objectTypes.unshift(null);
+      if (this.objectTypes?.length! > 0 && this.prop!.isNullable?.call(obj, this.index)) {
+        this.objectTypes!.unshift(null);
       }
       this.selected[0] = this.objectTypes
         ? this.objectTypes.findIndex((val) => {
@@ -223,14 +229,14 @@ class PropertyGroup {
       this.properties = [];
       this.subgroups = [];
       if (this.value.object[0]) {
-        let cls: SerializableClass = null;
+        let cls: Nullable<SerializableClass> = null;
         let ctor = this.value.object[0].constructor as GenericConstructor;
         while (ctor) {
           cls = resourceManager.getClassByConstructor(ctor);
           if (cls) {
             const props = resourceManager
-              .getPropertiesByClass(cls)
-              .filter((p) => !p.isHidden || !p.isHidden.call(this.value.object[0], -1));
+              .getPropertiesByClass(cls)!
+              .filter((p) => !p.isHidden || !p.isHidden.call(this.value.object[0]!, -1));
             if (props.length > 0) {
               if (!cls.noTitle) {
                 this.addSeparator(cls.name);
@@ -252,7 +258,7 @@ export class PropertyEditor extends Observable<{
   end_edit_aabb: [aabb: AABB];
   request_edit_track: [track: PropertyTrack, target: object];
   end_edit_track: [track: PropertyTrack, target: object, edited: boolean];
-  object_property_changed: [object: object, prop: PropertyAccessor];
+  object_property_changed: [object: Nullable<object>, prop: PropertyAccessor];
 }> {
   private _rootGroup: PropertyGroup;
   private readonly _labelPercent: number;
@@ -390,8 +396,8 @@ export class PropertyEditor extends Observable<{
                   ? group.prop.create.call(group.object, ctor, group.index)
                   : new ctor()
                 : null;
-              const value = { object: [newObj] };
-              group.prop.set.call(group.object, value, group.index);
+              const value = { object: [newObj], str: [], bool: [], num: [] };
+              group.prop.set!.call(group.object, value, group.index);
               this.dispatchEvent('object_property_changed', group.object, group.prop);
               this.refresh();
             }
@@ -408,7 +414,7 @@ export class PropertyEditor extends Observable<{
                   ? group.prop.create.call(group.object, ctor, group.index)
                   : new ctor()
                 : null;
-              group.prop.add.call(group.object, { object: [newObj] }, group.index);
+              (group.prop.add<'object'>).call(group.object, { object: [newObj] }, group.index);
               this.dispatchEvent('object_property_changed', group.object, group.prop);
               this.refresh();
             }
@@ -416,7 +422,7 @@ export class PropertyEditor extends Observable<{
           if (deletable) {
             ImGui.SameLine(0, 0);
             if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##delete`, new ImGui.ImVec2(buttonSize, 0))) {
-              group.prop.delete.call(group.object, group.index);
+              group.prop.delete!.call(group.object, group.index);
               this.dispatchEvent('object_property_changed', group.object, group.prop);
               this.refresh();
               if (editable) {
@@ -433,7 +439,7 @@ export class PropertyEditor extends Observable<{
                   this.dispatchEvent(
                     'end_edit_track',
                     group.value.object[0],
-                    getEngine().resourceManager.findAnimationTarget(node, group.value.object[0]),
+                    getEngine().resourceManager.findAnimationTarget(node, group.value.object[0])!,
                     false
                   );
                 }
@@ -456,7 +462,7 @@ export class PropertyEditor extends Observable<{
                 this.dispatchEvent(
                   'request_edit_track',
                   group.value.object[0],
-                  getEngine().resourceManager.findAnimationTarget(node, group.value.object[0])
+                  getEngine().resourceManager.findAnimationTarget(node, group.value.object[0])!
                 );
               }
             }
@@ -515,7 +521,7 @@ export class PropertyEditor extends Observable<{
     ImGui.SetNextItemWidth(-1);
     const readonly = !value.set;
     let changed = false;
-    const tmpProperty: PropertyValue = {
+    const tmpProperty: RequireOptionals<PropertyValue> = {
       num: [0, 0, 0, 0],
       str: [''],
       bool: [false],
@@ -675,7 +681,7 @@ export class PropertyEditor extends Observable<{
             if (!animation) {
               animation = this.object.animationSet.createAnimation(val.animationName, false);
             }
-            const propValue = { num: [0, 0, 0, 0] };
+            const propValue = { num: [0, 0, 0, 0], str: [], bool: [], object: [] };
             value.get.call(object, propValue);
             const track = new PropertyTrack(value, propValue.num);
             track.target = property.objectPath;
@@ -706,7 +712,7 @@ export class PropertyEditor extends Observable<{
       ImGui.SetNextItemWidth(-1);
       const readonly = !value.set;
       let changed = false;
-      const tmpProperty: PropertyValue = {
+      const tmpProperty = {
         num: [0, 0, 0, 0],
         str: [''],
         bool: [false],
@@ -888,7 +894,7 @@ export class PropertyEditor extends Observable<{
           if (value.isNullable?.call(object, 0)) {
             ImGui.SameLine(0, 0);
             if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
-              Promise.resolve(value.set.call(object, null)).then(() => {
+              Promise.resolve(value.set!.call(object, null)).then(() => {
                 this.refresh();
                 this.dispatchEvent('object_property_changed', object, value);
               });
@@ -952,7 +958,7 @@ export class PropertyEditor extends Observable<{
               const payload = ImGui.AcceptDragDropPayload('ASSET');
               if (payload) {
                 value.str[0] = data[0].path;
-                Promise.resolve(prop.set.call(obj, value)).then(() => {
+                Promise.resolve(prop.set.call(obj, value as RequireOptionals<PropertyValue>)).then(() => {
                   this.refresh();
                   this.dispatchEvent('object_property_changed', obj, prop);
                 });

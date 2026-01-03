@@ -35,15 +35,15 @@ export class StructuredBufferData {
     this.init(layout, 0, '');
   }
   /** The buffer size in bytes */
-  get byteLength(): number {
+  get byteLength() {
     return this._size;
   }
   /** Get the data cache buffer */
-  get buffer(): Nullable<ArrayBuffer> {
+  get buffer() {
     return this._cache;
   }
   /** Get all the uniform datas */
-  get uniforms(): Record<string, TypedArray> {
+  get uniforms() {
     return this._uniformMap;
   }
   /**
@@ -51,7 +51,7 @@ export class StructuredBufferData {
    * @param name - Name of the member
    * @param value - Value to set
    */
-  set(name: string, value: StructuredValue): void {
+  set(name: string, value: StructuredValue) {
     if (value !== undefined) {
       const view = this._uniformMap[name];
       if (view) {
@@ -97,13 +97,13 @@ export class StructuredBufferData {
     }
   }
   /** @internal */
-  private setStruct(name: string, value: any): void {
+  private setStruct(name: string, value: any) {
     for (const k in value) {
       this.set(`${name}.${k}`, value[k]);
     }
   }
   /** @internal */
-  private init(layout: UniformBufferLayout, offset: number, prefix: string): number {
+  private init(layout: UniformBufferLayout, offset: number, prefix: string) {
     for (const entry of layout.entries) {
       if (entry.subLayout) {
         offset = this.init(entry.subLayout, offset, `${prefix}${entry.name}.`);

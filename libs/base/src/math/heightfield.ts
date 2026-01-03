@@ -1,3 +1,4 @@
+import type { Immutable } from '../utils';
 import type { Ray } from './ray';
 import { Vector3, Vector4 } from './vector';
 
@@ -44,10 +45,10 @@ export class HeightField {
   /**
    * Region in xz plane covered by the height field
    */
-  get region(): Vector4 {
+  get region(): Immutable<Vector4> {
     return this._region;
   }
-  set region(v: Vector4) {
+  set region(v: Immutable<Vector4>) {
     this._region.set(v);
     this._scale.x = (this._region.z - this._region.x) / (this._width - 1);
     this._scale.z = (this._region.w - this._region.y) / (this._height - 1);
@@ -55,28 +56,28 @@ export class HeightField {
   /**
    * Base height offset
    */
-  get baseHeight(): number {
+  get baseHeight() {
     return this._baseHeight;
   }
-  set baseHeight(v: number) {
+  set baseHeight(v) {
     this._baseHeight = v;
   }
   /**
    * Height scale factor
    */
-  get scaleY(): number {
+  get scaleY() {
     return this._scale.y;
   }
-  set scaleY(v: number) {
+  set scaleY(v) {
     this._scale.y = v;
   }
   /**
    * Number of height samples in x direction
    */
-  get width(): number {
+  get width() {
     return this._width;
   }
-  set width(v: number) {
+  set width(v) {
     if (v !== this._width) {
       this._width = v;
       this._heightData = new Float32Array(this._width * this._height);
@@ -86,10 +87,10 @@ export class HeightField {
   /**
    * Number of height samples in z direction
    */
-  get height(): number {
+  get height() {
     return this._height;
   }
-  set height(v: number) {
+  set height(v) {
     if (v !== this._height) {
       this._height = v;
       this._heightData = new Float32Array(this._width * this._height);
@@ -99,7 +100,7 @@ export class HeightField {
   /**
    * Height data array (row major)
    */
-  get heightData(): Float32Array {
+  get heightData() {
     return this._heightData;
   }
   /**
@@ -108,7 +109,7 @@ export class HeightField {
    * @param y - y index
    * @returns height value
    */
-  sampleHeight(x: number, y: number): number {
+  sampleHeight(x: number, y: number) {
     return this._heightData[y * this._width + x] * this._scale.y + this._baseHeight;
   }
   /**
@@ -160,7 +161,7 @@ export class HeightField {
    * @param rayWorld - ray in world space
    * @returns distance to intersection point, or null if no intersection
    */
-  rayIntersect(rayWorld: Ray): number | null {
+  rayIntersect(rayWorld: Ray) {
     let x0 = rayWorld.origin.x;
     let y0 = rayWorld.origin.z;
     let dx = rayWorld.direction.x;

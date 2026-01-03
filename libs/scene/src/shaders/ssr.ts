@@ -451,7 +451,7 @@ export function screenSpaceRayTracing_HiZ(
   textureSize: PBShaderExp,
   HiZTexture: PBShaderExp,
   normalTexture?: PBShaderExp
-): PBShaderExp {
+) {
   const pb = scope.$builder;
   pb.func('getMipResolution', [pb.int('mipLevel')], function () {
     this.$return(pb.vec2(pb.textureDimensions(HiZTexture, this.mipLevel)));
@@ -702,7 +702,7 @@ export function screenSpaceRayTracing_HiZ(
     textureSize,
     pb.sub(maxMipLevel, 1),
     maxIterations
-  );
+  ) as PBShaderExp;
 }
 
 /*

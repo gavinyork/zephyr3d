@@ -1,4 +1,4 @@
-import type { CubeFace, Nullable, TypedArray } from '@zephyr3d/base';
+import type { CubeFace, TypedArray } from '@zephyr3d/base';
 import type {
   TextureMipmapData,
   TextureCube,
@@ -14,17 +14,10 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
   constructor(device: WebGPUDevice) {
     super(device, 'cube');
   }
-  init(): void {
+  init() {
     this.loadEmpty(this._format!, this._width, this._mipLevelCount);
   }
-  update(
-    data: TypedArray,
-    xOffset: number,
-    yOffset: number,
-    width: number,
-    height: number,
-    face: CubeFace
-  ): void {
+  update(data: TypedArray, xOffset: number, yOffset: number, width: number, height: number, face: CubeFace) {
     if (this._device.isContextLost()) {
       return;
     }
@@ -45,7 +38,7 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
     srcY: number,
     width: number,
     height: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
@@ -67,7 +60,7 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
       this.uploadImageData(data, srcX, srcY, width, height, destX, destY, 0, face);
     }
   }
-  createEmpty(format: TextureFormat, size: number, creationFlags?: number): void {
+  createEmpty(format: TextureFormat, size: number, creationFlags?: number) {
     this._flags = Number(creationFlags) || 0;
     if (this._flags & GPUResourceUsageFlags.TF_WRITABLE) {
       console.error(new Error('storage texture can not be cube texture'));
@@ -78,7 +71,7 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
   isTextureCube(): this is TextureCube {
     return true;
   }
-  createView(level?: number, face?: number, mipCount?: number): Nullable<GPUTextureView> {
+  createView(level?: number, face?: number, mipCount?: number) {
     return this._object
       ? this._device.gpuCreateTextureView(this._object, {
           format: this._gpuFormat!,
@@ -99,7 +92,7 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
     face: number,
     mipLevel: number,
     buffer: TypedArray
-  ): Promise<void> {
+  ) {
     if (mipLevel < 0 || mipLevel >= this.mipLevelCount) {
       throw new Error(`TextureCube.readPixels(): invalid miplevel: ${mipLevel}`);
     }
@@ -126,13 +119,13 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
     face: number,
     mipLevel: number,
     buffer: GPUDataBuffer
-  ): void {
+  ) {
     if (mipLevel < 0 || mipLevel >= this.mipLevelCount) {
       throw new Error(`TextureCube.readPixelsToBuffer(): invalid miplevel: ${mipLevel}`);
     }
     this.copyPixelDataToBuffer(x, y, w, h, face, mipLevel, buffer);
   }
-  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number): void {
+  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number) {
     if (!data.isCubemap) {
       console.error('loading cubmap with mipmap data failed: data is not cubemap');
     } else {
@@ -145,7 +138,7 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
     }
   }
   /** @internal */
-  private loadEmpty(format: TextureFormat, size: number, mipLevelCount: number): void {
+  private loadEmpty(format: TextureFormat, size: number, mipLevelCount: number) {
     this.allocInternal(format, size, size, 1, mipLevelCount);
     if (this._mipLevelCount > 1 && !this._device.isContextLost()) {
       this.generateMipmaps();
@@ -187,7 +180,7 @@ export class WebGPUTextureCube extends WebGPUBaseTexture implements TextureCube<
   }
   */
   /** @internal */
-  private loadLevels(levels: TextureMipmapData, sRGB: boolean): void {
+  private loadLevels(levels: TextureMipmapData, sRGB: boolean) {
     const format = sRGB ? linearTextureFormatToSRGB(levels.format) : levels.format;
     const width = levels.width;
     const height = levels.height;

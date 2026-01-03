@@ -262,7 +262,7 @@ export class ScriptingSystem {
    * @param deltaTime - Time in seconds since last update.
    * @param elapsedTime - Total time in seconds since start.
    */
-  update(deltaTime: number, elapsedTime: number): void {
+  update(deltaTime: number, elapsedTime: number) {
     if (this._hostScripts.size === 0) {
       return;
     }

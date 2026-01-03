@@ -6,6 +6,7 @@ import { initLeakDetector } from './helpers/leakdetector';
 import { initEmojiMapping } from './helpers/emoji';
 import type { ProjectSettings } from './core/services/project';
 import { ProjectService } from './core/services/project';
+import type { Nullable } from '@zephyr3d/base';
 import { GenericHtmlDirectoryReader } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
 
@@ -14,7 +15,7 @@ const project = searchParams.get('project');
 const open = searchParams.get('open') !== null;
 const remote = searchParams.get('remote') !== null;
 let rhiList: string[] = [];
-let settings: ProjectSettings = null;
+let settings: Nullable<ProjectSettings> = null;
 let editorMode: EditorMode;
 if (project && !open) {
   editorMode = 'editor-preview';
@@ -23,7 +24,7 @@ if (project && !open) {
     const head = document.head || document.getElementsByTagName('head')[0];
     const url = href;
     rels.forEach((rel) => {
-      [...document.querySelectorAll(`link[rel="${rel}"]`)].forEach((el) => el.parentNode.removeChild(el));
+      [...document.querySelectorAll(`link[rel="${rel}"]`)].forEach((el) => el.parentNode!.removeChild(el));
       const link = document.createElement('link');
       link.rel = rel;
       link.href = url;
@@ -43,7 +44,13 @@ if (project && !open) {
     await ProjectService.openProject(project);
   }
   const info = await ProjectService.getCurrentProjectInfo();
+  if (!info) {
+    throw new Error('Get project information failed');
+  }
   settings = await ProjectService.getCurrentProjectSettings();
+  if (!settings) {
+    throw new Error('Get project settings failed');
+  }
   rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
   document.title = settings.title ?? info.name;
   if (settings.favicon) {
@@ -63,7 +70,7 @@ if (project && !open) {
     rhiList = ['webgpu', 'webgl2', 'webgl'];
   }
 }
-let backend: DeviceBackend = null;
+let backend: Nullable<DeviceBackend> = null;
 if (rhiList.includes('webgpu')) {
   backend = (await import('@zephyr3d/backend-webgpu')).backendWebGPU;
   if (!(await backend.supported())) {
@@ -88,7 +95,7 @@ if (!backend) {
 
 const editorApp = new Application({
   backend,
-  canvas: document.querySelector('#canvas'),
+  canvas: document.querySelector('#canvas')!,
   runtimeOptions: {
     VFS: ProjectService.VFS,
     scriptsRoot: '/assets',
@@ -136,7 +143,7 @@ editorApp.ready().then(async () => {
     }
   } else {
     // start engine
-    getEngine().startup(settings.startupScene, settings.splashScreen, settings.startupScript);
+    getEngine().startup(settings!.startupScene, settings!.splashScreen, settings!.startupScript);
   }
   editorApp.run();
 });

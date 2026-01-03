@@ -59,26 +59,26 @@ export class BoundingBox extends AABB implements BoundingVolume {
     super(arg0 as any, arg1!);
   }
   /** {@inheritDoc BoundingVolume.behindPlane} */
-  behindPlane(plane: Plane): boolean {
+  behindPlane(plane: Plane) {
     return this.toAABB().behindPlane(plane);
   }
   /** {@inheritDoc BoundingVolume.clone} */
-  clone(): BoundingVolume {
+  clone() {
     return new BoundingBox(this);
   }
   /** {@inheritDoc BoundingVolume.transform} */
-  transform(matrix: Matrix4x4): BoundingBox {
+  transform(matrix: Matrix4x4) {
     return new BoundingBox(AABB.transform(this, matrix));
   }
   /** {@inheritDoc BoundingVolume.outsideFrustum} */
-  outsideFrustum(frustum: Frustum | Matrix4x4): boolean {
+  outsideFrustum(frustum: Frustum | Matrix4x4) {
     return (
       (frustum instanceof Frustum ? this.getClipStateWithFrustum(frustum) : this.getClipState(frustum)) ===
       ClipState.NOT_CLIPPED
     );
   }
   /** {@inheritDoc BoundingVolume.toAABB} */
-  toAABB(): AABB {
+  toAABB() {
     return this;
   }
 }

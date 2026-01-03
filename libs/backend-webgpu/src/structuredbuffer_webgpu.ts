@@ -118,7 +118,7 @@ export class WebGPUStructuredBuffer extends WebGPUBuffer implements StructuredBu
       this._structure = st;
     }
   }
-  static getGPUVertexFormat(type: PBTypeInfo): GPUVertexFormat {
+  static getGPUVertexFormat(type: PBTypeInfo) {
     return vertexFormatTable[type.typeId];
   }
 }

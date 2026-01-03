@@ -1,7 +1,7 @@
 import type { Texture3D, GPUDataBuffer, TextureFormat, TextureMipmapData } from '@zephyr3d/device';
 import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
-import type { Nullable, TypedArray } from '@zephyr3d/base';
+import type { TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 
 export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUTexture> {
@@ -11,7 +11,7 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
   isTexture3D(): this is Texture3D {
     return true;
   }
-  init(): void {
+  init() {
     this.loadEmpty(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
   }
   update(
@@ -22,7 +22,7 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     width: number,
     height: number,
     depth: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
@@ -31,17 +31,11 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     }
     this.uploadRaw(data, width, height, depth, xOffset, yOffset, zOffset, 0);
   }
-  createEmpty(
-    format: TextureFormat,
-    width: number,
-    height: number,
-    depth: number,
-    creationFlags?: number
-  ): void {
+  createEmpty(format: TextureFormat, width: number, height: number, depth: number, creationFlags?: number) {
     this._flags = Number(creationFlags) || 0;
     this.loadEmpty(format, width, height, depth, 0);
   }
-  createView(_level?: number, face?: number, _mipCount?: number): Nullable<GPUTextureView> {
+  createView(_level?: number, face?: number, _mipCount?: number) {
     return this._object
       ? this._device.gpuCreateTextureView(this._object, {
           dimension: '2d',
@@ -60,7 +54,7 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     layer: number,
     mipLevel: number,
     buffer: TypedArray
-  ): Promise<void> {
+  ) {
     if (mipLevel !== 0) {
       throw new Error(`Texture3D.readPixels(): parameter mipLevel must be 0`);
     }
@@ -87,13 +81,13 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     layer: number,
     mipLevel: number,
     buffer: GPUDataBuffer
-  ): void {
+  ) {
     if (mipLevel !== 0) {
       throw new Error(`Texture3D.readPixelsToBuffer(): parameter mipLevel must be 0`);
     }
     this.copyPixelDataToBuffer(x, y, w, h, layer, 0, buffer);
   }
-  createWithMipmapData(data: TextureMipmapData, creationFlags?: number): void {
+  createWithMipmapData(data: TextureMipmapData, creationFlags?: number) {
     if (!data.arraySize) {
       console.error('Texture2DArray.createWithMipmapData() failed: Data is not texture array');
     } else {
@@ -107,7 +101,7 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
       }
     }
   }
-  private loadLevels(levels: TextureMipmapData): void {
+  private loadLevels(levels: TextureMipmapData) {
     const format = levels.format;
     const width = levels.width;
     const height = levels.height;
@@ -153,7 +147,7 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     height: number,
     depth: number,
     numMipLevels: number
-  ): void {
+  ) {
     this.allocInternal(format, width, height, depth, numMipLevels);
     if (this._mipLevelCount > 1 && !this._device.isContextLost()) {
       this.generateMipmaps();

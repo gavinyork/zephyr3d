@@ -67,7 +67,7 @@ export class OctreeNode {
    *
    * @returns An array of scene nodes currently held by this octree node.
    */
-  getNodes(): GraphNode[] {
+  getNodes() {
     return this._nodes;
   }
   /**
@@ -86,7 +86,7 @@ export class OctreeNode {
    *
    * @param node - Scene node to add.
    */
-  addNode(node: GraphNode): void {
+  addNode(node: GraphNode) {
     if (node && this._nodes.indexOf(node) < 0) {
       this._nodes.push(node);
       node.octreeNode = this;
@@ -97,7 +97,7 @@ export class OctreeNode {
    *
    * @param node - Scene node to remove.
    */
-  removeNode(node: GraphNode): void {
+  removeNode(node: GraphNode) {
     const index = this._nodes.indexOf(node);
     if (index >= 0) {
       this._nodes.splice(index, 1);
@@ -118,7 +118,7 @@ export class OctreeNode {
    *
    * @param chunk - Owning chunk.
    */
-  setChunk(chunk: OctreeNodeChunk): void {
+  setChunk(chunk: OctreeNodeChunk) {
     ASSERT(!!chunk, 'Invalid chunk');
     this._chunk = chunk;
   }
@@ -135,7 +135,7 @@ export class OctreeNode {
    *
    * @param index - Position index.
    */
-  setPosition(index: number): void {
+  setPosition(index: number) {
     this._position = index;
   }
   /**
@@ -143,7 +143,7 @@ export class OctreeNode {
    *
    * @returns The linear position index of this node.
    */
-  getPosition(): number {
+  getPosition() {
     return this._position;
   }
   /**
@@ -184,7 +184,7 @@ export class OctreeNode {
    *
    * @returns The loosed `AABB` of this node.
    */
-  getBoxLoosed(): AABB {
+  getBoxLoosed() {
     if (this._boxLoosed === null) {
       ASSERT(!!this._chunk, 'Invalid chunk');
       const d = this._chunk.getDimension();
@@ -210,7 +210,7 @@ export class OctreeNode {
    *
    * @returns The minimum corner as a `Vector3`.
    */
-  getMinPoint(): Vector3 {
+  getMinPoint() {
     ASSERT(!!this._chunk, 'Invalid chunk');
     const d = this._chunk.getDimension();
     const nodeSize = this._chunk.getNodeSize();
@@ -227,7 +227,7 @@ export class OctreeNode {
    *
    * @returns The maximum corner as a `Vector3`.
    */
-  getMaxPoint(): Vector3 {
+  getMaxPoint() {
     ASSERT(!!this._chunk, 'Invalid chunk');
     const d = this._chunk.getDimension();
     const nodeSize = this._chunk.getNodeSize();
@@ -244,7 +244,7 @@ export class OctreeNode {
    *
    * @returns The loosed minimum corner as a `Vector3`.
    */
-  getMinPointLoosed(): Vector3 {
+  getMinPointLoosed() {
     const halfNodeSize = this._chunk!.getNodeSize() * 0.5;
     return this.getMinPoint().subBy(new Vector3(halfNodeSize, halfNodeSize, halfNodeSize));
   }
@@ -253,7 +253,7 @@ export class OctreeNode {
    *
    * @returns The loosed maximum corner as a `Vector3`.
    */
-  getMaxPointLoosed(): Vector3 {
+  getMaxPointLoosed() {
     const halfNodeSize = this._chunk!.getNodeSize() * 0.5;
     return this.getMaxPoint().addBy(new Vector3(halfNodeSize, halfNodeSize, halfNodeSize));
   }
@@ -267,7 +267,7 @@ export class OctreeNode {
    *
    * @returns The child `OctreeNode`, or `null` if not present.
    */
-  getChild(placement: OctreePlacement): Nullable<OctreeNode> {
+  getChild(placement: OctreePlacement) {
     ASSERT(!!this._chunk, 'Invalid chunk');
     const next = this._chunk.getNext();
     return next ? next.getNode(this._chunk.getChildIndex(this._position, placement)) : null;
@@ -282,7 +282,7 @@ export class OctreeNode {
    *
    * @returns The existing or newly created child `OctreeNode`, or `null` if creation is not possible.
    */
-  getOrCreateChild(placement: OctreePlacement): Nullable<OctreeNode> {
+  getOrCreateChild(placement: OctreePlacement) {
     ASSERT(!!this._chunk, 'Invalid chunk');
     const next = this._chunk.getNext();
     return next ? next.getOrCreateNode(this._chunk.getChildIndex(this._position, placement)) : null;
@@ -295,7 +295,7 @@ export class OctreeNode {
    *
    * @returns The parent `OctreeNode`, or `null` if not present.
    */
-  getParent(): Nullable<OctreeNode> {
+  getParent() {
     ASSERT(!!this._chunk, 'Invalid chunk');
     const prev = this._chunk.getPrev();
     return prev ? prev.getNode(this._chunk.getParentIndex(this._position)) : null;
@@ -308,7 +308,7 @@ export class OctreeNode {
    *
    * @returns The existing or newly created parent `OctreeNode`, or `null` if creation is not possible.
    */
-  getOrCreateParent(): Nullable<OctreeNode> {
+  getOrCreateParent() {
     ASSERT(!!this._chunk, 'Invalid chunk');
     const prev = this._chunk.getPrev();
     return prev ? prev.getOrCreateNode(this._chunk.getParentIndex(this._position)) : null;
@@ -399,7 +399,7 @@ export class OctreeNodeChunk {
    *
    * @returns The `OctreeNode` at the index, or `null` if absent.
    */
-  getNode(index: number): Nullable<OctreeNode> {
+  getNode(index: number) {
     return this._nodeMap.get(index) || null;
   }
   /**
@@ -409,7 +409,7 @@ export class OctreeNodeChunk {
    *
    * @returns The existing or newly created `OctreeNode`.
    */
-  getOrCreateNode(index: number): OctreeNode {
+  getOrCreateNode(index: number) {
     let node = this.getNode(index);
     if (!node) {
       node = new OctreeNode();
@@ -426,7 +426,7 @@ export class OctreeNodeChunk {
    *
    * @returns The `OctreeNode` at this level; parent nodes are created as needed.
    */
-  getOrCreateNodeChain(index: number): OctreeNode {
+  getOrCreateNodeChain(index: number) {
     const node = this.getOrCreateNode(index);
     if (this._prev) {
       this._prev.getOrCreateNodeChain(this.getParentIndex(index));
@@ -439,7 +439,7 @@ export class OctreeNodeChunk {
    * @remarks
    * Also detaches all scene nodes held by each `OctreeNode`.
    */
-  clearNodes(): void {
+  clearNodes() {
     for (const key of this._nodeMap.keys()) {
       this._nodeMap.get(key)!.clearNodes();
       this._nodeMap.delete(key);
@@ -453,7 +453,7 @@ export class OctreeNodeChunk {
    *
    * @returns The linear index of the child in the next chunk.
    */
-  getChildIndex(index: number, placement: OctreePlacement): number {
+  getChildIndex(index: number, placement: OctreePlacement) {
     const dim = this._dimension;
     let px = 2 * (index % dim);
     let py = 2 * (Math.floor(index / dim) % dim);
@@ -501,7 +501,7 @@ export class OctreeNodeChunk {
    *
    * @returns The linear index of the parent in the previous chunk.
    */
-  getParentIndex(index: number): number {
+  getParentIndex(index: number) {
     const dim = this._dimension;
     const px = index % dim >> 1;
     const py = Math.floor(index / dim) % dim >> 1;
@@ -517,7 +517,7 @@ export class OctreeNodeChunk {
    *
    * @returns The world-space edge length per cell in this chunk.
    */
-  getNodeSize(): number {
+  getNodeSize() {
     return this._nodeSize;
   }
   /**
@@ -528,7 +528,7 @@ export class OctreeNodeChunk {
    *
    * @returns The root world size (edge length) of the octree.
    */
-  getWorldSize(): number {
+  getWorldSize() {
     return this._octree.getRootSize();
   }
   /**
@@ -539,7 +539,7 @@ export class OctreeNodeChunk {
    *
    * @returns The dimension (cells per axis) for this chunk.
    */
-  getDimension(): number {
+  getDimension() {
     return this._dimension;
   }
   /**
@@ -547,7 +547,7 @@ export class OctreeNodeChunk {
    *
    * @returns The level index of this chunk.
    */
-  getLevel(): number {
+  getLevel() {
     return this._level;
   }
   /**
@@ -555,7 +555,7 @@ export class OctreeNodeChunk {
    *
    * @returns True if the chunk has no nodes; otherwise false.
    */
-  empty(): boolean {
+  empty() {
     return this._nodeMap.size === 0;
   }
   /**
@@ -731,7 +731,7 @@ export class Octree {
    *
    * @returns The `Scene` that owns this octree.
    */
-  getScene(): Scene {
+  getScene() {
     return this._scene;
   }
   /**
@@ -739,7 +739,7 @@ export class Octree {
    *
    * @returns The current root world size.
    */
-  getRootSize(): number {
+  getRootSize() {
     return this._rootSize;
   }
   /**
@@ -747,7 +747,7 @@ export class Octree {
    *
    * @returns The current leaf cell size.
    */
-  getLeafSize(): number {
+  getLeafSize() {
     return this._leafSize;
   }
   /**
@@ -791,7 +791,7 @@ export class Octree {
    *
    * @returns The root `OctreeNode`.
    */
-  getRootNode(): OctreeNode {
+  getRootNode() {
     if (!this._rootNode) {
       this._rootNode = this._chunks[0].getOrCreateNode(0);
     }
@@ -802,7 +802,7 @@ export class Octree {
    *
    * @returns The total number of chunk levels.
    */
-  getNumChunks(): number {
+  getNumChunks() {
     return this._chunks.length;
   }
   /**
@@ -812,7 +812,7 @@ export class Octree {
    *
    * @returns The `OctreeNodeChunk` at the given level.
    */
-  getChunk(level: number): OctreeNodeChunk {
+  getChunk(level: number) {
     return this._chunks[level];
   }
   /**
@@ -826,7 +826,7 @@ export class Octree {
    *   the octree resizes (up to `maxRootSize`) and reinserts nodes.
    * - Nodes without valid bounds or with clip tests disabled fall back to the root.
    */
-  placeNode(node: GraphNode): void {
+  placeNode(node: GraphNode) {
     const curNode = this._nodeMap.get(node) || null;
     let locatedNode: Nullable<OctreeNode> = this.getRootNode();
     if (node.clipTestEnabled) {
@@ -870,7 +870,7 @@ export class Octree {
    *
    * @param node - Scene graph node to remove.
    */
-  removeNode(node: GraphNode): void {
+  removeNode(node: GraphNode) {
     if (node.isGraphNode()) {
       const curNode = this._nodeMap.get(node) || null;
       if (curNode) {

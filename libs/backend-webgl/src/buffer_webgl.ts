@@ -54,13 +54,13 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
   get byteLength() {
     return this._size;
   }
-  get systemMemoryBuffer(): Nullable<ArrayBuffer> {
+  get systemMemoryBuffer() {
     return this._systemMemoryBuffer?.buffer || null;
   }
-  get usage(): number {
+  get usage() {
     return this._usage;
   }
-  bufferSubData(dstByteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number): void {
+  bufferSubData(dstByteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number) {
     srcPos = Number(srcPos) || 0;
     dstByteOffset = Number(dstByteOffset) || 0;
     srcLength = Number(srcLength) || data.length - srcPos;
@@ -70,9 +70,9 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     if (dstByteOffset + srcLength * data.BYTES_PER_ELEMENT > this.byteLength) {
       throw new Error('bufferSubData() failed: dest buffer is too small');
     }
-    if (this._systemMemory || this._usage & GPUResourceUsageFlags.MANAGED) {
+    if (this._systemMemoryBuffer) {
       // copy to system backup buffer if present
-      this._systemMemoryBuffer!.set(
+      this._systemMemoryBuffer.set(
         new Uint8Array(
           data.buffer,
           data.byteOffset + srcPos * data.BYTES_PER_ELEMENT,
@@ -124,7 +124,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     dstBuffer?: Nullable<Uint8Array<ArrayBuffer>>,
     offsetInBytes?: number,
     sizeInBytes?: number
-  ): Promise<Uint8Array<ArrayBuffer>> {
+  ) {
     if (this.disposed) {
       this.reload();
     }
@@ -134,7 +134,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     dstBuffer?: Nullable<Uint8Array<ArrayBuffer>>,
     offsetInBytes?: number,
     sizeInBytes?: number
-  ): Promise<Uint8Array<ArrayBuffer>> {
+  ) {
     offsetInBytes = Number(offsetInBytes) || 0;
     sizeInBytes = Number(sizeInBytes) || this.byteLength - offsetInBytes;
     if (offsetInBytes < 0 || offsetInBytes + sizeInBytes > this.byteLength) {
@@ -179,7 +179,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     }
     return dstBuffer;
   }
-  restore(): void {
+  restore() {
     if (!this._systemMemory && !this._object && !this._device.isContextLost()) {
       this.load(this._systemMemoryBuffer);
     }
@@ -195,7 +195,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
   isBuffer(): this is GPUDataBuffer {
     return true;
   }
-  protected load(data: Nullable<TypedArray>): void {
+  protected load(data: Nullable<TypedArray>) {
     if (!this._device.isContextLost()) {
       if (!this._object) {
         this._object = this._device.context.createBuffer();

@@ -73,11 +73,11 @@ export class Ray {
     this.prepare();
   }
   /** Get the ray origin point */
-  get origin(): Vector3 {
+  get origin() {
     return this._origin;
   }
   /** Get the ray direction vector */
-  get direction(): Vector3 {
+  get direction() {
     return this._direction;
   }
   /**
@@ -85,7 +85,7 @@ export class Ray {
    * @param origin - The ray origin point.
    * @param directionNormalized - The normalized direction vector.
    */
-  set(origin: Vector3, directionNormalized: Vector3): void {
+  set(origin: Vector3, directionNormalized: Vector3) {
     this._origin.set(origin);
     this._direction.set(directionNormalized);
     this.prepare();
@@ -96,7 +96,7 @@ export class Ray {
    * @param other - A ray object to which the result will be written, if not specified, a new ray object will be returned.
    * @returns The transform result.
    */
-  transform(matrix: Matrix4x4, other?: Ray): Ray {
+  transform(matrix: Matrix4x4, other?: Ray) {
     if (other) {
       matrix.transformPointAffine(Vector3.add(this._origin, this._direction), other._direction);
       matrix.transformPointAffine(this._origin, other._origin);
@@ -119,46 +119,30 @@ export class Ray {
     }
     return other;
   }
-  intersectionTestCircle(
-    center: Vector3,
-    normal: Vector3,
-    radius: number,
-    epsl: number
-  ): { dist: number; epsl: number } | null {
-    // 数值容差
+  intersectionTestCircle(center: Vector3, normal: Vector3, radius: number, epsl: number) {
     const deltaParallel = 1e-1; // 接近平行阈值
-    const deltaZero = 1e-12; // 避免除零用的小阈值
+    const deltaZero = 1e-12;
 
     const O = this.origin;
-    const D = this.direction; // 假定已归一化
+    const D = this.direction;
     const C = center;
-    const N = normal; // 假定已归一化
+    const N = normal;
     const R = radius;
 
-    // 基础量
     const w = Vector3.sub(O, C);
-    const a = Vector3.dot(D, N); // 射线方向与法线的夹角余弦
-    const b = Vector3.dot(w, N); // 起点到平面的有符号距离
-    /*
-    // 将点 P 投影到平面 (N, 过 C)
-    const projectPointToPlane = (P: Vector3) => {
-      const h = Vector3.dot(Vector3.sub(P, C), N);
-      return Vector3.sub(P, Vector3.scale(N, h));
-    };
-*/
-    // 已在平面内的点 Q 到圆周的平面内距离
+    const a = Vector3.dot(D, N);
+    const b = Vector3.dot(w, N);
+
     const closestOnCircleInPlane = (Q: Vector3) => {
       const u = Vector3.sub(Q, C);
-      const d = u.magnitude; // 长度
+      const d = u.magnitude;
       if (d < deltaZero) {
-        // Q 在圆心：最近距离等于半径
         return R;
       } else {
         return Math.abs(d - R);
       }
     };
 
-    // 近似平行/共面处理：更稳健
     if (Math.abs(a) < deltaParallel) {
       const distance = this.intersectionTestSphere(center, radius + Math.abs(epsl));
       if (!distance) {
@@ -178,35 +162,21 @@ export class Ray {
       }
     }
 
-    // 一般情况：用平面交点
     const tp = -b / a;
     if (tp >= 0) {
-      // 前方交平面：直接在交点上测平面内到圆周距离
       const P = Vector3.add(O, Vector3.scale(D, tp));
       const dCircle = closestOnCircleInPlane(P);
       return dCircle <= epsl ? { dist: tp, epsl: dCircle } : null;
     }
 
     return null;
-    /*
-    // 平面在射线后方：最近点是 O（t=0），组合空间距离
-    const distPlane = Math.abs(b);
-    if (distPlane > epsl) {
-      return null;
-    }
-
-    const Q = projectPointToPlane(O);
-    const dCircle = closestOnCircleInPlane(Q);
-    const distance = Math.hypot(distPlane, dCircle);
-    return distance <= epsl ? distance : null;
-    */
   }
   /**
    * Do a ray sphere intersection test
    * @param radius - Sphere radius
    * @returns Distance from origin to the intersected point if the ray intersects with the sphere, otherwise null
    */
-  intersectionTestSphere(center: Vector3, radius: number): number[] | null {
+  intersectionTestSphere(center: Vector3, radius: number) {
     const O = Vector3.sub(this._origin, center);
     const a = Vector3.dot(this._direction, this._direction);
     const b = 2 * Vector3.dot(O, this._direction);
@@ -243,7 +213,7 @@ export class Ray {
    * @param cull - Allow back side intersection if true.
    * @returns Distance from origin to the intersected point if the ray intersects with the triangle, otherwise null.
    */
-  intersectionTestTriangle(v1: Vector3, v2: Vector3, v3: Vector3, cull: boolean): number | null {
+  intersectionTestTriangle(v1: Vector3, v2: Vector3, v3: Vector3, cull: boolean) {
     const start = this._origin;
     const normal = this._direction;
     const edge1 = Vector3.sub(v2, v1, tmpV0);
@@ -284,7 +254,7 @@ export class Ray {
     }
   }
   /** @internal */
-  qtestMMM(bbox: AABB): boolean {
+  qtestMMM(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -307,7 +277,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMMMEx(bbox: AABB): number | null {
+  qtestMMMEx(bbox: AABB) {
     if (!this.qtestMMM(bbox)) {
       return null;
     }
@@ -323,7 +293,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestMMP(bbox: AABB): boolean {
+  qtestMMP(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -347,7 +317,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMMPEx(bbox: AABB): number | null {
+  qtestMMPEx(bbox: AABB) {
     if (!this.qtestMMP(bbox)) {
       return null;
     }
@@ -363,7 +333,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestMPM(bbox: AABB): boolean {
+  qtestMPM(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -387,7 +357,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMPMEx(bbox: AABB): number | null {
+  qtestMPMEx(bbox: AABB) {
     if (!this.qtestMPM(bbox)) {
       return null;
     }
@@ -403,7 +373,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestMPP(bbox: AABB): boolean {
+  qtestMPP(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -427,7 +397,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMPPEx(bbox: AABB): number | null {
+  qtestMPPEx(bbox: AABB) {
     if (!this.qtestMPP(bbox)) {
       return null;
     }
@@ -443,7 +413,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestPMM(bbox: AABB): boolean {
+  qtestPMM(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -467,7 +437,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPMMEx(bbox: AABB): number | null {
+  qtestPMMEx(bbox: AABB) {
     if (!this.qtestPMM(bbox)) {
       return null;
     }
@@ -483,7 +453,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestPMP(bbox: AABB): boolean {
+  qtestPMP(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -507,7 +477,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPMPEx(bbox: AABB): number | null {
+  qtestPMPEx(bbox: AABB) {
     if (!this.qtestPMP(bbox)) {
       return null;
     }
@@ -523,7 +493,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestPPM(bbox: AABB): boolean {
+  qtestPPM(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -547,7 +517,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPPMEx(bbox: AABB): number | null {
+  qtestPPMEx(bbox: AABB) {
     if (!this.qtestPPM(bbox)) {
       return null;
     }
@@ -564,7 +534,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestPPP(bbox: AABB): boolean {
+  qtestPPP(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -588,7 +558,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPPPEx(bbox: AABB): number | null {
+  qtestPPPEx(bbox: AABB) {
     if (!this.qtestPPP(bbox)) {
       return null;
     }
@@ -605,7 +575,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestOMM(bbox: AABB): boolean {
+  qtestOMM(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -626,7 +596,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOMMEx(bbox: AABB): number | null {
+  qtestOMMEx(bbox: AABB) {
     if (!this.qtestOMM(bbox)) {
       return null;
     }
@@ -640,7 +610,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestOMP(bbox: AABB): boolean {
+  qtestOMP(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -661,7 +631,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOMPEx(bbox: AABB): number | null {
+  qtestOMPEx(bbox: AABB) {
     if (!this.qtestOMP(bbox)) {
       return null;
     }
@@ -675,7 +645,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestOPM(bbox: AABB): boolean {
+  qtestOPM(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -696,7 +666,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOPMEx(bbox: AABB): number | null {
+  qtestOPMEx(bbox: AABB) {
     if (!this.qtestOPM(bbox)) {
       return null;
     }
@@ -709,7 +679,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestOPP(bbox: AABB): boolean {
+  qtestOPP(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -730,7 +700,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOPPEx(bbox: AABB): number | null {
+  qtestOPPEx(bbox: AABB) {
     if (!this.qtestOPP(bbox)) {
       return null;
     }
@@ -744,7 +714,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestMOM(bbox: AABB): boolean {
+  qtestMOM(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -765,7 +735,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMOMEx(bbox: AABB): number | null {
+  qtestMOMEx(bbox: AABB) {
     if (!this.qtestMOM(bbox)) {
       return null;
     }
@@ -778,7 +748,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestMOP(bbox: AABB): boolean {
+  qtestMOP(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -799,7 +769,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMOPEx(bbox: AABB): number | null {
+  qtestMOPEx(bbox: AABB) {
     if (!this.qtestMOP(bbox)) {
       return null;
     }
@@ -812,7 +782,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestPOM(bbox: AABB): boolean {
+  qtestPOM(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -833,7 +803,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPOMEx(bbox: AABB): number | null {
+  qtestPOMEx(bbox: AABB) {
     if (!this.qtestPOM(bbox)) {
       return null;
     }
@@ -846,7 +816,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestPOP(bbox: AABB): boolean {
+  qtestPOP(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -867,7 +837,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPOPEx(bbox: AABB): number | null {
+  qtestPOPEx(bbox: AABB) {
     if (!this.qtestPOP(bbox)) {
       return null;
     }
@@ -880,7 +850,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestMMO(bbox: AABB): boolean {
+  qtestMMO(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -901,7 +871,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMMOEx(bbox: AABB): number | null {
+  qtestMMOEx(bbox: AABB) {
     if (!this.qtestMMO(bbox)) {
       return null;
     }
@@ -914,7 +884,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestMPO(bbox: AABB): boolean {
+  qtestMPO(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -935,7 +905,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMPOEx(bbox: AABB): number | null {
+  qtestMPOEx(bbox: AABB) {
     if (!this.qtestMPO(bbox)) {
       return null;
     }
@@ -949,7 +919,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestPMO(bbox: AABB): boolean {
+  qtestPMO(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -969,7 +939,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPMOEx(bbox: AABB): number | null {
+  qtestPMOEx(bbox: AABB) {
     if (!this.qtestPMO(bbox)) {
       return null;
     }
@@ -982,7 +952,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestPPO(bbox: AABB): boolean {
+  qtestPPO(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -1003,7 +973,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPPOEx(bbox: AABB): number | null {
+  qtestPPOEx(bbox: AABB) {
     if (!this.qtestPPO(bbox)) {
       return null;
     }
@@ -1016,7 +986,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestMOO(bbox: AABB): boolean {
+  qtestMOO(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -1036,7 +1006,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMOOEx(bbox: AABB): number | null {
+  qtestMOOEx(bbox: AABB) {
     if (!this.qtestMOO(bbox)) {
       return null;
     }
@@ -1045,7 +1015,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestPOO(bbox: AABB): boolean {
+  qtestPOO(bbox: AABB) {
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
     const x1 = bbox.maxPoint.x;
@@ -1065,7 +1035,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPOOEx(bbox: AABB): number | null {
+  qtestPOOEx(bbox: AABB) {
     if (!this.qtestPOO(bbox)) {
       return null;
     }
@@ -1075,7 +1045,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestOMO(bbox: AABB): boolean {
+  qtestOMO(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -1095,7 +1065,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOMOEx(bbox: AABB): number | null {
+  qtestOMOEx(bbox: AABB) {
     if (!this.qtestOMO(bbox)) {
       return null;
     }
@@ -1105,7 +1075,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestOPO(bbox: AABB): boolean {
+  qtestOPO(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const z0 = bbox.minPoint.z;
     const x1 = bbox.maxPoint.x;
@@ -1125,7 +1095,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOPOEx(bbox: AABB): number | null {
+  qtestOPOEx(bbox: AABB) {
     if (!this.qtestOPO(bbox)) {
       return null;
     }
@@ -1135,7 +1105,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestOOM(bbox: AABB): boolean {
+  qtestOOM(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const z0 = bbox.minPoint.z;
@@ -1155,7 +1125,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOOMEx(bbox: AABB): number | null {
+  qtestOOMEx(bbox: AABB) {
     if (!this.qtestOOM(bbox)) {
       return null;
     }
@@ -1165,7 +1135,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  qtestOOP(bbox: AABB): boolean {
+  qtestOOP(bbox: AABB) {
     const x0 = bbox.minPoint.x;
     const y0 = bbox.minPoint.y;
     const x1 = bbox.maxPoint.x;
@@ -1185,7 +1155,7 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOOPEx(bbox: AABB): number | null {
+  qtestOOPEx(bbox: AABB) {
     if (!this.qtestOOP(bbox)) {
       return null;
     }
@@ -1195,7 +1165,7 @@ export class Ray {
     return t;
   }
   /** @internal */
-  prepare(): void {
+  prepare() {
     const x = this._origin.x;
     const y = this._origin.y;
     const z = this._origin.z;

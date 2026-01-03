@@ -1,4 +1,4 @@
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import { SceneNode } from '../../../scene';
 import {
@@ -24,7 +24,7 @@ export function getCameraClass(): SerializableClass {
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'HDR',
           type: 'bool',
@@ -611,7 +611,7 @@ export function getCameraClass(): SerializableClass {
             this.SSAOIntensity = value.num[0] * 0.01;
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -628,7 +628,7 @@ export function getPerspectiveCameraClass(): SerializableClass {
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'FovVertical',
           type: 'float',
@@ -677,7 +677,7 @@ export function getPerspectiveCameraClass(): SerializableClass {
             this.autoAspect = value.bool[0];
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -694,7 +694,7 @@ export function getOrthoCameraClass(): SerializableClass {
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Left',
           type: 'float',
@@ -761,7 +761,7 @@ export function getOrthoCameraClass(): SerializableClass {
             this.far = value.num[0];
           }
         }
-      ];
+      ]);
     }
   };
 }

@@ -7,7 +7,7 @@ import type {
 } from '@zephyr3d/device';
 import { linearTextureFormatToSRGB, GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
-import type { Nullable, TypedArray } from '@zephyr3d/base';
+import type { TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 
 export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUTexture> {
@@ -17,10 +17,10 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
   isTexture2D(): this is Texture2D {
     return true;
   }
-  init(): void {
+  init() {
     this.loadEmpty(this._format!, this._width, this._height, this._mipLevelCount);
   }
-  update(data: TypedArray, xOffset: number, yOffset: number, width: number, height: number): void {
+  update(data: TypedArray, xOffset: number, yOffset: number, width: number, height: number) {
     if (this._device.isContextLost()) {
       return;
     }
@@ -40,7 +40,7 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
     srcY: number,
     width: number,
     height: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
@@ -70,7 +70,7 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
     faceOrLayer: number,
     mipLevel: number,
     buffer: TypedArray
-  ): Promise<void> {
+  ) {
     if (faceOrLayer !== 0) {
       throw new Error(`Texture2D.readPixels(): parameter faceOrLayer must be 0`);
     }
@@ -109,16 +109,16 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
     }
     this.copyPixelDataToBuffer(x, y, w, h, 0, mipLevel, buffer);
   }
-  loadFromElement(element: TextureImageElement, sRGB: boolean, creationFlags?: number): void {
+  loadFromElement(element: TextureImageElement, sRGB: boolean, creationFlags?: number) {
     this._flags = Number(creationFlags) || 0;
     const format = sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm';
     this.loadImage(element, format);
   }
-  createEmpty(format: TextureFormat, width: number, height: number, creationFlags?: number): void {
+  createEmpty(format: TextureFormat, width: number, height: number, creationFlags?: number) {
     this._flags = Number(creationFlags) || 0;
     this.loadEmpty(format, width, height, 0);
   }
-  createView(level?: number, face?: number, mipCount?: number): Nullable<GPUTextureView> {
+  createView(level?: number, face?: number, mipCount?: number) {
     return this._object
       ? this._device.gpuCreateTextureView(this._object, {
           dimension: '2d',
@@ -129,7 +129,7 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
         })
       : null;
   }
-  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number): void {
+  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number) {
     if (data.isCubemap || data.isVolume) {
       console.error('loading 2d texture with mipmap data failed: data is not 2d texture');
     } else {
@@ -142,14 +142,14 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
     }
   }
   /** @internal */
-  private loadEmpty(format: TextureFormat, width: number, height: number, numMipLevels: number): void {
+  private loadEmpty(format: TextureFormat, width: number, height: number, numMipLevels: number) {
     this.allocInternal(format, width, height, 1, numMipLevels);
     if (this._mipLevelCount > 1 && !this._device.isContextLost()) {
       this.generateMipmaps();
     }
   }
   /** @internal */
-  private loadLevels(levels: TextureMipmapData, sRGB: boolean): void {
+  private loadLevels(levels: TextureMipmapData, sRGB: boolean) {
     let format = sRGB ? linearTextureFormatToSRGB(levels.format) : levels.format;
     let swizzle = false;
     if (format === 'bgra8unorm') {
@@ -193,7 +193,7 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
     }
   }
   /** @internal */
-  private loadImage(element: TextureImageElement, format: TextureFormat): void {
+  private loadImage(element: TextureImageElement, format: TextureFormat) {
     this.allocInternal(format, Number(element.width), Number(element.height), 1, 0);
     if (!this._device.isContextLost()) {
       this.updateFromElement(element, 0, 0, 0, 0, this._width, this._height);

@@ -1,4 +1,4 @@
-import type { Matrix4x4, AABB, Nullable } from '@zephyr3d/base';
+import type { Matrix4x4, Nullable } from '@zephyr3d/base';
 import { Vector3, Vector4, Ray, DRef, DWeakRef, makeObservable, Disposable } from '@zephyr3d/base';
 import { SceneNode } from './scene_node';
 import { Octree } from './octree';
@@ -6,7 +6,6 @@ import { RaycastVisitor } from './raycast_visitor';
 import { Environment } from './environment';
 import type { GraphNode } from './graph_node';
 import type { Camera } from '../camera/camera';
-import type { PickTarget } from '../render';
 import { SceneRenderer } from '../render';
 import type { Compositor } from '../posteffect';
 import type { Metadata } from 'draco3d';
@@ -91,7 +90,8 @@ export class Scene
     this._perCameraUpdateQueue = [];
     this._env = new Environment();
     this._updateFrame = -1;
-    this._rootNode = new DRef(new SceneNode(this));
+    this._rootNode = new DRef();
+    this._rootNode.set(new SceneNode(this));
     this._rootNode.get()!.name = 'Root';
     this._metaData = null;
     this._script = '';
@@ -100,7 +100,7 @@ export class Scene
   /**
    * Gets the unique identifier of the scene.
    */
-  get id(): number {
+  get id() {
     return this._id;
   }
   /**
@@ -125,14 +125,14 @@ export class Scene
    * Gets the root scene node of the scene
    */
   get rootNode() {
-    return this._rootNode?.get() ?? null;
+    return this._rootNode.get()!;
   }
   /**
    * Gets the octree used for spatial organization and queries.
    *
    * Ensures pending node placements are synchronized before returning.
    */
-  get octree(): Octree {
+  get octree() {
     // Make sure the octree state is up to date
     this.updateNodePlacement(this._octree, this._nodePlaceList);
     return this._octree;
@@ -142,7 +142,7 @@ export class Scene
    *
    * Ensures pending node placements are synchronized before computing.
    */
-  get boundingBox(): AABB {
+  get boundingBox() {
     this.updateNodePlacement(this._octree, this._nodePlaceList);
     // this._syncBVChangedList();
     return this._octree.getRootNode().getBoxLoosed();
@@ -150,7 +150,7 @@ export class Scene
   /**
    * The environment (sky, lights, IBL) of the scene.
    */
-  get env(): Environment {
+  get env() {
     return this._env;
   }
   /**
@@ -208,7 +208,7 @@ export class Scene
    * @returns Intersection info `{ target, dist, point }`, or `null` if no hit.
    *
    */
-  raycast(ray: Ray, length = Infinity): Nullable<{ target: PickTarget; dist: number; point: Vector3 }> {
+  raycast(ray: Ray, length = Infinity) {
     const raycastVisitor = new RaycastVisitor(ray, length);
     this.octree.getRootNode().traverse(raycastVisitor);
     return raycastVisitor.intersected
@@ -242,7 +242,7 @@ export class Scene
     screenX: number,
     screenY: number,
     invModelMatrix?: Matrix4x4
-  ): Ray {
+  ) {
     const vClip = new Vector4((2 * screenX) / viewportWidth - 1, 1 - (2 * screenY) / viewportHeight, 1, 1);
     const vWorld = camera.invViewProjectionMatrix.transform(vClip);
     vWorld.scaleBy(1 / vWorld.w);
@@ -339,7 +339,7 @@ export class Scene
    *
    * @internal
    */
-  getRenderer(): typeof SceneRenderer {
+  getRenderer() {
     return SceneRenderer;
   }
   /**

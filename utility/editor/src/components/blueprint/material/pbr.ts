@@ -37,7 +37,7 @@ import { getConstantNodeCategories } from '../nodes/constants';
 import { getMathNodeCategories } from '../nodes/math';
 import { getTextureNodeCategories } from './texture';
 import { GNode } from '../node';
-import type { GenericConstructor } from '@zephyr3d/base';
+import type { GenericConstructor, Nullable } from '@zephyr3d/base';
 import { ASSERT, DRef, guessMimeType, randomUUID, Vector3, Vector4 } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import type { FrameBuffer, Texture2D, TextureAddressMode, TextureFilterMode } from '@zephyr3d/device';
@@ -60,13 +60,13 @@ export class PBRMaterialEditor extends GraphEditor {
   private _irChanged: boolean;
   private _outputName: string;
   private _blueprintPath: string;
-  private _savedState: {
+  private _savedState: Nullable<{
     props: any;
-    irFrag: MaterialBlueprintIR;
-    irVert: MaterialBlueprintIR;
-    uniformValues: BluePrintUniformValue[];
-    uniformTextures: BluePrintUniformTexture[];
-  };
+    irFrag: Nullable<MaterialBlueprintIR>;
+    irVert: Nullable<MaterialBlueprintIR>;
+    uniformValues: Nullable<BluePrintUniformValue[]>;
+    uniformTextures: Nullable<BluePrintUniformTexture[]>;
+  }>;
   constructor(label: string, outputName: string) {
     super(label, []);
     this._outputName = outputName;
@@ -108,14 +108,14 @@ export class PBRMaterialEditor extends GraphEditor {
     if (mat instanceof Sprite3DMaterial || mat instanceof Sprite3DBlueprintMaterial) {
       const defaultMat = new Sprite3DMaterial();
       this._defaultMaterial.set(defaultMat);
-      const previewMesh = new Sprite3D(this._previewScene.get(), mat);
+      const previewMesh = new Sprite3D(this._previewScene.get()!, mat);
       this._previewMesh.set(previewMesh);
     } else {
       const sphere = new SphereShape({ radius: 4, horizonalDetail: 50, verticalDetail: 50 });
       const defaultMat = new UnlitMaterial();
       defaultMat.albedoColor = new Vector4(1, 0, 1, 1);
       this._defaultMaterial = new DRef(defaultMat);
-      const previewMesh = new Mesh(this._previewScene.get(), sphere, mat);
+      const previewMesh = new Mesh(this._previewScene.get()!, sphere, mat);
       this._previewMesh = new DRef(previewMesh);
     }
     this.propEditor.on('object_property_changed', this.graphChanged, this);
@@ -129,8 +129,8 @@ export class PBRMaterialEditor extends GraphEditor {
     this._previewMesh.dispose();
     this._previewTex.dispose();
     if (this._framebuffer.get()) {
-      this._framebuffer.get().getColorAttachment(0).dispose();
-      this._framebuffer.get().getDepthAttachment().dispose();
+      this._framebuffer.get()!.getColorAttachment(0).dispose();
+      this._framebuffer.get()!.getDepthAttachment()!.dispose();
       this._framebuffer.dispose();
     }
     this._defaultMaterial.dispose();
@@ -162,7 +162,7 @@ export class PBRMaterialEditor extends GraphEditor {
     if (ImGui.IsPopupOpen('', ImGui.PopupFlags.AnyPopupId)) {
       return false;
     }
-    return this._previewScene.get().mainCamera.handleEvent(ev, type);
+    return this._previewScene.get()!.mainCamera!.handleEvent(ev, type);
   }
   get saved() {
     return this._version === 0;
@@ -215,6 +215,9 @@ export class PBRMaterialEditor extends GraphEditor {
     if (path) {
       const VFS = ProjectService.VFS;
       const mat = this._editMaterial.get();
+      if (!mat) {
+        return;
+      }
       if (mat instanceof PBRBluePrintMaterial || mat instanceof Sprite3DBlueprintMaterial) {
         const bpPath =
           this._blueprintPath ||
@@ -297,7 +300,7 @@ export class PBRMaterialEditor extends GraphEditor {
       this._savedState = await this.getSavedState(mat);
     }
   }
-  getUniforms(fragmentIR: MaterialBlueprintIR, vertexIR?: MaterialBlueprintIR) {
+  getUniforms(fragmentIR: MaterialBlueprintIR, vertexIR?: Nullable<MaterialBlueprintIR>) {
     const uniformValues: BluePrintUniformValue[] = [];
     const uniformTextures: BluePrintUniformTexture[] = [];
     for (const ir of [fragmentIR, vertexIR]) {
@@ -381,6 +384,9 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   async init(path: string, type?: GenericConstructor<MeshMaterial>) {
     const mat = type ? new type() : await getEngine().resourceManager.fetchMaterial(path);
+    if (!mat) {
+      throw new Error(`Load material failed: ${path}`);
+    }
     this._editMaterial.set(mat);
     this._savedState = await this.getSavedState(mat);
     this.readonly = !type && getEngine().VFS.isParentOf('/assets/@builtins', path);
@@ -414,7 +420,7 @@ export class PBRMaterialEditor extends GraphEditor {
       v.impl.reset();
     }
     for (const i of dag.order) {
-      const node = editor.nodes.get(i);
+      const node = editor.nodes.get(i)!;
       node.impl.check();
       if (node.impl.error) {
         return null;
@@ -486,29 +492,29 @@ export class PBRMaterialEditor extends GraphEditor {
     const device = getDevice();
     if (
       this._framebuffer.get() &&
-      (this._framebuffer.get().getWidth() !== size.x || this._framebuffer.get().getHeight() !== size.y)
+      (this._framebuffer.get()!.getWidth() !== size.x || this._framebuffer.get()!.getHeight() !== size.y)
     ) {
-      this._framebuffer.get().getColorAttachment(0).dispose();
-      this._framebuffer.get().getDepthAttachment().dispose();
+      this._framebuffer.get()!.getColorAttachment(0).dispose();
+      this._framebuffer.get()!.getDepthAttachment()!.dispose();
       this._framebuffer.dispose();
       this._previewTex.dispose();
     }
     if (!this._framebuffer.get()) {
       const tex = device.createTexture2D('rgba16f', size.x, size.y, {
         mipmapping: false
-      });
-      const depth = device.createTexture2D('d24s8', size.x, size.y);
+      })!;
+      const depth = device.createTexture2D('d24s8', size.x, size.y)!;
       this._framebuffer.set(device.createFrameBuffer([tex], depth));
       const previewTex = device.createTexture2D('rgba8unorm', size.x, size.y, { mipmapping: false });
       this._previewTex.set(previewTex);
     }
     device.pushDeviceStates();
     device.setFramebuffer(this._framebuffer.get());
-    this._previewScene.get().render();
-    this._blitter.blit(this._framebuffer.get().getColorAttachment(0), this._previewTex.get());
+    this._previewScene.get()!.render();
+    this._blitter.blit(this._framebuffer.get()!.getColorAttachment(0), this._previewTex.get());
     device.popDeviceStates();
 
-    const camera = this._previewScene.get().mainCamera;
+    const camera = this._previewScene.get()!.mainCamera!;
     const cursorScreenPos = ImGui.GetCursorScreenPos();
     camera.interactionRect = [
       cursorScreenPos.x,
@@ -590,7 +596,7 @@ export class PBRMaterialEditor extends GraphEditor {
       } else {
         const uniformNames: Set<string> = new Set();
         for (const i of irFrag.DAG.order) {
-          const node = this.fragmentEditor.nodes.get(i);
+          const node = this.fragmentEditor.nodes.get(i)!;
           if (node.impl.isUniform && uniformNames.has(node.impl.paramName)) {
             node.impl.error = `Duplicated uniform name: ${node.impl.paramName}`;
             return;
@@ -599,8 +605,8 @@ export class PBRMaterialEditor extends GraphEditor {
         }
         if (this.vertexEditor) {
           uniformNames.clear();
-          for (const i of irVert.DAG.order) {
-            const node = this.vertexEditor.nodes.get(i);
+          for (const i of irVert!.DAG.order) {
+            const node = this.vertexEditor.nodes.get(i)!;
             if (node.impl.isUniform && uniformNames.has(node.impl.paramName)) {
               node.impl.error = `Duplicated uniform name: ${node.impl.paramName}`;
               return;
@@ -628,7 +634,7 @@ export class PBRMaterialEditor extends GraphEditor {
         }
         mat.fragmentIR = irFrag;
         if (mat instanceof PBRBluePrintMaterial) {
-          mat.vertexIR = irVert;
+          mat.vertexIR = irVert!;
         }
         mat.uniformValues = uniforms.uniformValues;
         mat.uniformTextures = uniforms.uniformTextures;

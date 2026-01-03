@@ -1,4 +1,4 @@
-import type { Nullable, TypedArray } from '@zephyr3d/base';
+import type { TypedArray } from '@zephyr3d/base';
 import type { GPUDataBuffer, TextureVideo } from '@zephyr3d/device';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUDevice } from './device';
@@ -30,13 +30,13 @@ export class WebGPUTextureVideo
       this._refBindGroups.splice(index, 1);
     }
   }
-  get width(): number {
+  get width() {
     return this._width;
   }
-  get height(): number {
+  get height() {
     return this._height;
   }
-  get source(): HTMLVideoElement {
+  get source() {
     return this._source;
   }
   restore() {
@@ -44,7 +44,7 @@ export class WebGPUTextureVideo
       this.loadElement(this._source);
     }
   }
-  updateVideoFrame(): boolean {
+  updateVideoFrame() {
     if (this._source.readyState > 2) {
       const videoFrame = new (window as any).VideoFrame(this._source);
       videoFrame.close();
@@ -53,13 +53,13 @@ export class WebGPUTextureVideo
     }
     return false;
   }
-  createView(_level?: number, _face?: number, _mipCount?: number): Nullable<GPUTextureView> {
+  createView(_level?: number, _face?: number, _mipCount?: number) {
     return null;
   }
-  init(): void {
+  init() {
     this.loadFromElement();
   }
-  readPixels(
+  async readPixels(
     _x: number,
     _y: number,
     _w: number,
@@ -67,7 +67,7 @@ export class WebGPUTextureVideo
     _faceOrLayer: number,
     _mipLevel: number,
     _buffer: TypedArray
-  ): Promise<void> {
+  ) {
     throw new Error(`Video texture does not support readPixels()`);
   }
   readPixelsToBuffer(
@@ -78,15 +78,15 @@ export class WebGPUTextureVideo
     _faceOrLayer: number,
     _mipLevel: number,
     _buffer: GPUDataBuffer<unknown>
-  ): void {
+  ) {
     throw new Error(`Video texture does not support readPixelsToBuffer()`);
   }
   /** @internal */
-  loadFromElement(): void {
+  loadFromElement() {
     this.loadElement(this._source);
   }
   /** @internal */
-  private loadElement(element: HTMLVideoElement): boolean {
+  private loadElement(element: HTMLVideoElement) {
     this._format = 'rgba8unorm';
     this._width = element.videoWidth;
     this._height = element.videoHeight;

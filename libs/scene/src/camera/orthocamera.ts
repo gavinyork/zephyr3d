@@ -44,60 +44,60 @@ export class OrthoCamera extends Camera {
     this._invalidate(true);
   }
   /** The near clip plane */
-  get near(): number {
+  get near() {
     return this._near;
   }
-  set near(val: number) {
+  set near(val) {
     if (val !== this._near) {
       this._near = val;
       this._invalidate(true);
     }
   }
   /** The far clip plane */
-  get far(): number {
+  get far() {
     return this._far;
   }
-  set far(val: number) {
+  set far(val) {
     if (val !== this._far) {
       this._far = val;
       this._invalidate(true);
     }
   }
   /** The left clip plane */
-  get left(): number {
+  get left() {
     return this._left;
   }
-  set left(val: number) {
+  set left(val) {
     if (val !== this._left) {
       this._left = val;
       this._invalidate(true);
     }
   }
   /** The right clip plane */
-  get right(): number {
+  get right() {
     return this._right;
   }
-  set right(val: number) {
+  set right(val) {
     if (val !== this._right) {
       this._right = val;
       this._invalidate(true);
     }
   }
   /** The top clip plane */
-  get top(): number {
+  get top() {
     return this._top;
   }
-  set top(val: number) {
+  set top(val) {
     if (val !== this._top) {
       this._top = val;
       this._invalidate(true);
     }
   }
   /** The bottom clip plane */
-  get bottom(): number {
+  get bottom() {
     return this._bottom;
   }
-  set bottom(val: number) {
+  set bottom(val) {
     if (val !== this._bottom) {
       this._bottom = val;
       this._invalidate(true);
@@ -115,7 +115,7 @@ export class OrthoCamera extends Camera {
   /**
    * {@inheritDoc Camera.setOrtho}
    */
-  setOrtho(left: number, right: number, bottom: number, top: number, near: number, far: number): this {
+  setOrtho(left: number, right: number, bottom: number, top: number, near: number, far: number) {
     this._left = left;
     this._right = right;
     this._bottom = bottom;
@@ -129,7 +129,7 @@ export class OrthoCamera extends Camera {
    * Setup a projection matrix for the camera
    * @param matrix - The projection matrix
    */
-  setProjectionMatrix(matrix: Matrix4x4): void {
+  setProjectionMatrix(matrix: Matrix4x4) {
     if (matrix !== this._projMatrix) {
       if (matrix?.isOrtho()) {
         super.setProjectionMatrix(matrix);
@@ -145,7 +145,7 @@ export class OrthoCamera extends Camera {
     }
   }
   /** @internal */
-  protected _computeProj(): void {
+  protected _computeProj() {
     let left = this._left;
     let right = this._right;
     let bottom = this._bottom;

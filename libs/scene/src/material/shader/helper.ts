@@ -1,4 +1,3 @@
-import type { Nullable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render/drawable';
 import {
@@ -96,43 +95,43 @@ export class ShaderHelper {
     atmosphereParams: getDefaultAtmosphereParams(),
     heightFogParams: getDefaultHeightFogParams()
   };
-  static getObjectColorUniformName(): string {
+  static getObjectColorUniformName() {
     return UNIFORM_NAME_OBJECT_COLOR;
   }
-  static getWorldMatrixUniformName(): string {
+  static getWorldMatrixUniformName() {
     return UNIFORM_NAME_WORLD_MATRIX;
   }
-  static getPrevWorldMatrixUniformName(): string {
+  static getPrevWorldMatrixUniformName() {
     return UNIFORM_NAME_PREV_WORLD_MATRIX;
   }
-  static getPrevWorldMatrixFrameUniformName(): string {
+  static getPrevWorldMatrixFrameUniformName() {
     return UNIFORM_NAME_PREV_WORLD_MATRXI_FRAME;
   }
-  static getInstanceDataUniformName(): string {
+  static getInstanceDataUniformName() {
     return UNIFORM_NAME_INSTANCE_DATA;
   }
-  static getInstanceDataOffsetUniformName(): string {
+  static getInstanceDataOffsetUniformName() {
     return UNIFORM_NAME_INSTANCE_DATA_OFFSET;
   }
-  static getInstanceDataStrideUniformName(): string {
+  static getInstanceDataStrideUniformName() {
     return UNIFORM_NAME_INSTANCE_DATA_STRIDE;
   }
-  static getBoneMatricesUniformName(): string {
+  static getBoneMatricesUniformName() {
     return UNIFORM_NAME_BONE_MATRICES;
   }
-  static getBoneTextureSizeUniformName(): string {
+  static getBoneTextureSizeUniformName() {
     return UNIFORM_NAME_BONE_TEXTURE_SIZE;
   }
-  static getBoneInvBindMatrixUniformName(): string {
+  static getBoneInvBindMatrixUniformName() {
     return UNIFORM_NAME_BONE_INV_BIND_MATRIX;
   }
-  static getMorphDataUniformName(): string {
+  static getMorphDataUniformName() {
     return UNIFORM_NAME_MORPH_DATA;
   }
-  static getMorphInfoUniformName(): string {
+  static getMorphInfoUniformName() {
     return UNIFORM_NAME_MORPH_INFO;
   }
-  static getLightBufferUniformName(): string {
+  static getLightBufferUniformName() {
     return UNIFORM_NAME_LIGHT_BUFFER;
   }
   static getDrawableBindGroupLayout(skinning: boolean, morphing: boolean, instancing: boolean) {
@@ -310,7 +309,7 @@ export class ShaderHelper {
    *
    * @returns true if the shader needs to process skeletal animation, otherwise false.
    */
-  static hasSkinning(scope: PBInsideFunctionScope): boolean {
+  static hasSkinning(scope: PBInsideFunctionScope) {
     return !!scope[UNIFORM_NAME_BONE_MATRICES];
   }
   /**
@@ -320,7 +319,7 @@ export class ShaderHelper {
    *
    * @returns true if the shader needs to process morph target animation, otherwise false.
    */
-  static hasMorphing(scope: PBInsideFunctionScope): boolean {
+  static hasMorphing(scope: PBInsideFunctionScope) {
     return !!scope[UNIFORM_NAME_MORPH_DATA];
   }
   /**
@@ -330,7 +329,7 @@ export class ShaderHelper {
    *
    * @returns Skinning matrix for current vertex, or null if there is not skeletal animation
    */
-  static calculateSkinMatrix(scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
+  static calculateSkinMatrix(scope: PBInsideFunctionScope) {
     if (!this.hasSkinning(scope)) {
       return null;
     }
@@ -376,9 +375,9 @@ export class ShaderHelper {
       );
       this.$return(pb.mul(invBindMatrix, this.m));
     });
-    return scope.$g[funcNameGetSkinningMatrix]();
+    return scope.$g[funcNameGetSkinningMatrix]() as PBShaderExp;
   }
-  static calculateMorphDelta(scope: PBInsideFunctionScope, attrib: number): PBShaderExp {
+  static calculateMorphDelta(scope: PBInsideFunctionScope, attrib: number) {
     const pb = scope.$builder;
     const isWebGL1 = pb.getDevice().type === 'webgl';
     if (pb.shaderKind !== 'vertex') {
@@ -448,7 +447,7 @@ export class ShaderHelper {
     const pos = 1 + MORPH_WEIGHTS_VECTOR_COUNT + (attrib >> 2);
     const comp = attrib & 3;
     const offset = scope[this.getMorphInfoUniformName()][pos][comp];
-    return scope[funcName](pb.int(offset));
+    return scope[funcName](pb.int(offset)) as PBShaderExp;
   }
   /** @internal */
   static prepareSkinAnimation(scope: PBInsideFunctionScope) {
@@ -511,7 +510,7 @@ export class ShaderHelper {
    * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
    * @returns The calculated vertex position in object space, or null if pos is null
    */
-  static resolveVertexPosition(scope: PBInsideFunctionScope): PBShaderExp {
+  static resolveVertexPosition(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
       throw new Error(`ShaderHelper.resolveVertexPosition(): must be called at vertex stage`);
@@ -553,11 +552,13 @@ export class ShaderHelper {
       }
       this.$return(this.pos);
     });
-    return scope[that.SKIN_MATRIX_NAME] && scope[that.SKIN_PREV_MATRIX_NAME]
-      ? scope.Z_resolveVertexPosition(scope[that.SKIN_MATRIX_NAME], scope[that.SKIN_PREV_MATRIX_NAME])
-      : scope[that.SKIN_MATRIX_NAME]
-        ? scope.Z_resolveVertexPosition(scope[that.SKIN_MATRIX_NAME])
-        : scope.Z_resolveVertexPosition();
+    return (
+      scope[that.SKIN_MATRIX_NAME] && scope[that.SKIN_PREV_MATRIX_NAME]
+        ? scope.Z_resolveVertexPosition(scope[that.SKIN_MATRIX_NAME], scope[that.SKIN_PREV_MATRIX_NAME])
+        : scope[that.SKIN_MATRIX_NAME]
+          ? scope.Z_resolveVertexPosition(scope[that.SKIN_MATRIX_NAME])
+          : scope.Z_resolveVertexPosition()
+    ) as PBShaderExp;
   }
   /**
    * Resolve motion vector
@@ -584,7 +585,7 @@ export class ShaderHelper {
    * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
    * @returns The calculated normal vector in object space, or null if normal is null
    */
-  static resolveVertexNormal(scope: PBInsideFunctionScope, normal?: PBShaderExp): PBShaderExp {
+  static resolveVertexNormal(scope: PBInsideFunctionScope, normal?: PBShaderExp) {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
       throw new Error(`ShaderHelper.resolveVertexNormal(): must be called in vertex stage`);
@@ -603,7 +604,7 @@ export class ShaderHelper {
       normal = pb.normalize(pb.add(normal, this.calculateMorphDelta(scope, MORPH_TARGET_NORMAL).xyz));
     }
     if (scope[this.SKIN_MATRIX_NAME]) {
-      return pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(normal, 0)).xyz;
+      return pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(normal, 0)).xyz as PBShaderExp;
     } else {
       return normal;
     }
@@ -616,7 +617,7 @@ export class ShaderHelper {
    * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
    * @returns The calculated tangent vector of type vec4 in object space, or null if tangent is null
    */
-  static resolveVertexTangent(scope: PBInsideFunctionScope, tangent?: PBShaderExp): PBShaderExp {
+  static resolveVertexTangent(scope: PBInsideFunctionScope, tangent?: PBShaderExp) {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
       throw new Error(`ShaderHelper.resolveVertexTangent(): must be called in vertex stage`);
@@ -637,7 +638,10 @@ export class ShaderHelper {
       );
     }
     if (scope[this.SKIN_MATRIX_NAME]) {
-      return pb.vec4(pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(tangent.xyz, 0)).xyz, tangent.w);
+      return pb.vec4(
+        pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(tangent.xyz, 0)).xyz,
+        tangent.w
+      ) as PBShaderExp;
     } else {
       return tangent;
     }
@@ -647,24 +651,22 @@ export class ShaderHelper {
    * @param scope - Current shader scope
    * @returns The world matrix of current object to be drawn
    */
-  static getWorldMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+  static getWorldMatrix(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
-    return (
-      scope[UNIFORM_NAME_WORLD_MATRIX] ??
+    return (scope[UNIFORM_NAME_WORLD_MATRIX] ??
       pb.mat4(
         this.getInstancedUniform(scope, 0),
         this.getInstancedUniform(scope, 1),
         this.getInstancedUniform(scope, 2),
         this.getInstancedUniform(scope, 3)
-      )
-    );
+      )) as PBShaderExp;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the world matrix at previous frame of current object to be drawn
    * @param scope - Current shader scope
    * @returns The world matrix at previous frame of current object to be drawn
    */
-  static getPrevWorldMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+  static getPrevWorldMatrix(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
     const that = this;
     const framestamp = this.getFramestamp(scope);
@@ -698,7 +700,7 @@ export class ShaderHelper {
           )
         );
       });
-      return scope.Z_getPrevWorldMatrix(framestamp);
+      return scope.Z_getPrevWorldMatrix(framestamp) as PBShaderExp;
     }
   }
   /**
@@ -706,7 +708,7 @@ export class ShaderHelper {
    * @param scope - Current shader scope
    * @returns instance uniform value
    */
-  static getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp {
+  static getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number) {
     const pb = scope.$builder;
     return scope[UNIFORM_NAME_INSTANCE_DATA].at(
       pb.add(
@@ -714,7 +716,7 @@ export class ShaderHelper {
         scope[UNIFORM_NAME_INSTANCE_DATA_OFFSET],
         pb.uint(uniformIndex)
       )
-    );
+    ) as PBShaderExp;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the normal matrix of current object to be drawn
@@ -722,7 +724,7 @@ export class ShaderHelper {
    * @param scope - Current shader scope
    * @returns The normal matrix of current object to be drawn
    */
-  static getNormalMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+  static getNormalMatrix(scope: PBInsideFunctionScope) {
     return this.getWorldMatrix(scope);
   }
   /**

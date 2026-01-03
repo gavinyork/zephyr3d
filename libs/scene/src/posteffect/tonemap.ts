@@ -22,18 +22,18 @@ export class Tonemap extends AbstractPostEffect {
     this._exposure = 1;
   }
   /** Exposure value */
-  get exposure(): number {
+  get exposure() {
     return this._exposure;
   }
-  set exposure(val: number) {
+  set exposure(val) {
     this._exposure = val;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
-  requireLinearDepthTexture(): boolean {
+  requireLinearDepthTexture() {
     return false;
   }
   /** {@inheritDoc AbstractPostEffect.requireDepthAttachment} */
-  requireDepthAttachment(): boolean {
+  requireDepthAttachment() {
     return false;
   }
   /** {@inheritDoc AbstractPostEffect.apply} */

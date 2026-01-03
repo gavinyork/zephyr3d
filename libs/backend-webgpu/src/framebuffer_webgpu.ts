@@ -94,17 +94,17 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
   getOptions(): Immutable<WebGPUFrameBufferOptions> {
     return this._options;
   }
-  get bindFlag(): number {
+  get bindFlag() {
     return this._bindFlag;
   }
-  getHash(): string {
+  getHash() {
     return this._hash;
   }
-  getWidth(): number {
+  getWidth() {
     const attachment = this._options.colorAttachments?.[0] ?? this._options.depthAttachment;
     return attachment ? Math.max(attachment.texture.width >> attachment.level!, 1) : 0;
   }
-  getHeight(): number {
+  getHeight() {
     const attachment = this._options.colorAttachments?.[0] ?? this._options.depthAttachment;
     return attachment ? Math.max(attachment.texture.height >> attachment.level!, 1) : 0;
   }
@@ -136,13 +136,13 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
       this._msaaDepthTexture = null;
     }
   }
-  setColorAttachmentGenerateMipmaps(index: number, generateMipmaps: boolean): void {
+  setColorAttachmentGenerateMipmaps(index: number, generateMipmaps: boolean) {
     const k = this._options.colorAttachments?.[index];
     if (k) {
       k.generateMipmaps = !!generateMipmaps;
     }
   }
-  getColorAttachmentGenerateMipmaps(index: number): boolean {
+  getColorAttachmentGenerateMipmaps(index: number) {
     return this._options.colorAttachments?.[index]?.generateMipmaps ?? false;
   }
   setColorAttachmentCubeFace(index: number, face: CubeFace) {
@@ -152,17 +152,17 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
       this._bindFlag++;
     }
   }
-  getColorAttachmentCubeFace(index: number): CubeFace {
-    return this._options.colorAttachments?.[index].face ?? CubeFace.PX;
+  getColorAttachmentCubeFace(index: number) {
+    return (this._options.colorAttachments?.[index].face as CubeFace) ?? CubeFace.PX;
   }
-  setColorAttachmentMipLevel(index: number, level: number): void {
+  setColorAttachmentMipLevel(index: number, level: number) {
     const k = this._options.colorAttachments?.[index];
     if (k && k.level !== level) {
       k.level = level;
       this._bindFlag++;
     }
   }
-  getColorAttachmentMipLevel(index: number): number {
+  getColorAttachmentMipLevel(index: number) {
     return this._options.colorAttachments?.[index].level ?? 0;
   }
   setColorAttachmentLayer(index: number, layer: number) {
@@ -172,18 +172,18 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
       this._bindFlag++;
     }
   }
-  getColorAttachmentLayer(index: number): number {
+  getColorAttachmentLayer(index: number) {
     return this._options.colorAttachments?.[index].layer ?? 0;
   }
-  setDepthAttachmentCubeFace(face: CubeFace): void {
+  setDepthAttachmentCubeFace(face: CubeFace) {
     const k = this._options.depthAttachment;
     if (k && k.face !== face) {
       k.face = face;
       this._bindFlag++;
     }
   }
-  getDepthAttachmentCubeFace(): CubeFace {
-    return this._options.depthAttachment?.face ?? CubeFace.PX;
+  getDepthAttachmentCubeFace() {
+    return (this._options.depthAttachment?.face as CubeFace) ?? CubeFace.PX;
   }
   setDepthAttachmentLayer(layer: number) {
     const k = this._options.depthAttachment;
@@ -192,39 +192,37 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
       this._bindFlag++;
     }
   }
-  getDepthAttachmentLayer(): number {
+  getDepthAttachmentLayer() {
     return this._options.depthAttachment?.layer ?? 0;
   }
-  getDepthAttachment(): Nullable<BaseTexture> {
+  getDepthAttachment() {
     return this._options?.depthAttachment?.texture || null;
   }
-  getColorAttachments(): BaseTexture[] {
+  getColorAttachments() {
     return this._options?.colorAttachments?.map((val) => val?.texture || null) || [];
   }
   getColorAttachment<T extends BaseTexture>(index: number): T {
     return (this.getColorAttachments()[index] as unknown as T) ?? null;
   }
-  getMSAADepthAttachment(): Nullable<GPUTexture> {
+  getMSAADepthAttachment() {
     return this._msaaDepthTexture;
   }
-  getMSAAColorAttacments(): Nullable<GPUTexture[]> {
+  getMSAAColorAttacments() {
     return this._msaaColorTextures;
   }
-  getColorFormats(): Nullable<GPUTextureFormat[]> {
+  getColorFormats() {
     return (
       this._options?.colorAttachments?.map((val) => (val.texture as WebGPUBaseTexture).gpuFormat!) ?? null
     );
   }
-  getDepthFormat(): Nullable<GPUTextureFormat> {
+  getDepthFormat() {
     return (this._options.depthAttachment?.texture as WebGPUBaseTexture)?.gpuFormat ?? null;
   }
-  bind(): boolean {
-    throw new Error('no bind operatation for WebGPU');
+  bind() {
+    return true;
   }
-  unbind(): void {
-    throw new Error('no unbind operatation for WebGPU');
-  }
-  private _init(): void {
+  unbind() {}
+  private _init() {
     if (this._options.sampleCount! > 1) {
       this._msaaColorTextures = [];
       for (const colorAttachment of this._options.colorAttachments!) {
@@ -263,7 +261,7 @@ export class WebGPUFrameBuffer extends WebGPUObject<unknown> implements FrameBuf
   isFramebuffer(): this is FrameBuffer {
     return true;
   }
-  getSampleCount(): number {
+  getSampleCount() {
     return this._options.sampleCount!;
   }
 }

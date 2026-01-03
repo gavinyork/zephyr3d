@@ -1,4 +1,3 @@
-import type { SerializableClass } from '../../serialization';
 import { getParamName } from '../common';
 import { BaseGraphNode } from '../node';
 
@@ -47,7 +46,7 @@ export class ConstantScalarNode extends BaseGraphNode {
    * Used by the serialization system to save/load node graphs.
    * Defines how to serialize the isUniform flag, parameter name, and value.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ConstantScalarNode,
       name: 'ConstantScalarNode',
@@ -133,7 +132,7 @@ export class ConstantScalarNode extends BaseGraphNode {
    * @remarks
    * Constant nodes have no validation requirements.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -141,7 +140,7 @@ export class ConstantScalarNode extends BaseGraphNode {
    *
    * @returns 'float' for scalar output
    */
-  protected getType(): string {
+  protected getType() {
     return 'float';
   }
 }
@@ -185,7 +184,7 @@ export class ConstantBooleanNode extends BaseGraphNode {
    * Used by the serialization system to save/load node graphs.
    * Defines how to serialize the isUniform flag, parameter name, and value.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ConstantBooleanNode,
       name: 'ConstantBooleanNode',
@@ -225,7 +224,7 @@ export class ConstantBooleanNode extends BaseGraphNode {
    * @remarks
    * Constant nodes have no validation requirements.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -233,7 +232,7 @@ export class ConstantBooleanNode extends BaseGraphNode {
    *
    * @returns 'bool' for scalar output
    */
-  protected getType(): string {
+  protected getType() {
     return 'bool';
   }
 }
@@ -339,7 +338,7 @@ export class ConstantVec2Node extends BaseGraphNode {
    * @remarks
    * Used by the serialization system to save/load node graphs.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ConstantVec2Node,
       name: 'ConstantVec2Node',
@@ -397,7 +396,7 @@ export class ConstantVec2Node extends BaseGraphNode {
    * @remarks
    * Constant nodes have no validation requirements.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -406,7 +405,7 @@ export class ConstantVec2Node extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for component outputs (id \> 1), 'vec2' for the full vector
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec2';
   }
 }
@@ -478,7 +477,7 @@ export class ConstantBVec2Node extends BaseGraphNode {
    * @remarks
    * Used by the serialization system to save/load node graphs.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ConstantBVec2Node,
       name: 'ConstantBVec2Node',
@@ -516,7 +515,7 @@ export class ConstantBVec2Node extends BaseGraphNode {
    * @remarks
    * Constant nodes have no validation requirements.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -525,7 +524,7 @@ export class ConstantBVec2Node extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'bool' for component outputs (id \> 1), 'bvec2' for the full vector
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'bool' : 'bvec2';
   }
 }
@@ -647,7 +646,7 @@ export class ConstantVec3Node extends BaseGraphNode {
    * Used by the serialization system to save/load node graphs.
    * Includes an 'rgb' property for color picker integration.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ConstantVec3Node,
       name: 'ConstantVec3Node',
@@ -729,7 +728,7 @@ export class ConstantVec3Node extends BaseGraphNode {
    * @remarks
    * Constant nodes have no validation requirements.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -738,7 +737,7 @@ export class ConstantVec3Node extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for component outputs (id \> 1), 'vec3' for the full vector
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec3';
   }
 }
@@ -824,7 +823,7 @@ export class ConstantBVec3Node extends BaseGraphNode {
    * Used by the serialization system to save/load node graphs.
    * Includes an 'rgb' property for color picker integration.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ConstantBVec3Node,
       name: 'ConstantBVec3Node',
@@ -872,7 +871,7 @@ export class ConstantBVec3Node extends BaseGraphNode {
    * @remarks
    * Constant nodes have no validation requirements.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -881,7 +880,7 @@ export class ConstantBVec3Node extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'bool' for component outputs (id \> 1), 'bvec3' for the full vector
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'bool' : 'bvec3';
   }
 }
@@ -1016,7 +1015,7 @@ export class ConstantVec4Node extends BaseGraphNode {
    * Used by the serialization system to save/load node graphs.
    * Includes an 'rgba' property for color picker integration with alpha channel.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ConstantVec4Node,
       name: 'ConstantVec4Node',
@@ -1110,7 +1109,7 @@ export class ConstantVec4Node extends BaseGraphNode {
    * @remarks
    * Constant nodes have no validation requirements.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -1119,7 +1118,7 @@ export class ConstantVec4Node extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for component outputs (id \> 1), 'vec4' for the full vector
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec4';
   }
 }
@@ -1220,7 +1219,7 @@ export class ConstantBVec4Node extends BaseGraphNode {
    * Used by the serialization system to save/load node graphs.
    * Includes an 'rgba' property for color picker integration with alpha channel.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ConstantBVec4Node,
       name: 'ConstantBVec4Node',
@@ -1278,7 +1277,7 @@ export class ConstantBVec4Node extends BaseGraphNode {
    * @remarks
    * Constant nodes have no validation requirements.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -1287,7 +1286,7 @@ export class ConstantBVec4Node extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'bool' for component outputs (id \> 1), 'bvec4' for the full vector
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'bool' : 'bvec4';
   }
 }

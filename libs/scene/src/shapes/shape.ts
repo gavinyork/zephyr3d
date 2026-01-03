@@ -15,7 +15,7 @@ export interface ShapeCreationOptions {
   /** true if we need to calculate texture coordinates for the shape */
   needUV?: boolean;
   /** Transform matrix for the shape */
-  transform?: Matrix4x4;
+  transform?: Nullable<Matrix4x4>;
 }
 
 /**
@@ -29,7 +29,8 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
   static _defaultOptions = {
     needNormal: true,
     needTangent: true,
-    needUV: true
+    needUV: true,
+    transform: null
   };
   protected _options!: DeepRequireOptionals<T>;
   /**
@@ -48,7 +49,7 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     uv1: number[],
     uv2: number[],
     normal: number[]
-  ): number[] {
+  ) {
     const dp1 = new Vector3(v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]);
     const dp2 = new Vector3(v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]);
 
@@ -156,7 +157,12 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     return true;
   }
   /** @internal */
-  protected static _transform(matrix: Matrix4x4, vertices: number[], normals: number[], offset: number) {
+  protected static _transform(
+    matrix: Nullable<Matrix4x4> | undefined,
+    vertices: number[],
+    normals: number[],
+    offset: number
+  ) {
     if (matrix) {
       const tmpVec = new Vector3();
       for (let i = offset; i < vertices.length - 2; i += 3) {

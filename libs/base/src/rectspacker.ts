@@ -42,7 +42,7 @@ export class RectsPacker {
     this._bins = [new Bin(this._width, this._height)];
   }
   /** Clear all image bins of the packer */
-  clear(): void {
+  clear() {
     this._bins = [new Bin(this._width, this._height)];
   }
   /**
@@ -51,7 +51,7 @@ export class RectsPacker {
    * @param height - Height of the rectangle.
    * @returns The pack result.
    */
-  insert(width: number, height: number): Nullable<PackRect> {
+  insert(width: number, height: number) {
     if (width > this._width || height > this._height) {
       return null;
     }
@@ -87,7 +87,7 @@ class Bin {
   constructor(width: number, height: number) {
     this.freeRects = [{ x: 0, y: 0, width, height }];
   }
-  insert(width: number, height: number): Nullable<Rect> {
+  insert(width: number, height: number) {
     const newRect = this.findBestFit(width, height);
     if (!newRect) {
       return null;
@@ -105,7 +105,7 @@ class Bin {
     this.pruneFreeRects();
     return newRect;
   }
-  private findBestFit(width: number, height: number): Nullable<Rect> {
+  private findBestFit(width: number, height: number) {
     let score = Number.MAX_VALUE;
     let rect: Nullable<Rect> = null;
     for (const freeRect of this.freeRects) {
@@ -123,7 +123,7 @@ class Bin {
     }
     return rect;
   }
-  private splitFreeRect(free: Rect, used: Rect): boolean {
+  private splitFreeRect(free: Rect, used: Rect) {
     if (
       used.x >= free.x + free.width ||
       used.x + used.width <= free.x ||
@@ -170,7 +170,7 @@ class Bin {
     }
     return true;
   }
-  private pruneFreeRects(): void {
+  private pruneFreeRects() {
     let i = 0;
     let j = 0;
     let len = this.freeRects.length;
@@ -195,7 +195,7 @@ class Bin {
       i++;
     }
   }
-  private isRectInRect(test: Rect, container: Rect): boolean {
+  private isRectInRect(test: Rect, container: Rect) {
     return (
       test.x >= container.x &&
       test.y >= container.y &&

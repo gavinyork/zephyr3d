@@ -2,7 +2,7 @@ import { WebGPUObject } from './gpuobject_webgpu';
 import { textureWrappingMap, textureFilterMap, compareFuncMap } from './constants_webgpu';
 import type { SamplerOptions, TextureSampler } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
-import type { Nullable, RequireOptionals } from '@zephyr3d/base';
+import type { RequireOptionals } from '@zephyr3d/base';
 
 export class WebGPUTextureSampler extends WebGPUObject<GPUSampler> implements TextureSampler<GPUSampler> {
   private readonly _options: RequireOptionals<SamplerOptions>;
@@ -25,7 +25,7 @@ export class WebGPUTextureSampler extends WebGPUObject<GPUSampler> implements Te
     );
     this._load();
   }
-  get hash(): Nullable<number> {
+  get hash() {
     return this._object ? this._device.gpuGetObjectHash(this._object) : 0;
   }
   get addressModeU() {
@@ -66,7 +66,7 @@ export class WebGPUTextureSampler extends WebGPUObject<GPUSampler> implements Te
       this._load();
     }
   }
-  private _load(): boolean {
+  private _load() {
     this._object = this._device.gpuCreateSampler({
       addressModeU: textureWrappingMap[this._options.addressU],
       addressModeV: textureWrappingMap[this._options.addressV],

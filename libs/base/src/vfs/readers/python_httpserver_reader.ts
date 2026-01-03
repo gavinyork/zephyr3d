@@ -22,7 +22,7 @@ import type { FileMetadata } from '../vfs';
 export class PythonHttpServerReader implements HttpDirectoryReader {
   readonly name = 'python-http-server';
 
-  async canHandle(dirPath: string, ctx: HttpDirectoryReaderContext): Promise<boolean> {
+  async canHandle(dirPath: string, ctx: HttpDirectoryReaderContext) {
     try {
       const res = await ctx.fetch(dirPath, { method: 'GET', headers: { Accept: 'text/html' } });
       if (!res.ok) {
@@ -36,7 +36,7 @@ export class PythonHttpServerReader implements HttpDirectoryReader {
     }
   }
 
-  async readOnce(dirPath: string, ctx: HttpDirectoryReaderContext): Promise<FileMetadata[]> {
+  async readOnce(dirPath: string, ctx: HttpDirectoryReaderContext) {
     const res = await ctx.fetch(dirPath, { method: 'GET', headers: { Accept: 'text/html,*/*' } });
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} for ${dirPath}`);
@@ -111,7 +111,7 @@ export class PythonHttpServerReader implements HttpDirectoryReader {
   }
 }
 
-function tryParsePythonSize(s: string): number | null {
+function tryParsePythonSize(s: string) {
   const m1 = s.match(/\b(\d+(?:\.\d+)?)\s*(K|KB|M|MB|G|GB|T|TB|P|PB)\b/i);
   if (m1) {
     const n = parseFloat(m1[1]);
@@ -140,7 +140,7 @@ function tryParsePythonSize(s: string): number | null {
   return null;
 }
 
-function tryParsePythonDate(s: string): Date | null {
+function tryParsePythonDate(s: string) {
   // Default date format of Python output "YYYY-MM-DD HH:MM" 或 "YYYY-MM-DD HH:MM:SS"
   const m = s.match(/\b(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?\b/);
   if (m) {

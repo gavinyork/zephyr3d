@@ -390,7 +390,7 @@ export class ClusteredLight {
     }
     device.popDeviceStates();
   }
-  private getVisibleLights(renderQueue: RenderQueue, lights: Float32Array): number {
+  private getVisibleLights(renderQueue: RenderQueue, lights: Float32Array) {
     const numLights = Math.min(renderQueue.unshadowedLights.length, MAX_CLUSTERED_LIGHTS);
     for (let i = 1; i <= numLights; i++) {
       const light = renderQueue.unshadowedLights[i - 1];

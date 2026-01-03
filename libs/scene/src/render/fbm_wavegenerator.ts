@@ -1,4 +1,4 @@
-import type { AABB } from '@zephyr3d/base';
+import type { AABB, Immutable } from '@zephyr3d/base';
 import { Disposable, Vector2 } from '@zephyr3d/base';
 import type { WaveGenerator } from './wavegenerator';
 import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
@@ -32,7 +32,7 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
     this._lacunarity = 1.83;
     this._gain = 0.57;
   }
-  clone(): this {
+  clone() {
     const other = new FBMWaveGenerator();
     other.numOctaves = this.numOctaves;
     other.wind = this.wind;
@@ -44,40 +44,40 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
     return this._version;
   }
   /** Number of octaves */
-  get numOctaves(): number {
+  get numOctaves() {
     return this._numOctaves;
   }
-  set numOctaves(val: number) {
+  set numOctaves(val) {
     if (val !== this.numOctaves) {
       this._numOctaves = val;
       this._version++;
     }
   }
   /** Wave amplitude */
-  get amplitude(): number {
+  get amplitude() {
     return this._amplitude;
   }
-  set amplitude(val: number) {
+  set amplitude(val) {
     if (val !== this._amplitude) {
       this._amplitude = val;
       this._version++;
     }
   }
   /** Wave frequency */
-  get frequency(): number {
+  get frequency() {
     return this._frequency;
   }
-  set frequency(val: number) {
+  set frequency(val) {
     if (val !== this._frequency) {
       this._frequency = val;
       this._version++;
     }
   }
   /** Wind velocity */
-  get wind(): Vector2 {
+  get wind(): Immutable<Vector2> {
     return this._windVelocity;
   }
-  set wind(val: Vector2) {
+  set wind(val: Immutable<Vector2>) {
     if (!val.equalsTo(this._windVelocity)) {
       this._windVelocity.set(val);
       this._version++;
@@ -158,7 +158,16 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
         this.$return(this.normal);
       }
     );
-    return scope[funcName](worldPos, time, windVelocity, amplitude, frequency, gain, lacunarity, numOctaves);
+    return scope[funcName](
+      worldPos,
+      time,
+      windVelocity,
+      amplitude,
+      frequency,
+      gain,
+      lacunarity,
+      numOctaves
+    ) as PBShaderExp;
   }
   /** @internal */
   private calcWaveHeight(
@@ -226,7 +235,15 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
         this.$return(pb.mul(this.height, this.amplitude));
       }
     );
-    return scope[funcName](worldPos, windVelocity, amplitude, frequency, gain, lacunarity, numOctaves);
+    return scope[funcName](
+      worldPos,
+      windVelocity,
+      amplitude,
+      frequency,
+      gain,
+      lacunarity,
+      numOctaves
+    ) as PBShaderExp;
   }
   /** @internal */
   private fbm(
@@ -268,10 +285,10 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
         this.$return(pb.div(this.a, this.c));
       }
     );
-    return scope[funcName](st, frequency, gain, lacunarity, numOctaves);
+    return scope[funcName](st, frequency, gain, lacunarity, numOctaves) as PBShaderExp;
   }
   /** {@inheritDoc WaveGenerator.update} */
-  update(): void {}
+  update() {}
   /** {@inheritDoc WaveGenerator.needUpdate} */
   needUpdate() {
     return false;
@@ -283,7 +300,7 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
     outAABB.maxPoint.setXYZ(maxX, y + maxHeight, maxZ);
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormal} */
-  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
+  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp) {
     const pb = scope.$builder;
     const that = this;
     pb.func('calcFragmentNormal', [pb.vec2('xz')], function () {
@@ -300,14 +317,14 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
       );
       this.$return(this.normal);
     });
-    return scope.calcFragmentNormal(xz);
+    return scope.calcFragmentNormal(xz) as PBShaderExp;
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormalAndFoam} */
-  calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
+  calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp) {
     return scope.$builder.vec4(this.calcFragmentNormal(scope, xz), 0);
   }
   /** {@inheritDoc WaveGenerator.setupUniforms} */
-  setupUniforms(scope: PBGlobalScope, uniformGroup: number): void {
+  setupUniforms(scope: PBGlobalScope, uniformGroup: number) {
     const pb = scope.$builder;
     scope.numOctaves = pb.int().uniform(uniformGroup);
     scope.windVelocity = pb.vec2().uniform(uniformGroup);
@@ -361,11 +378,11 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
     inPos: PBShaderExp,
     outPos: PBShaderExp,
     outNormal: PBShaderExp
-  ): void {
+  ) {
     this.calcNormalAndPos(scope, inPos, outPos, outNormal);
   }
   /** {@inheritDoc WaveGenerator.applyWaterBindGroup} */
-  applyWaterBindGroup(bindGroup: BindGroup): void {
+  applyWaterBindGroup(bindGroup: BindGroup) {
     bindGroup.setValue('numOctaves', this._numOctaves);
     bindGroup.setValue('windVelocity', this._windVelocity);
     bindGroup.setValue('waveAmplitude', this._amplitude);
@@ -374,11 +391,11 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
     bindGroup.setValue('waveLacunarity', this._lacunarity);
   }
   /** {@inheritDoc WaveGenerator.isOk} */
-  isOk(): boolean {
+  isOk() {
     return true;
   }
   /** {@inheritDoc WaveGenerator.getHash} */
-  getHash(): string {
+  getHash() {
     return 'FBMWaveGenerator';
   }
 }

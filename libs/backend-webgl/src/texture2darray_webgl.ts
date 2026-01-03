@@ -22,7 +22,7 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
   isTexture2DArray(): this is Texture2DArray {
     return true;
   }
-  init(): void {
+  init() {
     this.loadEmpty(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
   }
   update(
@@ -33,7 +33,7 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
     width: number,
     height: number,
     depth: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
@@ -62,7 +62,7 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
       this.generateMipmaps();
     }
   }
-  createWithMipmapData(data: TextureMipmapData, creationFlags?: number): void {
+  createWithMipmapData(data: TextureMipmapData, creationFlags?: number) {
     if (!data.arraySize) {
       console.error('Texture2DArray.createWithMipmapData() failed: Data is not texture array');
     } else {
@@ -76,7 +76,7 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
       }
     }
   }
-  private loadLevels(levels: TextureMipmapData): void {
+  private loadLevels(levels: TextureMipmapData) {
     const format = levels.format;
     const width = levels.width;
     const height = levels.height;
@@ -152,7 +152,7 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
     y: number,
     width: number,
     height: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
@@ -204,13 +204,7 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
       this.generateMipmaps();
     }
   }
-  createEmpty(
-    format: TextureFormat,
-    width: number,
-    height: number,
-    depth: number,
-    creationFlags?: number
-  ): void {
+  createEmpty(format: TextureFormat, width: number, height: number, depth: number, creationFlags?: number) {
     this._flags = Number(creationFlags) || 0;
     if (this._flags & GPUResourceUsageFlags.TF_WRITABLE) {
       console.error(new Error('webgl device does not support storage texture'));
@@ -234,7 +228,7 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
     layer: number,
     mipLevel: number,
     buffer: TypedArray
-  ): Promise<void> {
+  ) {
     if (layer < 0 || layer >= this._depth) {
       throw new Error(`Texture2DArray.readPixels(): invalid layer: ${layer}`);
     }
@@ -258,7 +252,7 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
     layer: number,
     mipLevel: number,
     buffer: GPUDataBuffer
-  ): void {
+  ) {
     if (layer < 0 || layer >= this._depth) {
       throw new Error(`Texture2DArray.readPixelsToBuffer(): invalid layer: ${layer}`);
     }
@@ -281,7 +275,7 @@ export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DAr
     height: number,
     depth: number,
     numMipLevels: number
-  ): void {
+  ) {
     this.allocInternal(format, width, height, depth, numMipLevels);
     if (this._mipLevelCount > 1 && !this._device.isContextLost()) {
       this.generateMipmaps();

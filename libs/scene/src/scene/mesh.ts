@@ -101,25 +101,25 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc Drawable.getName}
    */
-  getName(): string {
+  getName() {
     return this._name;
   }
   /**
    * {@inheritDoc BatchDrawable.getInstanceId}
    */
-  getInstanceId(_renderPass: RenderPass): string {
+  getInstanceId(_renderPass: RenderPass) {
     return `${this._instanceHash}:${this.worldMatrixDet >= 0}`;
   }
   /**
    * {@inheritDoc BatchDrawable.getInstanceUniforms}
    */
-  getInstanceUniforms(): Float32Array<ArrayBuffer> {
+  getInstanceUniforms() {
     return this._material.get()!.$instanceUniforms;
   }
   /**
    * {@inheritDoc Drawable.getPickTarget }
    */
-  getPickTarget(): PickTarget {
+  getPickTarget() {
     return this._pickTarget;
   }
   setPickTarget(node: SceneNode, label?: string) {
@@ -128,7 +128,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   get skeletonName() {
     return this._skeletonName;
   }
-  set skeletonName(name: string) {
+  set skeletonName(name) {
     if (name !== this._skeletonName) {
       this._skeletonName = name;
       this.updateSkeletonState();
@@ -142,21 +142,21 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   get skinAnimation() {
     return this._skinAnimation;
   }
-  set skinAnimation(val: boolean) {
+  set skinAnimation(val) {
     this._skinAnimation = val;
   }
   /** @internal */
   get morphAnimation() {
     return this._morphAnimation;
   }
-  set morphAnimation(val: boolean) {
+  set morphAnimation(val) {
     this._morphAnimation = val;
   }
   /** Wether the mesh node casts shadows */
-  get castShadow(): boolean {
+  get castShadow() {
     return this._castShadow;
   }
-  set castShadow(b: boolean) {
+  set castShadow(b) {
     this._castShadow = b;
   }
   /** Primitive of the mesh */
@@ -327,7 +327,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc Drawable.getMorphInfo}
    */
-  getMorphInfo(): Nullable<MorphInfo> {
+  getMorphInfo() {
     return this._morphInfo;
   }
   /** {@inheritDoc SceneNode.update} */
@@ -349,25 +349,25 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc Drawable.getQueueType}
    */
-  getQueueType(): number {
+  getQueueType() {
     return this.material?.getQueueType() ?? QUEUE_OPAQUE;
   }
   /**
    * {@inheritDoc Drawable.isUnlit}
    */
-  isUnlit(): boolean {
+  isUnlit() {
     return !this.material?.supportLighting();
   }
   /**
    * {@inheritDoc Drawable.needSceneColor}
    */
-  needSceneColor(): boolean {
+  needSceneColor() {
     return this.material?.needSceneColor() ?? false;
   }
   /**
    * {@inheritDoc Drawable.needSceneDepth}
    */
-  needSceneDepth(): boolean {
+  needSceneDepth() {
     return this.material?.needSceneDepth() ?? false;
   }
   /** @internal */
@@ -422,30 +422,30 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc Drawable.getMaterial}
    */
-  getMaterial(): Nullable<MeshMaterial> {
+  getMaterial() {
     return this.material;
   }
   /**
    * {@inheritDoc Drawable.getPrimitive}
    */
-  getPrimitive(): Nullable<Primitive> {
+  getPrimitive() {
     return this.primitive;
   }
   /**
    * {@inheritDoc Drawable.getBoneMatrices}
    */
-  getBoneMatrices(): Nullable<Texture2D> {
+  getBoneMatrices() {
     return this._boneMatrices.get();
   }
   /**
    * {@inheritDoc Drawable.getNode}
    */
-  getNode(): SceneNode {
+  getNode() {
     // mesh transform should be ignored when skinned
     return this;
   }
   /** @internal */
-  computeBoundingVolume(): Nullable<BoundingVolume> {
+  computeBoundingVolume() {
     let bbox: Nullable<BoundingVolume>;
     if (this._animatedBoundingBox) {
       bbox = this._animatedBoundingBox;
@@ -473,7 +473,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   private static _defaultMaterial: Nullable<MeshMaterial> = null;
   /** @internal */
-  private static _getDefaultMaterial(): MeshMaterial {
+  private static _getDefaultMaterial() {
     if (!this._defaultMaterial) {
       this._defaultMaterial = new LambertMaterial();
     }

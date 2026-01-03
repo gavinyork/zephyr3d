@@ -34,13 +34,13 @@ export class WeightedBlendedOIT extends Disposable implements OIT {
   /**
    * {@inheritDoc OIT.getType}
    */
-  getType(): string {
+  getType() {
     return WeightedBlendedOIT.type;
   }
   /**
    * {@inheritDoc OIT.supportDevice}
    */
-  supportDevice(_deviceType: string): boolean {
+  supportDevice(_deviceType: string) {
     return true;
   }
   /**
@@ -52,7 +52,7 @@ export class WeightedBlendedOIT extends Disposable implements OIT {
   /**
    * {@inheritDoc OIT.begin}
    */
-  begin(_ctx: DrawContext): number {
+  begin(_ctx: DrawContext) {
     return 1;
   }
   /**
@@ -72,7 +72,7 @@ export class WeightedBlendedOIT extends Disposable implements OIT {
   /**
    * {@inheritDoc OIT.beginPass}
    */
-  beginPass(ctx: DrawContext, _pass: number): boolean {
+  beginPass(ctx: DrawContext, _pass: number) {
     const device = ctx.device;
     const accumBuffer = this.getAccumFramebuffer(ctx, device);
     device.pushDeviceStates();
@@ -93,7 +93,7 @@ export class WeightedBlendedOIT extends Disposable implements OIT {
   /**
    * {@inheritDoc OIT.calculateHash}
    */
-  calculateHash(): string {
+  calculateHash() {
     return this.getType();
   }
   /**

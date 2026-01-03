@@ -9,7 +9,7 @@ export class GlobalBindGroupAllocator {
   constructor() {
     this._bindGroups = {};
   }
-  static get(): GlobalBindGroupAllocator {
+  static get() {
     return this._allocators.pop() ?? new GlobalBindGroupAllocator();
   }
   static release(allocator: GlobalBindGroupAllocator) {
@@ -20,7 +20,7 @@ export class GlobalBindGroupAllocator {
    * @param ctx - Draw context
    * @returns Global bind group
    */
-  getGlobalBindGroup(ctx: DrawContext): BindGroup {
+  getGlobalBindGroup(ctx: DrawContext) {
     const hash = ctx.renderPassHash!;
     let bindGroup = this._bindGroups[hash];
     if (!bindGroup) {

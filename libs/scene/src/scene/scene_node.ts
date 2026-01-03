@@ -203,7 +203,6 @@ export class SceneNode
     this._pickable = false;
     this._gpuPickable = true;
     this._placeToOctree = true;
-    this._parent = null;
     this._sealed = false;
     this._children = [];
     this._transformChangeCallback = () => this._onTransformChanged(true);
@@ -223,9 +222,8 @@ export class SceneNode
     this._tmpWorldMatrix = Matrix4x4.identity();
     this._script = '';
     this._metaData = null;
-    if (scene && this !== scene.rootNode) {
-      this.reparent(scene.rootNode);
-    }
+    this._parent = null;
+    this.reparent(scene?.rootNode ?? null);
   }
   /**
    * Whether the node should be inserted into the scene's spatial structure.
@@ -233,10 +231,10 @@ export class SceneNode
    * @remarks
    * Toggling this hints the scene to (re)place the node in octree/acceleration structures.
    */
-  get placeToOctree(): boolean {
+  get placeToOctree() {
     return this._placeToOctree;
   }
-  set placeToOctree(val: boolean) {
+  set placeToOctree(val) {
     if (!!val !== this._placeToOctree) {
       this._placeToOctree = !!val;
       if (this.isGraphNode()) {
@@ -357,7 +355,7 @@ export class SceneNode
   /**
    * Whether this node is currently attached under the scene's root.
    */
-  get attached(): boolean {
+  get attached() {
     if (!this._scene) {
       return false;
     }
@@ -371,10 +369,10 @@ export class SceneNode
    * If true, the node is logically sealed; some operations (like cloning as child)
    * may be restricted by engine policies.
    */
-  get sealed(): boolean {
+  get sealed() {
     return this._sealed;
   }
-  set sealed(val: boolean) {
+  set sealed(val) {
     this._sealed = val;
   }
   /**
@@ -440,7 +438,7 @@ export class SceneNode
    * @param child - The node to be checked
    * @returns true if the given node is a direct child of this node, false otherwise
    */
-  hasChild(child: SceneNode): boolean {
+  hasChild(child: SceneNode) {
     return child && child.parent === this;
   }
   /**
@@ -454,7 +452,7 @@ export class SceneNode
   /**
    * Whether this node is an ancestor (direct or indirect) of the given node.
    */
-  isParentOf(child: SceneNode): boolean {
+  isParentOf(child: Nullable<SceneNode>) {
     while (child && child !== this) {
       child = child.parent!;
     }
@@ -474,7 +472,7 @@ export class SceneNode
    *
    * @param v - Visitor invoked on each node.
    */
-  traverse(v: Visitor<SceneNode>): void {
+  traverse(v: Visitor<SceneNode>) {
     v.visit(this);
     for (const child of this._children) {
       child.get()!.traverse(v);
@@ -488,7 +486,7 @@ export class SceneNode
    * @param callback - Called for each node; if returns true, iteration stops.
    * @returns true if iteration was aborted early.
    */
-  iterate(callback: NodeIterateFunc): boolean {
+  iterate(callback: NodeIterateFunc) {
     if (callback(this)) {
       return true;
     }
@@ -507,7 +505,7 @@ export class SceneNode
    * @param callback - Called for each node; if returns true, iteration stops.
    * @returns true if iteration was aborted early.
    */
-  iterateBottomToTop(callback: NodeIterateFunc): boolean {
+  iterateBottomToTop(callback: NodeIterateFunc) {
     for (let i = this._children.length - 1; i >= 0; i--) {
       const child = this._children[i];
       if (child.get()!.iterateBottomToTop(callback)) {
@@ -629,14 +627,14 @@ export class SceneNode
     }
   }
   /** Clip mode */
-  get clipTestEnabled(): boolean {
+  get clipTestEnabled() {
     return this._clipMode;
   }
-  set clipTestEnabled(val: boolean) {
+  set clipTestEnabled(val) {
     this._clipMode = val;
   }
   /** Computed value of show state */
-  get hidden(): boolean {
+  get hidden() {
     let node: Nullable<SceneNode> = this;
     while (node && node._visible === 'inherit') {
       node = node.parent;
@@ -644,10 +642,10 @@ export class SceneNode
     return node ? node._visible === 'hidden' : false;
   }
   /** Show state */
-  get showState(): SceneNodeVisible {
+  get showState() {
     return this._visible;
   }
-  set showState(val: SceneNodeVisible) {
+  set showState(val) {
     if (val !== this._visible) {
       const prevHidden = this.hidden;
       this._visible = val;
@@ -665,17 +663,17 @@ export class SceneNode
     }
   }
   /** Whether this node is enabled for CPU picking */
-  get pickable(): boolean {
+  get pickable() {
     return this._pickable;
   }
-  set pickable(val: boolean) {
+  set pickable(val) {
     this._pickable = !!val;
   }
   /** Whether this node is enabled for GPU picking */
-  get gpuPickable(): boolean {
+  get gpuPickable() {
     return this._gpuPickable;
   }
-  set gpuPickable(val: boolean) {
+  set gpuPickable(val) {
     this._gpuPickable = !!val;
   }
   /**
@@ -700,7 +698,7 @@ export class SceneNode
    * @param id - Persistent identifier to match against `Skeleton.persistentId`.
    * @returns The first matchign node, or `null` if not found.
    */
-  findSkeletonById(id: string): Nullable<Skeleton> {
+  findSkeletonById(id: string) {
     const prefabNode = this.getPrefabNode() ?? this;
     let sk: Nullable<DRef<Skeleton>> = null;
     prefabNode.iterate((node) => {
@@ -746,10 +744,10 @@ export class SceneNode
     return this._boxDrawMode;
   }
   /** Bounding box draw mode */
-  get boundingBoxDrawMode(): number {
+  get boundingBoxDrawMode() {
     return this._boxDrawMode;
   }
-  set boundingBoxDrawMode(mode: number) {
+  set boundingBoxDrawMode(mode) {
     this._boxDrawMode = mode;
   }
   /** Get called when the node was just created by cloning from other node */
@@ -763,7 +761,7 @@ export class SceneNode
     this._sharedModel.dispose();
   }
   /** @internal */
-  protected _setParent(p: Nullable<SceneNode>): void {
+  protected _setParent(p: Nullable<SceneNode>) {
     if (p && p._scene !== this._scene) {
       throw new Error('Parent node and child node must belongs to the same scene');
     }
@@ -799,7 +797,7 @@ export class SceneNode
     }
   }
   /** @internal */
-  protected _onTransformChanged(invalidateLocal: boolean): void {
+  protected _onTransformChanged(invalidateLocal: boolean) {
     if (this._disableCallback) {
       return;
     }
@@ -819,20 +817,20 @@ export class SceneNode
   /**
    * Get called when this node is attached to scene
    */
-  protected _onAttached(): void {}
+  protected _onAttached() {}
   /**
    * Get called when this node is detached from scene
    */
-  protected _onDetached(): void {}
+  protected _onDetached() {}
   /** @internal */
-  protected _attached(): void {
+  protected _attached() {
     this.iterate((child) => {
       this.scene!.queueUpdateNode(child);
       child._onAttached();
     });
   }
   /** @internal */
-  protected _detached(): void {
+  protected _detached() {
     this.iterate((child) => {
       child._onDetached();
     });
@@ -847,18 +845,18 @@ export class SceneNode
     }
   }
   /** @internal */
-  protected _visibleChanged(): void {}
+  protected _visibleChanged() {}
   /** Parent of the xform */
   get parent() {
     return this._parent;
   }
-  set parent(p: Nullable<SceneNode>) {
+  set parent(p) {
     if (p !== this._parent) {
       this._setParent(p);
     }
   }
   /** Children of this xform */
-  get children(): DRef<SceneNode>[] {
+  get children() {
     return this._children;
   }
   /**
@@ -882,7 +880,7 @@ export class SceneNode
   /**
    * Rotation of the xform
    */
-  get rotation() {
+  get rotation(): Quaternion {
     return this._rotation;
   }
   set rotation(val: Quaternion) {
@@ -954,7 +952,7 @@ export class SceneNode
    * Gets the position of the xform in world space
    * @returns position of the xform in world space
    */
-  getWorldPosition(outPos?: Vector3): Vector3 {
+  getWorldPosition(outPos?: Vector3) {
     return (
       outPos?.setXYZ(this.worldMatrix.m03, this.worldMatrix.m13, this.worldMatrix.m23) ??
       new Vector3(this.worldMatrix.m03, this.worldMatrix.m13, this.worldMatrix.m23)
@@ -965,7 +963,7 @@ export class SceneNode
    * @param delta - The offset vector
    * @returns self
    */
-  moveBy(delta: Vector3): this {
+  moveBy(delta: Vector3) {
     this._position.addBy(delta);
     return this;
   }
@@ -974,7 +972,7 @@ export class SceneNode
    * @param factor - The scale factor
    * @returns self
    */
-  scaleBy(factor: Vector3): this {
+  scaleBy(factor: Vector3) {
     this._scaling.mulBy(factor);
     return this;
   }
@@ -983,7 +981,7 @@ export class SceneNode
    * @param matrix - The transform matrix to set
    * @returns self
    */
-  setLocalTransform(matrix: Matrix4x4): this {
+  setLocalTransform(matrix: Matrix4x4) {
     this._disableCallback = true;
     matrix.decompose(this._scaling, this._rotation, this._position);
     this._disableCallback = false;
@@ -998,7 +996,7 @@ export class SceneNode
     }
     return this._localMatrix;
   }
-  set localMatrix(matrix: Matrix4x4) {
+  set localMatrix(matrix: Immutable<Matrix4x4>) {
     this.setLocalTransform(matrix);
   }
   /** World transformation matrix of the xform */
@@ -1089,7 +1087,7 @@ export class SceneNode
     return this;
   }
   /** @internal */
-  get transformTag(): number {
+  get transformTag() {
     return this._transformTag;
   }
 }

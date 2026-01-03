@@ -1,7 +1,7 @@
 import { GraphNode, type EmitterBehavior, type EmitterShape } from '../../../scene';
 import type { SceneNode } from '../../../scene/scene_node';
 import { ParticleSystem } from '../../../scene/particlesys';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import { ParticleMaterial } from '../../../material';
 
 /** @internal */
@@ -16,7 +16,7 @@ export function getParticleNodeClass(): SerializableClass {
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'WorldSpace',
           type: 'bool',
@@ -339,7 +339,7 @@ export function getParticleNodeClass(): SerializableClass {
             }
           }
         }
-      ];
+      ]);
     }
   };
 }

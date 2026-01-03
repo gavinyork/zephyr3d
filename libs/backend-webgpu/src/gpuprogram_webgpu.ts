@@ -4,8 +4,6 @@ import type {
   ComputeProgramConstructParams,
   GPUProgram,
   BindGroupLayout,
-  BindPointInfo,
-  StructuredBuffer,
   PBStructTypeInfo,
   ShaderKind
 } from '@zephyr3d/device';
@@ -46,16 +44,16 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     this._load();
     this._hash = String(++WebGPUProgram._hashCounter);
   }
-  get type(): 'render' | 'compute' {
+  get type() {
     return this._type;
   }
-  get label(): string {
+  get label() {
     return this._label;
   }
-  getCompileError(): string {
+  getCompileError() {
     return this._error;
   }
-  getShaderSource(kin: ShaderKind): string {
+  getShaderSource(kin: ShaderKind) {
     switch (kin) {
       case 'vertex':
         return this._vs;
@@ -63,9 +61,11 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
         return this._fs;
       case 'compute':
         return this._cs;
+      default:
+        return null;
     }
   }
-  getBindingInfo(name: string): Nullable<BindPointInfo> {
+  getBindingInfo(name: string) {
     for (let group = 0; group < this._bindGroupLayouts.length; group++) {
       const layout = this._bindGroupLayouts[group];
       const bindName = layout.nameMap?.[name] ?? name;
@@ -85,21 +85,16 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   get bindGroupLayouts(): Immutable<BindGroupLayout[]> {
     return this._bindGroupLayouts;
   }
-  get vertexAttributes(): string {
+  get vertexAttributes() {
     return this._vertexAttributes;
   }
-  get hash(): string {
+  get hash() {
     return this._hash;
   }
-  getPipelineLayout(): GPUPipelineLayout {
+  getPipelineLayout() {
     return this._pipelineLayout;
   }
-  getShaderModule(): {
-    vsModule: GPUShaderModule;
-    fsModule: GPUShaderModule;
-    csModule: GPUShaderModule;
-    pipelineLayout: GPUPipelineLayout;
-  } {
+  getShaderModule() {
     return {
       vsModule: this._vsModule,
       fsModule: this._fsModule,
@@ -107,7 +102,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
       pipelineLayout: this._pipelineLayout
     };
   }
-  get fsModule(): GPUShaderModule {
+  get fsModule() {
     return this._fsModule;
   }
   destroy() {
@@ -121,7 +116,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   isProgram(): this is GPUProgram {
     return true;
   }
-  createUniformBuffer(uniform: string): Nullable<StructuredBuffer<unknown>> {
+  createUniformBuffer(uniform: string) {
     const type = this.getBindingInfo(uniform)?.type as PBStructTypeInfo;
     return type ? this.device.createStructuredBuffer(type, { usage: 'uniform' }) : null;
   }
@@ -135,7 +130,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     this._pipelineLayout = this.createPipelineLayout(this._bindGroupLayouts);
     this._object = {};
   }
-  private createPipelineLayout(bindGroupLayouts: BindGroupLayout[]): GPUPipelineLayout {
+  private createPipelineLayout(bindGroupLayouts: BindGroupLayout[]) {
     const layouts: GPUBindGroupLayout[] = [];
     bindGroupLayouts.forEach((val) => {
       layouts.push(this._device.fetchBindGroupLayout(val)[1]);
@@ -144,7 +139,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
       bindGroupLayouts: layouts
     });
   }
-  private createShaderModule(code: string): GPUShaderModule {
+  private createShaderModule(code: string) {
     let sm: Nullable<GPUShaderModule> = this._device.device.createShaderModule({ label: this._label, code });
     if (sm) {
       const func: (this: GPUShaderModule) => Promise<GPUCompilationInfo> =
@@ -183,7 +178,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     }
     return sm;
   }
-  use(): void {
+  use() {
     this._device.setProgram(this);
   }
 }

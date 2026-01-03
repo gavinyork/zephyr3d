@@ -89,11 +89,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this.optionChanged(true);
     }
   }
-  get scatterRampTexture(): Nullable<Texture2D> {
+  get scatterRampTexture() {
     const tex = this._getScatterRampTexture(getDevice());
     return tex === WaterMaterial._defaultScatterRampTexture.get() ? null : tex;
   }
-  set scatterRampTexture(tex: Texture2D) {
+  set scatterRampTexture(tex) {
     if (tex !== this.scatterRampTexture) {
       this._scatterRampTexture.set(tex);
       this.uniformChanged();
@@ -109,40 +109,40 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this.uniformChanged();
     }
   }
-  get depthMulti(): number {
+  get depthMulti() {
     return this._depthMulti;
   }
-  set depthMulti(val: number) {
+  set depthMulti(val) {
     if (val !== this._depthMulti) {
       this._depthMulti = val;
       this.uniformChanged();
     }
   }
-  get displace(): number {
+  get displace() {
     return this._displace;
   }
-  set displace(val: number) {
+  set displace(val) {
     if (val !== this._displace) {
       this._displace = val;
       this.uniformChanged();
     }
   }
-  get refractionStrength(): number {
+  get refractionStrength() {
     return this._refractionStrength;
   }
-  set refractionStrength(val: number) {
+  set refractionStrength(val) {
     if (val !== this._refractionStrength) {
       this._refractionStrength = val;
       this.uniformChanged();
     }
   }
-  needSceneColor(): boolean {
+  needSceneColor() {
     return true;
   }
-  needSceneDepth(): boolean {
+  needSceneDepth() {
     return true;
   }
-  protected _createHash(): string {
+  protected _createHash() {
     return `${super._createHash()}:${this.waveGenerator?.getHash() ?? ''}`;
   }
   setClipmapInfo(rotation: number, scale: number, offsetX: number, offsetY: number) {
@@ -159,13 +159,13 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this.uniformChanged();
     }
   }
-  supportInstancing(): boolean {
+  supportInstancing() {
     return false;
   }
-  supportLighting(): boolean {
+  supportLighting() {
     return true;
   }
-  vertexShader(scope: PBFunctionScope): void {
+  vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
     this.waveGenerator?.setupUniforms(scope, 2);
@@ -218,7 +218,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     );
     ShaderHelper.resolveMotionVector(scope, scope.$outputs.worldPos, scope.$outputs.worldPos);
   }
-  fragmentShader(scope: PBFunctionScope): void {
+  fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     const pb = scope.$builder;
     this.waveGenerator?.setupUniforms(scope, 2);
@@ -450,7 +450,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     );
     return scope.waterShading(worldPos, worldNormal, foamFactor);
   }
-  applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void {
+  applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number) {
     super.applyUniforms(bindGroup, ctx, needUpdate, pass);
     const waveGenerator = this._waveGenerator.get();
     if (waveGenerator && this._waveVersion !== waveGenerator.version) {
@@ -458,7 +458,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this._waveVersion = waveGenerator.version;
     }
   }
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setValue('clipmapGridInfo', this._clipmapGridInfo);
     bindGroup.setValue('region', this._region);

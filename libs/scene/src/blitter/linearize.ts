@@ -30,34 +30,34 @@ export class DepthLinearizeBlitter extends Blitter {
     this._outputComponent = 0;
   }
   /** Camera near plane */
-  get near(): number {
+  get near() {
     return this._cameraNearFar.x;
   }
-  set near(val: number) {
+  set near(val) {
     this._cameraNearFar.x = val;
   }
   /** Camera far plane */
-  get far(): number {
+  get far() {
     return this._cameraNearFar.y;
   }
-  set far(val: number) {
+  set far(val) {
     this._cameraNearFar.y = val;
   }
   /** RGBA encode */
-  get rgbaEncode(): boolean {
+  get rgbaEncode() {
     return this._rgbaEncode;
   }
-  set rgbaEncode(val: boolean) {
+  set rgbaEncode(val) {
     if (this._rgbaEncode === !!val) {
       this._rgbaEncode = !!val;
       this.invalidateHash();
     }
   }
   /** Output component */
-  get outputComponent(): number {
+  get outputComponent() {
     return this._outputComponent;
   }
-  set outputComponent(val: number) {
+  set outputComponent(val) {
     if (this._outputComponent !== val) {
       this._outputComponent = val;
       this.invalidateHash();
@@ -92,7 +92,7 @@ export class DepthLinearizeBlitter extends Blitter {
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'float' | 'int' | 'uint'
-  ): PBShaderExp {
+  ) {
     const that = this;
     const pb = scope.$builder;
     const srcTexel = this.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
@@ -113,7 +113,7 @@ export class DepthLinearizeBlitter extends Blitter {
    * {@inheritDoc Blitter.calcHash}
    * @override
    */
-  protected calcHash(): string {
+  protected calcHash() {
     return `${this._rgbaEncode ? 1 : 0}-${this._outputComponent}`;
   }
 }

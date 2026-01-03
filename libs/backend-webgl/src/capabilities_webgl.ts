@@ -1082,7 +1082,7 @@ export class WebGLTextureCaps implements TextureCaps {
       }
     }
   }
-  calcMemoryUsage(format: TextureFormat, type: number, numPixels): number {
+  calcMemoryUsage(format: TextureFormat, type: number, numPixels: number) {
     switch (format) {
       case 'd16':
       case 'd24':

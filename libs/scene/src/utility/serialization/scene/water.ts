@@ -3,7 +3,7 @@ import { Vector2 } from '@zephyr3d/base';
 import type { SceneNode } from '../../../scene';
 import { GraphNode } from '../../../scene';
 import { Water } from '../../../scene/water';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import type { WaveGenerator } from '../../../render';
 import { FBMWaveGenerator, FFTWaveGenerator } from '../../../render';
 import type { Texture2D } from '@zephyr3d/device';
@@ -15,7 +15,7 @@ export function getFBMWaveGeneratorClass(): SerializableClass {
     ctor: FBMWaveGenerator,
     name: 'FBMWaveGenerator',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'NumOctaves',
           type: 'int',
@@ -67,7 +67,7 @@ export function getFBMWaveGeneratorClass(): SerializableClass {
             this.frequency = value.num[0];
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -78,7 +78,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
     ctor: FFTWaveGenerator,
     name: 'FFTWaveGenerator',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Alignment',
           type: 'float',
@@ -176,7 +176,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
             this.setWaveCroppiness(2, value.num[2]);
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -193,7 +193,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'WaveGenerator',
           type: 'object',
@@ -362,7 +362,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
             }
           }
         }
-      ];
+      ]);
     }
   };
 }

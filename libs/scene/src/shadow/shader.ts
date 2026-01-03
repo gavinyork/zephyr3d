@@ -1,11 +1,7 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { ShaderHelper } from '../material';
 
-export function computeShadowBiasCSM(
-  scope: PBInsideFunctionScope,
-  NdotL: PBShaderExp,
-  split: PBShaderExp
-): PBShaderExp {
+export function computeShadowBiasCSM(scope: PBInsideFunctionScope, NdotL: PBShaderExp, split: PBShaderExp) {
   const pb = scope.$builder;
   const depthBiasParam = ShaderHelper.getDepthBiasValues(scope);
   const splitFlags = pb.vec4(
@@ -24,7 +20,7 @@ export function computeShadowBias(
   z: PBShaderExp,
   NdotL: PBShaderExp,
   linear: boolean
-): PBShaderExp {
+) {
   const pb = scope.$builder;
   const depthBiasParam = ShaderHelper.getDepthBiasValues(scope);
   if (lightType) {

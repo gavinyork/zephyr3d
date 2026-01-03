@@ -10,7 +10,7 @@ import { PBInsideFunctionScope, PBPrimitiveType } from '@zephyr3d/device';
  *
  * @public
  */
-export function decodeFloatFromRGBA(scope: PBInsideFunctionScope, value: PBShaderExp): PBShaderExp {
+export function decodeFloatFromRGBA(scope: PBInsideFunctionScope, value: PBShaderExp) {
   const pb = scope.$builder;
   if (
     !value ||
@@ -45,7 +45,7 @@ export function decodeFloatFromRGBA(scope: PBInsideFunctionScope, value: PBShade
     // Return result
     this.$return(pb.mul(pb.sub(1.0, pb.mul(this.bitSign, 2)), this.exponent, this.mantissa));
   });
-  return scope[funcName](value);
+  return scope[funcName](value) as PBShaderExp;
 }
 
 /**
@@ -57,7 +57,7 @@ export function decodeFloatFromRGBA(scope: PBInsideFunctionScope, value: PBShade
  *
  * @public
  */
-export function encodeFloatToRGBA(scope: PBInsideFunctionScope, value: PBShaderExp | number): PBShaderExp {
+export function encodeFloatToRGBA(scope: PBInsideFunctionScope, value: PBShaderExp | number) {
   const pb = scope.$builder;
   const funcName = 'Z_EncodeFloatToRGBA';
   pb.func(funcName, [pb.float('value')], function () {
@@ -94,7 +94,7 @@ export function encodeFloatToRGBA(scope: PBInsideFunctionScope, value: PBShaderE
     this.pack.x = pb.add(this.pack.x, pb.mul(128.0, pb.float(pb.lessThan(this.value, 0)))); // Sign
     this.$return(pb.div(pb.floor(pb.add(this.pack, pb.vec4(0.5))), 255.0));
   });
-  return pb.getGlobalScope()[funcName](value);
+  return pb.getGlobalScope()[funcName](value) as PBShaderExp;
 }
 
 /**
@@ -106,7 +106,7 @@ export function encodeFloatToRGBA(scope: PBInsideFunctionScope, value: PBShaderE
  *
  * @public
  */
-export function decodeNormalizedFloatFromRGBA(scope: PBInsideFunctionScope, value: PBShaderExp): PBShaderExp {
+export function decodeNormalizedFloatFromRGBA(scope: PBInsideFunctionScope, value: PBShaderExp) {
   const pb = scope.$builder;
   if (
     !value ||
@@ -125,7 +125,7 @@ export function decodeNormalizedFloatFromRGBA(scope: PBInsideFunctionScope, valu
     this.$l.bitShift = pb.vec4(1 / (256 * 256 * 256), 1 / (256 * 256), 1 / 256, 1);
     this.$return(pb.dot(this.value, this.bitShift));
   });
-  return scope[funcName](value);
+  return scope[funcName](value) as PBShaderExp;
 }
 
 /**
@@ -137,10 +137,7 @@ export function decodeNormalizedFloatFromRGBA(scope: PBInsideFunctionScope, valu
  *
  * @public
  */
-export function encodeNormalizedFloatToRGBA(
-  scope: PBInsideFunctionScope,
-  value: PBShaderExp | number
-): PBShaderExp {
+export function encodeNormalizedFloatToRGBA(scope: PBInsideFunctionScope, value: PBShaderExp | number) {
   const pb = scope.$builder;
   const funcName = 'Z_encodeNormalizedFloatToRGBA';
   pb.func(funcName, [pb.float('value')], function () {
@@ -149,7 +146,7 @@ export function encodeNormalizedFloatToRGBA(
     this.$l.t = pb.fract(pb.mul(this.value, this.bitShift));
     this.$return(pb.sub(this.t, pb.mul(this.t.xxyz, this.bitMask)));
   });
-  return pb.getGlobalScope()[funcName](value);
+  return pb.getGlobalScope()[funcName](value) as PBShaderExp;
 }
 
 /**
@@ -166,7 +163,7 @@ export function encode2HalfToRGBA(
   scope: PBInsideFunctionScope,
   a: PBShaderExp | number,
   b: PBShaderExp | number
-): PBShaderExp {
+) {
   const pb = scope.$builder;
   const funcName = 'Z_encode2HalfToRGBA';
   pb.func(funcName, [pb.float('a'), pb.float('b')], function () {
@@ -180,7 +177,7 @@ export function encode2HalfToRGBA(
       )
     );
   });
-  return pb.getGlobalScope()[funcName](a, b);
+  return pb.getGlobalScope()[funcName](a, b) as PBShaderExp;
 }
 /**
  * Decodes two half floats that was encoded into a rgba8unorm
@@ -191,7 +188,7 @@ export function encode2HalfToRGBA(
  *
  * @public
  */
-export function decode2HalfFromRGBA(scope: PBInsideFunctionScope, value: PBShaderExp): PBShaderExp {
+export function decode2HalfFromRGBA(scope: PBInsideFunctionScope, value: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_decode2HalfFromRGBA';
   pb.func(funcName, [pb.vec4('value')], function () {
@@ -202,7 +199,7 @@ export function decode2HalfFromRGBA(scope: PBInsideFunctionScope, value: PBShade
       )
     );
   });
-  return pb.getGlobalScope()[funcName](value);
+  return pb.getGlobalScope()[funcName](value) as PBShaderExp;
 }
 
 /**
@@ -215,11 +212,7 @@ export function decode2HalfFromRGBA(scope: PBInsideFunctionScope, value: PBShade
  *
  * @public
  */
-export function encodeRGBM(
-  scope: PBInsideFunctionScope,
-  rgb: PBShaderExp,
-  maxRange: PBShaderExp | number
-): PBShaderExp {
+export function encodeRGBM(scope: PBInsideFunctionScope, rgb: PBShaderExp, maxRange: PBShaderExp | number) {
   const pb = scope.$builder;
   const funcName = 'Z_encodeRGBM';
   pb.func(funcName, [pb.vec3('rgb'), pb.float('range')], function () {
@@ -228,7 +221,7 @@ export function encodeRGBM(
     this.M = pb.div(pb.ceil(pb.mul(this.M, 255)), 255);
     this.$return(pb.vec4(pb.div(this.rgb, pb.mul(this.M, this.range)), this.M));
   });
-  return pb.getGlobalScope()[funcName](rgb, maxRange);
+  return pb.getGlobalScope()[funcName](rgb, maxRange) as PBShaderExp;
 }
 
 /**
@@ -241,17 +234,13 @@ export function encodeRGBM(
  *
  * @public
  */
-export function decodeRGBM(
-  scope: PBInsideFunctionScope,
-  rgbm: PBShaderExp,
-  maxRange: PBShaderExp | number
-): PBShaderExp {
+export function decodeRGBM(scope: PBInsideFunctionScope, rgbm: PBShaderExp, maxRange: PBShaderExp | number) {
   const pb = scope.$builder;
   const funcName = 'Z_decodeRGBM';
   pb.func(funcName, [pb.vec4('rgbm'), pb.float('range')], function () {
     this.$return(pb.mul(this.rgbm.rgb, this.rgbm.a, this.range));
   });
-  return pb.getGlobalScope()[funcName](rgbm, maxRange);
+  return pb.getGlobalScope()[funcName](rgbm, maxRange) as PBShaderExp;
 }
 
 /**
@@ -263,7 +252,7 @@ export function decodeRGBM(
  *
  * @public
  */
-export function gammaToLinear(scope: PBInsideFunctionScope, color: PBShaderExp): PBShaderExp {
+export function gammaToLinear(scope: PBInsideFunctionScope, color: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_gammaToLinear';
   pb.func(funcName, [pb.vec3('color')], function () {
@@ -279,7 +268,7 @@ export function gammaToLinear(scope: PBInsideFunctionScope, color: PBShaderExp):
       )
     );
   });
-  return pb.getGlobalScope()[funcName](color);
+  return pb.getGlobalScope()[funcName](color) as PBShaderExp;
 }
 
 /**
@@ -301,7 +290,7 @@ export function linearToGamma(scope: PBInsideFunctionScope, color: PBShaderExp) 
       pb.max(pb.sub(pb.mul(pb.pow(this.color, pb.vec3(0.416666667)), 1.055), pb.vec3(0.055)), pb.vec3(0))
     );
   });
-  return pb.getGlobalScope()[funcName](color);
+  return pb.getGlobalScope()[funcName](color) as PBShaderExp;
 }
 
 /** @internal */
@@ -310,7 +299,7 @@ export function fetchNormalizedFloatForDevice(
   tex: PBShaderExp,
   uv: PBShaderExp,
   level?: PBShaderExp | number
-): PBShaderExp {
+) {
   const pb = scope.$builder;
   const texel =
     level === undefined || level === null ? pb.textureSample(tex, uv) : pb.textureSampleLevel(tex, uv, level);

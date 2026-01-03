@@ -163,7 +163,7 @@ function makeTextureFormat(
   blockWidth: number,
   blockHeight: number,
   blockSize: number
-): number {
+) {
   const compressionBits = compression;
   const colorBits =
     (r ? RED_BITMASK : 0) | (g ? GREEN_BITMASK : 0) | (b ? BLUE_BITMASK : 0) | (a ? ALPHA_BITMASK : 0);
@@ -1662,7 +1662,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
  * @returns The sRGB texture format
  * @public
  */
-export function linearTextureFormatToSRGB(format: TextureFormat): TextureFormat {
+export function linearTextureFormatToSRGB(format: TextureFormat) {
   switch (format) {
     case 'rgba8unorm':
       return 'rgba8unorm-srgb';
@@ -1715,7 +1715,7 @@ export function linearTextureFormatToSRGB(format: TextureFormat): TextureFormat 
  * @returns true if the texture format contains an alpha channel, otherwise false
  * @public
  */
-export function hasAlphaChannel(format: TextureFormat): boolean {
+export function hasAlphaChannel(format: TextureFormat) {
   return !!(textureFormatMap[format] & ALPHA_BITMASK);
 }
 
@@ -1725,7 +1725,7 @@ export function hasAlphaChannel(format: TextureFormat): boolean {
  * @returns true if the texture format contains a red channel, otherwise false
  * @public
  */
-export function hasRedChannel(format: TextureFormat): boolean {
+export function hasRedChannel(format: TextureFormat) {
   return !!(textureFormatMap[format] & RED_BITMASK);
 }
 
@@ -1735,7 +1735,7 @@ export function hasRedChannel(format: TextureFormat): boolean {
  * @returns true if the texture format contains a green channel, otherwise false
  * @public
  */
-export function hasGreenChannel(format: TextureFormat): boolean {
+export function hasGreenChannel(format: TextureFormat) {
   return !!(textureFormatMap[format] & GREEN_BITMASK);
 }
 
@@ -1745,7 +1745,7 @@ export function hasGreenChannel(format: TextureFormat): boolean {
  * @returns true if the texture format contains a blue channel, otherwise false
  * @public
  */
-export function hasBlueChannel(format: TextureFormat): boolean {
+export function hasBlueChannel(format: TextureFormat) {
   return !!(textureFormatMap[format] & BLUE_BITMASK);
 }
 
@@ -1755,7 +1755,7 @@ export function hasBlueChannel(format: TextureFormat): boolean {
  * @returns true if the texture format contains a depth channel, otherwise false
  * @public
  */
-export function hasDepthChannel(format: TextureFormat): boolean {
+export function hasDepthChannel(format: TextureFormat) {
   return !!(textureFormatMap[format] & DEPTH_BITMASK);
 }
 
@@ -1765,7 +1765,7 @@ export function hasDepthChannel(format: TextureFormat): boolean {
  * @returns true if the texture format contains a stencil channel, otherwise false
  * @public
  */
-export function hasStencilChannel(format: TextureFormat): boolean {
+export function hasStencilChannel(format: TextureFormat) {
   return !!(textureFormatMap[format] & STENCIL_BITMASK);
 }
 
@@ -1775,7 +1775,7 @@ export function hasStencilChannel(format: TextureFormat): boolean {
  * @returns true if the texture format is floating-point, otherwise false
  * @public
  */
-export function isFloatTextureFormat(format: TextureFormat): boolean {
+export function isFloatTextureFormat(format: TextureFormat) {
   return !!(textureFormatMap[format] & FLOAT_BITMASK);
 }
 
@@ -1785,7 +1785,7 @@ export function isFloatTextureFormat(format: TextureFormat): boolean {
  * @returns true if the texture format is integer, otherwise false
  * @public
  */
-export function isIntegerTextureFormat(format: TextureFormat): boolean {
+export function isIntegerTextureFormat(format: TextureFormat) {
   return !!(textureFormatMap[format] & INTEGER_BITMASK);
 }
 
@@ -1795,7 +1795,7 @@ export function isIntegerTextureFormat(format: TextureFormat): boolean {
  * @returns true if the texture format is signed, otherwise false
  * @public
  */
-export function isSignedTextureFormat(format: TextureFormat): boolean {
+export function isSignedTextureFormat(format: TextureFormat) {
   return !!(textureFormatMap[format] & SIGNED_BITMASK);
 }
 
@@ -1805,7 +1805,7 @@ export function isSignedTextureFormat(format: TextureFormat): boolean {
  * @returns true if the texture format is a compressed format, otherwise false
  * @public
  */
-export function isCompressedTextureFormat(format: TextureFormat): boolean {
+export function isCompressedTextureFormat(format: TextureFormat) {
   return !!(textureFormatMap[format] & COMPRESSION_FORMAT_BITMASK);
 }
 /**
@@ -1814,7 +1814,7 @@ export function isCompressedTextureFormat(format: TextureFormat): boolean {
  * @returns true if the texture format is sRGB format, otherwise false
  * @public
  */
-export function isSRGBTextureFormat(format: TextureFormat): boolean {
+export function isSRGBTextureFormat(format: TextureFormat) {
   return !!(textureFormatMap[format] & SRGB_BITMASK);
 }
 
@@ -1824,7 +1824,7 @@ export function isSRGBTextureFormat(format: TextureFormat): boolean {
  * @returns The block size
  * @public
  */
-export function getTextureFormatBlockSize(format: TextureFormat): number {
+export function getTextureFormatBlockSize(format: TextureFormat) {
   return (textureFormatMap[format] & BLOCK_SIZE_MASK) >> BLOCK_SIZE_SHIFT;
 }
 
@@ -1834,7 +1834,7 @@ export function getTextureFormatBlockSize(format: TextureFormat): number {
  * @returns The block width
  * @public
  */
-export function getTextureFormatBlockWidth(format: TextureFormat): number {
+export function getTextureFormatBlockWidth(format: TextureFormat) {
   return (textureFormatMap[format] & BLOCK_WIDTH_MASK) >> BLOCK_WIDTH_SHIFT;
 }
 
@@ -1844,20 +1844,20 @@ export function getTextureFormatBlockWidth(format: TextureFormat): number {
  * @returns The block height
  * @public
  */
-export function getTextureFormatBlockHeight(format: TextureFormat): number {
+export function getTextureFormatBlockHeight(format: TextureFormat) {
   return (textureFormatMap[format] & BLOCK_HEIGHT_MASK) >> BLOCK_HEIGHT_SHIFT;
 }
 
-function normalizeColorComponent(val: number, maxval: number): number {
+function normalizeColorComponent(val: number, maxval: number) {
   return Math.min(maxval, Math.max(Math.floor(val * maxval), 0));
 }
 
-function normalizeColorComponentSigned(val: number, maxval: number): number {
+function normalizeColorComponentSigned(val: number, maxval: number) {
   return normalizeColorComponent(val * 0.5 + 0.5, maxval) - (maxval + 1) / 2;
 }
 
 /** @internal */
-export function encodePixel(format: TextureFormat, r: number, g: number, b: number, a: number): TypedArray {
+export function encodePixel(format: TextureFormat, r: number, g: number, b: number, a: number) {
   switch (format) {
     case 'r8unorm':
       return new Uint8Array([normalizeColorComponent(r, 255)]);
@@ -1951,7 +1951,7 @@ export function encodePixelToArray(
   b: number,
   a: number,
   arr: Array<number>
-): void {
+) {
   switch (format) {
     case 'r8unorm':
       arr.push(normalizeColorComponent(r, 255));

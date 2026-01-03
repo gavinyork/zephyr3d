@@ -40,7 +40,7 @@ export class DrawText {
   /** @internal */
   private static readonly colorValue: Vector4 = new Vector4();
   /** @internal */
-  private static calculateTextMatrix(device: AbstractDevice, matrix: Matrix4x4): void {
+  private static calculateTextMatrix(device: AbstractDevice, matrix: Matrix4x4) {
     const viewport = device.getViewport();
     const projectionMatrix = Matrix4x4.ortho(0, viewport.width, 0, viewport.height, 1, 100);
     const flipMatrix = Matrix4x4.translation(new Vector3(0, viewport.height, 0)).scaleRight(
@@ -53,7 +53,7 @@ export class DrawText {
    * @param device - The render device
    * @param name - The font name
    */
-  static setFont(device: AbstractDevice, name: string): void {
+  static setFont(device: AbstractDevice, name: string) {
     const scale = device.getScaleY();
     this.font = Font.fetchFont(name, scale) || Font.fetchFont('12px arial', scale);
   }
@@ -65,7 +65,7 @@ export class DrawText {
    * @param x - X coordinate of the text
    * @param y - Y coordinate of the text
    */
-  static drawText(device: AbstractDevice, text: string, color: string, x: number, y: number): void {
+  static drawText(device: AbstractDevice, text: string, color: string, x: number, y: number) {
     if (text.length > 0) {
       device.pushDeviceStates();
       this.prepareDrawText(device);
@@ -108,7 +108,7 @@ export class DrawText {
     count: number,
     x: number,
     y: number
-  ): number {
+  ) {
     let drawn = 0;
     let atlasIndex = -1;
     let i = 0;
@@ -124,7 +124,7 @@ export class DrawText {
           (this.textOffset + drawn) * 16,
           (i - drawn) * 16
         );
-        this.textBindGroup!.setTexture('tex', this.glyphManager!.getAtlasTexture(atlasIndex));
+        this.textBindGroup!.setTexture('tex', this.glyphManager!.getAtlasTexture(atlasIndex)!);
         device.draw('triangle-list', (this.textOffset + drawn) * 6, (i - drawn) * 6);
         drawn = i;
       }
@@ -154,12 +154,12 @@ export class DrawText {
       (this.textOffset + drawn) * 16,
       (i - drawn) * 16
     );
-    this.textBindGroup!.setTexture('tex', this.glyphManager!.getAtlasTexture(atlasIndex));
+    this.textBindGroup!.setTexture('tex', this.glyphManager!.getAtlasTexture(atlasIndex)!);
     device.draw('triangle-list', (this.textOffset + drawn) * 6, (i - drawn) * 6);
     return x;
   }
   /** @internal */
-  private static prepareDrawText(device: AbstractDevice): void {
+  private static prepareDrawText(device: AbstractDevice) {
     if (!this.prepared) {
       this.prepared = true;
       this.font = this.font || Font.fetchFont('16px arial', device.getScaleY());

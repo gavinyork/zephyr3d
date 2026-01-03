@@ -8,7 +8,7 @@ import { getDevice } from '../../../app/api';
  * @internal
  */
 export class TGALoader extends AbstractTextureLoader {
-  supportMIMEType(mimeType: string): boolean {
+  supportMIMEType(mimeType: string) {
     return mimeType === 'image/tga' || mimeType === 'image/x-tga';
   }
   private parseTGA(
@@ -111,7 +111,7 @@ export class TGALoader extends AbstractTextureLoader {
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: Nullable<BaseTexture>
-  ): Promise<Nullable<BaseTexture>> {
+  ) {
     return new Promise<Nullable<BaseTexture>>((resolve) => {
       resolve(this.parseTGA(data, srgb, samplerOptions?.mipFilter === 'none', texture));
     });

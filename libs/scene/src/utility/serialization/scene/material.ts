@@ -11,7 +11,7 @@ import {
   Sprite3DBlueprintMaterial,
   UnlitMaterial
 } from '../../../material';
-import type { PropertyAccessor, SerializableClass } from '../types';
+import { defineProps, type PropertyAccessor, type SerializableClass } from '../types';
 import type { Nullable } from '@zephyr3d/base';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import { getTextureProps } from './common';
@@ -25,7 +25,7 @@ type LitPropTypes = LambertMaterial | BlinnMaterial | PBRMaterial;
 type UnlitPropTypes = UnlitMaterial | LitPropTypes;
 
 function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMaterial>[] {
-  return [
+  return defineProps([
     {
       name: 'IOR',
       type: 'float',
@@ -428,11 +428,11 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
       return this.sheen;
     }),
     ...getLitMaterialProps(manager)
-  ];
+  ]);
 }
 
 function getLitMaterialProps(manager: ResourceManager): PropertyAccessor<LitPropTypes>[] {
-  return [
+  return defineProps([
     ...getUnlitMaterialProps(manager),
     {
       name: 'doubleSidedLighting',
@@ -477,11 +477,11 @@ function getLitMaterialProps(manager: ResourceManager): PropertyAccessor<LitProp
       }
     },
     ...getTextureProps<LitPropTypes>(manager, 'normalTexture', '2D', false, 0)
-  ];
+  ]);
 }
 
 function getUnlitMaterialProps(manager: ResourceManager): PropertyAccessor<UnlitPropTypes>[] {
-  return [
+  return defineProps([
     {
       name: 'vertexColor',
       type: 'bool',
@@ -517,7 +517,7 @@ function getUnlitMaterialProps(manager: ResourceManager): PropertyAccessor<Unlit
       }
     },
     ...getTextureProps<UnlitPropTypes>(manager, 'albedoTexture', '2D', true, 0)
-  ];
+  ]);
 }
 
 /** @internal */
@@ -527,7 +527,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
       ctor: MeshMaterial,
       name: 'MeshMaterial',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'AlphaCutoff',
             type: 'float',
@@ -632,7 +632,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
               return !this.$isInstance;
             }
           }
-        ];
+        ]);
       }
     },
     getMeshMaterialInstanceUniformsClass(MeshMaterial)
@@ -662,7 +662,7 @@ export function getStandardSprite3DMaterialClass(manager: ResourceManager): Seri
       name: 'StandardSprite3DMaterial',
       parent: Sprite3DMaterial,
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'SpriteTexture',
             type: 'object',
@@ -708,7 +708,7 @@ export function getStandardSprite3DMaterialClass(manager: ResourceManager): Seri
               return !this.$isInstance;
             }
           }
-        ];
+        ]);
       }
     },
     getMeshMaterialInstanceUniformsClass(StandardSprite3DMaterial)
@@ -723,7 +723,7 @@ export function getParticleMaterialClass(manager: ResourceManager): Serializable
       name: 'ParticleMaterial',
       parent: MeshMaterial,
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'AlphaMap',
             type: 'object',
@@ -802,7 +802,7 @@ export function getParticleMaterialClass(manager: ResourceManager): Serializable
               }
             }
           }
-        ];
+        ]);
       }
     },
     getMeshMaterialInstanceUniformsClass(ParticleMaterial)
@@ -817,7 +817,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
       parent: MeshMaterial,
       name: 'PBRBluePrintMaterial',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'doubleSidedLighting',
             type: 'bool',
@@ -832,7 +832,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
               this.doubleSidedLighting = value.bool[0];
             }
           }
-        ];
+        ]);
       }
     },
     getMeshMaterialInstanceUniformsClass(PBRBluePrintMaterial)
@@ -892,7 +892,7 @@ export function getBlinnMaterialClass(manager: ResourceManager): SerializableCla
       parent: MeshMaterial,
       name: 'BlinnMaterial',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'Shininess',
             type: 'float',
@@ -912,7 +912,7 @@ export function getBlinnMaterialClass(manager: ResourceManager): SerializableCla
             }
           },
           ...getLitMaterialProps(manager)
-        ];
+        ]);
       }
     },
     getMeshMaterialInstanceUniformsClass(BlinnMaterial)
@@ -927,7 +927,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
       parent: MeshMaterial,
       name: 'PBRMetallicRoughnessMaterial',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'Metallic',
             type: 'float',
@@ -992,7 +992,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
           ),
           ...getTextureProps<PBRMetallicRoughnessMaterial>(manager, 'specularColorTexture', '2D', true, 0),
           ...getPBRCommonProps(manager)
-        ];
+        ]);
       }
     },
     getMeshMaterialInstanceUniformsClass(PBRMetallicRoughnessMaterial)
@@ -1007,7 +1007,7 @@ export function getPBRSpecularGlossinessMaterialClass(manager: ResourceManager):
       name: 'PBRSpecularGlossinessMaterial',
       parent: MeshMaterial,
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'SpecularFactor',
             type: 'rgb',
@@ -1045,7 +1045,7 @@ export function getPBRSpecularGlossinessMaterialClass(manager: ResourceManager):
             }
           },
           ...getPBRCommonProps(manager)
-        ];
+        ]);
       }
     },
     getMeshMaterialInstanceUniformsClass(PBRSpecularGlossinessMaterial)

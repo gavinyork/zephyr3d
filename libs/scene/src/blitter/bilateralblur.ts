@@ -64,16 +64,16 @@ export class BilateralBlurBlitter extends Blitter {
   set blurSizeTex(tex) {
     this._blurSizeTex = tex;
   }
-  get blurSizeIndex(): number {
+  get blurSizeIndex() {
     return this._blurSizeIndex;
   }
-  set blurSizeIndex(val: number) {
+  set blurSizeIndex(val) {
     this._blurSizeIndex = val;
   }
-  get blurSizeScale(): number {
+  get blurSizeScale() {
     return this._blurSizeScale;
   }
-  set blurSizeScale(val: number) {
+  set blurSizeScale(val) {
     this._blurSizeScale = val;
   }
   get sampler() {
@@ -82,46 +82,46 @@ export class BilateralBlurBlitter extends Blitter {
   set sampler(sampler) {
     this._sampler = sampler;
   }
-  get cameraNearFar(): Vector2 {
+  get cameraNearFar() {
     return this._cameraNearFar;
   }
-  set cameraNearFar(v: Vector2) {
+  set cameraNearFar(v) {
     this._cameraNearFar.set(v);
   }
-  get depthCutoff(): number {
+  get depthCutoff() {
     return this._depthCutoff;
   }
-  set depthCutoff(val: number) {
+  set depthCutoff(val) {
     this._depthCutoff = val;
   }
-  get size(): Vector2 {
+  get size() {
     return this._size;
   }
-  set size(val: Vector2) {
+  set size(val) {
     this._size.set(val);
   }
-  get stepSize(): number {
+  get stepSize() {
     return this._stepSize;
   }
-  set stepSize(val: number) {
+  set stepSize(val) {
     if (val !== this._stepSize) {
       this._stepSize = val;
       this.calcGaussion();
     }
   }
-  get stdDev(): number {
+  get stdDev() {
     return this._stdDev;
   }
-  set stdDev(val: number) {
+  set stdDev(val) {
     if (val !== this._stdDev) {
       this._stdDev = val;
       this.calcGaussion();
     }
   }
-  get kernelRadius(): number {
+  get kernelRadius() {
     return this._kernelRadius;
   }
-  set kernelRadius(val: number) {
+  set kernelRadius(val) {
     val = Math.max(val, 0) >> 0;
     if (val !== this._kernelRadius) {
       this._kernelRadius = val;
@@ -130,7 +130,7 @@ export class BilateralBlurBlitter extends Blitter {
       this.invalidateHash();
     }
   }
-  protected calcHash(): string {
+  protected calcHash() {
     return `${Number(!!this._blurSizeTex)}:${this._blurSizeIndex}:${this._kernelRadius}:${this._finalPhase}`;
   }
   private calcGaussion() {
@@ -185,7 +185,7 @@ export class BilateralBlurBlitter extends Blitter {
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'float' | 'int' | 'uint'
-  ): PBShaderExp {
+  ) {
     const that = this;
     const pb = scope.$builder;
     pb.func('getLinearDepth', [pb.vec2('uv')], function () {
@@ -242,6 +242,6 @@ export class BilateralBlurBlitter extends Blitter {
       });
     });
     scope.colorSum = pb.div(scope.colorSum, scope.weightSum);
-    return scope.colorSum;
+    return scope.colorSum as PBShaderExp;
   }
 }

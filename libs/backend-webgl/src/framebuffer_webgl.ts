@@ -135,21 +135,21 @@ export class WebGLFrameBuffer
   tagDraw() {
     this._drawTags++;
   }
-  isMRT(): boolean {
+  isMRT() {
     return this._isMRT;
   }
   invalidateMipmaps() {
     this._needGenerateMipmaps = true;
   }
-  getWidth(): number {
+  getWidth() {
     const attachment = this._options.colorAttachments?.[0] ?? this._options.depthAttachment!;
     return Math.max(attachment.texture.width >> attachment.level!, 1);
   }
-  getHeight(): number {
+  getHeight() {
     const attachment = this._options.colorAttachments?.[0] ?? this._options.depthAttachment!;
     return Math.max(attachment.texture.height >> attachment.level!, 1);
   }
-  getHash(): string {
+  getHash() {
     return this._hash;
   }
   restore() {
@@ -198,13 +198,13 @@ export class WebGLFrameBuffer
       }
     }
   }
-  setColorAttachmentGenerateMipmaps(index: number, generateMipmaps: boolean): void {
+  setColorAttachmentGenerateMipmaps(index: number, generateMipmaps: boolean) {
     const k = this._options.colorAttachments?.[index];
     if (k) {
       k.generateMipmaps = !!generateMipmaps;
     }
   }
-  getColorAttachmentGenerateMipmaps(index: number): boolean {
+  getColorAttachmentGenerateMipmaps(index: number) {
     return !!this._options.colorAttachments?.[index]?.generateMipmaps;
   }
   setColorAttachmentCubeFace(index: number, face: CubeFace) {
@@ -220,8 +220,8 @@ export class WebGLFrameBuffer
       }
     }
   }
-  getColorAttachmentCubeFace(index: number): CubeFace {
-    return this._options.colorAttachments?.[index]?.face ?? CubeFace.PX;
+  getColorAttachmentCubeFace(index: number) {
+    return (this._options.colorAttachments?.[index]?.face as CubeFace) ?? CubeFace.PX;
   }
   setColorAttachmentMipLevel(index: number, level: number) {
     const k = this._options.colorAttachments?.[index];
@@ -236,7 +236,7 @@ export class WebGLFrameBuffer
       }
     }
   }
-  getColorAttachmentMipLevel(index: number): number {
+  getColorAttachmentMipLevel(index: number) {
     return this._options.colorAttachments?.[index]?.level ?? 0;
   }
   setColorAttachmentLayer(index: number, layer: number) {
@@ -255,7 +255,7 @@ export class WebGLFrameBuffer
   getColorAttachmentLayer(index: number) {
     return this._options?.colorAttachments?.[index]?.layer ?? 0;
   }
-  setDepthAttachmentCubeFace(face: CubeFace): void {
+  setDepthAttachmentCubeFace(face: CubeFace) {
     const k = this._options.depthAttachment;
     if (k && k.face !== face) {
       this._needBindBuffers = true;
@@ -268,8 +268,8 @@ export class WebGLFrameBuffer
       }
     }
   }
-  getDepthAttachmentCubeFace(): CubeFace {
-    return this._options.depthAttachment?.face ?? CubeFace.PX;
+  getDepthAttachmentCubeFace() {
+    return (this._options.depthAttachment?.face as CubeFace) ?? CubeFace.PX;
   }
   setDepthAttachmentLayer(layer: number) {
     const k = this._options.depthAttachment;
@@ -287,16 +287,16 @@ export class WebGLFrameBuffer
   getDepthAttachmentLayer() {
     return this._options.depthAttachment?.layer ?? 0;
   }
-  getDepthAttachment(): Nullable<BaseTexture> {
+  getDepthAttachment() {
     return this._options?.depthAttachment?.texture || null;
   }
-  getColorAttachments(): BaseTexture[] {
+  getColorAttachments() {
     return this._options.colorAttachments?.map((val) => val.texture || null) || [];
   }
   getColorAttachment<T extends BaseTexture>(index: number): T {
     return (this.getColorAttachments()[index] as unknown as T) ?? null;
   }
-  bind(): boolean {
+  bind() {
     if (!this._initialized) {
       this._init();
       this._initialized = true;
@@ -326,7 +326,7 @@ export class WebGLFrameBuffer
     }
     return false;
   }
-  unbind(): void {
+  unbind() {
     if (this._device.context._currentFramebuffer === this) {
       this._updateMSAABuffer();
       this._device.context.bindFramebuffer(WebGLEnum.FRAMEBUFFER, null);
@@ -445,7 +445,7 @@ export class WebGLFrameBuffer
       this._lastDrawTag = this._drawTags;
     }
   }
-  private _load(): void {
+  private _load() {
     if (this._device.isContextLost()) {
       return;
     }
@@ -469,7 +469,7 @@ export class WebGLFrameBuffer
     this._device.context.bindFramebuffer(WebGLEnum.FRAMEBUFFER, null);
     this._device.context._currentFramebuffer = null;
   }
-  private _bindAttachment(attachment: number, info: FrameBufferTextureAttachment): boolean {
+  private _bindAttachment(attachment: number, info: FrameBufferTextureAttachment) {
     if (info.texture) {
       let intermediateTexture: Nullable<WebGLTexture> = null;
       if (
@@ -557,7 +557,7 @@ export class WebGLFrameBuffer
     }
     return false;
   }
-  private _bindBuffers(): boolean {
+  private _bindBuffers() {
     if (!this._object) {
       return false;
     }
@@ -588,7 +588,7 @@ export class WebGLFrameBuffer
     }
     return this._status === STATUS_OK;
   }
-  private _createRenderbufferAA(texture: BaseTexture): WebGLRenderbuffer {
+  private _createRenderbufferAA(texture: BaseTexture) {
     const renderBuffer = this._device.context.createRenderbuffer();
     const formatInfo = (this.device.getDeviceCaps().textureCaps as WebGLTextureCaps).getTextureFormatInfo(
       texture.format
@@ -603,7 +603,7 @@ export class WebGLFrameBuffer
     );
     return renderBuffer;
   }
-  private _bindBuffersAA(): boolean {
+  private _bindBuffersAA() {
     if (!this._framebufferAA) {
       return true;
     }
@@ -648,7 +648,7 @@ export class WebGLFrameBuffer
     }
     return this._statusAA === STATUS_OK;
   }
-  private _init(): void {
+  private _init() {
     if (this._options.sampleCount !== 1 && this._options.sampleCount !== 4) {
       throw new Error(`WebGLFramebuffer(): Sample should be 1 or 4, got ${this._options.sampleCount}`);
     }
@@ -663,7 +663,7 @@ export class WebGLFrameBuffer
   isFramebuffer(): this is FrameBuffer {
     return true;
   }
-  getSampleCount(): number {
+  getSampleCount() {
     return this._options.sampleCount!;
   }
 }

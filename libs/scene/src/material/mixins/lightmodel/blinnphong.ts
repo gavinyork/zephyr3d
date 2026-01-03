@@ -42,34 +42,34 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
       super();
       this._shininess = 32;
     }
-    copyFrom(other: this): void {
+    copyFrom(other: this) {
       super.copyFrom(other);
       this.shininess = other.shininess;
     }
     /** Shininess */
-    get shininess(): number {
+    get shininess() {
       return this._shininess;
     }
-    set shininess(val: number) {
+    set shininess(val) {
       if (val !== this._shininess) {
         this._shininess = val;
         this.uniformChanged();
       }
     }
-    vertexShader(scope: PBFunctionScope): void {
+    vertexShader(scope: PBFunctionScope) {
       super.vertexShader(scope);
       if (this.needFragmentColor() && this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
         scope.$outputs.zShininess = this.getInstancedUniform(scope, SHININESS_UNIFORM);
       }
     }
-    fragmentShader(scope: PBFunctionScope): void {
+    fragmentShader(scope: PBFunctionScope) {
       super.fragmentShader(scope);
       const pb = scope.$builder;
       if (this.needFragmentColor() && !(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         scope.zShininess = pb.float().uniform(2);
       }
     }
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx) && !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         bindGroup.setValue('zShininess', this._shininess);
@@ -82,7 +82,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
       viewVec: PBShaderExp,
       albedo: PBShaderExp,
       outRoughness?: PBShaderExp
-    ): PBShaderExp {
+    ) {
       const pb = scope.$builder;
       const funcName = 'Z_blinnPhongLight';
       const that = this;
@@ -146,9 +146,11 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
           }
         }
       );
-      return outRoughness
-        ? pb.getGlobalScope()[funcName](worldPos, normal, viewVec, albedo, outRoughness)
-        : pb.getGlobalScope()[funcName](worldPos, normal, viewVec, albedo);
+      return (
+        outRoughness
+          ? pb.getGlobalScope()[funcName](worldPos, normal, viewVec, albedo, outRoughness)
+          : pb.getGlobalScope()[funcName](worldPos, normal, viewVec, albedo)
+      ) as PBShaderExp;
     }
   } as unknown as T & { new (...args: any[]): IMixinBlinnPhong };
 }

@@ -51,10 +51,10 @@ export class Pool {
   /**
    * Id for this pool
    */
-  get id(): string | symbol {
+  get id() {
     return this._id;
   }
-  autoRelease(): void {
+  autoRelease() {
     // auto release objects
     for (const tex of this._autoReleaseTextures) {
       this.releaseTexture(tex);
@@ -84,7 +84,7 @@ export class Pool {
     width: number,
     height: number,
     mipmapping = false
-  ): Texture2D {
+  ) {
     const hash = `2d:${format}:${width}:${height}:${mipmapping ? 1 : 0}`;
     let texture: Nullable<BaseTexture> = null;
     const list = this._freeTextures[hash];
@@ -123,7 +123,7 @@ export class Pool {
     height: number,
     numLayers: number,
     mipmapping = false
-  ): Texture2DArray {
+  ) {
     const hash = `2darray:${format}:${width}:${height}:${numLayers}:${mipmapping ? 1 : 0}`;
     let texture: Nullable<BaseTexture> = null;
     const list = this._freeTextures[hash];
@@ -153,12 +153,7 @@ export class Pool {
    * @param mipmapping - Whether this texture support mipmapping
    * @returns The fetched TextureCube object.
    */
-  fetchTemporalTextureCube(
-    autoRelease: boolean,
-    format: TextureFormat,
-    size: number,
-    mipmapping = false
-  ): TextureCube {
+  fetchTemporalTextureCube(autoRelease: boolean, format: TextureFormat, size: number, mipmapping = false) {
     const hash = `cube:${format}:${size}:${mipmapping ? 1 : 0}`;
     let texture: Nullable<BaseTexture> = null;
     const list = this._freeTextures[hash];
@@ -207,7 +202,7 @@ export class Pool {
     attachmentMipLevel = 0,
     attachmentCubeface = 0,
     attachmentLayer = 0
-  ): FrameBuffer {
+  ) {
     const colors = Array.isArray(colorTexOrFormat)
       ? colorTexOrFormat
       : colorTexOrFormat
@@ -263,7 +258,7 @@ export class Pool {
     attachmentMipLevel = 0,
     attachmentCubeface = 0,
     attachmentLayer = 0
-  ): FrameBuffer {
+  ) {
     colorAttachments = colorAttachments ?? [];
     let hash = `${depthAttachment?.uid ?? 0}:${sampleCount ?? 1}:${ignoreDepthStencil ? 1 : 0}`;
     if (colorAttachments.length > 0) {
@@ -311,14 +306,14 @@ export class Pool {
    * Dispose a texture that is allocated from the object pool.
    * @param texture - The texture to dispose.
    */
-  disposeTexture(texture: BaseTexture): void {
+  disposeTexture(texture: BaseTexture) {
     this.safeReleaseTexture(texture, true);
   }
   /**
    * Release a texture back to the object pool.
    * @param texture - The texture to release.
    */
-  releaseTexture(texture: BaseTexture): void {
+  releaseTexture(texture: BaseTexture) {
     const info = this._allocatedTextures.get(texture);
     if (!info) {
       console.error(`ObjectPool.releaseTexture(): texture is not allocated from pool`);
@@ -330,7 +325,7 @@ export class Pool {
    * Increment reference counter for given texture
    * @param texture - The texture to retain
    */
-  retainTexture(texture: BaseTexture): void {
+  retainTexture(texture: BaseTexture) {
     const info = this._allocatedTextures.get(texture);
     if (!info) {
       console.error(`ObjectPool.retainTexture(): texture is not allocated from pool`);
@@ -342,7 +337,7 @@ export class Pool {
    * Dispose a framebuffer that is allocated from the object pool.
    * @param fb - The framebuffer to dispose.
    */
-  disposeFrameBuffer(fb: FrameBuffer): void {
+  disposeFrameBuffer(fb: FrameBuffer) {
     const hash = this._allocatedFramebuffers.get(fb);
     if (!hash) {
       console.error(`ObjectPool.disposeFrameBuffer(): framebuffer is not allocated from pool`);
@@ -355,7 +350,7 @@ export class Pool {
    * Release a framebuffer back to the object pool.
    * @param fb - The framebuffer to release.
    */
-  releaseFrameBuffer(fb: FrameBuffer): void {
+  releaseFrameBuffer(fb: FrameBuffer) {
     const info = this._allocatedFramebuffers.get(fb);
     if (!info) {
       console.error(`ObjectPool.releaseFrameBuffer(): framebuffer is not allocated from pool`);
@@ -376,7 +371,7 @@ export class Pool {
    * Increment reference counter for given framebuffer
    * @param fb - The framebuffer to retain
    */
-  retainFrameBuffer(fb: FrameBuffer): void {
+  retainFrameBuffer(fb: FrameBuffer) {
     const info = this._allocatedFramebuffers.get(fb);
     if (!info) {
       console.error(`ObjectPool.retainFrameBuffer(): framebuffer is not allocated from pool`);
@@ -387,7 +382,7 @@ export class Pool {
   /**
    * Purge the object pool by disposing all free framebuffers and textures.
    */
-  purge(): void {
+  purge() {
     for (const k in this._freeFramebuffers) {
       const list = this._freeFramebuffers[k];
       if (list) {
@@ -408,7 +403,7 @@ export class Pool {
     this._freeTextures = {};
   }
   /** @internal */
-  private internalDisposeFrameBuffer(fb: FrameBuffer): void {
+  private internalDisposeFrameBuffer(fb: FrameBuffer) {
     if (fb) {
       // Release attachment textures
       const colorAttachments = fb.getColorAttachments();
@@ -426,7 +421,7 @@ export class Pool {
     }
   }
   /** @internal */
-  private safeReleaseTexture(texture: BaseTexture, purge = false): void {
+  private safeReleaseTexture(texture: BaseTexture, purge = false) {
     const info = this._allocatedTextures.get(texture);
     if (info) {
       info.refcount--;

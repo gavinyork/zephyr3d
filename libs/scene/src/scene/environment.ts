@@ -1,7 +1,7 @@
-import type { Nullable, Vector4 } from '@zephyr3d/base';
+import type { Immutable, Nullable, Vector4 } from '@zephyr3d/base';
 import { Vector3, DRef, Disposable } from '@zephyr3d/base';
 import { ObservableVector4 } from '@zephyr3d/base';
-import type { DrawContext, EnvironmentLighting, EnvLightType } from '../render';
+import type { DrawContext, EnvironmentLighting } from '../render';
 import { EnvShIBL } from '../render';
 import { EnvConstantAmbient, EnvHemisphericAmbient } from '../render';
 import { SkyRenderer } from '../render/sky';
@@ -52,7 +52,7 @@ export class EnvLightWrapper extends Disposable {
     this._strength = 1;
   }
   /** @internal */
-  getHash(ctx?: DrawContext): string {
+  getHash(ctx?: DrawContext) {
     return !ctx || ctx.drawEnvLight
       ? `${this.type}:${this._envLight!.hasRadiance() ? '1' : '0'}:${
           this._envLight!.hasIrradiance() ? '1' : '0'
@@ -60,14 +60,14 @@ export class EnvLightWrapper extends Disposable {
       : 'none';
   }
   /** @internal */
-  get envLight(): EnvironmentLighting {
+  get envLight() {
     return this._envLight!;
   }
   /** The strength of environment lighting */
-  get strength(): number {
+  get strength() {
     return this._strength;
   }
-  set strength(val: number) {
+  set strength(val) {
     this._strength = val;
   }
   /** Ambient light color for environment light type constant */
@@ -122,20 +122,20 @@ export class EnvLightWrapper extends Disposable {
     }
   }
   /** Irradiance SH window for environment light type ibl */
-  get irradianceWindow(): Vector3 {
+  get irradianceWindow(): Immutable<Vector3> {
     return this._irradianceWindow;
   }
-  set irradianceWindow(value: Vector3) {
+  set irradianceWindow(value: Immutable<Vector3>) {
     this._irradianceWindow.set(value);
     if (this.type === 'ibl') {
       (this._envLight as EnvShIBL).irradianceWindow = this._irradianceWindow;
     }
   }
   /** The environment light type */
-  get type(): EnvLightType {
+  get type() {
     return this._envLight?.getType() ?? 'none';
   }
-  set type(val: EnvLightType) {
+  set type(val) {
     switch (val) {
       case 'none':
         this._envLight = null;
@@ -187,11 +187,11 @@ export class Environment extends Disposable {
     this._light = new EnvLightWrapper();
   }
   /** The sky renderer */
-  get sky(): SkyRenderer {
+  get sky() {
     return this._sky;
   }
   /** The environment lighting renderer */
-  get light(): EnvLightWrapper {
+  get light() {
     return this._light;
   }
   /** @internal */
@@ -199,7 +199,7 @@ export class Environment extends Disposable {
     return `${this.light?.getHash(ctx)}:${this._sky?.getHash(ctx)}`;
   }
   /** @internal */
-  needSceneDepthTexture(): boolean {
+  needSceneDepthTexture() {
     return this._sky.fogType !== 'none';
   }
   /** Disposes the environment object */

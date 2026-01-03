@@ -47,7 +47,7 @@ function init() {
   panoramaToCubemapBindGroupRGBM = device.createBindGroup(panoramaToCubemapProgramRGBM.bindGroupLayouts[0]);
 }
 
-function createPanoramaToCubemapProgram(rgbm: boolean): GPUProgram {
+function createPanoramaToCubemapProgram(rgbm: boolean) {
   const device = getDevice();
   const pb = device;
   const program = pb.buildRenderProgram({
@@ -124,7 +124,7 @@ function doConvertPanoramaToCubemap(srcTexture: Texture2D, dstTexture: TextureCu
  *
  * @public
  */
-export function panoramaToCubemap(tex: Texture2D, outputCubeMap: TextureCube): void {
+export function panoramaToCubemap(tex: Texture2D, outputCubeMap: TextureCube) {
   const device = getDevice();
   if (!vertexLayout) {
     init();

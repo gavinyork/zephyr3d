@@ -101,7 +101,7 @@ export class WebGLTextureSampler
       }
     }
   }
-  private _load(): boolean {
+  private _load() {
     if (!isWebGL2(this._device.context)) {
       this._object = {};
       return true;

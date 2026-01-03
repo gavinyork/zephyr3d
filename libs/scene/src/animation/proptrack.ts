@@ -137,7 +137,7 @@ export class PropertyTrack extends AnimationTrack<number[]> {
     }
   }
   /** {@inheritDoc AnimationTrack.calculateState} */
-  calculateState(target: unknown, currentTime: number): number[] {
+  calculateState(target: unknown, currentTime: number) {
     this._interpolator!.interpolate(currentTime, this._state);
     if (this._interpolatorAlpha) {
       this._interpolatorAlpha.interpolate(currentTime, this._stateAlpha);
@@ -150,7 +150,7 @@ export class PropertyTrack extends AnimationTrack<number[]> {
     this._prop.set!.call(target, { num: state } as any);
   }
   /** {@inheritDoc AnimationTrack.mixState} */
-  mixState(a: number[], b: number[], t: number): number[] {
+  mixState(a: number[], b: number[], t: number) {
     const v: number[] = [];
     for (let i = 0; i < this._count; i++) {
       v[i] = a[i] + t * (b[i] - a[i]);
@@ -158,11 +158,11 @@ export class PropertyTrack extends AnimationTrack<number[]> {
     return v;
   }
   /** {@inheritDoc AnimationTrack.getBlendId} */
-  getBlendId(): unknown {
+  getBlendId() {
     return this._prop;
   }
   /** {@inheritDoc AnimationTrack.getDuration} */
-  getDuration(): number {
+  getDuration() {
     return this._interpolator?.maxTime ?? 0;
   }
   /**
@@ -170,7 +170,7 @@ export class PropertyTrack extends AnimationTrack<number[]> {
    *
    * @returns The `PropertyAccessor` used by this track.
    */
-  getProp(): PropertyAccessor {
+  getProp() {
     return this._prop;
   }
 }

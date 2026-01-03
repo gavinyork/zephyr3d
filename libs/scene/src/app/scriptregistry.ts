@@ -12,7 +12,7 @@ import { getApp } from './api';
  * @returns A `data:text/javascript;base64,...` URL with an encoded `#id` suffix.
  * @internal
  */
-function toDataUrl(js: string, id: string): string {
+function toDataUrl(js: string, id: string) {
   const b64 = textToBase64(js);
   return `data:text/javascript;base64,${b64}#${encodeURIComponent(String(id))}`;
 }
@@ -21,7 +21,7 @@ function toDataUrl(js: string, id: string): string {
  * Checks whether a specifier is an absolute HTTP(S) URL.
  * @internal
  */
-function isAbsoluteUrl(spec: string): boolean {
+function isAbsoluteUrl(spec: string) {
   return /^https?:\/\//i.test(spec);
 }
 
@@ -29,7 +29,7 @@ function isAbsoluteUrl(spec: string): boolean {
  * Checks whether a specifier is a special URL (data: or blob:).
  * @internal
  */
-function isSpecialUrl(spec: string): boolean {
+function isSpecialUrl(spec: string) {
   return /^(data|blob):/i.test(spec);
 }
 
@@ -37,7 +37,7 @@ function isSpecialUrl(spec: string): boolean {
  * Checks whether a specifier is a bare module (not starting with ./, ../, /, or #/).
  * @internal
  */
-function isBareModule(spec: string): boolean {
+function isBareModule(spec: string) {
   return !spec.startsWith('./') && !spec.startsWith('../') && !spec.startsWith('/') && !spec.startsWith('#/');
 }
 
@@ -110,9 +110,7 @@ export class ScriptRegistry {
    * @param id - Logical module identifier (absolute or logical path-like).
    * @returns Source code, resolved path, and type (`'js' | 'ts'`), or `undefined` if not found.
    */
-  protected async fetchSource(
-    id: string
-  ): Promise<{ code: string; path: string; type: 'js' | 'ts'; sourceMap?: string } | undefined> {
+  protected async fetchSource(id: string) {
     let type: Nullable<'js' | 'ts'> = null;
     let pathWithExt = '';
     if (id.endsWith('.ts')) {
@@ -165,7 +163,7 @@ export class ScriptRegistry {
    * @param entryId - Entry module identifier (logical or path-like).
    * @returns A URL string that can be used in `import(...)`.
    */
-  async resolveRuntimeUrl(entryId: string): Promise<string> {
+  async resolveRuntimeUrl(entryId: string) {
     const id = await this.resolveLogicalId(entryId);
     return getApp().editorMode !== 'none'
       ? await this.build(String(id))
@@ -186,11 +184,7 @@ export class ScriptRegistry {
    * @param fromId - The logical id of the module containing `entryId`.
    * @param dependencies - Output map of `resolvedSourcePath -\> file contents`.
    */
-  async getDependencies(
-    entryId: string,
-    fromId: string,
-    dependencies: Record<string, string>
-  ): Promise<void> {
+  async getDependencies(entryId: string, fromId: string, dependencies: Record<string, string>) {
     const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
     const reDynamic = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
 
@@ -234,7 +228,7 @@ export class ScriptRegistry {
    * @param id - Logical module id to build.
    * @returns Data URL string for dynamic import, or empty string if not found.
    */
-  private async build(id: string): Promise<string> {
+  private async build(id: string) {
     const key = String(id);
     const cached = this._built.get(key);
     if (cached) {
@@ -268,7 +262,7 @@ export class ScriptRegistry {
    * @returns Transpiled JavaScript source.
    * @throws If TypeScript runtime is not found for TS input.
    */
-  private async transpile(code: string, _id: string, type: 'js' | 'ts'): Promise<string> {
+  private async transpile(code: string, _id: string, type: 'js' | 'ts') {
     const logicalId = String(_id);
 
     if (type === 'js') {
@@ -322,7 +316,7 @@ export class ScriptRegistry {
    * @param fromId - The logical id of the current module (resolution base for relatives).
    * @returns Transformed source with rewritten import specifiers.
    */
-  private async rewriteImports(code: string, fromId: string): Promise<string> {
+  private async rewriteImports(code: string, fromId: string) {
     await init;
     const [imports] = parse(code);
     const list = [...imports].sort((a, b) => (a.s || 0) - (b.s || 0));
@@ -378,7 +372,7 @@ export class ScriptRegistry {
    * @returns A normalized logical id or an external specifier string.
    * @throws If a relative import is provided without `fromId`.
    */
-  async resolveLogicalId(spec: string, fromId?: string): Promise<string> {
+  async resolveLogicalId(spec: string, fromId?: string) {
     if (spec.startsWith('#/')) {
       return this._vfs.normalizePath(this._vfs.join(this._scriptsRoot, spec.slice(2)));
     } else if (spec.startsWith('./') || spec.startsWith('../')) {

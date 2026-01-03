@@ -63,7 +63,7 @@ export class WebGLStructuredBuffer extends WebGLGPUBuffer implements StructuredB
       this._structure = st;
     }
   }
-  getUniformData(): StructuredBufferData {
+  getUniformData() {
     return this._data;
   }
   private static isValidArrayElementType(type: PBTypeInfo) {

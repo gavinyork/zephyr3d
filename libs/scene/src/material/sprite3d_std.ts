@@ -1,4 +1,4 @@
-import type { BindGroup, PBInsideFunctionScope, PBShaderExp, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, PBInsideFunctionScope, Texture2D } from '@zephyr3d/device';
 import type { Clonable } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import type { DrawContext } from '../render/drawable';
@@ -48,7 +48,7 @@ export class StandardSprite3DMaterial extends Sprite3DMaterial implements Clonab
    *
    * @returns A new {@link StandardSprite3DMaterial} instance with the same settings.
    */
-  clone(): StandardSprite3DMaterial {
+  clone() {
     const other = new StandardSprite3DMaterial();
     other.copyFrom(this);
     return other;
@@ -58,7 +58,7 @@ export class StandardSprite3DMaterial extends Sprite3DMaterial implements Clonab
    *
    * @param other - The source material to copy from.
    */
-  copyFrom(other: this): void {
+  copyFrom(other: this) {
     super.copyFrom(other);
     this.spriteTexture = other.spriteTexture;
   }
@@ -73,7 +73,7 @@ export class StandardSprite3DMaterial extends Sprite3DMaterial implements Clonab
    * @param ctx - The current draw context providing rendering-state information.
    *
    */
-  protected internalApplyUniforms(bindGroup: BindGroup, ctx: DrawContext): void {
+  protected internalApplyUniforms(bindGroup: BindGroup, ctx: DrawContext) {
     if (this.spriteTexture && this.needFragmentColor(ctx)) {
       bindGroup.setTexture('zSpriteTexture', this.spriteTexture, fetchSampler('clamp_linear'));
     }
@@ -89,7 +89,7 @@ export class StandardSprite3DMaterial extends Sprite3DMaterial implements Clonab
    *
    * @param scope - The current shader function scope used to build the program.
    */
-  protected internalSetupUniforms(scope: PBInsideFunctionScope): void {
+  protected internalSetupUniforms(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
     if (pb.shaderKind === 'fragment' && this.spriteTexture && this.needFragmentColor()) {
       scope.zSpriteTexture = pb.tex2D().uniform(2);
@@ -106,7 +106,7 @@ export class StandardSprite3DMaterial extends Sprite3DMaterial implements Clonab
    * @param scope - The current shader function scope providing inputs and uniforms.
    * @returns A shader expression representing the computed fragment color.
    */
-  protected calcFragmentColor(scope: PBInsideFunctionScope): PBShaderExp {
+  protected calcFragmentColor(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
     return this.spriteTexture ? pb.textureSample(scope.zSpriteTexture, scope.$inputs.zVertexUV) : pb.vec4(1);
   }
@@ -118,7 +118,7 @@ export class StandardSprite3DMaterial extends Sprite3DMaterial implements Clonab
    * call to the internal texture reference so that the associated GPU
    * resource can be released.
    */
-  protected onDispose(): void {
+  protected onDispose() {
     super.onDispose();
     this._texture.dispose();
   }

@@ -83,7 +83,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
     constructor() {
       super();
     }
-    copyFrom(other: this): void {
+    copyFrom(other: this) {
       super.copyFrom(other);
     }
     getCommonData(
@@ -111,7 +111,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         data
       );
     }
-    getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc {
+    getCommonDatasStruct(scope: PBInsideFunctionScope) {
       const pb = scope.$builder;
       return pb.defineStruct([
         pb.vec4('f0'),
@@ -133,7 +133,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       viewVec: PBShaderExp,
       commonData: PBShaderExp,
       outRoughness?: PBShaderExp
-    ): PBShaderExp {
+    ) {
       const pb = scope.$builder;
       const funcName = 'Z_PBRBluePrintLight';
       const that = this;
@@ -181,14 +181,16 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$return(pb.vec4(pb.add(this.lightingColor, this.emissiveColor), this.pbrData.albedo.a));
         }
       );
-      return outRoughness
-        ? pb.getGlobalScope()[funcName](commonData, viewVec, worldPos, outRoughness)
-        : pb.getGlobalScope()[funcName](commonData, viewVec, worldPos);
+      return (
+        outRoughness
+          ? pb.getGlobalScope()[funcName](commonData, viewVec, worldPos, outRoughness)
+          : pb.getGlobalScope()[funcName](commonData, viewVec, worldPos)
+      ) as PBShaderExp;
     }
-    vertexShader(scope: PBFunctionScope): void {
+    vertexShader(scope: PBFunctionScope) {
       super.vertexShader(scope);
     }
-    fragmentShader(scope: PBFunctionScope): void {
+    fragmentShader(scope: PBFunctionScope) {
       const pb = scope.$builder;
       super.fragmentShader(scope);
       if (this.needFragmentColor()) {
@@ -208,7 +210,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       vertexColor: PBShaderExp,
       vertexUV: PBShaderExp,
       data: PBShaderExp
-    ): void {
+    ) {
       const that = this;
       const pb = scope.$builder;
       const funcName = 'zCalculateCommonDataPBRBluePrint';
@@ -415,7 +417,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         scope.$g[funcName](viewVec, commonData, outColor);
       }
     }
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx)) {
         if (ctx.drawEnvLight) {

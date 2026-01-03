@@ -49,10 +49,7 @@ export class WebGPUClearQuad {
         1
       );
   }
-  private static getClearProgram(
-    device: WebGPUDevice,
-    hash: string
-  ): { program: WebGPUProgram; bindGroup: WebGPUBindGroup } {
+  private static getClearProgram(device: WebGPUDevice, hash: string) {
     let programInfo = this._clearPrograms[hash];
     if (!programInfo) {
       const colorAttachments = hash.split('');
@@ -103,7 +100,7 @@ export class WebGPUClearQuad {
     }
     return programInfo;
   }
-  private static initClearQuad(renderPass: WebGPURenderPass): void {
+  private static initClearQuad(renderPass: WebGPURenderPass) {
     this._clearStateSet = renderPass.getDevice().createRenderStateSet() as unknown as WebGPURenderStateSet;
     this._clearStateSet.useDepthState().enableTest(false);
     this._clearStateSet.useRasterizerState().setCullMode('none');
@@ -189,7 +186,7 @@ export class WebGPUMipmapGenerator {
     format: GPUTextureFormat,
     level: number,
     face: number
-  ): GPURenderPassEncoder {
+  ) {
     const passDesc: GPURenderPassDescriptor = {
       colorAttachments: [
         {
@@ -221,7 +218,7 @@ export class WebGPUMipmapGenerator {
     renderPassEncoder.insertDebugMarker('MipmapGeneration');
     return renderPassEncoder;
   }
-  private static initMipmapGeneration(device: WebGPUDevice): void {
+  private static initMipmapGeneration(device: WebGPUDevice) {
     this._mipmapGenerationProgram = device.buildRenderProgram({
       label: 'MipmapGeneration',
       vertex(pb) {

@@ -33,11 +33,7 @@ export class LoaderBase {
    * @param crossOrigin - crossOrigin property for the request
    * @returns Response of the request
    */
-  async request(
-    url: string,
-    headers: Record<string, string> = {},
-    crossOrigin = 'anonymous'
-  ): Promise<Nullable<Response>> {
+  async request(url: string, headers: Record<string, string> = {}, crossOrigin = 'anonymous') {
     const s = this._urlResolver ? this._urlResolver(url) : null;
     return s
       ? fetch(s, {

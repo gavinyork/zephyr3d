@@ -24,7 +24,7 @@ export class BindGroupCache {
     }
     return bgl;
   }
-  private getLayoutHash(desc: Immutable<BindGroupLayout>): string {
+  private getLayoutHash(desc: Immutable<BindGroupLayout>) {
     let hash = '';
     for (const entry of desc.entries) {
       let s = `${entry.binding}:${entry.visibility}:`;

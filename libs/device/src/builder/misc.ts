@@ -9,6 +9,6 @@ export function setCurrentProgramBuilder(pb: Nullable<ProgramBuilder>) {
 }
 
 /** @internal */
-export function getCurrentProgramBuilder(): Nullable<ProgramBuilder> {
+export function getCurrentProgramBuilder() {
   return currentProgramBuilder;
 }

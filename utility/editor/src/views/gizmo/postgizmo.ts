@@ -16,7 +16,7 @@ import {
   createSelectGizmo,
   axisList
 } from './gizmo';
-import type { Ray } from '@zephyr3d/base';
+import type { Nullable, Ray } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { AABB, makeObservable } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
@@ -41,11 +41,11 @@ export type HitType =
 export type GizmoMode = 'none' | 'translation' | 'rotation' | 'scaling' | 'select';
 export type GizmoHitInfo = {
   axis: number;
-  type?: HitType;
+  type?: Nullable<HitType>;
   coord: number;
   distance: number;
-  pointWorld: Vector3;
-  pointLocal: Vector3;
+  pointWorld: Nullable<Vector3>;
+  pointLocal: Nullable<Vector3>;
 };
 
 type TranslatePlaneInfo = {
@@ -90,21 +90,21 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
 }>() {
   static _aabbMesh: DRef<Mesh> = new DRef();
   static _blendBlitter: CopyBlitter = new CopyBlitter();
-  static _gizmoProgram: GPUProgram = null;
-  static _gizmoSelectProgram: GPUProgram = null;
-  static _gridProgram: GPUProgram = null;
-  static _gizmoRenderState: RenderStateSet = null;
-  static _gridRenderState: RenderStateSet = null;
-  static _blendRenderState: RenderStateSet = null;
-  static _gridPrimitive: Primitive = null;
-  static _bindGroup: BindGroup = null;
-  static _gridBindGroup: BindGroup = null;
-  static _rotation: Primitive = null;
+  static _gizmoProgram: Nullable<GPUProgram> = null;
+  static _gizmoSelectProgram: Nullable<GPUProgram> = null;
+  static _gridProgram: Nullable<GPUProgram> = null;
+  static _gizmoRenderState: Nullable<RenderStateSet> = null;
+  static _gridRenderState: Nullable<RenderStateSet> = null;
+  static _blendRenderState: Nullable<RenderStateSet> = null;
+  static _gridPrimitive: Nullable<Primitive> = null;
+  static _bindGroup: Nullable<BindGroup> = null;
+  static _gridBindGroup: Nullable<BindGroup> = null;
+  static _rotation: Nullable<Primitive> = null;
   static _mvpMatrix: Matrix4x4 = new Matrix4x4();
   static _texSize: Vector2 = new Vector2();
   static _cameraNearFar: Vector2 = new Vector2();
   static _axises = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)];
-  static _primitives: Partial<Record<GizmoMode, Primitive>> = null;
+  static _primitives: Nullable<Partial<Record<GizmoMode, Primitive>>> = null;
   private _allowTranslate: boolean;
   private _allowRotate: boolean;
   private _allowScale: boolean;
@@ -112,17 +112,17 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _gridSteps: Float32Array<ArrayBuffer>;
   private readonly _gridParams: Vector4;
   private _camera: Camera;
-  private _node: SceneNode;
+  private _node: Nullable<SceneNode>;
   private _mode: GizmoMode;
   private readonly _axisLength: number;
   private readonly _arrowLength: number;
   private readonly _axisRadius: number;
   private readonly _arrowRadius: number;
   private readonly _boxSize: number;
-  private _translatePlaneInfo: TranslatePlaneInfo;
-  private _rotateInfo: RotateInfo;
-  private _scaleInfo: ScaleInfo;
-  private _hitInfo: GizmoHitInfo;
+  private _translatePlaneInfo: Nullable<TranslatePlaneInfo>;
+  private _rotateInfo: Nullable<RotateInfo>;
+  private _scaleInfo: Nullable<ScaleInfo>;
+  private _hitInfo: Nullable<GizmoHitInfo>;
   private readonly _screenSize: number;
   private _drawGrid: boolean;
   private readonly _scaleBox: AABB;
@@ -210,10 +210,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       this._mode = val;
     }
   }
-  get node(): SceneNode {
+  get node() {
     return this._node;
   }
-  set node(node: SceneNode) {
+  set node(node) {
     this._node = node;
     if (this._node !== PostGizmoRenderer._aabbMesh.get()) {
       this._alwaysDrawIndicator = false;
@@ -254,20 +254,20 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   editAABB(value: AABB) {
     if (!PostGizmoRenderer._aabbMesh.get()) {
       PostGizmoRenderer._aabbMesh.set(
-        new Mesh(this._camera.scene, new BoxShape({ anchor: 0, size: 1 }), new UnlitMaterial())
+        new Mesh(this._camera.scene!, new BoxShape({ anchor: 0, size: 1 }), new UnlitMaterial())
       );
-      PostGizmoRenderer._aabbMesh.get().sealed = true;
-      PostGizmoRenderer._aabbMesh.get().showState = 'hidden';
-      PostGizmoRenderer._aabbMesh.get().remove();
-      PostGizmoRenderer._aabbMesh.get().on('transformchanged', () => {
-        const aabb = PostGizmoRenderer._aabbMesh.get().getWorldBoundingVolume().toAABB();
+      PostGizmoRenderer._aabbMesh.get()!.sealed = true;
+      PostGizmoRenderer._aabbMesh.get()!.showState = 'hidden';
+      PostGizmoRenderer._aabbMesh.get()!.remove();
+      PostGizmoRenderer._aabbMesh.get()!.on('transformchanged', () => {
+        const aabb = PostGizmoRenderer._aabbMesh.get()!.getWorldBoundingVolume()!.toAABB();
         this.dispatchEvent('aabb_changed', aabb);
       });
     }
     const pos = value.minPoint.clone();
     const scale = Vector3.sub(value.maxPoint, value.minPoint);
-    PostGizmoRenderer._aabbMesh.get().position.set(pos);
-    PostGizmoRenderer._aabbMesh.get().scale.set(scale);
+    PostGizmoRenderer._aabbMesh.get()!.position.set(pos);
+    PostGizmoRenderer._aabbMesh.get()!.scale.set(scale);
     this.node = PostGizmoRenderer._aabbMesh.get();
     this._alwaysDrawIndicator = true;
   }
@@ -300,7 +300,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       ctx.device.getDrawingBufferWidth(),
       ctx.device.getDrawingBufferHeight(),
       'rgba8unorm',
-      ctx.device.getFramebuffer().getDepthAttachment().format,
+      ctx.device.getFramebuffer()!.getDepthAttachment()!.format,
       false
     );
     this._calcGizmoMVPMatrix(this._mode, false, PostGizmoRenderer._mvpMatrix);
@@ -312,22 +312,22 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     if (this._drawGrid) {
       this._gridParams.z = ctx.camera.isPerspective() ? 1 : 0;
       ctx.device.setRenderStates(PostGizmoRenderer._gridRenderState);
-      PostGizmoRenderer._gridBindGroup.setValue('viewMatrixInv', ctx.camera.worldMatrix);
-      PostGizmoRenderer._gridBindGroup.setValue('cameraPos', ctx.camera.getWorldPosition());
-      PostGizmoRenderer._gridBindGroup.setValue('params', this._gridParams);
-      PostGizmoRenderer._gridBindGroup.setValue('steps', this._gridSteps);
-      PostGizmoRenderer._gridBindGroup.setValue('viewProjMatrix', ctx.camera.viewProjectionMatrix);
-      PostGizmoRenderer._gridBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
-      PostGizmoRenderer._gridBindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
-      PostGizmoRenderer._gridBindGroup.setTexture(
+      PostGizmoRenderer._gridBindGroup!.setValue('viewMatrixInv', ctx.camera.worldMatrix);
+      PostGizmoRenderer._gridBindGroup!.setValue('cameraPos', ctx.camera.getWorldPosition());
+      PostGizmoRenderer._gridBindGroup!.setValue('params', this._gridParams);
+      PostGizmoRenderer._gridBindGroup!.setValue('steps', this._gridSteps);
+      PostGizmoRenderer._gridBindGroup!.setValue('viewProjMatrix', ctx.camera.viewProjectionMatrix);
+      PostGizmoRenderer._gridBindGroup!.setValue('texSize', PostGizmoRenderer._texSize);
+      PostGizmoRenderer._gridBindGroup!.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
+      PostGizmoRenderer._gridBindGroup!.setTexture(
         'depthTex',
-        destFramebuffer.getDepthAttachment(),
+        destFramebuffer!.getDepthAttachment()!,
         fetchSampler('clamp_nearest_nomip')
       );
-      PostGizmoRenderer._gridBindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
+      PostGizmoRenderer._gridBindGroup!.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
       ctx.device.setProgram(PostGizmoRenderer._gridProgram);
-      ctx.device.setBindGroup(0, PostGizmoRenderer._gridBindGroup);
-      PostGizmoRenderer._gridPrimitive.draw();
+      ctx.device.setBindGroup(0, PostGizmoRenderer._gridBindGroup!);
+      PostGizmoRenderer._gridPrimitive!.draw();
     }
     if (
       this._node &&
@@ -335,48 +335,48 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       !(this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0)
     ) {
       ctx.device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
-      PostGizmoRenderer._bindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
-      PostGizmoRenderer._bindGroup.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
-      PostGizmoRenderer._bindGroup.setValue('texSize', PostGizmoRenderer._texSize);
-      PostGizmoRenderer._bindGroup.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
-      PostGizmoRenderer._bindGroup.setValue('time', (ctx.device.frameInfo.elapsedOverall % 1000) * 0.001);
-      PostGizmoRenderer._bindGroup.setTexture(
+      PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
+      PostGizmoRenderer._bindGroup!.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
+      PostGizmoRenderer._bindGroup!.setValue('texSize', PostGizmoRenderer._texSize);
+      PostGizmoRenderer._bindGroup!.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
+      PostGizmoRenderer._bindGroup!.setValue('time', (ctx.device.frameInfo.elapsedOverall % 1000) * 0.001);
+      PostGizmoRenderer._bindGroup!.setTexture(
         'depthTex',
-        destFramebuffer.getDepthAttachment(),
+        destFramebuffer!.getDepthAttachment()!,
         fetchSampler('clamp_nearest_nomip')
       );
       if (!this._hitInfo) {
-        PostGizmoRenderer._bindGroup.setValue('axisMode', 0);
+        PostGizmoRenderer._bindGroup!.setValue('axisMode', 0);
       } else if (
         this._hitInfo.type === 'move_axis' ||
         this._hitInfo.type === 'rotate_axis' ||
         this._hitInfo.type === 'scale_axis'
       ) {
-        PostGizmoRenderer._bindGroup.setValue('axisMode', axisList[this._hitInfo.axis]);
+        PostGizmoRenderer._bindGroup!.setValue('axisMode', axisList[this._hitInfo.axis]);
       } else if (this._hitInfo.type === 'move_plane') {
-        PostGizmoRenderer._bindGroup.setValue(
+        PostGizmoRenderer._bindGroup!.setValue(
           'axisMode',
           axisList[0] + axisList[1] + axisList[2] - axisList[this._hitInfo.axis]
         );
       } else if (this._hitInfo.type === 'scale_uniform' || this._hitInfo.type === 'move_free') {
-        PostGizmoRenderer._bindGroup.setValue('axisMode', axisList[0] + axisList[1] + axisList[2]);
+        PostGizmoRenderer._bindGroup!.setValue('axisMode', axisList[0] + axisList[1] + axisList[2]);
       } else {
-        PostGizmoRenderer._bindGroup.setValue('axisMode', 0);
+        PostGizmoRenderer._bindGroup!.setValue('axisMode', 0);
       }
       ctx.device.setProgram(
         this._mode === 'select' ? PostGizmoRenderer._gizmoSelectProgram : PostGizmoRenderer._gizmoProgram
       );
-      ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup);
+      ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup!);
       if (this._mode === 'select') {
         ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
       }
-      PostGizmoRenderer._primitives[this._mode].draw();
+      PostGizmoRenderer._primitives![this._mode]!.draw();
       if (this._alwaysDrawIndicator && this._mode !== 'select') {
         this._calcGizmoMVPMatrix('select', false, PostGizmoRenderer._mvpMatrix);
-        PostGizmoRenderer._bindGroup.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
+        PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
         ctx.device.setProgram(PostGizmoRenderer._gizmoSelectProgram);
         ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
-        PostGizmoRenderer._primitives.select.draw();
+        PostGizmoRenderer._primitives!.select!.draw();
       }
     }
     PostGizmoRenderer._blendBlitter.renderStates = PostGizmoRenderer._blendRenderState;
@@ -418,15 +418,15 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       if (type === 'pointerdown' && button === 0) {
         if (this._hitInfo) {
           if (this._mode === 'translation' && !this._translatePlaneInfo) {
-            this._beginTranslate(x, y, this._hitInfo.axis, this._hitInfo.type, this._hitInfo.pointLocal);
+            this._beginTranslate(x, y, this._hitInfo.axis, this._hitInfo.type!, this._hitInfo.pointLocal!);
             return true;
           }
           if (this._mode === 'rotation' && !this._rotateInfo) {
-            this._beginRotate(x, y, this._hitInfo.axis, this._hitInfo.pointWorld);
+            this._beginRotate(x, y, this._hitInfo.axis, this._hitInfo.pointWorld!);
             return true;
           }
           if (this._mode === 'scaling' && !this._scaleInfo) {
-            this._beginScale(x, y, this._hitInfo.axis, this._hitInfo.type, this._hitInfo.pointLocal);
+            this._beginScale(x, y, this._hitInfo.axis, this._hitInfo.type!, this._hitInfo.pointLocal!);
             return true;
           }
         }
@@ -463,7 +463,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     return false;
   }
   /** Ray intersection */
-  rayIntersection(ray: Ray): GizmoHitInfo {
+  rayIntersection(ray: Ray): Nullable<GizmoHitInfo> {
     const worldMatrix = this._calcGizmoWorldMatrix(this._mode, false);
     const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
     const rayLocal = ray.transform(invWorldMatrix);
@@ -476,7 +476,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         pointLocal: null
       };
       const d = rayLocal.bboxIntersectionTestEx(this._scaleBox);
-      if (d > 0) {
+      if (d !== null && d > 0) {
         hitInfo.type = this._mode === 'scaling' ? 'scale_uniform' : 'move_free';
         hitInfo.distance = d;
         hitInfo.pointLocal = Vector3.add(
@@ -547,7 +547,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._endScale();
     getDevice().canvas.style.cursor = 'grab';
     const center = new Vector3();
-    this._node.worldMatrix.decompose(null, null, center);
+    this._node!.worldMatrix.decompose(null, null, center);
     this._camera.viewProjectionMatrix.transformPointH(center, center);
     const vpWidth = this._camera.viewport ? this._camera.viewport[2] : getDevice().getViewport().width;
     const vpHeight = this._camera.viewport ? this._camera.viewport[3] : getDevice().getViewport().height;
@@ -559,11 +559,11 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       centerX,
       centerY,
       startPosition: hitPosition,
-      startRotation: new Quaternion(this._node.rotation),
+      startRotation: new Quaternion(this._node!.rotation),
       axis,
       speed: this._measureRotateSpeed()
     };
-    this.dispatchEvent('begin_rotate', this._node);
+    this.dispatchEvent('begin_rotate', this._node!);
   }
   private _updateRotate(x: number, y: number) {
     if (!this._rotateInfo) {
@@ -585,19 +585,19 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
     if (this._rotateInfo.axis === 0) {
       axis.setXYZ(1, 0, 0);
-      if (cameraPos.x < worldMatrix.m03) {
+      if (cameraPos!.x < worldMatrix.m03) {
         angle *= -1;
       }
       //angle = -(deltaY * 0.5) / this._rotateInfo.speed;
     } else if (this._rotateInfo.axis === 1) {
       axis.setXYZ(0, 1, 0);
-      if (cameraPos.y < worldMatrix.m13) {
+      if (cameraPos!.y < worldMatrix.m13) {
         angle *= -1;
       }
       //angle = (deltaX * 0.5) / this._rotateInfo.speed;
     } else if (this._rotateInfo.axis === 2) {
       axis.setXYZ(0, 0, 1);
-      if (cameraPos.z < worldMatrix.m23) {
+      if (cameraPos!.z < worldMatrix.m23) {
         angle *= -1;
       }
       //angle = -(deltaY * 0.5) / this._rotateInfo.speed;
@@ -625,7 +625,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           nearestPoint.set(nearestPoint2);
         }
       }
-      const center = this._node.getWorldPosition();
+      const center = this._node!.getWorldPosition();
       const edge1 = Vector3.sub(this._rotateInfo.startPosition, center).inplaceNormalize();
       const edge2 = Vector3.sub(nearestPoint, center).inplaceNormalize();
       Vector3.cross(edge1, edge2, axis).inplaceNormalize();
@@ -634,7 +634,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     invWorldMatrix.transformVectorAffine(axis, axis);
     axis.inplaceNormalize();
     const deltaRotation = Quaternion.fromAxisAngle(axis, angle);
-    this._node.rotation = Quaternion.multiply(deltaRotation, this._rotateInfo.startRotation);
+    this._node!.rotation = Quaternion.multiply(deltaRotation, this._rotateInfo.startRotation);
   }
   private _endRotate() {
     getDevice().canvas.style.cursor = 'default';
@@ -674,10 +674,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       startY,
       planeAxis,
       type,
-      scale: new Vector3(this._node.scale),
+      scale: new Vector3(this._node!.scale),
       lastPlanePos: pointLocal.mulBy(scale)
     };
-    this.dispatchEvent('begin_scale', this._node);
+    this.dispatchEvent('begin_scale', this._node!);
   }
   private _calcScaleFactor(d: number) {
     return Math.max(0.0001, 1 + d * 0.2);
@@ -699,15 +699,15 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       const d =
         (0 - rayLocal.origin[this._scaleInfo.planeAxis]) / rayLocal.direction[this._scaleInfo.planeAxis];
       const p = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, d));
-      this._node.scale[c] =
+      this._node!.scale[c] =
         this._scaleInfo.scale[c] *
         this._calcScaleFactor(p[this._scaleInfo.axis] - this._scaleInfo.lastPlanePos[this._scaleInfo.axis]);
     } else if (this._scaleInfo.type === 'scale_uniform') {
       const d = this._scaleInfo.startY - y;
       const factor = this._calcScaleFactor(d / 20);
-      this._node.scale.x = this._node.scale.x * factor;
-      this._node.scale.y = this._node.scale.y * factor;
-      this._node.scale.z = this._node.scale.z * factor;
+      this._node!.scale.x = this._node!.scale.x * factor;
+      this._node!.scale.y = this._node!.scale.y * factor;
+      this._node!.scale.z = this._node!.scale.z * factor;
       this._scaleInfo.startY = y;
     }
   }
@@ -750,7 +750,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       type,
       lastPlanePos: pointLocal.mulBy(scale)
     };
-    this.dispatchEvent('begin_translate', this._node);
+    this.dispatchEvent('begin_translate', this._node!);
   }
   private _updateTranslation(x: number, y: number, pickResult: PickResult) {
     if (!this._translatePlaneInfo) {
@@ -759,8 +759,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     if (this._translatePlaneInfo.type === 'move_free') {
       const hitPos = pickResult?.intersectedPoint ?? null;
       if (hitPos) {
-        const parentPos = this._node.parent.getWorldPosition();
-        this._node.position.set(Vector3.sub(hitPos, parentPos, parentPos));
+        const parentPos = this._node!.parent!.getWorldPosition();
+        this._node!.position.set(Vector3.sub(hitPos, parentPos, parentPos));
       } else {
         const ray = this.camera.constructRay(x, y);
         let hitDistance = -ray.origin.y / ray.direction.y;
@@ -770,7 +770,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         const px = ray.origin.x + ray.direction.x * hitDistance;
         const py = ray.origin.y + ray.direction.y * hitDistance;
         const pz = ray.origin.z + ray.direction.z * hitDistance;
-        this._node.position.setXYZ(px, py, pz);
+        this._node!.position.setXYZ(px, py, pz);
       }
       return;
     }
@@ -789,14 +789,14 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       rayLocal.direction[this._translatePlaneInfo.planeAxis];
     const p = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, d));
     if (this._translatePlaneInfo.type === 'move_axis') {
-      this._node.position[c] +=
+      this._node!.position[c] +=
         p[this._translatePlaneInfo.axis] -
         this._translatePlaneInfo.lastPlanePos[this._translatePlaneInfo.axis];
     } else {
       const dx = p[t[0]] - this._translatePlaneInfo.lastPlanePos[t[0]];
       const dy = p[t[1]] - this._translatePlaneInfo.lastPlanePos[t[1]];
-      this._node.position[t[0]] += dx;
-      this._node.position[t[1]] += dy;
+      this._node!.position[t[0]] += dx;
+      this._node!.position[t[1]] += dy;
     }
   }
   private _endTranslation() {
@@ -889,7 +889,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     intersectWithPlane: boolean,
     info: GizmoHitInfo
   ) {
-    let type: HitType = null;
+    let type: Nullable<HitType> = null;
     let intersectedAxis = -1;
     let minDistance = Infinity;
     let intersectedCoord = 0;

@@ -1,4 +1,3 @@
-import type { SerializableClass } from '../../serialization';
 import { BaseGraphNode } from '../node';
 
 /**
@@ -55,7 +54,7 @@ export class VertexColorNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: VertexColorNode,
       name: 'VertexColorNode',
@@ -80,7 +79,7 @@ export class VertexColorNode extends BaseGraphNode {
    * @remarks
    * Vertex color nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -89,7 +88,7 @@ export class VertexColorNode extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for individual channel outputs (id \> 1), 'vec4' for full color
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec4';
   }
 }
@@ -145,7 +144,7 @@ export class VertexUVNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: VertexUVNode,
       name: 'VertexUVNode',
@@ -170,7 +169,7 @@ export class VertexUVNode extends BaseGraphNode {
    * @remarks
    * Vertex UV nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -179,7 +178,7 @@ export class VertexUVNode extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for individual component outputs (id \> 1), 'vec2' for full UV
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec2';
   }
 }
@@ -250,7 +249,7 @@ export class VertexPositionNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: VertexPositionNode,
       name: 'VertexPositionNode',
@@ -267,7 +266,7 @@ export class VertexPositionNode extends BaseGraphNode {
    * @remarks
    * Vertex position nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -276,7 +275,7 @@ export class VertexPositionNode extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for individual component outputs (id \> 1), 'vec3' for full position
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec3';
   }
 }
@@ -347,7 +346,7 @@ export class VertexNormalNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: VertexNormalNode,
       name: 'VertexNormalNode',
@@ -364,7 +363,7 @@ export class VertexNormalNode extends BaseGraphNode {
    * @remarks
    * Vertex normal nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -373,7 +372,7 @@ export class VertexNormalNode extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for individual component outputs (id \> 1), 'vec3' for full normal
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec3';
   }
 }
@@ -442,7 +441,7 @@ export class VertexTangentNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: VertexTangentNode,
       name: 'VertexTangentNode',
@@ -459,7 +458,7 @@ export class VertexTangentNode extends BaseGraphNode {
    * @remarks
    * Vertex tangent nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -468,7 +467,7 @@ export class VertexTangentNode extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for individual component outputs (id \> 1), 'vec3' for full tangent
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec3';
   }
 }
@@ -540,7 +539,7 @@ export class VertexBinormalNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: VertexBinormalNode,
       name: 'VertexBinormalNode',
@@ -557,7 +556,7 @@ export class VertexBinormalNode extends BaseGraphNode {
    * @remarks
    * Vertex binormal nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -566,7 +565,7 @@ export class VertexBinormalNode extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for individual component outputs (id \> 1), 'vec3' for full binormal
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec3';
   }
 }
@@ -627,7 +626,7 @@ export class ProjectionMatrixNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ProjectionMatrixNode,
       name: 'ProjectionMatrixNode',
@@ -644,7 +643,7 @@ export class ProjectionMatrixNode extends BaseGraphNode {
    * @remarks
    * Matrix nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -652,7 +651,7 @@ export class ProjectionMatrixNode extends BaseGraphNode {
    *
    * @returns 'mat4'
    */
-  protected getType(): string {
+  protected getType() {
     return 'mat4';
   }
 }
@@ -713,7 +712,7 @@ export class ViewMatrixNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ViewMatrixNode,
       name: 'ViewMatrixNode',
@@ -730,7 +729,7 @@ export class ViewMatrixNode extends BaseGraphNode {
    * @remarks
    * Matrix nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -738,7 +737,7 @@ export class ViewMatrixNode extends BaseGraphNode {
    *
    * @returns 'mat4'
    */
-  protected getType(): string {
+  protected getType() {
     return 'mat4';
   }
 }
@@ -799,7 +798,7 @@ export class ViewProjMatrixNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ViewProjMatrixNode,
       name: 'ViewProjMatrixNode',
@@ -816,7 +815,7 @@ export class ViewProjMatrixNode extends BaseGraphNode {
    * @remarks
    * Matrix nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -824,7 +823,7 @@ export class ViewProjMatrixNode extends BaseGraphNode {
    *
    * @returns 'mat4'
    */
-  protected getType(): string {
+  protected getType() {
     return 'mat4';
   }
 }
@@ -882,7 +881,7 @@ export class InvProjMatrixNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: InvProjMatrixNode,
       name: 'InvProjMatrixNode',
@@ -899,7 +898,7 @@ export class InvProjMatrixNode extends BaseGraphNode {
    * @remarks
    * Matrix nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -907,7 +906,7 @@ export class InvProjMatrixNode extends BaseGraphNode {
    *
    * @returns 'mat4'
    */
-  protected getType(): string {
+  protected getType() {
     return 'mat4';
   }
 }
@@ -967,7 +966,7 @@ export class InvViewProjMatrixNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: InvViewProjMatrixNode,
       name: 'InvViewProjMatrixNode',
@@ -984,7 +983,7 @@ export class InvViewProjMatrixNode extends BaseGraphNode {
    * @remarks
    * Matrix nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -992,7 +991,7 @@ export class InvViewProjMatrixNode extends BaseGraphNode {
    *
    * @returns 'mat4'
    */
-  protected getType(): string {
+  protected getType() {
     return 'mat4';
   }
 }
@@ -1026,7 +1025,7 @@ export class BillboardMatrixNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: BillboardMatrixNode,
       name: 'BillboardMatrixNode',
@@ -1043,7 +1042,7 @@ export class BillboardMatrixNode extends BaseGraphNode {
    * @remarks
    * Matrix nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -1051,7 +1050,7 @@ export class BillboardMatrixNode extends BaseGraphNode {
    *
    * @returns 'mat4'
    */
-  protected getType(): string {
+  protected getType() {
     return 'mat3';
   }
 }
@@ -1120,7 +1119,7 @@ export class ElapsedTimeNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ElapsedTimeNode,
       name: 'ElapsedTimeNode',
@@ -1137,7 +1136,7 @@ export class ElapsedTimeNode extends BaseGraphNode {
    * @remarks
    * Time nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -1145,7 +1144,7 @@ export class ElapsedTimeNode extends BaseGraphNode {
    *
    * @returns 'float'
    */
-  protected getType(): string {
+  protected getType() {
     return 'float';
   }
 }
@@ -1221,7 +1220,7 @@ export class CameraPositionNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: CameraPositionNode,
       name: 'CameraPositionNode',
@@ -1238,7 +1237,7 @@ export class CameraPositionNode extends BaseGraphNode {
    * @remarks
    * Camera position nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -1247,7 +1246,7 @@ export class CameraPositionNode extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for individual component outputs (id \> 1), 'vec3' for full position
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec3';
   }
 }
@@ -1304,7 +1303,7 @@ export class SkyEnvTextureNode extends BaseGraphNode {
    *
    * @returns 'SkyEnvTexture'
    */
-  toString(): string {
+  toString() {
     return 'SkyEnvTexture';
   }
   /**
@@ -1312,7 +1311,7 @@ export class SkyEnvTextureNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: SkyEnvTextureNode,
       name: 'SkyEnvTextureNode',
@@ -1329,7 +1328,7 @@ export class SkyEnvTextureNode extends BaseGraphNode {
    * @remarks
    * Sky environment texture nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -1337,7 +1336,7 @@ export class SkyEnvTextureNode extends BaseGraphNode {
    *
    * @returns 'texCube' (cubemap texture sampler)
    */
-  protected getType(): string {
+  protected getType() {
     return 'texCube';
   }
 }
@@ -1409,7 +1408,7 @@ export class CameraNearFarNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: CameraNearFarNode,
       name: 'CameraNearFarNode',
@@ -1426,7 +1425,7 @@ export class CameraNearFarNode extends BaseGraphNode {
    * @remarks
    * Camera near/far nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -1435,7 +1434,7 @@ export class CameraNearFarNode extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for individual component outputs (id \> 1), 'vec2' for combined output
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec2';
   }
 }
@@ -1469,7 +1468,7 @@ export class ResolveVertexPositionNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ResolveVertexPositionNode,
       name: 'ResolveVertexPositionNode',
@@ -1486,7 +1485,7 @@ export class ResolveVertexPositionNode extends BaseGraphNode {
    * @remarks
    * Vertex position resolver nodes are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -1494,7 +1493,7 @@ export class ResolveVertexPositionNode extends BaseGraphNode {
    *
    * @returns vec3
    */
-  protected getType(): string {
+  protected getType() {
     return 'vec3';
   }
 }
@@ -1528,7 +1527,7 @@ export class ResolveVertexNormalNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ResolveVertexNormalNode,
       name: 'ResolveVertexNormalNode',
@@ -1545,7 +1544,7 @@ export class ResolveVertexNormalNode extends BaseGraphNode {
    * @remarks
    * Vertex normal resolve node are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -1553,7 +1552,7 @@ export class ResolveVertexNormalNode extends BaseGraphNode {
    *
    * @returns vec3
    */
-  protected getType(): string {
+  protected getType() {
     return 'vec3';
   }
 }
@@ -1587,7 +1586,7 @@ export class ResolveVertexTangentNode extends BaseGraphNode {
    *
    * @returns Serialization class descriptor
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ResolveVertexTangentNode,
       name: 'ResolveVertexTangentNode',
@@ -1604,7 +1603,7 @@ export class ResolveVertexTangentNode extends BaseGraphNode {
    * @remarks
    * Vertex tangent resolve node are always valid as they have no inputs.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -1612,7 +1611,7 @@ export class ResolveVertexTangentNode extends BaseGraphNode {
    *
    * @returns vec4
    */
-  protected getType(): string {
+  protected getType() {
     return 'vec4';
   }
 }

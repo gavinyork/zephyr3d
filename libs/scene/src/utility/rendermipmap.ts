@@ -25,8 +25,8 @@ export abstract class RenderMipmap {
     rightBottom: PBShaderExp,
     uv: PBShaderExp
   ): PBShaderExp;
-  setupUniforms(_scope: PBGlobalScope): void {}
-  applyUniformValues(_bindGroup: BindGroup): void {}
+  setupUniforms(_scope: PBGlobalScope) {}
+  applyUniformValues(_bindGroup: BindGroup) {}
   constructor() {
     this._program = new DRef();
     this._bindGroup = new DRef();
@@ -58,7 +58,7 @@ export abstract class RenderMipmap {
     miplevel: number,
     srcTexture: Texture2D,
     dstTexture: Texture2D
-  ): void {
+  ) {
     const sampler = fetchSampler('clamp_nearest');
     const framebuffer = device.createFrameBuffer([dstTexture], null);
     framebuffer.setColorAttachmentMipLevel(0, miplevel + 1);

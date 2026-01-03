@@ -82,7 +82,7 @@ export class Frustum {
    *
    * @returns The point of given corner
    */
-  getCorner(pos: number): Vector3 {
+  getCorner(pos: number) {
     return this.corners[pos];
   }
   /**
@@ -91,7 +91,7 @@ export class Frustum {
    * @param pt - The point to test.
    * @returns true if the point is inside the frustum, otherwise false
    */
-  containsPoint(pt: Vector3, epsl = 1e-6): boolean {
+  containsPoint(pt: Vector3, epsl = 1e-6) {
     for (const p of this.planes) {
       if (p.distanceToPoint(pt) < -epsl) {
         return false;
@@ -104,7 +104,7 @@ export class Frustum {
    * @param transform - Model-view matrix used to initialize the frustum
    * @returns self
    */
-  initWithMatrix(transform: Matrix4x4): this {
+  initWithMatrix(transform: Matrix4x4) {
     this._planes = this._planes || Array.from({ length: 6 }).map(() => new Plane());
     this._planes[BoxSide.LEFT]
       .setEquation(

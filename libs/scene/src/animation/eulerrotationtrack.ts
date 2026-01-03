@@ -66,7 +66,7 @@ export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
     this._interpolator = interp ?? null;
   }
   /** {@inheritDoc AnimationTrack.calculateState} */
-  calculateState(target: object, currentTime: number): Quaternion {
+  calculateState(target: object, currentTime: number) {
     this._interpolator.interpolate(currentTime, tmpVec3);
     this._state.fromEulerAngle(tmpVec3.x, tmpVec3.y, tmpVec3.z);
     return this._state;
@@ -76,15 +76,15 @@ export class NodeEulerRotationTrack extends AnimationTrack<Quaternion> {
     node.rotation.set(state);
   }
   /** {@inheritDoc AnimationTrack.mixState} */
-  mixState(a: Quaternion, b: Quaternion, t: number): Quaternion {
+  mixState(a: Quaternion, b: Quaternion, t: number) {
     return Quaternion.slerp(a, b, t);
   }
   /** {@inheritDoc AnimationTrack.getBlendId} */
-  getBlendId(): unknown {
+  getBlendId() {
     return 'node-rotation';
   }
   /** {@inheritDoc AnimationTrack.getDuration} */
-  getDuration(): number {
+  getDuration() {
     return this._interpolator.maxTime;
   }
 }

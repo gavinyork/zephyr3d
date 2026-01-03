@@ -1,7 +1,7 @@
 import { SceneNode } from '../../../scene/scene_node';
 import type { SceneNodeVisible } from '../../../scene/scene_node';
 import { Scene } from '../../../scene/scene';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import type { DiffPatch, DiffValue } from '@zephyr3d/base';
 import { applyPatch, ASSERT, degree2radian, diff, DRef, radian2degree } from '@zephyr3d/base';
 import { GraphNode } from '../../../scene';
@@ -59,7 +59,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         : null;
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Id',
           type: 'string',
@@ -83,7 +83,9 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         {
           name: 'Name',
           type: 'string',
-          defaultValue: '',
+          getDefaultValue() {
+            return '';
+          },
           get(this: SceneNode, value) {
             value.str[0] = this.name;
           },
@@ -324,7 +326,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
             this.metaData = (value?.object[0] as JSONData)?.data ?? null;
           }
         }
-      ];
+      ]);
     }
   };
 }

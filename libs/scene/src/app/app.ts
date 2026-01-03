@@ -1,4 +1,4 @@
-import type { Nullable, VFS } from '@zephyr3d/base';
+import type { Nullable, RequireOptionals, VFS } from '@zephyr3d/base';
 import { Observable, flushPendingDisposals } from '@zephyr3d/base';
 import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 import { InputManager } from './inputmgr';
@@ -49,12 +49,11 @@ type appEventMap = {
 export type EditorMode = 'editor' | 'editor-preview' | 'none';
 
 /**
- * Creation options for Application.
+ * Options for Application.
  *
- * Provides the canvas, device backend, and optional runtime and device configuration.
  * @public
  */
-export type AppOptions = {
+export interface AppOptions {
   /**
    * Target canvas element to attach the rendering device to.
    */
@@ -72,6 +71,15 @@ export type AppOptions = {
    * Device pixel ratio used when creating the device. Defaults to `window.devicePixelRatio` or 1.
    */
   pixelRatio?: number;
+}
+
+/**
+ * Creation options for Application.
+ *
+ * Provides the canvas, device backend, and optional runtime and device configuration.
+ * @public
+ */
+export interface AppCreationOptions extends AppOptions {
   /**
    * Options for the runtime scripting system.
    */
@@ -97,7 +105,7 @@ export type AppOptions = {
      */
     screen?: ScreenConfig;
   };
-};
+}
 
 /**
  * Log severity levels.
@@ -126,7 +134,7 @@ export type LogMode = 'info' | 'warn' | 'error' | 'debug';
  * @public
  */
 export class Application extends Observable<appEventMap> {
-  private readonly _options: AppOptions;
+  private readonly _options: RequireOptionals<AppOptions>;
   private _device: Nullable<AbstractDevice>;
   private readonly _inputManager: InputManager;
   private readonly _engine: Engine;
@@ -139,7 +147,7 @@ export class Application extends Observable<appEventMap> {
    *
    * @param opt - Application creation options (canvas, backend, and optional runtime/device settings).
    */
-  constructor(opt: AppOptions) {
+  constructor(opt: AppCreationOptions) {
     super();
     if (getApp()) {
       throw new Error('It is not allowed to have multiple Application instances');
@@ -174,13 +182,13 @@ export class Application extends Observable<appEventMap> {
   /**
    * The input manager instance handling pointer/keyboard event routing.
    */
-  get inputManager(): InputManager {
+  get inputManager() {
     return this._inputManager;
   }
   /**
    * Get the instanceof {@link Engine}.
    */
-  get engine(): Engine {
+  get engine() {
     return this._engine;
   }
   /**
@@ -188,7 +196,7 @@ export class Application extends Observable<appEventMap> {
    *
    * Note: Defaults are applied for `enableMSAA` and `pixelRatio` if omitted.
    */
-  get options(): AppOptions {
+  get options() {
     return this._options;
   }
   /**
@@ -196,13 +204,13 @@ export class Application extends Observable<appEventMap> {
    *
    * Available after `await ready()`.
    */
-  get device(): AbstractDevice {
+  get device() {
     return this._device!;
   }
   /**
    * Convenience accessor for the device type name provided by the backend.
    */
-  get deviceType(): string {
+  get deviceType() {
     return this._options.backend.typeName();
   }
   /**

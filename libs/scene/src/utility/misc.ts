@@ -106,7 +106,7 @@ let defaultCopyRenderState: Nullable<RenderStateSet> = null;
  * @returns The sampler for the given type
  * @public
  */
-export function fetchSampler(type: SamplerType): Nullable<TextureSampler> {
+export function fetchSampler(type: SamplerType) {
   let sampler = samplers[type];
   if (!sampler) {
     const opt = samplerOptions[type];

@@ -10,7 +10,7 @@ const _f16one = float2half(1);
  * @internal
  */
 export class HDRLoader extends AbstractTextureLoader {
-  supportMIMEType(mimeType: string): boolean {
+  supportMIMEType(mimeType: string) {
     return mimeType === 'image/hdr' || mimeType === 'image/x-hdr' || mimeType === 'image/vnd.radiance';
   }
   async load(
@@ -19,7 +19,7 @@ export class HDRLoader extends AbstractTextureLoader {
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture
-  ): Promise<Nullable<BaseTexture>> {
+  ) {
     let format: Nullable<TextureFormat> = null;
     for (const fmt of ['rg11b10uf', 'rgba16f', 'rgba32f', 'rgba8unorm'] as const) {
       const info = getDevice().getDeviceCaps().textureCaps.getTextureFormatInfo(fmt);
@@ -47,7 +47,7 @@ export class HDRLoader extends AbstractTextureLoader {
     }
     return tex;
   }
-  private _rgbeToFloat32(buffer: Uint8Array<ArrayBuffer>): Float32Array<ArrayBuffer> {
+  private _rgbeToFloat32(buffer: Uint8Array<ArrayBuffer>) {
     const length = buffer.byteLength >> 2;
     const result = new Float32Array(length * 4);
 
@@ -61,7 +61,7 @@ export class HDRLoader extends AbstractTextureLoader {
     }
     return result;
   }
-  private _rgbeToFloat16(buffer: Uint8Array<ArrayBuffer>): Uint16Array<ArrayBuffer> {
+  private _rgbeToFloat16(buffer: Uint8Array<ArrayBuffer>) {
     const length = buffer.byteLength >> 2;
     const result = new Uint16Array(length * 4);
     for (let i = 0; i < length; i++) {
@@ -73,7 +73,7 @@ export class HDRLoader extends AbstractTextureLoader {
     }
     return result;
   }
-  private _rgbeToR11G11B10(buffer: Uint8Array<ArrayBuffer>): Uint32Array<ArrayBuffer> {
+  private _rgbeToR11G11B10(buffer: Uint8Array<ArrayBuffer>) {
     const length = buffer.byteLength >> 2;
     const result = new Uint32Array(length);
 
@@ -89,7 +89,7 @@ export class HDRLoader extends AbstractTextureLoader {
   /*
     Decode: rgb = pow(6 * rgbm.rgb * rgbm.a, 2.2);
    */
-  private _rgbeToRGBM(buffer: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
+  private _rgbeToRGBM(buffer: Uint8Array<ArrayBuffer>) {
     const length = buffer.byteLength >> 2;
     const result = new Uint8Array(length * 4);
 

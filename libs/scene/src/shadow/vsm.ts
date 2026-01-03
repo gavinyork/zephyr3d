@@ -10,13 +10,13 @@ import { ShadowImpl } from './shadow_impl';
 import type { BlitType } from '../blitter';
 import { Blitter } from '../blitter';
 import { computeShadowMapDepth, filterShadowVSM } from '../shaders/shadow';
-import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
+import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
 import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encode2HalfToRGBA } from '../shaders/misc';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
 import { getDevice } from '../app/api';
-import { Nullable } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
 
 type VSMImplData = {
   blurFramebuffer: FrameBuffer;
@@ -35,25 +35,25 @@ class VSMBlitter extends Blitter {
     this._kernelSize = kernelSize;
     this._packFloat = packFloat;
   }
-  get blurSize(): number {
+  get blurSize() {
     return this._blurSize;
   }
-  set blurSize(val: number) {
+  set blurSize(val) {
     this._blurSize = val;
   }
-  get kernelSize(): number {
+  get kernelSize() {
     return this._kernelSize;
   }
-  set kernelSize(val: number) {
+  set kernelSize(val) {
     if (val !== this._kernelSize) {
       this._kernelSize = val;
       this.invalidateHash();
     }
   }
-  get packFloat(): boolean {
+  get packFloat() {
     return this._packFloat;
   }
-  set packFloat(b: boolean) {
+  set packFloat(b) {
     if (this._packFloat !== !!b) {
       this._packFloat = !!b;
       this.invalidateHash();
@@ -85,7 +85,7 @@ class VSMBlitter extends Blitter {
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'float' | 'int' | 'uint'
-  ): PBShaderExp {
+  ) {
     const pb = scope.$builder;
     const texel = super.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
     if (this._packFloat) {
@@ -98,12 +98,7 @@ class VSMBlitter extends Blitter {
       return texel;
     }
   }
-  writeTexel(
-    scope: PBInsideFunctionScope,
-    type: BlitType,
-    srcUV: PBShaderExp,
-    texel: PBShaderExp
-  ): PBShaderExp {
+  writeTexel(scope: PBInsideFunctionScope, type: BlitType, srcUV: PBShaderExp, texel: PBShaderExp) {
     const outTexel = super.writeTexel(scope, type, srcUV, texel);
     if (this._packFloat) {
       return encode2HalfToRGBA(scope, outTexel.x, outTexel.y);
@@ -118,7 +113,7 @@ class VSMBlitter extends Blitter {
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'int' | 'float' | 'uint'
-  ): PBShaderExp {
+  ) {
     const that = this;
     const pb = scope.$builder;
     scope.d0 = that.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
@@ -156,7 +151,7 @@ class VSMBlitter extends Blitter {
     scope.stdDev = pb.sqrt(pb.max(0, pb.sub(scope.squaredMean, pb.mul(scope.mean, scope.mean))));
     return pb.vec4(scope.mean, scope.stdDev, 0, 1);
   }
-  protected calcHash(): string {
+  protected calcHash() {
     return `${this._phase}-${this._kernelSize}-${Number(this._packFloat)}`;
   }
 }
@@ -187,22 +182,22 @@ export class VSM extends ShadowImpl {
     this._blitterH = new VSMBlitter('horizonal', this._kernelSize, 1 / 1024, false);
     this._blitterV = new VSMBlitter('vertical', this._kernelSize, 1 / 1024, false);
   }
-  resourceDirty(): boolean {
+  resourceDirty() {
     return this._resourceDirty;
   }
-  get blur(): boolean {
+  get blur() {
     return this._blur;
   }
-  set blur(val: boolean) {
+  set blur(val) {
     if (this._blur !== !!val) {
       this._blur = !!val;
       this._resourceDirty = true;
     }
   }
-  get mipmap(): boolean {
+  get mipmap() {
     return this._mipmap;
   }
-  set mipmap(b: boolean) {
+  set mipmap(b) {
     if (this._mipmap !== !!b) {
       this._mipmap = !!b;
       if (this._blur) {
@@ -210,31 +205,31 @@ export class VSM extends ShadowImpl {
       }
     }
   }
-  get kernelSize(): number {
+  get kernelSize() {
     return this._kernelSize;
   }
-  set kernelSize(val: number) {
+  set kernelSize(val) {
     this._kernelSize = val;
   }
-  get blurSize(): number {
+  get blurSize() {
     return this._blurSize;
   }
-  set blurSize(val: number) {
+  set blurSize(val) {
     this._blurSize = val;
   }
-  getDepthScale(): number {
+  getDepthScale() {
     return this._darkness;
   }
-  setDepthScale(val: number) {
+  setDepthScale(val) {
     this._darkness = val;
   }
-  getType(): ShadowMode {
-    return 'vsm';
+  getType() {
+    return 'vsm' as const;
   }
-  getShadowMapBorder(_shadowMapParams: ShadowMapParams): number {
+  getShadowMapBorder(_shadowMapParams: ShadowMapParams) {
     return this._blur ? Math.ceil(((this._kernelSize + 1) / 2) * this._blurSize) : 0;
   }
-  getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType {
+  getShadowMap(shadowMapParams: ShadowMapParams) {
     const implData = shadowMapParams.implData as VSMImplData;
     return (
       implData
@@ -338,10 +333,10 @@ export class VSM extends ShadowImpl {
       );
     }
   }
-  getShaderHash(): string {
+  getShaderHash() {
     return '';
   }
-  getShadowMapColorFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
+  getShadowMapColorFormat(_shadowMapParams: ShadowMapParams) {
     const device = getDevice();
     return device.getDeviceCaps().textureCaps.supportFloatColorBuffer &&
       device.getDeviceCaps().textureCaps.supportLinearFloatTexture
@@ -355,14 +350,14 @@ export class VSM extends ShadowImpl {
           : 'rg16f'
         : 'rgba8unorm';
   }
-  getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
-    return 'd24s8';
+  getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams) {
+    return 'd24s8' as const;
   }
   computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp
-  ): PBShaderExp {
+  ) {
     return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap!.format);
   }
   computeShadowCSM(
@@ -371,7 +366,7 @@ export class VSM extends ShadowImpl {
     shadowVertex: PBShaderExp,
     NdotL: PBShaderExp,
     split: PBShaderExp
-  ): PBShaderExp {
+  ) {
     const funcNameComputeShadowCSM = 'lib_computeShadowCSM';
     const pb = scope.$builder;
     pb.func(
@@ -408,14 +403,14 @@ export class VSM extends ShadowImpl {
         this.$return(this.shadow);
       }
     );
-    return pb.getGlobalScope()[funcNameComputeShadowCSM](shadowVertex, NdotL, split);
+    return pb.getGlobalScope()[funcNameComputeShadowCSM](shadowVertex, NdotL, split) as PBShaderExp;
   }
   computeShadow(
     shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,
     shadowVertex: PBShaderExp,
     NdotL: PBShaderExp
-  ): PBShaderExp {
+  ) {
     const funcNameComputeShadow = 'lib_computeShadow';
     const pb = scope.$builder;
     pb.func(funcNameComputeShadow, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
@@ -488,9 +483,9 @@ export class VSM extends ShadowImpl {
         this.$return(this.shadow);
       }
     });
-    return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
+    return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL) as PBShaderExp;
   }
-  useNativeShadowMap(_shadowMapParams: ShadowMapParams): boolean {
+  useNativeShadowMap(_shadowMapParams: ShadowMapParams) {
     return false;
   }
 }

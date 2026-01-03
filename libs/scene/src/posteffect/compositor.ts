@@ -63,7 +63,7 @@ export class Compositor {
     this._textureFormat = 'rgba16f';
   }
   /** @internal */
-  requireLinearDepth(ctx: DrawContext): boolean {
+  requireLinearDepth(ctx: DrawContext) {
     for (const list of this._postEffects) {
       for (const postEffect of list) {
         if (postEffect.get()!.requireLinearDepthTexture(ctx)) {
@@ -79,7 +79,7 @@ export class Compositor {
    * @param postEffect - The post effect to add
    * @param opaque - true if the post effect should be applied after the opaque pass and before the transparent pass, otherwise the post effect should be applied after the transparent pass
    */
-  appendPostEffect(postEffect: AbstractPostEffect): void {
+  appendPostEffect(postEffect: AbstractPostEffect) {
     if (postEffect) {
       for (const list of this._postEffects) {
         if (list.findIndex((val) => val.get() === postEffect) >= 0) {
@@ -95,7 +95,7 @@ export class Compositor {
    *
    * @param postEffect - The posteffect to be remove.
    */
-  removePostEffect(postEffect: AbstractPostEffect): void {
+  removePostEffect(postEffect: AbstractPostEffect) {
     for (const list of this._postEffects) {
       const index = list.findIndex((val) => val.get() === postEffect);
       if (index >= 0) {
@@ -108,7 +108,7 @@ export class Compositor {
   /**
    * Removes all post effects
    */
-  clear(): void {
+  clear() {
     for (const list of this._postEffects) {
       for (const p of list) {
         p.dispose();

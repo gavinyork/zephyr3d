@@ -18,14 +18,14 @@ export class CopyBlitter extends Blitter {
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'float' | 'int' | 'uint'
-  ): PBShaderExp {
+  ) {
     return this.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
   }
   /**
    * {@inheritDoc Blitter.calcHash}
    * @override
    */
-  protected calcHash(): string {
+  protected calcHash() {
     return '';
   }
 }

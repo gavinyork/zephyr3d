@@ -1,22 +1,12 @@
-import type { Matrix4x4, Nullable } from '@zephyr3d/base';
+import type { Immutable, Matrix4x4, Nullable } from '@zephyr3d/base';
 import { Vector4, applyMixins, Vector3, DRef, randomUUID } from '@zephyr3d/base';
-import type { PBInsideFunctionScope, PBShaderExp, Texture2D, Texture2DArray } from '@zephyr3d/device';
+import type { PBInsideFunctionScope, PBShaderExp, Texture2D } from '@zephyr3d/device';
 import type { Scene } from '../scene';
 import { GraphNode } from '../graph_node';
 import { mixinDrawable } from '../../render/drawable_mixin';
-import type {
-  Drawable,
-  DrawContext,
-  MorphData,
-  MorphInfo,
-  PickTarget,
-  Primitive,
-  PrimitiveInstanceInfo
-} from '../../render';
+import type { Drawable, DrawContext, PickTarget, PrimitiveInstanceInfo } from '../../render';
 import { Clipmap } from '../../render';
 import { ClipmapTerrainMaterial } from '../../material/terrain-cm';
-import type { MeshMaterial } from '../../material';
-import type { BoundingVolume } from '../../utility/bounding_volume';
 import { BoundingBox } from '../../utility/bounding_volume';
 import {
   MAX_TERRAIN_MIPMAP_LEVELS,
@@ -40,8 +30,8 @@ class HeightMinMaxBlitter extends CopyBlitter {
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'float' | 'int' | 'uint'
-  ): PBShaderExp {
-    return this.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType).xxxx;
+  ) {
+    return this.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType).xxxx as PBShaderExp;
   }
 }
 
@@ -52,7 +42,7 @@ class HeightBoundingGenerator extends RenderMipmap {
     rightTop: PBShaderExp,
     leftBottom: PBShaderExp,
     rightBottom: PBShaderExp
-  ): PBShaderExp {
+  ) {
     const pb = scope.$builder;
     scope.$l.maxHeight = pb.max(pb.max(leftTop.r, rightTop.r), pb.max(leftBottom.r, rightBottom.r));
     scope.$l.minHeight = pb.min(pb.min(leftTop.g, rightTop.g), pb.min(leftBottom.g, rightBottom.g));
@@ -198,10 +188,10 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
    *
    * @returns Number of active detail maps
    */
-  get numDetailMaps(): number {
+  get numDetailMaps() {
     return this.material?.numDetailMaps ?? 0;
   }
-  set numDetailMaps(val: number) {
+  set numDetailMaps(val) {
     if (this.material) {
       this.material.numDetailMaps = val;
     }
@@ -225,17 +215,17 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     }
   }
   /** Wether the mesh node casts shadows */
-  get castShadow(): boolean {
+  get castShadow() {
     return this._castShadow;
   }
-  set castShadow(val: boolean) {
+  set castShadow(val) {
     this._castShadow = !!val;
   }
   /** The terrain width. */
   get sizeX() {
     return this._sizeX;
   }
-  set sizeX(val: number) {
+  set sizeX(val) {
     if (val !== this._sizeX) {
       this._sizeX = val;
       this.resizeHeightMap(this._sizeX, this._sizeZ);
@@ -245,89 +235,89 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   get sizeZ() {
     return this._sizeZ;
   }
-  set sizeZ(val: number) {
+  set sizeZ(val) {
     if (val !== this._sizeZ) {
       this._sizeZ = val;
       this.resizeHeightMap(this._sizeX, this._sizeZ);
     }
   }
   /** The current height map texture. */
-  get heightMap(): Nullable<Texture2D> {
+  get heightMap() {
     return this.material?.heightMap ?? null;
   }
-  set heightMap(val: Nullable<Texture2D>) {
+  set heightMap(val) {
     if (this.material && val) {
       this.material.heightMap = val;
       this.updateRegion();
     }
   }
   /** The splat map texture */
-  get splatMap(): Nullable<Texture2DArray | Texture2D> {
+  get splatMap() {
     return this.material?.getSplatMap() ?? null;
   }
   /** Material instance of the terrain */
-  get material(): Nullable<ClipmapTerrainMaterial> {
+  get material() {
     return this._material?.get() ?? null;
   }
   /** whether wireframe rendering is enabled */
   get wireframe() {
     return this._clipmap.wireframe;
   }
-  set wireframe(val: boolean) {
+  set wireframe(val) {
     this._clipmap.wireframe = val;
   }
   /**
    * {@inheritDoc Drawable.getPickTarget }
    */
-  getPickTarget(): PickTarget {
+  getPickTarget() {
     return this._pickTarget;
   }
   /**
    * {@inheritDoc Drawable.getMorphData}
    */
-  getMorphData(): Nullable<MorphData> {
+  getMorphData() {
     return null;
   }
   /**
    * {@inheritDoc Drawable.getMorphInfo}
    */
-  getMorphInfo(): Nullable<MorphInfo> {
+  getMorphInfo() {
     return null;
   }
   /**
    * {@inheritDoc Drawable.getQueueType}
    */
-  getQueueType(): number {
+  getQueueType() {
     return this.material?.getQueueType() ?? QUEUE_OPAQUE;
   }
   /**
    * {@inheritDoc Drawable.isUnlit}
    */
-  isUnlit(): boolean {
+  isUnlit() {
     return this.material ? !this.material.supportLighting() : false;
   }
   /**
    * {@inheritDoc Drawable.needSceneColor}
    */
-  needSceneColor(): boolean {
+  needSceneColor() {
     return this.material?.needSceneColor() ?? false;
   }
   /**
    * {@inheritDoc Drawable.needSceneDepth}
    */
-  needSceneDepth(): boolean {
+  needSceneDepth() {
     return this.material?.needSceneDepth() ?? false;
   }
   /**
    * {@inheritDoc Drawable.getMaterial}
    */
-  getMaterial(): Nullable<MeshMaterial> {
+  getMaterial() {
     return this._material.get();
   }
   /**
    * {@inheritDoc Drawable.getPrimitive}
    */
-  getPrimitive(): Nullable<Primitive> {
+  getPrimitive() {
     return null;
   }
   /**
@@ -339,13 +329,13 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   /**
    * {@inheritDoc SceneNode.computeBoundingVolume}
    */
-  computeBoundingVolume(): Nullable<BoundingVolume> {
+  computeBoundingVolume() {
     return null;
   }
   /**
    * {@inheritDoc SceneNode.computeWorldBoundingVolume}
    */
-  computeWorldBoundingVolume(): Nullable<BoundingVolume> {
+  computeWorldBoundingVolume() {
     if (this.material) {
       const p = this.worldMatrix.transformPointAffine(Vector3.zero());
       const minHeight = this._minHeight * this.scale.y;
@@ -361,7 +351,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   /**
    * the actual world-space region covered by this terrain (After applying world transform).
    */
-  get worldRegion(): Vector4 {
+  get worldRegion(): Immutable<Vector4> {
     return this.material?.region ?? Vector4.zero();
   }
   /**
@@ -370,7 +360,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
    *
    * @param outMatrix - Output matrix to store the result
    */
-  calculateLocalTransform(outMatrix: Matrix4x4): void {
+  calculateLocalTransform(outMatrix: Matrix4x4) {
     outMatrix.translation(this._position);
   }
   /**
@@ -379,7 +369,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
    *
    * @param outMatrix - Output matrix to store the result
    */
-  calculateWorldTransform(outMatrix: Matrix4x4): void {
+  calculateWorldTransform(outMatrix: Matrix4x4) {
     outMatrix.set(this.localMatrix);
     if (this.parent) {
       outMatrix.m03 += this.parent.worldMatrix.m03;
@@ -440,12 +430,12 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     return getDevice().createTexture2D(getDevice().type === 'webgl' ? 'rgba16f' : 'r16f', width, height)!;
   }
   /** @internal */
-  protected _onTransformChanged(invalidateLocal: boolean): void {
+  protected _onTransformChanged(invalidateLocal: boolean) {
     super._onTransformChanged(invalidateLocal);
     this.updateRegion();
   }
   /** {@inheritDoc SceneNode.updatePerCamera} */
-  updatePerCamera(camera: Camera, _elapsedInSeconds: number, _deltaInSeconds: number): void {
+  updatePerCamera(camera: Camera, _elapsedInSeconds: number, _deltaInSeconds: number) {
     const mat = this._material.get();
     if (!mat) {
       return;
@@ -610,7 +600,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
    * Disposes of all resources used by this terrain.
    * Should be called when the terrain is no longer needed.
    */
-  protected onDispose(): void {
+  protected onDispose() {
     super.onDispose();
     this._clipmap?.dispose();
     this._material?.dispose();

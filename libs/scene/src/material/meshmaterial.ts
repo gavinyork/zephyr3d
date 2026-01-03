@@ -1,7 +1,6 @@
 import type {
   BindGroup,
   FaceMode,
-  GPUProgram,
   PBFunctionScope,
   PBInsideFunctionScope,
   PBShaderExp,
@@ -22,7 +21,7 @@ import type { DepthPass } from '../render';
 import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { ShaderHelper } from './shader/helper';
-import type { Clonable, Nullable } from '@zephyr3d/base';
+import type { Clonable, Immutable, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4, applyMixins, DRef } from '@zephyr3d/base';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import { getDevice } from '../app/api';
@@ -70,10 +69,7 @@ export type ExtractMixinType<M> = M extends [infer First]
  * const m = new Mixed();
  * @public
  */
-export function applyMaterialMixins<M extends ((target: any) => any)[], T>(
-  target: T,
-  ...mixins: M
-): ExtractMixinType<M> & T {
+export function applyMaterialMixins<M extends ((target: any) => any)[], T>(target: T, ...mixins: M) {
   return applyMixins(target, ...mixins);
 }
 
@@ -195,7 +191,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * Create a shallow clone of this material.
    * Subclasses should override to copy custom fields.
    */
-  clone(): MeshMaterial {
+  clone() {
     const other = new MeshMaterial();
     other.copyFrom(this);
     return other;
@@ -206,7 +202,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    *
    * @param other - Source material.
    */
-  copyFrom(other: this): void {
+  copyFrom(other: this) {
     super.copyFrom(other);
     this.alphaCutoff = other.alphaCutoff;
     this.blendMode = other.blendMode;
@@ -225,7 +221,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * Define a new feature bit/index for shader variants.
    * Subclasses may use this to add their own switches.
    */
-  static defineFeature(): number {
+  static defineFeature() {
     const val = this.NEXT_FEATURE_INDEX;
     this.NEXT_FEATURE_INDEX++;
     return val;
@@ -258,7 +254,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    *
    * @throws If the property is already defined or type is invalid.
    */
-  static defineInstanceUniform(prop: string, type: InstanceUniformType, name = ''): number {
+  static defineInstanceUniform(prop: string, type: InstanceUniformType, name = '') {
     if (this.INSTANCE_UNIFORMS.findIndex((val) => val.prop === prop) >= 0) {
       throw new Error(`${this.name}.defineInstanceUniform(): ${prop} was already defined`);
     }
@@ -299,7 +295,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @param uniformIndex - Encoded index from `defineInstanceUniform`.
    * @returns The shader expression reading the selected components.
    */
-  getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp {
+  getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number) {
     const pb = scope.$builder;
     const instanceID = scope.$builtins.instanceIndex;
     const uniformName = ShaderHelper.getInstanceDataUniformName();
@@ -316,7 +312,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       )
     );
     const m = ['x', 'y', 'z', 'w'].slice(vecOffset, vecOffset + numComponents).join('');
-    return u[m];
+    return u[m] as PBShaderExp;
   }
   /**
    * Get the list of per-instance uniforms for this material class.
@@ -338,7 +334,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    */
   createInstance(): this {
     if (this.$isInstance) {
-      return this.coreMaterial.createInstance();
+      return this.coreMaterial.createInstance() as this;
     }
     const isWebGL1 = getDevice().type === 'webgl';
     if (isWebGL1 || !this.supportInstancing()) {
@@ -469,14 +465,14 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       }
     }
     Object.setPrototypeOf(instance, that);
-    return instance;
+    return instance as this;
   }
   /**
    * Draw context captured during program creation, available inside shader hooks.
    *
    * @returns The last `DrawContext` used to build or apply this material.
    */
-  get drawContext(): DrawContext {
+  get drawContext() {
     return this._ctx!;
   }
   /**
@@ -486,7 +482,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @returns The active pass index while building the program, or -1 when idle.
    * @internal
    */
-  get pass(): number {
+  get pass() {
     return this._materialPass;
   }
   /**
@@ -495,10 +491,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * - \> 0 discards fragments with alpha \< cutoff.
    * Changing this marks uniforms dirty (no shader rebuild).
    */
-  get alphaCutoff(): number {
+  get alphaCutoff() {
     return this._alphaCutoff;
   }
-  set alphaCutoff(val: number) {
+  set alphaCutoff(val) {
     if (this._alphaCutoff !== val) {
       this.useFeature(FEATURE_ALPHATEST, val > 0);
       this._alphaCutoff = val;
@@ -510,10 +506,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * - When true, motion vectors encode a large sentinel to skip TAA accumulation.
    * - Managed via an internal feature toggle.
    */
-  get TAADisabled(): boolean {
+  get TAADisabled() {
     return !!this.featureUsed(FEATURE_DISABLE_TAA);
   }
-  set TAADisabled(val: boolean) {
+  set TAADisabled(val) {
     this.useFeature(FEATURE_DISABLE_TAA, !!val);
   }
   /**
@@ -521,10 +517,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * - Higher values generally imply stronger accumulation.
    * - The value is mapped when writing motion-vector outputs during depth pass.
    */
-  get TAAStrength(): number {
+  get TAAStrength() {
     return this._taaStrength;
   }
-  set TAAStrength(val: number) {
+  set TAAStrength(val) {
     val = val > 1 ? 1 : val < 0 ? 0 : val;
     if (this._taaStrength !== val) {
       this._taaStrength = val;
@@ -536,10 +532,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * - Useful to approximate transparency for MSAA targets.
    * - Managed as a shader feature; toggling rebuilds variants.
    */
-  get alphaToCoverage(): boolean {
-    return this.featureUsed(FEATURE_ALPHATOCOVERAGE);
+  get alphaToCoverage() {
+    return !!this.featureUsed(FEATURE_ALPHATOCOVERAGE);
   }
-  set alphaToCoverage(val: boolean) {
+  set alphaToCoverage(val) {
     this.useFeature(FEATURE_ALPHATOCOVERAGE, !!val);
   }
   /**
@@ -547,10 +543,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * - 'none' for opaque, 'blend' for standard alpha, 'additive' for emissive FX.
    * - Changing the mode toggles an internal feature and rebuilds variants.
    */
-  get blendMode(): BlendMode {
+  get blendMode() {
     return this._blendMode;
   }
-  set blendMode(val: BlendMode) {
+  set blendMode(val) {
     if (this._blendMode !== val) {
       this._blendMode = val;
       this.useFeature(FEATURE_ALPHABLEND, this._blendMode);
@@ -560,10 +556,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * Face culling mode: 'none' | 'front' | 'back'.
    * - Does not force shader rebuild; affects rasterizer state.
    */
-  get cullMode(): FaceMode {
+  get cullMode() {
     return this._cullMode;
   }
-  set cullMode(val: FaceMode) {
+  set cullMode(val) {
     if (this._cullMode !== val) {
       this._cullMode = val;
       this.useFeature(FEATURE_CULLMODE, this._cullMode);
@@ -573,10 +569,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * Material opacity in [0, 1].
    * - Used in transparent passes. Changing marks uniforms dirty only.
    */
-  get opacity(): number {
+  get opacity() {
     return this._opacity;
   }
-  set opacity(val: number) {
+  set opacity(val) {
     val = val < 0 ? 0 : val > 1 ? 1 : val;
     if (this._opacity !== val) {
       this._opacity = val;
@@ -587,10 +583,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * Per-object color used for GPU picking/object-ID pass.
    * - Changing marks uniforms dirty only.
    */
-  get objectColor(): Vector4 {
+  get objectColor(): Immutable<Vector4> {
     return this._objectColor;
   }
-  set objectColor(val: Vector4) {
+  set objectColor(val: Immutable<Vector4>) {
     if (val !== this._objectColor) {
       this._objectColor.set(val ?? Vector4.one());
       this.uniformChanged();
@@ -614,7 +610,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @param ctx - Current draw context.
    * @returns void
    */
-  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
+  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext) {
     const isObjectColorPass = ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR;
     const blending =
       !isObjectColorPass && (this.featureUsed<BlendMode>(FEATURE_ALPHABLEND) !== 'none' || ctx.lightBlending);
@@ -676,7 +672,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @param pass - Current material pass index.
    * @returns void
    */
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     if (this.featureUsed(FEATURE_ALPHATEST)) {
       bindGroup.setValue('zAlphaCutoff', this._alphaCutoff);
     }
@@ -710,7 +706,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @param pass - Material pass index.
    * @returns True if the pass is transparent; otherwise false.
    */
-  isTransparentPass(_pass: number): boolean {
+  isTransparentPass(_pass: number) {
     return this.featureUsed<BlendMode>(FEATURE_ALPHABLEND) !== 'none';
   }
   /**
@@ -722,7 +718,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @returns The created `GPUProgram`.
    * @internal
    */
-  protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
+  protected createProgram(ctx: DrawContext, pass: number) {
     const pb = new ProgramBuilder(ctx.device);
     if (ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP) {
       const shadowMapParams = ctx.shadowMapInfo!.get((ctx.renderPass as ShadowMapPass).light!)!;
@@ -761,7 +757,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @returns The hash fragment string.
    * @internal
    */
-  protected _createHash(): string {
+  protected _createHash() {
     return this._featureStates.map((val) => (val === undefined ? '' : val)).join('|');
   }
   /**
@@ -774,7 +770,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @returns void
    * @internal
    */
-  protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+  protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     this.applyUniformValues(bindGroup, ctx, pass);
   }
   /**
@@ -785,7 +781,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @param ctx - Optional draw context; defaults to the last captured `drawContext`.
    * @returns True if fragment color computation is needed; otherwise false.
    */
-  needFragmentColor(ctx?: DrawContext): boolean {
+  needFragmentColor(ctx?: DrawContext) {
     return (
       (ctx ?? this.drawContext).renderPass!.type === RENDER_PASS_TYPE_LIGHT ||
       this._alphaCutoff > 0 ||
@@ -800,7 +796,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @param scope - Vertex shader function scope.
    * @returns void
    */
-  vertexShader(scope: PBFunctionScope): void {
+  vertexShader(scope: PBFunctionScope) {
     const pb = scope.$builder;
     ShaderHelper.prepareVertexShader(pb, this.drawContext);
     if (this.drawContext.materialFlags & MaterialVaryingFlags.SKIN_ANIMATION) {
@@ -835,7 +831,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @param scope - Fragment shader function scope.
    * @returns void
    */
-  fragmentShader(scope: PBFunctionScope): void {
+  fragmentShader(scope: PBFunctionScope) {
     const pb = scope.$builder;
     ShaderHelper.prepareFragmentShader(pb, this.drawContext);
     if (this._alphaCutoff > 0) {
@@ -860,7 +856,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @returns The created `GPUProgram`.
    * @internal
    */
-  protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number): GPUProgram {
+  protected _createProgram(pb: ProgramBuilder, ctx: DrawContext, pass: number) {
     const that = this;
     this._ctx = ctx;
     this._materialPass = pass;

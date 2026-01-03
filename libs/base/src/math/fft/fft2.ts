@@ -5,7 +5,7 @@ import { dft, fft, idft, ifft } from './fft';
 /**
  *
  */
-export const dft2 = (signal: Complex[][]): Complex[][] => {
+export const dft2 = (signal: Complex[][]) => {
   const n = signal.length;
   const m = signal?.[0].length;
 
@@ -32,7 +32,7 @@ export const dft2 = (signal: Complex[][]): Complex[][] => {
   return fourier;
 };
 
-export const idft2 = (fourier: Complex[][]): Complex[][] => {
+export const idft2 = (fourier: Complex[][]) => {
   const n = fourier.length;
   const m = fourier?.[0].length;
   const signal: Complex[][] = [...Array(m).keys()].map(() => []);
@@ -58,7 +58,7 @@ export const idft2 = (fourier: Complex[][]): Complex[][] => {
   return signal;
 };
 
-export const fft2 = (signal: Complex[][]): Complex[][] => {
+export const fft2 = (signal: Complex[][]) => {
   const n = signal.length;
   const m = signal?.[0].length;
 
@@ -85,7 +85,7 @@ export const fft2 = (signal: Complex[][]): Complex[][] => {
   return fourier;
 };
 
-export const ifft2 = (fourier: Complex[][]): Complex[][] => {
+export const ifft2 = (fourier: Complex[][]) => {
   const n = fourier.length;
   const m = fourier?.[0].length;
   const signal: Complex[][] = [...Array(m).keys()].map(() => []);
@@ -111,7 +111,7 @@ export const ifft2 = (fourier: Complex[][]): Complex[][] => {
   return signal;
 };
 
-export const float4ToComplex2d = (data: Float32Array, size: number, offset = 0): Complex[][] => {
+export const float4ToComplex2d = (data: Float32Array, size: number, offset = 0) => {
   const result: Complex[][] = [];
   for (let i = 0; i < size; i++) {
     const row: Complex[] = [];

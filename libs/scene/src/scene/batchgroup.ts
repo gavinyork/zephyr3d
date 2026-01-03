@@ -74,7 +74,7 @@ export class BatchGroup extends GraphNode {
   /**
    * {@inheritDoc Drawable.getName}
    */
-  getName(): string {
+  getName() {
     return this._name;
   }
   /**
@@ -90,7 +90,7 @@ export class BatchGroup extends GraphNode {
     this._changeTag++;
   }
   /** @internal */
-  protected _onDetached(): void {
+  protected _onDetached() {
     super._onDetached();
     // Usually the node will be garbage collected after it is detached,
     // We should reset the render queue to release the render bundles.
@@ -100,7 +100,7 @@ export class BatchGroup extends GraphNode {
     this.invalidate();
   }
   /** @internal */
-  protected _onAttached(): void {
+  protected _onAttached() {
     // Reset the render queue when attached to a new scene.
     this.invalidate();
   }
@@ -120,7 +120,7 @@ export class BatchGroup extends GraphNode {
     return bv.isValid() ? bv : null;
   }
   /** @internal */
-  setBoundingVolume(bv: BoundingVolume): void {
+  setBoundingVolume(bv: BoundingVolume) {
     this._staticBV = !!bv;
     super.setBoundingVolume(bv);
   }

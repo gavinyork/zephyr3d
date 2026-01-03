@@ -96,7 +96,7 @@ function isArray(x: any): x is DiffArray {
 function isPrimitive(x: any): x is null | boolean | number | string {
   return x === null || typeof x === 'boolean' || typeof x === 'number' || typeof x === 'string';
 }
-function shallowEqual(a: any, b: any): boolean {
+function shallowEqual(a: any, b: any) {
   return a === b;
 }
 function cloneDeep<T extends DiffValue>(v: T): T {
@@ -140,7 +140,7 @@ function cloneDeep<T extends DiffValue>(v: T): T {
  *
  * @public
  */
-export function diff(base: DiffValue, target: DiffValue): DiffPatch {
+export function diff(base: DiffValue, target: DiffValue) {
   const patch: DiffPatch = [];
   diffInto(base, target, [], patch);
   return patch;
@@ -238,7 +238,7 @@ function diffArray(baseArr: DiffArray, targetArr: DiffArray, path: DiffPath, out
 
 // ---------- Apply ----------
 
-function getAt(root: any, path: DiffPath): any {
+function getAt(root: any, path: DiffPath) {
   let cur = root;
   for (const k of path) {
     cur = cur?.[k as any];
@@ -246,7 +246,7 @@ function getAt(root: any, path: DiffPath): any {
   return cur;
 }
 
-function ensurePath(root: any, path: DiffPath): any {
+function ensurePath(root: any, path: DiffPath) {
   let cur = root;
   for (let i = 0; i < path.length; i++) {
     const k = path[i];
@@ -259,7 +259,7 @@ function ensurePath(root: any, path: DiffPath): any {
   return cur;
 }
 
-function setAt(root: any, path: DiffPath, value: any): any {
+function setAt(root: any, path: DiffPath, value: any) {
   if (path.length === 0) {
     return cloneDeep(value);
   }
@@ -269,7 +269,7 @@ function setAt(root: any, path: DiffPath, value: any): any {
   return root;
 }
 
-function delAt(root: any, path: DiffPath): any {
+function delAt(root: any, path: DiffPath) {
   if (path.length === 0) {
     return undefined;
   }
@@ -334,7 +334,7 @@ function applyArrayOps(arr: any[], ops: (DiffArrIns | DiffArrDel | DiffArrSet)[]
  *
  * @public
  */
-export function applyPatch(base: DiffValue, patch: DiffPatch): DiffValue {
+export function applyPatch(base: DiffValue, patch: DiffPatch) {
   let root: any = cloneDeep(base);
 
   for (const op of patch) {

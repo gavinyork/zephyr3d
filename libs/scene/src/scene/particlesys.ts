@@ -1,15 +1,14 @@
-import type { Matrix4x4, Nullable } from '@zephyr3d/base';
+import type { Immutable, Matrix4x4, Nullable } from '@zephyr3d/base';
 import { applyMixins, nextPowerOf2, DRef } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
-import type { BoundingVolume } from '../utility';
 import { BoundingBox } from '../utility/bounding_volume';
 import { mixinDrawable } from '../render/drawable_mixin';
-import type { Drawable, DrawContext, MorphData, MorphInfo, PickTarget } from '../render';
+import type { Drawable, DrawContext, PickTarget } from '../render';
 import { Primitive } from '../render';
 import { QUEUE_OPAQUE } from '../values';
-import { ParticleMaterial, type MeshMaterial } from '../material';
+import { ParticleMaterial } from '../material';
 
 const tmpVec3 = new Vector3();
 
@@ -141,228 +140,228 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._material.set(material);
   }
   /** Maximum particle count */
-  get maxParticleCount(): number {
+  get maxParticleCount() {
     return this._maxParticleCount;
   }
-  set maxParticleCount(value: number) {
+  set maxParticleCount(value) {
     if (value !== this._maxParticleCount) {
       this._maxParticleCount = value;
       this.invalidateBoundingVolume();
     }
   }
   /** Particle emit interval in ms */
-  get emitInterval(): number {
+  get emitInterval() {
     return this._emitInterval;
   }
-  set emitInterval(value: number) {
+  set emitInterval(value) {
     if (value !== this._emitInterval) {
       this._emitInterval = Math.max(value, 1);
       this._startEmitTime = 0;
     }
   }
   /** How many particles should be emitted one time */
-  get emitCount(): number {
+  get emitCount() {
     return this._emitCount;
   }
-  set emitCount(value: number) {
+  set emitCount(value) {
     this._emitCount = value;
   }
   /** Gravity force */
-  get gravity(): Vector3 {
+  get gravity(): Immutable<Vector3> {
     return this._gravity;
   }
-  set gravity(value: Vector3) {
+  set gravity(value: Immutable<Vector3>) {
     if (!value.equalsTo(this._gravity)) {
       this._gravity.set(value);
       this.invalidateBoundingVolume();
     }
   }
   /** Wind force */
-  get wind(): Vector3 {
+  get wind(): Immutable<Vector3> {
     return this._wind;
   }
-  set wind(value: Vector3) {
+  set wind(value: Immutable<Vector3>) {
     if (!value.equalsTo(this._wind)) {
       this._wind.set(value);
       this.invalidateBoundingVolume();
     }
   }
   /** Particle scalar */
-  get scalar(): number {
+  get scalar() {
     return this._scalar;
   }
-  set scalar(value: number) {
+  set scalar(value) {
     if (value !== this._scalar) {
       this._scalar = value;
       this.invalidateBoundingVolume();
     }
   }
   /** Particle aspect ratio */
-  get aspect(): number {
+  get aspect() {
     return this._material.get()!.aspect;
   }
-  set aspect(value: number) {
+  set aspect(value) {
     this._material.get()!.aspect = value;
   }
   /** true if particle effected by wind */
-  get airResistence(): boolean {
+  get airResistence() {
     return this._airResistence;
   }
-  set airResistence(value: boolean) {
+  set airResistence(value) {
     this._airResistence = value;
   }
   /** Minimum particle rotation angle in radians */
-  get particleRotationMin(): number {
+  get particleRotationMin() {
     return this._particleRotationMin;
   }
-  set particleRotationMin(value: number) {
+  set particleRotationMin(value) {
     this._particleRotationMin = value;
   }
   /** Maximum particle rotation angle in radians */
-  get particleRotationMax(): number {
+  get particleRotationMax() {
     return this._particleRotationMax;
   }
-  set particleRotationMax(value: number) {
+  set particleRotationMax(value) {
     this._particleRotationMax = value;
   }
   /** Particle jitter speed */
-  get jitterSpeed(): number {
+  get jitterSpeed() {
     return this._jitterSpeed;
   }
-  set jitterSpeed(value: number) {
+  set jitterSpeed(value) {
     this._jitterSpeed = value;
   }
   /** Particle jitter power */
-  get jitterPower(): number {
+  get jitterPower() {
     return this._material.get()!.jitterPower;
   }
-  set jitterPower(value: number) {
+  set jitterPower(value) {
     this._material.get()!.jitterPower = value;
   }
   /** Particle emitter shape */
-  get emitterShape(): EmitterShape {
+  get emitterShape() {
     return this._emitterShape;
   }
-  set emitterShape(value: EmitterShape) {
+  set emitterShape(value) {
     this._emitterShape = value;
   }
   /** Particle emitter behavior */
-  get emitterBehavior(): EmitterBehavior {
+  get emitterBehavior() {
     return this._emitterBehavior;
   }
-  set emitterBehavior(value: EmitterBehavior) {
+  set emitterBehavior(value) {
     this._emitterBehavior = value;
   }
   /** Minimum cone radius of emitter */
-  get emitterConeRadiusMin(): number {
+  get emitterConeRadiusMin() {
     return this._emitterConeRadiusMin;
   }
-  set emitterConeRadiusMin(value: number) {
+  set emitterConeRadiusMin(value) {
     this._emitterConeRadiusMin = value;
   }
   /** Maximum cone radius of emitter */
-  get emitterConeRadiusMax(): number {
+  get emitterConeRadiusMax() {
     return this._emitterConeRadiusMax;
   }
-  set emitterConeRadiusMax(value: number) {
+  set emitterConeRadiusMax(value) {
     this._emitterConeRadiusMax = value;
   }
   /** Minimum particle velocity */
-  get particleVelocityMin(): number {
+  get particleVelocityMin() {
     return this._particleVelocityMin;
   }
-  set particleVelocityMin(value: number) {
+  set particleVelocityMin(value) {
     this._particleVelocityMin = value;
   }
   /** Maximum particle velocity */
-  get particleVelocityMax(): number {
+  get particleVelocityMax() {
     return this._particleVelocityMax;
   }
-  set particleVelocityMax(value: number) {
+  set particleVelocityMax(value) {
     this._particleVelocityMax = value;
   }
   /** Minimum particle life */
-  get particleLifeMin(): number {
+  get particleLifeMin() {
     return this._particleLifeMin;
   }
-  set particleLifeMin(value: number) {
+  set particleLifeMin(value) {
     this._particleLifeMin = value;
   }
   /** Maximum particle life */
-  get particleLifeMax(): number {
+  get particleLifeMax() {
     return this._particleLifeMax;
   }
-  set particleLifeMax(value: number) {
+  set particleLifeMax(value) {
     this._particleLifeMax = value;
   }
   /** Minimum particle start size */
-  get particleSize1Min(): number {
+  get particleSize1Min() {
     return this._particleSize1Min;
   }
-  set particleSize1Min(value: number) {
+  set particleSize1Min(value) {
     this._particleSize1Min = value;
   }
   /** Maximum particle start size */
-  get particleSize1Max(): number {
+  get particleSize1Max() {
     return this._particleSize1Max;
   }
-  set particleSize1Max(value: number) {
+  set particleSize1Max(value) {
     this._particleSize1Max = value;
   }
   /** Minimum particle end size */
-  get particleSize2Min(): number {
+  get particleSize2Min() {
     return this._particleSize2Min;
   }
-  set particleSize2Min(value: number) {
+  set particleSize2Min(value) {
     this._particleSize2Min = value;
   }
   /** Maximum particle end size */
-  get particleSize2Max(): number {
+  get particleSize2Max() {
     return this._particleSize2Max;
   }
-  set particleSize2Max(value: number) {
+  set particleSize2Max(value) {
     this._particleSize2Max = value;
   }
   /** Minimum particle acceleration */
-  get particleAccelMin(): number {
+  get particleAccelMin() {
     return this._particleAccelMin;
   }
-  set particleAccelMin(value: number) {
+  set particleAccelMin(value) {
     this._particleAccelMin = value;
   }
   /** Maximum particle acceleration */
-  get particleAccelMax(): number {
+  get particleAccelMax() {
     return this._particleAccelMax;
   }
-  set particleAccelMax(value: number) {
+  set particleAccelMax(value) {
     this._particleAccelMax = value;
   }
   /** Minimum emitter shape size */
-  get emitterShapeSizeMin(): Vector3 {
+  get emitterShapeSizeMin() {
     return this._emitterShapeSizeMin;
   }
-  set emitterShapeSizeMin(value: Vector3) {
+  set emitterShapeSizeMin(value) {
     this._emitterShapeSizeMin.set(value);
   }
   /** Maximum emitter shape size */
-  get emitterShapeSizeMax(): Vector3 {
+  get emitterShapeSizeMax() {
     return this._emitterShapeSizeMax;
   }
-  set emitterShapeSizeMax(value: Vector3) {
+  set emitterShapeSizeMax(value) {
     this._emitterShapeSizeMax.set(value);
   }
   /** Whether particles are directional */
-  get directional(): boolean {
+  get directional() {
     return this._material.get()!.directional;
   }
-  set directional(val: boolean) {
+  set directional(val) {
     this._material.get()!.directional = val;
   }
   /** Whether particles are in world space */
-  get worldSpace(): boolean {
+  get worldSpace() {
     return !!(this.flags & PS_WORLDSPACE);
   }
-  set worldSpace(value: boolean) {
+  set worldSpace(value) {
     if (value) {
       this.flags |= PS_WORLDSPACE;
     } else {
@@ -370,18 +369,18 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     }
   }
   /** @internal */
-  get flags(): number {
+  get flags() {
     return this._flags;
   }
-  set flags(value: number) {
+  set flags(value) {
     this._flags = value;
   }
   /** @internal */
-  computeBoundingVolume(): BoundingVolume {
+  computeBoundingVolume() {
     return this._wsBoundingBox;
   }
   /** @internal */
-  private initParticle(p?: Particle): Particle {
+  private initParticle(p?: Particle) {
     p =
       p ??
       ({
@@ -677,55 +676,55 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   /**
    * {@inheritDoc Drawable.getPickTarget }
    */
-  getPickTarget(): PickTarget {
+  getPickTarget() {
     return this._pickTarget;
   }
   /**
    * {@inheritDoc Drawable.getMorphData}
    */
-  getMorphData(): Nullable<MorphData> {
+  getMorphData() {
     return null;
   }
   /**
    * {@inheritDoc Drawable.getMorphInfo}
    */
-  getMorphInfo(): Nullable<MorphInfo> {
+  getMorphInfo() {
     return null;
   }
   /**
    * {@inheritDoc Drawable.getQueueType}
    */
-  getQueueType(): number {
+  getQueueType() {
     return this._material.get()?.getQueueType() ?? QUEUE_OPAQUE;
   }
   /**
    * {@inheritDoc Drawable.isUnlit}
    */
-  isUnlit(): boolean {
+  isUnlit() {
     return !this._material.get()?.supportLighting();
   }
   /**
    * {@inheritDoc Drawable.needSceneColor}
    */
-  needSceneColor(): boolean {
+  needSceneColor() {
     return this._material.get()?.needSceneColor() ?? false;
   }
   /**
    * {@inheritDoc Drawable.needSceneDepth}
    */
-  needSceneDepth(): boolean {
+  needSceneDepth() {
     return this._material.get()?.needSceneDepth() ?? false;
   }
   /**
    * {@inheritDoc Drawable.getMaterial}
    */
-  getMaterial(): Nullable<MeshMaterial> {
+  getMaterial() {
     return this._material.get();
   }
   /**
    * {@inheritDoc Drawable.getPrimitive}
    */
-  getPrimitive(): Nullable<Primitive> {
+  getPrimitive() {
     return this._primitive.get();
   }
   /**

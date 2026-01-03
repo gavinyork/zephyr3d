@@ -1,4 +1,4 @@
-import type { DeepRequireOptionals } from '@zephyr3d/base';
+import type { DeepRequireOptionals, Immutable } from '@zephyr3d/base';
 import { Vector3, Quaternion } from '@zephyr3d/base';
 import type {
   IControllerMouseEvent,
@@ -136,10 +136,10 @@ export class OrbitCameraController extends BaseCameraController {
     this.reset();
   }
   /** Rotation center */
-  get center(): Vector3 {
+  get center(): Immutable<Vector3> {
     return this.options.center;
   }
-  set center(val: Vector3) {
+  set center(val: Immutable<Vector3>) {
     const center = this.options.center;
     const dx = val.x - center.x;
     const dy = val.y - center.y;
@@ -155,7 +155,7 @@ export class OrbitCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController.reset}
    * @override
    */
-  reset(): void {
+  reset() {
     this.lastMouseX = 0;
     this.lastMouseY = 0;
     this.rotateX = 0;
@@ -170,7 +170,7 @@ export class OrbitCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseDown}
    * @override
    */
-  protected _onMouseDown(evt: IControllerPointerDownEvent): boolean {
+  protected _onMouseDown(evt: IControllerPointerDownEvent) {
     if (this.matchesControl(evt, this.options.controls.rotate)) {
       this.lastMouseX = evt.offsetX;
       this.lastMouseY = evt.offsetY;
@@ -205,7 +205,7 @@ export class OrbitCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseUp}
    * @override
    */
-  protected _onMouseUp(evt: IControllerPointerUpEvent): boolean {
+  protected _onMouseUp(evt: IControllerPointerUpEvent) {
     const control =
       this.currentOp === OperationType.ROTATE
         ? this.options.controls.rotate
@@ -224,7 +224,7 @@ export class OrbitCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseWheel}
    * @override
    */
-  protected _onMouseWheel(evt: IControllerWheelEvent): boolean {
+  protected _onMouseWheel(evt: IControllerWheelEvent) {
     this.zoom(evt.deltaY);
     return true;
   }
@@ -232,7 +232,7 @@ export class OrbitCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseMove}
    * @override
    */
-  protected _onMouseMove(evt: IControllerPointerMoveEvent): boolean {
+  protected _onMouseMove(evt: IControllerPointerMoveEvent) {
     if (this.currentOp !== OperationType.NONE) {
       const dx = evt.offsetX - this.lastMouseX;
       const dy = evt.offsetY - this.lastMouseY;
@@ -268,7 +268,7 @@ export class OrbitCameraController extends BaseCameraController {
       altKey: boolean;
       metaKey: boolean;
     }
-  ): boolean {
+  ) {
     return (
       evt.button === control.button &&
       evt.shiftKey === control.shiftKey &&

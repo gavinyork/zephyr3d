@@ -43,35 +43,35 @@ export abstract class WebGPUObject<T> extends Disposable implements GPUObject<T>
   get device(): AbstractDevice {
     return this._device;
   }
-  get object(): Nullable<T> {
+  get object() {
     return this._object;
   }
-  get uid(): number {
+  get uid() {
     return this._uid;
   }
-  get cid(): number {
+  get cid() {
     return this._cid;
   }
-  get restoreHandler(): Nullable<(obj: GPUObject) => void> {
+  get restoreHandler() {
     return this._restoreHandler;
   }
   set restoreHandler(handler: Nullable<(obj: GPUObject) => void>) {
     this._restoreHandler = handler;
   }
-  get name(): string {
+  get name() {
     return this._name;
   }
-  set name(val: string) {
+  set name(val) {
     if (val !== this._name) {
       const lastName = this._name;
       this._name = val;
       this._device.dispatchEvent('gpuobject_rename', this, lastName);
     }
   }
-  get queueState(): number {
+  get queueState() {
     return this._queueState;
   }
-  set queueState(val: number) {
+  set queueState(val) {
     this._queueState = val;
   }
   isVertexLayout(): this is VertexLayout {
@@ -110,16 +110,16 @@ export abstract class WebGPUObject<T> extends Disposable implements GPUObject<T>
   isBindGroup(): this is BindGroup {
     return false;
   }
-  reload(): void {
+  reload() {
     if (this.disposed) {
       this._device.restoreObject(this);
       this._cid++;
     }
   }
-  destroy(): void {
+  destroy() {
     throw new Error('Abstract function call: dispose()');
   }
-  restore(): void {
+  restore() {
     throw new Error('Abstract function call: restore()');
   }
   protected onDispose() {

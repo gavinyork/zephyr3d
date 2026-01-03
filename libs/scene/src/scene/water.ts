@@ -4,22 +4,12 @@ import { applyMixins, Vector3, DRef } from '@zephyr3d/base';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
 import { mixinDrawable } from '../render/drawable_mixin';
-import type {
-  Drawable,
-  DrawContext,
-  MorphData,
-  MorphInfo,
-  PickTarget,
-  PrimitiveInstanceInfo,
-  WaveGenerator
-} from '../render';
+import type { Drawable, DrawContext, PickTarget, PrimitiveInstanceInfo } from '../render';
 import { Primitive } from '../render';
 import { Clipmap, FBMWaveGenerator } from '../render';
 import { WaterMaterial } from '../material/water';
 import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet } from '@zephyr3d/device';
 import { QUEUE_OPAQUE } from '../values';
-import type { MeshMaterial } from '../material';
-import type { BoundingVolume } from '../utility/bounding_volume';
 import { BoundingBox } from '../utility/bounding_volume';
 import type { Camera } from '../camera';
 import { getDevice } from '../app/api';
@@ -65,7 +55,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     scene.queuePerCameraUpdateNode(this);
   }
   /** Disposes the water node */
-  protected onDispose(): void {
+  protected onDispose() {
     super.onDispose();
     this._clipmap.dispose();
     this._renderData = null;
@@ -88,14 +78,14 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._clipmap.wireframe = !!val;
   }
   /** Material of the water */
-  get material(): WaterMaterial {
+  get material() {
     return this._material.get()!;
   }
   /** Wave generator object of the water */
-  get waveGenerator(): Nullable<WaveGenerator> {
+  get waveGenerator() {
     return this.material.waveGenerator;
   }
-  set waveGenerator(waveGenerator: Nullable<WaveGenerator>) {
+  set waveGenerator(waveGenerator) {
     this.material.waveGenerator = waveGenerator;
     if (this.material.needUpdate()) {
       this.scene?.queueUpdateNode(this);
@@ -105,14 +95,14 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   get animationSpeed() {
     return this._animationSpeed;
   }
-  set animationSpeed(val: number) {
+  set animationSpeed(val) {
     this._animationSpeed = val;
   }
   /** TAA strength of the water */
   get TAAStrength() {
     return this.material.TAAStrength;
   }
-  set TAAStrength(val: number) {
+  set TAAStrength(val) {
     this.material.TAAStrength = val;
   }
   /** {@inheritDoc SceneNode.update} */
@@ -127,7 +117,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     }
   }
   /** {@inheritDoc SceneNode.updatePerCamera} */
-  updatePerCamera(camera: Camera, _elapsedInSeconds: number, _deltaInSeconds: number): void {
+  updatePerCamera(camera: Camera, _elapsedInSeconds: number, _deltaInSeconds: number) {
     const mat = this._material.get();
     if (mat) {
       const that = this;
@@ -153,55 +143,55 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * {@inheritDoc Drawable.getPickTarget }
    */
-  getPickTarget(): PickTarget {
+  getPickTarget() {
     return this._pickTarget;
   }
   /**
    * {@inheritDoc Drawable.getMorphData}
    */
-  getMorphData(): Nullable<MorphData> {
+  getMorphData() {
     return null;
   }
   /**
    * {@inheritDoc Drawable.getMorphInfo}
    */
-  getMorphInfo(): Nullable<MorphInfo> {
+  getMorphInfo() {
     return null;
   }
   /**
    * {@inheritDoc Drawable.getQueueType}
    */
-  getQueueType(): number {
+  getQueueType() {
     return this._material.get()?.getQueueType() ?? QUEUE_OPAQUE;
   }
   /**
    * {@inheritDoc Drawable.isUnlit}
    */
-  isUnlit(): boolean {
+  isUnlit() {
     return !this._material.get()?.supportLighting();
   }
   /**
    * {@inheritDoc Drawable.needSceneColor}
    */
-  needSceneColor(): boolean {
+  needSceneColor() {
     return this._material.get()?.needSceneColor() ?? false;
   }
   /**
    * {@inheritDoc Drawable.needSceneDepth}
    */
-  needSceneDepth(): boolean {
+  needSceneDepth() {
     return this._material.get()?.needSceneDepth() ?? false;
   }
   /**
    * {@inheritDoc Drawable.getMaterial}
    */
-  getMaterial(): Nullable<MeshMaterial> {
+  getMaterial() {
     return this._material.get();
   }
   /**
    * {@inheritDoc Drawable.getPrimitive}
    */
-  getPrimitive(): Nullable<Primitive> {
+  getPrimitive() {
     return null;
   }
   /**
@@ -213,13 +203,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * {@inheritDoc SceneNode.computeBoundingVolume}
    */
-  computeBoundingVolume(): Nullable<BoundingVolume> {
+  computeBoundingVolume() {
     return null;
   }
   /**
    * {@inheritDoc SceneNode.computeWorldBoundingVolume}
    */
-  computeWorldBoundingVolume(): Nullable<BoundingVolume> {
+  computeWorldBoundingVolume() {
     const p = this.worldMatrix.transformPointAffine(Vector3.zero());
     const mat = this._material?.get();
     if (mat) {
@@ -247,13 +237,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   get gridScale() {
     return this._gridScale;
   }
-  set gridScale(val: number) {
+  set gridScale(val) {
     this._gridScale = val;
   }
-  calculateLocalTransform(outMatrix: Matrix4x4): void {
+  calculateLocalTransform(outMatrix: Matrix4x4) {
     outMatrix.translation(this._position);
   }
-  calculateWorldTransform(outMatrix: Matrix4x4): void {
+  calculateWorldTransform(outMatrix: Matrix4x4) {
     outMatrix.set(this.localMatrix);
     if (this.parent) {
       outMatrix.m03 += this.parent.worldMatrix.m03;
@@ -261,7 +251,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       outMatrix.m23 += this.parent.worldMatrix.m23;
     }
   }
-  protected _onTransformChanged(invalidateLocal: boolean): void {
+  protected _onTransformChanged(invalidateLocal: boolean) {
     super._onTransformChanged(invalidateLocal);
     const material = this._material?.get();
     if (material) {
