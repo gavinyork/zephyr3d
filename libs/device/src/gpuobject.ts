@@ -758,7 +758,7 @@ export function getVertexAttribByName(name: Nullable<VertexSemantic>) {
  * @public
  */
 export function getVertexAttribName(attrib: number) {
-  return vertexAttribNameRevMap[attrib] as VertexSemantic;
+  return vertexAttribNameRevMap[attrib as keyof typeof vertexAttribNameRevMap] as VertexSemantic;
 }
 
 /**
@@ -842,7 +842,7 @@ export function getVertexFormatComponentCount(fmt: VertexAttribFormat) {
 export function getVertexAttribFormat(semantic: VertexSemantic, type: DataType, count: number) {
   const loc = getVertexAttribByName(semantic);
   for (const k in vertexAttribFormatMap) {
-    const v = vertexAttribFormatMap[k];
+    const v = vertexAttribFormatMap[k as keyof typeof vertexAttribFormatMap];
     if (v[0] === loc && v[3] === type && v[4] === count) {
       return k as VertexAttribFormat;
     }
@@ -1468,7 +1468,7 @@ export interface IndexBuffer<T = unknown> extends GPUDataBuffer<T> {
  */
 export interface StructuredBuffer<T = unknown> extends GPUDataBuffer<T> {
   structure: Immutable<PBStructTypeInfo>;
-  set(name: string, value: StructuredValue);
+  set(name: string, value: StructuredValue): void;
 }
 
 /**
@@ -1486,7 +1486,7 @@ export interface VertexLayout<T = unknown> extends GPUObject<T> {
   getIndexBuffer(): Nullable<IndexBuffer>;
   bind(): void;
   draw(primitiveType: PrimitiveType, first: number, count: number): void;
-  drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number);
+  drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number): void;
 }
 
 /**
@@ -1554,9 +1554,9 @@ export interface BindGroup extends GPUObject<unknown> {
     bindOffset?: number,
     bindSize?: number
   ): void;
-  setValue(name: string, value: StructuredValue);
-  setRawData(name: string, byteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number);
-  setTexture(name: string, texture: BaseTexture, sampler?: Nullable<TextureSampler>);
+  setValue(name: string, value: StructuredValue): void;
+  setRawData(name: string, byteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number): void;
+  setTexture(name: string, texture: BaseTexture, sampler?: Nullable<TextureSampler>): void;
   setTextureView(
     name: string,
     value: BaseTexture,
@@ -1564,8 +1564,8 @@ export interface BindGroup extends GPUObject<unknown> {
     face?: number,
     mipCount?: number,
     sampler?: Nullable<TextureSampler>
-  );
-  setSampler(name: string, sampler: TextureSampler);
+  ): void;
+  setSampler(name: string, sampler: TextureSampler): void;
 }
 
 /**

@@ -127,7 +127,7 @@ export interface InstancedArraysEXT {
 }
 
 export interface DrawBuffersEXT {
-  drawBuffers(buffers: number[]);
+  drawBuffers(buffers: number[]): void;
 }
 
 const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);

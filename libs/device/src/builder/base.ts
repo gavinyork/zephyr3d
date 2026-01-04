@@ -54,8 +54,9 @@ export function makeConstructor<T extends TypeDetailInfo>(
   elementType: PBTypeInfo<T>
 ) {
   const wrappedTypeFunc = new Proxy(typeFunc, {
-    get: function (target, prop) {
+    get: function (target, prop): any {
       if (typeof prop === 'symbol' || prop in target) {
+        // @ts-ignore 7015 */
         return target[prop];
       }
       let entries = constructorCache.get(typeFunc);

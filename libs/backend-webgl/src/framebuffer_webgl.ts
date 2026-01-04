@@ -369,7 +369,7 @@ export class WebGLFrameBuffer
                 this._device.bindTexture(WebGLEnum.TEXTURE_CUBE_MAP, 0, tex as WebGLTextureCube);
                 //this._device.context.bindTexture(WebGLEnum.TEXTURE_CUBE_MAP, tex.object);
                 this._device.context.copyTexSubImage2D(
-                  cubeMapFaceMap[attachment.face ?? CubeFace.PX],
+                  cubeMapFaceMap[(attachment.face as CubeFace) ?? CubeFace.PX],
                   attachment.level!,
                   0,
                   0,
@@ -537,7 +537,7 @@ export class WebGLFrameBuffer
           this._device.context.framebufferTexture2D(
             WebGLEnum.FRAMEBUFFER,
             attachment,
-            cubeMapFaceMap[info.face ?? CubeFace.PX],
+            cubeMapFaceMap[(info.face as CubeFace) ?? CubeFace.PX],
             info.texture.object!,
             info.level ?? 0
           );

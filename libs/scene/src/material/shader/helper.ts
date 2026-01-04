@@ -708,7 +708,7 @@ export class ShaderHelper {
    * @param scope - Current shader scope
    * @returns instance uniform value
    */
-  static getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number) {
+  static getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number | PBShaderExp) {
     const pb = scope.$builder;
     return scope[UNIFORM_NAME_INSTANCE_DATA].at(
       pb.add(

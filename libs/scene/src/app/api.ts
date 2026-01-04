@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import type { Application } from './app';
 
 /** @internal */
@@ -15,9 +16,19 @@ export function setApp(app: Application) {
  *
  * @public
  */
-
 export function getApp() {
   return appInstance;
+}
+
+/**
+ * Singleton accessor for the current Application instance.
+ *
+ * @returns The Application singleton.
+ *
+ * @public
+ */
+export function tryGetApp(): Nullable<Application> {
+  return appInstance ?? null;
 }
 
 /**

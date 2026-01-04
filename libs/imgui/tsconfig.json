@@ -6,7 +6,7 @@
     "module": "ESNext",
     "lib": ["es2020", "DOM", "DOM.Iterable"],
     "strict": true,
-    "noImplicitAny": false,
+    "noImplicitAny": true,
     "preserveConstEnums": false,
     "listEmittedFiles": true,
     "noUnusedLocals": true,

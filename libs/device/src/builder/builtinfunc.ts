@@ -38,8 +38,11 @@ function matchFunctionOverloadings(pb: ProgramBuilder, name: string, ...args: Ex
       : pb.getDevice().type === 'webgl2'
         ? MASK_WEBGL2
         : MASK_WEBGPU;
-  const overloadings = builtinFunctionsAll?.[name].overloads
+  // @ts-ignore 7053
+  const overloadings = builtinFunctionsAll[name].overloads
+    // @ts-ignore 7006
     .filter((val) => !!(val[1] & bit))
+    // @ts-ignore 7006
     .map((val) => val[0]);
   if (!overloadings || overloadings.length === 0) {
     throw new PBDeviceNotSupport(`builtin shader function '${name}'`);
@@ -471,7 +474,9 @@ const builtinFunctionsAll = {
       if (!argType.isPrimitiveType() || (!argType.isScalarType() && !argType.isVectorType())) {
         throw new PBParamTypeError('saturate', 'x');
       }
+      // @ts-ignore 7053
       const a = argType.isScalarType() ? 0 : pb[`vec${argType.cols}`](0);
+      // @ts-ignore 7053
       const b = argType.isScalarType() ? 1 : pb[`vec${argType.cols}`](1);
       return pb.clamp(args[0], a, b);
     }
@@ -3326,6 +3331,7 @@ for (const name of [
   'atomicXor',
   'atomicExchange'
 ]) {
+  // @ts-ignore 7053
   builtinFunctionsAll[name] = {
     overloades: [],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
@@ -3394,7 +3400,9 @@ export type PBBuiltinFunctionOverloadsInfo = {
 /** @internal */
 export function setBuiltinFuncs(cls: typeof ProgramBuilder) {
   for (const k of Object.keys(builtinFunctionsAll)) {
+    // @ts-ignore 7053
     cls.prototype[k] = function (this: ProgramBuilder, ...args: ExpValueType[]) {
+      // @ts-ignore 7053
       const normalizeFunc = builtinFunctionsAll?.[k]?.normalizeFunc || callBuiltin;
       return normalizeFunc(this, k, ...args);
     };

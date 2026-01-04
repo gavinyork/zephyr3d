@@ -246,14 +246,16 @@ export class WebGPURenderPass {
     const frameBuffer = this._frameBufferInfo.frameBuffer;
     if (!frameBuffer) {
       const mainPassDesc = this._device.defaultRenderPassDesc;
-      const colorAttachmentDesc = this._device.defaultRenderPassDesc.colorAttachments[0];
+      const colorAttachmentDesc = (
+        this._device.defaultRenderPassDesc.colorAttachments as GPURenderPassColorAttachment[]
+      )[0];
       if (this._frameBufferInfo.sampleCount > 1) {
         colorAttachmentDesc.resolveTarget = this._device.context!.getCurrentTexture().createView();
       } else {
         colorAttachmentDesc.view = this._device.context!.getCurrentTexture().createView();
       }
       colorAttachmentDesc.loadOp = color ? 'clear' : 'load';
-      colorAttachmentDesc.clearValue = color;
+      colorAttachmentDesc.clearValue = color ?? undefined;
       const depthAttachmentDesc = this._device.defaultRenderPassDesc.depthStencilAttachment;
       depthAttachmentDesc!.depthLoadOp = typeof depth === 'number' ? 'clear' : 'load';
       depthAttachmentDesc!.depthClearValue = depth ?? undefined;

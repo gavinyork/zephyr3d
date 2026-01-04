@@ -174,7 +174,7 @@ export class WebGPUTextureCaps implements TextureCaps {
         '12x12'
       ]) {
         const [w, h] = k.split('x').map((val) => Number(val));
-        this._textureFormatInfos[`astc-${k}`] = {
+        this._textureFormatInfos[`astc-${k}` as keyof typeof this._textureFormatInfos] = {
           gpuSampleType: 'float',
           filterable: true,
           renderable: false,
@@ -184,7 +184,7 @@ export class WebGPUTextureCaps implements TextureCaps {
           blockWidth: w,
           blockHeight: h
         };
-        this._textureFormatInfos[`astc-${k}-srgb`] = {
+        this._textureFormatInfos[`astc-${k}-srgb` as keyof typeof this._textureFormatInfos] = {
           gpuSampleType: 'float',
           filterable: true,
           renderable: false,

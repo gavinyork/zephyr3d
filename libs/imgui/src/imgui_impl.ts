@@ -689,7 +689,7 @@ export function calcTextSize(text: string, out?: ImGui.ImVec2) {
   let y = 0;
   if (text) {
     for (const ch of text) {
-      const glyphSize = glyphManager!.getGlyphSize(ch, deviceFont) ?? 0;
+      const glyphSize = glyphManager!.getGlyphSize(ch, deviceFont) ?? [0, 0];
       x += glyphSize[0];
       y = Math.max(glyphSize[1]);
     }

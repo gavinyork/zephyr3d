@@ -67,7 +67,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
     if (x === 0 && y === 0 && width === data.width && height === data.height) {
       this._device.context.texSubImage2D(
-        cubeMapFaceMap[face],
+        cubeMapFaceMap[face as keyof typeof cubeMapFaceMap],
         0,
         xOffset,
         yOffset,
@@ -240,7 +240,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       this._device.bindTexture(textureTargetMap[this._target], 0, this);
       (this.device as WebGLDevice).clearErrors();
       for (let face = 0; face < 6; face++) {
-        const faceTarget = cubeMapFaceMap[face];
+        const faceTarget = cubeMapFaceMap[face as keyof typeof cubeMapFaceMap];
         if (this._mipLevelCount > 1 && levels.mipDatas[face].length !== this._mipLevelCount) {
           console.error(`invalid texture data`);
           return;

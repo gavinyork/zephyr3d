@@ -2412,9 +2412,9 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /** Schedule next frame */
   nextFrame(callback: () => void): number;
   /** Cancel schedule next frame */
-  cancelNextFrame(handle: number);
+  cancelNextFrame(handle: number): void;
   /** Set font for drawText function */
-  setFont(fontName: string);
+  setFont(fontName: string): void;
   /**
    * Draw a string
    * @param text - The string that will be drawn
@@ -2422,7 +2422,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param y - y coordinate in pixels related to the viewport origin
    * @param color - A CSS color value
    */
-  drawText(text: string, x: number, y: number, color: string);
+  drawText(text: string, x: number, y: number, color: string): void;
   /**
    * Clears the current frame buffer
    * @param clearColor - If not null, the color buffer will be cleared to this value.
@@ -2433,7 +2433,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     clearColor: Nullable<Vector4>,
     clearDepth: Nullable<number>,
     clearStencil: Nullable<number>
-  );
+  ): void;
   /** Creates a GPU timer */
   createGPUTimer(): Nullable<ITimer>;
   /** Creates a render state set object */
@@ -2563,7 +2563,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param dst - Texture that will be copied to.
    * @param dstLevel - Which mipmap level to be copied to.
    */
-  copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number);
+  copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number): void;
   /**
    * Copies a color attachment of a framebuffer to a mipmap level of a texture.
    *
@@ -2575,7 +2575,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param dst - Texture that will be copied to.
    * @param level - Which mipmap level should be copied to.
    */
-  copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number);
+  copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number): void;
   /**
    * Set wether to reverse the winding order
    *
@@ -2622,7 +2622,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     srcOffset: number,
     dstOffset: number,
     bytes: number
-  );
+  ): void;
   /**
    * Creates an index buffer
    * @param data - Data of the index buffer
@@ -2708,7 +2708,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    *
    * @param rt - The FrameBuffer object to set as the current framebuffer.
    */
-  setFramebuffer(rt: Nullable<FrameBuffer>);
+  setFramebuffer(rt: Nullable<FrameBuffer>): void;
   /**
    * Sets the current framebuffer specifying complex color attachments, an optional depth attachment, MIP level, face, and sample count.
    *
@@ -2721,8 +2721,12 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param depth - Optional BaseTexture to serve as the depth attachment.
    * @param sampleCount - Optional sample count defining the number of samples for multisampling.
    */
-  setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number);
-  setFramebuffer(colorOrRT: BaseTexture[] | Nullable<FrameBuffer>, depth?: BaseTexture, sampleCount?: number);
+  setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number): void;
+  setFramebuffer(
+    colorOrRT: BaseTexture[] | Nullable<FrameBuffer>,
+    depth?: BaseTexture,
+    sampleCount?: number
+  ): void;
   /** Get current frame buffer */
   getFramebuffer(): Nullable<FrameBuffer>;
   /**
@@ -2732,7 +2736,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param bindGroup - The bind group to be set
    * @param dynamicOffsets - dynamic uniform buffer offsets of the bind group or null
    */
-  setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Nullable<Iterable<number>>);
+  setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Nullable<Iterable<number>>): void;
   /**
    * Get current bind group
    * @param index - index of the bind group to get
@@ -2777,7 +2781,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * Executes render bundle
    * @param renderBundle - RenderBundle to be execute
    */
-  executeRenderBundle(renderBundle: RenderBundle);
+  executeRenderBundle(renderBundle: RenderBundle): void;
   /**
    * End capture draw commands
    * @returns A RenderBundle that holds the captured draw commands
@@ -2943,7 +2947,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /** Builds compute program */
   buildComputeProgram(options: PBComputeOptions): Nullable<GPUProgram>;
   /** Pushes current FrameBuffer state */
-  pushDeviceStates();
+  pushDeviceStates(): void;
   /** Pops last FrameBuffer state */
-  popDeviceStates();
+  popDeviceStates(): void;
 }

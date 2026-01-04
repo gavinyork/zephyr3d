@@ -122,7 +122,9 @@ const simpleCtors = {
 function makeStorageTextureCtor(type: typeinfo.PBTextureType) {
   const ctor = {} as StorageTextureConstructor;
   for (const k of Object.keys(StorageTextureFormatMap)) {
+    // @ts-ignore 7053
     ctor[k] = function (rhs: string) {
+      // @ts-ignore 7053
       return new PBShaderExp(rhs, new typeinfo.PBTextureTypeInfo(type, StorageTextureFormatMap[k]));
     };
   }
@@ -138,7 +140,7 @@ const texStorageCtors = {
 
 /** @internal */
 export function setConstructors(cls: typeof ProgramBuilder) {
-  Object.keys(primitiveCtors).forEach((k) => {
+  (Object.keys(primitiveCtors) as Array<keyof typeof primitiveCtors>).forEach((k) => {
     cls.prototype[k] = makeConstructor(
       function (this: ProgramBuilder, ...args: any[]) {
         return vec_n.call(this, primitiveCtors[k], ...args);
@@ -146,12 +148,12 @@ export function setConstructors(cls: typeof ProgramBuilder) {
       primitiveCtors[k]
     );
   });
-  Object.keys(simpleCtors).forEach((k) => {
+  (Object.keys(simpleCtors) as Array<keyof typeof simpleCtors>).forEach((k) => {
     cls.prototype[k] = function (this: ProgramBuilder, rhs: string) {
       return new PBShaderExp(rhs, simpleCtors[k]);
     };
   });
-  Object.keys(texStorageCtors).forEach((k) => {
+  (Object.keys(texStorageCtors) as Array<keyof typeof texStorageCtors>).forEach((k) => {
     cls.prototype[k] = makeStorageTextureCtor(texStorageCtors[k]);
   });
   cls.prototype['atomic_int'] = makeConstructor(

@@ -31,7 +31,7 @@ function align(n: number, alignment: number) {
   return (n + alignment - 1) & ~(alignment - 1);
 }
 
-function getAlignment(type: LayoutableType) {
+function getAlignment(type: LayoutableType): number {
   if (type.isPrimitiveType()) {
     return type.isScalarType() ? 4 : 1 << Math.min(4, type.cols + 1);
   } else if (type.isAtomicI32() || type.isAtomicU32()) {
@@ -49,7 +49,7 @@ function getAlignment(type: LayoutableType) {
 function getAlignmentPacked(_type: LayoutableType) {
   return 1;
 }
-function getSize(type: LayoutableType) {
+function getSize(type: LayoutableType): number {
   if (type.isPrimitiveType()) {
     return type.isMatrixType()
       ? type.rows * getAlignment(PBPrimitiveTypeInfo.getCachedTypeInfo(type.resizeType(1, type.cols)))
@@ -72,7 +72,7 @@ function getSize(type: LayoutableType) {
     return align(size, structAlignment);
   }
 }
-function getSizePacked(type: LayoutableType) {
+function getSizePacked(type: LayoutableType): number {
   if (type.isPrimitiveType()) {
     let scalarSize: number;
     switch (type.scalarType) {
@@ -633,11 +633,11 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
     return false;
   }
   /** @internal */
-  isHostSharable() {
+  isHostSharable(): boolean {
     return false;
   }
   /** @internal */
-  isConstructible() {
+  isConstructible(): boolean {
     return false;
   }
   /** @internal */
@@ -653,7 +653,7 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
    * @param other - The type to be checked
    * @returns true if the given type is compatible with this type, othewise false
    */
-  isCompatibleType(other: PBTypeInfo) {
+  isCompatibleType(other: PBTypeInfo): boolean {
     return other.typeId === this.typeId;
   }
   /**
@@ -662,9 +662,9 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
    * @param layout - Type of the layout
    * @returns The created buffer layout
    */
-  abstract toBufferLayout(offset: number, layout: PBStructLayout);
+  abstract toBufferLayout(offset: number, layout: PBStructLayout): Nullable<UniformBufferLayout>;
   /** @internal */
-  abstract toTypeName(deviceType?: string, varName?: string);
+  abstract toTypeName(deviceType?: string, varName?: string): string;
   /** @internal */
   protected abstract genTypeId(): string;
 }
@@ -720,7 +720,7 @@ export class PBAnyTypeInfo extends PBTypeInfo<null> {
     return null;
   }
   /** {@inheritDoc PBTypeInfo.isCompatibleType} */
-  isCompatibleType(_other: PBTypeInfo<TypeDetailInfo>) {
+  isCompatibleType(_other: PBTypeInfo<TypeDetailInfo>): boolean {
     return true;
   }
 }
@@ -877,11 +877,11 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
     return !!((this.primitiveType >> NORM_BITSHIFT) & NORM_BITMASK);
   }
   /** @internal */
-  getLayoutAlignment(layout: PBStructLayout) {
+  getLayoutAlignment(layout: PBStructLayout): number {
     return layout === 'packed' ? 1 : this.isScalarType() ? 4 : 1 << Math.min(4, this.cols + 1);
   }
   /** @internal */
-  getLayoutSize() {
+  getLayoutSize(): number {
     return this.getSize();
   }
   /** @internal */
@@ -935,11 +935,11 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
     return true;
   }
   /** @internal */
-  isHostSharable() {
+  isHostSharable(): boolean {
     return this.scalarType !== PBPrimitiveType.BOOL;
   }
   /** @internal */
-  isConstructible() {
+  isConstructible(): boolean {
     return true;
   }
   /** @internal */
@@ -951,7 +951,7 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
     return PBPrimitiveTypeInfo.getCachedOverloads(deviceType, this.primitiveType);
   }
   /** @internal */
-  toTypeName(deviceType: string, varName?: string) {
+  toTypeName(deviceType: string, varName?: string): string {
     if (deviceType === 'webgpu') {
       const typename = primitiveTypeMapWGSL[this.primitiveType];
       return varName ? `${varName}: ${typename}` : typename;
@@ -1026,7 +1026,7 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
     return this.detail.structMembers;
   }
   /** Whether this struct has atomic members */
-  haveAtomicMembers() {
+  haveAtomicMembers(): boolean {
     for (const member of this.structMembers) {
       if (member.type.isStructType() && member.type.haveAtomicMembers()) {
         return true;
@@ -1056,11 +1056,11 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
     return true;
   }
   /** @internal */
-  isHostSharable() {
+  isHostSharable(): boolean {
     return this.detail.structMembers.every((val) => val.type.isHostSharable());
   }
   /** @internal */
-  isConstructible() {
+  isConstructible(): boolean {
     return this.detail.structMembers.every((val) => val.type.isConstructible());
   }
   /** @internal */
@@ -1082,7 +1082,7 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
     return result;
   }
   /** @internal */
-  toTypeName(deviceType: string, varName?: string) {
+  toTypeName(deviceType: string, varName?: string): string {
     if (deviceType === 'webgpu') {
       return varName ? `${varName}: ${this.structName}` : this.structName!;
     } else {
@@ -1090,7 +1090,7 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
     }
   }
   /** @internal */
-  getLayoutAlignment(layout: PBStructLayout) {
+  getLayoutAlignment(layout: PBStructLayout): number {
     if (layout === 'packed') {
       return 1;
     }
@@ -1104,7 +1104,7 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
     return alignment;
   }
   /** @internal */
-  getLayoutSize(layout: PBStructLayout) {
+  getLayoutSize(layout: PBStructLayout): number {
     let size = 0;
     let structAlignment = 0;
     for (const member of this.structMembers) {
@@ -1233,7 +1233,7 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
     return this.detail.dimension;
   }
   /** Wether array have atomic members */
-  haveAtomicMembers() {
+  haveAtomicMembers(): boolean {
     if (this.elementType.isStructType() || this.elementType.isArrayType()) {
       return this.elementType.haveAtomicMembers();
     } else {
@@ -1245,11 +1245,11 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
     return true;
   }
   /** @internal */
-  isHostSharable() {
+  isHostSharable(): boolean {
     return this.detail.elementType.isHostSharable();
   }
   /** @internal */
-  isConstructible() {
+  isConstructible(): boolean {
     return !!this.dimension && this.detail.elementType.isConstructible();
   }
   /** @internal */
@@ -1272,7 +1272,7 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
     return result;
   }
   /** @internal */
-  toTypeName(deviceType: string, varName?: string) {
+  toTypeName(deviceType: string, varName?: string): string {
     if (deviceType === 'webgpu') {
       const elementTypeName = this.elementType.toTypeName(deviceType);
       const typename = `array<${elementTypeName}${this.dimension ? ', ' + this.dimension : ''}>`;
@@ -1285,7 +1285,7 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
     }
   }
   /** @internal */
-  getLayoutAlignment(layout: PBStructLayout) {
+  getLayoutAlignment(layout: PBStructLayout): number {
     return layout === 'packed' || this.elementType.isAnyType()
       ? 1
       : layout === 'std430'
@@ -1293,7 +1293,7 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
         : align(this.elementType.getLayoutAlignment(layout), 16);
   }
   /** @internal */
-  getLayoutSize(layout: PBStructLayout) {
+  getLayoutSize(layout: PBStructLayout): number {
     const elementAlignment = this.elementType.isAnyType() ? 1 : this.elementType.getLayoutAlignment(layout);
     if (layout === 'std140' && !!(elementAlignment & 15)) {
       // array element stride of std140 layout must be multiple of 16
@@ -1307,7 +1307,7 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
   toBufferLayout(_offset: number) {
     return null;
   }
-  isCompatibleType(other: PBTypeInfo<TypeDetailInfo>) {
+  isCompatibleType(other: PBTypeInfo<TypeDetailInfo>): boolean {
     if (!other.isArrayType()) {
       return false;
     }
@@ -1352,7 +1352,7 @@ export class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail> {
     }
   }
   /** {@inheritDoc PBTypeInfo.haveAtomicMembers} */
-  haveAtomicMembers() {
+  haveAtomicMembers(): boolean {
     return this.pointerType.haveAtomicMembers();
   }
   /** {@inheritDoc PBTypeInfo.isPointerType} */
@@ -1360,7 +1360,7 @@ export class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail> {
     return true;
   }
   /** @internal */
-  toTypeName(device: string, varName?: string) {
+  toTypeName(device: string, varName?: string): string {
     if (device === 'webgpu') {
       const addressSpace =
         this.addressSpace === PBAddressSpace.UNKNOWN ? PBAddressSpace.FUNCTION : this.addressSpace;
@@ -1399,7 +1399,7 @@ export class PBAtomicI32TypeInfo extends PBTypeInfo<null> {
     super(PBTypeClass.ATOMIC_I32, null);
   }
   /** {@inheritDoc PBTypeInfo.isPointerType} */
-  haveAtomicMembers() {
+  haveAtomicMembers(): boolean {
     return true;
   }
   /** @internal */
@@ -1407,7 +1407,7 @@ export class PBAtomicI32TypeInfo extends PBTypeInfo<null> {
     return true;
   }
   /** @internal */
-  isHostSharable() {
+  isHostSharable(): boolean {
     return true;
   }
   /** @internal */
@@ -1415,7 +1415,7 @@ export class PBAtomicI32TypeInfo extends PBTypeInfo<null> {
     return true;
   }
   /** @internal */
-  toTypeName(deviceType: string, varName?: string) {
+  toTypeName(deviceType: string, varName?: string): string {
     if (deviceType === 'webgpu') {
       const typename = 'atomic<i32>';
       return varName ? `${varName}: ${typename}` : typename;
@@ -1428,11 +1428,11 @@ export class PBAtomicI32TypeInfo extends PBTypeInfo<null> {
     return null;
   }
   /** @internal */
-  getLayoutAlignment(_layout: PBStructLayout) {
+  getLayoutAlignment(_layout: PBStructLayout): number {
     return 4;
   }
   /** @internal */
-  getLayoutSize() {
+  getLayoutSize(): number {
     return this.getSize();
   }
   /** @internal */
@@ -1454,7 +1454,7 @@ export class PBAtomicU32TypeInfo extends PBTypeInfo<null> {
     super(PBTypeClass.ATOMIC_U32, null);
   }
   /** {@inheritDoc PBTypeInfo.isPointerType} */
-  haveAtomicMembers() {
+  haveAtomicMembers(): boolean {
     return true;
   }
   /** @internal */
@@ -1462,7 +1462,7 @@ export class PBAtomicU32TypeInfo extends PBTypeInfo<null> {
     return true;
   }
   /** @internal */
-  isHostSharable() {
+  isHostSharable(): boolean {
     return true;
   }
   /** @internal */
@@ -1470,7 +1470,7 @@ export class PBAtomicU32TypeInfo extends PBTypeInfo<null> {
     return true;
   }
   /** @internal */
-  toTypeName(deviceType: string, varName?: string) {
+  toTypeName(deviceType: string, varName?: string): string {
     if (deviceType === 'webgpu') {
       const typename = 'atomic<u32>';
       return varName ? `${varName}: ${typename}` : typename;
@@ -1483,11 +1483,11 @@ export class PBAtomicU32TypeInfo extends PBTypeInfo<null> {
     return null;
   }
   /** @internal */
-  getLayoutAlignment(_layout: PBStructLayout) {
+  getLayoutAlignment(_layout: PBStructLayout): number {
     return 4;
   }
   /** @internal */
-  getLayoutSize() {
+  getLayoutSize(): number {
     return this.getSize();
   }
   /** @internal */
@@ -1523,7 +1523,7 @@ export class PBSamplerTypeInfo extends PBTypeInfo<SamplerTypeDetail> {
     return true;
   }
   /** @internal */
-  toTypeName(deviceType: string, varName?: string) {
+  toTypeName(deviceType: string, varName?: string): string {
     if (deviceType === 'webgpu') {
       const typename = this.accessMode === PBSamplerAccessMode.SAMPLE ? 'sampler' : 'sampler_comparison';
       return varName ? `${varName}: ${typename}` : typename;
@@ -1560,8 +1560,8 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
     });
     ASSERT(!!textureTypeMapWGSL[textureType], 'unsupported texture type');
     ASSERT(
-      !(textureType & BITFLAG_STORAGE) || (!!texelFormat && !!storageTexelFormatMap[texelFormat]),
-      'invalid texel format for storage texture'
+      !(textureType & BITFLAG_STORAGE) || (!!texelFormat && texelFormat in storageTexelFormatMap),
+      `invalid texel format for storage texture: ${texelFormat}`
     );
   }
   /** Get the texture type */
@@ -1639,20 +1639,22 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
     return true;
   }
   /** @internal */
-  toTypeName(deviceType: string, varName?: string) {
+  toTypeName(deviceType: string, varName?: string): string {
     if (deviceType === 'webgpu') {
       let typename = textureTypeMapWGSL[this.textureType];
       if (this.isStorageTexture()) {
-        const storageTexelFormat = storageTexelFormatMap[this.storageTexelFormat!];
+        const storageTexelFormat =
+          storageTexelFormatMap[this.storageTexelFormat as keyof typeof storageTexelFormatMap];
         // storage textures currently only support 'write' access control
         const accessMode = this.writable ? (this.readable ? 'read_write' : 'write') : 'read'; // this.readable ? (this.writable ? 'read_write' : 'read') : 'write';
         typename = `${typename}<${storageTexelFormat}, ${accessMode}>`;
       }
       return varName ? `${varName}: ${typename}` : typename;
     } else {
-      const typename = (deviceType === 'webgl' ? textureTypeMapWebGL : textureTypeMapWebGL2)[
-        this.textureType
-      ];
+      const typename =
+        deviceType === 'webgl'
+          ? textureTypeMapWebGL[this.textureType as keyof typeof textureTypeMapWebGL]
+          : textureTypeMapWebGL2[this.textureType as keyof typeof textureTypeMapWebGL2];
       ASSERT(!!typename, 'unsupported texture type');
       return varName ? `${typename} ${varName}` : typename;
     }
@@ -1704,7 +1706,7 @@ export class PBFunctionTypeInfo extends PBTypeInfo<FunctionTypeDetail> {
     return null;
   }
   /** @internal */
-  toTypeName() {
+  toTypeName(): string {
     throw new Error('not supported');
   }
 }

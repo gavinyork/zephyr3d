@@ -88,13 +88,13 @@ export interface PBRenderOptions {
    * @param this - Global scope object of the vertex shader
    * @param pb - The program builder instance
    */
-  vertex(this: PBGlobalScope, pb: ProgramBuilder);
+  vertex(this: PBGlobalScope, pb: ProgramBuilder): void;
   /**
    * Fragment shader generator.
    * @param this - Global scope object of the fragment shader
    * @param pb - The program builder instance
    */
-  fragment(this: PBGlobalScope, pb: ProgramBuilder);
+  fragment(this: PBGlobalScope, pb: ProgramBuilder): void;
 }
 
 /**
@@ -107,7 +107,7 @@ export interface PBComputeOptions {
   /** workgroup size */
   workgroupSize: [number, number, number];
   /** compute shader */
-  compute(this: PBGlobalScope, pb: ProgramBuilder);
+  compute(this: PBGlobalScope, pb: ProgramBuilder): void;
 }
 
 type StructDef = {
@@ -719,17 +719,17 @@ export interface ProgramBuilder {
   /** Same as isinf builtin function in GLSL, only valid for WebGL2 device */
   isinf(x: number | PBShaderExp): PBShaderExp;
   /** add two values */
-  add_2(x: number | PBShaderExp, y: number | PBShaderExp);
+  add_2(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
   /** add a couple of values togeter */
-  add(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]);
+  add(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]): PBShaderExp;
   /** subtract two values */
-  sub(x: number | PBShaderExp, y: number | PBShaderExp);
+  sub(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
   /** multiply two values */
-  mul_2(x: number | PBShaderExp, y: number | PBShaderExp);
+  mul_2(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
   /** multiply a couple of values togeter */
-  mul(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]);
+  mul(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]): PBShaderExp;
   /** divide the first number by the second number */
-  div(x: number | PBShaderExp, y: number | PBShaderExp);
+  div(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
   /** Same as length builtin function in GLSL and WGSL */
   length(x: number | PBShaderExp): PBShaderExp;
   /** Same as distance builtin function in GLSL and WGSL */
@@ -779,7 +779,7 @@ export interface ProgramBuilder {
     x: PBShaderExp | number | boolean,
     y: PBShaderExp | number | boolean,
     ...rest: (PBShaderExp | number | boolean)[]
-  );
+  ): PBShaderExp;
   /** return x & y, per component */
   compAnd(x: PBShaderExp | number, y: PBShaderExp | number): PBShaderExp;
   /** return x ^ y, per component */
@@ -799,9 +799,9 @@ export interface ProgramBuilder {
   /** return the negate of the given value */
   neg(x: number | PBShaderExp): PBShaderExp;
   /** shift arithmetic left, not valid for WebGL1 device */
-  sal(a: number | PBShaderExp, b: number | PBShaderExp);
+  sal(a: number | PBShaderExp, b: number | PBShaderExp): PBShaderExp;
   /** shift arithmetic right, not valid for WebGL1 device */
-  sar(a: number | PBShaderExp, b: number | PBShaderExp);
+  sar(a: number | PBShaderExp, b: number | PBShaderExp): PBShaderExp;
   /** Same as the arrayLength builtin function in WGSL, only valid for WebGPU device */
   arrayLength(x: PBShaderExp): PBShaderExp;
   /** Same as the select builtin function in WGSL, only valid for WebGPU device */
@@ -980,9 +980,9 @@ export interface ProgramBuilder {
   /** Same as workgroupBarrier builtin function in WebGPU, only valid for WebGPU device */
   workgroupBarrier(): void;
   /** atomicLoad, only valid for WebGPU device */
-  atomicLoad(ptr: PBShaderExp);
+  atomicLoad(ptr: PBShaderExp): PBShaderExp;
   /** atomicStore, only valid for WebGPU device */
-  atomicStore(ptr: PBShaderExp, value: number | PBShaderExp);
+  atomicStore(ptr: PBShaderExp, value: number | PBShaderExp): void;
   /** atomicAdd, only valid for WebGPU device */
   atomicAdd(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
   /** atomicSub, only valid for WebGPU device */
@@ -1605,9 +1605,10 @@ export class ProgramBuilder {
     const args: { name: string; type: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo }[] = [];
     const prefix: string[] = [];
     for (const k in builtinVars) {
-      if (builtinVars[k].stage === stage && builtinVars[k].inOrOut === inOrOut) {
-        args.push({ name: builtinVars[k].name, type: builtinVars[k].type });
-        prefix.push(`@builtin(${builtinVars[k].semantic}) `);
+      const v = builtinVars[k as keyof typeof builtinVars];
+      if (v.stage === stage && v.inOrOut === inOrOut) {
+        args.push({ name: v.name, type: v.type });
+        prefix.push(`@builtin(${v.semantic}) `);
       }
     }
     const inoutList = inOrOut === 'in' ? this._inputs : this._outputs;
@@ -3125,13 +3126,17 @@ export class PBBuiltinScope extends PBScope {
     const isWebGPU = getCurrentProgramBuilder()!.getDevice().type === 'webgpu';
     if (!isWebGPU) {
       this.$_builtinVars = {};
-      const v = AST.builtinVariables[getCurrentProgramBuilder()!.getDevice().type];
+      const v =
+        AST.builtinVariables[
+          getCurrentProgramBuilder()!.getDevice().type as keyof typeof AST.builtinVariables
+        ];
       for (const k in v) {
-        const info = v[k];
+        const info = v[k as keyof typeof v];
         this.$_builtinVars[k] = new PBShaderExp(info.name, info.type);
       }
     }
-    const v = AST.builtinVariables[getCurrentProgramBuilder()!.getDevice().type];
+    const v =
+      AST.builtinVariables[getCurrentProgramBuilder()!.getDevice().type as keyof typeof AST.builtinVariables];
     const that = this;
     for (const k of Object.keys(v)) {
       Object.defineProperty(this, k, {
@@ -3162,16 +3167,13 @@ export class PBBuiltinScope extends PBScope {
     this.$_usedBuiltins.add(name);
     const isWebGPU = pb.getDevice().type === 'webgpu';
     if (isWebGPU) {
-      const v = AST.builtinVariables[pb.getDevice().type];
-      const info = v[name];
-      const inout = info.inOrOut;
+      const v = AST.builtinVariables[pb.getDevice().type as keyof typeof AST.builtinVariables];
+      const info = v[name as keyof typeof v];
+      const inout = 'inOrOut' in info ? info.inOrOut : undefined;
       if (inout === 'in') {
         return pb.getCurrentFunctionScope()[AST.getBuiltinParamName(pb.shaderType)][info.name];
       }
-      const structName =
-        inout === 'in'
-          ? AST.getBuiltinInputStructInstanceName(pb.shaderType)
-          : AST.getBuiltinOutputStructInstanceName(pb.shaderType);
+      const structName = AST.getBuiltinOutputStructInstanceName(pb.shaderType);
       const scope = pb.getCurrentScope();
       if (!scope[structName] || !scope[structName][info.name]) {
         throw new Error(`invalid use of builtin variable ${name}`);

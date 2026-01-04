@@ -150,10 +150,13 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
         if (!(buffer instanceof WebGPUStructuredBuffer)) {
           throw new Error(`BindGroup.setValue() failed: '${name}' is not structured buffer`);
         }
-        if ((value as any)?.BYTES_PER_ELEMENT) {
+        if (typeof value === 'number') {
+          throw new Error(`BindGroup.setValue() failed: cannot set ${value} to '${name}'`);
+        }
+        if ('BYTES_PER_ELEMENT' in value) {
           buffer.bufferSubData(0, value as TypedArray);
         } else {
-          for (const k in value as any) {
+          for (const k in value) {
             buffer.set(k, value[k]);
           }
         }
@@ -289,7 +292,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           if (!entry.externalTexture && !view) {
             throw new Error('WebGPUBindGroup.setTexture() failed: create texture view failed');
           }
-          if (!t || t[0] !== value) {
+          if (!t || (t as [WebGPUBaseTexture, Nullable<GPUTextureView>])[0] !== value) {
             this._resources[name] = [value as WebGPUBaseTexture, view];
             this.invalidate();
           }

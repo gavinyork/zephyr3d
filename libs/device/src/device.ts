@@ -318,7 +318,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     clearColor: Nullable<Vector4>,
     clearDepth: Nullable<number>,
     clearStencil: Nullable<number>
-  );
+  ): void;
   abstract createGPUTimer(): Nullable<ITimer>;
   abstract createRenderStateSet(): RenderStateSet;
   abstract createBlendingState(): BlendingState;
@@ -370,8 +370,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   abstract createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
   abstract reverseVertexWindingOrder(reverse: boolean): void;
   abstract isWindingOrderReversed(): boolean;
-  abstract copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number);
-  abstract copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number);
+  abstract copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number): void;
+  abstract copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number): void;
   // program
   abstract createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
   abstract createBindGroup(layout: Immutable<BindGroupLayout>): BindGroup;
@@ -382,7 +382,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     srcOffset: number,
     dstOffset: number,
     bytes: number
-  );
+  ): void;
   abstract createIndexBuffer(
     data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
     options?: BufferCreationOptions
@@ -410,11 +410,15 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   abstract setRenderStates(renderStates: Nullable<RenderStateSet>): void;
   abstract getRenderStates(): Nullable<RenderStateSet>;
   abstract getFramebuffer(): Nullable<FrameBuffer>;
-  abstract setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Nullable<Iterable<number>>);
+  abstract setBindGroup(
+    index: number,
+    bindGroup: BindGroup,
+    dynamicOffsets?: Nullable<Iterable<number>>
+  ): void;
   abstract getBindGroup(index: number): [BindGroup, Nullable<Iterable<number>>];
   abstract flush(): void;
   abstract nextFrame(callback: () => void): number;
-  abstract cancelNextFrame(handle: number);
+  abstract cancelNextFrame(handle: number): void;
   // misc
   abstract readPixels(
     index: number,
@@ -499,8 +503,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   drawText(text: string, x: number, y: number, color: string) {
     DrawText.drawText(this, text, color, x, y);
   }
-  setFramebuffer(rt: Nullable<FrameBuffer>);
-  setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number);
+  setFramebuffer(rt: Nullable<FrameBuffer>): void;
+  setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number): void;
   setFramebuffer(
     colorOrRT: BaseTexture[] | Nullable<FrameBuffer>,
     depth?: BaseTexture,
@@ -648,10 +652,10 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._frameInfo.drawCalls++;
     this._drawInstanced(primitiveType, first, count, numInstances);
   }
-  executeRenderBundle(renderBundle: RenderBundle) {
+  executeRenderBundle(renderBundle: RenderBundle): void {
     this._frameInfo.drawCalls += this._executeRenderBundle(renderBundle);
   }
-  compute(workgroupCountX, workgroupCountY, workgroupCountZ) {
+  compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number) {
     this._frameInfo.computeCalls++;
     this._compute(workgroupCountX, workgroupCountY, workgroupCountZ);
   }
@@ -803,7 +807,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   }
   protected abstract onBeginFrame(): boolean;
   protected abstract onEndFrame(): void;
-  protected abstract _setFramebuffer(fb: Nullable<FrameBuffer>);
+  protected abstract _setFramebuffer(fb: Nullable<FrameBuffer>): void;
   protected abstract _handleResize(
     cssWidth: number,
     cssHeight: number,

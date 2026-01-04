@@ -417,9 +417,11 @@ export class WebGLTextureCaps implements TextureCaps {
         '12x12'
       ]) {
         const [w, h] = k.split('x').map((val) => Number(val));
-        this._textureFormatInfos[`astc-${k}`] = {
+        this._textureFormatInfos[`astc-${k}` as keyof typeof this._textureFormatInfos] = {
           glFormat: gl.NONE,
-          glInternalFormat: this._extASTC[`COMPRESSED_RGBA_ASTC_${k}_KHR`],
+          glInternalFormat: this._extASTC[
+            `COMPRESSED_RGBA_ASTC_${k}_KHR` as keyof typeof this._extASTC
+          ] as number,
           glType: [gl.NONE],
           filterable: true,
           renderable: false,
@@ -428,9 +430,11 @@ export class WebGLTextureCaps implements TextureCaps {
           blockWidth: w,
           blockHeight: h
         };
-        this._textureFormatInfos[`astc-${k}-srgb`] = {
+        this._textureFormatInfos[`astc-${k}-srgb` as keyof typeof this._textureFormatInfos] = {
           glFormat: gl.NONE,
-          glInternalFormat: this._extASTC[`COMPRESSED_SRGB8_ALPHA8_ASTC_${k}_KHR`],
+          glInternalFormat: this._extASTC[
+            `COMPRESSED_SRGB8_ALPHA8_ASTC_${k}_KHR` as keyof typeof this._extASTC
+          ] as number,
           glType: [gl.NONE],
           filterable: true,
           renderable: false,

@@ -201,9 +201,7 @@ export class WebGPUDevice extends BaseDevice {
       throw new Error('WebGPU: requestAdapter() failed');
     }
     this._adapter = adapter;
-    this._adapterInfo = this._adapter['requestAdapterInfo']
-      ? await this._adapter['requestAdapterInfo']()
-      : {};
+    this._adapterInfo = this._adapter.info ?? {};
     this._device = await this._adapter.requestDevice({
       requiredFeatures: [...this._adapter.features] as GPUFeatureName[],
       requiredLimits: { ...this._adapter.limits } as any

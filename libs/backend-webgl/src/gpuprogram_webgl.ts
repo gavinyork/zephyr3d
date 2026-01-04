@@ -15,10 +15,8 @@ export interface AttributeSetter {
   location: number;
 }
 
-export type IUniformValue = number | Iterable<number> | [WebGLBaseTexture, WebGLSampler];
-export interface UniformSetter {
-  (value: IUniformValue): unknown;
-}
+export type IUniformValue = number | Iterable<number> | [WebGLBaseTexture, WebGLTextureSampler];
+export type UniformSetter = (value: IUniformValue) => unknown;
 
 interface ProgramUniformInfo {
   index: number;
@@ -256,7 +254,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     }
     return true;
   }
-  private createUniformSetter(info: ProgramUniformInfo) {
+  private createUniformSetter(info: ProgramUniformInfo): Nullable<UniformSetter> {
     const loc = info.location!;
     const isArray = info.isArray;
     const gl = this._device.context;
@@ -362,7 +360,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     return null;
   }
   private createUniformSetters() {
-    const uniformSetters = {};
+    const uniformSetters: Record<string, UniformSetter> = {};
     const gl = this._device.context;
     const numUniforms = gl.getProgramParameter(this._object!, WebGLEnum.ACTIVE_UNIFORMS) as number;
 
@@ -401,7 +399,7 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
         };
         this._uniformInfo.push(uniformInfo);
         if (location) {
-          uniformSetters[name] = this.createUniformSetter(uniformInfo);
+          uniformSetters[name] = this.createUniformSetter(uniformInfo)!;
         }
       }
     }
@@ -544,8 +542,9 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     };
   }
   private getSamplerSetter(location: WebGLUniformLocation, target: number, unit: number) {
-    return (texture: [WebGLBaseTexture, WebGLTextureSampler]) =>
+    return (texture: any) => {
       this._device.bindTexture(target, unit, texture[0], texture[1]);
+    };
     /*
     const gl = this._device.context;
     return isWebGL2(gl)

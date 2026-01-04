@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { Matrix4x4, Vector4 } from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
 import { MAX_CLUSTERED_LIGHTS } from '../values';
 import type {
   AbstractDevice,
@@ -373,7 +373,7 @@ export class ClusteredLight {
       this._countParam[1] = this._tileCountY;
       this._countParam[2] = this._tileCountZ;
       this._countParam[3] = numLights + 1;
-      this._bindGroup!.setValue('invProjMatrix', Matrix4x4.invert(camera.getProjectionMatrix()));
+      this._bindGroup!.setValue('invProjMatrix', camera.getInvProjectionMatrix());
       this._bindGroup!.setValue('viewMatrix', camera.viewMatrix);
       this._bindGroup!.setValue('sizeParam', this._sizeParam);
       this._bindGroup!.setValue('countParam', this._countParam);

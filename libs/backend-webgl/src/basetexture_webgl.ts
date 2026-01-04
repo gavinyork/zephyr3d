@@ -289,7 +289,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
             data?.fill(0xff);
             if (this.isTextureCube()) {
               for (let face = 0; face < 6; face++) {
-                const faceTarget = cubeMapFaceMap[face];
+                const faceTarget = cubeMapFaceMap[face as keyof typeof cubeMapFaceMap];
                 if (isCompressed) {
                   this._device.context.compressedTexImage2D(
                     faceTarget,

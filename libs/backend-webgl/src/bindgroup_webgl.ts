@@ -98,10 +98,13 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
         if (!(buffer instanceof WebGLStructuredBuffer)) {
           throw new Error(`BindGroup.setValue() failed: '${name}' is not structured buffer`);
         }
-        if ((value as TypedArray)?.BYTES_PER_ELEMENT) {
+        if (typeof value === 'number') {
+          throw new Error(`BindGroup.setValue() failed: cannot set ${value} to '${name}'`);
+        }
+        if ('BYTES_PER_ELEMENT' in value) {
           buffer.bufferSubData(0, value as TypedArray);
         } else {
-          for (const k in value as any) {
+          for (const k in value) {
             buffer.set(k, value[k]);
           }
         }
@@ -123,7 +126,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
   getTexture(name: string): Nullable<BaseTexture> {
     const entry = this._findTextureLayout(name);
     if (entry) {
-      return (this._resources[name]?.[0] as BaseTexture) || null;
+      return (this._resources[name] as [WebGLBaseTexture, WebGLTextureSampler])?.[0] || null;
     } else {
       throw new Error(`getTexture() failed:${name} is not a texture`);
     }
@@ -155,7 +158,7 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
             program.setBlock(
               (entry.type as PBStructTypeInfo).structName!,
               res,
-              dynamicOffsets![entry.buffer!.dynamicOffsetIndex]
+              (dynamicOffsets! as number[])[entry.buffer!.dynamicOffsetIndex]
             );
           } else {
             program.setBlock((entry.type as PBStructTypeInfo).structName!, res, 0);
