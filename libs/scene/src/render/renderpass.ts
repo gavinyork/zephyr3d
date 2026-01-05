@@ -102,9 +102,9 @@ export abstract class RenderPass extends Disposable {
     return `${this.constructor.name}:${this._getGlobalBindGroupHash(ctx)}`;
   }
   /** @internal */
-  protected abstract _getGlobalBindGroupHash(ctx: DrawContext);
+  protected abstract _getGlobalBindGroupHash(ctx: DrawContext): string;
   /** @internal */
-  protected abstract renderItems(ctx: DrawContext, renderQueue: RenderQueue);
+  protected abstract renderItems(ctx: DrawContext, renderQueue: RenderQueue): void;
   /** @internal */
   protected drawScene(ctx: DrawContext, cullCamera: Camera, renderQueue?: RenderQueue) {
     const device = ctx.device;

@@ -200,7 +200,7 @@ export interface Drawable {
    *
    * Useful for batching or deferred state application.
    */
-  pushRenderQueueRef(ref: RenderQueueRef);
+  pushRenderQueueRef(ref: RenderQueueRef): void;
   /**
    * Applies transform-related uniforms to the active bind group or pipeline.
    *
@@ -213,7 +213,7 @@ export interface Drawable {
    * @param ctx - Full draw context for the current pass.
    * @param hash - Optional hash key for render bundle or pipeline caching.
    */
-  draw(ctx: DrawContext, hash?: string);
+  draw(ctx: DrawContext, hash?: string): void;
   /**
    * Returns true if the object supports instanced rendering.
    *
@@ -267,7 +267,7 @@ export interface BatchDrawable extends Drawable {
    * @param instanceInfo - Instance data information for this batch.
    * @internal
    */
-  applyMaterialUniforms(instanceInfo: DrawableInstanceInfo);
+  applyMaterialUniforms(instanceInfo: DrawableInstanceInfo): void;
   /**
    * Applies material uniforms across all grouped instance informations belonging to this material.
    *
@@ -275,5 +275,5 @@ export interface BatchDrawable extends Drawable {
    *
    * @internal
    */
-  applyMaterialUniformsAll();
+  applyMaterialUniformsAll(): void;
 }

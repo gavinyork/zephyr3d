@@ -59,7 +59,7 @@ export class BoundingBox extends AABB implements BoundingVolume {
     super(arg0 as any, arg1!);
   }
   /** {@inheritDoc BoundingVolume.behindPlane} */
-  behindPlane(plane: Plane) {
+  behindPlane(plane: Plane): boolean {
     return this.toAABB().behindPlane(plane);
   }
   /** {@inheritDoc BoundingVolume.clone} */

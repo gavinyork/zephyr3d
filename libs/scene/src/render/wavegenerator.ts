@@ -73,7 +73,7 @@ export interface WaveGenerator extends IDisposable {
    * @param y - Y position of the water surface.
    * @param outAABB - Output AABB.
    */
-  calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB);
+  calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB): void;
   /**
    * Update the wave generator.
    * @param timeInSeconds - Time in seconds.

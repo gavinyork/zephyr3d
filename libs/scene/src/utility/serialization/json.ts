@@ -46,14 +46,14 @@ export class JSONBool extends JSONProp {
 
 export class JSONData extends JSONProp {
   value!: Nullable<JSONNumber | JSONString | JSONBool | JSONData>[];
-  data!: object;
+  data!: any;
   isnull!: boolean;
   isundefined!: boolean;
-  constructor(parent: Nullable<JSONData>, data: object = {}) {
+  constructor(parent: Nullable<JSONData>, data: any = {}) {
     super(parent);
     this.updateObject(data);
   }
-  updateObject(data: object) {
+  updateObject(data: any) {
     this.value = [];
     this.data = data;
     this.isnull = this.data === null;
@@ -80,7 +80,7 @@ export class JSONData extends JSONProp {
       this.value.push(prop);
     }
   }
-  updateProps(): object {
+  updateProps(): any {
     for (const key of Object.keys(this.data)) {
       delete this.data[key];
     }

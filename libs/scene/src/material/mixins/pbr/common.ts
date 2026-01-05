@@ -71,7 +71,7 @@ export type IMixinPBRCommon = {
     viewVec: PBShaderExp,
     commonData: PBShaderExp,
     outColor: PBShaderExp
-  );
+  ): void;
   indirectLighting(
     scope: PBInsideFunctionScope,
     normal: PBShaderExp,
@@ -79,7 +79,7 @@ export type IMixinPBRCommon = {
     commonData: PBShaderExp,
     outColor: PBShaderExp,
     outRoughness?: PBShaderExp
-  );
+  ): void;
 } & TextureMixinInstanceTypes<
   [
     'occlusion',

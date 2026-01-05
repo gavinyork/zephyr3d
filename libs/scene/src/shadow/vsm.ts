@@ -220,7 +220,7 @@ export class VSM extends ShadowImpl {
   getDepthScale() {
     return this._darkness;
   }
-  setDepthScale(val) {
+  setDepthScale(val: number) {
     this._darkness = val;
   }
   getType() {

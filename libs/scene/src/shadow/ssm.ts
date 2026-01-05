@@ -39,7 +39,7 @@ export class SSM extends ShadowImpl {
   getDepthScale() {
     return 1;
   }
-  setDepthScale(_val) {}
+  setDepthScale(_val: number) {}
   getShaderHash() {
     return '';
   }

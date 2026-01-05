@@ -1,5 +1,5 @@
 import type { Nullable, Vector4 } from '@zephyr3d/base';
-import { Disposable, Vector3 } from '@zephyr3d/base';
+import { Disposable, objectKeys, Vector3 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
 import type { BatchDrawable, Drawable } from './drawable';
 import type { DirectionalLight, PunctualLight } from '../scene/light';
@@ -12,7 +12,7 @@ import { ShaderHelper } from '../material';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
 import { getDevice } from '../app/api';
 
-/** @internal */
+/** @public */
 export type CachedBindGroup = {
   bindGroup: BindGroup;
   buffer: Float32Array;
@@ -128,7 +128,7 @@ export interface RenderItemList {
 
 /**
  * Render queue reference
- * @internal
+ * @public
  */
 export interface RenderQueueRef {
   ref: RenderQueue;
@@ -136,7 +136,7 @@ export interface RenderQueueRef {
 
 /**
  * Drawable instance information
- * @internal
+ * @public
  */
 export interface DrawableInstanceInfo {
   bindGroup: CachedBindGroup;
@@ -404,9 +404,9 @@ export class RenderQueue extends Disposable {
   reset() {
     if (this._itemList) {
       // Release all render bundles
-      for (const k in this._itemList) {
+      for (const k of objectKeys(this._itemList)) {
         const itemListBundle: RenderItemListBundle = this._itemList[k];
-        for (const l in itemListBundle) {
+        for (const l of objectKeys(itemListBundle)) {
           const listInfo: RenderItemListInfo[] = itemListBundle[l];
           for (const info of listInfo) {
             if (info.renderQueue === this) {

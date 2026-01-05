@@ -205,6 +205,7 @@ export class PBRBluePrintMaterial
 
     for (const u of [...this._uniformValues, ...this._uniformTextures]) {
       if (u.inVertexShader) {
+        // @ts-ignore
         pb.getGlobalScope()[u.name] = pb[u.type]().uniform(2);
       }
     }
@@ -243,6 +244,7 @@ export class PBRBluePrintMaterial
     if (this.needFragmentColor()) {
       for (const u of [...this._uniformValues, ...this._uniformTextures]) {
         if (u.inFragmentShader) {
+          // @ts-ignore
           pb.getGlobalScope()[u.name] = pb[u.type]().uniform(2);
         }
       }

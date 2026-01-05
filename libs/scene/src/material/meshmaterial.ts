@@ -367,7 +367,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     // Copy original uniform values
     for (let i = 0; i < instanceUniforms.length; i++) {
       const { prop, offset, type } = instanceUniforms[i];
-      const value = that[prop];
+      const value = that[prop as keyof typeof that];
       switch (type) {
         case 'float': {
           uniformsHolder![offset] = Number(value);

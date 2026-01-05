@@ -16,7 +16,7 @@ import {
   atmosphereLUTRendered
 } from '../shaders';
 import type { Immutable, Nullable } from '@zephyr3d/base';
-import { Disposable, DRef, Vector3 } from '@zephyr3d/base';
+import { Disposable, DRef, objectKeys, Vector3 } from '@zephyr3d/base';
 import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { Primitive } from './primitive';
 import { BoxShape } from '../shapes';
@@ -803,8 +803,8 @@ export class SkyRenderer extends Disposable {
       this._skyDistantLightLut.dispose();
     }
     this._bindgroupDistantLight!.dispose();
-    for (const k in this._bindgroupSky) {
-      this._bindgroupSky[k].dispose();
+    for (const k of objectKeys(this._bindgroupSky)) {
+      this._bindgroupSky[k]?.dispose();
     }
     this._bindgroupSky = {};
     this._bindgroupFog!.dispose();

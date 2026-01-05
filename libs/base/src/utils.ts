@@ -149,6 +149,30 @@ const colorNames: Record<string, string> = {
 export type Nullable<T> = T | null;
 
 /**
+ * Extract element type from array type
+ * @public
+ */
+export type ElementType<T> = T extends (infer U)[] ? U : never;
+
+/**
+ * Object.entries with typed return value
+ * @param obj - The object to extract entries from.
+ * @returns An array of key-value pairs from the object.
+ */
+export function objectEntries<T extends Record<PropertyKey, unknown>>(obj: T) {
+  return Object.entries(obj) as { [K in keyof T]-?: [K, T[K]] }[keyof T][];
+}
+
+/**
+ * Object.keys with typed return value
+ * @param obj - The object to extract keys from.
+ * @returns An array of keys from the object.
+ */
+export function objectKeys<T extends {}>(obj: T) {
+  return Object.keys(obj) as (keyof T)[];
+}
+
+/**
  * Make optional properties as required
  * @public
  */

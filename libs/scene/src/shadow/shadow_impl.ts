@@ -17,11 +17,11 @@ export abstract class ShadowImpl {
   abstract getType(): ShadowMode;
   abstract getShadowMapBorder(shadowMapParams: ShadowMapParams): number;
   abstract getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType;
-  abstract postRenderShadowMap(shadowMapParams: ShadowMapParams);
+  abstract postRenderShadowMap(shadowMapParams: ShadowMapParams): void;
   abstract getDepthScale(): number;
-  abstract setDepthScale(val: number);
+  abstract setDepthScale(val: number): void;
   abstract resourceDirty(): boolean;
-  abstract doUpdateResources(shadowMapParams: ShadowMapParams);
+  abstract doUpdateResources(shadowMapParams: ShadowMapParams): void;
   abstract getShaderHash(): string;
   abstract computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,

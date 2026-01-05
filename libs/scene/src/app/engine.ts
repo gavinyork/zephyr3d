@@ -1,5 +1,5 @@
 import type { IDisposable, Nullable, ReadOptions } from '@zephyr3d/base';
-import { MemoryFS } from '@zephyr3d/base';
+import { MemoryFS, objectEntries } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { HttpFS, type VFS } from '@zephyr3d/base';
 import { ScriptingSystem } from './scriptingsystem';
@@ -64,7 +64,7 @@ export class Engine {
   private _screen: ScreenAdapter;
   protected _activeRenderables: {
     renderable: DRef<IRenderable>;
-    hook?: IRenderHook;
+    hook: Nullable<IRenderHook>;
   }[];
   private _loadingScenes: Partial<Record<string, Promise<Nullable<Scene>>>>;
   /**
@@ -192,10 +192,11 @@ export class Engine {
   setRenderable(renderable: Nullable<IRenderable>, layer = 0, hook?: IRenderHook) {
     if (!this._activeRenderables[layer]) {
       this._activeRenderables[layer] = {
-        renderable: new DRef<IRenderable>(null)
+        renderable: new DRef<IRenderable>(null),
+        hook: null
       };
     }
-    this._activeRenderables[layer].hook = hook;
+    this._activeRenderables[layer].hook = hook ?? null;
     this._activeRenderables[layer].renderable.set(renderable);
   }
   async readFile<T extends ReadOptions['encoding'] = 'binary'>(path: string, encoding?: T) {
@@ -233,18 +234,17 @@ export class Engine {
     this.setRenderable(null, splashScreenLayer);
   }
   render() {
-    for (const k of Object.keys(this._activeRenderables)) {
-      const info = this._activeRenderables[k];
+    this._activeRenderables.forEach((info) => {
       const render = info.hook?.beforeRender
         ? (info.hook.beforeRender(info.renderable.get() ?? null) ?? true)
         : true;
-      if (render && info.renderable.get()) {
-        info.renderable.get().render();
+      if (render) {
+        info.renderable.get()?.render();
       }
       if (info.hook?.afterRender) {
         info.hook.afterRender(info.renderable.get() ?? null);
       }
-    }
+    });
   }
   private async ensureBuiltinVFS() {
     if (!this._builtinsVFS) {
@@ -269,7 +269,7 @@ export class Engine {
       '/materials/pbr_specular_glossiness.zmtl': PBRSpecularGlossinessMaterial,
       '/materials/sprite3d_std.zmtl': StandardSprite3DMaterial
     } as const;
-    for (const key of Object.keys(shapeClsMap)) {
+    for (const [key] of objectEntries(shapeClsMap)) {
       const obj = new shapeClsMap[key]();
       await this.writeSerializableObject(fs, 'Default', obj, key);
       obj.dispose();

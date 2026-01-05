@@ -131,7 +131,7 @@ export class AbstractPostEffect extends Disposable {
   protected destroy() {}
   /** @internal */
   static getDefaultRenderState(ctx: DrawContext, compareFunc: CompareFunc) {
-    let renderState = this._defaultRenderStates[compareFunc];
+    let renderState = this._defaultRenderStates[compareFunc as keyof typeof this._defaultRenderStates];
     if (!renderState) {
       renderState = ctx.device.createRenderStateSet();
       renderState.useRasterizerState().setCullMode('none');
@@ -140,7 +140,7 @@ export class AbstractPostEffect extends Disposable {
         .enableTest(compareFunc !== 'always')
         .enableWrite(false)
         .setCompareFunc(compareFunc);
-      this._defaultRenderStates[compareFunc] = renderState;
+      this._defaultRenderStates[compareFunc as keyof typeof this._defaultRenderStates] = renderState;
     }
     return renderState;
   }

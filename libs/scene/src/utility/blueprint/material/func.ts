@@ -1,4 +1,6 @@
+import { objectKeys } from '@zephyr3d/base';
 import type { ResourceManager } from '../../serialization';
+import { defineProps } from '../../serialization/types';
 import { BaseGraphNode } from '../node';
 import type { MaterialBlueprintIR } from './ir';
 
@@ -76,7 +78,7 @@ export class FunctionCallNode extends BaseGraphNode {
     this._outs = [];
     this._inputs = [];
     this._outputs = [];
-    for (const k of Object.keys(this._IR.DAG.nodeMap)) {
+    for (const k of objectKeys(this._IR.DAG.nodeMap)) {
       const node = this._IR.DAG.nodeMap[k];
       if (node instanceof FunctionInputNode) {
         const name = node.name || `arg_${k}`;
@@ -157,7 +159,7 @@ export class FunctionCallNode extends BaseGraphNode {
     return {
       ctor: FunctionCallNode,
       name: 'FunctionCallNode',
-      async createFunc(_, init: string) {
+      async createFunc(_: unknown, init: string) {
         const IR = await manager.loadBluePrint(init);
         const funcName = manager.VFS.basename(init, manager.VFS.extname(init));
         return { obj: new FunctionCallNode(init, funcName, IR!['func']) };
@@ -307,7 +309,7 @@ export class FunctionInputNode extends BaseGraphNode {
       ctor: FunctionInputNode,
       name: 'FunctionInputNode',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'type',
             type: 'string',
@@ -335,7 +337,7 @@ export class FunctionInputNode extends BaseGraphNode {
               this.dispatchEvent('changed');
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -466,7 +468,7 @@ export class FunctionOutputNode extends BaseGraphNode {
       ctor: FunctionOutputNode,
       name: 'FunctionOutputNode',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'name',
             type: 'string',
@@ -478,7 +480,7 @@ export class FunctionOutputNode extends BaseGraphNode {
               this.dispatchEvent('changed');
             }
           }
-        ];
+        ]);
       }
     };
   }

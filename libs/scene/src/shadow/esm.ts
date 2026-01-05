@@ -244,7 +244,7 @@ export class ESM extends ShadowImpl {
   getDepthScale() {
     return this._depthScale;
   }
-  setDepthScale(val) {
+  setDepthScale(val: number) {
     this._depthScale = val;
   }
   getShaderHash() {

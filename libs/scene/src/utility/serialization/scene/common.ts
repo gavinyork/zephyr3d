@@ -17,7 +17,7 @@ export const meshInstanceClsMap: Map<
   {
     new (...args: any[]): MeshMaterial;
   },
-  { C: { new (m: MeshMaterial) }; S: SerializableClass }
+  { C: { new (m: MeshMaterial): any }; S: SerializableClass }
 > = new Map();
 
 /** @internal */
@@ -49,9 +49,10 @@ export function getMeshMaterialInstanceUniformsClass(cls: {
           name: u.name,
           type: u.type,
           get(this: C, value) {
-            const val = this.material[u.prop];
+            const prop = u.prop as keyof MeshMaterial;
+            const val = this.material[prop] as any;
             if (u.type === 'float') {
-              value.num[0] = val;
+              value.num[0] = val as number;
             } else if (u.type === 'vec2') {
               value.num![0] = val.x;
               value.num[1] = val.y;
@@ -68,13 +69,17 @@ export function getMeshMaterialInstanceUniformsClass(cls: {
           },
           set(this: C, value) {
             if (u.type === 'float') {
-              this.material[u.prop] = value.num[0];
+              // @ts-ignore
+              this.material[prop] = value.num[0];
             } else if (u.type === 'vec2') {
-              this.material[u.prop] = new Vector2(value.num[0], value.num[1]);
+              // @ts-ignore
+              this.material[prop] = new Vector2(value.num[0], value.num[1]);
             } else if (u.type === 'vec3' || u.type === 'rgb') {
-              this.material[u.prop] = new Vector3(value.num[0], value.num[1], value.num[2]);
+              // @ts-ignore
+              this.material[prop] = new Vector3(value.num[0], value.num[1], value.num[2]);
             } else if (u.type === 'vec4' || u.type === 'rgba') {
-              this.material[u.prop] = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+              // @ts-ignore
+              this.material[prop] = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
             }
           }
         }));
@@ -158,7 +163,7 @@ export function getTextureProps<T extends Material>(
         animatable: true
       },
       get(this: T, value) {
-        const matrix = this[name.slice(0, name.length - 7) + 'TexCoordMatrix'] as Matrix4x4;
+        const matrix = this[(name.slice(0, name.length - 7) + 'TexCoordMatrix') as keyof T] as Matrix4x4;
         if (!matrix) {
           value.num[0] = 1;
           value.num[1] = 1;
@@ -171,8 +176,10 @@ export function getTextureProps<T extends Material>(
       },
       set(this: T, value) {
         if (value.num[0] === 1 && value.num[1] === 1) {
+          // @ts-ignore
           this[name.slice(0, name.length - 7) + 'TexCoordMatrix'] = null;
         } else {
+          // @ts-ignore
           this[name.slice(0, name.length - 7) + 'TexCoordMatrix'] = Matrix4x4.scaling(
             new Vector3(value.num[0], value.num[1], 1)
           );
@@ -202,24 +209,27 @@ export function getTextureProps<T extends Material>(
       default: 'clamp',
       get(this: T, value) {
         const sampler =
-          (this[name.slice(0, name.length - 7) + 'TextureSampler'] as TextureSampler) ??
-          (this[name] as BaseTexture).getDefaultSampler(false);
+          (this[
+            (name.slice(0, name.length - 7) + 'TextureSampler') as keyof typeof this
+          ] as TextureSampler) ?? (this[name] as BaseTexture).getDefaultSampler(false);
         value.str[0] = sampler.addressModeU;
       },
       set(this: T, value) {
         const sampler =
-          (this[name.slice(0, name.length - 7) + 'TextureSampler'] as TextureSampler) ??
-          (this[name] as BaseTexture).getDefaultSampler(false);
-        this[name.slice(0, name.length - 7) + 'TextureSampler'] = getDevice().createSampler({
-          addressU: value.str[0] as TextureAddressMode,
-          addressV: sampler.addressModeV,
-          lodMax: sampler.lodMax,
-          lodMin: sampler.lodMin,
-          magFilter: sampler.magFilter,
-          minFilter: sampler.minFilter,
-          mipFilter: sampler.mipFilter,
-          maxAnisotropy: sampler.maxAnisotropy
-        });
+          (this[
+            (name.slice(0, name.length - 7) + 'TextureSampler') as keyof typeof this
+          ] as TextureSampler) ?? (this[name] as BaseTexture).getDefaultSampler(false);
+        this[(name.slice(0, name.length - 7) + 'TextureSampler') as keyof typeof this] =
+          getDevice().createSampler({
+            addressU: value.str[0] as TextureAddressMode,
+            addressV: sampler.addressModeV,
+            lodMax: sampler.lodMax,
+            lodMin: sampler.lodMin,
+            magFilter: sampler.magFilter,
+            minFilter: sampler.minFilter,
+            mipFilter: sampler.mipFilter,
+            maxAnisotropy: sampler.maxAnisotropy
+          }) as any;
       },
       isValid() {
         if (this.$isInstance) {
@@ -245,14 +255,15 @@ export function getTextureProps<T extends Material>(
       default: 'clamp',
       get(this: T, value) {
         const sampler =
-          (this[name.slice(0, name.length - 7) + 'TextureSampler'] as TextureSampler) ??
+          (this[(name.slice(0, name.length - 7) + 'TextureSampler') as keyof T] as TextureSampler) ??
           (this[name] as BaseTexture).getDefaultSampler(false);
         value.str[0] = sampler.addressModeV;
       },
       set(this: T, value) {
         const sampler =
-          (this[name.slice(0, name.length - 7) + 'TextureSampler'] as TextureSampler) ??
+          (this[(name.slice(0, name.length - 7) + 'TextureSampler') as keyof T] as TextureSampler) ??
           (this[name] as BaseTexture).getDefaultSampler(false);
+        // @ts-ignore
         this[name.slice(0, name.length - 7) + 'TextureSampler'] = getDevice().createSampler({
           addressU: sampler.addressModeU,
           addressV: value.str[0] as TextureAddressMode,

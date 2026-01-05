@@ -142,7 +142,15 @@ export class GLTFAccessor {
     const componentCount = this.getComponentCount(this.type);
     const arrayLength = this.count * componentCount;
 
-    let func = 'getFloat32';
+    let func:
+      | 'getFloat32'
+      | 'getInt8'
+      | 'getUint8'
+      | 'getInt16'
+      | 'getUint16'
+      | 'getInt32'
+      | 'getUint32'
+      | 'getFloat32' = 'getFloat32';
     switch (this.componentType) {
       case ComponentType.BYTE:
         this._filteredView = new Int8Array(arrayLength);
@@ -268,6 +276,10 @@ export class GLTFAccessor {
       case ComponentType.UINT:
         indicesTypedView = new Uint32Array(indicesBuffer, indicesByteOffset, indicesArrayLength);
         break;
+    }
+    if (!indicesTypedView) {
+      console.warn('Failed to convert sparse accessor indices to typed view!: ' + this.bufferView);
+      return;
     }
 
     // Gather values.

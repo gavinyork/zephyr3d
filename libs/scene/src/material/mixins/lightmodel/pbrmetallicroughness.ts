@@ -32,7 +32,11 @@ export type IMixinPBRMetallicRoughness = {
   ): PBShaderExp;
   calculateMetallic(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp;
   calculateRoughness(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp;
-  calculateSpecularFactor(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp);
+  calculateSpecularFactor(
+    scope: PBInsideFunctionScope,
+    albedo: PBShaderExp,
+    normal: PBShaderExp
+  ): PBShaderExp;
   calculateCommonData(
     scope: PBInsideFunctionScope,
     albedo: PBShaderExp,

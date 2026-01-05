@@ -52,7 +52,7 @@ export interface OIT extends IDisposable {
    *
    * @param ctx - The draw context.
    */
-  end(ctx: DrawContext);
+  end(ctx: DrawContext): void;
   /**
    * Begins rendering for the given pass.
    *
@@ -67,7 +67,7 @@ export interface OIT extends IDisposable {
    * @param ctx - The draw context.
    * @param pass - The pass number.
    */
-  endPass(ctx: DrawContext, pass: number);
+  endPass(ctx: DrawContext, pass: number): void;
   /**
    * Sets up the fragment output.
    *
@@ -76,7 +76,7 @@ export interface OIT extends IDisposable {
    *
    * @param scope - The global shader scope.
    */
-  setupFragmentOutput(scope: PBGlobalScope);
+  setupFragmentOutput(scope: PBGlobalScope): void;
   /**
    * Do the fragment color output.
    *
@@ -95,7 +95,7 @@ export interface OIT extends IDisposable {
    * @param ctx - The draw context.
    * @param bindGroup - The bind group.
    */
-  applyUniforms(ctx: DrawContext, bindGroup: BindGroup);
+  applyUniforms(ctx: DrawContext, bindGroup: BindGroup): void;
   /**
    * Calculates the hash of the renderer.
    *
@@ -112,7 +112,7 @@ export interface OIT extends IDisposable {
    *
    * @param rs - The render states.
    */
-  setRenderStates(rs: RenderStateSet);
+  setRenderStates(rs: RenderStateSet): void;
   /**
    * Disposes the renderer.
    */

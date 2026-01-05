@@ -41,7 +41,7 @@ export interface ClipmapGatherContext {
     maxZ: number,
     outAABB: AABB,
     level: number
-  );
+  ): void;
 }
 
 /** @internal */
@@ -53,7 +53,7 @@ export interface ClipmapDrawContext extends ClipmapGatherContext {
     scale: number,
     gridScale: number,
     level: number
-  );
+  ): void;
 }
 
 /** @internal */

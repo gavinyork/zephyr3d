@@ -109,7 +109,7 @@ export abstract class AnimationTrack<StateType = unknown> {
    * @param target - The animated object to modify.
    * @param state - The state to apply.
    */
-  abstract applyState(target: object, state: StateType);
+  abstract applyState(target: object, state: StateType): unknown;
   /**
    * Blend two states into a new state using a weight.
    *

@@ -147,7 +147,7 @@ export interface BluePrintEditorState {
   nodes: {
     id: number;
     locked: boolean;
-    node: object;
+    node: Record<string, unknown>;
     title: string;
   }[];
   links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
@@ -382,13 +382,15 @@ class IRConstantfv extends IRExpression {
   create(pb: ProgramBuilder) {
     if (this.name) {
       if (!pb.getGlobalScope()[this.name]) {
+        // @ts-ignore
         pb.getGlobalScope()[this.name] = pb[`vec${this.value.length}`]().uniform(2);
       }
       return pb.getGlobalScope()[this.name] as PBShaderExp;
     }
     return (
-      Array.isArray(this.value) ? pb[`vec${this.value.length}`](...this.value) : this.value
-    ) as PBShaderExp;
+      // @ts-ignore
+      (Array.isArray(this.value) ? pb[`vec${this.value.length}`](...this.value) : this.value) as PBShaderExp
+    );
   }
   /**
    * Converts to a uniform value descriptor
@@ -433,6 +435,7 @@ class IRConstantbv extends IRExpression {
    * @returns A boolean vector constructor expression
    */
   create(pb: ProgramBuilder) {
+    // @ts-ignore
     return pb[`bvec${this.value.length}`](...this.value) as PBShaderExp;
   }
 }
@@ -547,6 +550,7 @@ class IRFunc extends IRExpression {
       return exp;
     }
     const params = this.params.map((param) => (param instanceof IRExpression ? param.create(pb) : param));
+    // @ts-ignore
     const exp = typeof this.func === 'string' ? pb[this.func](...params) : this.func(pb, ...params);
     if (this._ref === 1) {
       return exp as PBShaderExp;
@@ -672,11 +676,13 @@ class IRCallFunc extends IRExpression {
     }
     const that = this;
     const ir = this.node.IR;
+    // @ts-ignore
     const params = this.node.args.map((v) => pb[v.type](v.name));
     pb.func(this.node.name, params, function () {
       const outputs = ir.create(pb)!;
       const rettype = pb.defineStruct(
         that.node.outputs.map((output, index) => {
+          // @ts-ignore
           return pb[that.node.outs[index].type](output.swizzle);
         })
       );
@@ -891,6 +897,7 @@ class IRSwizzle extends IRExpression {
    */
   create(pb: ProgramBuilder): number | PBShaderExp {
     const src = this.src.create(pb);
+    // @ts-ignore
     return typeof src === 'number' ? pb[`vec${this.hash.length}`](src) : src[this.hash];
   }
 }
@@ -944,6 +951,7 @@ class IRCast extends IRExpression {
    * Example: vec4(src, 0, 0) for casting vec2 to vec4.
    */
   create(pb: ProgramBuilder): PBShaderExp {
+    // @ts-ignore
     return pb[this.type](this.src.create(pb), ...Array.from({ length: this.cast }).fill(0));
   }
 }
@@ -1017,6 +1025,7 @@ class IRSampleTexture extends IRExpression {
     if (coord instanceof PBShaderExp) {
       coordExp = coord;
     } else if (Array.isArray(coord)) {
+      // @ts-ignore
       coordExp = pb[`vec${coord.length}`](...coord);
     } else {
       throw new Error('Invalid texture coordinate');
@@ -1125,6 +1134,7 @@ class IRConstantTexture extends IRExpression {
    */
   create(pb: ProgramBuilder): PBShaderExp {
     if (!pb.getGlobalScope()[this.name]) {
+      // @ts-ignore
       pb.getGlobalScope()[this.name] = pb[this.type]().uniform(2);
     }
     return pb.getGlobalScope()[this.name];

@@ -681,7 +681,7 @@ export class ResourceManager {
    *
    * @returns A Promise resolving to the reconstructed object instance, or `null` on failure.
    */
-  async deserializeObject<T extends object>(ctx: any, json: object): Promise<Nullable<T>> {
+  async deserializeObject<T extends object>(ctx: any, json: Record<string, unknown>): Promise<Nullable<T>> {
     const cls = this.getClasses();
     const className = json['ClassName'];
     const index = cls.findIndex((val) => val.name === className);
@@ -689,8 +689,8 @@ export class ResourceManager {
       throw new Error('Deserialize object failed: Cannot found serialization meta data');
     }
     let info = cls[index];
-    const initParams: { asset?: string } = json['Init'];
-    json = json['Object'];
+    const initParams = json['Init'] as { asset?: string };
+    json = json['Object'] as Record<string, unknown>;
     let p: T | Promise<T>;
     let loadProps = true;
     if (info.createFunc) {
@@ -863,7 +863,10 @@ export class ResourceManager {
       const tmpNode = new DRef(new SceneNode(parent.scene));
       tmpNode.get()!.remove();
       tmpNode.get()!.prefabId = this._vfs.normalizePath(path);
-      const node = (await this.deserializeObject<SceneNode>(tmpNode.get(), json.data))!;
+      const node = (await this.deserializeObject<SceneNode>(
+        tmpNode.get(),
+        json['data'] as Record<string, unknown>
+      ))!;
       node.prefabId = tmpNode.get()!.prefabId;
       node.parent = parent;
       node.persistentId = randomUUID();
@@ -1140,7 +1143,11 @@ export class ResourceManager {
     }
     return v;
   }
-  private async deserializeObjectPropsForCls<T extends object>(obj: T, cls: SerializableClass, json: object) {
+  private async deserializeObjectPropsForCls<T extends object>(
+    obj: T,
+    cls: SerializableClass,
+    json: Record<string, unknown>
+  ) {
     const props = (this.getPropertiesByClass(cls) ?? []).sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0));
     let currentPhase: number | undefined = undefined;
     const promises: Promise<void>[] = [];
@@ -1242,7 +1249,7 @@ export class ResourceManager {
   private async serializeObjectPropsForCls<T extends object>(
     obj: T,
     cls: SerializableClass,
-    json: object,
+    json: Record<string, unknown>,
     asyncTasks?: Nullable<Promise<unknown>[]>
   ) {
     const props = this.getPropertiesByClass(cls) ?? [];
@@ -1282,10 +1289,11 @@ export class ResourceManager {
         }
         case 'object_array':
           if (tmpVal.object.length > 0) {
-            json[k] = [];
+            const arr: unknown[] = [];
             for (const p of tmpVal.object) {
-              json[k].push(await this.serializeObject(p, {}, asyncTasks));
+              arr.push(await this.serializeObject(p, {}, asyncTasks));
             }
+            json[k] = arr;
           }
           break;
         case 'embedded': {

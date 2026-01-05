@@ -1,5 +1,6 @@
 import type { Nullable } from '@zephyr3d/base';
 import { BaseGraphNode, getNodeTypeComponents } from '../node';
+import { defineProps } from '../../serialization/types';
 
 /**
  * Vector constructor node
@@ -235,7 +236,7 @@ export class SwizzleNode extends BaseGraphNode {
       ctor: SwizzleNode,
       name: 'SwizzleNode',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'Swizzle',
             type: 'string',
@@ -246,7 +247,7 @@ export class SwizzleNode extends BaseGraphNode {
               this.swizzle = value.str[0];
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -405,7 +406,7 @@ export class CompComparisonNode extends BaseGraphNode {
       ctor: CompComparisonNode,
       name: 'CompComparisonNode',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'mode',
             type: 'string',
@@ -422,7 +423,7 @@ export class CompComparisonNode extends BaseGraphNode {
               this.mode = value.str[0] as ComparisonMode;
             }
           }
-        ];
+        ]);
       }
     };
   }

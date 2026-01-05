@@ -155,7 +155,9 @@ export function mixinTextureProps<U extends string>(name: U) {
         });
       }
       [`sample${capName}Texture`](scope: PBInsideFunctionScope, texCoord?: PBShaderExp) {
+        // @ts-ignore
         const tex = this[`get${capName}TextureUniform`](scope);
+        // @ts-ignore
         const coord = texCoord ?? this[`get${capName}TexCoord`](scope);
         return scope.$builder.textureSample(tex, coord);
       }
@@ -246,6 +248,7 @@ export function mixinTextureProps<U extends string>(name: U) {
     feature = cls.defineFeature();
     featureTexIndex = cls.defineFeature();
     featureTexMatrix = cls.defineFeature();
+    // @ts-ignore
     cls[id] = true;
     return cls as unknown as T & {
       new (...args: any[]): TextureProp<U> & TexturePropUniforms<U>;

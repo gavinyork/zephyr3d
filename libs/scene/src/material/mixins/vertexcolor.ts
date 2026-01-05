@@ -1,5 +1,5 @@
 import type { MeshMaterial } from '../meshmaterial';
-import type { PBFunctionScope, PBInsideFunctionScope } from '@zephyr3d/device';
+import type { PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 
 /**
  * Interface for vertex color mixin
@@ -8,7 +8,7 @@ import type { PBFunctionScope, PBInsideFunctionScope } from '@zephyr3d/device';
  */
 export interface IMixinVertexColor {
   vertexColor: boolean;
-  getVertexColor(scope: PBInsideFunctionScope);
+  getVertexColor(scope: PBInsideFunctionScope): PBShaderExp;
 }
 
 /**

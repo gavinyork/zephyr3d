@@ -555,7 +555,7 @@ export class GLTFLoader extends AbstractModelLoader {
             const morphAttribSet = new Set<number>();
             for (const target of p.targets) {
               for (const k in target) {
-                const t = targetMap[k];
+                const t = targetMap[k as keyof typeof targetMap];
                 if (t !== undefined) {
                   targets[t] = targets[t] ?? { numComponents: 0, data: [] };
                   const accessorIndex = target[k] as number;

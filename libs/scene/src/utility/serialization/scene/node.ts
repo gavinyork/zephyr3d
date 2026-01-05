@@ -18,11 +18,11 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
       const scene = ctx instanceof Scene ? ctx : ctx.scene;
       if (init) {
         const prefabData = (await manager.loadPrefabContent(init.prefabId))!.data as DiffValue;
-        const nodeData = applyPatch(prefabData, init.patch);
+        const nodeData = applyPatch(prefabData, init.patch) as Record<string, unknown>;
         const tmpNode = new DRef(new SceneNode(scene));
         tmpNode.get()!.remove();
         tmpNode.get()!.prefabId = init.prefabId;
-        const sceneNode = await manager.deserializeObject<SceneNode>(tmpNode.get(), nodeData as object);
+        const sceneNode = await manager.deserializeObject<SceneNode>(tmpNode.get(), nodeData);
         if (sceneNode) {
           sceneNode.prefabId = init.prefabId;
           sceneNode.parent = ctx instanceof SceneNode ? ctx : ctx.rootNode;

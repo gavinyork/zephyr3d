@@ -1,3 +1,4 @@
+import { defineProps } from '../../serialization/types';
 import { getParamName } from '../common';
 import { BaseGraphNode } from '../node';
 
@@ -51,7 +52,7 @@ export class ConstantScalarNode extends BaseGraphNode {
       ctor: ConstantScalarNode,
       name: 'ConstantScalarNode',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'isUniform',
             type: 'bool',
@@ -82,7 +83,7 @@ export class ConstantScalarNode extends BaseGraphNode {
               this.x = value.num[0];
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -189,7 +190,7 @@ export class ConstantBooleanNode extends BaseGraphNode {
       ctor: ConstantBooleanNode,
       name: 'ConstantBooleanNode',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'x',
             type: 'bool',
@@ -200,7 +201,7 @@ export class ConstantBooleanNode extends BaseGraphNode {
               this.x = value.bool[0];
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -343,7 +344,7 @@ export class ConstantVec2Node extends BaseGraphNode {
       ctor: ConstantVec2Node,
       name: 'ConstantVec2Node',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'isUniform',
             type: 'bool',
@@ -384,7 +385,7 @@ export class ConstantVec2Node extends BaseGraphNode {
               this.y = value.num[0];
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -482,7 +483,7 @@ export class ConstantBVec2Node extends BaseGraphNode {
       ctor: ConstantBVec2Node,
       name: 'ConstantBVec2Node',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'x',
             type: 'bool',
@@ -503,7 +504,7 @@ export class ConstantBVec2Node extends BaseGraphNode {
               this.y = value.bool[0];
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -651,7 +652,7 @@ export class ConstantVec3Node extends BaseGraphNode {
       ctor: ConstantVec3Node,
       name: 'ConstantVec3Node',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'isUniform',
             type: 'bool',
@@ -716,7 +717,7 @@ export class ConstantVec3Node extends BaseGraphNode {
               this.z = value.num[2];
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -828,7 +829,7 @@ export class ConstantBVec3Node extends BaseGraphNode {
       ctor: ConstantBVec3Node,
       name: 'ConstantBVec3Node',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'x',
             type: 'bool',
@@ -859,7 +860,7 @@ export class ConstantBVec3Node extends BaseGraphNode {
               this.z = value.bool[0];
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -1020,7 +1021,7 @@ export class ConstantVec4Node extends BaseGraphNode {
       ctor: ConstantVec4Node,
       name: 'ConstantVec4Node',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'isUniform',
             type: 'bool',
@@ -1097,7 +1098,7 @@ export class ConstantVec4Node extends BaseGraphNode {
               this.w = value.num[3];
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -1224,7 +1225,7 @@ export class ConstantBVec4Node extends BaseGraphNode {
       ctor: ConstantBVec4Node,
       name: 'ConstantBVec4Node',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'x',
             type: 'bool',
@@ -1265,7 +1266,7 @@ export class ConstantBVec4Node extends BaseGraphNode {
               this.w = value.bool[0];
             }
           }
-        ];
+        ]);
       }
     };
   }
