@@ -489,7 +489,10 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
 
     this.scene?.queuePerCameraUpdateNode(this);
   }
-  /** @internal */
+  /**
+   * Updates the terrain material region based on current position and scale.
+   * Should be called after changing position, scale, or height map.
+   */
   updateRegion() {
     if (this.material) {
       const x = Math.abs(this.scale.x);

@@ -77,35 +77,35 @@ export const QUEUE_TRANSPARENT = 2;
 
 // Morph target attributes
 
-/** @internal */
+/** @public */
 export const MORPH_TARGET_POSITION = 0;
-/** @internal */
+/** @public */
 export const MORPH_TARGET_NORMAL = 1;
-/** @internal */
+/** @public */
 export const MORPH_TARGET_TANGENT = 2;
-/** @internal */
+/** @public */
 export const MORPH_TARGET_COLOR = 3;
-/** @internal */
+/** @public */
 export const MORPH_TARGET_TEX0 = 4;
-/** @internal */
+/** @public */
 export const MORPH_TARGET_TEX1 = 5;
-/** @internal */
+/** @public */
 export const MORPH_TARGET_TEX2 = 6;
-/** @internal */
+/** @public */
 export const MORPH_TARGET_TEX3 = 7;
-/** @internal */
+/** @public */
 export const MAX_MORPH_ATTRIBUTES = 8;
-/** @internal */
+/** @public */
 export const MAX_MORPH_TARGETS = 256;
-/** @internal */
+/** @public */
 export const MORPH_WEIGHTS_VECTOR_COUNT = (MAX_MORPH_TARGETS + 3) >> 2;
-/** @internal */
+/** @public */
 export const MORPH_ATTRIBUTE_VECTOR_COUNT = (MAX_MORPH_ATTRIBUTES + 3) >> 2;
 
-/** @internal */
+/** @public */
 export const MAX_TERRAIN_MIPMAP_LEVELS = 64;
 
-/** @internal */
+/** @public */
 export const MAX_GERSTNER_WAVE_COUNT = 16;
 
 /**

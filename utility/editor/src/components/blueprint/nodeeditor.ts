@@ -16,7 +16,7 @@ export type NodeEditorState = {
     position?: Nullable<number[]>;
     title: string;
     locked: boolean;
-    node: object;
+    node: Record<string, unknown>;
   }[];
   links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
   canvasOffset?: number[];
@@ -271,7 +271,7 @@ export class NodeEditor extends Observable<{
   }
   public async saveState(): Promise<NodeEditorState> {
     const nodes = [...this.nodes.values()].map(async (node) => {
-      const impl = (await getEngine().resourceManager.serializeObject(node.impl)) as IGraphNode;
+      const impl = await getEngine().resourceManager.serializeObject(node.impl);
       return {
         id: node.id,
         position: node.position ? [node.position.x, node.position.y] : null,

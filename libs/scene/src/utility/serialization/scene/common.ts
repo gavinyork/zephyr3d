@@ -68,6 +68,7 @@ export function getMeshMaterialInstanceUniformsClass(cls: {
             }
           },
           set(this: C, value) {
+            const prop = u.prop as keyof MeshMaterial;
             if (u.type === 'float') {
               // @ts-ignore
               this.material[prop] = value.num[0];

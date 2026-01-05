@@ -133,7 +133,9 @@ export class AnimationSet extends Disposable implements IDisposable {
   get numAnimations() {
     return Object.getOwnPropertyNames(this._animations).length;
   }
-  /** @internal */
+  /**
+   * The skeletons used by animations in this set.
+   */
   get skeletons() {
     return this._skeletons;
   }

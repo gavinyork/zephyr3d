@@ -79,7 +79,10 @@ let FEATURE_CULLMODE = 0;
 let FEATURE_ALPHATOCOVERAGE = 0;
 let FEATURE_DISABLE_TAA = 0;
 
-/** @internal */
+/**
+ * Instance uniform data type
+ * @public
+ */
 export type InstanceUniformType = 'float' | 'vec2' | 'vec3' | 'vec4' | 'rgb' | 'rgba';
 
 /**
@@ -480,7 +483,6 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * Typically used inside shader hooks to select per-pass logic.
    *
    * @returns The active pass index while building the program, or -1 when idle.
-   * @internal
    */
   get pass() {
     return this._materialPass;

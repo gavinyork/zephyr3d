@@ -270,7 +270,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
       RenderBundleWrapper.drawableChanged(this);
     }
   }
-  /** @internal */
+  /**
+   * Sets the skinned bounding info
+   * @param info - The skinned bounding info
+   */
   setSkinnedBoundingInfo(info: Nullable<SkinnedBoundingBox>) {
     this._skinnedBoundingInfo = info;
   }

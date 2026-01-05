@@ -6,7 +6,13 @@ import type { SceneNode } from '../scene/scene_node';
 import { BoundingBox } from '../utility/bounding_volume';
 import { getDevice } from '../app/api';
 
-/** @internal */
+/**
+ * Skinned bounding box information for a submesh.
+ *
+ * Used to compute animated AABB for skinned meshes.
+ *
+ * @public
+ */
 export interface SkinnedBoundingBox {
   /**
    * Representative vertices used to bound a skinned mesh (extreme points along axes).
@@ -350,7 +356,6 @@ export class Skeleton extends Disposable {
    *
    * @param meshData - Raw submesh attributes (positions, blend indices, weights).
    * @returns Skinned bounding box info used during per-frame updates.
-   * @internal
    */
   getBoundingInfo(data: { positions: Float32Array; blendIndices: TypedArray; weights: TypedArray }) {
     const indices = [0, 0, 0, 0, 0, 0];

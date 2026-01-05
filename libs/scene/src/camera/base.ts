@@ -195,7 +195,6 @@ export class BaseCameraController {
    * Get the attached camera.
    *
    * @returns The current camera or `null` if none is attached.
-   * @internal
    */
   _getCamera() {
     return this._camera;
@@ -207,7 +206,6 @@ export class BaseCameraController {
    * reinitialize state that depends on the camera.
    *
    * @param camera - The camera to attach.
-   * @internal
    */
   _setCamera(camera: Nullable<Camera>) {
     if (this._camera !== camera) {

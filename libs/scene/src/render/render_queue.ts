@@ -22,7 +22,10 @@ export type CachedBindGroup = {
 
 const maxBufferSizeInFloats = 65536 / 4;
 
-/** @internal */
+/**
+ * Instance bind group allocator
+ * @public
+ */
 export class InstanceBindGroupAllocator {
   private static _instanceBindGroupLayout: Nullable<BindGroupLayout> = null;
   _bindGroupList: CachedBindGroup[] = [];
@@ -83,7 +86,7 @@ export interface InstanceData {
 
 /**
  * Render queue item
- * @internal
+ * @public
  */
 export interface RenderQueueItem {
   drawable: Drawable;
@@ -92,7 +95,10 @@ export interface RenderQueueItem {
   instanceData: Nullable<InstanceData>;
 }
 
-/** @internal */
+/**
+ * Render item list information
+ * @public
+ */
 export interface RenderItemListInfo {
   itemList: RenderQueueItem[];
   renderBundle?: RenderBundleWrapper;
@@ -109,7 +115,10 @@ export interface RenderItemListInfo {
   renderQueue: RenderQueue;
 }
 
-/** @internal */
+/**
+ * Render item list bundle
+ * @public
+ */
 export interface RenderItemListBundle {
   lit: RenderItemListInfo[];
   unlit: RenderItemListInfo[];
@@ -117,7 +126,7 @@ export interface RenderItemListBundle {
 
 /**
  * Item list of render queue
- * @internal
+ * @public
  */
 export interface RenderItemList {
   opaque: RenderItemListBundle;
