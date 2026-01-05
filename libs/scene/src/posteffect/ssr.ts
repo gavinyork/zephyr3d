@@ -20,7 +20,7 @@ import { ShaderHelper } from '../material';
 export class SSR extends AbstractPostEffect {
   private static _programs: Record<string, GPUProgram> = {};
   private static _resolveProgram: Record<string, GPUProgram> = {};
-  private static _combineProgram: Nullable<GPUProgram> = null;
+  private static _combineProgram?: GPUProgram;
   private static _blurBlitterH: Nullable<BilateralBlurBlitter> = null;
   private static _blurBlitterV: Nullable<BilateralBlurBlitter> = null;
   private _bindgroups: Record<string, BindGroup>;
