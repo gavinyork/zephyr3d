@@ -17,3 +17,5 @@ export * from './wavegenerator';
 export * from './fft_wavegenerator';
 export * from './gerstner_wavegenerator';
 export * from './fbm_wavegenerator';
+export * from './rendertarget';
+export * from './screenrendertarget';
