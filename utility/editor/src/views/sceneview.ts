@@ -619,20 +619,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       );
       */
       const camera = this.controller.model.scene.mainCamera;
-      /*
-      camera.viewport = [
-        transform.viewportX,
-        transform.viewportY,
-        transform.viewportWidth,
-        transform.viewportHeight
-      ];
-      camera.scissor = [
-        transform.viewportX,
-        transform.viewportY,
-        transform.viewportWidth,
-        transform.viewportHeight
-      ];
-      */
+      camera.viewport = getEngine().screen.viewport.slice();
+      camera.scissor = camera.viewport.slice();
       camera!.render(this.controller.model.scene);
 
       // Render selected camera

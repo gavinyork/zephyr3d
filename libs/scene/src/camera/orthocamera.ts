@@ -146,19 +146,23 @@ export class OrthoCamera extends Camera {
   }
   /** @internal */
   protected _computeProj() {
-    let left = this._left;
-    let right = this._right;
-    let bottom = this._bottom;
-    let top = this._top;
-    if (this._window) {
-      const width = right - left;
-      const height = top - bottom;
-      left += width * this._window[0];
-      bottom += height * this._window[1];
-      right = left + width * this._window[2];
-      top = bottom + height * this._window[3];
+    if (this._renderTarget) {
+      this._renderTarget.calcOrthographicProjection(this._near, this._far, this._projMatrix);
+    } else {
+      let left = this._left;
+      let right = this._right;
+      let bottom = this._bottom;
+      let top = this._top;
+      if (this._window) {
+        const width = right - left;
+        const height = top - bottom;
+        left += width * this._window[0];
+        bottom += height * this._window[1];
+        right = left + width * this._window[2];
+        top = bottom + height * this._window[3];
+      }
+      this._projMatrix.ortho(left, right, bottom, top, this._near, this._far);
     }
-    this._projMatrix.ortho(left, right, bottom, top, this._near, this._far);
     Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
   }
 }

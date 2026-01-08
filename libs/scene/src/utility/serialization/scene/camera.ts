@@ -26,6 +26,16 @@ export function getCameraClass(): SerializableClass {
     getProps() {
       return defineProps([
         {
+          name: 'UseScreenSettings',
+          type: 'bool',
+          get(this: Camera, value) {
+            value.bool[0] = this.useScreenSettings;
+          },
+          set(this: Camera, value) {
+            this.useScreenSettings = value.bool[0];
+          }
+        },
+        {
           name: 'HDR',
           type: 'bool',
           default: false,

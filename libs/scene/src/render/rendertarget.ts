@@ -1,7 +1,7 @@
-import type { Matrix4x4 } from '@zephyr3d/base';
+import type { Matrix4x4, Nullable } from '@zephyr3d/base';
 
 export abstract class RenderTarget {
-  abstract calcViewport(outViewport?: number[]): number[];
+  abstract calcViewport(outViewport?: Nullable<number[]>): number[];
   abstract calcPerspectiveProjection(
     fov: number,
     nearClip: number,

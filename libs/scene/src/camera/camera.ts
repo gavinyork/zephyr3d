@@ -24,6 +24,8 @@ import { Bloom } from '../posteffect/bloom';
 import { SAO } from '../posteffect/sao';
 import { MotionBlur } from '../posteffect/motionblur';
 import { getDevice } from '../app/api';
+import type { RenderTarget } from '../render/rendertarget';
+import { ScreenRenderTarget } from '../render/screenrendertarget';
 
 /**
  * Result of a camera picking operation.
@@ -105,6 +107,10 @@ export class Camera extends SceneNode {
   protected _dirty: boolean;
   /** @internal Viewport [x, y, w, h]; null uses full framebuffer. */
   protected _viewport: Nullable<number[]>;
+  /** @internal Viewport for render target */
+  protected _renderTargetViewport: Nullable<number[]>;
+  /** @internal RenderTarget for this camera */
+  protected _renderTarget: Nullable<RenderTarget>;
   /** @internal Scissor rectangle [x, y, w, h]; null uses viewport. */
   protected _scissor: Nullable<number[]>;
   /** @internal Clip plane mask for custom clipping schemes. */
@@ -240,6 +246,7 @@ export class Camera extends SceneNode {
    */
   constructor(scene: Nullable<Scene>, projectionMatrix?: Matrix4x4) {
     super(scene);
+    this._renderTarget = null;
     this._projMatrix = projectionMatrix || Matrix4x4.identity();
     this._invProjMatrix = Matrix4x4.invert(this._projMatrix);
     this._viewMatrix = Matrix4x4.identity();
@@ -252,6 +259,7 @@ export class Camera extends SceneNode {
     this._dirty = true;
     this._controller = null;
     this._viewport = null;
+    this._renderTargetViewport = null;
     this._scissor = null;
     this._clipMask = 0;
     this._frustum = null;
@@ -317,6 +325,15 @@ export class Camera extends SceneNode {
     if (scene && !scene.mainCamera) {
       scene.mainCamera = this;
     }
+  }
+  /**
+   * Whether to use screen settings for this camera's render target.
+   */
+  get useScreenSettings() {
+    return !!this._renderTarget;
+  }
+  set useScreenSettings(val: boolean) {
+    this._renderTarget = val ? new ScreenRenderTarget() : null;
   }
   /**
    * The compositor that owns and runs the camera's post-processing chain.
@@ -737,7 +754,10 @@ export class Camera extends SceneNode {
   }
   /** Viewport used for rendering, if null, use full framebuffer size */
   get viewport(): Nullable<Immutable<number[]>> {
-    return this._viewport;
+    if (this._renderTarget) {
+      this._renderTargetViewport = this._renderTarget.calcViewport(this._renderTargetViewport);
+    }
+    return this._renderTarget ? this._renderTargetViewport : this._viewport;
   }
   set viewport(rect: Nullable<Immutable<number[]>>) {
     this._viewport = rect?.slice() ?? null;

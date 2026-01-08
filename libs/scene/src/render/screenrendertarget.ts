@@ -1,4 +1,5 @@
 import { Matrix4x4 } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
 import type { ScreenAdapter } from '../app/screen';
 import { getEngine } from '../app/api';
 import { RenderTarget } from './rendertarget';
@@ -9,7 +10,7 @@ export class ScreenRenderTarget extends RenderTarget {
     super();
     this.screenAdapter = screenAdapter ?? getEngine().screen;
   }
-  calcViewport(outViewport: number[] = []): number[] {
+  calcViewport(outViewport?: Nullable<number[]>): number[] {
     outViewport = outViewport ?? [];
     const transform = this.screenAdapter.transform;
     outViewport[0] = transform.croppedViewport.x;

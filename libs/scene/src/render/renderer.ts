@@ -26,7 +26,7 @@ import { MaterialVaryingFlags } from '../values';
 import { fetchSampler } from '../utility/misc';
 import type { Primitive } from '.';
 import { BoxShape } from '../shapes';
-import { getDevice, getEngine } from '../app/api';
+import { getDevice } from '../app/api';
 
 /**
  * Forward render scheme
@@ -85,7 +85,7 @@ export class SceneRenderer {
    * @param camera - The camera that will be used to render the scene
    * @param compositor - The compositor that will be used to apply postprocess effects
    */
-  static renderScene(scene: Scene, camera: Camera) {
+  static renderScene(scene: Scene, camera: Camera): void {
     const device = getDevice();
     const colorFormat =
       camera.HDR && device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
@@ -96,59 +96,23 @@ export class SceneRenderer {
     scene.frameUpdate();
     scene.frameUpdatePerCamera(camera);
     if (camera && !device.isContextLost()) {
-      const originFramebuffer = device.getFramebuffer();
-      const deviceWidth = device.getDrawingBufferWidth();
-      const deviceHeight = device.getDrawingBufferHeight();
-      const transform = originFramebuffer ? null : getEngine().screen.transform;
-      let screenX = transform?.viewportX ?? 0;
-      let screenY = transform?.viewportY ?? 0;
-      let screenW = transform?.viewportWidth ?? device.deviceXToScreen(deviceWidth);
-      let screenH = transform?.viewportHeight ?? device.deviceYToScreen(deviceHeight);
-      const viewportX = camera.viewport ? camera.viewport[0] + screenX : screenX;
-      const viewportY = camera.viewport ? camera.viewport[1] + screenY : screenY;
-      const viewportW = camera.viewport ? camera.viewport[2] : screenW;
-      const viewportH = camera.viewport ? camera.viewport[3] : screenH;
-      const scissorX = camera.scissor ? Math.max(viewportX, camera.scissor[0] + screenX) : screenX;
-      const scissorY = camera.scissor ? Math.max(viewportY, camera.scissor[1] + screenY) : screenY;
-      const scissorW = camera.scissor
-        ? Math.min(viewportX + viewportW - scissorX, camera.scissor[2])
-        : screenW;
-      const scissorH = camera.scissor
-        ? Math.min(viewportY + viewportH - scissorY, camera.scissor[3])
-        : screenH;
-      if (viewportW <= 0 || viewportH <= 0 || scissorW <= 0 || scissorH <= 0) {
+      const defaultViewport = !camera.viewport && !camera.scissor;
+      const renderX = camera.viewport ? device.screenXToDevice(camera.viewport[0]) : 0;
+      const renderY = camera.viewport ? device.screenYToDevice(camera.viewport[1]) : 0;
+      const renderWidth = camera.viewport
+        ? device.screenXToDevice(camera.viewport[2])
+        : device.getDrawingBufferWidth();
+      const renderHeight = camera.viewport
+        ? device.screenYToDevice(camera.viewport[3])
+        : device.getDrawingBufferHeight();
+      if (renderWidth <= 0 || renderHeight <= 0) {
         camera.getPickResultResolveFunc()?.(null);
         return;
       }
-      const defaultViewport =
-        viewportX === 0 &&
-        viewportY === 0 &&
-        viewportW === screenW &&
-        viewportH === screenH &&
-        scissorX === 0 &&
-        scissorY === 0 &&
-        scissorW === screenW &&
-        scissorH === screenH;
-      const renderX = device.screenXToDevice(viewportX);
-      const renderY = device.screenYToDevice(viewportY);
-      const renderWidth = device.screenXToDevice(viewportW);
-      const renderHeight = device.screenYToDevice(viewportH);
-      //const defaultViewport = !camera.viewport && !camera.scissor;
-      // const renderX = camera.viewport ? device.screenXToDevice(camera.viewport[0]) : 0;
-      // const renderY = camera.viewport ? device.screenYToDevice(camera.viewport[1]) : 0;
-      // const renderWidth = camera.viewport
-      //   ? device.screenXToDevice(camera.viewport[2])
-      //   : device.getDrawingBufferWidth();
-      // const renderHeight = camera.viewport
-      //   ? device.screenYToDevice(camera.viewport[3])
-      //   : device.getDrawingBufferHeight();
-      // if (renderWidth <= 0 || renderHeight <= 0) {
-      //   camera.getPickResultResolveFunc()?.(null);
-      //   return;
-      // }
       const tmpFramebuffer = defaultViewport
         ? null
         : device.pool.fetchTemporalFramebuffer(false, renderWidth, renderHeight, colorFormat, depthFormat);
+      const originFramebuffer = device.getFramebuffer();
       if (tmpFramebuffer) {
         device.pushDeviceStates();
         device.setFramebuffer(tmpFramebuffer);
@@ -205,9 +169,9 @@ export class SceneRenderer {
         if (oversizedViewport) {
           blitter.destRect = [renderX, renderY, renderWidth, renderHeight];
         } else {
-          blitter.viewport = [viewportX, viewportY, viewportW, viewportH];
+          blitter.viewport = camera.viewport ? camera.viewport.slice() : null;
         }
-        blitter.scissor = [scissorX, scissorY, scissorW, scissorH];
+        blitter.scissor = camera.scissor ? camera.scissor.slice() : null;
         blitter.srgbOut = !originFramebuffer;
         blitter.blit(
           tmpFramebuffer.getColorAttachments()[0],

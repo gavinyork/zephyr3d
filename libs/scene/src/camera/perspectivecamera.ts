@@ -151,21 +151,25 @@ export class PerspectiveCamera extends Camera {
   }
   /** @internal */
   protected _computeProj() {
-    const h = this._near * Math.tan(this._fovY * 0.5);
-    const w = h * this._aspect;
-    let left = -w;
-    let right = w;
-    let top = h;
-    let bottom = -h;
-    if (this._window) {
-      const width = right - left;
-      const height = top - bottom;
-      left += width * this._window[0];
-      bottom += height * this._window[1];
-      right = left + width * this._window[2];
-      top = bottom + height * this._window[3];
+    if (this._renderTarget) {
+      this._renderTarget.calcPerspectiveProjection(this._fovY, this._near, this._far, this._projMatrix);
+    } else {
+      const h = this._near * Math.tan(this._fovY * 0.5);
+      const w = h * this._aspect;
+      let left = -w;
+      let right = w;
+      let top = h;
+      let bottom = -h;
+      if (this._window) {
+        const width = right - left;
+        const height = top - bottom;
+        left += width * this._window[0];
+        bottom += height * this._window[1];
+        right = left + width * this._window[2];
+        top = bottom + height * this._window[3];
+      }
+      this._projMatrix.frustum(left, right, bottom, top, this._near, this._far);
     }
-    this._projMatrix.frustum(left, right, bottom, top, this._near, this._far);
     Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
   }
 }
