@@ -124,7 +124,6 @@ export class SceneRenderer {
         scene,
         renderWidth,
         renderHeight,
-        picking: false,
         oit: null,
         motionVectors: device.type !== 'webgl' && (camera.TAA || camera.motionBlur),
         HiZ: camera.HiZ && device.type !== 'webgl',
@@ -144,7 +143,6 @@ export class SceneRenderer {
         drawEnvLight: false,
         env: null,
         materialFlags: 0,
-        TAA: camera.TAA,
         SSR,
         SSRCalcThickness: SSR && camera.ssrCalcThickness,
         SSRRoughnessTexture: device.pool.fetchTemporalTexture2D(
@@ -251,13 +249,13 @@ export class SceneRenderer {
       ctx.forceCullMode = 'front';
       this._depthPass.renderBackface = true;
       this._depthPass.transmission = false;
-      this._depthPass.render(ctx, null, renderQueue);
+      this._depthPass.render(ctx, null, null, renderQueue);
       this._depthPass.clearColor = null;
       this._depthPass.renderBackface = false;
       ctx.forceColorState = this._frontDepthColorState;
       ctx.forceCullMode = null;
     }
-    this._depthPass.render(ctx, null, renderQueue);
+    this._depthPass.render(ctx, null, null, renderQueue);
     ctx.forceColorState = null;
     ctx.device.popDeviceStates();
 
@@ -366,7 +364,7 @@ export class SceneRenderer {
       device.pushDeviceStates();
       device.setFramebuffer(sceneColorFramebuffer);
       this._scenePass.transmission = false;
-      this._scenePass.render(ctx, null, renderQueue);
+      this._scenePass.render(ctx, null, null, renderQueue);
       device.popDeviceStates();
       ctx.sceneColorTexture = sceneColorFramebuffer.getColorAttachments()[0] as Texture2D;
       new CopyBlitter().blit(
@@ -380,7 +378,7 @@ export class SceneRenderer {
       this._scenePass.clearStencil = null;
       ctx.compositor = compositor;
     }
-    this._scenePass.render(ctx, null, renderQueue);
+    this._scenePass.render(ctx, null, null, renderQueue);
     if (renderQueue.needSceneColor()) {
       this.renderSceneDepth(ctx, renderQueue, depthFramebuffer);
     }
@@ -549,10 +547,8 @@ export class SceneRenderer {
     this._objectColorPass.clearColor = Vector4.zero();
     this._objectColorPass.clearDepth = 1;
     const rq = this._objectColorPass.cullScene(ctx, pickCamera);
-    ctx.camera = pickCamera;
-    this._objectColorPass.render(ctx, null, rq);
+    this._objectColorPass.render(ctx, pickCamera, null, rq);
     rq.dispose();
-    ctx.camera = camera;
     ctx.device.popDeviceStates();
     const colorTex = fb.getColorAttachments()[0];
     const distanceTex = fb.getColorAttachments()[1];

@@ -912,8 +912,7 @@ export class ShadowMapper {
         shadowMapRenderCamera.lookAtCubeFace(face);
         fb.setColorAttachmentCubeFace(0, face);
         fb.setDepthAttachmentCubeFace(face);
-        ctx.camera = shadowMapRenderCamera;
-        renderPass.render(ctx);
+        renderPass.render(ctx, shadowMapRenderCamera);
       }
       shadowMapParams.shadowMatrices.set(Matrix4x4.identity());
       ShadowMapper.releaseCamera(shadowMapRenderCamera);
@@ -1008,8 +1007,7 @@ export class ShadowMapper {
           }
           device.setFramebuffer(fb);
           device.setScissor(scissor);
-          ctx.camera = shadowMapRenderCamera;
-          renderPass.render(ctx, shadowMapCullCamera);
+          renderPass.render(ctx, shadowMapRenderCamera, shadowMapCullCamera);
           shadowMapParams.shadowMatrices.set(
             Matrix4x4.transpose(shadowMapRenderCamera.viewProjectionMatrix),
             split * 16
@@ -1052,13 +1050,11 @@ export class ShadowMapper {
         shadowMapRenderCamera.setProjectionMatrix(
           Matrix4x4.multiply(snapMatrix, shadowMapRenderCamera.getProjectionMatrix())
         );
-        ctx.camera = shadowMapRenderCamera;
-        renderPass.render(ctx);
+        renderPass.render(ctx, shadowMapRenderCamera);
         shadowMapParams.shadowMatrices.set(Matrix4x4.transpose(shadowMapRenderCamera.viewProjectionMatrix));
         ShadowMapper.releaseCamera(shadowMapRenderCamera);
       }
     }
-    ctx.camera = camera;
     this.postRenderShadowMap(shadowMapParams);
   }
   /** @internal */

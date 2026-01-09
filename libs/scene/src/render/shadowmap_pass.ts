@@ -5,6 +5,7 @@ import type { RenderQueue } from './render_queue';
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
 import type { Nullable } from '@zephyr3d/base';
+import type { Camera } from '../camera';
 
 /**
  * Shadow map render pass
@@ -33,19 +34,19 @@ export class ShadowMapPass extends RenderPass {
     return `${ctx.shadowMapInfo!.get(this.light!)!.shaderHash}`;
   }
   /** @internal */
-  protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {
+  protected renderItems(ctx: DrawContext, camera: Camera, renderQueue: RenderQueue) {
     const items = renderQueue.itemList;
     if (items) {
       ctx.drawEnvLight = false;
       ctx.env = null;
       ctx.fogFlags = 0;
       ctx.flip = this.isAutoFlip(ctx);
-      ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
+      ctx.renderPassHash = this.getGlobalBindGroupHash(ctx, camera);
       const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
       ctx.device.setBindGroup(0, bindGroup);
       ShaderHelper.setLightUniformsShadowMap(bindGroup, ctx, this._currentLight!);
-      ShaderHelper.setCameraUniforms(bindGroup, ctx, true);
-      const reverseWinding = ctx.camera.worldMatrixDet < 0;
+      ShaderHelper.setCameraUniforms(bindGroup, ctx, camera, true);
+      const reverseWinding = camera.worldMatrixDet < 0;
       for (const lit of items.opaque.lit) {
         this.drawItemList(lit, ctx, reverseWinding);
       }

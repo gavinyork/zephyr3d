@@ -31,6 +31,7 @@ import { getAtmosphereParamsStruct, getDefaultAtmosphereParams } from '../../sha
 import type { HeightFogParams } from '../../shaders/fog';
 import { calculateFog, getDefaultHeightFogParams, getHeightFogParamsStruct } from '../../shaders/fog';
 import { getDevice } from '../../app/api';
+import type { Camera } from '../../camera';
 
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
 const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
@@ -772,8 +773,8 @@ export class ShaderHelper {
     );
   }
   /** @internal */
-  static setCameraUniforms(bindGroup: BindGroup, ctx: DrawContext, linear: boolean) {
-    const pos = ctx.camera.getWorldPosition();
+  static setCameraUniforms(bindGroup: BindGroup, ctx: DrawContext, camera: Camera, linear: boolean) {
+    const pos = camera.getWorldPosition();
     const useJitter =
       ctx.motionVectors &&
       ctx.renderPass!.type !== RENDER_PASS_TYPE_SHADOWMAP &&
@@ -781,28 +782,23 @@ export class ShaderHelper {
     const cameraStruct = {
       position: new Vector4(pos.x, pos.y, pos.z, 0),
       renderSize: new Vector2(ctx.renderWidth, ctx.renderHeight),
-      viewProjectionMatrix: useJitter ? ctx.camera.jitteredVPMatrix : ctx.camera.viewProjectionMatrix,
-      unjitteredVPMatrix: ctx.camera.viewProjectionMatrix,
-      jitteredInvVPMatrix: useJitter ? ctx.camera.jitteredInvVPMatrix : ctx.camera.invViewProjectionMatrix,
-      jitterValue: ctx.camera.jitterValue,
-      invViewProjectionMatrix: ctx.camera.invViewProjectionMatrix,
-      projectionMatrix: ctx.camera.getProjectionMatrix(),
-      invProjectionMatrix: ctx.camera.getInvProjectionMatrix(),
-      viewMatrix: ctx.camera.viewMatrix,
-      worldMatrix: ctx.camera.worldMatrix,
-      params: new Vector4(
-        ctx.camera.getNearPlane(),
-        ctx.camera.getFarPlane(),
-        ctx.flip ? -1 : 1,
-        linear ? 0 : 1
-      ),
-      roughnessFactor: ctx.camera.SSR ? ctx.camera.ssrRoughnessFactor : 1,
-      frameDeltaTime: getDevice().frameInfo.elapsedFrame * 0.001,
-      elapsedTime: getDevice().frameInfo.elapsedOverall * 0.001,
-      framestamp: getDevice().frameInfo.frameCounter
+      viewProjectionMatrix: useJitter ? camera.jitteredVPMatrix : camera.viewProjectionMatrix,
+      unjitteredVPMatrix: camera.viewProjectionMatrix,
+      jitteredInvVPMatrix: useJitter ? camera.jitteredInvVPMatrix : camera.invViewProjectionMatrix,
+      jitterValue: camera.jitterValue,
+      invViewProjectionMatrix: camera.invViewProjectionMatrix,
+      projectionMatrix: camera.getProjectionMatrix(),
+      invProjectionMatrix: camera.getInvProjectionMatrix(),
+      viewMatrix: camera.viewMatrix,
+      worldMatrix: camera.worldMatrix,
+      params: new Vector4(camera.getNearPlane(), camera.getFarPlane(), ctx.flip ? -1 : 1, linear ? 0 : 1),
+      roughnessFactor: camera.SSR ? camera.ssrRoughnessFactor : 1,
+      frameDeltaTime: ctx.device.frameInfo.elapsedFrame * 0.001,
+      elapsedTime: ctx.device.frameInfo.elapsedOverall * 0.001,
+      framestamp: ctx.device.frameInfo.frameCounter
     } as any;
     if (ctx.motionVectors && ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH) {
-      cameraStruct.prevUnjitteredVPMatrix = ctx.camera.prevVPMatrix;
+      cameraStruct.prevUnjitteredVPMatrix = camera.prevVPMatrix;
     }
     if (ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
       if (ctx.linearDepthTexture) {

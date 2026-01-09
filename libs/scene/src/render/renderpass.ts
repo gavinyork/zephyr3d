@@ -5,7 +5,6 @@ import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
-import { ShaderHelper } from '../material/shader/helper';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
 import { MaterialVaryingFlags } from '../values';
 import type { BindGroup } from '@zephyr3d/device';
@@ -73,47 +72,32 @@ export abstract class RenderPass extends Disposable {
    * Renders a scene
    * @param ctx - Drawing context
    */
-  render(ctx: DrawContext, cullCamera?: Nullable<Camera>, renderQueue?: RenderQueue) {
+  render(
+    ctx: DrawContext,
+    renderCamera?: Nullable<Camera>,
+    cullCamera?: Nullable<Camera>,
+    renderQueue?: RenderQueue
+  ) {
     ctx.renderPass = this;
-    this.drawScene(ctx, cullCamera ?? ctx.camera, renderQueue);
+    this.drawScene(ctx, renderCamera ?? ctx.camera, cullCamera ?? renderCamera ?? ctx.camera, renderQueue);
   }
   /** @internal */
-  protected getGlobalBindGroup(ctx: DrawContext) {
-    const hash = this.getGlobalBindGroupHash(ctx);
-    let bindGroup = this._globalBindGroups[hash];
-    if (!bindGroup) {
-      const ret = ctx.device.programBuilder.buildRender({
-        vertex(pb) {
-          ShaderHelper.prepareVertexShader(pb, ctx);
-          pb.main(function () {});
-        },
-        fragment(pb) {
-          ShaderHelper.prepareFragmentShader(pb, ctx);
-          pb.main(function () {});
-        }
-      });
-      bindGroup = ctx.device.createBindGroup(ret[2][0]);
-      this._globalBindGroups[hash] = bindGroup;
-    }
-    return bindGroup;
+  getGlobalBindGroupHash(ctx: DrawContext, camera: Camera) {
+    return `${this.constructor.name}:${this._getGlobalBindGroupHash(ctx, camera)}`;
   }
   /** @internal */
-  getGlobalBindGroupHash(ctx: DrawContext) {
-    return `${this.constructor.name}:${this._getGlobalBindGroupHash(ctx)}`;
-  }
+  protected abstract _getGlobalBindGroupHash(ctx: DrawContext, camera: Camera): string;
   /** @internal */
-  protected abstract _getGlobalBindGroupHash(ctx: DrawContext): string;
+  protected abstract renderItems(ctx: DrawContext, renderCamera: Camera, renderQueue: RenderQueue): void;
   /** @internal */
-  protected abstract renderItems(ctx: DrawContext, renderQueue: RenderQueue): void;
-  /** @internal */
-  protected drawScene(ctx: DrawContext, cullCamera: Camera, renderQueue?: RenderQueue) {
+  protected drawScene(ctx: DrawContext, renderCamera: Camera, cullCamera: Camera, renderQueue?: RenderQueue) {
     const device = ctx.device;
     this.clearFramebuffer();
     const rq = renderQueue ?? this.cullScene(ctx, cullCamera);
     if (rq) {
       const windingReversed = device.isWindingOrderReversed();
       device.reverseVertexWindingOrder(this.isAutoFlip(ctx) ? !windingReversed : windingReversed);
-      this.renderItems(ctx, rq);
+      this.renderItems(ctx, renderCamera, rq);
       device.reverseVertexWindingOrder(windingReversed);
       if (rq !== renderQueue) {
         rq.dispose();

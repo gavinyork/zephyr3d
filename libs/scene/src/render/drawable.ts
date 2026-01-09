@@ -55,27 +55,27 @@ export class RenderContext {
  */
 export interface DrawContext {
   /** Render device used for issuing GPU commands. */
-  device: AbstractDevice;
+  readonly device: AbstractDevice;
   /** Framebuffer width for rendering (in pixels). */
-  renderWidth: number;
+  readonly renderWidth: number;
   /** Framebuffer height for rendering (in pixels). */
-  renderHeight: number;
+  readonly renderHeight: number;
   /** Allocator for global (frame/pass) bind groups and descriptor resources. */
-  globalBindGroupAllocator: GlobalBindGroupAllocator;
+  readonly globalBindGroupAllocator: GlobalBindGroupAllocator;
   /** The camera associated with the current drawing task (may differ from primaryCamera). */
-  camera: Camera;
+  readonly camera: Camera;
   /** Order-Independent Transparency interface for transparent passes. */
   oit: Nullable<OIT>;
   /** Whether motion vectors are being written this pass (used by TAA/MotionBlur). */
-  motionVectors: boolean;
+  readonly motionVectors: boolean;
   /** Motion vector texture target when motion vectors are active. */
   motionVectorTexture?: Nullable<Texture2D>;
   /** Whether hierarchical depth (Hi-Z) is enabled for the current pass. */
-  HiZ: boolean;
+  readonly HiZ: boolean;
   /** Hi-Z (hierarchical Z) depth texture, when generated. */
   HiZTexture: Nullable<Texture2D>;
   /** The scene currently being drawn. */
-  scene: Scene;
+  readonly scene: Scene;
   /** The render pass to which this drawing task belongs. */
   renderPass: Nullable<RenderPass>;
   /** Stable hash for the current pass/draw state, for render bundle or pipeline cache. */
@@ -89,11 +89,9 @@ export interface DrawContext {
   /** Scene environment (sky, IBL, exposure, etc.) used for shading. */
   env: Nullable<Environment>;
   /** Timestamp for the current draw (engine-defined time units). */
-  timestamp: number;
+  readonly timestamp: number;
   /** Current sub-queue index within the render queue (e.g., opaque, transparent). */
   queue: number;
-  /** Whether GPU-based picking is currently enabled. */
-  picking: boolean;
   /** Whether the current lighting pass is blending light accumulations. */
   lightBlending: boolean;
   /** Scene (non-linear) depth texture bound for sampling. */
@@ -103,9 +101,9 @@ export interface DrawContext {
   /** Scene color texture bound for sampling (previous pass or resolved color). */
   sceneColorTexture?: Texture2D;
   /** Default depth buffer format for targets created in this pass. */
-  depthFormat?: TextureFormat;
+  readonly depthFormat: TextureFormat;
   /** Default color buffer format for targets created in this pass. */
-  colorFormat?: TextureFormat;
+  readonly colorFormat: TextureFormat;
   /** Instance data buffer/metadata for the current drawing task (instanced rendering). */
   instanceData?: Nullable<InstanceData>;
   /** Compositor used to apply post-processing effects at the end of the frame/pass. */
@@ -124,10 +122,8 @@ export interface DrawContext {
   forceCullMode?: Nullable<FaceMode>;
   /** Force color mask state override for special passes (optional). */
   forceColorState?: Nullable<ColorState>;
-  /** Temporal anti-aliasing is active this frame/pass. */
-  TAA: boolean;
   /** Screen-space reflections are active this frame/pass. */
-  SSR: boolean;
+  readonly SSR: boolean;
   /** Whether SSR thickness should be computed dynamically in this pass. */
   SSRCalcThickness: boolean;
   /** SSR roughness input texture. */
