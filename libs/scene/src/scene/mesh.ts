@@ -10,7 +10,8 @@ import type {
   DrawContext,
   PickTarget,
   MorphData,
-  MorphInfo
+  MorphInfo,
+  RenderQueue
 } from '../render';
 import {
   PBArrayTypeInfo,
@@ -394,7 +395,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * {@inheritDoc Drawable.draw}
    */
-  draw(ctx: DrawContext, hash?: string) {
+  draw(ctx: DrawContext, renderQueue: Nullable<RenderQueue>, hash?: string) {
     const material = this.material;
     const primitive = this.primitive;
     if (material && primitive) {
@@ -410,14 +411,14 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
         const renderBundle = this._renderBundle![hash];
         if (!renderBundle) {
           ctx.device.beginCapture();
-          this.bind(ctx);
+          this.bind(ctx, renderQueue);
           material.draw(primitive, ctx);
           this._renderBundle![hash] = ctx.device.endCapture();
         } else {
           ctx.device.executeRenderBundle(renderBundle);
         }
       } else {
-        this.bind(ctx);
+        this.bind(ctx, renderQueue);
         material.draw(primitive, ctx);
       }
     }

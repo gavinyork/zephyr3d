@@ -5,7 +5,7 @@ import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
 import { BoundingBox } from '../utility/bounding_volume';
 import { mixinDrawable } from '../render/drawable_mixin';
-import type { Drawable, DrawContext, PickTarget } from '../render';
+import type { Drawable, DrawContext, PickTarget, RenderQueue } from '../render';
 import { Primitive } from '../render';
 import { QUEUE_OPAQUE } from '../values';
 import { ParticleMaterial } from '../material';
@@ -736,9 +736,9 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   /**
    * {@inheritDoc Drawable.draw}
    */
-  draw(ctx: DrawContext) {
+  draw(ctx: DrawContext, renderQueue: Nullable<RenderQueue>) {
     if (this._activeParticleList.length > 0) {
-      this.bind(ctx);
+      this.bind(ctx, renderQueue);
       this._material.get()!.draw(this._primitive.get()!, ctx, this._activeParticleList.length);
     }
   }

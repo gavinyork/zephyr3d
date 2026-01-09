@@ -142,6 +142,7 @@ export abstract class RenderPass extends Disposable {
   private internalDrawItemList(
     ctx: DrawContext,
     items: RenderQueueItem[],
+    renderQueue: Nullable<RenderQueue>,
     renderBundle: Nullable<RenderBundleWrapper>,
     reverseWinding: boolean,
     hash: string
@@ -171,7 +172,7 @@ export abstract class RenderPass extends Disposable {
           hash
         );
       }
-      item.drawable.draw(ctx, recording ? undefined : hash);
+      item.drawable.draw(ctx, renderQueue, recording ? undefined : hash);
       if (reverse) {
         ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
       }
@@ -182,7 +183,6 @@ export abstract class RenderPass extends Disposable {
   }
   /** @internal */
   protected drawItemList(itemList: RenderItemListInfo, ctx: DrawContext, reverseWinding: boolean) {
-    ctx.renderQueue = itemList.renderQueue;
     ctx.instanceData = null;
     const windingHash = reverseWinding ? '1' : '0';
     const bindGroupHash = ctx.device.getBindGroup(0)[0].getGPUId();
@@ -200,6 +200,7 @@ export abstract class RenderPass extends Disposable {
         this.internalDrawItemList(
           ctx,
           itemList.itemList,
+          itemList.renderQueue,
           itemList.renderBundle ?? null,
           reverseWinding,
           hash
@@ -212,6 +213,7 @@ export abstract class RenderPass extends Disposable {
         this.internalDrawItemList(
           ctx,
           itemList.skinItemList,
+          itemList.renderQueue,
           itemList.skinRenderBundle ?? null,
           reverseWinding,
           hash
@@ -224,6 +226,7 @@ export abstract class RenderPass extends Disposable {
         this.internalDrawItemList(
           ctx,
           itemList.morphItemList,
+          itemList.renderQueue,
           itemList.morphRenderBundle ?? null,
           reverseWinding,
           hash
@@ -236,6 +239,7 @@ export abstract class RenderPass extends Disposable {
         this.internalDrawItemList(
           ctx,
           itemList.skinAndMorphItemList,
+          itemList.renderQueue,
           itemList.skinAndMorphRenderBundle ?? null,
           reverseWinding,
           hash
@@ -248,13 +252,13 @@ export abstract class RenderPass extends Disposable {
         this.internalDrawItemList(
           ctx,
           itemList.instanceItemList,
+          itemList.renderQueue,
           itemList.instanceRenderBundle ?? null,
           reverseWinding,
           hash
         );
       }
     }
-    ctx.renderQueue = null;
   }
   /**
    * Disposes the render pass

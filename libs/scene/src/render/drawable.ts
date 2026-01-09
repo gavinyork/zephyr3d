@@ -19,6 +19,7 @@ import type { ClusteredLight } from './cluster_light';
 import type { MeshMaterial } from '../material';
 import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import type { OIT } from './oit';
+import { getDevice } from '../app/api';
 
 /**
  * Picking result target container.
@@ -30,6 +31,16 @@ import type { OIT } from './oit';
  */
 export type PickTarget = { node: SceneNode; label?: string };
 
+export class RenderContext {
+  public device: AbstractDevice;
+  public renderWidth: number;
+  public renderHeight: number;
+  constructor(_camera: Camera, w: number, h: number) {
+    this.device = getDevice();
+    this.renderWidth = w;
+    this.renderHeight = h;
+  }
+}
 /**
  * Context object passed to draw calls and render helpers.
  *
@@ -49,8 +60,6 @@ export interface DrawContext {
   renderWidth: number;
   /** Framebuffer height for rendering (in pixels). */
   renderHeight: number;
-  /** The render queue which is currently being rendered (if applicable). */
-  renderQueue?: Nullable<RenderQueue>;
   /** Allocator for global (frame/pass) bind groups and descriptor resources. */
   globalBindGroupAllocator: GlobalBindGroupAllocator;
   /** The camera associated with the current drawing task (may differ from primaryCamera). */
@@ -211,9 +220,10 @@ export interface Drawable {
    * Issues draw commands for this object.
    *
    * @param ctx - Full draw context for the current pass.
+   * @param renderQueue - The current render queue issuing this draw.
    * @param hash - Optional hash key for render bundle or pipeline caching.
    */
-  draw(ctx: DrawContext, hash?: string): void;
+  draw(ctx: DrawContext, renderQueue: Nullable<RenderQueue>, hash?: string): void;
   /**
    * Returns true if the object supports instanced rendering.
    *

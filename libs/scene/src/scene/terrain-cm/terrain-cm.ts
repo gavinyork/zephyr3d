@@ -4,7 +4,7 @@ import type { PBInsideFunctionScope, PBShaderExp, Texture2D } from '@zephyr3d/de
 import type { Scene } from '../scene';
 import { GraphNode } from '../graph_node';
 import { mixinDrawable } from '../../render/drawable_mixin';
-import type { Drawable, DrawContext, PickTarget, PrimitiveInstanceInfo } from '../../render';
+import type { Drawable, DrawContext, PickTarget, PrimitiveInstanceInfo, RenderQueue } from '../../render';
 import { Clipmap } from '../../render';
 import { ClipmapTerrainMaterial } from '../../material/terrain-cm';
 import { BoundingBox } from '../../utility/bounding_volume';
@@ -508,10 +508,10 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     this.grassRenderer.updateMaterial();
   }
   /** {@inheritDoc Drawable.draw} */
-  draw(ctx: DrawContext) {
+  draw(ctx: DrawContext, renderQueue: Nullable<RenderQueue>) {
     const mat = this._material?.get();
     if (mat) {
-      this.bind(ctx);
+      this.bind(ctx, renderQueue);
       mat.setClipmapGridInfo(this._gridScale, this.worldMatrix.m03, this.worldMatrix.m23);
       mat.apply(ctx);
       for (const info of this._renderData!) {

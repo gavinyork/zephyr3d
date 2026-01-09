@@ -4,7 +4,7 @@ import { applyMixins, Vector3, DRef } from '@zephyr3d/base';
 import type { Scene } from './scene';
 import { GraphNode } from './graph_node';
 import { mixinDrawable } from '../render/drawable_mixin';
-import type { Drawable, DrawContext, PickTarget, PrimitiveInstanceInfo } from '../render';
+import type { Drawable, DrawContext, PickTarget, PrimitiveInstanceInfo, RenderQueue } from '../render';
 import { Primitive } from '../render';
 import { Clipmap, FBMWaveGenerator } from '../render';
 import { WaterMaterial } from '../material/water';
@@ -265,10 +265,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * {@inheritDoc Drawable.draw}
    */
-  draw(ctx: DrawContext) {
+  draw(ctx: DrawContext, renderQueue: Nullable<RenderQueue>) {
     const mat = this._material?.get();
     if (mat) {
-      this.bind(ctx);
+      this.bind(ctx, renderQueue);
       mat.setClipmapGridInfo(this._gridScale, this.worldMatrix.m03, this.worldMatrix.m23);
       mat.apply(ctx);
       for (const info of this._renderData!) {

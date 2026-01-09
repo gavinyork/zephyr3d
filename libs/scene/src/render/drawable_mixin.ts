@@ -18,7 +18,7 @@ export interface IMixinDrawable {
   applyMaterialUniforms(instanceInfo: DrawableInstanceInfo): void;
   applyMaterialUniformsAll(): void;
   getObjectColor(): Vector4;
-  bind(ctx: DrawContext): void;
+  bind(ctx: DrawContext, renderQueue: Nullable<RenderQueue>): void;
 }
 
 let _drawableId = 0;
@@ -214,9 +214,9 @@ export function mixinDrawable<
       }
     }
     /** @internal */
-    bind(ctx: DrawContext) {
+    bind(ctx: DrawContext, renderQueue: Nullable<RenderQueue>) {
       const device = ctx.device;
-      const drawableBindGroup = this.getDrawableBindGroup(device, !!ctx.instanceData, ctx.renderQueue!);
+      const drawableBindGroup = this.getDrawableBindGroup(device, !!ctx.instanceData, renderQueue!);
       device.setBindGroup(1, drawableBindGroup);
       if (ctx.instanceData) {
         device.setBindGroup(3, ctx.instanceData.bindGroup.bindGroup);
