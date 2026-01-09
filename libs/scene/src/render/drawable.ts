@@ -80,16 +80,12 @@ export interface DrawContext {
   renderPass: Nullable<RenderPass>;
   /** Stable hash for the current pass/draw state, for render bundle or pipeline cache. */
   renderPassHash: Nullable<string>;
-  /** Fog application flags for transparent objects (bitmask). */
-  fogFlags: number;
   /** Whether the output orientation is flipped vertically (e.g., due to framebuffer conventions). */
   flip: boolean;
   /** Whether this is the base lighting pass that draws environment lighting. */
   drawEnvLight: boolean;
   /** Scene environment (sky, IBL, exposure, etc.) used for shading. */
   env: Nullable<Environment>;
-  /** Timestamp for the current draw (engine-defined time units). */
-  readonly timestamp: number;
   /** Current sub-queue index within the render queue (e.g., opaque, transparent). */
   queue: number;
   /** Whether the current lighting pass is blending light accumulations. */

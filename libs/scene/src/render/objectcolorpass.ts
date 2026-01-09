@@ -24,7 +24,6 @@ export class ObjectColorPass extends RenderPass {
   protected renderItems(ctx: DrawContext, camera: Camera, renderQueue: RenderQueue) {
     const items = renderQueue.itemList;
     if (items) {
-      ctx.fogFlags = 0;
       ctx.drawEnvLight = false;
       ctx.env = null;
       ctx.flip = this.isAutoFlip(ctx);

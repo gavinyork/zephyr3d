@@ -100,7 +100,6 @@ export class LightPass extends RenderPass {
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, camera: Camera, renderQueue: RenderQueue) {
-    ctx.fogFlags = 0;
     ctx.renderPassHash = null;
     ctx.env = ctx.scene.env;
     ctx.drawEnvLight = false;
