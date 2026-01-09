@@ -504,8 +504,8 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
         (z * this._sizeZ) / this.material.heightMap.height
       );
       this.material.update(new Vector4(px, pz, px + x * this._sizeX, pz + z * this._sizeZ), this.scale);
+      this.grassRenderer.updateMaterial();
     }
-    this.grassRenderer.updateMaterial();
   }
   /** {@inheritDoc Drawable.draw} */
   draw(ctx: DrawContext, renderQueue: Nullable<RenderQueue>) {
