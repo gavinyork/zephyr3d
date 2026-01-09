@@ -334,6 +334,7 @@ export class Camera extends SceneNode {
   }
   set useScreenSettings(val: boolean) {
     this._renderTarget = val ? new ScreenRenderTarget() : null;
+    this._invalidate(true);
   }
   /**
    * The compositor that owns and runs the camera's post-processing chain.
