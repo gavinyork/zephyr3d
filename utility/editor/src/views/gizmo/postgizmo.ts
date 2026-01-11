@@ -328,6 +328,39 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       ctx.device.setProgram(PostGizmoRenderer._gridProgram);
       ctx.device.setBindGroup(0, PostGizmoRenderer._gridBindGroup!);
       PostGizmoRenderer._gridPrimitive!.draw();
+      if (ctx.camera.isOrtho()) {
+        const projMatrix = ctx.camera.getProjectionMatrix();
+        const vpMatrix = ctx.camera.viewProjectionMatrix;
+        const cameraPos = ctx.camera.getWorldPosition();
+        const left = projMatrix.getLeftPlane() + cameraPos.x;
+        const right = projMatrix.getRightPlane() + cameraPos.x;
+        const bottom = projMatrix.getBottomPlane() + cameraPos.y;
+        const top = projMatrix.getTopPlane() + cameraPos.y;
+        let sizeX = Math.pow(10, Math.max(0, Math.round(Math.log10(Math.abs(right - left))) - 1));
+        const startX = Math.round(left / sizeX) * sizeX;
+        const stopX = Math.round(right / sizeX) * sizeX;
+        if (stopX < startX) {
+          sizeX = -sizeX;
+        }
+        for (let x = startX; x !== stopX; x += sizeX) {
+          const ndc = vpMatrix.transformPointH(new Vector3(x, top, 0));
+          const screenX = (ndc.x * 0.5 + 0.5) * ctx.renderWidth + 5;
+          const screenY = (0.5 - ndc.y * 0.5) * ctx.renderHeight + 5;
+          ctx.device.drawText(String(x), screenX, screenY, '#888888');
+        }
+        let sizeY = Math.pow(10, Math.max(0, Math.round(Math.log10(Math.abs(top - bottom))) - 1));
+        const startY = Math.round(bottom / sizeY) * sizeY;
+        const stopY = Math.round(top / sizeY) * sizeY;
+        if (stopY < startY) {
+          sizeY = -sizeY;
+        }
+        for (let y = startY; y !== stopY; y += sizeY) {
+          const ndc = vpMatrix.transformPointH(new Vector3(left, y, 0));
+          const screenX = (ndc.x * 0.5 + 0.5) * ctx.renderWidth + 5;
+          const screenY = (0.5 - ndc.y * 0.5) * ctx.renderHeight + 5;
+          ctx.device.drawText(String(y), screenX, screenY, '#888888');
+        }
+      }
     }
     if (
       this._node &&

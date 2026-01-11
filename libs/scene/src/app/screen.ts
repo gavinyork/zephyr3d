@@ -88,6 +88,8 @@ export class ScreenAdapter {
   private _config!: ScreenConfig;
   private _transform: Nullable<ResolutionTransform>;
   private _viewport: Nullable<Immutable<number[]>>;
+  private _resolvedViewport: Nullable<Immutable<number[]>>;
+  private _version: number;
   /**
    * Creates a new {@link ScreenAdapter}.
    *
@@ -97,6 +99,8 @@ export class ScreenAdapter {
   constructor(config?: ScreenConfig) {
     this._viewport = null;
     this._transform = null;
+    this._resolvedViewport = null;
+    this._version = 1;
     this.configure(config);
   }
   /**
@@ -114,22 +118,28 @@ export class ScreenAdapter {
   set viewport(vp: Nullable<Immutable<number[]>>) {
     if (this._viewport !== vp) {
       this._viewport = vp?.slice() ?? null;
-      this._transform = null;
+      this.resolveViewport();
     }
+  }
+  /**
+   * Returns the version of the screen adapter
+   */
+  get version() {
+    this.resolveViewport();
+    return this._version;
   }
   /**
    * Returns the calculated resolution transform
    */
   get transform(): Immutable<ResolutionTransform> {
+    this.resolveViewport();
     if (!this._transform) {
-      const device = getDevice();
-      const vp = this._viewport ?? [
-        0,
-        0,
-        device.deviceXToScreen(device.getDrawingBufferWidth()),
-        device.deviceYToScreen(device.getDrawingBufferHeight())
-      ];
-      this._transform = this.calculateResolutionTransform(vp[0], vp[1], vp[2], vp[3]);
+      this._transform = this.calculateResolutionTransform(
+        this._resolvedViewport![0],
+        this._resolvedViewport![1],
+        this._resolvedViewport![2],
+        this._resolvedViewport![3]
+      );
     }
     return this._transform;
   }
@@ -143,7 +153,7 @@ export class ScreenAdapter {
     this._config = {
       designWidth: 1920,
       designHeight: 1080,
-      scaleMode: 'fit',
+      scaleMode: 'cover',
       ..._config
     };
   }
@@ -369,5 +379,25 @@ export class ScreenAdapter {
     out.x = pointIn.x * transform.scaleX + transform.offsetX;
     out.y = pointIn.y * transform.scaleY + transform.offsetY;
     return out;
+  }
+  private resolveViewport() {
+    const device = getDevice();
+    const vp = this._viewport?.slice() ?? [
+      0,
+      0,
+      device.deviceXToScreen(device.getDrawingBufferWidth()),
+      device.deviceYToScreen(device.getDrawingBufferHeight())
+    ];
+    if (
+      !this._resolvedViewport ||
+      vp[0] !== this._resolvedViewport[0] ||
+      vp[1] !== this._resolvedViewport[1] ||
+      vp[2] !== this._resolvedViewport[2] ||
+      vp[3] !== this._resolvedViewport[3]
+    ) {
+      this._resolvedViewport = vp;
+      this._version++;
+      this._transform = null;
+    }
   }
 }

@@ -1,4 +1,4 @@
-import type { Nullable } from '@zephyr3d/base';
+import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Matrix4x4, parseColor, Vector3, Vector4 } from '@zephyr3d/base';
 import { Font } from './font';
 import { GlyphManager } from './glyphmanager';
@@ -40,10 +40,16 @@ export class DrawText {
   /** @internal */
   private static readonly colorValue: Vector4 = new Vector4();
   /** @internal */
-  private static calculateTextMatrix(device: AbstractDevice, matrix: Matrix4x4) {
-    const viewport = device.getViewport();
-    const projectionMatrix = Matrix4x4.ortho(0, viewport.width, 0, viewport.height, 1, 100);
-    const flipMatrix = Matrix4x4.translation(new Vector3(0, viewport.height, 0)).scaleRight(
+  private static calculateTextMatrix(
+    device: AbstractDevice,
+    matrix: Matrix4x4,
+    viewport?: Immutable<number[]>
+  ) {
+    const viewportWidth = viewport ? viewport[2] : device.getViewport().width;
+    const viewportHeight = viewport ? viewport[3] : device.getViewport().height;
+    matrix.identity();
+    const projectionMatrix = Matrix4x4.ortho(0, viewportWidth, 0, viewportHeight, 1, 100);
+    const flipMatrix = Matrix4x4.translation(new Vector3(0, viewportHeight, 0)).scaleRight(
       new Vector3(1, -1, 1)
     );
     Matrix4x4.multiply(projectionMatrix, flipMatrix, matrix);
@@ -65,11 +71,18 @@ export class DrawText {
    * @param x - X coordinate of the text
    * @param y - Y coordinate of the text
    */
-  static drawText(device: AbstractDevice, text: string, color: string, x: number, y: number) {
+  static drawText(
+    device: AbstractDevice,
+    text: string,
+    color: string,
+    x: number,
+    y: number,
+    viewport?: Immutable<number[]>
+  ) {
     if (text.length > 0) {
       device.pushDeviceStates();
       this.prepareDrawText(device);
-      this.calculateTextMatrix(device, this.textMatrix);
+      this.calculateTextMatrix(device, this.textMatrix, viewport);
       const colorValue = parseColor(color);
       this.colorValue.x = colorValue.r;
       this.colorValue.y = colorValue.g;

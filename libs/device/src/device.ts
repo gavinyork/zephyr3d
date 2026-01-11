@@ -500,8 +500,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   setFont(fontName: string) {
     DrawText.setFont(this, fontName);
   }
-  drawText(text: string, x: number, y: number, color: string) {
-    DrawText.drawText(this, text, color, x, y);
+  drawText(text: string, x: number, y: number, color: string, viewport?: Immutable<number[]>) {
+    DrawText.drawText(this, text, color, x, y, viewport);
   }
   setFramebuffer(rt: Nullable<FrameBuffer>): void;
   setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number): void;

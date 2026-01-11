@@ -2422,7 +2422,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param y - y coordinate in pixels related to the viewport origin
    * @param color - A CSS color value
    */
-  drawText(text: string, x: number, y: number, color: string): void;
+  drawText(text: string, x: number, y: number, color: string, viewport?: Immutable<number[]>): void;
   /**
    * Clears the current frame buffer
    * @param clearColor - If not null, the color buffer will be cleared to this value.

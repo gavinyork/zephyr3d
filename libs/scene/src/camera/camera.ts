@@ -111,6 +111,8 @@ export class Camera extends SceneNode {
   protected _renderTargetViewport: Nullable<number[]>;
   /** @internal RenderTarget for this camera */
   protected _renderTarget: Nullable<RenderTarget>;
+  /** @internal RenderTarget version */
+  protected _renderTargetVersion: number;
   /** @internal Scissor rectangle [x, y, w, h]; null uses viewport. */
   protected _scissor: Nullable<number[]>;
   /** @internal Clip plane mask for custom clipping schemes. */
@@ -260,6 +262,7 @@ export class Camera extends SceneNode {
     this._controller = null;
     this._viewport = null;
     this._renderTargetViewport = null;
+    this._renderTargetVersion = 0;
     this._scissor = null;
     this._clipMask = 0;
     this._frustum = null;
@@ -770,6 +773,12 @@ export class Camera extends SceneNode {
   set scissor(rect: Nullable<Immutable<number[]>>) {
     this._scissor = rect?.slice() ?? null;
   }
+  get relativeViewport(): Nullable<Immutable<number[]>> {
+    if (this._renderTarget) {
+      return this._renderTarget.calcRelativeViewport();
+    }
+    return this._viewport;
+  }
   /**
    * Handle input events
    * @param ev - input event object
@@ -901,8 +910,7 @@ export class Camera extends SceneNode {
    * @returns The projection matrix
    */
   getProjectionMatrix(): Immutable<Matrix4x4> {
-    if (this._dirty) {
-      this._dirty = false;
+    if (this.dirtyCheck()) {
       this._compute();
     }
     return this._projMatrix;
@@ -912,8 +920,7 @@ export class Camera extends SceneNode {
    * @returns The projection matrix
    */
   getInvProjectionMatrix(): Immutable<Matrix4x4> {
-    if (this._dirty) {
-      this._dirty = false;
+    if (this.dirtyCheck()) {
       this._compute();
     }
     return this._invProjMatrix;
@@ -936,15 +943,13 @@ export class Camera extends SceneNode {
    * Camera's view matrix will transform a point from the world space to the camera space
    */
   get viewMatrix(): Immutable<Matrix4x4> {
-    if (this._dirty) {
-      this._dirty = false;
+    if (this.dirtyCheck()) {
       this._compute();
     }
     return this._viewMatrix;
   }
   get viewProjectionMatrix(): Immutable<Matrix4x4> {
-    if (this._dirty) {
-      this._dirty = false;
+    if (this.dirtyCheck()) {
       this._compute();
     }
     return this._viewProjMatrix;
@@ -956,23 +961,20 @@ export class Camera extends SceneNode {
    * The inverse-view-projection matrix transforms a point from the clip space to the camera space
    */
   get invViewProjectionMatrix(): Immutable<Matrix4x4> {
-    if (this._dirty) {
-      this._dirty = false;
+    if (this.dirtyCheck()) {
       this._compute();
     }
     return this._invViewProjMatrix;
   }
   /** Gets the frustum of the camera */
   get frustum(): Immutable<Frustum> {
-    if (this._dirty) {
-      this._dirty = false;
+    if (this.dirtyCheck()) {
       this._compute();
     }
     return this._frustum!;
   }
   get frustumViewSpace(): Immutable<Frustum> {
-    if (this._dirty) {
-      this._dirty = false;
+    if (this.dirtyCheck()) {
       this._compute();
     }
     if (!this._frustumV) {
@@ -1304,5 +1306,20 @@ export class Camera extends SceneNode {
     x -= rect[0];
     y -= rect[1];
     return x >= 0 && x < rect[2] && y >= 0 && y < rect[3];
+  }
+  /** @internal */
+  private dirtyCheck() {
+    if (this._renderTarget) {
+      const version = this._renderTarget.getVersion();
+      if (this._renderTargetVersion !== version) {
+        this._dirty = true;
+        this._renderTargetVersion = version;
+      }
+    }
+    if (this._dirty) {
+      this._dirty = false;
+      return true;
+    }
+    return false;
   }
 }

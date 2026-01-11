@@ -166,7 +166,7 @@ export class EditorCameraController extends BaseCameraController {
           const width = Math.abs(projMatrix.getRightPlane() - projMatrix.getLeftPlane());
           const height = Math.abs(projMatrix.getTopPlane() - projMatrix.getBottomPlane());
           const deltaX = (-dx * width) / viewport[2];
-          const deltaY = (dy * height) / viewport[3];
+          const deltaY = (-dy * height) / viewport[3];
           const move = Vector3.combine(x, y, deltaX, deltaY);
           this._moveCamera(move);
         }
