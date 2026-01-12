@@ -14,9 +14,9 @@ import type { DrawContext } from '../render';
  * using UV information and an anchor point to control how the sprite
  * is positioned and textured.
  *
- * Derived classes can override {@link Sprite3DMaterial.internalSetupUniforms},
- * {@link Sprite3DMaterial.internalApplyUniforms} and
- * {@link Sprite3DMaterial.calcFragmentColor} to provide custom
+ * Derived classes can override {@link internalSetupUniforms},
+ * {@link internalApplyUniforms} and
+ * {@link calcFragmentColor} to provide custom
  * uniforms and shading logic (e.g. sampling a texture).
  *
  * @public
