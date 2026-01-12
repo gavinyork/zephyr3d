@@ -105,6 +105,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   static _cameraNearFar: Vector2 = new Vector2();
   static _axises = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)];
   static _primitives: Nullable<Partial<Record<GizmoMode, Primitive>>> = null;
+  private _snapping: number;
   private _allowTranslate: boolean;
   private _allowRotate: boolean;
   private _allowScale: boolean;
@@ -134,6 +135,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     super();
     this._camera = camera;
     this._node = binding;
+    this._snapping = 0;
     this._allowRotate = true;
     this._allowScale = true;
     this._allowTranslate = true;
@@ -169,6 +171,12 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     if (!this._allowRotate && this._mode === 'rotation') {
       this.mode = 'select';
     }
+  }
+  get snapping() {
+    return this._snapping;
+  }
+  set snapping(val) {
+    this._snapping = val;
   }
   get allowTranslate() {
     return this._allowTranslate;
@@ -811,32 +819,33 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         const pz = ray.origin.z + ray.direction.z * hitDistance;
         this._node!.position.setXYZ(px, py, pz);
       }
-      return;
-    }
-    const ray = this._camera.constructRay(x, y);
-    const worldMatrix = this._calcGizmoWorldMatrix(this._mode, true);
-    const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
-    const rayLocal = ray.transform(invWorldMatrix);
-    if (Math.abs(rayLocal.direction[this._translatePlaneInfo.planeAxis]) < 0.0001) {
-      return;
-    }
-    const t = ['x', 'y', 'z'];
-    const c = t[this._translatePlaneInfo.axis];
-    t.splice(this._translatePlaneInfo.planeAxis, 1);
-    const d =
-      (0 - rayLocal.origin[this._translatePlaneInfo.planeAxis]) /
-      rayLocal.direction[this._translatePlaneInfo.planeAxis];
-    const p = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, d));
-    if (this._translatePlaneInfo.type === 'move_axis') {
-      this._node!.position[c] +=
-        p[this._translatePlaneInfo.axis] -
-        this._translatePlaneInfo.lastPlanePos[this._translatePlaneInfo.axis];
     } else {
-      const dx = p[t[0]] - this._translatePlaneInfo.lastPlanePos[t[0]];
-      const dy = p[t[1]] - this._translatePlaneInfo.lastPlanePos[t[1]];
-      this._node!.position[t[0]] += dx;
-      this._node!.position[t[1]] += dy;
+      const ray = this._camera.constructRay(x, y);
+      const worldMatrix = this._calcGizmoWorldMatrix(this._mode, true);
+      const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
+      const rayLocal = ray.transform(invWorldMatrix);
+      if (Math.abs(rayLocal.direction[this._translatePlaneInfo.planeAxis]) > 0.0001) {
+        const t = ['x', 'y', 'z'];
+        const c = t[this._translatePlaneInfo.axis];
+        t.splice(this._translatePlaneInfo.planeAxis, 1);
+        const d =
+          (0 - rayLocal.origin[this._translatePlaneInfo.planeAxis]) /
+          rayLocal.direction[this._translatePlaneInfo.planeAxis];
+        const p = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, d));
+        if (this._translatePlaneInfo.type === 'move_axis') {
+          const delta =
+            p[this._translatePlaneInfo.axis] -
+            this._translatePlaneInfo.lastPlanePos[this._translatePlaneInfo.axis];
+          this._node!.position[c] += delta;
+        } else {
+          const dx = p[t[0]] - this._translatePlaneInfo.lastPlanePos[t[0]];
+          const dy = p[t[1]] - this._translatePlaneInfo.lastPlanePos[t[1]];
+          this._node!.position[t[0]] += dx;
+          this._node!.position[t[1]] += dy;
+        }
+      }
     }
+    this.snapToGrid(this._node!, this._snapping);
   }
   private _endTranslation() {
     getDevice().canvas.style.cursor = 'default';
@@ -1351,6 +1360,16 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         });
       }
     });
+  }
+  private snapToGrid(node: SceneNode, gridSize: number) {
+    if (gridSize > 0) {
+      const pos = node.getWorldPosition();
+      pos.x = Math.round(pos.x / gridSize) * gridSize;
+      pos.y = Math.round(pos.y / gridSize) * gridSize;
+      pos.z = Math.round(pos.z / gridSize) * gridSize;
+      node.parent.worldToThis(pos, pos);
+      node.position.set(pos);
+    }
   }
   private prepare() {
     if (!PostGizmoRenderer._gridPrimitive) {

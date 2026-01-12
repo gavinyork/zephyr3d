@@ -405,6 +405,28 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           }
         },
         {
+          label: '-'
+        },
+        {
+          label: '',
+          tooltip: () => 'Snap to grid when moving node (0 for no snap)',
+          visible: () => {
+            return this._postGizmoRenderer!.mode === 'translation';
+          },
+          selected: () => true,
+          render: () => {
+            const snapping = [this._postGizmoRenderer!.snapping] as [number];
+            ImGui.SetNextItemWidth(50);
+            if (ImGui.DragFloat('Snap', snapping, 0.1, 10, ImGui.InputTextFlags.EnterReturnsTrue)) {
+              this._postGizmoRenderer!.snapping = Math.max(0, snapping[0]);
+            }
+            return false;
+          }
+        },
+        {
+          label: '-'
+        },
+        {
           label: FontGlyph.glyphs['link'],
           shortcut: 'Ctrl+D',
           tooltip: () => 'Creatas an instance of current node',

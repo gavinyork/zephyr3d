@@ -6,6 +6,7 @@ export type ToolBarItem = {
   label: string;
   id?: string;
   shortcut?: string;
+  render?: (buttonSize: ImGui.ImVec2) => boolean;
   action?: () => void;
   tooltip?: () => string;
   visible?: () => boolean;
@@ -141,7 +142,7 @@ export class ToolBar extends Observable<{
             ImGui.Col.Text,
             tool.selected?.() ? this._textColorSelected : this._textColorUnselected
           );
-          if (ImGui.Button(tool.label, this._buttonSize)) {
+          if (tool.render ? tool.render(this._buttonSize) : ImGui.Button(tool.label, this._buttonSize)) {
             if (tool.action) {
               tool.action();
             } else if (tool.id) {
