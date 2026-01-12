@@ -1374,10 +1374,14 @@ export class Camera extends SceneNode {
   ): Matrix4x4 {
     const matrix = outMatrix ?? new Matrix4x4();
     const transform = this._screenAdapter.transform;
-    const left = transform.croppedViewport.x;
-    const right = transform.croppedViewport.x + transform.croppedViewport.width;
-    const bottom = transform.croppedViewport.y + transform.croppedViewport.height;
-    const top = transform.croppedViewport.y;
+    const scaleX = this._screenAdapter.config.designWidth / transform.viewportWidth;
+    const scaleY = this._screenAdapter.config.designHeight / transform.viewportHeight;
+    const left = (transform.croppedViewport.x - transform.viewportX) * scaleX;
+    const right =
+      (transform.croppedViewport.x + transform.croppedViewport.width - transform.viewportX) * scaleX;
+    const bottom =
+      (transform.croppedViewport.y + transform.croppedViewport.height - transform.viewportY) * scaleY;
+    const top = (transform.croppedViewport.y - transform.viewportY) * scaleY;
     return matrix.ortho(left, right, bottom, top, nearClip, farClip);
   }
   /** @internal */
