@@ -336,25 +336,31 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         const right = projMatrix.getRightPlane() + cameraPos.x;
         const bottom = projMatrix.getBottomPlane() + cameraPos.y;
         const top = projMatrix.getTopPlane() + cameraPos.y;
-        let sizeX = Math.pow(10, Math.max(0, Math.round(Math.log10(Math.abs(right - left))) - 1));
-        const startX = Math.round(left / sizeX) * sizeX;
-        const stopX = Math.round(right / sizeX) * sizeX;
-        if (stopX < startX) {
-          sizeX = -sizeX;
-        }
-        for (let x = startX; x !== stopX; x += sizeX) {
+
+        const minX = left < right ? left : right;
+        const maxX = left < right ? right : left;
+        const sizeX = Math.pow(
+          10,
+          Math.max(0, Math.round(Math.log10(((maxX - minX) * 100) / ctx.camera.viewport[2])))
+        );
+        const startX = Math.floor(minX / sizeX) * sizeX;
+        const stopX = Math.ceil(maxX / sizeX) * sizeX;
+        for (let x = startX; x < stopX; x += sizeX) {
           const ndc = vpMatrix.transformPointH(new Vector3(x, top, 0));
-          const screenX = (ndc.x * 0.5 + 0.5) * ctx.renderWidth + 5;
-          const screenY = (0.5 - ndc.y * 0.5) * ctx.renderHeight + 5;
+          const screenX = (ndc.x * 0.5 + 0.5) * ctx.renderWidth + 2;
+          const screenY = (0.5 - ndc.y * 0.5) * ctx.renderHeight + 2;
           ctx.device.drawText(String(x), screenX, screenY, '#888888');
         }
-        let sizeY = Math.pow(10, Math.max(0, Math.round(Math.log10(Math.abs(top - bottom))) - 1));
-        const startY = Math.round(bottom / sizeY) * sizeY;
-        const stopY = Math.round(top / sizeY) * sizeY;
-        if (stopY < startY) {
-          sizeY = -sizeY;
-        }
-        for (let y = startY; y !== stopY; y += sizeY) {
+
+        const minY = bottom < top ? bottom : top;
+        const maxY = bottom < top ? top : bottom;
+        const sizeY = Math.pow(
+          10,
+          Math.max(0, Math.round(Math.log10(((maxY - minY) * 100) / ctx.camera.viewport[3])))
+        );
+        const startY = Math.floor(minY / sizeY) * sizeY;
+        const stopY = Math.ceil(maxY / sizeY) * sizeY;
+        for (let y = startY; y < stopY; y += sizeY) {
           const ndc = vpMatrix.transformPointH(new Vector3(left, y, 0));
           const screenX = (ndc.x * 0.5 + 0.5) * ctx.renderWidth + 5;
           const screenY = (0.5 - ndc.y * 0.5) * ctx.renderHeight + 5;

@@ -5,7 +5,7 @@ import { HttpFS, type VFS } from '@zephyr3d/base';
 import { ScriptingSystem } from './scriptingsystem';
 import type { Host } from './scriptingsystem';
 import type { RuntimeScript } from './runtimescript';
-import { ResourceManager } from '../utility';
+import { ResourceManager } from '../utility/serialization/manager';
 import type { Scene } from '../scene';
 import { BoxShape, CylinderShape, PlaneShape, SphereShape, TetrahedronShape, TorusShape } from '../shapes';
 import {

@@ -596,6 +596,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
 
     this._toolbar.render();
     this._assetView!.render();
+
+    const camera = this.controller.model.scene.mainCamera;
+
     const viewportWidth = displaySize.x - this._leftDockPanel!.width - this._rightDockPanel.width;
     const viewportHeight =
       displaySize.y -
@@ -604,7 +607,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._toolbar.height -
       this._assetView!.panel.height;
     if (viewportWidth > 0 && viewportHeight > 0) {
-      getEngine().screen.viewport = [
+      camera.screenViewport = [
         this._leftDockPanel!.width,
         this._statusbar.height + this._assetView!.panel.height,
         viewportWidth,
@@ -618,9 +621,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         viewportHeight
       );
       */
-      const camera = this.controller.model.scene.mainCamera;
-      camera.viewport = getEngine().screen.viewport.slice();
-      camera.scissor = camera.viewport.slice();
+      camera.viewport = camera.screenViewport;
+      camera.scissor = camera.screenViewport;
       camera!.render(this.controller.model.scene);
 
       // Render selected camera

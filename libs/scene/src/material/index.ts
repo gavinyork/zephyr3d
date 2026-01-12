@@ -12,7 +12,7 @@ export * from './pbrsg';
 export * from './pbrblueprint';
 export * from './sprite3d';
 export * from './sprite3d_std';
-export * from './spriteblueprint';
+export * from './sprite3dblueprint';
 export * from './mixins/pbr/common';
 export * from './mixins/lightmodel/pbrmetallicroughness';
 export * from './mixins/lightmodel/pbrspecularglossness';

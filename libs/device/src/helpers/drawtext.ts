@@ -175,7 +175,7 @@ export class DrawText {
   private static prepareDrawText(device: AbstractDevice) {
     if (!this.prepared) {
       this.prepared = true;
-      this.font = this.font || Font.fetchFont('16px arial', device.getScaleY());
+      this.font = this.font || Font.fetchFont('12px arial', device.getScaleY());
       this.glyphManager = new GlyphManager(device, 1024, 1024, 1);
       this.vertexCache = new Float32Array(this.GLYPH_COUNT * 16);
       this.textVertexBuffer = device.createInterleavedVertexBuffer(

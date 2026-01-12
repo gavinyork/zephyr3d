@@ -3,6 +3,19 @@ import { Vector2 } from '@zephyr3d/base';
 import { getDevice } from './api';
 
 /**
+ * Scaling mode used to adapt the design resolution to the viewport.
+ *
+ * - 'fit'    – Preserve aspect ratio, show whole design area, may add letterboxing (black bars).
+ * - 'fit-width'  – Match viewport width exactly; height follows aspect ratio (may crop or letterbox vertically).
+ * - 'fit-height' – Match viewport height exactly; width follows aspect ratio (may crop or letterbox horizontall
+ * - 'cover'  – Preserve aspect ratio, fill the entire viewport, design area may be cropped.
+ * - 'stretch' – Do not preserve aspect ratio, stretch to fill the viewport.
+ *
+ * @public
+ */
+export type ScreenScaleMode = 'fit' | 'fit-width' | 'fit-height' | 'cover' | 'stretch';
+
+/**
  * Screen adapter configuration
  *
  * @public
@@ -12,16 +25,8 @@ export type ScreenConfig = {
   designWidth: number;
   /** Logical height in the design resolution coordinate system. */
   designHeight: number;
-  /**
-   * Scaling mode used to adapt the design resolution to the viewport.
-   *
-   * - 'fit'    – Preserve aspect ratio, show whole design area, may add letterboxing (black bars).
-   * - 'fit-width'  – Match viewport width exactly; height follows aspect ratio (may crop or letterbox vertically).
-   * - 'fit-height' – Match viewport height exactly; width follows aspect ratio (may crop or letterbox horizontall
-   * - 'cover'  – Preserve aspect ratio, fill the entire viewport, design area may be cropped.
-   * - 'stretch' – Do not preserve aspect ratio, stretch to fill the viewport.
-   */
-  scaleMode: 'fit' | 'fit-width' | 'fit-height' | 'cover' | 'stretch';
+  /** Scaling mode used to adapt the design resolution to the viewport. */
+  scaleMode: ScreenScaleMode;
 };
 
 /**
@@ -96,18 +101,23 @@ export class ScreenAdapter {
    * @param config - Optional initial screen configuration. If omitted,
    *   a default of 1920×1080 with 'stretch' mode is used.
    */
-  constructor(config?: ScreenConfig) {
+  constructor(config?: Immutable<ScreenConfig>) {
     this._viewport = null;
     this._transform = null;
     this._resolvedViewport = null;
     this._version = 1;
-    this.configure(config);
+    this._config = { ...this.getDefaultConfig(), ...config };
   }
   /**
    * Returns the current design resolution configuration.
    */
   get config(): Immutable<ScreenConfig> {
     return this._config;
+  }
+  set config(config: Immutable<ScreenConfig>) {
+    this._config = { ...this.getDefaultConfig(), ...config };
+    this._transform = null;
+    this._version++;
   }
   /**
    * Returns the viewport of the screen
@@ -142,20 +152,6 @@ export class ScreenAdapter {
       );
     }
     return this._transform;
-  }
-  /**
-   * Configures the design resolution and scale mode.
-   *
-   * @param config - Design resolution configuration. Any missing fields
-   *   are filled with default values: 1920×1080 and 'stretch' mode.
-   */
-  configure(_config?: ScreenConfig) {
-    this._config = {
-      designWidth: 1920,
-      designHeight: 1080,
-      scaleMode: 'cover',
-      ..._config
-    };
   }
   /**
    * Computes the resolution transform for a given viewport in canvas coordinates.
@@ -399,5 +395,12 @@ export class ScreenAdapter {
       this._version++;
       this._transform = null;
     }
+  }
+  private getDefaultConfig(): ScreenConfig {
+    return {
+      designWidth: 1920,
+      designHeight: 1080,
+      scaleMode: 'stretch'
+    };
   }
 }

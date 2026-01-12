@@ -28,11 +28,62 @@ export function getCameraClass(): SerializableClass {
         {
           name: 'UseScreenSettings',
           type: 'bool',
+          default: false,
           get(this: Camera, value) {
-            value.bool[0] = this.useScreenSettings;
+            value.bool[0] = this.adapted;
           },
           set(this: Camera, value) {
-            this.useScreenSettings = value.bool[0];
+            this.adapted = value.bool[0];
+          }
+        },
+        {
+          name: 'DesignWidth',
+          type: 'int',
+          options: { minValue: 1 },
+          default: 1920,
+          isHidden(this: Camera) {
+            return !this.adapted;
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.screenConfig.designWidth;
+          },
+          set(this: Camera, value) {
+            this.screenConfig = { ...this.screenConfig, designWidth: value.num[0] };
+          }
+        },
+        {
+          name: 'DesignHeight',
+          type: 'int',
+          options: { minValue: 1 },
+          default: 1080,
+          isHidden(this: Camera) {
+            return !this.adapted;
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.screenConfig.designHeight;
+          },
+          set(this: Camera, value) {
+            this.screenConfig = { ...this.screenConfig, designHeight: value.num[0] };
+          }
+        },
+        {
+          name: 'ScreenScaleMode',
+          type: 'string',
+          default: 'stretch',
+          options: {
+            enum: {
+              labels: ['ShowAll', 'NoBorder', 'ExactFit', 'FixedWidth', 'FixedHeight'],
+              values: ['fit', 'cover', 'stretch', 'fit-width', 'fit-height']
+            }
+          },
+          isHidden(this: Camera) {
+            return !this.adapted;
+          },
+          get(this: Camera, value) {
+            value.str[0] = this.screenConfig.scaleMode;
+          },
+          set(this: Camera, value) {
+            this.screenConfig = { ...this.screenConfig, scaleMode: value.str[0] as any };
           }
         },
         {

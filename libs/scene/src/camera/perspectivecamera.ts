@@ -151,8 +151,8 @@ export class PerspectiveCamera extends Camera {
   }
   /** @internal */
   protected _computeProj() {
-    if (this._renderTarget) {
-      this._renderTarget.calcPerspectiveProjection(this._fovY, this._near, this._far, this._projMatrix);
+    if (this.adapted) {
+      this.calcAdaptedPerspectiveProjection(this._fovY, this._near, this._far, this._projMatrix);
     } else {
       const h = this._near * Math.tan(this._fovY * 0.5);
       const w = h * this._aspect;

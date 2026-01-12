@@ -65,7 +65,7 @@ export class OrthoCamera extends Camera {
   }
   /** The left clip plane */
   get left() {
-    return this._renderTarget ? this.getProjectionMatrix().getLeftPlane() : this._left;
+    return this.adapted ? this.getProjectionMatrix().getLeftPlane() : this._left;
   }
   set left(val) {
     if (val !== this._left) {
@@ -75,7 +75,7 @@ export class OrthoCamera extends Camera {
   }
   /** The right clip plane */
   get right() {
-    return this._renderTarget ? this.getProjectionMatrix().getRightPlane() : this._right;
+    return this.adapted ? this.getProjectionMatrix().getRightPlane() : this._right;
   }
   set right(val) {
     if (val !== this._right) {
@@ -85,7 +85,7 @@ export class OrthoCamera extends Camera {
   }
   /** The top clip plane */
   get top() {
-    return this._renderTarget ? this.getProjectionMatrix().getTopPlane() : this._top;
+    return this.adapted ? this.getProjectionMatrix().getTopPlane() : this._top;
   }
   set top(val) {
     if (val !== this._top) {
@@ -95,7 +95,7 @@ export class OrthoCamera extends Camera {
   }
   /** The bottom clip plane */
   get bottom() {
-    return this._renderTarget ? this.getProjectionMatrix().getBottomPlane() : this._bottom;
+    return this.adapted ? this.getProjectionMatrix().getBottomPlane() : this._bottom;
   }
   set bottom(val) {
     if (val !== this._bottom) {
@@ -146,8 +146,8 @@ export class OrthoCamera extends Camera {
   }
   /** @internal */
   protected _computeProj() {
-    if (this._renderTarget) {
-      this._renderTarget.calcOrthographicProjection(this._near, this._far, this._projMatrix);
+    if (this.adapted) {
+      this.calcAdaptedOrthographicProjection(this._near, this._far, this._projMatrix);
     } else {
       let left = this._left;
       let right = this._right;

@@ -24,8 +24,8 @@ import { Bloom } from '../posteffect/bloom';
 import { SAO } from '../posteffect/sao';
 import { MotionBlur } from '../posteffect/motionblur';
 import { getDevice } from '../app/api';
-import type { RenderTarget } from '../render/rendertarget';
-import { ScreenRenderTarget } from '../render/screenrendertarget';
+import type { ScreenConfig } from '../app/screen';
+import { ScreenAdapter } from '../app/screen';
 
 /**
  * Result of a camera picking operation.
@@ -79,6 +79,16 @@ export class Camera extends SceneNode {
   private static readonly _halton23 = halton23(16);
   /** @internal Per-camera history resources. */
   private static readonly _historyData: WeakMap<Camera, CameraHistoryData> = new WeakMap();
+  /** @internal Screen adapter for this camera */
+  protected _screenAdapter: ScreenAdapter;
+  /** @internal Whether the camera is adapted */
+  protected _adapted: boolean;
+  /** @internal Adapted viewport */
+  protected _adaptedViewport: Nullable<number[]>;
+  /** @internal Adapted relative viewport */
+  protected _adaptedRelativeViewport: Nullable<number[]>;
+  /** @internal RenderTarget version */
+  protected _adaptedVersion: number;
   /** @internal Projection matrix. */
   protected _projMatrix: Matrix4x4;
   /** @internal Inverse projection matrix. */
@@ -107,20 +117,12 @@ export class Camera extends SceneNode {
   protected _dirty: boolean;
   /** @internal Viewport [x, y, w, h]; null uses full framebuffer. */
   protected _viewport: Nullable<number[]>;
-  /** @internal Viewport for render target */
-  protected _renderTargetViewport: Nullable<number[]>;
-  /** @internal RenderTarget for this camera */
-  protected _renderTarget: Nullable<RenderTarget>;
-  /** @internal RenderTarget version */
-  protected _renderTargetVersion: number;
   /** @internal Scissor rectangle [x, y, w, h]; null uses viewport. */
   protected _scissor: Nullable<number[]>;
   /** @internal Clip plane mask for custom clipping schemes. */
   protected _clipMask: number;
   /** @internal Order-Independent Transparency reference. */
   protected _oit: DRef<OIT>;
-  /** @internal */
-  protected _adapted: boolean;
   /** @internal Whether to perform a depth pre-pass. */
   protected _depthPrePass: boolean;
   /** @internal Whether command buffers may be reused for optimization. */
@@ -248,7 +250,6 @@ export class Camera extends SceneNode {
    */
   constructor(scene: Nullable<Scene>, projectionMatrix?: Matrix4x4) {
     super(scene);
-    this._renderTarget = null;
     this._projMatrix = projectionMatrix || Matrix4x4.identity();
     this._invProjMatrix = Matrix4x4.invert(this._projMatrix);
     this._viewMatrix = Matrix4x4.identity();
@@ -261,14 +262,16 @@ export class Camera extends SceneNode {
     this._dirty = true;
     this._controller = null;
     this._viewport = null;
-    this._renderTargetViewport = null;
-    this._renderTargetVersion = 0;
+    this._adaptedViewport = null;
+    this._adaptedRelativeViewport = null;
+    this._adaptedVersion = 0;
     this._scissor = null;
     this._clipMask = 0;
     this._frustum = null;
     this._frustumV = null;
     this._oit = new DRef();
     this._depthPrePass = false;
+    this._screenAdapter = new ScreenAdapter();
     this._adapted = false;
     this._HiZ = false;
     this._HDR = true;
@@ -328,16 +331,6 @@ export class Camera extends SceneNode {
     if (scene && !scene.mainCamera) {
       scene.mainCamera = this;
     }
-  }
-  /**
-   * Whether to use screen settings for this camera's render target.
-   */
-  get useScreenSettings() {
-    return !!this._renderTarget;
-  }
-  set useScreenSettings(val: boolean) {
-    this._renderTarget = val ? new ScreenRenderTarget() : null;
-    this._invalidate(true);
   }
   /**
    * The compositor that owns and runs the camera's post-processing chain.
@@ -740,7 +733,12 @@ export class Camera extends SceneNode {
     return this._adapted;
   }
   set adapted(val) {
-    this._adapted = !!val;
+    if (val !== this._adapted) {
+      this._adapted = !!val;
+      this._adaptedViewport = null;
+      this._adaptedRelativeViewport = null;
+      this._invalidate(true);
+    }
   }
   /** OIT */
   get oit() {
@@ -758,26 +756,50 @@ export class Camera extends SceneNode {
   }
   /** Viewport used for rendering, if null, use full framebuffer size */
   get viewport(): Nullable<Immutable<number[]>> {
-    if (this._renderTarget) {
-      this._renderTargetViewport = this._renderTarget.calcViewport(this._renderTargetViewport);
+    if (this._adapted) {
+      if (!this._adaptedViewport) {
+        this._adaptedViewport = this.calcAdaptedViewport(this._adaptedViewport);
+      }
+      return this._adaptedViewport;
     }
-    return this._renderTarget ? this._renderTargetViewport : this._viewport;
+    return this._viewport;
   }
   set viewport(rect: Nullable<Immutable<number[]>>) {
     this._viewport = rect?.slice() ?? null;
   }
   /** Scissor rectangle used for rendering, if null, use viewport value */
   get scissor(): Nullable<Immutable<number[]>> {
-    return this._scissor;
+    return this._adapted ? this.viewport : this._scissor;
   }
   set scissor(rect: Nullable<Immutable<number[]>>) {
     this._scissor = rect?.slice() ?? null;
   }
   get relativeViewport(): Nullable<Immutable<number[]>> {
-    if (this._renderTarget) {
-      return this._renderTarget.calcRelativeViewport();
+    if (this._adapted) {
+      if (!this._adaptedRelativeViewport) {
+        this._adaptedRelativeViewport = this.calcRelativeAdaptedViewport(this._adaptedRelativeViewport);
+      }
+      return this._adaptedRelativeViewport;
     }
     return this._viewport;
+  }
+  /**
+   * Screen configuration used for adapting the camera viewport
+   */
+  get screenConfig(): Immutable<ScreenConfig> {
+    return this._screenAdapter.config;
+  }
+  set screenConfig(config: Immutable<ScreenConfig>) {
+    this._screenAdapter.config = config;
+  }
+  /**
+   * Screen viewport used for adapting the camera viewport
+   */
+  get screenViewport(): Nullable<Immutable<number[]>> {
+    return this._screenAdapter.viewport;
+  }
+  set screenViewport(viewport: Nullable<Immutable<number[]>>) {
+    this._screenAdapter.viewport = viewport;
   }
   /**
    * Handle input events
@@ -1309,11 +1331,13 @@ export class Camera extends SceneNode {
   }
   /** @internal */
   private dirtyCheck() {
-    if (this._renderTarget) {
-      const version = this._renderTarget.getVersion();
-      if (this._renderTargetVersion !== version) {
+    if (this._adapted) {
+      const version = this._screenAdapter.version;
+      if (this._adaptedVersion !== version) {
         this._dirty = true;
-        this._renderTargetVersion = version;
+        this._adaptedViewport = null;
+        this._adaptedRelativeViewport = null;
+        this._adaptedVersion = version;
       }
     }
     if (this._dirty) {
@@ -1321,5 +1345,74 @@ export class Camera extends SceneNode {
       return true;
     }
     return false;
+  }
+  /** @internal */
+  private calcAdaptedViewport(outViewport?: Nullable<number[]>): number[] {
+    outViewport = outViewport ?? [];
+    const transform = this._screenAdapter.transform;
+    outViewport[0] = transform.croppedViewport.x;
+    outViewport[1] = transform.croppedViewport.y;
+    outViewport[2] = transform.croppedViewport.width;
+    outViewport[3] = transform.croppedViewport.height;
+    return outViewport;
+  }
+  /** @internal */
+  private calcRelativeAdaptedViewport(outViewport?: Nullable<number[]>): number[] {
+    outViewport = outViewport ?? [];
+    const transform = this._screenAdapter.transform;
+    outViewport[0] = transform.croppedViewport.x - transform.viewportX;
+    outViewport[1] = transform.croppedViewport.y - transform.viewportY;
+    outViewport[2] = transform.croppedViewport.width;
+    outViewport[3] = transform.croppedViewport.height;
+    return outViewport;
+  }
+  /** @internal */
+  protected calcAdaptedOrthographicProjection(
+    nearClip: number,
+    farClip: number,
+    outMatrix?: Matrix4x4
+  ): Matrix4x4 {
+    const matrix = outMatrix ?? new Matrix4x4();
+    const transform = this._screenAdapter.transform;
+    const left = transform.croppedViewport.x;
+    const right = transform.croppedViewport.x + transform.croppedViewport.width;
+    const bottom = transform.croppedViewport.y + transform.croppedViewport.height;
+    const top = transform.croppedViewport.y;
+    return matrix.ortho(left, right, bottom, top, nearClip, farClip);
+  }
+  /** @internal */
+  protected calcAdaptedPerspectiveProjection(
+    fov: number,
+    nearClip: number,
+    farClip: number,
+    outMatrix?: Matrix4x4
+  ): Matrix4x4 {
+    const matrix = outMatrix ?? new Matrix4x4();
+    const transform = this._screenAdapter.transform;
+    const aspect = transform.viewportHeight !== 0 ? transform.viewportWidth / transform.viewportHeight : 1;
+    const h = nearClip * Math.tan(fov * 0.5);
+    const w = h * aspect;
+    let left = -w + (2 * w * (transform.croppedViewport.x - transform.viewportX)) / transform.viewportWidth;
+    let right =
+      w -
+      (2 *
+        w *
+        (transform.viewportX +
+          transform.viewportWidth -
+          transform.croppedViewport.x -
+          transform.croppedViewport.width)) /
+        transform.viewportWidth;
+    let bottom =
+      -h + (2 * w * (transform.croppedViewport.y - transform.viewportY)) / transform.viewportHeight;
+    let top =
+      h -
+      (2 *
+        h *
+        (transform.viewportY +
+          transform.viewportHeight -
+          transform.croppedViewport.y -
+          transform.croppedViewport.height)) /
+        transform.viewportHeight;
+    return matrix.frustum(left, right, bottom, top, nearClip, farClip);
   }
 }

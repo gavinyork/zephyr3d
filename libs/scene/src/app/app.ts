@@ -167,7 +167,7 @@ export class Application extends Observable<appEventMap> {
       opt.runtimeOptions?.enabled
     );
     if (opt.runtimeOptions?.screen) {
-      this._engine.screen.configure(opt.runtimeOptions.screen);
+      this._engine.screen.config = opt.runtimeOptions.screen;
     }
     this._editorMode = opt.runtimeOptions?.editorMode ?? 'none';
     this._device = null;
