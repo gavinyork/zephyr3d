@@ -321,6 +321,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       this._gridParams.z = ctx.camera.isPerspective() ? 1 : 0;
       ctx.device.setRenderStates(PostGizmoRenderer._gridRenderState);
       PostGizmoRenderer._gridBindGroup!.setValue('viewMatrixInv', ctx.camera.worldMatrix);
+      PostGizmoRenderer._gridBindGroup!.setValue('projMatrix', ctx.camera.getProjectionMatrix());
       PostGizmoRenderer._gridBindGroup!.setValue('cameraPos', ctx.camera.getWorldPosition());
       PostGizmoRenderer._gridBindGroup!.setValue('params', this._gridParams);
       PostGizmoRenderer._gridBindGroup!.setValue('steps', this._gridSteps);
@@ -1009,6 +1010,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this.cameraPos = pb.vec3().uniform(0);
         this.viewMatrixInv = pb.mat4().uniform(0);
         this.viewProjMatrix = pb.mat4().uniform(0);
+        this.projMatrix = pb.mat4().uniform(0);
         this.flip = pb.float().uniform(0);
         pb.main(function () {
           this.$l.worldPos = pb.vec3();
@@ -1019,12 +1021,17 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             );
             this.$outputs.worldPos = this.worldPos;
           }).$else(function () {
-            this.$l.right = this.viewMatrixInv[0].xyz;
-            this.$l.up = this.viewMatrixInv[1].xyz;
-            this.$l.scale = pb.mul(this.$inputs.pos.xz, this.params.x);
             this.$l.planeNormal = this.viewMatrixInv[2].xyz;
             this.$l.planeD = pb.neg(pb.dot(this.cameraPos, this.planeNormal));
             this.$l.origin = pb.sub(pb.vec3(0), pb.mul(this.planeNormal, this.planeD));
+            this.$l.right = this.viewMatrixInv[0].xyz;
+            this.$l.up = this.viewMatrixInv[1].xyz;
+            this.$l.viewSize = pb.max(
+              pb.abs(pb.div(2, this.projMatrix[0].x)),
+              pb.abs(pb.div(2, this.projMatrix[1].y))
+            );
+            this.$l.scaleFactor = pb.max(this.params.x, pb.add(this.viewSize, pb.length(this.cameraPos)));
+            this.$l.scale = pb.mul(this.$inputs.pos.xz, this.scaleFactor /*this.params.x*/);
             this.$outputs.worldPos = pb.vec3(this.scale, 0);
             this.worldPos = pb.add(
               this.origin,
