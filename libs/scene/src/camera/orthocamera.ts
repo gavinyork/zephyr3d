@@ -17,12 +17,14 @@ export class OrthoCamera extends Camera {
   private _far: number;
   private _window: Nullable<number[]>;
   /**
-   * Creates an instance of PerspectiveCamera
+   * Creates an instance of OrthoCamera
    * @param scene - The scene that the camera belongs to.
-   * @param fovY - A radian value indicates the field of view in Y axis
-   * @param aspect - Aspect ratio of the perspective transform
-   * @param nearPlane - The near clip plane
-   * @param farPlane - The far clip plane
+   * @param left - The left clip plane
+   * @param right - The right clip plane
+   * @param bottom - The bottom clip plane
+   * @param top - The top clip plane
+   * @param near - The near clip plane
+   * @param far - The far clip plane
    */
   constructor(scene: Nullable<Scene>, left = -1, right = 1, bottom = -1, top = 1, near = -1, far = 1) {
     super(scene);
