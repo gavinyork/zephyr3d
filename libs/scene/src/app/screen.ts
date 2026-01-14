@@ -376,7 +376,10 @@ export class ScreenAdapter {
     out.y = pointIn.y * transform.scaleY + transform.offsetY;
     return out;
   }
-  private resolveViewport() {
+  /**
+   * Resolves the current viewport, updating internal state as needed.
+   */
+  resolveViewport() {
     const device = getDevice();
     const vp = this._viewport?.slice() ?? [
       0,

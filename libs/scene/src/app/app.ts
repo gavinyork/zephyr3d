@@ -237,6 +237,7 @@ export class Application extends Observable<appEventMap> {
       await this._engine.init();
       this._inputManager.start();
       this._device.on('resize', (width, height) => {
+        this._engine.screen.resolveViewport();
         this.dispatchEvent('resize', width, height);
       });
       this._ready = true;

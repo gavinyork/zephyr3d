@@ -161,7 +161,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    */
   private _taaStrength: number;
   /** @internal Per-object color for object picking pass. */
-  private readonly _objectColor: Vector4;
+  private _objectColor: Immutable<Vector4>;
   /** @internal Last draw context used for shader creation. */
   private _ctx: Nullable<DrawContext>;
   /** @internal Current material pass index during program building. */
@@ -590,7 +590,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   }
   set objectColor(val: Immutable<Vector4>) {
     if (val !== this._objectColor) {
-      this._objectColor.set(val ?? Vector4.one());
+      this._objectColor = val;
       this.uniformChanged();
     }
   }

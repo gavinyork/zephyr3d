@@ -346,6 +346,12 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         const bottom = projMatrix.getBottomPlane() + cameraPos.y;
         const top = projMatrix.getTopPlane() + cameraPos.y;
 
+        const planeNormal = ctx.camera.worldMatrix.getRow(2).xyz().inplaceNormalize();
+        const planeD = -Vector3.dot(planeNormal, cameraPos);
+        const origin = Vector3.scale(planeNormal, -planeD);
+        const rightAxis = ctx.camera.worldMatrix.getRow(0).xyz().inplaceNormalize();
+        const upAxis = ctx.camera.worldMatrix.getRow(1).xyz().inplaceNormalize();
+
         const minX = left < right ? left : right;
         const maxX = left < right ? right : left;
         const sizeX = Math.pow(
@@ -355,10 +361,11 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         const startX = Math.floor(minX / sizeX) * sizeX;
         const stopX = Math.ceil(maxX / sizeX) * sizeX;
         for (let x = startX; x < stopX; x += sizeX) {
-          const ndc = vpMatrix.transformPointH(new Vector3(x, top, 0));
+          const v = Vector3.add(origin, Vector3.scale(rightAxis, x));
+          const ndc = vpMatrix.transformPointH(v /*new Vector3(x, top, 0)*/);
           const screenX = (ndc.x * 0.5 + 0.5) * ctx.renderWidth + 2;
-          const screenY = (0.5 - ndc.y * 0.5) * ctx.renderHeight + 2;
-          ctx.device.drawText(String(x), screenX, screenY, '#888888');
+          const screenY = 2;
+          ctx.device.drawText(String(x), screenX, screenY, '#ffff00');
         }
 
         const minY = bottom < top ? bottom : top;
@@ -370,10 +377,11 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         const startY = Math.floor(minY / sizeY) * sizeY;
         const stopY = Math.ceil(maxY / sizeY) * sizeY;
         for (let y = startY; y < stopY; y += sizeY) {
-          const ndc = vpMatrix.transformPointH(new Vector3(left, y, 0));
-          const screenX = (ndc.x * 0.5 + 0.5) * ctx.renderWidth + 2;
+          const v = Vector3.add(origin, Vector3.scale(upAxis, y));
+          const ndc = vpMatrix.transformPointH(v /*new Vector3(left, y, 0)*/);
+          const screenX = 2;
           const screenY = (0.5 - ndc.y * 0.5) * ctx.renderHeight + 2;
-          ctx.device.drawText(String(y), screenX, screenY, '#888888');
+          ctx.device.drawText(String(y), screenX, screenY, '#ffff00');
         }
       }
     }
