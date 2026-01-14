@@ -205,7 +205,13 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
   static _defaultOptions = {
     ...Shape._defaultOptions,
     size: 1,
-    anchor: 0.5
+    sizeX: 1,
+    sizeY: 1,
+    sizeZ: 1,
+    anchor: 0.5,
+    anchorX: 0.5,
+    anchorY: 0.5,
+    anchorZ: 0.5
   };
   /**
    * Creates an instance of wireframe box shape

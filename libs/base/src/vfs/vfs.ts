@@ -744,7 +744,11 @@ export abstract class VFS extends Observable<{
       throw new VFSError('Target path is not a directory', 'ENOTDIR', normalizedPath);
     }
     for (const mountPath of this.sortedMountPaths) {
-      if (mountPath.startsWith(normalizedPath.endsWith('/') ? normalizedPath : normalizedPath + '/')) {
+      if (
+        (mountPath.endsWith('/') ? mountPath : `${mountPath}/`).startsWith(
+          normalizedPath.endsWith('/') ? normalizedPath : normalizedPath + '/'
+        )
+      ) {
         // Attempt to delete a mounted path or it's parent
         throw new VFSError(
           'Cannot delete a directory that contains mounted subdirectories. Unmount them first.',

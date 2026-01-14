@@ -1,4 +1,4 @@
-import type { PBInsideFunctionScope, PBShaderExp, TextureSampler } from '@zephyr3d/device';
+import type { PBInsideFunctionScope, PBShaderExp, TextureFormat, TextureSampler } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import { computeShadowMapDepth, computeReceiverPlaneDepthBias, filterShadowPCF } from '../shaders/shadow';
@@ -57,10 +57,10 @@ export class PCFOPT extends ShadowImpl {
   getShaderHash() {
     return `${this._kernelSize}`;
   }
-  getShadowMapColorFormat(shadowMapParams: ShadowMapParams) {
+  getShadowMapColorFormat(shadowMapParams: ShadowMapParams): Nullable<TextureFormat> {
     return this.useNativeShadowMap(shadowMapParams) ? null : 'rgba8unorm';
   }
-  getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams) {
+  getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
     return getDevice().type === 'webgl' ? 'd24s8' : 'd32f';
   }
   computeShadowMapDepth(

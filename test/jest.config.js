@@ -14,6 +14,7 @@ module.exports = {
   testEnvironment: 'node',
   transform,
   roots: ['<rootDir>/src'],
+  testMatch: ['**/*.test.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   setupFilesAfterEnv: ['<rootDir>/src/setup.ts'],
   moduleNameMapper: {

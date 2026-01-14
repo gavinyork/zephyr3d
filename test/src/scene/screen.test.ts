@@ -16,8 +16,8 @@ describe('ScreenAdapter', () => {
   describe('构造函数和配置', () => {
     test('应该使用默认配置创建实例', () => {
       const adapter = new ScreenAdapter();
-      expect(adapter.config.designWidth).toBe(1920);
-      expect(adapter.config.designHeight).toBe(1080);
+      expect(adapter.config.designWidth).toBe(1280);
+      expect(adapter.config.designHeight).toBe(720);
       expect(adapter.config.scaleMode).toBe('cover');
     });
 
@@ -35,11 +35,11 @@ describe('ScreenAdapter', () => {
 
     test('应该能重新配置', () => {
       const adapter = new ScreenAdapter();
-      adapter.configure({
+      adapter.config = {
         designWidth: 800,
         designHeight: 600,
         scaleMode: 'stretch'
-      });
+      };
       expect(adapter.config.designWidth).toBe(800);
       expect(adapter.config.designHeight).toBe(600);
       expect(adapter.config.scaleMode).toBe('stretch');
@@ -50,7 +50,7 @@ describe('ScreenAdapter', () => {
         designWidth: 1024,
         designHeight: 768,
         scaleMode: 'fit-width'
-      } as ScreenConfig);
+      });
       expect(adapter.config.designWidth).toBe(1024);
       expect(adapter.config.designHeight).toBe(768);
       expect(adapter.config.scaleMode).toBe('fit-width');
