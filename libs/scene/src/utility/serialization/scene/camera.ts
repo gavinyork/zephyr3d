@@ -40,7 +40,7 @@ export function getCameraClass(): SerializableClass {
           name: 'DesignWidth',
           type: 'int',
           options: { minValue: 1 },
-          default: 1920,
+          default: 1280,
           isHidden(this: Camera) {
             return !this.adapted;
           },
@@ -55,7 +55,7 @@ export function getCameraClass(): SerializableClass {
           name: 'DesignHeight',
           type: 'int',
           options: { minValue: 1 },
-          default: 1080,
+          default: 720,
           isHidden(this: Camera) {
             return !this.adapted;
           },
@@ -69,7 +69,7 @@ export function getCameraClass(): SerializableClass {
         {
           name: 'ScreenScaleMode',
           type: 'string',
-          default: 'stretch',
+          default: 'cover',
           options: {
             enum: {
               labels: ['ShowAll', 'NoBorder', 'ExactFit', 'FixedWidth', 'FixedHeight'],

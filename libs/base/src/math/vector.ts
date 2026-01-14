@@ -5168,21 +5168,6 @@ export class Matrix4x4 extends VectorBase {
     );
   }
   /**
-   * Transform a point by this matrix to homogeneous space.
-   * @param point - The point to be transformed.
-   * @param result - The output vector, if not specified, a new vector will be created.
-   * @returns The output vector
-   */
-  transformPointH(point: Vector3, result?: Vector3) {
-    result = result || new Vector3();
-    const w = this[3] * point[0] + this[7] * point[1] + this[11] * point[2] + this[15];
-    return result.setXYZ(
-      (this[0] * point[0] + this[4] * point[1] + this[8] * point[2] + this[12]) / w,
-      (this[1] * point[0] + this[5] * point[1] + this[9] * point[2] + this[13]) / w,
-      (this[2] * point[0] + this[6] * point[1] + this[10] * point[2] + this[14]) / w
-    );
-  }
-  /**
    * Transform a point by this matrix and then do a perspective divide.
    * @param point - The point to be transformed.
    * @param result - The output vector, if not specified, a new vector will be created.
@@ -5238,6 +5223,20 @@ export class Matrix4x4 extends VectorBase {
       this[1] * vec[0] + this[5] * vec[1] + this[9] * vec[2],
       this[2] * vec[0] + this[6] * vec[1] + this[10] * vec[2]
     );
+  }
+  /**
+   * Transform a vector by this matrix and then do a perspective divide.
+   * @param vec - The vector to be transformed.
+   * @param result - The output vector (can be the same as vec), if not specified, a new vector will be created.
+   * @returns The output vector
+   */
+  transformP(vec: Vector4, result?: Vector4) {
+    result = result || new Vector4();
+    const x = this[0] * vec[0] + this[4] * vec[1] + this[8] * vec[2] + this[12] * vec[3];
+    const y = this[1] * vec[0] + this[5] * vec[1] + this[9] * vec[2] + this[13] * vec[3];
+    const z = this[2] * vec[0] + this[6] * vec[1] + this[10] * vec[2] + this[14] * vec[3];
+    const w = this[3] * vec[0] + this[7] * vec[1] + this[11] * vec[2] + this[15] * vec[3];
+    return result.setXYZW(x / w, y / w, z / w, w);
   }
   /**
    * Transform a vector by this matrix.

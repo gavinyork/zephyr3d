@@ -99,7 +99,7 @@ export class ScreenAdapter {
    * Creates a new {@link ScreenAdapter}.
    *
    * @param config - Optional initial screen configuration. If omitted,
-   *   a default of 1920×1080 with 'stretch' mode is used.
+   *   a default of 1280×720 with 'cover' mode is used.
    */
   constructor(config?: Immutable<ScreenConfig>) {
     this._viewport = null;
@@ -401,9 +401,9 @@ export class ScreenAdapter {
   }
   private getDefaultConfig(): ScreenConfig {
     return {
-      designWidth: 1920,
-      designHeight: 1080,
-      scaleMode: 'stretch'
+      designWidth: 1280,
+      designHeight: 720,
+      scaleMode: 'cover'
     };
   }
 }

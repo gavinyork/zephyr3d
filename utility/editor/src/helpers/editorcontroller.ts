@@ -95,7 +95,7 @@ export class EditorCameraController extends BaseCameraController {
    * @override
    */
   protected _onMouseMove(evt: IControllerPointerMoveEvent): boolean {
-    if (this.rightMouseDown) {
+    if (this.rightMouseDown && this._getCamera().isPerspective()) {
       const dx = evt.offsetX - this.lastMouseX;
       const dy = evt.offsetY - this.lastMouseY;
       this.lastMouseX = evt.offsetX;

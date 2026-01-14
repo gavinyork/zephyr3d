@@ -362,10 +362,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         const stopX = Math.ceil(maxX / sizeX) * sizeX;
         for (let x = startX; x < stopX; x += sizeX) {
           const v = Vector3.add(origin, Vector3.scale(rightAxis, x));
-          const ndc = vpMatrix.transformPointH(v /*new Vector3(x, top, 0)*/);
+          const ndc = vpMatrix.transformPointP(v /*new Vector3(x, top, 0)*/);
           const screenX = (ndc.x * 0.5 + 0.5) * ctx.renderWidth + 2;
           const screenY = 2;
-          ctx.device.drawText(String(x), screenX, screenY, '#ffff00');
+          ctx.device.drawText(String(x), screenX, screenY, '#ffffff');
         }
 
         const minY = bottom < top ? bottom : top;
@@ -378,10 +378,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         const stopY = Math.ceil(maxY / sizeY) * sizeY;
         for (let y = startY; y < stopY; y += sizeY) {
           const v = Vector3.add(origin, Vector3.scale(upAxis, y));
-          const ndc = vpMatrix.transformPointH(v /*new Vector3(left, y, 0)*/);
+          const ndc = vpMatrix.transformPointP(v /*new Vector3(left, y, 0)*/);
           const screenX = 2;
           const screenY = (0.5 - ndc.y * 0.5) * ctx.renderHeight + 2;
-          ctx.device.drawText(String(y), screenX, screenY, '#ffff00');
+          ctx.device.drawText(String(y), screenX, screenY, '#ffffff');
         }
       }
     }
@@ -604,7 +604,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     getDevice().canvas.style.cursor = 'grab';
     const center = new Vector3();
     this._node!.worldMatrix.decompose(null, null, center);
-    this._camera.viewProjectionMatrix.transformPointH(center, center);
+    this._camera.viewProjectionMatrix.transformPointP(center, center);
     const vpWidth = this._camera.viewport ? this._camera.viewport[2] : getDevice().getViewport().width;
     const vpHeight = this._camera.viewport ? this._camera.viewport[3] : getDevice().getViewport().height;
     const centerX = vpWidth * (center.x * 0.5 + 0.5);

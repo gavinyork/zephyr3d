@@ -59,7 +59,7 @@ import { DlgCurveEditor } from './dlg/curveeditordlg';
 import { BottomView } from '../components/bottomview';
 import { ProjectService } from '../core/services/project';
 import type { SceneController } from '../controllers/scenecontroller';
-import { EditorCameraController } from '../helpers/editocontroller';
+import { EditorCameraController } from '../helpers/editorcontroller';
 import { ensureDependencies } from '../core/build/dep';
 import { SceneHierarchy } from '../components/scenehierarchy';
 import { DockPannel, ResizeDirection } from '../components/dockpanel';
