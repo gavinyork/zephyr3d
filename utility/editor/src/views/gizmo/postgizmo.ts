@@ -152,7 +152,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._rotateInfo = null;
     this._scaleInfo = null;
     this._hitInfo = null;
-    this._screenSize = 0.6;
+    this._screenSize = 0.4;
     this._gridParams = new Vector4(10000, 500, 0, 0);
     this._gridSteps = new Float32Array([
       1, 1, 0, 0, 10, 10, 0, 0, 100, 100, 0, 0, 1000, 1000, 0, 0, 1000, 1000, 0, 0, 1000, 1000, 0, 0, 1000,
@@ -907,16 +907,16 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             matrix.scaling(new Vector3(scale, scale, scale)).translateLeft(tmpVecT);
           } else {
             const projMatrix = this._camera.getProjectionMatrix();
-            const scaleY =
-              (this._screenSize * Math.abs(projMatrix.getBottomPlane() - projMatrix.getTopPlane())) /
-              (2 * this._axisLength);
+            const projWidth = Math.abs(projMatrix.getRightPlane() - projMatrix.getLeftPlane());
+            const projHeight = Math.abs(projMatrix.getBottomPlane() - projMatrix.getTopPlane());
+            const scaleY = (this._screenSize * projHeight) / (2 * this._axisLength);
             const vpWidth = this._camera.viewport
               ? this._camera.viewport[2]
               : getDevice().getDrawingBufferWidth();
             const vpHeight = this._camera.viewport
               ? this._camera.viewport[3]
               : getDevice().getDrawingBufferHeight();
-            const scaleX = scaleY * (vpHeight / vpWidth);
+            const scaleX = scaleY * (vpHeight / vpWidth) * (projWidth / projHeight);
             matrix.scaling(new Vector3(scaleX, scaleY, scaleY)).translateLeft(tmpVecT);
           }
         }

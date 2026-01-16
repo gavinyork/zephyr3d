@@ -855,7 +855,7 @@ export class Camera extends SceneNode {
     const height = this.viewport ? this.viewport[3] : getDevice().getViewport().height;
     const ndcX = (2 * x) / width - 1;
     const ndcY = 1 - (2 * y) / height;
-    const nearClip = new Vector4(ndcX, ndcY, 0, 1);
+    const nearClip = new Vector4(ndcX, ndcY, -1, 1);
     const farClip = new Vector4(ndcX, ndcY, 1, 1);
     const nearWorld = this.invViewProjectionMatrix.transform(nearClip);
     const farWorld = this.invViewProjectionMatrix.transform(farClip);
