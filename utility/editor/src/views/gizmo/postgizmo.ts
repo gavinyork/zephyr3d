@@ -6,7 +6,8 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import type { Camera, DrawContext, PickResult, Primitive, SceneNode } from '@zephyr3d/scene';
+import type { Camera, DrawContext, PickResult, SceneNode } from '@zephyr3d/scene';
+import { Primitive } from '@zephyr3d/scene';
 import { BoxShape, getDevice, Mesh, UnlitMaterial } from '@zephyr3d/scene';
 import { AbstractPostEffect, CopyBlitter, fetchSampler, PlaneShape } from '@zephyr3d/scene';
 import {
@@ -97,6 +98,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   static _gridRenderState: Nullable<RenderStateSet> = null;
   static _blendRenderState: Nullable<RenderStateSet> = null;
   static _gridPrimitive: Nullable<Primitive> = null;
+  static _gridPrimitiveOrtho: Nullable<Primitive> = null;
   static _bindGroup: Nullable<BindGroup> = null;
   static _gridBindGroup: Nullable<BindGroup> = null;
   static _rotation: Nullable<Primitive> = null;
@@ -321,6 +323,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       this._gridParams.z = ctx.camera.isPerspective() ? 1 : 0;
       ctx.device.setRenderStates(PostGizmoRenderer._gridRenderState);
       PostGizmoRenderer._gridBindGroup!.setValue('viewMatrixInv', ctx.camera.worldMatrix);
+      PostGizmoRenderer._gridBindGroup!.setValue('viewMatrix', ctx.camera.viewMatrix);
+      PostGizmoRenderer._gridBindGroup!.setValue('invViewProjMatrix', ctx.camera.invViewProjectionMatrix);
       PostGizmoRenderer._gridBindGroup!.setValue('projMatrix', ctx.camera.getProjectionMatrix());
       PostGizmoRenderer._gridBindGroup!.setValue('cameraPos', ctx.camera.getWorldPosition());
       PostGizmoRenderer._gridBindGroup!.setValue('params', this._gridParams);
@@ -336,7 +340,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       PostGizmoRenderer._gridBindGroup!.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
       ctx.device.setProgram(PostGizmoRenderer._gridProgram);
       ctx.device.setBindGroup(0, PostGizmoRenderer._gridBindGroup!);
-      PostGizmoRenderer._gridPrimitive!.draw();
+      const gridPrimitive = ctx.camera.isOrtho()
+        ? PostGizmoRenderer._gridPrimitiveOrtho!
+        : PostGizmoRenderer._gridPrimitive!;
+      gridPrimitive.draw();
       if (ctx.camera.isOrtho()) {
         const projMatrix = ctx.camera.getProjectionMatrix();
         const vpMatrix = ctx.camera.viewProjectionMatrix;
@@ -926,7 +933,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   }
   private _createGridRenderStates() {
     const rs = getDevice().createRenderStateSet();
-    rs.useDepthState().enableTest(true).enableWrite(false);
+    rs.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('le');
     return rs;
   }
   private _createBlendRenderStates() {
@@ -1017,7 +1024,9 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this.params = pb.vec4().uniform(0);
         this.cameraPos = pb.vec3().uniform(0);
         this.viewMatrixInv = pb.mat4().uniform(0);
+        this.viewMatrix = pb.mat4().uniform(0);
         this.viewProjMatrix = pb.mat4().uniform(0);
+        this.invViewProjMatrix = pb.mat4().uniform(0);
         this.projMatrix = pb.mat4().uniform(0);
         this.flip = pb.float().uniform(0);
         pb.main(function () {
@@ -1029,31 +1038,42 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             );
             this.$outputs.worldPos = this.worldPos;
           }).$else(function () {
-            this.$l.planeNormal = this.viewMatrixInv[2].xyz;
-            this.$l.planeD = pb.neg(pb.dot(this.cameraPos, this.planeNormal));
-            this.$l.origin = pb.sub(pb.vec3(0), pb.mul(this.planeNormal, this.planeD));
-            this.$l.right = this.viewMatrixInv[0].xyz;
-            this.$l.up = this.viewMatrixInv[1].xyz;
+            this.$l.vertexId = this.$inputs.pos.x;
+            this.$l.origin = pb.mul(this.invViewProjMatrix, pb.vec4(0, 0, 1, 1));
+            this.$l.forward = pb.vec3(this.viewMatrix[0].z, this.viewMatrix[1].z, this.viewMatrix[2].z);
+            this.$l.axis = this.$choice(
+              pb.lessThan(pb.abs(this.forward.y), 0.999),
+              pb.vec3(0, 1, 0),
+              pb.vec3(1, 0, 0)
+            );
+            this.$l.right = pb.normalize(pb.cross(this.axis, this.forward));
+            this.$l.up = pb.normalize(pb.cross(this.forward, this.right));
             this.$l.viewSize = pb.max(
               pb.abs(pb.div(2, this.projMatrix[0].x)),
               pb.abs(pb.div(2, this.projMatrix[1].y))
             );
-            this.$l.scaleFactor = pb.max(this.params.x, pb.add(this.viewSize, pb.length(this.cameraPos)));
-            this.$l.scale = pb.mul(this.$inputs.pos.xz, this.scaleFactor /*this.params.x*/);
-            this.$outputs.worldPos = pb.vec3(this.scale, 0);
+            this.$l.v = pb.vec2();
+            this.$if(pb.equal(this.vertexId, 0), function () {
+              this.v = pb.vec2(-0.5, -0.5);
+            })
+              .$elseif(pb.equal(this.vertexId, 1), function () {
+                this.v = pb.vec2(0.5, -0.5);
+              })
+              .$elseif(pb.equal(this.vertexId, 2), function () {
+                this.v = pb.vec2(-0.5, 0.5);
+              })
+              .$else(function () {
+                this.v = pb.vec2(0.5, 0.5);
+              });
+            this.v = pb.mul(this.v, this.viewSize);
             this.worldPos = pb.add(
-              this.origin,
-              pb.mul(this.right, this.scale.x),
-              pb.mul(this.up, this.scale.y)
+              pb.div(this.origin.xyz, this.origin.w),
+              pb.mul(this.right, this.v.x),
+              pb.mul(this.up, this.v.y)
             );
+            this.$outputs.worldPos = this.worldPos;
           });
-          /*
-          this.$outputs.worldPos = pb.add(
-            pb.vec3(this.cameraPos.x, 0, this.cameraPos.y),
-            pb.mul(this.$inputs.pos, pb.vec3(this.params.x, 1, this.params.x))
-          );
-          */
-          this.$builtins.position = pb.mul(this.viewProjMatrix, pb.vec4(this.worldPos, 1));
+          this.$builtins.position = pb.mul(this.viewProjMatrix, pb.vec4(this.$outputs.worldPos, 1));
           this.$builtins.position = pb.mul(this.$builtins.position, pb.vec4(1, this.flip, 1, 1));
         });
       },
@@ -1167,9 +1187,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
                 pb.sub(1, pb.smoothStep(0, this.distance, pb.sub(this.dist, this.distance)))
               );
             }).$else(function () {
-              this.dist = pb.sub(pb.mul(this.$builtins.fragCoord.z, 2), 1);
-              this.dist = pb.clamp(this.dist, 0, 1);
-              this.fade = pb.sub(1, pb.smoothStep(0, 0.5, pb.sub(this.dist, 0.5)));
+              this.fade = 1;
               this.dist = 1;
             });
             this.$l.gridRes = pb.mul(
@@ -1399,6 +1417,15 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       PostGizmoRenderer._gridBindGroup = getDevice().createBindGroup(
         PostGizmoRenderer._gridProgram.bindGroupLayouts[0]
       );
+    }
+    if (!PostGizmoRenderer._gridPrimitiveOrtho) {
+      PostGizmoRenderer._gridPrimitiveOrtho = new Primitive();
+      PostGizmoRenderer._gridPrimitiveOrtho.createAndSetVertexBuffer(
+        'position_f32x3',
+        new Float32Array([0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3])
+      );
+      PostGizmoRenderer._gridPrimitiveOrtho.createAndSetIndexBuffer(new Uint16Array([0, 1, 2, 3]));
+      PostGizmoRenderer._gridPrimitiveOrtho.primitiveType = 'triangle-strip';
     }
     if (!PostGizmoRenderer._gizmoSelectProgram) {
       PostGizmoRenderer._gizmoSelectProgram = this._createAxisProgram(true);
