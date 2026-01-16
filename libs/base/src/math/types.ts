@@ -37,10 +37,16 @@ export enum ClipState {
  * @public
  */
 export enum CubeFace {
+  /** Positive X Axis */
   PX = 0,
+  /** Negative X Axis */
   NX = 1,
+  /** Positive Y Axis */
   PY = 2,
+  /** Negative Y Axis */
   NY = 3,
+  /** Positive Z Axis */
   PZ = 4,
+  /** Negative Z Axis */
   NZ = 5
 }

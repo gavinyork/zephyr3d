@@ -18,6 +18,7 @@ import {
   axisList
 } from './gizmo';
 import type { Nullable, Ray } from '@zephyr3d/base';
+import { CubeFace } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { AABB, makeObservable } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
@@ -106,7 +107,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   static _texSize: Vector2 = new Vector2();
   static _cameraNearFar: Vector2 = new Vector2();
   static _axises = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)];
-  static _primitives: Nullable<Partial<Record<GizmoMode, Primitive>>> = null;
+  static _primitives: Nullable<Partial<Record<GizmoMode, Primitive[]>>> = null;
   private _snapping: number;
   private _allowTranslate: boolean;
   private _allowRotate: boolean;
@@ -115,6 +116,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _gridSteps: Float32Array<ArrayBuffer>;
   private readonly _gridParams: Vector4;
   private _camera: Camera;
+  private _orthoDirection: Nullable<CubeFace>;
+  private _orthoAxis: number;
   private _node: Nullable<SceneNode>;
   private _mode: GizmoMode;
   private readonly _axisLength: number;
@@ -136,6 +139,15 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   constructor(camera: Camera, binding = null, size = 15) {
     super();
     this._camera = camera;
+    this._orthoDirection = this.determinOrthoDirection(camera);
+    this._orthoAxis =
+      this._orthoDirection === null
+        ? -1
+        : this._orthoDirection === CubeFace.PX || this._orthoDirection === CubeFace.NX
+          ? 0
+          : this._orthoDirection === CubeFace.PY || this._orthoDirection === CubeFace.NY
+            ? 1
+            : 2;
     this._node = binding;
     this._snapping = 0;
     this._allowRotate = true;
@@ -234,6 +246,15 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   }
   set camera(camera: Camera) {
     this._camera = camera;
+    this._orthoDirection = this.determinOrthoDirection(camera);
+    this._orthoAxis =
+      this._orthoDirection === null
+        ? -1
+        : this._orthoDirection === CubeFace.PX || this._orthoDirection === CubeFace.NX
+          ? 0
+          : this._orthoDirection === CubeFace.PY || this._orthoDirection === CubeFace.NY
+            ? 1
+            : 2;
   }
   get drawGrid(): boolean {
     return this._drawGrid;
@@ -372,7 +393,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           const ndc = vpMatrix.transformPointP(v /*new Vector3(x, top, 0)*/);
           const screenX = (ndc.x * 0.5 + 0.5) * ctx.renderWidth + 2;
           const screenY = 2;
-          ctx.device.drawText(String(x), screenX, screenY, '#ffffff');
+          ctx.device.drawText(String(x), screenX, screenY, '#ffa0a0');
         }
 
         const minY = bottom < top ? bottom : top;
@@ -388,7 +409,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           const ndc = vpMatrix.transformPointP(v /*new Vector3(left, y, 0)*/);
           const screenX = 2;
           const screenY = (0.5 - ndc.y * 0.5) * ctx.renderHeight + 2;
-          ctx.device.drawText(String(y), screenX, screenY, '#ffffff');
+          ctx.device.drawText(String(y), screenX, screenY, '#a0a0ff');
         }
       }
     }
@@ -433,13 +454,16 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       if (this._mode === 'select') {
         ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
       }
-      PostGizmoRenderer._primitives![this._mode]!.draw();
+      (this._mode === 'select' || this._orthoDirection === null
+        ? PostGizmoRenderer._primitives![this._mode][0]!
+        : PostGizmoRenderer._primitives![this._mode][this._orthoDirection + 1]!
+      ).draw();
       if (this._alwaysDrawIndicator && this._mode !== 'select') {
         this._calcGizmoMVPMatrix('select', false, PostGizmoRenderer._mvpMatrix);
         PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
         ctx.device.setProgram(PostGizmoRenderer._gizmoSelectProgram);
         ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
-        PostGizmoRenderer._primitives!.select!.draw();
+        PostGizmoRenderer._primitives!.select[0]!.draw();
       }
     }
     PostGizmoRenderer._blendBlitter.renderStates = PostGizmoRenderer._blendRenderState;
@@ -538,7 +562,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         pointWorld: null,
         pointLocal: null
       };
-      const d = rayLocal.bboxIntersectionTestEx(this._scaleBox);
+      const d =
+        this._orthoAxis < 0 || this._mode === 'scaling'
+          ? rayLocal.bboxIntersectionTestEx(this._scaleBox)
+          : null;
       if (d !== null && d > 0) {
         hitInfo.type = this._mode === 'scaling' ? 'scale_uniform' : 'move_free';
         hitInfo.distance = d;
@@ -583,15 +610,17 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             axis = i;
           }
         }
-        const pointLocal = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, t));
-        return {
-          axis,
-          type: axis >= 0 ? 'rotate_axis' : 'rotate_free',
-          coord: t,
-          distance: t,
-          pointLocal,
-          pointWorld: worldMatrix.transformPointAffine(pointLocal)
-        };
+        if (this._orthoAxis < 0 || axis === this._orthoAxis) {
+          const pointLocal = Vector3.add(rayLocal.origin, Vector3.scale(rayLocal.direction, t));
+          return {
+            axis,
+            type: axis >= 0 ? 'rotate_axis' : 'rotate_free',
+            coord: t,
+            distance: t,
+            pointLocal,
+            pointWorld: worldMatrix.transformPointAffine(pointLocal)
+          };
+        }
       }
     }
     return null;
@@ -1404,6 +1433,25 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       node.position.set(pos);
     }
   }
+  private determinOrthoDirection(camera: Camera): Nullable<CubeFace> {
+    if (!camera.isOrtho()) {
+      return null;
+    }
+    const viewMatrix = camera.viewMatrix;
+    const forwardX = viewMatrix[2];
+    const forwardY = viewMatrix[6];
+    const forwardZ = viewMatrix[10];
+    if (forwardX === 0 && forwardY === 0) {
+      return forwardZ > 0 ? CubeFace.PZ : CubeFace.NZ;
+    }
+    if (forwardX === 0 && forwardZ === 0) {
+      return forwardY > 0 ? CubeFace.PY : CubeFace.NY;
+    }
+    if (forwardY === 0 && forwardZ === 0) {
+      return forwardX > 0 ? CubeFace.PX : CubeFace.NX;
+    }
+    return null;
+  }
   private prepare() {
     if (!PostGizmoRenderer._gridPrimitive) {
       PostGizmoRenderer._gridPrimitive = new PlaneShape({
@@ -1440,16 +1488,39 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
     if (!PostGizmoRenderer._primitives) {
       PostGizmoRenderer._primitives = {
-        translation: createTranslationGizmo(
-          this._axisLength,
-          this._axisRadius,
-          this._arrowLength,
-          this._arrowRadius,
-          this._boxSize
-        ),
-        rotation: createRotationGizmo(this._axisLength, this._axisRadius),
-        scaling: createScaleGizmo(this._axisLength, this._axisRadius, this._boxSize),
-        select: createSelectGizmo()
+        translation: [
+          createTranslationGizmo(
+            this._axisLength,
+            this._axisRadius,
+            this._arrowLength,
+            this._arrowRadius,
+            this._boxSize,
+            null
+          ),
+          ...[CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ].map((direction) =>
+            createTranslationGizmo(
+              this._axisLength,
+              this._axisRadius,
+              this._arrowLength,
+              this._arrowRadius,
+              this._boxSize,
+              direction
+            )
+          )
+        ],
+        rotation: [
+          createRotationGizmo(this._axisLength, this._axisRadius, null),
+          ...[CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ].map((direction) =>
+            createRotationGizmo(this._axisLength, this._axisRadius, direction)
+          )
+        ],
+        scaling: [
+          createScaleGizmo(this._axisLength, this._axisRadius, this._boxSize, null),
+          ...[CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ].map((direction) =>
+            createScaleGizmo(this._axisLength, this._axisRadius, this._boxSize, direction)
+          )
+        ],
+        select: [createSelectGizmo()]
       };
     }
   }
