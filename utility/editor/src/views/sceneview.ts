@@ -29,7 +29,7 @@ import { DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
-import type { AABB, CubeFace, GenericConstructor, Nullable } from '@zephyr3d/base';
+import type { AABB, GenericConstructor, Nullable } from '@zephyr3d/base';
 import { DRef, HttpFS } from '@zephyr3d/base';
 import { ASSERT, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
@@ -635,14 +635,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         viewportWidth,
         viewportHeight
       ];
-      /*
-      const transform = getEngine().screen.calculateResolutionTransform(
-        this._leftDockPanel.width,
-        this._statusbar.height + this._assetView.panel.height,
-        viewportWidth,
-        viewportHeight
-      );
-      */
       camera.viewport = camera.screenViewport;
       camera.scissor = camera.screenViewport;
       camera!.render(this.controller.model.scene);
