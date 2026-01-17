@@ -1,4 +1,5 @@
-import { CubeFace, Nullable } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
+import { CubeFace } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type {
   BoxCreationOptions,
@@ -190,6 +191,41 @@ export function createScaleGizmo(
 
   return primitive;
 }
+/**
+ * Creates a primitive that presents the scale-with-handles gizmo
+ * @param boxRadius - Half size of the boxes
+ * @returns The created primitive
+ *
+ * @public
+ */
+export function createScaleWithHandleGizmo(boxRadius: number): Primitive {
+  const boxOptions: BoxCreationOptions = {
+    size: boxRadius * 2
+  };
+  const vertices: number[] = [];
+  const diffuse: number[] = [];
+  const axies: number[] = [];
+  const rgb: number[] = [255, 255, 255, 255];
+
+  const indices: number[] = [];
+  const bbox = new BoundingBox();
+  bbox.beginExtend();
+  BoxShape.generateData(boxOptions, vertices, null, null, null, indices, bbox, vertices.length / 3, () => {
+    diffuse.push(...rgb);
+    axies.push(0);
+  });
+  const primitive = new Primitive();
+  primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
+  primitive.createAndSetVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
+  primitive.createAndSetVertexBuffer('tex0_f32', new Float32Array(axies));
+  primitive.createAndSetIndexBuffer(new Uint16Array(indices));
+  primitive.primitiveType = 'triangle-list';
+  primitive.indexCount = indices.length;
+  primitive.setBoundingVolume(bbox);
+
+  return primitive;
+}
+
 /**
  * Creates a primitive that presents the rotation gizmo
  * @param outerRadius - The outer radius

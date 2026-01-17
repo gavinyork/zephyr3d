@@ -15,14 +15,15 @@ import {
   createRotationGizmo,
   createScaleGizmo,
   createSelectGizmo,
-  axisList
+  axisList,
+  createScaleWithHandleGizmo
 } from './gizmo';
 import type { Nullable, Ray } from '@zephyr3d/base';
 import { CubeFace } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { AABB, makeObservable } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
-import { calcHierarchyBoundingBox } from '../../helpers/misc';
+import { calcHierarchyBoundingBoxWorld } from '../../helpers/misc';
 
 const tmpVecT = new Vector3();
 const tmpVecS = new Vector3();
@@ -40,7 +41,7 @@ export type HitType =
   | 'rotate_free'
   | 'scale_axis'
   | 'scale_uniform';
-export type GizmoMode = 'none' | 'translation' | 'rotation' | 'scaling' | 'select';
+export type GizmoMode = 'none' | 'translation' | 'rotation' | 'scaling' | 'scaling-with-handles' | 'select';
 export type GizmoHitInfo = {
   axis: number;
   type?: Nullable<HitType>;
@@ -454,10 +455,13 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       if (this._mode === 'select') {
         ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
       }
-      (this._mode === 'select' || this._orthoDirection === null
-        ? PostGizmoRenderer._primitives![this._mode][0]!
-        : PostGizmoRenderer._primitives![this._mode][this._orthoDirection + 1]!
-      ).draw();
+      if (this._mode === 'scaling-with-handles') {
+      } else {
+        (this._mode === 'select' || this._orthoDirection === null
+          ? PostGizmoRenderer._primitives![this._mode][0]!
+          : PostGizmoRenderer._primitives![this._mode][this._orthoDirection + 1]!
+        ).draw();
+      }
       if (this._alwaysDrawIndicator && this._mode !== 'select') {
         this._calcGizmoMVPMatrix('select', false, PostGizmoRenderer._mvpMatrix);
         PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
@@ -923,7 +927,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     matrix = matrix ?? new Matrix4x4();
     if (this._node) {
       if (mode === 'select') {
-        calcHierarchyBoundingBox(this._node, this._nodeBox);
+        calcHierarchyBoundingBoxWorld(this._node, this._nodeBox);
         const scale = Vector3.sub(this._nodeBox.maxPoint, this._nodeBox.minPoint);
         matrix.scaling(scale).translateLeft(this._nodeBox.minPoint);
       } else {
@@ -1520,6 +1524,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             createScaleGizmo(this._axisLength, this._axisRadius, this._boxSize, direction)
           )
         ],
+        'scaling-with-handles': [createScaleWithHandleGizmo(this._boxSize)],
         select: [createSelectGizmo()]
       };
     }

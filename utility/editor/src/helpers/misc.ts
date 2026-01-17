@@ -1,7 +1,7 @@
 import { AABB } from '@zephyr3d/base';
 import type { SceneNode } from '@zephyr3d/scene';
 
-export function calcHierarchyBoundingBox(node: SceneNode, bboxOut?: AABB): AABB {
+export function calcHierarchyBoundingBoxWorld(node: SceneNode, bboxOut?: AABB): AABB {
   bboxOut = bboxOut ?? new AABB();
   bboxOut.beginExtend();
   node.iterate((child) => {

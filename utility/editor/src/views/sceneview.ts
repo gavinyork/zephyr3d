@@ -52,7 +52,7 @@ import {
 import { NodeProxy } from '../helpers/proxy';
 import type { EditTool } from './edittools/edittool';
 import { createEditTool, isObjectEditable } from './edittools/edittool';
-import { calcHierarchyBoundingBox } from '../helpers/misc';
+import { calcHierarchyBoundingBoxWorld } from '../helpers/misc';
 import { DialogRenderer } from '../components/modal';
 import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
@@ -388,6 +388,15 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           },
           action: () => {
             this._postGizmoRenderer!.mode = 'scaling';
+          }
+        },
+        {
+          label: FontGlyph.glyphs['th-thumb-empty'],
+          selected: () => {
+            return this._postGizmoRenderer!.mode === 'scaling-with-handles';
+          },
+          action: () => {
+            this._postGizmoRenderer!.mode = 'scaling-with-handles';
           }
         },
         {
@@ -888,7 +897,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (camera === node) {
       return;
     }
-    const aabb = calcHierarchyBoundingBox(node);
+    const aabb = calcHierarchyBoundingBoxWorld(node);
     const nodePos = aabb.center;
     const radius = aabb.diagonalLength * 0.5;
     const distance = Math.max(radius / camera.getTanHalfFovy(), camera.getNearPlane() + 1);
