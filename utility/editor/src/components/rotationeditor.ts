@@ -26,6 +26,10 @@ export class RotationEditor {
   private static readonly _arrowRadius = 1;
   private static readonly _sphereRaidus = 8;
   private static _canvasSize: ImGui.ImVec2 = null;
+  private static _enabled = true;
+  static enable(b: boolean) {
+    this._enabled = b;
+  }
   static reset(rotation: Quaternion, canvasSize: ImGui.ImVec2) {
     this._rotation.set(rotation);
     this._canvasSize = new ImGui.ImVec2(canvasSize.x, canvasSize.y);
@@ -86,7 +90,7 @@ export class RotationEditor {
       new ImGui.ImVec2(cursorPos.x, cursorPos.y + this._canvasSize.y),
       new ImGui.ImVec2(cursorPos.x + this._canvasSize.x, cursorPos.y)
     );
-    if (ImGui.IsItemActive()) {
+    if (ImGui.IsItemActive() && this._enabled) {
       const mousePos = ImGui.GetMousePos();
       if (!this._isDragging) {
         this._isDragging = true;

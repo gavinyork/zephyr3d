@@ -2,6 +2,7 @@ import { ImGui } from '@zephyr3d/imgui';
 import type { PropertyType } from '@zephyr3d/scene';
 import {
   AnimationClip,
+  Camera,
   getEngine,
   PropertyTrack,
   SceneNode,
@@ -811,7 +812,9 @@ export class PropertyEditor extends Observable<{
         }
         case 'vec3': {
           const val = tmpProperty.num as [number, number, number];
-          if (value.options?.edit === 'quaternion') {
+          const isOrthoCamera = object instanceof Camera && object.isOrtho();
+          const editRotation = !isOrthoCamera && value.options?.edit === 'quaternion';
+          if (editRotation) {
             ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
           }
@@ -821,10 +824,11 @@ export class PropertyEditor extends Observable<{
             undefined,
             readonly ? ImGui.InputTextFlags.ReadOnly : undefined
           );
-          if (value.options?.edit === 'quaternion') {
+          if (editRotation) {
             ImGui.SameLine(0, 0);
             if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
               ImGui.OpenPopup('EditQuaternion');
+              RotationEditor.enable(!(object instanceof Camera) || !object.isOrtho());
               RotationEditor.reset(
                 Quaternion.fromEulerAngle(
                   degree2radian(val[0]),

@@ -120,6 +120,9 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           isPersistent(this: SceneNode) {
             return this.jointTypeS !== 'animated';
           },
+          isHidden(this: SceneNode) {
+            return this.isCamera();
+          },
           get(this: SceneNode, value) {
             value.num[0] = this.scale.x;
             value.num[1] = this.scale.y;
@@ -138,6 +141,9 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           },
           isPersistent() {
             return false;
+          },
+          isHidden(this: SceneNode) {
+            return this.isCamera() && this.isOrtho();
           },
           get(this: SceneNode, value) {
             const zyx = this.rotation.toEulerAngles();
