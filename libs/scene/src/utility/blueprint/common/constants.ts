@@ -67,10 +67,14 @@ export class ConstantScalarNode extends BaseGraphNode {
             name: 'paramName',
             type: 'string',
             get(this: ConstantScalarNode, value) {
-              value.str[0] = this.paramName;
+              value.str[0] = this.paramName ? this.paramName.slice(2) : '';
             },
             set(this: ConstantScalarNode, value) {
-              this.paramName = value.str[0];
+              if (!/^[A-Za-z0-9_]+$/.test(value.str[0])) {
+                console.log(`Invalid parameter name: ${value.str[0]}`);
+              } else {
+                this.paramName = `u_${value.str[0]}`;
+              }
             }
           },
           {
@@ -108,7 +112,7 @@ export class ConstantScalarNode extends BaseGraphNode {
     return this._paramName;
   }
   set paramName(val: string) {
-    if (val !== this.paramName) {
+    if (this._paramName !== val) {
       this._paramName = val;
       this.dispatchEvent('changed');
     }
@@ -302,11 +306,12 @@ export class ConstantVec2Node extends BaseGraphNode {
     return this._paramName;
   }
   set paramName(val: string) {
-    if (val !== this._paramName) {
+    if (this._paramName !== val) {
       this._paramName = val;
       this.dispatchEvent('changed');
     }
   }
+
   /**
    * Gets the x component of the vector
    */
@@ -359,10 +364,14 @@ export class ConstantVec2Node extends BaseGraphNode {
             name: 'paramName',
             type: 'string',
             get(this: ConstantVec2Node, value) {
-              value.str[0] = this.paramName;
+              value.str[0] = this.paramName ? this.paramName.slice(2) : '';
             },
             set(this: ConstantVec2Node, value) {
-              this.paramName = value.str[0];
+              if (!/^[A-Za-z0-9_]+$/.test(value.str[0])) {
+                console.log(`Invalid parameter name: ${value.str[0]}`);
+              } else {
+                this.paramName = `u_${value.str[0]}`;
+              }
             }
           },
           {
@@ -597,11 +606,12 @@ export class ConstantVec3Node extends BaseGraphNode {
     return this._paramName;
   }
   set paramName(val: string) {
-    if (val !== this._paramName) {
+    if (this._paramName !== val) {
       this._paramName = val;
       this.dispatchEvent('changed');
     }
   }
+
   /**
    * Gets the x component of the vector
    */
@@ -667,10 +677,14 @@ export class ConstantVec3Node extends BaseGraphNode {
             name: 'paramName',
             type: 'string',
             get(this: ConstantVec3Node, value) {
-              value.str[0] = this.paramName;
+              value.str[0] = this.paramName ? this.paramName.slice(2) : '';
             },
             set(this: ConstantVec3Node, value) {
-              this.paramName = value.str[0];
+              if (!/^[A-Za-z0-9_]+$/.test(value.str[0])) {
+                console.log(`Invalid parameter name: ${value.str[0]}`);
+              } else {
+                this.paramName = `u_${value.str[0]}`;
+              }
             }
           },
           {
@@ -954,11 +968,12 @@ export class ConstantVec4Node extends BaseGraphNode {
     return this._paramName;
   }
   set paramName(val: string) {
-    if (val !== this._paramName) {
+    if (this._paramName !== val) {
       this._paramName = val;
       this.dispatchEvent('changed');
     }
   }
+
   /**
    * Gets the x component of the vector
    */
@@ -1036,10 +1051,14 @@ export class ConstantVec4Node extends BaseGraphNode {
             name: 'paramName',
             type: 'string',
             get(this: ConstantVec4Node, value) {
-              value.str[0] = this.paramName;
+              value.str[0] = this.paramName ? this.paramName.slice(2) : '';
             },
             set(this: ConstantVec4Node, value) {
-              this.paramName = value.str[0];
+              if (!/^[A-Za-z0-9_]+$/.test(value.str[0])) {
+                console.log(`Invalid parameter name: ${value.str[0]}`);
+              } else {
+                this.paramName = `u_${value.str[0]}`;
+              }
             }
           },
           {

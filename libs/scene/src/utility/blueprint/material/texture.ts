@@ -121,10 +121,14 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
         return false;
       },
       get(this: BaseTextureNode, value) {
-        value.str[0] = this.paramName;
+        value.str[0] = this.paramName ? this.paramName.slice(2) : '';
       },
       set(this: BaseTextureNode, value) {
-        this.paramName = value.str[0];
+        if (!/^[A-Za-z0-9_]+$/.test(value.str[0])) {
+          console.log(`Invalid parameter name: ${value.str[0]}`);
+        } else {
+          this.paramName = `u_${value.str[0]}`;
+        }
       }
     },
     {
@@ -319,11 +323,12 @@ export abstract class BaseTextureNode extends BaseGraphNode {
     return this._paramName;
   }
   set paramName(val: string) {
-    if (val !== this._paramName) {
+    if (this._paramName !== val) {
       this._paramName = val;
       this.dispatchEvent('changed');
     }
   }
+
   /**
    * Indicates this node represents a shader uniform
    *
@@ -353,7 +358,7 @@ export abstract class BaseTextureNode extends BaseGraphNode {
    * and always have a valid texture (default if none assigned).
    */
   protected validate(): string {
-    return '';
+    return this.textureId ? '' : 'Texture not specified';
   }
   /**
    * Gets the output type
@@ -479,20 +484,12 @@ export class ConstantTexture2DNode extends BaseTextureNode {
     };
   }
   /**
-   * Validates the node state
-   *
-   * @returns Empty string (always valid)
-   */
-  protected validate(): string {
-    return '';
-  }
-  /**
    * Gets the output type
    *
    * @returns 'tex2D'
    */
   protected getType(): string {
-    return 'tex2D';
+    return this.validate() ? '' : 'tex2D';
   }
 }
 
@@ -594,20 +591,12 @@ export class ConstantTexture2DArrayNode extends BaseTextureNode {
     };
   }
   /**
-   * Validates the node state
-   *
-   * @returns Empty string (always valid)
-   */
-  protected validate(): string {
-    return '';
-  }
-  /**
    * Gets the output type
    *
    * @returns 'tex2DArray'
    */
   protected getType(): string {
-    return 'tex2DArray';
+    return this.validate() ? '' : 'tex2DArray';
   }
 }
 
@@ -722,20 +711,12 @@ export class ConstantTextureCubeNode extends BaseTextureNode {
     };
   }
   /**
-   * Validates the node state
-   *
-   * @returns Empty string (always valid)
-   */
-  protected validate(): string {
-    return '';
-  }
-  /**
    * Gets the output type
    *
    * @returns 'texCube'
    */
   protected getType(): string {
-    return 'texCube';
+    return this.validate() ? '' : 'texCube';
   }
 }
 
@@ -829,7 +810,32 @@ export class TextureSampleNode extends BaseGraphNode {
     this._outputs = [
       {
         id: 1,
-        name: ''
+        name: 'RGBA'
+      },
+      {
+        id: 2,
+        name: 'R',
+        swizzle: 'r'
+      },
+      {
+        id: 3,
+        name: 'G',
+        swizzle: 'g'
+      },
+      {
+        id: 4,
+        name: 'B',
+        swizzle: 'b'
+      },
+      {
+        id: 5,
+        name: 'A',
+        swizzle: 'a'
+      },
+      {
+        id: 6,
+        name: 'RGB',
+        swizzle: 'rgb'
       }
     ];
     this._inputs = [
@@ -927,11 +933,19 @@ export class TextureSampleNode extends BaseGraphNode {
   }
   /**
    * Gets the output type
-   *
-   * @returns 'vec4' (RGBA color)
    */
-  protected getType(): string {
-    return 'vec4';
+  protected getType(id: number) {
+    const err = this.validate();
+    if (err) {
+      return '';
+    }
+    if (id === 1) {
+      return 'vec4';
+    } else if (id === 6) {
+      return 'vec3';
+    } else {
+      return 'float';
+    }
   }
 }
 

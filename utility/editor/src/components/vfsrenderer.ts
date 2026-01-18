@@ -19,7 +19,7 @@ import { ListView, ListViewData } from './listview';
 import { ResourceService } from '../core/services/resource';
 import { DlgSaveFile } from '../views/dlg/savefiledlg';
 import type { MeshMaterial } from '@zephyr3d/scene';
-import { getEngine, PBRBluePrintMaterial, Sprite3DBlueprintMaterial } from '@zephyr3d/scene';
+import { getEngine, PBRBluePrintMaterial, SpriteBlueprintMaterial } from '@zephyr3d/scene';
 import { exportFile, exportMultipleFilesAsZip } from '../helpers/downloader';
 
 export type FileInfo = {
@@ -235,7 +235,7 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
               string
             >([
               [PBRBluePrintMaterial, 'PBR Material'],
-              [Sprite3DBlueprintMaterial, 'Sprite3D Material']
+              [SpriteBlueprintMaterial, 'Sprite Material']
             ]);
             for (const entry of materialTypes) {
               const title = entry[1];

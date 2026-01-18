@@ -8,7 +8,7 @@ import {
   PBRBluePrintMaterial,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
-  Sprite3DBlueprintMaterial,
+  SpriteBlueprintMaterial,
   UnlitMaterial
 } from '../../../material';
 import { defineProps, type PropertyAccessor, type SerializableClass } from '../types';
@@ -17,8 +17,8 @@ import { Vector3, Vector4 } from '@zephyr3d/base';
 import { getTextureProps } from './common';
 import type { ResourceManager } from '../manager';
 import { getMeshMaterialInstanceUniformsClass } from './common';
-import { Sprite3DMaterial } from '../../../material/sprite3d';
-import { StandardSprite3DMaterial } from '../../../material/sprite3d_std';
+import { SpriteMaterial } from '../../../material/sprite';
+import { StandardSpriteMaterial } from '../../../material/sprite_std';
 
 type PBRMaterial = PBRMetallicRoughnessMaterial | PBRSpecularGlossinessMaterial;
 type LitPropTypes = LambertMaterial | BlinnMaterial | PBRMaterial;
@@ -640,27 +640,27 @@ export function getMeshMaterialClass(): SerializableClass[] {
 }
 
 /** @internal */
-export function getSprite3DMaterialClass(_manager: ResourceManager): SerializableClass[] {
+export function getSpriteMaterialClass(_manager: ResourceManager): SerializableClass[] {
   return [
     {
-      ctor: Sprite3DMaterial,
-      name: 'Sprite3DMaterial',
+      ctor: SpriteMaterial,
+      name: 'SpriteMaterial',
       parent: MeshMaterial,
       getProps() {
         return [];
       }
     },
-    getMeshMaterialInstanceUniformsClass(Sprite3DMaterial)
+    getMeshMaterialInstanceUniformsClass(SpriteMaterial)
   ];
 }
 
 /** @internal */
-export function getStandardSprite3DMaterialClass(manager: ResourceManager): SerializableClass[] {
+export function getStandardSpriteMaterialClass(manager: ResourceManager): SerializableClass[] {
   return [
     {
-      ctor: StandardSprite3DMaterial,
-      name: 'StandardSprite3DMaterial',
-      parent: Sprite3DMaterial,
+      ctor: StandardSpriteMaterial,
+      name: 'StandardSpriteMaterial',
+      parent: SpriteMaterial,
       getProps() {
         return defineProps([
           {
@@ -711,7 +711,7 @@ export function getStandardSprite3DMaterialClass(manager: ResourceManager): Seri
         ]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(StandardSprite3DMaterial)
+    getMeshMaterialInstanceUniformsClass(StandardSpriteMaterial)
   ];
 }
 
@@ -840,17 +840,17 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
 }
 
 /** @internal */
-export function getSprite3DBlueprintMaterialClass(): SerializableClass[] {
+export function getSpriteBlueprintMaterialClass(): SerializableClass[] {
   return [
     {
-      ctor: Sprite3DBlueprintMaterial,
+      ctor: SpriteBlueprintMaterial,
       parent: MeshMaterial,
-      name: 'Sprite3DBlueprintMaterial',
+      name: 'SpriteBlueprintMaterial',
       getProps() {
         return [];
       }
     },
-    getMeshMaterialInstanceUniformsClass(Sprite3DBlueprintMaterial)
+    getMeshMaterialInstanceUniformsClass(SpriteBlueprintMaterial)
   ];
 }
 

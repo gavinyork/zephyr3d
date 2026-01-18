@@ -1,23 +1,23 @@
 import { DRef, Vector4 } from '@zephyr3d/base';
 import { type BluePrintUniformTexture, type BluePrintUniformValue } from '../utility/blueprint/material/ir';
-import { Sprite3DBlockNode } from '../utility/blueprint/material/pbr';
+import { SpriteBlockNode } from '../utility/blueprint/material/pbr';
 import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
-import { Sprite3DMaterial } from './sprite3d';
+import { SpriteMaterial } from './sprite';
 import type { BindGroup, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 
 /**
- * Sprite3D material driven by a blueprint graph.
+ * Sprite material driven by a blueprint graph.
  *
  * @remarks
- * This material extends {@link Sprite3DMaterial} and uses a
+ * This material extends {@link SpriteMaterial} and uses a
  * {@link MaterialBlueprintIR} fragment graph to compute the final
  * sprite color. All fragment shading logic is defined in the
  * blueprint instead of being hard-coded in the material.
  *
  * @public
  */
-export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
+export class SpriteBlueprintMaterial extends SpriteMaterial {
   /** @internal */
   private _irFrag: MaterialBlueprintIR;
   /** @internal */
@@ -25,10 +25,10 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
   /** @internal */
   private _uniformTextures: BluePrintUniformTexture[];
   /**
-   * Creates a new {@link Sprite3DBlueprintMaterial} instance.
+   * Creates a new {@link SpriteBlueprintMaterial} instance.
    *
    * @param irFrag - Optional fragment blueprint IR. If omitted, a default
-   *   IR containing a single {@link Sprite3DBlockNode} is created.
+   *   IR containing a single {@link SpriteBlockNode} is created.
    * @param uniformValues - Optional initial list of uniform value descriptors.
    * @param uniformTextures - Optional initial list of texture uniform descriptors.
    */
@@ -42,14 +42,14 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
       irFrag ??
       new MaterialBlueprintIR(
         {
-          nodeMap: { '1': new Sprite3DBlockNode() },
+          nodeMap: { '1': new SpriteBlockNode() },
           roots: [1],
           order: [1],
           graph: { incoming: {}, outgoing: {} }
         },
         '',
         {
-          nodes: [{ id: 1, title: '', locked: true, node: { ClassName: 'Sprite3DBlockNode', Object: '' } }],
+          nodes: [{ id: 1, title: '', locked: true, node: { ClassName: 'SpriteBlockNode', Object: '' } }],
           links: []
         }
       );
@@ -116,13 +116,13 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
    *
    * @remarks
    * The clone shares the same fragment IR reference and copies the
-   * current uniform descriptors, then calls {@link Sprite3DMaterial.copyFrom}
+   * current uniform descriptors, then calls {@link SpriteMaterial.copyFrom}
    * to copy base-class state.
    *
-   * @returns A new {@link Sprite3DBlueprintMaterial} instance.
+   * @returns A new {@link SpriteBlueprintMaterial} instance.
    */
   clone() {
-    const other = new Sprite3DBlueprintMaterial(this._irFrag, this._uniformValues, this._uniformTextures);
+    const other = new SpriteBlueprintMaterial(this._irFrag, this._uniformValues, this._uniformTextures);
     other.copyFrom(this);
     return other;
   }
@@ -179,7 +179,7 @@ export class Sprite3DBlueprintMaterial extends Sprite3DMaterial {
    * Creates a unique hash string used for program caching.
    *
    * @remarks
-   * The hash includes the base {@link Sprite3DMaterial} hash and the
+   * The hash includes the base {@link SpriteMaterial} hash and the
    * fragment IR hash, so that different blueprints will produce
    * different shader programs.
    *

@@ -22,7 +22,7 @@ import {
   OrthoCamera,
   getDevice,
   getEngine,
-  Sprite3D
+  Sprite
 } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { DirectionalLight } from '@zephyr3d/scene';
@@ -302,8 +302,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               ]
             },
             {
-              label: 'Sprite3D',
-              action: () => this.handleAddNode(Sprite3D, 'Add Sprite3D')
+              label: 'Sprite',
+              action: () => this.handleAddNode(Sprite, 'Add Sprite')
             },
             {
               label: 'Particle System',

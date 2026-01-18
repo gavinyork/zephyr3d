@@ -114,14 +114,14 @@ export class PBRBlockNode extends BaseGraphNode {
         id: 2,
         name: 'Metallic',
         type: ['float'],
-        defaultValue: 1,
+        defaultValue: [1],
         originType: 'float'
       },
       {
         id: 3,
         name: 'Roughness',
         type: ['float'],
-        defaultValue: 1,
+        defaultValue: [1],
         originType: 'float'
       },
       {
@@ -154,7 +154,7 @@ export class PBRBlockNode extends BaseGraphNode {
         id: 8,
         name: 'Opacity',
         type: ['float'],
-        defaultValue: 1,
+        defaultValue: [1],
         originType: 'float'
       }
     ];
@@ -318,13 +318,13 @@ export class VertexBlockNode extends BaseGraphNode {
 }
 
 /**
- * Sprite3D material output node
+ * Sprite material output node
  *
  * @public
  */
-export class Sprite3DBlockNode extends BaseGraphNode {
+export class SpriteBlockNode extends BaseGraphNode {
   /**
-   * Creates a new Sprite3D material output node
+   * Creates a new Sprite material output node
    */
   constructor() {
     super();
@@ -349,8 +349,8 @@ export class Sprite3DBlockNode extends BaseGraphNode {
    */
   static getSerializationCls(): SerializableClass {
     return {
-      ctor: Sprite3DBlockNode,
-      name: 'Sprite3DBlockNode',
+      ctor: SpriteBlockNode,
+      name: 'SpriteBlockNode',
       getProps() {
         return [];
       }

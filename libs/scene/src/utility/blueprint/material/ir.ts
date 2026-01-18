@@ -8,7 +8,7 @@ import type {
   TextureSampler
 } from '@zephyr3d/device';
 import { PBShaderExp } from '@zephyr3d/device';
-import type { BaseGraphNode, BlueprintDAG, IGraphNode } from '../node';
+import type { BaseGraphNode, BlueprintDAG, GraphNodeInput, IGraphNode } from '../node';
 import {
   ConstantBooleanNode,
   ConstantBVec2Node,
@@ -923,6 +923,8 @@ class IRSwizzle extends IRExpression {
 class IRCast extends IRExpression {
   /** The source expression to cast */
   readonly src: IRExpression;
+  /** The values to be filled */
+  readonly fill: Nullable<number[]>;
   /** The target type name (e.g., 'vec2', 'vec3', 'vec4') */
   readonly type: string;
   /** Number of zero components to append */
@@ -934,10 +936,11 @@ class IRCast extends IRExpression {
    * @param type - The target type name
    * @param cast - Number of zero components to append
    */
-  constructor(src: IRExpression, type: string, cast: number) {
+  constructor(src: IRExpression, type: string, cast: number, fill?: number[]) {
     super();
     this.src = src.addRef();
     this.cast = cast;
+    this.fill = fill?.slice() ?? null;
     this.type = type;
   }
   /**
@@ -952,7 +955,7 @@ class IRCast extends IRExpression {
    */
   create(pb: ProgramBuilder): PBShaderExp {
     // @ts-ignore
-    return pb[this.type](this.src.create(pb), ...Array.from({ length: this.cast }).fill(0));
+    return pb[this.type](this.src.create(pb), ...(this.fill ?? Array.from({ length: this.cast }).fill(0)));
   }
 }
 
@@ -1297,18 +1300,20 @@ export class MaterialBlueprintIR {
         if (input.inputNode) {
           this._outputs.push({
             name,
-            expr: this.ir(input.inputNode, input.inputId!, input.originType)!.addRef()
-          });
-        } else if (typeof input.defaultValue === 'number') {
-          this._outputs.push({
-            name,
-            expr: new IRConstantf(input.defaultValue, '').addRef()
+            expr: this.ir(input)!.addRef()
           });
         } else if (Array.isArray(input.defaultValue)) {
-          this._outputs.push({
-            name,
-            expr: new IRConstantfv(input.defaultValue, '', `vec${input.defaultValue.length}`).addRef()
-          });
+          if (input.defaultValue.length === 1) {
+            this._outputs.push({
+              name,
+              expr: new IRConstantf(input.defaultValue[0], '').addRef()
+            });
+          } else {
+            this._outputs.push({
+              name,
+              expr: new IRConstantfv(input.defaultValue, '', `vec${input.defaultValue.length}`).addRef()
+            });
+          }
         } else if (input.required) {
           this._outputs = null;
           return false;
@@ -1388,7 +1393,11 @@ export class MaterialBlueprintIR {
    *
    * @throws Error if type casting is invalid
    */
-  private ir(node: IGraphNode, output: number, originType?: string): Nullable<IRExpression> {
+  private ir(inputNode: GraphNodeInput): Nullable<IRExpression> {
+    const node = inputNode.inputNode!;
+    const output = inputNode.inputId!;
+    const originType = inputNode.originType;
+    const defaultValue = inputNode.defaultValue;
     let expr: Nullable<IRExpression> = null;
     if (node instanceof ConstantScalarNode) {
       expr = this.constantf(node, output);
@@ -1500,7 +1509,7 @@ export class MaterialBlueprintIR {
           if (nOut > nOrg) {
             return new IRSwizzle(expr, 'xyzw'.slice(0, nOrg));
           } else {
-            return new IRCast(expr, originType, nOrg - nOut);
+            return new IRCast(expr, originType, nOrg - nOut, defaultValue?.slice(nOut - nOrg));
           }
         } else {
           throw new Error(`Cannot cast type \`${outputType}\` to \`${originType}`);
@@ -1547,9 +1556,6 @@ export class MaterialBlueprintIR {
     if (!ir.outputs[outputId]) {
       const output = node.outputs.find((v) => v.id === outputId)!;
       ir.outputs[outputId] = ir;
-      if (typeof output.cast === 'number') {
-        ir.outputs[outputId] = new IRCast(ir, node.getOutputType(outputId), output.cast);
-      }
       if (output.swizzle) {
         ir.outputs[outputId] = new IRSwizzle(ir.outputs[outputId], output.swizzle);
       }
@@ -1561,7 +1567,7 @@ export class MaterialBlueprintIR {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
       if (input.inputNode) {
-        params.push(this.ir(input.inputNode, input.inputId!, input.originType)!);
+        params.push(this.ir(input)!);
       }
     }
     const funcName = node.getOutputType(output);
@@ -1569,13 +1575,7 @@ export class MaterialBlueprintIR {
   }
   /** Converts a swizzle node to IR */
   private swizzle(node: SwizzleNode, output: number): IRExpression {
-    return this.getOrCreateIRExpression(
-      node,
-      output,
-      IRSwizzle,
-      this.ir(node.inputs[0].inputNode!, node.inputs[0].inputId!, node.inputs[0].originType)!,
-      node.swizzle
-    );
+    return this.getOrCreateIRExpression(node, output, IRSwizzle, this.ir(node.inputs[0])!, node.swizzle);
   }
   /** Converts a comparison node to IR */
   private comparison(node: CompComparisonNode, output: number): IRExpression {
@@ -1583,28 +1583,18 @@ export class MaterialBlueprintIR {
       node,
       output,
       IRComparison,
-      this.ir(node.inputs[0].inputNode!, node.inputs[0].inputId!, node.inputs[0].originType)!,
-      this.ir(node.inputs[1].inputNode!, node.inputs[1].inputId!, node.inputs[1].originType)!,
+      this.ir(node.inputs[0])!,
+      this.ir(node.inputs[1])!,
       node.mode
     );
   }
   /** Converts an any-condition node to IR */
   private any(node: AnyConditionNode, output: number): IRExpression {
-    return this.getOrCreateIRExpression(
-      node,
-      output,
-      IRAny,
-      this.ir(node.inputs[0].inputNode!, node.inputs[0].inputId!, node.inputs[0].originType)!
-    );
+    return this.getOrCreateIRExpression(node, output, IRAny, this.ir(node.inputs[0])!);
   }
   /** Converts an all-condition node to IR */
   private all(node: AllConditionNode, output: number): IRExpression {
-    return this.getOrCreateIRExpression(
-      node,
-      output,
-      IRAll,
-      this.ir(node.inputs[0].inputNode!, node.inputs[0].inputId!, node.inputs[0].originType)!
-    );
+    return this.getOrCreateIRExpression(node, output, IRAll, this.ir(node.inputs[0])!);
   }
   /** Converts a selection node to IR */
   private selection(node: SelectionNode, output: number): IRExpression {
@@ -1612,9 +1602,9 @@ export class MaterialBlueprintIR {
       node,
       output,
       IRSelection,
-      this.ir(node.inputs[0].inputNode!, node.inputs[0].inputId!, node.inputs[0].originType)!,
-      this.ir(node.inputs[1].inputNode!, node.inputs[1].inputId!, node.inputs[1].originType)!,
-      this.ir(node.inputs[2].inputNode!, node.inputs[2].inputId!, node.inputs[2].originType)!
+      this.ir(node.inputs[0])!,
+      this.ir(node.inputs[1])!,
+      this.ir(node.inputs[2])!
     );
   }
   /** Converts a Transform node to IR */
@@ -1622,7 +1612,7 @@ export class MaterialBlueprintIR {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
       if (input.inputNode) {
-        params.push(this.ir(input.inputNode, input.inputId!, input.originType)!);
+        params.push(this.ir(input)!);
       }
     }
     return this.getOrCreateIRExpression(node, output, IRFunc, params, 'mul');
@@ -1632,7 +1622,7 @@ export class MaterialBlueprintIR {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
       if (input.inputNode) {
-        params.push(this.ir(input.inputNode, input.inputId!, input.originType)!);
+        params.push(this.ir(input)!);
       }
     }
     const funcName = node.func;
@@ -1640,7 +1630,7 @@ export class MaterialBlueprintIR {
   }
   /** Converts a function output node to IR */
   private functionOutput(node: FunctionOutputNode, output: number): IRExpression {
-    const input = this.ir(node.inputs[0].inputNode!, node.inputs[0].inputId!, node.inputs[0].originType)!;
+    const input = this.ir(node.inputs[0])!;
     return this.getOrCreateIRExpression(node, output, IRFunctionOutput, input);
   }
   /** Converts a vertex color input node to IR */
@@ -1814,7 +1804,7 @@ export class MaterialBlueprintIR {
     ASSERT(!!input.inputNode);
     const type = input.inputNode.getOutputType(input.inputId!);
     ASSERT(type === 'float' || type === 'vec2' || type === 'vec3');
-    params.push(this.ir(input.inputNode, input.inputId!, input.originType)!);
+    params.push(this.ir(input)!);
     return this.getOrCreateIRExpression(
       node,
       output,
@@ -1838,7 +1828,7 @@ export class MaterialBlueprintIR {
     ASSERT(!!input.inputNode);
     const type = input.inputNode.getOutputType(input.inputId!);
     ASSERT(type === 'float' || type === 'vec2' || type === 'vec3');
-    params.push(this.ir(input.inputNode, input.inputId!, input.originType)!);
+    params.push(this.ir(input)!);
     return this.getOrCreateIRExpression(
       node,
       output,
@@ -1862,7 +1852,7 @@ export class MaterialBlueprintIR {
     ASSERT(!!input.inputNode);
     const type = input.inputNode.getOutputType(input.inputId!);
     ASSERT(type === 'float' || type === 'vec2' || type === 'vec3');
-    params.push(this.ir(input.inputNode, input.inputId!, input.originType)!);
+    params.push(this.ir(input)!);
     return this.getOrCreateIRExpression(
       node,
       output,
@@ -1884,7 +1874,7 @@ export class MaterialBlueprintIR {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
       if (input.inputNode) {
-        params.push(this.ir(input.inputNode, input.inputId!, input.originType)!);
+        params.push(this.ir(input)!);
       }
     }
     return this.getOrCreateIRExpression(
@@ -1915,7 +1905,7 @@ export class MaterialBlueprintIR {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
       if (input.inputNode) {
-        params.push(this.ir(input.inputNode, input.inputId!, input.originType)!);
+        params.push(this.ir(input)!);
       }
     }
     return this.getOrCreateIRExpression(
@@ -1969,7 +1959,7 @@ export class MaterialBlueprintIR {
   /** Converts a function call node to IR */
   private functionCall(node: FunctionCallNode, output: number): IRExpression {
     const args = node.inputs.map((input) => {
-      return this.ir(input.inputNode!, input.inputId!, input.originType)!;
+      return this.ir(input)!;
     });
     return this.getOrCreateIRExpression(node, output, IRCallFunc, node, args);
   }
@@ -2033,8 +2023,8 @@ export class MaterialBlueprintIR {
   }
   /** Converts a texture sample node to IR */
   private textureSample(node: TextureSampleNode, output: number): IRExpression {
-    const tex = this.ir(node.inputs[0].inputNode!, node.inputs[0].inputId!)! as IRConstantTexture;
-    const coord = this.ir(node.inputs[1].inputNode!, node.inputs[1].inputId!)!;
+    const tex = this.ir(node.inputs[0])! as IRConstantTexture;
+    const coord = this.ir(node.inputs[1])!;
     return this.getOrCreateIRExpression(node, output, IRSampleTexture, tex, coord, node.samplerType);
   }
 }

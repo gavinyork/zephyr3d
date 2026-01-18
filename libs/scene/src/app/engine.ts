@@ -15,7 +15,7 @@ import {
   PBRSpecularGlossinessMaterial,
   UnlitMaterial
 } from '../material';
-import { StandardSprite3DMaterial } from '../material/sprite3d_std';
+import { StandardSpriteMaterial } from '../material/sprite_std';
 import { ScreenAdapter } from './screen';
 
 /**
@@ -267,7 +267,7 @@ export class Engine {
       '/materials/blinnphong.zmtl': BlinnMaterial,
       '/materials/pbr_metallic_roughness.zmtl': PBRMetallicRoughnessMaterial,
       '/materials/pbr_specular_glossiness.zmtl': PBRSpecularGlossinessMaterial,
-      '/materials/sprite3d_std.zmtl': StandardSprite3DMaterial
+      '/materials/sprite_std.zmtl': StandardSpriteMaterial
     } as const;
     for (const [key] of objectEntries(shapeClsMap)) {
       const obj = new shapeClsMap[key]();

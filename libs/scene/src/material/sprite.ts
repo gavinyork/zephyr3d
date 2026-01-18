@@ -7,7 +7,7 @@ import { Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../render';
 
 /**
- * Sprite3D material base class.
+ * Sprite material base class.
  *
  * @remarks
  * This material renders a camera-facing quad (billboard) in 3D space,
@@ -21,13 +21,13 @@ import type { DrawContext } from '../render';
  *
  * @public
  */
-export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DMaterial> {
+export class SpriteMaterial extends MeshMaterial implements Clonable<SpriteMaterial> {
   static UVINFO = this.defineInstanceUniform('uvinfo', 'vec4');
   static ANCHOR_ROTATION = this.defineInstanceUniform('anchorRotation', 'vec4');
   private _uvinfo: Vector4;
   private _anchorRotation: Vector4;
   /**
-   * Creates a new {@link Sprite3DMaterial} instance.
+   * Creates a new {@link SpriteMaterial} instance.
    *
    * @remarks
    * - Default UV rectangle is the full texture [0, 0, 1, 1].
@@ -157,15 +157,15 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
   /**
    * Creates a deep copy of this material.
    *
-   * @returns A new {@link Sprite3DMaterial} instance with the same properties.
+   * @returns A new {@link SpriteMaterial} instance with the same properties.
    */
   clone() {
-    const other = new Sprite3DMaterial();
+    const other = new SpriteMaterial();
     other.copyFrom(this);
     return other;
   }
   /**
-   * Copies all relevant state from another {@link Sprite3DMaterial}.
+   * Copies all relevant state from another {@link SpriteMaterial}.
    *
    * @param other - The source material to copy from.
    */
@@ -194,8 +194,8 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
     const pb = scope.$builder;
     scope.$inputs.vertexId = pb.float().attrib('position');
     if (this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
-      scope.$l.uvinfo = this.getInstancedUniform(scope, Sprite3DMaterial.UVINFO);
-      scope.$l.anchorRotation = this.getInstancedUniform(scope, Sprite3DMaterial.ANCHOR_ROTATION);
+      scope.$l.uvinfo = this.getInstancedUniform(scope, SpriteMaterial.UVINFO);
+      scope.$l.anchorRotation = this.getInstancedUniform(scope, SpriteMaterial.ANCHOR_ROTATION);
     } else {
       scope.uvinfo = pb.vec4().uniform(2);
       scope.anchorRotation = pb.vec4().uniform(2);
@@ -260,9 +260,9 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
    * @remarks
    * This method:
    * - Calls the base implementation.
-   * - Invokes {@link Sprite3DMaterial.internalSetupUniforms} for
+   * - Invokes {@link SpriteMaterial.internalSetupUniforms} for
    *   fragment-stage specific uniform declarations.
-   * - Computes fragment color by calling {@link Sprite3DMaterial.calcFragmentColor}
+   * - Computes fragment color by calling {@link SpriteMaterial.calcFragmentColor}
    *   if fragment color is needed.
    * - Outputs the final fragment color via {@link MeshMaterial.outputFragmentColor}.
    *
@@ -289,7 +289,7 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
    * for non-instanced rendering. For instanced rendering, these values
    * are expected to be provided as per-instance uniforms instead.
    *
-   * It also calls {@link Sprite3DMaterial.internalApplyUniforms} to allow
+   * It also calls {@link SpriteMaterial.internalApplyUniforms} to allow
    * derived classes to bind additional resources (e.g. textures).
    *
    * @param bindGroup - The bind group to which uniforms and resources are bound.
@@ -321,7 +321,7 @@ export class Sprite3DMaterial extends MeshMaterial implements Clonable<Sprite3DM
    * Hook for derived classes to bind additional uniform values or resources.
    *
    * @remarks
-   * This is called from {@link Sprite3DMaterial.applyUniformValues} and is
+   * This is called from {@link SpriteMaterial.applyUniformValues} and is
    * intended for subclasses to bind their own textures, samplers, or
    * other GPU resources.
    *

@@ -2,18 +2,18 @@ import type { BindGroup, PBInsideFunctionScope, Texture2D } from '@zephyr3d/devi
 import type { Clonable } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import type { DrawContext } from '../render/drawable';
-import { Sprite3DMaterial } from './sprite3d';
+import { SpriteMaterial } from './sprite';
 import { fetchSampler } from '../utility/misc';
 
 /**
- * Standard Sprite3D material
+ * Standard Sprite material
  * @public
  */
-export class StandardSprite3DMaterial extends Sprite3DMaterial implements Clonable<StandardSprite3DMaterial> {
+export class StandardSpriteMaterial extends SpriteMaterial implements Clonable<StandardSpriteMaterial> {
   static FEATURE_SPRITE_TEXTURE = this.defineFeature();
   protected _texture: DRef<Texture2D>;
   /**
-   * Creates a new instance of {@link StandardSprite3DMaterial}.
+   * Creates a new instance of {@link StandardSpriteMaterial}.
    *
    * @remarks
    * By default, no sprite texture is assigned and the material renders
@@ -35,7 +35,7 @@ export class StandardSprite3DMaterial extends Sprite3DMaterial implements Clonab
     tex = tex ?? null;
     if (tex !== this._texture.get()) {
       this._texture.set(tex);
-      this.useFeature(StandardSprite3DMaterial.FEATURE_SPRITE_TEXTURE, !!tex);
+      this.useFeature(StandardSpriteMaterial.FEATURE_SPRITE_TEXTURE, !!tex);
       this.uniformChanged();
     }
   }
@@ -46,15 +46,15 @@ export class StandardSprite3DMaterial extends Sprite3DMaterial implements Clonab
    * The new instance will copy all relevant state from this material,
    * including the assigned sprite texture reference.
    *
-   * @returns A new {@link StandardSprite3DMaterial} instance with the same settings.
+   * @returns A new {@link StandardSpriteMaterial} instance with the same settings.
    */
   clone() {
-    const other = new StandardSprite3DMaterial();
+    const other = new StandardSpriteMaterial();
     other.copyFrom(this);
     return other;
   }
   /**
-   * Copies the state from another {@link StandardSprite3DMaterial} into this instance.
+   * Copies the state from another {@link StandardSpriteMaterial} into this instance.
    *
    * @param other - The source material to copy from.
    */

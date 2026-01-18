@@ -152,7 +152,7 @@ export type GraphNodeInput = {
    * Default value when no connection exists
    * @remarks Can be a single number or an array of numbers for vector types
    */
-  defaultValue?: number[] | number;
+  defaultValue?: number[];
   /**
    * Whether this input must be connected
    * @remarks If true, validation will fail if no connection exists
@@ -196,11 +196,6 @@ export type GraphNodeOutput = {
    * @example 'xyz' extracts first 3 components from vec4
    */
   swizzle?: string;
-  /**
-   * Type cast index
-   * @remarks Index into a type array for automatic type conversion
-   */
-  cast?: number;
 };
 
 /**

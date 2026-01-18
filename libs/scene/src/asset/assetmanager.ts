@@ -34,7 +34,7 @@ import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
 import { getDevice, getEngine } from '../app/api';
-import { Material, PBRBluePrintMaterial, Sprite3DBlueprintMaterial } from '../material';
+import { Material, PBRBluePrintMaterial, SpriteBlueprintMaterial } from '../material';
 import type {
   BluePrintEditorState,
   BluePrintUniformTexture,
@@ -687,7 +687,7 @@ export class AssetManager {
         const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
         const content = JSON.parse(data) as { type: string; data: any };
         ASSERT(
-          content.type === 'PBRBluePrintMaterial' || content.type === 'Sprite3DBluePrintMaterial',
+          content.type === 'PBRBluePrintMaterial' || content.type === 'SpriteBluePrintMaterial',
           `Unsupported material type: ${content.type}`
         );
         irData = content.data as {
@@ -759,7 +759,7 @@ export class AssetManager {
       const content = JSON.parse(data) as { type: string; props: any; data: any };
       ASSERT(
         content.type === 'PBRBluePrintMaterial' ||
-          content.type === 'Sprite3DBluePrintMaterial' ||
+          content.type === 'SpriteBluePrintMaterial' ||
           content.type === 'Default',
         `Unsupported material type: ${content.type}`
       );
@@ -780,7 +780,7 @@ export class AssetManager {
           data.uniformValues,
           data.uniformTextures
         ) as unknown as T;
-      } else if (content.type === 'Sprite3DBluePrintMaterial') {
+      } else if (content.type === 'SpriteBluePrintMaterial') {
         const data = (await this.loadBluePrintMaterialData(
           content.data as {
             IR: string;
@@ -790,7 +790,7 @@ export class AssetManager {
           reload,
           VFSs
         ))!;
-        mat = new Sprite3DBlueprintMaterial(
+        mat = new SpriteBlueprintMaterial(
           data.irFragment!,
           data.uniformValues,
           data.uniformTextures
@@ -949,7 +949,7 @@ export class AssetManager {
         state: Record<string, BluePrintEditorState>;
       };
       ASSERT(
-        bp.type === 'PBRMaterial' || bp.type === 'Sprite3DMaterial' || bp.type === 'MaterialFunction',
+        bp.type === 'PBRMaterial' || bp.type === 'SpriteMaterial' || bp.type === 'MaterialFunction',
         `Unsupported blueprint type: ${bp.type}`
       );
       const states = bp.state;

@@ -20,9 +20,9 @@ import {
   getPBRSpecularGlossinessMaterialClass,
   getParticleMaterialClass,
   getPBRBluePrintMaterialClass,
-  getSprite3DMaterialClass,
-  getSprite3DBlueprintMaterialClass,
-  getStandardSprite3DMaterialClass
+  getSpriteMaterialClass,
+  getSpriteBlueprintMaterialClass,
+  getStandardSpriteMaterialClass
 } from './scene/material';
 import { getMeshClass } from './scene/mesh';
 import { getParticleNodeClass } from './scene/particle';
@@ -169,12 +169,12 @@ import {
   ViewMatrixNode,
   ViewProjMatrixNode
 } from '../blueprint/material/inputs';
-import { PBRBlockNode, Sprite3DBlockNode, VertexBlockNode } from '../blueprint/material/pbr';
+import { PBRBlockNode, SpriteBlockNode, VertexBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
 import type { Material, MeshMaterial, PBRBluePrintMaterial } from '../../material';
 import type { Primitive } from '../../render';
 import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
-import { getSprite3DClass } from './scene/sprite';
+import { getSpriteClass } from './scene/sprite';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -262,7 +262,7 @@ export class ResourceManager {
         getSceneNodeClass(this),
         getGraphNodeClass(),
         getMeshClass(),
-        getSprite3DClass(),
+        getSpriteClass(),
         getWaterClass(this),
         getTerrainClass(this),
         getFFTWaveGeneratorClass(),
@@ -279,15 +279,15 @@ export class ResourceManager {
         getSceneClass(this),
         ...getMeshMaterialClass(),
         ...getPBRBluePrintMaterialClass(),
-        ...getSprite3DBlueprintMaterialClass(),
+        ...getSpriteBlueprintMaterialClass(),
         ...getUnlitMaterialClass(this),
         ...getLambertMaterialClass(this),
         ...getBlinnMaterialClass(this),
         ...getPBRMetallicRoughnessMaterialClass(this),
         ...getPBRSpecularGlossinessMaterialClass(this),
         ...getParticleMaterialClass(this),
-        ...getSprite3DMaterialClass(this),
-        ...getStandardSprite3DMaterialClass(this),
+        ...getSpriteMaterialClass(this),
+        ...getStandardSpriteMaterialClass(this),
         getBoxShapeClass(),
         getBoxFrameShapeClass(),
         getSphereShapeClass(),
@@ -390,7 +390,7 @@ export class ResourceManager {
         SkyEnvTextureNode.getSerializationCls(),
         ElapsedTimeNode.getSerializationCls(),
         PBRBlockNode.getSerializationCls(),
-        Sprite3DBlockNode.getSerializationCls(),
+        SpriteBlockNode.getSerializationCls(),
         VertexBlockNode.getSerializationCls(),
         ResolveVertexPositionNode.getSerializationCls(),
         ResolveVertexTangentNode.getSerializationCls(),
