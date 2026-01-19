@@ -87,6 +87,12 @@ type ScaleInfo = {
   scale: Vector3;
 };
 
+type AABBInfo = {
+  axis: CubeFace;
+  pointOnPlane: Vector3;
+  planeNormal: Vector3;
+};
+
 /**
  * The post water effect
  * @public
@@ -138,6 +144,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _translatePlaneInfo: Nullable<TranslatePlaneInfo>;
   private _rotateInfo: Nullable<RotateInfo>;
   private _scaleInfo: Nullable<ScaleInfo>;
+  private _aabbInfo: Nullable<AABBInfo>;
   private _hitInfo: Nullable<GizmoHitInfo>;
   private readonly _screenSize: number;
   private _drawGrid: boolean;
@@ -236,6 +243,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       this._endTranslation();
       this._endScale();
       this._endRotate();
+      this._endAABB();
       this._mode = val;
     }
   }
@@ -291,6 +299,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   }
   endEditAABB(aabb: AABB) {
     if (aabb && aabb === this._aabbForEdit) {
+      PostGizmoRenderer._aabbMesh.get()?.off('transformchanged', this.applyAABBChange, this);
       this._aabbForEdit = null;
       this.node = null;
       this.mode = 'select';
@@ -305,13 +314,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       PostGizmoRenderer._aabbMesh.get()!.sealed = true;
       PostGizmoRenderer._aabbMesh.get()!.showState = 'hidden';
       PostGizmoRenderer._aabbMesh.get()!.remove();
-      PostGizmoRenderer._aabbMesh.get()!.on('transformchanged', () => {
-        const aabb = PostGizmoRenderer._aabbMesh.get()!.getWorldBoundingVolume()!.toAABB();
-        if (this._aabbForEdit) {
-          this._aabbForEdit.minPoint.set(aabb.minPoint);
-          this._aabbForEdit.maxPoint.set(aabb.maxPoint);
-        }
-      });
+      PostGizmoRenderer._aabbMesh.get()!.on('transformchanged', this.applyAABBChange, this);
     }
     const pos = value.minPoint.clone();
     const scale = Vector3.sub(value.maxPoint, value.minPoint);
@@ -452,6 +455,14 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       );
       if (!this._hitInfo) {
         PostGizmoRenderer._bindGroup!.setValue('axisMode', 0);
+      } else if (this._mode === 'edit-aabb') {
+        const axis =
+          this._hitInfo.axis === CubeFace.PX || this._hitInfo.axis === CubeFace.NX
+            ? 0
+            : this._hitInfo.axis === CubeFace.PY || this._hitInfo.axis === CubeFace.NY
+              ? 1
+              : 2;
+        PostGizmoRenderer._bindGroup!.setValue('axisMode', axisList[axis]);
       } else if (
         this._hitInfo.type === 'move_axis' ||
         this._hitInfo.type === 'rotate_axis' ||
@@ -502,12 +513,23 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     ctx.device.pool.releaseFrameBuffer(tmpFramebuffer);
   }
   updateHitInfo(x: number, y: number) {
-    if (this._translatePlaneInfo || this._scaleInfo || this._rotateInfo) {
+    if (this._translatePlaneInfo || this._scaleInfo || this._rotateInfo || this._aabbInfo) {
       return;
     }
-    if (this._mode === 'rotation' || this._mode === 'scaling' || this._mode === 'translation') {
+    if (
+      this._mode === 'rotation' ||
+      this._mode === 'scaling' ||
+      this._mode === 'translation' ||
+      this._mode === 'edit-aabb'
+    ) {
       const ray = this._camera.constructRay(x, y);
-      this._hitInfo = this.rayIntersection(ray);
+      if (this._mode === 'edit-aabb') {
+        this._hitInfo = PostGizmoRenderer._aabbMesh.get()
+          ? this.rayIntersectionAABB(ray, PostGizmoRenderer._aabbMesh.get().getWorldBoundingVolume().toAABB())
+          : null;
+      } else {
+        this._hitInfo = this.rayIntersection(ray);
+      }
     } else {
       this._hitInfo = null;
     }
@@ -523,9 +545,15 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       this._endRotate();
       this._endTranslation();
       this._endScale();
+      this._endAABB();
       return false;
     }
-    if (this._mode === 'rotation' || this._mode === 'scaling' || this._mode === 'translation') {
+    if (
+      this._mode === 'rotation' ||
+      this._mode === 'scaling' ||
+      this._mode === 'translation' ||
+      (this._mode === 'edit-aabb' && this._aabbForEdit)
+    ) {
       if (type === 'pointerdown' && button === 0) {
         if (this._hitInfo) {
           if (this._mode === 'translation' && !this._translatePlaneInfo) {
@@ -538,6 +566,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           }
           if (this._mode === 'scaling' && !this._scaleInfo) {
             this._beginScale(x, y, this._hitInfo.axis, this._hitInfo.type!, this._hitInfo.pointLocal!);
+            return true;
+          }
+          if (this._mode === 'edit-aabb' && !this._aabbInfo) {
+            this._beginAABB(x, y, this._hitInfo.axis as CubeFace, this._hitInfo.pointLocal);
             return true;
           }
         }
@@ -555,6 +587,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           this._updateScale(x, y);
           return true;
         }
+        if (this._mode === 'edit-aabb' && this._aabbInfo) {
+          this._updateAABB(x, y);
+          return true;
+        }
       }
       if (type === 'pointerup' && button === 0) {
         if (this._mode === 'translation' && this._translatePlaneInfo) {
@@ -569,9 +605,31 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           this._endScale();
           return true;
         }
+        if (this._mode === 'edit-aabb' && this._aabbInfo) {
+          this._endAABB();
+          return true;
+        }
       }
     }
     return false;
+  }
+  /** Ray intersection with AABB */
+  rayIntersectionAABB(ray: Ray, aabb: AABB): Nullable<GizmoHitInfo> {
+    const axisInfo = { axis: undefined };
+    const distance = ray.bboxIntersectionTestEx(aabb, axisInfo);
+    if (distance !== null) {
+      const point = Vector3.add(ray.origin, Vector3.scale(ray.direction, distance));
+      const axis = axisInfo.axis;
+      const coord = distance;
+      return {
+        axis,
+        coord,
+        distance,
+        pointLocal: point,
+        pointWorld: point
+      };
+    }
+    return null;
   }
   /** Ray intersection */
   rayIntersection(ray: Ray): Nullable<GizmoHitInfo> {
@@ -656,11 +714,12 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
     const PQ = Vector3.sub(P, Q);
     const t = Vector3.dot(N, PQ) / denominator;
-    return Vector3.add(Q, Vector3.scale(V, t));
+    return { intersectedPoint: Vector3.add(Q, Vector3.scale(V, t)), distance: t };
   }
   private _beginRotate(startX: number, startY: number, axis: number, hitPosition: Vector3) {
     this._endTranslation();
     this._endScale();
+    this._endAABB();
     getDevice().canvas.style.cursor = 'grab';
     const center = new Vector3();
     this._node!.worldMatrix.decompose(null, null, center);
@@ -761,9 +820,80 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       }
     }
   }
+  private _beginAABB(startX: number, startY: number, axis: CubeFace, pointLocal: Vector3) {
+    this._endTranslation();
+    this._endRotate();
+    this._endScale();
+    getDevice().canvas.style.cursor = 'grab';
+    const ray = this._camera.constructRay(startX, startY);
+    const v = Vector3.abs(Vector3.sub(pointLocal, ray.origin));
+    const n =
+      axis === CubeFace.PX || axis === CubeFace.NX
+        ? [1, 2]
+        : axis === CubeFace.PY || axis === CubeFace.NY
+          ? [0, 2]
+          : [0, 1];
+    const t = v[n[0]] > v[n[1]] ? n[0] : n[1];
+    const normal = new Vector3(t === 0 ? 1 : 0, t === 1 ? 1 : 0, t === 2 ? 1 : 0);
+    this._aabbInfo = {
+      axis: axis,
+      pointOnPlane: pointLocal,
+      planeNormal: normal
+    };
+  }
+  private _updateAABB(x: number, y: number) {
+    if (!this._aabbInfo) {
+      return;
+    }
+    const ray = this._camera.constructRay(x, y);
+    const hit = this.rayPlaneIntersection(
+      this._aabbInfo.pointOnPlane,
+      this._aabbInfo.planeNormal,
+      ray.origin,
+      ray.direction
+    );
+    const aabbMesh = PostGizmoRenderer._aabbMesh.get();
+    if (aabbMesh) {
+      const aabb = aabbMesh.getWorldBoundingVolume().toAABB();
+      switch (this._aabbInfo.axis) {
+        case CubeFace.PX: {
+          aabbMesh.scale.x = Math.max(0, hit.intersectedPoint.x - aabb.minPoint.x);
+          break;
+        }
+        case CubeFace.NX: {
+          aabbMesh.scale.x = Math.max(0, aabb.maxPoint.x - hit.intersectedPoint.x);
+          aabbMesh.position.x = Math.min(aabb.maxPoint.x, hit.intersectedPoint.x);
+          break;
+        }
+        case CubeFace.PY: {
+          aabbMesh.scale.y = Math.max(0, hit.intersectedPoint.y - aabb.minPoint.y);
+          break;
+        }
+        case CubeFace.NY: {
+          aabbMesh.scale.y = Math.max(0, aabb.maxPoint.y - hit.intersectedPoint.y);
+          aabbMesh.position.y = Math.min(aabb.maxPoint.y, hit.intersectedPoint.y);
+          break;
+        }
+        case CubeFace.PZ: {
+          aabbMesh.scale.z = Math.max(0, hit.intersectedPoint.z - aabb.minPoint.z);
+          break;
+        }
+        case CubeFace.NZ: {
+          aabbMesh.scale.z = Math.max(0, aabb.maxPoint.z - hit.intersectedPoint.z);
+          aabbMesh.position.z = Math.min(aabb.maxPoint.z, hit.intersectedPoint.z);
+          break;
+        }
+      }
+    }
+  }
+  private _endAABB() {
+    getDevice().canvas.style.cursor = 'default';
+    this._aabbInfo = null;
+  }
   private _beginScale(startX: number, startY: number, axis: number, type: HitType, pointLocal: Vector3) {
     this._endRotate();
     this._endTranslation();
+    this._endAABB();
     getDevice().canvas.style.cursor = 'grab';
     let planeAxis = axis;
     if (type === 'move_axis') {
@@ -839,6 +969,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _beginTranslate(startX: number, startY: number, axis: number, type: HitType, pointLocal: Vector3) {
     this._endRotate();
     this._endScale();
+    this._endAABB();
     getDevice().canvas.style.cursor = 'grab';
     let planeAxis = axis;
     if (type === 'move_axis') {
@@ -1405,7 +1536,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             this.colorScale = this.$choice(
               pb.equal(this.axisMode, this.$inputs.axis),
               pb.float(1),
-              pb.float(0.3)
+              pb.float(0.5)
             );
             this.$outputs.color = pb.mul(this.$inputs.color, this.colorScale);
           } else {
@@ -1555,6 +1686,16 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         'scaling-with-handles': [createScaleWithHandleGizmo(this._boxSize)],
         select: [createSelectGizmo()]
       };
+    }
+  }
+  private applyAABBChange() {
+    const aabbMesh = PostGizmoRenderer._aabbMesh.get();
+    if (aabbMesh) {
+      const aabb = aabbMesh.getWorldBoundingVolume().toAABB();
+      if (this._aabbForEdit) {
+        this._aabbForEdit.minPoint.set(aabb.minPoint);
+        this._aabbForEdit.maxPoint.set(aabb.maxPoint);
+      }
     }
   }
 }

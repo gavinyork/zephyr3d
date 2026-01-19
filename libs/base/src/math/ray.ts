@@ -1,6 +1,7 @@
 import type { Matrix4x4 } from './vector';
 import { Vector3 } from './vector';
 import type { AABB } from './aabb';
+import { CubeFace } from './types';
 
 // reduce GC
 const tmpV0 = new Vector3();
@@ -60,7 +61,7 @@ export class Ray {
    * @param bbox - The box to be test.
    * @returns The distance from the origin to intersected point if the ray intersect with the box, otherwise null.
    */
-  bboxIntersectionTestEx!: (bbox: AABB) => number | null;
+  bboxIntersectionTestEx!: (bbox: AABB, axisInfo?: { axis?: CubeFace }) => number | null;
 
   /**
    * Construct a ray from origin and normalized direction vector.
@@ -277,18 +278,24 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMMMEx(bbox: AABB) {
+  qtestMMMEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestMMM(bbox)) {
       return null;
     }
     let t = (bbox.maxPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.PX;
     const t1 = (bbox.maxPoint.y - this._origin.y) * this._ij;
     if (t1 > t) {
       t = t1;
+      axis = CubeFace.PY;
     }
     const t2 = (bbox.maxPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.PZ;
+    }
+    if (axisInfo) {
+      axisInfo.axis = axis;
     }
     return t;
   }
@@ -317,18 +324,24 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMMPEx(bbox: AABB) {
+  qtestMMPEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestMMP(bbox)) {
       return null;
     }
     let t = (bbox.maxPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.PX;
     const t1 = (bbox.maxPoint.y - this._origin.y) * this._ij;
     if (t1 > t) {
       t = t1;
+      axis = CubeFace.PY;
     }
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.NZ;
+    }
+    if (axisInfo) {
+      axisInfo.axis = axis;
     }
     return t;
   }
@@ -357,18 +370,24 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMPMEx(bbox: AABB) {
+  qtestMPMEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestMPM(bbox)) {
       return null;
     }
     let t = (bbox.maxPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.PX;
     const t1 = (bbox.minPoint.y - this._origin.y) * this._ij;
     if (t1 > t) {
       t = t1;
+      axis = CubeFace.NY;
     }
     const t2 = (bbox.maxPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.PZ;
+    }
+    if (axisInfo) {
+      axisInfo.axis = axis;
     }
     return t;
   }
@@ -397,18 +416,24 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMPPEx(bbox: AABB) {
+  qtestMPPEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestMPP(bbox)) {
       return null;
     }
     let t = (bbox.maxPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.PX;
     const t1 = (bbox.minPoint.y - this._origin.y) * this._ij;
     if (t1 > t) {
       t = t1;
+      axis = CubeFace.NY;
     }
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.NZ;
+    }
+    if (axisInfo) {
+      axisInfo.axis = axis;
     }
     return t;
   }
@@ -437,18 +462,24 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPMMEx(bbox: AABB) {
+  qtestPMMEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestPMM(bbox)) {
       return null;
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.NX;
     const t1 = (bbox.maxPoint.y - this._origin.y) * this._ij;
     if (t1 > t) {
       t = t1;
+      axis = CubeFace.PY;
     }
     const t2 = (bbox.maxPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.PZ;
+    }
+    if (axisInfo) {
+      axisInfo.axis = axis;
     }
     return t;
   }
@@ -477,18 +508,24 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPMPEx(bbox: AABB) {
+  qtestPMPEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestPMP(bbox)) {
       return null;
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.NX;
     const t1 = (bbox.maxPoint.y - this._origin.y) * this._ij;
     if (t1 > t) {
       t = t1;
+      axis = CubeFace.PY;
     }
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.NZ;
+    }
+    if (axisInfo) {
+      axisInfo.axis = axis;
     }
     return t;
   }
@@ -517,20 +554,25 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPPMEx(bbox: AABB) {
+  qtestPPMEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestPPM(bbox)) {
       return null;
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.NX;
     const t1 = (bbox.minPoint.y - this._origin.y) * this._ij;
     if (t1 > t) {
       t = t1;
+      axis = CubeFace.NY;
     }
     const t2 = (bbox.maxPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.PZ;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -558,20 +600,25 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPPPEx(bbox: AABB) {
+  qtestPPPEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestPPP(bbox)) {
       return null;
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.NX;
     const t1 = (bbox.minPoint.y - this._origin.y) * this._ij;
     if (t1 > t) {
       t = t1;
+      axis = CubeFace.NY;
     }
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.NZ;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -596,17 +643,20 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOMMEx(bbox: AABB) {
+  qtestOMMEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestOMM(bbox)) {
       return null;
     }
-
     let t = (bbox.maxPoint.y - this._origin.y) * this._ij;
+    let axis = CubeFace.PY;
     const t2 = (bbox.maxPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.PZ;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -631,17 +681,20 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOMPEx(bbox: AABB) {
+  qtestOMPEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestOMP(bbox)) {
       return null;
     }
-
     let t = (bbox.maxPoint.y - this._origin.y) * this._ij;
+    let axis = CubeFace.PY;
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.NZ;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -666,16 +719,20 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOPMEx(bbox: AABB) {
+  qtestOPMEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestOPM(bbox)) {
       return null;
     }
     let t = (bbox.minPoint.y - this._origin.y) * this._ij;
+    let axis = CubeFace.NY;
     const t2 = (bbox.maxPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.PZ;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -700,17 +757,20 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOPPEx(bbox: AABB) {
+  qtestOPPEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestOPP(bbox)) {
       return null;
     }
-
     let t = (bbox.minPoint.y - this._origin.y) * this._ij;
+    let axis = CubeFace.NY;
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.NZ;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -735,16 +795,20 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMOMEx(bbox: AABB) {
+  qtestMOMEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestMOM(bbox)) {
       return null;
     }
     let t = (bbox.maxPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.PX;
     const t2 = (bbox.maxPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.PZ;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -769,16 +833,20 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMOPEx(bbox: AABB) {
+  qtestMOPEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestMOP(bbox)) {
       return null;
     }
     let t = (bbox.maxPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.PX;
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.NZ;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -803,16 +871,20 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPOMEx(bbox: AABB) {
+  qtestPOMEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestPOM(bbox)) {
       return null;
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.NX;
     const t2 = (bbox.maxPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.PZ;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -837,16 +909,20 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPOPEx(bbox: AABB) {
+  qtestPOPEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestPOP(bbox)) {
       return null;
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.NX;
     const t2 = (bbox.minPoint.z - this._origin.z) * this._ik;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.NZ;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -871,16 +947,20 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMMOEx(bbox: AABB) {
+  qtestMMOEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestMMO(bbox)) {
       return null;
     }
     let t = (bbox.maxPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.PX;
     const t2 = (bbox.maxPoint.y - this._origin.y) * this._ij;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.PY;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -905,17 +985,20 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMPOEx(bbox: AABB) {
+  qtestMPOEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestMPO(bbox)) {
       return null;
     }
-
     let t = (bbox.maxPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.PX;
     const t2 = (bbox.minPoint.y - this._origin.y) * this._ij;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.NY;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -939,16 +1022,20 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPMOEx(bbox: AABB) {
+  qtestPMOEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestPMO(bbox)) {
       return null;
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.NX;
     const t2 = (bbox.maxPoint.y - this._origin.y) * this._ij;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.PY;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -973,16 +1060,20 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPPOEx(bbox: AABB) {
+  qtestPPOEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestPPO(bbox)) {
       return null;
     }
     let t = (bbox.minPoint.x - this._origin.x) * this._ii;
+    let axis = CubeFace.NX;
     const t2 = (bbox.minPoint.y - this._origin.y) * this._ij;
     if (t2 > t) {
       t = t2;
+      axis = CubeFace.NY;
     }
-
+    if (axisInfo) {
+      axisInfo.axis = axis;
+    }
     return t;
   }
   /** @internal */
@@ -1006,12 +1097,14 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestMOOEx(bbox: AABB) {
+  qtestMOOEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestMOO(bbox)) {
       return null;
     }
     const t = (bbox.maxPoint.x - this._origin.x) * this._ii;
-
+    if (axisInfo) {
+      axisInfo.axis = CubeFace.PX;
+    }
     return t;
   }
   /** @internal */
@@ -1035,13 +1128,14 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestPOOEx(bbox: AABB) {
+  qtestPOOEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestPOO(bbox)) {
       return null;
     }
-
     const t = (bbox.minPoint.x - this._origin.x) * this._ii;
-
+    if (axisInfo) {
+      axisInfo.axis = CubeFace.NX;
+    }
     return t;
   }
   /** @internal */
@@ -1065,13 +1159,14 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOMOEx(bbox: AABB) {
+  qtestOMOEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestOMO(bbox)) {
       return null;
     }
-
     const t = (bbox.maxPoint.y - this._origin.y) * this._ij;
-
+    if (axisInfo) {
+      axisInfo.axis = CubeFace.PY;
+    }
     return t;
   }
   /** @internal */
@@ -1095,13 +1190,14 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOPOEx(bbox: AABB) {
+  qtestOPOEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestOPO(bbox)) {
       return null;
     }
-
     const t = (bbox.minPoint.y - this._origin.y) * this._ij;
-
+    if (axisInfo) {
+      axisInfo.axis = CubeFace.NY;
+    }
     return t;
   }
   /** @internal */
@@ -1125,13 +1221,14 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOOMEx(bbox: AABB) {
+  qtestOOMEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestOOM(bbox)) {
       return null;
     }
-
     const t = (bbox.maxPoint.z - this._origin.z) * this._ik;
-
+    if (axisInfo) {
+      axisInfo.axis = CubeFace.PZ;
+    }
     return t;
   }
   /** @internal */
@@ -1155,13 +1252,14 @@ export class Ray {
     return true;
   }
   /** @internal */
-  qtestOOPEx(bbox: AABB) {
+  qtestOOPEx(bbox: AABB, axisInfo?: { axis?: CubeFace }) {
     if (!this.qtestOOP(bbox)) {
       return null;
     }
-
     const t = (bbox.minPoint.z - this._origin.z) * this._ik;
-
+    if (axisInfo) {
+      axisInfo.axis = CubeFace.NZ;
+    }
     return t;
   }
   /** @internal */
