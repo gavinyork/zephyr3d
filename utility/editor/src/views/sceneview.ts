@@ -95,7 +95,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
   private readonly _clipBoardData: DRef<SceneNode>;
-  private _aabbForEdit: Nullable<AABB>;
   private _proxy: Nullable<NodeProxy>;
   private readonly _currentEditTool: DRef<EditTool>;
   private readonly _cameraAnimationEyeFrom: Vector3;
@@ -127,7 +126,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
-    this._aabbForEdit = null;
     this._proxy = null;
     this._currentEditTool = new DRef();
     this._cameraAnimationEyeFrom = new Vector3();
@@ -1015,7 +1013,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._postGizmoRenderer.on('end_translate', this.handleEndTranslateNode, this);
       this._postGizmoRenderer.on('end_rotate', this.handleEndRotateNode, this);
       this._postGizmoRenderer.on('end_scale', this.handleEndScaleNode, this);
-      this._postGizmoRenderer.on('aabb_changed', this.handleEditAABB, this);
     }
   }
   private sceneFinialize() {
@@ -1045,7 +1042,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._postGizmoRenderer.off('end_translate', this.handleEndTranslateNode, this);
       this._postGizmoRenderer.off('end_rotate', this.handleEndRotateNode, this);
       this._postGizmoRenderer.off('end_scale', this.handleEndScaleNode, this);
-      this._postGizmoRenderer.off('aabb_changed', this.handleEditAABB, this);
       this._postGizmoRenderer.dispose();
       this._postGizmoRenderer = null;
     }
@@ -1227,15 +1223,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
   }
   private editAABB(aabb: AABB) {
-    this._aabbForEdit = aabb;
-    this._postGizmoRenderer!.editAABB(this._aabbForEdit);
+    this._postGizmoRenderer!.editAABB(aabb);
   }
   private endEditAABB(aabb: AABB) {
-    if (aabb === this._aabbForEdit) {
-      this._aabbForEdit = null;
-      this._postGizmoRenderer!.endEditAABB();
-      eventBus.dispatchEvent('scene_changed');
-    }
+    this._postGizmoRenderer!.endEditAABB(aabb);
   }
   private handleCopyNode(node: SceneNode) {
     if (node) {
@@ -1577,12 +1568,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       node,
       getEngine().resourceManager.getPropertyByName('/SceneNode/Scale')
     );
-  }
-  private handleEditAABB(aabb: AABB) {
-    if (this._aabbForEdit) {
-      this._aabbForEdit.minPoint.set(aabb.minPoint);
-      this._aabbForEdit.maxPoint.set(aabb.maxPoint);
-    }
   }
   private handleSceneAction(action: string) {
     eventBus.dispatchEvent('action', action);

@@ -16,7 +16,8 @@ import {
   createScaleGizmo,
   createSelectGizmo,
   axisList,
-  createScaleWithHandleGizmo
+  createScaleWithHandleGizmo,
+  createEditAABBGizmo
 } from './gizmo';
 import type { Nullable, Ray } from '@zephyr3d/base';
 import { CubeFace } from '@zephyr3d/base';
@@ -24,6 +25,7 @@ import { DRef } from '@zephyr3d/base';
 import { AABB, makeObservable } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { calcHierarchyBoundingBoxWorld } from '../../helpers/misc';
+import { eventBus } from '../../core/eventbus';
 
 const tmpVecT = new Vector3();
 const tmpVecS = new Vector3();
@@ -41,7 +43,14 @@ export type HitType =
   | 'rotate_free'
   | 'scale_axis'
   | 'scale_uniform';
-export type GizmoMode = 'none' | 'translation' | 'rotation' | 'scaling' | 'scaling-with-handles' | 'select';
+export type GizmoMode =
+  | 'none'
+  | 'translation'
+  | 'rotation'
+  | 'scaling'
+  | 'edit-aabb'
+  | 'scaling-with-handles'
+  | 'select';
 export type GizmoHitInfo = {
   axis: number;
   type?: Nullable<HitType>;
@@ -89,7 +98,6 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   end_rotate: [node: SceneNode];
   begin_scale: [node: SceneNode];
   end_scale: [node: SceneNode];
-  aabb_changed: [aabb: AABB];
 }>() {
   static _aabbMesh: DRef<Mesh> = new DRef();
   static _blendBlitter: CopyBlitter = new CopyBlitter();
@@ -109,6 +117,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   static _cameraNearFar: Vector2 = new Vector2();
   static _axises = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)];
   static _primitives: Nullable<Partial<Record<GizmoMode, Primitive[]>>> = null;
+  private _aabbForEdit: Nullable<AABB>;
   private _snapping: number;
   private _allowTranslate: boolean;
   private _allowRotate: boolean;
@@ -151,6 +160,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             : 2;
     this._node = binding;
     this._snapping = 0;
+    this._aabbForEdit = null;
     this._allowRotate = true;
     this._allowScale = true;
     this._allowTranslate = true;
@@ -223,13 +233,9 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       return;
     }
     if (this._mode !== val) {
-      if (this._mode === 'translation') {
-        this._endTranslation();
-      } else if (this._mode === 'scaling') {
-        this._endScale();
-      } else if (this._mode === 'rotation') {
-        this._endRotate();
-      }
+      this._endTranslation();
+      this._endScale();
+      this._endRotate();
       this._mode = val;
     }
   }
@@ -237,9 +243,14 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     return this._node;
   }
   set node(node) {
-    this._node = node;
-    if (this._node !== PostGizmoRenderer._aabbMesh.get()) {
-      this._alwaysDrawIndicator = false;
+    if (node !== this._node) {
+      if (this._node === PostGizmoRenderer._aabbMesh.get()) {
+        this.endEditAABB(this._aabbForEdit);
+      }
+      this._node = node;
+      if (this._node !== PostGizmoRenderer._aabbMesh.get()) {
+        this._alwaysDrawIndicator = false;
+      }
     }
   }
   get camera(): Camera {
@@ -278,9 +289,12 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   set gridDistance(val: number) {
     this._gridParams.y = val;
   }
-  endEditAABB() {
-    if (this._node === PostGizmoRenderer._aabbMesh.get()) {
+  endEditAABB(aabb: AABB) {
+    if (aabb && aabb === this._aabbForEdit) {
+      this._aabbForEdit = null;
       this.node = null;
+      this.mode = 'select';
+      eventBus.dispatchEvent('scene_changed');
     }
   }
   editAABB(value: AABB) {
@@ -293,15 +307,20 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       PostGizmoRenderer._aabbMesh.get()!.remove();
       PostGizmoRenderer._aabbMesh.get()!.on('transformchanged', () => {
         const aabb = PostGizmoRenderer._aabbMesh.get()!.getWorldBoundingVolume()!.toAABB();
-        this.dispatchEvent('aabb_changed', aabb);
+        if (this._aabbForEdit) {
+          this._aabbForEdit.minPoint.set(aabb.minPoint);
+          this._aabbForEdit.maxPoint.set(aabb.maxPoint);
+        }
       });
     }
     const pos = value.minPoint.clone();
     const scale = Vector3.sub(value.maxPoint, value.minPoint);
     PostGizmoRenderer._aabbMesh.get()!.position.set(pos);
     PostGizmoRenderer._aabbMesh.get()!.scale.set(scale);
+    this._aabbForEdit = value;
     this.node = PostGizmoRenderer._aabbMesh.get();
-    this._alwaysDrawIndicator = true;
+    this.mode = 'edit-aabb';
+    //this._alwaysDrawIndicator = true;
   }
   private calcGridSteps(size: number) {
     for (let i = 0, k = 1; i < 8; i++, k = Math.min(size, k * 10)) {
@@ -321,7 +340,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
-    this.prepare();
+    this.prepare(ctx.device.type === 'webgpu');
     this.passThrough(ctx, inputColorTexture, srgbOutput);
     if (!this.enabled) {
       return;
@@ -417,7 +436,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     if (
       this._node &&
       this._mode !== 'none' &&
-      !(this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0)
+      !(this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0) &&
+      !(this._mode === 'edit-aabb' && this._node !== PostGizmoRenderer._aabbMesh.get())
     ) {
       ctx.device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
       PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
@@ -457,7 +477,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       }
       if (this._mode === 'scaling-with-handles') {
       } else {
-        (this._mode === 'select' || this._orthoDirection === null
+        (this._mode === 'select' || this._mode === 'edit-aabb' || this._orthoDirection === null
           ? PostGizmoRenderer._primitives![this._mode][0]!
           : PostGizmoRenderer._primitives![this._mode][this._orthoDirection + 1]!
         ).draw();
@@ -920,7 +940,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     return Math.hypot(dx, dy);
   }
   private _calcGizmoMVPMatrix(mode: GizmoMode, noScale: boolean, matrix?: Matrix4x4) {
-    matrix = this._calcGizmoWorldMatrix(mode, noScale, matrix);
+    matrix = this._calcGizmoWorldMatrix(mode, noScale || this._mode === 'edit-aabb', matrix);
     return matrix.multiplyLeft(this._camera.viewProjectionMatrix);
   }
   private _calcGizmoWorldMatrix(mode: GizmoMode, noScale: boolean, matrix?: Matrix4x4) {
@@ -931,26 +951,30 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         const scale = Vector3.sub(this._nodeBox.maxPoint, this._nodeBox.minPoint);
         matrix.scaling(scale).translateLeft(this._nodeBox.minPoint);
       } else {
-        this._node.worldMatrix.decompose(tmpVecS, tmpQuatR, tmpVecT);
-        matrix.translation(tmpVecT);
-        if (!noScale) {
-          if (this._camera.isPerspective()) {
-            const d = Vector3.distance(this._camera.getWorldPosition(), tmpVecT);
-            const scale = (this._screenSize * d * this._camera.getTanHalfFovy()) / (2 * this._axisLength);
-            matrix.scaling(new Vector3(scale, scale, scale)).translateLeft(tmpVecT);
-          } else {
-            const projMatrix = this._camera.getProjectionMatrix();
-            const projWidth = Math.abs(projMatrix.getRightPlane() - projMatrix.getLeftPlane());
-            const projHeight = Math.abs(projMatrix.getBottomPlane() - projMatrix.getTopPlane());
-            const scaleY = (this._screenSize * projHeight) / (2 * this._axisLength);
-            const vpWidth = this._camera.viewport
-              ? this._camera.viewport[2]
-              : getDevice().getDrawingBufferWidth();
-            const vpHeight = this._camera.viewport
-              ? this._camera.viewport[3]
-              : getDevice().getDrawingBufferHeight();
-            const scaleX = scaleY * (vpHeight / vpWidth) * (projWidth / projHeight);
-            matrix.scaling(new Vector3(scaleX, scaleY, scaleY)).translateLeft(tmpVecT);
+        if (this._mode === 'edit-aabb') {
+          matrix.set(this._node.worldMatrix);
+        } else {
+          this._node.worldMatrix.decompose(tmpVecS, tmpQuatR, tmpVecT);
+          matrix.translation(tmpVecT);
+          if (!noScale) {
+            if (this._camera.isPerspective()) {
+              const d = Vector3.distance(this._camera.getWorldPosition(), tmpVecT);
+              const scale = (this._screenSize * d * this._camera.getTanHalfFovy()) / (2 * this._axisLength);
+              matrix.scaling(new Vector3(scale, scale, scale)).translateLeft(tmpVecT);
+            } else {
+              const projMatrix = this._camera.getProjectionMatrix();
+              const projWidth = Math.abs(projMatrix.getRightPlane() - projMatrix.getLeftPlane());
+              const projHeight = Math.abs(projMatrix.getBottomPlane() - projMatrix.getTopPlane());
+              const scaleY = (this._screenSize * projHeight) / (2 * this._axisLength);
+              const vpWidth = this._camera.viewport
+                ? this._camera.viewport[2]
+                : getDevice().getDrawingBufferWidth();
+              const vpHeight = this._camera.viewport
+                ? this._camera.viewport[3]
+                : getDevice().getDrawingBufferHeight();
+              const scaleX = scaleY * (vpHeight / vpWidth) * (projWidth / projHeight);
+              matrix.scaling(new Vector3(scaleX, scaleY, scaleY)).translateLeft(tmpVecT);
+            }
           }
         }
       }
@@ -959,9 +983,12 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
     return matrix;
   }
-  private _createGizmoRenderStates() {
+  private _createGizmoRenderStates(flip: boolean) {
     const rs = getDevice().createRenderStateSet();
-    rs.useDepthState().enableTest(true).enableWrite(true).setDepthBias(0).setDepthBiasSlopeScale(0);
+    rs.useDepthState().enableTest(true).enableWrite(true);
+    if (flip) {
+      rs.useRasterizerState().setCullMode('front');
+    }
     return rs;
   }
   private _createGridRenderStates() {
@@ -1378,7 +1405,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             this.colorScale = this.$choice(
               pb.equal(this.axisMode, this.$inputs.axis),
               pb.float(1),
-              pb.float(0.5)
+              pb.float(0.3)
             );
             this.$outputs.color = pb.mul(this.$inputs.color, this.colorScale);
           } else {
@@ -1456,7 +1483,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
     return null;
   }
-  private prepare() {
+  private prepare(flip: boolean) {
     if (!PostGizmoRenderer._gridPrimitive) {
       PostGizmoRenderer._gridPrimitive = new PlaneShape({
         size: 2,
@@ -1484,7 +1511,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
     if (!PostGizmoRenderer._gizmoProgram) {
       PostGizmoRenderer._gizmoProgram = this._createAxisProgram(false);
-      PostGizmoRenderer._gizmoRenderState = this._createGizmoRenderStates();
+      PostGizmoRenderer._gizmoRenderState = this._createGizmoRenderStates(flip);
       PostGizmoRenderer._blendRenderState = this._createBlendRenderStates();
       PostGizmoRenderer._bindGroup = getDevice().createBindGroup(
         PostGizmoRenderer._gizmoProgram.bindGroupLayouts[0]
@@ -1524,6 +1551,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             createScaleGizmo(this._axisLength, this._axisRadius, this._boxSize, direction)
           )
         ],
+        'edit-aabb': [createEditAABBGizmo()],
         'scaling-with-handles': [createScaleWithHandleGizmo(this._boxSize)],
         select: [createSelectGizmo()]
       };

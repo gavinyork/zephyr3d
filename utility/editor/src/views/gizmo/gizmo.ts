@@ -191,6 +191,45 @@ export function createScaleGizmo(
 
   return primitive;
 }
+export function createEditAABBGizmo(): Primitive {
+  const boxOptions: BoxCreationOptions = {
+    size: 1,
+    anchor: 0
+  };
+  const vertices: number[] = [];
+  const diffuse: number[] = [];
+  const normals: number[] = [];
+  const indices: number[] = [];
+  const axies: number[] = [];
+  const bbox = new BoundingBox();
+  bbox.beginExtend();
+  BoxShape.generateData(
+    boxOptions,
+    vertices,
+    normals,
+    null,
+    null,
+    indices,
+    bbox,
+    vertices.length / 3,
+    (index) => {
+      const normal = normals.slice(index * 3, index * 3 + 3);
+      const rgb = normal.map((val) => ((Math.abs(val) * 0.5 + 0.5) * 255) >> 0);
+      diffuse.push(...rgb, 255);
+      axies.push(normal.findIndex((val) => Math.abs(val) === 1) + AXIS_X);
+    }
+  );
+  const primitive = new Primitive();
+  primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
+  primitive.createAndSetVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
+  primitive.createAndSetVertexBuffer('tex0_f32', new Float32Array(axies));
+  primitive.createAndSetIndexBuffer(new Uint16Array(indices));
+  primitive.primitiveType = 'triangle-list';
+  primitive.indexCount = indices.length;
+  primitive.setBoundingVolume(bbox);
+
+  return primitive;
+}
 /**
  * Creates a primitive that presents the scale-with-handles gizmo
  * @param boxRadius - Half size of the boxes
