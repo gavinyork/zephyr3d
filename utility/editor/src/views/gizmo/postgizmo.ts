@@ -49,7 +49,7 @@ export type GizmoMode =
   | 'rotation'
   | 'scaling'
   | 'edit-aabb'
-  | 'scaling-with-handles'
+  | 'edit-rect'
   | 'select';
 export type GizmoHitInfo = {
   axis: number;
@@ -129,7 +129,6 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _allowTranslate: boolean;
   private _allowRotate: boolean;
   private _allowScale: boolean;
-  private _alwaysDrawIndicator: boolean;
   private _gridSteps: Float32Array<ArrayBuffer>;
   private readonly _gridParams: Vector4;
   private _camera: Camera;
@@ -172,7 +171,6 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._allowRotate = true;
     this._allowScale = true;
     this._allowTranslate = true;
-    this._alwaysDrawIndicator = false;
     this._axisLength = size;
     this._arrowLength = size * 0.8;
     this._axisRadius = size * 0.02;
@@ -236,7 +234,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     if (
       (val === 'rotation' && !this._allowRotate) ||
       (val === 'translation' && !this._allowTranslate) ||
-      (val === 'scaling' && !this._allowScale)
+      (val === 'scaling' && !this._allowScale) ||
+      (val === 'edit-rect' && !this._node?.isSprite())
     ) {
       return;
     }
@@ -260,8 +259,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this.endEditAABB(this._aabbForEdit);
       }
       this._node = node;
-      if (this._node !== PostGizmoRenderer._aabbMesh.get()) {
-        this._alwaysDrawIndicator = false;
+      if (!this._node?.isSprite() && this._mode === 'edit-rect') {
+        this.mode = 'select';
       }
     }
   }
@@ -327,7 +326,6 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._aabbForEdit = value;
     this.node = PostGizmoRenderer._aabbMesh.get();
     this.mode = 'edit-aabb';
-    //this._alwaysDrawIndicator = true;
   }
   private calcGridSteps(size: number) {
     for (let i = 0, k = 1; i < 8; i++, k = Math.min(size, k * 10)) {
@@ -444,7 +442,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       this._node &&
       this._mode !== 'none' &&
       !(this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0) &&
-      !(this._mode === 'edit-aabb' && this._node !== PostGizmoRenderer._aabbMesh.get())
+      !(this._mode === 'edit-aabb' && this._node !== PostGizmoRenderer._aabbMesh.get()) &&
+      !(this._mode === 'edit-rect' && !this._node?.isSprite())
     ) {
       ctx.device.setRenderStates(
         this._mode === 'edit-aabb' ? PostGizmoRenderer._aabbRenderState : PostGizmoRenderer._gizmoRenderState
@@ -454,36 +453,35 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       PostGizmoRenderer._bindGroup!.setValue('texSize', PostGizmoRenderer._texSize);
       PostGizmoRenderer._bindGroup!.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
       PostGizmoRenderer._bindGroup!.setValue('time', (ctx.device.frameInfo.elapsedOverall % 1000) * 0.001);
+      PostGizmoRenderer._bindGroup!.setValue('axisMode', 0);
       PostGizmoRenderer._bindGroup!.setTexture(
         'depthTex',
         destFramebuffer!.getDepthAttachment()!,
         fetchSampler('clamp_nearest_nomip')
       );
-      if (!this._hitInfo) {
-        PostGizmoRenderer._bindGroup!.setValue('axisMode', 0);
-      } else if (this._mode === 'edit-aabb') {
-        const axis =
-          this._hitInfo.axis === CubeFace.PX || this._hitInfo.axis === CubeFace.NX
-            ? 0
-            : this._hitInfo.axis === CubeFace.PY || this._hitInfo.axis === CubeFace.NY
-              ? 1
-              : 2;
-        PostGizmoRenderer._bindGroup!.setValue('axisMode', axisList[axis]);
-      } else if (
-        this._hitInfo.type === 'move_axis' ||
-        this._hitInfo.type === 'rotate_axis' ||
-        this._hitInfo.type === 'scale_axis'
-      ) {
-        PostGizmoRenderer._bindGroup!.setValue('axisMode', axisList[this._hitInfo.axis]);
-      } else if (this._hitInfo.type === 'move_plane') {
-        PostGizmoRenderer._bindGroup!.setValue(
-          'axisMode',
-          axisList[0] + axisList[1] + axisList[2] - axisList[this._hitInfo.axis]
-        );
-      } else if (this._hitInfo.type === 'scale_uniform' || this._hitInfo.type === 'move_free') {
-        PostGizmoRenderer._bindGroup!.setValue('axisMode', axisList[0] + axisList[1] + axisList[2]);
-      } else {
-        PostGizmoRenderer._bindGroup!.setValue('axisMode', 0);
+      if (this._hitInfo) {
+        if (this._mode === 'edit-aabb') {
+          const axis =
+            this._hitInfo.axis === CubeFace.PX || this._hitInfo.axis === CubeFace.NX
+              ? 0
+              : this._hitInfo.axis === CubeFace.PY || this._hitInfo.axis === CubeFace.NY
+                ? 1
+                : 2;
+          PostGizmoRenderer._bindGroup!.setValue('axisMode', axisList[axis]);
+        } else if (
+          this._hitInfo.type === 'move_axis' ||
+          this._hitInfo.type === 'rotate_axis' ||
+          this._hitInfo.type === 'scale_axis'
+        ) {
+          PostGizmoRenderer._bindGroup!.setValue('axisMode', axisList[this._hitInfo.axis]);
+        } else if (this._hitInfo.type === 'move_plane') {
+          PostGizmoRenderer._bindGroup!.setValue(
+            'axisMode',
+            axisList[0] + axisList[1] + axisList[2] - axisList[this._hitInfo.axis]
+          );
+        } else if (this._hitInfo.type === 'scale_uniform' || this._hitInfo.type === 'move_free') {
+          PostGizmoRenderer._bindGroup!.setValue('axisMode', axisList[0] + axisList[1] + axisList[2]);
+        }
       }
       ctx.device.setProgram(
         this._mode === 'select' ? PostGizmoRenderer._gizmoSelectProgram : PostGizmoRenderer._gizmoProgram
@@ -492,19 +490,28 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       if (this._mode === 'select') {
         ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
       }
-      if (this._mode === 'scaling-with-handles') {
+      if (this._mode === 'edit-rect') {
+        const aabb = this._node!.getWorldBoundingVolume().toAABB();
+        const x = [aabb.minPoint.x, (aabb.minPoint.x + aabb.maxPoint.x) * 0.5, aabb.maxPoint.x];
+        const y = [aabb.minPoint.y, (aabb.minPoint.y + aabb.maxPoint.y) * 0.5, aabb.maxPoint.y];
+        const z = aabb.minPoint.z;
+        const m = new Matrix4x4();
+        for (let i = 0; i < 3; i++) {
+          for (let j = 0; j < 3; j++) {
+            Matrix4x4.multiply(
+              this._camera.viewProjectionMatrix,
+              Matrix4x4.translation(new Vector3(x[i], y[i], z), m),
+              m
+            );
+            PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', m);
+            PostGizmoRenderer._primitives![this._mode][0]!.draw();
+          }
+        }
       } else {
         (this._mode === 'select' || this._mode === 'edit-aabb' || this._orthoDirection === null
           ? PostGizmoRenderer._primitives![this._mode][0]!
           : PostGizmoRenderer._primitives![this._mode][this._orthoDirection + 1]!
         ).draw();
-      }
-      if (this._alwaysDrawIndicator && this._mode !== 'select') {
-        this._calcGizmoMVPMatrix('select', false, PostGizmoRenderer._mvpMatrix);
-        PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
-        ctx.device.setProgram(PostGizmoRenderer._gizmoSelectProgram);
-        ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
-        PostGizmoRenderer._primitives!.select[0]!.draw();
       }
     }
     PostGizmoRenderer._blendBlitter.renderStates = PostGizmoRenderer._blendRenderState;
@@ -1705,7 +1712,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           )
         ],
         'edit-aabb': [createEditAABBGizmo()],
-        'scaling-with-handles': [createScaleWithHandleGizmo(this._boxSize)],
+        'edit-rect': [createScaleWithHandleGizmo(this._boxSize)],
         select: [createSelectGizmo()]
       };
     }

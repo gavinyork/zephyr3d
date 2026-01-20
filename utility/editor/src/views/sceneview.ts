@@ -390,11 +390,17 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         },
         {
           label: FontGlyph.glyphs['th-thumb-empty'],
+          visible: () => {
+            return (
+              this.controller.model.scene.mainCamera.isOrtho() &&
+              !!this._sceneHierarchy!.selectedNode?.isSprite()
+            );
+          },
           selected: () => {
-            return this._postGizmoRenderer!.mode === 'scaling-with-handles';
+            return this._postGizmoRenderer!.mode === 'edit-rect';
           },
           action: () => {
-            this._postGizmoRenderer!.mode = 'scaling-with-handles';
+            this._postGizmoRenderer!.mode = 'edit-rect';
           }
         },
         {
