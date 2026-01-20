@@ -240,24 +240,19 @@ export function createEditAABBGizmo(): Primitive {
  */
 export function createScaleWithHandleGizmo(boxRadius: number): Primitive {
   const boxOptions: BoxCreationOptions = {
-    size: boxRadius * 2
+    sizeX: boxRadius * 2,
+    sizeY: boxRadius * 2,
+    sizeZ: 0
   };
   const vertices: number[] = [];
-  const diffuse: number[] = [];
-  const axies: number[] = [];
-  const rgb: number[] = [255, 255, 255, 255];
 
   const indices: number[] = [];
   const bbox = new BoundingBox();
   bbox.beginExtend();
-  BoxShape.generateData(boxOptions, vertices, null, null, null, indices, bbox, vertices.length / 3, () => {
-    diffuse.push(...rgb);
-    axies.push(0);
-  });
+  BoxShape.generateData(boxOptions, vertices, null, null, null, indices, bbox, vertices.length / 3);
   const primitive = new Primitive();
   primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
-  primitive.createAndSetVertexBuffer('diffuse_u8normx4', new Uint8Array(diffuse));
-  primitive.createAndSetVertexBuffer('tex0_f32', new Float32Array(axies));
+  primitive.createAndSetVertexBuffer('tex0_f32x3', new Float32Array(3 * 9), 'instance');
   primitive.createAndSetIndexBuffer(new Uint16Array(indices));
   primitive.primitiveType = 'triangle-list';
   primitive.indexCount = indices.length;

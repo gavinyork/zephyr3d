@@ -255,11 +255,13 @@ export class BaseSprite<M extends SpriteMaterial>
    */
   computeWorldBoundingVolume() {
     const p = this.worldMatrix.transformPointAffine(Vector3.zero());
+    const scaleX = Math.hypot(this.worldMatrix[0], this.worldMatrix[1], this.worldMatrix[2]);
+    const scaleY = Math.hypot(this.worldMatrix[4], this.worldMatrix[5], this.worldMatrix[6]);
     const mat = this._material?.get();
     if (mat) {
       const boundingBox = new BoundingBox();
-      const cx = Math.max(Math.abs(this._anchor.x), Math.abs(1 - this._anchor.x)) * Math.abs(this.scale.x);
-      const cy = Math.max(Math.abs(this._anchor.y), Math.abs(1 - this._anchor.y)) * Math.abs(this.scale.y);
+      const cx = Math.max(Math.abs(this._anchor.x), Math.abs(1 - this._anchor.x)) * scaleX;
+      const cy = Math.max(Math.abs(this._anchor.y), Math.abs(1 - this._anchor.y)) * scaleY;
       const size = Math.max(cx, cy);
       boundingBox.minPoint.setXYZ(p.x - size, p.y - size, p.z - size);
       boundingBox.maxPoint.setXYZ(p.x + size, p.y + size, p.z + size);
