@@ -113,6 +113,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   static _gizmoRenderState: Nullable<RenderStateSet> = null;
   static _gridRenderState: Nullable<RenderStateSet> = null;
   static _blendRenderState: Nullable<RenderStateSet> = null;
+  static _aabbRenderState: Nullable<RenderStateSet> = null;
   static _gridPrimitive: Nullable<Primitive> = null;
   static _gridPrimitiveOrtho: Nullable<Primitive> = null;
   static _bindGroup: Nullable<BindGroup> = null;
@@ -245,6 +246,9 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       this._endRotate();
       this._endAABB();
       this._mode = val;
+    }
+    if (this._mode !== 'edit-aabb' && this._node && this._node === PostGizmoRenderer._aabbMesh.get()) {
+      this.node = null;
     }
   }
   get node() {
@@ -442,7 +446,9 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       !(this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0) &&
       !(this._mode === 'edit-aabb' && this._node !== PostGizmoRenderer._aabbMesh.get())
     ) {
-      ctx.device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
+      ctx.device.setRenderStates(
+        this._mode === 'edit-aabb' ? PostGizmoRenderer._aabbRenderState : PostGizmoRenderer._gizmoRenderState
+      );
       PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
       PostGizmoRenderer._bindGroup!.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
       PostGizmoRenderer._bindGroup!.setValue('texSize', PostGizmoRenderer._texSize);
@@ -1137,6 +1143,18 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       .setBlendFuncAlpha('zero', 'one');
     return rs;
   }
+  private _createAABBRenderStates(flip: boolean) {
+    const rs = getDevice().createRenderStateSet();
+    rs.useDepthState().enableTest(true).enableWrite(true);
+    if (flip) {
+      rs.useRasterizerState().setCullMode('front');
+    }
+    rs.useBlendingState()
+      .enable(true)
+      .setBlendFuncRGB('one', 'inv-src-alpha')
+      .setBlendFuncAlpha('zero', 'one');
+    return rs;
+  }
   private _rayIntersectAxis(
     ray: Ray,
     length: number,
@@ -1578,6 +1596,9 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             );
             this.alpha = pb.sub(1, pb.min(pb.min(this.edgeMask.x, this.edgeMask.y), this.edgeMask.z));
             this.alpha = pb.clamp(this.alpha, 0, 1);
+            if (!selectMode) {
+              this.alpha = pb.mul(this.alpha, this.$inputs.color.a);
+            }
           }
           const diffuse = selectMode ? pb.vec3(0, 255, 204) : this.$inputs.color.rgb;
           this.$outputs.color = pb.vec4(pb.mul(diffuse, this.alpha), this.alpha);
@@ -1644,6 +1665,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       PostGizmoRenderer._gizmoProgram = this._createAxisProgram(false);
       PostGizmoRenderer._gizmoRenderState = this._createGizmoRenderStates(flip);
       PostGizmoRenderer._blendRenderState = this._createBlendRenderStates();
+      PostGizmoRenderer._aabbRenderState = this._createAABBRenderStates(flip);
       PostGizmoRenderer._bindGroup = getDevice().createBindGroup(
         PostGizmoRenderer._gizmoProgram.bindGroupLayouts[0]
       );

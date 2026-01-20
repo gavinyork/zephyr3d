@@ -215,7 +215,7 @@ export function createEditAABBGizmo(): Primitive {
     (index) => {
       const normal = normals.slice(index * 3, index * 3 + 3);
       const rgb = normal.map((val) => ((Math.abs(val) * 0.5 + 0.5) * 255) >> 0);
-      diffuse.push(...rgb, 255);
+      diffuse.push(...rgb, 128);
       const axis = normal.findIndex((val) => Math.abs(val) === 1);
       axies.push(1 << axis);
     }
