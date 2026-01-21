@@ -250,7 +250,7 @@ export function createScaleWithHandleGizmo(boxRadius: number): Primitive {
   const bbox = new BoundingBox();
   bbox.beginExtend();
   BoxShape.generateData(boxOptions, vertices, null, null, null, indices, bbox, vertices.length / 3, () => {
-    diffuse.push(255, 255, 255, 255);
+    diffuse.push(0, 255, 255, 255);
   });
   const primitive = new Primitive();
   primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));

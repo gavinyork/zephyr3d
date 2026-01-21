@@ -1376,12 +1376,10 @@ export class Camera extends SceneNode {
     const transform = this._screenAdapter.transform;
     const scaleX = this._screenAdapter.config.designWidth / transform.viewportWidth;
     const scaleY = this._screenAdapter.config.designHeight / transform.viewportHeight;
-    const left = (transform.croppedViewport.x - transform.viewportX) * scaleX;
-    const right =
-      (transform.croppedViewport.x + transform.croppedViewport.width - transform.viewportX) * scaleX;
-    const bottom =
-      (transform.croppedViewport.y + transform.croppedViewport.height - transform.viewportY) * scaleY;
-    const top = (transform.croppedViewport.y - transform.viewportY) * scaleY;
+    const left = -transform.croppedViewport.width * scaleX * 0.5;
+    const right = -left;
+    const bottom = transform.croppedViewport.height * scaleY * 0.5;
+    const top = -bottom;
     return matrix.ortho(left, right, bottom, top, nearClip, farClip);
   }
   /** @internal */
