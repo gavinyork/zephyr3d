@@ -7,7 +7,7 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import type { Camera, DrawContext, PickResult, SceneNode } from '@zephyr3d/scene';
+import type { BaseSprite, Camera, DrawContext, PickResult, SceneNode } from '@zephyr3d/scene';
 import { Primitive } from '@zephyr3d/scene';
 import { BoxShape, getDevice, Mesh, UnlitMaterial } from '@zephyr3d/scene';
 import { AbstractPostEffect, CopyBlitter, fetchSampler, PlaneShape } from '@zephyr3d/scene';
@@ -30,6 +30,11 @@ import { eventBus } from '../../core/eventbus';
 
 const tmpVecT = new Vector3();
 const tmpVecS = new Vector3();
+const tmpVecR = new Vector3();
+const tmpVecQ = new Vector3();
+const tmpVecU = new Vector3();
+const tmpVecV = new Vector3();
+const tmpVecW = new Vector3();
 const tmpQuatR = new Quaternion();
 
 const discRadius = 1.05 / Math.sqrt(Math.PI);
@@ -382,6 +387,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     ) {
       if (this._mode === 'edit-aabb') {
         this.renderAABBGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
+      } else if (this._mode === 'edit-rect') {
+        this.renderRectGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       } else if (this._mode === 'select') {
         this.renderSelectGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       } else {
@@ -1673,6 +1680,24 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       ctx.device.drawText(String(y), screenX, screenY, '#a0a0ff');
     }
   }
+  private renderRectGizmo(ctx: DrawContext, depthTex: BaseTexture) {
+    ctx.device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
+    PostGizmoRenderer._bindGroup!.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
+    PostGizmoRenderer._bindGroup!.setValue('texSize', PostGizmoRenderer._texSize);
+    PostGizmoRenderer._bindGroup!.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
+    PostGizmoRenderer._bindGroup!.setValue('time', (ctx.device.frameInfo.elapsedOverall % 1000) * 0.001);
+    PostGizmoRenderer._bindGroup!.setValue('axisMode', 0);
+    PostGizmoRenderer._bindGroup!.setTexture('depthTex', depthTex, fetchSampler('clamp_nearest_nomip'));
+    ctx.device.setProgram(PostGizmoRenderer._gizmoProgram);
+    ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup!);
+    const v = new Vector3();
+    for (let i = 0; i < 4; i++) {
+      this.calcSpriteVertexPosition(this._node as BaseSprite<any>, i, v);
+      PostGizmoRenderer._mvpMatrix.translation(v).multiplyLeft(this._camera.viewProjectionMatrix);
+      PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
+      PostGizmoRenderer._primitives!['edit-rect'][0]!.draw();
+    }
+  }
   private renderTransformGizmo(ctx: DrawContext, depthTex: BaseTexture) {
     ctx.device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
     PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
@@ -1739,5 +1764,53 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     ctx.device.setProgram(PostGizmoRenderer._gizmoProgram);
     ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup!);
     PostGizmoRenderer._primitives!['edit-aabb'][0]!.draw();
+  }
+  private calcSpriteVertexPosition(sprite: BaseSprite<any>, vertexId: number, outWorldPos: Vector3) {
+    const worldPos = tmpVecS;
+    const forward = tmpVecT;
+    const axis = tmpVecR;
+    const right = tmpVecQ;
+    const up = tmpVecU;
+    const rightRot = tmpVecV;
+    const upRot = tmpVecW;
+    const rotateAngle = -sprite.rotation.toEulerAngles().z;
+    const worldMatrix = sprite.worldMatrix;
+    const viewMatrix = this._camera.viewMatrix;
+    worldPos.setXYZ(worldMatrix[12], worldMatrix[13], worldMatrix[14]);
+    const width = Math.hypot(worldMatrix[0], worldMatrix[1], worldMatrix[2]);
+    const height = Math.hypot(worldMatrix[4], worldMatrix[5], worldMatrix[6]);
+    forward.setXYZ(viewMatrix[2], viewMatrix[6], viewMatrix[10]);
+    if (Math.abs(forward.y) < 0.999) {
+      axis.setXYZ(0, 1, 0);
+    } else {
+      axis.setXYZ(1, 0, 0);
+    }
+    Vector3.cross(axis, forward, right).inplaceNormalize();
+    Vector3.cross(forward, right, up).inplaceNormalize();
+    const c = Math.cos(rotateAngle);
+    const s = Math.sin(rotateAngle);
+    Vector3.add(Vector3.scale(up, s), Vector3.scale(right, c), rightRot);
+    Vector3.sub(Vector3.scale(up, c), Vector3.scale(right, s), upRot);
+    let vx: number, vy: number;
+    if (vertexId === 0) {
+      vx = -sprite.anchorX;
+      vy = -sprite.anchorY;
+    } else if (vertexId === 1) {
+      vx = 1 - sprite.anchorX;
+      vy = -sprite.anchorY;
+    } else if (vertexId === 2) {
+      vx = -sprite.anchorX;
+      vy = 1 - sprite.anchorY;
+    } else if (vertexId === 3) {
+      vx = 1 - sprite.anchorX;
+      vy = 1 - sprite.anchorY;
+    }
+    vx *= width;
+    vy *= height;
+    Vector3.add(
+      Vector3.add(worldPos, Vector3.scale(rightRot, vx), outWorldPos),
+      Vector3.scale(upRot, vy),
+      outWorldPos
+    );
   }
 }

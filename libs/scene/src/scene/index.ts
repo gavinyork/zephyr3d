@@ -3,6 +3,7 @@ export * from './environment';
 export * from './graph_node';
 export * from './light';
 export * from './mesh';
+export * from './basesprite';
 export * from './sprite';
 export * from './water';
 export * from './octree';
