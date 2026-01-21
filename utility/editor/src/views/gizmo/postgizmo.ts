@@ -1593,7 +1593,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           )
         ],
         'edit-aabb': [createEditAABBGizmo()],
-        'edit-rect': [createScaleWithHandleGizmo(this._boxSize)],
+        'edit-rect': [createScaleWithHandleGizmo(1)],
         select: [createSelectGizmo()]
       };
     }
@@ -1691,9 +1691,19 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     ctx.device.setProgram(PostGizmoRenderer._gizmoProgram);
     ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup!);
     const v = new Vector3();
+    const blockSize = 8;
+    const viewport = ctx.device.getViewport();
+    const projMatrix = this._camera.getProjectionMatrix();
+    const projWidth = Math.abs(projMatrix.getRightPlane() - projMatrix.getLeftPlane());
+    const projHeight = Math.abs(projMatrix.getBottomPlane() - projMatrix.getTopPlane());
     for (let i = 0; i < 4; i++) {
       this.calcSpriteVertexPosition(this._node as BaseSprite<any>, i, v);
-      PostGizmoRenderer._mvpMatrix.translation(v).multiplyLeft(this._camera.viewProjectionMatrix);
+      const scaleY = (blockSize / 2 / viewport.height) * projHeight;
+      const scaleX = scaleY * (viewport.height / viewport.width) * (projWidth / projHeight);
+      PostGizmoRenderer._mvpMatrix
+        .scaling(new Vector3(scaleX, scaleY, 0))
+        .translateLeft(v)
+        .multiplyLeft(this._camera.viewProjectionMatrix);
       PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
       PostGizmoRenderer._primitives!['edit-rect'][0]!.draw();
     }
