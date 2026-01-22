@@ -394,7 +394,11 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       } else if (this._mode === 'edit-rect') {
         this.renderRectGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       } else if (this._mode === 'select') {
-        this.renderSelectGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
+        if (this._node.isSprite()) {
+          this.renderSelectSpriteGizmo(ctx);
+        } else {
+          this.renderSelectGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
+        }
       } else {
         this.renderTransformGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       }
@@ -1755,6 +1759,38 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       : PostGizmoRenderer._primitives![this._mode][this._orthoDirection + 1]!
     ).draw();
   }
+  private renderSelectSpriteGizmo(ctx: DrawContext) {
+    ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
+    const points: number[][] = [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1]
+    ];
+    const viewport = ctx.device.getViewport();
+    const sprite = this._node as Sprite;
+    const vpMatrix = this._camera.viewProjectionMatrix;
+    const ndcPoints = points.map((point) => {
+      const v = new Vector3();
+      this.calcSpriteVertexPosition(sprite, point[0], point[1], v);
+      return vpMatrix.transformPointP(v, v);
+    });
+    for (let i = 0; i < 4; i++) {
+      const A = ndcPoints[i];
+      const B = ndcPoints[(i + 1) % 4];
+      this.renderAALine(
+        A.x,
+        A.y,
+        A.z,
+        B.x,
+        B.y,
+        B.z,
+        2,
+        ctx.device.screenXToDevice(viewport.width),
+        ctx.device.screenYToDevice(viewport.height)
+      );
+    }
+  }
   private renderSelectGizmo(ctx: DrawContext, depthTex: BaseTexture) {
     ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
     PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
@@ -1876,6 +1912,9 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           this.$inputs.pos = pb.vec3().attrib('position');
           pb.main(function () {
             this.$builtins.position = pb.vec4(this.$inputs.pos, 1);
+            if (pb.getDevice().type === 'webgpu') {
+              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+            }
           });
         },
         fragment(pb) {
