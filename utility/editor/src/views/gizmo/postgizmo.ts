@@ -8,7 +8,7 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { BaseSprite, Camera, DrawContext, PickResult, SceneNode, Sprite } from '@zephyr3d/scene';
-import { Primitive, ShaderHelper } from '@zephyr3d/scene';
+import { Primitive } from '@zephyr3d/scene';
 import { BoxShape, getDevice, Mesh, UnlitMaterial } from '@zephyr3d/scene';
 import { AbstractPostEffect, CopyBlitter, fetchSampler, PlaneShape } from '@zephyr3d/scene';
 import {
@@ -377,15 +377,14 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._calcGizmoMVPMatrix(this._mode, false, PostGizmoRenderer._mvpMatrix);
     PostGizmoRenderer._texSize.setXY(inputColorTexture.width, inputColorTexture.height);
     PostGizmoRenderer._cameraNearFar.setXY(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
-    if (this._drawGrid) {
-      this.renderGrid(ctx);
-    }
     ctx.device.pushDeviceStates();
     ctx.device.setFramebuffer(tmpFramebuffer);
     ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 0), 1, 0);
+    if (this._drawGrid) {
+      this.renderGrid(ctx, destFramebuffer!.getDepthAttachment()!);
+    }
     if (
       this._node &&
-      this._mode !== 'select' &&
       this._mode !== 'none' &&
       !(this._mode === 'rotation' && this._rotateInfo && this._rotateInfo.axis < 0) &&
       !(this._mode === 'edit-aabb' && this._node !== PostGizmoRenderer._aabbMesh.get()) &&
@@ -395,6 +394,12 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this.renderAABBGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       } else if (this._mode === 'edit-rect') {
         this.renderRectGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
+      } else if (this._mode === 'select') {
+        if (this._node.isSprite()) {
+          this.renderSelectSpriteGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
+        } else {
+          this.renderSelectGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
+        }
       } else {
         this.renderTransformGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       }
@@ -409,13 +414,6 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     );
     ctx.device.popDeviceStates();
     ctx.device.pool.releaseFrameBuffer(tmpFramebuffer);
-    if (this._node && this._mode === 'select') {
-      if (this._node.isSprite()) {
-        this.renderSelectSpriteGizmo(ctx);
-      } else {
-        this.renderSelectGizmo(ctx, sceneDepthTexture);
-      }
-    }
   }
   updateHitInfo(x: number, y: number) {
     if (this._translatePlaneInfo || this._scaleInfo || this._rotateInfo || this._aabbInfo) {
@@ -1030,10 +1028,6 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _createGridRenderStates() {
     const rs = getDevice().createRenderStateSet();
     rs.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('le');
-    rs.useBlendingState()
-      .enable(true)
-      .setBlendFuncRGB('one', 'inv-src-alpha')
-      .setBlendFuncAlpha('zero', 'one');
     return rs;
   }
   private _createBlendRenderStates() {
@@ -1195,6 +1189,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this.params = pb.vec4().uniform(0);
         this.cameraPos = pb.vec3().uniform(0);
         this.steps = pb.vec4[8]().uniform(0);
+        this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.texSize = pb.vec2().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         const STEPS_LEN = 8;
@@ -1423,7 +1418,14 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           );
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
           this.$l.depth = this.$builtins.fragCoord.z;
-          this.$outputs.outColor = pb.vec4(pb.mul(this.color.rgb, this.color.a), this.color.a);
+          this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
+          this.$l.sceneDepth = this.sceneDepthSample.r;
+          this.$l.alpha = this.$choice(
+            pb.greaterThan(this.depth, this.sceneDepth),
+            pb.float(0),
+            this.color.a
+          );
+          this.$outputs.outColor = pb.vec4(pb.mul(this.color.rgb, this.alpha), this.alpha);
         });
       }
     });
@@ -1467,11 +1469,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this.time = pb.float().uniform(0);
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
-          this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(
-            this,
-            this.$builtins.fragCoord.z,
-            this.cameraNearFar
-          );
+          this.$l.depth = this.$builtins.fragCoord.z;
           this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
           this.$l.sceneDepth = this.sceneDepthSample.r;
           this.$l.alpha = this.$choice(
@@ -1619,7 +1617,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       }
     }
   }
-  private renderGrid(ctx: DrawContext) {
+  private renderGrid(ctx: DrawContext, depthTex: BaseTexture) {
     this._gridParams.z = ctx.camera.isPerspective() ? 1 : 0;
     ctx.device.setRenderStates(PostGizmoRenderer._gridRenderState);
     PostGizmoRenderer._gridBindGroup!.setValue('viewMatrixInv', ctx.camera.worldMatrix);
@@ -1631,6 +1629,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     PostGizmoRenderer._gridBindGroup!.setValue('steps', this._gridSteps);
     PostGizmoRenderer._gridBindGroup!.setValue('viewProjMatrix', ctx.camera.viewProjectionMatrix);
     PostGizmoRenderer._gridBindGroup!.setValue('texSize', PostGizmoRenderer._texSize);
+    PostGizmoRenderer._gridBindGroup.setTexture('depthTex', depthTex, fetchSampler('clamp_nearest_nomip'));
     PostGizmoRenderer._gridBindGroup!.setValue('cameraNearFar', PostGizmoRenderer._cameraNearFar);
     PostGizmoRenderer._gridBindGroup!.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
     ctx.device.setProgram(PostGizmoRenderer._gridProgram);
@@ -1761,7 +1760,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       : PostGizmoRenderer._primitives![this._mode][this._orthoDirection + 1]!
     ).draw();
   }
-  private renderSelectSpriteGizmo(ctx: DrawContext) {
+  private renderSelectSpriteGizmo(ctx: DrawContext, depthTex: BaseTexture) {
     ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
     const points: number[][] = [
       [0, 0],
@@ -1787,9 +1786,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         B.x,
         B.y,
         B.z,
-        2,
+        1,
         ctx.device.screenXToDevice(viewport.width),
-        ctx.device.screenYToDevice(viewport.height)
+        ctx.device.screenYToDevice(viewport.height),
+        depthTex
       );
     }
   }
@@ -1871,7 +1871,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     ndcZ2: number,
     pxWidth: number,
     viewportWidth: number,
-    viewportHeight: number
+    viewportHeight: number,
+    depthTex: BaseTexture
   ) {
     function ndc2screen(ndcX: number, ndcY: number, vpWidth: number, vpHeight: number) {
       return [(ndcX + 1) * 0.5 * vpWidth, (ndcY + 1) * 0.5 * vpHeight];
@@ -1889,7 +1890,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     const pxTY = pxDY / pxLenD;
     const pxNX = -pxTY;
     const pxNY = pxTX;
-    const r = pxWidth * 0.5 + 1.5;
+    const r = pxWidth * 0.5 + 1;
     const pxUpX1 = pxX1 + r * pxNX;
     const pxUpY1 = pxY1 + r * pxNY;
     const pxDownX1 = pxX1 - r * pxNX;
@@ -1926,6 +1927,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           this.pxWidth = pb.float().uniform(0);
           this.pxWidthAA = pb.float().uniform(0);
           this.lineColor = pb.vec4().uniform(0);
+          this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.texSize = pb.vec2().uniform(0);
           this.$outputs.color = pb.vec4();
           pb.func('sdSegment', [pb.vec2('p'), pb.vec2('a'), pb.vec2('b')], function () {
             this.$l.ab = pb.sub(this.b, this.a);
@@ -1944,6 +1947,13 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
               1,
               pb.smoothStep(pb.sub(this.pxWidth, this.w), pb.add(this.pxWidth, this.w), this.dist)
             );
+            this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.texSize);
+            this.$l.depth = this.$builtins.fragCoord.z;
+            this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
+            this.$l.sceneDepth = this.sceneDepthSample.r;
+            this.$if(pb.greaterThan(this.depth, this.sceneDepth), function () {
+              this.alpha = pb.mul(this.alpha, 0.5);
+            });
             this.$outputs.color = pb.vec4(
               pb.mul(this.lineColor.rgb, this.alpha),
               pb.mul(this.lineColor.a, this.alpha)
@@ -1994,9 +2004,11 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
 
     PostGizmoRenderer._aalineBindGroup.setValue('pxWidth', pxWidth * 0.5);
     PostGizmoRenderer._aalineBindGroup.setValue('lineColor', new Vector4(1, 0, 0, 1));
+    PostGizmoRenderer._aalineBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
+    PostGizmoRenderer._aalineBindGroup.setTexture('depthTex', depthTex, fetchSampler('clamp_nearest_nomip'));
     device.setProgram(PostGizmoRenderer._aalineProgram);
     device.setBindGroup(0, PostGizmoRenderer._aalineBindGroup);
-    device.setRenderStates(PostGizmoRenderer._blendRenderState);
+    device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
     PostGizmoRenderer._aalinePrimitive.draw();
   }
 }
