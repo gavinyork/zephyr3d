@@ -493,6 +493,11 @@ export class ObservableVector2 extends Vector2 {
   set callback(cb) {
     this._callback = cb;
   }
+  /** Set callback */
+  setCallback(cb: Nullable<() => void>) {
+    this._callback = cb;
+    return this;
+  }
   /**
    * {@inheritDoc Vector2.x}
    */
@@ -1038,6 +1043,11 @@ export class ObservableVector3 extends Vector3 {
   }
   set callback(cb) {
     this._callback = cb;
+  }
+  /** Set callback */
+  setCallback(cb: Nullable<() => void>) {
+    this._callback = cb;
+    return this;
   }
   /**
    * {@inheritDoc Vector3.x}
@@ -1616,6 +1626,11 @@ export class ObservableVector4 extends Vector4 {
   }
   set callback(cb) {
     this._callback = cb;
+  }
+  /** Set callback */
+  setCallback(cb: Nullable<() => void>) {
+    this._callback = cb;
+    return this;
   }
   /**
    * {@inheritDoc Vector4.x}
@@ -2411,6 +2426,11 @@ export class ObservableQuaternion extends Quaternion {
   }
   set callback(cb) {
     this._callback = cb;
+  }
+  /** Set callback */
+  setCallback(cb: Nullable<() => void>) {
+    this._callback = cb;
+    return this;
   }
   /**
    * {@inheritDoc Quaternion.x}

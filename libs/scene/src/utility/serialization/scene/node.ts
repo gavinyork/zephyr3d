@@ -96,6 +96,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         {
           name: 'Position',
           type: 'vec3',
+          default: [0, 0, 0],
           options: {
             animatable: true
           },
@@ -114,6 +115,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         {
           name: 'Scale',
           type: 'vec3',
+          default: [1, 1, 1],
           options: {
             animatable: true
           },
@@ -135,6 +137,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         {
           name: 'Rotation',
           type: 'vec3',
+          default: [0, 0, 0],
           options: {
             animatable: true,
             edit: 'quaternion'
@@ -162,6 +165,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         {
           name: 'QuatRotation',
           type: 'vec4',
+          default: [0, 0, 0, 1],
           isHidden() {
             return true;
           },

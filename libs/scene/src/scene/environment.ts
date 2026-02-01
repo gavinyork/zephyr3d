@@ -26,24 +26,21 @@ export class EnvLightWrapper extends Disposable {
   constructor() {
     super();
     this._envLight = new EnvShIBL();
-    this._ambientColor = new ObservableVector4(0.2, 0.2, 0.2, 1);
-    this._ambientColor.callback = () => {
+    this._ambientColor = new ObservableVector4(0.2, 0.2, 0.2, 1).setCallback(() => {
       if (this.type === 'constant') {
         (this._envLight as EnvConstantAmbient).ambientColor.set(this._ambientColor);
       }
-    };
-    this._ambientDown = new ObservableVector4(0.2, 0.2, 0.2, 1);
-    this._ambientDown.callback = () => {
+    });
+    this._ambientDown = new ObservableVector4(0.2, 0.2, 0.2, 1).setCallback(() => {
       if (this.type === 'hemisphere') {
         (this._envLight as EnvHemisphericAmbient).ambientDown.set(this._ambientDown);
       }
-    };
-    this._ambientUp = new ObservableVector4(0.3, 0.5, 0.8, 1);
-    this._ambientUp.callback = () => {
+    });
+    this._ambientUp = new ObservableVector4(0.3, 0.5, 0.8, 1).setCallback(() => {
       if (this.type === 'hemisphere') {
         (this._envLight as EnvHemisphericAmbient).ambientUp.set(this._ambientUp);
       }
-    };
+    });
     this._radianceMap = new DRef();
     this._irradianceMap = new DRef();
     this._irradianceSH = new DRef();

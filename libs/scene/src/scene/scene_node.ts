@@ -206,12 +206,9 @@ export class SceneNode
     this._sealed = false;
     this._children = [];
     this._transformChangeCallback = () => this._onTransformChanged(true);
-    this._position = new ObservableVector3(0, 0, 0);
-    this._position.callback = this._transformChangeCallback;
-    this._scaling = new ObservableVector3(1, 1, 1);
-    this._scaling.callback = this._transformChangeCallback;
-    this._rotation = new ObservableQuaternion();
-    this._rotation.callback = this._transformChangeCallback;
+    this._position = new ObservableVector3(0, 0, 0).setCallback(this._transformChangeCallback);
+    this._scaling = new ObservableVector3(1, 1, 1).setCallback(this._transformChangeCallback);
+    this._rotation = new ObservableQuaternion().setCallback(this._transformChangeCallback);
     this._worldMatrix = null;
     this._worldMatrixDet = null;
     this._invWorldMatrix = null;
