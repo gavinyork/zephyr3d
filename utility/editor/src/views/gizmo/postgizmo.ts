@@ -41,6 +41,11 @@ const discRadius = 1.05 / Math.sqrt(Math.PI);
 const gridLineSmoothStart = 0.5 + discRadius;
 const gridLineSmoothEnd = 0.5 - discRadius;
 
+const selectLineColor3D = new Vector4(0, 1, 1, 1);
+const selectLineWidth3D = 1;
+const selectLineColor2D = new Vector4(0, 1, 1, 1);
+const selectLineWidth2D = 2;
+
 export type HitType =
   | 'move_axis'
   | 'move_plane'
@@ -133,7 +138,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   static _axises = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)];
   static _primitives: Nullable<Partial<Record<GizmoMode, Primitive[]>>> = null;
   static _aalinePrimitive: Nullable<Primitive> = null;
-  static _aalinePositions: Float32Array<ArrayBuffer> = new Float32Array(3 * 4);
+  static _aalinePositions: Float32Array<ArrayBuffer> = new Float32Array(4 * 4);
   static _aalineAB: Float32Array<ArrayBuffer> = new Float32Array(4 * 4);
   private _aabbForEdit: Nullable<AABB>;
   private _snapping: number;
@@ -393,6 +398,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       if (this._mode === 'edit-aabb') {
         this.renderAABBGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       } else if (this._mode === 'edit-rect') {
+        this.renderSelectSpriteGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
         this.renderRectGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       } else if (this._mode === 'select') {
         if (this._node.isSprite()) {
@@ -1774,7 +1780,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     const ndcPoints = points.map((point) => {
       const v = new Vector3();
       this.calcSpriteVertexPosition(sprite, point[0], point[1], v);
-      return vpMatrix.transformPointP(v, v);
+      return vpMatrix.transformPoint(v);
     });
     for (let i = 0; i < 4; i++) {
       const A = ndcPoints[i];
@@ -1783,10 +1789,13 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         A.x,
         A.y,
         A.z,
+        A.w,
         B.x,
         B.y,
         B.z,
-        1,
+        B.w,
+        selectLineWidth2D,
+        selectLineColor2D,
         ctx.device.screenXToDevice(viewport.width),
         ctx.device.screenYToDevice(viewport.height),
         depthTex
@@ -1794,6 +1803,56 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
   }
   private renderSelectGizmo(ctx: DrawContext, depthTex: BaseTexture) {
+    ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
+    const points: number[][] = [
+      [0, 0, 0],
+      [1, 0, 0],
+      [1, 0, 1],
+      [0, 0, 1],
+      [0, 1, 0],
+      [1, 1, 0],
+      [1, 1, 1],
+      [0, 1, 1]
+    ];
+    const lines: number[][] = [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 0],
+      [4, 5],
+      [5, 6],
+      [6, 7],
+      [7, 4],
+      [0, 4],
+      [1, 5],
+      [2, 6],
+      [3, 7]
+    ];
+    const viewport = ctx.device.getViewport();
+    const ndcPoints = points.map((point) => {
+      const v = new Vector3(point[0], point[1], point[2]);
+      return PostGizmoRenderer._mvpMatrix.transformPoint(v);
+    });
+    for (const line of lines) {
+      const A = ndcPoints[line[0]];
+      const B = ndcPoints[line[1]];
+      this.renderAALine(
+        A.x,
+        A.y,
+        A.z,
+        A.w,
+        B.x,
+        B.y,
+        B.z,
+        B.w,
+        selectLineWidth3D,
+        selectLineColor3D,
+        ctx.device.screenXToDevice(viewport.width),
+        ctx.device.screenYToDevice(viewport.height),
+        depthTex
+      );
+    }
+    /*
     ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
     PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
     PostGizmoRenderer._bindGroup!.setValue('flip', this.needFlip(ctx.device) ? -1 : 1);
@@ -1805,6 +1864,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     ctx.device.setProgram(PostGizmoRenderer._gizmoSelectProgram);
     ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup!);
     PostGizmoRenderer._primitives!['select'][0]!.draw();
+    */
   }
   private renderAABBGizmo(ctx: DrawContext, depthTex: BaseTexture) {
     ctx.device.setRenderStates(PostGizmoRenderer._aabbRenderState);
@@ -1863,6 +1923,325 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     );
   }
   protected renderAALine(
+    clipX1: number,
+    clipY1: number,
+    clipZ1: number,
+    clipW1: number,
+    clipX2: number,
+    clipY2: number,
+    clipZ2: number,
+    clipW2: number,
+    pxWidth: number,
+    lineColor: Vector4,
+    viewportWidth: number,
+    viewportHeight: number,
+    depthTex: BaseTexture
+  ) {
+    const device = getDevice();
+    const EPS_W = 1e-4;
+    function ndc2screen(ndcX: number, ndcY: number, vpWidth: number, vpHeight: number) {
+      return [(ndcX + 1) * 0.5 * vpWidth, (ndcY + 1) * 0.5 * vpHeight] as const;
+    }
+    function screen2ndc(pxX: number, pxY: number, vpWidth: number, vpHeight: number) {
+      return [(pxX / vpWidth) * 2 - 1, (pxY / vpHeight) * 2 - 1] as const;
+    }
+
+    // Clip to w > EPS_W
+    function clipToPositiveW(
+      ax: number,
+      ay: number,
+      az: number,
+      aw: number,
+      bx: number,
+      by: number,
+      bz: number,
+      bw: number
+    ): [number, number, number, number, number, number, number, number] | null {
+      const aBad = aw <= EPS_W;
+      const bBad = bw <= EPS_W;
+
+      if (aBad && bBad) {
+        return null;
+      }
+      if (!aBad && !bBad) {
+        return [ax, ay, az, aw, bx, by, bz, bw];
+      }
+
+      const t = (EPS_W - aw) / (bw - aw); // solve aw + t(bw-aw) = EPS_W
+      const ix = ax + t * (bx - ax);
+      const iy = ay + t * (by - ay);
+      const iz = az + t * (bz - az);
+      const iw = EPS_W;
+
+      return aBad ? [ix, iy, iz, iw, bx, by, bz, bw] : [ax, ay, az, aw, ix, iy, iz, iw];
+    }
+
+    // Clip to -w <= z <= w
+    function clipZToClipVolumeGL(
+      ax: number,
+      ay: number,
+      az: number,
+      aw: number,
+      bx: number,
+      by: number,
+      bz: number,
+      bw: number
+    ): [number, number, number, number, number, number, number, number] | null {
+      let x0 = ax,
+        y0 = ay,
+        z0 = az,
+        w0 = aw;
+      let x1 = bx,
+        y1 = by,
+        z1 = bz,
+        w1 = bw;
+
+      // 线性不等式： z + w >= 0  (near) 以及  w - z >= 0 (far)
+      // 用 Liang-Barsky 思路在参数 t 上裁剪
+      let t0 = 0;
+      let t1p = 1;
+
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      const dz = z1 - z0;
+      const dw = w1 - w0;
+
+      function clipTest(p: number, q: number) {
+        // p * t <= q
+        if (Math.abs(p) < 1e-12) {
+          return q >= 0;
+        }
+        const r = q / p;
+        if (p < 0) {
+          if (r > t1p) {
+            return false;
+          }
+          if (r > t0) {
+            t0 = r;
+          }
+        } else {
+          if (r < t0) {
+            return false;
+          }
+          if (r < t1p) {
+            t1p = r;
+          }
+        }
+        return true;
+      }
+
+      // near: z + w >= 0  => -(dz+dw) * t <= z0 + w0
+      if (!clipTest(-(dz + dw), z0 + w0)) {
+        return null;
+      }
+      // far:  w - z >= 0  => -(dw-dz) * t <= w0 - z0
+      if (!clipTest(-(dw - dz), w0 - z0)) {
+        return null;
+      }
+
+      if (t1p < t0) {
+        return null;
+      }
+
+      const nx0 = x0 + t0 * dx,
+        ny0 = y0 + t0 * dy,
+        nz0 = z0 + t0 * dz,
+        nw0 = w0 + t0 * dw;
+      const nx1 = x0 + t1p * dx,
+        ny1 = y0 + t1p * dy,
+        nz1 = z0 + t1p * dz,
+        nw1 = w0 + t1p * dw;
+      return [nx0, ny0, nz0, nw0, nx1, ny1, nz1, nw1];
+    }
+
+    // ---- clip w ----
+    const wClipped = clipToPositiveW(clipX1, clipY1, clipZ1, clipW1, clipX2, clipY2, clipZ2, clipW2);
+    if (!wClipped) {
+      return;
+    }
+    [clipX1, clipY1, clipZ1, clipW1, clipX2, clipY2, clipZ2, clipW2] = wClipped;
+
+    // ---- clip z to GL clip volume ----
+    const zClipped = clipZToClipVolumeGL(clipX1, clipY1, clipZ1, clipW1, clipX2, clipY2, clipZ2, clipW2);
+    if (!zClipped) {
+      return;
+    }
+    [clipX1, clipY1, clipZ1, clipW1, clipX2, clipY2, clipZ2, clipW2] = zClipped;
+
+    // ---- calculate cliped SDF AB ----
+    const ndcX1 = clipX1 / clipW1;
+    const ndcY1 = clipY1 / clipW1;
+    const ndcX2 = clipX2 / clipW2;
+    const ndcY2 = clipY2 / clipW2;
+
+    const [pxX1, pxY1] = ndc2screen(ndcX1, ndcY1, viewportWidth, viewportHeight);
+    const [pxX2, pxY2] = ndc2screen(ndcX2, ndcY2, viewportWidth, viewportHeight);
+
+    // ---- calculate normal ----
+    const pxDX = pxX2 - pxX1;
+    const pxDY = pxY2 - pxY1;
+    const pxLenD = Math.hypot(pxDX, pxDY) || 1e-6;
+    const pxTX = pxDX / pxLenD;
+    const pxTY = pxDY / pxLenD;
+    const pxNX = -pxTY;
+    const pxNY = pxTX;
+    const r = pxWidth * 0.5 + 1;
+
+    const pxUpX1 = pxX1 + r * pxNX;
+    const pxUpY1 = pxY1 + r * pxNY;
+    const pxDownX1 = pxX1 - r * pxNX;
+    const pxDownY1 = pxY1 - r * pxNY;
+
+    const pxUpX2 = pxX2 + r * pxNX;
+    const pxUpY2 = pxY2 + r * pxNY;
+    const pxDownX2 = pxX2 - r * pxNX;
+    const pxDownY2 = pxY2 - r * pxNY;
+
+    const [ndcUpX1, ndcUpY1] = screen2ndc(pxUpX1, pxUpY1, viewportWidth, viewportHeight);
+    const [ndcDownX1, ndcDownY1] = screen2ndc(pxDownX1, pxDownY1, viewportWidth, viewportHeight);
+    const [ndcUpX2, ndcUpY2] = screen2ndc(pxUpX2, pxUpY2, viewportWidth, viewportHeight);
+    const [ndcDownX2, ndcDownY2] = screen2ndc(pxDownX2, pxDownY2, viewportWidth, viewportHeight);
+
+    // ndc to clip space
+    const clipUpX1 = ndcUpX1 * clipW1;
+    const clipUpY1 = ndcUpY1 * clipW1;
+    const clipDownX1 = ndcDownX1 * clipW1;
+    const clipDownY1 = ndcDownY1 * clipW1;
+
+    const clipUpX2 = ndcUpX2 * clipW2;
+    const clipUpY2 = ndcUpY2 * clipW2;
+    const clipDownX2 = ndcDownX2 * clipW2;
+    const clipDownY2 = ndcDownY2 * clipW2;
+
+    // ---- init resources ----
+    if (!PostGizmoRenderer._aalinePrimitive) {
+      PostGizmoRenderer._aalinePrimitive = new Primitive();
+      PostGizmoRenderer._aalinePrimitive.createAndSetVertexBuffer('position_f32x4', new Float32Array(4 * 4));
+      PostGizmoRenderer._aalinePrimitive.createAndSetVertexBuffer('tex0_f32x4', new Float32Array(4 * 4));
+      PostGizmoRenderer._aalinePrimitive.createAndSetIndexBuffer(new Uint16Array([0, 1, 2, 3]));
+      PostGizmoRenderer._aalinePrimitive.primitiveType = 'triangle-strip';
+    }
+
+    if (!PostGizmoRenderer._aalineProgram) {
+      PostGizmoRenderer._aalineProgram = device.buildRenderProgram({
+        vertex(pb) {
+          this.$inputs.pos = pb.vec4().attrib('position');
+          this.$inputs.AB = pb.vec4().attrib('texCoord0');
+          pb.main(function () {
+            this.$outputs.AB = this.$inputs.AB;
+            this.$builtins.position = this.$inputs.pos;
+            if (pb.getDevice().type === 'webgpu') {
+              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+            }
+          });
+        },
+        fragment(pb) {
+          this.pxWidth = pb.float().uniform(0);
+          this.lineColor = pb.vec4().uniform(0);
+          this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.texSize = pb.vec2().uniform(0);
+          this.$outputs.color = pb.vec4();
+
+          pb.func('sdSegment', [pb.vec2('p'), pb.vec2('a'), pb.vec2('b')], function () {
+            this.$l.ab = pb.sub(this.b, this.a);
+            this.$l.ap = pb.sub(this.p, this.a);
+            this.$l.t = pb.clamp(pb.div(pb.dot(this.ap, this.ab), pb.dot(this.ab, this.ab)), 0, 1);
+            this.$l.closest = pb.add(this.a, pb.mul(this.ab, this.t));
+            this.$return(pb.length(pb.sub(this.p, this.closest)));
+          });
+
+          pb.main(function () {
+            this.$l.P = this.$builtins.fragCoord.xy;
+            this.$l.dist = this.sdSegment(this.P, this.$inputs.AB.xy, this.$inputs.AB.zw);
+            this.$l.w = pb.fwidth(this.dist);
+            this.$l.alpha = pb.sub(
+              1,
+              pb.smoothStep(pb.sub(this.pxWidth, this.w), pb.add(this.pxWidth, this.w), this.dist)
+            );
+
+            this.$l.screenUV = pb.div(this.$builtins.fragCoord.xy, this.texSize);
+            this.$l.depth = this.$builtins.fragCoord.z;
+            this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
+            this.$l.sceneDepth = this.sceneDepthSample.r;
+
+            this.$if(pb.greaterThan(this.depth, this.sceneDepth), function () {
+              this.alpha = pb.mul(this.alpha, 0.5);
+            });
+
+            this.$outputs.color = pb.vec4(
+              pb.mul(this.lineColor.rgb, this.alpha),
+              pb.mul(this.lineColor.a, this.alpha)
+            );
+          });
+        }
+      });
+
+      PostGizmoRenderer._aalineBindGroup = device.createBindGroup(
+        PostGizmoRenderer._aalineProgram.bindGroupLayouts[0]
+      );
+    }
+
+    // ---- upload ----
+    const positions = PostGizmoRenderer._aalinePrimitive.getVertexBuffer('position')!;
+    if (!PostGizmoRenderer._aalinePositions || PostGizmoRenderer._aalinePositions.length !== 16) {
+      PostGizmoRenderer._aalinePositions = new Float32Array(16);
+    }
+    PostGizmoRenderer._aalinePositions.set([
+      clipUpX1,
+      clipUpY1,
+      clipZ1,
+      clipW1,
+      clipDownX1,
+      clipDownY1,
+      clipZ1,
+      clipW1,
+      clipUpX2,
+      clipUpY2,
+      clipZ2,
+      clipW2,
+      clipDownX2,
+      clipDownY2,
+      clipZ2,
+      clipW2
+    ]);
+    positions.bufferSubData(0, PostGizmoRenderer._aalinePositions);
+
+    const pxAB = PostGizmoRenderer._aalinePrimitive.getVertexBuffer('texCoord0');
+    if (!PostGizmoRenderer._aalineAB || PostGizmoRenderer._aalineAB.length !== 16) {
+      PostGizmoRenderer._aalineAB = new Float32Array(16);
+    }
+    PostGizmoRenderer._aalineAB.set([
+      pxX1,
+      pxY1,
+      pxX2,
+      pxY2,
+      pxX1,
+      pxY1,
+      pxX2,
+      pxY2,
+      pxX1,
+      pxY1,
+      pxX2,
+      pxY2,
+      pxX1,
+      pxY1,
+      pxX2,
+      pxY2
+    ]);
+    pxAB.bufferSubData(0, PostGizmoRenderer._aalineAB);
+
+    PostGizmoRenderer._aalineBindGroup.setValue('pxWidth', pxWidth * 0.5);
+    PostGizmoRenderer._aalineBindGroup.setValue('lineColor', lineColor);
+    PostGizmoRenderer._aalineBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
+    PostGizmoRenderer._aalineBindGroup.setTexture('depthTex', depthTex, fetchSampler('clamp_nearest_nomip'));
+
+    device.setProgram(PostGizmoRenderer._aalineProgram);
+    device.setBindGroup(0, PostGizmoRenderer._aalineBindGroup);
+    device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
+    PostGizmoRenderer._aalinePrimitive.draw();
+  }
+  /*
+  protected renderAALine(
     ndcX1: number,
     ndcY1: number,
     ndcZ1: number,
@@ -1870,6 +2249,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     ndcY2: number,
     ndcZ2: number,
     pxWidth: number,
+    lineColor: Vector4,
     viewportWidth: number,
     viewportHeight: number,
     depthTex: BaseTexture
@@ -2003,7 +2383,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     pxAB.bufferSubData(0, PostGizmoRenderer._aalineAB);
 
     PostGizmoRenderer._aalineBindGroup.setValue('pxWidth', pxWidth * 0.5);
-    PostGizmoRenderer._aalineBindGroup.setValue('lineColor', new Vector4(1, 0, 0, 1));
+    PostGizmoRenderer._aalineBindGroup.setValue('lineColor', lineColor);
     PostGizmoRenderer._aalineBindGroup.setValue('texSize', PostGizmoRenderer._texSize);
     PostGizmoRenderer._aalineBindGroup.setTexture('depthTex', depthTex, fetchSampler('clamp_nearest_nomip'));
     device.setProgram(PostGizmoRenderer._aalineProgram);
@@ -2011,4 +2391,5 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
     PostGizmoRenderer._aalinePrimitive.draw();
   }
+    */
 }
