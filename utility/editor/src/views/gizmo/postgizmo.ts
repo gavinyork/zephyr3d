@@ -53,7 +53,9 @@ export type HitType =
   | 'rotate_axis'
   | 'rotate_free'
   | 'scale_axis'
-  | 'scale_uniform';
+  | 'scale_uniform'
+  | 'sprite_handle'
+  | 'sprite_anchor';
 export type GizmoMode =
   | 'none'
   | 'translation'
@@ -102,6 +104,16 @@ type AABBInfo = {
   axis: CubeFace;
   pointOnPlane: Vector3;
   planeNormal: Vector3;
+};
+
+type RectInfo = {
+  type: HitType;
+  coord: number;
+  anchorPos: Vector3;
+  xAxis: Vector3;
+  yAxis: Vector3;
+  width: number;
+  height: number;
 };
 
 /**
@@ -162,12 +174,14 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _rotateInfo: Nullable<RotateInfo>;
   private _scaleInfo: Nullable<ScaleInfo>;
   private _aabbInfo: Nullable<AABBInfo>;
+  private _rectInfo: Nullable<RectInfo>;
   private _hitInfo: Nullable<GizmoHitInfo>;
   private readonly _screenSize: number;
   private _drawGrid: boolean;
   private readonly _scaleBox: AABB;
   private readonly _nodeBox: AABB;
-  private readonly _rectInstanceParams: Float32Array;
+  private readonly _rectHandles: number[][];
+  private readonly _rectHandlePositions: Vector3[];
   /**
    * Creates an instance of PostGizmoRenderer.
    */
@@ -198,10 +212,23 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._translatePlaneInfo = null;
     this._rotateInfo = null;
     this._scaleInfo = null;
+    this._aabbInfo = null;
+    this._rectInfo = null;
     this._hitInfo = null;
     this._screenSize = 0.4;
     this._gridParams = new Vector4(10000, 500, 0, 0);
-    this._rectInstanceParams = new Float32Array(3 * 9);
+    this._rectHandles = [
+      [0, 0],
+      [0.5, 0],
+      [1, 0],
+      [0, 0.5],
+      [0, 0],
+      [1, 0.5],
+      [0, 1],
+      [0.5, 1],
+      [1, 1]
+    ];
+    this._rectHandlePositions = this._rectHandles.map(() => new Vector3());
     this._rectHandleSize = 12;
     this._gridSteps = new Float32Array([
       1, 1, 0, 0, 10, 10, 0, 0, 100, 100, 0, 0, 1000, 1000, 0, 0, 1000, 1000, 0, 0, 1000, 1000, 0, 0, 1000,
@@ -264,6 +291,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       this._endScale();
       this._endRotate();
       this._endAABB();
+      this._endRect();
       this._mode = val;
     }
     if (this._mode !== 'edit-aabb' && this._node && this._node === PostGizmoRenderer._aabbMesh.get()) {
@@ -398,7 +426,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       if (this._mode === 'edit-aabb') {
         this.renderAABBGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       } else if (this._mode === 'edit-rect') {
-        this.renderSelectSpriteGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
+        this.renderSelectSpriteGizmo(ctx, destFramebuffer!.getDepthAttachment()!, 0.5);
         this.renderRectGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       } else if (this._mode === 'select') {
         if (this._node.isSprite()) {
@@ -422,7 +450,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     ctx.device.pool.releaseFrameBuffer(tmpFramebuffer);
   }
   updateHitInfo(x: number, y: number) {
-    if (this._translatePlaneInfo || this._scaleInfo || this._rotateInfo || this._aabbInfo) {
+    if (this._translatePlaneInfo || this._scaleInfo || this._rotateInfo || this._aabbInfo || this._rectInfo) {
       return;
     }
     if (
@@ -438,6 +466,25 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           : null;
       } else {
         this._hitInfo = this.rayIntersection(ray);
+      }
+    } else if (this._mode === 'edit-rect') {
+      const ndcPos = new Vector3();
+      this._hitInfo = null;
+      for (let i = 0; i < this._rectHandlePositions.length; i++) {
+        this._camera.viewProjectionMatrix.transformPointP(this._rectHandlePositions[i], ndcPos);
+        const screenX = (ndcPos.x * 0.5 + 0.5) * this._camera.viewport![2];
+        const screenY = (1 - (ndcPos.y * 0.5 + 0.5)) * this._camera.viewport![3];
+        const size = this._rectHandleSize >> 1;
+        if (Math.abs(x - screenX) <= size && Math.abs(y - screenY) <= size) {
+          this._hitInfo = {
+            axis: 0,
+            coord: i,
+            distance: 0,
+            type: i === 4 ? 'sprite_anchor' : 'sprite_handle',
+            pointLocal: null,
+            pointWorld: null
+          };
+        }
       }
     } else {
       this._hitInfo = null;
@@ -455,13 +502,15 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       this._endTranslation();
       this._endScale();
       this._endAABB();
+      this._endRect();
       return false;
     }
     if (
       this._mode === 'rotation' ||
       this._mode === 'scaling' ||
       this._mode === 'translation' ||
-      (this._mode === 'edit-aabb' && this._aabbForEdit)
+      (this._mode === 'edit-aabb' && this._aabbForEdit) ||
+      (this._mode === 'edit-rect' && this._node?.isSprite())
     ) {
       if (type === 'pointerdown' && button === 0) {
         if (this._hitInfo) {
@@ -479,6 +528,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           }
           if (this._mode === 'edit-aabb' && !this._aabbInfo) {
             this._beginAABB(x, y, this._hitInfo.axis as CubeFace, this._hitInfo.pointLocal);
+            return true;
+          }
+          if (this._mode === 'edit-rect' && !this._rectInfo) {
+            this._beginRect(x, y, this._hitInfo.type!, this._hitInfo.coord);
             return true;
           }
         }
@@ -500,6 +553,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           this._updateAABB(x, y);
           return true;
         }
+        if (this._mode === 'edit-rect' && this._rectInfo) {
+          this._updateRect(x, y);
+          return true;
+        }
       }
       if (type === 'pointerup' && button === 0) {
         if (this._mode === 'translation' && this._translatePlaneInfo) {
@@ -516,6 +573,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         }
         if (this._mode === 'edit-aabb' && this._aabbInfo) {
           this._endAABB();
+          return true;
+        }
+        if (this._mode === 'edit-rect' && this._rectInfo) {
+          this._endRect();
           return true;
         }
       }
@@ -629,6 +690,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._endTranslation();
     this._endScale();
     this._endAABB();
+    this._endRect();
     getDevice().canvas.style.cursor = 'grab';
     const center = new Vector3();
     this._node!.worldMatrix.decompose(null, null, center);
@@ -729,10 +791,128 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       }
     }
   }
+  private _beginRect(startX: number, startY: number, type: HitType, coord: number) {
+    this._endRotate();
+    this._endTranslation();
+    this._endScale();
+    this._endAABB();
+    getDevice().canvas.style.cursor = 'grab';
+    const sprite = this._node as Sprite;
+    const anchorPosW = new Vector3();
+    const ltPosW = new Vector3();
+    const rtPosW = new Vector3();
+    const lbPosW = new Vector3();
+    const rbPosW = new Vector3();
+    this.calcSpriteVertexPosition(sprite, this._rectHandles[4][0], this._rectHandles[4][1], anchorPosW);
+    this.calcSpriteVertexPosition(sprite, 0, 0, ltPosW);
+    this.calcSpriteVertexPosition(sprite, 1, 0, rtPosW);
+    this.calcSpriteVertexPosition(sprite, 0, 1, lbPosW);
+    this.calcSpriteVertexPosition(sprite, 1, 1, rbPosW);
+    const vx = Vector3.sub(rtPosW, ltPosW);
+    const width = vx.magnitude;
+    const xAxis = vx.scaleBy(1 / width);
+    const vy = Vector3.sub(lbPosW, ltPosW);
+    const height = vy.magnitude;
+    const yAxis = vy.scaleBy(1 / height);
+    this._rectInfo = {
+      type,
+      coord,
+      anchorPos: anchorPosW,
+      xAxis,
+      yAxis,
+      width,
+      height
+    };
+  }
+  private _updateRect(_x: number, _y: number) {
+    const sprite = this._node as Sprite;
+    const handle = this._rectHandles[this._rectInfo.coord];
+
+    const ndcX = (_x / this._camera.viewport![2]) * 2 - 1;
+    const ndcY = 1 - (_y / this._camera.viewport![3]) * 2;
+    const worldPos = this._camera.invViewProjectionMatrix.transformPointP(new Vector3(ndcX, ndcY, 0));
+
+    if (this._rectInfo.coord === 4) {
+      const lt = this.calcSpriteVertexPosition(sprite, 0, 0);
+      const rt = this.calcSpriteVertexPosition(sprite, 1, 0);
+      const lb = this.calcSpriteVertexPosition(sprite, 0, 1);
+      const width = Vector3.distance(lt, rt);
+      const height = Vector3.distance(lt, lb);
+      const deltaX = Vector3.dot(Vector3.sub(worldPos, lt), this._rectInfo.xAxis);
+      const deltaY = Vector3.dot(Vector3.sub(worldPos, lt), this._rectInfo.yAxis);
+      sprite.anchorX = deltaX / width;
+      sprite.anchorY = deltaY / height;
+      sprite.position.x = worldPos.x - sprite.parent.getWorldPosition().x;
+      sprite.position.y = worldPos.y - sprite.parent.getWorldPosition().y;
+      return;
+    }
+
+    const resizeX = handle[0] !== 0.5 && this._rectInfo.coord !== 4;
+    const resizeY = handle[1] !== 0.5 && this._rectInfo.coord !== 4;
+    if (resizeX) {
+      const wPositions = this._rectHandles.map((p) => this.calcSpriteVertexPosition(sprite, p[0], p[1]));
+      const delta = Vector3.dot(
+        Vector3.sub(worldPos, wPositions[this._rectInfo.coord]),
+        this._rectInfo.xAxis
+      );
+      const left =
+        handle[0] === 0
+          ? Vector3.add(wPositions[0], Vector3.scale(this._rectInfo.xAxis, delta))
+          : wPositions[0];
+      const right =
+        handle[0] === 1
+          ? Vector3.add(wPositions[2], Vector3.scale(this._rectInfo.xAxis, delta))
+          : wPositions[2];
+      const width = Vector3.distance(wPositions[0], wPositions[2]);
+      const newWidth = Vector3.distance(left, right);
+      const height = Vector3.distance(wPositions[0], wPositions[6]);
+      const scaleX = width > 1e-6 ? newWidth / width : 1;
+      sprite.scale.x *= scaleX;
+
+      const anchor = Vector3.add(
+        Vector3.add(left, Vector3.scale(this._rectInfo.xAxis, newWidth * sprite.anchorX)),
+        Vector3.scale(this._rectInfo.yAxis, height * sprite.anchorY)
+      );
+      sprite.position.x = anchor.x - sprite.parent.getWorldPosition().x;
+      sprite.position.y = anchor.y - sprite.parent.getWorldPosition().y;
+    }
+    if (resizeY) {
+      const wPositions = this._rectHandles.map((p) => this.calcSpriteVertexPosition(sprite, p[0], p[1]));
+      const delta = Vector3.dot(
+        Vector3.sub(worldPos, wPositions[this._rectInfo.coord]),
+        this._rectInfo.yAxis
+      );
+      const top =
+        handle[1] === 0
+          ? Vector3.add(wPositions[0], Vector3.scale(this._rectInfo.yAxis, delta))
+          : wPositions[0];
+      const bottom =
+        handle[1] === 1
+          ? Vector3.add(wPositions[6], Vector3.scale(this._rectInfo.yAxis, delta))
+          : wPositions[6];
+      const width = Vector3.distance(wPositions[0], wPositions[2]);
+      const height = Vector3.distance(wPositions[0], wPositions[6]);
+      const newHeight = Vector3.distance(top, bottom);
+      const scaleY = height > 1e-6 ? newHeight / height : 1;
+      sprite.scale.y *= scaleY;
+
+      const anchor = Vector3.add(
+        Vector3.add(top, Vector3.scale(this._rectInfo.xAxis, width * sprite.anchorX)),
+        Vector3.scale(this._rectInfo.yAxis, newHeight * sprite.anchorY)
+      );
+      sprite.position.x = anchor.x - sprite.parent.getWorldPosition().x;
+      sprite.position.y = anchor.y - sprite.parent.getWorldPosition().y;
+    }
+  }
+  private _endRect() {
+    getDevice().canvas.style.cursor = 'default';
+    this._rectInfo = null;
+  }
   private _beginAABB(startX: number, startY: number, axis: CubeFace, pointLocal: Vector3) {
     this._endTranslation();
     this._endRotate();
     this._endScale();
+    this._endRect();
     getDevice().canvas.style.cursor = 'grab';
     const ray = this._camera.constructRay(startX, startY);
     const v = Vector3.abs(Vector3.sub(pointLocal, ray.origin));
@@ -751,9 +931,6 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     };
   }
   private _updateAABB(x: number, y: number) {
-    if (!this._aabbInfo) {
-      return;
-    }
     const ray = this._camera.constructRay(x, y);
     const hit = this.rayPlaneIntersection(
       this._aabbInfo.pointOnPlane,
@@ -803,6 +980,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._endRotate();
     this._endTranslation();
     this._endAABB();
+    this._endRect();
     getDevice().canvas.style.cursor = 'grab';
     let planeAxis = axis;
     if (type === 'move_axis') {
@@ -879,6 +1057,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._endRotate();
     this._endScale();
     this._endAABB();
+    this._endRect();
     getDevice().canvas.style.cursor = 'grab';
     let planeAxis = axis;
     if (type === 'move_axis') {
@@ -1705,29 +1884,21 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     PostGizmoRenderer._bindGroup!.setTexture('depthTex', depthTex, fetchSampler('clamp_nearest_nomip'));
     ctx.device.setProgram(PostGizmoRenderer._gizmoProgram);
     ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup!);
-    const v = new Vector3();
     const sprite = this._node as Sprite;
     const viewport = ctx.device.getViewport();
     const projMatrix = this._camera.getProjectionMatrix();
     const projWidth = Math.abs(projMatrix.getRightPlane() - projMatrix.getLeftPlane());
     const projHeight = Math.abs(projMatrix.getBottomPlane() - projMatrix.getTopPlane());
-    const points: number[][] = [
-      [0, 0],
-      [0.5, 0],
-      [1, 0],
-      [0, 0.5],
-      [sprite.anchorX, sprite.anchorY],
-      [1, 0.5],
-      [0, 1],
-      [0.5, 1],
-      [1, 1]
-    ];
-    for (const p of points) {
+    this._rectHandles[4][0] = sprite.anchorX;
+    this._rectHandles[4][1] = sprite.anchorY;
+    for (let i = 0; i < this._rectHandles.length; i++) {
+      const p = this._rectHandles[i];
+      const v = this._rectHandlePositions[i];
       this.calcSpriteVertexPosition(sprite, p[0], p[1], v);
       const scaleY = (this._rectHandleSize / 2 / viewport.height) * projHeight;
       const scaleX = scaleY * (viewport.height / viewport.width) * (projWidth / projHeight);
       PostGizmoRenderer._mvpMatrix
-        .scaling(new Vector3(scaleX, scaleY, 0))
+        .scalingXYZ(scaleX, scaleY, 0)
         .translateLeft(v)
         .multiplyLeft(this._camera.viewProjectionMatrix);
       PostGizmoRenderer._bindGroup!.setValue('mvpMatrix', PostGizmoRenderer._mvpMatrix);
@@ -1766,7 +1937,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       : PostGizmoRenderer._primitives![this._mode][this._orthoDirection + 1]!
     ).draw();
   }
-  private renderSelectSpriteGizmo(ctx: DrawContext, depthTex: BaseTexture) {
+  private renderSelectSpriteGizmo(ctx: DrawContext, depthTex: BaseTexture, lineWidth?: number) {
     ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
     const points: number[][] = [
       [0, 0],
@@ -1794,7 +1965,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         B.y,
         B.z,
         B.w,
-        selectLineWidth2D,
+        lineWidth ?? selectLineWidth2D,
         selectLineColor2D,
         ctx.device.screenXToDevice(viewport.width),
         ctx.device.screenYToDevice(viewport.height),
@@ -1888,7 +2059,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup!);
     PostGizmoRenderer._primitives!['edit-aabb'][0]!.draw();
   }
-  private calcSpriteVertexPosition(sprite: BaseSprite<any>, x: number, y: number, outWorldPos: Vector3) {
+  private calcSpriteVertexPosition(sprite: BaseSprite<any>, x: number, y: number, outWorldPos?: Vector3) {
+    outWorldPos = outWorldPos || new Vector3();
     const worldPos = tmpVecS;
     const forward = tmpVecT;
     const axis = tmpVecR;
@@ -1921,6 +2093,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       Vector3.scale(upRot, vy),
       outWorldPos
     );
+    return outWorldPos;
   }
   protected renderAALine(
     clipX1: number,

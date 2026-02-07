@@ -4017,6 +4017,35 @@ export class Matrix4x4 extends VectorBase {
     return result;
   }
   /**
+   * Creates a Matrix4x4 which presents a translation.
+   * @param tx - The translate of x axis.
+   * @param ty - The translate of y axis.
+   * @param tz - The translate of z axis.
+   * @param result - The output matrix. if not specified, a new matrix will be created.
+   * @returns The output matrix
+   */
+  static translationXYZ(tx: number, ty: number, tz: number, result?: Matrix4x4) {
+    result = result || new Matrix4x4();
+    result[0] = 1;
+    result[1] = 0;
+    result[2] = 0;
+    result[3] = 0;
+    result[4] = 0;
+    result[5] = 1;
+    result[6] = 0;
+    result[7] = 0;
+    result[8] = 0;
+    result[9] = 0;
+    result[10] = 1;
+    result[11] = 0;
+    result[12] = tx;
+    result[13] = ty;
+    result[14] = tz;
+    result[15] = 1;
+
+    return result;
+  }
+  /**
    * Creates a Matrix4x4 which presents a scaling.
    * @param s - The scale vector.
    * @param result - The output matrix. if not specified, a new matrix will be created.
@@ -4035,6 +4064,35 @@ export class Matrix4x4 extends VectorBase {
     result[8] = 0;
     result[9] = 0;
     result[10] = s.z;
+    result[11] = 0;
+    result[12] = 0;
+    result[13] = 0;
+    result[14] = 0;
+    result[15] = 1;
+
+    return result;
+  }
+  /**
+   * Creates a Matrix4x4 which presents a scaling.
+   * @param sx - The scale of x axis.
+   * @param sy - The scale of y axis.
+   * @param sz - The scale of z axis.
+   * @param result - The output matrix. if not specified, a new matrix will be created.
+   * @returns The output matrix
+   */
+  static scalingXYZ(sx: number, sy: number, sz: number, result?: Matrix4x4) {
+    result = result || new Matrix4x4();
+    result[0] = sx;
+    result[1] = 0;
+    result[2] = 0;
+    result[3] = 0;
+    result[4] = 0;
+    result[5] = sy;
+    result[6] = 0;
+    result[7] = 0;
+    result[8] = 0;
+    result[9] = 0;
+    result[10] = sz;
     result[11] = 0;
     result[12] = 0;
     result[13] = 0;
@@ -4962,12 +5020,34 @@ export class Matrix4x4 extends VectorBase {
     return this;
   }
   /**
+   * Calculates a translation matrix inplace with individual translation factors.
+   * @param tx - The translation of x axis.
+   * @param ty - The translation of y axis.
+   * @param tz - The translation of z axis.
+   * @returns self
+   */
+  translationXYZ(tx: number, ty: number, tz: number) {
+    Matrix4x4.translationXYZ(tx, ty, tz, this);
+    return this;
+  }
+  /**
    * Calculates a scale matrix inplace.
    * @param s - The scale vector.
    * @returns self
    */
   scaling(s: Vector3) {
     Matrix4x4.scaling(s, this);
+    return this;
+  }
+  /**
+   * Calculates a scale matrix inplace with individual scale factors.
+   * @param sx - The scale of x axis.
+   * @param sy - The scale of y axis.
+   * @param sz - The scale of z axis.
+   * @returns self
+   */
+  scalingXYZ(sx: number, sy: number, sz: number) {
+    Matrix4x4.scalingXYZ(sx, sy, sz, this);
     return this;
   }
   /**
@@ -5344,56 +5424,148 @@ export class Matrix4x4 extends VectorBase {
     rotation?: Nullable<Quaternion | Matrix3x3 | Matrix4x4>,
     translation?: Nullable<Vector3>
   ) {
+    // translation (last column)
     if (translation) {
       translation.setXYZ(this[12], this[13], this[14]);
     }
-    const sign = this.det() <= 0 ? -1 : 1;
-    const sx = Math.hypot(this[0], this[1], this[2]);
-    const sy = Math.hypot(this[4], this[5], this[6]) * sign;
-    const sz = Math.hypot(this[8], this[9], this[10]);
+
+    // basis in columns (linear part)
+    const c0x = this[0],
+      c0y = this[1],
+      c0z = this[2];
+    const c1x = this[4],
+      c1y = this[5],
+      c1z = this[6];
+    const c2x = this[8],
+      c2y = this[9],
+      c2z = this[10];
+
+    let sx = Math.hypot(c0x, c0y, c0z);
+    let sy = Math.hypot(c1x, c1y, c1z);
+    let sz = Math.hypot(c2x, c2y, c2z);
+
+    const eps = 1e-8;
+    if (sx < eps || sy < eps || sz < eps) {
+      // Degenerate: rotation not well-defined
+      if (scale) {
+        scale.setXYZ(sx, sy, sz);
+      }
+      if (rotation instanceof Quaternion) {
+        rotation.setXYZW(0, 0, 0, 1);
+      } else if (rotation instanceof Matrix3x3) {
+        rotation[0] = 1;
+        rotation[1] = 0;
+        rotation[2] = 0;
+        rotation[3] = 0;
+        rotation[4] = 1;
+        rotation[5] = 0;
+        rotation[6] = 0;
+        rotation[7] = 0;
+        rotation[8] = 1;
+      } else if (rotation instanceof Matrix4x4) {
+        rotation[0] = 1;
+        rotation[1] = 0;
+        rotation[2] = 0;
+        rotation[3] = 0;
+        rotation[4] = 0;
+        rotation[5] = 1;
+        rotation[6] = 0;
+        rotation[7] = 0;
+        rotation[8] = 0;
+        rotation[9] = 0;
+        rotation[10] = 1;
+        rotation[11] = 0;
+        rotation[12] = 0;
+        rotation[13] = 0;
+        rotation[14] = 0;
+        rotation[15] = 1;
+      }
+      return this;
+    }
+
+    // Build R from normalized columns
+    let r0x = c0x / sx,
+      r0y = c0y / sx,
+      r0z = c0z / sx;
+    let r1x = c1x / sy,
+      r1y = c1y / sy,
+      r1z = c1z / sy;
+    let r2x = c2x / sz,
+      r2y = c2y / sz,
+      r2z = c2z / sz;
+
+    // det(R) = dot(r0, cross(r1, r2))
+    const cx = r1y * r2z - r1z * r2y;
+    const cy = r1z * r2x - r1x * r2z;
+    const cz = r1x * r2y - r1y * r2x;
+    const detR = r0x * cx + r0y * cy + r0z * cz;
+
+    if (detR < 0) {
+      // Stable normalization: put the minus sign on the largest-magnitude scale axis
+      if (sx >= sy && sx >= sz) {
+        sx = -sx;
+        r0x = -r0x;
+        r0y = -r0y;
+        r0z = -r0z;
+      } else if (sy >= sx && sy >= sz) {
+        sy = -sy;
+        r1x = -r1x;
+        r1y = -r1y;
+        r1z = -r1z;
+      } else {
+        sz = -sz;
+        r2x = -r2x;
+        r2y = -r2y;
+        r2z = -r2z;
+      }
+    }
+
     if (scale) {
       scale.setXYZ(sx, sy, sz);
     }
+
     if (rotation instanceof Quaternion) {
-      const rotationMatrix = new Matrix3x3(this);
-      rotationMatrix[0] /= sx;
-      rotationMatrix[1] /= sx;
-      rotationMatrix[2] /= sx;
-      rotationMatrix[3] /= sy;
-      rotationMatrix[4] /= sy;
-      rotationMatrix[5] /= sy;
-      rotationMatrix[6] /= sz;
-      rotationMatrix[7] /= sz;
-      rotationMatrix[8] /= sz;
-      rotation.fromRotationMatrix(rotationMatrix);
+      const rm = new Matrix3x3();
+      // columns packed into 3x3
+      rm[0] = r0x;
+      rm[1] = r0y;
+      rm[2] = r0z;
+      rm[3] = r1x;
+      rm[4] = r1y;
+      rm[5] = r1z;
+      rm[6] = r2x;
+      rm[7] = r2y;
+      rm[8] = r2z;
+      rotation.fromRotationMatrix(rm);
     } else if (rotation instanceof Matrix3x3) {
-      rotation[0] = this[0] / sx;
-      rotation[1] = this[1] / sx;
-      rotation[2] = this[2] / sx;
-      rotation[3] = this[4] / sy;
-      rotation[4] = this[5] / sy;
-      rotation[5] = this[6] / sy;
-      rotation[6] = this[8] / sz;
-      rotation[7] = this[9] / sz;
-      rotation[8] = this[10] / sz;
+      rotation[0] = r0x;
+      rotation[1] = r0y;
+      rotation[2] = r0z;
+      rotation[3] = r1x;
+      rotation[4] = r1y;
+      rotation[5] = r1z;
+      rotation[6] = r2x;
+      rotation[7] = r2y;
+      rotation[8] = r2z;
     } else if (rotation instanceof Matrix4x4) {
-      rotation[0] = this[0] / sx;
-      rotation[1] = this[1] / sx;
-      rotation[2] = this[2] / sx;
+      rotation[0] = r0x;
+      rotation[1] = r0y;
+      rotation[2] = r0z;
       rotation[3] = 0;
-      rotation[4] = this[4] / sy;
-      rotation[5] = this[5] / sy;
-      rotation[6] = this[6] / sy;
+      rotation[4] = r1x;
+      rotation[5] = r1y;
+      rotation[6] = r1z;
       rotation[7] = 0;
-      rotation[8] = this[8] / sz;
-      rotation[9] = this[9] / sz;
-      rotation[10] = this[10] / sz;
+      rotation[8] = r2x;
+      rotation[9] = r2y;
+      rotation[10] = r2z;
       rotation[11] = 0;
       rotation[12] = 0;
       rotation[13] = 0;
       rotation[14] = 0;
       rotation[15] = 1;
     }
+
     return this;
   }
   /**
