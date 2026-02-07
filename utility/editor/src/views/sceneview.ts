@@ -437,7 +437,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           }
         },
         {
-          label: '-'
+          label: '-',
+          visible: () => {
+            return this._postGizmoRenderer!.mode === 'translation';
+          }
         },
         {
           label: FontGlyph.glyphs['link'],
