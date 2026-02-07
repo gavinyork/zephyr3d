@@ -109,11 +109,8 @@ type AABBInfo = {
 type RectInfo = {
   type: HitType;
   coord: number;
-  anchorPos: Vector3;
   xAxis: Vector3;
   yAxis: Vector3;
-  width: number;
-  height: number;
 };
 
 /**
@@ -798,30 +795,19 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._endAABB();
     getDevice().canvas.style.cursor = 'grab';
     const sprite = this._node as Sprite;
-    const anchorPosW = new Vector3();
     const ltPosW = new Vector3();
     const rtPosW = new Vector3();
     const lbPosW = new Vector3();
     const rbPosW = new Vector3();
-    this.calcSpriteVertexPosition(sprite, this._rectHandles[4][0], this._rectHandles[4][1], anchorPosW);
     this.calcSpriteVertexPosition(sprite, 0, 0, ltPosW);
     this.calcSpriteVertexPosition(sprite, 1, 0, rtPosW);
     this.calcSpriteVertexPosition(sprite, 0, 1, lbPosW);
     this.calcSpriteVertexPosition(sprite, 1, 1, rbPosW);
-    const vx = Vector3.sub(rtPosW, ltPosW);
-    const width = vx.magnitude;
-    const xAxis = vx.scaleBy(1 / width);
-    const vy = Vector3.sub(lbPosW, ltPosW);
-    const height = vy.magnitude;
-    const yAxis = vy.scaleBy(1 / height);
     this._rectInfo = {
       type,
       coord,
-      anchorPos: anchorPosW,
-      xAxis,
-      yAxis,
-      width,
-      height
+      xAxis: Vector3.sub(rtPosW, ltPosW).inplaceNormalize(),
+      yAxis: Vector3.sub(lbPosW, ltPosW).inplaceNormalize()
     };
   }
   private _updateRect(_x: number, _y: number) {
