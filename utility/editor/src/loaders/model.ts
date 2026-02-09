@@ -1,4 +1,4 @@
-import type { TypedArray, Interpolator, VFS } from '@zephyr3d/base';
+import type { TypedArray, Interpolator, VFS, Nullable } from '@zephyr3d/base';
 import { ASSERT, DRef, uint8ArrayToBase64, Vector4 } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type {
@@ -246,6 +246,7 @@ export interface AssetSubMeshData {
  */
 export interface AssetMeshData {
   morphWeights?: number[];
+  morphNames?: string[];
   subMeshes: AssetSubMeshData[];
 }
 
@@ -855,7 +856,7 @@ export class SharedModel extends Disposable {
           meshNode.material = await this.createMaterial(manager, subMesh.material);
           meshNode.parent = node;
           subMesh.mesh = meshNode;
-          processMorphData(subMesh, meshData.morphWeights);
+          processMorphData(subMesh, meshData.morphWeights, meshData.morphNames);
           if (skeleton) {
             if (!skeletonMeshMap.has(skeleton)) {
               skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });
@@ -1196,7 +1197,11 @@ export class SharedModel extends Disposable {
 }
 
 /** @internal */
-function processMorphData(subMesh: AssetSubMeshData, morphWeights: number[]) {
+function processMorphData(
+  subMesh: AssetSubMeshData,
+  morphWeights: number[],
+  morphNames?: Nullable<string[]>
+) {
   const device = getDevice();
   const numTargets = subMesh.numTargets;
   if (numTargets === 0) {
@@ -1254,8 +1259,13 @@ function processMorphData(subMesh: AssetSubMeshData, morphWeights: number[]) {
   morphBoundingBox.minPoint.addBy(meshAABB.minPoint);
   morphBoundingBox.maxPoint.addBy(meshAABB.maxPoint);
 
+  const names: Record<string, number> = {};
+  for (let i = 0; i < numTargets; i++) {
+    const name = morphNames?.[i] ?? `Target${i}`;
+    names[name] = i;
+  }
   subMesh.mesh.setMorphData({ width: textureSize, height: textureSize, data: textureData });
-  subMesh.mesh.setMorphInfo({ data: weightsAndOffsets });
+  subMesh.mesh.setMorphInfo({ data: weightsAndOffsets, names });
   subMesh.mesh.setAnimatedBoundingBox(morphBoundingBox);
 }
 

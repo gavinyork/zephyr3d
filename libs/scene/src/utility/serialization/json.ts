@@ -82,7 +82,9 @@ export class JSONData extends JSONProp {
   }
   updateProps(): any {
     for (const key of Object.keys(this.data)) {
-      delete this.data[key];
+      if (!this.value.find((p) => p?.name === key)) {
+        delete this.data[key];
+      }
     }
     for (const prop of this.value) {
       if (prop instanceof JSONData) {

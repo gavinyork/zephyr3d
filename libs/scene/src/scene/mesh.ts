@@ -55,6 +55,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   protected _morphInfo: Nullable<MorphInfo>;
   /** @internal */
+  protected _morphDirty: boolean;
+  /** @internal */
   protected _instanceHash: Nullable<string>;
   /** @internal */
   protected _batchable: boolean;
@@ -86,6 +88,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._boneMatrices = new DRef();
     this._morphData = null;
     this._morphInfo = null;
+    this._morphDirty = false;
     this._instanceHash = null;
     this._pickTarget = { node: this };
     this._batchable = getDevice().type !== 'webgl';
@@ -303,6 +306,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
         } as MorphInfo;
       }
       this._morphInfo.data = info.data.slice();
+      this._morphInfo.names = { ...info.names };
       if (info.buffer?.get()) {
         this._morphInfo.buffer!.set(info.buffer.get());
       } else {
@@ -324,6 +328,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
         );
         this._morphInfo.buffer!.set(morphUniformBuffer);
       }
+      this._morphDirty = false;
       this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
     }
@@ -334,10 +339,57 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   getMorphInfo() {
     return this._morphInfo;
   }
+  /**
+   * Update morph target weight
+   *
+   * @param name - The name of the morph target
+   * @param weight - The weight of the morph target
+   */
+  setMorphWeight(name: string, weight: number) {
+    const index = this._morphInfo?.names?.[name];
+    if (
+      index !== undefined &&
+      index >= 0 &&
+      index < this._morphInfo!.data[3] &&
+      this._morphInfo!.data[4 + index] !== weight
+    ) {
+      this._morphInfo!.data[4 + index] = weight;
+      this._morphDirty = true;
+      this.scene!.queueUpdateNode(this);
+    } else {
+      console.warn(`Morph target ${name} not found`);
+    }
+  }
+  /**
+   * Get morph target weight
+   *
+   * @param name - The name of the morph target
+   * @returns The weight of the morph target, or 0 if not found
+   */
+  getMorphWeight(name: string): number {
+    const index = this._morphInfo?.names?.[name];
+    if (index !== undefined && index >= 0 && index < this._morphInfo!.data[3]) {
+      return this._morphInfo!.data[4 + index];
+    }
+    return 0;
+  }
+  /**
+   * Update morph target weight
+   *
+   * @param weight - The weights of the morph targets, the length should be less than or equal to ${MAX_MORPH_TARGETS}
+   */
+  updateMorphWeights(weight: number[]) {
+    if (this._morphInfo && weight && weight.length <= this._morphInfo.data[3]) {
+      this._morphInfo.data.set(weight, 4);
+      this._morphDirty = true;
+      this.scene!.queueUpdateNode(this);
+    }
+  }
   /** {@inheritDoc SceneNode.update} */
   update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {
     super.update(frameId, elapsedInSeconds, deltaInSeconds);
     this.updateSkeletonState();
+    this.updateMorphState();
   }
   /**
    * {@inheritDoc Drawable.isBatchable}
@@ -373,6 +425,13 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    */
   needSceneDepth() {
     return this.material?.needSceneDepth() ?? false;
+  }
+  /** @internal */
+  private updateMorphState() {
+    if (this._morphInfo && this._morphDirty) {
+      this._morphInfo.buffer!.get()!.bufferSubData(4 * 4, this._morphInfo.data, 4, this._morphInfo.data[3]);
+      this._morphDirty = false;
+    }
   }
   /** @internal */
   private updateSkeletonState() {

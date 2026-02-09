@@ -536,6 +536,7 @@ export class PBRMaterialEditor extends GraphEditor {
         metaKey: io.KeySuper,
         deltaX: 0,
         deltaY: -io.MouseWheel * 100,
+        deltaMode: 0,
         button: 1
       };
       this._previewScene.get()?.mainCamera?.handleEvent(evtWheel);

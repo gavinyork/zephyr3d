@@ -5,6 +5,7 @@ import { GraphNode, Mesh, type SceneNode } from '../../../scene';
 import { defineProps, type SerializableClass } from '../types';
 import { BoundingBox } from '../../bounding_volume';
 import { meshInstanceClsMap } from './common';
+import { JSONData } from '../json';
 
 /** @internal */
 export function getMeshClass(): SerializableClass {
@@ -116,12 +117,40 @@ export function getMeshClass(): SerializableClass {
           }
         },
         {
+          name: 'MorphTargets',
+          type: 'object',
+          options: { objectTypes: [JSONData] },
+          isPersistent() {
+            return false;
+          },
+          isHidden(this: Mesh) {
+            return !this.getMorphInfo();
+          },
+          get(this: Mesh, value) {
+            const morphInfo = this.getMorphInfo()!;
+            const numTargets = morphInfo.data[3];
+            const data: Record<string, number> = {};
+            for (let i = 0; i < numTargets; i++) {
+              const name = Object.keys(morphInfo.names).find((key) => morphInfo.names![key] === i);
+              if (name) {
+                Object.defineProperty(data, name, {
+                  enumerable: true,
+                  configurable: true,
+                  get: () => this.getMorphWeight(name),
+                  set: (v) => this.setMorphWeight(name, v)
+                });
+              }
+            }
+            value.object[0] = new JSONData(null, data);
+          }
+        },
+        {
           name: 'MorphInfo',
           type: 'string',
           isHidden() {
             return true;
           },
-          async get(this: Mesh, value) {
+          get(this: Mesh, value) {
             const morphInfo = this.getMorphInfo();
             if (morphInfo) {
               const data = new Uint8Array(
@@ -129,15 +158,26 @@ export function getMeshClass(): SerializableClass {
                 morphInfo.data.byteOffset,
                 morphInfo.data.byteLength
               );
-              value.str[0] = uint8ArrayToBase64(data);
+              value.str[0] = JSON.stringify({ data: uint8ArrayToBase64(data), names: morphInfo.names });
             } else {
               value.str[0] = '';
             }
           },
           set(this: Mesh, value) {
             if (value.str[0]) {
-              const data = base64ToUint8Array(value.str[0]);
-              this.setMorphInfo({ data });
+              try {
+                const info = JSON.parse(value.str[0]);
+                const data = base64ToUint8Array(info.data);
+                const names = info.names;
+                this.setMorphInfo({ data, names });
+              } catch {
+                const data = new Float32Array(base64ToUint8Array(value.str[0]).buffer);
+                const names: Record<string, number> = {};
+                for (let i = 0; i < data[3]; i++) {
+                  names[`Target${i}`] = i;
+                }
+                this.setMorphInfo({ data, names });
+              }
             } else {
               this.setMorphInfo(null);
             }

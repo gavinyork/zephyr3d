@@ -59,8 +59,14 @@ export function processMorphData(subMesh: AssetSubMeshData, morphWeights: number
   morphBoundingBox.minPoint.addBy(meshAABB.minPoint);
   morphBoundingBox.maxPoint.addBy(meshAABB.maxPoint);
 
+  const names: Record<string, number> = {};
+  for (let i = 0; i < numTargets; i++) {
+    const name = `Target${i}`;
+    names[name] = i;
+  }
+
   subMesh.mesh!.setMorphData({ width: textureSize, height: textureSize, data: textureData });
-  subMesh.mesh!.setMorphInfo({ data: weightsAndOffsets });
+  subMesh.mesh!.setMorphInfo({ data: weightsAndOffsets, names });
   subMesh.mesh!.setAnimatedBoundingBox(morphBoundingBox);
 }
 

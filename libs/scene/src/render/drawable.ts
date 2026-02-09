@@ -147,7 +147,7 @@ export type MorphData = {
  * Morph information
  * @public
  */
-export type MorphInfo = { data: TypedArray; buffer?: DRef<GPUDataBuffer> };
+export type MorphInfo = { data: TypedArray; buffer?: DRef<GPUDataBuffer>; names: Record<string, number> };
 
 /**
  * Base interface for a drawable (renderable) object.
