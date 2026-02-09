@@ -408,8 +408,31 @@ export class ShaderHelper {
               this.$return(this.value);
             });
             this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
+            this.$if(pb.notEqual(this.weight, 0), function () {
+              this.$l.pixelIndex = pb.float(
+                pb.add(this.offset, pb.mul(this.index, this.numVertices), this.vertexIndex)
+              );
+              this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
+              this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.texWidth));
+              this.$l.u = pb.div(pb.add(this.xIndex, 0.5), this.texWidth);
+              this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.texHeight);
+              this.$l.morphValue = pb.textureSampleLevel(
+                this[that.getMorphDataUniformName()],
+                pb.vec2(this.u, this.v),
+                0
+              );
+              this.value = pb.add(this.value, pb.mul(this.morphValue, this.weight));
+            });
+          });
+        });
+      } else {
+        this.$for(pb.int('t'), 0, this.numTargets, function () {
+          this.$l.i = pb.sar(this.t, 2);
+          this.$l.j = pb.compAnd(this.t, 3);
+          this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
+          this.$if(pb.notEqual(this.weight, 0), function () {
             this.$l.pixelIndex = pb.float(
-              pb.add(this.offset, pb.mul(this.index, this.numVertices), this.vertexIndex)
+              pb.add(this.offset, pb.mul(this.t, this.numVertices), this.vertexIndex)
             );
             this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
             this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.texWidth));
@@ -422,25 +445,6 @@ export class ShaderHelper {
             );
             this.value = pb.add(this.value, pb.mul(this.morphValue, this.weight));
           });
-        });
-      } else {
-        this.$for(pb.int('t'), 0, this.numTargets, function () {
-          this.$l.i = pb.sar(this.t, 2);
-          this.$l.j = pb.compAnd(this.t, 3);
-          this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
-          this.$l.pixelIndex = pb.float(
-            pb.add(this.offset, pb.mul(this.t, this.numVertices), this.vertexIndex)
-          );
-          this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
-          this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.texWidth));
-          this.$l.u = pb.div(pb.add(this.xIndex, 0.5), this.texWidth);
-          this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.texHeight);
-          this.$l.morphValue = pb.textureSampleLevel(
-            this[that.getMorphDataUniformName()],
-            pb.vec2(this.u, this.v),
-            0
-          );
-          this.value = pb.add(this.value, pb.mul(this.morphValue, this.weight));
         });
       }
       this.$return(this.value);
