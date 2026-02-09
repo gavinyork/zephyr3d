@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Fix morph target rendering issue",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
