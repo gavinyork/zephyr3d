@@ -213,9 +213,11 @@ export class Skeleton extends Disposable {
       const mat = this._jointMatrices[i + this._jointOffsets[0] - 1];
       const jointTransform = jointTransforms ? jointTransforms[i] : this._joints[i].worldMatrix;
       if (worldMatrix) {
-        Matrix4x4.multiplyAffine(worldMatrix, jointTransform, jointTransform);
+        Matrix4x4.multiplyAffine(worldMatrix, jointTransform, mat);
+        Matrix4x4.multiply(mat, this._inverseBindMatrices[i], mat);
+      } else {
+        Matrix4x4.multiply(jointTransform, this._inverseBindMatrices[i], mat);
       }
-      Matrix4x4.multiply(jointTransform, this._inverseBindMatrices[i], mat);
     }
   }
   /**
@@ -260,7 +262,7 @@ export class Skeleton extends Disposable {
    * @internal
    */
   reset() {
-    this.updateJointMatrices(this._bindPoseMatrices);
+    //this.updateJointMatrices(this._bindPoseMatrices);
     this._playing = false;
   }
   /**

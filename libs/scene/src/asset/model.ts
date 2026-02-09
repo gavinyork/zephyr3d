@@ -447,7 +447,7 @@ export class AssetSkeleton extends NamedObject {
     joint.attachToSkeleton(this);
     this.joints.push(joint);
     this.inverseBindMatrices.push(inverseBindMatrix);
-    this.bindPoseMatrices.push(joint.worldMatrix!);
+    this.bindPoseMatrices.push(joint.worldMatrix!.clone());
   }
 }
 
