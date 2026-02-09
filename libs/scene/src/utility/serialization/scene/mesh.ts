@@ -167,7 +167,7 @@ export function getMeshClass(): SerializableClass {
             if (value.str[0]) {
               try {
                 const info = JSON.parse(value.str[0]);
-                const data = base64ToUint8Array(info.data);
+                const data = new Float32Array(base64ToUint8Array(info.data).buffer);
                 const names = info.names;
                 this.setMorphInfo({ data, names });
               } catch {

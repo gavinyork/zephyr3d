@@ -340,6 +340,27 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     return this._morphInfo;
   }
   /**
+   * Get the number of morph targets
+   *
+   * @returns The number of morph targets
+   */
+  getNumMorphTargets(): number {
+    return this._morphInfo?.data[3] ?? 0;
+  }
+  /**
+   * Get the name of the morph target by index
+   *
+   * @param index - The index of the morph target
+   * @returns The name of the morph target, or null if not found
+   */
+  getMorphTargetName(index: number): Nullable<string> {
+    if (this._morphInfo && index >= 0 && index < this._morphInfo.data[3]) {
+      const name = Object.keys(this._morphInfo.names).find((key) => this._morphInfo!.names![key] === index);
+      return name ?? null;
+    }
+    return null;
+  }
+  /**
    * Update morph target weight
    *
    * @param name - The name of the morph target
