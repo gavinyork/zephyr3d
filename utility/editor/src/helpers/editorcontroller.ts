@@ -5,7 +5,7 @@ import type {
   IControllerPointerUpEvent,
   IControllerWheelEvent
 } from '@zephyr3d/scene';
-import { BaseCameraController, getDevice } from '@zephyr3d/scene';
+import { BaseCameraController } from '@zephyr3d/scene';
 
 export interface EditorCameraControllerOptions {
   /** Moving speed */
@@ -31,8 +31,6 @@ export class EditorCameraController extends BaseCameraController {
   private lastMouseX: number;
   /** @internal */
   private lastMouseY: number;
-  /** @internal */
-  private zoomVelocity: number;
   /**
    * Creates an instance of FPSCameraController
    * @param options - The creation options
@@ -58,7 +56,6 @@ export class EditorCameraController extends BaseCameraController {
     this.middleMouseDown = false;
     this.lastMouseX = 0;
     this.lastMouseY = 0;
-    this.zoomVelocity = 0;
   }
   /**
    * {@inheritDoc BaseCameraController._onMouseDown}
@@ -176,14 +173,23 @@ export class EditorCameraController extends BaseCameraController {
     return false;
   }
   protected _onMouseWheel(evt: IControllerWheelEvent): boolean {
-    /*
+    let px = evt.deltaY;
+    if (evt.deltaMode === 1) {
+      px *= 16;
+    } else if (evt.deltaMode === 2) {
+      px *= window.innerHeight;
+    }
+    if (evt.ctrlKey) {
+      px *= 10;
+    }
+    if (evt.shiftKey) {
+      px *= 0.1;
+    }
+    px = Math.max(-100, Math.min(100, px));
+
     const z = this._getCamera().worldMatrix.getRow(2).xyz().inplaceNormalize();
-    const move = z.scaleBy(this.options.zoomSpeed * evt.deltaY);
+    const move = z.scaleBy(this.options.zoomSpeed * px * 0.01);
     this._moveCamera(move);
-    */
-    const delta =
-      (this._getCamera().isPerspective() ? this.options.zoomSpeed : this.options.scaleSpeed) * evt.deltaY;
-    this.zoomVelocity += delta;
     return true;
   }
   private _scaleCamera(scale: number) {
@@ -223,32 +229,5 @@ export class EditorCameraController extends BaseCameraController {
   setOptions(opt?: EditorCameraControllerOptions) {
     Object.assign(this.options, opt ?? {});
     this.reset();
-  }
-  /**
-   * {@inheritDoc BaseCameraController.update}
-   * @override
-   */
-  update() {
-    if (Math.abs(this.zoomVelocity) > 1e-4) {
-      const dt = getDevice().frameInfo.elapsedFrame * 0.001;
-      const moveDist = this.zoomVelocity * dt;
-
-      if (this._getCamera().isPerspective()) {
-        const z = this._getCamera().worldMatrix.getRow(2).xyz().inplaceNormalize();
-        const move = z.scaleBy(moveDist);
-        this._moveCamera(move);
-      } else {
-        const scale = moveDist > 0 ? 1 + moveDist : 1 / (1 - moveDist);
-        this._scaleCamera(scale);
-      }
-
-      const damping = this.options.zoomDamping;
-      const factor = Math.exp(-damping * dt); // e^{-k dt}
-      this.zoomVelocity *= factor;
-
-      if (Math.abs(this.zoomVelocity) < 1e-4) {
-        this.zoomVelocity = 0;
-      }
-    }
   }
 }

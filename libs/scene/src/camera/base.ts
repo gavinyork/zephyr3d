@@ -100,6 +100,8 @@ export interface IControllerWheelEvent extends IControllerMouseEvent<'wheel'> {
   readonly deltaX: number;
   /** Vertical wheel scroll delta. */
   readonly deltaY: number;
+  /** Delta mode */
+  readonly deltaMode: number;
 }
 
 /**
