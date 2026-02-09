@@ -292,11 +292,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 {
                   label: 'Perspective Camera',
                   action: () => this.handleAddNode(PerspectiveCamera, 'Add perspective camera')
-                },
+                }
+                /*
                 {
                   label: 'Orthogonal Camera',
                   action: () => this.handleAddNode(OrthoCamera, 'Add orthogonal camera')
                 }
+                */
               ]
             },
             {
