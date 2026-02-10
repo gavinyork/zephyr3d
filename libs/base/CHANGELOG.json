@@ -2,6 +2,18 @@
   "name": "@zephyr3d/base",
   "entries": [
     {
+      "version": "0.2.1",
+      "tag": "@zephyr3d/base_v0.2.1",
+      "date": "Tue, 10 Feb 2026 07:50:06 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Change typescript compiler options"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.0",
       "tag": "@zephyr3d/base_v0.2.0",
       "date": "Mon, 24 Nov 2025 05:23:10 GMT",

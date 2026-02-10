@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/scene",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Scene API for zephyr3d",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
@@ -74,8 +74,8 @@
   "dependencies": {
     "@types/draco3d": "^1.4.9",
     "@webgpu/types": "^0.1.65",
-    "@zephyr3d/base": "workspace:^0.2.0",
-    "@zephyr3d/device": "workspace:^0.2.5",
+    "@zephyr3d/base": "workspace:^0.2.1",
+    "@zephyr3d/device": "workspace:^0.2.6",
     "es-module-lexer": "^1.7.0"
   }
 }

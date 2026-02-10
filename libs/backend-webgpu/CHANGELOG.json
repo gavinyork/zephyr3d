@@ -2,6 +2,29 @@
   "name": "@zephyr3d/backend-webgpu",
   "entries": [
     {
+      "version": "0.1.9",
+      "tag": "@zephyr3d/backend-webgpu_v0.1.9",
+      "date": "Tue, 10 Feb 2026 07:50:06 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Change canvas resize logic"
+          },
+          {
+            "comment": "Improve DeviceBackend.supported()"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.0` to `0.2.1`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.5` to `0.2.6`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.8",
       "tag": "@zephyr3d/backend-webgpu_v0.1.8",
       "date": "Mon, 24 Nov 2025 05:23:10 GMT",

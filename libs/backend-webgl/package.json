@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/backend-webgl",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "The WebGL device backend of zephyr3d",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
@@ -75,8 +75,8 @@
     "@rollup/plugin-commonjs": "~28.0.2",
     "@types/node": "^22.12.0",
     "@webgpu/types": "^0.1.65",
-    "@zephyr3d/base": "workspace:^0.2.0",
-    "@zephyr3d/device": "workspace:^0.2.5",
+    "@zephyr3d/base": "workspace:^0.2.1",
+    "@zephyr3d/device": "workspace:^0.2.6",
     "rollup-plugin-import-css": "~3.5.8"
   }
 }

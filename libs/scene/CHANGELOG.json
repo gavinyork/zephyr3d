@@ -2,6 +2,32 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.7.1",
+      "tag": "@zephyr3d/scene_v0.7.1",
+      "date": "Tue, 10 Feb 2026 07:50:06 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Optimize scene loading"
+          },
+          {
+            "comment": "Add material node types"
+          },
+          {
+            "comment": "Fix morph target rendering issue"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.0` to `0.2.1`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.5` to `0.2.6`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.7.0",
       "tag": "@zephyr3d/scene_v0.7.0",
       "date": "Mon, 24 Nov 2025 05:23:10 GMT",
