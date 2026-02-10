@@ -16,9 +16,15 @@ let inFrame = false;
  * @param device - The device object
  * @param fontFamily - Font family, default to arial
  * @param fontSize - Default font size, default to 16
+ * @param fontSizeGlyph - Default font size for glyph, default to fontSize
  * @public
  */
-export async function imGuiInit(device: AbstractDevice, fontFamily?: string, fontSize?: number) {
+export async function imGuiInit(
+  device: AbstractDevice,
+  fontFamily?: string,
+  fontSize?: number,
+  fontSizeGlyph?: number
+) {
   await ImGui.default();
   ImGui.CHECKVERSION();
   console.info('ImGui.CreateContext() VERSION=', ImGui.VERSION);
@@ -30,18 +36,20 @@ export async function imGuiInit(device: AbstractDevice, fontFamily?: string, fon
   io.ConfigWindowsResizeFromEdges = true;
   io.ConfigDragClickToInputText = true;
   io.BackendFlags |= ImGui.BackendFlags.HasMouseCursors;
+  fontSize = fontSize || 12;
+  fontSizeGlyph = fontSizeGlyph || fontSize;
   const font = io.Fonts.AddFontDefault();
 
   font.FontName = fontFamily || `'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`;
   font.FontSize = fontSize || 12;
-  ImGui_Impl.Init(device);
+  ImGui_Impl.Init(device, fontSizeGlyph ?? (fontSize || 12));
 }
 
 /**
  * Whether a frame is currently rendering
  * @public
  */
-export function imGuiInFrame(): boolean {
+export function imGuiInFrame() {
   return inFrame;
 }
 
@@ -110,7 +118,7 @@ export function imGuiSetFontGlyph(charCode: number, font: Font) {
  *
  * @public
  */
-export function imGuiCalcTextSize(text: string, out?: ImGui.ImVec2): ImGui.ImVec2 {
+export function imGuiCalcTextSize(text: string, out?: ImGui.ImVec2) {
   return ImGui_Impl.calcTextSize(text, out);
 }
 

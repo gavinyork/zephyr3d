@@ -1,3 +1,4 @@
+import type { Immutable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { MeshMaterial } from '../meshmaterial';
 import { applyMaterialMixins } from '../meshmaterial';
@@ -36,24 +37,26 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
       super();
       this._albedoColor = Vector4.one();
     }
-    copyFrom(other: this): void {
+    copyFrom(other: this) {
       super.copyFrom(other);
       this.albedoColor = other.albedoColor;
     }
     /** Albedo color */
-    get albedoColor(): Vector4 {
+    get albedoColor(): Immutable<Vector4> {
       return this._albedoColor;
     }
-    set albedoColor(val: Vector4) {
+    set albedoColor(val: Immutable<Vector4>) {
       this._albedoColor.set(val);
       this.uniformChanged();
     }
-    getUniformValueAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp {
-      return this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
-        ? scope.$inputs.zAlbedo
-        : scope.zAlbedo;
+    getUniformValueAlbedoColor(scope: PBInsideFunctionScope) {
+      return (
+        this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
+          ? scope.$inputs.zAlbedo
+          : scope.zAlbedo
+      ) as PBShaderExp;
     }
-    calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp {
+    calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp) {
       const pb = scope.$builder;
       if (!this.needFragmentColor()) {
         console.warn(
@@ -67,7 +70,7 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
       }
       return color;
     }
-    vertexShader(scope: PBFunctionScope): void {
+    vertexShader(scope: PBFunctionScope) {
       super.vertexShader(scope);
       if (this.needFragmentColor()) {
         if (this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
@@ -75,14 +78,14 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
         }
       }
     }
-    fragmentShader(scope: PBFunctionScope): void {
+    fragmentShader(scope: PBFunctionScope) {
       super.fragmentShader(scope);
       if (this.needFragmentColor() && !(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         const pb = scope.$builder;
         scope.zAlbedo = pb.vec4().uniform(2);
       }
     }
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx) && !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         bindGroup.setValue('zAlbedo', this._albedoColor);

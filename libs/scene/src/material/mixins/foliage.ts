@@ -31,11 +31,7 @@ function mixinFoliage<T extends typeof MeshMaterial>(BaseCls: T) {
       super();
       this.cullMode = 'none';
     }
-    calculateFoliageAlbedo(
-      scope: PBInsideFunctionScope,
-      albedoColor: PBShaderExp,
-      texelCoord: PBShaderExp
-    ): PBShaderExp {
+    calculateFoliageAlbedo(scope: PBInsideFunctionScope, albedoColor: PBShaderExp, texelCoord: PBShaderExp) {
       const pb = scope.$builder;
       const that = this;
       const funcNameCalcMipLevel = 'Z_CalcFoliageMipLevel';
@@ -56,7 +52,7 @@ function mixinFoliage<T extends typeof MeshMaterial>(BaseCls: T) {
         }
         this.$return(pb.vec4(this.albedo.rgb, this.a));
       });
-      return pb.getGlobalScope()[funcNameCalcFoliageAlbedo](albedoColor, texelCoord);
+      return pb.getGlobalScope()[funcNameCalcFoliageAlbedo](albedoColor, texelCoord) as PBShaderExp;
     }
   } as unknown as T & { new (...args: any[]): IMixinFoliage };
 }

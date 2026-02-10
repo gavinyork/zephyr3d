@@ -1,9 +1,10 @@
 import type { AbstractDevice, BindGroup, GPUProgram } from '@zephyr3d/device';
 import { drawFullscreenQuad } from '../../render/fullscreenquad';
 import { perlinNoise3D } from '../../shaders';
+import type { Nullable } from '@zephyr3d/base';
 
-let gradientNoiseProgram: GPUProgram = null;
-let gradientNoiseBindGroup: BindGroup = null;
+let gradientNoiseProgram: Nullable<GPUProgram> = null;
+let gradientNoiseBindGroup: Nullable<BindGroup> = null;
 
 /** @internal */
 export function createGradientNoiseTexture(
@@ -50,19 +51,19 @@ export function createGradientNoiseTexture(
           });
         });
       }
-    });
+    })!;
     gradientNoiseProgram.name = '@GradientNoise';
     gradientNoiseBindGroup = device.createBindGroup(gradientNoiseProgram.bindGroupLayouts[0]);
   }
-  const tex = device.createTexture2D('rgba8unorm', size, size);
+  const tex = device.createTexture2D('rgba8unorm', size, size)!;
   const fb = device.createFrameBuffer([tex], null);
-  gradientNoiseBindGroup.setValue('uvScale', uvscale);
-  gradientNoiseBindGroup.setValue('seed', seed);
-  gradientNoiseBindGroup.setValue('mono', mono ? 1 : 0);
+  gradientNoiseBindGroup!.setValue('uvScale', uvscale);
+  gradientNoiseBindGroup!.setValue('seed', seed);
+  gradientNoiseBindGroup!.setValue('mono', mono ? 1 : 0);
   device.pushDeviceStates();
   device.setFramebuffer(fb);
   device.setProgram(gradientNoiseProgram);
-  device.setBindGroup(0, gradientNoiseBindGroup);
+  device.setBindGroup(0, gradientNoiseBindGroup!);
   drawFullscreenQuad();
   device.popDeviceStates();
   fb.dispose();

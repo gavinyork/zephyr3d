@@ -1,7 +1,6 @@
 import { Vector3, type AABB, type Clonable } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
-import type { PrimitiveType } from '@zephyr3d/device';
 
 /**
  * Creation options for tetrahedron shape
@@ -32,18 +31,17 @@ export class TetrahedronShape
     super(options);
   }
 
-  clone(): TetrahedronShape {
-    return new TetrahedronShape(this._options);
+  clone() {
+    return new TetrahedronShape(this._options) as this;
   }
 
-  get type(): string {
+  get type() {
     return 'Tetrahedron';
   }
 
-  private static calculateTriangleNormal(v0: Vector3, v1: Vector3, v2: Vector3): Vector3 {
+  private static calculateTriangleNormal(v0: Vector3, v1: Vector3, v2: Vector3) {
     const edge1 = Vector3.sub(v1, v0);
     const edge2 = Vector3.sub(v2, v0);
-    // 使用右手定则：edge1 × edge2，确保逆时针顶点顺序产生向外法线
     return Vector3.normalize(Vector3.cross(edge1, edge2));
   }
 
@@ -58,7 +56,7 @@ export class TetrahedronShape
     indices: number[],
     indexOffset: number,
     currentVertexIndex: number
-  ): number {
+  ) {
     // Calculate normal
     const normal = this.calculateTriangleNormal(v0, v1, v2);
 
@@ -104,7 +102,7 @@ export class TetrahedronShape
   }
 
   static generateData(
-    options: TetrahedronCreationOptions,
+    opt: TetrahedronCreationOptions,
     vertices: number[],
     normals: number[],
     tangents: number[],
@@ -113,8 +111,8 @@ export class TetrahedronShape
     bbox?: AABB,
     indexOffset?: number,
     vertexCallback?: (index: number, x: number, y: number, z: number) => void
-  ): PrimitiveType {
-    options = Object.assign({}, this._defaultOptions, options ?? {});
+  ) {
+    const options = Object.assign({}, this._defaultOptions, opt ?? {});
     indexOffset = indexOffset ?? 0;
     const start = vertices.length;
 
@@ -233,7 +231,7 @@ export class TetrahedronShape
       }
     }
 
-    return 'triangle-list';
+    return 'triangle-list' as const;
   }
 }
 
@@ -256,15 +254,15 @@ export class TetrahedronFrameShape
     super(options);
   }
 
-  clone(): TetrahedronShape {
-    return new TetrahedronShape(this._options);
+  clone() {
+    return new TetrahedronShape(this._options) as this;
   }
 
-  get type(): string {
-    return 'Tetrahedron';
+  get type() {
+    return 'TetrahedronFrame' as const;
   }
 
-  private static calculateTriangleNormal(v0: Vector3, v1: Vector3, v2: Vector3): Vector3 {
+  private static calculateTriangleNormal(v0: Vector3, v1: Vector3, v2: Vector3) {
     const edge1 = Vector3.sub(v1, v0);
     const edge2 = Vector3.sub(v2, v0);
     return Vector3.normalize(Vector3.cross(edge1, edge2));
@@ -281,7 +279,7 @@ export class TetrahedronFrameShape
     indices: number[],
     indexOffset: number,
     currentVertexIndex: number
-  ): number {
+  ) {
     // Calculate normal
     const normal = this.calculateTriangleNormal(v0, v1, v2);
 
@@ -331,7 +329,7 @@ export class TetrahedronFrameShape
   }
 
   static generateData(
-    options: TetrahedronCreationOptions,
+    opt: TetrahedronCreationOptions,
     vertices: number[],
     normals: number[],
     tangents: number[],
@@ -340,8 +338,8 @@ export class TetrahedronFrameShape
     bbox?: AABB,
     indexOffset?: number,
     vertexCallback?: (index: number, x: number, y: number, z: number) => void
-  ): PrimitiveType {
-    options = Object.assign({}, this._defaultOptions, options ?? {});
+  ) {
+    const options = Object.assign({}, this._defaultOptions, opt ?? {});
     indexOffset = indexOffset ?? 0;
     const start = vertices.length;
 
@@ -431,6 +429,6 @@ export class TetrahedronFrameShape
       }
     }
 
-    return 'line-list';
+    return 'line-list' as const;
   }
 }

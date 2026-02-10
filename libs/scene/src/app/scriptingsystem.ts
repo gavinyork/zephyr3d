@@ -1,4 +1,4 @@
-import type { IDisposable, VFS } from '@zephyr3d/base';
+import type { IDisposable, Nullable, VFS } from '@zephyr3d/base';
 import { HttpFS } from '@zephyr3d/base';
 import { ScriptRegistry } from './scriptregistry';
 import { RuntimeScript } from './runtimescript';
@@ -24,8 +24,6 @@ export type ScriptingSystemOptions = {
   VFS?: VFS;
   /** Root path for scripts within the VFS. Defaults to `/`. */
   scriptsRoot?: string;
-  /** If true, enables editor-oriented behaviors in the registry. Defaults to `false`. */
-  editorMode?: boolean;
   /**
    * Optional string appended to dynamic import URLs (e.g., for cache busting).
    * Example: `'?v=' + Date.now()`
@@ -73,8 +71,8 @@ export interface IAttachedScript {
  */
 export class ScriptingSystem {
   private _registry: ScriptRegistry;
-  private _hostScripts: Map<Host, IAttachedScript[]>;
-  private _scriptHosts: Map<RuntimeScript<any>, Host[]>;
+  private _hostScripts: Map<Nullable<Host>, IAttachedScript[]>;
+  private _scriptHosts: Map<RuntimeScript<any>, Nullable<Host>[]>;
   private _onLoadError?: (e: unknown, id: string) => void;
   private _importComment?: string;
 
@@ -84,11 +82,7 @@ export class ScriptingSystem {
    * @param opts - Optional configuration.
    */
   constructor(opts: ScriptingSystemOptions = {}) {
-    this._registry = new ScriptRegistry(
-      opts.VFS ?? new HttpFS('./'),
-      opts.scriptsRoot ?? '/',
-      opts.editorMode ?? false
-    );
+    this._registry = new ScriptRegistry(opts.VFS ?? new HttpFS('./'), opts.scriptsRoot ?? '/');
     this._hostScripts = new Map();
     this._scriptHosts = new Map();
     this._importComment = opts.importComment;
@@ -121,14 +115,14 @@ export class ScriptingSystem {
    * @param module - Module identifier used by the registry (logical ID or path).
    * @returns The instantiated `RuntimeScript<T>` or `null` on failure.
    */
-  async attachScript<T extends Host>(host: T, module: string): Promise<RuntimeScript<T>> {
+  async attachScript<T extends Host>(host: Nullable<T>, module: string): Promise<Nullable<RuntimeScript<T>>> {
     try {
       const url = await this._registry.resolveRuntimeUrl(module);
       if (!url) {
         return null;
       }
       const mod = await import(url + (this._importComment ?? ''));
-      let instance: RuntimeScript<T> = null;
+      let instance: Nullable<RuntimeScript<T>> = null;
       if (typeof mod?.default === 'function') {
         // default export
         instance = new mod.default();
@@ -225,12 +219,13 @@ export class ScriptingSystem {
         }
 
         const hostList = this._scriptHosts.get(it.instance);
-        const index = hostList.indexOf(host);
-        if (index >= 0) {
-          hostList.splice(index, 1);
+        if (hostList) {
+          const index = hostList.indexOf(host);
+          if (index >= 0) {
+            hostList.splice(index, 1);
+          }
         }
-
-        if (hostList.length === 0) {
+        if (!hostList || hostList.length === 0) {
           try {
             it.instance.onDestroy();
           } catch (err) {
@@ -267,7 +262,7 @@ export class ScriptingSystem {
    * @param deltaTime - Time in seconds since last update.
    * @param elapsedTime - Total time in seconds since start.
    */
-  update(deltaTime: number, elapsedTime: number): void {
+  update(deltaTime: number, elapsedTime: number) {
     if (this._hostScripts.size === 0) {
       return;
     }
@@ -290,7 +285,9 @@ export class ScriptingSystem {
   detachAllScripts() {
     while (this._hostScripts.size > 0) {
       for (const entry of this._hostScripts) {
-        this.detachScript(entry[0]);
+        if (entry[0]) {
+          this.detachScript(entry[0]);
+        }
       }
     }
   }

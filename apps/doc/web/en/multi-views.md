@@ -52,8 +52,8 @@ myApp.on('tick', () => {
   camera.updateController();  
 
   // Get the canvas size in CSS pixels  
-  const canvasWidth = myApp.device.deviceToScreen(myApp.device.canvas.width);  
-  const canvasHeight = myApp.device.deviceToScreen(myApp.device.canvas.height);  
+  const canvasWidth = myApp.device.deviceXToScreen(myApp.device.canvas.width);  
+  const canvasHeight = myApp.device.deviceYToScreen(myApp.device.canvas.height);  
 
   // —— First render: main fullscreen view ——  
   camera.viewport = [0, 0, canvasWidth, canvasHeight];  
@@ -82,8 +82,8 @@ const camMain = new Camera(scene);
 const camTop = new Camera(scene);  
 const camSide = new Camera(scene);  
 
-const w = app.device.deviceToScreen(app.device.canvas.width);  
-const h = app.device.deviceToScreen(app.device.canvas.height);  
+const w = app.device.deviceXToScreen(app.device.canvas.width);  
+const h = app.device.deviceYToScreen(app.device.canvas.height);  
 
 // Main camera: right half of the screen  
 camMain.viewport = [w / 2, 0, w / 2, h];  

@@ -1,4 +1,4 @@
-import type { TypedArray, Vector4 } from '@zephyr3d/base';
+import type { Immutable, Nullable, TypedArray, Vector4 } from '@zephyr3d/base';
 import type { PrimitiveType, DeviceViewport } from '@zephyr3d/device';
 import {
   hasStencilChannel,
@@ -26,11 +26,11 @@ const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);
 
 export class WebGPURenderPass {
   private readonly _device: WebGPUDevice;
-  private _renderCommandEncoder: GPUCommandEncoder;
-  private _renderPassEncoder: GPURenderPassEncoder;
-  private _fbBindFlag: number;
-  private _currentViewport: DeviceViewport;
-  private _currentScissor: DeviceViewport;
+  private _renderCommandEncoder: Nullable<GPUCommandEncoder>;
+  private _renderPassEncoder: Nullable<GPURenderPassEncoder>;
+  private _fbBindFlag: Nullable<number>;
+  private _currentViewport: Nullable<DeviceViewport>;
+  private _currentScissor: Nullable<DeviceViewport>;
   private _frameBufferInfo: FrameBufferInfo;
   constructor(device: WebGPUDevice) {
     this._device = device;
@@ -41,10 +41,10 @@ export class WebGPURenderPass {
     this._currentScissor = null;
     this._frameBufferInfo = this.createFrameBufferInfo(null);
   }
-  get active(): boolean {
+  get active() {
     return !!this._renderPassEncoder;
   }
-  private createFrameBufferInfo(fb: WebGPUFrameBuffer): FrameBufferInfo {
+  private createFrameBufferInfo(fb: Nullable<WebGPUFrameBuffer>) {
     const info: FrameBufferInfo = !fb
       ? {
           frameBuffer: null,
@@ -56,14 +56,14 @@ export class WebGPURenderPass {
         }
       : {
           frameBuffer: fb,
-          colorFormats: fb.getColorAttachments().map((val) => (val as WebGPUBaseTexture).gpuFormat),
-          depthFormat: (fb.getDepthAttachment() as WebGPUBaseTexture)?.gpuFormat,
-          sampleCount: fb.getOptions().sampleCount,
+          colorFormats: fb.getColorAttachments().map((val) => (val as WebGPUBaseTexture).gpuFormat!),
+          depthFormat: (fb.getDepthAttachment() as WebGPUBaseTexture)?.gpuFormat!,
+          sampleCount: fb.getOptions().sampleCount ?? 1,
           hash: null,
           clearHash: fb
             .getColorAttachments()
             .map((val) => {
-              const fmt = textureFormatInvMap[(val as WebGPUBaseTexture).gpuFormat];
+              const fmt = textureFormatInvMap[(val as WebGPUBaseTexture).gpuFormat!];
               return isIntegerTextureFormat(fmt) ? (isSignedTextureFormat(fmt) ? 'i' : 'u') : 'f';
             })
             .join('')
@@ -71,7 +71,7 @@ export class WebGPURenderPass {
     info.hash = `${info.colorFormats.join('-')}:${info.depthFormat}:${info.sampleCount}`;
     return info;
   }
-  setFramebuffer(fb: WebGPUFrameBuffer): void {
+  setFramebuffer(fb: WebGPUFrameBuffer) {
     if (this._frameBufferInfo.frameBuffer !== fb) {
       this.end();
       this._frameBufferInfo = this.createFrameBufferInfo(fb);
@@ -79,16 +79,16 @@ export class WebGPURenderPass {
       this.setScissor(null);
     }
   }
-  getFramebuffer(): WebGPUFrameBuffer {
+  getFramebuffer() {
     return this._frameBufferInfo.frameBuffer;
   }
-  setViewport(vp?: number[] | DeviceViewport) {
-    if (!vp || (!Array.isArray(vp) && vp.default)) {
+  setViewport(vp: Nullable<Immutable<number[] | DeviceViewport>>) {
+    if (!vp || (!Array.isArray(vp) && (vp as DeviceViewport).default)) {
       this._currentViewport = {
         x: 0,
         y: 0,
-        width: this._device.deviceToScreen(this._device.drawingBufferWidth),
-        height: this._device.deviceToScreen(this._device.drawingBufferHeight),
+        width: this._device.deviceXToScreen(this._device.drawingBufferWidth),
+        height: this._device.deviceYToScreen(this._device.drawingBufferHeight),
         default: true
       };
     } else {
@@ -101,13 +101,13 @@ export class WebGPURenderPass {
           default: false
         };
       } else {
-        this._currentViewport = Object.assign({ default: false }, vp);
+        this._currentViewport = Object.assign({ default: false }, vp as DeviceViewport);
       }
     }
-    const vx = this._device.screenToDevice(this._currentViewport.x);
-    const vy = this._device.screenToDevice(this._currentViewport.y);
-    const vw = this._device.screenToDevice(this._currentViewport.width);
-    const vh = this._device.screenToDevice(this._currentViewport.height);
+    const vx = this._device.screenXToDevice(this._currentViewport.x);
+    const vy = this._device.screenYToDevice(this._currentViewport.y);
+    const vw = this._device.screenXToDevice(this._currentViewport.width);
+    const vh = this._device.screenYToDevice(this._currentViewport.height);
     /*
     if (vx < 0 || vy < 0 || vw > this._device.drawingBufferWidth || vh > this._device.drawingBufferHeight) {
       console.error(
@@ -119,13 +119,17 @@ export class WebGPURenderPass {
       this._renderPassEncoder.setViewport(vx, this._device.drawingBufferHeight - vy - vh, vw, vh, 0, 1);
     }
   }
-  getViewport(): DeviceViewport {
+  getViewport() {
     return Object.assign({}, this._currentViewport);
   }
-  setScissor(scissor?: number[] | DeviceViewport) {
-    const backBufferWidth = this._device.deviceToScreen(this._device.drawingBufferWidth);
-    const backBufferHeight = this._device.deviceToScreen(this._device.drawingBufferHeight);
-    if (scissor === null || scissor === undefined || (!Array.isArray(scissor) && scissor.default)) {
+  setScissor(scissor: Nullable<Immutable<number[] | DeviceViewport>>) {
+    const backBufferWidth = this._device.deviceXToScreen(this._device.drawingBufferWidth);
+    const backBufferHeight = this._device.deviceYToScreen(this._device.drawingBufferHeight);
+    if (
+      scissor === null ||
+      scissor === undefined ||
+      (!Array.isArray(scissor) && (scissor as DeviceViewport).default)
+    ) {
       this._currentScissor = {
         x: 0,
         y: 0,
@@ -143,13 +147,13 @@ export class WebGPURenderPass {
           default: false
         };
       } else {
-        this._currentScissor = Object.assign({ default: false }, scissor);
+        this._currentScissor = Object.assign({ default: false }, scissor as DeviceViewport);
       }
     }
-    let vx = this._device.screenToDevice(this._currentScissor.x);
-    let vy = this._device.screenToDevice(this._currentScissor.y);
-    let vw = this._device.screenToDevice(this._currentScissor.width);
-    let vh = this._device.screenToDevice(this._currentScissor.height);
+    let vx = this._device.screenXToDevice(this._currentScissor.x);
+    let vy = this._device.screenYToDevice(this._currentScissor.y);
+    let vw = this._device.screenXToDevice(this._currentScissor.width);
+    let vh = this._device.screenYToDevice(this._currentScissor.height);
     // Clip scissor region to screen
     if (vx < 0) {
       vw += vx;
@@ -159,8 +163,8 @@ export class WebGPURenderPass {
       vh += vy;
       vy = 0;
     }
-    vw = Math.min(this._device.screenToDevice(backBufferWidth) - vx, vw);
-    vh = Math.min(this._device.screenToDevice(backBufferHeight) - vy, vh);
+    vw = Math.min(this._device.screenXToDevice(backBufferWidth) - vx, vw);
+    vh = Math.min(this._device.screenYToDevice(backBufferHeight) - vy, vh);
     if (vw < 0 || vh < 0) {
       vx = 0;
       vy = 0;
@@ -171,26 +175,26 @@ export class WebGPURenderPass {
       this._renderPassEncoder.setScissorRect(vx, this._device.drawingBufferHeight - vy - vh, vw, vh);
     }
   }
-  getScissor(): DeviceViewport {
+  getScissor() {
     return Object.assign({}, this._currentScissor);
   }
   executeRenderBundle(renderBundle: GPURenderBundle) {
     if (!this.active) {
       this.begin();
     }
-    this._renderPassEncoder.executeBundles([renderBundle]);
+    this._renderPassEncoder!.executeBundles([renderBundle]);
   }
   draw(
     program: WebGPUProgram,
-    vertexData: WebGPUVertexLayout,
+    vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Nullable<Iterable<number>>[]>,
     primitiveType: PrimitiveType,
     first: number,
     count: number,
     numInstances: number
-  ): void {
+  ) {
     const validation = this.validateDraw(program, bindGroups);
     if (validation & VALIDATION_FAILED) {
       return;
@@ -202,7 +206,7 @@ export class WebGPURenderPass {
       this.begin();
     }
     this.drawInternal(
-      this._renderPassEncoder,
+      this._renderPassEncoder!,
       program,
       vertexData,
       stateSet,
@@ -214,7 +218,7 @@ export class WebGPURenderPass {
       numInstances
     );
   }
-  clear(color: Vector4, depth: number, stencil: number): void {
+  clear(color: Nullable<Vector4>, depth: Nullable<number>, stencil: Nullable<number>) {
     if (!this._currentScissor) {
       this.end();
       this.begin(color, depth, stencil);
@@ -222,18 +226,18 @@ export class WebGPURenderPass {
       if (!this._renderPassEncoder) {
         this.begin();
       }
-      this._renderPassEncoder.insertDebugMarker('clear');
+      this._renderPassEncoder!.insertDebugMarker('clear');
       WebGPUClearQuad.drawClearQuad(this, color, depth, stencil);
-      this._renderPassEncoder.insertDebugMarker('end clear');
+      this._renderPassEncoder!.insertDebugMarker('end clear');
     }
   }
-  getDevice(): WebGPUDevice {
+  getDevice() {
     return this._device;
   }
-  getFrameBufferInfo(): FrameBufferInfo {
+  getFrameBufferInfo() {
     return this._frameBufferInfo;
   }
-  begin(color?: TypedArray, depth?: number, stencil?: number): void {
+  begin(color?: Nullable<TypedArray>, depth?: Nullable<number>, stencil?: Nullable<number>) {
     if (this.active) {
       console.error('WebGPURenderPass.begin() failed: begin() has already been called');
       return;
@@ -242,19 +246,21 @@ export class WebGPURenderPass {
     const frameBuffer = this._frameBufferInfo.frameBuffer;
     if (!frameBuffer) {
       const mainPassDesc = this._device.defaultRenderPassDesc;
-      const colorAttachmentDesc = this._device.defaultRenderPassDesc.colorAttachments[0];
+      const colorAttachmentDesc = (
+        this._device.defaultRenderPassDesc.colorAttachments as GPURenderPassColorAttachment[]
+      )[0];
       if (this._frameBufferInfo.sampleCount > 1) {
-        colorAttachmentDesc.resolveTarget = this._device.context.getCurrentTexture().createView();
+        colorAttachmentDesc.resolveTarget = this._device.context!.getCurrentTexture().createView();
       } else {
-        colorAttachmentDesc.view = this._device.context.getCurrentTexture().createView();
+        colorAttachmentDesc.view = this._device.context!.getCurrentTexture().createView();
       }
       colorAttachmentDesc.loadOp = color ? 'clear' : 'load';
-      colorAttachmentDesc.clearValue = color;
+      colorAttachmentDesc.clearValue = color ?? undefined;
       const depthAttachmentDesc = this._device.defaultRenderPassDesc.depthStencilAttachment;
-      depthAttachmentDesc.depthLoadOp = typeof depth === 'number' ? 'clear' : 'load';
-      depthAttachmentDesc.depthClearValue = depth;
-      depthAttachmentDesc.stencilLoadOp = typeof stencil === 'number' ? 'clear' : 'load';
-      depthAttachmentDesc.stencilClearValue = stencil;
+      depthAttachmentDesc!.depthLoadOp = typeof depth === 'number' ? 'clear' : 'load';
+      depthAttachmentDesc!.depthClearValue = depth ?? undefined;
+      depthAttachmentDesc!.stencilLoadOp = typeof stencil === 'number' ? 'clear' : 'load';
+      depthAttachmentDesc!.stencilClearValue = stencil ?? undefined;
       this._renderPassEncoder = this._renderCommandEncoder.beginRenderPass(mainPassDesc);
     } else {
       const depthAttachmentTexture = frameBuffer.getDepthAttachment() as WebGPUBaseTexture;
@@ -264,9 +270,9 @@ export class WebGPURenderPass {
         const attachment = frameBuffer.getOptions().depthAttachment;
         const layer =
           depthAttachmentTexture.isTexture2DArray() || depthAttachmentTexture.isTexture3D()
-            ? attachment.layer
+            ? attachment!.layer
             : depthAttachmentTexture.isTextureCube()
-              ? attachment.face
+              ? attachment!.face
               : 0;
         depthTextureView = depthAttachmentTexture.getView(0, layer ?? 0, 1);
       }
@@ -293,7 +299,7 @@ export class WebGPURenderPass {
                   storeOp: 'store'
                 } as GPURenderPassColorAttachment;
               } else {
-                const msaaTexture = frameBuffer.getMSAAColorAttacments()[index];
+                const msaaTexture = frameBuffer.getMSAAColorAttacments()![index];
                 const msaaView = this._device.gpuCreateTextureView(msaaTexture, {
                   dimension: '2d',
                   baseMipLevel: attachment.level ?? 0,
@@ -316,29 +322,29 @@ export class WebGPURenderPass {
         depthStencilAttachment: depthAttachmentTexture
           ? frameBuffer.getOptions().sampleCount === 1
             ? {
-                view: depthTextureView,
+                view: depthTextureView!,
                 depthLoadOp: typeof depth === 'number' ? 'clear' : 'load',
-                depthClearValue: depth,
+                depthClearValue: depth ?? undefined,
                 depthStoreOp: 'store',
                 stencilLoadOp: hasStencilChannel(depthAttachmentTexture.format)
                   ? typeof stencil === 'number'
                     ? 'clear'
                     : 'load'
                   : undefined,
-                stencilClearValue: stencil,
+                stencilClearValue: stencil ?? undefined,
                 stencilStoreOp: hasStencilChannel(depthAttachmentTexture.format) ? 'store' : undefined
               }
             : {
-                view: frameBuffer.getMSAADepthAttachment().createView(),
+                view: frameBuffer.getMSAADepthAttachment()!.createView(),
                 depthLoadOp: typeof depth === 'number' ? 'clear' : 'load',
-                depthClearValue: depth,
+                depthClearValue: depth ?? undefined,
                 depthStoreOp: 'store',
                 stencilLoadOp: hasStencilChannel(depthAttachmentTexture.format)
                   ? typeof stencil === 'number'
                     ? 'clear'
                     : 'load'
                   : undefined,
-                stencilClearValue: stencil,
+                stencilClearValue: stencil ?? undefined,
                 stencilStoreOp: hasStencilChannel(depthAttachmentTexture.format) ? 'store' : undefined
               }
           : undefined
@@ -382,14 +388,14 @@ export class WebGPURenderPass {
     vertexData: WebGPUVertexLayout,
     stateSet: WebGPURenderStateSet,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Iterable<number>>[],
     primitiveType: PrimitiveType,
     first: number,
     count: number,
     numInstances: number
-  ): void {
+  ) {
     this.drawInternal(
-      this._renderPassEncoder,
+      this._renderPassEncoder!,
       program,
       vertexData,
       stateSet,
@@ -405,16 +411,16 @@ export class WebGPURenderPass {
   private drawInternal(
     renderPassEncoder: GPURenderPassEncoder,
     program: WebGPUProgram,
-    vertexData: WebGPUVertexLayout,
+    vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Nullable<Iterable<number>>[]>,
     primitiveType: PrimitiveType,
     first: number,
     count: number,
     numInstances: number,
     renderBundleEncoder?: GPURenderBundleEncoder
-  ): void {
+  ) {
     if (
       this.setBindGroupsForRender(
         renderPassEncoder,
@@ -447,11 +453,11 @@ export class WebGPURenderPass {
           const indexBuffer = vertexData.getIndexBuffer() as unknown as WebGPUIndexBuffer;
           if (indexBuffer) {
             renderPassEncoder.setIndexBuffer(
-              indexBuffer.object,
+              indexBuffer.object!,
               indexBuffer.indexType === typeU16 ? 'uint16' : 'uint32'
             );
             renderBundleEncoder?.setIndexBuffer(
-              indexBuffer.object,
+              indexBuffer.object!,
               indexBuffer.indexType === typeU16 ? 'uint16' : 'uint32'
             );
             renderPassEncoder.drawIndexed(count, numInstances, first);
@@ -467,7 +473,7 @@ export class WebGPURenderPass {
       }
     }
   }
-  private validateDraw(program: WebGPUProgram, bindGroups: WebGPUBindGroup[]): number {
+  private validateDraw(program: WebGPUProgram, bindGroups: WebGPUBindGroup[]) {
     let validation = 0;
     if (bindGroups) {
       for (let i = 0; i < program.bindGroupLayouts.length; i++) {
@@ -507,9 +513,9 @@ export class WebGPURenderPass {
     renderPassEncoder: GPURenderPassEncoder,
     program: WebGPUProgram,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Nullable<Iterable<number>>[]>,
     renderBundleEncoder?: GPURenderBundleEncoder
-  ): boolean {
+  ) {
     if (bindGroups) {
       for (let i = 0; i < 4; i++) {
         if (i < program.bindGroupLayouts.length) {

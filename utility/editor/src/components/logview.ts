@@ -178,7 +178,7 @@ class LogViewImpl {
     const lines = (text ?? '').split(/\r\n|\n|\r/);
 
     for (let li = 0; li < lines.length; li++) {
-      const line = li === 0 ? prefix + lines[li] : lines[li]; // 仅首行加前缀
+      const line = li === 0 ? prefix + lines[li] : lines[li];
       this.buffer.push({ ts, level, text: line });
     }
 
@@ -204,9 +204,9 @@ class LogViewImpl {
         true,
         ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
       );
-      ImGui.Button('Clear');
-      ImGui.SameLine();
-      ImGui.Button('Copy');
+      if (ImGui.Button('Clear')) {
+        this.buffer.clear();
+      }
 
       ImGui.EndChild();
       if (
@@ -219,44 +219,41 @@ class LogViewImpl {
         )
       ) {
         const total = this.buffer.size;
-        if (total === 0) {
-          return;
-        }
+        if (total > 0) {
+          const lineH = ImGui.GetTextLineHeightWithSpacing();
+          const contentRegionH = ImGui.GetContentRegionAvail().y;
+          const scrollY = ImGui.GetScrollY();
+          const contentHeight = total * lineH + ImGui.GetStyle().ItemSpacing.y;
 
-        const lineH = ImGui.GetTextLineHeightWithSpacing();
-        const contentRegionH = ImGui.GetContentRegionAvail().y;
-        const scrollY = ImGui.GetScrollY();
-        const contentHeight = total * lineH + ImGui.GetStyle().ItemSpacing.y;
+          const firstLine = Math.max(0, Math.floor(scrollY / lineH) - 3);
+          const visibleLines = Math.ceil(contentRegionH / lineH) + 6;
+          const lastLine = Math.min(total, firstLine + visibleLines);
 
-        const firstLine = Math.max(0, Math.floor(scrollY / lineH) - 3);
-        const visibleLines = Math.ceil(contentRegionH / lineH) + 6;
-        const lastLine = Math.min(total, firstLine + visibleLines);
-
-        const offsetY = firstLine * lineH;
-        if (offsetY > 0) {
-          ImGui.Dummy(new ImGui.Vec2(0, offsetY));
-        }
-
-        for (let i = firstLine; i < lastLine; i++) {
-          const item = this.buffer.get(i)!;
-          if (!this.levelEnabled[item.level]) {
-            continue;
+          const offsetY = firstLine * lineH;
+          if (offsetY > 0) {
+            ImGui.Dummy(new ImGui.Vec2(0, offsetY));
           }
 
-          const col =
-            (this.options.levelColors && this.options.levelColors[item.level]) ||
-            defaultOptions.levelColors![item.level]!;
-          ImGui.PushStyleColor(ImGui.Col.Text, new ImGui.Vec4(col[0], col[1], col[2], col[3]));
-          ImGui.TextUnformatted(item.text.slice(0, 512));
-          ImGui.PopStyleColor();
-        }
+          for (let i = firstLine; i < lastLine; i++) {
+            const item = this.buffer.get(i)!;
+            if (!this.levelEnabled[item.level]) {
+              continue;
+            }
 
-        const renderedHeight = (lastLine - firstLine) * lineH;
-        const tailPad = Math.max(0, contentHeight - offsetY - renderedHeight);
-        if (tailPad > 0) {
-          ImGui.Dummy(new ImGui.Vec2(0, tailPad));
-        }
+            const col =
+              (this.options.levelColors && this.options.levelColors[item.level]) ||
+              defaultOptions.levelColors![item.level]!;
+            ImGui.PushStyleColor(ImGui.Col.Text, new ImGui.Vec4(col[0], col[1], col[2], col[3]));
+            ImGui.TextUnformatted(item.text.slice(0, 512));
+            ImGui.PopStyleColor();
+          }
 
+          const renderedHeight = (lastLine - firstLine) * lineH;
+          const tailPad = Math.max(0, contentHeight - offsetY - renderedHeight);
+          if (tailPad > 0) {
+            ImGui.Dummy(new ImGui.Vec2(0, tailPad));
+          }
+        }
         if (this.scrollToBottomNextFrame) {
           ImGui.SetScrollHereY(1.0);
           //ImGui.SetScrollY(maxScrollY);

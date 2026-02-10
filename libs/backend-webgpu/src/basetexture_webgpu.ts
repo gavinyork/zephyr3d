@@ -1,9 +1,7 @@
 import { WebGPUObject } from './gpuobject_webgpu';
 import type {
-  TextureCaps,
   SamplerOptions,
   BaseTexture,
-  TextureSampler,
   GPUDataBuffer,
   TextureType,
   TextureFormat
@@ -23,7 +21,7 @@ import {
 import type { UploadTexture, UploadImage } from './uploadringbuffer';
 import { UploadRingBuffer } from './uploadringbuffer';
 import { textureFormatMap } from './constants_webgpu';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Immutable, Nullable, RequireOptionals, TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 import type { WebGPUBuffer } from './buffer_webgpu';
 import type { WebGPUTextureCaps, TextureFormatInfoWebGPU } from './capabilities_webgpu';
@@ -34,21 +32,20 @@ export abstract class WebGPUBaseTexture<
   T extends GPUTexture | GPUExternalTexture = GPUTexture
 > extends WebGPUObject<T> {
   protected _target: TextureType;
-  protected _hash: string;
   protected _memCost: number;
   protected _views: GPUTextureView[][][];
-  protected _defaultView: GPUTextureView;
+  protected _defaultView: Nullable<GPUTextureView>;
   protected _mipmapDirty: boolean;
   protected _flags: number;
   protected _width: number;
   protected _height: number;
   protected _depth: number;
-  protected _format: TextureFormat;
+  protected _format: Nullable<TextureFormat>;
   protected _renderable: boolean;
   protected _fb: boolean;
-  protected _gpuFormat: GPUTextureFormat;
+  protected _gpuFormat: Nullable<GPUTextureFormat>;
   protected _mipLevelCount: number;
-  protected _samplerOptions: SamplerOptions;
+  protected _samplerOptions: Nullable<RequireOptionals<SamplerOptions>>;
   protected _ringBuffer: UploadRingBuffer;
   protected _mipBindGroups: WebGPUBindGroup[][];
   protected _pendingUploads: (UploadTexture | UploadImage)[];
@@ -61,7 +58,7 @@ export abstract class WebGPUBaseTexture<
     this._depth = 0;
     this._renderable = false;
     this._fb = false;
-    this._format = 'unknown';
+    this._format = null;
     this._gpuFormat = null;
     this._mipLevelCount = 0;
     this._samplerOptions = null;
@@ -73,41 +70,45 @@ export abstract class WebGPUBaseTexture<
     this._ringBuffer = new UploadRingBuffer(device);
     this._pendingUploads = [];
   }
-  get hash(): number {
+  get hash() {
     return this._object ? this._device.gpuGetObjectHash(this._object) : 0;
   }
-  get target(): TextureType {
+  get target() {
     return this._target;
   }
-  get width(): number {
+  get width() {
     return this._width;
   }
-  get height(): number {
+  get height() {
     return this._height;
   }
-  get depth(): number {
+  get depth() {
     return this._depth;
   }
-  get memCost(): number {
+  get memCost() {
     return this._memCost;
   }
-  get format(): TextureFormat {
-    return this._format;
+  get format() {
+    return this._format!;
   }
-  get mipLevelCount(): number {
+  get mipLevelCount() {
     return this._mipLevelCount;
   }
-  get gpuFormat(): GPUTextureFormat {
+  get gpuFormat() {
     return this._gpuFormat;
   }
-  get samplerOptions(): SamplerOptions {
+  get samplerOptions(): Nullable<Immutable<SamplerOptions>> {
     return this._samplerOptions;
   }
-  set samplerOptions(options: SamplerOptions) {
-    const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
-    this._samplerOptions = options
-      ? Object.assign({}, this._getSamplerOptions(params, !!options.compare), options)
-      : null;
+  set samplerOptions(options: Nullable<Immutable<SamplerOptions>>) {
+    if (this._format) {
+      const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
+      this._samplerOptions = options
+        ? Object.assign({}, this._getSamplerOptions(params, !!options.compare), options)
+        : null;
+    } else {
+      console.error('Set sampler options failed: texture not initialized');
+    }
   }
   abstract init(): void;
   abstract readPixels(
@@ -131,8 +132,8 @@ export abstract class WebGPUBaseTexture<
   isTexture(): this is BaseTexture {
     return true;
   }
-  isFilterable(): boolean {
-    if (!this.getTextureCaps().getTextureFormatInfo(this._format)?.filterable) {
+  isFilterable() {
+    if (!this._format || !this.getTextureCaps().getTextureFormatInfo(this._format)?.filterable) {
       return false;
     }
     return true;
@@ -145,13 +146,13 @@ export abstract class WebGPUBaseTexture<
       this.endSyncChanges();
     }
   }
-  isMipmapDirty(): boolean {
+  isMipmapDirty() {
     return this._mipmapDirty;
   }
   setMipmapDirty(b: boolean) {
     this._mipmapDirty = b;
   }
-  destroy(): void {
+  destroy() {
     if (this._object) {
       if (!this.isTextureVideo()) {
         (this._object as GPUTexture).destroy();
@@ -174,31 +175,31 @@ export abstract class WebGPUBaseTexture<
       this.init();
     }
   }
-  getTextureCaps(): TextureCaps {
+  getTextureCaps() {
     return this._device.getDeviceCaps().textureCaps;
   }
-  isSRGBFormat(): boolean {
-    return isSRGBTextureFormat(this._format);
+  isSRGBFormat() {
+    return !!this._format && isSRGBTextureFormat(this._format);
   }
-  isFloatFormat(): boolean {
-    return isFloatTextureFormat(this._format);
+  isFloatFormat() {
+    return !!this._format && isFloatTextureFormat(this._format);
   }
-  isIntegerFormat(): boolean {
-    return isIntegerTextureFormat(this._format);
+  isIntegerFormat() {
+    return !!this._format && isIntegerTextureFormat(this._format);
   }
-  isSignedFormat(): boolean {
-    return isSignedTextureFormat(this._format);
+  isSignedFormat() {
+    return !!this._format && isSignedTextureFormat(this._format);
   }
-  isCompressedFormat(): boolean {
-    return isCompressedTextureFormat(this._format);
+  isCompressedFormat() {
+    return !!this._format && isCompressedTextureFormat(this._format);
   }
-  isDepth(): boolean {
-    return hasDepthChannel(this._format);
+  isDepth() {
+    return !!this._format && hasDepthChannel(this._format);
   }
-  isRenderable(): boolean {
+  isRenderable() {
     return this._renderable;
   }
-  getView(level?: number, face?: number, mipCount?: number): GPUTextureView {
+  getView(level?: number, face?: number, mipCount?: number) {
     level = Number(level) || 0;
     face = Number(face) || 0;
     mipCount = Number(mipCount) || 0;
@@ -209,11 +210,11 @@ export abstract class WebGPUBaseTexture<
       this._views[face][level] = [];
     }
     if (!this._views[face][level][mipCount]) {
-      this._views[face][level][mipCount] = this.createView(level, face, mipCount);
+      this._views[face][level][mipCount] = this.createView(level, face, mipCount)!;
     }
     return this._views[face][level][mipCount];
   }
-  getDefaultView(): GPUTextureView {
+  getDefaultView() {
     if (!this._defaultView && this._object && !this.isTextureVideo()) {
       this._defaultView = this._device.gpuCreateTextureView(this._object as GPUTexture, {
         dimension: this.isTextureCube()
@@ -237,7 +238,7 @@ export abstract class WebGPUBaseTexture<
     layer: number,
     level: number,
     buffer: GPUDataBuffer
-  ): void {
+  ) {
     if (this.isTextureVideo()) {
       throw new Error('copyPixelDataToBuffer() failed: can not copy pixel data of video texture');
     }
@@ -259,7 +260,7 @@ export abstract class WebGPUBaseTexture<
     this._mipmapDirty = true;
     this._device.textureUpload(this as WebGPUBaseTexture);
   }
-  beginSyncChanges(encoder: GPUCommandEncoder) {
+  beginSyncChanges(encoder: Nullable<GPUCommandEncoder>) {
     if (!this.isTextureVideo() && this._pendingUploads.length > 0 && this._object) {
       const cmdEncoder = encoder || this._device.device.createCommandEncoder();
       for (const u of this._pendingUploads) {
@@ -331,15 +332,15 @@ export abstract class WebGPUBaseTexture<
       this._ringBuffer.purge();
     }
   }
-  getDefaultSampler(shadow: boolean): TextureSampler {
-    const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
+  getDefaultSampler(shadow: boolean) {
+    const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format!);
     return this._device.createSampler(
       !this._samplerOptions || !this._samplerOptions.compare !== !shadow
         ? this._getSamplerOptions(params, shadow)
         : this._samplerOptions
     );
   }
-  abstract createView(level?: number, face?: number, mipCount?: number): GPUTextureView;
+  abstract createView(level?: number, face?: number, mipCount?: number): Nullable<GPUTextureView>;
   /** @internal */
   private sync() {
     this._device.flush();
@@ -355,7 +356,7 @@ export abstract class WebGPUBaseTexture<
     */
   }
   /** @internal */
-  protected _calcMipLevelCount(format: TextureFormat, width: number, height: number, _depth: number): number {
+  protected _calcMipLevelCount(format: TextureFormat, width: number, height: number, _depth: number) {
     if (hasDepthChannel(format) || this.isTexture3D() || this.isTextureVideo()) {
       return 1;
     }
@@ -439,11 +440,7 @@ export abstract class WebGPUBaseTexture<
       }
     }
   }
-  static calculateBufferSizeForCopy(
-    width: number,
-    height: number,
-    format: TextureFormat
-  ): { size: number; sizeAligned: number; strideAligned: number; numRows: number; stride: number } {
+  static calculateBufferSizeForCopy(width: number, height: number, format: TextureFormat) {
     const blockWidth = getTextureFormatBlockWidth(format);
     const blockHeight = getTextureFormatBlockHeight(format);
     const blockSize = getTextureFormatBlockSize(format);
@@ -467,7 +464,7 @@ export abstract class WebGPUBaseTexture<
     layer: number,
     level: number,
     buffer: GPUDataBuffer
-  ): void {
+  ) {
     if (!((buffer as WebGPUBuffer).gpuUsage & GPUBufferUsage.COPY_DST)) {
       console.error(
         'copyTexturePixelsToBuffer() failed: destination buffer does not have COPY_DST usage set'
@@ -543,7 +540,7 @@ export abstract class WebGPUBaseTexture<
       return;
     }
     const data = new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.byteLength);
-    const info = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
+    const info = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format!);
     const blockWidth = info.blockWidth || 1;
     const blockHeight = info.blockHeight || 1;
     const blocksPerRow = Math.ceil(width / blockWidth);
@@ -578,7 +575,7 @@ export abstract class WebGPUBaseTexture<
       const bufferStride = (rowStride + 255) & ~255; // align to 256 bytes
       const uploadSize = bufferStride * blocksPerCol * depth;
       const upload = this._ringBuffer.uploadBuffer(null, null, 0, 0, uploadSize);
-      const mappedRange = upload.mappedBuffer.mappedRange;
+      const mappedRange = upload.mappedBuffer.mappedRange!;
       const src = new Uint8Array(data);
       const dst = new Uint8Array(mappedRange, upload.mappedBuffer.offset, uploadSize);
       if (uploadSize === data.byteLength) {
@@ -680,7 +677,7 @@ export abstract class WebGPUBaseTexture<
     return levelGroup;
   }
   /** @internal */
-  protected _getSamplerOptions(params: Partial<TextureFormatInfoWebGPU>, shadow: boolean): SamplerOptions {
+  protected _getSamplerOptions(params: Partial<TextureFormatInfoWebGPU>, shadow: boolean) {
     const comparison = this.isDepth() && shadow;
     const filterable = params.filterable || comparison;
     const magFilter = filterable ? 'linear' : 'nearest';
@@ -693,15 +690,18 @@ export abstract class WebGPUBaseTexture<
       magFilter,
       minFilter,
       mipFilter,
+      lodMin: 0,
+      lodMax: 32,
+      maxAnisotropy: 1,
       compare: comparison ? 'lt' : null
-    };
+    } as const;
   }
   /** @internal */
   _markAsCurrentFB(b: boolean) {
     this._fb = b;
   }
   /** @internal */
-  _isMarkedAsCurrentFB(): boolean {
+  _isMarkedAsCurrentFB() {
     return this._fb;
   }
 }

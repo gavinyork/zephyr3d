@@ -19,17 +19,17 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
   isTexture2D(): this is Texture2D {
     return true;
   }
-  init(): void {
-    this.loadEmpty(this._format, this._width, this._height, this._mipLevelCount);
+  init() {
+    this.loadEmpty(this._format!, this._width, this._height, this._mipLevelCount);
   }
-  update(data: TypedArray, xOffset: number, yOffset: number, width: number, height: number): void {
+  update(data: TypedArray, xOffset: number, yOffset: number, width: number, height: number) {
     if (this._device.isContextLost()) {
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
-    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
     this._device.bindTexture(textureTargetMap[this._target], 0, this);
     //this._device.context.bindTexture(textureTargetMap[this._target], this._object);
     this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
@@ -56,14 +56,14 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
     y: number,
     width: number,
     height: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
-    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
     this._device.bindTexture(textureTargetMap[this._target], 0, this);
     //this._device.context.bindTexture(textureTargetMap[this._target], this._object);
     this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
@@ -81,7 +81,7 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       const cvs = document.createElement('canvas');
       cvs.width = width;
       cvs.height = height;
-      const ctx = cvs.getContext('2d');
+      const ctx = cvs.getContext('2d')!;
       ctx.drawImage(data, x, y, width, height, 0, 0, width, height);
       this._device.context.texSubImage2D(
         textureTargetMap[this._target],
@@ -131,7 +131,7 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
     faceOrLevel: number,
     mipLevel: number,
     buffer: GPUDataBuffer
-  ): void {
+  ) {
     if (faceOrLevel !== 0) {
       throw new Error(`Texture2D.readPixelsToBuffer(): parameter 'faceOrLayer' must be 0`);
     }
@@ -158,7 +158,7 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       this.loadImage(element, format);
     }
   }
-  createEmpty(format: TextureFormat, width: number, height: number, creationFlags?: number): void {
+  createEmpty(format: TextureFormat, width: number, height: number, creationFlags?: number) {
     this._flags = Number(creationFlags) || 0;
     if (this._flags & GPUResourceUsageFlags.TF_WRITABLE) {
       console.error(new Error('webgl device does not support storage texture'));
@@ -174,7 +174,7 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
       this._device.context.generateMipmap(target);
     }
   }
-  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number): void {
+  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number) {
     if (data.isCubemap || data.isVolume) {
       console.error('loading 2d texture with mipmap data failed: data is not 2d texture');
     } else {
@@ -187,14 +187,14 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
     }
   }
   /** @internal */
-  private loadEmpty(format: TextureFormat, width: number, height: number, numMipLevels: number): void {
+  private loadEmpty(format: TextureFormat, width: number, height: number, numMipLevels: number) {
     this.allocInternal(format, width, height, 1, numMipLevels);
     if (this._mipLevelCount > 1 && !this._device.isContextLost()) {
       this.generateMipmaps();
     }
   }
   /** @internal */
-  private loadLevels(levels: TextureMipmapData, sRGB: boolean): void {
+  private loadLevels(levels: TextureMipmapData, sRGB: boolean) {
     let format = sRGB ? linearTextureFormatToSRGB(levels.format) : levels.format;
     let swizzle = false;
     if (format === 'bgra8unorm') {
@@ -215,7 +215,7 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
     }
     this.allocInternal(format, width, height, 1, mipLevelCount);
     if (!this._device.isContextLost()) {
-      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
       const target = textureTargetMap[this._target];
       this._device.bindTexture(target, 0, this);
       //this._device.context.bindTexture(target, this._object);
@@ -262,10 +262,10 @@ export class WebGLTexture2D extends WebGLBaseTexture implements Texture2D<WebGLT
     }
   }
   /** @internal */
-  private loadImage(element: TextureImageElement, format: TextureFormat): void {
+  private loadImage(element: TextureImageElement, format: TextureFormat) {
     this.allocInternal(format, Number(element.width), Number(element.height), 1, 0);
     if (!this._device.isContextLost()) {
-      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
       (this.device as WebGLDevice).clearErrors();
       const target = textureTargetMap[this._target];
       this._device.bindTexture(target, 0, this);

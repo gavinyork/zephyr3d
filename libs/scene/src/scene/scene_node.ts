@@ -2,12 +2,11 @@ import type { Scene } from './scene';
 import type { GraphNode } from './graph_node';
 import type { Mesh } from './mesh';
 import type { Camera } from '../camera/camera';
-import type { Terrain } from './terrain/terrain';
 import type { PunctualLight, BaseLight } from './light';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import type { BatchGroup } from './batchgroup';
 import type { Visitor } from './visitor';
-import type { IDisposable, Quaternion } from '@zephyr3d/base';
+import type { IDisposable, Immutable, Nullable, Quaternion } from '@zephyr3d/base';
 import { Disposable, DRef, makeObservable, randomUUID } from '@zephyr3d/base';
 import { Matrix4x4, ObservableQuaternion, ObservableVector3, Vector3, Vector4 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
@@ -18,6 +17,7 @@ import type { Water } from './water';
 import type { ClipmapTerrain } from './terrain-cm/terrain-cm';
 import type { Metadata } from 'draco3d';
 import { getEngine } from '../app/api';
+import type { Sprite } from './sprite';
 
 /**
  * Iteration callback used by traversal helpers.
@@ -122,14 +122,14 @@ export class SceneNode
   /** @internal Friendly name for debugging/UI. */
   protected _name: string;
   /** @internal Owning scene. */
-  protected _scene: Scene;
+  protected _scene: Nullable<Scene>;
 
   /** @internal Local-space bounding volume cache. */
-  protected _bv: BoundingVolume;
+  protected _bv: Nullable<BoundingVolume>;
   /** @internal True if local BV needs recomputing. */
   protected _bvDirty: boolean;
   /** @internal World-space bounding volume cache. */
-  protected _bvWorld: BoundingVolume;
+  protected _bvWorld: Nullable<BoundingVolume>;
 
   /** @internal Whether this node participates in scene spatial structures (octree). */
   private _placeToOctree: boolean;
@@ -137,7 +137,7 @@ export class SceneNode
   private _sealed: boolean;
 
   /** @internal Parent node. */
-  protected _parent: SceneNode;
+  protected _parent: Nullable<SceneNode>;
   /** @internal Children list (DRef for memory/resource mgmt). */
   protected _children: DRef<SceneNode>[];
 
@@ -149,13 +149,13 @@ export class SceneNode
   protected _rotation: ObservableQuaternion;
 
   /** @internal Local transform matrix cache. */
-  protected _localMatrix: Matrix4x4;
+  protected _localMatrix: Nullable<Matrix4x4>;
   /** @internal World transform matrix cache. */
-  protected _worldMatrix: Matrix4x4;
+  protected _worldMatrix: Nullable<Matrix4x4>;
   /** @internal Determinant of world transform (cached). */
-  protected _worldMatrixDet: number;
+  protected _worldMatrixDet: Nullable<number>;
   /** @internal Inverse world transform matrix cache. */
-  protected _invWorldMatrix: Matrix4x4;
+  protected _invWorldMatrix: Nullable<Matrix4x4>;
 
   /** @internal Scratch local matrix to avoid allocations. */
   protected _tmpLocalMatrix: Matrix4x4;
@@ -168,7 +168,7 @@ export class SceneNode
   protected _transformChangeCallback: () => void;
 
   /** @internal Arbitrary metadata payload for this node. */
-  protected _metaData: Metadata;
+  protected _metaData: Nullable<Metadata>;
   /** @internal If true, suppress transform-change callbacks (during bulk updates). */
   private _disableCallback: boolean;
   /** @internal User-attached script entry (engine-defined). */
@@ -182,7 +182,7 @@ export class SceneNode
    *
    * @param scene - Scene that will own this node.
    */
-  constructor(scene: Scene) {
+  constructor(scene: Nullable<Scene>) {
     super();
     this._runtimeId = SceneNode._runTimeId++;
     this._id = randomUUID();
@@ -203,16 +203,12 @@ export class SceneNode
     this._pickable = false;
     this._gpuPickable = true;
     this._placeToOctree = true;
-    this._parent = null;
     this._sealed = false;
     this._children = [];
     this._transformChangeCallback = () => this._onTransformChanged(true);
-    this._position = new ObservableVector3(0, 0, 0);
-    this._position.callback = this._transformChangeCallback;
-    this._scaling = new ObservableVector3(1, 1, 1);
-    this._scaling.callback = this._transformChangeCallback;
-    this._rotation = new ObservableQuaternion();
-    this._rotation.callback = this._transformChangeCallback;
+    this._position = new ObservableVector3(0, 0, 0).setCallback(this._transformChangeCallback);
+    this._scaling = new ObservableVector3(1, 1, 1).setCallback(this._transformChangeCallback);
+    this._rotation = new ObservableQuaternion().setCallback(this._transformChangeCallback);
     this._worldMatrix = null;
     this._worldMatrixDet = null;
     this._invWorldMatrix = null;
@@ -223,9 +219,8 @@ export class SceneNode
     this._tmpWorldMatrix = Matrix4x4.identity();
     this._script = '';
     this._metaData = null;
-    if (scene && this !== scene.rootNode) {
-      this.reparent(scene.rootNode);
-    }
+    this._parent = null;
+    this.reparent(scene?.rootNode ?? null);
   }
   /**
    * Whether the node should be inserted into the scene's spatial structure.
@@ -233,10 +228,10 @@ export class SceneNode
    * @remarks
    * Toggling this hints the scene to (re)place the node in octree/acceleration structures.
    */
-  get placeToOctree(): boolean {
+  get placeToOctree() {
     return this._placeToOctree;
   }
-  set placeToOctree(val: boolean) {
+  set placeToOctree(val) {
     if (!!val !== this._placeToOctree) {
       this._placeToOctree = !!val;
       if (this.isGraphNode()) {
@@ -278,7 +273,7 @@ export class SceneNode
    * Get prefab node this node belongs to, or null if this node does not belongs to any prefab
    * @returns prefab node this node belongs to
    */
-  getPrefabNode(): SceneNode {
+  getPrefabNode(): Nullable<SceneNode> {
     return this._prefabId ? this : (this.parent?.getPrefabNode() ?? null);
   }
   /**
@@ -323,10 +318,10 @@ export class SceneNode
    * @remarks
    * Stored and transported with the node; format is application-defined.
    */
-  get metaData(): Metadata {
+  get metaData() {
     return this._metaData;
   }
-  set metaData(val: Metadata) {
+  set metaData(val: Nullable<Metadata>) {
     this._metaData = val;
   }
   /**
@@ -351,14 +346,17 @@ export class SceneNode
     this._name = val || '';
   }
   /** The owning scene. */
-  get scene(): Scene {
+  get scene() {
     return this._scene;
   }
   /**
    * Whether this node is currently attached under the scene's root.
    */
-  get attached(): boolean {
-    let node: SceneNode = this;
+  get attached() {
+    if (!this._scene) {
+      return false;
+    }
+    let node: Nullable<SceneNode> = this;
     while (node && node !== this._scene.rootNode) {
       node = node.parent;
     }
@@ -368,10 +366,10 @@ export class SceneNode
    * If true, the node is logically sealed; some operations (like cloning as child)
    * may be restricted by engine policies.
    */
-  get sealed(): boolean {
+  get sealed() {
     return this._sealed;
   }
-  set sealed(val: boolean) {
+  set sealed(val) {
     this._sealed = val;
   }
   /**
@@ -383,9 +381,9 @@ export class SceneNode
   get animationSet() {
     if (!this._animationSet.get()) {
       this._animationSet.set(new AnimationSet(this));
-      this.scene.queueUpdateNode(this);
+      this.scene?.queueUpdateNode(this);
     }
-    return this._animationSet.get();
+    return this._animationSet.get()!;
   }
   /**
    * Shared model reference for instancing/streaming systems.
@@ -393,7 +391,7 @@ export class SceneNode
   get sharedModel() {
     return this._sharedModel.get();
   }
-  set sharedModel(model: SharedModel) {
+  set sharedModel(model: Nullable<SharedModel>) {
     this._sharedModel.set(model);
   }
   /**
@@ -409,14 +407,14 @@ export class SceneNode
    */
   async clone(): Promise<this> {
     this.iterate((node) => {
-      if (node.isTerrain() || node.isClipmapTerrain()) {
+      if (node.isClipmapTerrain()) {
         throw new Error('Cloning terrain node is not allowed');
       }
     });
     const parent = this.parent;
     const tmpParent = new SceneNode(this.scene);
     const data = await getEngine().resourceManager.serializeObject(this);
-    const other = await getEngine().resourceManager.deserializeObject<this>(tmpParent, data);
+    const other = (await getEngine().resourceManager.deserializeObject<this>(tmpParent, data))!;
     other.persistentId = randomUUID();
     other.parent = parent;
     tmpParent.dispose();
@@ -437,7 +435,7 @@ export class SceneNode
    * @param child - The node to be checked
    * @returns true if the given node is a direct child of this node, false otherwise
    */
-  hasChild(child: SceneNode): boolean {
+  hasChild(child: SceneNode) {
     return child && child.parent === this;
   }
   /**
@@ -445,15 +443,15 @@ export class SceneNode
    */
   removeChildren() {
     while (this._children.length) {
-      this._children[0].get().remove();
+      this._children[0].get()!.remove();
     }
   }
   /**
    * Whether this node is an ancestor (direct or indirect) of the given node.
    */
-  isParentOf(child: SceneNode): boolean {
+  isParentOf(child: Nullable<SceneNode>) {
     while (child && child !== this) {
-      child = child.parent;
+      child = child.parent!;
     }
     return child === this;
   }
@@ -471,10 +469,10 @@ export class SceneNode
    *
    * @param v - Visitor invoked on each node.
    */
-  traverse(v: Visitor<SceneNode>): void {
+  traverse(v: Visitor<SceneNode>) {
     v.visit(this);
     for (const child of this._children) {
-      child.get().traverse(v);
+      child.get()!.traverse(v);
     }
   }
   /**
@@ -485,12 +483,12 @@ export class SceneNode
    * @param callback - Called for each node; if returns true, iteration stops.
    * @returns true if iteration was aborted early.
    */
-  iterate(callback: NodeIterateFunc): boolean {
+  iterate(callback: NodeIterateFunc) {
     if (callback(this)) {
       return true;
     }
     for (const child of this._children) {
-      if (child.get().iterate(callback)) {
+      if (child.get()!.iterate(callback)) {
         return true;
       }
     }
@@ -504,10 +502,10 @@ export class SceneNode
    * @param callback - Called for each node; if returns true, iteration stops.
    * @returns true if iteration was aborted early.
    */
-  iterateBottomToTop(callback: NodeIterateFunc): boolean {
+  iterateBottomToTop(callback: NodeIterateFunc) {
     for (let i = this._children.length - 1; i >= 0; i--) {
       const child = this._children[i];
-      if (child.get().iterateBottomToTop(callback)) {
+      if (child.get()!.iterateBottomToTop(callback)) {
         return true;
       }
     }
@@ -528,6 +526,10 @@ export class SceneNode
   isMesh(): this is Mesh {
     return false;
   }
+  /** Type guard: true if this node is a sprite */
+  isSprite(): this is Sprite {
+    return false;
+  }
   /** Type guard: true if this node is a water node. */
   isWater(): this is Water {
     return false;
@@ -538,10 +540,6 @@ export class SceneNode
   }
   /** Type guard: true if this node is a batch group. */
   isBatchGroup(): this is BatchGroup {
-    return false;
-  }
-  /** Type guard: true if this node is a terrain. */
-  isTerrain(): this is Terrain {
     return false;
   }
   /** Type guard: true if this node is a clipmap terrain. */
@@ -560,14 +558,14 @@ export class SceneNode
    * Computes the bounding volume of the node
    * @returns The output bounding volume
    */
-  computeBoundingVolume(): BoundingVolume {
+  computeBoundingVolume(): Nullable<BoundingVolume> {
     return null;
   }
   /**
    * Gets the bounding volume of the node
    * @returns The bounding volume of the node
    */
-  getBoundingVolume(): BoundingVolume {
+  getBoundingVolume(): Nullable<BoundingVolume> {
     if (this._bvDirty) {
       this._bv = this.computeBoundingVolume();
       this._bvDirty = false;
@@ -589,7 +587,7 @@ export class SceneNode
    * Gets the world space bounding volume of the node
    * @returns The world space bounding volume of the node
    */
-  getWorldBoundingVolume(): BoundingVolume {
+  getWorldBoundingVolume(): Nullable<BoundingVolume> {
     if (!this._bvWorld) {
       this._bvWorld = this.computeWorldBoundingVolume(this.getBoundingVolume());
     }
@@ -599,7 +597,7 @@ export class SceneNode
    * Computes the world space bounding volume of the node
    * @returns The output bounding volume
    */
-  computeWorldBoundingVolume(localBV: BoundingVolume): BoundingVolume {
+  computeWorldBoundingVolume(localBV: Nullable<BoundingVolume>): Nullable<BoundingVolume> {
     return localBV?.transform(this.worldMatrix) ?? null;
   }
   /**
@@ -616,7 +614,7 @@ export class SceneNode
       if (transformChanged) {
         this.iterate((node) => {
           if (node.isGraphNode()) {
-            this._scene.invalidateNodePlacement(node);
+            this._scene!.invalidateNodePlacement(node);
           }
         });
       } else if (this.isGraphNode()) {
@@ -626,25 +624,25 @@ export class SceneNode
     }
   }
   /** Clip mode */
-  get clipTestEnabled(): boolean {
+  get clipTestEnabled() {
     return this._clipMode;
   }
-  set clipTestEnabled(val: boolean) {
+  set clipTestEnabled(val) {
     this._clipMode = val;
   }
   /** Computed value of show state */
-  get hidden(): boolean {
-    let node: SceneNode = this;
+  get hidden() {
+    let node: Nullable<SceneNode> = this;
     while (node && node._visible === 'inherit') {
       node = node.parent;
     }
     return node ? node._visible === 'hidden' : false;
   }
   /** Show state */
-  get showState(): SceneNodeVisible {
+  get showState() {
     return this._visible;
   }
-  set showState(val: SceneNodeVisible) {
+  set showState(val) {
     if (val !== this._visible) {
       const prevHidden = this.hidden;
       this._visible = val;
@@ -652,7 +650,7 @@ export class SceneNode
         if (this.isGraphNode()) {
           this._scene?.invalidateNodePlacement(this);
         }
-        let parent: SceneNode = this;
+        let parent: Nullable<SceneNode> = this;
         while (parent) {
           parent.dispatchEvent('visiblechanged', this);
           parent = parent.parent;
@@ -662,17 +660,17 @@ export class SceneNode
     }
   }
   /** Whether this node is enabled for CPU picking */
-  get pickable(): boolean {
+  get pickable() {
     return this._pickable;
   }
-  set pickable(val: boolean) {
+  set pickable(val) {
     this._pickable = !!val;
   }
   /** Whether this node is enabled for GPU picking */
-  get gpuPickable(): boolean {
+  get gpuPickable() {
     return this._gpuPickable;
   }
-  set gpuPickable(val: boolean) {
+  set gpuPickable(val) {
     this._gpuPickable = !!val;
   }
   /**
@@ -682,15 +680,15 @@ export class SceneNode
    * @param id - Persistent identifier to match against `SceneNode.persistentId`.
    * @returns The first matching node, or `null` if not found.
    */
-  findNodeById<T extends SceneNode>(id: string) {
-    let node: T = null;
+  findNodeById<T extends SceneNode>(id: string): T {
+    let node: Nullable<T> = null;
     this.iterate((child) => {
       if (child.persistentId === id) {
         node = child as T;
         return true;
       }
     });
-    return node;
+    return node as unknown as T;
   }
   /**
    * Finds a skeleton object by its persistent ID.
@@ -699,12 +697,13 @@ export class SceneNode
    */
   findSkeletonById(id: string) {
     const prefabNode = this.getPrefabNode() ?? this;
-    let sk: DRef<Skeleton> = null;
+    let sk: Nullable<DRef<Skeleton>> = null;
     prefabNode.iterate((node) => {
-      sk = node.animationSet.skeletons.find((s) => s.get().persistentId === id);
+      sk = node.animationSet.skeletons.find((s) => s.get()!.persistentId === id) ?? null;
       return !!sk;
     });
-    return sk?.get() ?? null;
+    // avoid ts2339 compilation error (maybe a typescript bug?)
+    return (sk as Nullable<DRef<Skeleton>>)?.get() ?? null;
   }
   /**
    * Finds a scene node by name.
@@ -719,8 +718,8 @@ export class SceneNode
    * @remarks
    * Names are not guaranteed unique. Prefer IDs for stable references.
    */
-  findNodeByName<T extends SceneNode>(name: string) {
-    let node: T = null;
+  findNodeByName<T extends SceneNode>(name: string): Nullable<T> {
+    let node: Nullable<T> = null;
     this.iterate((child) => {
       if (child.name === name) {
         node = child as T;
@@ -742,10 +741,10 @@ export class SceneNode
     return this._boxDrawMode;
   }
   /** Bounding box draw mode */
-  get boundingBoxDrawMode(): number {
+  get boundingBoxDrawMode() {
     return this._boxDrawMode;
   }
-  set boundingBoxDrawMode(mode: number) {
+  set boundingBoxDrawMode(mode) {
     this._boxDrawMode = mode;
   }
   /** Get called when the node was just created by cloning from other node */
@@ -755,13 +754,11 @@ export class SceneNode
     super.onDispose();
     this.remove();
     this.removeChildren();
-    this._animationSet?.dispose();
-    this._animationSet = null;
-    this._sharedModel?.dispose();
-    this._sharedModel = null;
+    this._animationSet.dispose();
+    this._sharedModel.dispose();
   }
   /** @internal */
-  protected _setParent(p: SceneNode): void {
+  protected _setParent(p: Nullable<SceneNode>) {
     if (p && p._scene !== this._scene) {
       throw new Error('Parent node and child node must belongs to the same scene');
     }
@@ -797,7 +794,7 @@ export class SceneNode
     }
   }
   /** @internal */
-  protected _onTransformChanged(invalidateLocal: boolean): void {
+  protected _onTransformChanged(invalidateLocal: boolean) {
     if (this._disableCallback) {
       return;
     }
@@ -809,7 +806,7 @@ export class SceneNode
     this._worldMatrixDet = null;
     this._transformTag++;
     for (const child of this._children) {
-      child.get()._onTransformChanged(false);
+      child.get()!._onTransformChanged(false);
     }
     this.invalidateWorldBoundingVolume(true);
     this.dispatchEvent('transformchanged', this);
@@ -817,20 +814,20 @@ export class SceneNode
   /**
    * Get called when this node is attached to scene
    */
-  protected _onAttached(): void {}
+  protected _onAttached() {}
   /**
    * Get called when this node is detached from scene
    */
-  protected _onDetached(): void {}
+  protected _onDetached() {}
   /** @internal */
-  protected _attached(): void {
+  protected _attached() {
     this.iterate((child) => {
-      this.scene.queueUpdateNode(child);
+      this.scene!.queueUpdateNode(child);
       child._onAttached();
     });
   }
   /** @internal */
-  protected _detached(): void {
+  protected _detached() {
     this.iterate((child) => {
       child._onDetached();
     });
@@ -839,25 +836,24 @@ export class SceneNode
   notifyHiddenChanged() {
     this._visibleChanged();
     for (const child of this._children) {
-      if (child.get().showState === 'inherit') {
-        child.get().notifyHiddenChanged();
+      if (child.get()!.showState === 'inherit') {
+        child.get()!.notifyHiddenChanged();
       }
     }
   }
   /** @internal */
-  protected _visibleChanged(): void {}
+  protected _visibleChanged() {}
   /** Parent of the xform */
   get parent() {
     return this._parent;
   }
-  set parent(p: SceneNode) {
-    p = p || null;
+  set parent(p) {
     if (p !== this._parent) {
       this._setParent(p);
     }
   }
   /** Children of this xform */
-  get children(): DRef<SceneNode>[] {
+  get children() {
     return this._children;
   }
   /**
@@ -881,7 +877,7 @@ export class SceneNode
   /**
    * Rotation of the xform
    */
-  get rotation() {
+  get rotation(): Quaternion {
     return this._rotation;
   }
   set rotation(val: Quaternion) {
@@ -953,7 +949,7 @@ export class SceneNode
    * Gets the position of the xform in world space
    * @returns position of the xform in world space
    */
-  getWorldPosition(outPos?: Vector3): Vector3 {
+  getWorldPosition(outPos?: Vector3) {
     return (
       outPos?.setXYZ(this.worldMatrix.m03, this.worldMatrix.m13, this.worldMatrix.m23) ??
       new Vector3(this.worldMatrix.m03, this.worldMatrix.m13, this.worldMatrix.m23)
@@ -964,7 +960,7 @@ export class SceneNode
    * @param delta - The offset vector
    * @returns self
    */
-  moveBy(delta: Vector3): this {
+  moveBy(delta: Vector3) {
     this._position.addBy(delta);
     return this;
   }
@@ -973,7 +969,7 @@ export class SceneNode
    * @param factor - The scale factor
    * @returns self
    */
-  scaleBy(factor: Vector3): this {
+  scaleBy(factor: Vector3) {
     this._scaling.mulBy(factor);
     return this;
   }
@@ -982,39 +978,26 @@ export class SceneNode
    * @param matrix - The transform matrix to set
    * @returns self
    */
-  setLocalTransform(matrix: Matrix4x4): this {
+  setLocalTransform(matrix: Matrix4x4) {
     this._disableCallback = true;
     matrix.decompose(this._scaling, this._rotation, this._position);
     this._disableCallback = false;
     this._onTransformChanged(true);
-    /*
-    this._localMatrix = matrix;
-    this._disableCallback = true;
-    this._localMatrix.decompose(this._scaling, this._rotation, this._position);
-    this._disableCallback = false;
-    this._onTransformChanged(false);
-    */
     return this;
   }
   /** Local transformation matrix of the xform */
-  get localMatrix() {
+  get localMatrix(): Immutable<Matrix4x4> {
     if (!this._localMatrix) {
       this.calculateLocalTransform(this._tmpLocalMatrix);
       this._localMatrix = this._tmpLocalMatrix;
-      /*
-      this._localMatrix
-        .scaling(this._scaling)
-        .rotateLeft(new Matrix4x4(this._rotation))
-        .translateLeft(this._position);
-      */
     }
     return this._localMatrix;
   }
-  set localMatrix(matrix: Matrix4x4) {
+  set localMatrix(matrix: Immutable<Matrix4x4>) {
     this.setLocalTransform(matrix);
   }
   /** World transformation matrix of the xform */
-  get worldMatrix() {
+  get worldMatrix(): Immutable<Matrix4x4> {
     if (!this._worldMatrix) {
       this._worldMatrix = this._tmpWorldMatrix;
       this.calculateWorldTransform(this._worldMatrix);
@@ -1029,7 +1012,7 @@ export class SceneNode
     return this._worldMatrixDet;
   }
   /** Inverse of the world transformation matrix of the xform */
-  get invWorldMatrix() {
+  get invWorldMatrix(): Immutable<Matrix4x4> {
     if (!this._invWorldMatrix) {
       this._invWorldMatrix = Matrix4x4.invertAffine(this.worldMatrix);
     }
@@ -1078,7 +1061,7 @@ export class SceneNode
     if (animationSet) {
       if (animationSet.numAnimations > 0 || animationSet.skeletons.length > 0) {
         animationSet.update(deltaInSeconds);
-        this.scene.queueUpdateNode(this);
+        this.scene!.queueUpdateNode(this);
       } else {
         this._animationSet.dispose();
       }
@@ -1096,12 +1079,12 @@ export class SceneNode
    * @param p - The new parent node that this node should be added to or null
    * @returns self
    */
-  reparent(p?: SceneNode) {
-    this.parent = p;
+  reparent(p?: Nullable<SceneNode>) {
+    this.parent = p ?? null;
     return this;
   }
   /** @internal */
-  get transformTag(): number {
+  get transformTag() {
     return this._transformTag;
   }
 }

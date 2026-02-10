@@ -9,7 +9,6 @@ import {
   OrbitCameraController,
   Mesh,
   TorusShape,
-  AssetManager,
   applyMaterialMixins,
   DirectionalLight,
   mixinLight,
@@ -147,10 +146,9 @@ myApp.ready().then(async () => {
   const light = new DirectionalLight(scene);
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
-  const assetManager = new AssetManager();
   const material = new MyLambertMaterial();
   material.color.setXYZW(1, 1, 0, 1);
-  material.diffuseTexture = await assetManager.loadTexture(
+  material.diffuseTexture = await getEngine().resourceManager.fetchTexture(
     'https://cdn.zephyr3d.org/doc/assets/images/layer.jpg'
   );
   material.uniformChanged();

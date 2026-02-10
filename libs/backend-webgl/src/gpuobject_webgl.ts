@@ -16,17 +16,17 @@ import type {
 } from '@zephyr3d/device';
 import { genDefaultName } from '@zephyr3d/device';
 import type { WebGLDevice } from './device_webgl';
-import { Disposable } from '@zephyr3d/base';
+import { Disposable, type Nullable } from '@zephyr3d/base';
 
 let _uniqueId = 0;
 
 export abstract class WebGLGPUObject<T> extends Disposable implements GPUObject<T> {
   protected _device: WebGLDevice;
-  protected _object: T;
+  protected _object: Nullable<T>;
   protected _uid: number;
   protected _cid: number;
   protected _name: string;
-  protected _restoreHandler: (obj: GPUObject) => void;
+  protected _restoreHandler: Nullable<(obj: GPUObject) => void>;
   constructor(device: WebGLDevice) {
     super();
     this._device = device;
@@ -40,22 +40,22 @@ export abstract class WebGLGPUObject<T> extends Disposable implements GPUObject<
   get device(): AbstractDevice {
     return this._device;
   }
-  get object(): T {
+  get object() {
     return this._object;
   }
-  get restoreHandler(): (obj: GPUObject) => void {
+  get restoreHandler() {
     return this._restoreHandler;
   }
-  set restoreHandler(handler: (obj: GPUObject) => void) {
+  set restoreHandler(handler: Nullable<(obj: GPUObject) => void>) {
     this._restoreHandler = handler;
   }
-  get uid(): number {
+  get uid() {
     return this._uid;
   }
-  get cid(): number {
+  get cid() {
     return this._cid;
   }
-  get name(): string {
+  get name() {
     return this._name;
   }
   set name(val: string) {
@@ -101,19 +101,19 @@ export abstract class WebGLGPUObject<T> extends Disposable implements GPUObject<
   isBindGroup(): this is BindGroup {
     return false;
   }
-  reload(): void {
+  reload() {
     if (this.disposed) {
       this._device.restoreObject(this);
       this._cid++;
     }
   }
-  destroy(): void {
+  destroy() {
     throw new Error('Abstract function call: destroy()');
   }
-  restore(): void {
+  restore() {
     throw new Error('Abstract function call: restore()');
   }
-  protected onDispose(): void {
+  protected onDispose() {
     super.onDispose();
     this._device.disposeObject(this, true);
   }

@@ -17,8 +17,8 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
   isTexture2DArray(): this is Texture2DArray {
     return true;
   }
-  init(): void {
-    this.loadEmpty(this._format, this._width, this._height, this._depth, this._mipLevelCount);
+  init() {
+    this.loadEmpty(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
   }
   update(
     data: TypedArray,
@@ -28,12 +28,12 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     width: number,
     height: number,
     depth: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, this._depth, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
     }
     this.uploadRaw(data, width, height, depth, xOffset, yOffset, zOffset, 0);
     if (this._mipLevelCount > 1) {
@@ -49,19 +49,19 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     srcY: number,
     width: number,
     height: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, this._depth, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, this._depth, this._mipLevelCount);
     }
     if (data instanceof HTMLCanvasElement || this._device.isTextureUploading(this)) {
       // Copy the pixel values out in case the canvas content may be changed later
       const cvs = document.createElement('canvas');
       cvs.width = width;
       cvs.height = height;
-      const ctx = cvs.getContext('2d');
+      const ctx = cvs.getContext('2d')!;
       ctx.drawImage(data, srcX, srcY, width, height, 0, 0, width, height);
       const imageData = ctx.getImageData(0, 0, width, height);
       this.update(imageData.data, destX, destY, destZ, width, height, 1);
@@ -71,17 +71,11 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
       this.uploadImageData(data, srcX, srcY, width, height, destX, destY, 0, destZ);
     }
   }
-  createEmpty(
-    format: TextureFormat,
-    width: number,
-    height: number,
-    depth: number,
-    creationFlags?: number
-  ): void {
+  createEmpty(format: TextureFormat, width: number, height: number, depth: number, creationFlags?: number) {
     this._flags = Number(creationFlags) || 0;
     this.loadEmpty(format, width, height, depth, 0);
   }
-  createWithMipmapData(data: TextureMipmapData, creationFlags?: number): void {
+  createWithMipmapData(data: TextureMipmapData, creationFlags?: number) {
     if (!data.arraySize) {
       console.error('Texture2DArray.createWithMipmapData() failed: Data is not texture array');
     } else {
@@ -95,7 +89,7 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
       }
     }
   }
-  createView(level?: number, face?: number, mipCount?: number): GPUTextureView {
+  createView(level?: number, face?: number, mipCount?: number) {
     return this._object
       ? this._device.gpuCreateTextureView(this._object, {
           dimension: '2d',
@@ -114,7 +108,7 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     layer: number,
     mipLevel: number,
     buffer: TypedArray
-  ): Promise<void> {
+  ) {
     if (layer < 0 || layer >= this._depth) {
       throw new Error(`Texture2DArray.readPixels(): invalid layer: ${layer}`);
     }
@@ -144,7 +138,7 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     layer: number,
     mipLevel: number,
     buffer: GPUDataBuffer
-  ): void {
+  ) {
     if (layer < 0 || layer >= this._depth) {
       throw new Error(`Texture2DArray.readPixelsToBuffer(): invalid layer: ${layer}`);
     }
@@ -159,13 +153,13 @@ export class WebGPUTexture2DArray extends WebGPUBaseTexture implements Texture2D
     height: number,
     depth: number,
     numMipLevels: number
-  ): void {
+  ) {
     this.allocInternal(format, width, height, depth, numMipLevels);
     if (this._mipLevelCount > 1 && !this._device.isContextLost()) {
       this.generateMipmaps();
     }
   }
-  private loadLevels(levels: TextureMipmapData): void {
+  private loadLevels(levels: TextureMipmapData) {
     const format = levels.format;
     const width = levels.width;
     const height = levels.height;

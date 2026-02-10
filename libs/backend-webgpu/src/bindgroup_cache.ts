@@ -2,6 +2,7 @@ import type { BindGroupLayout } from '@zephyr3d/device';
 import { ShaderType } from '@zephyr3d/device';
 import { textureFormatMap } from './constants_webgpu';
 import type { WebGPUDevice } from './device';
+import type { Immutable } from '@zephyr3d/base';
 
 export class BindGroupCache {
   private readonly _device: WebGPUDevice;
@@ -10,7 +11,7 @@ export class BindGroupCache {
     this._device = device;
     this._bindGroupLayoutCache = {};
   }
-  fetchBindGroupLayout(desc: BindGroupLayout): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
+  fetchBindGroupLayout(desc: Immutable<BindGroupLayout>): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
     const hash = desc ? this.getLayoutHash(desc) : '';
     let bgl = this._bindGroupLayoutCache[hash];
     if (!bgl) {
@@ -23,7 +24,7 @@ export class BindGroupCache {
     }
     return bgl;
   }
-  private getLayoutHash(desc: BindGroupLayout): string {
+  private getLayoutHash(desc: Immutable<BindGroupLayout>) {
     let hash = '';
     for (const entry of desc.entries) {
       let s = `${entry.binding}:${entry.visibility}:`;
@@ -44,7 +45,9 @@ export class BindGroupCache {
     }
     return hash;
   }
-  private createBindGroupLayout(desc: BindGroupLayout): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
+  private createBindGroupLayout(
+    desc: Immutable<BindGroupLayout>
+  ): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
     const layoutDescriptor: GPUBindGroupLayoutDescriptor = {
       entries:
         desc?.entries.map((entry) => {
@@ -53,7 +56,7 @@ export class BindGroupCache {
             (entry.visibility & ShaderType.Vertex ? GPUShaderStage.VERTEX : 0) |
             (entry.visibility & ShaderType.Fragment ? GPUShaderStage.FRAGMENT : 0) |
             (entry.visibility & ShaderType.Compute ? GPUShaderStage.COMPUTE : 0);
-          const buffer: GPUBufferBindingLayout = entry.buffer
+          const buffer: GPUBufferBindingLayout | undefined = entry.buffer
             ? {
                 type: entry.buffer.type,
                 hasDynamicOffset: entry.buffer.hasDynamicOffset,
@@ -61,25 +64,27 @@ export class BindGroupCache {
                 minBindingSize: Number(entry.buffer.minBindingSize) || 0
               }
             : undefined;
-          const sampler: GPUSamplerBindingLayout = entry.sampler
+          const sampler: GPUSamplerBindingLayout | undefined = entry.sampler
             ? {
                 type: entry.sampler.type
               }
             : undefined;
-          const texture: GPUTextureBindingLayout = entry.texture
+          const texture: GPUTextureBindingLayout | undefined = entry.texture
             ? {
                 sampleType: entry.texture.sampleType,
                 viewDimension: entry.texture.viewDimension
               }
             : undefined;
-          const storageTexture: GPUStorageTextureBindingLayout = entry.storageTexture
+          const storageTexture: GPUStorageTextureBindingLayout | undefined = entry.storageTexture
             ? {
                 access: entry.storageTexture.access,
                 viewDimension: entry.storageTexture.viewDimension,
                 format: textureFormatMap[entry.storageTexture.format]
               }
             : undefined;
-          const externalTexture: GPUExternalTextureBindingLayout = entry.externalTexture ? {} : undefined;
+          const externalTexture: GPUExternalTextureBindingLayout | undefined = entry.externalTexture
+            ? {}
+            : undefined;
           const t: GPUBindGroupLayoutEntry = {
             binding,
             visibility

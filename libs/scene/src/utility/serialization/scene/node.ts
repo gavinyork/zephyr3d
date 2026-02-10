@@ -1,7 +1,7 @@
 import { SceneNode } from '../../../scene/scene_node';
 import type { SceneNodeVisible } from '../../../scene/scene_node';
 import { Scene } from '../../../scene/scene';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import type { DiffPatch, DiffValue } from '@zephyr3d/base';
 import { applyPatch, ASSERT, degree2radian, diff, DRef, radian2degree } from '@zephyr3d/base';
 import { GraphNode } from '../../../scene';
@@ -17,14 +17,16 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
     async createFunc(ctx: Scene | SceneNode, init?: { prefabId: string; patch: DiffPatch }) {
       const scene = ctx instanceof Scene ? ctx : ctx.scene;
       if (init) {
-        const prefabData = (await manager.loadPrefabContent(init.prefabId)).data as DiffValue;
-        const nodeData = applyPatch(prefabData, init.patch);
+        const prefabData = (await manager.loadPrefabContent(init.prefabId))!.data as DiffValue;
+        const nodeData = applyPatch(prefabData, init.patch) as Record<string, unknown>;
         const tmpNode = new DRef(new SceneNode(scene));
-        tmpNode.get().remove();
-        tmpNode.get().prefabId = init.prefabId;
-        const sceneNode = await manager.deserializeObject<SceneNode>(tmpNode.get(), nodeData as object);
-        sceneNode.prefabId = init.prefabId;
-        sceneNode.parent = ctx instanceof SceneNode ? ctx : ctx.rootNode;
+        tmpNode.get()!.remove();
+        tmpNode.get()!.prefabId = init.prefabId;
+        const sceneNode = await manager.deserializeObject<SceneNode>(tmpNode.get(), nodeData);
+        if (sceneNode) {
+          sceneNode.prefabId = init.prefabId;
+          sceneNode.parent = ctx instanceof SceneNode ? ctx : ctx.rootNode;
+        }
         tmpNode.dispose();
         return { obj: sceneNode, loadProps: false };
       }
@@ -36,11 +38,11 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
     },
     async getInitParams(obj: SceneNode, flags) {
       const prefabId = obj.prefabId;
-      let patch: DiffPatch;
+      let patch: DiffPatch | undefined = undefined;
       if (prefabId) {
         try {
           obj.prefabId = '';
-          const prefabData = (await manager.loadPrefabContent(prefabId)).data as DiffValue;
+          const prefabData = (await manager.loadPrefabContent(prefabId))!.data as DiffValue;
           const nodeData = await manager.serializeObject(obj);
           patch = diff(prefabData, nodeData);
           ASSERT(diff(applyPatch(prefabData, patch), nodeData).length === 0, 'Patch test failed');
@@ -57,7 +59,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         : null;
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Id',
           type: 'string',
@@ -81,7 +83,9 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         {
           name: 'Name',
           type: 'string',
-          defaultValue: '',
+          getDefaultValue() {
+            return '';
+          },
           get(this: SceneNode, value) {
             value.str[0] = this.name;
           },
@@ -92,6 +96,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         {
           name: 'Position',
           type: 'vec3',
+          default: [0, 0, 0],
           options: {
             animatable: true
           },
@@ -110,11 +115,15 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         {
           name: 'Scale',
           type: 'vec3',
+          default: [1, 1, 1],
           options: {
             animatable: true
           },
           isPersistent(this: SceneNode) {
             return this.jointTypeS !== 'animated';
+          },
+          isHidden(this: SceneNode) {
+            return this.isCamera();
           },
           get(this: SceneNode, value) {
             value.num[0] = this.scale.x;
@@ -128,12 +137,16 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         {
           name: 'Rotation',
           type: 'vec3',
+          default: [0, 0, 0],
           options: {
             animatable: true,
             edit: 'quaternion'
           },
           isPersistent() {
             return false;
+          },
+          isHidden(this: SceneNode) {
+            return this.isCamera() && this.isOrtho();
           },
           get(this: SceneNode, value) {
             const zyx = this.rotation.toEulerAngles();
@@ -152,6 +165,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         {
           name: 'QuatRotation',
           type: 'vec4',
+          default: [0, 0, 0, 1],
           isHidden() {
             return true;
           },
@@ -206,14 +220,14 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           get(this: SceneNode, value) {
             value.object = [];
             for (const child of this.children) {
-              if (!child.get().sealed) {
+              if (!child.get()!.sealed) {
                 value.object.push(child.get());
               }
             }
           },
           set(this: SceneNode, value) {
             for (let i = this.children.length - 1; i >= 0; i--) {
-              const child = this.children[i].get();
+              const child = this.children[i].get()!;
               if (!value.object.includes(child) && !child.sealed) {
                 child.remove();
               }
@@ -322,7 +336,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
             this.metaData = (value?.object[0] as JSONData)?.data ?? null;
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -334,7 +348,7 @@ export function getGraphNodeClass(): SerializableClass {
     parent: SceneNode,
     name: 'GraphNode',
     createFunc(ctx: SceneNode) {
-      const node = new GraphNode(ctx.scene);
+      const node = new GraphNode(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },

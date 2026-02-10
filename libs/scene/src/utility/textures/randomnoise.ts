@@ -1,7 +1,8 @@
 import type { AbstractDevice, GPUProgram } from '@zephyr3d/device';
 import { drawFullscreenQuad } from '../../render/fullscreenquad';
+import type { Nullable } from '@zephyr3d/base';
 
-let randomNoiseProgram: GPUProgram = null;
+let randomNoiseProgram: Nullable<GPUProgram> = null;
 
 /** @internal */
 export function createRandomNoiseTexture(device: AbstractDevice, size: number) {
@@ -27,10 +28,10 @@ export function createRandomNoiseTexture(device: AbstractDevice, size: number) {
           this.$outputs.color = pb.vec4(pb.vec3(this.noise), 1);
         });
       }
-    });
+    })!;
     randomNoiseProgram.name = '@RandomNoise';
   }
-  const tex = device.createTexture2D('rgba8unorm', size, size);
+  const tex = device.createTexture2D('rgba8unorm', size, size)!;
   const fb = device.createFrameBuffer([tex], null);
   device.pushDeviceStates();
   device.setFramebuffer(fb);

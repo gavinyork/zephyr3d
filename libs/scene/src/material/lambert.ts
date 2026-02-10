@@ -20,23 +20,23 @@ export class LambertMaterial
     super();
     this.useFeature(LambertMaterial.FEATURE_VERTEX_NORMAL, true);
   }
-  clone(): LambertMaterial {
+  clone() {
     const other = new LambertMaterial();
     other.copyFrom(this);
     return other;
   }
   /** true if vertex normal attribute presents */
-  get vertexNormal(): boolean {
-    return this.featureUsed(LambertMaterial.FEATURE_VERTEX_NORMAL);
+  get vertexNormal() {
+    return this.featureUsed<boolean>(LambertMaterial.FEATURE_VERTEX_NORMAL);
   }
-  set vertexNormal(val: boolean) {
+  set vertexNormal(val) {
     this.useFeature(LambertMaterial.FEATURE_VERTEX_NORMAL, !!val);
   }
   /** true if vertex normal attribute presents */
-  get vertexTangent(): boolean {
-    return this.featureUsed(LambertMaterial.FEATURE_VERTEX_TANGENT);
+  get vertexTangent() {
+    return this.featureUsed<boolean>(LambertMaterial.FEATURE_VERTEX_TANGENT);
   }
-  set vertexTangent(val: boolean) {
+  set vertexTangent(val) {
     this.useFeature(LambertMaterial.FEATURE_VERTEX_TANGENT, !!val);
   }
   vertexShader(scope: PBFunctionScope) {
@@ -73,7 +73,7 @@ export class LambertMaterial
       if (this.vertexColor) {
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));
       }
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+      if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         scope.$l.color = pb.vec3(0);
         scope.$l.normal = this.calculateNormal(
           scope,

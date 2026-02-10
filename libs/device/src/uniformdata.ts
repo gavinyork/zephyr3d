@@ -1,5 +1,5 @@
 import { PBPrimitiveType } from './builder/types';
-import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
+import type { Nullable, TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 import type { StructuredValue, UniformBufferLayout, StructuredBuffer } from './gpuobject';
 
 /**
@@ -8,9 +8,9 @@ import type { StructuredValue, UniformBufferLayout, StructuredBuffer } from './g
  */
 export class StructuredBufferData {
   /** @internal */
-  protected _cache: ArrayBuffer;
+  protected _cache: Nullable<ArrayBuffer>;
   /** @internal */
-  protected _buffer: StructuredBuffer;
+  protected _buffer: Nullable<StructuredBuffer>;
   /** @internal */
   protected _size: number;
   /** @internal */
@@ -22,7 +22,7 @@ export class StructuredBufferData {
    * @param layout - Layout of the structure
    * @param buffer - Buffer that holds the data
    */
-  constructor(layout: UniformBufferLayout, buffer?: StructuredBuffer | ArrayBuffer) {
+  constructor(layout: UniformBufferLayout, buffer?: Nullable<StructuredBuffer | ArrayBuffer>) {
     this._size = (layout.byteSize + 15) & ~15;
     if (this._size <= 0) {
       throw new Error(`UniformBuffer(): invalid uniform buffer byte size: ${this._size}`);
@@ -31,19 +31,19 @@ export class StructuredBufferData {
     this._uniformMap = {};
     this._uniformPositions = {};
     this._cache = buffer instanceof ArrayBuffer ? buffer : null;
-    this._buffer = buffer instanceof ArrayBuffer ? null : buffer;
+    this._buffer = buffer instanceof ArrayBuffer || !buffer ? null : buffer;
     this.init(layout, 0, '');
   }
   /** The buffer size in bytes */
-  get byteLength(): number {
+  get byteLength() {
     return this._size;
   }
   /** Get the data cache buffer */
-  get buffer(): ArrayBuffer {
+  get buffer() {
     return this._cache;
   }
   /** Get all the uniform datas */
-  get uniforms(): Record<string, TypedArray> {
+  get uniforms() {
     return this._uniformMap;
   }
   /**
@@ -51,7 +51,7 @@ export class StructuredBufferData {
    * @param name - Name of the member
    * @param value - Value to set
    */
-  set(name: string, value: StructuredValue): void {
+  set(name: string, value: StructuredValue) {
     if (value !== undefined) {
       const view = this._uniformMap[name];
       if (view) {
@@ -73,10 +73,10 @@ export class StructuredBufferData {
           const size = this._uniformPositions[name][1];
           if (typeof value === 'number') {
             view[0] = value;
-            this._buffer.bufferSubData(this._uniformPositions[name][0], view);
+            this._buffer!.bufferSubData(this._uniformPositions[name][0], view);
           } else if (value['BYTES_PER_ELEMENT'] && size <= (value['byteLength'] as number)) {
             const arr = value as TypedArray;
-            this._buffer.bufferSubData(
+            this._buffer!.bufferSubData(
               this._uniformPositions[name][0],
               arr,
               0,
@@ -97,13 +97,13 @@ export class StructuredBufferData {
     }
   }
   /** @internal */
-  private setStruct(name: string, value: any): void {
+  private setStruct(name: string, value: any) {
     for (const k in value) {
       this.set(`${name}.${k}`, value[k]);
     }
   }
   /** @internal */
-  private init(layout: UniformBufferLayout, offset: number, prefix: string): number {
+  private init(layout: UniformBufferLayout, offset: number, prefix: string) {
     for (const entry of layout.entries) {
       if (entry.subLayout) {
         offset = this.init(entry.subLayout, offset, `${prefix}${entry.name}.`);
@@ -116,7 +116,7 @@ export class StructuredBufferData {
           throw new Error('UniformBuffer(): invalid layout');
         }
         this._uniformPositions[name] = [entry.offset, entry.byteSize];
-        let viewCtor: TypedArrayConstructor = null;
+        let viewCtor: Nullable<TypedArrayConstructor> = null;
         switch (entry.type) {
           case PBPrimitiveType.F32:
             viewCtor = Float32Array;

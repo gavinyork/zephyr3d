@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import type { AnimationClip } from './animation';
 
 /**
@@ -21,7 +22,7 @@ export abstract class AnimationTrack<StateType = unknown> {
   /** @internal */
   protected _embedded: boolean;
   /** @internal */
-  protected _animation: AnimationClip;
+  protected _animation: Nullable<AnimationClip>;
   /** @internal */
   protected _target: string;
   /** @internal */
@@ -33,6 +34,7 @@ export abstract class AnimationTrack<StateType = unknown> {
    */
   constructor(embedded?: boolean) {
     this._name = 'noname';
+    this._animation = null;
     this._embedded = !!embedded;
     this._target = '';
     this._jointIndex = -1;
@@ -49,16 +51,16 @@ export abstract class AnimationTrack<StateType = unknown> {
   /**
    * Whether this track is embedded (owned inline by a resource/container).
    */
-  get embedded(): boolean {
+  get embedded() {
     return this._embedded;
   }
   /**
    * The `AnimationClip` that owns this track.
    */
-  get animation(): AnimationClip {
+  get animation() {
     return this._animation;
   }
-  set animation(ani: AnimationClip) {
+  set animation(ani) {
     this._animation = ani;
   }
   /**
@@ -107,7 +109,7 @@ export abstract class AnimationTrack<StateType = unknown> {
    * @param target - The animated object to modify.
    * @param state - The state to apply.
    */
-  abstract applyState(target: object, state: StateType);
+  abstract applyState(target: object, state: StateType): unknown;
   /**
    * Blend two states into a new state using a weight.
    *

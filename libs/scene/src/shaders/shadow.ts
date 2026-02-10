@@ -115,12 +115,12 @@ const PCF_POISSON_DISC = [
   [0.863832, -0.4072]
 ];
 
-function getShadowMapTexelSize(scope: PBInsideFunctionScope): PBShaderExp {
-  return scope.$builder.div(1, ShaderHelper.getShadowCameraParams(scope).z);
+function getShadowMapTexelSize(scope: PBInsideFunctionScope) {
+  return scope.$builder.div(1, ShaderHelper.getShadowCameraParams(scope).z) as PBShaderExp;
 }
 
-function getShadowMapSize(scope: PBInsideFunctionScope): PBShaderExp {
-  return ShaderHelper.getShadowCameraParams(scope).z;
+function getShadowMapSize(scope: PBInsideFunctionScope) {
+  return ShaderHelper.getShadowCameraParams(scope).z as PBShaderExp;
 }
 
 /** @internal */
@@ -128,7 +128,7 @@ export function computeShadowMapDepth(
   scope: PBInsideFunctionScope,
   worldPos: PBShaderExp,
   targetFormat: TextureFormat
-): PBShaderExp {
+) {
   const funcNameComputeShadowMapDepth = 'Z_computeShadowMapDepth';
   const pb = scope.$builder;
   pb.func(funcNameComputeShadowMapDepth, [pb.vec3('worldPos')], function () {
@@ -179,14 +179,11 @@ export function computeShadowMapDepth(
       );
     }
   });
-  return pb.getGlobalScope()[funcNameComputeShadowMapDepth](worldPos);
+  return pb.getGlobalScope()[funcNameComputeShadowMapDepth](worldPos) as PBShaderExp;
 }
 
 /** @internal */
-export function computeReceiverPlaneDepthBias(
-  scope: PBInsideFunctionScope,
-  texCoord: PBShaderExp
-): PBShaderExp {
+export function computeReceiverPlaneDepthBias(scope: PBInsideFunctionScope, texCoord: PBShaderExp) {
   const funcNameComputeReceiverPlaneDepthBias = 'lib_computeReceiverPlaneDepthBias';
   const pb = scope.$builder;
   pb.func(funcNameComputeReceiverPlaneDepthBias, [pb.vec4('coords')], function () {
@@ -208,10 +205,10 @@ export function computeReceiverPlaneDepthBias(
     // return
     this.$return(pb.vec3(this.$l.uv, this.$l.staticBias));
   });
-  return pb.getGlobalScope()[funcNameComputeReceiverPlaneDepthBias](texCoord);
+  return pb.getGlobalScope()[funcNameComputeReceiverPlaneDepthBias](texCoord) as PBShaderExp;
 }
 
-function getRandomRotationMatrix(scope: PBInsideFunctionScope, fragCoord: PBShaderExp): PBShaderExp {
+function getRandomRotationMatrix(scope: PBInsideFunctionScope, fragCoord: PBShaderExp) {
   const funcNameGetRandomRotationMatrix = 'lib_getRandomRotationMatrix';
   const pb = scope.$builder;
   pb.func(funcNameGetRandomRotationMatrix, [pb.vec2('fragCoord')], function () {
@@ -219,11 +216,11 @@ function getRandomRotationMatrix(scope: PBInsideFunctionScope, fragCoord: PBShad
     this.$l.randomBase = pb.vec2(pb.cos(this.randomAngle), pb.sin(this.randomAngle));
     this.$return(pb.mat2(this.randomBase.x, this.randomBase.y, pb.neg(this.randomBase.y), this.randomBase.x));
   });
-  return pb.getGlobalScope()[funcNameGetRandomRotationMatrix](fragCoord);
+  return pb.getGlobalScope()[funcNameGetRandomRotationMatrix](fragCoord) as PBShaderExp;
 }
 
-function getPoissonDiscSampleRadius(scope: PBInsideFunctionScope): PBShaderExp {
-  return ShaderHelper.getDepthBiasValues(scope).z;
+function getPoissonDiscSampleRadius(scope: PBInsideFunctionScope) {
+  return ShaderHelper.getDepthBiasValues(scope).z as PBShaderExp;
 }
 
 function sampleShadowMapPCF(
@@ -233,7 +230,7 @@ function sampleShadowMapPCF(
   offset: PBShaderExp,
   depth: PBShaderExp,
   cascade?: PBShaderExp
-): PBShaderExp {
+) {
   const funcName = cascade ? 'lib_sampleShadowMapCascadePCF' : 'lib_sampleShadowMapPCF';
   const pb = scope.$builder;
   const nativeShadowMap = hasDepthChannel(shadowMapFormat);
@@ -266,7 +263,7 @@ function sampleShadowMapPCF(
       }
     }
   );
-  return pb.getGlobalScope()[funcName](pos, depth, offset, ...(cascade ? [cascade] : []));
+  return pb.getGlobalScope()[funcName](pos, depth, offset, ...(cascade ? [cascade] : [])) as PBShaderExp;
 }
 
 function sampleShadowMap(
@@ -276,7 +273,7 @@ function sampleShadowMap(
   pos: PBShaderExp,
   depth: PBShaderExp,
   cascade?: PBShaderExp
-): PBShaderExp {
+) {
   const funcNameSampleShadowMap = 'lib_sampleShadowMap';
   const pb = scope.$builder;
   const nativeShadowMap = hasDepthChannel(shadowMapFormat);
@@ -325,16 +322,14 @@ function sampleShadowMap(
       }
     }
   );
-  return cascade
-    ? pb.getGlobalScope()[funcNameSampleShadowMap](pos, depth, cascade)
-    : pb.getGlobalScope()[funcNameSampleShadowMap](pos, depth);
+  return (
+    cascade
+      ? pb.getGlobalScope()[funcNameSampleShadowMap](pos, depth, cascade)
+      : pb.getGlobalScope()[funcNameSampleShadowMap](pos, depth)
+  ) as PBShaderExp;
 }
 
-function chebyshevUpperBound(
-  scope: PBInsideFunctionScope,
-  distance: PBShaderExp,
-  occluder: PBShaderExp
-): PBShaderExp {
+function chebyshevUpperBound(scope: PBInsideFunctionScope, distance: PBShaderExp, occluder: PBShaderExp) {
   const funcNameChebyshevUpperBound = 'lib_chebyshevUpperBound';
   const pb = scope.$builder;
   pb.func(funcNameChebyshevUpperBound, [pb.float('distance'), pb.vec2('occluder')], function () {
@@ -349,7 +344,7 @@ function chebyshevUpperBound(
     });
     this.$return(this.shadow);
   });
-  return pb.getGlobalScope()[funcNameChebyshevUpperBound](distance, occluder);
+  return pb.getGlobalScope()[funcNameChebyshevUpperBound](distance, occluder) as PBShaderExp;
 }
 
 /** @internal */
@@ -359,7 +354,7 @@ export function filterShadowVSM(
   shadowMapFormat: TextureFormat,
   texCoord: PBShaderExp,
   cascade?: PBShaderExp
-): PBShaderExp {
+) {
   const funcNameFilterShadowVSM = 'lib_filterShadowVSM';
   const pb = scope.$builder;
   pb.func(
@@ -396,7 +391,7 @@ export function filterShadowVSM(
       }
     }
   );
-  return pb.getGlobalScope()[funcNameFilterShadowVSM](texCoord, ...(cascade ? [cascade] : []));
+  return pb.getGlobalScope()[funcNameFilterShadowVSM](texCoord, ...(cascade ? [cascade] : [])) as PBShaderExp;
 }
 
 /** @internal */
@@ -406,7 +401,7 @@ export function filterShadowESM(
   shadowMapFormat: TextureFormat,
   shadowVertex: PBShaderExp,
   cascade?: PBShaderExp
-): PBShaderExp {
+) {
   const funcNameFilterShadowESM = 'lib_filterShadowESM';
   const pb = scope.$builder;
   pb.func(
@@ -456,7 +451,9 @@ export function filterShadowESM(
       );
     }
   );
-  return pb.getGlobalScope()[funcNameFilterShadowESM](shadowVertex, ...(cascade ? [cascade] : []));
+  return pb
+    .getGlobalScope()
+    [funcNameFilterShadowESM](shadowVertex, ...(cascade ? [cascade] : [])) as PBShaderExp;
 }
 
 /** @internal */
@@ -468,7 +465,7 @@ export function filterShadowPCF(
   texCoord: PBShaderExp,
   receiverPlaneDepthBias?: PBShaderExp,
   cascade?: PBShaderExp
-): PBShaderExp {
+) {
   const funcNameFilterShadowPCF = `lib_filterShadowPCF${kernelSize}x${kernelSize}`;
   const pb = scope.$builder;
   pb.func(
@@ -989,7 +986,7 @@ export function filterShadowPCF(
     .getGlobalScope()
     [
       funcNameFilterShadowPCF
-    ](texCoord, ...(receiverPlaneDepthBias ? [receiverPlaneDepthBias] : []), ...(cascade ? [cascade] : []));
+    ](texCoord, ...(receiverPlaneDepthBias ? [receiverPlaneDepthBias] : []), ...(cascade ? [cascade] : [])) as PBShaderExp;
 }
 
 /** @internal */
@@ -1001,7 +998,7 @@ export function filterShadowPoissonDisc(
   texCoord: PBShaderExp,
   receiverPlaneDepthBias?: PBShaderExp,
   cascade?: PBShaderExp
-): PBShaderExp {
+) {
   const funcNameFilterShadowPoissonDisc = 'lib_filterShadowPoissonDisc';
   const pb = scope.$builder;
   pb.func(
@@ -1048,5 +1045,5 @@ export function filterShadowPoissonDisc(
     .getGlobalScope()
     [
       funcNameFilterShadowPoissonDisc
-    ](texCoord, ...(receiverPlaneDepthBias ? [receiverPlaneDepthBias] : []), ...(cascade ? [cascade] : []));
+    ](texCoord, ...(receiverPlaneDepthBias ? [receiverPlaneDepthBias] : []), ...(cascade ? [cascade] : [])) as PBShaderExp;
 }

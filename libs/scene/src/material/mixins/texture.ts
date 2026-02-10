@@ -7,7 +7,7 @@ import type {
   TextureSampler
 } from '@zephyr3d/device';
 import type { MeshMaterial, applyMaterialMixins } from '../meshmaterial';
-import type { Matrix4x4 } from '@zephyr3d/base';
+import type { Matrix4x4, Nullable } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
 
@@ -44,13 +44,13 @@ export type TextureMixinInstanceTypes<T> =
  */
 export type TextureProp<U extends string> = {
   [P in 'Texture' | 'TextureSampler' | 'TexCoordIndex' | 'TexCoordMatrix' as `${U}${P}`]: P extends 'Texture'
-    ? Texture2D
+    ? Nullable<Texture2D>
     : P extends 'TextureSampler'
-      ? TextureSampler
+      ? Nullable<TextureSampler>
       : P extends 'TexCoordIndex'
         ? number
         : P extends 'TexCoordMatrix'
-          ? Matrix4x4
+          ? Nullable<Matrix4x4>
           : never;
 };
 
@@ -93,11 +93,11 @@ export function mixinTextureProps<U extends string>(name: U) {
       constructor() {
         super();
         const texture = new DRef<Texture2D>();
-        let sampler: TextureSampler = null;
+        let sampler: Nullable<TextureSampler> = null;
         let texCoord = 0;
-        let matrix: Matrix4x4 = null;
+        let matrix: Nullable<Matrix4x4> = null;
         Object.defineProperty(this, `${name}Texture`, {
-          get: function (): Texture2D {
+          get: function () {
             return texture.get();
           },
           set: function (newValue: Texture2D) {
@@ -115,7 +115,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           configurable: true
         });
         Object.defineProperty(this, `${name}TextureSampler`, {
-          get: function (): TextureSampler {
+          get: function () {
             return sampler;
           },
           set: function (newValue: TextureSampler) {
@@ -128,7 +128,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           configurable: true
         });
         Object.defineProperty(this, `${name}TexCoordMatrix`, {
-          get: function (): Matrix4x4 {
+          get: function () {
             return matrix;
           },
           set: function (newValue: Matrix4x4) {
@@ -140,7 +140,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           configurable: true
         });
         Object.defineProperty(this, `${name}TexCoordIndex`, {
-          get: function (): number {
+          get: function () {
             return texCoord;
           },
           set: function (newValue: number) {
@@ -154,15 +154,17 @@ export function mixinTextureProps<U extends string>(name: U) {
           configurable: true
         });
       }
-      [`sample${capName}Texture`](scope: PBInsideFunctionScope, texCoord?: PBShaderExp): PBShaderExp {
+      [`sample${capName}Texture`](scope: PBInsideFunctionScope, texCoord?: PBShaderExp) {
+        // @ts-ignore
         const tex = this[`get${capName}TextureUniform`](scope);
+        // @ts-ignore
         const coord = texCoord ?? this[`get${capName}TexCoord`](scope);
         return scope.$builder.textureSample(tex, coord);
       }
-      [`get${capName}TextureUniform`](scope: PBInsideFunctionScope): PBShaderExp {
+      [`get${capName}TextureUniform`](scope: PBInsideFunctionScope) {
         return scope.$builder.shaderKind === 'fragment' ? scope[`z${capName}Tex`] : null;
       }
-      [`get${capName}TexCoord`](scope: PBInsideFunctionScope): PBShaderExp {
+      [`get${capName}TexCoord`](scope: PBInsideFunctionScope) {
         const texCoord = (this as any)[`${name}TexCoordIndex`];
         if (texCoord < 0) {
           return null;
@@ -182,7 +184,7 @@ export function mixinTextureProps<U extends string>(name: U) {
                 .xy
             : scope.$inputs[`texCoord${texCoord}`];
       }
-      copyFrom(other: any): void {
+      copyFrom(other: any) {
         super.copyFrom(other);
         const that = this as any;
         that[`${name}Texture`] = other[`${name}Texture`];
@@ -190,7 +192,7 @@ export function mixinTextureProps<U extends string>(name: U) {
         that[`${name}TexCoordMatrix`] = other[`${name}TexCoordMatrix`];
         that[`${name}TexCoordIndex`] = other[`${name}TexCoordIndex`];
       }
-      vertexShader(scope: PBFunctionScope): void {
+      vertexShader(scope: PBFunctionScope) {
         super.vertexShader(scope);
         if (vertex || this.needFragmentColor()) {
           const pb = scope.$builder;
@@ -217,7 +219,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           }
         }
       }
-      fragmentShader(scope: PBFunctionScope): void {
+      fragmentShader(scope: PBFunctionScope) {
         super.fragmentShader(scope);
         if (this.needFragmentColor()) {
           const pb = scope.$builder;
@@ -226,7 +228,7 @@ export function mixinTextureProps<U extends string>(name: U) {
           }
         }
       }
-      applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+      applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
         super.applyUniformValues(bindGroup, ctx, pass);
         if (this.needFragmentColor(ctx)) {
           if (this.featureUsed(feature)) {
@@ -246,6 +248,7 @@ export function mixinTextureProps<U extends string>(name: U) {
     feature = cls.defineFeature();
     featureTexIndex = cls.defineFeature();
     featureTexMatrix = cls.defineFeature();
+    // @ts-ignore
     cls[id] = true;
     return cls as unknown as T & {
       new (...args: any[]): TextureProp<U> & TexturePropUniforms<U>;

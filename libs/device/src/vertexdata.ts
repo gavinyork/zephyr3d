@@ -7,6 +7,7 @@ import {
   getVertexBufferAttribType
 } from './gpuobject';
 import type { PBArrayTypeInfo, PBPrimitiveTypeInfo } from './builder/types';
+import type { Nullable } from '@zephyr3d/base';
 
 /**
  * Vertex buffer information
@@ -27,9 +28,9 @@ export type VertexBufferInfo = {
  */
 export class VertexData {
   /** @internal */
-  private _vertexBuffers: VertexBufferInfo[];
+  private _vertexBuffers: Nullable<VertexBufferInfo>[];
   /** @internal */
-  private _indexBuffer: IndexBuffer;
+  private _indexBuffer: Nullable<IndexBuffer>;
   /** @internal */
   private _drawOffset: number;
   /** @internal */
@@ -47,7 +48,7 @@ export class VertexData {
    * Creates a new instance of VertexData by copying from this object
    * @returns New instance of VertexData
    */
-  clone(): VertexData {
+  clone() {
     const newVertexData = new VertexData();
     newVertexData._vertexBuffers = this._vertexBuffers.slice();
     newVertexData._indexBuffer = this._indexBuffer;
@@ -56,11 +57,11 @@ export class VertexData {
     return newVertexData;
   }
   /** Vertex buffer information list */
-  get vertexBuffers(): VertexBufferInfo[] {
+  get vertexBuffers() {
     return this._vertexBuffers;
   }
   /** Index buffer */
-  get indexBuffer(): IndexBuffer {
+  get indexBuffer() {
     return this._indexBuffer;
   }
   /** Number of vertices */
@@ -68,10 +69,10 @@ export class VertexData {
     return this._numVertices;
   }
   /** Draw offset */
-  getDrawOffset(): number {
+  getDrawOffset() {
     return this._drawOffset;
   }
-  setDrawOffset(offset: number): void {
+  setDrawOffset(offset: number) {
     if (offset !== this._drawOffset) {
       this._drawOffset = offset;
       this.calcNumVertices();
@@ -82,23 +83,23 @@ export class VertexData {
    * @param semantic - The vertex semantic
    * @returns Vertex buffer of the given semantic
    */
-  getVertexBuffer(semantic: VertexSemantic): StructuredBuffer {
-    return this._vertexBuffers[getVertexAttribByName(semantic)]?.buffer ?? null;
+  getVertexBuffer(semantic: VertexSemantic) {
+    return this._vertexBuffers[getVertexAttribByName(semantic)!]?.buffer ?? null;
   }
   /**
    * Gets the vertex buffer information by specific vertex semantic
    * @param semantic - The vertex semantic
    * @returns Vertex buffer information of the given semantic
    */
-  getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo {
-    return this._vertexBuffers[getVertexAttribByName(semantic)] ?? null;
+  getVertexBufferInfo(semantic: VertexSemantic) {
+    return this._vertexBuffers[getVertexAttribByName(semantic)!] ?? null;
   }
   /**
    * Gets the index buffer
    * @returns The index buffer
    */
-  getIndexBuffer(): IndexBuffer {
-    return this._indexBuffer || null;
+  getIndexBuffer() {
+    return this._indexBuffer;
   }
   /**
    * Sets a vertex buffer
@@ -106,7 +107,7 @@ export class VertexData {
    * @param stepMode - Step mode of the buffer
    * @returns The buffer that was set
    */
-  setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode): StructuredBuffer {
+  setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode) {
     if (!buffer) {
       return null;
     }
@@ -119,12 +120,12 @@ export class VertexData {
       let offset = 0;
       for (const attrib of vertexType.structMembers) {
         const loc = getVertexAttribByName(attrib.name as VertexSemantic);
-        this.internalSetVertexBuffer(loc, buffer, offset, stepMode);
+        this.internalSetVertexBuffer(loc!, buffer, offset, stepMode);
         offset += attrib.size;
       }
     } else {
       const loc = getVertexAttribByName(buffer.structure.structMembers[0].name as VertexSemantic);
-      this.internalSetVertexBuffer(loc, buffer, 0, stepMode);
+      this.internalSetVertexBuffer(loc!, buffer, 0, stepMode);
     }
     return buffer;
   }
@@ -133,7 +134,7 @@ export class VertexData {
    * @param buffer - Vertex buffer to be removed
    * @returns true if the buffer was successfully removed, otherwise false
    */
-  removeVertexBuffer(buffer: StructuredBuffer): boolean {
+  removeVertexBuffer(buffer: StructuredBuffer) {
     let removed = false;
     for (let loc = 0; loc < this._vertexBuffers.length; loc++) {
       const info = this._vertexBuffers[loc];
@@ -153,9 +154,9 @@ export class VertexData {
    * @param buffer - Index buffer to be set
    * @returns The index buffer that was set
    */
-  setIndexBuffer(buffer: IndexBuffer): IndexBuffer {
+  setIndexBuffer(buffer: Nullable<IndexBuffer>) {
     if (buffer !== this._indexBuffer) {
-      this._indexBuffer = buffer || null;
+      this._indexBuffer = buffer;
     }
     return buffer;
   }
@@ -178,7 +179,7 @@ export class VertexData {
     buffer: StructuredBuffer,
     offset?: number,
     stepMode?: VertexStepMode
-  ): StructuredBuffer {
+  ) {
     if (loc < 0 || loc >= MAX_VERTEX_ATTRIBUTES) {
       throw new Error(`setVertexBuffer() failed: location out of bounds: ${loc}`);
     }
@@ -189,7 +190,7 @@ export class VertexData {
       this._vertexBuffers[loc] = {
         buffer: buffer,
         offset: offset,
-        type: getVertexBufferAttribType(buffer.structure, loc),
+        type: getVertexBufferAttribType(buffer.structure, loc)!,
         stride: getVertexBufferStride(buffer.structure),
         drawOffset: 0,
         stepMode: stepMode

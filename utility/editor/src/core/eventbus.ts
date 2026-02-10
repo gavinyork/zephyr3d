@@ -1,4 +1,6 @@
+import type { GenericConstructor } from '@zephyr3d/base';
 import { Observable } from '@zephyr3d/base';
+import type { MeshMaterial } from '@zephyr3d/scene';
 
 type EventBusEventMap = {
   error: [msg: string];
@@ -20,7 +22,7 @@ type EventBusEventMap = {
   external_dragover: [ev: DragEvent];
   external_drop: [ev: DragEvent];
   action: [action: string, ...args: any];
-  edit_material: [label: string, outputName: string, path: string];
+  edit_material: [label: string, outputName: string, type: GenericConstructor<MeshMaterial>, path: string];
   edit_material_function: [path: string];
 };
 

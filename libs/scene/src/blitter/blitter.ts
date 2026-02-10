@@ -1,4 +1,4 @@
-import type { CubeFace } from '@zephyr3d/base';
+import type { CubeFace, Nullable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
   RenderStateSet,
@@ -34,19 +34,19 @@ type BlitProgramInfo = { program: GPUProgram; bindGroup: BindGroup };
  */
 export abstract class Blitter {
   /** @internal */
-  protected _hash: string;
+  protected _hash: Nullable<string>;
   /** @internal */
-  protected _renderStates: RenderStateSet;
+  protected _renderStates: Nullable<RenderStateSet>;
   /** @internal */
   protected _srgbOut: boolean;
   /** @internal */
   protected _flip: boolean;
   /** @internal */
-  protected _viewport: number[];
+  protected _viewport: Nullable<number[]>;
   /** @internal */
-  protected _scissor: number[];
+  protected _scissor: Nullable<number[]>;
   /** @internal */
-  protected _destRect: number[];
+  protected _destRect: Nullable<number[]>;
   /** @internal */
   protected _offsetParams: Vector4;
   /**
@@ -63,36 +63,36 @@ export abstract class Blitter {
     this._offsetParams = new Vector4();
   }
   /** Viewport */
-  get viewport(): number[] {
+  get viewport() {
     return this._viewport;
   }
-  set viewport(val: number[]) {
-    this._viewport = val ?? null;
+  set viewport(val) {
+    this._viewport = val;
   }
   /** Scissor rect */
-  get scissor(): number[] {
+  get scissor() {
     return this._scissor;
   }
-  set scissor(val: number[]) {
-    this._scissor = val ?? null;
+  set scissor(val) {
+    this._scissor = val;
   }
   /** Destination rectangle */
-  get destRect(): number[] {
+  get destRect() {
     return this._destRect;
   }
-  set destRect(val: number[]) {
+  set destRect(val) {
     if (!!this._destRect !== !!val) {
       this.invalidateHash();
     }
-    this._destRect = val ?? null;
+    this._destRect = val;
   }
   /**
    * Whether output color value in gamma color space
    */
-  get srgbOut(): boolean {
+  get srgbOut() {
     return this._srgbOut;
   }
-  set srgbOut(val: boolean) {
+  set srgbOut(val) {
     if (this._srgbOut !== !!val) {
       this._srgbOut = !!val;
       this.invalidateHash();
@@ -101,16 +101,16 @@ export abstract class Blitter {
   /**
    * Render states used to do the blitting
    */
-  get renderStates(): RenderStateSet {
+  get renderStates() {
     return this._renderStates;
   }
-  set renderStates(rs: RenderStateSet) {
+  set renderStates(rs) {
     this._renderStates = rs;
   }
   /**
    * Program hash code
    */
-  get hash(): string {
+  get hash() {
     if (!this._hash) {
       this._hash = `${this.constructor.name}:${this._srgbOut ? 1 : 0}:${this._flip ? 1 : 0}:${
         this._destRect ? 1 : 0
@@ -121,7 +121,7 @@ export abstract class Blitter {
   /**
    * Force the hash code to be regenerated
    */
-  invalidateHash(): void {
+  invalidateHash() {
     this._hash = null;
   }
   /**
@@ -140,7 +140,7 @@ export abstract class Blitter {
     uv: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'float' | 'int' | 'uint' | 'depth'
-  ): PBShaderExp {
+  ) {
     const pb = scope.$builder;
     if (sampleType === 'float' || sampleType === 'depth') {
       switch (type) {
@@ -152,7 +152,7 @@ export abstract class Blitter {
         case '2d-array':
           return pb.textureArraySampleLevel(srcTex, uv, srcLayer, 0);
         default:
-          return null;
+          throw new Error(`Invalid blit type: ${type}`);
       }
     } else {
       switch (type) {
@@ -168,7 +168,7 @@ export abstract class Blitter {
             0
           );
         default:
-          return null;
+          throw new Error(`Invalid blit type: ${type}`);
       }
     }
   }
@@ -180,7 +180,7 @@ export abstract class Blitter {
    * @param texel - The texel to be written
    * @returns The written texel
    */
-  writeTexel(scope: PBInsideFunctionScope, type: BlitType, uv: PBShaderExp, texel: PBShaderExp): PBShaderExp {
+  writeTexel(scope: PBInsideFunctionScope, type: BlitType, uv: PBShaderExp, texel: PBShaderExp) {
     return texel;
   }
   /**
@@ -217,7 +217,7 @@ export abstract class Blitter {
    */
   protected abstract calcHash(): string;
   /** @internal */
-  protected blit2D(source: Texture2D, dest: FrameBuffer, sampler?: TextureSampler): void {
+  protected blit2D(source: Texture2D, dest: Nullable<FrameBuffer>, sampler?: Nullable<TextureSampler>): void {
     const device = getDevice();
     const flip = !dest && device.type === 'webgpu';
     const bilinearFiltering = sampler
@@ -254,10 +254,10 @@ export abstract class Blitter {
   /** @internal */
   protected blit2DArray(
     source: Texture2DArray,
-    dest: FrameBuffer,
+    dest: Nullable<FrameBuffer>,
     layer: number,
-    sampler?: TextureSampler
-  ): void {
+    sampler?: Nullable<TextureSampler>
+  ) {
     const device = getDevice();
     const flip = !dest && device.type === 'webgpu';
     const bilinearFiltering = sampler
@@ -284,10 +284,10 @@ export abstract class Blitter {
   /** @internal */
   protected blitCubeMap(
     source: TextureCube,
-    dest: FrameBuffer,
+    dest: Nullable<FrameBuffer>,
     face: CubeFace,
-    sampler?: TextureSampler
-  ): void {
+    sampler?: Nullable<TextureSampler>
+  ) {
     const device = getDevice();
     const flip = !dest && device.type === 'webgpu';
     const bilinearFiltering = sampler
@@ -318,14 +318,14 @@ export abstract class Blitter {
    * @param dest - The frame buffer to blit onto
    * @param sampler - Sampler for source texture
    */
-  blit(source: Texture2D, dest: FrameBuffer, sampler?: TextureSampler): void;
+  blit(source: Texture2D, dest: Nullable<FrameBuffer>, sampler?: Nullable<TextureSampler>): void;
   /**
    * Blits a 2D texture to 2D texture or frame buffer
    * @param source - The source texture
    * @param dest - The destination texture or frame buffer
    * @param sampler - Sampler for source texture
    */
-  blit(source: Texture2D, dest: Texture2D, sampler?: TextureSampler): void;
+  blit(source: Texture2D, dest: Texture2D, sampler?: Nullable<TextureSampler>): void;
   /**
    * Blits a 2D texture to given layer of a 2D array texture
    * @param source - The source texture
@@ -333,7 +333,7 @@ export abstract class Blitter {
    * @param layer - The layer of the destination texture
    * @param sampler - Sampler for source texture
    */
-  blit(source: Texture2D, dest: Texture2DArray, layer: number, sampler?: TextureSampler): void;
+  blit(source: Texture2D, dest: Texture2DArray, layer: number, sampler?: Nullable<TextureSampler>): void;
   /**
    * Blits a 2d array texture to another 2d array texture
    *
@@ -344,7 +344,7 @@ export abstract class Blitter {
    * @param dest - The destination texture
    * @param sampler - Sampler for source texture
    */
-  blit(source: Texture2DArray, dest: Texture2DArray, sampler?: TextureSampler): void;
+  blit(source: Texture2DArray, dest: Texture2DArray, sampler?: Nullable<TextureSampler>): void;
   /**
    * Blits given layer of a 2d array texture to a frame buffer
    * @param source - The source texture
@@ -352,7 +352,12 @@ export abstract class Blitter {
    * @param layer - The layer to be copied
    * @param sampler - Sampler for source texture
    */
-  blit(source: Texture2DArray, dest: FrameBuffer, layer: number, sampler?: TextureSampler): void;
+  blit(
+    source: Texture2DArray,
+    dest: Nullable<FrameBuffer>,
+    layer: number,
+    sampler?: Nullable<TextureSampler>
+  ): void;
   /**
    * Blits given layer of a 2d array texture to a 2d texture or frame buffer
    * @param source - The source texture
@@ -360,7 +365,7 @@ export abstract class Blitter {
    * @param layer - The layer to be copied
    * @param sampler - Sampler for source texture
    */
-  blit(source: Texture2DArray, dest: Texture2D, layer: number, sampler?: TextureSampler): void;
+  blit(source: Texture2DArray, dest: Texture2D, layer: number, sampler?: Nullable<TextureSampler>): void;
   /**
    * Blits a cube texture to another cube texture
    *
@@ -371,7 +376,7 @@ export abstract class Blitter {
    * @param dest - The destination texture
    * @param sampler - Sampler for source texture
    */
-  blit(source: TextureCube, dest: TextureCube, sampler?: TextureSampler): void;
+  blit(source: TextureCube, dest: TextureCube, sampler?: Nullable<TextureSampler>): void;
   /**
    * Blits given face of a cube texture to a frame buffer
    * @param source - The source texture
@@ -379,7 +384,12 @@ export abstract class Blitter {
    * @param face - The face to be copied
    * @param sampler - Sampler for source texture
    */
-  blit(source: TextureCube, dest: FrameBuffer, face: number, sampler?: TextureSampler): void;
+  blit(
+    source: TextureCube,
+    dest: Nullable<FrameBuffer>,
+    face: number,
+    sampler?: Nullable<TextureSampler>
+  ): void;
   /**
    * Blits given face of a cube texture to a 2d texture or frame buffer
    * @param source - The source texture
@@ -387,19 +397,19 @@ export abstract class Blitter {
    * @param face - The face to be copied
    * @param sampler - Sampler for source texture
    */
-  blit(source: TextureCube, dest: Texture2D, face: number, sampler?: TextureSampler): void;
+  blit(source: TextureCube, dest: Texture2D, face: number, sampler?: Nullable<TextureSampler>): void;
   blit(
     source: BaseTexture,
-    dest: BaseTexture | FrameBuffer,
-    layer?: number | TextureSampler,
-    sampler?: TextureSampler
+    dest: BaseTexture | Nullable<FrameBuffer>,
+    layer?: number | Nullable<TextureSampler>,
+    sampler?: Nullable<TextureSampler>
   ): void;
   blit(
     source: BaseTexture,
-    dest: BaseTexture | FrameBuffer,
-    layer?: number | TextureSampler,
-    sampler?: TextureSampler
-  ): void {
+    dest: BaseTexture | Nullable<FrameBuffer>,
+    layer?: number | Nullable<TextureSampler>,
+    sampler?: Nullable<TextureSampler>
+  ) {
     const device = getDevice();
     device.pushDeviceStates();
     if (!dest) {
@@ -465,10 +475,10 @@ const blitProgramCache: {
   [hash: string]: BlitProgramInfo;
 } = {};
 
-let blitPrimitive2D: Primitive = null;
-let blitRenderStates: RenderStateSet = null;
+let blitPrimitive2D: Nullable<Primitive> = null;
+let blitRenderStates: Nullable<RenderStateSet> = null;
 
-function getBlitPrimitive2D(): Primitive {
+function getBlitPrimitive2D() {
   if (!blitPrimitive2D) {
     blitPrimitive2D = new Primitive();
     blitPrimitive2D.createAndSetVertexBuffer(
@@ -482,7 +492,7 @@ function getBlitPrimitive2D(): Primitive {
   return blitPrimitive2D;
 }
 
-function getBlitRenderStateSet(): RenderStateSet {
+function getBlitRenderStateSet() {
   if (!blitRenderStates) {
     blitRenderStates = getDevice().createRenderStateSet();
     blitRenderStates.useDepthState().enableTest(false).enableWrite(false);
@@ -497,7 +507,7 @@ function getBlitProgram(
   bilinearFiltering: boolean,
   sampleType: 'int' | 'uint' | 'float' | 'depth',
   flip: boolean
-): BlitProgramInfo {
+) {
   const hash = `${type}:${filter.hash}:${bilinearFiltering}:${sampleType}:${flip ? 1 : 0}`;
   let programInfo = blitProgramCache[hash];
   if (programInfo === undefined) {
@@ -515,7 +525,7 @@ function createBlitProgram(
   st: 'int' | 'uint' | 'float' | 'depth',
   flip: boolean,
   scaleBias: boolean
-): BlitProgramInfo {
+) {
   const program = getDevice().buildRenderProgram({
     vertex(pb) {
       this.$inputs.pos = pb.vec2().attrib('position');
@@ -635,14 +645,10 @@ function createBlitProgram(
         }
       });
     }
-  });
-  if (program) {
-    program.name = `@Blit_${type}_${st}_${bilinearFiltering ? 'bilinear' : 'point'}_${flip ? 'flip' : 'noflip'}`;
-  }
-  return program
-    ? {
-        program,
-        bindGroup: getDevice().createBindGroup(program.bindGroupLayouts[0])
-      }
-    : null;
+  })!;
+  program.name = `@Blit_${type}_${st}_${bilinearFiltering ? 'bilinear' : 'point'}_${flip ? 'flip' : 'noflip'}`;
+  return {
+    program,
+    bindGroup: getDevice().createBindGroup(program.bindGroupLayouts[0])
+  };
 }

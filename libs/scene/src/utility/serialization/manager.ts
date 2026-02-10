@@ -1,3 +1,4 @@
+import type { Nullable, RequireOptionals } from '@zephyr3d/base';
 import { ASSERT, DRef, randomUUID, type GenericConstructor, type TypedArray, type VFS } from '@zephyr3d/base';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
@@ -18,7 +19,10 @@ import {
   getPBRMetallicRoughnessMaterialClass,
   getPBRSpecularGlossinessMaterialClass,
   getParticleMaterialClass,
-  getPBRBluePrintMaterialClass
+  getPBRBluePrintMaterialClass,
+  getSpriteMaterialClass,
+  getSpriteBlueprintMaterialClass,
+  getStandardSpriteMaterialClass
 } from './scene/material';
 import { getMeshClass } from './scene/mesh';
 import { getParticleNodeClass } from './scene/particle';
@@ -60,6 +64,10 @@ import {
   getJSONArrayClass
 } from './json';
 import {
+  ConstantBooleanNode,
+  ConstantBVec2Node,
+  ConstantBVec3Node,
+  ConstantBVec4Node,
   ConstantScalarNode,
   ConstantVec2Node,
   ConstantVec3Node,
@@ -129,7 +137,16 @@ import {
   Hash1Node,
   Hash2Node,
   Hash3Node,
-  SwizzleNode
+  SwizzleNode,
+  CompComparisonNode,
+  AnyConditionNode,
+  AllConditionNode,
+  SelectionNode,
+  EqualNode,
+  NotEqualNode,
+  LogicallyAndNode,
+  LogicallyOrNode,
+  SmoothStepNode
 } from '../blueprint/common/math';
 import {
   BillboardMatrixNode,
@@ -152,11 +169,12 @@ import {
   ViewMatrixNode,
   ViewProjMatrixNode
 } from '../blueprint/material/inputs';
-import { PBRBlockNode, VertexBlockNode } from '../blueprint/material/pbr';
+import { PBRBlockNode, SpriteBlockNode, VertexBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
 import type { Material, MeshMaterial, PBRBluePrintMaterial } from '../../material';
 import type { Primitive } from '../../render';
 import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
+import { getSpriteClass } from './scene/sprite';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -244,6 +262,7 @@ export class ResourceManager {
         getSceneNodeClass(this),
         getGraphNodeClass(),
         getMeshClass(),
+        getSpriteClass(),
         getWaterClass(this),
         getTerrainClass(this),
         getFFTWaveGeneratorClass(),
@@ -260,12 +279,15 @@ export class ResourceManager {
         getSceneClass(this),
         ...getMeshMaterialClass(),
         ...getPBRBluePrintMaterialClass(),
+        ...getSpriteBlueprintMaterialClass(),
         ...getUnlitMaterialClass(this),
         ...getLambertMaterialClass(this),
         ...getBlinnMaterialClass(this),
         ...getPBRMetallicRoughnessMaterialClass(this),
         ...getPBRSpecularGlossinessMaterialClass(this),
         ...getParticleMaterialClass(this),
+        ...getSpriteMaterialClass(this),
+        ...getStandardSpriteMaterialClass(this),
         getBoxShapeClass(),
         getBoxFrameShapeClass(),
         getSphereShapeClass(),
@@ -277,11 +299,23 @@ export class ResourceManager {
         ConstantVec2Node.getSerializationCls(),
         ConstantVec3Node.getSerializationCls(),
         ConstantVec4Node.getSerializationCls(),
+        ConstantBooleanNode.getSerializationCls(),
+        ConstantBVec2Node.getSerializationCls(),
+        ConstantBVec3Node.getSerializationCls(),
+        ConstantBVec4Node.getSerializationCls(),
         ConstantTexture2DNode.getSerializationCls(),
         ConstantTexture2DArrayNode.getSerializationCls(),
         ConstantTextureCubeNode.getSerializationCls(),
         MakeVectorNode.getSerializationCls(),
         SwizzleNode.getSerializationCls(),
+        EqualNode.getSerializationCls(),
+        NotEqualNode.getSerializationCls(),
+        LogicallyAndNode.getSerializationCls(),
+        LogicallyOrNode.getSerializationCls(),
+        CompComparisonNode.getSerializationCls(),
+        AnyConditionNode.getSerializationCls(),
+        AllConditionNode.getSerializationCls(),
+        SelectionNode.getSerializationCls(),
         Degrees2RadiansNode.getSerializationCls(),
         Radians2DegreesNode.getSerializationCls(),
         SinNode.getSerializationCls(),
@@ -320,6 +354,7 @@ export class ResourceManager {
         MaxNode.getSerializationCls(),
         PowNode.getSerializationCls(),
         StepNode.getSerializationCls(),
+        SmoothStepNode.getSerializationCls(),
         FmaNode.getSerializationCls(),
         ClampNode.getSerializationCls(),
         SaturateNode.getSerializationCls(),
@@ -355,6 +390,7 @@ export class ResourceManager {
         SkyEnvTextureNode.getSerializationCls(),
         ElapsedTimeNode.getSerializationCls(),
         PBRBlockNode.getSerializationCls(),
+        SpriteBlockNode.getSerializationCls(),
         VertexBlockNode.getSerializationCls(),
         ResolveVertexPositionNode.getSerializationCls(),
         ResolveVertexTangentNode.getSerializationCls(),
@@ -450,7 +486,7 @@ export class ResourceManager {
    *
    * @returns The `SerializableClass` that declares the property, or `null` if unknown.
    */
-  getClassByProperty(prop: PropertyAccessor): SerializableClass {
+  getClassByProperty(prop: PropertyAccessor): Nullable<SerializableClass> {
     for (const k of this._clsPropMap) {
       if (k[1].indexOf(prop) >= 0) {
         return k[0];
@@ -540,7 +576,7 @@ export class ResourceManager {
    * @param id - Asset ID to associated to this asset.
    *
    */
-  setAssetId(asset: unknown, id: string) {
+  setAssetId(asset: unknown, id?: Nullable<string>) {
     if (asset) {
       if (id) {
         this._allocated.set(asset, id);
@@ -580,7 +616,7 @@ export class ResourceManager {
    *
    * @returns The serialized JSON structure.
    */
-  async serializeObject(obj: any, json?: any, asyncTasks?: Promise<unknown>[]) {
+  async serializeObject(obj: any, json?: any, asyncTasks?: Nullable<Promise<unknown>[]>) {
     if (obj === null || obj === undefined) {
       return obj;
     }
@@ -599,10 +635,37 @@ export class ResourceManager {
       json.Init = initParams;
     }
     if (flags.saveProps) {
-      while (info) {
-        await this.serializeObjectProps(obj, info, json.Object, asyncTasks);
-        info = this.getClassByConstructor(info.parent);
+      await this.serializeObjectProps(obj, json.Object, asyncTasks, info);
+    }
+    return json;
+  }
+  /**
+   * Serialize object properties into a JSON structure.
+   *
+   * @param obj - The target object to serialize.
+   * @param json - The JSON structure to populate.
+   * @param asyncTasks - Optional list to collect async tasks for embedded asset export.
+   * @param info - Optional serialization metadata for the object's class.
+   * @returns A Promise that resolves when serialization is complete.
+   */
+  async serializeObjectProps(
+    obj: any,
+    json?: any,
+    asyncTasks?: Nullable<Promise<unknown>[]>,
+    info?: SerializableClass
+  ) {
+    if (!info) {
+      const cls = this.getClasses();
+      const index = cls.findIndex((val) => val.ctor === obj.constructor);
+      if (index < 0) {
+        throw new Error('Serialize object properties failed: Cannot found serialization meta data');
       }
+      info = cls[index];
+    }
+    json = json ?? {};
+    while (info) {
+      await this.serializeObjectPropsForCls(obj, info, json, asyncTasks);
+      info = this.getClassByConstructor(info.parent!)!;
     }
     return json;
   }
@@ -618,7 +681,7 @@ export class ResourceManager {
    *
    * @returns A Promise resolving to the reconstructed object instance, or `null` on failure.
    */
-  async deserializeObject<T extends object>(ctx: any, json: object): Promise<T> {
+  async deserializeObject<T extends object>(ctx: any, json: Record<string, unknown>): Promise<Nullable<T>> {
     const cls = this.getClasses();
     const className = json['ClassName'];
     const index = cls.findIndex((val) => val.name === className);
@@ -626,8 +689,8 @@ export class ResourceManager {
       throw new Error('Deserialize object failed: Cannot found serialization meta data');
     }
     let info = cls[index];
-    const initParams: { asset?: string } = json['Init'];
-    json = json['Object'];
+    const initParams = json['Init'] as { asset?: string };
+    json = json['Object'] as Record<string, unknown>;
     let p: T | Promise<T>;
     let loadProps = true;
     if (info.createFunc) {
@@ -646,12 +709,30 @@ export class ResourceManager {
     }
     const obj = p instanceof Promise ? await p : p;
     if (loadProps) {
-      while (info) {
-        await this.deserializeObjectProps(obj, info, json);
-        info = this.getClassByConstructor(info.parent);
-      }
+      await this.deserializeObjectProps(obj, json, info);
     }
     return obj;
+  }
+  /**
+   * Deserialize object properties from JSON into an existing object instance.
+   *
+   * @param obj - The target object to populate.
+   * @param json - The JSON structure containing serialized properties.
+   * @param info - Optional serialization metadata for the object's class.
+   */
+  async deserializeObjectProps(obj: any, json: any, info?: SerializableClass) {
+    if (!info) {
+      const cls = this.getClasses();
+      const index = cls.findIndex((val) => val.ctor === obj.constructor);
+      if (index < 0) {
+        throw new Error('Deserialize object properties failed: Cannot found serialization meta data');
+      }
+      info = cls[index];
+    }
+    while (info) {
+      await this.deserializeObjectPropsForCls(obj, info, json);
+      info = this.getClassByConstructor(info!.parent!)!;
+    }
   }
   /**
    * Load a model by ID and track the allocation for reverse lookup.
@@ -734,6 +815,13 @@ export class ResourceManager {
     await this._assetManager.reloadBluePrintMaterials(filter);
   }
   /**
+   * Mark specific blue print as changed
+   * @param path - BluePrint file path
+   */
+  invalidateBluePrint(path: string) {
+    this._assetManager.invalidateBluePrint(path);
+  }
+  /**
    * Load a primitive by ID and track the allocation for reverse lookup.
    *
    * @param id - Primitive identifier or path.
@@ -752,7 +840,7 @@ export class ResourceManager {
    * @param path - Path to the prefab JSON file in VFS.
    * @returns A Promise resolving to the prefab json object, or `null` on failure.
    */
-  async loadPrefabContent(path: string): Promise<{ type: string; data: object }> {
+  async loadPrefabContent(path: string): Promise<Nullable<{ type: string; data: object }>> {
     try {
       const content = (await this._vfs.readFile(path, { encoding: 'utf8' })) as string;
       const json = JSON.parse(content) as { type: string; data: object };
@@ -768,15 +856,18 @@ export class ResourceManager {
    * @param path - Path to the prefab JSON file in VFS.
    * @returns A Promise resolving to the instantiated `SceneNode`, or `null` on failure.
    */
-  async instantiatePrefab(parent: SceneNode, path: string): Promise<SceneNode> {
+  async instantiatePrefab(parent: SceneNode, path: string): Promise<Nullable<SceneNode>> {
     try {
       const json = await this.loadPrefabContent(path);
       ASSERT(json?.type === 'SceneNode', 'Invalid prefab format');
       const tmpNode = new DRef(new SceneNode(parent.scene));
-      tmpNode.get().remove();
-      tmpNode.get().prefabId = this._vfs.normalizePath(path);
-      const node = await this.deserializeObject<SceneNode>(tmpNode.get(), json.data);
-      node.prefabId = tmpNode.get().prefabId;
+      tmpNode.get()!.remove();
+      tmpNode.get()!.prefabId = this._vfs.normalizePath(path);
+      const node = (await this.deserializeObject<SceneNode>(
+        tmpNode.get(),
+        json['data'] as Record<string, unknown>
+      ))!;
+      node.prefabId = tmpNode.get()!.prefabId;
       node.parent = parent;
       node.persistentId = randomUUID();
       tmpNode.dispose();
@@ -797,7 +888,7 @@ export class ResourceManager {
    *
    * @returns A Promise resolving to the loaded `Scene`.
    */
-  async loadScene(filename: string): Promise<Scene> {
+  async loadScene(filename: string): Promise<Nullable<Scene>> {
     const content = (await this._vfs.readFile(filename, { encoding: 'utf8' })) as string;
     const json = JSON.parse(content);
     return await this.deserializeObject<Scene>(null, json);
@@ -884,10 +975,10 @@ export class ResourceManager {
     gs: GraphStructure,
     nodes: Record<number, IGraphNode>,
     roots: number[]
-  ): {
+  ): Nullable<{
     order: number[];
     levels: number[][];
-  } {
+  }> {
     if (!roots || roots.length === 0) {
       return { order: [], levels: [] };
     }
@@ -940,7 +1031,7 @@ export class ResourceManager {
     for (const k in gs.incoming) {
       const node = nodeMap[k];
       for (const conn of gs.incoming[k]) {
-        const input = node.inputs.find((input) => input.id === conn.endSlotId);
+        const input = node.inputs.find((input) => input.id === conn.endSlotId)!;
         input.inputNode = nodeMap[conn.targetNodeId];
         input.inputId = conn.startSlotId;
       }
@@ -949,7 +1040,7 @@ export class ResourceManager {
       graph: gs,
       nodeMap,
       roots,
-      order: this.getReverseTopologicalOrderFromRoots(gs, nodeMap, roots).order.reverse()
+      order: this.getReverseTopologicalOrderFromRoots(gs, nodeMap, roots)!.order.reverse()
     };
   }
   async loadBluePrint(path: string) {
@@ -994,11 +1085,11 @@ export class ResourceManager {
    */
   findAnimationTarget(node: SceneNode, track: PropertyTrack) {
     const target = track.target ?? '';
-    const value: PropertyValue = { object: [] };
+    const value: RequireOptionals<PropertyValue> = { num: [], bool: [], str: [], object: [] };
     const parts = target.split('/').filter((val) => !!val);
-    let targetObj: object = node;
+    let targetObj: Nullable<object> = node;
     while (parts.length > 0) {
-      const propName = parts.shift();
+      const propName = parts.shift()!;
       const info = ResourceManager.parsePropertyPath(propName);
       if (!info) {
         return null;
@@ -1016,7 +1107,7 @@ export class ResourceManager {
           return null;
         }
         prop.get.call(targetObj, value);
-        targetObj = value.object?.[info.indexValue] ?? null;
+        targetObj = value.object?.[info.indexValue!] ?? null;
       } else {
         if (prop.type !== 'object') {
           return null;
@@ -1052,9 +1143,13 @@ export class ResourceManager {
     }
     return v;
   }
-  private async deserializeObjectProps<T extends object>(obj: T, cls: SerializableClass, json: object) {
+  private async deserializeObjectPropsForCls<T extends object>(
+    obj: T,
+    cls: SerializableClass,
+    json: Record<string, unknown>
+  ) {
     const props = (this.getPropertiesByClass(cls) ?? []).sort((a, b) => (a.phase ?? 0) - (b.phase ?? 0));
-    let currentPhase: number = undefined;
+    let currentPhase: number | undefined = undefined;
     const promises: Promise<void>[] = [];
     for (const prop of props) {
       const phase = prop.phase ?? 0;
@@ -1079,7 +1174,7 @@ export class ResourceManager {
       }
       const k = prop.name;
       const v = json[k] ?? this.getDefaultValue(obj, prop);
-      const tmpVal: PropertyValue = {
+      const tmpVal: RequireOptionals<PropertyValue> = {
         num: [0, 0, 0, 0],
         str: [''],
         bool: [false],
@@ -1151,11 +1246,11 @@ export class ResourceManager {
       await Promise.all(promises);
     }
   }
-  private async serializeObjectProps<T extends object>(
+  private async serializeObjectPropsForCls<T extends object>(
     obj: T,
     cls: SerializableClass,
-    json: object,
-    asyncTasks?: Promise<unknown>[]
+    json: Record<string, unknown>,
+    asyncTasks?: Nullable<Promise<unknown>[]>
   ) {
     const props = this.getPropertiesByClass(cls) ?? [];
     for (const prop of props) {
@@ -1169,7 +1264,7 @@ export class ResourceManager {
       if (!persistent) {
         continue;
       }
-      const tmpVal: PropertyValue = {
+      const tmpVal: RequireOptionals<PropertyValue> = {
         num: [0, 0, 0, 0],
         str: [''],
         bool: [false],
@@ -1194,10 +1289,11 @@ export class ResourceManager {
         }
         case 'object_array':
           if (tmpVal.object.length > 0) {
-            json[k] = [];
+            const arr: unknown[] = [];
             for (const p of tmpVal.object) {
-              json[k].push(await this.serializeObject(p, {}, asyncTasks));
+              arr.push(await this.serializeObject(p, {}, asyncTasks));
             }
+            json[k] = arr;
           }
           break;
         case 'embedded': {

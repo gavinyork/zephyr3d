@@ -44,47 +44,47 @@ export class AABB {
       this._maxPoint = new Vector3(arg0.maxPoint);
     } else if (arg0 instanceof Vector3) {
       this._minPoint = new Vector3(arg0);
-      this._maxPoint = new Vector3(arg1);
+      this._maxPoint = new Vector3(arg1!);
     } else {
       this._minPoint = new Vector3(-1, -1, -1);
       this._maxPoint = new Vector3(1, 1, 1);
     }
   }
   /** Get the min point of the AABB. */
-  get minPoint(): Vector3 {
+  get minPoint() {
     return this._minPoint;
   }
-  set minPoint(p: Vector3) {
+  set minPoint(p) {
     this._minPoint.set(p);
   }
   /** Get the max point of the AABB. */
-  get maxPoint(): Vector3 {
+  get maxPoint() {
     return this._maxPoint;
   }
-  set maxPoint(p: Vector3) {
+  set maxPoint(p) {
     this._maxPoint.set(p);
   }
   /** Get half size of the AABB. */
-  get extents(): Vector3 {
+  get extents() {
     return Vector3.sub(this._maxPoint, this._minPoint).scaleBy(0.5);
   }
   /** Get center point of the AABB. */
-  get center(): Vector3 {
+  get center() {
     return Vector3.add(this._maxPoint, this._minPoint).scaleBy(0.5);
   }
   /** Get size of the AABB. */
-  get size(): Vector3 {
+  get size() {
     return Vector3.sub(this._maxPoint, this._minPoint);
   }
   /** Get the diagonal length of the AABB. */
-  get diagonalLength(): number {
+  get diagonalLength() {
     return Vector3.sub(this._maxPoint, this._minPoint).magnitude;
   }
   /**
    * Calculate the coordinates of the eight corners of the AABB.
    * @returns the coordinates of the eight corners of the AABB.
    */
-  computePoints(): Vector3[] {
+  computePoints() {
     const { x: minx, y: miny, z: minz } = this._minPoint;
     const { x: maxx, y: maxy, z: maxz } = this._maxPoint;
     return [
@@ -103,7 +103,7 @@ export class AABB {
    * @param matrix - The transform matrix.
    * @returns self
    */
-  inplaceTransform(matrix: Matrix4x4): this {
+  inplaceTransform(matrix: Matrix4x4) {
     AABB.transform(this, matrix, this);
     return this;
   }
@@ -111,7 +111,7 @@ export class AABB {
    * Invalidate the min/max point so that we can start extending the AABB.
    * @returns self
    **/
-  beginExtend(): this {
+  beginExtend() {
     this._minPoint.setXYZ(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
     this._maxPoint.setXYZ(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
     return this;
@@ -121,7 +121,7 @@ export class AABB {
    * @param v - The point used to extend the AABB.
    * @returns self
    */
-  extend(v: Vector3): this {
+  extend(v: Vector3) {
     this._minPoint.inplaceMin(v);
     this._maxPoint.inplaceMax(v);
     return this;
@@ -133,7 +133,7 @@ export class AABB {
    * @param z - The z coordinate of the point.
    * @returns self
    */
-  extend3(x: number, y: number, z: number): this {
+  extend3(x: number, y: number, z: number) {
     if (x < this._minPoint.x) {
       this._minPoint.x = x;
     }
@@ -159,7 +159,7 @@ export class AABB {
    * @param other - The AABB to be merged with.
    * @returns self
    */
-  union(other: AABB): this {
+  union(other: AABB) {
     if (other && other.isValid()) {
       this.extend(other._minPoint);
       this.extend(other._maxPoint);
@@ -170,7 +170,7 @@ export class AABB {
    * Check if the AABB is valid.
    * @returns true if the AABB is valid, otherwise false.
    */
-  isValid(): boolean {
+  isValid() {
     return (
       this._minPoint.x <= this._maxPoint.x &&
       this._minPoint.y <= this._maxPoint.y &&
@@ -183,7 +183,7 @@ export class AABB {
    * @param epsl - The epsilon for comparison.
    * @returns true if the comparison error is less than epsl, otherwise false.
    */
-  equalsTo(other: AABB, epsl?: number): boolean {
+  equalsTo(other: AABB, epsl?: number) {
     return this._minPoint.equalsTo(other._minPoint, epsl) && this._maxPoint.equalsTo(other._maxPoint, epsl);
   }
   /**
@@ -191,7 +191,7 @@ export class AABB {
    * @param other - The destination AABB.
    * @returns true if the AABB intersects with other, otherwise false.
    */
-  intersectedWithBox(other: AABB): boolean {
+  intersectedWithBox(other: AABB) {
     return !(
       this._maxPoint.x <= other._minPoint.x ||
       this._minPoint.x >= other._maxPoint.x ||
@@ -206,7 +206,7 @@ export class AABB {
    * @param pt - The point to be checked.
    * @returns true if the box contains the point, otherwise false.s
    */
-  containsPoint(pt: Vector3): boolean {
+  containsPoint(pt: Vector3) {
     return (
       this._minPoint.x <= pt.x &&
       this._maxPoint.x >= pt.x &&
@@ -221,7 +221,7 @@ export class AABB {
    * @param other - The AABB to be checked.
    * @returns true if all contains, otherwise false.
    */
-  containsBox(other: AABB): boolean {
+  containsBox(other: AABB) {
     return (
       this._minPoint.x <= other._minPoint.x &&
       this._maxPoint.x >= other._maxPoint.x &&
@@ -237,7 +237,7 @@ export class AABB {
    * @param mask - The frustum planes that needs to be tested.
    * @returns The clip test result.
    */
-  getClipStateMask(viewProjMatrix: Matrix4x4, mask: number): ClipState {
+  getClipStateMask(viewProjMatrix: Matrix4x4, mask: number) {
     let andFlags = 0xffff;
     let orFlags = 0;
     const v0 = new Vector3();
@@ -289,7 +289,7 @@ export class AABB {
    * @param viewProjMatrix - The view projection matrix of the frustum.
    * @returns The clip test result.
    */
-  getClipState(viewProjMatrix: Matrix4x4): ClipState {
+  getClipState(viewProjMatrix: Matrix4x4) {
     let andFlags = 0xffff;
     let orFlags = 0;
     const v0 = new Vector3();
@@ -335,7 +335,7 @@ export class AABB {
    * @param p - The plane to be tested.
    * @returns true if the box is behind the plane, otherwise false.
    */
-  behindPlane(p: Plane): boolean {
+  behindPlane(p: Plane) {
     const cx = (this._maxPoint.x + this._minPoint.x) * 0.5;
     const cy = (this._maxPoint.y + this._minPoint.y) * 0.5;
     const cz = (this._maxPoint.z + this._minPoint.z) * 0.5;
@@ -349,7 +349,7 @@ export class AABB {
    * @param frustum - The frustum object.
    * @returns The clip test result.
    */
-  getClipStateWithFrustum(frustum: Frustum): ClipState {
+  getClipStateWithFrustum(frustum: Frustum) {
     let badIntersect = false;
     const cx = (this._maxPoint.x + this._minPoint.x) * 0.5;
     const cy = (this._maxPoint.y + this._minPoint.y) * 0.5;
@@ -374,7 +374,7 @@ export class AABB {
    * @param mask - The frustum planes that needs to be tested.
    * @returns The clip test result.
    */
-  getClipStateWithFrustumMask(frustum: Frustum, mask: number): ClipState {
+  getClipStateWithFrustumMask(frustum: Frustum, mask: number) {
     let badIntersect = false;
     const cx = (this._maxPoint.x + this._minPoint.x) * 0.5;
     const cy = (this._maxPoint.y + this._minPoint.y) * 0.5;
@@ -402,7 +402,7 @@ export class AABB {
    * @param result - The out AABB to be write to.
    * @returns The out AABB.
    */
-  static transform(bbox: AABB, matrix: Matrix4x4, result?: AABB): AABB {
+  static transform(bbox: AABB, matrix: Matrix4x4, result?: AABB) {
     const ret = result || new AABB();
     const minp = [0, 0, 0];
     const maxp = [0, 0, 0];

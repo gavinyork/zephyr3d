@@ -10,6 +10,7 @@ import type {
 import type { BlitType } from './blitter';
 import { Blitter } from './blitter';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
+import type { Nullable } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 import { fetchSampler } from '../utility/misc';
 
@@ -18,9 +19,9 @@ import { fetchSampler } from '../utility/misc';
  * @public
  */
 export class BilateralBlurBlitter extends Blitter {
-  protected _depthTex: Texture2D;
-  protected _sampler: TextureSampler;
-  protected _blurSizeTex: Texture2D;
+  protected _depthTex: Nullable<Texture2D>;
+  protected _sampler: Nullable<TextureSampler>;
+  protected _blurSizeTex: Nullable<Texture2D>;
   protected _blurSizeScale: number;
   protected _blurSizeIndex: number;
   protected _kernelRadius: number;
@@ -51,76 +52,76 @@ export class BilateralBlurBlitter extends Blitter {
     this._uvStep = this._finalPhase ? new Vector2(1, 0) : new Vector2(0, 1);
     this.calcGaussion();
   }
-  get depthTex(): Texture2D {
+  get depthTex() {
     return this._depthTex;
   }
-  set depthTex(tex: Texture2D) {
+  set depthTex(tex) {
     this._depthTex = tex;
   }
-  get blurSizeTex(): Texture2D {
+  get blurSizeTex() {
     return this._blurSizeTex;
   }
-  set blurSizeTex(tex: Texture2D) {
+  set blurSizeTex(tex) {
     this._blurSizeTex = tex;
   }
-  get blurSizeIndex(): number {
+  get blurSizeIndex() {
     return this._blurSizeIndex;
   }
-  set blurSizeIndex(val: number) {
+  set blurSizeIndex(val) {
     this._blurSizeIndex = val;
   }
-  get blurSizeScale(): number {
+  get blurSizeScale() {
     return this._blurSizeScale;
   }
-  set blurSizeScale(val: number) {
+  set blurSizeScale(val) {
     this._blurSizeScale = val;
   }
-  get sampler(): TextureSampler {
+  get sampler() {
     return this._sampler;
   }
-  set sampler(sampler: TextureSampler) {
+  set sampler(sampler) {
     this._sampler = sampler;
   }
-  get cameraNearFar(): Vector2 {
+  get cameraNearFar() {
     return this._cameraNearFar;
   }
-  set cameraNearFar(v: Vector2) {
+  set cameraNearFar(v) {
     this._cameraNearFar.set(v);
   }
-  get depthCutoff(): number {
+  get depthCutoff() {
     return this._depthCutoff;
   }
-  set depthCutoff(val: number) {
+  set depthCutoff(val) {
     this._depthCutoff = val;
   }
-  get size(): Vector2 {
+  get size() {
     return this._size;
   }
-  set size(val: Vector2) {
+  set size(val) {
     this._size.set(val);
   }
-  get stepSize(): number {
+  get stepSize() {
     return this._stepSize;
   }
-  set stepSize(val: number) {
+  set stepSize(val) {
     if (val !== this._stepSize) {
       this._stepSize = val;
       this.calcGaussion();
     }
   }
-  get stdDev(): number {
+  get stdDev() {
     return this._stdDev;
   }
-  set stdDev(val: number) {
+  set stdDev(val) {
     if (val !== this._stdDev) {
       this._stdDev = val;
       this.calcGaussion();
     }
   }
-  get kernelRadius(): number {
+  get kernelRadius() {
     return this._kernelRadius;
   }
-  set kernelRadius(val: number) {
+  set kernelRadius(val) {
     val = Math.max(val, 0) >> 0;
     if (val !== this._kernelRadius) {
       this._kernelRadius = val;
@@ -129,7 +130,7 @@ export class BilateralBlurBlitter extends Blitter {
       this.invalidateHash();
     }
   }
-  protected calcHash(): string {
+  protected calcHash() {
     return `${Number(!!this._blurSizeTex)}:${this._blurSizeIndex}:${this._kernelRadius}:${this._finalPhase}`;
   }
   private calcGaussion() {
@@ -167,7 +168,7 @@ export class BilateralBlurBlitter extends Blitter {
   }
   setUniforms(bindGroup: BindGroup, sourceTex: BaseTexture) {
     super.setUniforms(bindGroup, sourceTex);
-    bindGroup.setTexture('depthTex', this._depthTex, this._sampler ?? fetchSampler('clamp_nearest_nomip'));
+    bindGroup.setTexture('depthTex', this._depthTex!, this._sampler ?? fetchSampler('clamp_nearest_nomip'));
     if (this._blurSizeTex) {
       bindGroup.setTexture('blurSizeTex', this._blurSizeTex, fetchSampler('clamp_linear_nomip'));
       bindGroup.setValue('blurSizeScale', this._blurSizeScale);
@@ -184,7 +185,7 @@ export class BilateralBlurBlitter extends Blitter {
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'float' | 'int' | 'uint'
-  ): PBShaderExp {
+  ) {
     const that = this;
     const pb = scope.$builder;
     pb.func('getLinearDepth', [pb.vec2('uv')], function () {
@@ -241,6 +242,6 @@ export class BilateralBlurBlitter extends Blitter {
       });
     });
     scope.colorSum = pb.div(scope.colorSum, scope.weightSum);
-    return scope.colorSum;
+    return scope.colorSum as PBShaderExp;
   }
 }

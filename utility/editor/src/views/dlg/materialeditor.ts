@@ -3,18 +3,30 @@ import { DialogRenderer } from '../../components/modal';
 import { PBRMaterialEditor } from '../../components/blueprint/material/pbr';
 import { DlgMessageBoxEx } from './messageexdlg';
 import { ProjectService } from '../../core/services/project';
+import type { GenericConstructor } from '@zephyr3d/base';
+import type { MeshMaterial } from '@zephyr3d/scene';
 
 export class DlgPBRMaterialEditor extends DialogRenderer<void> {
   private readonly editor: PBRMaterialEditor;
   private path: string;
-  constructor(id: string, width: number, height: number, outputName: string, path: string) {
+  private type: GenericConstructor<MeshMaterial>;
+  constructor(
+    id: string,
+    width: number,
+    height: number,
+    outputName: string,
+    type: GenericConstructor<MeshMaterial>,
+    path: string
+  ) {
     super(id, width, height, false, false, false, false);
     this.path = path;
+    this.type = type;
     this.editor = new PBRMaterialEditor(id, outputName);
   }
   public static async editPBRMaterial(
     title: string,
     outptuName: string,
+    type: GenericConstructor<MeshMaterial>,
     path: string,
     width?: number,
     height?: number
@@ -24,7 +36,7 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
       ImGui.SetWindowFocus(title);
       return DialogRenderer.getModeless(existing).promise;
     } else {
-      return new DlgPBRMaterialEditor(title, width, height, outptuName, path).show();
+      return new DlgPBRMaterialEditor(title, width, height, outptuName, type, path).show();
     }
   }
   public async show(): Promise<void> {
@@ -32,10 +44,10 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
     if (exists) {
       const stat = await ProjectService.VFS.stat(this.path);
       if (stat.isFile) {
-        await this.editor.load(this.path);
+        await this.editor.init(this.path);
       }
     } else {
-      await this.editor.load('');
+      await this.editor.init(this.path, this.type);
     }
     super.show();
     this.editor.open();
@@ -72,7 +84,10 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
               this.close();
             });
           } else if (value === 'No') {
-            this.close();
+            // Restore material state
+            this.editor.restoreState().then(() => {
+              this.close();
+            });
           }
         });
       } else {

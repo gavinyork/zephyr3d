@@ -2,45 +2,46 @@ import type { PBInsideFunctionScope, PBShaderExp, TextureFormat, TextureSampler 
 import { ShadowImpl } from './shadow_impl';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import { computeShadowMapDepth, computeReceiverPlaneDepthBias, filterShadowPCF } from '../shaders/shadow';
-import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
+import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
 import { LIGHT_TYPE_POINT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
 import { getDevice } from '../app/api';
+import type { Nullable } from '@zephyr3d/base';
 
 /** @internal */
 export class PCFOPT extends ShadowImpl {
   protected _kernelSize: number;
-  protected _shadowSampler: TextureSampler;
+  protected _shadowSampler: Nullable<TextureSampler>;
   constructor(kernelSize?: number) {
     super();
     this._kernelSize = kernelSize ?? 5;
     this._shadowSampler = null;
   }
-  get kernelSize(): number {
+  get kernelSize() {
     return this._kernelSize;
   }
-  set kernelSize(val: number) {
+  set kernelSize(val) {
     val = val !== 3 && val !== 5 && val !== 7 ? 5 : val;
     this._kernelSize = val;
   }
-  getType(): ShadowMode {
-    return 'pcf-opt';
+  getType() {
+    return 'pcf-opt' as const;
   }
-  dispose(): void {
+  dispose() {
     this._shadowSampler = null;
   }
-  resourceDirty(): boolean {
+  resourceDirty() {
     return false;
   }
-  getShadowMapBorder(_shadowMapParams: ShadowMapParams): number {
+  getShadowMapBorder(_shadowMapParams: ShadowMapParams) {
     return this._kernelSize;
   }
-  getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType {
+  getShadowMap(shadowMapParams: ShadowMapParams) {
     return (
       this.useNativeShadowMap(shadowMapParams)
-        ? shadowMapParams.shadowMapFramebuffer.getDepthAttachment()
-        : shadowMapParams.shadowMapFramebuffer.getColorAttachments()[0]
+        ? shadowMapParams.shadowMapFramebuffer!.getDepthAttachment()
+        : shadowMapParams.shadowMapFramebuffer!.getColorAttachments()[0]
     ) as ShadowMapType;
   }
   doUpdateResources(shadowMapParams: ShadowMapParams) {
@@ -49,14 +50,14 @@ export class PCFOPT extends ShadowImpl {
       shadowMapParams.shadowMap?.getDefaultSampler(this.useNativeShadowMap(shadowMapParams)) || null;
   }
   postRenderShadowMap() {}
-  getDepthScale(): number {
+  getDepthScale() {
     return 1;
   }
   setDepthScale(_val: number) {}
-  getShaderHash(): string {
+  getShaderHash() {
     return `${this._kernelSize}`;
   }
-  getShadowMapColorFormat(shadowMapParams: ShadowMapParams): TextureFormat {
+  getShadowMapColorFormat(shadowMapParams: ShadowMapParams): Nullable<TextureFormat> {
     return this.useNativeShadowMap(shadowMapParams) ? null : 'rgba8unorm';
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
@@ -66,8 +67,8 @@ export class PCFOPT extends ShadowImpl {
     shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp
-  ): PBShaderExp {
-    return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap.format);
+  ) {
+    return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap!.format);
   }
   computeShadowCSM(
     shadowMapParams: ShadowMapParams,
@@ -75,7 +76,7 @@ export class PCFOPT extends ShadowImpl {
     shadowVertex: PBShaderExp,
     NdotL: PBShaderExp,
     split: PBShaderExp
-  ): PBShaderExp {
+  ) {
     const funcNameComputeShadowCSM = 'lib_computeShadowCSM';
     const pb = scope.$builder;
     const that = this;
@@ -106,7 +107,7 @@ export class PCFOPT extends ShadowImpl {
           this.shadow = filterShadowPCF(
             this,
             shadowMapParams.lightType,
-            shadowMapParams.shadowMap.format,
+            shadowMapParams.shadowMap!.format,
             that._kernelSize,
             this.shadowCoord,
             this.receiverPlaneDepthBias,
@@ -116,14 +117,14 @@ export class PCFOPT extends ShadowImpl {
         this.$return(this.shadow);
       }
     );
-    return pb.getGlobalScope()[funcNameComputeShadowCSM](shadowVertex, NdotL, split);
+    return pb.getGlobalScope()[funcNameComputeShadowCSM](shadowVertex, NdotL, split) as PBShaderExp;
   }
   computeShadow(
     shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,
     shadowVertex: PBShaderExp,
     NdotL: PBShaderExp
-  ): PBShaderExp {
+  ) {
     const funcNameComputeShadow = 'lib_computeShadow';
     const pb = scope.$builder;
     const that = this;
@@ -186,7 +187,7 @@ export class PCFOPT extends ShadowImpl {
           this.shadow = filterShadowPCF(
             this,
             shadowMapParams.lightType,
-            shadowMapParams.shadowMap.format,
+            shadowMapParams.shadowMap!.format,
             that._kernelSize,
             this.shadowCoord,
             this.receiverPlaneDepthBias
@@ -195,9 +196,9 @@ export class PCFOPT extends ShadowImpl {
         this.$return(this.shadow);
       }
     });
-    return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL);
+    return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL) as PBShaderExp;
   }
-  useNativeShadowMap(_shadowMapParams: ShadowMapParams): boolean {
+  useNativeShadowMap(_shadowMapParams: ShadowMapParams) {
     return getDevice().type !== 'webgl';
   }
   /** @internal */
@@ -207,12 +208,12 @@ export class PCFOPT extends ShadowImpl {
     coords: PBShaderExp,
     z: PBShaderExp,
     bias: PBShaderExp
-  ): PBShaderExp {
+  ) {
     const funcNameSampleShadowMap = `lib_sampleShadowMap`;
     const pb = scope.$builder;
     const that = this;
     pb.func(funcNameSampleShadowMap, [pb.vec3('coords'), pb.float('z'), pb.float('bias')], function () {
-      const floatDepthTexture = shadowMapParams.shadowMap.format !== 'rgba8unorm';
+      const floatDepthTexture = shadowMapParams.shadowMap!.format !== 'rgba8unorm';
       if (that.useNativeShadowMap(shadowMapParams)) {
         this.$return(
           pb.clamp(
@@ -234,7 +235,7 @@ export class PCFOPT extends ShadowImpl {
         this.$return(pb.step(this.distance, this.shadowTex.x));
       }
     });
-    return pb.getGlobalScope()[funcNameSampleShadowMap](coords, z, bias);
+    return pb.getGlobalScope()[funcNameSampleShadowMap](coords, z, bias) as PBShaderExp;
   }
   /** @internal */
   sampleShadowMapCSM(
@@ -244,7 +245,7 @@ export class PCFOPT extends ShadowImpl {
     split: PBShaderExp,
     z: PBShaderExp,
     bias: PBShaderExp
-  ): PBShaderExp {
+  ) {
     const funcNameSampleShadowMapCSM = 'lib_sampleShadowMapCSM';
     const pb = scope.$builder;
     const that = this;
@@ -252,10 +253,10 @@ export class PCFOPT extends ShadowImpl {
       funcNameSampleShadowMapCSM,
       [pb.vec4('coords'), pb.int('split'), pb.float('z'), pb.float('bias')],
       function () {
-        const floatDepthTexture = shadowMapParams.shadowMap.format !== 'rgba8unorm';
+        const floatDepthTexture = shadowMapParams.shadowMap!.format !== 'rgba8unorm';
         this.$l.distance = pb.sub(this.z, this.bias);
         if (that.useNativeShadowMap(shadowMapParams)) {
-          if (shadowMapParams.shadowMap.isTexture2DArray()) {
+          if (shadowMapParams.shadowMap!.isTexture2DArray()) {
             this.$return(
               pb.clamp(
                 pb.textureArraySampleCompareLevel(
@@ -278,7 +279,7 @@ export class PCFOPT extends ShadowImpl {
             );
           }
         } else {
-          if (shadowMapParams.shadowMap.isTexture2DArray()) {
+          if (shadowMapParams.shadowMap!.isTexture2DArray()) {
             this.$l.shadowTex = pb.textureArraySampleLevel(
               ShaderHelper.getShadowMap(this),
               this.coords.xy,
@@ -295,6 +296,6 @@ export class PCFOPT extends ShadowImpl {
         }
       }
     );
-    return pb.getGlobalScope()[funcNameSampleShadowMapCSM](coords, split, z, bias);
+    return pb.getGlobalScope()[funcNameSampleShadowMapCSM](coords, split, z, bias) as PBShaderExp;
   }
 }

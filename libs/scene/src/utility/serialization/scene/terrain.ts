@@ -1,10 +1,10 @@
 import type { GrassInstanceInfo } from '../../../scene';
 import { GraphNode, type SceneNode } from '../../../scene';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
 import type { Texture2D } from '@zephyr3d/device';
-import type { TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
+import type { Nullable, TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 import type { ResourceManager } from '../manager';
 import { JSONArray } from '../json';
 import { getDevice } from '../../../app/api';
@@ -29,11 +29,11 @@ async function getTerrainGrassContent(terrain: ClipmapTerrain): Promise<ArrayBuf
     const layer = grassRenderer.getLayer(i);
     const queue = [layer.quadtree];
     while (queue.length > 0) {
-      const quadtreeNode = queue.shift();
+      const quadtreeNode = queue.shift()!;
       if (quadtreeNode.children) {
         queue.push(...quadtreeNode.children);
       }
-      const grassInstances = quadtreeNode.grassInstances;
+      const grassInstances = quadtreeNode.grassInstances!;
       if (grassInstances.numInstances > 0) {
         const instanceBuffer = grassInstances.instanceBuffer;
         const P = instanceBuffer.getBufferSubData(null, 0, grassInstances.numInstances * 4 * 4);
@@ -64,7 +64,7 @@ async function getTerrainGrassContent(terrain: ClipmapTerrain): Promise<ArrayBuf
 }
 
 async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<ArrayBuffer> {
-  const heightmap = terrain.heightMap;
+  const heightmap = terrain.heightMap!;
   const buffer = new ArrayBuffer(2 * 4 + heightmap.width * heightmap.height * 2);
   const head = new DataView(buffer);
   head.setUint32(0, heightmap.width, true);
@@ -85,8 +85,8 @@ async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<Arra
 
 async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<ArrayBuffer> {
   const device = getDevice();
-  const splatMap = terrain.splatMap;
-  const numLayers = (terrain.material.numDetailMaps + 3) >> 2;
+  const splatMap = terrain.splatMap!;
+  const numLayers = (terrain.material!.numDetailMaps + 3) >> 2;
   const info = device.getDeviceCaps().textureCaps.getTextureFormatInfo(splatMap.format);
   const buffer = new ArrayBuffer(
     3 * 4 + numLayers * splatMap.width * splatMap.height * info.blockWidth * info.blockHeight * info.size
@@ -112,7 +112,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
     name: 'ClipmapTerrain',
     parent: GraphNode,
     createFunc(ctx: SceneNode, init: number) {
-      const node = new ClipmapTerrain(ctx.scene);
+      const node = new ClipmapTerrain(ctx.scene!);
       node.numDetailMaps = init;
       node.parent = ctx;
       return { obj: node };
@@ -121,7 +121,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
       return obj.numDetailMaps;
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Resolution',
           type: 'int2',
@@ -174,10 +174,10 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
             return false;
           },
           get(this: ClipmapTerrain, value) {
-            value.str[0] = this.material.debugMode;
+            value.str[0] = this.material!.debugMode;
           },
           set(this: ClipmapTerrain, value) {
-            this.material.debugMode = value.str[0] as TerrainDebugMode;
+            this.material!.debugMode = value.str[0] as TerrainDebugMode;
           }
         },
         {
@@ -217,7 +217,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
             for (let i = 0; i < data.length; i++) {
               const info = data[i];
               const assetId = info.texture;
-              let texture: Texture2D = null;
+              let texture: Nullable<Texture2D> = null;
               if (assetId) {
                 try {
                   texture = await manager.fetchTexture<Texture2D>(assetId);
@@ -231,7 +231,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                   texture = null;
                 }
               }
-              this.grassRenderer.addLayer(info.bladeWidth ?? 1, info.bladeHeight ?? 1, texture);
+              this.grassRenderer.addLayer(info.bladeWidth ?? 1, info.bladeHeight ?? 1, texture!);
             }
           }
         },
@@ -248,7 +248,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
           },
           get(this: ClipmapTerrain, value) {
             const data: { albedo: string; normal: string; roughness: number; uvscale: number }[] = [];
-            const material = this.material;
+            const material = this.material!;
             for (let i = 0; i < material.numDetailMaps; i++) {
               data.push({
                 albedo: manager.getAssetId(material.getDetailMap(i)) ?? '',
@@ -262,7 +262,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
           async set(this: ClipmapTerrain, value) {
             const json = value.object[0] as JSONArray;
             if (!json) {
-              this.material.numDetailMaps = 0;
+              this.material!.numDetailMaps = 0;
               return;
             }
             const data =
@@ -272,14 +272,14 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 roughness: number;
                 uvscale: number;
               }[]) ?? [];
-            const material = this.material;
+            const material = this.material!;
             material.numDetailMaps = data.length;
             for (let i = 0; i < this.numDetailMaps; i++) {
               const info = data[i];
               if (!info?.albedo) {
                 material.setDetailMap(i, null);
               } else {
-                let tex: Texture2D;
+                let tex: Nullable<Texture2D>;
                 try {
                   tex = await manager.fetchTexture<Texture2D>(info.albedo);
                 } catch (err) {
@@ -295,7 +295,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
               if (!info?.normal) {
                 material.setDetailNormalMap(i, null);
               } else {
-                let tex: Texture2D;
+                let tex: Nullable<Texture2D>;
                 try {
                   tex = await manager.fetchTexture<Texture2D>(info.normal);
                 } catch (err) {
@@ -336,7 +336,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
               const width = dataView.getUint32(0, true);
               const height = dataView.getUint32(4, true);
               const numLayers = dataView.getUint32(8, true);
-              const splatMap = this.splatMap;
+              const splatMap = this.splatMap!;
               if (splatMap.width !== width || splatMap.height !== height) {
                 console.error('Invalid splatmap data');
                 return;
@@ -421,7 +421,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
               const dataView = new DataView(data);
               const width = dataView.getUint32(0, true);
               const height = dataView.getUint32(4, true);
-              const heightMap = this.createHeightMapTexture(width, height);
+              const heightMap = this.createHeightMapTexture(width, height)!;
               if (heightMap.format !== 'r16f') {
                 if (heightMap.format === 'rgba16f') {
                   // WebGL1 uses rgba16f for height map, so we need to convert
@@ -443,7 +443,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
             }
           }
         }
-      ];
+      ]);
     }
   };
 }

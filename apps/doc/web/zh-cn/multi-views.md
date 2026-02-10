@@ -54,8 +54,8 @@ myApp.on('tick', () => {
   camera.updateController();  
 
   // 获取画布的 CSS 像素尺寸  
-  const canvasWidth = myApp.device.deviceToScreen(myApp.device.canvas.width);  
-  const canvasHeight = myApp.device.deviceToScreen(myApp.device.canvas.height);  
+  const canvasWidth = myApp.device.deviceXToScreen(myApp.device.canvas.width);  
+  const canvasHeight = myApp.device.deviceYToScreen(myApp.device.canvas.height);  
 
   // —— 第一次渲染：全屏主画面 ——  
   camera.viewport = [0, 0, canvasWidth, canvasHeight];  
@@ -84,8 +84,8 @@ const camMain = new Camera(scene);
 const camTop = new Camera(scene);  
 const camSide = new Camera(scene);  
 
-const w = app.device.deviceToScreen(app.device.canvas.width);  
-const h = app.device.deviceToScreen(app.device.canvas.height);  
+const w = app.device.deviceXToScreen(app.device.canvas.width);  
+const h = app.device.deviceYToScreen(app.device.canvas.height);  
 
 // 主相机：右半屏  
 camMain.viewport = [w / 2, 0, w / 2, h];  

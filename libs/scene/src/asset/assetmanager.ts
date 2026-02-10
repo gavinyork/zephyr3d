@@ -1,5 +1,5 @@
 import type { DecoderModule } from 'draco3d';
-import type { HttpRequest, ReadOptions, TypedArray, VFS, WriteOptions } from '@zephyr3d/base';
+import type { HttpRequest, Nullable, ReadOptions, TypedArray, VFS, WriteOptions } from '@zephyr3d/base';
 import {
   isPowerOf2,
   nextPowerOf2,
@@ -34,9 +34,9 @@ import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader, AbstractModelLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
 import { getDevice, getEngine } from '../app/api';
-import { Material, PBRBluePrintMaterial } from '../material';
+import { Material, PBRBluePrintMaterial, SpriteBlueprintMaterial } from '../material';
 import type {
-  BlueprintDAG,
+  BluePrintEditorState,
   BluePrintUniformTexture,
   BluePrintUniformValue,
   GraphStructure,
@@ -169,7 +169,7 @@ export class AssetManager {
   };
   /** @internal */
   private _binaryDatas: {
-    [url: string]: Promise<ArrayBuffer>;
+    [url: string]: Promise<Nullable<ArrayBuffer>>;
   };
   /** @internal */
   private _textDatas: {
@@ -177,15 +177,15 @@ export class AssetManager {
   };
   /** @internal */
   private _bluePrints: {
-    [url: string]: Promise<Record<string, MaterialBlueprintIR>>;
+    [url: string]: Promise<Nullable<Record<string, MaterialBlueprintIR>>>;
   };
   /** @internal */
   private _materials: {
-    [url: string]: Promise<Material> | DWeakRef<Material>;
+    [url: string]: Promise<Nullable<Material>> | DWeakRef<Material>;
   };
   /** @internal */
   private _primitives: {
-    [url: string]: Promise<Primitive> | DWeakRef<Primitive>;
+    [url: string]: Promise<Nullable<Primitive>> | DWeakRef<Primitive>;
   };
   /** @internal */
   private _skeletons: {
@@ -206,6 +206,7 @@ export class AssetManager {
     this._models = {};
     this._materials = {};
     this._primitives = {};
+    this._skeletons = {};
     this._bluePrints = {};
     this._binaryDatas = {};
     this._textDatas = {};
@@ -272,7 +273,7 @@ export class AssetManager {
    *
    * @param loader - A concrete texture loader implementation.
    */
-  static addTextureLoader(loader: AbstractTextureLoader): void {
+  static addTextureLoader(loader: AbstractTextureLoader) {
     if (loader) {
       this._textureLoaders.unshift(loader);
     }
@@ -306,7 +307,7 @@ export class AssetManager {
     postProcess?: (text: string) => string,
     httpRequest?: HttpRequest,
     VFSs?: VFS[]
-  ): Promise<string> {
+  ) {
     const hash = httpRequest?.urlResolver?.(url) ?? url;
     let P = this._textDatas[hash];
     if (!P) {
@@ -333,9 +334,9 @@ export class AssetManager {
     VFSs?: VFS[]
   ): Promise<T> {
     const hash = httpRequest?.urlResolver?.(url) ?? url;
-    let P = this._jsonDatas[hash];
+    let P = this._jsonDatas[hash] as Promise<T>;
     if (!P) {
-      P = this.loadJsonData(url, postProcess, VFSs);
+      P = this.loadJsonData<T>(url, postProcess, VFSs);
       this._jsonDatas[hash] = P;
     }
     return P;
@@ -352,10 +353,10 @@ export class AssetManager {
    */
   async fetchBinaryData(
     url: string,
-    postProcess?: (data: ArrayBuffer) => ArrayBuffer,
-    httpRequest?: HttpRequest,
+    postProcess?: Nullable<(data: ArrayBuffer) => ArrayBuffer>,
+    httpRequest?: Nullable<HttpRequest>,
     VFSs?: VFS[]
-  ): Promise<ArrayBuffer> {
+  ) {
     const hash = httpRequest?.urlResolver?.(url) ?? url;
     let P = this._binaryDatas[hash];
     if (!P) {
@@ -364,7 +365,7 @@ export class AssetManager {
     }
     return P;
   }
-  async fetchBluePrint(url: string, VFSs?: VFS[]): Promise<Record<string, MaterialBlueprintIR>> {
+  async fetchBluePrint(url: string, VFSs?: VFS[]) {
     const hash = url;
     let P = this._bluePrints[hash];
     if (!P) {
@@ -380,11 +381,11 @@ export class AssetManager {
    * @param url - Resource URL or VFS path.
    * @returns A promise that resolves to the loaded material.
    */
-  async fetchMaterial<T extends Material = Material>(url: string, VFSs?: VFS[]): Promise<T> {
+  async fetchMaterial<T extends Material = Material>(url: string, VFSs?: VFS[]): Promise<Nullable<T>> {
     const hash = url;
-    let P = this._materials[hash] as Promise<T> | DWeakRef<T>;
-    if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
-      return P.get();
+    let P = this._materials[hash] as Promise<Nullable<T>> | DWeakRef<T>;
+    if (P instanceof DWeakRef && P.get() && !P.get()!.disposed) {
+      return P.get()!;
     } else if (!P || P instanceof DWeakRef) {
       P = this.loadMaterial<T>(url, false, VFSs);
       this._materials[hash] = P;
@@ -402,11 +403,11 @@ export class AssetManager {
    * @param url - Resource URL or VFS path.
    * @returns A promise that resolves to the loaded primitive.
    */
-  async fetchPrimitive<T extends Primitive = Primitive>(url: string, VFSs?: VFS[]): Promise<T> {
+  async fetchPrimitive<T extends Primitive = Primitive>(url: string, VFSs?: VFS[]): Promise<Nullable<T>> {
     const hash = url;
-    let P = this._primitives[hash] as Promise<T> | DWeakRef<T>;
-    if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
-      return P.get();
+    let P = this._primitives[hash] as Promise<Nullable<T>> | DWeakRef<T>;
+    if (P instanceof DWeakRef && P.get() && !P.get()!.disposed) {
+      return P.get()!;
     } else if (!P || P instanceof DWeakRef) {
       P = this.loadPrimitive<T>(url, VFSs);
       this._primitives[hash] = P;
@@ -448,8 +449,8 @@ export class AssetManager {
     } else {
       const hash = this.getHash('2d', url, options);
       let P = this._textures[hash] as Promise<T> | DWeakRef<T>;
-      if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
-        return P.get();
+      if (P instanceof DWeakRef && P.get() && !P.get()!.disposed) {
+        return P.get()!;
       } else if (!P || P instanceof DWeakRef) {
         P = this.loadTexture(
           url,
@@ -479,11 +480,11 @@ export class AssetManager {
    * @returns A promise that resolves to the SharedModel.
    * @internal
    */
-  async fetchModelData(url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<SharedModel> {
+  async fetchModelData(url: string, options?: ModelFetchOptions, VFSs?: VFS[]) {
     const hash = url;
     let P = this._models[hash];
-    if (P instanceof DWeakRef && P.get() && !P.get().disposed) {
-      return P.get();
+    if (P instanceof DWeakRef && P.get() && !P.get()!.disposed) {
+      return P.get()!;
     } else if (!P || P instanceof DWeakRef) {
       P = this.loadModel(url, options, VFSs);
       this._models[hash] = P;
@@ -506,7 +507,7 @@ export class AssetManager {
    * @param httpRequest - Optional HttpRequest (unused for binary read; present for API symmetry).
    * @returns A promise with the created node group and animation set info.
    */
-  async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<ModelInfo> {
+  async fetchModel(scene: Scene, url: string, options?: ModelFetchOptions, VFSs?: VFS[]) {
     const sharedModel = await this.fetchModelData(url, options, VFSs);
     const node = sharedModel.createSceneNode(scene, !!options?.enableInstancing);
     return { group: node, animationSet: node.animationSet };
@@ -521,7 +522,7 @@ export class AssetManager {
    * @returns A promise that resolves to the loaded (and optionally processed) text.
    * @internal
    */
-  async loadTextData(url: string, postProcess?: (text: string) => string, VFSs?: VFS[]): Promise<string> {
+  async loadTextData(url: string, postProcess?: (text: string) => string, VFSs?: VFS[]) {
     let text = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
     if (postProcess) {
       try {
@@ -542,8 +543,8 @@ export class AssetManager {
    * @returns A promise that resolves to the loaded (and optionally processed) JSON.
    * @internal
    */
-  async loadJsonData(url: string, postProcess?: (json: any) => any, VFSs?: VFS[]): Promise<string> {
-    let json = JSON.parse((await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string);
+  async loadJsonData<T = unknown>(url: string, postProcess?: (json: any) => any, VFSs?: VFS[]): Promise<T> {
+    let json = JSON.parse((await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string) as T;
 
     if (postProcess) {
       try {
@@ -566,9 +567,9 @@ export class AssetManager {
    */
   async loadBinaryData(
     url: string,
-    postProcess?: (data: ArrayBuffer) => ArrayBuffer,
+    postProcess?: Nullable<(data: ArrayBuffer) => ArrayBuffer>,
     VFSs?: VFS[]
-  ): Promise<ArrayBuffer> {
+  ) {
     try {
       let data = (await this.readFileFromVFSs(url, { encoding: 'binary' }, VFSs)) as ArrayBuffer;
       if (postProcess) {
@@ -580,7 +581,7 @@ export class AssetManager {
       return null;
     }
   }
-  async loadPrimitive<T extends Primitive = Primitive>(url: string, VFSs?: VFS[]): Promise<T> {
+  async loadPrimitive<T extends Primitive = Primitive>(url: string, VFSs?: VFS[]): Promise<Nullable<T>> {
     try {
       const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
       const content = JSON.parse(data) as { type: string; data: any };
@@ -643,7 +644,7 @@ export class AssetManager {
     }
   }
   async reloadBluePrintMaterials(filter?: (m: PBRBluePrintMaterial) => boolean) {
-    const promises: Promise<Material>[] = [];
+    const promises: Promise<Nullable<Material>>[] = [];
     const paths: string[] = [];
     for (const k of Object.keys(this._materials)) {
       const m = this._materials[k];
@@ -651,7 +652,7 @@ export class AssetManager {
         promises.push(m);
         paths.push(k);
       } else if (m instanceof DWeakRef && !!m.get()) {
-        promises.push(Promise.resolve(m.get()));
+        promises.push(Promise.resolve(m.get()!));
         paths.push(k);
       }
     }
@@ -660,29 +661,52 @@ export class AssetManager {
       const m = materials[i];
       if (m instanceof PBRBluePrintMaterial && (!filter || filter(m))) {
         const data = await this.loadBluePrintMaterialData(paths[i], true);
-        m.fragmentIR = data.irFragment;
-        m.vertexIR = data.irVertex;
-        m.uniformValues = data.uniformValues;
-        m.uniformTextures = data.uniformTextures;
+        if (data) {
+          m.fragmentIR = data.irFragment!;
+          m.vertexIR = data.irVertex!;
+          m.uniformValues = data.uniformValues;
+          m.uniformTextures = data.uniformTextures;
+        }
       }
     }
   }
-  private async loadBluePrintMaterialData(url: string, reload: boolean, VFSs?: VFS[]) {
+  private async loadBluePrintMaterialData(
+    url:
+      | string
+      | { IR: string; uniformValues: BluePrintUniformValue[]; uniformTextures: BluePrintUniformTexture[] },
+    reload: boolean,
+    VFSs?: VFS[]
+  ) {
     try {
-      const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
-      const content = JSON.parse(data) as { type: string; data: any };
-      ASSERT(content.type === 'PBRBluePrintMaterial', `Unsupported material type: ${content.type}`);
+      let irData: {
+        IR: string;
+        uniformValues: BluePrintUniformValue[];
+        uniformTextures: BluePrintUniformTexture[];
+      };
+      if (typeof url === 'string') {
+        const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
+        const content = JSON.parse(data) as { type: string; data: any };
+        ASSERT(
+          content.type === 'PBRBluePrintMaterial' || content.type === 'SpriteBluePrintMaterial',
+          `Unsupported material type: ${content.type}`
+        );
+        irData = content.data as {
+          IR: string;
+          uniformValues: BluePrintUniformValue[];
+          uniformTextures: BluePrintUniformTexture[];
+        };
+      } else {
+        irData = url;
+      }
       const ir = reload
-        ? await this.loadBluePrint(content.data.IR as string, VFSs)
-        : await this.fetchBluePrint(content.data.IR as string, VFSs);
-      const uniformValues: BluePrintUniformValue[] = (
-        content.data.uniformValues as BluePrintUniformValue[]
-      ).map((v) => ({
+        ? await this.loadBluePrint(irData.IR, VFSs)
+        : await this.fetchBluePrint(irData.IR, VFSs);
+      const uniformValues: BluePrintUniformValue[] = irData.uniformValues.map((v) => ({
         ...v,
         finalValue: v.value.length === 1 ? v.value[0] : new Float32Array(v.value)
       }));
       const uniformTextures: BluePrintUniformTexture[] = [];
-      const textures = content.data.uniformTextures as BluePrintUniformTexture[];
+      const textures = irData.uniformTextures;
       for (const v of textures) {
         const tex = await this.fetchTexture(
           v.texture,
@@ -705,8 +729,8 @@ export class AssetManager {
         });
       }
       return {
-        irFragment: ir['fragment'],
-        irVertex: ir['vertex'],
+        irFragment: ir?.['fragment'] ?? null,
+        irVertex: ir?.['vertex'] ?? null,
         uniformValues,
         uniformTextures
       };
@@ -725,19 +749,49 @@ export class AssetManager {
    * @returns A promise that resolves to the loaded material.
    * @internal
    */
-  async loadMaterial<T extends Material = Material>(url: string, reload: boolean, VFSs?: VFS[]): Promise<T> {
+  async loadMaterial<T extends Material = Material>(
+    url: string,
+    reload: boolean,
+    VFSs?: VFS[]
+  ): Promise<Nullable<T>> {
     try {
       const data = (await this.readFileFromVFSs(url, { encoding: 'utf8' }, VFSs)) as string;
-      const content = JSON.parse(data) as { type: string; data: any };
+      const content = JSON.parse(data) as { type: string; props: any; data: any };
       ASSERT(
-        content.type === 'PBRBluePrintMaterial' || content.type === 'Default',
+        content.type === 'PBRBluePrintMaterial' ||
+          content.type === 'SpriteBluePrintMaterial' ||
+          content.type === 'Default',
         `Unsupported material type: ${content.type}`
       );
+      let mat: T;
       if (content.type === 'PBRBluePrintMaterial') {
-        const data = await this.loadBluePrintMaterialData(url, reload, VFSs);
-        return new PBRBluePrintMaterial(
-          data.irFragment,
-          data.irVertex,
+        const data = (await this.loadBluePrintMaterialData(
+          content.data as {
+            IR: string;
+            uniformValues: BluePrintUniformValue[];
+            uniformTextures: BluePrintUniformTexture[];
+          },
+          reload,
+          VFSs
+        ))!;
+        mat = new PBRBluePrintMaterial(
+          data.irFragment!,
+          data.irVertex!,
+          data.uniformValues,
+          data.uniformTextures
+        ) as unknown as T;
+      } else if (content.type === 'SpriteBluePrintMaterial') {
+        const data = (await this.loadBluePrintMaterialData(
+          content.data as {
+            IR: string;
+            uniformValues: BluePrintUniformValue[];
+            uniformTextures: BluePrintUniformTexture[];
+          },
+          reload,
+          VFSs
+        ))!;
+        mat = new SpriteBlueprintMaterial(
+          data.irFragment!,
           data.uniformValues,
           data.uniformTextures
         ) as unknown as T;
@@ -751,6 +805,10 @@ export class AssetManager {
         }
         return obj;
       }
+      if (mat && content.props) {
+        await this._resourceManager.deserializeObjectProps(mat, content.props);
+      }
+      return mat;
     } catch (err) {
       console.error(`Load material failed: ${err}`);
       return null;
@@ -759,7 +817,7 @@ export class AssetManager {
   private rebuildGraphStructure(
     nodes: Record<number, IGraphNode>,
     links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[]
-  ): GraphStructure {
+  ) {
     const gs: GraphStructure = {
       outgoing: {},
       incoming: {}
@@ -788,11 +846,7 @@ export class AssetManager {
     }
     return gs;
   }
-  private collectReachableBackward(
-    gs: GraphStructure,
-    nodes: Record<number, IGraphNode>,
-    roots: number[]
-  ): Set<number> {
+  private collectReachableBackward(gs: GraphStructure, nodes: Record<number, IGraphNode>, roots: number[]) {
     const reachable = new Set<number>();
     const q: number[] = [];
 
@@ -819,10 +873,7 @@ export class AssetManager {
     gs: GraphStructure,
     nodes: Record<number, IGraphNode>,
     roots: number[]
-  ): {
-    order: number[];
-    levels: number[][];
-  } {
+  ) {
     if (!roots || roots.length === 0) {
       return { order: [], levels: [] };
     }
@@ -870,12 +921,12 @@ export class AssetManager {
     nodeMap: Record<number, IGraphNode>,
     roots: number[],
     links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[]
-  ): BlueprintDAG {
+  ) {
     const gs = this.rebuildGraphStructure(nodeMap, links);
     for (const k in gs.incoming) {
       const node = nodeMap[k];
       for (const conn of gs.incoming[k]) {
-        const input = node.inputs.find((input) => input.id === conn.endSlotId);
+        const input = node.inputs.find((input) => input.id === conn.endSlotId)!;
         input.inputNode = nodeMap[conn.targetNodeId];
         input.inputId = conn.startSlotId;
       }
@@ -884,28 +935,21 @@ export class AssetManager {
       graph: gs,
       nodeMap,
       roots,
-      order: this.getReverseTopologicalOrderFromRoots(gs, nodeMap, roots).order.reverse()
+      order: this.getReverseTopologicalOrderFromRoots(gs, nodeMap, roots)!.order.reverse()
     };
+  }
+  invalidateBluePrint(path: string) {
+    delete this._bluePrints[path];
   }
   async loadBluePrint(path: string, VFSs?: VFS[]) {
     try {
       const content = (await this.readFileFromVFSs(path, { encoding: 'utf8' }, VFSs)) as string;
       const bp = JSON.parse(content) as {
         type: string;
-        state: Record<
-          string,
-          {
-            nodes: {
-              id: number;
-              locked: boolean;
-              node: object;
-            }[];
-            links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
-          }
-        >;
+        state: Record<string, BluePrintEditorState>;
       };
       ASSERT(
-        bp.type === 'PBRMaterial' || bp.type === 'MaterialFunction',
+        bp.type === 'PBRMaterial' || bp.type === 'SpriteMaterial' || bp.type === 'MaterialFunction',
         `Unsupported blueprint type: ${bp.type}`
       );
       const states = bp.state;
@@ -916,13 +960,13 @@ export class AssetManager {
         const state = states[k];
         for (const node of state.nodes) {
           const impl = await this._resourceManager.deserializeObject<IGraphNode>(null, node.node);
-          nodeMap[node.id] = impl;
-          if (impl.outputs.length === 0) {
+          nodeMap[node.id] = impl!;
+          if (impl!.outputs.length === 0) {
             roots.push(node.id);
           }
         }
         const dag = await this.createBluePrintDAG(nodeMap, roots, state.links);
-        result[k] = new MaterialBlueprintIR(dag, path);
+        result[k] = new MaterialBlueprintIR(dag, path, state);
       }
       return result;
     } catch (err) {
@@ -978,12 +1022,12 @@ export class AssetManager {
    */
   async loadTexture(
     url: string,
-    mimeType?: string,
+    mimeType?: Nullable<string>,
     srgb?: boolean,
     samplerOptions?: SamplerOptions,
-    texture?: BaseTexture,
+    texture?: Nullable<BaseTexture>,
     VFSs?: VFS[]
-  ): Promise<BaseTexture> {
+  ) {
     const data = (await this.readFileFromVFSs(url, { encoding: 'binary' }, VFSs)) as ArrayBuffer;
     mimeType = mimeType ?? this.vfs.guessMIMEType(url);
     for (const loader of AssetManager._textureLoaders) {
@@ -991,7 +1035,9 @@ export class AssetManager {
         continue;
       }
       const tex = await this.doLoadTexture(loader, mimeType, data, !!srgb, samplerOptions, texture);
-      tex.name = this.vfs.basename(url);
+      if (tex) {
+        tex.name = this.vfs.basename(url);
+      }
       return tex;
     }
     throw new Error(`Can not find loader for asset ${url}`);
@@ -1015,35 +1061,17 @@ export class AssetManager {
     data: ArrayBuffer | TypedArray,
     srgb: boolean,
     samplerOptions?: SamplerOptions,
-    texture?: BaseTexture
-  ): Promise<BaseTexture> {
+    texture?: Nullable<BaseTexture>
+  ) {
     const device = getDevice();
     if (device.type !== 'webgl') {
       return await loader.load(mimeType, data, srgb, samplerOptions, texture);
     } else {
       let tex = await loader.load(mimeType, data, srgb, samplerOptions);
-      if (texture) {
-        const magFilter = tex.width !== texture.width || tex.height !== texture.height ? 'linear' : 'nearest';
-        const minFilter = magFilter;
-        const mipFilter = 'none';
-        const sampler = device.createSampler({
-          addressU: 'clamp',
-          addressV: 'clamp',
-          magFilter,
-          minFilter,
-          mipFilter
-        });
-        const blitter = new CopyBlitter();
-        blitter.blit(tex as any, texture as any, sampler);
-        tex = texture;
-      } else {
-        const po2_w = isPowerOf2(tex.width);
-        const po2_h = isPowerOf2(tex.height);
-        const srgb = tex.isSRGBFormat();
-        if (srgb || !po2_w || !po2_h) {
-          const newWidth = po2_w ? tex.width : nextPowerOf2(tex.width);
-          const newHeight = po2_h ? tex.height : nextPowerOf2(tex.height);
-          const magFilter = newWidth !== tex.width || newHeight !== tex.height ? 'linear' : 'nearest';
+      if (tex) {
+        if (texture) {
+          const magFilter =
+            tex.width !== texture.width || tex.height !== texture.height ? 'linear' : 'nearest';
           const minFilter = magFilter;
           const mipFilter = 'none';
           const sampler = device.createSampler({
@@ -1053,14 +1081,35 @@ export class AssetManager {
             minFilter,
             mipFilter
           });
-          const destFormat = srgb ? 'rgba8unorm' : tex.format;
           const blitter = new CopyBlitter();
-          const newTexture = tex.isTexture2D()
-            ? device.createTexture2D(destFormat, newWidth, newHeight)
-            : device.createCubeTexture(destFormat, newWidth);
-          blitter.blit(tex as any, newTexture as any, sampler);
-          tex.dispose();
-          tex = newTexture;
+          blitter.blit(tex as any, texture as any, sampler);
+          tex = texture;
+        } else {
+          const po2_w = isPowerOf2(tex.width);
+          const po2_h = isPowerOf2(tex.height);
+          const srgb = tex.isSRGBFormat();
+          if (srgb || !po2_w || !po2_h) {
+            const newWidth = po2_w ? tex.width : nextPowerOf2(tex.width);
+            const newHeight = po2_h ? tex.height : nextPowerOf2(tex.height);
+            const magFilter = newWidth !== tex.width || newHeight !== tex.height ? 'linear' : 'nearest';
+            const minFilter = magFilter;
+            const mipFilter = 'none';
+            const sampler = device.createSampler({
+              addressU: 'clamp',
+              addressV: 'clamp',
+              magFilter,
+              minFilter,
+              mipFilter
+            });
+            const destFormat = srgb ? 'rgba8unorm' : tex.format;
+            const blitter = new CopyBlitter();
+            const newTexture = tex.isTexture2D()
+              ? device.createTexture2D(destFormat, newWidth, newHeight)
+              : device.createCubeTexture(destFormat, newWidth);
+            blitter.blit(tex as any, newTexture as any, sampler);
+            tex.dispose();
+            tex = newTexture;
+          }
         }
       }
       return tex;
@@ -1078,7 +1127,7 @@ export class AssetManager {
    * @returns A promise that resolves to the loaded SharedModel.
    * @internal
    */
-  async loadModel(url: string, options?: ModelFetchOptions, VFSs?: VFS[]): Promise<SharedModel> {
+  async loadModel(url: string, options?: ModelFetchOptions, VFSs?: VFS[]) {
     const arrayBuffer = (await this.readFileFromVFSs(url, { encoding: 'binary' }, VFSs)) as ArrayBuffer;
     const mimeType = options?.mimeType || this.vfs.guessMIMEType(url);
     const data = new Blob([arrayBuffer], { type: mimeType });
@@ -1150,11 +1199,11 @@ export class AssetManager {
    * @param name - Built-in texture identifier.
    * @param loader - Factory that creates the built-in texture using the provided AssetManager.
    */
-  static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => BaseTexture): void {
+  static setBuiltinTextureLoader(name: string, loader: (assetManager: AssetManager) => BaseTexture) {
     if (loader) {
       this._builtinTextureLoaders[name] = loader;
     } else {
-      this._builtinTextureLoaders[name] = undefined;
+      delete this._builtinTextureLoaders[name];
     }
   }
   /**
@@ -1169,7 +1218,7 @@ export class AssetManager {
    * @returns A string cache key combining type, URL, and color space choice.
    * @internal
    */
-  private getHash<T extends BaseTexture>(type: string, url: string, options: TextureFetchOptions<T>): string {
+  private getHash<T extends BaseTexture>(type: string, url: string, options?: TextureFetchOptions<T>) {
     return `${type}:${url}:${!options?.linearColorSpace}`;
   }
   /**
@@ -1185,14 +1234,9 @@ export class AssetManager {
   async readFileFromVFSs(path: string, options: ReadOptions, vfsList?: VFS[]) {
     vfsList = vfsList ?? [this.vfs];
     for (const vfs of vfsList) {
-      if (!(await vfs.exists(path))) {
-        continue;
-      }
-      const stat = await vfs.stat(path);
-      if (!stat || !stat.isFile) {
-        continue;
-      }
-      return await vfs.readFile(path, options);
+      try {
+        return await vfs.readFile(path, options);
+      } catch {}
     }
     throw new VFSError(`File does not exist: ${path}`, 'ENOENT', path);
   }

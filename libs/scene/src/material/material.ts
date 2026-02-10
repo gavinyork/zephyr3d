@@ -5,12 +5,12 @@ import type { DrawContext } from '../render/drawable';
 import { QUEUE_OPAQUE } from '../values';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import { Disposable } from '@zephyr3d/base';
-import type { Clonable, IDisposable } from '@zephyr3d/base';
+import type { Clonable, IDisposable, Nullable } from '@zephyr3d/base';
 import { getEngine } from '../app/api';
 
 type MaterialState = {
   program: GPUProgram;
-  bindGroup: BindGroup;
+  bindGroup: Nullable<BindGroup>;
   bindGroupTag: string;
   renderStateSet: RenderStateSet;
   materialTag: number;
@@ -82,7 +82,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * Per-pass hash cached results. Length scales with `numPasses`.
    * @internal
    */
-  protected _hash: string[];
+  protected _hash: Nullable<string>[];
   /**
    * Incremented each time options change (via `optionChanged`), used to decide whether
    * uniforms need update on next `apply()`.
@@ -134,7 +134,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * Note: The base implementation returns a base `Material`. Subclasses should
    * override to return their own type and copy custom fields.
    */
-  clone(): Material {
+  clone() {
     const other = new Material();
     other.copyFrom(this);
     return other;
@@ -163,7 +163,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
   /**
    * Runtime-unique numeric identifier for the material instance.
    */
-  get instanceId(): number {
+  get instanceId() {
     return this._id;
   }
   /**
@@ -173,10 +173,10 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * `createHash(pass)`, `_createProgram(pb, ctx, pass)`, and `updateRenderStates(pass, ...)`
    * accordingly for each pass.
    */
-  get numPasses(): number {
+  get numPasses() {
     return this._numPasses;
   }
-  set numPasses(val: number) {
+  set numPasses(val) {
     while (this._hash.length < val) {
       this._hash.push(null);
     }
@@ -188,7 +188,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * Calls `createHash(pass)` lazily and caches the result.
    * @internal
    */
-  protected getHash(pass: number): string {
+  protected getHash(pass: number) {
     if (this._hash[pass] === null) {
       this._hash[pass] = this.createHash(pass);
     }
@@ -249,7 +249,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * Base returns `null`. Subclasses that support instancing can return a lightweight instance.
    */
   createInstance(): this {
-    return null;
+    throw new Error('Abstract function call');
   }
   /**
    * Returns the core material that owns GPU state.
@@ -274,7 +274,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @param ctx - Draw context (device, flags, pass hash, instance data, etc.).
    * @returns `true` if successful; `false` if any pass lacks a valid program.
    */
-  apply(ctx: DrawContext): boolean {
+  apply(ctx: DrawContext) {
     for (let pass = 0; pass < this._numPasses; pass++) {
       const hash = this.calcGlobalHash(ctx, pass);
       let state = this._states[hash];
@@ -297,7 +297,9 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
       if (!state.program) {
         return false;
       }
-      this.applyUniforms(state.bindGroup, ctx, state.materialTag !== this._optionTag, pass);
+      if (state.bindGroup) {
+        this.applyUniforms(state.bindGroup, ctx, state.materialTag !== this._optionTag, pass);
+      }
       state.materialTag = this._optionTag;
       this.updateRenderStates(pass, state.renderStateSet, ctx);
       this._currentHash[pass] = hash;
@@ -310,6 +312,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
         }
       }
     }
+    return true;
   }
   /**
    * Bind the program, bind group, and render states for the specified pass.
@@ -321,7 +324,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @returns `true` on success; `false` if state or program missing.
    * @internal
    */
-  bind(device: AbstractDevice, pass: number): boolean {
+  bind(device: AbstractDevice, pass: number) {
     const hash = this._currentHash[pass];
     const state = this._states[hash];
     if (!state) {
@@ -332,8 +335,11 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
       return false;
     }
     device.setProgram(state.program);
-    device.setBindGroup(2, state.bindGroup);
+    if (state.bindGroup) {
+      device.setBindGroup(2, state.bindGroup);
+    }
     device.setRenderStates(state.renderStateSet);
+    return true;
   }
   /**
    * Compute the global hash for the given pass and draw context.
@@ -344,7 +350,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * - `ctx.renderPassHash` for framebuffer/attachment layout variants.
    * @internal
    */
-  private calcGlobalHash(ctx: DrawContext, pass: number): string {
+  private calcGlobalHash(ctx: DrawContext, pass: number) {
     return `${this.getHash(pass)}:${ctx.materialFlags}:${ctx.renderPassHash}`;
   }
   /**
@@ -374,7 +380,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @param needUpdate - Whether uniforms need to be refreshed.
    * @param pass - Pass index.
    */
-  applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number): void {
+  applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number) {
     if (needUpdate) {
       this._applyUniforms(bindGroup, ctx, pass);
     }
@@ -414,7 +420,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @param pass - Pass number.
    * @returns String used when building full hash.
    */
-  passToHash(pass: number): string {
+  passToHash(pass: number) {
     return String(pass);
   }
   /**
@@ -426,7 +432,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @returns Hash string used in program caching.
    * @internal
    */
-  createHash(pass: number): string {
+  createHash(pass: number) {
     return `${this.constructor.name}|${pass}|${this._createHash()}`;
   }
   /**
@@ -442,7 +448,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @param ctx - Draw context.
    * @param numInstances - Explicit instance count (0 = auto).
    */
-  drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void {
+  drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number) {
     if (numInstances > 0) {
       primitive.drawInstanced(numInstances);
     } else if (ctx.instanceData) {
@@ -473,7 +479,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @returns The compiled `GPUProgram`, or `null` on failure.
    * @internal
    */
-  protected createProgram(ctx: DrawContext, pass: number): GPUProgram {
+  protected createProgram(ctx: DrawContext, pass: number) {
     const pb = new ProgramBuilder(ctx.device);
     return this._createProgram(pb, ctx, pass);
   }
@@ -490,7 +496,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @returns The created program, or `null` on failure.
    */
   protected _createProgram(_pb: ProgramBuilder, _ctx: DrawContext, _pass: number): GPUProgram {
-    return null;
+    throw new Error('Abstract function call');
   }
   /**
    * Upload uniforms and bind resources to the per-material bind group (index 2).
@@ -514,7 +520,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @param _renderStates - Render state set to mutate.
    * @param _ctx - Draw context.
    */
-  protected updateRenderStates(_pass: number, _renderStates: RenderStateSet, _ctx: DrawContext): void {}
+  protected updateRenderStates(_pass: number, _renderStates: RenderStateSet, _ctx: DrawContext) {}
   /**
    * Compute the material-specific portion of the shader hash for the current options.
    *
@@ -523,7 +529,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    *
    * @returns Hash fragment string (no context/pass info).
    */
-  protected _createHash(): string {
+  protected _createHash() {
     return '';
   }
   /**
@@ -532,7 +538,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * Instances typically share GPU programs with a core and only override instance uniforms.
    * @internal
    */
-  get $isInstance() {
+  get $isInstance(): boolean {
     return false;
   }
   /**
@@ -542,6 +548,6 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @internal
    */
   get $instanceUniforms(): Float32Array<ArrayBuffer> {
-    return null;
+    throw new Error('Abstract function call');
   }
 }

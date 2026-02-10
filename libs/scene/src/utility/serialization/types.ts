@@ -1,30 +1,34 @@
-import type { GenericConstructor } from '@zephyr3d/base';
+import type { GenericConstructor, Nullable, RequireOptionals } from '@zephyr3d/base';
 
 /**
  * Enumerates supported data types for serializable properties.
  *
  * This type informs serializers/editors how to interpret and encode values.
+ * 'bool'|'int'|'float'|'vec2'|'vec3'|'vec4'|'int2'|'int3'|'int4'|'string'|'rgb'|'rgba'|'object'|'object_array'|'embedded'|'command';
  *
  * @public
  */
-export type PropertyType =
-  | 'bool'
-  | 'int'
+export type PropertyType = string;
+
+export type PropertyToType<T extends string> = T extends
   | 'float'
   | 'vec2'
   | 'vec3'
   | 'vec4'
+  | 'int'
   | 'int2'
   | 'int3'
   | 'int4'
-  | 'string'
   | 'rgb'
   | 'rgba'
-  | 'object'
-  | 'object_array'
-  | 'embedded'
-  | 'command';
-
+  ? 'num'
+  : T extends 'bool'
+    ? 'bool'
+    : T extends 'string'
+      ? 'str'
+      : T extends 'object' | 'object_array'
+        ? 'object'
+        : 'num' | 'bool' | 'str' | 'object';
 /**
  * Container for a serializable property's value.
  *
@@ -49,7 +53,7 @@ export type PropertyValue = {
   /** Boolean lane(s) for boolean properties. */
   bool?: boolean[];
   /** Object lane(s) for object references or embedded objects. */
-  object?: object[];
+  object?: Nullable<object>[];
 };
 
 /**
@@ -95,6 +99,10 @@ export type PropertyAccessorOptions = {
   enum?: { labels: string[]; values: unknown[] };
 };
 
+export function defineProps(accessors: PropertyAccessor<any, 'DUMMY'>[]): PropertyAccessor[] {
+  return accessors;
+}
+
 /**
  * Descriptor for a serializable property of a class/type.
  *
@@ -110,7 +118,7 @@ export type PropertyAccessorOptions = {
  * @typeParam T - The instance type that owns the property.
  * @public
  */
-export type PropertyAccessor<T = object> = {
+export type PropertyAccessor<T = object, U extends string = ''> = {
   /** The storage/serialization data type. */
   type: PropertyType;
   /** Unique property name (stable identifier for tooling/serialization). */
@@ -139,7 +147,10 @@ export type PropertyAccessor<T = object> = {
    *
    * @param value - Output container to be filled by the getter.
    */
-  get: (this: T, value: PropertyValue) => void;
+  get: <K extends string>(
+    this: T,
+    value: U extends '' ? Required<Pick<PropertyValue, PropertyToType<K>>> : RequireOptionals<PropertyValue>
+  ) => void;
   /**
    * Writes an incoming value to `this`.
    *
@@ -150,7 +161,11 @@ export type PropertyAccessor<T = object> = {
    * @param index - Optional element index for array-like properties.
    * @returns Optionally `Promise<void>` if asynchronous work is required.
    */
-  set?: (this: T, value: PropertyValue, index?: number) => void | Promise<void>;
+  set?: <K extends string>(
+    this: T,
+    value: U extends '' ? Required<Pick<PropertyValue, PropertyToType<K>>> : RequireOptionals<PropertyValue>,
+    index?: number
+  ) => void | Promise<void>;
   /**
    * Creates a new embedded/contained object for object-like properties.
    *
@@ -160,7 +175,7 @@ export type PropertyAccessor<T = object> = {
    * @param index - Target index where the new object will be inserted.
    * @returns The newly created object instance.
    */
-  create?: (this: T, ctor: GenericConstructor, index: number) => object;
+  create?: (this: T, ctor: GenericConstructor, index: number) => Nullable<object>;
   /**
    * Deletes an element from an array-like property or clears a value.
    *
@@ -177,7 +192,11 @@ export type PropertyAccessor<T = object> = {
    * @param index - Optional insertion index.
    * @returns Optionally `Promise<void>` if asynchronous work is required.
    */
-  add?: (this: T, value: PropertyValue, index?: number) => void | Promise<void>;
+  add?: <K extends string>(
+    this: T,
+    value: U extends '' ? Required<Pick<PropertyValue, PropertyToType<K>>> : RequireOptionals<PropertyValue>,
+    index?: number
+  ) => void | Promise<void>;
   /**
    * Validates the current state of `this` with respect to this property.
    *

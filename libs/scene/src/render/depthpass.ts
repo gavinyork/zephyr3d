@@ -3,6 +3,7 @@ import { RENDER_PASS_TYPE_DEPTH } from '../values';
 import type { RenderQueue } from './render_queue';
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
+import type { Camera } from '../camera';
 
 /**
  * Depth render pass
@@ -30,16 +31,16 @@ export class DepthPass extends RenderPass {
   set transmission(val: boolean) {
     this._transmission = val;
   }
-  get renderBackface(): boolean {
+  get renderBackface() {
     return this._renderBackface;
   }
-  set renderBackface(val: boolean) {
+  set renderBackface(val) {
     this._renderBackface = !!val;
   }
-  get encodeDepth(): boolean {
+  get encodeDepth() {
     return this._encodeDepth;
   }
-  set encodeDepth(val: boolean) {
+  set encodeDepth(val) {
     this._encodeDepth = !!val;
   }
   /** @internal */
@@ -47,17 +48,16 @@ export class DepthPass extends RenderPass {
     return `${Number(this._renderBackface)}:${Number(this._encodeDepth)}:${Number(ctx.motionVectors)}`;
   }
   /** @internal */
-  protected renderItems(ctx: DrawContext, renderQueue: RenderQueue) {
+  protected renderItems(ctx: DrawContext, renderCamera: Camera, renderQueue: RenderQueue) {
     const items = renderQueue.itemList;
     if (items) {
-      ctx.fogFlags = 0;
       ctx.drawEnvLight = false;
       ctx.env = null;
       ctx.flip = this.isAutoFlip(ctx);
-      ctx.renderPassHash = this.getGlobalBindGroupHash(ctx);
+      ctx.renderPassHash = this.getGlobalBindGroupHash(ctx, renderCamera);
       const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
       ctx.device.setBindGroup(0, bindGroup);
-      ShaderHelper.setCameraUniforms(bindGroup, ctx, true);
+      ShaderHelper.setCameraUniforms(bindGroup, ctx, renderCamera, true);
       const reverseWinding = ctx.camera.worldMatrixDet < 0;
       const list = this._transmission ? items.transmission : items.opaque;
       for (const lit of list.lit) {

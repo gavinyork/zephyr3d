@@ -6,7 +6,7 @@ export class FilePicker {
       fileInput.accept = accept ?? '';
       fileInput.multiple = !!multi;
       fileInput.onchange = () => {
-        resolve([...fileInput.files]);
+        resolve([...fileInput.files!]);
       };
       fileInput.click();
     });
@@ -19,7 +19,7 @@ export class FilePicker {
       fileInput.multiple = false;
       fileInput.webkitdirectory = true;
       fileInput.onchange = () => {
-        resolve([...fileInput.files]);
+        resolve([...fileInput.files!]);
       };
       fileInput.click();
     });

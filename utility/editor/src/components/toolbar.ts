@@ -6,6 +6,7 @@ export type ToolBarItem = {
   label: string;
   id?: string;
   shortcut?: string;
+  render?: (buttonSize: ImGui.ImVec2) => boolean;
   action?: () => void;
   tooltip?: () => string;
   visible?: () => boolean;
@@ -130,18 +131,22 @@ export class ToolBar extends Observable<{
       for (let i = 0; i < this._tools.length; i++) {
         ImGui.PushID(i);
         const tool = this._tools[i];
+        if (tool.visible && !tool.visible()) {
+          ImGui.PopID();
+          continue;
+        }
         if (tool.label === '-') {
           ImGui.PushStyleColor(ImGui.Col.Button, this._sepColor);
           ImGui.PushStyleColor(ImGui.Col.ButtonHovered, this._sepColor);
           ImGui.PushStyleColor(ImGui.Col.ButtonActive, this._sepColor);
           ImGui.Button('##vsep', new ImGui.ImVec2(1, -1));
           ImGui.PopStyleColor(3);
-        } else if (!tool.visible || tool.visible()) {
+        } else {
           ImGui.PushStyleColor(
             ImGui.Col.Text,
             tool.selected?.() ? this._textColorSelected : this._textColorUnselected
           );
-          if (ImGui.Button(tool.label, this._buttonSize)) {
+          if (tool.render ? tool.render(this._buttonSize) : ImGui.Button(tool.label, this._buttonSize)) {
             if (tool.action) {
               tool.action();
             } else if (tool.id) {

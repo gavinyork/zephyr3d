@@ -1,4 +1,4 @@
-import type { Clonable } from '@zephyr3d/base';
+import type { Clonable, DeepRequireOptionals, Nullable } from '@zephyr3d/base';
 import { Vector3, type Matrix4x4 } from '@zephyr3d/base';
 import { Primitive } from '../render/primitive';
 import { BoundingBox } from '../utility/bounding_volume';
@@ -15,7 +15,7 @@ export interface ShapeCreationOptions {
   /** true if we need to calculate texture coordinates for the shape */
   needUV?: boolean;
   /** Transform matrix for the shape */
-  transform?: Matrix4x4;
+  transform?: Nullable<Matrix4x4>;
 }
 
 /**
@@ -29,9 +29,10 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
   static _defaultOptions = {
     needNormal: true,
     needTangent: true,
-    needUV: true
+    needUV: true,
+    transform: null
   };
-  protected _options: T;
+  protected _options!: DeepRequireOptionals<T>;
   /**
    * Creates an instance of shape
    * @param options - The creation options
@@ -48,7 +49,7 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     uv1: number[],
     uv2: number[],
     normal: number[]
-  ): number[] {
+  ) {
     const dp1 = new Vector3(v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]);
     const dp2 = new Vector3(v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]);
 
@@ -96,9 +97,9 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     return [t0, t1, t2, w];
   }
 
-  abstract clone(): Shape<T>;
+  abstract clone(): this;
   /** Get shape creation options */
-  get options(): T {
+  get options(): DeepRequireOptionals<T> {
     return this._options;
   }
   set options(options: T) {
@@ -111,8 +112,8 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
    * @param options - creation options
    * @returns Normalized creation options
    */
-  normalizeOptions(options?: T): T {
-    const defaultOptions = (this.constructor as any)._defaultOptions as T;
+  normalizeOptions(options?: T): DeepRequireOptionals<T> {
+    const defaultOptions = (this.constructor as any)._defaultOptions as DeepRequireOptionals<T>;
     return Object.assign({}, defaultOptions, options ?? {});
   }
   /** @internal */
@@ -120,9 +121,9 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     this._options = this.normalizeOptions(options);
     const vertices: number[] = [];
     const indices: number[] = [];
-    const normals: number[] = this._options.needNormal ? [] : null;
-    const tangents: number[] = this._options.needTangent ? [] : null;
-    const uvs: number[] = this._options.needUV ? [] : null;
+    const normals: Nullable<number[]> = this._options.needNormal ? [] : null;
+    const tangents: Nullable<number[]> = this._options.needTangent ? [] : null;
+    const uvs: Nullable<number[]> = this._options.needUV ? [] : null;
     const bbox = new BoundingBox();
     bbox.beginExtend();
     this.primitiveType = (this.constructor as any).generateData(
@@ -156,7 +157,12 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     return true;
   }
   /** @internal */
-  protected static _transform(matrix: Matrix4x4, vertices: number[], normals: number[], offset: number) {
+  protected static _transform(
+    matrix: Nullable<Matrix4x4> | undefined,
+    vertices: number[],
+    normals: number[],
+    offset: number
+  ) {
     if (matrix) {
       const tmpVec = new Vector3();
       for (let i = offset; i < vertices.length - 2; i += 3) {

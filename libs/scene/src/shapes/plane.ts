@@ -1,7 +1,6 @@
 import type { AABB, Clonable } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
-import type { PrimitiveType } from '@zephyr3d/device';
 
 /**
  * Creation options for plane shapes
@@ -49,12 +48,12 @@ export class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<
   constructor(options?: PlaneCreationOptions) {
     super(options);
   }
-  clone(): PlaneShape {
-    return new PlaneShape(this._options);
+  clone() {
+    return new PlaneShape(this._options) as this;
   }
   /** type of the shape */
-  get type(): string {
-    return 'Plane';
+  get type() {
+    return 'Plane' as const;
   }
   /**
    * Generates the data for the cylinder shape
@@ -64,7 +63,7 @@ export class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<
    * @param indices - vertex indices
    */
   static generateData(
-    options: PlaneCreationOptions,
+    opt: PlaneCreationOptions,
     vertices: number[],
     normals: number[],
     tangents: number[],
@@ -73,8 +72,8 @@ export class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<
     bbox?: AABB,
     indexOffset?: number,
     vertexCallback?: (index: number, x: number, y: number, z: number) => void
-  ): PrimitiveType {
-    options = Object.assign({}, this._defaultOptions, options ?? {});
+  ) {
+    const options = Object.assign({}, this._defaultOptions, opt ?? {});
     indexOffset = indexOffset ?? 0;
     const start = vertices.length;
     const sizeX = Math.abs(options.sizeX || options.size) || 1;
@@ -139,6 +138,6 @@ export class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<
         vertexCallback?.((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
       }
     }
-    return 'triangle-list';
+    return 'triangle-list' as const;
   }
 }

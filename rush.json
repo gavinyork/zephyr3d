@@ -468,6 +468,10 @@
     {
       "packageName": "@zephyr3d/doc",
       "projectFolder": "apps/doc"
+    },
+    {
+      "packageName": "@zephyr3d/buildertest",
+      "projectFolder": "apps/builder"
     }
   ]
 }

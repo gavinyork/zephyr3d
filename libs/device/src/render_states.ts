@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import type { CompareFunc } from './base_types';
 
 /**
@@ -301,15 +302,15 @@ export interface RenderStateSet {
   /** Shallow copy existing RenderStateSet object to this */
   copyFrom(stateSet: RenderStateSet): void;
   /** Fragment output related render statements or null if the default values should be used */
-  readonly colorState: ColorState;
+  readonly colorState: Nullable<ColorState>;
   /** Alpha blending related render statements or null if the default values should be used */
-  readonly blendingState: BlendingState;
+  readonly blendingState: Nullable<BlendingState>;
   /** Rasterization related render statements or null if the default values should be used */
-  readonly rasterizerState: RasterizerState;
+  readonly rasterizerState: Nullable<RasterizerState>;
   /** Depth buffer related render statements or null if the default values should be used */
-  readonly depthState: DepthState;
+  readonly depthState: Nullable<DepthState>;
   /** Stencil buffer related render statements or null if the default values should be used */
-  readonly stencilState: StencilState;
+  readonly stencilState: Nullable<StencilState>;
   /**
    * Allocates a ColorState
    * @returns The created ColorState

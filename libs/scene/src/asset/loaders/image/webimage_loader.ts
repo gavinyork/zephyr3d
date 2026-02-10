@@ -8,7 +8,7 @@ import { getDevice } from '../../../app/api';
  * @internal
  */
 export class WebImageLoader extends AbstractTextureLoader {
-  supportMIMEType(mimeType: string): boolean {
+  supportMIMEType(mimeType: string) {
     return mimeType === 'image/jpeg' || mimeType === 'image/png' || mimeType === 'image/webp';
   }
   async load(
@@ -17,7 +17,7 @@ export class WebImageLoader extends AbstractTextureLoader {
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture
-  ): Promise<BaseTexture> {
+  ) {
     if (!mimeType) {
       throw new Error('unknown image file type');
     }
@@ -56,8 +56,8 @@ export class WebImageLoader extends AbstractTextureLoader {
     }
   }
 
-  private async loadHTMLImage(src: string): Promise<HTMLImageElement> {
-    return new Promise((resolve, reject) => {
+  private async loadHTMLImage(src: string) {
+    return new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve(img);
       img.onerror = (err) => reject(err);

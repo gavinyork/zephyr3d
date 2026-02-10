@@ -1,7 +1,7 @@
 import { DirectionalLight, PerspectiveCamera, Scene } from '@zephyr3d/scene';
 import { BaseModel } from './basemodel';
 import { Vector3 } from '@zephyr3d/base';
-import { EditorCameraController } from '../helpers/editocontroller';
+import { EditorCameraController } from '../helpers/editorcontroller';
 
 export class SceneModel extends BaseModel {
   private _scene: Scene;

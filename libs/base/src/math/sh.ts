@@ -18,7 +18,7 @@ export class SH {
    *
    * @returns The SH basis evaluate at given direction
    */
-  static evalBasis(direction: Vector3, order: number): number[] {
+  static evalBasis(direction: Vector3, order: number) {
     if (order < this.MIN_ORDER || order > this.MAX_ORDER) {
       throw new Error(`SH.evalBasis(): order must between ${this.MIN_ORDER} and ${this.MAX_ORDER}`);
     }
@@ -59,7 +59,7 @@ export class SH {
    *
    * @returns Evaluated SH data
    */
-  static evalDirectionLight(direction: Vector3, color: Vector3, order: number): Vector3[] {
+  static evalDirectionLight(direction: Vector3, color: Vector3, order: number) {
     if (order < this.MIN_ORDER || order > this.MAX_ORDER) {
       throw new Error(`SH.evalBasis(): order must between ${this.MIN_ORDER} and ${this.MAX_ORDER}`);
     }

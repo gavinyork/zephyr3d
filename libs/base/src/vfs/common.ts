@@ -29,8 +29,7 @@ export class PathUtils {
    * @param path - Input path (relative or absolute).
    * @returns The normalized absolute path (always starting with "/").
    */
-  static normalize(path: string): string {
-    // 移除多余的斜杠，处理 . 和 ..
+  static normalize(path: string) {
     const parts = path.split('/').filter((p) => p && p !== '.');
     const result: string[] = [];
 
@@ -58,7 +57,7 @@ export class PathUtils {
    * @param paths - Path segments in order.
    * @returns Normalized absolute path.
    */
-  static join(...paths: string[]): string {
+  static join(...paths: string[]) {
     return this.normalize(paths.join('/'));
   }
 
@@ -77,7 +76,7 @@ export class PathUtils {
    * @param path - Input path.
    * @returns Directory path of the input.
    */
-  static dirname(path: string): string {
+  static dirname(path: string) {
     const normalized = this.normalize(path);
     const lastSlash = normalized.lastIndexOf('/');
     return lastSlash <= 0 ? '/' : normalized.slice(0, lastSlash);
@@ -99,7 +98,7 @@ export class PathUtils {
    * @param ext - Optional extension to strip (exact suffix match).
    * @returns The base name of the path.
    */
-  static basename(path: string, ext?: string): string {
+  static basename(path: string, ext?: string) {
     const normalized = this.normalize(path);
     const lastSlash = normalized.lastIndexOf('/');
     let name = normalized.slice(lastSlash + 1);
@@ -125,7 +124,7 @@ export class PathUtils {
    * @param path - Input path.
    * @returns The extension (e.g., ".txt") or an empty string if none.
    */
-  static extname(path: string): string {
+  static extname(path: string) {
     const basename = this.basename(path);
     const lastDot = basename.lastIndexOf('.');
     return lastDot === -1 ? '' : basename.slice(lastDot);
@@ -207,7 +206,7 @@ export class PathUtils {
    * @param path - Input path.
    * @returns True if the path starts with "/", otherwise false.
    */
-  static isAbsolute(path: string): boolean {
+  static isAbsolute(path: string) {
     return path.startsWith('/');
   }
 
@@ -228,7 +227,7 @@ export class PathUtils {
    * @param to - Target path to reach.
    * @returns Relative path from `from` to `to`.
    */
-  static relative(from: string, to: string): string {
+  static relative(from: string, to: string) {
     const fromParts = this.normalize(from).split('/').filter(Boolean);
     const toParts = this.normalize(to).split('/').filter(Boolean);
 
@@ -265,7 +264,7 @@ export class PathUtils {
  *
  * @public
  */
-export function guessMimeType(path: string): string {
+export function guessMimeType(path: string) {
   const ext = PathUtils.extname(path).toLowerCase();
   const mimeTypes: Record<string, string> = {
     '.txt': 'text/plain',

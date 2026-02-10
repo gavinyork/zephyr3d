@@ -6,6 +6,7 @@ import { mixinTextureProps } from '../texture';
 import type { IMixinPBRCommon } from '../pbr/common';
 import { mixinPBRCommon } from '../pbr/common';
 import type { DrawContext } from '../../../render';
+import type { Immutable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
@@ -31,7 +32,11 @@ export type IMixinPBRMetallicRoughness = {
   ): PBShaderExp;
   calculateMetallic(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp;
   calculateRoughness(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp;
-  calculateSpecularFactor(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp);
+  calculateSpecularFactor(
+    scope: PBInsideFunctionScope,
+    albedo: PBShaderExp,
+    normal: PBShaderExp
+  ): PBShaderExp;
   calculateCommonData(
     scope: PBInsideFunctionScope,
     albedo: PBShaderExp,
@@ -77,34 +82,34 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       this._roughness = 1;
       this._specularFactor = Vector4.one();
     }
-    copyFrom(other: this): void {
+    copyFrom(other: this) {
       super.copyFrom(other);
       this.metallic = other.metallic;
       this.roughness = other.roughness;
       this.specularFactor = other.specularFactor;
     }
-    get metallic(): number {
+    get metallic() {
       return this._metallic;
     }
-    set metallic(val: number) {
+    set metallic(val) {
       if (val !== this._metallic) {
         this._metallic = val;
         this.uniformChanged();
       }
     }
-    get roughness(): number {
+    get roughness() {
       return this._roughness;
     }
-    set roughness(val: number) {
+    set roughness(val) {
       if (val !== this._roughness) {
         this._roughness = val;
         this.uniformChanged();
       }
     }
-    get specularFactor(): Vector4 {
+    get specularFactor(): Immutable<Vector4> {
       return this._specularFactor;
     }
-    set specularFactor(val: Vector4) {
+    set specularFactor(val: Immutable<Vector4>) {
       if (!val.equalsTo(this._specularFactor)) {
         this._specularFactor.set(val);
         this.uniformChanged();
@@ -118,7 +123,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       albedo: PBShaderExp,
       TBN: PBShaderExp,
       outRoughness?: PBShaderExp
-    ): PBShaderExp {
+    ) {
       const pb = scope.$builder;
       const funcName = 'Z_PBRMetallicRoughnessLight';
       const that = this;
@@ -177,11 +182,13 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
           this.$return(pb.add(this.lightingColor, this.emissiveColor));
         }
       );
-      return outRoughness
-        ? pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo, outRoughness)
-        : pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo);
+      return (
+        outRoughness
+          ? pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo, outRoughness)
+          : pb.getGlobalScope()[funcName](worldPos, normal, TBN, viewVec, albedo)
+      ) as PBShaderExp;
     }
-    vertexShader(scope: PBFunctionScope): void {
+    vertexShader(scope: PBFunctionScope) {
       super.vertexShader(scope);
       if (this.needFragmentColor() && this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
         scope.$outputs.zMetallic = this.getInstancedUniform(scope, METALLIC_UNIFORM);
@@ -189,7 +196,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
         scope.$outputs.zSpecularFactor = this.getInstancedUniform(scope, SPECULAR_FACTOR_UNFORM);
       }
     }
-    fragmentShader(scope: PBFunctionScope): void {
+    fragmentShader(scope: PBFunctionScope) {
       super.fragmentShader(scope);
       if (this.needFragmentColor()) {
         const pb = scope.$builder;
@@ -200,7 +207,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
         }
       }
     }
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx)) {
         if (!(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
@@ -210,25 +217,17 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
         }
       }
     }
-    calculateMetallic(scope: PBInsideFunctionScope, _albedo: PBShaderExp, _normal: PBShaderExp): PBShaderExp {
+    calculateMetallic(scope: PBInsideFunctionScope, _albedo: PBShaderExp, _normal: PBShaderExp) {
       const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
-      return instancing ? scope.$inputs.zMetallic : scope.zMetallic;
+      return (instancing ? scope.$inputs.zMetallic : scope.zMetallic) as PBShaderExp;
     }
-    calculateRoughness(
-      scope: PBInsideFunctionScope,
-      _albedo: PBShaderExp,
-      _normal: PBShaderExp
-    ): PBShaderExp {
+    calculateRoughness(scope: PBInsideFunctionScope, _albedo: PBShaderExp, _normal: PBShaderExp) {
       const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
-      return instancing ? scope.$inputs.zRoughness : scope.zRoughness;
+      return (instancing ? scope.$inputs.zRoughness : scope.zRoughness) as PBShaderExp;
     }
-    calculateSpecularFactor(
-      scope: PBInsideFunctionScope,
-      _albedo: PBShaderExp,
-      _normal: PBShaderExp
-    ): PBShaderExp {
+    calculateSpecularFactor(scope: PBInsideFunctionScope, _albedo: PBShaderExp, _normal: PBShaderExp) {
       const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
-      return instancing ? scope.$inputs.zSpecularFactor : scope.zSpecularFactor;
+      return (instancing ? scope.$inputs.zSpecularFactor : scope.zSpecularFactor) as PBShaderExp;
     }
     calculateCommonData(
       scope: PBInsideFunctionScope,
@@ -237,7 +236,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       viewVec: PBShaderExp,
       TBN: PBShaderExp,
       data: PBShaderExp
-    ): void {
+    ) {
       const pb = scope.$builder;
       const metallic = this.calculateMetallic(scope, albedo, normal);
       const roughness = this.calculateRoughness(scope, albedo, normal);

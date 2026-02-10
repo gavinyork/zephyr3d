@@ -1,5 +1,6 @@
 import { Camera } from './camera';
 import type { Scene } from '../scene/scene';
+import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Matrix4x4 } from '@zephyr3d/base';
 
 /**
@@ -14,16 +15,18 @@ export class OrthoCamera extends Camera {
   private _bottom: number;
   private _near: number;
   private _far: number;
-  private _window: number[];
+  private _window: Nullable<number[]>;
   /**
-   * Creates an instance of PerspectiveCamera
+   * Creates an instance of OrthoCamera
    * @param scene - The scene that the camera belongs to.
-   * @param fovY - A radian value indicates the field of view in Y axis
-   * @param aspect - Aspect ratio of the perspective transform
-   * @param nearPlane - The near clip plane
-   * @param farPlane - The far clip plane
+   * @param left - The left clip plane
+   * @param right - The right clip plane
+   * @param bottom - The bottom clip plane
+   * @param top - The top clip plane
+   * @param near - The near clip plane
+   * @param far - The far clip plane
    */
-  constructor(scene: Scene, left = -1, right = 1, bottom = -1, top = 1, near = -1, far = 1) {
+  constructor(scene: Nullable<Scene>, left = -1, right = 1, bottom = -1, top = 1, near = -1, far = 1) {
     super(scene);
     this._left = left;
     this._right = right;
@@ -35,68 +38,68 @@ export class OrthoCamera extends Camera {
     this._invalidate(true);
   }
   /** Sub-window of the frustum */
-  get window(): number[] {
+  get window(): Nullable<Immutable<number[]>> {
     return this._window;
   }
-  set window(val: number[]) {
+  set window(val: Nullable<Immutable<number[]>>) {
     this._window = val?.slice() ?? null;
     this._invalidate(true);
   }
   /** The near clip plane */
-  get near(): number {
+  get near() {
     return this._near;
   }
-  set near(val: number) {
+  set near(val) {
     if (val !== this._near) {
       this._near = val;
       this._invalidate(true);
     }
   }
   /** The far clip plane */
-  get far(): number {
+  get far() {
     return this._far;
   }
-  set far(val: number) {
+  set far(val) {
     if (val !== this._far) {
       this._far = val;
       this._invalidate(true);
     }
   }
   /** The left clip plane */
-  get left(): number {
-    return this._left;
+  get left() {
+    return this.adapted ? this.getProjectionMatrix().getLeftPlane() : this._left;
   }
-  set left(val: number) {
+  set left(val) {
     if (val !== this._left) {
       this._left = val;
       this._invalidate(true);
     }
   }
   /** The right clip plane */
-  get right(): number {
-    return this._right;
+  get right() {
+    return this.adapted ? this.getProjectionMatrix().getRightPlane() : this._right;
   }
-  set right(val: number) {
+  set right(val) {
     if (val !== this._right) {
       this._right = val;
       this._invalidate(true);
     }
   }
   /** The top clip plane */
-  get top(): number {
-    return this._top;
+  get top() {
+    return this.adapted ? this.getProjectionMatrix().getTopPlane() : this._top;
   }
-  set top(val: number) {
+  set top(val) {
     if (val !== this._top) {
       this._top = val;
       this._invalidate(true);
     }
   }
   /** The bottom clip plane */
-  get bottom(): number {
-    return this._bottom;
+  get bottom() {
+    return this.adapted ? this.getProjectionMatrix().getBottomPlane() : this._bottom;
   }
-  set bottom(val: number) {
+  set bottom(val) {
     if (val !== this._bottom) {
       this._bottom = val;
       this._invalidate(true);
@@ -114,7 +117,7 @@ export class OrthoCamera extends Camera {
   /**
    * {@inheritDoc Camera.setOrtho}
    */
-  setOrtho(left: number, right: number, bottom: number, top: number, near: number, far: number): this {
+  setOrtho(left: number, right: number, bottom: number, top: number, near: number, far: number) {
     this._left = left;
     this._right = right;
     this._bottom = bottom;
@@ -128,7 +131,7 @@ export class OrthoCamera extends Camera {
    * Setup a projection matrix for the camera
    * @param matrix - The projection matrix
    */
-  setProjectionMatrix(matrix: Matrix4x4): void {
+  setProjectionMatrix(matrix: Matrix4x4) {
     if (matrix !== this._projMatrix) {
       if (matrix?.isOrtho()) {
         super.setProjectionMatrix(matrix);
@@ -144,20 +147,24 @@ export class OrthoCamera extends Camera {
     }
   }
   /** @internal */
-  protected _computeProj(): void {
-    let left = this._left;
-    let right = this._right;
-    let bottom = this._bottom;
-    let top = this._top;
-    if (this._window) {
-      const width = right - left;
-      const height = top - bottom;
-      left += width * this._window[0];
-      bottom += height * this._window[1];
-      right = left + width * this._window[2];
-      top = bottom + height * this._window[3];
+  protected _computeProj() {
+    if (this.adapted) {
+      this.calcAdaptedOrthographicProjection(this._near, this._far, this._projMatrix);
+    } else {
+      let left = this._left;
+      let right = this._right;
+      let bottom = this._bottom;
+      let top = this._top;
+      if (this._window) {
+        const width = right - left;
+        const height = top - bottom;
+        left += width * this._window[0];
+        bottom += height * this._window[1];
+        right = left + width * this._window[2];
+        top = bottom + height * this._window[3];
+      }
+      this._projMatrix.ortho(left, right, bottom, top, this._near, this._far);
     }
-    this._projMatrix.ortho(left, right, bottom, top, this._near, this._far);
     Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
   }
 }

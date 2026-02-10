@@ -8,17 +8,22 @@ import type {
   TextureSampler
 } from '@zephyr3d/device';
 import { PBShaderExp } from '@zephyr3d/device';
-import type { BaseGraphNode, BlueprintDAG, IGraphNode } from '../node';
+import type { BaseGraphNode, BlueprintDAG, GraphNodeInput, IGraphNode } from '../node';
 import {
+  ConstantBooleanNode,
+  ConstantBVec2Node,
+  ConstantBVec3Node,
+  ConstantBVec4Node,
   ConstantScalarNode,
   ConstantVec2Node,
   ConstantVec3Node,
   ConstantVec4Node
 } from '../common/constants';
-import type { GenericConstructor, DRef } from '@zephyr3d/base';
+import type { GenericConstructor, DRef, Nullable } from '@zephyr3d/base';
 import type { Vector4 } from '@zephyr3d/base';
 import { ASSERT } from '@zephyr3d/base';
 import { BaseTextureNode, TextureSampleNode } from './texture';
+import type { ComparisonMode } from '../common/math';
 import {
   GenericMathNode,
   PerlinNoise2DNode,
@@ -28,7 +33,11 @@ import {
   Hash1Node,
   Hash2Node,
   Hash3Node,
-  SwizzleNode
+  SwizzleNode,
+  CompComparisonNode,
+  AnyConditionNode,
+  AllConditionNode,
+  SelectionNode
 } from '../common/math';
 import {
   BillboardMatrixNode,
@@ -92,7 +101,7 @@ export interface IRUniformValue {
 export interface BluePrintUniformValue extends IRUniformValue {
   inVertexShader: boolean;
   inFragmentShader: boolean;
-  finalValue?: number | Float32Array<ArrayBuffer>;
+  finalValue?: Nullable<number | Float32Array<ArrayBuffer>>;
 }
 
 /**
@@ -124,9 +133,24 @@ export interface IRUniformTexture {
 export interface BluePrintUniformTexture extends IRUniformTexture {
   inVertexShader: boolean;
   inFragmentShader: boolean;
-  finalTexture?: DRef<BaseTexture>;
+  finalTexture?: Nullable<DRef<BaseTexture>>;
   finalSampler?: TextureSampler;
-  params?: Vector4;
+  params?: Nullable<Vector4>;
+}
+
+/**
+ * Editor state of a blueprint
+ *
+ * @public
+ */
+export interface BluePrintEditorState {
+  nodes: {
+    id: number;
+    locked: boolean;
+    node: Record<string, unknown>;
+    title: string;
+  }[];
+  links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
 }
 
 /**
@@ -167,7 +191,7 @@ abstract class IRExpression {
    * This is the core method that translates the IR to actual shader code.
    * Must be implemented by all concrete expression types.
    */
-  abstract create(pb: ProgramBuilder): number | PBShaderExp;
+  abstract create(pb: ProgramBuilder): number | boolean | PBShaderExp;
   /** Gets the array of output expressions */
   get outputs() {
     return this._outputs;
@@ -181,7 +205,7 @@ abstract class IRExpression {
    * Called when this expression is referenced by another expression.
    * Reference count is used to determine if a temporary variable is needed.
    */
-  addRef(): this {
+  addRef() {
     this._ref++;
     return this;
   }
@@ -213,7 +237,7 @@ abstract class IRExpression {
    * Only constant expressions can be converted to uniforms.
    * Returns null by default; overridden by constant expression types.
    */
-  asUniformValue(_node: IGraphNode): IRUniformValue {
+  asUniformValue(_node: IGraphNode): Nullable<IRUniformValue> {
     return null;
   }
   /**
@@ -226,7 +250,7 @@ abstract class IRExpression {
    * Only texture constant expressions can be converted to texture uniforms.
    * Returns null by default; overridden by texture constant expression types.
    */
-  asUniformTexture(_node: IGraphNode): IRUniformTexture {
+  asUniformTexture(_node: IGraphNode): Nullable<IRUniformTexture> {
     return null;
   }
   /**
@@ -237,19 +261,6 @@ abstract class IRExpression {
 
 /**
  * IR expression for a constant scalar (float) value
- *
- * @remarks
- * Represents either a literal constant or a uniform parameter.
- * If a parameter name is provided, generates a uniform; otherwise, uses a literal.
- *
- * @example
- * ```typescript
- * // Literal constant
- * const literal = new IRConstantf(1.5, '');
- *
- * // Uniform parameter
- * const uniform = new IRConstantf(1.0, 'u_roughness');
- * ```
  *
  * @public
  */
@@ -279,7 +290,7 @@ class IRConstantf extends IRExpression {
    * If a parameter name exists, creates a uniform in the global scope.
    * Otherwise, returns the literal value.
    */
-  create(pb: ProgramBuilder): number {
+  create(pb: ProgramBuilder) {
     if (this.name) {
       if (!pb.getGlobalScope()[this.name]) {
         pb.getGlobalScope()[this.name] = pb.float().uniform(2);
@@ -294,7 +305,7 @@ class IRConstantf extends IRExpression {
    * @param node - The graph node
    * @returns Uniform value descriptor if this is a uniform parameter, null otherwise
    */
-  asUniformValue(): IRUniformValue {
+  asUniformValue() {
     return this.name
       ? {
           name: this.name,
@@ -306,20 +317,35 @@ class IRConstantf extends IRExpression {
 }
 
 /**
+ * IR expression for a constant scalar (boolean) value
+ *
+ * @public
+ */
+class IRConstantb extends IRExpression {
+  /** The constant boolean value */
+  readonly value: boolean;
+  /**
+   * Creates a constant boolean expression
+   *
+   * @param value - The boolean value
+   */
+  constructor(value: boolean) {
+    super();
+    this.value = value;
+  }
+  /**
+   * Generates shader code for this constant
+   *
+   * @returns The literal boolean value
+   *
+   */
+  create() {
+    return this.value;
+  }
+}
+
+/**
  * IR expression for a constant vector value
- *
- * @remarks
- * Represents vec2, vec3, or vec4 constants.
- * Can be either literals or uniform parameters.
- *
- * @example
- * ```typescript
- * // Literal vec3
- * const color = new IRConstantfv([1.0, 0.0, 0.0], '');
- *
- * // Uniform vec2
- * const param = new IRConstantfv([0.5, 0.5], 'u_offset');
- * ```
  *
  * @public
  */
@@ -353,14 +379,18 @@ class IRConstantfv extends IRExpression {
    * If a parameter name exists, creates a uniform in the global scope.
    * The vector size is determined by the array length (vec2/vec3/vec4).
    */
-  create(pb: ProgramBuilder): PBShaderExp {
+  create(pb: ProgramBuilder) {
     if (this.name) {
       if (!pb.getGlobalScope()[this.name]) {
+        // @ts-ignore
         pb.getGlobalScope()[this.name] = pb[`vec${this.value.length}`]().uniform(2);
       }
-      return pb.getGlobalScope()[this.name];
+      return pb.getGlobalScope()[this.name] as PBShaderExp;
     }
-    return Array.isArray(this.value) ? pb[`vec${this.value.length}`](...this.value) : this.value;
+    return (
+      // @ts-ignore
+      (Array.isArray(this.value) ? pb[`vec${this.value.length}`](...this.value) : this.value) as PBShaderExp
+    );
   }
   /**
    * Converts to a uniform value descriptor
@@ -368,7 +398,7 @@ class IRConstantfv extends IRExpression {
    * @param node - The graph node
    * @returns Uniform value descriptor if this is a uniform parameter, null otherwise
    */
-  asUniformValue(): IRUniformValue {
+  asUniformValue() {
     return this.name
       ? {
           name: this.name,
@@ -376,6 +406,37 @@ class IRConstantfv extends IRExpression {
           value: this.value
         }
       : null;
+  }
+}
+
+/**
+ * IR expression for a constant boolean vector value
+ *
+ * @public
+ */
+class IRConstantbv extends IRExpression {
+  /** The constant vector value as an array of booleans */
+  readonly value: boolean[];
+
+  /**
+   * Creates a constant boolean vector expression
+   *
+   * @param value - The vector value as an array (length 2-4)
+   */
+  constructor(value: boolean[]) {
+    super();
+    this.value = value;
+  }
+  /**
+   * Generates shader code for this constant vector
+   *
+   * @param pb - The program builder
+   *
+   * @returns A boolean vector constructor expression
+   */
+  create(pb: ProgramBuilder) {
+    // @ts-ignore
+    return pb[`bvec${this.value.length}`](...this.value) as PBShaderExp;
   }
 }
 
@@ -416,8 +477,10 @@ class IRInput extends IRExpression {
    * @param pb - The program builder
    * @returns The shader expression referencing the input variable
    */
-  create(pb: ProgramBuilder): PBShaderExp {
-    return typeof this.func === 'string' ? pb.getCurrentScope()[this.func] : this.func(pb.getCurrentScope());
+  create(pb: ProgramBuilder) {
+    return (
+      typeof this.func === 'string' ? pb.getCurrentScope()[this.func] : this.func(pb.getCurrentScope())
+    ) as PBShaderExp;
   }
 }
 
@@ -443,7 +506,9 @@ class IRFunc extends IRExpression {
   /** Array of parameters (can be expressions or literal numbers) */
   readonly params: (number | IRExpression)[];
   /** The function name (e.g., 'add', 'mul', 'sin', 'vec3') */
-  readonly func: string | ((pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => PBShaderExp);
+  readonly func:
+    | string
+    | ((pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => PBShaderExp);
   /** Cached temporary variable name if expression is referenced multiple times */
   private tmpName: string;
   /**
@@ -457,7 +522,7 @@ class IRFunc extends IRExpression {
    */
   constructor(
     params: (number | IRExpression)[],
-    func: string | ((pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => PBShaderExp)
+    func: string | ((pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => PBShaderExp)
   ) {
     super();
     this.params = params.map((param) => (param instanceof IRExpression ? param.addRef() : param));
@@ -478,20 +543,21 @@ class IRFunc extends IRExpression {
    * If referenced multiple times (_ref > 1), stores result in a temporary variable.
    * Otherwise, generates the function call inline.
    */
-  create(pb: ProgramBuilder): PBShaderExp {
+  create(pb: ProgramBuilder) {
     if (this.tmpName) {
-      const exp = pb.getCurrentScope()[this.tmpName];
-      ASSERT(exp, 'expression not exists');
+      const exp = pb.getCurrentScope()[this.tmpName] as PBShaderExp;
+      ASSERT(!!exp, 'expression not exists');
       return exp;
     }
     const params = this.params.map((param) => (param instanceof IRExpression ? param.create(pb) : param));
+    // @ts-ignore
     const exp = typeof this.func === 'string' ? pb[this.func](...params) : this.func(pb, ...params);
     if (this._ref === 1) {
-      return exp;
+      return exp as PBShaderExp;
     } else {
       this.tmpName = this.getTmpName(pb.getCurrentScope());
       pb.getCurrentScope()[this.tmpName] = exp;
-      return pb.getCurrentScope()[this.tmpName];
+      return pb.getCurrentScope()[this.tmpName] as PBShaderExp;
     }
   }
 }
@@ -539,7 +605,7 @@ class IRFunctionOutput extends IRExpression {
    * @remarks
    * If referenced multiple times, stores result in a temporary variable.
    */
-  create(pb: ProgramBuilder): PBShaderExp | number {
+  create(pb: ProgramBuilder): PBShaderExp | number | boolean {
     if (this.tmpName) {
       return pb.getCurrentScope()[this.tmpName];
     }
@@ -610,11 +676,13 @@ class IRCallFunc extends IRExpression {
     }
     const that = this;
     const ir = this.node.IR;
+    // @ts-ignore
     const params = this.node.args.map((v) => pb[v.type](v.name));
     pb.func(this.node.name, params, function () {
-      const outputs = ir.create(pb);
+      const outputs = ir.create(pb)!;
       const rettype = pb.defineStruct(
         that.node.outputs.map((output, index) => {
+          // @ts-ignore
           return pb[that.node.outs[index].type](output.swizzle);
         })
       );
@@ -628,6 +696,148 @@ class IRCallFunc extends IRExpression {
     });
     const args = this.args.map((arg) => arg.create(pb));
     const exp = pb.getGlobalScope()[this.node.name](...args);
+    if (this._ref === 1) {
+      return exp;
+    } else {
+      this.tmpName = this.getTmpName(pb.getCurrentScope());
+      pb.getCurrentScope()[this.tmpName] = exp;
+      return pb.getCurrentScope()[this.tmpName];
+    }
+  }
+}
+
+class IRSelection extends IRExpression {
+  readonly a: IRExpression;
+  readonly b: IRExpression;
+  readonly cond: IRExpression;
+  tmpName: string;
+  constructor(a: IRExpression, b: IRExpression, cond: IRExpression) {
+    super();
+    this.a = a.addRef();
+    this.b = b.addRef();
+    this.cond = cond.addRef();
+    this.tmpName = '';
+  }
+  reset() {
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const a = this.a.create(pb) as number | PBShaderExp;
+    const b = this.b.create(pb) as number | PBShaderExp;
+    const c = this.cond.create(pb);
+    const exp = pb.select(a, b, typeof c === 'number' ? c !== 0 : c);
+    if (this._ref === 1) {
+      return exp;
+    } else {
+      this.tmpName = this.getTmpName(pb.getCurrentScope());
+      pb.getCurrentScope()[this.tmpName] = exp;
+      return pb.getCurrentScope()[this.tmpName];
+    }
+  }
+}
+
+class IRAny extends IRExpression {
+  readonly src: IRExpression;
+  tmpName: string;
+  constructor(src: IRExpression) {
+    super();
+    this.src = src.addRef();
+    this.tmpName = '';
+  }
+  reset() {
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const src = this.src.create(pb) as PBShaderExp;
+    const exp = pb.any(src);
+    if (this._ref === 1) {
+      return exp;
+    } else {
+      this.tmpName = this.getTmpName(pb.getCurrentScope());
+      pb.getCurrentScope()[this.tmpName] = exp;
+      return pb.getCurrentScope()[this.tmpName];
+    }
+  }
+}
+
+class IRAll extends IRExpression {
+  readonly src: IRExpression;
+  tmpName: string;
+  constructor(src: IRExpression) {
+    super();
+    this.src = src.addRef();
+    this.tmpName = '';
+  }
+  reset() {
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const src = this.src.create(pb) as PBShaderExp;
+    const exp = pb.all(src);
+    if (this._ref === 1) {
+      return exp;
+    } else {
+      this.tmpName = this.getTmpName(pb.getCurrentScope());
+      pb.getCurrentScope()[this.tmpName] = exp;
+      return pb.getCurrentScope()[this.tmpName];
+    }
+  }
+}
+
+class IRComparison extends IRExpression {
+  readonly a: IRExpression;
+  readonly b: IRExpression;
+  readonly mode: ComparisonMode;
+  tmpName: string;
+  constructor(a: IRExpression, b: IRExpression, mode: ComparisonMode) {
+    super();
+    this.a = a.addRef();
+    this.b = b.addRef();
+    this.mode = mode;
+    this.tmpName = '';
+  }
+  /** Reset for next creation */
+  reset() {
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const a = this.a.create(pb) as PBShaderExp;
+    const b = this.b.create(pb) as PBShaderExp;
+    let exp: PBShaderExp;
+    switch (this.mode) {
+      case 'eq':
+        exp = pb.compEqual(a, b);
+        break;
+      case 'ne':
+        exp = pb.compNotEqual(a, b);
+        break;
+      case 'lt':
+        exp = pb.lessThan(a, b);
+        break;
+      case 'le':
+        exp = pb.lessThanEqual(a, b);
+        break;
+      case 'gt':
+        exp = pb.greaterThan(a, b);
+        break;
+      case 'ge':
+        exp = pb.greaterThanEqual(a, b);
+        break;
+      default:
+        throw new Error(`Invalid comparison mode: ${this.mode}`);
+    }
     if (this._ref === 1) {
       return exp;
     } else {
@@ -687,6 +897,7 @@ class IRSwizzle extends IRExpression {
    */
   create(pb: ProgramBuilder): number | PBShaderExp {
     const src = this.src.create(pb);
+    // @ts-ignore
     return typeof src === 'number' ? pb[`vec${this.hash.length}`](src) : src[this.hash];
   }
 }
@@ -712,6 +923,8 @@ class IRSwizzle extends IRExpression {
 class IRCast extends IRExpression {
   /** The source expression to cast */
   readonly src: IRExpression;
+  /** The values to be filled */
+  readonly fill: Nullable<number[]>;
   /** The target type name (e.g., 'vec2', 'vec3', 'vec4') */
   readonly type: string;
   /** Number of zero components to append */
@@ -723,10 +936,11 @@ class IRCast extends IRExpression {
    * @param type - The target type name
    * @param cast - Number of zero components to append
    */
-  constructor(src: IRExpression, type: string, cast: number) {
+  constructor(src: IRExpression, type: string, cast: number, fill?: number[]) {
     super();
     this.src = src.addRef();
     this.cast = cast;
+    this.fill = fill?.slice() ?? null;
     this.type = type;
   }
   /**
@@ -740,7 +954,8 @@ class IRCast extends IRExpression {
    * Example: vec4(src, 0, 0) for casting vec2 to vec4.
    */
   create(pb: ProgramBuilder): PBShaderExp {
-    return pb[this.type](this.src.create(pb), ...Array.from({ length: this.cast }).fill(0));
+    // @ts-ignore
+    return pb[this.type](this.src.create(pb), ...(this.fill ?? Array.from({ length: this.cast }).fill(0)));
   }
 }
 
@@ -813,6 +1028,7 @@ class IRSampleTexture extends IRExpression {
     if (coord instanceof PBShaderExp) {
       coordExp = coord;
     } else if (Array.isArray(coord)) {
+      // @ts-ignore
       coordExp = pb[`vec${coord.length}`](...coord);
     } else {
       throw new Error('Invalid texture coordinate');
@@ -921,6 +1137,7 @@ class IRConstantTexture extends IRExpression {
    */
   create(pb: ProgramBuilder): PBShaderExp {
     if (!pb.getGlobalScope()[this.name]) {
+      // @ts-ignore
       pb.getGlobalScope()[this.name] = pb[this.type]().uniform(2);
     }
     return pb.getGlobalScope()[this.name];
@@ -980,20 +1197,6 @@ export interface MaterialBlueprintIRBehaviors {
  * 3. Track uniforms and behaviors
  * 4. Generate optimized shader code from the IR
  *
- * @example
- * ```typescript
- * const ir = new MaterialBlueprintIR(dag, materialHash);
- * if (ir.ok) {
- *   // Generate shader code
- *   const outputs = ir.create(programBuilder);
- *
- *   // Apply uniforms at runtime
- *   for (const uniform of ir.uniformValues) {
- *     material.setUniform(uniform.name, uniform.value);
- *   }
- * }
- * ```
- *
  * @public
  */
 export class MaterialBlueprintIR {
@@ -1001,29 +1204,32 @@ export class MaterialBlueprintIR {
   private _dag: BlueprintDAG;
   /** Unique hash identifying this material configuration */
   private _hash: string;
+  /** Editor state snapshot at time of compilation */
+  private _editorState: BluePrintEditorState;
   /** Array of all IR expressions in the graph */
-  private _expressions: IRExpression[];
+  private _expressions!: IRExpression[];
   /** Map from graph node to IR expression index */
-  private _expressionMap: Map<BaseGraphNode, number>;
+  private _expressionMap!: Map<BaseGraphNode, number>;
   /** Array of uniform scalar/vector values to be set at runtime */
-  private _uniformValues: IRUniformValue[];
+  private _uniformValues!: IRUniformValue[];
   /** Array of uniform textures to be bound at runtime */
-  private _uniformTextures: IRUniformTexture[];
+  private _uniformTextures!: IRUniformTexture[];
   /** Flags indicating which shader features are used */
-  private _behaviors: MaterialBlueprintIRBehaviors;
+  private _behaviors!: MaterialBlueprintIRBehaviors;
   /** Array of named output expressions (e.g., baseColor, normal, metallic) */
-  private _outputs: { name: string; expr: IRExpression }[];
+  private _outputs!: Nullable<{ name: string; expr: IRExpression }[]>;
   /**
    * Creates and compiles a material blueprint IR
    *
    * @param dag - The material node graph DAG
    * @param hash - Unique identifier for this material
+   * @param editorState - Editor state snapshot
    *
    * @remarks
    * Automatically compiles the DAG during construction.
    * Check the `ok` property to verify successful compilation.
    */
-  constructor(dag: BlueprintDAG, hash: string) {
+  constructor(dag: BlueprintDAG, hash: string, editorState: BluePrintEditorState) {
     this._dag = dag ?? {
       nodeMap: {},
       roots: [],
@@ -1034,6 +1240,7 @@ export class MaterialBlueprintIR {
       order: []
     };
     this._hash = hash;
+    this._editorState = editorState;
     this.compile();
   }
   /**
@@ -1042,11 +1249,15 @@ export class MaterialBlueprintIR {
    * @returns True if compilation produced valid outputs
    */
   get ok() {
-    return this._outputs?.length > 0;
+    return this._outputs ? this._outputs.length > 0 : false;
   }
   /** Gets the unique hash for this material */
   get hash() {
     return this._hash;
+  }
+  /** Gets the editor state snapshot */
+  get editorState() {
+    return this._editorState;
   }
   /** Gets the behavior flags indicating shader requirements */
   get behaviors() {
@@ -1089,18 +1300,20 @@ export class MaterialBlueprintIR {
         if (input.inputNode) {
           this._outputs.push({
             name,
-            expr: this.ir(input.inputNode, input.inputId, input.originType).addRef()
-          });
-        } else if (typeof input.defaultValue === 'number') {
-          this._outputs.push({
-            name,
-            expr: new IRConstantf(input.defaultValue, '').addRef()
+            expr: this.ir(input)!.addRef()
           });
         } else if (Array.isArray(input.defaultValue)) {
-          this._outputs.push({
-            name,
-            expr: new IRConstantfv(input.defaultValue, '', `vec${input.defaultValue.length}`).addRef()
-          });
+          if (input.defaultValue.length === 1) {
+            this._outputs.push({
+              name,
+              expr: new IRConstantf(input.defaultValue[0], '').addRef()
+            });
+          } else {
+            this._outputs.push({
+              name,
+              expr: new IRConstantfv(input.defaultValue, '', `vec${input.defaultValue.length}`).addRef()
+            });
+          }
         } else if (input.required) {
           this._outputs = null;
           return false;
@@ -1135,14 +1348,14 @@ export class MaterialBlueprintIR {
    * });
    * ```
    */
-  create(pb: ProgramBuilder): { name: string; exp: PBShaderExp | number }[] {
+  create(pb: ProgramBuilder): Nullable<{ name: string; exp: PBShaderExp | number | boolean }[]> {
     if (!this._outputs) {
       return null;
     }
     for (const expr of this._expressions) {
       expr.reset();
     }
-    const outputs: { name: string; exp: PBShaderExp | number }[] = [];
+    const outputs: { name: string; exp: PBShaderExp | number | boolean }[] = [];
     for (const output of this._outputs) {
       outputs.push({ name: output.name, exp: output.expr.create(pb) });
     }
@@ -1180,8 +1393,12 @@ export class MaterialBlueprintIR {
    *
    * @throws Error if type casting is invalid
    */
-  private ir(node: IGraphNode, output: number, originType?: string): IRExpression {
-    let expr: IRExpression = null;
+  private ir(inputNode: GraphNodeInput): Nullable<IRExpression> {
+    const node = inputNode.inputNode!;
+    const output = inputNode.inputId!;
+    const originType = inputNode.originType;
+    const defaultValue = inputNode.defaultValue;
+    let expr: Nullable<IRExpression> = null;
     if (node instanceof ConstantScalarNode) {
       expr = this.constantf(node, output);
     } else if (
@@ -1190,6 +1407,14 @@ export class MaterialBlueprintIR {
       node instanceof ConstantVec4Node
     ) {
       expr = this.constantfv(node, output);
+    } else if (node instanceof ConstantBooleanNode) {
+      expr = this.constantb(node, output);
+    } else if (
+      node instanceof ConstantBVec2Node ||
+      node instanceof ConstantBVec3Node ||
+      node instanceof ConstantBVec4Node
+    ) {
+      expr = this.constantbv(node, output);
     } else if (node instanceof BaseTextureNode) {
       expr = this.constantTexture(node, output);
     } else if (node instanceof TextureSampleNode) {
@@ -1198,6 +1423,14 @@ export class MaterialBlueprintIR {
       expr = this.makeVector(node, output);
     } else if (node instanceof SwizzleNode) {
       expr = this.swizzle(node, output);
+    } else if (node instanceof CompComparisonNode) {
+      expr = this.comparison(node, output);
+    } else if (node instanceof AnyConditionNode) {
+      expr = this.any(node, output);
+    } else if (node instanceof AllConditionNode) {
+      expr = this.all(node, output);
+    } else if (node instanceof SelectionNode) {
+      expr = this.selection(node, output);
     } else if (node instanceof ResolveVertexPositionNode) {
       expr = this.resolveVertexPosition(node, output);
     } else if (node instanceof ResolveVertexNormalNode) {
@@ -1276,7 +1509,7 @@ export class MaterialBlueprintIR {
           if (nOut > nOrg) {
             return new IRSwizzle(expr, 'xyzw'.slice(0, nOrg));
           } else {
-            return new IRCast(expr, originType, nOrg - nOut);
+            return new IRCast(expr, originType, nOrg - nOut, defaultValue?.slice(nOut - nOrg));
           }
         } else {
           throw new Error(`Cannot cast type \`${outputType}\` to \`${originType}`);
@@ -1318,14 +1551,11 @@ export class MaterialBlueprintIR {
         this._uniformTextures.push(uniformTexture);
       }
     } else {
-      ir = this._expressions[this._expressionMap.get(node)] as InstanceType<T>;
+      ir = this._expressions[this._expressionMap.get(node)!] as InstanceType<T>;
     }
     if (!ir.outputs[outputId]) {
-      const output = node.outputs.find((v) => v.id === outputId);
+      const output = node.outputs.find((v) => v.id === outputId)!;
       ir.outputs[outputId] = ir;
-      if (typeof output.cast === 'number') {
-        ir.outputs[outputId] = new IRCast(ir, node.getOutputType(outputId), output.cast);
-      }
       if (output.swizzle) {
         ir.outputs[outputId] = new IRSwizzle(ir.outputs[outputId], output.swizzle);
       }
@@ -1337,7 +1567,7 @@ export class MaterialBlueprintIR {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
       if (input.inputNode) {
-        params.push(this.ir(input.inputNode, input.inputId, input.originType));
+        params.push(this.ir(input)!);
       }
     }
     const funcName = node.getOutputType(output);
@@ -1345,12 +1575,36 @@ export class MaterialBlueprintIR {
   }
   /** Converts a swizzle node to IR */
   private swizzle(node: SwizzleNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRSwizzle, this.ir(node.inputs[0])!, node.swizzle);
+  }
+  /** Converts a comparison node to IR */
+  private comparison(node: CompComparisonNode, output: number): IRExpression {
     return this.getOrCreateIRExpression(
       node,
       output,
-      IRSwizzle,
-      this.ir(node.inputs[0].inputNode, node.inputs[0].inputId, node.inputs[0].originType),
-      node.swizzle
+      IRComparison,
+      this.ir(node.inputs[0])!,
+      this.ir(node.inputs[1])!,
+      node.mode
+    );
+  }
+  /** Converts an any-condition node to IR */
+  private any(node: AnyConditionNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRAny, this.ir(node.inputs[0])!);
+  }
+  /** Converts an all-condition node to IR */
+  private all(node: AllConditionNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRAll, this.ir(node.inputs[0])!);
+  }
+  /** Converts a selection node to IR */
+  private selection(node: SelectionNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRSelection,
+      this.ir(node.inputs[0])!,
+      this.ir(node.inputs[1])!,
+      this.ir(node.inputs[2])!
     );
   }
   /** Converts a Transform node to IR */
@@ -1358,7 +1612,7 @@ export class MaterialBlueprintIR {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
       if (input.inputNode) {
-        params.push(this.ir(input.inputNode, input.inputId, input.originType));
+        params.push(this.ir(input)!);
       }
     }
     return this.getOrCreateIRExpression(node, output, IRFunc, params, 'mul');
@@ -1368,7 +1622,7 @@ export class MaterialBlueprintIR {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
       if (input.inputNode) {
-        params.push(this.ir(input.inputNode, input.inputId, input.originType));
+        params.push(this.ir(input)!);
       }
     }
     const funcName = node.func;
@@ -1376,19 +1630,19 @@ export class MaterialBlueprintIR {
   }
   /** Converts a function output node to IR */
   private functionOutput(node: FunctionOutputNode, output: number): IRExpression {
-    const input = this.ir(node.inputs[0].inputNode, node.inputs[0].inputId, node.inputs[0].originType);
+    const input = this.ir(node.inputs[0])!;
     return this.getOrCreateIRExpression(node, output, IRFunctionOutput, input);
   }
   /** Converts a vertex color input node to IR */
   private vertexColor(node: VertexColorNode, output: number): IRExpression {
     this._behaviors.useVertexColor = true;
-    return this.getOrCreateIRExpression(node, output, IRInput, (scope) => scope.$inputs.zVertexColor);
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope) => scope.zVertexColor);
   }
   /** Converts a vertex UV input node to IR */
   private vertexUV(node: VertexUVNode, output: number): IRExpression {
     this._behaviors.useVertexUV = true;
     return this.getOrCreateIRExpression(node, output, IRInput, (scope) => {
-      return scope.$inputs.zVertexUV;
+      return scope.zVertexUV;
     });
   }
   /** Converts a vertex normal input node to IR */
@@ -1396,7 +1650,7 @@ export class MaterialBlueprintIR {
     return this.getOrCreateIRExpression(node, output, IRInput, (scope) =>
       scope.$builder.getDevice().type === 'vertex'
         ? (scope.$getVertexAttrib('normal') ?? ShaderHelper.resolveVertexNormal(scope))
-        : scope.$inputs.zVertexNormal
+        : scope.zVertexNormal
     );
   }
   /** Converts a vertex tangent input node to IR */
@@ -1404,7 +1658,7 @@ export class MaterialBlueprintIR {
     return this.getOrCreateIRExpression(node, output, IRInput, (scope) =>
       scope.$builder.getDevice().type === 'vertex'
         ? (scope.$getVertexAttrib('tangent') ?? ShaderHelper.resolveVertexTangent(scope))
-        : scope.$inputs.zVertexTangent
+        : scope.zVertexTangent
     );
   }
   /** Converts a vertex binormal input node to IR */
@@ -1548,17 +1802,17 @@ export class MaterialBlueprintIR {
     const params: IRExpression[] = [];
     const input = node.inputs[0];
     ASSERT(!!input.inputNode);
-    const type = input.inputNode.getOutputType(input.inputId);
+    const type = input.inputNode.getOutputType(input.inputId!);
     ASSERT(type === 'float' || type === 'vec2' || type === 'vec3');
-    params.push(this.ir(input.inputNode, input.inputId, input.originType));
+    params.push(this.ir(input)!);
     return this.getOrCreateIRExpression(
       node,
       output,
       IRFunc,
       params,
-      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
+      (pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => {
         const scope = pb.getCurrentScope() as PBInsideFunctionScope;
-        const seed = params[0];
+        const seed = params[0] as number | PBShaderExp;
         return type === 'float'
           ? hash11(scope, seed)
           : type === 'vec2'
@@ -1572,17 +1826,17 @@ export class MaterialBlueprintIR {
     const params: IRExpression[] = [];
     const input = node.inputs[0];
     ASSERT(!!input.inputNode);
-    const type = input.inputNode.getOutputType(input.inputId);
+    const type = input.inputNode.getOutputType(input.inputId!);
     ASSERT(type === 'float' || type === 'vec2' || type === 'vec3');
-    params.push(this.ir(input.inputNode, input.inputId, input.originType));
+    params.push(this.ir(input)!);
     return this.getOrCreateIRExpression(
       node,
       output,
       IRFunc,
       params,
-      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
+      (pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => {
         const scope = pb.getCurrentScope() as PBInsideFunctionScope;
-        const seed = params[0];
+        const seed = params[0] as number | PBShaderExp;
         return type === 'float'
           ? hash12(scope, seed)
           : type === 'vec2'
@@ -1596,17 +1850,17 @@ export class MaterialBlueprintIR {
     const params: IRExpression[] = [];
     const input = node.inputs[0];
     ASSERT(!!input.inputNode);
-    const type = input.inputNode.getOutputType(input.inputId);
+    const type = input.inputNode.getOutputType(input.inputId!);
     ASSERT(type === 'float' || type === 'vec2' || type === 'vec3');
-    params.push(this.ir(input.inputNode, input.inputId, input.originType));
+    params.push(this.ir(input)!);
     return this.getOrCreateIRExpression(
       node,
       output,
       IRFunc,
       params,
-      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
+      (pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => {
         const scope = pb.getCurrentScope() as PBInsideFunctionScope;
-        const seed = params[0];
+        const seed = params[0] as number | PBShaderExp;
         return type === 'float'
           ? hash13(scope, seed)
           : type === 'vec2'
@@ -1620,7 +1874,7 @@ export class MaterialBlueprintIR {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
       if (input.inputNode) {
-        params.push(this.ir(input.inputNode, input.inputId, input.originType));
+        params.push(this.ir(input)!);
       }
     }
     return this.getOrCreateIRExpression(
@@ -1628,7 +1882,7 @@ export class MaterialBlueprintIR {
       output,
       IRFunc,
       params,
-      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
+      (pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => {
         pb.func(node.toString(), [pb.vec2('uv'), pb.float('scale')], function () {
           this.$l.t = pb.float(0);
           let freq = 1;
@@ -1651,7 +1905,7 @@ export class MaterialBlueprintIR {
     const params: IRExpression[] = [];
     for (const input of node.inputs) {
       if (input.inputNode) {
-        params.push(this.ir(input.inputNode, input.inputId, input.originType));
+        params.push(this.ir(input)!);
       }
     }
     return this.getOrCreateIRExpression(
@@ -1659,7 +1913,7 @@ export class MaterialBlueprintIR {
       output,
       IRFunc,
       params,
-      (pb: ProgramBuilder, ...params: (number | PBShaderExp)[]) => {
+      (pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => {
         pb.func('Z_perlinNoise2dDir', [pb.vec2('uv')], function () {
           this.$l.p = pb.mod(this.uv, pb.vec2(289));
           this.$l.x = pb.add(pb.mod(pb.mul(pb.add(pb.mul(this.p.x, 34), 1), this.p.x), 289), this.p.y);
@@ -1705,7 +1959,7 @@ export class MaterialBlueprintIR {
   /** Converts a function call node to IR */
   private functionCall(node: FunctionCallNode, output: number): IRExpression {
     const args = node.inputs.map((input) => {
-      return this.ir(input.inputNode, input.inputId, input.originType);
+      return this.ir(input)!;
     });
     return this.getOrCreateIRExpression(node, output, IRCallFunc, node, args);
   }
@@ -1733,6 +1987,23 @@ export class MaterialBlueprintIR {
       `vec${value.length}`
     );
   }
+  /** Converts a scalar boolean constant node to IR */
+  private constantb(node: ConstantBooleanNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRConstantb, node.x);
+  }
+  /** Converts a boolean vector constant node to IR */
+  private constantbv(
+    node: ConstantBVec2Node | ConstantBVec3Node | ConstantBVec4Node,
+    output: number
+  ): IRExpression {
+    const value =
+      node instanceof ConstantBVec2Node
+        ? [node.x, node.y]
+        : node instanceof ConstantBVec3Node
+          ? [node.x, node.y, node.z]
+          : [node.x, node.y, node.z, node.w];
+    return this.getOrCreateIRExpression(node, output, IRConstantbv, value);
+  }
   /** Converts a texture constant node to IR */
   private constantTexture(node: BaseTextureNode, output: number): IRConstantTexture {
     return this.getOrCreateIRExpression(
@@ -1752,8 +2023,8 @@ export class MaterialBlueprintIR {
   }
   /** Converts a texture sample node to IR */
   private textureSample(node: TextureSampleNode, output: number): IRExpression {
-    const tex = this.ir(node.inputs[0].inputNode, node.inputs[0].inputId) as IRConstantTexture;
-    const coord = this.ir(node.inputs[1].inputNode, node.inputs[1].inputId);
+    const tex = this.ir(node.inputs[0])! as IRConstantTexture;
+    const coord = this.ir(node.inputs[1])!;
     return this.getOrCreateIRExpression(node, output, IRSampleTexture, tex, coord, node.samplerType);
   }
 }

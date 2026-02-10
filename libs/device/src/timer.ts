@@ -24,25 +24,26 @@ export class CPUTimer implements ITimer {
   private _ended: boolean;
   constructor() {
     this._cpuTimer = window.performance || window.Date;
-    this._cpuTime = null;
+    this._cpuStart = 0;
+    this._cpuTime = 0;
     this._ended = false;
   }
-  now(): number {
+  now() {
     return this._cpuTimer.now();
   }
-  begin(): void {
+  begin() {
     this._cpuStart = this.now();
-    this._cpuTime = null;
+    this._cpuTime = 0;
     this._ended = false;
   }
-  end(): void {
+  end() {
     this._cpuTime = this.now() - this._cpuStart;
     this._ended = true;
   }
-  ended(): boolean {
+  ended() {
     return this._ended;
   }
-  elapsed(): number {
+  elapsed() {
     return this._cpuTime;
   }
 }

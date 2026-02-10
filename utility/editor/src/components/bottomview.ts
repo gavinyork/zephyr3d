@@ -36,6 +36,5 @@ export class BottomView extends Disposable {
   protected onDispose() {
     super.onDispose();
     this._renderer.dispose();
-    this._renderer = null;
   }
 }

@@ -91,6 +91,7 @@ export class Editor {
   };
   private _leakTestA: ReturnType<typeof getGPUObjectStatistics>;
   private _currentProject: ProjectInfo;
+  private _isRemoteProject: boolean;
   private _codeEditor: CodeEditor;
   private _extraLibs: Record<string, Monaco.IDisposable>;
   constructor() {
@@ -98,6 +99,7 @@ export class Editor {
     this._assetImages = { brushes: {}, app: {} };
     this._leakTestA = null;
     this._currentProject = null;
+    this._isRemoteProject = false;
     this._codeEditor = null;
     this._extraLibs = {};
   }
@@ -193,7 +195,7 @@ export class Editor {
     return this._currentProject;
   }
   async saveProject() {
-    if (this._currentProject) {
+    if (this._currentProject && !this._isRemoteProject) {
       ProjectService.saveProject(this._currentProject);
     }
   }
@@ -205,9 +207,9 @@ export class Editor {
       await ProjectService.saveCurrentProjectSettings(settings);
     }
   }
-  async init() {
+  async init(fontSize: number) {
     //await Database.init();
-    await FontGlyph.loadFontGlyphs('zef-16px');
+    await FontGlyph.loadFontGlyphs('zef-16px', fontSize);
     await this.loadAssets();
     initLogView({ maxLines: 8000 });
     eventBus.on('action', this.onAction, this);
@@ -375,7 +377,7 @@ export class Editor {
       this._codeEditor = null;
       this.deleteAllDependences();
       this._currentProject.lastEditScene = lastScenePath ?? '';
-      await ProjectService.saveProject(this._currentProject);
+      await this.saveProject();
       this._moduleManager.activate('');
       await ProjectService.closeCurrentProject();
       this._currentProject = null;
@@ -496,8 +498,8 @@ export class Editor {
       this._moduleManager.activate('Scene', '');
     }
   }
-  async openRemoteProject() {
-    const url = await Dialog.promptName('Open Remote Project', 'Project URL', '', 400);
+  async openRemoteProject(url?: string) {
+    url = url || (await Dialog.promptName('Open Remote Project', 'Project URL', '', 400));
     if (!url) {
       return;
     }
@@ -511,6 +513,7 @@ export class Editor {
     try {
       const project = await ProjectService.openRemoteProject(url, new RemoteProjectDirectoryReader(fileList));
       this._currentProject = project;
+      this._isRemoteProject = true;
       this.loadDepTypes();
       const settings = await ProjectService.getCurrentProjectSettings();
       await this._moduleManager.activate(
@@ -521,12 +524,15 @@ export class Editor {
       loading.close('');
     }
   }
-  async openProject() {
-    const projects = await ProjectService.listProjects();
-    const names = projects.map((project) => project.name);
-    const ids = projects.map((project) => project.uuid);
-    const id = await Dialog.openFromList('Open Project', names, ids, 400, 400);
+  async openProject(id?: string) {
+    if (!id) {
+      const projects = await ProjectService.listProjects();
+      const names = projects.map((project) => project.name);
+      const ids = projects.map((project) => project.uuid);
+      id = await Dialog.openFromList('Open Project', names, ids, 400, 400);
+    }
     if (id) {
+      this._isRemoteProject = false;
       const project = await ProjectService.openProject(id);
       const settings = await ProjectService.getCurrentProjectSettings();
       this._currentProject = project;
@@ -558,6 +564,13 @@ export class Editor {
   }
   async buildProject() {
     const settings = await ProjectService.getCurrentProjectSettings();
+    if (!settings.startupScene && !settings.startupScript) {
+      await DlgMessage.messageBox(
+        'Error',
+        'Please set startup scene or startup script in <Project Settings>'
+      );
+      return;
+    }
     const srcIndexTS = generateIndexTS(settings);
     const srcVFS = new MemoryFS();
     const distVFS = new MemoryFS();

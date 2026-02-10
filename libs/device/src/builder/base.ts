@@ -14,7 +14,7 @@ import {
   ASTAssignment,
   ASTCast
 } from './ast';
-import type { PBTypeInfo } from './types';
+import type { PBTypeInfo, TypeDetailInfo } from './types';
 import {
   PBPrimitiveType,
   PBPrimitiveTypeInfo,
@@ -27,6 +27,7 @@ import { PBASTError } from './errors';
 import type { VertexSemantic } from '../gpuobject';
 import type { ProgramBuilder } from './programbuilder';
 import { getCurrentProgramBuilder } from './misc';
+import type { Nullable } from '@zephyr3d/base';
 
 const constructorCache: Map<ShaderTypeFunc, Record<string | symbol, ShaderTypeFunc>> = new Map();
 
@@ -48,10 +49,14 @@ export type ShaderTypeFunc = {
 };
 
 /** @internal */
-export function makeConstructor<T>(typeFunc: ShaderTypeFunc, elementType: PBTypeInfo<T>): ShaderTypeFunc {
+export function makeConstructor<T extends TypeDetailInfo>(
+  typeFunc: ShaderTypeFunc,
+  elementType: PBTypeInfo<T>
+) {
   const wrappedTypeFunc = new Proxy(typeFunc, {
-    get: function (target, prop) {
+    get: function (target, prop): any {
       if (typeof prop === 'symbol' || prop in target) {
+        // @ts-ignore 7015 */
         return target[prop];
       }
       let entries = constructorCache.get(typeFunc);
@@ -81,7 +86,7 @@ export function makeConstructor<T>(typeFunc: ShaderTypeFunc, elementType: PBType
             const dim = Number(prop);
             if (Number.isInteger(dim) && dim >= 0) {
               const arrayType = new PBArrayTypeInfo(elementType, dim);
-              const arrayTypeFunc = function arrayCtor(this: ProgramBuilder, ...args: any[]): PBShaderExp {
+              const arrayTypeFunc = function arrayCtor(this: ProgramBuilder, ...args: any[]) {
                 if (args.length === 1 && typeof args[0] === 'string') {
                   return new PBShaderExp(args[0], arrayType);
                 } else {
@@ -125,7 +130,7 @@ export abstract class Proxiable<T> {
     }) as Proxiable<T>;
     return this.proxy;
   }
-  get $thisProxy(): T {
+  get $thisProxy() {
     return this.proxy as unknown as T;
   }
   /** @internal */
@@ -158,15 +163,15 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
   /** @internal */
   $ast: ASTExpression;
   /** @internal */
-  $inout: 'out' | 'inout';
+  $inout: Nullable<'out' | 'inout'>;
   /** @internal */
   $memberCache: Record<string, PBShaderExp>;
   /** @internal */
-  $attrib: VertexSemantic;
+  $attrib: Nullable<VertexSemantic>;
   /** @internal */
   $tags: ShaderExpTagValue[];
   /** @internal */
-  $_group: number;
+  $_group: Nullable<number>;
   /** @internal */
   $declareType: DeclareType;
   /** @internal */
@@ -189,6 +194,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$typeinfo = typeInfo;
     this.$qualifier = null;
     this.$precision = ShaderPrecisionType.NONE;
+    this.$sampleType = 'float';
     this.$ast = new ASTPrimitive(this);
     this.$inout = null;
     this.$memberCache = {};
@@ -214,10 +220,10 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
       }
     }
   }
-  get $group(): number {
+  get $group() {
     return this.$_group;
   }
-  set $group(val: number) {
+  set $group(val) {
     this.$_group = val;
   }
   /**
@@ -225,7 +231,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param group - The bind group index
    * @returns self
    */
-  uniform(group: number): PBShaderExp {
+  uniform(group: number) {
     this.$declareType = DeclareType.DECLARE_TYPE_UNIFORM;
     this.$group = group;
     this.$isBuffer = false;
@@ -236,7 +242,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param group - The bind group index
    * @returns self
    */
-  uniformBuffer(group: number, bindingSize = 0): PBShaderExp {
+  uniformBuffer(group: number, bindingSize = 0) {
     if (
       !this.$typeinfo.isPrimitiveType() &&
       !this.$typeinfo.isArrayType() &&
@@ -261,7 +267,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    *
    * @returns self
    */
-  workgroup(): PBShaderExp {
+  workgroup() {
     this.$declareType = DeclareType.DECLARE_TYPE_WORKGROUP;
     return this;
   }
@@ -270,7 +276,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param group - The bind group index
    * @returns self
    */
-  storage(group: number): PBShaderExp {
+  storage(group: number) {
     if (!this.$typeinfo.isHostSharable()) {
       if (this.$typeinfo.isTextureType()) {
         if (!this.$typeinfo.isStorageTexture()) {
@@ -291,7 +297,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param group - The bind group index
    * @returns self
    */
-  storageReadonly(group: number): PBShaderExp {
+  storageReadonly(group: number) {
     this.storage(group);
     this.$readonly = true;
     return this;
@@ -301,7 +307,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param group - The bind group index
    * @returns self
    */
-  storageBuffer(group: number, bindingSize = 0): PBShaderExp {
+  storageBuffer(group: number, bindingSize = 0) {
     if (
       !this.$typeinfo.isPrimitiveType() &&
       !this.$typeinfo.isArrayType() &&
@@ -326,16 +332,16 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param group - The bind group index
    * @returns self
    */
-  storageBufferReadonly(group: number, bindingSize = 0): PBShaderExp {
+  storageBufferReadonly(group: number, bindingSize = 0) {
     this.storageBuffer(group, bindingSize);
     this.$readonly = true;
     return this;
   }
-  inout(): PBShaderExp {
+  inout() {
     this.$inout = 'inout';
     return this;
   }
-  out(): PBShaderExp {
+  out() {
     this.$inout = 'out';
     return this;
   }
@@ -344,7 +350,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param attr - The vertex semantic
    * @returns self
    */
-  attrib(attr: VertexSemantic): PBShaderExp {
+  attrib(attr: VertexSemantic) {
     this.$declareType = DeclareType.DECLARE_TYPE_IN;
     this.$attrib = attr;
     return this;
@@ -354,7 +360,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param args - tags
    * @returns self
    */
-  tag(...args: ShaderExpTagValue[]): PBShaderExp {
+  tag(...args: ShaderExpTagValue[]) {
     args.forEach((val) => {
       if (this.$tags.indexOf(val) < 0) {
         this.$tags.push(val);
@@ -367,7 +373,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param type - sample type
    * @returns self
    */
-  sampleType(type: 'float' | 'unfilterable-float' | 'sint' | 'uint' | 'depth'): PBShaderExp {
+  sampleType(type: 'float' | 'unfilterable-float' | 'sint' | 'uint' | 'depth') {
     if (type) {
       this.$sampleType = type;
     }
@@ -378,7 +384,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param index - index of the element
    * @returns the element variable
    */
-  at(index: number | PBShaderExp): PBShaderExp {
+  at(index: number | PBShaderExp) {
     const varType = this.$ast.getType();
     if (
       !varType.isArrayType() &&
@@ -386,7 +392,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     ) {
       throw new Error('at() function must be used with array types');
     }
-    let elementType: PBTypeInfo = null;
+    let elementType: PBTypeInfo;
     let dimension: number;
     if (varType.isArrayType()) {
       elementType = varType.elementType;
@@ -397,6 +403,8 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     } else if (varType.isMatrixType()) {
       elementType = PBPrimitiveTypeInfo.getCachedTypeInfo(varType.resizeType(1, varType.cols));
       dimension = varType.rows;
+    } else {
+      throw new Error('at() source type is not indexable');
     }
     const result = new PBShaderExp('', elementType);
     if (typeof index === 'number') {
@@ -425,7 +433,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * @param index - index of the element
    * @param val - value to set
    */
-  setAt(index: number | PBShaderExp, val: number | boolean | PBShaderExp): void {
+  setAt(index: number | PBShaderExp, val: number | boolean | PBShaderExp) {
     const varType = this.$ast.getType();
     if (!varType.isArrayType() && !(varType.isPrimitiveType() && varType.isVectorType())) {
       throw new Error('setAt() function must be used with array types');
@@ -439,7 +447,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
         throw new Error('setAt() array index out of bounds');
       }
     }
-    getCurrentProgramBuilder()
+    getCurrentProgramBuilder()!
       .getCurrentScope()
       .$ast.statements.push(
         new ASTAssignment(
@@ -456,7 +464,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * Point out that the variable should be in high precision
    * @returns self
    */
-  highp(): PBShaderExp {
+  highp() {
     this.$precision = ShaderPrecisionType.HIGH;
     return this;
   }
@@ -464,7 +472,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * Points out that the variable should be in medium precision
    * @returns self
    */
-  mediump(): PBShaderExp {
+  mediump() {
     this.$precision = ShaderPrecisionType.MEDIUM;
     return this;
   }
@@ -472,7 +480,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * Points out that the variable should be in low precision
    * @returns self
    */
-  lowp(): PBShaderExp {
+  lowp() {
     this.$precision = ShaderPrecisionType.LOW;
     return this;
   }
@@ -480,14 +488,14 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * Whether this is a constructor
    * @returns true if this is a constructor
    */
-  isConstructor(): boolean {
+  isConstructor() {
     return this.$ast instanceof ASTShaderExpConstructor && this.$ast.args.length === 0;
   }
   /**
    * Determine if this variable is of vector type
    * @returns true if the variable is of vector type, otherwise false
    */
-  isVector(): boolean {
+  isVector() {
     const varType = this.$ast.getType();
     return varType.isPrimitiveType() && varType.isVectorType();
   }
@@ -495,7 +503,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * Get vector component count of the variable if this variable is of vector type
    * @returns the vector component count
    */
-  numComponents(): number {
+  numComponents() {
     const varType = this.$ast.getType();
     return varType.isPrimitiveType() ? varType.cols : 0;
   }
@@ -503,11 +511,11 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    * Get type name of this variable
    * @returns The type name of this variable
    */
-  getTypeName(): string {
-    return this.$ast.getType().toTypeName(getCurrentProgramBuilder().getDevice().type);
+  getTypeName() {
+    return this.$ast.getType().toTypeName(getCurrentProgramBuilder()!.getDevice().type);
   }
   /** @internal */
-  protected $get(prop: string): any {
+  protected $get(prop: string) {
     if (typeof prop === 'string') {
       if (prop[0] === '$' || prop in this) {
         return this[prop];
@@ -524,7 +532,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
               }
               const element = varType.structMembers[elementIndex];
               if (element.type.isStructType()) {
-                const ctor = getCurrentProgramBuilder().structInfo.structs[element.type.structName];
+                const ctor = getCurrentProgramBuilder()!.structInfo.structs[element.type.structName!];
                 exp = ctor.call(getCurrentProgramBuilder(), `${this.$str}.${prop}`);
               } else {
                 exp = new PBShaderExp(`${this.$str}.${prop}`, element.type);
@@ -534,7 +542,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
               if (!varType.isPrimitiveType() || (!varType.isVectorType() && !varType.isScalarType())) {
                 throw new Error(
                   `invalid index operation: ${this.$ast.toString(
-                    getCurrentProgramBuilder().getDevice().type
+                    getCurrentProgramBuilder()!.getDevice().type
                   )}[${prop}]`
                 );
               }
@@ -546,7 +554,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
               ) {
                 throw new Error(
                   `unknown swizzle target: ${this.$ast.toString(
-                    getCurrentProgramBuilder().getDevice().type
+                    getCurrentProgramBuilder()!.getDevice().type
                   )}[${prop}]`
                 );
               }
@@ -583,7 +591,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     }
   }
   /** @internal */
-  protected $set(prop: string, value: any): boolean {
+  protected $set(prop: string, value: any) {
     if (typeof prop === 'string') {
       if (prop[0] === '$' || prop in this) {
         this[prop] = value;
@@ -600,7 +608,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
               throw new Error(`unknown struct member '${prop}`);
             }
             const element = varType.structMembers[elementIndex];
-            let dstAST: ASTExpression;
+            let dstAST: Nullable<ASTExpression> = null;
             if (typeof value === 'number' || typeof value === 'boolean') {
               if (!element.type.isPrimitiveType() || !element.type.isScalarType()) {
                 throw new Error(`can not set struct member '${prop}: invalid value type`);
@@ -612,7 +620,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
             if (!dstAST) {
               throw new Error(`can not set struct member '${prop}: invalid value type`);
             }
-            getCurrentProgramBuilder()
+            getCurrentProgramBuilder()!
               .getCurrentScope()
               .$ast.statements.push(
                 new ASTAssignment(
@@ -629,7 +637,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
               throw new Error(`invalid index operation: ${this.$str}[${num}]`);
             }
             const type = PBPrimitiveTypeInfo.getCachedTypeInfo(varType.scalarType);
-            getCurrentProgramBuilder()
+            getCurrentProgramBuilder()!
               .getCurrentScope()
               .$ast.statements.push(
                 new ASTAssignment(
@@ -651,7 +659,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
               throw new Error(`invalid matrix column vector assignment: ${this.$str}[${num}]`);
             }
             const type = PBPrimitiveTypeInfo.getCachedTypeInfo(varType.resizeType(1, varType.cols));
-            getCurrentProgramBuilder()
+            getCurrentProgramBuilder()!
               .getCurrentScope()
               .$ast.statements.push(
                 new ASTAssignment(

@@ -2,7 +2,7 @@ import type { BaseTexture, SamplerOptions } from '@zephyr3d/device';
 import type { AssetManager } from '../assetmanager';
 import type { SharedModel } from '../model';
 import type { DecoderModule } from 'draco3d';
-import type { TypedArray, VFS } from '@zephyr3d/base';
+import type { Nullable, TypedArray, VFS } from '@zephyr3d/base';
 
 /**
  * Base interface for any kind loaders
@@ -10,7 +10,7 @@ import type { TypedArray, VFS } from '@zephyr3d/base';
  */
 export class LoaderBase {
   /** @internal */
-  protected _urlResolver: (url: string) => string;
+  protected _urlResolver: Nullable<(url: string) => string>;
   /**
    * Creates an instance of LoaderBase
    */
@@ -20,10 +20,10 @@ export class LoaderBase {
   /**
    * URL resolver for the loader
    */
-  get urlResolver(): (url: string) => string {
+  get urlResolver() {
     return this._urlResolver;
   }
-  set urlResolver(resolver: (url: string) => string) {
+  set urlResolver(resolver) {
     this._urlResolver = resolver;
   }
   /**
@@ -33,14 +33,10 @@ export class LoaderBase {
    * @param crossOrigin - crossOrigin property for the request
    * @returns Response of the request
    */
-  async request(
-    url: string,
-    headers: Record<string, string> = {},
-    crossOrigin = 'anonymous'
-  ): Promise<Response> {
-    url = this._urlResolver ? this._urlResolver(url) : null;
-    return url
-      ? fetch(url, {
+  async request(url: string, headers: Record<string, string> = {}, crossOrigin = 'anonymous') {
+    const s = this._urlResolver ? this._urlResolver(url) : null;
+    return s
+      ? fetch(s, {
           credentials: crossOrigin === 'anonymous' ? 'same-origin' : 'include',
           headers: headers
         })
@@ -74,8 +70,8 @@ export abstract class AbstractTextureLoader extends LoaderBase {
     data: ArrayBuffer | TypedArray,
     srgb: boolean,
     samplerOptions?: SamplerOptions,
-    texture?: BaseTexture
-  ): Promise<BaseTexture>;
+    texture?: Nullable<BaseTexture>
+  ): Promise<Nullable<BaseTexture>>;
 }
 
 /**
@@ -104,5 +100,5 @@ export abstract class AbstractModelLoader extends LoaderBase {
     data: Blob,
     dracoDecoderModule?: DecoderModule,
     VFSs?: VFS[]
-  ): Promise<SharedModel>;
+  ): Promise<Nullable<SharedModel>>;
 }

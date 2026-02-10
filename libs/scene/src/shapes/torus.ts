@@ -1,7 +1,6 @@
 import type { AABB, Clonable } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
-import type { PrimitiveType } from '@zephyr3d/device';
 
 /**
  * Creation options for torus shape
@@ -58,12 +57,12 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
   constructor(options?: TorusCreationOptions) {
     super(options);
   }
-  clone(): TorusShape {
-    return new TorusShape(this._options);
+  clone() {
+    return new TorusShape(this._options) as this;
   }
   /** type of the shape */
-  get type(): string {
-    return 'Torus';
+  get type() {
+    return 'Torus' as const;
   }
   /**
    * Generates the data for the torus shape
@@ -73,7 +72,7 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
    * @param indices - vertex indices
    */
   static generateData(
-    options: TorusCreationOptions,
+    opt: TorusCreationOptions,
     vertices: number[],
     normals: number[],
     tangents: number[],
@@ -82,8 +81,8 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
     bbox?: AABB,
     indexOffset?: number,
     vertexCallback?: (index: number, x: number, y: number, z: number) => void
-  ): PrimitiveType {
-    options = Object.assign({}, this._defaultOptions, options ?? {});
+  ) {
+    const options = Object.assign({}, this._defaultOptions, opt ?? {});
     indexOffset = indexOffset ?? 0;
     const start = vertices.length;
     const N = options.numSlices;
@@ -149,6 +148,6 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
         vertexCallback?.((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
       }
     }
-    return 'triangle-list';
+    return 'triangle-list' as const;
   }
 }

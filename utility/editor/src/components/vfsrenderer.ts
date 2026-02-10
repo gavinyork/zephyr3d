@@ -1,4 +1,4 @@
-import type { FileMetadata, VFS } from '@zephyr3d/base';
+import type { FileMetadata, GenericConstructor, VFS } from '@zephyr3d/base';
 import UPNG from 'upng-js';
 import { DataTransferVFS, Disposable, guessMimeType, makeObservable, PathUtils } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
@@ -18,7 +18,8 @@ import { DlgImport } from '../views/dlg/importdlg';
 import { ListView, ListViewData } from './listview';
 import { ResourceService } from '../core/services/resource';
 import { DlgSaveFile } from '../views/dlg/savefiledlg';
-import { getEngine } from '@zephyr3d/scene';
+import type { MeshMaterial } from '@zephyr3d/scene';
+import { getEngine, PBRBluePrintMaterial, SpriteBlueprintMaterial } from '@zephyr3d/scene';
 import { exportFile, exportMultipleFilesAsZip } from '../helpers/downloader';
 
 export type FileInfo = {
@@ -228,14 +229,27 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
             });
           }
           ImGui.Separator();
-          if (ImGui.MenuItem('Material...')) {
-            this.renderer.createNewFile('Create Material', 'Material Name', (path) => {
-              if (!path.toLowerCase().endsWith('.zmtl')) {
-                path = `${path}.zmtl`;
+          if (ImGui.BeginMenu('Material')) {
+            const materialTypes: Map<GenericConstructor<MeshMaterial>, string> = new Map<
+              GenericConstructor<MeshMaterial>,
+              string
+            >([
+              [PBRBluePrintMaterial, 'PBR Material'],
+              [SpriteBlueprintMaterial, 'Sprite Material']
+            ]);
+            for (const entry of materialTypes) {
+              const title = entry[1];
+              if (ImGui.MenuItem(`${title}...`)) {
+                this.renderer.createNewFile(`Create ${title}`, 'Material Name', (path) => {
+                  if (!path.toLowerCase().endsWith('.zmtl')) {
+                    path = `${path}.zmtl`;
+                  }
+                  const name = path.slice(0, -5);
+                  eventBus.dispatchEvent('edit_material', name, name, entry[0], path);
+                });
               }
-              const name = path.slice(0, -5);
-              eventBus.dispatchEvent('edit_material', name, name, path);
-            });
+            }
+            ImGui.EndMenu();
           }
           ImGui.Separator();
           if (ImGui.MenuItem('Material function...')) {
@@ -755,8 +769,11 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         // open scene
         eventBus.dispatchEvent('action', 'OPEN_DOC', file.meta.path);
       } else if (file.meta.path.toLowerCase().endsWith('.zmtl')) {
-        const name = this._vfs.basename(file.meta.path).slice(0, -5);
-        eventBus.dispatchEvent('edit_material', name, name, file.meta.path);
+        let name = this._vfs.basename(file.meta.path).slice(0, -5);
+        if (this._vfs.isParentOf('/assets/@builtins', file.meta.path)) {
+          name = `${name} (read-only)`;
+        }
+        eventBus.dispatchEvent('edit_material', name, name, null, file.meta.path);
       } else if (file.meta.path.toLowerCase().endsWith('.zmf')) {
         eventBus.dispatchEvent('edit_material_function', file.meta.path);
       } else {
@@ -1159,48 +1176,42 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       return null;
     }
 
-    const dirExists = await this._vfs.exists(path);
-    if (!dirExists) {
-      return null;
-    }
+    try {
+      const info: DirectoryInfo = {
+        files: [],
+        subDir: [],
+        parent: null,
+        open: false,
+        path
+      };
 
-    const stats = await this._vfs.stat(path);
-    if (!stats) {
-      return null;
-    }
+      const content: FileMetadata[] =
+        this._fileFilter?.length > 0
+          ? await this._vfs.glob(this._fileFilter, { cwd: path, recursive: false, includeDirs: true })
+          : await this._vfs.readDirectory(path, {
+              includeHidden: true,
+              recursive: false
+            });
 
-    const info: DirectoryInfo = {
-      files: [],
-      subDir: [],
-      parent: null,
-      open: false,
-      path
-    };
-
-    const content: FileMetadata[] =
-      this._fileFilter?.length > 0
-        ? await this._vfs.glob(this._fileFilter, { cwd: path, recursive: false, includeDirs: true })
-        : await this._vfs.readDirectory(path, {
-            includeHidden: true,
-            recursive: false
+      for (const entry of content) {
+        if (entry.type === 'directory') {
+          const dirInfo = await this.loadDirectoryInfo(entry.path);
+          if (dirInfo) {
+            info.subDir.push(dirInfo);
+            dirInfo.parent = info;
+          }
+        } else if (entry.type === 'file') {
+          info.files.push({
+            meta: entry,
+            parent: info
           });
-
-    for (const entry of content) {
-      if (entry.type === 'directory') {
-        const dirInfo = await this.loadDirectoryInfo(entry.path);
-        if (dirInfo) {
-          info.subDir.push(dirInfo);
-          dirInfo.parent = info;
         }
-      } else if (entry.type === 'file') {
-        info.files.push({
-          meta: entry,
-          parent: info
-        });
       }
-    }
 
-    return info;
+      return info;
+    } catch {
+      return null;
+    }
   }
 
   async handleDragEvent(ev: DragEvent) {

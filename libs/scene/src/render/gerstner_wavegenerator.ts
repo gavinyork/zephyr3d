@@ -40,7 +40,7 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
   setRaw(data: Float32Array, index: number) {
     this._waveParams.set(data, index * 8);
   }
-  clone(): this {
+  clone() {
     const other = new GerstnerWaveGenerator();
     other.numWaves = this.numWaves;
     other._waveParams.set(this._waveParams);
@@ -50,10 +50,10 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
     return this._version;
   }
   /** Gets the number of waves. */
-  get numWaves(): number {
+  get numWaves() {
     return this._numWaves;
   }
-  set numWaves(val: number) {
+  set numWaves(val) {
     if (!Number.isInteger(val) || val <= 0 || val > MAX_GERSTNER_WAVE_COUNT) {
       console.error(`Invalid wave number: ${val}`);
       return;
@@ -100,7 +100,7 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
    * @param waveIndex - index of the wave to get.
    * @returns Angle of the wave direction in radians.
    */
-  getWaveDirection(waveIndex: number): number {
+  getWaveDirection(waveIndex: number) {
     return waveIndex < MAX_GERSTNER_WAVE_COUNT ? this._waveParams[waveIndex * 8 + 0] : 0;
   }
   /**
@@ -119,7 +119,7 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
    * @param waveIndex - index of the wave to set.
    * @returns Steepness of the wave.
    */
-  getWaveSteepness(waveIndex: number): number {
+  getWaveSteepness(waveIndex: number) {
     return waveIndex < MAX_GERSTNER_WAVE_COUNT ? this._waveParams[waveIndex * 8 + 1] : 0;
   }
   /**
@@ -165,7 +165,7 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
    * @param waveIndex - index of the wave to set.
    * @returns true if the wave is an omni-directional wave, false otherwise.
    */
-  isOmniWave(waveIndex: number): boolean {
+  isOmniWave(waveIndex: number) {
     return waveIndex < MAX_GERSTNER_WAVE_COUNT ? this._waveParams[waveIndex * 8 + 7] !== 0 : false;
   }
   /**
@@ -213,7 +213,7 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
     GerstnerWaveGenerator.randomWaveData(this._waveParams, i * 8);
   }
   /** {@inheritDoc WaveGenerator.update} */
-  update(): void {}
+  update() {}
   /** {@inheritDoc WaveGenerator.needUpdate} */
   needUpdate() {
     return false;
@@ -231,7 +231,7 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
     outAABB.maxPoint.setXYZ(maxX, y + maxHeight, maxZ);
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormal} */
-  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
+  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp) {
     const pb = scope.$builder;
     const that = this;
     pb.func('calcFragmentNormal', [pb.vec2('xz')], function () {
@@ -241,14 +241,14 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
       that.calcNormalAndPos(this, this.inPos, this.outPos, this.outNormal);
       this.$return(this.outNormal);
     });
-    return scope.calcFragmentNormal(xz);
+    return scope.calcFragmentNormal(xz) as PBShaderExp;
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormalAndFoam} */
-  calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
+  calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp) {
     return scope.$builder.vec4(this.calcFragmentNormal(scope, xz), 0);
   }
   /** {@inheritDoc WaveGenerator.setupUniforms} */
-  setupUniforms(scope: PBGlobalScope, uniformGroup: number): void {
+  setupUniforms(scope: PBGlobalScope, uniformGroup: number) {
     const pb = scope.$builder;
     scope.numWaves = pb.float().uniform(uniformGroup);
     scope.waveParams = pb.vec4[MAX_GERSTNER_WAVE_COUNT * 2]().uniform(uniformGroup);
@@ -260,7 +260,7 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
     omniParam: PBShaderExp,
     inPos: PBShaderExp,
     outNormal: PBShaderExp
-  ): PBShaderExp {
+  ) {
     const pb = scope.$builder;
     pb.func(
       'gerstnerWave',
@@ -297,7 +297,7 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
         this.$return(pb.mul(this.wave, pb.clamp(pb.mul(this.amplitude, 10000), 0, 1)));
       }
     );
-    return scope.gerstnerWave(waveParam, omniParam, inPos, outNormal);
+    return scope.gerstnerWave(waveParam, omniParam, inPos, outNormal) as PBShaderExp;
   }
   /** @internal */
   private calcNormalAndPos(
@@ -346,20 +346,20 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
     inPos: PBShaderExp,
     outPos: PBShaderExp,
     outNormal: PBShaderExp
-  ): void {
+  ) {
     this.calcNormalAndPos(scope, inPos, outPos, outNormal);
   }
   /** {@inheritDoc WaveGenerator.applyWaterBindGroup} */
-  applyWaterBindGroup(bindGroup: BindGroup): void {
+  applyWaterBindGroup(bindGroup: BindGroup) {
     bindGroup.setValue('numWaves', this._numWaves);
     bindGroup.setValue('waveParams', this._waveParams);
   }
   /** {@inheritDoc WaveGenerator.isOk} */
-  isOk(): boolean {
+  isOk() {
     return true;
   }
   /** {@inheritDoc WaveGenerator.getHash} */
-  getHash(): string {
+  getHash() {
     return 'GerstnerWaveGenerator';
   }
 }

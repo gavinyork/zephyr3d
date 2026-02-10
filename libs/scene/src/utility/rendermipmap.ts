@@ -25,8 +25,8 @@ export abstract class RenderMipmap {
     rightBottom: PBShaderExp,
     uv: PBShaderExp
   ): PBShaderExp;
-  setupUniforms(_scope: PBGlobalScope): void {}
-  applyUniformValues(_bindGroup: BindGroup): void {}
+  setupUniforms(_scope: PBGlobalScope) {}
+  applyUniformValues(_bindGroup: BindGroup) {}
   constructor() {
     this._program = new DRef();
     this._bindGroup = new DRef();
@@ -42,7 +42,7 @@ export abstract class RenderMipmap {
         this.renderLevel(device, i, srcTex, srcTex);
       }
     } else {
-      const tmpTexture = device.createTexture2D(srcTex.format, srcTex.width, srcTex.height);
+      const tmpTexture = device.createTexture2D(srcTex.format, srcTex.width, srcTex.height)!;
       const tmpFramebuffer = device.createFrameBuffer([tmpTexture], null);
       const dstTex = tmpFramebuffer.getColorAttachments()[0] as Texture2D;
       for (let i = 0; i < srcTex.mipLevelCount - 1; i++) {
@@ -58,11 +58,11 @@ export abstract class RenderMipmap {
     miplevel: number,
     srcTexture: Texture2D,
     dstTexture: Texture2D
-  ): void {
+  ) {
     const sampler = fetchSampler('clamp_nearest');
     const framebuffer = device.createFrameBuffer([dstTexture], null);
     framebuffer.setColorAttachmentMipLevel(0, miplevel + 1);
-    const bindGroup = this._bindGroup.get();
+    const bindGroup = this._bindGroup.get()!;
     framebuffer.setColorAttachmentGenerateMipmaps(0, false);
     this._srcSize[0] = Math.max(srcTexture.width >> miplevel, 1);
     this._srcSize[1] = Math.max(srcTexture.height >> miplevel, 1);
@@ -78,7 +78,7 @@ export abstract class RenderMipmap {
     }
     this.applyUniformValues(bindGroup);
     device.setProgram(this._program.get());
-    device.setBindGroup(0, this._bindGroup.get());
+    device.setBindGroup(0, this._bindGroup.get()!);
     device.setFramebuffer(framebuffer);
     drawFullscreenQuad();
     if (srcTexture !== dstTexture) {
@@ -138,7 +138,7 @@ export abstract class RenderMipmap {
             this.$outputs.color = that.renderPixel(this, this.d0, this.d1, this.d2, this.d3, this.uv);
           });
         }
-      });
+      })!;
       program.name = '@RenderMipmap';
       this._program.set(program);
       this._bindGroup.set(device.createBindGroup(program.bindGroupLayouts[0]));

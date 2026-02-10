@@ -9,7 +9,7 @@ import type { SceneNode } from '../scene';
  */
 export class NodeRotationTrack extends AnimationTrack<Quaternion> {
   private readonly _state: Quaternion;
-  private _interpolator: Interpolator;
+  private _interpolator!: Interpolator;
   /**
    * Create an instance of RotationTrack
    */
@@ -34,7 +34,6 @@ export class NodeRotationTrack extends AnimationTrack<Quaternion> {
   ) {
     if (modeOrInterpolator === undefined) {
       super(false);
-      this._interpolator = null;
     } else if (modeOrInterpolator instanceof Interpolator) {
       if (modeOrInterpolator.target !== 'quat') {
         throw new Error(`RotationTrack(): interpolator target must be 'quat'`);
@@ -66,7 +65,7 @@ export class NodeRotationTrack extends AnimationTrack<Quaternion> {
     this._interpolator = interp ?? null;
   }
   /** {@inheritDoc AnimationTrack.calculateState} */
-  calculateState(target: object, currentTime: number): Quaternion {
+  calculateState(target: object, currentTime: number) {
     this._interpolator.interpolate(currentTime, this._state);
     return this._state;
   }
@@ -75,15 +74,15 @@ export class NodeRotationTrack extends AnimationTrack<Quaternion> {
     node.rotation.set(state);
   }
   /** {@inheritDoc AnimationTrack.mixState} */
-  mixState(a: Quaternion, b: Quaternion, t: number): Quaternion {
+  mixState(a: Quaternion, b: Quaternion, t: number) {
     return Quaternion.slerp(a, b, t);
   }
   /** {@inheritDoc AnimationTrack.getBlendId} */
-  getBlendId(): unknown {
+  getBlendId() {
     return 'node-rotation';
   }
   /** {@inheritDoc AnimationTrack.getDuration} */
-  getDuration(): number {
+  getDuration() {
     return this._interpolator.maxTime;
   }
 }

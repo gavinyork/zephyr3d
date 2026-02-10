@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type {
   Texture2D,
@@ -10,12 +11,12 @@ import type {
 import { gammaToLinear } from '../shaders/misc';
 import { getDevice } from '../app/api';
 
-let vertexLayout: VertexLayout = null;
-let renderStates: RenderStateSet = null;
-let panoramaToCubemapProgram: GPUProgram = null;
-let panoramaToCubemapBindGroup: BindGroup = null;
-let panoramaToCubemapProgramRGBM: GPUProgram = null;
-let panoramaToCubemapBindGroupRGBM: BindGroup = null;
+let vertexLayout: Nullable<VertexLayout> = null;
+let renderStates: Nullable<RenderStateSet> = null;
+let panoramaToCubemapProgram: Nullable<GPUProgram> = null;
+let panoramaToCubemapBindGroup: Nullable<BindGroup> = null;
+let panoramaToCubemapProgramRGBM: Nullable<GPUProgram> = null;
+let panoramaToCubemapBindGroupRGBM: Nullable<BindGroup> = null;
 const faceDirections = [
   [new Vector3(0, 0, -1), new Vector3(0, -1, 0), new Vector3(1, 0, 0)],
   [new Vector3(0, 0, 1), new Vector3(0, -1, 0), new Vector3(-1, 0, 0)],
@@ -32,7 +33,7 @@ function init() {
   vertexLayout = device.createVertexLayout({
     vertexBuffers: [
       {
-        buffer: device.createVertexBuffer('position_f32x2', vertices)
+        buffer: device.createVertexBuffer('position_f32x2', vertices)!
       }
     ],
     indexBuffer: device.createIndexBuffer(indices)
@@ -46,7 +47,7 @@ function init() {
   panoramaToCubemapBindGroupRGBM = device.createBindGroup(panoramaToCubemapProgramRGBM.bindGroupLayouts[0]);
 }
 
-function createPanoramaToCubemapProgram(rgbm: boolean): GPUProgram {
+function createPanoramaToCubemapProgram(rgbm: boolean) {
   const device = getDevice();
   const pb = device;
   const program = pb.buildRenderProgram({
@@ -86,7 +87,7 @@ function createPanoramaToCubemapProgram(rgbm: boolean): GPUProgram {
         }
       });
     }
-  });
+  })!;
   program.name = rgbm ? '@PanoramaToCubemap_RGBM' : '@PanoramaToCubemap';
   return program;
 }
@@ -94,8 +95,8 @@ function createPanoramaToCubemapProgram(rgbm: boolean): GPUProgram {
 function doConvertPanoramaToCubemap(srcTexture: Texture2D, dstTexture: TextureCube) {
   const device = getDevice();
   const rgbm = srcTexture.format === 'rgba8unorm';
-  const program = rgbm ? panoramaToCubemapProgramRGBM : panoramaToCubemapProgram;
-  const bindgroup = rgbm ? panoramaToCubemapBindGroupRGBM : panoramaToCubemapBindGroup;
+  const program = rgbm ? panoramaToCubemapProgramRGBM! : panoramaToCubemapProgram!;
+  const bindgroup = rgbm ? panoramaToCubemapBindGroupRGBM! : panoramaToCubemapBindGroup!;
   const framebuffer = device.createFrameBuffer([dstTexture], null);
   device.pushDeviceStates();
   device.setFramebuffer(framebuffer);
@@ -123,7 +124,7 @@ function doConvertPanoramaToCubemap(srcTexture: Texture2D, dstTexture: TextureCu
  *
  * @public
  */
-export function panoramaToCubemap(tex: Texture2D, outputCubeMap: TextureCube): void {
+export function panoramaToCubemap(tex: Texture2D, outputCubeMap: TextureCube) {
   const device = getDevice();
   if (!vertexLayout) {
     init();

@@ -6,7 +6,7 @@ import { add, complex, eix, mult, scale } from './complex';
  * @param signal Signal to transform into fourier complex coefficients
  * @return Fourier coefficients
  */
-export const dft = (signal: Complex[]): Complex[] => {
+export const dft = (signal: Complex[]) => {
   const n = signal.length;
   const fhat = new Array<Complex>(n);
   const coeff = (-2 * Math.PI) / n;
@@ -24,7 +24,7 @@ export const dft = (signal: Complex[]): Complex[] => {
  * @param fourier Fourier coefficients to restore signal from
  * @return Sourse signal as complex samples (Actualy signal will be stored in real part of samples)
  */
-export const idft = (fourier: Complex[]): Complex[] => {
+export const idft = (fourier: Complex[]) => {
   const n = fourier.length;
   const fhat = new Array<Complex>(n);
   const coeff = (2 * Math.PI) / n;
@@ -43,7 +43,7 @@ export const idft = (fourier: Complex[]): Complex[] => {
  * @param signal Signal to transform into fourier complex coefficients. Should be power of 2
  * @return Fourier coefficients
  */
-export const fft = (signal: Complex[]): Complex[] => {
+export const fft = (signal: Complex[]) => {
   if (signal.length <= 2) {
     return dft(signal);
   } else {
@@ -75,7 +75,7 @@ export const fft = (signal: Complex[]): Complex[] => {
  * @param fourier Fourier coefficients to restore signal from
  * @return Sourse signal as complex samples (Actualy signal will be stored in real part of samples)
  */
-export const ifft = (fourier: Complex[]): Complex[] => {
+export const ifft = (fourier: Complex[]) => {
   if (fourier.length <= 2) {
     return idft(fourier);
   } else {

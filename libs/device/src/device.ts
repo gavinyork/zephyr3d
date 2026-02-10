@@ -1,3 +1,4 @@
+import type { Immutable, Nullable } from '@zephyr3d/base';
 import { type Vector4, type TypedArray, type IEventTarget, Observable } from '@zephyr3d/base';
 import type { ITimer } from './timer';
 import { CPUTimer } from './timer';
@@ -68,26 +69,156 @@ import { Pool } from './pool';
  */
 export interface DeviceBackend {
   typeName(): string;
-  supported(): boolean;
-  createDevice(cvs: HTMLCanvasElement, options?: DeviceOptions): Promise<AbstractDevice>;
+  supported(): Promise<boolean>;
+  createDevice(cvs: HTMLCanvasElement, options?: DeviceOptions): Promise<Nullable<AbstractDevice>>;
 }
 
 type DeviceState = {
-  framebuffer: FrameBuffer;
+  framebuffer: Nullable<FrameBuffer>;
   windowOrderReversed: boolean;
   viewport: DeviceViewport;
   scissor: DeviceViewport;
-  renderStateSet: RenderStateSet;
-  program: GPUProgram;
-  vertexLayout: VertexLayout;
-  bindGroups: [BindGroup, Iterable<number>][];
+  renderStateSet: Nullable<RenderStateSet>;
+  program: Nullable<GPUProgram>;
+  vertexLayout: Nullable<VertexLayout>;
+  bindGroups: [BindGroup, Nullable<Iterable<number>>][];
 };
+
+type ResizeCallback = (
+  cssWidth: number,
+  cssHeight: number,
+  deviceWidth: number,
+  deviceHeight: number
+) => void;
+
+class ResizeHandler {
+  private readonly _canvas: HTMLCanvasElement;
+  private readonly _dpr: number;
+  private _cssWidth: number;
+  private _cssHeight: number;
+  private _deviceWidth: number;
+  private _deviceHeight: number;
+
+  private _resizeObserver!: ResizeObserver;
+  private _mutationObserver!: MutationObserver;
+  private _onResizeCallback: ResizeCallback;
+
+  constructor(canvas: HTMLCanvasElement, onResize: ResizeCallback, dpr: number) {
+    this._canvas = canvas;
+    this._dpr = dpr;
+    this._cssWidth = 0;
+    this._cssHeight = 0;
+    this._deviceWidth = 0;
+    this._deviceHeight = 0;
+    this._onResizeCallback = onResize;
+  }
+
+  init() {
+    const canvas = this._canvas;
+    if (window.ResizeObserver) {
+      this._resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        this._handleResizeEntry(entry);
+      });
+      try {
+        (this._resizeObserver as any).observe(canvas, { box: 'device-pixel-content-box' });
+      } catch {
+        this._resizeObserver.observe(canvas);
+      }
+    } else {
+      if (window.MutationObserver) {
+        this._mutationObserver = new MutationObserver((mutations) => {
+          if (mutations.length > 0) {
+            this._handleLegacyResize();
+          }
+        });
+        this._mutationObserver.observe(canvas, { attributes: true, attributeFilter: ['style'] });
+      }
+      window.addEventListener('resize', this._handleLegacyResize);
+      this._handleLegacyResize();
+    }
+  }
+
+  private _handleResizeEntry(_entry: ResizeObserverEntry) {
+    // CSS pixel
+    const cssWidth = this._canvas.clientWidth;
+    const cssHeight = this._canvas.clientHeight;
+
+    // Device pixel
+    /*
+    let deviceWidth: number;
+    let deviceHeight: number;
+
+    const dpBox = (entry as any).devicePixelContentBoxSize?.[0];
+    if (dpBox) {
+      deviceWidth = dpBox.inlineSize;
+      deviceHeight = dpBox.blockSize;
+    } else {
+      deviceWidth = Math.round(cssWidth * this._dpr);
+      deviceHeight = Math.round(cssHeight * this._dpr);
+    }
+    */
+    const deviceWidth = cssWidth * this._dpr;
+    const deviceHeight = cssHeight * this._dpr;
+
+    if (
+      cssWidth === this._cssWidth &&
+      cssHeight === this._cssHeight &&
+      deviceWidth === this._deviceWidth &&
+      deviceHeight === this._deviceHeight
+    ) {
+      return;
+    }
+
+    this._cssWidth = cssWidth;
+    this._cssHeight = cssHeight;
+    this._deviceWidth = deviceWidth;
+    this._deviceHeight = deviceHeight;
+
+    this._onResizeCallback(cssWidth, cssHeight, deviceWidth, deviceHeight);
+  }
+
+  private _handleLegacyResize = () => {
+    const cssWidth = this._canvas.clientWidth;
+    const cssHeight = this._canvas.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    const deviceWidth = Math.round(cssWidth * dpr);
+    const deviceHeight = Math.round(cssHeight * dpr);
+
+    if (
+      cssWidth === this._cssWidth &&
+      cssHeight === this._cssHeight &&
+      deviceWidth === this._deviceWidth &&
+      deviceHeight === this._deviceHeight
+    ) {
+      return;
+    }
+
+    this._cssWidth = cssWidth;
+    this._cssHeight = cssHeight;
+    this._deviceWidth = deviceWidth;
+    this._deviceHeight = deviceHeight;
+
+    this._onResizeCallback(cssWidth, cssHeight, deviceWidth, deviceHeight);
+  };
+
+  public dispose() {
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+    }
+    if (this._mutationObserver) {
+      this._mutationObserver.disconnect();
+    }
+    window.removeEventListener('resize', this._handleLegacyResize);
+  }
+}
 
 /**
  * Base class for rendering device
  * @public
  */
 export abstract class BaseDevice extends Observable<DeviceEventMap> {
+  protected _dpr: number;
   protected _canvas: HTMLCanvasElement;
   protected _canvasClientWidth: number;
   protected _canvasClientHeight: number;
@@ -98,10 +229,10 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   protected _endFrameTime: number;
   protected _frameInfo: FrameInfo;
   protected _cpuTimer: CPUTimer;
-  protected _gpuTimer: ITimer;
-  protected _runningLoop: number;
+  protected _gpuTimer: Nullable<ITimer>;
+  protected _runningLoop: Nullable<number>;
   protected _fpsCounter: { time: number; frame: number };
-  protected _runLoopFunc: (device: AbstractDevice) => void;
+  protected _runLoopFunc: Nullable<(device: AbstractDevice) => void>;
   protected _backend: DeviceBackend;
   protected _beginFrameCounter: number;
   protected _programBuilder: ProgramBuilder;
@@ -109,9 +240,11 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   protected _defaultPoolKey: symbol;
   protected _temporalFramebuffer: boolean;
   protected _vSync: boolean;
+  private readonly _resizer: ResizeHandler;
   private readonly _stateStack: DeviceState[];
-  constructor(cvs: HTMLCanvasElement, backend: DeviceBackend) {
+  constructor(cvs: HTMLCanvasElement, backend: DeviceBackend, dpr?: number) {
     super();
+    this._dpr = dpr ?? window.devicePixelRatio ?? 1;
     this._backend = backend;
     this._gpuObjectList = {
       textures: [],
@@ -157,20 +290,36 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._temporalFramebuffer = false;
     this._temporalFramebuffer = false;
     this._vSync = true;
-    this._registerEventHandlers();
+    //this._registerEventHandlers();
+    this._resizer = new ResizeHandler(
+      this._canvas,
+      (cssWidth, cssHeight, deviceWidth, deviceHeight) => {
+        this.dispatchEvent('resize', cssWidth, cssHeight, deviceWidth, deviceHeight);
+      },
+      this._dpr
+    );
+  }
+  getScaleX() {
+    return this._canvas.width / this._canvas.clientWidth;
+  }
+  getScaleY() {
+    return this._canvas.height / this._canvas.clientHeight;
   }
   abstract getAdapterInfo(): any;
   abstract getFrameBufferSampleCount(): number;
   abstract isContextLost(): boolean;
-  abstract getScale(): number;
   abstract getDrawingBufferWidth(): number;
   abstract getDrawingBufferHeight(): number;
   abstract getBackBufferWidth(): number;
   abstract getBackBufferHeight(): number;
-  abstract getDeviceCaps(): DeviceCaps;
+  abstract getDeviceCaps(): Immutable<DeviceCaps>;
   abstract initContext(): Promise<void>;
-  abstract clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number);
-  abstract createGPUTimer(): ITimer;
+  abstract clearFrameBuffer(
+    clearColor: Nullable<Vector4>,
+    clearDepth: Nullable<number>,
+    clearStencil: Nullable<number>
+  ): void;
+  abstract createGPUTimer(): Nullable<ITimer>;
   abstract createRenderStateSet(): RenderStateSet;
   abstract createBlendingState(): BlendingState;
   abstract createColorState(): ColorState;
@@ -182,50 +331,50 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     data: TextureMipmapData,
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): T;
+  ): Nullable<T>;
   abstract createTexture2D(
     format: TextureFormat,
     width: number,
     height: number,
     options?: TextureCreationOptions
-  ): Texture2D;
+  ): Nullable<Texture2D>;
   abstract createTexture2DFromImage(
     element: TextureImageElement,
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): Texture2D;
+  ): Nullable<Texture2D>;
   abstract createTexture2DArray(
     format: TextureFormat,
     width: number,
     height: number,
     depth: number,
     options?: TextureCreationOptions
-  ): Texture2DArray;
+  ): Nullable<Texture2DArray>;
   abstract createTexture2DArrayFromImages(
     elements: TextureImageElement[],
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): Texture2DArray;
+  ): Nullable<Texture2DArray>;
   abstract createTexture3D(
     format: TextureFormat,
     width: number,
     height: number,
     depth: number,
     options?: TextureCreationOptions
-  ): Texture3D;
+  ): Nullable<Texture3D>;
   abstract createCubeTexture(
     format: TextureFormat,
     size: number,
     options?: TextureCreationOptions
-  ): TextureCube;
+  ): Nullable<TextureCube>;
   abstract createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
   abstract reverseVertexWindingOrder(reverse: boolean): void;
   abstract isWindingOrderReversed(): boolean;
-  abstract copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number);
-  abstract copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number);
+  abstract copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number): void;
+  abstract copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number): void;
   // program
   abstract createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
-  abstract createBindGroup(layout: BindGroupLayout): BindGroup;
+  abstract createBindGroup(layout: Immutable<BindGroupLayout>): BindGroup;
   abstract createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer;
   abstract copyBuffer(
     sourceBuffer: GPUDataBuffer,
@@ -233,7 +382,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     srcOffset: number,
     dstOffset: number,
     bytes: number
-  );
+  ): void;
   abstract createIndexBuffer(
     data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
     options?: BufferCreationOptions
@@ -246,26 +395,30 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   abstract createVertexLayout(options: VertexLayoutOptions): VertexLayout;
   abstract createFrameBuffer(
     colorAttachments: BaseTexture[],
-    depthAttachment: BaseTexture,
-    options?: FrameBufferOptions
+    depthAttachment: Nullable<BaseTexture>,
+    options?: Nullable<FrameBufferOptions>
   ): FrameBuffer;
   // render related
-  abstract setViewport(vp?: number[] | DeviceViewport): void;
-  abstract getViewport(): DeviceViewport;
-  abstract setScissor(scissor?: number[] | DeviceViewport): void;
-  abstract getScissor(): DeviceViewport;
-  abstract setProgram(program: GPUProgram): void;
-  abstract getProgram(): GPUProgram;
-  abstract setVertexLayout(vertexData: VertexLayout): void;
-  abstract getVertexLayout(): VertexLayout;
-  abstract setRenderStates(renderStates: RenderStateSet): void;
-  abstract getRenderStates(): RenderStateSet;
-  abstract getFramebuffer(): FrameBuffer;
-  abstract setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>);
-  abstract getBindGroup(index: number): [BindGroup, Iterable<number>];
+  abstract setViewport(vp: Nullable<Immutable<number[] | DeviceViewport>>): void;
+  abstract getViewport(): Immutable<DeviceViewport>;
+  abstract setScissor(scissor: Nullable<Immutable<number[] | DeviceViewport>>): void;
+  abstract getScissor(): Immutable<DeviceViewport>;
+  abstract setProgram(program: Nullable<GPUProgram>): void;
+  abstract getProgram(): Nullable<GPUProgram>;
+  abstract setVertexLayout(vertexData: Nullable<VertexLayout>): void;
+  abstract getVertexLayout(): Nullable<VertexLayout>;
+  abstract setRenderStates(renderStates: Nullable<RenderStateSet>): void;
+  abstract getRenderStates(): Nullable<RenderStateSet>;
+  abstract getFramebuffer(): Nullable<FrameBuffer>;
+  abstract setBindGroup(
+    index: number,
+    bindGroup: BindGroup,
+    dynamicOffsets?: Nullable<Iterable<number>>
+  ): void;
+  abstract getBindGroup(index: number): [BindGroup, Nullable<Iterable<number>>];
   abstract flush(): void;
   abstract nextFrame(callback: () => void): number;
-  abstract cancelNextFrame(handle: number);
+  abstract cancelNextFrame(handle: number): void;
   // misc
   abstract readPixels(
     index: number,
@@ -300,43 +453,43 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     workgroupCountY: number,
     workgroupCountZ: number
   ): void;
-  get backend(): DeviceBackend {
+  get backend() {
     return this._backend;
   }
-  get videoMemoryUsage(): number {
+  get videoMemoryUsage() {
     return this._gpuMemCost;
   }
-  get frameInfo(): FrameInfo {
+  get frameInfo() {
     return this._frameInfo;
   }
-  get isRendering(): boolean {
+  get isRendering() {
     return this._runningLoop !== null;
   }
-  get canvas(): HTMLCanvasElement {
+  get canvas() {
     return this._canvas;
   }
-  get type(): string {
+  get type() {
     return this._backend.typeName();
   }
-  get vSync(): boolean {
+  get vSync() {
     return this._vSync;
   }
-  set vSync(val: boolean) {
+  set vSync(val) {
     this._vSync = !!val;
   }
-  get pool(): Pool {
-    return this._poolMap.get(this._defaultPoolKey);
+  get pool() {
+    return this._poolMap.get(this._defaultPoolKey)!;
   }
-  get runLoopFunction(): (device: AbstractDevice) => void {
+  get runLoopFunction() {
     return this._runLoopFunc;
   }
-  get programBuilder(): ProgramBuilder {
+  get programBuilder() {
     return this._programBuilder;
   }
-  poolExists(key: string | symbol): boolean {
+  poolExists(key: string | symbol) {
     return this._poolMap.has(key);
   }
-  getPool(key: string | symbol): Pool {
+  getPool(key: string | symbol) {
     let pool = this._poolMap.get(key);
     if (!pool) {
       pool = new Pool(this, key);
@@ -347,24 +500,28 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   setFont(fontName: string) {
     DrawText.setFont(this, fontName);
   }
-  drawText(text: string, x: number, y: number, color: string) {
-    DrawText.drawText(this, text, color, x, y);
+  drawText(text: string, x: number, y: number, color: string, viewport?: Immutable<number[]>) {
+    DrawText.drawText(this, text, color, x, y, viewport);
   }
-  setFramebuffer(rt: FrameBuffer);
-  setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number);
-  setFramebuffer(colorOrRT: BaseTexture[] | FrameBuffer, depth?: BaseTexture, sampleCount?: number) {
-    let newRT: FrameBuffer = null;
+  setFramebuffer(rt: Nullable<FrameBuffer>): void;
+  setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number): void;
+  setFramebuffer(
+    colorOrRT: BaseTexture[] | Nullable<FrameBuffer>,
+    depth?: BaseTexture,
+    sampleCount?: number
+  ) {
+    let newRT: Nullable<FrameBuffer> = null;
     let temporal = false;
     if (!Array.isArray(colorOrRT)) {
       newRT = colorOrRT ?? null;
     } else {
-      newRT = this.pool.fetchTemporalFramebuffer(false, 0, 0, colorOrRT, depth, true, sampleCount);
+      newRT = this.pool!.fetchTemporalFramebuffer(false, 0, 0, colorOrRT, depth, true, sampleCount);
       temporal = true;
     }
     const currentRT = this.getFramebuffer();
     if (currentRT !== newRT) {
-      if (this._temporalFramebuffer) {
-        this.pool.releaseFrameBuffer(currentRT);
+      if (this._temporalFramebuffer && currentRT) {
+        this.pool!.releaseFrameBuffer(currentRT);
       }
       this._temporalFramebuffer = temporal;
       this._setFramebuffer(newRT);
@@ -396,7 +553,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._gpuTimer = null;
     }
   }
-  beginFrame(): boolean {
+  beginFrame() {
     if (this._beginFrameCounter === 0) {
       for (const obj of this._disposeObjectList) {
         obj.destroy();
@@ -409,7 +566,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._poolMap.forEach((pool) => pool.autoRelease());
     return this.onBeginFrame();
   }
-  endFrame(): void {
+  endFrame() {
     if (this._beginFrameCounter > 0) {
       this._beginFrameCounter--;
       if (this._beginFrameCounter === 0) {
@@ -419,18 +576,14 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       }
     }
   }
-  getVertexAttribFormat(
-    semantic: VertexSemantic,
-    dataType: DataType,
-    componentCount: number
-  ): VertexAttribFormat {
+  getVertexAttribFormat(semantic: VertexSemantic, dataType: DataType, componentCount: number) {
     return getVertexAttribFormat(semantic, dataType, componentCount);
   }
   createInterleavedVertexBuffer(
     attribFormats: VertexAttribFormat[],
     data: TypedArray,
     options?: BufferCreationOptions
-  ): StructuredBuffer {
+  ) {
     if (options && options.usage && options.usage !== 'vertex') {
       console.error(`createInterleavedVertexBuffer() failed: options.usage must be 'vertex' or not set`);
       return null;
@@ -440,6 +593,10 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       size += getVertexFormatSize(format);
     }
     const vertexBufferType = makeVertexBufferType((data.byteLength / size) >> 0, ...attribFormats);
+    if (!vertexBufferType) {
+      console.error('createInterleavedVertexBuffer() failed: Cannot determine vertex buffer type');
+      return null;
+    }
     const opt = Object.assign(
       {
         usage: 'vertex',
@@ -458,17 +615,17 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     return this.createStructuredBuffer(vertexBufferType, opt, data);
   }
-  createVertexBuffer(
-    attribFormat: VertexAttribFormat,
-    data: TypedArray,
-    options?: BufferCreationOptions
-  ): StructuredBuffer {
+  createVertexBuffer(attribFormat: VertexAttribFormat, data: TypedArray, options?: BufferCreationOptions) {
     if (options && options.usage && options.usage !== 'vertex') {
       console.error(`createVertexBuffer() failed: options.usage must be 'vertex' or not set`);
       return null;
     }
     const count = getVertexFormatSize(attribFormat);
     const vertexBufferType = makeVertexBufferType((data.byteLength / count) >> 0, attribFormat);
+    if (!vertexBufferType) {
+      console.error('createInterleavedVertexBuffer() failed: Cannot determine vertex buffer type');
+      return null;
+    }
     const opt = Object.assign(
       {
         usage: 'vertex',
@@ -487,18 +644,18 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     return this.createStructuredBuffer(vertexBufferType, opt, data);
   }
-  draw(primitiveType: PrimitiveType, first: number, count: number): void {
+  draw(primitiveType: PrimitiveType, first: number, count: number) {
     this._frameInfo.drawCalls++;
     this._draw(primitiveType, first, count);
   }
-  drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number): void {
+  drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number) {
     this._frameInfo.drawCalls++;
     this._drawInstanced(primitiveType, first, count, numInstances);
   }
-  executeRenderBundle(renderBundle: RenderBundle) {
+  executeRenderBundle(renderBundle: RenderBundle): void {
     this._frameInfo.drawCalls += this._executeRenderBundle(renderBundle);
   }
-  compute(workgroupCountX, workgroupCountY, workgroupCountZ): void {
+  compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number) {
     this._frameInfo.computeCalls++;
     this._compute(workgroupCountX, workgroupCountY, workgroupCountZ);
   }
@@ -507,8 +664,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._frameInfo.nextFrameCall.push(f);
     }
   }
-  async runNextFrameAsync(f: () => void | Promise<void>): Promise<void> {
-    return new Promise((resolve) => {
+  async runNextFrameAsync(f: () => void | Promise<void>) {
+    return new Promise<void>((resolve) => {
       if (f) {
         this._frameInfo.nextFrameCall.push(() => {
           const p = f();
@@ -576,7 +733,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     if (this._stateStack.length === 0) {
       console.error('Device.popDeviceStates(): stack is empty');
     } else {
-      const top = this._stateStack.pop();
+      const top = this._stateStack.pop()!;
       this.setFramebuffer(top.framebuffer);
       this.setViewport(top.viewport);
       this.setScissor(top.scissor);
@@ -590,10 +747,10 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this.reverseVertexWindingOrder(top.windowOrderReversed);
     }
   }
-  getGPUObjects(): GPUObjectList {
+  getGPUObjects() {
     return this._gpuObjectList;
   }
-  getGPUObjectById(uid: number): GPUObject {
+  getGPUObjectById(uid: number) {
     for (const list of [
       this._gpuObjectList.textures,
       this._gpuObjectList.samplers,
@@ -610,16 +767,22 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     return null;
   }
-  screenToDevice(val: number): number {
-    return this.getFramebuffer() ? val : Math.round(val * this.getScale());
+  screenXToDevice(val: number) {
+    return this.getFramebuffer() ? val : Math.round(val * this.getScaleX());
   }
-  deviceToScreen(val: number): number {
-    return this.getFramebuffer() ? val : Math.round(val / this.getScale());
+  deviceXToScreen(val: number) {
+    return this.getFramebuffer() ? val : Math.round(val / this.getScaleX());
   }
-  buildRenderProgram(options: PBRenderOptions): GPUProgram {
+  screenYToDevice(val: number) {
+    return this.getFramebuffer() ? val : Math.round(val * this.getScaleY());
+  }
+  deviceYToScreen(val: number) {
+    return this.getFramebuffer() ? val : Math.round(val / this.getScaleY());
+  }
+  buildRenderProgram(options: PBRenderOptions) {
     return this._programBuilder.buildRenderProgram(options);
   }
-  buildComputeProgram(options: PBComputeOptions): GPUProgram {
+  buildComputeProgram(options: PBComputeOptions) {
     return this._programBuilder.buildComputeProgram(options);
   }
   addGPUObject(obj: GPUObject) {
@@ -644,36 +807,30 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   }
   protected abstract onBeginFrame(): boolean;
   protected abstract onEndFrame(): void;
-  protected abstract _setFramebuffer(fb: FrameBuffer);
-  private _onresize() {
-    if (
-      this._canvasClientWidth !== this._canvas.clientWidth ||
-      this._canvasClientHeight !== this._canvas.clientHeight
-    ) {
-      this._canvasClientWidth = this._canvas.clientWidth;
-      this._canvasClientHeight = this._canvas.clientHeight;
-      this.dispatchEvent('resize', this._canvasClientWidth, this._canvasClientHeight);
-    }
-  }
-  private _registerEventHandlers() {
-    const canvas: HTMLCanvasElement = this._canvas;
-    const that = this;
-    if (window.ResizeObserver) {
-      new window.ResizeObserver(() => {
-        that._onresize();
-      }).observe(canvas, {});
-    } else {
-      if (window.MutationObserver) {
-        new MutationObserver(function (mutations) {
-          if (mutations.length > 0) {
-            that._onresize();
-          }
-        }).observe(canvas, { attributes: true, attributeFilter: ['style'] });
-      }
-      window.addEventListener('resize', () => {
-        this._onresize();
-      });
-    }
+  protected abstract _setFramebuffer(fb: Nullable<FrameBuffer>): void;
+  protected abstract _handleResize(
+    cssWidth: number,
+    cssHeight: number,
+    deviceWidth: number,
+    deviceHeight: number
+  ): void;
+  protected async initResizer() {
+    return new Promise<void>((resolve) => {
+      this.once(
+        'resize',
+        (cssWidth: number, cssHeight: number, deviceWidth: number, deviceHeight: number) => {
+          this._handleResize(cssWidth, cssHeight, deviceWidth, deviceHeight);
+          this.on(
+            'resize',
+            (cssWidth: number, cssHeight: number, deviceWidth: number, deviceHeight: number) => {
+              this._handleResize(cssWidth, cssHeight, deviceWidth, deviceHeight);
+            }
+          );
+          resolve();
+        }
+      );
+      this._resizer.init();
+    });
   }
   private updateFrameInfo() {
     this._frameInfo.drawCalls = 0;
@@ -718,8 +875,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     this._frameInfo.nextFrameCallNext.length = 0;
   }
-  private getGPUObjectList(obj: GPUObject): GPUObject[] {
-    let list: GPUObject[] = null;
+  private getGPUObjectList(obj: GPUObject) {
+    let list: Nullable<GPUObject[]> = null;
     if (obj.isTexture()) {
       list = this._gpuObjectList.textures;
     } else if (obj.isSampler()) {
@@ -758,7 +915,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._disposeObjectList = [];
     }
   }
-  protected reloadAll(): void {
+  protected reloadAll() {
     for (const list of [
       this._gpuObjectList.buffers,
       this._gpuObjectList.textures,
@@ -775,7 +932,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     return;
   }
-  protected parseTextureOptions(options?: TextureCreationOptions): number {
+  protected parseTextureOptions(options?: TextureCreationOptions) {
     const noMipmapFlag = options?.mipmapping === false ? GPUResourceUsageFlags.TF_NO_MIPMAP : 0;
     const writableFlag = options?.writable ? GPUResourceUsageFlags.TF_WRITABLE : 0;
     const dynamicFlag = options?.dynamic ? GPUResourceUsageFlags.DYNAMIC : 0;
@@ -784,8 +941,9 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     return noMipmapFlag | writableFlag | dynamicFlag;
   }
-  protected parseBufferOptions(options: BufferCreationOptions, defaultUsage?: BufferUsage): number {
-    const usage = options?.usage || defaultUsage;
+  protected parseBufferOptions(options?: BufferCreationOptions, defaultUsage?: BufferUsage) {
+    options = options ?? {};
+    const usage = options.usage ?? defaultUsage;
     let usageFlag: number;
     switch (usage) {
       case 'uniform':

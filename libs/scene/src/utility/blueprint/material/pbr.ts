@@ -114,14 +114,14 @@ export class PBRBlockNode extends BaseGraphNode {
         id: 2,
         name: 'Metallic',
         type: ['float'],
-        defaultValue: 1,
+        defaultValue: [1],
         originType: 'float'
       },
       {
         id: 3,
         name: 'Roughness',
         type: ['float'],
-        defaultValue: 1,
+        defaultValue: [1],
         originType: 'float'
       },
       {
@@ -154,7 +154,7 @@ export class PBRBlockNode extends BaseGraphNode {
         id: 8,
         name: 'Opacity',
         type: ['float'],
-        defaultValue: 1,
+        defaultValue: [1],
         originType: 'float'
       }
     ];
@@ -288,6 +288,85 @@ export class VertexBlockNode extends BaseGraphNode {
    */
   toString(): string {
     return 'VertexOutput';
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   *
+   * @remarks
+   * The PBR output node is always valid because:
+   * - All inputs are optional (have default values)
+   * - Type conversions are handled automatically (float → vec3, etc.)
+   * - It's the terminal node with no type inference requirements
+   */
+  protected validate(): string {
+    return '';
+  }
+  /**
+   * Gets the output type
+   *
+   * @returns Empty string (no outputs)
+   *
+   * @remarks
+   * As a terminal output node, PBRBlockNode has no outputs.
+   * It consumes the material graph data and provides it to the renderer.
+   */
+  protected getType(): string {
+    return '';
+  }
+}
+
+/**
+ * Sprite material output node
+ *
+ * @public
+ */
+export class SpriteBlockNode extends BaseGraphNode {
+  /**
+   * Creates a new Sprite material output node
+   */
+  constructor() {
+    super();
+    this._inputs = [
+      {
+        id: 1,
+        name: 'Color',
+        type: ['float', 'vec2', 'vec3', 'vec4'],
+        defaultValue: [1, 1, 1, 1],
+        originType: 'vec4'
+      }
+    ];
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   *
+   * @remarks
+   * No additional properties need to be serialized beyond the base node data
+   * and input connections.
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: SpriteBlockNode,
+      name: 'SpriteBlockNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'Output'
+   *
+   * @remarks
+   * This node is typically labeled "Output" in the material editor UI
+   * as it represents the final material output.
+   */
+  toString(): string {
+    return 'Output';
   }
   /**
    * Validates the node state

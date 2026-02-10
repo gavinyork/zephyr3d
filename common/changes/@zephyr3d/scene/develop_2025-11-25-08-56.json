@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Optimize scene loading",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

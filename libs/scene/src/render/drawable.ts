@@ -1,4 +1,4 @@
-import type { DRef, TypedArray, Vector4 } from '@zephyr3d/base';
+import type { DRef, Nullable, TypedArray, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   ColorState,
@@ -19,6 +19,7 @@ import type { ClusteredLight } from './cluster_light';
 import type { MeshMaterial } from '../material';
 import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import type { OIT } from './oit';
+import { getDevice } from '../app/api';
 
 /**
  * Picking result target container.
@@ -30,6 +31,16 @@ import type { OIT } from './oit';
  */
 export type PickTarget = { node: SceneNode; label?: string };
 
+export class RenderContext {
+  public device: AbstractDevice;
+  public renderWidth: number;
+  public renderHeight: number;
+  constructor(_camera: Camera, w: number, h: number) {
+    this.device = getDevice();
+    this.renderWidth = w;
+    this.renderHeight = h;
+  }
+}
 /**
  * Context object passed to draw calls and render helpers.
  *
@@ -44,49 +55,39 @@ export type PickTarget = { node: SceneNode; label?: string };
  */
 export interface DrawContext {
   /** Render device used for issuing GPU commands. */
-  device: AbstractDevice;
+  readonly device: AbstractDevice;
   /** Framebuffer width for rendering (in pixels). */
-  renderWidth: number;
+  readonly renderWidth: number;
   /** Framebuffer height for rendering (in pixels). */
-  renderHeight: number;
-  /** The camera position/view used by the primary render pass of this frame. */
-  primaryCamera: Camera;
-  /** The render queue which is currently being rendered (if applicable). */
-  renderQueue?: RenderQueue;
+  readonly renderHeight: number;
   /** Allocator for global (frame/pass) bind groups and descriptor resources. */
-  globalBindGroupAllocator: GlobalBindGroupAllocator;
+  readonly globalBindGroupAllocator: GlobalBindGroupAllocator;
   /** The camera associated with the current drawing task (may differ from primaryCamera). */
-  camera: Camera;
+  readonly camera: Camera;
   /** Order-Independent Transparency interface for transparent passes. */
-  oit: OIT;
+  oit: Nullable<OIT>;
   /** Whether motion vectors are being written this pass (used by TAA/MotionBlur). */
-  motionVectors: boolean;
+  readonly motionVectors: boolean;
   /** Motion vector texture target when motion vectors are active. */
-  motionVectorTexture?: Texture2D;
+  motionVectorTexture?: Nullable<Texture2D>;
   /** Whether hierarchical depth (Hi-Z) is enabled for the current pass. */
-  HiZ: boolean;
+  readonly HiZ: boolean;
   /** Hi-Z (hierarchical Z) depth texture, when generated. */
-  HiZTexture: Texture2D;
+  HiZTexture: Nullable<Texture2D>;
   /** The scene currently being drawn. */
-  scene: Scene;
+  readonly scene: Scene;
   /** The render pass to which this drawing task belongs. */
-  renderPass: RenderPass;
+  renderPass: Nullable<RenderPass>;
   /** Stable hash for the current pass/draw state, for render bundle or pipeline cache. */
-  renderPassHash: string;
-  /** Fog application flags for transparent objects (bitmask). */
-  fogFlags: number;
+  renderPassHash: Nullable<string>;
   /** Whether the output orientation is flipped vertically (e.g., due to framebuffer conventions). */
   flip: boolean;
   /** Whether this is the base lighting pass that draws environment lighting. */
   drawEnvLight: boolean;
   /** Scene environment (sky, IBL, exposure, etc.) used for shading. */
-  env: Environment;
-  /** Timestamp for the current draw (engine-defined time units). */
-  timestamp: number;
+  env: Nullable<Environment>;
   /** Current sub-queue index within the render queue (e.g., opaque, transparent). */
   queue: number;
-  /** Whether GPU-based picking is currently enabled. */
-  picking: boolean;
   /** Whether the current lighting pass is blending light accumulations. */
   lightBlending: boolean;
   /** Scene (non-linear) depth texture bound for sampling. */
@@ -96,31 +97,29 @@ export interface DrawContext {
   /** Scene color texture bound for sampling (previous pass or resolved color). */
   sceneColorTexture?: Texture2D;
   /** Default depth buffer format for targets created in this pass. */
-  depthFormat?: TextureFormat;
+  readonly depthFormat: TextureFormat;
   /** Default color buffer format for targets created in this pass. */
-  colorFormat?: TextureFormat;
+  readonly colorFormat: TextureFormat;
   /** Instance data buffer/metadata for the current drawing task (instanced rendering). */
-  instanceData?: InstanceData;
+  instanceData?: Nullable<InstanceData>;
   /** Compositor used to apply post-processing effects at the end of the frame/pass. */
-  compositor?: Compositor;
+  compositor?: Nullable<Compositor>;
   /** @internal Map of punctual lights to their shadow map parameters for this pass. */
-  shadowMapInfo?: Map<PunctualLight, ShadowMapParams>;
+  shadowMapInfo?: Nullable<Map<PunctualLight, ShadowMapParams>>;
   /** @internal The punctual light currently rendering shadows (shadow pass). */
-  currentShadowLight?: PunctualLight;
+  currentShadowLight?: Nullable<PunctualLight>;
   /** Sun/directional light reference for passes that need it. */
-  sunLight?: DirectionalLight;
+  sunLight?: Nullable<DirectionalLight>;
   /** Clustered light index/structure for lighting in forward+, clustered shading, etc. */
   clusteredLight?: ClusteredLight;
   /** Material varying bit flags that influence shader selection. */
   materialFlags: number;
   /** Force cull mode override for special passes (optional). */
-  forceCullMode?: FaceMode;
+  forceCullMode?: Nullable<FaceMode>;
   /** Force color mask state override for special passes (optional). */
-  forceColorState?: ColorState;
-  /** Temporal anti-aliasing is active this frame/pass. */
-  TAA: boolean;
+  forceColorState?: Nullable<ColorState>;
   /** Screen-space reflections are active this frame/pass. */
-  SSR: boolean;
+  readonly SSR: boolean;
   /** Whether SSR thickness should be computed dynamically in this pass. */
   SSRCalcThickness: boolean;
   /** SSR roughness input texture. */
@@ -128,9 +127,9 @@ export interface DrawContext {
   /** SSR normal input texture (usually view-space or world-space normals). */
   SSRNormalTexture: Texture2D;
   /** Final framebuffer target where the last stage renders. */
-  finalFramebuffer: FrameBuffer;
+  finalFramebuffer: Nullable<FrameBuffer>;
   /** Intermediate framebuffer used by the compositor or multi-pass pipelines. */
-  intermediateFramebuffer: FrameBuffer;
+  intermediateFramebuffer: Nullable<FrameBuffer>;
 }
 
 /**
@@ -148,7 +147,7 @@ export type MorphData = {
  * Morph information
  * @public
  */
-export type MorphInfo = { data: TypedArray; buffer?: DRef<GPUDataBuffer> };
+export type MorphInfo = { data: TypedArray; buffer?: DRef<GPUDataBuffer>; names: Record<string, number> };
 
 /**
  * Base interface for a drawable (renderable) object.
@@ -172,13 +171,13 @@ export interface Drawable {
    */
   getPickTarget(): PickTarget;
   /** Returns the texture containing bone matrices for skinned meshes. */
-  getBoneMatrices(): Texture2D;
+  getBoneMatrices(): Nullable<Texture2D>;
   /** Returns the unique color used for GPU picking (object ID in color). */
   getObjectColor(): Vector4;
   /** Returns the morph target data texture (if morphing is used). */
-  getMorphData(): MorphData;
+  getMorphData(): Nullable<MorphData>;
   /** Returns the morph information buffer (weights, ranges, etc.). */
-  getMorphInfo(): MorphInfo;
+  getMorphInfo(): Nullable<MorphInfo>;
   /**
    * Computes the distance used for sorting (e.g., transparent draw order).
    *
@@ -194,15 +193,15 @@ export interface Drawable {
   /** True if shading is unlit (does not depend on scene lighting). */
   isUnlit(): boolean;
   /** Returns the bound material driving shading for this drawable. */
-  getMaterial(): MeshMaterial;
+  getMaterial(): Nullable<MeshMaterial>;
   /** Returns the geometry primitive to be drawn. */
-  getPrimitive(): Primitive;
+  getPrimitive(): Nullable<Primitive>;
   /**
    * Pushes a reference to the current render queue for cleanup or back-references.
    *
    * Useful for batching or deferred state application.
    */
-  pushRenderQueueRef(ref: RenderQueueRef);
+  pushRenderQueueRef(ref: RenderQueueRef): void;
   /**
    * Applies transform-related uniforms to the active bind group or pipeline.
    *
@@ -213,9 +212,10 @@ export interface Drawable {
    * Issues draw commands for this object.
    *
    * @param ctx - Full draw context for the current pass.
+   * @param renderQueue - The current render queue issuing this draw.
    * @param hash - Optional hash key for render bundle or pipeline caching.
    */
-  draw(ctx: DrawContext, hash?: string);
+  draw(ctx: DrawContext, renderQueue: Nullable<RenderQueue>, hash?: string): void;
   /**
    * Returns true if the object supports instanced rendering.
    *
@@ -269,7 +269,7 @@ export interface BatchDrawable extends Drawable {
    * @param instanceInfo - Instance data information for this batch.
    * @internal
    */
-  applyMaterialUniforms(instanceInfo: DrawableInstanceInfo);
+  applyMaterialUniforms(instanceInfo: DrawableInstanceInfo): void;
   /**
    * Applies material uniforms across all grouped instance informations belonging to this material.
    *
@@ -277,5 +277,5 @@ export interface BatchDrawable extends Drawable {
    *
    * @internal
    */
-  applyMaterialUniformsAll();
+  applyMaterialUniformsAll(): void;
 }

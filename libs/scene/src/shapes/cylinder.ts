@@ -1,7 +1,6 @@
 import type { AABB, Clonable } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
-import type { PrimitiveType } from '@zephyr3d/device';
 
 /**
  * Creation options for cylinder shape
@@ -49,12 +48,12 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
   constructor(options?: CylinderCreationOptions) {
     super(options);
   }
-  clone(): CylinderShape {
-    return new CylinderShape(this._options);
+  clone() {
+    return new CylinderShape(this._options) as this;
   }
   /** type of the shape */
-  get type(): string {
-    return 'Cylinder';
+  get type() {
+    return 'Cylinder' as const;
   }
   /** @internal */
   private static addPatch(
@@ -86,7 +85,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
    * @param indices - vertex indices
    */
   static generateData(
-    options: CylinderCreationOptions,
+    opt: CylinderCreationOptions,
     vertices: number[],
     normals: number[],
     tangents: number[],
@@ -95,8 +94,8 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
     bbox?: AABB,
     indexOffset?: number,
     vertexCallback?: (index: number, x: number, y: number, z: number) => void
-  ): PrimitiveType {
-    options = Object.assign({}, this._defaultOptions, options ?? {});
+  ) {
+    const options = Object.assign({}, this._defaultOptions, opt ?? {});
     indexOffset = indexOffset ?? 0;
     const start = vertices.length;
 
@@ -201,6 +200,6 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
         vertexCallback?.((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
       }
     }
-    return 'triangle-list';
+    return 'triangle-list' as const;
   }
 }

@@ -1,11 +1,11 @@
-import type { IDisposable, ReadOptions } from '@zephyr3d/base';
-import { MemoryFS } from '@zephyr3d/base';
+import type { IDisposable, Nullable, ReadOptions } from '@zephyr3d/base';
+import { MemoryFS, objectEntries } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { HttpFS, type VFS } from '@zephyr3d/base';
 import { ScriptingSystem } from './scriptingsystem';
 import type { Host } from './scriptingsystem';
 import type { RuntimeScript } from './runtimescript';
-import { ResourceManager } from '../utility';
+import { ResourceManager } from '../utility/serialization/manager';
 import type { Scene } from '../scene';
 import { BoxShape, CylinderShape, PlaneShape, SphereShape, TetrahedronShape, TorusShape } from '../shapes';
 import {
@@ -15,6 +15,8 @@ import {
   PBRSpecularGlossinessMaterial,
   UnlitMaterial
 } from '../material';
+import { StandardSpriteMaterial } from '../material/sprite_std';
+import { ScreenAdapter } from './screen';
 
 /**
  * Interface for objects that can be rendered.
@@ -55,31 +57,32 @@ export interface IRenderHook {
  * @public
  */
 export class Engine {
-  private _builtinsVFS: MemoryFS;
+  private _builtinsVFS: Nullable<MemoryFS>;
   private _scriptingSystem: ScriptingSystem;
   private _resourceManager: ResourceManager;
   private _enabled: boolean;
+  private _screen: ScreenAdapter;
   protected _activeRenderables: {
     renderable: DRef<IRenderable>;
-    hook?: IRenderHook;
+    hook: Nullable<IRenderHook>;
   }[];
-  private _loadingScenes: Record<string, Promise<Scene>>[];
+  private _loadingScenes: Partial<Record<string, Promise<Nullable<Scene>>>>;
   /**
    * Creates a new runtime manager.
    *
    * @param VFS - Optional virtual file system passed to the internal {@link ScriptingSystem}.
    * @param scriptsRoot - Optional scripts root path within the VFS. Defaults as in `ScriptingSystem`.
-   * @param editorMode - Optional editor mode flag for the underlying `ScriptingSystem`.
    * @param enabled - Whether runtime operations are active. Defaults to `true`.
    */
-  constructor(VFS?: VFS, scriptsRoot?: string, editorMode?: boolean, enabled?: boolean) {
+  constructor(VFS?: VFS, scriptsRoot?: string, enabled?: boolean) {
     VFS = VFS ?? new HttpFS('./');
     this._builtinsVFS = null;
-    this._scriptingSystem = new ScriptingSystem({ VFS, scriptsRoot, editorMode });
+    this._scriptingSystem = new ScriptingSystem({ VFS, scriptsRoot });
     this._resourceManager = new ResourceManager(VFS);
     this._enabled = enabled ?? true;
     this._activeRenderables = [];
-    this._loadingScenes = [];
+    this._loadingScenes = {};
+    this._screen = new ScreenAdapter();
   }
   /**
    * Exposes the instance of {@link ScriptingSystem}.
@@ -107,6 +110,12 @@ export class Engine {
   get resourceManager() {
     return this._resourceManager;
   }
+  /**
+   * Exposes the instanceof {@link Screen}
+   */
+  get screen() {
+    return this._screen;
+  }
   /** @internal */
   async init() {
     await this.ensureBuiltinVFS();
@@ -131,7 +140,7 @@ export class Engine {
    * @param module - Module identifier to resolve and load.
    * @returns The `RuntimeScript<T>` instance, or `null` if disabled or on failure.
    */
-  async attachScript<T extends Host>(host: T, module: string): Promise<RuntimeScript<T>> {
+  async attachScript<T extends Host>(host: Nullable<T>, module: string) {
     return this._enabled ? await this._scriptingSystem.attachScript(host, module) : null;
   }
   /**
@@ -157,7 +166,7 @@ export class Engine {
    * @param host - Host object to query.
    * @returns Script instances attached to the host, or an empty array.
    */
-  getScriptObjects<T extends RuntimeScript<any>>(host: unknown): T[] {
+  getScriptObjects<T extends RuntimeScript<any>>(host: unknown) {
     return this._scriptingSystem.getScriptObjects(host) as T[];
   }
   /**
@@ -173,26 +182,24 @@ export class Engine {
       this._scriptingSystem.update(deltaTime, elapsedTime);
     }
   }
-  async loadSceneFromFile(path: string): Promise<Scene> {
+  async loadSceneFromFile(path: string) {
     path = this.VFS.normalizePath(path);
     if (!this._loadingScenes[path]) {
       this._loadingScenes[path] = this._loadScene(path);
     }
-    return this._loadingScenes[path];
+    return this._loadingScenes[path]!;
   }
-  setRenderable(renderable: IRenderable, layer = 0, hook?: IRenderHook) {
+  setRenderable(renderable: Nullable<IRenderable>, layer = 0, hook?: IRenderHook) {
     if (!this._activeRenderables[layer]) {
       this._activeRenderables[layer] = {
-        renderable: new DRef<IRenderable>(null)
+        renderable: new DRef<IRenderable>(null),
+        hook: null
       };
     }
-    this._activeRenderables[layer].hook = hook;
+    this._activeRenderables[layer].hook = hook ?? null;
     this._activeRenderables[layer].renderable.set(renderable);
   }
-  async readFile<T extends ReadOptions['encoding'] = 'binary'>(
-    path: string,
-    encoding?: T
-  ): Promise<T extends 'binary' ? ArrayBuffer : string> {
+  async readFile<T extends ReadOptions['encoding'] = 'binary'>(path: string, encoding?: T) {
     try {
       const content = await this.VFS.readFile(path, { encoding: encoding ?? 'binary' });
       return content as T extends 'binary' ? ArrayBuffer : string;
@@ -201,7 +208,11 @@ export class Engine {
       return null;
     }
   }
-  async startup(startupScene: string, splashScreen: string, startupScript: string) {
+  async startup(
+    startupScene?: Nullable<string>,
+    splashScreen?: Nullable<string>,
+    startupScript?: Nullable<string>
+  ) {
     const splashScreenLayer = 9999;
     if (splashScreen) {
       const splashScreenScene = await this.loadSceneFromFile(splashScreen);
@@ -223,18 +234,17 @@ export class Engine {
     this.setRenderable(null, splashScreenLayer);
   }
   render() {
-    for (const k of Object.keys(this._activeRenderables)) {
-      const info = this._activeRenderables[k];
+    this._activeRenderables.forEach((info) => {
       const render = info.hook?.beforeRender
         ? (info.hook.beforeRender(info.renderable.get() ?? null) ?? true)
         : true;
-      if (render && info.renderable.get()) {
-        info.renderable.get().render();
+      if (render) {
+        info.renderable.get()?.render();
       }
       if (info.hook?.afterRender) {
         info.hook.afterRender(info.renderable.get() ?? null);
       }
-    }
+    });
   }
   private async ensureBuiltinVFS() {
     if (!this._builtinsVFS) {
@@ -243,7 +253,7 @@ export class Engine {
     this.VFS.unmount('/assets/@builtins');
     this.VFS.mount('/assets/@builtins', this._builtinsVFS);
   }
-  private async createBuiltinVFS(): Promise<MemoryFS> {
+  private async createBuiltinVFS() {
     const fs = new MemoryFS();
     const shapeClsMap = {
       '/primitives/box.zmsh': BoxShape,
@@ -256,9 +266,10 @@ export class Engine {
       '/materials/lambert.zmtl': LambertMaterial,
       '/materials/blinnphong.zmtl': BlinnMaterial,
       '/materials/pbr_metallic_roughness.zmtl': PBRMetallicRoughnessMaterial,
-      '/materials/pbr_specular_glossiness.zmtl': PBRSpecularGlossinessMaterial
+      '/materials/pbr_specular_glossiness.zmtl': PBRSpecularGlossinessMaterial,
+      '/materials/sprite_std.zmtl': StandardSpriteMaterial
     } as const;
-    for (const key of Object.keys(shapeClsMap)) {
+    for (const [key] of objectEntries(shapeClsMap)) {
       const obj = new shapeClsMap[key]();
       await this.writeSerializableObject(fs, 'Default', obj, key);
       obj.dispose();
@@ -275,7 +286,7 @@ export class Engine {
       console.error(`Write file '${path}' failed: ${err}`);
     }
   }
-  private async _loadScene(path: string): Promise<Scene> {
+  private async _loadScene(path: string) {
     try {
       const scene = await this._resourceManager.loadScene(path);
       if (scene) {

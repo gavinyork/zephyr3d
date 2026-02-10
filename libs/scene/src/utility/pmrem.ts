@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type {
   BindGroup,
@@ -15,8 +16,8 @@ import { fetchSampler } from './misc';
 
 type DistributionType = 'lambertian' | 'ggx';
 
-let vertexLayout: VertexLayout = null;
-let renderStates: RenderStateSet = null;
+let vertexLayout: Nullable<VertexLayout> = null;
+let renderStates: Nullable<RenderStateSet> = null;
 const programs: Record<
   string,
   {
@@ -41,7 +42,7 @@ function init() {
   vertexLayout = device.createVertexLayout({
     vertexBuffers: [
       {
-        buffer: device.createVertexBuffer('position_f32x2', vertices)
+        buffer: device.createVertexBuffer('position_f32x2', vertices)!
       }
     ],
     indexBuffer: device.createIndexBuffer(indices)
@@ -63,7 +64,7 @@ function getProgramInfo(type: DistributionType, numSamples: number) {
   return ret;
 }
 
-function createPMREMProgram(type: DistributionType, numSamples: number): GPUProgram {
+function createPMREMProgram(type: DistributionType, numSamples: number) {
   const device = getDevice();
   const pb = device;
   return pb.buildRenderProgram({
@@ -291,7 +292,7 @@ function createPMREMProgram(type: DistributionType, numSamples: number): GPUProg
         this.$outputs.outcolor = pb.vec4(pb.mul(this.color, this.hdrScale), 1);
       });
     }
-  });
+  })!;
 }
 function doPrefilterCubemap(
   type: DistributionType,
@@ -302,7 +303,7 @@ function doPrefilterCubemap(
   dstFramebuffer: FrameBuffer,
   filteringInfo: Vector3,
   numSamples: number
-): void {
+) {
   const device = getDevice();
   const framebuffer = dstFramebuffer;
   framebuffer.setColorAttachmentMipLevel(0, miplevel);
@@ -343,7 +344,7 @@ export function prefilterCubemap(
   destTexture: TextureCube | FrameBuffer,
   numSamples?: number,
   radianceSource?: boolean
-): void {
+) {
   if (!tex || !tex.isTextureCube()) {
     console.error('prefilterCubemap(): source texture must be cube texture');
     return;
@@ -371,7 +372,7 @@ export function prefilterCubemap(
       alpha,
       i,
       srcTex,
-      fetchSampler(type === 'ggx' ? 'clamp_nearest_nomip' : 'clamp_linear'),
+      fetchSampler(type === 'ggx' ? 'clamp_nearest_nomip' : 'clamp_linear')!,
       fb,
       filteringInfo,
       numSamples ?? 64

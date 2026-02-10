@@ -215,17 +215,17 @@ function createGGXLUT(size: number) {
         this.$outputs.color = pb.vec4(this.integrateBRDF(this.$inputs.uv.x, this.$inputs.uv.y), 1);
       });
     }
-  });
+  })!;
   program.name = '@GGXLUT_Generation';
   const vertexLayout = device.createVertexLayout({
     vertexBuffers: [
-      { buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])) }
+      { buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]))! }
     ]
   });
   const rs = device.createRenderStateSet();
   rs.useRasterizerState().setCullMode('none');
   rs.useDepthState().enableTest(false).enableWrite(false);
-  const tex = device.createTexture2D('rgba8unorm', size, size, { mipmapping: false });
+  const tex = device.createTexture2D('rgba8unorm', size, size, { mipmapping: false })!;
   tex.name = 'GGXLUT';
   const fb = device.createFrameBuffer([tex], null);
   device.pushDeviceStates();

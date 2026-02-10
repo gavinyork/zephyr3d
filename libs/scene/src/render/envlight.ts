@@ -1,3 +1,4 @@
+import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Disposable, DRef, Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
@@ -46,7 +47,11 @@ export abstract class EnvironmentLighting extends Disposable {
    *
    * @returns The radiance for the fragment
    */
-  abstract getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp;
+  abstract getRadiance(
+    scope: PBInsideFunctionScope,
+    refl: PBShaderExp,
+    roughness: PBShaderExp
+  ): Nullable<PBShaderExp>;
   /**
    * Get irradiance for a fragment
    *
@@ -103,42 +108,42 @@ export class EnvShIBL extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.getType}
    * @override
    */
-  getType(): EnvLightType {
-    return 'ibl';
+  getType() {
+    return 'ibl' as const;
   }
   /** The radiance map */
-  get radianceMap(): TextureCube {
+  get radianceMap() {
     return this._radianceMap.get();
   }
-  set radianceMap(tex: TextureCube) {
+  set radianceMap(tex) {
     this._radianceMap.set(tex);
   }
   /** The irradiance sh coeffecients */
-  get irradianceSH(): GPUDataBuffer {
+  get irradianceSH() {
     return this._irradianceSH.get();
   }
-  set irradianceSH(value: GPUDataBuffer) {
+  set irradianceSH(value) {
     this._irradianceSH.set(value);
   }
   /** The irradiance sh coeffecients */
-  get irradianceSHFB(): FrameBuffer {
+  get irradianceSHFB() {
     return this._irradianceSHFB.get();
   }
-  set irradianceSHFB(value: FrameBuffer) {
+  set irradianceSHFB(value) {
     this._irradianceSHFB.set(value);
   }
   /** The irradiance sh window */
-  get irradianceWindow(): Vector3 {
+  get irradianceWindow() {
     return this._irraidanceWindow;
   }
-  set irradianceWindow(val: Vector3) {
+  set irradianceWindow(val) {
     this._irraidanceWindow = val;
   }
   /**
    * {@inheritDoc EnvironmentLighting.initShaderBindings}
    * @override
    */
-  initShaderBindings(pb: ProgramBuilder): void {
+  initShaderBindings(pb: ProgramBuilder) {
     if (pb.shaderKind === 'fragment') {
       if (this.radianceMap) {
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP] = pb.texCube().uniform(0);
@@ -161,7 +166,7 @@ export class EnvShIBL extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.updateBindGroup}
    * @override
    */
-  updateBindGroup(bg: BindGroup): void {
+  updateBindGroup(bg: BindGroup) {
     if (this.radianceMap) {
       bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this.radianceMap.mipLevelCount - 1);
       bg.setTexture(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this.radianceMap);
@@ -186,21 +191,21 @@ export class EnvShIBL extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.getRadiance}
    * @override
    */
-  getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp): PBShaderExp {
+  getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp) {
     const pb = scope.$builder;
     return getDevice().getDeviceCaps().shaderCaps.supportShaderTextureLod
-      ? pb.textureSampleLevel(
+      ? (pb.textureSampleLevel(
           scope[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP],
           refl,
           pb.mul(roughness, scope[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD])
-        ).rgb
-      : pb.textureSample(scope[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP], refl).rgb;
+        ).rgb as PBShaderExp)
+      : (pb.textureSample(scope[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP], refl).rgb as PBShaderExp);
   }
   /**
    * {@inheritDoc EnvironmentLighting.getIrradiance}
    * @override
    */
-  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp {
+  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp) {
     const pb = scope.$builder;
     pb.func('Z_sh_Y0', [pb.vec3('v')], function () {
       this.$return(0.2820947917);
@@ -351,20 +356,20 @@ export class EnvShIBL extends EnvironmentLighting {
       }
       this.$return(this.c);
     });
-    return pb.getGlobalScope().Z_sh_eval(normal);
+    return pb.getGlobalScope().Z_sh_eval(normal) as PBShaderExp;
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasRadiance}
    * @override
    */
-  hasRadiance(): boolean {
+  hasRadiance() {
     return !!this._radianceMap;
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasIrradiance}
    * @override
    */
-  hasIrradiance(): boolean {
+  hasIrradiance() {
     return !!this._irradianceSH;
   }
   /**
@@ -397,10 +402,10 @@ export class EnvConstantAmbient extends EnvironmentLighting {
     this._ambientColor = ambientColor ? new Vector4(ambientColor) : new Vector4(0, 0, 0, 1);
   }
   /** The ambient color */
-  get ambientColor(): Vector4 {
+  get ambientColor(): Immutable<Vector4> {
     return this._ambientColor;
   }
-  set ambientColor(ambientColor: Vector4) {
+  set ambientColor(ambientColor: Immutable<Vector4>) {
     if (ambientColor) {
       this._ambientColor.set(ambientColor);
     }
@@ -409,14 +414,14 @@ export class EnvConstantAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.getType}
    * @override
    */
-  getType(): EnvLightType {
-    return 'constant';
+  getType() {
+    return 'constant' as const;
   }
   /**
    * {@inheritDoc EnvironmentLighting.initShaderBindings}
    * @override
    */
-  initShaderBindings(pb: ProgramBuilder): void {
+  initShaderBindings(pb: ProgramBuilder) {
     if (pb.shaderKind === 'fragment') {
       pb.getGlobalScope()[EnvConstantAmbient.UNIFORM_NAME_CONSTANT_AMBIENT] = pb.vec4().uniform(0);
     }
@@ -425,35 +430,35 @@ export class EnvConstantAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.updateBindGroup}
    * @override
    */
-  updateBindGroup(bg: BindGroup): void {
+  updateBindGroup(bg: BindGroup) {
     bg.setValue(EnvConstantAmbient.UNIFORM_NAME_CONSTANT_AMBIENT, this._ambientColor);
   }
   /**
    * {@inheritDoc EnvironmentLighting.getRadiance}
    * @override
    */
-  getRadiance(_scope: PBInsideFunctionScope, _refl: PBShaderExp, _roughness: PBShaderExp): PBShaderExp {
+  getRadiance(_scope: PBInsideFunctionScope, _refl: PBShaderExp, _roughness: PBShaderExp) {
     return null;
   }
   /**
    * {@inheritDoc EnvironmentLighting.getIrradiance}
    * @override
    */
-  getIrradiance(scope: PBInsideFunctionScope, _normal: PBShaderExp): PBShaderExp {
-    return scope[EnvConstantAmbient.UNIFORM_NAME_CONSTANT_AMBIENT].rgb;
+  getIrradiance(scope: PBInsideFunctionScope, _normal: PBShaderExp) {
+    return scope[EnvConstantAmbient.UNIFORM_NAME_CONSTANT_AMBIENT].rgb as PBShaderExp;
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasRadiance}
    * @override
    */
-  hasRadiance(): boolean {
+  hasRadiance() {
     return false;
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasIrradiance}
    * @override
    */
-  hasIrradiance(): boolean {
+  hasIrradiance() {
     return true;
   }
 }
@@ -482,19 +487,19 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
     this._ambientDown = new Vector4(ambientDown);
   }
   /** The upside ambient color */
-  get ambientUp(): Vector4 {
+  get ambientUp(): Immutable<Vector4> {
     return this._ambientUp;
   }
-  set ambientUp(color: Vector4) {
+  set ambientUp(color: Immutable<Vector4>) {
     if (color) {
       this._ambientUp.set(color);
     }
   }
   /** The downside ambient color */
-  get ambientDown(): Vector4 {
+  get ambientDown(): Immutable<Vector4> {
     return this._ambientDown;
   }
-  set ambientDown(color: Vector4) {
+  set ambientDown(color: Immutable<Vector4>) {
     if (color) {
       this._ambientDown.set(color);
     }
@@ -503,14 +508,14 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.getType}
    * @override
    */
-  getType(): EnvLightType {
-    return 'hemisphere';
+  getType() {
+    return 'hemisphere' as const;
   }
   /**
    * {@inheritDoc EnvironmentLighting.initShaderBindings}
    * @override
    */
-  initShaderBindings(pb: ProgramBuilder): void {
+  initShaderBindings(pb: ProgramBuilder) {
     if (pb.shaderKind === 'fragment') {
       pb.getGlobalScope()[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_UP] = pb.vec4().uniform(0);
       pb.getGlobalScope()[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_DOWN] = pb.vec4().uniform(0);
@@ -520,7 +525,7 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.updateBindGroup}
    * @override
    */
-  updateBindGroup(bg: BindGroup): void {
+  updateBindGroup(bg: BindGroup) {
     bg.setValue(EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_UP, this._ambientUp);
     bg.setValue(EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_DOWN, this._ambientDown);
   }
@@ -528,40 +533,40 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.getRadiance}
    * @override
    */
-  getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, _roughness: PBShaderExp): PBShaderExp {
+  getRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, _roughness: PBShaderExp) {
     const pb = scope.$builder;
     const factor = pb.add(pb.mul(refl.y, 0.5), 0.5);
     return pb.mix(
       scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_DOWN],
       scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_UP],
       factor
-    ).rgb;
+    ).rgb as PBShaderExp;
   }
   /**
    * {@inheritDoc EnvironmentLighting.getIrradiance}
    * @override
    */
-  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp {
+  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp) {
     const pb = scope.$builder;
     const factor = pb.add(pb.mul(normal.y, 0.5), 0.5);
     return pb.mix(
       scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_DOWN],
       scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_UP],
       factor
-    ).rgb;
+    ).rgb as PBShaderExp;
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasRadiance}
    * @override
    */
-  hasRadiance(): boolean {
+  hasRadiance() {
     return true;
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasIrradiance}
    * @override
    */
-  hasIrradiance(): boolean {
+  hasIrradiance() {
     return true;
   }
 }

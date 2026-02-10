@@ -9,11 +9,11 @@ import {
   OrbitCameraController,
   Mesh,
   TorusShape,
-  AssetManager,
   applyMaterialMixins,
   DirectionalLight,
   mixinLambert,
-  getInput
+  getInput,
+  getEngine
 } from '@zephyr3d/scene';
 
 // 自定义Lambert材质
@@ -114,8 +114,9 @@ myApp.ready().then(async () => {
   const light = new DirectionalLight(scene);
   light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
 
-  const assetManager = new AssetManager();
-  const tex = await assetManager.loadTexture('https://cdn.zephyr3d.org/doc/assets/images/layer.jpg');
+  const tex = await getEngine().resourceManager.fetchTexture(
+    'https://cdn.zephyr3d.org/doc/assets/images/layer.jpg'
+  );
   const material = new MyLambertMaterial();
   material.color.setXYZW(1, 1, 0, 1);
   material.diffuseTexture = tex;

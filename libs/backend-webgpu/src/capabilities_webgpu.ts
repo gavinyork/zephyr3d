@@ -7,6 +7,7 @@ import type {
   TextureCaps
 } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
+import type { Immutable } from '@zephyr3d/base';
 
 export interface TextureParams {
   gpuFormat: GPUTextureFormat;
@@ -67,7 +68,6 @@ export class WebGPUShaderCaps implements ShaderCaps {
   supportStandardDerivatives: boolean;
   supportShaderTextureLod: boolean;
   supportHighPrecisionFloat: boolean;
-  supportHighPrecisionInt: boolean;
   maxUniformBufferSize: number;
   uniformBufferOffsetAlignment: number;
   maxStorageBufferSize: number;
@@ -174,7 +174,7 @@ export class WebGPUTextureCaps implements TextureCaps {
         '12x12'
       ]) {
         const [w, h] = k.split('x').map((val) => Number(val));
-        this._textureFormatInfos[`astc-${k}`] = {
+        this._textureFormatInfos[`astc-${k}` as keyof typeof this._textureFormatInfos] = {
           gpuSampleType: 'float',
           filterable: true,
           renderable: false,
@@ -184,7 +184,7 @@ export class WebGPUTextureCaps implements TextureCaps {
           blockWidth: w,
           blockHeight: h
         };
-        this._textureFormatInfos[`astc-${k}-srgb`] = {
+        this._textureFormatInfos[`astc-${k}-srgb` as keyof typeof this._textureFormatInfos] = {
           gpuSampleType: 'float',
           filterable: true,
           renderable: false,
@@ -713,10 +713,10 @@ export class WebGPUTextureCaps implements TextureCaps {
       this._textureFormatInfos['rg16f'].filterable &&
       this._textureFormatInfos['rgba16f'].filterable;
   }
-  calcMemoryUsage(format: TextureFormat, numPixels): number {
+  calcMemoryUsage(format: TextureFormat, numPixels: number) {
     return this._textureFormatInfos[format] ? this._textureFormatInfos[format].size * numPixels : 0;
   }
-  getTextureFormatInfo(format: TextureFormat): TextureFormatInfoWebGPU {
+  getTextureFormatInfo(format: TextureFormat): Immutable<TextureFormatInfoWebGPU> {
     return this._textureFormatInfos[format];
   }
 }

@@ -9,7 +9,7 @@ import type {
 } from '@zephyr3d/device';
 import { DRef } from '@zephyr3d/base';
 import { getDevice } from '../../../app/api';
-import type { PropertyAccessor, SerializableClass } from '../../serialization';
+import { defineProps, type PropertyAccessor, type SerializableClass } from '../../serialization/types';
 
 /**
  * Default 1x1 white 2D texture reference
@@ -44,11 +44,11 @@ export function getDefaultTexture2D(): Texture2D {
   if (!defaultTexture2D.get()) {
     const defaultTex = getDevice().createTexture2D('rgba8unorm', 1, 1, {
       mipmapping: false
-    });
+    })!;
     defaultTex.update(new Uint8Array([255, 255, 255, 255]), 0, 0, 1, 1);
     defaultTexture2D.set(defaultTex);
   }
-  return defaultTexture2D.get();
+  return defaultTexture2D.get()!;
 }
 
 /**
@@ -66,11 +66,11 @@ export function getDefaultTexture2DArray(): Texture2DArray {
   if (!defaultTexture2DArray.get()) {
     const defaultTex = getDevice().createTexture2DArray('rgba8unorm', 1, 1, 1, {
       mipmapping: false
-    });
+    })!;
     defaultTex.update(new Uint8Array([255, 255, 255, 255]), 0, 0, 0, 1, 1, 1);
     defaultTexture2DArray.set(defaultTex);
   }
-  return defaultTexture2DArray.get();
+  return defaultTexture2DArray.get()!;
 }
 
 /**
@@ -88,13 +88,13 @@ export function getDefaultTextureCube(): TextureCube {
   if (!defaultTextureCube.get()) {
     const defaultTex = getDevice().createCubeTexture('rgba8unorm', 1, {
       mipmapping: false
-    });
+    })!;
     for (let i = 0; i < 6; i++) {
       defaultTex.update(new Uint8Array([255, 255, 255, 255]), 0, 0, 1, 1, i);
     }
     defaultTextureCube.set(defaultTex);
   }
-  return defaultTextureCube.get();
+  return defaultTextureCube.get()!;
 }
 
 /**
@@ -113,7 +113,7 @@ export function getDefaultTextureCube(): TextureCube {
  * @internal
  */
 const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseTextureNode>[] {
-  return [
+  return defineProps([
     {
       name: 'Name',
       type: 'string',
@@ -121,10 +121,14 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
         return false;
       },
       get(this: BaseTextureNode, value) {
-        value.str[0] = this.paramName;
+        value.str[0] = this.paramName ? this.paramName.slice(2) : '';
       },
       set(this: BaseTextureNode, value) {
-        this.paramName = value.str[0];
+        if (!/^[A-Za-z0-9_]+$/.test(value.str[0])) {
+          console.log(`Invalid parameter name: ${value.str[0]}`);
+        } else {
+          this.paramName = `u_${value.str[0]}`;
+        }
       }
     },
     {
@@ -238,7 +242,7 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
         this.filterMip = value.str[0] as TextureFilterMode;
       }
     }
-  ];
+  ]);
 })();
 
 /**
@@ -319,11 +323,12 @@ export abstract class BaseTextureNode extends BaseGraphNode {
     return this._paramName;
   }
   set paramName(val: string) {
-    if (val !== this._paramName) {
+    if (this._paramName !== val) {
       this._paramName = val;
       this.dispatchEvent('changed');
     }
   }
+
   /**
    * Indicates this node represents a shader uniform
    *
@@ -353,7 +358,7 @@ export abstract class BaseTextureNode extends BaseGraphNode {
    * and always have a valid texture (default if none assigned).
    */
   protected validate(): string {
-    return '';
+    return this.textureId ? '' : 'Texture not specified';
   }
   /**
    * Gets the output type
@@ -448,7 +453,7 @@ export class ConstantTexture2DNode extends BaseTextureNode {
       name: 'Texture2DNode',
       noTitle: true,
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'Texture',
             type: 'object',
@@ -474,17 +479,9 @@ export class ConstantTexture2DNode extends BaseTextureNode {
             }
           },
           ...textureNodeProps
-        ];
+        ]);
       }
     };
-  }
-  /**
-   * Validates the node state
-   *
-   * @returns Empty string (always valid)
-   */
-  protected validate(): string {
-    return '';
   }
   /**
    * Gets the output type
@@ -492,7 +489,7 @@ export class ConstantTexture2DNode extends BaseTextureNode {
    * @returns 'tex2D'
    */
   protected getType(): string {
-    return 'tex2D';
+    return this.validate() ? '' : 'tex2D';
   }
 }
 
@@ -570,7 +567,7 @@ export class ConstantTexture2DArrayNode extends BaseTextureNode {
       name: 'Texture2DArrayNode',
       noTitle: true,
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'Texture',
             type: 'object',
@@ -589,17 +586,9 @@ export class ConstantTexture2DArrayNode extends BaseTextureNode {
             }
           },
           ...textureNodeProps
-        ];
+        ]);
       }
     };
-  }
-  /**
-   * Validates the node state
-   *
-   * @returns Empty string (always valid)
-   */
-  protected validate(): string {
-    return '';
   }
   /**
    * Gets the output type
@@ -607,7 +596,7 @@ export class ConstantTexture2DArrayNode extends BaseTextureNode {
    * @returns 'tex2DArray'
    */
   protected getType(): string {
-    return 'tex2DArray';
+    return this.validate() ? '' : 'tex2DArray';
   }
 }
 
@@ -698,7 +687,7 @@ export class ConstantTextureCubeNode extends BaseTextureNode {
       name: 'TextureCubeNode',
       noTitle: true,
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'Texture',
             type: 'object',
@@ -717,17 +706,9 @@ export class ConstantTextureCubeNode extends BaseTextureNode {
             }
           },
           ...textureNodeProps
-        ];
+        ]);
       }
     };
-  }
-  /**
-   * Validates the node state
-   *
-   * @returns Empty string (always valid)
-   */
-  protected validate(): string {
-    return '';
   }
   /**
    * Gets the output type
@@ -735,7 +716,7 @@ export class ConstantTextureCubeNode extends BaseTextureNode {
    * @returns 'texCube'
    */
   protected getType(): string {
-    return 'texCube';
+    return this.validate() ? '' : 'texCube';
   }
 }
 
@@ -829,7 +810,32 @@ export class TextureSampleNode extends BaseGraphNode {
     this._outputs = [
       {
         id: 1,
-        name: ''
+        name: 'RGBA'
+      },
+      {
+        id: 2,
+        name: 'R',
+        swizzle: 'r'
+      },
+      {
+        id: 3,
+        name: 'G',
+        swizzle: 'g'
+      },
+      {
+        id: 4,
+        name: 'B',
+        swizzle: 'b'
+      },
+      {
+        id: 5,
+        name: 'A',
+        swizzle: 'a'
+      },
+      {
+        id: 6,
+        name: 'RGB',
+        swizzle: 'rgb'
       }
     ];
     this._inputs = [
@@ -860,7 +866,7 @@ export class TextureSampleNode extends BaseGraphNode {
       ctor: TextureSampleNode,
       name: 'TextureSampleNode',
       getProps(): PropertyAccessor<TextureSampleNode>[] {
-        return [
+        return defineProps([
           {
             name: 'SamplerType',
             type: 'string',
@@ -877,7 +883,7 @@ export class TextureSampleNode extends BaseGraphNode {
               this.samplerType = value.str[0] as any;
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -908,14 +914,14 @@ export class TextureSampleNode extends BaseGraphNode {
     if (err) {
       return err;
     }
-    const type0 = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    const type0 = this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
     if (!type0) {
       return `Cannot determine type of argument \`${this._inputs[0].name}\``;
     }
     if (!this._inputs[0].type.includes(type0)) {
       return `Invalid input type of argument \`${this._inputs[0].name}\`: ${type0}`;
     }
-    const type1 = this._inputs[1].inputNode.getOutputType(this._inputs[1].inputId);
+    const type1 = this._inputs[1].inputNode!.getOutputType(this._inputs[1].inputId!);
     if (!type1) {
       return `Cannot determine type of argument \`${this._inputs[1].name}\``;
     }
@@ -927,11 +933,19 @@ export class TextureSampleNode extends BaseGraphNode {
   }
   /**
    * Gets the output type
-   *
-   * @returns 'vec4' (RGBA color)
    */
-  protected getType(): string {
-    return 'vec4';
+  protected getType(id: number) {
+    const err = this.validate();
+    if (err) {
+      return '';
+    }
+    if (id === 1) {
+      return 'vec4';
+    } else if (id === 6) {
+      return 'vec3';
+    } else {
+      return 'float';
+    }
   }
 }
 
@@ -1013,7 +1027,7 @@ export class TextureSampleGrad extends BaseGraphNode {
       ctor: TextureSampleNode,
       name: 'TextureSampleNode',
       getProps(): PropertyAccessor<TextureSampleNode>[] {
-        return [
+        return defineProps([
           {
             name: 'SamplerType',
             type: 'string',
@@ -1030,7 +1044,7 @@ export class TextureSampleGrad extends BaseGraphNode {
               this.samplerType = value.str[0] as any;
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -1058,14 +1072,14 @@ export class TextureSampleGrad extends BaseGraphNode {
     if (err) {
       return err;
     }
-    const type0 = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    const type0 = this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
     if (!type0) {
       return `Cannot determine type of argument \`${this._inputs[0].name}\``;
     }
     if (!this._inputs[0].type.includes(type0)) {
       return `Invalid input type of argument \`${this._inputs[0].name}\`: ${type0}`;
     }
-    const type1 = this._inputs[1].inputNode.getOutputType(this._inputs[1].inputId);
+    const type1 = this._inputs[1].inputNode!.getOutputType(this._inputs[1].inputId!);
     if (!type1) {
       return `Cannot determine type of argument \`${this._inputs[1].name}\``;
     }

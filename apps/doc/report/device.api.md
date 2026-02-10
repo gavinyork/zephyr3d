@@ -7,7 +7,9 @@
 import { CubeFace } from '@zephyr3d/base';
 import { IDisposable } from '@zephyr3d/base';
 import { IEventTarget } from '@zephyr3d/base';
+import { Immutable } from '@zephyr3d/base';
 import { MaybeArray } from '@zephyr3d/base';
+import { Nullable } from '@zephyr3d/base';
 import { Observable } from '@zephyr3d/base';
 import { TypedArray } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
@@ -17,99 +19,100 @@ import { VectorBase } from '@zephyr3d/base';
 export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     beginCapture(): void;
     beginFrame(): boolean;
-    buildComputeProgram(options: PBComputeOptions): GPUProgram;
-    buildRenderProgram(options: PBRenderOptions): GPUProgram;
-    cancelNextFrame(handle: number): any;
+    buildComputeProgram(options: PBComputeOptions): Nullable<GPUProgram>;
+    buildRenderProgram(options: PBRenderOptions): Nullable<GPUProgram>;
+    cancelNextFrame(handle: number): void;
     canvas: HTMLCanvasElement;
-    clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number): any;
+    clearFrameBuffer(clearColor: Nullable<Vector4>, clearDepth: Nullable<number>, clearStencil: Nullable<number>): void;
     compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number): void;
-    copyBuffer(sourceBuffer: GPUDataBuffer, destBuffer: GPUDataBuffer, srcOffset: number, dstOffset: number, bytes: number): any;
-    copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number): any;
-    copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number): any;
-    createBindGroup(layout: BindGroupLayout): BindGroup;
+    copyBuffer(sourceBuffer: GPUDataBuffer, destBuffer: GPUDataBuffer, srcOffset: number, dstOffset: number, bytes: number): void;
+    copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number): void;
+    copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number): void;
+    createBindGroup(layout: Immutable<BindGroupLayout>): BindGroup;
     createBlendingState(): BlendingState;
     createBuffer(sizeInBytes: number, options: BufferCreationOptions): GPUDataBuffer;
     createColorState(): ColorState;
-    createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube;
+    createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): Nullable<TextureCube>;
     createDepthState(): DepthState;
-    createFrameBuffer(colorAttachments: BaseTexture[], depthAttachment: BaseTexture, options?: FrameBufferOptions): FrameBuffer;
+    createFrameBuffer(colorAttachments: BaseTexture[], depthAttachment: Nullable<BaseTexture>, options?: Nullable<FrameBufferOptions>): FrameBuffer;
     createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
+    createGPUTimer(): Nullable<ITimer>;
     createIndexBuffer(data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>, options?: BufferCreationOptions): IndexBuffer;
-    createInterleavedVertexBuffer(attribFormats: VertexAttribFormat[], data: TypedArray, options?: BufferCreationOptions): StructuredBuffer;
+    createInterleavedVertexBuffer(attribFormats: VertexAttribFormat[], data: TypedArray, options?: BufferCreationOptions): Nullable<StructuredBuffer>;
     createRasterizerState(): RasterizerState;
     createRenderStateSet(): RenderStateSet;
     createSampler(options: SamplerOptions): TextureSampler;
     createStencilState(): StencilState;
     createStructuredBuffer(structureType: PBStructTypeInfo, options: BufferCreationOptions, data?: TypedArray): StructuredBuffer;
-    createTexture2D(format: TextureFormat, width: number, height: number, options?: TextureCreationOptions): Texture2D;
-    createTexture2DArray(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Texture2DArray;
-    createTexture2DArrayFromImages(elements: TextureImageElement[], sRGB: boolean, options?: TextureCreationOptions): Texture2DArray;
-    createTexture2DFromImage(element: TextureImageElement, sRGB: boolean, options?: TextureCreationOptions): Texture2D;
-    createTexture3D(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Texture3D;
-    createTextureFromMipmapData<T extends BaseTexture = BaseTexture>(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): T;
+    createTexture2D(format: TextureFormat, width: number, height: number, options?: TextureCreationOptions): Nullable<Texture2D>;
+    createTexture2DArray(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Nullable<Texture2DArray>;
+    createTexture2DArrayFromImages(elements: TextureImageElement[], sRGB: boolean, options?: TextureCreationOptions): Nullable<Texture2DArray>;
+    createTexture2DFromImage(element: TextureImageElement, sRGB: boolean, options?: TextureCreationOptions): Nullable<Texture2D>;
+    createTexture3D(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Nullable<Texture3D>;
+    createTextureFromMipmapData<T extends BaseTexture = BaseTexture>(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): Nullable<T>;
     createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
-    createVertexBuffer(attribFormat: VertexAttribFormat, data: TypedArray, options?: BufferCreationOptions): StructuredBuffer;
+    createVertexBuffer(attribFormat: VertexAttribFormat, data: TypedArray, options?: BufferCreationOptions): Nullable<StructuredBuffer>;
     createVertexLayout(options: VertexLayoutOptions): VertexLayout;
-    deviceToScreen(val: number): number;
+    deviceXToScreen(val: number): number;
+    deviceYToScreen(val: number): number;
     draw(primitiveType: PrimitiveType, first: number, count: number): void;
     drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number): void;
-    drawText(text: string, x: number, y: number, color: string): any;
+    drawText(text: string, x: number, y: number, color: string, viewport?: Immutable<number[]>): void;
     endCapture(): RenderBundle;
     endFrame(): void;
-    executeRenderBundle(renderBundle: RenderBundle): any;
+    executeRenderBundle(renderBundle: RenderBundle): void;
     exitLoop(): void;
     flush(): void;
     frameInfo: FrameInfo;
     getAdapterInfo(): any;
     getBackBufferHeight(): number;
     getBackBufferWidth(): number;
-    getBindGroup(index: number): [BindGroup, Iterable<number>];
-    getDeviceCaps(): DeviceCaps;
+    getBindGroup(index: number): [BindGroup, Nullable<Iterable<number>>];
+    getDeviceCaps(): Immutable<DeviceCaps>;
     getDrawingBufferHeight(): number;
     getDrawingBufferWidth(): number;
-    getFramebuffer(): FrameBuffer;
+    getFramebuffer(): Nullable<FrameBuffer>;
     getFrameBufferSampleCount(): number;
-    getGPUObjectById(uid: number): GPUObject;
+    getGPUObjectById(uid: number): Nullable<GPUObject>;
     getGPUObjects(): GPUObjectList;
     getPool(key: string | symbol): Pool;
-    getProgram(): GPUProgram;
-    getRenderStates(): RenderStateSet;
-    getScale(): number;
-    getScissor(): DeviceViewport;
-    getVertexAttribFormat(semantic: VertexSemantic, dataType: DataType, componentCount: number): VertexAttribFormat;
-    getVertexLayout(): VertexLayout;
-    getViewport(): DeviceViewport;
+    getProgram(): Nullable<GPUProgram>;
+    getRenderStates(): Nullable<RenderStateSet>;
+    getScaleX(): number;
+    getScaleY(): number;
+    getScissor(): Immutable<DeviceViewport>;
+    getVertexAttribFormat(semantic: VertexSemantic, dataType: DataType, componentCount: number): Nullable<VertexAttribFormat>;
+    getVertexLayout(): Nullable<VertexLayout>;
+    getViewport(): Immutable<DeviceViewport>;
     isContextLost(): boolean;
     isRendering: boolean;
     isWindingOrderReversed(): boolean;
     nextFrame(callback: () => void): number;
     pool: Pool;
     poolExists(key: string | symbol): boolean;
-    popDeviceStates(): any;
+    popDeviceStates(): void;
     programBuilder: ProgramBuilder;
-    pushDeviceStates(): any;
+    pushDeviceStates(): void;
     readPixels(index: number, x: number, y: number, w: number, h: number, buffer: TypedArray): Promise<void>;
     readPixelsToBuffer(index: number, x: number, y: number, w: number, h: number, buffer: GPUDataBuffer): void;
     reverseVertexWindingOrder(reverse: boolean): void;
     runLoop(func: (device: AbstractDevice) => void): void;
-    runLoopFunction: (device: AbstractDevice) => void;
+    runLoopFunction: Nullable<(device: AbstractDevice) => void>;
     runNextFrame(f: () => void): void;
     runNextFrameAsync(f: () => void): Promise<void>;
-    screenToDevice(val: number): number;
-    setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>): any;
-    setFont(fontName: string): any;
-    setFramebuffer(rt: FrameBuffer): any;
-    setFramebuffer(color: (BaseTexture | {
-        texture: BaseTexture;
-        miplevel?: number;
-        face?: number;
-        layer?: number;
-    })[], depth?: BaseTexture, miplevel?: number, face?: number, sampleCount?: number): any;
-    setProgram(program: GPUProgram): void;
-    setRenderStates(renderStates: RenderStateSet): void;
-    setScissor(scissor?: DeviceViewport | number[]): void;
-    setVertexLayout(vertexData: VertexLayout): void;
-    setViewport(vp?: DeviceViewport | number[]): void;
+    screenXToDevice(val: number): number;
+    screenYToDevice(val: number): number;
+    setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Nullable<Iterable<number>>): void;
+    setFont(fontName: string): void;
+    setFramebuffer(rt: Nullable<FrameBuffer>): void;
+    setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number): void;
+    // (undocumented)
+    setFramebuffer(colorOrRT: BaseTexture[] | Nullable<FrameBuffer>, depth?: BaseTexture, sampleCount?: number): void;
+    setProgram(program: Nullable<GPUProgram>): void;
+    setRenderStates(renderStates: Nullable<RenderStateSet>): void;
+    setScissor(scissor: Nullable<Immutable<DeviceViewport | number[]>>): void;
+    setVertexLayout(vertexData: Nullable<VertexLayout>): void;
+    setViewport(vp: Nullable<Immutable<DeviceViewport | number[]>>): void;
     type: string;
     videoMemoryUsage: number;
     vSync: boolean;
@@ -151,7 +154,7 @@ export interface BaseCreationOptions {
 
 // @public
 export abstract class BaseDevice extends Observable<DeviceEventMap> {
-    constructor(cvs: HTMLCanvasElement, backend: DeviceBackend);
+    constructor(cvs: HTMLCanvasElement, backend: DeviceBackend, dpr?: number);
     // (undocumented)
     addGPUObject(obj: GPUObject): void;
     // (undocumented)
@@ -167,11 +170,11 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     protected _beginFrameTime: number;
     // (undocumented)
-    buildComputeProgram(options: PBComputeOptions): GPUProgram;
+    buildComputeProgram(options: PBComputeOptions): Nullable<GPUProgram<unknown>>;
     // (undocumented)
-    buildRenderProgram(options: PBRenderOptions): GPUProgram;
+    buildRenderProgram(options: PBRenderOptions): Nullable<GPUProgram<unknown>>;
     // (undocumented)
-    abstract cancelNextFrame(handle: number): any;
+    abstract cancelNextFrame(handle: number): void;
     // (undocumented)
     get canvas(): HTMLCanvasElement;
     // (undocumented)
@@ -181,21 +184,21 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     protected _canvasClientWidth: number;
     // (undocumented)
-    abstract clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number): any;
+    abstract clearFrameBuffer(clearColor: Nullable<Vector4>, clearDepth: Nullable<number>, clearStencil: Nullable<number>): void;
     // (undocumented)
-    compute(workgroupCountX: any, workgroupCountY: any, workgroupCountZ: any): void;
+    compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number): void;
     // (undocumented)
     protected abstract _compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number): void;
     // (undocumented)
-    abstract copyBuffer(sourceBuffer: GPUDataBuffer, destBuffer: GPUDataBuffer, srcOffset: number, dstOffset: number, bytes: number): any;
+    abstract copyBuffer(sourceBuffer: GPUDataBuffer, destBuffer: GPUDataBuffer, srcOffset: number, dstOffset: number, bytes: number): void;
     // (undocumented)
-    abstract copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number): any;
+    abstract copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number): void;
     // (undocumented)
-    abstract copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number): any;
+    abstract copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number): void;
     // (undocumented)
     protected _cpuTimer: CPUTimer;
     // (undocumented)
-    abstract createBindGroup(layout: BindGroupLayout): BindGroup;
+    abstract createBindGroup(layout: Immutable<BindGroupLayout>): BindGroup;
     // (undocumented)
     abstract createBlendingState(): BlendingState;
     // (undocumented)
@@ -203,19 +206,19 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     abstract createColorState(): ColorState;
     // (undocumented)
-    abstract createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube;
+    abstract createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): Nullable<TextureCube>;
     // (undocumented)
     abstract createDepthState(): DepthState;
     // (undocumented)
-    abstract createFrameBuffer(colorAttachments: BaseTexture[], depthAttachment: BaseTexture, options?: FrameBufferOptions): FrameBuffer;
+    abstract createFrameBuffer(colorAttachments: BaseTexture[], depthAttachment: Nullable<BaseTexture>, options?: Nullable<FrameBufferOptions>): FrameBuffer;
     // (undocumented)
     abstract createGPUProgram(params: GPUProgramConstructParams): GPUProgram;
     // (undocumented)
-    abstract createGPUTimer(): ITimer;
+    abstract createGPUTimer(): Nullable<ITimer>;
     // (undocumented)
     abstract createIndexBuffer(data: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>, options?: BufferCreationOptions): IndexBuffer;
     // (undocumented)
-    createInterleavedVertexBuffer(attribFormats: VertexAttribFormat[], data: TypedArray, options?: BufferCreationOptions): StructuredBuffer;
+    createInterleavedVertexBuffer(attribFormats: VertexAttribFormat[], data: TypedArray, options?: BufferCreationOptions): StructuredBuffer<unknown> | null;
     // (undocumented)
     abstract createRasterizerState(): RasterizerState;
     // (undocumented)
@@ -227,31 +230,35 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     abstract createStructuredBuffer(structureType: PBStructTypeInfo, options: BufferCreationOptions, data?: TypedArray): StructuredBuffer;
     // (undocumented)
-    abstract createTexture2D(format: TextureFormat, width: number, height: number, options?: TextureCreationOptions): Texture2D;
+    abstract createTexture2D(format: TextureFormat, width: number, height: number, options?: TextureCreationOptions): Nullable<Texture2D>;
     // (undocumented)
-    abstract createTexture2DArray(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Texture2DArray;
+    abstract createTexture2DArray(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Nullable<Texture2DArray>;
     // (undocumented)
-    abstract createTexture2DArrayFromImages(elements: TextureImageElement[], sRGB: boolean, options?: TextureCreationOptions): Texture2DArray;
+    abstract createTexture2DArrayFromImages(elements: TextureImageElement[], sRGB: boolean, options?: TextureCreationOptions): Nullable<Texture2DArray>;
     // (undocumented)
-    abstract createTexture2DFromImage(element: TextureImageElement, sRGB: boolean, options?: TextureCreationOptions): Texture2D;
+    abstract createTexture2DFromImage(element: TextureImageElement, sRGB: boolean, options?: TextureCreationOptions): Nullable<Texture2D>;
     // (undocumented)
-    abstract createTexture3D(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Texture3D;
+    abstract createTexture3D(format: TextureFormat, width: number, height: number, depth: number, options?: TextureCreationOptions): Nullable<Texture3D>;
     // (undocumented)
-    abstract createTextureFromMipmapData<T extends BaseTexture>(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): T;
+    abstract createTextureFromMipmapData<T extends BaseTexture>(data: TextureMipmapData, sRGB: boolean, options?: TextureCreationOptions): Nullable<T>;
     // (undocumented)
     abstract createTextureVideo(el: HTMLVideoElement, samplerOptions?: SamplerOptions): TextureVideo;
     // (undocumented)
-    createVertexBuffer(attribFormat: VertexAttribFormat, data: TypedArray, options?: BufferCreationOptions): StructuredBuffer;
+    createVertexBuffer(attribFormat: VertexAttribFormat, data: TypedArray, options?: BufferCreationOptions): StructuredBuffer<unknown> | null;
     // (undocumented)
     abstract createVertexLayout(options: VertexLayoutOptions): VertexLayout;
     // (undocumented)
     protected _defaultPoolKey: symbol;
     // (undocumented)
-    deviceToScreen(val: number): number;
+    deviceXToScreen(val: number): number;
+    // (undocumented)
+    deviceYToScreen(val: number): number;
     // (undocumented)
     disposeObject(obj: GPUObject, remove?: boolean): void;
     // (undocumented)
     protected _disposeObjectList: GPUObject[];
+    // (undocumented)
+    protected _dpr: number;
     // (undocumented)
     draw(primitiveType: PrimitiveType, first: number, count: number): void;
     // (undocumented)
@@ -261,7 +268,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     protected abstract _drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number): void;
     // (undocumented)
-    drawText(text: string, x: number, y: number, color: string): void;
+    drawText(text: string, x: number, y: number, color: string, viewport?: Immutable<number[]>): void;
     // (undocumented)
     enableGPUTimeRecording(enable: boolean): void;
     // (undocumented)
@@ -294,45 +301,51 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     abstract getBackBufferWidth(): number;
     // (undocumented)
-    abstract getBindGroup(index: number): [BindGroup, Iterable<number>];
+    abstract getBindGroup(index: number): [BindGroup, Nullable<Iterable<number>>];
     // (undocumented)
-    abstract getDeviceCaps(): DeviceCaps;
+    abstract getDeviceCaps(): Immutable<DeviceCaps>;
     // (undocumented)
     abstract getDrawingBufferHeight(): number;
     // (undocumented)
     abstract getDrawingBufferWidth(): number;
     // (undocumented)
-    abstract getFramebuffer(): FrameBuffer;
+    abstract getFramebuffer(): Nullable<FrameBuffer>;
     // (undocumented)
     abstract getFrameBufferSampleCount(): number;
     // (undocumented)
-    getGPUObjectById(uid: number): GPUObject;
+    getGPUObjectById(uid: number): GPUDataBuffer<unknown> | BaseTexture<unknown> | VertexLayout<unknown> | FrameBuffer<unknown> | TextureSampler<unknown> | GPUProgram<unknown> | null;
     // (undocumented)
     getGPUObjects(): GPUObjectList;
     // (undocumented)
     getPool(key: string | symbol): Pool;
     // (undocumented)
-    abstract getProgram(): GPUProgram;
+    abstract getProgram(): Nullable<GPUProgram>;
     // (undocumented)
-    abstract getRenderStates(): RenderStateSet;
+    abstract getRenderStates(): Nullable<RenderStateSet>;
     // (undocumented)
-    abstract getScale(): number;
+    getScaleX(): number;
     // (undocumented)
-    abstract getScissor(): DeviceViewport;
+    getScaleY(): number;
     // (undocumented)
-    getVertexAttribFormat(semantic: VertexSemantic, dataType: DataType, componentCount: number): VertexAttribFormat;
+    abstract getScissor(): Immutable<DeviceViewport>;
     // (undocumented)
-    abstract getVertexLayout(): VertexLayout;
+    getVertexAttribFormat(semantic: VertexSemantic, dataType: DataType, componentCount: number): VertexAttribFormat | null;
     // (undocumented)
-    abstract getViewport(): DeviceViewport;
+    abstract getVertexLayout(): Nullable<VertexLayout>;
+    // (undocumented)
+    abstract getViewport(): Immutable<DeviceViewport>;
     // (undocumented)
     protected _gpuMemCost: number;
     // (undocumented)
     protected _gpuObjectList: GPUObjectList;
     // (undocumented)
-    protected _gpuTimer: ITimer;
+    protected _gpuTimer: Nullable<ITimer>;
+    // (undocumented)
+    protected abstract _handleResize(cssWidth: number, cssHeight: number, deviceWidth: number, deviceHeight: number): void;
     // (undocumented)
     abstract initContext(): Promise<void>;
+    // (undocumented)
+    protected initResizer(): Promise<void>;
     // (undocumented)
     protected invalidateAll(): void;
     // (undocumented)
@@ -350,7 +363,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     protected abstract onEndFrame(): void;
     // (undocumented)
-    protected parseBufferOptions(options: BufferCreationOptions, defaultUsage?: BufferUsage): number;
+    protected parseBufferOptions(options?: BufferCreationOptions, defaultUsage?: BufferUsage): number;
     // (undocumented)
     protected parseTextureOptions(options?: TextureCreationOptions): number;
     // (undocumented)
@@ -384,37 +397,39 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     runLoop(func: (device: AbstractDevice) => void): void;
     // (undocumented)
-    protected _runLoopFunc: (device: AbstractDevice) => void;
+    protected _runLoopFunc: Nullable<(device: AbstractDevice) => void>;
     // (undocumented)
-    get runLoopFunction(): (device: AbstractDevice) => void;
+    get runLoopFunction(): Nullable<(device: AbstractDevice) => void>;
     // (undocumented)
     runNextFrame(f: () => void): void;
     // (undocumented)
     runNextFrameAsync(f: () => void | Promise<void>): Promise<void>;
     // (undocumented)
-    protected _runningLoop: number;
+    protected _runningLoop: Nullable<number>;
     // (undocumented)
-    screenToDevice(val: number): number;
+    screenXToDevice(val: number): number;
     // (undocumented)
-    abstract setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>): any;
+    screenYToDevice(val: number): number;
+    // (undocumented)
+    abstract setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Nullable<Iterable<number>>): void;
     // (undocumented)
     setFont(fontName: string): void;
     // (undocumented)
-    setFramebuffer(rt: FrameBuffer): any;
+    setFramebuffer(rt: Nullable<FrameBuffer>): void;
     // (undocumented)
-    setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number): any;
+    setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number): void;
     // (undocumented)
-    protected abstract _setFramebuffer(fb: FrameBuffer): any;
+    protected abstract _setFramebuffer(fb: Nullable<FrameBuffer>): void;
     // (undocumented)
-    abstract setProgram(program: GPUProgram): void;
+    abstract setProgram(program: Nullable<GPUProgram>): void;
     // (undocumented)
-    abstract setRenderStates(renderStates: RenderStateSet): void;
+    abstract setRenderStates(renderStates: Nullable<RenderStateSet>): void;
     // (undocumented)
-    abstract setScissor(scissor?: number[] | DeviceViewport): void;
+    abstract setScissor(scissor: Nullable<Immutable<number[] | DeviceViewport>>): void;
     // (undocumented)
-    abstract setVertexLayout(vertexData: VertexLayout): void;
+    abstract setVertexLayout(vertexData: Nullable<VertexLayout>): void;
     // (undocumented)
-    abstract setViewport(vp?: number[] | DeviceViewport): void;
+    abstract setViewport(vp: Nullable<Immutable<number[] | DeviceViewport>>): void;
     // (undocumented)
     protected _temporalFramebuffer: boolean;
     // (undocumented)
@@ -471,7 +486,7 @@ export interface BaseTexture<T = unknown> extends GPUObject<T> {
     // (undocumented)
     readPixelsToBuffer(x: number, y: number, w: number, h: number, faceOrLayer: number, mipLevel: number, buffer: GPUDataBuffer): void;
     // (undocumented)
-    samplerOptions: SamplerOptions;
+    samplerOptions: Nullable<Immutable<SamplerOptions>>;
     // (undocumented)
     readonly target: TextureType;
     // (undocumented)
@@ -481,27 +496,27 @@ export interface BaseTexture<T = unknown> extends GPUObject<T> {
 // @public
 export interface BindGroup extends GPUObject<unknown> {
     // (undocumented)
-    getBuffer(name: string, nocreate?: boolean): GPUDataBuffer;
+    getBuffer(name: string, nocreate?: boolean): Nullable<GPUDataBuffer>;
     // (undocumented)
-    getDynamicOffsets(): number[];
+    getDynamicOffsets(): Nullable<Immutable<number[]>>;
     // (undocumented)
     getGPUId(): string;
     // (undocumented)
-    getLayout(): BindGroupLayout;
+    getLayout(): Immutable<BindGroupLayout>;
     // (undocumented)
-    getTexture(name: string): BaseTexture;
+    getTexture(name: string): Nullable<BaseTexture>;
     // (undocumented)
     setBuffer(name: string, buffer: GPUDataBuffer, offset?: number, bindOffset?: number, bindSize?: number): void;
     // (undocumented)
-    setRawData(name: string, byteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number): any;
+    setRawData(name: string, byteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number): void;
     // (undocumented)
-    setSampler(name: string, sampler: TextureSampler): any;
+    setSampler(name: string, sampler: TextureSampler): void;
     // (undocumented)
-    setTexture(name: string, texture: BaseTexture, sampler?: TextureSampler): any;
+    setTexture(name: string, texture: BaseTexture, sampler?: Nullable<TextureSampler>): void;
     // (undocumented)
-    setTextureView(name: string, value: BaseTexture, level?: number, face?: number, mipCount?: number, sampler?: TextureSampler): any;
+    setTextureView(name: string, value: BaseTexture, level?: number, face?: number, mipCount?: number, sampler?: Nullable<TextureSampler>): void;
     // (undocumented)
-    setValue(name: string, value: StructuredValue): any;
+    setValue(name: string, value: StructuredValue): void;
 }
 
 // @public
@@ -633,9 +648,9 @@ export interface DepthState {
 // @public
 export interface DeviceBackend {
     // (undocumented)
-    createDevice(cvs: HTMLCanvasElement, options?: DeviceOptions): Promise<AbstractDevice>;
+    createDevice(cvs: HTMLCanvasElement, options?: DeviceOptions): Promise<Nullable<AbstractDevice>>;
     // (undocumented)
-    supported(): boolean;
+    supported(): Promise<boolean>;
     // (undocumented)
     typeName(): string;
 }
@@ -650,7 +665,7 @@ export interface DeviceCaps {
 
 // @public
 export type DeviceEventMap = {
-    resize: [width: number, height: number];
+    resize: [cssWidth: number, cssHeight: number, deviceWidth: number, deviceHeight: number];
     devicelost: [];
     devicerestored: [];
     gpuobject_added: [obj: GPUObject];
@@ -675,7 +690,7 @@ export type DeviceViewport = {
 
 // @public
 export class DrawText {
-    static drawText(device: AbstractDevice, text: string, color: string, x: number, y: number): void;
+    static drawText(device: AbstractDevice, text: string, color: string, x: number, y: number, viewport?: Immutable<number[]>): void;
     static setFont(device: AbstractDevice, name: string): void;
 }
 
@@ -687,7 +702,7 @@ export type ExpValueType = ExpValueNonArrayType | Array<ExpValueType>;
 
 // @public
 export interface ExternalTextureBindingLayout {
-    autoBindSampler: string;
+    autoBindSampler: Nullable<string>;
 }
 
 // @public
@@ -731,7 +746,7 @@ export interface FrameBuffer<T = unknown> extends GPUObject<T> {
     // (undocumented)
     getColorAttachments(): BaseTexture[];
     // (undocumented)
-    getDepthAttachment(): BaseTexture;
+    getDepthAttachment(): Nullable<BaseTexture>;
     // (undocumented)
     getDepthAttachmentCubeFace(): CubeFace;
     // (undocumented)
@@ -822,10 +837,10 @@ export function getTextureFormatBlockSize(format: TextureFormat): number;
 export function getTextureFormatBlockWidth(format: TextureFormat): number;
 
 // @public
-export function getVertexAttribByName(name: VertexSemantic): number;
+export function getVertexAttribByName(name: Nullable<VertexSemantic>): 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 13 | 12 | undefined;
 
 // @public
-export function getVertexAttribFormat(semantic: VertexSemantic, type: DataType, count: number): VertexAttribFormat;
+export function getVertexAttribFormat(semantic: VertexSemantic, type: DataType, count: number): VertexAttribFormat | null;
 
 // @public
 export function getVertexAttribName(attrib: number): VertexSemantic;
@@ -834,32 +849,34 @@ export function getVertexAttribName(attrib: number): VertexSemantic;
 export function getVertexAttributeFormat(fmt: VertexAttribFormat): "f32" | "i32" | "u32" | "u8norm" | "i8norm" | "u16" | "i16" | "u16norm" | "i16norm" | "f16";
 
 // @public
-export function getVertexAttributeIndex(fmt: VertexAttribFormat): number;
+export function getVertexAttributeIndex(fmt: VertexAttribFormat): 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 13 | 12;
 
 // @public
-export function getVertexBufferAttribType(vertexBufferType: PBStructTypeInfo, attrib: number): PBPrimitiveTypeInfo;
+export function getVertexBufferAttribType(vertexBufferType: Immutable<PBStructTypeInfo>, attrib: number): PBPrimitiveTypeInfo | null;
 
 // @public
-export function getVertexBufferAttribTypeBySemantic(vertexBufferType: PBStructTypeInfo, semantic: VertexSemantic): PBPrimitiveTypeInfo;
+export function getVertexBufferAttribTypeBySemantic(vertexBufferType: Immutable<PBStructTypeInfo>, semantic: VertexSemantic): PBPrimitiveTypeInfo | null;
 
 // @public
 export function getVertexBufferLength(vertexBufferType: PBStructTypeInfo): number;
 
 // @public
-export function getVertexBufferStride(vertexBufferType: PBStructTypeInfo): number;
+export function getVertexBufferStride(vertexBufferType: Immutable<PBStructTypeInfo>): number;
 
 // @public
-export function getVertexFormatComponentCount(fmt: VertexAttribFormat): number;
+export function getVertexFormatComponentCount(fmt: VertexAttribFormat): 1 | 2 | 3 | 4;
 
 // @public
-export function getVertexFormatSize(fmt: VertexAttribFormat): number;
+export function getVertexFormatSize(fmt: VertexAttribFormat): 2 | 4 | 6 | 8 | 16 | 12;
 
 // @public
 export class GlyphManager extends TextureAtlasManager {
     constructor(device: AbstractDevice, binWidth: number, binHeight: number, border: number);
     clipStringToWidth(str: string, width: number, charMargin: number, start: number, font: Font): number;
     getCharWidth(char: string, font: Font): number;
-    getGlyphInfo(char: string, font: Font): AtlasInfo;
+    // (undocumented)
+    getGlyphInfo(char: string, font: Font): AtlasInfo | null;
+    getGlyphSize(char: string, font: Font): number[] | null;
     measureStringWidth(str: string, charMargin: number, font: Font): number;
 }
 
@@ -870,7 +887,7 @@ export interface GPUDataBuffer<T = unknown> extends GPUObject<T> {
     // (undocumented)
     readonly byteLength: number;
     // (undocumented)
-    getBufferSubData(dstBuffer?: Uint8Array<ArrayBuffer>, offsetInBytes?: number, sizeInBytes?: number): Promise<Uint8Array<ArrayBuffer>>;
+    getBufferSubData(dstBuffer?: Nullable<Uint8Array<ArrayBuffer>>, offsetInBytes?: number, sizeInBytes?: number): Promise<Uint8Array<ArrayBuffer>>;
     // (undocumented)
     readonly usage: number;
 }
@@ -912,13 +929,13 @@ export interface GPUObject<T = unknown> extends IDisposable {
     isVertexLayout(): this is VertexLayout;
     // (undocumented)
     name: string;
-    readonly object: T;
+    readonly object: Nullable<T>;
     // (undocumented)
     reload(): void;
     // (undocumented)
     restore(): void;
     // (undocumented)
-    restoreHandler: (tex: GPUObject) => void;
+    restoreHandler: Nullable<(tex: GPUObject) => void>;
     readonly uid: number;
 }
 
@@ -936,15 +953,15 @@ export interface GPUObjectList {
 // @public
 export interface GPUProgram<T = unknown> extends GPUObject<T> {
     // (undocumented)
-    readonly bindGroupLayouts: BindGroupLayout[];
+    readonly bindGroupLayouts: Immutable<BindGroupLayout[]>;
     // (undocumented)
-    createUniformBuffer(uniform: string): StructuredBuffer;
+    createUniformBuffer(uniform: string): Nullable<StructuredBuffer>;
     // (undocumented)
-    getBindingInfo(name: string): BindPointInfo;
+    getBindingInfo(name: string): Nullable<BindPointInfo>;
     // (undocumented)
-    getCompileError(): string;
+    getCompileError(): Nullable<string>;
     // (undocumented)
-    getShaderSource(kind: ShaderKind): string;
+    getShaderSource(kind: ShaderKind): Nullable<string>;
     // (undocumented)
     readonly type: 'render' | 'compute';
     // (undocumented)
@@ -1044,10 +1061,10 @@ export interface ITimer {
 }
 
 // @public
-export function linearTextureFormatToSRGB(format: TextureFormat): TextureFormat;
+export function linearTextureFormatToSRGB(format: TextureFormat): "rgba8snorm" | "r8unorm" | "r8snorm" | "r16f" | "r32f" | "r8ui" | "r8i" | "r16ui" | "r16i" | "r32ui" | "r32i" | "rg8unorm" | "rg8snorm" | "rg16f" | "rg32f" | "rg8ui" | "rg8i" | "rg16ui" | "rg16i" | "rg32ui" | "rg32i" | "rgba8unorm-srgb" | "bgra8unorm-srgb" | "rgba16f" | "rgba32f" | "rgba8ui" | "rgba8i" | "rgba16ui" | "rgba16i" | "rgba32ui" | "rgba32i" | "rg11b10uf" | "d16" | "d24" | "d32f" | "d24s8" | "d32fs8" | "dxt1-srgb" | "dxt3-srgb" | "dxt5-srgb" | "bc4" | "bc4-signed" | "bc5" | "bc5-signed" | "bc7-srgb" | "bc6h" | "bc6h-signed" | "astc-4x4-srgb" | "astc-5x4-srgb" | "astc-5x5-srgb" | "astc-6x5-srgb" | "astc-6x6-srgb" | "astc-8x5-srgb" | "astc-8x6-srgb" | "astc-8x8-srgb" | "astc-10x5-srgb" | "astc-10x6-srgb" | "astc-10x8-srgb" | "astc-10x10-srgb" | "astc-12x10-srgb" | "astc-12x12-srgb";
 
 // @public
-export function makeVertexBufferType(length: number, ...attributes: VertexAttribFormat[]): PBStructTypeInfo;
+export function makeVertexBufferType(length: number, ...attributes: Immutable<VertexAttribFormat[]>): PBStructTypeInfo | null;
 
 // @public
 export function matchVertexBuffer(buffer: StructuredBuffer, name: VertexSemantic): boolean;
@@ -1091,33 +1108,33 @@ export class PBAnyTypeInfo extends PBTypeInfo<null> {
     constructor();
     isAnyType(): this is PBAnyTypeInfo;
     isCompatibleType(_other: PBTypeInfo<TypeDetailInfo>): boolean;
-    toBufferLayout(_offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): null;
 }
 
 // @public
 export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
     constructor(elementType: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo, dimension?: number);
     get dimension(): number;
-    get elementType(): PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAnyTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo;
+    get elementType(): PBPrimitiveTypeInfo | PBArrayTypeInfo | PBStructTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo | PBAnyTypeInfo;
     haveAtomicMembers(): boolean;
     isArrayType(): this is PBArrayTypeInfo;
     // (undocumented)
     isCompatibleType(other: PBTypeInfo<TypeDetailInfo>): boolean;
-    toBufferLayout(_offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): null;
 }
 
 // @public
 export class PBAtomicI32TypeInfo extends PBTypeInfo<null> {
     constructor();
     haveAtomicMembers(): boolean;
-    toBufferLayout(_offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): null;
 }
 
 // @public
 export class PBAtomicU32TypeInfo extends PBTypeInfo<null> {
     constructor();
     haveAtomicMembers(): boolean;
-    toBufferLayout(_offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): null;
 }
 
 // @public
@@ -1159,7 +1176,7 @@ export class PBBuiltinScope extends PBScope {
 
 // @public
 export interface PBComputeOptions {
-    compute(this: PBGlobalScope, pb: ProgramBuilder): any;
+    compute(this: PBGlobalScope, pb: ProgramBuilder): void;
     label?: string;
     workgroupSize: [number, number, number];
 }
@@ -1192,8 +1209,8 @@ export class PBFunctionTypeInfo extends PBTypeInfo<FunctionTypeDetail> {
         byRef?: boolean;
     }[];
     get name(): string;
-    get returnType(): PBTypeInfo;
-    toBufferLayout(_offset: number): UniformBufferLayout;
+    get returnType(): PBTypeInfo<TypeDetailInfo>;
+    toBufferLayout(_offset: number): null;
 }
 
 // @public
@@ -1217,7 +1234,7 @@ export class PBInsideFunctionScope extends PBScope {
     $continue(): void;
     $do(body: (this: PBDoWhileScope) => void): PBDoWhileScope;
     $for(counter: PBShaderExp, init: number | PBShaderExp, end: number | PBShaderExp, open?: boolean | ((this: PBForScope) => void), reverse?: boolean | ((this: PBForScope) => void), body?: (this: PBForScope) => void): void;
-    $getMainScope(): PBFunctionScope;
+    $getMainScope(): Nullable<PBFunctionScope>;
     $if(condition: ExpValueNonArrayType, body: (this: PBIfScope) => void): PBIfScope;
     $return(retval?: ExpValueType): void;
     $scope(body: (this: PBInsideFunctionScope) => void): PBInsideFunctionScope;
@@ -1247,8 +1264,8 @@ export class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail> {
     set addressSpace(val: PBAddressSpace);
     haveAtomicMembers(): boolean;
     isPointerType(): this is PBPointerTypeInfo;
-    get pointerType(): PBTypeInfo;
-    toBufferLayout(_offset: number): UniformBufferLayout;
+    get pointerType(): PBTypeInfo<TypeDetailInfo>;
+    toBufferLayout(_offset: number): null;
 }
 
 // @public
@@ -1410,13 +1427,13 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
     resizeType(rows: number, cols: number): PBPrimitiveType;
     get rows(): number;
     get scalarType(): PBPrimitiveType;
-    toBufferLayout(_offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): null;
 }
 
 // @public
 export class PBReflection {
     constructor(builder: ProgramBuilder);
-    attribute(attrib: VertexSemantic): PBShaderExp;
+    attribute(attrib: VertexSemantic): PBShaderExp | null;
     clear(): void;
     hasVertexAttribute(attrib: number): boolean;
     tag(name: string): PBShaderExp;
@@ -1430,9 +1447,9 @@ export type PBReflectionTagGetter = (scope: PBGlobalScope) => PBShaderExp;
 
 // @public
 export interface PBRenderOptions {
-    fragment(this: PBGlobalScope, pb: ProgramBuilder): any;
+    fragment(this: PBGlobalScope, pb: ProgramBuilder): void;
     label?: string;
-    vertex(this: PBGlobalScope, pb: ProgramBuilder): any;
+    vertex(this: PBGlobalScope, pb: ProgramBuilder): void;
 }
 
 // @public
@@ -1449,7 +1466,7 @@ export enum PBSamplerAccessMode {
 export class PBSamplerTypeInfo extends PBTypeInfo<SamplerTypeDetail> {
     constructor(accessMode: PBSamplerAccessMode);
     get accessMode(): PBSamplerAccessMode;
-    toBufferLayout(_offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): null;
 }
 
 // @public
@@ -1457,7 +1474,7 @@ export class PBScope extends Proxiable<PBScope> {
     get $builder(): ProgramBuilder;
     get $builtins(): PBBuiltinScope;
     get $g(): PBGlobalScope;
-    $getVertexAttrib(semantic: VertexSemantic): PBShaderExp;
+    $getVertexAttrib(semantic: VertexSemantic): Nullable<PBShaderExp>;
     get $inputs(): PBInputScope;
     get $l(): PBLocalScope;
     get $outputs(): PBOutputScope;
@@ -1469,33 +1486,33 @@ export class PBScope extends Proxiable<PBScope> {
 // @public
 export class PBShaderExp extends Proxiable<PBShaderExp> {
     // (undocumented)
-    get $group(): number;
-    set $group(val: number);
+    get $group(): Nullable<number>;
+    set $group(val: Nullable<number>);
     // (undocumented)
     [name: string]: any;
     at(index: number | PBShaderExp): PBShaderExp;
-    attrib(attr: VertexSemantic): PBShaderExp;
+    attrib(attr: VertexSemantic): this;
     getTypeName(): string;
-    highp(): PBShaderExp;
+    highp(): this;
     // (undocumented)
-    inout(): PBShaderExp;
+    inout(): this;
     isConstructor(): boolean;
     isVector(): boolean;
-    lowp(): PBShaderExp;
-    mediump(): PBShaderExp;
+    lowp(): this;
+    mediump(): this;
     numComponents(): number;
     // (undocumented)
-    out(): PBShaderExp;
-    sampleType(type: 'float' | 'unfilterable-float' | 'sint' | 'uint' | 'depth'): PBShaderExp;
+    out(): this;
+    sampleType(type: 'float' | 'unfilterable-float' | 'sint' | 'uint' | 'depth'): this;
     setAt(index: number | PBShaderExp, val: number | boolean | PBShaderExp): void;
-    storage(group: number): PBShaderExp;
-    storageBuffer(group: number, bindingSize?: number): PBShaderExp;
-    storageBufferReadonly(group: number, bindingSize?: number): PBShaderExp;
-    storageReadonly(group: number): PBShaderExp;
-    tag(...args: ShaderExpTagValue[]): PBShaderExp;
-    uniform(group: number): PBShaderExp;
-    uniformBuffer(group: number, bindingSize?: number): PBShaderExp;
-    workgroup(): PBShaderExp;
+    storage(group: number): this;
+    storageBuffer(group: number, bindingSize?: number): this;
+    storageBufferReadonly(group: number, bindingSize?: number): this;
+    storageReadonly(group: number): this;
+    tag(...args: ShaderExpTagValue[]): this;
+    uniform(group: number): this;
+    uniformBuffer(group: number, bindingSize?: number): this;
+    workgroup(): this;
 }
 
 // @public
@@ -1503,7 +1520,7 @@ export type PBStructLayout = 'default' | 'std140' | 'std430' | 'packed';
 
 // @public
 export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
-    constructor(name: string, layout: PBStructLayout, members: {
+    constructor(name: Nullable<string>, layout: PBStructLayout, members: {
         name: string;
         type: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo | PBStructTypeInfo;
     }[]);
@@ -1522,8 +1539,8 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
         defaultAlignment: number;
         defaultSize: number;
     }[];
-    get structName(): string;
-    set structName(val: string);
+    get structName(): Nullable<string>;
+    set structName(val: Nullable<string>);
     toBufferLayout(offset: number, layout: PBStructLayout): UniformBufferLayout;
 }
 
@@ -1608,9 +1625,9 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
     isUIntTexture(): boolean;
     get readable(): boolean;
     set readable(val: boolean);
-    get storageTexelFormat(): TextureFormat;
+    get storageTexelFormat(): Nullable<TextureFormat>;
     get textureType(): PBTextureType;
-    toBufferLayout(_offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): null;
     get writable(): boolean;
     set writable(val: boolean);
 }
@@ -1629,7 +1646,7 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
     isStructType(): this is PBStructTypeInfo;
     isTextureType(): this is PBTextureTypeInfo;
     isVoidType(): this is PBVoidTypeInfo;
-    abstract toBufferLayout(offset: number, layout: PBStructLayout): UniformBufferLayout;
+    abstract toBufferLayout(offset: number, layout: PBStructLayout): Nullable<UniformBufferLayout>;
     get typeId(): string;
 }
 
@@ -1637,7 +1654,7 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
 export class PBVoidTypeInfo extends PBTypeInfo<null> {
     constructor();
     isVoidType(): this is PBVoidTypeInfo;
-    toBufferLayout(_offset: number): UniformBufferLayout;
+    toBufferLayout(_offset: number): null;
 }
 
 // @public
@@ -1655,10 +1672,10 @@ export class Pool {
     constructor(device: AbstractDevice, id: string | symbol, memCostThreshold?: number);
     // (undocumented)
     autoRelease(): void;
-    createTemporalFramebuffer(autoRelease: boolean, colorAttachments: BaseTexture[], depthAttachment?: BaseTexture, sampleCount?: number, ignoreDepthStencil?: boolean, attachmentMipLevel?: number, attachmentCubeface?: number, attachmentLayer?: number): FrameBuffer;
+    createTemporalFramebuffer(autoRelease: boolean, colorAttachments: BaseTexture[], depthAttachment?: Nullable<BaseTexture>, sampleCount?: number, ignoreDepthStencil?: boolean, attachmentMipLevel?: number, attachmentCubeface?: number, attachmentLayer?: number): FrameBuffer<unknown>;
     disposeFrameBuffer(fb: FrameBuffer): void;
     disposeTexture(texture: BaseTexture): void;
-    fetchTemporalFramebuffer<T extends BaseTexture<unknown>>(autoRelease: boolean, width: number, height: number, colorTexOrFormat: MaybeArray<TextureFormat | T>, depthTexOrFormat?: TextureFormat | T, mipmapping?: boolean, sampleCount?: number, ignoreDepthStencil?: boolean, attachmentMipLevel?: number, attachmentCubeface?: number, attachmentLayer?: number): FrameBuffer;
+    fetchTemporalFramebuffer<T extends BaseTexture<unknown>>(autoRelease: boolean, width: number, height: number, colorTexOrFormat: MaybeArray<TextureFormat | T>, depthTexOrFormat?: Nullable<TextureFormat | T>, mipmapping?: boolean, sampleCount?: number, ignoreDepthStencil?: boolean, attachmentMipLevel?: number, attachmentCubeface?: number, attachmentLayer?: number): FrameBuffer<unknown>;
     fetchTemporalTexture2D(autoRelease: boolean, format: TextureFormat, width: number, height: number, mipmapping?: boolean): Texture2D;
     fetchTemporalTexture2DArray(autoRelease: boolean, format: TextureFormat, width: number, height: number, numLayers: number, mipmapping?: boolean): Texture2DArray;
     fetchTemporalTextureCube(autoRelease: boolean, format: TextureFormat, size: number, mipmapping?: boolean): TextureCube;
@@ -1676,7 +1693,7 @@ export type PrimitiveType = 'triangle-list' | 'triangle-strip' | 'triangle-fan' 
 // @public
 export interface PrimitiveTypeDetail {
     // (undocumented)
-    primitiveType?: PBPrimitiveType;
+    primitiveType: PBPrimitiveType;
 }
 
 // @public
@@ -1685,11 +1702,11 @@ export interface ProgramBuilder {
     abs(val: number | PBShaderExp): PBShaderExp;
     acos(val: number | PBShaderExp): PBShaderExp;
     acosh(val: number | PBShaderExp): PBShaderExp;
-    add(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]): any;
-    add_2(x: number | PBShaderExp, y: number | PBShaderExp): any;
+    add(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]): PBShaderExp;
+    add_2(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
     addressOf(ref: PBShaderExp): PBShaderExp;
     all(x: PBShaderExp): PBShaderExp;
-    and(x: PBShaderExp | number | boolean, y: PBShaderExp | number | boolean, ...rest: (PBShaderExp | number | boolean)[]): any;
+    and(x: PBShaderExp | number | boolean, y: PBShaderExp | number | boolean, ...rest: (PBShaderExp | number | boolean)[]): PBShaderExp;
     and_2(x: PBShaderExp | number | boolean, y: PBShaderExp | number | boolean): PBShaderExp;
     any(x: PBShaderExp): PBShaderExp;
     arrayLength(x: PBShaderExp): PBShaderExp;
@@ -1719,11 +1736,11 @@ export interface ProgramBuilder {
     atomicAdd(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
     atomicAnd(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
     atomicExchange(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
-    atomicLoad(ptr: PBShaderExp): any;
+    atomicLoad(ptr: PBShaderExp): PBShaderExp;
     atomicMax(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
     atomicMin(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
     atomicOr(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
-    atomicStore(ptr: PBShaderExp, value: number | PBShaderExp): any;
+    atomicStore(ptr: PBShaderExp, value: number | PBShaderExp): void;
     atomicSub(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
     atomicXor(ptr: PBShaderExp, value: number | PBShaderExp): PBShaderExp;
     bool: {
@@ -1783,7 +1800,7 @@ export interface ProgramBuilder {
     determinant(mat: PBShaderExp): PBShaderExp;
     discard(): void;
     distance(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
-    div(x: number | PBShaderExp, y: number | PBShaderExp): any;
+    div(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
     dot(x: PBShaderExp, y: PBShaderExp): PBShaderExp;
     dpdx(x: PBShaderExp): PBShaderExp;
     dpdxCoarse(x: PBShaderExp): PBShaderExp;
@@ -1947,8 +1964,8 @@ export interface ProgramBuilder {
     min(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
     mix(x: number | PBShaderExp, y: number | PBShaderExp, z: number | PBShaderExp): PBShaderExp;
     mod(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
-    mul(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]): any;
-    mul_2(x: number | PBShaderExp, y: number | PBShaderExp): any;
+    mul(x: number | PBShaderExp, y: number | PBShaderExp, ...rest: (number | PBShaderExp)[]): PBShaderExp;
+    mul_2(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
     neg(x: number | PBShaderExp): PBShaderExp;
     normalize(x: PBShaderExp): PBShaderExp;
     not(x: boolean | PBShaderExp): PBShaderExp;
@@ -1968,10 +1985,10 @@ export interface ProgramBuilder {
     reflect(x: PBShaderExp, y: PBShaderExp): PBShaderExp;
     refract(x: PBShaderExp, y: PBShaderExp, z: number | PBShaderExp): PBShaderExp;
     round(val: number | PBShaderExp): PBShaderExp;
-    sal(a: number | PBShaderExp, b: number | PBShaderExp): any;
+    sal(a: number | PBShaderExp, b: number | PBShaderExp): PBShaderExp;
     sampler(rhs?: string): PBShaderExp;
     samplerComparison(rhs?: string): PBShaderExp;
-    sar(a: number | PBShaderExp, b: number | PBShaderExp): any;
+    sar(a: number | PBShaderExp, b: number | PBShaderExp): PBShaderExp;
     saturate(x: PBShaderExp): PBShaderExp;
     select(x: number | PBShaderExp, y: number | PBShaderExp, cond: boolean | PBShaderExp): PBShaderExp;
     sign(val: number | PBShaderExp): PBShaderExp;
@@ -1982,7 +1999,7 @@ export interface ProgramBuilder {
     step(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
     storageBarrier(): void;
     struct(structName: string, instanceName: string): PBShaderExp;
-    sub(x: number | PBShaderExp, y: number | PBShaderExp): any;
+    sub(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
     tan(val: number | PBShaderExp): PBShaderExp;
     tanh(val: number | PBShaderExp): PBShaderExp;
     tex1D(rhs?: string): PBShaderExp;
@@ -2118,8 +2135,8 @@ export class ProgramBuilder {
     set emulateDepthClamp(val: boolean);
     getCurrentFunctionScope(): PBFunctionScope;
     getReflection(): PBReflection;
-    get lastError(): string;
-    get shaderKind(): ShaderKind;
+    get lastError(): Nullable<string>;
+    get shaderKind(): Nullable<ShaderKind>;
 }
 
 // @public
@@ -2152,18 +2169,18 @@ export interface RenderProgramConstructParams {
 // @public
 export interface RenderStateSet {
     apply(force?: boolean): void;
-    readonly blendingState: BlendingState;
+    readonly blendingState: Nullable<BlendingState>;
     clone(): RenderStateSet;
-    readonly colorState: ColorState;
+    readonly colorState: Nullable<ColorState>;
     copyFrom(stateSet: RenderStateSet): void;
     defaultBlendingState(): void;
     defaultColorState(): void;
     defaultDepthState(): void;
     defaultRasterizerState(): void;
     defaultStencilState(): void;
-    readonly depthState: DepthState;
-    readonly rasterizerState: RasterizerState;
-    readonly stencilState: StencilState;
+    readonly depthState: Nullable<DepthState>;
+    readonly rasterizerState: Nullable<RasterizerState>;
+    readonly stencilState: Nullable<StencilState>;
     useBlendingState(state?: BlendingState): BlendingState;
     useColorState(state?: ColorState): ColorState;
     useDepthState(state?: DepthState): DepthState;
@@ -2185,7 +2202,7 @@ export interface SamplerOptions {
     // (undocumented)
     addressW?: TextureAddressMode;
     // (undocumented)
-    compare?: CompareFunc;
+    compare?: Nullable<CompareFunc>;
     // (undocumented)
     lodMax?: number;
     // (undocumented)
@@ -2215,7 +2232,6 @@ export interface ShaderCaps {
     storageBufferOffsetAlignment: number;
     supportFragmentDepth: boolean;
     supportHighPrecisionFloat: boolean;
-    supportHighPrecisionInt: boolean;
     supportShaderTextureLod: boolean;
     supportStandardDerivatives: boolean;
     uniformBufferOffsetAlignment: number;
@@ -2288,27 +2304,27 @@ export interface StorageTextureBindingLayout {
 // @public
 export interface StructTypeDetail {
     layout: PBStructLayout;
-    structMembers?: {
+    structMembers: {
         name: string;
         type: PBPrimitiveTypeInfo | PBArrayTypeInfo | PBAtomicI32TypeInfo | PBAtomicU32TypeInfo | PBStructTypeInfo;
         alignment: number;
         size: number;
     }[];
-    structName?: string;
+    structName: Nullable<string>;
 }
 
 // @public
 export interface StructuredBuffer<T = unknown> extends GPUDataBuffer<T> {
     // (undocumented)
-    set(name: string, value: StructuredValue): any;
+    set(name: string, value: StructuredValue): void;
     // (undocumented)
-    structure: PBStructTypeInfo;
+    structure: Immutable<PBStructTypeInfo>;
 }
 
 // @public
 export class StructuredBufferData {
-    constructor(layout: UniformBufferLayout, buffer?: StructuredBuffer | ArrayBuffer);
-    get buffer(): ArrayBuffer;
+    constructor(layout: UniformBufferLayout, buffer?: Nullable<StructuredBuffer | ArrayBuffer>);
+    get buffer(): Nullable<ArrayBuffer>;
     get byteLength(): number;
     set(name: string, value: StructuredValue): void;
     get uniforms(): Record<string, TypedArray>;
@@ -2355,20 +2371,20 @@ export type TextureAddressMode = 'repeat' | 'mirrored-repeat' | 'clamp';
 // @public
 export class TextureAtlasManager {
     constructor(device: AbstractDevice, binWidth: number, binHeight: number, rectBorderWidth: number, linearSpace?: boolean);
-    get atlasTextureRestoreHandler(): (tex: BaseTexture) => void;
-    set atlasTextureRestoreHandler(f: (tex: BaseTexture) => void);
+    get atlasTextureRestoreHandler(): Nullable<(tex: BaseTexture) => void>;
+    set atlasTextureRestoreHandler(f: Nullable<(tex: BaseTexture) => void>);
     clear(): void;
-    getAtlasInfo(key: string): AtlasInfo;
-    getAtlasTexture(index: number): Texture2D;
+    getAtlasInfo(key: string): AtlasInfo | null;
+    getAtlasTexture(index: number): Texture2D<unknown> | undefined;
     isEmpty(): boolean;
-    pushBitmap(key: string, bitmap: ImageData | ImageBitmap): AtlasInfo;
-    pushCanvas(key: string, ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): AtlasInfo;
+    pushBitmap(key: string, bitmap: ImageData | ImageBitmap): AtlasInfo | null;
+    pushCanvas(key: string, ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): AtlasInfo | null;
 }
 
 // @public
 export interface TextureBindingLayout {
-    autoBindSampler: string;
-    autoBindSamplerComparison: string;
+    autoBindSampler: Nullable<string>;
+    autoBindSamplerComparison: Nullable<string>;
     multisampled: boolean;
     sampleType: 'float' | 'unfilterable-float' | 'depth' | 'sint' | 'uint';
     viewDimension: '1d' | '2d' | '2d-array' | 'cube' | 'cube-array' | '3d';
@@ -2376,7 +2392,7 @@ export interface TextureBindingLayout {
 
 // @public
 export interface TextureCaps {
-    getTextureFormatInfo(format: TextureFormat): TextureFormatInfo;
+    getTextureFormatInfo(format: TextureFormat): Immutable<TextureFormatInfo>;
     maxCubeTextureSize: number;
     maxTextureSize: number;
     npo2Mipmapping: boolean;
@@ -2407,9 +2423,9 @@ export interface TextureCreationOptions extends BaseCreationOptions {
     // (undocumented)
     mipmapping?: boolean;
     // (undocumented)
-    samplerOptions?: SamplerOptions;
+    samplerOptions?: Nullable<SamplerOptions>;
     // (undocumented)
-    texture?: BaseTexture;
+    texture?: Nullable<BaseTexture>;
     // (undocumented)
     writable?: boolean;
 }
@@ -2428,7 +2444,7 @@ export interface TextureCube<T = unknown> extends BaseTexture<T> {
 export type TextureFilterMode = 'none' | 'nearest' | 'linear';
 
 // @public
-export type TextureFormat = 'unknown' | 'r8unorm' | 'r8snorm' | 'r16f' | 'r32f' | 'r8ui' | 'r8i' | 'r16ui' | 'r16i' | 'r32ui' | 'r32i' | 'rg8unorm' | 'rg8snorm' | 'rg16f' | 'rg32f' | 'rg8ui' | 'rg8i' | 'rg16ui' | 'rg16i' | 'rg32ui' | 'rg32i' | 'rgba8unorm' | 'rgba8unorm-srgb' | 'rgba8snorm' | 'bgra8unorm' | 'bgra8unorm-srgb' | 'rgba16f' | 'rgba32f' | 'rgba8ui' | 'rgba8i' | 'rgba16ui' | 'rgba16i' | 'rgba32ui' | 'rgba32i' | 'rg11b10uf' | 'd16' | 'd24' | 'd32f' | 'd24s8' | 'd32fs8' | 'dxt1' | 'dxt1-srgb' | 'dxt3' | 'dxt3-srgb' | 'dxt5' | 'dxt5-srgb' | 'bc4' | 'bc4-signed' | 'bc5' | 'bc5-signed' | 'bc7' | 'bc7-srgb' | 'bc6h' | 'bc6h-signed' | 'astc-4x4' | 'astc-4x4-srgb' | 'astc-5x4' | 'astc-5x4-srgb' | 'astc-5x5' | 'astc-5x5-srgb' | 'astc-6x5' | 'astc-6x5-srgb' | 'astc-6x6' | 'astc-6x6-srgb' | 'astc-8x5' | 'astc-8x5-srgb' | 'astc-8x6' | 'astc-8x6-srgb' | 'astc-8x8' | 'astc-8x8-srgb' | 'astc-10x5' | 'astc-10x5-srgb' | 'astc-10x6' | 'astc-10x6-srgb' | 'astc-10x8' | 'astc-10x8-srgb' | 'astc-10x10' | 'astc-10x10-srgb' | 'astc-12x10' | 'astc-12x10-srgb' | 'astc-12x12' | 'astc-12x12-srgb';
+export type TextureFormat = 'r8unorm' | 'r8snorm' | 'r16f' | 'r32f' | 'r8ui' | 'r8i' | 'r16ui' | 'r16i' | 'r32ui' | 'r32i' | 'rg8unorm' | 'rg8snorm' | 'rg16f' | 'rg32f' | 'rg8ui' | 'rg8i' | 'rg16ui' | 'rg16i' | 'rg32ui' | 'rg32i' | 'rgba8unorm' | 'rgba8unorm-srgb' | 'rgba8snorm' | 'bgra8unorm' | 'bgra8unorm-srgb' | 'rgba16f' | 'rgba32f' | 'rgba8ui' | 'rgba8i' | 'rgba16ui' | 'rgba16i' | 'rgba32ui' | 'rgba32i' | 'rg11b10uf' | 'd16' | 'd24' | 'd32f' | 'd24s8' | 'd32fs8' | 'dxt1' | 'dxt1-srgb' | 'dxt3' | 'dxt3-srgb' | 'dxt5' | 'dxt5-srgb' | 'bc4' | 'bc4-signed' | 'bc5' | 'bc5-signed' | 'bc7' | 'bc7-srgb' | 'bc6h' | 'bc6h-signed' | 'astc-4x4' | 'astc-4x4-srgb' | 'astc-5x4' | 'astc-5x4-srgb' | 'astc-5x5' | 'astc-5x5-srgb' | 'astc-6x5' | 'astc-6x5-srgb' | 'astc-6x6' | 'astc-6x6-srgb' | 'astc-8x5' | 'astc-8x5-srgb' | 'astc-8x6' | 'astc-8x6-srgb' | 'astc-8x8' | 'astc-8x8-srgb' | 'astc-10x5' | 'astc-10x5-srgb' | 'astc-10x6' | 'astc-10x6-srgb' | 'astc-10x8' | 'astc-10x8-srgb' | 'astc-10x10' | 'astc-10x10-srgb' | 'astc-12x10' | 'astc-12x10-srgb' | 'astc-12x12' | 'astc-12x12-srgb';
 
 // @public
 export interface TextureFormatInfo {
@@ -2474,7 +2490,7 @@ export interface TextureSampler<T = unknown> extends GPUObject<T> {
     // (undocumented)
     readonly addressModeW: TextureAddressMode;
     // (undocumented)
-    readonly compare: CompareFunc;
+    readonly compare: Nullable<CompareFunc>;
     // (undocumented)
     readonly lodMax: number;
     // (undocumented)
@@ -2495,7 +2511,7 @@ export type TextureType = '2d' | '3d' | 'cube' | '2darray';
 // @public
 export interface TextureTypeDetail {
     readable: boolean;
-    storageTexelFormat: TextureFormat;
+    storageTexelFormat: Nullable<TextureFormat>;
     textureType: PBTextureType;
     writable: boolean;
 }
@@ -2523,7 +2539,7 @@ export interface UniformLayout {
     byteSize: number;
     name: string;
     offset: number;
-    subLayout: UniformBufferLayout;
+    subLayout: Nullable<UniformBufferLayout>;
     type: PBPrimitiveType;
 }
 
@@ -2587,17 +2603,17 @@ export class VertexData {
     constructor();
     clone(): VertexData;
     getDrawOffset(): number;
-    getIndexBuffer(): IndexBuffer;
-    getVertexBuffer(semantic: VertexSemantic): StructuredBuffer;
-    getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo;
-    get indexBuffer(): IndexBuffer;
+    getIndexBuffer(): Nullable<IndexBuffer<unknown>>;
+    getVertexBuffer(semantic: VertexSemantic): StructuredBuffer<unknown> | null;
+    getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo | null;
+    get indexBuffer(): Nullable<IndexBuffer<unknown>>;
     get numVertices(): number;
     removeVertexBuffer(buffer: StructuredBuffer): boolean;
     // (undocumented)
     setDrawOffset(offset: number): void;
-    setIndexBuffer(buffer: IndexBuffer): IndexBuffer;
-    setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode): StructuredBuffer;
-    get vertexBuffers(): VertexBufferInfo[];
+    setIndexBuffer(buffer: Nullable<IndexBuffer>): Nullable<IndexBuffer<unknown>>;
+    setVertexBuffer(buffer: StructuredBuffer, stepMode?: VertexStepMode): StructuredBuffer<unknown> | null;
+    get vertexBuffers(): Nullable<VertexBufferInfo>[];
 }
 
 // @public
@@ -2607,23 +2623,23 @@ export interface VertexLayout<T = unknown> extends GPUObject<T> {
     // (undocumented)
     draw(primitiveType: PrimitiveType, first: number, count: number): void;
     // (undocumented)
-    drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number): any;
+    drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number): void;
     // (undocumented)
-    getIndexBuffer(): IndexBuffer;
+    getIndexBuffer(): Nullable<IndexBuffer>;
     // (undocumented)
-    getVertexBuffer(semantic: VertexSemantic): StructuredBuffer;
+    getVertexBuffer(semantic: VertexSemantic): Nullable<StructuredBuffer>;
     // (undocumented)
-    getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo;
+    getVertexBufferInfo(semantic: VertexSemantic): Nullable<VertexBufferInfo>;
     // (undocumented)
-    readonly indexBuffer: IndexBuffer;
+    readonly indexBuffer: Nullable<IndexBuffer>;
     // (undocumented)
     setDrawOffset(buffer: StructuredBuffer, byteOffset: number): void;
     // (undocumented)
     readonly vertexBuffers: {
-        [semantic: number]: {
+        [semantic: number]: Nullable<{
             buffer: StructuredBuffer;
             offset: number;
-        };
+        }>;
     };
 }
 
@@ -2633,7 +2649,7 @@ export type VertexLayoutOptions = {
         buffer: StructuredBuffer;
         stepMode?: VertexStepMode;
     }[];
-    indexBuffer?: IndexBuffer;
+    indexBuffer?: Nullable<IndexBuffer>;
 };
 
 // @public

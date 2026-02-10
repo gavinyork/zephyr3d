@@ -64,14 +64,14 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
   }
   set colorStart(val: Vector4) {
     this._colorStart.set(val);
-    this.optionChanged(false);
+    this.uniformChanged();
   }
   get colorEnd(): Vector4 {
     return this._colorEnd;
   }
   set colorEnd(val: Vector4) {
     this._colorEnd.set(val);
-    this.optionChanged(false);
+    this.uniformChanged();
   }
   get alphaTexture(): Texture2D {
     return this._alphaTexture;
@@ -79,7 +79,7 @@ export class FurMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert)
   set alphaTexture(tex: Texture2D) {
     this._alphaTexture = tex;
   }
-  getQueueType(): number {
+  getQueueType() {
     return QUEUE_TRANSPARENT;
   }
   passToHash(pass: number): string {

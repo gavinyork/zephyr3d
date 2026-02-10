@@ -31,7 +31,7 @@ export class MaterialFunctionEditor extends GraphEditor {
     ];
   }
   get saved() {
-    return this._version === this.getNodeEditor('function').version;
+    return this._version === 0;
   }
   async save(path: string) {
     if (path) {
@@ -52,7 +52,7 @@ export class MaterialFunctionEditor extends GraphEditor {
         console.error(msg);
         Dialog.messageBox('Error', msg);
       }
-      this._version = this.getNodeEditor('function').version;
+      this._version = 0;
     }
   }
   async load(path: string) {
@@ -62,7 +62,7 @@ export class MaterialFunctionEditor extends GraphEditor {
       ASSERT(blueprintData.type === 'MaterialFunction', 'Invalid PBR Material BluePrint');
       const state = blueprintData.state as { func: NodeEditorState };
       await this.getNodeEditor('function').loadState(state.func);
-      this._version = this.getNodeEditor('function').version;
+      this._version = 0;
     } catch (err) {
       const msg = `Load material failed: ${err}`;
       console.error(msg);
@@ -77,6 +77,10 @@ export class MaterialFunctionEditor extends GraphEditor {
     }
     ImGui.EndChild();
   }
-  protected onPropChanged(): void {}
-  private graphChanged() {}
+  protected onPropChanged(): void {
+    this._version = -1;
+  }
+  private graphChanged() {
+    this._version = -1;
+  }
 }

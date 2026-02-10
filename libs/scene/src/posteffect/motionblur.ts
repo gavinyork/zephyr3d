@@ -3,6 +3,7 @@ import { linearToGamma } from '../shaders/misc';
 import type { AbstractDevice, BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { fetchSampler } from '../utility/misc';
+import type { Nullable } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 
 /**
@@ -10,8 +11,8 @@ import { Vector2 } from '@zephyr3d/base';
  * @public
  */
 export class MotionBlur extends AbstractPostEffect {
-  private static _programMotionBlur: GPUProgram = null;
-  private static _bindgroupMotionBlur: BindGroup = null;
+  private static _programMotionBlur: Nullable<GPUProgram> = null;
+  private static _bindgroupMotionBlur: Nullable<BindGroup> = null;
   /** @internal */
   private _intensity: number;
   /** @internal */
@@ -33,11 +34,11 @@ export class MotionBlur extends AbstractPostEffect {
     this._intensity = val;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
-  requireLinearDepthTexture(): boolean {
+  requireLinearDepthTexture() {
     return false;
   }
   /** {@inheritDoc AbstractPostEffect.requireDepthAttachment} */
-  requireDepthAttachment(): boolean {
+  requireDepthAttachment() {
     return false;
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
@@ -45,23 +46,23 @@ export class MotionBlur extends AbstractPostEffect {
     const device = ctx.device;
     this._prepare(device);
     this._aspect.setXY(inputColorTexture.width / inputColorTexture.height, 1);
-    MotionBlur._bindgroupMotionBlur.setTexture(
+    MotionBlur._bindgroupMotionBlur!.setTexture(
       'inputTexture',
       inputColorTexture,
       fetchSampler('clamp_nearest_nomip')
     );
-    MotionBlur._bindgroupMotionBlur.setTexture(
+    MotionBlur._bindgroupMotionBlur!.setTexture(
       'motionVectorTexture',
-      ctx.motionVectorTexture,
+      ctx.motionVectorTexture!,
       fetchSampler('clamp_nearest_nomip')
     );
-    MotionBlur._bindgroupMotionBlur.setValue('flip', this.needFlip(device) ? 1 : 0);
-    MotionBlur._bindgroupMotionBlur.setValue('srgbOut', srgbOutput ? 1 : 0);
-    MotionBlur._bindgroupMotionBlur.setValue('frameDeltaTime', device.frameInfo.elapsedFrame);
-    MotionBlur._bindgroupMotionBlur.setValue('intensity', this._intensity);
-    MotionBlur._bindgroupMotionBlur.setValue('aspect', this._aspect);
+    MotionBlur._bindgroupMotionBlur!.setValue('flip', this.needFlip(device) ? 1 : 0);
+    MotionBlur._bindgroupMotionBlur!.setValue('srgbOut', srgbOutput ? 1 : 0);
+    MotionBlur._bindgroupMotionBlur!.setValue('frameDeltaTime', device.frameInfo.elapsedFrame);
+    MotionBlur._bindgroupMotionBlur!.setValue('intensity', this._intensity);
+    MotionBlur._bindgroupMotionBlur!.setValue('aspect', this._aspect);
     device.setProgram(MotionBlur._programMotionBlur);
-    device.setBindGroup(0, MotionBlur._bindgroupMotionBlur);
+    device.setBindGroup(0, MotionBlur._bindgroupMotionBlur!);
     this.drawFullscreenQuad();
   }
   /** @internal */
@@ -115,7 +116,7 @@ export class MotionBlur extends AbstractPostEffect {
             this.$outputs.outColor = pb.vec4(this.color, this.sourceSample.a);
           });
         }
-      });
+      })!;
       MotionBlur._programMotionBlur.name = '@MotionBlur';
       MotionBlur._bindgroupMotionBlur = device.createBindGroup(
         MotionBlur._programMotionBlur.bindGroupLayouts[0]

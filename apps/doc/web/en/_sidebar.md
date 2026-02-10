@@ -82,4 +82,5 @@
     - [Live Preview](en/editor/preview.md)
     - [Deployment](en/editor/build-deploy.md)
 
-  
+  - Other Topics
+    - [FAQ](en/editor/faq.md)

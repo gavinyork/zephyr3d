@@ -1,5 +1,6 @@
 import type * as Monaco from 'monaco-editor';
 import { eventBus } from '../core/eventbus';
+import type { Nullable } from '@zephyr3d/base';
 
 declare global {
   interface Window {
@@ -9,7 +10,7 @@ declare global {
 
 export class CodeEditor {
   private isMinimized: boolean;
-  private editor: Monaco.editor.IStandaloneCodeEditor;
+  private editor: Nullable<Monaco.editor.IStandaloneCodeEditor>;
   protected fileName: string;
   private dirty: boolean;
   private baselineVersion: number;
@@ -21,7 +22,7 @@ export class CodeEditor {
     this.baselineVersion = 0;
   }
 
-  get content(): string {
+  get content(): Nullable<string> {
     if (this.editor) {
       return this.editor.getValue({
         preserveBOM: false,
@@ -37,7 +38,7 @@ export class CodeEditor {
       if (this.dirty && !confirm(`${this.fileName} has been changed, close it without saving?`)) {
         return false;
       }
-      this.editor.getModel().dispose();
+      this.editor.getModel()?.dispose();
       this.editor.dispose();
       this.editor = null;
     }
@@ -390,7 +391,7 @@ export class CodeEditor {
       overlay.style.width = constrainedWidth + 'px';
 
       if (this.editor) {
-        setTimeout(() => this.editor.layout(), 0);
+        setTimeout(() => this.editor?.layout(), 0);
       }
     };
 

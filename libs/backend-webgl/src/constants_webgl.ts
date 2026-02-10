@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { CubeFace } from '@zephyr3d/base';
 import type {
   TextureType,
@@ -121,7 +122,7 @@ export const compareFuncMap: Record<CompareFunc, number> = {
   never: WebGLEnum.NEVER
 };
 
-export const compareFuncInvMap: Record<number, CompareFunc> = {
+export const compareFuncInvMap: Record<number, Nullable<CompareFunc>> = {
   [WebGLEnum.NONE]: null,
   [WebGLEnum.ALWAYS]: 'always',
   [WebGLEnum.LEQUAL]: 'le',

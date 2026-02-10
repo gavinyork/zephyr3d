@@ -1,22 +1,24 @@
+import type { Nullable } from '@zephyr3d/base';
+
 /** @internal */
 export class FontCanvas {
-  private static _canvas: HTMLCanvasElement = null;
-  private static _context: CanvasRenderingContext2D = null;
-  static get canvas(): HTMLCanvasElement {
+  private static _canvas: Nullable<HTMLCanvasElement> = null;
+  private static _context: Nullable<CanvasRenderingContext2D> = null;
+  static get canvas() {
     this._realize();
-    return this._canvas;
+    return this._canvas!;
   }
-  static get context(): CanvasRenderingContext2D {
+  static get context() {
     this._realize();
-    return this._context;
+    return this._context!;
   }
-  static get font(): string {
+  static get font() {
     return this.context.font;
   }
-  static set font(font: string) {
+  static set font(font) {
     this.context.font = font;
   }
-  private static _realize(): void {
+  private static _realize() {
     if (!this._canvas) {
       this._canvas = document.createElement('canvas');
       this._canvas.width = 512;
@@ -26,7 +28,7 @@ export class FontCanvas {
       //document.body.appendChild(this._canvas);
       this._context = this._canvas.getContext('2d', {
         willReadFrequently: true
-      });
+      })!;
       this._context.textBaseline = 'top';
       this._context.textAlign = 'left';
       this._context.fillStyle = 'transparent';
@@ -52,7 +54,7 @@ export class Font {
   /** @internal */
   private _name: string;
   /** @internal */
-  private _nameScaled: string;
+  private _nameScaled: Nullable<string>;
   /** @internal */
   private readonly _scale: number;
   /** @internal */
@@ -95,7 +97,7 @@ export class Font {
    * @param scale - The scale value
    * @returns The font object
    */
-  static fetchFont(name: string, scale: number): Font {
+  static fetchFont(name: string, scale: number) {
     let fontlist = this.fontCache[name];
     if (!fontlist) {
       fontlist = {};
@@ -109,60 +111,55 @@ export class Font {
     return font;
   }
   /** Gets the font name */
-  get fontName(): string {
+  get fontName() {
     return this._name;
   }
-  set fontName(name: string) {
+  set fontName(name) {
     this._name = name;
     this._normalizeFont();
   }
   /** Gets the scaled font name */
-  get fontNameScaled(): string {
-    return this._nameScaled;
+  get fontNameScaled() {
+    return this._nameScaled!;
   }
   /** Gets the font size */
-  get size(): number {
+  get size() {
     return this._size;
   }
   /** Gets the font family */
-  get family(): string {
+  get family() {
     return this._family;
   }
   /** Gets top position of the font */
-  get top(): number {
+  get top() {
     return this._top;
   }
   /** Gets the bottom position of the font */
-  get bottom(): number {
+  get bottom() {
     return this._bottom;
   }
   /** Gets the scaled top position of the font */
-  get topScaled(): number {
+  get topScaled() {
     return this._topScaled;
   }
   /** Gets the scaled bottom position of the font */
-  get bottomScaled(): number {
+  get bottomScaled() {
     return this._bottomScaled;
   }
   /** Gets the maximum height of the font */
-  get maxHeight(): number {
+  get maxHeight() {
     return this._bottom - this._top + 1;
   }
   /** Gets the scaled maximum height of the font */
-  get maxHeightScaled(): number {
+  get maxHeightScaled() {
     return this._bottomScaled - this._topScaled + 1;
   }
   /** Tests if two fonts are the same */
-  equalTo(other: Font): boolean {
+  equalTo(other: Font) {
     return this._size === other._size && this._family === other._family;
   }
   /** @internal */
-  private _measureFontHeight(fontName: string): {
-    size: number;
-    family: string;
-    top: number;
-    bottom: number;
-  } {
+  private _measureFontHeight(fontName: string) {
     const oldFont = FontCanvas.context.font;
     const oldTextBaseline = FontCanvas.context.textBaseline;
     const oldFillStyle = FontCanvas.context.fillStyle;
@@ -209,7 +206,7 @@ export class Font {
     return { size, family, top, bottom };
   }
   /** @internal */
-  private _normalizeFont(): void {
+  private _normalizeFont() {
     const info = this._measureFontHeight(this._name);
     this._nameScaled = `${Math.round(info.size * this._scale)}px ${info.family}`;
     const infoScaled = this._measureFontHeight(this._nameScaled);

@@ -16,24 +16,17 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
   constructor(device: WebGLDevice) {
     super(device, 'cube');
   }
-  init(): void {
-    this.loadEmpty(this._format, this._width, this._mipLevelCount);
+  init() {
+    this.loadEmpty(this._format!, this._width, this._mipLevelCount);
   }
-  update(
-    data: TypedArray,
-    xOffset: number,
-    yOffset: number,
-    width: number,
-    height: number,
-    face: CubeFace
-  ): void {
+  update(data: TypedArray, xOffset: number, yOffset: number, width: number, height: number, face: CubeFace) {
     if (this._device.isContextLost()) {
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
-    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
     this._device.bindTexture(textureTargetMap[this._target], 0, this);
     //this._device.context.bindTexture(textureTargetMap[this._target], this._object);
     this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
@@ -61,20 +54,20 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     y: number,
     width: number,
     height: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
-    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+    const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
     this._device.bindTexture(textureTargetMap[this._target], 0, this);
     //this._device.context.bindTexture(textureTargetMap[this._target], this._object);
     this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
     if (x === 0 && y === 0 && width === data.width && height === data.height) {
       this._device.context.texSubImage2D(
-        cubeMapFaceMap[face],
+        cubeMapFaceMap[face as keyof typeof cubeMapFaceMap],
         0,
         xOffset,
         yOffset,
@@ -86,7 +79,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       const cvs = document.createElement('canvas');
       cvs.width = width;
       cvs.height = height;
-      const ctx = cvs.getContext('2d');
+      const ctx = cvs.getContext('2d')!;
       ctx.drawImage(data, x, y, width, height, 0, 0, width, height);
       this._device.context.texSubImage2D(
         textureTargetMap[this._target],
@@ -104,7 +97,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       this.generateMipmaps();
     }
   }
-  createEmpty(format: TextureFormat, size: number, creationFlags?: number): void {
+  createEmpty(format: TextureFormat, size: number, creationFlags?: number) {
     this._flags = Number(creationFlags) || 0;
     if (this._flags & GPUResourceUsageFlags.TF_WRITABLE) {
       console.error(new Error('webgl device does not support storage texture'));
@@ -120,7 +113,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     face: number,
     mipLevel: number,
     buffer: TypedArray
-  ): Promise<void> {
+  ) {
     if (mipLevel < 0 || mipLevel >= this.mipLevelCount) {
       throw new Error(`TextureCube.readPixels(): invalid miplevel: ${mipLevel}`);
     }
@@ -141,7 +134,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     face: number,
     mipLevel: number,
     buffer: GPUDataBuffer
-  ): void {
+  ) {
     if (mipLevel < 0 || mipLevel >= this.mipLevelCount) {
       throw new Error(`TextureCube.readPixels(): invalid miplevel: ${mipLevel}`);
     }
@@ -166,7 +159,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
       this._device.context.generateMipmap(target);
     }
   }
-  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number): void {
+  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number) {
     if (!data.isCubemap) {
       console.error('loading cubmap with mipmap data failed: data is not cubemap');
     } else {
@@ -179,7 +172,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     }
   }
   /** @internal */
-  private loadEmpty(format: TextureFormat, size: number, mipLevelCount: number): void {
+  private loadEmpty(format: TextureFormat, size: number, mipLevelCount: number) {
     this.allocInternal(format, size, size, 1, mipLevelCount);
     if (this._mipLevelCount > 1 && !this._device.isContextLost()) {
       this.generateMipmaps();
@@ -230,7 +223,7 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     }
   }
   */
-  private loadLevels(levels: TextureMipmapData, sRGB: boolean): void {
+  private loadLevels(levels: TextureMipmapData, sRGB: boolean) {
     const format = sRGB ? linearTextureFormatToSRGB(levels.format) : levels.format;
     const width = levels.width;
     const height = levels.height;
@@ -243,11 +236,11 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     }
     this.allocInternal(format, width, height, 1, mipLevelCount);
     if (!this._device.isContextLost()) {
-      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
       this._device.bindTexture(textureTargetMap[this._target], 0, this);
       (this.device as WebGLDevice).clearErrors();
       for (let face = 0; face < 6; face++) {
-        const faceTarget = cubeMapFaceMap[face];
+        const faceTarget = cubeMapFaceMap[face as keyof typeof cubeMapFaceMap];
         if (this._mipLevelCount > 1 && levels.mipDatas[face].length !== this._mipLevelCount) {
           console.error(`invalid texture data`);
           return;

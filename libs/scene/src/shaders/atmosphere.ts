@@ -11,6 +11,7 @@ import type {
 } from '@zephyr3d/device';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { fetchSampler } from '../utility/misc';
+import type { Nullable } from '@zephyr3d/base';
 import { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import { uniformSphereSamples } from '../values';
 import { getDevice } from '../app/api';
@@ -42,7 +43,7 @@ export type AtmosphereParams = {
 };
 
 /** @internal */
-export function getDefaultAtmosphereParams(): AtmosphereParams {
+export function getDefaultAtmosphereParams() {
   return {
     plantRadius: 6360000,
     atmosphereHeight: 60000,
@@ -57,19 +58,14 @@ export function getDefaultAtmosphereParams(): AtmosphereParams {
     lightColor: new Vector4(1, 1, 1, 10),
     cameraAspect: 1,
     cameraHeightScale: 1
-  };
+  } as AtmosphereParams;
 }
 
 const defaultAtmosphereParams = getDefaultAtmosphereParams();
 
-let currentAtmosphereParams: AtmosphereParams = null;
+let currentAtmosphereParams: Nullable<AtmosphereParams> = null;
 
-function checkParams(other?: Partial<AtmosphereParams>): {
-  transmittance: boolean;
-  multiScattering: boolean;
-  skyView: boolean;
-  aerialPerspective: boolean;
-} {
+function checkParams(other?: Partial<AtmosphereParams>) {
   const result = {
     transmittance: false,
     multiScattering: false,
@@ -102,9 +98,9 @@ function checkParams(other?: Partial<AtmosphereParams>): {
       result.transmittance ||
       result.multiScattering ||
       currentAtmosphereParams.cameraHeightScale !== other.cameraHeightScale ||
-      !currentAtmosphereParams.lightDir.equalsTo(other.lightDir) ||
-      !currentAtmosphereParams.lightColor.equalsTo(other.lightColor) ||
-      !currentAtmosphereParams.cameraWorldMatrix.equalsTo(other.cameraWorldMatrix);
+      !currentAtmosphereParams.lightDir.equalsTo(other.lightDir!) ||
+      !currentAtmosphereParams.lightColor.equalsTo(other.lightColor!) ||
+      !currentAtmosphereParams.cameraWorldMatrix.equalsTo(other.cameraWorldMatrix!);
     result.aerialPerspective =
       result.transmittance ||
       result.multiScattering ||
@@ -113,25 +109,25 @@ function checkParams(other?: Partial<AtmosphereParams>): {
       currentAtmosphereParams.cameraAspect !== other.cameraAspect;
   }
   if (result.transmittance) {
-    currentAtmosphereParams.plantRadius = other.plantRadius;
-    currentAtmosphereParams.atmosphereHeight = other.atmosphereHeight;
-    currentAtmosphereParams.rayleighScatteringHeight = other.rayleighScatteringHeight;
-    currentAtmosphereParams.mieScatteringHeight = other.mieScatteringHeight;
-    currentAtmosphereParams.ozoneCenter = other.ozoneCenter;
-    currentAtmosphereParams.ozoneWidth = other.ozoneWidth;
+    currentAtmosphereParams.plantRadius = other.plantRadius!;
+    currentAtmosphereParams.atmosphereHeight = other.atmosphereHeight!;
+    currentAtmosphereParams.rayleighScatteringHeight = other.rayleighScatteringHeight!;
+    currentAtmosphereParams.mieScatteringHeight = other.mieScatteringHeight!;
+    currentAtmosphereParams.ozoneCenter = other.ozoneCenter!;
+    currentAtmosphereParams.ozoneWidth = other.ozoneWidth!;
   }
   if (result.multiScattering) {
-    currentAtmosphereParams.mieAnstropy = other.mieAnstropy;
+    currentAtmosphereParams.mieAnstropy = other.mieAnstropy!;
   }
   if (result.skyView) {
-    currentAtmosphereParams.cameraHeightScale = other.cameraHeightScale;
-    currentAtmosphereParams.lightDir.set(other.lightDir);
-    currentAtmosphereParams.lightColor.set(other.lightColor);
-    currentAtmosphereParams.cameraWorldMatrix.set(other.cameraWorldMatrix);
+    currentAtmosphereParams.cameraHeightScale = other.cameraHeightScale!;
+    currentAtmosphereParams.lightDir.set(other.lightDir!);
+    currentAtmosphereParams.lightColor.set(other.lightColor!);
+    currentAtmosphereParams.cameraWorldMatrix.set(other.cameraWorldMatrix!);
   }
   if (result.aerialPerspective) {
-    currentAtmosphereParams.apDistance = other.apDistance;
-    currentAtmosphereParams.cameraAspect = other.cameraAspect;
+    currentAtmosphereParams.apDistance = other.apDistance!;
+    currentAtmosphereParams.cameraAspect = other.cameraAspect!;
   }
   return result;
 }
@@ -143,7 +139,7 @@ export function rayIntersectSphere(
   fRadius: PBShaderExp,
   f3RayStart: PBShaderExp,
   f3RayDir: PBShaderExp
-): PBShaderExp {
+) {
   const pb = scope.$builder;
   const funcName = 'z_rayIntersectSphere';
   pb.func(
@@ -162,7 +158,7 @@ export function rayIntersectSphere(
       this.$return(this.$choice(pb.lessThan(this.t1, 0), this.t2, this.t1));
     }
   );
-  return scope[funcName](f3Center, fRadius, f3RayStart, f3RayDir);
+  return scope[funcName](f3Center, fRadius, f3RayStart, f3RayDir) as PBShaderExp;
 }
 
 /** @internal */
@@ -451,7 +447,7 @@ export function scattering(
   stParams: PBShaderExp,
   f3Pos: PBShaderExp,
   f3ViewDir: PBShaderExp
-): PBShaderExp {
+) {
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
   const funcName = 'z_scattering';
@@ -468,7 +464,7 @@ export function scattering(
     );
     this.$return(pb.add(this.rayleigh, this.mie));
   });
-  return scope[funcName](stParams, f3Pos, f3ViewDir);
+  return scope[funcName](stParams, f3Pos, f3ViewDir) as PBShaderExp;
 }
 
 /** @internal */
@@ -477,7 +473,7 @@ export function transmittance(
   stParams: PBShaderExp,
   f3P1: PBShaderExp,
   f3P2: PBShaderExp
-): PBShaderExp {
+) {
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
   const funcName = 'z_transmittance';
@@ -503,7 +499,7 @@ export function transmittance(
     });
     this.$return(pb.exp(pb.neg(this.sum)));
   });
-  return scope[funcName](stParams, f3P1, f3P2);
+  return scope[funcName](stParams, f3P1, f3P2) as PBShaderExp;
 }
 
 /** @internal */
@@ -541,7 +537,7 @@ export function transmittanceLutToUV(
       this.$return(pb.vec2(this.x_mu, this.x_r));
     }
   );
-  return scope[funcName](fBottomRadius, fTopRadius, fMu, fR);
+  return scope[funcName](fBottomRadius, fTopRadius, fMu, fR) as PBShaderExp;
 }
 
 /** @internal */
@@ -554,7 +550,7 @@ export function viewDirToUV(scope: PBInsideFunctionScope, f3ViewDir: PBShaderExp
     this.uv = pb.add(this.uv, pb.vec2(0.5));
     this.$return(this.uv);
   });
-  return scope[funcName](f3ViewDir);
+  return scope[funcName](f3ViewDir) as PBShaderExp;
 }
 
 /** @internal */
@@ -569,7 +565,7 @@ export function uvToViewDir(scope: PBInsideFunctionScope, f2UV: PBShaderExp) {
     this.$l.y = pb.cos(this.theta);
     this.$return(pb.vec3(this.x, this.y, this.z));
   });
-  return scope[funcName](f2UV);
+  return scope[funcName](f2UV) as PBShaderExp;
 }
 
 /** @internal */
@@ -578,7 +574,7 @@ export function uvToTransmittanceLut(
   f2UV: PBShaderExp,
   fBottomRadius: PBShaderExp,
   fTopRadius: PBShaderExp
-): PBShaderExp {
+) {
   const pb = scope.$builder;
   const funcName = 'z_uvToTransmittanceLut';
   pb.func(funcName, [pb.vec2('uv'), pb.float('bottomRadius'), pb.float('topRadius')], function () {
@@ -605,7 +601,7 @@ export function uvToTransmittanceLut(
     this.mu = pb.clamp(this.mu, -1, 1);
     this.$return(pb.vec2(this.mu, this.r));
   });
-  return scope[funcName](f2UV, fBottomRadius, fTopRadius);
+  return scope[funcName](f2UV, fBottomRadius, fTopRadius) as PBShaderExp;
 }
 
 function sunBloom(
@@ -633,7 +629,7 @@ function sunBloom(
       this.$return(this.luminance);
     }
   );
-  return scope[funcName](f3ViewDir, f3LightDir, f4LightColorAndIntensity, fSunSolidAngle);
+  return scope[funcName](f3ViewDir, f3LightDir, f4LightColorAndIntensity, fSunSolidAngle) as PBShaderExp;
 }
 
 /** @internal */
@@ -683,7 +679,7 @@ export function skyBox(
       this.$return(pb.vec4(this.rgb, 1));
     }
   );
-  return scope[funcName](stParams, f4SunColor, f3SkyBoxWorldPos, fSunSolidAngle);
+  return scope[funcName](stParams, f4SunColor, f3SkyBoxWorldPos, fSunSolidAngle) as PBShaderExp;
 }
 
 /** @internal */
@@ -734,7 +730,7 @@ export function aerialPerspective(
       this.$return(pb.vec4(this.inscattering, this.transmittance));
     }
   );
-  return scope[funcName](stParams, f2UV, f3CameraPos, f3WorldPos, f3Dim);
+  return scope[funcName](stParams, f2UV, f3CameraPos, f3WorldPos, f3Dim) as PBShaderExp;
 }
 
 /** @internal */
@@ -846,7 +842,7 @@ export function aerialPerspectiveLut(
     this.$l.t = pb.clamp(pb.div(this.t1, pb.max(this.t2, pb.vec3(0.0001))), pb.vec3(0), pb.vec3(1));
     this.$return(pb.vec4(this.color, pb.dot(this.t, pb.vec3(1 / 3, 1 / 3, 1 / 3))));
   });
-  return scope[funcName](stParams, f2UV, f3VoxelDim, CAMERA_POS_Y);
+  return scope[funcName](stParams, f2UV, f3VoxelDim, CAMERA_POS_Y) as PBShaderExp;
 }
 
 /** @internal */
@@ -875,7 +871,7 @@ export function skyViewLut(
     );
     this.$return(pb.vec4(this.rgb, 1));
   });
-  return scope[funcName](stParams, f2UV, CAMERA_POS_Y);
+  return scope[funcName](stParams, f2UV, CAMERA_POS_Y) as PBShaderExp;
 }
 
 /** @internal */
@@ -898,7 +894,7 @@ export function multiScatteringLut(
     this.$l.rgb = integralMultiScattering(this, this.params, this.lightDir, this.p, texTransmittanceLut);
     this.$return(pb.vec4(this.rgb, 1));
   });
-  return scope[funcName](stParams, f2UV);
+  return scope[funcName](stParams, f2UV) as PBShaderExp;
 }
 
 /** @internal */
@@ -920,11 +916,11 @@ export function transmittanceLut(scope: PBInsideFunctionScope, stParams: PBShade
     this.$l.hitPoint = pb.add(this.eyePos, pb.mul(this.viewDir, this.dis));
     this.$return(pb.vec4(transmittance(this, this.params, this.eyePos, this.hitPoint), 1));
   });
-  return scope[funcName](stParams, f2UV);
+  return scope[funcName](stParams, f2UV) as PBShaderExp;
 }
 
 /** @internal */
-export function atmosphereLUTRendered(): boolean {
+export function atmosphereLUTRendered() {
   return !!transmittanceLUT && !!multiScatteringLUT && !!skyViewLUT && !!ApLut;
 }
 
@@ -932,40 +928,40 @@ export function atmosphereLUTRendered(): boolean {
 export function renderAtmosphereLUTs(params?: Partial<AtmosphereParams>) {
   const checkResult = checkParams(params);
   if (checkResult.transmittance || !transmittanceLUT) {
-    renderTransmittanceLut(currentAtmosphereParams);
+    renderTransmittanceLut(currentAtmosphereParams!);
   }
   if (checkResult.multiScattering || !multiScatteringLUT) {
-    renderMultiScatteringLut(currentAtmosphereParams);
+    renderMultiScatteringLut(currentAtmosphereParams!);
   }
   if (checkResult.skyView || !skyViewLUT) {
-    renderSkyViewLut(currentAtmosphereParams);
+    renderSkyViewLut(currentAtmosphereParams!);
   }
   if (checkResult.aerialPerspective || !ApLut) {
-    renderAPLut(currentAtmosphereParams);
+    renderAPLut(currentAtmosphereParams!);
   }
 }
 
 /* For debug */
-let transmittanceLutProgram: GPUProgram = undefined;
-let multiScatteringLutProgram: GPUProgram = undefined;
-let skyViewLutProgram: GPUProgram = undefined;
-let APLutProgram: GPUProgram = undefined;
-let transmittanceLutBindGroup: BindGroup = undefined;
-let transmittanceLUT: Texture2D = undefined;
-let transmittanceFramebuffer: FrameBuffer = undefined;
+let transmittanceLutProgram: GPUProgram;
+let multiScatteringLutProgram: GPUProgram;
+let skyViewLutProgram: GPUProgram;
+let APLutProgram: GPUProgram;
+let transmittanceLutBindGroup: BindGroup;
+let transmittanceLUT: Texture2D;
+let transmittanceFramebuffer: FrameBuffer;
 
-let multiScatteringLutBindGroup: BindGroup = undefined;
-let multiScatteringLUT: Texture2D = undefined;
-let uniformSphereSampleBuffer: GPUDataBuffer = undefined;
-let multiScatteringFramebuffer: FrameBuffer = undefined;
+let multiScatteringLutBindGroup: BindGroup;
+let multiScatteringLUT: Texture2D;
+let uniformSphereSampleBuffer: GPUDataBuffer;
+let multiScatteringFramebuffer: FrameBuffer;
 
-let skyViewLutBindGroup: BindGroup = undefined;
-let skyViewLUT: Texture2D = undefined;
-let skyViewFramebuffer: FrameBuffer = undefined;
+let skyViewLutBindGroup: BindGroup;
+let skyViewLUT: Texture2D;
+let skyViewFramebuffer: FrameBuffer;
 
-let APLutBindGroup: BindGroup = undefined;
-let ApLut: Texture2D = undefined;
-let APFramebuffer: FrameBuffer = undefined;
+let APLutBindGroup: BindGroup;
+let ApLut: Texture2D;
+let APFramebuffer: FrameBuffer;
 
 /** @internal */
 export function getTransmittanceLut() {
@@ -1007,7 +1003,7 @@ export function getAtmosphereParamsStruct(pb: ProgramBuilder) {
 }
 
 /** @internal */
-export function createTransmittanceLutProgram(device: AbstractDevice): GPUProgram {
+export function createTransmittanceLutProgram(device: AbstractDevice) {
   const program = device.buildRenderProgram({
     vertex(pb) {
       this.flip = pb.int().uniform(0);
@@ -1029,7 +1025,7 @@ export function createTransmittanceLutProgram(device: AbstractDevice): GPUProgra
         this.$outputs.outColor = transmittanceLut(this, this.params, this.$inputs.uv);
       });
     }
-  });
+  })!;
   program.name = '@TransmittanceLutProgram';
   return program;
 }
@@ -1043,14 +1039,11 @@ export function renderTransmittanceLut(params: AtmosphereParams) {
       transmittanceLutBindGroup = device.createBindGroup(transmittanceLutProgram.bindGroupLayouts[0]);
       transmittanceLUT = device.createTexture2D('rgba16f', 256, 64, {
         mipmapping: false
-      });
+      })!;
       transmittanceLUT.name = 'DebugTransmittanceLut';
       transmittanceFramebuffer = device.createFrameBuffer([transmittanceLUT], null);
     } catch (err) {
       console.error(err);
-      transmittanceLutProgram = null;
-      transmittanceLutBindGroup = null;
-      transmittanceFramebuffer = null;
     }
   }
   if (transmittanceLutProgram) {
@@ -1095,7 +1088,7 @@ export function createMultiScatteringLutProgram(device: AbstractDevice) {
         );
       });
     }
-  });
+  })!;
   program.name = '@MultiScatteringLutProgram';
   return program;
 }
@@ -1109,10 +1102,10 @@ export function renderMultiScatteringLut(params: AtmosphereParams) {
       multiScatteringLutBindGroup = device.createBindGroup(multiScatteringLutProgram.bindGroupLayouts[0]);
       multiScatteringLUT = device.createTexture2D('rgba16f', 32, 32, {
         mipmapping: false
-      });
+      })!;
       multiScatteringLUT.name = 'DebugMultiScatteringLut';
       multiScatteringFramebuffer = device.createFrameBuffer([multiScatteringLUT], null);
-      uniformSphereSampleBuffer = multiScatteringLutBindGroup.getBuffer('uniformSphereSamples', false);
+      uniformSphereSampleBuffer = multiScatteringLutBindGroup.getBuffer('uniformSphereSamples', false)!;
       const sphereSamples = new Float32Array(64 * 4);
       for (let i = 0; i < 64; i++) {
         sphereSamples[i * 4 + 0] = uniformSphereSamples[i].x;
@@ -1123,9 +1116,6 @@ export function renderMultiScatteringLut(params: AtmosphereParams) {
       uniformSphereSampleBuffer.bufferSubData(0, sphereSamples);
     } catch (err) {
       console.error(err);
-      multiScatteringLutProgram = null;
-      multiScatteringLutBindGroup = null;
-      multiScatteringFramebuffer = null;
     }
   }
   if (multiScatteringLutProgram) {
@@ -1177,7 +1167,7 @@ export function createSkyViewLutProgram(device: AbstractDevice) {
         );
       });
     }
-  });
+  })!;
   program.name = '@SkyViewLutProgram';
   return program;
 }
@@ -1191,14 +1181,11 @@ export function renderSkyViewLut(params: AtmosphereParams) {
       skyViewLutBindGroup = device.createBindGroup(skyViewLutProgram.bindGroupLayouts[0]);
       skyViewLUT = device.createTexture2D('rgba16f', 256, 128, {
         mipmapping: false
-      });
+      })!;
       skyViewLUT.name = 'DebugSkyViewLut';
       skyViewFramebuffer = device.createFrameBuffer([skyViewLUT], null);
     } catch (err) {
       console.error(err);
-      skyViewLutProgram = null;
-      skyViewLutBindGroup = null;
-      skyViewFramebuffer = null;
     }
   }
   if (skyViewLutProgram) {
@@ -1251,7 +1238,7 @@ export function createAPLutProgram(device: AbstractDevice) {
         );
       });
     }
-  });
+  })!;
   program.name = '@APLutProgram';
   return program;
 }
@@ -1263,14 +1250,11 @@ export function renderAPLut(params: AtmosphereParams) {
     try {
       APLutProgram = createAPLutProgram(device);
       APLutBindGroup = device.createBindGroup(APLutProgram.bindGroupLayouts[0]);
-      ApLut = device.createTexture2D('rgba16f', 32 * 32, 32, { mipmapping: false });
+      ApLut = device.createTexture2D('rgba16f', 32 * 32, 32, { mipmapping: false })!;
       ApLut.name = 'DebugAPLut';
       APFramebuffer = device.createFrameBuffer([ApLut], null);
     } catch (err) {
       console.error(err);
-      APLutProgram = null;
-      APLutBindGroup = null;
-      APFramebuffer = null;
     }
   }
   if (APLutProgram) {

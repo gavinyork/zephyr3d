@@ -1,8 +1,9 @@
+import type { Nullable } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 import type { SceneNode } from '../../../scene';
 import { GraphNode } from '../../../scene';
 import { Water } from '../../../scene/water';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import type { WaveGenerator } from '../../../render';
 import { FBMWaveGenerator, FFTWaveGenerator } from '../../../render';
 import type { Texture2D } from '@zephyr3d/device';
@@ -14,7 +15,7 @@ export function getFBMWaveGeneratorClass(): SerializableClass {
     ctor: FBMWaveGenerator,
     name: 'FBMWaveGenerator',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'NumOctaves',
           type: 'int',
@@ -66,7 +67,7 @@ export function getFBMWaveGeneratorClass(): SerializableClass {
             this.frequency = value.num[0];
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -77,7 +78,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
     ctor: FFTWaveGenerator,
     name: 'FFTWaveGenerator',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Alignment',
           type: 'float',
@@ -175,7 +176,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
             this.setWaveCroppiness(2, value.num[2]);
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -187,12 +188,12 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
     name: 'Water',
     parent: GraphNode,
     createFunc(ctx: SceneNode) {
-      const node = new Water(ctx.scene);
+      const node = new Water(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'WaveGenerator',
           type: 'object',
@@ -313,7 +314,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
             } else {
               if (value.str[0]) {
                 const assetId = value.str[0];
-                let tex: Texture2D;
+                let tex: Nullable<Texture2D>;
                 try {
                   tex = await manager.fetchTexture<Texture2D>(assetId);
                 } catch (err) {
@@ -345,7 +346,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
             } else {
               if (value.str[0]) {
                 const assetId = value.str[0];
-                let tex: Texture2D;
+                let tex: Nullable<Texture2D>;
                 try {
                   tex = await manager.fetchTexture<Texture2D>(assetId);
                 } catch (err) {
@@ -361,7 +362,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
             }
           }
         }
-      ];
+      ]);
     }
   };
 }

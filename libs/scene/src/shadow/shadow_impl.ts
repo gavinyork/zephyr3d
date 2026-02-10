@@ -1,5 +1,6 @@
 import type { PBInsideFunctionScope, PBShaderExp, TextureFormat } from '@zephyr3d/device';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
+import type { Nullable } from '@zephyr3d/base';
 
 /** @internal */
 export abstract class ShadowImpl {
@@ -16,11 +17,11 @@ export abstract class ShadowImpl {
   abstract getType(): ShadowMode;
   abstract getShadowMapBorder(shadowMapParams: ShadowMapParams): number;
   abstract getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType;
-  abstract postRenderShadowMap(shadowMapParams: ShadowMapParams);
+  abstract postRenderShadowMap(shadowMapParams: ShadowMapParams): void;
   abstract getDepthScale(): number;
-  abstract setDepthScale(val: number);
+  abstract setDepthScale(val: number): void;
   abstract resourceDirty(): boolean;
-  abstract doUpdateResources(shadowMapParams: ShadowMapParams);
+  abstract doUpdateResources(shadowMapParams: ShadowMapParams): void;
   abstract getShaderHash(): string;
   abstract computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,
@@ -40,7 +41,7 @@ export abstract class ShadowImpl {
     NdotL: PBShaderExp,
     split: PBShaderExp
   ): PBShaderExp;
-  abstract getShadowMapColorFormat(shadowMapParams: ShadowMapParams): TextureFormat;
+  abstract getShadowMapColorFormat(shadowMapParams: ShadowMapParams): Nullable<TextureFormat>;
   abstract getShadowMapDepthFormat(shadowMapParams: ShadowMapParams): TextureFormat;
   abstract useNativeShadowMap(shadowMapParams: ShadowMapParams): boolean;
 }

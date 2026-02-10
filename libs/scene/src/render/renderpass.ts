@@ -1,10 +1,10 @@
+import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Disposable, Vector4 } from '@zephyr3d/base';
 import { CullVisitor } from './cull_visitor';
 import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
 import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
-import { ShaderHelper } from '../material/shader/helper';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
 import { MaterialVaryingFlags } from '../values';
 import type { BindGroup } from '@zephyr3d/device';
@@ -20,11 +20,11 @@ export abstract class RenderPass extends Disposable {
   /** @internal */
   protected _globalBindGroups: Record<string, BindGroup>;
   /** @internal */
-  protected _clearColor: Vector4;
+  protected _clearColor: Nullable<Vector4>;
   /** @internal */
-  protected _clearDepth: number;
+  protected _clearDepth: Nullable<number>;
   /** @internal */
-  protected _clearStencil: number;
+  protected _clearStencil: Nullable<number>;
   /**
    * Creates an instanceof RenderPass
    * @param type - Render pass type
@@ -38,81 +38,66 @@ export abstract class RenderPass extends Disposable {
     this._globalBindGroups = {};
   }
   /** Color value that is used to clear the frame buffer  */
-  get clearColor(): Vector4 {
+  get clearColor(): Nullable<Immutable<Vector4>> {
     return this._clearColor;
   }
-  set clearColor(color: Vector4) {
-    this._clearColor = color ?? null;
+  set clearColor(color: Nullable<Immutable<Vector4>>) {
+    this._clearColor = color;
   }
   /** Depth value that is used to clear the frame buffer */
-  get clearDepth(): number {
+  get clearDepth() {
     return this._clearDepth;
   }
-  set clearDepth(depth: number) {
-    this._clearDepth = depth ?? null;
+  set clearDepth(depth) {
+    this._clearDepth = depth;
   }
   /** Stencil value that is used to clear the frame buffer */
-  get clearStencil(): number {
+  get clearStencil() {
     return this._clearStencil;
   }
-  set clearStencil(stencil: number) {
-    this._clearStencil = stencil ?? null;
+  set clearStencil(stencil) {
+    this._clearStencil = stencil;
   }
   /**
    * The render pass type
    */
-  get type(): number {
+  get type() {
     return this._type;
   }
   /** @internal */
-  isAutoFlip(ctx: DrawContext): boolean {
+  isAutoFlip(ctx: DrawContext) {
     return !!(ctx.device.getFramebuffer() && ctx.device.type === 'webgpu');
   }
   /**
    * Renders a scene
    * @param ctx - Drawing context
    */
-  render(ctx: DrawContext, cullCamera?: Camera, renderQueue?: RenderQueue) {
+  render(
+    ctx: DrawContext,
+    renderCamera?: Nullable<Camera>,
+    cullCamera?: Nullable<Camera>,
+    renderQueue?: RenderQueue
+  ) {
     ctx.renderPass = this;
-    this.drawScene(ctx, cullCamera ?? ctx.camera, renderQueue);
+    this.drawScene(ctx, renderCamera ?? ctx.camera, cullCamera ?? renderCamera ?? ctx.camera, renderQueue);
   }
   /** @internal */
-  protected getGlobalBindGroup(ctx: DrawContext): BindGroup {
-    const hash = this.getGlobalBindGroupHash(ctx);
-    let bindGroup = this._globalBindGroups[hash];
-    if (!bindGroup) {
-      const ret = ctx.device.programBuilder.buildRender({
-        vertex(pb) {
-          ShaderHelper.prepareVertexShader(pb, ctx);
-          pb.main(function () {});
-        },
-        fragment(pb) {
-          ShaderHelper.prepareFragmentShader(pb, ctx);
-          pb.main(function () {});
-        }
-      });
-      bindGroup = ctx.device.createBindGroup(ret[2][0]);
-      this._globalBindGroups[hash] = bindGroup;
-    }
-    return bindGroup;
+  getGlobalBindGroupHash(ctx: DrawContext, camera: Camera) {
+    return `${this.constructor.name}:${this._getGlobalBindGroupHash(ctx, camera)}`;
   }
   /** @internal */
-  getGlobalBindGroupHash(ctx: DrawContext) {
-    return `${this.constructor.name}:${this._getGlobalBindGroupHash(ctx)}`;
-  }
+  protected abstract _getGlobalBindGroupHash(ctx: DrawContext, camera: Camera): string;
   /** @internal */
-  protected abstract _getGlobalBindGroupHash(ctx: DrawContext);
+  protected abstract renderItems(ctx: DrawContext, renderCamera: Camera, renderQueue: RenderQueue): void;
   /** @internal */
-  protected abstract renderItems(ctx: DrawContext, renderQueue: RenderQueue);
-  /** @internal */
-  protected drawScene(ctx: DrawContext, cullCamera: Camera, renderQueue?: RenderQueue) {
+  protected drawScene(ctx: DrawContext, renderCamera: Camera, cullCamera: Camera, renderQueue?: RenderQueue) {
     const device = ctx.device;
     this.clearFramebuffer();
     const rq = renderQueue ?? this.cullScene(ctx, cullCamera);
     if (rq) {
       const windingReversed = device.isWindingOrderReversed();
       device.reverseVertexWindingOrder(this.isAutoFlip(ctx) ? !windingReversed : windingReversed);
-      this.renderItems(ctx, rq);
+      this.renderItems(ctx, renderCamera, rq);
       device.reverseVertexWindingOrder(windingReversed);
       if (rq !== renderQueue) {
         rq.dispose();
@@ -125,31 +110,29 @@ export abstract class RenderPass extends Disposable {
    * @param cullCamera - The camera that will be used to cull the scene
    * @returns The cull result
    */
-  cullScene(ctx: DrawContext, cullCamera: Camera): RenderQueue {
-    if (cullCamera) {
-      const renderQueue = new RenderQueue(this);
-      const cullVisitor = new CullVisitor(this, cullCamera, renderQueue, ctx.primaryCamera);
-      if (ctx.scene.octree) {
-        ctx.scene.octree.getRootNode().traverse(cullVisitor);
-      } else {
-        ctx.scene.rootNode.traverse(cullVisitor);
-      }
-      renderQueue.end(cullCamera);
-      ctx.sunLight = renderQueue.sunLight;
-      return renderQueue;
+  cullScene(ctx: DrawContext, cullCamera: Camera) {
+    const renderQueue = new RenderQueue(this);
+    const cullVisitor = new CullVisitor(this, cullCamera, renderQueue);
+    if (ctx.scene.octree) {
+      ctx.scene.octree.getRootNode().traverse(cullVisitor);
+    } else {
+      ctx.scene.rootNode.traverse(cullVisitor);
     }
-    return null;
+    renderQueue.end(cullCamera);
+    ctx.sunLight = renderQueue.sunLight;
+    return renderQueue;
   }
   /** @internal */
   private internalDrawItemList(
     ctx: DrawContext,
     items: RenderQueueItem[],
-    renderBundle: RenderBundleWrapper,
+    renderQueue: Nullable<RenderQueue>,
+    renderBundle: Nullable<RenderBundleWrapper>,
     reverseWinding: boolean,
     hash: string
   ) {
     let recording = false;
-    if (renderBundle && ctx.primaryCamera.commandBufferReuse) {
+    if (renderBundle && ctx.camera.commandBufferReuse) {
       const bundle = renderBundle.getRenderBundle(hash);
       if (bundle) {
         ctx.device.executeRenderBundle(bundle);
@@ -167,24 +150,23 @@ export abstract class RenderPass extends Disposable {
       if (recording) {
         RenderBundleWrapper.addDrawable(
           item.drawable,
-          item.drawable.getMaterial()?.coreMaterial,
-          item.drawable.getPrimitive(),
-          renderBundle,
+          item.drawable.getMaterial()?.coreMaterial!,
+          item.drawable.getPrimitive()!,
+          renderBundle!,
           hash
         );
       }
-      item.drawable.draw(ctx, recording ? undefined : hash);
+      item.drawable.draw(ctx, renderQueue, recording ? undefined : hash);
       if (reverse) {
         ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
       }
     }
-    if (renderBundle && ctx.primaryCamera.commandBufferReuse) {
+    if (renderBundle && ctx.camera.commandBufferReuse) {
       renderBundle.endRenderBundle(hash);
     }
   }
   /** @internal */
   protected drawItemList(itemList: RenderItemListInfo, ctx: DrawContext, reverseWinding: boolean) {
-    ctx.renderQueue = itemList.renderQueue;
     ctx.instanceData = null;
     const windingHash = reverseWinding ? '1' : '0';
     const bindGroupHash = ctx.device.getBindGroup(0)[0].getGPUId();
@@ -199,7 +181,14 @@ export abstract class RenderPass extends Disposable {
           MaterialVaryingFlags.MORPH_ANIMATION
         );
         itemList.materialList.forEach((mat) => mat.apply(ctx));
-        this.internalDrawItemList(ctx, itemList.itemList, itemList.renderBundle, reverseWinding, hash);
+        this.internalDrawItemList(
+          ctx,
+          itemList.itemList,
+          itemList.renderQueue,
+          itemList.renderBundle ?? null,
+          reverseWinding,
+          hash
+        );
       }
       if (itemList.skinItemList.length > 0) {
         ctx.materialFlags |= MaterialVaryingFlags.SKIN_ANIMATION;
@@ -208,7 +197,8 @@ export abstract class RenderPass extends Disposable {
         this.internalDrawItemList(
           ctx,
           itemList.skinItemList,
-          itemList.skinRenderBundle,
+          itemList.renderQueue,
+          itemList.skinRenderBundle ?? null,
           reverseWinding,
           hash
         );
@@ -220,7 +210,8 @@ export abstract class RenderPass extends Disposable {
         this.internalDrawItemList(
           ctx,
           itemList.morphItemList,
-          itemList.morphRenderBundle,
+          itemList.renderQueue,
+          itemList.morphRenderBundle ?? null,
           reverseWinding,
           hash
         );
@@ -232,7 +223,8 @@ export abstract class RenderPass extends Disposable {
         this.internalDrawItemList(
           ctx,
           itemList.skinAndMorphItemList,
-          itemList.skinAndMorphRenderBundle,
+          itemList.renderQueue,
+          itemList.skinAndMorphRenderBundle ?? null,
           reverseWinding,
           hash
         );
@@ -244,13 +236,13 @@ export abstract class RenderPass extends Disposable {
         this.internalDrawItemList(
           ctx,
           itemList.instanceItemList,
-          itemList.instanceRenderBundle,
+          itemList.renderQueue,
+          itemList.instanceRenderBundle ?? null,
           reverseWinding,
           hash
         );
       }
     }
-    ctx.renderQueue = null;
   }
   /**
    * Disposes the render pass

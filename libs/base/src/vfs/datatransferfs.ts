@@ -1,6 +1,6 @@
 import { uint8ArrayToBase64 } from '../utils';
 import { PathUtils } from './common';
-import type { FileMetadata, FileStat, ListOptions, ReadOptions } from './vfs';
+import type { FileMetadata, ListOptions, ReadOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
 
 /**
@@ -60,7 +60,7 @@ export class DataTransferVFS extends VFS {
         : this.initializeFromFileList(data);
   }
 
-  protected setReadonly(readonly: boolean): void {
+  protected setReadonly(readonly: boolean) {
     if (!readonly) {
       console.error('DataTransfer VFS is always read-only');
     }
@@ -68,7 +68,7 @@ export class DataTransferVFS extends VFS {
   /**
    * {@inheritDoc VFS._readDirectory}
    */
-  protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
+  protected async _readDirectory(path: string, options?: ListOptions) {
     await this.ensureInitialized();
 
     const normalizedPath = this.normalizePath(path);
@@ -122,7 +122,7 @@ export class DataTransferVFS extends VFS {
   /**
    * {@inheritDoc VFS._readFile}
    */
-  protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
+  protected async _readFile(path: string, options?: ReadOptions) {
     await this.ensureInitialized();
 
     const normalizedPath = this.normalizePath(path);
@@ -156,7 +156,7 @@ export class DataTransferVFS extends VFS {
   /**
    * {@inheritDoc VFS._exists}
    */
-  protected async _exists(path: string): Promise<boolean> {
+  protected async _exists(path: string) {
     await this.ensureInitialized();
 
     const normalizedPath = this.normalizePath(path);
@@ -170,7 +170,7 @@ export class DataTransferVFS extends VFS {
   /**
    * {@inheritDoc VFS._stat}
    */
-  protected async _stat(path: string): Promise<FileStat> {
+  protected async _stat(path: string) {
     await this.ensureInitialized();
 
     const normalizedPath = this.normalizePath(path);
@@ -205,50 +205,50 @@ export class DataTransferVFS extends VFS {
    * Not supported. DataTransfer VFS is read-only.
    * @throws {@link VFSError} with code `"EROFS"`.
    */
-  protected async _writeFile(): Promise<void> {
+  protected async _writeFile() {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
   /**
    * Not supported. DataTransfer VFS is read-only.
    * @throws {@link VFSError} with code `"EROFS"`.
    */
-  protected async _makeDirectory(): Promise<void> {
+  protected async _makeDirectory() {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
   /**
    * Not supported. DataTransfer VFS is read-only.
    * @throws {@link VFSError} with code `"EROFS"`.
    */
-  protected async _deleteFile(): Promise<void> {
+  protected async _deleteFile() {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
   /**
    * Not supported. DataTransfer VFS is read-only.
    * @throws {@link VFSError} with code `"EROFS"`.
    */
-  protected async _deleteDirectory(): Promise<void> {
+  protected async _deleteDirectory() {
     throw new VFSError('DataTransfer VFS is read-only', 'EROFS');
   }
   /**
    * No-op for read-only VFS.
    */
-  protected async _wipe(): Promise<void> {
+  protected async _wipe() {
     return;
   }
   /**
    * No-op for read-only VFS.
    */
-  protected _deleteFileSystem(): Promise<void> {
+  protected _deleteFileSystem() {
     return Promise.resolve();
   }
   /**
    * No-op for read-only VFS.
    */
-  protected _move(): Promise<void> {
+  protected _move() {
     return Promise.resolve();
   }
 
-  private async ensureInitialized(): Promise<void> {
+  private async ensureInitialized() {
     if (this.initialized) {
       return;
     }
@@ -256,7 +256,7 @@ export class DataTransferVFS extends VFS {
     this.initialized = true;
   }
 
-  private async initializeFromDataTransfer(dataTransfer: DataTransfer): Promise<void> {
+  private async initializeFromDataTransfer(dataTransfer: DataTransfer) {
     this.entries.clear();
     this.directoryStructure.clear();
 
@@ -306,7 +306,7 @@ export class DataTransferVFS extends VFS {
     }
   }
 
-  private async initializeFromFileList(fileList: FileList): Promise<void> {
+  private async initializeFromFileList(fileList: FileList) {
     this.entries.clear();
     this.directoryStructure.clear();
 
@@ -328,11 +328,8 @@ export class DataTransferVFS extends VFS {
     }
   }
 
-  private collectFileOperation(
-    fileEntry: FileSystemFileEntry,
-    relativePath: string
-  ): Promise<{ file: File; path: string }> {
-    return new Promise((resolve, reject) => {
+  private collectFileOperation(fileEntry: FileSystemFileEntry, relativePath: string) {
+    return new Promise<{ file: File; path: string }>((resolve, reject) => {
       try {
         fileEntry.file(
           (file: File) => resolve({ file, path: relativePath }),
@@ -348,11 +345,8 @@ export class DataTransferVFS extends VFS {
     });
   }
 
-  private collectDirectoryOperation(
-    dirEntry: FileSystemDirectoryEntry,
-    basePath: string
-  ): Promise<Array<{ file: File; path: string }>> {
-    return new Promise((resolve, reject) => {
+  private collectDirectoryOperation(dirEntry: FileSystemDirectoryEntry, basePath: string) {
+    return new Promise<Array<{ file: File; path: string }>>((resolve, reject) => {
       const reader = dirEntry.createReader();
       const batchEntries: FileSystemEntry[] = [];
 
@@ -405,11 +399,7 @@ export class DataTransferVFS extends VFS {
     });
   }
 
-  private async processFile(
-    file: File,
-    relativePath: string,
-    fileEntries: DataTransferFileEntry[]
-  ): Promise<void> {
+  private async processFile(file: File, relativePath: string, fileEntries: DataTransferFileEntry[]) {
     const normalizedPath = this.normalizePath('/' + relativePath);
 
     const entry: DataTransferFileEntry = {
@@ -423,7 +413,7 @@ export class DataTransferVFS extends VFS {
     fileEntries.push(entry);
   }
 
-  private updateDirectoryStructure(filePath: string): void {
+  private updateDirectoryStructure(filePath: string) {
     const parts = filePath.split('/').filter((p) => p);
     let currentPath = '';
 
@@ -453,7 +443,7 @@ export class DataTransferVFS extends VFS {
     this.directoryStructure.get(parentPath)!.add(fileName);
   }
 
-  private matchesFilter(metadata: FileMetadata, options?: ListOptions): boolean {
+  private matchesFilter(metadata: FileMetadata, options?: ListOptions) {
     if (!options) {
       return true;
     }

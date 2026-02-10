@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';
@@ -10,14 +11,14 @@ import type { WebGPURenderPass } from './renderpass_webgpu';
 export class WebGPUClearQuad {
   private static _clearPrograms: { [hash: string]: { program: WebGPUProgram; bindGroup: WebGPUBindGroup } } =
     {};
-  private static _clearStateSet: WebGPURenderStateSet = null;
+  private static _clearStateSet: Nullable<WebGPURenderStateSet> = null;
   private static readonly _defaultClearColor = new Vector4(0, 0, 0, 1);
 
   static drawClearQuad(
     renderPass: WebGPURenderPass,
-    clearColor: Float32Array<ArrayBuffer>,
-    clearDepth: number,
-    clearStencil: number
+    clearColor: Nullable<Float32Array<ArrayBuffer>>,
+    clearDepth: Nullable<number>,
+    clearStencil: Nullable<number>
   ) {
     if (!this._clearStateSet) {
       this.initClearQuad(renderPass);
@@ -29,10 +30,9 @@ export class WebGPUClearQuad {
     const bClearStencil = !(clearStencil === null || clearStencil === undefined);
     program.bindGroup.setValue('clearDepth', clearDepth ?? 1);
     program.bindGroup.setValue('clearColor', clearColor ?? this._defaultClearColor);
-    this._clearStateSet.useDepthState().enableWrite(bClearDepth);
-    this._clearStateSet.useColorState().setColorMask(bClearColor, bClearColor, bClearColor, bClearColor);
-    this._clearStateSet
-      .useStencilState()
+    this._clearStateSet!.useDepthState().enableWrite(bClearDepth);
+    this._clearStateSet!.useColorState().setColorMask(bClearColor, bClearColor, bClearColor, bClearColor);
+    this._clearStateSet!.useStencilState()
       .enable(bClearStencil)
       .setReference(bClearStencil ? clearStencil : 0);
     renderPass
@@ -40,7 +40,7 @@ export class WebGPUClearQuad {
       .commandQueue.draw(
         program.program,
         null,
-        this._clearStateSet,
+        this._clearStateSet!,
         [program.bindGroup],
         null,
         'triangle-strip',
@@ -49,10 +49,7 @@ export class WebGPUClearQuad {
         1
       );
   }
-  private static getClearProgram(
-    device: WebGPUDevice,
-    hash: string
-  ): { program: WebGPUProgram; bindGroup: WebGPUBindGroup } {
+  private static getClearProgram(device: WebGPUDevice, hash: string) {
     let programInfo = this._clearPrograms[hash];
     if (!programInfo) {
       const colorAttachments = hash.split('');
@@ -103,7 +100,7 @@ export class WebGPUClearQuad {
     }
     return programInfo;
   }
-  private static initClearQuad(renderPass: WebGPURenderPass): void {
+  private static initClearQuad(renderPass: WebGPURenderPass) {
     this._clearStateSet = renderPass.getDevice().createRenderStateSet() as unknown as WebGPURenderStateSet;
     this._clearStateSet.useDepthState().enableTest(false);
     this._clearStateSet.useRasterizerState().setCullMode('none');
@@ -118,14 +115,14 @@ export class WebGPUClearQuad {
 }
 
 export class WebGPUMipmapGenerator {
-  static _frameBufferInfo: FrameBufferInfo = null;
-  static _mipmapGenerationProgram: WebGPUProgram = null;
-  static _mipmapGenerationStateSet: WebGPURenderStateSet = null;
+  static _frameBufferInfo: Nullable<FrameBufferInfo> = null;
+  static _mipmapGenerationProgram: Nullable<WebGPUProgram> = null;
+  static _mipmapGenerationStateSet: Nullable<WebGPURenderStateSet> = null;
   static getMipmapGenerationBindGroupLayout(device: WebGPUDevice) {
     if (!this._mipmapGenerationProgram) {
       this.initMipmapGeneration(device);
     }
-    return this._mipmapGenerationProgram.bindGroupLayouts[0];
+    return this._mipmapGenerationProgram!.bindGroupLayouts[0];
   }
   static generateMipmap(device: WebGPUDevice, tex: WebGPUBaseTexture, cmdEncoder?: GPUCommandEncoder) {
     if (!tex.isRenderable()) {
@@ -140,7 +137,7 @@ export class WebGPUMipmapGenerator {
     tex.setMipmapDirty(false);
     for (let face = 0; face < numLayers; face++) {
       for (let level = 1; level < miplevels; level++) {
-        this.generateMiplevel(device, encoder, tex, tex.object, tex.gpuFormat, level, level, face);
+        this.generateMiplevel(device, encoder, tex, tex.object!, tex.gpuFormat!, level, level, face);
       }
     }
     if (!cmdEncoder) {
@@ -171,11 +168,11 @@ export class WebGPUMipmapGenerator {
     const renderPassEncoder = this.beginMipmapGenerationPass(commandEncoder, dstTex, format, dstLevel, face);
     renderPassEncoder.setBindGroup(0, srcTex.getMipmapGenerationBindGroup(srcLevel, face).bindGroup);
     const pipeline = device.pipelineCache.fetchRenderPipeline(
-      this._mipmapGenerationProgram,
+      this._mipmapGenerationProgram!,
       null,
-      this._mipmapGenerationStateSet,
+      this._mipmapGenerationStateSet!,
       'triangle-strip',
-      this._frameBufferInfo
+      this._frameBufferInfo!
     );
     if (pipeline) {
       renderPassEncoder.setPipeline(pipeline);
@@ -189,7 +186,7 @@ export class WebGPUMipmapGenerator {
     format: GPUTextureFormat,
     level: number,
     face: number
-  ): GPURenderPassEncoder {
+  ) {
     const passDesc: GPURenderPassDescriptor = {
       colorAttachments: [
         {
@@ -213,7 +210,7 @@ export class WebGPUMipmapGenerator {
       sampleCount: 1,
       hash: null,
       clearHash: null
-    };
+    } as unknown as FrameBufferInfo;
     this._frameBufferInfo.hash = `${this._frameBufferInfo.colorFormats.join('-')}:${
       this._frameBufferInfo.depthFormat
     }:${this._frameBufferInfo.sampleCount}`;
@@ -221,7 +218,7 @@ export class WebGPUMipmapGenerator {
     renderPassEncoder.insertDebugMarker('MipmapGeneration');
     return renderPassEncoder;
   }
-  private static initMipmapGeneration(device: WebGPUDevice): void {
+  private static initMipmapGeneration(device: WebGPUDevice) {
     this._mipmapGenerationProgram = device.buildRenderProgram({
       label: 'MipmapGeneration',
       vertex(pb) {

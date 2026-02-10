@@ -12,17 +12,18 @@ import type {
   StencilOp
 } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
+import type { Nullable } from '@zephyr3d/base';
 
 export abstract class WebGPURenderState {
   protected static _defaultState: WebGPURenderState;
-  protected _hash: string;
+  protected _hash: Nullable<string>;
   static get defaultState() {
     return this._defaultState;
   }
   constructor() {
     this._hash = null;
   }
-  get hash(): string {
+  get hash() {
     return this._getHash(this.constructor);
   }
   invalidateHash() {
@@ -51,7 +52,7 @@ export class WebGPUColorState extends WebGPURenderState implements ColorState {
     super();
     this._redMask = this._greenMask = this._blueMask = this._alphaMask = true;
   }
-  clone(): ColorState {
+  clone() {
     return new WebGPUColorState().setColorMask(
       this._redMask,
       this._greenMask,
@@ -59,50 +60,50 @@ export class WebGPUColorState extends WebGPURenderState implements ColorState {
       this._alphaMask
     );
   }
-  get redMask(): boolean {
+  get redMask() {
     return this._redMask;
   }
-  set redMask(val: boolean) {
+  set redMask(val) {
     if (this._redMask !== !!val) {
       this._redMask = !!val;
       this.invalidateHash();
     }
   }
-  get greenMask(): boolean {
+  get greenMask() {
     return this._greenMask;
   }
-  set greenMask(val: boolean) {
+  set greenMask(val) {
     if (this._greenMask !== !!val) {
       this._greenMask = !!val;
       this.invalidateHash();
     }
   }
-  get blueMask(): boolean {
+  get blueMask() {
     return this._blueMask;
   }
-  set blueMask(val: boolean) {
+  set blueMask(val) {
     if (this._blueMask !== !!val) {
       this._blueMask = !!val;
       this.invalidateHash();
     }
   }
-  get alphaMask(): boolean {
+  get alphaMask() {
     return this._alphaMask;
   }
-  set alphaMask(val: boolean) {
+  set alphaMask(val) {
     if (this._alphaMask !== !!val) {
       this._alphaMask = !!val;
       this.invalidateHash();
     }
   }
-  setColorMask(r: boolean, g: boolean, b: boolean, a: boolean): this {
+  setColorMask(r: boolean, g: boolean, b: boolean, a: boolean) {
     this.redMask = r;
     this.greenMask = g;
     this.blueMask = b;
     this.alphaMask = a;
     return this;
   }
-  protected computeHash(): string {
+  protected computeHash() {
     let val = 0;
     if (this.redMask) {
       val += 1 << 0;
@@ -141,7 +142,7 @@ export class WebGPUBlendingState extends WebGPURenderState implements BlendingSt
     this._rgbEquation = 'add';
     this._alphaEquation = 'add';
   }
-  clone(): BlendingState {
+  clone() {
     const other = new WebGPUBlendingState();
     other.enable(this._enabled);
     other.enableAlphaToCoverage(this._alphaToCoverageEnabled);
@@ -150,10 +151,10 @@ export class WebGPUBlendingState extends WebGPURenderState implements BlendingSt
     other.setBlendEquation(this._rgbEquation, this._alphaEquation);
     return other;
   }
-  get enabled(): boolean {
+  get enabled() {
     return this._enabled;
   }
-  set enabled(val: boolean) {
+  set enabled(val) {
     if (this._enabled !== !!val) {
       this._enabled = !!val;
       this.invalidateHash();
@@ -162,97 +163,97 @@ export class WebGPUBlendingState extends WebGPURenderState implements BlendingSt
   get alphaToCoverageEnabled() {
     return this._alphaToCoverageEnabled;
   }
-  set alphaToCoverageEnabled(val: boolean) {
+  set alphaToCoverageEnabled(val) {
     if (this._alphaToCoverageEnabled !== !!val) {
       this._alphaToCoverageEnabled = !!val;
       this.invalidateHash();
     }
   }
-  get srcBlendRGB(): BlendFunc {
+  get srcBlendRGB() {
     return this._srcBlendRGB;
   }
-  set srcBlendRGB(val: BlendFunc) {
+  set srcBlendRGB(val) {
     if (this._srcBlendRGB !== val) {
       this._srcBlendRGB = val;
       this.invalidateHash();
     }
   }
-  get srcBlendAlpha(): BlendFunc {
+  get srcBlendAlpha() {
     return this._srcBlendAlpha;
   }
-  set srcBlendAlpha(val: BlendFunc) {
+  set srcBlendAlpha(val) {
     if (this._srcBlendAlpha !== val) {
       this._srcBlendAlpha = val;
       this.invalidateHash();
     }
   }
-  get dstBlendRGB(): BlendFunc {
+  get dstBlendRGB() {
     return this._dstBlendRGB;
   }
-  set dstBlendRGB(val: BlendFunc) {
+  set dstBlendRGB(val) {
     if (this._dstBlendRGB !== val) {
       this._dstBlendRGB = val;
       this.invalidateHash();
     }
   }
-  get dstBlendAlpha(): BlendFunc {
+  get dstBlendAlpha() {
     return this._dstBlendAlpha;
   }
-  set dstBlendAlpha(val: BlendFunc) {
+  set dstBlendAlpha(val) {
     if (this._dstBlendAlpha !== val) {
       this._dstBlendAlpha = val;
       this.invalidateHash();
     }
   }
-  get rgbEquation(): BlendEquation {
+  get rgbEquation() {
     return this._rgbEquation;
   }
-  set rgbEquation(val: BlendEquation) {
+  set rgbEquation(val) {
     if (this._rgbEquation !== val) {
       this._rgbEquation = val;
       this.invalidateHash();
     }
   }
-  get alphaEquation(): BlendEquation {
+  get alphaEquation() {
     return this._alphaEquation;
   }
-  set alphaEquation(val: BlendEquation) {
+  set alphaEquation(val) {
     if (this._alphaEquation !== val) {
       this._alphaEquation = val;
       this.invalidateHash();
     }
   }
-  enable(b: boolean): this {
+  enable(b: boolean) {
     this.enabled = b;
     return this;
   }
-  enableAlphaToCoverage(b: boolean): this {
+  enableAlphaToCoverage(b: boolean) {
     this.alphaToCoverageEnabled = b;
     return this;
   }
-  setBlendFunc(src: BlendFunc, dest: BlendFunc): this {
+  setBlendFunc(src: BlendFunc, dest: BlendFunc) {
     this.srcBlendRGB = src;
     this.dstBlendRGB = dest;
     this.srcBlendAlpha = src;
     this.dstBlendAlpha = dest;
     return this;
   }
-  setBlendFuncRGB(src: BlendFunc, dest: BlendFunc): this {
+  setBlendFuncRGB(src: BlendFunc, dest: BlendFunc) {
     this.srcBlendRGB = src;
     this.dstBlendRGB = dest;
     return this;
   }
-  setBlendFuncAlpha(src: BlendFunc, dest: BlendFunc): this {
+  setBlendFuncAlpha(src: BlendFunc, dest: BlendFunc) {
     this.srcBlendAlpha = src;
     this.dstBlendAlpha = dest;
     return this;
   }
-  setBlendEquation(rgb: BlendEquation, alpha: BlendEquation): this {
+  setBlendEquation(rgb: BlendEquation, alpha: BlendEquation) {
     this.rgbEquation = rgb;
     this.alphaEquation = alpha;
     return this;
   }
-  protected computeHash(): string {
+  protected computeHash() {
     return this._enabled
       ? `${this._srcBlendRGB}-${this._srcBlendAlpha}-${this._dstBlendRGB}-${this._dstBlendAlpha}-${
           this._rgbEquation
@@ -270,36 +271,36 @@ export class WebGPURasterizerState extends WebGPURenderState implements Rasteriz
     this._cullMode = 'back';
     this._depthClampEnabled = false;
   }
-  clone(): RasterizerState {
+  clone() {
     return new WebGPURasterizerState().setCullMode(this._cullMode).enableDepthClamp(this._depthClampEnabled);
   }
-  get cullMode(): FaceMode {
+  get cullMode() {
     return this._cullMode;
   }
-  set cullMode(val: FaceMode) {
+  set cullMode(val) {
     if (this._cullMode !== val) {
       this._cullMode = val;
       this.invalidateHash();
     }
   }
-  setCullMode(mode: FaceMode): this {
+  setCullMode(mode: FaceMode) {
     this.cullMode = mode;
     return this;
   }
-  get depthClampEnabled(): boolean {
+  get depthClampEnabled() {
     return this._depthClampEnabled;
   }
-  set depthClampEnabled(val: boolean) {
+  set depthClampEnabled(val) {
     this.enableDepthClamp(val);
   }
-  enableDepthClamp(enable: boolean): this {
+  enableDepthClamp(enable: boolean) {
     if (this._depthClampEnabled !== !!enable) {
       this._depthClampEnabled = !!enable;
       this.invalidateHash();
     }
     return this;
   }
-  protected computeHash(): string {
+  protected computeHash() {
     return `${this._cullMode}-${this._depthClampEnabled ? 1 : 0}`;
   }
 }
@@ -319,7 +320,7 @@ export class WebGPUDepthState extends WebGPURenderState implements DepthState {
     this._depthBias = 0;
     this._depthBiasSlopeScale = 0;
   }
-  clone(): DepthState {
+  clone() {
     const other = new WebGPUDepthState();
     other.enableTest(this._testEnabled);
     other.enableWrite(this._writeEnabled);
@@ -328,72 +329,72 @@ export class WebGPUDepthState extends WebGPURenderState implements DepthState {
     other.setDepthBiasSlopeScale(this._depthBiasSlopeScale);
     return other;
   }
-  get testEnabled(): boolean {
+  get testEnabled() {
     return this._testEnabled;
   }
-  set testEnabled(val: boolean) {
+  set testEnabled(val) {
     if (this._testEnabled !== !!val) {
       this._testEnabled = val;
       this.invalidateHash();
     }
   }
-  get writeEnabled(): boolean {
+  get writeEnabled() {
     return this._writeEnabled;
   }
-  set writeEnabled(val: boolean) {
+  set writeEnabled(val) {
     if (this._writeEnabled !== !!val) {
       this._writeEnabled = val;
       this.invalidateHash();
     }
   }
-  get compareFunc(): CompareFunc {
+  get compareFunc() {
     return this._compareFunc;
   }
-  set compareFunc(val: CompareFunc) {
+  set compareFunc(val) {
     if (this._compareFunc !== val) {
       this._compareFunc = val;
       this.invalidateHash();
     }
   }
-  get depthBias(): number {
+  get depthBias() {
     return this._depthBias;
   }
-  set depthBias(value: number) {
+  set depthBias(value) {
     this.setDepthBias(value);
   }
-  setDepthBias(value: number): this {
+  setDepthBias(value: number) {
     if (this._depthBias !== value) {
       this._depthBias = value;
       this.invalidateHash();
     }
     return this;
   }
-  get depthBiasSlopeScale(): number {
+  get depthBiasSlopeScale() {
     return this._depthBiasSlopeScale;
   }
-  set depthBiasSlopeScale(value: number) {
+  set depthBiasSlopeScale(value) {
     this.setDepthBiasSlopeScale(value);
   }
-  setDepthBiasSlopeScale(value: number): this {
+  setDepthBiasSlopeScale(value: number) {
     if (this._depthBiasSlopeScale !== value) {
       this._depthBiasSlopeScale = value;
       this.invalidateHash();
     }
     return this;
   }
-  enableTest(b: boolean): this {
+  enableTest(b: boolean) {
     this.testEnabled = b;
     return this;
   }
-  enableWrite(b: boolean): this {
+  enableWrite(b: boolean) {
     this.writeEnabled = b;
     return this;
   }
-  setCompareFunc(func: CompareFunc): this {
+  setCompareFunc(func: CompareFunc) {
     this.compareFunc = func;
     return this;
   }
-  protected computeHash(): string {
+  protected computeHash() {
     return `${Number(this._testEnabled)}-${Number(this._writeEnabled)}-${this._compareFunc}-${
       this._depthBias
     }-${this._depthBiasSlopeScale}`;
@@ -405,13 +406,13 @@ export class WebGPUStencilState extends WebGPURenderState implements StencilStat
   private _enabled: boolean;
   private _writeMask: number;
   private _failOp: StencilOp;
-  private _failOpBack: StencilOp;
+  private _failOpBack!: StencilOp;
   private _zFailOp: StencilOp;
-  private _zFailOpBack: StencilOp;
+  private _zFailOpBack!: StencilOp;
   private _passOp: StencilOp;
-  private _passOpBack: StencilOp;
+  private _passOpBack!: StencilOp;
   private _func: CompareFunc;
-  private _funcBack: CompareFunc;
+  private _funcBack!: CompareFunc;
   private _ref: number;
   private _readMask: number;
   constructor() {
@@ -425,7 +426,7 @@ export class WebGPUStencilState extends WebGPURenderState implements StencilStat
     this._writeMask = 0xffffffff;
     this._readMask = 0xffffffff;
   }
-  clone(): StencilState {
+  clone() {
     const other = new WebGPUStencilState();
     other.enable(this._enabled);
     other.setWriteMask(this._writeMask);
@@ -437,151 +438,151 @@ export class WebGPUStencilState extends WebGPURenderState implements StencilStat
     other.setReadMask(this._readMask);
     return other;
   }
-  get enabled(): boolean {
+  get enabled() {
     return this._enabled;
   }
-  set enabled(val: boolean) {
+  set enabled(val) {
     if (this._enabled !== !!val) {
       this._enabled = !!val;
       this.invalidateHash();
     }
   }
-  get writeMask(): number {
+  get writeMask() {
     return this._writeMask;
   }
-  set writeMask(val: number) {
+  set writeMask(val) {
     if (this._writeMask !== val) {
       this._writeMask = val;
       this.invalidateHash();
     }
   }
-  get failOp(): StencilOp {
+  get failOp() {
     return this._failOp;
   }
-  set failOp(val: StencilOp) {
+  set failOp(val) {
     if (this._failOp !== val) {
       this._failOp = val;
       this.invalidateHash();
     }
   }
-  get failOpBack(): StencilOp {
+  get failOpBack() {
     return this._failOpBack;
   }
-  set failOpBack(val: StencilOp) {
+  set failOpBack(val) {
     if (this._failOpBack !== val) {
       this._failOpBack = val;
       this.invalidateHash();
     }
   }
-  get zFailOp(): StencilOp {
+  get zFailOp() {
     return this._zFailOp;
   }
-  set zFailOp(val: StencilOp) {
+  set zFailOp(val) {
     if (this._zFailOp !== val) {
       this._zFailOp = val;
       this.invalidateHash();
     }
   }
-  get zFailOpBack(): StencilOp {
+  get zFailOpBack() {
     return this._zFailOpBack;
   }
-  set zFailOpBack(val: StencilOp) {
+  set zFailOpBack(val) {
     if (this._zFailOpBack !== val) {
       this._zFailOpBack = val;
       this.invalidateHash();
     }
   }
-  get passOp(): StencilOp {
+  get passOp() {
     return this._passOp;
   }
-  set passOp(val: StencilOp) {
+  set passOp(val) {
     if (this._passOp !== val) {
       this._passOp = val;
       this.invalidateHash();
     }
   }
-  get passOpBack(): StencilOp {
+  get passOpBack() {
     return this._passOpBack;
   }
-  set passOpBack(val: StencilOp) {
+  set passOpBack(val) {
     if (this._passOpBack !== val) {
       this._passOpBack = val;
       this.invalidateHash();
     }
   }
-  get func(): CompareFunc {
+  get func() {
     return this._func;
   }
-  set func(val: CompareFunc) {
+  set func(val) {
     if (this._func !== val) {
       this._func = val;
       this.invalidateHash();
     }
   }
-  get funcBack(): CompareFunc {
+  get funcBack() {
     return this._funcBack;
   }
-  set funcBack(val: CompareFunc) {
+  set funcBack(val) {
     if (this._funcBack !== val) {
       this._funcBack = val;
       this.invalidateHash();
     }
   }
-  get ref(): number {
+  get ref() {
     return this._ref;
   }
-  set ref(val: number) {
+  set ref(val) {
     if (this._ref !== val) {
       this._ref = val;
       this.invalidateHash();
     }
   }
-  get readMask(): number {
+  get readMask() {
     return this._readMask;
   }
-  set readMask(val: number) {
+  set readMask(val) {
     if (this._readMask !== val) {
       this._readMask = val;
       this.invalidateHash();
     }
   }
-  enable(b: boolean): this {
+  enable(b: boolean) {
     this.enabled = b;
     return this;
   }
-  setWriteMask(mask: number): this {
+  setWriteMask(mask: number) {
     this.writeMask = mask;
     return this;
   }
-  setFrontOp(fail: StencilOp, zfail: StencilOp, pass: StencilOp): this {
+  setFrontOp(fail: StencilOp, zfail: StencilOp, pass: StencilOp) {
     this.failOp = fail;
     this.zFailOp = zfail;
     this.passOp = pass;
     return this;
   }
-  setBackOp(fail: StencilOp, zfail: StencilOp, pass: StencilOp): this {
+  setBackOp(fail: StencilOp, zfail: StencilOp, pass: StencilOp) {
     this.failOpBack = fail;
     this.zFailOpBack = zfail;
     this.passOpBack = pass;
     return this;
   }
-  setFrontCompareFunc(func: CompareFunc): this {
+  setFrontCompareFunc(func: CompareFunc) {
     this.func = func;
     return this;
   }
-  setBackCompareFunc(func: CompareFunc): this {
+  setBackCompareFunc(func: CompareFunc) {
     this.funcBack = func;
     return this;
   }
-  setReference(ref: number): this {
+  setReference(ref: number) {
     this.ref = ref;
     return this;
   }
-  setReadMask(mask: number): this {
+  setReadMask(mask: number) {
     this.readMask = mask;
     return this;
   }
-  protected computeHash(): string {
+  protected computeHash() {
     return this._enabled
       ? `${this.sideHash(false)}-${this.sideHash(true)}-${this.readMask.toString(
           16
@@ -597,11 +598,11 @@ export class WebGPUStencilState extends WebGPURenderState implements StencilStat
 
 export class WebGPURenderStateSet implements RenderStateSet {
   private readonly _device: WebGPUDevice;
-  colorState: WebGPUColorState;
-  blendingState: WebGPUBlendingState;
-  rasterizerState: WebGPURasterizerState;
-  depthState: WebGPUDepthState;
-  stencilState: WebGPUStencilState;
+  colorState: Nullable<WebGPUColorState>;
+  blendingState: Nullable<WebGPUBlendingState>;
+  rasterizerState: Nullable<WebGPURasterizerState>;
+  depthState: Nullable<WebGPUDepthState>;
+  stencilState: Nullable<WebGPUStencilState>;
   constructor(device: WebGPUDevice) {
     this._device = device;
     this.colorState = null;
@@ -610,7 +611,7 @@ export class WebGPURenderStateSet implements RenderStateSet {
     this.depthState = null;
     this.stencilState = null;
   }
-  clone(): RenderStateSet {
+  clone() {
     const newStateSet = new WebGPURenderStateSet(this._device);
     newStateSet.colorState = (this.colorState?.clone() as WebGPUColorState) ?? null;
     newStateSet.blendingState = (this.blendingState?.clone() as WebGPUBlendingState) ?? null;
@@ -619,52 +620,52 @@ export class WebGPURenderStateSet implements RenderStateSet {
     newStateSet.stencilState = (this.stencilState?.clone() as WebGPUStencilState) ?? null;
     return newStateSet;
   }
-  copyFrom(stateSet: RenderStateSet): void {
+  copyFrom(stateSet: RenderStateSet) {
     this.colorState = stateSet.colorState as WebGPUColorState;
     this.blendingState = stateSet.blendingState as WebGPUBlendingState;
     this.rasterizerState = stateSet.rasterizerState as WebGPURasterizerState;
     this.depthState = stateSet.depthState as WebGPUDepthState;
     this.stencilState = stateSet.stencilState as WebGPUStencilState;
   }
-  get hash(): string {
+  get hash() {
     return `${this.colorState?.hash || ''}:${this.blendingState?.hash || ''}:${
       this.rasterizerState?.hash || ''
     }:${this.depthState?.hash || ''}:${this.stencilState?.hash || ''}`;
   }
-  useColorState(state?: ColorState): ColorState {
+  useColorState(state?: ColorState) {
     return (this.colorState = (state as WebGPUColorState) ?? this.colorState ?? new WebGPUColorState());
   }
   defaultColorState() {
     this.colorState = null;
   }
-  useBlendingState(state?: BlendingState): BlendingState {
+  useBlendingState(state?: BlendingState) {
     return (this.blendingState =
       (state as WebGPUBlendingState) ?? this.blendingState ?? new WebGPUBlendingState());
   }
   defaultBlendingState() {
     this.blendingState = null;
   }
-  useRasterizerState(state?: RasterizerState): RasterizerState {
+  useRasterizerState(state?: RasterizerState) {
     return (this.rasterizerState =
       (state as WebGPURasterizerState) ?? this.rasterizerState ?? new WebGPURasterizerState());
   }
   defaultRasterizerState() {
     this.rasterizerState = null;
   }
-  useDepthState(state?: DepthState): DepthState {
+  useDepthState(state?: DepthState) {
     return (this.depthState = (state as WebGPUDepthState) ?? this.depthState ?? new WebGPUDepthState());
   }
   defaultDepthState() {
     this.depthState = null;
   }
-  useStencilState(state?: StencilState): StencilState {
+  useStencilState(state?: StencilState) {
     return (this.stencilState =
       (state as WebGPUStencilState) ?? this.stencilState ?? new WebGPUStencilState());
   }
   defaultStencilState() {
     this.stencilState = null;
   }
-  apply(_force?: boolean): void {
+  apply(_force?: boolean) {
     this._device.setRenderStates(this);
   }
 }

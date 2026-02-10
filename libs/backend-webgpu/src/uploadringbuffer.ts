@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 
 export interface MappedBuffer {
@@ -5,13 +6,13 @@ export interface MappedBuffer {
   size: number;
   offset: number;
   used: boolean;
-  mappedRange: ArrayBuffer;
+  mappedRange: Nullable<ArrayBuffer>;
 }
 
 export interface UploadBuffer {
   mappedBuffer: MappedBuffer;
   uploadSize: number;
-  uploadBuffer: GPUBuffer;
+  uploadBuffer: Nullable<GPUBuffer>;
   uploadOffset: number;
 }
 
@@ -53,18 +54,18 @@ export class UploadRingBuffer {
     this._unmappedBufferList = [];
   }
   uploadBuffer(
-    src: ArrayBuffer,
-    dst: GPUBuffer,
+    src: Nullable<ArrayBuffer>,
+    dst: Nullable<GPUBuffer>,
     srcOffset: number,
     dstOffset: number,
     uploadSize: number,
     allowOverlap?: boolean
-  ): UploadBuffer {
+  ) {
     const size = (uploadSize + 3) & ~3;
     const mappedBuffer = this.fetchBufferMapped(size, !!allowOverlap);
     if (src) {
       const mappedRange = mappedBuffer.mappedRange; //mappedBuffer.buffer.getMappedRange(mappedBuffer.offset, size);
-      new Uint8Array(mappedRange, mappedBuffer.offset, size).set(new Uint8Array(src, srcOffset, uploadSize));
+      new Uint8Array(mappedRange!, mappedBuffer.offset, size).set(new Uint8Array(src, srcOffset, uploadSize));
     }
     const upload = {
       mappedBuffer: { ...mappedBuffer },
@@ -76,7 +77,7 @@ export class UploadRingBuffer {
     mappedBuffer.offset = (mappedBuffer.offset + 7) & ~7;
     return upload;
   }
-  beginUploads(): number {
+  beginUploads() {
     for (let i = this._bufferList.length - 1; i >= 0; i--) {
       const buffer = this._bufferList[i];
       if (buffer.used) {
@@ -113,7 +114,7 @@ export class UploadRingBuffer {
     }
     this._unmappedBufferList = [];
   }
-  fetchBufferMapped(size: number, allowOverlap: boolean): MappedBuffer {
+  fetchBufferMapped(size: number, allowOverlap: boolean) {
     for (const buffer of this._bufferList) {
       if (allowOverlap || buffer.size - buffer.offset >= size) {
         buffer.used = true;

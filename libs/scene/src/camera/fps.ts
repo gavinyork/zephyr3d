@@ -1,3 +1,4 @@
+import type { RequireOptionals } from '@zephyr3d/base';
 import { Vector3, Quaternion, Matrix3x3, Matrix4x4 } from '@zephyr3d/base';
 import type {
   IControllerKeydownEvent,
@@ -34,25 +35,25 @@ export interface FPSCameraControllerOptions {
  */
 export class FPSCameraController extends BaseCameraController {
   /** @internal */
-  private readonly options: FPSCameraControllerOptions;
+  private readonly options: RequireOptionals<FPSCameraControllerOptions>;
   /** @internal */
-  private mouseDown: boolean;
+  private mouseDown!: boolean;
   /** @internal */
-  private lastMouseX: number;
+  private lastMouseX!: number;
   /** @internal */
-  private lastMouseY: number;
+  private lastMouseY!: number;
   /** @internal */
-  private keyUp: boolean;
+  private keyUp!: boolean;
   /** @internal */
-  private keyDown: boolean;
+  private keyDown!: boolean;
   /** @internal */
-  private keyLeft: boolean;
+  private keyLeft!: boolean;
   /** @internal */
-  private keyRight: boolean;
+  private keyRight!: boolean;
   /** @internal */
-  private keyForward: boolean;
+  private keyForward!: boolean;
   /** @internal */
-  private keyBackward: boolean;
+  private keyBackward!: boolean;
   /**
    * Creates an instance of FPSCameraController
    * @param options - The creation options
@@ -95,7 +96,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseDown}
    * @override
    */
-  protected _onMouseDown(evt: IControllerPointerDownEvent): boolean {
+  protected _onMouseDown(evt: IControllerPointerDownEvent) {
     if (evt.button === 0) {
       this.mouseDown = true;
       this.lastMouseX = evt.offsetX;
@@ -108,7 +109,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseUp}
    * @override
    */
-  protected _onMouseUp(evt: IControllerPointerUpEvent): boolean {
+  protected _onMouseUp(evt: IControllerPointerUpEvent) {
     if (evt.button === 0 && this.mouseDown) {
       this.mouseDown = false;
       return true;
@@ -119,13 +120,14 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseMove}
    * @override
    */
-  protected _onMouseMove(evt: IControllerPointerMoveEvent): boolean {
+  protected _onMouseMove(evt: IControllerPointerMoveEvent) {
+    const camera = this._getCamera()!;
     if (this.mouseDown) {
       const dx = evt.offsetX - this.lastMouseX;
       const dy = evt.offsetY - this.lastMouseY;
       this.lastMouseX = evt.offsetX;
       this.lastMouseY = evt.offsetY;
-      const zAxis = this._getCamera().worldMatrix.getRow(2).xyz();
+      const zAxis = camera.worldMatrix.getRow(2).xyz();
       const alpha = Math.atan2(zAxis.z, zAxis.x) + dx * this.options.rotateSpeed;
       const beta = Math.min(
         Math.PI / 2.1,
@@ -141,20 +143,20 @@ export class FPSCameraController extends BaseCameraController {
       const rotation = Quaternion.fromRotationMatrix(
         new Matrix3x3([XAxis.x, XAxis.y, XAxis.z, YAxis.x, YAxis.y, YAxis.z, zAxis.x, zAxis.y, zAxis.z])
       );
-      if (!this._getCamera().parent) {
-        this._getCamera().rotation.set(rotation);
+      if (!camera.parent) {
+        camera.rotation.set(rotation);
       } else {
         const pos = new Vector3();
         const scale = new Vector3();
-        this._getCamera().worldMatrix.decompose(scale, null, pos);
+        camera.worldMatrix.decompose(scale, null, pos);
         const newWorldMatrix = Matrix4x4.scaling(scale).rotateLeft(rotation).translateLeft(pos);
-        const newLocalMatrix = this._getCamera().parent
-          ? newWorldMatrix.multiplyLeftAffine(Matrix4x4.invertAffine(this._getCamera().parent.worldMatrix))
+        const newLocalMatrix = camera.parent
+          ? newWorldMatrix.multiplyLeftAffine(Matrix4x4.invertAffine(camera.parent.worldMatrix))
           : newWorldMatrix;
         newLocalMatrix.decompose(scale, rotation, pos);
-        this._getCamera().position.set(pos);
-        this._getCamera().scale.set(scale);
-        this._getCamera().rotation.set(rotation);
+        camera.position.set(pos);
+        camera.scale.set(scale);
+        camera.rotation.set(rotation);
       }
       return true;
     }
@@ -164,7 +166,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onKeyDown}
    * @override
    */
-  protected _onKeyDown(evt: IControllerKeydownEvent): boolean {
+  protected _onKeyDown(evt: IControllerKeydownEvent) {
     switch (evt.code) {
       case this.options.controlKeys.up:
         this.keyUp = true;
@@ -193,7 +195,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onKeyUp}
    * @override
    */
-  protected _onKeyUp(evt: IControllerKeyupEvent): boolean {
+  protected _onKeyUp(evt: IControllerKeyupEvent) {
     switch (evt.code) {
       case this.options.controlKeys.up:
         this.keyUp = false;
@@ -231,10 +233,11 @@ export class FPSCameraController extends BaseCameraController {
    * @override
    */
   update() {
-    const x = this._getCamera().worldMatrix.getRow(0).xyz();
+    const camera = this._getCamera()!;
+    const x = camera.worldMatrix.getRow(0).xyz();
     x.y = 0;
     x.inplaceNormalize();
-    const z = this._getCamera().worldMatrix.getRow(2).xyz().inplaceNormalize();
+    const z = camera.worldMatrix.getRow(2).xyz().inplaceNormalize();
     const move = new Vector3(0, 0, 0);
     let changed = false;
     if (this.keyForward) {
@@ -262,22 +265,22 @@ export class FPSCameraController extends BaseCameraController {
       move.addBy(Vector3.scale(x, this.options.moveSpeed));
     }
     if (changed) {
-      if (this._getCamera().parent) {
+      if (camera.parent) {
         const pos = new Vector3();
         const scale = new Vector3();
         const rotation = new Quaternion();
-        this._getCamera().worldMatrix.decompose(scale, rotation, pos);
+        camera.worldMatrix.decompose(scale, rotation, pos);
         pos.addBy(move);
         const newWorldMatrix = Matrix4x4.scaling(scale).rotateLeft(rotation).translateLeft(pos);
         const newLocalMatrix = newWorldMatrix.multiplyLeftAffine(
-          Matrix4x4.invertAffine(this._getCamera().parent.worldMatrix)
+          Matrix4x4.invertAffine(camera.parent.worldMatrix)
         );
         newLocalMatrix.decompose(scale, rotation, pos);
-        this._getCamera().position.set(pos);
-        this._getCamera().scale.set(scale);
-        this._getCamera().rotation.set(rotation);
+        camera.position.set(pos);
+        camera.scale.set(scale);
+        camera.rotation.set(rotation);
       } else {
-        this._getCamera().moveBy(move);
+        camera.moveBy(move);
       }
     }
   }

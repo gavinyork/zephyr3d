@@ -1,6 +1,6 @@
 import { base64ToUint8Array, uint8ArrayToBase64 } from '../utils';
 import { PathUtils } from './common';
-import type { FileMetadata, FileStat, ListOptions, MoveOptions, ReadOptions, WriteOptions } from './vfs';
+import type { FileMetadata, ListOptions, MoveOptions, ReadOptions, WriteOptions } from './vfs';
 import { VFS, VFSError } from './vfs';
 
 /**
@@ -29,7 +29,7 @@ export class MemoryFS extends VFS {
     });
   }
 
-  protected async _makeDirectory(path: string, recursive: boolean): Promise<void> {
+  protected async _makeDirectory(path: string, recursive: boolean) {
     if (this.directories.has(path)) {
       throw new VFSError('Directory already exists', 'EEXIST', path);
     }
@@ -54,7 +54,7 @@ export class MemoryFS extends VFS {
     });
   }
 
-  protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
+  protected async _readDirectory(path: string, options?: ListOptions) {
     if (!this.directories.has(path)) {
       throw new VFSError('Directory does not exist', 'ENOENT', path);
     }
@@ -93,7 +93,7 @@ export class MemoryFS extends VFS {
     return results;
   }
 
-  protected async _deleteDirectory(path: string, recursive: boolean): Promise<void> {
+  protected async _deleteDirectory(path: string, recursive: boolean) {
     if (!this.directories.has(path)) {
       throw new VFSError('Directory does not exist', 'ENOENT', path);
     }
@@ -125,7 +125,7 @@ export class MemoryFS extends VFS {
     this.metadata.delete(path);
   }
 
-  protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
+  protected async _readFile(path: string, options?: ReadOptions) {
     if (!this.files.has(path)) {
       throw new VFSError(`File does not exist: ${path}`, 'ENOENT', path);
     }
@@ -169,11 +169,7 @@ export class MemoryFS extends VFS {
     return data;
   }
 
-  protected async _writeFile(
-    path: string,
-    data: ArrayBuffer | string,
-    options?: WriteOptions
-  ): Promise<void> {
+  protected async _writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions) {
     const parent = PathUtils.dirname(path);
 
     if (!this.directories.has(parent)) {
@@ -236,7 +232,7 @@ export class MemoryFS extends VFS {
     });
   }
 
-  protected async _deleteFile(path: string): Promise<void> {
+  protected async _deleteFile(path: string) {
     if (!this.files.has(path)) {
       throw new VFSError(`File does not exist: ${path}`, 'ENOENT', path);
     }
@@ -245,11 +241,11 @@ export class MemoryFS extends VFS {
     this.metadata.delete(path);
   }
 
-  protected async _exists(path: string): Promise<boolean> {
+  protected async _exists(path: string) {
     return this.files.has(path) || this.directories.has(path);
   }
 
-  protected async _stat(path: string): Promise<FileStat> {
+  protected async _stat(path: string) {
     const metadata = this.metadata.get(path);
 
     if (!metadata) {
@@ -264,13 +260,13 @@ export class MemoryFS extends VFS {
       modified: metadata.modified
     };
   }
-  protected async _deleteFileSystem(): Promise<void> {
+  protected async _deleteFileSystem() {
     return;
   }
-  protected async _wipe(): Promise<void> {
+  protected async _wipe() {
     return;
   }
-  protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {
+  protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions) {
     if (!this.files.has(sourcePath) && !this.directories.has(sourcePath)) {
       throw new VFSError('Source path does not exist', 'ENOENT', sourcePath);
     }

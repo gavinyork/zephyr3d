@@ -1,80 +1,12 @@
-import { base64ToUint8Array, uint8ArrayToBase64, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import { base64ToUint8Array, uint8ArrayToBase64, Vector3 } from '@zephyr3d/base';
 import { getEngine } from '../../../app/api';
-import { MeshMaterial } from '../../../material/meshmaterial';
+import type { MeshMaterial } from '../../../material/meshmaterial';
 import { GraphNode, Mesh, type SceneNode } from '../../../scene';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import { BoundingBox } from '../../bounding_volume';
+import { meshInstanceClsMap } from './common';
+import { JSONData } from '../json';
 
-const meshInstanceClsMap: Map<
-  {
-    new (...args: any[]): MeshMaterial;
-  },
-  { C: { new (m: MeshMaterial) }; S: SerializableClass }
-> = new Map();
-
-/** @internal */
-export function getMeshMaterialInstanceUniformsClass(cls: {
-  new (...args: any[]): MeshMaterial;
-}): SerializableClass {
-  let info = meshInstanceClsMap.get(cls);
-  if (!info) {
-    class C {
-      materialId: string;
-      constructor(public material: MeshMaterial) {
-        this.materialId = getEngine().resourceManager.getAssetId(material.coreMaterial) ?? '';
-      }
-    }
-    const S: SerializableClass = {
-      ctor: C,
-      name: `${cls.name}InstanceUniforms`,
-      async createFunc(_ctx, init) {
-        const material = await getEngine().resourceManager.fetchMaterial<MeshMaterial>(init);
-        return { obj: new C(material.createInstance()) };
-      },
-      getInitParams(obj: C) {
-        return obj.materialId;
-      },
-      getProps() {
-        return (cls as typeof MeshMaterial).INSTANCE_UNIFORMS.filter((u) => !!u.name).map((u) => ({
-          name: u.name,
-          type: u.type,
-          get(this: C, value) {
-            const val = this.material[u.prop];
-            if (u.type === 'float') {
-              value.num[0] = val;
-            } else if (u.type === 'vec2') {
-              value.num[0] = val.x;
-              value.num[1] = val.y;
-            } else if (u.type === 'vec3' || u.type === 'rgb') {
-              value.num[0] = val.x;
-              value.num[1] = val.y;
-              value.num[2] = val.z;
-            } else if (u.type === 'vec4' || u.type === 'rgba') {
-              value.num[0] = val.x;
-              value.num[1] = val.y;
-              value.num[2] = val.z;
-              value.num[3] = val.w;
-            }
-          },
-          set(this: C, value) {
-            if (u.type === 'float') {
-              this.material[u.prop] = value.num[0];
-            } else if (u.type === 'vec2') {
-              this.material[u.prop] = new Vector2(value.num[0], value.num[1]);
-            } else if (u.type === 'vec3' || u.type === 'rgb') {
-              this.material[u.prop] = new Vector3(value.num[0], value.num[1], value.num[2]);
-            } else if (u.type === 'vec4' || u.type === 'rgba') {
-              this.material[u.prop] = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
-            }
-          }
-        }));
-      }
-    };
-    info = { C, S };
-    meshInstanceClsMap.set(cls, info);
-  }
-  return info.S;
-}
 /** @internal */
 export function getMeshClass(): SerializableClass {
   return {
@@ -83,12 +15,12 @@ export function getMeshClass(): SerializableClass {
     parent: GraphNode,
     noTitle: true,
     createFunc(ctx: SceneNode) {
-      const node = new Mesh(ctx.scene);
+      const node = new Mesh(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'CastShadow',
           type: 'bool',
@@ -185,12 +117,40 @@ export function getMeshClass(): SerializableClass {
           }
         },
         {
+          name: 'MorphTargets',
+          type: 'object',
+          options: { objectTypes: [JSONData] },
+          isPersistent() {
+            return false;
+          },
+          isHidden(this: Mesh) {
+            return !this.getMorphInfo();
+          },
+          get(this: Mesh, value) {
+            const morphInfo = this.getMorphInfo()!;
+            const numTargets = morphInfo.data[3];
+            const data: Record<string, number> = {};
+            for (let i = 0; i < numTargets; i++) {
+              const name = Object.keys(morphInfo.names).find((key) => morphInfo.names![key] === i);
+              if (name) {
+                Object.defineProperty(data, name, {
+                  enumerable: true,
+                  configurable: true,
+                  get: () => this.getMorphWeight(name),
+                  set: (v) => this.setMorphWeight(name, v)
+                });
+              }
+            }
+            value.object[0] = new JSONData(null, data);
+          }
+        },
+        {
           name: 'MorphInfo',
           type: 'string',
           isHidden() {
             return true;
           },
-          async get(this: Mesh, value) {
+          get(this: Mesh, value) {
             const morphInfo = this.getMorphInfo();
             if (morphInfo) {
               const data = new Uint8Array(
@@ -198,15 +158,26 @@ export function getMeshClass(): SerializableClass {
                 morphInfo.data.byteOffset,
                 morphInfo.data.byteLength
               );
-              value.str[0] = uint8ArrayToBase64(data);
+              value.str[0] = JSON.stringify({ data: uint8ArrayToBase64(data), names: morphInfo.names });
             } else {
               value.str[0] = '';
             }
           },
           set(this: Mesh, value) {
             if (value.str[0]) {
-              const data = base64ToUint8Array(value.str[0]);
-              this.setMorphInfo({ data });
+              try {
+                const info = JSON.parse(value.str[0]);
+                const data = new Float32Array(base64ToUint8Array(info.data).buffer);
+                const names = info.names;
+                this.setMorphInfo({ data, names });
+              } catch {
+                const data = new Float32Array(base64ToUint8Array(value.str[0]).buffer);
+                const names: Record<string, number> = {};
+                for (let i = 0; i < data[3]; i++) {
+                  names[`Target${i}`] = i;
+                }
+                this.setMorphInfo({ data, names });
+              }
             } else {
               this.setMorphInfo(null);
             }
@@ -247,7 +218,9 @@ export function getMeshClass(): SerializableClass {
             mimeTypes: ['application/vnd.zephyr3d.mesh+json']
           },
           get(this: Mesh, value) {
-            value.str[0] = this.primitive ? getEngine().resourceManager.getAssetId(this.primitive) : '';
+            value.str[0] = this.primitive
+              ? (getEngine().resourceManager.getAssetId(this.primitive) ?? '')
+              : '';
           },
           async set(this: Mesh, value) {
             if (value?.str[0]) {
@@ -282,26 +255,15 @@ export function getMeshClass(): SerializableClass {
           }
         },
         {
-          name: 'MaterialObject',
-          type: 'object',
-          isPersistent() {
-            return false;
-          },
-          options: {
-            objectTypes: [MeshMaterial]
-          },
-          get(this: Mesh, value) {
-            value.object[0] = this.material ?? null;
-          }
-        },
-        {
           name: 'Geometry Instance',
           type: 'bool',
           get(this: Mesh, value) {
             value.bool[0] = !!this.material?.$isInstance;
           },
           set(this: Mesh, value) {
-            this.material = value.bool[0] ? this.material?.createInstance() : this.material?.coreMaterial;
+            this.material = value.bool[0]
+              ? (this.material?.createInstance() ?? null)
+              : (this.material?.coreMaterial ?? null);
           }
         },
         {
@@ -312,7 +274,7 @@ export function getMeshClass(): SerializableClass {
             objectTypes: []
           },
           isHidden(this: Mesh) {
-            return this.material && !this.material?.$isInstance;
+            return !!this.material && !this.material?.$isInstance;
           },
           isNullable() {
             return true;
@@ -321,7 +283,7 @@ export function getMeshClass(): SerializableClass {
             const C = this.material?.$isInstance
               ? meshInstanceClsMap.get(this.material.coreMaterial.constructor as typeof MeshMaterial)
               : null;
-            value.object[0] = C ? new C.C(this.material) : null;
+            value.object[0] = C ? new C.C(this.material!) : null;
           },
           set(this: Mesh, value) {
             if (value.object[0]) {
@@ -329,7 +291,7 @@ export function getMeshClass(): SerializableClass {
             }
           }
         }
-      ];
+      ]);
     }
   };
 }

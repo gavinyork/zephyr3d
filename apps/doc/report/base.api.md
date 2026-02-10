@@ -26,10 +26,10 @@ export class AABB {
     extend(v: Vector3): this;
     extend3(x: number, y: number, z: number): this;
     get extents(): Vector3;
-    getClipState(viewProjMatrix: Matrix4x4): ClipState;
-    getClipStateMask(viewProjMatrix: Matrix4x4, mask: number): ClipState;
-    getClipStateWithFrustum(frustum: Frustum): ClipState;
-    getClipStateWithFrustumMask(frustum: Frustum, mask: number): ClipState;
+    getClipState(viewProjMatrix: Matrix4x4): ClipState.NOT_CLIPPED | ClipState.A_INSIDE_B | ClipState.CLIPPED;
+    getClipStateMask(viewProjMatrix: Matrix4x4, mask: number): ClipState.NOT_CLIPPED | ClipState.A_INSIDE_B | ClipState.CLIPPED;
+    getClipStateWithFrustum(frustum: Frustum): ClipState.NOT_CLIPPED | ClipState.A_INSIDE_B | ClipState.CLIPPED;
+    getClipStateWithFrustumMask(frustum: Frustum, mask: number): ClipState.NOT_CLIPPED | ClipState.A_INSIDE_B | ClipState.CLIPPED;
     inplaceTransform(matrix: Matrix4x4): this;
     intersectedWithBox(other: AABB): boolean;
     isValid(): boolean;
@@ -95,17 +95,11 @@ export interface ColorRGBA {
 
 // @public
 export enum CubeFace {
-    // (undocumented)
     NX = 1,
-    // (undocumented)
     NY = 3,
-    // (undocumented)
     NZ = 5,
-    // (undocumented)
     PX = 0,
-    // (undocumented)
     PY = 2,
-    // (undocumented)
     PZ = 4
 }
 
@@ -128,13 +122,25 @@ export class DataTransferVFS extends VFS {
     protected _makeDirectory(): Promise<void>;
     protected _move(): Promise<void>;
     protected _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
-    protected _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
+    protected _readFile(path: string, options?: ReadOptions): Promise<string | ArrayBuffer>;
     // (undocumented)
     protected setReadonly(readonly: boolean): void;
-    protected _stat(path: string): Promise<FileStat>;
+    protected _stat(path: string): Promise<{
+        size: number;
+        isFile: boolean;
+        isDirectory: boolean;
+        created: Date;
+        modified: Date;
+        accessed: Date;
+    }>;
     protected _wipe(): Promise<void>;
     protected _writeFile(): Promise<void>;
 }
+
+// @public
+export type DeepRequireOptionals<T> = T extends Function | Date | RegExp | symbol | bigint | string | number | boolean ? T : T extends readonly (infer U)[] ? readonly DeepRequireOptionals<U>[] : T extends object ? {
+    [K in keyof T]-?: {} extends Pick<T, K> ? Exclude<DeepRequireOptionals<T[K]>, undefined> : DeepRequireOptionals<T[K]>;
+} : T;
 
 // @public
 export function degree2radian(degree: number): number;
@@ -214,19 +220,22 @@ export class Disposable extends Observable<{
 
 // @public
 export class DRef<T extends IDisposable> {
-    constructor(obj?: T);
+    constructor(obj?: Nullable<T>);
     dispose(): void;
-    get(): T;
-    set(obj: T): void;
+    get(): Nullable<T>;
+    set(obj: Nullable<T>): void;
 }
 
 // @public
 export class DWeakRef<T extends IDisposable> {
-    constructor(obj?: T);
+    constructor(obj?: Nullable<T>);
     dispose(): void;
-    get(): T;
-    set(obj: T): void;
+    get(): Nullable<T>;
+    set(obj: Nullable<T>): void;
 }
+
+// @public
+export type ElementType<T> = T extends (infer U)[] ? U : never;
 
 // @public
 export type EulerAngleOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY';
@@ -280,9 +289,6 @@ export interface FileStat {
 export function float2half(f32: number): number;
 
 // @public
-export function floatToHalf(val: number): number;
-
-// @public
 export function flushPendingDisposals(): void;
 
 // Warning: (ae-forgotten-export) The symbol "SprintfArg" needs to be exported by the entry point index.d.ts
@@ -311,10 +317,82 @@ export class Frustum {
     static readonly CORNER_RIGHT_TOP_FAR = 5;
     // (undocumented)
     static readonly CORNER_RIGHT_TOP_NEAR = 4;
-    get corners(): Vector3[];
-    getCorner(pos: number): Vector3;
+    get corners(): Immutable<Vector3[]>;
+    getCorner(pos: number): Readonly<{
+        [x: number]: number;
+        clone: () => Vector3;
+        x: number;
+        y: number;
+        z: number;
+        readonly magnitude: number;
+        readonly magnitudeSq: number;
+        xy: () => Vector2;
+        setXYZ: (x: number, y: number, z: number) => Vector3;
+        setAndNormalize: (x: number, y: number, z: number) => Vector3;
+        subBy: (other: Vector3) => Vector3;
+        addBy: (other: Vector3) => Vector3;
+        combineBy: (other: Vector3, t0: number, t1: number) => Vector3;
+        mulBy: (other: Vector3) => Vector3;
+        divBy: (other: Vector3) => Vector3;
+        scaleBy: (f: number) => Vector3;
+        inplaceNormalize: () => Vector3;
+        inplaceInverse: () => Vector3;
+        inplaceMin: (other: Vector3) => Vector3;
+        inplaceMax: (other: Vector3) => Vector3;
+        equalsTo: (other: Float32Array<ArrayBuffer>, epsl?: number) => boolean;
+        toString: () => string;
+        isNaN: () => boolean;
+        setRandom: (minValue: number, maxValue: number) => void;
+        readonly BYTES_PER_ELEMENT: number;
+        readonly buffer: Readonly<{
+            readonly byteLength: number;
+            slice: (begin?: number, end?: number) => ArrayBuffer;
+            readonly [Symbol.toStringTag]: "ArrayBuffer";
+        }>;
+        readonly byteLength: number;
+        readonly byteOffset: number;
+        copyWithin: (target: number, start: number, end?: number) => Vector3;
+        every: (predicate: (value: number, index: number, array: Vector3) => unknown, thisArg?: any) => boolean;
+        fill: (value: number, start?: number, end?: number) => Vector3;
+        filter: (predicate: (value: number, index: number, array: Vector3) => any, thisArg?: any) => Float32Array<ArrayBuffer>;
+        find: (predicate: (value: number, index: number, obj: Vector3) => boolean, thisArg?: any) => number | undefined;
+        findIndex: (predicate: (value: number, index: number, obj: Vector3) => boolean, thisArg?: any) => number;
+        forEach: (callbackfn: (value: number, index: number, array: Vector3) => void, thisArg?: any) => void;
+        indexOf: (searchElement: number, fromIndex?: number) => number;
+        join: (separator?: string) => string;
+        lastIndexOf: (searchElement: number, fromIndex?: number) => number;
+        readonly length: number;
+        map: (callbackfn: (value: number, index: number, array: Vector3) => number, thisArg?: any) => Float32Array<ArrayBuffer>;
+        reduce: {
+            (callbackfn: (previousValue: number, currentValue: number, currentIndex: number, array: Vector3) => number): number;
+            (callbackfn: (previousValue: number, currentValue: number, currentIndex: number, array: Vector3) => number, initialValue: number): number;
+            <U>(callbackfn: (previousValue: U, currentValue: number, currentIndex: number, array: Vector3) => U, initialValue: U): U;
+        };
+        reduceRight: {
+            (callbackfn: (previousValue: number, currentValue: number, currentIndex: number, array: Vector3) => number): number;
+            (callbackfn: (previousValue: number, currentValue: number, currentIndex: number, array: Vector3) => number, initialValue: number): number;
+            <U>(callbackfn: (previousValue: U, currentValue: number, currentIndex: number, array: Vector3) => U, initialValue: U): U;
+        };
+        reverse: () => Vector3;
+        set: (array: ArrayLike<number>, offset?: number) => void;
+        slice: (start?: number, end?: number) => Float32Array<ArrayBuffer>;
+        some: (predicate: (value: number, index: number, array: Vector3) => unknown, thisArg?: any) => boolean;
+        sort: (compareFn?: ((a: number, b: number) => number) | undefined) => Vector3;
+        subarray: (begin?: number, end?: number) => Float32Array<ArrayBuffer>;
+        toLocaleString: {
+            (): string;
+            (locales: string | string[], options?: Intl.NumberFormatOptions): string;
+        };
+        valueOf: () => Vector3;
+        entries: () => ArrayIterator<[number, number]>;
+        keys: () => ArrayIterator<number>;
+        values: () => ArrayIterator<number>;
+        includes: (searchElement: number, fromIndex?: number) => boolean;
+        [Symbol.iterator]: () => ArrayIterator<number>;
+        readonly [Symbol.toStringTag]: "Float32Array";
+    }>;
     initWithMatrix(transform: Matrix4x4): this;
-    get planes(): Plane[];
+    get planes(): Immutable<Plane[]>;
 }
 
 // @public
@@ -352,7 +430,7 @@ export interface GlobOptions {
 
 // @public
 export interface GlobResult extends FileMetadata {
-    matchedPattern: string;
+    matchedPattern: Nullable<string>;
     relativePath: string;
 }
 
@@ -376,10 +454,10 @@ export class HeightField {
     calculateHeight(worldX: number, worldZ: number): number;
     get height(): number;
     set height(v: number);
-    get heightData(): Float32Array;
+    get heightData(): Float32Array<ArrayBufferLike>;
     rayIntersect(rayWorld: Ray): number | null;
-    get region(): Vector4;
-    set region(v: Vector4);
+    get region(): Immutable<Vector4>;
+    set region(v: Immutable<Vector4>);
     sampleHeight(x: number, y: number): number;
     get scaleY(): number;
     set scaleY(v: number);
@@ -415,12 +493,19 @@ export class HttpFS extends VFS {
     protected _move(): Promise<void>;
     normalizePath(path: string): string;
     protected _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
-    protected _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
+    protected _readFile(path: string, options?: ReadOptions): Promise<string | ArrayBuffer>;
     // (undocumented)
     protected setReadonly(readonly: boolean): void;
-    protected _stat(path: string): Promise<FileStat>;
-    get urlResolver(): (url: string) => string;
-    set urlResolver(resolver: (url: string) => string);
+    protected _stat(path: string): Promise<{
+        size: number;
+        isFile: boolean;
+        isDirectory: boolean;
+        created: Date;
+        modified: Date;
+        accessed: Date;
+    }>;
+    get urlResolver(): ((url: string) => string) | null;
+    set urlResolver(resolver: ((url: string) => string) | null);
     // (undocumented)
     protected _wipe(): Promise<void>;
     protected _writeFile(path: string, _data: ArrayBuffer | string, _options?: WriteOptions): Promise<void>;
@@ -432,7 +517,7 @@ export interface HttpFSOptions {
     directoryReader?: HttpDirectoryReader | HttpDirectoryReader[];
     headers?: Record<string, string>;
     timeout?: number;
-    urlResolver?: (url: string) => string;
+    urlResolver?: Nullable<(url: string) => string>;
 }
 
 // @public
@@ -442,14 +527,14 @@ export class HttpRequest {
     set crossOrigin(val: string);
     get headers(): Record<string, string>;
     set headers(val: Record<string, string>);
-    request(url: string): Promise<Response>;
+    request(url: string): Promise<Response | null>;
     requestArrayBuffer(url: string): Promise<ArrayBuffer>;
     requestBlob(url: string): Promise<Blob>;
-    requestJson(url: string): Promise<string>;
+    requestJson(url: string): Promise<any>;
     requestText(url: string): Promise<string>;
     resolveURL(url: string): string;
-    get urlResolver(): (url: string) => string;
-    set urlResolver(resolver: (url: string) => string);
+    get urlResolver(): Nullable<(url: string) => string>;
+    set urlResolver(resolver: Nullable<(url: string) => string>);
 }
 
 // @public
@@ -465,10 +550,15 @@ export interface IDisposable extends IEventTarget<{
 // @public
 export interface IEventTarget<T extends EventMap = any> {
     dispatchEvent<K extends keyof T>(type: K, ...args: T[K]): void;
-    off<K extends keyof T>(type: K, listener: EventListener_2<T, K>, context?: unknown): void;
+    off<K extends keyof T>(type: K, listener?: Nullable<EventListener_2<T, K>>, context?: unknown): void;
     on<K extends keyof T>(type: K, listener: EventListener_2<T, K>, context?: unknown): void;
     once<K extends keyof T>(type: K, listener: EventListener_2<T, K>, context?: unknown): void;
 }
+
+// @public
+export type Immutable<T> = T extends (...args: any[]) => any ? T : T extends readonly (infer U)[] ? ReadonlyArray<Immutable<U>> : T extends Map<infer K, infer V> ? ReadonlyMap<Immutable<K>, Immutable<V>> : T extends Set<infer U> ? ReadonlySet<Immutable<U>> : T extends object ? Readonly<{
+    [K in keyof T]: Immutable<T[K]>;
+}> : T;
 
 // @public
 export class IndexedDBFS extends VFS {
@@ -492,7 +582,7 @@ export class IndexedDBFS extends VFS {
     // (undocumented)
     protected _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
     // (undocumented)
-    protected _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
+    protected _readFile(path: string, options?: ReadOptions): Promise<string | ArrayBuffer>;
     // (undocumented)
     protected _stat(path: string): Promise<FileStat>;
     // (undocumented)
@@ -512,7 +602,7 @@ export type InterpolationTarget = 'number' | 'vec2' | 'vec3' | 'vec4' | 'quat';
 
 // @public
 export class Interpolator {
-    constructor(mode: InterpolationMode, target: InterpolationTarget, inputs: InterpolateData, outputs: InterpolateData);
+    constructor(mode: InterpolationMode, target: Nullable<InterpolationTarget>, inputs: InterpolateData, outputs: InterpolateData);
     static getTargetStride(target: InterpolationTarget): number;
     get inputs(): InterpolateData;
     set inputs(val: InterpolateData);
@@ -524,12 +614,15 @@ export class Interpolator {
     get outputs(): InterpolateData;
     set outputs(val: InterpolateData);
     get stride(): number;
-    get target(): InterpolationTarget;
-    set target(val: InterpolationTarget);
+    get target(): Nullable<InterpolationTarget>;
+    set target(val: Nullable<InterpolationTarget>);
 }
 
 // @public
 export function IS_INSTANCE_OF<T extends GenericConstructor>(value: unknown, constructor: T): value is InstanceType<T>;
+
+// @public
+export function IS_SUBCLASS_OF<B extends new (...args: any[]) => any, D extends B>(derived: new (...args: any[]) => any, base: B): derived is D;
 
 // @public
 export function isPowerOf2(value: number): boolean;
@@ -545,7 +638,7 @@ export class List<T = unknown> {
     forEach(callback: (data: T) => void): void;
     forEachReverse(callback: (data: T) => void): void;
     front(): T;
-    insert(data: T, at: ListIterator<T>): ListIterator<T>;
+    insert(data: T, at: ListIterator<T>): ListIterator<T> | null;
     get length(): number;
     prepend(data: T): ListIterator<T>;
     rbegin(): ListIterator<T>;
@@ -560,8 +653,8 @@ export class ListIterator<T = unknown> {
     getNext(): ListIterator<T>;
     getPrev(): ListIterator<T>;
     get list(): List<T>;
-    next(): ListIterator<T>;
-    prev(): ListIterator<T>;
+    next(): this;
+    prev(): this;
     get reversed(): boolean;
     valid(): boolean;
 }
@@ -579,13 +672,13 @@ export interface ListOptions {
 // @public
 export function makeObservable<C extends GenericConstructor | ObjectConstructor>(cls: C): <X extends EventMap>() => {
     new (...args: any[]): {
-        _listeners: EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>;
+        _listeners: Nullable<EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>>;
         on<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, context?: unknown): void;
         once<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, context?: unknown): void;
         off<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, context?: unknown): void;
         dispatchEvent<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: K, ...args: (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)[K]): void;
-        _internalAddEventListener<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(listenerMap: EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>, type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, options: REventHandlerOptions): EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>;
-        _internalRemoveEventListener<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(listenerMap: EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>, type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, context: unknown): void;
+        _internalAddEventListener<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(listenerMap: Nullable<EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>>, type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, options: REventHandlerOptions): Nullable<EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>>;
+        _internalRemoveEventListener<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(listenerMap: Nullable<EventListenerMap<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X>>, type: K, listener: EventListener_2<InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X, K>, context: unknown): void;
         _invokeLocalListeners<K extends keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)>(type: keyof (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X), ...args: (InstanceType<C> extends IEventTarget<infer U extends EventMap> ? X & U : X)[K]): void;
     };
 } & C;
@@ -666,7 +759,7 @@ export class Matrix4x4 extends VectorBase {
     clone(): Matrix4x4;
     static compose(scale: Vector3, rotation: Quaternion | Matrix3x3 | Matrix4x4, translation: Vector3, result?: Matrix4x4): Matrix4x4;
     compose(scale: Vector3, rotation: Quaternion | Matrix3x3 | Matrix4x4, translation: Vector3): this;
-    decompose(scale?: Vector3, rotation?: Quaternion | Matrix3x3 | Matrix4x4, translation?: Vector3): this;
+    decompose(scale?: Nullable<Vector3>, rotation?: Nullable<Quaternion | Matrix3x3 | Matrix4x4>, translation?: Nullable<Vector3>): this;
     decomposeLookAt(eye?: Vector3, target?: Vector3, up?: Vector3): this;
     det(): number;
     static div(a: Matrix4x4, b: Matrix4x4, result?: Matrix4x4): Matrix4x4;
@@ -768,6 +861,8 @@ export class Matrix4x4 extends VectorBase {
     scaleRight(s: Vector3): this;
     static scaling(s: Vector3, result?: Matrix4x4): Matrix4x4;
     scaling(s: Vector3): this;
+    static scalingXYZ(sx: number, sy: number, sz: number, result?: Matrix4x4): Matrix4x4;
+    scalingXYZ(sx: number, sy: number, sz: number): this;
     setCol(col: number, v: Vector4): this;
     setColXYZW(col: number, x: number, y: number, z: number, w: number): this;
     setNearFar(znear: number, zfar: number): this;
@@ -777,9 +872,9 @@ export class Matrix4x4 extends VectorBase {
     subBy(other: Matrix4x4): this;
     transform(vec: Vector4, result?: Vector4): Vector4;
     transformAffine(vec: Vector4, result?: Vector4): Vector4;
+    transformP(vec: Vector4, result?: Vector4): Vector4;
     transformPoint(point: Vector3, result?: Vector4): Vector4;
     transformPointAffine(point: Vector3, result?: Vector3): Vector3;
-    transformPointH(point: Vector3, result?: Vector3): Vector3;
     transformPointP(point: Vector3, result?: Vector3): Vector3;
     transformVector(vec: Vector3, result?: Vector4): Vector4;
     transformVectorAffine(vec: Vector3, result?: Vector3): Vector3;
@@ -789,6 +884,8 @@ export class Matrix4x4 extends VectorBase {
     translateRight(t: Vector3): this;
     static translation(t: Vector3, result?: Matrix4x4): Matrix4x4;
     translation(t: Vector3): this;
+    static translationXYZ(tx: number, ty: number, tz: number, result?: Matrix4x4): Matrix4x4;
+    translationXYZ(tx: number, ty: number, tz: number): this;
     static transpose(matrix: Matrix4x4, result?: Matrix4x4): Matrix4x4;
     transpose(): this;
 }
@@ -814,9 +911,15 @@ export class MemoryFS extends VFS {
     // (undocumented)
     protected _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
     // (undocumented)
-    protected _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
+    protected _readFile(path: string, options?: ReadOptions): Promise<string | ArrayBuffer>;
     // (undocumented)
-    protected _stat(path: string): Promise<FileStat>;
+    protected _stat(path: string): Promise<{
+        size: number;
+        isFile: boolean;
+        isDirectory: boolean;
+        created: Date;
+        modified: Date;
+    }>;
     // (undocumented)
     protected _wipe(): Promise<void>;
     // (undocumented)
@@ -831,6 +934,9 @@ export interface MoveOptions {
 
 // @public
 export function nextPowerOf2(value: number): number;
+
+// @public
+export type Nullable<T> = T | null;
 
 // @public
 export class NullVFS extends VFS {
@@ -848,11 +954,17 @@ export class NullVFS extends VFS {
     // (undocumented)
     protected _move(): Promise<void>;
     // (undocumented)
-    protected _readDirectory(): Promise<FileMetadata[]>;
+    protected _readDirectory(): Promise<never[]>;
     // (undocumented)
     protected _readFile(path: string): Promise<ArrayBuffer | string>;
     // (undocumented)
-    protected _stat(path: string): Promise<FileStat>;
+    protected _stat(path: string): Promise<{
+        size: number;
+        isFile: boolean;
+        isDirectory: boolean;
+        created: Date;
+        modified: Date;
+    }>;
     // (undocumented)
     protected _wipe(): Promise<void>;
     // (undocumented)
@@ -860,22 +972,29 @@ export class NullVFS extends VFS {
 }
 
 // @public
+export function objectEntries<T extends Record<PropertyKey, unknown>>(obj: T): { [K in keyof T]-?: [K, T[K]]; }[keyof T][];
+
+// @public
+export function objectKeys<T extends {}>(obj: T): (keyof T)[];
+
+// @public
 export class Observable<X extends EventMap> implements IEventTarget<X> {
     constructor();
     dispatchEvent<K extends keyof X>(type: K, ...args: X[K]): void;
-    off<K extends keyof X>(type: K, listener: EventListener_2<X, K>, context?: unknown): void;
+    off<K extends keyof X>(type: K, listener?: Nullable<EventListener_2<X, K>>, context?: unknown): void;
     on<K extends keyof X>(type: K, listener: EventListener_2<X, K>, context?: unknown): void;
     once<K extends keyof X>(type: K, listener: EventListener_2<X, K>, context?: unknown): void;
 }
 
 // @public
 export class ObservableQuaternion extends Quaternion {
-    get callback(): () => void;
-    set callback(cb: () => void);
+    get callback(): Nullable<() => void>;
+    set callback(cb: Nullable<() => void>);
     copyWithin(target: number, start: number, end?: number): this;
     fill(value: number, start?: number, end?: number): this;
     reverse(): this;
     set(array: ArrayLike<number>, offset?: number): void;
+    setCallback(cb: Nullable<() => void>): this;
     setXYZW(x: number, y: number, z: number, w: number): this;
     sort(compareFn?: (a: number, b: number) => number): this;
     get w(): number;
@@ -890,12 +1009,13 @@ export class ObservableQuaternion extends Quaternion {
 
 // @public
 export class ObservableVector2 extends Vector2 {
-    get callback(): () => void;
-    set callback(cb: () => void);
+    get callback(): Nullable<() => void>;
+    set callback(cb: Nullable<() => void>);
     copyWithin(target: number, start: number, end?: number): this;
     fill(value: number, start?: number, end?: number): this;
     reverse(): this;
     set(array: ArrayLike<number>, offset?: number): void;
+    setCallback(cb: Nullable<() => void>): this;
     setXY(x: number, y: number): this;
     sort(compareFn?: (a: number, b: number) => number): this;
     get x(): number;
@@ -906,12 +1026,13 @@ export class ObservableVector2 extends Vector2 {
 
 // @public
 export class ObservableVector3 extends Vector3 {
-    get callback(): () => void;
-    set callback(cb: () => void);
+    get callback(): Nullable<() => void>;
+    set callback(cb: Nullable<() => void>);
     copyWithin(target: number, start: number, end?: number): this;
     fill(value: number, start?: number, end?: number): this;
     reverse(): this;
     set(array: ArrayLike<number>, offset?: number): void;
+    setCallback(cb: Nullable<() => void>): this;
     setXYZ(x: number, y: number, z: number): this;
     sort(compareFn?: (a: number, b: number) => number): this;
     get x(): number;
@@ -924,12 +1045,13 @@ export class ObservableVector3 extends Vector3 {
 
 // @public
 export class ObservableVector4 extends Vector4 {
-    get callback(): () => void;
-    set callback(cb: () => void);
+    get callback(): Nullable<() => void>;
+    set callback(cb: Nullable<() => void>);
     copyWithin(target: number, start: number, end?: number): this;
     fill(value: number, start?: number, end?: number): this;
     reverse(): this;
     set(array: ArrayLike<number>, offset?: number): void;
+    setCallback(cb: Nullable<() => void>): this;
     setXYZW(x: number, y: number, z: number, w: number): this;
     sort(compareFn?: (a: number, b: number) => number): this;
     get w(): number;
@@ -940,6 +1062,16 @@ export class ObservableVector4 extends Vector4 {
     set y(val: number);
     get z(): number;
     set z(val: number);
+}
+
+// @public
+export class OrderedStringSet {
+    constructor(allowDuplicates?: boolean);
+    add(str: string): void;
+    has(str: string): boolean;
+    get items(): string[];
+    remove(str: string): void;
+    removeAll(str: string): void;
 }
 
 // @public
@@ -1081,7 +1213,9 @@ export function randomUUID(): string;
 export class Ray {
     constructor(origin?: Vector3, directionNormalized?: Vector3);
     bboxIntersectionTest: (bbox: AABB) => boolean;
-    bboxIntersectionTestEx: (bbox: AABB) => number | null;
+    bboxIntersectionTestEx: (bbox: AABB, axisInfo?: {
+        axis?: CubeFace;
+    }) => number | null;
     get direction(): Vector3;
     // (undocumented)
     intersectionTestCircle(center: Vector3, normal: Vector3, radius: number, epsl: number): {
@@ -1106,17 +1240,40 @@ export interface ReadOptions {
 }
 
 // @public
-export class RectsPacker {
-    constructor(width: number, height: number, maxBins?: number);
-    clear(): void;
-    insert(width: number, height: number): PackRect;
+export interface Rect {
+    // (undocumented)
+    height: number;
+    // (undocumented)
+    width: number;
+    // (undocumented)
+    x: number;
+    // (undocumented)
+    y: number;
 }
 
 // @public
-export function releaseObject(obj: IDisposable): void;
+export class RectsPacker {
+    constructor(width: number, height: number, maxBins?: number);
+    clear(): void;
+    insert(width: number, height: number): {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        binIndex: number;
+    } | null;
+}
 
 // @public
-export function retainObject(obj: IDisposable): void;
+export function releaseObject(obj: Nullable<IDisposable>): void;
+
+// @public
+export type RequireOptionals<T> = {
+    [K in keyof T]-?: {} extends Pick<T, K> ? Exclude<T[K], undefined> : T[K];
+};
+
+// @public
+export function retainObject(obj: Nullable<IDisposable>): void;
 
 // @public
 export type REventHandlerOptions = {
@@ -1409,7 +1566,7 @@ export abstract class VFS extends Observable<{
     protected abstract _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void>;
     normalizePath(path: string): string;
     protected onChange(type: 'created' | 'deleted' | 'moved' | 'modified', path: string, itemType: 'file' | 'directory'): void;
-    parseDataURI(uri: string): RegExpMatchArray;
+    parseDataURI(uri: string): RegExpMatchArray | null;
     popd(): Promise<void>;
     pushd(path: string): Promise<void>;
     // (undocumented)
@@ -1433,11 +1590,11 @@ export abstract class VFS extends Observable<{
 
 // @public
 export class VFSError extends Error {
-    constructor(message: string, code?: string, path?: string);
+    constructor(message: string, code?: string | undefined, path?: string | undefined);
     // (undocumented)
-    code?: string;
+    code?: string | undefined;
     // (undocumented)
-    path?: string;
+    path?: string | undefined;
 }
 
 // @public
@@ -1501,9 +1658,16 @@ export class ZipFS extends VFS {
     protected _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void>;
     protected onClose(): Promise<void>;
     protected _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]>;
-    protected _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string>;
+    protected _readFile(path: string, options?: ReadOptions): Promise<string | ArrayBuffer>;
     saveToVFS(targetVFS: VFS, path: string): Promise<void>;
-    protected _stat(path: string): Promise<FileStat>;
+    protected _stat(path: string): Promise<{
+        size: number;
+        isFile: boolean;
+        isDirectory: boolean;
+        created: Date;
+        modified: Date;
+        accessed: Date;
+    }>;
     verify(): Promise<{
         isValid: boolean;
         errors: string[];
@@ -1581,7 +1745,7 @@ export interface ZipJSWriterConstructor {
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:517:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:577:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

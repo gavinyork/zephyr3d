@@ -246,7 +246,7 @@ export class GLTFAccessor {
 
     const indicesBufferView = gltf.bufferViews[this.sparse.indices.bufferView];
     const indicesBuffer = gltf._loadedBuffers[indicesBufferView.buffer];
-    const indicesByteOffset = this.sparse.indices.byteOffset + (indicesBufferView.byteOffset ?? 0);
+    const indicesByteOffset = (this.sparse.indices.byteOffset ?? 0) + (indicesBufferView.byteOffset ?? 0);
 
     const indicesComponentSize = this.getComponentSize(this.sparse.indices.componentType);
     let indicesComponentCount = 1;
@@ -274,7 +274,7 @@ export class GLTFAccessor {
 
     const valuesBufferView = gltf.bufferViews[this.sparse.values.bufferView];
     const valuesBuffer = gltf._loadedBuffers[valuesBufferView.buffer];
-    const valuesByteOffset = this.sparse.values.byteOffset + (valuesBufferView.byteOffset ?? 0);
+    const valuesByteOffset = (this.sparse.values.byteOffset ?? 0) + (valuesBufferView.byteOffset ?? 0);
 
     const valuesComponentSize = this.getComponentSize(this.componentType);
     let valuesComponentCount = this.getComponentCount(this.type);

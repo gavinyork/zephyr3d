@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgpu",
+      "comment": "Improve DeviceBackend.supported()",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgpu"
+}

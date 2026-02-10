@@ -2,7 +2,7 @@
  * copy from http://git.mikejsavage.co.uk/medfall/file/clipmap.cc.html#l197
  */
 
-import type { Vector4 } from '@zephyr3d/base';
+import type { Nullable, Vector4 } from '@zephyr3d/base';
 import { AABB, ClipState, Disposable, Matrix4x4, Vector2, Vector3 } from '@zephyr3d/base';
 import type { Camera } from '../camera';
 import { Primitive } from './primitive';
@@ -41,7 +41,7 @@ export interface ClipmapGatherContext {
     maxZ: number,
     outAABB: AABB,
     level: number
-  );
+  ): void;
 }
 
 /** @internal */
@@ -53,7 +53,7 @@ export interface ClipmapDrawContext extends ClipmapGatherContext {
     scale: number,
     gridScale: number,
     level: number
-  );
+  ): void;
 }
 
 /** @internal */
@@ -70,25 +70,25 @@ export class Clipmap extends Disposable {
   private _tileResolution: number;
   private readonly _maxMipLevels: number;
 
-  private _tileMesh: Primitive;
-  private _tileMeshLines: Primitive;
-  private _tileMeshBBox: AABB;
+  private _tileMesh!: Primitive;
+  private _tileMeshLines!: Primitive;
+  private _tileMeshBBox!: AABB;
 
-  private _fillerMesh: Primitive;
-  private _fillerMeshLines: Primitive;
-  private _fillerMeshAABB: AABB;
+  private _fillerMesh!: Primitive;
+  private _fillerMeshLines!: Primitive;
+  private _fillerMeshAABB!: AABB;
 
-  private _trimMesh: Primitive;
-  private _trimMeshLines: Primitive;
-  private _trimMeshAABB: AABB;
+  private _trimMesh!: Primitive;
+  private _trimMeshLines!: Primitive;
+  private _trimMeshAABB!: AABB;
 
-  private _crossMesh: Primitive;
-  private _crossMeshLines: Primitive;
-  private _crossMeshAABB: AABB;
+  private _crossMesh!: Primitive;
+  private _crossMeshLines!: Primitive;
+  private _crossMeshAABB!: AABB;
 
-  private _seamMesh: Primitive;
-  private _seamMeshLines: Primitive;
-  private _seamMeshAABB: AABB;
+  private _seamMesh!: Primitive;
+  private _seamMeshLines!: Primitive;
+  private _seamMeshAABB!: AABB;
 
   private _wireframe: boolean;
 
@@ -144,7 +144,7 @@ export class Clipmap extends Disposable {
       this.generateTrimMesh();
     }
   }
-  private allocInstanceBuffer(): Float32Array<ArrayBuffer> {
+  private allocInstanceBuffer() {
     if (this._instanceDataPoolSize === 0) {
       const buffer = new Float32Array(this._maxMipLevels * 16 * 4);
       this._instanceDataPool.push(buffer);
@@ -153,7 +153,7 @@ export class Clipmap extends Disposable {
       return this._instanceDataPool[--this._instanceDataPoolSize];
     }
   }
-  private allocNonInstanceBuffer(x: number, y: number, z: number, w: number): Float32Array<ArrayBuffer> {
+  private allocNonInstanceBuffer(x: number, y: number, z: number, w: number) {
     let buffer: Float32Array<ArrayBuffer>;
     if (this._nonInstanceDataPoolSize === 0) {
       buffer = new Float32Array(4);
@@ -167,7 +167,7 @@ export class Clipmap extends Disposable {
     buffer[3] = w;
     return buffer;
   }
-  private allocMipLevelBuffer(): Float32Array<ArrayBuffer> {
+  private allocMipLevelBuffer() {
     if (this._mipLevelDataPoolSize === 0) {
       const buffer = new Float32Array(this._maxMipLevels * 16);
       this._mipLevelDataPool.push(buffer);
@@ -176,7 +176,7 @@ export class Clipmap extends Disposable {
       return this._mipLevelDataPool[--this._mipLevelDataPoolSize];
     }
   }
-  private allocNonInstanceMipLevelBuffer(val: number): Float32Array<ArrayBuffer> {
+  private allocNonInstanceMipLevelBuffer(val: number) {
     let buffer: Float32Array<ArrayBuffer>;
     if (this._nonInstanceMipLevelDataPoolSize === 0) {
       buffer = new Float32Array(1);
@@ -190,7 +190,7 @@ export class Clipmap extends Disposable {
   private patch2d(tileResolution: number, x: number, y: number) {
     return y * (tileResolution + 1) + x;
   }
-  private calcAABB(vertices: Float32Array): AABB {
+  private calcAABB(vertices: Float32Array) {
     let maxX = -Number.MAX_VALUE;
     let maxY = -Number.MAX_VALUE;
     let minX = Number.MAX_VALUE;
@@ -262,7 +262,7 @@ export class Clipmap extends Disposable {
     }
     this._tileMeshLines?.dispose();
     this._tileMeshLines = new Primitive();
-    this._tileMeshLines.setVertexBuffer(this._tileMesh.getVertexBuffer('position'));
+    this._tileMeshLines.setVertexBuffer(this._tileMesh.getVertexBuffer('position')!);
     this._tileMeshLines.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
     this._instanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
@@ -361,7 +361,7 @@ export class Clipmap extends Disposable {
     }
     this._fillerMeshLines?.dispose();
     this._fillerMeshLines = new Primitive();
-    this._fillerMeshLines.setVertexBuffer(this._fillerMesh.getVertexBuffer('position'));
+    this._fillerMeshLines.setVertexBuffer(this._fillerMesh.getVertexBuffer('position')!);
     this._fillerMeshLines.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
     this._instanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
@@ -439,7 +439,7 @@ export class Clipmap extends Disposable {
     }
     this._trimMeshLines?.dispose();
     this._trimMeshLines = new Primitive();
-    this._trimMeshLines.setVertexBuffer(this._trimMesh.getVertexBuffer('position'));
+    this._trimMeshLines.setVertexBuffer(this._trimMesh.getVertexBuffer('position')!);
     this._trimMeshLines.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
     this._instanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
@@ -531,7 +531,7 @@ export class Clipmap extends Disposable {
     }
     this._crossMeshLines?.dispose();
     this._crossMeshLines = new Primitive();
-    this._crossMeshLines.setVertexBuffer(this._crossMesh.getVertexBuffer('position'));
+    this._crossMeshLines.setVertexBuffer(this._crossMesh.getVertexBuffer('position')!);
     this._crossMeshLines.createAndSetVertexBuffer(
       'tex0_f32x4',
       this.allocNonInstanceBuffer(0, 0, 0, 0),
@@ -598,7 +598,7 @@ export class Clipmap extends Disposable {
     }
     this._seamMeshLines?.dispose();
     this._seamMeshLines = new Primitive();
-    this._seamMeshLines.setVertexBuffer(this._seamMesh.getVertexBuffer('position'));
+    this._seamMeshLines.setVertexBuffer(this._seamMesh.getVertexBuffer('position')!);
     this._seamMeshLines.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
     this._instanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
@@ -615,7 +615,7 @@ export class Clipmap extends Disposable {
   }
   private updateAABB(
     aabb: AABB,
-    rotation: number,
+    rotation: Nullable<number>,
     offset: Vector2,
     scale: number,
     gridScale: number,
@@ -648,7 +648,7 @@ export class Clipmap extends Disposable {
     ctx: ClipmapGatherContext,
     aabb: AABB,
     camera: Camera,
-    rotation: number,
+    rotation: Nullable<number>,
     offset: Vector2,
     scale: number,
     gridScale: number,
@@ -667,7 +667,7 @@ export class Clipmap extends Disposable {
     ctx.calcAABB(ctx.userData, minX, maxX, minZ, maxZ, tmpAABB, level);
     return tmpAABB.getClipStateWithFrustum(camera.frustum) !== ClipState.NOT_CLIPPED;
   }
-  calcLevelAABB(camera: Camera, minMaxWorldPos: Vector4, gridScale: number): AABB[] {
+  calcLevelAABB(camera: Camera, minMaxWorldPos: Vector4, gridScale: number) {
     const mipLevels = this.calcMipLevels(camera, minMaxWorldPos, gridScale);
     camera.getWorldPosition(tmpV3);
 
@@ -763,7 +763,7 @@ export class Clipmap extends Disposable {
     info.numInstances++;
   }
 
-  gather(context: ClipmapGatherContext): PrimitiveInstanceInfo[] {
+  gather(context: ClipmapGatherContext) {
     this._instanceDataPoolSize = this._instanceDataPool.length;
     this._mipLevelDataPoolSize = this._mipLevelDataPool.length;
     this._nonInstanceDataPoolSize = this._nonInstanceDataPool.length;
@@ -954,7 +954,7 @@ export class Clipmap extends Disposable {
     }
     for (const info of renderData) {
       info.primitive
-        .getVertexBuffer('texCoord0')
+        .getVertexBuffer('texCoord0')!
         .bufferSubData(0, info.instanceDatas, 0, info.numInstances * 4);
     }
     return renderData;
@@ -963,24 +963,14 @@ export class Clipmap extends Disposable {
   protected onDispose() {
     super.onDispose();
     this._crossMesh.dispose();
-    this._crossMesh = null;
     this._crossMeshLines.dispose();
-    this._crossMeshLines = null;
     this._fillerMesh.dispose();
-    this._fillerMesh = null;
     this._fillerMeshLines.dispose();
-    this._fillerMeshLines = null;
     this._seamMesh.dispose();
-    this._seamMesh = null;
     this._seamMeshLines.dispose();
-    this._seamMeshLines = null;
     this._trimMesh.dispose();
-    this._trimMesh = null;
     this._trimMeshLines.dispose();
-    this._trimMeshLines = null;
     this._tileMesh.dispose();
-    this._tileMesh = null;
     this._tileMeshLines.dispose();
-    this._tileMeshLines = null;
   }
 }

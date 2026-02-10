@@ -1,7 +1,8 @@
 import { Camera } from './camera';
 import type { Scene } from '../scene/scene';
+import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Matrix4x4 } from '@zephyr3d/base';
-import { getDevice } from '../app/api';
+import { getDevice, getEngine } from '../app/api';
 
 /**
  * Perspective camera class
@@ -14,7 +15,7 @@ export class PerspectiveCamera extends Camera {
   private _fovY: number;
   private _aspect: number;
   private _autoAspect: boolean;
-  private _window: number[];
+  private _window: Nullable<number[]>;
   /**
    * Creates an instance of PerspectiveCamera
    * @param scene - The scene that the camera belongs to.
@@ -23,7 +24,7 @@ export class PerspectiveCamera extends Camera {
    * @param near - The near clip plane
    * @param far - The far clip plane
    */
-  constructor(scene: Scene, fovY = Math.PI / 3, near = 1, far = 1000, aspect = 1) {
+  constructor(scene: Nullable<Scene>, fovY = Math.PI / 3, near = 1, far = 1000, aspect = 1) {
     super(scene);
     this._fovY = fovY;
     this._aspect = aspect;
@@ -34,10 +35,10 @@ export class PerspectiveCamera extends Camera {
     this._invalidate(true);
   }
   /** Sub-window of the frustum */
-  get window(): number[] {
+  get window(): Nullable<Immutable<number[]>> {
     return this._window;
   }
-  set window(val: number[]) {
+  set window(val: Nullable<number[]>) {
     this._window = val?.slice() ?? null;
     this._invalidate(true);
   }
@@ -45,44 +46,44 @@ export class PerspectiveCamera extends Camera {
   get autoAspect() {
     return this._autoAspect;
   }
-  set autoAspect(val: boolean) {
+  set autoAspect(val) {
     this._autoAspect = !!val;
   }
   /** The near clip plane */
-  get near(): number {
+  get near() {
     return this._near;
   }
-  set near(val: number) {
+  set near(val) {
     if (val !== this._near) {
       this._near = val;
       this._invalidate(true);
     }
   }
   /** The far clip plane */
-  get far(): number {
+  get far() {
     return this._far;
   }
-  set far(val: number) {
+  set far(val) {
     if (val !== this._far) {
       this._far = val;
       this._invalidate(true);
     }
   }
   /** Radian value indicates the field of view in Y axis */
-  get fovY(): number {
+  get fovY() {
     return this._fovY;
   }
-  set fovY(val: number) {
+  set fovY(val) {
     if (val !== this._fovY) {
       this._fovY = val;
       this._invalidate(true);
     }
   }
   /** Aspect ratio of the perspective transform */
-  get aspect(): number {
+  get aspect() {
     return this._aspect;
   }
-  set aspect(val: number) {
+  set aspect(val) {
     if (val !== this._aspect) {
       this._aspect = val;
       this._invalidate(true);
@@ -93,14 +94,19 @@ export class PerspectiveCamera extends Camera {
     if (this._viewport) {
       this.aspect = this._viewport[2] / this._viewport[3];
     } else {
-      const vp = getDevice().getViewport();
-      this.aspect = vp.width / vp.height;
+      if (getDevice().getFramebuffer()) {
+        const vp = getDevice().getViewport();
+        this.aspect = vp.width / vp.height;
+      } else {
+        const transform = getEngine().screen.transform;
+        this.aspect = transform.viewportWidth / transform.viewportHeight;
+      }
     }
   }
   /**
    * {@inheritDoc Camera.setPerspective}
    */
-  setPerspective(fovY: number, aspect: number, zNear: number, zFar: number): this {
+  setPerspective(fovY: number, aspect: number, zNear: number, zFar: number) {
     this._aspect = aspect;
     this._fovY = fovY;
     this._near = zNear;
@@ -121,7 +127,7 @@ export class PerspectiveCamera extends Camera {
    * Setup a projection matrix for the camera
    * @param matrix - The projection matrix
    */
-  setProjectionMatrix(matrix: Matrix4x4): void {
+  setProjectionMatrix(matrix: Matrix4x4) {
     if (matrix !== this._projMatrix) {
       if (matrix?.isPerspective()) {
         super.setProjectionMatrix(matrix);
@@ -144,22 +150,26 @@ export class PerspectiveCamera extends Camera {
     super.render(scene);
   }
   /** @internal */
-  protected _computeProj(): void {
-    const h = this._near * Math.tan(this._fovY * 0.5);
-    const w = h * this._aspect;
-    let left = -w;
-    let right = w;
-    let top = h;
-    let bottom = -h;
-    if (this._window) {
-      const width = right - left;
-      const height = top - bottom;
-      left += width * this._window[0];
-      bottom += height * this._window[1];
-      right = left + width * this._window[2];
-      top = bottom + height * this._window[3];
+  protected _computeProj() {
+    if (this.adapted) {
+      this.calcAdaptedPerspectiveProjection(this._fovY, this._near, this._far, this._projMatrix);
+    } else {
+      const h = this._near * Math.tan(this._fovY * 0.5);
+      const w = h * this._aspect;
+      let left = -w;
+      let right = w;
+      let top = h;
+      let bottom = -h;
+      if (this._window) {
+        const width = right - left;
+        const height = top - bottom;
+        left += width * this._window[0];
+        bottom += height * this._window[1];
+        right = left + width * this._window[2];
+        top = bottom + height * this._window[3];
+      }
+      this._projMatrix.frustum(left, right, bottom, top, this._near, this._far);
     }
-    this._projMatrix.frustum(left, right, bottom, top, this._near, this._far);
     Matrix4x4.invert(this._projMatrix, this._invProjMatrix);
   }
 }

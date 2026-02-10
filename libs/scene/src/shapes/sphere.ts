@@ -3,7 +3,6 @@ import type { AABB } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
-import type { PrimitiveType } from '@zephyr3d/device';
 
 /**
  * Creation options for sphere shape
@@ -36,12 +35,12 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
   constructor(options?: SphereCreationOptions) {
     super(options);
   }
-  clone(): SphereShape {
-    return new SphereShape(this._options);
+  clone() {
+    return new SphereShape(this._options) as this;
   }
   /** type of the shape */
-  get type(): string {
-    return 'Sphere';
+  get type() {
+    return 'Sphere' as const;
   }
   /**
    * {@inheritDoc Primitive.raycast}
@@ -61,7 +60,7 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
     return a - Math.sqrt(rSquared - bSquared);
   }
   /** Sphere radius */
-  get radius(): number {
+  get radius() {
     return this._options.radius ?? 1;
   }
   /**
@@ -72,7 +71,7 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
    * @param indices - vertex indices
    */
   static generateData(
-    options: SphereCreationOptions,
+    opt: SphereCreationOptions,
     vertices: number[],
     normals: number[],
     tangents: number[],
@@ -81,8 +80,8 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
     bbox?: AABB,
     indexOffset?: number,
     vertexCallback?: (index: number, x: number, y: number, z: number) => void
-  ): PrimitiveType {
-    options = Object.assign({}, this._defaultOptions, options ?? {});
+  ) {
+    const options = Object.assign({}, this._defaultOptions, opt ?? {});
     indexOffset = indexOffset ?? 0;
     const start = vertices.length;
     const stripIndices: number[] = [];
@@ -154,6 +153,6 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
         vertexCallback?.((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
       }
     }
-    return 'triangle-list';
+    return 'triangle-list' as const;
   }
 }

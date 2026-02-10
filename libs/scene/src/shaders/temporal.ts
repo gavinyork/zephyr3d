@@ -46,7 +46,7 @@ export function temporalResolve(
   uv: PBShaderExp,
   workSize: PBShaderExp,
   debug = TAA_DEBUG_NONE
-): PBShaderExp {
+) {
   const pb = scope.$builder;
   pb.func('getClosestVelocity', [pb.vec2('uv'), pb.vec2('texSize')], function () {
     this.$l.minDepth = pb.float(1);
@@ -297,5 +297,5 @@ export function temporalResolve(
     }
     this.$return(this.resolvedColor);
   });
-  return scope.temporalResolve(uv, workSize);
+  return scope.temporalResolve(uv, workSize) as PBShaderExp;
 }

@@ -1,4 +1,4 @@
-import type { Vector4 } from '@zephyr3d/base';
+import type { Immutable, Nullable, Vector4 } from '@zephyr3d/base';
 import { WebGPURenderPass } from './renderpass_webgpu';
 import { WebGPUComputePass } from './computepass_webgpu';
 import type { PrimitiveType, DeviceViewport } from '@zephyr3d/device';
@@ -8,7 +8,6 @@ import type { WebGPUVertexLayout } from './vertexlayout_webgpu';
 import type { WebGPURenderStateSet } from './renderstates_webgpu';
 import type { WebGPUBindGroup } from './bindgroup_webgpu';
 import type { WebGPUFrameBuffer } from './framebuffer_webgpu';
-import type { FrameBufferInfo } from './pipeline_cache';
 import type { WebGPUBuffer } from './buffer_webgpu';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';
 import { WebGPUMipmapGenerator } from './utils_webgpu';
@@ -28,10 +27,10 @@ export class CommandQueueImmediate {
     this._computePass = new WebGPUComputePass(device);
     this._drawcallCounter = 0;
   }
-  isBufferUploading(buffer: WebGPUBuffer): boolean {
+  isBufferUploading(buffer: WebGPUBuffer) {
     return !!this._bufferUploads.has(buffer);
   }
-  isTextureUploading(tex: WebGPUBaseTexture): boolean {
+  isTextureUploading(tex: WebGPUBaseTexture) {
     return !!this._textureUploads.has(tex);
   }
   flushUploads() {
@@ -54,11 +53,11 @@ export class CommandQueueImmediate {
       textureUploads.forEach((_, tex) => tex.endSyncChanges());
     }
   }
-  get currentPass(): WebGPURenderPass | WebGPUComputePass {
+  get currentPass(): Nullable<WebGPURenderPass | WebGPUComputePass> {
     return this._renderPass.active ? this._renderPass : this._computePass.active ? this._computePass : null;
   }
-  beginFrame(): void {}
-  endFrame(): void {
+  beginFrame() {}
+  endFrame() {
     this.flush();
   }
   flush() {
@@ -70,16 +69,16 @@ export class CommandQueueImmediate {
       this._computePass.end();
     }
   }
-  setFramebuffer(fb: WebGPUFrameBuffer): void {
+  setFramebuffer(fb: WebGPUFrameBuffer) {
     if (this._renderPass.active) {
       this.flushUploads();
     }
     this._renderPass.setFramebuffer(fb);
   }
-  getFramebuffer(): WebGPUFrameBuffer {
+  getFramebuffer() {
     return this._renderPass.getFramebuffer();
   }
-  getFramebufferInfo(): FrameBufferInfo {
+  getFramebufferInfo() {
     return this._renderPass.getFrameBufferInfo();
   }
   executeRenderBundle(renderBundle: GPURenderBundle) {
@@ -91,7 +90,7 @@ export class CommandQueueImmediate {
   }
   bufferUpload(buffer: WebGPUBuffer) {
     if (this._bufferUploads.has(buffer)) {
-      if (this._drawcallCounter > this._bufferUploads.get(buffer)) {
+      if (this._drawcallCounter > this._bufferUploads.get(buffer)!) {
         this.flush();
       }
     } else {
@@ -100,7 +99,7 @@ export class CommandQueueImmediate {
   }
   textureUpload(tex: WebGPUBaseTexture) {
     if (this._textureUploads.has(tex)) {
-      if (this._drawcallCounter > this._textureUploads.get(tex)) {
+      if (this._drawcallCounter > this._textureUploads.get(tex)!) {
         this.flush();
       }
     } else {
@@ -116,13 +115,13 @@ export class CommandQueueImmediate {
   ) {
     this.flush();
     const copyCommandEncoder = this._device.device.createCommandEncoder();
-    copyCommandEncoder.copyBufferToBuffer(srcBuffer.object, srcOffset, dstBuffer.object, dstOffset, bytes);
+    copyCommandEncoder.copyBufferToBuffer(srcBuffer.object!, srcOffset, dstBuffer.object!, dstOffset, bytes);
     this._device.device.queue.submit([copyCommandEncoder.finish()]);
   }
   compute(
     program: WebGPUProgram,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Iterable<number>>[],
     workgroupCountX: number,
     workgroupCountY: number,
     workgroupCountZ: number
@@ -143,15 +142,15 @@ export class CommandQueueImmediate {
   }
   draw(
     program: WebGPUProgram,
-    vertexData: WebGPUVertexLayout,
+    vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Nullable<Iterable<number>>[]>,
     primitiveType: PrimitiveType,
     first: number,
     count: number,
     numInstances: number
-  ): void {
+  ) {
     if (this._computePass.active) {
       this.flushUploads();
       this._computePass.end();
@@ -175,12 +174,12 @@ export class CommandQueueImmediate {
     vertexData: WebGPUVertexLayout,
     stateSet: WebGPURenderStateSet,
     bindGroups: WebGPUBindGroup[],
-    bindGroupOffsets: Iterable<number>[],
+    bindGroupOffsets: Nullable<Iterable<number>>[],
     primitiveType: PrimitiveType,
     first: number,
     count: number,
     numInstances: number
-  ): void {
+  ) {
     this._drawcallCounter++;
     if (this._computePass.active) {
       this.flushUploads();
@@ -199,19 +198,19 @@ export class CommandQueueImmediate {
       numInstances
     );
   }
-  setViewport(vp?: number[] | DeviceViewport) {
+  setViewport(vp: Nullable<Immutable<number[] | DeviceViewport>>) {
     this._renderPass.setViewport(vp);
   }
-  getViewport(): DeviceViewport {
+  getViewport() {
     return this._renderPass.getViewport();
   }
-  setScissor(scissor?: number[] | DeviceViewport) {
+  setScissor(scissor: Nullable<Immutable<number[] | DeviceViewport>>) {
     this._renderPass.setScissor(scissor);
   }
-  getScissor(): DeviceViewport {
+  getScissor() {
     return this._renderPass.getScissor();
   }
-  clear(color: Vector4, depth: number, stencil: number): void {
+  clear(color: Nullable<Vector4>, depth: Nullable<number>, stencil: Nullable<number>) {
     this._renderPass.clear(color, depth, stencil);
   }
   finish() {

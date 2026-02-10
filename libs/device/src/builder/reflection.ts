@@ -1,6 +1,7 @@
 import type { PBGlobalScope, ProgramBuilder } from './programbuilder';
 import type { PBShaderExp } from './base';
 import type { VertexSemantic } from '../gpuobject';
+import type { Nullable } from '@zephyr3d/base';
 
 /**
  * Shader variable getter function type
@@ -16,29 +17,29 @@ export class PBReflection {
   /** @internal */
   private readonly _builder: ProgramBuilder;
   /** @internal */
-  private _tagList: Record<string, PBReflectionTagGetter>;
+  private _tagList: Partial<Record<string, PBReflectionTagGetter>>;
   /** @internal */
-  private _attribList: Record<string, PBShaderExp>;
+  private _attribList: Partial<Record<string, PBShaderExp>>;
   constructor(builder: ProgramBuilder) {
     this._builder = builder;
     this._tagList = {};
     this._attribList = {};
   }
   /** Gets all the vertex attributes that was used by the program */
-  get vertexAttributes(): number[] {
+  get vertexAttributes() {
     return this._builder.getVertexAttributes();
   }
   /**
    * Check if specified vertex attribute was used by the program
    * @param attrib - The vertex attribute to check
    */
-  hasVertexAttribute(attrib: number): boolean {
+  hasVertexAttribute(attrib: number) {
     return this.vertexAttributes.indexOf(attrib) >= 0;
   }
   /**
    * Clear all contents
    */
-  clear(): void {
+  clear() {
     this._tagList = {};
     this._attribList = {};
   }
@@ -61,7 +62,7 @@ export class PBReflection {
   tag(
     arg0: string | Record<string, PBReflectionTagGetter>,
     arg1?: PBReflectionTagGetter
-  ): PBShaderExp | void {
+  ): Nullable<PBShaderExp> | void {
     if (typeof arg0 === 'string') {
       if (arg1 === undefined) {
         return this.getTag(arg0);
@@ -78,19 +79,19 @@ export class PBReflection {
    * Gets the variable which is the vertex attribute of specified semantic
    * @param attrib - The vertex semantic
    */
-  attribute(attrib: VertexSemantic): PBShaderExp {
-    return this._attribList[attrib] || null;
+  attribute(attrib: VertexSemantic) {
+    return this._attribList[attrib] ?? null;
   }
   /** @internal */
   setAttrib(attrib: VertexSemantic, exp: PBShaderExp) {
     this._attribList[attrib] = exp;
   }
   /** @internal */
-  private addTag(name: string, exp: PBReflectionTagGetter): void {
+  private addTag(name: string, exp: PBReflectionTagGetter) {
     this._tagList[name] = exp;
   }
   /** @internal */
-  private getTag(name: string): PBShaderExp {
+  private getTag(name: string) {
     const getter = this._tagList[name];
     return getter ? getter(this._builder.getGlobalScope()) : null;
   }

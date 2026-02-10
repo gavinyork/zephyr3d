@@ -9,7 +9,7 @@ import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
  *
  * @public
  */
-export function hash11(scope: PBInsideFunctionScope, p: number | PBShaderExp): PBShaderExp {
+export function hash11(scope: PBInsideFunctionScope, p: number | PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_hash11';
   pb.func(funcName, [pb.float('p')], function () {
@@ -18,7 +18,7 @@ export function hash11(scope: PBInsideFunctionScope, p: number | PBShaderExp): P
     this.x = pb.mul(this.x, pb.add(this.x, this.x));
     this.$return(pb.fract(this.x));
   });
-  return scope[funcName](p);
+  return scope[funcName](p) as PBShaderExp;
 }
 
 /**
@@ -30,7 +30,7 @@ export function hash11(scope: PBInsideFunctionScope, p: number | PBShaderExp): P
  *
  * @public
  */
-export function hash21(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+export function hash21(scope: PBInsideFunctionScope, p: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_hash21';
   pb.func(funcName, [pb.vec2('p')], function () {
@@ -38,7 +38,7 @@ export function hash21(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderEx
     this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
     this.$return(pb.fract(pb.mul(pb.add(this.p3.x, this.p3.y), this.p3.z)));
   });
-  return scope[funcName](p);
+  return scope[funcName](p) as PBShaderExp;
 }
 
 /**
@@ -50,7 +50,7 @@ export function hash21(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderEx
  *
  * @public
  */
-export function hash31(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+export function hash31(scope: PBInsideFunctionScope, p: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_hash31';
   pb.func(funcName, [pb.vec3('p')], function () {
@@ -58,7 +58,7 @@ export function hash31(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderEx
     this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.zyx, pb.vec3(31.32))));
     this.$return(pb.fract(pb.mul(pb.add(this.p3.x, this.p3.y), this.p3.z)));
   });
-  return scope[funcName](p);
+  return scope[funcName](p) as PBShaderExp;
 }
 
 /**
@@ -70,7 +70,7 @@ export function hash31(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderEx
  *
  * @public
  */
-export function hash12(scope: PBInsideFunctionScope, p: number | PBShaderExp): PBShaderExp {
+export function hash12(scope: PBInsideFunctionScope, p: number | PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_hash12';
   pb.func(funcName, [pb.float('p')], function () {
@@ -78,7 +78,7 @@ export function hash12(scope: PBInsideFunctionScope, p: number | PBShaderExp): P
     this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
     this.$return(pb.fract(pb.mul(pb.add(this.p3.xx, this.p3.yz), this.p3.zy)));
   });
-  return scope[funcName](p);
+  return scope[funcName](p) as PBShaderExp;
 }
 
 /**
@@ -90,7 +90,7 @@ export function hash12(scope: PBInsideFunctionScope, p: number | PBShaderExp): P
  *
  * @public
  */
-export function hash22(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+export function hash22(scope: PBInsideFunctionScope, p: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_hash22';
   pb.func(funcName, [pb.vec2('p')], function () {
@@ -98,7 +98,7 @@ export function hash22(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderEx
     this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
     this.$return(pb.fract(pb.mul(pb.add(this.p3.xx, this.p3.yz), this.p3.zy)));
   });
-  return scope[funcName](p);
+  return scope[funcName](p) as PBShaderExp;
 }
 
 /**
@@ -110,7 +110,7 @@ export function hash22(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderEx
  *
  * @public
  */
-export function hash32(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+export function hash32(scope: PBInsideFunctionScope, p: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_hash32';
   pb.func(funcName, [pb.vec3('p')], function () {
@@ -118,7 +118,7 @@ export function hash32(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderEx
     this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
     this.$return(pb.fract(pb.mul(pb.add(this.p3.xx, this.p3.yz), this.p3.zy)));
   });
-  return scope[funcName](p);
+  return scope[funcName](p) as PBShaderExp;
 }
 
 /**
@@ -130,7 +130,7 @@ export function hash32(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderEx
  *
  * @public
  */
-export function hash13(scope: PBInsideFunctionScope, p: number | PBShaderExp): PBShaderExp {
+export function hash13(scope: PBInsideFunctionScope, p: number | PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_hash13';
   pb.func(funcName, [pb.float('p')], function () {
@@ -138,7 +138,7 @@ export function hash13(scope: PBInsideFunctionScope, p: number | PBShaderExp): P
     this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
     this.$return(pb.fract(pb.mul(pb.add(this.p3.xxy, this.p3.yzz), this.p3.zyx)));
   });
-  return scope[funcName](p);
+  return scope[funcName](p) as PBShaderExp;
 }
 
 /**
@@ -150,7 +150,7 @@ export function hash13(scope: PBInsideFunctionScope, p: number | PBShaderExp): P
  *
  * @public
  */
-export function hash23(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+export function hash23(scope: PBInsideFunctionScope, p: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_hash23';
   pb.func(funcName, [pb.vec2('p')], function () {
@@ -158,7 +158,7 @@ export function hash23(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderEx
     this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
     this.$return(pb.fract(pb.mul(pb.add(this.p3.xxy, this.p3.yzz), this.p3.zyx)));
   });
-  return scope[funcName](p);
+  return scope[funcName](p) as PBShaderExp;
 }
 
 /**
@@ -170,7 +170,7 @@ export function hash23(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderEx
  *
  * @public
  */
-export function hash33(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+export function hash33(scope: PBInsideFunctionScope, p: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_hash33';
   pb.func(funcName, [pb.vec3('p')], function () {
@@ -178,7 +178,7 @@ export function hash33(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderEx
     this.p3 = pb.add(this.p3, pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33))));
     this.$return(pb.fract(pb.mul(pb.add(this.p3.xxy, this.p3.yzz), this.p3.zyx)));
   });
-  return scope[funcName](p);
+  return scope[funcName](p) as PBShaderExp;
 }
 
 /**
@@ -190,13 +190,13 @@ export function hash33(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderEx
  *
  * @public
  */
-export function whiteNoise(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+export function whiteNoise(scope: PBInsideFunctionScope, p: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_whiteNoise';
   pb.func(funcName, [pb.vec2('p')], function () {
     this.$return(pb.fract(pb.mul(pb.sin(pb.dot(this.p, pb.vec2(12.9898, 78.233))), 43758.5453)));
   });
-  return scope[funcName](p);
+  return scope[funcName](p) as PBShaderExp;
 }
 
 /**
@@ -208,7 +208,7 @@ export function whiteNoise(scope: PBInsideFunctionScope, p: PBShaderExp): PBShad
  *
  * @public
  */
-export function valueNoise(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+export function valueNoise(scope: PBInsideFunctionScope, p: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_valueNoise';
   pb.func(funcName, [pb.vec2('p')], function () {
@@ -225,7 +225,7 @@ export function valueNoise(scope: PBInsideFunctionScope, p: PBShaderExp): PBShad
     this.$l.r3 = whiteNoise(this, this.c3);
     this.$return(pb.mix(pb.mix(this.r0, this.r1, this.f.x), pb.mix(this.r2, this.r3, this.f.x), this.f.y));
   });
-  return scope[funcName](p);
+  return scope[funcName](p) as PBShaderExp;
 }
 
 /**
@@ -245,7 +245,7 @@ export function gradient(scope: PBInsideFunctionScope, p: PBShaderExp, t: PBShad
     this.$l.angle = pb.mul(pb.add(this.t, Math.PI * 2), this.rand);
     this.$return(pb.vec2(pb.cos(this.angle), pb.sin(this.angle)));
   });
-  return scope[funcName](p, t);
+  return scope[funcName](p, t) as PBShaderExp;
 }
 
 /**
@@ -289,7 +289,7 @@ export function perlinNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp) {
     this.noise = pb.add(pb.mul(this.noise, 0.5), 0.5);
     this.$return(this.noise);
   });
-  return scope[funcNameNoise](p);
+  return scope[funcNameNoise](p) as PBShaderExp;
 }
 
 /**
@@ -303,11 +303,7 @@ export function perlinNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp) {
  *
  * @public
  */
-export function worleyNoise(
-  scope: PBInsideFunctionScope,
-  uv: PBShaderExp,
-  freq: PBShaderExp | number
-): PBShaderExp {
+export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq: PBShaderExp | number) {
   const pb = scope.$builder;
   const funcNameHash = 'Z_worleyHash';
   // https://www.shadertoy.com/view/4sc3z2
@@ -368,7 +364,7 @@ export function worleyNoise(
     });
     this.$return(pb.sub(1, this.minDist));
   });
-  return pb.getGlobalScope()[funcNameNoise](uv, freq);
+  return pb.getGlobalScope()[funcNameNoise](uv, freq) as PBShaderExp;
 }
 /**
  * Calculate worley FBM
@@ -380,11 +376,7 @@ export function worleyNoise(
  *
  * @public
  */
-export function worleyFBM(
-  scope: PBInsideFunctionScope,
-  p: PBShaderExp,
-  freq: PBShaderExp | number
-): PBShaderExp {
+export function worleyFBM(scope: PBInsideFunctionScope, p: PBShaderExp, freq: PBShaderExp | number) {
   const pb = scope.$builder;
   const funcName = 'Z_worleyFBM';
   pb.func(funcName, [pb.vec3('p'), pb.float('freq')], function () {
@@ -394,7 +386,7 @@ export function worleyFBM(
     this.$l.fbm = pb.add(pb.mul(this.n1, 0.625), pb.mul(this.n2, 0.25), pb.mul(this.n3, 0.125));
     this.$return(pb.max(pb.sub(pb.mul(this.fbm, 1.1), pb.vec3(0.1)), pb.vec3(0)));
   });
-  return pb.getGlobalScope()[funcName](p, freq);
+  return pb.getGlobalScope()[funcName](p, freq) as PBShaderExp;
 }
 /**
  * Calculate 3d noise by a 3d position
@@ -405,7 +397,7 @@ export function worleyFBM(
  *
  * @public
  */
-export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_noise3d';
   pb.func(funcName, [pb.vec3('p')], function () {
@@ -413,7 +405,7 @@ export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderE
     this.$l.p3 = pb.add(this.p3, pb.vec3(pb.dot(this.p3, pb.add(this.p3.yzx, pb.vec3(33.33)))));
     this.$return(pb.fract(pb.mul(pb.add(this.p3.x, this.p3.y), this.p3.z)));
   });
-  return pb.getGlobalScope()[funcName](p);
+  return pb.getGlobalScope()[funcName](p) as PBShaderExp;
 }
 /**
  * Calculate smooth 3d noise by a 3d position
@@ -424,7 +416,7 @@ export function noise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderE
  *
  * @public
  */
-export function smoothNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp {
+export function smoothNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_smoothNoise3D';
   pb.func(funcName, [pb.vec3('p')], function () {
@@ -455,7 +447,7 @@ export function smoothNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBS
       )
     );
   });
-  return pb.getGlobalScope()[funcName](p);
+  return pb.getGlobalScope()[funcName](p) as PBShaderExp;
 }
 
 /**
@@ -467,10 +459,10 @@ export function smoothNoise3D(scope: PBInsideFunctionScope, p: PBShaderExp): PBS
  *
  * @public
  */
-export function interleavedGradientNoise(scope: PBInsideFunctionScope, c: PBShaderExp): PBShaderExp {
+export function interleavedGradientNoise(scope: PBInsideFunctionScope, c: PBShaderExp) {
   const pb = scope.$builder;
   const x = 0.06711056;
   const y = 0.00583715;
   const z = 52.9829189;
-  return pb.fract(pb.mul(z, pb.fract(pb.dot(c, pb.vec2(x, y)))));
+  return pb.fract(pb.mul(z, pb.fract(pb.dot(c, pb.vec2(x, y))))) as PBShaderExp;
 }

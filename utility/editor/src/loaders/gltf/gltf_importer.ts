@@ -370,6 +370,9 @@ export class GLTFImporter implements ModelImporter {
         node.mesh = gltf._meshes[nodeInfo.mesh];
         if (node.weights) {
           node.mesh.morphWeights = node.weights;
+          if (!node.mesh.morphNames && node['extras']?.targetNames) {
+            node.mesh.morphNames = node['extras'].targetNames;
+          }
         }
         const instancing = nodeInfo.extensions?.['EXT_mesh_gpu_instancing'];
         if (instancing) {
@@ -456,6 +459,7 @@ export class GLTFImporter implements ModelImporter {
     if (meshInfo) {
       mesh = {
         morphWeights: meshInfo.weights ?? null,
+        morphNames: meshInfo['extras']?.targetNames ?? null,
         subMeshes: []
       };
       const primitives = meshInfo.primitives;

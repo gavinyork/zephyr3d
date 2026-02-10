@@ -6,7 +6,13 @@ import type { SceneNode } from '../scene/scene_node';
 import { BoundingBox } from '../utility/bounding_volume';
 import { getDevice } from '../app/api';
 
-/** @internal */
+/**
+ * Skinned bounding box information for a submesh.
+ *
+ * Used to compute animated AABB for skinned meshes.
+ *
+ * @public
+ */
 export interface SkinnedBoundingBox {
   /**
    * Representative vertices used to bound a skinned mesh (extreme points along axes).
@@ -67,13 +73,13 @@ export class Skeleton extends Disposable {
   /** @internal */
   protected _bindPoseMatrices: Matrix4x4[];
   /** @internal */
-  protected _jointMatrices: Matrix4x4[];
+  protected _jointMatrices!: Matrix4x4[];
   /** @internal */
   protected _jointTransforms: { scale: Vector3; rotation: Quaternion; position: Vector3 }[];
   /** @internal */
-  protected _jointOffsets: Float32Array<ArrayBuffer>;
+  protected _jointOffsets!: Float32Array<ArrayBuffer>;
   /** @internal */
-  protected _jointMatrixArray: Float32Array<ArrayBuffer>;
+  protected _jointMatrixArray!: Float32Array<ArrayBuffer>;
   /** @internal */
   protected _jointTexture: DRef<Texture2D>;
   /** @internal */
@@ -96,9 +102,6 @@ export class Skeleton extends Disposable {
     this._joints = joints;
     this._inverseBindMatrices = inverseBindMatrices;
     this._bindPoseMatrices = bindPoseMatrices;
-    this._jointMatrixArray = null;
-    this._jointMatrices = null;
-    this._jointOffsets = null;
     this._jointTexture = new DRef();
     this._playing = false;
     if (jointTransforms) {
@@ -176,8 +179,8 @@ export class Skeleton extends Disposable {
    *
    * Each matrix is stored in 4 texels (one row per texel, RGBA = 4 floats).
    */
-  get jointTexture(): Texture2D {
-    return this._jointTexture.get();
+  get jointTexture() {
+    return this._jointTexture.get()!;
   }
   /**
    * Update joint matrices from either provided transforms or the joints' world matrices.
@@ -210,9 +213,11 @@ export class Skeleton extends Disposable {
       const mat = this._jointMatrices[i + this._jointOffsets[0] - 1];
       const jointTransform = jointTransforms ? jointTransforms[i] : this._joints[i].worldMatrix;
       if (worldMatrix) {
-        Matrix4x4.multiplyAffine(worldMatrix, jointTransform, jointTransform);
+        Matrix4x4.multiplyAffine(worldMatrix, jointTransform, mat);
+        Matrix4x4.multiply(mat, this._inverseBindMatrices[i], mat);
+      } else {
+        Matrix4x4.multiply(jointTransform, this._inverseBindMatrices[i], mat);
       }
-      Matrix4x4.multiply(jointTransform, this._inverseBindMatrices[i], mat);
     }
   }
   /**
@@ -227,7 +232,7 @@ export class Skeleton extends Disposable {
   computeBindPose(model: SceneNode) {
     this.updateJointMatrices(this._bindPoseMatrices, model.worldMatrix);
     this._jointOffsets[1] = this._jointOffsets[0];
-    const tex = this._jointTexture.get();
+    const tex = this.jointTexture;
     tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
   }
   /**
@@ -237,7 +242,7 @@ export class Skeleton extends Disposable {
    */
   computeJoints() {
     this.updateJointMatrices();
-    const tex = this._jointTexture.get();
+    const tex = this.jointTexture;
     tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
   }
   /**
@@ -257,7 +262,7 @@ export class Skeleton extends Disposable {
    * @internal
    */
   reset() {
-    this.updateJointMatrices(this._bindPoseMatrices);
+    //this.updateJointMatrices(this._bindPoseMatrices);
     this._playing = false;
   }
   /**
@@ -301,11 +306,6 @@ export class Skeleton extends Disposable {
   protected onDispose() {
     super.onDispose();
     this._jointTexture.dispose();
-    this._joints = null;
-    this._inverseBindMatrices = null;
-    this._bindPoseMatrices = null;
-    this._jointMatrices = null;
-    this._jointMatrixArray = null;
     const m = Skeleton._registry.get(this._id);
     if (m?.get() === this) {
       Skeleton._registry.delete(this._id);
@@ -358,13 +358,8 @@ export class Skeleton extends Disposable {
    *
    * @param meshData - Raw submesh attributes (positions, blend indices, weights).
    * @returns Skinned bounding box info used during per-frame updates.
-   * @internal
    */
-  getBoundingInfo(data: {
-    positions: Float32Array;
-    blendIndices: TypedArray;
-    weights: TypedArray;
-  }): SkinnedBoundingBox {
+  getBoundingInfo(data: { positions: Float32Array; blendIndices: TypedArray; weights: TypedArray }) {
     const indices = [0, 0, 0, 0, 0, 0];
     let minx = Number.MAX_VALUE;
     let maxx = -Number.MAX_VALUE;

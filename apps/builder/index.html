@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="origin-trial"
+      content="AqCnZyPTDPRK7MVw+bbVJoQkYndOjHKTarXCp+JTVy4VPAKv/E1SJDuFzsJGm0COxapIEanHG7oF0W+HT0ANwQUAAABJeyJvcmlnaW4iOiJodHRwOi8vbG9jYWxob3N0OjgwMDAiLCJmZWF0dXJlIjoiV2ViR1BVIiwiZXhwaXJ5IjoxNjQzMTU1MTk5fQ=="
+    />
+    <title>program builder test</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      .fullpage {
+        position: fixed;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        margin: 0;
+      }
+
+      .flex-row {
+        display: flex;
+        flex-flow: row nowrap;
+      }
+
+      .flex-col {
+        display: flex;
+        flex-flow: column nowrap;
+      }
+
+      .nav {
+        position: relative;
+        left: 0;
+        flex: 1 1;
+        height: 100vh;
+        overflow: auto;
+        background: #fafafa;
+        padding: 0 15px;
+        color: #045b88;
+      }
+
+      .maximized {
+        flex-grow: 1;
+      }
+
+      .fit {
+        flex-shrink: 1;
+      }
+
+      li {
+        list-style: none;
+        padding: 3px;
+        cursor: pointer;
+      }
+
+      a {
+        text-decoration: none;
+      }
+
+      .active {
+        color: red;
+      }
+
+      .title {
+        text-align: center;
+        font-family: 'Segoe UI Light', 'Segoe UI', 'Trebuchet MS', Tahoma, Arial, Helvetica;
+        font-weight: lighter;
+      }
+    </style>
+  </head>
+
+  <body class="fullpage flex-col">
+    <div class="flex-row maximized fit">
+      <nav class="flex-col nav" style="padding: 15px; width: 1200px">
+        <div style="padding: 10px">
+          <select id="device-type" style="padding: 3px; margin: 0px 10px 0px 0px; outline: none">
+            <option value="webgl" selected>WebGL</option>
+            <option value="webgl2">WebGL2</option>
+            <option value="webgpu">WebGPU</option>
+            <option value="webgpu">WebGPU Compute</option>
+          </select>
+          <button id="reset-code">重置</button>
+          <button id="run-code">生成</button>
+        </div>
+        <div id="workgroup-size" class="flex-row" style="display: none">
+          <label for="workgroup-x">x:</label>
+          <input id="workgroup-x" style="max-width: 60px; margin-right: 5px" type="number" />
+          <label for="workgroup-y">y:</label>
+          <input id="workgroup-y" style="max-width: 60px; margin-right: 5px" type="number" />
+          <label for="workgroup-z">z:</label>
+          <input id="workgroup-z" style="max-width: 60px" type="number" />
+        </div>
+        <label id="vertex-id" for="vscode">vertex:</label>
+        <textarea
+          id="vscode"
+          class="maximized"
+          spellcheck="false"
+          style="
+            text-align: left;
+            overflow: auto;
+            padding: 10px;
+            margin-bottom: 10px;
+            resize: none;
+            width: 100%;
+          "
+        >
+        </textarea>
+        <label id="fragment-id" for="fscode">fragment:</label>
+        <textarea
+          id="fscode"
+          class="maximized"
+          spellcheck="false"
+          style="
+            text-align: left;
+            overflow: auto;
+            padding: 10px;
+            margin-bottom: 10px;
+            resize: none;
+            width: 100%;
+          "
+        >
+        </textarea>
+      </nav>
+      <div class="maximized fit flex-col" id="generated" title="generated code" scrolling="no">
+        <label id="vertexshader-id" for="vs">vertex shader:</label>
+        <textarea
+          id="vertexshader-generated"
+          class="maximized fit"
+          id="vs"
+          spellcheck="false"
+          style="background-color: #333; color: #fff; margin-bottom: 10px; resize: none"
+        ></textarea>
+        <label id="fragmentshader-id" for="fs">fragment shader:</label>
+        <textarea
+          id="fragmentshader-generated"
+          class="maximized fit"
+          id="fs"
+          spellcheck="false"
+          style="background-color: #333; color: #fff; margin-bottom: 10px; resize: none"
+        ></textarea>
+        <label for="bindgroups">bind groups:</label>
+        <textarea
+          class="maximized fit"
+          id="bindgroups"
+          spellcheck="false"
+          style="background-color: #333; color: #fff; resize: none"
+        ></textarea>
+      </div>
+    </div>
+    <canvas
+      id="webgl"
+      style="position: absolute; left: -100px; width: 1px; height: 1px"
+      width="100"
+      height="100"
+    ></canvas>
+    <canvas
+      id="webgl2"
+      style="position: absolute; left: -100px; width: 1px; height: 1px"
+      width="100"
+      height="100"
+    ></canvas>
+    <canvas
+      id="webgpu"
+      style="position: absolute; left: -100px; width: 1px; height: 1px"
+      width="100"
+      height="100"
+    ></canvas>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

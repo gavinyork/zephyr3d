@@ -18,7 +18,7 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 // The canvas element for creating device
 const canvas = document.querySelector('#canvas');
 // Creates device if it is being supported
-if (backendWebGPU.supported()) {
+if (await backendWebGPU.supported()) {
   const device = await backendWebGPU.createDevice(canvas);
   if (!device) {
     console.error('Create device failed');

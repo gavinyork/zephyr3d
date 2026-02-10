@@ -1,4 +1,6 @@
-import type { SerializableClass, ResourceManager } from '../../serialization';
+import { objectKeys } from '@zephyr3d/base';
+import type { ResourceManager } from '../../serialization';
+import { defineProps } from '../../serialization/types';
 import { BaseGraphNode } from '../node';
 import type { MaterialBlueprintIR } from './ir';
 
@@ -76,7 +78,7 @@ export class FunctionCallNode extends BaseGraphNode {
     this._outs = [];
     this._inputs = [];
     this._outputs = [];
-    for (const k of Object.keys(this._IR.DAG.nodeMap)) {
+    for (const k of objectKeys(this._IR.DAG.nodeMap)) {
       const node = this._IR.DAG.nodeMap[k];
       if (node instanceof FunctionInputNode) {
         const name = node.name || `arg_${k}`;
@@ -153,14 +155,14 @@ export class FunctionCallNode extends BaseGraphNode {
    * Uses a custom createFunc to asynchronously load the function blueprint
    * from the file system. The initialization parameter is the blueprint path.
    */
-  static getSerializationCls(manager: ResourceManager): SerializableClass {
+  static getSerializationCls(manager: ResourceManager) {
     return {
       ctor: FunctionCallNode,
       name: 'FunctionCallNode',
-      async createFunc(_, init: string) {
+      async createFunc(_: unknown, init: string) {
         const IR = await manager.loadBluePrint(init);
         const funcName = manager.VFS.basename(init, manager.VFS.extname(init));
-        return { obj: new FunctionCallNode(init, funcName, IR['func']) };
+        return { obj: new FunctionCallNode(init, funcName, IR!['func']) };
       },
       getInitParams(obj: FunctionCallNode) {
         return obj.path;
@@ -189,13 +191,13 @@ export class FunctionCallNode extends BaseGraphNode {
    * - Input types can be determined
    * - Input types match the function's parameter types
    */
-  protected validate(): string {
+  protected validate() {
     for (let i = 0; i < this._inputs.length; i++) {
       const name = this._inputs[i].name;
       if (!this._inputs[i].inputNode) {
         return `Missing argument \`${name}\``;
       }
-      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const type = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!type) {
         return `Cannot determine type of argument \`${name}\``;
       }
@@ -215,7 +217,7 @@ export class FunctionCallNode extends BaseGraphNode {
    * Returns the type declared by the corresponding FunctionOutputNode
    * in the function's blueprint.
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return this._outs[id - 1].type;
   }
 }
@@ -302,12 +304,12 @@ export class FunctionInputNode extends BaseGraphNode {
    * Serializes the parameter type and name. The type has an enumeration
    * constraint limited to valid shader types.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: FunctionInputNode,
       name: 'FunctionInputNode',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'type',
             type: 'string',
@@ -332,9 +334,10 @@ export class FunctionInputNode extends BaseGraphNode {
             },
             set(this: FunctionInputNode, value) {
               this.name = value.str[0];
+              this.dispatchEvent('changed');
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -355,7 +358,7 @@ export class FunctionInputNode extends BaseGraphNode {
    * Function input nodes have no validation requirements as they
    * have no inputs and their type is explicitly set.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -363,7 +366,7 @@ export class FunctionInputNode extends BaseGraphNode {
    *
    * @returns The parameter type
    */
-  protected getType(): string {
+  protected getType() {
     return this._type;
   }
 }
@@ -460,12 +463,12 @@ export class FunctionOutputNode extends BaseGraphNode {
    * Only serializes the output name. The type is inferred at runtime
    * from the connected input node.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: FunctionOutputNode,
       name: 'FunctionOutputNode',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'name',
             type: 'string',
@@ -474,9 +477,10 @@ export class FunctionOutputNode extends BaseGraphNode {
             },
             set(this: FunctionOutputNode, value) {
               this.name = value.str[0];
+              this.dispatchEvent('changed');
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -498,11 +502,11 @@ export class FunctionOutputNode extends BaseGraphNode {
    * - The input is connected (function must return a value)
    * - The input type can be determined
    */
-  protected validate(): string {
+  protected validate() {
     if (!this._inputs[0].inputNode) {
       return 'Missing result';
     }
-    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId!);
     if (!type) {
       return 'Cannot determin result type';
     }
@@ -518,7 +522,7 @@ export class FunctionOutputNode extends BaseGraphNode {
    * the connected input to find its source type. This allows functions
    * to work with multiple types without explicit type declarations.
    */
-  protected getType(): string {
-    return this._inputs[0].inputNode ? this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId) : '';
+  protected getType() {
+    return this._inputs[0].inputNode ? this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId!) : '';
   }
 }

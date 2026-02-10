@@ -21,7 +21,7 @@ export class OrderedStringSet {
   /**
    * An array of all strings in the set.
    */
-  get items(): string[] {
+  get items() {
     return [...this._items];
   }
   /**
@@ -29,7 +29,7 @@ export class OrderedStringSet {
    *
    * @param str The string to add to the set.
    */
-  add(str: string): void {
+  add(str: string) {
     const position = this.findInsertPosition(str);
 
     if (position !== null) {
@@ -43,7 +43,7 @@ export class OrderedStringSet {
    *
    * @param str The string to remove from the set.
    */
-  remove(str: string): void {
+  remove(str: string) {
     const position = this.findStringPosition(str);
     if (position !== -1) {
       // Only attempt to remove if the element exists.
@@ -61,7 +61,7 @@ export class OrderedStringSet {
    *
    * @param str - The string to be removed from the collection.
    */
-  removeAll(str: string): void {
+  removeAll(str: string) {
     const index = this.findStringPosition(str);
 
     // Return immediately if no matching element is found
@@ -86,7 +86,7 @@ export class OrderedStringSet {
    * @param str - The string to search for in the collection.
    * @returns true if the string is found in the collection; otherwise, false.
    */
-  has(str: string): boolean {
+  has(str: string) {
     return this.findStringPosition(str) >= 0;
   }
 
@@ -97,7 +97,7 @@ export class OrderedStringSet {
    * @param str The string to find in the set.
    * @returns The index of the string, or -1 if not found.
    */
-  private findStringPosition(str: string): number {
+  private findStringPosition(str: string) {
     let low = 0;
     let high = this._items.length - 1;
 
@@ -126,7 +126,7 @@ export class OrderedStringSet {
    * @param str The string for which to find the insertion position.
    * @returns The position to insert the string, or null if the string exists and duplicates are not allowed.
    */
-  private findInsertPosition(str: string): number | null {
+  private findInsertPosition(str: string) {
     let low = 0;
     let high = this._items.length - 1;
 

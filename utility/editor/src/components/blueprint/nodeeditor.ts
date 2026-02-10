@@ -2,6 +2,7 @@ import { ImGui, imGuiWantCaptureKeyboard } from '@zephyr3d/imgui';
 import { GNode } from './node';
 import type { GraphEditorApi } from './api';
 import type { NodeCategory } from './api';
+import type { Nullable } from '@zephyr3d/base';
 import { ASSERT, Observable } from '@zephyr3d/base';
 import type { IGraphNode, GraphStructure, NodeConnection } from '@zephyr3d/scene';
 import { getEngine } from '@zephyr3d/scene';
@@ -12,16 +13,14 @@ const SLOT_RADIUS = 6;
 export type NodeEditorState = {
   nodes: {
     id: number;
-    position: number[];
+    position?: Nullable<number[]>;
     title: string;
-    titleBg: number;
-    titleTextCol: number;
     locked: boolean;
-    node: object;
+    node: Record<string, unknown>;
   }[];
   links: { startNodeId: number; startSlotId: number; endNodeId: number; endSlotId: number }[];
-  canvasOffset: number[];
-  canvasScale: number;
+  canvasOffset?: number[];
+  canvasScale?: number;
 };
 
 interface GraphLink {
@@ -52,7 +51,6 @@ export class NodeEditor extends Observable<{
   close: [changed: boolean];
 }> {
   private nodeId: number;
-  public version: number;
   private api: GraphEditorApi;
   private emitChange: boolean;
   public nodes: Map<number, GNode>;
@@ -63,22 +61,22 @@ export class NodeEditor extends Observable<{
   private structureDirty: boolean;
 
   public selectedNodes: number[];
-  private draggingNode: number;
+  private draggingNode: Nullable<number>;
   private isDraggingCanvas: boolean;
   private isHoveringMenu: boolean;
   private canvasOffset: ImGui.ImVec2;
-  public canvasSize: ImGui.ImVec2;
+  public canvasSize!: ImGui.ImVec2;
   public canvasScale: number;
   private isCreatingLink: boolean;
-  private linkStartSlot: SlotInfo;
-  private hoveredSlot: SlotInfo;
-  private contextMenuNode: number;
+  private linkStartSlot: Nullable<SlotInfo>;
+  private hoveredSlot: Nullable<SlotInfo>;
+  private contextMenuNode: Nullable<number>;
   private showContextMenu: boolean;
   private showGrid: boolean;
   private gridSizePx: number;
   private gridCellCount: number;
   private showCanvasContextMenu: boolean;
-  private canvasContextClickLocal: ImGui.ImVec2;
+  private canvasContextClickLocal: Nullable<ImGui.ImVec2>;
   private dragOffsetsForSelection: Map<number, ImGui.ImVec2>;
   private pendingSingleSelectNodeId: number | null;
   private dragStartedOnThisClick: boolean;
@@ -97,7 +95,6 @@ export class NodeEditor extends Observable<{
   constructor(api: GraphEditorApi) {
     super();
     this.nodeId = 1;
-    this.version = 1;
     this.emitChange = true;
     this.api = api;
     this.nodes = new Map();
@@ -146,7 +143,6 @@ export class NodeEditor extends Observable<{
 
   private invalidateStructure() {
     this.structureDirty = true;
-    this.version++;
     if (this.emitChange) {
       this.dispatchEvent('changed');
     }
@@ -275,13 +271,11 @@ export class NodeEditor extends Observable<{
   }
   public async saveState(): Promise<NodeEditorState> {
     const nodes = [...this.nodes.values()].map(async (node) => {
-      const impl = (await getEngine().resourceManager.serializeObject(node.impl)) as IGraphNode;
+      const impl = await getEngine().resourceManager.serializeObject(node.impl);
       return {
         id: node.id,
         position: node.position ? [node.position.x, node.position.y] : null,
         title: node.title,
-        titleBg: node.titleBg,
-        titleTextCol: node.titleTextCol,
         locked: node.locked,
         node: impl
       };
@@ -312,13 +306,15 @@ export class NodeEditor extends Observable<{
       const n = new GNode(
         this,
         node.position ? new ImGui.ImVec2(node.position[0], node.position[1]) : null,
-        impl
+        impl!
       );
       n.id = node.id;
       n.title = node.title;
-      n.titleBg = node.titleBg;
-      n.titleTextCol = node.titleTextCol;
       n.locked = node.locked;
+      if (n.locked) {
+        n.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
+        n.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
+      }
       this.addNode(n);
       if (n.id > maxId) {
         maxId = n.id;
@@ -330,9 +326,9 @@ export class NodeEditor extends Observable<{
       this.addLink(link.startNodeId, link.startSlotId, link.endNodeId, link.endSlotId);
     }
     // apply canvas states
-    this.canvasOffset.x = state.canvasOffset[0];
-    this.canvasOffset.y = state.canvasOffset[1];
-    this.canvasScale = state.canvasScale;
+    this.canvasOffset.x = state.canvasOffset ? state.canvasOffset[0] : 0;
+    this.canvasOffset.y = state.canvasOffset ? state.canvasOffset[1] : 0;
+    this.canvasScale = state.canvasScale ?? 1;
     //
     this.emitChange = emit;
     this.invalidateStructure();
@@ -463,7 +459,7 @@ export class NodeEditor extends Observable<{
     return { order: result, levels };
   }
 
-  public getTopologicalOrder(): TraversalResult {
+  public getTopologicalOrder(): Nullable<TraversalResult> {
     this.rebuildGraphStructure();
 
     const inDegree = new Map<number, number>();
@@ -506,7 +502,7 @@ export class NodeEditor extends Observable<{
     return { order: result, levels };
   }
 
-  public getReverseTopologicalOrder(): TraversalResult {
+  public getReverseTopologicalOrder(): Nullable<TraversalResult> {
     this.rebuildGraphStructure();
 
     const outDegree = new Map<number, number>();
@@ -575,7 +571,7 @@ export class NodeEditor extends Observable<{
 
   private deleteLink(index: number) {
     const link = this.links[index];
-    const node = this.nodes.get(link.endNodeId).impl;
+    const node = this.nodes.get(link.endNodeId)!.impl;
     ASSERT(!!node, 'Node not exists');
     const pin = node.inputs.find((pin) => pin.id === link.endSlotId);
     ASSERT(!!pin, 'Pin not exists');
@@ -656,9 +652,9 @@ export class NodeEditor extends Observable<{
       color: new ImGui.ImVec4(0.9, 0.9, 0.9, 1.0)
     };
     this.links.push(link);
-    const inputPin = this.nodes.get(endNodeId).inputs.find((pin) => pin.id === endSlotId);
+    const inputPin = this.nodes.get(endNodeId)!.inputs.find((pin) => pin.id === endSlotId);
     ASSERT(!!inputPin, 'Input pin not found');
-    inputPin.inputNode = this.nodes.get(startNodeId).impl;
+    inputPin.inputNode = this.nodes.get(startNodeId)!.impl;
     inputPin.inputId = startSlotId;
     this.invalidateStructure();
     return true;
@@ -668,7 +664,7 @@ export class NodeEditor extends Observable<{
     return Array.from(this.nodes.values());
   }
 
-  private hitTestNodeAt(worldPos: ImGui.ImVec2): GNode {
+  private hitTestNodeAt(worldPos: ImGui.ImVec2): Nullable<GNode> {
     const nodesArray = this.getNodesArray();
 
     for (let i = nodesArray.length - 1; i >= 0; i--) {
@@ -781,7 +777,7 @@ export class NodeEditor extends Observable<{
     );
   }
 
-  private getSlotAtPosition(pos: ImGui.ImVec2): SlotInfo {
+  private getSlotAtPosition(pos: ImGui.ImVec2): Nullable<SlotInfo> {
     const nodesArray = this.getNodesArray();
     for (let i = nodesArray.length - 1; i >= 0; i--) {
       const node = nodesArray[i];
@@ -1268,7 +1264,7 @@ export class NodeEditor extends Observable<{
       if (v.children) {
         v.children = this.filterCategory(str, v.children);
       }
-      if (!!v.create || v.children?.length > 0) {
+      if (!!v.create || v.children?.length! > 0) {
         newCategory.push(v);
       }
     }
@@ -1311,7 +1307,7 @@ export class NodeEditor extends Observable<{
       }
       if (isOpen) {
         if (!leaf) {
-          this.renderCategoryList(item.children);
+          this.renderCategoryList(item.children!);
         }
         ImGui.TreePop();
       }
@@ -1499,12 +1495,12 @@ export class NodeEditor extends Observable<{
     return { min: new ImGui.ImVec2(minX, minY), max: new ImGui.ImVec2(maxX, maxY) };
   }
   private getSlotInputType(slot: SlotInfo) {
-    const node = this.nodes.get(slot.nodeId).impl;
+    const node = this.nodes.get(slot.nodeId)!.impl;
     const inTypes = node.inputs.find((pin) => pin.id === slot.slotId)?.type ?? [];
     return Array.isArray(inTypes) ? inTypes : [inTypes];
   }
   private getSlotOutputType(slot: SlotInfo) {
-    const node = this.nodes.get(slot.nodeId).impl;
+    const node = this.nodes.get(slot.nodeId)!.impl;
     return node.getOutputType(slot.slotId);
   }
   snapWorldToScreenGrid(pos: ImGui.ImVec2, canvasScale: number): ImGui.ImVec2 {

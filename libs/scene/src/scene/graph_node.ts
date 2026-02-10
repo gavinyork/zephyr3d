@@ -1,9 +1,10 @@
 import { SceneNode } from './scene_node';
-import type { Texture2D } from '@zephyr3d/device';
 import type { BatchDrawable } from '../render/drawable';
 import type { Scene } from './scene';
 import type { Camera } from '../camera/camera';
 import type { OctreeNode } from '.';
+import type { Nullable } from '@zephyr3d/base';
+import type { Texture2D } from '@zephyr3d/device';
 
 /**
  * Graph scene node
@@ -14,7 +15,7 @@ import type { OctreeNode } from '.';
  * @public
  */
 export class GraphNode extends SceneNode {
-  private _octreeNode: OctreeNode;
+  private _octreeNode: Nullable<OctreeNode>;
   /**
    * Creates a graph node
    * @param scene - The scene to which the node belongs
@@ -24,14 +25,14 @@ export class GraphNode extends SceneNode {
     this._octreeNode = null;
   }
   /** @internal */
-  get octreeNode(): OctreeNode {
+  get octreeNode() {
     return this._octreeNode;
   }
-  set octreeNode(node: OctreeNode) {
+  set octreeNode(node) {
     this._octreeNode = node;
   }
   /** Gets the name */
-  getName(): string {
+  getName() {
     return this._name;
   }
   /**
@@ -44,19 +45,19 @@ export class GraphNode extends SceneNode {
   /**
    * {@inheritDoc Drawable.getNode}
    */
-  getNode(): SceneNode {
+  getNode() {
     return this;
   }
   /**
    * {@inheritDoc Drawable.getBoneMatrices}
    */
-  getBoneMatrices(): Texture2D {
+  getBoneMatrices(): Nullable<Texture2D> {
     return null;
   }
   /**
    * {@inheritDoc Drawable.getSortDistance}
    */
-  getSortDistance(camera: Camera): number {
+  getSortDistance(camera: Camera) {
     const cameraWorldMatrix = camera.worldMatrix;
     const objectWorldMatrix = this.worldMatrix;
     const dx = cameraWorldMatrix.m03 - objectWorldMatrix.m03;
@@ -71,7 +72,7 @@ export class GraphNode extends SceneNode {
     return false;
   }
   /** @internal */
-  protected _visibleChanged(): void {
+  protected _visibleChanged() {
     this._scene?.invalidateNodePlacement(this);
   }
 }

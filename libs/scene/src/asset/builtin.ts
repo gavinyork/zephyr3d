@@ -1,6 +1,6 @@
 import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT } from '../values';
-import type { Texture2D, BaseTexture, TextureCube } from '@zephyr3d/device';
+import type { Texture2D, BaseTexture } from '@zephyr3d/device';
 import type { AssetManager } from './assetmanager';
 import { getDevice } from '../app/api';
 
@@ -13,11 +13,11 @@ interface MicrofacetDistributionSample {
 }
 */
 /** @internal */
-export function testCubemapLoader(): TextureCube {
+export function testCubemapLoader() {
   const device = getDevice();
   const tex = device.createCubeTexture('rgba8unorm', 32, {
     mipmapping: false
-  });
+  })!;
   const fb = device.createFrameBuffer([tex], null);
   device.pushDeviceStates();
   device.setFramebuffer(fb);
@@ -40,7 +40,7 @@ export function testCubemapLoader(): TextureCube {
 }
 
 /** @internal */
-export function getSheenLutLoader(textureSize: number): (assetManager: AssetManager) => Texture2D {
+export function getSheenLutLoader(textureSize: number) {
   const bits = new Uint32Array(1);
 
   //Van der Corput radical inverse
@@ -88,10 +88,10 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     out.setCol(1, bitangent);
     out.setCol(2, normal);
   }
-  function mix(x: number, y: number, a: number): number {
+  function mix(x: number, y: number, a: number) {
     return x * (1 - a) + y * a;
   }
-  function l(x: number, alphaG: number): number {
+  function l(x: number, alphaG: number) {
     const oneMinusAlphaSq = (1 - alphaG) * (1 - alphaG);
     const a = mix(21.5473, 25.3245, oneMinusAlphaSq);
     const b = mix(3.82987, 3.32435, oneMinusAlphaSq);
@@ -100,12 +100,12 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     const e = mix(-4.32054, -4.85967, oneMinusAlphaSq);
     return a / (1 + b * Math.pow(x, c)) + d * x + e;
   }
-  function lambdaSheen(cosTheta: number, alphaG: number): number {
+  function lambdaSheen(cosTheta: number, alphaG: number) {
     return Math.abs(cosTheta) < 0.5
       ? Math.exp(l(Math.abs(cosTheta), alphaG))
       : Math.exp(2 * l(0.5, alphaG) - l(1 - Math.abs(cosTheta), alphaG));
   }
-  function visibilityCharlie(NdotV: number, NdotL: number, a: number): number {
+  function visibilityCharlie(NdotV: number, NdotL: number, a: number) {
     const alphaG = a;
     return 1 / ((1 + lambdaSheen(NdotV, alphaG) + lambdaSheen(NdotL, alphaG)) * (4 * NdotV * NdotL));
   }
@@ -178,7 +178,7 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     out.setXYZW(4 * A, 4 * B, 4 * 2 * Math.PI * C, 0).scaleBy(1 / numSamples);
   }
 
-  async function createSheenLUT(): Promise<Texture2D> {
+  async function createSheenLUT() {
     const tex = getDevice().createTexture2D('rgba8unorm', textureSize, textureSize);
     const image = new Uint8Array(textureSize * textureSize * 4);
     let p = 0;
@@ -205,7 +205,7 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  function visibilityAshikhmin(NdotV: number, NdotL: number): number {
+  function visibilityAshikhmin(NdotV: number, NdotL: number) {
     return Math.min(Math.max(1 / (4 * (NdotL + NdotV - NdotL * NdotV)), 0), 1);
   }
 
@@ -216,7 +216,7 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     out.setXYZ(sinTheta * Math.cos(phi), sinTheta * Math.sin(phi), cosTheta);
   }
 
-  function dfvCharlieUniform(NdotV: number, roughness: number, numSamples: number): number {
+  function dfvCharlieUniform(NdotV: number, roughness: number, numSamples: number) {
     let r = 0;
     const V = new Vector3(Math.sqrt(1 - NdotV * NdotV), 0, NdotV);
     const u = new Vector2();
@@ -346,7 +346,7 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
     };
   })();
 
-  function encodeF16(val: number): number {
+  function encodeF16(val: number) {
     val = Math.min(Math.max(val, -65504), 65504);
     _tables.floatView[0] = val;
     const f = _tables.uint32View[0];
@@ -371,7 +371,7 @@ export function getSheenLutLoader(textureSize: number): (assetManager: AssetMana
   }
   */
 
-  function createSheenLUTFilament(assetManager: AssetManager, texture?: BaseTexture): Texture2D {
+  function createSheenLUTFilament(assetManager: AssetManager, texture?: BaseTexture) {
     if (texture) {
       if (!texture.isTexture2D()) {
         throw new Error('can not reload sheen lut texture: invalid texture type');

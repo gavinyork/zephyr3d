@@ -1,3 +1,4 @@
+import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Matrix4x4, parseColor, Vector3, Vector4 } from '@zephyr3d/base';
 import { Font } from './font';
 import { GlyphManager } from './glyphmanager';
@@ -15,34 +16,40 @@ export class DrawText {
   /** @internal */
   private static readonly GLYPH_COUNT = MAX_GLYPH_COUNT;
   /** @internal */
-  private static glyphManager: GlyphManager = null;
+  private static glyphManager: Nullable<GlyphManager> = null;
   /** @internal */
   private static prepared = false;
   /** @internal */
-  private static textVertexBuffer: StructuredBuffer = null;
+  private static textVertexBuffer: Nullable<StructuredBuffer> = null;
   /** @internal */
-  private static textVertexLayout: VertexLayout = null;
+  private static textVertexLayout: Nullable<VertexLayout> = null;
   /** @internal */
-  private static textProgram: GPUProgram = null;
+  private static textProgram: Nullable<GPUProgram> = null;
   /** @internal */
-  private static textBindGroup: BindGroup = null;
+  private static textBindGroup: Nullable<BindGroup> = null;
   /** @internal */
-  private static textRenderStates: RenderStateSet = null;
+  private static textRenderStates: Nullable<RenderStateSet> = null;
   /** @internal */
   private static textOffset = 0;
   /** @internal */
   private static readonly textMatrix = new Matrix4x4();
   /** @internal */
-  private static font: Font = null;
+  private static font: Nullable<Font> = null;
   /** @internal */
-  private static vertexCache: Float32Array<ArrayBuffer> = null;
+  private static vertexCache: Nullable<Float32Array<ArrayBuffer>> = null;
   /** @internal */
   private static readonly colorValue: Vector4 = new Vector4();
   /** @internal */
-  private static calculateTextMatrix(device: AbstractDevice, matrix: Matrix4x4): void {
-    const viewport = device.getViewport();
-    const projectionMatrix = Matrix4x4.ortho(0, viewport.width, 0, viewport.height, 1, 100);
-    const flipMatrix = Matrix4x4.translation(new Vector3(0, viewport.height, 0)).scaleRight(
+  private static calculateTextMatrix(
+    device: AbstractDevice,
+    matrix: Matrix4x4,
+    viewport?: Immutable<number[]>
+  ) {
+    const viewportWidth = viewport ? viewport[2] : device.getViewport().width;
+    const viewportHeight = viewport ? viewport[3] : device.getViewport().height;
+    matrix.identity();
+    const projectionMatrix = Matrix4x4.ortho(0, viewportWidth, 0, viewportHeight, 1, 100);
+    const flipMatrix = Matrix4x4.translation(new Vector3(0, viewportHeight, 0)).scaleRight(
       new Vector3(1, -1, 1)
     );
     Matrix4x4.multiply(projectionMatrix, flipMatrix, matrix);
@@ -52,8 +59,9 @@ export class DrawText {
    * @param device - The render device
    * @param name - The font name
    */
-  static setFont(device: AbstractDevice, name: string): void {
-    this.font = Font.fetchFont(name, device.getScale()) || Font.fetchFont('12px arial', device.getScale());
+  static setFont(device: AbstractDevice, name: string) {
+    const scale = device.getScaleY();
+    this.font = Font.fetchFont(name, scale) || Font.fetchFont('12px arial', scale);
   }
   /**
    * Draw text onto the screen
@@ -63,24 +71,31 @@ export class DrawText {
    * @param x - X coordinate of the text
    * @param y - Y coordinate of the text
    */
-  static drawText(device: AbstractDevice, text: string, color: string, x: number, y: number): void {
+  static drawText(
+    device: AbstractDevice,
+    text: string,
+    color: string,
+    x: number,
+    y: number,
+    viewport?: Immutable<number[]>
+  ) {
     if (text.length > 0) {
       device.pushDeviceStates();
       this.prepareDrawText(device);
-      this.calculateTextMatrix(device, this.textMatrix);
+      this.calculateTextMatrix(device, this.textMatrix, viewport);
       const colorValue = parseColor(color);
       this.colorValue.x = colorValue.r;
       this.colorValue.y = colorValue.g;
       this.colorValue.z = colorValue.b;
       this.colorValue.w = colorValue.a;
-      this.textBindGroup.setValue('flip', device.type === 'webgpu' && device.getFramebuffer() ? 1 : 0);
-      this.textBindGroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
-      this.textBindGroup.setValue('textMatrix', this.textMatrix);
-      this.textBindGroup.setValue('textColor', this.colorValue);
-      device.setProgram(this.textProgram);
-      device.setVertexLayout(this.textVertexLayout);
-      device.setRenderStates(this.textRenderStates);
-      device.setBindGroup(0, this.textBindGroup);
+      this.textBindGroup!.setValue('flip', device.type === 'webgpu' && device.getFramebuffer() ? 1 : 0);
+      this.textBindGroup!.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
+      this.textBindGroup!.setValue('textMatrix', this.textMatrix);
+      this.textBindGroup!.setValue('textColor', this.colorValue);
+      device.setProgram(this.textProgram!);
+      device.setVertexLayout(this.textVertexLayout!);
+      device.setRenderStates(this.textRenderStates!);
+      device.setBindGroup(0, this.textBindGroup!);
       let drawn = 0;
       const total = text.length;
       while (drawn < total) {
@@ -106,60 +121,61 @@ export class DrawText {
     count: number,
     x: number,
     y: number
-  ): number {
+  ) {
     let drawn = 0;
     let atlasIndex = -1;
     let i = 0;
+    const vertexCache = this.vertexCache!;
     for (; i < count; i++) {
       const glyph =
-        this.glyphManager.getGlyphInfo(text[i + start], this.font) ||
-        this.glyphManager.getGlyphInfo('?', this.font);
+        this.glyphManager!.getGlyphInfo(text[i + start], this.font!) ||
+        this.glyphManager!.getGlyphInfo('?', this.font!)!;
       if (atlasIndex >= 0 && glyph.atlasIndex !== atlasIndex) {
-        this.textVertexBuffer.bufferSubData(
+        this.textVertexBuffer!.bufferSubData(
           (this.textOffset + drawn) * 16 * 4,
-          this.vertexCache,
+          this.vertexCache!,
           (this.textOffset + drawn) * 16,
           (i - drawn) * 16
         );
-        this.textBindGroup.setTexture('tex', this.glyphManager.getAtlasTexture(atlasIndex));
+        this.textBindGroup!.setTexture('tex', this.glyphManager!.getAtlasTexture(atlasIndex)!);
         device.draw('triangle-list', (this.textOffset + drawn) * 6, (i - drawn) * 6);
         drawn = i;
       }
       atlasIndex = glyph.atlasIndex;
       const base = (this.textOffset + i) * 16;
-      this.vertexCache[base + 0] = x;
-      this.vertexCache[base + 1] = y;
-      this.vertexCache[base + 2] = glyph.uMin;
-      this.vertexCache[base + 3] = glyph.vMin;
-      this.vertexCache[base + 4] = x + glyph.width;
-      this.vertexCache[base + 5] = y;
-      this.vertexCache[base + 6] = glyph.uMax;
-      this.vertexCache[base + 7] = glyph.vMin;
-      this.vertexCache[base + 8] = x + glyph.width;
-      this.vertexCache[base + 9] = y + glyph.height;
-      this.vertexCache[base + 10] = glyph.uMax;
-      this.vertexCache[base + 11] = glyph.vMax;
-      this.vertexCache[base + 12] = x;
-      this.vertexCache[base + 13] = y + glyph.height;
-      this.vertexCache[base + 14] = glyph.uMin;
-      this.vertexCache[base + 15] = glyph.vMax;
+      vertexCache[base + 0] = x;
+      vertexCache[base + 1] = y;
+      vertexCache[base + 2] = glyph.uMin;
+      vertexCache[base + 3] = glyph.vMin;
+      vertexCache[base + 4] = x + glyph.width;
+      vertexCache[base + 5] = y;
+      vertexCache[base + 6] = glyph.uMax;
+      vertexCache[base + 7] = glyph.vMin;
+      vertexCache[base + 8] = x + glyph.width;
+      vertexCache[base + 9] = y + glyph.height;
+      vertexCache[base + 10] = glyph.uMax;
+      vertexCache[base + 11] = glyph.vMax;
+      vertexCache[base + 12] = x;
+      vertexCache[base + 13] = y + glyph.height;
+      vertexCache[base + 14] = glyph.uMin;
+      vertexCache[base + 15] = glyph.vMax;
       x += glyph.width;
     }
-    this.textVertexBuffer.bufferSubData(
+    this.textVertexBuffer!.bufferSubData(
       (this.textOffset + drawn) * 16 * 4,
-      this.vertexCache,
+      vertexCache,
       (this.textOffset + drawn) * 16,
       (i - drawn) * 16
     );
-    this.textBindGroup.setTexture('tex', this.glyphManager.getAtlasTexture(atlasIndex));
+    this.textBindGroup!.setTexture('tex', this.glyphManager!.getAtlasTexture(atlasIndex)!);
     device.draw('triangle-list', (this.textOffset + drawn) * 6, (i - drawn) * 6);
     return x;
   }
   /** @internal */
-  private static prepareDrawText(device: AbstractDevice): void {
+  private static prepareDrawText(device: AbstractDevice) {
     if (!this.prepared) {
       this.prepared = true;
-      this.font = this.font || Font.fetchFont('16px arial', device.getScale());
+      this.font = this.font || Font.fetchFont('12px arial', device.getScaleY());
       this.glyphManager = new GlyphManager(device, 1024, 1024, 1);
       this.vertexCache = new Float32Array(this.GLYPH_COUNT * 16);
       this.textVertexBuffer = device.createInterleavedVertexBuffer(
@@ -181,7 +197,7 @@ export class DrawText {
       }
       const textIndexBuffer = device.createIndexBuffer(indices);
       this.textVertexLayout = device.createVertexLayout({
-        vertexBuffers: [{ buffer: this.textVertexBuffer }],
+        vertexBuffers: [{ buffer: this.textVertexBuffer! }],
         indexBuffer: textIndexBuffer
       });
       this.textOffset = 0;
@@ -218,8 +234,8 @@ export class DrawText {
           });
         }
       });
-      this.textProgram.name = '@DrawText';
-      this.textBindGroup = device.createBindGroup(this.textProgram.bindGroupLayouts[0]);
+      this.textProgram!.name = '@DrawText';
+      this.textBindGroup = device.createBindGroup(this.textProgram!.bindGroupLayouts[0]);
       this.textRenderStates = device.createRenderStateSet();
       this.textRenderStates
         .useBlendingState()

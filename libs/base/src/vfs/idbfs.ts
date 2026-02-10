@@ -35,7 +35,7 @@ export class IndexedDBFS extends VFS {
     this.storeName = storeName;
   }
 
-  protected async _makeDirectory(path: string, recursive: boolean): Promise<void> {
+  protected async _makeDirectory(path: string, recursive: boolean) {
     const parent = PathUtils.dirname(path);
 
     // Ensure parent directories outside the transaction
@@ -53,7 +53,7 @@ export class IndexedDBFS extends VFS {
     // Making directory in a transaction
     const db = await this.ensureDB();
 
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       const transaction = db.transaction([this.storeName], 'readwrite');
       const store = transaction.objectStore(this.storeName);
 
@@ -93,7 +93,7 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
+  protected async _readDirectory(path: string, options?: ListOptions) {
     return this.dbOperation('readonly', (store) => {
       return new Promise<FileMetadata[]>((resolve, reject) => {
         // Test directory existence
@@ -167,7 +167,7 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  protected async _deleteDirectory(path: string, recursive: boolean): Promise<void> {
+  protected async _deleteDirectory(path: string, recursive: boolean) {
     const children = await this._readDirectory(path);
 
     if (children.length > 0 && !recursive) {
@@ -203,7 +203,7 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
+  protected async _readFile(path: string, options?: ReadOptions) {
     return this.dbOperation('readonly', (store) => {
       return new Promise<ArrayBuffer | string>((resolve, reject) => {
         const request = store.get(path);
@@ -257,11 +257,7 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  protected async _writeFile(
-    path: string,
-    data: ArrayBuffer | string,
-    options?: WriteOptions
-  ): Promise<void> {
+  protected async _writeFile(path: string, data: ArrayBuffer | string, options?: WriteOptions) {
     const parent = PathUtils.dirname(path);
 
     if (parent !== '/') {
@@ -338,7 +334,7 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  protected async _deleteFile(path: string): Promise<void> {
+  protected async _deleteFile(path: string) {
     return this.dbOperation('readwrite', (store) => {
       return new Promise<void>((resolve, reject) => {
         // Test file existence
@@ -359,7 +355,7 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  protected async _exists(path: string): Promise<boolean> {
+  protected async _exists(path: string) {
     return this.dbOperation('readonly', (store) => {
       return new Promise<boolean>((resolve, reject) => {
         const request = store.get(path);
@@ -371,7 +367,7 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  protected async _stat(path: string): Promise<FileStat> {
+  protected async _stat(path: string) {
     return this.dbOperation('readonly', (store) => {
       return new Promise<FileStat>((resolve, reject) => {
         const request = store.get(path);
@@ -408,7 +404,6 @@ export class IndexedDBFS extends VFS {
       const deleteRequest = indexedDB.deleteDatabase(name);
 
       deleteRequest.onsuccess = () => {
-        console.info(`Database "${name}" deleted successfully`);
         resolve();
       };
 
@@ -423,14 +418,14 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  protected async _wipe(): Promise<void> {
+  protected async _wipe() {
     await this.close();
     await IndexedDBFS.deleteDatabase(this.dbName);
   }
-  protected async _deleteFileSystem(): Promise<void> {
+  protected async _deleteFileSystem() {
     await this.close();
     const currentVersion = await this.getCurrentDatabaseVersion();
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       const newVersion = currentVersion + 1;
       const request = indexedDB.open(this.dbName, newVersion);
 
@@ -466,7 +461,7 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions): Promise<void> {
+  protected async _move(sourcePath: string, targetPath: string, options?: MoveOptions) {
     return this.dbOperation('readwrite', (store) => {
       return new Promise<void>((resolve, reject) => {
         const sourceRequest = store.get(sourcePath);
@@ -538,7 +533,7 @@ export class IndexedDBFS extends VFS {
     options: MoveOptions | undefined,
     resolve: () => void,
     reject: (error: VFSError) => void
-  ): void {
+  ) {
     const now = new Date();
 
     const newRecord = {
@@ -549,7 +544,7 @@ export class IndexedDBFS extends VFS {
       modified: now
     };
 
-    const handleUpdate = (): void => {
+    const handleUpdate = () => {
       const addRequest = store.put(newRecord);
       addRequest.onsuccess = () => {
         const deleteRequest = store.delete(sourceRecord.path);
@@ -583,7 +578,7 @@ export class IndexedDBFS extends VFS {
     options: MoveOptions | undefined,
     resolve: () => void,
     reject: (error: VFSError) => void
-  ): void {
+  ) {
     const itemsToMove: any[] = [];
     const sourcePrefix = sourcePath === '/' ? '/' : sourcePath + '/';
 
@@ -629,7 +624,7 @@ export class IndexedDBFS extends VFS {
     options: MoveOptions | undefined,
     resolve: () => void,
     reject: (error: VFSError) => void
-  ): void {
+  ) {
     if (itemsToMove.length === 0) {
       resolve();
       return;
@@ -642,7 +637,7 @@ export class IndexedDBFS extends VFS {
     let processed = 0;
     let hasError = false;
 
-    const processMove = (): void => {
+    const processMove = () => {
       for (const item of itemsToMove) {
         if (hasError) {
           break;
@@ -713,7 +708,7 @@ export class IndexedDBFS extends VFS {
     dirPath: string,
     onSuccess: () => void,
     onError: (error: VFSError) => void
-  ): void {
+  ) {
     const itemsToDelete: string[] = [];
     const dirPrefix = dirPath === '/' ? '/' : dirPath + '/';
 
@@ -769,8 +764,8 @@ export class IndexedDBFS extends VFS {
     };
   }
 
-  private async getCurrentDatabaseVersion(): Promise<number> {
-    return new Promise((resolve, reject) => {
+  private async getCurrentDatabaseVersion() {
+    return new Promise<number>((resolve, reject) => {
       const request = indexedDB.open(this.dbName);
 
       request.onsuccess = (event) => {
@@ -785,7 +780,7 @@ export class IndexedDBFS extends VFS {
       };
     });
   }
-  private async ensureDB(): Promise<IDBDatabase> {
+  private async ensureDB() {
     if (this.db) {
       return this.db;
     }
@@ -802,8 +797,8 @@ export class IndexedDBFS extends VFS {
     }
   }
 
-  private async getDatabaseInfo(): Promise<{ version: number; storeExists: boolean }> {
-    return new Promise((resolve) => {
+  private async getDatabaseInfo() {
+    return new Promise<{ version: number; storeExists: boolean }>((resolve) => {
       const request = indexedDB.open(this.dbName);
 
       request.onsuccess = (event) => {
@@ -827,8 +822,8 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  private async openDatabase(version: number): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
+  private async openDatabase(version: number) {
+    return new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(this.dbName, version);
 
       request.onsuccess = () => {
@@ -845,8 +840,8 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  private async createObjectStoreAsync(newVersion: number): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
+  private async createObjectStoreAsync(newVersion: number) {
+    return new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(this.dbName, newVersion);
 
       request.onupgradeneeded = (event) => {
@@ -893,12 +888,12 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  private async ensureRootDirectoryAsync(): Promise<void> {
+  private async ensureRootDirectoryAsync() {
     if (!this.db) {
       throw new VFSError('Database not available', 'EIO');
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], 'readwrite');
       const store = transaction.objectStore(this.storeName);
 
@@ -946,10 +941,10 @@ export class IndexedDBFS extends VFS {
   private async dbOperation<T>(
     mode: IDBTransactionMode,
     operation: (store: IDBObjectStore) => IDBRequest | Promise<T>
-  ): Promise<T> {
+  ) {
     const db = await this.ensureDB();
 
-    return new Promise((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       const transaction = db.transaction([this.storeName], mode);
       const store = transaction.objectStore(this.storeName);
 
@@ -975,7 +970,7 @@ export class IndexedDBFS extends VFS {
     });
   }
 
-  private matchesFilter(metadata: FileMetadata, options?: ListOptions): boolean {
+  private matchesFilter(metadata: FileMetadata, options?: ListOptions) {
     if (!options) {
       return true;
     }

@@ -1,8 +1,8 @@
 import type { BaseLight } from '../../../scene/light';
 import { DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../../scene/light';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import { AABB, degree2radian, radian2degree, Vector4 } from '@zephyr3d/base';
-import { ClipmapTerrain, Mesh, SceneNode, Terrain } from '../../../scene';
+import { ClipmapTerrain, Mesh, SceneNode } from '../../../scene';
 import type { ShadowMode } from '../../../shadow';
 
 /** @internal */
@@ -12,7 +12,7 @@ export function getPunctualLightClass(): SerializableClass {
     parent: SceneNode,
     name: 'PunctualLight',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Color',
           type: 'rgb',
@@ -133,10 +133,10 @@ export function getPunctualLightClass(): SerializableClass {
           create(this: PunctualLight) {
             const aabb = new AABB();
             aabb.beginExtend();
-            this.scene.rootNode.iterate((child) => {
-              if (child instanceof Mesh || child instanceof Terrain || child instanceof ClipmapTerrain) {
+            this.scene!.rootNode.iterate((child) => {
+              if (child instanceof Mesh || child instanceof ClipmapTerrain) {
                 if (child.castShadow) {
-                  const bbox = child.getWorldBoundingVolume().toAABB();
+                  const bbox = child.getWorldBoundingVolume()!.toAABB();
                   aabb.extend(bbox.minPoint);
                   aabb.extend(bbox.maxPoint);
                 }
@@ -403,7 +403,7 @@ export function getPunctualLightClass(): SerializableClass {
             return !!this.castShadow && this.shadow.mode === 'esm' && this.shadow.esmBlur;
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -415,12 +415,12 @@ export function getDirectionalLightClass(): SerializableClass {
     name: 'DirectionalLight',
     parent: PunctualLight,
     createFunc(ctx: SceneNode) {
-      const node = new DirectionalLight(ctx.scene);
+      const node = new DirectionalLight(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'SunLight',
           type: 'bool',
@@ -432,7 +432,7 @@ export function getDirectionalLightClass(): SerializableClass {
             this.sunLight = value.bool[0];
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -444,12 +444,12 @@ export function getPointLightClass(): SerializableClass {
     name: 'PointLight',
     parent: PunctualLight,
     createFunc(ctx: SceneNode) {
-      const node = new PointLight(ctx.scene);
+      const node = new PointLight(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Range',
           type: 'float',
@@ -466,7 +466,7 @@ export function getPointLightClass(): SerializableClass {
             this.range = value.num[0];
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -478,12 +478,12 @@ export function getSpotLightClass(): SerializableClass {
     name: 'SpotLight',
     parent: PunctualLight,
     createFunc(ctx: SceneNode) {
-      const node = new SpotLight(ctx.scene);
+      const node = new SpotLight(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Range',
           type: 'float',
@@ -516,7 +516,7 @@ export function getSpotLightClass(): SerializableClass {
             this.cutoff = Math.cos(degree2radian(value.num[0]) * 0.5);
           }
         }
-      ];
+      ]);
     }
   };
 }

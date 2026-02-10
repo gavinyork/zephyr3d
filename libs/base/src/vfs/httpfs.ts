@@ -1,7 +1,8 @@
-import type { FileMetadata, FileStat, ListOptions, ReadOptions, WriteOptions } from './vfs';
+import type { FileMetadata, ListOptions, ReadOptions, WriteOptions } from './vfs';
 import { VFS, VFSError, GlobMatcher } from './vfs';
 import type { HttpDirectoryReader, HttpDirectoryReaderContext } from './readers/reader';
 import { PathUtils } from './common';
+import type { Nullable } from '../utils';
 import { uint8ArrayToBase64 } from '../utils';
 
 /**
@@ -32,7 +33,7 @@ export interface HttpFSOptions {
    * - Injecting cache-busting query params
    * - Mapping to object/data URLs
    */
-  urlResolver?: (url: string) => string;
+  urlResolver?: Nullable<(url: string) => string>;
   /**
    * One or more directory readers used to enumerate HTTP-backed directories.
    * If not provided, directory listing is not supported.
@@ -95,11 +96,11 @@ export class HttpFS extends VFS {
    *
    * If present, it is applied by {@link VFS.normalizePath} before other checks.
    */
-  get urlResolver(): (url: string) => string {
+  get urlResolver() {
     return this.options.urlResolver ?? null;
   }
-  set urlResolver(resolver: (url: string) => string) {
-    this.options.urlResolver = resolver ?? null;
+  set urlResolver(resolver) {
+    this.options.urlResolver = resolver;
   }
   /**
    * Normalizes a VFS path for HTTP use.
@@ -112,7 +113,7 @@ export class HttpFS extends VFS {
    * @param path - Input VFS path or URL-like string.
    * @returns Normalized path or URL.
    */
-  normalizePath(path: string): string {
+  normalizePath(path: string) {
     if (this.options.urlResolver) {
       path = this.options.urlResolver(path);
     }
@@ -123,18 +124,18 @@ export class HttpFS extends VFS {
     return super.normalizePath(path);
   }
 
-  protected setReadonly(readonly: boolean): void {
+  protected setReadonly(readonly: boolean) {
     if (!readonly) {
       console.error('Http VFS is always read-only');
     }
   }
   /** {@inheritDoc VFS._makeDirectory} */
-  protected async _makeDirectory(path: string): Promise<void> {
+  protected async _makeDirectory(path: string) {
     throw new VFSError('HTTP file system is read-only', 'EROFS', path);
   }
 
   /** {@inheritDoc VFS._readDirectory} */
-  protected async _readDirectory(path: string, options?: ListOptions): Promise<FileMetadata[]> {
+  protected async _readDirectory(path: string, options?: ListOptions) {
     const normalized = this.normalizePath(path);
     const dirPath = normalized.endsWith('/') ? normalized : normalized + '/';
 
@@ -190,12 +191,12 @@ export class HttpFS extends VFS {
   }
 
   /** {@inheritDoc VFS._deleteDirectory} */
-  protected async _deleteDirectory(path: string): Promise<void> {
+  protected async _deleteDirectory(path: string) {
     throw new VFSError('HTTP file system is read-only', 'EROFS', path);
   }
 
   /** {@inheritDoc VFS._readFile} */
-  protected async _readFile(path: string, options?: ReadOptions): Promise<ArrayBuffer | string> {
+  protected async _readFile(path: string, options?: ReadOptions) {
     try {
       const response = await this.fetchWithTimeout(path);
 
@@ -236,21 +237,17 @@ export class HttpFS extends VFS {
   }
 
   /** {@inheritDoc VFS._writeFile} */
-  protected async _writeFile(
-    path: string,
-    _data: ArrayBuffer | string,
-    _options?: WriteOptions
-  ): Promise<void> {
+  protected async _writeFile(path: string, _data: ArrayBuffer | string, _options?: WriteOptions) {
     throw new VFSError('HTTP file system is read-only', 'EROFS', path);
   }
 
   /** {@inheritDoc VFS._deleteFile} */
-  protected async _deleteFile(path: string): Promise<void> {
+  protected async _deleteFile(path: string) {
     throw new VFSError('HTTP file system is read-only', 'EROFS', path);
   }
 
   /** {@inheritDoc VFS._exists} */
-  protected async _exists(path: string): Promise<boolean> {
+  protected async _exists(path: string) {
     const normalizedPath = this.normalizePath(path);
 
     try {
@@ -262,7 +259,7 @@ export class HttpFS extends VFS {
   }
 
   /** {@inheritDoc VFS._stat} */
-  protected async _stat(path: string): Promise<FileStat> {
+  protected async _stat(path: string) {
     try {
       const response = await this.fetchWithTimeout(path, { method: 'HEAD' });
 
@@ -278,7 +275,7 @@ export class HttpFS extends VFS {
       const lastModified = response.headers.get('last-modified');
       const contentType = response.headers.get('content-type');
 
-      const isDirectory = contentType?.includes('text/html') && path.endsWith('/');
+      const isDirectory = !!contentType && contentType.includes('text/html') && path.endsWith('/');
       const modifiedDate = lastModified ? new Date(lastModified) : new Date();
 
       return {
@@ -297,18 +294,18 @@ export class HttpFS extends VFS {
     }
   }
   /** {@inheritDoc VFS._deleteFileSystem} */
-  protected async _deleteFileSystem(): Promise<void> {
+  protected async _deleteFileSystem() {
     return;
   }
   /** {@inheritDoc VFS._wipe} */
-  protected async _wipe(): Promise<void> {
+  protected async _wipe() {
     return;
   }
   /** {@inheritDoc VFS._move} */
-  protected async _move(): Promise<void> {
+  protected async _move() {
     throw new VFSError('HTTP file system is read-only', 'EROFS');
   }
-  private toAbsoluteURL(url: string): string {
+  private toAbsoluteURL(url: string) {
     // Specical URL case, just return
     if (this.isObjectURL(url) || this.parseDataURI(url) || this.isAbsoluteURL(url)) {
       return url;
@@ -353,7 +350,7 @@ export class HttpFS extends VFS {
     return baseUrl.href;
   }
 
-  private async fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  private async fetchWithTimeout(url: string, init?: RequestInit) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.options.timeout);
     url = this.toAbsoluteURL(url);
@@ -372,7 +369,7 @@ export class HttpFS extends VFS {
       clearTimeout(timeoutId);
     }
   }
-  private async selectReader(dirPath: string, ctx: HttpDirectoryReaderContext): Promise<HttpDirectoryReader> {
+  private async selectReader(dirPath: string, ctx: HttpDirectoryReaderContext) {
     if (this.dirReaders.length === 1) {
       return this.dirReaders[0];
     }

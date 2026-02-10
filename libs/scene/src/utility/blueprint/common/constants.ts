@@ -1,30 +1,9 @@
-import type { SerializableClass } from '../../serialization';
+import { defineProps } from '../../serialization/types';
 import { getParamName } from '../common';
 import { BaseGraphNode } from '../node';
 
 /**
  * Constant scalar (float) value node
- *
- * @remarks
- * Represents a single floating-point constant in the material graph.
- * Can be either a literal constant or exposed as a uniform parameter.
- *
- * When set as uniform:
- * - Generates a shader uniform variable
- * - Can be modified at runtime without recompiling the shader
- * - Useful for material parameters like roughness, metallic, etc.
- *
- * When set as literal:
- * - Value is baked into the shader code
- * - More efficient but requires shader recompilation to change
- *
- * @example
- * ```typescript
- * const roughness = new ConstantScalarNode();
- * roughness.x = 0.5;
- * roughness.isUniform = true;
- * roughness.paramName = 'u_roughness';
- * ```
  *
  * @public
  */
@@ -68,12 +47,12 @@ export class ConstantScalarNode extends BaseGraphNode {
    * Used by the serialization system to save/load node graphs.
    * Defines how to serialize the isUniform flag, parameter name, and value.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ConstantScalarNode,
       name: 'ConstantScalarNode',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'isUniform',
             type: 'bool',
@@ -88,10 +67,14 @@ export class ConstantScalarNode extends BaseGraphNode {
             name: 'paramName',
             type: 'string',
             get(this: ConstantScalarNode, value) {
-              value.str[0] = this.paramName;
+              value.str[0] = this.paramName ? this.paramName.slice(2) : '';
             },
             set(this: ConstantScalarNode, value) {
-              this.paramName = value.str[0];
+              if (!/^[A-Za-z0-9_]+$/.test(value.str[0])) {
+                console.log(`Invalid parameter name: ${value.str[0]}`);
+              } else {
+                this.paramName = `u_${value.str[0]}`;
+              }
             }
           },
           {
@@ -104,7 +87,7 @@ export class ConstantScalarNode extends BaseGraphNode {
               this.x = value.num[0];
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -129,7 +112,7 @@ export class ConstantScalarNode extends BaseGraphNode {
     return this._paramName;
   }
   set paramName(val: string) {
-    if (val !== this.paramName) {
+    if (this._paramName !== val) {
       this._paramName = val;
       this.dispatchEvent('changed');
     }
@@ -154,7 +137,7 @@ export class ConstantScalarNode extends BaseGraphNode {
    * @remarks
    * Constant nodes have no validation requirements.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -162,31 +145,105 @@ export class ConstantScalarNode extends BaseGraphNode {
    *
    * @returns 'float' for scalar output
    */
-  protected getType(): string {
+  protected getType() {
     return 'float';
   }
 }
 
 /**
+ * Constant scalar (bool) value node
+ *
+ * @public
+ */
+export class ConstantBooleanNode extends BaseGraphNode {
+  /** The scalar boolean value */
+  private _value: boolean;
+  /**
+   * Creates a new constant boolean node
+   *
+   * @remarks
+   * Initializes with a value of false and a single unnamed output slot.
+   */
+  constructor() {
+    super();
+    this._value = false;
+    this._outputs = [{ id: 1, name: '' }];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns The parameter name if uniform, otherwise the rounded numeric value
+   *
+   * @remarks
+   * Values are rounded to 3 decimal places for display purposes.
+   */
+  toString() {
+    return String(this._value);
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor with property definitions
+   *
+   * @remarks
+   * Used by the serialization system to save/load node graphs.
+   * Defines how to serialize the isUniform flag, parameter name, and value.
+   */
+  static getSerializationCls() {
+    return {
+      ctor: ConstantBooleanNode,
+      name: 'ConstantBooleanNode',
+      getProps() {
+        return defineProps([
+          {
+            name: 'x',
+            type: 'bool',
+            get(this: ConstantBooleanNode, value) {
+              value.bool[0] = this.x;
+            },
+            set(this: ConstantBooleanNode, value) {
+              this.x = value.bool[0];
+            }
+          }
+        ]);
+      }
+    };
+  }
+  /**
+   * Gets the scalar value
+   */
+  get x() {
+    return this._value;
+  }
+  set x(val: boolean) {
+    if (!!val !== this._value) {
+      this._value = !!val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   *
+   * @remarks
+   * Constant nodes have no validation requirements.
+   */
+  protected validate() {
+    return '';
+  }
+  /**
+   * Gets the output type for this node
+   *
+   * @returns 'bool' for scalar output
+   */
+  protected getType() {
+    return 'bool';
+  }
+}
+
+/**
  * Constant 2D vector (vec2) value node
- *
- * @remarks
- * Represents a 2-component vector constant (e.g., UV coordinates, 2D positions).
- * Provides multiple output slots:
- * - Output 1: The full vec2 value
- * - Output 2: The x component (swizzle)
- * - Output 3: The y component (swizzle)
- *
- * Can be exposed as a uniform parameter for runtime modification.
- *
- * @example
- * ```typescript
- * const offset = new ConstantVec2Node();
- * offset.x = 0.5;
- * offset.y = 0.5;
- * offset.isUniform = true;
- * offset.paramName = 'u_uvOffset';
- * ```
  *
  * @public
  */
@@ -249,11 +306,12 @@ export class ConstantVec2Node extends BaseGraphNode {
     return this._paramName;
   }
   set paramName(val: string) {
-    if (val !== this._paramName) {
+    if (this._paramName !== val) {
       this._paramName = val;
       this.dispatchEvent('changed');
     }
   }
+
   /**
    * Gets the x component of the vector
    */
@@ -286,12 +344,12 @@ export class ConstantVec2Node extends BaseGraphNode {
    * @remarks
    * Used by the serialization system to save/load node graphs.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ConstantVec2Node,
       name: 'ConstantVec2Node',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'isUniform',
             type: 'bool',
@@ -306,10 +364,14 @@ export class ConstantVec2Node extends BaseGraphNode {
             name: 'paramName',
             type: 'string',
             get(this: ConstantVec2Node, value) {
-              value.str[0] = this.paramName;
+              value.str[0] = this.paramName ? this.paramName.slice(2) : '';
             },
             set(this: ConstantVec2Node, value) {
-              this.paramName = value.str[0];
+              if (!/^[A-Za-z0-9_]+$/.test(value.str[0])) {
+                console.log(`Invalid parameter name: ${value.str[0]}`);
+              } else {
+                this.paramName = `u_${value.str[0]}`;
+              }
             }
           },
           {
@@ -332,7 +394,7 @@ export class ConstantVec2Node extends BaseGraphNode {
               this.y = value.num[0];
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -344,7 +406,7 @@ export class ConstantVec2Node extends BaseGraphNode {
    * @remarks
    * Constant nodes have no validation requirements.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -353,34 +415,132 @@ export class ConstantVec2Node extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for component outputs (id \> 1), 'vec2' for the full vector
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec2';
   }
 }
 
 /**
+ * Constant 2D boolean vector (bvec2) value node
+ *
+ * @public
+ */
+export class ConstantBVec2Node extends BaseGraphNode {
+  /** The 2D vector value [x, y] */
+  private _value: boolean[];
+  /**
+   * Creates a new constant bvec2 node
+   *
+   * @remarks
+   * Initializes with [false, false] and creates output slots for the full vector
+   * and individual components.
+   */
+  constructor() {
+    super();
+    this._value = [false, false];
+    this._outputs = [
+      { id: 1, name: '' },
+      { id: 2, name: 'x', swizzle: 'x' },
+      { id: 3, name: 'y', swizzle: 'y' }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns The parameter name if uniform, otherwise comma-separated values
+   *
+   * @remarks
+   * Values are rounded to 3 decimal places for display purposes.
+   */
+  toString() {
+    return `${String(this._value[0])},${String(this._value[1])}`;
+  }
+  /**
+   * Gets the x component of the vector
+   */
+  get x() {
+    return this._value[0];
+  }
+  set x(val: boolean) {
+    if (!!val !== this._value[0]) {
+      this._value[0] = !!val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Gets the y component of the vector
+   */
+  get y() {
+    return this._value[1];
+  }
+  set y(val: boolean) {
+    if (!!val !== this._value[1]) {
+      this._value[1] = !!val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor with property definitions
+   *
+   * @remarks
+   * Used by the serialization system to save/load node graphs.
+   */
+  static getSerializationCls() {
+    return {
+      ctor: ConstantBVec2Node,
+      name: 'ConstantBVec2Node',
+      getProps() {
+        return defineProps([
+          {
+            name: 'x',
+            type: 'bool',
+            get(this: ConstantBVec2Node, value) {
+              value.bool[0] = this.x;
+            },
+            set(this: ConstantBVec2Node, value) {
+              this.x = value.bool[0];
+            }
+          },
+          {
+            name: 'y',
+            type: 'bool',
+            get(this: ConstantBVec2Node, value) {
+              value.bool[0] = this.y;
+            },
+            set(this: ConstantBVec2Node, value) {
+              this.y = value.bool[0];
+            }
+          }
+        ]);
+      }
+    };
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   *
+   * @remarks
+   * Constant nodes have no validation requirements.
+   */
+  protected validate() {
+    return '';
+  }
+  /**
+   * Gets the output type for a specific output slot
+   *
+   * @param id - The output slot ID
+   * @returns 'bool' for component outputs (id \> 1), 'bvec2' for the full vector
+   */
+  protected getType(id: number) {
+    return id > 1 ? 'bool' : 'bvec2';
+  }
+}
+
+/**
  * Constant 3D vector (vec3) value node
- *
- * @remarks
- * Represents a 3-component vector constant (e.g., RGB colors, 3D positions, normals).
- * Provides multiple output slots:
- * - Output 1: The full vec3 value
- * - Output 2: The x component (swizzle)
- * - Output 3: The y component (swizzle)
- * - Output 4: The z component (swizzle)
- *
- * Includes special 'rgb' serialization property for color picker integration.
- * Can be exposed as a uniform parameter for runtime modification.
- *
- * @example
- * ```typescript
- * const color = new ConstantVec3Node();
- * color.x = 1.0; // Red
- * color.y = 0.0; // Green
- * color.z = 0.0; // Blue
- * color.isUniform = true;
- * color.paramName = 'u_baseColor';
- * ```
  *
  * @public
  */
@@ -446,11 +606,12 @@ export class ConstantVec3Node extends BaseGraphNode {
     return this._paramName;
   }
   set paramName(val: string) {
-    if (val !== this._paramName) {
+    if (this._paramName !== val) {
       this._paramName = val;
       this.dispatchEvent('changed');
     }
   }
+
   /**
    * Gets the x component of the vector
    */
@@ -496,12 +657,12 @@ export class ConstantVec3Node extends BaseGraphNode {
    * Used by the serialization system to save/load node graphs.
    * Includes an 'rgb' property for color picker integration.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ConstantVec3Node,
       name: 'ConstantVec3Node',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'isUniform',
             type: 'bool',
@@ -516,10 +677,14 @@ export class ConstantVec3Node extends BaseGraphNode {
             name: 'paramName',
             type: 'string',
             get(this: ConstantVec3Node, value) {
-              value.str[0] = this.paramName;
+              value.str[0] = this.paramName ? this.paramName.slice(2) : '';
             },
             set(this: ConstantVec3Node, value) {
-              this.paramName = value.str[0];
+              if (!/^[A-Za-z0-9_]+$/.test(value.str[0])) {
+                console.log(`Invalid parameter name: ${value.str[0]}`);
+              } else {
+                this.paramName = `u_${value.str[0]}`;
+              }
             }
           },
           {
@@ -566,7 +731,7 @@ export class ConstantVec3Node extends BaseGraphNode {
               this.z = value.num[2];
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -578,7 +743,7 @@ export class ConstantVec3Node extends BaseGraphNode {
    * @remarks
    * Constant nodes have no validation requirements.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -587,36 +752,156 @@ export class ConstantVec3Node extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for component outputs (id \> 1), 'vec3' for the full vector
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec3';
   }
 }
 
 /**
+ * Constant 3D boolean vector (bvec3) value node
+ *
+ * @public
+ */
+export class ConstantBVec3Node extends BaseGraphNode {
+  /** The 3D vector value [x, y, z] */
+  private _value: boolean[];
+  /**
+   * Creates a new constant bvec3 node
+   *
+   * @remarks
+   * Initializes with [false, false, false] and creates output slots for the full vector
+   * and individual components.
+   */
+  constructor() {
+    super();
+    this._value = [false, false, false];
+    this._outputs = [
+      { id: 1, name: '' },
+      { id: 2, name: 'x', swizzle: 'x' },
+      { id: 3, name: 'y', swizzle: 'y' },
+      { id: 4, name: 'z', swizzle: 'z' }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns The parameter name if uniform, otherwise comma-separated values
+   *
+   * @remarks
+   * Values are rounded to 3 decimal places for display purposes.
+   */
+  toString() {
+    return `${String(this._value[0])},${String(this._value[1])},${String(this._value[2])}`;
+  }
+  /**
+   * Gets the x component of the vector
+   */
+  get x() {
+    return this._value[0];
+  }
+  set x(val: boolean) {
+    if (!!val !== this._value[0]) {
+      this._value[0] = !!val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Gets the y component of the vector
+   */
+  get y() {
+    return this._value[1];
+  }
+  set y(val: boolean) {
+    if (!!val !== this._value[1]) {
+      this._value[1] = !!val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Gets the z component of the vector
+   */
+  get z() {
+    return this._value[2];
+  }
+  set z(val: boolean) {
+    if (!!val !== this._value[2]) {
+      this._value[2] = !!val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor with property definitions
+   *
+   * @remarks
+   * Used by the serialization system to save/load node graphs.
+   * Includes an 'rgb' property for color picker integration.
+   */
+  static getSerializationCls() {
+    return {
+      ctor: ConstantBVec3Node,
+      name: 'ConstantBVec3Node',
+      getProps() {
+        return defineProps([
+          {
+            name: 'x',
+            type: 'bool',
+            get(this: ConstantBVec3Node, value) {
+              value.bool[0] = this.x;
+            },
+            set(this: ConstantBVec3Node, value) {
+              this.x = value.bool[0];
+            }
+          },
+          {
+            name: 'y',
+            type: 'bool',
+            get(this: ConstantBVec3Node, value) {
+              value.bool[0] = this.y;
+            },
+            set(this: ConstantBVec3Node, value) {
+              this.y = value.bool[0];
+            }
+          },
+          {
+            name: 'z',
+            type: 'bool',
+            get(this: ConstantBVec3Node, value) {
+              value.bool[0] = this.z;
+            },
+            set(this: ConstantBVec3Node, value) {
+              this.z = value.bool[0];
+            }
+          }
+        ]);
+      }
+    };
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   *
+   * @remarks
+   * Constant nodes have no validation requirements.
+   */
+  protected validate() {
+    return '';
+  }
+  /**
+   * Gets the output type for a specific output slot
+   *
+   * @param id - The output slot ID
+   * @returns 'bool' for component outputs (id \> 1), 'bvec3' for the full vector
+   */
+  protected getType(id: number) {
+    return id > 1 ? 'bool' : 'bvec3';
+  }
+}
+
+/**
  * Constant 4D vector (vec4) value node
- *
- * @remarks
- * Represents a 4-component vector constant (e.g., RGBA colors with alpha, 4D positions).
- * Provides multiple output slots:
- * - Output 1: The full vec4 value
- * - Output 2: The x component (swizzle)
- * - Output 3: The y component (swizzle)
- * - Output 4: The z component (swizzle)
- * - Output 5: The w component (swizzle)
- *
- * Includes special 'rgba' serialization property for color picker integration with alpha.
- * Can be exposed as a uniform parameter for runtime modification.
- *
- * @example
- * ```typescript
- * const color = new ConstantVec4Node();
- * color.x = 1.0; // Red
- * color.y = 0.5; // Green
- * color.z = 0.0; // Blue
- * color.w = 0.8; // Alpha
- * color.isUniform = true;
- * color.paramName = 'u_tintColor';
- * ```
  *
  * @public
  */
@@ -683,11 +968,12 @@ export class ConstantVec4Node extends BaseGraphNode {
     return this._paramName;
   }
   set paramName(val: string) {
-    if (val !== this._paramName) {
+    if (this._paramName !== val) {
       this._paramName = val;
       this.dispatchEvent('changed');
     }
   }
+
   /**
    * Gets the x component of the vector
    */
@@ -745,12 +1031,12 @@ export class ConstantVec4Node extends BaseGraphNode {
    * Used by the serialization system to save/load node graphs.
    * Includes an 'rgba' property for color picker integration with alpha channel.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ConstantVec4Node,
       name: 'ConstantVec4Node',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'isUniform',
             type: 'bool',
@@ -765,10 +1051,14 @@ export class ConstantVec4Node extends BaseGraphNode {
             name: 'paramName',
             type: 'string',
             get(this: ConstantVec4Node, value) {
-              value.str[0] = this.paramName;
+              value.str[0] = this.paramName ? this.paramName.slice(2) : '';
             },
             set(this: ConstantVec4Node, value) {
-              this.paramName = value.str[0];
+              if (!/^[A-Za-z0-9_]+$/.test(value.str[0])) {
+                console.log(`Invalid parameter name: ${value.str[0]}`);
+              } else {
+                this.paramName = `u_${value.str[0]}`;
+              }
             }
           },
           {
@@ -827,7 +1117,7 @@ export class ConstantVec4Node extends BaseGraphNode {
               this.w = value.num[3];
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -839,7 +1129,7 @@ export class ConstantVec4Node extends BaseGraphNode {
    * @remarks
    * Constant nodes have no validation requirements.
    */
-  protected validate(): string {
+  protected validate() {
     return '';
   }
   /**
@@ -848,7 +1138,175 @@ export class ConstantVec4Node extends BaseGraphNode {
    * @param id - The output slot ID
    * @returns 'float' for component outputs (id \> 1), 'vec4' for the full vector
    */
-  protected getType(id: number): string {
+  protected getType(id: number) {
     return id > 1 ? 'float' : 'vec4';
+  }
+}
+
+/**
+ * Constant 4D boolean vector (bvec4) value node
+ *
+ * @public
+ */
+export class ConstantBVec4Node extends BaseGraphNode {
+  /** The 4D vector value [x, y, z, w] */
+  private _value: boolean[];
+  /**
+   * Creates a new constant vec4 node
+   *
+   * @remarks
+   * Initializes with [false, false, false, false] and creates output slots for the full vector
+   * and individual components.
+   */
+  constructor() {
+    super();
+    this._value = [false, false, false, false];
+    this._outputs = [
+      { id: 1, name: '' },
+      { id: 2, name: 'x', swizzle: 'x' },
+      { id: 3, name: 'y', swizzle: 'y' },
+      { id: 4, name: 'z', swizzle: 'z' },
+      { id: 5, name: 'w', swizzle: 'w' }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns The parameter name if uniform, otherwise comma-separated values
+   *
+   * @remarks
+   * Values are rounded to 3 decimal places for display purposes.
+   */
+  toString() {
+    return `${String(this._value[0])},${String(this._value[1])},${String(
+      this._value[2]
+    )},${String(this._value[3])}`;
+  }
+  /**
+   * Gets the x component of the vector
+   */
+  get x() {
+    return this._value[0];
+  }
+  set x(val: boolean) {
+    if (!!val !== this._value[0]) {
+      this._value[0] = !!val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Gets the y component of the vector
+   */
+  get y() {
+    return this._value[1];
+  }
+  set y(val: boolean) {
+    if (!!val !== this._value[1]) {
+      this._value[1] = !!val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Gets the z component of the vector
+   */
+  get z() {
+    return this._value[2];
+  }
+  set z(val: boolean) {
+    if (!!val !== this._value[2]) {
+      this._value[2] = !!val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Gets the w component of the vector
+   */
+  get w() {
+    return this._value[3];
+  }
+  set w(val: boolean) {
+    if (!!val !== this._value[3]) {
+      this._value[3] = !!val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor with property definitions
+   *
+   * @remarks
+   * Used by the serialization system to save/load node graphs.
+   * Includes an 'rgba' property for color picker integration with alpha channel.
+   */
+  static getSerializationCls() {
+    return {
+      ctor: ConstantBVec4Node,
+      name: 'ConstantBVec4Node',
+      getProps() {
+        return defineProps([
+          {
+            name: 'x',
+            type: 'bool',
+            get(this: ConstantBVec4Node, value) {
+              value.bool[0] = this.x;
+            },
+            set(this: ConstantBVec4Node, value) {
+              this.x = value.bool[0];
+            }
+          },
+          {
+            name: 'y',
+            type: 'bool',
+            get(this: ConstantBVec4Node, value) {
+              value.bool[0] = this.y;
+            },
+            set(this: ConstantBVec4Node, value) {
+              this.y = value.bool[0];
+            }
+          },
+          {
+            name: 'z',
+            type: 'bool',
+            get(this: ConstantBVec4Node, value) {
+              value.bool[0] = this.z;
+            },
+            set(this: ConstantBVec4Node, value) {
+              this.z = value.bool[0];
+            }
+          },
+          {
+            name: 'w',
+            type: 'bool',
+            get(this: ConstantBVec4Node, value) {
+              value.bool[0] = this.w;
+            },
+            set(this: ConstantBVec4Node, value) {
+              this.w = value.bool[0];
+            }
+          }
+        ]);
+      }
+    };
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   *
+   * @remarks
+   * Constant nodes have no validation requirements.
+   */
+  protected validate() {
+    return '';
+  }
+  /**
+   * Gets the output type for a specific output slot
+   *
+   * @param id - The output slot ID
+   * @returns 'bool' for component outputs (id \> 1), 'bvec4' for the full vector
+   */
+  protected getType(id: number) {
+    return id > 1 ? 'bool' : 'bvec4';
   }
 }

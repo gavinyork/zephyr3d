@@ -1,5 +1,5 @@
-import type { Vector4 } from '@zephyr3d/base';
-import { Disposable, Vector3 } from '@zephyr3d/base';
+import type { Nullable, Vector4 } from '@zephyr3d/base';
+import { Disposable, objectKeys, Vector3 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
 import type { BatchDrawable, Drawable } from './drawable';
 import type { DirectionalLight, PunctualLight } from '../scene/light';
@@ -12,7 +12,7 @@ import { ShaderHelper } from '../material';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
 import { getDevice } from '../app/api';
 
-/** @internal */
+/** @public */
 export type CachedBindGroup = {
   bindGroup: BindGroup;
   buffer: Float32Array;
@@ -22,16 +22,19 @@ export type CachedBindGroup = {
 
 const maxBufferSizeInFloats = 65536 / 4;
 
-/** @internal */
+/**
+ * Instance bind group allocator
+ * @public
+ */
 export class InstanceBindGroupAllocator {
-  private static _instanceBindGroupLayout: BindGroupLayout = null;
+  private static _instanceBindGroupLayout: Nullable<BindGroupLayout> = null;
   _bindGroupList: CachedBindGroup[] = [];
   private _allocFrameStamp: number;
   constructor() {
     this._allocFrameStamp = -1;
     this._bindGroupList = [];
   }
-  allocateInstanceBindGroup(framestamp: number, sizeInFloats: number): CachedBindGroup {
+  allocateInstanceBindGroup(framestamp: number, sizeInFloats: number) {
     // Reset if render frame changed
     if (this._allocFrameStamp !== framestamp) {
       this._allocFrameStamp = framestamp;
@@ -83,16 +86,19 @@ export interface InstanceData {
 
 /**
  * Render queue item
- * @internal
+ * @public
  */
 export interface RenderQueueItem {
   drawable: Drawable;
   sortDistance: number;
   instanceColor?: Vector4;
-  instanceData: InstanceData;
+  instanceData: Nullable<InstanceData>;
 }
 
-/** @internal */
+/**
+ * Render item list information
+ * @public
+ */
 export interface RenderItemListInfo {
   itemList: RenderQueueItem[];
   renderBundle?: RenderBundleWrapper;
@@ -109,7 +115,10 @@ export interface RenderItemListInfo {
   renderQueue: RenderQueue;
 }
 
-/** @internal */
+/**
+ * Render item list bundle
+ * @public
+ */
 export interface RenderItemListBundle {
   lit: RenderItemListInfo[];
   unlit: RenderItemListInfo[];
@@ -117,7 +126,7 @@ export interface RenderItemListBundle {
 
 /**
  * Item list of render queue
- * @internal
+ * @public
  */
 export interface RenderItemList {
   opaque: RenderItemListBundle;
@@ -128,7 +137,7 @@ export interface RenderItemList {
 
 /**
  * Render queue reference
- * @internal
+ * @public
  */
 export interface RenderQueueRef {
   ref: RenderQueue;
@@ -136,7 +145,7 @@ export interface RenderQueueRef {
 
 /**
  * Drawable instance information
- * @internal
+ * @public
  */
 export interface DrawableInstanceInfo {
   bindGroup: CachedBindGroup;
@@ -149,7 +158,7 @@ export interface DrawableInstanceInfo {
  */
 export class RenderQueue extends Disposable {
   /** @internal */
-  private _itemList: RenderItemList;
+  private _itemList: Nullable<RenderItemList>;
   /** @internal */
   private readonly _renderPass: RenderPass;
   /** @internal */
@@ -157,7 +166,7 @@ export class RenderQueue extends Disposable {
   /** @internal */
   private _unshadowedLightList: PunctualLight[];
   /** @internal */
-  private _sunLight: DirectionalLight;
+  private _sunLight: Nullable<DirectionalLight>;
   /** @internal */
   private readonly _bindGroupAllocator: InstanceBindGroupAllocator;
   /** @internal */
@@ -193,30 +202,30 @@ export class RenderQueue extends Disposable {
     this._objectColorMaps = [new Map()];
   }
   /** The sun light */
-  get sunLight(): DirectionalLight {
+  get sunLight() {
     return this._sunLight;
   }
-  set sunLight(light: DirectionalLight) {
+  set sunLight(light) {
     this._sunLight = light;
   }
   /** @internal */
-  needSceneColor(): boolean {
+  needSceneColor() {
     return this._needSceneColor;
   }
   /** @internal */
-  needSceneDepth(): boolean {
+  needSceneDepth() {
     return this._needSceneDepth;
   }
   /** @internal */
-  needSceneColorWithDepth(): boolean {
+  needSceneColorWithDepth() {
     return this._needSceneColorWithDepth;
   }
   /** Whether this render queue has transparent objects to be drawn */
-  get drawTransparent(): boolean {
+  get drawTransparent() {
     return this._drawTransparent;
   }
   /** The render pass to which the render queue belongs */
-  get renderPass(): RenderPass {
+  get renderPass() {
     return this._renderPass;
   }
   /**
@@ -240,7 +249,7 @@ export class RenderQueue extends Disposable {
   /**
    * Gets the indirect reference of this
    */
-  get ref(): RenderQueueRef {
+  get ref() {
     return this._ref;
   }
   /**
@@ -305,7 +314,7 @@ export class RenderQueue extends Disposable {
    * @param camera - The camera for drawing the item
    * @param drawable - The object to be drawn
    */
-  push(camera: Camera, drawable: Drawable): void {
+  push(camera: Camera, drawable: Drawable) {
     if (drawable) {
       drawable.pushRenderQueueRef(this._ref);
       if (!this._itemList) {
@@ -320,7 +329,7 @@ export class RenderQueue extends Disposable {
       this._needSceneColorWithDepth ||= transmission && needDepth;
       this._drawTransparent ||= trans;
       if (camera.getPickResultResolveFunc()) {
-        drawable.getMaterial().objectColor = drawable.getObjectColor();
+        drawable.getMaterial()!.objectColor = drawable.getObjectColor();
         this._objectColorMaps[0].set(drawable.getDrawableId(), drawable);
       }
       if (drawable.isBatchable()) {
@@ -404,9 +413,9 @@ export class RenderQueue extends Disposable {
   reset() {
     if (this._itemList) {
       // Release all render bundles
-      for (const k in this._itemList) {
+      for (const k of objectKeys(this._itemList)) {
         const itemListBundle: RenderItemListBundle = this._itemList[k];
-        for (const l in itemListBundle) {
+        for (const l of objectKeys(itemListBundle)) {
           const listInfo: RenderItemListInfo[] = itemListBundle[l];
           for (const info of listInfo) {
             if (info.renderQueue === this) {
@@ -440,9 +449,9 @@ export class RenderQueue extends Disposable {
     this._drawTransparent = false;
   }
   /** @internal */
-  end(camera: Camera, createRenderBundles?: boolean): this {
+  end(camera: Camera, createRenderBundles?: boolean) {
     const frameCounter = getDevice().frameInfo.frameCounter;
-    const itemList = this._itemList;
+    const itemList = this._itemList!;
     if (!this.itemList) {
       return this;
     }
@@ -465,8 +474,8 @@ export class RenderQueue extends Disposable {
         const instanceList = info.instanceList;
         for (const x in instanceList) {
           const drawables = instanceList[x];
-          let bindGroup: CachedBindGroup = null;
-          let item: RenderQueueItem = null;
+          let bindGroup: Nullable<CachedBindGroup> = null;
+          let item: Nullable<RenderQueueItem> = null;
           for (let i = 0; i < drawables.length; i++) {
             const drawable = drawables[i];
             const instanceUniforms = drawable.getInstanceUniforms();
@@ -492,7 +501,7 @@ export class RenderQueue extends Disposable {
             drawable.applyTransformUniforms(this);
             drawable.applyMaterialUniforms(instanceInfo);
             bindGroup.offset += stride;
-            item.instanceData.numInstances++;
+            item!.instanceData!.numInstances++;
             const mat = drawable.getMaterial();
             if (mat) {
               info.materialList.add(mat.coreMaterial);
@@ -524,10 +533,10 @@ export class RenderQueue extends Disposable {
   binaryInsert(itemList: RenderQueueItem[], item: RenderQueueItem) {
     let left = 0;
     let right = itemList.length - 1;
-    const newInstanceId = item.drawable.getMaterial().instanceId;
+    const newInstanceId = item.drawable.getMaterial()!.instanceId;
     while (left <= right) {
       const mid = Math.floor((left + right) / 2);
-      const instanceId = itemList[mid].drawable.getMaterial().instanceId;
+      const instanceId = itemList[mid].drawable.getMaterial()!.instanceId;
       if (instanceId === newInstanceId) {
         itemList.splice(mid + 1, 0, item);
         return;
@@ -596,7 +605,7 @@ export class RenderQueue extends Disposable {
     const drawablePos = drawable.getNode().position;
     return Vector3.distanceSq(drawablePos, cameraPos);
   }
-  private newRenderItemListInfo(): RenderItemListInfo {
+  private newRenderItemListInfo() {
     return {
       itemList: [],
       skinItemList: [],
@@ -606,15 +615,15 @@ export class RenderQueue extends Disposable {
       materialList: new Set(),
       instanceList: {},
       renderQueue: this
-    };
+    } as RenderItemListInfo;
   }
-  private newRenderItemListBundle(): RenderItemListBundle {
+  private newRenderItemListBundle() {
     return {
       lit: [this.newRenderItemListInfo()],
       unlit: [this.newRenderItemListInfo()]
     };
   }
-  private newRenderItemList(): RenderItemList {
+  private newRenderItemList() {
     return {
       opaque: this.newRenderItemListBundle(),
       transmission: this.newRenderItemListBundle(),

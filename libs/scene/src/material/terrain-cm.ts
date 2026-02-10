@@ -11,6 +11,7 @@ import { applyMaterialMixins, MeshMaterial } from './meshmaterial';
 import type { DrawContext } from '../render';
 import { MaterialVaryingFlags, MAX_TERRAIN_MIPMAP_LEVELS } from '../values';
 import { ShaderHelper } from './shader/helper';
+import type { Nullable } from '@zephyr3d/base';
 import { DRef, Vector3, Vector4 } from '@zephyr3d/base';
 import { mixinLight } from './mixins/lit';
 import { fetchSampler } from '../utility/misc';
@@ -93,15 +94,15 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   static get MAX_DETAIL_MAP_COUNT() {
     return MAX_DETAIL_MAPS;
   }
-  get debugMode(): TerrainDebugMode {
+  get debugMode() {
     return this.featureUsed<TerrainDebugMode>(ClipmapTerrainMaterial.FEATURE_DEBUG_MODE);
   }
-  set debugMode(mode: TerrainDebugMode) {
+  set debugMode(mode) {
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DEBUG_MODE, mode);
   }
   /** @internal */
   setLevelData(data: Float32Array<ArrayBuffer>, length: number) {
-    this._levelDataBuffer.get().bufferSubData(0, data, 0, length);
+    this._levelDataBuffer.get()!.bufferSubData(0, data, 0, length);
   }
   /** @internal */
   get region() {
@@ -184,7 +185,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this.uniformChanged();
     }
   }
-  getDetailMapUVScale(index: number): number {
+  getDetailMapUVScale(index: number) {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
       console.error('Invalid detail map index');
       return 0;
@@ -201,7 +202,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this.uniformChanged();
     }
   }
-  getDetailMapRoughness(index: number): number {
+  getDetailMapRoughness(index: number) {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
       console.error('Invalid detail map index');
       return 0;
@@ -218,14 +219,14 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this.uniformChanged();
     }
   }
-  getDetailMap(index: number): Texture2D {
+  getDetailMap(index: number) {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
       console.error('Invalid detail map index');
       return null;
     }
     return this._detailMapInfo.detailMapList[index].get();
   }
-  setDetailMap(index: number, albedoMap: Texture2D) {
+  setDetailMap(index: number, albedoMap: Nullable<Texture2D>) {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
       console.error('Invalid detail map index');
       return;
@@ -239,26 +240,26 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     );
     if (getDevice().type !== 'webgl') {
       const blitter = new CopyBlitter();
-      const fb = getDevice().createFrameBuffer([this._detailMapInfo.detailMap.get()], null);
+      const fb = getDevice().createFrameBuffer([this._detailMapInfo.detailMap!.get()!], null);
       blitter.blit(
-        albedoMap,
+        albedoMap!,
         fb,
         index,
-        albedoMap.width === this._detailMapSize && albedoMap.height === this._detailMapSize
+        albedoMap!.width === this._detailMapSize && albedoMap!.height === this._detailMapSize
           ? fetchSampler('clamp_nearest_nomip')
           : fetchSampler('clamp_linear_nomip')
       );
       fb.dispose();
     }
   }
-  getDetailNormalMap(index: number): Texture2D {
+  getDetailNormalMap(index: number) {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
       console.error('Invalid detail map index');
       return null;
     }
     return this._detailMapInfo.detailNormalMapList[index].get();
   }
-  setDetailNormalMap(index: number, normalMap: Texture2D) {
+  setDetailNormalMap(index: number, normalMap: Nullable<Texture2D>) {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
       console.error('Invalid detail map index');
       return;
@@ -272,12 +273,12 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     );
     if (getDevice().type !== 'webgl') {
       const blitter = new CopyBlitter();
-      const fb = getDevice().createFrameBuffer([this._detailMapInfo.detailNormalMap.get()], null);
+      const fb = getDevice().createFrameBuffer([this._detailMapInfo.detailNormalMap!.get()!], null);
       blitter.blit(
-        normalMap,
+        normalMap!,
         fb,
         index,
-        normalMap.width === this._detailMapSize && normalMap.height === this._detailMapSize
+        normalMap!.width === this._detailMapSize && normalMap!.height === this._detailMapSize
           ? fetchSampler('clamp_nearest_nomip')
           : fetchSampler('clamp_linear_nomip')
       );
@@ -293,7 +294,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     }
   }
   get heightMap() {
-    return this._heightMap.get();
+    return this._heightMap.get()!;
   }
   set heightMap(val: Texture2D) {
     if (val !== this._heightMap.get()) {
@@ -307,22 +308,22 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this.uniformChanged();
     }
   }
-  needSceneColor(): boolean {
+  needSceneColor() {
     return false;
   }
-  needSceneDepth(): boolean {
+  needSceneDepth() {
     return false;
   }
-  supportInstancing(): boolean {
+  supportInstancing() {
     return false;
   }
-  supportLighting(): boolean {
+  supportLighting() {
     return true;
   }
   getMetallicRoughnessTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp = function (scope) {
     return scope.$inputs.uv;
   };
-  sampleDetailNormalMap(scope: PBInsideFunctionScope, index: number, texCoord: PBShaderExp): PBShaderExp {
+  sampleDetailNormalMap(scope: PBInsideFunctionScope, index: number, texCoord: PBShaderExp) {
     const pb = scope.$builder;
     const sample =
       this.drawContext.device.type === 'webgl'
@@ -358,7 +359,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   getNormalTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp = function (scope) {
     return scope.$inputs.uv;
   };
-  calculateAlbedoColor(scope: PBInsideFunctionScope): PBShaderExp {
+  calculateAlbedoColor(scope: PBInsideFunctionScope) {
     const that = this;
     const pb = scope.$builder;
     const funcName = 'getTerrainAlbedo';
@@ -405,7 +406,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         this.$return(pb.vec4(this.color, 1));
       }
     });
-    return pb.getGlobalScope()[funcName]();
+    return pb.getGlobalScope()[funcName]() as PBShaderExp;
   }
   sampleHeightMap(
     scope: PBInsideFunctionScope,
@@ -458,7 +459,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     tangent: PBShaderExp,
     bitangent: PBShaderExp,
     normal: PBShaderExp
-  ): PBShaderExp {
+  ) {
     const that = this;
     const pb = scope.$builder;
     pb.func(
@@ -528,9 +529,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       tangent,
       bitangent,
       normal
-    );
+    ) as PBShaderExp;
   }
-  vertexShader(scope: PBFunctionScope): void {
+  vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$inputs.position = pb.vec3().attrib('position');
@@ -628,7 +629,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     );
     ShaderHelper.resolveMotionVector(scope, scope.$outputs.worldPos, scope.$outputs.worldPos);
   }
-  fragmentShader(scope: PBFunctionScope): void {
+  fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     const pb = scope.$builder;
     scope.region = pb.vec4().uniform(2);
@@ -717,40 +718,40 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
   }
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setValue('clipmapGridInfo', this._clipmapGridInfo);
     bindGroup.setValue('region', this._region);
     bindGroup.setValue('terrainScale', this._terrainScale);
-    bindGroup.setTexture('heightMap', this._heightMap.get(), fetchSampler('clamp_linear_nomip'));
+    bindGroup.setTexture('heightMap', this._heightMap.get()!, fetchSampler('clamp_linear_nomip'));
     bindGroup.setValue('heightMapSize', this._heightMapSize);
-    bindGroup.setBuffer('levelData', this._levelDataBuffer.get());
+    bindGroup.setBuffer('levelData', this._levelDataBuffer.get()!);
     if (this.needFragmentColor(ctx)) {
       if (this._detailMapInfo.numDetailMaps > 0) {
-        bindGroup.setTexture('splatMap', this._detailMapInfo.splatMap.get());
+        bindGroup.setTexture('splatMap', this._detailMapInfo.splatMap.get()!);
         if (ctx.device.type === 'webgl') {
           for (let i = 0; i < this._detailMapInfo.numDetailMaps; i++) {
             bindGroup.setTexture(
               `detailAlbedoMap${i}`,
-              this._detailMapInfo.detailMapList[i]?.get() ?? ClipmapTerrainMaterial.getDefaultDetailMap(),
+              this._detailMapInfo.detailMapList[i]?.get() ?? ClipmapTerrainMaterial.getDefaultDetailMap()!,
               fetchSampler('repeat_linear')
             );
             bindGroup.setTexture(
               `detailNormalMap${i}`,
               this._detailMapInfo.detailNormalMapList[i]?.get() ??
-                ClipmapTerrainMaterial.getDefaultNormalMap(),
+                ClipmapTerrainMaterial.getDefaultNormalMap()!,
               fetchSampler('repeat_linear')
             );
           }
         } else {
           bindGroup.setTexture(
             'detailAlbedoMap',
-            this._detailMapInfo.detailMap.get(),
+            this._detailMapInfo.detailMap.get()!,
             fetchSampler('repeat_linear')
           );
           bindGroup.setTexture(
             'detailNormalMap',
-            this._detailMapInfo.detailNormalMap.get(),
+            this._detailMapInfo.detailNormalMap!.get()!,
             fetchSampler('repeat_linear')
           );
         }
@@ -758,7 +759,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       }
     }
   }
-  private createDetailMapInfo(): ClipmapTerrainDetailMapInfo {
+  private createDetailMapInfo() {
     const device = getDevice();
     const isWebGL1 = device.type === 'webgl';
     const detailMap = isWebGL1
@@ -777,24 +778,24 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         );
     device.pushDeviceStates();
     if (!isWebGL1) {
-      const fbDetail = device.createFrameBuffer([detailMap], null);
+      const fbDetail = device.createFrameBuffer([detailMap!], null);
       device.setFramebuffer(fbDetail);
-      for (let i = 0; i < detailMap.depth; i++) {
+      for (let i = 0; i < detailMap!.depth; i++) {
         fbDetail.setColorAttachmentLayer(0, i);
         device.clearFrameBuffer(Vector4.zero(), 1, 0);
       }
       fbDetail.dispose();
-      const fbNormal = device.createFrameBuffer([detailNormalMap], null);
+      const fbNormal = device.createFrameBuffer([detailNormalMap!], null);
       device.setFramebuffer(fbNormal);
-      for (let i = 0; i < detailNormalMap.depth; i++) {
+      for (let i = 0; i < detailNormalMap!.depth; i++) {
         fbNormal.setColorAttachmentLayer(0, i);
         device.clearFrameBuffer(new Vector4(0.5, 0.5, 1, 1), 1, 0);
       }
       fbNormal.dispose();
     }
-    const fbSplat = device.createFrameBuffer([splatMap], null);
+    const fbSplat = device.createFrameBuffer([splatMap!], null);
     device.setFramebuffer(fbSplat);
-    for (let i = 0; i < splatMap.depth; i++) {
+    for (let i = 0; i < splatMap!.depth; i++) {
       fbSplat.setColorAttachmentLayer(0, i);
       device.clearFrameBuffer(i === 0 ? new Vector4(1, 0, 0, 0) : Vector4.zero(), 1, 0);
     }
@@ -811,7 +812,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     };
   }
 
-  protected onDispose(): void {
+  protected onDispose() {
     super.onDispose();
     this._heightMap.dispose();
     this._levelDataBuffer.dispose();
@@ -825,13 +826,12 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       for (const tex of this._detailMapInfo.detailNormalMapList) {
         tex.dispose();
       }
-      this._detailMapInfo = null;
     }
   }
   static getDefaultDetailMap() {
     if (!ClipmapTerrainMaterial._defaultDetailMap.get()) {
       const device = getDevice();
-      const tex = device.createTexture2D('rgba8unorm', 1, 1);
+      const tex = device.createTexture2D('rgba8unorm', 1, 1)!;
       tex.update(new Uint8Array([0, 0, 0, 255]), 0, 0, 1, 1);
       ClipmapTerrainMaterial._defaultDetailMap.set(tex);
     }
@@ -840,7 +840,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   static getDefaultNormalMap() {
     if (!ClipmapTerrainMaterial._defaultNormalMap.get()) {
       const device = getDevice();
-      const tex = device.createTexture2D('rgba8unorm', 1, 1);
+      const tex = device.createTexture2D('rgba8unorm', 1, 1)!;
       tex.update(new Uint8Array([128, 128, 255, 255]), 0, 0, 1, 1);
       ClipmapTerrainMaterial._defaultNormalMap.set(tex);
     }

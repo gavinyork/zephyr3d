@@ -4,25 +4,24 @@ import { textureTargetMap } from './constants_webgl';
 import { WebGLBaseTexture } from './basetexture_webgl';
 import type { WebGLDevice } from './device_webgl';
 import type { WebGLTextureCaps } from './capabilities_webgl';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
 
 export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<WebGLTexture> {
-  private _source: HTMLVideoElement;
-  private _callbackId: number;
+  private _source!: HTMLVideoElement;
+  private _callbackId: Nullable<number>;
   constructor(device: WebGLDevice, source: HTMLVideoElement) {
     super(device, '2d');
-    this._source = null;
     this._callbackId = null;
-    this._format = 'unknown';
+    this._format = null;
     this.loadFromElement(source);
   }
   isTextureVideo(): this is TextureVideo {
     return true;
   }
-  get source(): HTMLVideoElement {
+  get source() {
     return this._source;
   }
-  destroy(): void {
+  destroy() {
     if (this._source && this._callbackId !== null) {
       this._source.cancelVideoFrameCallback(this._callbackId);
     }
@@ -32,14 +31,14 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
     this.loadElement(this._source);
   }
   /** @internal */
-  loadFromElement(el: HTMLVideoElement): void {
+  loadFromElement(el: HTMLVideoElement) {
     this._flags = GPUResourceUsageFlags.TF_NO_MIPMAP;
     this.loadElement(el);
   }
   generateMipmaps() {
     // Does nothing
   }
-  readPixels(
+  async readPixels(
     _x: number,
     _y: number,
     _w: number,
@@ -47,7 +46,7 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
     _faceOrLayer: number,
     _mipLevel: number,
     _buffer: TypedArray
-  ): Promise<void> {
+  ) {
     throw new Error(`Video texture does not support readPixels()`);
   }
   readPixelsToBuffer(
@@ -58,11 +57,11 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
     _faceOrLayer: number,
     _mipLevel: number,
     _buffer: GPUDataBuffer<unknown>
-  ): void {
+  ) {
     throw new Error(`Video texture does not support readPixelsToBuffer()`);
   }
   /** @internal */
-  updateVideoFrame(): boolean {
+  updateVideoFrame() {
     if (this.object && this._source.currentTime > 0 && !this._source.requestVideoFrameCallback) {
       this.update();
       return true;
@@ -70,11 +69,11 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
     return false;
   }
   /** @internal */
-  private update(): void {
+  private update() {
     this.allocInternal('rgba8unorm', this._source.videoWidth, this._source.videoHeight, 1, 1);
     if (!this._device.isContextLost()) {
       const target = textureTargetMap[this._target];
-      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
+      const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format!);
       this._device.bindTexture(target, 0, this);
       //this._device.context.bindTexture(target, this._object);
       this._device.context.pixelStorei(this._device.context.UNPACK_ALIGNMENT, 1);
@@ -89,7 +88,7 @@ export class WebGLTextureVideo extends WebGLBaseTexture implements TextureVideo<
     }
   }
   /** @internal */
-  private loadElement(element: HTMLVideoElement): void {
+  private loadElement(element: HTMLVideoElement) {
     if (this._source && this._callbackId !== null) {
       this._source.cancelVideoFrameCallback(this._callbackId);
       this._callbackId = null;

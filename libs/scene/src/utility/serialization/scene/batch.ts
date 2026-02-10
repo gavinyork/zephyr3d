@@ -8,7 +8,7 @@ export function getBatchGroupClass(): SerializableClass {
     parent: GraphNode,
     name: 'BatchGroup',
     createFunc(ctx: SceneNode) {
-      const batchGroup = new BatchGroup(ctx.scene);
+      const batchGroup = new BatchGroup(ctx.scene!);
       batchGroup.parent = ctx;
       return { obj: batchGroup };
     },

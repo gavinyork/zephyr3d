@@ -43,7 +43,7 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
    *
    * @returns A cloned `ParticleMaterial`.
    */
-  clone(): ParticleMaterial {
+  clone() {
     const other = new ParticleMaterial();
     other.copyFrom(this);
     return other;
@@ -54,7 +54,7 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
    * @param other - The source material to copy from.
    * @returns void
    */
-  copyFrom(other: this): void {
+  copyFrom(other: this) {
     super.copyFrom(other);
     this.jitterPower = other.jitterPower;
     this.aspect = other.aspect;
@@ -75,10 +75,10 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
    *
    * @returns The current alpha map texture or `undefined` if not set.
    */
-  get alphaMap(): Texture2D {
+  get alphaMap() {
     return this._alphaMap.get();
   }
-  set alphaMap(tex: Texture2D) {
+  set alphaMap(tex) {
     if (tex !== this._alphaMap.get()) {
       this._alphaMap.set(tex);
       this.useFeature(ParticleMaterial.FEATURE_ALPHA_MAP, !!this._alphaMap.get());
@@ -92,10 +92,10 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
    *
    * @returns The current ramp map texture or `undefined` if not set.
    */
-  get rampMap(): Texture2D {
+  get rampMap() {
     return this._rampMap.get();
   }
-  set rampMap(tex: Texture2D) {
+  set rampMap(tex) {
     if (tex !== this._rampMap.get()) {
       this._rampMap.set(tex);
       this.useFeature(ParticleMaterial.FEATURE_RAMP_MAP, !!this._rampMap.get());
@@ -292,7 +292,7 @@ export class ParticleMaterial extends MeshMaterial implements Clonable<ParticleM
    * @param pass - The current material pass.
    * @returns void
    */
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setValue('params', this._params);
     if (this.needFragmentColor(ctx)) {

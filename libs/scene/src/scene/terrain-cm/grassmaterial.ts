@@ -43,15 +43,15 @@ export class ClipmapGrassMaterial
     this.specularFactor = new Vector4(1, 1, 1, 0.2);
     this._terrain = new DWeakRef(terrain);
     this._terrainPosScale = new Vector4();
-    this._heightMapSize = new Vector2(1 / terrain.heightMap.width, 1 / terrain.heightMap.height);
+    this._heightMapSize = new Vector2(1 / terrain.heightMap!.width, 1 / terrain.heightMap!.height);
     this._textureSize = Vector2.one();
   }
-  clone(): ClipmapGrassMaterial {
-    const other = new ClipmapGrassMaterial(this._terrain.get());
+  clone() {
+    const other = new ClipmapGrassMaterial(this._terrain.get()!);
     other.copyFrom(this);
     return other;
   }
-  copyFrom(other: this): void {
+  copyFrom(other: this) {
     super.copyFrom(other);
     this._terrainPosScale.set(other._terrainPosScale);
     this._heightMapSize.set(other._heightMapSize);
@@ -65,28 +65,28 @@ export class ClipmapGrassMaterial
    * {@inheritDoc MeshMaterial.isTransparentPass}
    * @override
    */
-  isTransparentPass(_pass: number): boolean {
+  isTransparentPass(_pass: number) {
     return false;
   }
   /**
    * {@inheritDoc Material.supportLighting}
    * @override
    */
-  supportLighting(): boolean {
+  supportLighting() {
     return true;
   }
   /**
    * {@inheritDoc Material.supportInstancing}
    * @override
    */
-  supportInstancing(): boolean {
+  supportInstancing() {
     return false;
   }
-  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
-    const terrain = this._terrain.get();
+    const terrain = this._terrain.get()!;
     this._terrainPosScale.setXYZW(terrain.scale.x, terrain.scale.y, terrain.scale.z, terrain.worldMatrix.m13);
-    bindGroup.setTexture('terrainHeightMap', terrain.heightMap, fetchSampler('clamp_linear_nomip'));
+    bindGroup.setTexture('terrainHeightMap', terrain.heightMap!, fetchSampler('clamp_linear_nomip'));
     bindGroup.setValue('heightMapSize', this._heightMapSize);
     bindGroup.setValue('terrainRegion', terrain.worldRegion);
     bindGroup.setValue('terrainPosScale', this._terrainPosScale);
@@ -94,7 +94,7 @@ export class ClipmapGrassMaterial
       bindGroup.setValue('albedoTextureSize', this._textureSize);
     }
   }
-  vertexShader(scope: PBFunctionScope): void {
+  vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
     scope.$inputs.pos = pb.vec3().attrib('position');
@@ -154,7 +154,7 @@ export class ClipmapGrassMaterial
     scope.$outputs.worldNorm = scope.normal;
     ShaderHelper.resolveMotionVector(scope, scope.$outputs.worldPos, scope.$outputs.worldPos);
   }
-  fragmentShader(scope: PBFunctionScope): void {
+  fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     const pb = scope.$builder;
     const that = this;
@@ -167,7 +167,7 @@ export class ClipmapGrassMaterial
         pb.mul(that.getAlbedoTexCoord(scope), scope.albedoTextureSize)
       );
       scope.$l.litColor = pb.vec3(0);
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+      if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         scope.$l.normalInfo = this.calculateNormalAndTBN(
           scope,
           scope.$inputs.worldPos,
@@ -188,12 +188,12 @@ export class ClipmapGrassMaterial
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
   }
-  apply(ctx: DrawContext): boolean {
+  apply(ctx: DrawContext) {
     this.alphaToCoverage = ctx.device.getFrameBufferSampleCount() > 1;
     this.alphaCutoff = this.alphaToCoverage ? 1 : 0.8;
     return super.apply(ctx);
   }
-  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
+  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext) {
     super.updateRenderStates(pass, stateSet, ctx);
     stateSet.useRasterizerState().setCullMode('none');
   }

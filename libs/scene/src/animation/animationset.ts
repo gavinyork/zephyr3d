@@ -1,4 +1,4 @@
-import { weightedAverage, DWeakRef, Disposable } from '@zephyr3d/base';
+import { weightedAverage, Disposable } from '@zephyr3d/base';
 import type { DRef, IDisposable } from '@zephyr3d/base';
 import type { SceneNode } from '../scene';
 import { AnimationClip } from './animation';
@@ -82,9 +82,9 @@ export type StopAnimationOptions = {
  */
 export class AnimationSet extends Disposable implements IDisposable {
   /** @internal */
-  private _model: DWeakRef<SceneNode>;
+  private _model: SceneNode;
   /** @internal */
-  private _animations: Record<string, AnimationClip>;
+  private _animations: Partial<Record<string, AnimationClip>>;
   /** @internal */
   private _skeletons: DRef<Skeleton>[];
   /** @internal */
@@ -114,7 +114,7 @@ export class AnimationSet extends Disposable implements IDisposable {
    */
   constructor(model: SceneNode) {
     super();
-    this._model = new DWeakRef<SceneNode>(model);
+    this._model = model;
     this._animations = {};
     this._activeTracks = new Map();
     this._activeSkeletons = new Map();
@@ -124,16 +124,18 @@ export class AnimationSet extends Disposable implements IDisposable {
   /**
    * The model (SceneNode) controlled by this animation set.
    */
-  get model(): SceneNode {
-    return this._model.get();
+  get model() {
+    return this._model;
   }
   /**
    * Number of animation clips registered in this set.
    */
-  get numAnimations(): number {
+  get numAnimations() {
     return Object.getOwnPropertyNames(this._animations).length;
   }
-  /** @internal */
+  /**
+   * The skeletons used by animations in this set.
+   */
   get skeletons() {
     return this._skeletons;
   }
@@ -143,7 +145,7 @@ export class AnimationSet extends Disposable implements IDisposable {
    * @param name - Name of the animation.
    * @returns The clip if present; otherwise null.
    */
-  get(name: string): AnimationClip {
+  get(name: string) {
     return this._animations[name] ?? null;
   }
   /**
@@ -153,14 +155,14 @@ export class AnimationSet extends Disposable implements IDisposable {
    * @param embedded - Whether the clip is embedded/owned (implementation-specific). Default false.
    * @returns The created clip, or null if the name is empty or not unique.
    */
-  createAnimation(name: string, embedded = false): AnimationClip {
+  createAnimation(name: string, embedded = false) {
     if (!name || this._animations[name]) {
       console.error('Animation must have unique name');
       return null;
     } else {
       const animation = new AnimationClip(name, this, embedded);
       this._animations[name] = animation;
-      this._model.get().scene.queueUpdateNode(this._model.get());
+      this._model.scene?.queueUpdateNode(this._model);
       return animation;
     }
   }
@@ -184,7 +186,7 @@ export class AnimationSet extends Disposable implements IDisposable {
    *
    * @returns An array of clip names.
    */
-  getAnimationNames(): string[] {
+  getAnimationNames() {
     return Object.keys(this._animations);
   }
   /**
@@ -199,7 +201,7 @@ export class AnimationSet extends Disposable implements IDisposable {
    *
    * @param deltaInSeconds - Time step in seconds since last update.
    */
-  update(deltaInSeconds: number): void {
+  update(deltaInSeconds: number) {
     this._activeAnimations.forEach((v, k) => {
       if (v.fadeOut > 0 && v.fadeOutStart < 0) {
         v.fadeOutStart = v.animateTime;
@@ -236,7 +238,7 @@ export class AnimationSet extends Disposable implements IDisposable {
         );
         if (tracks.length > 0) {
           const weights = tracks.map((track) => {
-            const info = this._activeAnimations.get(track.animation);
+            const info = this._activeAnimations.get(track.animation!)!;
             const weight = info.weight;
             const fadeIn = info.fadeIn === 0 ? 1 : Math.min(1, info.animateTime / info.fadeIn);
             let fadeOut = 1;
@@ -246,9 +248,8 @@ export class AnimationSet extends Disposable implements IDisposable {
             return weight * fadeIn * fadeOut;
           });
           const states = tracks.map((track) => {
-            const t =
-              (this._activeAnimations.get(track.animation).currentTime / track.animation.timeDuration) *
-              track.getDuration();
+            const info = this._activeAnimations.get(track.animation!)!;
+            const t = (info.currentTime / track.animation!.timeDuration) * track.getDuration();
             return track.calculateState(k, t);
           });
           const state = weightedAverage(weights, states, (a, b, t) => {
@@ -269,8 +270,12 @@ export class AnimationSet extends Disposable implements IDisposable {
    * @param name - Optional animation name. If omitted, returns true if any animation is playing.
    * @returns True if playing; otherwise false.
    */
-  isPlayingAnimation(name?: string): boolean {
-    return name ? this._activeAnimations.has(this._animations[name]) : this._activeAnimations.size > 0;
+  isPlayingAnimation(name?: string) {
+    if (name) {
+      const animation = this._animations[name];
+      return !!animation && this._activeAnimations.has(animation);
+    }
+    return this._activeAnimations.size > 0;
   }
   /**
    * Get an animation clip by name.
@@ -280,7 +285,7 @@ export class AnimationSet extends Disposable implements IDisposable {
    * @param name - Name of the animation.
    * @returns The clip if present; otherwise null.
    */
-  getAnimationClip(name: string): AnimationClip | null {
+  getAnimationClip(name: string) {
     return this._animations[name] ?? null;
   }
   /**
@@ -291,8 +296,12 @@ export class AnimationSet extends Disposable implements IDisposable {
    * @param name - Name of the playing animation.
    * @param weight - New weight value used during blending.
    */
-  setAnimationWeight(name: string, weight: number): void {
+  setAnimationWeight(name: string, weight: number) {
     const ani = this._animations[name];
+    if (!ani) {
+      console.error(`Animation ${name} not exists`);
+      return;
+    }
     const info = this._activeAnimations.get(ani);
     if (info) {
       info.weight = weight;
@@ -309,7 +318,7 @@ export class AnimationSet extends Disposable implements IDisposable {
    * @param name - Name of the animation to play.
    * @param options - Playback options (repeat, speedRatio, fadeIn).
    */
-  playAnimation(name: string, options?: PlayAnimationOptions): void {
+  playAnimation(name: string, options?: PlayAnimationOptions) {
     const ani = this._animations[name];
     if (!ani) {
       console.error(`Animation ${name} not exists`);
@@ -379,8 +388,12 @@ export class AnimationSet extends Disposable implements IDisposable {
    * @param name - Name of the animation to stop.
    * @param options - Optional fade-out configuration.
    */
-  stopAnimation(name: string, options?: StopAnimationOptions): void {
+  stopAnimation(name: string, options?: StopAnimationOptions) {
     const ani = this._animations[name];
+    if (!ani) {
+      console.error(`Animation ${name} not exists`);
+      return;
+    }
     const info = this._activeAnimations.get(ani);
     if (info) {
       const fadeOut = Math.max(options?.fadeOut ?? 0, 0);
@@ -400,7 +413,7 @@ export class AnimationSet extends Disposable implements IDisposable {
         ani.skeletons?.forEach((v, k) => {
           const skeleton = this.model.findSkeletonById(k);
           if (skeleton) {
-            const refcount = this._activeSkeletons.get(skeleton);
+            const refcount = this._activeSkeletons.get(skeleton)!;
             if (refcount === 1) {
               skeleton.reset();
               this._activeSkeletons.delete(skeleton);
@@ -421,10 +434,8 @@ export class AnimationSet extends Disposable implements IDisposable {
    */
   protected onDispose() {
     super.onDispose();
-    this._model?.dispose();
-    this._model = null;
     for (const k in this._animations) {
-      this._animations[k].dispose();
+      this._animations[k]!.dispose();
     }
     this._animations = {};
     this._activeAnimations.clear();

@@ -1,6 +1,7 @@
 import { Plane } from './plane';
 import { Matrix4x4, Vector3 } from './vector';
 import { BoxSide } from './types';
+import type { Immutable } from '../utils';
 
 const nnn = [-1, -1, -1];
 const nnp = [-1, -1, 1];
@@ -28,9 +29,9 @@ export class Frustum {
   static readonly CORNER_RIGHT_BOTTOM_NEAR = 0b110;
   static readonly CORNER_RIGHT_BOTTOM_FAR = 0b111;
   /** @internal */
-  private _planes: Plane[];
+  private _planes!: Plane[];
   /** @internal */
-  private _corners: Vector3[];
+  private _corners!: Vector3[];
   /**
    * Creates a frustum from the tranform matrix.
    * @param transform - The transform matrix
@@ -42,8 +43,6 @@ export class Frustum {
    */
   constructor(other: Frustum);
   constructor(arg0: Matrix4x4 | Frustum) {
-    this._planes = null;
-    this._corners = null;
     if (arg0 instanceof Frustum) {
       this._planes = arg0._planes.map((plane) => new Plane(plane));
       this._corners = arg0._corners.map((vec) => new Vector3(vec));
@@ -54,13 +53,13 @@ export class Frustum {
   /**
    * Get the frustum planes.
    */
-  get planes(): Plane[] {
+  get planes(): Immutable<Plane[]> {
     return this._planes;
   }
   /**
    * Get the corner points.
    */
-  get corners(): Vector3[] {
+  get corners(): Immutable<Vector3[]> {
     return this._corners;
   }
   /**
@@ -83,7 +82,7 @@ export class Frustum {
    *
    * @returns The point of given corner
    */
-  getCorner(pos: number): Vector3 {
+  getCorner(pos: number) {
     return this.corners[pos];
   }
   /**
@@ -92,7 +91,7 @@ export class Frustum {
    * @param pt - The point to test.
    * @returns true if the point is inside the frustum, otherwise false
    */
-  containsPoint(pt: Vector3, epsl = 1e-6): boolean {
+  containsPoint(pt: Vector3, epsl = 1e-6) {
     for (const p of this.planes) {
       if (p.distanceToPoint(pt) < -epsl) {
         return false;
@@ -105,7 +104,7 @@ export class Frustum {
    * @param transform - Model-view matrix used to initialize the frustum
    * @returns self
    */
-  initWithMatrix(transform: Matrix4x4): this {
+  initWithMatrix(transform: Matrix4x4) {
     this._planes = this._planes || Array.from({ length: 6 }).map(() => new Plane());
     this._planes[BoxSide.LEFT]
       .setEquation(

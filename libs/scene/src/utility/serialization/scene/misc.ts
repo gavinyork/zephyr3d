@@ -1,5 +1,5 @@
 import { AABB } from '@zephyr3d/base';
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 
 /** @internal */
 export function getAABBClass(): SerializableClass {
@@ -7,7 +7,7 @@ export function getAABBClass(): SerializableClass {
     ctor: AABB,
     name: 'AABB',
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Min',
           type: 'vec3',
@@ -32,7 +32,7 @@ export function getAABBClass(): SerializableClass {
             this.maxPoint.setXYZ(value.num[0], value.num[1], value.num[2]);
           }
         }
-      ];
+      ]);
     }
   };
 }

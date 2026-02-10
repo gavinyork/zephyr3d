@@ -3,11 +3,9 @@ import { WebGLEnum } from './webgl_enum';
 import type {
   VertexLayout,
   StructuredBuffer,
-  IndexBuffer,
   VertexSemantic,
   VertexLayoutOptions,
-  PrimitiveType,
-  VertexBufferInfo
+  PrimitiveType
 } from '@zephyr3d/device';
 import { VertexData } from '@zephyr3d/device';
 import { typeMap } from './constants_webgl';
@@ -56,13 +54,13 @@ export class WebGLVertexLayout
       }
     }
   }
-  getVertexBuffer(semantic: VertexSemantic): StructuredBuffer {
+  getVertexBuffer(semantic: VertexSemantic) {
     return this._vertexData.getVertexBuffer(semantic);
   }
-  getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo {
+  getVertexBufferInfo(semantic: VertexSemantic) {
     return this._vertexData.getVertexBufferInfo(semantic);
   }
-  getIndexBuffer(): IndexBuffer {
+  getIndexBuffer() {
     return this._vertexData.getIndexBuffer();
   }
   bind() {
@@ -76,18 +74,18 @@ export class WebGLVertexLayout
       this.bindBuffers();
     }
   }
-  draw(primitiveType: PrimitiveType, first: number, count: number): void {
+  draw(primitiveType: PrimitiveType, first: number, count: number) {
     this._device.setVertexLayout(this);
     this._device.draw(primitiveType, first, count);
   }
-  drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number): void {
+  drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number) {
     this._device.setVertexLayout(this);
     this._device.drawInstanced(primitiveType, first, count, numInstances);
   }
   isVertexLayout(): this is VertexLayout {
     return true;
   }
-  private load(): void {
+  private load() {
     if (this._device.isContextLost()) {
       return;
     }
@@ -112,7 +110,7 @@ export class WebGLVertexLayout
         if (buffer.disposed) {
           buffer.reload();
         }
-        gl.bindBuffer(WebGLEnum.ARRAY_BUFFER, buffer.object);
+        gl.bindBuffer(WebGLEnum.ARRAY_BUFFER, buffer.object!);
         gl.enableVertexAttribArray(loc);
         if (bufferInfo.stepMode === 'instance' && this._device.instancedArraysExt) {
           gl.vertexAttribPointer(
@@ -143,7 +141,7 @@ export class WebGLVertexLayout
     }
     gl.bindBuffer(
       WebGLEnum.ELEMENT_ARRAY_BUFFER,
-      this._vertexData.indexBuffer ? this._vertexData.indexBuffer.object : null
+      this._vertexData.indexBuffer ? this._vertexData.indexBuffer.object! : null
     );
   }
 }

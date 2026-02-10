@@ -29,17 +29,17 @@ function getQueryString(name: string) {
   return new URL(window.location.toString()).searchParams.get(name) || null;
 }
 
-function getBackend(): DeviceBackend {
+async function getBackend(): Promise<DeviceBackend> {
   const type = getQueryString('dev') || 'webgl';
   if (type === 'webgpu') {
-    if (backendWebGPU.supported()) {
+    if (await backendWebGPU.supported()) {
       return backendWebGPU;
     } else {
       console.warn('No WebGPU support, fall back to WebGL2');
     }
   }
   if (type === 'webgl2') {
-    if (backendWebGL2.supported()) {
+    if (await backendWebGL2.supported()) {
       return backendWebGL2;
     } else {
       console.warn('No WebGL2 support, fall back to WebGL1');
@@ -80,7 +80,7 @@ async function fetchModel(scene: Scene, url: string) {
 }
 
 const myApp = new Application({
-  backend: getBackend(),
+  backend: await getBackend(),
   canvas: document.querySelector('#canvas')
 });
 

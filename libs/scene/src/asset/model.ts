@@ -1,4 +1,4 @@
-import type { Vector4, TypedArray, Interpolator } from '@zephyr3d/base';
+import type { Vector4, TypedArray, Interpolator, Nullable } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import { type Texture2D, type TextureSampler } from '@zephyr3d/device';
@@ -33,10 +33,10 @@ export class NamedObject {
  * @public
  */
 export interface MaterialTextureInfo {
-  texture: Texture2D;
-  sampler: TextureSampler;
+  texture: Nullable<Texture2D>;
+  sampler: Nullable<TextureSampler>;
   texCoord: number;
-  transform: Matrix4x4;
+  transform: Nullable<Matrix4x4>;
 }
 
 /**
@@ -50,12 +50,12 @@ export interface AssetMaterialCommon {
   alphaMode?: 'blend' | 'mask';
   alphaCutoff?: number;
   doubleSided?: boolean;
-  normalMap?: MaterialTextureInfo;
+  normalMap?: Nullable<MaterialTextureInfo>;
   bumpScale?: number;
-  emissiveMap?: MaterialTextureInfo;
+  emissiveMap?: Nullable<MaterialTextureInfo>;
   emissiveColor?: Vector3;
   emissiveStrength?: number;
-  occlusionMap?: MaterialTextureInfo;
+  occlusionMap?: Nullable<MaterialTextureInfo>;
   occlusionStrength?: number;
 }
 
@@ -73,7 +73,7 @@ export interface AssetMaterial {
  * @public
  */
 export interface AssetUnlitMaterial extends AssetMaterial {
-  diffuseMap?: MaterialTextureInfo;
+  diffuseMap?: Nullable<MaterialTextureInfo>;
   diffuse?: Vector4;
 }
 
@@ -83,9 +83,9 @@ export interface AssetUnlitMaterial extends AssetMaterial {
  */
 export interface AssetMaterialSheen {
   sheenColorFactor?: Vector3;
-  sheenColorMap?: MaterialTextureInfo;
+  sheenColorMap?: Nullable<MaterialTextureInfo>;
   sheenRoughnessFactor?: number;
-  sheenRoughnessMap?: MaterialTextureInfo;
+  sheenRoughnessMap?: Nullable<MaterialTextureInfo>;
 }
 
 /**
@@ -94,10 +94,10 @@ export interface AssetMaterialSheen {
  */
 export interface AssetMaterialClearcoat {
   clearCoatFactor?: number;
-  clearCoatIntensityMap?: MaterialTextureInfo;
+  clearCoatIntensityMap?: Nullable<MaterialTextureInfo>;
   clearCoatRoughnessFactor?: number;
-  clearCoatRoughnessMap?: MaterialTextureInfo;
-  clearCoatNormalMap?: MaterialTextureInfo;
+  clearCoatRoughnessMap?: Nullable<MaterialTextureInfo>;
+  clearCoatNormalMap?: Nullable<MaterialTextureInfo>;
 }
 
 /**
@@ -106,9 +106,9 @@ export interface AssetMaterialClearcoat {
  */
 export interface AssetMaterialTransmission {
   transmissionFactor?: number;
-  transmissionMap?: MaterialTextureInfo;
+  transmissionMap?: Nullable<MaterialTextureInfo>;
   thicknessFactor?: number;
-  thicknessMap?: MaterialTextureInfo;
+  thicknessMap?: Nullable<MaterialTextureInfo>;
   attenuationColor?: Vector3;
   attenuationDistance?: number;
 }
@@ -119,11 +119,11 @@ export interface AssetMaterialTransmission {
  */
 export interface AssetMaterialIridescence {
   iridescenceFactor?: number;
-  iridescenceMap?: MaterialTextureInfo;
+  iridescenceMap?: Nullable<MaterialTextureInfo>;
   iridescenceIor?: number;
   iridescenceThicknessMinimum?: number;
   iridescenceThicknessMaximum?: number;
-  iridescenceThicknessMap?: MaterialTextureInfo;
+  iridescenceThicknessMap?: Nullable<MaterialTextureInfo>;
 }
 
 /**
@@ -141,11 +141,11 @@ export interface AssetPBRMaterialCommon extends AssetUnlitMaterial {
 export interface AssetPBRMaterialMR extends AssetPBRMaterialCommon {
   metallic?: number;
   roughness?: number;
-  metallicMap?: MaterialTextureInfo;
+  metallicMap?: Nullable<MaterialTextureInfo>;
   metallicIndex?: number;
   roughnessIndex?: number;
-  specularMap?: MaterialTextureInfo;
-  specularColorMap?: MaterialTextureInfo;
+  specularMap?: Nullable<MaterialTextureInfo>;
+  specularColorMap?: Nullable<MaterialTextureInfo>;
   specularFactor?: Vector4;
   sheen?: AssetMaterialSheen;
   clearcoat?: AssetMaterialClearcoat;
@@ -160,7 +160,7 @@ export interface AssetPBRMaterialMR extends AssetPBRMaterialCommon {
 export interface AssetPBRMaterialSG extends AssetPBRMaterialCommon {
   specular?: Vector3;
   glossness?: number;
-  specularGlossnessMap?: MaterialTextureInfo;
+  specularGlossnessMap?: Nullable<MaterialTextureInfo>;
 }
 
 /**
@@ -171,9 +171,9 @@ export interface AssetSubMeshData {
   primitive: DRef<Primitive>;
   material: DRef<MeshMaterial>;
   mesh?: Mesh;
-  rawPositions: Float32Array;
-  rawBlendIndices: TypedArray;
-  rawJointWeights: TypedArray;
+  rawPositions: Nullable<Float32Array>;
+  rawBlendIndices: Nullable<TypedArray>;
+  rawJointWeights: Nullable<TypedArray>;
   name: string;
   numTargets: number;
   targets?: Partial<Record<number, { numComponents: number; data: Float32Array[] }>>;
@@ -186,7 +186,7 @@ export interface AssetSubMeshData {
  * @public
  */
 export interface AssetMeshData {
-  morphWeights?: number[];
+  morphWeights?: Nullable<number[]>;
   subMeshes: AssetSubMeshData[];
 }
 
@@ -253,17 +253,17 @@ export interface AssetScaleTrack extends AssetAnimationTrack {
  * @public
  */
 export class AssetHierarchyNode extends NamedObject {
-  private _parent: AssetHierarchyNode;
+  private _parent: Nullable<AssetHierarchyNode>;
   private _position: Vector3;
   private _rotation: Quaternion;
   private _scaling: Vector3;
-  private _mesh: AssetMeshData;
-  private _skeleton: AssetSkeleton;
-  private _attachToSkeleton: Set<AssetSkeleton>;
+  private _mesh: Nullable<AssetMeshData>;
+  private _skeleton: Nullable<AssetSkeleton>;
+  private _attachToSkeleton: Nullable<Set<AssetSkeleton>>;
   private _meshAttached: boolean;
-  private _matrix: Matrix4x4;
-  private _worldMatrix: Matrix4x4;
-  private _weights: number[];
+  private _matrix: Nullable<Matrix4x4>;
+  private _worldMatrix: Nullable<Matrix4x4>;
+  private _weights: Nullable<number[]>;
   private readonly _children: AssetHierarchyNode[];
   private readonly _instances?: { t: Vector3; s: Vector3; r: Quaternion }[];
   /**
@@ -271,7 +271,7 @@ export class AssetHierarchyNode extends NamedObject {
    * @param name - Name of the node
    * @param parent - Parent of the node
    */
-  constructor(name: string, parent?: AssetHierarchyNode) {
+  constructor(name: string, parent?: Nullable<AssetHierarchyNode>) {
     super(name);
     this._parent = null;
     this._position = Vector3.zero();
@@ -289,78 +289,78 @@ export class AssetHierarchyNode extends NamedObject {
     parent?.addChild(this);
   }
   /** Parent of the node */
-  get parent(): AssetHierarchyNode {
+  get parent() {
     return this._parent;
   }
   /** Local transformation matrix of the node */
-  get matrix(): Matrix4x4 {
+  get matrix() {
     return this._matrix;
   }
   /** World transformation matrix of the node */
-  get worldMatrix(): Matrix4x4 {
+  get worldMatrix() {
     return this._worldMatrix;
   }
   /** Mesh data of the node, or null if this is not a mesh node */
-  get mesh(): AssetMeshData {
+  get mesh() {
     return this._mesh;
   }
-  set mesh(data: AssetMeshData) {
+  set mesh(data) {
     this._mesh = data;
     this.setMeshAttached();
   }
   /** instances */
-  get instances(): { t: Vector3; s: Vector3; r: Quaternion }[] {
-    return this._instances;
+  get instances() {
+    return this._instances ?? null;
   }
   /** Default morph target weights */
-  get weights(): number[] {
+  get weights() {
     return this._weights;
   }
-  set weights(val: number[]) {
+  set weights(val) {
     this._weights = val;
   }
   /** The skeleton used to control the node */
-  get skeleton(): AssetSkeleton {
+  get skeleton() {
     return this._skeleton;
   }
-  set skeleton(skeleton: AssetSkeleton) {
+  set skeleton(skeleton) {
     this._skeleton = skeleton;
   }
   /** The translation of the node */
-  get position(): Vector3 {
+  get position() {
     return this._position;
   }
-  set position(val: Vector3) {
+  set position(val) {
     this._position = val;
   }
   /** The rotation of the node */
-  get rotation(): Quaternion {
+  get rotation() {
     return this._rotation;
   }
-  set rotation(val: Quaternion) {
+  set rotation(val) {
     this._rotation = val;
   }
   /** The scale of the node */
-  get scaling(): Vector3 {
+  get scaling() {
     return this._scaling;
   }
-  set scaling(val: Vector3) {
+  set scaling(val) {
     this._scaling = val;
   }
   /** true if the node is parent of a mesh node */
-  get meshAttached(): boolean {
+  get meshAttached() {
     return this._meshAttached;
   }
   /** Children of the node */
-  get children(): AssetHierarchyNode[] {
+  get children() {
     return this._children;
   }
   /** The skeleton to which the node belongs if this is a joint node */
-  get skeletonAttached(): Set<AssetSkeleton> {
+  get skeletonAttached() {
     return this._attachToSkeleton;
   }
   /** @internal */
-  computeTransforms(parentTransform: Matrix4x4) {
+  computeTransforms(parentTransform: Nullable<Matrix4x4>) {
     this._matrix = Matrix4x4.scaling(this._scaling).rotateLeft(this._rotation).translateLeft(this._position);
     this._worldMatrix = parentTransform
       ? Matrix4x4.multiply(parentTransform, this._matrix)
@@ -419,7 +419,7 @@ export class AssetHierarchyNode extends NamedObject {
  */
 export class AssetSkeleton extends NamedObject {
   /** The pivot node */
-  pivot: AssetHierarchyNode;
+  pivot: Nullable<AssetHierarchyNode>;
   /** Joints of the skeleton */
   joints: AssetHierarchyNode[];
   /** Inverse of the binding matrices of the joints */
@@ -447,7 +447,7 @@ export class AssetSkeleton extends NamedObject {
     joint.attachToSkeleton(this);
     this.joints.push(joint);
     this.inverseBindMatrices.push(inverseBindMatrix);
-    this.bindPoseMatrices.push(joint.worldMatrix);
+    this.bindPoseMatrices.push(joint.worldMatrix!.clone());
   }
 }
 
@@ -499,33 +499,33 @@ export class SharedModel extends Disposable {
     this._activeScene = -1;
   }
   /** Name of the model */
-  get name(): string {
+  get name() {
     return this._name;
   }
-  set name(val: string) {
+  set name(val) {
     this._name = val;
   }
   /** All scenes that the model contains */
-  get scenes(): AssetScene[] {
+  get scenes() {
     return this._scenes;
   }
   /** All animations that the model contains */
-  get animations(): AssetAnimationData[] {
+  get animations() {
     return this._animations;
   }
   /** All skeletons that the model contains */
-  get skeletons(): AssetSkeleton[] {
+  get skeletons() {
     return this._skeletons;
   }
   /** All nodes that the model contains */
-  get nodes(): AssetHierarchyNode[] {
+  get nodes() {
     return this._nodes;
   }
   /** The active scene of the model */
-  get activeScene(): number {
+  get activeScene() {
     return this._activeScene;
   }
-  set activeScene(val: number) {
+  set activeScene(val) {
     this._activeScene = val;
   }
   /**
@@ -535,7 +535,7 @@ export class SharedModel extends Disposable {
    * @param name - Name of the node
    * @returns The added node
    */
-  addNode(parent: AssetHierarchyNode, index: number, name: string): AssetHierarchyNode {
+  addNode(parent: Nullable<AssetHierarchyNode>, index: number, name: string) {
     const childNode = new AssetHierarchyNode(name, parent);
     this._nodes[index] = childNode;
     return childNode;
@@ -554,7 +554,7 @@ export class SharedModel extends Disposable {
   addAnimation(animation: AssetAnimationData) {
     this._animations.push(animation);
   }
-  createSceneNode(scene: Scene, instancing: boolean): SceneNode {
+  createSceneNode(scene: Scene, instancing: boolean) {
     const group = new SceneNode(scene);
     group.name = this.name;
     const animationSet = group.animationSet;
@@ -586,16 +586,16 @@ export class SharedModel extends Disposable {
             }
           }
         }
-        const animation = animationSet.createAnimation(name, true);
+        const animation = animationSet.createAnimation(name, true)!;
         for (const track of animationData.tracks) {
           if (track.type === 'translation') {
-            animation.addTrack(nodeMap.get(track.node), new NodeTranslationTrack(track.interpolator, true));
+            animation.addTrack(nodeMap.get(track.node)!, new NodeTranslationTrack(track.interpolator, true));
           } else if (track.type === 'scale') {
-            animation.addTrack(nodeMap.get(track.node), new NodeScaleTrack(track.interpolator, true));
+            animation.addTrack(nodeMap.get(track.node)!, new NodeScaleTrack(track.interpolator, true));
           } else if (track.type === 'rotation') {
-            animation.addTrack(nodeMap.get(track.node), new NodeRotationTrack(track.interpolator, true));
+            animation.addTrack(nodeMap.get(track.node)!, new NodeRotationTrack(track.interpolator, true));
           } else if (track.type === 'weights') {
-            for (const m of track.node.mesh.subMeshes) {
+            for (const m of track.node.mesh!.subMeshes) {
               if (track.interpolator.stride > MAX_MORPH_TARGETS) {
                 console.error(
                   `Morph target too large: ${track.interpolator.stride}, the maximum is ${MAX_MORPH_TARGETS}`
@@ -605,10 +605,10 @@ export class SharedModel extends Disposable {
                   track.interpolator,
                   track.defaultMorphWeights,
                   m.targetBox,
-                  m.mesh.getBoundingVolume().toAABB(),
+                  m.mesh!.getBoundingVolume()!.toAABB(),
                   true
                 );
-                animation.addTrack(m.mesh, morphTrack);
+                animation.addTrack(m.mesh!, morphTrack);
               }
             }
           } else {
@@ -620,16 +620,16 @@ export class SharedModel extends Disposable {
           if (nodes) {
             if (!nodes.skeleton) {
               nodes.skeleton = new Skeleton(
-                sk.joints.map((val) => nodeMap.get(val)),
+                sk.joints.map((val) => nodeMap.get(val)!),
                 sk.inverseBindMatrices,
                 sk.bindPoseMatrices
               );
               for (let i = 0; i < nodes.mesh.length; i++) {
                 const mesh = nodes.mesh[i];
                 const v = {
-                  positions: nodes.bounding[i].rawPositions,
-                  blendIndices: nodes.bounding[i].rawBlendIndices,
-                  weights: nodes.bounding[i].rawJointWeights
+                  positions: nodes.bounding[i].rawPositions!,
+                  blendIndices: nodes.bounding[i].rawBlendIndices!,
+                  weights: nodes.bounding[i].rawJointWeights!
                 };
                 mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
                 mesh.skeletonName = nodes.skeleton.persistentId;
@@ -654,8 +654,8 @@ export class SharedModel extends Disposable {
     const nodes = [...this._nodes];
     while (nodes.length > 0) {
       const node = nodes.shift();
-      nodes.push(...node.children);
-      const mesh = node.mesh;
+      nodes.push(...node!.children);
+      const mesh = node!.mesh;
       if (mesh) {
         for (const subMesh of mesh.subMeshes) {
           subMesh.primitive?.dispose();
@@ -686,7 +686,7 @@ export class SharedModel extends Disposable {
       const meshData = assetNode.mesh;
       const skeleton = assetNode.skeleton;
       for (const subMesh of meshData.subMeshes) {
-        for (const instance of assetNode.instances) {
+        for (const instance of assetNode.instances!) {
           const meshNode = new Mesh(scene);
           meshNode.position = instance.t;
           meshNode.scale = instance.s;
@@ -696,20 +696,20 @@ export class SharedModel extends Disposable {
           meshNode.showState = 'inherit';
           meshNode.skinAnimation = !!skeleton;
           meshNode.morphAnimation = subMesh.numTargets > 0;
-          meshNode.primitive = subMesh.primitive.get();
+          meshNode.primitive = subMesh.primitive.get()!;
           meshNode.material =
             instancing && !meshNode.skinAnimation && !meshNode.morphAnimation
-              ? subMesh.material.get().createInstance()
-              : subMesh.material.get().clone();
+              ? subMesh.material.get()!.createInstance()
+              : subMesh.material.get()!.clone();
           meshNode.parent = node;
           subMesh.mesh = meshNode;
-          processMorphData(subMesh, meshData.morphWeights);
+          processMorphData(subMesh, meshData.morphWeights!);
           if (skeleton) {
             if (!skeletonMeshMap.has(skeleton)) {
               skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });
             } else {
-              skeletonMeshMap.get(skeleton).mesh.push(meshNode);
-              skeletonMeshMap.get(skeleton).bounding.push(subMesh);
+              skeletonMeshMap.get(skeleton)!.mesh.push(meshNode);
+              skeletonMeshMap.get(skeleton)!.bounding.push(subMesh);
             }
           }
         }

@@ -1,7 +1,6 @@
-import type { AABB, Clonable } from '@zephyr3d/base';
+import type { AABB, Clonable, DeepRequireOptionals } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
-import type { PrimitiveType } from '@zephyr3d/device';
 
 /**
  * Creation options for box shape
@@ -43,12 +42,12 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
   constructor(options?: BoxCreationOptions) {
     super(options);
   }
-  clone(): BoxShape {
-    return new BoxShape(this._options);
+  clone() {
+    return new BoxShape(this._options) as this;
   }
   /** type of the shape */
-  get type(): string {
-    return 'Box';
+  get type() {
+    return 'Box' as const;
   }
   /**
    * Generates the data for the box shape
@@ -58,7 +57,7 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
    * @param indices - vertex indices
    */
   static generateData(
-    options: BoxCreationOptions,
+    opt: BoxCreationOptions,
     vertices: number[],
     normals: number[],
     tangents: number[],
@@ -67,8 +66,8 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
     bbox?: AABB,
     indexOffset?: number,
     vertexCallback?: (index: number, x: number, y: number, z: number) => void
-  ): PrimitiveType {
-    options = Object.assign({}, this._defaultOptions, options ?? {});
+  ) {
+    const options = Object.assign({}, this._defaultOptions, opt ?? {});
     indexOffset = indexOffset ?? 0;
     const start = vertices.length;
     const sizeX = options?.sizeX ?? options?.size ?? 1;
@@ -143,14 +142,14 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
       ...bottomFacePos
     );
     normals?.push(
-      ...topFacenormal,
-      ...frontFaceNormal,
-      ...rightFaceNormal,
-      ...backFaceNormal,
-      ...leftFaceNormal,
-      ...bottomFaceNormal
+      ...topFacenormal!,
+      ...frontFaceNormal!,
+      ...rightFaceNormal!,
+      ...backFaceNormal!,
+      ...leftFaceNormal!,
+      ...bottomFaceNormal!
     );
-    uvs?.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
+    uvs?.push(...uv!, ...uv!, ...uv!, ...uv!, ...uv!, ...uv!);
     if (tangents) {
       const pushFaceTangent = (tx: number, ty: number, tz: number) => {
         tangents.push(tx, ty, tz, 1.0, tx, ty, tz, 1.0, tx, ty, tz, 1.0, tx, ty, tz, 1.0);
@@ -182,18 +181,18 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
         vertexCallback?.((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
       }
     }
-    return 'triangle-list';
+    return 'triangle-list' as const;
   }
   /** Box width */
-  get width(): number {
+  get width() {
     return this._options.sizeX ?? this._options.size ?? 1;
   }
   /** Box height */
-  get height(): number {
+  get height() {
     return this._options.sizeY ?? this._options.size ?? 1;
   }
   /** Box depth */
-  get depth(): number {
+  get depth() {
     return this._options.sizeZ ?? this._options.size ?? 1;
   }
 }
@@ -206,7 +205,13 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
   static _defaultOptions = {
     ...Shape._defaultOptions,
     size: 1,
-    anchor: 0.5
+    sizeX: 1,
+    sizeY: 1,
+    sizeZ: 1,
+    anchor: 0.5,
+    anchorX: 0.5,
+    anchorY: 0.5,
+    anchorZ: 0.5
   };
   /**
    * Creates an instance of wireframe box shape
@@ -215,12 +220,12 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
   constructor(options?: BoxCreationOptions) {
     super(options);
   }
-  clone(): BoxFrameShape {
-    return new BoxFrameShape(this._options);
+  clone() {
+    return new BoxFrameShape(this._options) as this;
   }
   /** type of the shape */
-  get type(): string {
-    return 'BoxFrame';
+  get type() {
+    return 'BoxFrame' as const;
   }
   /**
    * Generates the data for the box shape
@@ -230,7 +235,7 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
    * @param indices - vertex indices
    */
   static generateData(
-    options: BoxCreationOptions,
+    options: DeepRequireOptionals<BoxCreationOptions>,
     vertices: number[],
     normals: number[],
     tangents: number[],
@@ -239,7 +244,7 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
     bbox?: AABB,
     indexOffset?: number,
     vertexCallback?: (index: number, x: number, y: number, z: number) => void
-  ): PrimitiveType {
+  ) {
     options = Object.assign({}, this._defaultOptions, options ?? {});
     indexOffset = indexOffset ?? 0;
     const start = vertices.length;
@@ -287,8 +292,8 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
       6 + indexOffset
     );
     vertices?.push(...topFacePos, ...bottomFacePos);
-    normals?.push(...topFacenormal, ...bottomFaceNormal);
-    uvs?.push(...uv, ...uv, ...uv, ...uv, ...uv, ...uv);
+    normals?.push(...topFacenormal!, ...bottomFaceNormal!);
+    uvs?.push(...uv!, ...uv!, ...uv!, ...uv!, ...uv!, ...uv!);
     if (tangents) {
       const pushFaceTangent = (tx: number, ty: number, tz: number) => {
         tangents.push(tx, ty, tz, 1.0, tx, ty, tz, 1.0, tx, ty, tz, 1.0, tx, ty, tz, 1.0);
@@ -320,6 +325,6 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
         vertexCallback?.((i - start) / 3, vertices[i], vertices[i + 1], vertices[i + 2]);
       }
     }
-    return 'line-list';
+    return 'line-list' as const;
   }
 }

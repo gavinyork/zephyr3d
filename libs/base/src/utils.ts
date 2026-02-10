@@ -1,4 +1,4 @@
-const colorNames = {
+const colorNames: Record<string, string> = {
   aliceblue: '#f0f8ff',
   antiquewhite: '#faebd7',
   aqua: '#00ffff',
@@ -143,6 +143,83 @@ const colorNames = {
 };
 
 /**
+ * Nullable type modifier
+ * @public
+ */
+export type Nullable<T> = T | null;
+
+/**
+ * Extract element type from array type
+ * @public
+ */
+export type ElementType<T> = T extends (infer U)[] ? U : never;
+
+/**
+ * Object.entries with typed return value
+ * @param obj - The object to extract entries from.
+ * @returns An array of key-value pairs from the object.
+ */
+export function objectEntries<T extends Record<PropertyKey, unknown>>(obj: T) {
+  return Object.entries(obj) as { [K in keyof T]-?: [K, T[K]] }[keyof T][];
+}
+
+/**
+ * Object.keys with typed return value
+ * @param obj - The object to extract keys from.
+ * @returns An array of keys from the object.
+ */
+export function objectKeys<T extends {}>(obj: T) {
+  return Object.keys(obj) as (keyof T)[];
+}
+
+/**
+ * Make optional properties as required
+ * @public
+ */
+export type RequireOptionals<T> = {
+  [K in keyof T]-?: {} extends Pick<T, K> ? Exclude<T[K], undefined> : T[K];
+};
+
+/**
+ * Deep version: recursively apply RequireOptionals
+ * @public
+ */
+export type DeepRequireOptionals<T> = T extends
+  | Function
+  | Date
+  | RegExp
+  | symbol
+  | bigint
+  | string
+  | number
+  | boolean
+  ? T
+  : T extends readonly (infer U)[]
+    ? readonly DeepRequireOptionals<U>[]
+    : T extends object
+      ? {
+          [K in keyof T]-?: {} extends Pick<T, K>
+            ? Exclude<DeepRequireOptionals<T[K]>, undefined>
+            : DeepRequireOptionals<T[K]>;
+        }
+      : T;
+
+/**
+ * Immutable type modifier
+ */
+export type Immutable<T> = T extends (...args: any[]) => any
+  ? T
+  : T extends readonly (infer U)[]
+    ? ReadonlyArray<Immutable<U>>
+    : T extends Map<infer K, infer V>
+      ? ReadonlyMap<Immutable<K>, Immutable<V>>
+      : T extends Set<infer U>
+        ? ReadonlySet<Immutable<U>>
+        : T extends object
+          ? Readonly<{ [K in keyof T]: Immutable<T[K]> }>
+          : T;
+
+/**
  * A generic constructor type
  * @public
  */
@@ -150,6 +227,17 @@ export type GenericConstructor<T = object> = {
   new (...args: any[]): T;
   isPrototypeOf(v: object): boolean;
 };
+
+/**
+ * Rectangle type
+ * @public
+ */
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 /**
  * Clonable interface
@@ -193,37 +281,37 @@ export type TypedArrayConstructor<T extends TypedArray = any> = {
  */
 export class HttpRequest {
   /** @internal */
-  static _tempElement: HTMLAnchorElement = null;
+  static _tempElement: Nullable<HTMLAnchorElement> = null;
   /** @internal */
-  private _urlResolver: (url: string) => string;
+  private _urlResolver: Nullable<(url: string) => string>;
   /** @internal */
   private _crossOrigin: string;
   /** @internal */
   private _headers: Record<string, string>;
   constructor(urlResolver?: (url: string) => string) {
-    this._urlResolver = urlResolver;
+    this._urlResolver = urlResolver ?? null;
     this._crossOrigin = '';
     this._headers = {};
   }
   /** Get the custom URL resolver */
-  get urlResolver(): (url: string) => string {
+  get urlResolver() {
     return this._urlResolver;
   }
-  set urlResolver(resolver: (url: string) => string) {
+  set urlResolver(resolver) {
     this._urlResolver = resolver;
   }
   /** Get the cross origin property */
-  get crossOrigin(): string {
+  get crossOrigin() {
     return this._crossOrigin;
   }
-  set crossOrigin(val: string) {
+  set crossOrigin(val) {
     this._crossOrigin = val;
   }
   /** Get the request headers */
-  get headers(): Record<string, string> {
+  get headers() {
     return this._headers;
   }
-  set headers(val: Record<string, string>) {
+  set headers(val) {
     this._headers = val;
   }
   /**
@@ -231,7 +319,7 @@ export class HttpRequest {
    * @param url - The input url string,
    * @returns The resolved URL string.
    */
-  resolveURL(url: string): string {
+  resolveURL(url: string) {
     if (!HttpRequest._tempElement) {
       HttpRequest._tempElement = document.createElement('a');
     }
@@ -243,7 +331,7 @@ export class HttpRequest {
    * @param url - The remote URL to fetch.
    * @returns The fetch result.
    */
-  async request(url: string): Promise<Response> {
+  async request(url: string) {
     url = this._urlResolver ? this._urlResolver(url) : this.resolveURL(url);
     return url
       ? fetch(url, {
@@ -257,7 +345,7 @@ export class HttpRequest {
    * @param url - The remote URL to fetch.
    * @returns The fetch result.
    */
-  async requestText(url: string): Promise<string> {
+  async requestText(url: string) {
     const response = await this.request(url);
     if (!response?.ok) {
       throw new Error(`Asset download failed: ${url}`);
@@ -269,7 +357,7 @@ export class HttpRequest {
    * @param url - The remote URL to fetch.
    * @returns The fetch result.
    */
-  async requestJson(url: string): Promise<string> {
+  async requestJson(url: string) {
     const response = await this.request(url);
     if (!response?.ok) {
       throw new Error(`Asset download failed: ${url}`);
@@ -281,7 +369,7 @@ export class HttpRequest {
    * @param url - The remote URL to fetch.
    * @returns The fetch result.
    */
-  async requestArrayBuffer(url: string): Promise<ArrayBuffer> {
+  async requestArrayBuffer(url: string) {
     const response = await this.request(url);
     if (!response?.ok) {
       throw new Error(`Asset download failed: ${url}`);
@@ -293,7 +381,7 @@ export class HttpRequest {
    * @param url - The remote URL to fetch.
    * @returns The fetch result.
    */
-  async requestBlob(url: string): Promise<Blob> {
+  async requestBlob(url: string) {
     const arrayBuffer = await this.requestArrayBuffer(url);
     return new Blob([arrayBuffer]);
   }
@@ -361,7 +449,7 @@ export function ASSERT(condition: boolean, message?: string): asserts condition 
  * @returns Base64 string
  * @public
  */
-export function uint8ArrayToBase64(array: Uint8Array): string {
+export function uint8ArrayToBase64(array: Uint8Array) {
   let binaryString = '';
   for (let i = 0; i < array.length; i++) {
     binaryString += String.fromCharCode(array[i]);
@@ -375,7 +463,7 @@ export function uint8ArrayToBase64(array: Uint8Array): string {
  * @returns Base64 string
  * @public
  */
-export function textToBase64(text: string): string {
+export function textToBase64(text: string) {
   const encoder = new TextEncoder();
   const uint8Array = encoder.encode(text);
   return uint8ArrayToBase64(uint8Array);
@@ -387,7 +475,7 @@ export function textToBase64(text: string): string {
  * @returns Original text
  * @public
  */
-export function base64ToText(base64: string): string {
+export function base64ToText(base64: string) {
   const bytes = base64ToUint8Array(base64);
   return new TextDecoder('utf-8').decode(bytes);
 }
@@ -398,7 +486,7 @@ export function base64ToText(base64: string): string {
  * @returns Uint8Array
  * @public
  */
-export function base64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
+export function base64ToUint8Array(base64: string) {
   const binaryString = atob(base64);
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
@@ -448,15 +536,33 @@ export function IS_INSTANCE_OF<T extends GenericConstructor>(
 }
 
 /**
+ * Check if a constructor is a subclass of another constructor.
+ * @param derived - The derived constructor.
+ * @param base - The base constructor.
+ * @returns True if the derived is a subclass of the base, false otherwise.
+ * @public
+ */
+export function IS_SUBCLASS_OF<B extends new (...args: any[]) => any, D extends B>(
+  derived: new (...args: any[]) => any,
+  base: B
+): derived is D {
+  return !!(
+    base &&
+    derived &&
+    (derived === (base as any) || base.prototype.isPrototypeOf(derived.prototype))
+  );
+}
+
+/**
  * parse a css color value to RGBA color type.
  * @param input - The css color value.
  * @returns The RGBA color value.
  * @public
  */
-export function parseColor(input: string): ColorRGBA {
-  input = input.trim().toLowerCase();
+export function parseColor(input: string) {
+  input = input.trim().toLowerCase() as keyof typeof colorNames;
   input = colorNames[input] || input;
-  let v: ColorRGBA = null;
+  let v: Nullable<ColorRGBA> = null;
   if (input[0] === '#') {
     const collen = (input.length - 1) / 3;
     const fact = [17, 1, 0.062272][collen - 1];
@@ -467,7 +573,7 @@ export function parseColor(input: string): ColorRGBA {
       a: 1
     };
   } else {
-    let m: RegExpMatchArray;
+    let m: Nullable<RegExpMatchArray>;
     if ((m = input.match(/^\s*rgb\s*\(\s*(\d*\.?\d*)\s*,\s*(\d*\.?\d*)\s*,\s*(\d\.?\d*)\s*\)\s*$/i))) {
       v = {
         r: Number(m[1]) / 255,
@@ -546,13 +652,26 @@ interface FormatToken {
   };
   width?: number; // number or from-arg
   widthFromArg?: boolean; // *
+  widthIndex?: number;
   precision?: number; // .number or from-arg
   precisionFromArg?: boolean; // .*
+  precisionIndex?: number;
   type: string; // s d i u f x X o c %
   explicitIndex?: number; // n$ style index (1-based)
 }
 
-const formatRegex = /%(?:(\d+)\$)?([-+ 0#]*)(\*|\d+)?(?:\.(\*|\d+))?([%sdifuoxXc])/g;
+// 说明：
+//  1: i$           -> 显式索引（整个转换的值索引）
+//  2: flagsStr
+//  3: starWidth    -> '*'（有星号宽度）
+//  4: widthIndex$  -> 星号宽度的显式索引，如 *3$ 里的 3
+//  5: widthNum     -> 数字宽度，如 10
+//  6: starPrec     -> '*'（有星号精度）
+//  7: precIndex$   -> 星号精度的显式索引，如 *4$ 里的 4
+//  8: precNum      -> 数字精度，如 .2
+//  9: type
+const formatRegex =
+  /%(?:(\d+)\$)?([-+ 0#]*)(?:(\*)(?:(\d+)\$)?|(\d+))?(?:\.(?:(\*)(?:(\d+)\$)?|(\d+)))?([%sdifuoxXc])/g;
 
 /**
  * Simple sprintf implementation:
@@ -592,7 +711,7 @@ const formatRegex = /%(?:(\d+)\$)?([-+ 0#]*)(\*|\d+)?(?:\.(\*|\d+))?([%sdifuoxXc
  *
  * @public
  */
-export function formatString(format: string, ...args: SprintfArg[]): string {
+export function formatString(format: string, ...args: SprintfArg[]) {
   let out = '';
   let lastIndex = 0;
   let argIndex = 0;
@@ -619,150 +738,172 @@ export function formatString(format: string, ...args: SprintfArg[]): string {
     return n;
   };
 
-  format.replace(formatRegex, (match, i$, flagsStr, widthStr, precStr, type, offset) => {
-    out += format.slice(lastIndex, offset);
-    lastIndex = offset + match.length;
+  format.replace(
+    formatRegex,
+    (
+      match,
+      i$, // 1
+      flagsStr, // 2
+      starWidth, // 3: '*' or undefined
+      widthIndex$, // 4: like '3' in *3$
+      widthNum, // 5: like '10'
+      starPrec, // 6: '*' or undefined
+      precIndex$, // 7: like '4' in *4$
+      precNum, // 8: like '2'
+      type, // 9
+      offset
+    ) => {
+      out += format.slice(lastIndex, offset);
+      lastIndex = offset + match.length;
 
-    const token: FormatToken = {
-      flags: {
-        leftAlign: false,
-        sign: false,
-        space: false,
-        zeroPad: false,
-        alt: false
-      },
-      type
-    };
-
-    if (i$) {
-      token.explicitIndex = parseInt(i$, 10);
-    }
-
-    // flags
-    for (const ch of flagsStr || '') {
-      switch (ch) {
-        case '-':
-          token.flags.leftAlign = true;
-          break;
-        case '+':
-          token.flags.sign = true;
-          break;
-        case ' ':
-          token.flags.space = true;
-          break;
-        case '0':
-          token.flags.zeroPad = true;
-          break;
-        case '#':
-          token.flags.alt = true;
-          break;
-      }
-    }
-
-    // width
-    if (widthStr === '*') {
-      token.widthFromArg = true;
-    } else if (widthStr) {
-      token.width = parseInt(widthStr, 10);
-    }
-
-    // precision
-    if (precStr === '*') {
-      token.precisionFromArg = true;
-    } else if (precStr) {
-      token.precision = parseInt(precStr, 10);
-    }
-
-    const render = (): string => {
-      // read * parameter of width/precision
-      if (token.widthFromArg) {
-        const wArg = readArg(token.explicitIndex);
-        token.width = parseNumber(wArg, 'width');
-      }
-      if (token.precisionFromArg) {
-        const pArg = readArg(token.explicitIndex);
-        token.precision = parseNumber(pArg, 'precision');
-        if (token.precision! < 0) {
-          token.precision = undefined;
-        }
-      }
-
-      const t = token.type;
-
-      if (t === '%') {
-        // literal %
-        return '%';
-      }
-
-      const raw = readArg(token.explicitIndex);
-
-      let body = '';
-      let signStr = '';
-
-      const asNumber = (v: SprintfArg): number => {
-        const n =
-          typeof v === 'boolean'
-            ? v
-              ? 1
-              : 0
-            : v == null
-              ? NaN
-              : typeof v === 'string' && v.trim() === ''
-                ? 0
-                : Number(v);
-        return n;
+      const token: FormatToken = {
+        flags: {
+          leftAlign: false,
+          sign: false,
+          space: false,
+          zeroPad: false,
+          alt: false
+        },
+        type
       };
 
-      const pad = (s: string, width?: number, leftAlign?: boolean, padChar = ' '): string => {
-        if (!width || s.length >= width) {
-          return s;
-        }
-        const fill = padChar.repeat(width - s.length);
-        return leftAlign ? s + fill : fill + s;
-      };
+      if (i$) {
+        token.explicitIndex = parseInt(i$, 10);
+      }
 
-      const prefixForAlt = (t: string): string => {
-        if (t === 'x') {
-          return '0x';
+      // flags
+      for (const ch of flagsStr || '') {
+        switch (ch) {
+          case '-':
+            token.flags.leftAlign = true;
+            break;
+          case '+':
+            token.flags.sign = true;
+            break;
+          case ' ':
+            token.flags.space = true;
+            break;
+          case '0':
+            token.flags.zeroPad = true;
+            break;
+          case '#':
+            token.flags.alt = true;
+            break;
         }
-        if (t === 'X') {
-          return '0X';
-        }
-        if (t === 'o') {
-          return '0o';
-        }
-        return '';
-      };
+      }
 
-      switch (t) {
-        case 's': {
-          body = String(raw ?? '');
-          if (token.precision != null) {
-            // precision
-            body = body.slice(0, token.precision);
+      // width
+      if (starWidth) {
+        token.widthFromArg = true;
+        if (widthIndex$) {
+          token.widthIndex = parseInt(widthIndex$, 10);
+        }
+      } else if (widthNum) {
+        token.width = parseInt(widthNum, 10);
+      }
+
+      // precision
+      if (starPrec) {
+        token.precisionFromArg = true;
+        if (precIndex$) {
+          token.precisionIndex = parseInt(precIndex$, 10);
+        }
+      } else if (precNum) {
+        token.precision = parseInt(precNum, 10);
+      }
+
+      const render = (): string => {
+        const readIndex = (idx?: number): SprintfArg => readArg(idx);
+
+        // read * parameter of width/precision
+        if (token.widthFromArg) {
+          const wArg = readIndex(token.widthIndex ?? token.explicitIndex);
+          token.width = parseNumber(wArg, 'width');
+        }
+        if (token.precisionFromArg) {
+          const pArg = readIndex(token.precisionIndex ?? token.explicitIndex);
+          token.precision = parseNumber(pArg, 'precision');
+          if (token.precision! < 0) {
+            token.precision = undefined;
           }
-          break;
         }
-        case 'c': {
-          if (typeof raw === 'number') {
-            body = String.fromCharCode(raw);
-          } else {
-            const s = String(raw ?? '');
-            body = s.length ? s[0] : '\u0000';
+
+        const t = token.type;
+
+        if (t === '%') {
+          // literal %
+          return '%';
+        }
+
+        const raw = readArg(token.explicitIndex);
+
+        let body = '';
+        let signStr = '';
+
+        const asNumber = (v: SprintfArg): number => {
+          const n =
+            typeof v === 'boolean'
+              ? v
+                ? 1
+                : 0
+              : v == null
+                ? NaN
+                : typeof v === 'string' && v.trim() === ''
+                  ? 0
+                  : Number(v);
+          return n;
+        };
+
+        const pad = (s: string, width?: number, leftAlign?: boolean, padChar = ' '): string => {
+          if (!width || s.length >= width) {
+            return s;
           }
-          break;
-        }
-        case 'd':
-        case 'i':
-        case 'u': {
-          let n = asNumber(raw);
-          if (t === 'u') {
-            n = Math.floor(Math.abs(n)) >>> 0; // unsigned 32bit
-            body = n.toString(10);
-          } else {
+          const fill = padChar.repeat(width - s.length);
+          return leftAlign ? s + fill : fill + s;
+        };
+
+        const prefixForAlt = (t: string): string => {
+          if (t === 'x') {
+            return '0x';
+          }
+          if (t === 'X') {
+            return '0X';
+          }
+          if (t === 'o') {
+            return '0o';
+          }
+          return '';
+        };
+
+        switch (t) {
+          case 's': {
+            body = String(raw ?? '');
+            if (token.precision != null) {
+              // precision: max length
+              body = body.slice(0, token.precision);
+            }
+            break;
+          }
+          case 'c': {
+            if (typeof raw === 'number') {
+              body = String.fromCharCode(raw);
+            } else {
+              const s = String(raw ?? '');
+              body = s.length ? s[0] : '\u0000';
+            }
+            break;
+          }
+          case 'd':
+          case 'i': {
+            const n = asNumber(raw);
             const isNeg = n < 0 || Object.is(n, -0);
             const abs = Math.abs(n);
             body = Math.trunc(abs).toString(10);
+
+            if (token.precision != null) {
+              body = '0'.repeat(Math.max(0, token.precision - body.length)) + body;
+            }
+
             if (isNeg) {
               signStr = '-';
             } else if (token.flags.sign) {
@@ -770,73 +911,81 @@ export function formatString(format: string, ...args: SprintfArg[]): string {
             } else if (token.flags.space) {
               signStr = ' ';
             }
+
+            body = signStr + body;
+            break;
           }
-          if (token.precision != null) {
-            body = '0'.repeat(Math.max(0, token.precision - body.length)) + body;
-          }
-          body = signStr + body;
-          break;
-        }
-        case 'f': {
-          const n = asNumber(raw);
-          const prec = token.precision ?? 6;
-          if (!Number.isFinite(n)) {
-            body = String(n);
-          } else {
-            body = n.toFixed(Math.max(0, Math.min(100, prec)));
-          }
-          if (n >= 0) {
-            if (token.flags.sign) {
-              body = '+' + body;
-            } else if (token.flags.space) {
-              body = ' ' + body;
+          case 'u': {
+            const n = asNumber(raw);
+            const u = n >>> 0; // unsigned 32-bit
+            body = u.toString(10);
+
+            if (token.precision != null) {
+              body = '0'.repeat(Math.max(0, token.precision - body.length)) + body;
             }
+            break;
           }
-          break;
+          case 'f': {
+            const n = asNumber(raw);
+            const prec = token.precision ?? 6;
+            if (!Number.isFinite(n)) {
+              body = String(n);
+            } else {
+              body = n.toFixed(Math.max(0, Math.min(100, prec)));
+            }
+            if (n >= 0) {
+              if (token.flags.sign) {
+                body = '+' + body;
+              } else if (token.flags.space) {
+                body = ' ' + body;
+              }
+            }
+            break;
+          }
+          case 'x':
+          case 'X':
+          case 'o': {
+            const n = asNumber(raw);
+            const isUpper = t === 'X';
+            const abs = Math.trunc(Math.abs(n));
+            let str = t === 'o' ? abs.toString(8) : abs.toString(16);
+            if (isUpper) {
+              str = str.toUpperCase();
+            }
+            if (token.precision != null) {
+              str = '0'.repeat(Math.max(0, token.precision - str.length)) + str;
+            }
+            const pre = token.flags.alt && abs !== 0 ? prefixForAlt(t) : '';
+            body = pre + str;
+            break;
+          }
+          default:
+            throw new Error(`Unsupported format type: ${t}`);
         }
-        case 'x':
-        case 'X':
-        case 'o': {
-          const n = asNumber(raw);
-          const isUpper = t === 'X';
-          const abs = Math.trunc(Math.abs(n));
-          let str = t === 'o' ? abs.toString(8) : abs.toString(16);
-          if (isUpper) {
-            str = str.toUpperCase();
-          }
-          if (token.precision != null) {
-            str = '0'.repeat(Math.max(0, token.precision - str.length)) + str;
-          }
-          const pre = token.flags.alt && abs !== 0 ? prefixForAlt(t) : '';
-          body = pre + str;
-          break;
+
+        const useZeroPad =
+          token.flags.zeroPad &&
+          !token.flags.leftAlign &&
+          token.type !== 's' &&
+          token.precision == null &&
+          token.type !== '%';
+
+        if (useZeroPad) {
+          const prefixMatch = body.match(/^([+\- ]|0x|0X|0o)/);
+          const prefix = prefixMatch ? prefixMatch[0] : '';
+          const rest = body.slice(prefix.length);
+          body = prefix + pad(rest, token.width ? token.width - prefix.length : undefined, false, '0');
+        } else {
+          body = pad(body, token.width, token.flags.leftAlign, ' ');
         }
-        default:
-          throw new Error(`Unsupported format type: ${t}`);
-      }
 
-      const useZeroPad =
-        token.flags.zeroPad &&
-        !token.flags.leftAlign &&
-        token.type !== 's' &&
-        token.precision == null &&
-        token.type !== '%';
+        return body;
+      };
 
-      if (useZeroPad) {
-        const prefixMatch = body.match(/^([+\- ]|0x|0X|0o)/);
-        const prefix = prefixMatch ? prefixMatch[0] : '';
-        const rest = body.slice(prefix.length);
-        body = prefix + pad(rest, token.width ? token.width - prefix.length : undefined, false, '0');
-      } else {
-        body = pad(body, token.width, token.flags.leftAlign, ' ');
-      }
-
-      return body;
-    };
-
-    out += render();
-    return match;
-  });
+      out += render();
+      return match;
+    }
+  );
 
   out += format.slice(lastIndex);
   return out;

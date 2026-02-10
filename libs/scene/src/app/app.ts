@@ -1,9 +1,10 @@
-import type { VFS } from '@zephyr3d/base';
+import type { Nullable, RequireOptionals, VFS } from '@zephyr3d/base';
 import { Observable, flushPendingDisposals } from '@zephyr3d/base';
 import type { AbstractDevice, DeviceBackend } from '@zephyr3d/device';
 import { InputManager } from './inputmgr';
 import { Engine } from './engine';
 import { getApp, setApp } from './api';
+import type { ScreenConfig } from './screen';
 
 type appEventMap = {
   /**
@@ -44,13 +45,15 @@ type appEventMap = {
   drop: [evt: DragEvent];
 };
 
+/** Editor Mode */
+export type EditorMode = 'editor' | 'editor-preview' | 'none';
+
 /**
- * Creation options for Application.
+ * Options for Application.
  *
- * Provides the canvas, device backend, and optional runtime and device configuration.
  * @public
  */
-export type AppOptions = {
+export interface AppOptions {
   /**
    * Target canvas element to attach the rendering device to.
    */
@@ -68,6 +71,15 @@ export type AppOptions = {
    * Device pixel ratio used when creating the device. Defaults to `window.devicePixelRatio` or 1.
    */
   pixelRatio?: number;
+}
+
+/**
+ * Creation options for Application.
+ *
+ * Provides the canvas, device backend, and optional runtime and device configuration.
+ * @public
+ */
+export interface AppCreationOptions extends AppOptions {
   /**
    * Options for the runtime scripting system.
    */
@@ -83,13 +95,17 @@ export type AppOptions = {
     /**
      * Whether the application is running in editor mode. Should be true for user applications.
      */
-    editorMode?: boolean;
+    editorMode?: EditorMode;
     /**
      * Whether the runtime scripting system is enabled. Should be true for user applications.
      */
     enabled?: boolean;
+    /**
+     * Screen configuration
+     */
+    screen?: ScreenConfig;
   };
-};
+}
 
 /**
  * Log severity levels.
@@ -118,10 +134,11 @@ export type LogMode = 'info' | 'warn' | 'error' | 'debug';
  * @public
  */
 export class Application extends Observable<appEventMap> {
-  private readonly _options: AppOptions;
-  private _device: AbstractDevice;
+  private readonly _options: RequireOptionals<AppOptions>;
+  private _device: Nullable<AbstractDevice>;
   private readonly _inputManager: InputManager;
   private readonly _engine: Engine;
+  private readonly _editorMode: EditorMode;
   private _ready: boolean;
   /**
    * Construct the Application singleton with the provided options.
@@ -130,7 +147,7 @@ export class Application extends Observable<appEventMap> {
    *
    * @param opt - Application creation options (canvas, backend, and optional runtime/device settings).
    */
-  constructor(opt: AppOptions) {
+  constructor(opt: AppCreationOptions) {
     super();
     if (getApp()) {
       throw new Error('It is not allowed to have multiple Application instances');
@@ -147,21 +164,31 @@ export class Application extends Observable<appEventMap> {
     this._engine = new Engine(
       opt.runtimeOptions?.VFS,
       opt.runtimeOptions?.scriptsRoot,
-      opt.runtimeOptions?.editorMode,
       opt.runtimeOptions?.enabled
     );
+    if (opt.runtimeOptions?.screen) {
+      this._engine.screen.config = opt.runtimeOptions.screen;
+    }
+    this._editorMode = opt.runtimeOptions?.editorMode ?? 'none';
+    this._device = null;
     this._ready = false;
+  }
+  /**
+   * Editor mode
+   */
+  get editorMode() {
+    return this._editorMode;
   }
   /**
    * The input manager instance handling pointer/keyboard event routing.
    */
-  get inputManager(): InputManager {
+  get inputManager() {
     return this._inputManager;
   }
   /**
    * Get the instanceof {@link Engine}.
    */
-  get engine(): Engine {
+  get engine() {
     return this._engine;
   }
   /**
@@ -169,7 +196,7 @@ export class Application extends Observable<appEventMap> {
    *
    * Note: Defaults are applied for `enableMSAA` and `pixelRatio` if omitted.
    */
-  get options(): AppOptions {
+  get options() {
     return this._options;
   }
   /**
@@ -177,20 +204,20 @@ export class Application extends Observable<appEventMap> {
    *
    * Available after `await ready()`.
    */
-  get device(): AbstractDevice {
-    return this._device;
+  get device() {
+    return this._device!;
   }
   /**
    * Convenience accessor for the device type name provided by the backend.
    */
-  get deviceType(): string {
+  get deviceType() {
     return this._options.backend.typeName();
   }
   /**
    * Set keyboard focus to the device's canvas element.
    */
   focus() {
-    this._device.canvas.focus();
+    this._device!.canvas.focus();
   }
   /**
    * Initialize the rendering device and start input processing.
@@ -210,6 +237,7 @@ export class Application extends Observable<appEventMap> {
       await this._engine.init();
       this._inputManager.start();
       this._device.on('resize', (width, height) => {
+        this._engine.screen.resolveViewport();
         this.dispatchEvent('resize', width, height);
       });
       this._ready = true;

@@ -1,5 +1,5 @@
-import type { TypedArray, Vector4, IEventTarget } from '@zephyr3d/base';
-import { floatToHalf } from '@zephyr3d/base';
+import type { TypedArray, Vector4, IEventTarget, Nullable, Immutable } from '@zephyr3d/base';
+import { float2half } from '@zephyr3d/base';
 import type { PBComputeOptions, PBRenderOptions, PBStructTypeInfo, ProgramBuilder } from './builder';
 import type {
   BaseTexture,
@@ -38,6 +38,7 @@ import type {
   StencilState
 } from './render_states';
 import type { Pool } from './pool';
+import type { ITimer } from './timer';
 
 /**
  * The webgl context type
@@ -162,7 +163,7 @@ function makeTextureFormat(
   blockWidth: number,
   blockHeight: number,
   blockSize: number
-): number {
+) {
   const compressionBits = compression;
   const colorBits =
     (r ? RED_BITMASK : 0) | (g ? GREEN_BITMASK : 0) | (b ? BLUE_BITMASK : 0) | (a ? ALPHA_BITMASK : 0);
@@ -192,7 +193,6 @@ function makeTextureFormat(
  * @public
  */
 export type TextureFormat =
-  | 'unknown'
   | 'r8unorm'
   | 'r8snorm'
   | 'r16f'
@@ -276,7 +276,6 @@ export type TextureFormat =
   | 'astc-12x12-srgb';
 
 const textureFormatMap: Record<TextureFormat, number> = {
-  unknown: 0,
   r8unorm: makeTextureFormat(
     0,
     true,
@@ -1663,7 +1662,7 @@ const textureFormatMap: Record<TextureFormat, number> = {
  * @returns The sRGB texture format
  * @public
  */
-export function linearTextureFormatToSRGB(format: TextureFormat): TextureFormat {
+export function linearTextureFormatToSRGB(format: TextureFormat) {
   switch (format) {
     case 'rgba8unorm':
       return 'rgba8unorm-srgb';
@@ -1716,7 +1715,7 @@ export function linearTextureFormatToSRGB(format: TextureFormat): TextureFormat 
  * @returns true if the texture format contains an alpha channel, otherwise false
  * @public
  */
-export function hasAlphaChannel(format: TextureFormat): boolean {
+export function hasAlphaChannel(format: TextureFormat) {
   return !!(textureFormatMap[format] & ALPHA_BITMASK);
 }
 
@@ -1726,7 +1725,7 @@ export function hasAlphaChannel(format: TextureFormat): boolean {
  * @returns true if the texture format contains a red channel, otherwise false
  * @public
  */
-export function hasRedChannel(format: TextureFormat): boolean {
+export function hasRedChannel(format: TextureFormat) {
   return !!(textureFormatMap[format] & RED_BITMASK);
 }
 
@@ -1736,7 +1735,7 @@ export function hasRedChannel(format: TextureFormat): boolean {
  * @returns true if the texture format contains a green channel, otherwise false
  * @public
  */
-export function hasGreenChannel(format: TextureFormat): boolean {
+export function hasGreenChannel(format: TextureFormat) {
   return !!(textureFormatMap[format] & GREEN_BITMASK);
 }
 
@@ -1746,7 +1745,7 @@ export function hasGreenChannel(format: TextureFormat): boolean {
  * @returns true if the texture format contains a blue channel, otherwise false
  * @public
  */
-export function hasBlueChannel(format: TextureFormat): boolean {
+export function hasBlueChannel(format: TextureFormat) {
   return !!(textureFormatMap[format] & BLUE_BITMASK);
 }
 
@@ -1756,7 +1755,7 @@ export function hasBlueChannel(format: TextureFormat): boolean {
  * @returns true if the texture format contains a depth channel, otherwise false
  * @public
  */
-export function hasDepthChannel(format: TextureFormat): boolean {
+export function hasDepthChannel(format: TextureFormat) {
   return !!(textureFormatMap[format] & DEPTH_BITMASK);
 }
 
@@ -1766,7 +1765,7 @@ export function hasDepthChannel(format: TextureFormat): boolean {
  * @returns true if the texture format contains a stencil channel, otherwise false
  * @public
  */
-export function hasStencilChannel(format: TextureFormat): boolean {
+export function hasStencilChannel(format: TextureFormat) {
   return !!(textureFormatMap[format] & STENCIL_BITMASK);
 }
 
@@ -1776,7 +1775,7 @@ export function hasStencilChannel(format: TextureFormat): boolean {
  * @returns true if the texture format is floating-point, otherwise false
  * @public
  */
-export function isFloatTextureFormat(format: TextureFormat): boolean {
+export function isFloatTextureFormat(format: TextureFormat) {
   return !!(textureFormatMap[format] & FLOAT_BITMASK);
 }
 
@@ -1786,7 +1785,7 @@ export function isFloatTextureFormat(format: TextureFormat): boolean {
  * @returns true if the texture format is integer, otherwise false
  * @public
  */
-export function isIntegerTextureFormat(format: TextureFormat): boolean {
+export function isIntegerTextureFormat(format: TextureFormat) {
   return !!(textureFormatMap[format] & INTEGER_BITMASK);
 }
 
@@ -1796,7 +1795,7 @@ export function isIntegerTextureFormat(format: TextureFormat): boolean {
  * @returns true if the texture format is signed, otherwise false
  * @public
  */
-export function isSignedTextureFormat(format: TextureFormat): boolean {
+export function isSignedTextureFormat(format: TextureFormat) {
   return !!(textureFormatMap[format] & SIGNED_BITMASK);
 }
 
@@ -1806,7 +1805,7 @@ export function isSignedTextureFormat(format: TextureFormat): boolean {
  * @returns true if the texture format is a compressed format, otherwise false
  * @public
  */
-export function isCompressedTextureFormat(format: TextureFormat): boolean {
+export function isCompressedTextureFormat(format: TextureFormat) {
   return !!(textureFormatMap[format] & COMPRESSION_FORMAT_BITMASK);
 }
 /**
@@ -1815,7 +1814,7 @@ export function isCompressedTextureFormat(format: TextureFormat): boolean {
  * @returns true if the texture format is sRGB format, otherwise false
  * @public
  */
-export function isSRGBTextureFormat(format: TextureFormat): boolean {
+export function isSRGBTextureFormat(format: TextureFormat) {
   return !!(textureFormatMap[format] & SRGB_BITMASK);
 }
 
@@ -1825,7 +1824,7 @@ export function isSRGBTextureFormat(format: TextureFormat): boolean {
  * @returns The block size
  * @public
  */
-export function getTextureFormatBlockSize(format: TextureFormat): number {
+export function getTextureFormatBlockSize(format: TextureFormat) {
   return (textureFormatMap[format] & BLOCK_SIZE_MASK) >> BLOCK_SIZE_SHIFT;
 }
 
@@ -1835,7 +1834,7 @@ export function getTextureFormatBlockSize(format: TextureFormat): number {
  * @returns The block width
  * @public
  */
-export function getTextureFormatBlockWidth(format: TextureFormat): number {
+export function getTextureFormatBlockWidth(format: TextureFormat) {
   return (textureFormatMap[format] & BLOCK_WIDTH_MASK) >> BLOCK_WIDTH_SHIFT;
 }
 
@@ -1845,27 +1844,27 @@ export function getTextureFormatBlockWidth(format: TextureFormat): number {
  * @returns The block height
  * @public
  */
-export function getTextureFormatBlockHeight(format: TextureFormat): number {
+export function getTextureFormatBlockHeight(format: TextureFormat) {
   return (textureFormatMap[format] & BLOCK_HEIGHT_MASK) >> BLOCK_HEIGHT_SHIFT;
 }
 
-function normalizeColorComponent(val: number, maxval: number): number {
+function normalizeColorComponent(val: number, maxval: number) {
   return Math.min(maxval, Math.max(Math.floor(val * maxval), 0));
 }
 
-function normalizeColorComponentSigned(val: number, maxval: number): number {
+function normalizeColorComponentSigned(val: number, maxval: number) {
   return normalizeColorComponent(val * 0.5 + 0.5, maxval) - (maxval + 1) / 2;
 }
 
 /** @internal */
-export function encodePixel(format: TextureFormat, r: number, g: number, b: number, a: number): TypedArray {
+export function encodePixel(format: TextureFormat, r: number, g: number, b: number, a: number) {
   switch (format) {
     case 'r8unorm':
       return new Uint8Array([normalizeColorComponent(r, 255)]);
     case 'r8snorm':
       return new Int8Array([normalizeColorComponentSigned(r, 255)]);
     case 'r16f':
-      return new Uint16Array([floatToHalf(r)]);
+      return new Uint16Array([float2half(r)]);
     case 'r32f':
       return new Float32Array([r]);
     case 'r8ui':
@@ -1885,7 +1884,7 @@ export function encodePixel(format: TextureFormat, r: number, g: number, b: numb
     case 'rg8snorm':
       return new Int8Array([normalizeColorComponentSigned(r, 255), normalizeColorComponentSigned(g, 255)]);
     case 'rg16f':
-      return new Uint16Array([floatToHalf(r), floatToHalf(g)]);
+      return new Uint16Array([float2half(r), float2half(g)]);
     case 'rg32f':
       return new Float32Array([r, g]);
     case 'rg8ui':
@@ -1924,7 +1923,7 @@ export function encodePixel(format: TextureFormat, r: number, g: number, b: numb
         normalizeColorComponentSigned(a, 255)
       ]);
     case 'rgba16f':
-      return new Uint16Array([floatToHalf(r), floatToHalf(g), floatToHalf(b), floatToHalf(a)]);
+      return new Uint16Array([float2half(r), float2half(g), float2half(b), float2half(a)]);
     case 'rgba32f':
       return new Float32Array([r, g, b, a]);
     case 'rgba8ui':
@@ -1940,7 +1939,7 @@ export function encodePixel(format: TextureFormat, r: number, g: number, b: numb
     case 'rgba32i':
       return new Int32Array([r | 0, g | 0, b | 0, a | 0]);
     default:
-      return null;
+      throw new Error(`Invalid texture format: ${format}`);
   }
 }
 
@@ -1952,7 +1951,7 @@ export function encodePixelToArray(
   b: number,
   a: number,
   arr: Array<number>
-): void {
+) {
   switch (format) {
     case 'r8unorm':
       arr.push(normalizeColorComponent(r, 255));
@@ -1961,7 +1960,7 @@ export function encodePixelToArray(
       arr.push(normalizeColorComponentSigned(r, 255));
       break;
     case 'r16f':
-      arr.push(floatToHalf(r));
+      arr.push(float2half(r));
       break;
     case 'r32f':
       arr.push(r);
@@ -1991,7 +1990,7 @@ export function encodePixelToArray(
       arr.push(normalizeColorComponentSigned(r, 255), normalizeColorComponentSigned(g, 255));
       break;
     case 'rg16f':
-      arr.push(floatToHalf(r), floatToHalf(g));
+      arr.push(float2half(r), float2half(g));
       break;
     case 'rg32f':
       arr.push(r, g);
@@ -2041,7 +2040,7 @@ export function encodePixelToArray(
       );
       break;
     case 'rgba16f':
-      arr.push(floatToHalf(r), floatToHalf(g), floatToHalf(b), floatToHalf(a));
+      arr.push(float2half(r), float2half(g), float2half(b), float2half(a));
       break;
     case 'rgba32f':
       arr.push(r, g, b, a);
@@ -2211,8 +2210,6 @@ export interface ShaderCaps {
   supportShaderTextureLod: boolean;
   /** True if the device supports high precison float number for shader programs */
   supportHighPrecisionFloat: boolean;
-  /** True if the device supports high precison integer number for shader programs */
-  supportHighPrecisionInt: boolean;
   /** The maximum number of bytes of uniform buffer */
   maxUniformBufferSize: number;
   /** The uniform buffer offset alignment */
@@ -2292,7 +2289,7 @@ export interface TextureCaps {
    * @param format - The texture format
    * @returns the texture format infomation
    */
-  getTextureFormatInfo(format: TextureFormat): TextureFormatInfo;
+  getTextureFormatInfo(format: TextureFormat): Immutable<TextureFormatInfo>;
 }
 
 /**
@@ -2350,7 +2347,7 @@ export interface DeviceOptions {
  * @public
  */
 export type DeviceEventMap = {
-  resize: [width: number, height: number];
+  resize: [cssWidth: number, cssHeight: number, deviceWidth: number, deviceHeight: number];
   devicelost: [];
   devicerestored: [];
   gpuobject_added: [obj: GPUObject];
@@ -2398,8 +2395,10 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   getFrameBufferSampleCount(): number;
   /** Returns true if device context is lost. */
   isContextLost(): boolean;
-  /** Get the value of device pixel ratio */
-  getScale(): number;
+  /** Get the value of device pixel ratio in X axis */
+  getScaleX(): number;
+  /** Get the value of device pixel ratio in Y axis */
+  getScaleY(): number;
   /** Get the width of current frame buffer */
   getDrawingBufferWidth(): number;
   /** Get the height of current frame buffer */
@@ -2409,13 +2408,13 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /** Get the height of back buffer */
   getBackBufferHeight(): number;
   /** Get the device capabilities */
-  getDeviceCaps(): DeviceCaps;
+  getDeviceCaps(): Immutable<DeviceCaps>;
   /** Schedule next frame */
   nextFrame(callback: () => void): number;
   /** Cancel schedule next frame */
-  cancelNextFrame(handle: number);
+  cancelNextFrame(handle: number): void;
   /** Set font for drawText function */
-  setFont(fontName: string);
+  setFont(fontName: string): void;
   /**
    * Draw a string
    * @param text - The string that will be drawn
@@ -2423,14 +2422,20 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param y - y coordinate in pixels related to the viewport origin
    * @param color - A CSS color value
    */
-  drawText(text: string, x: number, y: number, color: string);
+  drawText(text: string, x: number, y: number, color: string, viewport?: Immutable<number[]>): void;
   /**
    * Clears the current frame buffer
    * @param clearColor - If not null, the color buffer will be cleared to this value.
    * @param clearDepth - If not null, the depth buffer will be cleared to this value.
    * @param clearStencil - If not null, the stencil buffer will be cleared to this value.
    */
-  clearFrameBuffer(clearColor: Vector4, clearDepth: number, clearStencil: number);
+  clearFrameBuffer(
+    clearColor: Nullable<Vector4>,
+    clearDepth: Nullable<number>,
+    clearStencil: Nullable<number>
+  ): void;
+  /** Creates a GPU timer */
+  createGPUTimer(): Nullable<ITimer>;
   /** Creates a render state set object */
   createRenderStateSet(): RenderStateSet;
   /** Creates a blending state object */
@@ -2459,7 +2464,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     data: TextureMipmapData,
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): T;
+  ): Nullable<T>;
   /**
    * Creates a 2d texture
    * @param format - The texture format
@@ -2473,7 +2478,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     width: number,
     height: number,
     options?: TextureCreationOptions
-  ): Texture2D;
+  ): Nullable<Texture2D>;
   /**
    * Creates a 2d texture from a image element
    * @param element - The image element
@@ -2484,7 +2489,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     element: TextureImageElement,
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): Texture2D;
+  ): Nullable<Texture2D>;
   /**
    * Creates a 2d array texture
    * @param format - The texture format
@@ -2500,7 +2505,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     height: number,
     depth: number,
     options?: TextureCreationOptions
-  ): Texture2DArray;
+  ): Nullable<Texture2DArray>;
   /**
    * Creates a 2d array texture from a seris of image elements
    * @remarks image elements must have the same size.
@@ -2512,7 +2517,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     elements: TextureImageElement[],
     sRGB: boolean,
     options?: TextureCreationOptions
-  ): Texture2DArray;
+  ): Nullable<Texture2DArray>;
   /**
    * Creates a 3D texture
    * @param format - The texture format
@@ -2528,7 +2533,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     height: number,
     depth: number,
     options?: TextureCreationOptions
-  ): Texture3D;
+  ): Nullable<Texture3D>;
   /**
    * Creates a cube texture
    * @param format - The texture format
@@ -2536,7 +2541,11 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param options - The creation options
    * @returns The created cube texture.
    */
-  createCubeTexture(format: TextureFormat, size: number, options?: TextureCreationOptions): TextureCube;
+  createCubeTexture(
+    format: TextureFormat,
+    size: number,
+    options?: TextureCreationOptions
+  ): Nullable<TextureCube>;
   /**
    * Creates a video texture from a video element
    * @param el - The video element
@@ -2554,7 +2563,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param dst - Texture that will be copied to.
    * @param dstLevel - Which mipmap level to be copied to.
    */
-  copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number);
+  copyTexture2D(src: Texture2D, srcLevel: number, dst: Texture2D, dstLevel: number): void;
   /**
    * Copies a color attachment of a framebuffer to a mipmap level of a texture.
    *
@@ -2566,7 +2575,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param dst - Texture that will be copied to.
    * @param level - Which mipmap level should be copied to.
    */
-  copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number);
+  copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number): void;
   /**
    * Set wether to reverse the winding order
    *
@@ -2591,7 +2600,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param layout - Layout of the bind group
    * @returns The created bind group.
    */
-  createBindGroup(layout: BindGroupLayout): BindGroup;
+  createBindGroup(layout: Immutable<BindGroupLayout>): BindGroup;
   /**
    * Creates a gpu buffer
    * @param sizeInBytes - Size of the buffer in bytes
@@ -2613,7 +2622,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     srcOffset: number,
     dstOffset: number,
     bytes: number
-  );
+  ): void;
   /**
    * Creates an index buffer
    * @param data - Data of the index buffer
@@ -2649,57 +2658,57 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    */
   createFrameBuffer(
     colorAttachments: BaseTexture[],
-    depthAttachment: BaseTexture,
-    options?: FrameBufferOptions
+    depthAttachment: Nullable<BaseTexture>,
+    options?: Nullable<FrameBufferOptions>
   ): FrameBuffer;
   /**
    * Set viewport from an array that contains the position and size
    *
    * @param vp - The viewport position and size, if not specified, the viewport will be set to [0, 0, drawingBufferWidth, drawingBufferHeight]
    */
-  setViewport(vp?: DeviceViewport | number[]): void;
+  setViewport(vp: Nullable<Immutable<DeviceViewport | number[]>>): void;
   /** Get current viewport as [x, y, width, height] */
-  getViewport(): DeviceViewport;
+  getViewport(): Immutable<DeviceViewport>;
   /**
    * Set scissor rectangle from an array that contains the position and size
    * @param scissor - The scissor rectangle position and size, if not specified, the scissor rectangle will be set to [0, 0, drawingBufferWidth,drawingBufferHeight]
    */
-  setScissor(scissor?: DeviceViewport | number[]): void;
+  setScissor(scissor: Nullable<Immutable<DeviceViewport | number[]>>): void;
   /**
    * Get current scissor rectangle
    */
-  getScissor(): DeviceViewport;
+  getScissor(): Immutable<DeviceViewport>;
   /**
    * Set current GPU program
    * @param program - The GPU program to be set
    */
-  setProgram(program: GPUProgram): void;
+  setProgram(program: Nullable<GPUProgram>): void;
   /**
    * Get current GPU program
    */
-  getProgram(): GPUProgram;
+  getProgram(): Nullable<GPUProgram>;
   /**
    * Set current vertex layout
    *
    * @param vertexData - The vertex layout to be set
    */
-  setVertexLayout(vertexData: VertexLayout): void;
+  setVertexLayout(vertexData: Nullable<VertexLayout>): void;
   /** Get current vertex layout */
-  getVertexLayout(): VertexLayout;
+  getVertexLayout(): Nullable<VertexLayout>;
   /**
    * Set current render states
    *
    * @param renderStates - The render state set
    */
-  setRenderStates(renderStates: RenderStateSet): void;
+  setRenderStates(renderStates: Nullable<RenderStateSet>): void;
   /** Get current render states */
-  getRenderStates(): RenderStateSet;
+  getRenderStates(): Nullable<RenderStateSet>;
   /**
    * Sets the current framebuffer to the specified FrameBuffer object.
    *
    * @param rt - The FrameBuffer object to set as the current framebuffer.
    */
-  setFramebuffer(rt: FrameBuffer);
+  setFramebuffer(rt: Nullable<FrameBuffer>): void;
   /**
    * Sets the current framebuffer specifying complex color attachments, an optional depth attachment, MIP level, face, and sample count.
    *
@@ -2712,15 +2721,14 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param depth - Optional BaseTexture to serve as the depth attachment.
    * @param sampleCount - Optional sample count defining the number of samples for multisampling.
    */
+  setFramebuffer(color: BaseTexture[], depth?: BaseTexture, sampleCount?: number): void;
   setFramebuffer(
-    color: (BaseTexture | { texture: BaseTexture; miplevel?: number; face?: number; layer?: number })[],
+    colorOrRT: BaseTexture[] | Nullable<FrameBuffer>,
     depth?: BaseTexture,
-    miplevel?: number,
-    face?: number,
     sampleCount?: number
-  );
+  ): void;
   /** Get current frame buffer */
-  getFramebuffer(): FrameBuffer;
+  getFramebuffer(): Nullable<FrameBuffer>;
   /**
    * Set current bind group
    *
@@ -2728,12 +2736,12 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param bindGroup - The bind group to be set
    * @param dynamicOffsets - dynamic uniform buffer offsets of the bind group or null
    */
-  setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Iterable<number>);
+  setBindGroup(index: number, bindGroup: BindGroup, dynamicOffsets?: Nullable<Iterable<number>>): void;
   /**
    * Get current bind group
    * @param index - index of the bind group to get
    */
-  getBindGroup(index: number): [BindGroup, Iterable<number>];
+  getBindGroup(index: number): [BindGroup, Nullable<Iterable<number>>];
   /** Flush the gpu command buffer */
   flush(): void;
   /**
@@ -2773,7 +2781,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * Executes render bundle
    * @param renderBundle - RenderBundle to be execute
    */
-  executeRenderBundle(renderBundle: RenderBundle);
+  executeRenderBundle(renderBundle: RenderBundle): void;
   /**
    * End capture draw commands
    * @returns A RenderBundle that holds the captured draw commands
@@ -2792,7 +2800,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /** Get the program builder */
   programBuilder: ProgramBuilder;
   /** Get the run loop callback function */
-  runLoopFunction: (device: AbstractDevice) => void;
+  runLoopFunction: Nullable<(device: AbstractDevice) => void>;
   /**
    * Begins a frame for rendering
    *
@@ -2818,7 +2826,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     semantic: VertexSemantic,
     dataType: DataType,
     componentCount: number
-  ): VertexAttribFormat;
+  ): Nullable<VertexAttribFormat>;
   /**
    * Creates an interleaved vertex buffer
    *
@@ -2831,7 +2839,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     attribFormats: VertexAttribFormat[],
     data: TypedArray,
     options?: BufferCreationOptions
-  ): StructuredBuffer;
+  ): Nullable<StructuredBuffer>;
   /**
    * Creates a non-interleaved vertex buffer
    *
@@ -2844,7 +2852,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     attribFormat: VertexAttribFormat,
     data: TypedArray,
     options?: BufferCreationOptions
-  ): StructuredBuffer;
+  ): Nullable<StructuredBuffer>;
   /**
    * Draw primitives
    *
@@ -2897,31 +2905,49 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    *
    * @param uid - id of the GPU object
    */
-  getGPUObjectById(uid: number): GPUObject;
+  getGPUObjectById(uid: number): Nullable<GPUObject>;
   /**
-   * Calculates the actual position of current frame buffer from screen position.
+   * Calculates the actual position of current frame buffer from screen position in X axis.
    *
    * @remarks
    * If current frame buffer is the back buffer, the value will be scaled by the device pixel ratio.
    *
    * @param val - The screen position in pixels
    */
-  screenToDevice(val: number): number;
+  screenXToDevice(val: number): number;
   /**
-   * Calculates the screen position from position of current frame buffer.
+   * Calculates the screen position from position of current frame buffer in X axis.
    *
    * @remarks
    * If current frame buffer is the back buffer, the value will be divided by the device pixel ratio.
    *
    * @param val - The position of current frame buffer in pixels
    */
-  deviceToScreen(val: number): number;
+  deviceXToScreen(val: number): number;
+  /**
+   * Calculates the actual position of current frame buffer from screen position in Y axis.
+   *
+   * @remarks
+   * If current frame buffer is the back buffer, the value will be scaled by the device pixel ratio.
+   *
+   * @param val - The screen position in pixels
+   */
+  screenYToDevice(val: number): number;
+  /**
+   * Calculates the screen position from position of current frame buffer in Y axis.
+   *
+   * @remarks
+   * If current frame buffer is the back buffer, the value will be divided by the device pixel ratio.
+   *
+   * @param val - The position of current frame buffer in pixels
+   */
+  deviceYToScreen(val: number): number;
   /** Builds render program */
-  buildRenderProgram(options: PBRenderOptions): GPUProgram;
+  buildRenderProgram(options: PBRenderOptions): Nullable<GPUProgram>;
   /** Builds compute program */
-  buildComputeProgram(options: PBComputeOptions): GPUProgram;
+  buildComputeProgram(options: PBComputeOptions): Nullable<GPUProgram>;
   /** Pushes current FrameBuffer state */
-  pushDeviceStates();
+  pushDeviceStates(): void;
   /** Pops last FrameBuffer state */
-  popDeviceStates();
+  popDeviceStates(): void;
 }

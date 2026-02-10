@@ -25,31 +25,31 @@ export class PBRMetallicRoughnessMaterial
     super();
     this.useFeature(PBRMetallicRoughnessMaterial.FEATURE_VERTEX_NORMAL, true);
   }
-  clone(): PBRMetallicRoughnessMaterial {
+  clone() {
     const other = new PBRMetallicRoughnessMaterial();
     other.copyFrom(this);
     return other;
   }
-  copyFrom(other: this): void {
+  copyFrom(other: this) {
     super.copyFrom(other);
     this.vertexNormal = other.vertexNormal;
     this.vertexTangent = other.vertexTangent;
   }
   /** true if vertex normal attribute presents */
-  get vertexNormal(): boolean {
-    return this.featureUsed(PBRMetallicRoughnessMaterial.FEATURE_VERTEX_NORMAL);
+  get vertexNormal() {
+    return this.featureUsed<boolean>(PBRMetallicRoughnessMaterial.FEATURE_VERTEX_NORMAL);
   }
-  set vertexNormal(val: boolean) {
+  set vertexNormal(val) {
     this.useFeature(PBRMetallicRoughnessMaterial.FEATURE_VERTEX_NORMAL, !!val);
   }
   /** true if vertex normal attribute presents */
-  get vertexTangent(): boolean {
-    return this.featureUsed(PBRMetallicRoughnessMaterial.FEATURE_VERTEX_TANGENT);
+  get vertexTangent() {
+    return this.featureUsed<boolean>(PBRMetallicRoughnessMaterial.FEATURE_VERTEX_TANGENT);
   }
-  set vertexTangent(val: boolean) {
+  set vertexTangent(val) {
     this.useFeature(PBRMetallicRoughnessMaterial.FEATURE_VERTEX_TANGENT, !!val);
   }
-  vertexShader(scope: PBFunctionScope): void {
+  vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
     const worldMatrix = ShaderHelper.getWorldMatrix(scope);
@@ -81,7 +81,7 @@ export class PBRMetallicRoughnessMaterial
       }
     }
   }
-  fragmentShader(scope: PBFunctionScope): void {
+  fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     const pb = scope.$builder;
     if (this.needFragmentColor()) {
@@ -89,7 +89,7 @@ export class PBRMetallicRoughnessMaterial
       if (this.vertexColor) {
         scope.albedo = pb.mul(scope.albedo, this.getVertexColor(scope));
       }
-      if (this.drawContext.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+      if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         scope.$l.normalInfo = this.calculateNormalAndTBN(
           scope,
           scope.$inputs.worldPos,

@@ -19,7 +19,7 @@ export class PRNG {
     };
   }
   /** Gets next random value between 0 and 1 */
-  get(): number {
+  get() {
     return this._generator();
   }
 }

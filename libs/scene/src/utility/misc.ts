@@ -7,6 +7,7 @@ import type {
 } from '@zephyr3d/device';
 import { CopyBlitter } from '../blitter/copy';
 import { getDevice } from '../app/api';
+import type { Nullable } from '@zephyr3d/base';
 
 /**
  * Metadata interface for storing additional information
@@ -96,8 +97,8 @@ const samplerOptions: Record<SamplerType, SamplerOptions> = {
 };
 
 const samplers: Partial<Record<SamplerType, TextureSampler>> = {};
-let copyBlitter: CopyBlitter = null;
-let defaultCopyRenderState: RenderStateSet = null;
+let copyBlitter: Nullable<CopyBlitter> = null;
+let defaultCopyRenderState: Nullable<RenderStateSet> = null;
 
 /**
  * Fetch a sampler by type
@@ -105,7 +106,7 @@ let defaultCopyRenderState: RenderStateSet = null;
  * @returns The sampler for the given type
  * @public
  */
-export function fetchSampler(type: SamplerType): TextureSampler {
+export function fetchSampler(type: SamplerType) {
   let sampler = samplers[type];
   if (!sampler) {
     const opt = samplerOptions[type];
@@ -114,7 +115,7 @@ export function fetchSampler(type: SamplerType): TextureSampler {
       samplers[type] = sampler;
     }
   }
-  return sampler;
+  return sampler ?? null;
 }
 
 /**
@@ -130,8 +131,8 @@ export function fetchSampler(type: SamplerType): TextureSampler {
 export function copyTexture(
   src: BaseTexture,
   dest: BaseTexture | FrameBuffer,
-  sampler: TextureSampler = null,
-  renderState: RenderStateSet = null,
+  sampler: Nullable<TextureSampler> = null,
+  renderState: Nullable<RenderStateSet> = null,
   layer = 0,
   srgbOut = false
 ) {

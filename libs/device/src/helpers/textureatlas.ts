@@ -1,5 +1,6 @@
+import type { Nullable } from '@zephyr3d/base';
 import { RectsPacker } from '@zephyr3d/base';
-import type { AbstractDevice } from '../base_types';
+import type { AbstractDevice, TextureFormat } from '../base_types';
 import type { BaseTexture, Texture2D } from '../gpuobject';
 
 /**
@@ -38,11 +39,11 @@ export class TextureAtlasManager {
   /** @internal */
   protected _linearSpace: boolean;
   /** @internal */
-  protected _atlasList: Texture2D[];
+  protected _atlasList: Partial<Texture2D[]>;
   /** @internal */
-  protected _atlasInfoMap: Record<string, AtlasInfo>;
+  protected _atlasInfoMap: Partial<Record<string, AtlasInfo>>;
   /** @internal */
-  protected _atlasRestoreHandler: (tex: BaseTexture) => void;
+  protected _atlasRestoreHandler: Nullable<(tex: BaseTexture) => void>;
   /**
    * Creates a new texture atlas manager instance
    * @param device - The render device
@@ -72,10 +73,10 @@ export class TextureAtlasManager {
    * The texture restore handler callback function
    * This callback function will be called whenever the device has been restored
    */
-  get atlasTextureRestoreHandler(): (tex: BaseTexture) => void {
+  get atlasTextureRestoreHandler() {
     return this._atlasRestoreHandler;
   }
-  set atlasTextureRestoreHandler(f: (tex: BaseTexture) => void) {
+  set atlasTextureRestoreHandler(f) {
     this._atlasRestoreHandler = f;
   }
   /**
@@ -83,7 +84,7 @@ export class TextureAtlasManager {
    * @param index - Index of the atlas bin
    * @returns Atlas texture for given index
    */
-  getAtlasTexture(index: number): Texture2D {
+  getAtlasTexture(index: number) {
     return this._atlasList[index];
   }
   /**
@@ -91,23 +92,23 @@ export class TextureAtlasManager {
    * @param key - Key of the atlas
    * @returns Information of the atlas
    */
-  getAtlasInfo(key: string): AtlasInfo {
+  getAtlasInfo(key: string) {
     return this._atlasInfoMap[key] || null;
   }
   /**
    * Check if no atlas has been created
    * @returns true if no atlas has been created
    */
-  isEmpty(): boolean {
+  isEmpty() {
     return this._atlasList.length === 0;
   }
   /**
    * Removes all created atlases
    */
-  clear(): void {
+  clear() {
     this._packer.clear();
     for (const tex of this._atlasList) {
-      tex.dispose();
+      tex!.dispose();
     }
     this._atlasList = [];
     this._atlasInfoMap = {};
@@ -122,14 +123,7 @@ export class TextureAtlasManager {
    * @param h - height of the rectangle
    * @returns The atals info or null if insert failed
    */
-  pushCanvas(
-    key: string,
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    w: number,
-    h: number
-  ): AtlasInfo {
+  pushCanvas(key: string, ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
     const rc = this._packer.insert(w + 2 * this._rectBorderWidth, h + 2 * this._rectBorderWidth);
     if (rc) {
       const atlasX = rc.x + this._rectBorderWidth;
@@ -155,7 +149,7 @@ export class TextureAtlasManager {
    * @param bitmap - The bitmap object
    * @returns The atals info or null if insert failed
    */
-  pushBitmap(key: string, bitmap: ImageData | ImageBitmap): AtlasInfo {
+  pushBitmap(key: string, bitmap: ImageData | ImageBitmap) {
     const rc = this._packer.insert(
       bitmap.width + 2 * this._rectBorderWidth,
       bitmap.height + 2 * this._rectBorderWidth
@@ -179,10 +173,14 @@ export class TextureAtlasManager {
     return null;
   }
   /** @internal */
-  protected _createAtlasTexture(): Texture2D {
-    const tex = this._device.createTexture2D('rgba8unorm', this._binWidth, this._binHeight, {
+  protected _createAtlasTexture() {
+    const format: TextureFormat = 'rgba8unorm';
+    const tex = this._device.createTexture2D(format, this._binWidth, this._binHeight, {
       mipmapping: false
     });
+    if (!tex) {
+      throw new Error(`Create 2D texture failed: ${format}-${this._binWidth}x${this._binHeight}`);
+    }
     tex.update(new Uint8Array(tex.width * tex.height * 4), 0, 0, tex.width, tex.height);
     tex.restoreHandler = () => {
       tex.update(new Uint8Array(tex.width * tex.height * 4), 0, 0, tex.width, tex.height);
@@ -200,29 +198,24 @@ export class TextureAtlasManager {
     h: number,
     xOffset: number,
     yOffset: number
-  ): void {
-    let textureAtlas: Texture2D = null;
+  ) {
+    let textureAtlas: Texture2D;
     if (atlasIndex === this._atlasList.length) {
       textureAtlas = this._createAtlasTexture();
       this._atlasList.push(textureAtlas);
     } else {
-      textureAtlas = this._atlasList[atlasIndex];
+      textureAtlas = this._atlasList[atlasIndex]!;
     }
     textureAtlas.updateFromElement(ctx.canvas, x, y, xOffset, yOffset, w, h);
   }
   /** @internal */
-  private _updateAtlasTexture(
-    atlasIndex: number,
-    bitmap: ImageData | ImageBitmap,
-    x: number,
-    y: number
-  ): void {
-    let textureAtlas: Texture2D = null;
+  private _updateAtlasTexture(atlasIndex: number, bitmap: ImageData | ImageBitmap, x: number, y: number) {
+    let textureAtlas: Texture2D;
     if (atlasIndex === this._atlasList.length) {
       textureAtlas = this._createAtlasTexture();
       this._atlasList.push(textureAtlas);
     } else {
-      textureAtlas = this._atlasList[atlasIndex];
+      textureAtlas = this._atlasList[atlasIndex]!;
     }
     if (bitmap instanceof ImageBitmap) {
       textureAtlas.updateFromElement(bitmap, x, y, 0, 0, bitmap.width, bitmap.height);

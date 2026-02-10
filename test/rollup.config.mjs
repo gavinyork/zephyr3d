@@ -3,47 +3,54 @@ import { swc } from 'rollup-plugin-swc3';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import copy from 'rollup-plugin-copy';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const srcdir = path.join(__dirname, 'src');
 const destdir = path.join(__dirname, 'dist');
-const srcfiles = [];
 
-const whitelist = ['terrain'];
-fs.readdirSync(srcdir).filter((dir) => {
-  if (true || whitelist.indexOf(dir) >= 0) {
-    const fullpath = path.join(srcdir, dir);
-    if (fs.statSync(fullpath).isDirectory()) {
-      const main = path.join(fullpath, 'main.ts');
-      const html = path.join('src', dir, 'index.html');
-      if (
-        fs.existsSync(main) &&
-        fs.statSync(main).isFile() &&
-        fs.existsSync(html) &&
-        fs.statSync(html).isFile()
-      ) {
-        console.log('src files added: ' + main);
-        srcfiles.push([main, dir]);
-      }
+function collectTestFiles(dir, baseDir, out = []) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      collectTestFiles(fullPath, baseDir, out);
+    } else if (entry.isFile() && entry.name.endsWith('.test.ts')) {
+      const rel = path.relative(baseDir, fullPath); // e.g. "foo/bar.test.ts"
+      out.push({ fullPath, relPath: rel });
     }
   }
-});
+  return out;
+}
 
-function getTargetES6(input, output) {
-  console.log(input, ',', output);
+const testFiles = collectTestFiles(srcdir, srcdir);
+if (testFiles.length === 0) {
+  console.log('No .test.ts files found under src/');
+} else {
+  console.log('Test files found:');
+  for (const f of testFiles) {
+    console.log('  ' + f.fullPath);
+  }
+}
+
+function getTargetESM(input, relPath) {
+  // relPath: e.g. "foo/bar.test.ts" -> output: "foo/bar.test.js"
+  const outRel = relPath.replace(/\.ts$/, '.js');
+  const outFile = path.join(destdir, outRel);
+
   return {
-    input: input,
+    input,
     preserveSymlinks: false,
     output: {
-      file: path.join(destdir, 'js', `${output}.js`),
+      file: outFile,
       format: 'esm',
       sourcemap: true
     },
     onwarn(warning, warn) {
       if (warning.code === 'CIRCULAR_DEPENDENCY') {
         console.error(warning.message);
+      } else {
+        warn(warning);
       }
     },
     plugins: [
@@ -51,23 +58,12 @@ function getTargetES6(input, output) {
       swc({
         sourceMaps: true,
         inlineSourcesContent: false
-      }),
-      // terser()
-      copy({
-        targets: [
-          {
-            src: `src/${output}/index.html`,
-            dest: 'dist',
-            rename: `${output}.html`
-          }
-        ],
-        verbose: true
       })
     ]
   };
 }
 
 export default () => {
-  const targets = srcfiles.map((f) => getTargetES6(f[0], f[1]));
+  const targets = testFiles.map((f) => getTargetESM(f.fullPath, f.relPath));
   return targets;
 };

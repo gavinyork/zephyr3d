@@ -1,6 +1,5 @@
 import type { Font } from './font';
 import { FontCanvas } from './font';
-import type { AtlasInfo } from './textureatlas';
 import { TextureAtlasManager } from './textureatlas';
 import type { AbstractDevice } from '../base_types';
 
@@ -25,20 +24,22 @@ export class GlyphManager extends TextureAtlasManager {
     };
   }
   /**
-   * Gets the atlas information for given character
+   * Gets the size for given character
    * @param char - The character
    * @param font - Font of the character
-   * @returns Atlas information for the glyph
+   * @returns [width, height]
    */
-  getGlyphInfo(char: string, font: Font): AtlasInfo {
-    if (!char || !font) {
-      return null;
-    }
+  getGlyphSize(char: string, font: Font) {
+    return this._getGlyphSize(char, font);
+  }
+  getGlyphInfo(char: string, font: Font) {
     let glyphInfo = this.getAtlasInfo(this._hash(char, font));
     if (!glyphInfo) {
       glyphInfo = this._cacheGlyph(char, font);
-      glyphInfo.width = Math.round(glyphInfo.width * (font.maxHeight / font.maxHeightScaled));
-      glyphInfo.height = font.maxHeight;
+      if (glyphInfo) {
+        glyphInfo.width = Math.round(glyphInfo.width * (font.maxHeight / font.maxHeightScaled));
+        glyphInfo.height = font.maxHeight;
+      }
     }
     return glyphInfo;
   }
@@ -49,7 +50,7 @@ export class GlyphManager extends TextureAtlasManager {
    * @param font - Font of the string
    * @returns Width of the string
    */
-  measureStringWidth(str: string, charMargin: number, font: Font): number {
+  measureStringWidth(str: string, charMargin: number, font: Font) {
     let w = 0;
     for (const ch of str) {
       w += charMargin + this.getCharWidth(ch, font);
@@ -65,7 +66,7 @@ export class GlyphManager extends TextureAtlasManager {
    * @param font - Font of the string
    * @returns
    */
-  clipStringToWidth(str: string, width: number, charMargin: number, start: number, font: Font): number {
+  clipStringToWidth(str: string, width: number, charMargin: number, start: number, font: Font) {
     let sum = 0;
     let i = start;
     for (; i < str.length; i++) {
@@ -82,7 +83,7 @@ export class GlyphManager extends TextureAtlasManager {
    * @param font - Font of the character
    * @returns Width of the character
    */
-  getCharWidth(char: string, font: Font): number {
+  getCharWidth(char: string, font: Font) {
     if (!font) {
       return 0;
     }
@@ -99,10 +100,21 @@ export class GlyphManager extends TextureAtlasManager {
     return w;
   }
   /** @internal */
-  private _getGlyphBitmap(
-    char: string,
-    font: Font
-  ): ImageData | { x: number; y: number; w: number; h: number } {
+  private _getGlyphSize(char: string, font: Font) {
+    FontCanvas.font = font.fontNameScaled;
+    const metric = FontCanvas.context.measureText(char);
+    let w = metric.width;
+    if (w === 0) {
+      return null;
+    }
+    if (typeof metric.actualBoundingBoxRight === 'number') {
+      w = Math.floor(Math.max(w, metric.actualBoundingBoxRight) + 0.8);
+    }
+    const h = font.maxHeightScaled;
+    return [w, h];
+  }
+  /** @internal */
+  private _getGlyphBitmap(char: string, font: Font) {
     if (!font) {
       return null;
     }
@@ -122,11 +134,11 @@ export class GlyphManager extends TextureAtlasManager {
     return FontCanvas.context.getImageData(0, 0, w, h);
   }
   /** @internal */
-  private _hash(char: string, font: Font): string {
+  private _hash(char: string, font: Font) {
     return `${font.family}@${font.size}&${char}`;
   }
   /** @internal */
-  private _cacheGlyph(char: string, font: Font): AtlasInfo {
+  private _cacheGlyph(char: string, font: Font) {
     const bitmap = this._getGlyphBitmap(char, font) as ImageData;
     return this.pushBitmap(this._hash(char, font), bitmap);
   }

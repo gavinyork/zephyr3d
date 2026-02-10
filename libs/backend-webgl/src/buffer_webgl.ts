@@ -3,13 +3,13 @@ import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGLGPUObject } from './gpuobject_webgl';
 import { WebGLEnum } from './webgl_enum';
 import { isWebGL2 } from './utils';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
 import type { WebGLDevice } from './device_webgl';
 
 export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDataBuffer<WebGLBuffer> {
   protected _size: number;
   protected _usage: number;
-  protected _systemMemoryBuffer: Uint8Array<ArrayBuffer>;
+  protected _systemMemoryBuffer: Nullable<Uint8Array<ArrayBuffer>>;
   protected _systemMemory: boolean;
   protected _memCost: number;
   constructor(device: WebGLDevice, usage: number, data: TypedArray | number, systemMemory = false) {
@@ -54,13 +54,13 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
   get byteLength() {
     return this._size;
   }
-  get systemMemoryBuffer(): ArrayBuffer {
+  get systemMemoryBuffer() {
     return this._systemMemoryBuffer?.buffer || null;
   }
-  get usage(): number {
+  get usage() {
     return this._usage;
   }
-  bufferSubData(dstByteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number): void {
+  bufferSubData(dstByteOffset: number, data: TypedArray, srcPos?: number, srcLength?: number) {
     srcPos = Number(srcPos) || 0;
     dstByteOffset = Number(dstByteOffset) || 0;
     srcLength = Number(srcLength) || data.length - srcPos;
@@ -70,7 +70,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     if (dstByteOffset + srcLength * data.BYTES_PER_ELEMENT > this.byteLength) {
       throw new Error('bufferSubData() failed: dest buffer is too small');
     }
-    if (this._systemMemory || this._usage & GPUResourceUsageFlags.MANAGED) {
+    if (this._systemMemoryBuffer) {
       // copy to system backup buffer if present
       this._systemMemoryBuffer.set(
         new Uint8Array(
@@ -121,20 +121,20 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     }
   }
   async getBufferSubData(
-    dstBuffer?: Uint8Array<ArrayBuffer>,
+    dstBuffer?: Nullable<Uint8Array<ArrayBuffer>>,
     offsetInBytes?: number,
     sizeInBytes?: number
-  ): Promise<Uint8Array<ArrayBuffer>> {
+  ) {
     if (this.disposed) {
       this.reload();
     }
     return this._getBufferData(dstBuffer, offsetInBytes, sizeInBytes);
   }
   protected async _getBufferData(
-    dstBuffer?: Uint8Array<ArrayBuffer>,
+    dstBuffer?: Nullable<Uint8Array<ArrayBuffer>>,
     offsetInBytes?: number,
     sizeInBytes?: number
-  ): Promise<Uint8Array<ArrayBuffer>> {
+  ) {
     offsetInBytes = Number(offsetInBytes) || 0;
     sizeInBytes = Number(sizeInBytes) || this.byteLength - offsetInBytes;
     if (offsetInBytes < 0 || offsetInBytes + sizeInBytes > this.byteLength) {
@@ -150,8 +150,10 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
       const gl = this._device.context as WebGL2RenderingContext;
       if (isWebGL2(gl)) {
         const sync = gl.fenceSync(WebGLEnum.SYNC_GPU_COMMANDS_COMPLETE, 0);
-        await this.clientWaitAsync(gl, sync, 0, 10);
-        gl.deleteSync(sync);
+        if (sync) {
+          await this.clientWaitAsync(gl, sync, 0, 10);
+          gl.deleteSync(sync);
+        }
       }
       this._device.vaoExt?.bindVertexArray(null);
       let target: number;
@@ -177,7 +179,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     }
     return dstBuffer;
   }
-  restore(): void {
+  restore() {
     if (!this._systemMemory && !this._object && !this._device.isContextLost()) {
       this.load(this._systemMemoryBuffer);
     }
@@ -193,7 +195,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
   isBuffer(): this is GPUDataBuffer {
     return true;
   }
-  protected load(data?: TypedArray): void {
+  protected load(data: Nullable<TypedArray>) {
     if (!this._device.isContextLost()) {
       if (!this._object) {
         this._object = this._device.context.createBuffer();

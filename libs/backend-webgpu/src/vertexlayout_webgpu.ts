@@ -2,11 +2,9 @@ import type {
   PrimitiveType,
   StructuredBuffer,
   VertexLayout,
-  IndexBuffer,
   VertexSemantic,
   VertexLayoutOptions,
-  VertexBufferInfo,
-  GPUDataBuffer
+  VertexBufferInfo
 } from '@zephyr3d/device';
 import {
   getVertexAttribFormat,
@@ -19,6 +17,7 @@ import { vertexFormatToHash } from './constants_webgpu';
 import { WebGPUObject } from './gpuobject_webgpu';
 import { WebGPUStructuredBuffer } from './structuredbuffer_webgpu';
 import type { WebGPUDevice } from './device';
+import type { Nullable } from '@zephyr3d/base';
 
 export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexLayout<unknown> {
   private static _hashCounter = 0;
@@ -43,7 +42,7 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
   destroy() {
     this._object = null;
   }
-  restore(): void {
+  restore() {
     this._object = {};
   }
   setDrawOffset(buffer: StructuredBuffer, byteOffset: number) {
@@ -53,7 +52,7 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
       }
     }
   }
-  get hash(): string {
+  get hash() {
     return this._hash;
   }
   get vertexBuffers() {
@@ -62,22 +61,19 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
   get indexBuffer() {
     return this._vertexData.indexBuffer;
   }
-  getDrawOffset(): number {
+  getDrawOffset() {
     return this._vertexData.getDrawOffset();
   }
-  getVertexBuffer(semantic: VertexSemantic): StructuredBuffer {
+  getVertexBuffer(semantic: VertexSemantic) {
     return this._vertexData.getVertexBuffer(semantic);
   }
-  getVertexBufferInfo(semantic: VertexSemantic): VertexBufferInfo {
+  getVertexBufferInfo(semantic: VertexSemantic) {
     return this._vertexData.getVertexBufferInfo(semantic);
   }
-  getIndexBuffer(): IndexBuffer {
+  getIndexBuffer() {
     return this._vertexData.getIndexBuffer();
   }
-  getLayouts(attributes: string): {
-    layoutHash: string;
-    buffers: { buffer: GPUDataBuffer; drawOffset: number }[];
-  } {
+  getLayouts(attributes: string) {
     if (!attributes) {
       return null;
     }
@@ -88,8 +84,8 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
     }
     return layout;
   }
-  private getDefaultBuffer(attrib: number, numVertices: number): StructuredBuffer {
-    let buffer = WebGPUVertexLayout._defaultBuffers[0];
+  private getDefaultBuffer(attrib: number, numVertices: number) {
+    let buffer: Nullable<StructuredBuffer> = WebGPUVertexLayout._defaultBuffers[0];
     if (buffer) {
       const n = Math.floor((buffer.byteLength / 4) * 4);
       if (n < numVertices) {
@@ -98,17 +94,14 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
     }
     if (!buffer) {
       buffer = this._device.createVertexBuffer(
-        getVertexAttribFormat(getVertexAttribName(attrib), 'f32', 4),
+        getVertexAttribFormat(getVertexAttribName(attrib), 'f32', 4)!,
         new Float32Array(numVertices * 4)
       );
-      WebGPUVertexLayout._defaultBuffers.unshift(buffer);
+      WebGPUVertexLayout._defaultBuffers.unshift(buffer!);
     }
     return buffer;
   }
-  private calcHash(attribHash: string): {
-    layoutHash: string;
-    buffers: VertexBufferInfo[];
-  } {
+  private calcHash(attribHash: string) {
     const layouts: string[] = [];
     const layoutVertexBuffers: VertexBufferInfo[] = [];
     const vertexBuffers = this._vertexData.vertexBuffers;
@@ -116,10 +109,10 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
     for (let idx = 0; idx < attributes.length; idx++) {
       const attrib = attributes[idx];
       let bufferInfo = vertexBuffers[attrib];
-      let buffer = bufferInfo?.buffer;
+      let buffer: Nullable<StructuredBuffer> = bufferInfo?.buffer ?? null;
       if (!buffer) {
         console.warn(`No vertex buffer set for location <${getVertexAttribName(attrib)}>`);
-        buffer = this.getDefaultBuffer(attrib, this._vertexData.numVertices);
+        buffer = this.getDefaultBuffer(attrib, this._vertexData.numVertices)!;
         bufferInfo = {
           buffer,
           offset: 0,
@@ -129,19 +122,19 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
           stepMode: 'vertex'
         };
       }
-      const gpuFormat = WebGPUStructuredBuffer.getGPUVertexFormat(bufferInfo.type);
+      const gpuFormat = WebGPUStructuredBuffer.getGPUVertexFormat(bufferInfo!.type);
       if (!gpuFormat) {
         throw new Error('Invalid vertex buffer format');
       }
       const index = layoutVertexBuffers.findIndex((val) => val.buffer === buffer);
-      const stride = bufferInfo.stride;
-      let layout = index >= 0 ? layouts[index] : `${stride}-${Number(bufferInfo.stepMode === 'instance')}`;
-      layout += `-${vertexFormatToHash[gpuFormat]}-${bufferInfo.offset}-${idx}`;
+      const stride = bufferInfo!.stride;
+      let layout = index >= 0 ? layouts[index] : `${stride}-${Number(bufferInfo!.stepMode === 'instance')}`;
+      layout += `-${vertexFormatToHash[gpuFormat]}-${bufferInfo!.offset}-${idx}`;
       if (index >= 0) {
         layouts[index] = layout;
       } else {
         layouts.push(layout);
-        layoutVertexBuffers.push(bufferInfo);
+        layoutVertexBuffers.push(bufferInfo!);
       }
     }
     return {
@@ -149,10 +142,10 @@ export class WebGPUVertexLayout extends WebGPUObject<unknown> implements VertexL
       buffers: layoutVertexBuffers
     };
   }
-  bind(): void {
+  bind() {
     this._device.setVertexLayout(this);
   }
-  draw(primitiveType: PrimitiveType, first: number, count: number): void {
+  draw(primitiveType: PrimitiveType, first: number, count: number) {
     this.bind();
     this._device.draw(primitiveType, first, count);
   }

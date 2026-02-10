@@ -1,7 +1,8 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { eventBus } from '../core/eventbus';
+import type { Nullable } from '@zephyr3d/base';
 
-let isDragging = null;
+let isDragging: Nullable<unknown> = null;
 
 export function enableWorkspaceDragging(
   object: unknown,

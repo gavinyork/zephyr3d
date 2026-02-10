@@ -1,5 +1,6 @@
-import type { SerializableClass } from '../../serialization';
-import { BaseGraphNode } from '../node';
+import type { Nullable } from '@zephyr3d/base';
+import { BaseGraphNode, getNodeTypeComponents } from '../node';
+import { defineProps } from '../../serialization/types';
 
 /**
  * Vector constructor node
@@ -75,7 +76,7 @@ export class MakeVectorNode extends BaseGraphNode {
    *
    * @returns 'MakeVector'
    */
-  toString(): string {
+  toString() {
     return 'MakeVector';
   }
   /**
@@ -86,7 +87,7 @@ export class MakeVectorNode extends BaseGraphNode {
    * @remarks
    * No properties need to be serialized beyond the base node data.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: MakeVectorNode,
       name: 'MakeVectorNode',
@@ -107,7 +108,7 @@ export class MakeVectorNode extends BaseGraphNode {
    * - Total component count must be between 2 and 4
    * - All input types must be valid (float, vec2, or vec3)
    */
-  protected validate(): string {
+  protected validate() {
     const err = super.validate();
     if (err) {
       return err;
@@ -126,7 +127,7 @@ export class MakeVectorNode extends BaseGraphNode {
       if (!this._inputs[i].inputNode) {
         return `Missing argument \`${name}\``;
       }
-      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const type = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!type) {
         return `Cannot determine type of argument \`${name}\``;
       }
@@ -166,7 +167,7 @@ export class MakeVectorNode extends BaseGraphNode {
       if (!this._inputs[i].inputNode) {
         return '';
       }
-      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const type = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!type) {
         return '';
       }
@@ -219,7 +220,7 @@ export class SwizzleNode extends BaseGraphNode {
    *
    * @returns 'Swizzle'
    */
-  toString(): string {
+  toString() {
     return 'Swizzle';
   }
   /**
@@ -230,12 +231,12 @@ export class SwizzleNode extends BaseGraphNode {
    * @remarks
    * No properties need to be serialized beyond the base node data.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: SwizzleNode,
       name: 'SwizzleNode',
       getProps() {
-        return [
+        return defineProps([
           {
             name: 'Swizzle',
             type: 'string',
@@ -246,7 +247,7 @@ export class SwizzleNode extends BaseGraphNode {
               this.swizzle = value.str[0];
             }
           }
-        ];
+        ]);
       }
     };
   }
@@ -262,15 +263,12 @@ export class SwizzleNode extends BaseGraphNode {
    * - Total component count must be between 2 and 4
    * - All input types must be valid (float, vec2, or vec3)
    */
-  protected validate(): string {
+  protected validate() {
     const err = super.validate();
     if (err) {
       return err;
     }
-    if (!this._inputs[0].inputNode) {
-      return `Missing argument \`${name}\``;
-    }
-    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    const type = this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
     if (!type) {
       return `Cannot determine type of argument \`${name}\``;
     }
@@ -304,14 +302,14 @@ export class SwizzleNode extends BaseGraphNode {
    *
    */
   protected getType() {
-    const err = super.validate();
+    const err = this.validate();
     if (err) {
       return '';
     }
     if (!this._inputs[0].inputNode) {
       return '';
     }
-    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId);
+    const type = this._inputs[0].inputNode.getOutputType(this._inputs[0].inputId!);
     if (!type) {
       return '';
     }
@@ -337,6 +335,352 @@ export class SwizzleNode extends BaseGraphNode {
       return '';
     }
     return this._swizzle.length === 1 ? 'float' : `vec${this._swizzle.length}`;
+  }
+}
+
+/**
+ * Comparison mode
+ * @public
+ **/
+export type ComparisonMode = 'eq' | 'ne' | 'lt' | 'le' | 'gt' | 'ge';
+
+/**
+ * Vector comparison node
+ *
+ * @public
+ */
+export class CompComparisonNode extends BaseGraphNode {
+  private _mode: ComparisonMode;
+  /**
+   * Creates a new swizzle node
+   */
+  constructor() {
+    super();
+    this._mode = 'eq';
+    this._inputs = [
+      {
+        id: 1,
+        name: '',
+        type: ['vec2', 'vec3', 'vec4'],
+        required: true
+      },
+      {
+        id: 2,
+        name: '',
+        type: ['vec2', 'vec3', 'vec4'],
+        required: true
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      }
+    ];
+  }
+  /** Swizzle */
+  get mode() {
+    return this._mode;
+  }
+  set mode(val: ComparisonMode) {
+    this._mode = val;
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'Swizzle'
+   */
+  toString() {
+    return 'Comparison';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   *
+   * @remarks
+   * No properties need to be serialized beyond the base node data.
+   */
+  static getSerializationCls() {
+    return {
+      ctor: CompComparisonNode,
+      name: 'CompComparisonNode',
+      getProps() {
+        return defineProps([
+          {
+            name: 'mode',
+            type: 'string',
+            options: {
+              enum: {
+                labels: ['Equal', 'NotEqual', 'LessThan', 'LessThanEqual', 'GreaterThan', 'GreaterThanEqual'],
+                values: ['eq', 'ne', 'lt', 'le', 'gt', 'ge']
+              }
+            },
+            get(this: CompComparisonNode, value) {
+              value.str[0] = this.mode;
+            },
+            set(this: CompComparisonNode, value) {
+              this.mode = value.str[0] as ComparisonMode;
+            }
+          }
+        ]);
+      }
+    };
+  }
+  /**
+   * Validates the node state and input types
+   *
+   * @returns Error message if invalid, empty string if valid
+   */
+  protected validate() {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    const type0 = this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
+    const type1 = this._inputs[1].inputNode!.getOutputType(this._inputs[1].inputId!);
+    if (type0 !== type1) {
+      return 'Input arguments must be the same type';
+    }
+    return '';
+  }
+  /**
+   * Gets the output type based on connected inputs
+   *
+   * @returns 'bvec2', 'bvec3', 'bvec4', or empty string if invalid
+   *
+   */
+  protected getType() {
+    const err = this.validate();
+    if (err) {
+      return '';
+    }
+    const type = this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
+    return `bvec${getNodeTypeComponents(type)}`;
+  }
+}
+
+/**
+ * Any condition node
+ *
+ * @public
+ */
+export class AnyConditionNode extends BaseGraphNode {
+  /**
+   * Creates a new any-condition node
+   */
+  constructor() {
+    super();
+    this._inputs = [
+      {
+        id: 1,
+        name: '',
+        type: ['bool', 'bvec2', 'bvec3', 'bvec4'],
+        required: true
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'Any'
+   */
+  toString() {
+    return 'Any';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   *
+   * @remarks
+   * No properties need to be serialized beyond the base node data.
+   */
+  static getSerializationCls() {
+    return {
+      ctor: AnyConditionNode,
+      name: 'AnyConditionNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Gets the output type based on connected inputs
+   *
+   * @returns 'bool'
+   *
+   */
+  protected getType() {
+    return this.validate() ? '' : 'bool';
+  }
+}
+
+/**
+ * All condition node
+ *
+ * @public
+ */
+export class AllConditionNode extends BaseGraphNode {
+  /**
+   * Creates a new all-condition node
+   */
+  constructor() {
+    super();
+    this._inputs = [
+      {
+        id: 1,
+        name: '',
+        type: ['bool', 'bvec2', 'bvec3', 'bvec4'],
+        required: true
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'All'
+   */
+  toString() {
+    return 'All';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   *
+   * @remarks
+   * No properties need to be serialized beyond the base node data.
+   */
+  static getSerializationCls() {
+    return {
+      ctor: AllConditionNode,
+      name: 'AllConditionNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Gets the output type based on connected inputs
+   *
+   * @returns 'bool'
+   *
+   */
+  protected getType() {
+    return this.validate() ? '' : 'bool';
+  }
+}
+
+/**
+ * Selection node
+ *
+ * @public
+ */
+export class SelectionNode extends BaseGraphNode {
+  /**
+   * Creates a new selection node
+   */
+  constructor() {
+    super();
+    this._inputs = [
+      {
+        id: 1,
+        name: 'a',
+        type: ['float', 'vec2', 'vec3', 'vec4'],
+        required: true
+      },
+      {
+        id: 2,
+        name: 'b',
+        type: ['float', 'vec2', 'vec3', 'vec4'],
+        required: true
+      },
+      {
+        id: 3,
+        name: 'condition',
+        type: ['bool', 'bvec2', 'bvec3', 'bvec4'],
+        required: true
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'Selection'
+   */
+  toString() {
+    return 'Selection';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   *
+   * @remarks
+   * No properties need to be serialized beyond the base node data.
+   */
+  static getSerializationCls() {
+    return {
+      ctor: SelectionNode,
+      name: 'SelectionNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Validates the node state and input types
+   *
+   * @returns Error message if invalid, empty string if valid
+   */
+  protected validate() {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    const type0 = this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
+    const type1 = this._inputs[1].inputNode!.getOutputType(this._inputs[1].inputId!);
+    if (type0 !== type1) {
+      return 'Input arguments 0-1 must be the same type';
+    }
+    const type2 = this._inputs[2].inputNode!.getOutputType(this._inputs[2].inputId!);
+    const n = getNodeTypeComponents(type2);
+    if (n > 1 && n !== getNodeTypeComponents(type0)) {
+      return 'Invalid type of argument 2';
+    }
+    return '';
+  }
+  /**
+   * Gets the output type based on connected inputs
+   *
+   * @returns 'bool'
+   *
+   */
+  protected getType() {
+    const err = this.validate();
+    if (err) {
+      return '';
+    }
+    return this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
   }
 }
 
@@ -405,7 +749,7 @@ export class TransformNode extends BaseGraphNode {
    *
    * @returns 'Transform'
    */
-  toString(): string {
+  toString() {
     return 'Transform';
   }
   /**
@@ -416,7 +760,7 @@ export class TransformNode extends BaseGraphNode {
    * @remarks
    * No properties need to be serialized beyond the base node data.
    */
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: TransformNode,
       name: 'TransformNode',
@@ -437,7 +781,7 @@ export class TransformNode extends BaseGraphNode {
    * - vec4 with mat4
    * - Compatible matrix-matrix multiplications
    */
-  protected validate(): string {
+  protected validate() {
     const err = super.validate();
     if (err) {
       return err;
@@ -448,7 +792,7 @@ export class TransformNode extends BaseGraphNode {
       if (!this._inputs[i].inputNode) {
         return `Missing argument \`${name}\``;
       }
-      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const type = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!type) {
         return `Cannot determine type of argument \`${name}\``;
       }
@@ -489,7 +833,7 @@ export class TransformNode extends BaseGraphNode {
    * - mat * mat = mat (same dimension)
    */
   protected getType() {
-    const err = super.validate();
+    const err = this.validate();
     if (err) {
       return '';
     }
@@ -498,7 +842,7 @@ export class TransformNode extends BaseGraphNode {
       if (!this._inputs[i].inputNode) {
         return '';
       }
-      const type = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const type = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!type) {
         return '';
       }
@@ -581,9 +925,9 @@ export abstract class GenericMathNode extends BaseGraphNode {
   /** The explicit output type, if specified (otherwise inferred from inputs) */
   readonly outType: string;
   /** Maps input slot IDs to allowed types for that specific slot */
-  readonly explicitInTypes: Record<number, string[]>;
+  readonly explicitInTypes: Nullable<Record<number, string[]>>;
   /** Maps input slot IDs to additional allowed types beyond the common type */
-  readonly additionalInTypes: Record<number, string[]>;
+  readonly additionalInTypes: Nullable<Record<number, string[]>>;
   /**
    * Creates a new generic math node
    *
@@ -602,10 +946,10 @@ export abstract class GenericMathNode extends BaseGraphNode {
   constructor(
     func: string,
     numArgs: number,
-    outType?: string,
-    inTypes?: string[],
-    explicitInTypes?: Record<number, string[]>,
-    additionalInTypes?: Record<number, string[]>,
+    outType?: Nullable<string>,
+    inTypes?: Nullable<string[]>,
+    explicitInTypes?: Nullable<Record<number, string[]>>,
+    additionalInTypes?: Nullable<Record<number, string[]>>,
     originTypes?: string[]
   ) {
     super();
@@ -649,7 +993,7 @@ export abstract class GenericMathNode extends BaseGraphNode {
    * - Have allowed types for their slot
    * - Share a common type (unless explicitly or additionally typed)
    */
-  protected validate(): string {
+  protected validate() {
     const err = super.validate();
     if (err) {
       return err;
@@ -657,7 +1001,7 @@ export abstract class GenericMathNode extends BaseGraphNode {
     let type: string = '';
     for (let i = 0; i < this._inputs.length; i++) {
       const name = 'abcdefghijklmn'[i];
-      const t = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const t = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!t) {
         return `Cannot determine type of argument \`${name}\``;
       }
@@ -685,7 +1029,7 @@ export abstract class GenericMathNode extends BaseGraphNode {
    * Returns the explicit output type if specified, otherwise infers
    * the common type from non-explicit, non-additional inputs.
    */
-  protected getType(): string {
+  protected getType() {
     if (this.outType) {
       return this.outType;
     }
@@ -694,7 +1038,7 @@ export abstract class GenericMathNode extends BaseGraphNode {
       if (!this._inputs[i].inputNode) {
         return '';
       }
-      const t = this._inputs[i].inputNode.getOutputType(this._inputs[i].inputId);
+      const t = this._inputs[i].inputNode!.getOutputType(this._inputs[i].inputId!);
       if (!t) {
         return '';
       }
@@ -725,7 +1069,7 @@ export class Degrees2RadiansNode extends GenericMathNode {
   constructor() {
     super('degrees2radians', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: Degrees2RadiansNode,
       name: 'Degrees2RadiansNode',
@@ -749,7 +1093,7 @@ export class Radians2DegreesNode extends GenericMathNode {
   constructor() {
     super('radians2degrees', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: Radians2DegreesNode,
       name: 'Radians2DegreesNode',
@@ -773,7 +1117,7 @@ export class SinNode extends GenericMathNode {
   constructor() {
     super('sin', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: SinNode,
       name: 'SinNode',
@@ -797,7 +1141,7 @@ export class CosNode extends GenericMathNode {
   constructor() {
     super('cos', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: CosNode,
       name: 'CosNode',
@@ -821,7 +1165,7 @@ export class TanNode extends GenericMathNode {
   constructor() {
     super('tan', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: TanNode,
       name: 'TanNode',
@@ -845,7 +1189,7 @@ export class ArcSinNode extends GenericMathNode {
   constructor() {
     super('asin', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ArcSinNode,
       name: 'ArcSinNode',
@@ -869,7 +1213,7 @@ export class ArcCosNode extends GenericMathNode {
   constructor() {
     super('acos', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ArcCosNode,
       name: 'ArcCosNode',
@@ -894,7 +1238,7 @@ export class ArcTanNode extends GenericMathNode {
   constructor() {
     super('atan', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ArcTanNode,
       name: 'ArcTanNode',
@@ -920,7 +1264,7 @@ export class ArcTan2Node extends GenericMathNode {
   constructor() {
     super('atan2', 2);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ArcTan2Node,
       name: 'ArcTan2Node',
@@ -944,7 +1288,7 @@ export class SinHNode extends GenericMathNode {
   constructor() {
     super('sinh', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: SinHNode,
       name: 'SinHNode',
@@ -968,7 +1312,7 @@ export class CosHNode extends GenericMathNode {
   constructor() {
     super('cosh', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: CosHNode,
       name: 'CosHNode',
@@ -993,7 +1337,7 @@ export class TanHNode extends GenericMathNode {
   constructor() {
     super('tanh', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: TanHNode,
       name: 'TanHNode',
@@ -1017,7 +1361,7 @@ export class ArcsineHNode extends GenericMathNode {
   constructor() {
     super('asinh', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ArcsineHNode,
       name: 'ArcsineHNode',
@@ -1041,7 +1385,7 @@ export class ArccosineHNode extends GenericMathNode {
   constructor() {
     super('acosh', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ArccosineHNode,
       name: 'ArccosineHNode',
@@ -1065,7 +1409,7 @@ export class ArctangentHNode extends GenericMathNode {
   constructor() {
     super('atanh', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ArctangentHNode,
       name: 'ArctangentHNode',
@@ -1089,7 +1433,7 @@ export class ExpNode extends GenericMathNode {
   constructor() {
     super('exp', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ExpNode,
       name: 'ExpNode',
@@ -1113,7 +1457,7 @@ export class Exp2Node extends GenericMathNode {
   constructor() {
     super('exp2', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: Exp2Node,
       name: 'Exp2Node',
@@ -1137,7 +1481,7 @@ export class LogNode extends GenericMathNode {
   constructor() {
     super('log', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: LogNode,
       name: 'LogNode',
@@ -1161,7 +1505,7 @@ export class Log2Node extends GenericMathNode {
   constructor() {
     super('log2', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: Log2Node,
       name: 'Log2Node',
@@ -1185,7 +1529,7 @@ export class SqrtNode extends GenericMathNode {
   constructor() {
     super('sqrt', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: SqrtNode,
       name: 'SqrtNode',
@@ -1210,7 +1554,7 @@ export class InvSqrtNode extends GenericMathNode {
   constructor() {
     super('inverseSqrt', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: InvSqrtNode,
       name: 'InvSqrtNode',
@@ -1234,7 +1578,7 @@ export class AbsNode extends GenericMathNode {
   constructor() {
     super('abs', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: AbsNode,
       name: 'AbsNode',
@@ -1258,7 +1602,7 @@ export class SignNode extends GenericMathNode {
   constructor() {
     super('sign', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: SignNode,
       name: 'SignNode',
@@ -1282,7 +1626,7 @@ export class FloorNode extends GenericMathNode {
   constructor() {
     super('floor', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: FloorNode,
       name: 'FloorNode',
@@ -1306,7 +1650,7 @@ export class CeilNode extends GenericMathNode {
   constructor() {
     super('ceil', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: CeilNode,
       name: 'CeilNode',
@@ -1331,7 +1675,7 @@ export class FractNode extends GenericMathNode {
   constructor() {
     super('fract', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: FractNode,
       name: 'FractNode',
@@ -1357,7 +1701,7 @@ export class DDXNode extends GenericMathNode {
   constructor() {
     super('dpdx', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: DDXNode,
       name: 'DDXNode',
@@ -1383,7 +1727,7 @@ export class DDYNode extends GenericMathNode {
   constructor() {
     super('dpdy', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: DDYNode,
       name: 'DDYNode',
@@ -1409,7 +1753,7 @@ export class FWidthNode extends GenericMathNode {
   constructor() {
     super('fwidth', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: FWidthNode,
       name: 'FWidthNode',
@@ -1433,7 +1777,7 @@ export class CompAddNode extends GenericMathNode {
   constructor() {
     super('add', 2);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: CompAddNode,
       name: 'CompAddNode',
@@ -1457,7 +1801,7 @@ export class CompSubNode extends GenericMathNode {
   constructor() {
     super('sub', 2);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: CompSubNode,
       name: 'CompSubNode',
@@ -1487,7 +1831,7 @@ export class CompMulNode extends GenericMathNode {
   constructor() {
     super('mul', 2, null, null, null, { '1': ['float'], '2': ['float'] });
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: CompMulNode,
       name: 'CompMulNode',
@@ -1496,12 +1840,12 @@ export class CompMulNode extends GenericMathNode {
       }
     };
   }
-  protected getType(): string {
+  protected getType() {
     const type1 = this.inputs[0].inputNode
-      ? this.inputs[0].inputNode.getOutputType(this.inputs[0].inputId)
+      ? this.inputs[0].inputNode.getOutputType(this.inputs[0].inputId!)
       : '';
     const type2 = this.inputs[1].inputNode
-      ? this.inputs[1].inputNode.getOutputType(this.inputs[1].inputId)
+      ? this.inputs[1].inputNode.getOutputType(this.inputs[1].inputId!)
       : '';
     if (!type1 || !type2) {
       return '';
@@ -1524,7 +1868,7 @@ export class CompDivNode extends GenericMathNode {
   constructor() {
     super('div', 2);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: CompDivNode,
       name: 'CompDivNode',
@@ -1549,7 +1893,7 @@ export class ModNode extends GenericMathNode {
   constructor() {
     super('mod', 2);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ModNode,
       name: 'ModNode',
@@ -1574,7 +1918,7 @@ export class MinNode extends GenericMathNode {
   constructor() {
     super('min', 2);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: MinNode,
       name: 'MinNode',
@@ -1599,7 +1943,7 @@ export class MaxNode extends GenericMathNode {
   constructor() {
     super('max', 2);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: MaxNode,
       name: 'MaxNode',
@@ -1624,7 +1968,7 @@ export class PowNode extends GenericMathNode {
   constructor() {
     super('pow', 2);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: PowNode,
       name: 'PowNode',
@@ -1650,10 +1994,30 @@ export class StepNode extends GenericMathNode {
   constructor() {
     super('step', 2);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: StepNode,
       name: 'StepNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}
+
+/**
+ * SmoothStep function
+ *
+ * @public
+ */
+export class SmoothStepNode extends GenericMathNode {
+  constructor() {
+    super('smoothStep', 3);
+  }
+  static getSerializationCls() {
+    return {
+      ctor: SmoothStepNode,
+      name: 'SmoothStepNode',
       getProps() {
         return [];
       }
@@ -1676,7 +2040,7 @@ export class FmaNode extends GenericMathNode {
   constructor() {
     super('fma', 3);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: FmaNode,
       name: 'FmaNode',
@@ -1702,7 +2066,7 @@ export class ClampNode extends GenericMathNode {
   constructor() {
     super('clamp', 3);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ClampNode,
       name: 'ClampNode',
@@ -1728,7 +2092,7 @@ export class SaturateNode extends GenericMathNode {
   constructor() {
     super('saturate', 1);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: SaturateNode,
       name: 'SaturateNode',
@@ -1754,7 +2118,7 @@ export class MixNode extends GenericMathNode {
   constructor() {
     super('mix', 3, null, null, null, { '3': ['float'] });
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: MixNode,
       name: 'MixNode',
@@ -1779,7 +2143,7 @@ export class NormalizeNode extends GenericMathNode {
   constructor() {
     super('normalize', 1, null, ['vec2', 'vec3', 'vec4']);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: NormalizeNode,
       name: 'NormalizeNode',
@@ -1804,7 +2168,7 @@ export class FaceForwardNode extends GenericMathNode {
   constructor() {
     super('faceForward', 3, null, ['vec2', 'vec3']);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: FaceForwardNode,
       name: 'FaceForwardNode',
@@ -1829,7 +2193,7 @@ export class ReflectNode extends GenericMathNode {
   constructor() {
     super('reflect', 2, null, ['vec2', 'vec3']);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: ReflectNode,
       name: 'ReflectNode',
@@ -1856,7 +2220,7 @@ export class RefractNode extends GenericMathNode {
   constructor() {
     super('refract', 3, null, ['vec2', 'vec3'], { '3': ['float'] });
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: RefractNode,
       name: 'RefractNode',
@@ -1881,7 +2245,7 @@ export class LengthNode extends GenericMathNode {
   constructor() {
     super('length', 1, 'float');
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: LengthNode,
       name: 'LengthNode',
@@ -1906,7 +2270,7 @@ export class DistanceNode extends GenericMathNode {
   constructor() {
     super('distance', 2, 'float');
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: DistanceNode,
       name: 'DistanceNode',
@@ -1917,6 +2281,85 @@ export class DistanceNode extends GenericMathNode {
   }
 }
 
+/**
+ * Logically and
+ *
+ * @public
+ */
+export class LogicallyAndNode extends GenericMathNode {
+  constructor() {
+    super('and', 2, 'bool', ['bool']);
+  }
+  static getSerializationCls() {
+    return {
+      ctor: LogicallyAndNode,
+      name: 'LogicallyAndNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}
+
+/**
+ * Logically or
+ *
+ * @public
+ */
+export class LogicallyOrNode extends GenericMathNode {
+  constructor() {
+    super('or', 2, 'bool', ['bool']);
+  }
+  static getSerializationCls() {
+    return {
+      ctor: LogicallyOrNode,
+      name: 'LogicallyOrNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}
+
+/**
+ * Equal test across two scalar or vectors
+ *
+ * @public
+ */
+export class EqualNode extends GenericMathNode {
+  constructor() {
+    super('equal', 2, 'bool', ['float', 'vec2', 'vec3', 'vec4']);
+  }
+  static getSerializationCls() {
+    return {
+      ctor: EqualNode,
+      name: 'EqualNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}
+
+/**
+ * Not-Equal test across two scalar or vectors
+ *
+ * @public
+ */
+export class NotEqualNode extends GenericMathNode {
+  constructor() {
+    super('notEqual', 2, 'bool', ['float', 'vec2', 'vec3', 'vec4']);
+  }
+  static getSerializationCls() {
+    return {
+      ctor: NotEqualNode,
+      name: 'NotEqualNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+}
 /**
  * Calculates the dot product of two vectors
  *
@@ -1936,7 +2379,7 @@ export class DotProductNode extends GenericMathNode {
   constructor() {
     super('dot', 2, 'float', ['vec2', 'vec3', 'vec4']);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: DotProductNode,
       name: 'DotProductNode',
@@ -1969,7 +2412,7 @@ export class CrossProductNode extends GenericMathNode {
   constructor() {
     super('cross', 2, null, ['vec3']);
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: CrossProductNode,
       name: 'CrossProductNode',
@@ -1992,7 +2435,7 @@ export class SimplexNoise2DNode extends GenericMathNode {
   constructor() {
     super('Z_simplexNoise2D', 2, 'float', null, { '1': ['vec2'], '2': ['float'] });
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: SimplexNoise2DNode,
       name: 'SimplexNoise2DNode',
@@ -2015,7 +2458,7 @@ export class PerlinNoise2DNode extends GenericMathNode {
   constructor() {
     super('Z_perlinNoise2D', 2, 'float', null, { '1': ['vec2'], '2': ['float'] });
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: PerlinNoise2DNode,
       name: 'PerlinNoise2DNode',
@@ -2035,7 +2478,7 @@ export class Hash1Node extends GenericMathNode {
   constructor() {
     super('Z_hash1', 1, 'float', null, { '1': ['float', 'vec2', 'vec3'] });
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: Hash1Node,
       name: 'Hash1Node',
@@ -2055,7 +2498,7 @@ export class Hash2Node extends GenericMathNode {
   constructor() {
     super('Z_hash2', 1, 'vec2', null, { '1': ['float', 'vec2', 'vec3'] });
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: Hash2Node,
       name: 'Hash2Node',
@@ -2075,7 +2518,7 @@ export class Hash3Node extends GenericMathNode {
   constructor() {
     super('Z_hash3', 1, 'vec3', null, { '1': ['float', 'vec2', 'vec3'] });
   }
-  static getSerializationCls(): SerializableClass {
+  static getSerializationCls() {
     return {
       ctor: Hash3Node,
       name: 'Hash3Node',

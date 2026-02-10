@@ -1,4 +1,4 @@
-import type { IDisposable } from '@zephyr3d/base';
+import type { IDisposable, Nullable } from '@zephyr3d/base';
 
 /**
  * Base class for runtime scripts that can be attached to a host object.
@@ -39,7 +39,7 @@ export class RuntimeScript<T extends IDisposable | null> {
    * @param _host - The host the script is being attached to.
    * @returns Optionally a Promise to await asynchronous setup.
    */
-  onAttached(_host: T): void | Promise<void> {}
+  onAttached(_host: Nullable<T>): void | Promise<void> {}
   /**
    * Called every update/tick while the script is active.
    *

@@ -1,6 +1,6 @@
 import { AbstractTextureLoader } from '../loader';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions } from '@zephyr3d/device';
-import type { TypedArray } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
 import { getDevice } from '../../../app/api';
 
 /**
@@ -8,14 +8,14 @@ import { getDevice } from '../../../app/api';
  * @internal
  */
 export class TGALoader extends AbstractTextureLoader {
-  supportMIMEType(mimeType: string): boolean {
+  supportMIMEType(mimeType: string) {
     return mimeType === 'image/tga' || mimeType === 'image/x-tga';
   }
   private parseTGA(
     content: ArrayBuffer | TypedArray,
     sRGB: boolean,
     noMipmap: boolean,
-    texture: BaseTexture
+    texture?: Nullable<BaseTexture>
   ) {
     const arrayBuffer = content instanceof ArrayBuffer ? content : content.buffer;
     const offset = content instanceof ArrayBuffer ? 0 : content.byteOffset;
@@ -80,11 +80,12 @@ export class TGALoader extends AbstractTextureLoader {
       if (noMipmap) {
         opt.mipmapping = false;
       }
-      const tex = getDevice().createTexture2D(sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm', width, height, opt);
+      const tex = getDevice().createTexture2D(sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm', width, height, opt)!;
       tex.update(pixels, 0, 0, width, height);
       return tex;
     }
-    throw new Error(`Unsupported TGA file format`);
+    console.error('Unsupported TGA file format');
+    return null;
   }
   private mergeBytes(dest: Uint8Array<ArrayBuffer>, offset: number, pixel: number[], numBytes: number) {
     if (numBytes === 4) {
@@ -109,9 +110,9 @@ export class TGALoader extends AbstractTextureLoader {
     data: ArrayBuffer | TypedArray,
     srgb: boolean,
     samplerOptions?: SamplerOptions,
-    texture?: BaseTexture
-  ): Promise<BaseTexture> {
-    return new Promise<BaseTexture>((resolve) => {
+    texture?: Nullable<BaseTexture>
+  ) {
+    return new Promise<Nullable<BaseTexture>>((resolve) => {
       resolve(this.parseTGA(data, srgb, samplerOptions?.mipFilter === 'none', texture));
     });
   }

@@ -10,6 +10,7 @@ import {
   PBParamValueError
 } from './errors';
 import type { ExpValueType, ProgramBuilder } from './programbuilder';
+import type { Nullable } from '@zephyr3d/base';
 
 const genTypeList = [
   [typeinfo.typeF32, typeinfo.typeF32Vec2, typeinfo.typeF32Vec3, typeinfo.typeF32Vec4],
@@ -30,43 +31,42 @@ const genMatrixTypeList = [
   typeinfo.typeMat4
 ];
 
-function matchFunctionOverloadings(
-  pb: ProgramBuilder,
-  name: string,
-  ...args: ExpValueType[]
-): [ASTFunction, ASTExpression[]] {
+function matchFunctionOverloadings(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
   const bit =
     pb.getDevice().type === 'webgl'
       ? MASK_WEBGL1
       : pb.getDevice().type === 'webgl2'
         ? MASK_WEBGL2
         : MASK_WEBGPU;
-  const overloadings = builtinFunctionsAll?.[name].overloads
+  // @ts-ignore 7053
+  const overloadings = builtinFunctionsAll[name].overloads
+    // @ts-ignore 7006
     .filter((val) => !!(val[1] & bit))
+    // @ts-ignore 7006
     .map((val) => val[0]);
   if (!overloadings || overloadings.length === 0) {
     throw new PBDeviceNotSupport(`builtin shader function '${name}'`);
   }
-  const argsNonArray = args.map((val) => pb.normalizeExpValue(val));
+  const argsNonArray = args.map((val) => pb.normalizeExpValue(val)!);
   const matchResult = pb._matchFunctionOverloading(overloadings, argsNonArray);
   if (!matchResult) {
     throw new PBOverloadingMatchError(name);
   }
   return matchResult;
 }
-function callBuiltinChecked(pb: ProgramBuilder, matchResult: [ASTFunction, ASTExpression[]]): PBShaderExp {
+function callBuiltinChecked(pb: ProgramBuilder, matchResult: [ASTFunction, ASTExpression[]]) {
   return pb.$callFunction(matchResult[0].name, matchResult[1], matchResult[0]);
 }
-function callBuiltin(pb: ProgramBuilder, name: string, ...args: ExpValueType[]): PBShaderExp {
+function callBuiltin(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
   return callBuiltinChecked(pb, matchFunctionOverloadings(pb, name, ...args));
 }
 
 function genMatrixType(
   name: string,
   shaderTypeMask: number,
-  r: typeinfo.PBTypeInfo,
-  args: typeinfo.PBPrimitiveTypeInfo[]
-): [ASTFunction, number][] {
+  r: Nullable<typeinfo.PBTypeInfo>,
+  args: Nullable<typeinfo.PBPrimitiveTypeInfo>[]
+) {
   const result: [ASTFunction, number][] = [];
   for (let i = 0; i < genMatrixTypeList.length; i++) {
     const returnType = r || genMatrixTypeList[i];
@@ -87,7 +87,7 @@ function genType(
   r: typeinfo.PBTypeInfo | number,
   args: (typeinfo.PBTypeInfo | number)[],
   vecOnly?: boolean
-): [ASTFunction, number][] {
+) {
   if (args.findIndex((val) => typeof val === 'number') < 0) {
     return [
       [
@@ -126,13 +126,13 @@ function genType(
   }
 }
 
-function unaryFunc(a: ASTExpression, op: string, type: typeinfo.PBTypeInfo): PBShaderExp {
+function unaryFunc(a: ASTExpression, op: string, type: typeinfo.PBTypeInfo) {
   const exp = new PBShaderExp('', type);
   exp.$ast = new ASTUnaryFunc(a, op, type);
   return exp;
 }
 
-function binaryFunc(a: ASTExpression, b: ASTExpression, op: string, type: typeinfo.PBTypeInfo): PBShaderExp {
+function binaryFunc(a: ASTExpression, b: ASTExpression, op: string, type: typeinfo.PBTypeInfo) {
   const exp = new PBShaderExp('', type);
   exp.$ast = new ASTBinaryFunc(a, b, op, type);
   return exp;
@@ -179,7 +179,7 @@ const builtinFunctionsAll = {
         return args[0] + args[1];
       }
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
-      return binaryFunc(matchResult[1][0], matchResult[1][1], '+', matchResult[0].returnType);
+      return binaryFunc(matchResult[1][0], matchResult[1][1], '+', matchResult[0].returnType!);
     }
   },
   add: {
@@ -226,7 +226,7 @@ const builtinFunctionsAll = {
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
-      return binaryFunc(matchResult[1][0], matchResult[1][1], '-', matchResult[0].returnType);
+      return binaryFunc(matchResult[1][0], matchResult[1][1], '-', matchResult[0].returnType!);
     }
   },
   div: {
@@ -258,7 +258,7 @@ const builtinFunctionsAll = {
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
-      return binaryFunc(matchResult[1][0], matchResult[1][1], '/', matchResult[0].returnType);
+      return binaryFunc(matchResult[1][0], matchResult[1][1], '/', matchResult[0].returnType!);
     }
   },
   mul_2: {
@@ -347,7 +347,7 @@ const builtinFunctionsAll = {
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
-      return binaryFunc(matchResult[1][0], matchResult[1][1], '*', matchResult[0].returnType);
+      return binaryFunc(matchResult[1][0], matchResult[1][1], '*', matchResult[0].returnType!);
     }
   },
   mul: {
@@ -381,7 +381,7 @@ const builtinFunctionsAll = {
         throw new PBDeviceNotSupport('integer modulus');
       }
       if (pb.getDevice().type === 'webgpu' || isIntegerType) {
-        return binaryFunc(matchResult[1][0], matchResult[1][1], '%', matchResult[0].returnType);
+        return binaryFunc(matchResult[1][0], matchResult[1][1], '%', matchResult[0].returnType!);
       } else {
         return callBuiltinChecked(pb, matchResult);
       }
@@ -474,7 +474,9 @@ const builtinFunctionsAll = {
       if (!argType.isPrimitiveType() || (!argType.isScalarType() && !argType.isVectorType())) {
         throw new PBParamTypeError('saturate', 'x');
       }
+      // @ts-ignore 7053
       const a = argType.isScalarType() ? 0 : pb[`vec${argType.cols}`](0);
+      // @ts-ignore 7053
       const b = argType.isScalarType() ? 1 : pb[`vec${argType.cols}`](1);
       return pb.clamp(args[0], a, b);
     }
@@ -595,7 +597,7 @@ const builtinFunctionsAll = {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
       const argType = matchResult[1][0].getType();
       if (pb.getDevice().type === 'webgpu' || (argType.isPrimitiveType() && argType.isScalarType())) {
-        return binaryFunc(matchResult[1][0], matchResult[1][1], '<', matchResult[0].returnType);
+        return binaryFunc(matchResult[1][0], matchResult[1][1], '<', matchResult[0].returnType!);
       } else {
         return callBuiltinChecked(pb, matchResult);
       }
@@ -611,7 +613,7 @@ const builtinFunctionsAll = {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
       const argType = matchResult[1][0].getType();
       if (pb.getDevice().type === 'webgpu' || (argType.isPrimitiveType() && argType.isScalarType())) {
-        return binaryFunc(matchResult[1][0], matchResult[1][1], '<=', matchResult[0].returnType);
+        return binaryFunc(matchResult[1][0], matchResult[1][1], '<=', matchResult[0].returnType!);
       } else {
         return callBuiltinChecked(pb, matchResult);
       }
@@ -627,7 +629,7 @@ const builtinFunctionsAll = {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
       const argType = matchResult[1][0].getType();
       if (pb.getDevice().type === 'webgpu' || (argType.isPrimitiveType() && argType.isScalarType())) {
-        return binaryFunc(matchResult[1][0], matchResult[1][1], '>', matchResult[0].returnType);
+        return binaryFunc(matchResult[1][0], matchResult[1][1], '>', matchResult[0].returnType!);
       } else {
         return callBuiltinChecked(pb, matchResult);
       }
@@ -643,7 +645,7 @@ const builtinFunctionsAll = {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
       const argType = matchResult[1][0].getType();
       if (pb.getDevice().type === 'webgpu' || (argType.isPrimitiveType() && argType.isScalarType())) {
-        return binaryFunc(matchResult[1][0], matchResult[1][1], '>=', matchResult[0].returnType);
+        return binaryFunc(matchResult[1][0], matchResult[1][1], '>=', matchResult[0].returnType!);
       } else {
         return callBuiltinChecked(pb, matchResult);
       }
@@ -660,7 +662,7 @@ const builtinFunctionsAll = {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
       const argType = matchResult[1][0].getType();
       if (pb.getDevice().type === 'webgpu' || (argType.isPrimitiveType() && argType.isScalarType())) {
-        return binaryFunc(matchResult[1][0], matchResult[1][1], '==', matchResult[0].returnType);
+        return binaryFunc(matchResult[1][0], matchResult[1][1], '==', matchResult[0].returnType!);
       } else {
         return callBuiltinChecked(pb, matchResult);
       }
@@ -677,7 +679,7 @@ const builtinFunctionsAll = {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
       const argType = matchResult[1][0].getType();
       if (pb.getDevice().type === 'webgpu' || (argType.isPrimitiveType() && argType.isScalarType())) {
-        return binaryFunc(matchResult[1][0], matchResult[1][1], '!=', matchResult[0].returnType);
+        return binaryFunc(matchResult[1][0], matchResult[1][1], '!=', matchResult[0].returnType!);
       } else {
         return callBuiltinChecked(pb, matchResult);
       }
@@ -696,7 +698,7 @@ const builtinFunctionsAll = {
       if (pb.getDevice().type === 'webgpu' && argType.isPrimitiveType() && !argType.isScalarType()) {
         return pb.all(pb.compEqual(args[0] as PBShaderExp, args[1] as PBShaderExp));
       } else {
-        return binaryFunc(matchResult[1][0], matchResult[1][1], '==', matchResult[0].returnType);
+        return binaryFunc(matchResult[1][0], matchResult[1][1], '==', matchResult[0].returnType!);
       }
     }
   },
@@ -713,7 +715,7 @@ const builtinFunctionsAll = {
       if (pb.getDevice().type === 'webgpu' && argType.isPrimitiveType() && !argType.isScalarType()) {
         return pb.any(pb.compNotEqual(args[0] as PBShaderExp, args[1] as PBShaderExp));
       } else {
-        return binaryFunc(matchResult[1][0], matchResult[1][1], '!=', matchResult[0].returnType);
+        return binaryFunc(matchResult[1][0], matchResult[1][1], '!=', matchResult[0].returnType!);
       }
     }
   },
@@ -725,7 +727,7 @@ const builtinFunctionsAll = {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
       const argType = matchResult[1][0].getType();
       if (pb.getDevice().type === 'webgpu' || (argType.isPrimitiveType() && argType.isScalarType())) {
-        return unaryFunc(matchResult[1][0], '!', matchResult[0].returnType);
+        return unaryFunc(matchResult[1][0], '!', matchResult[0].returnType!);
       } else {
         return callBuiltinChecked(pb, matchResult);
       }
@@ -735,14 +737,14 @@ const builtinFunctionsAll = {
     overloads: [...genType('neg', MASK_ALL, 0, [0]), ...genType('neg', MASK_ALL, 1, [1])],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
-      return unaryFunc(matchResult[1][0], '-', matchResult[0].returnType);
+      return unaryFunc(matchResult[1][0], '-', matchResult[0].returnType!);
     }
   },
   or_2: {
     overloads: genType('or', MASK_ALL, typeinfo.typeBool, [3, 3]),
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
-      return binaryFunc(matchResult[1][0], matchResult[1][1], '||', matchResult[0].returnType);
+      return binaryFunc(matchResult[1][0], matchResult[1][1], '||', matchResult[0].returnType!);
     }
   },
   or: {
@@ -765,14 +767,14 @@ const builtinFunctionsAll = {
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
-      return binaryFunc(matchResult[1][0], matchResult[1][1], '|', matchResult[0].returnType);
+      return binaryFunc(matchResult[1][0], matchResult[1][1], '|', matchResult[0].returnType!);
     }
   },
   and_2: {
     overloads: genType('and', MASK_ALL, typeinfo.typeBool, [3, 3]),
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
-      return binaryFunc(matchResult[1][0], matchResult[1][1], '&&', matchResult[0].returnType);
+      return binaryFunc(matchResult[1][0], matchResult[1][1], '&&', matchResult[0].returnType!);
     }
   },
   and: {
@@ -798,7 +800,7 @@ const builtinFunctionsAll = {
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
-      return binaryFunc(matchResult[1][0], matchResult[1][1], '&', matchResult[0].returnType);
+      return binaryFunc(matchResult[1][0], matchResult[1][1], '&', matchResult[0].returnType!);
     }
   },
   compXor: {
@@ -808,7 +810,7 @@ const builtinFunctionsAll = {
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
-      return binaryFunc(matchResult[1][0], matchResult[1][1], '^', matchResult[0].returnType);
+      return binaryFunc(matchResult[1][0], matchResult[1][1], '^', matchResult[0].returnType!);
     }
   },
   sal: {
@@ -818,7 +820,7 @@ const builtinFunctionsAll = {
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
-      return binaryFunc(matchResult[1][0], matchResult[1][1], '<<', matchResult[0].returnType);
+      return binaryFunc(matchResult[1][0], matchResult[1][1], '<<', matchResult[0].returnType!);
     }
   },
   sar: {
@@ -828,7 +830,7 @@ const builtinFunctionsAll = {
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
-      return binaryFunc(matchResult[1][0], matchResult[1][1], '>>', matchResult[0].returnType);
+      return binaryFunc(matchResult[1][0], matchResult[1][1], '>>', matchResult[0].returnType!);
     }
   },
   arrayLength: {
@@ -859,10 +861,38 @@ const builtinFunctionsAll = {
       ...genType('select', MASK_WEBGPU, 1, [1, 1, 3], true),
       ...genType('select', MASK_WEBGPU, 2, [2, 2, 3], true),
       ...genType('select', MASK_WEBGPU, 3, [3, 3, 3], true),
-      ...genType('mix', MASK_WEBGL2, 0, [0, 0, 3]),
-      ...genType('mix', MASK_WEBGL2, 1, [1, 1, 3]),
-      ...genType('mix', MASK_WEBGL2, 2, [2, 2, 3])
-    ]
+      ...genType('mix', MASK_WEBGL, 0, [0, 0, 3]),
+      ...genType('mix', MASK_WEBGL, 1, [1, 1, 3]),
+      ...genType('mix', MASK_WEBGL, 2, [2, 2, 3])
+    ],
+    normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
+      if (pb.getDevice().type === 'webgl') {
+        const cond = args[2];
+        let newCond: Nullable<number | PBShaderExp> = null;
+        if (typeof cond === 'boolean') {
+          newCond = cond ? 1 : 0;
+        } else if (typeof cond === 'number') {
+          newCond = cond;
+        } else if (cond instanceof PBShaderExp) {
+          const type = cond.$ast.getType();
+          if (type.typeId === typeinfo.typeBool.typeId) {
+            newCond = pb.float(cond);
+          } else if (type.typeId === typeinfo.typeBVec2.typeId) {
+            newCond = pb.vec2(cond);
+          } else if (type.typeId === typeinfo.typeBVec3.typeId) {
+            newCond = pb.vec3(cond);
+          } else if (type.typeId === typeinfo.typeBVec4.typeId) {
+            newCond = pb.vec4(cond);
+          }
+        }
+        if (newCond === null) {
+          throw new PBParamValueError('select', 'cond');
+        }
+        return callBuiltin(pb, 'mix', args[0], args[1], newCond);
+      } else {
+        return callBuiltin(pb, name, ...args);
+      }
+    }
   },
   floatBitsToInt: {
     overloads: genType('floatBitsToInt', MASK_WEBGL2, 1, [0]),
@@ -2492,7 +2522,7 @@ const builtinFunctionsAll = {
         if (texType.isStorageTexture()) {
           throw new PBParamTypeError('textureSample', 'texture');
         }
-        const sampler = pb.getDefaultSampler(tex, false);
+        const sampler = pb.getDefaultSampler(tex, false)!;
         const coords = args[1];
         const ret = callBuiltin(pb, name, tex, sampler, coords);
         if (ret.$ast.getType().isCompatibleType(typeinfo.typeF32)) {
@@ -2573,7 +2603,7 @@ const builtinFunctionsAll = {
         const sampler = pb.getDefaultSampler(tex, false);
         const coords = args[1];
         const arrayIndex = args[2];
-        const ret = callBuiltin(pb, name, tex, sampler, coords, arrayIndex);
+        const ret = callBuiltin(pb, name, tex, sampler!, coords, arrayIndex);
         if (ret.$ast.getType().isCompatibleType(typeinfo.typeF32)) {
           return pb.vec4(ret);
         } else {
@@ -2649,7 +2679,7 @@ const builtinFunctionsAll = {
       }
       if (pb.getDevice().type === 'webgpu') {
         const sampler = pb.getDefaultSampler(tex, false);
-        return callBuiltin(pb, name, tex, sampler, args[1], args[2]);
+        return callBuiltin(pb, name, tex, sampler!, args[1], args[2]);
       } else {
         pb.getDefaultSampler(tex, false);
         return callBuiltin(pb, name, ...args);
@@ -2693,7 +2723,7 @@ const builtinFunctionsAll = {
       }
       if (pb.getDevice().type === 'webgpu') {
         const sampler = pb.getDefaultSampler(tex, false);
-        return callBuiltin(pb, name, tex, sampler, args[1], args[2], args[3]);
+        return callBuiltin(pb, name, tex, sampler!, args[1], args[2], args[3]);
       } else if (pb.getDevice().type === 'webgl2') {
         pb.getDefaultSampler(tex, false);
         const coords = args[1];
@@ -2735,7 +2765,7 @@ const builtinFunctionsAll = {
       }
       if (pb.getDevice().type === 'webgpu') {
         const sampler = pb.getDefaultSampler(args[0] as PBShaderExp, true);
-        return callBuiltin(pb, name, tex, sampler, args[1], args[2]);
+        return callBuiltin(pb, name, tex, sampler!, args[1], args[2]);
       } else {
         pb.getDefaultSampler(args[0] as PBShaderExp, true);
         let coordsComposite: PBShaderExp;
@@ -2784,7 +2814,7 @@ const builtinFunctionsAll = {
       }
       if (pb.getDevice().type === 'webgpu') {
         const sampler = pb.getDefaultSampler(args[0] as PBShaderExp, true);
-        return callBuiltin(pb, name, tex, sampler, args[1], args[2], args[3]);
+        return callBuiltin(pb, name, tex, sampler!, args[1], args[2], args[3]);
       } else {
         pb.getDefaultSampler(args[0] as PBShaderExp, true);
         const coordsComposite = pb.vec4(args[1] as any, pb.float(args[2] as any), args[3] as any);
@@ -2911,8 +2941,8 @@ const builtinFunctionsAll = {
               ? pb.int(args[2])
               : args[2];
           const ret = texType.isExternalTexture()
-            ? callBuiltin(pb, name, tex, sampler, args[1])
-            : callBuiltin(pb, name, tex, sampler, args[1], level);
+            ? callBuiltin(pb, name, tex, sampler!, args[1])
+            : callBuiltin(pb, name, tex, sampler!, args[1], level);
           if (ret.$ast.getType().isCompatibleType(typeinfo.typeF32)) {
             return pb.vec4(ret);
           } else {
@@ -2984,7 +3014,7 @@ const builtinFunctionsAll = {
             (args[3] instanceof PBShaderExp && args[3].$ast.getType().isCompatibleType(typeinfo.typeF32)))
             ? pb.int(args[3])
             : args[3];
-        const ret = callBuiltin(pb, name, tex, sampler, args[1], args[2], level);
+        const ret = callBuiltin(pb, name, tex, sampler!, args[1], args[2], level);
         if (ret.$ast.getType().isCompatibleType(typeinfo.typeF32)) {
           return pb.vec4(ret);
         } else {
@@ -3033,7 +3063,7 @@ const builtinFunctionsAll = {
       }
       if (pb.getDevice().type === 'webgpu') {
         const sampler = pb.getDefaultSampler(tex, true);
-        return callBuiltin(pb, name, tex, sampler, args[1], args[2]);
+        return callBuiltin(pb, name, tex, sampler!, args[1], args[2]);
       } else {
         pb.getDefaultSampler(args[0] as PBShaderExp, true);
         let coordsComposite: PBShaderExp;
@@ -3084,7 +3114,7 @@ const builtinFunctionsAll = {
       }
       if (pb.getDevice().type === 'webgpu') {
         const sampler = pb.getDefaultSampler(tex, true);
-        return callBuiltin(pb, name, tex, sampler, args[1], args[2], args[3]);
+        return callBuiltin(pb, name, tex, sampler!, args[1], args[2], args[3]);
       } else {
         pb.getDefaultSampler(args[0] as PBShaderExp, true);
         const coordsComposite = pb.vec4(args[1] as any, pb.float(args[2] as any), args[3] as any);
@@ -3161,7 +3191,7 @@ const builtinFunctionsAll = {
       }
       if (pb.getDevice().type === 'webgpu') {
         const sampler = pb.getDefaultSampler(tex, false);
-        return callBuiltin(pb, name, tex, sampler, args[1], args[2], args[3]);
+        return callBuiltin(pb, name, tex, sampler!, args[1], args[2], args[3]);
       } else {
         pb.getDefaultSampler(tex, false);
         return callBuiltin(pb, name, ...args);
@@ -3208,7 +3238,7 @@ const builtinFunctionsAll = {
       }
       if (pb.getDevice().type === 'webgpu') {
         const sampler = pb.getDefaultSampler(tex, false);
-        return callBuiltin(pb, name, tex, sampler, args[1], args[2], args[3], args[4]);
+        return callBuiltin(pb, name, tex, sampler!, args[1], args[2], args[3], args[4]);
       } else {
         pb.getDefaultSampler(tex, false);
         const coordsComposite = pb.vec3(args[1] as any, pb.float(args[2] as any));
@@ -3301,6 +3331,7 @@ for (const name of [
   'atomicXor',
   'atomicExchange'
 ]) {
+  // @ts-ignore 7053
   builtinFunctionsAll[name] = {
     overloades: [],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
@@ -3369,7 +3400,9 @@ export type PBBuiltinFunctionOverloadsInfo = {
 /** @internal */
 export function setBuiltinFuncs(cls: typeof ProgramBuilder) {
   for (const k of Object.keys(builtinFunctionsAll)) {
-    cls.prototype[k] = function (this: ProgramBuilder, ...args: ExpValueType[]): PBShaderExp {
+    // @ts-ignore 7053
+    cls.prototype[k] = function (this: ProgramBuilder, ...args: ExpValueType[]) {
+      // @ts-ignore 7053
       const normalizeFunc = builtinFunctionsAll?.[k]?.normalizeFunc || callBuiltin;
       return normalizeFunc(this, k, ...args);
     };

@@ -21,7 +21,7 @@ import type { FileMetadata } from '../vfs';
 export class GenericHtmlDirectoryReader implements HttpDirectoryReader {
   readonly name = 'generic-html';
 
-  async readOnce(dirPath: string, ctx: HttpDirectoryReaderContext): Promise<FileMetadata[]> {
+  async readOnce(dirPath: string, ctx: HttpDirectoryReaderContext) {
     const res = await ctx.fetch(dirPath, { method: 'GET', headers: { Accept: 'text/html,*/*' } });
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} for ${dirPath}`);
@@ -120,7 +120,7 @@ export class GenericHtmlDirectoryReader implements HttpDirectoryReader {
   }
 }
 
-function tryParseSize(s: string): number | null {
+function tryParseSize(s: string) {
   // Recoganize 123, 1.2K, 34KB, 5.6M, 7G, etc
   const m = s.match(/(\d+(?:\.\d+)?)\s*([KMGTP]?B?)\b/i);
   if (!m) {
@@ -145,7 +145,7 @@ function tryParseSize(s: string): number | null {
   return Math.round(n * (map[unit] ?? 1));
 }
 
-function tryParseDate(s: string): Date | null {
+function tryParseDate(s: string) {
   const cands = [s, s.replace(/\s+/g, ' ')];
   for (const c of cands) {
     const d = new Date(c);

@@ -106,6 +106,7 @@ dist/
 # Rush temporal files
 common/temp/
 .rush/
+rush-logs/
 
 # rollup
 .rollup.cache
@@ -116,3 +117,6 @@ common/temp/
 # site tmp cache
 .buildcache.json
 .buildcache.tmp.json
+
+# VSCodeCounter
+.VSCodeCounter

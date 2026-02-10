@@ -1,16 +1,16 @@
 import { AbstractTextureLoader } from '../loader';
-import type { TypedArray } from '@zephyr3d/base';
-import { floatToHalf, packFloat3 } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
+import { float2half, packFloat3 } from '@zephyr3d/base';
 import type { BaseTexture, SamplerOptions, TextureCreationOptions, TextureFormat } from '@zephyr3d/device';
 import { getDevice } from '../../../app/api';
 
-const _f16one = floatToHalf(1);
+const _f16one = float2half(1);
 /**
  * The HDR texture loader
  * @internal
  */
 export class HDRLoader extends AbstractTextureLoader {
-  supportMIMEType(mimeType: string): boolean {
+  supportMIMEType(mimeType: string) {
     return mimeType === 'image/hdr' || mimeType === 'image/x-hdr' || mimeType === 'image/vnd.radiance';
   }
   async load(
@@ -19,8 +19,8 @@ export class HDRLoader extends AbstractTextureLoader {
     srgb: boolean,
     samplerOptions?: SamplerOptions,
     texture?: BaseTexture
-  ): Promise<BaseTexture> {
-    let format: TextureFormat;
+  ) {
+    let format: Nullable<TextureFormat> = null;
     for (const fmt of ['rg11b10uf', 'rgba16f', 'rgba32f', 'rgba8unorm'] as const) {
       const info = getDevice().getDeviceCaps().textureCaps.getTextureFormatInfo(fmt);
       if (info && info.filterable && info.renderable) {
@@ -28,18 +28,26 @@ export class HDRLoader extends AbstractTextureLoader {
         break;
       }
     }
+    if (!format) {
+      return null;
+    }
     const arrayBuffer = data instanceof ArrayBuffer ? data : data.buffer;
     const offset = data instanceof ArrayBuffer ? 0 : data.byteOffset;
     const textureData = await this.loadHDR(new Uint8Array(arrayBuffer, offset), format);
+    if (!textureData) {
+      return null;
+    }
     const options: TextureCreationOptions = {
       texture: texture,
       samplerOptions
     };
     const tex = getDevice().createTexture2D(format, textureData.width, textureData.height, options);
-    tex.update(textureData.dataFloat, 0, 0, textureData.width, textureData.height);
+    if (tex) {
+      tex.update(textureData.dataFloat, 0, 0, textureData.width, textureData.height);
+    }
     return tex;
   }
-  private _rgbeToFloat32(buffer: Uint8Array<ArrayBuffer>): Float32Array<ArrayBuffer> {
+  private _rgbeToFloat32(buffer: Uint8Array<ArrayBuffer>) {
     const length = buffer.byteLength >> 2;
     const result = new Float32Array(length * 4);
 
@@ -53,19 +61,19 @@ export class HDRLoader extends AbstractTextureLoader {
     }
     return result;
   }
-  private _rgbeToFloat16(buffer: Uint8Array<ArrayBuffer>): Uint16Array<ArrayBuffer> {
+  private _rgbeToFloat16(buffer: Uint8Array<ArrayBuffer>) {
     const length = buffer.byteLength >> 2;
     const result = new Uint16Array(length * 4);
     for (let i = 0; i < length; i++) {
       const s = Math.pow(2, buffer[i * 4 + 3] - (128 + 8));
-      result[i * 4 + 0] = floatToHalf(Math.max(-65504, Math.min(buffer[i * 4] * s, 65504)));
-      result[i * 4 + 1] = floatToHalf(Math.max(-65504, Math.min(buffer[i * 4 + 1] * s, 65504)));
-      result[i * 4 + 2] = floatToHalf(Math.max(-65504, Math.min(buffer[i * 4 + 2] * s, 65504)));
+      result[i * 4 + 0] = float2half(Math.max(-65504, Math.min(buffer[i * 4] * s, 65504)));
+      result[i * 4 + 1] = float2half(Math.max(-65504, Math.min(buffer[i * 4 + 1] * s, 65504)));
+      result[i * 4 + 2] = float2half(Math.max(-65504, Math.min(buffer[i * 4 + 2] * s, 65504)));
       result[i * 4 + 3] = _f16one;
     }
     return result;
   }
-  private _rgbeToR11G11B10(buffer: Uint8Array<ArrayBuffer>): Uint32Array<ArrayBuffer> {
+  private _rgbeToR11G11B10(buffer: Uint8Array<ArrayBuffer>) {
     const length = buffer.byteLength >> 2;
     const result = new Uint32Array(length);
 
@@ -81,7 +89,7 @@ export class HDRLoader extends AbstractTextureLoader {
   /*
     Decode: rgb = pow(6 * rgbm.rgb * rgbm.a, 2.2);
    */
-  private _rgbeToRGBM(buffer: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
+  private _rgbeToRGBM(buffer: Uint8Array<ArrayBuffer>) {
     const length = buffer.byteLength >> 2;
     const result = new Uint8Array(length * 4);
 
@@ -104,19 +112,18 @@ export class HDRLoader extends AbstractTextureLoader {
     let header = '';
     let pos = 0;
     const d8 = buffer;
-    let format = undefined;
     // read header.
     while (!header.match(/\n\n[^\n]+\n/g)) {
       header += String.fromCodePoint(d8[pos++]);
     }
     // check format.
-    format = header.match(/FORMAT=(.*)$/m);
-    if (format.length < 2) {
+    let format = header.match(/FORMAT=(.*)$/m);
+    if (!format || format.length < 2) {
       return undefined;
     }
-    format = format[1];
-    if (format != '32-bit_rle_rgbe') {
-      console.warn('unknown format : ' + format);
+    const info = format[1];
+    if (info != '32-bit_rle_rgbe') {
+      console.warn('unknown format : ' + info);
       return null;
     }
     // parse resolution
@@ -135,7 +142,7 @@ export class HDRLoader extends AbstractTextureLoader {
     let ipos = 0;
     // Read all scanlines
     for (let j = 0; j < height; j++) {
-      const scanline = [];
+      const scanline: number[] = [];
 
       let rgbe = d8.slice(pos, (pos += 4));
       const isNewRLE =
@@ -145,8 +152,8 @@ export class HDRLoader extends AbstractTextureLoader {
         for (let i = 0; i < 4; i++) {
           let ptr = i * width;
           const ptr_end = (i + 1) * width;
-          let buf = undefined;
-          let count = undefined;
+          let buf: Uint8Array<ArrayBuffer>;
+          let count: number;
           while (ptr < ptr_end) {
             buf = d8.slice(pos, (pos += 2));
             if (buf[0] > 128) {

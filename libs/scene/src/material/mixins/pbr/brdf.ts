@@ -45,11 +45,7 @@ export function mixinPBRBRDF<T extends typeof MeshMaterial>(BaseCls: T) {
       });
       return pb.getGlobalScope()[funcName](fresnel0);
     }
-    iorToFresnel0v(
-      scope: PBInsideFunctionScope,
-      transmittedIor: PBShaderExp,
-      incidentIor: PBShaderExp
-    ): PBShaderExp {
+    iorToFresnel0v(scope: PBInsideFunctionScope, transmittedIor: PBShaderExp, incidentIor: PBShaderExp) {
       const pb = scope.$builder;
       const funcName = 'Z_iorToFresnel0v';
       pb.func(funcName, [pb.vec3('transmittedIor'), pb.float('incidentIor')], function () {
@@ -59,13 +55,9 @@ export function mixinPBRBRDF<T extends typeof MeshMaterial>(BaseCls: T) {
         );
         this.$return(pb.mul(this.t, this.t));
       });
-      return pb.getGlobalScope()[funcName](transmittedIor, incidentIor);
+      return pb.getGlobalScope()[funcName](transmittedIor, incidentIor) as PBShaderExp;
     }
-    iorToFresnel0(
-      scope: PBInsideFunctionScope,
-      transmittedIor: PBShaderExp,
-      incidentIor: PBShaderExp
-    ): PBShaderExp {
+    iorToFresnel0(scope: PBInsideFunctionScope, transmittedIor: PBShaderExp, incidentIor: PBShaderExp) {
       const pb = scope.$builder;
       const funcName = 'Z_iorToFresnel0';
       pb.func(funcName, [pb.float('transmittedIor'), pb.float('incidentIor')], function () {
@@ -75,9 +67,9 @@ export function mixinPBRBRDF<T extends typeof MeshMaterial>(BaseCls: T) {
         );
         this.$return(pb.mul(this.t, this.t));
       });
-      return pb.getGlobalScope()[funcName](transmittedIor, incidentIor);
+      return pb.getGlobalScope()[funcName](transmittedIor, incidentIor) as PBShaderExp;
     }
-    evalSensitivity(scope: PBInsideFunctionScope, OPD: PBShaderExp, shift: PBShaderExp): PBShaderExp {
+    evalSensitivity(scope: PBInsideFunctionScope, OPD: PBShaderExp, shift: PBShaderExp) {
       const pb = scope.$builder;
       const funcName = 'Z_evalSensitivity';
       pb.func(funcName, [pb.float('OPD'), pb.vec3('shift')], function () {
@@ -118,14 +110,9 @@ export function mixinPBRBRDF<T extends typeof MeshMaterial>(BaseCls: T) {
           )
         );
       });
-      return pb.getGlobalScope()[funcName](OPD, shift);
+      return pb.getGlobalScope()[funcName](OPD, shift) as PBShaderExp;
     }
-    schlickToF0(
-      scope: PBInsideFunctionScope,
-      f: PBShaderExp,
-      f90: PBShaderExp,
-      VdotH: PBShaderExp
-    ): PBShaderExp {
+    schlickToF0(scope: PBInsideFunctionScope, f: PBShaderExp, f90: PBShaderExp, VdotH: PBShaderExp) {
       const pb = scope.$builder;
       const funcName = 'Z_schlickToF0';
       pb.func(funcName, [pb.vec3('f'), pb.vec3('f90'), pb.float('VdotH')], function () {
@@ -134,14 +121,9 @@ export function mixinPBRBRDF<T extends typeof MeshMaterial>(BaseCls: T) {
         this.$l.x5 = pb.clamp(pb.mul(this.x, this.x2, this.x2), 0, 0.9999);
         this.$return(pb.div(pb.sub(this.f, pb.mul(this.f90, this.x5)), pb.sub(1, this.x5)));
       });
-      return pb.getGlobalScope()[funcName](f, f90, VdotH);
+      return pb.getGlobalScope()[funcName](f, f90, VdotH) as PBShaderExp;
     }
-    fresnelSchlick(
-      scope: PBInsideFunctionScope,
-      cosTheta: PBShaderExp,
-      F0: PBShaderExp,
-      F90: PBShaderExp
-    ): PBShaderExp {
+    fresnelSchlick(scope: PBInsideFunctionScope, cosTheta: PBShaderExp, F0: PBShaderExp, F90: PBShaderExp) {
       const pb = scope.$builder;
       const funcName = 'Z_fresnelSchlick';
       pb.func(funcName, [pb.float('cosTheta'), pb.vec3('f0'), pb.vec3('f90')], function () {
@@ -152,13 +134,9 @@ export function mixinPBRBRDF<T extends typeof MeshMaterial>(BaseCls: T) {
           )
         );
       });
-      return scope.$g[funcName](cosTheta, F0, F90);
+      return scope.$g[funcName](cosTheta, F0, F90) as PBShaderExp;
     }
-    distributionGGX(
-      scope: PBInsideFunctionScope,
-      NdotH: PBShaderExp,
-      alphaRoughness: PBShaderExp
-    ): PBShaderExp {
+    distributionGGX(scope: PBInsideFunctionScope, NdotH: PBShaderExp, alphaRoughness: PBShaderExp) {
       const pb = scope.$builder;
       const funcName = 'Z_distributionGGX';
       pb.func(funcName, [pb.float('NdotH'), pb.float('roughness')], function () {
@@ -169,14 +147,14 @@ export function mixinPBRBRDF<T extends typeof MeshMaterial>(BaseCls: T) {
         this.denom = pb.mul(pb.mul(3.14159265, this.denom), this.denom);
         this.$return(pb.div(this.num, this.denom));
       });
-      return scope.$g[funcName](NdotH, alphaRoughness);
+      return scope.$g[funcName](NdotH, alphaRoughness) as PBShaderExp;
     }
     visGGX(
       scope: PBInsideFunctionScope,
       NdotV: PBShaderExp,
       NdotL: PBShaderExp,
       alphaRoughness: PBShaderExp
-    ): PBShaderExp {
+    ) {
       const pb = scope.$builder;
       const funcName = 'Z_visGGX';
       pb.func(funcName, [pb.float('NdotV'), pb.float('NdotL'), pb.float('roughness')], function () {
@@ -196,7 +174,7 @@ export function mixinPBRBRDF<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$return(pb.float(0));
         });
       });
-      return scope.$g[funcName](NdotV, NdotL, alphaRoughness);
+      return scope.$g[funcName](NdotV, NdotL, alphaRoughness) as PBShaderExp;
     }
   } as unknown as T & { new (...args: any[]): IMixinPBRBRDF };
   return cls;

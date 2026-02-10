@@ -14,6 +14,7 @@ import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPUDevice } from './device';
 import type { WebGPURenderStateSet } from './renderstates_webgpu';
 import type { WebGPUFrameBuffer } from './framebuffer_webgpu';
+import type { Nullable } from '@zephyr3d/base';
 
 const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);
 const stencilFormats = ['stencil8', 'depth24plus-stencil8', 'depth24unorm-stencil8', 'depth32float-stencil8'];
@@ -26,11 +27,11 @@ const depthFormats = [
   'depth32float-stencil8'
 ];
 export type FrameBufferInfo = {
-  frameBuffer: WebGPUFrameBuffer;
+  frameBuffer: Nullable<WebGPUFrameBuffer>;
   colorFormats: GPUTextureFormat[];
-  depthFormat: GPUTextureFormat;
+  depthFormat?: GPUTextureFormat;
   sampleCount: number;
-  hash: string;
+  hash: Nullable<string>;
   clearHash: string;
 };
 
@@ -47,7 +48,7 @@ export class PipelineCache {
     this._renderPipelines = {};
     this._computePipelines = {};
   }
-  fetchComputePipeline(program: WebGPUProgram): GPUComputePipeline {
+  fetchComputePipeline(program: WebGPUProgram) {
     const hash = this.getComputePipelineHash(program);
     let pipeline = this._computePipelines[hash];
     if (pipeline === undefined) {
@@ -66,29 +67,26 @@ export class PipelineCache {
   }
   fetchRenderPipeline(
     program: WebGPUProgram,
-    vertexData: WebGPUVertexLayout,
+    vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     primitiveType: PrimitiveType,
     frameBufferInfo: FrameBufferInfo
-  ): GPURenderPipeline {
+  ) {
     if (!frameBufferInfo.hash) {
       return null;
     }
-    if (!program.vertexAttributes) {
-      // no vertex data needed for this pipeline
-      vertexData = null;
-    }
+    const vertexLayout = program.vertexAttributes ? vertexData : null;
     const hash = this.getRenderPipelineHash(
       frameBufferInfo.hash,
       program,
-      vertexData,
+      vertexLayout,
       stateSet,
       primitiveType
     );
     let pipeline = this._renderPipelines[hash];
     if (pipeline === undefined) {
-      const bufferLayouts = vertexData
-        ? this._device.fetchVertexLayout(vertexData.getLayouts(program.vertexAttributes).layoutHash)
+      const bufferLayouts = vertexLayout
+        ? this._device.fetchVertexLayout(vertexLayout.getLayouts(program.vertexAttributes)!.layoutHash)
         : null;
       const shaderModule = program.getShaderModule();
       const vertex: GPUVertexState = {
@@ -98,7 +96,7 @@ export class PipelineCache {
       if (bufferLayouts) {
         vertex.buffers = bufferLayouts;
       }
-      const primitiveState = this.createPrimitiveState(vertexData, stateSet, primitiveType);
+      const primitiveState = this.createPrimitiveState(vertexLayout, stateSet, primitiveType);
       const depthStencilState = this.createDepthStencilState(frameBufferInfo.depthFormat, stateSet);
       const colorTargetStates = frameBufferInfo.colorFormats.map((val) =>
         this.createColorTargetState(stateSet, val)
@@ -122,10 +120,10 @@ export class PipelineCache {
     return pipeline;
   }
   private createPrimitiveState(
-    vertexData: WebGPUVertexLayout,
+    vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     primitiveType: PrimitiveType
-  ): GPUPrimitiveState {
+  ) {
     const topology = primitiveTypeMap[primitiveType];
     if (!topology) {
       throw new Error(`createPrimitiveState() failed: invalid primitive type: ${primitiveType}`);
@@ -150,7 +148,7 @@ export class PipelineCache {
     }
     return state;
   }
-  private createMultisampleState(sampleCount: number, stateSet: WebGPURenderStateSet): GPUMultisampleState {
+  private createMultisampleState(sampleCount: number, stateSet: WebGPURenderStateSet) {
     return {
       count: sampleCount,
       alphaToCoverageEnabled:
@@ -159,10 +157,7 @@ export class PipelineCache {
           .alphaToCoverageEnabled
     };
   }
-  private createDepthStencilState(
-    depthFormat: GPUTextureFormat,
-    stateSet: WebGPURenderStateSet
-  ): GPUDepthStencilState {
+  private createDepthStencilState(depthFormat: GPUTextureFormat | undefined, stateSet: WebGPURenderStateSet) {
     if (!depthFormat) {
       return undefined;
     }
@@ -214,7 +209,7 @@ export class PipelineCache {
     failOp: StencilOp,
     zFailOp: StencilOp,
     passOp: StencilOp
-  ): GPUStencilFaceState {
+  ) {
     return {
       compare: compareFuncMap[func],
       failOp: stencilOpMap[failOp],
@@ -239,7 +234,7 @@ export class PipelineCache {
     }
     return state;
   }
-  private createBlendState(blendingState: rs.WebGPUBlendingState): GPUBlendState {
+  private createBlendState(blendingState: rs.WebGPUBlendingState) {
     return {
       color: this.createBlendComponent(
         blendingState.rgbEquation,
@@ -253,7 +248,7 @@ export class PipelineCache {
       )
     };
   }
-  private createBlendComponent(op: BlendEquation, srcFunc: BlendFunc, dstFunc: BlendFunc): GPUBlendComponent {
+  private createBlendComponent(op: BlendEquation, srcFunc: BlendFunc, dstFunc: BlendFunc) {
     const operation = blendEquationMap[op];
     if (!operation) {
       throw new Error(`createBlendComponent() failed: invalid blend op: ${op}`);
@@ -275,18 +270,18 @@ export class PipelineCache {
   private getRenderPipelineHash(
     fbHash: string,
     program: WebGPUProgram,
-    vertexData: WebGPUVertexLayout,
+    vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
     primitiveType: PrimitiveType
-  ): string {
+  ) {
     const programHash = program.hash;
-    const vertexHash = vertexData?.getLayouts(program.vertexAttributes).layoutHash || '';
+    const vertexHash = vertexData?.getLayouts(program.vertexAttributes)?.layoutHash || '';
     const stateHash = stateSet?.hash || '';
     return `${programHash}:${vertexHash}:${fbHash}:${primitiveType}:${stateHash}:${Number(
       this._device.isWindingOrderReversed()
     )}`;
   }
-  private getComputePipelineHash(program: WebGPUProgram): string {
+  private getComputePipelineHash(program: WebGPUProgram) {
     return program.hash;
   }
 }

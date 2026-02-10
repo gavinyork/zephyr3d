@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import type { Application } from '../app';
 
 type PointerEventData = {
@@ -166,7 +167,7 @@ export class InputManager {
    * @param ctx - `this` object for handler
    * @returns The InputManager instance for chaining.
    */
-  use(handler: InputEventHandler, ctx?: unknown): this {
+  use(handler: Nullable<InputEventHandler>, ctx?: unknown) {
     if (handler) {
       this._middlewares.push({ handler, ctx });
     }
@@ -179,7 +180,7 @@ export class InputManager {
    * @param ctx - `this` object for handler
    * @returns The InputManager instance for chaining.
    */
-  useFirst(handler: InputEventHandler, ctx?: unknown): this {
+  useFirst(handler: Nullable<InputEventHandler>, ctx?: unknown) {
     if (handler) {
       this._middlewares.unshift({ handler, ctx });
     }
@@ -199,7 +200,7 @@ export class InputManager {
    * @param ctx - `this` object that was associated with the `handler` when it was added.
    * @returns The InputManager instance for chaining.
    */
-  unuse(handler: InputEventHandler, ctx?: unknown): this {
+  unuse(handler: InputEventHandler, ctx?: unknown) {
     const index = this._middlewares.findIndex((h) => h.handler === handler && h.ctx === ctx);
     if (index >= 0) {
       this._middlewares.splice(index, 1);
@@ -225,7 +226,7 @@ export class InputManager {
   private _callMiddlewares(
     ev: PointerEvent | WheelEvent | KeyboardEvent | DragEvent | CompositionEvent,
     type?: string
-  ): boolean {
+  ) {
     for (const mw of this._middlewares) {
       if (mw.handler.call(mw.ctx, ev, type ?? ev.type)) {
         return true;
@@ -367,7 +368,7 @@ export class InputManager {
       }
     };
   }
-  private _getPointerEventData(pointerId: number): PointerEventData {
+  private _getPointerEventData(pointerId: number) {
     return (
       this._lastEventDatas[pointerId] ??
       (this._lastEventDatas[pointerId] = {

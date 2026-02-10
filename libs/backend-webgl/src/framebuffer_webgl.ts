@@ -1,4 +1,4 @@
-import { CubeFace } from '@zephyr3d/base';
+import { CubeFace, type Nullable } from '@zephyr3d/base';
 import type { BaseTexture, FrameBuffer, FrameBufferOptions } from '@zephyr3d/device';
 import { hasStencilChannel } from '@zephyr3d/device';
 import { WebGLGPUObject } from './gpuobject_webgl';
@@ -18,8 +18,8 @@ type FrameBufferTextureAttachment = {
 };
 
 type Options = {
-  colorAttachments?: FrameBufferTextureAttachment[];
-  depthAttachment?: FrameBufferTextureAttachment;
+  colorAttachments: Nullable<FrameBufferTextureAttachment[]>;
+  depthAttachment: Nullable<FrameBufferTextureAttachment>;
   sampleCount?: number;
   ignoreDepthStencil?: boolean;
 };
@@ -44,18 +44,17 @@ export class WebGLFrameBuffer
   private readonly _hash: string;
   private _needGenerateMipmaps: boolean;
   private readonly _depthAttachmentTarget: number;
-  private _colorAttachmentsAA: WebGLRenderbuffer[];
-  private _depthAttachmentAA: WebGLRenderbuffer;
-  private _intermediateAttachments: Map<
-    BaseTexture,
-    { texture: WebGLTexture; width: number; height: number }[]
+  private _colorAttachmentsAA: Nullable<WebGLRenderbuffer[]>;
+  private _depthAttachmentAA: Nullable<WebGLRenderbuffer>;
+  private _intermediateAttachments: Nullable<
+    Map<BaseTexture, { texture: WebGLTexture; width: number; height: number }[]>
   >;
-  private _framebufferAA: WebGLFramebuffer;
+  private _framebufferAA: Nullable<WebGLFramebuffer>;
   private _initialized: boolean;
   constructor(
     device: WebGLDevice,
     colorAttachments: BaseTexture[],
-    depthAttachment: BaseTexture,
+    depthAttachment: Nullable<BaseTexture>,
     opt?: FrameBufferOptions
   ) {
     super(device);
@@ -100,10 +99,10 @@ export class WebGLFrameBuffer
     }
     this._width = this._options.colorAttachments
       ? this._options.colorAttachments[0].texture.width
-      : this._options.depthAttachment.texture.width;
+      : this._options.depthAttachment!.texture.width;
     this._height = this._options.colorAttachments
       ? this._options.colorAttachments[0].texture.height
-      : this._options.depthAttachment.texture.height;
+      : this._options.depthAttachment!.texture.height;
     if (
       (this._options.colorAttachments &&
         this._options.colorAttachments.findIndex(
@@ -136,21 +135,21 @@ export class WebGLFrameBuffer
   tagDraw() {
     this._drawTags++;
   }
-  isMRT(): boolean {
+  isMRT() {
     return this._isMRT;
   }
   invalidateMipmaps() {
     this._needGenerateMipmaps = true;
   }
-  getWidth(): number {
-    const attachment = this._options.colorAttachments?.[0] ?? this._options.depthAttachment;
-    return Math.max(attachment.texture.width >> attachment.level, 1);
+  getWidth() {
+    const attachment = this._options.colorAttachments?.[0] ?? this._options.depthAttachment!;
+    return Math.max(attachment.texture.width >> attachment.level!, 1);
   }
-  getHeight(): number {
-    const attachment = this._options.colorAttachments?.[0] ?? this._options.depthAttachment;
-    return Math.max(attachment.texture.height >> attachment.level, 1);
+  getHeight() {
+    const attachment = this._options.colorAttachments?.[0] ?? this._options.depthAttachment!;
+    return Math.max(attachment.texture.height >> attachment.level!, 1);
   }
-  getHash(): string {
+  getHash() {
     return this._hash;
   }
   restore() {
@@ -199,14 +198,14 @@ export class WebGLFrameBuffer
       }
     }
   }
-  setColorAttachmentGenerateMipmaps(index: number, generateMipmaps: boolean): void {
+  setColorAttachmentGenerateMipmaps(index: number, generateMipmaps: boolean) {
     const k = this._options.colorAttachments?.[index];
     if (k) {
       k.generateMipmaps = !!generateMipmaps;
     }
   }
-  getColorAttachmentGenerateMipmaps(index: number): boolean {
-    return this._options.colorAttachments?.[index]?.generateMipmaps;
+  getColorAttachmentGenerateMipmaps(index: number) {
+    return !!this._options.colorAttachments?.[index]?.generateMipmaps;
   }
   setColorAttachmentCubeFace(index: number, face: CubeFace) {
     const k = this._options.colorAttachments?.[index];
@@ -221,8 +220,8 @@ export class WebGLFrameBuffer
       }
     }
   }
-  getColorAttachmentCubeFace(index: number): CubeFace {
-    return this._options.colorAttachments?.[index]?.face;
+  getColorAttachmentCubeFace(index: number) {
+    return (this._options.colorAttachments?.[index]?.face as CubeFace) ?? CubeFace.PX;
   }
   setColorAttachmentMipLevel(index: number, level: number) {
     const k = this._options.colorAttachments?.[index];
@@ -237,8 +236,8 @@ export class WebGLFrameBuffer
       }
     }
   }
-  getColorAttachmentMipLevel(index: number): number {
-    return this._options.colorAttachments?.[index]?.level;
+  getColorAttachmentMipLevel(index: number) {
+    return this._options.colorAttachments?.[index]?.level ?? 0;
   }
   setColorAttachmentLayer(index: number, layer: number) {
     const k = this._options.colorAttachments?.[index];
@@ -254,9 +253,9 @@ export class WebGLFrameBuffer
     }
   }
   getColorAttachmentLayer(index: number) {
-    return this._options?.colorAttachments?.[index]?.layer;
+    return this._options?.colorAttachments?.[index]?.layer ?? 0;
   }
-  setDepthAttachmentCubeFace(face: CubeFace): void {
+  setDepthAttachmentCubeFace(face: CubeFace) {
     const k = this._options.depthAttachment;
     if (k && k.face !== face) {
       this._needBindBuffers = true;
@@ -269,8 +268,8 @@ export class WebGLFrameBuffer
       }
     }
   }
-  getDepthAttachmentCubeFace(): CubeFace {
-    return this._options.depthAttachment?.face;
+  getDepthAttachmentCubeFace() {
+    return (this._options.depthAttachment?.face as CubeFace) ?? CubeFace.PX;
   }
   setDepthAttachmentLayer(layer: number) {
     const k = this._options.depthAttachment;
@@ -286,18 +285,18 @@ export class WebGLFrameBuffer
     }
   }
   getDepthAttachmentLayer() {
-    return this._options.depthAttachment?.layer;
+    return this._options.depthAttachment?.layer ?? 0;
   }
-  getDepthAttachment(): BaseTexture {
+  getDepthAttachment() {
     return this._options?.depthAttachment?.texture || null;
   }
-  getColorAttachments(): BaseTexture[] {
+  getColorAttachments() {
     return this._options.colorAttachments?.map((val) => val.texture || null) || [];
   }
   getColorAttachment<T extends BaseTexture>(index: number): T {
     return (this.getColorAttachments()[index] as unknown as T) ?? null;
   }
-  bind(): boolean {
+  bind() {
     if (!this._initialized) {
       this._init();
       this._initialized = true;
@@ -327,13 +326,13 @@ export class WebGLFrameBuffer
     }
     return false;
   }
-  unbind(): void {
+  unbind() {
     if (this._device.context._currentFramebuffer === this) {
       this._updateMSAABuffer();
       this._device.context.bindFramebuffer(WebGLEnum.FRAMEBUFFER, null);
       this._device.context._currentFramebuffer = null;
-      this._device.setViewport();
-      this._device.setScissor();
+      this._device.setViewport(null);
+      this._device.setScissor(null);
       const drawBuffersExt = this._device.drawBuffersExt;
       if (drawBuffersExt) {
         drawBuffersExt.drawBuffers([WebGLEnum.BACK]);
@@ -341,8 +340,8 @@ export class WebGLFrameBuffer
       if (this._options.colorAttachments) {
         for (const attachment of this._options.colorAttachments) {
           const tex = attachment.texture;
-          if (attachment.level > 0) {
-            const texture = this._intermediateAttachments?.get(tex)?.[attachment.level];
+          if (attachment.level! > 0) {
+            const texture = this._intermediateAttachments?.get(tex)?.[attachment.level!];
             if (texture) {
               const tmpFramebuffer = this._device.context.createFramebuffer();
               this._device.context.bindFramebuffer(WebGLEnum.FRAMEBUFFER, tmpFramebuffer);
@@ -358,7 +357,7 @@ export class WebGLFrameBuffer
                 //this._device.context.bindTexture(WebGLEnum.TEXTURE_2D, tex.object);
                 this._device.context.copyTexSubImage2D(
                   WebGLEnum.TEXTURE_2D,
-                  attachment.level,
+                  attachment.level!,
                   0,
                   0,
                   0,
@@ -370,8 +369,8 @@ export class WebGLFrameBuffer
                 this._device.bindTexture(WebGLEnum.TEXTURE_CUBE_MAP, 0, tex as WebGLTextureCube);
                 //this._device.context.bindTexture(WebGLEnum.TEXTURE_CUBE_MAP, tex.object);
                 this._device.context.copyTexSubImage2D(
-                  cubeMapFaceMap[attachment.face ?? CubeFace.PX],
-                  attachment.level,
+                  cubeMapFaceMap[(attachment.face as CubeFace) ?? CubeFace.PX],
+                  attachment.level!,
                   0,
                   0,
                   0,
@@ -392,7 +391,7 @@ export class WebGLFrameBuffer
     }
   }
   private _updateMSAABuffer() {
-    if (this._options.sampleCount > 1 && this._lastDrawTag !== this._drawTags) {
+    if (this._options.sampleCount! > 1 && this._lastDrawTag !== this._drawTags) {
       const gl = this._device.context as WebGL2RenderingContext;
       gl.bindFramebuffer(WebGLEnum.READ_FRAMEBUFFER, this._framebufferAA);
       gl.bindFramebuffer(WebGLEnum.DRAW_FRAMEBUFFER, this._object);
@@ -446,12 +445,12 @@ export class WebGLFrameBuffer
       this._lastDrawTag = this._drawTags;
     }
   }
-  private _load(): void {
+  private _load() {
     if (this._device.isContextLost()) {
       return;
     }
     load: {
-      if (this._options.sampleCount > 1) {
+      if (this._options.sampleCount! > 1) {
         this._framebufferAA = this._device.context.createFramebuffer();
         this._colorAttachmentsAA = [];
         this._depthAttachmentAA = null;
@@ -470,13 +469,13 @@ export class WebGLFrameBuffer
     this._device.context.bindFramebuffer(WebGLEnum.FRAMEBUFFER, null);
     this._device.context._currentFramebuffer = null;
   }
-  private _bindAttachment(attachment: number, info: FrameBufferTextureAttachment): boolean {
+  private _bindAttachment(attachment: number, info: FrameBufferTextureAttachment) {
     if (info.texture) {
-      let intermediateTexture: WebGLTexture = null;
+      let intermediateTexture: Nullable<WebGLTexture> = null;
       if (
         this.device.type === 'webgl' &&
         !this.device.getDeviceCaps().framebufferCaps.supportRenderMipmap &&
-        info.level > 0
+        info.level! > 0
       ) {
         if (!this._intermediateAttachments) {
           this._intermediateAttachments = new Map();
@@ -486,10 +485,10 @@ export class WebGLFrameBuffer
           intermediateAttachments = [];
           this._intermediateAttachments.set(info.texture, intermediateAttachments);
         }
-        if (!intermediateAttachments[info.level]) {
+        if (!intermediateAttachments[info.level!]) {
           let width = info.texture.width;
           let height = info.texture.height;
-          let level = info.level;
+          let level = info.level!;
           while (level-- > 0) {
             width = Math.max(width >> 1, 1);
             height = Math.max(height >> 1, 1);
@@ -511,10 +510,10 @@ export class WebGLFrameBuffer
             formatInfo.glType[0],
             null
           );
-          intermediateAttachments[info.level] = { texture: intermediateTexture, width, height };
+          intermediateAttachments[info.level!] = { texture: intermediateTexture, width, height };
           this._device.bindTexture(WebGLEnum.TEXTURE_2D, 0, null);
         } else {
-          intermediateTexture = intermediateAttachments[info.level].texture;
+          intermediateTexture = intermediateAttachments[info.level!].texture;
         }
       }
       if (intermediateTexture) {
@@ -531,22 +530,22 @@ export class WebGLFrameBuffer
             WebGLEnum.FRAMEBUFFER,
             attachment,
             WebGLEnum.TEXTURE_2D,
-            info.texture.object,
+            info.texture.object!,
             info.level ?? 0
           );
         } else if (info.texture.isTextureCube()) {
           this._device.context.framebufferTexture2D(
             WebGLEnum.FRAMEBUFFER,
             attachment,
-            cubeMapFaceMap[info.face ?? CubeFace.PX],
-            info.texture.object,
+            cubeMapFaceMap[(info.face as CubeFace) ?? CubeFace.PX],
+            info.texture.object!,
             info.level ?? 0
           );
         } else if (info.texture.isTexture2DArray() || info.texture.isTexture3D()) {
           (this._device.context as WebGL2RenderingContext).framebufferTextureLayer(
             WebGLEnum.FRAMEBUFFER,
             attachment,
-            info.texture.object,
+            info.texture.object!,
             info.level ?? 0,
             info.layer ?? 0
           );
@@ -558,13 +557,13 @@ export class WebGLFrameBuffer
     }
     return false;
   }
-  private _bindBuffers(): boolean {
+  private _bindBuffers() {
     if (!this._object) {
       return false;
     }
     this._device.context.bindFramebuffer(WebGLEnum.FRAMEBUFFER, this._object);
     if (this._depthAttachmentTarget !== WebGLEnum.NONE) {
-      if (!this._bindAttachment(this._depthAttachmentTarget, this._options.depthAttachment)) {
+      if (!this._bindAttachment(this._depthAttachmentTarget, this._options.depthAttachment!)) {
         return false;
       }
     }
@@ -589,7 +588,7 @@ export class WebGLFrameBuffer
     }
     return this._status === STATUS_OK;
   }
-  private _createRenderbufferAA(texture: BaseTexture): WebGLRenderbuffer {
+  private _createRenderbufferAA(texture: BaseTexture) {
     const renderBuffer = this._device.context.createRenderbuffer();
     const formatInfo = (this.device.getDeviceCaps().textureCaps as WebGLTextureCaps).getTextureFormatInfo(
       texture.format
@@ -597,21 +596,21 @@ export class WebGLFrameBuffer
     this._device.context.bindRenderbuffer(WebGLEnum.RENDERBUFFER, renderBuffer);
     (this._device.context as WebGL2RenderingContext).renderbufferStorageMultisample(
       WebGLEnum.RENDERBUFFER,
-      this._options.sampleCount,
+      this._options.sampleCount!,
       formatInfo.glInternalFormat,
-      this._options.depthAttachment.texture.width,
-      this._options.depthAttachment.texture.height
+      this._options.depthAttachment!.texture.width,
+      this._options.depthAttachment!.texture.height
     );
     return renderBuffer;
   }
-  private _bindBuffersAA(): boolean {
+  private _bindBuffersAA() {
     if (!this._framebufferAA) {
       return true;
     }
     this._device.context.bindFramebuffer(WebGLEnum.FRAMEBUFFER, this._framebufferAA);
     if (this._depthAttachmentTarget !== WebGLEnum.NONE) {
       if (!this._depthAttachmentAA) {
-        this._depthAttachmentAA = this._createRenderbufferAA(this._options.depthAttachment.texture);
+        this._depthAttachmentAA = this._createRenderbufferAA(this._options.depthAttachment!.texture);
       }
       this._device.context.framebufferRenderbuffer(
         WebGLEnum.FRAMEBUFFER,
@@ -624,8 +623,8 @@ export class WebGLFrameBuffer
       for (let i = 0; i < this._options.colorAttachments.length; i++) {
         const opt = this._options.colorAttachments[i];
         if (opt.texture) {
-          if (!this._colorAttachmentsAA[i]) {
-            this._colorAttachmentsAA[i] = this._createRenderbufferAA(
+          if (!this._colorAttachmentsAA![i]) {
+            this._colorAttachmentsAA![i] = this._createRenderbufferAA(
               this._options.colorAttachments[i].texture
             );
           }
@@ -633,7 +632,7 @@ export class WebGLFrameBuffer
             WebGLEnum.FRAMEBUFFER,
             WebGLEnum.COLOR_ATTACHMENT0 + i,
             WebGLEnum.RENDERBUFFER,
-            this._colorAttachmentsAA[i]
+            this._colorAttachmentsAA![i]
           );
         }
       }
@@ -649,7 +648,7 @@ export class WebGLFrameBuffer
     }
     return this._statusAA === STATUS_OK;
   }
-  private _init(): void {
+  private _init() {
     if (this._options.sampleCount !== 1 && this._options.sampleCount !== 4) {
       throw new Error(`WebGLFramebuffer(): Sample should be 1 or 4, got ${this._options.sampleCount}`);
     }
@@ -664,7 +663,7 @@ export class WebGLFrameBuffer
   isFramebuffer(): this is FrameBuffer {
     return true;
   }
-  getSampleCount(): number {
-    return this._options.sampleCount;
+  getSampleCount() {
+    return this._options.sampleCount!;
   }
 }

@@ -11,12 +11,13 @@ import type { SamplerOptions, TextureSampler } from '@zephyr3d/device';
 import type { WebGLBaseTexture } from './basetexture_webgl';
 import type { WebGLDevice } from './device_webgl';
 import { isWebGL2 } from './utils';
+import type { RequireOptionals } from '@zephyr3d/base';
 
 export class WebGLTextureSampler
   extends WebGLGPUObject<WebGLSampler>
   implements TextureSampler<WebGLSampler>
 {
-  private readonly _options: SamplerOptions;
+  private readonly _options: RequireOptionals<SamplerOptions>;
   constructor(device: WebGLDevice, options: SamplerOptions) {
     super(device);
     this._options = Object.assign(
@@ -100,7 +101,7 @@ export class WebGLTextureSampler
       }
     }
   }
-  private _load(): boolean {
+  private _load() {
     if (!isWebGL2(this._device.context)) {
       this._object = {};
       return true;

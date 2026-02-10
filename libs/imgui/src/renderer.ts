@@ -1,4 +1,5 @@
-import type { ColorRGBA } from '@zephyr3d/base';
+import type { ColorRGBA, Nullable } from '@zephyr3d/base';
+import { Vector2 } from '@zephyr3d/base';
 import { ASSERT, Disposable, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   type BindGroup,
@@ -26,6 +27,10 @@ export class Renderer extends Disposable {
   private _drawPosition: number;
   /** @internal */
   private _indexPosition: number;
+  /** @internal */
+  private _mvpMatrix: Matrix4x4;
+  /** @internal */
+  private _deviceSize: Vector2;
   /** @internal */
   private readonly _program: GPUProgram;
   /** @internal */
@@ -57,6 +62,8 @@ export class Renderer extends Disposable {
     this._device = device;
     this._projectionMatrix = new Matrix4x4();
     this._flipMatrix = new Matrix4x4();
+    this._mvpMatrix = new Matrix4x4();
+    this._deviceSize = new Vector2();
     this._program = this.createProgram(false);
     this._programTexture = this.createProgram(true);
     this._bindGroup = this._device.createBindGroup(this._program.bindGroupLayouts[0]);
@@ -79,7 +86,7 @@ export class Renderer extends Disposable {
               ['position_f32x2', 'tex0_f32x2', 'diffuse_u8normx4'],
               this._vertexCache,
               { dynamic: true }
-            )
+            )!
           }
         ],
         indexBuffer: this._device.createIndexBuffer(this._indexCache, { dynamic: true })
@@ -94,37 +101,21 @@ export class Renderer extends Disposable {
   get device() {
     return this._device;
   }
-  get clearBeforeRender(): boolean {
+  get clearBeforeRender() {
     return this._clearBeforeRender;
   }
-  set clearBeforeRender(val: boolean) {
+  set clearBeforeRender(val) {
     this._clearBeforeRender = val;
   }
   /** @internal */
-  getCanvas(): HTMLCanvasElement {
+  getCanvas() {
     return this._device.canvas;
   }
   /** @internal */
-  getDrawingBufferWidth(): number {
-    return this._device.deviceToScreen(this._device.getDrawingBufferWidth());
-  }
-  /** @internal */
-  getDrawingBufferHeight(): number {
-    return this._device.deviceToScreen(this._device.getDrawingBufferHeight());
-  }
-  /** @internal */
-  screenToDevice(val: number): number {
-    return this._device.screenToDevice(val);
-  }
-  /** @internal */
-  deviceToScreen(val: number): number {
-    return this._device.deviceToScreen(val);
-  }
-  /** @internal */
-  createTexture(width: number, height: number, color: ColorRGBA, linear: boolean): Texture2D {
+  createTexture(width: number, height: number, color: ColorRGBA, linear: boolean) {
     const tex = this._device.createTexture2D(linear ? 'rgba8unorm' : 'rgba8unorm-srgb', width, height, {
       mipmapping: false
-    });
+    })!;
     if (color) {
       this.clearTexture(tex, color);
     }
@@ -146,7 +137,7 @@ export class Renderer extends Disposable {
     tex.update(pixels, 0, 0, tex.width, tex.height);
   }
   /** @internal */
-  updateTextureWithImage(texture: Texture2D, bitmap: ImageData, x: number, y: number): void {
+  updateTextureWithImage(texture: Texture2D, bitmap: ImageData, x: number, y: number) {
     const originValues = new Uint8Array(bitmap.data.buffer);
     ASSERT(texture.format === 'rgba8unorm');
     texture.update(originValues, x, y, bitmap.width, bitmap.height);
@@ -161,27 +152,27 @@ export class Renderer extends Disposable {
     h: number,
     x: number,
     y: number
-  ): void {
+  ) {
     texture.updateFromElement(ctx.canvas, x, y, cvsOffsetX, cvsOffsetY, w, h);
   }
   /** @internal */
-  getTextureWidth(texture: Texture2D): number {
+  getTextureWidth(texture: Texture2D) {
     return texture.width;
   }
   /** @internal */
-  getTextureHeight(texture: Texture2D): number {
+  getTextureHeight(texture: Texture2D) {
     return texture.height;
   }
   /** @internal */
-  disposeTexture(texture: Texture2D): void {
+  disposeTexture(texture: Texture2D) {
     texture?.dispose();
   }
   /** @internal */
-  setCursorStyle(style: string): void {
+  setCursorStyle(style: string) {
     this.getCanvas().style.cursor = style;
   }
   /** @internal */
-  getCursorStyle(): string {
+  getCursorStyle() {
     return this.getCanvas().style.cursor;
   }
   /** @internal */
@@ -190,7 +181,7 @@ export class Renderer extends Disposable {
     indexData: Uint16Array<ArrayBuffer>,
     indexOffset: number,
     indexCount: number,
-    texture: Texture2D,
+    texture: Nullable<Texture2D>,
     scissor: number[]
   ) {
     let tex = texture || null;
@@ -215,10 +206,10 @@ export class Renderer extends Disposable {
       indexData = alignedIndexData;
       indexOffset = 0;
     }
-    const vertexBuffer = vertexLayout.getVertexBuffer('position');
+    const vertexBuffer = vertexLayout.getVertexBuffer('position')!;
     vertexBuffer.bufferSubData(this._drawPosition * 20, vertexData, 0, vertexCount * 20);
     vertexLayout
-      .getIndexBuffer()
+      .getIndexBuffer()!
       .bufferSubData(this._indexPosition * 2, indexData, indexOffset, alignedIndexCount);
     vertexLayout.setDrawOffset(vertexBuffer, this._drawPosition * 20);
     if (texture) {
@@ -239,14 +230,19 @@ export class Renderer extends Disposable {
   }
   /** @internal */
   beginRender() {
-    const vp = this._device.getViewport();
+    const width = this._device.getDrawingBufferWidth();
+    const height = this._device.getDrawingBufferHeight();
     //this._device.setViewport();
     //this._device.setScissor();
-    this._projectionMatrix.ortho(0, vp.width, 0, vp.height, -1, 1);
-    this._flipMatrix = Matrix4x4.translation(new Vector3(0, vp.height, 0)).scaleRight(new Vector3(1, -1, 1));
-    const mvpMatrix = Matrix4x4.multiply(this._projectionMatrix, this._flipMatrix);
-    this._bindGroup.setValue('mvpMatrix', mvpMatrix);
-    this._bindGroupTexture.setValue('mvpMatrix', mvpMatrix);
+    this._projectionMatrix.ortho(0, width, 0, height, -1, 1);
+    this._flipMatrix = Matrix4x4.translation(new Vector3(0, height, 0)).scaleRight(new Vector3(1, -1, 1));
+    Matrix4x4.multiply(this._projectionMatrix, this._flipMatrix, this._mvpMatrix);
+    this._deviceSize.x = this._device.getScaleX();
+    this._deviceSize.y = this._device.getScaleY();
+    this._bindGroup.setValue('mvpMatrix', this._mvpMatrix);
+    this._bindGroup.setValue('deviceSize', this._deviceSize);
+    this._bindGroupTexture.setValue('mvpMatrix', this._mvpMatrix);
+    this._bindGroupTexture.setValue('deviceSize', this._deviceSize);
     if (this._clearBeforeRender) {
       this._device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
     }
@@ -256,12 +252,15 @@ export class Renderer extends Disposable {
   /** Disposes this renderer */
   protected onDispose() {
     super.onDispose();
-    this._primitiveBuffer = null;
-    this._vertexCache = null;
-    this._device = null;
+    this._bindGroup?.dispose();
+    this._bindGroupTexture?.dispose();
+    this._primitiveBuffer?.forEach((vertexLayout) => vertexLayout.dispose());
+    this._program?.dispose();
+    this._programTexture?.dispose();
+    this._textureSampler?.dispose();
   }
   /** @internal */
-  private createStateSet(): RenderStateSet {
+  private createStateSet() {
     const rs = this._device.createRenderStateSet();
     rs.useBlendingState().enable(true).setBlendFunc('one', 'inv-src-alpha');
     rs.useDepthState().enableTest(false).enableWrite(false);
@@ -269,7 +268,7 @@ export class Renderer extends Disposable {
     return rs;
   }
   /** @internal */
-  private createProgram(diffuseMap: boolean): GPUProgram {
+  private createProgram(diffuseMap: boolean) {
     const program = this._device.buildRenderProgram({
       label: 'UI',
       vertex(pb) {
@@ -281,8 +280,12 @@ export class Renderer extends Disposable {
           this.$outputs.outUV = pb.vec2();
         }
         this.mvpMatrix = pb.mat4().uniform(0);
+        this.deviceSize = pb.vec2().uniform(0);
         pb.main(function () {
-          this.$builtins.position = pb.mul(this.mvpMatrix, pb.vec4(this.$inputs.pos, 0, 1));
+          this.$l.$builtins.position = pb.mul(
+            this.mvpMatrix,
+            pb.vec4(pb.mul(this.$inputs.pos, this.deviceSize), 0, 1)
+          );
           this.$outputs.outDiffuse = this.$inputs.diffuse;
           if (diffuseMap) {
             this.$outputs.outUV = this.$inputs.uv;
@@ -303,7 +306,7 @@ export class Renderer extends Disposable {
           this.$outputs.outColor = pb.vec4(pb.mul(this.color.rgb, this.color.a), this.color.a);
         });
       }
-    });
+    })!;
     program.name = diffuseMap ? '@UI_withDiffuse' : '@UI_noDiffuse';
     return program;
   }

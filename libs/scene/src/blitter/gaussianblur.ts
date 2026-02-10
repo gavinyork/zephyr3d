@@ -8,6 +8,7 @@ import type {
 import type { BlitType } from './blitter';
 import { Blitter } from './blitter';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
+import type { Nullable } from '@zephyr3d/base';
 
 /**
  * Gaussian blur blitter
@@ -27,7 +28,7 @@ export class GaussianBlurBlitter extends Blitter {
   /** @internal */
   protected _logSpaceMultiplier: number;
   /** @internal */
-  protected _depthTex: Texture2D;
+  protected _depthTex: Nullable<Texture2D>;
   /** @internal */
   protected _depthCutoff: number;
   /**
@@ -49,44 +50,44 @@ export class GaussianBlurBlitter extends Blitter {
     this._depthCutoff = 0.7;
   }
   /** Blur radius */
-  get blurSize(): number {
+  get blurSize() {
     return this._blurSize;
   }
-  set blurSize(val: number) {
+  set blurSize(val) {
     this._blurSize = val;
   }
   /** Kernel size */
-  get kernelSize(): number {
+  get kernelSize() {
     return this._kernelSize;
   }
-  set kernelSize(val: number) {
+  set kernelSize(val) {
     if (this._kernelSize !== val) {
       this._kernelSize = val;
       this.invalidateHash();
     }
   }
   /** true if the box filter will be applied in logarithmic space */
-  get logSpace(): boolean {
+  get logSpace() {
     return this._logSpace;
   }
-  set logSpace(val: boolean) {
+  set logSpace(val) {
     if (this._logSpace !== !!val) {
       this._logSpace = !!val;
       this.invalidateHash();
     }
   }
   /** Multiplier for logarithmic space blur */
-  get logSpaceMultiplier(): number {
+  get logSpaceMultiplier() {
     return this._logSpaceMultiplier;
   }
-  set logSpaceMultiplier(val: number) {
+  set logSpaceMultiplier(val) {
     this._logSpaceMultiplier = val;
   }
   /** Linear depth texture */
-  get depthTexture(): Texture2D {
+  get depthTexture() {
     return this._depthTex;
   }
-  set depthTexture(tex: Texture2D) {
+  set depthTexture(tex) {
     if (this._depthTex !== tex) {
       if (!tex || !this._depthTex) {
         this.invalidateHash();
@@ -95,10 +96,10 @@ export class GaussianBlurBlitter extends Blitter {
     }
   }
   /** Depth cutoff */
-  get depthCutoff(): number {
+  get depthCutoff() {
     return this._depthCutoff;
   }
-  set depthCutoff(val: number) {
+  set depthCutoff(val) {
     this._depthCutoff = val;
   }
   /**
@@ -160,7 +161,7 @@ export class GaussianBlurBlitter extends Blitter {
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'float' | 'int' | 'uint'
-  ): PBShaderExp {
+  ) {
     const that = this;
     const pb = scope.$builder;
     if (that._depthTex) {
@@ -287,13 +288,13 @@ export class GaussianBlurBlitter extends Blitter {
         scope.outColor = pb.add(scope.d0, pb.log(scope.outColor));
       }
     }
-    return scope.outColor;
+    return scope.outColor as PBShaderExp;
   }
   /**
    * {@inheritDoc Blitter.calcHash}
    * @override
    */
-  protected calcHash(): string {
+  protected calcHash() {
     return `${this._depthTex ? 1 : 0}-${this._phase}-${this._kernelSize}-${Number(!!this._logSpace)}`;
   }
 }

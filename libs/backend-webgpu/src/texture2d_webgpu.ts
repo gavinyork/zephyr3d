@@ -17,15 +17,15 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
   isTexture2D(): this is Texture2D {
     return true;
   }
-  init(): void {
-    this.loadEmpty(this._format, this._width, this._height, this._mipLevelCount);
+  init() {
+    this.loadEmpty(this._format!, this._width, this._height, this._mipLevelCount);
   }
-  update(data: TypedArray, xOffset: number, yOffset: number, width: number, height: number): void {
+  update(data: TypedArray, xOffset: number, yOffset: number, width: number, height: number) {
     if (this._device.isContextLost()) {
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
     this.uploadRaw(data, width, height, 1, xOffset, yOffset, 0, 0);
     if (this._mipLevelCount > 1) {
@@ -40,19 +40,19 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
     srcY: number,
     width: number,
     height: number
-  ): void {
+  ) {
     if (this._device.isContextLost()) {
       return;
     }
     if (!this._object) {
-      this.allocInternal(this._format, this._width, this._height, 1, this._mipLevelCount);
+      this.allocInternal(this._format!, this._width, this._height, 1, this._mipLevelCount);
     }
     if (data instanceof HTMLCanvasElement || this._device.isTextureUploading(this)) {
       // Copy the pixel values out in case the canvas content may be changed later
       const cvs = document.createElement('canvas');
       cvs.width = width;
       cvs.height = height;
-      const ctx = cvs.getContext('2d');
+      const ctx = cvs.getContext('2d')!;
       ctx.drawImage(data, srcX, srcY, width, height, 0, 0, width, height);
       const imageData = ctx.getImageData(0, 0, width, height);
       this.update(imageData.data, destX, destY, width, height);
@@ -70,7 +70,7 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
     faceOrLayer: number,
     mipLevel: number,
     buffer: TypedArray
-  ): Promise<void> {
+  ) {
     if (faceOrLayer !== 0) {
       throw new Error(`Texture2D.readPixels(): parameter faceOrLayer must be 0`);
     }
@@ -109,16 +109,16 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
     }
     this.copyPixelDataToBuffer(x, y, w, h, 0, mipLevel, buffer);
   }
-  loadFromElement(element: TextureImageElement, sRGB: boolean, creationFlags?: number): void {
+  loadFromElement(element: TextureImageElement, sRGB: boolean, creationFlags?: number) {
     this._flags = Number(creationFlags) || 0;
     const format = sRGB ? 'rgba8unorm-srgb' : 'rgba8unorm';
     this.loadImage(element, format);
   }
-  createEmpty(format: TextureFormat, width: number, height: number, creationFlags?: number): void {
+  createEmpty(format: TextureFormat, width: number, height: number, creationFlags?: number) {
     this._flags = Number(creationFlags) || 0;
     this.loadEmpty(format, width, height, 0);
   }
-  createView(level?: number, face?: number, mipCount?: number): GPUTextureView {
+  createView(level?: number, face?: number, mipCount?: number) {
     return this._object
       ? this._device.gpuCreateTextureView(this._object, {
           dimension: '2d',
@@ -129,7 +129,7 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
         })
       : null;
   }
-  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number): void {
+  createWithMipmapData(data: TextureMipmapData, sRGB: boolean, creationFlags?: number) {
     if (data.isCubemap || data.isVolume) {
       console.error('loading 2d texture with mipmap data failed: data is not 2d texture');
     } else {
@@ -142,14 +142,14 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
     }
   }
   /** @internal */
-  private loadEmpty(format: TextureFormat, width: number, height: number, numMipLevels: number): void {
+  private loadEmpty(format: TextureFormat, width: number, height: number, numMipLevels: number) {
     this.allocInternal(format, width, height, 1, numMipLevels);
     if (this._mipLevelCount > 1 && !this._device.isContextLost()) {
       this.generateMipmaps();
     }
   }
   /** @internal */
-  private loadLevels(levels: TextureMipmapData, sRGB: boolean): void {
+  private loadLevels(levels: TextureMipmapData, sRGB: boolean) {
     let format = sRGB ? linearTextureFormatToSRGB(levels.format) : levels.format;
     let swizzle = false;
     if (format === 'bgra8unorm') {
@@ -193,7 +193,7 @@ export class WebGPUTexture2D extends WebGPUBaseTexture implements Texture2D<GPUT
     }
   }
   /** @internal */
-  private loadImage(element: TextureImageElement, format: TextureFormat): void {
+  private loadImage(element: TextureImageElement, format: TextureFormat) {
     this.allocInternal(format, Number(element.width), Number(element.height), 1, 0);
     if (!this._device.isContextLost()) {
       this.updateFromElement(element, 0, 0, 0, 0, this._width, this._height);

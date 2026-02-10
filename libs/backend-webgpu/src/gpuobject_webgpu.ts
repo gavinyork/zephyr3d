@@ -16,18 +16,19 @@ import type {
 } from '@zephyr3d/device';
 import { genDefaultName } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
+import type { Nullable } from '@zephyr3d/base';
 import { Disposable } from '@zephyr3d/base';
 
 let _uniqueId = 0;
 
 export abstract class WebGPUObject<T> extends Disposable implements GPUObject<T> {
   protected _device: WebGPUDevice;
-  protected _object: T;
+  protected _object: Nullable<T>;
   protected _uid: number;
   protected _cid: number;
   protected _name: string;
   protected _queueState: number;
-  protected _restoreHandler: (tex: GPUObject) => void;
+  protected _restoreHandler: Nullable<(tex: GPUObject) => void>;
   constructor(device: WebGPUDevice) {
     super();
     this._device = device;
@@ -42,35 +43,35 @@ export abstract class WebGPUObject<T> extends Disposable implements GPUObject<T>
   get device(): AbstractDevice {
     return this._device;
   }
-  get object(): T {
+  get object() {
     return this._object;
   }
-  get uid(): number {
+  get uid() {
     return this._uid;
   }
-  get cid(): number {
+  get cid() {
     return this._cid;
   }
-  get restoreHandler(): (obj: GPUObject) => void {
+  get restoreHandler() {
     return this._restoreHandler;
   }
-  set restoreHandler(handler: (obj: GPUObject) => void) {
+  set restoreHandler(handler: Nullable<(obj: GPUObject) => void>) {
     this._restoreHandler = handler;
   }
-  get name(): string {
+  get name() {
     return this._name;
   }
-  set name(val: string) {
+  set name(val) {
     if (val !== this._name) {
       const lastName = this._name;
       this._name = val;
       this._device.dispatchEvent('gpuobject_rename', this, lastName);
     }
   }
-  get queueState(): number {
+  get queueState() {
     return this._queueState;
   }
-  set queueState(val: number) {
+  set queueState(val) {
     this._queueState = val;
   }
   isVertexLayout(): this is VertexLayout {
@@ -109,16 +110,16 @@ export abstract class WebGPUObject<T> extends Disposable implements GPUObject<T>
   isBindGroup(): this is BindGroup {
     return false;
   }
-  reload(): void {
+  reload() {
     if (this.disposed) {
       this._device.restoreObject(this);
       this._cid++;
     }
   }
-  destroy(): void {
+  destroy() {
     throw new Error('Abstract function call: dispose()');
   }
-  restore(): void {
+  restore() {
     throw new Error('Abstract function call: restore()');
   }
   protected onDispose() {

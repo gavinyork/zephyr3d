@@ -9,7 +9,7 @@ const tmpUint32Array = new Uint32Array(tmpArrayBuffer);
  *
  * @public
  */
-export function degree2radian(degree: number): number {
+export function degree2radian(degree: number) {
   return (degree * Math.PI) / 180;
 }
 
@@ -20,7 +20,7 @@ export function degree2radian(degree: number): number {
  *
  * @public
  */
-export function radian2degree(radian: number): number {
+export function radian2degree(radian: number) {
   return (radian * 180) / Math.PI;
 }
 
@@ -31,7 +31,7 @@ export function radian2degree(radian: number): number {
  *
  * @public
  */
-export function toFloat(val: number): number {
+export function toFloat(val: number) {
   tmpFloatArray[0] = val;
   return tmpFloatArray[0];
 }
@@ -44,7 +44,7 @@ export function toFloat(val: number): number {
  *
  * @public
  */
-export function isPowerOf2(value: number): boolean {
+export function isPowerOf2(value: number) {
   return value % 1 === 0 && value >= 0 && (value & (value - 1)) === 0;
 }
 
@@ -56,7 +56,7 @@ export function isPowerOf2(value: number): boolean {
  *
  * @public
  */
-export function nextPowerOf2(value: number): number {
+export function nextPowerOf2(value: number) {
   if (value <= 0) {
     return 1;
   }
@@ -71,61 +71,6 @@ export function nextPowerOf2(value: number): number {
 }
 
 /**
- * Converts float value to half float
- *
- * @param val - The float value to be converted.
- * @returns A 16-bits integer presents the half float value
- *
- * @public
- */
-export function floatToHalf(val: number): number {
-  /*
-  _floatView[0] = val;
-  const x = _int32View[0];
-  let bits = (x >> 16) & 0x8000;
-  let m = (x >> 12) & 0x07ff;
-  const e = (x >> 23) & 0xff;
-  if (e < 103) {
-    return bits;
-  }
-  if (e > 142) {
-    bits |= 0x7c00;
-    bits |= (e === 255 ? 0 : 1) && x & 0x007fffff;
-    return bits;
-  }
-  if (e < 113) {
-    m |= 0x0800;
-    bits |= (m >> (114 - e)) + ((m >> (113 - e)) & 1);
-    return bits;
-  }
-  bits |= ((e - 112) << 10) | (m >> 1);
-  bits += m & 1;
-  return bits;
-  */
-  tmpFloatArray[0] = val;
-  let ivalue = tmpUint32Array[0];
-  let result: number;
-  const sign = (ivalue & 0x80000000) >>> 16;
-  ivalue = ivalue & 0x7fffffff;
-  if (ivalue >= 0x47800000) {
-    // number is too large
-    result = 0x7c00 | (ivalue > 0x7f800000 ? 0x200 | ((ivalue >>> 13) & 0x3ff) : 0);
-  } else if (ivalue <= 0x33000000) {
-    result = 0;
-  } else if (ivalue < 0x38800000) {
-    const shift = 125 - (ivalue >>> 23);
-    ivalue = 0x800000 | (ivalue & 0x7fffff);
-    result = ivalue >>> (shift + 1);
-    const s = (ivalue & ((1 << shift) - 1)) !== 0 ? 1 : 0;
-    result += (result | s) & ((ivalue >>> shift) & 1);
-  } else {
-    ivalue += 0xc8000000;
-    result = ((ivalue + 0x0fff + ((ivalue >>> 13) & 1)) >>> 13) & 0x7fff;
-  }
-  return result | sign;
-}
-
-/**
  * Converts half float value to float
  *
  * @param val - A 16-bits integer presents the half float value to be converted.
@@ -133,7 +78,7 @@ export function floatToHalf(val: number): number {
  *
  * @public
  */
-export function halfToFloat(val: number): number {
+export function halfToFloat(val: number) {
   /*
   const s = (val & 0x8000) >> 15;
   const e = (val & 0x7c00) >> 10;
@@ -178,13 +123,7 @@ export function halfToFloat(val: number): number {
  *
  * @public
  */
-export function packFloat3(a: number, b: number, c: number): number {
-  /*
-  const x = floatToHalf(a);
-  const y = floatToHalf(b);
-  const z = floatToHalf(c);
-  return ((x >> 4) & 0x7ff) | (((y << 7) & 0x3ff800)) | (((z << 17) & 0xffc00000));
-  */
+export function packFloat3(a: number, b: number, c: number) {
   const ivalues: number[] = [];
   const result: number[] = [];
   tmpFloatArray[0] = a;
@@ -256,7 +195,7 @@ export function packFloat3(a: number, b: number, c: number): number {
  *
  * @public
  */
-export function unpackFloat3<T extends number[] | Float32Array<ArrayBuffer>>(pk: number, result: T): void {
+export function unpackFloat3<T extends number[] | Float32Array<ArrayBuffer>>(pk: number, result: T) {
   /*
   result[0] = halfToFloat((pk & 0x7ff) << 4);
   result[1] = halfToFloat((pk & 0x3ff800) >> 7);
@@ -344,11 +283,7 @@ export function unpackFloat3<T extends number[] | Float32Array<ArrayBuffer>>(pk:
  *
  * @public
  */
-export function weightedAverage<T>(
-  weights: number[],
-  values: T[],
-  funcLerp: (a: T, b: T, w: number) => T
-): T {
+export function weightedAverage<T>(weights: number[], values: T[], funcLerp: (a: T, b: T, w: number) => T) {
   let totalWeight = weights[0];
   let t = values[0];
   for (let i = 1; i < weights.length; i++) {

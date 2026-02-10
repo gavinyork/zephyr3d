@@ -1,6 +1,7 @@
 import type { AbstractDevice, BindGroup, GPUProgram, RenderStateSet, Texture2D } from '@zephyr3d/device';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import type { DrawContext } from '../render';
+import type { Nullable } from '@zephyr3d/base';
 import { Vector2, Vector4 } from '@zephyr3d/base';
 
 /**
@@ -9,17 +10,17 @@ import { Vector2, Vector4 } from '@zephyr3d/base';
  */
 export class Bloom extends AbstractPostEffect {
   static readonly className = 'Bloom' as const;
-  private static _programDownsampleH: GPUProgram = null;
-  private static _programDownsampleV: GPUProgram = null;
-  private static _programUpsample: GPUProgram = null;
-  private static _programFinalCompose: GPUProgram = null;
-  private static _programPrefilter: GPUProgram = null;
-  private static _renderStateAdditive: RenderStateSet = null;
-  private static _bindgroupDownsampleH: BindGroup = null;
-  private static _bindgroupDownsampleV: BindGroup = null;
-  private static _bindgroupUpsample: BindGroup = null;
-  private static _bindgroupFinalCompose: BindGroup = null;
-  private static _bindgroupPrefilter: BindGroup = null;
+  private static _programDownsampleH: Nullable<GPUProgram> = null;
+  private static _programDownsampleV: Nullable<GPUProgram> = null;
+  private static _programUpsample: Nullable<GPUProgram> = null;
+  private static _programFinalCompose: Nullable<GPUProgram> = null;
+  private static _programPrefilter: Nullable<GPUProgram> = null;
+  private static _renderStateAdditive: Nullable<RenderStateSet> = null;
+  private static _bindgroupDownsampleH: Nullable<BindGroup> = null;
+  private static _bindgroupDownsampleV: Nullable<BindGroup> = null;
+  private static _bindgroupUpsample: Nullable<BindGroup> = null;
+  private static _bindgroupFinalCompose: Nullable<BindGroup> = null;
+  private static _bindgroupPrefilter: Nullable<BindGroup> = null;
   private readonly _thresholdValue: Vector4;
   private readonly _invTexSize: Vector2;
   private _maxDownsampleLevels: number;
@@ -42,46 +43,46 @@ export class Bloom extends AbstractPostEffect {
     this._intensity = 1;
   }
   /** The maximum downsample levels */
-  get maxDownsampleLevel(): number {
+  get maxDownsampleLevel() {
     return this._maxDownsampleLevels;
   }
-  set maxDownsampleLevel(val: number) {
+  set maxDownsampleLevel(val) {
     this._maxDownsampleLevels = val;
   }
   /** Downsample resolution limitation */
-  get downsampleLimit(): number {
+  get downsampleLimit() {
     return this._downsampleLimit;
   }
-  set downsampleLimit(val: number) {
+  set downsampleLimit(val) {
     this._downsampleLimit = val;
   }
   /** Bloom threshold */
-  get threshold(): number {
+  get threshold() {
     return this._threshold;
   }
-  set threshold(val: number) {
+  set threshold(val) {
     this._threshold = val;
   }
   /** Bloom threshold knee */
-  get thresholdKnee(): number {
+  get thresholdKnee() {
     return this._thresholdKnee;
   }
-  set thresholdKnee(val: number) {
+  set thresholdKnee(val) {
     this._thresholdKnee = val;
   }
   /** Bloom intensity */
-  get intensity(): number {
+  get intensity() {
     return this._intensity;
   }
-  set intensity(val: number) {
+  set intensity(val) {
     this._intensity = val;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
-  requireLinearDepthTexture(): boolean {
+  requireLinearDepthTexture() {
     return false;
   }
   /** {@inheritDoc AbstractPostEffect.requireDepthAttachment} */
-  requireDepthAttachment(): boolean {
+  requireDepthAttachment() {
     return false;
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
@@ -112,20 +113,20 @@ export class Bloom extends AbstractPostEffect {
     this._thresholdValue.y -= this._thresholdValue.x;
     device.setFramebuffer([rt]);
     device.setProgram(Bloom._programPrefilter);
-    device.setBindGroup(0, Bloom._bindgroupPrefilter);
-    Bloom._bindgroupPrefilter.setTexture('tex', srcTexture);
-    Bloom._bindgroupPrefilter.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    Bloom._bindgroupPrefilter.setValue('threshold', this._thresholdValue);
+    device.setBindGroup(0, Bloom._bindgroupPrefilter!);
+    Bloom._bindgroupPrefilter!.setTexture('tex', srcTexture);
+    Bloom._bindgroupPrefilter!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
+    Bloom._bindgroupPrefilter!.setValue('threshold', this._thresholdValue);
     this.drawFullscreenQuad();
   }
   /** @internal */
   finalCompose(device: AbstractDevice, srcTexture: Texture2D, bloomTexture: Texture2D) {
     device.setProgram(Bloom._programFinalCompose);
-    device.setBindGroup(0, Bloom._bindgroupFinalCompose);
-    Bloom._bindgroupFinalCompose.setTexture('srcTex', srcTexture);
-    Bloom._bindgroupFinalCompose.setTexture('bloomTex', bloomTexture);
-    Bloom._bindgroupFinalCompose.setValue('intensity', this._intensity);
-    Bloom._bindgroupFinalCompose.setValue(
+    device.setBindGroup(0, Bloom._bindgroupFinalCompose!);
+    Bloom._bindgroupFinalCompose!.setTexture('srcTex', srcTexture);
+    Bloom._bindgroupFinalCompose!.setTexture('bloomTex', bloomTexture);
+    Bloom._bindgroupFinalCompose!.setValue('intensity', this._intensity);
+    Bloom._bindgroupFinalCompose!.setValue(
       'flip',
       device.type === 'webgpu' && device.getFramebuffer() ? 1 : 0
     );
@@ -134,12 +135,12 @@ export class Bloom extends AbstractPostEffect {
   /** @internal */
   upsample(device: AbstractDevice, textures: Texture2D[]) {
     device.setProgram(Bloom._programUpsample);
-    device.setBindGroup(0, Bloom._bindgroupUpsample);
-    Bloom._bindgroupUpsample.setValue('flip', device.type === 'webgpu' ? 1 : 0);
+    device.setBindGroup(0, Bloom._bindgroupUpsample!);
+    Bloom._bindgroupUpsample!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     for (let i = textures.length - 2; i >= 0; i--) {
-      Bloom._bindgroupUpsample.setTexture('tex', textures[i + 1]);
+      Bloom._bindgroupUpsample!.setTexture('tex', textures[i + 1]);
       device.setFramebuffer([textures[i]]);
-      this.drawFullscreenQuad(Bloom._renderStateAdditive);
+      this.drawFullscreenQuad(Bloom._renderStateAdditive!);
     }
   }
   /** @internal */
@@ -149,8 +150,8 @@ export class Bloom extends AbstractPostEffect {
     let h = Math.max(t, inputColorTexture.height >> 1);
     let maxLevels = Math.max(this._maxDownsampleLevels, 1);
     let sourceTex = inputColorTexture;
-    Bloom._bindgroupDownsampleH.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    Bloom._bindgroupDownsampleV.setValue('flip', device.type === 'webgpu' ? 1 : 0);
+    Bloom._bindgroupDownsampleH!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
+    Bloom._bindgroupDownsampleV!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     while ((w >= t || h >= t) && maxLevels > 0) {
       const tex = device.pool.fetchTemporalTexture2D(false, inputColorTexture.format, w, h, false);
       textures.push(tex);
@@ -161,18 +162,18 @@ export class Bloom extends AbstractPostEffect {
       this._invTexSize.setXY(1 / sourceTex.width, 1 / sourceTex.height);
       device.setFramebuffer([texMiddle]);
       device.setProgram(Bloom._programDownsampleH);
-      device.setBindGroup(0, Bloom._bindgroupDownsampleH);
-      Bloom._bindgroupDownsampleH.setTexture('tex', sourceTex);
-      Bloom._bindgroupDownsampleH.setValue('invTexSize', this._invTexSize);
+      device.setBindGroup(0, Bloom._bindgroupDownsampleH!);
+      Bloom._bindgroupDownsampleH!.setTexture('tex', sourceTex);
+      Bloom._bindgroupDownsampleH!.setValue('invTexSize', this._invTexSize);
       this.drawFullscreenQuad();
 
       // vertical blur
       this._invTexSize.setXY(1 / texMiddle.width, 1 / texMiddle.height);
       device.setFramebuffer([tex]);
       device.setProgram(Bloom._programDownsampleV);
-      device.setBindGroup(0, Bloom._bindgroupDownsampleV);
-      Bloom._bindgroupDownsampleV.setTexture('tex', texMiddle);
-      Bloom._bindgroupDownsampleV.setValue('invTexSize', this._invTexSize);
+      device.setBindGroup(0, Bloom._bindgroupDownsampleV!);
+      Bloom._bindgroupDownsampleV!.setTexture('tex', texMiddle);
+      Bloom._bindgroupDownsampleV!.setValue('invTexSize', this._invTexSize);
       this.drawFullscreenQuad();
 
       maxLevels--;
@@ -213,7 +214,7 @@ export class Bloom extends AbstractPostEffect {
             );
           });
         }
-      });
+      })!;
       Bloom._programFinalCompose.name = '@Bloom_FinalCompose';
       Bloom._bindgroupFinalCompose = device.createBindGroup(Bloom._programFinalCompose.bindGroupLayouts[0]);
     }
@@ -247,7 +248,7 @@ export class Bloom extends AbstractPostEffect {
             this.$outputs.outColor = pb.vec4(pb.mul(this.p.rgb, this.contrib), 1);
           });
         }
-      });
+      })!;
       Bloom._programPrefilter.name = '@Bloom_Prefilter';
       Bloom._bindgroupPrefilter = device.createBindGroup(Bloom._programPrefilter.bindGroupLayouts[0]);
     }
@@ -272,7 +273,7 @@ export class Bloom extends AbstractPostEffect {
             this.$outputs.outColor = pb.textureSampleLevel(this.tex, this.$inputs.uv, 0);
           });
         }
-      });
+      })!;
       Bloom._programUpsample.name = '@Bloom_Upsample';
       Bloom._bindgroupUpsample = device.createBindGroup(Bloom._programUpsample.bindGroupLayouts[0]);
     }
@@ -315,7 +316,7 @@ export class Bloom extends AbstractPostEffect {
             this.$outputs.outColor = pb.vec4(this.sum, 1);
           });
         }
-      });
+      })!;
       Bloom._programDownsampleH.name = '@Bloom_DownsampleH';
       Bloom._bindgroupDownsampleH = device.createBindGroup(Bloom._programDownsampleH.bindGroupLayouts[0]);
     }
@@ -355,7 +356,7 @@ export class Bloom extends AbstractPostEffect {
             this.$outputs.outColor = pb.vec4(this.sum, 1);
           });
         }
-      });
+      })!;
       Bloom._programDownsampleV.name = '@Bloom_DownsampleV';
       Bloom._bindgroupDownsampleV = device.createBindGroup(Bloom._programDownsampleV.bindGroupLayouts[0]);
     }

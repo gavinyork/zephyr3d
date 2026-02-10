@@ -48,8 +48,8 @@ myApp.ready().then(function () {
 
   getEngine().setRenderable(scene, 0, {
     beforeRender(scene) {
-      const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
-      const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
+      const width = myApp.device.deviceXToScreen(myApp.device.canvas.width);
+      const height = myApp.device.deviceYToScreen(myApp.device.canvas.height);
       // The lower half of the screen uses FXAA
       scene.mainCamera.viewport = [0, 0, width, height >> 1];
       scene.mainCamera.TAA = true;
@@ -58,8 +58,8 @@ myApp.ready().then(function () {
 
   getEngine().setRenderable(scene, 1, {
     beforeRender(scene) {
-      const width = myApp.device.deviceToScreen(myApp.device.canvas.width);
-      const height = myApp.device.deviceToScreen(myApp.device.canvas.height);
+      const width = myApp.device.deviceXToScreen(myApp.device.canvas.width);
+      const height = myApp.device.deviceYToScreen(myApp.device.canvas.height);
       // The lower half of the screen uses Tonemap
       scene.mainCamera.viewport = [0, height >> 1, width, height - (height >> 1)];
       scene.mainCamera.TAA = false;

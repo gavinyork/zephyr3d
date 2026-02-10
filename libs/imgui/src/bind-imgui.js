@@ -1,4 +1,14 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable no-useless-escape */
+/* eslint-disable no-empty */
+/* eslint-disable no-func-assign */
+/* eslint-disable no-prototype-builtins */
+/* eslint-disable no-fallthrough */
+/* eslint-disable getter-return */
+/* eslint-disable no-constant-condition */
+/* eslint-disable no-redeclare */
+/* eslint-disable no-undef */
+/* eslint-disable no-unused-vars */
+/* eslint-disable no-global-assign */
 var Module = (() => {
   var _scriptDir =
     typeof document !== 'undefined' && document.currentScript ? document.currentScript.src : undefined;
@@ -35,12 +45,13 @@ var Module = (() => {
                 prop +
                 ' on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js'
             ),
-          set: () =>
+          set: () => {
             abort(
               'You are setting ' +
                 prop +
                 ' on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js'
-            )
+            );
+          }
         });
       }
     });
@@ -2589,8 +2600,8 @@ var Module = (() => {
         return function ${makeLegalFunctionName(humanName)}(${argsList}) {
         if (arguments.length !== ${argCount - 2}) {
           throwBindingError('function ${humanName} called with ${arguments.length} arguments, expected ${
-        argCount - 2
-      } args!');
+            argCount - 2
+          } args!');
         }`;
 
       if (needsDestructorStack) {

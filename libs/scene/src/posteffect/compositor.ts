@@ -14,6 +14,7 @@ import type { AbstractPostEffect } from './posteffect';
 import { PostEffectLayer } from './posteffect';
 import { MaterialVaryingFlags } from '../values';
 import { fetchSampler } from '../utility/misc';
+import type { Nullable } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 
 /**
@@ -33,21 +34,21 @@ export class Compositor {
   /** @internal */
   protected _postEffects: DRef<AbstractPostEffect>[][];
   /** @internal */
-  private _finalFramebuffer: FrameBuffer;
+  private _finalFramebuffer: Nullable<FrameBuffer>;
   /** @internal */
-  private _prevInputTexture: Texture2D;
+  private _prevInputTexture: Nullable<Texture2D>;
   /** @internal */
-  private _prevFrameBuffer: FrameBuffer;
+  private _prevFrameBuffer: Nullable<FrameBuffer>;
   /** @internal */
   private _textureFormat: TextureFormat;
   /** @internal */
-  private static _blitProgram: GPUProgram = null;
+  private static _blitProgram: Nullable<GPUProgram> = null;
   /** @internal */
-  private static _blitBindgroup: BindGroup = null;
+  private static _blitBindgroup: Nullable<BindGroup> = null;
   /** @internal */
-  private static _blitRenderStates: RenderStateSet = null;
+  private static _blitRenderStates: Nullable<RenderStateSet> = null;
   /** @internal */
-  private static _blitVertexLayout: VertexLayout = null;
+  private static _blitVertexLayout: Nullable<VertexLayout> = null;
   /**
    * Creates an instance of Compositor
    */
@@ -62,10 +63,10 @@ export class Compositor {
     this._textureFormat = 'rgba16f';
   }
   /** @internal */
-  requireLinearDepth(ctx: DrawContext): boolean {
+  requireLinearDepth(ctx: DrawContext) {
     for (const list of this._postEffects) {
       for (const postEffect of list) {
-        if (postEffect.get().requireLinearDepthTexture(ctx)) {
+        if (postEffect.get()!.requireLinearDepthTexture(ctx)) {
           return true;
         }
       }
@@ -78,7 +79,7 @@ export class Compositor {
    * @param postEffect - The post effect to add
    * @param opaque - true if the post effect should be applied after the opaque pass and before the transparent pass, otherwise the post effect should be applied after the transparent pass
    */
-  appendPostEffect(postEffect: AbstractPostEffect): void {
+  appendPostEffect(postEffect: AbstractPostEffect) {
     if (postEffect) {
       for (const list of this._postEffects) {
         if (list.findIndex((val) => val.get() === postEffect) >= 0) {
@@ -94,7 +95,7 @@ export class Compositor {
    *
    * @param postEffect - The posteffect to be remove.
    */
-  removePostEffect(postEffect: AbstractPostEffect): void {
+  removePostEffect(postEffect: AbstractPostEffect) {
     for (const list of this._postEffects) {
       const index = list.findIndex((val) => val.get() === postEffect);
       if (index >= 0) {
@@ -107,7 +108,7 @@ export class Compositor {
   /**
    * Removes all post effects
    */
-  clear(): void {
+  clear() {
     for (const list of this._postEffects) {
       for (const p of list) {
         p.dispose();
@@ -145,11 +146,11 @@ export class Compositor {
     const postEffects = this._postEffects[layer];
     if (postEffects.length > 0) {
       const device = ctx.device;
-      const inputFramebuffer = device.getFramebuffer();
-      const inputTexture = inputFramebuffer.getColorAttachments()[0] as Texture2D;
-      let tmpTexture: Texture2D = null;
+      const inputFramebuffer = device.getFramebuffer()!;
+      const inputTexture = inputFramebuffer!.getColorAttachments()[0] as Texture2D;
+      let tmpTexture: Nullable<Texture2D> = null;
       for (let i = 0; i < postEffects.length; i++) {
-        const postEffect = postEffects[i].get();
+        const postEffect = postEffects[i].get()!;
         if (!postEffect.enabled) {
           continue;
         }
@@ -189,7 +190,7 @@ export class Compositor {
   end(ctx: DrawContext) {
     const device = ctx.device;
     if (device.getFramebuffer() !== this._finalFramebuffer) {
-      const srcTex = device.getFramebuffer().getColorAttachments()[0] as Texture2D;
+      const srcTex = device.getFramebuffer()!.getColorAttachments()[0] as Texture2D;
       device.setFramebuffer(this._finalFramebuffer);
       device.setViewport(null);
       device.setScissor(null);
@@ -209,7 +210,7 @@ export class Compositor {
     for (let i = layer; i < this._postEffects.length; i++) {
       const start = i === layer ? index + 1 : 0;
       for (let j = start; j < this._postEffects[i].length; j++) {
-        if (this._postEffects[i][j].get().enabled) {
+        if (this._postEffects[i][j].get()!.enabled) {
           return false;
         }
       }
@@ -243,7 +244,7 @@ export class Compositor {
             });
           });
         }
-      });
+      })!;
       this._blitProgram.name = '@Compositor_blit';
       this._blitBindgroup = device.createBindGroup(this._blitProgram.bindGroupLayouts[0]);
       this._blitVertexLayout = device.createVertexLayout({
@@ -252,7 +253,7 @@ export class Compositor {
             buffer: device.createVertexBuffer(
               'position_f32x2',
               new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])
-            )
+            )!
           }
         ]
       });
@@ -260,12 +261,12 @@ export class Compositor {
       this._blitRenderStates.useRasterizerState().setCullMode('none');
       this._blitRenderStates.useDepthState().enableTest(false).enableWrite(false);
     }
-    this._blitBindgroup.setTexture('srcTex', srcTex, fetchSampler('clamp_nearest_nomip'));
-    this._blitBindgroup.setValue('srgbOutput', srgbOutput ? 1 : 0);
-    this._blitBindgroup.setValue('flip', device.type === 'webgpu' && !!device.getFramebuffer() ? 1 : 0);
+    this._blitBindgroup!.setTexture('srcTex', srcTex, fetchSampler('clamp_nearest_nomip'));
+    this._blitBindgroup!.setValue('srgbOutput', srgbOutput ? 1 : 0);
+    this._blitBindgroup!.setValue('flip', device.type === 'webgpu' && !!device.getFramebuffer() ? 1 : 0);
     device.setRenderStates(this._blitRenderStates);
     device.setProgram(this._blitProgram);
-    device.setBindGroup(0, this._blitBindgroup);
+    device.setBindGroup(0, this._blitBindgroup!);
     device.setVertexLayout(this._blitVertexLayout);
     device.draw('triangle-strip', 0, 4);
   }

@@ -1,4 +1,4 @@
-import type { SerializableClass } from '../types';
+import { defineProps, type SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import { SceneNode } from '../../../scene';
 import {
@@ -24,7 +24,68 @@ export function getCameraClass(): SerializableClass {
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
+        {
+          name: 'UseScreenSettings',
+          type: 'bool',
+          default: false,
+          get(this: Camera, value) {
+            value.bool[0] = this.adapted;
+          },
+          set(this: Camera, value) {
+            this.adapted = value.bool[0];
+          }
+        },
+        {
+          name: 'DesignWidth',
+          type: 'int',
+          options: { minValue: 1 },
+          default: 1280,
+          isHidden(this: Camera) {
+            return !this.adapted;
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.screenConfig.designWidth;
+          },
+          set(this: Camera, value) {
+            this.screenConfig = { ...this.screenConfig, designWidth: value.num[0] };
+          }
+        },
+        {
+          name: 'DesignHeight',
+          type: 'int',
+          options: { minValue: 1 },
+          default: 720,
+          isHidden(this: Camera) {
+            return !this.adapted;
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.screenConfig.designHeight;
+          },
+          set(this: Camera, value) {
+            this.screenConfig = { ...this.screenConfig, designHeight: value.num[0] };
+          }
+        },
+        {
+          name: 'ScreenScaleMode',
+          type: 'string',
+          default: 'cover',
+          options: {
+            enum: {
+              labels: ['ShowAll', 'NoBorder', 'ExactFit', 'FixedWidth', 'FixedHeight'],
+              values: ['fit', 'cover', 'stretch', 'fit-width', 'fit-height']
+            }
+          },
+          isHidden(this: Camera) {
+            return !this.adapted;
+          },
+          get(this: Camera, value) {
+            value.str[0] = this.screenConfig.scaleMode;
+          },
+          set(this: Camera, value) {
+            this.screenConfig = { ...this.screenConfig, scaleMode: value.str[0] as any };
+          }
+        },
         {
           name: 'HDR',
           type: 'bool',
@@ -611,7 +672,7 @@ export function getCameraClass(): SerializableClass {
             this.SSAOIntensity = value.num[0] * 0.01;
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -628,7 +689,7 @@ export function getPerspectiveCameraClass(): SerializableClass {
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'FovVertical',
           type: 'float',
@@ -677,7 +738,7 @@ export function getPerspectiveCameraClass(): SerializableClass {
             this.autoAspect = value.bool[0];
           }
         }
-      ];
+      ]);
     }
   };
 }
@@ -689,12 +750,12 @@ export function getOrthoCameraClass(): SerializableClass {
     parent: Camera,
     name: 'OrthoCamera',
     createFunc(ctx: SceneNode) {
-      const node = new OrthoCamera(ctx.scene);
+      const node = new OrthoCamera(ctx.scene!);
       node.parent = ctx;
       return { obj: node };
     },
     getProps() {
-      return [
+      return defineProps([
         {
           name: 'Left',
           type: 'float',
@@ -761,7 +822,7 @@ export function getOrthoCameraClass(): SerializableClass {
             this.far = value.num[0];
           }
         }
-      ];
+      ]);
     }
   };
 }

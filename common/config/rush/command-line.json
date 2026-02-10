@@ -63,9 +63,8 @@
     {
       "name": "test",
       "commandKind": "global",
-      "summary": "Launch all test case",
-      "safeForSimultaneousRushProcesses": true,
-      "shellCommand": "npx serve test/dist"
+      "summary": "Run tests in ./test",
+      "shellCommand": "npm test --prefix ./test"
     }
     // {
     //   /**

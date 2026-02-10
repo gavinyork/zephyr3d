@@ -7,6 +7,7 @@ export * from './utils';
 export * from './diff';
 export * from './event';
 export * from './linkedlist';
+export * from './orderedstringset';
 export * from './math';
 export * from './rectspacker';
 export * from './prng';

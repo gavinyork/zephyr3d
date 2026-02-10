@@ -83,7 +83,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
     constructor() {
       super();
     }
-    copyFrom(other: this): void {
+    copyFrom(other: this) {
       super.copyFrom(other);
     }
     getCommonData(
@@ -111,7 +111,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         data
       );
     }
-    getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc {
+    getCommonDatasStruct(scope: PBInsideFunctionScope) {
       const pb = scope.$builder;
       return pb.defineStruct([
         pb.vec4('f0'),
@@ -133,7 +133,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       viewVec: PBShaderExp,
       commonData: PBShaderExp,
       outRoughness?: PBShaderExp
-    ): PBShaderExp {
+    ) {
       const pb = scope.$builder;
       const funcName = 'Z_PBRBluePrintLight';
       const that = this;
@@ -181,14 +181,16 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$return(pb.vec4(pb.add(this.lightingColor, this.emissiveColor), this.pbrData.albedo.a));
         }
       );
-      return outRoughness
-        ? pb.getGlobalScope()[funcName](commonData, viewVec, worldPos, outRoughness)
-        : pb.getGlobalScope()[funcName](commonData, viewVec, worldPos);
+      return (
+        outRoughness
+          ? pb.getGlobalScope()[funcName](commonData, viewVec, worldPos, outRoughness)
+          : pb.getGlobalScope()[funcName](commonData, viewVec, worldPos)
+      ) as PBShaderExp;
     }
-    vertexShader(scope: PBFunctionScope): void {
+    vertexShader(scope: PBFunctionScope) {
       super.vertexShader(scope);
     }
-    fragmentShader(scope: PBFunctionScope): void {
+    fragmentShader(scope: PBFunctionScope) {
       const pb = scope.$builder;
       super.fragmentShader(scope);
       if (this.needFragmentColor()) {
@@ -208,7 +210,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       vertexColor: PBShaderExp,
       vertexUV: PBShaderExp,
       data: PBShaderExp
-    ): void {
+    ) {
       const that = this;
       const pb = scope.$builder;
       const funcName = 'zCalculateCommonDataPBRBluePrint';
@@ -233,14 +235,17 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         vertexUV
       ];
       pb.func(funcName, params, function () {
-        const outputs = ir.create(pb);
+        const outputs = ir.create(pb)!;
         this.zCommonData.albedo = pb.vec4(
           (that.getOutput(outputs, 'BaseColor') as PBShaderExp)?.rgb ?? pb.vec3(1),
-          that.getOutput(outputs, 'Opacity') ?? 1
+          (that.getOutput(outputs, 'Opacity') as number | PBShaderExp) ?? 1
         );
         this.zCommonData.metallic = that.getOutput(outputs, 'Metallic') ?? 0;
         this.zCommonData.roughness = that.getOutput(outputs, 'Roughness')
-          ? pb.mul(that.getOutput(outputs, 'Roughness'), ShaderHelper.getCameraRoughnessFactor(scope))
+          ? pb.mul(
+              that.getOutput(outputs, 'Roughness') as number | PBShaderExp,
+              ShaderHelper.getCameraRoughnessFactor(scope)
+            )
           : ShaderHelper.getCameraRoughnessFactor(scope);
         this.zCommonData.specular = that.getOutput(outputs, 'Specular') ?? pb.vec3(1);
         this.zCommonData.emissive = that.getOutput(outputs, 'Emissive') ?? pb.vec3(0);
@@ -258,10 +263,18 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         this.$l.t_ = pb.normalize(this.tangent);
         this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
         this.$l.b = pb.cross(this.ng, this.t);
+        if (that.doubleSidedLighting && that.cullMode !== 'back') {
+          this.$if(pb.not(this.$builtins.frontFacing), function () {
+            this.t = pb.mul(this.t, -1);
+            this.b = pb.mul(this.b, -1);
+            this.ng = pb.mul(this.ng, -1);
+          });
+        }
         this.zCommonData.TBN = pb.mat3(this.t, this.b, this.ng);
+
         if (that.getOutput(outputs, 'Normal')) {
           this.zCommonData.normal = pb.normalize(
-            pb.mul(this.zCommonData.TBN, that.getOutput(outputs, 'Normal'))
+            pb.mul(this.zCommonData.TBN, that.getOutput(outputs, 'Normal') as number | PBShaderExp)
           );
         } else {
           this.zCommonData.normal = this.ng;
@@ -276,7 +289,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
     private getOutput(
       outputs: {
         name: string;
-        exp: number | PBShaderExp;
+        exp: number | boolean | PBShaderExp;
       }[],
       name: string
     ) {
@@ -346,7 +359,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         function () {
           if (
             !ctx.drawEnvLight ||
-            (!ctx.env.light.envLight.hasRadiance() && !ctx.env.light.envLight.hasIrradiance())
+            (!ctx.env!.light.envLight.hasRadiance() && !ctx.env!.light.envLight.hasIrradiance())
           ) {
             return;
           }
@@ -368,13 +381,13 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
             this.data.f0.rgb
           );
           this.$l.k_S = pb.add(this.data.f0.rgb, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5)));
-          if (outRoughness || ctx.env.light.envLight.hasRadiance()) {
+          if (outRoughness || ctx.env!.light.envLight.hasRadiance()) {
             this.$l.FssEss = pb.add(pb.mul(this.k_S, this.f_ab.x), pb.vec3(this.f_ab.y));
             this.$l.specularFactor = pb.mul(this.FssEss, this.occlusion);
             if (outRoughness) {
               this.outRoughness = pb.vec4(this.specularFactor /*this.data.f0.rgb*/, this.data.roughness);
-            } else if (ctx.env.light.envLight.hasRadiance()) {
-              this.$l.radiance = ctx.env.light.envLight.getRadiance(
+            } else if (ctx.env!.light.envLight.hasRadiance()) {
+              this.$l.radiance = ctx.env!.light.envLight.getRadiance(
                 this,
                 pb.reflect(pb.neg(this.viewVec), this.data.normal),
                 this.data.roughness
@@ -382,8 +395,8 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
               this.outColor = pb.add(this.outColor, pb.mul(this.radiance, this.specularFactor));
             }
           }
-          if (ctx.env.light.envLight.hasIrradiance()) {
-            this.$l.irradiance = ctx.env.light.envLight.getIrradiance(this, this.data.normal);
+          if (ctx.env!.light.envLight.hasIrradiance()) {
+            this.$l.irradiance = ctx.env!.light.envLight.getIrradiance(this, this.data.normal);
             this.$l.mixedF0 = this.data.f0.rgb;
             this.$l.FssEss = pb.add(pb.mul(this.k_S, this.f_ab.x), pb.vec3(this.f_ab.y));
             this.$l.Ems = pb.sub(1, pb.add(this.f_ab.x, this.f_ab.y));
@@ -404,7 +417,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         scope.$g[funcName](viewVec, commonData, outColor);
       }
     }
-    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void {
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx)) {
         if (ctx.drawEnvLight) {

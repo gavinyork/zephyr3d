@@ -1,4 +1,4 @@
-import type { AbstractDevice, CompareFunc, RenderStateSet, Texture2D, VertexLayout } from '@zephyr3d/device';
+import type { AbstractDevice, CompareFunc, RenderStateSet, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { copyTexture, fetchSampler } from '../utility/misc';
@@ -33,14 +33,14 @@ export class AbstractPostEffect extends Disposable {
     this._layer = PostEffectLayer.end;
   }
   /** Whether this post effect is enabled */
-  get enabled(): boolean {
+  get enabled() {
     return this._enabled;
   }
-  set enabled(val: boolean) {
+  set enabled(val) {
     this._enabled = !!val;
   }
   /** Whether this post effect will be rendered at opaque phase */
-  get layer(): PostEffectLayer {
+  get layer() {
     return this._layer;
   }
   /**
@@ -48,21 +48,21 @@ export class AbstractPostEffect extends Disposable {
    * @param device - The device object
    * @returns true if the post effect should be rendered upside down
    */
-  needFlip(device: AbstractDevice): boolean {
+  needFlip(device: AbstractDevice) {
     return device.type === 'webgpu' && !!device.getFramebuffer();
   }
   /**
    * Checks whether this post effect requires the linear depth texture
    * @returns true if the linear depth texture is required.
    */
-  requireLinearDepthTexture(_ctx: DrawContext): boolean {
+  requireLinearDepthTexture(_ctx: DrawContext) {
     return false;
   }
   /**
    * Checks whether this post effect requires the scene depth buffer
    * @returns true if the scene depth buffer is required.
    */
-  requireDepthAttachment(_ctx: DrawContext): boolean {
+  requireDepthAttachment(_ctx: DrawContext) {
     return false;
   }
   /**
@@ -75,12 +75,7 @@ export class AbstractPostEffect extends Disposable {
    * @remarks
    * The frame buffer of the post effect is already set when apply() is called.
    */
-  apply(
-    ctx: DrawContext,
-    inputColorTexture: Texture2D,
-    sceneDepthTexture: Texture2D,
-    srgbOutput: boolean
-  ): void {
+  apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     this.passThrough(ctx, inputColorTexture, srgbOutput);
   }
   /**
@@ -97,7 +92,7 @@ export class AbstractPostEffect extends Disposable {
   ) {
     copyTexture(
       inputColorTexture,
-      ctx.device.getFramebuffer(),
+      ctx.device.getFramebuffer()!,
       fetchSampler('clamp_nearest_nomip'),
       renderStates,
       0,
@@ -112,11 +107,11 @@ export class AbstractPostEffect extends Disposable {
     drawFullscreenQuad(renderStateSet);
   }
   /** @internal */
-  protected createVertexLayout(device: AbstractDevice): VertexLayout {
+  protected createVertexLayout(device: AbstractDevice) {
     return device.createVertexLayout({
       vertexBuffers: [
         {
-          buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]))
+          buffer: device.createVertexBuffer('position_f32x2', new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]))!
         }
       ]
     });
@@ -126,7 +121,7 @@ export class AbstractPostEffect extends Disposable {
     this.destroy();
   }
   /** @internal */
-  protected createRenderStates(device: AbstractDevice): RenderStateSet {
+  protected createRenderStates(device: AbstractDevice) {
     const renderStates = device.createRenderStateSet();
     renderStates.useRasterizerState().setCullMode('none');
     renderStates.useDepthState().enableTest(false).enableWrite(false);
@@ -136,7 +131,7 @@ export class AbstractPostEffect extends Disposable {
   protected destroy() {}
   /** @internal */
   static getDefaultRenderState(ctx: DrawContext, compareFunc: CompareFunc) {
-    let renderState = this._defaultRenderStates[compareFunc];
+    let renderState = this._defaultRenderStates[compareFunc as keyof typeof this._defaultRenderStates];
     if (!renderState) {
       renderState = ctx.device.createRenderStateSet();
       renderState.useRasterizerState().setCullMode('none');
@@ -145,7 +140,7 @@ export class AbstractPostEffect extends Disposable {
         .enableTest(compareFunc !== 'always')
         .enableWrite(false)
         .setCompareFunc(compareFunc);
-      this._defaultRenderStates[compareFunc] = renderState;
+      this._defaultRenderStates[compareFunc as keyof typeof this._defaultRenderStates] = renderState;
     }
     return renderState;
   }

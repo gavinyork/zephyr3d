@@ -6,14 +6,13 @@ import type { GraphNode } from '../scene/graph_node';
 import type { RenderQueue } from './render_queue';
 import type { RenderPass, Drawable } from '.';
 import type { Mesh } from '../scene/mesh';
-import type { Terrain } from '../scene/terrain';
 import type { ClipmapTerrain } from '../scene/terrain-cm';
 import type { PunctualLight } from '../scene/light';
 import type { Visitor } from '../scene/visitor';
 import type { Camera } from '../camera/camera';
 import type { SceneNode } from '../scene/scene_node';
 import type { BatchGroup } from '../scene/batchgroup';
-import type { ParticleSystem } from '../scene';
+import type { ParticleSystem, Sprite } from '../scene';
 import type { Water } from '../scene/water';
 
 /**
@@ -21,8 +20,6 @@ import type { Water } from '../scene/water';
  * @public
  */
 export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
-  /** @internal */
-  private readonly _primaryCamera: Camera;
   /** @internal */
   private _camera: Camera;
   /** @internal */
@@ -42,8 +39,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
    * @param rendeQueue - RenderQueue
    * @param viewPoint - Camera position of the primary render pass
    */
-  constructor(renderPass: RenderPass, camera: Camera, renderQueue: RenderQueue, primaryCamera: Camera) {
-    this._primaryCamera = primaryCamera;
+  constructor(renderPass: RenderPass, camera: Camera, renderQueue: RenderQueue) {
     this._camera = camera;
     this._renderQueue = renderQueue;
     this._skipClipTest = false;
@@ -59,18 +55,14 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     this._camera = camera || null;
   }
   /** true if cull with frustum culling, otherwise false. default is true */
-  get frustumCulling(): boolean {
+  get frustumCulling() {
     return !this._skipClipTest;
   }
-  set frustumCulling(val: boolean) {
+  set frustumCulling(val) {
     this._skipClipTest = !val;
   }
-  /** The camera position of the primary render pass */
-  get primaryCamera() {
-    return this._primaryCamera;
-  }
   /** Render pass for the culling task */
-  get renderPass(): RenderPass {
+  get renderPass() {
     return this._renderPass;
   }
   /** The result of culling */
@@ -96,23 +88,25 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
    * Visits a node
    * @param target - The node to be visit
    */
-  visit(target: SceneNode | OctreeNode): unknown {
+  visit(target: SceneNode | OctreeNode) {
     if (target instanceof OctreeNode) {
       return this.visitOctreeNode(target);
     } else if (target.isMesh()) {
       return this.visitMesh(target);
+    } else if (target.isSprite()) {
+      return this.visitSprite(target);
     } else if (target.isWater()) {
       return this.visitWater(target);
     } else if (target.isParticleSystem()) {
       return this.visitParticleSystem(target);
-    } else if (target.isTerrain()) {
-      return this.visitTerrain(target);
     } else if (target.isClipmapTerrain()) {
       return this.visitClipmapTerrain(target);
     } else if (target.isPunctualLight()) {
       return this.visitPunctualLight(target);
     } else if (target.isBatchGroup()) {
       return this.visitBatchGroup(target);
+    } else {
+      return false;
     }
   }
   /** @internal */
@@ -122,20 +116,6 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
       if (clipState !== ClipState.NOT_CLIPPED) {
         this.renderQueue.pushLight(node);
         return true;
-      }
-    }
-    return false;
-  }
-  /** @internal */
-  visitTerrain(node: Terrain) {
-    if (
-      !node.hidden &&
-      (node.castShadow || !this._isShadowMapping) &&
-      (node.gpuPickable || !this._isGPUPicking)
-    ) {
-      const clipState = this.getClipStateWithNode(node);
-      if (clipState !== ClipState.NOT_CLIPPED) {
-        return node.cull(this) > 0;
       }
     }
     return false;
@@ -168,6 +148,16 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   }
   /** @internal */
   visitParticleSystem(node: ParticleSystem) {
+    if (!node.hidden && !this._isShadowMapping && (node.gpuPickable || !this._isGPUPicking)) {
+      const clipState = this.getClipStateWithNode(node);
+      if (clipState !== ClipState.NOT_CLIPPED) {
+        this.push(this._camera, node);
+        return true;
+      }
+    }
+    return false;
+  }
+  visitSprite(node: Sprite) {
     if (!node.hidden && !this._isShadowMapping && (node.gpuPickable || !this._isGPUPicking)) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
@@ -220,7 +210,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     return false;
   }
   /** @internal */
-  protected getClipStateWithNode(node: GraphNode): ClipState {
+  protected getClipStateWithNode(node: GraphNode) {
     let clipState: ClipState;
     if (this._skipClipTest) {
       clipState = ClipState.A_INSIDE_B;
@@ -233,7 +223,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     return clipState;
   }
   /** @internal */
-  protected getClipStateWithAABB(aabb: AABB): ClipState {
+  protected getClipStateWithAABB(aabb: AABB) {
     return this.camera.clipMask
       ? aabb.getClipStateWithFrustumMask(this.frustum, this.camera.clipMask)
       : aabb.getClipStateWithFrustum(this.frustum);

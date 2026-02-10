@@ -12,8 +12,6 @@ export class BoxFilterBlitter extends Blitter {
   /** @internal */
   protected _kernelSize: number;
   /** @internal */
-  protected _sigma: number;
-  /** @internal */
   protected _blurSize: number;
   /** @internal */
   protected _logSpace: boolean;
@@ -36,19 +34,19 @@ export class BoxFilterBlitter extends Blitter {
   /**
    * true if the box filter will be applied in logarithmic space
    */
-  get logSpace(): boolean {
+  get logSpace() {
     return this._logSpace;
   }
-  set logSpace(val: boolean) {
+  set logSpace(val) {
     this._logSpace = !!val;
   }
   /**
    * Multiplier for logarithmic space blur
    */
-  get logSpaceMultiplier(): number {
+  get logSpaceMultiplier() {
     return this._logSpaceMultiplier;
   }
-  set logSpaceMultiplier(val: number) {
+  set logSpaceMultiplier(val) {
     this._logSpaceMultiplier = val;
   }
   /**
@@ -101,7 +99,7 @@ export class BoxFilterBlitter extends Blitter {
     srcUV: PBShaderExp,
     srcLayer: PBShaderExp,
     sampleType: 'float' | 'int' | 'uint'
-  ): PBShaderExp {
+  ) {
     const that = this;
     const pb = scope.$builder;
     scope.d0 = that.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
@@ -153,13 +151,13 @@ export class BoxFilterBlitter extends Blitter {
         scope.avgValue = pb.add(scope.d0, pb.log(scope.avgValue));
       }
     }
-    return scope.avgValue;
+    return scope.avgValue as PBShaderExp;
   }
   /**
    * {@inheritDoc Blitter.calcHash}
    * @override
    */
-  protected calcHash(): string {
+  protected calcHash() {
     return `${this._phase}-${this._kernelSize}-${Number(!!this._logSpace)}`;
   }
 }

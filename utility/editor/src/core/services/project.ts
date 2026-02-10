@@ -1,6 +1,6 @@
-import type { HttpDirectoryReader, VFS } from '@zephyr3d/base';
+import type { HttpDirectoryReader, Immutable, VFS } from '@zephyr3d/base';
 import { HttpFS, IndexedDBFS, MemoryFS, PathUtils, randomUUID } from '@zephyr3d/base';
-import { getEngine } from '@zephyr3d/scene';
+import { getEngine, tryGetApp } from '@zephyr3d/scene';
 import { fileListFileName, libDir, projectFileName } from '../build/templates';
 import { DlgMessage } from '../../views/dlg/messagedlg';
 import { installDeps } from '../build/dep';
@@ -21,7 +21,7 @@ export type ProjectSettings = {
   dependencies?: { [name: string]: string };
 };
 
-const defaultProjectSettings: Readonly<ProjectSettings> = {
+const defaultProjectSettings: Immutable<ProjectSettings> = {
   preferredRHI: ['WebGL', 'WebGL2', 'WebGPU']
 };
 
@@ -50,7 +50,7 @@ export class ProjectService {
       projectVFS.close();
     }
     projectVFS = vfs;
-    if (getEngine()) {
+    if (tryGetApp()) {
       getEngine().VFS = vfs;
     }
   }

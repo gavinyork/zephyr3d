@@ -31,6 +31,7 @@ import { getAtmosphereParamsStruct, getDefaultAtmosphereParams } from '../../sha
 import type { HeightFogParams } from '../../shaders/fog';
 import { calculateFog, getDefaultHeightFogParams, getHeightFogParamsStruct } from '../../shaders/fog';
 import { getDevice } from '../../app/api';
+import type { Camera } from '../../camera';
 
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
 const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
@@ -95,43 +96,43 @@ export class ShaderHelper {
     atmosphereParams: getDefaultAtmosphereParams(),
     heightFogParams: getDefaultHeightFogParams()
   };
-  static getObjectColorUniformName(): string {
+  static getObjectColorUniformName() {
     return UNIFORM_NAME_OBJECT_COLOR;
   }
-  static getWorldMatrixUniformName(): string {
+  static getWorldMatrixUniformName() {
     return UNIFORM_NAME_WORLD_MATRIX;
   }
-  static getPrevWorldMatrixUniformName(): string {
+  static getPrevWorldMatrixUniformName() {
     return UNIFORM_NAME_PREV_WORLD_MATRIX;
   }
-  static getPrevWorldMatrixFrameUniformName(): string {
+  static getPrevWorldMatrixFrameUniformName() {
     return UNIFORM_NAME_PREV_WORLD_MATRXI_FRAME;
   }
-  static getInstanceDataUniformName(): string {
+  static getInstanceDataUniformName() {
     return UNIFORM_NAME_INSTANCE_DATA;
   }
-  static getInstanceDataOffsetUniformName(): string {
+  static getInstanceDataOffsetUniformName() {
     return UNIFORM_NAME_INSTANCE_DATA_OFFSET;
   }
-  static getInstanceDataStrideUniformName(): string {
+  static getInstanceDataStrideUniformName() {
     return UNIFORM_NAME_INSTANCE_DATA_STRIDE;
   }
-  static getBoneMatricesUniformName(): string {
+  static getBoneMatricesUniformName() {
     return UNIFORM_NAME_BONE_MATRICES;
   }
-  static getBoneTextureSizeUniformName(): string {
+  static getBoneTextureSizeUniformName() {
     return UNIFORM_NAME_BONE_TEXTURE_SIZE;
   }
-  static getBoneInvBindMatrixUniformName(): string {
+  static getBoneInvBindMatrixUniformName() {
     return UNIFORM_NAME_BONE_INV_BIND_MATRIX;
   }
-  static getMorphDataUniformName(): string {
+  static getMorphDataUniformName() {
     return UNIFORM_NAME_MORPH_DATA;
   }
-  static getMorphInfoUniformName(): string {
+  static getMorphInfoUniformName() {
     return UNIFORM_NAME_MORPH_INFO;
   }
-  static getLightBufferUniformName(): string {
+  static getLightBufferUniformName() {
     return UNIFORM_NAME_LIGHT_BUFFER;
   }
   static getDrawableBindGroupLayout(skinning: boolean, morphing: boolean, instancing: boolean) {
@@ -183,7 +184,6 @@ export class ShaderHelper {
     const scope = pb.getGlobalScope();
     const cameraStruct = pb.defineStruct([
       pb.vec4('position'),
-      pb.vec4('clipPlane'),
       pb.mat4('viewProjectionMatrix'),
       pb.mat4('invViewProjectionMatrix'),
       pb.mat4('unjitteredVPMatrix'),
@@ -193,7 +193,7 @@ export class ShaderHelper {
       pb.mat4('projectionMatrix'),
       pb.mat4('invProjectionMatrix'),
       pb.vec4('params'),
-      ...(ctx.motionVectors && ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH
+      ...(ctx.motionVectors && ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH
         ? [pb.mat4('prevUnjitteredVPMatrix')]
         : []),
       pb.vec2('renderSize'),
@@ -203,7 +203,7 @@ export class ShaderHelper {
       pb.float('elapsedTime'),
       pb.int('framestamp')
     ]);
-    if (ctx.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP) {
+    if (ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP) {
       const lightStruct = pb.defineStruct([
         pb.vec4('positionAndRange'),
         pb.vec4('directionCutoff'),
@@ -214,11 +214,11 @@ export class ShaderHelper {
       scope.camera = cameraStruct().uniform(0);
       scope.light = lightStruct().uniform(0);
     } else if (
-      ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH ||
-      ctx.renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR
+      ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH ||
+      ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR
     ) {
       scope.camera = cameraStruct().uniform(0);
-    } else if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+    } else if (ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
       const useClusteredLighting = !ctx.currentShadowLight;
       if (ctx.materialFlags & MaterialVaryingFlags.APPLY_FOG) {
         const fogStructMembers: PBShaderExp[] = [
@@ -265,21 +265,21 @@ export class ShaderHelper {
       scope[UNIFORM_NAME_BAKED_SKY_MAP] = pb.texCube().uniform(0);
       if (ctx.currentShadowLight) {
         const scope = pb.getGlobalScope();
-        const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
-        const tex = shadowMapParams.shadowMap.isTextureCube()
+        const shadowMapParams = ctx.shadowMapInfo!.get(ctx.currentShadowLight)!;
+        const tex = shadowMapParams.shadowMap!.isTextureCube()
           ? shadowMapParams.shadowMap.isDepth()
             ? scope.$builder.texCubeShadow()
             : scope.$builder.texCube()
-          : shadowMapParams.shadowMap.isTexture2D()
+          : shadowMapParams.shadowMap!.isTexture2D()
             ? shadowMapParams.shadowMap.isDepth()
               ? scope.$builder.tex2DShadow()
               : scope.$builder.tex2D()
-            : shadowMapParams.shadowMap.isDepth()
+            : shadowMapParams.shadowMap!.isDepth()
               ? scope.$builder.tex2DArrayShadow()
               : scope.$builder.tex2DArray();
         if (
-          !shadowMapParams.shadowMap.isDepth() &&
-          !ctx.device.getDeviceCaps().textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap.format)
+          !shadowMapParams.shadowMap!.isDepth() &&
+          !ctx.device.getDeviceCaps().textureCaps.getTextureFormatInfo(shadowMapParams.shadowMap!.format)
             .filterable
         ) {
           tex.sampleType('unfilterable-float');
@@ -287,7 +287,7 @@ export class ShaderHelper {
         scope[UNIFORM_NAME_SHADOW_MAP] = tex.uniform(0);
       }
       if (ctx.drawEnvLight) {
-        ctx.env.light.envLight.initShaderBindings(pb);
+        ctx.env!.light.envLight.initShaderBindings(pb);
       }
       if (ctx.linearDepthTexture) {
         scope[UNIFORM_NAME_LINEAR_DEPTH_MAP] = pb.tex2D().uniform(0);
@@ -310,7 +310,7 @@ export class ShaderHelper {
    *
    * @returns true if the shader needs to process skeletal animation, otherwise false.
    */
-  static hasSkinning(scope: PBInsideFunctionScope): boolean {
+  static hasSkinning(scope: PBInsideFunctionScope) {
     return !!scope[UNIFORM_NAME_BONE_MATRICES];
   }
   /**
@@ -320,7 +320,7 @@ export class ShaderHelper {
    *
    * @returns true if the shader needs to process morph target animation, otherwise false.
    */
-  static hasMorphing(scope: PBInsideFunctionScope): boolean {
+  static hasMorphing(scope: PBInsideFunctionScope) {
     return !!scope[UNIFORM_NAME_MORPH_DATA];
   }
   /**
@@ -330,7 +330,7 @@ export class ShaderHelper {
    *
    * @returns Skinning matrix for current vertex, or null if there is not skeletal animation
    */
-  static calculateSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+  static calculateSkinMatrix(scope: PBInsideFunctionScope) {
     if (!this.hasSkinning(scope)) {
       return null;
     }
@@ -362,8 +362,8 @@ export class ShaderHelper {
     const funcNameGetSkinningMatrix = 'Z_getSkinningMatrix';
     pb.func(funcNameGetSkinningMatrix, [], function () {
       const invBindMatrix = this[UNIFORM_NAME_BONE_INV_BIND_MATRIX];
-      const blendIndices = scope.$getVertexAttrib('blendIndices');
-      const blendWeights = scope.$getVertexAttrib('blendWeights');
+      const blendIndices = scope.$getVertexAttrib('blendIndices')!;
+      const blendWeights = scope.$getVertexAttrib('blendWeights')!;
       this.$l.m0 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[0]));
       this.$l.m1 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[1]));
       this.$l.m2 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[2]));
@@ -376,9 +376,9 @@ export class ShaderHelper {
       );
       this.$return(pb.mul(invBindMatrix, this.m));
     });
-    return scope.$g[funcNameGetSkinningMatrix]();
+    return scope.$g[funcNameGetSkinningMatrix]() as PBShaderExp;
   }
-  static calculateMorphDelta(scope: PBInsideFunctionScope, attrib: number): PBShaderExp {
+  static calculateMorphDelta(scope: PBInsideFunctionScope, attrib: number) {
     const pb = scope.$builder;
     const isWebGL1 = pb.getDevice().type === 'webgl';
     if (pb.shaderKind !== 'vertex') {
@@ -408,8 +408,31 @@ export class ShaderHelper {
               this.$return(this.value);
             });
             this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
+            this.$if(pb.notEqual(this.weight, 0), function () {
+              this.$l.pixelIndex = pb.float(
+                pb.add(this.offset, pb.mul(this.index, this.numVertices), this.vertexIndex)
+              );
+              this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
+              this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.texWidth));
+              this.$l.u = pb.div(pb.add(this.xIndex, 0.5), this.texWidth);
+              this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.texHeight);
+              this.$l.morphValue = pb.textureSampleLevel(
+                this[that.getMorphDataUniformName()],
+                pb.vec2(this.u, this.v),
+                0
+              );
+              this.value = pb.add(this.value, pb.mul(this.morphValue, this.weight));
+            });
+          });
+        });
+      } else {
+        this.$for(pb.int('t'), 0, this.numTargets, function () {
+          this.$l.i = pb.sar(this.t, 2);
+          this.$l.j = pb.compAnd(this.t, 3);
+          this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
+          this.$if(pb.notEqual(this.weight, 0), function () {
             this.$l.pixelIndex = pb.float(
-              pb.add(this.offset, pb.mul(this.index, this.numVertices), this.vertexIndex)
+              pb.add(this.offset, pb.mul(this.t, this.numVertices), this.vertexIndex)
             );
             this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
             this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.texWidth));
@@ -423,32 +446,13 @@ export class ShaderHelper {
             this.value = pb.add(this.value, pb.mul(this.morphValue, this.weight));
           });
         });
-      } else {
-        this.$for(pb.int('t'), 0, this.numTargets, function () {
-          this.$l.i = pb.sar(this.t, 2);
-          this.$l.j = pb.compAnd(this.t, 3);
-          this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
-          this.$l.pixelIndex = pb.float(
-            pb.add(this.offset, pb.mul(this.t, this.numVertices), this.vertexIndex)
-          );
-          this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
-          this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.texWidth));
-          this.$l.u = pb.div(pb.add(this.xIndex, 0.5), this.texWidth);
-          this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.texHeight);
-          this.$l.morphValue = pb.textureSampleLevel(
-            this[that.getMorphDataUniformName()],
-            pb.vec2(this.u, this.v),
-            0
-          );
-          this.value = pb.add(this.value, pb.mul(this.morphValue, this.weight));
-        });
       }
       this.$return(this.value);
     });
     const pos = 1 + MORPH_WEIGHTS_VECTOR_COUNT + (attrib >> 2);
     const comp = attrib & 3;
     const offset = scope[this.getMorphInfoUniformName()][pos][comp];
-    return scope[funcName](pb.int(offset));
+    return scope[funcName](pb.int(offset)) as PBShaderExp;
   }
   /** @internal */
   static prepareSkinAnimation(scope: PBInsideFunctionScope) {
@@ -478,8 +482,8 @@ export class ShaderHelper {
     const funcNameGetSkinningMatrix = 'Z_getSkinningMatrix';
     pb.func(funcNameGetSkinningMatrix, [pb.float('boneOffset')], function () {
       const invBindMatrix = this[UNIFORM_NAME_BONE_INV_BIND_MATRIX];
-      const blendIndices = scope.$getVertexAttrib('blendIndices');
-      const blendWeights = scope.$getVertexAttrib('blendWeights');
+      const blendIndices = scope.$getVertexAttrib('blendIndices')!;
+      const blendWeights = scope.$getVertexAttrib('blendWeights')!;
       this.$l.m0 = scope.$g[funcNameGetBoneMatrixFromTexture](blendIndices[0], this.boneOffset);
       this.$l.m1 = scope.$g[funcNameGetBoneMatrixFromTexture](blendIndices[1], this.boneOffset);
       this.$l.m2 = scope.$g[funcNameGetBoneMatrixFromTexture](blendIndices[2], this.boneOffset);
@@ -511,7 +515,7 @@ export class ShaderHelper {
    * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
    * @returns The calculated vertex position in object space, or null if pos is null
    */
-  static resolveVertexPosition(scope: PBInsideFunctionScope): PBShaderExp {
+  static resolveVertexPosition(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
       throw new Error(`ShaderHelper.resolveVertexPosition(): must be called at vertex stage`);
@@ -527,7 +531,7 @@ export class ShaderHelper {
           ? [pb.mat4('skinMatrix')]
           : [];
     pb.func('Z_resolveVertexPosition', params, function () {
-      this.$l.opos = this.$getVertexAttrib('position').xyz;
+      this.$l.opos = this.$getVertexAttrib('position')!.xyz;
       if (that.hasMorphing(scope)) {
         this.opos = pb.add(this.opos, that.calculateMorphDelta(this, MORPH_TARGET_POSITION).xyz);
       }
@@ -553,11 +557,13 @@ export class ShaderHelper {
       }
       this.$return(this.pos);
     });
-    return scope[that.SKIN_MATRIX_NAME] && scope[that.SKIN_PREV_MATRIX_NAME]
-      ? scope.Z_resolveVertexPosition(scope[that.SKIN_MATRIX_NAME], scope[that.SKIN_PREV_MATRIX_NAME])
-      : scope[that.SKIN_MATRIX_NAME]
-        ? scope.Z_resolveVertexPosition(scope[that.SKIN_MATRIX_NAME])
-        : scope.Z_resolveVertexPosition();
+    return (
+      scope[that.SKIN_MATRIX_NAME] && scope[that.SKIN_PREV_MATRIX_NAME]
+        ? scope.Z_resolveVertexPosition(scope[that.SKIN_MATRIX_NAME], scope[that.SKIN_PREV_MATRIX_NAME])
+        : scope[that.SKIN_MATRIX_NAME]
+          ? scope.Z_resolveVertexPosition(scope[that.SKIN_MATRIX_NAME])
+          : scope.Z_resolveVertexPosition()
+    ) as PBShaderExp;
   }
   /**
    * Resolve motion vector
@@ -584,7 +590,7 @@ export class ShaderHelper {
    * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
    * @returns The calculated normal vector in object space, or null if normal is null
    */
-  static resolveVertexNormal(scope: PBInsideFunctionScope, normal?: PBShaderExp): PBShaderExp {
+  static resolveVertexNormal(scope: PBInsideFunctionScope, normal?: PBShaderExp) {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
       throw new Error(`ShaderHelper.resolveVertexNormal(): must be called in vertex stage`);
@@ -597,13 +603,13 @@ export class ShaderHelper {
       if (!scope.$getVertexAttrib('normal')) {
         scope.$inputs.Z_normal = pb.vec3().attrib('normal');
       }
-      normal = scope.$getVertexAttrib('normal');
+      normal = scope.$getVertexAttrib('normal')!;
     }
     if (this.hasMorphing(scope)) {
       normal = pb.normalize(pb.add(normal, this.calculateMorphDelta(scope, MORPH_TARGET_NORMAL).xyz));
     }
     if (scope[this.SKIN_MATRIX_NAME]) {
-      return pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(normal, 0)).xyz;
+      return pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(normal, 0)).xyz as PBShaderExp;
     } else {
       return normal;
     }
@@ -616,7 +622,7 @@ export class ShaderHelper {
    * @param skinMatrix - The skinning matrix if there is skeletal animation, otherwise null
    * @returns The calculated tangent vector of type vec4 in object space, or null if tangent is null
    */
-  static resolveVertexTangent(scope: PBInsideFunctionScope, tangent?: PBShaderExp): PBShaderExp {
+  static resolveVertexTangent(scope: PBInsideFunctionScope, tangent?: PBShaderExp) {
     const pb = scope.$builder;
     if (pb.shaderKind !== 'vertex') {
       throw new Error(`ShaderHelper.resolveVertexTangent(): must be called in vertex stage`);
@@ -629,7 +635,7 @@ export class ShaderHelper {
       if (!scope.$getVertexAttrib('tangent')) {
         scope.$inputs.Z_tangent = pb.vec4().attrib('tangent');
       }
-      tangent = scope.$getVertexAttrib('tangent');
+      tangent = scope.$getVertexAttrib('tangent')!;
     }
     if (this.hasMorphing(scope)) {
       tangent = pb.normalize(
@@ -637,7 +643,10 @@ export class ShaderHelper {
       );
     }
     if (scope[this.SKIN_MATRIX_NAME]) {
-      return pb.vec4(pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(tangent.xyz, 0)).xyz, tangent.w);
+      return pb.vec4(
+        pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(tangent.xyz, 0)).xyz,
+        tangent.w
+      ) as PBShaderExp;
     } else {
       return tangent;
     }
@@ -647,24 +656,22 @@ export class ShaderHelper {
    * @param scope - Current shader scope
    * @returns The world matrix of current object to be drawn
    */
-  static getWorldMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+  static getWorldMatrix(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
-    return (
-      scope[UNIFORM_NAME_WORLD_MATRIX] ??
+    return (scope[UNIFORM_NAME_WORLD_MATRIX] ??
       pb.mat4(
         this.getInstancedUniform(scope, 0),
         this.getInstancedUniform(scope, 1),
         this.getInstancedUniform(scope, 2),
         this.getInstancedUniform(scope, 3)
-      )
-    );
+      )) as PBShaderExp;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the world matrix at previous frame of current object to be drawn
    * @param scope - Current shader scope
    * @returns The world matrix at previous frame of current object to be drawn
    */
-  static getPrevWorldMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+  static getPrevWorldMatrix(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
     const that = this;
     const framestamp = this.getFramestamp(scope);
@@ -698,7 +705,7 @@ export class ShaderHelper {
           )
         );
       });
-      return scope.Z_getPrevWorldMatrix(framestamp);
+      return scope.Z_getPrevWorldMatrix(framestamp) as PBShaderExp;
     }
   }
   /**
@@ -706,7 +713,7 @@ export class ShaderHelper {
    * @param scope - Current shader scope
    * @returns instance uniform value
    */
-  static getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number): PBShaderExp {
+  static getInstancedUniform(scope: PBInsideFunctionScope, uniformIndex: number | PBShaderExp) {
     const pb = scope.$builder;
     return scope[UNIFORM_NAME_INSTANCE_DATA].at(
       pb.add(
@@ -714,7 +721,7 @@ export class ShaderHelper {
         scope[UNIFORM_NAME_INSTANCE_DATA_OFFSET],
         pb.uint(uniformIndex)
       )
-    );
+    ) as PBShaderExp;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the normal matrix of current object to be drawn
@@ -722,7 +729,7 @@ export class ShaderHelper {
    * @param scope - Current shader scope
    * @returns The normal matrix of current object to be drawn
    */
-  static getNormalMatrix(scope: PBInsideFunctionScope): PBShaderExp {
+  static getNormalMatrix(scope: PBInsideFunctionScope) {
     return this.getWorldMatrix(scope);
   }
   /**
@@ -770,40 +777,34 @@ export class ShaderHelper {
     );
   }
   /** @internal */
-  static setCameraUniforms(bindGroup: BindGroup, ctx: DrawContext, linear: boolean) {
-    const pos = ctx.camera.getWorldPosition();
+  static setCameraUniforms(bindGroup: BindGroup, ctx: DrawContext, camera: Camera, linear: boolean) {
+    const pos = camera.getWorldPosition();
     const useJitter =
       ctx.motionVectors &&
-      ctx.renderPass.type !== RENDER_PASS_TYPE_SHADOWMAP &&
-      ctx.renderPass.type !== RENDER_PASS_TYPE_OBJECT_COLOR;
+      ctx.renderPass!.type !== RENDER_PASS_TYPE_SHADOWMAP &&
+      ctx.renderPass!.type !== RENDER_PASS_TYPE_OBJECT_COLOR;
     const cameraStruct = {
-      position: new Vector4(pos.x, pos.y, pos.z, ctx.camera.clipPlane ? 1 : 0),
-      clipPlane: ctx.camera.clipPlane ?? Vector4.zero(),
+      position: new Vector4(pos.x, pos.y, pos.z, 0),
       renderSize: new Vector2(ctx.renderWidth, ctx.renderHeight),
-      viewProjectionMatrix: useJitter ? ctx.camera.jitteredVPMatrix : ctx.camera.viewProjectionMatrix,
-      unjitteredVPMatrix: ctx.camera.viewProjectionMatrix,
-      jitteredInvVPMatrix: useJitter ? ctx.camera.jitteredInvVPMatrix : ctx.camera.invViewProjectionMatrix,
-      jitterValue: ctx.camera.jitterValue,
-      invViewProjectionMatrix: ctx.camera.invViewProjectionMatrix,
-      projectionMatrix: ctx.camera.getProjectionMatrix(),
-      invProjectionMatrix: ctx.camera.getInvProjectionMatrix(),
-      viewMatrix: ctx.camera.viewMatrix,
-      worldMatrix: ctx.camera.worldMatrix,
-      params: new Vector4(
-        ctx.camera.getNearPlane(),
-        ctx.camera.getFarPlane(),
-        ctx.flip ? -1 : 1,
-        linear ? 0 : 1
-      ),
-      roughnessFactor: ctx.camera.SSR ? ctx.camera.ssrRoughnessFactor : 1,
-      frameDeltaTime: getDevice().frameInfo.elapsedFrame * 0.001,
-      elapsedTime: getDevice().frameInfo.elapsedOverall * 0.001,
-      framestamp: getDevice().frameInfo.frameCounter
+      viewProjectionMatrix: useJitter ? camera.jitteredVPMatrix : camera.viewProjectionMatrix,
+      unjitteredVPMatrix: camera.viewProjectionMatrix,
+      jitteredInvVPMatrix: useJitter ? camera.jitteredInvVPMatrix : camera.invViewProjectionMatrix,
+      jitterValue: camera.jitterValue,
+      invViewProjectionMatrix: camera.invViewProjectionMatrix,
+      projectionMatrix: camera.getProjectionMatrix(),
+      invProjectionMatrix: camera.getInvProjectionMatrix(),
+      viewMatrix: camera.viewMatrix,
+      worldMatrix: camera.worldMatrix,
+      params: new Vector4(camera.getNearPlane(), camera.getFarPlane(), ctx.flip ? -1 : 1, linear ? 0 : 1),
+      roughnessFactor: camera.SSR ? camera.ssrRoughnessFactor : 1,
+      frameDeltaTime: ctx.device.frameInfo.elapsedFrame * 0.001,
+      elapsedTime: ctx.device.frameInfo.elapsedOverall * 0.001,
+      framestamp: ctx.device.frameInfo.frameCounter
     } as any;
-    if (ctx.motionVectors && ctx.renderPass.type === RENDER_PASS_TYPE_DEPTH) {
-      cameraStruct.prevUnjitteredVPMatrix = ctx.camera.prevVPMatrix;
+    if (ctx.motionVectors && ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH) {
+      cameraStruct.prevUnjitteredVPMatrix = camera.prevVPMatrix;
     }
-    if (ctx.renderPass.type === RENDER_PASS_TYPE_LIGHT) {
+    if (ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
       if (ctx.linearDepthTexture) {
         bindGroup.setTexture(UNIFORM_NAME_LINEAR_DEPTH_MAP, ctx.linearDepthTexture);
         bindGroup.setValue(
@@ -831,7 +832,7 @@ export class ShaderHelper {
   /** @internal */
   static setLightUniformsShadowMap(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight) {
     if (light) {
-      const shadowMapParams = ctx.shadowMapInfo.get(light);
+      const shadowMapParams = ctx.shadowMapInfo!.get(light)!;
       bindGroup.setValue('light', {
         positionAndRange: light.positionAndRange,
         directionCutoff: light.directionAndCutoff,
@@ -874,19 +875,19 @@ export class ShaderHelper {
       sunDir: ctx.sunLight ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1) : this.defaultSunDir,
       clusterParams: clusterParams,
       countParams: countParams,
-      envLightStrength: ctx.env.light.strength ?? 0,
+      envLightStrength: ctx.env!.light.strength ?? 0,
       lightIndexTexSize: new Int32Array([lightIndexTexture.width, lightIndexTexture.height])
     });
     bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, lightBuffer);
     bindGroup.setTexture(UNIFORM_NAME_LIGHT_INDEX_TEXTURE, lightIndexTexture);
     bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ctx.drawEnvLight) {
-      ctx.env.light.envLight.updateBindGroup(bindGroup);
+      ctx.env!.light.envLight.updateBindGroup(bindGroup);
     }
   }
   /** @internal */
   static setLightUniformsShadow(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight) {
-    const shadowMapParams = ctx.shadowMapInfo.get(light);
+    const shadowMapParams = ctx.shadowMapInfo!.get(light)!;
     this._lightUniformShadow.sunDir = ctx.sunLight
       ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1)
       : this.defaultSunDir;
@@ -903,12 +904,12 @@ export class ShaderHelper {
     bindGroup.setValue('light', this._lightUniformShadow);
     bindGroup.setTexture(
       UNIFORM_NAME_SHADOW_MAP,
-      shadowMapParams.shadowMap,
+      shadowMapParams.shadowMap!,
       shadowMapParams.shadowMapSampler
     );
     bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ctx.drawEnvLight) {
-      ctx.env.light.envLight.updateBindGroup(bindGroup);
+      ctx.env!.light.envLight.updateBindGroup(bindGroup);
     }
   }
   /**
@@ -1034,27 +1035,6 @@ export class ShaderHelper {
    */
   static getFramestamp(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.camera.framestamp;
-  }
-  /**
-   * Discard the fragment if it was clipped by the clip plane
-   * @param scope - Current shader scope
-   */
-  static discardIfClipped(scope: PBInsideFunctionScope, worldPos: PBShaderExp) {
-    const funcName = 'Z_discardIfClippped';
-    const pb = scope.$builder;
-    const that = this;
-    pb.func(funcName, [pb.vec3('worldPos')], function () {
-      this.$if(pb.notEqual(that.getCameraClipPlaneFlag(this), 0), function () {
-        this.$l.clipPlane = that.getCameraClipPlane(this);
-        this.$if(
-          pb.greaterThan(pb.add(pb.dot(this.worldPos.xyz, this.clipPlane.xyz), this.clipPlane.w), 0),
-          function () {
-            pb.discard();
-          }
-        );
-      });
-    });
-    pb.getGlobalScope()[funcName](worldPos);
   }
   /**
    * Gets the clip plane flag
@@ -1316,7 +1296,7 @@ export class ShaderHelper {
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
-    const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
+    const shadowMapParams = ctx.shadowMapInfo!.get(ctx.currentShadowLight!)!;
     const funcName = 'Z_calculateShadow';
     pb.func(funcName, [pb.vec3('worldPos'), pb.float('NoL')], function () {
       if (shadowMapParams.numShadowCascades > 1) {
@@ -1347,8 +1327,8 @@ export class ShaderHelper {
         } else {
           this.$l.shadowVertex = that.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1), this.split);
         }
-        const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
-        this.$l.shadow = shadowMapParams.impl.computeShadowCSM(
+        const shadowMapParams = ctx.shadowMapInfo!.get(ctx.currentShadowLight!)!;
+        this.$l.shadow = shadowMapParams.impl!.computeShadowCSM(
           shadowMapParams,
           this,
           this.shadowVertex,
@@ -1368,8 +1348,8 @@ export class ShaderHelper {
         this.$return(this.shadow);
       } else {
         this.$l.shadowVertex = that.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1));
-        const shadowMapParams = ctx.shadowMapInfo.get(ctx.currentShadowLight);
-        this.$l.shadow = shadowMapParams.impl.computeShadow(
+        const shadowMapParams = ctx.shadowMapInfo!.get(ctx.currentShadowLight!)!;
+        this.$l.shadow = shadowMapParams.impl!.computeShadow(
           shadowMapParams,
           this,
           this.shadowVertex,
