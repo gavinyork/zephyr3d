@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/backend-webgl
 
-This log was last generated on Mon, 24 Nov 2025 05:23:10 GMT and should not be manually modified.
+This log was last generated on Tue, 10 Feb 2026 07:50:06 GMT and should not be manually modified.
+
+## 0.1.10
+Tue, 10 Feb 2026 07:50:06 GMT
+
+### Patches
+
+- Change canvas resize logic
 
 ## 0.1.9
 Mon, 24 Nov 2025 05:23:10 GMT

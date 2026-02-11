@@ -2,6 +2,29 @@
   "name": "@zephyr3d/device",
   "entries": [
     {
+      "version": "0.2.6",
+      "tag": "@zephyr3d/device_v0.2.6",
+      "date": "Tue, 10 Feb 2026 07:50:06 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Change canvas resize logic"
+          },
+          {
+            "comment": "Make select function available for WebGL1"
+          },
+          {
+            "comment": "Change typescript compiler options"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.0` to `0.2.1`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.5",
       "tag": "@zephyr3d/device_v0.2.5",
       "date": "Mon, 24 Nov 2025 05:23:10 GMT",

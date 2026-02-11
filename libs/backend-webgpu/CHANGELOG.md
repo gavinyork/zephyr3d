@@ -1,6 +1,14 @@
 # Change Log - @zephyr3d/backend-webgpu
 
-This log was last generated on Mon, 24 Nov 2025 05:23:10 GMT and should not be manually modified.
+This log was last generated on Tue, 10 Feb 2026 07:50:06 GMT and should not be manually modified.
+
+## 0.1.9
+Tue, 10 Feb 2026 07:50:06 GMT
+
+### Patches
+
+- Change canvas resize logic
+- Improve DeviceBackend.supported()
 
 ## 0.1.8
 Mon, 24 Nov 2025 05:23:10 GMT
