@@ -1412,9 +1412,15 @@ export class ShaderHelper {
   ): PBShaderExp {
     const pb = scope.$builder;
     nearFar = nearFar ?? this.getCameraParams(scope);
-    return pb.div(
-      pb.sub(nearFar.y, pb.div(pb.mul(nearFar.x, nearFar.y), depth)),
-      pb.sub(nearFar.y, nearFar.x)
+    return pb.add(
+      pb.mul(
+        pb.div(
+          pb.sub(pb.add(nearFar.x, nearFar.y), pb.div(pb.mul(nearFar.x, nearFar.y, 2), depth)),
+          pb.sub(nearFar.y, nearFar.x)
+        ),
+        0.5
+      ),
+      0.5
     );
   }
   /**
@@ -1432,7 +1438,11 @@ export class ShaderHelper {
   ): PBShaderExp {
     const pb = scope.$builder;
     nearFar = nearFar ?? this.getCameraParams(scope);
-    return pb.div(pb.mul(nearFar.x, nearFar.y), pb.mix(nearFar.y, nearFar.x, depth));
+    return pb.div(
+      pb.mul(nearFar.x, nearFar.y, 2),
+      pb.add(nearFar.x, nearFar.y, pb.mul(pb.sub(nearFar.x, nearFar.y), pb.sub(pb.mul(depth, 2), 1)))
+    );
+    //return pb.div(pb.mul(nearFar.x, nearFar.y), pb.mix(nearFar.y, nearFar.x, depth));
   }
   /**
    * Calculates the normalized linear depth from non-linear depth
@@ -1449,7 +1459,11 @@ export class ShaderHelper {
   ): PBShaderExp {
     const pb = scope.$builder;
     nearFar = nearFar ?? this.getCameraParams(scope);
-    return pb.div(nearFar.x, pb.mix(nearFar.y, nearFar.x, depth));
+    //return pb.div(nearFar.x, pb.mix(nearFar.y, nearFar.x, depth));
+    return pb.div(
+      pb.sub(this.nonLinearDepthToLinear(scope, depth, nearFar), nearFar.x),
+      pb.sub(nearFar.y, nearFar.x)
+    );
   }
   /**
    * Sample linear depth from linear depth texture
