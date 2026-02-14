@@ -368,15 +368,12 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    */
   setMorphWeight(name: string, weight: number) {
     const index = this._morphInfo?.names?.[name];
-    if (
-      index !== undefined &&
-      index >= 0 &&
-      index < this._morphInfo!.data[3] &&
-      this._morphInfo!.data[4 + index] !== weight
-    ) {
-      this._morphInfo!.data[4 + index] = weight;
-      this._morphDirty = true;
-      this.scene!.queueUpdateNode(this);
+    if (index !== undefined && index >= 0 && index < this._morphInfo!.data[3]) {
+      if (this._morphInfo!.data[4 + index] !== weight) {
+        this._morphInfo!.data[4 + index] = weight;
+        this._morphDirty = true;
+        this.scene!.queueUpdateNode(this);
+      }
     } else {
       console.warn(`Morph target ${name} not found`);
     }
@@ -450,6 +447,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   private updateMorphState() {
     if (this._morphInfo && this._morphDirty) {
+      console.log(`jawOpen: ${this._morphInfo.data[20]}`);
       this._morphInfo.buffer!.get()!.bufferSubData(4 * 4, this._morphInfo.data, 4, this._morphInfo.data[3]);
       this._morphDirty = false;
     }
