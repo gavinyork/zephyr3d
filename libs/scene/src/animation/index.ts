@@ -8,3 +8,4 @@ export * from './scaletrack';
 export * from './proptrack';
 export * from './morphtrack';
 export * from './skeleton';
+export * from './ik';

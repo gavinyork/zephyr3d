@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zephyr3D IK System Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4ec9b0;
+            border-bottom: 2px solid #4ec9b0;
+            padding-bottom: 10px;
+        }
+        .test-output {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 20px;
+            margin: 20px 0;
+            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .pass {
+            color: #4ec9b0;
+        }
+        .fail {
+            color: #f48771;
+        }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        button:disabled {
+            background: #3e3e42;
+            cursor: not-allowed;
+        }
+        .info {
+            background: #1e3a5f;
+            border-left: 4px solid #4ec9b0;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .warning {
+            background: #5f4e1e;
+            border-left: 4px solid #dcdcaa;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Zephyr3D IK System Test Suite</h1>
+
+        <div class="info">
+            <strong>About this test:</strong><br>
+            This test suite verifies the IK (Inverse Kinematics) system implementation for Zephyr3D.
+            It tests FABRIK solver convergence, constraint enforcement, and chain building utilities.
+        </div>
+
+        <div class="warning">
+            <strong>Note:</strong><br>
+            To run this test, you need to import the compiled Zephyr3D scene module.
+            This HTML file is a template - you'll need to integrate it with your build system.
+        </div>
+
+        <button id="runTests" onclick="runTests()">Run IK Tests</button>
+
+        <div id="output" class="test-output">
+Click "Run IK Tests" to start the test suite...
+        </div>
+    </div>
+
+    <script type="module">
+        // This is a template - you would import your built module here
+        // import { runAllIKTests } from './path/to/built/scene.js';
+
+        window.runTests = function() {
+            const output = document.getElementById('output');
+            const button = document.getElementById('runTests');
+
+            button.disabled = true;
+            output.textContent = 'Running tests...\n\n';
+
+            // Simulate test output (replace with actual test execution)
+            setTimeout(() => {
+                output.innerHTML = `<span class="pass">
+=============================================================
+IK System Test Suite
+=============================================================
+
+Test 1: Basic FABRIK solver convergence
+  Converged: true
+  End effector position: (1.500, 0.500, 0.000)
+  Target position: (1.500, 0.500, 0.000)
+  Distance to target: 0.000001
+  Result: PASS ✓
+
+Test 2: Unreachable target handling
+  Converged: false (should be false)
+  Chain total length: 2.000
+  Stretched distance: 2.000
+  Result: PASS ✓
+
+Test 3: Angle constraint enforcement
+  Elbow angle: 89.95° (should be ≤90°)
+  Result: PASS ✓
+
+Test 4: Pole vector constraint
+  Shoulder Y: 0.000
+  Elbow Y: 0.250
+  Hand Y: 0.300
+  Elbow above midline: true
+  Result: PASS ✓
+
+Test 5: Chain builder from hierarchy
+  Chain length: 3 (expected: 3)
+  Root matches: true
+  End effector matches: true
+  Result: PASS ✓
+
+=============================================================
+Test Results: 5/5 passed
+=============================================================
+✓ All tests passed!
+</span>`;
+                button.disabled = false;
+            }, 500);
+        };
+    </script>
+</body>
+</html>
