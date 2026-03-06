@@ -1,4 +1,5 @@
-import { Vector3, Quaternion } from '@zephyr3d/base';
+import type { Quaternion } from '@zephyr3d/base';
+import { Vector3 } from '@zephyr3d/base';
 
 /**
  * Utility functions for IK calculations.
@@ -38,7 +39,7 @@ export class IKUtils {
     }
 
     // General case
-    const axis = Vector3.cross(fromNorm, toNorm, new Vector3());
+    const axis = Vector3.cross(fromNorm, toNorm).inplaceNormalize();
     const angle = Math.acos(dot);
     return result.fromAxisAngle(axis, angle);
   }

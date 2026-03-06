@@ -80,7 +80,7 @@ export class IKAngleConstraint extends IKConstraint {
     const currentJoint = joints[index];
     const childJoint = joints[index + 1];
 
-    // Calculate vectors
+    // Calculate vectors from current joint
     const toParent = Vector3.sub(parentJoint.position, currentJoint.position, new Vector3());
     const toChild = Vector3.sub(childJoint.position, currentJoint.position, new Vector3());
 
@@ -92,11 +92,11 @@ export class IKAngleConstraint extends IKConstraint {
     }
 
     // Normalize
-    toParent.scaleBy(1 / parentLen);
-    toChild.scaleBy(1 / childLen);
+    const toParentNorm = Vector3.scale(toParent, 1 / parentLen, new Vector3());
+    const toChildNorm = Vector3.scale(toChild, 1 / childLen, new Vector3());
 
-    // Calculate current angle
-    const dot = Vector3.dot(toParent, toChild);
+    // Calculate current angle between parent and child bones
+    const dot = Vector3.dot(toParentNorm, toChildNorm);
     const currentAngleDeg = Math.acos(Math.max(-1, Math.min(1, dot))) * (180 / Math.PI);
 
     // Check if constraint is violated
@@ -110,21 +110,21 @@ export class IKAngleConstraint extends IKConstraint {
     }
 
     // Calculate rotation axis (perpendicular to both vectors)
-    const axis = Vector3.cross(toParent, toChild, new Vector3());
+    const axis = Vector3.cross(toParentNorm, toChildNorm, new Vector3());
     const axisLen = axis.magnitude;
 
     if (axisLen < 0.000001) {
-      return; // Vectors are parallel
+      return; // Vectors are parallel or anti-parallel
     }
 
     axis.scaleBy(1 / axisLen);
 
-    // Rotate child position to satisfy constraint
+    // Calculate the angle we need to rotate
     const targetAngleRad = targetAngleDeg * (Math.PI / 180);
     const currentAngleRad = currentAngleDeg * (Math.PI / 180);
     const deltaAngle = targetAngleRad - currentAngleRad;
 
-    // Rotate toChild vector around axis
+    // Rotate the toChild vector around the axis by deltaAngle
     const cos = Math.cos(deltaAngle);
     const sin = Math.sin(deltaAngle);
     const oneMinusCos = 1 - cos;
@@ -132,22 +132,39 @@ export class IKAngleConstraint extends IKConstraint {
     // Rodrigues' rotation formula
     const rotated = new Vector3();
     rotated.x =
-      toChild.x * (cos + axis.x * axis.x * oneMinusCos) +
-      toChild.y * (axis.x * axis.y * oneMinusCos - axis.z * sin) +
-      toChild.z * (axis.x * axis.z * oneMinusCos + axis.y * sin);
+      toChildNorm.x * (cos + axis.x * axis.x * oneMinusCos) +
+      toChildNorm.y * (axis.x * axis.y * oneMinusCos - axis.z * sin) +
+      toChildNorm.z * (axis.x * axis.z * oneMinusCos + axis.y * sin);
 
     rotated.y =
-      toChild.x * (axis.y * axis.x * oneMinusCos + axis.z * sin) +
-      toChild.y * (cos + axis.y * axis.y * oneMinusCos) +
-      toChild.z * (axis.y * axis.z * oneMinusCos - axis.x * sin);
+      toChildNorm.x * (axis.y * axis.x * oneMinusCos + axis.z * sin) +
+      toChildNorm.y * (cos + axis.y * axis.y * oneMinusCos) +
+      toChildNorm.z * (axis.y * axis.z * oneMinusCos - axis.x * sin);
 
     rotated.z =
-      toChild.x * (axis.z * axis.x * oneMinusCos - axis.y * sin) +
-      toChild.y * (axis.z * axis.y * oneMinusCos + axis.x * sin) +
-      toChild.z * (cos + axis.z * axis.z * oneMinusCos);
+      toChildNorm.x * (axis.z * axis.x * oneMinusCos - axis.y * sin) +
+      toChildNorm.y * (axis.z * axis.y * oneMinusCos + axis.x * sin) +
+      toChildNorm.z * (cos + axis.z * axis.z * oneMinusCos);
 
-    // Update child position
-    rotated.scaleBy(childLen);
+    // Update child position using the original bone length
+    const boneLength = currentJoint.boneLength;
+    rotated.scaleBy(boneLength);
     Vector3.add(currentJoint.position, rotated, childJoint.position);
+
+    // Recursively update all subsequent joints to maintain bone lengths
+    for (let i = index + 1; i < joints.length - 1; i++) {
+      const joint = joints[i];
+      const nextJoint = joints[i + 1];
+
+      // Calculate direction from current joint to next
+      const dir = Vector3.sub(nextJoint.position, joint.position, new Vector3());
+      const dist = dir.magnitude;
+
+      if (dist > 0.000001) {
+        // Normalize and scale to correct bone length
+        dir.scaleBy(joint.boneLength / dist);
+        Vector3.add(joint.position, dir, nextJoint.position);
+      }
+    }
   }
 }

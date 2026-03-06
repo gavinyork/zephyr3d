@@ -58,6 +58,43 @@ export class IKChain {
   }
 
   /**
+   * Create an IK chain by traversing from a start node to an end node.
+   *
+   * @remarks
+   * This method walks up the parent chain from the end node until it
+   * reaches the start node, building the joint chain in the process.
+   *
+   * @param startNode - The root joint of the chain
+   * @param endNode - The end effector joint
+   * @returns The created IK chain
+   */
+  static fromNodeHierarchy(startNode: SceneNode, endNode: SceneNode): IKChain {
+    const nodes: SceneNode[] = [];
+    let current: SceneNode | null = endNode;
+
+    // Walk up the hierarchy from end to start
+    while (current) {
+      nodes.unshift(current); // Add to front
+
+      if (current === startNode) {
+        break;
+      }
+
+      current = current.parent as SceneNode | null;
+    }
+
+    if (nodes[0] !== startNode) {
+      throw new Error('End node is not a descendant of start node');
+    }
+
+    if (nodes.length < 2) {
+      throw new Error('IK chain must have at least 2 joints');
+    }
+
+    return new IKChain(nodes);
+  }
+
+  /**
    * Get all joints in the chain.
    */
   get joints(): IKJoint[] {

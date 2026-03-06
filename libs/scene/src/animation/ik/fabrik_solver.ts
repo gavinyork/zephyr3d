@@ -33,6 +33,13 @@ export class FABRIKSolver extends IKSolver {
    */
   solve(target: Vector3): boolean {
     const joints = this._chain.joints;
+
+    // Update joint positions from scene nodes before solving
+    this._chain.updateFromNodes();
+
+    // Store original positions
+    this._chain.storeOriginalPositions();
+
     const rootPos = joints[0].originalPosition.clone();
 
     // Check if target is reachable
@@ -42,9 +49,6 @@ export class FABRIKSolver extends IKSolver {
       this._stretchToward(target);
       return false;
     }
-
-    // Store original positions
-    this._chain.storeOriginalPositions();
 
     let converged = false;
     for (let iteration = 0; iteration < this._maxIterations; iteration++) {
@@ -83,24 +87,36 @@ export class FABRIKSolver extends IKSolver {
       const joint = joints[i];
       const nextJoint = joints[i + 1];
 
-      // Calculate direction from current joint to next joint
+      // Calculate direction from current joint to next joint in world space
       const originalDir = Vector3.sub(nextJoint.originalPosition, joint.originalPosition, new Vector3());
       const newDir = Vector3.sub(nextJoint.position, joint.position, new Vector3());
 
-      // Calculate rotation needed to align original direction to new direction
+      // Calculate rotation needed to align original direction to new direction (in world space)
       const deltaRotation = new Quaternion();
       IKUtils.fromToRotation(originalDir, newDir, deltaRotation);
 
-      // Apply rotation to the joint
-      const finalRotation = Quaternion.multiply(deltaRotation, joint.originalRotation, new Quaternion());
+      // Calculate new world rotation
+      let worldRotation = Quaternion.multiply(deltaRotation, joint.originalRotation, new Quaternion());
 
       // Blend with original rotation based on weight
       if (weight < 1) {
-        Quaternion.slerp(joint.originalRotation, finalRotation, weight, finalRotation);
+        Quaternion.slerp(joint.originalRotation, worldRotation, weight, worldRotation);
       }
 
-      // Apply to scene node
-      joint.node.rotation = finalRotation;
+      // Convert world rotation to local rotation (relative to parent)
+      if (joint.node.parent) {
+        const parentWorldRotation = new Quaternion();
+        joint.node.parent.worldMatrix.decompose(null, parentWorldRotation, null);
+
+        // localRotation = conjugate(parentWorldRotation) * worldRotation
+        const parentInvRotation = Quaternion.conjugate(parentWorldRotation, new Quaternion());
+        const localRotation = Quaternion.multiply(parentInvRotation, worldRotation, new Quaternion());
+
+        joint.node.rotation = localRotation;
+      } else {
+        // Root node has no parent, world rotation is local rotation
+        joint.node.rotation = worldRotation;
+      }
     }
   }
 

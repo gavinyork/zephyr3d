@@ -19,4 +19,3 @@ export { IKConstraint } from './ik_constraint';
 export { IKAngleConstraint } from './ik_angle_constraint';
 export { IKPoleVectorConstraint } from './ik_pole_constraint';
 export { IKTrack } from './ik_track';
-export { IKChainBuilder } from './ik_chain_builder';
