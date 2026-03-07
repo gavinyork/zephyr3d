@@ -175,7 +175,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
                 dirCutoff
               );
               this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
-              this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
+              this.$l.NoL = pb.dot(this.normal, this.lightDir);
               this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
               this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
               this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
@@ -198,6 +198,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
                 );
                 this.$l.specular = pb.mul(this.lightColor, this.spec);
               } else {
+                this.NoL = pb.clamp(this.NoL, 0, 1);
                 this.$l.diffuse = pb.mul(this.lightColor, 1 / Math.PI, this.NoL);
                 this.$l.specular = pb.mul(this.lightColor, pb.pow(this.NoH, shininess));
               }
