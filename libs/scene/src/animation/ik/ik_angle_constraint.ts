@@ -71,11 +71,75 @@ export class IKAngleConstraint extends IKConstraint {
   apply(joints: IKJoint[]): void {
     const index = this._jointIndex;
 
-    // Need at least 3 joints (parent, this, child)
-    if (index < 1 || index >= joints.length - 1) {
+    // For end effector (last joint), we constrain the angle between the last two bones
+    // For other joints, we constrain the angle at the joint itself
+    if (index === joints.length - 1) {
+      // End effector: constrain angle between (parent-1 -> parent) and (parent -> this)
+      if (index < 2) {
+        return; // Need at least 3 joints total
+      }
+      this._applyEndEffectorConstraint(joints, index);
+    } else {
+      // Regular joint: constrain angle between (parent -> this) and (this -> child)
+      if (index < 1) {
+        return; // Root joint cannot be constrained this way
+      }
+      this._applyRegularConstraint(joints, index);
+    }
+  }
+
+  /**
+   * Apply constraint to end effector joint.
+   */
+  private _applyEndEffectorConstraint(joints: IKJoint[], index: number): void {
+    const grandParentJoint = joints[index - 2];
+    const parentJoint = joints[index - 1];
+    const currentJoint = joints[index];
+
+    // Calculate bone vectors
+    const incomingBone = Vector3.sub(parentJoint.position, grandParentJoint.position, new Vector3());
+    const outgoingBone = Vector3.sub(currentJoint.position, parentJoint.position, new Vector3());
+
+    const incomingLen = incomingBone.magnitude;
+    const outgoingLen = outgoingBone.magnitude;
+
+    if (incomingLen < 0.000001 || outgoingLen < 0.000001) {
       return;
     }
 
+    // Normalize
+    const incomingNorm = Vector3.scale(incomingBone, 1 / incomingLen, new Vector3());
+    const outgoingNorm = Vector3.scale(outgoingBone, 1 / outgoingLen, new Vector3());
+
+    // Calculate current angle
+    const dot = Vector3.dot(incomingNorm, outgoingNorm);
+    const currentAngleDeg = Math.acos(Math.max(-1, Math.min(1, dot))) * (180 / Math.PI);
+
+    // Check if constraint is violated
+    let targetAngleDeg = currentAngleDeg;
+    if (currentAngleDeg < this._minAngle) {
+      targetAngleDeg = this._minAngle;
+    } else if (currentAngleDeg > this._maxAngle) {
+      targetAngleDeg = this._maxAngle;
+    } else {
+      return;
+    }
+
+    // Apply the same constraint logic as regular joints
+    this._adjustJointAngle(
+      incomingNorm,
+      outgoingNorm,
+      currentAngleDeg,
+      targetAngleDeg,
+      parentJoint,
+      currentJoint
+    );
+  }
+
+  /**
+   * Apply constraint to regular joint.
+   */
+  private _applyRegularConstraint(joints: IKJoint[], index: number): void {
     const parentJoint = joints[index - 1];
     const currentJoint = joints[index];
     const childJoint = joints[index + 1];
@@ -106,15 +170,35 @@ export class IKAngleConstraint extends IKConstraint {
     } else if (currentAngleDeg > this._maxAngle) {
       targetAngleDeg = this._maxAngle;
     } else {
-      return; // Within limits
+      return;
     }
 
-    // Add a dead zone to prevent oscillation: if angle difference is very small, don't apply constraint
-    const angleDifference = Math.abs(targetAngleDeg - currentAngleDeg);
+    // Apply the constraint
+    this._adjustJointAngle(
+      incomingNorm,
+      outgoingNorm,
+      currentAngleDeg,
+      targetAngleDeg,
+      currentJoint,
+      childJoint
+    );
+  }
 
-    // Use larger dead zone for hard constraints (minAngle == maxAngle) to prevent oscillation
+  /**
+   * Adjust joint angle by rotating the outgoing bone.
+   */
+  private _adjustJointAngle(
+    incomingNorm: Vector3,
+    outgoingNorm: Vector3,
+    currentAngleDeg: number,
+    targetAngleDeg: number,
+    pivotJoint: IKJoint,
+    targetJoint: IKJoint
+  ): void {
+    // Add a dead zone to prevent oscillation
+    const angleDifference = Math.abs(targetAngleDeg - currentAngleDeg);
     const isHardConstraint = Math.abs(this._maxAngle - this._minAngle) < 0.01;
-    const deadZone = isHardConstraint ? 1.0 : 0.5;
+    const deadZone = isHardConstraint ? 0.2 : 0.1;
 
     if (angleDifference < deadZone) {
       return; // Too close to target, avoid over-correction
@@ -124,7 +208,8 @@ export class IKAngleConstraint extends IKConstraint {
     const axis = Vector3.cross(incomingNorm, outgoingNorm, new Vector3());
     const axisLen = axis.magnitude;
 
-    if (axisLen < 0.001) {
+    // Use a smaller threshold to allow constraint to work at small angles
+    if (axisLen < 0.0001) {
       return; // Vectors are too close to parallel or anti-parallel
     }
 
@@ -135,17 +220,9 @@ export class IKAngleConstraint extends IKConstraint {
     const currentAngleRad = currentAngleDeg * (Math.PI / 180);
     let deltaAngle = targetAngleRad - currentAngleRad;
 
-    // Clamp the maximum angle change per iteration to prevent violent oscillation
-    // This is especially important during "cold start" (first application or after pause)
-    const maxAngleChangeRad = (5.0 * Math.PI) / 180; // 5 degrees max per iteration
-    if (Math.abs(deltaAngle) > maxAngleChangeRad) {
-      deltaAngle = Math.sign(deltaAngle) * maxAngleChangeRad;
-    }
-
-    // Apply damping to reduce oscillation: only apply a fraction of the correction
-    // Use stronger damping for hard constraints
-    const dampingFactor = isHardConstraint ? 0.5 : 0.7;
-    deltaAngle *= dampingFactor;
+    // Apply full correction without damping to ensure constraints are enforced
+    // This is necessary because FABRIK will try to undo the constraint in the next iteration
+    // So we need strong constraint enforcement
 
     // Rotate the outgoing bone vector around the axis by deltaAngle
     const cos = Math.cos(deltaAngle);
@@ -169,9 +246,13 @@ export class IKAngleConstraint extends IKConstraint {
       outgoingNorm.y * (axis.z * axis.y * oneMinusCos + axis.x * sin) +
       outgoingNorm.z * (cos + axis.z * axis.z * oneMinusCos);
 
-    // Update child position using the rotated bone vector
-    const boneLength = currentJoint.boneLength;
+    // Update target joint position using the rotated bone vector
+    const boneLength = pivotJoint.boneLength;
     rotated.scaleBy(boneLength);
-    Vector3.add(currentJoint.position, rotated, childJoint.position);
+    Vector3.add(pivotJoint.position, rotated, targetJoint.position);
+
+    // Note: We do NOT recursively update subsequent joints here.
+    // Instead, we let FABRIK algorithm handle the propagation in subsequent iterations.
+    // This ensures that each joint's constraint is properly applied.
   }
 }

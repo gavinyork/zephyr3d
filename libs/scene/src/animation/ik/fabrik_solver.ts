@@ -62,14 +62,8 @@ export class FABRIKSolver extends IKSolver {
       // Forward pass: end effector to root
       this._forwardPass(target);
 
-      // Apply constraints after forward pass
-      this._chain.applyConstraints();
-
-      // Backward pass: root to end effector
+      // Backward pass: root to end effector (constraints are applied within the pass)
       this._backwardPass(rootPos);
-
-      // Apply constraints after backward pass
-      this._chain.applyConstraints();
     }
 
     return converged;
@@ -123,6 +117,7 @@ export class FABRIKSolver extends IKSolver {
   /**
    * Forward pass: move from end effector toward root.
    * Each joint is pulled toward its child, maintaining bone length.
+   * Constraints are applied immediately after each joint adjustment.
    *
    * @param target - Target position for end effector
    */
@@ -147,12 +142,20 @@ export class FABRIKSolver extends IKSolver {
         Vector3.scale(direction, joint.boneLength, direction);
         Vector3.add(childJoint.position, direction, joint.position);
       }
+
+      // Apply constraints immediately after adjusting this joint
+      // This ensures constraints are integrated into the FABRIK algorithm
+      if (i > 0) {
+        // Apply constraints for joint i (not for root joint)
+        this._applyConstraintsForJoint(i);
+      }
     }
   }
 
   /**
    * Backward pass: move from root toward end effector.
    * Each joint is pulled toward its parent, maintaining bone length.
+   * Constraints are applied immediately after each joint adjustment.
    *
    * @param rootPos - Original root position to restore
    */
@@ -176,6 +179,25 @@ export class FABRIKSolver extends IKSolver {
         // Place child at correct distance from current joint
         Vector3.scale(direction, joint.boneLength, direction);
         Vector3.add(joint.position, direction, childJoint.position);
+      }
+
+      // Apply constraints immediately after adjusting this joint
+      // This ensures constraints are integrated into the FABRIK algorithm
+      this._applyConstraintsForJoint(i + 1);
+    }
+  }
+
+  /**
+   * Apply constraints for a specific joint.
+   * This is called during the backward pass to integrate constraints into FABRIK.
+   *
+   * @param jointIndex - Index of the joint to apply constraints to
+   */
+  private _applyConstraintsForJoint(jointIndex: number): void {
+    const constraints = this._chain.constraints;
+    for (const constraint of constraints) {
+      if (constraint.jointIndex === jointIndex) {
+        constraint.apply(this._chain.joints);
       }
     }
   }
