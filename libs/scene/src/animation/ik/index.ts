@@ -6,6 +6,7 @@
  * It includes:
  * - FABRIK solver for multi-joint chains
  * - Two Bone IK solver for 2-bone chains (arms, legs)
+ * - CCD solver for flexible chains (tentacles, tails)
  * - Constraint system (angle limits, pole vectors)
  * - Integration with AnimationTrack system
  *
@@ -17,6 +18,7 @@ export { IKChain } from './ik_chain';
 export { IKSolver } from './ik_solver';
 export { FABRIKSolver } from './fabrik_solver';
 export { TwoBoneIKSolver } from './two_bone_ik_solver';
+export { CCDSolver } from './ccd_solver';
 export { IKConstraint } from './ik_constraint';
 export { IKAngleConstraint } from './ik_angle_constraint';
 export { IKPoleVectorConstraint } from './ik_pole_constraint';
