@@ -21,5 +21,4 @@ export { TwoBoneIKSolver } from './two_bone_ik_solver';
 export { CCDSolver } from './ccd_solver';
 export { IKConstraint } from './ik_constraint';
 export { IKAngleConstraint } from './ik_angle_constraint';
-export { IKPoleVectorConstraint } from './ik_pole_constraint';
 export { IKTrack } from './ik_track';

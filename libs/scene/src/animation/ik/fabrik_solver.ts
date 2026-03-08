@@ -4,6 +4,16 @@ import type { IKChain } from './ik_chain';
 import { IKUtils } from './ik_utils';
 
 /**
+ * Pole vector configuration for a specific joint.
+ */
+interface PoleVectorConfig {
+  /** Pole vector position in world space */
+  position: Vector3;
+  /** Weight of the pole vector constraint (0-1) */
+  weight: number;
+}
+
+/**
  * FABRIK (Forward And Backward Reaching Inverse Kinematics) solver.
  *
  * @remarks
@@ -11,9 +21,14 @@ import { IKUtils } from './ik_utils';
  * 1. Forward pass: Move from end effector to root, pulling joints toward target
  * 2. Backward pass: Move from root to end effector, restoring root position
  *
+ * Supports multiple pole vectors to control the bending direction of different joints.
+ *
  * @public
  */
 export class FABRIKSolver extends IKSolver {
+  /** Map of joint index to pole vector configuration */
+  private _poleVectors: Map<number, PoleVectorConfig>;
+
   /**
    * Create a FABRIK solver.
    *
@@ -23,6 +38,69 @@ export class FABRIKSolver extends IKSolver {
    */
   constructor(chain: IKChain, maxIterations = 15, tolerance = 0.001) {
     super(chain, maxIterations, tolerance);
+    this._poleVectors = new Map();
+  }
+
+  /**
+   * Set pole vector for a specific joint.
+   *
+   * @param jointIndex - Index of the joint to apply pole vector to
+   * @param poleVector - Pole vector position in world space
+   * @param weight - Weight of the pole vector constraint (0-1, default: 1)
+   */
+  setPoleVector(jointIndex: number, poleVector: Vector3, weight = 1): void {
+    if (jointIndex < 0 || jointIndex >= this._chain.joints.length) {
+      throw new Error(`Invalid joint index: ${jointIndex}`);
+    }
+
+    this._poleVectors.set(jointIndex, {
+      position: poleVector.clone(),
+      weight: Math.max(0, Math.min(1, weight))
+    });
+  }
+
+  /**
+   * Remove pole vector for a specific joint.
+   *
+   * @param jointIndex - Index of the joint to remove pole vector from
+   * @returns True if a pole vector was removed, false if none existed
+   */
+  removePoleVector(jointIndex: number): boolean {
+    return this._poleVectors.delete(jointIndex);
+  }
+
+  /**
+   * Clear all pole vectors.
+   */
+  clearPoleVectors(): void {
+    this._poleVectors.clear();
+  }
+
+  /**
+   * Get pole vector configuration for a specific joint.
+   *
+   * @param jointIndex - Index of the joint
+   * @returns Pole vector configuration or undefined if not set
+   */
+  getPoleVector(jointIndex: number): { position: Vector3; weight: number } | undefined {
+    const config = this._poleVectors.get(jointIndex);
+    if (config) {
+      return {
+        position: config.position.clone(),
+        weight: config.weight
+      };
+    }
+    return undefined;
+  }
+
+  /**
+   * Check if a joint has a pole vector.
+   *
+   * @param jointIndex - Index of the joint
+   * @returns True if the joint has a pole vector
+   */
+  hasPoleVector(jointIndex: number): boolean {
+    return this._poleVectors.has(jointIndex);
   }
 
   /**
@@ -189,16 +267,115 @@ export class FABRIKSolver extends IKSolver {
 
   /**
    * Apply constraints for a specific joint.
-   * This is called during the backward pass to integrate constraints into FABRIK.
+   * This is called during the FABRIK passes to integrate constraints into the algorithm.
    *
    * @param jointIndex - Index of the joint to apply constraints to
    */
   private _applyConstraintsForJoint(jointIndex: number): void {
     const constraints = this._chain.constraints;
+
+    // Apply non-pole-vector constraints
+    // IKPoleVectorConstraint is deprecated and ignored in favor of built-in pole vectors
     for (const constraint of constraints) {
       if (constraint.jointIndex === jointIndex) {
+        // Skip IKPoleVectorConstraint - use built-in pole vectors instead
+        if (constraint.constructor.name === 'IKPoleVectorConstraint') {
+          continue;
+        }
         constraint.apply(this._chain.joints);
       }
+    }
+
+    // Apply built-in pole vector if configured for this joint
+    const poleConfig = this._poleVectors.get(jointIndex);
+    if (poleConfig && poleConfig.weight > 0.001) {
+      this._applyPoleVectorTwist(jointIndex, poleConfig.position, poleConfig.weight);
+    }
+  }
+
+  /**
+   * Apply pole vector twist to a specific joint.
+   *
+   * @remarks
+   * This method adjusts the joint position to align with the pole vector.
+   * It uses the same algorithm as IKPoleVectorConstraint but is integrated
+   * into the solver for better performance and control.
+   *
+   * @param jointIndex - Index of the pole joint
+   * @param poleVector - Pole vector position in world space
+   * @param weight - Weight of the pole vector constraint (0-1)
+   */
+  private _applyPoleVectorTwist(jointIndex: number, poleVector: Vector3, weight: number): void {
+    const joints = this._chain.joints;
+
+    // We need at least 3 joints to apply pole vector (parent, pole joint, child)
+    if (jointIndex < 1 || jointIndex >= joints.length - 1) {
+      return;
+    }
+
+    const parentJoint = joints[jointIndex - 1];
+    const currentJoint = joints[jointIndex];
+    const childJoint = joints[jointIndex + 1];
+
+    const parentPos = parentJoint.position;
+    const currentPos = currentJoint.position;
+    const childPos = childJoint.position;
+
+    // Calculate the plane defined by parent, child, and pole vector
+    // Vector from parent to child (the "line" we're bending around)
+    const parentToChild = Vector3.sub(childPos, parentPos, new Vector3());
+    const lineLength = parentToChild.magnitude;
+
+    if (lineLength < 0.000001) {
+      return; // Parent and child are at same position
+    }
+
+    const lineDir = Vector3.scale(parentToChild, 1 / lineLength, new Vector3());
+
+    // Project current joint onto the parent-child line
+    const parentToCurrent = Vector3.sub(currentPos, parentPos, new Vector3());
+    const projectionLength = Vector3.dot(parentToCurrent, lineDir);
+    const projectionPoint = Vector3.scale(lineDir, projectionLength, new Vector3());
+    Vector3.add(parentPos, projectionPoint, projectionPoint);
+
+    // Vector from projection point to current joint (perpendicular to line)
+    const perpendicular = Vector3.sub(currentPos, projectionPoint, new Vector3());
+    const perpLength = perpendicular.magnitude;
+
+    if (perpLength < 0.000001) {
+      return; // Current joint is on the line
+    }
+
+    // Calculate desired direction toward pole vector
+    const parentToPole = Vector3.sub(poleVector, parentPos, new Vector3());
+    const poleProjectionLength = Vector3.dot(parentToPole, lineDir);
+    const poleProjectionPoint = Vector3.scale(lineDir, poleProjectionLength, new Vector3());
+    Vector3.add(parentPos, poleProjectionPoint, poleProjectionPoint);
+
+    // Direction from projection to pole (perpendicular to line)
+    const poleDirection = Vector3.sub(poleVector, poleProjectionPoint, new Vector3());
+    const poleDirLength = poleDirection.magnitude;
+
+    if (poleDirLength < 0.000001) {
+      return; // Pole is on the line
+    }
+
+    poleDirection.scaleBy(1 / poleDirLength);
+
+    // Calculate new position for current joint
+    // Keep the same distance from the line, but rotate toward pole direction
+    const desiredPerpendicular = Vector3.scale(poleDirection, perpLength, new Vector3());
+    const newPosition = Vector3.add(projectionPoint, desiredPerpendicular, new Vector3());
+
+    // Apply weight (blend between original and constrained position)
+    if (weight < 0.999) {
+      const blended = new Vector3();
+      blended.x = currentPos.x + (newPosition.x - currentPos.x) * weight;
+      blended.y = currentPos.y + (newPosition.y - currentPos.y) * weight;
+      blended.z = currentPos.z + (newPosition.z - currentPos.z) * weight;
+      currentJoint.position.set(blended);
+    } else {
+      currentJoint.position.set(newPosition);
     }
   }
 
