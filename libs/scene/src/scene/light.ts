@@ -3,7 +3,12 @@ import { Vector3, Vector4, DWeakRef, AABB } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import { BoundingBox } from '../utility/bounding_volume';
 import { ShadowMapper } from '../shadow/shadowmapper';
-import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
+import {
+  LIGHT_TYPE_DIRECTIONAL,
+  LIGHT_TYPE_POINT,
+  LIGHT_TYPE_SPOT,
+  LIGHT_TYPE_RECT
+} from '../values';
 import type { Scene } from './scene';
 
 /**
@@ -21,6 +26,8 @@ export abstract class BaseLight extends GraphNode {
   protected _directionCutoff: Nullable<Vector4>;
   /** @internal */
   protected _diffuseIntensity: Nullable<Vector4>;
+  /** @internal */
+  protected _extraParams: Nullable<Vector4>;
   /**
    * Creates a light node
    * @param scene - The scene to which the light node belongs
@@ -33,6 +40,7 @@ export abstract class BaseLight extends GraphNode {
     this._positionRange = null;
     this._directionCutoff = null;
     this._diffuseIntensity = null;
+    this._extraParams = null;
   }
   /** Gets the light type */
   get lightType() {
@@ -85,6 +93,18 @@ export abstract class BaseLight extends GraphNode {
     return this._diffuseIntensity!;
   }
   /**
+   * Extra parameters of the light
+   *
+   * @remarks
+   * Custom data for advanced light types.
+   */
+  get extraParams() {
+    if (!this._extraParams) {
+      this.computeUniforms();
+    }
+    return this._extraParams!;
+  }
+  /**
    * View matrix of the light
    *
    * @remarks
@@ -111,6 +131,7 @@ export abstract class BaseLight extends GraphNode {
     this._positionRange = null;
     this._directionCutoff = null;
     this._diffuseIntensity = null;
+    this._extraParams = null;
   }
   /** {@inheritDoc SceneNode.isLight} */
   isLight(): this is BaseLight {
@@ -130,6 +151,10 @@ export abstract class BaseLight extends GraphNode {
   }
   /** returns true if this is a spot light */
   isSpotLight(): this is SpotLight {
+    return false;
+  }
+  /** returns true if this is a rect light */
+  isRectLight(): this is RectLight {
     return false;
   }
   /** @internal */
@@ -306,6 +331,7 @@ export class DirectionalLight extends PunctualLight {
     this._positionRange = new Vector4(a.x, a.y, a.z, -1);
     this._directionCutoff = new Vector4(b.x, b.y, b.z, 0);
     this._diffuseIntensity = new Vector4(this.color.x, this.color.y, this.color.z, this.intensity);
+    this._extraParams = new Vector4(0, 0, 0, this.lightType);
   }
   // adapt from DXSDK
   /*
@@ -549,6 +575,7 @@ export class PointLight extends PunctualLight {
     this._positionRange = new Vector4(a.x, a.y, a.z, this.range);
     this._directionCutoff = new Vector4(b.x, b.y, b.z, -1);
     this._diffuseIntensity = new Vector4(this.color.x, this.color.y, this.color.z, this.intensity);
+    this._extraParams = new Vector4(0, 0, 0, this.lightType);
   }
 }
 
@@ -636,5 +663,121 @@ export class SpotLight extends PunctualLight {
     this._positionRange = new Vector4(a.x, a.y, a.z, this.range);
     this._directionCutoff = new Vector4(b.x, b.y, b.z, this.cutoff);
     this._diffuseIntensity = new Vector4(this.color.x, this.color.y, this.color.z, this.intensity);
+    this._extraParams = new Vector4(0, 0, 0, this.lightType);
+  }
+}
+
+/**
+ * Rectangular area light
+ * @public
+ */
+export class RectLight extends PunctualLight {
+  /** @internal */
+  protected _range: number;
+  /** @internal */
+  protected _width: number;
+  /** @internal */
+  protected _height: number;
+  /**
+   * Creates an instance of rect light
+   * @param scene - The scene to which the light belongs
+   */
+  constructor(scene: Scene) {
+    super(scene, LIGHT_TYPE_RECT);
+    this._range = 10;
+    this._width = 1;
+    this._height = 1;
+    this.invalidateBoundingVolume();
+  }
+  /** The range of the light */
+  get range() {
+    return this._range;
+  }
+  set range(val: number) {
+    this.setRange(val);
+  }
+  /**
+   * Sets the range of the light
+   * @param val - The value to set
+   * @returns self
+   */
+  setRange(val: number) {
+    val = val < 0 ? 0 : val;
+    if (this._range !== val) {
+      this._range = val;
+      this.invalidateUniforms();
+      this.invalidateBoundingVolume();
+    }
+    return this;
+  }
+  /** The width of the light */
+  get width() {
+    return this._width;
+  }
+  set width(val: number) {
+    this.setWidth(val);
+  }
+  /**
+   * Sets the width of the light
+   * @param val - The value to set
+   * @returns self
+   */
+  setWidth(val: number) {
+    val = val < 0 ? 0 : val;
+    if (this._width !== val) {
+      this._width = val;
+      this.invalidateUniforms();
+      this.invalidateBoundingVolume();
+    }
+    return this;
+  }
+  /** The height of the light */
+  get height() {
+    return this._height;
+  }
+  set height(val: number) {
+    this.setHeight(val);
+  }
+  /**
+   * Sets the height of the light
+   * @param val - The value to set
+   * @returns self
+   */
+  setHeight(val: number) {
+    val = val < 0 ? 0 : val;
+    if (this._height !== val) {
+      this._height = val;
+      this.invalidateUniforms();
+      this.invalidateBoundingVolume();
+    }
+    return this;
+  }
+  /**
+   * {@inheritDoc BaseLight.isRectLight}
+   * @override
+   */
+  isRectLight(): this is RectLight {
+    return true;
+  }
+  /**
+   * Rect light supports shadow in current pipeline
+   */
+  /** @internal */
+  computeBoundingVolume() {
+    const bbox = new BoundingBox();
+    const r = this._range;
+    bbox.minPoint = new Vector3(-r, -r, -r);
+    bbox.maxPoint = new Vector3(r, r, r);
+    return bbox;
+  }
+  /** @internal */
+  computeUniforms() {
+    const pos = this.worldMatrix.getRow(3);
+    const axisX = this.worldMatrix.getRow(0).inplaceNormalize().scaleBy(this._width * 0.5);
+    const axisY = this.worldMatrix.getRow(1).inplaceNormalize().scaleBy(this._height * 0.5);
+    this._positionRange = new Vector4(pos.x, pos.y, pos.z, this.range);
+    this._directionCutoff = new Vector4(axisX.x, axisX.y, axisX.z, 0);
+    this._diffuseIntensity = new Vector4(this.color.x, this.color.y, this.color.z, this.intensity);
+    this._extraParams = new Vector4(axisY.x, axisY.y, axisY.z, this.lightType);
   }
 }

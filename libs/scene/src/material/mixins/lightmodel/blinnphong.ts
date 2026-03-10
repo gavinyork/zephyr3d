@@ -109,7 +109,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
               this.$l.diffuseColor = pb.vec3(0);
             }
             this.$l.specularColor = pb.vec3(0);
-            that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
+            that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, _extra, shadow) {
               this.$l.lightAtten = that.calculateLightAttenuation(
                 this,
                 type,

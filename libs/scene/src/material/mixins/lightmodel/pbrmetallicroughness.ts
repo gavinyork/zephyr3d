@@ -11,7 +11,7 @@ import { Vector4 } from '@zephyr3d/base';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
 import { ShaderHelper } from '../../shader/helper';
-import { MaterialVaryingFlags } from '../../../values';
+import { LIGHT_TYPE_RECT, MaterialVaryingFlags } from '../../../values';
 
 /**
  * Interface for PBRMetallicRoughness lighting model mixin
@@ -153,31 +153,46 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
           } else {
             that.indirectLighting(this, this.normal, this.viewVec, this.pbrData, this.lightingColor);
           }
-          that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
-            this.$l.diffuse = pb.vec3();
-            this.$l.specular = pb.vec3();
-            this.$l.lightAtten = that.calculateLightAttenuation(
-              this,
-              type,
-              this.worldPos,
-              posRange,
-              dirCutoff
-            );
-            this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
-            this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
-            this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
-            if (shadow) {
-              this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.worldPos, this.NoL));
-            }
-            that.directLighting(
-              this,
-              this.lightDir,
-              this.lightColor,
-              this.normal,
-              this.viewVec,
-              this.pbrData,
-              this.lightingColor
-            );
+          that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
+            this.$if(pb.equal(type, LIGHT_TYPE_RECT), function () {
+              that.directRectLight(
+                this,
+                this.worldPos,
+                this.normal,
+                this.viewVec,
+                this.pbrData,
+                posRange,
+                dirCutoff,
+                extra,
+                colorIntensity,
+                this.lightingColor
+              );
+            }).$else(function () {
+              this.$l.diffuse = pb.vec3();
+              this.$l.specular = pb.vec3();
+              this.$l.lightAtten = that.calculateLightAttenuation(
+                this,
+                type,
+                this.worldPos,
+                posRange,
+                dirCutoff
+              );
+              this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
+              this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
+              this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
+              if (shadow) {
+                this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.worldPos, this.NoL));
+              }
+              that.directLighting(
+                this,
+                this.lightDir,
+                this.lightColor,
+                this.normal,
+                this.viewVec,
+                this.pbrData,
+                this.lightingColor
+              );
+            });
           });
           this.$return(pb.add(this.lightingColor, this.emissiveColor));
         }
