@@ -24,3 +24,5 @@ export * from './mixins/lit';
 export * from './mixins/texture';
 export * from './mixins/vertexcolor';
 export * from './mixins/foliage';
+// 自定义
+export * from './Custom_Scattering';

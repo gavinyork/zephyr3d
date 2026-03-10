@@ -82,6 +82,7 @@ export class ShaderHelper {
     positionAndRange: new Vector4(),
     directionAndCutoff: new Vector4(),
     diffuseAndIntensity: new Vector4(),
+    extraParams: new Vector4(),
     cascadeDistances: new Vector4(),
     depthBiasValues: new Vector4(),
     shadowCameraParams: new Vector4(),
@@ -240,6 +241,7 @@ export class ShaderHelper {
             pb.vec4('positionAndRange'),
             pb.vec4('directionAndCutoff'),
             pb.vec4('diffuseAndIntensity'),
+            pb.vec4('extraParams'),
             pb.vec4('cascadeDistances'),
             pb.vec4('depthBiasValues'),
             pb.vec4('shadowCameraParams'),
@@ -257,7 +259,7 @@ export class ShaderHelper {
       scope.camera = cameraStruct().uniform(0);
       scope.light = lightStruct().uniform(0);
       if (useClusteredLighting) {
-        scope[UNIFORM_NAME_LIGHT_BUFFER] = pb.vec4[(MAX_CLUSTERED_LIGHTS + 1) * 3]().uniformBuffer(0);
+        scope[UNIFORM_NAME_LIGHT_BUFFER] = pb.vec4[(MAX_CLUSTERED_LIGHTS + 1) * 4]().uniformBuffer(0);
         scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE] = (
           pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D()
         ).uniform(0);
@@ -896,6 +898,7 @@ export class ShaderHelper {
     this._lightUniformShadow.positionAndRange.set(light.positionAndRange);
     this._lightUniformShadow.directionAndCutoff.set(light.directionAndCutoff);
     this._lightUniformShadow.diffuseAndIntensity.set(light.diffuseAndIntensity);
+    this._lightUniformShadow.extraParams.set(light.extraParams);
     this._lightUniformShadow.cascadeDistances.set(shadowMapParams.cascadeDistances);
     this._lightUniformShadow.depthBiasValues.set(shadowMapParams.depthBiasValues[0]);
     this._lightUniformShadow.shadowCameraParams.set(shadowMapParams.cameraParams);
@@ -1232,21 +1235,28 @@ export class ShaderHelper {
     scope: PBInsideFunctionScope,
     lightIndex: PBShaderExp | number
   ): PBShaderExp {
-    return scope[UNIFORM_NAME_LIGHT_BUFFER].at(scope.$builder.mul(lightIndex, 3));
+    return scope[UNIFORM_NAME_LIGHT_BUFFER].at(scope.$builder.mul(lightIndex, 4));
   }
   /** @internal */
   static getLightDirectionAndCutoff(
     scope: PBInsideFunctionScope,
     lightIndex: PBShaderExp | number
   ): PBShaderExp {
-    return scope[UNIFORM_NAME_LIGHT_BUFFER].at(scope.$builder.add(scope.$builder.mul(lightIndex, 3), 1));
+    return scope[UNIFORM_NAME_LIGHT_BUFFER].at(scope.$builder.add(scope.$builder.mul(lightIndex, 4), 1));
   }
   /** @internal */
   static getLightColorAndIntensity(
     scope: PBInsideFunctionScope,
     lightIndex: PBShaderExp | number
   ): PBShaderExp {
-    return scope[UNIFORM_NAME_LIGHT_BUFFER].at(scope.$builder.add(scope.$builder.mul(lightIndex, 3), 2));
+    return scope[UNIFORM_NAME_LIGHT_BUFFER].at(scope.$builder.add(scope.$builder.mul(lightIndex, 4), 2));
+  }
+  /** @internal */
+  static getLightExtra(
+    scope: PBInsideFunctionScope,
+    lightIndex: PBShaderExp | number
+  ): PBShaderExp {
+    return scope[UNIFORM_NAME_LIGHT_BUFFER].at(scope.$builder.add(scope.$builder.mul(lightIndex, 4), 3));
   }
   /**
    * Sets the clip space position in vertex shader

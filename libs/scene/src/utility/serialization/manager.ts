@@ -9,7 +9,8 @@ import {
   getPunctualLightClass,
   getDirectionalLightClass,
   getSpotLightClass,
-  getPointLightClass
+  getPointLightClass,
+  getRectLightClass
 } from './scene/light';
 import {
   getMeshMaterialClass,
@@ -22,7 +23,11 @@ import {
   getPBRBluePrintMaterialClass,
   getSpriteMaterialClass,
   getSpriteBlueprintMaterialClass,
-  getStandardSpriteMaterialClass
+  getStandardSpriteMaterialClass,
+
+  //自定义
+  getCustomScatteringMaterialClass,
+  
 } from './scene/material';
 import { getMeshClass } from './scene/mesh';
 import { getParticleNodeClass } from './scene/particle';
@@ -272,6 +277,7 @@ export class ResourceManager {
         getDirectionalLightClass(),
         getSpotLightClass(),
         getPointLightClass(),
+        getRectLightClass(),
         getCameraClass(),
         getPerspectiveCameraClass(),
         getOrthoCameraClass(),
@@ -288,6 +294,10 @@ export class ResourceManager {
         ...getParticleMaterialClass(this),
         ...getSpriteMaterialClass(this),
         ...getStandardSpriteMaterialClass(this),
+
+        //自定义
+        ...getCustomScatteringMaterialClass(this),
+
         getBoxShapeClass(),
         getBoxFrameShapeClass(),
         getSphereShapeClass(),
