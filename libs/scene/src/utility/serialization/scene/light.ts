@@ -1,5 +1,5 @@
 import type { BaseLight } from '../../../scene/light';
-import { DirectionalLight, PointLight, PunctualLight, SpotLight } from '../../../scene/light';
+import { DirectionalLight, PointLight, PunctualLight, RectLight, SpotLight } from '../../../scene/light';
 import { defineProps, type SerializableClass } from '../types';
 import { AABB, degree2radian, radian2degree, Vector4 } from '@zephyr3d/base';
 import { ClipmapTerrain, Mesh, SceneNode } from '../../../scene';
@@ -514,6 +514,72 @@ export function getSpotLightClass(): SerializableClass {
           },
           set(this: SpotLight, value) {
             this.cutoff = Math.cos(degree2radian(value.num[0]) * 0.5);
+          }
+        }
+      ]);
+    }
+  };
+}
+
+/** @internal */
+export function getRectLightClass(): SerializableClass {
+  return {
+    ctor: RectLight,
+    name: 'RectLight',
+    parent: PunctualLight,
+    createFunc(ctx: SceneNode) {
+      const node = new RectLight(ctx.scene!);
+      node.parent = ctx;
+      return { obj: node };
+    },
+    getProps() {
+      return defineProps([
+        {
+          name: 'Range',
+          type: 'float',
+          default: 10,
+          options: {
+            animatable: true,
+            minValue: 0,
+            maxValue: 1000
+          },
+          get(this: RectLight, value) {
+            value.num[0] = this.range;
+          },
+          set(this: RectLight, value) {
+            this.range = value.num[0];
+          }
+        },
+        {
+          name: 'Width',
+          type: 'float',
+          default: 1,
+          options: {
+            animatable: true,
+            minValue: 0,
+            maxValue: 1000
+          },
+          get(this: RectLight, value) {
+            value.num[0] = this.width;
+          },
+          set(this: RectLight, value) {
+            this.width = value.num[0];
+          }
+        },
+        {
+          name: 'Height',
+          type: 'float',
+          default: 1,
+          options: {
+            animatable: true,
+            minValue: 0,
+            maxValue: 1000
+          },
+          get(this: RectLight, value) {
+            value.num[0] = this.height;
+          },
+          set(this: RectLight, value) {
+            this.height = value.num[0];
           }
         }
       ]);

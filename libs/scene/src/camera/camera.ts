@@ -26,6 +26,7 @@ import { MotionBlur } from '../posteffect/motionblur';
 import { getDevice } from '../app/api';
 import type { ScreenConfig } from '../app/screen';
 import { ScreenAdapter } from '../app/screen';
+import {ABufferOIT} from '../render/abuffer_oit'
 
 /**
  * Result of a camera picking operation.
@@ -269,7 +270,7 @@ export class Camera extends SceneNode {
     this._clipMask = 0;
     this._frustum = null;
     this._frustumV = null;
-    this._oit = new DRef();
+    this._oit = new DRef(new ABufferOIT(20));  //修改摄像机属性
     this._depthPrePass = false;
     this._screenAdapter = new ScreenAdapter();
     this._adapted = false;

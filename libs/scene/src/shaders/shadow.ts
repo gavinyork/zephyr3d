@@ -1,6 +1,6 @@
 import type { TextureFormat, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { hasDepthChannel } from '@zephyr3d/device';
-import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
+import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_RECT, LIGHT_TYPE_SPOT } from '../values';
 import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from './misc';
 import { ShaderHelper } from '../material/shader/helper';
 import { interleavedGradientNoise } from './noise';
@@ -145,11 +145,14 @@ export function computeShadowMapDepth(
     } else {
       this.$l.depth = pb.float();
       this.$l.lightType = ShaderHelper.getLightTypeForShadow(this);
-      this.$if(pb.equal(this.lightType, LIGHT_TYPE_DIRECTIONAL), function () {
-        this.depth = pb.emulateDepthClamp
-          ? pb.clamp(this.$inputs.clamppedDepth, 0, 1)
-          : this.$builtins.fragCoord.z;
-      })
+      this.$if(
+        pb.or(pb.equal(this.lightType, LIGHT_TYPE_DIRECTIONAL), pb.equal(this.lightType, LIGHT_TYPE_RECT)),
+        function () {
+          this.depth = pb.emulateDepthClamp
+            ? pb.clamp(this.$inputs.clamppedDepth, 0, 1)
+            : this.$builtins.fragCoord.z;
+        }
+      )
         .$elseif(pb.equal(this.lightType, LIGHT_TYPE_POINT), function () {
           this.$l.lightSpacePos = pb.mul(
             ShaderHelper.getLightViewMatrixForShadow(this),
