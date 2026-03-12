@@ -9,3 +9,4 @@ export * from './proptrack';
 export * from './morphtrack';
 export * from './skeleton';
 export * from './ik';
+export * from './spring';
