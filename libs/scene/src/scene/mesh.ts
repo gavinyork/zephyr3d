@@ -135,7 +135,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   set skeletonName(name) {
     if (name !== this._skeletonName) {
       this._skeletonName = name;
-      this.updateSkeletonState();
+      this.updateSkeletonState(0);
     }
   }
   /** @internal */
@@ -409,7 +409,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** {@inheritDoc SceneNode.update} */
   update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {
     super.update(frameId, elapsedInSeconds, deltaInSeconds);
-    this.updateSkeletonState();
+    this.updateSkeletonState(deltaInSeconds);
     this.updateMorphState();
   }
   /**
@@ -455,7 +455,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     }
   }
   /** @internal */
-  private updateSkeletonState() {
+  private updateSkeletonState(deltaTime: number) {
     if (this._skeletonName) {
       const skeleton = this.findSkeletonById(this._skeletonName);
       if (skeleton?.playing) {
@@ -465,7 +465,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
       } else if (skeleton) {
         const prefab = this.getPrefabNode();
         if (prefab) {
-          skeleton.computeBindPose(prefab);
+          skeleton.computeBindPose(prefab, deltaTime);
           this.setBoneMatrices(skeleton.jointTexture);
           skeleton.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
           this.setAnimatedBoundingBox(this._skinnedBoundingInfo!.boundingBox);

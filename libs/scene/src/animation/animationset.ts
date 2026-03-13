@@ -261,7 +261,7 @@ export class AnimationSet extends Disposable implements IDisposable {
     });
     // Update skeletons
     this._activeSkeletons.forEach((v, k) => {
-      k.apply();
+      k.apply(deltaInSeconds);
     });
   }
   /**

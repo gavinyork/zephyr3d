@@ -5,6 +5,7 @@ import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';
 import { BoundingBox } from '../utility/bounding_volume';
 import { getDevice } from '../app/api';
+import type { SkeletonPostProcessor } from './skeleton_postprocessor';
 
 /**
  * Skinned bounding box information for a submesh.
@@ -84,6 +85,10 @@ export class Skeleton extends Disposable {
   protected _jointTexture: DRef<Texture2D>;
   /** @internal */
   protected _playing: boolean;
+  /** @internal */
+  protected _postProcessors: SkeletonPostProcessor[];
+  /** @internal */
+  protected _lastUpdateTime: number;
   /**
    * Create a skeleton instance.
    *
@@ -104,6 +109,8 @@ export class Skeleton extends Disposable {
     this._bindPoseMatrices = bindPoseMatrices;
     this._jointTexture = new DRef();
     this._playing = false;
+    this._postProcessors = [];
+    this._lastUpdateTime = 0;
     if (jointTransforms) {
       this._jointTransforms = jointTransforms;
       for (let i = 0; i < jointTransforms.length; i++) {
@@ -118,7 +125,7 @@ export class Skeleton extends Disposable {
         position: joint.position.clone()
       }));
     }
-    this.updateJointMatrices();
+    this.updateJointMatrices(0);
     Skeleton._registry.set(this._id, new DWeakRef(this));
   }
   /**
@@ -198,7 +205,8 @@ export class Skeleton extends Disposable {
    * @param worldMatrix - Optional world-to-model transform applied before inverse bind.
    * @internal
    */
-  updateJointMatrices(jointTransforms?: Matrix4x4[], worldMatrix?: Matrix4x4) {
+  updateJointMatrices(deltaTime: number, jointTransforms?: Matrix4x4[], worldMatrix?: Matrix4x4) {
+    this.applyPostProcessors(deltaTime);
     if (!this._jointTexture.get()) {
       this._createJointTexture();
     }
@@ -229,8 +237,8 @@ export class Skeleton extends Disposable {
    * @param model - The model node whose world matrix provides the reference space.
    * @internal
    */
-  computeBindPose(model: SceneNode) {
-    this.updateJointMatrices(this._bindPoseMatrices, model.worldMatrix);
+  computeBindPose(model: SceneNode, deltaTime: number) {
+    this.updateJointMatrices(deltaTime, this._bindPoseMatrices, model.worldMatrix);
     this._jointOffsets[1] = this._jointOffsets[0];
     const tex = this.jointTexture;
     tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
@@ -240,21 +248,87 @@ export class Skeleton extends Disposable {
    *
    * @internal
    */
-  computeJoints() {
-    this.updateJointMatrices();
+  computeJoints(deltaTime: number) {
+    this.updateJointMatrices(deltaTime);
     const tex = this.jointTexture;
     tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
   }
   /**
-   * Apply current skeleton state to all meshes:
-   * - Updates joint matrices and uploads to the texture.
+   * Apply current skeleton state to all meshes:\n   * - Updates joint matrices and uploads to the texture.
    * - Computes animated bounding boxes per mesh in model space.
    * - Binds the joint texture to each mesh for GPU skinning.
    *
+   * @param deltaTime - Time elapsed since last frame (in seconds), used for post-processors
    * @internal
    */
-  apply() {
-    this.computeJoints();
+  apply(deltaTime: number = 0) {
+    this.computeJoints(deltaTime);
+    this.applyPostProcessors(deltaTime);
+  }
+  /**
+   * Apply all enabled post-processors in priority order.
+   *
+   * Post-processors are applied after the base animation/bind pose layer,
+   * allowing procedural modifications like IK, spring physics, or manual overrides.
+   *
+   * @param deltaTime - Time elapsed since last frame (in seconds)
+   * @internal
+   */
+  protected applyPostProcessors(deltaTime: number): void {
+    if (this._postProcessors.length === 0) {
+      return;
+    }
+
+    // Sort by priority (higher priority = applied later)
+    const sortedProcessors = this._postProcessors
+      .filter((p) => p.enabled)
+      .sort((a, b) => a.priority - b.priority);
+
+    for (const processor of sortedProcessors) {
+      processor.apply(this, deltaTime);
+    }
+  }
+  /**
+   * Add a post-processor to the skeleton.
+   *
+   * Post-processors are applied after the base animation/bind pose layer.
+   * They are executed in priority order (lower priority first).
+   *
+   * @param processor - The post-processor to add
+   * @public
+   */
+  addPostProcessor(processor: SkeletonPostProcessor): void {
+    if (!this._postProcessors.includes(processor)) {
+      this._postProcessors.push(processor);
+    }
+  }
+  /**
+   * Remove a post-processor from the skeleton.
+   *
+   * @param processor - The post-processor to remove
+   * @public
+   */
+  removePostProcessor(processor: SkeletonPostProcessor): void {
+    const index = this._postProcessors.indexOf(processor);
+    if (index >= 0) {
+      this._postProcessors.splice(index, 1);
+    }
+  }
+  /**
+   * Remove all post-processors from the skeleton.
+   *
+   * @public
+   */
+  clearPostProcessors(): void {
+    this._postProcessors = [];
+  }
+  /**
+   * Get all post-processors attached to this skeleton.
+   *
+   * @public
+   */
+  getPostProcessors(): readonly SkeletonPostProcessor[] {
+    return this._postProcessors;
   }
   /**
    * Reset all meshes to an unskinned state and clear animated bounds.
