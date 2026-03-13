@@ -1,6 +1,6 @@
 # Spring Physics System
 
-A particle-spring based physics simulation system for Zephyr3D, designed for hair and cloth effects.
+A particle-spring based physics simulation system for Zephyr3D, designed for hair, cloth, and multi-chain effects.
 
 ## Overview
 
@@ -27,13 +27,22 @@ Manages a collection of particles and constraints:
 - Merge multiple chains together
 
 ### SpringSystem
-The physics engine that:
+The physics engine for single chains that:
 - Performs Verlet integration
 - Solves constraints iteratively
 - Applies external forces (gravity, wind)
 - Updates scene node rotations based on simulation
 
-## Usage Example
+### MultiChainSpringSystem
+The physics engine for multiple chains with inter-chain constraints:
+- Manages multiple SpringChain instances
+- Supports inter-chain constraints for cloth/skirt effects
+- Unified physics update loop
+- Automatic radial constraint generation
+
+## Usage Examples
+
+### Single Chain (Hair)
 
 ```typescript
 import { SpringChain, SpringSystem, Vector3 } from '@zephyr3d/scene';
@@ -55,6 +64,56 @@ scene.onUpdate = (deltaTime) => {
   springSystem.update(deltaTime);
   springSystem.applyToNodes(1.0);
 };
+```
+
+### Multiple Chains (Skirt)
+
+```typescript
+import { SpringChain, MultiChainSpringSystem, Vector3 } from '@zephyr3d/scene';
+
+// Create multiple chains for skirt segments
+const skirtSystem = new MultiChainSpringSystem({
+  iterations: 8,
+  gravity: new Vector3(0, -9.8, 0)
+});
+
+// Add 8 chains around the waist
+for (let i = 0; i < 8; i++) {
+  const chain = SpringChain.fromBoneChain(
+    skirtBones[i].root,
+    skirtBones[i].tip,
+    1,
+    { stiffness: 0.8, damping: 0.95 }
+  );
+  skirtSystem.addChain(chain);
+}
+
+// Create radial constraints between adjacent chains
+skirtSystem.createRadialConstraints({
+  stiffness: 0.6,
+  maxDistance: 0.5,
+  skipRows: 1  // Skip waist anchor points
+});
+
+// In your update loop
+scene.onUpdate = (deltaTime) => {
+  skirtSystem.update(deltaTime);
+  skirtSystem.applyToNodes(1.0);
+};
+```
+
+### Manual Inter-Chain Constraints
+
+```typescript
+// Add custom constraints between specific particles in different chains
+skirtSystem.addInterChainConstraint({
+  chainAIndex: 0,
+  chainBIndex: 1,
+  particleAIndex: 2,
+  particleBIndex: 2,
+  restLength: 0.3,
+  stiffness: 0.7
+});
 ```
 
 ## API Reference
@@ -88,6 +147,26 @@ Sets the wind force vector.
 
 ### SpringSystem.setIterations()
 Sets the number of constraint solver iterations.
+
+### MultiChainSpringSystem.addChain()
+Adds a SpringChain to the multi-chain system.
+
+**Returns:** Index of the added chain.
+
+### MultiChainSpringSystem.addInterChainConstraint()
+Adds a constraint between particles in different chains.
+
+**Parameters:**
+- `constraint`: InterChainConstraint object specifying chain indices, particle indices, rest length, and stiffness.
+
+### MultiChainSpringSystem.createRadialConstraints()
+Automatically creates constraints between adjacent chains for radial structures (skirts, capes).
+
+**Parameters:**
+- `stiffness`: Constraint stiffness [0-1]
+- `maxDistance`: Maximum distance to create constraints
+- `skipRows`: Number of rows to skip (default: 0)
+- `connectDistance`: Connect to next N chains (default: 1)
 
 ## Physics Parameters
 
@@ -150,7 +229,8 @@ Scene node rotations are calculated using:
 - `spring_particle.ts` - Particle interface and factory
 - `spring_constraint.ts` - Constraint interface and factory
 - `spring_chain.ts` - Chain management class
-- `spring_system.ts` - Physics engine
+- `spring_system.ts` - Single-chain physics engine
+- `multi_chain_spring_system.ts` - Multi-chain physics engine with inter-chain constraints
 - `index.ts` - Public API exports
 
 ## See Also

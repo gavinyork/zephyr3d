@@ -12,3 +12,6 @@ export { createSpringConstraint } from './spring_constraint';
 export { SpringChain } from './spring_chain';
 export { SpringSystem } from './spring_system';
 export type { SpringSystemOptions } from './spring_system';
+
+export { MultiChainSpringSystem } from './multi_chain_spring_system';
+export type { MultiChainSpringSystemOptions, InterChainConstraint } from './multi_chain_spring_system';
