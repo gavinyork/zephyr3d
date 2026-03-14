@@ -493,7 +493,6 @@ export function getSkeletonClass(): SerializableClass {
         inverseBindMatrices: string;
         bindPoseMatrices: string;
         bindPose: string;
-        jointTransforms: string;
         id: string;
       }
     ) {
@@ -510,10 +509,8 @@ export function getSkeletonClass(): SerializableClass {
       const bindPoseArray = new Float32Array(
         base64ToUint8Array(init.bindPose ?? init.bindPoseMatrices).buffer
       );
-      const jointTransformsArray = new Float32Array(base64ToUint8Array(init.jointTransforms).buffer);
       const inverseBindMatrices: Matrix4x4[] = [];
       const bindPose: { rotation: Quaternion; scale: Vector3; position: Vector3 }[] = [];
-      const jointTransforms: { scale: Vector3; rotation: Quaternion; position: Vector3 }[] = [];
       for (let i = 0; i < joints.length; i++) {
         inverseBindMatrices.push(new Matrix4x4(inverseBindMatricesArray.slice(i * 16, i * 16 + 16)));
         if (!init.bindPose) {
@@ -545,13 +542,8 @@ export function getSkeletonClass(): SerializableClass {
             )
           });
         }
-        jointTransforms.push({
-          position: new Vector3(jointTransformsArray.slice(i * 10 + 0, i * 10 + 3)),
-          rotation: new Quaternion(jointTransformsArray.slice(i * 10 + 3, i * 10 + 7)),
-          scale: new Vector3(jointTransformsArray.slice(i * 10 + 7, i * 10 + 10))
-        });
       }
-      const skeleton = new Skeleton(joints, inverseBindMatrices, bindPose, jointTransforms);
+      const skeleton = new Skeleton(joints, inverseBindMatrices, bindPose);
       skeleton.persistentId = init.id;
       return {
         obj: skeleton,
@@ -565,14 +557,10 @@ export function getSkeletonClass(): SerializableClass {
       const bindPose: number[] = obj.bindPose
         .map((v) => [...v.position, ...v.rotation, ...v.scale])
         .reduce((a, b) => [...a, ...b], []);
-      const jointTransforms: number[] = obj.jointTransforms
-        .map((v) => [...v.position, ...v.rotation, ...v.scale])
-        .reduce((a, b) => [...a, ...b], []);
       return {
         joints: obj.joints.map((joint) => joint.persistentId),
         inverseBindMatrices: uint8ArrayToBase64(new Uint8Array(new Float32Array(inverseBindMatrices).buffer)),
         bindPose: uint8ArrayToBase64(new Uint8Array(new Float32Array(bindPose).buffer)),
-        jointTransforms: uint8ArrayToBase64(new Uint8Array(new Float32Array(jointTransforms).buffer)),
         id: obj.persistentId
       };
     },

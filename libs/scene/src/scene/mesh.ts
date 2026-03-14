@@ -135,7 +135,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   set skeletonName(name) {
     if (name !== this._skeletonName) {
       this._skeletonName = name;
-      this.updateSkeletonState(0);
+      this.updateSkeletonState();
     }
   }
   /** @internal */
@@ -409,7 +409,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** {@inheritDoc SceneNode.update} */
   update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number) {
     super.update(frameId, elapsedInSeconds, deltaInSeconds);
-    this.updateSkeletonState(deltaInSeconds);
+    this.updateSkeletonState();
     this.updateMorphState();
   }
   /**
@@ -455,26 +455,18 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     }
   }
   /** @internal */
-  private updateSkeletonState(deltaTime: number) {
-    if (this._skeletonName) {
-      const skeleton = this.findSkeletonById(this._skeletonName);
-      if (skeleton?.playing) {
-        this.setBoneMatrices(skeleton.jointTexture);
-        skeleton.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
-        this.setAnimatedBoundingBox(this._skinnedBoundingInfo!.boundingBox);
-      } else if (skeleton) {
-        skeleton.computeBindPose(deltaTime);
-        this.setBoneMatrices(skeleton.jointTexture);
-        skeleton.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
-        this.setAnimatedBoundingBox(this._skinnedBoundingInfo!.boundingBox);
-      } else {
-        this.setBoneMatrices(null);
-        this.setAnimatedBoundingBox(null);
-      }
-      this.scene!.queueUpdateNode(this);
+  private updateSkeletonState() {
+    const skeleton = this._skeletonName && this.findSkeletonById(this._skeletonName);
+    if (skeleton) {
+      this.setBoneMatrices(skeleton.jointTexture);
+      skeleton.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
+      this.setAnimatedBoundingBox(this._skinnedBoundingInfo!.boundingBox);
     } else {
       this.setBoneMatrices(null);
       this.setAnimatedBoundingBox(null);
+    }
+    if (this._skeletonName) {
+      this.scene!.queueUpdateNode(this);
     }
   }
   /**

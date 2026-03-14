@@ -76,8 +76,6 @@ export class Skeleton extends Disposable {
   /** @internal */
   protected _jointMatrices!: Matrix4x4[];
   /** @internal */
-  protected _jointTransforms: { scale: Vector3; rotation: Quaternion; position: Vector3 }[];
-  /** @internal */
   protected _jointOffsets!: Float32Array<ArrayBuffer>;
   /** @internal */
   protected _jointMatrixArray!: Float32Array<ArrayBuffer>;
@@ -99,8 +97,7 @@ export class Skeleton extends Disposable {
   constructor(
     joints: SceneNode[],
     inverseBindMatrices: Matrix4x4[],
-    bindPose: { rotation: Quaternion; scale: Vector3; position: Vector3 }[],
-    jointTransforms?: { scale: Vector3; rotation: Quaternion; position: Vector3 }[]
+    bindPose: { rotation: Quaternion; scale: Vector3; position: Vector3 }[]
   ) {
     super();
     this._id = randomUUID();
@@ -111,20 +108,7 @@ export class Skeleton extends Disposable {
     this._playing = false;
     this._postProcessors = [];
     this._lastUpdateTime = 0;
-    if (jointTransforms) {
-      this._jointTransforms = jointTransforms;
-      for (let i = 0; i < jointTransforms.length; i++) {
-        this._joints[i].scale = jointTransforms[i].scale;
-        this._joints[i].rotation = jointTransforms[i].rotation;
-        this._joints[i].position = jointTransforms[i].position;
-      }
-    } else {
-      this._jointTransforms = this._joints.map((joint) => ({
-        scale: joint.scale.clone(),
-        rotation: joint.rotation.clone(),
-        position: joint.position.clone()
-      }));
-    }
+    this.computeBindPose();
     this.updateJointMatrices(0);
     Skeleton._registry.set(this._id, new DWeakRef(this));
   }
@@ -146,10 +130,6 @@ export class Skeleton extends Disposable {
   /** @internal */
   get joints() {
     return this._joints;
-  }
-  /** @internal */
-  get jointTransforms() {
-    return this._jointTransforms;
   }
   /** @internal */
   get inverseBindMatrices() {
@@ -226,15 +206,11 @@ export class Skeleton extends Disposable {
     }
   }
   /**
-   * Compute and upload the bind pose matrices to the joint texture for a given model.
+   * Reset skeleton to bind pose
    *
-   * - Fills the "current" ring buffer slot with bind pose transforms.
-   * - Uploads the entire matrix array to the GPU texture.
-   *
-   * @param model - The model node whose world matrix provides the reference space.
    * @internal
    */
-  computeBindPose(deltaTime: number) {
+  computeBindPose() {
     for (let i = 0; i < this._joints.length; i++) {
       const joint = this._joints[i];
       const bindpose = this._bindPose[i];
@@ -242,31 +218,16 @@ export class Skeleton extends Disposable {
       joint.rotation.set(bindpose.rotation);
       joint.scale.set(bindpose.scale);
     }
-    this.updateJointMatrices(deltaTime);
-    this._jointOffsets[1] = this._jointOffsets[0];
-    const tex = this.jointTexture;
-    tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
   }
   /**
    * Compute current joint matrices from the nodes and upload them to the joint texture.
    *
    * @internal
    */
-  computeJoints(deltaTime: number) {
+  apply(deltaTime: number) {
     this.updateJointMatrices(deltaTime);
     const tex = this.jointTexture;
     tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
-  }
-  /**
-   * Apply current skeleton state to all meshes:\n   * - Updates joint matrices and uploads to the texture.
-   * - Computes animated bounding boxes per mesh in model space.
-   * - Binds the joint texture to each mesh for GPU skinning.
-   *
-   * @param deltaTime - Time elapsed since last frame (in seconds), used for post-processors
-   * @internal
-   */
-  apply(deltaTime: number = 0) {
-    this.computeJoints(deltaTime);
   }
   /**
    * Apply all enabled post-processors in priority order.

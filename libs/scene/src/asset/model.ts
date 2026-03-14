@@ -448,9 +448,9 @@ export class AssetSkeleton extends NamedObject {
     this.joints.push(joint);
     this.inverseBindMatrices.push(inverseBindMatrix);
     this.bindPose.push({
-      position: joint.position,
-      rotation: joint.rotation,
-      scale: joint.scaling
+      position: joint.position.clone(),
+      rotation: joint.rotation.clone(),
+      scale: joint.scaling.clone()
     });
   }
 }
