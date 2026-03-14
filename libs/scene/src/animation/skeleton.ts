@@ -72,7 +72,7 @@ export class Skeleton extends Disposable {
   /** @internal */
   protected _inverseBindMatrices: Matrix4x4[];
   /** @internal */
-  protected _bindPoseMatrices: Matrix4x4[];
+  protected _bindPose: { rotation: Quaternion; scale: Vector3; position: Vector3 }[];
   /** @internal */
   protected _jointMatrices!: Matrix4x4[];
   /** @internal */
@@ -99,14 +99,14 @@ export class Skeleton extends Disposable {
   constructor(
     joints: SceneNode[],
     inverseBindMatrices: Matrix4x4[],
-    bindPoseMatrices: Matrix4x4[],
+    bindPose: { rotation: Quaternion; scale: Vector3; position: Vector3 }[],
     jointTransforms?: { scale: Vector3; rotation: Quaternion; position: Vector3 }[]
   ) {
     super();
     this._id = randomUUID();
     this._joints = joints;
     this._inverseBindMatrices = inverseBindMatrices;
-    this._bindPoseMatrices = bindPoseMatrices;
+    this._bindPose = bindPose;
     this._jointTexture = new DRef();
     this._playing = false;
     this._postProcessors = [];
@@ -156,8 +156,8 @@ export class Skeleton extends Disposable {
     return this._inverseBindMatrices;
   }
   /** @internal */
-  get bindPoseMatrices() {
-    return this._bindPoseMatrices;
+  get bindPose() {
+    return this._bindPose;
   }
   /** @internal */
   get playing() {
@@ -205,7 +205,7 @@ export class Skeleton extends Disposable {
    * @param worldMatrix - Optional world-to-model transform applied before inverse bind.
    * @internal
    */
-  updateJointMatrices(deltaTime: number, jointTransforms?: Matrix4x4[], worldMatrix?: Matrix4x4) {
+  updateJointMatrices(deltaTime: number) {
     this.applyPostProcessors(deltaTime);
     if (!this._jointTexture.get()) {
       this._createJointTexture();
@@ -218,14 +218,11 @@ export class Skeleton extends Disposable {
       this._jointOffsets[0] = this._joints.length - this._jointOffsets[0] + 2;
     }
     for (let i = 0; i < this._joints.length; i++) {
-      const mat = this._jointMatrices[i + this._jointOffsets[0] - 1];
-      const jointTransform = jointTransforms ? jointTransforms[i] : this._joints[i].worldMatrix;
-      if (worldMatrix) {
-        Matrix4x4.multiplyAffine(worldMatrix, jointTransform, mat);
-        Matrix4x4.multiply(mat, this._inverseBindMatrices[i], mat);
-      } else {
-        Matrix4x4.multiply(jointTransform, this._inverseBindMatrices[i], mat);
-      }
+      Matrix4x4.multiply(
+        this._joints[i].worldMatrix,
+        this._inverseBindMatrices[i],
+        this._jointMatrices[i + this._jointOffsets[0] - 1]
+      );
     }
   }
   /**
@@ -237,8 +234,15 @@ export class Skeleton extends Disposable {
    * @param model - The model node whose world matrix provides the reference space.
    * @internal
    */
-  computeBindPose(model: SceneNode, deltaTime: number) {
-    this.updateJointMatrices(deltaTime, this._bindPoseMatrices, model.worldMatrix);
+  computeBindPose(deltaTime: number) {
+    for (let i = 0; i < this._joints.length; i++) {
+      const joint = this._joints[i];
+      const bindpose = this._bindPose[i];
+      joint.position.set(bindpose.position);
+      joint.rotation.set(bindpose.rotation);
+      joint.scale.set(bindpose.scale);
+    }
+    this.updateJointMatrices(deltaTime);
     this._jointOffsets[1] = this._jointOffsets[0];
     const tex = this.jointTexture;
     tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
@@ -263,7 +267,6 @@ export class Skeleton extends Disposable {
    */
   apply(deltaTime: number = 0) {
     this.computeJoints(deltaTime);
-    this.applyPostProcessors(deltaTime);
   }
   /**
    * Apply all enabled post-processors in priority order.

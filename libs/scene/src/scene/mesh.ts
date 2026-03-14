@@ -463,13 +463,10 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
         skeleton.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
         this.setAnimatedBoundingBox(this._skinnedBoundingInfo!.boundingBox);
       } else if (skeleton) {
-        const prefab = this.getPrefabNode();
-        if (prefab) {
-          skeleton.computeBindPose(prefab, deltaTime);
-          this.setBoneMatrices(skeleton.jointTexture);
-          skeleton.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
-          this.setAnimatedBoundingBox(this._skinnedBoundingInfo!.boundingBox);
-        }
+        skeleton.computeBindPose(deltaTime);
+        this.setBoneMatrices(skeleton.jointTexture);
+        skeleton.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
+        this.setAnimatedBoundingBox(this._skinnedBoundingInfo!.boundingBox);
       } else {
         this.setBoneMatrices(null);
         this.setAnimatedBoundingBox(null);
