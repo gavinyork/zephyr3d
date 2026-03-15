@@ -1,6 +1,13 @@
 import { Vector3, Quaternion } from '@zephyr3d/base';
 import type { SpringChain } from './spring_chain';
 import { IKUtils } from '../ik/ik_utils';
+import type { SpringCollider } from './spring_collider';
+import {
+  resolveSphereCollision,
+  resolveCapsuleCollision,
+  resolvePlaneCollision,
+  updateColliderFromNode
+} from './spring_collider';
 
 /**
  * Options for creating a SpringSystem
@@ -32,6 +39,7 @@ export class SpringSystem {
   private _enableInertialForces: boolean;
   private _centrifugalScale: number;
   private _coriolisScale: number;
+  private _colliders: SpringCollider[];
 
   constructor(chain: SpringChain, options?: SpringSystemOptions) {
     this._chain = chain;
@@ -41,6 +49,7 @@ export class SpringSystem {
     this._enableInertialForces = options?.enableInertialForces ?? true;
     this._centrifugalScale = options?.centrifugalScale ?? 1.0;
     this._coriolisScale = options?.coriolisScale ?? 1.0;
+    this._colliders = [];
   }
 
   /**
@@ -111,6 +120,9 @@ export class SpringSystem {
       for (const constraint of this._chain.constraints) {
         this.solveConstraint(constraint);
       }
+
+      // Apply collision constraints
+      this.solveCollisions();
     }
   }
 
@@ -377,6 +389,43 @@ export class SpringSystem {
   }
 
   /**
+   * Solves collisions for all particles
+   */
+  private solveCollisions(): void {
+    // Update dynamic colliders from their nodes
+    for (const collider of this._colliders) {
+      if (collider.node) {
+        updateColliderFromNode(collider);
+      }
+    }
+
+    // Check each particle against all colliders
+    for (const particle of this._chain.particles) {
+      if (particle.fixed) {
+        continue; // Skip fixed particles
+      }
+
+      for (const collider of this._colliders) {
+        if (!collider.enabled) {
+          continue;
+        }
+
+        switch (collider.type) {
+          case 'sphere':
+            resolveSphereCollision(particle.position, collider as any);
+            break;
+          case 'capsule':
+            resolveCapsuleCollision(particle.position, collider as any);
+            break;
+          case 'plane':
+            resolvePlaneCollision(particle.position, collider as any);
+            break;
+        }
+      }
+    }
+  }
+
+  /**
    * Applies simulation results to scene nodes
    * @param weight - Blend weight [0-1] (default: 1.0)
    */
@@ -540,5 +589,38 @@ export class SpringSystem {
    */
   setCoriolisScale(scale: number): void {
     this._coriolisScale = Math.max(0, scale);
+  }
+
+  /**
+   * Adds a collider to the system
+   */
+  addCollider(collider: SpringCollider): void {
+    this._colliders.push(collider);
+  }
+
+  /**
+   * Removes a collider from the system
+   */
+  removeCollider(collider: SpringCollider): boolean {
+    const index = this._colliders.indexOf(collider);
+    if (index >= 0) {
+      this._colliders.splice(index, 1);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Clears all colliders
+   */
+  clearColliders(): void {
+    this._colliders = [];
+  }
+
+  /**
+   * Gets all colliders
+   */
+  get colliders(): SpringCollider[] {
+    return this._colliders;
   }
 }
