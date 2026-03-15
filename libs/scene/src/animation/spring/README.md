@@ -31,6 +31,7 @@ The physics engine for single chains that:
 - Performs Verlet integration
 - Solves constraints iteratively
 - Applies external forces (gravity, wind)
+- Applies inertial forces (centrifugal, Coriolis) when root rotates
 - Updates scene node rotations based on simulation
 
 ### MultiChainSpringSystem
@@ -56,7 +57,8 @@ const springChain = SpringChain.fromBoneChain(hairRoot, hairTip);
 const springSystem = new SpringSystem(springChain, {
   iterations: 5,
   gravity: new Vector3(0, -9.8, 0),
-  wind: new Vector3(1, 0, 0)
+  wind: new Vector3(1, 0, 0),
+  enableInertialForces: true  // Enable centrifugal/Coriolis forces (default: true)
 });
 
 // In your update loop
@@ -148,6 +150,12 @@ Sets the wind force vector.
 ### SpringSystem.setIterations()
 Sets the number of constraint solver iterations.
 
+### SpringSystem.setEnableInertialForces()
+Enables or disables inertial forces (centrifugal and Coriolis effects).
+
+**Parameters:**
+- `enabled`: Boolean flag to enable/disable inertial forces
+
 ### MultiChainSpringSystem.addChain()
 Adds a SpringChain to the multi-chain system.
 
@@ -198,6 +206,13 @@ Spring constraint stiffness [0-1].
 - 0 = no constraint (particles fly apart)
 - 1 = rigid constraint
 - Recommended: 0.7-0.9 for hair, 0.5-0.7 for cloth
+
+### Inertial Forces
+When enabled (default), the system calculates centrifugal and Coriolis forces when the root node rotates.
+- **Centrifugal force**: Pushes particles outward when rotating (a = ω × (ω × r))
+- **Coriolis force**: Affects particles moving in a rotating reference frame (a = -2ω × v)
+- Essential for realistic behavior when characters spin or turn quickly
+- Can be disabled for performance or artistic control via `setEnableInertialForces(false)`
 
 ## Implementation Details
 

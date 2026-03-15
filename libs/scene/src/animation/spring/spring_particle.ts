@@ -21,6 +21,10 @@ export interface SpringParticle {
   fixed: boolean;
   /** Associated scene node (optional) */
   node: Nullable<SceneNode>;
+  /** Previous frame position (used to calculate velocity for inertial forces) */
+  lastFramePosition: Vector3;
+  /** Position history for rotation center estimation (for fixed particles) */
+  positionHistory?: Vector3[];
 }
 
 /**
@@ -44,6 +48,7 @@ export function createSpringParticle(
     mass: options?.mass ?? 1.0,
     damping: options?.damping ?? 0.95,
     fixed: options?.fixed ?? false,
-    node: options?.node ?? null
+    node: options?.node ?? null,
+    lastFramePosition: position.clone()
   };
 }
