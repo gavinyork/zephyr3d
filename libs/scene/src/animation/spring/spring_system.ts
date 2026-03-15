@@ -78,12 +78,9 @@ export class SpringSystem {
    */
   private updateFixedParticles(): void {
     for (const particle of this._chain.particles) {
-      if (particle.fixed && particle.node) {
-        const worldPos = new Vector3(
-          particle.node.worldMatrix.m03,
-          particle.node.worldMatrix.m13,
-          particle.node.worldMatrix.m23
-        );
+      if (particle.node && particle.fixed) {
+        const worldMatrix = particle.node.worldMatrix;
+        const worldPos = new Vector3(worldMatrix.m03, worldMatrix.m13, worldMatrix.m23);
         particle.position.set(worldPos);
         particle.prevPosition.set(worldPos);
       }
@@ -126,9 +123,10 @@ export class SpringSystem {
     for (let i = 0; i < this._chain.particles.length - 1; i++) {
       const particle = this._chain.particles[i];
       const nextParticle = this._chain.particles[i + 1];
+      const node = particle.node;
 
       // Skip if no node or no original rotation
-      if (!particle.node || !particle.originalRotation) {
+      if (!node || !particle.originalRotation) {
         continue;
       }
 
@@ -153,7 +151,7 @@ export class SpringSystem {
       }
 
       // Convert world rotation to local rotation (relative to parent)
-      const parent = particle.node.parent;
+      const parent = node.parent;
       if (parent) {
         const parentWorldRotation = new Quaternion();
         parent.worldMatrix.decompose(null, parentWorldRotation, null);
@@ -162,10 +160,10 @@ export class SpringSystem {
         const parentInvRotation = Quaternion.conjugate(parentWorldRotation, new Quaternion());
         const localRotation = Quaternion.multiply(parentInvRotation, worldRotation, new Quaternion());
 
-        particle.node.rotation = localRotation;
+        node.rotation = localRotation;
       } else {
         // Root node has no parent, world rotation is local rotation
-        particle.node.rotation = worldRotation;
+        node.rotation = worldRotation;
       }
     }
   }

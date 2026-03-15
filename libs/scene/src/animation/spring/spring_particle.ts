@@ -1,4 +1,4 @@
-import type { Vector3, Quaternion } from '@zephyr3d/base';
+import type { Vector3, Quaternion, Nullable } from '@zephyr3d/base';
 import type { SceneNode } from '../../scene/scene_node';
 
 /**
@@ -20,7 +20,7 @@ export interface SpringParticle {
   /** Whether this particle is fixed (anchor point) */
   fixed: boolean;
   /** Associated scene node (optional) */
-  node: SceneNode | null;
+  node: Nullable<SceneNode>;
 }
 
 /**

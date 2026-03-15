@@ -127,28 +127,6 @@ export class SpringChain {
   }
 
   /**
-   * Sets whether a particle is fixed (anchor point)
-   * @param index - Index of the particle
-   * @param fixed - Whether the particle should be fixed
-   */
-  setParticleFixed(index: number, fixed: boolean): void {
-    if (index >= 0 && index < this.particles.length) {
-      this.particles[index].fixed = fixed;
-    }
-  }
-
-  /**
-   * Attaches a particle to a scene node
-   * @param index - Index of the particle
-   * @param node - The scene node to attach to
-   */
-  attachParticleToNode(index: number, node: SceneNode): void {
-    if (index >= 0 && index < this.particles.length) {
-      this.particles[index].node = node;
-    }
-  }
-
-  /**
    * Merges another spring chain into this one
    * @param other - The chain to merge
    */
