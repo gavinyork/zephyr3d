@@ -73,12 +73,7 @@ export class IKUtils {
    * @param outSwing - Output swing rotation
    * @param outTwist - Output twist rotation
    */
-  static decomposeSwingTwist(
-    q: Quaternion,
-    axis: Vector3,
-    outSwing: Quaternion,
-    outTwist: Quaternion
-  ): void {
+  static decomposeSwingTwist(q: Quaternion, axis: Vector3, outSwing: Quaternion, outTwist: Quaternion): void {
     // Project quaternion's imaginary part (xyz) onto twist axis
     // twist quaternion = (w, (xyz · axis) * axis)
     const dot = q.x * axis.x + q.y * axis.y + q.z * axis.z;
@@ -90,10 +85,7 @@ export class IKUtils {
 
     // Normalize twist quaternion
     const twistLen = Math.sqrt(
-      outTwist.x * outTwist.x +
-        outTwist.y * outTwist.y +
-        outTwist.z * outTwist.z +
-        outTwist.w * outTwist.w
+      outTwist.x * outTwist.x + outTwist.y * outTwist.y + outTwist.z * outTwist.z + outTwist.w * outTwist.w
     );
 
     if (twistLen < 0.000001) {

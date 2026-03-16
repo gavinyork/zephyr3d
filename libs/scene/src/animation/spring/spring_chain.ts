@@ -127,29 +127,6 @@ export class SpringChain {
   }
 
   /**
-   * Merges another spring chain into this one
-   * @param other - The chain to merge
-   */
-  merge(other: SpringChain): void {
-    const offset = this.particles.length;
-
-    // Add particles
-    for (const particle of other.particles) {
-      this.particles.push(particle);
-    }
-
-    // Add constraints with adjusted indices
-    for (const constraint of other.constraints) {
-      this.constraints.push({
-        particleA: constraint.particleA + offset,
-        particleB: constraint.particleB + offset,
-        restLength: constraint.restLength,
-        stiffness: constraint.stiffness
-      });
-    }
-  }
-
-  /**
    * Resets all particles to their original positions
    */
   reset(): void {

@@ -1,4 +1,5 @@
-import { Vector3, Nullable } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
+import { Vector3 } from '@zephyr3d/base';
 import type { SceneNode } from '../../scene/scene_node';
 
 /**
@@ -196,10 +197,7 @@ export function createPlaneCollider(
  * Resolves collision between a particle and a sphere collider
  * @returns true if collision occurred
  */
-export function resolveSphereCollision(
-  particlePos: Vector3,
-  collider: SphereCollider
-): boolean {
+export function resolveSphereCollision(particlePos: Vector3, collider: SphereCollider): boolean {
   const toParticle = Vector3.sub(particlePos, collider.center, new Vector3());
   const distSq = toParticle.magnitudeSq;
   const radiusSq = collider.radius * collider.radius;
@@ -224,10 +222,7 @@ export function resolveSphereCollision(
  * Resolves collision between a particle and a capsule collider
  * @returns true if collision occurred
  */
-export function resolveCapsuleCollision(
-  particlePos: Vector3,
-  collider: CapsuleCollider
-): boolean {
+export function resolveCapsuleCollision(particlePos: Vector3, collider: CapsuleCollider): boolean {
   // Find closest point on capsule axis
   const axis = Vector3.sub(collider.end, collider.start, new Vector3());
   const axisLength = axis.magnitude;
@@ -258,11 +253,7 @@ export function resolveCapsuleCollision(
   const t = Math.max(0, Math.min(axisLength, projection));
 
   // Closest point on capsule axis
-  const closestPoint = Vector3.add(
-    collider.start,
-    Vector3.scale(axis, t, new Vector3()),
-    new Vector3()
-  );
+  const closestPoint = Vector3.add(collider.start, Vector3.scale(axis, t, new Vector3()), new Vector3());
 
   // Check distance from closest point
   const toParticleFromAxis = Vector3.sub(particlePos, closestPoint, new Vector3());
@@ -285,10 +276,7 @@ export function resolveCapsuleCollision(
  * Resolves collision between a particle and a plane collider
  * @returns true if collision occurred
  */
-export function resolvePlaneCollision(
-  particlePos: Vector3,
-  collider: PlaneCollider
-): boolean {
+export function resolvePlaneCollision(particlePos: Vector3, collider: PlaneCollider): boolean {
   const toParticle = Vector3.sub(particlePos, collider.point, new Vector3());
   const distance = Vector3.dot(toParticle, collider.normal);
 
@@ -317,9 +305,7 @@ export function updateColliderFromNode(collider: SpringCollider): void {
       const sphere = collider as SphereCollider;
       if (sphere.localOffset) {
         // Transform local offset to world space
-        sphere.center.x = worldMatrix.m03 + sphere.localOffset.x;
-        sphere.center.y = worldMatrix.m13 + sphere.localOffset.y;
-        sphere.center.z = worldMatrix.m23 + sphere.localOffset.z;
+        worldMatrix.transformPointAffine(sphere.localOffset, sphere.center);
       } else {
         // No local offset, just use node position
         sphere.center.x = worldMatrix.m03;
@@ -333,13 +319,8 @@ export function updateColliderFromNode(collider: SpringCollider): void {
       const capsule = collider as CapsuleCollider;
       if (capsule.localStartOffset && capsule.localEndOffset) {
         // Transform local offsets to world space
-        capsule.start.x = worldMatrix.m03 + capsule.localStartOffset.x;
-        capsule.start.y = worldMatrix.m13 + capsule.localStartOffset.y;
-        capsule.start.z = worldMatrix.m23 + capsule.localStartOffset.z;
-
-        capsule.end.x = worldMatrix.m03 + capsule.localEndOffset.x;
-        capsule.end.y = worldMatrix.m13 + capsule.localEndOffset.y;
-        capsule.end.z = worldMatrix.m23 + capsule.localEndOffset.z;
+        worldMatrix.transformPointAffine(capsule.localStartOffset, capsule.start);
+        worldMatrix.transformPointAffine(capsule.localEndOffset, capsule.end);
       } else {
         // No local offsets, just use node position for start
         capsule.start.x = worldMatrix.m03;
@@ -353,9 +334,7 @@ export function updateColliderFromNode(collider: SpringCollider): void {
       const plane = collider as PlaneCollider;
       if (plane.localPointOffset) {
         // Transform local offset to world space
-        plane.point.x = worldMatrix.m03 + plane.localPointOffset.x;
-        plane.point.y = worldMatrix.m13 + plane.localPointOffset.y;
-        plane.point.z = worldMatrix.m23 + plane.localPointOffset.z;
+        worldMatrix.transformPointAffine(plane.localPointOffset, plane.point);
       } else {
         // No local offset, just use node position
         plane.point.x = worldMatrix.m03;
@@ -365,14 +344,7 @@ export function updateColliderFromNode(collider: SpringCollider): void {
 
       if (plane.localNormal) {
         // Transform local normal to world space (rotation only)
-        // For proper normal transformation, we should use the inverse transpose
-        // But for simplicity, we'll just rotate the normal
-        const rotatedNormal = new Vector3(
-          worldMatrix.m00 * plane.localNormal.x + worldMatrix.m01 * plane.localNormal.y + worldMatrix.m02 * plane.localNormal.z,
-          worldMatrix.m10 * plane.localNormal.x + worldMatrix.m11 * plane.localNormal.y + worldMatrix.m12 * plane.localNormal.z,
-          worldMatrix.m20 * plane.localNormal.x + worldMatrix.m21 * plane.localNormal.y + worldMatrix.m22 * plane.localNormal.z
-        );
-        Vector3.normalize(rotatedNormal, plane.normal);
+        worldMatrix.transformVectorAffine(plane.localNormal, plane.normal).inplaceNormalize;
       }
       break;
     }

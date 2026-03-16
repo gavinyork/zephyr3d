@@ -3,6 +3,7 @@ import type { SceneNode } from '../../scene/scene_node';
 
 /**
  * Represents a particle in the spring system
+ * @public
  */
 export interface SpringParticle {
   /** Current position in world space */
@@ -29,6 +30,7 @@ export interface SpringParticle {
 
 /**
  * Creates a new spring particle
+ * @public
  */
 export function createSpringParticle(
   position: Vector3,

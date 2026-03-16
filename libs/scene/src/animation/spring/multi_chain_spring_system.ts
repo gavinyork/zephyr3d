@@ -175,8 +175,7 @@ export class MultiChainSpringSystem {
             angularVelocity,
             velocity,
             this._centrifugalScale,
-            this._coriolisScale,
-            dt
+            this._coriolisScale
           );
           Vector3.add(acceleration, inertialAccel, acceleration);
         }
@@ -334,7 +333,11 @@ export class MultiChainSpringSystem {
     const normal = Vector3.cross(dir12, dir23, new Vector3());
 
     if (normal.magnitudeSq < 0.0001) {
-      return Vector3.scale(Vector3.add(Vector3.add(p1, p2, new Vector3()), p3, new Vector3()), 1.0 / 3.0, new Vector3());
+      return Vector3.scale(
+        Vector3.add(Vector3.add(p1, p2, new Vector3()), p3, new Vector3()),
+        1.0 / 3.0,
+        new Vector3()
+      );
     }
 
     Vector3.normalize(normal, normal);
@@ -355,7 +358,11 @@ export class MultiChainSpringSystem {
       return center;
     }
 
-    return Vector3.scale(Vector3.add(Vector3.add(p1, p2, new Vector3()), p3, new Vector3()), 1.0 / 3.0, new Vector3());
+    return Vector3.scale(
+      Vector3.add(Vector3.add(p1, p2, new Vector3()), p3, new Vector3()),
+      1.0 / 3.0,
+      new Vector3()
+    );
   }
 
   private calculateInertialAcceleration(
@@ -364,8 +371,7 @@ export class MultiChainSpringSystem {
     angularVelocity: Vector3,
     particleVelocity: Vector3,
     centrifugalScale: number,
-    coriolisScale: number,
-    dt: number
+    coriolisScale: number
   ): Vector3 {
     const r = Vector3.sub(particle.position, rotationCenter, new Vector3());
 
@@ -442,14 +448,22 @@ export class MultiChainSpringSystem {
       }
 
       // Get current bone direction from node's world matrix (before physics)
-      const currentBonePos = new Vector3(particle.node.worldMatrix.m03, particle.node.worldMatrix.m13, particle.node.worldMatrix.m23);
+      const currentBonePos = new Vector3(
+        particle.node.worldMatrix.m03,
+        particle.node.worldMatrix.m13,
+        particle.node.worldMatrix.m23
+      );
 
       const nextNode = nextParticle.node;
       if (!nextNode) {
         continue;
       }
 
-      const nextBonePos = new Vector3(nextNode.worldMatrix.m03, nextNode.worldMatrix.m13, nextNode.worldMatrix.m23);
+      const nextBonePos = new Vector3(
+        nextNode.worldMatrix.m03,
+        nextNode.worldMatrix.m13,
+        nextNode.worldMatrix.m23
+      );
       const originalDir = Vector3.sub(nextBonePos, currentBonePos, new Vector3());
 
       // Get current bone rotation from node's world matrix
