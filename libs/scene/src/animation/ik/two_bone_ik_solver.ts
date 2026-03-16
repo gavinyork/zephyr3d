@@ -4,6 +4,18 @@ import type { IKChain } from './ik_chain';
 import { IKUtils } from './ik_utils';
 
 /**
+ * Twist constraint configuration for a joint.
+ */
+export interface TwistConstraint {
+  /** Minimum twist angle in radians */
+  minTwist: number;
+  /** Maximum twist angle in radians */
+  maxTwist: number;
+  /** Smoothing factor [0-1], 0 = no smoothing, 1 = full smoothing */
+  smoothFactor: number;
+}
+
+/**
  * Two Bone IK solver for chains with exactly 3 joints (2 bones).
  *
  * @remarks
@@ -21,6 +33,8 @@ export class TwoBoneIKSolver extends IKSolver {
   private _poleVector: Vector3 | null;
   /** Weight of the pole vector constraint (0-1) */
   private _poleWeight: number;
+  /** Twist constraints for each joint (indexed by joint index) */
+  private _twistConstraints: Map<number, TwistConstraint>;
 
   /**
    * Create a Two Bone IK solver.
@@ -38,6 +52,74 @@ export class TwoBoneIKSolver extends IKSolver {
 
     this._poleVector = poleVector ? poleVector.clone() : null;
     this._poleWeight = Math.max(0, Math.min(1, poleWeight));
+    this._twistConstraints = new Map();
+
+    // Set default twist constraints
+    // Root joint (shoulder/hip) - moderate twist
+    this._twistConstraints.set(0, {
+      minTwist: -Math.PI * 0.25, // -45 degrees
+      maxTwist: Math.PI * 0.25, // +45 degrees
+      smoothFactor: 0.3
+    });
+
+    // Middle joint (elbow/knee) - very limited twist
+    this._twistConstraints.set(1, {
+      minTwist: -Math.PI * 0.15, // -27 degrees
+      maxTwist: Math.PI * 0.15, // +27 degrees
+      smoothFactor: 0.3
+    });
+  }
+
+  /**
+   * Set twist constraint for a specific joint.
+   *
+   * @param jointIndex - Index of the joint (0 = root, 1 = middle)
+   * @param minTwist - Minimum twist angle in radians
+   * @param maxTwist - Maximum twist angle in radians
+   * @param smoothFactor - Smoothing factor [0-1] (default: 0.3)
+   */
+  setTwistConstraint(
+    jointIndex: number,
+    minTwist: number,
+    maxTwist: number,
+    smoothFactor: number = 0.3
+  ): void {
+    if (jointIndex < 0 || jointIndex >= this._chain.joints.length - 1) {
+      throw new Error(`Invalid joint index: ${jointIndex}`);
+    }
+
+    this._twistConstraints.set(jointIndex, {
+      minTwist,
+      maxTwist,
+      smoothFactor: Math.max(0, Math.min(1, smoothFactor))
+    });
+  }
+
+  /**
+   * Get twist constraint for a specific joint.
+   *
+   * @param jointIndex - Index of the joint
+   * @returns Twist constraint or undefined if not set
+   */
+  getTwistConstraint(jointIndex: number): TwistConstraint | undefined {
+    return this._twistConstraints.get(jointIndex);
+  }
+
+  /**
+   * Remove twist constraint for a specific joint.
+   *
+   * @param jointIndex - Index of the joint
+   * @returns True if a constraint was removed
+   */
+  removeTwistConstraint(jointIndex: number): boolean {
+    return this._twistConstraints.delete(jointIndex);
+  }
+
+  /**
+   * Clear all twist constraints.
+   */
+  clearTwistConstraints(): void {
+    this._twistConstraints.clear();
   }
 
   /**
@@ -293,26 +375,18 @@ export class TwoBoneIKSolver extends IKSolver {
       // Get twist angle
       let twistAngle = IKUtils.getTwistAngle(twist, newDirNorm);
 
-      // Define twist limits (adjust these based on your character's anatomy)
-      // For elbow (middle joint), typically very limited twist
-      let minTwist = -Math.PI * 0.25; // -45 degrees
-      let maxTwist = Math.PI * 0.25; // +45 degrees
-
-      if (i === 1) {
-        // Middle joint (elbow) - more restrictive
-        minTwist = -Math.PI * 0.15; // -27 degrees
-        maxTwist = Math.PI * 0.15; // +27 degrees
+      // Get twist constraint for this joint
+      const constraint = this._twistConstraints.get(i);
+      if (constraint) {
+        // Clamp and smooth twist
+        twistAngle = IKUtils.clampAndSmoothTwist(
+          twistAngle,
+          joint.previousTwist,
+          constraint.minTwist,
+          constraint.maxTwist,
+          constraint.smoothFactor
+        );
       }
-
-      // Clamp and smooth twist
-      const smoothFactor = 0.3; // Adjust for more/less smoothing
-      twistAngle = IKUtils.clampAndSmoothTwist(
-        twistAngle,
-        joint.previousTwist,
-        minTwist,
-        maxTwist,
-        smoothFactor
-      );
 
       // Store for next frame
       joint.previousTwist = twistAngle;

@@ -14,6 +14,18 @@ interface PoleVectorConfig {
 }
 
 /**
+ * Twist constraint configuration for a joint.
+ */
+export interface TwistConstraint {
+  /** Minimum twist angle in radians */
+  minTwist: number;
+  /** Maximum twist angle in radians */
+  maxTwist: number;
+  /** Smoothing factor [0-1], 0 = no smoothing, 1 = full smoothing */
+  smoothFactor: number;
+}
+
+/**
  * CCD (Cyclic Coordinate Descent) IK solver.
  *
  * @remarks
@@ -33,6 +45,8 @@ interface PoleVectorConfig {
 export class CCDSolver extends IKSolver {
   /** Map of joint index to pole vector configuration */
   private _poleVectors: Map<number, PoleVectorConfig>;
+  /** Twist constraints for each joint (indexed by joint index) */
+  private _twistConstraints: Map<number, TwistConstraint>;
 
   /**
    * Create a CCD solver.
@@ -44,6 +58,70 @@ export class CCDSolver extends IKSolver {
   constructor(chain: IKChain, maxIterations = 10, tolerance = 0.001) {
     super(chain, maxIterations, tolerance);
     this._poleVectors = new Map();
+    this._twistConstraints = new Map();
+
+    // Set default twist constraints for all joints
+    for (let i = 0; i < chain.joints.length - 1; i++) {
+      // Middle joints have more restrictive twist limits
+      const isMiddleJoint = i > 0 && i < chain.joints.length - 2;
+      this._twistConstraints.set(i, {
+        minTwist: isMiddleJoint ? -Math.PI * 0.2 : -Math.PI * 0.3,
+        maxTwist: isMiddleJoint ? Math.PI * 0.2 : Math.PI * 0.3,
+        smoothFactor: 0.3
+      });
+    }
+  }
+
+  /**
+   * Set twist constraint for a specific joint.
+   *
+   * @param jointIndex - Index of the joint
+   * @param minTwist - Minimum twist angle in radians
+   * @param maxTwist - Maximum twist angle in radians
+   * @param smoothFactor - Smoothing factor [0-1] (default: 0.3)
+   */
+  setTwistConstraint(
+    jointIndex: number,
+    minTwist: number,
+    maxTwist: number,
+    smoothFactor: number = 0.3
+  ): void {
+    if (jointIndex < 0 || jointIndex >= this._chain.joints.length - 1) {
+      throw new Error(`Invalid joint index: ${jointIndex}`);
+    }
+
+    this._twistConstraints.set(jointIndex, {
+      minTwist,
+      maxTwist,
+      smoothFactor: Math.max(0, Math.min(1, smoothFactor))
+    });
+  }
+
+  /**
+   * Get twist constraint for a specific joint.
+   *
+   * @param jointIndex - Index of the joint
+   * @returns Twist constraint or undefined if not set
+   */
+  getTwistConstraint(jointIndex: number): TwistConstraint | undefined {
+    return this._twistConstraints.get(jointIndex);
+  }
+
+  /**
+   * Remove twist constraint for a specific joint.
+   *
+   * @param jointIndex - Index of the joint
+   * @returns True if a constraint was removed
+   */
+  removeTwistConstraint(jointIndex: number): boolean {
+    return this._twistConstraints.delete(jointIndex);
+  }
+
+  /**
+   * Clear all twist constraints.
+   */
+  clearTwistConstraints(): void {
+    this._twistConstraints.clear();
   }
 
   /**
@@ -362,25 +440,18 @@ export class CCDSolver extends IKSolver {
       // Get twist angle
       let twistAngle = IKUtils.getTwistAngle(twist, newDirNorm);
 
-      // Define twist limits based on joint position in chain
-      let minTwist = -Math.PI * 0.3;
-      let maxTwist = Math.PI * 0.3;
-
-      // Middle joints typically have more restrictive twist limits
-      if (i > 0 && i < joints.length - 2) {
-        minTwist = -Math.PI * 0.2;
-        maxTwist = Math.PI * 0.2;
+      // Get twist constraint for this joint
+      const constraint = this._twistConstraints.get(i);
+      if (constraint) {
+        // Clamp and smooth twist
+        twistAngle = IKUtils.clampAndSmoothTwist(
+          twistAngle,
+          joint.previousTwist,
+          constraint.minTwist,
+          constraint.maxTwist,
+          constraint.smoothFactor
+        );
       }
-
-      // Clamp and smooth twist
-      const smoothFactor = 0.3;
-      twistAngle = IKUtils.clampAndSmoothTwist(
-        twistAngle,
-        joint.previousTwist,
-        minTwist,
-        maxTwist,
-        smoothFactor
-      );
 
       // Store for next frame
       joint.previousTwist = twistAngle;
