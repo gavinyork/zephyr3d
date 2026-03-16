@@ -19,4 +19,8 @@ export interface IKJoint {
   originalRotation: Quaternion;
   /** Length of the bone from this joint to the next (0 for end effector) */
   boneLength: number;
+  /** Previous IK world rotation (for twist continuity across frames) */
+  previousIKRotation?: Quaternion;
+  /** Previous twist angle in radians (for twist smoothing) */
+  previousTwist?: number;
 }

@@ -20,8 +20,8 @@ import type { Vector3 } from '@zephyr3d/base';
  *
  * @public
  */
-export class IKPostProcessor extends SkeletonPostProcessor {
-  private _solver: IKSolver;
+export class IKPostProcessor<Solver extends IKSolver = IKSolver> extends SkeletonPostProcessor {
+  private _solver: Solver;
   private _target: Vector3;
 
   /**
@@ -32,7 +32,7 @@ export class IKPostProcessor extends SkeletonPostProcessor {
    * @param weight - Blend weight [0-1] (default: 1.0)
    * @param priority - Priority for ordering (default: 50)
    */
-  constructor(solver: IKSolver, target: Vector3, weight: number = 1.0, priority: number = 50) {
+  constructor(solver: Solver, target: Vector3, weight: number = 1.0, priority: number = 50) {
     super(weight, priority);
     this._solver = solver;
     this._target = target.clone();
@@ -41,7 +41,7 @@ export class IKPostProcessor extends SkeletonPostProcessor {
   /**
    * Get the IK solver.
    */
-  get solver(): IKSolver {
+  get solver(): Solver {
     return this._solver;
   }
 

@@ -344,16 +344,62 @@ export class CCDSolver extends IKSolver {
       const originalDir = Vector3.sub(nextJoint.originalPosition, joint.originalPosition, new Vector3());
       const newDir = Vector3.sub(nextJoint.position, joint.position, new Vector3());
 
-      // Calculate rotation needed to align original direction to new direction (in world space)
+      const originalDirNorm = Vector3.normalize(originalDir, new Vector3());
+      const newDirNorm = Vector3.normalize(newDir, new Vector3());
+
+      // Calculate basic rotation
       const deltaRotation = new Quaternion();
-      IKUtils.fromToRotation(originalDir, newDir, deltaRotation);
+      IKUtils.fromToRotation(originalDirNorm, newDirNorm, deltaRotation);
 
       // Calculate new world rotation
       let worldRotation = Quaternion.multiply(deltaRotation, joint.originalRotation, new Quaternion());
 
+      // Apply swing-twist constraint to prevent over-rotation
+      const swing = new Quaternion();
+      const twist = new Quaternion();
+      IKUtils.decomposeSwingTwist(worldRotation, newDirNorm, swing, twist);
+
+      // Get twist angle
+      let twistAngle = IKUtils.getTwistAngle(twist, newDirNorm);
+
+      // Define twist limits based on joint position in chain
+      let minTwist = -Math.PI * 0.3;
+      let maxTwist = Math.PI * 0.3;
+
+      // Middle joints typically have more restrictive twist limits
+      if (i > 0 && i < joints.length - 2) {
+        minTwist = -Math.PI * 0.2;
+        maxTwist = Math.PI * 0.2;
+      }
+
+      // Clamp and smooth twist
+      const smoothFactor = 0.3;
+      twistAngle = IKUtils.clampAndSmoothTwist(
+        twistAngle,
+        joint.previousTwist,
+        minTwist,
+        maxTwist,
+        smoothFactor
+      );
+
+      // Store for next frame
+      joint.previousTwist = twistAngle;
+
+      // Reconstruct rotation from clamped twist: Q = Twist * Swing
+      const clampedTwist = new Quaternion();
+      IKUtils.createTwist(twistAngle, newDirNorm, clampedTwist);
+      worldRotation = Quaternion.multiply(clampedTwist, swing, worldRotation);
+
       // Blend with original rotation based on weight
       if (weight < 1) {
         Quaternion.slerp(joint.originalRotation, worldRotation, weight, worldRotation);
+      }
+
+      // Store this frame's world rotation for next frame's twist continuity
+      if (!joint.previousIKRotation) {
+        joint.previousIKRotation = worldRotation.clone();
+      } else {
+        joint.previousIKRotation.set(worldRotation);
       }
 
       // Convert world rotation to local rotation (relative to parent)
