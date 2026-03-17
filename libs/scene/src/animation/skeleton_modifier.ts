@@ -8,7 +8,7 @@ import type { Skeleton } from './skeleton';
  *
  * @public
  */
-export abstract class SkeletonPostProcessor {
+export abstract class SkeletonModifier {
   /** Blend weight for this processor [0-1] */
   protected _weight: number;
   /** Whether this processor is enabled */

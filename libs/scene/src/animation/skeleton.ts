@@ -5,7 +5,7 @@ import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';
 import { BoundingBox } from '../utility/bounding_volume';
 import { getDevice } from '../app/api';
-import type { SkeletonPostProcessor } from './skeleton_postprocessor';
+import type { SkeletonModifier } from './skeleton_modifier';
 
 /**
  * Skinned bounding box information for a submesh.
@@ -84,7 +84,7 @@ export class Skeleton extends Disposable {
   /** @internal */
   protected _playing: boolean;
   /** @internal */
-  protected _postProcessors: SkeletonPostProcessor[];
+  protected _modifiers: SkeletonModifier[];
   /** @internal */
   protected _lastUpdateTime: number;
   /**
@@ -106,7 +106,7 @@ export class Skeleton extends Disposable {
     this._bindPose = bindPose;
     this._jointTexture = new DRef();
     this._playing = false;
-    this._postProcessors = [];
+    this._modifiers = [];
     this._lastUpdateTime = 0;
     this.computeBindPose();
     this.updateJointMatrices(0);
@@ -170,6 +170,22 @@ export class Skeleton extends Disposable {
     return this._jointTexture.get()!;
   }
   /**
+   * Get joint index by joint node
+   * @param joint - joint node
+   * @returns The index of the joint
+   */
+  getJointIndex(joint: SceneNode) {
+    return this._joints.indexOf(joint);
+  }
+  /**
+   * Get joint index by joint name
+   * @param jointName - joint name
+   * @returns The index of the joint
+   */
+  getJointIndexByName(jointName: string) {
+    return this._joints.findIndex((joint) => joint.name === jointName);
+  }
+  /**
    * Update joint matrices from either provided transforms or the joints' world matrices.
    *
    * - Lazily creates the joint texture and its backing arrays on first call.
@@ -186,7 +202,7 @@ export class Skeleton extends Disposable {
    * @internal
    */
   updateJointMatrices(deltaTime: number) {
-    this.applyPostProcessors(deltaTime);
+    this.applyModifiers(deltaTime);
     if (!this._jointTexture.get()) {
       this._createJointTexture();
     }
@@ -230,69 +246,66 @@ export class Skeleton extends Disposable {
     tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
   }
   /**
-   * Apply all enabled post-processors in priority order.
+   * Apply all enabled modifiers in priority order.
    *
-   * Post-processors are applied after the base animation/bind pose layer,
+   * Modifiers are applied after the base animation/bind pose layer,
    * allowing procedural modifications like IK, spring physics, or manual overrides.
    *
    * @param deltaTime - Time elapsed since last frame (in seconds)
    * @internal
    */
-  protected applyPostProcessors(deltaTime: number): void {
-    if (this._postProcessors.length === 0) {
+  protected applyModifiers(deltaTime: number): void {
+    if (this._modifiers.length === 0) {
       return;
     }
 
     // Sort by priority (higher priority = applied later)
-    const sortedProcessors = this._postProcessors
-      .filter((p) => p.enabled)
-      .sort((a, b) => a.priority - b.priority);
+    const sortedModifiers = this._modifiers.filter((p) => p.enabled).sort((a, b) => a.priority - b.priority);
 
-    for (const processor of sortedProcessors) {
-      processor.apply(this, deltaTime);
+    for (const modifier of sortedModifiers) {
+      modifier.apply(this, deltaTime);
     }
   }
   /**
-   * Add a post-processor to the skeleton.
+   * Add a modifier to the skeleton.
    *
-   * Post-processors are applied after the base animation/bind pose layer.
+   * Modifiers are applied after the base animation/bind pose layer.
    * They are executed in priority order (lower priority first).
    *
-   * @param processor - The post-processor to add
-   * @public
+   * @param modifier - The modifier to add
    */
-  addPostProcessor(processor: SkeletonPostProcessor): void {
-    if (!this._postProcessors.includes(processor)) {
-      this._postProcessors.push(processor);
+  addModifier(modifier: SkeletonModifier): void {
+    if (!this._modifiers.includes(modifier)) {
+      this._modifiers.push(modifier);
     }
   }
   /**
-   * Remove a post-processor from the skeleton.
+   * Remove a modifier from the skeleton.
    *
-   * @param processor - The post-processor to remove
+   * @param modifier - The modifier to remove
    * @public
    */
-  removePostProcessor(processor: SkeletonPostProcessor): void {
-    const index = this._postProcessors.indexOf(processor);
+  removeModifier(modifier: SkeletonModifier): void {
+    const index = this._modifiers.indexOf(modifier);
     if (index >= 0) {
-      this._postProcessors.splice(index, 1);
+      this._modifiers.splice(index, 1);
     }
   }
   /**
-   * Remove all post-processors from the skeleton.
+   * Remove all modifiers from the skeleton.
    *
    * @public
    */
-  clearPostProcessors(): void {
-    this._postProcessors = [];
+  clearModifiers(): void {
+    this._modifiers = [];
   }
   /**
-   * Get all post-processors attached to this skeleton.
+   * Get all modifiers attached to this skeleton.
    *
    * @public
    */
-  getPostProcessors(): readonly SkeletonPostProcessor[] {
-    return this._postProcessors;
+  getModifiers(): readonly SkeletonModifier[] {
+    return this._modifiers;
   }
   /**
    * Reset all meshes to an unskinned state and clear animated bounds.

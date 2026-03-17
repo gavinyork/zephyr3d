@@ -1,4 +1,4 @@
-import { SkeletonPostProcessor } from './skeleton_postprocessor';
+import { SkeletonModifier } from './skeleton_modifier';
 import type { Skeleton } from './skeleton';
 import type { SpringSystem } from './spring/spring_system';
 
@@ -18,7 +18,7 @@ import type { SpringSystem } from './spring/spring_system';
  *
  * @public
  */
-export class SpringPostProcessor extends SkeletonPostProcessor {
+export class SpringModifier extends SkeletonModifier {
   private _springSystem: SpringSystem;
 
   /**

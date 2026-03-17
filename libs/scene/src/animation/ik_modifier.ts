@@ -1,4 +1,4 @@
-import { SkeletonPostProcessor } from './skeleton_postprocessor';
+import { SkeletonModifier } from './skeleton_modifier';
 import type { Skeleton } from './skeleton';
 import type { IKSolver } from './ik/ik_solver';
 import type { Vector3 } from '@zephyr3d/base';
@@ -20,7 +20,7 @@ import type { Vector3 } from '@zephyr3d/base';
  *
  * @public
  */
-export class IKPostProcessor<Solver extends IKSolver = IKSolver> extends SkeletonPostProcessor {
+export class IKModifier<Solver extends IKSolver = IKSolver> extends SkeletonModifier {
   private _solver: Solver;
   private _target: Vector3;
 
