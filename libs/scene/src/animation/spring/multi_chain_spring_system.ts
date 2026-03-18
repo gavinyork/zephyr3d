@@ -20,8 +20,15 @@ export interface InterChainConstraint {
   particleBIndex: number;
   /** Desired distance between particles */
   restLength: number;
-  /** Constraint strength [0-1] */
+  /** Constraint strength [0-1], used by Verlet solver */
   stiffness: number;
+  /**
+   * XPBD compliance (inverse stiffness) in m/N.
+   * Only used when solver is 'xpbd'.
+   */
+  compliance: number;
+  /** XPBD Lagrange multiplier accumulator, reset each time step. */
+  lambda: number;
 }
 
 /**
@@ -42,6 +49,12 @@ export interface MultiChainSpringSystemOptions {
   centrifugalScale?: number;
   /** Coriolis force multiplier (default: 1.0) */
   coriolisScale?: number;
+  /**
+   * Constraint solver type (default: 'verlet').
+   * - 'verlet': stiffness [0-1] controls per-iteration correction strength.
+   * - 'xpbd': compliance (m/N) gives physically correct, iteration-independent results.
+   */
+  solver?: 'verlet' | 'xpbd';
 }
 
 /**
@@ -59,6 +72,7 @@ export class MultiChainSpringSystem {
   private _enableInertialForces: boolean;
   private _centrifugalScale: number;
   private _coriolisScale: number;
+  private _solver: 'verlet' | 'xpbd';
 
   constructor(options?: MultiChainSpringSystemOptions) {
     this._chains = [];
@@ -69,6 +83,7 @@ export class MultiChainSpringSystem {
     this._enableInertialForces = options?.enableInertialForces ?? true;
     this._centrifugalScale = options?.centrifugalScale ?? 1.0;
     this._coriolisScale = options?.coriolisScale ?? 1.0;
+    this._solver = options?.solver ?? 'verlet';
   }
 
   /**
@@ -95,7 +110,7 @@ export class MultiChainSpringSystem {
    * @param options - Configuration options
    */
   createRadialConstraints(options: {
-    /** Constraint stiffness [0-1] */
+    /** Constraint stiffness [0-1], used by Verlet solver */
     stiffness: number;
     /** Maximum distance to create constraints (particles further apart are not connected) */
     maxDistance: number;
@@ -103,9 +118,12 @@ export class MultiChainSpringSystem {
     skipRows?: number;
     /** Connect to next N chains (default: 1, only adjacent chains) */
     connectDistance?: number;
+    /** XPBD compliance in m/N (default: 0 = rigid). Only used when solver is 'xpbd'. */
+    compliance?: number;
   }): void {
     const skipRows = options.skipRows ?? 0;
     const connectDistance = options.connectDistance ?? 1;
+    const compliance = options.compliance ?? 0;
 
     for (let i = 0; i < this._chains.length; i++) {
       for (let offset = 1; offset <= connectDistance; offset++) {
@@ -127,7 +145,9 @@ export class MultiChainSpringSystem {
               particleAIndex: row,
               particleBIndex: row,
               restLength: distance,
-              stiffness: options.stiffness
+              stiffness: options.stiffness,
+              compliance,
+              lambda: 0
             });
           }
         }
@@ -195,15 +215,33 @@ export class MultiChainSpringSystem {
       }
     }
 
+    if (this._solver === 'xpbd') {
+      for (const chain of this._chains) {
+        for (const c of chain.constraints) {
+          c.lambda = 0;
+        }
+      }
+      for (const c of this._interChainConstraints) {
+        c.lambda = 0;
+      }
+    }
     for (let iter = 0; iter < this._iterations; iter++) {
       for (const chain of this._chains) {
         for (const constraint of chain.constraints) {
-          this.solveConstraint(chain, constraint);
+          if (this._solver === 'xpbd') {
+            this.solveConstraintXPBD(chain, constraint, dt);
+          } else {
+            this.solveConstraint(chain, constraint);
+          }
         }
       }
 
       for (const constraint of this._interChainConstraints) {
-        this.solveInterChainConstraint(constraint);
+        if (this._solver === 'xpbd') {
+          this.solveInterChainConstraintXPBD(constraint, dt);
+        } else {
+          this.solveInterChainConstraint(constraint);
+        }
       }
     }
   }
@@ -439,6 +477,70 @@ export class MultiChainSpringSystem {
     }
   }
 
+  private solveConstraintXPBD(chain: SpringChain, constraint: SpringConstraint, dt: number): void {
+    const pA = chain.particles[constraint.particleA];
+    const pB = chain.particles[constraint.particleB];
+
+    const wA = pA.fixed ? 0 : 1.0 / pA.mass;
+    const wB = pB.fixed ? 0 : 1.0 / pB.mass;
+    const wSum = wA + wB;
+    if (wSum < 1e-10) {
+      return;
+    }
+
+    const delta = Vector3.sub(pB.position, pA.position, new Vector3());
+    const currentLength = delta.magnitude;
+    if (currentLength < 0.0001) {
+      return;
+    }
+
+    const C = currentLength - constraint.restLength;
+    const alphaTilde = constraint.compliance / (dt * dt);
+    const deltaLambda = (-C - alphaTilde * constraint.lambda) / (wSum + alphaTilde);
+    constraint.lambda += deltaLambda;
+
+    const n = Vector3.scale(delta, 1.0 / currentLength, new Vector3());
+    if (!pA.fixed) {
+      Vector3.add(pA.position, Vector3.scale(n, -wA * deltaLambda, new Vector3()), pA.position);
+    }
+    if (!pB.fixed) {
+      Vector3.add(pB.position, Vector3.scale(n, wB * deltaLambda, new Vector3()), pB.position);
+    }
+  }
+
+  private solveInterChainConstraintXPBD(constraint: InterChainConstraint, dt: number): void {
+    const chainA = this._chains[constraint.chainAIndex];
+    const chainB = this._chains[constraint.chainBIndex];
+    const pA = chainA.particles[constraint.particleAIndex];
+    const pB = chainB.particles[constraint.particleBIndex];
+
+    const wA = pA.fixed ? 0 : 1.0 / pA.mass;
+    const wB = pB.fixed ? 0 : 1.0 / pB.mass;
+    const wSum = wA + wB;
+    if (wSum < 1e-10) {
+      return;
+    }
+
+    const delta = Vector3.sub(pB.position, pA.position, new Vector3());
+    const currentLength = delta.magnitude;
+    if (currentLength < 0.0001) {
+      return;
+    }
+
+    const C = currentLength - constraint.restLength;
+    const alphaTilde = constraint.compliance / (dt * dt);
+    const deltaLambda = (-C - alphaTilde * constraint.lambda) / (wSum + alphaTilde);
+    constraint.lambda += deltaLambda;
+
+    const n = Vector3.scale(delta, 1.0 / currentLength, new Vector3());
+    if (!pA.fixed) {
+      Vector3.add(pA.position, Vector3.scale(n, -wA * deltaLambda, new Vector3()), pA.position);
+    }
+    if (!pB.fixed) {
+      Vector3.add(pB.position, Vector3.scale(n, wB * deltaLambda, new Vector3()), pB.position);
+    }
+  }
+
   /**
    * Applies simulation results to scene nodes
    * @param weight - Blend weight [0-1] (default: 1.0)
@@ -593,5 +695,25 @@ export class MultiChainSpringSystem {
 
   set coriolisScale(scale: number) {
     this._coriolisScale = Math.max(0, scale);
+  }
+
+  get solver(): 'verlet' | 'xpbd' {
+    return this._solver;
+  }
+
+  set solver(type: 'verlet' | 'xpbd') {
+    if (this._solver !== type) {
+      this._solver = type;
+      if (type === 'xpbd') {
+        for (const chain of this._chains) {
+          for (const c of chain.constraints) {
+            c.lambda = 0;
+          }
+        }
+        for (const c of this._interChainConstraints) {
+          c.lambda = 0;
+        }
+      }
+    }
   }
 }

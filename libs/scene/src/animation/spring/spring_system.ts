@@ -27,6 +27,15 @@ export interface SpringSystemOptions {
   centrifugalScale?: number;
   /** Coriolis force multiplier (default: 1.0) */
   coriolisScale?: number;
+  /**
+   * Constraint solver type (default: 'verlet').
+   * - 'verlet': Classic Verlet integration with iterative position correction.
+   *   stiffness [0-1] controls correction strength per iteration.
+   * - 'xpbd': Extended Position-Based Dynamics (Müller et al. 2020).
+   *   Uses compliance (inverse stiffness in m/N) for physically correct,
+   *   iteration-count-independent constraint solving.
+   */
+  solver?: 'verlet' | 'xpbd';
 }
 
 /**
@@ -44,6 +53,7 @@ export class SpringSystem {
   private _centrifugalScale: number;
   private _coriolisScale: number;
   private _colliders: SpringCollider[];
+  private _solver: 'verlet' | 'xpbd';
 
   constructor(chain: SpringChain, options?: SpringSystemOptions) {
     this._chain = chain;
@@ -54,6 +64,7 @@ export class SpringSystem {
     this._centrifugalScale = options?.centrifugalScale ?? 1.0;
     this._coriolisScale = options?.coriolisScale ?? 1.0;
     this._colliders = [];
+    this._solver = options?.solver ?? 'verlet';
   }
 
   /**
@@ -120,9 +131,19 @@ export class SpringSystem {
     }
 
     // Step 5: Iteratively solve constraints
+    if (this._solver === 'xpbd') {
+      // Reset Lagrange multipliers at the start of each time step
+      for (const constraint of this._chain.constraints) {
+        constraint.lambda = 0;
+      }
+    }
     for (let iter = 0; iter < this._iterations; iter++) {
       for (const constraint of this._chain.constraints) {
-        this.solveConstraint(constraint);
+        if (this._solver === 'xpbd') {
+          this.solveConstraintXPBD(constraint, dt);
+        } else {
+          this.solveConstraint(constraint);
+        }
       }
 
       // Apply collision constraints
@@ -365,7 +386,60 @@ export class SpringSystem {
   }
 
   /**
-   * Solves a single spring constraint
+   * Solves a single spring constraint using XPBD (Extended Position-Based Dynamics).
+   *
+   * Reference: Müller et al., "Detailed Rigid Body Simulation with Extended Position Based Dynamics", 2020.
+   *
+   * The XPBD correction for a distance constraint C(x) = |x_b - x_a| - L is:
+   *   α̃ = compliance / dt²          (scaled compliance)
+   *   Δλ = (-C - α̃·λ) / (w_a + w_b + α̃)
+   *   λ  += Δλ
+   *   Δx_a = -w_a · Δλ · n̂
+   *   Δx_b = +w_b · Δλ · n̂
+   * where w = 1/mass (0 for fixed particles), n̂ = unit vector from a to b.
+   */
+  private solveConstraintXPBD(constraint: any, dt: number): void {
+    const pA = this._chain.particles[constraint.particleA];
+    const pB = this._chain.particles[constraint.particleB];
+
+    const wA = pA.fixed ? 0 : 1.0 / pA.mass;
+    const wB = pB.fixed ? 0 : 1.0 / pB.mass;
+    const wSum = wA + wB;
+    if (wSum < 1e-10) {
+      return;
+    }
+
+    const delta = Vector3.sub(pB.position, pA.position, new Vector3());
+    const currentLength = delta.magnitude;
+    if (currentLength < 0.0001) {
+      return;
+    }
+
+    // Constraint value C = currentLength - restLength
+    const C = currentLength - constraint.restLength;
+
+    // Scaled compliance: α̃ = compliance / dt²
+    const alphaTilde = constraint.compliance / (dt * dt);
+
+    // XPBD Lagrange multiplier update
+    const deltaLambda = (-C - alphaTilde * constraint.lambda) / (wSum + alphaTilde);
+    constraint.lambda += deltaLambda;
+
+    // Correction direction (unit vector from A to B)
+    const n = Vector3.scale(delta, 1.0 / currentLength, new Vector3());
+
+    if (!pA.fixed) {
+      // Δx_a = -w_a · Δλ · n̂
+      Vector3.add(pA.position, Vector3.scale(n, -wA * deltaLambda, new Vector3()), pA.position);
+    }
+    if (!pB.fixed) {
+      // Δx_b = +w_b · Δλ · n̂
+      Vector3.add(pB.position, Vector3.scale(n, wB * deltaLambda, new Vector3()), pB.position);
+    }
+  }
+
+  /**
+   * Solves a single spring constraint (Verlet / PBD)
    */
   private solveConstraint(constraint: any): void {
     const pA = this._chain.particles[constraint.particleA];
@@ -578,6 +652,28 @@ export class SpringSystem {
    */
   set coriolisScale(scale: number) {
     this._coriolisScale = Math.max(0, scale);
+  }
+
+  /**
+   * Gets the constraint solver type
+   */
+  get solver(): 'verlet' | 'xpbd' {
+    return this._solver;
+  }
+
+  /**
+   * Sets the constraint solver type.
+   * Switching to 'xpbd' resets all Lagrange multipliers.
+   */
+  set solver(type: 'verlet' | 'xpbd') {
+    if (this._solver !== type) {
+      this._solver = type;
+      if (type === 'xpbd') {
+        for (const c of this._chain.constraints) {
+          c.lambda = 0;
+        }
+      }
+    }
   }
 
   /**
