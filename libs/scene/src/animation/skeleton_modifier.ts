@@ -13,13 +13,10 @@ export abstract class SkeletonModifier {
   protected _weight: number;
   /** Whether this processor is enabled */
   protected _enabled: boolean;
-  /** Priority for ordering (higher = applied later) */
-  protected _priority: number;
 
-  constructor(weight: number = 1.0, priority: number = 0) {
+  constructor(weight: number = 1.0) {
     this._weight = Math.max(0, Math.min(1, weight));
     this._enabled = true;
-    this._priority = priority;
   }
 
   /**
@@ -48,20 +45,6 @@ export abstract class SkeletonModifier {
    */
   set enabled(value: boolean) {
     this._enabled = value;
-  }
-
-  /**
-   * Get the priority (higher = applied later)
-   */
-  get priority(): number {
-    return this._priority;
-  }
-
-  /**
-   * Set the priority (higher = applied later)
-   */
-  set priority(value: number) {
-    this._priority = value;
   }
 
   /**

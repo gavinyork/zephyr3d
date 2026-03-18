@@ -2,18 +2,7 @@ import { Vector3, Quaternion } from '@zephyr3d/base';
 import { IKSolver } from './ik_solver';
 import type { IKChain } from './ik_chain';
 import { IKUtils } from './ik_utils';
-
-/**
- * Twist constraint configuration for a joint.
- */
-export interface TwistConstraint {
-  /** Minimum twist angle in radians */
-  minTwist: number;
-  /** Maximum twist angle in radians */
-  maxTwist: number;
-  /** Smoothing factor [0-1], 0 = no smoothing, 1 = full smoothing */
-  smoothFactor: number;
-}
+import type { TwistConstraint } from './ik_constraint';
 
 /**
  * Two Bone IK solver for chains with exactly 3 joints (2 bones).

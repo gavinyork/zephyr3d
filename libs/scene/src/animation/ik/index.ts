@@ -16,9 +16,9 @@
 export type { IKJoint } from './ik_joint';
 export { IKChain } from './ik_chain';
 export { IKSolver } from './ik_solver';
-export { FABRIKSolver, type TwistConstraint as FABRIKTwistConstraint } from './fabrik_solver';
-export { TwoBoneIKSolver, type TwistConstraint as TwoBoneTwistConstraint } from './two_bone_ik_solver';
-export { CCDSolver, type TwistConstraint as CCDTwistConstraint } from './ccd_solver';
+export { FABRIKSolver } from './fabrik_solver';
+export { TwoBoneIKSolver } from './two_bone_ik_solver';
+export { CCDSolver } from './ccd_solver';
 export { IKConstraint } from './ik_constraint';
+export type { TwistConstraint } from './ik_constraint';
 export { IKAngleConstraint } from './ik_angle_constraint';
-export { IKTrack } from './ik_track';

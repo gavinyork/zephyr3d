@@ -1,5 +1,7 @@
 /**
  * Represents a spring constraint between two particles
+ *
+ * @public
  */
 export interface SpringConstraint {
   /** Index of the first particle */
@@ -26,6 +28,8 @@ export interface SpringConstraint {
 
 /**
  * Creates a new spring constraint
+ *
+ * @public
  */
 export function createSpringConstraint(
   particleA: number,

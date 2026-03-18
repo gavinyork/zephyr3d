@@ -246,7 +246,7 @@ export class Skeleton extends Disposable {
     tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
   }
   /**
-   * Apply all enabled modifiers in priority order.
+   * Apply all enabled modifiers.
    *
    * Modifiers are applied after the base animation/bind pose layer,
    * allowing procedural modifications like IK, spring physics, or manual overrides.
@@ -255,56 +255,16 @@ export class Skeleton extends Disposable {
    * @internal
    */
   protected applyModifiers(deltaTime: number): void {
-    if (this._modifiers.length === 0) {
-      return;
-    }
-
-    // Sort by priority (higher priority = applied later)
-    const sortedModifiers = this._modifiers.filter((p) => p.enabled).sort((a, b) => a.priority - b.priority);
-
-    for (const modifier of sortedModifiers) {
+    for (const modifier of this._modifiers) {
       modifier.apply(this, deltaTime);
     }
-  }
-  /**
-   * Add a modifier to the skeleton.
-   *
-   * Modifiers are applied after the base animation/bind pose layer.
-   * They are executed in priority order (lower priority first).
-   *
-   * @param modifier - The modifier to add
-   */
-  addModifier(modifier: SkeletonModifier): void {
-    if (!this._modifiers.includes(modifier)) {
-      this._modifiers.push(modifier);
-    }
-  }
-  /**
-   * Remove a modifier from the skeleton.
-   *
-   * @param modifier - The modifier to remove
-   * @public
-   */
-  removeModifier(modifier: SkeletonModifier): void {
-    const index = this._modifiers.indexOf(modifier);
-    if (index >= 0) {
-      this._modifiers.splice(index, 1);
-    }
-  }
-  /**
-   * Remove all modifiers from the skeleton.
-   *
-   * @public
-   */
-  clearModifiers(): void {
-    this._modifiers = [];
   }
   /**
    * Get all modifiers attached to this skeleton.
    *
    * @public
    */
-  getModifiers(): readonly SkeletonModifier[] {
+  get modifiers(): SkeletonModifier[] {
     return this._modifiers;
   }
   /**

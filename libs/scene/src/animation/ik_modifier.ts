@@ -4,19 +4,10 @@ import type { IKSolver } from './ik/ik_solver';
 import type { Vector3 } from '@zephyr3d/base';
 
 /**
- * Post-processor wrapper for IK solvers.
+ * Skeleton modifier for IK solvers.
  *
  * Integrates IK solving into the skeleton post-processing pipeline.
  * The IK solver is executed each frame and results are blended with the base animation.
- *
- * @example
- * ```typescript
- * const ikChain = new IKChain([joint1, joint2, joint3]);
- * const ikSolver = new FABRIKSolver(ikChain);
- * const targetPos = new Vector3(1, 2, 3);
- * const processor = new IKPostProcessor(ikSolver, targetPos, 1.0);
- * skeleton.addPostProcessor(processor);
- * ```
  *
  * @public
  */
@@ -30,10 +21,9 @@ export class IKModifier<Solver extends IKSolver = IKSolver> extends SkeletonModi
    * @param solver - The IK solver to integrate
    * @param target - Target position for the end effector
    * @param weight - Blend weight [0-1] (default: 1.0)
-   * @param priority - Priority for ordering (default: 50)
    */
-  constructor(solver: Solver, target: Vector3, weight: number = 1.0, priority: number = 50) {
-    super(weight, priority);
+  constructor(solver: Solver, target: Vector3, weight: number = 1.0) {
+    super(weight);
     this._solver = solver;
     this._target = target.clone();
   }

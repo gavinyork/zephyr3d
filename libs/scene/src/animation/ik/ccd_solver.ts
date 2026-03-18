@@ -2,6 +2,7 @@ import { Vector3, Quaternion } from '@zephyr3d/base';
 import { IKSolver } from './ik_solver';
 import type { IKChain } from './ik_chain';
 import { IKUtils } from './ik_utils';
+import type { TwistConstraint } from './ik_constraint';
 
 /**
  * Pole vector configuration for a specific joint.
@@ -11,18 +12,6 @@ interface PoleVectorConfig {
   position: Vector3;
   /** Weight of the pole vector constraint (0-1) */
   weight: number;
-}
-
-/**
- * Twist constraint configuration for a joint.
- */
-export interface TwistConstraint {
-  /** Minimum twist angle in radians */
-  minTwist: number;
-  /** Maximum twist angle in radians */
-  maxTwist: number;
-  /** Smoothing factor [0-1], 0 = no smoothing, 1 = full smoothing */
-  smoothFactor: number;
 }
 
 /**

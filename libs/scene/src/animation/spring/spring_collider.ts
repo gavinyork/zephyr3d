@@ -4,6 +4,8 @@ import type { SceneNode } from '../../scene/scene_node';
 
 /**
  * Base interface for spring collision shapes
+ *
+ * @public
  */
 export interface SpringCollider {
   /** Type of collider */
@@ -16,6 +18,8 @@ export interface SpringCollider {
 
 /**
  * Sphere collider for spring collision detection
+ *
+ * @public
  */
 export interface SphereCollider extends SpringCollider {
   type: 'sphere';
@@ -29,6 +33,8 @@ export interface SphereCollider extends SpringCollider {
 
 /**
  * Capsule collider for spring collision detection
+ *
+ * @public
  */
 export interface CapsuleCollider extends SpringCollider {
   type: 'capsule';
@@ -46,6 +52,8 @@ export interface CapsuleCollider extends SpringCollider {
 
 /**
  * Plane collider for spring collision detection
+ *
+ * @public
  */
 export interface PlaneCollider extends SpringCollider {
   type: 'plane';
@@ -64,6 +72,8 @@ export interface PlaneCollider extends SpringCollider {
  * @param centerOrOffset - Center position in world space, or local offset if node is provided
  * @param radius - Radius of the sphere
  * @param node - Optional scene node to attach to (if provided, centerOrOffset is treated as local offset)
+ *
+ * @public
  */
 export function createSphereCollider(
   centerOrOffset: Vector3,
@@ -105,6 +115,8 @@ export function createSphereCollider(
  * @param endOrOffset - End point in world space, or local offset if node is provided
  * @param radius - Radius of the capsule
  * @param node - Optional scene node to attach to (if provided, offsets are treated as local)
+ *
+ * @public
  */
 export function createCapsuleCollider(
   startOrOffset: Vector3,
@@ -154,6 +166,8 @@ export function createCapsuleCollider(
  * @param pointOrOffset - Point on plane in world space, or local offset if node is provided
  * @param normal - Normal vector (will be normalized)
  * @param node - Optional scene node to attach to (if provided, pointOrOffset is treated as local offset)
+ *
+ * @public
  */
 export function createPlaneCollider(
   pointOrOffset: Vector3,
@@ -196,6 +210,8 @@ export function createPlaneCollider(
 /**
  * Resolves collision between a particle and a sphere collider
  * @returns true if collision occurred
+ *
+ * @public
  */
 export function resolveSphereCollision(particlePos: Vector3, collider: SphereCollider): boolean {
   const toParticle = Vector3.sub(particlePos, collider.center, new Vector3());
@@ -221,6 +237,8 @@ export function resolveSphereCollision(particlePos: Vector3, collider: SphereCol
 /**
  * Resolves collision between a particle and a capsule collider
  * @returns true if collision occurred
+ *
+ * @public
  */
 export function resolveCapsuleCollision(particlePos: Vector3, collider: CapsuleCollider): boolean {
   // Find closest point on capsule axis
@@ -275,6 +293,8 @@ export function resolveCapsuleCollision(particlePos: Vector3, collider: CapsuleC
 /**
  * Resolves collision between a particle and a plane collider
  * @returns true if collision occurred
+ *
+ * @public
  */
 export function resolvePlaneCollision(particlePos: Vector3, collider: PlaneCollider): boolean {
   const toParticle = Vector3.sub(particlePos, collider.point, new Vector3());
@@ -292,6 +312,8 @@ export function resolvePlaneCollision(particlePos: Vector3, collider: PlaneColli
 
 /**
  * Updates collider position from its associated node
+ *
+ * @public
  */
 export function updateColliderFromNode(collider: SpringCollider): void {
   if (!collider.node || !collider.enabled) {

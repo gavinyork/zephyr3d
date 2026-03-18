@@ -8,14 +8,6 @@ import type { SpringSystem } from './spring/spring_system';
  * Integrates spring-based physics simulation into the skeleton post-processing pipeline.
  * The spring system is updated each frame and results are blended with the base animation.
  *
- * @example
- * ```typescript
- * const springChain = new SpringChain([joint1, joint2, joint3]);
- * const springSystem = new SpringSystem(springChain);
- * const processor = new SpringPostProcessor(springSystem, 1.0);
- * skeleton.addPostProcessor(processor);
- * ```
- *
  * @public
  */
 export class SpringModifier extends SkeletonModifier {
@@ -26,10 +18,9 @@ export class SpringModifier extends SkeletonModifier {
    *
    * @param springSystem - The spring system to integrate
    * @param weight - Blend weight [0-1] (default: 1.0)
-   * @param priority - Priority for ordering (default: 50)
    */
-  constructor(springSystem: SpringSystem, weight: number = 1.0, priority: number = 50) {
-    super(weight, priority);
+  constructor(springSystem: SpringSystem, weight: number = 1.0) {
+    super(weight);
     this._springSystem = springSystem;
   }
 

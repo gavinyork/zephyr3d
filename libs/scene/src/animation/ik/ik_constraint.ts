@@ -37,3 +37,17 @@ export abstract class IKConstraint {
    */
   abstract apply(joints: IKJoint[]): void;
 }
+
+/**
+ * Twist constraint configuration for a joint.
+ *
+ * @public
+ */
+export interface TwistConstraint {
+  /** Minimum twist angle in radians */
+  minTwist: number;
+  /** Maximum twist angle in radians */
+  maxTwist: number;
+  /** Smoothing factor [0-1], 0 = no smoothing, 1 = full smoothing */
+  smoothFactor: number;
+}
