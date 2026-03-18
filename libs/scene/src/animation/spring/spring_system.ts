@@ -11,6 +11,8 @@ import {
 
 /**
  * Options for creating a SpringSystem
+ *
+ * @public
  */
 export interface SpringSystemOptions {
   /** Number of constraint solver iterations (default: 5) */
@@ -30,6 +32,8 @@ export interface SpringSystemOptions {
 /**
  * Physics engine for spring-based particle simulation
  * Uses Verlet integration and iterative constraint solving
+ *
+ * @public
  */
 export class SpringSystem {
   private _chain: SpringChain;
@@ -501,27 +505,6 @@ export class SpringSystem {
   }
 
   /**
-   * Sets the gravity force
-   */
-  setGravity(gravity: Vector3): void {
-    this._gravity.set(gravity);
-  }
-
-  /**
-   * Sets the wind force
-   */
-  setWind(wind: Vector3): void {
-    this._wind.set(wind);
-  }
-
-  /**
-   * Sets the number of constraint solver iterations
-   */
-  setIterations(count: number): void {
-    this._iterations = Math.max(1, count);
-  }
-
-  /**
    * Gets the spring chain
    */
   get chain(): SpringChain {
@@ -535,11 +518,19 @@ export class SpringSystem {
     return this._gravity;
   }
 
+  set gravity(gravity: Vector3) {
+    this._gravity.set(gravity);
+  }
+
   /**
    * Gets the current wind
    */
   get wind(): Vector3 {
     return this._wind;
+  }
+
+  set wind(wind: Vector3) {
+    this._wind.set(wind);
   }
 
   /**
@@ -549,6 +540,10 @@ export class SpringSystem {
     return this._iterations;
   }
 
+  set iterations(count: number) {
+    this._iterations = Math.max(1, count);
+  }
+
   /**
    * Gets whether inertial forces are enabled
    */
@@ -556,10 +551,7 @@ export class SpringSystem {
     return this._enableInertialForces;
   }
 
-  /**
-   * Sets whether inertial forces are enabled
-   */
-  setEnableInertialForces(enabled: boolean): void {
+  set enableInertialForces(enabled: boolean) {
     this._enableInertialForces = enabled;
   }
 
@@ -570,10 +562,7 @@ export class SpringSystem {
     return this._centrifugalScale;
   }
 
-  /**
-   * Sets the centrifugal force scale
-   */
-  setCentrifugalScale(scale: number): void {
+  set centrifugalScale(scale: number) {
     this._centrifugalScale = Math.max(0, scale);
   }
 
@@ -587,7 +576,7 @@ export class SpringSystem {
   /**
    * Sets the Coriolis force scale
    */
-  setCoriolisScale(scale: number): void {
+  set coriolisScale(scale: number) {
     this._coriolisScale = Math.max(0, scale);
   }
 

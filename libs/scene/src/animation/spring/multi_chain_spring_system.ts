@@ -1,3 +1,4 @@
+import type { Nullable } from '@zephyr3d/base';
 import { Vector3, Quaternion } from '@zephyr3d/base';
 import type { SpringChain } from './spring_chain';
 import type { SpringConstraint } from './spring_constraint';
@@ -5,6 +6,8 @@ import { IKUtils } from '../ik/ik_utils';
 
 /**
  * Constraint between particles in different chains
+ *
+ * @public
  */
 export interface InterChainConstraint {
   /** Index of the first chain */
@@ -23,6 +26,8 @@ export interface InterChainConstraint {
 
 /**
  * Options for creating a MultiChainSpringSystem
+ *
+ * @public
  */
 export interface MultiChainSpringSystemOptions {
   /** Number of constraint solver iterations (default: 5) */
@@ -42,6 +47,8 @@ export interface MultiChainSpringSystemOptions {
 /**
  * Physics engine for multiple spring chains with inter-chain constraints
  * Suitable for cloth, skirts, capes, and other multi-chain simulations
+ *
+ * @public
  */
 export class MultiChainSpringSystem {
   private _chains: SpringChain[];
@@ -147,8 +154,8 @@ export class MultiChainSpringSystem {
     this.updateFixedParticles();
 
     // Calculate global rotation parameters
-    let rotationCenter: Vector3 | null = null;
-    let angularVelocity: Vector3 | null = null;
+    let rotationCenter: Nullable<Vector3> = null;
+    let angularVelocity: Nullable<Vector3> = null;
 
     if (this._enableInertialForces && dt > 0.0001) {
       const result = this.calculateGlobalRotation(dt);
@@ -432,6 +439,10 @@ export class MultiChainSpringSystem {
     }
   }
 
+  /**
+   * Applies simulation results to scene nodes
+   * @param weight - Blend weight [0-1] (default: 1.0)
+   */
   applyToNodes(weight: number = 1.0): void {
     for (const chain of this._chains) {
       this.applyChainToNodes(chain, weight);
@@ -495,65 +506,92 @@ export class MultiChainSpringSystem {
     }
   }
 
+  /**
+   * Resets the simulation to initial state
+   */
   reset(): void {
     for (const chain of this._chains) {
       chain.reset();
     }
   }
 
-  setGravity(gravity: Vector3): void {
-    this._gravity.set(gravity);
-  }
-
-  setWind(wind: Vector3): void {
-    this._wind.set(wind);
-  }
-
-  setIterations(count: number): void {
-    this._iterations = Math.max(1, count);
-  }
-
+  /**
+   * Gets the spring chains
+   */
   get chains(): SpringChain[] {
     return this._chains;
   }
 
+  /**
+   * Gets the inter-chain constraints
+   */
   get interChainConstraints(): InterChainConstraint[] {
     return this._interChainConstraints;
   }
 
+  /**
+   * Gets the current gravity
+   */
   get gravity(): Vector3 {
     return this._gravity;
   }
 
+  set gravity(gravity: Vector3) {
+    this._gravity.set(gravity);
+  }
+
+  /**
+   * Gets the current wind
+   */
   get wind(): Vector3 {
     return this._wind;
   }
 
+  set wind(wind: Vector3) {
+    this._wind.set(wind);
+  }
+
+  /**
+   * Gets the number of iterations
+   */
   get iterations(): number {
     return this._iterations;
   }
 
+  set iterations(count: number) {
+    this._iterations = Math.max(1, count);
+  }
+
+  /**
+   * Gets whether inertial forces are enabled
+   */
   get enableInertialForces(): boolean {
     return this._enableInertialForces;
   }
 
-  setEnableInertialForces(enabled: boolean): void {
+  set enableInertialForces(enabled: boolean) {
     this._enableInertialForces = enabled;
   }
 
+  /**
+   * Gets the centrifugal force scale
+   */
   get centrifugalScale(): number {
     return this._centrifugalScale;
   }
 
-  setCentrifugalScale(scale: number): void {
+  set centrifugalScale(scale: number) {
     this._centrifugalScale = Math.max(0, scale);
   }
 
+  /**
+   * Gets the Coriolis force scale
+   */
   get coriolisScale(): number {
     return this._coriolisScale;
   }
 
-  setCoriolisScale(scale: number): void {
+  set coriolisScale(scale: number) {
     this._coriolisScale = Math.max(0, scale);
   }
 }

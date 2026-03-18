@@ -7,6 +7,8 @@ import { createSpringConstraint } from './spring_constraint';
 
 /**
  * Manages a chain of spring particles and constraints
+ *
+ * @public
  */
 export class SpringChain {
   /** Array of particles in the chain */
@@ -23,14 +25,12 @@ export class SpringChain {
    * Creates a spring chain from a bone hierarchy
    * @param startNode - Root node of the bone chain
    * @param endNode - End node of the bone chain (optional, if null uses all descendants)
-   * @param particlesPerBone - Number of particles per bone segment (default: 1)
    * @param options - Additional options
    * @returns A new SpringChain instance
    */
   static fromBoneChain(
     startNode: SceneNode,
     endNode: SceneNode | null = null,
-    _particlesPerBone: number = 1,
     options?: {
       mass?: number;
       damping?: number;
@@ -52,8 +52,6 @@ export class SpringChain {
         break;
       }
 
-      // Follow the first child (assumes single chain)
-      // children is DRef<SceneNode>[], so we use .get() to dereference
       if (current.children && current.children.length > 0) {
         current = current.children[0].get();
       } else {
