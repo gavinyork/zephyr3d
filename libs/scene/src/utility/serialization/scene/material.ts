@@ -911,6 +911,66 @@ export function getBlinnMaterialClass(manager: ResourceManager): SerializableCla
               return this.$isInstance ? this.coreMaterial.shininess : 32;
             }
           },
+          {
+            name: 'ScatterWrap',
+            type: 'float',
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 1
+            },
+            get(this: BlinnMaterial, value) {
+              value.num[0] = this.scatterWrap;
+            },
+            set(this: BlinnMaterial, value) {
+              this.scatterWrap = value.num[0];
+            },
+            getDefaultValue(this: BlinnMaterial) {
+              return this.$isInstance ? this.coreMaterial.scatterWrap : 0;
+            }
+          },
+          {
+            name: 'ScatterWidth',
+            type: 'float',
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 1
+            },
+            get(this: BlinnMaterial, value) {
+              value.num[0] = this.scatterWidth;
+            },
+            set(this: BlinnMaterial, value) {
+              this.scatterWidth = value.num[0];
+            },
+            getDefaultValue(this: BlinnMaterial) {
+              return this.$isInstance ? this.coreMaterial.scatterWidth : 0;
+            }
+          },
+          {
+            name: 'ScatterColor',
+            type: 'rgb',
+            options: {
+              animatable: true
+            },
+            get(this: BlinnMaterial, value) {
+              value.num[0] = this.scatterColor.x;
+              value.num[1] = this.scatterColor.y;
+              value.num[2] = this.scatterColor.z;
+            },
+            set(this: BlinnMaterial, value) {
+              this.scatterColor = new Vector4(value.num[0], value.num[1], value.num[2], 1);
+            },
+            getDefaultValue(this: BlinnMaterial) {
+              return this.$isInstance
+                ? [
+                    this.coreMaterial.scatterColor.x,
+                    this.coreMaterial.scatterColor.y,
+                    this.coreMaterial.scatterColor.z
+                  ]
+                : [0, 0, 0];
+            }
+          },
           ...getLitMaterialProps(manager)
         ]);
       }

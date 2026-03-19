@@ -91,10 +91,10 @@ export class PerspectiveCamera extends Camera {
   }
   /** Adjust aspect ratio according to viewport settings of the camera */
   adjustAspectRatio() {
-    if (this._viewport) {
-      this.aspect = this._viewport[2] / this._viewport[3];
+    if (this.viewport) {
+      this.aspect = this.viewport[2] / this.viewport[3];
     } else {
-      if (getDevice().getFramebuffer()) {
+      if (!this.adapted || getDevice().getFramebuffer()) {
         const vp = getDevice().getViewport();
         this.aspect = vp.width / vp.height;
       } else {

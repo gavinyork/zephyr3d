@@ -470,7 +470,7 @@ export class AssetSkeleton extends NamedObject {
   /** Inverse of the binding matrices of the joints */
   inverseBindMatrices: Matrix4x4[];
   /** Binding pose matrices of the joints */
-  bindPoseMatrices: Matrix4x4[];
+  bindPose: { position: Vector3; rotation: Quaternion; scale: Vector3 }[];
   /**
    * Creates an instance of AssetSkeleton
    * @param name - Name of the skeleton
@@ -481,7 +481,7 @@ export class AssetSkeleton extends NamedObject {
     this.pivot = null;
     this.joints = [];
     this.inverseBindMatrices = [];
-    this.bindPoseMatrices = [];
+    this.bindPose = [];
   }
   /**
    * Adds a joint to the skeleton
@@ -492,7 +492,11 @@ export class AssetSkeleton extends NamedObject {
     joint.attachToSkeleton(this);
     this.joints.push(joint);
     this.inverseBindMatrices.push(inverseBindMatrix);
-    this.bindPoseMatrices.push(joint.worldMatrix);
+    this.bindPose.push({
+      position: joint.position.clone(),
+      rotation: joint.rotation.clone(),
+      scale: joint.scaling.clone()
+    });
   }
 }
 
@@ -764,7 +768,7 @@ export class SharedModel extends Disposable {
                   return node;
                 }),
                 sk.inverseBindMatrices,
-                sk.bindPoseMatrices
+                sk.bindPose
               );
               for (let i = 0; i < nodes.mesh.length; i++) {
                 const mesh = nodes.mesh[i];

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rush build:check:*)",
+      "Bash(rush build:*)"
+    ]
+  }
+}

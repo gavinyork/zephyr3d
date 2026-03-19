@@ -190,7 +190,7 @@ export class AnimationClip extends Disposable {
     track.reset(target);
     return this;
   }
-  /** @internal */
+  /*
   resample(frames: number, callback: (frame: number) => void) {
     for (let frame = 0; frame <= frames; frame++) {
       const t = frame / this.timeDuration;
@@ -209,4 +209,5 @@ export class AnimationClip extends Disposable {
       callback(frame);
     }
   }
+  */
 }

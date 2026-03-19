@@ -454,28 +454,17 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   }
   /** @internal */
   private updateSkeletonState() {
-    if (this._skeletonName) {
-      const skeleton = this.findSkeletonById(this._skeletonName);
-      if (skeleton?.playing) {
-        this.setBoneMatrices(skeleton.jointTexture);
-        skeleton.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
-        this.setAnimatedBoundingBox(this._skinnedBoundingInfo!.boundingBox);
-      } else if (skeleton) {
-        const prefab = this.getPrefabNode();
-        if (prefab) {
-          skeleton.computeBindPose(prefab);
-          this.setBoneMatrices(skeleton.jointTexture);
-          skeleton.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
-          this.setAnimatedBoundingBox(this._skinnedBoundingInfo!.boundingBox);
-        }
-      } else {
-        this.setBoneMatrices(null);
-        this.setAnimatedBoundingBox(null);
-      }
-      this.scene!.queueUpdateNode(this);
+    const skeleton = this._skeletonName && this.findSkeletonById(this._skeletonName);
+    if (skeleton) {
+      this.setBoneMatrices(skeleton.jointTexture);
+      skeleton.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
+      this.setAnimatedBoundingBox(this._skinnedBoundingInfo!.boundingBox);
     } else {
       this.setBoneMatrices(null);
       this.setAnimatedBoundingBox(null);
+    }
+    if (this._skeletonName) {
+      this.scene!.queueUpdateNode(this);
     }
   }
   /**
