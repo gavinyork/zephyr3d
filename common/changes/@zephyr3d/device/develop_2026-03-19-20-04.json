@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Fix issue #10: Canvas becomes huge if its size is not set in style",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}
