@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Tue, 10 Feb 2026 07:50:06 GMT and should not be manually modified.
+This log was last generated on Fri, 20 Mar 2026 11:37:32 GMT and should not be manually modified.
+
+## 0.8.0
+Fri, 20 Mar 2026 11:37:32 GMT
+
+### Minor changes
+
+- Adds IK support and a spring system for bone-chain animation
 
 ## 0.7.1
 Tue, 10 Feb 2026 07:50:06 GMT

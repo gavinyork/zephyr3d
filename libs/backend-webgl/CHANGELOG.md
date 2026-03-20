@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/backend-webgl
 
-This log was last generated on Tue, 10 Feb 2026 07:50:06 GMT and should not be manually modified.
+This log was last generated on Fri, 20 Mar 2026 11:37:32 GMT and should not be manually modified.
+
+## 0.1.11
+Fri, 20 Mar 2026 11:37:32 GMT
+
+### Patches
+
+- Fix issue #10: Canvas becomes huge if its size is not set in style
 
 ## 0.1.10
 Tue, 10 Feb 2026 07:50:06 GMT
