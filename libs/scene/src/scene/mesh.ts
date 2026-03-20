@@ -368,15 +368,12 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
    */
   setMorphWeight(name: string, weight: number) {
     const index = this._morphInfo?.names?.[name];
-    if (
-      index !== undefined &&
-      index >= 0 &&
-      index < this._morphInfo!.data[3] &&
-      this._morphInfo!.data[4 + index] !== weight
-    ) {
-      this._morphInfo!.data[4 + index] = weight;
-      this._morphDirty = true;
-      this.scene!.queueUpdateNode(this);
+    if (index !== undefined && index >= 0 && index < this._morphInfo!.data[3]) {
+      if (this._morphInfo!.data[4 + index] !== weight) {
+        this._morphInfo!.data[4 + index] = weight;
+        this._morphDirty = true;
+        this.scene!.queueUpdateNode(this);
+      }
     } else {
       console.warn(`Morph target ${name} not found`);
     }
@@ -450,34 +447,24 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   private updateMorphState() {
     if (this._morphInfo && this._morphDirty) {
+      console.log(`jawOpen: ${this._morphInfo.data[20]}`);
       this._morphInfo.buffer!.get()!.bufferSubData(4 * 4, this._morphInfo.data, 4, this._morphInfo.data[3]);
       this._morphDirty = false;
     }
   }
   /** @internal */
   private updateSkeletonState() {
-    if (this._skeletonName) {
-      const skeleton = this.findSkeletonById(this._skeletonName);
-      if (skeleton?.playing) {
-        this.setBoneMatrices(skeleton.jointTexture);
-        skeleton.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
-        this.setAnimatedBoundingBox(this._skinnedBoundingInfo!.boundingBox);
-      } else if (skeleton) {
-        const prefab = this.getPrefabNode();
-        if (prefab) {
-          skeleton.computeBindPose(prefab);
-          this.setBoneMatrices(skeleton.jointTexture);
-          skeleton.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
-          this.setAnimatedBoundingBox(this._skinnedBoundingInfo!.boundingBox);
-        }
-      } else {
-        this.setBoneMatrices(null);
-        this.setAnimatedBoundingBox(null);
-      }
-      this.scene!.queueUpdateNode(this);
+    const skeleton = this._skeletonName && this.findSkeletonById(this._skeletonName);
+    if (skeleton) {
+      this.setBoneMatrices(skeleton.jointTexture);
+      skeleton.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
+      this.setAnimatedBoundingBox(this._skinnedBoundingInfo!.boundingBox);
     } else {
       this.setBoneMatrices(null);
       this.setAnimatedBoundingBox(null);
+    }
+    if (this._skeletonName) {
+      this.scene!.queueUpdateNode(this);
     }
   }
   /**

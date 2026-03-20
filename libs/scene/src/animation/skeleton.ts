@@ -5,6 +5,7 @@ import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';
 import { BoundingBox } from '../utility/bounding_volume';
 import { getDevice } from '../app/api';
+import type { SkeletonModifier } from './skeleton_modifier';
 
 /**
  * Skinned bounding box information for a submesh.
@@ -71,11 +72,9 @@ export class Skeleton extends Disposable {
   /** @internal */
   protected _inverseBindMatrices: Matrix4x4[];
   /** @internal */
-  protected _bindPoseMatrices: Matrix4x4[];
+  protected _bindPose: { rotation: Quaternion; scale: Vector3; position: Vector3 }[];
   /** @internal */
   protected _jointMatrices!: Matrix4x4[];
-  /** @internal */
-  protected _jointTransforms: { scale: Vector3; rotation: Quaternion; position: Vector3 }[];
   /** @internal */
   protected _jointOffsets!: Float32Array<ArrayBuffer>;
   /** @internal */
@@ -84,6 +83,10 @@ export class Skeleton extends Disposable {
   protected _jointTexture: DRef<Texture2D>;
   /** @internal */
   protected _playing: boolean;
+  /** @internal */
+  protected _modifiers: SkeletonModifier[];
+  /** @internal */
+  protected _lastUpdateTime: number;
   /**
    * Create a skeleton instance.
    *
@@ -94,31 +97,19 @@ export class Skeleton extends Disposable {
   constructor(
     joints: SceneNode[],
     inverseBindMatrices: Matrix4x4[],
-    bindPoseMatrices: Matrix4x4[],
-    jointTransforms?: { scale: Vector3; rotation: Quaternion; position: Vector3 }[]
+    bindPose: { rotation: Quaternion; scale: Vector3; position: Vector3 }[]
   ) {
     super();
     this._id = randomUUID();
     this._joints = joints;
     this._inverseBindMatrices = inverseBindMatrices;
-    this._bindPoseMatrices = bindPoseMatrices;
+    this._bindPose = bindPose;
     this._jointTexture = new DRef();
     this._playing = false;
-    if (jointTransforms) {
-      this._jointTransforms = jointTransforms;
-      for (let i = 0; i < jointTransforms.length; i++) {
-        this._joints[i].scale = jointTransforms[i].scale;
-        this._joints[i].rotation = jointTransforms[i].rotation;
-        this._joints[i].position = jointTransforms[i].position;
-      }
-    } else {
-      this._jointTransforms = this._joints.map((joint) => ({
-        scale: joint.scale.clone(),
-        rotation: joint.rotation.clone(),
-        position: joint.position.clone()
-      }));
-    }
-    this.updateJointMatrices();
+    this._modifiers = [];
+    this._lastUpdateTime = 0;
+    this.computeBindPose();
+    this.updateJointMatrices(0);
     Skeleton._registry.set(this._id, new DWeakRef(this));
   }
   /**
@@ -141,16 +132,12 @@ export class Skeleton extends Disposable {
     return this._joints;
   }
   /** @internal */
-  get jointTransforms() {
-    return this._jointTransforms;
-  }
-  /** @internal */
   get inverseBindMatrices() {
     return this._inverseBindMatrices;
   }
   /** @internal */
-  get bindPoseMatrices() {
-    return this._bindPoseMatrices;
+  get bindPose() {
+    return this._bindPose;
   }
   /** @internal */
   get playing() {
@@ -183,6 +170,22 @@ export class Skeleton extends Disposable {
     return this._jointTexture.get()!;
   }
   /**
+   * Get joint index by joint node
+   * @param joint - joint node
+   * @returns The index of the joint
+   */
+  getJointIndex(joint: SceneNode) {
+    return this._joints.indexOf(joint);
+  }
+  /**
+   * Get joint index by joint name
+   * @param jointName - joint name
+   * @returns The index of the joint
+   */
+  getJointIndexByName(jointName: string) {
+    return this._joints.findIndex((joint) => joint.name === jointName);
+  }
+  /**
    * Update joint matrices from either provided transforms or the joints' world matrices.
    *
    * - Lazily creates the joint texture and its backing arrays on first call.
@@ -198,7 +201,8 @@ export class Skeleton extends Disposable {
    * @param worldMatrix - Optional world-to-model transform applied before inverse bind.
    * @internal
    */
-  updateJointMatrices(jointTransforms?: Matrix4x4[], worldMatrix?: Matrix4x4) {
+  updateJointMatrices(deltaTime: number) {
+    this.applyModifiers(deltaTime);
     if (!this._jointTexture.get()) {
       this._createJointTexture();
     }
@@ -210,51 +214,58 @@ export class Skeleton extends Disposable {
       this._jointOffsets[0] = this._joints.length - this._jointOffsets[0] + 2;
     }
     for (let i = 0; i < this._joints.length; i++) {
-      const mat = this._jointMatrices[i + this._jointOffsets[0] - 1];
-      const jointTransform = jointTransforms ? jointTransforms[i] : this._joints[i].worldMatrix;
-      if (worldMatrix) {
-        Matrix4x4.multiplyAffine(worldMatrix, jointTransform, mat);
-        Matrix4x4.multiply(mat, this._inverseBindMatrices[i], mat);
-      } else {
-        Matrix4x4.multiply(jointTransform, this._inverseBindMatrices[i], mat);
-      }
+      Matrix4x4.multiply(
+        this._joints[i].worldMatrix,
+        this._inverseBindMatrices[i],
+        this._jointMatrices[i + this._jointOffsets[0] - 1]
+      );
     }
   }
   /**
-   * Compute and upload the bind pose matrices to the joint texture for a given model.
+   * Reset skeleton to bind pose
    *
-   * - Fills the "current" ring buffer slot with bind pose transforms.
-   * - Uploads the entire matrix array to the GPU texture.
-   *
-   * @param model - The model node whose world matrix provides the reference space.
    * @internal
    */
-  computeBindPose(model: SceneNode) {
-    this.updateJointMatrices(this._bindPoseMatrices, model.worldMatrix);
-    this._jointOffsets[1] = this._jointOffsets[0];
-    const tex = this.jointTexture;
-    tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
+  computeBindPose() {
+    for (let i = 0; i < this._joints.length; i++) {
+      const joint = this._joints[i];
+      const bindpose = this._bindPose[i];
+      joint.position.set(bindpose.position);
+      joint.rotation.set(bindpose.rotation);
+      joint.scale.set(bindpose.scale);
+    }
   }
   /**
    * Compute current joint matrices from the nodes and upload them to the joint texture.
    *
    * @internal
    */
-  computeJoints() {
-    this.updateJointMatrices();
+  apply(deltaTime: number) {
+    this.updateJointMatrices(deltaTime);
     const tex = this.jointTexture;
     tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
   }
   /**
-   * Apply current skeleton state to all meshes:
-   * - Updates joint matrices and uploads to the texture.
-   * - Computes animated bounding boxes per mesh in model space.
-   * - Binds the joint texture to each mesh for GPU skinning.
+   * Apply all enabled modifiers.
    *
+   * Modifiers are applied after the base animation/bind pose layer,
+   * allowing procedural modifications like IK, spring physics, or manual overrides.
+   *
+   * @param deltaTime - Time elapsed since last frame (in seconds)
    * @internal
    */
-  apply() {
-    this.computeJoints();
+  protected applyModifiers(deltaTime: number): void {
+    for (const modifier of this._modifiers) {
+      modifier.apply(this, deltaTime);
+    }
+  }
+  /**
+   * Get all modifiers attached to this skeleton.
+   *
+   * @public
+   */
+  get modifiers(): SkeletonModifier[] {
+    return this._modifiers;
   }
   /**
    * Reset all meshes to an unskinned state and clear animated bounds.

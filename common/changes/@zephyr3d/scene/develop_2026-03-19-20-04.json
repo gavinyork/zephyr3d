@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Adds IK support and a spring system for bone-chain animation",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

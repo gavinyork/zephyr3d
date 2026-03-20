@@ -387,13 +387,7 @@ export class ScreenAdapter {
       device.deviceXToScreen(device.getDrawingBufferWidth()),
       device.deviceYToScreen(device.getDrawingBufferHeight())
     ];
-    if (
-      !this._resolvedViewport ||
-      vp[0] !== this._resolvedViewport[0] ||
-      vp[1] !== this._resolvedViewport[1] ||
-      vp[2] !== this._resolvedViewport[2] ||
-      vp[3] !== this._resolvedViewport[3]
-    ) {
+    if (this._resolvedViewport !== vp) {
       this._resolvedViewport = vp;
       this._version++;
       this._transform = null;

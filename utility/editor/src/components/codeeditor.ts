@@ -500,6 +500,8 @@ export class CodeEditor {
         cursorBlinking: 'blink',
         cursorWidth: 2,
         glyphMargin: true,
+        overviewRulerLanes: 0,
+        overviewRulerBorder: false,
         folding: false,
         foldingStrategy: 'auto',
         showFoldingControls: 'never',

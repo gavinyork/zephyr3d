@@ -250,8 +250,20 @@ export class WebGPUDevice extends BaseDevice {
     deviceWidth: number,
     deviceHeight: number
   ): void {
+    const lastWidth = this.canvas.clientWidth;
+    const lastHeight = this.canvas.clientHeight;
     this.canvas.width = deviceWidth;
     this.canvas.height = deviceHeight;
+    if (
+      (this.canvas.clientWidth !== lastWidth && this.canvas.clientWidth === this.canvas.width) ||
+      (this.canvas.clientHeight !== lastHeight && this.canvas.clientHeight === this.canvas.height)
+    ) {
+      console.warn(
+        '[Engine] Canvas intrinsic size affected layout. CSS size locked to prevent feedback loop.'
+      );
+      this.canvas.style.width = `${lastWidth}px`;
+      this.canvas.style.height = `${lastHeight}px`;
+    }
     this.createDefaultRenderAttachments();
     this.setViewport(null);
     this.setScissor(null);

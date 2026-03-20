@@ -3,6 +3,17 @@ import * as streamSaver from 'streamsaver';
 import { ProjectService } from '../core/services/project';
 
 export class ZipDownloader {
+  static readonly _hasNativeDeflateRawSupport = (function supportsDeflateRaw(): boolean {
+    try {
+      if (typeof CompressionStream === 'undefined') {
+        return false;
+      }
+      new CompressionStream('deflate-raw');
+      return true;
+    } catch {
+      return false;
+    }
+  })();
   private readonly _zipWriter: ZipWriter<any>;
   private readonly _downloadPromise: Promise<void>;
   private readonly _transformStream: TransformStream;
@@ -10,7 +21,10 @@ export class ZipDownloader {
     const fileStream = streamSaver.createWriteStream(filename);
     this._transformStream = new TransformStream();
     this._downloadPromise = this._transformStream.readable.pipeTo(fileStream);
-    configure({ useWebWorkers: false });
+    configure({
+      useWebWorkers: false,
+      useCompressionStream: ZipDownloader._hasNativeDeflateRawSupport
+    });
     this._zipWriter = new ZipWriter(this._transformStream.writable);
   }
   get zipWriter() {

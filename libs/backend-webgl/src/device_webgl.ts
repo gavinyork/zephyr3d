@@ -380,8 +380,20 @@ export class WebGLDevice extends BaseDevice {
     */
   }
   protected _handleResize(_cssWidth: number, _cssHeight: number, deviceWidth: number, deviceHeight: number) {
+    const lastWidth = this.canvas.clientWidth;
+    const lastHeight = this.canvas.clientHeight;
     this.canvas.width = deviceWidth;
     this.canvas.height = deviceHeight;
+    if (
+      (this.canvas.clientWidth !== lastWidth && this.canvas.clientWidth === this.canvas.width) ||
+      (this.canvas.clientHeight !== lastHeight && this.canvas.clientHeight === this.canvas.height)
+    ) {
+      console.warn(
+        '[Engine] Canvas intrinsic size affected layout. CSS size locked to prevent feedback loop.'
+      );
+      this.canvas.style.width = `${lastWidth}px`;
+      this.canvas.style.height = `${lastHeight}px`;
+    }
     this.setViewport(this._currentViewport);
     this.setScissor(this._currentScissorRect);
   }

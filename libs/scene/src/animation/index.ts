@@ -8,3 +8,8 @@ export * from './scaletrack';
 export * from './proptrack';
 export * from './morphtrack';
 export * from './skeleton';
+export * from './skeleton_modifier';
+export * from './ik_modifier';
+export * from './spring_modifier';
+export * from './ik';
+export * from './spring';
