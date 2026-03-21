@@ -255,7 +255,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.outputFragmentColor(
           scope,
           scope.$inputs.worldPos,
-          pb.vec4(1),
+          scope.outColor,
           scope.outRoughness,
           scope.outColor
         );
@@ -424,7 +424,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.vec3(1),
           this.foamFactor
         );
-        that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
+        that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, _extra, shadow) {
           this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.worldPos, posRange, dirCutoff);
           this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);

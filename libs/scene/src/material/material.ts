@@ -9,7 +9,7 @@ import type { Clonable, IDisposable, Nullable } from '@zephyr3d/base';
 import { getEngine } from '../app/api';
 
 type MaterialState = {
-  program: GPUProgram;
+  program: Nullable<GPUProgram>;
   bindGroup: Nullable<BindGroup>;
   bindGroupTag: string;
   renderStateSet: RenderStateSet;
@@ -280,6 +280,17 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
       let state = this._states[hash];
       if (!state) {
         const program = this.createProgram(ctx, pass) ?? null;
+        if (!program) {
+          state = {
+            program: null,
+            bindGroup: null,
+            bindGroupTag: '',
+            renderStateSet: ctx.device.createRenderStateSet(),
+            materialTag: -1
+          };
+          this._states[hash] = state;
+          return false;
+        }
         program.name = `@${this.constructor.name}_program_${this._nextProgramId++}`;
         const bindGroup =
           program.bindGroupLayouts.length > 2

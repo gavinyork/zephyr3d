@@ -2,6 +2,7 @@ import {
   ConstantTexture2DArrayNode,
   ConstantTexture2DNode,
   ConstantTextureCubeNode,
+  PannerNode,
   TextureSampleNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
@@ -22,6 +23,10 @@ export function getTextureNodeCategories(): NodeCategory[] {
         {
           name: 'TextureCube',
           create: () => new ConstantTextureCubeNode()
+        },
+        {
+          name: 'Panner',
+          create: () => new PannerNode()
         },
         {
           name: 'TextureSample',

@@ -19,7 +19,7 @@ import { ESM } from './esm';
 import { VSM } from './vsm';
 import { PCFPD } from './pcf_pd';
 import { PCFOPT } from './pcf_opt';
-import type { PointLight, PunctualLight, SpotLight } from '../scene/light';
+import type { PointLight, PunctualLight, RectLight, SpotLight } from '../scene/light';
 import type { ShadowMapPass } from '../render/shadowmap_pass';
 import type { Scene } from '../scene/scene';
 import type { ShadowImpl } from './shadow_impl';
@@ -643,6 +643,25 @@ export class ShadowMapper {
     );
   }
   /** @internal */
+  protected createLightCameraRect(lightCamera: Camera) {
+    const rect = this._light as RectLight;
+    lightCamera.parent = this._light;
+    lightCamera.position.setXYZ(0, 0, 0);
+    lightCamera.rotation.identity();
+    lightCamera.scale.setXYZ(1, 1, 1);
+    const halfW = rect.width * 0.5;
+    const halfH = rect.height * 0.5;
+    const far = Math.min(this._shadowDistance, rect.range);
+    lightCamera.setOrtho(
+      -halfW,
+      halfW,
+      -halfH,
+      halfH,
+      this._config.nearClip,
+      Math.max(this._config.nearClip + 0.001, far)
+    );
+  }
+  /** @internal */
   protected createLightCameraDirectional(
     sceneAABB: AABB,
     sceneCamera: Camera,
@@ -1029,6 +1048,8 @@ export class ShadowMapper {
             snapMatrix,
             shadowMapParams.impl!.getShadowMapBorder(shadowMapParams)
           );
+        } else if (this._light.isRectLight()) {
+          this.createLightCameraRect(shadowMapRenderCamera);
         } else {
           this.createLightCameraSpot(shadowMapRenderCamera);
         }
