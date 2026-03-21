@@ -863,7 +863,12 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$l.NoV = pb.clamp(pb.dot(this.normal, this.viewVec), 0, 1);
           this.$if(pb.greaterThan(this.NoL, 0), function () {
             this.$l.VoH = pb.clamp(pb.dot(this.viewVec, this.H), 0, 1);
-            this.$l.schlickFresnel = that.fresnelSchlick(this, this.VoH, this.data.f0.rgb, this.data.f90);
+            this.$l.schlickFresnel = that.fresnelSchlick(
+              this,
+              this.VoH,
+              pb.mul(this.data.f0.rgb, pb.mix(this.data.specularWeight, 1, this.data.metallic)),
+              this.data.f90
+            );
             if (that.iridescence) {
               this.$l.F = pb.mix(
                 this.schlickFresnel,
@@ -876,7 +881,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             this.$l.alphaRoughness = pb.mul(this.data.roughness, this.data.roughness);
             this.$l.D = that.distributionGGX(this, this.NoH, this.alphaRoughness);
             this.$l.V = that.visGGX(this, this.NoV, this.NoL, this.alphaRoughness);
-            this.$l.specular = pb.mul(this.lightColor, this.D, this.V, this.F, this.data.specularWeight);
+            this.$l.specular = pb.mul(this.lightColor, this.D, this.V, this.F);
             if (that.sheen) {
               this.specular = pb.mul(this.specular, this.data.sheenAlbedoScaling);
             }
@@ -890,10 +895,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               );
               this.F = pb.mix(this.schlickFresnel, this.iridescenceFresnelMax, this.data.iridescenceFactor.x);
             }
-            this.$l.diffuseBRDF = pb.mul(
-              pb.sub(pb.vec3(1), pb.mul(this.F, this.data.specularWeight)),
-              pb.div(this.data.diffuse.rgb, Math.PI)
-            );
+            this.$l.diffuseBRDF = pb.mul(pb.sub(pb.vec3(1), this.F), pb.div(this.data.diffuse.rgb, Math.PI));
             this.$l.diffuse = pb.mul(this.lightColor, pb.max(this.diffuseBRDF, pb.vec3(0)));
             if (that.transmission && that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
               this.$l.transmissionRay = that.getVolumeTransmissionRay(
@@ -943,11 +945,14 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               this.alphaRoughness = pb.mul(this.data.ccFactor.y, this.data.ccFactor.y);
               this.NoH = pb.clamp(pb.dot(this.data.ccNormal, this.H), 0, 1);
               this.NoL = pb.clamp(pb.dot(this.data.ccNormal, this.L), 0, 1);
-              this.ccF0 = pb.vec3(pb.pow(pb.div(pb.sub(this.data.f0.a, 1), pb.add(this.data.f0.a, 1)), 2));
+              this.ccF0 = pb.vec3(0.04);
               this.F = that.fresnelSchlick(this, this.VoH, this.ccF0, pb.vec3(1));
               this.D = that.distributionGGX(this, this.NoH, this.alphaRoughness);
               this.V = that.visGGX(this, this.data.ccNoV, this.NoL, this.alphaRoughness);
-              this.outColor = pb.add(this.outColor, pb.mul(this.D, this.V, this.F, this.data.ccFactor.x));
+              this.outColor = pb.add(
+                pb.mul(this.outColor, pb.sub(1, pb.mul(this.F, this.data.ccFactor.x))),
+                pb.mul(this.D, this.V, this.F, this.data.ccFactor.x)
+              );
             }
           });
         }
@@ -1158,6 +1163,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             return;
           }
           const envLightStrength = ShaderHelper.getEnvLightStrength(this);
+          this.$l.specWeight = pb.mix(this.data.specularWeight, 1.0, this.data.metallic);
           if (that.occlusionTexture) {
             const occlusionSample = that.sampleOcclusionTexture(this).r;
             this.$l.occlusion = pb.mul(
@@ -1178,22 +1184,20 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             pb.vec4(1)
           );
           this.$l.f_ab = this.ggxLutSample.rg;
-          this.$l.Fr = pb.sub(
-            pb.max(pb.vec3(pb.sub(1, this.data.roughness)), this.data.f0.rgb),
-            this.data.f0.rgb
-          );
+          this.$l.F0 = pb.mul(this.data.f0.rgb, this.specWeight);
+          this.$l.Fr = pb.sub(pb.max(pb.vec3(pb.sub(1, this.data.roughness)), this.F0), this.F0);
           if (that.iridescence) {
             this.$l.k_S = pb.mix(
-              pb.add(this.data.f0.rgb, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5))),
+              pb.add(this.F0, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5))),
               this.data.iridescenceFresnel,
               this.data.iridescenceFactor.x
             );
           } else {
-            this.$l.k_S = pb.add(this.data.f0.rgb, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5)));
+            this.$l.k_S = pb.add(this.F0, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5)));
           }
           if (outRoughness || ctx.env!.light.envLight.hasRadiance()) {
             this.$l.FssEss = pb.add(pb.mul(this.k_S, this.f_ab.x), pb.vec3(this.f_ab.y));
-            this.$l.specularFactor = pb.mul(this.FssEss, this.data.specularWeight, this.occlusion);
+            this.$l.specularFactor = pb.mul(this.FssEss, this.occlusion);
             if (that.sheen) {
               this.specularFactor = pb.mul(this.specularFactor, this.data.sheenAlbedoScaling);
             }
@@ -1217,25 +1221,15 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
                   this.data.iridescenceF0.b
                 )
               );
-              this.$l.mixedF0 = pb.mix(
-                this.data.f0.rgb,
-                this.iridescenceF0Max,
-                this.data.iridescenceFactor.x
-              );
+              this.$l.mixedF0 = pb.mix(this.F0, this.iridescenceF0Max, this.data.iridescenceFactor.x);
               this.Fr = pb.sub(pb.max(pb.vec3(pb.sub(1, this.data.roughness)), this.mixedF0), this.mixedF0);
               this.k_S = pb.add(this.mixedF0, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5)));
             } else {
-              this.$l.mixedF0 = this.data.f0.rgb;
+              this.$l.mixedF0 = this.F0;
             }
-            this.$l.FssEss = pb.add(
-              pb.mul(this.k_S, this.f_ab.x, this.data.specularWeight),
-              pb.vec3(this.f_ab.y)
-            );
+            this.$l.FssEss = pb.add(pb.mul(this.k_S, this.f_ab.x), pb.vec3(this.f_ab.y));
             this.$l.Ems = pb.sub(1, pb.add(this.f_ab.x, this.f_ab.y));
-            this.$l.F_avg = pb.mul(
-              pb.add(this.mixedF0, pb.div(pb.sub(pb.vec3(1), this.mixedF0), 21)),
-              this.data.specularWeight
-            );
+            this.$l.F_avg = pb.add(this.mixedF0, pb.div(pb.sub(pb.vec3(1), this.mixedF0), 21));
             this.$l.FmsEms = pb.div(
               pb.mul(this.FssEss, this.F_avg, this.Ems),
               pb.sub(pb.vec3(1), pb.mul(this.F_avg, this.Ems))
@@ -1297,19 +1291,20 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               pb.vec4(1)
             );
             this.$l.f_ab = this.ggxLutSample.rg;
-            this.$l.Fr = pb.sub(
-              pb.max(pb.vec3(pb.sub(1, this.data.ccFactor.y)), this.data.f0.rgb),
-              this.data.f0.rgb
-            );
-            this.$l.k_S = pb.add(this.data.f0.rgb, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5)));
+            this.$l.ccF0 = pb.vec3(0.04);
+            this.$l.Fr = pb.sub(pb.max(pb.vec3(pb.sub(1, this.data.ccFactor.y)), this.ccF0), this.ccF0);
+            this.$l.k_S = pb.add(this.ccF0, pb.mul(this.Fr, pb.pow(pb.sub(1, this.NoV), 5)));
             this.$l.radiance = ctx.env!.light.envLight.getRadiance(
               this,
               pb.reflect(pb.neg(this.viewVec), this.data.ccNormal),
               this.data.ccFactor.y
             );
             this.$l.FssEss = pb.add(pb.mul(this.k_S, this.f_ab.x), pb.vec3(this.f_ab.y));
-            this.$l.ccSpecular = pb.mul(this.radiance, this.FssEss, this.data.specularWeight, this.occlusion);
-            this.outColor = pb.add(this.outColor, pb.mul(this.ccSpecular, this.data.ccFactor.x));
+            this.$l.ccSpecular = pb.mul(this.radiance, this.FssEss, this.occlusion);
+            this.outColor = pb.add(
+              pb.mul(this.outColor, pb.sub(pb.vec3(1), pb.mul(this.FssEss, this.data.ccFactor.x))),
+              pb.mul(this.ccSpecular, this.data.ccFactor.x)
+            );
           }
         }
       );

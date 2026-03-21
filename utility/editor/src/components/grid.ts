@@ -898,7 +898,7 @@ export class PropertyEditor extends Observable<{
             this.linearToSRGB(tmpProperty.num[2]),
             tmpProperty.num[3]
           ] as [number, number, number, number];
-          if (ImGui.ColorEdit3('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined)) {
+          if (ImGui.ColorEdit4('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined)) {
             changed = true;
             tmpProperty.num[0] = this.sRGBToLinear(val[0]);
             tmpProperty.num[1] = this.sRGBToLinear(val[1]);
