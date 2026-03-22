@@ -264,7 +264,8 @@ export class SSR extends AbstractPostEffect {
     this.intersect(ctx, inputColorTexture, sceneDepthTexture, true, false);
     const intersectTex = intersectFramebuffer.getColorAttachments()[0] as Texture2D;
     device.setFramebuffer(pingpongFramebuffer[0]);
-    this.resolve(ctx, inputColorTexture, sceneDepthTexture, intersectTex);
+    const ssrSceneColorTexture = ctx.sceneColorTexture ?? inputColorTexture;
+    this.resolve(ctx, ssrSceneColorTexture, sceneDepthTexture, intersectTex);
     if (ctx.camera.ssrBlurScale > 0 && ctx.camera.ssrBlurKernelSize > 0) {
       const blurSizeScale = 255 * ctx.camera.ssrBlurScale;
       const kernelRadius = (Math.max(1, ctx.camera.ssrBlurKernelSize >> 0) - 1) >> 1;
@@ -452,7 +453,7 @@ export class SSR extends AbstractPostEffect {
             SSR_calcJitter(this, this.viewPos, this.roughness)
           );
           this.$l.reflectVecW = pb.mul(this.invViewMatrix, pb.vec4(this.reflectVec, 0)).xyz;
-          this.$l.roughness2 = pb.float(0);
+          this.$l.roughness2 = pb.clamp(this.roughness, 0, 1);
           this.$l.env = pb.mul(
             ctx.env!.light.envLight.getRadiance(this, this.reflectVecW, this.roughness2)!,
             this.envLightStrength
@@ -464,62 +465,51 @@ export class SSR extends AbstractPostEffect {
           [pb.vec2('uv'), pb.vec3('reflectSceneColor'), pb.vec4('roughnessInfo'), pb.float('alpha')],
           function () {
             this.$l.env = this.resolveEnvRadiance(this.uv, this.roughnessInfo);
-            this.$l.reflectance = pb.mix(this.env, this.reflectSceneColor, this.alpha);
+            this.$l.reflectance = pb.mix(this.env, this.reflectSceneColor, pb.clamp(this.alpha, 0, 1));
             this.$return(this.reflectance);
           }
         );
         pb.main(function () {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
           this.$l.roughnessInfo = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
-          this.$if(pb.greaterThanEqual(this.roughnessInfo.a, this.ssrMaxRoughness), function () {
-            pb.discard();
-          });
-          this.$l.intersectSample = pb.textureSampleLevel(this.intersectTex, this.screenUV, 0);
-          this.$l.reflectance = pb.vec3();
-          this.$if(pb.greaterThan(this.intersectSample.w, 0), function () {
-            this.$l.indirectIntersectSample = pb.textureSampleLevel(
-              this.intersectTex,
-              this.intersectSample.xy,
-              0
-            );
-            this.$l.indirectRoughnessInfo = pb.textureSampleLevel(
-              this.roughnessTex,
-              this.intersectSample.xy,
-              0
-            );
-            this.$l.indirectReflectance = pb.vec3();
-            this.$if(pb.greaterThan(this.indirectIntersectSample.w, 0), function () {
-              this.$l.indirectReflectSceneColor = pb.textureSampleLevel(
-                this.colorTex,
-                this.indirectIntersectSample.xy,
-                0
-              ).rgb;
-              this.indirectReflectance = this.resolveReflectance(
-                this.intersectSample.xy,
-                this.indirectReflectSceneColor,
-                this.indirectRoughnessInfo,
-                this.indirectIntersectSample.w
-              );
-            }).$else(function () {
-              this.indirectReflectance = this.resolveEnvRadiance(
-                this.intersectSample.xy,
+          this.$l.intersectSample = pb.vec4(0);
+          this.$l.reflectance = pb.vec3(0);
+          this.$if(pb.lessThan(this.roughnessInfo.a, this.ssrMaxRoughness), function () {
+            this.intersectSample = pb.textureSampleLevel(this.intersectTex, this.screenUV, 0);
+            this.$l.hitAlpha = pb.clamp(this.intersectSample.w, 0, 1);
+            this.$l.hitUV = pb.clamp(this.intersectSample.xy, pb.vec2(0), pb.vec2(1));
+            this.$if(pb.greaterThan(this.hitAlpha, 0), function () {
+              this.$l.indirectIntersectSample = pb.textureSampleLevel(this.intersectTex, this.hitUV, 0);
+              this.$l.indirectAlpha = pb.clamp(this.indirectIntersectSample.w, 0, 1);
+              this.$l.indirectUV = pb.clamp(this.indirectIntersectSample.xy, pb.vec2(0), pb.vec2(1));
+              this.$l.indirectRoughnessInfo = pb.textureSampleLevel(this.roughnessTex, this.hitUV, 0);
+              this.$l.indirectReflectance = pb.vec3();
+              this.$if(pb.greaterThan(this.indirectAlpha, 0), function () {
+                this.$l.indirectReflectSceneColor = pb.textureSampleLevel(this.colorTex, this.indirectUV, 0).rgb;
+                this.indirectReflectance = this.resolveReflectance(
+                  this.hitUV,
+                  this.indirectReflectSceneColor,
+                  this.indirectRoughnessInfo,
+                  this.indirectAlpha
+                );
+              }).$else(function () {
+                this.indirectReflectance = this.resolveEnvRadiance(this.hitUV, this.indirectRoughnessInfo);
+              });
+              this.$l.reflectSceneColor = pb.textureSampleLevel(this.colorTex, this.hitUV, 0).rgb;
+              this.$l.reflectSceneColor = this.resolveSample(
+                this.reflectSceneColor,
+                this.indirectReflectance,
                 this.indirectRoughnessInfo
               );
+              this.reflectance = this.resolveReflectance(
+                this.screenUV,
+                this.reflectSceneColor,
+                this.roughnessInfo,
+                this.hitAlpha
+              );
+            }).$else(function () {
+              this.reflectance = this.resolveEnvRadiance(this.screenUV, this.roughnessInfo);
             });
-            this.$l.reflectSceneColor = pb.textureSampleLevel(this.colorTex, this.intersectSample.xy, 0).rgb;
-            this.$l.reflectSceneColor = this.resolveSample(
-              this.reflectSceneColor,
-              this.indirectReflectance,
-              this.indirectRoughnessInfo
-            );
-            this.reflectance = this.resolveReflectance(
-              this.screenUV,
-              this.reflectSceneColor,
-              this.roughnessInfo,
-              this.intersectSample.w
-            );
-          }).$else(function () {
-            this.reflectance = this.resolveEnvRadiance(this.screenUV, this.roughnessInfo);
           });
           this.$outputs.outColor = pb.vec4(this.reflectance, this.intersectSample.z);
         });
@@ -592,16 +582,14 @@ export class SSR extends AbstractPostEffect {
           this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
           this.$l.roughnessValue = pb.textureSampleLevel(this.roughnessTex, this.screenUV, 0);
           this.$l.roughness = this.roughnessValue.a;
-          this.$if(pb.greaterThanEqual(this.roughness, this.ssrMaxRoughness), function () {
-            pb.discard();
-          });
           if (!blur) {
             this.$l.sceneColor = pb.textureSampleLevel(this.colorTex, this.screenUV, 0).rgb;
           }
+          this.$l.color = pb.vec3(0);
+          this.$l.a = pb.float(0);
+          this.$if(pb.lessThan(this.roughness, this.ssrMaxRoughness), function () {
           this.$l.pos = this.getPosition(this.screenUV, this.invProjMatrix);
           this.$l.linearDepth = this.pos.w;
-          this.$l.color = pb.vec3(0);
-          this.$l.a = pb.float();
           this.$if(pb.greaterThanEqual(this.linearDepth, 1), function () {
             if (!blur) {
               this.color = this.sceneColor;
@@ -652,12 +640,14 @@ export class SSR extends AbstractPostEffect {
                   this.normalTex,
                   !!ctx.camera.ssrCalcThickness
                 );
+            this.$l.hitAlpha = pb.clamp(this.hitInfo.w, 0, 1);
+            this.$l.hitUV = pb.clamp(this.hitInfo.xy, pb.vec2(0), pb.vec2(1));
             if (blur) {
               this.blurRadius = pb.float(0);
               this.$if(pb.greaterThan(this.roughness, 0.001), function () {
                 this.$l.coneAngle = pb.mul(pb.min(this.roughness, 0.999), Math.PI * 0.5);
                 this.$l.coneLen = this.$choice(
-                  pb.greaterThan(this.hitInfo.w, 0),
+                  pb.greaterThan(this.hitAlpha, 0),
                   this.hitInfo.z,
                   pb.min(this.targetSize.z, this.targetSize.w)
                 );
@@ -669,8 +659,8 @@ export class SSR extends AbstractPostEffect {
                   pb.mul(this.coneLen, 4)
                 );
               });
-              this.a = this.hitInfo.w;
-              this.color = pb.vec3(this.hitInfo.xy, pb.clamp(pb.div(this.blurRadius, 255), 0, 1));
+              this.a = this.hitAlpha;
+              this.color = pb.vec3(this.hitUV, pb.clamp(pb.div(this.blurRadius, 255), 0, 1));
             } else {
               if (ctx.env!.light.envLight) {
                 this.$l.reflectVecW = pb.mul(this.invViewMatrix, pb.vec4(this.reflectVec, 0)).xyz;
@@ -683,8 +673,8 @@ export class SSR extends AbstractPostEffect {
               }
               this.$l.reflectance = pb.mix(
                 this.env,
-                pb.textureSampleLevel(this.colorTex, this.hitInfo.xy, 0).rgb,
-                this.hitInfo.w
+                pb.textureSampleLevel(this.colorTex, this.hitUV, 0).rgb,
+                this.hitAlpha
               );
               this.reflectance = pb.div(this.reflectance, pb.add(this.reflectance, pb.vec3(1)));
               this.$l.strength = pb.clamp(this.roughnessValue.rgb, pb.vec3(0), pb.vec3(1));
@@ -693,6 +683,7 @@ export class SSR extends AbstractPostEffect {
                 pb.mul(this.sceneColor, pb.sub(pb.vec3(1), this.strength))
               );
             }
+          });
           });
           this.$if(pb.equal(this.srgbOut, 0), function () {
             this.$outputs.outColor = pb.vec4(this.color, this.a);

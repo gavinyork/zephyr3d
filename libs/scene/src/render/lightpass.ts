@@ -36,9 +36,11 @@ export class LightPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext, camera: Camera) {
-    return `${this._shadowMapHash}:${camera.oit?.calculateHash() ?? ''}:${ctx.env!.getHash(ctx)}:${
-      ctx.materialFlags
-    }:${ctx.linearDepthTexture?.uid ?? 0}:${ctx.sceneColorTexture?.uid ?? 0}:${ctx.HiZTexture?.uid ?? 0}`;
+    return `${this._shadowMapHash}:${ctx.lightBlending ? 1 : 0}:${camera.oit?.calculateHash() ?? ''}:${
+      ctx.env!.getHash(ctx)
+    }:${ctx.materialFlags}:${ctx.linearDepthTexture?.uid ?? 0}:${ctx.sceneColorTexture?.uid ?? 0}:${
+      ctx.HiZTexture?.uid ?? 0
+    }`;
   }
   /** @internal */
   protected renderLightPass(

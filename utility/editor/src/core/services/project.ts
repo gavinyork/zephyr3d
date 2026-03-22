@@ -18,12 +18,40 @@ export type ProjectSettings = {
   splashScreen?: string;
   startupScript?: string;
   preferredRHI?: string[];
+  enableMSAA?: boolean;
+  renderScale?: number;
   dependencies?: { [name: string]: string };
 };
 
 const defaultProjectSettings: Immutable<ProjectSettings> = {
-  preferredRHI: ['WebGL', 'WebGL2', 'WebGPU']
+  preferredRHI: ['WebGL', 'WebGL2', 'WebGPU'],
+  enableMSAA: false,
+  renderScale: 1
 };
+
+function normalizeRenderScale(scale: number): number {
+  const supportedScales = [1, 1.25, 1.5, 2];
+  if (typeof scale !== 'number' || !Number.isFinite(scale)) {
+    return 1;
+  }
+  for (const value of supportedScales) {
+    if (Math.abs(value - scale) < 1e-6) {
+      return value;
+    }
+  }
+  return 1;
+}
+
+function normalizeProjectSettings(settings: ProjectSettings): ProjectSettings {
+  const preferredRHI = settings?.preferredRHI ?? defaultProjectSettings.preferredRHI;
+  return {
+    ...defaultProjectSettings,
+    ...settings,
+    preferredRHI: preferredRHI ? [...preferredRHI] : undefined,
+    enableMSAA: !!settings?.enableMSAA,
+    renderScale: normalizeRenderScale(settings?.renderScale)
+  };
+}
 
 export type RecentProject = {
   uuid: string;
@@ -146,13 +174,13 @@ export class ProjectService {
         });
       }
       const content = (await this.VFS.readFile(`/${projectFileName}`, { encoding: 'utf8' })) as string;
-      return JSON.parse(content);
+      return normalizeProjectSettings(JSON.parse(content));
     }
     return null;
   }
   static async saveCurrentProjectSettings(settings: ProjectSettings) {
     if (this.VFS) {
-      await this.VFS.writeFile(`/${projectFileName}`, JSON.stringify(settings, null, 2), {
+      await this.VFS.writeFile(`/${projectFileName}`, JSON.stringify(normalizeProjectSettings(settings), null, 2), {
         encoding: 'utf8',
         create: true
       });

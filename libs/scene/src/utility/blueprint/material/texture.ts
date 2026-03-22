@@ -721,6 +721,171 @@ export class ConstantTextureCubeNode extends BaseTextureNode {
 }
 
 /**
+ * UV panner node (scrolls UVs over time)
+ *
+ * @remarks
+ * Computes:
+ * `coord + time * speed`
+ *
+ * If `Coordinate` is not connected, the node defaults to mesh UV0 in IR.
+ * If `Time` is not connected, the node defaults to elapsed time in IR.
+ *
+ * Inputs:
+ * - Coordinate (vec2)
+ * - Time (float)
+ * - Speed (vec2)
+ *
+ * Output:
+ * - Output 1: Panned UV (vec2)
+ *
+ * @example
+ * ```typescript
+ * const panner = new PannerNode();
+ * panner.speedX = 0.1;
+ * panner.speedY = 0.0;
+ *
+ * const tex = new ConstantTexture2DNode();
+ * const sample = new TextureSampleNode();
+ * sample.connectInput(1, tex, 1);
+ * sample.connectInput(2, panner, 1);
+ * ```
+ *
+ * @public
+ */
+export class PannerNode extends BaseGraphNode {
+  /** Speed in U direction */
+  private _speedX: number;
+  /** Speed in V direction */
+  private _speedY: number;
+  /**
+   * Creates a new panner node
+   *
+   * @remarks
+   * Initializes with optional inputs for coordinate, time, and speed.
+   */
+  constructor() {
+    super();
+    this._speedX = 0;
+    this._speedY = 0;
+    this._inputs = [
+      {
+        id: 1,
+        name: 'Coordinate',
+        type: ['vec2']
+      },
+      {
+        id: 2,
+        name: 'Time',
+        type: ['float']
+      },
+      {
+        id: 3,
+        name: 'Speed',
+        type: ['vec2'],
+        defaultValue: [this._speedX, this._speedY]
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'Panner'
+   */
+  toString() {
+    return 'Panner';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: PannerNode,
+      name: 'PannerNode',
+      getProps(): PropertyAccessor<PannerNode>[] {
+        return defineProps([
+          {
+            name: 'SpeedX',
+            type: 'float',
+            get(this: PannerNode, value) {
+              value.num[0] = this.speedX;
+            },
+            set(this: PannerNode, value) {
+              this.speedX = value.num[0];
+            }
+          },
+          {
+            name: 'SpeedY',
+            type: 'float',
+            get(this: PannerNode, value) {
+              value.num[0] = this.speedY;
+            },
+            set(this: PannerNode, value) {
+              this.speedY = value.num[0];
+            }
+          }
+        ]);
+      }
+    };
+  }
+  /**
+   * Gets speed in U direction
+   */
+  get speedX() {
+    return this._speedX;
+  }
+  set speedX(val: number) {
+    if (this._speedX !== val) {
+      this._speedX = val;
+      const speedInput = this._inputs.find((input) => input.id === 3);
+      if (speedInput) {
+        speedInput.defaultValue = [this._speedX, this._speedY];
+      }
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Gets speed in V direction
+   */
+  get speedY() {
+    return this._speedY;
+  }
+  set speedY(val: number) {
+    if (this._speedY !== val) {
+      this._speedY = val;
+      const speedInput = this._inputs.find((input) => input.id === 3);
+      if (speedInput) {
+        speedInput.defaultValue = [this._speedX, this._speedY];
+      }
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   */
+  protected validate() {
+    return '';
+  }
+  /**
+   * Gets the output type
+   *
+   * @returns 'vec2'
+   */
+  protected getType() {
+    return 'vec2';
+  }
+}
+
+/**
  * Texture sampling node
  *
  * @remarks

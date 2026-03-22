@@ -1,10 +1,13 @@
 import {
   VertexColorNode,
   VertexNormalNode,
+  PixelNormalNode,
   VertexTangentNode,
   VertexBinormalNode,
   CameraPositionNode,
+  CameraVectorNode,
   VertexPositionNode,
+  PixelWorldPositionNode,
   VertexUVNode,
   ElapsedTimeNode,
   CameraNearFarNode,
@@ -51,6 +54,10 @@ export function getInputNodeCategories(): NodeCategory[] {
           create: () => new VertexNormalNode()
         },
         {
+          name: 'PixelNormalWS',
+          create: () => new PixelNormalNode()
+        },
+        {
           name: 'VertexTangentWS',
           create: () => new VertexTangentNode()
         },
@@ -61,6 +68,10 @@ export function getInputNodeCategories(): NodeCategory[] {
         {
           name: 'WorldPosition',
           create: () => new VertexPositionNode()
+        },
+        {
+          name: 'PixelWorldPosition',
+          create: () => new PixelWorldPositionNode()
         },
         {
           name: 'WorldToViewMatrix',
@@ -89,6 +100,10 @@ export function getInputNodeCategories(): NodeCategory[] {
         {
           name: 'CameraPositionWS',
           create: () => new CameraPositionNode()
+        },
+        {
+          name: 'CameraVectorWS',
+          create: () => new CameraVectorNode()
         },
         {
           name: 'CameraNearFar',
