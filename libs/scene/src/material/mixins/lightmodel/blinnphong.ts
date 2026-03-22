@@ -5,9 +5,7 @@ import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
 import type { DrawContext } from '../../../render';
 import { ShaderHelper } from '../../shader/helper';
-import { MaterialVaryingFlags } from '../../../values';
-import type { Immutable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { LIGHT_TYPE_POINT, MaterialVaryingFlags } from '../../../values';
 
 /**
  * Interface for blinn-phong lighting model mixin
@@ -15,9 +13,6 @@ import { Vector4 } from '@zephyr3d/base';
  */
 export type IMixinBlinnPhong = {
   shininess: number;
-  scatterWrap: number;
-  scatterWidth: number;
-  scatterColor: Vector4;
   blinnPhongLight(
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp,
@@ -40,27 +35,16 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
   }
   const S = applyMaterialMixins(BaseCls, mixinLight);
   const SHININESS_UNIFORM = S.defineInstanceUniform('shininess', 'float', 'Shininess');
-  let FEATURE_WRAP_LIGHTING = 0;
-  const cls = class extends S implements IMixinBlinnPhong {
+  return class extends S {
     protected static blinnPhongMixed = true;
     private _shininess: number;
-    private _wrap: number;
-    private _scatterWidth: number;
-    private _scatterColor: Vector4;
     constructor() {
       super();
       this._shininess = 32;
-      this._wrap = 0;
-      this._scatterWidth = 0.3;
-      this._scatterColor = Vector4.zero();
-      this.useFeature(FEATURE_WRAP_LIGHTING, false);
     }
     copyFrom(other: this) {
       super.copyFrom(other);
       this.shininess = other.shininess;
-      this.scatterWrap = other.scatterWrap;
-      this.scatterColor = other.scatterColor;
-      this.scatterWidth = other.scatterWidth;
     }
     /** Shininess */
     get shininess() {
@@ -69,37 +53,6 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
     set shininess(val) {
       if (val !== this._shininess) {
         this._shininess = val;
-        this.uniformChanged();
-      }
-    }
-    /** Wrap */
-    get scatterWrap() {
-      return this._wrap;
-    }
-    set scatterWrap(wrap) {
-      if (this._wrap !== wrap) {
-        this._wrap = wrap;
-        this.uniformChanged();
-        this.useFeature(FEATURE_WRAP_LIGHTING, this._wrap !== 0);
-      }
-    }
-    /** Scatter color */
-    get scatterColor(): Immutable<Vector4> {
-      return this._scatterColor;
-    }
-    set scatterColor(color: Immutable<Vector4>) {
-      if (!color.equalsTo(this._scatterColor)) {
-        this._scatterColor.set(color);
-        this.uniformChanged();
-      }
-    }
-    /** Scatter width */
-    get scatterWidth() {
-      return this._scatterWidth;
-    }
-    set scatterWidth(val) {
-      if (val !== this._scatterWidth) {
-        this._scatterWidth = val;
         this.uniformChanged();
       }
     }
@@ -114,22 +67,12 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       if (this.needFragmentColor() && !(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         scope.zShininess = pb.float().uniform(2);
-        if (this.featureUsed(FEATURE_WRAP_LIGHTING)) {
-          scope.zScatterWrap = pb.float().uniform(2);
-          scope.zScatterWidth = pb.float().uniform(2);
-          scope.zScatterColor = pb.vec4().uniform(2);
-        }
       }
     }
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (this.needFragmentColor(ctx) && !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
         bindGroup.setValue('zShininess', this._shininess);
-        if (this.featureUsed(FEATURE_WRAP_LIGHTING)) {
-          bindGroup.setValue('zScatterWrap', this._wrap);
-          bindGroup.setValue('zScatterWidth', this._scatterWidth);
-          bindGroup.setValue('zScatterColor', this._scatterColor);
-        }
       }
     }
     blinnPhongLight(
@@ -166,7 +109,18 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
               this.$l.diffuseColor = pb.vec3(0);
             }
             this.$l.specularColor = pb.vec3(0);
-            that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
+            that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
+              this.$l.diffuseScale = pb.float(1);
+              this.$l.specularScale = pb.float(1);
+              this.$l.sourceRadiusFactor = pb.float(0);
+              this.$if(pb.equal(type, LIGHT_TYPE_POINT), function () {
+                this.diffuseScale = extra.x;
+                this.specularScale = extra.y;
+                this.sourceRadiusFactor = pb.div(
+                  extra.z,
+                  pb.max(pb.distance(posRange.xyz, this.worldPos), 0.0001)
+                );
+              });
               this.$l.lightAtten = that.calculateLightAttenuation(
                 this,
                 type,
@@ -175,33 +129,14 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
                 dirCutoff
               );
               this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
-              this.$l.NoL = pb.dot(this.normal, this.lightDir);
+              this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
               this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
               this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
               this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
-              if (that.featureUsed(FEATURE_WRAP_LIGHTING)) {
-                this.$l.NoLwrap = pb.div(pb.add(this.NoL, this.zScatterWrap), pb.add(1, this.zScatterWrap));
-                this.$l.diff = pb.max(this.NoLwrap, 0);
-                this.$l.scatter = pb.mul(
-                  pb.smoothStep(0, this.zScatterWidth, this.NoLwrap),
-                  pb.smoothStep(pb.mul(this.zScatterWidth, 2), this.zScatterWidth, this.NoLwrap)
-                );
-                this.$l.spec = this.$choice(
-                  pb.lessThanEqual(this.NoLwrap, 0),
-                  pb.float(0),
-                  pb.pow(this.NoH, shininess)
-                );
-                this.$l.diffuse = pb.mul(
-                  this.lightColor,
-                  1 / Math.PI,
-                  pb.add(pb.vec3(this.diff), pb.mul(this.zScatterColor.rgb, this.scatter))
-                );
-                this.$l.specular = pb.mul(this.lightColor, this.spec);
-              } else {
-                this.NoL = pb.clamp(this.NoL, 0, 1);
-                this.$l.diffuse = pb.mul(this.lightColor, 1 / Math.PI, this.NoL);
-                this.$l.specular = pb.mul(this.lightColor, pb.pow(this.NoH, shininess));
-              }
+              this.$l.pointShininess = pb.div(shininess, pb.add(1, pb.mul(this.sourceRadiusFactor, 32)));
+              this.$l.pointShininess = pb.max(this.pointShininess, 1);
+              this.$l.diffuse = pb.mul(this.lightColor, 1 / Math.PI, this.NoL, this.diffuseScale);
+              this.$l.specular = pb.mul(this.lightColor, pb.pow(this.NoH, this.pointShininess), this.specularScale);
               if (shadow) {
                 this.$if(pb.greaterThan(this.NoL, 0), function () {
                   this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));
@@ -231,6 +166,4 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
       ) as PBShaderExp;
     }
   } as unknown as T & { new (...args: any[]): IMixinBlinnPhong };
-  FEATURE_WRAP_LIGHTING = cls.defineFeature();
-  return cls;
 }

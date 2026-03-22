@@ -281,6 +281,74 @@ export class VertexPositionNode extends BaseGraphNode {
 }
 
 /**
+ * Pixel world position input node
+ *
+ * @remarks
+ * Provides access to current pixel world-space position.
+ *
+ * Outputs:
+ * - Output 1: Full position (vec3)
+ * - Output 2: X coordinate (float)
+ * - Output 3: Y coordinate (float)
+ * - Output 4: Z coordinate (float)
+ *
+ * @public
+ */
+export class PixelWorldPositionNode extends BaseGraphNode {
+  /**
+   * Creates a new pixel world position node
+   */
+  constructor() {
+    super();
+    this._outputs = [
+      { id: 1, name: '' },
+      { id: 2, name: 'x', swizzle: 'x' },
+      { id: 3, name: 'y', swizzle: 'y' },
+      { id: 4, name: 'z', swizzle: 'z' }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'pixel world position'
+   */
+  toString() {
+    return 'pixel world position';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   */
+  static getSerializationCls() {
+    return {
+      ctor: PixelWorldPositionNode,
+      name: 'PixelWorldPositionNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   */
+  protected validate() {
+    return '';
+  }
+  /**
+   * Gets the output type for a specific output slot
+   *
+   * @param id - The output slot ID
+   * @returns 'float' for individual component outputs (id > 1), 'vec3' for full position
+   */
+  protected getType(id: number) {
+    return id > 1 ? 'float' : 'vec3';
+  }
+}
+
+/**
  * Vertex normal input node
  *
  * @remarks
@@ -371,6 +439,77 @@ export class VertexNormalNode extends BaseGraphNode {
    *
    * @param id - The output slot ID
    * @returns 'float' for individual component outputs (id \> 1), 'vec3' for full normal
+   */
+  protected getType(id: number) {
+    return id > 1 ? 'float' : 'vec3';
+  }
+}
+
+/**
+ * Pixel normal input node
+ *
+ * @remarks
+ * Provides access to the world-space surface normal used in fragment shading.
+ *
+ * Outputs:
+ * - Output 1: Full normal vector (vec3, normalized)
+ * - Output 2: X component (float)
+ * - Output 3: Y component (float)
+ * - Output 4: Z component (float)
+ *
+ * @public
+ */
+export class PixelNormalNode extends BaseGraphNode {
+  /**
+   * Creates a new pixel normal node
+   *
+   * @remarks
+   * Initializes with 4 output slots: full normal and individual X, Y, Z components.
+   */
+  constructor() {
+    super();
+    this._outputs = [
+      { id: 1, name: '' },
+      { id: 2, name: 'x', swizzle: 'x' },
+      { id: 3, name: 'y', swizzle: 'y' },
+      { id: 4, name: 'z', swizzle: 'z' }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'pixel normal'
+   */
+  toString() {
+    return 'pixel normal';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   */
+  static getSerializationCls() {
+    return {
+      ctor: PixelNormalNode,
+      name: 'PixelNormalNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   */
+  protected validate() {
+    return '';
+  }
+  /**
+   * Gets the output type for a specific output slot
+   *
+   * @param id - The output slot ID
+   * @returns 'float' for individual component outputs (id > 1), 'vec3' for full normal
    */
   protected getType(id: number) {
     return id > 1 ? 'float' : 'vec3';
@@ -1245,6 +1384,77 @@ export class CameraPositionNode extends BaseGraphNode {
    *
    * @param id - The output slot ID
    * @returns 'float' for individual component outputs (id \> 1), 'vec3' for full position
+   */
+  protected getType(id: number) {
+    return id > 1 ? 'float' : 'vec3';
+  }
+}
+
+/**
+ * Camera vector input node
+ *
+ * @remarks
+ * Provides the world-space direction from current surface point to camera.
+ *
+ * Outputs:
+ * - Output 1: Full vector (vec3, normalized)
+ * - Output 2: X component (float)
+ * - Output 3: Y component (float)
+ * - Output 4: Z component (float)
+ *
+ * @public
+ */
+export class CameraVectorNode extends BaseGraphNode {
+  /**
+   * Creates a new camera vector node
+   *
+   * @remarks
+   * Initializes with 4 output slots: full vector and individual X, Y, Z components.
+   */
+  constructor() {
+    super();
+    this._outputs = [
+      { id: 1, name: '' },
+      { id: 2, name: 'x', swizzle: 'x' },
+      { id: 3, name: 'y', swizzle: 'y' },
+      { id: 4, name: 'z', swizzle: 'z' }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'camera vector'
+   */
+  toString() {
+    return 'camera vector';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   */
+  static getSerializationCls() {
+    return {
+      ctor: CameraVectorNode,
+      name: 'CameraVectorNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid)
+   */
+  protected validate() {
+    return '';
+  }
+  /**
+   * Gets the output type for a specific output slot
+   *
+   * @param id - The output slot ID
+   * @returns 'float' for individual component outputs (id > 1), 'vec3' for full vector
    */
   protected getType(id: number) {
     return id > 1 ? 'float' : 'vec3';

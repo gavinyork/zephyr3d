@@ -36,7 +36,7 @@ export class ClusteredLight {
     this._tileCountX = 16;
     this._tileCountY = 16;
     this._tileCountZ = 32;
-    this._lights = new Float32Array(12 * (MAX_CLUSTERED_LIGHTS + 1));
+    this._lights = new Float32Array(16 * (MAX_CLUSTERED_LIGHTS + 1));
     this._lightIndexTexture = null;
     this._lightIndexFramebuffer = null;
     this._lightIndexProgram = null;
@@ -102,7 +102,7 @@ export class ClusteredLight {
         this.sizeParam = pb.vec4().uniform(0);
         this.countParam = pb.ivec4().uniform(0);
         this[ShaderHelper.getLightBufferUniformName()] =
-          pb.vec4[(MAX_CLUSTERED_LIGHTS + 1) * 3]().uniformBuffer(0);
+          pb.vec4[(MAX_CLUSTERED_LIGHTS + 1) * 4]().uniformBuffer(0);
         pb.func('lineIntersectionToZPlane', [pb.vec3('a'), pb.vec3('b'), pb.float('zDistance')], function () {
           this.$l.normal = pb.vec3(0, 0, 1);
           this.$l.ab = pb.sub(this.b, this.a);
@@ -222,7 +222,7 @@ export class ClusteredLight {
               this.$if(pb.equal(this.i, this.countParam.w), function () {
                 this.$break();
               });
-              this.$l.light = this[ShaderHelper.getLightBufferUniformName()].at(pb.mul(this.i, 3));
+              this.$l.light = this[ShaderHelper.getLightBufferUniformName()].at(pb.mul(this.i, 4));
               this.$l.lightPos = pb.mul(this.viewMatrix, pb.vec4(this.light.xyz, 1));
               this.$l.lightPos.w = this.light.w;
               this.$if(this.sphereIntersectsAABB(this.lightPos, this.aabbMin, this.aabbMax), function () {
@@ -262,7 +262,7 @@ export class ClusteredLight {
               pb.uint(0)
             ];
             this.$for(pb.uint('i'), 1, pb.uint(this.countParam.w), function () {
-              this.$l.light = this[ShaderHelper.getLightBufferUniformName()].at(pb.mul(this.i, 3));
+              this.$l.light = this[ShaderHelper.getLightBufferUniformName()].at(pb.mul(this.i, 4));
               this.$l.lightPos = pb.mul(this.viewMatrix, pb.vec4(this.light.xyz, 1));
               this.$l.lightPos.w = this.light.w;
               this.$if(this.sphereIntersectsAABB(this.lightPos, this.aabbMin, this.aabbMax), function () {
@@ -394,9 +394,11 @@ export class ClusteredLight {
     const numLights = Math.min(renderQueue.unshadowedLights.length, MAX_CLUSTERED_LIGHTS);
     for (let i = 1; i <= numLights; i++) {
       const light = renderQueue.unshadowedLights[i - 1];
-      lights.set(light.positionAndRange, i * 12);
-      lights.set(light.directionAndCutoff, i * 12 + 4);
-      lights.set(light.diffuseAndIntensity, i * 12 + 8);
+      const offset = i * 16;
+      lights.set(light.positionAndRange, offset);
+      lights.set(light.directionAndCutoff, offset + 4);
+      lights.set(light.diffuseAndIntensity, offset + 8);
+      lights.set(light.extraParams, offset + 12);
     }
     return numLights;
   }

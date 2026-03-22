@@ -23,9 +23,11 @@ import { FXAA } from '../posteffect/fxaa';
 import { Bloom } from '../posteffect/bloom';
 import { SAO } from '../posteffect/sao';
 import { MotionBlur } from '../posteffect/motionblur';
+import { ColorAdjust } from '../posteffect/coloradjust';
 import { getDevice } from '../app/api';
 import type { ScreenConfig } from '../app/screen';
 import { ScreenAdapter } from '../app/screen';
+import {ABufferOIT} from '../render/abuffer_oit'
 
 /**
  * Result of a camera picking operation.
@@ -53,6 +55,8 @@ export type PickResult = {
 export type CameraHistoryData = {
   prevColorTex: Nullable<BaseTexture>;
   prevMotionVectorTex: Nullable<BaseTexture>;
+  prevSSRReflectTex: Nullable<BaseTexture>;
+  prevSSRMotionVectorTex: Nullable<BaseTexture>;
 };
 
 /**
@@ -157,6 +161,18 @@ export class Camera extends SceneNode {
   protected _bloomThresholdKnee: number;
   /** @internal Bloom intensity. */
   protected _bloomIntensity: number;
+  /** @internal Color adjustment enable flag (via post effect). */
+  protected _colorAdjustEnabled: boolean;
+  /** @internal Color adjustment post effect reference. */
+  protected _postEffectColorAdjust: DRef<ColorAdjust>;
+  /** @internal Color adjustment saturation. */
+  protected _colorAdjustSaturation: number;
+  /** @internal Color adjustment contrast. */
+  protected _colorAdjustContrast: number;
+  /** @internal Color adjustment hue (degrees). */
+  protected _colorAdjustHue: number;
+  /** @internal Color adjustment sharpen amount. */
+  protected _colorAdjustSharpen: number;
 
   /** @internal FXAA enable flag (via post effect). */
   protected _FXAA: boolean;
@@ -269,7 +285,7 @@ export class Camera extends SceneNode {
     this._clipMask = 0;
     this._frustum = null;
     this._frustumV = null;
-    this._oit = new DRef();
+    this._oit = new DRef(new ABufferOIT(20));  //修改摄像机属性
     this._depthPrePass = false;
     this._screenAdapter = new ScreenAdapter();
     this._adapted = false;
@@ -288,6 +304,12 @@ export class Camera extends SceneNode {
     this._bloomThreshold = 0.8;
     this._bloomThresholdKnee = 0;
     this._bloomIntensity = 1;
+    this._colorAdjustEnabled = false;
+    this._postEffectColorAdjust = new DRef();
+    this._colorAdjustSaturation = 1;
+    this._colorAdjustContrast = 1;
+    this._colorAdjustHue = 0;
+    this._colorAdjustSharpen = 0;
     this._FXAA = false;
     this._postEffectFXAA = new DRef();
     this._TAA = false;
@@ -295,15 +317,15 @@ export class Camera extends SceneNode {
     this._TAADebug = 0;
     this._SSR = false;
     this._postEffectSSR = new DRef();
-    this._ssrParams = new Vector4(100, 120, 0.5, 0);
-    this._ssrMaxRoughness = 0.8;
+    this._ssrParams = new Vector4(64, 96, 0.9, 0);
+    this._ssrMaxRoughness = 0.55;
     this._ssrRoughnessFactor = 1;
-    this._ssrStride = 2;
+    this._ssrStride = 1;
     this._ssrCalcThickness = false;
-    this._ssrBlurriness = 0.01;
+    this._ssrBlurriness = 0.008;
     this._ssrBlurDepthCutoff = 2;
-    this._ssrBlurKernelSize = 10;
-    this._ssrBlurStdDev = 10;
+    this._ssrBlurKernelSize = 5;
+    this._ssrBlurStdDev = 4;
     this._SSAO = false;
     this._postEffectSSAO = new DRef();
     this._SSAOScale = 10;
@@ -491,6 +513,53 @@ export class Camera extends SceneNode {
     this._bloomIntensity = val;
     if (this._postEffectBloom.get()) {
       this._postEffectBloom.get()!.intensity = val;
+    }
+  }
+  /** Whether color adjustment is enabled. */
+  get colorAdjust() {
+    return this._postEffectColorAdjust.get()!.enabled;
+  }
+  set colorAdjust(val) {
+    this._postEffectColorAdjust.get()!.enabled = !!val;
+  }
+  /** Color adjustment saturation, 1 means unchanged. */
+  get colorAdjustSaturation() {
+    return this._colorAdjustSaturation;
+  }
+  set colorAdjustSaturation(val) {
+    this._colorAdjustSaturation = val;
+    if (this._postEffectColorAdjust.get()) {
+      this._postEffectColorAdjust.get()!.saturation = val;
+    }
+  }
+  /** Color adjustment contrast, 1 means unchanged. */
+  get colorAdjustContrast() {
+    return this._colorAdjustContrast;
+  }
+  set colorAdjustContrast(val) {
+    this._colorAdjustContrast = val;
+    if (this._postEffectColorAdjust.get()) {
+      this._postEffectColorAdjust.get()!.contrast = val;
+    }
+  }
+  /** Color adjustment hue in degrees. */
+  get colorAdjustHue() {
+    return this._colorAdjustHue;
+  }
+  set colorAdjustHue(val) {
+    this._colorAdjustHue = val;
+    if (this._postEffectColorAdjust.get()) {
+      this._postEffectColorAdjust.get()!.hue = val;
+    }
+  }
+  /** Color adjustment sharpen amount, 0 means disabled. */
+  get colorAdjustSharpen() {
+    return this._colorAdjustSharpen;
+  }
+  set colorAdjustSharpen(val) {
+    this._colorAdjustSharpen = val;
+    if (this._postEffectColorAdjust.get()) {
+      this._postEffectColorAdjust.get()!.sharpen = val;
     }
   }
   /**
@@ -1052,7 +1121,9 @@ export class Camera extends SceneNode {
     if (!data) {
       data = {
         prevColorTex: null,
-        prevMotionVectorTex: null
+        prevMotionVectorTex: null,
+        prevSSRReflectTex: null,
+        prevSSRMotionVectorTex: null
       };
       Camera._historyData.set(this, data);
     }
@@ -1069,6 +1140,12 @@ export class Camera extends SceneNode {
       }
       if (data.prevMotionVectorTex) {
         getDevice().pool.releaseTexture(data.prevMotionVectorTex);
+      }
+      if (data.prevSSRReflectTex) {
+        getDevice().pool.releaseTexture(data.prevSSRReflectTex);
+      }
+      if (data.prevSSRMotionVectorTex) {
+        getDevice().pool.releaseTexture(data.prevSSRMotionVectorTex);
       }
       Camera._historyData.delete(this);
     }
@@ -1117,6 +1194,16 @@ export class Camera extends SceneNode {
       this._postEffectTonemap.set(tonemap);
       this._compositor.appendPostEffect(tonemap);
     }
+    if (!this._postEffectColorAdjust.get()) {
+      const colorAdjust = new ColorAdjust();
+      colorAdjust.enabled = false;
+      colorAdjust.saturation = this._colorAdjustSaturation;
+      colorAdjust.contrast = this._colorAdjustContrast;
+      colorAdjust.hue = this._colorAdjustHue;
+      colorAdjust.sharpen = this._colorAdjustSharpen;
+      this._postEffectColorAdjust.set(colorAdjust);
+      this._compositor.appendPostEffect(colorAdjust);
+    }
     if (!this._postEffectFXAA.get()) {
       const fxaa = new FXAA();
       fxaa.enabled = false;
@@ -1143,7 +1230,7 @@ export class Camera extends SceneNode {
   render(scene: Scene) {
     const device = getDevice();
     //this.updatePostProcessing(device);
-    const useMotionVector = (this.TAA || this.motionBlur) && device.type !== 'webgl';
+    const useMotionVector = (this.TAA || this.motionBlur || this.SSR) && device.type !== 'webgl';
     const useTAA = useMotionVector && this.TAA;
     scene.dispatchEvent('startrender', scene, this, this._compositor);
     if (useMotionVector) {
@@ -1308,6 +1395,7 @@ export class Camera extends SceneNode {
     this._postEffectSSR.dispose();
     this._postEffectTAA.dispose();
     this._postEffectTonemap.dispose();
+    this._postEffectColorAdjust.dispose();
     this._oit.dispose();
   }
   /** @internal */

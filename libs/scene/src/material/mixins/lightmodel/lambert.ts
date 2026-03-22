@@ -3,6 +3,7 @@ import type { MeshMaterial } from '../../meshmaterial';
 import { applyMaterialMixins } from '../../meshmaterial';
 import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
+import { LIGHT_TYPE_POINT } from '../../../values';
 
 /**
  * Interface of lambert lighting model mixin
@@ -51,7 +52,11 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
           } else {
             this.$l.diffuseColor = pb.vec3(0);
           }
-          that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
+          that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
+            this.$l.diffuseScale = pb.float(1);
+            this.$if(pb.equal(type, LIGHT_TYPE_POINT), function () {
+              this.diffuseScale = extra.x;
+            });
             this.$l.lightAtten = that.calculateLightAttenuation(
               this,
               type,
@@ -61,7 +66,7 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
             );
             this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
             this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
-            this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
+            this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.diffuseScale);
             this.$l.diffuse = pb.mul(this.lightColor, 1 / Math.PI, this.NoL);
             if (shadow) {
               this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));

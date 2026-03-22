@@ -22,7 +22,7 @@ import {
 import type { GenericConstructor, DRef, Nullable } from '@zephyr3d/base';
 import type { Vector4 } from '@zephyr3d/base';
 import { ASSERT } from '@zephyr3d/base';
-import { BaseTextureNode, TextureSampleNode } from './texture';
+import { BaseTextureNode, PannerNode, TextureSampleNode } from './texture';
 import type { ComparisonMode } from '../common/math';
 import {
   GenericMathNode,
@@ -33,6 +33,7 @@ import {
   Hash1Node,
   Hash2Node,
   Hash3Node,
+  RotateAboutAxisNode,
   SwizzleNode,
   CompComparisonNode,
   AnyConditionNode,
@@ -53,7 +54,10 @@ import {
 import {
   CameraNearFarNode,
   CameraPositionNode,
+  CameraVectorNode,
   ElapsedTimeNode,
+  PixelNormalNode,
+  PixelWorldPositionNode,
   SkyEnvTextureNode,
   VertexBinormalNode,
   VertexColorNode,
@@ -546,8 +550,11 @@ class IRFunc extends IRExpression {
   create(pb: ProgramBuilder) {
     if (this.tmpName) {
       const exp = pb.getCurrentScope()[this.tmpName] as PBShaderExp;
-      ASSERT(!!exp, 'expression not exists');
-      return exp;
+      if (exp) {
+        return exp;
+      }
+      // Scope changed, recompute in current scope
+      this.tmpName = '';
     }
     const params = this.params.map((param) => (param instanceof IRExpression ? param.create(pb) : param));
     // @ts-ignore
@@ -1419,6 +1426,8 @@ export class MaterialBlueprintIR {
       expr = this.constantTexture(node, output);
     } else if (node instanceof TextureSampleNode) {
       expr = this.textureSample(node, output);
+    } else if (node instanceof PannerNode) {
+      expr = this.panner(node, output);
     } else if (node instanceof MakeVectorNode) {
       expr = this.makeVector(node, output);
     } else if (node instanceof SwizzleNode) {
@@ -1451,14 +1460,20 @@ export class MaterialBlueprintIR {
       expr = this.func(node, output);
     } else if (node instanceof TransformNode) {
       expr = this.transform(node, output);
+    } else if (node instanceof RotateAboutAxisNode) {
+      expr = this.rotateAboutAxis(node, output);
     } else if (node instanceof VertexColorNode) {
       expr = this.vertexColor(node, output);
     } else if (node instanceof VertexUVNode) {
       expr = this.vertexUV(node, output);
     } else if (node instanceof VertexPositionNode) {
       expr = this.vertexPosition(node, output);
+    } else if (node instanceof PixelWorldPositionNode) {
+      expr = this.pixelWorldPosition(node, output);
     } else if (node instanceof VertexNormalNode) {
       expr = this.vertexNormal(node, output);
+    } else if (node instanceof PixelNormalNode) {
+      expr = this.pixelNormal(node, output);
     } else if (node instanceof VertexTangentNode) {
       expr = this.vertexTangent(node, output);
     } else if (node instanceof VertexBinormalNode) {
@@ -1477,6 +1492,8 @@ export class MaterialBlueprintIR {
       expr = this.billboardMatrix(node, output);
     } else if (node instanceof CameraPositionNode) {
       expr = this.cameraPosition(node, output);
+    } else if (node instanceof CameraVectorNode) {
+      expr = this.cameraVector(node, output);
     } else if (node instanceof CameraNearFarNode) {
       expr = this.cameraNearFar(node, output);
     } else if (node instanceof SkyEnvTextureNode) {
@@ -1633,6 +1650,54 @@ export class MaterialBlueprintIR {
     const input = this.ir(node.inputs[0])!;
     return this.getOrCreateIRExpression(node, output, IRFunctionOutput, input);
   }
+  /** Converts a rotate-about-axis node to IR */
+  private rotateAboutAxis(node: RotateAboutAxisNode, output: number): IRExpression {
+    const axis = this.ir(node.inputs[0])!;
+    const angleTurns = node.inputs[1].inputNode
+      ? this.ir(node.inputs[1])!
+      : new IRConstantf(node.inputs[1].defaultValue?.[0] ?? 0, '');
+    const pivot = node.inputs[2].inputNode
+      ? this.ir(node.inputs[2])!
+      : new IRConstantfv(node.inputs[2].defaultValue ?? [0, 0, 0], '', 'vec3');
+    const position = this.ir(node.inputs[3])!;
+
+    const angleRad = new IRFunc([angleTurns, 6.283185307179586], 'mul'); // turns -> radians
+    const cosA = new IRFunc([angleRad], 'cos');
+    const sinA = new IRFunc([angleRad], 'sin');
+
+    const p = new IRFunc([position, pivot], 'sub');
+    const term1 = new IRFunc([p, cosA], 'mul');
+    const term2 = new IRFunc([new IRFunc([axis, p], 'cross'), sinA], 'mul');
+    const term3 = new IRFunc(
+      [axis, new IRFunc([new IRFunc([axis, p], 'dot'), new IRFunc([1, cosA], 'sub')], 'mul')],
+      'mul'
+    );
+    const rotated = new IRFunc([new IRFunc([term1, term2], 'add'), term3], 'add');
+    return this.getOrCreateIRExpression(node, output, IRFunc, [rotated, pivot], 'add');
+  }
+  /** Converts a panner node to IR */
+  private panner(node: PannerNode, output: number): IRExpression {
+    const coordInput = node.inputs[0];
+    const timeInput = node.inputs[1];
+    const speedInput = node.inputs[2];
+
+    const coord = coordInput.inputNode
+      ? this.ir(coordInput)!
+      : (() => {
+          this._behaviors.useVertexUV = true;
+          return new IRInput((scope) => scope.zVertexUV);
+        })();
+
+    const time = timeInput.inputNode
+      ? this.ir(timeInput)!
+      : new IRInput((scope: PBInsideFunctionScope) => ShaderHelper.getElapsedTime(scope));
+
+    const speed = speedInput.inputNode
+      ? this.ir(speedInput)!
+      : new IRConstantfv(speedInput.defaultValue ?? [0, 0], '', 'vec2');
+
+    return this.getOrCreateIRExpression(node, output, IRFunc, [coord, new IRFunc([time, speed], 'mul')], 'add');
+  }
   /** Converts a vertex color input node to IR */
   private vertexColor(node: VertexColorNode, output: number): IRExpression {
     this._behaviors.useVertexColor = true;
@@ -1653,6 +1718,14 @@ export class MaterialBlueprintIR {
         : scope.zVertexNormal
     );
   }
+  /** Converts a pixel normal input node to IR */
+  private pixelNormal(node: PixelNormalNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope) =>
+      scope.$builder.getDevice().type === 'vertex'
+        ? (scope.$getVertexAttrib('normal') ?? ShaderHelper.resolveVertexNormal(scope))
+        : scope.zVertexNormal
+    );
+  }
   /** Converts a vertex tangent input node to IR */
   private vertexTangent(node: VertexTangentNode, output: number): IRExpression {
     return this.getOrCreateIRExpression(node, output, IRInput, (scope) =>
@@ -1667,7 +1740,25 @@ export class MaterialBlueprintIR {
   }
   /** Converts a vertex position input node to IR */
   private vertexPosition(node: VertexPositionNode, output: number): IRExpression {
-    return this.getOrCreateIRExpression(node, output, IRInput, 'zWorldPos');
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope: PBInsideFunctionScope) => {
+      if (scope.$builder.getDevice().type === 'vertex') {
+        const worldMatrix = ShaderHelper.getWorldMatrix(scope);
+        const basePos = ShaderHelper.resolveVertexPosition(scope);
+        return scope.$builder.mul(worldMatrix, scope.$builder.vec4(basePos, 1)).xyz;
+      }
+      return scope.zWorldPos;
+    });
+  }
+  /** Converts a pixel world position input node to IR */
+  private pixelWorldPosition(node: PixelWorldPositionNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope: PBInsideFunctionScope) => {
+      if (scope.$builder.getDevice().type === 'vertex') {
+        const worldMatrix = ShaderHelper.getWorldMatrix(scope);
+        const basePos = ShaderHelper.resolveVertexPosition(scope);
+        return scope.$builder.mul(worldMatrix, scope.$builder.vec4(basePos, 1)).xyz;
+      }
+      return scope.zWorldPos;
+    });
   }
   /** Converts a view matrix input node to IR */
   private viewMatrix(node: ViewMatrixNode, output: number): IRExpression {
@@ -1703,6 +1794,25 @@ export class MaterialBlueprintIR {
   private cameraPosition(node: CameraPositionNode, output: number): IRExpression {
     return this.getOrCreateIRExpression(node, output, IRInput, (scope: PBInsideFunctionScope) =>
       ShaderHelper.getCameraPosition(scope)
+    );
+  }
+  /** Converts a camera vector input node to IR */
+  private cameraVector(node: CameraVectorNode, output: number): IRExpression {
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRInput,
+      (scope: PBInsideFunctionScope) => {
+        const pb = scope.$builder;
+        const worldPos =
+          pb.getDevice().type === 'vertex'
+            ? pb.mul(
+                ShaderHelper.getWorldMatrix(scope),
+                pb.vec4(ShaderHelper.resolveVertexPosition(scope), 1)
+              ).xyz
+            : scope.zWorldPos;
+        return pb.normalize(pb.sub(ShaderHelper.getCameraPosition(scope), worldPos));
+      }
     );
   }
   /** Converts a camera near/far input node to IR */

@@ -64,7 +64,8 @@ import {
   NotEqualNode,
   LogicallyAndNode,
   LogicallyOrNode,
-  SmoothStepNode
+  SmoothStepNode,
+  RotateAboutAxisNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
 
@@ -116,6 +117,10 @@ export function getMathNodeCategories(): NodeCategory[] {
         {
           name: 'Transform',
           create: () => new TransformNode()
+        },
+        {
+          name: 'RotateAboutAxis',
+          create: () => new RotateAboutAxisNode()
         },
         {
           name: 'CompAdd',

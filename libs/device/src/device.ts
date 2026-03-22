@@ -121,7 +121,7 @@ class ResizeHandler {
         this._handleResizeEntry(entry);
       });
       try {
-        (this._resizeObserver as any).observe(canvas);
+        (this._resizeObserver as any).observe(canvas, { box: 'device-pixel-content-box' });
       } catch {
         this._resizeObserver.observe(canvas);
       }
@@ -141,8 +141,8 @@ class ResizeHandler {
 
   private _handleResizeEntry(_entry: ResizeObserverEntry) {
     // CSS pixel
-    const cssWidth = _entry.contentBoxSize[0].inlineSize;
-    const cssHeight = _entry.contentBoxSize[0].blockSize;
+    const cssWidth = this._canvas.clientWidth;
+    const cssHeight = this._canvas.clientHeight;
 
     // Device pixel
     /*

@@ -138,6 +138,110 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'ColorAdjustEnabled',
+          type: 'bool',
+          phase: 0,
+          default: false,
+          options: {
+            label: 'Enabled',
+            group: 'PostProcessing/ColorAdjust'
+          },
+          get(this: Camera, value) {
+            value.bool[0] = this.colorAdjust;
+          },
+          set(this: Camera, value) {
+            this.colorAdjust = value.bool[0];
+          }
+        },
+        {
+          name: 'ColorAdjustSaturation',
+          type: 'float',
+          phase: 1,
+          default: 1,
+          options: {
+            label: 'Saturation',
+            group: 'PostProcessing/ColorAdjust',
+            minValue: 0,
+            maxValue: 2,
+            animatable: true
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.colorAdjustSaturation;
+          },
+          set(this: Camera, value) {
+            this.colorAdjustSaturation = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.colorAdjust;
+          }
+        },
+        {
+          name: 'ColorAdjustContrast',
+          type: 'float',
+          phase: 1,
+          default: 1,
+          options: {
+            label: 'Contrast',
+            group: 'PostProcessing/ColorAdjust',
+            minValue: 0,
+            maxValue: 2,
+            animatable: true
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.colorAdjustContrast;
+          },
+          set(this: Camera, value) {
+            this.colorAdjustContrast = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.colorAdjust;
+          }
+        },
+        {
+          name: 'ColorAdjustHue',
+          type: 'float',
+          phase: 1,
+          default: 0,
+          options: {
+            label: 'Hue',
+            group: 'PostProcessing/ColorAdjust',
+            minValue: -1,
+            maxValue: 1,
+            animatable: true
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.colorAdjustHue / 180;
+          },
+          set(this: Camera, value) {
+            this.colorAdjustHue = value.num[0] * 180;
+          },
+          isValid(this: Camera) {
+            return this.colorAdjust;
+          }
+        },
+        {
+          name: 'Sharpen',
+          type: 'float',
+          phase: 1,
+          default: 0,
+          options: {
+            label: 'Sharpen',
+            group: 'PostProcessing/ColorAdjust',
+            minValue: 0,
+            maxValue: 2,
+            animatable: true
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.colorAdjustSharpen;
+          },
+          set(this: Camera, value) {
+            this.colorAdjustSharpen = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.colorAdjust;
+          }
+        },
+        {
           name: 'BloomEnabled',
           type: 'bool',
           phase: 0,

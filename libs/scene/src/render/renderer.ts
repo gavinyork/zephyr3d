@@ -122,7 +122,7 @@ export class SceneRenderer {
         renderWidth,
         renderHeight,
         oit: null,
-        motionVectors: device.type !== 'webgl' && (camera.TAA || camera.motionBlur),
+        motionVectors: device.type !== 'webgl' && (camera.TAA || camera.motionBlur || camera.SSR),
         HiZ: camera.HiZ && device.type !== 'webgl',
         HiZTexture: null,
         globalBindGroupAllocator,
@@ -311,8 +311,19 @@ export class SceneRenderer {
     // Render shadow maps
     this.renderShadowMaps(ctx, renderQueue.shadowedLights);
 
-    // Render scene depth first
+    // Render scene depth first (opaque only)
     const depthFramebuffer = this.renderSceneDepth(ctx, renderQueue, null);
+    // When SSR is enabled and scene-color-dependent materials exist (e.g. transmission),
+    // make sure their depth is present before SSR runs to avoid depth/normal mismatch artifacts.
+    // Transmission depth prepass for SSR can corrupt depth-dependent scene-color materials
+    // (e.g. water that samples linear depth for refraction), because their depth gets written
+    // before the opaque color pass and then incorrectly occludes opaque replay.
+    // Only enable this workaround for scene-color materials that do NOT also depend on scene depth.
+    const needsTransmissionDepthForSSR =
+      !!ctx.SSR && renderQueue.needSceneColor() && !renderQueue.needSceneColorWithDepth();
+    if (needsTransmissionDepthForSSR) {
+      this.renderSceneDepth(ctx, renderQueue, depthFramebuffer);
+    }
     if (ctx.depthTexture === ctx.finalFramebuffer?.getDepthAttachment()) {
       ctx.intermediateFramebuffer = ctx.finalFramebuffer;
     } else {
@@ -335,7 +346,11 @@ export class SceneRenderer {
     this._scenePass.transmission = false; // transmission
     this._scenePass.clearDepth = ctx.depthTexture ? null : 1;
     this._scenePass.clearStencil = ctx.depthTexture ? null : 0;
-    if (ctx.SSR && !renderQueue.needSceneColor()) {
+    if (ctx.SSR) {
+      // SSR still needs its roughness/normal MRTs when the scene uses
+      // scene-color dependent materials (for example transmission).
+      // Otherwise the SSR pass samples uninitialized textures and produces
+      // black sparkling artifacts on affected pixels.
       ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
     }
     ctx.compositor?.begin(ctx);
@@ -362,19 +377,30 @@ export class SceneRenderer {
       this._scenePass.render(ctx, null, null, renderQueue);
       device.popDeviceStates();
       ctx.sceneColorTexture = sceneColorFramebuffer.getColorAttachments()[0] as Texture2D;
-      new CopyBlitter().blit(
-        ctx.sceneColorTexture,
-        device.getFramebuffer() ?? null,
-        fetchSampler('clamp_nearest_nomip')
-      );
+      const currentFramebuffer = device.getFramebuffer();
+      let blitFramebuffer = currentFramebuffer ?? null;
+      if (currentFramebuffer && currentFramebuffer.getColorAttachments().length > 1) {
+        const primaryColor = currentFramebuffer.getColorAttachments()[0] as Texture2D;
+        blitFramebuffer = device.pool.fetchTemporalFramebuffer(
+          false,
+          primaryColor.width,
+          primaryColor.height,
+          primaryColor,
+          currentFramebuffer.getDepthAttachment() ?? null
+        );
+      }
+      new CopyBlitter().blit(ctx.sceneColorTexture, blitFramebuffer, fetchSampler('clamp_nearest_nomip'));
+      if (blitFramebuffer && blitFramebuffer !== currentFramebuffer) {
+        device.pool.releaseFrameBuffer(blitFramebuffer);
+      }
+      ctx.compositor = compositor;
       this._scenePass.transmission = true;
       this._scenePass.clearColor = null;
       this._scenePass.clearDepth = null;
       this._scenePass.clearStencil = null;
-      ctx.compositor = compositor;
     }
     this._scenePass.render(ctx, null, null, renderQueue);
-    if (renderQueue.needSceneColor()) {
+    if (renderQueue.needSceneColor() && !needsTransmissionDepthForSSR) {
       this.renderSceneDepth(ctx, renderQueue, depthFramebuffer);
     }
     ctx.compositor?.drawPostEffects(ctx, PostEffectLayer.end, ctx.linearDepthTexture!);

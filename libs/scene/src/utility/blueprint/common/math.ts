@@ -874,6 +874,109 @@ export class TransformNode extends BaseGraphNode {
 }
 
 /**
+ * Rotate about axis node
+ *
+ * @remarks
+ * Rotates a position around a pivot along a normalized axis by a given angle.
+ * Angle input is in turns (1.0 = 360 degrees).
+ *
+ * Outputs:
+ * - Output 1: Rotated position (vec3)
+ *
+ * @example
+ * ```typescript
+ * const rotate = new RotateAboutAxisNode();
+ * rotate.connectInput(1, axisNode, 1); // normalized axis (vec3)
+ * rotate.connectInput(2, angleNode, 1); // angle in turns (float)
+ * rotate.connectInput(3, pivotNode, 1); // pivot (vec3)
+ * rotate.connectInput(4, posNode, 1); // position (vec3)
+ * ```
+ *
+ * @public
+ */
+export class RotateAboutAxisNode extends BaseGraphNode {
+  /**
+   * Creates a new rotate-about-axis node
+   *
+   * @remarks
+   * Initializes with four inputs and one output.
+   */
+  constructor() {
+    super();
+    this._inputs = [
+      {
+        id: 1,
+        name: 'NormalizedRotationAxis',
+        type: ['vec3'],
+        required: true
+      },
+      {
+        id: 2,
+        name: 'RotationAngle',
+        type: ['float'],
+        defaultValue: [0]
+      },
+      {
+        id: 3,
+        name: 'PivotPoint',
+        type: ['vec3'],
+        defaultValue: [0, 0, 0]
+      },
+      {
+        id: 4,
+        name: 'Position',
+        type: ['vec3'],
+        required: true
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      }
+    ];
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns 'RotateAboutAxis'
+   */
+  toString() {
+    return 'RotateAboutAxis';
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   */
+  static getSerializationCls() {
+    return {
+      ctor: RotateAboutAxisNode,
+      name: 'RotateAboutAxisNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  /**
+   * Validates the node state
+   *
+   * @returns Empty string (always valid beyond base validation)
+   */
+  protected validate() {
+    return super.validate();
+  }
+  /**
+   * Gets the output type
+   *
+   * @returns 'vec3'
+   */
+  protected getType() {
+    return 'vec3';
+  }
+}
+
+/**
  * Abstract base class for generic mathematical function nodes
  *
  * @remarks
