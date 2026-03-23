@@ -36,6 +36,42 @@ export interface SpringSystemOptions {
    *   iteration-count-independent constraint solving.
    */
   solver?: 'verlet' | 'xpbd';
+  /**
+   * How strongly particles are pulled toward current animated pose [0-1].
+   * This preserves the authored hair shape while still allowing secondary motion.
+   * Higher values keep the original hairstyle better.
+   */
+  poseFollow?: number;
+  /**
+   * Optional root-follow override [0-1].
+   * If provided, pose follow is interpolated from root to tip.
+   */
+  poseFollowRoot?: number;
+  /**
+   * Optional tip-follow override [0-1].
+   * If provided, pose follow is interpolated from root to tip.
+   */
+  poseFollowTip?: number;
+  /**
+   * Exponent used when interpolating root->tip follow.
+   * 1 = linear, >1 keeps root stiffer and tip looser.
+   */
+  poseFollowExponent?: number;
+  /**
+   * Optional per-step limit for deviation from animated pose.
+   * 0 disables clamping. Useful to prevent extreme stretch under high acceleration.
+   */
+  maxPoseOffset?: number;
+  /**
+   * Optional root max-offset override.
+   * If provided, max offset is interpolated from root to tip.
+   */
+  maxPoseOffsetRoot?: number;
+  /**
+   * Optional tip max-offset override.
+   * If provided, max offset is interpolated from root to tip.
+   */
+  maxPoseOffsetTip?: number;
 }
 
 /**
@@ -54,6 +90,13 @@ export class SpringSystem {
   private _coriolisScale: number;
   private _colliders: SpringCollider[];
   private _solver: 'verlet' | 'xpbd';
+  private _poseFollow: number;
+  private _maxPoseOffset: number;
+  private _poseFollowRoot: number;
+  private _poseFollowTip: number;
+  private _poseFollowExponent: number;
+  private _maxPoseOffsetRoot: number;
+  private _maxPoseOffsetTip: number;
 
   constructor(chain: SpringChain, options?: SpringSystemOptions) {
     this._chain = chain;
@@ -65,6 +108,19 @@ export class SpringSystem {
     this._coriolisScale = options?.coriolisScale ?? 1.0;
     this._colliders = [];
     this._solver = options?.solver ?? 'verlet';
+    this._poseFollow = Math.max(0, Math.min(1, options?.poseFollow ?? 0.35));
+    this._maxPoseOffset = Math.max(0, options?.maxPoseOffset ?? 0);
+    this._poseFollowRoot = Math.max(
+      0,
+      Math.min(1, options?.poseFollowRoot ?? this._poseFollow)
+    );
+    this._poseFollowTip = Math.max(
+      0,
+      Math.min(1, options?.poseFollowTip ?? this._poseFollow)
+    );
+    this._poseFollowExponent = Math.max(0.1, options?.poseFollowExponent ?? 1.6);
+    this._maxPoseOffsetRoot = Math.max(0, options?.maxPoseOffsetRoot ?? this._maxPoseOffset);
+    this._maxPoseOffsetTip = Math.max(0, options?.maxPoseOffsetTip ?? this._maxPoseOffset);
   }
 
   /**
@@ -146,6 +202,10 @@ export class SpringSystem {
         }
       }
 
+      // Pull particles back toward the animated pose to preserve hair silhouette.
+      // Normalize follow strength across solver iterations so tuning stays intuitive.
+      this.solvePosePreservation(this._iterations);
+
       // Apply collision constraints
       this.solveCollisions();
     }
@@ -159,6 +219,7 @@ export class SpringSystem {
       if (particle.node && particle.fixed) {
         const worldMatrix = particle.node.worldMatrix;
         const worldPos = new Vector3(worldMatrix.m03, worldMatrix.m13, worldMatrix.m23);
+        particle.animPosition.set(worldPos);
         particle.position.set(worldPos);
         particle.prevPosition.set(worldPos);
 
@@ -174,7 +235,55 @@ export class SpringSystem {
           }
         }
       }
+      if (particle.node && !particle.fixed) {
+        const worldMatrix = particle.node.worldMatrix;
+        particle.animPosition.setXYZ(worldMatrix.m03, worldMatrix.m13, worldMatrix.m23);
+      }
     }
+  }
+
+  /**
+   * Solves pose preservation (long-range attachment to animated pose).
+   * This keeps strands close to authored shape while preserving dynamic movement.
+   */
+  private solvePosePreservation(totalIterations: number): void {
+    if (this._poseFollowRoot <= 0 && this._poseFollowTip <= 0) {
+      return;
+    }
+
+    const lastIndex = Math.max(1, this._chain.particles.length - 1);
+    for (let i = 0; i < this._chain.particles.length; i++) {
+      const particle = this._chain.particles[i];
+      if (particle.fixed) {
+        continue;
+      }
+
+      const t = Math.pow(i / lastIndex, this._poseFollowExponent);
+      const particlePoseFollow = this.lerp(this._poseFollowRoot, this._poseFollowTip, t);
+      // Convert user-facing per-frame follow into per-iteration follow:
+      // effective = 1 - (1 - follow)^iterations
+      const iterationFollow =
+        totalIterations > 1
+          ? 1 - Math.pow(Math.max(0, 1 - particlePoseFollow), 1 / totalIterations)
+          : particlePoseFollow;
+      const toAnim = Vector3.sub(particle.animPosition, particle.position, new Vector3());
+      const correction = Vector3.scale(toAnim, iterationFollow, new Vector3());
+      Vector3.add(particle.position, correction, particle.position);
+
+      const particleMaxPoseOffset = this.lerp(this._maxPoseOffsetRoot, this._maxPoseOffsetTip, t);
+      if (particleMaxPoseOffset > 0) {
+        const offset = Vector3.sub(particle.position, particle.animPosition, new Vector3());
+        const offsetLen = offset.magnitude;
+        if (offsetLen > particleMaxPoseOffset && offsetLen > 1e-6) {
+          offset.scaleBy(particleMaxPoseOffset / offsetLen);
+          Vector3.add(particle.animPosition, offset, particle.position);
+        }
+      }
+    }
+  }
+
+  private lerp(a: number, b: number, t: number): number {
+    return a + (b - a) * t;
   }
 
   /**
@@ -674,6 +783,110 @@ export class SpringSystem {
         }
       }
     }
+  }
+
+  /**
+   * Gets pose preservation strength [0-1]
+   */
+  get poseFollow(): number {
+    return this._poseFollow;
+  }
+
+  /**
+   * Sets pose preservation strength [0-1]
+   */
+  set poseFollow(value: number) {
+    const v = Math.max(0, Math.min(1, value));
+    this._poseFollow = v;
+    this._poseFollowRoot = v;
+    this._poseFollowTip = v;
+  }
+
+  /**
+   * Gets max allowed deviation from animated pose
+   */
+  get maxPoseOffset(): number {
+    return this._maxPoseOffset;
+  }
+
+  /**
+   * Sets max allowed deviation from animated pose. 0 disables clamping.
+   */
+  set maxPoseOffset(value: number) {
+    const v = Math.max(0, value);
+    this._maxPoseOffset = v;
+    this._maxPoseOffsetRoot = v;
+    this._maxPoseOffsetTip = v;
+  }
+
+  /**
+   * Gets root pose follow strength [0-1]
+   */
+  get poseFollowRoot(): number {
+    return this._poseFollowRoot;
+  }
+
+  /**
+   * Sets root pose follow strength [0-1]
+   */
+  set poseFollowRoot(value: number) {
+    this._poseFollowRoot = Math.max(0, Math.min(1, value));
+  }
+
+  /**
+   * Gets tip pose follow strength [0-1]
+   */
+  get poseFollowTip(): number {
+    return this._poseFollowTip;
+  }
+
+  /**
+   * Sets tip pose follow strength [0-1]
+   */
+  set poseFollowTip(value: number) {
+    this._poseFollowTip = Math.max(0, Math.min(1, value));
+  }
+
+  /**
+   * Gets exponent for root->tip interpolation
+   */
+  get poseFollowExponent(): number {
+    return this._poseFollowExponent;
+  }
+
+  /**
+   * Sets exponent for root->tip interpolation
+   */
+  set poseFollowExponent(value: number) {
+    this._poseFollowExponent = Math.max(0.1, value);
+  }
+
+  /**
+   * Gets root max allowed deviation from animated pose
+   */
+  get maxPoseOffsetRoot(): number {
+    return this._maxPoseOffsetRoot;
+  }
+
+  /**
+   * Sets root max allowed deviation from animated pose
+   */
+  set maxPoseOffsetRoot(value: number) {
+    this._maxPoseOffsetRoot = Math.max(0, value);
+  }
+
+  /**
+   * Gets tip max allowed deviation from animated pose
+   */
+  get maxPoseOffsetTip(): number {
+    return this._maxPoseOffsetTip;
+  }
+
+  /**
+   * Sets tip max allowed deviation from animated pose
+   */
+  set maxPoseOffsetTip(value: number) {
+    this._maxPoseOffsetTip = Math.max(0, value);
   }
 
   /**
