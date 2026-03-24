@@ -1,4 +1,4 @@
-import { ImGui } from '@zephyr3d/imgui';
+﻿import { ImGui } from '@zephyr3d/imgui';
 import type { SceneModel } from '../models/scenemodel';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
@@ -67,6 +67,8 @@ import { DockPannel, ResizeDirection } from '../components/dockpanel';
 import { DlgSaveFile } from './dlg/savefiledlg';
 import { ResourceService } from '../core/services/resource';
 import { DlgMessage } from './dlg/messagedlg';
+
+type SpringColliderKind = 'sphere' | 'capsule' | 'plane';
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -1039,6 +1041,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.on('set_main_camera', this.handleSetMainCamera, this);
       this._sceneHierarchy.on('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.on('request_save_prefab', this.handleSavePrefab, this);
+      this._sceneHierarchy.on('request_add_spring_collider', this.handleAddSpringCollider, this);
       this.controller.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
       this.controller.model.scene.rootNode.iterate((node) => {
         this._proxy!.createProxy(node);
@@ -1071,6 +1074,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.off('set_main_camera', this.handleSetMainCamera, this);
       this._sceneHierarchy.off('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.off('request_save_prefab', this.handleSavePrefab, this);
+      this._sceneHierarchy.off('request_add_spring_collider', this.handleAddSpringCollider, this);
       this._sceneHierarchy = null;
     }
     if (this.controller.model.scene) {
@@ -1150,6 +1154,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleObjectPropertyChanged(object: object, prop: PropertyAccessor) {
     if (object instanceof SceneNode) {
       this._proxy!.updateProxy(object);
+    } else if (this.shouldRefreshSelectedSpringColliderProxy(prop)) {
+      const selectedNode = this._sceneHierarchy?.selectedNode;
+      if (selectedNode) {
+        this._proxy!.updateProxy(selectedNode);
+      }
     }
     const info = this._editingProps.get(object)?.get(prop);
     if (info) {
@@ -1166,6 +1175,28 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       }
     }
     eventBus.dispatchEvent('scene_changed');
+  }
+  private shouldRefreshSelectedSpringColliderProxy(prop: PropertyAccessor) {
+    const selectedNode = this._sceneHierarchy?.selectedNode;
+    if (!selectedNode || !selectedNode.metaData || typeof selectedNode.metaData !== 'object') {
+      return false;
+    }
+    const springCollider = (selectedNode.metaData as any).springCollider;
+    if (!springCollider || typeof springCollider !== 'object') {
+      return false;
+    }
+    const cls = getEngine().resourceManager.getClassByProperty(prop);
+    if (!cls) {
+      return false;
+    }
+    return (
+      cls.name === 'JSONProp' ||
+      cls.name === 'JSONString' ||
+      cls.name === 'JSONNumber' ||
+      cls.name === 'JSONBool' ||
+      cls.name === 'JSONData' ||
+      cls.name === 'JSONArray'
+    );
   }
   update(dt: number) {
     const selectedNode = this._sceneHierarchy!.selectedNode;
@@ -1541,6 +1572,80 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           getEngine().VFS.basename(name)
         );
       }
+    });
+  }
+  private isSpringTestScript(script: string): boolean {
+    const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
+    return /(^|\/)springtest(\.ts|\.js)?$/.test(normalized);
+  }
+  private findSpringHost(startNode: SceneNode): Nullable<SceneNode> {
+    let current: Nullable<SceneNode> = startNode;
+    while (current) {
+      if (this.isSpringTestScript((current as any).script ?? '')) {
+        return current;
+      }
+      current = current.parent;
+    }
+    return null;
+  }
+  private handleAddSpringCollider(node: SceneNode, type: SpringColliderKind) {
+    const springHost = this.findSpringHost(node);
+    if (!springHost) {
+      DlgMessage.messageBox(
+        'Spring Collider',
+        'No spring script host found in this bone hierarchy. Please attach Spring Test script first.'
+      );
+      return;
+    }
+    const defaultMeta =
+      type === 'sphere'
+        ? {
+            springCollider: {
+              type: 'sphere',
+              enabled: true,
+              visible: true,
+              offset: [0, 0, 0],
+              radius: 0.15
+            }
+          }
+        : type === 'capsule'
+          ? {
+              springCollider: {
+                type: 'capsule',
+                enabled: true,
+                visible: true,
+                offset: [0, 0, 0],
+                endOffset: [0, 0.2, 0],
+                radius: 0.1
+              }
+            }
+          : {
+              springCollider: {
+                type: 'plane',
+                enabled: true,
+                visible: true,
+                offset: [0, 0, 0],
+                normal: [0, 1, 0],
+                planeSize: 0.5
+              }
+            };
+    const typeName = type === 'sphere' ? 'Sphere' : type === 'capsule' ? 'Capsule' : 'Plane';
+    this._cmdManager.execute(new AddChildCommand(node, SceneNode)).then((colliderNode) => {
+      if (!colliderNode) {
+        return;
+      }
+      let index = 1;
+      while (node.children.find((c) => c.get()?.name === `${typeName}Collider_${index}`)) {
+        index++;
+      }
+      colliderNode.name = `${typeName}Collider_${index}`;
+      colliderNode.metaData = defaultMeta as any;
+      colliderNode.gpuPickable = true;
+      this._proxy!.createProxy(colliderNode);
+      this._proxy!.updateProxy(colliderNode);
+      this._sceneHierarchy?.selectNode(colliderNode);
+      this._propGrid.refresh();
+      eventBus.dispatchEvent('scene_changed');
     });
   }
   private handleNodeRemoved(node: SceneNode) {

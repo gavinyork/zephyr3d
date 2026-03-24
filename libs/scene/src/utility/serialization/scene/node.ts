@@ -1,4 +1,4 @@
-import { SceneNode } from '../../../scene/scene_node';
+﻿import { SceneNode } from '../../../scene/scene_node';
 import type { SceneNodeVisible } from '../../../scene/scene_node';
 import { Scene } from '../../../scene/scene';
 import { defineProps, type SerializableClass } from '../types';
@@ -8,6 +8,19 @@ import { GraphNode } from '../../../scene';
 import type { ResourceManager } from '../manager';
 import { AnimationClip, NodeRotationTrack, NodeScaleTrack, NodeTranslationTrack } from '../../../animation';
 import { JSONData } from '../json';
+import { SpringScriptConfig } from './spring_script';
+
+const BUILTIN_SPRING_TEST_SCRIPT = '/assets/@builtins/scripts/springtest';
+
+function isSpringTestScript(script: string) {
+  const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
+  return /(^|\/)springtest(\.ts|\.js)?$/.test(normalized);
+}
+
+function isBuiltinSpringTestScript(script: string) {
+  const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
+  return normalized === BUILTIN_SPRING_TEST_SCRIPT || normalized === `${BUILTIN_SPRING_TEST_SCRIPT}.js`;
+}
 
 function normalizeSerializedSceneNodeData(data: DiffValue): Record<string, unknown> {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -341,6 +354,56 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           },
           set(this: SceneNode, value) {
             this.script = value?.str?.[0] ?? '';
+            if (isSpringTestScript(this.script) && !(this.scriptConfig instanceof SpringScriptConfig)) {
+              this.scriptConfig = new SpringScriptConfig();
+            }
+          }
+        },
+        {
+          name: 'BuiltInScript',
+          type: 'string',
+          options: {
+            group: 'Script',
+            label: 'BuiltIn',
+            enum: {
+              labels: ['None', 'Spring Test'],
+              values: ['', BUILTIN_SPRING_TEST_SCRIPT]
+            }
+          },
+          get(this: SceneNode, value) {
+            value.str[0] = isBuiltinSpringTestScript(this.script) ? BUILTIN_SPRING_TEST_SCRIPT : '';
+          },
+          set(this: SceneNode, value) {
+            const selected = value?.str?.[0] ?? '';
+            if (selected) {
+              this.script = selected;
+              if (isSpringTestScript(this.script) && !(this.scriptConfig instanceof SpringScriptConfig)) {
+                this.scriptConfig = new SpringScriptConfig();
+              }
+            } else if (isBuiltinSpringTestScript(this.script)) {
+              this.script = '';
+            }
+          }
+        },
+        {
+          name: 'SpringConfig',
+          type: 'object',
+          options: {
+            objectTypes: [SpringScriptConfig],
+            group: 'Script',
+            label: 'Parameters'
+          },
+          isValid(this: SceneNode) {
+            return isSpringTestScript(this.script);
+          },
+          get(this: SceneNode, value) {
+            if (!(this.scriptConfig instanceof SpringScriptConfig)) {
+              this.scriptConfig = new SpringScriptConfig();
+            }
+            value.object[0] = this.scriptConfig;
+          },
+          set(this: SceneNode, value) {
+            this.scriptConfig = (value?.object?.[0] as SpringScriptConfig | null) ?? new SpringScriptConfig();
           }
         },
         {

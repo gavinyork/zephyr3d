@@ -1,4 +1,4 @@
-import type { Nullable, RequireOptionals } from '@zephyr3d/base';
+﻿import type { Nullable, RequireOptionals } from '@zephyr3d/base';
 import { ASSERT, DRef, randomUUID, type GenericConstructor, type TypedArray, type VFS } from '@zephyr3d/base';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
@@ -181,6 +181,11 @@ import type { Material, MeshMaterial, PBRBluePrintMaterial } from '../../materia
 import type { Primitive } from '../../render';
 import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
 import { getSpriteClass } from './scene/sprite';
+import {
+  getSpringBoneChainConfigClass,
+  getSpringColliderConfigClass,
+  getSpringScriptConfigClass
+} from './scene/spring_script';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -255,6 +260,9 @@ export class ResourceManager {
         getJSONBoolClass(),
         getJSONObjectClass(),
         getJSONArrayClass(),
+        getSpringBoneChainConfigClass(),
+        getSpringColliderConfigClass(),
+        getSpringScriptConfigClass(),
         getAABBClass(),
         getInterpolatorClass(),
         getSkeletonClass(),

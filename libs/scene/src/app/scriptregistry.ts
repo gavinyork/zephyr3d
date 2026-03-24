@@ -1,4 +1,4 @@
-import type * as TS from 'typescript';
+﻿import type * as TS from 'typescript';
 import type { Nullable, VFS } from '@zephyr3d/base';
 import { textToBase64 } from '@zephyr3d/base';
 import { init, parse } from 'es-module-lexer';
@@ -165,6 +165,9 @@ export class ScriptRegistry {
    */
   async resolveRuntimeUrl(entryId: string) {
     const id = await this.resolveLogicalId(entryId);
+    if (id.startsWith('/assets/@builtins/')) {
+      return await this.build(String(id));
+    }
     return getApp().editorMode !== 'none'
       ? await this.build(String(id))
       : id.endsWith('.js')
@@ -349,7 +352,7 @@ export class ScriptRegistry {
         const depId = await this.resolveLogicalId(spec, String(fromId));
         replacement = await this.build(depId); // recursively build as dataURL
       }
-      out += replacement; // 不加引号
+      out += replacement; // 涓嶅姞寮曞彿
       last = im.e;
     }
     out += code.slice(last);
