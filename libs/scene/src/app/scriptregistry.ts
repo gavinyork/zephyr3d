@@ -1,4 +1,4 @@
-﻿import type * as TS from 'typescript';
+import type * as TS from 'typescript';
 import type { Nullable, VFS } from '@zephyr3d/base';
 import { textToBase64 } from '@zephyr3d/base';
 import { init, parse } from 'es-module-lexer';

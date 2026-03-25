@@ -1,4 +1,4 @@
-﻿import type { Scene } from '@zephyr3d/scene';
+import type { Scene } from '@zephyr3d/scene';
 import { Camera } from '@zephyr3d/scene';
 import {
   BaseLight,

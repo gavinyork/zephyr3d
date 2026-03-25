@@ -774,10 +774,21 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       Vector3.cross(edge1, edge2, axis).inplaceNormalize();
       angle = movement / this._rotateInfo.speed;
     }
-    invWorldMatrix.transformVectorAffine(axis, axis);
     axis.inplaceNormalize();
     const deltaRotation = Quaternion.fromAxisAngle(axis, angle);
-    this._node!.rotation = Quaternion.multiply(deltaRotation, this._rotateInfo.startRotation);
+    if (this._node!.parent) {
+      const parentWorldRotation = new Quaternion();
+      this._node!.parent.worldMatrix.decompose(null, parentWorldRotation, null);
+      const invParentWorldRotation = Quaternion.conjugate(parentWorldRotation, new Quaternion()).inplaceNormalize();
+      const localDeltaRotation = Quaternion.multiply(
+        Quaternion.multiply(invParentWorldRotation, deltaRotation, new Quaternion()),
+        parentWorldRotation,
+        new Quaternion()
+      );
+      this._node!.rotation = Quaternion.multiply(localDeltaRotation, this._rotateInfo.startRotation);
+    } else {
+      this._node!.rotation = Quaternion.multiply(deltaRotation, this._rotateInfo.startRotation);
+    }
   }
   private _endRotate() {
     getDevice().canvas.style.cursor = 'default';
@@ -1080,8 +1091,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     if (this._translatePlaneInfo.type === 'move_free') {
       const hitPos = pickResult?.intersectedPoint ?? null;
       if (hitPos) {
-        const parentPos = this._node!.parent!.getWorldPosition();
-        this._node!.position.set(Vector3.sub(hitPos, parentPos, parentPos));
+        this._setNodeWorldPosition(hitPos);
       } else {
         const ray = this.camera.constructRay(x, y);
         let hitDistance = -ray.origin.y / ray.direction.y;
@@ -1091,7 +1101,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         const px = ray.origin.x + ray.direction.x * hitDistance;
         const py = ray.origin.y + ray.direction.y * hitDistance;
         const pz = ray.origin.z + ray.direction.z * hitDistance;
-        this._node!.position.setXYZ(px, py, pz);
+        this._setNodeWorldPosition(new Vector3(px, py, pz));
       }
     } else {
       const ray = this._camera.constructRay(x, y);
@@ -1110,12 +1120,16 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           const delta =
             p[this._translatePlaneInfo.axis] -
             this._translatePlaneInfo.lastPlanePos[this._translatePlaneInfo.axis];
-          this._node!.position[c] += delta;
+          const worldDelta = new Vector3();
+          worldDelta[c] = delta;
+          this._addWorldTranslation(worldDelta);
         } else {
           const dx = p[t[0]] - this._translatePlaneInfo.lastPlanePos[t[0]];
           const dy = p[t[1]] - this._translatePlaneInfo.lastPlanePos[t[1]];
-          this._node!.position[t[0]] += dx;
-          this._node!.position[t[1]] += dy;
+          const worldDelta = new Vector3();
+          worldDelta[t[0]] = dx;
+          worldDelta[t[1]] = dy;
+          this._addWorldTranslation(worldDelta);
         }
       }
     }
@@ -1128,6 +1142,28 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       if (this._node) {
         this.dispatchEvent('end_translate', this._node);
       }
+    }
+  }
+  private _setNodeWorldPosition(worldPos: Vector3) {
+    if (!this._node) {
+      return;
+    }
+    if (this._node.parent) {
+      this._node.parent.invWorldMatrix.transformPointAffine(worldPos, tmpVecT);
+      this._node.position.set(tmpVecT);
+    } else {
+      this._node.position.set(worldPos);
+    }
+  }
+  private _addWorldTranslation(worldDelta: Vector3) {
+    if (!this._node) {
+      return;
+    }
+    if (this._node.parent) {
+      this._node.parent.invWorldMatrix.transformVectorAffine(worldDelta, tmpVecT);
+      this._node.position.addBy(tmpVecT);
+    } else {
+      this._node.position.addBy(worldDelta);
     }
   }
   private _measureRotateSpeed() {

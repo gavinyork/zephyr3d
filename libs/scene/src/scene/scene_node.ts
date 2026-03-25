@@ -1,4 +1,4 @@
-﻿import type { Scene } from './scene';
+import type { Scene } from './scene';
 import type { GraphNode } from './graph_node';
 import type { Mesh } from './mesh';
 import type { Camera } from '../camera/camera';

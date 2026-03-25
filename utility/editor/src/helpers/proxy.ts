@@ -1,4 +1,4 @@
-﻿import { Matrix4x4, Quaternion, Vector3, Vector4, DRef, DWeakRef, Disposable } from '@zephyr3d/base';
+import { Matrix4x4, Quaternion, Vector3, Vector4, DRef, DWeakRef, Disposable } from '@zephyr3d/base';
 import type { Scene, SceneNode } from '@zephyr3d/scene';
 import { TetrahedronFrameShape } from '@zephyr3d/scene';
 import {
@@ -27,7 +27,6 @@ export class NodeProxy extends Disposable {
   private readonly _colliderProxyMaterial: DRef<UnlitMaterial>;
   private _scene: Scene;
   private _proxyList: DWeakRef<Mesh>[];
-  private _colliderScaleRefs: WeakMap<SceneNode, { uniform: number; axis: number; perpendicular: number }>;
   constructor(scene: Scene) {
     super();
     this._scene = scene;
@@ -46,7 +45,6 @@ export class NodeProxy extends Disposable {
     this._colliderProxyMaterial.get().opacity = 0.3;
     this._colliderProxyMaterial.get().albedoColor = new Vector4(0, 0, 1, 1);
     this._proxyList = [];
-    this._colliderScaleRefs = new WeakMap();
   }
   getProto(proxy: SceneNode) {
     return this.isProxy(proxy) ? proxy.parent : proxy;
@@ -102,7 +100,6 @@ export class NodeProxy extends Disposable {
             (type === 'capsule' && !(primitive instanceof CylinderShape)) ||
             (type === 'plane' && !(primitive instanceof PlaneShape));
           if (mismatch) {
-            this._colliderScaleRefs.delete(src);
             proxy.remove();
             this.createProxy(src);
             return;
@@ -164,7 +161,6 @@ export class NodeProxy extends Disposable {
       ref.dispose();
     }
     this._proxyList = [];
-    this._colliderScaleRefs = new WeakMap();
   }
   private getSpringColliderMeta(src: SceneNode): any | null {
     const meta = src.metaData as any;
@@ -230,6 +226,7 @@ export class NodeProxy extends Disposable {
     return new Mesh(this._scene, this._colliderSpherePrimitive.get(), this._colliderProxyMaterial.get().createInstance());
   }
   private updateSpringColliderProxy(proxy: Mesh, meta: any) {
+    const COLLIDER_PANEL_SCALE = 10;
     const mat = proxy.material as UnlitMaterial;
     const visible = meta?.visible !== false;
     proxy.showState = visible ? 'visible' : 'hidden';
@@ -238,96 +235,43 @@ export class NodeProxy extends Disposable {
     if (!visible) {
       return;
     }
-    const src = proxy.parent!;
-    const worldMatrix = src.worldMatrix;
-    const worldScale = new Vector3(1, 1, 1);
-    worldMatrix.decompose(worldScale, null, null);
-    const invScale = new Vector3(
-      Math.abs(worldScale.x) > 1e-6 ? 1 / Math.abs(worldScale.x) : 1,
-      Math.abs(worldScale.y) > 1e-6 ? 1 / Math.abs(worldScale.y) : 1,
-      Math.abs(worldScale.z) > 1e-6 ? 1 / Math.abs(worldScale.z) : 1
-    );
-    const scaleRef = this.getOrCreateColliderScaleRef(src, worldMatrix, meta);
     if (meta.type === 'sphere') {
-      const radius = Math.max(0.001, Number(meta.radius) || 0.15);
-      const uniformScale = this.getUniformScale(worldMatrix);
-      const scaledRadius = radius * (uniformScale / Math.max(1e-6, scaleRef.uniform));
+      const radius = Math.max(0.001, (Number(meta.radius) || 0.15) * COLLIDER_PANEL_SCALE);
       const offset = this.getVector3Array(meta.offset, Vector3.zero());
       proxy.position.set(offset);
       proxy.rotation.identity();
-      proxy.scale.setXYZ(scaledRadius * 2 * invScale.x, scaledRadius * 2 * invScale.y, scaledRadius * 2 * invScale.z);
+      proxy.scale.setXYZ(radius * 2, radius * 2, radius * 2);
       return;
     }
     if (meta.type === 'capsule') {
-      const radius = Math.max(0.001, Number(meta.radius) || 0.1);
+      const radius = Math.max(0.001, (Number(meta.radius) || 0.1) * COLLIDER_PANEL_SCALE);
       const startOffset = this.getVector3Array(meta.offset, Vector3.zero());
       const endOffset = this.getVector3Array(meta.endOffset, new Vector3(0, 0.2, 0));
-      const axis = Vector3.sub(endOffset, startOffset, new Vector3());
-      const length = Math.max(0.001, axis.magnitude);
-      const axisScale = this.getAxisScale(worldMatrix, axis);
-      const perpScale = this.getPerpendicularScale(worldMatrix, axis);
-      const scaledLength = length * (axisScale / Math.max(1e-6, scaleRef.axis));
-      const scaledRadius = radius * (perpScale / Math.max(1e-6, scaleRef.perpendicular));
       const center = Vector3.scale(Vector3.add(startOffset, endOffset, new Vector3()), 0.5, new Vector3());
+      const half = Vector3.scale(
+        Vector3.sub(endOffset, startOffset, new Vector3()),
+        0.5 * COLLIDER_PANEL_SCALE,
+        new Vector3()
+      );
+      const scaledStart = Vector3.sub(center, half, new Vector3());
+      const scaledEnd = Vector3.add(center, half, new Vector3());
+      const axis = Vector3.sub(scaledEnd, scaledStart, new Vector3());
+      const length = Math.max(0.001, axis.magnitude);
       const dir = Vector3.scale(axis, 1 / length, new Vector3());
       const rot = this.fromToRotation(Vector3.axisPY(), dir);
       proxy.position.set(center);
       proxy.rotation.set(rot);
-      proxy.scale.setXYZ(scaledRadius * 2 * invScale.x, scaledLength * invScale.y, scaledRadius * 2 * invScale.z);
+      proxy.scale.setXYZ(radius * 2, length, radius * 2);
       return;
     }
     const offset = this.getVector3Array(meta.offset, Vector3.zero());
     const normal = this.getVector3Array(meta.normal, Vector3.axisPY());
-    const planeSize = Math.max(0.001, Number(meta.planeSize) || 0.5);
+    const planeSize = Math.max(0.001, (Number(meta.planeSize) || 0.5) * COLLIDER_PANEL_SCALE);
     const n = normal.magnitudeSq > 1e-6 ? normal.inplaceNormalize() : Vector3.axisPY();
     const rot = this.fromToRotation(Vector3.axisPY(), n);
     proxy.position.set(offset);
     proxy.rotation.set(rot);
-    proxy.scale.setXYZ(planeSize * 2 * invScale.x, planeSize * 2 * invScale.y, invScale.z);
-  }
-  private getOrCreateColliderScaleRef(
-    src: SceneNode,
-    worldMatrix: any,
-    meta: any
-  ): { uniform: number; axis: number; perpendicular: number } {
-    const cached = this._colliderScaleRefs.get(src);
-    if (cached) {
-      return cached;
-    }
-    const axis =
-      meta?.type === 'capsule'
-        ? Vector3.sub(
-            this.getVector3Array(meta.endOffset, new Vector3(0, 0.2, 0)),
-            this.getVector3Array(meta.offset, Vector3.zero()),
-            new Vector3()
-          )
-        : Vector3.axisPY();
-    const created = {
-      uniform: this.getUniformScale(worldMatrix),
-      axis: this.getAxisScale(worldMatrix, axis),
-      perpendicular: this.getPerpendicularScale(worldMatrix, axis)
-    };
-    this._colliderScaleRefs.set(src, created);
-    return created;
-  }
-  private getUniformScale(worldMatrix: any): number {
-    const sx = worldMatrix.transformVectorAffine(Vector3.axisPX(), new Vector3()).magnitude;
-    const sy = worldMatrix.transformVectorAffine(Vector3.axisPY(), new Vector3()).magnitude;
-    const sz = worldMatrix.transformVectorAffine(Vector3.axisPZ(), new Vector3()).magnitude;
-    return Math.max(1e-6, (sx + sy + sz) / 3);
-  }
-  private getAxisScale(worldMatrix: any, axisLocal: Vector3): number {
-    const axis = axisLocal.magnitudeSq > 1e-8 ? axisLocal.clone().inplaceNormalize() : Vector3.axisPY();
-    return Math.max(1e-6, worldMatrix.transformVectorAffine(axis, new Vector3()).magnitude);
-  }
-  private getPerpendicularScale(worldMatrix: any, axisLocal: Vector3): number {
-    const axis = axisLocal.magnitudeSq > 1e-8 ? axisLocal.clone().inplaceNormalize() : Vector3.axisPY();
-    const helper = Math.abs(axis.y) < 0.99 ? Vector3.axisPY() : Vector3.axisPX();
-    const u = Vector3.cross(axis, helper, new Vector3()).inplaceNormalize();
-    const v = Vector3.cross(axis, u, new Vector3()).inplaceNormalize();
-    const su = worldMatrix.transformVectorAffine(u, new Vector3()).magnitude;
-    const sv = worldMatrix.transformVectorAffine(v, new Vector3()).magnitude;
-    return Math.max(1e-6, (su + sv) * 0.5);
+    proxy.scale.setXYZ(planeSize * 2, planeSize * 2, 1);
   }
   private static createLinePrimitive(vertices: number[], indices: number[], bbox: BoundingBox) {
     const primitive = new Primitive();

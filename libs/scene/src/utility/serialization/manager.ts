@@ -1,4 +1,4 @@
-﻿import type { Nullable, RequireOptionals } from '@zephyr3d/base';
+import type { Nullable, RequireOptionals } from '@zephyr3d/base';
 import { ASSERT, DRef, randomUUID, type GenericConstructor, type TypedArray, type VFS } from '@zephyr3d/base';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';

@@ -1,4 +1,4 @@
-﻿import { ImGui } from '@zephyr3d/imgui';
+import { ImGui } from '@zephyr3d/imgui';
 import type { SceneModel } from '../models/scenemodel';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';

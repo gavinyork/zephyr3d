@@ -1,4 +1,4 @@
-﻿import { SceneNode } from '../../../scene/scene_node';
+import { SceneNode } from '../../../scene/scene_node';
 import type { SceneNodeVisible } from '../../../scene/scene_node';
 import { Scene } from '../../../scene/scene';
 import { defineProps, type SerializableClass } from '../types';
