@@ -630,7 +630,8 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
               : null;
           },
           set(this: Scene, value) {
-            this.metaData = (value?.object[0] as JSONData | JSONArray)?.data ?? null;
+            const data = value?.object[0] as JSONData | JSONArray | Record<string, unknown> | unknown[] | null | undefined;
+            this.metaData = data instanceof JSONData || data instanceof JSONArray ? data.data : (data ?? null);
           }
         }
       ]);

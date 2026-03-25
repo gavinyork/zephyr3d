@@ -8,6 +8,40 @@ import { GraphNode } from '../../../scene';
 import type { ResourceManager } from '../manager';
 import { AnimationClip, NodeRotationTrack, NodeScaleTrack, NodeTranslationTrack } from '../../../animation';
 import { JSONData } from '../json';
+import { SpringScriptConfig } from './spring_script';
+
+const BUILTIN_SPRING_TEST_SCRIPT = '/assets/@builtins/scripts/springtest';
+
+function isSpringTestScript(script: string) {
+  const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
+  return /(^|\/)springtest(\.ts|\.js)?$/.test(normalized);
+}
+
+function isBuiltinSpringTestScript(script: string) {
+  const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
+  return normalized === BUILTIN_SPRING_TEST_SCRIPT || normalized === `${BUILTIN_SPRING_TEST_SCRIPT}.js`;
+}
+
+function normalizeSerializedSceneNodeData(data: DiffValue): Record<string, unknown> {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return {
+      ClassName: 'SceneNode',
+      Object: {}
+    };
+  }
+  const serialized = data as Record<string, unknown>;
+  if (typeof serialized.ClassName === 'string') {
+    return serialized;
+  }
+  const objectData =
+    serialized.Object && typeof serialized.Object === 'object' && !Array.isArray(serialized.Object)
+      ? (serialized.Object as Record<string, unknown>)
+      : serialized;
+  return {
+    ClassName: 'SceneNode',
+    Object: objectData
+  };
+}
 
 /** @internal */
 export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
@@ -18,7 +52,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
       const scene = ctx instanceof Scene ? ctx : ctx.scene;
       if (init) {
         const prefabData = (await manager.loadPrefabContent(init.prefabId))!.data as DiffValue;
-        const nodeData = applyPatch(prefabData, init.patch) as Record<string, unknown>;
+        const nodeData = normalizeSerializedSceneNodeData(applyPatch(prefabData, init.patch) as DiffValue);
         const tmpNode = new DRef(new SceneNode(scene));
         tmpNode.get()!.remove();
         tmpNode.get()!.prefabId = init.prefabId;
@@ -320,6 +354,56 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           },
           set(this: SceneNode, value) {
             this.script = value?.str?.[0] ?? '';
+            if (isSpringTestScript(this.script) && !(this.scriptConfig instanceof SpringScriptConfig)) {
+              this.scriptConfig = new SpringScriptConfig();
+            }
+          }
+        },
+        {
+          name: 'BuiltInScript',
+          type: 'string',
+          options: {
+            group: 'Script',
+            label: 'BuiltIn',
+            enum: {
+              labels: ['None', 'Spring Test'],
+              values: ['', BUILTIN_SPRING_TEST_SCRIPT]
+            }
+          },
+          get(this: SceneNode, value) {
+            value.str[0] = isBuiltinSpringTestScript(this.script) ? BUILTIN_SPRING_TEST_SCRIPT : '';
+          },
+          set(this: SceneNode, value) {
+            const selected = value?.str?.[0] ?? '';
+            if (selected) {
+              this.script = selected;
+              if (isSpringTestScript(this.script) && !(this.scriptConfig instanceof SpringScriptConfig)) {
+                this.scriptConfig = new SpringScriptConfig();
+              }
+            } else if (isBuiltinSpringTestScript(this.script)) {
+              this.script = '';
+            }
+          }
+        },
+        {
+          name: 'SpringConfig',
+          type: 'object',
+          options: {
+            objectTypes: [SpringScriptConfig],
+            group: 'Script',
+            label: 'Parameters'
+          },
+          isValid(this: SceneNode) {
+            return isSpringTestScript(this.script);
+          },
+          get(this: SceneNode, value) {
+            if (!(this.scriptConfig instanceof SpringScriptConfig)) {
+              this.scriptConfig = new SpringScriptConfig();
+            }
+            value.object[0] = this.scriptConfig;
+          },
+          set(this: SceneNode, value) {
+            this.scriptConfig = (value?.object?.[0] as SpringScriptConfig | null) ?? new SpringScriptConfig();
           }
         },
         {
@@ -333,7 +417,8 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
             value.object[0] = this.metaData ? new JSONData(null, this.metaData) : null;
           },
           set(this: SceneNode, value) {
-            this.metaData = (value?.object[0] as JSONData)?.data ?? null;
+            const data = value?.object[0] as JSONData | Record<string, unknown> | null | undefined;
+            this.metaData = data instanceof JSONData ? data.data : (data ?? null);
           }
         }
       ]);

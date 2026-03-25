@@ -173,6 +173,8 @@ export class SceneNode
   private _disableCallback: boolean;
   /** @internal User-attached script entry (engine-defined). */
   private _script: string;
+  /** @internal Script component configuration object (engine/editor-defined). */
+  private _scriptConfig: Nullable<object>;
   /**
    * Construct a scene node.
    *
@@ -218,6 +220,7 @@ export class SceneNode
     this._tmpLocalMatrix = Matrix4x4.identity();
     this._tmpWorldMatrix = Matrix4x4.identity();
     this._script = '';
+    this._scriptConfig = null;
     this._metaData = null;
     this._parent = null;
     this.reparent(scene?.rootNode ?? null);
@@ -328,13 +331,22 @@ export class SceneNode
    * Attached script filename or identifier (engine-specific).
    *
    * @remarks
-   * Integrates with the engine’s scripting system if available.
+   * Integrates with the engine鈥檚 scripting system if available.
    */
   get script() {
     return this._script;
   }
   set script(fileName: string) {
     this._script = fileName ?? '';
+  }
+  /**
+   * Script component configuration payload used by editor/runtime script components.
+   */
+  get scriptConfig() {
+    return this._scriptConfig;
+  }
+  set scriptConfig(value: Nullable<object>) {
+    this._scriptConfig = value ?? null;
   }
   /**
    * Display name of the node (for UI/debugging).

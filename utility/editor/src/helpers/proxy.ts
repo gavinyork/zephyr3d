@@ -3,7 +3,10 @@ import type { Scene, SceneNode } from '@zephyr3d/scene';
 import { TetrahedronFrameShape } from '@zephyr3d/scene';
 import {
   BoundingBox,
+  CylinderShape,
   Mesh,
+  PlaneShape,
+  SphereShape,
   Primitive,
   UnlitMaterial,
   PerspectiveCamera
@@ -17,7 +20,11 @@ export class NodeProxy extends Disposable {
   private readonly _directionalLightPrimitive: DRef<Primitive>;
   private readonly _rectLightPrimitive: DRef<Primitive>;
   private readonly _perspectiveCameraPrimitive: DRef<TetrahedronFrameShape>;
+  private readonly _colliderSpherePrimitive: DRef<SphereShape>;
+  private readonly _colliderCapsulePrimitive: DRef<CylinderShape>;
+  private readonly _colliderPlanePrimitive: DRef<PlaneShape>;
   private readonly _lightProxyMaterial: DRef<UnlitMaterial>;
+  private readonly _colliderProxyMaterial: DRef<UnlitMaterial>;
   private _scene: Scene;
   private _proxyList: DWeakRef<Mesh>[];
   constructor(scene: Scene) {
@@ -28,7 +35,15 @@ export class NodeProxy extends Disposable {
     this._directionalLightPrimitive = new DRef();
     this._rectLightPrimitive = new DRef();
     this._perspectiveCameraPrimitive = new DRef();
+    this._colliderSpherePrimitive = new DRef();
+    this._colliderCapsulePrimitive = new DRef();
+    this._colliderPlanePrimitive = new DRef();
     this._lightProxyMaterial = new DRef(new UnlitMaterial());
+    this._colliderProxyMaterial = new DRef(new UnlitMaterial());
+    this._colliderProxyMaterial.get().blendMode = 'blend';
+    this._colliderProxyMaterial.get().cullMode = 'none';
+    this._colliderProxyMaterial.get().opacity = 0.3;
+    this._colliderProxyMaterial.get().albedoColor = new Vector4(0, 0, 1, 1);
     this._proxyList = [];
   }
   getProto(proxy: SceneNode) {
@@ -46,7 +61,9 @@ export class NodeProxy extends Disposable {
       return;
     }
     let proxy: Mesh;
-    if (src.isPunctualLight() && src.isDirectionLight()) {
+    if (this.getSpringColliderMeta(src)) {
+      proxy = this.getSpringColliderProxyMesh(src);
+    } else if (src.isPunctualLight() && src.isDirectionLight()) {
       proxy = this.getDirectionalLightProxyMesh();
     } else if (src.isPunctualLight() && src.isSpotLight()) {
       proxy = this.getSpotLightProxyMesh();
@@ -75,7 +92,20 @@ export class NodeProxy extends Disposable {
         const proxy = src.children[index].get() as Mesh;
         const material = proxy.material;
         const primitive = proxy.primitive;
-        if (src.isPunctualLight()) {
+        const springMeta = this.getSpringColliderMeta(src);
+        if (springMeta) {
+          const type = springMeta.type;
+          const mismatch =
+            (type === 'sphere' && !(primitive instanceof SphereShape)) ||
+            (type === 'capsule' && !(primitive instanceof CylinderShape)) ||
+            (type === 'plane' && !(primitive instanceof PlaneShape));
+          if (mismatch) {
+            proxy.remove();
+            this.createProxy(src);
+            return;
+          }
+          this.updateSpringColliderProxy(proxy, springMeta);
+        } else if (src.isPunctualLight()) {
           (material as UnlitMaterial).albedoColor = new Vector4(src.color.x, src.color.y, src.color.z, 1);
           if (src.isPointLight()) {
             const range = src.range;
@@ -121,11 +151,127 @@ export class NodeProxy extends Disposable {
     this._spotLightPrimitive.dispose();
     this._directionalLightPrimitive.dispose();
     this._rectLightPrimitive.dispose();
+    this._perspectiveCameraPrimitive.dispose();
+    this._colliderSpherePrimitive.dispose();
+    this._colliderCapsulePrimitive.dispose();
+    this._colliderPlanePrimitive.dispose();
     this._lightProxyMaterial.dispose();
+    this._colliderProxyMaterial.dispose();
     for (const ref of this._proxyList) {
       ref.dispose();
     }
     this._proxyList = [];
+  }
+  private getSpringColliderMeta(src: SceneNode): any | null {
+    const meta = src.metaData as any;
+    const collider = meta?.springCollider;
+    if (!collider || typeof collider !== 'object') {
+      return null;
+    }
+    if (collider.type !== 'sphere' && collider.type !== 'capsule' && collider.type !== 'plane') {
+      return null;
+    }
+    // Migrate legacy fields so the inspector only exposes the new visibility toggle.
+    if (collider.visible === undefined) {
+      collider.visible = true;
+    }
+    if ('opacity' in collider) {
+      delete collider.opacity;
+    }
+    if ('alpha' in collider) {
+      delete collider.alpha;
+    }
+    return collider;
+  }
+  private getVector3Array(value: unknown, fallback: Vector3): Vector3 {
+    if (Array.isArray(value) && value.length >= 3) {
+      return new Vector3(Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0);
+    }
+    return fallback.clone();
+  }
+  private fromToRotation(from: Vector3, to: Vector3): Quaternion {
+    const f = from.clone().inplaceNormalize();
+    const t = to.clone().inplaceNormalize();
+    const dot = Math.max(-1, Math.min(1, Vector3.dot(f, t)));
+    if (dot > 0.999999) {
+      return Quaternion.identity();
+    }
+    if (dot < -0.999999) {
+      const ortho = Math.abs(f.x) < 0.9 ? Vector3.axisPX() : Vector3.axisPY();
+      const axis = Vector3.cross(f, ortho, new Vector3()).inplaceNormalize();
+      return Quaternion.fromAxisAngle(axis, Math.PI);
+    }
+    const axis = Vector3.cross(f, t, new Vector3()).inplaceNormalize();
+    const angle = Math.acos(dot);
+    return Quaternion.fromAxisAngle(axis, angle);
+  }
+  private getSpringColliderProxyMesh(src: SceneNode) {
+    const meta = this.getSpringColliderMeta(src);
+    const type = meta?.type ?? 'sphere';
+    if (type === 'capsule') {
+      if (!this._colliderCapsulePrimitive.get()) {
+        this._colliderCapsulePrimitive.set(new CylinderShape({ topRadius: 0.5, bottomRadius: 0.5, height: 1 }));
+      }
+      return new Mesh(this._scene, this._colliderCapsulePrimitive.get(), this._colliderProxyMaterial.get().createInstance());
+    }
+    if (type === 'plane') {
+      if (!this._colliderPlanePrimitive.get()) {
+        this._colliderPlanePrimitive.set(new PlaneShape({ size: 1 }));
+      }
+      return new Mesh(this._scene, this._colliderPlanePrimitive.get(), this._colliderProxyMaterial.get().createInstance());
+    }
+    if (!this._colliderSpherePrimitive.get()) {
+      this._colliderSpherePrimitive.set(new SphereShape({ radius: 0.5 }));
+    }
+    return new Mesh(this._scene, this._colliderSpherePrimitive.get(), this._colliderProxyMaterial.get().createInstance());
+  }
+  private updateSpringColliderProxy(proxy: Mesh, meta: any) {
+    const COLLIDER_PANEL_SCALE = 10;
+    const mat = proxy.material as UnlitMaterial;
+    const visible = meta?.visible !== false;
+    proxy.showState = visible ? 'visible' : 'hidden';
+    mat.opacity = 0.3;
+    mat.albedoColor = new Vector4(0, 0, 1, 1);
+    if (!visible) {
+      return;
+    }
+    if (meta.type === 'sphere') {
+      const radius = Math.max(0.001, (Number(meta.radius) || 0.15) * COLLIDER_PANEL_SCALE);
+      const offset = this.getVector3Array(meta.offset, Vector3.zero());
+      proxy.position.set(offset);
+      proxy.rotation.identity();
+      proxy.scale.setXYZ(radius * 2, radius * 2, radius * 2);
+      return;
+    }
+    if (meta.type === 'capsule') {
+      const radius = Math.max(0.001, (Number(meta.radius) || 0.1) * COLLIDER_PANEL_SCALE);
+      const startOffset = this.getVector3Array(meta.offset, Vector3.zero());
+      const endOffset = this.getVector3Array(meta.endOffset, new Vector3(0, 0.2, 0));
+      const center = Vector3.scale(Vector3.add(startOffset, endOffset, new Vector3()), 0.5, new Vector3());
+      const half = Vector3.scale(
+        Vector3.sub(endOffset, startOffset, new Vector3()),
+        0.5 * COLLIDER_PANEL_SCALE,
+        new Vector3()
+      );
+      const scaledStart = Vector3.sub(center, half, new Vector3());
+      const scaledEnd = Vector3.add(center, half, new Vector3());
+      const axis = Vector3.sub(scaledEnd, scaledStart, new Vector3());
+      const length = Math.max(0.001, axis.magnitude);
+      const dir = Vector3.scale(axis, 1 / length, new Vector3());
+      const rot = this.fromToRotation(Vector3.axisPY(), dir);
+      proxy.position.set(center);
+      proxy.rotation.set(rot);
+      proxy.scale.setXYZ(radius * 2, length, radius * 2);
+      return;
+    }
+    const offset = this.getVector3Array(meta.offset, Vector3.zero());
+    const normal = this.getVector3Array(meta.normal, Vector3.axisPY());
+    const planeSize = Math.max(0.001, (Number(meta.planeSize) || 0.5) * COLLIDER_PANEL_SCALE);
+    const n = normal.magnitudeSq > 1e-6 ? normal.inplaceNormalize() : Vector3.axisPY();
+    const rot = this.fromToRotation(Vector3.axisPY(), n);
+    proxy.position.set(offset);
+    proxy.rotation.set(rot);
+    proxy.scale.setXYZ(planeSize * 2, planeSize * 2, 1);
   }
   private static createLinePrimitive(vertices: number[], indices: number[], bbox: BoundingBox) {
     const primitive = new Primitive();

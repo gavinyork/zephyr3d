@@ -27,6 +27,10 @@ export interface SphereCollider extends SpringCollider {
   center: Vector3;
   /** Radius of the sphere */
   radius: number;
+  /** Authoring-space radius before node scaling (if node is set) */
+  localRadius?: number;
+  /** Baseline world scale captured at creation for backward compatibility */
+  localRadiusScaleRef?: number;
   /** Local offset from node (if node is set) */
   localOffset?: Vector3;
 }
@@ -44,6 +48,10 @@ export interface CapsuleCollider extends SpringCollider {
   end: Vector3;
   /** Radius of the capsule */
   radius: number;
+  /** Authoring-space radius before node scaling (if node is set) */
+  localRadius?: number;
+  /** Baseline perpendicular scale captured at creation for backward compatibility */
+  localRadiusScaleRef?: number;
   /** Local start offset from node (if node is set) */
   localStartOffset?: Vector3;
   /** Local end offset from node (if node is set) */
@@ -83,16 +91,14 @@ export function createSphereCollider(
   if (node) {
     // If node is provided, treat centerOrOffset as local offset
     const worldMatrix = node.worldMatrix;
-    const worldCenter = new Vector3(
-      worldMatrix.m03 + centerOrOffset.x,
-      worldMatrix.m13 + centerOrOffset.y,
-      worldMatrix.m23 + centerOrOffset.z
-    );
+    const worldCenter = worldMatrix.transformPointAffine(centerOrOffset, new Vector3());
 
     return {
       type: 'sphere',
       center: worldCenter,
       radius,
+      localRadius: radius,
+      localRadiusScaleRef: getUniformScale(worldMatrix),
       node,
       enabled: true,
       localOffset: centerOrOffset.clone()
@@ -127,22 +133,19 @@ export function createCapsuleCollider(
   if (node) {
     // If node is provided, treat as local offsets
     const worldMatrix = node.worldMatrix;
-    const worldStart = new Vector3(
-      worldMatrix.m03 + startOrOffset.x,
-      worldMatrix.m13 + startOrOffset.y,
-      worldMatrix.m23 + startOrOffset.z
-    );
-    const worldEnd = new Vector3(
-      worldMatrix.m03 + endOrOffset.x,
-      worldMatrix.m13 + endOrOffset.y,
-      worldMatrix.m23 + endOrOffset.z
-    );
+    const worldStart = worldMatrix.transformPointAffine(startOrOffset, new Vector3());
+    const worldEnd = worldMatrix.transformPointAffine(endOrOffset, new Vector3());
 
     return {
       type: 'capsule',
       start: worldStart,
       end: worldEnd,
       radius,
+      localRadius: radius,
+      localRadiusScaleRef: getPerpendicularScale(
+        worldMatrix,
+        Vector3.sub(endOrOffset, startOrOffset, new Vector3())
+      ),
       node,
       enabled: true,
       localStartOffset: startOrOffset.clone(),
@@ -180,11 +183,7 @@ export function createPlaneCollider(
   if (node) {
     // If node is provided, treat as local offset
     const worldMatrix = node.worldMatrix;
-    const worldPoint = new Vector3(
-      worldMatrix.m03 + pointOrOffset.x,
-      worldMatrix.m13 + pointOrOffset.y,
-      worldMatrix.m23 + pointOrOffset.z
-    );
+    const worldPoint = worldMatrix.transformPointAffine(pointOrOffset, new Vector3());
 
     return {
       type: 'plane',
@@ -325,6 +324,11 @@ export function updateColliderFromNode(collider: SpringCollider): void {
   switch (collider.type) {
     case 'sphere': {
       const sphere = collider as SphereCollider;
+      if (sphere.localRadius !== undefined) {
+        const currentScale = getUniformScale(worldMatrix);
+        const refScale = Math.max(1e-6, sphere.localRadiusScaleRef ?? 1);
+        sphere.radius = sphere.localRadius * (currentScale / refScale);
+      }
       if (sphere.localOffset) {
         // Transform local offset to world space
         worldMatrix.transformPointAffine(sphere.localOffset, sphere.center);
@@ -339,6 +343,15 @@ export function updateColliderFromNode(collider: SpringCollider): void {
 
     case 'capsule': {
       const capsule = collider as CapsuleCollider;
+      if (capsule.localRadius !== undefined) {
+        const axisLocal =
+          capsule.localStartOffset && capsule.localEndOffset
+            ? Vector3.sub(capsule.localEndOffset, capsule.localStartOffset, new Vector3())
+            : Vector3.axisPY();
+        const currentScale = getPerpendicularScale(worldMatrix, axisLocal);
+        const refScale = Math.max(1e-6, capsule.localRadiusScaleRef ?? 1);
+        capsule.radius = capsule.localRadius * (currentScale / refScale);
+      }
       if (capsule.localStartOffset && capsule.localEndOffset) {
         // Transform local offsets to world space
         worldMatrix.transformPointAffine(capsule.localStartOffset, capsule.start);
@@ -366,9 +379,26 @@ export function updateColliderFromNode(collider: SpringCollider): void {
 
       if (plane.localNormal) {
         // Transform local normal to world space (rotation only)
-        worldMatrix.transformVectorAffine(plane.localNormal, plane.normal).inplaceNormalize;
+        worldMatrix.transformVectorAffine(plane.localNormal, plane.normal).inplaceNormalize();
       }
       break;
     }
   }
+}
+
+function getUniformScale(worldMatrix: any): number {
+  const sx = worldMatrix.transformVectorAffine(Vector3.axisPX(), new Vector3()).magnitude;
+  const sy = worldMatrix.transformVectorAffine(Vector3.axisPY(), new Vector3()).magnitude;
+  const sz = worldMatrix.transformVectorAffine(Vector3.axisPZ(), new Vector3()).magnitude;
+  return Math.max(1e-6, (sx + sy + sz) / 3);
+}
+
+function getPerpendicularScale(worldMatrix: any, axisLocal: Vector3): number {
+  const axis = axisLocal.magnitudeSq > 1e-8 ? axisLocal.clone().inplaceNormalize() : Vector3.axisPY();
+  const helper = Math.abs(axis.y) < 0.99 ? Vector3.axisPY() : Vector3.axisPX();
+  const u = Vector3.cross(axis, helper, new Vector3()).inplaceNormalize();
+  const v = Vector3.cross(axis, u, new Vector3()).inplaceNormalize();
+  const su = worldMatrix.transformVectorAffine(u, new Vector3()).magnitude;
+  const sv = worldMatrix.transformVectorAffine(v, new Vector3()).magnitude;
+  return Math.max(1e-6, (su + sv) * 0.5);
 }

@@ -1,26 +1,26 @@
-import { Vector3, Quaternion, Matrix3x3, Matrix4x4, ASSERT } from '@zephyr3d/base';
+﻿import { Vector3, Quaternion, Matrix3x3, Matrix4x4, ASSERT } from '@zephyr3d/base';
 import type {
   IControllerPointerDownEvent,
   IControllerPointerMoveEvent,
   IControllerPointerUpEvent,
   IControllerWheelEvent,
-  IControllerKeydownEvent,  // 键盘按下事件接口
-  IControllerKeyupEvent     // 键盘释放事件接口
+  IControllerKeydownEvent, // 键盘按下事件
+  IControllerKeyupEvent // 键盘抬起事件
 } from '@zephyr3d/scene';
 import { BaseCameraController } from '@zephyr3d/scene';
 
 export interface EditorCameraControllerOptions {
-  /** Moving speed */
+  /** 平移速度 */
   moveSpeed?: number;
-  /** Zoom speed */
+  /** 缩放速度 */
   zoomSpeed?: number;
-  /** Rotating speed */
+  /** 旋转速度 */
   rotateSpeed?: number;
-  /** Scale speed */
+  /** 正交缩放速度 */
   scaleSpeed?: number;
-  /** Zoom damping */
+  /** 缩放阻尼 */
   zoomDamping?: number;
-  /** WSADQE movement speed multiplier when right mouse button is held */
+  /** 右键按住时 WSADQE 移动速度倍率 */
   rightClickMoveSpeed?: number;
 }
 
@@ -28,7 +28,7 @@ export class EditorCameraController extends BaseCameraController {
   /** @internal */
   private readonly options: EditorCameraControllerOptions;
   /** @internal */
-  private altLeftMouseDown: boolean; // 新增：Alt+左键状态
+  private altLeftMouseDown: boolean; // Alt+左键是否按下（绕视图中心旋转）
   /** @internal */
   private rightMouseDown: boolean;
   /** @internal */
@@ -39,52 +39,52 @@ export class EditorCameraController extends BaseCameraController {
   private lastMouseY: number;
   /** @internal */
   /** @internal */
-  private viewCenter: Vector3; // 新增：固定的视图中心点
+  private viewCenter: Vector3; // 当前视图中心（轨道旋转中心）
+  public cameraDistanceToViewCenter: number; // 相机到视图中心的缓存距离
   /** @internal */
-  private pressedKeys: Set<string>; // 新增：记录按下的按键
+  private pressedKeys: Set<string>; // 当前按下的移动按键集合（W/S/A/D/Q/E）
   /**
- * 检查是否按下了鼠标右键
- * @returns 如果右键按下返回true
- */
+   * 是否正在按住右键
+   * @returns 右键按下返回 true
+   */
   isRightMouseDown(): boolean {
     return this.rightMouseDown;
   }
-   /**
- * 获取当前摄像机前方目标点
- * @returns 如果相机有效返回坐标
- */ 
-  getCameraTargetPos(): Vector3{
-      // 尝试获取摄像机并设置视图中心到其前方10个单位
+  /**
+   * 获取当前“视图中心”初始值（默认取相机前方 10 个单位）
+   * @returns 视图中心世界坐标
+   */
+  getCameraTargetPos(): Vector3 {
+    // 尝试从当前相机推导默认视图中心
     try {
       const camera = this._getCamera();
       if (camera) {
-        // 获取摄像机世界矩阵的前向向量 (负Z轴，但通常“前”是-Z方向，此处需根据引擎坐标系确认)
-        // 假设 camera.worldMatrix 的行2 (索引2) 是-Z轴方向 (摄像机朝向)
+        // 使用相机世界矩阵第 2 行作为相机后向，取反得到前向
         const forward = camera.worldMatrix.getRow(2).xyz().inplaceNormalize();
-        // 获取摄像机世界位置
+        // 分解得到相机世界位置
         const cameraPos = new Vector3();
         const cameraScale = new Vector3();
         const cameraRotation = new Quaternion();
         camera.worldMatrix.decompose(cameraScale, cameraRotation, cameraPos);
-        // 计算摄像机前方10个单位的位置: 位置 + 前向向量 * 10
+        // 默认目标点：相机位置沿前向 10 个单位
         const targetPos = Vector3.add(cameraPos, forward.scaleBy(-10));
         return targetPos;
       } else {
-        // 摄像机未就绪，暂时设置为原点
+        // 相机尚不可用时回退到原点
         return new Vector3(0,0,0);
       }
     } catch (error) {
-      // 防止_getCamera()调用异常，回退到原点
+      // 控制器初始化早期可能取不到相机，异常时回退到原点
       console.warn('Failed to get camera for initial view center, setting to origin.', error);
       return new Vector3(0,0,0);
     }
   }
 
   /**
-   * Creates an instance of FPSCameraController
-   * @param options - The creation options
+   * 创建编辑器相机控制器
+   * @param options - 初始化参数
    */
-  constructor(options?: EditorCameraControllerOptions) {  // 移除 getTargetCenter 参数
+  constructor(options?: EditorCameraControllerOptions) {
     super();
     this.options = {
       moveSpeed: 0.1,
@@ -92,11 +92,12 @@ export class EditorCameraController extends BaseCameraController {
       rotateSpeed: 0.01,
       scaleSpeed: 0.01,
       zoomDamping: 10,
-      rightClickMoveSpeed: 2, // 新增：右键按住时的移动速度倍数
+      rightClickMoveSpeed: 2, // 右键按住时的 WSADQE 速度倍率
       ...options
     };
-    this.viewCenter = this.getCameraTargetPos(); // 默认中心点
+    this.viewCenter = this.getCameraTargetPos(); // 初始化视图中心
     this.pressedKeys = new Set<string>(); // 初始化按键集合
+    this.cameraDistanceToViewCenter = 0;
     this.reset();
   }
   
@@ -109,8 +110,10 @@ export class EditorCameraController extends BaseCameraController {
     this.middleMouseDown = false;
     this.lastMouseX = 0;
     this.lastMouseY = 0;
-    this.pressedKeys.clear(); // 重置按键集合
+    this.pressedKeys.clear(); // 清空按键状态
     this.viewCenter = this.getCameraTargetPos(); // 重置视图中心
+    // 重置后同步刷新距离缓存
+    this.refreshCameraDistanceToViewCenter();
   }
 
 
@@ -120,7 +123,7 @@ export class EditorCameraController extends BaseCameraController {
    * @override
    */
   protected _onMouseDown(evt: IControllerPointerDownEvent): boolean {
-    // 修改：添加Alt+左键支持
+    // 支持 Alt+左键 / 中键 / 右键三种模式
     if (evt.button === 0 && evt.altKey) {
       this.altLeftMouseDown = true;
     }else if (evt.button === 1) {
@@ -140,7 +143,7 @@ export class EditorCameraController extends BaseCameraController {
    * @override
    */
   protected _onMouseUp(evt: IControllerPointerUpEvent): boolean {
-    // 修改：检查Alt+左键释放
+    // 对应释放 Alt+左键 / 中键 / 右键状态
     if (evt.button === 0 && this.altLeftMouseDown) {
       this.altLeftMouseDown = false;
       return true;
@@ -150,7 +153,7 @@ export class EditorCameraController extends BaseCameraController {
     } else if (evt.button === 2 && this.rightMouseDown) {
         this.rightMouseDown = false;
         if(!evt.altKey){
-          this.viewCenter = this.getCameraTargetPos(); 
+          this.setViewCenter(this.getCameraTargetPos()); 
         }
         return true;
     }
@@ -163,7 +166,7 @@ export class EditorCameraController extends BaseCameraController {
    */
   protected _onMouseMove(evt: IControllerPointerMoveEvent): boolean {
     
-    // 新增：Alt+左键旋转逻辑（围绕固定视图中心）
+    // Alt+左键：绕固定视图中心做轨道旋转
     if (this.altLeftMouseDown && evt.altKey && this._getCamera().isPerspective()) {
       const dx = evt.offsetX - this.lastMouseX;
       const dy = evt.offsetY - this.lastMouseY;
@@ -172,42 +175,37 @@ export class EditorCameraController extends BaseCameraController {
 
       const camera = this._getCamera();
       
-      // ========== 新模式：始终围绕固定中心点旋转 ==========
-      // 1. 获取摄像机当前位置
+      // 1) 获取当前相机世界位置
       const cameraWorldPos = new Vector3();
       const cameraRotation = new Quaternion();
       const cameraScale = new Vector3();
       camera.worldMatrix.decompose(cameraScale, cameraRotation, cameraWorldPos);
       
-      // 2. 计算摄像机到视图中心的向量和距离
+      // 2) 计算相机到视图中心向量和缓存距离
       const cameraToViewCenter = Vector3.sub(this.viewCenter, cameraWorldPos);
-      const distance = Math.sqrt(
-        cameraToViewCenter.x * cameraToViewCenter.x +
-        cameraToViewCenter.y * cameraToViewCenter.y +
-        cameraToViewCenter.z * cameraToViewCenter.z
-      );
+      const distance = this.cameraDistanceToViewCenter;
       
       if (distance < 1e-6) {
-        // 防止摄像机与视图中心重合导致计算异常
+        // 避免距离过小导致计算不稳定
         console.warn('Camera is too close to the view center. Falling back to default rotation.');
         return this._performDefaultRotation(dx, dy);
       }
       
-      // 3. 将摄像机到视图中心的向量标准化
+      // 3) 归一化方向向量
       const direction = cameraToViewCenter.inplaceNormalize();
       
-      // 4. 计算基于鼠标位移的新方位角
+      // 4) 计算当前球坐标角
       const currentTheta = Math.atan2(direction.z, direction.x);
       const currentPhi = Math.asin(direction.y);
       
-      // 计算新的角度
+      // 根据鼠标位移更新角度
       const newTheta = currentTheta + dx * this.options.rotateSpeed;
       const newPhi = Math.min(
         Math.PI / 2.1,
         Math.max(-Math.PI / 2.1, currentPhi - dy * this.options.rotateSpeed)
       );
       
-      // 5. 根据新角度计算新的方向向量
+      // 5) 由新角度反算方向向量
       const cosPhi = Math.cos(newPhi);
       const newDirection = new Vector3(
         cosPhi * Math.cos(newTheta),
@@ -215,10 +213,10 @@ export class EditorCameraController extends BaseCameraController {
         cosPhi * Math.sin(newTheta)
       ).inplaceNormalize();
       
-      // 6. 计算新的摄像机位置
+      // 6) 由方向和半径反算新相机位置
       const newCameraWorldPos = Vector3.sub(this.viewCenter, newDirection.scaleBy(distance));
       
-      // 7. 计算摄像机的新朝向（看向视图中心）
+      // 7) 计算相机朝向（始终看向视图中心）
       const lookAtRotation = new Quaternion();
       const forward = Vector3.sub(this.viewCenter, newCameraWorldPos).inplaceNormalize();
       const back = forward.scaleBy(-1); 
@@ -233,7 +231,7 @@ export class EditorCameraController extends BaseCameraController {
 
       lookAtRotation.set(Quaternion.fromRotationMatrix(rotationMatrix));
       
-      // 8. 更新摄像机变换
+      // 8) 写回相机变换（兼容有父节点和无父节点两种情况）
       if (!camera.parent) {
         camera.position.set(newCameraWorldPos);
         camera.rotation.set(lookAtRotation);
@@ -252,10 +250,12 @@ export class EditorCameraController extends BaseCameraController {
         camera.scale.set(newLocalScale);
         camera.rotation.set(newLocalRotation);
       }
+      // 绕固定中心旋转时半径不变，直接复用当前 distance
+      this.cameraDistanceToViewCenter = distance;
       return true;
     }
 
-    // 右键直接调用默认旋转
+    // 右键拖拽：沿相机自身坐标系做自由旋转
     if (!evt.altKey && this.rightMouseDown && this._getCamera().isPerspective()) {
       const dx = evt.offsetX - this.lastMouseX;
       const dy = evt.offsetY - this.lastMouseY;
@@ -264,7 +264,7 @@ export class EditorCameraController extends BaseCameraController {
       return this._performDefaultRotation(dx, dy);
     }
 
-    // 修改：中键平移时，视图中心跟随摄像机一起平移
+    // Alt 模式：右键缩放/推进，中键平移
     if (evt.altKey) {
       const dx = evt.offsetX - this.lastMouseX;
       const dy = evt.offsetY - this.lastMouseY;
@@ -272,8 +272,8 @@ export class EditorCameraController extends BaseCameraController {
       this.lastMouseY = evt.offsetY;
       // const zooming = evt.altKey;
       const moveSpeed = this._getCamera().isPerspective() ? this.options.moveSpeed : this.options.scaleSpeed;
-      const moveX = -dx * moveSpeed;
-      const moveY = dy * moveSpeed;
+      let moveX = -dx * moveSpeed;
+      let moveY = dy * moveSpeed;
       const z = this._getCamera().worldMatrix.getRow(2).xyz().inplaceNormalize();
       if (this.rightMouseDown) {
         if (this._getCamera().isPerspective()) {
@@ -290,10 +290,14 @@ export class EditorCameraController extends BaseCameraController {
           .inplaceNormalize();
         const y = Vector3.cross(z, x);
         if (this._getCamera().isPerspective()) {
+          // 透视相机平移速度随距离缩放，距离越远移动越快
+          const panSpeedScale = Math.max(0.01, this.cameraDistanceToViewCenter * 0.02);
+          moveX *= panSpeedScale;
+          moveY *= panSpeedScale;
           const move = Vector3.combine(x, y, moveX, moveY);
-          this._moveCamera(move);
+          this._moveCamera(move, false);
 
-          // 新增：视图中心跟随摄像机一起平移
+          // 相机与视图中心同步平移，保持相对关系
           this.moveViewCenter(move);
         } else {
           const viewport = this._getCamera().viewport;
@@ -303,9 +307,9 @@ export class EditorCameraController extends BaseCameraController {
           const deltaX = (-dx * width) / viewport[2];
           const deltaY = (dy * height) / viewport[3];
           const move = Vector3.combine(x, y, deltaX, deltaY);
-          this._moveCamera(move);
+          this._moveCamera(move, false);
           
-          // 新增：视图中心跟随摄像机一起平移
+          // 正交相机同样同步平移视图中心
           this.moveViewCenter(move);
         }
       }
@@ -313,13 +317,37 @@ export class EditorCameraController extends BaseCameraController {
     }
     return false;
   }
+
+  /**
+   * 计算“相机到视图中心”的实时距离（内部方法）
+   */
+  private calcCameraDistanceToViewCenter(): number {
+    const camera = this._getCamera();
+    if (!camera) {
+      // 初始化阶段可能还没有相机，返回 0 避免异常
+      return 0;
+    }
+    const cameraPos = new Vector3();
+    const cameraScale = new Vector3();
+    camera.worldMatrix.decompose(cameraScale, null, cameraPos);
+    const delta = Vector3.sub(this.viewCenter, cameraPos);
+    return Math.sqrt(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
+  }
+
+  /**
+   * 刷新距离缓存，避免在多处重复计算
+   */
+  private refreshCameraDistanceToViewCenter(): void {
+    // 统一更新缓存入口
+    this.cameraDistanceToViewCenter = this.calcCameraDistanceToViewCenter();
+  }
   
   /**
-   * 新增：处理按键按下事件
+   * 处理键盘按下事件
    * @override
    */
   protected _onKeyDown(evt: IControllerKeydownEvent): boolean {
-    // 只处理W、S、A、D、Q、E键
+    // 只处理用于移动的按键
     if (['KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyQ', 'KeyE'].includes(evt.code)) {
       this.pressedKeys.add(evt.code);
       return true;
@@ -327,8 +355,8 @@ export class EditorCameraController extends BaseCameraController {
     return false;
   }
 
-    /**
-   * 新增：处理按键释放事件
+  /**
+   * 处理键盘抬起事件
    * @override
    */
   protected _onKeyUp(evt: IControllerKeyupEvent): boolean {
@@ -339,21 +367,21 @@ export class EditorCameraController extends BaseCameraController {
     return false;
   }
 
-    /**
-   * 新增：更新方法，用于处理帧更新时的移动逻辑
+  /**
+   * 每帧更新：右键按住时处理 WSADQE 连续移动
    * @override
    */
   update(): void {
     super.update();
     
-    // 当鼠标右键被按下时，处理WSADQE按键移动
+    // 仅在透视相机且右键按住时启用飞行移动
     if (this.rightMouseDown && this.pressedKeys.size > 0 && this._getCamera().isPerspective()) {
       this._handleWASDQEMovement();
     }
   }
 
-    /**
-   * 新增：处理WSADQE按键移动
+  /**
+   * 处理 WSADQE 移动逻辑（飞行模式）
    */
   private _handleWASDQEMovement(): void {
     if (this.pressedKeys.size === 0) return;
@@ -362,18 +390,18 @@ export class EditorCameraController extends BaseCameraController {
     const moveSpeed = this.options.moveSpeed * (this.options.rightClickMoveSpeed || 3);
     const moveVector = new Vector3(0, 0, 0);
     
-    // 获取摄像机的局部坐标系方向
-    const forward = camera.worldMatrix.getRow(2).xyz().inplaceNormalize().scaleBy(-1); // 摄像机前向
-    const right = camera.worldMatrix.getRow(0).xyz().inplaceNormalize(); // 摄像机右向
-    const up = camera.worldMatrix.getRow(1).xyz().inplaceNormalize(); // 摄像机上向
+    // 相机局部坐标轴：前/右/上
+    const forward = camera.worldMatrix.getRow(2).xyz().inplaceNormalize().scaleBy(-1); // 前向
+    const right = camera.worldMatrix.getRow(0).xyz().inplaceNormalize(); // 右向
+    const up = camera.worldMatrix.getRow(1).xyz().inplaceNormalize(); // 上向
     
-    // 处理每个按下的键
+    // 累积每个按键贡献的移动向量
     for (const key of this.pressedKeys) {
       switch (key) {
-        case 'KeyW': // 前移
+        case 'KeyW': // 前进
           moveVector.addBy(forward.scaleBy(moveSpeed));
           break;
-        case 'KeyS': // 后移
+        case 'KeyS': // 后退
           moveVector.addBy(forward.scaleBy(-moveSpeed));
           break;
         case 'KeyA': // 左移
@@ -398,14 +426,14 @@ export class EditorCameraController extends BaseCameraController {
       moveVector.z * moveVector.z
     );
     if (moveLength > 0.0001) {
-      this._moveCamera(moveVector);
-      // 视图中心跟随摄像机一起移动
-      this.viewCenter.addBy(moveVector);
+      this._moveCamera(moveVector, false);
+      // 统一通过方法更新视图中心，自动维护距离缓存
+      this.moveViewCenter(moveVector);
     }
   }
   
   /**
-   * 执行原始的绕自身旋转逻辑（内部辅助函数）
+   * 默认旋转：绕相机自身旋转（非绕中心轨道）
    * @private
    */
   private _performDefaultRotation(dx: number, dy: number): boolean {
@@ -424,7 +452,7 @@ export class EditorCameraController extends BaseCameraController {
     const XAxis = Vector3.cross(Vector3.axisPY(), zAxis).inplaceNormalize();
     const YAxis = Vector3.cross(zAxis, XAxis).inplaceNormalize();
 
-    // 修复：正确的矩阵构造
+    // 根据正交基重建旋转四元数
     const rotation = Quaternion.fromRotationMatrix(
       new Matrix3x3([XAxis.x, XAxis.y, XAxis.z, YAxis.x, YAxis.y, YAxis.z, zAxis.x, zAxis.y, zAxis.z])
     );
@@ -481,7 +509,7 @@ export class EditorCameraController extends BaseCameraController {
     this._getCamera().setProjectionMatrix(Matrix4x4.ortho(left, right, bottom, top, near, far));
   }
   
-  private _moveCamera(move: Vector3) {
+  private _moveCamera(move: Vector3, refreshDistance = true) {
     if (this._getCamera().parent) {
       const pos = new Vector3();
       const scale = new Vector3();
@@ -499,19 +527,25 @@ export class EditorCameraController extends BaseCameraController {
     } else {
       this._getCamera().moveBy(move);
     }
+    // 相机位置变化后刷新距离缓存（可按需关闭，避免重复刷新）
+    if (refreshDistance) {
+      this.refreshCameraDistanceToViewCenter();
+    }
   }
   
-    /**
-   * 设置视图中心点
-   * @param center - 新的视图中心
+  /**
+   * 设置视图中心
+   * @param center - 新的视图中心（世界坐标）
    */
   setViewCenter(center: Vector3): void {
     this.viewCenter.set(center);
+    // 视图中心变化后刷新距离缓存
+    this.refreshCameraDistanceToViewCenter();
   }
   
   /**
    * 获取当前视图中心
-   * @returns 当前视图中心
+   * @returns 视图中心（拷贝）
    */
   getViewCenter(): Vector3 {
     return this.viewCenter.clone();
@@ -523,11 +557,20 @@ export class EditorCameraController extends BaseCameraController {
    */
   moveViewCenter(delta: Vector3): void {
     this.viewCenter.addBy(delta);
+    // 视图中心平移后刷新距离缓存
+    this.refreshCameraDistanceToViewCenter();
   }
 
   /**
-   * Set options
-   * @param opt - options
+   * 公开方法：立即同步“相机到视图中心”距离缓存
+   */
+  syncCameraDistanceToViewCenter(): void {
+    this.refreshCameraDistanceToViewCenter();
+  }
+
+  /**
+   * 更新控制器参数并重置状态
+   * @param opt - 新参数
    */
   setOptions(opt?: EditorCameraControllerOptions) {
     Object.assign(this.options, opt ?? {});

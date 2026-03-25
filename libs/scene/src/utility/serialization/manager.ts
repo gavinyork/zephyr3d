@@ -181,6 +181,11 @@ import type { Material, MeshMaterial, PBRBluePrintMaterial } from '../../materia
 import type { Primitive } from '../../render';
 import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
 import { getSpriteClass } from './scene/sprite';
+import {
+  getSpringBoneChainConfigClass,
+  getSpringColliderConfigClass,
+  getSpringScriptConfigClass
+} from './scene/spring_script';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -255,6 +260,9 @@ export class ResourceManager {
         getJSONBoolClass(),
         getJSONObjectClass(),
         getJSONArrayClass(),
+        getSpringBoneChainConfigClass(),
+        getSpringColliderConfigClass(),
+        getSpringScriptConfigClass(),
         getAABBClass(),
         getInterpolatorClass(),
         getSkeletonClass(),
@@ -699,7 +707,7 @@ export class ResourceManager {
     const className = json['ClassName'];
     const index = cls.findIndex((val) => val.name === className);
     if (index < 0) {
-      throw new Error('Deserialize object failed: Cannot found serialization meta data');
+      throw new Error(`Deserialize object failed: Cannot found serialization meta data for class "${String(className)}"`);
     }
     let info = cls[index];
     const initParams = json['Init'] as { asset?: string };
@@ -1156,6 +1164,9 @@ export class ResourceManager {
     }
     return v;
   }
+  private isSerializedObjectEnvelope(v: unknown): v is Record<string, unknown> {
+    return !!v && typeof v === 'object' && !Array.isArray(v) && typeof (v as Record<string, unknown>).ClassName === 'string';
+  }
   private async deserializeObjectPropsForCls<T extends object>(
     obj: T,
     cls: SerializableClass,
@@ -1201,7 +1212,9 @@ export class ResourceManager {
             tmpVal.object[0] = v
               ? Array.isArray(v)
                 ? v
-                : ((await this.deserializeObject<any>(obj, v)) ?? null)
+                : this.isSerializedObjectEnvelope(v)
+                  ? ((await this.deserializeObject<any>(obj, v)) ?? null)
+                  : v
               : null;
           }
           break;
@@ -1212,7 +1225,9 @@ export class ResourceManager {
               if (typeof p === 'string' && p) {
                 tmpVal.str[0] = p;
               } else {
-                tmpVal.object.push(p ? ((await this.deserializeObject<any>(obj, p)) ?? null) : null);
+                tmpVal.object.push(
+                  p ? (this.isSerializedObjectEnvelope(p) ? ((await this.deserializeObject<any>(obj, p)) ?? null) : p) : null
+                );
               }
             }
           }

@@ -77,6 +77,7 @@ export class SceneHierarchy extends TreeView<
     set_main_camera: [camea: Camera];
     request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }];
     request_save_prefab: [node: SceneNode];
+    request_add_spring_collider: [node: SceneNode, type: 'sphere' | 'capsule' | 'plane'];
   },
   SceneNode
 > {
@@ -124,6 +125,19 @@ export class SceneHierarchy extends TreeView<
     ImGui.Separator();
     if (ImGui.MenuItem('Create Prefab...')) {
       this.dispatchEvent('request_save_prefab', node);
+    }
+    ImGui.Separator();
+    if (ImGui.BeginMenu('Add Spring Collider')) {
+      if (ImGui.MenuItem('Sphere')) {
+        this.dispatchEvent('request_add_spring_collider', node, 'sphere');
+      }
+      if (ImGui.MenuItem('Capsule')) {
+        this.dispatchEvent('request_add_spring_collider', node, 'capsule');
+      }
+      if (ImGui.MenuItem('Plane')) {
+        this.dispatchEvent('request_add_spring_collider', node, 'plane');
+      }
+      ImGui.EndMenu();
     }
     const animationSet = node.animationSet;
     if (animationSet && animationSet.getAnimationNames().length > 0) {
