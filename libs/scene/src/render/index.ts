@@ -19,3 +19,4 @@ export * from './gerstner_wavegenerator';
 export * from './fbm_wavegenerator';
 export * from './rendertarget';
 export * from './screenrendertarget';
+export * from './rendergraph';
