@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /e/works/zephyr3d/libs/scene/src/render/*.ts)",
+      "Bash(npx jest:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx -p typescript tsc --noEmit -p libs/scene/tsconfig.json)"
+    ]
+  }
+}
