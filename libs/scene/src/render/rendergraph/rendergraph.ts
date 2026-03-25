@@ -123,7 +123,9 @@ export class RenderGraph {
   execute(compiled: CompiledRenderGraph): void {
     const noopCtx: RGExecuteContext = {
       getTexture() {
-        throw new Error('RenderGraph.execute(): resource resolution not available. Use RenderGraphExecutor for managed execution.');
+        throw new Error(
+          'RenderGraph.execute(): resource resolution not available. Use RenderGraphExecutor for managed execution.'
+        );
       }
     };
     for (const pass of compiled.orderedPasses) {
@@ -185,7 +187,7 @@ export class RenderGraph {
         if (res.producer && res.producer !== pass) {
           throw new Error(
             `RenderGraph: resource "${res.name}" already produced by pass "${res.producer.name}", ` +
-            `cannot be written by pass "${pass.name}"`
+              `cannot be written by pass "${pass.name}"`
           );
         }
         res.producer = pass;
@@ -281,9 +283,13 @@ export class RenderGraph {
 
     // For each resource, its producer has an edge to each of its consumers
     for (const res of this._resources.values()) {
-      if (!res.producer || !aliveSet.has(res.producer)) continue;
+      if (!res.producer || !aliveSet.has(res.producer)) {
+        continue;
+      }
       for (const consumer of res.consumers) {
-        if (!aliveSet.has(consumer)) continue;
+        if (!aliveSet.has(consumer)) {
+          continue;
+        }
         adjacency.get(res.producer)!.push(consumer);
         inDegree.set(consumer, inDegree.get(consumer)! + 1);
       }
@@ -313,7 +319,7 @@ export class RenderGraph {
     if (result.length !== alivePasses.length) {
       throw new Error(
         `RenderGraph: circular dependency detected. ` +
-        `Sorted ${result.length} of ${alivePasses.length} alive passes.`
+          `Sorted ${result.length} of ${alivePasses.length} alive passes.`
       );
     }
 

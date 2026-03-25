@@ -29,13 +29,7 @@ export class DevicePoolAllocator implements RGTextureAllocator<Texture2D> {
   allocate(desc: RGTextureDesc, size: RGResolvedSize): Texture2D {
     const device = getDevice();
     const mipmapping = (desc.mipLevels ?? 1) > 1;
-    return device.pool.fetchTemporalTexture2D(
-      false,
-      desc.format,
-      size.width,
-      size.height,
-      mipmapping
-    );
+    return device.pool.fetchTemporalTexture2D(false, desc.format, size.width, size.height, mipmapping);
   }
 
   /**

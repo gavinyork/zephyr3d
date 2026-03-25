@@ -1,6 +1,13 @@
 import type { Nullable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
-import type { BindGroup, ColorState, FrameBuffer, GPUProgram, Texture2D, TextureFormat } from '@zephyr3d/device';
+import type {
+  BindGroup,
+  ColorState,
+  FrameBuffer,
+  GPUProgram,
+  Texture2D,
+  TextureFormat
+} from '@zephyr3d/device';
 import type { DrawContext } from '../drawable';
 import type { RenderQueue } from '../render_queue';
 import type { PunctualLight, Scene } from '../../scene';
@@ -185,8 +192,12 @@ export function buildForwardPlusGraph(
   graph.addPass('DepthPrepass', (builder) => {
     depthHandle = builder.createTexture({
       format: ctx.SSRCalcThickness
-        ? (device.type === 'webgl' ? 'rgba16f' : 'rg32f')
-        : (device.type === 'webgl' ? 'rgba8unorm' : 'r32f'),
+        ? device.type === 'webgl'
+          ? 'rgba16f'
+          : 'rg32f'
+        : device.type === 'webgl'
+          ? 'rgba8unorm'
+          : 'r32f',
       label: 'linearDepth'
     });
     if (options.motionVectors) {
@@ -214,8 +225,12 @@ export function buildForwardPlusGraph(
   let sceneColorHandle: RGHandle;
   graph.addPass('LightPass', (builder) => {
     builder.read(depthHandle!);
-    if (shadowMapsHandle) builder.read(shadowMapsHandle);
-    if (hiZHandle) builder.read(hiZHandle);
+    if (shadowMapsHandle) {
+      builder.read(shadowMapsHandle);
+    }
+    if (hiZHandle) {
+      builder.read(hiZHandle);
+    }
     sceneColorHandle = builder.createTexture({ format: ctx.colorFormat, label: 'sceneColor' });
     builder.setExecute(() => {
       renderMainLightPass(frame);
@@ -225,7 +240,9 @@ export function buildForwardPlusGraph(
   // ── 8. Post Effects + Final Composite ─────────────────────────────
   graph.addPass('Composite', (builder) => {
     builder.read(sceneColorHandle!);
-    if (motionVectorHandle) builder.read(motionVectorHandle);
+    if (motionVectorHandle) {
+      builder.read(motionVectorHandle);
+    }
     builder.write(backbuffer);
     builder.setExecute(() => {
       renderComposite(frame);
@@ -251,10 +268,7 @@ function renderShadowMaps(ctx: DrawContext, lights: PunctualLight[]): void {
 }
 
 /** @internal */
-function renderSceneDepth(
-  frame: FrameState,
-  existingDepthFb: Nullable<FrameBuffer>
-): FrameBuffer {
+function renderSceneDepth(frame: FrameState, existingDepthFb: Nullable<FrameBuffer>): FrameBuffer {
   const ctx = frame.ctx;
   const renderQueue = frame.renderQueue;
   const transmission = !!existingDepthFb;
@@ -370,16 +384,12 @@ let _skyMVBox: Nullable<Primitive> = null;
 
 /** @internal */
 function renderSkyMotionVectors(ctx: DrawContext): void {
-  if (!ctx.motionVectorTexture) return;
+  if (!ctx.motionVectorTexture) {
+    return;
+  }
 
   const device = ctx.device;
-  const fb = device.pool.fetchTemporalFramebuffer(
-    false,
-    0,
-    0,
-    ctx.motionVectorTexture,
-    ctx.depthTexture
-  );
+  const fb = device.pool.fetchTemporalFramebuffer(false, 0, 0, ctx.motionVectorTexture, ctx.depthTexture);
 
   if (!_skyMVProgram) {
     _skyMVProgram = device.buildRenderProgram({
@@ -549,7 +559,7 @@ function renderComposite(frame: FrameState): void {
  * This is the drop-in replacement for `SceneRenderer._renderScene`.
  *
  * @param ctx - The draw context for this frame.
- * @internal
+ * @public
  */
 export function executeForwardPlusGraph(ctx: DrawContext): void {
   const device = ctx.device;
