@@ -1,4 +1,4 @@
-﻿import { Vector3, Quaternion, Matrix3x3, Matrix4x4, ASSERT } from '@zephyr3d/base';
+import { Vector3, Quaternion, Matrix3x3, Matrix4x4, ASSERT } from '@zephyr3d/base';
 import type {
   IControllerPointerDownEvent,
   IControllerPointerMoveEvent,
