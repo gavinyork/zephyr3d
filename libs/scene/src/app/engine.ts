@@ -1,4 +1,4 @@
-﻿import type { IDisposable, Nullable, ReadOptions } from '@zephyr3d/base';
+import type { IDisposable, Nullable, ReadOptions } from '@zephyr3d/base';
 import { MemoryFS, objectEntries } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { HttpFS, type VFS } from '@zephyr3d/base';
@@ -46,6 +46,15 @@ export default class extends RuntimeScript {
       }
       return fallback.clone();
     };
+    const COLLIDER_PANEL_SCALE = 10;
+    const scaleCapsuleAroundCenter = (start, end, scale) => {
+      const center = Vector3.scale(Vector3.add(start, end, new Vector3()), 0.5, new Vector3());
+      const half = Vector3.scale(Vector3.sub(end, start, new Vector3()), 0.5 * scale, new Vector3());
+      return {
+        start: Vector3.sub(center, half, new Vector3()),
+        end: Vector3.add(center, half, new Vector3())
+      };
+    };
     const hierarchyColliders = [];
     root.iterate((node) => {
       const c = node?.metaData?.springCollider;
@@ -90,16 +99,23 @@ export default class extends RuntimeScript {
           if (colliderConfig.type === 'sphere') {
             collider = createSphereCollider(
               parseVec3(colliderConfig.offset, Vector3.zero()),
-              Math.max(0, Number(colliderConfig.radius) || 0.15),
+              Math.max(0, (Number(colliderConfig.radius) || 0.15) * COLLIDER_PANEL_SCALE),
               item.node
             );
+            // Keep collider radius authored by node scale in editor gizmo workflow.
+            collider.localRadiusScaleRef = 1;
           } else if (colliderConfig.type === 'capsule') {
+            const startOffset = parseVec3(colliderConfig.offset, Vector3.zero());
+            const endOffset = parseVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0));
+            const scaledCapsule = scaleCapsuleAroundCenter(startOffset, endOffset, COLLIDER_PANEL_SCALE);
             collider = createCapsuleCollider(
-              parseVec3(colliderConfig.offset, Vector3.zero()),
-              parseVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0)),
-              Math.max(0, Number(colliderConfig.radius) || 0.1),
+              scaledCapsule.start,
+              scaledCapsule.end,
+              Math.max(0, (Number(colliderConfig.radius) || 0.1) * COLLIDER_PANEL_SCALE),
               item.node
             );
+            // Keep collider radius authored by node scale in editor gizmo workflow.
+            collider.localRadiusScaleRef = 1;
           } else if (colliderConfig.type === 'plane') {
             collider = createPlaneCollider(
               parseVec3(colliderConfig.offset, Vector3.zero()),
@@ -120,14 +136,21 @@ export default class extends RuntimeScript {
           if (colliderConfig.type === 'sphere') {
             collider = createSphereCollider(
               new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
-              colliderConfig.radius,
+              Math.max(0, Number(colliderConfig.radius) * COLLIDER_PANEL_SCALE),
               attachNode
             );
           } else if (colliderConfig.type === 'capsule') {
+            const startOffset = new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ);
+            const endOffset = new Vector3(
+              colliderConfig.endOffsetX,
+              colliderConfig.endOffsetY,
+              colliderConfig.endOffsetZ
+            );
+            const scaledCapsule = scaleCapsuleAroundCenter(startOffset, endOffset, COLLIDER_PANEL_SCALE);
             collider = createCapsuleCollider(
-              new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
-              new Vector3(colliderConfig.endOffsetX, colliderConfig.endOffsetY, colliderConfig.endOffsetZ),
-              colliderConfig.radius,
+              scaledCapsule.start,
+              scaledCapsule.end,
+              Math.max(0, Number(colliderConfig.radius) * COLLIDER_PANEL_SCALE),
               attachNode
             );
           } else if (colliderConfig.type === 'plane') {
