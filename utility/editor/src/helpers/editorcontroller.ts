@@ -40,6 +40,7 @@ export class EditorCameraController extends BaseCameraController {
   /** @internal */
   /** @internal */
   private viewCenter: Vector3; // 新增：固定的视图中心点
+  public cameraDistanceToViewCenter: number; // 公共变量：相机到视图中心的距离（缓存值）
   /** @internal */
   private pressedKeys: Set<string>; // 新增：记录按下的按键
   /**
@@ -84,7 +85,7 @@ export class EditorCameraController extends BaseCameraController {
    * Creates an instance of FPSCameraController
    * @param options - The creation options
    */
-  constructor(options?: EditorCameraControllerOptions) {  // 移除 getTargetCenter 参数
+  constructor(options?: EditorCameraControllerOptions) {
     super();
     this.options = {
       moveSpeed: 0.1,
@@ -97,6 +98,7 @@ export class EditorCameraController extends BaseCameraController {
     };
     this.viewCenter = this.getCameraTargetPos(); // 默认中心点
     this.pressedKeys = new Set<string>(); // 初始化按键集合
+    this.cameraDistanceToViewCenter = 0;
     this.reset();
   }
   
@@ -111,6 +113,8 @@ export class EditorCameraController extends BaseCameraController {
     this.lastMouseY = 0;
     this.pressedKeys.clear(); // 重置按键集合
     this.viewCenter = this.getCameraTargetPos(); // 重置视图中心
+    // 重置后同步刷新距离缓存，供平移/旋转逻辑复用
+    this.refreshCameraDistanceToViewCenter();
   }
 
 
@@ -150,7 +154,7 @@ export class EditorCameraController extends BaseCameraController {
     } else if (evt.button === 2 && this.rightMouseDown) {
         this.rightMouseDown = false;
         if(!evt.altKey){
-          this.viewCenter = this.getCameraTargetPos(); 
+          this.setViewCenter(this.getCameraTargetPos()); 
         }
         return true;
     }
@@ -181,11 +185,7 @@ export class EditorCameraController extends BaseCameraController {
       
       // 2. 计算摄像机到视图中心的向量和距离
       const cameraToViewCenter = Vector3.sub(this.viewCenter, cameraWorldPos);
-      const distance = Math.sqrt(
-        cameraToViewCenter.x * cameraToViewCenter.x +
-        cameraToViewCenter.y * cameraToViewCenter.y +
-        cameraToViewCenter.z * cameraToViewCenter.z
-      );
+      const distance = this.cameraDistanceToViewCenter;
       
       if (distance < 1e-6) {
         // 防止摄像机与视图中心重合导致计算异常
@@ -252,6 +252,8 @@ export class EditorCameraController extends BaseCameraController {
         camera.scale.set(newLocalScale);
         camera.rotation.set(newLocalRotation);
       }
+      // 绕固定中心旋转不会改变半径，直接复用当前 distance 更新缓存值
+      this.cameraDistanceToViewCenter = distance;
       return true;
     }
 
@@ -272,8 +274,8 @@ export class EditorCameraController extends BaseCameraController {
       this.lastMouseY = evt.offsetY;
       // const zooming = evt.altKey;
       const moveSpeed = this._getCamera().isPerspective() ? this.options.moveSpeed : this.options.scaleSpeed;
-      const moveX = -dx * moveSpeed;
-      const moveY = dy * moveSpeed;
+      let moveX = -dx * moveSpeed;
+      let moveY = dy * moveSpeed;
       const z = this._getCamera().worldMatrix.getRow(2).xyz().inplaceNormalize();
       if (this.rightMouseDown) {
         if (this._getCamera().isPerspective()) {
@@ -290,6 +292,10 @@ export class EditorCameraController extends BaseCameraController {
           .inplaceNormalize();
         const y = Vector3.cross(z, x);
         if (this._getCamera().isPerspective()) {
+          // 使用缓存距离控制中键平移速度，距离越远速度越快
+          const panSpeedScale = Math.max(0.01, this.cameraDistanceToViewCenter * 0.02);
+          moveX *= panSpeedScale;
+          moveY *= panSpeedScale;
           const move = Vector3.combine(x, y, moveX, moveY);
           this._moveCamera(move);
 
@@ -312,6 +318,30 @@ export class EditorCameraController extends BaseCameraController {
       return true;
     }
     return false;
+  }
+
+  /**
+   * 计算相机到视图中心的真实距离（私有计算方法）
+   */
+  private calcCameraDistanceToViewCenter(): number {
+    const camera = this._getCamera();
+    if (!camera) {
+      // 控制器初始化早期可能还没有相机，返回 0 避免空引用
+      return 0;
+    }
+    const cameraPos = new Vector3();
+    const cameraScale = new Vector3();
+    camera.worldMatrix.decompose(cameraScale, null, cameraPos);
+    const delta = Vector3.sub(this.viewCenter, cameraPos);
+    return Math.sqrt(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
+  }
+
+  /**
+   * 刷新公共距离缓存，避免多处重复计算 distance
+   */
+  private refreshCameraDistanceToViewCenter(): void {
+    // 统一刷新缓存，减少多处重复计算
+    this.cameraDistanceToViewCenter = this.calcCameraDistanceToViewCenter();
   }
   
   /**
@@ -399,8 +429,8 @@ export class EditorCameraController extends BaseCameraController {
     );
     if (moveLength > 0.0001) {
       this._moveCamera(moveVector);
-      // 视图中心跟随摄像机一起移动
-      this.viewCenter.addBy(moveVector);
+      // 统一通过方法更新视图中心，自动维护距离缓存
+      this.moveViewCenter(moveVector);
     }
   }
   
@@ -499,6 +529,8 @@ export class EditorCameraController extends BaseCameraController {
     } else {
       this._getCamera().moveBy(move);
     }
+    // 相机位置变化后刷新距离缓存
+    this.refreshCameraDistanceToViewCenter();
   }
   
     /**
@@ -507,6 +539,8 @@ export class EditorCameraController extends BaseCameraController {
    */
   setViewCenter(center: Vector3): void {
     this.viewCenter.set(center);
+    // 视图中心变化后刷新距离缓存
+    this.refreshCameraDistanceToViewCenter();
   }
   
   /**
@@ -523,6 +557,8 @@ export class EditorCameraController extends BaseCameraController {
    */
   moveViewCenter(delta: Vector3): void {
     this.viewCenter.addBy(delta);
+    // 视图中心平移后刷新距离缓存
+    this.refreshCameraDistanceToViewCenter();
   }
 
   /**
