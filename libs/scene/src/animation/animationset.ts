@@ -523,17 +523,19 @@ export class AnimationSet extends Disposable implements IDisposable {
     }
 
     // Map non-skeleton nodes by name
+    /*
     for (const srcNode of sourceClip.tracks.keys()) {
       if (!nodeMap.has(srcNode)) {
         const name = (srcNode as SceneNode).name;
         const dstNode = this._model.findNodeByName<SceneNode>(name);
         if (!dstNode) {
-          console.error(`copyAnimationFrom: target model has no node named '${name}'`);
-          return null;
+          console.warn(`copyAnimationFrom: target model has no node named '${name}'`);
+        } else {
+          nodeMap.set(srcNode, dstNode);
         }
-        nodeMap.set(srcNode, dstNode);
       }
     }
+    */
 
     const dstClip = this.createAnimation(destName);
     if (!dstClip) {
@@ -560,7 +562,10 @@ export class AnimationSet extends Disposable implements IDisposable {
     const tmpDstBindInv = new Quaternion();
 
     for (const [srcNode, srcTracks] of sourceClip.tracks) {
-      const dstNode = nodeMap.get(srcNode)!;
+      const dstNode = nodeMap.get(srcNode);
+      if (!dstNode) {
+        continue;
+      }
       const remap = jointRemapBySrcNode.get(srcNode) ?? null;
 
       for (const srcTrack of srcTracks) {
