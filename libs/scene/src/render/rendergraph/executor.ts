@@ -6,7 +6,7 @@ import type {
   RGExecuteContext,
   RGExecuteFn
 } from './types';
-import { RGHandle } from './types';
+import type { RGHandle } from './types';
 
 /**
  * Executes a compiled render graph with automatic resource lifecycle management.
@@ -73,7 +73,7 @@ export class RenderGraphExecutor<TTexture = unknown> {
   execute(compiled: CompiledRenderGraph): void {
     // Build per-pass allocation and release schedules
     const allocateAt = new Map<number, number[]>(); // passIndex -> resourceIds to allocate
-    const releaseAt = new Map<number, number[]>();   // passIndex -> resourceIds to release
+    const releaseAt = new Map<number, number[]>(); // passIndex -> resourceIds to release
 
     for (const [resId, lifetime] of compiled.lifetimes) {
       if (lifetime.resource.kind === 'transient') {
@@ -175,7 +175,7 @@ export class RenderGraphExecutor<TTexture = unknown> {
         }
         throw new Error(
           `RenderGraphExecutor: cannot resolve resource "${handle.name}" (id=${handle._id}). ` +
-          `It may not have been allocated yet or was already released.`
+            `It may not have been allocated yet or was already released.`
         );
       }
     };
