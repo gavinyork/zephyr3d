@@ -1,5 +1,10 @@
 import { RenderGraph, RGHandle, RenderGraphExecutor } from '../../../libs/scene/src/render/rendergraph';
-import type { RGTextureAllocator, RGTextureDesc, RGResolvedSize, RGExecuteContext } from '../../../libs/scene/src/render/rendergraph';
+import type {
+  RGTextureAllocator,
+  RGTextureDesc,
+  RGResolvedSize,
+  RGExecuteContext
+} from '../../../libs/scene/src/render/rendergraph';
 
 // ─── Mock Allocator ──────────────────────────────────────────────────
 
@@ -387,7 +392,9 @@ describe('RenderGraph', () => {
       graph.addPass('LightPass', (builder) => {
         builder.read(linearDepth!);
         builder.read(shadowMaps!);
-        if (hiZ) builder.read(hiZ);
+        if (hiZ) {
+          builder.read(hiZ);
+        }
         sceneColor = builder.createTexture({ format: 'rgba16f', label: 'sceneColor' });
         builder.setExecute((_ctx) => log.push('LightPass'));
       });
