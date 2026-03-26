@@ -381,14 +381,20 @@ export class ScreenAdapter {
    */
   resolveViewport() {
     const device = getDevice();
-    const vp = this._viewport?.slice() ?? [
+    const vp = this._viewport ?? [
       0,
       0,
       device.deviceXToScreen(device.getDrawingBufferWidth()),
       device.deviceYToScreen(device.getDrawingBufferHeight())
     ];
-    if (this._resolvedViewport !== vp) {
-      this._resolvedViewport = vp;
+    if (
+      !this._resolvedViewport ||
+      this._resolvedViewport[0] !== vp[0] ||
+      this._resolvedViewport[1] !== vp[1] ||
+      this._resolvedViewport[2] !== vp[2] ||
+      this._resolvedViewport[3] !== vp[3]
+    ) {
+      this._resolvedViewport = vp.slice();
       this._version++;
       this._transform = null;
     }
