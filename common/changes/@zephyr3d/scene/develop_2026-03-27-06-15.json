@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Supports copying animation clips at runtime",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

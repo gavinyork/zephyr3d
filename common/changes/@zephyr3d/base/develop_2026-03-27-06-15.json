@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/base",
+      "comment": "Add twist/wing decompos suppor for Quaternion",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/base"
+}
