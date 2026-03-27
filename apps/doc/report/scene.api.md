@@ -624,7 +624,11 @@ export interface AssetSkeletalAnimationTrack extends AssetAnimationTrack {
 export class AssetSkeleton extends NamedObject {
     constructor(name: string);
     addJoint(joint: AssetHierarchyNode, inverseBindMatrix: Matrix4x4): void;
-    bindPoseMatrices: Matrix4x4[];
+    bindPose: {
+        position: Vector3;
+        rotation: Quaternion;
+        scale: Vector3;
+    }[];
     inverseBindMatrices: Matrix4x4[];
     joints: AssetHierarchyNode[];
     pivot: Nullable<AssetHierarchyNode>;
@@ -1242,6 +1246,36 @@ export class CameraPositionNode extends BaseGraphNode {
 }
 
 // @public
+export interface CapsuleCollider extends SpringCollider {
+    end: Vector3;
+    localEndOffset?: Vector3;
+    localStartOffset?: Vector3;
+    radius: number;
+    start: Vector3;
+    // (undocumented)
+    type: 'capsule';
+}
+
+// @public
+export class CCDSolver extends IKSolver {
+    constructor(chain: IKChain, maxIterations?: number, tolerance?: number);
+    applyToNodes(weight?: number): void;
+    clearPoleVectors(): void;
+    clearTwistConstraints(): void;
+    getPoleVector(jointIndex: number): {
+        position: Vector3;
+        weight: number;
+    } | undefined;
+    getTwistConstraint(jointIndex: number): TwistConstraint | undefined;
+    hasPoleVector(jointIndex: number): boolean;
+    removePoleVector(jointIndex: number): boolean;
+    removeTwistConstraint(jointIndex: number): boolean;
+    setPoleVector(jointIndex: number, poleVector: Vector3, weight?: number): void;
+    setTwistConstraint(jointIndex: number, minTwist: number, maxTwist: number, smoothFactor?: number): void;
+    solve(target: Vector3): boolean;
+}
+
+// @public
 export class CeilNode extends GenericMathNode {
     constructor();
     // (undocumented)
@@ -1684,6 +1718,27 @@ export class CosNode extends GenericMathNode {
         getProps(): never[];
     };
 }
+
+// @public
+export function createCapsuleCollider(startOrOffset: Vector3, endOrOffset: Vector3, radius: number, node?: SceneNode): CapsuleCollider;
+
+// @public
+export function createPlaneCollider(pointOrOffset: Vector3, normal: Vector3, node?: SceneNode): PlaneCollider;
+
+// @public
+export function createSphereCollider(centerOrOffset: Vector3, radius: number, node?: SceneNode): SphereCollider;
+
+// @public
+export function createSpringConstraint(particleA: number, particleB: number, restLength: number, stiffness?: number, compliance?: number): SpringConstraint;
+
+// @public
+export function createSpringParticle(position: Vector3, options?: {
+    mass?: number;
+    damping?: number;
+    fixed?: boolean;
+    node?: SceneNode;
+    originalRotation?: Quaternion;
+}): SpringParticle;
 
 // @public
 export class CrossProductNode extends GenericMathNode {
@@ -2373,6 +2428,25 @@ export type ExtractMixinReturnType<M> = M extends (target: infer A) => infer R ?
 export type ExtractMixinType<M> = M extends [infer First] ? ExtractMixinReturnType<First> : M extends [infer First, ...infer Rest] ? ExtractMixinReturnType<First> & ExtractMixinType<[...Rest]> : never;
 
 // @public
+export class FABRIKSolver extends IKSolver {
+    constructor(chain: IKChain, maxIterations?: number, tolerance?: number);
+    applyToNodes(weight?: number): void;
+    clearPoleVectors(): void;
+    clearTwistConstraints(): void;
+    getPoleVector(jointIndex: number): {
+        position: Vector3;
+        weight: number;
+    } | undefined;
+    getTwistConstraint(jointIndex: number): TwistConstraint | undefined;
+    hasPoleVector(jointIndex: number): boolean;
+    removePoleVector(jointIndex: number): boolean;
+    removeTwistConstraint(jointIndex: number): boolean;
+    setPoleVector(jointIndex: number, poleVector: Vector3, weight?: number): void;
+    setTwistConstraint(jointIndex: number, minTwist: number, maxTwist: number, smoothFactor?: number): void;
+    solve(target: Vector3): boolean;
+}
+
+// @public
 export class FaceForwardNode extends GenericMathNode {
     constructor();
     // (undocumented)
@@ -2953,6 +3027,80 @@ export interface IGraphNode extends IEventTarget<{
 }
 
 // @public
+export class IKAngleConstraint extends IKConstraint {
+    constructor(jointIndex: number, minAngle: number, maxAngle: number);
+    apply(joints: IKJoint[]): void;
+    get maxAngle(): number;
+    set maxAngle(value: number);
+    get minAngle(): number;
+    set minAngle(value: number);
+}
+
+// @public
+export class IKChain {
+    constructor(nodes: SceneNode[]);
+    addConstraint(constraint: IKConstraint): void;
+    applyConstraints(): void;
+    clearConstraints(): void;
+    get constraints(): readonly IKConstraint[];
+    get endEffector(): IKJoint;
+    static fromNodeHierarchy(startNode: SceneNode, endNode: SceneNode): IKChain;
+    get joints(): IKJoint[];
+    get length(): number;
+    removeConstraint(constraint: IKConstraint): boolean;
+    restoreOriginalPositions(): void;
+    get root(): IKJoint;
+    storeOriginalPositions(): void;
+    get totalLength(): number;
+    updateFromNodes(): void;
+}
+
+// @public
+export abstract class IKConstraint {
+    constructor(jointIndex: number);
+    abstract apply(joints: IKJoint[]): void;
+    get jointIndex(): number;
+    protected _jointIndex: number;
+}
+
+// @public
+export interface IKJoint {
+    boneLength: number;
+    node: SceneNode;
+    originalPosition: Vector3;
+    originalRotation: Quaternion;
+    position: Vector3;
+    previousIKRotation?: Quaternion;
+    previousTwist?: number;
+    rotation: Quaternion;
+}
+
+// @public
+export class IKModifier<Solver extends IKSolver = IKSolver> extends SkeletonModifier {
+    constructor(solver: Solver, target: Vector3, weight?: number);
+    apply(_skeleton: Skeleton, _deltaTime: number): void;
+    reset(): void;
+    setTarget(target: Vector3): void;
+    get solver(): Solver;
+    get target(): Vector3;
+}
+
+// @public
+export abstract class IKSolver {
+    constructor(chain: IKChain, maxIterations?: number, tolerance?: number);
+    abstract applyToNodes(weight?: number): void;
+    get chain(): IKChain;
+    protected _chain: IKChain;
+    getMaxIterations(): number;
+    getTolerance(): number;
+    protected _maxIterations: number;
+    setMaxIterations(value: number): void;
+    setTolerance(value: number): void;
+    abstract solve(target: Vector3): boolean;
+    protected _tolerance: number;
+}
+
+// @public
 export type IMixinAlbedoColor = {
     albedoColor: Vector4;
     calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp;
@@ -2961,6 +3109,9 @@ export type IMixinAlbedoColor = {
 // @public
 export type IMixinBlinnPhong = {
     shininess: number;
+    scatterWrap: number;
+    scatterWidth: number;
+    scatterColor: Vector4;
     blinnPhongLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp, outRoughness?: PBShaderExp): PBShaderExp;
 } & IMixinLight;
 
@@ -3123,6 +3274,18 @@ export interface InstanceData {
 
 // @public
 export type InstanceUniformType = 'float' | 'vec2' | 'vec3' | 'vec4' | 'rgb' | 'rgba';
+
+// @public
+export interface InterChainConstraint {
+    chainAIndex: number;
+    chainBIndex: number;
+    compliance: number;
+    lambda: number;
+    particleAIndex: number;
+    particleBIndex: number;
+    restLength: number;
+    stiffness: number;
+}
 
 // @public
 export function interleavedGradientNoise(scope: PBInsideFunctionScope, c: PBShaderExp): PBShaderExp;
@@ -3687,6 +3850,51 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
 }
 
 // @public
+export class MultiChainSpringSystem {
+    constructor(options?: MultiChainSpringSystemOptions);
+    addChain(chain: SpringChain): number;
+    addInterChainConstraint(constraint: InterChainConstraint): void;
+    applyToNodes(weight?: number): void;
+    get centrifugalScale(): number;
+    set centrifugalScale(scale: number);
+    get chains(): SpringChain[];
+    get coriolisScale(): number;
+    set coriolisScale(scale: number);
+    createRadialConstraints(options: {
+        stiffness: number;
+        maxDistance: number;
+        skipRows?: number;
+        connectDistance?: number;
+        compliance?: number;
+    }): void;
+    get enableInertialForces(): boolean;
+    set enableInertialForces(enabled: boolean);
+    get gravity(): Vector3;
+    set gravity(gravity: Vector3);
+    get interChainConstraints(): InterChainConstraint[];
+    get iterations(): number;
+    set iterations(count: number);
+    reset(): void;
+    // (undocumented)
+    get solver(): 'verlet' | 'xpbd';
+    set solver(type: 'verlet' | 'xpbd');
+    update(deltaTime: number): void;
+    get wind(): Vector3;
+    set wind(wind: Vector3);
+}
+
+// @public
+export interface MultiChainSpringSystemOptions {
+    centrifugalScale?: number;
+    coriolisScale?: number;
+    enableInertialForces?: boolean;
+    gravity?: Vector3;
+    iterations?: number;
+    solver?: 'verlet' | 'xpbd';
+    wind?: Vector3;
+}
+
+// @public
 export class NamedObject {
     constructor(name: string);
     // (undocumented)
@@ -4223,6 +4431,16 @@ export type PickTarget = {
 };
 
 // @public
+export interface PlaneCollider extends SpringCollider {
+    localNormal?: Vector3;
+    localPointOffset?: Vector3;
+    normal: Vector3;
+    point: Vector3;
+    // (undocumented)
+    type: 'plane';
+}
+
+// @public
 export interface PlaneCreationOptions extends ShapeCreationOptions {
     anchor?: number;
     anchorX?: number;
@@ -4630,6 +4848,15 @@ export type ResolutionTransform = {
     canvasToViewport: PointTransform;
     canvasToLogic: PointTransform;
 };
+
+// @public
+export function resolveCapsuleCollision(particlePos: Vector3, collider: CapsuleCollider): boolean;
+
+// @public
+export function resolvePlaneCollision(particlePos: Vector3, collider: PlaneCollider): boolean;
+
+// @public
+export function resolveSphereCollision(particlePos: Vector3, collider: SphereCollider): boolean;
 
 // @public
 export class ResolveVertexNormalNode extends BaseGraphNode {
@@ -5318,9 +5545,9 @@ export class SinNode extends GenericMathNode {
 
 // @public
 export class Skeleton extends Disposable {
-    constructor(joints: SceneNode[], inverseBindMatrices: Matrix4x4[], bindPoseMatrices: Matrix4x4[], jointTransforms?: {
-        scale: Vector3;
+    constructor(joints: SceneNode[], inverseBindMatrices: Matrix4x4[], bindPose: {
         rotation: Quaternion;
+        scale: Vector3;
         position: Vector3;
     }[]);
     getBoundingInfo(data: {
@@ -5328,12 +5555,28 @@ export class Skeleton extends Disposable {
         blendIndices: TypedArray;
         weights: TypedArray;
     }): SkinnedBoundingBox;
+    getJointIndex(joint: SceneNode): number;
+    getJointIndexByName(jointName: string): number;
     get jointTexture(): Texture2D<unknown>;
+    get modifiers(): SkeletonModifier[];
     protected onDispose(): void;
     // (undocumented)
     set persistentId(val: string);
     // (undocumented)
     set playing(b: boolean);
+}
+
+// @public
+export abstract class SkeletonModifier {
+    constructor(weight?: number);
+    abstract apply(skeleton: Skeleton, deltaTime: number): void;
+    get enabled(): boolean;
+    set enabled(value: boolean);
+    protected _enabled: boolean;
+    abstract reset(): void;
+    get weight(): number;
+    set weight(value: number);
+    protected _weight: number;
 }
 
 // @public
@@ -5453,6 +5696,15 @@ export class SmoothStepNode extends GenericMathNode {
 }
 
 // @public
+export interface SphereCollider extends SpringCollider {
+    center: Vector3;
+    localOffset?: Vector3;
+    radius: number;
+    // (undocumented)
+    type: 'sphere';
+}
+
+// @public
 export interface SphereCreationOptions extends ShapeCreationOptions {
     horizonalDetail?: number;
     radius?: number;
@@ -5492,6 +5744,99 @@ export class SpotLight extends PunctualLight {
     set range(val: number);
     setCutoff(val: number): this;
     setRange(val: number): this;
+}
+
+// @public
+export class SpringChain {
+    constructor();
+    addConstraint(constraint: SpringConstraint): void;
+    addCrossConstraints(stiffness?: number, skipDistance?: number): void;
+    addParticle(particle: SpringParticle): number;
+    constraints: SpringConstraint[];
+    static fromBoneChain(startNode: SceneNode, endNode?: SceneNode | null, options?: {
+        mass?: number;
+        damping?: number;
+        stiffness?: number;
+    }): SpringChain;
+    particles: SpringParticle[];
+    reset(): void;
+}
+
+// @public
+export interface SpringCollider {
+    enabled: boolean;
+    node?: Nullable<SceneNode>;
+    type: 'sphere' | 'capsule' | 'plane';
+}
+
+// @public
+export interface SpringConstraint {
+    compliance: number;
+    lambda: number;
+    particleA: number;
+    particleB: number;
+    restLength: number;
+    stiffness: number;
+}
+
+// @public
+export class SpringModifier extends SkeletonModifier {
+    constructor(springSystem: SpringSystem, weight?: number);
+    apply(_skeleton: Skeleton, deltaTime: number): void;
+    reset(): void;
+    get springSystem(): SpringSystem;
+}
+
+// @public
+export interface SpringParticle {
+    damping: number;
+    fixed: boolean;
+    lastFramePosition: Vector3;
+    mass: number;
+    node: Nullable<SceneNode>;
+    originalPosition: Vector3;
+    originalRotation: Quaternion | null;
+    position: Vector3;
+    positionHistory?: Vector3[];
+    prevPosition: Vector3;
+}
+
+// @public
+export class SpringSystem {
+    constructor(chain: SpringChain, options?: SpringSystemOptions);
+    addCollider(collider: SpringCollider): void;
+    applyToNodes(weight?: number): void;
+    get centrifugalScale(): number;
+    set centrifugalScale(scale: number);
+    get chain(): SpringChain;
+    clearColliders(): void;
+    get colliders(): SpringCollider[];
+    get coriolisScale(): number;
+    set coriolisScale(scale: number);
+    get enableInertialForces(): boolean;
+    set enableInertialForces(enabled: boolean);
+    get gravity(): Vector3;
+    set gravity(gravity: Vector3);
+    get iterations(): number;
+    set iterations(count: number);
+    removeCollider(collider: SpringCollider): boolean;
+    reset(): void;
+    get solver(): 'verlet' | 'xpbd';
+    set solver(type: 'verlet' | 'xpbd');
+    update(deltaTime: number): void;
+    get wind(): Vector3;
+    set wind(wind: Vector3);
+}
+
+// @public
+export interface SpringSystemOptions {
+    centrifugalScale?: number;
+    coriolisScale?: number;
+    enableInertialForces?: boolean;
+    gravity?: Vector3;
+    iterations?: number;
+    solver?: 'verlet' | 'xpbd';
+    wind?: Vector3;
 }
 
 // @public
@@ -5804,6 +6149,28 @@ export class TransformNode extends BaseGraphNode {
 // @public
 export function tryGetApp(): Nullable<Application>;
 
+// @public
+export interface TwistConstraint {
+    maxTwist: number;
+    minTwist: number;
+    smoothFactor: number;
+}
+
+// @public
+export class TwoBoneIKSolver extends IKSolver {
+    constructor(chain: IKChain, poleVector?: Vector3 | null, poleWeight?: number);
+    applyToNodes(weight?: number): void;
+    clearTwistConstraints(): void;
+    getTwistConstraint(jointIndex: number): TwistConstraint | undefined;
+    get poleVector(): Vector3 | null;
+    set poleVector(value: Vector3 | null);
+    get poleWeight(): number;
+    set poleWeight(value: number);
+    removeTwistConstraint(jointIndex: number): boolean;
+    setTwistConstraint(jointIndex: number, minTwist: number, maxTwist: number, smoothFactor?: number): void;
+    solve(target: Vector3): boolean;
+}
+
 // Warning: (ae-forgotten-export) The symbol "UnlitMaterial_base" needs to be exported by the entry point index.d.ts
 //
 // @public
@@ -5818,6 +6185,9 @@ export class UnlitMaterial extends UnlitMaterial_base implements Clonable<UnlitM
     // (undocumented)
     vertexShader(scope: PBFunctionScope): void;
 }
+
+// @public
+export function updateColliderFromNode(collider: SpringCollider): void;
 
 // @public
 export function valueNoise(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;

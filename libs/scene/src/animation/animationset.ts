@@ -436,19 +436,11 @@ export class AnimationSet extends Disposable implements IDisposable {
    * - Both sets must reference skeletons with identical joint names and counts.
    * - The source clip must exist in `sourceSet`.
    *
-   * BindPose differences are handled for rotation tracks: each keyframe rotation is
-   * retargeted from the source joint's bind orientation to the target joint's bind
-   * orientation using: `R_dst = dstBind.inverse * srcBind * R_src`.
-   * Translation and scale tracks are copied verbatim (they store local-space offsets
-   * that are independent of bind pose orientation).
-   *
    * @param sourceSet - The AnimationSet to copy from.
    * @param animationName - Name of the clip to copy.
    * @param targetName - Name for the new clip in this set. Defaults to `animationName`.
    * @param excludeJoint - Optional predicate; joints whose name returns true are excluded from
-   *   skeleton structure matching. Useful when one model has extra bone chains (e.g. accessories)
-   *   that the other lacks. Tracks targeting excluded joints are still copied if a same-named
-   *   node exists in the target model.
+   *   skeleton structure matching.
    * @returns The newly created AnimationClip, or null on failure.
    */
   copyAnimationFrom(
@@ -521,21 +513,6 @@ export class AnimationSet extends Disposable implements IDisposable {
         });
       }
     }
-
-    // Map non-skeleton nodes by name
-    /*
-    for (const srcNode of sourceClip.tracks.keys()) {
-      if (!nodeMap.has(srcNode)) {
-        const name = (srcNode as SceneNode).name;
-        const dstNode = this._model.findNodeByName<SceneNode>(name);
-        if (!dstNode) {
-          console.warn(`copyAnimationFrom: target model has no node named '${name}'`);
-        } else {
-          nodeMap.set(srcNode, dstNode);
-        }
-      }
-    }
-    */
 
     const dstClip = this.createAnimation(destName);
     if (!dstClip) {

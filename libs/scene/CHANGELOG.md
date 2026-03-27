@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Fri, 20 Mar 2026 11:37:32 GMT and should not be manually modified.
+This log was last generated on Fri, 27 Mar 2026 06:21:52 GMT and should not be manually modified.
+
+## 0.8.1
+Fri, 27 Mar 2026 06:21:52 GMT
+
+### Patches
+
+- Supports copying animation clips at runtime
 
 ## 0.8.0
 Fri, 20 Mar 2026 11:37:32 GMT
