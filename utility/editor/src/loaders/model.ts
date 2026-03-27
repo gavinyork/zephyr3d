@@ -743,6 +743,14 @@ export class SharedModel extends Disposable {
           instancing
         );
       }
+      for (const sk of this.skeletons) {
+        if (!skeletonMeshMap.has(sk)) {
+          skeletonMeshMap.set(sk, {
+            mesh: [],
+            bounding: []
+          });
+        }
+      }
       for (const v of skeletonMeshMap) {
         const sk = v[0];
         const skeleton = new Skeleton(

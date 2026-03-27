@@ -1,5 +1,5 @@
 import { DRef, randomUUID, DWeakRef } from '@zephyr3d/base';
-import type { Quaternion, TypedArray } from '@zephyr3d/base';
+import { Nullable, Quaternion, TypedArray } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Vector3, nextPowerOf2 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';
@@ -72,6 +72,8 @@ export class Skeleton extends Disposable {
   /** @internal */
   protected _inverseBindMatrices: Matrix4x4[];
   /** @internal */
+  protected _bindPoseModelSpace: Matrix4x4[];
+  /** @internal */
   protected _bindPose: { rotation: Quaternion; scale: Vector3; position: Vector3 }[];
   /** @internal */
   protected _jointMatrices!: Matrix4x4[];
@@ -108,8 +110,21 @@ export class Skeleton extends Disposable {
     this._playing = false;
     this._modifiers = [];
     this._lastUpdateTime = 0;
+    this._bindPoseModelSpace = [];
     this.computeBindPose();
     this.updateJointMatrices(0);
+    let skeletonRoot = this.findRootJoint(this._joints);
+    if (!skeletonRoot || !this._joints.includes(skeletonRoot)) {
+      throw new Error('Skeleton root must be included in the joint list');
+    }
+    while (skeletonRoot.parent && this._joints.includes(skeletonRoot.parent)) {
+      skeletonRoot = skeletonRoot.parent;
+    }
+    const im = skeletonRoot.parent!.invWorldMatrix;
+    for (const joint of this._joints) {
+      const m = Matrix4x4.multiplyAffine(im, joint.worldMatrix);
+      this._bindPoseModelSpace.push(m);
+    }
     Skeleton._registry.set(this._id, new DWeakRef(this));
   }
   /**
@@ -138,6 +153,9 @@ export class Skeleton extends Disposable {
   /** @internal */
   get bindPose() {
     return this._bindPose;
+  }
+  get bindPoseModelSpace() {
+    return this._bindPoseModelSpace;
   }
   /** @internal */
   get playing() {
@@ -445,5 +463,31 @@ export class Skeleton extends Disposable {
       boundingBox: new BoundingBox()
     };
     return info;
+  }
+  private findRootJoint(joints: SceneNode[]) {
+    let root: Nullable<SceneNode> = null;
+    for (const joint of joints) {
+      if (!root) {
+        root = joint;
+      }
+      while (!root!.isParentOf(joint)) {
+        root = root!.parent;
+      }
+      if (!root) {
+        break;
+      }
+    }
+    return root;
+  }
+  retargetJointRotation(
+    srcRotation: Quaternion,
+    srcParentRotation: Quaternion,
+    dstParentRotation: Quaternion,
+    dstRotation?: Quaternion
+  ): Quaternion {
+    dstRotation = dstRotation ?? new Quaternion();
+    const srcRotationWorld = Quaternion.multiply(srcParentRotation, srcRotation);
+    Quaternion.multiply(Quaternion.conjugate(dstParentRotation), srcRotationWorld, dstRotation);
+    return dstRotation;
   }
 }
