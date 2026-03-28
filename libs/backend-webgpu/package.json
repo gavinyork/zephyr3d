@@ -75,7 +75,7 @@
     "@rollup/plugin-commonjs": "~28.0.2",
     "@types/node": "^22.12.0",
     "@webgpu/types": "^0.1.65",
-    "@zephyr3d/base": "workspace:^0.2.1",
+    "@zephyr3d/base": "workspace:^0.2.2",
     "@zephyr3d/device": "workspace:^0.2.7",
     "rollup-plugin-import-css": "~3.5.8"
   }

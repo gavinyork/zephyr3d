@@ -1,9 +1,13 @@
-import { weightedAverage, Disposable } from '@zephyr3d/base';
-import type { DRef, IDisposable } from '@zephyr3d/base';
+import { weightedAverage, Disposable, Interpolator } from '@zephyr3d/base';
+import type { DRef, IDisposable, Nullable, Quaternion } from '@zephyr3d/base';
 import type { SceneNode } from '../scene';
 import { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
-import type { Skeleton } from './skeleton';
+import { NodeRotationTrack } from './rotationtrack';
+import { NodeEulerRotationTrack } from './eulerrotationtrack';
+import { NodeTranslationTrack } from './translationtrack';
+import { NodeScaleTrack } from './scaletrack';
+import { Skeleton } from './skeleton';
 
 /**
  * Options for playing an animation.
@@ -425,6 +429,270 @@ export class AnimationSet extends Disposable implements IDisposable {
       }
     }
   }
+  /**
+   * Copy an animation clip from another AnimationSet into this one.
+   *
+   * Prerequisites:
+   * - Both sets must reference skeletons with identical joint names and counts.
+   * - The source clip must exist in `sourceSet`.
+   *
+   * @param sourceSet - The AnimationSet to copy from.
+   * @param animationName - Name of the clip to copy.
+   * @param targetName - Name for the new clip in this set. Defaults to `animationName`.
+   * @param excludeJoint - Optional predicate; joints whose name returns true are excluded from
+   *   skeleton structure matching.
+   * @returns The newly created AnimationClip, or null on failure.
+   */
+  copyAnimationFrom(
+    sourceSet: AnimationSet,
+    animationName: string,
+    targetName?: string,
+    excludeJoint?: (jointName: string) => boolean
+  ): AnimationClip | null {
+    const destName = targetName ?? animationName;
+    const sourceClip = sourceSet.get(animationName);
+    if (!sourceClip) {
+      console.error(`copyAnimationFrom: animation '${animationName}' not found in source set`);
+      return null;
+    }
+    if (this._animations[destName]) {
+      console.error(`copyAnimationFrom: animation '${destName}' already exists in target set`);
+      return null;
+    }
+
+    // Per-joint retargeting info indexed by source joint node
+    type JointRemap = {
+      dstNode: SceneNode;
+      srcBindRot: Quaternion;
+      dstBindRot: Quaternion;
+      translationScale: number;
+    };
+    if (sourceClip.skeletons.size !== 1) {
+      console.error(`copyAnimationFrom: source animation clip must be affected by exactly one skeleton`);
+      return null;
+    }
+    const srcSkeletonId = [...sourceClip.skeletons][0];
+    const srcSkeleton = Skeleton.findSkeletonById(srcSkeletonId);
+    if (!srcSkeleton) {
+      console.error(`copyAnimationFrom: source skeleton '${srcSkeletonId}' not found`);
+      return null;
+    }
+    const nodeMap = new Map<object, SceneNode>();
+    const jointRemapBySrcNode = new Map<object, JointRemap>();
+
+    const jointsFiltered = srcSkeleton.joints.filter((j) => !excludeJoint?.(j.name));
+    const srcRootNode = findRootJoint(jointsFiltered);
+    if (!srcRootNode) {
+      console.error(`copyAnimationFrom: cannot determine the root joint for source skeleton`);
+      return null;
+    }
+    // Build filtered joint lists for matching (exclude joints rejected by filterJoint)
+    const srcJointsFiltered = sortJoints(srcRootNode, jointsFiltered);
+    if (!srcJointsFiltered) {
+      console.error(`copyAnimationFrom: invalid source skeleton structure`);
+      return null;
+    }
+    let dstJointsFiltered: SceneNode[] = [];
+    const dstSkeleton = this._skeletons
+      .map((ref) => ref.get())
+      .find((sk) => {
+        if (!sk) {
+          return false;
+        }
+        const jointsFiltered = sk.joints.filter((j) => !excludeJoint?.(j.name));
+        if (jointsFiltered.length !== srcJointsFiltered.length) {
+          return false;
+        }
+        const rootNode = findRootJoint(jointsFiltered);
+        if (!rootNode) {
+          return false;
+        }
+        const sortedJointsFiltered = sortJoints(rootNode, jointsFiltered);
+        if (
+          sortedJointsFiltered &&
+          srcJointsFiltered.every((j, i) => j.name === sortedJointsFiltered[i].name)
+        ) {
+          dstJointsFiltered = sortedJointsFiltered;
+          return true;
+        }
+        return false;
+      });
+    if (!dstJointsFiltered || !dstSkeleton) {
+      console.error(`copyAnimationFrom: no matching skeleton in target set for '${srcSkeletonId}'`);
+      return null;
+    }
+    // Build remap only for joints that pass the filter
+    for (let fi = 0; fi < srcJointsFiltered.length; fi++) {
+      const srcJoint = srcJointsFiltered[fi];
+      const dstJoint = dstJointsFiltered[fi];
+      const si = srcSkeleton.joints.indexOf(srcJoint);
+      const di = dstSkeleton.joints.indexOf(dstJoint);
+      const srcLen = srcSkeleton.bindPose[si].position.magnitude;
+      const dstLen = dstSkeleton.bindPose[di].position.magnitude;
+      const translationScale = srcLen > 1e-6 ? dstLen / srcLen : 1;
+      nodeMap.set(srcJoint, dstJoint);
+      jointRemapBySrcNode.set(srcJoint, {
+        dstNode: dstJoint,
+        srcBindRot: srcSkeleton.bindPose[si].rotation,
+        dstBindRot: dstSkeleton.bindPose[di].rotation,
+        translationScale
+      });
+    }
+
+    const dstClip = this.createAnimation(destName);
+    if (!dstClip) {
+      return null;
+    }
+    dstClip.timeDuration = sourceClip.timeDuration;
+    dstClip.weight = sourceClip.weight;
+    dstClip.autoPlay = sourceClip.autoPlay;
+
+    // Register destination skeleton
+    dstClip.addSkeleton(dstSkeleton.persistentId);
+
+    for (const srcNode of srcJointsFiltered) {
+      const srcTracks = sourceClip.tracks.get(srcNode);
+      if (!srcTracks) {
+        console.error(`copyAnimationFrom: no track for joint: ${srcNode.name}`);
+        return null;
+      }
+      const dstNode = nodeMap.get(srcNode)!;
+      const remap = jointRemapBySrcNode.get(srcNode) ?? null;
+
+      for (const srcTrack of srcTracks) {
+        let dstTrack: AnimationTrack;
+        if (srcTrack instanceof NodeRotationTrack) {
+          dstTrack = retargetRotationTrack(srcTrack);
+        } else if (srcTrack instanceof NodeEulerRotationTrack) {
+          dstTrack = retargetEulerToRotationTrack(srcTrack);
+        } else if (srcTrack instanceof NodeTranslationTrack) {
+          dstTrack = retargetTranslationTrack(srcTrack, remap);
+        } else if (srcTrack instanceof NodeScaleTrack) {
+          dstTrack = new NodeScaleTrack(cloneInterpolator(srcTrack.interpolator));
+        } else {
+          console.warn(`copyAnimationFrom: unsupported track type '${srcTrack.constructor.name}', skipping`);
+          continue;
+        }
+
+        dstTrack.name = srcTrack.name;
+        dstTrack.target = srcTrack.target;
+        dstTrack.jointIndex = srcTrack.jointIndex;
+        dstClip.addTrack(dstNode, dstTrack);
+      }
+    }
+
+    return dstClip;
+
+    function findRootJoint(joints: SceneNode[]) {
+      let root: Nullable<SceneNode> = null;
+      for (const joint of joints) {
+        if (!root) {
+          root = joint;
+        }
+        while (!root!.isParentOf(joint)) {
+          root = root!.parent;
+        }
+        if (!root) {
+          break;
+        }
+      }
+      if (!root || !joints.includes(root)) {
+        return null;
+      }
+      return root;
+    }
+
+    function sortJoints(root: SceneNode, joints: SceneNode[]): Nullable<SceneNode[]> {
+      const ordered: SceneNode[] = [];
+      const visited = new Set<SceneNode>();
+      function visit(joint: SceneNode) {
+        if (visited.has(joint)) {
+          return true;
+        }
+        if (!joints.includes(joint)) {
+          return false;
+        }
+        if (joint !== root) {
+          visit(joint.parent!);
+        }
+        visited.add(joint);
+        ordered.push(joint);
+        return true;
+      }
+      for (const joint of joints) {
+        if (!visit(joint)) {
+          return null;
+        }
+      }
+      return ordered;
+    }
+    function retargetTranslationTrack(
+      src: NodeTranslationTrack,
+      remap: JointRemap | null
+    ): NodeTranslationTrack {
+      if (!remap || Math.abs(remap.translationScale - 1) < 1e-6) {
+        return new NodeTranslationTrack(cloneInterpolator(src.interpolator));
+      }
+      const scale = remap.translationScale;
+      const srcOutputs = src.interpolator.outputs as Float32Array;
+      const newOutputs = new Float32Array(srcOutputs.length);
+      for (let i = 0; i < newOutputs.length; i++) {
+        newOutputs[i] = srcOutputs[i] * scale;
+      }
+      return new NodeTranslationTrack(
+        new Interpolator(
+          src.interpolator.mode,
+          'vec3',
+          new Float32Array(src.interpolator.inputs as Float32Array),
+          newOutputs
+        )
+      );
+    }
+
+    function cloneInterpolator(src: Interpolator): Interpolator {
+      return new Interpolator(
+        src.mode,
+        src.target,
+        src.inputs instanceof Float32Array ? new Float32Array(src.inputs) : [...src.inputs],
+        src.outputs instanceof Float32Array ? new Float32Array(src.outputs) : [...src.outputs]
+      );
+    }
+
+    function retargetRotationTrack(src: NodeRotationTrack): NodeRotationTrack {
+      const isCubic = src.interpolator.mode === 'cubicspline';
+      const frameStride = isCubic ? 12 : 4;
+      const numFrames = (src.interpolator.inputs as Float32Array).length;
+      const srcOutputs = src.interpolator.outputs as Float32Array;
+      const newOutputs = new Float32Array(srcOutputs.length);
+      for (let f = 0; f < numFrames; f++) {
+        const base = f * frameStride;
+        newOutputs.set(srcOutputs.subarray(base, base + (isCubic ? 12 : 4)), base);
+      }
+      return new NodeRotationTrack(
+        new Interpolator(
+          src.interpolator.mode,
+          'quat',
+          new Float32Array(src.interpolator.inputs as Float32Array),
+          newOutputs
+        )
+      );
+    }
+
+    function retargetEulerToRotationTrack(src: NodeEulerRotationTrack): NodeRotationTrack {
+      const srcInputs = src.interpolator.inputs as Float32Array;
+      const srcOutputs = src.interpolator.outputs as Float32Array;
+      const numFrames = srcInputs.length;
+      const newOutputs = new Float32Array(numFrames * 3);
+      for (let f = 0; f < numFrames; f++) {
+        const base = f * 3;
+        newOutputs.set(srcOutputs.subarray(base, base + 3), base);
+      }
+      return new NodeRotationTrack(
+        new Interpolator('linear', 'quat', new Float32Array(srcInputs), newOutputs)
+      );
+    }
+  }
+
   /**
    * Dispose the animation set and release owned resources.
    *

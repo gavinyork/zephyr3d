@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/base
 
-This log was last generated on Tue, 10 Feb 2026 07:50:06 GMT and should not be manually modified.
+This log was last generated on Fri, 27 Mar 2026 06:21:52 GMT and should not be manually modified.
+
+## 0.2.2
+Fri, 27 Mar 2026 06:21:52 GMT
+
+### Patches
+
+- Add twist/wing decompos suppor for Quaternion
 
 ## 0.2.1
 Tue, 10 Feb 2026 07:50:06 GMT
