@@ -479,15 +479,4 @@ export class Skeleton extends Disposable {
     }
     return root;
   }
-  retargetJointRotation(
-    srcRotation: Quaternion,
-    srcParentRotation: Quaternion,
-    dstParentRotation: Quaternion,
-    dstRotation?: Quaternion
-  ): Quaternion {
-    dstRotation = dstRotation ?? new Quaternion();
-    const srcRotationWorld = Quaternion.multiply(srcParentRotation, srcRotation);
-    Quaternion.multiply(Quaternion.conjugate(dstParentRotation), srcRotationWorld, dstRotation);
-    return dstRotation;
-  }
 }
