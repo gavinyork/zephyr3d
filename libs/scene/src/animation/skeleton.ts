@@ -1,5 +1,5 @@
 import { DRef, randomUUID, DWeakRef } from '@zephyr3d/base';
-import { Nullable, Quaternion, TypedArray } from '@zephyr3d/base';
+import type { Nullable, Quaternion, TypedArray } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Vector3, nextPowerOf2 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';

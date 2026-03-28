@@ -1,5 +1,5 @@
-import { weightedAverage, Disposable, Interpolator, Quaternion } from '@zephyr3d/base';
-import type { DRef, IDisposable, Nullable } from '@zephyr3d/base';
+import { weightedAverage, Disposable, Interpolator } from '@zephyr3d/base';
+import type { DRef, IDisposable, Nullable, Quaternion } from '@zephyr3d/base';
 import type { SceneNode } from '../scene';
 import { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
