@@ -751,7 +751,8 @@ export class SharedModel extends Disposable {
           });
         }
       }
-      for (const [sk, nodes] of skeletonMeshMap) {
+      for (const v of skeletonMeshMap) {
+        const sk = v[0];
         const skeleton = new Skeleton(
           sk.joints.map((val) => {
             const node = nodeMap.get(val);
@@ -763,17 +764,20 @@ export class SharedModel extends Disposable {
           sk.inverseBindMatrices,
           sk.bindPose
         );
-        if (!nodes.skeleton) {
-          nodes.skeleton = skeleton;
-          for (let i = 0; i < nodes.mesh.length; i++) {
-            const mesh = nodes.mesh[i];
-            const v = {
-              positions: nodes.bounding[i].rawPositions,
-              blendIndices: nodes.bounding[i].rawBlendIndices,
-              weights: nodes.bounding[i].rawJointWeights
-            };
-            mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
-            mesh.skeletonName = nodes.skeleton.persistentId;
+        const nodes = skeletonMeshMap.get(sk);
+        if (nodes) {
+          if (!nodes.skeleton) {
+            nodes.skeleton = skeleton;
+            for (let i = 0; i < nodes.mesh.length; i++) {
+              const mesh = nodes.mesh[i];
+              const v = {
+                positions: nodes.bounding[i].rawPositions,
+                blendIndices: nodes.bounding[i].rawBlendIndices,
+                weights: nodes.bounding[i].rawJointWeights
+              };
+              mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
+              mesh.skeletonName = nodes.skeleton.persistentId;
+            }
           }
         }
         animationSet.skeletons.push(new DRef(nodes.skeleton));

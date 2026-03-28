@@ -12,6 +12,13 @@ import { LIGHT_TYPE_POINT, LIGHT_TYPE_RECT } from '../../../values';
 import type { DrawContext } from '../../../render';
 import { getGGXLUT } from '../../../utility/textures/ggxlut';
 
+const PBR_REFLECTION_MODE = {
+  none: 0,
+  ggx: 1,
+  anisotropic: 2,
+  glint: 3
+} as const;
+
 /**
  * Interface for mixinPBRBluePrint lighting model mixin
  * @public
@@ -278,6 +285,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       super.fragmentShader(scope);
       if (this.needFragmentColor()) {
+        scope.zReflectionMode = pb.float().uniform(2);
         if (this.drawContext.drawEnvLight) {
           scope.zGGXLut = pb.tex2D().uniform(2);
         }
@@ -406,6 +414,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           pb.vec3('outColor').inout()
         ],
         function () {
+          this.$l.reflectionMode = this.zReflectionMode;
           this.$l.H = pb.normalize(pb.add(this.viewVec, this.L));
           this.$l.NoH = pb.clamp(pb.dot(this.data.normal, this.H), 0, 1);
           this.$l.NoL = pb.clamp(pb.dot(this.data.normal, this.L), 0, 1);
@@ -417,8 +426,54 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
             this.$l.specularRoughness = pb.clamp(pb.add(this.data.roughness, this.sourceRadiusFactor), 0, 1);
             this.$l.alphaRoughness = pb.mul(this.specularRoughness, this.specularRoughness);
             this.$l.D = that.distributionGGX(this, this.NoH, this.alphaRoughness);
+            this.$if(pb.equal(this.reflectionMode, PBR_REFLECTION_MODE.anisotropic), function () {
+              this.$l.dirAngle = pb.mul(
+                pb.add(
+                  pb.mul(this.zAnisotropyDirection, this.zAnisotropyDirectionScaleBias.x),
+                  this.zAnisotropyDirectionScaleBias.y
+                ),
+                Math.PI / 180
+              );
+              this.$l.t0 = pb.normalize(this.data.TBN[0]);
+              this.$l.b0 = pb.normalize(this.data.TBN[1]);
+              this.$l.tangent = pb.normalize(
+                pb.add(pb.mul(this.t0, pb.cos(this.dirAngle)), pb.mul(this.b0, pb.sin(this.dirAngle)))
+              );
+              this.$l.bitangent = pb.normalize(pb.cross(this.data.normal, this.tangent));
+              this.$l.ToH = pb.dot(this.tangent, this.H);
+              this.$l.BoH = pb.dot(this.bitangent, this.H);
+              this.$l.at = pb.max(pb.mul(this.alphaRoughness, pb.add(1, this.zAnisotropy)), 0.0001);
+              this.$l.ab = pb.max(pb.mul(this.alphaRoughness, pb.sub(1, this.zAnisotropy)), 0.0001);
+              this.$l.anisoDenom = pb.mul(
+                Math.PI,
+                this.at,
+                this.ab,
+                pb.pow(
+                  pb.add(
+                    pb.div(pb.mul(this.ToH, this.ToH), pb.mul(this.at, this.at)),
+                    pb.div(pb.mul(this.BoH, this.BoH), pb.mul(this.ab, this.ab)),
+                    pb.mul(this.NoH, this.NoH)
+                  ),
+                  2
+                )
+              );
+              this.D = pb.div(1, pb.max(this.anisoDenom, 0.0001));
+            });
+            this.$if(pb.equal(this.reflectionMode, PBR_REFLECTION_MODE.glint), function () {
+              this.$l.glintNoise = pb.fract(
+                pb.mul(
+                  pb.sin(pb.add(pb.dot(this.H, pb.vec3(127.1, 311.7, 74.7)), pb.mul(this.NoH, 43.1))),
+                  43758.5453
+                )
+              );
+              this.$l.glintMask = pb.smoothStep(0.97, 1, this.glintNoise);
+              this.D = pb.mul(this.D, pb.add(1, pb.mul(this.glintMask, 8)));
+            });
             this.$l.V = that.visGGX(this, this.NoV, this.NoL, this.alphaRoughness);
             this.$l.specular = pb.mul(this.lightColor, this.D, this.V, this.F, this.specularScale);
+            this.$if(pb.equal(this.reflectionMode, PBR_REFLECTION_MODE.none), function () {
+              this.specular = pb.vec3(0);
+            });
             this.outColor = pb.add(this.outColor, this.specular);
             this.$l.diffuseBRDF = pb.mul(pb.sub(pb.vec3(1), this.F), pb.div(this.data.diffuse.rgb, Math.PI));
             this.$l.diffuse = pb.mul(this.lightColor, pb.max(this.diffuseBRDF, pb.vec3(0)), this.diffuseScale);
@@ -465,6 +520,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           }
           const envLightStrength = ShaderHelper.getEnvLightStrength(this);
           this.$l.occlusion = envLightStrength;
+          this.$l.reflectionMode = this.zReflectionMode;
           this.$l.NoV = pb.clamp(pb.dot(this.data.normal, this.viewVec), 0.0001, 1);
           this.$l.ggxLutSample = pb.clamp(
             pb.textureSampleLevel(
@@ -484,6 +540,10 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           if (outRoughness || ctx.env!.light.envLight.hasRadiance()) {
             this.$l.FssEss = pb.add(pb.mul(this.k_S, this.f_ab.x), pb.vec3(this.f_ab.y));
             this.$l.specularFactor = pb.mul(this.FssEss, this.occlusion);
+            this.specularFactor = pb.mul(
+              this.specularFactor,
+              pb.float(pb.notEqual(this.reflectionMode, PBR_REFLECTION_MODE.none))
+            );
             if (outRoughness) {
               this.outRoughness = pb.vec4(this.specularFactor /*this.data.f0.rgb*/, this.data.roughness);
             } else if (ctx.env!.light.envLight.hasRadiance()) {

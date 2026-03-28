@@ -539,6 +539,7 @@ export class AnimationSet extends Disposable implements IDisposable {
       });
     }
 
+
     const dstClip = this.createAnimation(destName);
     if (!dstClip) {
       return null;

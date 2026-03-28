@@ -1,13 +1,21 @@
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
-import type { BindGroup, PBFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
 import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
-import { DRef, Vector4, type Clonable } from '@zephyr3d/base';
+import { DRef, Vector2, Vector3, Vector4, type Clonable, type Immutable } from '@zephyr3d/base';
 import { mixinPBRBluePrint } from './mixins/lightmodel/pbrblueprintmixin';
 import type { BluePrintUniformTexture, BluePrintUniformValue } from '../utility/blueprint/material/ir';
 import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
 import type { DrawContext } from '../render/drawable';
 import { PBRBlockNode, VertexBlockNode } from '../utility/blueprint/material/pbr';
+import type { PBRReflectionMode } from './mixins/lightmodel/pbrmetallicroughness';
+
+const PBR_REFLECTION_MODE: Record<PBRReflectionMode, number> = {
+  none: 0,
+  ggx: 1,
+  anisotropic: 2,
+  glint: 3
+};
 
 /**
  * Physically-based rendering material driven by blueprint graphs.
@@ -37,6 +45,8 @@ export class PBRBluePrintMaterial
   /** @internal */
   private static readonly FEATURE_VERTEX_UV = this.defineFeature();
   /** @internal */
+  private static readonly FEATURE_SUBSURFACE_SCATTERING = this.defineFeature();
+  /** @internal */
   private _irFrag: MaterialBlueprintIR;
   /** @internal */
   private _irVertex: MaterialBlueprintIR;
@@ -44,6 +54,22 @@ export class PBRBluePrintMaterial
   private _uniformValues: BluePrintUniformValue[];
   /** @internal */
   private _uniformTextures: BluePrintUniformTexture[];
+  /** @internal */
+  private _reflectionMode: PBRReflectionMode;
+  /** @internal */
+  private readonly _subsurfaceColor: Vector3;
+  /** @internal */
+  private _subsurfaceScale: number;
+  /** @internal */
+  private _subsurfacePower: number;
+  /** @internal */
+  private _subsurfaceIntensity: number;
+  /** @internal */
+  private _anisotropy: number;
+  /** @internal */
+  private _anisotropyDirection: number;
+  /** @internal */
+  private readonly _anisotropyDirectionScaleBias: Vector2;
   /**
    * Creates a new {@link PBRBluePrintMaterial} instance.
    *
@@ -93,8 +119,96 @@ export class PBRBluePrintMaterial
       );
     this._uniformValues = uniformValues ?? [];
     this._uniformTextures = uniformTextures ?? [];
+    this._reflectionMode = 'ggx';
+    this._subsurfaceColor = new Vector3(1, 0.3, 0.2);
+    this._subsurfaceScale = 0.5;
+    this._subsurfacePower = 1.5;
+    this._subsurfaceIntensity = 0.5;
+    this._anisotropy = 0.75;
+    this._anisotropyDirection = 0;
+    this._anisotropyDirectionScaleBias = new Vector2(1, 0);
+    this.useFeature(PBRBluePrintMaterial.FEATURE_SUBSURFACE_SCATTERING, false);
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_COLOR, this._irVertex.behaviors.useVertexColor);
     this.useFeature(PBRBluePrintMaterial.FEATURE_VERTEX_UV, this._irVertex.behaviors.useVertexUV);
+  }
+  get reflectionMode() {
+    return this._reflectionMode;
+  }
+  set reflectionMode(val: PBRReflectionMode) {
+    if (val !== this._reflectionMode) {
+      this._reflectionMode = val;
+      this.uniformChanged();
+    }
+  }
+  get subsurfaceScattering() {
+    return this.featureUsed<boolean>(PBRBluePrintMaterial.FEATURE_SUBSURFACE_SCATTERING);
+  }
+  set subsurfaceScattering(val: boolean) {
+    this.useFeature(PBRBluePrintMaterial.FEATURE_SUBSURFACE_SCATTERING, !!val);
+  }
+  get subsurfaceColor(): Immutable<Vector3> {
+    return this._subsurfaceColor;
+  }
+  set subsurfaceColor(val: Immutable<Vector3>) {
+    if (!val.equalsTo(this._subsurfaceColor)) {
+      this._subsurfaceColor.set(val);
+      this.uniformChanged();
+    }
+  }
+  get subsurfaceScale() {
+    return this._subsurfaceScale;
+  }
+  set subsurfaceScale(val: number) {
+    if (val !== this._subsurfaceScale) {
+      this._subsurfaceScale = val;
+      this.uniformChanged();
+    }
+  }
+  get subsurfacePower() {
+    return this._subsurfacePower;
+  }
+  set subsurfacePower(val: number) {
+    if (val !== this._subsurfacePower) {
+      this._subsurfacePower = val;
+      this.uniformChanged();
+    }
+  }
+  get subsurfaceIntensity() {
+    return this._subsurfaceIntensity;
+  }
+  set subsurfaceIntensity(val: number) {
+    if (val !== this._subsurfaceIntensity) {
+      this._subsurfaceIntensity = val;
+      this.uniformChanged();
+    }
+  }
+  get anisotropy() {
+    return this._anisotropy;
+  }
+  set anisotropy(val: number) {
+    const clamped = Math.max(-0.95, Math.min(0.95, val));
+    if (clamped !== this._anisotropy) {
+      this._anisotropy = clamped;
+      this.uniformChanged();
+    }
+  }
+  get anisotropyDirection() {
+    return this._anisotropyDirection;
+  }
+  set anisotropyDirection(val: number) {
+    if (val !== this._anisotropyDirection) {
+      this._anisotropyDirection = val;
+      this.uniformChanged();
+    }
+  }
+  get anisotropyDirectionScaleBias(): Immutable<Vector2> {
+    return this._anisotropyDirectionScaleBias;
+  }
+  set anisotropyDirectionScaleBias(val: Immutable<Vector2>) {
+    if (!val.equalsTo(this._anisotropyDirectionScaleBias)) {
+      this._anisotropyDirectionScaleBias.set(val);
+      this.uniformChanged();
+    }
   }
   /**
    * Gets the fragment blueprint IR.
@@ -185,6 +299,18 @@ export class PBRBluePrintMaterial
     other.copyFrom(this);
     return other;
   }
+  copyFrom(other: this) {
+    super.copyFrom(other);
+    this.reflectionMode = other.reflectionMode;
+    this.subsurfaceScattering = other.subsurfaceScattering;
+    this.subsurfaceColor = other.subsurfaceColor;
+    this.subsurfaceScale = other.subsurfaceScale;
+    this.subsurfacePower = other.subsurfacePower;
+    this.subsurfaceIntensity = other.subsurfaceIntensity;
+    this.anisotropy = other.anisotropy;
+    this.anisotropyDirection = other.anisotropyDirection;
+    this.anisotropyDirectionScaleBias = other.anisotropyDirectionScaleBias;
+  }
   /**
    * Builds the vertex shader for this PBR blueprint material.
    *
@@ -241,7 +367,20 @@ export class PBRBluePrintMaterial
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     const pb = scope.$builder;
+    if (
+      this.subsurfaceScattering &&
+      this.needFragmentColor() &&
+      this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT
+    ) {
+      scope.zSubsurfaceColor = pb.vec3().uniform(2);
+      scope.zSubsurfaceScale = pb.float().uniform(2);
+      scope.zSubsurfacePower = pb.float().uniform(2);
+      scope.zSubsurfaceIntensity = pb.float().uniform(2);
+    }
     if (this.needFragmentColor()) {
+      scope.zAnisotropy = pb.float().uniform(2);
+      scope.zAnisotropyDirection = pb.float().uniform(2);
+      scope.zAnisotropyDirectionScaleBias = pb.vec2().uniform(2);
       for (const u of [...this._uniformValues, ...this._uniformTextures]) {
         if (u.inFragmentShader) {
           // @ts-ignore
@@ -272,6 +411,15 @@ export class PBRBluePrintMaterial
             scope.commonData,
             scope.outRoughness
           );
+          if (this.subsurfaceScattering) {
+            scope.litColor = this.applySubsurfaceScattering(
+              scope,
+              scope.litColor,
+              scope.commonData.albedo.rgb,
+              scope.commonData.normal,
+              scope.viewVec
+            );
+          }
           this.outputFragmentColor(
             scope,
             scope.$inputs.worldPos,
@@ -281,6 +429,15 @@ export class PBRBluePrintMaterial
           );
         } else {
           scope.$l.litColor = this.PBRLight(scope, scope.$inputs.worldPos, scope.viewVec, scope.commonData);
+          if (this.subsurfaceScattering) {
+            scope.litColor = this.applySubsurfaceScattering(
+              scope,
+              scope.litColor,
+              scope.commonData.albedo.rgb,
+              scope.commonData.normal,
+              scope.viewVec
+            );
+          }
           this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.litColor);
         }
       } else {
@@ -305,11 +462,21 @@ export class PBRBluePrintMaterial
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx)) {
+      bindGroup.setValue('zReflectionMode', PBR_REFLECTION_MODE[this._reflectionMode]);
+      bindGroup.setValue('zAnisotropy', this._anisotropy);
+      bindGroup.setValue('zAnisotropyDirection', this._anisotropyDirection);
+      bindGroup.setValue('zAnisotropyDirectionScaleBias', this._anisotropyDirectionScaleBias);
       for (const u of this._uniformValues) {
         bindGroup.setValue(u.name, u.finalValue!);
       }
       for (const u of this._uniformTextures) {
         bindGroup.setTexture(u.name, u.finalTexture!.get()!, u.finalSampler);
+      }
+      if (this.subsurfaceScattering && ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
+        bindGroup.setValue('zSubsurfaceColor', this._subsurfaceColor);
+        bindGroup.setValue('zSubsurfaceScale', this._subsurfaceScale);
+        bindGroup.setValue('zSubsurfacePower', this._subsurfacePower);
+        bindGroup.setValue('zSubsurfaceIntensity', this._subsurfaceIntensity);
       }
     }
   }
@@ -379,5 +546,22 @@ export class PBRBluePrintMaterial
     name: string
   ) {
     return outputs.find((output) => output.name === name)?.exp;
+  }
+  private applySubsurfaceScattering(
+    scope: PBInsideFunctionScope,
+    litColor: PBShaderExp,
+    albedoRGB: PBShaderExp,
+    normal: PBShaderExp,
+    viewVec: PBShaderExp
+  ) {
+    const pb = scope.$builder;
+    scope.$l.NoV = pb.clamp(pb.dot(normal, viewVec), 0, 1);
+    scope.$l.wrapNdotV = pb.clamp(
+      pb.div(pb.add(pb.sub(1, scope.NoV), scope.zSubsurfaceScale), pb.add(1, scope.zSubsurfaceScale)),
+      0,
+      1
+    );
+    scope.$l.sssFactor = pb.mul(pb.pow(scope.wrapNdotV, scope.zSubsurfacePower), scope.zSubsurfaceIntensity);
+    return pb.vec4(pb.add(litColor.rgb, pb.mul(albedoRGB, scope.zSubsurfaceColor, scope.sssFactor)), litColor.a);
   }
 }

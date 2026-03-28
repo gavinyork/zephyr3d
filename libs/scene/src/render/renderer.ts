@@ -2,7 +2,7 @@ import { LightPass } from './lightpass';
 import { ShadowMapPass } from './shadowmap_pass';
 import { DepthPass } from './depthpass';
 import type { Nullable } from '@zephyr3d/base';
-import { isPowerOf2, Matrix4x4, nextPowerOf2, Vector3, Vector4 } from '@zephyr3d/base';
+import { Quaternion, degree2radian, isPowerOf2, Matrix4x4, nextPowerOf2, Vector3, Vector4 } from '@zephyr3d/base';
 import type {
   BindGroup,
   ColorState,
@@ -26,6 +26,13 @@ import { fetchSampler } from '../utility/misc';
 import type { Primitive } from '.';
 import { BoxShape } from '../shapes';
 import { getDevice } from '../app/api';
+
+const tmpSkyScale = new Vector3();
+const tmpSkyPosition = new Vector3();
+const tmpSkyRootRotation = new Quaternion();
+const tmpSkyExtraRotation = new Quaternion();
+const tmpSkyFinalRotation = new Quaternion();
+const tmpSkyWorldMatrix = Matrix4x4.identity();
 
 /**
  * Forward render scheme
@@ -294,6 +301,23 @@ export class SceneRenderer {
 
     // Cull scene
     const renderQueue = this._scenePass.cullScene(ctx, ctx.camera);
+
+    // Keep sky world matrix synchronized before sky.update(), so skybox rotation
+    // also affects baked radiance/irradiance lighting.
+    if (ctx.scene.env.sky.skyType === 'skybox') {
+      const skyboxRotation = ctx.scene.env.sky.skyboxRotation;
+      ctx.scene.rootNode.worldMatrix.decompose(tmpSkyScale, tmpSkyRootRotation, tmpSkyPosition);
+      tmpSkyExtraRotation.fromEulerAngle(
+        degree2radian(skyboxRotation.x),
+        degree2radian(skyboxRotation.y),
+        degree2radian(skyboxRotation.z)
+      );
+      Quaternion.multiply(tmpSkyRootRotation, tmpSkyExtraRotation, tmpSkyFinalRotation);
+      tmpSkyWorldMatrix.compose(tmpSkyScale, tmpSkyFinalRotation, tmpSkyPosition);
+      ctx.scene.env.sky.skyWorldMatrix = tmpSkyWorldMatrix;
+    } else {
+      ctx.scene.env.sky.skyWorldMatrix = ctx.scene.rootNode.worldMatrix;
+    }
 
     // Update sky
     const sunLightColor = ctx.scene.env.sky.update(ctx);
