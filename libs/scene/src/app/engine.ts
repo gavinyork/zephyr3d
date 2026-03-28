@@ -1,7 +1,8 @@
-import type { IDisposable, Nullable, ReadOptions } from '@zephyr3d/base';
+﻿import type { IDisposable, Nullable, ReadOptions } from '@zephyr3d/base';
 import { MemoryFS, objectEntries } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { HttpFS, type VFS } from '@zephyr3d/base';
+import { Vector3 } from '@zephyr3d/base';
 import { ScriptingSystem } from './scriptingsystem';
 import type { Host } from './scriptingsystem';
 import type { RuntimeScript } from './runtimescript';
@@ -16,6 +17,14 @@ import {
   UnlitMaterial
 } from '../material';
 import { StandardSpriteMaterial } from '../material/sprite_std';
+import {
+  createCapsuleCollider,
+  createPlaneCollider,
+  createSphereCollider,
+  SpringChain,
+  SpringModifier,
+  SpringSystem
+} from '../animation';
 import { ScreenAdapter } from './screen';
 
 const BUILTIN_SPRING_TEST_SCRIPT_JS = `import { Vector3 } from '@zephyr3d/base';
@@ -230,6 +239,9 @@ export class Engine {
     renderable: DRef<IRenderable>;
     hook: Nullable<IRenderHook>;
   }[];
+  // 内置 springtest 的延迟挂载队列：
+  // 需要等骨骼世界矩阵稳定后再初始化弹簧，避免 restLength 在未就位时采样为异常值。
+  private _pendingBuiltinSpringHosts: Array<{ host: any; retries: number; delayFrames: number }>;
   private _loadingScenes: Partial<Record<string, Promise<Nullable<Scene>>>>;
   /**
    * Creates a new runtime manager.
@@ -245,6 +257,7 @@ export class Engine {
     this._resourceManager = new ResourceManager(VFS);
     this._enabled = enabled ?? true;
     this._activeRenderables = [];
+    this._pendingBuiltinSpringHosts = [];
     this._loadingScenes = {};
     this._screen = new ScreenAdapter();
   }
@@ -343,6 +356,8 @@ export class Engine {
    */
   update(deltaTime: number, elapsedTime: number) {
     if (this._enabled) {
+      // 每帧先尝试处理内置 spring 的延迟挂载，再执行常规脚本更新。
+      this.flushPendingBuiltinSpringHosts();
       this._scriptingSystem.update(deltaTime, elapsedTime);
     }
   }
@@ -459,19 +474,19 @@ export class Engine {
       const scene = await this._resourceManager.loadScene(path);
       if (scene) {
         if (scene.script) {
-          try {
-            await this.attachScript(scene, scene.script);
-          } catch (err) {
-            console.error(`Attach script failed: ${err}`);
-          }
+          await this.attachScriptOrBuiltin(scene as any, scene.script);
         }
         const P: Promise<any>[] = [];
         const scripts: string[] = [];
         scene.rootNode.iterate((node) => {
           if (node.script) {
+            if (this.tryAttachBuiltinSpringScript(node, node.script)) {
+              return false;
+            }
             scripts.push(node.script);
             P.push(this.attachScript(node, node.script));
           }
+          return false;
         });
         if (P.length > 0) {
           const result = await Promise.allSettled(P);
@@ -487,5 +502,235 @@ export class Engine {
       console.error(`Load scene from '${path}' failed: ${err}`);
       return null;
     }
+  }
+  private async attachScriptOrBuiltin(host: any, script: string) {
+    if (this.tryAttachBuiltinSpringScript(host, script)) {
+      return;
+    }
+    try {
+      await this.attachScript(host, script);
+    } catch (err) {
+      console.error(`Attach script failed: ${err}`);
+    }
+  }
+  private isBuiltinSpringTestScript(script: string): boolean {
+    const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
+    return /(^|\/)springtest(\.ts|\.js)?$/.test(normalized);
+  }
+  private tryAttachBuiltinSpringScript(root: any, script: string): boolean {
+    if (!this.isBuiltinSpringTestScript(script)) {
+      return false;
+    }
+    this.enqueueBuiltinSpringHost(root);
+    return true;
+  }
+  private enqueueBuiltinSpringHost(host: any) {
+    if (!host) {
+      return;
+    }
+    if ((host as any).__builtinSpringAttached) {
+      return;
+    }
+    if (this._pendingBuiltinSpringHosts.some((v) => v.host === host)) {
+      return;
+    }
+    this._pendingBuiltinSpringHosts.push({
+      host,
+      // 给出足够重试窗口，等待模型/骨骼异步资源加载完成。
+      retries: 120,
+      // 至少延迟 1 帧，避免与反序列化同帧初始化导致姿态未就绪。
+      delayFrames: 1
+    });
+  }
+  private flushPendingBuiltinSpringHosts() {
+    if (this._pendingBuiltinSpringHosts.length === 0) {
+      return;
+    }
+    const remained: Array<{ host: any; retries: number; delayFrames: number }> = [];
+    for (const item of this._pendingBuiltinSpringHosts) {
+      const host = item.host;
+      if (!host || host.disposed || (host as any).__builtinSpringAttached) {
+        continue;
+      }
+      if (item.delayFrames > 0) {
+        item.delayFrames -= 1;
+        remained.push(item);
+        continue;
+      }
+      const ok = this.attachBuiltinSpringScript(host);
+      if (!ok && item.retries > 0) {
+        item.retries -= 1;
+        item.delayFrames = 1;
+        remained.push(item);
+      }
+    }
+    this._pendingBuiltinSpringHosts = remained;
+  }
+  private attachBuiltinSpringScript(root: any): boolean {
+    const config = root?.scriptConfig;
+    if (!config || !config.enabled) {
+      return true;
+    }
+    const skeletonRef = root.animationSet?.skeletons?.[0];
+    const skeleton = typeof skeletonRef?.get === 'function' ? skeletonRef.get() : skeletonRef;
+    if (!skeleton) {
+      return false;
+    }
+    let hasValidChainPose = false;
+    for (const chainConfig of config.chains ?? []) {
+      const chainStart = root.findNodeByName(chainConfig.startBone);
+      const chainEnd = root.findNodeByName(chainConfig.endBone);
+      if (!chainStart || !chainEnd) {
+        continue;
+      }
+      const startPos = chainStart.getWorldPosition();
+      const endPos = chainEnd.getWorldPosition();
+      if (Vector3.distance(startPos, endPos) > 1e-4) {
+        hasValidChainPose = true;
+        break;
+      }
+    }
+    if (!hasValidChainPose) {
+      // 链条骨骼尚未形成有效世界距离，延后到后续帧再初始化。
+      return false;
+    }
+    const parseVec3 = (value: any, fallback: Vector3) => {
+      if (Array.isArray(value) && value.length >= 3) {
+        return new Vector3(Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0);
+      }
+      return fallback.clone();
+    };
+    const COLLIDER_PANEL_SCALE = 10;
+    const scaleCapsuleAroundCenter = (start: Vector3, end: Vector3, scale: number) => {
+      const center = Vector3.scale(Vector3.add(start, end, new Vector3()), 0.5, new Vector3());
+      const half = Vector3.scale(Vector3.sub(end, start, new Vector3()), 0.5 * scale, new Vector3());
+      return {
+        start: Vector3.sub(center, half, new Vector3()),
+        end: Vector3.add(center, half, new Vector3())
+      };
+    };
+    const hierarchyColliders: Array<{ node: any; config: any }> = [];
+    root.iterate((node: any) => {
+      const c = node?.metaData?.springCollider;
+      if (!c || typeof c !== 'object') {
+        return false;
+      }
+      if (c.type !== 'sphere' && c.type !== 'capsule' && c.type !== 'plane') {
+        return false;
+      }
+      hierarchyColliders.push({ node, config: c });
+      return false;
+    });
+    for (const chainConfig of config.chains ?? []) {
+      const chainStart = root.findNodeByName(chainConfig.startBone);
+      const chainEnd = root.findNodeByName(chainConfig.endBone);
+      if (!chainStart || !chainEnd) {
+        continue;
+      }
+      const chain = SpringChain.fromBoneChain(chainStart, chainEnd, {
+        damping: config.chainDamping,
+        stiffness: config.chainStiffness
+      });
+      const springSystem = new SpringSystem(chain, {
+        gravity: new Vector3(config.gravityX, config.gravityY, config.gravityZ),
+        iterations: config.iterations,
+        enableInertialForces: config.enableInertialForces,
+        centrifugalScale: config.centrifugalScale,
+        coriolisScale: config.coriolisScale,
+        solver: config.solver,
+        poseFollow: config.poseFollow,
+        poseFollowRoot: config.poseFollowRoot,
+        poseFollowTip: config.poseFollowTip,
+        poseFollowExponent: config.poseFollowExponent,
+        maxPoseOffset: config.maxPoseOffset,
+        maxPoseOffsetRoot: config.maxPoseOffsetRoot,
+        maxPoseOffsetTip: config.maxPoseOffsetTip
+      });
+      if (hierarchyColliders.length > 0) {
+        for (const item of hierarchyColliders) {
+          const colliderConfig = item.config;
+          let collider: any = null;
+          if (colliderConfig.type === 'sphere') {
+            collider = createSphereCollider(
+              parseVec3(colliderConfig.offset, Vector3.zero()),
+              Math.max(0, (Number(colliderConfig.radius) || 0.15) * COLLIDER_PANEL_SCALE),
+              item.node
+            );
+            collider.localRadiusScaleRef = 1;
+          } else if (colliderConfig.type === 'capsule') {
+            const startOffset = parseVec3(colliderConfig.offset, Vector3.zero());
+            const endOffset = parseVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0));
+            const scaledCapsule = scaleCapsuleAroundCenter(startOffset, endOffset, COLLIDER_PANEL_SCALE);
+            collider = createCapsuleCollider(
+              scaledCapsule.start,
+              scaledCapsule.end,
+              Math.max(0, (Number(colliderConfig.radius) || 0.1) * COLLIDER_PANEL_SCALE),
+              item.node
+            );
+            collider.localRadiusScaleRef = 1;
+          } else if (colliderConfig.type === 'plane') {
+            collider = createPlaneCollider(
+              parseVec3(colliderConfig.offset, Vector3.zero()),
+              parseVec3(colliderConfig.normal, Vector3.axisPY()),
+              item.node
+            );
+          }
+          if (collider) {
+            collider.enabled = colliderConfig.enabled !== false;
+            springSystem.addCollider(collider);
+          }
+        }
+      } else if ((config.colliders ?? []).length > 0) {
+        const colliderConfigs = config.colliders ?? [];
+        for (const colliderConfig of colliderConfigs) {
+          const attachNode = root.findNodeByName(colliderConfig.bone) ?? root;
+          let collider: any = null;
+          if (colliderConfig.type === 'sphere') {
+            collider = createSphereCollider(
+              new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
+              Math.max(0, Number(colliderConfig.radius) * COLLIDER_PANEL_SCALE),
+              attachNode
+            );
+          } else if (colliderConfig.type === 'capsule') {
+            const startOffset = new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ);
+            const endOffset = new Vector3(
+              colliderConfig.endOffsetX,
+              colliderConfig.endOffsetY,
+              colliderConfig.endOffsetZ
+            );
+            const scaledCapsule = scaleCapsuleAroundCenter(startOffset, endOffset, COLLIDER_PANEL_SCALE);
+            collider = createCapsuleCollider(
+              scaledCapsule.start,
+              scaledCapsule.end,
+              Math.max(0, Number(colliderConfig.radius) * COLLIDER_PANEL_SCALE),
+              attachNode
+            );
+          } else if (colliderConfig.type === 'plane') {
+            collider = createPlaneCollider(
+              new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
+              new Vector3(colliderConfig.normalX, colliderConfig.normalY, colliderConfig.normalZ),
+              attachNode
+            );
+          }
+          if (collider) {
+            collider.enabled = colliderConfig.enabled !== false;
+            springSystem.addCollider(collider);
+          }
+        }
+      } else {
+        springSystem.addCollider(
+          createSphereCollider(
+            new Vector3(config.colliderOffsetX, config.colliderOffsetY, config.colliderOffsetZ),
+            config.colliderRadius,
+            root
+          )
+        );
+      }
+      const springModifier = new SpringModifier(springSystem, config.modifierWeight);
+      skeleton.modifiers.push(springModifier);
+    }
+    // 标记已完成，防止重复挂载同一套 spring modifier。
+    (root as any).__builtinSpringAttached = true;
+    return true;
   }
 }

@@ -79,7 +79,6 @@
     "@jridgewell/trace-mapping": "^0.3.25",
     "@zephyr3d/base": "workspace:^0.2.2",
     "@zephyr3d/device": "workspace:^0.2.7",
-    "@zephyr3d/scene": "workspace:^0.8.2",
     "@zephyr3d/scene": "workspace:^0.8.1",
     "@zephyr3d/imgui": "workspace:^0.2.1",
     "@zephyr3d/backend-webgl": "workspace:^0.1.11",

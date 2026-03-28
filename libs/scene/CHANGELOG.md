@@ -1,13 +1,6 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Sat, 28 Mar 2026 03:28:36 GMT and should not be manually modified.
-
-## 0.8.2
-Sat, 28 Mar 2026 03:28:36 GMT
-
-### Patches
-
-- Fix: copying animation between models with different bind poses.
+This log was last generated on Fri, 27 Mar 2026 06:21:52 GMT and should not be manually modified.
 
 ## 0.8.1
 Fri, 27 Mar 2026 06:21:52 GMT

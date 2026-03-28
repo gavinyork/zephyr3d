@@ -2008,18 +2008,11 @@ export class Quaternion extends VectorBase {
    * - Swing: rotation perpendicular to A
    * Such that Q = Twist * Swing
    *
-   * Algorithm:
-   * 1. Project Q's imaginary part onto axis to get twist component
-   * 2. Normalize to get pure twist rotation
-   * 3. Calculate swing = twist^-1 * Q
-   *
    * @param axis - The twist axis (must be normalized)
    * @param outSwing - Output swing rotation
    * @param outTwist - Output twist rotation
    */
   decomposeSwingTwist(axis: Vector3, outSwing?: Quaternion, outTwist?: Quaternion) {
-    // Project quaternion's imaginary part (xyz) onto twist axis
-    // twist quaternion = (w, (xyz · axis) * axis)
     const dot = this.x * axis.x + this.y * axis.y + this.z * axis.z;
 
     let twistX = axis.x * dot;
@@ -2027,11 +2020,8 @@ export class Quaternion extends VectorBase {
     let twistZ = axis.z * dot;
     let twistW = this.w;
 
-    // Normalize twist quaternion
     const twistLen = Math.hypot(twistX, twistY, twistZ, twistW);
-
     if (twistLen < 0.000001) {
-      // No rotation or rotation perpendicular to axis
       outTwist?.identity();
       outSwing?.set(this);
       return;
@@ -2054,7 +2044,6 @@ export class Quaternion extends VectorBase {
     }
 
     if (outSwing) {
-      // Calculate swing: Q = Twist * Swing => Swing = Twist^-1 * Q
       outSwing.setXYZW(-twistX, -twistY, -twistZ, twistW);
       Quaternion.multiply(outSwing, this, outSwing);
     }
@@ -2066,10 +2055,6 @@ export class Quaternion extends VectorBase {
    * @returns Twist angle in radians, range [-PI, PI]
    */
   getTwistAngle(axis: Vector3): number {
-    // For a twist quaternion around axis: twist = (cos(θ/2), sin(θ/2) * axis)
-    // We can extract the angle from the quaternion components
-
-    // Ensure twist is normalized
     const len = Math.hypot(this.x, this.y, this.z, this.w);
     if (len < 0.000001) {
       return 0;
@@ -2077,14 +2062,10 @@ export class Quaternion extends VectorBase {
 
     const w = this.w / len;
     const halfAngle = Math.acos(Math.max(-1, Math.min(1, w)));
-
-    // Determine sign based on axis direction
     const dot = this.x * axis.x + this.y * axis.y + this.z * axis.z;
     const sign = dot >= 0 ? 1 : -1;
-
     return sign * 2 * halfAngle;
   }
-
   /**
    * Convert this quaternion to a 3x3 rotation matrix.
    * @param matrix - The output matrix, if not specified, a new matrix will be created.

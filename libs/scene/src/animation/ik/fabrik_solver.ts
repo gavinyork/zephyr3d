@@ -243,10 +243,10 @@ export class FABRIKSolver extends IKSolver {
       // Apply swing-twist constraint to prevent over-rotation
       const swing = new Quaternion();
       const twist = new Quaternion();
-      IKUtils.decomposeSwingTwist(worldRotation, newDirNorm, swing, twist);
+      worldRotation.decomposeSwingTwist(newDirNorm, swing, twist);
 
       // Get twist angle
-      let twistAngle = IKUtils.getTwistAngle(twist, newDirNorm);
+      let twistAngle = twist.getTwistAngle(newDirNorm);
 
       // Get twist constraint for this joint
       const constraint = this._twistConstraints.get(i);
@@ -265,8 +265,7 @@ export class FABRIKSolver extends IKSolver {
       joint.previousTwist = twistAngle;
 
       // Reconstruct rotation from clamped twist: Q = Twist * Swing
-      const clampedTwist = new Quaternion();
-      IKUtils.createTwist(twistAngle, newDirNorm, clampedTwist);
+      const clampedTwist = Quaternion.fromAxisAngle(newDirNorm, twistAngle);
       worldRotation = Quaternion.multiply(clampedTwist, swing, worldRotation);
 
       // Blend with original rotation based on weight

@@ -141,8 +141,9 @@ class ResizeHandler {
 
   private _handleResizeEntry(_entry: ResizeObserverEntry) {
     // CSS pixel
-    const cssWidth = this._canvas.clientWidth;
-    const cssHeight = this._canvas.clientHeight;
+    const boxSize = Array.isArray(_entry.contentBoxSize) ? _entry.contentBoxSize[0] : _entry.contentBoxSize;
+    const cssWidth = boxSize?.inlineSize ?? this._canvas.clientWidth;
+    const cssHeight = boxSize?.blockSize ?? this._canvas.clientHeight;
 
     // Device pixel
     /*

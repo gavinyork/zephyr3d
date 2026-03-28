@@ -2,18 +2,6 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
-      "version": "0.8.2",
-      "tag": "@zephyr3d/scene_v0.8.2",
-      "date": "Sat, 28 Mar 2026 03:28:36 GMT",
-      "comments": {
-        "patch": [
-          {
-            "comment": "Fix: copying animation between models with different bind poses."
-          }
-        ]
-      }
-    },
-    {
       "version": "0.8.1",
       "tag": "@zephyr3d/scene_v0.8.1",
       "date": "Fri, 27 Mar 2026 06:21:52 GMT",
