@@ -52,11 +52,11 @@ export class Input {
     cvs.appendChild(this._dom_input);
     this.blur();
   }
-  onKeydown(e: KeyboardEvent): boolean {
-    return canvas_on_keydown(e);
+  onKeydown(e: KeyboardEvent) {
+    canvas_on_keydown(e);
   }
-  onKeyup(e: KeyboardEvent): boolean {
-    return canvas_on_keyup(e);
+  onKeyup(e: KeyboardEvent) {
+    canvas_on_keyup(e);
   }
   onKeypress(e: KeyboardEvent) {
     e.preventDefault();
