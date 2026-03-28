@@ -493,7 +493,6 @@ export class AnimationSet extends Disposable implements IDisposable {
       return null;
     }
     let dstJointsFiltered: SceneNode[] = [];
-    let dstRootNode: SceneNode = srcRootNode;
     const dstSkeleton = this._skeletons
       .map((ref) => ref.get())
       .find((sk) => {
@@ -514,7 +513,6 @@ export class AnimationSet extends Disposable implements IDisposable {
           srcJointsFiltered.every((j, i) => j.name === sortedJointsFiltered[i].name)
         ) {
           dstJointsFiltered = sortedJointsFiltered;
-          dstRootNode = rootNode;
           return true;
         }
         return false;
@@ -564,16 +562,9 @@ export class AnimationSet extends Disposable implements IDisposable {
       for (const srcTrack of srcTracks) {
         let dstTrack: AnimationTrack;
         if (srcTrack instanceof NodeRotationTrack) {
-          dstTrack = retargetRotationTrack(srcTrack, dstClip, srcNode, srcRootNode, dstNode, dstRootNode);
+          dstTrack = retargetRotationTrack(srcTrack);
         } else if (srcTrack instanceof NodeEulerRotationTrack) {
-          dstTrack = retargetEulerToRotationTrack(
-            srcTrack,
-            dstClip,
-            srcNode,
-            srcRootNode,
-            dstNode,
-            dstRootNode
-          );
+          dstTrack = retargetEulerToRotationTrack(srcTrack);
         } else if (srcTrack instanceof NodeTranslationTrack) {
           dstTrack = retargetTranslationTrack(srcTrack, remap);
         } else if (srcTrack instanceof NodeScaleTrack) {
@@ -592,32 +583,6 @@ export class AnimationSet extends Disposable implements IDisposable {
 
     return dstClip;
 
-    function calcJointRotation(
-      ani: AnimationClip,
-      skeleton: Skeleton,
-      root: SceneNode,
-      joint: SceneNode,
-      t: number
-    ): Nullable<Quaternion> {
-      const q = Quaternion.identity();
-      for (;;) {
-        const tracks = ani.tracks.get(joint);
-        const track = tracks?.find(
-          (track) => track instanceof NodeRotationTrack || track instanceof NodeEulerRotationTrack
-        );
-        if (track) {
-          Quaternion.multiply(track.calculateState(joint, t), q, q);
-        } else {
-          const index = skeleton.joints.indexOf(joint);
-          q.set(skeleton.bindPose[index].rotation);
-        }
-        if (joint === root) {
-          break;
-        }
-        joint = joint.parent!;
-      }
-      return q;
-    }
     function findRootJoint(joints: SceneNode[]) {
       let root: Nullable<SceneNode> = null;
       for (const joint of joints) {
@@ -693,44 +658,15 @@ export class AnimationSet extends Disposable implements IDisposable {
       );
     }
 
-    function retargetRotationTrack(
-      src: NodeRotationTrack,
-      dstAni: AnimationClip,
-      srcNode: SceneNode,
-      srcRoot: SceneNode,
-      dstNode: SceneNode,
-      dstRoot: SceneNode
-    ): NodeRotationTrack {
+    function retargetRotationTrack(src: NodeRotationTrack): NodeRotationTrack {
       const isCubic = src.interpolator.mode === 'cubicspline';
       const frameStride = isCubic ? 12 : 4;
       const numFrames = (src.interpolator.inputs as Float32Array).length;
-      const srcInputs = src.interpolator.inputs as Float32Array;
       const srcOutputs = src.interpolator.outputs as Float32Array;
       const newOutputs = new Float32Array(srcOutputs.length);
-      const q = new Quaternion();
       for (let f = 0; f < numFrames; f++) {
         const base = f * frameStride;
-        const t = srcInputs[f];
-        const srcParentRotation = calcJointRotation(src.animation!, srcSkeleton!, srcRoot, srcNode, t)!;
-        const dstParentRotation = calcJointRotation(dstAni, dstSkeleton!, dstRoot, dstNode, t)!;
-        if (isCubic) {
-          // layout per frame: [inTangent×4, value×4, outTangent×4] — only retarget value
-          newOutputs.set(srcOutputs.subarray(base, base + 4), base);
-          q.set(srcOutputs.subarray(base + 4, base + 8));
-          const q2 = srcSkeleton!.retargetJointRotation(q, srcParentRotation, dstParentRotation);
-          newOutputs[base + 4] = q2.x;
-          newOutputs[base + 5] = q2.y;
-          newOutputs[base + 6] = q2.z;
-          newOutputs[base + 7] = q2.w;
-          newOutputs.set(srcOutputs.subarray(base + 8, base + 12), base + 8);
-        } else {
-          q.set(srcOutputs.subarray(base, base + 4));
-          const q2 = srcSkeleton!.retargetJointRotation(q, srcParentRotation, dstParentRotation);
-          newOutputs[base] = q2.x;
-          newOutputs[base + 1] = q2.y;
-          newOutputs[base + 2] = q2.z;
-          newOutputs[base + 3] = q2.w;
-        }
+        newOutputs.set(srcOutputs.subarray(base, base + (isCubic ? 12 : 4)), base);
       }
       return new NodeRotationTrack(
         new Interpolator(
@@ -742,31 +678,14 @@ export class AnimationSet extends Disposable implements IDisposable {
       );
     }
 
-    function retargetEulerToRotationTrack(
-      src: NodeEulerRotationTrack,
-      dstAni: AnimationClip,
-      srcNode: SceneNode,
-      srcRoot: SceneNode,
-      dstNode: SceneNode,
-      dstRoot: SceneNode
-    ): NodeRotationTrack {
+    function retargetEulerToRotationTrack(src: NodeEulerRotationTrack): NodeRotationTrack {
       const srcInputs = src.interpolator.inputs as Float32Array;
       const srcOutputs = src.interpolator.outputs as Float32Array;
       const numFrames = srcInputs.length;
-      const newOutputs = new Float32Array(numFrames * 4);
-      const q = new Quaternion();
+      const newOutputs = new Float32Array(numFrames * 3);
       for (let f = 0; f < numFrames; f++) {
-        const t = srcInputs[f];
-        const srcParentRotation = calcJointRotation(src.animation!, srcSkeleton!, srcRoot, srcNode, t)!;
-        const dstParentRotation = calcJointRotation(dstAni, dstSkeleton!, dstRoot, dstNode, t)!;
-        const b3 = f * 3;
-        const b4 = f * 4;
-        q.fromEulerAngle(srcOutputs[b3], srcOutputs[b3 + 1], srcOutputs[b3 + 2]);
-        const q2 = srcSkeleton!.retargetJointRotation(q, srcParentRotation, dstParentRotation);
-        newOutputs[b4] = q2.x;
-        newOutputs[b4 + 1] = q2.y;
-        newOutputs[b4 + 2] = q2.z;
-        newOutputs[b4 + 3] = q2.w;
+        const base = f * 3;
+        newOutputs.set(srcOutputs.subarray(base, base + 3), base);
       }
       return new NodeRotationTrack(
         new Interpolator('linear', 'quat', new Float32Array(srcInputs), newOutputs)
