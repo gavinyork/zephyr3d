@@ -992,6 +992,26 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     }
   }
 
+  async duplicateSelectedItems(): Promise<boolean> {
+    if (this._vfs.readOnly || this.selectedItems.size === 0) {
+      return false;
+    }
+    const items = Array.from(this.selectedItems);
+    for (const item of items) {
+      const isDir = 'subDir' in item;
+      const sourcePath = isDir ? item.path : item.meta.path;
+      const targetPath = await this.makeDuplicatedPath(sourcePath, isDir);
+      if (isDir) {
+        await this.copyDirectoryRecursive(sourcePath, targetPath);
+      } else {
+        await this._vfs.copyFile(sourcePath, targetPath, {
+          overwrite: false
+        });
+      }
+    }
+    return true;
+  }
+
   deleteSelectedItems() {
     if (this.selectedItems.size === 0) {
       return;
@@ -1015,6 +1035,49 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       .catch((err) => {
         DlgMessage.messageBox('Error', `Delete failed: ${err}`);
       });
+  }
+
+  private async makeDuplicatedPath(sourcePath: string, isDir: boolean): Promise<string> {
+    const parentPath = this._vfs.dirname(sourcePath);
+    const basename = this._vfs.basename(sourcePath);
+    const ext = isDir ? '' : this._vfs.extname(basename);
+    const stem = ext ? basename.slice(0, -ext.length) : basename;
+    let index = 1;
+    while (true) {
+      const suffix = index === 1 ? ' copy' : ` copy ${index}`;
+      const candidateName = `${stem}${suffix}${ext}`;
+      const candidatePath = this._vfs.join(parentPath, candidateName);
+      if (!(await this._vfs.exists(candidatePath))) {
+        return candidatePath;
+      }
+      index++;
+    }
+  }
+
+  private async copyDirectoryRecursive(sourceDir: string, targetDir: string): Promise<void> {
+    await this._vfs.makeDirectory(targetDir, true);
+    const entries = await this._vfs.readDirectory(sourceDir, {
+      includeHidden: true,
+      recursive: true
+    });
+    for (const entry of entries) {
+      const relativePath = PathUtils.relative(sourceDir, entry.path);
+      if (!relativePath || relativePath === '.') {
+        continue;
+      }
+      const targetPath = this._vfs.join(targetDir, relativePath);
+      if (entry.type === 'directory') {
+        await this._vfs.makeDirectory(targetPath, true);
+      } else if (entry.type === 'file') {
+        const parentDir = this._vfs.dirname(targetPath);
+        if (!(await this._vfs.exists(parentDir))) {
+          await this._vfs.makeDirectory(parentDir, true);
+        }
+        await this._vfs.copyFile(entry.path, targetPath, {
+          overwrite: false
+        });
+      }
+    }
   }
 
   renameItem(item: DirectoryInfo | FileInfo) {
@@ -1433,7 +1496,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         } else {
           const dest = vfs.join(targetDir, vfs.basename(sourceDir));
           if (copy) {
-            await vfs.copyFileEx(vfs.join(sourceDir, '/**/*'), dest, {
+            await vfs.copyFileEx(vfs.join(sourceDir, '**/*'), dest, {
               overwrite: true,
               onProgress: (current, total) => {
                 if (dlg) {

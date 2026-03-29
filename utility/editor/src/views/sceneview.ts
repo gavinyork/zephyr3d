@@ -106,9 +106,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cameraAnimationTargetTo: Vector3;
   private _cameraAnimationTime: number;
   private readonly _cameraAnimationDuration: number;
-  private _animatedCamera: Nullable<Camera>;
+   private _animatedCamera: Nullable<Camera>;
   private readonly _editingProps: Map<object, Map<PropertyAccessor, { id: string; value: number[] }>>;
   private _trackId: number;
+  private _lastDuplicateTarget: 'scene' | 'asset';
   constructor(controller: SceneController) {
     super(controller);
     this._cmdManager = new CommandManager();
@@ -140,6 +141,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._animatedCamera = null;
     this._editingProps = new Map();
     this._trackId = 0;
+    this._lastDuplicateTarget = 'scene';
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
       items: [
@@ -161,6 +163,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             {
               label: 'Export Project',
               action: () => eventBus.dispatchEvent('action', 'EXPORT_PROJECT')
+            },
+            {
+              label: 'Export to OSS...',
+              action: () => eventBus.dispatchEvent('action', 'EXPORT_ASSETS_OSS')
             },
             {
               label: 'Delete Project',
@@ -979,7 +985,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._menubar.registerShortcuts(this);
     this._menubar.on('action', this.handleSceneAction, this);
     this._toolbar.registerShortcuts(this);
+    this.registerShortcut('Ctrl+D', () => {
+      this.handleDuplicateShortcut();
+    });
     this._toolbar.on('action', this.handleSceneAction, this);
+    this._assetView.renderer.on('selection_changed', this.handleAssetSelectionChanged, this);
     this._propGrid.on('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.on('request_edit_aabb', this.editAABB, this);
     this._propGrid.on('end_edit_aabb', this.endEditAABB, this);
@@ -997,6 +1007,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   protected onDeactivate(): void {
     super.onDeactivate();
+    this._assetView?.renderer.off('selection_changed', this.handleAssetSelectionChanged, this);
     this._assetView?.dispose();
     this._assetView = null;
     this._menubar.unregisterShortcuts(this);
@@ -1441,14 +1452,44 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
   }
   private handleNodeSelected(node: SceneNode) {
+    this._lastDuplicateTarget = 'scene';
     this._postGizmoRenderer!.node =
       node === node.scene!.rootNode || node === this.controller.model.scene.mainCamera ? null : node;
     this._propGrid.object = node === node.scene!.rootNode ? node.scene : node;
   }
   private handleNodeDeselected(node: SceneNode) {
+    this._lastDuplicateTarget = 'scene';
     this._postGizmoRenderer!.node = null;
     if (this._propGrid.object === node) {
       this._propGrid.object = this.controller.model.scene;
+    }
+  }
+  private handleAssetSelectionChanged() {
+    this._lastDuplicateTarget = 'asset';
+  }
+  private async handleDuplicateShortcut() {
+    const selectedNode = this._sceneHierarchy?.selectedNode ?? null;
+    const assetRenderer = this._assetView?.renderer;
+    if (this._lastDuplicateTarget === 'asset' && assetRenderer) {
+      try {
+        if (await assetRenderer.duplicateSelectedItems()) {
+          return;
+        }
+      } catch (err) {
+        DlgMessage.messageBox('Error', `Duplicate asset failed: ${err}`);
+        return;
+      }
+    }
+    if (selectedNode) {
+      this.handleCloneNode(selectedNode);
+      return;
+    }
+    if (assetRenderer) {
+      try {
+        await assetRenderer.duplicateSelectedItems();
+      } catch (err) {
+        DlgMessage.messageBox('Error', `Duplicate asset failed: ${err}`);
+      }
     }
   }
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {
@@ -1607,7 +1648,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               enabled: true,
               visible: true,
               offset: [0, 0, 0],
-              radius: 0.15
+              radius: 1.5
             }
           }
         : type === 'capsule'
@@ -1617,8 +1658,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 enabled: true,
                 visible: true,
                 offset: [0, 0, 0],
-                endOffset: [0, 0.2, 0],
-                radius: 0.1
+                endOffset: [0, 2, 0],
+                radius: 1
               }
             }
           : {
@@ -1628,7 +1669,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 visible: true,
                 offset: [0, 0, 0],
                 normal: [0, 1, 0],
-                planeSize: 0.5
+                planeSize: 5
               }
             };
     const typeName = type === 'sphere' ? 'Sphere' : type === 'capsule' ? 'Capsule' : 'Plane';
