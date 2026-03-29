@@ -176,6 +176,13 @@ export class RenderGraph {
         if (!res) {
           throw new Error(`RenderGraph: unknown resource "${handle.name}" (id=${handle._id})`);
         }
+        // Validate that transient resources have a producer
+        if (res.kind === 'transient' && !res.producer) {
+          throw new Error(
+            `RenderGraph: pass "${pass.name}" attempts to read transient resource "${res.name}" ` +
+              `which has no producer. Ensure the resource is created before being read.`
+          );
+        }
         pass.reads.push(res);
         res.consumers.push(pass);
       },
@@ -317,9 +324,17 @@ export class RenderGraph {
     }
 
     if (result.length !== alivePasses.length) {
+      // Find passes that are part of the cycle (those with non-zero in-degree)
+      const cycleParticipants: string[] = [];
+      for (const [pass, degree] of inDegree) {
+        if (degree > 0) {
+          cycleParticipants.push(pass.name);
+        }
+      }
       throw new Error(
         `RenderGraph: circular dependency detected. ` +
-          `Sorted ${result.length} of ${alivePasses.length} alive passes.`
+          `Sorted ${result.length} of ${alivePasses.length} alive passes. ` +
+          `Passes in cycle: [${cycleParticipants.join(', ')}]`
       );
     }
 
