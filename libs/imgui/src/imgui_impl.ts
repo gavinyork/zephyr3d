@@ -15,6 +15,25 @@ let fontSizeGlyph = 0;
 const fonts: Record<string, DeviceFont> = {};
 const glyphFonts: Record<string, DeviceFont> = {};
 
+function isPasteShortcut(event: KeyboardEvent) {
+  const key = event.key?.toLowerCase?.() ?? '';
+  return (event.ctrlKey || event.metaKey) && !event.altKey && key === 'v';
+}
+
+async function readClipboardTextPreferSystem() {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (typeof text === 'string') {
+        clipboard_text = text;
+      }
+    } catch {
+      // Ignore clipboard read failures and fallback to in-memory clipboard.
+    }
+  }
+  return clipboard_text;
+}
+
 export class Input {
   public _dom_input: HTMLInputElement;
   constructor(cvs: HTMLCanvasElement) {
@@ -49,6 +68,9 @@ export class Input {
     this._dom_input.addEventListener('compositionend', (e) => {
       this.onCompositionEnd(e as CompositionEvent);
     });
+    this._dom_input.addEventListener('paste', (e) => {
+      this.onPaste(e as ClipboardEvent);
+    });
     cvs.appendChild(this._dom_input);
     this.blur();
   }
@@ -67,6 +89,13 @@ export class Input {
     for (let i = 0; i < e.data.length; i++) {
       const io = ImGui.GetIO();
       io.AddInputCharacter(e.data.codePointAt(i)!);
+    }
+  }
+  onPaste(e: ClipboardEvent) {
+    e.stopPropagation();
+    const text = e.clipboardData?.getData('text/plain');
+    if (typeof text === 'string') {
+      clipboard_text = text;
     }
   }
   blur() {
@@ -103,6 +132,13 @@ function document_on_paste(event: ClipboardEvent) {
 }
 */
 function window_on_resize() {}
+
+function document_on_paste(event: ClipboardEvent) {
+  const text = event.clipboardData?.getData('text/plain');
+  if (typeof text === 'string') {
+    clipboard_text = text;
+  }
+}
 
 function window_on_gamepadconnected(event: any /* GamepadEvent */) {
   console.info(
@@ -165,6 +201,9 @@ export function canvas_on_keydown(event: KeyboardEvent) {
   io.KeyShift = event.shiftKey;
   io.KeyAlt = event.altKey;
   io.KeySuper = event.metaKey;
+  if (isPasteShortcut(event)) {
+    readClipboardTextPreferSystem();
+  }
   const key_index = key_code_to_index[event.code];
   if (key_index) {
     ImGui.ASSERT(key_index >= 0 && key_index < ImGui.ARRAYSIZE(io.KeysDown));
@@ -491,19 +530,16 @@ export function Init(device: AbstractDevice, glyphSize: number) {
     io.ConfigMacOSXBehaviors = navigator.platform.match(/Mac/) !== null;
   }
 
-  /*
-    if (typeof(document) !== "undefined") {
-        document.body.addEventListener("copy", document_on_copy);
-        document.body.addEventListener("cut", document_on_cut);
-        document.body.addEventListener("paste", document_on_paste);
-    }
-    */
+  if (typeof document !== 'undefined') {
+    document.body.addEventListener('paste', document_on_paste);
+  }
 
   io.SetClipboardTextFn = (user_data: any, text: string) => {
     clipboard_text = text;
     navigator.clipboard.writeText(clipboard_text);
   };
   io.GetClipboardTextFn = (_user_data: any) => {
+    readClipboardTextPreferSystem();
     return clipboard_text;
   };
   io.ClipboardUserData = null;

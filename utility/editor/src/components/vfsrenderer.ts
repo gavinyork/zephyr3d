@@ -7,6 +7,7 @@ import { convertEmojiString } from '../helpers/emoji';
 import { ProjectService } from '../core/services/project';
 import { eventBus } from '../core/eventbus';
 import { DlgPromptName } from '../views/dlg/promptnamedlg';
+import { DlgRename } from '../views/dlg/renamedlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgProgress } from '../views/dlg/progressdlg';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
@@ -1015,7 +1016,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     const currentName = isDir
       ? item.path.slice(item.path.lastIndexOf('/') + 1)
       : (item as FileInfo).meta.name;
-    DlgPromptName.promptName('Rename', 'Name', currentName).then((newName) => {
+    DlgRename.rename('Rename', currentName).then((newName) => {
       newName = newName.trim();
       if (newName && newName !== currentName) {
         if (PathUtils.sanitizeFilename(newName) !== newName) {
