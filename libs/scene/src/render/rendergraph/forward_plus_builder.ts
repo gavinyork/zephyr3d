@@ -214,9 +214,23 @@ export function buildForwardPlusGraph(
     graph.addPass('HiZ', (builder) => {
       builder.read(depthHandle!);
       hiZHandle = builder.createTexture({ format: 'r32f', label: 'hiZ', mipLevels: 10 });
-      builder.setExecute(() => {
-        // HiZ is already built inside renderSceneDepth, but we declare it
-        // for graph dependency tracking. In the future this will be split out.
+      builder.setExecute((rgCtx) => {
+        const ctx = frame.ctx;
+        const depthTex = ctx.depthTexture;
+        if (depthTex) {
+          const w = ctx.linearDepthTexture!.width;
+          const h = ctx.linearDepthTexture!.height;
+          const HiZFrameBuffer = ctx.device.pool.fetchTemporalFramebuffer(
+            true,
+            w,
+            h,
+            ctx.linearDepthTexture!.format,
+            null,
+            true
+          );
+          buildHiZ(depthTex, HiZFrameBuffer);
+          ctx.HiZTexture = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
+        }
       });
     });
   }
@@ -358,20 +372,7 @@ function renderSceneDepth(frame: FrameState, existingDepthFb: Nullable<FrameBuff
       // Sky motion vectors rendering is handled inline
       renderSkyMotionVectors(ctx);
     }
-    if (ctx.HiZ) {
-      const w = ctx.linearDepthTexture.width;
-      const h = ctx.linearDepthTexture.height;
-      const HiZFrameBuffer = ctx.device.pool.fetchTemporalFramebuffer(
-        true,
-        w,
-        h,
-        ctx.linearDepthTexture.format,
-        null,
-        true
-      );
-      buildHiZ(ctx.depthTexture, HiZFrameBuffer);
-      ctx.HiZTexture = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
-    }
+    // HiZ is now built in the dedicated HiZ pass
   }
   return depthFramebuffer!;
 }

@@ -106,19 +106,21 @@ export class RenderGraphExecutor<TTexture = unknown> {
         }
       }
 
-      // Execute the pass
-      if (pass.executeFn) {
-        (pass.executeFn as RGExecuteFn<unknown>)(ctx, pass.data);
-      }
-
-      // Release resources that end at this pass
-      const toRelease = releaseAt.get(i);
-      if (toRelease) {
-        for (const resId of toRelease) {
-          const texture = this._allocatedTextures.get(resId);
-          if (texture !== undefined) {
-            this._allocator.release(texture);
-            this._allocatedTextures.delete(resId);
+      // Execute the pass with exception safety for resource cleanup
+      try {
+        if (pass.executeFn) {
+          (pass.executeFn as RGExecuteFn<unknown>)(ctx, pass.data);
+        }
+      } finally {
+        // Release resources that end at this pass (always runs even if pass throws)
+        const toRelease = releaseAt.get(i);
+        if (toRelease) {
+          for (const resId of toRelease) {
+            const texture = this._allocatedTextures.get(resId);
+            if (texture !== undefined) {
+              this._allocator.release(texture);
+              this._allocatedTextures.delete(resId);
+            }
           }
         }
       }
