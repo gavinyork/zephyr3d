@@ -22,6 +22,8 @@ import { fetchSampler } from '../../utility/misc';
 import { MaterialVaryingFlags } from '../../values';
 import { AbstractPostEffect, PostEffectLayer } from '../../posteffect/posteffect';
 import { RenderGraph } from './rendergraph';
+import { RenderGraphExecutor } from './executor';
+import { DevicePoolAllocator } from './device_pool_allocator';
 import type { RGHandle } from './types';
 import { renderObjectColors } from '../gpu_picking';
 import type { Primitive } from '../primitive';
@@ -132,7 +134,6 @@ export function buildForwardPlusGraph(
   renderQueue: RenderQueue,
   options: ForwardPlusOptions
 ): RGHandle {
-  const device = ctx.device;
   const backbuffer = graph.importTexture('backbuffer');
 
   // Shared mutable frame state
@@ -177,8 +178,10 @@ export function buildForwardPlusGraph(
   // ── 4. Shadow Maps ────────────────────────────────────────────────
   let shadowMapsHandle: RGHandle | undefined;
   if (renderQueue.shadowedLights.length > 0) {
+    // Shadow maps are managed internally by lights, just declare dependency
+    shadowMapsHandle = graph.importTexture('shadowMaps');
     graph.addPass('ShadowMaps', (builder) => {
-      shadowMapsHandle = builder.createTexture({ format: 'r32f', label: 'shadowMaps' });
+      builder.write(shadowMapsHandle!);
       builder.setExecute(() => {
         renderShadowMaps(ctx, renderQueue.shadowedLights);
       });
@@ -186,22 +189,17 @@ export function buildForwardPlusGraph(
   }
 
   // ── 5. Depth Prepass ──────────────────────────────────────────────
-  let depthHandle: RGHandle;
+  // Depth and motion vector textures are managed by renderSceneDepth
+  const depthHandle = graph.importTexture('linearDepth');
   let motionVectorHandle: RGHandle | undefined;
+  if (options.motionVectors) {
+    motionVectorHandle = graph.importTexture('motionVector');
+  }
 
   graph.addPass('DepthPrepass', (builder) => {
-    depthHandle = builder.createTexture({
-      format: ctx.SSRCalcThickness
-        ? device.type === 'webgl'
-          ? 'rgba16f'
-          : 'rg32f'
-        : device.type === 'webgl'
-          ? 'rgba8unorm'
-          : 'r32f',
-      label: 'linearDepth'
-    });
-    if (options.motionVectors) {
-      motionVectorHandle = builder.createTexture({ format: 'rgba16f', label: 'motionVector' });
+    builder.write(depthHandle);
+    if (motionVectorHandle) {
+      builder.write(motionVectorHandle);
     }
     builder.setExecute(() => {
       frame.depthFramebuffer = renderSceneDepth(frame, null);
@@ -218,34 +216,38 @@ export function buildForwardPlusGraph(
         const ctx = frame.ctx;
         const depthTex = ctx.depthTexture;
         if (depthTex) {
-          const w = ctx.linearDepthTexture!.width;
-          const h = ctx.linearDepthTexture!.height;
+          // Get the HiZ texture allocated by the executor
+          const hiZTex = rgCtx.getTexture<Texture2D>(hiZHandle!);
+          const w = hiZTex.width;
+          const h = hiZTex.height;
           const HiZFrameBuffer = ctx.device.pool.fetchTemporalFramebuffer(
-            true,
+            false,
             w,
             h,
-            ctx.linearDepthTexture!.format,
+            hiZTex,
             null,
-            true
+            false
           );
           buildHiZ(depthTex, HiZFrameBuffer);
-          ctx.HiZTexture = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
+          ctx.HiZTexture = hiZTex;
+          ctx.device.pool.releaseFrameBuffer(HiZFrameBuffer);
         }
       });
     });
   }
 
   // ── 7. Main Light Pass ────────────────────────────────────────────
-  let sceneColorHandle: RGHandle;
+  // Scene color is managed by renderMainLightPass
+  const sceneColorHandle = graph.importTexture('sceneColor');
   graph.addPass('LightPass', (builder) => {
-    builder.read(depthHandle!);
+    builder.read(depthHandle);
     if (shadowMapsHandle) {
       builder.read(shadowMapsHandle);
     }
     if (hiZHandle) {
       builder.read(hiZHandle);
     }
-    sceneColorHandle = builder.createTexture({ format: ctx.colorFormat, label: 'sceneColor' });
+    builder.write(sceneColorHandle);
     builder.setExecute(() => {
       renderMainLightPass(frame);
     });
@@ -253,7 +255,7 @@ export function buildForwardPlusGraph(
 
   // ── 8. Post Effects + Final Composite ─────────────────────────────
   graph.addPass('Composite', (builder) => {
-    builder.read(sceneColorHandle!);
+    builder.read(sceneColorHandle);
     if (motionVectorHandle) {
       builder.read(motionVectorHandle);
     }
@@ -573,5 +575,20 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
   const backbuffer = buildForwardPlusGraph(graph, ctx, renderQueue, options);
 
   const compiled = graph.compile([backbuffer]);
-  graph.execute(compiled);
+
+  // Use RenderGraphExecutor for automatic resource management
+  const executor = new RenderGraphExecutor(
+    new DevicePoolAllocator(),
+    ctx.renderWidth,
+    ctx.renderHeight
+  );
+
+  // Register imported backbuffer (if using finalFramebuffer)
+  if (ctx.finalFramebuffer) {
+    const backbufferTex = ctx.finalFramebuffer.getColorAttachments()[0] as Texture2D;
+    executor.setImportedTexture(backbuffer, backbufferTex);
+  }
+
+  executor.execute(compiled);
+  executor.reset();
 }
