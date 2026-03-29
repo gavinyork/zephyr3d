@@ -90,7 +90,9 @@ export function getSpriteClass(): SerializableClass {
             value.bool[0] = !!this.material?.$isInstance;
           },
           set(this: Sprite, value) {
-            this.material = value.bool[0] ? this.material?.createInstance() : this.material?.coreMaterial;
+            this.material = value.bool[0]
+              ? (this.material?.createInstance() ?? null)
+              : (this.material?.coreMaterial ?? null);
           }
         },
         {

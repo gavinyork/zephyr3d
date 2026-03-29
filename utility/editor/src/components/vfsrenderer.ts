@@ -54,6 +54,12 @@ type VFSRendererOptions = {
   multiSelect?: boolean;
 };
 
+type PathRewriteRule = {
+  oldPath: string;
+  newPath: string;
+  isDirectory: boolean;
+};
+
 class VFSDirData extends TreeViewData<DirectoryInfo> {
   private _renderer: VFSRenderer;
   private _projectName: string;
@@ -1016,17 +1022,33 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     const currentName = isDir
       ? item.path.slice(item.path.lastIndexOf('/') + 1)
       : (item as FileInfo).meta.name;
-    DlgRename.rename('Rename', currentName).then((newName) => {
+    DlgRename.rename('Rename', currentName).then(async (newName) => {
       newName = newName.trim();
       if (newName && newName !== currentName) {
         if (PathUtils.sanitizeFilename(newName) !== newName) {
           DlgMessage.messageBox('Error', 'Invalid name');
         } else {
-          const parentPath = isDir
-            ? item.path.slice(0, item.path.lastIndexOf('/'))
-            : (item as FileInfo).meta.path.slice(0, (item as FileInfo).meta.path.lastIndexOf('/'));
-          const newPath = this._vfs.join(parentPath, newName);
-          this._vfs.move(isDir ? item.path : item.meta.path, newPath);
+          try {
+            const oldPath = isDir ? item.path : item.meta.path;
+            const parentPath = isDir
+              ? item.path.slice(0, item.path.lastIndexOf('/'))
+              : (item as FileInfo).meta.path.slice(0, (item as FileInfo).meta.path.lastIndexOf('/'));
+            const newPath = this._vfs.join(parentPath, newName);
+             await this._vfs.move(oldPath, newPath);
+            try {
+              await this.rewriteAssetReferencesAfterMove([
+                {
+                  oldPath,
+                  newPath,
+                  isDirectory: isDir
+                }
+              ]);
+            } catch (err) {
+              console.warn(`Rewrite references after rename failed: ${err}`);
+            }
+          } catch (err) {
+            DlgMessage.messageBox('Error', `Rename failed: ${err}`);
+          }
         }
       }
     });
@@ -1377,6 +1399,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   async handleFileMoveOrCopy(targetDir: string, payload: { isDir: boolean; path: string }[]) {
     const copy = ImGui.GetIO().KeyCtrl;
     const dlg = copy ? new DlgProgress('CopyFile##CopyProgress', 300, true) : null;
+    const movedRules: PathRewriteRule[] = [];
     if (dlg) {
       dlg.showModal();
       dlg.setProgress(0, payload.length);
@@ -1398,6 +1421,11 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           await vfs.move(sourceDir, targetPath, {
             overwrite: true
           });
+          movedRules.push({
+            oldPath: sourceDir,
+            newPath: targetPath,
+            isDirectory: false
+          });
         }
       } else {
         if (vfs.isParentOf(sourceDir, targetDir)) {
@@ -1415,6 +1443,11 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             });
           } else {
             await vfs.move(sourceDir, dest);
+            movedRules.push({
+              oldPath: sourceDir,
+              newPath: dest,
+              isDirectory: true
+            });
           }
         }
       }
@@ -1422,8 +1455,116 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         dlg.setProgress(i + 1, payload.length);
       }
     }
+    if (!copy && movedRules.length > 0) {
+      try {
+        await this.rewriteAssetReferencesAfterMove(movedRules);
+      } catch (err) {
+        console.warn(`Rewrite references after move failed: ${err}`);
+      }
+    }
     if (dlg) {
       dlg.close();
     }
+  }
+
+  private async rewriteAssetReferencesAfterMove(rules: PathRewriteRule[]) {
+    const deduplicated = this.prepareRewriteRules(rules);
+    if (deduplicated.length === 0) {
+      return;
+    }
+    const rootDir = this._options.rootDir || '/assets';
+    const entries = await this._vfs.readDirectory(rootDir, {
+      includeHidden: true,
+      recursive: true
+    });
+    const targetFiles = entries.filter(
+      (entry) =>
+        entry.type === 'file' &&
+        (entry.path.toLowerCase().endsWith('.zscn') ||
+          entry.path.toLowerCase().endsWith('.prefab') ||
+          entry.path.toLowerCase().endsWith('.zprefab') ||
+          entry.path.toLowerCase().endsWith('.zmtl'))
+    );
+    for (const file of targetFiles) {
+      try {
+        const text = (await this._vfs.readFile(file.path, { encoding: 'utf8' })) as string;
+        const json = JSON.parse(text);
+        if (this.rewriteJsonPathValues(json, deduplicated)) {
+          await this._vfs.writeFile(file.path, JSON.stringify(json, null, 2), {
+            encoding: 'utf8',
+            create: true
+          });
+        }
+      } catch (err) {
+        console.warn(`Skip reference rewrite for ${file.path}: ${err}`);
+      }
+    }
+  }
+
+  private prepareRewriteRules(rules: PathRewriteRule[]): PathRewriteRule[] {
+    const map = new Map<string, PathRewriteRule>();
+    for (const rule of rules) {
+      const oldPath = this._vfs.normalizePath(rule.oldPath);
+      const newPath = this._vfs.normalizePath(rule.newPath);
+      if (!oldPath || !newPath || oldPath === newPath) {
+        continue;
+      }
+      map.set(oldPath, {
+        oldPath,
+        newPath,
+        isDirectory: rule.isDirectory
+      });
+    }
+    return [...map.values()].sort((a, b) => b.oldPath.length - a.oldPath.length);
+  }
+
+  private rewriteJsonPathValues(node: unknown, rules: PathRewriteRule[]): boolean {
+    let changed = false;
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i++) {
+        const value = node[i];
+        if (typeof value === 'string') {
+          const rewritten = this.rewritePathString(value, rules);
+          if (rewritten !== value) {
+            node[i] = rewritten;
+            changed = true;
+          }
+        } else if (value && typeof value === 'object') {
+          changed = this.rewriteJsonPathValues(value, rules) || changed;
+        }
+      }
+      return changed;
+    }
+    if (!node || typeof node !== 'object') {
+      return false;
+    }
+    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+      if (typeof value === 'string') {
+        const rewritten = this.rewritePathString(value, rules);
+        if (rewritten !== value) {
+          (node as Record<string, unknown>)[key] = rewritten;
+          changed = true;
+        }
+      } else if (value && typeof value === 'object') {
+        changed = this.rewriteJsonPathValues(value, rules) || changed;
+      }
+    }
+    return changed;
+  }
+
+  private rewritePathString(value: string, rules: PathRewriteRule[]): string {
+    for (const rule of rules) {
+      if (rule.isDirectory) {
+        if (value === rule.oldPath) {
+          return rule.newPath;
+        }
+        if (value.startsWith(`${rule.oldPath}/`)) {
+          return `${rule.newPath}${value.slice(rule.oldPath.length)}`;
+        }
+      } else if (value === rule.oldPath) {
+        return rule.newPath;
+      }
+    }
+    return value;
   }
 }

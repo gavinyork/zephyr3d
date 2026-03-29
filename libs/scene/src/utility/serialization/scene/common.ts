@@ -37,7 +37,11 @@ export function getMeshMaterialInstanceUniformsClass(cls: {
       name: `${cls.name}InstanceUniforms`,
       async createFunc(_ctx, init) {
         const material = await getEngine().resourceManager.fetchMaterial<MeshMaterial>(init);
-        return { obj: new C(material!.createInstance()) };
+        if (!material) {
+          console.error(`Material not found when creating material instance uniforms: ${String(init)}`);
+          return { obj: null, loadProps: false };
+        }
+        return { obj: new C(material.createInstance()) };
       },
       getInitParams(obj: C) {
         return obj.materialId;
