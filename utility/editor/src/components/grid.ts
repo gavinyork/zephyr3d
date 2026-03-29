@@ -595,46 +595,70 @@ export class PropertyEditor extends Observable<{
       }
       case 'int2': {
         const val = tmpProperty.num as [number, number];
-        changed = ImGui.InputInt2('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+        changed = ImGui.DragInt2(
+          '##value',
+          val,
+          readonly ? 0 : (value.options?.speed ?? 0.1),
+          value.options?.minValue ?? undefined,
+          value.options?.maxValue ?? undefined
+        );
         break;
       }
       case 'int3': {
         const val = tmpProperty.num as [number, number, number];
-        changed = ImGui.InputInt3('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+        changed = ImGui.DragInt3(
+          '##value',
+          val,
+          readonly ? 0 : (value.options?.speed ?? 0.1),
+          value.options?.minValue ?? undefined,
+          value.options?.maxValue ?? undefined
+        );
         break;
       }
       case 'int4': {
         const val = tmpProperty.num as [number, number, number, number];
-        changed = ImGui.InputInt4('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+        changed = ImGui.DragInt4(
+          '##value',
+          val,
+          readonly ? 0 : (value.options?.speed ?? 0.1),
+          value.options?.minValue ?? undefined,
+          value.options?.maxValue ?? undefined
+        );
         break;
       }
       case 'vec2': {
         const val = tmpProperty.num as [number, number];
-        changed = ImGui.InputFloat2(
+        changed = ImGui.DragFloat2(
           '##value',
           val,
-          undefined,
-          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+          readonly ? 0 : (value.options?.speed ?? 0.01),
+          value.options?.minValue ?? undefined,
+          value.options?.maxValue ?? undefined,
+          '%.3f'
         );
         break;
       }
       case 'vec3': {
         const val = tmpProperty.num as [number, number, number];
-        changed = ImGui.InputFloat3(
+        changed = ImGui.DragFloat3(
           '##value',
           val,
-          undefined,
-          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+          readonly ? 0 : (value.options?.speed ?? 0.01),
+          value.options?.minValue ?? undefined,
+          value.options?.maxValue ?? undefined,
+          '%.3f'
         );
         break;
       }
       case 'vec4': {
         const val = tmpProperty.num as [number, number, number, number];
-        changed = ImGui.InputFloat4(
+        changed = ImGui.DragFloat4(
           '##value',
           val,
-          undefined,
-          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+          readonly ? 0 : (value.options?.speed ?? 0.01),
+          value.options?.minValue ?? undefined,
+          value.options?.maxValue ?? undefined,
+          '%.3f'
         );
         break;
       }
@@ -667,6 +691,25 @@ export class PropertyEditor extends Observable<{
   private sRGBToLinear(x: number): number {
     // sRGB -> 线性
     return Math.pow(Math.max(0, Math.min(1, x)), 2.2);
+  }
+  private revealAsset(path: string) {
+    if (!path || !path.startsWith('/')) {
+      return;
+    }
+    eventBus.dispatchEvent('reveal_asset', ProjectService.VFS.normalizePath(path));
+  }
+  private revealAssetFromProperty(object: any, prop: PropertyAccessor<any>) {
+    if (!prop.options?.mimeTypes?.length) {
+      return;
+    }
+    const tmpProperty: RequireOptionals<PropertyValue> = {
+      num: [0, 0, 0, 0],
+      str: [''],
+      bool: [false],
+      object: []
+    };
+    prop.get.call(object, tmpProperty);
+    this.revealAsset(tmpProperty.str[0]);
   }
   private renderProperty(property: PropertyGroup | Property<any>, level: number) {
     if (property instanceof PropertyGroup) {
@@ -716,6 +759,9 @@ export class PropertyEditor extends Observable<{
       ImGui.TextDisabled(name ?? '');
     } else {
       ImGui.Text(value.options?.label ?? name);
+      if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
+        this.revealAssetFromProperty(object, value);
+      }
       if (level > 0) {
         ImGui.SetCursorPosX(baseX);
       }
@@ -793,32 +839,55 @@ export class PropertyEditor extends Observable<{
               undefined,
               readonly ? ImGui.InputTextFlags.ReadOnly : undefined
             );
+            if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
+              this.revealAsset(val[0]);
+            }
             this.setDragDropProperty(object, value, tmpProperty);
           }
           break;
         }
         case 'int2': {
           const val = tmpProperty.num as [number, number];
-          changed = ImGui.InputInt2('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+          changed = ImGui.DragInt2(
+            '##value',
+            val,
+            readonly ? 0 : (value.options?.speed ?? 0.1),
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined
+          );
           break;
         }
         case 'int3': {
           const val = tmpProperty.num as [number, number, number];
-          changed = ImGui.InputInt3('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+          changed = ImGui.DragInt3(
+            '##value',
+            val,
+            readonly ? 0 : (value.options?.speed ?? 0.1),
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined
+          );
           break;
         }
         case 'int4': {
           const val = tmpProperty.num as [number, number, number, number];
-          changed = ImGui.InputInt4('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+          changed = ImGui.DragInt4(
+            '##value',
+            val,
+            readonly ? 0 : (value.options?.speed ?? 0.1),
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined
+          );
           break;
         }
         case 'vec2': {
           const val = tmpProperty.num as [number, number];
-          changed = ImGui.InputFloat2(
+          changed = ImGui.DragFloat2(
             '##value',
             val,
-            undefined,
-            readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+            readonly ? 0 : (value.options?.speed ?? 0.01),
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined,
+            '%.3f'
           );
           break;
         }
@@ -830,11 +899,13 @@ export class PropertyEditor extends Observable<{
             ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
           }
-          changed = ImGui.InputFloat3(
+          changed = ImGui.DragFloat3(
             '##value',
             val,
-            undefined,
-            readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+            readonly ? 0 : (value.options?.speed ?? 0.01),
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined,
+            '%.3f'
           );
           if (editRotation) {
             ImGui.SameLine(0, 0);
@@ -869,11 +940,13 @@ export class PropertyEditor extends Observable<{
         }
         case 'vec4': {
           const val = tmpProperty.num as [number, number, number, number];
-          changed = ImGui.InputFloat4(
+          changed = ImGui.DragFloat4(
             '##value',
             val,
-            undefined,
-            readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+            readonly ? 0 : (value.options?.speed ?? 0.01),
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined,
+            '%.3f'
           );
           break;
         }
@@ -926,6 +999,9 @@ export class PropertyEditor extends Observable<{
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
           }
           ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
+          if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
+            this.revealAsset(val[0]);
+          }
           this.setDragDropProperty(object, value, tmpProperty);
           if (value.isNullable?.call(object, 0)) {
             ImGui.SameLine(0, 0);

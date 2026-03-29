@@ -986,8 +986,8 @@ class IRCast extends IRExpression {
  * @public
  */
 class IRSampleTexture extends IRExpression {
-  /** The texture constant expression */
-  readonly tex: IRConstantTexture;
+  /** The texture expression */
+  readonly tex: IRExpression;
   /** The texture coordinate expression */
   readonly coord: IRExpression;
   /** The sampler type determining how to interpret the sampled value */
@@ -1001,7 +1001,7 @@ class IRSampleTexture extends IRExpression {
    * @param coord - The texture coordinates
    * @param samplerType - How to interpret the sampled value ('Color' or 'Normal')
    */
-  constructor(tex: IRConstantTexture, coord: IRExpression, samplerType: 'Color' | 'Normal') {
+  constructor(tex: IRExpression, coord: IRExpression, samplerType: 'Color' | 'Normal') {
     super();
     this.tex = tex.addRef();
     this.coord = coord.addRef();
@@ -1032,6 +1032,12 @@ class IRSampleTexture extends IRExpression {
     const tex = this.tex.create(pb);
     const coord = this.coord.create(pb);
     let coordExp: PBShaderExp;
+    let texExp: PBShaderExp;
+    if (tex instanceof PBShaderExp) {
+      texExp = tex;
+    } else {
+      throw new Error('Invalid texture expression');
+    }
     if (coord instanceof PBShaderExp) {
       coordExp = coord;
     } else if (Array.isArray(coord)) {
@@ -1040,7 +1046,7 @@ class IRSampleTexture extends IRExpression {
     } else {
       throw new Error('Invalid texture coordinate');
     }
-    let exp = pb.textureSample(tex, coordExp);
+    let exp = pb.textureSample(texExp, coordExp);
     if (this.samplerType === 'Normal') {
       exp = pb.sub(pb.mul(exp, pb.vec4(2, 2, 2, 1)), pb.vec4(1, 1, 1, 0));
     }
@@ -1221,6 +1227,8 @@ export class MaterialBlueprintIR {
   private _uniformValues!: IRUniformValue[];
   /** Array of uniform textures to be bound at runtime */
   private _uniformTextures!: IRUniformTexture[];
+  /** Fallback texture uniforms generated for TextureSample nodes without texture input */
+  private _textureSampleFallbackMap!: Map<TextureSampleNode, IRConstantTexture>;
   /** Flags indicating which shader features are used */
   private _behaviors!: MaterialBlueprintIRBehaviors;
   /** Array of named output expressions (e.g., baseColor, normal, metallic) */
@@ -1380,6 +1388,7 @@ export class MaterialBlueprintIR {
     this._expressionMap = new Map();
     this._uniformTextures = [];
     this._uniformValues = [];
+    this._textureSampleFallbackMap = new Map();
     this._outputs = null;
     this._behaviors = {
       useVertexColor: false,
@@ -2133,8 +2142,37 @@ export class MaterialBlueprintIR {
   }
   /** Converts a texture sample node to IR */
   private textureSample(node: TextureSampleNode, output: number): IRExpression {
-    const tex = this.ir(node.inputs[0])! as IRConstantTexture;
-    const coord = this.ir(node.inputs[1])!;
+    const tex = node.inputs[0].inputNode ? this.ir(node.inputs[0])! : this.textureSampleFallbackTexture(node);
+    const coord = node.inputs[1].inputNode
+      ? this.ir(node.inputs[1])!
+      : (() => {
+          this._behaviors.useVertexUV = true;
+          return new IRInput((scope) => scope.zVertexUV);
+        })();
     return this.getOrCreateIRExpression(node, output, IRSampleTexture, tex, coord, node.samplerType);
+  }
+  /** Gets or creates fallback texture uniform expression for texture sample nodes */
+  private textureSampleFallbackTexture(node: TextureSampleNode): IRConstantTexture {
+    let ir = this._textureSampleFallbackMap.get(node);
+    if (!ir) {
+      ir = new IRConstantTexture(
+        node.paramName,
+        node.textureId,
+        'tex2D',
+        node.sRGB,
+        node.addressU,
+        node.addressV,
+        node.filterMin,
+        node.filterMag,
+        node.filterMip
+      );
+      this._expressions.push(ir);
+      this._textureSampleFallbackMap.set(node, ir);
+      const uniformTexture = ir.asUniformTexture();
+      if (uniformTexture) {
+        this._uniformTextures.push(uniformTexture);
+      }
+    }
+    return ir;
   }
 }

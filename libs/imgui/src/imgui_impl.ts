@@ -130,6 +130,8 @@ function canvas_on_blur(_event: FocusEvent) {
   for (let i = 0; i < io.MouseDown.length; ++i) {
     io.MouseDown[i] = false;
   }
+  leftMouseDown = false;
+  releasePointerLock();
 }
 
 const key_code_to_index: Record<string, number> = {
@@ -203,8 +205,23 @@ export function canvas_on_keypress(event: KeyboardEvent) {
 
 function canvas_on_pointermove(event: PointerEvent) {
   const io = ImGui.GetIO();
-  io.MousePos.x = event.offsetX;
-  io.MousePos.y = event.offsetY;
+  if (isPointerLocked()) {
+    io.MousePos.x += event.movementX || 0;
+    io.MousePos.y += event.movementY || 0;
+  } else {
+    io.MousePos.x = event.offsetX;
+    io.MousePos.y = event.offsetY;
+    if (
+      event.pointerType === 'mouse' &&
+      leftMouseDown &&
+      (event.buttons & 1) !== 0 &&
+      io.WantCaptureMouse &&
+      isDraggingFromMouseDown(event) &&
+      isPointerNearScreenEdge(event)
+    ) {
+      requestPointerLock();
+    }
+  }
   if (io.WantCaptureMouse) {
     return true;
   }
@@ -236,11 +253,78 @@ export function any_pointerdown() {
   return false;
 }
 
+function isPointerLocked() {
+  if (typeof document === 'undefined') {
+    return false;
+  }
+  return document.pointerLockElement === renderer?.device.canvas;
+}
+
+function requestPointerLock() {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  const canvas = renderer?.device.canvas;
+  if (!canvas || isPointerLocked() || typeof canvas.requestPointerLock !== 'function') {
+    return;
+  }
+  try {
+    const ret = canvas.requestPointerLock();
+    if (ret && typeof (ret as Promise<void>).catch === 'function') {
+      (ret as Promise<void>).catch(() => {
+        // Ignore pointer lock denial and keep default behavior.
+      });
+    }
+  } catch {
+    // Ignore pointer lock denial and keep default behavior.
+  }
+}
+
+function releasePointerLock() {
+  if (typeof document === 'undefined' || !isPointerLocked()) {
+    return;
+  }
+  if (typeof document.exitPointerLock === 'function') {
+    document.exitPointerLock();
+  }
+}
+
+const DRAG_LOCK_THRESHOLD_PX = 2;
+const EDGE_LOCK_PADDING_PX = 1;
+let leftMouseDown = false;
+let leftMouseDownClientX = 0;
+let leftMouseDownClientY = 0;
+
+function isDraggingFromMouseDown(event: PointerEvent) {
+  const dx = event.clientX - leftMouseDownClientX;
+  const dy = event.clientY - leftMouseDownClientY;
+  return dx * dx + dy * dy >= DRAG_LOCK_THRESHOLD_PX * DRAG_LOCK_THRESHOLD_PX;
+}
+
+function isPointerNearScreenEdge(event: PointerEvent) {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const x = event.clientX;
+  const y = event.clientY;
+  return (
+    x <= EDGE_LOCK_PADDING_PX ||
+    y <= EDGE_LOCK_PADDING_PX ||
+    x >= window.innerWidth - EDGE_LOCK_PADDING_PX ||
+    y >= window.innerHeight - EDGE_LOCK_PADDING_PX
+  );
+}
+
 function canvas_on_pointerdown(event: PointerEvent) {
   const io = ImGui.GetIO();
   io.MousePos.x = event.offsetX;
   io.MousePos.y = event.offsetY;
   io.MouseDown[mouseButtonToImGui(event.button)] = true;
+  if (event.button === 0 && event.pointerType === 'mouse') {
+    leftMouseDown = true;
+    leftMouseDownClientX = event.clientX;
+    leftMouseDownClientY = event.clientY;
+  }
   if (io.WantCaptureMouse) {
     return true;
   }
@@ -258,6 +342,12 @@ function canvas_on_contextmenu(_event: Event) {
 function canvas_on_pointerup(event: PointerEvent) {
   const io = ImGui.GetIO();
   io.MouseDown[mouse_button_map[event.button]] = false;
+  if (event.button === 0) {
+    leftMouseDown = false;
+  }
+  if (!any_pointerdown()) {
+    releasePointerLock();
+  }
   if (io.WantCaptureMouse) {
     return true;
   }

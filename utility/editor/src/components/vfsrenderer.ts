@@ -436,6 +436,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   private _contentBounds: AreaBounds | null = null;
   private _isDragOverNavigation = false;
   private _isDragOverContent = false;
+  private _pendingRevealAssetPath: string | null = null;
   private readonly _options: VFSRendererOptions = null;
 
   constructor(vfs: VFS, fileFilter: string[] = [], treePanelWidth = 200, options?: VFSRendererOptions) {
@@ -455,6 +456,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     };
     this._nav = new DirTreeView(this, this._options.rootDir);
     this._contentView = new ContentListView(new VFSContentData(this));
+    eventBus.on('reveal_asset', this.revealAsset, this);
     this.loadFileSystem();
     if (this._options.allowDrop) {
       eventBus.on('external_dragenter', this.handleDragEvent, this);
@@ -1051,6 +1053,36 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     this._contentView.deselectAll();
   }
 
+  private revealAsset(path: string) {
+    if (!path) {
+      return;
+    }
+    const normalizedPath = this._vfs.normalizePath(path);
+    if (!this._filesystem) {
+      this._pendingRevealAssetPath = normalizedPath;
+      return;
+    }
+    this.selectAssetByPath(normalizedPath);
+  }
+
+  private selectAssetByPath(path: string) {
+    if (!path) {
+      return;
+    }
+    const normalizedPath = this._vfs.normalizePath(path);
+    const dirPath = this._vfs.dirname(normalizedPath);
+    const dir = this.findDirectoryByPath(this._filesystem, dirPath);
+    if (!dir) {
+      return;
+    }
+    this._nav.selectNode(dir);
+    const file = dir.files.find((item) => this._vfs.normalizePath(item.meta.path) === normalizedPath);
+    if (file) {
+      this._contentView.deselectAll();
+      this._contentView.selectItems([file]);
+    }
+  }
+
   renderDir(dir: DirectoryInfo) {
     const name = dir.path.slice(dir.path.lastIndexOf('/') + 1);
     const emoji = '📁';
@@ -1144,6 +1176,11 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       this._nav.selectNode(newSelectedDir ?? null);
     } else {
       this._nav.selectNode(this._filesystem);
+    }
+    if (this._pendingRevealAssetPath) {
+      const path = this._pendingRevealAssetPath;
+      this._pendingRevealAssetPath = null;
+      this.selectAssetByPath(path);
     }
   }
 
@@ -1283,6 +1320,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   protected onDispose() {
     super.onDispose();
     this._vfs.off('changed', this.onVFSChanged, this);
+    eventBus.off('reveal_asset', this.revealAsset, this);
     if (this._options.allowDrop) {
       eventBus.off('external_dragenter', this.handleDragEvent, this);
       eventBus.off('external_dragover', this.handleDragEvent, this);
