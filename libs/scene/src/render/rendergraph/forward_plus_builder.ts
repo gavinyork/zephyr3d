@@ -24,6 +24,7 @@ import { AbstractPostEffect, PostEffectLayer } from '../../posteffect/posteffect
 import { RenderGraph } from './rendergraph';
 import { RenderGraphExecutor } from './executor';
 import { DevicePoolAllocator } from './device_pool_allocator';
+import { HistoryResourceManager } from './history_resource_manager';
 import type { RGHandle } from './types';
 import { renderObjectColors } from '../gpu_picking';
 import type { Primitive } from '../primitive';
@@ -35,6 +36,7 @@ const _scenePass = new LightPass();
 const _depthPass = new DepthPass();
 const _shadowMapPass = new ShadowMapPass();
 const _clusters: ClusteredLight[] = [];
+const _devicePoolAllocator = new DevicePoolAllocator();
 let _backDepthColorState: Nullable<ColorState> = null;
 let _frontDepthColorState: Nullable<ColorState> = null;
 
@@ -220,14 +222,7 @@ export function buildForwardPlusGraph(
           const hiZTex = rgCtx.getTexture<Texture2D>(hiZHandle!);
           const w = hiZTex.width;
           const h = hiZTex.height;
-          const HiZFrameBuffer = ctx.device.pool.fetchTemporalFramebuffer(
-            false,
-            w,
-            h,
-            hiZTex,
-            null,
-            false
-          );
+          const HiZFrameBuffer = ctx.device.pool.fetchTemporalFramebuffer(false, w, h, hiZTex, null, false);
           buildHiZ(depthTex, HiZFrameBuffer);
           ctx.HiZTexture = hiZTex;
           ctx.device.pool.releaseFrameBuffer(HiZFrameBuffer);
@@ -572,16 +567,21 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
   const renderQueue = _scenePass.cullScene(ctx, ctx.camera);
 
   const options = deriveForwardPlusOptions(ctx.scene, ctx.camera, device.type, renderQueue);
+
+  // Get or create HistoryResourceManager from camera (persistent across frames)
+  let historyManager = ctx.camera.getHistoryResourceManager();
+  if (!historyManager) {
+    historyManager = new HistoryResourceManager<Texture2D>(_devicePoolAllocator);
+    ctx.camera.setHistoryResourceManager(historyManager);
+  }
+  ctx.historyResourceManager = historyManager;
+
   const backbuffer = buildForwardPlusGraph(graph, ctx, renderQueue, options);
 
   const compiled = graph.compile([backbuffer]);
 
   // Use RenderGraphExecutor for automatic resource management
-  const executor = new RenderGraphExecutor(
-    new DevicePoolAllocator(),
-    ctx.renderWidth,
-    ctx.renderHeight
-  );
+  const executor = new RenderGraphExecutor(_devicePoolAllocator, ctx.renderWidth, ctx.renderHeight);
 
   // Register imported backbuffer (if using finalFramebuffer)
   if (ctx.finalFramebuffer) {
@@ -591,4 +591,7 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
 
   executor.execute(compiled);
   executor.reset();
+
+  // Swap history buffers at frame end (ping-pong)
+  historyManager.swap();
 }
