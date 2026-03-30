@@ -25,6 +25,7 @@ import { MotionBlur } from '../posteffect/motionblur';
 import { getDevice } from '../app/api';
 import type { ScreenConfig } from '../app/screen';
 import { ScreenAdapter } from '../app/screen';
+import type { HistoryResourceManager } from '../render';
 
 /**
  * Result of a camera picking operation.
@@ -67,7 +68,7 @@ export class Camera extends SceneNode {
   /** @internal Halton 2-3 sequence used for TAA jittering. */
   private static readonly _halton23 = halton23(16);
   /** @internal Per-camera history resource manager. */
-  private static readonly _historyResourceManager: WeakMap<Camera, any> = new WeakMap();
+  private static readonly _historyResourceManager: WeakMap<Camera, HistoryResourceManager> = new WeakMap();
   /** @internal Screen adapter for this camera */
   protected _screenAdapter: ScreenAdapter;
   /** @internal Whether the camera is adapted */
@@ -1036,7 +1037,7 @@ export class Camera extends SceneNode {
    * Gets the camera history resource manager for temporal effects
    * @returns History resource manager
    */
-  getHistoryResourceManager(): any {
+  getHistoryResourceManager(): Nullable<HistoryResourceManager> {
     let manager = Camera._historyResourceManager.get(this);
     if (!manager) {
       // Import dynamically to avoid circular dependency
@@ -1049,7 +1050,7 @@ export class Camera extends SceneNode {
    * Sets the camera history resource manager for temporal effects
    * @internal
    */
-  setHistoryResourceManager(manager: any): void {
+  setHistoryResourceManager(manager: HistoryResourceManager): void {
     Camera._historyResourceManager.set(this, manager);
   }
   /**

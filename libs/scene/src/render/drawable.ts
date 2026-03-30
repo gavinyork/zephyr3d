@@ -19,7 +19,6 @@ import type { ClusteredLight } from './cluster_light';
 import type { MeshMaterial } from '../material';
 import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import type { OIT } from './oit';
-import type { HistoryResourceManager } from './rendergraph/history_resource_manager';
 import { getDevice } from '../app/api';
 
 /**
@@ -131,8 +130,6 @@ export interface DrawContext {
   finalFramebuffer: Nullable<FrameBuffer>;
   /** Intermediate framebuffer used by the compositor or multi-pass pipelines. */
   intermediateFramebuffer: Nullable<FrameBuffer>;
-  /** History resource manager for temporal effects (TAA, motion blur). */
-  historyResourceManager?: HistoryResourceManager<Texture2D>;
 }
 
 /**

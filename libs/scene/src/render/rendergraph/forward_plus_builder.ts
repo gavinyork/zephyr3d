@@ -568,13 +568,12 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
 
   const options = deriveForwardPlusOptions(ctx.scene, ctx.camera, device.type, renderQueue);
 
-  // Get or create HistoryResourceManager from camera (persistent across frames)
+  // Ensure the camera has a history resource manager for temporal effects (TAA, motion blur)
   let historyManager = ctx.camera.getHistoryResourceManager();
   if (!historyManager) {
     historyManager = new HistoryResourceManager<Texture2D>(_devicePoolAllocator);
     ctx.camera.setHistoryResourceManager(historyManager);
   }
-  ctx.historyResourceManager = historyManager;
 
   const backbuffer = buildForwardPlusGraph(graph, ctx, renderQueue, options);
 

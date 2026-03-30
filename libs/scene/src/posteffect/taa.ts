@@ -55,7 +55,7 @@ export class TAA extends AbstractPostEffect {
     ctx.device.pool.releaseFrameBuffer(fb);
   }
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
-    const historyMgr = ctx.historyResourceManager!;
+    const historyMgr = ctx.camera.getHistoryResourceManager()!;
 
     // Check if this is the first frame (no history yet)
     const isFirstFrame = !historyMgr.has(TAA_RESOURCES.COLOR);
