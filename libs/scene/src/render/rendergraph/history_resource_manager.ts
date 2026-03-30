@@ -1,3 +1,4 @@
+import type { Texture2D } from '@zephyr3d/device';
 import type { RGTextureAllocator, RGTextureDesc, RGResolvedSize } from './types';
 
 /**
@@ -29,7 +30,7 @@ import type { RGTextureAllocator, RGTextureDesc, RGResolvedSize } from './types'
  * @typeParam TTexture - The concrete texture type (e.g. `Texture2D`).
  * @public
  */
-export class HistoryResourceManager<TTexture = unknown> {
+export class HistoryResourceManager<TTexture = Texture2D> {
   private _resources: Map<string, TTexture[]> = new Map();
   private _allocator: RGTextureAllocator<TTexture>;
   private _frameIndex = 0;
@@ -72,7 +73,12 @@ export class HistoryResourceManager<TTexture = unknown> {
    * @param size - Resolved pixel dimensions.
    * @param initialTexture - The initial texture to use as current frame.
    */
-  registerWithTexture(name: string, desc: RGTextureDesc, size: RGResolvedSize, initialTexture: TTexture): void {
+  registerWithTexture(
+    name: string,
+    desc: RGTextureDesc,
+    size: RGResolvedSize,
+    initialTexture: TTexture
+  ): void {
     if (!this._resources.has(name)) {
       // Allocate only one texture for the "previous" slot
       const prevTexture = this._allocator.allocate(desc, size);
