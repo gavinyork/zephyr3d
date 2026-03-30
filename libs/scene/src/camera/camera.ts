@@ -2,7 +2,6 @@ import type { CubeFace, Immutable, Nullable, Plane } from '@zephyr3d/base';
 import { DRef, Vector2, Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
 import { SceneNode } from '../scene/scene_node';
 import type { Drawable, PickTarget } from '../render/drawable';
-import type { BaseTexture } from '@zephyr3d/device';
 import { Compositor } from '../posteffect/compositor';
 import type { Scene } from '../scene/scene';
 import type {
@@ -46,16 +45,6 @@ export type PickResult = {
 };
 
 /**
- * Temporal history resources used by reprojection (TAA, motion blur).
- *
- * @public
- */
-export type CameraHistoryData = {
-  prevColorTex: Nullable<BaseTexture>;
-  prevMotionVectorTex: Nullable<BaseTexture>;
-};
-
-/**
  * A renderable camera node that manages view/projection math, frusta,
  * input control, picking, and a post-processing chain via a compositor.
  *
@@ -77,8 +66,8 @@ export type CameraHistoryData = {
 export class Camera extends SceneNode {
   /** @internal Halton 2-3 sequence used for TAA jittering. */
   private static readonly _halton23 = halton23(16);
-  /** @internal Per-camera history resources. */
-  private static readonly _historyData: WeakMap<Camera, CameraHistoryData> = new WeakMap();
+  /** @internal Per-camera history resource manager. */
+  private static readonly _historyResourceManager: WeakMap<Camera, any> = new WeakMap();
   /** @internal Screen adapter for this camera */
   protected _screenAdapter: ScreenAdapter;
   /** @internal Whether the camera is adapted */
@@ -1044,34 +1033,36 @@ export class Camera extends SceneNode {
     return this.getProjectionMatrix().isOrtho();
   }
   /**
-   * Gets the camera history data which is used in temporal reprojection
-   * @returns Camera history data
+   * Gets the camera history resource manager for temporal effects
+   * @returns History resource manager
    */
-  getHistoryData() {
-    let data = Camera._historyData.get(this);
-    if (!data) {
-      data = {
-        prevColorTex: null,
-        prevMotionVectorTex: null
-      };
-      Camera._historyData.set(this, data);
+  getHistoryResourceManager(): any {
+    let manager = Camera._historyResourceManager.get(this);
+    if (!manager) {
+      // Import dynamically to avoid circular dependency
+      // The actual import happens in forward_plus_builder.ts
+      return null;
     }
-    return data;
+    return manager;
+  }
+  /**
+   * Sets the camera history resource manager for temporal effects
+   * @internal
+   */
+  setHistoryResourceManager(manager: any): void {
+    Camera._historyResourceManager.set(this, manager);
   }
   /**
    * Clears the camera history data which is used in temporal reprojection
    */
   clearHistoryData() {
-    const data = Camera._historyData.get(this);
-    if (data) {
-      if (data.prevColorTex) {
-        getDevice().pool.releaseTexture(data.prevColorTex);
-      }
-      if (data.prevMotionVectorTex) {
-        getDevice().pool.releaseTexture(data.prevMotionVectorTex);
-      }
-      Camera._historyData.delete(this);
+    // Clear history resource manager
+    const manager = Camera._historyResourceManager.get(this);
+    if (manager) {
+      manager.dispose();
+      Camera._historyResourceManager.delete(this);
     }
+
     this._prevVPMatrix = null;
     this._prevPosition = null;
     this._prevJitteredVPMatrix = null;

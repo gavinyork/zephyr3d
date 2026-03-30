@@ -8,6 +8,12 @@ import { temporalResolve } from '../shaders/temporal';
 import type { Nullable } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 
+/** Resource names for TAA history buffers */
+const TAA_RESOURCES = {
+  COLOR: 'taaColor',
+  MOTION_VECTOR: 'taaMotionVector'
+} as const;
+
 /** @internal */
 export class TAA extends AbstractPostEffect {
   private static _resolveProgram: GPUProgram[] = [];
@@ -49,57 +55,93 @@ export class TAA extends AbstractPostEffect {
     ctx.device.pool.releaseFrameBuffer(fb);
   }
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
-    const data = ctx.camera.getHistoryData();
-    if (
-      !data.prevColorTex ||
-      !data.prevMotionVectorTex ||
-      data.prevColorTex.width !== inputColorTexture.width ||
-      data.prevColorTex.height !== inputColorTexture.height
-    ) {
+    const historyMgr = ctx.historyResourceManager!;
+
+    // Check if this is the first frame (no history yet)
+    const isFirstFrame = !historyMgr.has(TAA_RESOURCES.COLOR);
+
+    if (isFirstFrame) {
+      // First frame: just pass through
       this.passThrough(ctx, inputColorTexture, srgbOutput);
-    } else {
-      //this.renderSkyMotionVectors(ctx);
-      let program = TAA._resolveProgram[ctx.camera.TAADebug];
-      if (!program) {
-        program = TAA._getResolveProgram(ctx, ctx.camera.TAADebug);
-        TAA._resolveProgram[ctx.camera.TAADebug] = program;
-      }
-      if (!this._bindGroup) {
-        this._bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
-      }
-      this._bindGroup.setTexture('historyColorTex', data.prevColorTex, fetchSampler('clamp_linear_nomip'));
-      this._bindGroup.setTexture('currentColorTex', inputColorTexture, fetchSampler('clamp_nearest_nomip'));
-      this._bindGroup.setTexture('currentDepthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
-      this._bindGroup.setTexture(
-        'motionVector',
-        ctx.motionVectorTexture!,
-        fetchSampler('clamp_nearest_nomip')
+
+      // Register and update history resources (zero-copy)
+      const currentColorTex = ctx.device.getFramebuffer()!.getColorAttachments()[0] as Texture2D;
+      ctx.device.pool.retainTexture(currentColorTex);
+
+      historyMgr.registerWithTexture(
+        TAA_RESOURCES.COLOR,
+        {
+          format: inputColorTexture.format,
+          sizeMode: 'absolute',
+          width: inputColorTexture.width,
+          height: inputColorTexture.height
+        },
+        { width: inputColorTexture.width, height: inputColorTexture.height },
+        currentColorTex
       );
-      this._bindGroup.setTexture(
-        'prevMotionVector',
-        data.prevMotionVectorTex,
-        fetchSampler('clamp_nearest_nomip')
+
+      ctx.device.pool.retainTexture(ctx.motionVectorTexture!);
+      historyMgr.registerWithTexture(
+        TAA_RESOURCES.MOTION_VECTOR,
+        {
+          format: ctx.motionVectorTexture!.format,
+          sizeMode: 'absolute',
+          width: ctx.motionVectorTexture!.width,
+          height: ctx.motionVectorTexture!.height
+        },
+        { width: ctx.motionVectorTexture!.width, height: ctx.motionVectorTexture!.height },
+        ctx.motionVectorTexture!
       );
-      this._bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
-      this._bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
-      TAA._texSize.setXY(sceneDepthTexture.width, sceneDepthTexture.height);
-      this._bindGroup.setValue('texSize', TAA._texSize);
-      //this.passThrough(ctx, inputColorTexture, srgbOutput, AbstractPostEffect.getZTestEqualRenderState(ctx));
-      ctx.device.setProgram(program);
-      ctx.device.setBindGroup(0, this._bindGroup);
-      this.drawFullscreenQuad();
+
+      return;
     }
-    if (data.prevColorTex) {
-      ctx.device.pool.releaseTexture(data.prevColorTex);
+
+    // Get history textures
+    const prevColorTex = historyMgr.getPrevious(TAA_RESOURCES.COLOR);
+
+    // Check if resolution changed
+    if (prevColorTex.width !== inputColorTexture.width || prevColorTex.height !== inputColorTexture.height) {
+      // Resolution changed, unregister old resources and restart
+      historyMgr.unregister(TAA_RESOURCES.COLOR);
+      historyMgr.unregister(TAA_RESOURCES.MOTION_VECTOR);
+      this.passThrough(ctx, inputColorTexture, srgbOutput);
+      return;
     }
-    const currentColorTex = ctx.device.getFramebuffer()!.getColorAttachments()[0];
+
+    const prevMotionVectorTex = historyMgr.getPrevious(TAA_RESOURCES.MOTION_VECTOR);
+
+    // Render TAA
+    let program = TAA._resolveProgram[ctx.camera.TAADebug];
+    if (!program) {
+      program = TAA._getResolveProgram(ctx, ctx.camera.TAADebug);
+      TAA._resolveProgram[ctx.camera.TAADebug] = program;
+    }
+    if (!this._bindGroup) {
+      this._bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
+    }
+    this._bindGroup.setTexture('historyColorTex', prevColorTex, fetchSampler('clamp_linear_nomip'));
+    this._bindGroup.setTexture('currentColorTex', inputColorTexture, fetchSampler('clamp_nearest_nomip'));
+    this._bindGroup.setTexture('currentDepthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
+    this._bindGroup.setTexture('motionVector', ctx.motionVectorTexture!, fetchSampler('clamp_nearest_nomip'));
+    this._bindGroup.setTexture('prevMotionVector', prevMotionVectorTex, fetchSampler('clamp_nearest_nomip'));
+    this._bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
+    this._bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
+    TAA._texSize.setXY(sceneDepthTexture.width, sceneDepthTexture.height);
+    this._bindGroup.setValue('texSize', TAA._texSize);
+
+    ctx.device.setProgram(program);
+    ctx.device.setBindGroup(0, this._bindGroup);
+    this.drawFullscreenQuad();
+
+    // Update history with current framebuffer output (zero-copy)
+    const currentColorTex = ctx.device.getFramebuffer()!.getColorAttachments()[0] as Texture2D;
     ctx.device.pool.retainTexture(currentColorTex);
-    data.prevColorTex = currentColorTex;
-    if (data.prevMotionVectorTex) {
-      ctx.device.pool.releaseTexture(data.prevMotionVectorTex);
-    }
+    historyMgr.updateCurrent(TAA_RESOURCES.COLOR, currentColorTex);
+
     ctx.device.pool.retainTexture(ctx.motionVectorTexture!);
-    data.prevMotionVectorTex = ctx.motionVectorTexture!;
+    historyMgr.updateCurrent(TAA_RESOURCES.MOTION_VECTOR, ctx.motionVectorTexture!);
+
+    // Note: History swap happens automatically in executeForwardPlusGraph
   }
   requireLinearDepthTexture(_ctx: DrawContext) {
     return true;

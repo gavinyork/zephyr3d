@@ -1,4 +1,5 @@
-import { RenderGraph, RGHandle } from '../../../libs/scene/src/render/rendergraph';
+import type { RGHandle } from '../../../libs/scene/src/render/rendergraph';
+import { RenderGraph } from '../../../libs/scene/src/render/rendergraph';
 
 describe('RenderGraph validation improvements', () => {
   let graph: RenderGraph;
