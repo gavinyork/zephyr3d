@@ -8,6 +8,8 @@ import type {
   IControllerWheelEvent,
   IGraphNode,
   MeshMaterial,
+  PropertyAccessor,
+  PropertyValue,
   SceneNode
 } from '@zephyr3d/scene';
 import {
@@ -38,6 +40,7 @@ import { getMathNodeCategories } from '../nodes/math';
 import { getTextureNodeCategories } from './texture';
 import { GNode } from '../node';
 import type { GenericConstructor, Nullable } from '@zephyr3d/base';
+import type { RequireOptionals } from '@zephyr3d/base';
 import { ASSERT, DRef, guessMimeType, randomUUID, Vector3, Vector4 } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import type { FrameBuffer, Texture2D, TextureAddressMode, TextureFilterMode } from '@zephyr3d/device';
@@ -45,8 +48,80 @@ import { getInputNodeCategories } from './inputs';
 import { ProjectService } from '../../../core/services/project';
 import { Dialog } from '../../../views/dlg/dlg';
 import type { NodeEditor } from '../nodeeditor';
+import { Command, CommandManager } from '../../../core/command';
 
 let wasDragging = false;
+
+type PropertySnapshot = RequireOptionals<PropertyValue>;
+
+function clonePropertyValue(value: PropertySnapshot): PropertySnapshot {
+  return {
+    num: [...(value.num ?? [])],
+    str: [...(value.str ?? [])],
+    bool: [...(value.bool ?? [])],
+    object: [...(value.object ?? [])]
+  };
+}
+
+function isSamePropertyValue(a: PropertySnapshot, b: PropertySnapshot): boolean {
+  if (a.num.length !== b.num.length || a.str.length !== b.str.length || a.bool.length !== b.bool.length) {
+    return false;
+  }
+  for (let i = 0; i < a.num.length; i++) {
+    if (a.num[i] !== b.num[i]) {
+      return false;
+    }
+  }
+  for (let i = 0; i < a.str.length; i++) {
+    if (a.str[i] !== b.str[i]) {
+      return false;
+    }
+  }
+  for (let i = 0; i < a.bool.length; i++) {
+    if (a.bool[i] !== b.bool[i]) {
+      return false;
+    }
+  }
+  if (a.object.length !== b.object.length) {
+    return false;
+  }
+  for (let i = 0; i < a.object.length; i++) {
+    if (a.object[i] !== b.object[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+class MaterialPropertyEditCommand extends Command {
+  private readonly _target: object;
+  private readonly _prop: PropertyAccessor;
+  private readonly _oldValue: PropertySnapshot;
+  private readonly _newValue: PropertySnapshot;
+  private readonly _onApplied: () => void;
+  constructor(
+    target: object,
+    prop: PropertyAccessor,
+    oldValue: PropertySnapshot,
+    newValue: PropertySnapshot,
+    onApplied: () => void
+  ) {
+    super(`Edit material property ${prop.name}`);
+    this._target = target;
+    this._prop = prop;
+    this._oldValue = clonePropertyValue(oldValue);
+    this._newValue = clonePropertyValue(newValue);
+    this._onApplied = onApplied;
+  }
+  async execute(): Promise<void> {
+    this._prop.set?.call(this._target, clonePropertyValue(this._newValue));
+    this._onApplied();
+  }
+  async undo(): Promise<void> {
+    this._prop.set?.call(this._target, clonePropertyValue(this._oldValue));
+    this._onApplied();
+  }
+}
 
 export class PBRMaterialEditor extends GraphEditor {
   private _previewScene: DRef<Scene>;
@@ -60,6 +135,7 @@ export class PBRMaterialEditor extends GraphEditor {
   private _irChanged: boolean;
   private _outputName: string;
   private _blueprintPath: string;
+  private readonly _cmdManager: CommandManager;
   private _savedState: Nullable<{
     props: any;
     irFrag: Nullable<MaterialBlueprintIR>;
@@ -81,8 +157,10 @@ export class PBRMaterialEditor extends GraphEditor {
     this._blitter = new CopyBlitter();
     this._blitter.srgbOut = true;
     this._blueprintPath = '';
+    this._cmdManager = new CommandManager();
     this._savedState = null;
     this.propEditor.on('object_property_changed', this.graphChanged, this);
+    this.propEditor.on('object_property_edit_finished', this.handlePropertyEditFinished, this);
   }
   //protected create
   get fragmentEditor() {
@@ -136,6 +214,7 @@ export class PBRMaterialEditor extends GraphEditor {
     this._defaultMaterial.dispose();
     this._editMaterial.dispose();
     this.propEditor.off('object_property_changed', this.graphChanged, this);
+    this.propEditor.off('object_property_edit_finished', this.handlePropertyEditFinished, this);
     this.fragmentEditor?.off('changed', this.graphChanged, this);
     this.fragmentEditor?.off('dragdrop', this.dragdropFrag, this);
     this.vertexEditor?.off('changed', this.graphChanged, this);
@@ -166,6 +245,18 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   get saved() {
     return this._version === 0;
+  }
+  canUndo() {
+    return !!this._cmdManager.getUndoCommand();
+  }
+  canRedo() {
+    return !!this._cmdManager.getRedoCommand();
+  }
+  undo() {
+    return this._cmdManager.undo();
+  }
+  redo() {
+    return this._cmdManager.redo();
   }
   async getSavedState(mat: MeshMaterial) {
     return {
@@ -696,6 +787,22 @@ export class PBRMaterialEditor extends GraphEditor {
     if (mat instanceof PBRBluePrintMaterial || mat instanceof SpriteBlueprintMaterial) {
       this._irChanged = true;
     }
+  }
+  private handlePropertyEditFinished(
+    object: Nullable<object>,
+    prop: PropertyAccessor,
+    oldValue: PropertySnapshot,
+    newValue: PropertySnapshot
+  ) {
+    if (!object || !prop?.set || isSamePropertyValue(oldValue, newValue)) {
+      return;
+    }
+    this._cmdManager.execute(
+      new MaterialPropertyEditCommand(object, prop, oldValue, newValue, () => {
+        this.graphChanged();
+        this.propEditor.refresh();
+      })
+    );
   }
   private dragdropFrag(x: number, y: number, _payload: { isDir: boolean; path: string }[]) {
     if (

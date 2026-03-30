@@ -57,6 +57,19 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
     super.close();
   }
   public doRender(): void {
+    const io = ImGui.GetIO();
+    const focused = ImGui.IsWindowFocused(ImGui.FocusedFlags.RootAndChildWindows);
+    const cmdDown = io.KeyCtrl || io.KeySuper;
+    if (focused && cmdDown && ImGui.IsKeyPressed(ImGui.GetKeyIndex(ImGui.Key.Z)) && this.editor.canUndo()) {
+      this.editor.undo();
+    } else if (
+      focused &&
+      cmdDown &&
+      ImGui.IsKeyPressed(ImGui.GetKeyIndex(ImGui.Key.Y)) &&
+      this.editor.canRedo()
+    ) {
+      this.editor.redo();
+    }
     if (
       ImGui.BeginChild(
         'NodeEditorContainer',

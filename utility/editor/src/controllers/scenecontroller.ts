@@ -8,6 +8,7 @@ import type { Editor } from '../core/editor';
 import { ProjectService } from '../core/services/project';
 import { DlgProjectSettings } from '../views/dlg/projectsettingsdlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
+import { DlgOSSFileSelect } from '../views/dlg/ossfileselectdlg';
 
 export class SceneController extends BaseController<SceneModel, SceneView> {
   protected _editor: Editor;
@@ -27,6 +28,18 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
   }
   get sceneChanged() {
     return this._sceneChanged;
+  }
+  get scenePath() {
+    return this._scenePath;
+  }
+  get openedSceneName() {
+    if (!this._scenePath) {
+      return 'Untitled';
+    }
+    const normalized = this._scenePath.replace(/\\/g, '/');
+    const index = normalized.lastIndexOf('/');
+    const fileName = index >= 0 ? normalized.slice(index + 1) : normalized;
+    return fileName.replace(/\.zscn$/i, '');
   }
   getModel(): SceneModel {
     return this._model;
@@ -102,6 +115,28 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
           await this._editor.exportProject();
         }
         break;
+      case 'EXPORT_ASSETS_OSS': {
+        if (await this.ensureSceneSaved()) {
+          const selectedPaths = await DlgOSSFileSelect.selectFiles(
+            'Export to OSS',
+            ProjectService.VFS,
+            '/assets',
+            600,
+            450
+          );
+          if (selectedPaths?.length > 0) {
+            const confirm = await Dialog.messageBoxEx(
+              'Confirm Upload',
+              `Upload ${selectedPaths.length} item(s) to OSS?`,
+              ['OK', 'Cancel']
+            );
+            if (confirm === 'OK') {
+              await this._editor.exportAssetsToOSS(selectedPaths);
+            }
+          }
+        }
+        break;
+      }
       case 'DELETE_PROJECT':
         if (this._editor.currentProject) {
           const uuid = this._editor.currentProject.uuid;

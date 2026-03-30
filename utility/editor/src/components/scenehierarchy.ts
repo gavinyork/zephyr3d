@@ -1,4 +1,5 @@
 import type { Scene } from '@zephyr3d/scene';
+import type { Nullable } from '@zephyr3d/base';
 import { Camera } from '@zephyr3d/scene';
 import {
   BaseLight,
@@ -15,9 +16,11 @@ import { convertEmojiString } from '../helpers/emoji';
 
 class SceneData extends TreeViewData<SceneNode> {
   private _scene: Scene;
-  constructor(scene: Scene) {
+  private _getOpenedSceneName: (() => string) | undefined;
+  constructor(scene: Scene, getOpenedSceneName?: () => string) {
     super();
     this._scene = scene;
+    this._getOpenedSceneName = getOpenedSceneName;
   }
   getRoot(): SceneNode {
     return this._scene.rootNode;
@@ -34,7 +37,10 @@ class SceneData extends TreeViewData<SceneNode> {
   getNodeName(node: SceneNode, forceUpdate: boolean): string {
     if (node instanceof SceneNode) {
       if (node === node.scene.rootNode) {
-        return `${node.scene.name || 'Scene'}${forceUpdate ? ' (Unsaved)' : ''}`;
+        const openedSceneName = this._getOpenedSceneName?.();
+        return `${node.scene.name || 'Scene'}${openedSceneName ? ` ${openedSceneName}` : ''}${
+          forceUpdate ? ' (Unsaved)' : ''
+        }`;
       }
       let emoj: string;
       if (node instanceof Mesh) {
@@ -71,10 +77,12 @@ export class SceneHierarchy extends TreeView<
   {
     node_deselected: [node: SceneNode];
     node_selected: [node: SceneNode];
+    selection_changed: [selectedNodes: SceneNode[], activeNode: Nullable<SceneNode>];
     node_request_delete: [node: SceneNode];
     node_double_clicked: [node: SceneNode];
     node_drag_drop: [from: SceneNode, target: SceneNode];
     set_main_camera: [camea: Camera];
+    request_go_to_assets: [node: SceneNode];
     request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }];
     request_save_prefab: [node: SceneNode];
     request_add_spring_collider: [node: SceneNode, type: 'sphere' | 'capsule' | 'plane'];
@@ -82,8 +90,8 @@ export class SceneHierarchy extends TreeView<
   SceneNode
 > {
   private _scene: Scene;
-  constructor(scene) {
-    super('###SceneHierarchyInner', new SceneData(scene));
+  constructor(scene: Scene, getOpenedSceneName?: () => string) {
+    super('###SceneHierarchyInner', new SceneData(scene, getOpenedSceneName), true);
     this._scene = scene;
   }
   get scene() {
@@ -102,6 +110,9 @@ export class SceneHierarchy extends TreeView<
   protected onNodeSelected(node: SceneNode) {
     this.dispatchEvent('node_selected', node);
   }
+  protected onSelectionChanged(selectedNodes: Set<SceneNode>, activeNode: Nullable<SceneNode>) {
+    this.dispatchEvent('selection_changed', [...selectedNodes], activeNode);
+  }
   protected onNodeDblClicked(node: SceneNode) {
     this.dispatchEvent('node_double_clicked', node);
   }
@@ -109,6 +120,10 @@ export class SceneHierarchy extends TreeView<
     return `context_${node.runtimeId}`;
   }
   protected onDrawContextMenu(node: SceneNode, _menuId: string) {
+    if (ImGui.MenuItem('Go to Assets')) {
+      this.dispatchEvent('request_go_to_assets', node);
+    }
+    ImGui.Separator();
     if (node !== this._scene.rootNode) {
       if (ImGui.MenuItem('Delete', 'Delete')) {
         this.dispatchEvent('node_request_delete', node);

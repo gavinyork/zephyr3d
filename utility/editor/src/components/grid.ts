@@ -260,17 +260,25 @@ export class PropertyEditor extends Observable<{
   request_edit_track: [track: PropertyTrack, target: object];
   end_edit_track: [track: PropertyTrack, target: object, edited: boolean];
   object_property_changed: [object: Nullable<object>, prop: PropertyAccessor];
+  object_property_edit_finished: [
+    object: Nullable<object>,
+    prop: PropertyAccessor,
+    oldValue: RequireOptionals<PropertyValue>,
+    newValue: RequireOptionals<PropertyValue>
+  ];
 }> {
   private _rootGroup: PropertyGroup;
   private readonly _labelPercent: number;
   private _dragging: boolean;
   private _dirty: boolean;
+  private _editSessions: Map<string, RequireOptionals<PropertyValue>>;
   constructor(labelPercent: number) {
     super();
     this._rootGroup = new PropertyGroup('Root', this);
     this._labelPercent = labelPercent;
     this._dragging = false;
     this._dirty = false;
+    this._editSessions = new Map();
   }
   get object(): any {
     return this._rootGroup.getObject();
@@ -767,6 +775,7 @@ export class PropertyEditor extends Observable<{
       }
     }
     if (value) {
+      const editSessionKey = this.getEditSessionKey(object, property.path);
       ImGui.TableNextColumn();
       ImGui.SetNextItemWidth(-1);
       const readonly = !value.set;
@@ -778,6 +787,7 @@ export class PropertyEditor extends Observable<{
         object: []
       };
       value.get.call(object, tmpProperty);
+      const oldValue = this.clonePropertyValue(tmpProperty);
       switch (value.type) {
         case 'bool': {
           const val = tmpProperty.bool as [boolean];
@@ -1055,8 +1065,49 @@ export class PropertyEditor extends Observable<{
         this.refresh();
         this.dispatchEvent('object_property_changed', object, value);
       }
+      if (value.set && ImGui.IsItemActivated() && !this._editSessions.has(editSessionKey)) {
+        this._editSessions.set(editSessionKey, oldValue);
+      }
+      if (value.set && ImGui.IsItemDeactivatedAfterEdit()) {
+        const oldSnapshot = this._editSessions.get(editSessionKey) ?? oldValue;
+        const newSnapshot = {
+          num: [0, 0, 0, 0],
+          str: [''],
+          bool: [false],
+          object: []
+        } as RequireOptionals<PropertyValue>;
+        value.get.call(object, newSnapshot);
+        this.dispatchEvent(
+          'object_property_edit_finished',
+          object,
+          value,
+          this.clonePropertyValue(oldSnapshot),
+          this.clonePropertyValue(newSnapshot)
+        );
+        this._editSessions.delete(editSessionKey);
+      }
     }
     ImGui.PopID();
+  }
+  private getEditSessionKey(object: any, propertyPath: string) {
+    const objectId =
+      object?.runtimeId !== undefined
+        ? `${object.runtimeId}`
+        : `${object?.constructor?.name ?? 'Object'}:${Object.prototype.toString.call(object)}`;
+    return `${objectId}::${propertyPath}`;
+  }
+  private clonePropertyValue(value: {
+    num: number[];
+    str: string[];
+    bool: boolean[];
+    object: object[];
+  }): RequireOptionals<PropertyValue> {
+    return {
+      num: [...(value.num ?? [])],
+      str: [...(value.str ?? [])],
+      bool: [...(value.bool ?? [])],
+      object: [...(value.object ?? [])]
+    };
   }
   private setDragDropProperty(obj: any, prop: PropertyAccessor, value: PropertyValue) {
     if (prop.set) {

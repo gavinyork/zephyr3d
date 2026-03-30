@@ -1,9 +1,9 @@
-import type { MeshMaterial, Scene, SceneNode } from '@zephyr3d/scene';
+import type { MeshMaterial, PropertyAccessor, PropertyValue, Scene, SceneNode } from '@zephyr3d/scene';
 import { getEngine } from '@zephyr3d/scene';
 import { ParticleSystem } from '@zephyr3d/scene';
 import { Mesh } from '@zephyr3d/scene';
 import { Command } from '../core/command';
-import type { Nullable } from '@zephyr3d/base';
+import type { Nullable, RequireOptionals } from '@zephyr3d/base';
 import { ASSERT, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 
@@ -352,5 +352,40 @@ export class NodeTransformCommand extends Command {
       node.rotation = this._oldTransform.rotation;
       node.scale = this._oldTransform.scale;
     }
+  }
+}
+
+function clonePropertyValue(value: RequireOptionals<PropertyValue>): RequireOptionals<PropertyValue> {
+  return {
+    num: [...(value.num ?? [])],
+    str: [...(value.str ?? [])],
+    bool: [...(value.bool ?? [])],
+    object: [...(value.object ?? [])]
+  };
+}
+
+export class PropertyEditCommand extends Command {
+  private readonly _target: object;
+  private readonly _property: PropertyAccessor;
+  private readonly _oldValue: RequireOptionals<PropertyValue>;
+  private readonly _newValue: RequireOptionals<PropertyValue>;
+  constructor(
+    target: object,
+    property: PropertyAccessor,
+    oldValue: RequireOptionals<PropertyValue>,
+    newValue: RequireOptionals<PropertyValue>,
+    desc?: string
+  ) {
+    super(desc ?? `Edit property ${property.name}`);
+    this._target = target;
+    this._property = property;
+    this._oldValue = clonePropertyValue(oldValue);
+    this._newValue = clonePropertyValue(newValue);
+  }
+  async execute() {
+    this._property.set?.call(this._target, clonePropertyValue(this._newValue));
+  }
+  async undo() {
+    this._property.set?.call(this._target, clonePropertyValue(this._oldValue));
   }
 }
