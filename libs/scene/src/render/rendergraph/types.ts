@@ -65,12 +65,12 @@ export class RGHandle {
 
 // ─── Internal Resource Tracking ─────────────────────────────────────────
 
-/** @internal */
+/** @public */
 export type RGResourceKind = 'transient' | 'imported';
 
 /**
  * Internal bookkeeping for a resource within the render graph.
- * @internal
+ * @public
  */
 export class RGResource {
   readonly id: number;
@@ -127,7 +127,7 @@ export type RGExecuteFn<T = void> = (ctx: RGExecuteContext, data: T) => void;
 
 /**
  * Internal bookkeeping for a pass within the render graph.
- * @internal
+ * @public
  */
 export class RGPass<T = unknown> {
   readonly index: number;
