@@ -458,6 +458,38 @@ export class Editor {
     );
     await zipDownloader.finish();
   }
+  async exportAssetsToOSS(selectedPaths: string[]) {
+    if (!this._currentProject) {
+      return;
+    }
+    const region = import.meta.env.VITE_OSS_REGION;
+    const bucket = import.meta.env.VITE_OSS_BUCKET;
+    const accessKeyId = import.meta.env.VITE_OSS_ACCESS_KEY_ID;
+    const accessKeySecret = import.meta.env.VITE_OSS_ACCESS_KEY_SECRET;
+    const prefix = import.meta.env.VITE_OSS_PREFIX || '';
+    if (!region || !bucket || !accessKeyId || !accessKeySecret) {
+      await Dialog.messageBox('Export to OSS', 'OSS not configured. Please set VITE_OSS_* variables in .env file.');
+      return;
+    }
+    const OSS = (await import('ali-oss')).default;
+    const client = new OSS({ region, accessKeyId, accessKeySecret, bucket });
+    const total = selectedPaths.length;
+    if (total === 0) {
+      await Dialog.messageBox('Export to OSS', 'No files to upload.');
+      return;
+    }
+    let uploaded = 0;
+    const prefixStr = prefix ? prefix.replace(/\/+$/, '') + '/' : '';
+    for (const filePath of selectedPaths) {
+      const content = (await ProjectService.VFS.readFile(filePath, { encoding: 'binary' })) as ArrayBuffer;
+      const relativePath = ProjectService.VFS.relative(filePath, '/');
+      const objectKey = `${prefixStr}${relativePath}`;
+      await client.put(objectKey, new Blob([content]));
+      uploaded++;
+      console.log(`[OSS] uploaded ${uploaded}/${total}: ${objectKey}`);
+    }
+    await Dialog.messageBox('Export to OSS', `Upload complete: ${uploaded} files uploaded.`);
+  }
   async importProject() {
     const files = await FilePicker.chooseDirectory();
     if (files?.length > 0) {

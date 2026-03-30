@@ -88,6 +88,7 @@
     "typescript": "^5.7.3",
     "monaco-editor": "^0.52.0",
     "@monaco-editor/loader": "^1.5.0",
-    "rollup-plugin-import-css": "~3.5.8"
+    "rollup-plugin-import-css": "~3.5.8",
+    "ali-oss": "^6.21.0"
   }
 }
