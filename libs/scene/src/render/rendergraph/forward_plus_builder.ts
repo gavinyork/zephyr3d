@@ -178,12 +178,10 @@ export function buildForwardPlusGraph(
   }
 
   // ── 4. Shadow Maps ────────────────────────────────────────────────
-  let shadowMapsHandle: RGHandle | undefined;
+  // Shadow maps are managed internally by lights, mark as side effect
   if (renderQueue.shadowedLights.length > 0) {
-    // Shadow maps are managed internally by lights, just declare dependency
-    shadowMapsHandle = graph.importTexture('shadowMaps');
     graph.addPass('ShadowMaps', (builder) => {
-      builder.write(shadowMapsHandle!);
+      builder.sideEffect();
       builder.setExecute(() => {
         renderShadowMaps(ctx, renderQueue.shadowedLights);
       });
@@ -191,22 +189,34 @@ export function buildForwardPlusGraph(
   }
 
   // ── 5. Depth Prepass ──────────────────────────────────────────────
-  // Depth and motion vector textures are managed by renderSceneDepth
-  const depthHandle = graph.importTexture('linearDepth');
-  let motionVectorHandle: RGHandle | undefined;
-  if (options.motionVectors) {
-    motionVectorHandle = graph.importTexture('motionVector');
-  }
+  // Declare transient depth and motion vector textures
+  const depthPassResult = graph.addPass('DepthPrepass', (builder) => {
+    const format: TextureFormat =
+      ctx.device.type === 'webgl'
+        ? ctx.SSRCalcThickness
+          ? 'rgba16f'
+          : 'rgba8unorm'
+        : ctx.SSRCalcThickness
+          ? 'rg32f'
+          : 'r32f';
+    const mvFormat: TextureFormat = 'rgba16f';
 
-  graph.addPass('DepthPrepass', (builder) => {
-    builder.write(depthHandle);
-    if (motionVectorHandle) {
-      builder.write(motionVectorHandle);
-    }
-    builder.setExecute(() => {
-      frame.depthFramebuffer = renderSceneDepth(frame, null);
+    const depthHandle = builder.createTexture({ format, label: 'linearDepth' });
+    const motionVectorHandle = options.motionVectors
+      ? builder.createTexture({ format: mvFormat, label: 'motionVector' })
+      : undefined;
+
+    builder.setExecute((rgCtx) => {
+      const depthTex = rgCtx.getTexture<Texture2D>(depthHandle);
+      const mvTex = motionVectorHandle ? rgCtx.getTexture<Texture2D>(motionVectorHandle) : null;
+      frame.depthFramebuffer = renderSceneDepth(frame, null, depthTex, mvTex);
     });
+
+    return { depthHandle, motionVectorHandle };
   });
+
+  const depthHandle = depthPassResult.depthHandle;
+  const motionVectorHandle = depthPassResult.motionVectorHandle;
 
   // ── 6. Hi-Z (optional) ───────────────────────────────────────────
   let hiZHandle: RGHandle | undefined;
@@ -216,7 +226,8 @@ export function buildForwardPlusGraph(
       hiZHandle = builder.createTexture({ format: 'r32f', label: 'hiZ', mipLevels: 10 });
       builder.setExecute((rgCtx) => {
         const ctx = frame.ctx;
-        const depthTex = ctx.depthTexture;
+        // Use the depth texture from the framebuffer (which contains the RenderGraph texture)
+        const depthTex = frame.depthFramebuffer?.getDepthAttachment() as Texture2D;
         if (depthTex) {
           // Get the HiZ texture allocated by the executor
           const hiZTex = rgCtx.getTexture<Texture2D>(hiZHandle!);
@@ -232,21 +243,39 @@ export function buildForwardPlusGraph(
   }
 
   // ── 7. Main Light Pass ────────────────────────────────────────────
-  // Scene color is managed by renderMainLightPass
-  const sceneColorHandle = graph.importTexture('sceneColor');
-  graph.addPass('LightPass', (builder) => {
+  const lightPassResult = graph.addPass('LightPass', (builder) => {
     builder.read(depthHandle);
-    if (shadowMapsHandle) {
-      builder.read(shadowMapsHandle);
-    }
     if (hiZHandle) {
       builder.read(hiZHandle);
     }
-    builder.write(sceneColorHandle);
-    builder.setExecute(() => {
-      renderMainLightPass(frame);
+
+    // Create scene color texture (intermediate render target)
+    const sceneColorHandle = builder.createTexture({
+      format: ctx.colorFormat!,
+      label: 'sceneColor'
     });
+
+    // Create optional sceneColorCopy for transmission/refraction materials
+    let sceneColorCopyHandle: RGHandle | undefined;
+    if (options.needSceneColor) {
+      sceneColorCopyHandle = builder.createTexture({
+        format: ctx.colorFormat!,
+        label: 'sceneColorCopy'
+      });
+    }
+
+    builder.setExecute((rgCtx) => {
+      const sceneColorTex = rgCtx.getTexture<Texture2D>(sceneColorHandle);
+      const sceneColorCopyTex = sceneColorCopyHandle
+        ? rgCtx.getTexture<Texture2D>(sceneColorCopyHandle)
+        : null;
+      renderMainLightPass(frame, sceneColorTex, sceneColorCopyTex);
+    });
+
+    return { sceneColorHandle, sceneColorCopyHandle };
   });
+
+  const sceneColorHandle = lightPassResult.sceneColorHandle;
 
   // ── 8. Post Effects + Final Composite ─────────────────────────────
   graph.addPass('Composite', (builder) => {
@@ -279,50 +308,72 @@ function renderShadowMaps(ctx: DrawContext, lights: PunctualLight[]): void {
 }
 
 /** @internal */
-function renderSceneDepth(frame: FrameState, existingDepthFb: Nullable<FrameBuffer>): FrameBuffer {
+function renderSceneDepth(
+  frame: FrameState,
+  existingDepthFb: Nullable<FrameBuffer>,
+  depthTex?: Texture2D,
+  motionVectorTex?: Nullable<Texture2D>
+): FrameBuffer {
   const ctx = frame.ctx;
   const renderQueue = frame.renderQueue;
   const transmission = !!existingDepthFb;
   let depthFramebuffer = existingDepthFb;
 
   if (!depthFramebuffer) {
-    const format: TextureFormat =
-      ctx.device.type === 'webgl'
-        ? ctx.SSRCalcThickness
-          ? 'rgba16f'
-          : 'rgba8unorm'
-        : ctx.SSRCalcThickness
-          ? 'rg32f'
-          : 'r32f';
-    const mvFormat: TextureFormat = 'rgba16f';
-    if (!ctx.finalFramebuffer) {
+    // Use RenderGraph-allocated textures if provided
+    if (depthTex) {
+      const colorAttachments = motionVectorTex ? [depthTex, motionVectorTex] : depthTex;
+      const depthAttachment = ctx.finalFramebuffer?.getDepthAttachment();
+      const depthTexOrFormat = depthAttachment?.isTexture2D() ? depthAttachment : ctx.depthFormat;
+
       depthFramebuffer = ctx.device.pool.fetchTemporalFramebuffer(
         true,
-        ctx.renderWidth,
-        ctx.renderHeight,
-        ctx.motionVectors ? [format, mvFormat] : format,
-        ctx.depthFormat,
+        depthTex.width,
+        depthTex.height,
+        colorAttachments,
+        depthTexOrFormat,
         false
       );
     } else {
-      const originDepth = ctx.finalFramebuffer?.getDepthAttachment();
-      depthFramebuffer = originDepth?.isTexture2D()
-        ? ctx.device.pool.fetchTemporalFramebuffer(
-            true,
-            originDepth.width,
-            originDepth.height,
-            ctx.motionVectors ? [format, mvFormat] : format,
-            originDepth,
-            false
-          )
-        : ctx.device.pool.fetchTemporalFramebuffer(
-            true,
-            ctx.renderWidth,
-            ctx.renderHeight,
-            ctx.motionVectors ? [format, mvFormat] : format,
-            ctx.depthFormat,
-            false
-          );
+      // Fallback: allocate from pool (legacy path)
+      const format: TextureFormat =
+        ctx.device.type === 'webgl'
+          ? ctx.SSRCalcThickness
+            ? 'rgba16f'
+            : 'rgba8unorm'
+          : ctx.SSRCalcThickness
+            ? 'rg32f'
+            : 'r32f';
+      const mvFormat: TextureFormat = 'rgba16f';
+      if (!ctx.finalFramebuffer) {
+        depthFramebuffer = ctx.device.pool.fetchTemporalFramebuffer(
+          true,
+          ctx.renderWidth,
+          ctx.renderHeight,
+          ctx.motionVectors ? [format, mvFormat] : format,
+          ctx.depthFormat,
+          false
+        );
+      } else {
+        const originDepth = ctx.finalFramebuffer?.getDepthAttachment();
+        depthFramebuffer = originDepth?.isTexture2D()
+          ? ctx.device.pool.fetchTemporalFramebuffer(
+              true,
+              originDepth.width,
+              originDepth.height,
+              ctx.motionVectors ? [format, mvFormat] : format,
+              originDepth,
+              false
+            )
+          : ctx.device.pool.fetchTemporalFramebuffer(
+              true,
+              ctx.renderWidth,
+              ctx.renderHeight,
+              ctx.motionVectors ? [format, mvFormat] : format,
+              ctx.depthFormat,
+              false
+            );
+      }
     }
   }
 
@@ -449,21 +500,29 @@ function renderSkyMotionVectors(ctx: DrawContext): void {
 }
 
 /** @internal */
-function renderMainLightPass(frame: FrameState): void {
+function renderMainLightPass(
+  frame: FrameState,
+  sceneColorTex: Texture2D,
+  sceneColorCopyTex: Nullable<Texture2D>
+): void {
   const { ctx, renderQueue } = frame;
   const device = ctx.device;
 
-  if (ctx.depthTexture === ctx.finalFramebuffer?.getDepthAttachment()) {
+  // Use RenderGraph-allocated scene color texture
+  const depthTex = frame.depthFramebuffer?.getDepthAttachment() as Texture2D;
+
+  if (depthTex === ctx.finalFramebuffer?.getDepthAttachment()) {
     ctx.intermediateFramebuffer = ctx.finalFramebuffer;
   } else {
     ctx.intermediateFramebuffer = device.pool.fetchTemporalFramebuffer(
       false,
-      ctx.depthTexture!.width,
-      ctx.depthTexture!.height,
-      ctx.colorFormat!,
-      ctx.depthTexture
+      sceneColorTex.width,
+      sceneColorTex.height,
+      sceneColorTex,
+      depthTex
     );
   }
+
   if (ctx.intermediateFramebuffer && ctx.intermediateFramebuffer !== ctx.finalFramebuffer) {
     device.pushDeviceStates();
     device.setFramebuffer(ctx.intermediateFramebuffer);
@@ -473,8 +532,8 @@ function renderMainLightPass(frame: FrameState): void {
   }
 
   _scenePass.transmission = false;
-  _scenePass.clearDepth = ctx.depthTexture ? null : 1;
-  _scenePass.clearStencil = ctx.depthTexture ? null : 0;
+  _scenePass.clearDepth = depthTex ? null : 1;
+  _scenePass.clearStencil = depthTex ? null : 0;
 
   if (ctx.SSR && !renderQueue.needSceneColor()) {
     ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
@@ -482,21 +541,23 @@ function renderMainLightPass(frame: FrameState): void {
 
   ctx.compositor?.begin(ctx);
 
-  if (renderQueue.needSceneColor()) {
+  if (renderQueue.needSceneColor() && sceneColorCopyTex) {
     const compositor = ctx.compositor;
     ctx.compositor = null;
+
+    // Use RenderGraph-allocated sceneColorCopy texture
     const sceneColorFramebuffer = device.pool.fetchTemporalFramebuffer(
       true,
-      ctx.depthTexture!.width,
-      ctx.depthTexture!.height,
+      sceneColorCopyTex.width,
+      sceneColorCopyTex.height,
       ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS
         ? [
-            ctx.colorFormat!,
+            sceneColorCopyTex,
             device.getFramebuffer()!.getColorAttachments()[1]!,
             device.getFramebuffer()!.getColorAttachments()[2]!
           ]
-        : ctx.colorFormat!,
-      ctx.depthTexture,
+        : sceneColorCopyTex,
+      depthTex,
       false
     );
     device.pushDeviceStates();
@@ -504,7 +565,7 @@ function renderMainLightPass(frame: FrameState): void {
     _scenePass.transmission = false;
     _scenePass.render(ctx, null, null, renderQueue);
     device.popDeviceStates();
-    ctx.sceneColorTexture = sceneColorFramebuffer.getColorAttachments()[0] as Texture2D;
+    ctx.sceneColorTexture = sceneColorCopyTex;
     new CopyBlitter().blit(
       ctx.sceneColorTexture,
       device.getFramebuffer() ?? null,
