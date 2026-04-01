@@ -1,6 +1,7 @@
 import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render/drawable';
 import {
+  RENDER_PASS_TYPE_DEFERRED_LIGHT,
   MaterialVaryingFlags,
   MAX_CLUSTERED_LIGHTS,
   MORPH_ATTRIBUTE_VECTOR_COUNT,
@@ -9,6 +10,7 @@ import {
   MORPH_TARGET_TANGENT,
   MORPH_WEIGHTS_VECTOR_COUNT,
   RENDER_PASS_TYPE_DEPTH,
+  RENDER_PASS_TYPE_GBUFFER,
   RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_OBJECT_COLOR,
   RENDER_PASS_TYPE_SHADOWMAP
@@ -216,10 +218,14 @@ export class ShaderHelper {
       scope.light = lightStruct().uniform(0);
     } else if (
       ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH ||
-      ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR
+      ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR ||
+      ctx.renderPass!.type === RENDER_PASS_TYPE_GBUFFER
     ) {
       scope.camera = cameraStruct().uniform(0);
-    } else if (ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
+    } else if (
+      ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT ||
+      ctx.renderPass!.type === RENDER_PASS_TYPE_DEFERRED_LIGHT
+    ) {
       const useClusteredLighting = !ctx.currentShadowLight;
       if (ctx.materialFlags & MaterialVaryingFlags.APPLY_FOG) {
         const fogStructMembers: PBShaderExp[] = [
@@ -806,7 +812,10 @@ export class ShaderHelper {
     if (ctx.motionVectors && ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH) {
       cameraStruct.prevUnjitteredVPMatrix = camera.prevVPMatrix;
     }
-    if (ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
+    if (
+      ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT ||
+      ctx.renderPass!.type === RENDER_PASS_TYPE_DEFERRED_LIGHT
+    ) {
       if (ctx.linearDepthTexture) {
         bindGroup.setTexture(UNIFORM_NAME_LINEAR_DEPTH_MAP, ctx.linearDepthTexture);
         bindGroup.setValue(

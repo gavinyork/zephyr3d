@@ -60,6 +60,12 @@ export type CameraHistoryData = {
 };
 
 /**
+ * Rendering pipeline path for a camera.
+ * @public
+ */
+export type RenderPath = 'forward' | 'deferred' | 'hybrid';
+
+/**
  * A renderable camera node that manages view/projection math, frusta,
  * input control, picking, and a post-processing chain via a compositor.
  *
@@ -129,6 +135,8 @@ export class Camera extends SceneNode {
   protected _oit: DRef<OIT>;
   /** @internal Whether to perform a depth pre-pass. */
   protected _depthPrePass: boolean;
+  /** @internal Render path selector for pipeline dispatch. */
+  protected _renderPath: RenderPath;
   /** @internal Whether command buffers may be reused for optimization. */
   protected _commandBufferReuse: boolean;
   /** @internal Hi-Z acceleration enable (primarily for SSR). */
@@ -287,6 +295,7 @@ export class Camera extends SceneNode {
     this._frustumV = null;
     this._oit = new DRef(new ABufferOIT(20));  //修改摄像机属性
     this._depthPrePass = false;
+    this._renderPath = 'forward';
     this._screenAdapter = new ScreenAdapter();
     this._adapted = false;
     this._HiZ = false;
@@ -406,6 +415,20 @@ export class Camera extends SceneNode {
   }
   set HiZ(val) {
     this._HiZ = !!val;
+  }
+  /**
+   * Selects which render pipeline path this camera uses.
+   *
+   * Supported values:
+   * - `forward`: current forward path
+   * - `deferred`: deferred path (phase 1 routes to forward implementation)
+   * - `hybrid`: hybrid path (phase 1 routes to forward implementation)
+   */
+  get renderPath(): RenderPath {
+    return this._renderPath;
+  }
+  set renderPath(path: RenderPath) {
+    this._renderPath = path ?? 'forward';
   }
   /**
    * Whether HDR backbuffer is enabled.

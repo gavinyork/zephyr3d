@@ -3,7 +3,7 @@ import { mixinVertexColor } from './mixins/vertexcolor';
 import type { PBFunctionScope } from '@zephyr3d/device';
 import { mixinPBRSpecularGlossness } from './mixins/lightmodel/pbrspecularglossness';
 import { ShaderHelper } from './shader/helper';
-import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import { MaterialVaryingFlags, RENDER_PASS_TYPE_GBUFFER, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Clonable } from '@zephyr3d/base';
 
 /**
@@ -133,6 +133,29 @@ export class PBRSpecularGlossinessMaterial
           );
           this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
         }
+      } else if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_GBUFFER) {
+        scope.$l.normalInfo = this.calculateNormalAndTBN(
+          scope,
+          scope.$inputs.worldPos,
+          scope.$inputs.wNorm,
+          scope.$inputs.wTangent,
+          scope.$inputs.wBinormal
+        );
+        scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
+        scope.$l.pbrData = this.getCommonData(
+          scope,
+          scope.albedo,
+          scope.normalInfo.normal,
+          scope.viewVec,
+          scope.normalInfo.TBN
+        );
+        this.outputFragmentColor(
+          scope,
+          scope.$inputs.worldPos,
+          scope.albedo,
+          pb.vec4(scope.pbrData.f0.rgb, scope.pbrData.roughness),
+          pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1)
+        );
       } else {
         this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.albedo);
       }

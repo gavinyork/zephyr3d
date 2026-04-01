@@ -11,7 +11,9 @@ import {
   MaterialVaryingFlags,
   QUEUE_OPAQUE,
   QUEUE_TRANSPARENT,
+  RENDER_PASS_TYPE_DEFERRED_LIGHT,
   RENDER_PASS_TYPE_DEPTH,
+  RENDER_PASS_TYPE_GBUFFER,
   RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_OBJECT_COLOR,
   RENDER_PASS_TYPE_SHADOWMAP
@@ -784,8 +786,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @returns True if fragment color computation is needed; otherwise false.
    */
   needFragmentColor(ctx?: DrawContext) {
+    const passType = (ctx ?? this.drawContext).renderPass!.type;
     return (
-      (ctx ?? this.drawContext).renderPass!.type === RENDER_PASS_TYPE_LIGHT ||
+      passType === RENDER_PASS_TYPE_LIGHT ||
+      passType === RENDER_PASS_TYPE_GBUFFER ||
+      passType === RENDER_PASS_TYPE_DEFERRED_LIGHT ||
       this._alphaCutoff > 0 ||
       this.alphaToCoverage
     );
@@ -1012,7 +1017,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             pb.distance(ShaderHelper.getCameraPosition(this), this.worldPos)
           );
         }
-      } /*if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ else {
+      } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP) {
         if (color) {
           this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
             pb.discard();
@@ -1026,6 +1031,21 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           this,
           this.worldPos
         );
+      } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_GBUFFER) {
+        if (color) {
+          if (this.zAlphaCutoff) {
+            this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
+              pb.discard();
+            });
+          }
+          this.$outputs.zFragmentOutput = ShaderHelper.encodeColorOutput(this, this.outColor);
+        } else {
+          this.$outputs.zFragmentOutput = pb.vec4(0);
+        }
+      } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_DEFERRED_LIGHT) {
+        this.$outputs.zFragmentOutput = ShaderHelper.encodeColorOutput(this, this.outColor);
+      } else {
+        this.$outputs.zFragmentOutput = ShaderHelper.encodeColorOutput(this, this.outColor);
       }
     });
     if (color) {
@@ -1045,8 +1065,13 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         scope.$outputs.zSSRRoughness = pb.vec4(0, 0, 0, 1);
         scope.$outputs.zSSRNormal = pb.vec4(0);
       } else {
-        scope.$outputs.zSSRRoughness = ssrRoughness ?? pb.vec4(1, 0, 0, 1);
-        scope.$outputs.zSSRNormal = ssrNormal ?? pb.vec4(0);
+        const isGBufferPass = that.drawContext.renderPass!.type === RENDER_PASS_TYPE_GBUFFER;
+        const gbufferDefaultNormal = pb.vec4(
+          pb.add(pb.mul(pb.normalize(pb.cross(pb.dpdx(worldPos), pb.dpdy(worldPos))), 0.5), pb.vec3(0.5)),
+          1
+        );
+        scope.$outputs.zSSRRoughness = ssrRoughness ?? pb.vec4(0.04, 0.04, 0.04, 1);
+        scope.$outputs.zSSRNormal = ssrNormal ?? (isGBufferPass ? gbufferDefaultNormal : pb.vec4(0));
       }
     }
   }

@@ -109,6 +109,23 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'RenderPath',
+          type: 'string',
+          default: 'forward',
+          options: {
+            enum: {
+              labels: ['Forward', 'Deferred', 'Hybrid'],
+              values: ['forward', 'deferred', 'hybrid']
+            }
+          },
+          get(this: Camera, value) {
+            value.str[0] = this.renderPath;
+          },
+          set(this: Camera, value) {
+            this.renderPath = value.str[0] as any;
+          }
+        },
+        {
           name: 'ToneMapEnabled',
           type: 'bool',
           phase: 0,

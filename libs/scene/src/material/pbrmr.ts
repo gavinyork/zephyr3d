@@ -4,7 +4,7 @@ import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } f
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import { mixinTextureProps } from './mixins/texture';
 import { ShaderHelper } from './shader/helper';
-import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import { MaterialVaryingFlags, RENDER_PASS_TYPE_GBUFFER, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Clonable, Immutable } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { DrawContext } from '../render';
@@ -320,6 +320,29 @@ export class PBRMetallicRoughnessMaterial
           }
           this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
         }
+      } else if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_GBUFFER) {
+        scope.$l.normalInfo = this.calculateNormalAndTBN(
+          scope,
+          scope.$inputs.worldPos,
+          scope.$inputs.wNorm,
+          scope.$inputs.wTangent,
+          scope.$inputs.wBinormal
+        );
+        scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
+        scope.$l.pbrData = this.getCommonData(
+          scope,
+          scope.albedo,
+          scope.normalInfo.normal,
+          scope.viewVec,
+          scope.normalInfo.TBN
+        );
+        this.outputFragmentColor(
+          scope,
+          scope.$inputs.worldPos,
+          scope.albedo,
+          pb.vec4(scope.pbrData.f0.rgb, scope.pbrData.roughness),
+          pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1)
+        );
       } else {
         this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.albedo);
       }

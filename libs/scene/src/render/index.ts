@@ -4,6 +4,8 @@ export * from './renderer';
 export * from './lightpass';
 export * from './shadowmap_pass';
 export * from './depthpass';
+export * from './gbufferpass';
+export * from './deferred_lightpass';
 export * from './render_queue';
 export * from './sky';
 export * from './clipmap';

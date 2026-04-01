@@ -18,6 +18,10 @@ export class LightPass extends RenderPass {
   protected _shadowMapHash: Nullable<string>;
   /** @internal */
   protected _transmission: boolean;
+  /** @internal */
+  protected _renderOpaque: boolean;
+  /** @internal */
+  protected _renderTransparent: boolean;
   /**
    * Creates an instance of ForwardRenderPass
    */
@@ -25,6 +29,8 @@ export class LightPass extends RenderPass {
     super(RENDER_PASS_TYPE_LIGHT);
     this._shadowMapHash = null;
     this._transmission = false;
+    this._renderOpaque = true;
+    this._renderTransparent = true;
     this._clearColor = Vector4.zero();
   }
   /** @internal */
@@ -33,6 +39,20 @@ export class LightPass extends RenderPass {
   }
   set transmission(val) {
     this._transmission = val;
+  }
+  /** @internal */
+  get renderOpaque() {
+    return this._renderOpaque;
+  }
+  set renderOpaque(val: boolean) {
+    this._renderOpaque = !!val;
+  }
+  /** @internal */
+  get renderTransparent() {
+    return this._renderTransparent;
+  }
+  set renderTransparent(val: boolean) {
+    this._renderTransparent = !!val;
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext, camera: Camera) {
@@ -134,6 +154,10 @@ export class LightPass extends RenderPass {
       : [items?.opaque, items?.transparent];
     const transparentPass = lists.length - 1;
     for (let i = 0; i < lists.length; i++) {
+      const isOpaquePass = i === 0;
+      if ((isOpaquePass && !this._renderOpaque) || (!isOpaquePass && !this._renderTransparent)) {
+        continue;
+      }
       if (lists[i]) {
         ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
         ctx.oit = i === 0 || !items ? null : oit;

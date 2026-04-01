@@ -1,6 +1,8 @@
 import { LightPass } from './lightpass';
 import { ShadowMapPass } from './shadowmap_pass';
 import { DepthPass } from './depthpass';
+import { GBufferPass } from './gbufferpass';
+import { DeferredLightPass } from './deferred_lightpass';
 import type { Nullable } from '@zephyr3d/base';
 import { Quaternion, degree2radian, isPowerOf2, Matrix4x4, nextPowerOf2, Vector3, Vector4 } from '@zephyr3d/base';
 import type {
@@ -183,7 +185,7 @@ export class SceneRenderer {
     }
     GlobalBindGroupAllocator.release(globalBindGroupAllocator);
   }
-  private static renderSceneDepth(
+  protected static renderSceneDepth(
     ctx: DrawContext,
     renderQueue: RenderQueue,
     depthFramebuffer: Nullable<FrameBuffer>
@@ -497,7 +499,7 @@ export class SceneRenderer {
     return this._box;
   }
   /** @internal */
-  private static renderSkyMotionVectors(ctx: DrawContext) {
+  protected static renderSkyMotionVectors(ctx: DrawContext) {
     if (!ctx.motionVectorTexture) {
       return;
     }
@@ -527,7 +529,7 @@ export class SceneRenderer {
     ctx.device.pool.releaseFrameBuffer(fb);
   }
   /** @internal */
-  private static renderShadowMaps(ctx: DrawContext, lights: PunctualLight[]) {
+  protected static renderShadowMaps(ctx: DrawContext, lights: PunctualLight[]) {
     ctx.renderPass = this._shadowMapPass;
     ctx.device.pushDeviceStates();
     for (const light of lights) {
@@ -544,7 +546,7 @@ export class SceneRenderer {
     return a / (256 * 256 * 256) + b / (256 * 256) + c / 256 + d;
   }
   /** @internal */
-  private static renderObjectColors(
+  protected static renderObjectColors(
     ctx: DrawContext,
     pickResolveFunc: (result: Nullable<PickResult>) => void,
     renderQueue: RenderQueue
@@ -641,5 +643,334 @@ export class SceneRenderer {
         camera.getPickResultResolveFunc()?.(null);
         device.pool.releaseFrameBuffer(fb);
       });
+  }
+}
+
+/**
+ * Deferred renderer entry (phase 1 placeholder).
+ *
+ * The real deferred pipeline will be introduced incrementally in later stages.
+ * For now it intentionally reuses the current forward implementation to keep behavior stable.
+ *
+ * @internal
+ */
+export class DeferredSceneRenderer extends SceneRenderer {
+  /** Deferred geometry pass (GBuffer). */
+  private static readonly _gbufferPass = new GBufferPass();
+  /** Deferred light accumulation pass. */
+  private static readonly _deferredLightPass = new DeferredLightPass();
+  /** Forward pass used for transmission/transparent composition. */
+  private static readonly _forwardTransparentPass = new LightPass();
+  static get gbufferRenderPass() {
+    return this._gbufferPass;
+  }
+  static get deferredLightRenderPass() {
+    return this._deferredLightPass;
+  }
+  /**
+   * Executes a phase-2 deferred geometry prepass using current draw context.
+   *
+   * This writes a provisional GBuffer (MRT). Final shading remains the existing
+   * forward path until deferred full-screen lighting is integrated.
+   */
+  private static renderGBufferPrepass(ctx: DrawContext, renderQueue: RenderQueue): void {
+    const device = ctx.device;
+    if (device.getDeviceCaps().framebufferCaps.maxDrawBuffers < 3) {
+      delete ctx.gbufferFramebuffer;
+      delete ctx.gbufferAlbedoTexture;
+      delete ctx.gbufferNormalTexture;
+      delete ctx.gbufferMaterialTexture;
+      delete ctx.gbufferEmissiveTexture;
+      return;
+    }
+    if (ctx.gbufferFramebuffer) {
+      device.pool.releaseFrameBuffer(ctx.gbufferFramebuffer);
+      delete ctx.gbufferFramebuffer;
+      delete ctx.gbufferAlbedoTexture;
+      delete ctx.gbufferNormalTexture;
+      delete ctx.gbufferMaterialTexture;
+      delete ctx.gbufferEmissiveTexture;
+    }
+    const gbufferFramebuffer = device.pool.fetchTemporalFramebuffer(
+      true,
+      ctx.renderWidth,
+      ctx.renderHeight,
+      ['rgba8unorm', 'rgba8unorm', 'rgba8unorm'],
+      ctx.depthTexture ?? ctx.depthFormat,
+      false
+    );
+    device.pushDeviceStates();
+    device.setFramebuffer(gbufferFramebuffer);
+    const restoreFlags = ctx.materialFlags;
+    ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+    this._gbufferPass.clearColor = Vector4.zero();
+    this._gbufferPass.clearDepth = null;
+    this._gbufferPass.clearStencil = null;
+    this._gbufferPass.render(ctx, null, null, renderQueue);
+    ctx.materialFlags = restoreFlags;
+    device.popDeviceStates();
+    ctx.gbufferFramebuffer = gbufferFramebuffer;
+    ctx.gbufferAlbedoTexture = gbufferFramebuffer.getColorAttachments()[0] as Texture2D;
+    ctx.gbufferNormalTexture = gbufferFramebuffer.getColorAttachments()[1] as Texture2D;
+    ctx.gbufferMaterialTexture = gbufferFramebuffer.getColorAttachments()[2] as Texture2D;
+    // Compatibility alias for existing in-flight phase code.
+    ctx.gbufferEmissiveTexture = ctx.gbufferMaterialTexture;
+  }
+  /** @internal */
+  protected static _renderScene(ctx: DrawContext) {
+    const device = ctx.device;
+    const renderQueue = this.sceneRenderPass.cullScene(ctx, ctx.camera);
+
+    if (ctx.scene.env.sky.skyType === 'skybox') {
+      const skyboxRotation = ctx.scene.env.sky.skyboxRotation;
+      ctx.scene.rootNode.worldMatrix.decompose(tmpSkyScale, tmpSkyRootRotation, tmpSkyPosition);
+      tmpSkyExtraRotation.fromEulerAngle(
+        degree2radian(skyboxRotation.x),
+        degree2radian(skyboxRotation.y),
+        degree2radian(skyboxRotation.z)
+      );
+      Quaternion.multiply(tmpSkyRootRotation, tmpSkyExtraRotation, tmpSkyFinalRotation);
+      tmpSkyWorldMatrix.compose(tmpSkyScale, tmpSkyFinalRotation, tmpSkyPosition);
+      ctx.scene.env.sky.skyWorldMatrix = tmpSkyWorldMatrix;
+    } else {
+      ctx.scene.env.sky.skyWorldMatrix = ctx.scene.rootNode.worldMatrix;
+    }
+
+    const sunLightColor = ctx.scene.env.sky.update(ctx);
+    ctx.clusteredLight = this.getClusteredLight();
+    ctx.clusteredLight.calculateLightIndex(ctx.camera, renderQueue);
+
+    const pickResolveFunc = ctx.camera.getPickResultResolveFunc();
+    if (pickResolveFunc) {
+      this.renderObjectColors(ctx, pickResolveFunc, renderQueue);
+    }
+
+    this.renderShadowMaps(ctx, renderQueue.shadowedLights);
+    const depthFramebuffer = this.renderSceneDepth(ctx, renderQueue, null);
+    const needsTransmissionDepthForSSR =
+      !!ctx.SSR && renderQueue.needSceneColor() && !renderQueue.needSceneColorWithDepth();
+    if (needsTransmissionDepthForSSR) {
+      this.renderSceneDepth(ctx, renderQueue, depthFramebuffer);
+    }
+
+    if (ctx.depthTexture === ctx.finalFramebuffer?.getDepthAttachment()) {
+      ctx.intermediateFramebuffer = ctx.finalFramebuffer;
+    } else {
+      ctx.intermediateFramebuffer = device.pool.fetchTemporalFramebuffer(
+        false,
+        ctx.depthTexture!.width,
+        ctx.depthTexture!.height,
+        ctx.colorFormat!,
+        ctx.depthTexture
+      );
+    }
+    if (ctx.intermediateFramebuffer && ctx.intermediateFramebuffer !== ctx.finalFramebuffer) {
+      device.pushDeviceStates();
+      device.setFramebuffer(ctx.intermediateFramebuffer);
+    } else {
+      device.setViewport(null);
+      device.setScissor(null);
+    }
+
+    if (ctx.SSR) {
+      ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+    }
+    ctx.compositor?.begin(ctx);
+
+    this.renderGBufferPrepass(ctx, renderQueue);
+
+    this._deferredLightPass.clearColor = Vector4.zero();
+    this._deferredLightPass.clearDepth = ctx.depthTexture ? null : 1;
+    this._deferredLightPass.clearStencil = ctx.depthTexture ? null : 0;
+    this._deferredLightPass.render(ctx, null, null, renderQueue);
+
+    let sceneColorFramebuffer: Nullable<FrameBuffer> = null;
+    this._forwardTransparentPass.renderTransparent = true;
+    this._forwardTransparentPass.clearColor = null;
+    this._forwardTransparentPass.clearDepth = null;
+    this._forwardTransparentPass.clearStencil = null;
+    if (renderQueue.needSceneColor()) {
+      sceneColorFramebuffer = device.pool.fetchTemporalFramebuffer(
+        true,
+        ctx.depthTexture!.width,
+        ctx.depthTexture!.height,
+        ctx.colorFormat!,
+        ctx.depthTexture,
+        false
+      );
+      ctx.sceneColorTexture = sceneColorFramebuffer.getColorAttachments()[0] as Texture2D;
+      new CopyBlitter().blit(
+        (device.getFramebuffer()!.getColorAttachments()[0] as Texture2D),
+        sceneColorFramebuffer,
+        fetchSampler('clamp_nearest_nomip')
+      );
+      this._forwardTransparentPass.transmission = true;
+      this._forwardTransparentPass.renderOpaque = true;
+    } else {
+      this._forwardTransparentPass.transmission = false;
+      this._forwardTransparentPass.renderOpaque = false;
+    }
+    this._forwardTransparentPass.render(ctx, null, null, renderQueue);
+    this._forwardTransparentPass.transmission = false;
+    this._forwardTransparentPass.renderOpaque = false;
+
+    if (renderQueue.needSceneColor() && !needsTransmissionDepthForSSR) {
+      this.renderSceneDepth(ctx, renderQueue, depthFramebuffer);
+    }
+    ctx.compositor?.drawPostEffects(ctx, PostEffectLayer.end, ctx.linearDepthTexture!);
+    ctx.compositor?.end(ctx);
+    renderQueue.dispose();
+    ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+
+    if (sceneColorFramebuffer) {
+      device.pool.releaseFrameBuffer(sceneColorFramebuffer);
+      delete ctx.sceneColorTexture;
+    }
+    if (ctx.gbufferFramebuffer) {
+      device.pool.releaseFrameBuffer(ctx.gbufferFramebuffer);
+      delete ctx.gbufferFramebuffer;
+      delete ctx.gbufferAlbedoTexture;
+      delete ctx.gbufferNormalTexture;
+      delete ctx.gbufferMaterialTexture;
+      delete ctx.gbufferEmissiveTexture;
+    }
+    if (ctx.intermediateFramebuffer && ctx.intermediateFramebuffer !== ctx.finalFramebuffer) {
+      const blitter = new CopyBlitter();
+      blitter.srgbOut = !ctx.finalFramebuffer;
+      const srcTex = ctx.intermediateFramebuffer.getColorAttachments()[0] as Texture2D;
+      blitter.blit(srcTex, ctx.finalFramebuffer ?? null, fetchSampler('clamp_nearest_nomip'));
+      device.popDeviceStates();
+      device.pool.releaseFrameBuffer(ctx.intermediateFramebuffer);
+    }
+    this.freeClusteredLight(ctx.clusteredLight);
+
+    if (sunLightColor) {
+      ctx.sunLight!.color = sunLightColor;
+    }
+  }
+  static override renderScene(scene: Scene, camera: Camera): void {
+    const device = getDevice();
+    const colorFormat =
+      camera.HDR && device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
+    const depthFormat = device.getDeviceCaps().framebufferCaps.supportDepth32floatStencil8 ? 'd32fs8' : 'd24s8';
+    const globalBindGroupAllocator = GlobalBindGroupAllocator.get();
+    scene.frameUpdate();
+    scene.frameUpdatePerCamera(camera);
+    if (camera && !device.isContextLost()) {
+      const defaultViewport = !camera.viewport && !camera.scissor;
+      const renderX = camera.viewport ? device.screenXToDevice(camera.viewport[0]) : 0;
+      const renderY = camera.viewport ? device.screenYToDevice(camera.viewport[1]) : 0;
+      const renderWidth = camera.viewport
+        ? device.screenXToDevice(camera.viewport[2])
+        : device.getDrawingBufferWidth();
+      const renderHeight = camera.viewport
+        ? device.screenYToDevice(camera.viewport[3])
+        : device.getDrawingBufferHeight();
+      if (renderWidth <= 0 || renderHeight <= 0) {
+        camera.getPickResultResolveFunc()?.(null);
+        return;
+      }
+      const tmpFramebuffer = defaultViewport
+        ? null
+        : device.pool.fetchTemporalFramebuffer(false, renderWidth, renderHeight, colorFormat, depthFormat);
+      const originFramebuffer = device.getFramebuffer();
+      if (tmpFramebuffer) {
+        device.pushDeviceStates();
+        device.setFramebuffer(tmpFramebuffer);
+      }
+      device.clearFrameBuffer(camera.clearColor, camera.clearDepth, camera.clearStencil);
+      const SSR = camera.SSR && scene.env.light.envLight && scene.env.light.envLight.hasRadiance();
+      const ctx: DrawContext = {
+        device,
+        scene,
+        renderWidth,
+        renderHeight,
+        oit: null,
+        motionVectors: device.type !== 'webgl' && (camera.TAA || camera.motionBlur || camera.SSR),
+        HiZ: camera.HiZ && device.type !== 'webgl',
+        HiZTexture: null,
+        globalBindGroupAllocator,
+        camera,
+        compositor: camera.compositor,
+        queue: 0,
+        lightBlending: false,
+        renderPass: null,
+        renderPassHash: null,
+        flip: false,
+        depthFormat,
+        colorFormat,
+        drawEnvLight: false,
+        env: null,
+        materialFlags: 0,
+        SSR,
+        SSRCalcThickness: SSR && camera.ssrCalcThickness,
+        SSRRoughnessTexture: device.pool.fetchTemporalTexture2D(true, 'rgba8unorm', renderWidth, renderHeight),
+        SSRNormalTexture: device.pool.fetchTemporalTexture2D(true, 'rgba8unorm', renderWidth, renderHeight),
+        finalFramebuffer: device.getFramebuffer(),
+        intermediateFramebuffer: null
+      };
+      this._renderScene(ctx);
+      if (tmpFramebuffer) {
+        device.popDeviceStates();
+        const oversizedViewport =
+          renderX < 0 ||
+          renderY < 0 ||
+          renderX + renderWidth > device.getDrawingBufferWidth() ||
+          renderY + renderHeight > device.getDrawingBufferHeight();
+        const blitter = new CopyBlitter();
+        if (oversizedViewport) {
+          blitter.destRect = [renderX, renderY, renderWidth, renderHeight];
+        } else {
+          blitter.viewport = camera.viewport ? camera.viewport.slice() : null;
+        }
+        blitter.scissor = camera.scissor ? camera.scissor.slice() : null;
+        blitter.srgbOut = !originFramebuffer;
+        blitter.blit(
+          tmpFramebuffer.getColorAttachments()[0],
+          originFramebuffer ?? null,
+          fetchSampler('clamp_nearest_nomip')
+        );
+        device.pool.releaseFrameBuffer(tmpFramebuffer);
+      }
+    }
+    GlobalBindGroupAllocator.release(globalBindGroupAllocator);
+  }
+}
+
+/**
+ * Hybrid renderer entry (phase 1 placeholder).
+ *
+ * The real hybrid pipeline will be introduced incrementally in later stages.
+ * For now it intentionally reuses the current forward implementation to keep behavior stable.
+ *
+ * @internal
+ */
+export class HybridSceneRenderer extends DeferredSceneRenderer {
+  static override renderScene(scene: Scene, camera: Camera): void {
+    SceneRenderer.renderScene(scene, camera);
+  }
+}
+
+/**
+ * Render-path dispatcher renderer.
+ *
+ * Routes to forward/deferred/hybrid pipeline entry points based on `camera.renderPath`.
+ *
+ * @internal
+ */
+export class RenderPathSceneRenderer extends SceneRenderer {
+  static override renderScene(scene: Scene, camera: Camera): void {
+    switch (camera.renderPath) {
+      case 'deferred':
+        DeferredSceneRenderer.renderScene(scene, camera);
+        break;
+      case 'hybrid':
+        HybridSceneRenderer.renderScene(scene, camera);
+        break;
+      case 'forward':
+      default:
+        SceneRenderer.renderScene(scene, camera);
+        break;
+    }
   }
 }

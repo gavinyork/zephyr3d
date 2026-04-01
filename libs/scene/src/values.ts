@@ -20,6 +20,16 @@ export const RENDER_PASS_TYPE_DEPTH = 2;
  * @public
  */
 export const RENDER_PASS_TYPE_OBJECT_COLOR = 3;
+/**
+ * Deferred GBuffer render pass type
+ * @public
+ */
+export const RENDER_PASS_TYPE_GBUFFER = 4;
+/**
+ * Deferred lighting render pass type
+ * @public
+ */
+export const RENDER_PASS_TYPE_DEFERRED_LIGHT = 5;
 
 /**
  * Builtin texture name for sheen LUT
