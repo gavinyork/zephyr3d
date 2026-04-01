@@ -6,7 +6,7 @@ import { RaycastVisitor } from './raycast_visitor';
 import { Environment } from './environment';
 import type { GraphNode } from './graph_node';
 import type { Camera } from '../camera/camera';
-import { RenderPathSceneRenderer } from '../render';
+import { SceneRenderer } from '../render';
 import type { Compositor } from '../posteffect';
 import type { Metadata } from 'draco3d';
 import { getDevice } from '../app/api';
@@ -340,7 +340,7 @@ export class Scene
    * @internal
    */
   getRenderer() {
-    return RenderPathSceneRenderer;
+    return SceneRenderer;
   }
   /**
    * Performs per-frame scene updates, once per device frame.
