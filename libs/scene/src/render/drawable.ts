@@ -96,6 +96,16 @@ export interface DrawContext {
   linearDepthTexture?: Texture2D;
   /** Scene color texture bound for sampling (previous pass or resolved color). */
   sceneColorTexture?: Texture2D;
+  /** Deferred GBuffer framebuffer for the current frame (optional). */
+  gbufferFramebuffer?: Nullable<FrameBuffer>;
+  /** Deferred GBuffer albedo/metallic target (optional). */
+  gbufferAlbedoTexture?: Texture2D;
+  /** Deferred GBuffer normal/roughness target (optional). */
+  gbufferNormalTexture?: Texture2D;
+  /** Deferred GBuffer material parameter target (optional). */
+  gbufferMaterialTexture?: Texture2D;
+  /** @deprecated Kept as alias for old phase naming, use gbufferMaterialTexture instead. */
+  gbufferEmissiveTexture?: Texture2D;
   /** Default depth buffer format for targets created in this pass. */
   readonly depthFormat: TextureFormat;
   /** Default color buffer format for targets created in this pass. */
