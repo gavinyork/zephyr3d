@@ -1,7 +1,7 @@
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
-import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import { MaterialVaryingFlags, RENDER_PASS_TYPE_GBUFFER, RENDER_PASS_TYPE_LIGHT } from '../values';
 import { DRef, Vector2, Vector3, Vector4, type Clonable, type Immutable } from '@zephyr3d/base';
 import { mixinPBRBluePrint } from './mixins/lightmodel/pbrblueprintmixin';
 import type { BluePrintUniformTexture, BluePrintUniformValue } from '../utility/blueprint/material/ir';
@@ -440,6 +440,26 @@ export class PBRBluePrintMaterial
           }
           this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.litColor);
         }
+      } else if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_GBUFFER) {
+        this.outputFragmentColor(
+          scope,
+          scope.$inputs.worldPos,
+          scope.commonData.albedo,
+          pb.vec4(
+            scope.commonData.metallic,
+            1,
+            pb.clamp(
+              pb.max(
+                pb.max(scope.commonData.specular.r, scope.commonData.specular.g),
+                scope.commonData.specular.b
+              ),
+              0,
+              1
+            ),
+            scope.commonData.roughness
+          ),
+          pb.vec4(pb.add(pb.mul(scope.commonData.normal, 0.5), pb.vec3(0.5)), 1)
+        );
       } else {
         this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.commonData.albedo);
       }

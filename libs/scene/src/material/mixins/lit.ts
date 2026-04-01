@@ -4,6 +4,7 @@ import {
   LIGHT_TYPE_POINT,
   LIGHT_TYPE_RECT,
   // LIGHT_TYPE_SPOT,
+  RENDER_PASS_TYPE_GBUFFER,
   RENDER_PASS_TYPE_LIGHT
 } from '../../values';
 import type { DrawContext } from '../../render';
@@ -200,7 +201,11 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.worldTangent,
           this.worldBinormal
         );
-        if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
+        if (
+          (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT ||
+            that.drawContext.renderPass!.type === RENDER_PASS_TYPE_GBUFFER) &&
+          that.normalTexture
+        ) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
@@ -271,7 +276,11 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.worldTangent,
           this.worldBinormal
         );
-        if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
+        if (
+          (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT ||
+            that.drawContext.renderPass!.type === RENDER_PASS_TYPE_GBUFFER) &&
+          that.normalTexture
+        ) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
@@ -402,7 +411,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      */
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
       super.applyUniformValues(bindGroup, ctx, pass);
-      if (ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
+      if (
+        ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT ||
+        ctx.renderPass!.type === RENDER_PASS_TYPE_GBUFFER
+      ) {
         if (this.normalTexture) {
           bindGroup.setValue('zNormalScale', this._normalScale);
         }
@@ -702,7 +714,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     fragmentShader(scope: PBFunctionScope) {
       super.fragmentShader(scope);
       const pb = scope.$builder;
-      if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
+      if (
+        this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT ||
+        this.drawContext.renderPass!.type === RENDER_PASS_TYPE_GBUFFER
+      ) {
         if (this.normalTexture) {
           scope.zNormalScale = pb.float().uniform(2);
         }

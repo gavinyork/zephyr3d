@@ -3,7 +3,7 @@ import { mixinVertexColor } from './mixins/vertexcolor';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import type { PBFunctionScope } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
-import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import { MaterialVaryingFlags, RENDER_PASS_TYPE_GBUFFER, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Clonable } from '@zephyr3d/base';
 
 /**
@@ -126,6 +126,21 @@ export class LambertMaterial
         } else {
           this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.litColor);
         }
+      } else if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_GBUFFER) {
+        scope.$l.normal = this.calculateNormal(
+          scope,
+          scope.$inputs.worldPos,
+          scope.$inputs.wNorm,
+          scope.$inputs.wTangent,
+          scope.$inputs.wBinormal
+        );
+        this.outputFragmentColor(
+          scope,
+          scope.$inputs.worldPos,
+          scope.albedo,
+          pb.vec4(0, 1, 0, 1),
+          pb.vec4(pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)), 1)
+        );
       } else {
         this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.albedo);
       }

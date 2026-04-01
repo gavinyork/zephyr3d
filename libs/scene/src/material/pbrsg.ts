@@ -3,7 +3,7 @@ import { mixinVertexColor } from './mixins/vertexcolor';
 import type { PBFunctionScope } from '@zephyr3d/device';
 import { mixinPBRSpecularGlossness } from './mixins/lightmodel/pbrspecularglossness';
 import { ShaderHelper } from './shader/helper';
-import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import { MaterialVaryingFlags, RENDER_PASS_TYPE_GBUFFER, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Clonable } from '@zephyr3d/base';
 
 /**
@@ -133,6 +133,61 @@ export class PBRSpecularGlossinessMaterial
           );
           this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
         }
+      } else if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_GBUFFER) {
+        scope.$l.normalInfo = this.calculateNormalAndTBN(
+          scope,
+          scope.$inputs.worldPos,
+          scope.$inputs.wNorm,
+          scope.$inputs.wTangent,
+          scope.$inputs.wBinormal
+        );
+        scope.$l.occlusion = pb.float(1);
+        const specularFactor =
+          this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
+            ? scope.$inputs.zSpecularFactor
+            : scope.zSpecularFactor;
+        const glossinessFactor =
+          this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
+            ? scope.$inputs.zGlossinessFactor
+            : scope.zGlossinessFactor;
+        if (this.specularTexture) {
+          scope.$l.specularSample = this.sampleSpecularTexture(scope);
+          scope.$l.specularColor = pb.mul(scope.specularSample.rgb, specularFactor);
+        } else {
+          scope.$l.specularColor = specularFactor;
+        }
+        scope.$l.metallic = pb.max(
+          pb.max(scope.specularColor.r, scope.specularColor.g),
+          scope.specularColor.b
+        );
+        if (this.specularTexture) {
+          scope.$l.roughness = pb.sub(1, pb.mul(glossinessFactor, scope.specularSample.a));
+        } else {
+          scope.$l.roughness = pb.sub(1, glossinessFactor);
+        }
+        if (this.occlusionTexture) {
+          scope.occlusion = pb.add(
+            pb.mul(scope.zOcclusionStrength, pb.sub(this.sampleOcclusionTexture(scope).r, 1)),
+            1
+          );
+        }
+        scope.roughness = pb.mul(scope.roughness, ShaderHelper.getCameraRoughnessFactor(scope));
+        this.outputFragmentColor(
+          scope,
+          scope.$inputs.worldPos,
+          scope.albedo,
+          pb.vec4(
+            scope.metallic,
+            scope.occlusion,
+            pb.clamp(
+              pb.max(pb.max(scope.specularColor.r, scope.specularColor.g), scope.specularColor.b),
+              0,
+              1
+            ),
+            scope.roughness
+          ),
+          pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1)
+        );
       } else {
         this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.albedo);
       }

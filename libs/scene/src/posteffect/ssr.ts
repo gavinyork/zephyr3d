@@ -90,10 +90,10 @@ export class SSR extends AbstractPostEffect {
     this._combineBindGroup.setValue(
       'targetSize',
       new Vector4(
-        device.getDrawingBufferWidth(),
-        device.getDrawingBufferHeight(),
-        device.getDrawingBufferWidth(),
-        device.getDrawingBufferHeight()
+        inputColorTexture.width,
+        inputColorTexture.height,
+        inputColorTexture.width,
+        inputColorTexture.height
       )
     );
     this._combineBindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
@@ -133,8 +133,8 @@ export class SSR extends AbstractPostEffect {
     bindGroup.setValue(
       'targetSize',
       new Vector4(
-        device.getDrawingBufferWidth(),
-        device.getDrawingBufferHeight(),
+        inputColorTexture.width,
+        inputColorTexture.height,
         sceneDepthTexture.width,
         sceneDepthTexture.height
       )
@@ -199,8 +199,8 @@ export class SSR extends AbstractPostEffect {
       bindGroup.setValue(
         'targetSize',
         new Vector4(
-          device.getDrawingBufferWidth(),
-          device.getDrawingBufferHeight(),
+          sceneDepthTexture.width,
+          sceneDepthTexture.height,
           ctx.HiZTexture.width,
           ctx.HiZTexture.height
         )
@@ -210,8 +210,8 @@ export class SSR extends AbstractPostEffect {
       bindGroup.setValue(
         'targetSize',
         new Vector4(
-          device.getDrawingBufferWidth(),
-          device.getDrawingBufferHeight(),
+          sceneDepthTexture.width,
+          sceneDepthTexture.height,
           sceneDepthTexture.width,
           sceneDepthTexture.height
         )

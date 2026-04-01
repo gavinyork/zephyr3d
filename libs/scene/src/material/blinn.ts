@@ -3,7 +3,7 @@ import { mixinVertexColor } from './mixins/vertexcolor';
 import type { PBFunctionScope } from '@zephyr3d/device';
 import { mixinBlinnPhong } from './mixins/lightmodel/blinnphong';
 import { ShaderHelper } from './shader/helper';
-import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import { MaterialVaryingFlags, RENDER_PASS_TYPE_GBUFFER, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Clonable } from '@zephyr3d/base';
 
 /**
@@ -113,6 +113,26 @@ export class BlinnMaterial
           );
           this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, scope.albedo.a));
         }
+      } else if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_GBUFFER) {
+        scope.$l.normal = this.calculateNormal(
+          scope,
+          scope.$inputs.worldPos,
+          scope.$inputs.wNorm,
+          scope.$inputs.wTangent,
+          scope.$inputs.wBinormal
+        );
+        const shininess =
+          this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
+            ? scope.$inputs.zShininess
+            : scope.zShininess;
+        scope.$l.roughness = pb.sqrt(pb.div(2, pb.add(shininess, 2)));
+        this.outputFragmentColor(
+          scope,
+          scope.$inputs.worldPos,
+          scope.albedo,
+          pb.vec4(0, 1, 0, scope.roughness),
+          pb.vec4(pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)), 1)
+        );
       } else {
         this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.albedo);
       }

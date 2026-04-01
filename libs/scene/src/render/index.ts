@@ -2,6 +2,8 @@ export * from './drawable';
 export * from './renderpass';
 export * from './renderer';
 export * from './lightpass';
+export * from './gbufferpass';
+export * from './deferredlightpass';
 export * from './shadowmap_pass';
 export * from './depthpass';
 export * from './render_queue';

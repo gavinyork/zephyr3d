@@ -9,6 +9,7 @@ import {
   MORPH_TARGET_TANGENT,
   MORPH_WEIGHTS_VECTOR_COUNT,
   RENDER_PASS_TYPE_DEPTH,
+  RENDER_PASS_TYPE_GBUFFER,
   RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_OBJECT_COLOR,
   RENDER_PASS_TYPE_SHADOWMAP
@@ -200,6 +201,7 @@ export class ShaderHelper {
       pb.vec2('renderSize'),
       pb.vec2('jitterValue'),
       pb.float('roughnessFactor'),
+      pb.float('shadowDebugCascades'),
       pb.float('frameDeltaTime'),
       pb.float('elapsedTime'),
       pb.int('framestamp')
@@ -216,7 +218,8 @@ export class ShaderHelper {
       scope.light = lightStruct().uniform(0);
     } else if (
       ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH ||
-      ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR
+      ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR ||
+      ctx.renderPass!.type === RENDER_PASS_TYPE_GBUFFER
     ) {
       scope.camera = cameraStruct().uniform(0);
     } else if (ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
@@ -799,6 +802,7 @@ export class ShaderHelper {
       worldMatrix: camera.worldMatrix,
       params: new Vector4(camera.getNearPlane(), camera.getFarPlane(), ctx.flip ? -1 : 1, linear ? 0 : 1),
       roughnessFactor: camera.SSR ? camera.ssrRoughnessFactor : 1,
+      shadowDebugCascades: camera.shadowDebugCascades ? 1 : 0,
       frameDeltaTime: ctx.device.frameInfo.elapsedFrame * 0.001,
       elapsedTime: ctx.device.frameInfo.elapsedOverall * 0.001,
       framestamp: ctx.device.frameInfo.frameCounter
@@ -1355,6 +1359,9 @@ export class ShaderHelper {
             pb.distance(that.getCameraPosition(this), this.worldPos)
           )
         );
+        this.$if(pb.greaterThan(this.camera.shadowDebugCascades, 0.5), function () {
+          this.shadow = pb.add(pb.mul(pb.float(this.split), 0.2), 0.2);
+        });
         this.$return(this.shadow);
       } else {
         this.$l.shadowVertex = that.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1));

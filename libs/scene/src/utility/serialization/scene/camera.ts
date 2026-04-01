@@ -1,5 +1,6 @@
 import { defineProps, type SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
+import type { RenderPath } from '../../../camera';
 import { SceneNode } from '../../../scene';
 import {
   TAA_DEBUG_ALAPH,
@@ -106,6 +107,23 @@ export function getCameraClass(): SerializableClass {
           },
           set(this: Camera, value) {
             this.HiZ = value.bool[0];
+          }
+        },
+        {
+          name: 'RenderPath',
+          type: 'string',
+          default: 'forward',
+          options: {
+            enum: {
+              labels: ['Forward', 'Deferred', 'Hybrid'],
+              values: ['forward', 'deferred', 'hybrid']
+            }
+          },
+          get(this: Camera, value) {
+            value.str[0] = this.renderPath;
+          },
+          set(this: Camera, value) {
+            this.renderPath = value.str[0] as RenderPath;
           }
         },
         {

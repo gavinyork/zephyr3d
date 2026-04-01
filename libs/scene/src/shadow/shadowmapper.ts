@@ -36,6 +36,7 @@ const tmpFrustum = new Frustum(Matrix4x4.identity());
  * @public
  */
 export type ShadowMode = 'hard' | 'vsm' | 'esm' | 'pcf-pd' | 'pcf-opt';
+export type ShadowQualityPreset = 'character-small' | 'outdoor-large';
 
 /** @internal */
 export type ShadowMapParams = {
@@ -124,6 +125,8 @@ export class ShadowMapper {
   protected _esmDepthScale: number;
   /** @internal */
   protected _shadowRegion: Nullable<AABB>;
+  /** @internal */
+  protected _autoShadowRegion: boolean;
   /**
    * Creates an instance of ShadowMapper
    * @param light - The light that is used to generate shadow map
@@ -153,6 +156,7 @@ export class ShadowMapper {
     this._esmBlurRadius = 4;
     this._esmDepthScale = 200;
     this._shadowRegion = null;
+    this._autoShadowRegion = false;
     this.applyMode(this._shadowMode);
   }
   copyFrom(other: ShadowMapper) {
@@ -200,6 +204,33 @@ export class ShadowMapper {
   }
   set shadowRegion(region) {
     this._shadowRegion = region;
+    this._autoShadowRegion = false;
+  }
+  /** @internal */
+  updateDirectionalShadowRegion(force = false) {
+    if (!this._light.isDirectionLight()) {
+      return;
+    }
+    if (!force && !this._autoShadowRegion) {
+      return;
+    }
+    const scene = this._light.scene;
+    if (!scene) {
+      return;
+    }
+    const aabb = new AABB();
+    aabb.beginExtend();
+    scene.rootNode.iterate((child) => {
+      if ((child.isMesh() || child.isClipmapTerrain()) && child.castShadow) {
+        const bbox = child.getWorldBoundingVolume()?.toAABB();
+        if (bbox) {
+          aabb.extend(bbox.minPoint);
+          aabb.extend(bbox.maxPoint);
+        }
+      }
+    });
+    this._shadowRegion = aabb.isValid() ? aabb : null;
+    this._autoShadowRegion = true;
   }
   /** Maximum distance from the camera, shadow will not be rendered beyond this range */
   get shadowDistance() {
@@ -267,6 +298,35 @@ export class ShadowMapper {
       this._shadowMode = mode;
       this.applyMode(this._shadowMode);
     }
+  }
+  /**
+   * Applies a practical shadow preset for common scenarios.
+   *
+   * `character-small`: higher contact quality and tighter distance for character-centric scenes.
+   * `outdoor-large`: longer distance coverage for open scenes.
+   */
+  applyQualityPreset(preset: ShadowQualityPreset) {
+    if (preset === 'character-small') {
+      this.mode = 'pcf-opt';
+      this.shadowMapSize = 2048;
+      this.shadowDistance = 120;
+      this.splitLambda = 0.75;
+      this.depthBias = 0.18;
+      this.normalBias = 0.3;
+      this.nearClip = 0.2;
+      this.pcfKernelSize = 5;
+      this.numShadowCascades = this._light.isDirectionLight() ? 3 : 1;
+      return;
+    }
+    this.mode = 'pcf-opt';
+    this.shadowMapSize = 2048;
+    this.shadowDistance = 800;
+    this.splitLambda = 0.6;
+    this.depthBias = 0.35;
+    this.normalBias = 0.22;
+    this.nearClip = 1;
+    this.pcfKernelSize = 3;
+    this.numShadowCascades = this._light.isDirectionLight() ? 4 : 1;
   }
   /** @internal */
   getShaderHash(shadowMapParams: ShadowMapParams) {
@@ -639,7 +699,7 @@ export class ShadowMapper {
       2 * Math.acos((this._light as SpotLight).cutoff),
       1,
       this._config.nearClip,
-      Math.min((this._shadowDistance, this._light as SpotLight).range)
+      Math.min(this._shadowDistance, (this._light as SpotLight).range)
     );
   }
   /** @internal */
@@ -904,6 +964,9 @@ export class ShadowMapper {
         : new Vector4(0, 0, 0, 1)
       : null;
     const depthScale = this._impl!.getDepthScale();
+    if (this._light.isDirectionLight() && this._autoShadowRegion) {
+      this.updateDirectionalShadowRegion();
+    }
     const shadowRegion =
       this._light.isDirectionLight() && this._shadowRegion && this._shadowRegion.isValid()
         ? this._shadowRegion
@@ -973,9 +1036,10 @@ export class ShadowMapper {
             depthScale,
             shadowMapParams.depthBiasValues[split]
           );
-          shadowMapParams.depthBiasScales[split] = 1;
-          // Incorrect calculation
-          // shadowMapParams.depthBiasScales[split] = shadowMapParams.depthBiasValues[0].x !== 0 ? shadowMapParams.depthBiasValues[split].x / shadowMapParams.depthBiasValues[0].x : 1;
+          shadowMapParams.depthBiasScales[split] =
+            shadowMapParams.depthBiasValues[0].x !== 0
+              ? shadowMapParams.depthBiasValues[split].x / shadowMapParams.depthBiasValues[0].x
+              : 1;
           shadowMapParams.cameraParams.setXYZW(
             shadowMapRenderCamera.getNearPlane(),
             shadowMapRenderCamera.getFarPlane(),

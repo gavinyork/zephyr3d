@@ -12,6 +12,7 @@ import {
   QUEUE_OPAQUE,
   QUEUE_TRANSPARENT,
   RENDER_PASS_TYPE_DEPTH,
+  RENDER_PASS_TYPE_GBUFFER,
   RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_OBJECT_COLOR,
   RENDER_PASS_TYPE_SHADOWMAP
@@ -785,6 +786,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    */
   needFragmentColor(ctx?: DrawContext) {
     return (
+      (ctx ?? this.drawContext).renderPass!.type === RENDER_PASS_TYPE_GBUFFER ||
       (ctx ?? this.drawContext).renderPass!.type === RENDER_PASS_TYPE_LIGHT ||
       this._alphaCutoff > 0 ||
       this.alphaToCoverage
@@ -955,6 +957,15 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
           this.$outputs.zFragmentOutput = ShaderHelper.encodeColorOutput(this, this.outColor);
         }
+      } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_GBUFFER) {
+        if (color) {
+          if (this.zAlphaCutoff) {
+            this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
+              pb.discard();
+            });
+          }
+        }
+        this.$outputs.zFragmentOutput = this.outColor;
       } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_DEPTH) {
         if (color) {
           if (this.zAlphaCutoff) {
@@ -1045,8 +1056,12 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         scope.$outputs.zSSRRoughness = pb.vec4(0, 0, 0, 1);
         scope.$outputs.zSSRNormal = pb.vec4(0);
       } else {
-        scope.$outputs.zSSRRoughness = ssrRoughness ?? pb.vec4(1, 0, 0, 1);
-        scope.$outputs.zSSRNormal = ssrNormal ?? pb.vec4(0);
+        scope.$outputs.zSSRRoughness = ssrRoughness ?? pb.vec4(1, 1, 0, 1);
+        scope.$outputs.zSSRNormal = ssrNormal
+          ? ssrNormal
+          : scope.$inputs.wNorm
+            ? pb.vec4(pb.add(pb.mul(pb.normalize(scope.$inputs.wNorm), 0.5), pb.vec3(0.5)), 1)
+            : pb.vec4(0.5, 0.5, 1, 1);
       }
     }
   }

@@ -60,6 +60,12 @@ export type CameraHistoryData = {
 };
 
 /**
+ * Camera render path mode.
+ * @public
+ */
+export type RenderPath = 'forward' | 'deferred' | 'hybrid';
+
+/**
  * A renderable camera node that manages view/projection math, frusta,
  * input control, picking, and a post-processing chain via a compositor.
  *
@@ -129,6 +135,8 @@ export class Camera extends SceneNode {
   protected _oit: DRef<OIT>;
   /** @internal Whether to perform a depth pre-pass. */
   protected _depthPrePass: boolean;
+  /** @internal Render path selection for scene renderer. */
+  protected _renderPath: RenderPath;
   /** @internal Whether command buffers may be reused for optimization. */
   protected _commandBufferReuse: boolean;
   /** @internal Hi-Z acceleration enable (primarily for SSR). */
@@ -185,6 +193,8 @@ export class Camera extends SceneNode {
   protected _postEffectTAA: DRef<TAA>;
   /** @internal TAA debug mode (implementation-defined). */
   protected _TAADebug: number;
+  /** @internal Cascaded shadow debug visualization flag. */
+  protected _shadowDebugCascades: boolean;
 
   /** @internal SSR enable flag (via post effect). */
   protected _SSR: boolean;
@@ -287,6 +297,7 @@ export class Camera extends SceneNode {
     this._frustumV = null;
     this._oit = new DRef(new ABufferOIT(20));  //修改摄像机属性
     this._depthPrePass = false;
+    this._renderPath = 'forward';
     this._screenAdapter = new ScreenAdapter();
     this._adapted = false;
     this._HiZ = false;
@@ -315,6 +326,7 @@ export class Camera extends SceneNode {
     this._TAA = false;
     this._postEffectTAA = new DRef();
     this._TAADebug = 0;
+    this._shadowDebugCascades = false;
     this._SSR = false;
     this._postEffectSSR = new DRef();
     this._ssrParams = new Vector4(64, 96, 0.9, 0);
@@ -406,6 +418,15 @@ export class Camera extends SceneNode {
   }
   set HiZ(val) {
     this._HiZ = !!val;
+  }
+  /**
+   * Render path used by the scene renderer.
+   */
+  get renderPath() {
+    return this._renderPath;
+  }
+  set renderPath(val: RenderPath) {
+    this._renderPath = val ?? 'forward';
   }
   /**
    * Whether HDR backbuffer is enabled.
@@ -600,6 +621,15 @@ export class Camera extends SceneNode {
   }
   set TAADebug(val) {
     this._TAADebug = val;
+  }
+  /**
+   * Enables cascade debug visualization for directional shadows.
+   */
+  get shadowDebugCascades() {
+    return this._shadowDebugCascades;
+  }
+  set shadowDebugCascades(val) {
+    this._shadowDebugCascades = !!val;
   }
   /**
    * Gets whether Screen Space Reflections (SSR) is enabled.

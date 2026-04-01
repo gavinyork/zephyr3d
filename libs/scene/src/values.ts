@@ -20,6 +20,11 @@ export const RENDER_PASS_TYPE_DEPTH = 2;
  * @public
  */
 export const RENDER_PASS_TYPE_OBJECT_COLOR = 3;
+/**
+ * GBuffer render pass type
+ * @public
+ */
+export const RENDER_PASS_TYPE_GBUFFER = 4;
 
 /**
  * Builtin texture name for sheen LUT
