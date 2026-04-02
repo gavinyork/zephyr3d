@@ -23,13 +23,15 @@ export class DeferredLightPass {
       return;
     }
     const device = ctx.device;
+    const hasEnvLight = !!ctx.env?.light?.envLight;
+    const hasEnvRadiance = !!ctx.env?.light?.envLight?.hasRadiance();
+    const hasEnvIrradiance = !!ctx.env?.light?.envLight?.hasIrradiance();
     const envHash = ctx.env?.light?.envLight ? ctx.env.light.getHash() : 'none';
-    const hash = `${device.type}:${envHash}:clustered`;
+    const hash = `${device.type}:${envHash}:clustered:env:${hasEnvLight ? 1 : 0}:rad:${
+      hasEnvRadiance ? 1 : 0
+    }:irr:${hasEnvIrradiance ? 1 : 0}`;
     let program = DeferredLightPass._programs[hash];
     if (!program) {
-      const hasEnvLight = !!ctx.env?.light?.envLight;
-      const hasEnvRadiance = !!ctx.env?.light?.envLight?.hasRadiance();
-      const hasEnvIrradiance = !!ctx.env?.light?.envLight?.hasIrradiance();
       const isWebGL = device.type === 'webgl';
       const builtProgram = device.buildRenderProgram({
         label: 'DeferredLightPass',

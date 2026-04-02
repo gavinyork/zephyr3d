@@ -172,7 +172,11 @@ export class SSR extends AbstractPostEffect {
     }:${!!ctx.HiZTexture}:${!!ctx.camera.ssrCalcThickness}`;
     let program = SSR._programs[hash];
     if (program === undefined) {
-      program = this._createIntersectProgram(ctx, blur);
+      const created = this._createIntersectProgram(ctx, blur);
+      if (!created) {
+        return;
+      }
+      program = created;
       SSR._programs[hash] = program;
     }
     let bindGroup = this._bindgroups[hash];
@@ -679,7 +683,7 @@ export class SSR extends AbstractPostEffect {
     return program;
   }
   /** @internal */
-  private _createIntersectProgram(ctx: DrawContext, blur: boolean) {
+  private _createIntersectProgram(ctx: DrawContext, blur: boolean): Nullable<GPUProgram> {
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         this.flip = pb.int().uniform(0);
@@ -982,7 +986,7 @@ export class SSR extends AbstractPostEffect {
                 pb.textureSampleLevel(this.colorTex, this.hitUV, 0).rgb,
                 this.hitAlpha
               );
-              this.reflectance = pb.div(this.reflectance, pb.add(this.reflectance, pb.vec3(1)));
+              this.$l.reflectance = pb.div(this.$l.reflectance, pb.add(this.$l.reflectance, pb.vec3(1)));
               this.$l.strength = pb.vec3();
               this.$if(pb.equal(this.ssrStrengthMode, 0), function () {
                 this.strength = pb.clamp(this.roughnessValue.rgb, pb.vec3(0), pb.vec3(1));
@@ -1012,7 +1016,10 @@ export class SSR extends AbstractPostEffect {
           });
         });
       }
-    })!;
+    });
+    if (!program) {
+      return null;
+    }
     program.name = blur ? '@SSR_Intersect_Blur' : '@SSR_Intersect';
     return program;
   }

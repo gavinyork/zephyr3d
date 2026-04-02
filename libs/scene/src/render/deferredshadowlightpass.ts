@@ -43,7 +43,10 @@ export class DeferredShadowLightPass {
     const prevRenderPass = ctx.renderPass;
     ctx.currentShadowLight = light;
     ctx.renderPass = { type: RENDER_PASS_TYPE_LIGHT } as any;
-    const hash = `${device.type}:${shadowMapParams.shaderHash}:deferred-shadow:${debugShadowTermOnly ? 1 : 0}`;
+    const envHash = ctx.drawEnvLight && ctx.env?.light?.envLight ? ctx.env.light.getHash() : 'none';
+    const hash = `${device.type}:${shadowMapParams.shaderHash}:deferred-shadow:${debugShadowTermOnly ? 1 : 0}:hiz:${
+      ctx.HiZTexture ? 1 : 0
+    }:sceneColor:${ctx.sceneColorTexture ? 1 : 0}:env:${ctx.drawEnvLight ? 1 : 0}:${envHash}:mf:${ctx.materialFlags}`;
     let program = DeferredShadowLightPass._programs[hash];
     if (!program) {
       const isWebGL = device.type === 'webgl';
@@ -68,6 +71,7 @@ export class DeferredShadowLightPass {
           this.cameraRight = pb.vec3().uniform(0);
           this.cameraUp = pb.vec3().uniform(0);
           this.cameraForward = pb.vec3().uniform(0);
+          this.cameraViewProjection = pb.mat4().uniform(0);
           this.cameraProj = pb.vec2().uniform(0); // x: tanHalfFovy, y: aspect
           this.cameraNearFar = pb.vec2().uniform(0);
           this.debugShadowTermOnly = pb.int().uniform(0);
@@ -101,6 +105,66 @@ export class DeferredShadowLightPass {
                 this.spotFactor
               );
               this.$return(pb.mul(this.base, this.spotFactor));
+            }
+          );
+          pb.func('zSampleLinearDepthAtUV', [pb.vec2('uv')], function () {
+            if (isWebGL) {
+              this.$l.depthSample = pb.textureSample(this.linearDepthTex, this.uv);
+              this.$return(decodeNormalizedFloatFromRGBA(this, this.depthSample));
+            } else {
+              this.$l.texSize = pb.ivec2(ShaderHelper.getRenderSize(this));
+              this.$l.pixelCoord = pb.clamp(
+                pb.ivec2(pb.mul(this.uv, pb.vec2(this.texSize))),
+                pb.ivec2(0),
+                pb.sub(this.texSize, pb.ivec2(1))
+              );
+              this.$l.depthSample = pb.textureLoad(this.linearDepthTex, this.pixelCoord, 0);
+              this.$return(this.depthSample.r);
+            }
+          });
+          pb.func(
+            'zContactShadow',
+            [pb.vec3('worldPos'), pb.vec3('L'), pb.int('lightType'), pb.vec4('posRange')],
+            function () {
+              this.$l.steps = pb.int(8);
+              this.$l.maxDistance = this.$choice(
+                pb.equal(this.lightType, LIGHT_TYPE_POINT),
+                pb.clamp(pb.mul(this.posRange.w, 0.2), 0.2, 3),
+                this.$choice(
+                  pb.equal(this.lightType, LIGHT_TYPE_SPOT),
+                  pb.clamp(pb.mul(this.posRange.w, 0.25), 0.25, 3.5),
+                  pb.float(1.5)
+                )
+              );
+              this.$l.stepLen = pb.div(this.maxDistance, pb.float(this.steps));
+              this.$l.occlusion = pb.float(0);
+              this.$for(pb.int('i'), 1, pb.add(this.steps, 1), function () {
+                this.$l.samplePos = pb.add(this.worldPos, pb.mul(this.L, pb.mul(pb.float(this.i), this.stepLen)));
+                this.$l.clip = pb.mul(this.cameraViewProjection, pb.vec4(this.samplePos, 1));
+                this.$if(pb.lessThanEqual(this.clip.w, 1e-6), function () {
+                  this.$continue();
+                });
+                this.$l.ndc = pb.div(this.clip.xy, this.clip.w);
+                this.$l.uv = pb.add(pb.mul(this.ndc, 0.5), pb.vec2(0.5));
+                this.$if(
+                  pb.or(
+                    pb.lessThan(this.uv.x, 0),
+                    pb.greaterThan(this.uv.x, 1),
+                    pb.lessThan(this.uv.y, 0),
+                    pb.greaterThan(this.uv.y, 1)
+                  ),
+                  function () {
+                    this.$continue();
+                  }
+                );
+                this.$l.sceneDepth = pb.mul(this.zSampleLinearDepthAtUV(this.uv), this.cameraNearFar.y);
+                this.$l.sampleDepth = pb.dot(pb.sub(this.samplePos, this.cameraPos), this.cameraForward);
+                this.$if(pb.greaterThan(pb.sub(this.sampleDepth, this.sceneDepth), 0.02), function () {
+                  this.occlusion = pb.add(this.occlusion, 1);
+                });
+              });
+              this.$l.visibility = pb.sub(1, pb.mul(pb.div(this.occlusion, pb.float(this.steps)), 0.65));
+              this.$return(pb.clamp(this.visibility, 0, 1));
             }
           );
           pb.main(function () {
@@ -180,6 +244,8 @@ export class DeferredShadowLightPass {
             // Keep shadow sampling in uniform control flow for WebGPU derivatives (dpdx/ddy in PCF).
             this.$l.shadow = ShaderHelper.calculateShadow(this, this.worldPos, pb.max(this.NoL, 1e-5), ctx);
             this.shadow = pb.mix(1, this.shadow, this.validMask);
+            this.$l.contactShadow = this.zContactShadow(this.worldPos, this.L, this.lightType, this.posRange);
+            this.shadow = pb.mul(this.shadow, this.contactShadow);
             this.$if(pb.notEqual(this.debugShadowTermOnly, 0), function () {
               this.$outputs.color = pb.vec4(pb.vec3(this.shadow), 1);
             }).$else(function () {
@@ -232,6 +298,7 @@ export class DeferredShadowLightPass {
     bindGroup.setValue('cameraRight', new Float32Array([cameraRight.x, cameraRight.y, cameraRight.z]));
     bindGroup.setValue('cameraUp', new Float32Array([cameraUp.x, cameraUp.y, cameraUp.z]));
     bindGroup.setValue('cameraForward', new Float32Array([cameraForward.x, cameraForward.y, cameraForward.z]));
+    bindGroup.setValue('cameraViewProjection', ctx.camera.viewProjectionMatrix);
     bindGroup.setValue('cameraPos', new Float32Array([cameraPos.x, cameraPos.y, cameraPos.z]));
     bindGroup.setValue('cameraProj', new Float32Array([ctx.camera.getTanHalfFovy(), ctx.camera.getAspect()]));
     bindGroup.setValue('cameraNearFar', new Float32Array([ctx.camera.getNearPlane(), ctx.camera.getFarPlane()]));
