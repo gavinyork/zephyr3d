@@ -1,6 +1,7 @@
 import { LightPass } from './lightpass';
 import { GBufferPass } from './gbufferpass';
 import { DeferredLightPass } from './deferredlightpass';
+import { DeferredShadowLightPass } from './deferredshadowlightpass';
 import { ShadowMapPass } from './shadowmap_pass';
 import { DepthPass } from './depthpass';
 import type { Nullable } from '@zephyr3d/base';
@@ -9,6 +10,7 @@ import type {
   BindGroup,
   ColorState,
   FrameBuffer,
+  GPUDataBuffer,
   GPUProgram,
   Texture2D,
   TextureFormat
@@ -46,6 +48,9 @@ export class SceneRenderer {
   /** @internal */
   private static _skyMotionVectorBindGroup: Nullable<BindGroup> = null;
   private static _box: Nullable<Primitive> = null;
+  private static readonly _ssrSDFMaxBoxes = 24;
+  private static _ssrSDFBoxBuffer: Nullable<GPUDataBuffer> = null;
+  private static _ssrSDFBoxData: Nullable<Float32Array> = null;
   /** @internal */
   private static readonly _pickCamera = new Camera(null);
   /** @internal */
@@ -54,6 +59,8 @@ export class SceneRenderer {
   private static readonly _gBufferPass = new GBufferPass();
   /** @internal */
   private static readonly _deferredLightPass = new DeferredLightPass();
+  /** @internal */
+  private static readonly _deferredShadowLightPass = new DeferredShadowLightPass();
   /** @internal */
   private static readonly _depthPass = new DepthPass();
   /** @internal */
@@ -160,6 +167,8 @@ export class SceneRenderer {
           renderHeight
         ),
         SSRNormalTexture: device.pool.fetchTemporalTexture2D(true, 'rgba8unorm', renderWidth, renderHeight),
+        ssrSDFBoxBuffer: null,
+        ssrSDFBoxCount: 0,
         finalFramebuffer: device.getFramebuffer(),
         intermediateFramebuffer: null
       };
@@ -318,6 +327,7 @@ export class SceneRenderer {
 
     // Cull scene
     const renderQueue = this._scenePass.cullScene(ctx, ctx.camera);
+    this.prepareSSRProxySDF(ctx, renderQueue);
 
     // Keep sky world matrix synchronized before sky.update(), so skybox rotation
     // also affects baked radiance/irradiance lighting.
@@ -469,6 +479,7 @@ export class SceneRenderer {
   protected static _renderSceneDeferred(ctx: DrawContext) {
     const device = ctx.device;
     const renderQueue = this._scenePass.cullScene(ctx, ctx.camera);
+    this.prepareSSRProxySDF(ctx, renderQueue);
 
     if (ctx.scene.env.sky.skyType === 'skybox') {
       const skyboxRotation = ctx.scene.env.sky.skyboxRotation;
@@ -556,6 +567,26 @@ export class SceneRenderer {
       gbufferFramebuffer.getColorAttachments()[1] as Texture2D,
       gbufferFramebuffer.getColorAttachments()[2] as Texture2D
     );
+    // Deferred base pass shades unshadowed clustered lights. Accumulate each shadowed
+    // light separately so CSM/spot/point shadow maps match forward behavior.
+    const debugViewsEnabled =
+      ctx.camera.deferredShowGBuffer ||
+      ctx.camera.deferredShowCluster ||
+      ctx.camera.deferredShowSpecTerm;
+    const debugShadowTermOnly = !!ctx.camera.deferredShowShadowTerm;
+    const shadowLights = ctx.shadowMapInfo ? Array.from(ctx.shadowMapInfo.keys()) : [];
+    if (!debugViewsEnabled) {
+      for (const shadowedLight of shadowLights) {
+        this._deferredShadowLightPass.render(
+          ctx,
+          shadowedLight,
+          gbufferFramebuffer.getColorAttachments()[0] as Texture2D,
+          gbufferFramebuffer.getColorAttachments()[1] as Texture2D,
+          gbufferFramebuffer.getColorAttachments()[2] as Texture2D,
+          debugShadowTermOnly
+        );
+      }
+    }
     device.popDeviceStates();
     ctx.SSRRoughnessTexture = gbufferFramebuffer.getColorAttachments()[1] as Texture2D;
     ctx.SSRNormalTexture = gbufferFramebuffer.getColorAttachments()[2] as Texture2D;
@@ -608,9 +639,10 @@ export class SceneRenderer {
   }
   /** @internal */
   protected static _renderSceneHybrid(ctx: DrawContext) {
-    // Stage-1 scaffold: hybrid path currently falls back to forward pipeline.
-    // Follow-up will route opaque to deferred while preserving forward transparents.
-    this._renderSceneForward(ctx);
+    // Hybrid path: deferred opaque + forward transparent/transmission.
+    // Current implementation shares deferred pipeline, which already preserves
+    // forward transparent rendering in the transmission stage.
+    this._renderSceneDeferred(ctx);
   }
   private static _getSkyMotionVectorProgram(ctx: DrawContext) {
     if (!this._skyMotionVectorProgram) {
@@ -649,6 +681,128 @@ export class SceneRenderer {
       this._skyMotionVectorProgram.name = '@TAA_SkyMotionVector';
     }
     return this._skyMotionVectorProgram;
+  }
+  /** @internal */
+  private static prepareSSRProxySDF(ctx: DrawContext, renderQueue: RenderQueue) {
+    ctx.ssrSDFBoxBuffer = null;
+    ctx.ssrSDFBoxCount = 0;
+    if (!ctx.SSR || !ctx.HiZ) {
+      return;
+    }
+    if (!this._ssrSDFBoxData || this._ssrSDFBoxData.length !== this._ssrSDFMaxBoxes * 8) {
+      this._ssrSDFBoxData = new Float32Array(this._ssrSDFMaxBoxes * 8);
+    }
+    const data = this._ssrSDFBoxData;
+    data.fill(0);
+    const itemList = renderQueue.itemList;
+    if (!itemList) {
+      return;
+    }
+    const visited = new Set<number>();
+    let count = 0;
+    const pushDrawable = (drawable: any) => {
+      if (!drawable || count >= this._ssrSDFMaxBoxes) {
+        return;
+      }
+      const id = drawable.getDrawableId?.();
+      if (typeof id === 'number' && visited.has(id)) {
+        return;
+      }
+      const node = drawable.getNode?.();
+      const bv = node?.getWorldBoundingVolume?.();
+      const aabb = bv?.toAABB?.();
+      if (!aabb) {
+        return;
+      }
+      const minP = aabb.minPoint;
+      const maxP = aabb.maxPoint;
+      if (
+        !Number.isFinite(minP.x) ||
+        !Number.isFinite(minP.y) ||
+        !Number.isFinite(minP.z) ||
+        !Number.isFinite(maxP.x) ||
+        !Number.isFinite(maxP.y) ||
+        !Number.isFinite(maxP.z)
+      ) {
+        return;
+      }
+      if (maxP.x <= minP.x || maxP.y <= minP.y || maxP.z <= minP.z) {
+        return;
+      }
+      const base = count * 8;
+      data[base + 0] = minP.x;
+      data[base + 1] = minP.y;
+      data[base + 2] = minP.z;
+      data[base + 3] = 0;
+      data[base + 4] = maxP.x;
+      data[base + 5] = maxP.y;
+      data[base + 6] = maxP.z;
+      data[base + 7] = 0;
+      if (typeof id === 'number') {
+        visited.add(id);
+      }
+      count++;
+    };
+    const collectFromListInfo = (listInfo: any) => {
+      if (!listInfo || count >= this._ssrSDFMaxBoxes) {
+        return;
+      }
+      const itemArrays = [
+        listInfo.itemList,
+        listInfo.skinItemList,
+        listInfo.morphItemList,
+        listInfo.skinAndMorphItemList,
+        listInfo.instanceItemList
+      ];
+      for (const arr of itemArrays) {
+        if (!arr) {
+          continue;
+        }
+        for (const item of arr) {
+          pushDrawable(item?.drawable);
+          if (count >= this._ssrSDFMaxBoxes) {
+            return;
+          }
+        }
+      }
+      if (listInfo.instanceList) {
+        for (const key of Object.keys(listInfo.instanceList)) {
+          const batchDrawables = listInfo.instanceList[key];
+          if (!batchDrawables) {
+            continue;
+          }
+          for (const drawable of batchDrawables) {
+            pushDrawable(drawable);
+            if (count >= this._ssrSDFMaxBoxes) {
+              return;
+            }
+          }
+        }
+      }
+    };
+    const bundles = [
+      itemList.opaque.lit,
+      itemList.opaque.unlit,
+      itemList.transmission.lit,
+      itemList.transmission.unlit
+    ];
+    for (const bundle of bundles) {
+      for (const listInfo of bundle) {
+        collectFromListInfo(listInfo);
+        if (count >= this._ssrSDFMaxBoxes) {
+          break;
+        }
+      }
+      if (count >= this._ssrSDFMaxBoxes) {
+        break;
+      }
+    }
+    if (!this._ssrSDFBoxBuffer) {
+      this._ssrSDFBoxBuffer = ctx.device.createBuffer(this._ssrSDFMaxBoxes * 8 * 4, { usage: 'uniform' });
+    }
+    this._ssrSDFBoxBuffer.bufferSubData(0, data as unknown as Float32Array<ArrayBuffer>);
+    ctx.ssrSDFBoxBuffer = this._ssrSDFBoxBuffer;
+    ctx.ssrSDFBoxCount = count;
   }
   private static _getBox(_ctx: DrawContext) {
     if (!this._box) {

@@ -96,16 +96,6 @@ export interface DrawContext {
   linearDepthTexture?: Texture2D;
   /** Scene color texture bound for sampling (previous pass or resolved color). */
   sceneColorTexture?: Texture2D;
-  /** Deferred GBuffer framebuffer for the current frame (optional). */
-  gbufferFramebuffer?: Nullable<FrameBuffer>;
-  /** Deferred GBuffer albedo/metallic target (optional). */
-  gbufferAlbedoTexture?: Texture2D;
-  /** Deferred GBuffer normal/roughness target (optional). */
-  gbufferNormalTexture?: Texture2D;
-  /** Deferred GBuffer material parameter target (optional). */
-  gbufferMaterialTexture?: Texture2D;
-  /** @deprecated Kept as alias for old phase naming, use gbufferMaterialTexture instead. */
-  gbufferEmissiveTexture?: Texture2D;
   /** Default depth buffer format for targets created in this pass. */
   readonly depthFormat: TextureFormat;
   /** Default color buffer format for targets created in this pass. */
@@ -136,6 +126,10 @@ export interface DrawContext {
   SSRRoughnessTexture: Texture2D;
   /** SSR normal input texture (usually view-space or world-space normals). */
   SSRNormalTexture: Texture2D;
+  /** SSR SDF proxy uniform buffer (pair of vec4: min.xyz / max.xyz for each box). */
+  ssrSDFBoxBuffer: Nullable<GPUDataBuffer>;
+  /** Number of valid SDF proxy boxes in `ssrSDFBoxBuffer`. */
+  ssrSDFBoxCount: number;
   /** Final framebuffer target where the last stage renders. */
   finalFramebuffer: Nullable<FrameBuffer>;
   /** Intermediate framebuffer used by the compositor or multi-pass pipelines. */

@@ -63,6 +63,11 @@ export class DeferredLightPass {
           this.cameraNearFar = pb.vec2().uniform(0);
           this.sunDir = pb.vec3().uniform(0);
           this.sunColorIntensity = pb.vec4().uniform(0);
+          this.showGBuffer = pb.int().uniform(0);
+          this.gbufferViewMode = pb.int().uniform(0);
+          this.showCluster = pb.int().uniform(0);
+          this.showShadowTerm = pb.int().uniform(0);
+          this.showSpecTerm = pb.int().uniform(0);
           if (hasEnvLight) {
             this.envLightStrength = pb.float().uniform(0);
             ctx.env!.light.envLight.initShaderBindings(pb);
@@ -180,6 +185,7 @@ export class DeferredLightPass {
             });
             this.$l.diffuse = this.sunDiffuse;
             this.$l.specular = this.sunSpecular;
+            this.$l.clusterLightCount = pb.int(0);
             this.$l.clusterIndex = this.zGetClusterIndex(this.linearDepth);
             if (isWebGL) {
               this.$l.texCoordX = pb.div(
@@ -196,6 +202,7 @@ export class DeferredLightPass {
                 this.$for(pb.int('k'), 0, 2, function () {
                   this.$l.lightIndex = this.zDecodeWebGLLightIndex(this.packed, this.k);
                   this.$if(pb.greaterThan(this.lightIndex, 0), function () {
+                    this.clusterLightCount = pb.add(this.clusterLightCount, 1);
                     this.$l.positionRange = this.zLightBuffer.at(pb.mul(this.lightIndex, 4));
                     this.$l.directionCutoff = this.zLightBuffer.at(pb.add(pb.mul(this.lightIndex, 4), 1));
                     this.$l.diffuseIntensity = this.zLightBuffer.at(pb.add(pb.mul(this.lightIndex, 4), 2));
@@ -283,6 +290,7 @@ export class DeferredLightPass {
                 this.$for(pb.uint('k'), 0, 4, function () {
                   this.$l.lightIndex = pb.compAnd(pb.sar(this.samp.at(this.i), pb.mul(this.k, 8)), 0xff);
                   this.$if(pb.greaterThan(this.lightIndex, 0), function () {
+                    this.clusterLightCount = pb.add(this.clusterLightCount, 1);
                     this.$l.positionRange = this.zLightBuffer.at(pb.mul(this.lightIndex, 4));
                     this.$l.directionCutoff = this.zLightBuffer.at(pb.add(pb.mul(this.lightIndex, 4), 1));
                     this.$l.diffuseIntensity = this.zLightBuffer.at(pb.add(pb.mul(this.lightIndex, 4), 2));
@@ -410,7 +418,44 @@ export class DeferredLightPass {
                 )
               );
             }
-            this.$outputs.color = pb.vec4(pb.max(this.finalColor, pb.vec3(0)), this.base.a);
+            // Deferred direct shadowing is aligned in follow-up pass; keep a stable debug channel now.
+            this.$l.shadowTerm = pb.float(1);
+            this.$l.debugColor = pb.max(this.finalColor, pb.vec3(0));
+            this.$if(pb.notEqual(this.showGBuffer, 0), function () {
+              this.$if(pb.equal(this.gbufferViewMode, 1), function () {
+                this.debugColor = pb.vec3(pb.clamp(this.linearDepthNormalized, 0, 1));
+              }).$elseif(pb.equal(this.gbufferViewMode, 2), function () {
+                this.debugColor = pb.vec3(this.metallic);
+              }).$elseif(pb.equal(this.gbufferViewMode, 3), function () {
+                this.debugColor = pb.vec3(this.roughness);
+              }).$elseif(pb.equal(this.gbufferViewMode, 4), function () {
+                this.$l.rawN = pb.sub(pb.mul(pb.textureSample(this.gbufferNormalTex, this.$inputs.uv).xyz, 2), pb.vec3(1));
+                this.debugColor = pb.vec3(pb.clamp(pb.length(this.rawN), 0, 1));
+              }).$else(function () {
+                // composite
+                this.$if(pb.lessThan(this.$inputs.uv.x, 0.5), function () {
+                  this.$if(pb.lessThan(this.$inputs.uv.y, 0.5), function () {
+                    this.debugColor = this.base.rgb;
+                  }).$else(function () {
+                    this.debugColor = this.rm.rgb;
+                  });
+                }).$else(function () {
+                  this.$if(pb.lessThan(this.$inputs.uv.y, 0.5), function () {
+                    this.debugColor = pb.add(pb.mul(this.n, 0.5), pb.vec3(0.5));
+                  }).$else(function () {
+                    this.debugColor = pb.vec3(this.roughness);
+                  });
+                });
+              });
+            }).$elseif(pb.notEqual(this.showCluster, 0), function () {
+              this.$l.clusterT = pb.clamp(pb.div(pb.float(this.clusterLightCount), 16), 0, 1);
+              this.debugColor = pb.vec3(this.clusterT, pb.mul(this.clusterT, this.clusterT), pb.sub(1, this.clusterT));
+            }).$elseif(pb.notEqual(this.showShadowTerm, 0), function () {
+              this.debugColor = pb.vec3(this.shadowTerm);
+            }).$elseif(pb.notEqual(this.showSpecTerm, 0), function () {
+              this.debugColor = pb.max(this.specular, pb.vec3(0));
+            });
+            this.$outputs.color = pb.vec4(this.debugColor, this.base.a);
           });
         }
       });
@@ -452,8 +497,11 @@ export class DeferredLightPass {
       new Int32Array([ctx.clusteredLight.lightIndexTexture.width, ctx.clusteredLight.lightIndexTexture.height])
     );
     const sunDirSrc = ctx.sunLight ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1) : { x: 0, y: 0, z: 1 };
+    const sunShadowed = !!(ctx.sunLight && ctx.shadowMapInfo?.has(ctx.sunLight));
     const sunColorIntensitySrc = ctx.sunLight
-      ? ctx.sunLight.diffuseAndIntensity
+      ? sunShadowed
+        ? { x: 0, y: 0, z: 0, w: 0 }
+        : ctx.sunLight.diffuseAndIntensity
       : { x: 1, y: 1, z: 1, w: 0 };
     const cameraRight = ctx.camera.worldMatrix.getRow(0).xyz().inplaceNormalize();
     const cameraUp = ctx.camera.worldMatrix.getRow(1).xyz().inplaceNormalize();
@@ -475,6 +523,29 @@ export class DeferredLightPass {
     bindGroup.setValue('cameraPos', new Float32Array([cameraPos.x, cameraPos.y, cameraPos.z]));
     bindGroup.setValue('cameraProj', new Float32Array([ctx.camera.getTanHalfFovy(), ctx.camera.getAspect()]));
     bindGroup.setValue('cameraNearFar', new Float32Array([ctx.camera.getNearPlane(), ctx.camera.getFarPlane()]));
+    let gbufferViewMode = 0;
+    switch (ctx.camera.deferredGBufferView) {
+      case 'depth':
+        gbufferViewMode = 1;
+        break;
+      case 'metallic':
+        gbufferViewMode = 2;
+        break;
+      case 'roughness':
+        gbufferViewMode = 3;
+        break;
+      case 'normal-length':
+        gbufferViewMode = 4;
+        break;
+      default:
+        gbufferViewMode = 0;
+        break;
+    }
+    bindGroup.setValue('showGBuffer', ctx.camera.deferredShowGBuffer ? 1 : 0);
+    bindGroup.setValue('gbufferViewMode', gbufferViewMode);
+    bindGroup.setValue('showCluster', ctx.camera.deferredShowCluster ? 1 : 0);
+    bindGroup.setValue('showShadowTerm', ctx.camera.deferredShowShadowTerm ? 1 : 0);
+    bindGroup.setValue('showSpecTerm', ctx.camera.deferredShowSpecTerm ? 1 : 0);
     if (ctx.env?.light?.envLight) {
       bindGroup.setValue('envLightStrength', ctx.env.light.strength ?? 0);
       ctx.env.light.envLight.updateBindGroup(bindGroup);

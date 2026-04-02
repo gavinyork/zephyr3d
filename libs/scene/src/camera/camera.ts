@@ -64,6 +64,12 @@ export type CameraHistoryData = {
  * @public
  */
 export type RenderPath = 'forward' | 'deferred' | 'hybrid';
+export type DeferredGBufferView =
+  | 'composite'
+  | 'depth'
+  | 'metallic'
+  | 'roughness'
+  | 'normal-length';
 
 /**
  * A renderable camera node that manages view/projection math, frusta,
@@ -218,6 +224,26 @@ export class Camera extends SceneNode {
   protected _ssrBlurKernelSize: number;
   /** @internal SSR Gaussian blur standard deviation. */
   protected _ssrBlurStdDev: number;
+  /** @internal Whether HiZ miss falls back to linear SSR tracing. */
+  protected _ssrHiZFallback: boolean;
+  /** @internal Max iterations for HiZ miss linear SSR fallback. */
+  protected _ssrHiZFallbackSteps: number;
+  /** @internal Stride for HiZ miss linear SSR fallback. */
+  protected _ssrHiZFallbackStride: number;
+  /** @internal Whether SSR temporal accumulation is enabled. */
+  protected _ssrTemporal: boolean;
+  /** @internal SSR temporal blending weight in [0, 1]. */
+  protected _ssrTemporalWeight: number;
+  /** @internal Deferred debug: visualize gbuffer payload. */
+  protected _deferredShowGBuffer: boolean;
+  /** @internal Deferred debug gbuffer channel mode. */
+  protected _deferredGBufferView: DeferredGBufferView;
+  /** @internal Deferred debug: visualize clustered light occupancy. */
+  protected _deferredShowCluster: boolean;
+  /** @internal Deferred debug: visualize shadow term contribution. */
+  protected _deferredShowShadowTerm: boolean;
+  /** @internal Deferred debug: visualize specular term contribution. */
+  protected _deferredShowSpecTerm: boolean;
 
   /** @internal SSAO enable flag (via post effect). */
   protected _SSAO: boolean;
@@ -338,6 +364,16 @@ export class Camera extends SceneNode {
     this._ssrBlurDepthCutoff = 2;
     this._ssrBlurKernelSize = 5;
     this._ssrBlurStdDev = 4;
+    this._ssrHiZFallback = true;
+    this._ssrHiZFallbackSteps = 24;
+    this._ssrHiZFallbackStride = 1;
+    this._ssrTemporal = true;
+    this._ssrTemporalWeight = 0.85;
+    this._deferredShowGBuffer = false;
+    this._deferredGBufferView = 'composite';
+    this._deferredShowCluster = false;
+    this._deferredShowShadowTerm = false;
+    this._deferredShowSpecTerm = false;
     this._SSAO = false;
     this._postEffectSSAO = new DRef();
     this._SSAOScale = 10;
@@ -427,6 +463,53 @@ export class Camera extends SceneNode {
   }
   set renderPath(val: RenderPath) {
     this._renderPath = val ?? 'forward';
+  }
+  /**
+   * Deferred debug toggle: show GBuffer payload.
+   *
+   * When enabled in deferred/hybrid path, final shading is replaced by a GBuffer visualization.
+   */
+  get deferredShowGBuffer() {
+    return this._deferredShowGBuffer;
+  }
+  set deferredShowGBuffer(val: boolean) {
+    this._deferredShowGBuffer = !!val;
+  }
+  /**
+   * Deferred debug channel mode for GBuffer visualization.
+   */
+  get deferredGBufferView() {
+    return this._deferredGBufferView;
+  }
+  set deferredGBufferView(val: DeferredGBufferView) {
+    this._deferredGBufferView = val ?? 'composite';
+  }
+  /**
+   * Deferred debug toggle: show clustered-light occupancy.
+   */
+  get deferredShowCluster() {
+    return this._deferredShowCluster;
+  }
+  set deferredShowCluster(val: boolean) {
+    this._deferredShowCluster = !!val;
+  }
+  /**
+   * Deferred debug toggle: show shadow term.
+   */
+  get deferredShowShadowTerm() {
+    return this._deferredShowShadowTerm;
+  }
+  set deferredShowShadowTerm(val: boolean) {
+    this._deferredShowShadowTerm = !!val;
+  }
+  /**
+   * Deferred debug toggle: show specular term.
+   */
+  get deferredShowSpecTerm() {
+    return this._deferredShowSpecTerm;
+  }
+  set deferredShowSpecTerm(val: boolean) {
+    this._deferredShowSpecTerm = !!val;
   }
   /**
    * Whether HDR backbuffer is enabled.
@@ -749,6 +832,52 @@ export class Camera extends SceneNode {
   }
   set ssrBlurStdDev(val) {
     this._ssrBlurStdDev = val;
+  }
+  /**
+   * Gets whether HiZ miss should fall back to linear SSR tracing.
+   */
+  get ssrHiZFallback() {
+    return this._ssrHiZFallback;
+  }
+  set ssrHiZFallback(val) {
+    this._ssrHiZFallback = !!val;
+  }
+  /**
+   * Gets maximum steps for HiZ miss linear SSR fallback.
+   */
+  get ssrHiZFallbackSteps() {
+    return this._ssrHiZFallbackSteps;
+  }
+  set ssrHiZFallbackSteps(val) {
+    this._ssrHiZFallbackSteps = Math.max(1, val ?? 1);
+  }
+  /**
+   * Gets stride for HiZ miss linear SSR fallback.
+   */
+  get ssrHiZFallbackStride() {
+    return this._ssrHiZFallbackStride;
+  }
+  set ssrHiZFallbackStride(val) {
+    this._ssrHiZFallbackStride = Math.max(1, val ?? 1);
+  }
+  /**
+   * Gets whether SSR temporal accumulation is enabled.
+   */
+  get ssrTemporal() {
+    return this._ssrTemporal;
+  }
+  set ssrTemporal(val) {
+    this._ssrTemporal = !!val;
+  }
+  /**
+   * Gets SSR temporal blending weight in [0, 1].
+   * Higher values rely more on reprojected history.
+   */
+  get ssrTemporalWeight() {
+    return this._ssrTemporalWeight;
+  }
+  set ssrTemporalWeight(val) {
+    this._ssrTemporalWeight = Math.max(0, Math.min(1, val ?? 0));
   }
   /** @internal */
   get ssrParams(): Immutable<Vector4> {
@@ -1260,7 +1389,8 @@ export class Camera extends SceneNode {
   render(scene: Scene) {
     const device = getDevice();
     //this.updatePostProcessing(device);
-    const useMotionVector = (this.TAA || this.motionBlur || this.SSR) && device.type !== 'webgl';
+    const useMotionVector =
+      (this.TAA || this.motionBlur || (this.SSR && this.ssrTemporal)) && device.type !== 'webgl';
     const useTAA = useMotionVector && this.TAA;
     scene.dispatchEvent('startrender', scene, this, this._compositor);
     if (useMotionVector) {

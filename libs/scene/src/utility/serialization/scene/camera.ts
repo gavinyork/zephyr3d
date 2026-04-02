@@ -1,6 +1,6 @@
 import { defineProps, type SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
-import type { RenderPath } from '../../../camera';
+import type { DeferredGBufferView, RenderPath } from '../../../camera';
 import { SceneNode } from '../../../scene';
 import {
   TAA_DEBUG_ALAPH,
@@ -124,6 +124,105 @@ export function getCameraClass(): SerializableClass {
           },
           set(this: Camera, value) {
             this.renderPath = value.str[0] as RenderPath;
+          }
+        },
+        {
+          name: 'DeferredShowGBuffer',
+          type: 'bool',
+          phase: 0,
+          default: false,
+          options: {
+            label: 'ShowGBuffer',
+            group: 'Rendering/DeferredDebug'
+          },
+          get(this: Camera, value) {
+            value.bool[0] = this.deferredShowGBuffer;
+          },
+          set(this: Camera, value) {
+            this.deferredShowGBuffer = value.bool[0];
+          },
+          isValid(this: Camera) {
+            return this.renderPath !== 'forward';
+          }
+        },
+        {
+          name: 'DeferredGBufferView',
+          type: 'string',
+          phase: 0,
+          default: 'composite',
+          options: {
+            label: 'GBufferView',
+            group: 'Rendering/DeferredDebug',
+            enum: {
+              labels: ['Composite', 'Depth', 'Metallic', 'Roughness', 'NormalLength'],
+              values: ['composite', 'depth', 'metallic', 'roughness', 'normal-length']
+            }
+          },
+          get(this: Camera, value) {
+            value.str[0] = this.deferredGBufferView;
+          },
+          set(this: Camera, value) {
+            this.deferredGBufferView = value.str[0] as DeferredGBufferView;
+          },
+          isValid(this: Camera) {
+            return this.renderPath !== 'forward' && this.deferredShowGBuffer;
+          }
+        },
+        {
+          name: 'DeferredShowCluster',
+          type: 'bool',
+          phase: 0,
+          default: false,
+          options: {
+            label: 'ShowCluster',
+            group: 'Rendering/DeferredDebug'
+          },
+          get(this: Camera, value) {
+            value.bool[0] = this.deferredShowCluster;
+          },
+          set(this: Camera, value) {
+            this.deferredShowCluster = value.bool[0];
+          },
+          isValid(this: Camera) {
+            return this.renderPath !== 'forward';
+          }
+        },
+        {
+          name: 'DeferredShowShadowTerm',
+          type: 'bool',
+          phase: 0,
+          default: false,
+          options: {
+            label: 'ShowShadowTerm',
+            group: 'Rendering/DeferredDebug'
+          },
+          get(this: Camera, value) {
+            value.bool[0] = this.deferredShowShadowTerm;
+          },
+          set(this: Camera, value) {
+            this.deferredShowShadowTerm = value.bool[0];
+          },
+          isValid(this: Camera) {
+            return this.renderPath !== 'forward';
+          }
+        },
+        {
+          name: 'DeferredShowSpecTerm',
+          type: 'bool',
+          phase: 0,
+          default: false,
+          options: {
+            label: 'ShowSpecTerm',
+            group: 'Rendering/DeferredDebug'
+          },
+          get(this: Camera, value) {
+            value.bool[0] = this.deferredShowSpecTerm;
+          },
+          set(this: Camera, value) {
+            this.deferredShowSpecTerm = value.bool[0];
+          },
+          isValid(this: Camera) {
+            return this.renderPath !== 'forward';
           }
         },
         {
@@ -712,6 +811,107 @@ export function getCameraClass(): SerializableClass {
           },
           isValid(this: Camera) {
             return this.SSR;
+          }
+        },
+        {
+          name: 'SSRHiZFallback',
+          type: 'bool',
+          phase: 1,
+          default: true,
+          options: {
+            label: 'HiZFallback',
+            group: 'PostProcessing/SSR'
+          },
+          get(this: Camera, value) {
+            value.bool[0] = this.ssrHiZFallback;
+          },
+          set(this: Camera, value) {
+            this.ssrHiZFallback = value.bool[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR && this.HiZ;
+          }
+        },
+        {
+          name: 'SSRHiZFallbackSteps',
+          type: 'int',
+          phase: 1,
+          default: 24,
+          options: {
+            label: 'FallbackSteps',
+            group: 'PostProcessing/SSR',
+            minValue: 1,
+            maxValue: 512
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssrHiZFallbackSteps;
+          },
+          set(this: Camera, value) {
+            this.ssrHiZFallbackSteps = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR && this.HiZ && this.ssrHiZFallback;
+          }
+        },
+        {
+          name: 'SSRHiZFallbackStride',
+          type: 'float',
+          phase: 1,
+          default: 1,
+          options: {
+            label: 'FallbackStride',
+            group: 'PostProcessing/SSR',
+            minValue: 1,
+            maxValue: 8
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssrHiZFallbackStride;
+          },
+          set(this: Camera, value) {
+            this.ssrHiZFallbackStride = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR && this.HiZ && this.ssrHiZFallback;
+          }
+        },
+        {
+          name: 'SSRTemporal',
+          type: 'bool',
+          phase: 1,
+          default: true,
+          options: {
+            label: 'Temporal',
+            group: 'PostProcessing/SSR'
+          },
+          get(this: Camera, value) {
+            value.bool[0] = this.ssrTemporal;
+          },
+          set(this: Camera, value) {
+            this.ssrTemporal = value.bool[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR;
+          }
+        },
+        {
+          name: 'SSRTemporalWeight',
+          type: 'float',
+          phase: 1,
+          default: 0.85,
+          options: {
+            label: 'TemporalWeight',
+            group: 'PostProcessing/SSR',
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssrTemporalWeight;
+          },
+          set(this: Camera, value) {
+            this.ssrTemporalWeight = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSR && this.ssrTemporal;
           }
         },
         {
