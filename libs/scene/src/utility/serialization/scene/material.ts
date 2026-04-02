@@ -563,6 +563,20 @@ export function getMeshMaterialClass(): SerializableClass[] {
             }
           },
           {
+            name: 'AlphaDither',
+            type: 'bool',
+            default: false,
+            get(this: MeshMaterial, value) {
+              value.bool[0] = this.alphaDither;
+            },
+            set(this: MeshMaterial, value) {
+              this.alphaDither = value.bool[0];
+            },
+            isValid(this: MeshMaterial) {
+              return !this.$isInstance && this.alphaCutoff > 0;
+            }
+          },
+          {
             name: 'BlendMode',
             type: 'string',
             options: {
