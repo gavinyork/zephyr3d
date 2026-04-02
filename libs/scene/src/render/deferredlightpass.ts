@@ -18,7 +18,13 @@ export class DeferredLightPass {
   private static _programs: Record<string, GPUProgram> = {};
   private static _bindGroups: Record<string, BindGroup> = {};
 
-  render(ctx: DrawContext, gbufferColor: Texture2D, gbufferRoughness: Texture2D, gbufferNormal: Texture2D) {
+  render(
+    ctx: DrawContext,
+    gbufferColor: Texture2D,
+    gbufferRoughness: Texture2D,
+    gbufferNormal: Texture2D,
+    gbufferExtra: Texture2D
+  ) {
     if (!ctx.clusteredLight?.lightBuffer || !ctx.clusteredLight.lightIndexTexture || !ctx.linearDepthTexture) {
       return;
     }
@@ -50,6 +56,7 @@ export class DeferredLightPass {
           this.gbufferColorTex = pb.tex2D().uniform(0);
           this.gbufferRoughnessTex = pb.tex2D().uniform(0);
           this.gbufferNormalTex = pb.tex2D().uniform(0);
+          this.gbufferExtraTex = pb.tex2D().uniform(0);
           this.linearDepthTex = pb.tex2D().uniform(0);
           this.zGGXLut = pb.tex2D().uniform(0);
           this.lightIndexTex = (isWebGL ? pb.tex2D() : pb.utex2D()).uniform(0);
@@ -126,9 +133,151 @@ export class DeferredLightPass {
               this.$return(pb.mul(this.base, this.spotFactor));
             }
           );
+          pb.func(
+            'zAccumulatePunctualLight',
+            [
+              pb.vec3('baseColor'),
+              pb.float('metallic'),
+              pb.float('roughness'),
+              pb.float('specularStrength'),
+              pb.vec3('n'),
+              pb.vec3('viewDir'),
+              pb.float('NoV'),
+              pb.vec3('f0'),
+              pb.vec3('lightColor'),
+              pb.vec3('L'),
+              pb.float('atten'),
+              pb.float('diffScale'),
+              pb.float('specScale'),
+              pb.float('sourceRadiusFactor'),
+              pb.vec3('outDiffuse').inout(),
+              pb.vec3('outSpecular').inout()
+            ],
+            function () {
+              this.$l.pointNoL = pb.clamp(pb.dot(this.n, this.L), 0, 1);
+              this.$if(pb.greaterThan(this.pointNoL, 1e-5), function () {
+                this.$l.H = pb.normalize(pb.add(this.viewDir, this.L));
+                this.$l.NoH = pb.clamp(pb.dot(this.n, this.H), 0, 1);
+                this.$l.VoH = pb.clamp(pb.dot(this.viewDir, this.H), 0, 1);
+                this.$l.F = fresnelSchlick(this, this.VoH, this.f0, pb.vec3(1));
+                this.$l.specularRoughness = pb.clamp(
+                  pb.add(this.roughness, this.sourceRadiusFactor),
+                  0,
+                  1
+                );
+                this.$l.alphaRoughness = pb.mul(this.specularRoughness, this.specularRoughness);
+                this.$l.D = distributionGGX(this, this.NoH, this.alphaRoughness);
+                this.$l.V = visGGX(this, this.NoV, this.pointNoL, this.alphaRoughness);
+                this.$l.punctualColor = pb.mul(this.lightColor, this.atten, this.pointNoL);
+                this.$l.diffuseBRDF = pb.mul(
+                  pb.sub(pb.vec3(1), this.F),
+                  pb.div(pb.mul(this.baseColor, pb.sub(1, this.metallic)), Math.PI)
+                );
+                this.outDiffuse = pb.add(
+                  this.outDiffuse,
+                  pb.mul(this.punctualColor, pb.max(this.diffuseBRDF, pb.vec3(0)), this.diffScale)
+                );
+                this.outSpecular = pb.add(
+                  this.outSpecular,
+                  pb.mul(this.punctualColor, this.D, this.V, this.F, this.specScale)
+                );
+              });
+            }
+          );
+          pb.func(
+            'zAccumulateRectLight',
+            [
+              pb.vec3('worldPos'),
+              pb.vec3('baseColor'),
+              pb.float('metallic'),
+              pb.float('roughness'),
+              pb.float('specularStrength'),
+              pb.vec3('n'),
+              pb.vec3('viewDir'),
+              pb.float('NoV'),
+              pb.vec3('f0'),
+              pb.vec4('posRange'),
+              pb.vec4('axisX'),
+              pb.vec4('axisY'),
+              pb.vec4('colorIntensity'),
+              pb.vec3('outDiffuse').inout(),
+              pb.vec3('outSpecular').inout()
+            ],
+            function () {
+              this.$l.center = this.posRange.xyz;
+              this.$l.range = this.posRange.w;
+              this.$l.ax = this.axisX.xyz;
+              this.$l.ay = this.axisY.xyz;
+              this.$l.halfWidth = pb.length(this.ax);
+              this.$l.halfHeight = pb.length(this.ay);
+              this.$l.area = pb.mul(this.halfWidth, this.halfHeight, 4);
+              this.$l.lightNormal = pb.neg(pb.normalize(pb.cross(this.ax, this.ay)));
+              this.$if(pb.greaterThan(this.area, 0), function () {
+                this.$l.baseRectColor = pb.mul(this.colorIntensity.rgb, this.colorIntensity.a, this.area, 0.25);
+                this.$l.samplePos = pb.vec3();
+                this.$l.Lvec = pb.vec3();
+                this.$l.L = pb.vec3();
+                this.$l.dist = pb.float();
+                this.$l.invDist2 = pb.float();
+                this.$l.NoL = pb.float();
+                this.$l.NoL_light = pb.float();
+                this.$l.falloff = pb.float();
+                this.$l.lightSampleColor = pb.vec3();
+
+                const sample = (u: number, v: number) => {
+                  this.samplePos = pb.add(
+                    this.center,
+                    pb.add(
+                      pb.mul(this.ax, pb.sub(pb.mul(u, 2), 1)),
+                      pb.mul(this.ay, pb.sub(pb.mul(v, 2), 1))
+                    )
+                  );
+                  this.Lvec = pb.sub(this.samplePos, this.worldPos);
+                  this.dist = pb.length(this.Lvec);
+                  this.invDist2 = pb.div(1, pb.max(pb.mul(this.dist, this.dist), 0.0001));
+                  this.L = pb.normalize(this.Lvec);
+                  this.NoL = pb.clamp(pb.dot(this.n, this.L), 0, 1);
+                  this.NoL_light = pb.clamp(pb.dot(this.lightNormal, pb.neg(this.L)), 0, 1);
+                  this.$if(pb.greaterThan(pb.mul(this.NoL, this.NoL_light), 1e-5), function () {
+                    this.falloff = pb.float(1);
+                    this.$if(pb.greaterThan(this.range, 0), function () {
+                      this.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.range)));
+                      this.falloff = pb.mul(this.falloff, this.falloff);
+                    });
+                    this.lightSampleColor = pb.mul(this.baseRectColor, this.invDist2, this.NoL_light);
+                    this.zAccumulatePunctualLight(
+                      this.baseColor,
+                      this.metallic,
+                      this.roughness,
+                      this.specularStrength,
+                      this.n,
+                      this.viewDir,
+                      this.NoV,
+                      this.f0,
+                      this.lightSampleColor,
+                      this.L,
+                      this.falloff,
+                      1,
+                      1,
+                      0,
+                      this.outDiffuse,
+                      this.outSpecular
+                    );
+                  });
+                };
+
+                sample(0.25, 0.25);
+                sample(0.75, 0.25);
+                sample(0.25, 0.75);
+                sample(0.75, 0.75);
+              });
+            }
+          );
           pb.main(function () {
             this.$l.base = pb.textureSample(this.gbufferColorTex, this.$inputs.uv);
             this.$l.rm = pb.textureSample(this.gbufferRoughnessTex, this.$inputs.uv);
+            this.$l.extra = pb.textureSample(this.gbufferExtraTex, this.$inputs.uv);
+            this.$l.litFlag = pb.float(pb.greaterThan(this.extra.a, 0.5));
             this.$l.n = pb.normalize(
               pb.sub(pb.mul(pb.textureSample(this.gbufferNormalTex, this.$inputs.uv).xyz, 2), pb.vec3(1))
             );
@@ -213,8 +362,7 @@ export class DeferredLightPass {
                     this.$if(
                       pb.or(
                         pb.equal(this.lightType, LIGHT_TYPE_POINT),
-                        pb.equal(this.lightType, LIGHT_TYPE_SPOT),
-                        pb.equal(this.lightType, LIGHT_TYPE_RECT)
+                        pb.equal(this.lightType, LIGHT_TYPE_SPOT)
                       ),
                       function () {
                         this.$l.toLight = pb.sub(this.positionRange.xyz, this.worldPos);
@@ -231,7 +379,6 @@ export class DeferredLightPass {
                         });
                         this.$if(pb.greaterThan(this.atten, 1e-5), function () {
                           this.$l.lightColor = pb.mul(this.diffuseIntensity.rgb, this.diffuseIntensity.a);
-                          this.$l.pointNoL = pb.clamp(pb.dot(this.n, this.L), 0, 1);
                           this.$l.diffScale = this.$choice(
                             pb.equal(this.lightType, LIGHT_TYPE_POINT),
                             this.extra.x,
@@ -247,40 +394,46 @@ export class DeferredLightPass {
                             pb.div(this.extra.z, pb.max(this.dist, 1e-4)),
                             pb.float(0)
                           );
-                          this.$if(pb.greaterThan(this.pointNoL, 1e-5), function () {
-                            this.$l.H = pb.normalize(pb.add(this.viewDir, this.L));
-                            this.$l.NoH = pb.clamp(pb.dot(this.n, this.H), 0, 1);
-                            this.$l.VoH = pb.clamp(pb.dot(this.viewDir, this.H), 0, 1);
-                            this.$l.F = fresnelSchlick(this, this.VoH, this.f0, pb.vec3(1));
-                            this.$l.specularRoughness = pb.clamp(
-                              pb.add(this.roughness, this.sourceRadiusFactor),
-                              0,
-                              1
-                            );
-                            this.$l.alphaRoughness = pb.mul(this.specularRoughness, this.specularRoughness);
-                            this.$l.D = distributionGGX(this, this.NoH, this.alphaRoughness);
-                            this.$l.V = visGGX(this, this.NoV, this.pointNoL, this.alphaRoughness);
-                            this.$l.punctualColor = pb.mul(this.lightColor, this.atten, this.pointNoL);
-                            this.$l.diffuseBRDF = pb.mul(
-                              pb.sub(pb.vec3(1), this.F),
-                              pb.div(pb.mul(this.base.rgb, pb.sub(1, this.metallic)), Math.PI)
-                            );
-                            this.diffuse = pb.add(
-                              this.diffuse,
-                              pb.mul(
-                                this.punctualColor,
-                                pb.max(this.diffuseBRDF, pb.vec3(0)),
-                                this.diffScale
-                              )
-                            );
-                            this.specular = pb.add(
-                              this.specular,
-                              pb.mul(this.punctualColor, this.D, this.V, this.F, this.specScale)
-                            );
-                          });
+                          this.zAccumulatePunctualLight(
+                            this.base.rgb,
+                            this.metallic,
+                            this.roughness,
+                            this.specularStrength,
+                            this.n,
+                            this.viewDir,
+                            this.NoV,
+                            this.f0,
+                            this.lightColor,
+                            this.L,
+                            this.atten,
+                            this.diffScale,
+                            this.specScale,
+                            this.sourceRadiusFactor,
+                            this.diffuse,
+                            this.specular
+                          );
                         });
                       }
                     );
+                    this.$if(pb.equal(this.lightType, LIGHT_TYPE_RECT), function () {
+                      this.zAccumulateRectLight(
+                        this.worldPos,
+                        this.base.rgb,
+                        this.metallic,
+                        this.roughness,
+                        this.specularStrength,
+                        this.n,
+                        this.viewDir,
+                        this.NoV,
+                        this.f0,
+                        this.positionRange,
+                        this.directionCutoff,
+                        this.extra,
+                        this.diffuseIntensity,
+                        this.diffuse,
+                        this.specular
+                      );
+                    });
                   });
                 });
               });
@@ -301,8 +454,7 @@ export class DeferredLightPass {
                     this.$if(
                       pb.or(
                         pb.equal(this.lightType, LIGHT_TYPE_POINT),
-                        pb.equal(this.lightType, LIGHT_TYPE_SPOT),
-                        pb.equal(this.lightType, LIGHT_TYPE_RECT)
+                        pb.equal(this.lightType, LIGHT_TYPE_SPOT)
                       ),
                       function () {
                         this.$l.toLight = pb.sub(this.positionRange.xyz, this.worldPos);
@@ -319,7 +471,6 @@ export class DeferredLightPass {
                         });
                         this.$if(pb.greaterThan(this.atten, 1e-5), function () {
                           this.$l.lightColor = pb.mul(this.diffuseIntensity.rgb, this.diffuseIntensity.a);
-                          this.$l.pointNoL = pb.clamp(pb.dot(this.n, this.L), 0, 1);
                           this.$l.diffScale = this.$choice(
                             pb.equal(this.lightType, LIGHT_TYPE_POINT),
                             this.extra.x,
@@ -335,45 +486,51 @@ export class DeferredLightPass {
                             pb.div(this.extra.z, pb.max(this.dist, 1e-4)),
                             pb.float(0)
                           );
-                          this.$if(pb.greaterThan(this.pointNoL, 1e-5), function () {
-                            this.$l.H = pb.normalize(pb.add(this.viewDir, this.L));
-                            this.$l.NoH = pb.clamp(pb.dot(this.n, this.H), 0, 1);
-                            this.$l.VoH = pb.clamp(pb.dot(this.viewDir, this.H), 0, 1);
-                            this.$l.F = fresnelSchlick(this, this.VoH, this.f0, pb.vec3(1));
-                            this.$l.specularRoughness = pb.clamp(
-                              pb.add(this.roughness, this.sourceRadiusFactor),
-                              0,
-                              1
-                            );
-                            this.$l.alphaRoughness = pb.mul(this.specularRoughness, this.specularRoughness);
-                            this.$l.D = distributionGGX(this, this.NoH, this.alphaRoughness);
-                            this.$l.V = visGGX(this, this.NoV, this.pointNoL, this.alphaRoughness);
-                            this.$l.punctualColor = pb.mul(this.lightColor, this.atten, this.pointNoL);
-                            this.$l.diffuseBRDF = pb.mul(
-                              pb.sub(pb.vec3(1), this.F),
-                              pb.div(pb.mul(this.base.rgb, pb.sub(1, this.metallic)), Math.PI)
-                            );
-                            this.diffuse = pb.add(
-                              this.diffuse,
-                              pb.mul(
-                                this.punctualColor,
-                                pb.max(this.diffuseBRDF, pb.vec3(0)),
-                                this.diffScale
-                              )
-                            );
-                            this.specular = pb.add(
-                              this.specular,
-                              pb.mul(this.punctualColor, this.D, this.V, this.F, this.specScale)
-                            );
-                          });
+                          this.zAccumulatePunctualLight(
+                            this.base.rgb,
+                            this.metallic,
+                            this.roughness,
+                            this.specularStrength,
+                            this.n,
+                            this.viewDir,
+                            this.NoV,
+                            this.f0,
+                            this.lightColor,
+                            this.L,
+                            this.atten,
+                            this.diffScale,
+                            this.specScale,
+                            this.sourceRadiusFactor,
+                            this.diffuse,
+                            this.specular
+                          );
                         });
                       }
                     );
+                    this.$if(pb.equal(this.lightType, LIGHT_TYPE_RECT), function () {
+                      this.zAccumulateRectLight(
+                        this.worldPos,
+                        this.base.rgb,
+                        this.metallic,
+                        this.roughness,
+                        this.specularStrength,
+                        this.n,
+                        this.viewDir,
+                        this.NoV,
+                        this.f0,
+                        this.positionRange,
+                        this.directionCutoff,
+                        this.extra,
+                        this.diffuseIntensity,
+                        this.diffuse,
+                        this.specular
+                      );
+                    });
                   });
                 });
               });
             }
-            this.$l.finalColor = pb.add(this.diffuse, this.specular);
+            this.$l.finalColor = pb.add(pb.mul(pb.add(this.diffuse, this.specular), this.litFlag), this.extra.rgb);
             if (hasEnvIrradiance || hasEnvRadiance) {
               this.$l.ggxLutSample = pb.clamp(
                 pb.textureSampleLevel(
@@ -488,6 +645,7 @@ export class DeferredLightPass {
       gbufferNormal,
       fetchSampler('clamp_nearest_nomip')
     );
+    bindGroup.setTexture('gbufferExtraTex', gbufferExtra, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setTexture('linearDepthTex', ctx.linearDepthTexture, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setTexture('zGGXLut', getGGXLUT(1024), fetchSampler('clamp_nearest_nomip'));
     bindGroup.setTexture('lightIndexTex', ctx.clusteredLight.lightIndexTexture);

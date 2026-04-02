@@ -458,7 +458,8 @@ export class PBRBluePrintMaterial
             ),
             scope.commonData.roughness
           ),
-          pb.vec4(pb.add(pb.mul(scope.commonData.normal, 0.5), pb.vec3(0.5)), 1)
+          pb.vec4(pb.add(pb.mul(scope.commonData.normal, 0.5), pb.vec3(0.5)), 1),
+          pb.vec4(scope.commonData.emissive, 1)
         );
       } else {
         this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.commonData.albedo);

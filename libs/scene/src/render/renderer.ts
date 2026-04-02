@@ -313,6 +313,12 @@ export class SceneRenderer {
   /** @internal */
   protected static _renderSceneByPath(ctx: DrawContext) {
     const path = ctx.camera.renderPath;
+    // Deferred/Hybrid are currently maintained as WebGPU-first paths.
+    // On non-WebGPU backends, fall back to forward to keep compatibility stable.
+    if (ctx.device.type !== 'webgpu' && path !== 'forward') {
+      this._renderSceneForward(ctx);
+      return;
+    }
     if (path === 'deferred') {
       this._renderSceneDeferred(ctx);
     } else if (path === 'hybrid') {
@@ -533,7 +539,9 @@ export class SceneRenderer {
       true,
       ctx.depthTexture!.width,
       ctx.depthTexture!.height,
-      [ctx.colorFormat!, ctx.SSRRoughnessTexture, ctx.SSRNormalTexture],
+      // MeshMaterial GBuffer output order:
+      // 0: zFragmentOutput(color), 1: zGBufferExtra, 2: zSSRRoughness, 3: zSSRNormal
+      [ctx.colorFormat!, ctx.colorFormat!, ctx.SSRRoughnessTexture, ctx.SSRNormalTexture],
       ctx.depthTexture,
       false
     );
@@ -564,32 +572,31 @@ export class SceneRenderer {
     this._deferredLightPass.render(
       ctx,
       gbufferFramebuffer.getColorAttachments()[0] as Texture2D,
-      gbufferFramebuffer.getColorAttachments()[1] as Texture2D,
-      gbufferFramebuffer.getColorAttachments()[2] as Texture2D
+      gbufferFramebuffer.getColorAttachments()[2] as Texture2D,
+      gbufferFramebuffer.getColorAttachments()[3] as Texture2D,
+      gbufferFramebuffer.getColorAttachments()[1] as Texture2D
     );
     // Deferred base pass shades unshadowed clustered lights. Accumulate each shadowed
     // light separately so CSM/spot/point shadow maps match forward behavior.
-    const debugViewsEnabled =
-      ctx.camera.deferredShowGBuffer ||
-      ctx.camera.deferredShowCluster ||
-      ctx.camera.deferredShowSpecTerm;
     const debugShadowTermOnly = !!ctx.camera.deferredShowShadowTerm;
     const shadowLights = ctx.shadowMapInfo ? Array.from(ctx.shadowMapInfo.keys()) : [];
-    if (!debugViewsEnabled) {
+    const shouldRenderShadowAccumulation = !ctx.camera.deferredShowGBuffer && !ctx.camera.deferredShowCluster;
+    if (shouldRenderShadowAccumulation) {
       for (const shadowedLight of shadowLights) {
         this._deferredShadowLightPass.render(
           ctx,
           shadowedLight,
           gbufferFramebuffer.getColorAttachments()[0] as Texture2D,
-          gbufferFramebuffer.getColorAttachments()[1] as Texture2D,
           gbufferFramebuffer.getColorAttachments()[2] as Texture2D,
+          gbufferFramebuffer.getColorAttachments()[3] as Texture2D,
+          gbufferFramebuffer.getColorAttachments()[1] as Texture2D,
           debugShadowTermOnly
         );
       }
     }
     device.popDeviceStates();
-    ctx.SSRRoughnessTexture = gbufferFramebuffer.getColorAttachments()[1] as Texture2D;
-    ctx.SSRNormalTexture = gbufferFramebuffer.getColorAttachments()[2] as Texture2D;
+    ctx.SSRRoughnessTexture = gbufferFramebuffer.getColorAttachments()[2] as Texture2D;
+    ctx.SSRNormalTexture = gbufferFramebuffer.getColorAttachments()[3] as Texture2D;
     ctx.sceneColorTexture = deferredLitFramebuffer.getColorAttachments()[0] as Texture2D;
     let blitFramebuffer = currentFramebuffer ?? null;
     if (currentFramebuffer && currentFramebuffer.getColorAttachments().length > 1) {

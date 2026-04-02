@@ -171,6 +171,7 @@ export class PBRSpecularGlossinessMaterial
             1
           );
         }
+        scope.$l.emissive = this.calculateEmissiveColor(scope);
         scope.roughness = pb.mul(scope.roughness, ShaderHelper.getCameraRoughnessFactor(scope));
         this.outputFragmentColor(
           scope,
@@ -186,7 +187,8 @@ export class PBRSpecularGlossinessMaterial
             ),
             scope.roughness
           ),
-          pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1)
+          pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1),
+          pb.vec4(scope.emissive, 1)
         );
       } else {
         this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.albedo);

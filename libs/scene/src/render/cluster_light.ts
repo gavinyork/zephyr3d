@@ -361,6 +361,14 @@ export class ClusteredLight {
       Math.log2(camera.getFarPlane() / camera.getNearPlane())
     );
     this._clusterParam.setXYZW(vw, vh, scale, bias);
+    this._sizeParam.setXYZW(vw, vh, camera.getNearPlane(), camera.getFarPlane());
+    this._countParam[0] = this._tileCountX;
+    this._countParam[1] = this._tileCountY;
+    this._countParam[2] = this._tileCountZ;
+    // countParam.w stores light count + 1 because clustered indices start from 1.
+    // Keep it valid even when there are no unshadowed punctual lights so deferred
+    // passes can still evaluate emissive / env lighting without invalid cluster math.
+    this._countParam[3] = numLights + 1;
     device.pushDeviceStates();
     device.setFramebuffer(this._lightIndexFramebuffer);
     if (numLights > 0) {
@@ -368,11 +376,6 @@ export class ClusteredLight {
         this._lightBuffer!.reload();
       }
       this._lightBuffer!.bufferSubData(0, this._lights);
-      this._sizeParam.setXYZW(vw, vh, camera.getNearPlane(), camera.getFarPlane());
-      this._countParam[0] = this._tileCountX;
-      this._countParam[1] = this._tileCountY;
-      this._countParam[2] = this._tileCountZ;
-      this._countParam[3] = numLights + 1;
       this._bindGroup!.setValue('invProjMatrix', camera.getInvProjectionMatrix());
       this._bindGroup!.setValue('viewMatrix', camera.viewMatrix);
       this._bindGroup!.setValue('sizeParam', this._sizeParam);

@@ -895,6 +895,9 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           that.drawContext.oit.setupFragmentOutput(this);
         } else {
           this.$outputs.zFragmentOutput = pb.vec4();
+          if (ctx.renderPass!.type === RENDER_PASS_TYPE_GBUFFER) {
+            this.$outputs.zGBufferExtra = pb.vec4();
+          }
           if (ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
             this.$outputs.zSSRRoughness = pb.vec4();
             this.$outputs.zSSRNormal = pb.vec4();
@@ -930,6 +933,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @param color - Lit fragment color expression; may be undefined for depth-only paths.
    * @param ssrRoughness - Optional SSR roughness output expression.
    * @param ssrNormal - Optional SSR normal output expression.
+   * @param gbufferExtra - Optional deferred GBuffer extra output (rgb emissive / a lit-flag).
    * @returns void
    */
   outputFragmentColor(
@@ -937,7 +941,8 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     worldPos: PBShaderExp,
     color: Nullable<PBShaderExp>,
     ssrRoughness?: PBShaderExp,
-    ssrNormal?: PBShaderExp
+    ssrNormal?: PBShaderExp,
+    gbufferExtra?: PBShaderExp
   ) {
     const pb = scope.$builder;
     const that = this;
@@ -963,7 +968,16 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         this.$return(pb.lessThan(this.alpha, this.cutoff));
       }
     });
-    pb.func(funcName, color ? [pb.vec3('worldPos'), pb.vec4('color')] : [pb.vec3('worldPos')], function () {
+    pb.func(
+      funcName,
+      color
+        ? gbufferExtra
+          ? [pb.vec3('worldPos'), pb.vec4('color'), pb.vec4('gbufferExtra')]
+          : [pb.vec3('worldPos'), pb.vec4('color')]
+        : gbufferExtra
+          ? [pb.vec3('worldPos'), pb.vec4('gbufferExtra')]
+          : [pb.vec3('worldPos')],
+      function () {
       this.$l.outColor = color ? this.color : pb.vec4();
       if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         let output = true;
@@ -1007,6 +1021,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           }
         }
         this.$outputs.zFragmentOutput = this.outColor;
+        this.$outputs.zGBufferExtra = gbufferExtra
+          ? this.gbufferExtra
+          : that.supportLighting()
+            ? pb.vec4(0, 0, 0, 1)
+            : pb.vec4(this.outColor.rgb, 0);
       } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_DEPTH) {
         if (color) {
           if (this.zAlphaCutoff) {
@@ -1081,7 +1100,13 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       }
     });
     if (color) {
-      pb.getGlobalScope()[funcName](worldPos, color);
+      if (gbufferExtra) {
+        pb.getGlobalScope()[funcName](worldPos, color, gbufferExtra);
+      } else {
+        pb.getGlobalScope()[funcName](worldPos, color);
+      }
+    } else if (gbufferExtra) {
+      pb.getGlobalScope()[funcName](worldPos, gbufferExtra);
     } else {
       pb.getGlobalScope()[funcName](worldPos);
     }
