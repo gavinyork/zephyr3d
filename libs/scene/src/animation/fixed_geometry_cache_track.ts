@@ -1,48 +1,30 @@
 import { AnimationTrack } from './animationtrack';
-import { BoundingBox } from '../utility/bounding_volume';
 import type { Mesh } from '../scene';
-import { Primitive } from '../render/primitive';
-import { getDevice } from '../app/api';
 import type { Nullable } from '@zephyr3d/base';
-import { Vector3 } from '@zephyr3d/base';
-import type { StructuredBuffer } from '@zephyr3d/device';
+import {
+  createGeometryCacheState,
+  ensureGeometryCacheMeshBinding,
+  mixGeometryCacheBoundingBox,
+  type GeometryCacheFrame,
+  type GeometryCacheMeshBinding,
+  type GeometryCacheState
+} from './geometry_cache_utils';
 
-export type FixedGeometryCacheFrame = {
-  positions: Float32Array;
-  normals?: Nullable<Float32Array>;
-  boundingBox: BoundingBox;
-};
-
-export type FixedGeometryCacheState = {
-  positions: Float32Array;
-  normals?: Nullable<Float32Array>;
-  boundingBox: BoundingBox;
-};
-
-type MeshBinding = {
-  primitive: Primitive;
-  positionBuffer: StructuredBuffer;
-  normalBuffer: Nullable<StructuredBuffer>;
-};
+export type FixedGeometryCacheFrame = GeometryCacheFrame;
+export type FixedGeometryCacheState = GeometryCacheState;
 
 export class FixedGeometryCacheTrack extends AnimationTrack<FixedGeometryCacheState> {
   private _times: Float32Array;
   private _frames: FixedGeometryCacheFrame[];
   private _state: Nullable<FixedGeometryCacheState>;
-  private readonly _meshBindings: WeakMap<Mesh, MeshBinding>;
+  private readonly _meshBindings: WeakMap<Mesh, GeometryCacheMeshBinding>;
 
   constructor(times?: Float32Array, frames?: FixedGeometryCacheFrame[], embedded?: boolean) {
     super(embedded);
     this._times = times ?? new Float32Array();
     this._frames = frames ?? [];
     this._state =
-      this._frames.length > 0
-        ? {
-            positions: new Float32Array(this._frames[0].positions.length),
-            normals: this._frames[0].normals ? new Float32Array(this._frames[0].normals.length) : null,
-            boundingBox: new BoundingBox()
-          }
-        : null;
+      this._frames.length > 0 ? createGeometryCacheState(this._frames[0]) : null;
     this._meshBindings = new WeakMap();
   }
 
@@ -60,14 +42,7 @@ export class FixedGeometryCacheTrack extends AnimationTrack<FixedGeometryCacheSt
 
   set frames(value: FixedGeometryCacheFrame[]) {
     this._frames = value ?? [];
-    this._state =
-      this._frames.length > 0
-        ? {
-            positions: new Float32Array(this._frames[0].positions.length),
-            normals: this._frames[0].normals ? new Float32Array(this._frames[0].normals.length) : null,
-            boundingBox: new BoundingBox()
-          }
-        : null;
+    this._state = this._frames.length > 0 ? createGeometryCacheState(this._frames[0]) : null;
   }
 
   calculateState(_target: object, currentTime: number) {
@@ -123,7 +98,7 @@ export class FixedGeometryCacheTrack extends AnimationTrack<FixedGeometryCacheSt
     return {
       positions,
       normals,
-      boundingBox: this.mixBoundingBox(a.boundingBox, b.boundingBox, t)
+      boundingBox: mixGeometryCacheBoundingBox(a.boundingBox, b.boundingBox, t)
     };
   }
 
@@ -143,11 +118,7 @@ export class FixedGeometryCacheTrack extends AnimationTrack<FixedGeometryCacheSt
 
   private copyFrameToState(frame: FixedGeometryCacheFrame) {
     if (!this._state) {
-      this._state = {
-        positions: new Float32Array(frame.positions.length),
-        normals: frame.normals ? new Float32Array(frame.normals.length) : null,
-        boundingBox: new BoundingBox()
-      };
+      this._state = createGeometryCacheState(frame);
     }
     this._state.positions.set(frame.positions);
     if (frame.normals) {
@@ -165,11 +136,7 @@ export class FixedGeometryCacheTrack extends AnimationTrack<FixedGeometryCacheSt
 
   private interpolateFrames(a: FixedGeometryCacheFrame, b: FixedGeometryCacheFrame, t: number) {
     if (!this._state) {
-      this._state = {
-        positions: new Float32Array(a.positions.length),
-        normals: a.normals ? new Float32Array(a.normals.length) : null,
-        boundingBox: new BoundingBox()
-      };
+      this._state = createGeometryCacheState(a);
     }
     for (let i = 0; i < this._state.positions.length; i++) {
       this._state.positions[i] = a.positions[i] + (b.positions[i] - a.positions[i]) * t;
@@ -197,71 +164,12 @@ export class FixedGeometryCacheTrack extends AnimationTrack<FixedGeometryCacheSt
     return this._state;
   }
 
-  private mixBoundingBox(a: BoundingBox, b: BoundingBox, t: number) {
-    return new BoundingBox(
-      new Vector3(
-        a.minPoint.x + (b.minPoint.x - a.minPoint.x) * t,
-        a.minPoint.y + (b.minPoint.y - a.minPoint.y) * t,
-        a.minPoint.z + (b.minPoint.z - a.minPoint.z) * t
-      ),
-      new Vector3(
-        a.maxPoint.x + (b.maxPoint.x - a.maxPoint.x) * t,
-        a.maxPoint.y + (b.maxPoint.y - a.maxPoint.y) * t,
-        a.maxPoint.z + (b.maxPoint.z - a.maxPoint.z) * t
-      )
-    );
-  }
-
   private ensureMeshBinding(mesh: Mesh, state: FixedGeometryCacheState) {
-    let binding = this._meshBindings.get(mesh);
-    if (!binding) {
-      const primitive = mesh.primitive;
-      if (!primitive) {
-        throw new Error('FixedGeometryCacheTrack.applyState(): target mesh has no primitive');
-      }
-      const expectedPositionLength = primitive.getNumVertices() * 3;
-      if (state.positions.length !== expectedPositionLength) {
-        throw new Error(
-          `FixedGeometryCacheTrack.applyState(): position count mismatch, expected ${expectedPositionLength}, got ${state.positions.length}`
-        );
-      }
-      const cachePrimitive = primitive.clone();
-      cachePrimitive.setBoundingVolume(primitive.getBoundingVolume()!);
-      cachePrimitive.removeVertexBuffer('position');
-      const positionBuffer = getDevice().createVertexBuffer(
-        'position_f32x3',
-        state.positions as unknown as Float32Array<ArrayBuffer>,
-        {
-          dynamic: true
-        }
-      )!;
-      cachePrimitive.setVertexBuffer(positionBuffer);
-      let normalBuffer: Nullable<StructuredBuffer> = null;
-      if (state.normals) {
-        const expectedNormalLength = primitive.getNumVertices() * 3;
-        if (state.normals.length !== expectedNormalLength) {
-          throw new Error(
-            `FixedGeometryCacheTrack.applyState(): normal count mismatch, expected ${expectedNormalLength}, got ${state.normals.length}`
-          );
-        }
-        cachePrimitive.removeVertexBuffer('normal');
-        normalBuffer = getDevice().createVertexBuffer(
-          'normal_f32x3',
-          state.normals as unknown as Float32Array<ArrayBuffer>,
-          {
-            dynamic: true
-          }
-        )!;
-        cachePrimitive.setVertexBuffer(normalBuffer);
-      }
-      mesh.primitive = cachePrimitive;
-      binding = {
-        primitive: cachePrimitive,
-        positionBuffer,
-        normalBuffer
-      };
-      this._meshBindings.set(mesh, binding);
-    }
-    return binding;
+    return ensureGeometryCacheMeshBinding(
+      this._meshBindings,
+      mesh,
+      state,
+      'FixedGeometryCacheTrack.applyState()'
+    );
   }
 }

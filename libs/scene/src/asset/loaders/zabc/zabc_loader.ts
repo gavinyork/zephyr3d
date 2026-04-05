@@ -11,6 +11,7 @@ import {
 import { AbstractModelLoader } from '../loader';
 
 type ZABCCacheTrackJSON = {
+  codec?: 'fixed' | 'pca';
   node?: number;
   nodePath?: string;
   nodeName?: string;
@@ -20,6 +21,16 @@ type ZABCCacheTrackJSON = {
   positionFrames: Array<string | ZABCBinaryBufferRef>;
   normalFrames?: Array<string | ZABCBinaryBufferRef>;
   bounds: [number, number, number, number, number, number][];
+  vectorLength?: number;
+  positionReference?: string | ZABCBinaryBufferRef;
+  positionComponents?: number;
+  positionMean?: string | ZABCBinaryBufferRef;
+  positionBases?: string | ZABCBinaryBufferRef;
+  positionCoefficients?: string | ZABCBinaryBufferRef;
+  normalComponents?: number;
+  normalMean?: string | ZABCBinaryBufferRef;
+  normalBases?: string | ZABCBinaryBufferRef;
+  normalCoefficients?: string | ZABCBinaryBufferRef;
 };
 
 type ZABCAnimationJSON = {
@@ -81,19 +92,64 @@ export class ZABCLoader extends AbstractModelLoader {
           );
           continue;
         }
-        const times = this.decodeTimes(track);
-        const frames = track.positionFrames.map((positionsRef, index) => ({
-          positions: this.decodeFloat32Array(positionsRef, parsed),
-          normals: track.normalFrames?.[index] ? this.decodeFloat32Array(track.normalFrames[index], parsed) : null,
-          boundingBox: this.decodeBoundingBox(track.bounds[index])
-        }));
-        const cacheTrack: AssetGeometryCacheAnimationTrack = {
-          node: targetNode,
-          type: 'geometry-cache',
-          subMeshIndex: track.subMeshIndex ?? 0,
-          times,
-          frames
-        };
+        const cacheTrack: AssetGeometryCacheAnimationTrack =
+          track.codec === 'pca'
+            ? {
+                node: targetNode,
+                type: 'geometry-cache',
+                codec: 'pca',
+                subMeshIndex: track.subMeshIndex ?? 0,
+                times: this.decodeTimes(track),
+                bounds: track.bounds ?? [],
+                positionReference: track.positionReference
+                  ? this.decodeFloat32Array(track.positionReference, parsed)
+                  : null,
+                positionMean: this.decodeFloat32Array(track.positionMean!, parsed),
+                positionBases: this.decodePCAFrames(
+                  track.positionBases!,
+                  track.positionComponents ?? 0,
+                  track.vectorLength ?? 0,
+                  parsed
+                ),
+                positionCoefficients: this.decodePCAFrames(
+                  track.positionCoefficients!,
+                  track.bounds?.length ?? 0,
+                  track.positionComponents ?? 0,
+                  parsed
+                ),
+                normalMean: track.normalMean ? this.decodeFloat32Array(track.normalMean, parsed) : null,
+                normalBases:
+                  track.normalBases && track.normalComponents
+                    ? this.decodePCAFrames(
+                        track.normalBases,
+                        track.normalComponents,
+                        track.vectorLength ?? 0,
+                        parsed
+                      )
+                    : null,
+                normalCoefficients:
+                  track.normalCoefficients && track.normalComponents
+                    ? this.decodePCAFrames(
+                        track.normalCoefficients,
+                        track.bounds?.length ?? 0,
+                        track.normalComponents,
+                        parsed
+                      )
+                    : null
+              }
+            : {
+                node: targetNode,
+                type: 'geometry-cache',
+                subMeshIndex: track.subMeshIndex ?? 0,
+                times: this.decodeTimes(track),
+                frames: track.positionFrames.map((positionsRef, index) => ({
+                  positions: this.decodeFloat32Array(positionsRef, parsed),
+                  normals: track.normalFrames?.[index]
+                    ? this.decodeFloat32Array(track.normalFrames[index], parsed)
+                    : null,
+                  boundingBox: this.decodeBoundingBox(track.bounds[index])
+                }))
+              };
         tracks.push(cacheTrack);
         if (nodes.indexOf(targetNode) < 0) {
           nodes.push(targetNode);
@@ -218,6 +274,23 @@ export class ZABCLoader extends AbstractModelLoader {
     );
   }
 
+  private decodePCAFrames(
+    data: string | ZABCBinaryBufferRef,
+    rows: number,
+    columns: number,
+    parsed: ParsedZABC
+  ) {
+    const values = this.decodeFloat32Array(data, parsed);
+    const result: Float32Array[] = [];
+    if (rows <= 0 || columns <= 0) {
+      return result;
+    }
+    for (let i = 0; i < rows; i++) {
+      result.push(values.slice(i * columns, i * columns + columns));
+    }
+    return result;
+  }
+
   private decodeTimes(track: ZABCCacheTrackJSON) {
     if (track.times) {
       return this.decodeFloat32Array(track.times, this._currentParsed!);
@@ -261,7 +334,7 @@ export class ZABCLoader extends AbstractModelLoader {
   private parseBinaryZABC(arrayBuffer: ArrayBuffer) {
     const view = new DataView(arrayBuffer);
     const version = view.getUint32(4, true);
-    if (version !== 2) {
+    if (version !== 2 && version !== 3) {
       throw new Error(`Unsupported binary zabc version: ${version}`);
     }
     const manifestLength = view.getUint32(8, true);

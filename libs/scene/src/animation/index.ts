@@ -8,6 +8,8 @@ export * from './scaletrack';
 export * from './proptrack';
 export * from './morphtrack';
 export * from './fixed_geometry_cache_track';
+export * from './geometry_cache_utils';
+export * from './pca_geometry_cache_track';
 export * from './skeleton';
 export * from './skeleton_modifier';
 export * from './ik_modifier';

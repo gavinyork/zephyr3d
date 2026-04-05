@@ -6,6 +6,7 @@ import { AnimationTrack, Skeleton } from '../../../animation';
 import {
   AnimationClip,
   FixedGeometryCacheTrack,
+  PCAGeometryCacheTrack,
   MorphTargetTrack,
   NodeEulerRotationTrack,
   NodeRotationTrack,
@@ -282,6 +283,165 @@ export function getFixedGeometryCacheTrackClass(): SerializableClass {
                 new Vector3(frame.bounds[3], frame.bounds[4], frame.bounds[5])
               )
             }));
+          }
+        }
+      ]);
+    }
+  };
+}
+
+export function getPCAGeometryCacheTrackClass(): SerializableClass {
+  return {
+    ctor: PCAGeometryCacheTrack,
+    name: 'PCAGeometryCacheTrack',
+    getProps() {
+      return defineProps([
+        {
+          name: 'TrackName',
+          type: 'string',
+          options: {
+            label: 'Name'
+          },
+          get(this: PCAGeometryCacheTrack, value) {
+            value.str[0] = this.name;
+          },
+          set(this: PCAGeometryCacheTrack, value) {
+            this.name = value.str[0];
+          }
+        },
+        {
+          name: 'TrackTarget',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: PCAGeometryCacheTrack, value) {
+            value.str[0] = this.target;
+          },
+          set(this: PCAGeometryCacheTrack, value) {
+            this.target = value.str[0];
+          }
+        },
+        {
+          name: 'Times',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: PCAGeometryCacheTrack, value) {
+            value.str[0] = encodeFloat32Array(this.times);
+          },
+          set(this: PCAGeometryCacheTrack, value) {
+            this.times = value.str[0] ? decodeFloat32Array(value.str[0]) : new Float32Array();
+          }
+        },
+        {
+          name: 'Bounds',
+          type: 'object',
+          isHidden() {
+            return true;
+          },
+          get(this: PCAGeometryCacheTrack, value) {
+            value.object[0] = this.bounds;
+          },
+          set(this: PCAGeometryCacheTrack, value) {
+            this.bounds =
+              (value.object[0] as [number, number, number, number, number, number][]) ?? [];
+          }
+        },
+        {
+          name: 'PositionReference',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: PCAGeometryCacheTrack, value) {
+            value.str[0] = this.positionReference ? encodeFloat32Array(this.positionReference) : '';
+          },
+          set(this: PCAGeometryCacheTrack, value) {
+            this.positionReference = value.str[0] ? decodeFloat32Array(value.str[0]) : null;
+          }
+        },
+        {
+          name: 'PositionMean',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: PCAGeometryCacheTrack, value) {
+            value.str[0] = encodeFloat32Array(this.positionMean);
+          },
+          set(this: PCAGeometryCacheTrack, value) {
+            this.positionMean = value.str[0] ? decodeFloat32Array(value.str[0]) : new Float32Array();
+          }
+        },
+        {
+          name: 'PositionBases',
+          type: 'object',
+          isHidden() {
+            return true;
+          },
+          get(this: PCAGeometryCacheTrack, value) {
+            value.object[0] = this.positionBases.map((item) => encodeFloat32Array(item));
+          },
+          set(this: PCAGeometryCacheTrack, value) {
+            this.positionBases =
+              ((value.object[0] as string[]) ?? []).map((item) => decodeFloat32Array(item));
+          }
+        },
+        {
+          name: 'PositionCoefficients',
+          type: 'object',
+          isHidden() {
+            return true;
+          },
+          get(this: PCAGeometryCacheTrack, value) {
+            value.object[0] = this.positionCoefficients.map((item) => encodeFloat32Array(item));
+          },
+          set(this: PCAGeometryCacheTrack, value) {
+            this.positionCoefficients =
+              ((value.object[0] as string[]) ?? []).map((item) => decodeFloat32Array(item));
+          }
+        },
+        {
+          name: 'NormalMean',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: PCAGeometryCacheTrack, value) {
+            value.str[0] = this.normalMean ? encodeFloat32Array(this.normalMean) : '';
+          },
+          set(this: PCAGeometryCacheTrack, value) {
+            this.normalMean = value.str[0] ? decodeFloat32Array(value.str[0]) : null;
+          }
+        },
+        {
+          name: 'NormalBases',
+          type: 'object',
+          isHidden() {
+            return true;
+          },
+          get(this: PCAGeometryCacheTrack, value) {
+            value.object[0] = this.normalBases?.map((item) => encodeFloat32Array(item)) ?? [];
+          },
+          set(this: PCAGeometryCacheTrack, value) {
+            this.normalBases =
+              ((value.object[0] as string[]) ?? []).map((item) => decodeFloat32Array(item)) ?? null;
+          }
+        },
+        {
+          name: 'NormalCoefficients',
+          type: 'object',
+          isHidden() {
+            return true;
+          },
+          get(this: PCAGeometryCacheTrack, value) {
+            value.object[0] = this.normalCoefficients?.map((item) => encodeFloat32Array(item)) ?? [];
+          },
+          set(this: PCAGeometryCacheTrack, value) {
+            this.normalCoefficients =
+              ((value.object[0] as string[]) ?? []).map((item) => decodeFloat32Array(item)) ?? null;
           }
         }
       ]);

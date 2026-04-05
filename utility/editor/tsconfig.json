@@ -1,4 +1,5 @@
 {
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "downlevelIteration": true,
     "skipLibCheck": true,
@@ -17,8 +18,16 @@
     "emitDecoratorMetadata": false,
     "sourceMap": true,
     "stripInternal": true,
-    "rootDir": "./src",
-    "typeRoots": ["./node_modules/@webgpu/types"]
+    "typeRoots": ["./node_modules/@webgpu/types"],
+    "baseUrl": ".",
+    "paths": {
+      "@zephyr3d/base": ["../../libs/base/src/index.ts"],
+      "@zephyr3d/device": ["../../libs/device/src/index.ts"],
+      "@zephyr3d/scene": ["../../libs/scene/src/index.ts"],
+      "@zephyr3d/imgui": ["../../libs/imgui/src/index.ts"],
+      "@zephyr3d/backend-webgl": ["../../libs/backend-webgl/src/index.ts"],
+      "@zephyr3d/backend-webgpu": ["../../libs/backend-webgpu/src/index.ts"]
+    }
   },
   "include": ["./src"],
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts"]
