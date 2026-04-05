@@ -1,0 +1,9 @@
+{
+  "type": "PBRBluePrintMaterial",
+  "props": {},
+  "data": {
+    "IR": "/assets/test/aaa.zbpt",
+    "uniformValues": [],
+    "uniformTextures": []
+  }
+}

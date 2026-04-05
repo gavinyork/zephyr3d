@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Test</title>
+    
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 100vw;
+        height: 100vh;
+      }
+      canvas {
+        touch-action: none;
+        overscroll-behavior: contain;
+        overflow: hidden;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "@zephyr3d/base": "./libs/deps/@zephyr3d/base/index.js",
+    "@zephyr3d/device": "./libs/deps/@zephyr3d/device/index.js",
+    "@zephyr3d/scene": "./libs/deps/@zephyr3d/scene/index.js",
+    "@zephyr3d/runtime": "./libs/deps/@zephyr3d/runtime/index.js",
+    "@zephyr3d/imgui": "./libs/deps/@zephyr3d/imgui/index.js",
+    "@zephyr3d/backend-webgl": "./libs/deps/@zephyr3d/backend-webgl/index.js",
+    "@zephyr3d/backend-webgpu": "./libs/deps/@zephyr3d/backend-webgpu/index.js"
+  }
+}
+</script>
+</head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <script type="module" src="./index.js"></script>
+</body>
+</html>

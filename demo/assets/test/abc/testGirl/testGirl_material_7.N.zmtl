@@ -1,0 +1,22 @@
+{
+  "type": "Default",
+  "data": {
+    "ClassName": "PBRMetallicRoughnessMaterial",
+    "Object": {
+      "Metallic": 0,
+      "Roughness": 0.5527864098548889,
+      "SpecularFactor": [
+        0.4000000059604645,
+        0.4000000059604645,
+        0.4000000059604645,
+        1
+      ],
+      "AlbedoTexture": "/assets/test/abc/testGirl/testGirl_texture_5.png",
+      "doubleSidedLighting": true,
+      "AlbedoTexCoordAddressU": "repeat",
+      "AlbedoTexCoordAddressV": "repeat",
+      "BlendMode": "blend",
+      "CullMode": "none"
+    }
+  }
+}

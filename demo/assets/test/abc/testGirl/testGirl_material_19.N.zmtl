@@ -1,0 +1,24 @@
+{
+  "type": "Default",
+  "data": {
+    "ClassName": "PBRMetallicRoughnessMaterial",
+    "Object": {
+      "Metallic": 0,
+      "Roughness": 0.5527864098548889,
+      "SpecularFactor": [
+        0.4000000059604645,
+        0.4000000059604645,
+        0.4000000059604645,
+        1
+      ],
+      "AlbedoColor": [
+        0.9215686321258545,
+        0.9215686321258545,
+        0.9215686321258545,
+        1
+      ],
+      "doubleSidedLighting": true,
+      "CullMode": "none"
+    }
+  }
+}

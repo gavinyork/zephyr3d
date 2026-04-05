@@ -1,0 +1,10 @@
+{
+  "type": "Default",
+  "data": {
+    "ClassName": "TetrahedronShape",
+    "Object": {
+      "SizeX": 1,
+      "SizeZ": 1
+    }
+  }
+}
