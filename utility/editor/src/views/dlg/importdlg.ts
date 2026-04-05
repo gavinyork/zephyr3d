@@ -27,7 +27,7 @@ export class DlgImport extends DialogRenderer<{ op: string; paths?: string[] }> 
         this._msg = 'Searching for importable files...';
         this._paths = [];
         this._selected = [];
-        this._vfs.glob('/**/*.{gltf,glb}', { recursive: true, includeDirs: false }).then((files) => {
+        this._vfs.glob('/**/*.{gltf,glb,zabc}', { recursive: true, includeDirs: false }).then((files) => {
           for (const f of files) {
             this._paths.push(f.path);
             this._selected.push([true]);

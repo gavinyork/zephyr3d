@@ -5,6 +5,7 @@ import { Interpolator, Vector3 } from '@zephyr3d/base';
 import { AnimationTrack, Skeleton } from '../../../animation';
 import {
   AnimationClip,
+  FixedGeometryCacheTrack,
   MorphTargetTrack,
   NodeEulerRotationTrack,
   NodeRotationTrack,
@@ -188,6 +189,99 @@ export function getMorphTrackClass(): SerializableClass {
           },
           set(this: NodeRotationTrack, value) {
             this.target = value.str[0];
+          }
+        }
+      ]);
+    }
+  };
+}
+
+function encodeFloat32Array(values: Float32Array) {
+  return uint8ArrayToBase64(new Uint8Array(values.buffer, values.byteOffset, values.byteLength));
+}
+
+function decodeFloat32Array(value: string) {
+  return new Float32Array(base64ToUint8Array(value).buffer);
+}
+
+export function getFixedGeometryCacheTrackClass(): SerializableClass {
+  return {
+    ctor: FixedGeometryCacheTrack,
+    name: 'FixedGeometryCacheTrack',
+    getProps() {
+      return defineProps([
+        {
+          name: 'TrackName',
+          type: 'string',
+          options: {
+            label: 'Name'
+          },
+          get(this: FixedGeometryCacheTrack, value) {
+            value.str[0] = this.name;
+          },
+          set(this: FixedGeometryCacheTrack, value) {
+            this.name = value.str[0];
+          }
+        },
+        {
+          name: 'TrackTarget',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: FixedGeometryCacheTrack, value) {
+            value.str[0] = this.target;
+          },
+          set(this: FixedGeometryCacheTrack, value) {
+            this.target = value.str[0];
+          }
+        },
+        {
+          name: 'Times',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: FixedGeometryCacheTrack, value) {
+            value.str[0] = encodeFloat32Array(this.times);
+          },
+          set(this: FixedGeometryCacheTrack, value) {
+            this.times = value.str[0] ? decodeFloat32Array(value.str[0]) : new Float32Array();
+          }
+        },
+        {
+          name: 'Frames',
+          type: 'object',
+          isHidden() {
+            return true;
+          },
+          get(this: FixedGeometryCacheTrack, value) {
+            value.object[0] = this.frames.map((frame) => ({
+              positions: encodeFloat32Array(frame.positions),
+              normals: frame.normals ? encodeFloat32Array(frame.normals) : '',
+              bounds: [
+                frame.boundingBox.minPoint.x,
+                frame.boundingBox.minPoint.y,
+                frame.boundingBox.minPoint.z,
+                frame.boundingBox.maxPoint.x,
+                frame.boundingBox.maxPoint.y,
+                frame.boundingBox.maxPoint.z
+              ]
+            }));
+          },
+          set(this: FixedGeometryCacheTrack, value) {
+            this.frames = ((value.object[0] as Array<{
+              positions: string;
+              normals: string;
+              bounds: number[];
+            }>) ?? []).map((frame) => ({
+              positions: decodeFloat32Array(frame.positions),
+              normals: frame.normals ? decodeFloat32Array(frame.normals) : null,
+              boundingBox: new BoundingBox(
+                new Vector3(frame.bounds[0], frame.bounds[1], frame.bounds[2]),
+                new Vector3(frame.bounds[3], frame.bounds[4], frame.bounds[5])
+              )
+            }));
           }
         }
       ]);
@@ -496,9 +590,9 @@ export function getSkeletonClass(): SerializableClass {
         id: string;
       }
     ) {
-      const prefabNode = ctx.getPrefabNode();
+      const prefabNode = ctx.getPrefabNode() ?? ctx;
       const joints = init.joints
-        .map((id) => prefabNode!.findNodeById(id)!)
+        .map((id) => prefabNode.findNodeById(id)!)
         .map((node) => {
           node!.jointTypeT = 'static';
           node!.jointTypeS = 'static';
@@ -676,8 +770,8 @@ export function getAnimationClass(manager: ResourceManager): SerializableClass {
                   this.addTrack(targetObj, track);
                 }
               } else if (track instanceof AnimationTrack) {
-                const prefabNode = this._animationSet.model.getPrefabNode();
-                const node = prefabNode!.findNodeById(track.target);
+                const prefabNode = this._animationSet.model.getPrefabNode() ?? this._animationSet.model;
+                const node = prefabNode.findNodeById(track.target);
                 if (node) {
                   this.addTrack(node, track);
                 } else {

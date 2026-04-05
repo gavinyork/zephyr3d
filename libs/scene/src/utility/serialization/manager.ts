@@ -41,6 +41,7 @@ import { getTerrainClass } from './scene/terrain';
 import { getWaterClass, getFFTWaveGeneratorClass, getFBMWaveGeneratorClass } from './scene/water';
 import {
   getAnimationClass,
+  getFixedGeometryCacheTrackClass,
   getInterpolatorClass,
   getMorphTrackClass,
   getNodeEulerRotationTrackClass,
@@ -272,6 +273,7 @@ export class ResourceManager {
         getNodeScaleTrackClass(),
         getNodeTranslationTrackClass(),
         getNodeEulerRotationTrackClass(),
+        getFixedGeometryCacheTrackClass(),
         getMorphTrackClass(),
         getSceneNodeClass(this),
         getGraphNodeClass(),

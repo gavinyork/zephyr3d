@@ -20,6 +20,8 @@ import {
   UnlitMaterial
 } from '@zephyr3d/scene';
 import {
+  type FixedGeometryCacheFrame,
+  FixedGeometryCacheTrack,
   Mesh,
   SceneNode,
   NodeRotationTrack,
@@ -261,13 +263,27 @@ export interface AssetAnimationTrack {
   defaultMorphWeights?: number[];
 }
 
+export interface AssetGeometryCacheFrame {
+  positions: Float32Array;
+  normals?: Nullable<Float32Array>;
+  boundingBox: BoundingBox;
+}
+
+export interface AssetGeometryCacheAnimationTrack {
+  node: AssetHierarchyNode;
+  type: 'geometry-cache';
+  subMeshIndex: number;
+  times: Float32Array;
+  frames: AssetGeometryCacheFrame[];
+}
+
 /**
  * Animation data interface for model loading
  * @public
  */
 export interface AssetAnimationData {
   name: string;
-  tracks: AssetAnimationTrack[];
+  tracks: (AssetAnimationTrack | AssetGeometryCacheAnimationTrack)[];
   skeletons: AssetSkeleton[];
   nodes: AssetHierarchyNode[];
 }
@@ -531,6 +547,8 @@ export class SharedModel extends Disposable {
   /** @internal */
   private _skeletons: AssetSkeleton[];
   /** @internal */
+  private _nodes: AssetHierarchyNode[];
+  /** @internal */
   private _animations: AssetAnimationData[];
   /** @internal */
   private _scenes: AssetScene[];
@@ -552,6 +570,7 @@ export class SharedModel extends Disposable {
     this._name = VFS.basename(path, VFS.extname(path));
     this._pathname = VFS.dirname(path);
     this._skeletons = [];
+    this._nodes = [];
     this._scenes = [];
     this._animations = [];
     this._imageList = [];
@@ -586,6 +605,10 @@ export class SharedModel extends Disposable {
   get skeletons(): AssetSkeleton[] {
     return this._skeletons;
   }
+  /** All nodes that the model contains */
+  get nodes(): AssetHierarchyNode[] {
+    return this._nodes;
+  }
   /** The active scene of the model */
   get activeScene(): number {
     return this._activeScene;
@@ -615,12 +638,29 @@ export class SharedModel extends Disposable {
   addSkeleton(skeleton: AssetSkeleton) {
     this._skeletons.push(skeleton);
   }
+  addNode(parent: Nullable<AssetHierarchyNode>, index: number, name: string) {
+    const childNode = new AssetHierarchyNode(name, parent);
+    this._nodes[index] = childNode;
+    return childNode;
+  }
   /**
    * Adds an animation to the scene
    * @param animation - The animation to be added
    */
   addAnimation(animation: AssetAnimationData) {
     this._animations.push(animation);
+  }
+  copyFrom(source: SharedModel) {
+    this._name = source._name;
+    this._pathname = source._pathname;
+    this._skeletons = source._skeletons.slice();
+    this._nodes = source._nodes.slice();
+    this._animations = source._animations.slice();
+    this._scenes = source._scenes.slice();
+    this._activeScene = source._activeScene;
+    this._imageList = source._imageList.slice();
+    this._primitiveList = source._primitiveList.slice();
+    this._materialList = { ...source._materialList };
   }
   /** save as prefab */
   async savePrefab(manager: ResourceManager, path: string): Promise<void> {
@@ -743,7 +783,16 @@ export class SharedModel extends Disposable {
           instancing
         );
       }
-      for (const [sk, nodes] of skeletonMeshMap) {
+      for (const sk of this.skeletons) {
+        if (!skeletonMeshMap.has(sk)) {
+          skeletonMeshMap.set(sk, {
+            mesh: [],
+            bounding: []
+          });
+        }
+      }
+      for (const v of skeletonMeshMap) {
+        const sk = v[0];
         const skeleton = new Skeleton(
           sk.joints.map((val) => {
             const node = nodeMap.get(val);
@@ -755,17 +804,20 @@ export class SharedModel extends Disposable {
           sk.inverseBindMatrices,
           sk.bindPose
         );
-        if (!nodes.skeleton) {
-          nodes.skeleton = skeleton;
-          for (let i = 0; i < nodes.mesh.length; i++) {
-            const mesh = nodes.mesh[i];
-            const v = {
-              positions: nodes.bounding[i].rawPositions,
-              blendIndices: nodes.bounding[i].rawBlendIndices,
-              weights: nodes.bounding[i].rawJointWeights
-            };
-            mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
-            mesh.skeletonName = nodes.skeleton.persistentId;
+        const nodes = skeletonMeshMap.get(sk);
+        if (nodes) {
+          if (!nodes.skeleton) {
+            nodes.skeleton = skeleton;
+            for (let i = 0; i < nodes.mesh.length; i++) {
+              const mesh = nodes.mesh[i];
+              const v = {
+                positions: nodes.bounding[i].rawPositions,
+                blendIndices: nodes.bounding[i].rawBlendIndices,
+                weights: nodes.bounding[i].rawJointWeights
+              };
+              mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
+              mesh.skeletonName = nodes.skeleton.persistentId;
+            }
           }
         }
         animationSet.skeletons.push(new DRef(nodes.skeleton));
@@ -816,6 +868,14 @@ export class SharedModel extends Disposable {
                 animation.addTrack(m.mesh, morphTrack);
               }
             }
+          } else if (track.type === 'geometry-cache') {
+            const subMesh = track.node.mesh?.subMeshes[track.subMeshIndex];
+            if (!subMesh?.mesh) {
+              console.error(`Invalid geometry cache sub mesh: ${track.subMeshIndex}`);
+            } else {
+              const frames = this.remapGeometryCacheFrames(subMesh, track.frames);
+              animation.addTrack(subMesh.mesh, new FixedGeometryCacheTrack(track.times, frames, true));
+            }
           } else {
             console.error(`Invalid animation track type: ${track.type}`);
           }
@@ -824,9 +884,131 @@ export class SharedModel extends Disposable {
     }
     return group;
   }
+
+  private remapGeometryCacheFrames(subMesh: AssetSubMeshData, frames: FixedGeometryCacheFrame[]) {
+    if (!subMesh.rawPositions || frames.length === 0) {
+      return frames;
+    }
+    const sourcePositions = frames[0].positions;
+    const sourceVertexCount = (sourcePositions.length / 3) >> 0;
+    const targetVertexCount = (subMesh.rawPositions.length / 3) >> 0;
+    if (sourceVertexCount === targetVertexCount) {
+      return frames;
+    }
+    const remap = this.buildGeometryCacheRemap(subMesh.rawPositions, sourcePositions);
+    if (!remap) {
+      console.error(
+        `Geometry cache vertex layout mismatch: source=${sourceVertexCount}, target=${targetVertexCount}. ` +
+          `Export the base glb and zabc from the same final mesh layout.`
+      );
+      return frames;
+    }
+    return frames.map((frame) => ({
+      positions: this.expandGeometryCacheData(frame.positions, remap),
+      normals:
+        frame.normals && ((frame.normals.length / 3) >> 0) === sourceVertexCount
+          ? this.expandGeometryCacheData(frame.normals, remap)
+          : null,
+      boundingBox: frame.boundingBox
+    }));
+  }
+
+  private buildGeometryCacheRemap(targetPositions: Float32Array, sourcePositions: Float32Array) {
+    const sourceCount = (sourcePositions.length / 3) >> 0;
+    const targetCount = (targetPositions.length / 3) >> 0;
+    const buckets = new Map<string, number[]>();
+    for (let i = 0; i < sourceCount; i++) {
+      const key = this.geometryCachePositionKey(
+        sourcePositions[i * 3],
+        sourcePositions[i * 3 + 1],
+        sourcePositions[i * 3 + 2]
+      );
+      const bucket = buckets.get(key);
+      if (bucket) {
+        bucket.push(i);
+      } else {
+        buckets.set(key, [i]);
+      }
+    }
+    const remap = new Uint32Array(targetCount);
+    for (let i = 0; i < targetCount; i++) {
+      const x = targetPositions[i * 3];
+      const y = targetPositions[i * 3 + 1];
+      const z = targetPositions[i * 3 + 2];
+      let sourceIndex = this.findGeometryCacheSourceIndex(sourcePositions, buckets, x, y, z);
+      if (sourceIndex < 0) {
+        sourceIndex = this.findNearestGeometryCacheSourceIndex(sourcePositions, x, y, z);
+      }
+      if (sourceIndex < 0) {
+        return null;
+      }
+      remap[i] = sourceIndex;
+    }
+    return remap;
+  }
+
+  private expandGeometryCacheData(source: Float32Array, remap: Uint32Array) {
+    const expanded = new Float32Array(remap.length * 3);
+    for (let i = 0; i < remap.length; i++) {
+      const sourceOffset = remap[i] * 3;
+      const targetOffset = i * 3;
+      expanded[targetOffset] = source[sourceOffset];
+      expanded[targetOffset + 1] = source[sourceOffset + 1];
+      expanded[targetOffset + 2] = source[sourceOffset + 2];
+    }
+    return expanded;
+  }
+
+  private findGeometryCacheSourceIndex(
+    sourcePositions: Float32Array,
+    buckets: Map<string, number[]>,
+    x: number,
+    y: number,
+    z: number
+  ) {
+    const bucket = buckets.get(this.geometryCachePositionKey(x, y, z));
+    if (!bucket) {
+      return -1;
+    }
+    const epsilon = 1e-5;
+    for (const index of bucket) {
+      const offset = index * 3;
+      if (
+        Math.abs(sourcePositions[offset] - x) <= epsilon &&
+        Math.abs(sourcePositions[offset + 1] - y) <= epsilon &&
+        Math.abs(sourcePositions[offset + 2] - z) <= epsilon
+      ) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  private findNearestGeometryCacheSourceIndex(sourcePositions: Float32Array, x: number, y: number, z: number) {
+    const epsilonSquared = 1e-8;
+    let bestIndex = -1;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < sourcePositions.length; i += 3) {
+      const dx = sourcePositions[i] - x;
+      const dy = sourcePositions[i + 1] - y;
+      const dz = sourcePositions[i + 2] - z;
+      const distance = dx * dx + dy * dy + dz * dz;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = i / 3;
+      }
+    }
+    return bestDistance <= epsilonSquared ? bestIndex : -1;
+  }
+
+  private geometryCachePositionKey(x: number, y: number, z: number) {
+    return `${Math.round(x * 100000)}|${Math.round(y * 100000)}|${Math.round(z * 100000)}`;
+  }
+
   protected onDispose() {
     super.onDispose();
     this._skeletons = [];
+    this._nodes = [];
     this._scenes = [];
     this._animations = [];
   }

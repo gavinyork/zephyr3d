@@ -302,7 +302,8 @@ export function guessMimeType(path: string) {
     '.zmtl': 'application/vnd.zephyr3d.material+json',
     '.zmf': 'application/vnd.zephyr3d.blueprint.mf+json',
     '.zscn': 'application/vnd.zephyr3d.scene+json',
-    '.zprefab': 'application/vnd.zephyr3d.prefab+json'
+    '.zprefab': 'application/vnd.zephyr3d.prefab+json',
+    '.zabc': 'application/vnd.zephyr3d.alembic-cache+json'
   };
 
   return mimeTypes[ext] || 'application/octet-stream';

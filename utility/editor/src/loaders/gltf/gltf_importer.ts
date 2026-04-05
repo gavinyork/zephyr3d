@@ -365,7 +365,7 @@ export class GLTFImporter implements ModelImporter {
     }
     const nodeInfo = gltf.nodes?.[nodeIndex];
     if (nodeInfo) {
-      node = new AssetHierarchyNode(nodeInfo.name, parent); //model.addNode(parent, nodeInfo.name);
+      node = model.addNode(parent, nodeIndex, nodeInfo.name);
       if (typeof nodeInfo.mesh === 'number') {
         node.mesh = gltf._meshes[nodeInfo.mesh];
         if (node.weights) {

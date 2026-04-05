@@ -48,11 +48,11 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
   return {
     ctor: SceneNode,
     name: 'SceneNode',
-    async createFunc(ctx: Scene | SceneNode, init?: { prefabId: string; patch: DiffPatch }) {
+    async createFunc(ctx: Scene | SceneNode, init?: { prefabId?: string; assetId?: string; patch?: DiffPatch }) {
       const scene = ctx instanceof Scene ? ctx : ctx.scene;
-      if (init) {
+      if (init?.prefabId) {
         const prefabData = (await manager.loadPrefabContent(init.prefabId))!.data as DiffValue;
-        const nodeData = normalizeSerializedSceneNodeData(applyPatch(prefabData, init.patch) as DiffValue);
+        const nodeData = normalizeSerializedSceneNodeData(applyPatch(prefabData, init.patch ?? []) as DiffValue);
         const tmpNode = new DRef(new SceneNode(scene));
         tmpNode.get()!.remove();
         tmpNode.get()!.prefabId = init.prefabId;
@@ -64,6 +64,25 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         tmpNode.dispose();
         return { obj: sceneNode, loadProps: false };
       }
+      if (init?.assetId) {
+        const fetchedModel = await manager.fetchModel(init.assetId, scene!);
+        const sceneNode = fetchedModel?.group ?? null;
+        if (sceneNode) {
+          const originalAssetId = manager.getAssetId(sceneNode);
+          try {
+            manager.setAssetId(sceneNode, null);
+            const baseNodeData = await manager.serializeObject(sceneNode);
+            const nodeData = normalizeSerializedSceneNodeData(
+              applyPatch(baseNodeData as DiffValue, init.patch ?? []) as DiffValue
+            );
+            await manager.deserializeObjectProps(sceneNode, nodeData.Object as Record<string, unknown>);
+          } finally {
+            manager.setAssetId(sceneNode, originalAssetId ?? init.assetId);
+          }
+          sceneNode.parent = ctx instanceof SceneNode ? ctx : ctx.rootNode;
+        }
+        return { obj: sceneNode, loadProps: false };
+      }
       const node = new SceneNode(scene);
       if (ctx instanceof SceneNode) {
         node.parent = ctx;
@@ -72,6 +91,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
     },
     async getInitParams(obj: SceneNode, flags) {
       const prefabId = obj.prefabId;
+      const assetId = manager.getAssetId(obj);
       let patch: DiffPatch | undefined = undefined;
       if (prefabId) {
         try {
@@ -85,12 +105,37 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         }
         flags.saveProps = false;
       }
+      if (!prefabId && assetId) {
+        const baseNode = (await manager.fetchModel(assetId, obj.scene!))?.group ?? null;
+        if (baseNode) {
+          const originalObjectAssetId = manager.getAssetId(obj);
+          const originalBaseAssetId = manager.getAssetId(baseNode);
+          try {
+            manager.setAssetId(obj, null);
+            manager.setAssetId(baseNode, null);
+            const baseNodeData = await manager.serializeObject(baseNode);
+            const nodeData = await manager.serializeObject(obj);
+            patch = diff(baseNodeData, nodeData);
+            ASSERT(diff(applyPatch(baseNodeData, patch), nodeData).length === 0, 'Patch test failed');
+          } finally {
+            manager.setAssetId(obj, originalObjectAssetId);
+            manager.setAssetId(baseNode, originalBaseAssetId);
+            baseNode.remove();
+          }
+          flags.saveProps = false;
+        }
+      }
       return prefabId
         ? {
             prefabId,
             patch
           }
-        : null;
+        : assetId
+          ? {
+              assetId,
+              patch
+            }
+          : null;
     },
     getProps() {
       return defineProps([

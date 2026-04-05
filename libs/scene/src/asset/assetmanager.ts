@@ -13,6 +13,7 @@ import {
 } from '@zephyr3d/base';
 import type { SharedModel } from './model';
 import { GLTFLoader } from './loaders/gltf/gltf_loader';
+import { ZABCLoader } from './loaders/zabc/zabc_loader';
 import { WebImageLoader } from './loaders/image/webimage_loader';
 import { DDSLoader } from './loaders/dds/dds_loader';
 import { HDRLoader } from './loaders/hdr/hdr';
@@ -158,7 +159,7 @@ export class AssetManager {
     new TGALoader()
   ];
   /** @internal */
-  private static readonly _modelLoaders: AbstractModelLoader[] = [new GLTFLoader()];
+  private static readonly _modelLoaders: AbstractModelLoader[] = [new ZABCLoader(), new GLTFLoader()];
   /** @internal */
   private _textures: {
     [hash: string]: Promise<BaseTexture> | DWeakRef<BaseTexture>;
