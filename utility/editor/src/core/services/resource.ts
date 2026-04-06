@@ -2,7 +2,6 @@ import { ASSERT, type VFS } from '@zephyr3d/base';
 import { SharedModel } from '../../loaders/model';
 import type { ModelImporter } from '../../loaders/importer';
 import { GLTFImporter } from '../../loaders/gltf/gltf_importer';
-import { ZABCImporter } from '../../loaders/zabc_importer';
 import type { SceneNode, ResourceManager } from '@zephyr3d/scene';
 
 export class ResourceService {
@@ -12,9 +11,6 @@ export class ResourceService {
     if (mimeType === 'model/gltf+json' || mimeType === 'model/gltf-binary') {
       console.info(`Start importing model ${path} - ${mimeType}`);
       loader = new GLTFImporter();
-    } else if (mimeType === 'application/vnd.zephyr3d.alembic-cache+json') {
-      console.info(`Start importing geometry cache ${path} - ${mimeType}`);
-      loader = new ZABCImporter();
     } else {
       throw new Error(`No valid loader found`);
     }

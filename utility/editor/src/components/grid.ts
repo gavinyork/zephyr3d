@@ -843,6 +843,11 @@ export class PropertyEditor extends Observable<{
             }
           } else {
             const val = tmpProperty.str as [string];
+            const canClearAssetPath = !!value.options?.mimeTypes?.length && !!value.set && !!val[0];
+            if (canClearAssetPath) {
+              ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
+              ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
+            }
             changed = ImGui.InputText(
               '##value',
               val,
@@ -853,6 +858,17 @@ export class PropertyEditor extends Observable<{
               this.revealAsset(val[0]);
             }
             this.setDragDropProperty(object, value, tmpProperty);
+            if (canClearAssetPath) {
+              ImGui.SameLine(0, 0);
+              if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
+                tmpProperty.str[0] = '';
+                Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
+                  this.refresh();
+                  this.dispatchEvent('object_property_changed', object, value);
+                });
+              }
+              ImGui.EndChild();
+            }
           }
           break;
         }

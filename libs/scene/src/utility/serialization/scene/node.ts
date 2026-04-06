@@ -9,8 +9,18 @@ import type { ResourceManager } from '../manager';
 import { AnimationClip, NodeRotationTrack, NodeScaleTrack, NodeTranslationTrack } from '../../../animation';
 import { JSONData } from '../json';
 import { SpringScriptConfig } from './spring_script';
+import { parseZABCBlob, attachZABCAnimationsToSceneNode } from '../../../asset/loaders/zabc/zabc_loader';
+import { restoreGeometryCacheMeshBinding } from '../../../animation/geometry_cache_utils';
 
 const BUILTIN_SPRING_TEST_SCRIPT = '/assets/@builtins/scripts/springtest';
+const geometryCacheBindings = new WeakMap<
+  SceneNode,
+  {
+    assetId: string;
+    autoPlay: boolean;
+    animationNames: string[];
+  }
+>();
 
 function isSpringTestScript(script: string) {
   const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
@@ -41,6 +51,47 @@ function normalizeSerializedSceneNodeData(data: DiffValue): Record<string, unkno
     ClassName: 'SceneNode',
     Object: objectData
   };
+}
+
+function hasMeshDescendants(node: SceneNode) {
+  let hasMesh = false;
+  node.iterate((child) => {
+    if (child.isMesh()) {
+      hasMesh = true;
+      return true;
+    }
+    return false;
+  });
+  return hasMesh;
+}
+
+async function restoreGeometryCacheMeshes(node: SceneNode) {
+  const tasks: Promise<boolean>[] = [];
+  node.iterate((child) => {
+    if (child.isMesh()) {
+      tasks.push(restoreGeometryCacheMeshBinding(child));
+    }
+    return false;
+  });
+  if (tasks.length > 0) {
+    await Promise.all(tasks);
+  }
+}
+
+async function clearGeometryCacheBinding(node: SceneNode) {
+  const previous = geometryCacheBindings.get(node);
+  if (!previous) {
+    return null;
+  }
+  for (const name of previous.animationNames) {
+    if (node.animationSet.isPlayingAnimation(name)) {
+      node.animationSet.stopAnimation(name);
+    }
+    node.animationSet.deleteAnimation(name);
+  }
+  await restoreGeometryCacheMeshes(node);
+  geometryCacheBindings.delete(node);
+  return previous;
 }
 
 /** @internal */
@@ -316,6 +367,81 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
                 child.parent = this;
               } else {
                 console.error(`Invalid scene node: ${child}`);
+              }
+            }
+          }
+        },
+        {
+          name: 'GeometryCache',
+          type: 'string',
+          options: {
+            group: 'Animation',
+            label: 'Geometry Cache',
+            mimeTypes: ['application/vnd.zephyr3d.alembic-cache+json']
+          },
+          isValid(this: SceneNode) {
+            return this !== this.scene?.rootNode && hasMeshDescendants(this);
+          },
+          get(this: SceneNode, value) {
+            value.str[0] = geometryCacheBindings.get(this)?.assetId ?? '';
+          },
+          async set(this: SceneNode, value) {
+            const previous = await clearGeometryCacheBinding(this);
+            const assetId = value?.str?.[0]?.trim() ?? '';
+            if (!assetId) {
+              return;
+            }
+            const binary = (await manager.assetManager.fetchBinaryData(assetId)) as ArrayBuffer;
+            const parsed = await parseZABCBlob(
+              new Blob([binary], { type: manager.VFS.guessMIMEType(assetId) || 'application/octet-stream' })
+            );
+            const autoPlay = previous?.autoPlay ?? false;
+            const result = await attachZABCAnimationsToSceneNode(this, parsed, {
+              sourcePath: assetId,
+              autoPlay,
+              replaceAnimationNames: []
+            });
+            geometryCacheBindings.set(this, {
+              assetId,
+              autoPlay,
+              animationNames: result.animationNames
+            });
+          }
+        },
+        {
+          name: 'GeometryCacheAutoPlay',
+          type: 'bool',
+          default: false,
+          options: {
+            group: 'Animation',
+            label: 'Cache AutoPlay'
+          },
+          isValid(this: SceneNode) {
+            return this !== this.scene?.rootNode && hasMeshDescendants(this);
+          },
+          get(this: SceneNode, value) {
+            value.bool[0] = geometryCacheBindings.get(this)?.autoPlay ?? false;
+          },
+          async set(this: SceneNode, value) {
+            const current = geometryCacheBindings.get(this);
+            if (!current) {
+              return;
+            }
+            const autoPlay = !!value.bool[0];
+            geometryCacheBindings.set(this, {
+              assetId: current.assetId,
+              autoPlay,
+              animationNames: current.animationNames
+            });
+            for (const name of current.animationNames) {
+              const animation = this.animationSet.getAnimationClip(name);
+              if (animation) {
+                animation.autoPlay = autoPlay;
+                if (autoPlay) {
+                  this.animationSet.playAnimation(name, { repeat: 0 });
+                } else if (this.animationSet.isPlayingAnimation(name)) {
+                  this.animationSet.stopAnimation(name);
+                }
               }
             }
           }

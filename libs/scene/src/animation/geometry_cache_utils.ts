@@ -1,4 +1,4 @@
-import { getDevice } from '../app/api';
+import { getDevice, getEngine } from '../app/api';
 import type { Mesh } from '../scene';
 import { Primitive } from '../render/primitive';
 import { BoundingBox } from '../utility/bounding_volume';
@@ -19,10 +19,21 @@ export type GeometryCacheState = {
 };
 
 export type GeometryCacheMeshBinding = {
+  originalPrimitive: Primitive;
   primitive: Primitive;
   positionBuffer: StructuredBuffer;
   normalBuffer: Nullable<StructuredBuffer>;
 };
+
+type GeometryCacheMeshState = {
+  originalPrimitive: Primitive;
+  originalPrimitiveAssetId: string;
+  cachePrimitive: Primitive;
+  positionBuffer: StructuredBuffer;
+  normalBuffer: Nullable<StructuredBuffer>;
+};
+
+const geometryCacheMeshStates = new WeakMap<Mesh, GeometryCacheMeshState>();
 
 export function createGeometryCacheState(frame: Pick<GeometryCacheFrame, 'positions' | 'normals'>): GeometryCacheState {
   return {
@@ -56,51 +67,134 @@ export function ensureGeometryCacheMeshBinding(
   let binding = meshBindings.get(mesh);
   if (!binding) {
     const primitive = mesh.primitive;
-    if (!primitive) {
+    const meshState = geometryCacheMeshStates.get(mesh);
+    const originalPrimitive = meshState?.originalPrimitive ?? primitive;
+    if (!originalPrimitive) {
       throw new Error(`${errorPrefix}: target mesh has no primitive`);
     }
-    const expectedPositionLength = primitive.getNumVertices() * 3;
-    if (state.positions.length !== expectedPositionLength) {
-      throw new Error(
-        `${errorPrefix}: position count mismatch, expected ${expectedPositionLength}, got ${state.positions.length}`
-      );
+    validateGeometryCacheState(originalPrimitive, state, errorPrefix);
+    const ensuredState = meshState
+      ? ensureGeometryCacheNormalBuffer(meshState, originalPrimitive, state, errorPrefix)
+      : createGeometryCacheMeshState(originalPrimitive, state);
+    geometryCacheMeshStates.set(mesh, ensuredState);
+    if (mesh.primitive !== ensuredState.cachePrimitive) {
+      mesh.primitive = ensuredState.cachePrimitive;
     }
-    const cachePrimitive = primitive.clone();
-    cachePrimitive.setBoundingVolume(primitive.getBoundingVolume()!);
-    cachePrimitive.removeVertexBuffer('position');
-    const positionBuffer = getDevice().createVertexBuffer(
-      'position_f32x3',
-      state.positions as unknown as Float32Array<ArrayBuffer>,
-      {
-        dynamic: true
-      }
-    )!;
-    cachePrimitive.setVertexBuffer(positionBuffer);
-    let normalBuffer: Nullable<StructuredBuffer> = null;
-    if (state.normals) {
-      const expectedNormalLength = primitive.getNumVertices() * 3;
-      if (state.normals.length !== expectedNormalLength) {
-        throw new Error(
-          `${errorPrefix}: normal count mismatch, expected ${expectedNormalLength}, got ${state.normals.length}`
-        );
-      }
-      cachePrimitive.removeVertexBuffer('normal');
-      normalBuffer = getDevice().createVertexBuffer(
-        'normal_f32x3',
-        state.normals as unknown as Float32Array<ArrayBuffer>,
-        {
-          dynamic: true
-        }
-      )!;
-      cachePrimitive.setVertexBuffer(normalBuffer);
-    }
-    mesh.primitive = cachePrimitive;
     binding = {
-      primitive: cachePrimitive,
-      positionBuffer,
-      normalBuffer
+      originalPrimitive,
+      primitive: ensuredState.cachePrimitive,
+      positionBuffer: ensuredState.positionBuffer,
+      normalBuffer: ensuredState.normalBuffer
     };
     meshBindings.set(mesh, binding);
   }
   return binding;
+}
+
+export async function restoreGeometryCacheMeshBinding(mesh: Mesh) {
+  const meshState = geometryCacheMeshStates.get(mesh);
+  if (!meshState) {
+    return false;
+  }
+  const primitiveToRestore = await resolveOriginalPrimitive(meshState);
+  if (mesh.primitive === meshState.cachePrimitive) {
+    mesh.primitive = primitiveToRestore;
+  }
+  mesh.setAnimatedBoundingBox(null);
+  mesh.scene?.queueUpdateNode(mesh);
+  geometryCacheMeshStates.delete(mesh);
+  return true;
+}
+
+function validateGeometryCacheState(primitive: Primitive, state: GeometryCacheState, errorPrefix: string) {
+  const expectedPositionLength = primitive.getNumVertices() * 3;
+  if (state.positions.length !== expectedPositionLength) {
+    throw new Error(
+      `${errorPrefix}: position count mismatch, expected ${expectedPositionLength}, got ${state.positions.length}`
+    );
+  }
+  if (state.normals) {
+    const expectedNormalLength = primitive.getNumVertices() * 3;
+    if (state.normals.length !== expectedNormalLength) {
+      throw new Error(
+        `${errorPrefix}: normal count mismatch, expected ${expectedNormalLength}, got ${state.normals.length}`
+      );
+    }
+  }
+}
+
+function createGeometryCacheMeshState(
+  originalPrimitive: Primitive,
+  state: GeometryCacheState
+): GeometryCacheMeshState {
+  const cachePrimitive = originalPrimitive.clone();
+  cachePrimitive.setBoundingVolume(originalPrimitive.getBoundingVolume()!);
+  const primitiveAssetId = getEngine().resourceManager.getAssetId(originalPrimitive);
+  if (primitiveAssetId) {
+    getEngine().resourceManager.setAssetId(cachePrimitive, primitiveAssetId);
+  }
+  cachePrimitive.removeVertexBuffer('position');
+  const positionBuffer = getDevice().createVertexBuffer(
+    'position_f32x3',
+    state.positions as unknown as Float32Array<ArrayBuffer>,
+    {
+      dynamic: true
+    }
+  )!;
+  cachePrimitive.setVertexBuffer(positionBuffer);
+  let normalBuffer: Nullable<StructuredBuffer> = null;
+  if (state.normals) {
+    cachePrimitive.removeVertexBuffer('normal');
+    normalBuffer = getDevice().createVertexBuffer(
+      'normal_f32x3',
+      state.normals as unknown as Float32Array<ArrayBuffer>,
+      {
+        dynamic: true
+      }
+    )!;
+    cachePrimitive.setVertexBuffer(normalBuffer);
+  }
+  return {
+    originalPrimitive,
+    originalPrimitiveAssetId: primitiveAssetId ?? '',
+    cachePrimitive,
+    positionBuffer,
+    normalBuffer
+  };
+}
+
+function ensureGeometryCacheNormalBuffer(
+  meshState: GeometryCacheMeshState,
+  originalPrimitive: Primitive,
+  state: GeometryCacheState,
+  errorPrefix: string
+) {
+  if (state.normals && !meshState.normalBuffer) {
+    const expectedNormalLength = originalPrimitive.getNumVertices() * 3;
+    if (state.normals.length !== expectedNormalLength) {
+      throw new Error(
+        `${errorPrefix}: normal count mismatch, expected ${expectedNormalLength}, got ${state.normals.length}`
+      );
+    }
+    meshState.cachePrimitive.removeVertexBuffer('normal');
+    meshState.normalBuffer = getDevice().createVertexBuffer(
+      'normal_f32x3',
+      state.normals as unknown as Float32Array<ArrayBuffer>,
+      {
+        dynamic: true
+      }
+    )!;
+    meshState.cachePrimitive.setVertexBuffer(meshState.normalBuffer);
+  }
+  return meshState;
+}
+
+async function resolveOriginalPrimitive(meshState: GeometryCacheMeshState) {
+  if (meshState.originalPrimitiveAssetId) {
+    const restoredPrimitive = await getEngine().resourceManager.fetchPrimitive(meshState.originalPrimitiveAssetId);
+    if (restoredPrimitive) {
+      return restoredPrimitive;
+    }
+  }
+  return meshState.originalPrimitive;
 }

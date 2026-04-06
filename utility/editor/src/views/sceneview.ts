@@ -1743,8 +1743,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     const mimeType = getEngine().VFS.guessMIMEType(payload.path);
     if (
       mimeType === 'model/gltf-binary' ||
-      mimeType === 'model/gltf+json' ||
-      mimeType === 'application/vnd.zephyr3d.alembic-cache+json'
+      mimeType === 'model/gltf+json'
     ) {
       this.handleAddAsset(payload.path);
     } else if (mimeType === 'application/vnd.zephyr3d.prefab+json') {
