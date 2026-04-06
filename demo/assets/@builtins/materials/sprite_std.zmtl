@@ -1,9 +1,0 @@
-{
-  "type": "Default",
-  "data": {
-    "ClassName": "StandardSpriteMaterial",
-    "Object": {
-      "CullMode": "none"
-    }
-  }
-}
