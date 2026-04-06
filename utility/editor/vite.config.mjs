@@ -1,105 +1,116 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 
-export default defineConfig({
-  root: '.',
-  publicDir: 'public',
-  base: './',
-  build: {
-    outDir: 'dist',
-    assetsDir: 'assets',
-    copyPublicDir: true,
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'index.html')
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageNames = ['base', 'device', 'scene', 'imgui', 'backend-webgl', 'backend-webgpu'];
+const runtimeSourcePackageNames = ['base', 'device', 'scene', 'backend-webgl', 'backend-webgpu'];
+const sourceAliases = Object.fromEntries(
+  runtimeSourcePackageNames.map((name) => [
+    `@zephyr3d/${name}`,
+    resolve(__dirname, `../../libs/${name}/src/index.ts`)
+  ])
+);
+
+function toViteFsPath(filePath) {
+  return `/@fs/${filePath.replace(/\\/g, '/')}`;
+}
+
+const monacoPackages = packageNames.map((name) => ({
+  name: `@zephyr3d/${name}`,
+  devEntry: toViteFsPath(resolve(__dirname, `../../libs/${name}/src/index.ts`)),
+  devRoot: toViteFsPath(resolve(__dirname, `../../libs/${name}/src`)),
+  prodDts: `./vendor/zephyr3d/${name}/dist/index.d.ts`,
+  useSourceInDev: name !== 'imgui'
+}));
+
+function createStaticCopyPlugin() {
+  return viteStaticCopy({
+    targets: [
+      {
+        src: 'node_modules/monaco-editor/dev/vs',
+        dest: 'vendor/monaco'
       },
-      external: (id) => id.startsWith('@zephyr3d/'),
-      treeshake: {
-        moduleSideEffects: (id, external) => {
-          return /[\\\/]zephyr3d[\\\/]libs[\\\/]/.test(id);
+      ...packageNames.map((name) => ({
+        src: `node_modules/@zephyr3d/${name}/dist`,
+        dest: `vendor/zephyr3d/${name}`
+      }))
+    ],
+    flatten: false
+  });
+}
+
+export default defineConfig(({ command }) => {
+  const isDev = command === 'serve';
+  return {
+    root: '.',
+    publicDir: 'public',
+    base: './',
+    build: {
+      outDir: 'dist',
+      assetsDir: 'assets',
+      copyPublicDir: true,
+      rollupOptions: {
+        input: {
+          main: resolve(__dirname, 'index.html')
         },
-        propertyReadSideEffects: true,
-        unknownGlobalSideEffects: true
-      },
-      output: {
-        entryFileNames: 'assets/index-[hash].js',
-        chunkFileNames: 'assets/chunk-[hash].js',
-        assetFileNames: 'assets/[name]-[hash][extname]'
-      }
-    },
-    sourcemap: false,
-    minify: false,
-    terserOptions: {
-      compress: {
-        drop_console: false, // 保留 console
-        drop_debugger: true
-      }
-    },
-    chunkSizeWarningLimit: 1000
-  },
-  server: {
-    host: 'localhost',
-    port: 8000,
-    open: true,
-    fs: {
-      allow: ['..']
-    }
-  },
-  preview: {
-    host: 'localhost',
-    port: 8000
-  },
-  plugins: [
-    viteStaticCopy({
-      targets: [
-        {
-          src: 'node_modules/monaco-editor/dev/vs',
-          dest: 'vendor/monaco'
+        external: isDev ? undefined : (id) => id.startsWith('@zephyr3d/'),
+        treeshake: {
+          moduleSideEffects: (id) => {
+            return /[\\\/]zephyr3d[\\\/]libs[\\\/]/.test(id);
+          },
+          propertyReadSideEffects: true,
+          unknownGlobalSideEffects: true
         },
-        {
-          src: 'node_modules/@zephyr3d/base/dist',
-          dest: 'vendor/zephyr3d/base'
-        },
-        {
-          src: 'node_modules/@zephyr3d/device/dist',
-          dest: 'vendor/zephyr3d/device'
-        },
-        {
-          src: 'node_modules/@zephyr3d/scene/dist',
-          dest: 'vendor/zephyr3d/scene'
-        },
-        {
-          src: 'node_modules/@zephyr3d/imgui/dist',
-          dest: 'vendor/zephyr3d/imgui'
-        },
-        {
-          src: 'node_modules/@zephyr3d/backend-webgl/dist',
-          dest: 'vendor/zephyr3d/backend-webgl'
-        },
-        {
-          src: 'node_modules/@zephyr3d/backend-webgpu/dist',
-          dest: 'vendor/zephyr3d/backend-webgpu'
+        output: {
+          entryFileNames: 'assets/index-[hash].js',
+          chunkFileNames: 'assets/chunk-[hash].js',
+          assetFileNames: 'assets/[name]-[hash][extname]'
         }
-      ],
-      flatten: false
-    })
-  ],
-  resolve: {
-    alias: {
-      '@': resolve(__dirname, 'src')
+      },
+      sourcemap: false,
+      minify: false,
+      terserOptions: {
+        compress: {
+          drop_console: false,
+          drop_debugger: true
+        }
+      },
+      chunkSizeWarningLimit: 1000
     },
-    extensions: ['.js', '.ts', '.jsx', '.tsx', '.json']
-  },
-  define: {
-    __DEV__: JSON.stringify(process.env.NODE_ENV === 'development')
-  },
-  css: {
-    preprocessorOptions: {
-      scss: {}
+    server: {
+      host: 'localhost',
+      port: 8000,
+      open: true,
+      fs: {
+        allow: [resolve(__dirname, '..', '..')]
+      }
     },
-    modules: {
-      generateScopedName: '[name]__[local]___[hash:base64:5]'
+    preview: {
+      host: 'localhost',
+      port: 8000
+    },
+    plugins: [createStaticCopyPlugin()],
+    resolve: {
+      alias: {
+        '@': resolve(__dirname, 'src'),
+        ...(isDev ? sourceAliases : {})
+      },
+      extensions: ['.js', '.ts', '.jsx', '.tsx', '.json']
+    },
+    define: {
+      __DEV__: JSON.stringify(process.env.NODE_ENV === 'development'),
+      __ZEPHYR3D_MONACO_PACKAGES__: JSON.stringify(monacoPackages)
+    },
+    css: {
+      preprocessorOptions: {
+        scss: {}
+      },
+      modules: {
+        generateScopedName: '[name]__[local]___[hash:base64:5]'
+      }
     }
-  }
+  };
 });
