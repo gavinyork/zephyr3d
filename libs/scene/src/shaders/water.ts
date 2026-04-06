@@ -11,7 +11,7 @@ import type {
 import type { WaveGenerator } from '../render/wavegenerator';
 import { getDevice } from '../app/api';
 
-function getFragCoord(scope: PBGlobalScope, useComputeShader: boolean) {
+function getFragCoord(scope: PBInsideFunctionScope, useComputeShader: boolean) {
   return useComputeShader ? scope.$builtins.globalInvocationId.xy : scope.$builtins.fragCoord.xy;
 }
 

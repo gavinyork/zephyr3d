@@ -2,6 +2,7 @@ import type {
   AbstractDevice,
   BindGroup,
   PBFunctionScope,
+  PBGlobalScope,
   PBInsideFunctionScope,
   PBShaderExp,
   Texture2D
@@ -168,7 +169,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
-    this.waveGenerator?.setupUniforms(scope, 2);
+    this.waveGenerator?.setupUniforms(scope as unknown as PBGlobalScope, 2);
     scope.$inputs.position = pb.vec3().attrib('position');
     scope.$inputs.clipmapInfo = pb.vec4().attrib('texCoord0');
     scope.clipmapGridInfo = pb.vec4().uniform(2);
@@ -221,7 +222,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     const pb = scope.$builder;
-    this.waveGenerator?.setupUniforms(scope, 2);
+    this.waveGenerator?.setupUniforms(scope as unknown as PBGlobalScope, 2);
     scope.region = pb.vec4().uniform(2);
     if (this.needFragmentColor()) {
       scope.displace = pb.float().uniform(2);
