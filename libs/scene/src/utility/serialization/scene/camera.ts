@@ -1,6 +1,6 @@
 import { defineProps, type SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
-import type { DeferredGBufferView, RenderPath } from '../../../camera';
+import type { CameraOITMode, DeferredGBufferView, RenderPath } from '../../../camera';
 import { SceneNode } from '../../../scene';
 import {
   TAA_DEBUG_ALAPH,
@@ -124,6 +124,44 @@ export function getCameraClass(): SerializableClass {
           },
           set(this: Camera, value) {
             this.renderPath = value.str[0] as RenderPath;
+          }
+        },
+        {
+          name: 'OITMode',
+          type: 'string',
+          default: 'none',
+          options: {
+            label: 'OIT',
+            group: 'Rendering',
+            enum: {
+              labels: ['None', 'Weighted', 'ABuffer'],
+              values: ['none', 'weighted', 'abuffer']
+            }
+          },
+          get(this: Camera, value) {
+            value.str[0] = this.oitMode;
+          },
+          set(this: Camera, value) {
+            this.oitMode = value.str[0] as CameraOITMode;
+          }
+        },
+        {
+          name: 'ABufferLayers',
+          type: 'int',
+          default: 20,
+          options: {
+            label: 'ABuffer Layers',
+            group: 'Rendering',
+            minValue: 1
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.oitABufferLayers;
+          },
+          set(this: Camera, value) {
+            this.oitABufferLayers = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.oitMode === 'abuffer';
           }
         },
         {

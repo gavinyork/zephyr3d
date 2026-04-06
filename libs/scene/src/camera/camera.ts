@@ -27,7 +27,8 @@ import { ColorAdjust } from '../posteffect/coloradjust';
 import { getDevice } from '../app/api';
 import type { ScreenConfig } from '../app/screen';
 import { ScreenAdapter } from '../app/screen';
-import {ABufferOIT} from '../render/abuffer_oit'
+import { ABufferOIT } from '../render/abuffer_oit';
+import { WeightedBlendedOIT } from '../render/weightedblended_oit';
 
 /**
  * Result of a camera picking operation.
@@ -64,6 +65,7 @@ export type CameraHistoryData = {
  * @public
  */
 export type RenderPath = 'forward' | 'deferred' | 'hybrid';
+export type CameraOITMode = 'none' | 'weighted' | 'abuffer';
 export type DeferredGBufferView =
   | 'composite'
   | 'depth'
@@ -139,6 +141,10 @@ export class Camera extends SceneNode {
   protected _clipMask: number;
   /** @internal Order-Independent Transparency reference. */
   protected _oit: DRef<OIT>;
+  /** @internal OIT algorithm selection mode. */
+  protected _oitMode: CameraOITMode;
+  /** @internal ABuffer OIT layer budget. */
+  protected _oitABufferLayers: number;
   /** @internal Whether to perform a depth pre-pass. */
   protected _depthPrePass: boolean;
   /** @internal Render path selection for scene renderer. */
@@ -321,7 +327,9 @@ export class Camera extends SceneNode {
     this._clipMask = 0;
     this._frustum = null;
     this._frustumV = null;
-    this._oit = new DRef(new ABufferOIT(20));  //修改摄像机属性
+    this._oit = new DRef();
+    this._oitMode = 'none';
+    this._oitABufferLayers = 20;
     this._depthPrePass = false;
     this._renderPath = 'forward';
     this._screenAdapter = new ScreenAdapter();
@@ -974,6 +982,34 @@ export class Camera extends SceneNode {
   }
   set oit(val) {
     this._oit.set(val);
+    const inferredMode = this.inferOITMode(val);
+    if (inferredMode) {
+      this._oitMode = inferredMode;
+    }
+  }
+  /** OIT mode */
+  get oitMode() {
+    return this._oitMode;
+  }
+  set oitMode(val: CameraOITMode) {
+    const mode = val ?? 'none';
+    if (mode !== this._oitMode) {
+      this._oitMode = mode;
+      this._oit.set(this.createOITForMode(mode));
+    }
+  }
+  /** ABuffer OIT layer budget. */
+  get oitABufferLayers() {
+    return this._oitABufferLayers;
+  }
+  set oitABufferLayers(val: number) {
+    const layers = Math.max(1, Math.floor(val || 0));
+    if (layers !== this._oitABufferLayers) {
+      this._oitABufferLayers = layers;
+      if (this._oitMode === 'abuffer') {
+        this._oit.set(this.createOITForMode('abuffer'));
+      }
+    }
   }
   /** Clip plane mask */
   get clipMask() {
@@ -1557,6 +1593,30 @@ export class Camera extends SceneNode {
     this._postEffectTonemap.dispose();
     this._postEffectColorAdjust.dispose();
     this._oit.dispose();
+  }
+  /** @internal */
+  private createOITForMode(mode: CameraOITMode): OIT | null {
+    if (mode === 'abuffer') {
+      return new ABufferOIT(this._oitABufferLayers);
+    }
+    if (mode === 'weighted') {
+      return new WeightedBlendedOIT();
+    }
+    return null;
+  }
+  /** @internal */
+  private inferOITMode(oit: Nullable<OIT>): Nullable<CameraOITMode> {
+    if (!oit) {
+      return 'none';
+    }
+    const type = oit.getType();
+    if (type === ABufferOIT.type) {
+      return 'abuffer';
+    }
+    if (type === WeightedBlendedOIT.type) {
+      return 'weighted';
+    }
+    return null;
   }
   /** @internal */
   private posInViewport(x: number, y: number) {
