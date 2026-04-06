@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "downlevelIteration": true,
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "target": "ESNext",

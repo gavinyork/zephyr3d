@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
-    "downlevelIteration": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "target": "ES2015",
     "module": "ES2015",
     "lib": ["ES6", "ES2020", "DOM", "DOM.Iterable"],

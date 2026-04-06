@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
-    "downlevelIteration": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "target": "ESNext",
     "module": "ESNext",
     "lib": ["es2020", "DOM", "DOM.Iterable"],
@@ -21,7 +20,7 @@
     "rootDir": "./src",
     "declaration": true,
     "declarationMap": true,
-    "importHelpers": false,
+    "importHelpers": true,
     "typeRoots": ["./node_modules/@types"]
   },
   "include": ["./src"],

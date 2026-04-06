@@ -389,6 +389,19 @@ export class Vector2 extends VectorBase {
     return (result || new Vector2()).setXY(x, y);
   }
   /**
+   * Linearly interpolate between two Vector2's.
+   * @param a - The first operand.
+   * @param b - The second operand.
+   * @param t - The interpolation factor. The result is equal to a when t = 0 and equal to b when t = 1.
+   * @param result - The output vector (can be the same vector as a or b). if not specified, a new vector will be created.
+   * @returns The output vector
+   */
+  static lerp(a: Vector2, b: Vector2, t: number, result?: Vector2) {
+    const x = a.x + (b.x - a.x) * t;
+    const y = a.y + (b.y - a.y) * t;
+    return (result || new Vector2()).setXY(x, y);
+  }
+  /**
    * Multiply two Vector2's.
    * @param a - The first operand.
    * @param b - The second operand.
@@ -931,6 +944,20 @@ export class Vector3 extends VectorBase {
     return (result || new Vector3()).setXYZ(x, y, z);
   }
   /**
+   * Linearly interpolate between two Vector3's.
+   * @param a - The first operand.
+   * @param b - The second operand.
+   * @param t - The interpolation factor. The result is equal to a when t = 0 and equal to b when t = 1.
+   * @param result - The output vector (can be the same vector as a or b). if not specified, a new vector will be created.
+   * @returns The output vector
+   */
+  static lerp(a: Vector3, b: Vector3, t: number, result?: Vector3) {
+    const x = a.x + (b.x - a.x) * t;
+    const y = a.y + (b.y - a.y) * t;
+    const z = a.z + (b.z - a.z) * t;
+    return (result || new Vector3()).setXYZ(x, y, z);
+  }
+  /**
    * Multiply two Vector3's.
    * @param a - The first operand.
    * @param b - The second operand.
@@ -1027,6 +1054,20 @@ export class Vector3 extends VectorBase {
     const y = a.z * b.x - a.x * b.z;
     const z = a.x * b.y - a.y * b.x;
     return (result || new Vector3()).setXYZ(x, y, z);
+  }
+  /**
+   * Calculates the angle between two Vector3's.
+   * @param a - The first operand.
+   * @param b - The second operand.
+   * @returns the angle between the two vectors in radians
+   */
+  static angleBetween(a: Vector3, b: Vector3) {
+    const denom = Math.sqrt(a.magnitudeSq * b.magnitudeSq);
+    if (denom < 1e-6) {
+      return 0;
+    }
+    const d = Math.max(-1, Math.min(1, Vector3.dot(a, b) / denom));
+    return Math.acos(d);
   }
 }
 /**
@@ -1520,6 +1561,21 @@ export class Vector4 extends VectorBase {
     return (result || new Vector4()).setXYZW(x, y, z, w);
   }
   /**
+   * Linearly interpolate between two Vector4's.
+   * @param a - The first operand.
+   * @param b - The second operand.
+   * @param t - The interpolation factor. The result is equal to a when t = 0 and equal to b when t = 1.
+   * @param result - The output vector (can be the same vector as a or b). if not specified, a new vector will be created.
+   * @returns The output vector
+   */
+  static lerp(a: Vector4, b: Vector4, t: number, result?: Vector4) {
+    const x = a.x + (b.x - a.x) * t;
+    const y = a.y + (b.y - a.y) * t;
+    const z = a.z + (b.z - a.z) * t;
+    const w = a.w + (b.w - a.w) * t;
+    return (result || new Vector4()).setXYZW(x, y, z, w);
+  }
+  /**
    * Multiply two Vector4's.
    * @param a - The first operand.
    * @param b - The second operand.
@@ -1909,6 +1965,14 @@ export class Quaternion extends VectorBase {
     return this;
   }
   /**
+   * Calculates the inverse of this quaternion inplace.
+   * @returns self
+   */
+  inplaceInverse() {
+    Quaternion.inverse(this, this);
+    return this;
+  }
+  /**
    * Multiply this quaternion by another quaternion at the right side inplace.
    * @param other - The quaternion that to be multiplied by.
    * @returns self
@@ -2243,6 +2307,23 @@ export class Quaternion extends VectorBase {
    */
   static conjugate(q: Quaternion, result?: Quaternion) {
     return (result || new Quaternion()).setXYZW(-q.x, -q.y, -q.z, q.w);
+  }
+  /**
+   * Gets the inverse of a quaternion
+   * @param q - The input quaternion
+   * @param result - The output quaternion (can be the same as q), if not specified, a new quaternion will be created.
+   * @returns The output quaternion
+   */
+  static inverse(q: Quaternion, result?: Quaternion) {
+    result = result ?? new Quaternion(q.x, q.y, q.z, q.w);
+    const dot = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
+    if (dot < 1e-6) {
+      result.identity();
+    } else {
+      const inv = 1 / dot;
+      result.setXYZW(-q.x * inv, -q.y * inv, -q.z * inv, q.w * inv);
+    }
+    return result;
   }
   /**
    * Multiply two Quaternion's.

@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
-    "downlevelIteration": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "target": "ESNext",
     "module": "ESNext",
     "lib": ["es2020", "DOM", "DOM.Iterable"],
@@ -19,7 +18,7 @@
     "keyofStringsOnly": false,
     "rootDir": "./src",
     "declaration": true,
-    "importHelpers": false,
+    "importHelpers": true,
     "typeRoots": ["./node_modules/@types", "./node_modules/@webgpu/types"]
   },
   "include": ["./src"],

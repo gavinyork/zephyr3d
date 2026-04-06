@@ -356,3 +356,25 @@ export class Interpolator {
     return Quaternion.slerp(q1, q2, t, result).inplaceNormalize();
   }
 }
+
+const tmpArray = new Float32Array(1);
+
+/**
+ * A helper class for scalar interpolation
+ * @public
+ */
+export class InterpolatorScalar extends Interpolator {
+  constructor(mode: InterpolationMode, inputs: InterpolateData, outputs: InterpolateData) {
+    super(mode, 'number', inputs, outputs);
+  }
+  static constant(value: number) {
+    return new InterpolatorScalar('step', new Float32Array([0]), new Float32Array([value]));
+  }
+  static linear(value0: number, value1: number, t0 = 0, t1 = 1) {
+    return new InterpolatorScalar('linear', new Float32Array([t0, t1]), new Float32Array([value0, value1]));
+  }
+  evaluate(t: number) {
+    this.interpolate(t, tmpArray);
+    return tmpArray[0];
+  }
+}
