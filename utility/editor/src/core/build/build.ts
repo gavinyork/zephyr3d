@@ -79,7 +79,7 @@ export async function getImportMap(vfs: VFS, distDir: string, writeDependencies 
   if (writeDependencies) {
     await vfs.makeDirectory(depsDir, true);
   }
-  for (const name of ['base', 'device', 'scene', 'runtime', 'imgui', 'backend-webgl', 'backend-webgpu']) {
+  for (const name of ['base', 'device', 'scene', 'imgui', 'backend-webgl', 'backend-webgpu']) {
     const path = vfs.join(depsDir, `@zephyr3d/${name}/index.js`);
     if (writeDependencies) {
       const content = await (await fetch(`./modules/zephyr3d_${name}.js`)).text();
