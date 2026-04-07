@@ -21,7 +21,7 @@ type ZABCCacheTrackJSON = {
   node?: number;
   nodePath?: string;
   nodeName?: string;
-  subMeshIndex: number;
+  subMeshIndex?: number;
   times?: string | ZABCBinaryBufferRef;
   sampleRate?: number;
   positionFrames: Array<string | ZABCBinaryBufferRef>;
@@ -95,9 +95,11 @@ export async function attachZABCAnimationsToSceneNode(
         );
         continue;
       }
-      const targetMesh = getTargetMesh(targetNode, track.subMeshIndex ?? 0);
+      const targetMesh = await getTargetMesh(targetNode, track, parsed);
       if (!targetMesh) {
-        console.error(`zabc target mesh not found: node=${targetNode.name}, subMeshIndex=${track.subMeshIndex ?? 0}`);
+        const subMeshLabel =
+          typeof track.subMeshIndex === 'number' && track.subMeshIndex >= 0 ? `${track.subMeshIndex}` : 'auto';
+        console.error(`zabc target mesh not found: node=${targetNode.name}, subMeshIndex=${subMeshLabel}`);
         continue;
       }
       const assetSubMesh = getTargetAssetSubMesh(node, track);
@@ -154,15 +156,70 @@ function buildAnimationName(sourcePath: string | undefined, animationName: strin
   return `Cache:${fileName}:${animationName}`;
 }
 
-function getTargetMesh(node: SceneNode, subMeshIndex: number) {
+async function getTargetMesh(node: SceneNode, track: ZABCCacheTrackJSON, parsed: ParsedZABC) {
+  const directMeshes = collectMeshChildren(node, false);
+  const candidateMeshes = directMeshes.length > 0 ? directMeshes : collectMeshChildren(node, true);
+  if (candidateMeshes.length === 0) {
+    return null;
+  }
+  if (typeof track.subMeshIndex === 'number' && track.subMeshIndex >= 0) {
+    return candidateMeshes[track.subMeshIndex] ?? null;
+  }
+  if (candidateMeshes.length === 1) {
+    return candidateMeshes[0];
+  }
+  const sourceVertexCount = getTrackSourceVertexCount(track, parsed);
+  if (sourceVertexCount > 0) {
+    const matched: Mesh[] = [];
+    for (const mesh of candidateMeshes) {
+      const rawPositions = await getMeshRawPositions(mesh);
+      const targetVertexCount = rawPositions ? (rawPositions.length / 3) >> 0 : -1;
+      if (targetVertexCount === sourceVertexCount) {
+        matched.push(mesh);
+      }
+    }
+    if (matched.length === 1) {
+      return matched[0];
+    }
+    if (matched.length > 1) {
+      console.warn(
+        `zabc subMesh auto-match is ambiguous under node=${node.name}, matched=${matched.length}, fallback=first`
+      );
+    }
+  }
+  return candidateMeshes[0];
+}
+
+function collectMeshChildren(root: SceneNode, recursive: boolean) {
   const meshes: Mesh[] = [];
-  for (const child of node.children) {
+  if (recursive) {
+    root.iterate((child) => {
+      if (child !== root && child.isMesh()) {
+        meshes.push(child);
+      }
+      return false;
+    });
+    return meshes;
+  }
+  for (const child of root.children) {
     const sceneNode = child.get();
     if (sceneNode?.isMesh()) {
       meshes.push(sceneNode);
     }
   }
-  return meshes[subMeshIndex] ?? null;
+  return meshes;
+}
+
+function getTrackSourceVertexCount(track: ZABCCacheTrackJSON, parsed: ParsedZABC) {
+  try {
+    const first = track.positionFrames?.[0];
+    if (!first) {
+      return -1;
+    }
+    return (decodeFloat32Array(first, parsed).length / 3) >> 0;
+  } catch {
+    return -1;
+  }
 }
 
 function getTargetAssetSubMesh(node: SceneNode, track: ZABCCacheTrackJSON) {
@@ -170,8 +227,11 @@ function getTargetAssetSubMesh(node: SceneNode, track: ZABCCacheTrackJSON) {
   if (!sharedModel) {
     return null;
   }
+  if (typeof track.subMeshIndex !== 'number' || track.subMeshIndex < 0) {
+    return null;
+  }
   const assetNode = findTargetAssetNode(node, track);
-  return assetNode?.mesh?.subMeshes?.[track.subMeshIndex ?? 0] ?? null;
+  return assetNode?.mesh?.subMeshes?.[track.subMeshIndex] ?? null;
 }
 
 function findTargetAssetNode(root: SceneNode, track: ZABCCacheTrackJSON) {
@@ -221,6 +281,7 @@ function findAssetNodeByPath(node: { name: string; children: any[] }, normalized
 }
 
 function findTargetNode(root: SceneNode, track: ZABCCacheTrackJSON) {
+  const hasExplicitTarget = !!track.nodePath || !!track.nodeName;
   if (track.nodePath) {
     for (const candidatePath of getNodePathCandidates(track.nodePath)) {
       for (const child of root.children) {
@@ -239,7 +300,12 @@ function findTargetNode(root: SceneNode, track: ZABCCacheTrackJSON) {
       }
     }
   }
-  return null;
+  if (hasExplicitTarget) {
+    console.warn(
+      `zabc track target fallback to attached node: nodePath=${track.nodePath ?? ''}, nodeName=${track.nodeName ?? ''}`
+    );
+  }
+  return root;
 }
 
 function findSceneNodeByPath(node: SceneNode, normalizedTrackPath: string, currentPath = ''): SceneNode | null {
