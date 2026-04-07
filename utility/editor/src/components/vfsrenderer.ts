@@ -1,4 +1,4 @@
-import type { FileMetadata, GenericConstructor, VFS } from '@zephyr3d/base';
+﻿import type { FileMetadata, GenericConstructor, VFS } from '@zephyr3d/base';
 import UPNG from 'upng-js';
 import { DataTransferVFS, Disposable, guessMimeType, makeObservable, PathUtils } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
@@ -16,6 +16,7 @@ import { installDeps, reinstallPackages } from '../core/build/dep';
 import { DlgRampTextureCreator } from '../views/dlg/ramptexturedlg';
 import { TreeViewData, TreeView } from './treeview';
 import { DlgImport } from '../views/dlg/importdlg';
+import { DlgZABCCompress, type ZABCCompressDialogResult } from '../views/dlg/zabccompressdlg';
 import { ListView, ListViewData } from './listview';
 import { ResourceService } from '../core/services/resource';
 import { DlgSaveFile } from '../views/dlg/savefiledlg';
@@ -82,7 +83,7 @@ class VFSDirData extends TreeViewData<DirectoryInfo> {
   }
   getNodeName(node: DirectoryInfo): string {
     const name = node.path.slice(node.path.lastIndexOf('/') + 1);
-    const emoji = '📁';
+    const emoji = '\uD83D\uDCC1';
     const id = node.path;
     return convertEmojiString(`${emoji}${node === this._renderer.root ? this._projectName : name}##${id}`);
   }
@@ -110,7 +111,7 @@ class VFSContentData extends ListViewData<FileInfo | DirectoryInfo> {
   }
   getItemIcon(item: FileInfo | DirectoryInfo): string {
     const isDir = 'subDir' in item;
-    return isDir ? '📁' : this.renderer.getFileEmoji(item.meta);
+    return isDir ? '\uD83D\uDCC1' : this.renderer.getFileEmoji(item.meta);
   }
   getItemName(item: FileInfo | DirectoryInfo): string {
     const isDir = 'subDir' in item;
@@ -184,7 +185,7 @@ class VFSContentData extends ListViewData<FileInfo | DirectoryInfo> {
   getDragSourceHint(_lv, item: DirectoryInfo | FileInfo): string {
     if (this.renderer.selectedItems.size > 0) {
       const ctrlDown = ImGui.GetIO().KeyCtrl;
-      let icon = 'subDir' in item ? '📁' : this.renderer.getFileEmoji(item.meta);
+      let icon = 'subDir' in item ? '\uD83D\uDCC1' : this.renderer.getFileEmoji(item.meta);
       if (ctrlDown) {
         icon += '+';
       }
@@ -678,13 +679,13 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   private renderToolbar() {
     const canGoUp = this.selectedDir && this.selectedDir.parent;
     if (canGoUp) {
-      if (ImGui.Button('⬆##DirUP')) {
+      if (ImGui.Button('Up##DirUP')) {
         this.selectedDir.parent.open = true;
         this._nav.selectNode(this.selectedDir.parent);
       }
     } else {
       ImGui.PushStyleVar(ImGui.StyleVar.Alpha, 0.5);
-      ImGui.Button('⬆##DirUP');
+      ImGui.Button('Up##DirUP');
       ImGui.PopStyleVar();
     }
     if (ImGui.IsItemHovered()) {
@@ -692,7 +693,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     }
     if (!this._vfs.readOnly) {
       ImGui.SameLine();
-      if (ImGui.Button(convertEmojiString('📦##ImportPackage'))) {
+      if (ImGui.Button(convertEmojiString('\uD83D\uDCE6##ImportPackage'))) {
         DlgPromptName.promptName('Install Package', 'package', 'packageName@x.y.z').then((val) => {
           if (val) {
             ProjectService.getCurrentProjectSettings().then((settings) => {
@@ -731,7 +732,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         ImGui.SetTooltip('Installs a third party library');
       }
       ImGui.SameLine();
-      if (ImGui.Button(convertEmojiString('♻️##ReinstallPackages'))) {
+      if (ImGui.Button(convertEmojiString('\u267B\uFE0F##ReinstallPackages'))) {
         reinstallPackages();
       }
       if (ImGui.IsItemHovered()) {
@@ -813,19 +814,19 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   getFileEmoji(meta: FileMetadata): string {
     const mimeType = guessMimeType(meta.name);
     if (mimeType.startsWith('image/')) {
-      return '🖼️';
+      return '\uD83D\uDDBC';
     }
     if (mimeType.startsWith('video/')) {
-      return '🎬';
+      return '\uD83C\uDFAC';
     }
     if (mimeType.startsWith('audio/')) {
-      return '🔊';
+      return '\uD83C\uDFB5';
     }
     if (mimeType.includes('text') || mimeType.includes('json')) {
-      return '📝';
+      return '\uD83D\uDCC4';
     }
     if (mimeType.includes('zip') || mimeType.includes('archive')) {
-      return '📦';
+      return '\uD83D\uDDDC';
     }
 
     const ext = meta.name.split('.').pop()?.toLowerCase();
@@ -843,15 +844,15 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       case 'scss':
       case 'sass':
       case 'less':
-        return '📜';
+        return '\uD83D\uDCDD';
       case 'html':
       case 'htm':
-        return '🌍';
+        return '\uD83C\uDF10';
       case 'gltf':
       case 'glb':
-        return '🧊';
+        return '\uD83C\uDFB2';
       default:
-        return '📄';
+        return '\uD83D\uDCE6';
     }
   }
 
@@ -1171,7 +1172,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
 
   renderDir(dir: DirectoryInfo) {
     const name = dir.path.slice(dir.path.lastIndexOf('/') + 1);
-    const emoji = '📁';
+    const emoji = '\uD83D\uDCC1';
     const id = dir.path;
     const label = convertEmojiString(
       `${emoji}${dir === this._filesystem ? this._options.rootDir : name}##${id}`
@@ -1356,16 +1357,33 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             0,
             true,
             new ImGui.ImVec4(211 / 255, 47 / 255, 47 / 255, 1),
-            '⚠️'
+            '\u26A0\uFE0F'
           )) === 'Cancel'
         ) {
           return;
         }
       }
-      DlgImport.promptImport('Import options', dtVFS, 0, 0).then(async (result) => {
-        if (result?.op === 'copy') {
-          const dlgProgressBar = new DlgProgress('Copy File##CopyProgress', 300);
-          dlgProgressBar.showModal();
+      const droppedZabc = await dtVFS.glob('/**/*.zabc', { recursive: true, includeDirs: false });
+      const droppedFiles = await dtVFS.glob('/**/*', { recursive: true, includeDirs: false });
+      const onlyZabcDrop =
+        droppedFiles.length > 0 &&
+        droppedFiles.every((entry) => entry.path.toLowerCase().endsWith('.zabc'));
+      const rawZabcPaths = await this.filterRawZabcPaths(
+        dtVFS,
+        droppedZabc.map((entry) => entry.path)
+      );
+      const zabcDecision =
+        rawZabcPaths.length > 0
+          ? await this.askZabcImportOptions(dtVFS, rawZabcPaths)
+          : ({ action: 'keep', components: 16, compressNormals: false } as ZABCCompressDialogResult);
+      if (zabcDecision.action === 'cancel') {
+        return;
+      }
+
+      const copyDroppedFiles = async () => {
+        const dlgProgressBar = new DlgProgress('Copy File##CopyProgress', 300);
+        dlgProgressBar.showModal();
+        try {
           await dtVFS.copyFileEx('/**/*', info.targetDirectory.path, {
             overwrite: true,
             targetVFS: this._vfs,
@@ -1373,23 +1391,213 @@ export class VFSRenderer extends makeObservable(Disposable)<{
               dlgProgressBar.setProgress(current, total);
             }
           });
-          dlgProgressBar.close();
-        } else if (result?.op === 'import') {
-          const dlgProgressBar = new DlgProgress('Import File##ImportProgress', 300);
-          dlgProgressBar.showModal();
-          for (let i = 0; i < result.paths.length; i++) {
-            dlgProgressBar.setProgress(i + 1, result.paths.length);
-            try {
-              const sharedModel = await ResourceService.importModel(dtVFS, result.paths[i]);
-              await sharedModel.savePrefab(getEngine().resourceManager, info.targetDirectory.path);
-            } catch (err) {
-              console.error(`Load model ${result.paths[i]} failed: ${err}`);
-            }
+          if (zabcDecision.action === 'compress' && rawZabcPaths.length > 0) {
+            const targetFiles = rawZabcPaths.map((sourcePath) =>
+              this._vfs.join(info.targetDirectory.path, sourcePath.replace(/^\/+/, ''))
+            );
+            await this.compressImportedZabcFiles(
+              targetFiles,
+              zabcDecision.components,
+              zabcDecision.compressNormals
+            );
           }
+        } finally {
           dlgProgressBar.close();
         }
-      });
+      };
+
+      if (onlyZabcDrop) {
+        await copyDroppedFiles();
+        return;
+      }
+
+      DlgImport.promptImport('Import options', dtVFS, 0, 0)
+        .then(async (result) => {
+          if (result?.op === 'copy') {
+            await copyDroppedFiles();
+          } else if (result?.op === 'import') {
+            const dlgProgressBar = new DlgProgress('Import File##ImportProgress', 300);
+            dlgProgressBar.showModal();
+            for (let i = 0; i < result.paths.length; i++) {
+              dlgProgressBar.setProgress(i + 1, result.paths.length);
+              try {
+                const sharedModel = await ResourceService.importModel(dtVFS, result.paths[i]);
+                await sharedModel.savePrefab(getEngine().resourceManager, info.targetDirectory.path);
+              } catch (err) {
+                console.error(`Load model ${result.paths[i]} failed: ${err}`);
+              }
+            }
+            dlgProgressBar.close();
+          }
+        })
+        .catch((err) => {
+          DlgMessage.messageBox('Import Error', `${err}`);
+        });
     }
+  }
+
+  private async askZabcImportOptions(srcVFS: VFS, rawZabcPaths: string[]): Promise<ZABCCompressDialogResult> {
+    const previewPath = rawZabcPaths[0] ?? '';
+    return DlgZABCCompress.prompt(
+      rawZabcPaths.length,
+      (components, compressNormals) => this.previewZabcCompression(srcVFS, previewPath, components, compressNormals),
+      460
+    );
+  }
+
+  private async compressImportedZabcFiles(files: string[], components: number, compressNormals: boolean) {
+    if (!files.length) {
+      return;
+    }
+    const dlgProgressBar = new DlgProgress('Compress ZABC##CompressZABC', 360);
+    dlgProgressBar.showModal();
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const path = files[i];
+        dlgProgressBar.setProgress(i + 1, files.length);
+        await this.compressSingleZabc(path, components, compressNormals);
+      }
+    } finally {
+      dlgProgressBar.close();
+    }
+  }
+
+  private async filterRawZabcPaths(srcVFS: VFS, paths: string[]) {
+    const raw: string[] = [];
+    for (const path of paths) {
+      try {
+        const data = (await srcVFS.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
+        if (this.isRawZabcData(data)) {
+          raw.push(path);
+        }
+      } catch {
+        raw.push(path);
+      }
+    }
+    return raw;
+  }
+
+  private isRawZabcData(arrayBuffer: ArrayBuffer) {
+    const manifest = this.tryParseZabcManifest(arrayBuffer);
+    if (!manifest) {
+      return true;
+    }
+    const animations = Array.isArray((manifest as any).animations) ? (manifest as any).animations : [];
+    for (const animation of animations) {
+      const tracks = Array.isArray(animation?.tracks) ? animation.tracks : [];
+      for (const track of tracks) {
+        const codec = `${track?.codec ?? 'fixed'}`.toLowerCase();
+        if (codec !== 'pca') {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private tryParseZabcManifest(arrayBuffer: ArrayBuffer): Record<string, unknown> | null {
+    try {
+      if (arrayBuffer.byteLength >= 12) {
+        const magic = new Uint8Array(arrayBuffer, 0, 4);
+        if (magic[0] === 0x5a && magic[1] === 0x41 && magic[2] === 0x42 && magic[3] === 0x43) {
+          const view = new DataView(arrayBuffer);
+          const manifestLength = view.getUint32(8, true);
+          const start = 12;
+          const end = start + manifestLength;
+          const text = new TextDecoder().decode(arrayBuffer.slice(start, end));
+          return JSON.parse(text) as Record<string, unknown>;
+        }
+      }
+      const text = new TextDecoder().decode(arrayBuffer);
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  private async compressSingleZabc(path: string, components: number, compressNormals: boolean) {
+    const input = (await this._vfs.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
+    const worker = new Worker(new URL('../workers/zabc_pca.ts', import.meta.url), { type: 'module' });
+    const output = await new Promise<ArrayBuffer>((resolve, reject) => {
+      worker.onmessage = (event: MessageEvent<{ type: string; output?: ArrayBuffer; error?: string }>) => {
+        const data = event.data;
+        if (data?.type === 'success' && data.output) {
+          resolve(data.output);
+        } else {
+          reject(new Error(data?.error || 'ZABC compression failed'));
+        }
+      };
+      worker.onerror = (event) => {
+        reject(new Error(event.message || 'ZABC worker failed'));
+      };
+      worker.postMessage(
+        {
+          type: 'compress',
+          input,
+          components,
+          compressNormals
+        },
+        [input]
+      );
+    }).finally(() => {
+      worker.terminate();
+    });
+    await this._vfs.writeFile(path, output, { encoding: 'binary', create: true });
+  }
+
+  private async previewZabcCompression(srcVFS: VFS, path: string, components: number, compressNormals: boolean) {
+    if (!path) {
+      throw new Error('No .zabc file selected for preview');
+    }
+    const input = (await srcVFS.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
+    const worker = new Worker(new URL('../workers/zabc_pca.ts', import.meta.url), { type: 'module' });
+    const stats = await new Promise<{
+      animationCount: number;
+      trackCount: number;
+      frameCount: number;
+      sourcePayloadBytes: number;
+      convertedPayloadBytes: number;
+      maxPositionError: number;
+      rmsPositionError: number;
+    }>((resolve, reject) => {
+      worker.onmessage = (
+        event: MessageEvent<{
+          type: string;
+          stats?: {
+            animationCount: number;
+            trackCount: number;
+            frameCount: number;
+            sourcePayloadBytes: number;
+            convertedPayloadBytes: number;
+            maxPositionError: number;
+            rmsPositionError: number;
+          };
+          error?: string;
+        }>
+      ) => {
+        const data = event.data;
+        if (data?.type === 'preview' && data.stats) {
+          resolve(data.stats);
+        } else {
+          reject(new Error(data?.error || 'ZABC preview failed'));
+        }
+      };
+      worker.onerror = (event) => {
+        reject(new Error(event.message || 'ZABC preview worker failed'));
+      };
+      worker.postMessage(
+        {
+          type: 'preview',
+          input,
+          components,
+          compressNormals
+        },
+        [input]
+      );
+    }).finally(() => {
+      worker.terminate();
+    });
+    return stats;
   }
 
   emitSelectedChanged() {
@@ -1631,3 +1839,4 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     return value;
   }
 }
+
