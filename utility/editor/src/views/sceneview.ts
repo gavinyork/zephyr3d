@@ -1,6 +1,7 @@
 import { ImGui } from '@zephyr3d/imgui';
 import type { SceneModel } from '../models/scenemodel';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
+import type { TransformSpace } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import type {
   Camera,
@@ -130,6 +131,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _multiTransformItems: MultiTransformItem[];
   private _multiTransformMasterStartWorld: Nullable<Matrix4x4>;
   private _multiTransformPivot: Nullable<SceneNode>;
+  private _preferredTransformSpace: TransformSpace;
   private _suspendMultiPropertySync: boolean;
   private _syncedPropertySessions: Map<string, Map<SceneNode, SyncedPropertyRecord>>;
   constructor(controller: SceneController) {
@@ -168,6 +170,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._multiTransformItems = [];
     this._multiTransformMasterStartWorld = null;
     this._multiTransformPivot = null;
+    this._preferredTransformSpace = 'world';
     this._suspendMultiPropertySync = false;
     this._syncedPropertySessions = new Map();
     this._statusbar = new StatusBar();
@@ -476,6 +479,24 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         },
         {
           label: '-'
+        },
+        {
+          label: '',
+          tooltip: () =>
+            this.isTransformSpaceForcedWorld()
+              ? 'Transform space (multi-selection uses World): click to set preferred space'
+              : 'Transform space for move/rotate/scale',
+          visible: () => this.isTransformModeActive(),
+          selected: () => this._preferredTransformSpace === 'local',
+          render: () => ImGui.Button(this._preferredTransformSpace === 'local' ? 'Local' : 'World'),
+          action: () => {
+            this._preferredTransformSpace = this._preferredTransformSpace === 'local' ? 'world' : 'local';
+            this.updateGizmoTransformSpace();
+          }
+        },
+        {
+          label: '-',
+          visible: () => this.isTransformModeActive()
         },
         {
           label: '',
@@ -1051,6 +1072,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._proxy = new NodeProxy(this.controller.model.scene);
       this._postGizmoRenderer = new PostGizmoRenderer(this.controller.model.scene.mainCamera!, null);
       this._postGizmoRenderer.mode = 'select';
+      this.updateGizmoTransformSpace();
       this._leftDockPanel = new DockPannel(
         0,
         this._menubar.height + this._toolbar.height,
@@ -1869,6 +1891,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._syncedPropertySessions.clear();
     if (!activeNode) {
       this._postGizmoRenderer!.node = null;
+      this.updateGizmoTransformSpace();
       this._propGrid.object = this.controller.model.scene;
       return;
     }
@@ -1878,7 +1901,23 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       (activeNode === activeNode.scene!.rootNode || activeNode === this.controller.model.scene.mainCamera
         ? null
         : activeNode);
+    this.updateGizmoTransformSpace();
     this._propGrid.object = activeNode === activeNode.scene!.rootNode ? activeNode.scene : activeNode;
+  }
+  private isTransformModeActive() {
+    const mode = this._postGizmoRenderer?.mode;
+    return mode === 'translation' || mode === 'rotation' || mode === 'scaling';
+  }
+  private isTransformSpaceForcedWorld() {
+    return !!this._postGizmoRenderer && this._postGizmoRenderer.node === this._multiTransformPivot;
+  }
+  private updateGizmoTransformSpace() {
+    if (!this._postGizmoRenderer) {
+      return;
+    }
+    this._postGizmoRenderer.transformSpace = this.isTransformSpaceForcedWorld()
+      ? 'world'
+      : this._preferredTransformSpace;
   }
   private handleNodeDeselected(_node: SceneNode) {}
   private handleAssetSelectionChanged() {
