@@ -266,6 +266,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 {
                   label: 'Tetrahedron',
                   action: () => this.handleAddShape('/assets/@builtins/primitives/tetrahedron.zmsh')
+                },
+                {
+                  label: 'Capsule',
+                  action: () => this.handleAddShape('/assets/@builtins/primitives/capsule.zmsh')
                 }
               ]
             },

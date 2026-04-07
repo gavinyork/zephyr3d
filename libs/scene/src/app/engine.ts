@@ -7,7 +7,15 @@ import type { Host } from './scriptingsystem';
 import type { RuntimeScript } from './runtimescript';
 import { ResourceManager } from '../utility/serialization/manager';
 import type { Scene } from '../scene';
-import { BoxShape, CylinderShape, PlaneShape, SphereShape, TetrahedronShape, TorusShape } from '../shapes';
+import {
+  BoxShape,
+  CapsuleShape,
+  CylinderShape,
+  PlaneShape,
+  SphereShape,
+  TetrahedronShape,
+  TorusShape
+} from '../shapes';
 import {
   BlinnMaterial,
   LambertMaterial,
@@ -262,6 +270,7 @@ export class Engine {
       '/primitives/plane.zmsh': PlaneShape,
       '/primitives/torus.zmsh': TorusShape,
       '/primitives/tetrahedron.zmsh': TetrahedronShape,
+      '/primitives/capsule.zmsh': CapsuleShape,
       '/materials/unlit.zmtl': UnlitMaterial,
       '/materials/lambert.zmtl': LambertMaterial,
       '/materials/blinnphong.zmtl': BlinnMaterial,

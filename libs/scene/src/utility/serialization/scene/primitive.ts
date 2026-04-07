@@ -2,6 +2,7 @@ import { Primitive } from '../../../render';
 import {
   BoxFrameShape,
   BoxShape,
+  CapsuleShape,
   CylinderShape,
   PlaneShape,
   SphereShape,
@@ -51,6 +52,103 @@ export function getBoxShapeClass(): SerializableClass {
               anchorX: value.num[0],
               anchorY: value.num[1],
               anchorZ: value.num[2]
+            };
+          }
+        }
+      ]);
+    }
+  };
+}
+
+/** @internal */
+export function getCapsuleShapeClass(): SerializableClass {
+  return {
+    ctor: CapsuleShape,
+    parent: Primitive,
+    name: 'CapsuleShape',
+    getProps() {
+      return defineProps([
+        {
+          name: 'Radius',
+          type: 'float',
+          default: 1,
+          get(this: CapsuleShape, value) {
+            value.num[0] = this.options.radius ?? 1;
+          },
+          set(this: CapsuleShape, value) {
+            this.options = {
+              ...this.options,
+              radius: value.num[0]
+            };
+          }
+        },
+        {
+          name: 'Height',
+          type: 'float',
+          default: 1,
+          get(this: CapsuleShape, value) {
+            value.num[0] = this.options.height ?? 1;
+          },
+          set(this: CapsuleShape, value) {
+            this.options = {
+              ...this.options,
+              height: value.num[0]
+            };
+          }
+        },
+        {
+          name: 'RadialDetail',
+          type: 'int',
+          default: 20,
+          get(this: CapsuleShape, value) {
+            value.num[0] = this.options.radialDetail ?? 10;
+          },
+          set(this: CapsuleShape, value) {
+            this.options = {
+              ...this.options,
+              radialDetail: value.num[0]
+            };
+          }
+        },
+        {
+          name: 'HemisphereDetail',
+          type: 'int',
+          default: 10,
+          get(this: CapsuleShape, value) {
+            value.num[0] = this.options.hemisphereDetail ?? 10;
+          },
+          set(this: CapsuleShape, value) {
+            this.options = {
+              ...this.options,
+              hemisphereDetail: value.num[0]
+            };
+          }
+        },
+        {
+          name: 'HeightDetail',
+          type: 'int',
+          default: 1,
+          get(this: CapsuleShape, value) {
+            value.num[0] = this.options.heightDetail ?? 1;
+          },
+          set(this: CapsuleShape, value) {
+            this.options = {
+              ...this.options,
+              heightDetail: value.num[0]
+            };
+          }
+        },
+        {
+          name: 'Anchor',
+          type: 'float',
+          default: 0.5,
+          get(this: CapsuleShape, value) {
+            value.num[0] = this.options.anchor ?? 0.5;
+          },
+          set(this: CapsuleShape, value) {
+            this.options = {
+              ...this.options,
+              anchor: value.num[0]
             };
           }
         }

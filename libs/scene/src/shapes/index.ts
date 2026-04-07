@@ -1,5 +1,6 @@
 import type { Shape } from './shape';
 import type { BoxFrameShape, BoxShape } from './box';
+import type { CapsuleShape } from './capsule';
 import type { CylinderShape } from './cylinder';
 import type { PlaneShape } from './plane';
 import type { SphereShape } from './sphere';
@@ -8,6 +9,7 @@ import type { TetrahedronFrameShape, TetrahedronShape } from './tetrahedron';
 
 export * from './shape';
 export * from './box';
+export * from './capsule';
 export * from './cylinder';
 export * from './torus';
 export * from './plane';
@@ -21,6 +23,7 @@ export * from './tetrahedron';
 export type ShapeType =
   | BoxShape
   | BoxFrameShape
+  | CapsuleShape
   | SphereShape
   | CylinderShape
   | PlaneShape

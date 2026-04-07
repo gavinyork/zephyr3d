@@ -33,7 +33,8 @@ import {
   getTorusShapeClass,
   getCylinderShapeClass,
   getPlaneShapeClass,
-  getTetrahedronShapeClass
+  getTetrahedronShapeClass,
+  getCapsuleShapeClass
 } from './scene/primitive';
 import { getSceneClass } from './scene/scene';
 import { getTerrainClass } from './scene/terrain';
@@ -295,6 +296,7 @@ export class ResourceManager {
         getCylinderShapeClass(),
         getPlaneShapeClass(),
         getTetrahedronShapeClass(),
+        getCapsuleShapeClass(),
         ConstantScalarNode.getSerializationCls(),
         ConstantVec2Node.getSerializationCls(),
         ConstantVec3Node.getSerializationCls(),
