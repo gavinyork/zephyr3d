@@ -6,6 +6,7 @@ import { RaycastVisitor } from './raycast_visitor';
 import { Environment } from './environment';
 import type { GraphNode } from './graph_node';
 import type { Camera } from '../camera/camera';
+import type { Drawable } from '../render';
 import { SceneRenderer } from '../render';
 import type { Compositor } from '../posteffect';
 import type { Metadata } from 'draco3d';
@@ -61,6 +62,8 @@ export class Scene
   protected _id: number;
   /** @internal One-shot per-frame update queue (runs before render). */
   protected _nodeUpdateQueue: DWeakRef<SceneNode>[];
+  /** @internal */
+  protected _drawableUpdateQueue: Drawable[];
   /** @internal One-shot per-frame-per-camera update queue. */
   protected _perCameraUpdateQueue: DWeakRef<SceneNode>[];
   /** @internal Main camera reference. */
@@ -87,6 +90,7 @@ export class Scene
     this._octree = new Octree(this, 8, 8);
     this._nodePlaceList = new Set();
     this._nodeUpdateQueue = [];
+    this._drawableUpdateQueue = [];
     this._perCameraUpdateQueue = [];
     this._env = new Environment();
     this._updateFrame = -1;
@@ -272,6 +276,21 @@ export class Scene
     }
   }
   /**
+   * Queues a drawable for a one-shot state update before the next render.
+   *
+   * The drawable's `updateState()` will be called during Scene.frameUpdate and then the drawable is removed from the queue.
+   * @param drawable - Drawable to schedule.
+   *
+   * @remarks
+   * - To update continuously each frame, call `queueUpdateDrawable(this)` from within the drawable's `updateState` method.
+   * - Duplicate scheduling within the same frame is prevented.
+   */
+  queueUpdateDrawable(drawable: Drawable) {
+    if (drawable && this._drawableUpdateQueue.indexOf(drawable) < 0) {
+      this._drawableUpdateQueue.push(drawable);
+    }
+  }
+  /**
    * Queues a node for a one-shot per-camera update before render.
    *
    * The node's `updatePerCamera(camera, elapsedSeconds, deltaSeconds)` will be
@@ -373,6 +392,12 @@ export class Scene
           }
           ref.dispose();
         }
+      }
+      if (this._drawableUpdateQueue.length > 0) {
+        for (const drawable of this._drawableUpdateQueue) {
+          drawable.updateState();
+        }
+        this._drawableUpdateQueue = [];
       }
       this.updateNodePlacement(this._octree, this._nodePlaceList);
     }

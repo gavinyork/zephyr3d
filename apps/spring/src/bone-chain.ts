@@ -1,16 +1,8 @@
 // Bone chain demo — 8-bone pendulum with sphere collider
 
 import { InterpolatorScalar } from '@zephyr3d/base';
-import {
-  BoneNode,
-  ColliderR,
-  GrabberR,
-  LambertMaterial,
-  Mesh,
-  Scene,
-  SceneNode,
-  SphereShape
-} from '@zephyr3d/scene';
+import type { BoneNode, ColliderR, GrabberR, Scene } from '@zephyr3d/scene';
+import { LambertMaterial, Mesh, SceneNode, SphereShape } from '@zephyr3d/scene';
 import { SPCRJointDynamicsController, type ControllerConfig, type PhysicsCurves } from '@zephyr3d/scene';
 import { buildConstraints } from '@zephyr3d/scene';
 import { createTransformAccess } from './three-bridge';

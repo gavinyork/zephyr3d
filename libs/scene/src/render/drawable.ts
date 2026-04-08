@@ -217,6 +217,10 @@ export interface Drawable {
    */
   draw(ctx: DrawContext, renderQueue: Nullable<RenderQueue>, hash?: string): void;
   /**
+   * Updates internal state or GPU resources for this drawable, if needed.
+   */
+  updateState(): void;
+  /**
    * Returns true if the object supports instanced rendering.
    *
    * When true, the object should also implement the {@link BatchDrawable} methods.

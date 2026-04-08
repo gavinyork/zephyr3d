@@ -67,8 +67,8 @@ export interface BarrelClothDemo {
 }
 
 export function createBarrelClothDemo(scene: Scene): BarrelClothDemo {
-  const COLS = 12;
-  const ROWS = 10; // longer skirt for visible draping
+  const COLS = 22;
+  const ROWS = 20; // longer skirt for visible draping
   const WAIST_RADIUS = 0.15;
   const FLARE_PER_ROW = 0.063; // subtle flare: hem radius ≈ 0.15 + 9×0.03 = 0.42
   const ROW_SPACING = 0.12; // denser rows for smoother draping
@@ -220,8 +220,8 @@ export function createBarrelClothDemo(scene: Scene): BarrelClothDemo {
   const update = (time: number) => {
     group.position.x = Math.sin(time * 1.5) * 0.25;
     group.position.z = Math.sin(time * 0.8) * 0.15;
-    group.rotation = Quaternion.fromAxisAngle(Vector3.axisPY(), time * 0.4);
-    group.position.y = WAIST_Y - BODY_HEIGHT * 0.5 + (Math.sin(time * 6) * 0.5 + 0.5) * 0.8;
+    group.rotation = Quaternion.fromAxisAngle(Vector3.axisPY(), time * 2.4);
+    //group.position.y = WAIST_Y - BODY_HEIGHT * 0.5 + (Math.sin(time * 6) * 0.5 + 0.5) * 0.8;
     colliderObj.position.x = group.position.x;
     colliderObj.position.z = group.position.z;
   };

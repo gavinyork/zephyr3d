@@ -170,7 +170,7 @@ export class SceneNode
   /** @internal Arbitrary metadata payload for this node. */
   protected _metaData: Nullable<Metadata>;
   /** @internal If true, suppress transform-change callbacks (during bulk updates). */
-  private _disableCallback: boolean;
+  private _disableCallback: number;
   /** @internal User-attached script entry (engine-defined). */
   private _script: string;
   /**
@@ -214,7 +214,7 @@ export class SceneNode
     this._invWorldMatrix = null;
     this._localMatrix = null;
     this._transformTag = 0;
-    this._disableCallback = false;
+    this._disableCallback = 0;
     this._tmpLocalMatrix = Matrix4x4.identity();
     this._tmpWorldMatrix = Matrix4x4.identity();
     this._script = '';
@@ -747,6 +747,9 @@ export class SceneNode
   set boundingBoxDrawMode(mode) {
     this._boxDrawMode = mode;
   }
+  invalidateTransform(invalidateLocal = true) {
+    this._onTransformChanged(invalidateLocal);
+  }
   /** Get called when the node was just created by cloning from other node */
   protected onPostClone(): void | Promise<void> {}
   /** Disposes the node */
@@ -795,21 +798,23 @@ export class SceneNode
   }
   /** @internal */
   protected _onTransformChanged(invalidateLocal: boolean) {
-    if (this._disableCallback) {
+    if (this._disableCallback > 0) {
       return;
     }
     if (invalidateLocal) {
       this._localMatrix = null;
     }
-    this._worldMatrix = null;
-    this._invWorldMatrix = null;
-    this._worldMatrixDet = null;
-    this._transformTag++;
-    for (const child of this._children) {
-      child.get()!._onTransformChanged(false);
-    }
     this.invalidateWorldBoundingVolume(true);
     this.dispatchEvent('transformchanged', this);
+    if (this._worldMatrix) {
+      this._transformTag++;
+      this._worldMatrix = null;
+      this._invWorldMatrix = null;
+      this._worldMatrixDet = null;
+      for (const child of this._children) {
+        child.get()!._onTransformChanged(false);
+      }
+    }
   }
   /**
    * Get called when this node is attached to scene
@@ -979,9 +984,9 @@ export class SceneNode
    * @returns self
    */
   setLocalTransform(matrix: Matrix4x4) {
-    this._disableCallback = true;
+    this._disableCallback++;
     matrix.decompose(this._scaling, this._rotation, this._position);
-    this._disableCallback = false;
+    this._disableCallback--;
     this._onTransformChanged(true);
     return this;
   }
@@ -998,25 +1003,18 @@ export class SceneNode
   }
   /** World transformation matrix of the xform */
   get worldMatrix(): Immutable<Matrix4x4> {
-    if (!this._worldMatrix) {
-      this._worldMatrix = this._tmpWorldMatrix;
-      this.calculateWorldTransform(this._worldMatrix);
-    }
-    return this._worldMatrix;
+    this.syncTransform();
+    return this._worldMatrix!;
   }
   /** The determinant of world matrix */
-  get worldMatrixDet() {
-    if (this._worldMatrixDet === null) {
-      this._worldMatrixDet = this.worldMatrix.det();
-    }
-    return this._worldMatrixDet;
+  get worldMatrixDet(): number {
+    this.syncTransform();
+    return this._worldMatrixDet!;
   }
   /** Inverse of the world transformation matrix of the xform */
   get invWorldMatrix(): Immutable<Matrix4x4> {
-    if (!this._invWorldMatrix) {
-      this._invWorldMatrix = Matrix4x4.invertAffine(this.worldMatrix);
-    }
-    return this._invWorldMatrix;
+    this.syncTransform();
+    return this._invWorldMatrix!;
   }
   /**
    * Calculate local transform matrix
@@ -1086,5 +1084,18 @@ export class SceneNode
   /** @internal */
   get transformTag() {
     return this._transformTag;
+  }
+  /** @internal */
+  private syncTransform() {
+    if (!this._worldMatrix) {
+      this._worldMatrix = this._tmpWorldMatrix;
+      this.calculateWorldTransform(this._worldMatrix);
+    }
+    if (this._worldMatrixDet === null) {
+      this._worldMatrixDet = this._worldMatrix.det();
+    }
+    if (!this._invWorldMatrix) {
+      this._invWorldMatrix = Matrix4x4.invertAffine(this._worldMatrix);
+    }
   }
 }

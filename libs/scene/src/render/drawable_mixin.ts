@@ -18,6 +18,7 @@ export interface IMixinDrawable {
   applyMaterialUniforms(instanceInfo: DrawableInstanceInfo): void;
   applyMaterialUniformsAll(): void;
   getObjectColor(): Vector4;
+  updateState(): void;
   bind(ctx: DrawContext, renderQueue: Nullable<RenderQueue>): void;
 }
 
@@ -82,6 +83,7 @@ export function mixinDrawable<
     private readonly _prevWorldMatrixBuffer: Float32Array<ArrayBuffer>;
     private readonly _drawableId: number;
     private _objectColor: Nullable<Vector4>;
+    private _nodeTransformTag: number;
     constructor(...args: any[]) {
       super(...args);
       this._drawableId = ++_drawableId;
@@ -100,19 +102,9 @@ export function mixinDrawable<
       this._framestampBuffer[0] = getDevice().frameInfo.frameCounter;
       this._framestampBuffer[1] = this._framestampBuffer[0];
       this._prevWorldMatrixBuffer.set(this.getNode().worldMatrix);
+      this._nodeTransformTag = -1;
       this.getNode().on('transformchanged', () => {
-        const frame = getDevice().frameInfo.frameCounter;
-        if (frame !== this._framestampBuffer[1]) {
-          this._prevWorldMatrixBuffer.set(this._currentWorldMatrixBuffer);
-          this._framestampBuffer[0] = frame;
-          this._framestampBuffer[1] = frame;
-        }
-        this._currentWorldMatrixBuffer.set(this.getNode().worldMatrix);
-        for (const ref of this._mdRenderQueueRef) {
-          if (ref.ref) {
-            this.applyTransformUniforms(ref.ref);
-          }
-        }
+        this.getNode().scene?.queueUpdateDrawable(this as unknown as Drawable);
       });
     }
     getDrawableId() {
@@ -211,6 +203,24 @@ export function mixinDrawable<
           0,
           uniforms.length
         );
+      }
+    }
+    updateState() {
+      const currentTag = this.getNode().transformTag;
+      if (this._nodeTransformTag !== currentTag) {
+        this._nodeTransformTag = currentTag;
+        const frame = getDevice().frameInfo.frameCounter;
+        if (frame !== this._framestampBuffer[1]) {
+          this._prevWorldMatrixBuffer.set(this._currentWorldMatrixBuffer);
+          this._framestampBuffer[0] = frame;
+          this._framestampBuffer[1] = frame;
+        }
+        this._currentWorldMatrixBuffer.set(this.getNode().worldMatrix);
+        for (const ref of this._mdRenderQueueRef) {
+          if (ref.ref) {
+            this.applyTransformUniforms(ref.ref);
+          }
+        }
       }
     }
     /** @internal */

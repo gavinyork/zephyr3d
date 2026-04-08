@@ -77,6 +77,7 @@ function clearDemos() {
 function activateChain() {
   clearDemos();
   chainDemo = createBoneChainDemo(scene);
+  chainDemo.controller.warp();
   activeDemo = 'chain';
 
   const fixedSet = new Set<number>();
@@ -371,5 +372,5 @@ function tick(dt: number) {
     barrelDemo.controller.step(dt);
   }
 
-  console.log(getDevice().frameInfo.FPS);
+  console.log(`FPS: ${getDevice().frameInfo.FPS.toFixed(1)}`);
 }
