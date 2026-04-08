@@ -1,4 +1,4 @@
-import type { AABB, Clonable } from '@zephyr3d/base';
+import type { AABB, Clonable, Ray } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 
@@ -70,6 +70,93 @@ export class CapsuleShape extends Shape<CapsuleCreationOptions> implements Clona
   /** Capsule total height */
   get totalHeight() {
     return this.height + this.radius * 2;
+  }
+  /**
+   * {@inheritDoc Primitive.raycast}
+   * @override
+   *
+   * Analytically intersects a ray with a capsule aligned along the Y axis.
+   *
+   * The capsule consists of:
+   *   - A cylindrical body between y = bottomCenterY and y = topCenterY
+   *     (both at distance `radius` from the respective hemispheres).
+   *   - A bottom hemisphere centred at (0, bottomCenterY, 0).
+   *   - A top    hemisphere centred at (0, topCenterY,    0).
+   *
+   * The offset from the world origin is determined by the `anchor` parameter.
+   */
+  raycast(ray: Ray) {
+    const opt = this._options;
+    const radius = Math.abs(opt.radius ?? 1);
+    const height = Math.max(0, opt.height ?? 1);
+    const anchor = opt.anchor ?? 0.5;
+    const totalH = height + radius * 2;
+    const minY = -anchor * totalH;
+    const botY = minY + radius;
+    const topY = botY + height;
+
+    const ox = ray.origin.x;
+    const oy = ray.origin.y;
+    const oz = ray.origin.z;
+    const dx = ray.direction.x;
+    const dy = ray.direction.y;
+    const dz = ray.direction.z;
+    const r2 = radius * radius;
+    const eps = 1e-10;
+
+    let tMin = Infinity;
+
+    // Cylindrical body (only when height > 0)
+    if (height > eps) {
+      const A = dx * dx + dz * dz;
+      const B = 2 * (ox * dx + oz * dz);
+      const C = ox * ox + oz * oz - r2;
+      if (A > eps) {
+        const disc = B * B - 4 * A * C;
+        if (disc >= 0) {
+          const sqrtDisc = Math.sqrt(disc);
+          const inv2A = 1 / (2 * A);
+          for (const sign of [-1, 1]) {
+            const t = (-B + sign * sqrtDisc) * inv2A;
+            if (t >= 0) {
+              const hitY = oy + t * dy;
+              if (hitY >= botY - eps && hitY <= topY + eps) {
+                tMin = Math.min(tMin, t);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Hemisphere helper
+    const testHemisphere = (cy: number, isTop: boolean) => {
+      const ocy = oy - cy;
+      const A = dx * dx + dy * dy + dz * dz;
+      const B = 2 * (ox * dx + ocy * dy + oz * dz);
+      const C = ox * ox + ocy * ocy + oz * oz - r2;
+      const disc = B * B - 4 * A * C;
+      if (disc < 0) {
+        return;
+      }
+      const sqrtDisc = Math.sqrt(disc);
+      const inv2A = 1 / (2 * A);
+      for (const sign of [-1, 1]) {
+        const t = (-B + sign * sqrtDisc) * inv2A;
+        if (t < 0) {
+          continue;
+        }
+        const hitY = oy + t * dy;
+        if (isTop ? hitY >= topY - eps : hitY <= botY + eps) {
+          tMin = Math.min(tMin, t);
+        }
+      }
+    };
+
+    testHemisphere(botY, false);
+    testHemisphere(topY, true);
+
+    return isFinite(tMin) ? tMin : null;
   }
   /**
    * Generates the data for the capsule shape

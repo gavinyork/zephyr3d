@@ -1,4 +1,4 @@
-import type { AABB, Clonable } from '@zephyr3d/base';
+import type { AABB, Clonable, Ray } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 
@@ -54,6 +54,103 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
   /** type of the shape */
   get type() {
     return 'Cylinder' as const;
+  }
+  /**
+   * {@inheritDoc Primitive.raycast}
+   * @override
+   *
+   * Analytically intersects a ray with a cone frustum (or cylinder when
+   * topRadius === bottomRadius) including the optional top and bottom caps.
+   *
+   * The frustum axis is the Y axis.  At y=0 the cross-section radius equals
+   * `bottomRadius`; at y=height it equals `topRadius`.
+   * Both ends are offset by `anchor`: the bottom cap sits at y = -anchor*height
+   * and the top cap at y = (1-anchor)*height.
+   */
+  raycast(ray: Ray) {
+    const opt = this._options;
+    const R0 = opt.bottomRadius ?? 1;
+    const R1 = opt.topRadius ?? 1;
+    const H = opt.height ?? 1;
+    const anchor = opt.anchor ?? 0;
+    const yBot = -anchor * H;
+    const yTop = yBot + H;
+
+    const ox = ray.origin.x;
+    const oy = ray.origin.y;
+    const oz = ray.origin.z;
+    const dx = ray.direction.x;
+    const dy = ray.direction.y;
+    const dz = ray.direction.z;
+
+    // radius varies linearly with y: r(y) = R0 + k*(y - yBot)
+    const k = (R1 - R0) / H;
+    const ry = oy - yBot;
+
+    // Side surface: (ox+t*dx)^2+(oz+t*dz)^2 = (R0+k*(ry+t*dy))^2
+    // => A*t^2 + B*t + C = 0
+    const rO = R0 + k * ry;
+    const A = dx * dx + dz * dz - k * k * dy * dy;
+    const B = 2 * (ox * dx + oz * dz - rO * k * dy);
+    const C = ox * ox + oz * oz - rO * rO;
+
+    let tMin = Infinity;
+
+    const eps = 1e-10;
+    if (Math.abs(A) > eps) {
+      const disc = B * B - 4 * A * C;
+      if (disc >= 0) {
+        const sqrtDisc = Math.sqrt(disc);
+        const invA2 = 1 / (2 * A);
+        for (const sign of [-1, 1]) {
+          const t = (-B + sign * sqrtDisc) * invA2;
+          if (t >= 0) {
+            const hitY = oy + t * dy;
+            if (hitY >= yBot - eps && hitY <= yTop + eps) {
+              tMin = Math.min(tMin, t);
+            }
+          }
+        }
+      }
+    } else if (Math.abs(B) > eps) {
+      const t = -C / B;
+      if (t >= 0) {
+        const hitY = oy + t * dy;
+        if (hitY >= yBot - eps && hitY <= yTop + eps) {
+          tMin = Math.min(tMin, t);
+        }
+      }
+    }
+
+    // Bottom cap
+    if (opt.bottomCap !== false && R0 > eps) {
+      if (Math.abs(dy) > eps) {
+        const t = (yBot - oy) / dy;
+        if (t >= 0) {
+          const hx = ox + t * dx;
+          const hz = oz + t * dz;
+          if (hx * hx + hz * hz <= R0 * R0) {
+            tMin = Math.min(tMin, t);
+          }
+        }
+      }
+    }
+
+    // Top cap
+    if (opt.topCap !== false && R1 > eps) {
+      if (Math.abs(dy) > eps) {
+        const t = (yTop - oy) / dy;
+        if (t >= 0) {
+          const hx = ox + t * dx;
+          const hz = oz + t * dz;
+          if (hx * hx + hz * hz <= R1 * R1) {
+            tMin = Math.min(tMin, t);
+          }
+        }
+      }
+    }
+
+    return isFinite(tMin) ? tMin : null;
   }
   /** @internal */
   private static addPatch(

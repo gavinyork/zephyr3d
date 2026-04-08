@@ -9,7 +9,10 @@ import type { Water } from './water';
 
 const tmpV3 = new Vector3();
 
-/** @internal */
+/**
+ * Visitor for raycasting in the scene. It can be used for picking or other raycast-based queries.
+ * @public
+ */
 export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
   /** @internal */
   private readonly _ray: Ray;
@@ -21,12 +24,27 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
   private _intersectedDist: number;
   /** @internal */
   private readonly _intersectedPoint: Vector3;
-  constructor(ray: Ray, length: number) {
-    this._ray = ray;
+  constructor(ray?: Ray, length?: number) {
+    this._ray = ray ?? new Ray();
     this._rayLocal = new Ray();
     this._intersected = null;
-    this._intersectedDist = length;
+    this._intersectedDist = length ?? Infinity;
     this._intersectedPoint = new Vector3();
+  }
+  get ray() {
+    return this._ray;
+  }
+  set ray(ray: Ray) {
+    this._ray.set(ray.origin, ray.direction);
+    this._intersected = null;
+    this._intersectedDist = Infinity;
+  }
+  get rayLength() {
+    return this._intersectedDist;
+  }
+  set rayLength(length: number) {
+    this._intersectedDist = length;
+    this._intersected = null;
   }
   get intersected() {
     return this._intersected;

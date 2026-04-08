@@ -184,6 +184,8 @@ export interface IControllerKeypressEvent extends IControllerKeyboardEvent<'keyp
 export class BaseCameraController {
   /** @internal */
   private _camera: Nullable<Camera>;
+  /** @internal */
+  private _enabled: boolean;
   /**
    * Create a base camera controller.
    *
@@ -192,6 +194,7 @@ export class BaseCameraController {
    */
   constructor() {
     this._camera = null;
+    this._enabled = true;
   }
   /**
    * Get the attached camera.
@@ -214,6 +217,15 @@ export class BaseCameraController {
       this._camera = camera;
       this.reset();
     }
+  }
+  /**
+   * Check if the controller is enabled.
+   */
+  get enabled() {
+    return this._enabled;
+  }
+  set enabled(value: boolean) {
+    this._enabled = value;
   }
   /**
    * Convenience method that delegates to `camera.lookAt`.
@@ -239,7 +251,7 @@ export class BaseCameraController {
    * @returns `true` if handled and should stop further processing; otherwise `false`.
    */
   onMouseDown(evt: IControllerPointerDownEvent) {
-    return this._onMouseDown(evt);
+    return this._enabled ? this._onMouseDown(evt) : false;
   }
   /**
    * Handle pointer up events.
@@ -248,7 +260,7 @@ export class BaseCameraController {
    * @returns `true` if handled; otherwise `false`.
    */
   onMouseUp(evt: IControllerPointerUpEvent) {
-    return this._onMouseUp(evt);
+    return this._enabled ? this._onMouseUp(evt) : false;
   }
   /**
    * Handle mouse wheel (scroll) events.
@@ -259,7 +271,7 @@ export class BaseCameraController {
    * @returns `true` if handled; otherwise `false`.
    */
   onMouseWheel(evt: IControllerWheelEvent) {
-    return this._onMouseWheel(evt);
+    return this._enabled ? this._onMouseWheel(evt) : false;
   }
   /**
    * Handle pointer move events.
@@ -270,7 +282,7 @@ export class BaseCameraController {
    * @returns `true` if handled; otherwise `false`.
    */
   onMouseMove(evt: IControllerPointerMoveEvent) {
-    return this._onMouseMove(evt);
+    return this._enabled ? this._onMouseMove(evt) : false;
   }
   /**
    * Handle key down events.
@@ -281,7 +293,7 @@ export class BaseCameraController {
    * @returns `true` if handled; otherwise `false`.
    */
   onKeyDown(evt: IControllerKeydownEvent) {
-    return this._onKeyDown(evt);
+    return this._enabled ? this._onKeyDown(evt) : false;
   }
   /**
    * Handle key up events.
@@ -290,7 +302,7 @@ export class BaseCameraController {
    * @returns `true` if handled; otherwise `false`.
    */
   onKeyUp(evt: IControllerKeyupEvent) {
-    return this._onKeyUp(evt);
+    return this._enabled ? this._onKeyUp(evt) : false;
   }
   /**
    * Per-frame update.
@@ -302,7 +314,11 @@ export class BaseCameraController {
    *
    * Called once per frame by the owning system.
    */
-  update() {}
+  update() {
+    if (this._enabled) {
+      this._onUpdate();
+    }
+  }
   /**
    * Mouse down event handler
    * @param evt - Mouse event
@@ -355,5 +371,11 @@ export class BaseCameraController {
    */
   protected _onKeyUp(_evt: IControllerKeyupEvent): boolean {
     return false;
+  }
+  /**
+   * Per-frame update handler for subclasses to override.
+   */
+  protected _onUpdate() {
+    // Subclasses can override this for per-frame updates.
   }
 }

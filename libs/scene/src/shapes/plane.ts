@@ -1,4 +1,4 @@
-import type { AABB, Clonable } from '@zephyr3d/base';
+import type { AABB, Clonable, Ray } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 
@@ -54,6 +54,43 @@ export class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<
   /** type of the shape */
   get type() {
     return 'Plane' as const;
+  }
+  /**
+   * {@inheritDoc Primitive.raycast}
+   * @override
+   *
+   * Intersects the ray with the finite XZ plane (y = 0) whose bounds are
+   * determined by size/anchor options.
+   */
+  raycast(ray: Ray) {
+    const opt = this._options;
+    const sizeX = Math.abs(opt.sizeX || opt.size || 1);
+    const sizeY = Math.abs(opt.sizeY || opt.size || 1);
+    const anchorX = opt.anchorX ?? opt.anchor ?? 0.5;
+    const anchorY = opt.anchorY ?? opt.anchor ?? 0.5;
+    const minX = -anchorX * sizeX;
+    const maxX = minX + sizeX;
+    const minZ = -anchorY * sizeY;
+    const maxZ = minZ + sizeY;
+
+    // Plane is y = 0 (XZ plane)
+    const dy = ray.direction.y;
+    if (Math.abs(dy) < 1e-10) {
+      return null;
+    } // ray parallel to plane
+
+    const t = -ray.origin.y / dy;
+    if (t < 0) {
+      return null;
+    }
+
+    const hx = ray.origin.x + t * ray.direction.x;
+    const hz = ray.origin.z + t * ray.direction.z;
+    if (hx < minX || hx > maxX || hz < minZ || hz > maxZ) {
+      return null;
+    }
+
+    return t;
   }
   /**
    * Generates the data for the cylinder shape

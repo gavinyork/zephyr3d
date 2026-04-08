@@ -1,6 +1,7 @@
 import type { Matrix4x4 } from './vector';
 import { Vector3 } from './vector';
 import type { AABB } from './aabb';
+import type { Plane } from './plane';
 import { CubeFace } from './types';
 
 // reduce GC
@@ -171,6 +172,36 @@ export class Ray {
     }
 
     return null;
+  }
+  /**
+   * Do a ray-plane intersection test.
+   *
+   * The plane is defined by the equation Ax + By + Cz + D = 0 where
+   * (A, B, C) is the plane normal (assumed to be normalised) and D is the
+   * signed distance offset stored in `plane.d`.
+   *
+   * @param plane - The plane to test against.
+   * @returns The distance t from the ray origin to the intersection point
+   *   (i.e. the hit point is `origin + t * direction`), or `null` when
+   *   there is no intersection in the forward direction (t < 0) or the ray
+   *   is parallel to the plane.
+   */
+  intersectionTestPlane(plane: Plane): number | null {
+    // denominator = N · D  (N = plane normal, D = ray direction)
+    const denom = plane[0] * this._direction.x + plane[1] * this._direction.y + plane[2] * this._direction.z;
+    // Ray is (nearly) parallel to the plane – no intersection
+    if (Math.abs(denom) < 1e-10) {
+      return null;
+    }
+    // numerator = -(N · O + d)  (O = ray origin, d = plane[3])
+    const numer = -(
+      plane[0] * this._origin.x +
+      plane[1] * this._origin.y +
+      plane[2] * this._origin.z +
+      plane[3]
+    );
+    const t = numer / denom;
+    return t >= 0 ? t : null;
   }
   /**
    * Do a ray sphere intersection test

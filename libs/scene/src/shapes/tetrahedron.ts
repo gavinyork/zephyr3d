@@ -1,4 +1,4 @@
-import { Vector3, type AABB, type Clonable } from '@zephyr3d/base';
+import { Vector3, type AABB, type Clonable, type Ray } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 
@@ -37,6 +37,97 @@ export class TetrahedronShape
 
   get type() {
     return 'Tetrahedron';
+  }
+
+  /**
+   * {@inheritDoc Primitive.raycast}
+   * @override
+   *
+   * Tests each triangular face of the tetrahedron with the Möller–Trumbore
+   * algorithm and returns the smallest non-negative t.
+   */
+  raycast(ray: Ray) {
+    const opt = this._options;
+    const height = opt.height ?? 1;
+    const sizeX = opt.sizeX ?? 1;
+    const sizeZ = opt.sizeZ ?? 1;
+
+    const top = [0, height, 0] as const;
+    const p0 = [sizeX, 0, sizeZ] as const; // pxpz
+    const p1 = [sizeX, 0, -sizeZ] as const; // pxnz
+    const p2 = [-sizeX, 0, -sizeZ] as const; // nxnz
+    const p3 = [-sizeX, 0, sizeZ] as const; // nxpz
+
+    // All six faces (4 side triangles + 2 bottom triangles)
+    const faces: [
+      readonly [number, number, number],
+      readonly [number, number, number],
+      readonly [number, number, number]
+    ][] = [
+      [top, p0, p1], // right
+      [top, p1, p2], // back
+      [top, p2, p3], // left
+      [top, p3, p0], // front
+      [p0, p3, p1], // bottom tri 1: pxpz -> nxpz -> pxnz
+      [p1, p3, p2] // bottom tri 2: pxnz -> nxpz -> nxnz
+    ];
+
+    let tMin = Infinity;
+    for (const [v0, v1, v2] of faces) {
+      const t = TetrahedronShape._rayTriangle(ray, v0, v1, v2);
+      if (t !== null && t < tMin) {
+        tMin = t;
+      }
+    }
+    return isFinite(tMin) ? tMin : null;
+  }
+
+  /**
+   * @internal Möller–Trumbore ray-triangle intersection.
+   * Returns t >= 0 on hit, null otherwise.
+   */
+  private static _rayTriangle(
+    ray: Ray,
+    v0: readonly [number, number, number],
+    v1: readonly [number, number, number],
+    v2: readonly [number, number, number]
+  ): number | null {
+    const eps = 1e-8;
+    const e1x = v1[0] - v0[0],
+      e1y = v1[1] - v0[1],
+      e1z = v1[2] - v0[2];
+    const e2x = v2[0] - v0[0],
+      e2y = v2[1] - v0[1],
+      e2z = v2[2] - v0[2];
+    const dx = ray.direction.x,
+      dy = ray.direction.y,
+      dz = ray.direction.z;
+    // h = D × e2
+    const hx = dy * e2z - dz * e2y;
+    const hy = dz * e2x - dx * e2z;
+    const hz = dx * e2y - dy * e2x;
+    const det = e1x * hx + e1y * hy + e1z * hz;
+    if (Math.abs(det) < eps) {
+      return null;
+    }
+    const invDet = 1 / det;
+    const sx = ray.origin.x - v0[0];
+    const sy = ray.origin.y - v0[1];
+    const sz = ray.origin.z - v0[2];
+    const u = (sx * hx + sy * hy + sz * hz) * invDet;
+    if (u < 0 || u > 1) {
+      return null;
+    }
+    // q = s × e1
+    const qx = sy * e1z - sz * e1y;
+    const qy = sz * e1x - sx * e1z;
+    const qz = sx * e1y - sy * e1x;
+    const v = (dx * qx + dy * qy + dz * qz) * invDet;
+    if (v < 0 || u + v > 1) {
+      return null;
+    }
+    const t = (e2x * qx + e2y * qy + e2z * qz) * invDet;
+    return t >= 0 ? t : null;
   }
 
   private static calculateTriangleNormal(v0: Vector3, v1: Vector3, v2: Vector3) {
@@ -260,6 +351,90 @@ export class TetrahedronFrameShape
 
   get type() {
     return 'TetrahedronFrame' as const;
+  }
+
+  /**
+   * {@inheritDoc Primitive.raycast}
+   * @override
+   *
+   * Tests each triangular face of the tetrahedron with the Möller–Trumbore
+   * algorithm and returns the smallest non-negative t.
+   * The wireframe has the same overall geometry as the solid version.
+   */
+  raycast(ray: Ray) {
+    const opt = this._options;
+    const height = opt.height ?? 1;
+    const sizeX = opt.sizeX ?? 1;
+    const sizeZ = opt.sizeZ ?? 1;
+
+    const top = [0, height, 0] as const;
+    const p0 = [sizeX, 0, sizeZ] as const;
+    const p1 = [sizeX, 0, -sizeZ] as const;
+    const p2 = [-sizeX, 0, -sizeZ] as const;
+    const p3 = [-sizeX, 0, sizeZ] as const;
+
+    const faces: [
+      readonly [number, number, number],
+      readonly [number, number, number],
+      readonly [number, number, number]
+    ][] = [
+      [top, p0, p1],
+      [top, p1, p2],
+      [top, p2, p3],
+      [top, p3, p0]
+    ];
+
+    let tMin = Infinity;
+    for (const [v0, v1, v2] of faces) {
+      const t = TetrahedronFrameShape._rayTriangle(ray, v0, v1, v2);
+      if (t !== null && t < tMin) {
+        tMin = t;
+      }
+    }
+    return isFinite(tMin) ? tMin : null;
+  }
+
+  /** @internal Möller–Trumbore ray-triangle intersection */
+  private static _rayTriangle(
+    ray: Ray,
+    v0: readonly [number, number, number],
+    v1: readonly [number, number, number],
+    v2: readonly [number, number, number]
+  ): number | null {
+    const eps = 1e-8;
+    const e1x = v1[0] - v0[0],
+      e1y = v1[1] - v0[1],
+      e1z = v1[2] - v0[2];
+    const e2x = v2[0] - v0[0],
+      e2y = v2[1] - v0[1],
+      e2z = v2[2] - v0[2];
+    const dx = ray.direction.x,
+      dy = ray.direction.y,
+      dz = ray.direction.z;
+    const hx = dy * e2z - dz * e2y;
+    const hy = dz * e2x - dx * e2z;
+    const hz = dx * e2y - dy * e2x;
+    const det = e1x * hx + e1y * hy + e1z * hz;
+    if (Math.abs(det) < eps) {
+      return null;
+    }
+    const invDet = 1 / det;
+    const sx = ray.origin.x - v0[0];
+    const sy = ray.origin.y - v0[1];
+    const sz = ray.origin.z - v0[2];
+    const u = (sx * hx + sy * hy + sz * hz) * invDet;
+    if (u < 0 || u > 1) {
+      return null;
+    }
+    const qx = sy * e1z - sz * e1y;
+    const qy = sz * e1x - sx * e1z;
+    const qz = sx * e1y - sy * e1x;
+    const v = (dx * qx + dy * qy + dz * qz) * invDet;
+    if (v < 0 || u + v > 1) {
+      return null;
+    }
+    const t = (e2x * qx + e2y * qy + e2z * qz) * invDet;
+    return t >= 0 ? t : null;
   }
 
   private static calculateTriangleNormal(v0: Vector3, v1: Vector3, v2: Vector3) {

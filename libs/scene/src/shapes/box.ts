@@ -1,4 +1,4 @@
-import type { AABB, Clonable, DeepRequireOptionals } from '@zephyr3d/base';
+import type { AABB, Clonable, DeepRequireOptionals, Ray } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 
@@ -48,6 +48,107 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
   /** type of the shape */
   get type() {
     return 'Box' as const;
+  }
+  /**
+   * {@inheritDoc Primitive.raycast}
+   * @override
+   */
+  raycast(ray: Ray) {
+    const sizeX = this._options.sizeX ?? this._options.size ?? 1;
+    const sizeY = this._options.sizeY ?? this._options.size ?? 1;
+    const sizeZ = this._options.sizeZ ?? this._options.size ?? 1;
+    const anchorX = this._options.anchorX ?? this._options.anchor ?? 0.5;
+    const anchorY = this._options.anchorY ?? this._options.anchor ?? 0.5;
+    const anchorZ = this._options.anchorZ ?? this._options.anchor ?? 0.5;
+    return BoxShape._raycastAABB(
+      ray,
+      -anchorX * sizeX,
+      -anchorY * sizeY,
+      -anchorZ * sizeZ,
+      (1 - anchorX) * sizeX,
+      (1 - anchorY) * sizeY,
+      (1 - anchorZ) * sizeZ
+    );
+  }
+  /** @internal AABB slab test: returns t >= 0 on hit, null otherwise */
+  private static _raycastAABB(
+    ray: Ray,
+    minx: number,
+    miny: number,
+    minz: number,
+    maxx: number,
+    maxy: number,
+    maxz: number
+  ): number | null {
+    const ox = ray.origin.x;
+    const oy = ray.origin.y;
+    const oz = ray.origin.z;
+    const dx = ray.direction.x;
+    const dy = ray.direction.y;
+    const dz = ray.direction.z;
+    let tmin = -Infinity;
+    let tmax = Infinity;
+    // X slab
+    if (Math.abs(dx) < 1e-10) {
+      if (ox < minx || ox > maxx) {
+        return null;
+      }
+    } else {
+      const invDx = 1 / dx;
+      let t1 = (minx - ox) * invDx;
+      let t2 = (maxx - ox) * invDx;
+      if (t1 > t2) {
+        const tmp = t1;
+        t1 = t2;
+        t2 = tmp;
+      }
+      tmin = Math.max(tmin, t1);
+      tmax = Math.min(tmax, t2);
+      if (tmin > tmax) {
+        return null;
+      }
+    }
+    // Y slab
+    if (Math.abs(dy) < 1e-10) {
+      if (oy < miny || oy > maxy) {
+        return null;
+      }
+    } else {
+      const invDy = 1 / dy;
+      let t1 = (miny - oy) * invDy;
+      let t2 = (maxy - oy) * invDy;
+      if (t1 > t2) {
+        const tmp = t1;
+        t1 = t2;
+        t2 = tmp;
+      }
+      tmin = Math.max(tmin, t1);
+      tmax = Math.min(tmax, t2);
+      if (tmin > tmax) {
+        return null;
+      }
+    }
+    // Z slab
+    if (Math.abs(dz) < 1e-10) {
+      if (oz < minz || oz > maxz) {
+        return null;
+      }
+    } else {
+      const invDz = 1 / dz;
+      let t1 = (minz - oz) * invDz;
+      let t2 = (maxz - oz) * invDz;
+      if (t1 > t2) {
+        const tmp = t1;
+        t1 = t2;
+        t2 = tmp;
+      }
+      tmin = Math.max(tmin, t1);
+      tmax = Math.min(tmax, t2);
+      if (tmin > tmax) {
+        return null;
+      }
+    }
+    return tmin >= 0 ? tmin : tmax >= 0 ? tmax : null;
   }
   /**
    * Generates the data for the box shape
@@ -226,6 +327,104 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
   /** type of the shape */
   get type() {
     return 'BoxFrame' as const;
+  }
+  /**
+   * {@inheritDoc Primitive.raycast}
+   * @override
+   */
+  raycast(ray: Ray) {
+    const sizeX = this._options.sizeX ?? this._options.size ?? 1;
+    const sizeY = this._options.sizeY ?? this._options.size ?? 1;
+    const sizeZ = this._options.sizeZ ?? this._options.size ?? 1;
+    const anchorX = this._options.anchorX ?? this._options.anchor ?? 0.5;
+    const anchorY = this._options.anchorY ?? this._options.anchor ?? 0.5;
+    const anchorZ = this._options.anchorZ ?? this._options.anchor ?? 0.5;
+    return BoxFrameShape._raycastAABB(
+      ray,
+      -anchorX * sizeX,
+      -anchorY * sizeY,
+      -anchorZ * sizeZ,
+      (1 - anchorX) * sizeX,
+      (1 - anchorY) * sizeY,
+      (1 - anchorZ) * sizeZ
+    );
+  }
+  /** @internal AABB slab test: returns t >= 0 on hit, null otherwise */
+  private static _raycastAABB(
+    ray: Ray,
+    minx: number,
+    miny: number,
+    minz: number,
+    maxx: number,
+    maxy: number,
+    maxz: number
+  ): number | null {
+    const ox = ray.origin.x;
+    const oy = ray.origin.y;
+    const oz = ray.origin.z;
+    const dx = ray.direction.x;
+    const dy = ray.direction.y;
+    const dz = ray.direction.z;
+    let tmin = -Infinity;
+    let tmax = Infinity;
+    if (Math.abs(dx) < 1e-10) {
+      if (ox < minx || ox > maxx) {
+        return null;
+      }
+    } else {
+      const invDx = 1 / dx;
+      let t1 = (minx - ox) * invDx;
+      let t2 = (maxx - ox) * invDx;
+      if (t1 > t2) {
+        const tmp = t1;
+        t1 = t2;
+        t2 = tmp;
+      }
+      tmin = Math.max(tmin, t1);
+      tmax = Math.min(tmax, t2);
+      if (tmin > tmax) {
+        return null;
+      }
+    }
+    if (Math.abs(dy) < 1e-10) {
+      if (oy < miny || oy > maxy) {
+        return null;
+      }
+    } else {
+      const invDy = 1 / dy;
+      let t1 = (miny - oy) * invDy;
+      let t2 = (maxy - oy) * invDy;
+      if (t1 > t2) {
+        const tmp = t1;
+        t1 = t2;
+        t2 = tmp;
+      }
+      tmin = Math.max(tmin, t1);
+      tmax = Math.min(tmax, t2);
+      if (tmin > tmax) {
+        return null;
+      }
+    }
+    if (Math.abs(dz) < 1e-10) {
+      if (oz < minz || oz > maxz) {
+        return null;
+      }
+    } else {
+      const invDz = 1 / dz;
+      let t1 = (minz - oz) * invDz;
+      let t2 = (maxz - oz) * invDz;
+      if (t1 > t2) {
+        const tmp = t1;
+        t1 = t2;
+        t2 = tmp;
+      }
+      tmin = Math.max(tmin, t1);
+      tmax = Math.min(tmax, t2);
+      if (tmin > tmax) {
+        return null;
+      }
+    }
+    return tmin >= 0 ? tmin : tmax >= 0 ? tmax : null;
   }
   /**
    * Generates the data for the box shape

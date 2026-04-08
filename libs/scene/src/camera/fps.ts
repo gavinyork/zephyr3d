@@ -229,10 +229,10 @@ export class FPSCameraController extends BaseCameraController {
     this.reset();
   }
   /**
-   * {@inheritDoc BaseCameraController.update}
+   * {@inheritDoc BaseCameraController._onUpdate}
    * @override
    */
-  update() {
+  protected _onUpdate() {
     const camera = this._getCamera()!;
     const x = camera.worldMatrix.getRow(0).xyz();
     x.y = 0;

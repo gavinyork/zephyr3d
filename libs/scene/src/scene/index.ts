@@ -13,3 +13,4 @@ export * from './batchgroup';
 export * from './scene';
 export * from './terrain-cm';
 export * from './visitor';
+export * from './raycast_visitor';

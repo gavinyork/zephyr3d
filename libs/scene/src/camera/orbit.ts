@@ -306,10 +306,10 @@ export class OrbitCameraController extends BaseCameraController {
     this.reset();
   }
   /**
-   * {@inheritDoc BaseCameraController.update}
+   * {@inheritDoc BaseCameraController._onUpdate}
    * @override
    */
-  update() {
+  protected _onUpdate() {
     const camera = this._getCamera()!;
     const center = this.options.center;
 

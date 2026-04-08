@@ -3,15 +3,16 @@
 import { createBoneChainDemo, type BoneChainDemo } from './bone-chain';
 import { createClothGridDemo, type ClothGridDemo } from './cloth-grid';
 import { createBarrelClothDemo, type BarrelClothDemo } from './barrel-cloth';
-import { Vector3 } from '@zephyr3d/base';
+import { Plane, Vector2, Vector3 } from '@zephyr3d/base';
+import type { IControllerPointerDownEvent, SceneNode } from '@zephyr3d/scene';
 import {
   Application,
   DirectionalLight,
-  getDevice,
   getEngine,
   getInput,
   OrbitCameraController,
   PerspectiveCamera,
+  RaycastVisitor,
   Scene
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
@@ -50,19 +51,6 @@ let barrelDemo: BarrelClothDemo | null = null;
 let activeDemo: 'chain' | 'cloth' | 'barrel' = 'cloth';
 let windEnabled = false;
 let broadPhaseEnabled = true;
-
-function getActiveController() {
-  if (activeDemo === 'chain' && chainDemo) {
-    return chainDemo.controller;
-  }
-  if (activeDemo === 'cloth' && clothDemo) {
-    return clothDemo.controller;
-  }
-  if (activeDemo === 'barrel' && barrelDemo) {
-    return barrelDemo.controller;
-  }
-  return null;
-}
 
 function applyRuntimeFlags() {
   const controller = getActiveController();
@@ -260,14 +248,14 @@ activateCloth();
 app.run();
 
 // ── Grabber mouse interaction ──
-/*
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-const grabPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-const grabIntersect = new THREE.Vector3();
+
+const raycaster = new RaycastVisitor();
+const mouse = new Vector2();
+const grabPlane = new Plane(0, 0, 1, 0);
+const grabIntersect = new Vector3();
 let grabbing = false;
 
-function getActiveGrabber(): THREE.Object3D | null {
+function getActiveGrabber(): SceneNode | null {
   if (activeDemo === 'chain' && chainDemo) {
     return chainDemo.grabberObj;
   }
@@ -295,85 +283,95 @@ function getActiveController() {
 
 function updateGrabPlane() {
   // Plane faces camera, passes through grab target area
-  const camDir = new THREE.Vector3();
-  camera.getWorldDirection(camDir);
-  grabPlane.normal.copy(camDir).negate();
+  const cameraWorldMatrix = camera.worldMatrix;
+  const camDir = new Vector3(
+    -cameraWorldMatrix[8],
+    -cameraWorldMatrix[9],
+    -cameraWorldMatrix[10]
+  ).inplaceNormalize();
+  grabPlane.a = -camDir.x;
+  grabPlane.b = -camDir.y;
+  grabPlane.c = -camDir.z;
   const grabber = getActiveGrabber();
   if (grabber) {
-    grabPlane.constant = -grabPlane.normal.dot(grabber.position);
+    grabPlane.d = -Vector3.dot(grabPlane.getNormal(), grabber.position);
   }
 }
 
-function updateMousePosition(e: MouseEvent) {
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+function updateMousePosition(e: IControllerPointerDownEvent) {
+  mouse.x = e.offsetX;
+  mouse.y = e.offsetY;
 }
 
 function moveGrabberToMouse() {
-  raycaster.setFromCamera(mouse, camera);
-  if (raycaster.ray.intersectPlane(grabPlane, grabIntersect)) {
-    const grabber = getActiveGrabber();
-    if (grabber) {
-      grabber.position.copy(grabIntersect);
-      // Show grabber radius visualization
-      const vis = grabber.children[0];
-      if (vis) {
-        vis.visible = true;
-      }
+  raycaster.ray = camera.constructRay(mouse.x, mouse.y);
+  const d = raycaster.ray.intersectionTestPlane(grabPlane);
+  if (d === null) {
+    return;
+  }
+  Vector3.add(raycaster.ray.origin, Vector3.scale(raycaster.ray.direction, d), grabIntersect);
+  const grabber = getActiveGrabber();
+  if (grabber) {
+    grabber.position.set(grabIntersect);
+    // Show grabber radius visualization
+    const vis = grabber.children[0].get()!;
+    if (vis) {
+      vis.showState = 'visible';
     }
   }
 }
 
-renderer.domElement.addEventListener('mousedown', (e) => {
-  if (e.button !== 0) {
-    return;
-  } // left click only
-  grabbing = true;
-  updateMousePosition(e);
-  updateGrabPlane();
-  moveGrabberToMouse();
-  const ctrl = getActiveController();
-  if (ctrl) {
-    const grabber = getActiveGrabber()!;
-    const p = grabber.position;
-    ctrl.updateGrabberState(0, true, new Vector3(p.x, p.y, p.z));
-  }
-  controls.enabled = false; // disable orbit while grabbing
-});
-
-renderer.domElement.addEventListener('mousemove', (e) => {
-  if (!grabbing) {
-    return;
-  }
-  updateMousePosition(e);
-  moveGrabberToMouse();
-  const ctrl = getActiveController();
-  if (ctrl) {
-    const grabber = getActiveGrabber()!;
-    const p = grabber.position;
-    ctrl.updateGrabberState(0, true, new Vector3(p.x, p.y, p.z));
-  }
-});
-
-renderer.domElement.addEventListener('mouseup', () => {
-  if (!grabbing) {
-    return;
-  }
-  grabbing = false;
-  const ctrl = getActiveController();
-  if (ctrl) {
-    ctrl.updateGrabberState(0, false, Vector3.zero());
-  }
-  const grabber = getActiveGrabber();
-  if (grabber) {
-    const vis = grabber.children[0];
-    if (vis) {
-      vis.visible = false;
+getInput().useFirst((evt) => {
+  if (evt.type === 'pointerdown') {
+    const e = evt as unknown as IControllerPointerDownEvent;
+    if (e.button !== 2) {
+      return false;
+    } // right click only
+    grabbing = true;
+    updateMousePosition(e);
+    updateGrabPlane();
+    moveGrabberToMouse();
+    const ctrl = getActiveController();
+    if (ctrl) {
+      const grabber = getActiveGrabber()!;
+      const p = grabber.position;
+      ctrl.updateGrabberState(0, true, new Vector3(p.x, p.y, p.z));
     }
+    return true;
+  } else if (evt.type === 'pointermove') {
+    const e = evt as unknown as IControllerPointerDownEvent;
+    if (!grabbing) {
+      return false;
+    }
+    updateMousePosition(e);
+    moveGrabberToMouse();
+    const ctrl = getActiveController();
+    if (ctrl) {
+      const grabber = getActiveGrabber()!;
+      const p = grabber.position;
+      ctrl.updateGrabberState(0, true, new Vector3(p.x, p.y, p.z));
+    }
+    return true;
+  } else if (evt.type === 'pointerup') {
+    if (!grabbing) {
+      return false;
+    }
+    grabbing = false;
+    const ctrl = getActiveController();
+    if (ctrl) {
+      ctrl.updateGrabberState(0, false, Vector3.zero());
+    }
+    const grabber = getActiveGrabber();
+    if (grabber) {
+      const vis = grabber.children[0].get()!;
+      if (vis) {
+        vis.showState = 'hidden';
+      }
+    }
+    return true;
   }
-  controls.enabled = true;
+  return false;
 });
-*/
 // ── Animation loop ──
 
 function tick(dt: number) {
@@ -403,6 +401,4 @@ function tick(dt: number) {
     barrelDemo.controller.setWindForce(wind);
     barrelDemo.controller.step(dt);
   }
-
-  console.log(`FPS: ${getDevice().frameInfo.FPS.toFixed(1)}`);
 }

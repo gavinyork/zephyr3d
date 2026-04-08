@@ -1,4 +1,4 @@
-import type { AABB, Clonable } from '@zephyr3d/base';
+import type { AABB, Clonable, Ray } from '@zephyr3d/base';
 import type { ShapeCreationOptions } from './shape';
 import { Shape } from './shape';
 
@@ -63,6 +63,184 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
   /** type of the shape */
   get type() {
     return 'Torus' as const;
+  }
+  /**
+   * {@inheritDoc Primitive.raycast}
+   * @override
+   *
+   * Analytically intersects a ray with a torus lying in the XZ plane.
+   * The torus has major radius R (outerRadius) and minor radius r (innerRadius).
+   *
+   * Equation of torus: (x²+y²+z²+R²-r²)² = 4R²(x²+z²)
+   * Substituting ray P(t) = O + t*D leads to a quartic in t which is solved
+   * with Ferrari's method.
+   */
+  raycast(ray: Ray) {
+    const R = this._options.outerRadius ?? 1; // major radius
+    const r = this._options.innerRadius ?? 0.3; // minor radius
+
+    const ox = ray.origin.x,
+      oy = ray.origin.y,
+      oz = ray.origin.z;
+    const dx = ray.direction.x,
+      dy = ray.direction.y,
+      dz = ray.direction.z;
+
+    // Let  f = |O|² + R² - r²
+    //      g = O·D           (dot product)
+    //      h = |D|²  (should be 1 for a normalised direction, kept general)
+    // Quartic: (h*t² + 2g*t + f)² = 4R²*((dx*t+ox)² + (dz*t+oz)²)
+    // Expand into  c4*t^4 + c3*t^3 + c2*t^2 + c1*t + c0 = 0
+
+    const OO = ox * ox + oy * oy + oz * oz;
+    const OD = ox * dx + oy * dy + oz * dz;
+    const DD = dx * dx + dy * dy + dz * dz;
+
+    const f = OO + R * R - r * r;
+    const g = OD;
+    const h = DD;
+
+    // XZ components only (for the 4R²(x²+z²) term)
+    const oxz2 = ox * ox + oz * oz; // ox² + oz²
+    const odxz = ox * dx + oz * dz; // ox*dx + oz*dz
+    const dxz2 = dx * dx + dz * dz; // dx² + dz²
+
+    // Quartic coefficients (from expanding both sides)
+    const R2 = 4 * R * R;
+    const c4 = h * h;
+    const c3 = 4 * h * g;
+    const c2 = 2 * h * f + 4 * g * g - R2 * dxz2;
+    const c1 = 4 * g * f - 2 * R2 * odxz;
+    const c0 = f * f - R2 * oxz2;
+
+    // Solve quartic c4*t^4 + c3*t^3 + c2*t^2 + c1*t + c0 = 0
+    const roots = TorusShape._solveQuartic(c4, c3, c2, c1, c0);
+    let tMin = Infinity;
+    for (const t of roots) {
+      if (t >= 0 && t < tMin) {
+        tMin = t;
+      }
+    }
+    return isFinite(tMin) ? tMin : null;
+  }
+
+  /** @internal Solve quartic a*t^4+b*t^3+c*t^2+d*t+e=0, returns real roots */
+  private static _solveQuartic(a: number, b: number, c: number, d: number, e: number): number[] {
+    const eps = 1e-8;
+    if (Math.abs(a) < eps) {
+      return TorusShape._solveCubic(b, c, d, e);
+    }
+    // Depress quartic: divide by a and substitute t = u - b/(4a)
+    const inv_a = 1 / a;
+    const B = b * inv_a;
+    const C = c * inv_a;
+    const D = d * inv_a;
+    const E = e * inv_a;
+    const p = C - (3 / 8) * B * B;
+    const q = (B * B * B) / 8 - (B * C) / 2 + D;
+    const r2 = -(3 / 256) * B * B * B * B + (B * B * C) / 16 - (B * D) / 4 + E;
+
+    let roots: number[];
+    if (Math.abs(q) < eps) {
+      // Biquadratic: u^4 + p*u^2 + r2 = 0
+      const disc = p * p - 4 * r2;
+      if (disc < 0) {
+        return [];
+      }
+      const sqrtDisc = Math.sqrt(disc);
+      roots = [];
+      for (const sign of [-1, 1]) {
+        const w2 = (-p + sign * sqrtDisc) / 2;
+        if (w2 >= 0) {
+          const w = Math.sqrt(w2);
+          roots.push(w, -w);
+        }
+      }
+    } else {
+      // Ferrari: find a real root of the resolvent cubic
+      //   8m^3 + 8p*m^2 + (2p^2-8r2)*m - q^2 = 0
+      const cubicRoots = TorusShape._solveCubic(8, 8 * p, 2 * p * p - 8 * r2, -q * q);
+      // Pick the largest real root
+      let m = -Infinity;
+      for (const cr of cubicRoots) {
+        if (cr > m) {
+          m = cr;
+        }
+      }
+      if (!isFinite(m)) {
+        return [];
+      }
+
+      const sqrtM = m >= 0 ? Math.sqrt(m) : 0;
+      const disc1 = -(p + 2 * m) + q / (sqrtM + eps);
+      const disc2 = -(p + 2 * m) - q / (sqrtM + eps);
+      roots = [];
+      if (disc1 >= 0) {
+        const s = Math.sqrt(disc1);
+        roots.push(sqrtM + s, sqrtM - s);
+      }
+      if (disc2 >= 0) {
+        const s = Math.sqrt(disc2);
+        roots.push(-sqrtM + s, -sqrtM - s);
+      }
+    }
+    // Un-depress: t = u - B/4
+    const shift = B / 4;
+    return roots.map((u) => u - shift);
+  }
+
+  /** @internal Solve cubic a*t^3+b*t^2+c*t+d=0, returns real roots (Cardano) */
+  private static _solveCubic(a: number, b: number, c: number, d: number): number[] {
+    const eps = 1e-8;
+    if (Math.abs(a) < eps) {
+      return TorusShape._solveQuadratic(b, c, d);
+    }
+    const inv_a = 1 / a;
+    const B = b * inv_a;
+    const C = c * inv_a;
+    const D = d * inv_a;
+    const p = C - (B * B) / 3;
+    const q = (2 * B * B * B) / 27 - (B * C) / 3 + D;
+    const disc = (q * q) / 4 + (p * p * p) / 27;
+    const shift = -B / 3;
+    if (disc > eps) {
+      const sqrtDisc = Math.sqrt(disc);
+      const u = Math.cbrt(-q / 2 + sqrtDisc);
+      const v = Math.cbrt(-q / 2 - sqrtDisc);
+      return [u + v + shift];
+    } else if (disc < -eps) {
+      const r = Math.sqrt((-p * p * p) / 27);
+      const theta = Math.acos(Math.max(-1, Math.min(1, -q / (2 * r))));
+      const rCbrt = Math.cbrt(r);
+      return [
+        2 * rCbrt * Math.cos(theta / 3) + shift,
+        2 * rCbrt * Math.cos((theta + 2 * Math.PI) / 3) + shift,
+        2 * rCbrt * Math.cos((theta + 4 * Math.PI) / 3) + shift
+      ];
+    } else {
+      const u = Math.cbrt(-q / 2);
+      return [2 * u + shift, -u + shift];
+    }
+  }
+
+  /** @internal Solve quadratic a*t^2+b*t+c=0 */
+  private static _solveQuadratic(a: number, b: number, c: number): number[] {
+    const eps = 1e-8;
+    if (Math.abs(a) < eps) {
+      if (Math.abs(b) < eps) {
+        return [];
+      }
+      return [-c / b];
+    }
+    const disc = b * b - 4 * a * c;
+    if (disc < 0) {
+      return [];
+    }
+    if (disc < eps) {
+      return [-b / (2 * a)];
+    }
+    const s = Math.sqrt(disc);
+    return [(-b - s) / (2 * a), (-b + s) / (2 * a)];
   }
   /**
    * Generates the data for the torus shape
