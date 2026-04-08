@@ -49,6 +49,27 @@ let clothDemo: ClothGridDemo | null = null;
 let barrelDemo: BarrelClothDemo | null = null;
 let activeDemo: 'chain' | 'cloth' | 'barrel' = 'cloth';
 let windEnabled = false;
+let broadPhaseEnabled = true;
+
+function getActiveController() {
+  if (activeDemo === 'chain' && chainDemo) {
+    return chainDemo.controller;
+  }
+  if (activeDemo === 'cloth' && clothDemo) {
+    return clothDemo.controller;
+  }
+  if (activeDemo === 'barrel' && barrelDemo) {
+    return barrelDemo.controller;
+  }
+  return null;
+}
+
+function applyRuntimeFlags() {
+  const controller = getActiveController();
+  if (controller) {
+    controller.setBroadPhaseEnabled(broadPhaseEnabled);
+  }
+}
 
 function clearDemos() {
   if (chainDemo) {
@@ -87,6 +108,7 @@ function activateChain() {
   btnCloth.classList.remove('active');
   btnBarrel.classList.remove('active');
   releaseControls.style.display = 'none';
+  applyRuntimeFlags();
   updateStatus();
 }
 
@@ -105,6 +127,7 @@ function activateCloth() {
   btnBarrel.classList.remove('active');
   releaseControls.style.display = 'inline';
   nextReleaseCol = 0;
+  applyRuntimeFlags();
   updateStatus();
 }
 
@@ -123,6 +146,7 @@ function activateBarrel() {
   btnBarrel.classList.add('active');
   releaseControls.style.display = 'inline';
   nextReleaseCol = 0;
+  applyRuntimeFlags();
   updateStatus();
 }
 
@@ -132,6 +156,7 @@ const btnChain = document.getElementById('btn-chain')!;
 const btnCloth = document.getElementById('btn-cloth')!;
 const btnBarrel = document.getElementById('btn-barrel')!;
 const btnWind = document.getElementById('btn-wind')!;
+const btnBroadPhase = document.getElementById('btn-broadphase')!;
 const btnReset = document.getElementById('btn-reset')!;
 const releaseControls = document.getElementById('release-controls')! as HTMLElement;
 const btnReleaseOne = document.getElementById('btn-release-one')!;
@@ -147,6 +172,13 @@ btnBarrel.addEventListener('click', activateBarrel);
 btnWind.addEventListener('click', () => {
   windEnabled = !windEnabled;
   btnWind.classList.toggle('active', windEnabled);
+});
+btnBroadPhase.addEventListener('click', () => {
+  broadPhaseEnabled = !broadPhaseEnabled;
+  btnBroadPhase.classList.toggle('active', broadPhaseEnabled);
+  btnBroadPhase.textContent = broadPhaseEnabled ? 'Broad-Phase On' : 'Broad-Phase Off';
+  applyRuntimeFlags();
+  updateStatus();
 });
 btnReset.addEventListener('click', () => {
   if (chainDemo) {
@@ -215,9 +247,9 @@ function updateStatus() {
       const fixed = demo!.controller.isPointFixed(idx);
       return `Col${col}: ${fixed ? 'Fixed' : 'Free'}`;
     });
-    statusDiv.textContent = `Top row: ${states.join('  |  ')}`;
+    statusDiv.textContent = `Top row: ${states.join('  |  ')} | Colliders: ${demo.collidersR.length} | Broad-Phase: ${broadPhaseEnabled ? 'On' : 'Off'}`;
   } else {
-    statusDiv.textContent = '';
+    statusDiv.textContent = `Broad-Phase: ${broadPhaseEnabled ? 'On' : 'Off'}`;
   }
 }
 

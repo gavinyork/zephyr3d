@@ -1,4 +1,4 @@
-// Core physics simulation — direct port of JobExecuteSimulation from SPCRJointDynamicsJob.cs
+// Core physics simulation 閳?direct port of JobExecuteSimulation from SPCRJointDynamicsJob.cs
 
 import { Quaternion, Vector3, Matrix4x4, degree2radian, radian2degree } from '@zephyr3d/base';
 import { clamp01, smoothStep } from './math';
@@ -33,6 +33,10 @@ const _computeCapsuleAxis = new Vector3();
 const _computeCapsuleHalfDir = new Vector3();
 const _applySystemTransformOffset = new Vector3();
 const _applySystemTransformRotated = new Vector3();
+const _broadPhaseSegmentDir = new Vector3();
+const _broadPhaseToCenter = new Vector3();
+const _broadPhaseClosestPoint = new Vector3();
+const _broadPhaseDelta = new Vector3();
 
 /** Parameters for a single simulation step */
 export interface SimulationParams {
@@ -58,7 +62,7 @@ export interface SimulationParams {
   windForce: Vector3;
   /** Enable triangle-based surface collision */
   enableSurfaceCollision: boolean;
-  /** Triangle indices for surface collision (6 per quad: 2 triangles × 3 indices) */
+  /** Triangle indices for surface collision (6 per quad: 2 triangles 鑴?3 indices) */
   surfaceConstraints: number[];
   /** Number of constraint relaxation iterations per substep */
   relaxation: number;
@@ -76,6 +80,8 @@ export interface SimulationParams {
   fakeWaveCounter: number;
   /** Global scale multiplier for all collider radii */
   collisionScale: number;
+  /** Enable broad-phase pruning before precise collision checks */
+  enableBroadPhase: boolean;
 }
 
 /**
@@ -178,7 +184,8 @@ export function simulate(
           constraints,
           collidersR,
           collidersRW,
-          params.constraintShrinkLimit
+          params.constraintShrinkLimit,
+          params.enableBroadPhase
         );
       }
     }
@@ -198,7 +205,7 @@ export function simulate(
   return { positionsToTransform, fakeWaveCounter: fakeWaveFreq };
 }
 
-// ── Collider interpolation ──
+// 閳光偓閳光偓 Collider interpolation 閳光偓閳光偓
 
 function computeCapsule(pos: Vector3, rot: Quaternion, height: number, head: Vector3, direction: Vector3): void {
   rot.transform(Vector3.scale(AXIS_Y, height, _computeCapsuleAxis), direction);
@@ -232,6 +239,15 @@ function colliderUpdate(
     );
 
     computeCapsule(curPos, curDir, colR.height, colRW.positionCurrent, colRW.directionCurrent);
+    if (colR.height > EPSILON) {
+      Vector3.scale(colRW.directionCurrent, 0.5, _computeCapsuleHalfDir);
+      Vector3.add(colRW.positionCurrent, _computeCapsuleHalfDir, colRW.boundsCenter);
+      colRW.boundsRadius = Math.sqrt(colRW.directionCurrent.magnitudeSq) * 0.5 +
+        Math.max(colRW.radius, colRW.radius * colR.radiusTailScale);
+    } else {
+      colRW.boundsCenter.set(colRW.positionCurrent);
+      colRW.boundsRadius = colRW.radius;
+    }
 
     // Update local bounds
     Vector3.scale(VEC3_ONE, colR.radius, corner);
@@ -257,7 +273,7 @@ function colliderUpdate(
   }
 }
 
-// ── Apply root motion transform ──
+// 閳光偓閳光偓 Apply root motion transform 閳光偓閳光偓
 
 function applySystemTransform(
   point: Vector3,
@@ -271,7 +287,28 @@ function applySystemTransform(
   return Vector3.add(rotated, slideOffset, rotated);
 }
 
-// ── Pass 1: Verlet integration + forces ──
+
+function pointMayCollideBroadPhase(point: Vector3, colRW: ColliderRW, padding = 0): boolean {
+  const radius = colRW.boundsRadius + padding;
+  const delta = Vector3.sub(point, colRW.boundsCenter, _broadPhaseDelta);
+  return delta.magnitudeSq <= radius * radius;
+}
+
+function segmentMayCollideBroadPhase(point1: Vector3, point2: Vector3, colRW: ColliderRW): boolean {
+  const segmentDir = Vector3.sub(point2, point1, _broadPhaseSegmentDir);
+  const lenSq = segmentDir.magnitudeSq;
+  if (lenSq <= EPSILON) {
+    return pointMayCollideBroadPhase(point1, colRW);
+  }
+  const toCenter = Vector3.sub(colRW.boundsCenter, point1, _broadPhaseToCenter);
+  const t = clamp01(Vector3.dot(toCenter, segmentDir) / lenSq);
+  const closestPoint = Vector3.scale(segmentDir, t, _broadPhaseClosestPoint);
+  Vector3.add(point1, closestPoint, closestPoint);
+  const delta = Vector3.sub(colRW.boundsCenter, closestPoint, _broadPhaseDelta);
+  return delta.magnitudeSq <= colRW.boundsRadius * colRW.boundsRadius;
+}
+
+// 閳光偓閳光偓 Pass 1: Verlet integration + forces 閳光偓閳光偓
 
 function pointUpdatePass1(
   pointsR: readonly PointR[],
@@ -395,7 +432,7 @@ function pointUpdatePass1(
   }
 }
 
-// ── Surface collision (triangle-based cloth collision) ──
+// 閳光偓閳光偓 Surface collision (triangle-based cloth collision) 閳光偓閳光偓
 
 function surfaceCollision(
   pointsRW: PointRW[],
@@ -473,7 +510,7 @@ function surfaceCollision(
   }
 }
 
-// ── Constraint relaxation ──
+// 閳光偓閳光偓 Constraint relaxation 閳光偓閳光偓
 
 function constraintUpdate(
   pointsR: readonly PointR[],
@@ -481,7 +518,8 @@ function constraintUpdate(
   constraints: readonly Constraint[],
   collidersR: readonly ColliderR[],
   collidersRW: ColliderRW[],
-  constraintShrinkLimit: number
+  constraintShrinkLimit: number,
+  enableBroadPhase: boolean
 ) {
   const direction = new Vector3();
   const dirN = new Vector3();
@@ -587,17 +625,24 @@ function constraintUpdate(
           continue;
         }
         const colR = collidersR[i];
+        const canPointA = !enableBroadPhase || colR.isInverseCollider || pointMayCollideBroadPhase(rwA.positionCurrent, colRW, ptRA.pointRadius);
+        const canPointB = !enableBroadPhase || colR.isInverseCollider || pointMayCollideBroadPhase(rwB.positionCurrent, colRW, ptRB.pointRadius);
+        const canLine = !colR.isInverseCollider && (!enableBroadPhase || segmentMayCollideBroadPhase(rwA.positionCurrent, rwB.positionCurrent, colRW));
+
+        if (!canPointA && !canPointB && !canLine) {
+          continue;
+        }
 
         if (colR.height > EPSILON) {
           if (colR.isInverseCollider) {
-            if (ptRA.applyInvertCollision === 1) {
+            if (ptRA.applyInvertCollision === 1 && canPointA) {
               const res = pushInFromCapsule(colR, colRW, rwA.positionCurrent, pointResultA);
               if (res.hit) {
                 rwA.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);
               }
             }
-            if (ptRB.applyInvertCollision === 1) {
+            if (ptRB.applyInvertCollision === 1 && canPointB) {
               const res = pushInFromCapsule(colR, colRW, rwB.positionCurrent, pointResultB);
               if (res.hit) {
                 rwB.positionCurrent.set(res.point);
@@ -605,27 +650,31 @@ function constraintUpdate(
               }
             }
           } else {
-            let res = pushoutFromCapsule(colR, colRW, rwA.positionCurrent, ptRA, pointResultA);
-            if (res.hit) {
-              rwA.positionCurrent.set(res.point);
-              friction = Math.max(friction, colR.friction * 0.25);
+            if (canPointA) {
+              const res = pushoutFromCapsule(colR, colRW, rwA.positionCurrent, ptRA, pointResultA);
+              if (res.hit) {
+                rwA.positionCurrent.set(res.point);
+                friction = Math.max(friction, colR.friction * 0.25);
+              }
             }
-            res = pushoutFromCapsule(colR, colRW, rwB.positionCurrent, ptRB, pointResultB);
-            if (res.hit) {
-              rwB.positionCurrent.set(res.point);
-              friction = Math.max(friction, colR.friction * 0.25);
+            if (canPointB) {
+              const res = pushoutFromCapsule(colR, colRW, rwB.positionCurrent, ptRB, pointResultB);
+              if (res.hit) {
+                rwB.positionCurrent.set(res.point);
+                friction = Math.max(friction, colR.friction * 0.25);
+              }
             }
           }
         } else {
           if (colR.isInverseCollider) {
-            if (ptRA.applyInvertCollision === 1) {
+            if (ptRA.applyInvertCollision === 1 && canPointA) {
               const res = pushInFromSphere(colRW.positionCurrent, colRW.radius, rwA.positionCurrent, pointResultA);
               if (res.hit) {
                 rwA.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);
               }
             }
-            if (ptRB.applyInvertCollision === 1) {
+            if (ptRB.applyInvertCollision === 1 && canPointB) {
               const res = pushInFromSphere(colRW.positionCurrent, colRW.radius, rwB.positionCurrent, pointResultB);
               if (res.hit) {
                 rwB.positionCurrent.set(res.point);
@@ -633,33 +682,37 @@ function constraintUpdate(
               }
             }
           } else {
-            let res = pushoutFromSphere(
-              colRW.positionCurrent,
-              colRW.radius,
-              ptRA.pointRadius,
-              rwA.positionCurrent,
-              pointResultA
-            );
-            if (res.hit) {
-              rwA.positionCurrent.set(res.point);
-              friction = Math.max(friction, colR.friction * 0.25);
+            if (canPointA) {
+              const res = pushoutFromSphere(
+                colRW.positionCurrent,
+                colRW.radius,
+                ptRA.pointRadius,
+                rwA.positionCurrent,
+                pointResultA
+              );
+              if (res.hit) {
+                rwA.positionCurrent.set(res.point);
+                friction = Math.max(friction, colR.friction * 0.25);
+              }
             }
-            res = pushoutFromSphere(
-              colRW.positionCurrent,
-              colRW.radius,
-              ptRB.pointRadius,
-              rwB.positionCurrent,
-              pointResultB
-            );
-            if (res.hit) {
-              rwB.positionCurrent.set(res.point);
-              friction = Math.max(friction, colR.friction * 0.25);
+            if (canPointB) {
+              const res = pushoutFromSphere(
+                colRW.positionCurrent,
+                colRW.radius,
+                ptRB.pointRadius,
+                rwB.positionCurrent,
+                pointResultB
+              );
+              if (res.hit) {
+                rwB.positionCurrent.set(res.point);
+                friction = Math.max(friction, colR.friction * 0.25);
+              }
             }
           }
         }
 
         // Line segment collision
-        if (!colR.isInverseCollider) {
+        if (!colR.isInverseCollider && canLine) {
           const lineRes = collisionDetection(colR, colRW, rwA.positionCurrent, rwB.positionCurrent, lineResult);
           if (lineRes.hit) {
             Vector3.sub(lineRes.pointOnLine, lineRes.pointOnCollider, pushout);
@@ -697,7 +750,7 @@ function constraintUpdate(
   }
 }
 
-// ── Pass 2: blend + fake wave ──
+// 閳光偓閳光偓 Pass 2: blend + fake wave 閳光偓閳光偓
 
 function pointUpdatePass2(
   pointsR: readonly PointR[],
@@ -738,7 +791,7 @@ function pointUpdatePass2(
   }
 }
 
-// ── Apply simulation result to transforms ──
+// 閳光偓閳光偓 Apply simulation result to transforms 閳光偓閳光偓
 
 export interface ApplyResultOutput {
   position: Vector3;
@@ -776,7 +829,7 @@ export function applyResult(
       }
       const pos = ptRW.positionToTransform;
       // SetRotation with blendRatio=0 for dynamic points
-      // Step 1: Reset localRotation → initialLocalRotation (blendRatio=0 → fully initial)
+      // Step 1: Reset localRotation 閳?initialLocalRotation (blendRatio=0 閳?fully initial)
       localRot = ptR.initialLocalRotation.clone();
 
       // Step 2: Recompute worldRot from the new localRot
@@ -806,7 +859,7 @@ export function applyResult(
         localRotation: localRot
       };
     } else {
-      // Fixed point — follow transform, blend rotation
+      // Fixed point 閳?follow transform, blend rotation
       const childBlend =
         ptR.child !== -1 ? Math.max(pointsR[ptR.child].forceFadeRatio, blendRatio) : blendRatio;
 
@@ -841,7 +894,7 @@ export function applyResult(
   return results;
 }
 
-// ── Angle limiting (post-simulation) ──
+// 閳光偓閳光偓 Angle limiting (post-simulation) 閳光偓閳光偓
 
 export function applyAngleLimits(
   pointsR: readonly PointR[],
@@ -881,3 +934,4 @@ export function applyAngleLimits(
     }
   }
 }
+

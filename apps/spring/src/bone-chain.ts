@@ -132,6 +132,7 @@ export function createBoneChainDemo(scene: Scene): BoneChainDemo {
     fakeWaveSpeed: 0,
     fakeWavePower: 0,
     enableSurfaceCollision: false,
+    enableBroadPhase: true,
     angleLimitConfig: { angleLimit: -1, limitFromRoot: false },
     curves: defaultCurves(),
     constraintOptions: {

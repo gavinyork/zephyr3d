@@ -163,6 +163,10 @@ export interface ColliderRW {
   positionCurrent: Vector3;
   /** Current interpolated capsule direction vector (head→tail) */
   directionCurrent: Vector3;
+  /** World-space broad-phase center for current collider */
+  boundsCenter: Vector3;
+  /** World-space broad-phase radius for current collider */
+  boundsRadius: number;
   /** This frame's world position (read from transform) */
   positionCurrentTransform: Vector3;
   /** Previous frame's world position */

@@ -87,12 +87,27 @@ export function createClothGridDemo(scene: Scene): ClothGridDemo {
     boneGrid.push(chain);
   }
 
-  // Capsule collider
+  // Multiple colliders for broad-phase testing
   const colliderObj = new SceneNode(scene);
-  colliderObj.position.setXYZ(0, 0.8, 0.15);
-
-  const capsuleVis = new Mesh(scene, new CapsuleShape({ radius: 0.12, height: 0.4 }), new LambertMaterial());
-  capsuleVis.parent = colliderObj;
+  const colliderNodes: SceneNode[] = [];
+  const colliderDefs = [
+    { radius: 0.12, height: 0.4, x: 0, y: 0.8, z: 0.15 },
+    { radius: 0.11, height: 0.35, x: -0.35, y: 1.05, z: -0.1 },
+    { radius: 0.1, height: 0.3, x: 0.35, y: 0.65, z: 0.2 },
+    { radius: 0.09, height: 0.25, x: 0, y: 1.2, z: -0.25 }
+  ];
+  for (const def of colliderDefs) {
+    const colliderNode = new SceneNode(scene);
+    colliderNode.parent = colliderObj;
+    colliderNode.position.setXYZ(def.x, def.y, def.z);
+    const capsuleVis = new Mesh(
+      scene,
+      new CapsuleShape({ radius: def.radius, height: def.height }),
+      new LambertMaterial()
+    );
+    capsuleVis.parent = colliderNode;
+    colliderNodes.push(colliderNode);
+  }
 
   // Grabber
   const grabberObj = new SceneNode(scene);
@@ -107,7 +122,6 @@ export function createClothGridDemo(scene: Scene): ClothGridDemo {
     const wp = new Vector3();
     b.getWorldPosition(wp);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const col = Math.floor(i / ROWS);
     const row = i % ROWS;
     return {
       index: i,
@@ -130,16 +144,14 @@ export function createClothGridDemo(scene: Scene): ClothGridDemo {
   // Root points = first bone of each chain
   const rootPoints = boneGrid.map((_, col) => boneNodes[col * ROWS]);
 
-  const collidersR: ColliderR[] = [
-    {
-      radius: 0.12,
-      radiusTailScale: 1,
-      height: 0.4,
-      friction: 0.5,
-      isInverseCollider: false,
-      forceType: 0
-    }
-  ];
+  const collidersR: ColliderR[] = colliderDefs.map((def) => ({
+    radius: def.radius,
+    radiusTailScale: 1,
+    height: def.height,
+    friction: 0.5,
+    isInverseCollider: false,
+    forceType: 0
+  }));
 
   const config: ControllerConfig = {
     gravity: new Vector3(0, -9.8, 0),
@@ -155,6 +167,7 @@ export function createClothGridDemo(scene: Scene): ClothGridDemo {
     fakeWaveSpeed: 0,
     fakeWavePower: 0,
     enableSurfaceCollision: true,
+    enableBroadPhase: true,
     angleLimitConfig: { angleLimit: -1, limitFromRoot: false },
     curves: defaultCurves(),
     constraintOptions: {
@@ -175,14 +188,14 @@ export function createClothGridDemo(scene: Scene): ClothGridDemo {
 
   const pointTransforms = allBones.map((b) => createTransformAccess(b));
   const rootTA = createTransformAccess(group);
-  const colliderTA = createTransformAccess(colliderObj);
+  const colliderTAs = colliderNodes.map((node) => createTransformAccess(node));
   const grabberTA = createTransformAccess(grabberObj);
 
   controller.initialize(
     rootTA,
     rootPoints,
     pointTransforms,
-    [{ r: collidersR[0], transform: colliderTA }],
+    collidersR.map((r, index) => ({ r, transform: colliderTAs[index] })),
     [{ r: grabbersR[0], transform: grabberTA, enabled: false }],
     [{ up: new Vector3(0, 1, 0), position: new Vector3(0, 0, 0) }] // floor at y=0
   );
@@ -190,9 +203,14 @@ export function createClothGridDemo(scene: Scene): ClothGridDemo {
   const constraints = buildConstraints(rootPoints, config.constraintOptions);
 
   const update = (time: number) => {
-    // Move collider up and down through the cloth
-    colliderObj.position.y = 0.8 + Math.sin(time * 1.5) * 0.5;
-    colliderObj.position.z = 0.15 + Math.sin(time * 0.7) * 0.2;
+    colliderNodes[0].position.y = 0.8 + Math.sin(time * 1.5) * 0.5;
+    colliderNodes[0].position.z = 0.15 + Math.sin(time * 0.7) * 0.2;
+    colliderNodes[1].position.x = -0.35 + Math.sin(time * 0.9) * 0.18;
+    colliderNodes[1].position.y = 1.05 + Math.cos(time * 1.2) * 0.22;
+    colliderNodes[2].position.x = 0.35 + Math.cos(time * 1.1) * 0.2;
+    colliderNodes[2].position.z = 0.2 + Math.sin(time * 1.6) * 0.16;
+    colliderNodes[3].position.y = 1.2 + Math.sin(time * 1.8) * 0.18;
+    colliderNodes[3].position.z = -0.25 + Math.cos(time * 0.8) * 0.14;
   };
 
   // Fixed point indices: first bone (row=0) of each column

@@ -98,6 +98,8 @@ export interface ControllerConfig {
   fakeWavePower: number;
   /** Enable triangle-based surface collision (cloth vs colliders) */
   enableSurfaceCollision: boolean;
+  /** Enable broad-phase pruning before precise collider tests */
+  enableBroadPhase: boolean;
   /** Post-simulation angle limiting between parent-child bones */
   angleLimitConfig: AngleLimitConfig;
   /** Depth-based physics parameter curves */
@@ -321,7 +323,8 @@ export class SPCRJointDynamicsController {
       fakeWaveSpeed: this._config.fakeWaveSpeed,
       fakeWavePower: this._config.fakeWavePower,
       fakeWaveCounter: this._fakeWaveCounter,
-      collisionScale: 1.0
+      collisionScale: 1.0,
+      enableBroadPhase: this._config.enableBroadPhase
     };
 
     const result = simulate(
@@ -489,6 +492,11 @@ export class SPCRJointDynamicsController {
     this._config.windForce = wind;
   }
 
+  /** Enable/disable broad-phase pruning for runtime performance comparison */
+  setBroadPhaseEnabled(enabled: boolean): void {
+    this._config.enableBroadPhase = enabled;
+  }
+
   /**
    * 暂停/恢复物理模拟
    * 暂停时仍会跟随根骨骼运动，但不进行力学积分和约束求解
@@ -624,6 +632,8 @@ export class SPCRJointDynamicsController {
     return {
       positionCurrent: pos.clone(),
       directionCurrent: Vector3.zero(),
+      boundsCenter: pos.clone(),
+      boundsRadius: 0,
       positionCurrentTransform: pos.clone(),
       positionPreviousTransform: pos.clone(),
       directionCurrentTransform: rot.clone(),
