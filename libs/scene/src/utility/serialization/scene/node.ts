@@ -9,10 +9,12 @@ import type { ResourceManager } from '../manager';
 import { AnimationClip, NodeRotationTrack, NodeScaleTrack, NodeTranslationTrack } from '../../../animation';
 import { JSONData } from '../json';
 import { SpringScriptConfig } from './spring_script';
+import { ClothScriptConfig } from './cloth_script';
 import { parseZABCBlob, attachZABCAnimationsToSceneNode } from '../../../asset/loaders/zabc/zabc_loader';
 import { restoreGeometryCacheMeshBinding } from '../../../animation/geometry_cache_utils';
 
 const BUILTIN_SPRING_TEST_SCRIPT = '/assets/@builtins/scripts/springtest';
+const BUILTIN_GPU_CLOTH_SCRIPT = '/assets/@builtins/scripts/gpucloth';
 const geometryCacheBindings = new WeakMap<
   SceneNode,
   {
@@ -30,6 +32,16 @@ function isSpringTestScript(script: string) {
 function isBuiltinSpringTestScript(script: string) {
   const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
   return normalized === BUILTIN_SPRING_TEST_SCRIPT || normalized === `${BUILTIN_SPRING_TEST_SCRIPT}.js`;
+}
+
+function isGPUClothScript(script: string) {
+  const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
+  return /(^|\/)gpucloth(\.ts|\.js)?$/.test(normalized);
+}
+
+function isBuiltinGPUClothScript(script: string) {
+  const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
+  return normalized === BUILTIN_GPU_CLOTH_SCRIPT || normalized === `${BUILTIN_GPU_CLOTH_SCRIPT}.js`;
 }
 
 function normalizeSerializedSceneNodeData(data: DiffValue): Record<string, unknown> {
@@ -527,6 +539,8 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
             this.script = value?.str?.[0] ?? '';
             if (isSpringTestScript(this.script) && !(this.scriptConfig instanceof SpringScriptConfig)) {
               this.scriptConfig = new SpringScriptConfig();
+            } else if (isGPUClothScript(this.script) && !(this.scriptConfig instanceof ClothScriptConfig)) {
+              this.scriptConfig = new ClothScriptConfig();
             }
           }
         },
@@ -537,12 +551,16 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
             group: 'Script',
             label: 'BuiltIn',
             enum: {
-              labels: ['None', 'Spring Test'],
-              values: ['', BUILTIN_SPRING_TEST_SCRIPT]
+              labels: ['None', 'Spring Test', 'GPU Cloth'],
+              values: ['', BUILTIN_SPRING_TEST_SCRIPT, BUILTIN_GPU_CLOTH_SCRIPT]
             }
           },
           get(this: SceneNode, value) {
-            value.str[0] = isBuiltinSpringTestScript(this.script) ? BUILTIN_SPRING_TEST_SCRIPT : '';
+            value.str[0] = isBuiltinSpringTestScript(this.script)
+              ? BUILTIN_SPRING_TEST_SCRIPT
+              : isBuiltinGPUClothScript(this.script)
+                ? BUILTIN_GPU_CLOTH_SCRIPT
+                : '';
           },
           set(this: SceneNode, value) {
             const selected = value?.str?.[0] ?? '';
@@ -550,8 +568,10 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
               this.script = selected;
               if (isSpringTestScript(this.script) && !(this.scriptConfig instanceof SpringScriptConfig)) {
                 this.scriptConfig = new SpringScriptConfig();
+              } else if (isGPUClothScript(this.script) && !(this.scriptConfig instanceof ClothScriptConfig)) {
+                this.scriptConfig = new ClothScriptConfig();
               }
-            } else if (isBuiltinSpringTestScript(this.script)) {
+            } else if (isBuiltinSpringTestScript(this.script) || isBuiltinGPUClothScript(this.script)) {
               this.script = '';
             }
           }
@@ -575,6 +595,27 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           },
           set(this: SceneNode, value) {
             this.scriptConfig = (value?.object?.[0] as SpringScriptConfig | null) ?? new SpringScriptConfig();
+          }
+        },
+        {
+          name: 'ClothConfig',
+          type: 'object',
+          options: {
+            objectTypes: [ClothScriptConfig],
+            group: 'Script',
+            label: 'Parameters'
+          },
+          isValid(this: SceneNode) {
+            return this.isMesh() && isGPUClothScript(this.script);
+          },
+          get(this: SceneNode, value) {
+            if (!(this.scriptConfig instanceof ClothScriptConfig)) {
+              this.scriptConfig = new ClothScriptConfig();
+            }
+            value.object[0] = this.scriptConfig;
+          },
+          set(this: SceneNode, value) {
+            this.scriptConfig = (value?.object?.[0] as ClothScriptConfig | null) ?? new ClothScriptConfig();
           }
         },
         {

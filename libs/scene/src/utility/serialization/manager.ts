@@ -188,6 +188,7 @@ import {
   getSpringColliderConfigClass,
   getSpringScriptConfigClass
 } from './scene/spring_script';
+import { getClothColliderConfigClass, getClothScriptConfigClass } from './scene/cloth_script';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -265,6 +266,8 @@ export class ResourceManager {
         getSpringBoneChainConfigClass(),
         getSpringColliderConfigClass(),
         getSpringScriptConfigClass(),
+        getClothColliderConfigClass(),
+        getClothScriptConfigClass(),
         getAABBClass(),
         getInterpolatorClass(),
         getSkeletonClass(),

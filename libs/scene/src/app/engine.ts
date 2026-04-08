@@ -6,6 +6,7 @@ import { Vector3 } from '@zephyr3d/base';
 import { ScriptingSystem } from './scriptingsystem';
 import type { Host } from './scriptingsystem';
 import type { RuntimeScript } from './runtimescript';
+import { getDevice } from './api';
 import { ResourceManager } from '../utility/serialization/manager';
 import type { Scene } from '../scene';
 import { BoxShape, CylinderShape, PlaneShape, SphereShape, TetrahedronShape, TorusShape } from '../shapes';
@@ -18,6 +19,7 @@ import {
 } from '../material';
 import { StandardSpriteMaterial } from '../material/sprite_std';
 import {
+  GPUClothSystem,
   createCapsuleCollider,
   createPlaneCollider,
   createSphereCollider,
@@ -191,6 +193,242 @@ export default class extends RuntimeScript {
 }
 `;
 
+const BUILTIN_GPU_CLOTH_SCRIPT_JS = `import { Vector3 } from '@zephyr3d/base';
+import {
+  RuntimeScript,
+  GPUClothSystem,
+  createSphereCollider,
+  createCapsuleCollider
+} from '@zephyr3d/scene';
+
+function parsePinnedVertexIndices(config) {
+  const pinMode = String(config?.pinMode || 'auto');
+  if (pinMode !== 'manual') {
+    return undefined;
+  }
+  const source = String(config?.pinnedVertexIndices || '');
+  const values = source
+    .split(/[^0-9]+/g)
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v) && v >= 0)
+    .map((v) => v | 0);
+  return values.length > 0 ? values : undefined;
+}
+
+function readNumber(value, fallback) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function serializeColliderConfig(colliders) {
+  return JSON.stringify(
+    (colliders || []).map((collider) => ({
+      type: String(collider?.type || 'sphere'),
+      enabled: collider?.enabled !== false,
+      bone: String(collider?.bone || ''),
+      offsetX: Number(collider?.offsetX) || 0,
+      offsetY: Number(collider?.offsetY) || 0,
+      offsetZ: Number(collider?.offsetZ) || 0,
+      endOffsetX: Number(collider?.endOffsetX) || 0,
+      endOffsetY: Number(collider?.endOffsetY) || 0,
+      endOffsetZ: Number(collider?.endOffsetZ) || 0,
+      radius: Number(collider?.radius) || 0
+    }))
+  );
+}
+
+function buildStructureSignature(host, config) {
+  return JSON.stringify({
+    primitiveId: Number(host?.primitive?.id) || 0,
+    pinMode: String(config?.pinMode || 'auto'),
+    pinnedVertexIndices: String(config?.pinnedVertexIndices || ''),
+    maxNeighbors: Number(config?.maxNeighbors) || 8,
+    maxTrianglesPerVertex: Number(config?.maxTrianglesPerVertex) || 16,
+    workgroupSize: Number(config?.workgroupSize) || 64,
+    rebuildNormals: config?.rebuildNormals !== false
+  });
+}
+
+function buildRuntimeSignature(config) {
+  return JSON.stringify({
+    enabled: config?.enabled !== false,
+    autoUpdate: config?.autoUpdate !== false,
+    damping: Number(config?.damping),
+    stiffness: Number(config?.stiffness),
+    gravityX: Number(config?.gravityX),
+    gravityY: Number(config?.gravityY),
+    gravityZ: Number(config?.gravityZ),
+    solverIterations: Number(config?.solverIterations),
+    colliders: serializeColliderConfig(config?.colliders)
+  });
+}
+
+function buildColliders(host, config) {
+  const colliders = [];
+  const scope =
+    (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
+    host?.scene?.rootNode ||
+    host;
+  for (const colliderConfig of config?.colliders || []) {
+    const attachNode = (colliderConfig?.bone && scope?.findNodeByName?.(colliderConfig.bone)) || host;
+    let collider = null;
+    if (colliderConfig?.type === 'capsule') {
+      collider = createCapsuleCollider(
+        new Vector3(
+          Number(colliderConfig?.offsetX) || 0,
+          Number(colliderConfig?.offsetY) || 0,
+          Number(colliderConfig?.offsetZ) || 0
+        ),
+        new Vector3(
+          Number(colliderConfig?.endOffsetX) || 0,
+          Number(colliderConfig?.endOffsetY) || 0.2,
+          Number(colliderConfig?.endOffsetZ) || 0
+        ),
+        Math.max(0, Number(colliderConfig?.radius) || 0.15),
+        attachNode
+      );
+    } else {
+      collider = createSphereCollider(
+        new Vector3(
+          Number(colliderConfig?.offsetX) || 0,
+          Number(colliderConfig?.offsetY) || 0,
+          Number(colliderConfig?.offsetZ) || 0
+        ),
+        Math.max(0, Number(colliderConfig?.radius) || 0.15),
+        attachNode
+      );
+    }
+    collider.enabled = colliderConfig?.enabled !== false;
+    colliders.push(collider);
+  }
+  return colliders;
+}
+
+export default class extends RuntimeScript {
+  constructor() {
+    super();
+    this._host = null;
+    this._cloth = null;
+    this._structureSignature = '';
+    this._runtimeSignature = '';
+    this._rebuilding = false;
+  }
+
+  async onAttached(host) {
+    this._host = host;
+    await this._ensureCloth(true);
+  }
+
+  onUpdate(deltaTime) {
+    const host = this._host;
+    const config = host?.scriptConfig;
+    if (!host || !config) {
+      return;
+    }
+    const structureSignature = buildStructureSignature(host, config);
+    if (!this._cloth || structureSignature !== this._structureSignature) {
+      if (!this._rebuilding) {
+        this._rebuilding = true;
+        Promise.resolve(this._ensureCloth(false)).finally(() => {
+          this._rebuilding = false;
+        });
+      }
+      return;
+    }
+    const runtimeSignature = buildRuntimeSignature(config);
+    if (runtimeSignature !== this._runtimeSignature) {
+      this._applyRuntimeConfig();
+    }
+    if (this._cloth && config.autoUpdate === false) {
+      this._cloth.update(deltaTime);
+    }
+  }
+
+  onDetached() {
+    this._disposeCloth();
+    this._host = null;
+  }
+
+  onDestroy() {
+    this._disposeCloth();
+    this._host = null;
+  }
+
+  async _ensureCloth(force) {
+    const host = this._host;
+    const config = host?.scriptConfig;
+    if (!host || !config || !host.isMesh?.() || !host.primitive) {
+      this._disposeCloth();
+      return;
+    }
+    const structureSignature = buildStructureSignature(host, config);
+    if (!force && this._cloth && structureSignature === this._structureSignature) {
+      this._applyRuntimeConfig();
+      return;
+    }
+    this._disposeCloth();
+    try {
+      const cloth = await GPUClothSystem.createFromMesh(host, {
+        enabled: config.enabled !== false,
+        gravity: new Vector3(
+          readNumber(config.gravityX, 0),
+          readNumber(config.gravityY, -9.8),
+          readNumber(config.gravityZ, 0)
+        ),
+        damping: readNumber(config.damping, 0.995),
+        stiffness: readNumber(config.stiffness, 0.3),
+        solverIterations: Math.max(1, Number(config.solverIterations) || 5),
+        maxNeighbors: Math.max(1, Number(config.maxNeighbors) || 8),
+        workgroupSize: Math.max(1, Number(config.workgroupSize) || 64),
+        maxTrianglesPerVertex: Math.max(1, Number(config.maxTrianglesPerVertex) || 16),
+        rebuildNormals: config.rebuildNormals !== false,
+        pinnedVertexIndices: parsePinnedVertexIndices(config),
+        colliders: buildColliders(host, config),
+        autoUpdate: config.autoUpdate !== false
+      });
+      this._cloth = cloth;
+      this._structureSignature = structureSignature;
+      this._applyRuntimeConfig();
+      if (!cloth.supported && cloth.disabledReason) {
+        console.warn('GPU cloth disabled:', cloth.disabledReason);
+      }
+    } catch (err) {
+      console.error('GPU cloth initialization failed:', err);
+    }
+  }
+
+  _applyRuntimeConfig() {
+    const cloth = this._cloth;
+    const host = this._host;
+    const config = host?.scriptConfig;
+    if (!cloth || !config) {
+      return;
+    }
+    cloth.enabled = config.enabled !== false;
+    cloth.gravity = new Vector3(
+      readNumber(config.gravityX, 0),
+      readNumber(config.gravityY, -9.8),
+      readNumber(config.gravityZ, 0)
+    );
+    cloth.damping = readNumber(config.damping, 0.995);
+    cloth.stiffness = readNumber(config.stiffness, 0.3);
+    cloth.solverIterations = Math.max(1, Number(config.solverIterations) || 5);
+    cloth.colliders = buildColliders(host, config);
+    cloth.bindToScene(config.autoUpdate === false ? null : host.scene || null);
+    this._runtimeSignature = buildRuntimeSignature(config);
+  }
+
+  _disposeCloth() {
+    if (this._cloth) {
+      this._cloth.dispose();
+      this._cloth = null;
+    }
+    this._structureSignature = '';
+    this._runtimeSignature = '';
+  }
+}
+`;
+
 /**
  * Interface for objects that can be rendered.
  *
@@ -210,6 +448,114 @@ export interface IRenderHook {
   beforeRender?: (renderable: any) => boolean | void;
   // If presents, called after rendering the renderable.
   afterRender?: (renderable: any) => void;
+}
+
+function isBuiltinGPUClothScript(script: string): boolean {
+  const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
+  return /(^|\/)gpucloth(\.ts|\.js)?$/.test(normalized);
+}
+
+function parseClothPinnedVertexIndices(config: any): number[] | undefined {
+  const pinMode = String(config?.pinMode || 'auto');
+  if (pinMode !== 'manual') {
+    return undefined;
+  }
+  const source = String(config?.pinnedVertexIndices || '');
+  const values = source
+    .split(/[^0-9]+/g)
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v) && v >= 0)
+    .map((v) => v | 0);
+  return values.length > 0 ? values : undefined;
+}
+
+function readClothNumber(value: unknown, fallback: number): number {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function serializeClothColliderConfig(colliders: any[]) {
+  return JSON.stringify(
+    (colliders || []).map((collider) => ({
+      type: String(collider?.type || 'sphere'),
+      enabled: collider?.enabled !== false,
+      bone: String(collider?.bone || ''),
+      offsetX: readClothNumber(collider?.offsetX, 0),
+      offsetY: readClothNumber(collider?.offsetY, 0),
+      offsetZ: readClothNumber(collider?.offsetZ, 0),
+      endOffsetX: readClothNumber(collider?.endOffsetX, 0),
+      endOffsetY: readClothNumber(collider?.endOffsetY, 0),
+      endOffsetZ: readClothNumber(collider?.endOffsetZ, 0),
+      radius: readClothNumber(collider?.radius, 0)
+    }))
+  );
+}
+
+function buildClothStructureSignature(host: any, config: any) {
+  return JSON.stringify({
+    primitiveId: Number(host?.primitive?.id) || 0,
+    pinMode: String(config?.pinMode || 'auto'),
+    pinnedVertexIndices: String(config?.pinnedVertexIndices || ''),
+    maxNeighbors: Math.max(1, Number(config?.maxNeighbors) || 8),
+    maxTrianglesPerVertex: Math.max(1, Number(config?.maxTrianglesPerVertex) || 16),
+    workgroupSize: Math.max(1, Number(config?.workgroupSize) || 64),
+    rebuildNormals: config?.rebuildNormals !== false
+  });
+}
+
+function buildClothRuntimeSignature(config: any) {
+  return JSON.stringify({
+    enabled: config?.enabled !== false,
+    autoUpdate: config?.autoUpdate !== false,
+    damping: readClothNumber(config?.damping, 0.995),
+    stiffness: readClothNumber(config?.stiffness, 0.3),
+    gravityX: readClothNumber(config?.gravityX, 0),
+    gravityY: readClothNumber(config?.gravityY, -9.8),
+    gravityZ: readClothNumber(config?.gravityZ, 0),
+    solverIterations: Math.max(1, Number(config?.solverIterations) || 5),
+    colliders: serializeClothColliderConfig(config?.colliders ?? [])
+  });
+}
+
+function buildClothColliders(host: any, config: any) {
+  const colliders = [];
+  const scope =
+    (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
+    host?.scene?.rootNode ||
+    host;
+  for (const colliderConfig of config?.colliders ?? []) {
+    const attachNode = (colliderConfig?.bone && scope?.findNodeByName?.(colliderConfig.bone)) || host;
+    let collider = null;
+    if (colliderConfig?.type === 'capsule') {
+      collider = createCapsuleCollider(
+        new Vector3(
+          readClothNumber(colliderConfig?.offsetX, 0),
+          readClothNumber(colliderConfig?.offsetY, 0),
+          readClothNumber(colliderConfig?.offsetZ, 0)
+        ),
+        new Vector3(
+          readClothNumber(colliderConfig?.endOffsetX, 0),
+          readClothNumber(colliderConfig?.endOffsetY, 0.2),
+          readClothNumber(colliderConfig?.endOffsetZ, 0)
+        ),
+        Math.max(0, readClothNumber(colliderConfig?.radius, 0.15)),
+        attachNode
+      );
+    } else {
+      collider = createSphereCollider(
+        new Vector3(
+          readClothNumber(colliderConfig?.offsetX, 0),
+          readClothNumber(colliderConfig?.offsetY, 0),
+          readClothNumber(colliderConfig?.offsetZ, 0)
+        ),
+        Math.max(0, readClothNumber(colliderConfig?.radius, 0.15)),
+        attachNode
+      );
+    }
+    collider.enabled = colliderConfig?.enabled !== false;
+    colliders.push(collider);
+  }
+  return colliders;
 }
 
 /**
@@ -242,6 +588,7 @@ export class Engine {
   // 内置 springtest 的延迟挂载队列：
   // 需要等骨骼世界矩阵稳定后再初始化弹簧，避免 restLength 在未就位时采样为异常值。
   private _pendingBuiltinSpringHosts: Array<{ host: any; retries: number; delayFrames: number }>;
+  private _builtinClothHosts: any[];
   private _loadingScenes: Partial<Record<string, Promise<Nullable<Scene>>>>;
   /**
    * Creates a new runtime manager.
@@ -258,6 +605,7 @@ export class Engine {
     this._enabled = enabled ?? true;
     this._activeRenderables = [];
     this._pendingBuiltinSpringHosts = [];
+    this._builtinClothHosts = [];
     this._loadingScenes = {};
     this._screen = new ScreenAdapter();
   }
@@ -318,7 +666,13 @@ export class Engine {
    * @returns The `RuntimeScript<T>` instance, or `null` if disabled or on failure.
    */
   async attachScript<T extends Host>(host: Nullable<T>, module: string) {
-    return this._enabled ? await this._scriptingSystem.attachScript(host, module) : null;
+    if (!this._enabled) {
+      return null;
+    }
+    if (host && (this.tryAttachBuiltinSpringScript(host, module) || this.tryAttachBuiltinGPUClothScript(host, module))) {
+      return null;
+    }
+    return await this._scriptingSystem.attachScript(host, module);
   }
   /**
    * Detaches a script from a host, by module ID or instance, if enabled.
@@ -358,6 +712,7 @@ export class Engine {
     if (this._enabled) {
       // 每帧先尝试处理内置 spring 的延迟挂载，再执行常规脚本更新。
       this.flushPendingBuiltinSpringHosts();
+      this.updateBuiltinClothHosts(deltaTime);
       this._scriptingSystem.update(deltaTime, elapsedTime);
     }
   }
@@ -457,6 +812,10 @@ export class Engine {
       encoding: 'utf8',
       create: true
     });
+    await fs.writeFile('/scripts/gpucloth.js', BUILTIN_GPU_CLOTH_SCRIPT_JS, {
+      encoding: 'utf8',
+      create: true
+    });
     fs.readOnly = true;
     return fs;
   }
@@ -483,6 +842,9 @@ export class Engine {
             if (this.tryAttachBuiltinSpringScript(node, node.script)) {
               return false;
             }
+            if (this.tryAttachBuiltinGPUClothScript(node, node.script)) {
+              return false;
+            }
             scripts.push(node.script);
             P.push(this.attachScript(node, node.script));
           }
@@ -504,7 +866,7 @@ export class Engine {
     }
   }
   private async attachScriptOrBuiltin(host: any, script: string) {
-    if (this.tryAttachBuiltinSpringScript(host, script)) {
+    if (this.tryAttachBuiltinSpringScript(host, script) || this.tryAttachBuiltinGPUClothScript(host, script)) {
       return;
     }
     try {
@@ -565,6 +927,145 @@ export class Engine {
       }
     }
     this._pendingBuiltinSpringHosts = remained;
+  }
+  private tryAttachBuiltinGPUClothScript(host: any, script: string): boolean {
+    if (!host || !isBuiltinGPUClothScript(script)) {
+      return false;
+    }
+    if (!this._builtinClothHosts.includes(host)) {
+      this._builtinClothHosts.push(host);
+    }
+    return true;
+  }
+  private updateBuiltinClothHosts(deltaTime: number) {
+    if (this._builtinClothHosts.length === 0) {
+      return;
+    }
+    const remained: any[] = [];
+    for (const host of this._builtinClothHosts) {
+      if (!host || host.disposed) {
+        this.disposeBuiltinClothHost(host);
+        continue;
+      }
+      if (!isBuiltinGPUClothScript(host.script ?? '')) {
+        this.disposeBuiltinClothHost(host);
+        continue;
+      }
+      remained.push(host);
+      this.updateBuiltinClothHost(host, deltaTime);
+    }
+    this._builtinClothHosts = remained;
+  }
+  private updateBuiltinClothHost(host: any, deltaTime: number) {
+    const config = host?.scriptConfig;
+    if (!host || !config || !host.isMesh?.() || !host.primitive) {
+      this.disposeBuiltinClothHost(host);
+      return;
+    }
+    const state = ((host as any).__builtinClothState ??= {
+      cloth: null,
+      structureSignature: '',
+      runtimeSignature: '',
+      rebuilding: false
+    });
+    const structureSignature = buildClothStructureSignature(host, config);
+    if (!state.cloth || structureSignature !== state.structureSignature) {
+      if (!state.rebuilding) {
+        state.rebuilding = true;
+        Promise.resolve(this.ensureBuiltinClothHost(host)).finally(() => {
+          state.rebuilding = false;
+        });
+      }
+      return;
+    }
+    const runtimeSignature = buildClothRuntimeSignature(config);
+    if (runtimeSignature !== state.runtimeSignature) {
+      this.applyBuiltinClothRuntimeConfig(host);
+    }
+    if (state.cloth && config.autoUpdate === false) {
+      state.cloth.update(deltaTime);
+    }
+  }
+  private async ensureBuiltinClothHost(host: any) {
+    const config = host?.scriptConfig;
+    if (!host || !config || !host.isMesh?.() || !host.primitive) {
+      this.disposeBuiltinClothHost(host);
+      return;
+    }
+    const state = ((host as any).__builtinClothState ??= {
+      cloth: null,
+      structureSignature: '',
+      runtimeSignature: '',
+      rebuilding: false
+    });
+    const structureSignature = buildClothStructureSignature(host, config);
+    if (state.cloth && structureSignature === state.structureSignature) {
+      this.applyBuiltinClothRuntimeConfig(host);
+      return;
+    }
+    this.disposeBuiltinClothHost(host);
+    try {
+      const cloth = await GPUClothSystem.createFromMesh(host, {
+        enabled: config.enabled !== false,
+        gravity: new Vector3(
+          readClothNumber(config.gravityX, 0),
+          readClothNumber(config.gravityY, -9.8),
+          readClothNumber(config.gravityZ, 0)
+        ),
+        damping: readClothNumber(config.damping, 0.995),
+        stiffness: readClothNumber(config.stiffness, 0.3),
+        solverIterations: Math.max(1, Number(config.solverIterations) || 5),
+        maxNeighbors: Math.max(1, Number(config.maxNeighbors) || 8),
+        workgroupSize: Math.max(1, Number(config.workgroupSize) || 64),
+        maxTrianglesPerVertex: Math.max(1, Number(config.maxTrianglesPerVertex) || 16),
+        rebuildNormals: config.rebuildNormals !== false,
+        pinnedVertexIndices: parseClothPinnedVertexIndices(config),
+        colliders: buildClothColliders(host, config),
+        autoUpdate: config.autoUpdate !== false,
+        device: getDevice()
+      });
+      (host as any).__builtinClothState = {
+        cloth,
+        structureSignature,
+        runtimeSignature: '',
+        rebuilding: false
+      };
+      this.applyBuiltinClothRuntimeConfig(host);
+      if (!cloth.supported && cloth.disabledReason) {
+        console.warn('GPU cloth disabled:', cloth.disabledReason);
+      }
+    } catch (err) {
+      console.error('GPU cloth initialization failed:', err);
+    }
+  }
+  private applyBuiltinClothRuntimeConfig(host: any) {
+    const config = host?.scriptConfig;
+    const state = (host as any)?.__builtinClothState;
+    const cloth = state?.cloth as Nullable<GPUClothSystem>;
+    if (!cloth || !config) {
+      return;
+    }
+    cloth.enabled = config.enabled !== false;
+    cloth.gravity = new Vector3(
+      readClothNumber(config.gravityX, 0),
+      readClothNumber(config.gravityY, -9.8),
+      readClothNumber(config.gravityZ, 0)
+    );
+    cloth.damping = readClothNumber(config.damping, 0.995);
+    cloth.stiffness = readClothNumber(config.stiffness, 0.3);
+    cloth.solverIterations = Math.max(1, Number(config.solverIterations) || 5);
+    cloth.colliders = buildClothColliders(host, config);
+    cloth.bindToScene(config.autoUpdate === false ? null : host.scene || null);
+    state.runtimeSignature = buildClothRuntimeSignature(config);
+  }
+  private disposeBuiltinClothHost(host: any) {
+    const state = host?.__builtinClothState;
+    if (state?.cloth) {
+      state.cloth.dispose();
+    }
+    if (host && '__builtinClothState' in host) {
+      (host as any).__builtinClothState = null;
+    }
   }
   private attachBuiltinSpringScript(root: any): boolean {
     const config = root?.scriptConfig;
