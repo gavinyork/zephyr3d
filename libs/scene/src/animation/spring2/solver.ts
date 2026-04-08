@@ -21,8 +21,18 @@ import {
   pushInFromSphere,
   pushInFromCapsule,
   collisionDetection,
-  checkSurfaceCollision
+  checkSurfaceCollision,
+  type CollisionResult,
+  type LineCollisionResult,
+  type SurfaceCheckResult
 } from './collision';
+
+const AXIS_Y = new Vector3(0, 1, 0);
+const VEC3_ONE = new Vector3(1, 1, 1);
+const _computeCapsuleAxis = new Vector3();
+const _computeCapsuleHalfDir = new Vector3();
+const _applySystemTransformOffset = new Vector3();
+const _applySystemTransformRotated = new Vector3();
 
 /** Parameters for a single simulation step */
 export interface SimulationParams {
@@ -190,14 +200,10 @@ export function simulate(
 
 // ── Collider interpolation ──
 
-function computeCapsule(
-  pos: Vector3,
-  rot: Quaternion,
-  height: number
-): { head: Vector3; direction: Vector3 } {
-  const dir = rot.transform(Vector3.scale(Vector3.axisPY(), height));
-  const head = Vector3.sub(pos, Vector3.scale(dir, 0.5));
-  return { head, direction: dir };
+function computeCapsule(pos: Vector3, rot: Quaternion, height: number, head: Vector3, direction: Vector3): void {
+  rot.transform(Vector3.scale(AXIS_Y, height, _computeCapsuleAxis), direction);
+  Vector3.scale(direction, 0.5, _computeCapsuleHalfDir);
+  Vector3.sub(pos, _computeCapsuleHalfDir, head);
 }
 
 function colliderUpdate(
@@ -206,39 +212,43 @@ function colliderUpdate(
   stepDelta: number,
   collisionScale: number
 ) {
+  const curPos = new Vector3();
+  const curDir = new Quaternion();
+  const corner = new Vector3();
+  const center = new Vector3();
+  const tailCorner = new Vector3();
+  const tailCenter = new Vector3();
   for (let i = 0; i < collidersR.length; i++) {
     const colR = collidersR[i];
     const colRW = collidersRW[i];
     colRW.radius = colR.radius * collisionScale;
 
-    const curPos = Vector3.lerp(colRW.positionPreviousTransform, colRW.positionCurrentTransform, stepDelta);
-    const curDir = Quaternion.slerp(
+    Vector3.lerp(colRW.positionPreviousTransform, colRW.positionCurrentTransform, stepDelta, curPos);
+    Quaternion.slerp(
       colRW.directionPreviousTransform,
       colRW.directionCurrentTransform,
-      stepDelta
+      stepDelta,
+      curDir
     );
 
-    const cap = computeCapsule(curPos, curDir, colR.height);
-    colRW.positionCurrent = cap.head;
-    colRW.directionCurrent = cap.direction;
+    computeCapsule(curPos, curDir, colR.height, colRW.positionCurrent, colRW.directionCurrent);
 
     // Update local bounds
-    const corner = Vector3.scale(Vector3.one(), colR.radius);
-    const center = colRW.worldToLocal.transformPointAffine(colRW.positionCurrent);
-    colRW.localBoundsMin = Vector3.sub(center, corner);
-    colRW.localBoundsMax = Vector3.add(center, corner);
+    Vector3.scale(VEC3_ONE, colR.radius, corner);
+    colRW.worldToLocal.transformPointAffine(colRW.positionCurrent, center);
+    Vector3.sub(center, corner, colRW.localBoundsMin);
+    Vector3.add(center, corner, colRW.localBoundsMax);
 
     if (colR.height > EPSILON) {
-      const tailCorner = Vector3.scale(Vector3.one(), colR.radius * colR.radiusTailScale);
-      const tailCenter = colRW.worldToLocal.transformPointAffine(
-        Vector3.add(colRW.positionCurrent, colRW.directionCurrent)
-      );
-      colRW.localBoundsMin = new Vector3(
+      Vector3.scale(VEC3_ONE, colR.radius * colR.radiusTailScale, tailCorner);
+      Vector3.add(colRW.positionCurrent, colRW.directionCurrent, tailCenter);
+      colRW.worldToLocal.transformPointAffine(tailCenter, tailCenter);
+      colRW.localBoundsMin.setXYZ(
         Math.min(colRW.localBoundsMin.x, tailCenter.x - tailCorner.x),
         Math.min(colRW.localBoundsMin.y, tailCenter.y - tailCorner.y),
         Math.min(colRW.localBoundsMin.z, tailCenter.z - tailCorner.z)
       );
-      colRW.localBoundsMax = new Vector3(
+      colRW.localBoundsMax.setXYZ(
         Math.max(colRW.localBoundsMax.x, tailCenter.x + tailCorner.x),
         Math.max(colRW.localBoundsMax.y, tailCenter.y + tailCorner.y),
         Math.max(colRW.localBoundsMax.z, tailCenter.z + tailCorner.z)
@@ -253,10 +263,12 @@ function applySystemTransform(
   point: Vector3,
   pivot: Vector3,
   slideOffset: Vector3,
-  rotOffset: Quaternion
+  rotOffset: Quaternion,
+  result?: Vector3
 ): Vector3 {
-  const rotated = rotOffset.transform(Vector3.sub(point, pivot));
-  return Vector3.add(Vector3.add(rotated, pivot), slideOffset);
+  const rotated = rotOffset.transform(Vector3.sub(point, pivot, _applySystemTransformOffset), result || _applySystemTransformRotated);
+  Vector3.add(rotated, pivot, rotated);
+  return Vector3.add(rotated, slideOffset, rotated);
 }
 
 // ── Pass 1: Verlet integration + forces ──
@@ -276,58 +288,53 @@ function pointUpdatePass1(
   movableLimitTargets: readonly Vector3[],
   flatPlanes: readonly FlatPlane[]
 ) {
+  const currentTransformPos = new Vector3();
+  const moveDir = new Vector3();
+  const extForce = new Vector3();
+  const displacement = new Vector3();
+  const restore = new Vector3();
+  const tempVec0 = new Vector3();
+  const tempVec1 = new Vector3();
+  const planeOffset = new Vector3();
   for (let index = 0; index < pointsR.length; index++) {
     const ptR = pointsR[index];
     const ptRW = pointsRW[index];
 
-    const currentTransformPos = Vector3.lerp(
-      ptRW.positionPreviousTransform,
-      ptRW.positionCurrentTransform,
-      stepDelta
-    );
+    Vector3.lerp(ptRW.positionPreviousTransform, ptRW.positionCurrentTransform, stepDelta, currentTransformPos);
 
     if (ptR.weight <= EPSILON) {
-      ptRW.positionPrevious = ptRW.positionCurrent.clone();
-      ptRW.positionCurrent = currentTransformPos;
+      ptRW.positionPrevious.set(ptRW.positionCurrent);
+      ptRW.positionCurrent.set(currentTransformPos);
     } else {
-      ptRW.positionPrevious = applySystemTransform(
-        ptRW.positionPrevious,
-        rootPosition,
-        rootSlideOffset,
-        rootRotationOffset
-      );
-      ptRW.positionCurrent = applySystemTransform(
-        ptRW.positionCurrent,
-        rootPosition,
-        rootSlideOffset,
-        rootRotationOffset
-      );
+      applySystemTransform(ptRW.positionPrevious, rootPosition, rootSlideOffset, rootRotationOffset, ptRW.positionPrevious);
+      applySystemTransform(ptRW.positionCurrent, rootPosition, rootSlideOffset, rootRotationOffset, ptRW.positionCurrent);
 
-      let displacement = Vector3.zero();
+      displacement.setXYZ(0, 0, 0);
       if (!isPaused) {
-        const moveDir = Vector3.sub(ptRW.positionCurrent, ptRW.positionPrevious);
-        let extForce = ptR.gravity.clone();
-        extForce = Vector3.add(extForce, Vector3.scale(windForce, ptR.windForceScale / ptR.mass));
-        extForce = Vector3.scale(extForce, stepTime_x2_half);
+        Vector3.sub(ptRW.positionCurrent, ptRW.positionPrevious, moveDir);
+        Vector3.scale(windForce, ptR.windForceScale / ptR.mass, extForce);
+        Vector3.add(ptR.gravity, extForce, extForce);
+        Vector3.scale(extForce, stepTime_x2_half, extForce);
 
-        displacement = Vector3.add(moveDir, extForce);
-        displacement = Vector3.scale(displacement, ptR.resistance);
-        displacement = Vector3.scale(displacement, 1.0 - clamp01(ptRW.friction * ptR.frictionScale));
+        Vector3.add(moveDir, extForce, displacement);
+        Vector3.scale(displacement, ptR.resistance, displacement);
+        Vector3.scale(displacement, 1.0 - clamp01(ptRW.friction * ptR.frictionScale), displacement);
       }
 
-      ptRW.positionPrevious = ptRW.positionCurrent.clone();
-      ptRW.positionCurrent = Vector3.add(ptRW.positionCurrent, displacement);
+      ptRW.positionPrevious.set(ptRW.positionCurrent);
+      Vector3.add(ptRW.positionCurrent, displacement, ptRW.positionCurrent);
       ptRW.friction = 0;
 
       if (!isPaused) {
         // Hardness restore
         if (ptR.hardness > 0) {
-          const restore = Vector3.scale(Vector3.sub(currentTransformPos, ptRW.positionCurrent), ptR.hardness);
-          ptRW.positionCurrent = Vector3.add(ptRW.positionCurrent, restore);
+          Vector3.sub(currentTransformPos, ptRW.positionCurrent, restore);
+          Vector3.scale(restore, ptR.hardness, restore);
+          Vector3.add(ptRW.positionCurrent, restore, ptRW.positionCurrent);
         }
         // Force fade ratio
         if (ptR.forceFadeRatio > 0) {
-          ptRW.positionCurrent = Vector3.lerp(ptRW.positionCurrent, currentTransformPos, ptR.forceFadeRatio);
+          Vector3.lerp(ptRW.positionCurrent, currentTransformPos, ptR.forceFadeRatio, ptRW.positionCurrent);
         }
         // Grabber
         if (ptRW.grabberIndex !== -1) {
@@ -336,15 +343,13 @@ function pointUpdatePass1(
           if (grRW.enabled === 0) {
             ptRW.grabberIndex = -1;
           } else {
-            const vec = Vector3.sub(ptRW.positionCurrent, grRW.position);
-            const pos = Vector3.add(
-              grRW.position,
-              Vector3.scale(Vector3.normalize(vec), ptRW.grabberDistance)
-            );
-            ptRW.positionCurrent = Vector3.add(
-              ptRW.positionCurrent,
-              Vector3.scale(Vector3.sub(pos, ptRW.positionCurrent), grR.force)
-            );
+            Vector3.sub(ptRW.positionCurrent, grRW.position, tempVec0);
+            Vector3.normalize(tempVec0, tempVec0);
+            Vector3.scale(tempVec0, ptRW.grabberDistance, tempVec1);
+            Vector3.add(grRW.position, tempVec1, tempVec1);
+            Vector3.sub(tempVec1, ptRW.positionCurrent, tempVec0);
+            Vector3.scale(tempVec0, grR.force, tempVec0);
+            Vector3.add(ptRW.positionCurrent, tempVec0, ptRW.positionCurrent);
           }
         } else {
           let nearIndex = -1;
@@ -352,8 +357,7 @@ function pointUpdatePass1(
           for (let ig = 0; ig < grabbersR.length; ig++) {
             const grRW = grabbersRW[ig];
             if (grRW.enabled !== 0) {
-              const vec = Vector3.sub(grRW.position, ptRW.positionCurrent);
-              const sqrLen = vec.magnitudeSq;
+              const sqrLen = Vector3.sub(grRW.position, ptRW.positionCurrent, tempVec0).magnitudeSq;
               if (sqrLen < grabbersR[ig].radius * grabbersR[ig].radius && sqrLen < sqrNearRange) {
                 sqrNearRange = sqrLen;
                 nearIndex = ig;
@@ -368,10 +372,11 @@ function pointUpdatePass1(
         // Movable limit
         if (ptR.movableLimitIndex !== -1) {
           const target = movableLimitTargets[ptR.movableLimitIndex];
-          const move = Vector3.sub(ptRW.positionCurrent, target);
+          const move = Vector3.sub(ptRW.positionCurrent, target, tempVec0);
           const moveLen = move.magnitude;
           if (moveLen > ptR.movableLimitRadius) {
-            ptRW.positionCurrent = Vector3.add(target, Vector3.scale(move, ptR.movableLimitRadius / moveLen));
+            Vector3.scale(move, ptR.movableLimitRadius / moveLen, move);
+            Vector3.add(target, move, ptRW.positionCurrent);
           }
         }
       }
@@ -381,7 +386,8 @@ function pointUpdatePass1(
         const fp = flatPlanes[i];
         const dist = Vector3.dot(fp.normal, ptRW.positionCurrent) + fp.distance;
         if (dist < 0) {
-          ptRW.positionCurrent = Vector3.sub(ptRW.positionCurrent, Vector3.scale(fp.normal, dist));
+          Vector3.scale(fp.normal, dist, planeOffset);
+          Vector3.sub(ptRW.positionCurrent, planeOffset, ptRW.positionCurrent);
           ptRW.friction = 0.3;
         }
       }
@@ -397,6 +403,18 @@ function surfaceCollision(
   collidersRW: ColliderRW[],
   surfaceConstraints: readonly number[]
 ) {
+  const surfaceResult: SurfaceCheckResult = {
+    hit: false,
+    intersectionPoint: new Vector3(),
+    pushOut: new Vector3(),
+    pointOnCollider: new Vector3(),
+    radius: 0
+  };
+  const triCenter = new Vector3();
+  const pushDir = new Vector3();
+  const centerToPt = new Vector3();
+  const intersectToPt = new Vector3();
+  const pushVec = new Vector3();
   for (let index = 0; index < surfaceConstraints.length; index += 6) {
     for (let i = 0; i < collidersR.length; i++) {
       const colR = collidersR[i];
@@ -422,31 +440,32 @@ function surfaceCollision(
           rwC.positionCurrent,
           colliderPos,
           colR,
-          colRW
+          colRW,
+          surfaceResult
         );
 
         if (result.hit) {
-          const triCenter = Vector3.lerp(
-            Vector3.lerp(rwA.positionCurrent, rwB.positionCurrent, 0.5),
-            Vector3.lerp(rwA.positionCurrent, rwC.positionCurrent, 0.5),
-            0.5
+          triCenter.setXYZ(
+            (rwA.positionCurrent.x + rwB.positionCurrent.x + rwC.positionCurrent.x) / 3,
+            (rwA.positionCurrent.y + rwB.positionCurrent.y + rwC.positionCurrent.y) / 3,
+            (rwA.positionCurrent.z + rwB.positionCurrent.z + rwC.positionCurrent.z) / 3
           );
           const pushMag = result.pushOut.magnitude;
           if (pushMag < EPSILON) {
             continue;
           }
-          const pushDir = Vector3.scale(result.pushOut, 1 / pushMag);
+          Vector3.scale(result.pushOut, 1 / pushMag, pushDir);
 
           for (let k = 0; k < 3; k++) {
             const idxR = surfaceConstraints[index + j + k];
             const rwPt = pointsRW[idxR];
-            const centerToPt = Vector3.sub(rwPt.positionCurrent, triCenter);
-            const intersectToPt = Vector3.sub(rwPt.positionCurrent, result.intersectionPoint);
+            Vector3.sub(rwPt.positionCurrent, triCenter, centerToPt);
+            Vector3.sub(rwPt.positionCurrent, result.intersectionPoint, intersectToPt);
             const intersectLen = intersectToPt.magnitude;
             let rate = intersectLen > EPSILON ? centerToPt.magnitude / intersectLen : 0;
             rate = clamp01(Math.abs(rate));
-            const pushVec = Vector3.scale(pushDir, (result.radius - pushMag) * rate);
-            rwPt.positionCurrent = Vector3.add(rwPt.positionCurrent, pushVec);
+            Vector3.scale(pushDir, (result.radius - pushMag) * rate, pushVec);
+            Vector3.add(rwPt.positionCurrent, pushVec, rwPt.positionCurrent);
           }
         }
       }
@@ -464,6 +483,24 @@ function constraintUpdate(
   collidersRW: ColliderRW[],
   constraintShrinkLimit: number
 ) {
+  const direction = new Vector3();
+  const dirN = new Vector3();
+  const disp = new Vector3();
+  const scaledDisp = new Vector3();
+  const pointResultA: CollisionResult = { hit: false, point: new Vector3() };
+  const pointResultB: CollisionResult = { hit: false, point: new Vector3() };
+  const lineResult: LineCollisionResult = {
+    hit: false,
+    pointOnLine: new Vector3(),
+    pointOnCollider: new Vector3(),
+    radius: 0
+  };
+  const pushout = new Vector3();
+  const segment = new Vector3();
+  const pointToA = new Vector3();
+  const pointToB = new Vector3();
+  const pushN = new Vector3();
+  const pushVec = new Vector3();
   for (let index = 0; index < constraints.length; index++) {
     const c = constraints[index];
     const ptRA = pointsR[c.indexA];
@@ -477,7 +514,7 @@ function constraintUpdate(
     const rwA = pointsRW[c.indexA];
     const rwB = pointsRW[c.indexB];
 
-    const direction = Vector3.sub(rwB.positionCurrent, rwA.positionCurrent);
+    Vector3.sub(rwB.positionCurrent, rwA.positionCurrent, direction);
     const distance = direction.magnitude;
 
     let shrinkLen = c.length;
@@ -528,11 +565,17 @@ function constraintUpdate(
     }
 
     if (power > 0) {
-      const dirN = distance > EPSILON ? Vector3.scale(direction, 1 / distance) : Vector3.zero();
-      const disp = Vector3.scale(dirN, force * power);
+      if (distance > EPSILON) {
+        Vector3.scale(direction, 1 / distance, dirN);
+      } else {
+        dirN.setXYZ(0, 0, 0);
+      }
+      Vector3.scale(dirN, force * power, disp);
       const wAB = weightA + weightB;
-      rwA.positionCurrent = Vector3.add(rwA.positionCurrent, Vector3.scale(disp, weightA / wAB));
-      rwB.positionCurrent = Vector3.sub(rwB.positionCurrent, Vector3.scale(disp, weightB / wAB));
+      Vector3.scale(disp, weightA / wAB, scaledDisp);
+      Vector3.add(rwA.positionCurrent, scaledDisp, rwA.positionCurrent);
+      Vector3.scale(disp, weightB / wAB, scaledDisp);
+      Vector3.sub(rwB.positionCurrent, scaledDisp, rwB.positionCurrent);
     }
 
     // Per-constraint collision
@@ -548,44 +591,44 @@ function constraintUpdate(
         if (colR.height > EPSILON) {
           if (colR.isInverseCollider) {
             if (ptRA.applyInvertCollision === 1) {
-              const res = pushInFromCapsule(colR, colRW, rwA.positionCurrent);
+              const res = pushInFromCapsule(colR, colRW, rwA.positionCurrent, pointResultA);
               if (res.hit) {
-                rwA.positionCurrent = res.point;
+                rwA.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);
               }
             }
             if (ptRB.applyInvertCollision === 1) {
-              const res = pushInFromCapsule(colR, colRW, rwB.positionCurrent);
+              const res = pushInFromCapsule(colR, colRW, rwB.positionCurrent, pointResultB);
               if (res.hit) {
-                rwB.positionCurrent = res.point;
+                rwB.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);
               }
             }
           } else {
-            let res = pushoutFromCapsule(colR, colRW, rwA.positionCurrent, ptRA);
+            let res = pushoutFromCapsule(colR, colRW, rwA.positionCurrent, ptRA, pointResultA);
             if (res.hit) {
-              rwA.positionCurrent = res.point;
+              rwA.positionCurrent.set(res.point);
               friction = Math.max(friction, colR.friction * 0.25);
             }
-            res = pushoutFromCapsule(colR, colRW, rwB.positionCurrent, ptRB);
+            res = pushoutFromCapsule(colR, colRW, rwB.positionCurrent, ptRB, pointResultB);
             if (res.hit) {
-              rwB.positionCurrent = res.point;
+              rwB.positionCurrent.set(res.point);
               friction = Math.max(friction, colR.friction * 0.25);
             }
           }
         } else {
           if (colR.isInverseCollider) {
             if (ptRA.applyInvertCollision === 1) {
-              const res = pushInFromSphere(colRW.positionCurrent, colRW.radius, rwA.positionCurrent);
+              const res = pushInFromSphere(colRW.positionCurrent, colRW.radius, rwA.positionCurrent, pointResultA);
               if (res.hit) {
-                rwA.positionCurrent = res.point;
+                rwA.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);
               }
             }
             if (ptRB.applyInvertCollision === 1) {
-              const res = pushInFromSphere(colRW.positionCurrent, colRW.radius, rwB.positionCurrent);
+              const res = pushInFromSphere(colRW.positionCurrent, colRW.radius, rwB.positionCurrent, pointResultB);
               if (res.hit) {
-                rwB.positionCurrent = res.point;
+                rwB.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);
               }
             }
@@ -594,20 +637,22 @@ function constraintUpdate(
               colRW.positionCurrent,
               colRW.radius,
               ptRA.pointRadius,
-              rwA.positionCurrent
+              rwA.positionCurrent,
+              pointResultA
             );
             if (res.hit) {
-              rwA.positionCurrent = res.point;
+              rwA.positionCurrent.set(res.point);
               friction = Math.max(friction, colR.friction * 0.25);
             }
             res = pushoutFromSphere(
               colRW.positionCurrent,
               colRW.radius,
               ptRB.pointRadius,
-              rwB.positionCurrent
+              rwB.positionCurrent,
+              pointResultB
             );
             if (res.hit) {
-              rwB.positionCurrent = res.point;
+              rwB.positionCurrent.set(res.point);
               friction = Math.max(friction, colR.friction * 0.25);
             }
           }
@@ -615,30 +660,32 @@ function constraintUpdate(
 
         // Line segment collision
         if (!colR.isInverseCollider) {
-          const lineRes = collisionDetection(colR, colRW, rwA.positionCurrent, rwB.positionCurrent);
+          const lineRes = collisionDetection(colR, colRW, rwA.positionCurrent, rwB.positionCurrent, lineResult);
           if (lineRes.hit) {
-            const pushout = Vector3.sub(lineRes.pointOnLine, lineRes.pointOnCollider);
+            Vector3.sub(lineRes.pointOnLine, lineRes.pointOnCollider, pushout);
             const pushDist = pushout.magnitude;
             if (pushDist > EPSILON) {
-              const ptDist = Vector3.sub(rwB.positionCurrent, rwA.positionCurrent).magnitude * 0.5;
+              const ptDist = Vector3.sub(rwB.positionCurrent, rwA.positionCurrent, segment).magnitude * 0.5;
               const rateP1 =
                 ptDist > EPSILON
-                  ? clamp01(Vector3.sub(lineRes.pointOnLine, rwA.positionCurrent).magnitude / ptDist)
+                  ? clamp01(Vector3.sub(lineRes.pointOnLine, rwA.positionCurrent, pointToA).magnitude / ptDist)
                   : 0;
               const rateP2 =
                 ptDist > EPSILON
-                  ? clamp01(Vector3.sub(lineRes.pointOnLine, rwB.positionCurrent).magnitude / ptDist)
+                  ? clamp01(Vector3.sub(lineRes.pointOnLine, rwB.positionCurrent, pointToB).magnitude / ptDist)
                   : 0;
-              const pushN = Vector3.scale(pushout, 1 / pushDist);
-              const pushVec = Vector3.scale(pushN, Math.max(lineRes.radius - pushDist, 0));
+              Vector3.scale(pushout, 1 / pushDist, pushN);
+              Vector3.scale(pushN, Math.max(lineRes.radius - pushDist, 0), pushVec);
               if (weightA > EPSILON) {
-                rwA.positionCurrent = Vector3.add(rwA.positionCurrent, Vector3.scale(pushVec, rateP2));
+                Vector3.scale(pushVec, rateP2, scaledDisp);
+                Vector3.add(rwA.positionCurrent, scaledDisp, rwA.positionCurrent);
               }
               if (weightB > EPSILON) {
-                rwB.positionCurrent = Vector3.add(rwB.positionCurrent, Vector3.scale(pushVec, rateP1));
+                Vector3.scale(pushVec, rateP1, scaledDisp);
+                Vector3.add(rwB.positionCurrent, scaledDisp, rwB.positionCurrent);
               }
 
-              const dotUp = Vector3.dot(Vector3.axisPY(), Vector3.normalize(pushout));
+              const dotUp = Vector3.dot(AXIS_Y, Vector3.normalize(pushout, pushN));
               friction = Math.max(friction, colR.friction * clamp01(dotUp));
             }
           }
@@ -663,32 +710,28 @@ function pointUpdatePass2(
   fakeWavePower: number
 ) {
   let freq = fakeWaveFreq;
+  const curTransformPos = new Vector3();
+  const fakeWindOffset = new Vector3();
   for (let index = 0; index < pointsR.length; index++) {
     const ptR = pointsR[index];
     const ptRW = pointsRW[index];
 
-    const curTransformPos = Vector3.lerp(
-      ptRW.positionPreviousTransform,
-      ptRW.positionCurrentTransform,
-      stepDelta
-    );
+    Vector3.lerp(ptRW.positionPreviousTransform, ptRW.positionCurrentTransform, stepDelta, curTransformPos);
     const blend = smoothStep(0, 1, Math.max(ptR.forceFadeRatio, blendRatio));
-    ptRW.positionToTransform = Vector3.lerp(ptRW.positionCurrent, curTransformPos, blend);
+    Vector3.lerp(ptRW.positionCurrent, curTransformPos, blend, ptRW.positionToTransform);
 
     if (isFakeWave && ptR.child === -1 && ptR.parent !== -1) {
       const A = pointsRW[ptR.parent].positionToTransform;
       const B = ptRW.positionToTransform;
-      const mAxis = Matrix4x4.lookAt(A, B, Vector3.axisPY());
+      const mAxis = Matrix4x4.lookAt(A, B, AXIS_Y);
       // Column 1 = up axis of the look-at matrix
       const col1 = mAxis.getCol(1).xyz();
-      ptRW.fakeWindDirection = Vector3.lerp(ptRW.fakeWindDirection, col1, 0.5);
+      Vector3.lerp(ptRW.fakeWindDirection, col1, 0.5, ptRW.fakeWindDirection);
 
       freq += ptR.fakeWaveFreq;
       const power = Math.sin(freq) * fakeWavePower * ptR.fakeWavePower;
-      ptRW.positionToTransform = Vector3.add(
-        ptRW.positionToTransform,
-        Vector3.scale(ptRW.fakeWindDirection, power)
-      );
+      Vector3.scale(ptRW.fakeWindDirection, power, fakeWindOffset);
+      Vector3.add(ptRW.positionToTransform, fakeWindOffset, ptRW.positionToTransform);
     }
 
     positionsToTransform[index] = ptRW.positionToTransform.clone();
