@@ -121,7 +121,7 @@ export function createClothGridDemo(scene: Scene): ClothGridDemo {
   const boneNodes: BoneNode[] = allBones.map((b, i) => {
     const wp = new Vector3();
     b.getWorldPosition(wp);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     const row = i % ROWS;
     return {
       index: i,

@@ -193,7 +193,8 @@ export function createBarrelClothDemo(scene: Scene): BarrelClothDemo {
       collideStructuralHorizontal: true,
       collideShear: true,
       enableSurfaceCollision: false
-    }
+    },
+    enableBroadPhase: true
   };
 
   const controller = new SPCRJointDynamicsController(config);

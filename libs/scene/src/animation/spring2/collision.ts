@@ -114,7 +114,12 @@ const _triangleU = new Vector3();
 const _triangleV = new Vector3();
 const _triangleW = new Vector3();
 
-function writeCollisionResult(out: CollisionResult | undefined, hit: boolean, point: Vector3, copyPoint: boolean) {
+function writeCollisionResult(
+  out: CollisionResult | undefined,
+  hit: boolean,
+  point: Vector3,
+  copyPoint: boolean
+) {
   if (!out) {
     return { hit, point: copyPoint ? point.clone() : point };
   }
@@ -398,7 +403,13 @@ export function collisionDetectionCapsule(
   }
 
   const tail = Vector3.add(capsulePos, capsuleDir, _collisionCapsuleTail);
-  res = collisionDetectionSphere(tail, colRW.radius * colR.radiusTailScale, point1, point2, _collisionCapsuleTempLineResult);
+  res = collisionDetectionSphere(
+    tail,
+    colRW.radius * colR.radiusTailScale,
+    point1,
+    point2,
+    _collisionCapsuleTempLineResult
+  );
   if (res.hit) {
     return writeLineCollisionResult(out, true, res.pointOnLine, res.pointOnCollider, res.radius, !out);
   }
