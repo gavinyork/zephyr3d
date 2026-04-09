@@ -312,10 +312,40 @@ function serializeColliderConfig(colliders) {
   );
 }
 
+function serializeSharedHierarchyColliders(host) {
+  const entries = [];
+  host?.iterate?.((node) => {
+    const collider = node?.metaData?.springCollider;
+    if (!collider || typeof collider !== 'object') {
+      return false;
+    }
+    if (collider.type !== 'sphere' && collider.type !== 'capsule') {
+      return false;
+    }
+    entries.push(
+      JSON.stringify({
+        id: String(node?.persistentId || ''),
+        type: collider.type,
+        enabled: collider.enabled !== false,
+        offset: Array.isArray(collider.offset) ? collider.offset.map((v) => Number(v) || 0) : [0, 0, 0],
+        endOffset:
+          collider.type === 'capsule' && Array.isArray(collider.endOffset)
+            ? collider.endOffset.map((v) => Number(v) || 0)
+            : [0, 0.2, 0],
+        radius: readNumber(collider.radius, collider.type === 'capsule' ? 0.1 : 0.15)
+      })
+    );
+    return false;
+  });
+  entries.sort();
+  return JSON.stringify(entries);
+}
+
 function buildStructureSignature(host, config) {
   return JSON.stringify({
     primitiveId: Number(host?.primitive?.id) || 0,
     vertexPinWeightsByTarget: getVertexWeightSource(config, host),
+    sharedSpringColliders: serializeSharedHierarchyColliders(host),
     maxNeighbors: Number(config?.maxNeighbors) || 8,
     maxTrianglesPerVertex: Number(config?.maxTrianglesPerVertex) || 16,
     workgroupSize: Number(config?.workgroupSize) || 64,
@@ -339,6 +369,53 @@ function buildRuntimeSignature(config) {
 
 function buildColliders(host, config) {
   const colliders = [];
+  host?.iterate?.((node) => {
+    const springCollider = node?.metaData?.springCollider;
+    if (!springCollider || typeof springCollider !== 'object') {
+      return false;
+    }
+    if (springCollider.type === 'sphere') {
+      const collider = createSphereCollider(
+        Array.isArray(springCollider.offset)
+          ? new Vector3(
+              readNumber(springCollider.offset[0], 0),
+              readNumber(springCollider.offset[1], 0),
+              readNumber(springCollider.offset[2], 0)
+            )
+          : Vector3.zero(),
+        Math.max(0, readNumber(springCollider.radius, 0.15)),
+        node
+      );
+      collider.enabled = springCollider.enabled !== false;
+      collider.localRadiusScaleRef = 1;
+      colliders.push(collider);
+    } else if (springCollider.type === 'capsule') {
+      const startOffset = Array.isArray(springCollider.offset)
+        ? new Vector3(
+            readNumber(springCollider.offset[0], 0),
+            readNumber(springCollider.offset[1], 0),
+            readNumber(springCollider.offset[2], 0)
+          )
+        : Vector3.zero();
+      const endOffset = Array.isArray(springCollider.endOffset)
+        ? new Vector3(
+            readNumber(springCollider.endOffset[0], 0),
+            readNumber(springCollider.endOffset[1], 0.2),
+            readNumber(springCollider.endOffset[2], 0)
+          )
+        : new Vector3(0, 0.2, 0);
+      const collider = createCapsuleCollider(
+        startOffset,
+        endOffset,
+        Math.max(0, readNumber(springCollider.radius, 0.1)),
+        node
+      );
+      collider.enabled = springCollider.enabled !== false;
+      collider.localRadiusScaleRef = 1;
+      colliders.push(collider);
+    }
+    return false;
+  });
   const scope =
     (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
     host?.scene?.rootNode ||
@@ -651,10 +728,40 @@ function serializeClothColliderConfig(colliders: any[]) {
   );
 }
 
-function buildClothStructureSignature(host: any, config: any) {
+function serializeSharedClothHierarchyColliders(host: any) {
+  const entries: string[] = [];
+  host?.iterate?.((node: any) => {
+    const collider = node?.metaData?.springCollider;
+    if (!collider || typeof collider !== 'object') {
+      return false;
+    }
+    if (collider.type !== 'sphere' && collider.type !== 'capsule') {
+      return false;
+    }
+    entries.push(
+      JSON.stringify({
+        id: String(node?.persistentId ?? ''),
+        type: collider.type,
+        enabled: collider.enabled !== false,
+        offset: Array.isArray(collider.offset) ? collider.offset.map((v: any) => Number(v) || 0) : [0, 0, 0],
+        endOffset:
+          collider.type === 'capsule' && Array.isArray(collider.endOffset)
+            ? collider.endOffset.map((v: any) => Number(v) || 0)
+            : [0, 0.2, 0],
+        radius: readClothNumber(collider.radius, collider.type === 'capsule' ? 0.1 : 0.15)
+      })
+    );
+    return false;
+  });
+  entries.sort();
+  return JSON.stringify(entries);
+}
+
+function buildClothStructureSignature(scopeHost: any, target: any, config: any) {
   return JSON.stringify({
-    primitiveId: Number(host?.primitive?.id) || 0,
-    vertexPinWeightsByTarget: getClothVertexWeightSource(config, host),
+    primitiveId: Number(target?.primitive?.id) || 0,
+    vertexPinWeightsByTarget: getClothVertexWeightSource(config, target),
+    sharedSpringColliders: serializeSharedClothHierarchyColliders(scopeHost),
     maxNeighbors: Math.max(1, Number(config?.maxNeighbors) || 8),
     maxTrianglesPerVertex: Math.max(1, Number(config?.maxTrianglesPerVertex) || 16),
     workgroupSize: Math.max(1, Number(config?.workgroupSize) || 64),
@@ -676,14 +783,61 @@ function buildClothRuntimeSignature(config: any) {
   });
 }
 
-function buildClothColliders(host: any, config: any) {
+function buildClothColliders(scopeHost: any, config: any) {
   const colliders = [];
+  scopeHost?.iterate?.((node: any) => {
+    const springCollider = node?.metaData?.springCollider;
+    if (!springCollider || typeof springCollider !== 'object') {
+      return false;
+    }
+    if (springCollider.type === 'sphere') {
+      const collider = createSphereCollider(
+        Array.isArray(springCollider.offset)
+          ? new Vector3(
+              readClothNumber(springCollider.offset[0], 0),
+              readClothNumber(springCollider.offset[1], 0),
+              readClothNumber(springCollider.offset[2], 0)
+            )
+          : Vector3.zero(),
+        Math.max(0, readClothNumber(springCollider.radius, 0.15)),
+        node
+      );
+      collider.enabled = springCollider.enabled !== false;
+      collider.localRadiusScaleRef = 1;
+      colliders.push(collider);
+    } else if (springCollider.type === 'capsule') {
+      const startOffset = Array.isArray(springCollider.offset)
+        ? new Vector3(
+            readClothNumber(springCollider.offset[0], 0),
+            readClothNumber(springCollider.offset[1], 0),
+            readClothNumber(springCollider.offset[2], 0)
+          )
+        : Vector3.zero();
+      const endOffset = Array.isArray(springCollider.endOffset)
+        ? new Vector3(
+            readClothNumber(springCollider.endOffset[0], 0),
+            readClothNumber(springCollider.endOffset[1], 0.2),
+            readClothNumber(springCollider.endOffset[2], 0)
+          )
+        : new Vector3(0, 0.2, 0);
+      const collider = createCapsuleCollider(
+        startOffset,
+        endOffset,
+        Math.max(0, readClothNumber(springCollider.radius, 0.1)),
+        node
+      );
+      collider.enabled = springCollider.enabled !== false;
+      collider.localRadiusScaleRef = 1;
+      colliders.push(collider);
+    }
+    return false;
+  });
   const scope =
-    (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
-    host?.scene?.rootNode ||
-    host;
+    (typeof scopeHost?.getPrefabNode === 'function' && scopeHost.getPrefabNode()) ||
+    scopeHost?.scene?.rootNode ||
+    scopeHost;
   for (const colliderConfig of config?.colliders ?? []) {
-    const attachNode = (colliderConfig?.bone && scope?.findNodeByName?.(colliderConfig.bone)) || host;
+    const attachNode = (colliderConfig?.bone && scope?.findNodeByName?.(colliderConfig.bone)) || scopeHost;
     let collider = null;
     if (colliderConfig?.type === 'capsule') {
       collider = createCapsuleCollider(
@@ -1171,7 +1325,7 @@ export class Engine {
     const runtimeSignature = buildClothRuntimeSignature(config);
     for (const target of targets) {
       const state = ensureBuiltinClothState(target);
-      const structureSignature = buildClothStructureSignature(target, config);
+      const structureSignature = buildClothStructureSignature(host, target, config);
       if (!state.cloth || structureSignature !== state.structureSignature) {
         if (!state.rebuilding) {
           state.rebuilding = true;
@@ -1200,7 +1354,7 @@ export class Engine {
       return;
     }
     const state = ensureBuiltinClothState(target);
-    const structureSignature = buildClothStructureSignature(target, config);
+    const structureSignature = buildClothStructureSignature(host, target, config);
     if (state.cloth && structureSignature === state.structureSignature) {
       this.applyBuiltinClothRuntimeConfig(host, target);
       return;
@@ -1218,7 +1372,7 @@ export class Engine {
         maxTrianglesPerVertex: Math.max(1, Number(config.maxTrianglesPerVertex) || 16),
         rebuildNormals: config.rebuildNormals !== false,
         pinnedVertexWeights: parseClothPinnedVertexIndices(config, target),
-        colliders: buildClothColliders(target, config),
+        colliders: buildClothColliders(host, config),
         autoUpdate: config.autoUpdate !== false,
         device: getDevice()
       });
@@ -1248,7 +1402,7 @@ export class Engine {
     cloth.damping = readClothNumber(config.damping, 0.995);
     cloth.stiffness = readClothNumber(config.stiffness, 0.3);
     cloth.solverIterations = Math.max(1, Number(config.solverIterations) || 5);
-    cloth.colliders = buildClothColliders(target, config);
+    cloth.colliders = buildClothColliders(host, config);
     cloth.bindToScene(config.autoUpdate === false ? null : target.scene || host.scene || null);
     state.runtimeSignature = buildClothRuntimeSignature(config);
   }

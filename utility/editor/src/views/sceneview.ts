@@ -2114,6 +2114,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
     return /(^|\/)springtest(\.ts|\.js)?$/.test(normalized);
   }
+  private isGPUClothScript(script: string): boolean {
+    const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
+    return /(^|\/)gpucloth(\.ts|\.js)?$/.test(normalized);
+  }
   private findSpringHost(startNode: SceneNode): Nullable<SceneNode> {
     let current: Nullable<SceneNode> = startNode;
     while (current) {
@@ -2124,12 +2128,24 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     return null;
   }
+  private findClothHost(startNode: SceneNode): Nullable<SceneNode> {
+    let current: Nullable<SceneNode> = startNode;
+    while (current) {
+      if (this.isGPUClothScript((current as any).script ?? '')) {
+        return current;
+      }
+      current = current.parent;
+    }
+    return null;
+  }
   private handleAddSpringCollider(node: SceneNode, type: SpringColliderKind) {
     const springHost = this.findSpringHost(node);
-    if (!springHost) {
+    const clothHost = this.findClothHost(node);
+    const sharedColliderHost = springHost ?? clothHost;
+    if (!sharedColliderHost) {
       DlgMessage.messageBox(
-        'Spring Collider',
-        'No spring script host found in this bone hierarchy. Please attach Spring Test script first.'
+        'Shared Collider',
+        'No Spring Test or GPU Cloth script host found in this hierarchy. Please attach one first.'
       );
       return;
     }
