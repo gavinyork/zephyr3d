@@ -2,10 +2,10 @@
 
 import { InterpolatorScalar } from '@zephyr3d/base';
 import type { BoneNode, ColliderR, GrabberR, Scene } from '@zephyr3d/scene';
+import { SpringSystem2 } from '@zephyr3d/scene';
 import { BoxShape, CapsuleShape, LambertMaterial, Mesh, SceneNode, SphereShape } from '@zephyr3d/scene';
-import { SPCRJointDynamicsController, type ControllerConfig, type PhysicsCurves } from '@zephyr3d/scene';
+import { type ControllerConfig, type PhysicsCurves } from '@zephyr3d/scene';
 import { createTransformAccess } from './three-bridge';
-import { buildConstraints } from '@zephyr3d/scene';
 import { Vector3 } from '@zephyr3d/base';
 
 function defaultCurves(): PhysicsCurves {
@@ -39,15 +39,15 @@ export interface ClothGridDemo {
   bones: SceneNode[];
   colliderObj: SceneNode;
   grabberObj: SceneNode;
-  controller: SPCRJointDynamicsController;
+  springSystem: SpringSystem2;
   rootPoints: BoneNode[];
-  constraints: ReturnType<typeof buildConstraints>;
+  //constraints: ReturnType<typeof buildConstraints>;
   collidersR: ColliderR[];
   /** Indices of the top-row fixed points (one per column) */
   fixedIndices: number[];
   cols: number;
   rows: number;
-  update: (time: number) => void;
+  update: (time: number, dt: number) => void;
 }
 
 export function createClothGridDemo(scene: Scene): ClothGridDemo {
@@ -65,7 +65,6 @@ export function createClothGridDemo(scene: Scene): ClothGridDemo {
   const boneMat = new LambertMaterial();
   const boneGeo = new BoxShape({ size: 0.1 });
 
-  let globalIndex = 0;
   for (let col = 0; col < COLS; col++) {
     const chain: SceneNode[] = [];
     for (let row = 0; row < ROWS; row++) {
@@ -81,8 +80,6 @@ export function createClothGridDemo(scene: Scene): ClothGridDemo {
       mesh.parent = bone;
       chain.push(bone);
       allBones.push(bone);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      globalIndex++;
     }
     boneGrid.push(chain);
   }
@@ -184,25 +181,23 @@ export function createClothGridDemo(scene: Scene): ClothGridDemo {
     }
   };
 
-  const controller = new SPCRJointDynamicsController(config);
-
-  const pointTransforms = allBones.map((b) => createTransformAccess(b));
-  const rootTA = createTransformAccess(group);
   const colliderTAs = colliderNodes.map((node) => createTransformAccess(node));
   const grabberTA = createTransformAccess(grabberObj);
 
-  controller.initialize(
-    rootTA,
-    rootPoints,
-    pointTransforms,
+  const springSystem = new SpringSystem2(
+    config,
+    {
+      systemRoot: group,
+      chains: boneGrid.map((chain) => ({ start: chain[0], end: chain[chain.length - 1] }))
+    },
     collidersR.map((r, index) => ({ r, transform: colliderTAs[index] })),
     [{ r: grabbersR[0], transform: grabberTA, enabled: false }],
     [{ up: new Vector3(0, 1, 0), position: new Vector3(0, 0, 0) }] // floor at y=0
   );
 
-  const constraints = buildConstraints(rootPoints, config.constraintOptions);
+  //const constraints = buildConstraints(rootPoints, config.constraintOptions);
 
-  const update = (time: number) => {
+  const update = (time: number, dt: number) => {
     colliderNodes[0].position.y = 0.8 + Math.sin(time * 1.5) * 0.5;
     colliderNodes[0].position.z = 0.15 + Math.sin(time * 0.7) * 0.2;
     colliderNodes[1].position.x = -0.35 + Math.sin(time * 0.9) * 0.18;
@@ -211,6 +206,8 @@ export function createClothGridDemo(scene: Scene): ClothGridDemo {
     colliderNodes[2].position.z = 0.2 + Math.sin(time * 1.6) * 0.16;
     colliderNodes[3].position.y = 1.2 + Math.sin(time * 1.8) * 0.18;
     colliderNodes[3].position.z = -0.25 + Math.cos(time * 0.8) * 0.14;
+
+    springSystem.update(dt);
   };
 
   // Fixed point indices: first bone (row=0) of each column
@@ -221,9 +218,9 @@ export function createClothGridDemo(scene: Scene): ClothGridDemo {
     bones: allBones,
     colliderObj,
     grabberObj,
-    controller,
+    springSystem,
     rootPoints,
-    constraints,
+    //constraints,
     collidersR,
     fixedIndices,
     cols: COLS,

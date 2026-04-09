@@ -29,6 +29,7 @@ let elapsed = 0;
 const scene = new Scene();
 const camera = new PerspectiveCamera(scene, Math.PI / 3, 0.1, 100);
 camera.position.setXYZ(0, 1.5, 3);
+camera.TAA = true;
 scene.mainCamera = camera;
 
 camera.controller = new OrbitCameraController({
@@ -86,7 +87,7 @@ function clearDemos() {
 function activateChain() {
   clearDemos();
   chainDemo = createBoneChainDemo(scene);
-  chainDemo.controller.warp();
+  chainDemo.springSystem.controller.warp();
   activeDemo = 'chain';
 
   const fixedSet = new Set<number>();
@@ -170,20 +171,20 @@ btnBroadPhase.addEventListener('click', () => {
 });
 btnReset.addEventListener('click', () => {
   if (chainDemo) {
-    chainDemo.controller.reset();
+    chainDemo.springSystem.controller.reset();
   }
   if (clothDemo) {
-    clothDemo.controller.reset();
+    clothDemo.springSystem.controller.reset();
     // Re-fix all top-row points
     for (const idx of clothDemo.fixedIndices) {
-      clothDemo.controller.fixPoint(idx);
+      clothDemo.springSystem.controller.fixPoint(idx);
     }
     nextReleaseCol = 0;
   }
   if (barrelDemo) {
-    barrelDemo.controller.reset();
+    barrelDemo.springSystem.controller.reset();
     for (const idx of barrelDemo.fixedIndices) {
-      barrelDemo.controller.fixPoint(idx);
+      barrelDemo.springSystem.controller.fixPoint(idx);
     }
     nextReleaseCol = 0;
   }
@@ -198,7 +199,7 @@ btnReleaseOne.addEventListener('click', () => {
   }
   if (nextReleaseCol < demo.cols) {
     const idx = demo.fixedIndices[nextReleaseCol];
-    demo.controller.releasePoint(idx);
+    demo.springSystem.controller.releasePoint(idx);
     nextReleaseCol++;
     updateStatus();
   }
@@ -210,7 +211,7 @@ btnReleaseAll.addEventListener('click', () => {
     return;
   }
   for (const idx of demo.fixedIndices) {
-    demo.controller.releasePoint(idx);
+    demo.springSystem.controller.releasePoint(idx);
   }
   nextReleaseCol = demo.cols;
   updateStatus();
@@ -222,7 +223,7 @@ btnFixAll.addEventListener('click', () => {
     return;
   }
   for (const idx of demo.fixedIndices) {
-    demo.controller.fixPoint(idx);
+    demo.springSystem.controller.fixPoint(idx);
   }
   nextReleaseCol = 0;
   updateStatus();
@@ -232,7 +233,7 @@ function updateStatus() {
   const demo = activeDemo === 'cloth' ? clothDemo : activeDemo === 'barrel' ? barrelDemo : null;
   if (demo) {
     const states = demo.fixedIndices.map((idx, col) => {
-      const fixed = demo!.controller.isPointFixed(idx);
+      const fixed = demo!.springSystem.controller.isPointFixed(idx);
       return `Col${col}: ${fixed ? 'Fixed' : 'Free'}`;
     });
     statusDiv.textContent = `Top row: ${states.join('  |  ')} | Colliders: ${demo.collidersR.length} | Broad-Phase: ${broadPhaseEnabled ? 'On' : 'Off'}`;
@@ -270,13 +271,13 @@ function getActiveGrabber(): SceneNode | null {
 
 function getActiveController() {
   if (activeDemo === 'chain' && chainDemo) {
-    return chainDemo.controller;
+    return chainDemo.springSystem.controller;
   }
   if (activeDemo === 'cloth' && clothDemo) {
-    return clothDemo.controller;
+    return clothDemo.springSystem.controller;
   }
   if (activeDemo === 'barrel' && barrelDemo) {
-    return barrelDemo.controller;
+    return barrelDemo.springSystem.controller;
   }
   return null;
 }
@@ -381,24 +382,21 @@ function tick(dt: number) {
   elapsed += dt;
 
   const wind = windEnabled
-    ? new Vector3(Math.sin(elapsed * 2) * 32, 0, Math.cos(elapsed * 1.3) * 21.5)
+    ? new Vector3(Math.sin(elapsed * 2) * 80, 0, Math.cos(elapsed * 1.3) * 60)
     : Vector3.zero();
 
   if (activeDemo === 'chain' && chainDemo) {
-    chainDemo.update(elapsed);
-    chainDemo.controller.setWindForce(wind);
-    chainDemo.controller.step(dt);
+    chainDemo.springSystem.controller.setWindForce(wind);
+    chainDemo.update(elapsed, dt);
   }
 
   if (activeDemo === 'cloth' && clothDemo) {
-    clothDemo.update(elapsed);
-    clothDemo.controller.setWindForce(wind);
-    clothDemo.controller.step(dt);
+    clothDemo.springSystem.controller.setWindForce(wind);
+    clothDemo.update(elapsed, dt);
   }
 
   if (activeDemo === 'barrel' && barrelDemo) {
-    barrelDemo.update(elapsed);
-    barrelDemo.controller.setWindForce(wind);
-    barrelDemo.controller.step(dt);
+    barrelDemo.springSystem.controller.setWindForce(wind);
+    barrelDemo.update(elapsed, dt);
   }
 }

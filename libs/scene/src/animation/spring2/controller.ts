@@ -108,7 +108,7 @@ export interface ControllerConfig {
   constraintOptions: ConstraintBuildOptions;
 }
 
-export class SPCRJointDynamicsController {
+export class SpringSystemController {
   private _config: ControllerConfig;
   private _pointsR: PointR[] = [];
   private _pointsRW: PointRW[] = [];

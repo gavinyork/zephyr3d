@@ -6,3 +6,4 @@ export * from './collision';
 export * from './solver';
 export * from './constraints';
 export * from './controller';
+export * from './spring_system';

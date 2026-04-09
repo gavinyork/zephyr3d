@@ -2,9 +2,9 @@
 
 import { InterpolatorScalar } from '@zephyr3d/base';
 import type { BoneNode, ColliderR, GrabberR, Scene } from '@zephyr3d/scene';
+import { SpringSystem2 } from '@zephyr3d/scene';
 import { LambertMaterial, Mesh, SceneNode, SphereShape } from '@zephyr3d/scene';
-import { SPCRJointDynamicsController, type ControllerConfig, type PhysicsCurves } from '@zephyr3d/scene';
-import { buildConstraints } from '@zephyr3d/scene';
+import { type ControllerConfig, type PhysicsCurves } from '@zephyr3d/scene';
 import { createTransformAccess } from './three-bridge';
 import { Vector3 } from '@zephyr3d/base';
 
@@ -39,18 +39,17 @@ export interface BoneChainDemo {
   bones: SceneNode[];
   colliderObj: SceneNode;
   grabberObj: SceneNode;
-  controller: SPCRJointDynamicsController;
+  springSystem: SpringSystem2;
   rootPoints: BoneNode[];
-  constraints: ReturnType<typeof buildConstraints>;
   collidersR: ColliderR[];
-  update: (time: number) => void;
+  update: (time: number, dt: number) => void;
 }
 
 export function createBoneChainDemo(scene: Scene): BoneChainDemo {
   const BONE_COUNT = 8;
   const BONE_SPACING = 0.2;
 
-  // Create bone hierarchy as Three.js objects
+  // Create bone hierarchy
   const root = new SceneNode(scene);
   root.position.setXYZ(0, 2, 0);
 
@@ -149,29 +148,18 @@ export function createBoneChainDemo(scene: Scene): BoneChainDemo {
     }
   };
 
-  const controller = new SPCRJointDynamicsController(config);
-
-  const pointTransforms = allBones.map((b) => createTransformAccess(b));
-  const rootTA = createTransformAccess(root);
-  const colliderTA = createTransformAccess(colliderObj);
-  const grabberTA = createTransformAccess(grabberObj);
-
-  controller.initialize(
-    rootTA,
-    rootPoints,
-    pointTransforms,
-    [{ r: collidersR[0], transform: colliderTA }],
-    [{ r: grabbersR[0], transform: grabberTA, enabled: false }],
-    [{ up: new Vector3(0, 1, 0), position: new Vector3(0, 0, 0) }] // floor at y=0
+  const springSystem = new SpringSystem2(
+    config,
+    { systemRoot: root, chains: [{ start: root, end: bones[bones.length - 1] }] },
+    [{ r: collidersR[0], transform: createTransformAccess(colliderObj) }],
+    [{ r: grabbersR[0], transform: createTransformAccess(grabberObj), enabled: false }],
+    [{ up: new Vector3(0, 1, 0), position: new Vector3(0, 0, 0) }]
   );
-
-  // Get constraints for debug rendering
-  const constraints = buildConstraints(rootPoints, config.constraintOptions);
-
-  const update = (time: number) => {
+  const update = (time: number, dt: number) => {
     // Oscillate root
     root.position.x = Math.sin(time * 2) * 0.5;
     root.position.y = 2 + Math.sin(time * 1.5) * 0.1;
+    springSystem.update(dt);
   };
 
   return {
@@ -179,9 +167,8 @@ export function createBoneChainDemo(scene: Scene): BoneChainDemo {
     bones,
     colliderObj,
     grabberObj,
-    controller,
+    springSystem,
     rootPoints,
-    constraints,
     collidersR,
     update
   };

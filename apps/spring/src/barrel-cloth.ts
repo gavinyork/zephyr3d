@@ -7,17 +7,17 @@
 
 import { InterpolatorScalar, Quaternion } from '@zephyr3d/base';
 import type { BoneNode, ColliderR, GrabberR, Scene } from '@zephyr3d/scene';
+import { SpringSystem2 } from '@zephyr3d/scene';
 import {
   CapsuleShape,
   LambertMaterial,
   Mesh,
-  SPCRJointDynamicsController,
   SphereShape,
   type ControllerConfig,
   type PhysicsCurves
 } from '@zephyr3d/scene';
 import { createTransformAccess } from './three-bridge';
-import { buildConstraints, SceneNode } from '@zephyr3d/scene';
+import { /*buildConstraints, */ SceneNode } from '@zephyr3d/scene';
 import { Vector3 } from '@zephyr3d/base';
 
 function defaultCurves(): PhysicsCurves {
@@ -56,14 +56,14 @@ export interface BarrelClothDemo {
   bones: SceneNode[];
   colliderObj: SceneNode;
   grabberObj: SceneNode;
-  controller: SPCRJointDynamicsController;
+  springSystem: SpringSystem2;
   rootPoints: BoneNode[];
-  constraints: ReturnType<typeof buildConstraints>;
+  //constraints: ReturnType<typeof buildConstraints>;
   collidersR: ColliderR[];
   fixedIndices: number[];
   cols: number;
   rows: number;
-  update: (time: number) => void;
+  update: (time: number, dt: number) => void;
 }
 
 export function createBarrelClothDemo(scene: Scene): BarrelClothDemo {
@@ -75,7 +75,6 @@ export function createBarrelClothDemo(scene: Scene): BarrelClothDemo {
   const WAIST_Y = 2.0;
 
   const group = new SceneNode(scene);
-  group.name = 'BarrelClothDemo_root';
   group.position.setXYZ(0, WAIST_Y, 0);
 
   // Bone grid with cone-shaped initial layout.
@@ -197,34 +196,34 @@ export function createBarrelClothDemo(scene: Scene): BarrelClothDemo {
     enableBroadPhase: true
   };
 
-  const controller = new SPCRJointDynamicsController(config);
-
-  const pointTransforms = allBones.map((b) => createTransformAccess(b));
-  const rootTA = createTransformAccess(group);
   const colliderTA = createTransformAccess(colliderObj);
   const grabberTA = createTransformAccess(grabberObj);
 
-  controller.initialize(
-    rootTA,
-    rootPoints,
-    pointTransforms,
+  const springSystem = new SpringSystem2(
+    config,
+    {
+      systemRoot: group,
+      chains: boneGrid.map((chain) => ({ start: chain[0], end: chain[chain.length - 1] }))
+    },
     [{ r: collidersR[0], transform: colliderTA }],
     [{ r: grabbersR[0], transform: grabberTA, enabled: false }],
     [{ up: new Vector3(0, 1, 0), position: new Vector3(0, 0, 0) }]
   );
 
-  const constraints = buildConstraints(rootPoints, config.constraintOptions);
+  //const constraints = buildConstraints(rootPoints, config.constraintOptions);
 
   const fixedIndices = Array.from({ length: COLS }, (_, col) => col * ROWS);
 
   // Graceful hip sway — slow and smooth so the cloth drapes, not bounces
-  const update = (time: number) => {
+  const update = (time: number, dt: number) => {
     group.position.x = Math.sin(time * 1.5) * 0.25;
     group.position.z = Math.sin(time * 0.8) * 0.15;
     group.rotation = Quaternion.fromAxisAngle(Vector3.axisPY(), time * 2.4);
     //group.position.y = WAIST_Y - BODY_HEIGHT * 0.5 + (Math.sin(time * 6) * 0.5 + 0.5) * 0.8;
     colliderObj.position.x = group.position.x;
     colliderObj.position.z = group.position.z;
+
+    springSystem.update(dt);
   };
 
   return {
@@ -232,9 +231,9 @@ export function createBarrelClothDemo(scene: Scene): BarrelClothDemo {
     bones: allBones,
     colliderObj,
     grabberObj,
-    controller,
+    springSystem,
     rootPoints,
-    constraints,
+    //constraints,
     collidersR,
     fixedIndices,
     cols: COLS,
