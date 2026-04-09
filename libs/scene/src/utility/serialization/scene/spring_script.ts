@@ -62,11 +62,6 @@ export class SpringScriptConfig {
   maxPoseOffset: number;
   maxPoseOffsetRoot: number;
   maxPoseOffsetTip: number;
-  // legacy single sphere collider fields (kept for backward compatibility)
-  colliderOffsetX: number;
-  colliderOffsetY: number;
-  colliderOffsetZ: number;
-  colliderRadius: number;
   modifierWeight: number;
   chains: SpringBoneChainConfig[];
   colliders: SpringColliderConfig[];
@@ -89,10 +84,6 @@ export class SpringScriptConfig {
     this.maxPoseOffset = 0.3;
     this.maxPoseOffsetRoot = 0.2;
     this.maxPoseOffsetTip = 0.4;
-    this.colliderOffsetX = 0;
-    this.colliderOffsetY = 1.5;
-    this.colliderOffsetZ = 0;
-    this.colliderRadius = 0.15;
     this.modifierWeight = 1;
     this.chains = defaultSpringChains();
     this.colliders = [];
@@ -579,36 +570,6 @@ export function getSpringScriptConfigClass(): SerializableClass {
           },
           create() {
             return new SpringColliderConfig();
-          }
-        },
-        {
-          name: 'ColliderOffset',
-          type: 'vec3',
-          isHidden() {
-            return true;
-          },
-          get(this: SpringScriptConfig, value) {
-            value.num[0] = this.colliderOffsetX;
-            value.num[1] = this.colliderOffsetY;
-            value.num[2] = this.colliderOffsetZ;
-          },
-          set(this: SpringScriptConfig, value) {
-            this.colliderOffsetX = value.num[0];
-            this.colliderOffsetY = value.num[1];
-            this.colliderOffsetZ = value.num[2];
-          }
-        },
-        {
-          name: 'ColliderRadius',
-          type: 'float',
-          isHidden() {
-            return true;
-          },
-          get(this: SpringScriptConfig, value) {
-            value.num[0] = this.colliderRadius;
-          },
-          set(this: SpringScriptConfig, value) {
-            this.colliderRadius = value.num[0];
           }
         }
       ]);

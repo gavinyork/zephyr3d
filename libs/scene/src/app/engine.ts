@@ -176,15 +176,6 @@ export default class extends RuntimeScript {
             springSystem.addCollider(collider);
           }
         }
-      } else {
-        // Legacy fallback: keep old single-sphere config working.
-        springSystem.addCollider(
-          createSphereCollider(
-            new Vector3(config.colliderOffsetX, config.colliderOffsetY, config.colliderOffsetZ),
-            config.colliderRadius,
-            root
-          )
-        );
       }
       const springModifier = new SpringModifier(springSystem, config.modifierWeight);
       skeleton.modifiers.push(springModifier);
@@ -1218,14 +1209,6 @@ export class Engine {
             springSystem.addCollider(collider);
           }
         }
-      } else {
-        springSystem.addCollider(
-          createSphereCollider(
-            new Vector3(config.colliderOffsetX, config.colliderOffsetY, config.colliderOffsetZ),
-            config.colliderRadius,
-            root
-          )
-        );
       }
       const springModifier = new SpringModifier(springSystem, config.modifierWeight);
       skeleton.modifiers.push(springModifier);
