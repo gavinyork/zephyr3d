@@ -44,6 +44,12 @@ function isBuiltinGPUClothScript(script: string) {
   return normalized === BUILTIN_GPU_CLOTH_SCRIPT || normalized === `${BUILTIN_GPU_CLOTH_SCRIPT}.js`;
 }
 
+function ensureDefaultClothScriptConfig(node: SceneNode, reset = false) {
+  if (reset || !(node.scriptConfig instanceof ClothScriptConfig)) {
+    node.scriptConfig = new ClothScriptConfig();
+  }
+}
+
 function normalizeSerializedSceneNodeData(data: DiffValue): Record<string, unknown> {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return {
@@ -536,11 +542,12 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
             value.str[0] = this.script;
           },
           set(this: SceneNode, value) {
+            const wasGPUCloth = isGPUClothScript(this.script);
             this.script = value?.str?.[0] ?? '';
             if (isSpringTestScript(this.script) && !(this.scriptConfig instanceof SpringScriptConfig)) {
               this.scriptConfig = new SpringScriptConfig();
-            } else if (isGPUClothScript(this.script) && !(this.scriptConfig instanceof ClothScriptConfig)) {
-              this.scriptConfig = new ClothScriptConfig();
+            } else if (isGPUClothScript(this.script)) {
+              ensureDefaultClothScriptConfig(this, !wasGPUCloth);
             }
           }
         },
@@ -564,12 +571,13 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           },
           set(this: SceneNode, value) {
             const selected = value?.str?.[0] ?? '';
+            const wasGPUCloth = isGPUClothScript(this.script);
             if (selected) {
               this.script = selected;
               if (isSpringTestScript(this.script) && !(this.scriptConfig instanceof SpringScriptConfig)) {
                 this.scriptConfig = new SpringScriptConfig();
-              } else if (isGPUClothScript(this.script) && !(this.scriptConfig instanceof ClothScriptConfig)) {
-                this.scriptConfig = new ClothScriptConfig();
+              } else if (isGPUClothScript(this.script)) {
+                ensureDefaultClothScriptConfig(this, !wasGPUCloth);
               }
             } else if (isBuiltinSpringTestScript(this.script) || isBuiltinGPUClothScript(this.script)) {
               this.script = '';
@@ -606,11 +614,14 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
             label: 'Parameters'
           },
           isValid(this: SceneNode) {
-            return this.isMesh() && isGPUClothScript(this.script);
+            return (
+              isGPUClothScript(this.script) &&
+              (this.isMesh() || hasMeshDescendants(this) || this.scriptConfig instanceof ClothScriptConfig)
+            );
           },
           get(this: SceneNode, value) {
             if (!(this.scriptConfig instanceof ClothScriptConfig)) {
-              this.scriptConfig = new ClothScriptConfig();
+              ensureDefaultClothScriptConfig(this, true);
             }
             value.object[0] = this.scriptConfig;
           },

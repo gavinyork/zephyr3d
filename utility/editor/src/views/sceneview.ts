@@ -53,7 +53,7 @@ import {
   NodeTransformCommand
 } from '../commands/scenecommands';
 import { NodeProxy } from '../helpers/proxy';
-import type { EditTool } from './edittools/edittool';
+import type { EditTool, EditToolContext } from './edittools/edittool';
 import { createEditTool, isObjectEditable } from './edittools/edittool';
 import { calcHierarchyBoundingBoxWorld } from '../helpers/misc';
 import { DialogRenderer } from '../components/modal';
@@ -134,6 +134,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _preferredTransformSpace: TransformSpace;
   private _suspendMultiPropertySync: boolean;
   private _syncedPropertySessions: Map<string, Map<SceneNode, SyncedPropertyRecord>>;
+  private readonly _editToolContext: EditToolContext;
   constructor(controller: SceneController) {
     super(controller);
     this._cmdManager = new CommandManager();
@@ -173,6 +174,24 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._preferredTransformSpace = 'world';
     this._suspendMultiPropertySync = false;
     this._syncedPropertySessions = new Map();
+    this._editToolContext = {
+      executeCommand: (command) => this._cmdManager.execute(command),
+      notifySceneChanged: () => eventBus.dispatchEvent('scene_changed'),
+      refreshProperties: () => this._propGrid.refresh(),
+      getCamera: () => this.controller.model.scene.mainCamera ?? null,
+      getViewportRect: () => {
+        const viewport = this.controller.model.scene.mainCamera?.viewport;
+        if (!viewport) {
+          return null;
+        }
+        return [
+          viewport[0],
+          getDevice().canvas.clientHeight - viewport[1] - viewport[3],
+          viewport[2],
+          viewport[3]
+        ];
+      }
+    };
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
       items: [
@@ -1485,10 +1504,19 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (!node) {
       return;
     }
-    if (!this._currentEditTool.get()) {
-      this._currentEditTool.set(createEditTool(this.editor, node));
-    } else {
+    const currentTool = this._currentEditTool.get();
+    if (!currentTool) {
+      this._currentEditTool.set(createEditTool(this.editor, node, this._editToolContext));
+      return;
+    }
+    const currentTarget = currentTool.getTarget();
+    const sameTarget =
+      currentTarget === node ||
+      (currentTarget instanceof SceneNode && currentTarget.isParentOf(node));
+    if (sameTarget) {
       this._currentEditTool.dispose();
+    } else {
+      this._currentEditTool.set(createEditTool(this.editor, node, this._editToolContext));
     }
   }
   private getSelectedSceneNodes() {
@@ -1889,6 +1917,15 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleHierarchySelectionChanged(_selectedNodes: SceneNode[], activeNode: Nullable<SceneNode>) {
     this._lastDuplicateTarget = 'scene';
     this._syncedPropertySessions.clear();
+    const editTarget = this._currentEditTool.get()?.getTarget();
+    if (
+      this._currentEditTool.get() &&
+      (!(editTarget instanceof SceneNode) ||
+        !activeNode ||
+        (editTarget !== activeNode && !editTarget.isParentOf(activeNode)))
+    ) {
+      this._currentEditTool.dispose();
+    }
     if (!activeNode) {
       this._postGizmoRenderer!.node = null;
       this.updateGizmoTransformSpace();

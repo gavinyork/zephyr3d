@@ -1,6 +1,5 @@
 import { defineProps, type SerializableClass } from '../types';
 
-export type ClothPinMode = 'auto' | 'manual';
 export type ClothColliderType = 'sphere' | 'capsule';
 
 export class ClothColliderConfig {
@@ -38,8 +37,8 @@ export class ClothScriptConfig {
   gravityY: number;
   gravityZ: number;
   solverIterations: number;
-  pinMode: ClothPinMode;
-  pinnedVertexIndices: string;
+  vertexPinWeightsByTarget: string;
+  pinnedVertexIndicesByTarget: string;
   maxNeighbors: number;
   maxTrianglesPerVertex: number;
   workgroupSize: number;
@@ -55,8 +54,8 @@ export class ClothScriptConfig {
     this.gravityY = -9.8;
     this.gravityZ = 0;
     this.solverIterations = 5;
-    this.pinMode = 'auto';
-    this.pinnedVertexIndices = '';
+    this.vertexPinWeightsByTarget = '';
+    this.pinnedVertexIndicesByTarget = '';
     this.maxNeighbors = 8;
     this.maxTrianglesPerVertex = 16;
     this.workgroupSize = 64;
@@ -211,37 +210,29 @@ export function getClothScriptConfigClass(): SerializableClass {
           }
         },
         {
-          name: 'PinMode',
+          name: 'VertexPinWeightsByTarget',
           type: 'string',
-          options: {
-            group: 'Pinning',
-            enum: {
-              labels: ['Auto Top Vertices', 'Manual Indices'],
-              values: ['auto', 'manual']
-            }
+          isHidden() {
+            return true;
           },
           get(this: ClothScriptConfig, value) {
-            value.str[0] = this.pinMode;
+            value.str[0] = this.vertexPinWeightsByTarget;
           },
           set(this: ClothScriptConfig, value) {
-            this.pinMode = (value.str[0] as ClothPinMode) ?? 'auto';
+            this.vertexPinWeightsByTarget = value.str[0] ?? '';
           }
         },
         {
-          name: 'PinnedVertexIndices',
+          name: 'PinnedVertexIndicesByTarget',
           type: 'string',
-          options: {
-            group: 'Pinning',
-            label: 'Pinned Vertices'
-          },
-          isValid(this: ClothScriptConfig) {
-            return this.pinMode === 'manual';
+          isHidden() {
+            return true;
           },
           get(this: ClothScriptConfig, value) {
-            value.str[0] = this.pinnedVertexIndices;
+            value.str[0] = this.pinnedVertexIndicesByTarget;
           },
           set(this: ClothScriptConfig, value) {
-            this.pinnedVertexIndices = value.str[0] ?? '';
+            this.pinnedVertexIndicesByTarget = value.str[0] ?? '';
           }
         },
         {

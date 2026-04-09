@@ -389,3 +389,47 @@ export class PropertyEditCommand extends Command {
     this._property.set?.call(this._target, clonePropertyValue(this._oldValue));
   }
 }
+
+export type ClothWeightState = {
+  vertexPinWeightsByTarget: string;
+  pinnedVertexIndicesByTarget: string;
+};
+
+function cloneClothWeightState(state: ClothWeightState): ClothWeightState {
+  return {
+    vertexPinWeightsByTarget: state?.vertexPinWeightsByTarget ?? '',
+    pinnedVertexIndicesByTarget: state?.pinnedVertexIndicesByTarget ?? ''
+  };
+}
+
+export class ClothWeightPaintCommand extends Command {
+  private readonly _scene: Scene;
+  private readonly _hostId: string;
+  private readonly _oldState: ClothWeightState;
+  private readonly _newState: ClothWeightState;
+  constructor(host: SceneNode, oldState: ClothWeightState, newState: ClothWeightState, desc = 'Paint cloth weights') {
+    super(desc);
+    this._scene = host.scene!;
+    this._hostId = getNodePath(host);
+    this._oldState = cloneClothWeightState(oldState);
+    this._newState = cloneClothWeightState(newState);
+  }
+  async execute() {
+    this.apply(this._newState);
+  }
+  async undo() {
+    this.apply(this._oldState);
+  }
+  private apply(state: ClothWeightState) {
+    const host = findNodeByPath(this._scene.rootNode, this._hostId);
+    if (!host) {
+      return;
+    }
+    const config = (((host as any).scriptConfig ??= {}) as {
+      vertexPinWeightsByTarget?: string;
+      pinnedVertexIndicesByTarget?: string;
+    });
+    config.vertexPinWeightsByTarget = state.vertexPinWeightsByTarget ?? '';
+    config.pinnedVertexIndicesByTarget = state.pinnedVertexIndicesByTarget ?? '';
+  }
+}

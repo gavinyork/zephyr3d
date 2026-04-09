@@ -192,18 +192,102 @@ import {
   createCapsuleCollider
 } from '@zephyr3d/scene';
 
-function parsePinnedVertexIndices(config) {
-  const pinMode = String(config?.pinMode || 'auto');
-  if (pinMode !== 'manual') {
+function parseTargetEncodedMap(source) {
+  const text = String(source || '').trim();
+  if (!text) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+    const result = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      result[key] = typeof value === 'string' ? value : String(value ?? '');
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+function parsePinnedVertexMap(config) {
+  const source = String(config?.vertexPinWeightsByTarget || '').trim();
+  if (!source) {
+    return {};
+  }
+  return parseTargetEncodedMap(source);
+}
+
+function getPinnedVertexSource(config, host) {
+  const hostId = String(host?.persistentId || '');
+  if (hostId) {
+    const byTarget = parsePinnedVertexMap(config);
+    if (Object.prototype.hasOwnProperty.call(byTarget, hostId)) {
+      return byTarget[hostId] || '';
+    }
+  }
+  return '';
+}
+
+function getLegacyPinnedVertexSource(config, host) {
+  const hostId = String(host?.persistentId || '');
+  if (hostId) {
+    const byTarget = parseTargetEncodedMap(config?.pinnedVertexIndicesByTarget);
+    if (Object.prototype.hasOwnProperty.call(byTarget, hostId)) {
+      return byTarget[hostId] || '';
+    }
+  }
+  return '';
+}
+
+function getVertexWeightSource(config, host) {
+  return getPinnedVertexSource(config, host) || getLegacyPinnedVertexSource(config, host);
+}
+
+function parsePinnedVertexIndices(config, host) {
+  const vertexCount = Math.max(0, Number(host?.primitive?.getNumVertices?.()) || 0);
+  if (vertexCount <= 0) {
     return undefined;
   }
-  const source = String(config?.pinnedVertexIndices || '');
-  const values = source
-    .split(/[^0-9]+/g)
-    .map((v) => Number(v))
-    .filter((v) => Number.isFinite(v) && v >= 0)
-    .map((v) => v | 0);
-  return values.length > 0 ? values : undefined;
+  const source = getPinnedVertexSource(config, host);
+  if (!source.trim()) {
+    const legacySource = getLegacyPinnedVertexSource(config, host);
+    if (!legacySource.trim()) {
+      return undefined;
+    }
+    const legacyWeights = new Float32Array(vertexCount);
+    const values = legacySource
+      .split(/[^0-9]+/g)
+      .filter((v) => v.length > 0)
+      .map((v) => Number(v))
+      .filter((v) => Number.isFinite(v) && v >= 0)
+      .map((v) => v | 0);
+    for (const index of values) {
+      if (index < vertexCount) {
+        legacyWeights[index] = 1;
+      }
+    }
+    return legacyWeights;
+  }
+  const weights = new Float32Array(vertexCount);
+  for (const token of source.split(',')) {
+    const entry = token.trim();
+    if (!entry) {
+      continue;
+    }
+    const separator = entry.indexOf(':');
+    if (separator < 0) {
+      continue;
+    }
+    const index = Number(entry.slice(0, separator).trim()) | 0;
+    const clothWeight = Math.min(Math.max(Number(entry.slice(separator + 1).trim()) || 0, 0), 1);
+    if (Number.isFinite(index) && index >= 0 && index < vertexCount) {
+      weights[index] = 1 - clothWeight;
+    }
+  }
+  return weights;
 }
 
 function readNumber(value, fallback) {
@@ -231,8 +315,7 @@ function serializeColliderConfig(colliders) {
 function buildStructureSignature(host, config) {
   return JSON.stringify({
     primitiveId: Number(host?.primitive?.id) || 0,
-    pinMode: String(config?.pinMode || 'auto'),
-    pinnedVertexIndices: String(config?.pinnedVertexIndices || ''),
+    vertexPinWeightsByTarget: getVertexWeightSource(config, host),
     maxNeighbors: Number(config?.maxNeighbors) || 8,
     maxTrianglesPerVertex: Number(config?.maxTrianglesPerVertex) || 16,
     workgroupSize: Number(config?.workgroupSize) || 64,
@@ -373,7 +456,7 @@ export default class extends RuntimeScript {
         workgroupSize: Math.max(1, Number(config.workgroupSize) || 64),
         maxTrianglesPerVertex: Math.max(1, Number(config.maxTrianglesPerVertex) || 16),
         rebuildNormals: config.rebuildNormals !== false,
-        pinnedVertexIndices: parsePinnedVertexIndices(config),
+        pinnedVertexWeights: parsePinnedVertexIndices(config, host),
         colliders: buildColliders(host, config),
         autoUpdate: config.autoUpdate !== false
       });
@@ -446,18 +529,104 @@ function isBuiltinGPUClothScript(script: string): boolean {
   return /(^|\/)gpucloth(\.ts|\.js)?$/.test(normalized);
 }
 
-function parseClothPinnedVertexIndices(config: any): number[] | undefined {
-  const pinMode = String(config?.pinMode || 'auto');
-  if (pinMode !== 'manual') {
+function parseClothTargetEncodedMap(source: unknown): Record<string, string> {
+  const text = String(source ?? '').trim();
+  if (!text) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+    const result: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof key === 'string') {
+        result[key] = typeof value === 'string' ? value : String(value ?? '');
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+function parseClothPinnedVertexMap(config: any): Record<string, string> {
+  const source = String(config?.vertexPinWeightsByTarget || '').trim();
+  if (!source) {
+    return {};
+  }
+  return parseClothTargetEncodedMap(source);
+}
+
+function getClothPinnedVertexSource(config: any, target?: any): string {
+  const targetId = String(target?.persistentId ?? '');
+  if (targetId) {
+    const byTarget = parseClothPinnedVertexMap(config);
+    if (Object.prototype.hasOwnProperty.call(byTarget, targetId)) {
+      return byTarget[targetId] ?? '';
+    }
+  }
+  return '';
+}
+
+function getClothLegacyPinnedVertexSource(config: any, target?: any): string {
+  const targetId = String(target?.persistentId ?? '');
+  if (targetId) {
+    const byTarget = parseClothTargetEncodedMap(config?.pinnedVertexIndicesByTarget);
+    if (Object.prototype.hasOwnProperty.call(byTarget, targetId)) {
+      return byTarget[targetId] ?? '';
+    }
+  }
+  return '';
+}
+
+function getClothVertexWeightSource(config: any, target?: any): string {
+  return getClothPinnedVertexSource(config, target) || getClothLegacyPinnedVertexSource(config, target);
+}
+
+function parseClothPinnedVertexIndices(config: any, target?: any): Float32Array<ArrayBuffer> | undefined {
+  const vertexCount = Math.max(0, Number(target?.primitive?.getNumVertices?.()) || 0);
+  if (vertexCount <= 0) {
     return undefined;
   }
-  const source = String(config?.pinnedVertexIndices || '');
-  const values = source
-    .split(/[^0-9]+/g)
-    .map((v) => Number(v))
-    .filter((v) => Number.isFinite(v) && v >= 0)
-    .map((v) => v | 0);
-  return values.length > 0 ? values : undefined;
+  const source = getClothPinnedVertexSource(config, target);
+  if (!source.trim()) {
+    const legacySource = getClothLegacyPinnedVertexSource(config, target);
+    if (!legacySource.trim()) {
+      return undefined;
+    }
+    const legacyWeights = new Float32Array(vertexCount);
+    const values = legacySource
+      .split(/[^0-9]+/g)
+      .filter((v) => v.length > 0)
+      .map((v) => Number(v))
+      .filter((v) => Number.isFinite(v) && v >= 0)
+      .map((v) => v | 0);
+    for (const index of values) {
+      if (index < vertexCount) {
+        legacyWeights[index] = 1;
+      }
+    }
+    return legacyWeights;
+  }
+  const weights = new Float32Array(vertexCount);
+  for (const token of source.split(',')) {
+    const entry = token.trim();
+    if (!entry) {
+      continue;
+    }
+    const separator = entry.indexOf(':');
+    if (separator < 0) {
+      continue;
+    }
+    const index = Number(entry.slice(0, separator).trim()) | 0;
+    const clothWeight = Math.min(Math.max(Number(entry.slice(separator + 1).trim()) || 0, 0), 1);
+    if (Number.isFinite(index) && index >= 0 && index < vertexCount) {
+      weights[index] = 1 - clothWeight;
+    }
+  }
+  return weights;
 }
 
 function readClothNumber(value: unknown, fallback: number): number {
@@ -485,8 +654,7 @@ function serializeClothColliderConfig(colliders: any[]) {
 function buildClothStructureSignature(host: any, config: any) {
   return JSON.stringify({
     primitiveId: Number(host?.primitive?.id) || 0,
-    pinMode: String(config?.pinMode || 'auto'),
-    pinnedVertexIndices: String(config?.pinnedVertexIndices || ''),
+    vertexPinWeightsByTarget: getClothVertexWeightSource(config, host),
     maxNeighbors: Math.max(1, Number(config?.maxNeighbors) || 8),
     maxTrianglesPerVertex: Math.max(1, Number(config?.maxTrianglesPerVertex) || 16),
     workgroupSize: Math.max(1, Number(config?.workgroupSize) || 64),
@@ -547,6 +715,45 @@ function buildClothColliders(host: any, config: any) {
     colliders.push(collider);
   }
   return colliders;
+}
+
+function resolveClothGravity(target: any, config: any) {
+  const worldGravity = new Vector3(
+    readClothNumber(config?.gravityX, 0),
+    readClothNumber(config?.gravityY, -9.8),
+    readClothNumber(config?.gravityZ, 0)
+  );
+  const invWorldMatrix = target?.invWorldMatrix;
+  if (!invWorldMatrix?.transformVectorAffine) {
+    return worldGravity;
+  }
+  return invWorldMatrix.transformVectorAffine(worldGravity, new Vector3());
+}
+
+function collectBuiltinClothTargetMeshes(host: any): any[] {
+  if (!host) {
+    return [];
+  }
+  if (host.isMesh?.() && host.primitive) {
+    return [host];
+  }
+  const targets: any[] = [];
+  host.iterate?.((node: any) => {
+    if (node?.isMesh?.() && node.primitive) {
+      targets.push(node);
+    }
+    return false;
+  });
+  return targets;
+}
+
+function ensureBuiltinClothState(host: any) {
+  return ((host as any).__builtinClothState ??= {
+    cloth: null,
+    structureSignature: '',
+    runtimeSignature: '',
+    rebuilding: false
+  });
 }
 
 /**
@@ -949,60 +1156,60 @@ export class Engine {
   }
   private updateBuiltinClothHost(host: any, deltaTime: number) {
     const config = host?.scriptConfig;
-    if (!host || !config || !host.isMesh?.() || !host.primitive) {
+    const targets = collectBuiltinClothTargetMeshes(host);
+    if (!host || !config || targets.length === 0) {
       this.disposeBuiltinClothHost(host);
       return;
     }
-    const state = ((host as any).__builtinClothState ??= {
-      cloth: null,
-      structureSignature: '',
-      runtimeSignature: '',
-      rebuilding: false
-    });
-    const structureSignature = buildClothStructureSignature(host, config);
-    if (!state.cloth || structureSignature !== state.structureSignature) {
-      if (!state.rebuilding) {
-        state.rebuilding = true;
-        Promise.resolve(this.ensureBuiltinClothHost(host)).finally(() => {
-          state.rebuilding = false;
-        });
+    const previousTargets = ((host as any).__builtinClothTargets as any[] | undefined) ?? [];
+    for (const previousTarget of previousTargets) {
+      if (!targets.includes(previousTarget)) {
+        this.disposeBuiltinClothTarget(previousTarget);
       }
-      return;
     }
+    (host as any).__builtinClothTargets = targets;
     const runtimeSignature = buildClothRuntimeSignature(config);
-    if (runtimeSignature !== state.runtimeSignature) {
-      this.applyBuiltinClothRuntimeConfig(host);
-    }
-    if (state.cloth && config.autoUpdate === false) {
-      state.cloth.update(deltaTime);
+    for (const target of targets) {
+      const state = ensureBuiltinClothState(target);
+      const structureSignature = buildClothStructureSignature(target, config);
+      if (!state.cloth || structureSignature !== state.structureSignature) {
+        if (!state.rebuilding) {
+          state.rebuilding = true;
+          Promise.resolve(this.ensureBuiltinClothHost(host, target)).finally(() => {
+            const latestState = (target as any)?.__builtinClothState;
+            if (latestState) {
+              latestState.rebuilding = false;
+            }
+          });
+        }
+        continue;
+      }
+      if (runtimeSignature !== state.runtimeSignature) {
+        this.applyBuiltinClothRuntimeConfig(host, target);
+      }
+      state.cloth.gravity = resolveClothGravity(target, config);
+      if (state.cloth && config.autoUpdate === false) {
+        state.cloth.update(deltaTime);
+      }
     }
   }
-  private async ensureBuiltinClothHost(host: any) {
+  private async ensureBuiltinClothHost(host: any, target: any) {
     const config = host?.scriptConfig;
-    if (!host || !config || !host.isMesh?.() || !host.primitive) {
-      this.disposeBuiltinClothHost(host);
+    if (!host || !config || !target || !target.isMesh?.() || !target.primitive) {
+      this.disposeBuiltinClothTarget(target);
       return;
     }
-    const state = ((host as any).__builtinClothState ??= {
-      cloth: null,
-      structureSignature: '',
-      runtimeSignature: '',
-      rebuilding: false
-    });
-    const structureSignature = buildClothStructureSignature(host, config);
+    const state = ensureBuiltinClothState(target);
+    const structureSignature = buildClothStructureSignature(target, config);
     if (state.cloth && structureSignature === state.structureSignature) {
-      this.applyBuiltinClothRuntimeConfig(host);
+      this.applyBuiltinClothRuntimeConfig(host, target);
       return;
     }
-    this.disposeBuiltinClothHost(host);
+    this.disposeBuiltinClothTarget(target);
     try {
-      const cloth = await GPUClothSystem.createFromMesh(host, {
+      const cloth = await GPUClothSystem.createFromMesh(target, {
         enabled: config.enabled !== false,
-        gravity: new Vector3(
-          readClothNumber(config.gravityX, 0),
-          readClothNumber(config.gravityY, -9.8),
-          readClothNumber(config.gravityZ, 0)
-        ),
+        gravity: resolveClothGravity(target, config),
         damping: readClothNumber(config.damping, 0.995),
         stiffness: readClothNumber(config.stiffness, 0.3),
         solverIterations: Math.max(1, Number(config.solverIterations) || 5),
@@ -1010,18 +1217,18 @@ export class Engine {
         workgroupSize: Math.max(1, Number(config.workgroupSize) || 64),
         maxTrianglesPerVertex: Math.max(1, Number(config.maxTrianglesPerVertex) || 16),
         rebuildNormals: config.rebuildNormals !== false,
-        pinnedVertexIndices: parseClothPinnedVertexIndices(config),
-        colliders: buildClothColliders(host, config),
+        pinnedVertexWeights: parseClothPinnedVertexIndices(config, target),
+        colliders: buildClothColliders(target, config),
         autoUpdate: config.autoUpdate !== false,
         device: getDevice()
       });
-      (host as any).__builtinClothState = {
+      (target as any).__builtinClothState = {
         cloth,
         structureSignature,
         runtimeSignature: '',
         rebuilding: false
       };
-      this.applyBuiltinClothRuntimeConfig(host);
+      this.applyBuiltinClothRuntimeConfig(host, target);
       if (!cloth.supported && cloth.disabledReason) {
         console.warn('GPU cloth disabled:', cloth.disabledReason);
       }
@@ -1029,33 +1236,38 @@ export class Engine {
       console.error('GPU cloth initialization failed:', err);
     }
   }
-  private applyBuiltinClothRuntimeConfig(host: any) {
+  private applyBuiltinClothRuntimeConfig(host: any, target: any) {
     const config = host?.scriptConfig;
-    const state = (host as any)?.__builtinClothState;
+    const state = target?.__builtinClothState;
     const cloth = state?.cloth as Nullable<GPUClothSystem>;
     if (!cloth || !config) {
       return;
     }
     cloth.enabled = config.enabled !== false;
-    cloth.gravity = new Vector3(
-      readClothNumber(config.gravityX, 0),
-      readClothNumber(config.gravityY, -9.8),
-      readClothNumber(config.gravityZ, 0)
-    );
+    cloth.gravity = resolveClothGravity(target, config);
     cloth.damping = readClothNumber(config.damping, 0.995);
     cloth.stiffness = readClothNumber(config.stiffness, 0.3);
     cloth.solverIterations = Math.max(1, Number(config.solverIterations) || 5);
-    cloth.colliders = buildClothColliders(host, config);
-    cloth.bindToScene(config.autoUpdate === false ? null : host.scene || null);
+    cloth.colliders = buildClothColliders(target, config);
+    cloth.bindToScene(config.autoUpdate === false ? null : target.scene || host.scene || null);
     state.runtimeSignature = buildClothRuntimeSignature(config);
   }
   private disposeBuiltinClothHost(host: any) {
-    const state = host?.__builtinClothState;
+    const targets = ((host as any)?.__builtinClothTargets as any[] | undefined) ?? [];
+    for (const target of targets) {
+      this.disposeBuiltinClothTarget(target);
+    }
+    if (host && '__builtinClothTargets' in host) {
+      (host as any).__builtinClothTargets = [];
+    }
+  }
+  private disposeBuiltinClothTarget(target: any) {
+    const state = target?.__builtinClothState;
     if (state?.cloth) {
       state.cloth.dispose();
     }
-    if (host && '__builtinClothState' in host) {
-      (host as any).__builtinClothState = null;
+    if (target && '__builtinClothState' in target) {
+      (target as any).__builtinClothState = null;
     }
   }
   private attachBuiltinSpringScript(root: any): boolean {

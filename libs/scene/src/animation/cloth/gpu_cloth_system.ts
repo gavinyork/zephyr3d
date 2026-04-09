@@ -6,7 +6,7 @@ import type {
   StructuredBuffer
 } from '@zephyr3d/device';
 import { PBPrimitiveType } from '@zephyr3d/device';
-import { Vector3, type Nullable } from '@zephyr3d/base';
+import { releaseObject, retainObject, Vector3, type Nullable } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
 import type { Primitive } from '../../render';
 import type { Scene } from '../../scene';
@@ -19,6 +19,7 @@ export type GPUClothSystemOptions = {
   primitive?: Nullable<Primitive>;
   positionData?: Float32Array<ArrayBuffer>;
   indexData?: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>;
+  pinnedVertexWeights?: ArrayLike<number>;
   pinnedVertexIndices?: number[];
   gravity?: Vector3;
   damping?: number;
@@ -74,41 +75,28 @@ function distance3(positions: Float32Array<ArrayBuffer>, a: number, b: number) {
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-function buildPinnedVertices(
+function buildPinWeightArray(
   positions: Float32Array<ArrayBuffer>,
+  explicitWeights?: ArrayLike<number>,
   explicitPinned?: number[]
-): Set<number> {
+): Float32Array<ArrayBuffer> {
   const vertexCount = (positions.length / 3) >> 0;
+  const result = new Float32Array(vertexCount);
+  if (explicitWeights && explicitWeights.length > 0) {
+    const len = Math.min(vertexCount, explicitWeights.length);
+    for (let i = 0; i < len; i++) {
+      result[i] = clamp(Number(explicitWeights[i]) || 0, 0, 1);
+    }
+    return result;
+  }
   if (explicitPinned && explicitPinned.length > 0) {
-    const result = new Set<number>();
     for (const i of explicitPinned) {
       if (Number.isFinite(i) && i >= 0 && i < vertexCount) {
-        result.add(i >> 0);
+        result[i >> 0] = 1;
       }
     }
-    if (result.size > 0) {
-      return result;
-    }
   }
-  let minY = Number.POSITIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (let i = 0; i < vertexCount; i++) {
-    const y = positions[i * 3 + 1];
-    minY = Math.min(minY, y);
-    maxY = Math.max(maxY, y);
-  }
-  const range = Math.max(1e-6, maxY - minY);
-  const threshold = maxY - range * 0.02;
-  const autoPinned = new Set<number>();
-  for (let i = 0; i < vertexCount; i++) {
-    if (positions[i * 3 + 1] >= threshold) {
-      autoPinned.add(i);
-    }
-  }
-  if (autoPinned.size === 0 && vertexCount > 0) {
-    autoPinned.add(0);
-  }
-  return autoPinned;
+  return result;
 }
 
 function buildNeighborData(
@@ -224,6 +212,7 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
     compute(pb) {
       this.positions = pb.float[0]().storageBuffer(0);
       this.prevPositions = pb.float[0]().storageBuffer(0);
+      this.restPositions = pb.float[0]().storageBufferReadonly(0);
       this.invMass = pb.float[0]().storageBufferReadonly(0);
       this.sphereData = pb.float[0]().storageBufferReadonly(0);
       this.capsuleData = pb.float[0]().storageBufferReadonly(0);
@@ -244,14 +233,19 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
           this.$l.px = this.prevPositions.at(this.base);
           this.$l.py = this.prevPositions.at(pb.add(this.base, 1));
           this.$l.pz = this.prevPositions.at(pb.add(this.base, 2));
-          this.$l.invMassValue = this.invMass.at(this.index);
-          this.$if(pb.greaterThan(this.invMassValue, 0), function () {
-            this.$l.current = pb.vec3(this.x, this.y, this.z);
-            this.$l.previous = pb.vec3(this.px, this.py, this.pz);
-            this.$l.dt2 = pb.mul(this.deltaTime, this.deltaTime);
-            this.$l.velocity = pb.mul(pb.sub(this.current, this.previous), this.damping);
-            this.$l.next = pb.add(this.current, this.velocity, pb.mul(this.gravity, this.dt2));
+          this.$l.restX = this.restPositions.at(this.base);
+          this.$l.restY = this.restPositions.at(pb.add(this.base, 1));
+          this.$l.restZ = this.restPositions.at(pb.add(this.base, 2));
+          this.$l.freeWeight = this.invMass.at(this.index);
+          this.$l.pinWeight = pb.sub(1, this.freeWeight);
+          this.$l.current = pb.vec3(this.x, this.y, this.z);
+          this.$l.previous = pb.vec3(this.px, this.py, this.pz);
+          this.$l.rest = pb.vec3(this.restX, this.restY, this.restZ);
+          this.$l.dt2 = pb.mul(this.deltaTime, this.deltaTime);
+          this.$l.velocity = pb.mul(pb.sub(this.current, this.previous), pb.mul(this.damping, this.freeWeight));
+          this.$l.next = pb.add(this.current, this.velocity, pb.mul(this.gravity, pb.mul(this.dt2, this.freeWeight)));
 
+          this.$if(pb.greaterThan(this.freeWeight, this.minDistance), function () {
             this.$for(pb.uint('i'), 0, this.sphereCount, function () {
               this.$l.sphereBase = pb.mul(this.i, 4);
               this.$l.center = pb.vec3(
@@ -302,18 +296,16 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
                 });
               });
             });
-
-            this.prevPositions.setAt(this.base, this.x);
-            this.prevPositions.setAt(pb.add(this.base, 1), this.y);
-            this.prevPositions.setAt(pb.add(this.base, 2), this.z);
-            this.positions.setAt(this.base, this.next.x);
-            this.positions.setAt(pb.add(this.base, 1), this.next.y);
-            this.positions.setAt(pb.add(this.base, 2), this.next.z);
-          }).$else(function () {
-            this.prevPositions.setAt(this.base, this.x);
-            this.prevPositions.setAt(pb.add(this.base, 1), this.y);
-            this.prevPositions.setAt(pb.add(this.base, 2), this.z);
           });
+
+          this.next = pb.add(pb.mul(this.next, this.freeWeight), pb.mul(this.rest, this.pinWeight));
+          this.$l.prevOut = pb.add(pb.mul(this.current, this.freeWeight), pb.mul(this.rest, this.pinWeight));
+          this.prevPositions.setAt(this.base, this.prevOut.x);
+          this.prevPositions.setAt(pb.add(this.base, 1), this.prevOut.y);
+          this.prevPositions.setAt(pb.add(this.base, 2), this.prevOut.z);
+          this.positions.setAt(this.base, this.next.x);
+          this.positions.setAt(pb.add(this.base, 1), this.next.y);
+          this.positions.setAt(pb.add(this.base, 2), this.next.z);
         });
       });
     }
@@ -329,6 +321,7 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
     workgroupSize: [workgroupSize, 1, 1],
     compute(pb) {
       this.positions = pb.float[0]().storageBuffer(0);
+      this.restPositions = pb.float[0]().storageBufferReadonly(0);
       this.invMass = pb.float[0]().storageBufferReadonly(0);
       this.neighborIndices = pb.int[0]().storageBufferReadonly(0);
       this.restLengths = pb.float[0]().storageBufferReadonly(0);
@@ -339,9 +332,15 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
       pb.main(function () {
         this.$l.index = this.$builtins.globalInvocationId.x;
         this.$if(pb.lessThan(this.index, this.vertexCount), function () {
-          this.$l.invMassValue = this.invMass.at(this.index);
-          this.$if(pb.greaterThan(this.invMassValue, 0), function () {
-            this.$l.base = pb.mul(this.index, 3);
+          this.$l.freeWeight = this.invMass.at(this.index);
+          this.$l.pinWeight = pb.sub(1, this.freeWeight);
+          this.$l.base = pb.mul(this.index, 3);
+          this.$l.rest = pb.vec3(
+            this.restPositions.at(this.base),
+            this.restPositions.at(pb.add(this.base, 1)),
+            this.restPositions.at(pb.add(this.base, 2))
+          );
+          this.$if(pb.greaterThan(this.freeWeight, this.minDistance), function () {
             this.$l.pos = pb.vec3(
               this.positions.at(this.base),
               this.positions.at(pb.add(this.base, 1)),
@@ -370,13 +369,19 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
                 });
               });
             });
+            this.$l.corrected = this.pos;
             this.$if(pb.greaterThan(this.validCount, 0), function () {
-              this.$l.scale = pb.div(this.stiffness, pb.float(this.validCount));
-              this.$l.corrected = pb.sub(this.pos, pb.mul(this.correction, this.scale));
-              this.positions.setAt(this.base, this.corrected.x);
-              this.positions.setAt(pb.add(this.base, 1), this.corrected.y);
-              this.positions.setAt(pb.add(this.base, 2), this.corrected.z);
+              this.$l.scale = pb.div(pb.mul(this.stiffness, this.freeWeight), pb.float(this.validCount));
+              this.corrected = pb.sub(this.pos, pb.mul(this.correction, this.scale));
             });
+            this.corrected = pb.add(pb.mul(this.corrected, this.freeWeight), pb.mul(this.rest, this.pinWeight));
+            this.positions.setAt(this.base, this.corrected.x);
+            this.positions.setAt(pb.add(this.base, 1), this.corrected.y);
+            this.positions.setAt(pb.add(this.base, 2), this.corrected.z);
+          }).$else(function () {
+            this.positions.setAt(this.base, this.rest.x);
+            this.positions.setAt(pb.add(this.base, 1), this.rest.y);
+            this.positions.setAt(pb.add(this.base, 2), this.rest.z);
           });
         });
       });
@@ -566,8 +571,11 @@ export class GPUClothSystem {
   private _disabledReason: Nullable<string>;
   private _device: Nullable<AbstractDevice>;
   private _primitive: Nullable<Primitive>;
+  private _originalPositionBuffer: Nullable<StructuredBuffer>;
+  private _originalNormalBuffer: Nullable<StructuredBuffer>;
   private _positionBuffer: Nullable<StructuredBuffer>;
   private _prevPositionBuffer: Nullable<GPUDataBuffer>;
+  private _restPositionBuffer: Nullable<GPUDataBuffer>;
   private _invMassBuffer: Nullable<GPUDataBuffer>;
   private _neighborIndexBuffer: Nullable<GPUDataBuffer>;
   private _restLengthBuffer: Nullable<GPUDataBuffer>;
@@ -609,8 +617,11 @@ export class GPUClothSystem {
     this._enabled = false;
     this._disabledReason = null;
     this._primitive = options?.primitive ?? null;
+    this._originalPositionBuffer = null;
+    this._originalNormalBuffer = null;
     this._positionBuffer = null;
     this._prevPositionBuffer = null;
+    this._restPositionBuffer = null;
     this._invMassBuffer = null;
     this._neighborIndexBuffer = null;
     this._restLengthBuffer = null;
@@ -682,7 +693,11 @@ export class GPUClothSystem {
 
     const workgroupSize = clamp(options?.workgroupSize ?? DEFAULT_WORKGROUP_SIZE, 1, 256) | 0;
     const indexDataU32 = toUInt32Indices(options.indexData);
-    const pinnedSet = buildPinnedVertices(options.positionData, options.pinnedVertexIndices);
+    const pinWeightArray = buildPinWeightArray(
+      options.positionData,
+      options.pinnedVertexWeights,
+      options.pinnedVertexIndices
+    );
     const neighbors = buildNeighborData(options.positionData, options.indexData, this._maxNeighbors);
     const adjacency = buildVertexTriangleAdjacency(
       vertexCount,
@@ -711,11 +726,18 @@ export class GPUClothSystem {
       });
       this._prevPositionBuffer.bufferSubData(0, options.positionData);
 
-      const invMassArray = new Float32Array(vertexCount);
-      invMassArray.fill(1);
-      pinnedSet.forEach((idx) => {
-        invMassArray[idx] = 0;
+      this._restPositionBuffer = this._device.createBuffer(options.positionData.byteLength, {
+        usage: 'uniform',
+        storage: true,
+        dynamic: false,
+        managed: false
       });
+      this._restPositionBuffer.bufferSubData(0, options.positionData);
+
+      const invMassArray = new Float32Array(vertexCount);
+      for (let i = 0; i < vertexCount; i++) {
+        invMassArray[i] = 1 - pinWeightArray[i];
+      }
       this._invMassBuffer = this._device.createBuffer(invMassArray.byteLength, {
         usage: 'uniform',
         storage: true,
@@ -789,6 +811,7 @@ export class GPUClothSystem {
       this._integrateBindGroup = this._device.createBindGroup(this._integrateProgram.bindGroupLayouts[0]);
       this._integrateBindGroup.setBuffer('positions', this._positionBuffer!);
       this._integrateBindGroup.setBuffer('prevPositions', this._prevPositionBuffer);
+      this._integrateBindGroup.setBuffer('restPositions', this._restPositionBuffer);
       this._integrateBindGroup.setBuffer('invMass', this._invMassBuffer);
       this._integrateBindGroup.setBuffer('sphereData', this._sphereColliderBuffer);
       this._integrateBindGroup.setBuffer('capsuleData', this._capsuleColliderBuffer);
@@ -801,6 +824,7 @@ export class GPUClothSystem {
 
       this._constraintBindGroup = this._device.createBindGroup(this._constraintProgram.bindGroupLayouts[0]);
       this._constraintBindGroup.setBuffer('positions', this._positionBuffer!);
+      this._constraintBindGroup.setBuffer('restPositions', this._restPositionBuffer);
       this._constraintBindGroup.setBuffer('invMass', this._invMassBuffer);
       this._constraintBindGroup.setBuffer('neighborIndices', this._neighborIndexBuffer);
       this._constraintBindGroup.setBuffer('restLengths', this._restLengthBuffer);
@@ -849,9 +873,13 @@ export class GPUClothSystem {
         }
       }
 
+      this._originalPositionBuffer = this._primitive.getVertexBuffer('position');
+      retainObject(this._originalPositionBuffer);
       this._primitive.removeVertexBuffer('position');
       this._primitive.setVertexBuffer(this._positionBuffer!);
       if (this._normalBuffer) {
+        this._originalNormalBuffer = this._primitive.getVertexBuffer('normal');
+        retainObject(this._originalNormalBuffer);
         this._primitive.removeVertexBuffer('normal');
         this._primitive.setVertexBuffer(this._normalBuffer);
       }
@@ -1051,6 +1079,20 @@ export class GPUClothSystem {
 
   dispose() {
     this.unbindFromScene();
+    if (this._primitive) {
+      if (this._positionBuffer) {
+        this._primitive.removeVertexBuffer('position');
+        if (this._originalPositionBuffer) {
+          this._primitive.setVertexBuffer(this._originalPositionBuffer);
+        }
+      }
+      if (this._normalBuffer || this._originalNormalBuffer) {
+        this._primitive.removeVertexBuffer('normal');
+        if (this._originalNormalBuffer) {
+          this._primitive.setVertexBuffer(this._originalNormalBuffer);
+        }
+      }
+    }
     this._integrateBindGroup?.dispose();
     this._integrateBindGroup = null;
     this._constraintBindGroup?.dispose();
@@ -1069,6 +1111,8 @@ export class GPUClothSystem {
     this._vertexNormalProgram = null;
     this._prevPositionBuffer?.dispose();
     this._prevPositionBuffer = null;
+    this._restPositionBuffer?.dispose();
+    this._restPositionBuffer = null;
     this._invMassBuffer?.dispose();
     this._invMassBuffer = null;
     this._neighborIndexBuffer?.dispose();
@@ -1085,6 +1129,10 @@ export class GPUClothSystem {
     this._sphereColliderBuffer = null;
     this._capsuleColliderBuffer?.dispose();
     this._capsuleColliderBuffer = null;
+    releaseObject(this._originalPositionBuffer);
+    this._originalPositionBuffer = null;
+    releaseObject(this._originalNormalBuffer);
+    this._originalNormalBuffer = null;
     this._enabled = false;
   }
 
