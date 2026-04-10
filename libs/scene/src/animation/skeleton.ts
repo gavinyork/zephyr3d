@@ -8,6 +8,67 @@ import { getDevice } from '../app/api';
 import type { SkeletonModifier } from './skeleton_modifier';
 
 /**
+ * Standardized humanoid bone names for consistent skeleton mapping across models and animations.
+ *
+ * These names align with common conventions used in 3D modeling and animation tools, facilitating interoperability and reuse of assets.
+ *
+ * @public
+ */
+export enum HumanoidBodyRig {
+  Hips = 'Hips',
+  Spine = 'Spine',
+  Chest = 'Chest',
+  UpperChest = 'UpperChest',
+  Neck = 'Neck',
+  Head = 'Head',
+
+  LeftShoulder = 'LeftShoulder',
+  LeftUpperArm = 'LeftUpperArm',
+  LeftLowerArm = 'LeftLowerArm',
+  LeftHand = 'LeftHand',
+
+  RightShoulder = 'RightShoulder',
+  RightUpperArm = 'RightUpperArm',
+  RightLowerArm = 'RightLowerArm',
+  RightHand = 'RightHand',
+
+  LeftUpperLeg = 'LeftUpperLeg',
+  LeftLowerLeg = 'LeftLowerLeg',
+  LeftFoot = 'LeftFoot',
+  LeftToes = 'LeftToes',
+
+  RightUpperLeg = 'RightUpperLeg',
+  RightLowerLeg = 'RightLowerLeg',
+  RightFoot = 'RightFoot',
+  RightToes = 'RightToes'
+}
+
+/**
+ * Standardized humanoid hand bone names for consistent skeleton mapping across models and animations.
+ *
+ * These names align with common conventions used in 3D modeling and animation tools, facilitating interoperability and reuse of assets.
+ *
+ * @public
+ */
+export enum HumanoidHandRig {
+  ThumbProximal = 'ThumbProximal',
+  ThumbIntermediate = 'ThumbIntermediate',
+  ThumbDistal = 'ThumbDistal',
+  IndexProximal = 'IndexProximal',
+  IndexIntermediate = 'IndexIntermediate',
+  IndexDistal = 'IndexDistal',
+  MiddleProximal = 'MiddleProximal',
+  MiddleIntermediate = 'MiddleIntermediate',
+  MiddleDistal = 'MiddleDistal',
+  RingProximal = 'RingProximal',
+  RingIntermediate = 'RingIntermediate',
+  RingDistal = 'RingDistal',
+  PinkyProximal = 'PinkyProximal',
+  PinkyIntermediate = 'PinkyIntermediate',
+  PinkyDistal = 'PinkyDistal'
+}
+
+/**
  * Skinned bounding box information for a submesh.
  *
  * Used to compute animated AABB for skinned meshes.
@@ -39,6 +100,49 @@ const tmpV0 = new Vector3();
 const tmpV1 = new Vector3();
 const tmpV2 = new Vector3();
 const tmpV3 = new Vector3();
+
+type HumanoidBoneExtraction = {
+  body: Record<HumanoidBodyRig, SceneNode>;
+  leftHand?: Record<HumanoidHandRig, SceneNode>;
+  rightHand?: Record<HumanoidHandRig, SceneNode>;
+};
+
+type HumanoidBonePattern = {
+  all?: string[];
+  any?: string[];
+  none?: string[];
+};
+
+type HumanoidBoneProfile<T extends string> = Record<T, HumanoidBonePattern[]>;
+
+type HumanoidBoneNodeInfo = {
+  node: SceneNode;
+  depth: number;
+  tokens: string[];
+  tokenSet: Set<string>;
+};
+
+function bonePattern(all: string[], none?: string[], any?: string[]): HumanoidBonePattern {
+  return {
+    all,
+    any: any?.length ? any : undefined,
+    none: none?.length ? none : undefined
+  };
+}
+
+function sideBonePatterns(
+  side: 'left' | 'right',
+  patterns: Array<{ all: string[]; none?: string[]; any?: string[] }>
+): HumanoidBonePattern[] {
+  const sideTokens = side === 'left' ? ['left', 'l'] : ['right', 'r'];
+  return sideTokens.flatMap((sideToken) =>
+    patterns.map((pattern) => ({
+      all: [sideToken, ...pattern.all],
+      any: pattern.any?.length ? [...pattern.any] : undefined,
+      none: pattern.none?.length ? [...pattern.none] : undefined
+    }))
+  );
+}
 
 /**
  * Skeleton for skinned animation.
@@ -117,6 +221,8 @@ export class Skeleton extends Disposable {
     if (!skeletonRoot || !this._joints.includes(skeletonRoot)) {
       throw new Error('Skeleton root must be included in the joint list');
     }
+    const humanoid = Skeleton.tryExtractHumanoidBones(skeletonRoot);
+    console.log(humanoid);
     while (skeletonRoot.parent && this._joints.includes(skeletonRoot.parent)) {
       skeletonRoot = skeletonRoot.parent;
     }
@@ -478,5 +584,685 @@ export class Skeleton extends Disposable {
       }
     }
     return root;
+  }
+  private static normalizeHumanoidBoneName(name: string) {
+    return name
+      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/([a-zA-Z])(\d+)/g, '$1 $2')
+      .replace(/(\d+)([a-zA-Z])/g, '$1 $2')
+      .replace(/[_:\/\\.-]+/g, ' ')
+      .replace(/[^a-zA-Z0-9]+/g, ' ')
+      .toLowerCase()
+      .replace(/\bforearm\b/g, 'fore arm')
+      .replace(/\bupperarm\b/g, 'upper arm')
+      .replace(/\blowerarm\b/g, 'lower arm')
+      .replace(/\bupleg\b/g, 'up leg')
+      .replace(/\bupperleg\b/g, 'upper leg')
+      .replace(/\blowerleg\b/g, 'lower leg')
+      .replace(/\btoebase\b/g, 'toe base')
+      .replace(/\bupperchest\b/g, 'upper chest')
+      .replace(/\btoes\b/g, 'toe')
+      .replace(/\blittle\b/g, 'pinky')
+      .replace(/\bcollar\b/g, 'clavicle')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  private static getHumanoidBoneNodeDepth(root: SceneNode, node: SceneNode) {
+    let depth = 0;
+    let current: Nullable<SceneNode> = node;
+    while (current && current !== root) {
+      depth++;
+      current = current.parent;
+    }
+    return depth;
+  }
+  private static collectHumanoidBoneNodeInfos(root: SceneNode): HumanoidBoneNodeInfo[] {
+    const nodes: HumanoidBoneNodeInfo[] = [];
+    root.iterate((node) => {
+      const normalizedName = this.normalizeHumanoidBoneName(node.name || '');
+      if (!normalizedName) {
+        return false;
+      }
+      const tokens = normalizedName.split(' ').filter(Boolean);
+      if (!tokens.length) {
+        return false;
+      }
+      nodes.push({
+        node,
+        depth: this.getHumanoidBoneNodeDepth(root, node),
+        tokens,
+        tokenSet: new Set(tokens)
+      });
+      return false;
+    });
+    return nodes;
+  }
+  private static matchesHumanoidBonePattern(info: HumanoidBoneNodeInfo, pattern: HumanoidBonePattern) {
+    if (pattern.all?.some((token) => !info.tokenSet.has(token))) {
+      return false;
+    }
+    if (pattern.any?.length && !pattern.any.some((token) => info.tokenSet.has(token))) {
+      return false;
+    }
+    if (pattern.none?.some((token) => info.tokenSet.has(token))) {
+      return false;
+    }
+    return true;
+  }
+  private static scoreHumanoidBonePattern(
+    info: HumanoidBoneNodeInfo,
+    pattern: HumanoidBonePattern,
+    priority: number
+  ) {
+    const matchedTokens = new Set(pattern.all ?? []);
+    for (const token of pattern.any ?? []) {
+      if (info.tokenSet.has(token)) {
+        matchedTokens.add(token);
+      }
+    }
+    let extraTokenCount = 0;
+    for (const token of info.tokens) {
+      if (!matchedTokens.has(token)) {
+        extraTokenCount++;
+      }
+    }
+    return priority * 100000 + matchedTokens.size * 100 - extraTokenCount * 5 - info.depth;
+  }
+  private static findBestHumanoidBone(
+    nodes: HumanoidBoneNodeInfo[],
+    patterns: HumanoidBonePattern[],
+    used: Set<SceneNode>
+  ) {
+    let bestNode: Nullable<SceneNode> = null;
+    let bestScore = Number.NEGATIVE_INFINITY;
+    for (let index = 0; index < patterns.length; index++) {
+      const pattern = patterns[index];
+      const priority = patterns.length - index;
+      for (const info of nodes) {
+        if (used.has(info.node) || !this.matchesHumanoidBonePattern(info, pattern)) {
+          continue;
+        }
+        const score = this.scoreHumanoidBonePattern(info, pattern, priority);
+        if (score > bestScore) {
+          bestScore = score;
+          bestNode = info.node;
+        }
+      }
+    }
+    return bestNode;
+  }
+  private static matchHumanoidBoneProfile<T extends string>(
+    nodes: HumanoidBoneNodeInfo[],
+    profile: HumanoidBoneProfile<T>,
+    used: Set<SceneNode>,
+    optional?: Set<T>
+  ): Partial<Record<T, SceneNode>> | null {
+    const result = {} as Partial<Record<T, SceneNode>>;
+    const reserved = new Set<SceneNode>();
+    for (const bone of Object.keys(profile) as T[]) {
+      const node = this.findBestHumanoidBone(
+        nodes,
+        profile[bone],
+        new Set<SceneNode>([...used, ...reserved])
+      );
+      if (!node) {
+        if (optional?.has(bone)) {
+          continue;
+        }
+        return null;
+      }
+      result[bone] = node;
+      reserved.add(node);
+    }
+    for (const node of reserved) {
+      used.add(node);
+    }
+    return result;
+  }
+  private static getHumanoidIntermediateChain(ancestor: SceneNode, descendant: SceneNode) {
+    if (!this.isSameOrAncestor(ancestor, descendant)) {
+      return null;
+    }
+    const chain: SceneNode[] = [];
+    let current = descendant.parent;
+    while (current && current !== ancestor) {
+      chain.unshift(current);
+      current = current.parent;
+    }
+    return chain;
+  }
+  private static completeHumanoidBody(
+    body: Partial<Record<HumanoidBodyRig, SceneNode>>
+  ): Record<HumanoidBodyRig, SceneNode> | null {
+    const requiredBones = [
+      HumanoidBodyRig.Hips,
+      HumanoidBodyRig.Spine,
+      HumanoidBodyRig.Neck,
+      HumanoidBodyRig.Head,
+      HumanoidBodyRig.LeftShoulder,
+      HumanoidBodyRig.LeftUpperArm,
+      HumanoidBodyRig.LeftLowerArm,
+      HumanoidBodyRig.LeftHand,
+      HumanoidBodyRig.RightShoulder,
+      HumanoidBodyRig.RightUpperArm,
+      HumanoidBodyRig.RightLowerArm,
+      HumanoidBodyRig.RightHand,
+      HumanoidBodyRig.LeftUpperLeg,
+      HumanoidBodyRig.LeftLowerLeg,
+      HumanoidBodyRig.LeftFoot,
+      HumanoidBodyRig.LeftToes,
+      HumanoidBodyRig.RightUpperLeg,
+      HumanoidBodyRig.RightLowerLeg,
+      HumanoidBodyRig.RightFoot,
+      HumanoidBodyRig.RightToes
+    ];
+    for (const bone of requiredBones) {
+      if (!body[bone]) {
+        return null;
+      }
+    }
+    const spine = body[HumanoidBodyRig.Spine]!;
+    const neck = body[HumanoidBodyRig.Neck]!;
+    let chest = body[HumanoidBodyRig.Chest];
+    let upperChest = body[HumanoidBodyRig.UpperChest];
+    if (!chest || !upperChest) {
+      const spineChain = this.getHumanoidIntermediateChain(spine, neck);
+      if (!spineChain || spineChain.length === 0) {
+        chest ||= spine;
+        upperChest ||= chest;
+      } else if (spineChain.length === 1) {
+        chest ||= spineChain[0];
+        upperChest ||= chest;
+      } else {
+        chest ||= spineChain[0];
+        upperChest ||= spineChain[spineChain.length - 1];
+      }
+    }
+    if (!chest || !upperChest) {
+      return null;
+    }
+    return {
+      [HumanoidBodyRig.Hips]: body[HumanoidBodyRig.Hips]!,
+      [HumanoidBodyRig.Spine]: spine,
+      [HumanoidBodyRig.Chest]: chest,
+      [HumanoidBodyRig.UpperChest]: upperChest,
+      [HumanoidBodyRig.Neck]: neck,
+      [HumanoidBodyRig.Head]: body[HumanoidBodyRig.Head]!,
+      [HumanoidBodyRig.LeftShoulder]: body[HumanoidBodyRig.LeftShoulder]!,
+      [HumanoidBodyRig.LeftUpperArm]: body[HumanoidBodyRig.LeftUpperArm]!,
+      [HumanoidBodyRig.LeftLowerArm]: body[HumanoidBodyRig.LeftLowerArm]!,
+      [HumanoidBodyRig.LeftHand]: body[HumanoidBodyRig.LeftHand]!,
+      [HumanoidBodyRig.RightShoulder]: body[HumanoidBodyRig.RightShoulder]!,
+      [HumanoidBodyRig.RightUpperArm]: body[HumanoidBodyRig.RightUpperArm]!,
+      [HumanoidBodyRig.RightLowerArm]: body[HumanoidBodyRig.RightLowerArm]!,
+      [HumanoidBodyRig.RightHand]: body[HumanoidBodyRig.RightHand]!,
+      [HumanoidBodyRig.LeftUpperLeg]: body[HumanoidBodyRig.LeftUpperLeg]!,
+      [HumanoidBodyRig.LeftLowerLeg]: body[HumanoidBodyRig.LeftLowerLeg]!,
+      [HumanoidBodyRig.LeftFoot]: body[HumanoidBodyRig.LeftFoot]!,
+      [HumanoidBodyRig.LeftToes]: body[HumanoidBodyRig.LeftToes]!,
+      [HumanoidBodyRig.RightUpperLeg]: body[HumanoidBodyRig.RightUpperLeg]!,
+      [HumanoidBodyRig.RightLowerLeg]: body[HumanoidBodyRig.RightLowerLeg]!,
+      [HumanoidBodyRig.RightFoot]: body[HumanoidBodyRig.RightFoot]!,
+      [HumanoidBodyRig.RightToes]: body[HumanoidBodyRig.RightToes]!
+    };
+  }
+  private static completeHumanoidHand(
+    hand: Partial<Record<HumanoidHandRig, SceneNode>>
+  ): Record<HumanoidHandRig, SceneNode> | null {
+    for (const bone of Object.values(HumanoidHandRig)) {
+      if (!hand[bone]) {
+        return null;
+      }
+    }
+    return {
+      [HumanoidHandRig.ThumbProximal]: hand[HumanoidHandRig.ThumbProximal]!,
+      [HumanoidHandRig.ThumbIntermediate]: hand[HumanoidHandRig.ThumbIntermediate]!,
+      [HumanoidHandRig.ThumbDistal]: hand[HumanoidHandRig.ThumbDistal]!,
+      [HumanoidHandRig.IndexProximal]: hand[HumanoidHandRig.IndexProximal]!,
+      [HumanoidHandRig.IndexIntermediate]: hand[HumanoidHandRig.IndexIntermediate]!,
+      [HumanoidHandRig.IndexDistal]: hand[HumanoidHandRig.IndexDistal]!,
+      [HumanoidHandRig.MiddleProximal]: hand[HumanoidHandRig.MiddleProximal]!,
+      [HumanoidHandRig.MiddleIntermediate]: hand[HumanoidHandRig.MiddleIntermediate]!,
+      [HumanoidHandRig.MiddleDistal]: hand[HumanoidHandRig.MiddleDistal]!,
+      [HumanoidHandRig.RingProximal]: hand[HumanoidHandRig.RingProximal]!,
+      [HumanoidHandRig.RingIntermediate]: hand[HumanoidHandRig.RingIntermediate]!,
+      [HumanoidHandRig.RingDistal]: hand[HumanoidHandRig.RingDistal]!,
+      [HumanoidHandRig.PinkyProximal]: hand[HumanoidHandRig.PinkyProximal]!,
+      [HumanoidHandRig.PinkyIntermediate]: hand[HumanoidHandRig.PinkyIntermediate]!,
+      [HumanoidHandRig.PinkyDistal]: hand[HumanoidHandRig.PinkyDistal]!
+    };
+  }
+  private static tryExtractOptionalHumanoidHand(
+    nodes: HumanoidBoneNodeInfo[],
+    side: 'left' | 'right',
+    used: Set<SceneNode>
+  ): Record<HumanoidHandRig, SceneNode> | undefined {
+    const handCandidates = this.matchHumanoidBoneProfile(
+      nodes,
+      this.createCommonHumanoidHandProfile(side),
+      used
+    );
+    if (!handCandidates) {
+      return undefined;
+    }
+    return this.completeHumanoidHand(handCandidates) ?? undefined;
+  }
+  private static isSameOrAncestor(parent: SceneNode, child: SceneNode) {
+    return parent === child || parent.isParentOf(child);
+  }
+  private static validateHumanoidHandHierarchy(hand: SceneNode, bones: Record<HumanoidHandRig, SceneNode>) {
+    const chains: [HumanoidHandRig, HumanoidHandRig, HumanoidHandRig][] = [
+      [HumanoidHandRig.ThumbProximal, HumanoidHandRig.ThumbIntermediate, HumanoidHandRig.ThumbDistal],
+      [HumanoidHandRig.IndexProximal, HumanoidHandRig.IndexIntermediate, HumanoidHandRig.IndexDistal],
+      [HumanoidHandRig.MiddleProximal, HumanoidHandRig.MiddleIntermediate, HumanoidHandRig.MiddleDistal],
+      [HumanoidHandRig.RingProximal, HumanoidHandRig.RingIntermediate, HumanoidHandRig.RingDistal],
+      [HumanoidHandRig.PinkyProximal, HumanoidHandRig.PinkyIntermediate, HumanoidHandRig.PinkyDistal]
+    ];
+    return chains.every(
+      ([proximal, intermediate, distal]) =>
+        this.isSameOrAncestor(hand, bones[proximal]) &&
+        this.isSameOrAncestor(bones[proximal], bones[intermediate]) &&
+        this.isSameOrAncestor(bones[intermediate], bones[distal])
+    );
+  }
+  private static validateHumanoidBoneExtraction(result: HumanoidBoneExtraction) {
+    const body = result.body;
+    return (
+      this.isSameOrAncestor(body[HumanoidBodyRig.Hips], body[HumanoidBodyRig.Spine]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.Spine], body[HumanoidBodyRig.Chest]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.Chest], body[HumanoidBodyRig.UpperChest]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.UpperChest], body[HumanoidBodyRig.Neck]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.Neck], body[HumanoidBodyRig.Head]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.UpperChest], body[HumanoidBodyRig.LeftShoulder]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.LeftShoulder], body[HumanoidBodyRig.LeftUpperArm]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.LeftUpperArm], body[HumanoidBodyRig.LeftLowerArm]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.LeftLowerArm], body[HumanoidBodyRig.LeftHand]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.UpperChest], body[HumanoidBodyRig.RightShoulder]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.RightShoulder], body[HumanoidBodyRig.RightUpperArm]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.RightUpperArm], body[HumanoidBodyRig.RightLowerArm]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.RightLowerArm], body[HumanoidBodyRig.RightHand]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.Hips], body[HumanoidBodyRig.LeftUpperLeg]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.LeftUpperLeg], body[HumanoidBodyRig.LeftLowerLeg]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.LeftLowerLeg], body[HumanoidBodyRig.LeftFoot]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.LeftFoot], body[HumanoidBodyRig.LeftToes]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.Hips], body[HumanoidBodyRig.RightUpperLeg]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.RightUpperLeg], body[HumanoidBodyRig.RightLowerLeg]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.RightLowerLeg], body[HumanoidBodyRig.RightFoot]) &&
+      this.isSameOrAncestor(body[HumanoidBodyRig.RightFoot], body[HumanoidBodyRig.RightToes]) &&
+      (!result.leftHand ||
+        this.validateHumanoidHandHierarchy(body[HumanoidBodyRig.LeftHand], result.leftHand)) &&
+      (!result.rightHand ||
+        this.validateHumanoidHandHierarchy(body[HumanoidBodyRig.RightHand], result.rightHand))
+    );
+  }
+  private static createCommonHumanoidHandProfile(
+    side: 'left' | 'right'
+  ): HumanoidBoneProfile<HumanoidHandRig> {
+    return {
+      [HumanoidHandRig.ThumbProximal]: sideBonePatterns(side, [
+        { all: ['thumb', 'proximal'] },
+        { all: ['thumb', '1'] },
+        { all: ['finger', '0'] }
+      ]),
+      [HumanoidHandRig.ThumbIntermediate]: sideBonePatterns(side, [
+        { all: ['thumb', 'intermediate'] },
+        { all: ['thumb', '2'] },
+        { all: ['finger', '01'] }
+      ]),
+      [HumanoidHandRig.ThumbDistal]: sideBonePatterns(side, [
+        { all: ['thumb', 'distal'] },
+        { all: ['thumb', '3'] },
+        { all: ['finger', '02'] }
+      ]),
+      [HumanoidHandRig.IndexProximal]: sideBonePatterns(side, [
+        { all: ['index', 'proximal'] },
+        { all: ['index', '1'] },
+        { all: ['finger', '1'] }
+      ]),
+      [HumanoidHandRig.IndexIntermediate]: sideBonePatterns(side, [
+        { all: ['index', 'intermediate'] },
+        { all: ['index', '2'] },
+        { all: ['finger', '11'] }
+      ]),
+      [HumanoidHandRig.IndexDistal]: sideBonePatterns(side, [
+        { all: ['index', 'distal'] },
+        { all: ['index', '3'] },
+        { all: ['finger', '12'] }
+      ]),
+      [HumanoidHandRig.MiddleProximal]: sideBonePatterns(side, [
+        { all: ['middle', 'proximal'] },
+        { all: ['middle', '1'] },
+        { all: ['finger', '2'] }
+      ]),
+      [HumanoidHandRig.MiddleIntermediate]: sideBonePatterns(side, [
+        { all: ['middle', 'intermediate'] },
+        { all: ['middle', '2'] },
+        { all: ['finger', '21'] }
+      ]),
+      [HumanoidHandRig.MiddleDistal]: sideBonePatterns(side, [
+        { all: ['middle', 'distal'] },
+        { all: ['middle', '3'] },
+        { all: ['finger', '22'] }
+      ]),
+      [HumanoidHandRig.RingProximal]: sideBonePatterns(side, [
+        { all: ['ring', 'proximal'] },
+        { all: ['ring', '1'] },
+        { all: ['finger', '3'] }
+      ]),
+      [HumanoidHandRig.RingIntermediate]: sideBonePatterns(side, [
+        { all: ['ring', 'intermediate'] },
+        { all: ['ring', '2'] },
+        { all: ['finger', '31'] }
+      ]),
+      [HumanoidHandRig.RingDistal]: sideBonePatterns(side, [
+        { all: ['ring', 'distal'] },
+        { all: ['ring', '3'] },
+        { all: ['finger', '32'] }
+      ]),
+      [HumanoidHandRig.PinkyProximal]: sideBonePatterns(side, [
+        { all: ['pinky', 'proximal'] },
+        { all: ['pinky', '1'] },
+        { all: ['finger', '4'] }
+      ]),
+      [HumanoidHandRig.PinkyIntermediate]: sideBonePatterns(side, [
+        { all: ['pinky', 'intermediate'] },
+        { all: ['pinky', '2'] },
+        { all: ['finger', '41'] }
+      ]),
+      [HumanoidHandRig.PinkyDistal]: sideBonePatterns(side, [
+        { all: ['pinky', 'distal'] },
+        { all: ['pinky', '3'] },
+        { all: ['finger', '42'] }
+      ])
+    };
+  }
+  private static createStandardHumanoidBodyProfile(): HumanoidBoneProfile<HumanoidBodyRig> {
+    return {
+      [HumanoidBodyRig.Hips]: [bonePattern(['hips']), bonePattern(['pelvis'])],
+      [HumanoidBodyRig.Spine]: [bonePattern(['spine'], ['1', '2', '3', 'chest', 'upper'])],
+      [HumanoidBodyRig.Chest]: [bonePattern(['chest'], ['upper']), bonePattern(['spine', '1'])],
+      [HumanoidBodyRig.UpperChest]: [
+        bonePattern(['upper', 'chest']),
+        bonePattern(['spine', '2']),
+        bonePattern(['spine', '3'])
+      ],
+      [HumanoidBodyRig.Neck]: [bonePattern(['neck'], ['1', '2'])],
+      [HumanoidBodyRig.Head]: [bonePattern(['head'], ['top', 'end', 'nub'])],
+      [HumanoidBodyRig.LeftShoulder]: sideBonePatterns('left', [
+        { all: ['shoulder'] },
+        { all: ['clavicle'] }
+      ]),
+      [HumanoidBodyRig.LeftUpperArm]: sideBonePatterns('left', [
+        { all: ['upper', 'arm'], none: ['twist'] },
+        { all: ['arm'], none: ['fore', 'lower', 'hand', 'twist', 'shoulder'] }
+      ]),
+      [HumanoidBodyRig.LeftLowerArm]: sideBonePatterns('left', [
+        { all: ['lower', 'arm'], none: ['twist'] },
+        { all: ['fore', 'arm'], none: ['twist'] }
+      ]),
+      [HumanoidBodyRig.LeftHand]: sideBonePatterns('left', [
+        { all: ['hand'], none: ['thumb', 'index', 'middle', 'ring', 'pinky'] }
+      ]),
+      [HumanoidBodyRig.RightShoulder]: sideBonePatterns('right', [
+        { all: ['shoulder'] },
+        { all: ['clavicle'] }
+      ]),
+      [HumanoidBodyRig.RightUpperArm]: sideBonePatterns('right', [
+        { all: ['upper', 'arm'], none: ['twist'] },
+        { all: ['arm'], none: ['fore', 'lower', 'hand', 'twist', 'shoulder'] }
+      ]),
+      [HumanoidBodyRig.RightLowerArm]: sideBonePatterns('right', [
+        { all: ['lower', 'arm'], none: ['twist'] },
+        { all: ['fore', 'arm'], none: ['twist'] }
+      ]),
+      [HumanoidBodyRig.RightHand]: sideBonePatterns('right', [
+        { all: ['hand'], none: ['thumb', 'index', 'middle', 'ring', 'pinky'] }
+      ]),
+      [HumanoidBodyRig.LeftUpperLeg]: sideBonePatterns('left', [
+        { all: ['upper', 'leg'] },
+        { all: ['up', 'leg'] },
+        { all: ['thigh'] }
+      ]),
+      [HumanoidBodyRig.LeftLowerLeg]: sideBonePatterns('left', [
+        { all: ['lower', 'leg'] },
+        { all: ['leg'], none: ['upper', 'up', 'thigh', 'foot', 'toe'] },
+        { all: ['calf'] },
+        { all: ['shin'] }
+      ]),
+      [HumanoidBodyRig.LeftFoot]: sideBonePatterns('left', [{ all: ['foot'], none: ['toe'] }]),
+      [HumanoidBodyRig.LeftToes]: sideBonePatterns('left', [
+        { all: ['toe', 'base'] },
+        { all: ['toe'], none: ['end'] }
+      ]),
+      [HumanoidBodyRig.RightUpperLeg]: sideBonePatterns('right', [
+        { all: ['upper', 'leg'] },
+        { all: ['up', 'leg'] },
+        { all: ['thigh'] }
+      ]),
+      [HumanoidBodyRig.RightLowerLeg]: sideBonePatterns('right', [
+        { all: ['lower', 'leg'] },
+        { all: ['leg'], none: ['upper', 'up', 'thigh', 'foot', 'toe'] },
+        { all: ['calf'] },
+        { all: ['shin'] }
+      ]),
+      [HumanoidBodyRig.RightFoot]: sideBonePatterns('right', [{ all: ['foot'], none: ['toe'] }]),
+      [HumanoidBodyRig.RightToes]: sideBonePatterns('right', [
+        { all: ['toe', 'base'] },
+        { all: ['toe'], none: ['end'] }
+      ])
+    };
+  }
+  private static createMixamoHumanoidBodyProfile(): HumanoidBoneProfile<HumanoidBodyRig> {
+    return {
+      [HumanoidBodyRig.Hips]: [bonePattern(['hips'])],
+      [HumanoidBodyRig.Spine]: [bonePattern(['spine'], ['1', '2', '3'])],
+      [HumanoidBodyRig.Chest]: [bonePattern(['spine', '1']), bonePattern(['chest'], ['upper'])],
+      [HumanoidBodyRig.UpperChest]: [
+        bonePattern(['spine', '2']),
+        bonePattern(['spine', '3']),
+        bonePattern(['upper', 'chest'])
+      ],
+      [HumanoidBodyRig.Neck]: [bonePattern(['neck'], ['1', '2'])],
+      [HumanoidBodyRig.Head]: [bonePattern(['head'], ['top', 'end', 'nub'])],
+      [HumanoidBodyRig.LeftShoulder]: sideBonePatterns('left', [
+        { all: ['shoulder'] },
+        { all: ['clavicle'] }
+      ]),
+      [HumanoidBodyRig.LeftUpperArm]: sideBonePatterns('left', [
+        { all: ['arm'], none: ['upper', 'fore', 'lower', 'hand', 'twist', 'shoulder'] },
+        { all: ['upper', 'arm'], none: ['twist'] }
+      ]),
+      [HumanoidBodyRig.LeftLowerArm]: sideBonePatterns('left', [
+        { all: ['fore', 'arm'], none: ['twist'] },
+        { all: ['lower', 'arm'], none: ['twist'] }
+      ]),
+      [HumanoidBodyRig.LeftHand]: sideBonePatterns('left', [
+        { all: ['hand'], none: ['thumb', 'index', 'middle', 'ring', 'pinky'] }
+      ]),
+      [HumanoidBodyRig.RightShoulder]: sideBonePatterns('right', [
+        { all: ['shoulder'] },
+        { all: ['clavicle'] }
+      ]),
+      [HumanoidBodyRig.RightUpperArm]: sideBonePatterns('right', [
+        { all: ['arm'], none: ['upper', 'fore', 'lower', 'hand', 'twist', 'shoulder'] },
+        { all: ['upper', 'arm'], none: ['twist'] }
+      ]),
+      [HumanoidBodyRig.RightLowerArm]: sideBonePatterns('right', [
+        { all: ['fore', 'arm'], none: ['twist'] },
+        { all: ['lower', 'arm'], none: ['twist'] }
+      ]),
+      [HumanoidBodyRig.RightHand]: sideBonePatterns('right', [
+        { all: ['hand'], none: ['thumb', 'index', 'middle', 'ring', 'pinky'] }
+      ]),
+      [HumanoidBodyRig.LeftUpperLeg]: sideBonePatterns('left', [
+        { all: ['up', 'leg'] },
+        { all: ['upper', 'leg'] },
+        { all: ['thigh'] }
+      ]),
+      [HumanoidBodyRig.LeftLowerLeg]: sideBonePatterns('left', [
+        { all: ['leg'], none: ['upper', 'up', 'thigh', 'foot', 'toe'] },
+        { all: ['lower', 'leg'] },
+        { all: ['calf'] },
+        { all: ['shin'] }
+      ]),
+      [HumanoidBodyRig.LeftFoot]: sideBonePatterns('left', [{ all: ['foot'], none: ['toe'] }]),
+      [HumanoidBodyRig.LeftToes]: sideBonePatterns('left', [
+        { all: ['toe', 'base'] },
+        { all: ['toe'], none: ['end'] }
+      ]),
+      [HumanoidBodyRig.RightUpperLeg]: sideBonePatterns('right', [
+        { all: ['up', 'leg'] },
+        { all: ['upper', 'leg'] },
+        { all: ['thigh'] }
+      ]),
+      [HumanoidBodyRig.RightLowerLeg]: sideBonePatterns('right', [
+        { all: ['leg'], none: ['upper', 'up', 'thigh', 'foot', 'toe'] },
+        { all: ['lower', 'leg'] },
+        { all: ['calf'] },
+        { all: ['shin'] }
+      ]),
+      [HumanoidBodyRig.RightFoot]: sideBonePatterns('right', [{ all: ['foot'], none: ['toe'] }]),
+      [HumanoidBodyRig.RightToes]: sideBonePatterns('right', [
+        { all: ['toe', 'base'] },
+        { all: ['toe'], none: ['end'] }
+      ])
+    };
+  }
+  private static createBipedHumanoidBodyProfile(): HumanoidBoneProfile<HumanoidBodyRig> {
+    return {
+      [HumanoidBodyRig.Hips]: [bonePattern(['pelvis']), bonePattern(['hips'])],
+      [HumanoidBodyRig.Spine]: [bonePattern(['spine'], ['1', '2', '3'])],
+      [HumanoidBodyRig.Chest]: [bonePattern(['spine', '1']), bonePattern(['chest'], ['upper'])],
+      [HumanoidBodyRig.UpperChest]: [
+        bonePattern(['spine', '2']),
+        bonePattern(['spine', '3']),
+        bonePattern(['upper', 'chest'])
+      ],
+      [HumanoidBodyRig.Neck]: [bonePattern(['neck'], ['1', '2'])],
+      [HumanoidBodyRig.Head]: [bonePattern(['head'], ['top', 'end', 'nub'])],
+      [HumanoidBodyRig.LeftShoulder]: sideBonePatterns('left', [
+        { all: ['clavicle'] },
+        { all: ['shoulder'] }
+      ]),
+      [HumanoidBodyRig.LeftUpperArm]: sideBonePatterns('left', [
+        { all: ['upper', 'arm'], none: ['twist'] },
+        { all: ['arm'], none: ['fore', 'lower', 'hand', 'twist', 'shoulder', 'clavicle'] }
+      ]),
+      [HumanoidBodyRig.LeftLowerArm]: sideBonePatterns('left', [
+        { all: ['fore', 'arm'], none: ['twist'] },
+        { all: ['lower', 'arm'], none: ['twist'] }
+      ]),
+      [HumanoidBodyRig.LeftHand]: sideBonePatterns('left', [
+        { all: ['hand'], none: ['finger', 'thumb', 'index', 'middle', 'ring', 'pinky'] }
+      ]),
+      [HumanoidBodyRig.RightShoulder]: sideBonePatterns('right', [
+        { all: ['clavicle'] },
+        { all: ['shoulder'] }
+      ]),
+      [HumanoidBodyRig.RightUpperArm]: sideBonePatterns('right', [
+        { all: ['upper', 'arm'], none: ['twist'] },
+        { all: ['arm'], none: ['fore', 'lower', 'hand', 'twist', 'shoulder', 'clavicle'] }
+      ]),
+      [HumanoidBodyRig.RightLowerArm]: sideBonePatterns('right', [
+        { all: ['fore', 'arm'], none: ['twist'] },
+        { all: ['lower', 'arm'], none: ['twist'] }
+      ]),
+      [HumanoidBodyRig.RightHand]: sideBonePatterns('right', [
+        { all: ['hand'], none: ['finger', 'thumb', 'index', 'middle', 'ring', 'pinky'] }
+      ]),
+      [HumanoidBodyRig.LeftUpperLeg]: sideBonePatterns('left', [
+        { all: ['thigh'] },
+        { all: ['upper', 'leg'] },
+        { all: ['up', 'leg'] }
+      ]),
+      [HumanoidBodyRig.LeftLowerLeg]: sideBonePatterns('left', [
+        { all: ['calf'] },
+        { all: ['lower', 'leg'] },
+        { all: ['leg'], none: ['upper', 'up', 'thigh', 'foot', 'toe'] }
+      ]),
+      [HumanoidBodyRig.LeftFoot]: sideBonePatterns('left', [{ all: ['foot'], none: ['toe'] }]),
+      [HumanoidBodyRig.LeftToes]: sideBonePatterns('left', [
+        { all: ['toe', '0'] },
+        { all: ['toe'], none: ['end'] }
+      ]),
+      [HumanoidBodyRig.RightUpperLeg]: sideBonePatterns('right', [
+        { all: ['thigh'] },
+        { all: ['upper', 'leg'] },
+        { all: ['up', 'leg'] }
+      ]),
+      [HumanoidBodyRig.RightLowerLeg]: sideBonePatterns('right', [
+        { all: ['calf'] },
+        { all: ['lower', 'leg'] },
+        { all: ['leg'], none: ['upper', 'up', 'thigh', 'foot', 'toe'] }
+      ]),
+      [HumanoidBodyRig.RightFoot]: sideBonePatterns('right', [{ all: ['foot'], none: ['toe'] }]),
+      [HumanoidBodyRig.RightToes]: sideBonePatterns('right', [
+        { all: ['toe', '0'] },
+        { all: ['toe'], none: ['end'] }
+      ])
+    };
+  }
+  private static tryExtractHumanoidBonesByBodyProfile(
+    root: SceneNode,
+    bodyProfile: HumanoidBoneProfile<HumanoidBodyRig>
+  ): HumanoidBoneExtraction | null {
+    const nodes = this.collectHumanoidBoneNodeInfos(root);
+    const used = new Set<SceneNode>();
+    const bodyCandidates = this.matchHumanoidBoneProfile(
+      nodes,
+      bodyProfile,
+      used,
+      new Set<HumanoidBodyRig>([HumanoidBodyRig.Chest, HumanoidBodyRig.UpperChest])
+    );
+    if (!bodyCandidates) {
+      return null;
+    }
+    const body = this.completeHumanoidBody(bodyCandidates);
+    if (!body) {
+      return null;
+    }
+    const leftHand = this.tryExtractOptionalHumanoidHand(nodes, 'left', used);
+    const rightHand = this.tryExtractOptionalHumanoidHand(nodes, 'right', used);
+    const result: HumanoidBoneExtraction = {
+      body,
+      leftHand,
+      rightHand
+    };
+    return this.validateHumanoidBoneExtraction(result) ? result : null;
+  }
+  /**
+   * Attempt to extract humanoid bone mappings from the skeleton's joints based on their names.
+   *
+   * This method looks for joints with names matching the standardized `HumanoidBodyRig` and `HumanoidHandRig` enums.
+   * If a complete mapping is found, it returns an object containing the mapped joints for the body and hands.
+   * If any required joint is missing, it returns `null`.
+   *
+   * This method tries to find the best match for humanoid rigs, designed to work with Mixamo, VRoid, Unity Humanoid,
+   * Biped, and similar skeletons. It is not guaranteed to work with all models, and may require manual adjustments or
+   * custom modifiers for non-standard rigs.
+   *
+   * @param root - The root scene node to search for humanoid bones.
+   * @returns An object containing the mapped body and hand joints if a complete humanoid rig is detected, otherwise `null`.
+   */
+  static tryExtractHumanoidBones(root: SceneNode): HumanoidBoneExtraction | null {
+    return (
+      this.tryExtractHumanoidBonesMixamo(root) ??
+      this.tryExtractHumanoidBonesVRM(root) ??
+      this.tryExtractHumanoidBonesUnityHumanoid(root) ??
+      this.tryExtractHumanoidBonesBiped(root)
+    );
+  }
+  static tryExtractHumanoidBonesMixamo(root: SceneNode): HumanoidBoneExtraction | null {
+    return this.tryExtractHumanoidBonesByBodyProfile(root, this.createMixamoHumanoidBodyProfile());
+  }
+  static tryExtractHumanoidBonesVRM(root: SceneNode): HumanoidBoneExtraction | null {
+    return this.tryExtractHumanoidBonesByBodyProfile(root, this.createStandardHumanoidBodyProfile());
+  }
+  static tryExtractHumanoidBonesUnityHumanoid(root: SceneNode): HumanoidBoneExtraction | null {
+    return this.tryExtractHumanoidBonesByBodyProfile(root, this.createStandardHumanoidBodyProfile());
+  }
+  static tryExtractHumanoidBonesBiped(root: SceneNode): HumanoidBoneExtraction | null {
+    return this.tryExtractHumanoidBonesByBodyProfile(root, this.createBipedHumanoidBodyProfile());
   }
 }
