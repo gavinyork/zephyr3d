@@ -148,6 +148,18 @@ export class JSONArray extends JSONData {
   }
 }
 
+function clampPositiveCapsuleAxisDistance(prop: JSONNumber, value: number): number {
+  if (
+    (prop.name === 'offset' || prop.name === 'endOffset') &&
+    prop.parent &&
+    !(prop.parent instanceof JSONArray) &&
+    prop.parent.data?.type === 'capsule'
+  ) {
+    return Math.max(0.0001, Math.abs(value));
+  }
+  return value;
+}
+
 export function getJSONPropClass(): SerializableClass {
   return {
     ctor: JSONProp,
@@ -234,8 +246,9 @@ export function getJSONNumberClass(): SerializableClass {
             value.num![0] = this.value;
           },
           set(this: JSONNumber, value) {
-            if (this.value !== value.num![0]) {
-              this.value = value.num![0];
+            const nextValue = clampPositiveCapsuleAxisDistance(this, value.num![0]);
+            if (this.value !== nextValue) {
+              this.value = nextValue;
               this.parent!.updateProps();
             }
           }

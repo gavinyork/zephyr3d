@@ -61,6 +61,20 @@ export default class extends RuntimeScript {
       }
       return fallback.clone();
     };
+    const parseCapsuleDistance = (value, fallback, scale = 1) => {
+      const minValue = 0.0001 * scale;
+      let distance = Math.abs(Number(fallback) || 0);
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        distance = Math.abs(value);
+      } else if (Array.isArray(value) && value.length >= 3) {
+        const x = Number(value[0]) || 0;
+        const y = Number(value[1]) || 0;
+        const z = Number(value[2]) || 0;
+        const legacyDistance = Math.abs(x) > 1e-6 ? Math.abs(x) : Math.hypot(x, y, z);
+        distance = legacyDistance || distance;
+      }
+      return Math.max(minValue, distance * scale);
+    };
     const getSceneColliderMeta = (node) => {
       const meta = node?.metaData;
       const collider = meta?.sceneCollider;
@@ -97,15 +111,17 @@ export default class extends RuntimeScript {
         let collider = null;
         if (colliderConfig.type === 'sphere') {
           collider = createSphereCollider(
-            parseVec3(colliderConfig.offset, Vector3.zero(), unitScale),
+            Vector3.zero(),
             Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
             node
           );
           collider.localRadiusScaleRef = 1;
         } else if (colliderConfig.type === 'capsule') {
+          const startDistance = parseCapsuleDistance(colliderConfig.offset, 0.1, unitScale);
+          const endDistance = parseCapsuleDistance(colliderConfig.endOffset, 0.1, unitScale);
           collider = createCapsuleCollider(
-            parseVec3(colliderConfig.offset, Vector3.zero(), unitScale),
-            parseVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale),
+            new Vector3(startDistance, 0, 0),
+            new Vector3(-endDistance, 0, 0),
             Math.max(0, (Number(colliderConfig.radius) || 0.1) * unitScale),
             node
           );
@@ -340,6 +356,28 @@ function parseSceneColliderVec3(value, fallback, scale = 1) {
   return fallback.clone();
 }
 
+function parseSceneColliderDistance(value, fallback, scale = 1) {
+  const minValue = 0.0001 * scale;
+  let distance = Math.abs(Number(fallback) || 0);
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    distance = Math.abs(value);
+  } else if (Array.isArray(value) && value.length >= 3) {
+    const x = Number(value[0]) || 0;
+    const y = Number(value[1]) || 0;
+    const z = Number(value[2]) || 0;
+    const legacyDistance = Math.abs(x) > 1e-6 ? Math.abs(x) : Math.hypot(x, y, z);
+    distance = legacyDistance || distance;
+  }
+  return Math.max(minValue, distance * scale);
+}
+
+function buildSceneColliderCapsulePoints(offset, endOffset, scale = 1) {
+  return {
+    start: new Vector3(parseSceneColliderDistance(offset, 0.1, scale), 0, 0),
+    end: new Vector3(-parseSceneColliderDistance(endOffset, 0.1, scale), 0, 0)
+  };
+}
+
 function sceneColliderVec3ToArray(value) {
   return [value.x, value.y, value.z];
 }
@@ -363,15 +401,16 @@ function collectSceneNodeColliders(host, includePlane = false) {
     let collider = null;
     if (colliderConfig.type === 'sphere') {
       collider = createSphereCollider(
-        parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale),
+        Vector3.zero(),
         Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
         node
       );
       collider.localRadiusScaleRef = 1;
     } else if (colliderConfig.type === 'capsule') {
+      const capsulePoints = buildSceneColliderCapsulePoints(colliderConfig.offset, colliderConfig.endOffset, unitScale);
       collider = createCapsuleCollider(
-        parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale),
-        parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale),
+        capsulePoints.start,
+        capsulePoints.end,
         Math.max(0, (Number(colliderConfig.radius) || 0.1) * unitScale),
         node
       );
@@ -408,13 +447,21 @@ function serializeSceneColliderConfig(host, includePlane = false) {
       return false;
     }
     const unitScale = entry?.legacy ? 0.1 : 1;
+    const isCapsule = colliderConfig.type === 'capsule';
+    const isSphere = colliderConfig.type === 'sphere';
     colliders.push({
       type: colliderConfig.type,
       enabled: colliderConfig.enabled !== false,
-      offset: sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale)),
-      endOffset: sceneColliderVec3ToArray(
-        parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale)
-      ),
+      offset: isSphere
+        ? undefined
+        : isCapsule
+        ? parseSceneColliderDistance(colliderConfig.offset, 0.1, unitScale)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale)),
+      endOffset: isSphere
+        ? undefined
+        : isCapsule
+        ? parseSceneColliderDistance(colliderConfig.endOffset, 0.1, unitScale)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale)),
       normal: sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY())),
       radius: Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
       planeSize: Math.max(0, (Number(colliderConfig.planeSize) || 0.5) * unitScale)
@@ -510,6 +557,32 @@ function parseSceneColliderVec3(value: unknown, fallback: Vector3, scale = 1) {
   return fallback.clone();
 }
 
+function parseSceneColliderDistance(value: unknown, fallback: number, scale = 1): number {
+  const minValue = 0.0001 * scale;
+  let distance = Math.abs(Number(fallback) || 0);
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    distance = Math.abs(value);
+  } else if (Array.isArray(value) && value.length >= 3) {
+    const x = Number(value[0]) || 0;
+    const y = Number(value[1]) || 0;
+    const z = Number(value[2]) || 0;
+    const legacyDistance = Math.abs(x) > 1e-6 ? Math.abs(x) : Math.hypot(x, y, z);
+    distance = legacyDistance || distance;
+  }
+  return Math.max(minValue, distance * scale);
+}
+
+function buildSceneColliderCapsulePoints(
+  offset: unknown,
+  endOffset: unknown,
+  scale = 1
+): { start: Vector3; end: Vector3 } {
+  return {
+    start: new Vector3(parseSceneColliderDistance(offset, 0.1, scale), 0, 0),
+    end: new Vector3(-parseSceneColliderDistance(endOffset, 0.1, scale), 0, 0)
+  };
+}
+
 function sceneColliderVec3ToArray(value: Vector3): [number, number, number] {
   return [value.x, value.y, value.z];
 }
@@ -533,15 +606,16 @@ function collectSceneNodeColliders(host: any, includePlane = false) {
     let collider = null;
     if (colliderConfig.type === 'sphere') {
       collider = createSphereCollider(
-        parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale),
+        Vector3.zero(),
         Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
         node
       );
       collider.localRadiusScaleRef = 1;
     } else if (colliderConfig.type === 'capsule') {
+      const capsulePoints = buildSceneColliderCapsulePoints(colliderConfig.offset, colliderConfig.endOffset, unitScale);
       collider = createCapsuleCollider(
-        parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale),
-        parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale),
+        capsulePoints.start,
+        capsulePoints.end,
         Math.max(0, (Number(colliderConfig.radius) || 0.1) * unitScale),
         node
       );
@@ -578,13 +652,21 @@ function serializeSceneNodeColliderConfig(host: any, includePlane = false) {
       return false;
     }
     const unitScale = entry?.legacy ? 0.1 : 1;
+    const isCapsule = colliderConfig.type === 'capsule';
+    const isSphere = colliderConfig.type === 'sphere';
     colliders.push({
       type: colliderConfig.type,
       enabled: colliderConfig.enabled !== false,
-      offset: sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale)),
-      endOffset: sceneColliderVec3ToArray(
-        parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale)
-      ),
+      offset: isSphere
+        ? undefined
+        : isCapsule
+        ? parseSceneColliderDistance(colliderConfig.offset, 0.1, unitScale)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale)),
+      endOffset: isSphere
+        ? undefined
+        : isCapsule
+        ? parseSceneColliderDistance(colliderConfig.endOffset, 0.1, unitScale)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale)),
       normal: sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY())),
       radius: Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
       planeSize: Math.max(0, (Number(colliderConfig.planeSize) || 0.5) * unitScale)
@@ -937,6 +1019,32 @@ function parseSceneColliderVec3(value: unknown, fallback: Vector3, scale = 1) {
   return fallback.clone();
 }
 
+function parseSceneColliderDistance(value: unknown, fallback: number, scale = 1): number {
+  const minValue = 0.0001 * scale;
+  let distance = Math.abs(Number(fallback) || 0);
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    distance = Math.abs(value);
+  } else if (Array.isArray(value) && value.length >= 3) {
+    const x = Number(value[0]) || 0;
+    const y = Number(value[1]) || 0;
+    const z = Number(value[2]) || 0;
+    const legacyDistance = Math.abs(x) > 1e-6 ? Math.abs(x) : Math.hypot(x, y, z);
+    distance = legacyDistance || distance;
+  }
+  return Math.max(minValue, distance * scale);
+}
+
+function buildSceneColliderCapsulePoints(
+  offset: unknown,
+  endOffset: unknown,
+  scale = 1
+): { start: Vector3; end: Vector3 } {
+  return {
+    start: new Vector3(parseSceneColliderDistance(offset, 0.1, scale), 0, 0),
+    end: new Vector3(-parseSceneColliderDistance(endOffset, 0.1, scale), 0, 0)
+  };
+}
+
 function sceneColliderVec3ToArray(value: Vector3): [number, number, number] {
   return [value.x, value.y, value.z];
 }
@@ -960,15 +1068,16 @@ function collectSceneNodeColliders(host: any, includePlane = false) {
     let collider = null;
     if (colliderConfig.type === 'sphere') {
       collider = createSphereCollider(
-        parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale),
+        Vector3.zero(),
         Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
         node
       );
       collider.localRadiusScaleRef = 1;
     } else if (colliderConfig.type === 'capsule') {
+      const capsulePoints = buildSceneColliderCapsulePoints(colliderConfig.offset, colliderConfig.endOffset, unitScale);
       collider = createCapsuleCollider(
-        parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale),
-        parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale),
+        capsulePoints.start,
+        capsulePoints.end,
         Math.max(0, (Number(colliderConfig.radius) || 0.1) * unitScale),
         node
       );
@@ -1005,13 +1114,21 @@ function serializeSceneNodeColliderConfig(host: any, includePlane = false) {
       return false;
     }
     const unitScale = entry?.legacy ? 0.1 : 1;
+    const isCapsule = colliderConfig.type === 'capsule';
+    const isSphere = colliderConfig.type === 'sphere';
     colliders.push({
       type: colliderConfig.type,
       enabled: colliderConfig.enabled !== false,
-      offset: sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale)),
-      endOffset: sceneColliderVec3ToArray(
-        parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale)
-      ),
+      offset: isSphere
+        ? undefined
+        : isCapsule
+        ? parseSceneColliderDistance(colliderConfig.offset, 0.1, unitScale)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale)),
+      endOffset: isSphere
+        ? undefined
+        : isCapsule
+        ? parseSceneColliderDistance(colliderConfig.endOffset, 0.1, unitScale)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale)),
       normal: sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY())),
       radius: Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
       planeSize: Math.max(0, (Number(colliderConfig.planeSize) || 0.5) * unitScale)

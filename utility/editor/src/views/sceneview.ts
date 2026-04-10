@@ -2118,7 +2118,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               type: 'sphere',
               enabled: true,
               visible: true,
-              offset: [0, 0, 0],
               radius: 0.15
             }
           }
@@ -2128,8 +2127,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 type: 'capsule',
                 enabled: true,
                 visible: true,
-                offset: [0, 0, 0],
-                endOffset: [0, 0.2, 0],
+                offset: 0.1,
+                endOffset: 0.1,
                 radius: 0.1
               }
             }
