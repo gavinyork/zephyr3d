@@ -70,7 +70,7 @@ import { DlgSaveFile } from './dlg/savefiledlg';
 import { ResourceService } from '../core/services/resource';
 import { DlgMessage } from './dlg/messagedlg';
 
-type SpringColliderKind = 'sphere' | 'capsule' | 'plane';
+type ColliderKind = 'sphere' | 'capsule' | 'plane';
 type MultiTransformItem = {
   node: SceneNode;
   startWorld: Matrix4x4;
@@ -1116,7 +1116,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.on('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.on('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.on('request_save_prefab', this.handleSavePrefab, this);
-      this._sceneHierarchy.on('request_add_spring_collider', this.handleAddSpringCollider, this);
+      this._sceneHierarchy.on('request_add_collider', this.handleAddCollider, this);
       this.controller.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
       this.controller.model.scene.rootNode.iterate((node) => {
         this._proxy!.createProxy(node);
@@ -1153,7 +1153,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.off('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.off('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.off('request_save_prefab', this.handleSavePrefab, this);
-      this._sceneHierarchy.off('request_add_spring_collider', this.handleAddSpringCollider, this);
+      this._sceneHierarchy.off('request_add_collider', this.handleAddCollider, this);
       this._sceneHierarchy = null;
     }
     if (this.controller.model.scene) {
@@ -1234,7 +1234,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (object instanceof SceneNode) {
       this._proxy!.updateProxy(object);
       this.syncPropertyToMultiSelection(object, prop);
-    } else if (this.shouldRefreshSelectedSpringColliderProxy(prop)) {
+    } else if (this.shouldRefreshSelectedColliderProxy(prop)) {
       const selectedNode = this._sceneHierarchy?.selectedNode;
       if (selectedNode) {
         this._proxy!.updateProxy(selectedNode);
@@ -1300,13 +1300,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     eventBus.dispatchEvent('scene_changed');
   }
-  private shouldRefreshSelectedSpringColliderProxy(prop: PropertyAccessor) {
+  private shouldRefreshSelectedColliderProxy(prop: PropertyAccessor) {
     const selectedNode = this._sceneHierarchy?.selectedNode;
     if (!selectedNode || !selectedNode.metaData || typeof selectedNode.metaData !== 'object') {
       return false;
     }
-    const springCollider = (selectedNode.metaData as any).springCollider;
-    if (!springCollider || typeof springCollider !== 'object') {
+    const collider = (selectedNode.metaData as any).sceneCollider ?? (selectedNode.metaData as any).springCollider;
+    if (!collider || typeof collider !== 'object') {
       return false;
     }
     const cls = getEngine().resourceManager.getClassByProperty(prop);
@@ -2110,59 +2110,37 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       }
     });
   }
-  private isSpringTestScript(script: string): boolean {
-    const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
-    return /(^|\/)springtest(\.ts|\.js)?$/.test(normalized);
-  }
-  private findSpringHost(startNode: SceneNode): Nullable<SceneNode> {
-    let current: Nullable<SceneNode> = startNode;
-    while (current) {
-      if (this.isSpringTestScript((current as any).script ?? '')) {
-        return current;
-      }
-      current = current.parent;
-    }
-    return null;
-  }
-  private handleAddSpringCollider(node: SceneNode, type: SpringColliderKind) {
-    const springHost = this.findSpringHost(node);
-    if (!springHost) {
-      DlgMessage.messageBox(
-        'Spring Collider',
-        'No spring script host found in this bone hierarchy. Please attach Spring Test script first.'
-      );
-      return;
-    }
+  private handleAddCollider(node: SceneNode, type: ColliderKind) {
     const defaultMeta =
       type === 'sphere'
         ? {
-            springCollider: {
+            sceneCollider: {
               type: 'sphere',
               enabled: true,
               visible: true,
               offset: [0, 0, 0],
-              radius: 1.5
+              radius: 0.15
             }
           }
         : type === 'capsule'
           ? {
-              springCollider: {
+              sceneCollider: {
                 type: 'capsule',
                 enabled: true,
                 visible: true,
                 offset: [0, 0, 0],
-                endOffset: [0, 2, 0],
-                radius: 1
+                endOffset: [0, 0.2, 0],
+                radius: 0.1
               }
             }
           : {
-              springCollider: {
+              sceneCollider: {
                 type: 'plane',
                 enabled: true,
                 visible: true,
                 offset: [0, 0, 0],
                 normal: [0, 1, 0],
-                planeSize: 5
+                planeSize: 0.5
               }
             };
     const typeName = type === 'sphere' ? 'Sphere' : type === 'capsule' ? 'Capsule' : 'Plane';

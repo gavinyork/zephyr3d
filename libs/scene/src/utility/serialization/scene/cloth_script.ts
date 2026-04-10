@@ -2,6 +2,10 @@ import { defineProps, type SerializableClass } from '../types';
 
 export type ClothColliderType = 'sphere' | 'capsule';
 
+function clamp01(value: number) {
+  return Math.min(Math.max(value, 0), 1);
+}
+
 export class ClothColliderConfig {
   type: ClothColliderType;
   enabled: boolean;
@@ -48,7 +52,7 @@ export class ClothScriptConfig {
   constructor() {
     this.enabled = true;
     this.autoUpdate = true;
-    this.damping = 0.995;
+    this.damping = 0.02;
     this.stiffness = 0.3;
     this.gravityX = 0;
     this.gravityY = -9.8;
@@ -264,7 +268,7 @@ export function getClothScriptConfigClass(): SerializableClass {
             value.num[0] = this.damping;
           },
           set(this: ClothScriptConfig, value) {
-            this.damping = value.num[0];
+            this.damping = clamp01(value.num[0]);
           }
         },
         {
@@ -279,7 +283,7 @@ export function getClothScriptConfigClass(): SerializableClass {
             value.num[0] = this.stiffness;
           },
           set(this: ClothScriptConfig, value) {
-            this.stiffness = value.num[0];
+            this.stiffness = clamp01(value.num[0]);
           }
         },
         {

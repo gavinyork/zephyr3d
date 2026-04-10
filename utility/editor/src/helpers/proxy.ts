@@ -164,7 +164,7 @@ export class NodeProxy extends Disposable {
   }
   private getSpringColliderMeta(src: SceneNode): any | null {
     const meta = src.metaData as any;
-    const collider = meta?.springCollider;
+    const collider = meta?.sceneCollider ?? meta?.springCollider;
     if (!collider || typeof collider !== 'object') {
       return null;
     }
@@ -181,11 +181,18 @@ export class NodeProxy extends Disposable {
     if ('alpha' in collider) {
       delete collider.alpha;
     }
-    return collider;
+    return {
+      ...collider,
+      __unitScale: meta?.sceneCollider ? 1 : 0.1
+    };
   }
-  private getVector3Array(value: unknown, fallback: Vector3): Vector3 {
+  private getVector3Array(value: unknown, fallback: Vector3, scale = 1): Vector3 {
     if (Array.isArray(value) && value.length >= 3) {
-      return new Vector3(Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0);
+      return new Vector3(
+        (Number(value[0]) || 0) * scale,
+        (Number(value[1]) || 0) * scale,
+        (Number(value[2]) || 0) * scale
+      );
     }
     return fallback.clone();
   }
@@ -226,7 +233,7 @@ export class NodeProxy extends Disposable {
     return new Mesh(this._scene, this._colliderSpherePrimitive.get(), this._colliderProxyMaterial.get().createInstance());
   }
   private updateSpringColliderProxy(proxy: Mesh, meta: any) {
-    const COLLIDER_PANEL_SCALE = 10;
+    const unitScale = Number(meta?.__unitScale) || 1;
     const mat = proxy.material as UnlitMaterial;
     const visible = meta?.visible !== false;
     proxy.showState = visible ? 'visible' : 'hidden';
@@ -236,26 +243,19 @@ export class NodeProxy extends Disposable {
       return;
     }
     if (meta.type === 'sphere') {
-      const radius = Math.max(0.001, (Number(meta.radius) || 0.15) * COLLIDER_PANEL_SCALE);
-      const offset = this.getVector3Array(meta.offset, Vector3.zero());
+      const radius = Math.max(0.001, (Number(meta.radius) || 0.15) * unitScale);
+      const offset = this.getVector3Array(meta.offset, Vector3.zero(), unitScale);
       proxy.position.set(offset);
       proxy.rotation.identity();
       proxy.scale.setXYZ(radius * 2, radius * 2, radius * 2);
       return;
     }
     if (meta.type === 'capsule') {
-      const radius = Math.max(0.001, (Number(meta.radius) || 0.1) * COLLIDER_PANEL_SCALE);
-      const startOffset = this.getVector3Array(meta.offset, Vector3.zero());
-      const endOffset = this.getVector3Array(meta.endOffset, new Vector3(0, 0.2, 0));
+      const radius = Math.max(0.001, (Number(meta.radius) || 0.1) * unitScale);
+      const startOffset = this.getVector3Array(meta.offset, Vector3.zero(), unitScale);
+      const endOffset = this.getVector3Array(meta.endOffset, new Vector3(0, 0.2, 0), unitScale);
       const center = Vector3.scale(Vector3.add(startOffset, endOffset, new Vector3()), 0.5, new Vector3());
-      const half = Vector3.scale(
-        Vector3.sub(endOffset, startOffset, new Vector3()),
-        0.5 * COLLIDER_PANEL_SCALE,
-        new Vector3()
-      );
-      const scaledStart = Vector3.sub(center, half, new Vector3());
-      const scaledEnd = Vector3.add(center, half, new Vector3());
-      const axis = Vector3.sub(scaledEnd, scaledStart, new Vector3());
+      const axis = Vector3.sub(endOffset, startOffset, new Vector3());
       const length = Math.max(0.001, axis.magnitude);
       const dir = Vector3.scale(axis, 1 / length, new Vector3());
       const rot = this.fromToRotation(Vector3.axisPY(), dir);
@@ -264,9 +264,9 @@ export class NodeProxy extends Disposable {
       proxy.scale.setXYZ(radius * 2, length, radius * 2);
       return;
     }
-    const offset = this.getVector3Array(meta.offset, Vector3.zero());
+    const offset = this.getVector3Array(meta.offset, Vector3.zero(), unitScale);
     const normal = this.getVector3Array(meta.normal, Vector3.axisPY());
-    const planeSize = Math.max(0.001, (Number(meta.planeSize) || 0.5) * COLLIDER_PANEL_SCALE);
+    const planeSize = Math.max(0.001, (Number(meta.planeSize) || 0.5) * unitScale);
     const n = normal.magnitudeSq > 1e-6 ? normal.inplaceNormalize() : Vector3.axisPY();
     const rot = this.fromToRotation(Vector3.axisPY(), n);
     proxy.position.set(offset);

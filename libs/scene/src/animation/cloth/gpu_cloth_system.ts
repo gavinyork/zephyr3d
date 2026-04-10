@@ -17,6 +17,7 @@ export type GPUClothSystemOptions = {
   enabled?: boolean;
   device?: Nullable<AbstractDevice>;
   primitive?: Nullable<Primitive>;
+  collisionSpaceNode?: any;
   positionData?: Float32Array<ArrayBuffer>;
   indexData?: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>;
   pinnedVertexWeights?: ArrayLike<number>;
@@ -55,7 +56,7 @@ export function isGPUClothSupported(device?: Nullable<AbstractDevice>) {
   return resolved?.type === 'webgpu';
 }
 
-const DEFAULT_DAMPING = 0.995;
+const DEFAULT_DAMPING = 0.02;
 const DEFAULT_STIFFNESS = 0.3;
 const DEFAULT_SOLVER_ITERATIONS = 5;
 const DEFAULT_MAX_NEIGHBORS = 8;
@@ -242,7 +243,11 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
           this.$l.previous = pb.vec3(this.px, this.py, this.pz);
           this.$l.rest = pb.vec3(this.restX, this.restY, this.restZ);
           this.$l.dt2 = pb.mul(this.deltaTime, this.deltaTime);
-          this.$l.velocity = pb.mul(pb.sub(this.current, this.previous), pb.mul(this.damping, this.freeWeight));
+          // Damping is modeled as velocity loss strength: 0 keeps full inertia, 1 removes it entirely.
+          this.$l.velocity = pb.mul(
+            pb.sub(this.current, this.previous),
+            pb.mul(pb.sub(1, this.damping), this.freeWeight)
+          );
           this.$l.next = pb.add(this.current, this.velocity, pb.mul(this.gravity, pb.mul(this.dt2, this.freeWeight)));
 
           this.$if(pb.greaterThan(this.freeWeight, this.minDistance), function () {
@@ -325,9 +330,13 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
       this.invMass = pb.float[0]().storageBufferReadonly(0);
       this.neighborIndices = pb.int[0]().storageBufferReadonly(0);
       this.restLengths = pb.float[0]().storageBufferReadonly(0);
+      this.sphereData = pb.float[0]().storageBufferReadonly(0);
+      this.capsuleData = pb.float[0]().storageBufferReadonly(0);
       this.vertexCount = pb.uint().uniform(0);
       this.maxNeighbors = pb.uint().uniform(0);
       this.stiffness = pb.float().uniform(0);
+      this.sphereCount = pb.uint().uniform(0);
+      this.capsuleCount = pb.uint().uniform(0);
       this.minDistance = pb.float().uniform(0);
       pb.main(function () {
         this.$l.index = this.$builtins.globalInvocationId.x;
@@ -375,6 +384,58 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
               this.corrected = pb.sub(this.pos, pb.mul(this.correction, this.scale));
             });
             this.corrected = pb.add(pb.mul(this.corrected, this.freeWeight), pb.mul(this.rest, this.pinWeight));
+            this.$for(pb.uint('i'), 0, this.sphereCount, function () {
+              this.$l.sphereBase = pb.mul(this.i, 4);
+              this.$l.center = pb.vec3(
+                this.sphereData.at(this.sphereBase),
+                this.sphereData.at(pb.add(this.sphereBase, 1)),
+                this.sphereData.at(pb.add(this.sphereBase, 2))
+              );
+              this.$l.radius = this.sphereData.at(pb.add(this.sphereBase, 3));
+              this.$l.deltaCol = pb.sub(this.corrected, this.center);
+              this.$l.lenCol = pb.length(this.deltaCol);
+              this.$if(pb.lessThan(this.lenCol, this.radius), function () {
+                this.$if(pb.greaterThan(this.lenCol, this.minDistance), function () {
+                  this.corrected = pb.add(this.center, pb.mul(pb.div(this.deltaCol, this.lenCol), this.radius));
+                }).$else(function () {
+                  this.corrected = pb.add(this.center, pb.vec3(0, this.radius, 0));
+                });
+              });
+            });
+            this.$for(pb.uint('j'), 0, this.capsuleCount, function () {
+              this.$l.capsuleBase = pb.mul(this.j, 8);
+              this.$l.cStart = pb.vec3(
+                this.capsuleData.at(this.capsuleBase),
+                this.capsuleData.at(pb.add(this.capsuleBase, 1)),
+                this.capsuleData.at(pb.add(this.capsuleBase, 2))
+              );
+              this.$l.cRadius = this.capsuleData.at(pb.add(this.capsuleBase, 3));
+              this.$l.cEnd = pb.vec3(
+                this.capsuleData.at(pb.add(this.capsuleBase, 4)),
+                this.capsuleData.at(pb.add(this.capsuleBase, 5)),
+                this.capsuleData.at(pb.add(this.capsuleBase, 6))
+              );
+              this.$l.ab = pb.sub(this.cEnd, this.cStart);
+              this.$l.abLen2 = pb.dot(this.ab, this.ab);
+              this.$l.closest = this.cStart;
+              this.$if(pb.greaterThan(this.abLen2, this.minDistance), function () {
+                this.$l.ap = pb.sub(this.corrected, this.cStart);
+                this.$l.t = pb.clamp(pb.div(pb.dot(this.ap, this.ab), this.abLen2), 0, 1);
+                this.closest = pb.add(this.cStart, pb.mul(this.ab, this.t));
+              });
+              this.$l.deltaCap = pb.sub(this.corrected, this.closest);
+              this.$l.lenCap = pb.length(this.deltaCap);
+              this.$if(pb.lessThan(this.lenCap, this.cRadius), function () {
+                this.$if(pb.greaterThan(this.lenCap, this.minDistance), function () {
+                  this.corrected = pb.add(
+                    this.closest,
+                    pb.mul(pb.div(this.deltaCap, this.lenCap), this.cRadius)
+                  );
+                }).$else(function () {
+                  this.corrected = pb.add(this.closest, pb.vec3(0, this.cRadius, 0));
+                });
+              });
+            });
             this.positions.setAt(this.base, this.corrected.x);
             this.positions.setAt(pb.add(this.base, 1), this.corrected.y);
             this.positions.setAt(pb.add(this.base, 2), this.corrected.z);
@@ -607,6 +668,7 @@ export class GPUClothSystem {
   private _vertexTriangleAdjacencyBuffer: Nullable<GPUDataBuffer>;
   private _normalBuffer: Nullable<StructuredBuffer>;
   private _rebuildNormals: boolean;
+  private _collisionSpaceNode: any;
   private _boundScene: Nullable<Scene>;
   private _autoUpdate: boolean;
 
@@ -657,6 +719,7 @@ export class GPUClothSystem {
     this._vertexTriangleAdjacencyBuffer = null;
     this._normalBuffer = null;
     this._rebuildNormals = options?.rebuildNormals ?? true;
+    this._collisionSpaceNode = options?.collisionSpaceNode ?? null;
     this._boundScene = null;
     this._autoUpdate = options?.autoUpdate ?? true;
 
@@ -828,9 +891,13 @@ export class GPUClothSystem {
       this._constraintBindGroup.setBuffer('invMass', this._invMassBuffer);
       this._constraintBindGroup.setBuffer('neighborIndices', this._neighborIndexBuffer);
       this._constraintBindGroup.setBuffer('restLengths', this._restLengthBuffer);
+      this._constraintBindGroup.setBuffer('sphereData', this._sphereColliderBuffer);
+      this._constraintBindGroup.setBuffer('capsuleData', this._capsuleColliderBuffer);
       this._constraintBindGroup.setValue('vertexCount', vertexCount);
       this._constraintBindGroup.setValue('maxNeighbors', this._maxNeighbors);
       this._constraintBindGroup.setValue('stiffness', this._stiffness);
+      this._constraintBindGroup.setValue('sphereCount', 0);
+      this._constraintBindGroup.setValue('capsuleCount', 0);
       this._constraintBindGroup.setValue('minDistance', 1e-5);
 
       if (this._rebuildNormals) {
@@ -924,6 +991,7 @@ export class GPUClothSystem {
     }
     return GPUClothSystem.createFromPrimitive(mesh.primitive, {
       ...options,
+      collisionSpaceNode: mesh,
       scene: mesh.scene ?? null
     });
   }
@@ -1160,22 +1228,26 @@ export class GPUClothSystem {
     const sphereData = new Float32Array(Math.max(1, spheres.length) * 4);
     for (let i = 0; i < spheres.length; i++) {
       const base = i * 4;
-      sphereData[base] = spheres[i].center.x;
-      sphereData[base + 1] = spheres[i].center.y;
-      sphereData[base + 2] = spheres[i].center.z;
-      sphereData[base + 3] = spheres[i].radius;
+      const center = this.toCollisionSpacePoint(spheres[i].center);
+      sphereData[base] = center.x;
+      sphereData[base + 1] = center.y;
+      sphereData[base + 2] = center.z;
+      sphereData[base + 3] = this.toCollisionSpaceRadius(spheres[i].radius);
     }
 
     const capsuleData = new Float32Array(Math.max(1, capsules.length) * 8);
     for (let i = 0; i < capsules.length; i++) {
       const base = i * 8;
-      capsuleData[base] = capsules[i].start.x;
-      capsuleData[base + 1] = capsules[i].start.y;
-      capsuleData[base + 2] = capsules[i].start.z;
-      capsuleData[base + 3] = capsules[i].radius;
-      capsuleData[base + 4] = capsules[i].end.x;
-      capsuleData[base + 5] = capsules[i].end.y;
-      capsuleData[base + 6] = capsules[i].end.z;
+      const start = this.toCollisionSpacePoint(capsules[i].start);
+      const end = this.toCollisionSpacePoint(capsules[i].end);
+      const axis = Vector3.sub(capsules[i].end, capsules[i].start, new Vector3());
+      capsuleData[base] = start.x;
+      capsuleData[base + 1] = start.y;
+      capsuleData[base + 2] = start.z;
+      capsuleData[base + 3] = this.toCollisionSpaceRadius(capsules[i].radius, axis);
+      capsuleData[base + 4] = end.x;
+      capsuleData[base + 5] = end.y;
+      capsuleData[base + 6] = end.z;
       capsuleData[base + 7] = 0;
     }
 
@@ -1188,6 +1260,7 @@ export class GPUClothSystem {
         managed: false
       });
       this._integrateBindGroup.setBuffer('sphereData', this._sphereColliderBuffer);
+      this._constraintBindGroup?.setBuffer('sphereData', this._sphereColliderBuffer);
     }
     this._sphereColliderBuffer.bufferSubData(0, sphereData);
 
@@ -1200,11 +1273,57 @@ export class GPUClothSystem {
         managed: false
       });
       this._integrateBindGroup.setBuffer('capsuleData', this._capsuleColliderBuffer);
+      this._constraintBindGroup?.setBuffer('capsuleData', this._capsuleColliderBuffer);
     }
     this._capsuleColliderBuffer.bufferSubData(0, capsuleData);
 
     this._integrateBindGroup.setValue('sphereCount', spheres.length);
     this._integrateBindGroup.setValue('capsuleCount', capsules.length);
+    this._constraintBindGroup?.setValue('sphereCount', spheres.length);
+    this._constraintBindGroup?.setValue('capsuleCount', capsules.length);
+  }
+
+  private toCollisionSpacePoint(worldPoint: Vector3): Vector3 {
+    const invWorldMatrix = this._collisionSpaceNode?.invWorldMatrix;
+    if (!invWorldMatrix?.transformPointAffine) {
+      return worldPoint;
+    }
+    return invWorldMatrix.transformPointAffine(worldPoint, new Vector3());
+  }
+
+  private toCollisionSpaceVector(worldVector: Vector3): Vector3 {
+    const invWorldMatrix = this._collisionSpaceNode?.invWorldMatrix;
+    if (!invWorldMatrix?.transformVectorAffine) {
+      return worldVector;
+    }
+    return invWorldMatrix.transformVectorAffine(worldVector, new Vector3());
+  }
+
+  private toCollisionSpaceRadius(worldRadius: number, axisWorld?: Vector3): number {
+    const radius = Math.max(0, Number(worldRadius) || 0);
+    if (radius <= 0) {
+      return 0;
+    }
+    const invWorldMatrix = this._collisionSpaceNode?.invWorldMatrix;
+    if (!invWorldMatrix?.transformVectorAffine) {
+      return radius;
+    }
+    if (axisWorld && axisWorld.magnitudeSq > 1e-6) {
+      const axis = axisWorld.clone().inplaceNormalize();
+      let tangent = Vector3.cross(Math.abs(axis.y) < 0.999 ? Vector3.axisPY() : Vector3.axisPX(), axis, new Vector3());
+      if (tangent.magnitudeSq <= 1e-6) {
+        tangent = Vector3.cross(Vector3.axisPZ(), axis, tangent);
+      }
+      tangent.inplaceNormalize();
+      const bitangent = Vector3.cross(axis, tangent, new Vector3()).inplaceNormalize();
+      const localTangent = this.toCollisionSpaceVector(Vector3.scale(tangent, radius, new Vector3())).magnitude;
+      const localBitangent = this.toCollisionSpaceVector(Vector3.scale(bitangent, radius, new Vector3())).magnitude;
+      return Math.max(1e-6, (localTangent + localBitangent) * 0.5);
+    }
+    const localX = this.toCollisionSpaceVector(new Vector3(radius, 0, 0)).magnitude;
+    const localY = this.toCollisionSpaceVector(new Vector3(0, radius, 0)).magnitude;
+    const localZ = this.toCollisionSpaceVector(new Vector3(0, 0, radius)).magnitude;
+    return Math.max(1e-6, (localX + localY + localZ) / 3);
   }
 
   private _onSceneUpdate() {
