@@ -75,6 +75,15 @@ export default class extends RuntimeScript {
       }
       return Math.max(minValue, distance * scale);
     };
+    const parsePlaneNormalY = (value, fallback = 1) => {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value < 0 ? -1 : 1;
+      }
+      if (Array.isArray(value) && value.length >= 3) {
+        return (Number(value[1]) || 0) < 0 ? -1 : 1;
+      }
+      return fallback < 0 ? -1 : 1;
+    };
     const getSceneColliderMeta = (node) => {
       const meta = node?.metaData;
       const collider = meta?.sceneCollider;
@@ -128,8 +137,8 @@ export default class extends RuntimeScript {
           collider.localRadiusScaleRef = 1;
         } else if (colliderConfig.type === 'plane') {
           collider = createPlaneCollider(
-            parseVec3(colliderConfig.offset, Vector3.zero(), unitScale),
-            parseVec3(colliderConfig.normal, Vector3.axisPY()),
+            Vector3.zero(),
+            new Vector3(0, parsePlaneNormalY(colliderConfig.normal), 0),
             node
           );
         }
@@ -218,7 +227,8 @@ import {
   RuntimeScript,
   GPUClothSystem,
   createSphereCollider,
-  createCapsuleCollider
+  createCapsuleCollider,
+  createPlaneCollider
 } from '@zephyr3d/scene';
 
 function parseTargetEncodedMap(source) {
@@ -371,6 +381,20 @@ function parseSceneColliderDistance(value, fallback, scale = 1) {
   return Math.max(minValue, distance * scale);
 }
 
+function parseSceneColliderPlaneNormalY(value, fallback = 1) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value < 0 ? -1 : 1;
+  }
+  if (Array.isArray(value) && value.length >= 3) {
+    return (Number(value[1]) || 0) < 0 ? -1 : 1;
+  }
+  return fallback < 0 ? -1 : 1;
+}
+
+function buildSceneColliderPlaneNormal(value) {
+  return new Vector3(0, parseSceneColliderPlaneNormalY(value), 0);
+}
+
 function buildSceneColliderCapsulePoints(offset, endOffset, scale = 1) {
   return {
     start: new Vector3(parseSceneColliderDistance(offset, 0.1, scale), 0, 0),
@@ -417,8 +441,8 @@ function collectSceneNodeColliders(host, includePlane = false) {
       collider.localRadiusScaleRef = 1;
     } else if (colliderConfig.type === 'plane') {
       collider = createPlaneCollider(
-        parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale),
-        parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY()),
+        Vector3.zero(),
+        buildSceneColliderPlaneNormal(colliderConfig.normal),
         node
       );
     }
@@ -449,20 +473,23 @@ function serializeSceneColliderConfig(host, includePlane = false) {
     const unitScale = entry?.legacy ? 0.1 : 1;
     const isCapsule = colliderConfig.type === 'capsule';
     const isSphere = colliderConfig.type === 'sphere';
+    const isPlane = colliderConfig.type === 'plane';
     colliders.push({
       type: colliderConfig.type,
       enabled: colliderConfig.enabled !== false,
-      offset: isSphere
+      offset: isSphere || isPlane
         ? undefined
         : isCapsule
         ? parseSceneColliderDistance(colliderConfig.offset, 0.1, unitScale)
         : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale)),
-      endOffset: isSphere
+      endOffset: isSphere || isPlane
         ? undefined
         : isCapsule
         ? parseSceneColliderDistance(colliderConfig.endOffset, 0.1, unitScale)
         : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale)),
-      normal: sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY())),
+      normal: isPlane
+        ? parseSceneColliderPlaneNormalY(colliderConfig.normal)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY())),
       radius: Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
       planeSize: Math.max(0, (Number(colliderConfig.planeSize) || 0.5) * unitScale)
     });
@@ -483,6 +510,7 @@ function serializeColliderConfig(colliders) {
       endOffsetX: Number(collider?.endOffsetX) || 0,
       endOffsetY: Number(collider?.endOffsetY) || 0,
       endOffsetZ: Number(collider?.endOffsetZ) || 0,
+      normalY: Number(collider?.normalY) < 0 ? -1 : 1,
       radius: Number(collider?.radius) || 0
     }))
   );
@@ -512,7 +540,7 @@ function buildRuntimeSignature(config, host) {
     gravityY: Number(config?.gravityY),
     gravityZ: Number(config?.gravityZ),
     solverIterations: Number(config?.solverIterations),
-    sceneColliders: serializeSceneColliderConfig(host, false),
+    sceneColliders: serializeSceneColliderConfig(host, true),
     colliders: serializeColliderConfig(config?.colliders)
   });
 }
@@ -572,6 +600,20 @@ function parseSceneColliderDistance(value: unknown, fallback: number, scale = 1)
   return Math.max(minValue, distance * scale);
 }
 
+function parseSceneColliderPlaneNormalY(value: unknown, fallback = 1): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value < 0 ? -1 : 1;
+  }
+  if (Array.isArray(value) && value.length >= 3) {
+    return (Number(value[1]) || 0) < 0 ? -1 : 1;
+  }
+  return fallback < 0 ? -1 : 1;
+}
+
+function buildSceneColliderPlaneNormal(value: unknown): Vector3 {
+  return new Vector3(0, parseSceneColliderPlaneNormalY(value), 0);
+}
+
 function buildSceneColliderCapsulePoints(
   offset: unknown,
   endOffset: unknown,
@@ -622,8 +664,8 @@ function collectSceneNodeColliders(host: any, includePlane = false) {
       collider.localRadiusScaleRef = 1;
     } else if (colliderConfig.type === 'plane') {
       collider = createPlaneCollider(
-        parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale),
-        parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY()),
+        Vector3.zero(),
+        buildSceneColliderPlaneNormal(colliderConfig.normal),
         node
       );
     }
@@ -654,20 +696,23 @@ function serializeSceneNodeColliderConfig(host: any, includePlane = false) {
     const unitScale = entry?.legacy ? 0.1 : 1;
     const isCapsule = colliderConfig.type === 'capsule';
     const isSphere = colliderConfig.type === 'sphere';
+    const isPlane = colliderConfig.type === 'plane';
     colliders.push({
       type: colliderConfig.type,
       enabled: colliderConfig.enabled !== false,
-      offset: isSphere
+      offset: isSphere || isPlane
         ? undefined
         : isCapsule
         ? parseSceneColliderDistance(colliderConfig.offset, 0.1, unitScale)
         : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale)),
-      endOffset: isSphere
+      endOffset: isSphere || isPlane
         ? undefined
         : isCapsule
         ? parseSceneColliderDistance(colliderConfig.endOffset, 0.1, unitScale)
         : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale)),
-      normal: sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY())),
+      normal: isPlane
+        ? parseSceneColliderPlaneNormalY(colliderConfig.normal)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY())),
       radius: Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
       planeSize: Math.max(0, (Number(colliderConfig.planeSize) || 0.5) * unitScale)
     });
@@ -677,7 +722,7 @@ function serializeSceneNodeColliderConfig(host: any, includePlane = false) {
 }
 
 function buildColliders(host, config) {
-  const colliders = collectSceneNodeColliders(host, false);
+  const colliders = collectSceneNodeColliders(host, true);
   const scope =
     (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
     host?.scene?.rootNode ||
@@ -698,6 +743,12 @@ function buildColliders(host, config) {
           Number(colliderConfig?.endOffsetZ) || 0
         ),
         Math.max(0, Number(colliderConfig?.radius) || 0.15),
+        attachNode
+      );
+    } else if (colliderConfig?.type === 'plane') {
+      collider = createPlaneCollider(
+        Vector3.zero(),
+        new Vector3(0, Number(colliderConfig?.normalY) < 0 ? -1 : 1, 0),
         attachNode
       );
     } else {
@@ -1034,6 +1085,20 @@ function parseSceneColliderDistance(value: unknown, fallback: number, scale = 1)
   return Math.max(minValue, distance * scale);
 }
 
+function parseSceneColliderPlaneNormalY(value: unknown, fallback = 1): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value < 0 ? -1 : 1;
+  }
+  if (Array.isArray(value) && value.length >= 3) {
+    return (Number(value[1]) || 0) < 0 ? -1 : 1;
+  }
+  return fallback < 0 ? -1 : 1;
+}
+
+function buildSceneColliderPlaneNormal(value: unknown): Vector3 {
+  return new Vector3(0, parseSceneColliderPlaneNormalY(value), 0);
+}
+
 function buildSceneColliderCapsulePoints(
   offset: unknown,
   endOffset: unknown,
@@ -1084,8 +1149,8 @@ function collectSceneNodeColliders(host: any, includePlane = false) {
       collider.localRadiusScaleRef = 1;
     } else if (colliderConfig.type === 'plane') {
       collider = createPlaneCollider(
-        parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale),
-        parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY()),
+        Vector3.zero(),
+        buildSceneColliderPlaneNormal(colliderConfig.normal),
         node
       );
     }
@@ -1116,20 +1181,23 @@ function serializeSceneNodeColliderConfig(host: any, includePlane = false) {
     const unitScale = entry?.legacy ? 0.1 : 1;
     const isCapsule = colliderConfig.type === 'capsule';
     const isSphere = colliderConfig.type === 'sphere';
+    const isPlane = colliderConfig.type === 'plane';
     colliders.push({
       type: colliderConfig.type,
       enabled: colliderConfig.enabled !== false,
-      offset: isSphere
+      offset: isSphere || isPlane
         ? undefined
         : isCapsule
         ? parseSceneColliderDistance(colliderConfig.offset, 0.1, unitScale)
         : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale)),
-      endOffset: isSphere
+      endOffset: isSphere || isPlane
         ? undefined
         : isCapsule
         ? parseSceneColliderDistance(colliderConfig.endOffset, 0.1, unitScale)
         : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale)),
-      normal: sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY())),
+      normal: isPlane
+        ? parseSceneColliderPlaneNormalY(colliderConfig.normal)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY())),
       radius: Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
       planeSize: Math.max(0, (Number(colliderConfig.planeSize) || 0.5) * unitScale)
     });
@@ -1150,6 +1218,7 @@ function serializeClothColliderConfig(colliders: any[]) {
       endOffsetX: readClothNumber(collider?.endOffsetX, 0),
       endOffsetY: readClothNumber(collider?.endOffsetY, 0),
       endOffsetZ: readClothNumber(collider?.endOffsetZ, 0),
+      normalY: readClothNumber(collider?.normalY, 1) < 0 ? -1 : 1,
       radius: readClothNumber(collider?.radius, 0)
     }))
   );
@@ -1179,13 +1248,13 @@ function buildClothRuntimeSignature(config: any, host: any) {
     gravityY: readClothNumber(config?.gravityY, -9.8),
     gravityZ: readClothNumber(config?.gravityZ, 0),
     solverIterations: Math.max(1, Number(config?.solverIterations) || 5),
-    sceneColliders: serializeSceneNodeColliderConfig(host, false),
+    sceneColliders: serializeSceneNodeColliderConfig(host, true),
     colliders: serializeClothColliderConfig(config?.colliders ?? [])
   });
 }
 
 function buildClothColliders(host: any, config: any) {
-  const colliders = collectSceneNodeColliders(host, false);
+  const colliders = collectSceneNodeColliders(host, true);
   const scope =
     (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
     host?.scene?.rootNode ||
@@ -1206,6 +1275,12 @@ function buildClothColliders(host: any, config: any) {
           readClothNumber(colliderConfig?.endOffsetZ, 0)
         ),
         Math.max(0, readClothNumber(colliderConfig?.radius, 0.15)),
+        attachNode
+      );
+    } else if (colliderConfig?.type === 'plane') {
+      collider = createPlaneCollider(
+        Vector3.zero(),
+        new Vector3(0, readClothNumber(colliderConfig?.normalY, 1) < 0 ? -1 : 1, 0),
         attachNode
       );
     } else {

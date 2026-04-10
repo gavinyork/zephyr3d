@@ -12,6 +12,7 @@ import {
 } from '@zephyr3d/scene';
 
 const PROXY_NAME = '$__PROXY__$';
+const PLANE_NORMAL_PROXY_NAME = '$__PLANE_NORMAL_PROXY__$';
 
 export class NodeProxy extends Disposable {
   private readonly _diamondPrimitive: DRef<Primitive>;
@@ -184,6 +185,12 @@ export class NodeProxy extends Disposable {
       collider.offset = this.normalizeCapsuleAxisDistance(collider.offset, 0.1);
       collider.endOffset = this.normalizeCapsuleAxisDistance(collider.endOffset, 0.1);
     }
+    if (collider.type === 'plane') {
+      if ('offset' in collider) {
+        delete collider.offset;
+      }
+      collider.normal = this.normalizePlaneNormalY(collider.normal, 1);
+    }
     return {
       ...collider,
       __unitScale: meta?.sceneCollider ? 1 : 0.1
@@ -203,15 +210,15 @@ export class NodeProxy extends Disposable {
     }
     return Math.max(minValue, Math.abs(fallback));
   }
-  private getVector3Array(value: unknown, fallback: Vector3, scale = 1): Vector3 {
-    if (Array.isArray(value) && value.length >= 3) {
-      return new Vector3(
-        (Number(value[0]) || 0) * scale,
-        (Number(value[1]) || 0) * scale,
-        (Number(value[2]) || 0) * scale
-      );
+  private normalizePlaneNormalY(value: unknown, fallback: number): number {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value < 0 ? -1 : 1;
     }
-    return fallback.clone();
+    if (Array.isArray(value) && value.length >= 3) {
+      const y = Number(value[1]) || 0;
+      return y < 0 ? -1 : 1;
+    }
+    return fallback < 0 ? -1 : 1;
   }
   private fromToRotation(from: Vector3, to: Vector3): Quaternion {
     const f = from.clone().inplaceNormalize();
@@ -243,7 +250,9 @@ export class NodeProxy extends Disposable {
       if (!this._colliderPlanePrimitive.get()) {
         this._colliderPlanePrimitive.set(new PlaneShape({ size: 1 }));
       }
-      return new Mesh(this._scene, this._colliderPlanePrimitive.get(), this._colliderProxyMaterial.get().createInstance());
+      const proxy = new Mesh(this._scene, this._colliderPlanePrimitive.get(), this._colliderProxyMaterial.get().createInstance());
+      this.ensurePlaneNormalProxy(proxy);
+      return proxy;
     }
     if (!this._colliderSpherePrimitive.get()) {
       this._colliderSpherePrimitive.set(new SphereShape({ radius: 0.5 }));
@@ -290,14 +299,40 @@ export class NodeProxy extends Disposable {
       proxy.scale.setXYZ(1, 1, 1);
       return;
     }
-    const offset = this.getVector3Array(meta.offset, Vector3.zero(), unitScale);
-    const normal = this.getVector3Array(meta.normal, Vector3.axisPY());
+    const normalY = this.normalizePlaneNormalY(meta.normal, 1);
+    const normal = new Vector3(0, normalY, 0);
     const planeSize = Math.max(0.001, (Number(meta.planeSize) || 0.5) * unitScale);
     const n = normal.magnitudeSq > 1e-6 ? normal.inplaceNormalize() : Vector3.axisPY();
     const rot = this.fromToRotation(Vector3.axisPY(), n);
-    proxy.position.set(offset);
+    proxy.position.setXYZ(0, 0, 0);
     proxy.rotation.set(rot);
     proxy.scale.setXYZ(planeSize * 2, planeSize * 2, 1);
+    const direction = this.ensurePlaneNormalProxy(proxy);
+    if (direction) {
+      direction.position.setXYZ(0, 0, 0);
+      direction.rotation.identity();
+      direction.scale.setXYZ(1, 1, 1);
+      direction.showState = visible ? 'visible' : 'hidden';
+    }
+  }
+  private ensurePlaneNormalProxy(proxy: Mesh): Mesh {
+    let direction = proxy.children.find((child) => child.get()?.name === PLANE_NORMAL_PROXY_NAME)?.get() as Mesh;
+    if (!direction) {
+      direction = new Mesh(
+        this._scene,
+        NodeProxy.createPlaneNormalPrimitive(),
+        this._colliderProxyMaterial.get().createInstance()
+      );
+      direction.sealed = true;
+      direction.parent = proxy;
+      direction.showState = 'inherit';
+      direction.castShadow = false;
+      direction.name = PLANE_NORMAL_PROXY_NAME;
+      const directionMat = direction.material as UnlitMaterial;
+      directionMat.opacity = 1;
+      directionMat.albedoColor = new Vector4(0, 0, 1, 1);
+    }
+    return direction;
   }
   private static createLinePrimitive(vertices: number[], indices: number[], bbox: BoundingBox) {
     const primitive = new Primitive();
@@ -378,6 +413,32 @@ export class NodeProxy extends Disposable {
       new BoundingBox(new Vector3(-r, -halfAxis - r, -r), new Vector3(r, halfAxis + r, r))
     );
     return primitive;
+  }
+  private static createPlaneNormalPrimitive() {
+    return NodeProxy.createLinePrimitive(
+      [
+        0,
+        0,
+        0,
+        0,
+        0.6,
+        0,
+        0.08,
+        0.48,
+        0,
+        -0.08,
+        0.48,
+        0,
+        0,
+        0.48,
+        0.08,
+        0,
+        0.48,
+        -0.08
+      ],
+      [0, 1, 1, 2, 1, 3, 1, 4, 1, 5],
+      new BoundingBox(new Vector3(-0.08, 0, -0.08), new Vector3(0.08, 0.6, 0.08))
+    );
   }
   private getDirectionalLightProxyMesh() {
     if (!this._directionalLightPrimitive.get()) {

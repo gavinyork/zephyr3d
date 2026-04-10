@@ -10,7 +10,7 @@ import { releaseObject, retainObject, Vector3, type Nullable } from '@zephyr3d/b
 import { getDevice } from '../../app/api';
 import type { Primitive } from '../../render';
 import type { Scene } from '../../scene';
-import type { CapsuleCollider, SphereCollider, SpringCollider } from '../spring/spring_collider';
+import type { CapsuleCollider, PlaneCollider, SphereCollider, SpringCollider } from '../spring/spring_collider';
 import { updateColliderFromNode } from '../spring/spring_collider';
 
 export type GPUClothSystemOptions = {
@@ -223,12 +223,14 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
       this.invMass = pb.float[0]().storageBufferReadonly(0);
       this.sphereData = pb.float[0]().storageBufferReadonly(0);
       this.capsuleData = pb.float[0]().storageBufferReadonly(0);
+      this.planeData = pb.float[0]().storageBufferReadonly(0);
       this.vertexCount = pb.uint().uniform(0);
       this.deltaTime = pb.float().uniform(0);
       this.damping = pb.float().uniform(0);
       this.gravity = pb.vec3().uniform(0);
       this.sphereCount = pb.uint().uniform(0);
       this.capsuleCount = pb.uint().uniform(0);
+      this.planeCount = pb.uint().uniform(0);
       this.dynamicFriction = pb.float().uniform(0);
       this.staticFriction = pb.float().uniform(0);
       this.minDistance = pb.float().uniform(0);
@@ -373,6 +375,56 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
                 });
               });
             });
+
+            this.$for(pb.uint('k'), 0, this.planeCount, function () {
+              this.$l.planeBase = pb.mul(this.k, 8);
+              this.$l.planePoint = pb.vec3(
+                this.planeData.at(this.planeBase),
+                this.planeData.at(pb.add(this.planeBase, 1)),
+                this.planeData.at(pb.add(this.planeBase, 2))
+              );
+              this.$l.planeNormal = pb.vec3(
+                this.planeData.at(pb.add(this.planeBase, 4)),
+                this.planeData.at(pb.add(this.planeBase, 5)),
+                this.planeData.at(pb.add(this.planeBase, 6))
+              );
+              this.$l.planeDistance = pb.dot(pb.sub(this.next, this.planePoint), this.planeNormal);
+              this.$if(pb.lessThan(this.planeDistance, 0), function () {
+                this.$l.contactNormal = this.planeNormal;
+                this.$l.preProject = this.next;
+                this.next = pb.sub(this.next, pb.mul(this.contactNormal, this.planeDistance));
+                this.$l.correctionDelta = pb.sub(this.next, this.preProject);
+                this.$l.correctionLen = pb.length(this.correctionDelta);
+                this.$l.surfaceDelta = pb.sub(this.next, this.current);
+                this.$l.normalStep = pb.mul(this.contactNormal, pb.dot(this.surfaceDelta, this.contactNormal));
+                this.$l.tangentStep = pb.sub(this.surfaceDelta, this.normalStep);
+                this.$l.normalTravel = pb.length(this.normalStep);
+                this.$l.tangentLen = pb.length(this.tangentStep);
+                this.$if(pb.greaterThan(this.tangentLen, this.minDistance), function () {
+                  this.$l.dynamicBasis = pb.max(
+                    this.correctionLen,
+                    pb.max(this.normalTravel, pb.mul(this.tangentLen, 0.5))
+                  );
+                  this.$l.staticBasis = pb.max(this.correctionLen, pb.max(this.normalTravel, this.tangentLen));
+                  this.$l.staticLimit = pb.max(
+                    this.minDistance,
+                    pb.mul(this.staticBasis, pb.mul(this.staticFriction, 2))
+                  );
+                  this.$if(pb.lessThanEqual(this.tangentLen, this.staticLimit), function () {
+                    this.next = pb.sub(this.next, this.tangentStep);
+                  }).$else(function () {
+                    this.$l.dynamicRemove = pb.min(
+                      this.tangentLen,
+                      pb.mul(this.dynamicBasis, this.dynamicFriction)
+                    );
+                    this.next = pb.sub(
+                      this.next,
+                      pb.mul(pb.div(this.tangentStep, this.tangentLen), this.dynamicRemove)
+                    );
+                  });
+                });
+              });
+            });
           });
 
           this.next = pb.add(pb.mul(this.next, this.freeWeight), pb.mul(this.rest, this.pinWeight));
@@ -404,11 +456,13 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
       this.restLengths = pb.float[0]().storageBufferReadonly(0);
       this.sphereData = pb.float[0]().storageBufferReadonly(0);
       this.capsuleData = pb.float[0]().storageBufferReadonly(0);
+      this.planeData = pb.float[0]().storageBufferReadonly(0);
       this.vertexCount = pb.uint().uniform(0);
       this.maxNeighbors = pb.uint().uniform(0);
       this.stiffness = pb.float().uniform(0);
       this.sphereCount = pb.uint().uniform(0);
       this.capsuleCount = pb.uint().uniform(0);
+      this.planeCount = pb.uint().uniform(0);
       this.dynamicFriction = pb.float().uniform(0);
       this.staticFriction = pb.float().uniform(0);
       this.minDistance = pb.float().uniform(0);
@@ -508,6 +562,23 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
                 }).$else(function () {
                   this.corrected = pb.add(this.closest, pb.vec3(0, this.cRadius, 0));
                 });
+              });
+            });
+            this.$for(pb.uint('k'), 0, this.planeCount, function () {
+              this.$l.planeBase = pb.mul(this.k, 8);
+              this.$l.planePoint = pb.vec3(
+                this.planeData.at(this.planeBase),
+                this.planeData.at(pb.add(this.planeBase, 1)),
+                this.planeData.at(pb.add(this.planeBase, 2))
+              );
+              this.$l.planeNormal = pb.vec3(
+                this.planeData.at(pb.add(this.planeBase, 4)),
+                this.planeData.at(pb.add(this.planeBase, 5)),
+                this.planeData.at(pb.add(this.planeBase, 6))
+              );
+              this.$l.planeDistance = pb.dot(pb.sub(this.corrected, this.planePoint), this.planeNormal);
+              this.$if(pb.lessThan(this.planeDistance, 0), function () {
+                this.corrected = pb.sub(this.corrected, pb.mul(this.planeNormal, this.planeDistance));
               });
             });
             this.positions.setAt(this.base, this.corrected.x);
@@ -738,8 +809,10 @@ export class GPUClothSystem {
   private _colliders: SpringCollider[];
   private _sphereColliderBuffer: Nullable<GPUDataBuffer>;
   private _capsuleColliderBuffer: Nullable<GPUDataBuffer>;
+  private _planeColliderBuffer: Nullable<GPUDataBuffer>;
   private _sphereColliderData: Float32Array<ArrayBuffer>;
   private _capsuleColliderData: Float32Array<ArrayBuffer>;
+  private _planeColliderData: Float32Array<ArrayBuffer>;
   private _triangleIndexBuffer: Nullable<GPUDataBuffer>;
   private _triangleNormalBuffer: Nullable<GPUDataBuffer>;
   private _vertexTriangleAdjacencyBuffer: Nullable<GPUDataBuffer>;
@@ -792,8 +865,10 @@ export class GPUClothSystem {
     this._colliders = [...(options?.colliders ?? [])];
     this._sphereColliderBuffer = null;
     this._capsuleColliderBuffer = null;
+    this._planeColliderBuffer = null;
     this._sphereColliderData = new Float32Array(4);
     this._capsuleColliderData = new Float32Array(8);
+    this._planeColliderData = new Float32Array(8);
     this._triangleIndexBuffer = null;
     this._triangleNormalBuffer = null;
     this._vertexTriangleAdjacencyBuffer = null;
@@ -944,6 +1019,14 @@ export class GPUClothSystem {
       });
       this._capsuleColliderBuffer.bufferSubData(0, this._capsuleColliderData);
 
+      this._planeColliderBuffer = this._device.createBuffer(this._planeColliderData.byteLength, {
+        usage: 'uniform',
+        storage: true,
+        dynamic: false,
+        managed: false
+      });
+      this._planeColliderBuffer.bufferSubData(0, this._planeColliderData);
+
       this._integrateProgram = createIntegrateProgram(this._device, workgroupSize);
       this._constraintProgram = createConstraintProgram(this._device, workgroupSize);
       if (!this._integrateProgram || !this._constraintProgram) {
@@ -958,11 +1041,13 @@ export class GPUClothSystem {
       this._integrateBindGroup.setBuffer('invMass', this._invMassBuffer);
       this._integrateBindGroup.setBuffer('sphereData', this._sphereColliderBuffer);
       this._integrateBindGroup.setBuffer('capsuleData', this._capsuleColliderBuffer);
+      this._integrateBindGroup.setBuffer('planeData', this._planeColliderBuffer);
       this._integrateBindGroup.setValue('vertexCount', vertexCount);
       this._integrateBindGroup.setValue('damping', this._damping);
       this._integrateBindGroup.setValue('gravity', this._gravity);
       this._integrateBindGroup.setValue('sphereCount', 0);
       this._integrateBindGroup.setValue('capsuleCount', 0);
+      this._integrateBindGroup.setValue('planeCount', 0);
       this._integrateBindGroup.setValue('dynamicFriction', this._dynamicFriction);
       this._integrateBindGroup.setValue('staticFriction', this._staticFriction);
       this._integrateBindGroup.setValue('minDistance', 1e-5);
@@ -975,11 +1060,13 @@ export class GPUClothSystem {
       this._constraintBindGroup.setBuffer('restLengths', this._restLengthBuffer);
       this._constraintBindGroup.setBuffer('sphereData', this._sphereColliderBuffer);
       this._constraintBindGroup.setBuffer('capsuleData', this._capsuleColliderBuffer);
+      this._constraintBindGroup.setBuffer('planeData', this._planeColliderBuffer);
       this._constraintBindGroup.setValue('vertexCount', vertexCount);
       this._constraintBindGroup.setValue('maxNeighbors', this._maxNeighbors);
       this._constraintBindGroup.setValue('stiffness', this._stiffness);
       this._constraintBindGroup.setValue('sphereCount', 0);
       this._constraintBindGroup.setValue('capsuleCount', 0);
+      this._constraintBindGroup.setValue('planeCount', 0);
       this._constraintBindGroup.setValue('dynamicFriction', this._dynamicFriction);
       this._constraintBindGroup.setValue('staticFriction', this._staticFriction);
       this._constraintBindGroup.setValue('minDistance', 1e-5);
@@ -1313,6 +1400,8 @@ export class GPUClothSystem {
     this._sphereColliderBuffer = null;
     this._capsuleColliderBuffer?.dispose();
     this._capsuleColliderBuffer = null;
+    this._planeColliderBuffer?.dispose();
+    this._planeColliderBuffer = null;
     releaseObject(this._originalPositionBuffer);
     this._originalPositionBuffer = null;
     releaseObject(this._originalNormalBuffer);
@@ -1327,6 +1416,7 @@ export class GPUClothSystem {
 
     const spheres: SphereCollider[] = [];
     const capsules: CapsuleCollider[] = [];
+    const planes: PlaneCollider[] = [];
     for (const collider of this._colliders) {
       if (!collider?.enabled) {
         continue;
@@ -1338,6 +1428,8 @@ export class GPUClothSystem {
         spheres.push(collider as SphereCollider);
       } else if (collider.type === 'capsule') {
         capsules.push(collider as CapsuleCollider);
+      } else if (collider.type === 'plane') {
+        planes.push(collider as PlaneCollider);
       }
     }
 
@@ -1367,6 +1459,26 @@ export class GPUClothSystem {
       capsuleData[base + 7] = 0;
     }
 
+    const planeData = new Float32Array(Math.max(1, planes.length) * 8);
+    for (let i = 0; i < planes.length; i++) {
+      const base = i * 8;
+      const point = this.toCollisionSpacePoint(planes[i].point);
+      const normal = this.toCollisionSpaceVector(planes[i].normal);
+      if (normal.magnitudeSq > 1e-8) {
+        normal.inplaceNormalize();
+      } else {
+        normal.setXYZ(0, 1, 0);
+      }
+      planeData[base] = point.x;
+      planeData[base + 1] = point.y;
+      planeData[base + 2] = point.z;
+      planeData[base + 3] = 0;
+      planeData[base + 4] = normal.x;
+      planeData[base + 5] = normal.y;
+      planeData[base + 6] = normal.z;
+      planeData[base + 7] = 0;
+    }
+
     if (!this._sphereColliderBuffer || this._sphereColliderBuffer.byteLength < sphereData.byteLength) {
       this._sphereColliderBuffer?.dispose();
       this._sphereColliderBuffer = this._device.createBuffer(sphereData.byteLength, {
@@ -1393,10 +1505,25 @@ export class GPUClothSystem {
     }
     this._capsuleColliderBuffer.bufferSubData(0, capsuleData);
 
+    if (!this._planeColliderBuffer || this._planeColliderBuffer.byteLength < planeData.byteLength) {
+      this._planeColliderBuffer?.dispose();
+      this._planeColliderBuffer = this._device.createBuffer(planeData.byteLength, {
+        usage: 'uniform',
+        storage: true,
+        dynamic: false,
+        managed: false
+      });
+      this._integrateBindGroup.setBuffer('planeData', this._planeColliderBuffer);
+      this._constraintBindGroup?.setBuffer('planeData', this._planeColliderBuffer);
+    }
+    this._planeColliderBuffer.bufferSubData(0, planeData);
+
     this._integrateBindGroup.setValue('sphereCount', spheres.length);
     this._integrateBindGroup.setValue('capsuleCount', capsules.length);
+    this._integrateBindGroup.setValue('planeCount', planes.length);
     this._constraintBindGroup?.setValue('sphereCount', spheres.length);
     this._constraintBindGroup?.setValue('capsuleCount', capsules.length);
+    this._constraintBindGroup?.setValue('planeCount', planes.length);
   }
 
   private toCollisionSpacePoint(worldPoint: Vector3): Vector3 {

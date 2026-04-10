@@ -1,9 +1,13 @@
 import { defineProps, type SerializableClass } from '../types';
 
-export type ClothColliderType = 'sphere' | 'capsule';
+export type ClothColliderType = 'sphere' | 'capsule' | 'plane';
 
 function clamp01(value: number) {
   return Math.min(Math.max(value, 0), 1);
+}
+
+function normalizePlaneDirection(value: number) {
+  return value < 0 ? -1 : 1;
 }
 
 export class ClothColliderConfig {
@@ -16,6 +20,9 @@ export class ClothColliderConfig {
   endOffsetX: number;
   endOffsetY: number;
   endOffsetZ: number;
+  normalX: number;
+  normalY: number;
+  normalZ: number;
   radius: number;
 
   constructor(type: ClothColliderType = 'sphere') {
@@ -28,6 +35,9 @@ export class ClothColliderConfig {
     this.endOffsetX = 0;
     this.endOffsetY = 0.2;
     this.endOffsetZ = 0;
+    this.normalX = 0;
+    this.normalY = 1;
+    this.normalZ = 0;
     this.radius = 0.15;
   }
 }
@@ -90,8 +100,8 @@ export function getClothColliderConfigClass(): SerializableClass {
           options: {
             group: 'Shape',
             enum: {
-              labels: ['Sphere', 'Capsule'],
-              values: ['sphere', 'capsule']
+              labels: ['Sphere', 'Capsule', 'Plane'],
+              values: ['sphere', 'capsule', 'plane']
             }
           },
           get(this: ClothColliderConfig, value) {
@@ -133,6 +143,9 @@ export function getClothColliderConfigClass(): SerializableClass {
           options: {
             group: 'Shape'
           },
+          isValid(this: ClothColliderConfig) {
+            return this.type !== 'plane';
+          },
           get(this: ClothColliderConfig, value) {
             value.num[0] = this.offsetX;
             value.num[1] = this.offsetY;
@@ -171,11 +184,34 @@ export function getClothColliderConfigClass(): SerializableClass {
             group: 'Shape',
             minValue: 0
           },
+          isValid(this: ClothColliderConfig) {
+            return this.type !== 'plane';
+          },
           get(this: ClothColliderConfig, value) {
             value.num[0] = this.radius;
           },
           set(this: ClothColliderConfig, value) {
             this.radius = value.num[0];
+          }
+        },
+        {
+          name: 'Normal',
+          type: 'float',
+          options: {
+            group: 'Shape',
+            minValue: -1,
+            maxValue: 1
+          },
+          isValid(this: ClothColliderConfig) {
+            return this.type === 'plane';
+          },
+          get(this: ClothColliderConfig, value) {
+            value.num[0] = this.normalY;
+          },
+          set(this: ClothColliderConfig, value) {
+            this.normalX = 0;
+            this.normalY = normalizePlaneDirection(value.num[0]);
+            this.normalZ = 0;
           }
         }
       ]);

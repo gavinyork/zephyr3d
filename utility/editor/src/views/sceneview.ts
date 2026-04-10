@@ -2137,8 +2137,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 type: 'plane',
                 enabled: true,
                 visible: true,
-                offset: [0, 0, 0],
-                normal: [0, 1, 0],
+                normal: 1,
                 planeSize: 0.5
               }
             };

@@ -148,7 +148,7 @@ export class JSONArray extends JSONData {
   }
 }
 
-function clampPositiveCapsuleAxisDistance(prop: JSONNumber, value: number): number {
+function normalizeSpecialJSONNumber(prop: JSONNumber, value: number): number {
   if (
     (prop.name === 'offset' || prop.name === 'endOffset') &&
     prop.parent &&
@@ -156,6 +156,9 @@ function clampPositiveCapsuleAxisDistance(prop: JSONNumber, value: number): numb
     prop.parent.data?.type === 'capsule'
   ) {
     return Math.max(0.0001, Math.abs(value));
+  }
+  if (prop.name === 'normal' && prop.parent && !(prop.parent instanceof JSONArray) && prop.parent.data?.type === 'plane') {
+    return value < 0 ? -1 : 1;
   }
   return value;
 }
@@ -246,7 +249,7 @@ export function getJSONNumberClass(): SerializableClass {
             value.num![0] = this.value;
           },
           set(this: JSONNumber, value) {
-            const nextValue = clampPositiveCapsuleAxisDistance(this, value.num![0]);
+            const nextValue = normalizeSpecialJSONNumber(this, value.num![0]);
             if (this.value !== nextValue) {
               this.value = nextValue;
               this.parent!.updateProps();
