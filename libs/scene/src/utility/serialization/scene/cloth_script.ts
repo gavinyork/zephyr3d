@@ -36,7 +36,10 @@ export class ClothScriptConfig {
   enabled: boolean;
   autoUpdate: boolean;
   damping: number;
+  dynamicFriction: number;
+  staticFriction: number;
   stiffness: number;
+  substeps: number;
   gravityX: number;
   gravityY: number;
   gravityZ: number;
@@ -53,7 +56,10 @@ export class ClothScriptConfig {
     this.enabled = true;
     this.autoUpdate = true;
     this.damping = 0.02;
+    this.dynamicFriction = 0.15;
+    this.staticFriction = 0.3;
     this.stiffness = 0.3;
+    this.substeps = 2;
     this.gravityX = 0;
     this.gravityY = -9.8;
     this.gravityZ = 0;
@@ -287,6 +293,36 @@ export function getClothScriptConfigClass(): SerializableClass {
           }
         },
         {
+          name: 'DynamicFriction',
+          type: 'float',
+          options: {
+            group: 'Simulation',
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: ClothScriptConfig, value) {
+            value.num[0] = this.dynamicFriction;
+          },
+          set(this: ClothScriptConfig, value) {
+            this.dynamicFriction = clamp01(value.num[0]);
+          }
+        },
+        {
+          name: 'StaticFriction',
+          type: 'float',
+          options: {
+            group: 'Simulation',
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: ClothScriptConfig, value) {
+            value.num[0] = this.staticFriction;
+          },
+          set(this: ClothScriptConfig, value) {
+            this.staticFriction = clamp01(value.num[0]);
+          }
+        },
+        {
           name: 'SolverIterations',
           type: 'int',
           options: {
@@ -299,6 +335,21 @@ export function getClothScriptConfigClass(): SerializableClass {
           },
           set(this: ClothScriptConfig, value) {
             this.solverIterations = value.num[0];
+          }
+        },
+        {
+          name: 'Substeps',
+          type: 'int',
+          options: {
+            group: 'Simulation',
+            minValue: 1,
+            maxValue: 8
+          },
+          get(this: ClothScriptConfig, value) {
+            value.num[0] = this.substeps;
+          },
+          set(this: ClothScriptConfig, value) {
+            this.substeps = Math.max(1, Math.min(8, value.num[0] | 0));
           }
         },
         {

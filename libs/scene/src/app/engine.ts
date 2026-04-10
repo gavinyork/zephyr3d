@@ -457,7 +457,10 @@ function buildRuntimeSignature(config, host) {
     enabled: config?.enabled !== false,
     autoUpdate: config?.autoUpdate !== false,
     damping: Number(config?.damping),
+    dynamicFriction: Number(config?.dynamicFriction),
+    staticFriction: Number(config?.staticFriction),
     stiffness: Number(config?.stiffness),
+    substeps: Number(config?.substeps),
     gravityX: Number(config?.gravityX),
     gravityY: Number(config?.gravityY),
     gravityZ: Number(config?.gravityZ),
@@ -704,7 +707,10 @@ export default class extends RuntimeScript {
           readNumber(config.gravityZ, 0)
         ),
         damping: readNumber(config.damping, 0.02),
+        dynamicFriction: readNumber(config.dynamicFriction, 0.15),
+        staticFriction: readNumber(config.staticFriction, 0.3),
         stiffness: readNumber(config.stiffness, 0.3),
+        substeps: Math.max(1, Math.min(8, Number(config.substeps) || 2)),
         solverIterations: Math.max(1, Number(config.solverIterations) || 5),
         maxNeighbors: Math.max(1, Number(config.maxNeighbors) || 8),
         workgroupSize: Math.max(1, Number(config.workgroupSize) || 64),
@@ -739,7 +745,10 @@ export default class extends RuntimeScript {
       readNumber(config.gravityZ, 0)
     );
     cloth.damping = readNumber(config.damping, 0.02);
+    cloth.dynamicFriction = readNumber(config.dynamicFriction, 0.15);
+    cloth.staticFriction = readNumber(config.staticFriction, 0.3);
     cloth.stiffness = readNumber(config.stiffness, 0.3);
+    cloth.substeps = Math.max(1, Math.min(8, Number(config.substeps) || 2));
     cloth.solverIterations = Math.max(1, Number(config.solverIterations) || 5);
     cloth.colliders = buildColliders(host, config);
     cloth.bindToScene(config.autoUpdate === false ? null : host.scene || null);
@@ -1045,7 +1054,10 @@ function buildClothRuntimeSignature(config: any, host: any) {
     enabled: config?.enabled !== false,
     autoUpdate: config?.autoUpdate !== false,
     damping: readClothNumber(config?.damping, 0.02),
+    dynamicFriction: readClothNumber(config?.dynamicFriction, 0.15),
+    staticFriction: readClothNumber(config?.staticFriction, 0.3),
     stiffness: readClothNumber(config?.stiffness, 0.3),
+    substeps: Math.max(1, Math.min(8, Number(config?.substeps) || 2)),
     gravityX: readClothNumber(config?.gravityX, 0),
     gravityY: readClothNumber(config?.gravityY, -9.8),
     gravityZ: readClothNumber(config?.gravityZ, 0),
@@ -1590,7 +1602,10 @@ export class Engine {
         enabled: config.enabled !== false,
         gravity: resolveClothGravity(target, config),
         damping: readClothNumber(config.damping, 0.02),
+        dynamicFriction: readClothNumber(config.dynamicFriction, 0.15),
+        staticFriction: readClothNumber(config.staticFriction, 0.3),
         stiffness: readClothNumber(config.stiffness, 0.3),
+        substeps: Math.max(1, Math.min(8, Number(config.substeps) || 2)),
         solverIterations: Math.max(1, Number(config.solverIterations) || 5),
         maxNeighbors: Math.max(1, Number(config.maxNeighbors) || 8),
         workgroupSize: Math.max(1, Number(config.workgroupSize) || 64),
@@ -1625,7 +1640,10 @@ export class Engine {
     cloth.enabled = config.enabled !== false;
     cloth.gravity = resolveClothGravity(target, config);
     cloth.damping = readClothNumber(config.damping, 0.02);
+    cloth.dynamicFriction = readClothNumber(config.dynamicFriction, 0.15);
+    cloth.staticFriction = readClothNumber(config.staticFriction, 0.3);
     cloth.stiffness = readClothNumber(config.stiffness, 0.3);
+    cloth.substeps = Math.max(1, Math.min(8, Number(config.substeps) || 2));
     cloth.solverIterations = Math.max(1, Number(config.solverIterations) || 5);
     cloth.colliders = buildClothColliders(target, config);
     cloth.bindToScene(config.autoUpdate === false ? null : target.scene || host.scene || null);

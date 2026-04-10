@@ -24,7 +24,10 @@ export type GPUClothSystemOptions = {
   pinnedVertexIndices?: number[];
   gravity?: Vector3;
   damping?: number;
+  dynamicFriction?: number;
+  staticFriction?: number;
   stiffness?: number;
+  substeps?: number;
   solverIterations?: number;
   maxNeighbors?: number;
   workgroupSize?: number;
@@ -57,7 +60,10 @@ export function isGPUClothSupported(device?: Nullable<AbstractDevice>) {
 }
 
 const DEFAULT_DAMPING = 0.02;
+const DEFAULT_DYNAMIC_FRICTION = 0.15;
+const DEFAULT_STATIC_FRICTION = 0.3;
 const DEFAULT_STIFFNESS = 0.3;
+const DEFAULT_SUBSTEPS = 2;
 const DEFAULT_SOLVER_ITERATIONS = 5;
 const DEFAULT_MAX_NEIGHBORS = 8;
 const DEFAULT_WORKGROUP_SIZE = 64;
@@ -223,6 +229,8 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
       this.gravity = pb.vec3().uniform(0);
       this.sphereCount = pb.uint().uniform(0);
       this.capsuleCount = pb.uint().uniform(0);
+      this.dynamicFriction = pb.float().uniform(0);
+      this.staticFriction = pb.float().uniform(0);
       this.minDistance = pb.float().uniform(0);
       pb.main(function () {
         this.$l.index = this.$builtins.globalInvocationId.x;
@@ -262,10 +270,42 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
               this.$l.deltaCol = pb.sub(this.next, this.center);
               this.$l.lenCol = pb.length(this.deltaCol);
               this.$if(pb.lessThan(this.lenCol, this.radius), function () {
+                this.$l.contactNormal = pb.vec3(0, 1, 0);
                 this.$if(pb.greaterThan(this.lenCol, this.minDistance), function () {
-                  this.next = pb.add(this.center, pb.mul(pb.div(this.deltaCol, this.lenCol), this.radius));
+                  this.contactNormal = pb.div(this.deltaCol, this.lenCol);
+                  this.next = pb.add(this.center, pb.mul(this.contactNormal, this.radius));
                 }).$else(function () {
                   this.next = pb.add(this.center, pb.vec3(0, this.radius, 0));
+                });
+                this.$l.correctionDelta = pb.sub(this.next, pb.add(this.center, this.deltaCol));
+                this.$l.correctionLen = pb.length(this.correctionDelta);
+                this.$l.surfaceDelta = pb.sub(this.next, this.current);
+                this.$l.normalStep = pb.mul(this.contactNormal, pb.dot(this.surfaceDelta, this.contactNormal));
+                this.$l.tangentStep = pb.sub(this.surfaceDelta, this.normalStep);
+                this.$l.normalTravel = pb.length(this.normalStep);
+                this.$l.tangentLen = pb.length(this.tangentStep);
+                this.$if(pb.greaterThan(this.tangentLen, this.minDistance), function () {
+                  this.$l.dynamicBasis = pb.max(
+                    this.correctionLen,
+                    pb.max(this.normalTravel, pb.mul(this.tangentLen, 0.5))
+                  );
+                  this.$l.staticBasis = pb.max(this.correctionLen, pb.max(this.normalTravel, this.tangentLen));
+                  this.$l.staticLimit = pb.max(
+                    this.minDistance,
+                    pb.mul(this.staticBasis, pb.mul(this.staticFriction, 2))
+                  );
+                  this.$if(pb.lessThanEqual(this.tangentLen, this.staticLimit), function () {
+                    this.next = pb.sub(this.next, this.tangentStep);
+                  }).$else(function () {
+                    this.$l.dynamicRemove = pb.min(
+                      this.tangentLen,
+                      pb.mul(this.dynamicBasis, this.dynamicFriction)
+                    );
+                    this.next = pb.sub(
+                      this.next,
+                      pb.mul(pb.div(this.tangentStep, this.tangentLen), this.dynamicRemove)
+                    );
+                  });
                 });
               });
             });
@@ -294,10 +334,42 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
               this.$l.deltaCap = pb.sub(this.next, this.closest);
               this.$l.lenCap = pb.length(this.deltaCap);
               this.$if(pb.lessThan(this.lenCap, this.cRadius), function () {
+                this.$l.contactNormal = pb.vec3(0, 1, 0);
                 this.$if(pb.greaterThan(this.lenCap, this.minDistance), function () {
-                  this.next = pb.add(this.closest, pb.mul(pb.div(this.deltaCap, this.lenCap), this.cRadius));
+                  this.contactNormal = pb.div(this.deltaCap, this.lenCap);
+                  this.next = pb.add(this.closest, pb.mul(this.contactNormal, this.cRadius));
                 }).$else(function () {
                   this.next = pb.add(this.closest, pb.vec3(0, this.cRadius, 0));
+                });
+                this.$l.correctionDelta = pb.sub(this.next, pb.add(this.closest, this.deltaCap));
+                this.$l.correctionLen = pb.length(this.correctionDelta);
+                this.$l.surfaceDelta = pb.sub(this.next, this.current);
+                this.$l.normalStep = pb.mul(this.contactNormal, pb.dot(this.surfaceDelta, this.contactNormal));
+                this.$l.tangentStep = pb.sub(this.surfaceDelta, this.normalStep);
+                this.$l.normalTravel = pb.length(this.normalStep);
+                this.$l.tangentLen = pb.length(this.tangentStep);
+                this.$if(pb.greaterThan(this.tangentLen, this.minDistance), function () {
+                  this.$l.dynamicBasis = pb.max(
+                    this.correctionLen,
+                    pb.max(this.normalTravel, pb.mul(this.tangentLen, 0.5))
+                  );
+                  this.$l.staticBasis = pb.max(this.correctionLen, pb.max(this.normalTravel, this.tangentLen));
+                  this.$l.staticLimit = pb.max(
+                    this.minDistance,
+                    pb.mul(this.staticBasis, pb.mul(this.staticFriction, 2))
+                  );
+                  this.$if(pb.lessThanEqual(this.tangentLen, this.staticLimit), function () {
+                    this.next = pb.sub(this.next, this.tangentStep);
+                  }).$else(function () {
+                    this.$l.dynamicRemove = pb.min(
+                      this.tangentLen,
+                      pb.mul(this.dynamicBasis, this.dynamicFriction)
+                    );
+                    this.next = pb.sub(
+                      this.next,
+                      pb.mul(pb.div(this.tangentStep, this.tangentLen), this.dynamicRemove)
+                    );
+                  });
                 });
               });
             });
@@ -337,6 +409,8 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
       this.stiffness = pb.float().uniform(0);
       this.sphereCount = pb.uint().uniform(0);
       this.capsuleCount = pb.uint().uniform(0);
+      this.dynamicFriction = pb.float().uniform(0);
+      this.staticFriction = pb.float().uniform(0);
       this.minDistance = pb.float().uniform(0);
       pb.main(function () {
         this.$l.index = this.$builtins.globalInvocationId.x;
@@ -656,7 +730,10 @@ export class GPUClothSystem {
   private _maxTrianglesPerVertex: number;
   private _gravity: Vector3;
   private _damping: number;
+  private _dynamicFriction: number;
+  private _staticFriction: number;
   private _stiffness: number;
+  private _substeps: number;
   private _solverIterations: number;
   private _colliders: SpringCollider[];
   private _sphereColliderBuffer: Nullable<GPUDataBuffer>;
@@ -707,7 +784,10 @@ export class GPUClothSystem {
     );
     this._gravity = options?.gravity?.clone() ?? new Vector3(0, -9.8, 0);
     this._damping = clamp(options?.damping ?? DEFAULT_DAMPING, 0, 1);
+    this._dynamicFriction = clamp(options?.dynamicFriction ?? DEFAULT_DYNAMIC_FRICTION, 0, 1);
+    this._staticFriction = clamp(options?.staticFriction ?? DEFAULT_STATIC_FRICTION, 0, 1);
     this._stiffness = clamp(options?.stiffness ?? DEFAULT_STIFFNESS, 0, 1);
+    this._substeps = clamp(options?.substeps ?? DEFAULT_SUBSTEPS, 1, 8) | 0;
     this._solverIterations = Math.max(1, (options?.solverIterations ?? DEFAULT_SOLVER_ITERATIONS) | 0);
     this._colliders = [...(options?.colliders ?? [])];
     this._sphereColliderBuffer = null;
@@ -883,6 +963,8 @@ export class GPUClothSystem {
       this._integrateBindGroup.setValue('gravity', this._gravity);
       this._integrateBindGroup.setValue('sphereCount', 0);
       this._integrateBindGroup.setValue('capsuleCount', 0);
+      this._integrateBindGroup.setValue('dynamicFriction', this._dynamicFriction);
+      this._integrateBindGroup.setValue('staticFriction', this._staticFriction);
       this._integrateBindGroup.setValue('minDistance', 1e-5);
 
       this._constraintBindGroup = this._device.createBindGroup(this._constraintProgram.bindGroupLayouts[0]);
@@ -898,6 +980,8 @@ export class GPUClothSystem {
       this._constraintBindGroup.setValue('stiffness', this._stiffness);
       this._constraintBindGroup.setValue('sphereCount', 0);
       this._constraintBindGroup.setValue('capsuleCount', 0);
+      this._constraintBindGroup.setValue('dynamicFriction', this._dynamicFriction);
+      this._constraintBindGroup.setValue('staticFriction', this._staticFriction);
       this._constraintBindGroup.setValue('minDistance', 1e-5);
 
       if (this._rebuildNormals) {
@@ -1057,6 +1141,22 @@ export class GPUClothSystem {
     this._damping = clamp(value, 0, 1);
   }
 
+  get dynamicFriction() {
+    return this._dynamicFriction;
+  }
+
+  set dynamicFriction(value: number) {
+    this._dynamicFriction = clamp(value, 0, 1);
+  }
+
+  get staticFriction() {
+    return this._staticFriction;
+  }
+
+  set staticFriction(value: number) {
+    this._staticFriction = clamp(value, 0, 1);
+  }
+
   get stiffness() {
     return this._stiffness;
   }
@@ -1071,6 +1171,14 @@ export class GPUClothSystem {
 
   set solverIterations(value: number) {
     this._solverIterations = Math.max(1, value | 0);
+  }
+
+  get substeps() {
+    return this._substeps;
+  }
+
+  set substeps(value: number) {
+    this._substeps = clamp(value, 1, 8) | 0;
   }
 
   get vertexCount() {
@@ -1109,20 +1217,28 @@ export class GPUClothSystem {
     }
     this.updateColliderBuffers();
     const dt = clamp(Number(deltaTime) || 0, 1 / 240, 1 / 20);
+    const substeps = this._substeps;
+    const substepDt = dt / substeps;
     this._device.pushDeviceStates();
     try {
-      this._integrateBindGroup.setValue('deltaTime', dt);
-      this._integrateBindGroup.setValue('damping', this._damping);
-      this._integrateBindGroup.setValue('gravity', this._gravity);
-      this._device.setProgram(this._integrateProgram);
-      this._device.setBindGroup(0, this._integrateBindGroup);
-      this._device.compute(this._workgroupCount, 1, 1);
-
-      this._constraintBindGroup.setValue('stiffness', this._stiffness);
-      this._device.setProgram(this._constraintProgram);
-      this._device.setBindGroup(0, this._constraintBindGroup);
-      for (let i = 0; i < this._solverIterations; i++) {
+      for (let substep = 0; substep < substeps; substep++) {
+        this._integrateBindGroup.setValue('deltaTime', substepDt);
+        this._integrateBindGroup.setValue('damping', this._damping);
+        this._integrateBindGroup.setValue('gravity', this._gravity);
+        this._integrateBindGroup.setValue('dynamicFriction', this._dynamicFriction);
+        this._integrateBindGroup.setValue('staticFriction', this._staticFriction);
+        this._device.setProgram(this._integrateProgram);
+        this._device.setBindGroup(0, this._integrateBindGroup);
         this._device.compute(this._workgroupCount, 1, 1);
+
+        this._constraintBindGroup.setValue('stiffness', this._stiffness);
+        this._constraintBindGroup.setValue('dynamicFriction', this._dynamicFriction);
+        this._constraintBindGroup.setValue('staticFriction', this._staticFriction);
+        this._device.setProgram(this._constraintProgram);
+        this._device.setBindGroup(0, this._constraintBindGroup);
+        for (let i = 0; i < this._solverIterations; i++) {
+          this._device.compute(this._workgroupCount, 1, 1);
+        }
       }
 
       if (
