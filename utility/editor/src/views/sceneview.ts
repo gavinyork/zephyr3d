@@ -650,6 +650,17 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           action: () => {
             this.play();
           }
+        },
+        {
+          label: FontGlyph.glyphs['eye'],
+          id: 'PLAY_CURRENT_SCENE',
+          selected: () => true,
+          tooltip: () => {
+            return 'Preview current scene in new tab';
+          },
+          action: () => {
+            this.playCurrentScene();
+          }
         }
       ],
       0,
@@ -781,21 +792,39 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         if (!settings!.startupScene && !settings!.startupScript) {
           DlgMessage.messageBox('Error', 'Please set startup scene or startup script in <Project Settings>');
         } else {
-          const projectId = this.controller.editor.currentProject.uuid!;
-          const url = new URL(window.location.href);
-          url.search = '';
-          url.searchParams.append('project', projectId);
-          if (ProjectService.VFS instanceof HttpFS) {
-            url.searchParams.append('remote', '');
-          }
-          const a = document.createElement('a');
-          a.href = url.href;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
-          a.click();
+          this.openPreviewInNewTab();
         }
       });
     });
+  }
+  async playCurrentScene() {
+    await ensureDependencies();
+    if (!(await this.controller.ensureSceneSaved())) {
+      return;
+    }
+    const scenePath = this.controller.scenePath;
+    if (!scenePath) {
+      await DlgMessage.messageBox('Error', 'Please save current scene first.');
+      return;
+    }
+    this.openPreviewInNewTab(scenePath);
+  }
+  private openPreviewInNewTab(sceneOverride?: string) {
+    const projectId = this.controller.editor.currentProject.uuid!;
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.searchParams.append('project', projectId);
+    if (sceneOverride) {
+      url.searchParams.append('scene', sceneOverride);
+    }
+    if (ProjectService.VFS instanceof HttpFS) {
+      url.searchParams.append('remote', '');
+    }
+    const a = document.createElement('a');
+    a.href = url.href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.click();
   }
   renderDropZone(x: number, y: number, w: number, h: number) {
     const color = new ImGui.ImVec4(0, 0, 0, 0);
