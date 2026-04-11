@@ -535,6 +535,7 @@ function buildRuntimeSignature(config, host) {
     dynamicFriction: Number(config?.dynamicFriction),
     staticFriction: Number(config?.staticFriction),
     stiffness: Number(config?.stiffness),
+    poseFollow: Number(config?.poseFollow),
     substeps: Number(config?.substeps),
     gravityX: Number(config?.gravityX),
     gravityY: Number(config?.gravityY),
@@ -843,6 +844,7 @@ export default class extends RuntimeScript {
         dynamicFriction: readNumber(config.dynamicFriction, 0.15),
         staticFriction: readNumber(config.staticFriction, 0.3),
         stiffness: readNumber(config.stiffness, 0.3),
+        poseFollow: readNumber(config.poseFollow, 0),
         substeps: Math.max(1, Math.min(8, Number(config.substeps) || 2)),
         solverIterations: Math.max(1, Number(config.solverIterations) || 5),
         maxNeighbors: Math.max(1, Number(config.maxNeighbors) || 8),
@@ -881,6 +883,7 @@ export default class extends RuntimeScript {
     cloth.dynamicFriction = readNumber(config.dynamicFriction, 0.15);
     cloth.staticFriction = readNumber(config.staticFriction, 0.3);
     cloth.stiffness = readNumber(config.stiffness, 0.3);
+    cloth.poseFollow = readNumber(config.poseFollow, 0);
     cloth.substeps = Math.max(1, Math.min(8, Number(config.substeps) || 2));
     cloth.solverIterations = Math.max(1, Number(config.solverIterations) || 5);
     cloth.colliders = buildColliders(host, config);
@@ -1243,6 +1246,7 @@ function buildClothRuntimeSignature(config: any, host: any) {
     dynamicFriction: readClothNumber(config?.dynamicFriction, 0.15),
     staticFriction: readClothNumber(config?.staticFriction, 0.3),
     stiffness: readClothNumber(config?.stiffness, 0.3),
+    poseFollow: readClothNumber(config?.poseFollow, 0),
     substeps: Math.max(1, Math.min(8, Number(config?.substeps) || 2)),
     gravityX: readClothNumber(config?.gravityX, 0),
     gravityY: readClothNumber(config?.gravityY, -9.8),
@@ -1797,6 +1801,7 @@ export class Engine {
         dynamicFriction: readClothNumber(config.dynamicFriction, 0.15),
         staticFriction: readClothNumber(config.staticFriction, 0.3),
         stiffness: readClothNumber(config.stiffness, 0.3),
+        poseFollow: readClothNumber(config.poseFollow, 0),
         substeps: Math.max(1, Math.min(8, Number(config.substeps) || 2)),
         solverIterations: Math.max(1, Number(config.solverIterations) || 5),
         maxNeighbors: Math.max(1, Number(config.maxNeighbors) || 8),
@@ -1835,6 +1840,7 @@ export class Engine {
     cloth.dynamicFriction = readClothNumber(config.dynamicFriction, 0.15);
     cloth.staticFriction = readClothNumber(config.staticFriction, 0.3);
     cloth.stiffness = readClothNumber(config.stiffness, 0.3);
+    cloth.poseFollow = readClothNumber(config.poseFollow, 0);
     cloth.substeps = Math.max(1, Math.min(8, Number(config.substeps) || 2));
     cloth.solverIterations = Math.max(1, Number(config.solverIterations) || 5);
     cloth.colliders = buildClothColliders(target, config);

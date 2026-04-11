@@ -49,6 +49,7 @@ export class ClothScriptConfig {
   dynamicFriction: number;
   staticFriction: number;
   stiffness: number;
+  poseFollow: number;
   substeps: number;
   gravityX: number;
   gravityY: number;
@@ -69,6 +70,7 @@ export class ClothScriptConfig {
     this.dynamicFriction = 0.15;
     this.staticFriction = 0.3;
     this.stiffness = 0.3;
+    this.poseFollow = 0;
     this.substeps = 2;
     this.gravityX = 0;
     this.gravityY = -9.8;
@@ -341,6 +343,21 @@ export function getClothScriptConfigClass(): SerializableClass {
           },
           set(this: ClothScriptConfig, value) {
             this.dynamicFriction = clamp01(value.num[0]);
+          }
+        },
+        {
+          name: 'PoseFollow',
+          type: 'float',
+          options: {
+            group: 'PoseFollow',
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: ClothScriptConfig, value) {
+            value.num[0] = this.poseFollow;
+          },
+          set(this: ClothScriptConfig, value) {
+            this.poseFollow = clamp01(value.num[0]);
           }
         },
         {

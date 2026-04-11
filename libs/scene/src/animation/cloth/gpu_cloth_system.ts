@@ -31,6 +31,7 @@ export type GPUClothSystemOptions = {
   dynamicFriction?: number;
   staticFriction?: number;
   stiffness?: number;
+  poseFollow?: number;
   substeps?: number;
   solverIterations?: number;
   maxNeighbors?: number;
@@ -67,6 +68,7 @@ const DEFAULT_DAMPING = 0.02;
 const DEFAULT_DYNAMIC_FRICTION = 0.15;
 const DEFAULT_STATIC_FRICTION = 0.3;
 const DEFAULT_STIFFNESS = 0.3;
+const DEFAULT_POSE_FOLLOW = 0;
 const DEFAULT_SUBSTEPS = 2;
 const DEFAULT_SOLVER_ITERATIONS = 5;
 const DEFAULT_MAX_NEIGHBORS = 8;
@@ -564,6 +566,7 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
       this.vertexCount = pb.uint().uniform(0);
       this.maxNeighbors = pb.uint().uniform(0);
       this.stiffness = pb.float().uniform(0);
+      this.poseFollow = pb.float().uniform(0);
       this.sphereCount = pb.uint().uniform(0);
       this.capsuleCount = pb.uint().uniform(0);
       this.planeCount = pb.uint().uniform(0);
@@ -614,6 +617,13 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
             this.$if(pb.greaterThan(this.validCount, 0), function () {
               this.$l.scale = pb.div(pb.mul(this.stiffness, this.freeWeight), pb.float(this.validCount));
               this.corrected = pb.sub(this.pos, pb.mul(this.correction, this.scale));
+            });
+            this.$if(pb.greaterThan(this.poseFollow, this.minDistance), function () {
+              this.$l.followStrength = pb.mul(this.poseFollow, this.freeWeight);
+              this.corrected = pb.add(
+                this.corrected,
+                pb.mul(pb.sub(this.rest, this.corrected), this.followStrength)
+              );
             });
             this.corrected = pb.add(pb.mul(this.corrected, this.freeWeight), pb.mul(this.rest, this.pinWeight));
             this.$for(pb.uint('i'), 0, this.sphereCount, function () {
@@ -964,6 +974,7 @@ export class GPUClothSystem {
   private _dynamicFriction: number;
   private _staticFriction: number;
   private _stiffness: number;
+  private _poseFollow: number;
   private _substeps: number;
   private _solverIterations: number;
   private _colliders: SpringCollider[];
@@ -1030,6 +1041,7 @@ export class GPUClothSystem {
     this._dynamicFriction = clamp(options?.dynamicFriction ?? DEFAULT_DYNAMIC_FRICTION, 0, 1);
     this._staticFriction = clamp(options?.staticFriction ?? DEFAULT_STATIC_FRICTION, 0, 1);
     this._stiffness = clamp(options?.stiffness ?? DEFAULT_STIFFNESS, 0, 1);
+    this._poseFollow = clamp(options?.poseFollow ?? DEFAULT_POSE_FOLLOW, 0, 1);
     this._substeps = clamp(options?.substeps ?? DEFAULT_SUBSTEPS, 1, 8) | 0;
     this._solverIterations = Math.max(1, (options?.solverIterations ?? DEFAULT_SOLVER_ITERATIONS) | 0);
     this._colliders = [...(options?.colliders ?? [])];
@@ -1263,6 +1275,7 @@ export class GPUClothSystem {
       this._constraintBindGroup.setValue('vertexCount', vertexCount);
       this._constraintBindGroup.setValue('maxNeighbors', this._maxNeighbors);
       this._constraintBindGroup.setValue('stiffness', this._stiffness);
+      this._constraintBindGroup.setValue('poseFollow', this.getSubstepPoseFollow());
       this._constraintBindGroup.setValue('sphereCount', 0);
       this._constraintBindGroup.setValue('capsuleCount', 0);
       this._constraintBindGroup.setValue('planeCount', 0);
@@ -1456,6 +1469,14 @@ export class GPUClothSystem {
     this._stiffness = clamp(value, 0, 1);
   }
 
+  get poseFollow() {
+    return this._poseFollow;
+  }
+
+  set poseFollow(value: number) {
+    this._poseFollow = clamp(value, 0, 1);
+  }
+
   get solverIterations() {
     return this._solverIterations;
   }
@@ -1531,6 +1552,10 @@ export class GPUClothSystem {
         this._device.setProgram(this._constraintProgram);
         this._device.setBindGroup(0, this._constraintBindGroup);
         for (let i = 0; i < this._solverIterations; i++) {
+          this._constraintBindGroup.setValue(
+            'poseFollow',
+            i === this._solverIterations - 1 ? this.getSubstepPoseFollow() : 0
+          );
           this._device.compute(this._workgroupCount, 1, 1);
         }
       }
@@ -1735,6 +1760,24 @@ export class GPUClothSystem {
     this._constraintBindGroup?.setValue('sphereCount', spheres.length);
     this._constraintBindGroup?.setValue('capsuleCount', capsules.length);
     this._constraintBindGroup?.setValue('planeCount', planes.length);
+  }
+
+  private getSubstepPoseFollow() {
+    const effectivePoseFollow = this.getEffectivePoseFollow();
+    if (effectivePoseFollow <= 0) {
+      return 0;
+    }
+    const totalPoseFollowApplications = Math.max(1, this._substeps);
+    return totalPoseFollowApplications > 1
+      ? 1 - Math.pow(Math.max(0, 1 - effectivePoseFollow), 1 / totalPoseFollowApplications)
+      : effectivePoseFollow;
+  }
+
+  private getEffectivePoseFollow() {
+    // Cloth uses a dense per-vertex animated target, so the same numeric follow value
+    // feels much stronger than sparse spring chains. Square the UI value to keep the
+    // low range usable while preserving 1 => full follow.
+    return this._poseFollow * this._poseFollow;
   }
 
   private toCollisionSpacePoint(worldPoint: Vector3): Vector3 {
