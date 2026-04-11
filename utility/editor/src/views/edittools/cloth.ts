@@ -12,6 +12,9 @@ type ClothPaintMode = 'pin' | 'unpin' | 'smooth';
 type ClothMeshData = {
   vertexCount: number;
   positions: Nullable<Float32Array>;
+  basePositions: Nullable<Float32Array>;
+  blendIndices: Nullable<Float32Array>;
+  blendWeights: Nullable<Float32Array>;
   loading: boolean;
   error: string;
   primitiveSignature: string;
@@ -140,32 +143,58 @@ function sameClothWeightState(a: ClothWeightState, b: ClothWeightState) {
   );
 }
 
-async function readMeshPositionData(mesh: Mesh): Promise<Float32Array> {
+async function readMeshVertexAttributeData(
+  mesh: Mesh,
+  semantic: 'position' | 'blendIndices' | 'blendWeights',
+  minComponents: number
+): Promise<Nullable<Float32Array>> {
   const primitive = mesh.primitive;
   if (!primitive) {
     throw new Error('Mesh has no primitive.');
   }
-  const info = primitive.getVertexBufferInfo('position');
+  const info = primitive.getVertexBufferInfo(semantic);
   if (!info) {
-    throw new Error('Mesh has no position buffer.');
+    return null;
   }
-  if (!info.type.isPrimitiveType() || info.type.scalarType !== PBPrimitiveType.F32 || info.type.cols < 3) {
-    throw new Error('Only float3/float4 position buffers are supported.');
+  if (!info.type.isPrimitiveType() || info.type.scalarType !== PBPrimitiveType.F32 || info.type.cols < minComponents) {
+    throw new Error(`Only float ${semantic} buffers are supported.`);
   }
   const bytes = await info.buffer.getBufferSubData();
   const raw = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
   const stride = info.stride >> 2;
-  const drawOffset = info.drawOffset >> 2;
+  const drawOffset = (info.drawOffset + info.offset) >> 2;
   const vertexCount = primitive.getNumVertices();
-  const positions = new Float32Array(vertexCount * 3);
+  const positions = new Float32Array(vertexCount * minComponents);
   for (let i = 0; i < vertexCount; i++) {
     const src = drawOffset + i * stride;
-    const dst = i * 3;
-    positions[dst] = raw[src];
-    positions[dst + 1] = raw[src + 1];
-    positions[dst + 2] = raw[src + 2];
+    const dst = i * minComponents;
+    for (let c = 0; c < minComponents; c++) {
+      positions[dst + c] = raw[src + c];
+    }
   }
   return positions;
+}
+
+async function readMeshPositionData(mesh: Mesh): Promise<Float32Array> {
+  const positions = await readMeshVertexAttributeData(mesh, 'position', 3);
+  if (!positions) {
+    throw new Error('Mesh has no position buffer.');
+  }
+  return positions;
+}
+
+async function readMeshSkinningData(mesh: Mesh): Promise<{
+  blendIndices: Nullable<Float32Array>;
+  blendWeights: Nullable<Float32Array>;
+}> {
+  const [blendIndices, blendWeights] = await Promise.all([
+    readMeshVertexAttributeData(mesh, 'blendIndices', 4),
+    readMeshVertexAttributeData(mesh, 'blendWeights', 4)
+  ]);
+  return {
+    blendIndices,
+    blendWeights
+  };
 }
 
 export class ClothPaintTool extends Disposable implements EditTool {
@@ -336,6 +365,7 @@ export class ClothPaintTool extends Disposable implements EditTool {
   }
   update(): void {
     this.ensureActiveMeshData();
+    this.updateSkinnedMeshData();
     if (!this._strokeActive) {
       this.syncVertexWeightsFromConfig();
     }
@@ -421,6 +451,7 @@ export class ClothPaintTool extends Disposable implements EditTool {
     if (!camera || !viewportRect || !activeMesh || !meshInfo?.positions || meshInfo.loading) {
       return;
     }
+    this.updateSkinnedMeshData(activeMesh);
     const drawList = ImGui.GetForegroundDrawList();
     const clipMin = new ImGui.ImVec2(viewportRect[0], viewportRect[1]);
     const clipMax = new ImGui.ImVec2(viewportRect[0] + viewportRect[2], viewportRect[1] + viewportRect[3]);
@@ -730,21 +761,28 @@ export class ClothPaintTool extends Disposable implements EditTool {
     data = {
       vertexCount: primitive.getNumVertices(),
       positions: data?.positions ?? null,
+      basePositions: data?.basePositions ?? null,
+      blendIndices: data?.blendIndices ?? null,
+      blendWeights: data?.blendWeights ?? null,
       loading: true,
       error: '',
       primitiveSignature
     };
     this._meshData.set(mesh, data);
-    void readMeshPositionData(mesh)
-      .then((positions) => {
+    void Promise.all([readMeshPositionData(mesh), readMeshSkinningData(mesh)])
+      .then(([positions, skinning]) => {
         const next = this._meshData.get(mesh);
         if (!next || next.primitiveSignature !== primitiveSignature) {
           return;
         }
-        next.positions = positions;
+        next.basePositions = positions;
+        next.positions = positions.slice();
+        next.blendIndices = skinning.blendIndices;
+        next.blendWeights = skinning.blendWeights;
         next.vertexCount = positions.length / 3;
         next.loading = false;
         next.error = '';
+        this.updateSkinnedMeshData(mesh);
       })
       .catch((err) => {
         const next = this._meshData.get(mesh);
@@ -752,9 +790,42 @@ export class ClothPaintTool extends Disposable implements EditTool {
           return;
         }
         next.positions = null;
+        next.basePositions = null;
+        next.blendIndices = null;
+        next.blendWeights = null;
         next.loading = false;
         next.error = err instanceof Error ? err.message : String(err);
       });
+  }
+  private updateSkinnedMeshData(targetMesh?: Mesh) {
+    const meshes = targetMesh ? [targetMesh] : [this.getActiveTarget()].filter((mesh): mesh is Mesh => !!mesh);
+    for (const mesh of meshes) {
+      const data = this._meshData.get(mesh);
+      if (!data || data.loading || !data.basePositions || !data.positions) {
+        continue;
+      }
+      const skeletonId = String((mesh as any).skeletonName ?? '');
+      const skeleton =
+        skeletonId && typeof (mesh as any).findSkeletonById === 'function'
+          ? (mesh as any).findSkeletonById(skeletonId)
+          : null;
+      if (
+        skeleton?.skinPositionsToLocal &&
+        data.blendIndices &&
+        data.blendWeights &&
+        (mesh as any).invWorldMatrix
+      ) {
+        skeleton.skinPositionsToLocal(
+          data.basePositions,
+          data.blendIndices,
+          data.blendWeights,
+          (mesh as any).invWorldMatrix,
+          data.positions
+        );
+      } else if (data.positions !== data.basePositions) {
+        data.positions.set(data.basePositions);
+      }
+    }
   }
   private applyBrushDab(hitPos: Vector3) {
     const mesh = this.getActiveTarget();
@@ -762,6 +833,7 @@ export class ClothPaintTool extends Disposable implements EditTool {
     if (!mesh || !data?.positions || data.loading) {
       return;
     }
+    this.updateSkinnedMeshData(mesh);
     const spacing = Math.max(this._brushRadius * 0.15, 0.005);
     if (this._lastStrokePos) {
       const dx = hitPos.x - this._lastStrokePos.x;

@@ -464,6 +464,76 @@ export class Skeleton extends Disposable {
     };
     return info;
   }
+  /**
+   * Skin all vertices into mesh-local space for the current skeleton pose.
+   *
+   * This is used by systems like cloth that need the animated mesh pose on CPU,
+   * but render with GPU skinning disabled to avoid double deformation.
+   *
+   * @param positions - Bind-pose/object-space input positions, xyz packed.
+   * @param blendIndices - 4 joint indices per vertex.
+   * @param weights - 4 joint weights per vertex.
+   * @param invWorldMatrix - Mesh inverse world matrix to convert skinned world positions back to mesh-local space.
+   * @param out - Optional output array to reuse.
+   * @returns The skinned mesh-local positions.
+   * @internal
+   */
+  skinPositionsToLocal(
+    positions: Float32Array<ArrayBuffer>,
+    blendIndices: ArrayLike<number>,
+    weights: ArrayLike<number>,
+    invWorldMatrix: Matrix4x4,
+    out?: Float32Array<ArrayBuffer>
+  ) {
+    const result = out && out.length === positions.length ? out : new Float32Array(positions.length);
+    const matrixOffset = this._jointOffsets[0] - 1;
+    for (let i = 0; i + 2 < positions.length; i += 3) {
+      const vertexIndex = (i / 3) >> 0;
+      const x = positions[i];
+      const y = positions[i + 1];
+      const z = positions[i + 2];
+      let skinnedX = 0;
+      let skinnedY = 0;
+      let skinnedZ = 0;
+      let weightSum = 0;
+      for (let j = 0; j < 4; j++) {
+        const weight = Number(weights[vertexIndex * 4 + j]) || 0;
+        if (weight <= 0) {
+          continue;
+        }
+        const jointIndex = (Number(blendIndices[vertexIndex * 4 + j]) || 0) + matrixOffset;
+        const matrix = this._jointMatrices[jointIndex];
+        if (!matrix) {
+          continue;
+        }
+        skinnedX += (matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12]) * weight;
+        skinnedY += (matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13]) * weight;
+        skinnedZ += (matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14]) * weight;
+        weightSum += weight;
+      }
+      if (weightSum <= 1e-6) {
+        skinnedX = x;
+        skinnedY = y;
+        skinnedZ = z;
+      }
+      result[i] =
+        invWorldMatrix[0] * skinnedX +
+        invWorldMatrix[4] * skinnedY +
+        invWorldMatrix[8] * skinnedZ +
+        invWorldMatrix[12];
+      result[i + 1] =
+        invWorldMatrix[1] * skinnedX +
+        invWorldMatrix[5] * skinnedY +
+        invWorldMatrix[9] * skinnedZ +
+        invWorldMatrix[13];
+      result[i + 2] =
+        invWorldMatrix[2] * skinnedX +
+        invWorldMatrix[6] * skinnedY +
+        invWorldMatrix[10] * skinnedZ +
+        invWorldMatrix[14];
+    }
+    return result;
+  }
   private findRootJoint(joints: SceneNode[]) {
     let root: Nullable<SceneNode> = null;
     for (const joint of joints) {

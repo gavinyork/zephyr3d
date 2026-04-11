@@ -125,11 +125,15 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     if (dstBuffer && dstBuffer.byteLength < sizeInBytes) {
       throw new Error('no enough space for querying buffer data');
     }
+    let readOffsetInBytes = offsetInBytes;
     if (!(this._usage & (GPUResourceUsageFlags.BF_READ | GPUResourceUsageFlags.BF_PACK_PIXEL))) {
       if (this._gpuUsage & GPUBufferUsage.COPY_SRC) {
-        sourceBuffer = this._device.createBuffer(sizeInBytes, { usage: 'read' });
+        const copyOffsetInBytes = offsetInBytes & ~3;
+        readOffsetInBytes = offsetInBytes - copyOffsetInBytes;
+        const copySizeInBytes = (readOffsetInBytes + sizeInBytes + 3) & ~3;
+        sourceBuffer = this._device.createBuffer(copySizeInBytes, { usage: 'read' });
         this.sync();
-        this._device.copyBuffer(this, sourceBuffer, offsetInBytes, 0, sizeInBytes);
+        this._device.copyBuffer(this, sourceBuffer, copyOffsetInBytes, 0, copySizeInBytes);
       } else {
         throw new Error('getBufferSubData() failed: buffer does not have BF_READ or BF_PACK_PIXEL flag set');
       }
@@ -140,7 +144,7 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     await buffer.mapAsync(GPUMapMode.READ);
     const range = buffer.getMappedRange();
     dstBuffer = dstBuffer || new Uint8Array(sizeInBytes);
-    dstBuffer.set(new Uint8Array(range, offsetInBytes, sizeInBytes));
+    dstBuffer.set(new Uint8Array(range, readOffsetInBytes, sizeInBytes));
     buffer.unmap();
 
     if (sourceBuffer !== this) {

@@ -10,6 +10,7 @@ import { releaseObject, retainObject, Vector3, type Nullable } from '@zephyr3d/b
 import { getDevice } from '../../app/api';
 import type { Primitive } from '../../render';
 import type { Scene } from '../../scene';
+import type { MeshUpdateCallback } from '../../scene/mesh';
 import type { CapsuleCollider, PlaneCollider, SphereCollider, SpringCollider } from '../spring/spring_collider';
 import { updateColliderFromNode } from '../spring/spring_collider';
 
@@ -20,6 +21,8 @@ export type GPUClothSystemOptions = {
   collisionSpaceNode?: any;
   positionData?: Float32Array<ArrayBuffer>;
   indexData?: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>;
+  skinningBlendIndices?: Float32Array<ArrayBuffer>;
+  skinningBlendWeights?: Float32Array<ArrayBuffer>;
   pinnedVertexWeights?: ArrayLike<number>;
   pinnedVertexIndices?: number[];
   gravity?: Vector3;
@@ -71,6 +74,69 @@ const DEFAULT_MAX_TRIANGLES_PER_VERTEX = 16;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function getPrimitiveScalarByteSize(type: PBPrimitiveType) {
+  switch (type) {
+    case PBPrimitiveType.I16:
+    case PBPrimitiveType.I16_NORM:
+    case PBPrimitiveType.U16:
+    case PBPrimitiveType.U16_NORM:
+    case PBPrimitiveType.F16:
+      return 2;
+    case PBPrimitiveType.I32:
+    case PBPrimitiveType.I32_NORM:
+    case PBPrimitiveType.U32:
+    case PBPrimitiveType.U32_NORM:
+    case PBPrimitiveType.F32:
+      return 4;
+    default:
+      return 1;
+  }
+}
+
+function readPrimitiveScalar(
+  view: DataView,
+  byteOffset: number,
+  scalarType: PBPrimitiveType,
+  normalized: boolean
+) {
+  switch (scalarType) {
+    case PBPrimitiveType.I8:
+    case PBPrimitiveType.I8_NORM: {
+      const value = view.getInt8(byteOffset);
+      return normalized ? Math.max(-1, value / 127) : value;
+    }
+    case PBPrimitiveType.U8:
+    case PBPrimitiveType.U8_NORM: {
+      const value = view.getUint8(byteOffset);
+      return normalized ? value / 255 : value;
+    }
+    case PBPrimitiveType.I16:
+    case PBPrimitiveType.I16_NORM: {
+      const value = view.getInt16(byteOffset, true);
+      return normalized ? Math.max(-1, value / 32767) : value;
+    }
+    case PBPrimitiveType.U16:
+    case PBPrimitiveType.U16_NORM: {
+      const value = view.getUint16(byteOffset, true);
+      return normalized ? value / 65535 : value;
+    }
+    case PBPrimitiveType.I32:
+    case PBPrimitiveType.I32_NORM: {
+      const value = view.getInt32(byteOffset, true);
+      return normalized ? Math.max(-1, value / 2147483647) : value;
+    }
+    case PBPrimitiveType.U32:
+    case PBPrimitiveType.U32_NORM: {
+      const value = view.getUint32(byteOffset, true);
+      return normalized ? value / 4294967295 : value;
+    }
+    case PBPrimitiveType.F32:
+      return view.getFloat32(byteOffset, true);
+    default:
+      throw new Error(`Unsupported vertex scalar type: ${scalarType}`);
+  }
 }
 
 function distance3(positions: Float32Array<ArrayBuffer>, a: number, b: number) {
@@ -213,6 +279,35 @@ function buildVertexTriangleAdjacency(
   };
 }
 
+function buildInitialSimulationPositions(options?: GPUClothSystemOptions) {
+  const sourcePositions = options?.positionData;
+  if (!sourcePositions) {
+    return null;
+  }
+  const target = options?.collisionSpaceNode;
+  const blendIndices = options?.skinningBlendIndices;
+  const blendWeights = options?.skinningBlendWeights;
+  if (
+    !target?.invWorldMatrix ||
+    !blendIndices ||
+    !blendWeights ||
+    typeof target?.findSkeletonById !== 'function'
+  ) {
+    return new Float32Array(sourcePositions);
+  }
+  const skeletonId = String(target.skeletonName ?? '');
+  const skeleton = skeletonId ? target.findSkeletonById(skeletonId) : null;
+  if (!skeleton?.skinPositionsToLocal) {
+    return new Float32Array(sourcePositions);
+  }
+  return skeleton.skinPositionsToLocal(
+    sourcePositions,
+    blendIndices,
+    blendWeights,
+    target.invWorldMatrix
+  );
+}
+
 function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
   const program = device.buildComputeProgram({
     workgroupSize: [workgroupSize, 1, 1],
@@ -220,6 +315,7 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
       this.positions = pb.float[0]().storageBuffer(0);
       this.prevPositions = pb.float[0]().storageBuffer(0);
       this.restPositions = pb.float[0]().storageBufferReadonly(0);
+      this.prevRestPositions = pb.float[0]().storageBufferReadonly(0);
       this.invMass = pb.float[0]().storageBufferReadonly(0);
       this.sphereData = pb.float[0]().storageBufferReadonly(0);
       this.capsuleData = pb.float[0]().storageBufferReadonly(0);
@@ -247,11 +343,18 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
           this.$l.restX = this.restPositions.at(this.base);
           this.$l.restY = this.restPositions.at(pb.add(this.base, 1));
           this.$l.restZ = this.restPositions.at(pb.add(this.base, 2));
+          this.$l.prevRestX = this.prevRestPositions.at(this.base);
+          this.$l.prevRestY = this.prevRestPositions.at(pb.add(this.base, 1));
+          this.$l.prevRestZ = this.prevRestPositions.at(pb.add(this.base, 2));
           this.$l.freeWeight = this.invMass.at(this.index);
           this.$l.pinWeight = pb.sub(1, this.freeWeight);
           this.$l.current = pb.vec3(this.x, this.y, this.z);
           this.$l.previous = pb.vec3(this.px, this.py, this.pz);
           this.$l.rest = pb.vec3(this.restX, this.restY, this.restZ);
+          this.$l.prevRest = pb.vec3(this.prevRestX, this.prevRestY, this.prevRestZ);
+          this.$l.restDelta = pb.sub(this.rest, this.prevRest);
+          this.current = pb.add(this.current, this.restDelta);
+          this.previous = pb.add(this.previous, this.restDelta);
           this.$l.dt2 = pb.mul(this.deltaTime, this.deltaTime);
           // Damping is modeled as velocity loss strength: 0 keeps full inertia, 1 removes it entirely.
           this.$l.velocity = pb.mul(
@@ -711,27 +814,82 @@ function createVertexNormalProgram(device: AbstractDevice, workgroupSize: number
 }
 
 async function readPositionDataFromPrimitive(primitive: Primitive) {
-  const info = primitive.getVertexBufferInfo('position');
-  if (!info) {
+  const positions = await readVertexAttributeDataFromPrimitive(primitive, 'position', 3);
+  if (!positions) {
     throw new Error('GPU cloth initialization failed: primitive has no position buffer.');
   }
-  if (!info.type.isPrimitiveType() || info.type.scalarType !== PBPrimitiveType.F32 || info.type.cols < 3) {
-    throw new Error('GPU cloth initialization failed: only f32 position attributes are supported.');
+  return positions;
+}
+
+async function readVertexAttributeDataFromPrimitive(
+  primitive: Primitive,
+  semantic: 'position' | 'blendIndices' | 'blendWeights',
+  componentCount: number
+) {
+  const info = primitive.getVertexBufferInfo(semantic);
+  if (!info || !info.type.isPrimitiveType() || info.type.cols < componentCount) {
+    return null;
+  }
+  const vertexCount = primitive.getNumVertices();
+  if (vertexCount <= 0) {
+    return null;
   }
   const bytes = await info.buffer.getBufferSubData();
-  const raw = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
-  const stride = info.stride >> 2;
-  const drawOffset = info.drawOffset >> 2;
-  const vertexCount = primitive.getNumVertices();
-  const positions = new Float32Array(vertexCount * 3);
-  for (let i = 0; i < vertexCount; i++) {
-    const src = drawOffset + i * stride;
-    const dst = i * 3;
-    positions[dst] = raw[src];
-    positions[dst + 1] = raw[src + 1];
-    positions[dst + 2] = raw[src + 2];
+  const result = new Float32Array(vertexCount * componentCount);
+  const scalarType = info.type.scalarType;
+  const normalized = info.type.normalized;
+  const componentByteSize = getPrimitiveScalarByteSize(scalarType);
+  const baseByteOffset = info.drawOffset + info.offset;
+  if (
+    scalarType === PBPrimitiveType.F32 &&
+    !normalized &&
+    baseByteOffset % 4 === 0 &&
+    info.stride % 4 === 0
+  ) {
+    const raw = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
+    const stride = info.stride >> 2;
+    const srcOffset = baseByteOffset >> 2;
+    for (let i = 0; i < vertexCount; i++) {
+      const src = srcOffset + i * stride;
+      const dst = i * componentCount;
+      for (let c = 0; c < componentCount; c++) {
+        result[dst + c] = raw[src + c];
+      }
+    }
+    return result;
   }
-  return positions;
+  if (scalarType === PBPrimitiveType.F16) {
+    throw new Error(`GPU cloth initialization failed: unsupported ${semantic} attribute format.`);
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let i = 0; i < vertexCount; i++) {
+    const src = baseByteOffset + i * info.stride;
+    const dst = i * componentCount;
+    for (let c = 0; c < componentCount; c++) {
+      result[dst + c] = readPrimitiveScalar(
+        view,
+        src + c * componentByteSize,
+        scalarType,
+        normalized
+      );
+    }
+  }
+  return result;
+}
+
+async function readSkinningDataFromPrimitive(primitive: Primitive) {
+  try {
+    const [blendIndices, blendWeights] = await Promise.all([
+      readVertexAttributeDataFromPrimitive(primitive, 'blendIndices', 4),
+      readVertexAttributeDataFromPrimitive(primitive, 'blendWeights', 4)
+    ]);
+    if (!blendIndices || !blendWeights) {
+      return null;
+    }
+    return { blendIndices, blendWeights };
+  } catch {
+    return null;
+  }
 }
 
 function buildNonIndexedTriangles(primitive: Primitive, vertexCount: number) {
@@ -782,6 +940,7 @@ export class GPUClothSystem {
   private _positionBuffer: Nullable<StructuredBuffer>;
   private _prevPositionBuffer: Nullable<GPUDataBuffer>;
   private _restPositionBuffer: Nullable<GPUDataBuffer>;
+  private _prevRestPositionBuffer: Nullable<GPUDataBuffer>;
   private _invMassBuffer: Nullable<GPUDataBuffer>;
   private _neighborIndexBuffer: Nullable<GPUDataBuffer>;
   private _restLengthBuffer: Nullable<GPUDataBuffer>;
@@ -819,8 +978,17 @@ export class GPUClothSystem {
   private _normalBuffer: Nullable<StructuredBuffer>;
   private _rebuildNormals: boolean;
   private _collisionSpaceNode: any;
+  private _sourcePositionData: Nullable<Float32Array<ArrayBuffer>>;
+  private _skinningBlendIndices: Nullable<Float32Array<ArrayBuffer>>;
+  private _skinningBlendWeights: Nullable<Float32Array<ArrayBuffer>>;
+  private _dynamicRestPositionData: Nullable<Float32Array<ArrayBuffer>>;
+  private _usingDynamicRestPose: boolean;
+  private _skinAnimationTarget: any;
+  private _restoreSkinAnimation: Nullable<boolean>;
   private _boundScene: Nullable<Scene>;
   private _autoUpdate: boolean;
+  private _pendingAutoUpdateDeltaTime: number;
+  private readonly _meshPostUpdateCallback: MeshUpdateCallback;
 
   constructor(options?: GPUClothSystemOptions) {
     this._device = resolveDevice(options?.device ?? null);
@@ -834,6 +1002,7 @@ export class GPUClothSystem {
     this._positionBuffer = null;
     this._prevPositionBuffer = null;
     this._restPositionBuffer = null;
+    this._prevRestPositionBuffer = null;
     this._invMassBuffer = null;
     this._neighborIndexBuffer = null;
     this._restLengthBuffer = null;
@@ -875,8 +1044,27 @@ export class GPUClothSystem {
     this._normalBuffer = null;
     this._rebuildNormals = options?.rebuildNormals ?? true;
     this._collisionSpaceNode = options?.collisionSpaceNode ?? null;
+    this._sourcePositionData = options?.positionData ? new Float32Array(options.positionData) : null;
+    this._skinningBlendIndices = options?.skinningBlendIndices
+      ? new Float32Array(options.skinningBlendIndices)
+      : null;
+    this._skinningBlendWeights = options?.skinningBlendWeights
+      ? new Float32Array(options.skinningBlendWeights)
+      : null;
+    this._dynamicRestPositionData = null;
+    this._usingDynamicRestPose = false;
+    this._skinAnimationTarget = null;
+    this._restoreSkinAnimation = null;
     this._boundScene = null;
     this._autoUpdate = options?.autoUpdate ?? true;
+    this._pendingAutoUpdateDeltaTime = 0;
+    this._meshPostUpdateCallback = (_frameId, _elapsedInSeconds, deltaInSeconds) => {
+      const dt = this._pendingAutoUpdateDeltaTime || deltaInSeconds;
+      if (dt > 0) {
+        this._pendingAutoUpdateDeltaTime = 0;
+        this.update(dt);
+      }
+    };
 
     if (!supported) {
       this._disabledReason = 'GPU cloth is disabled: current backend is not WebGPU.';
@@ -909,14 +1097,15 @@ export class GPUClothSystem {
       return;
     }
 
+    const initialSimulationPositions = buildInitialSimulationPositions(options) ?? new Float32Array(options.positionData);
     const workgroupSize = clamp(options?.workgroupSize ?? DEFAULT_WORKGROUP_SIZE, 1, 256) | 0;
     const indexDataU32 = toUInt32Indices(options.indexData);
     const pinWeightArray = buildPinWeightArray(
-      options.positionData,
+      initialSimulationPositions,
       options.pinnedVertexWeights,
       options.pinnedVertexIndices
     );
-    const neighbors = buildNeighborData(options.positionData, options.indexData, this._maxNeighbors);
+    const neighbors = buildNeighborData(initialSimulationPositions, options.indexData, this._maxNeighbors);
     const adjacency = buildVertexTriangleAdjacency(
       vertexCount,
       indexDataU32,
@@ -928,7 +1117,7 @@ export class GPUClothSystem {
     }
 
     try {
-      this._positionBuffer = this._device.createVertexBuffer('position_f32x3', options.positionData, {
+      this._positionBuffer = this._device.createVertexBuffer('position_f32x3', initialSimulationPositions, {
         storage: true,
         managed: false
       });
@@ -942,7 +1131,7 @@ export class GPUClothSystem {
         dynamic: false,
         managed: false
       });
-      this._prevPositionBuffer.bufferSubData(0, options.positionData);
+      this._prevPositionBuffer.bufferSubData(0, initialSimulationPositions);
 
       this._restPositionBuffer = this._device.createBuffer(options.positionData.byteLength, {
         usage: 'uniform',
@@ -950,7 +1139,15 @@ export class GPUClothSystem {
         dynamic: false,
         managed: false
       });
-      this._restPositionBuffer.bufferSubData(0, options.positionData);
+      this._restPositionBuffer.bufferSubData(0, initialSimulationPositions);
+
+      this._prevRestPositionBuffer = this._device.createBuffer(options.positionData.byteLength, {
+        usage: 'uniform',
+        storage: true,
+        dynamic: false,
+        managed: false
+      });
+      this._prevRestPositionBuffer.bufferSubData(0, initialSimulationPositions);
 
       const invMassArray = new Float32Array(vertexCount);
       for (let i = 0; i < vertexCount; i++) {
@@ -1038,6 +1235,7 @@ export class GPUClothSystem {
       this._integrateBindGroup.setBuffer('positions', this._positionBuffer!);
       this._integrateBindGroup.setBuffer('prevPositions', this._prevPositionBuffer);
       this._integrateBindGroup.setBuffer('restPositions', this._restPositionBuffer);
+      this._integrateBindGroup.setBuffer('prevRestPositions', this._prevRestPositionBuffer);
       this._integrateBindGroup.setBuffer('invMass', this._invMassBuffer);
       this._integrateBindGroup.setBuffer('sphereData', this._sphereColliderBuffer);
       this._integrateBindGroup.setBuffer('capsuleData', this._capsuleColliderBuffer);
@@ -1125,6 +1323,7 @@ export class GPUClothSystem {
       this._workgroupCount = Math.max(1, Math.ceil(vertexCount / workgroupSize));
       this._triangleCount = adjacency.triangleCount;
       this._triangleWorkgroupCount = Math.max(1, Math.ceil(this._triangleCount / workgroupSize));
+      this.disableTargetSkinning();
       this.updateColliderBuffers();
       if (this._autoUpdate && options?.scene) {
         this.bindToScene(options.scene);
@@ -1144,12 +1343,15 @@ export class GPUClothSystem {
     options?: Omit<GPUClothSystemOptions, 'primitive' | 'positionData' | 'indexData'>
   ) {
     const positionData = await readPositionDataFromPrimitive(primitive);
+    const skinningData = await readSkinningDataFromPrimitive(primitive);
     const indexData = await readIndexDataFromPrimitive(primitive, (positionData.length / 3) >> 0);
     return new GPUClothSystem({
       ...options,
       primitive,
       positionData,
-      indexData
+      indexData,
+      skinningBlendIndices: skinningData?.blendIndices ?? undefined,
+      skinningBlendWeights: skinningData?.blendWeights ?? undefined
     });
   }
 
@@ -1276,12 +1478,14 @@ export class GPUClothSystem {
     if (this._boundScene === scene) {
       return;
     }
+    this.detachAutoUpdateTarget();
     if (this._boundScene) {
       this._boundScene.off('update', this._onSceneUpdate, this);
     }
     this._boundScene = scene ?? null;
     if (this._boundScene) {
       this._boundScene.on('update', this._onSceneUpdate, this);
+      this.attachAutoUpdateTarget();
     }
   }
 
@@ -1302,6 +1506,7 @@ export class GPUClothSystem {
     ) {
       return;
     }
+    this.updateSkinnedRestPositions();
     this.updateColliderBuffers();
     const dt = clamp(Number(deltaTime) || 0, 1 / 240, 1 / 20);
     const substeps = this._substeps;
@@ -1344,12 +1549,14 @@ export class GPUClothSystem {
         this._device.compute(this._workgroupCount, 1, 1);
       }
     } finally {
+      this.commitRestPositions();
       this._device.popDeviceStates();
     }
   }
 
   dispose() {
     this.unbindFromScene();
+    this.restoreTargetSkinning();
     if (this._primitive) {
       if (this._positionBuffer) {
         this._primitive.removeVertexBuffer('position');
@@ -1384,6 +1591,8 @@ export class GPUClothSystem {
     this._prevPositionBuffer = null;
     this._restPositionBuffer?.dispose();
     this._restPositionBuffer = null;
+    this._prevRestPositionBuffer?.dispose();
+    this._prevRestPositionBuffer = null;
     this._invMassBuffer?.dispose();
     this._invMassBuffer = null;
     this._neighborIndexBuffer?.dispose();
@@ -1571,6 +1780,91 @@ export class GPUClothSystem {
 
   private _onSceneUpdate() {
     const dt = (getDevice().frameInfo.elapsedFrame || 16.6667) * 0.001;
+    if (this.hasAutoUpdateTarget()) {
+      this._pendingAutoUpdateDeltaTime = dt;
+      this._collisionSpaceNode?.scene?.queueUpdateNode?.(this._collisionSpaceNode);
+      return;
+    }
     this.update(dt);
+  }
+  private hasAutoUpdateTarget() {
+    const target = this._collisionSpaceNode;
+    return !!(target?.addPostUpdateCallback && target?.removePostUpdateCallback);
+  }
+  private attachAutoUpdateTarget() {
+    if (this.hasAutoUpdateTarget()) {
+      this._collisionSpaceNode.addPostUpdateCallback(this._meshPostUpdateCallback);
+    }
+  }
+  private detachAutoUpdateTarget() {
+    if (this.hasAutoUpdateTarget()) {
+      this._collisionSpaceNode.removePostUpdateCallback(this._meshPostUpdateCallback);
+    }
+    this._pendingAutoUpdateDeltaTime = 0;
+  }
+  private updateSkinnedRestPositions() {
+    if (
+      !this._sourcePositionData ||
+      !this._skinningBlendIndices ||
+      !this._skinningBlendWeights ||
+      !this._restPositionBuffer ||
+      !this._prevRestPositionBuffer
+    ) {
+      return;
+    }
+    const target = this._collisionSpaceNode;
+    const skeletonId = String(target?.skeletonName ?? '');
+    const skeleton =
+      skeletonId && typeof target?.findSkeletonById === 'function' ? target.findSkeletonById(skeletonId) : null;
+    if (skeleton?.skinPositionsToLocal && target?.invWorldMatrix) {
+      const restPositions =
+        this._dynamicRestPositionData && this._dynamicRestPositionData.length === this._sourcePositionData.length
+          ? this._dynamicRestPositionData
+          : new Float32Array(this._sourcePositionData.length);
+      skeleton.skinPositionsToLocal(
+        this._sourcePositionData,
+        this._skinningBlendIndices,
+        this._skinningBlendWeights,
+        target.invWorldMatrix,
+        restPositions
+      );
+      this._dynamicRestPositionData = restPositions;
+      this._restPositionBuffer.bufferSubData(0, restPositions);
+      this._usingDynamicRestPose = true;
+      return;
+    }
+    if (this._usingDynamicRestPose) {
+      this._restPositionBuffer.bufferSubData(0, this._sourcePositionData);
+      this._prevRestPositionBuffer.bufferSubData(0, this._sourcePositionData);
+      this._usingDynamicRestPose = false;
+    }
+  }
+  private commitRestPositions() {
+    if (!this._prevRestPositionBuffer || !this._usingDynamicRestPose) {
+      return;
+    }
+    if (this._dynamicRestPositionData) {
+      this._prevRestPositionBuffer.bufferSubData(0, this._dynamicRestPositionData);
+    }
+  }
+  private disableTargetSkinning() {
+    const target = this._collisionSpaceNode;
+    if (!target || typeof target.suspendSkinning !== 'boolean' || this._restoreSkinAnimation !== null) {
+      return;
+    }
+    this._skinAnimationTarget = target;
+    this._restoreSkinAnimation = target.suspendSkinning;
+    target.suspendSkinning = true;
+    target.setBoneMatrices?.(null);
+    target.setAnimatedBoundingBox?.(null);
+  }
+  private restoreTargetSkinning() {
+    if (!this._skinAnimationTarget || this._restoreSkinAnimation === null) {
+      return;
+    }
+    this.detachAutoUpdateTarget();
+    this._skinAnimationTarget.suspendSkinning = this._restoreSkinAnimation;
+    this._skinAnimationTarget = null;
+    this._restoreSkinAnimation = null;
   }
 }
