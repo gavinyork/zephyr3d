@@ -11,6 +11,7 @@ import { getDevice } from '../../app/api';
 import type { Primitive } from '../../render';
 import type { Scene } from '../../scene';
 import type { MeshUpdateCallback } from '../../scene/mesh';
+import { BoundingBox } from '../../utility/bounding_volume';
 import type { CapsuleCollider, PlaneCollider, SphereCollider, SpringCollider } from '../spring/spring_collider';
 import { updateColliderFromNode } from '../spring/spring_collider';
 
@@ -1324,6 +1325,7 @@ export class GPUClothSystem {
       this._triangleCount = adjacency.triangleCount;
       this._triangleWorkgroupCount = Math.max(1, Math.ceil(this._triangleCount / workgroupSize));
       this.disableTargetSkinning();
+      this.updateTargetBoundingBox(initialSimulationPositions);
       this.updateColliderBuffers();
       if (this._autoUpdate && options?.scene) {
         this.bindToScene(options.scene);
@@ -1831,12 +1833,53 @@ export class GPUClothSystem {
       this._dynamicRestPositionData = restPositions;
       this._restPositionBuffer.bufferSubData(0, restPositions);
       this._usingDynamicRestPose = true;
+      this.updateTargetBoundingBox(restPositions);
       return;
     }
     if (this._usingDynamicRestPose) {
       this._restPositionBuffer.bufferSubData(0, this._sourcePositionData);
       this._prevRestPositionBuffer.bufferSubData(0, this._sourcePositionData);
       this._usingDynamicRestPose = false;
+      this.updateTargetBoundingBox(this._sourcePositionData);
+    }
+  }
+  private updateTargetBoundingBox(positions: Float32Array<ArrayBuffer>) {
+    if (!positions || positions.length < 3) {
+      return;
+    }
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let minZ = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    let maxZ = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i + 2 < positions.length; i += 3) {
+      const x = positions[i];
+      const y = positions[i + 1];
+      const z = positions[i + 2];
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+        continue;
+      }
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      minZ = Math.min(minZ, z);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+      maxZ = Math.max(maxZ, z);
+    }
+    if (!Number.isFinite(minX)) {
+      return;
+    }
+    const padding = Math.max(maxX - minX, maxY - minY, maxZ - minZ) * 0.15;
+    const bbox = new BoundingBox(
+      new Vector3(minX - padding, minY - padding, minZ - padding),
+      new Vector3(maxX + padding, maxY + padding, maxZ + padding)
+    );
+    const target = this._collisionSpaceNode;
+    if (typeof target?.setAnimatedBoundingBox === 'function') {
+      target.setAnimatedBoundingBox(bbox);
+    } else {
+      this._primitive?.setBoundingVolume(bbox);
     }
   }
   private commitRestPositions() {
@@ -1863,6 +1906,7 @@ export class GPUClothSystem {
       return;
     }
     this.detachAutoUpdateTarget();
+    this._skinAnimationTarget.setAnimatedBoundingBox?.(null);
     this._skinAnimationTarget.suspendSkinning = this._restoreSkinAnimation;
     this._skinAnimationTarget = null;
     this._restoreSkinAnimation = null;
