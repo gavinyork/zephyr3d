@@ -306,11 +306,31 @@ function buildBipedSuffixSkeleton() {
     nodes[`Bip001 ${side} Forearm_22`] = lowerArm;
     nodes[`Bip001 ${side} Hand_23`] = hand;
 
-    appendFingerChain(hand, [`Bip001 ${side} Finger0_30`, `Bip001 ${side} Finger01_31`, `Bip001 ${side} Finger02_32`], nodes);
-    appendFingerChain(hand, [`Bip001 ${side} Finger1_33`, `Bip001 ${side} Finger11_34`, `Bip001 ${side} Finger12_35`], nodes);
-    appendFingerChain(hand, [`Bip001 ${side} Finger2_36`, `Bip001 ${side} Finger21_37`, `Bip001 ${side} Finger22_38`], nodes);
-    appendFingerChain(hand, [`Bip001 ${side} Finger3_39`, `Bip001 ${side} Finger31_40`, `Bip001 ${side} Finger32_41`], nodes);
-    appendFingerChain(hand, [`Bip001 ${side} Finger4_42`, `Bip001 ${side} Finger41_43`, `Bip001 ${side} Finger42_44`], nodes);
+    appendFingerChain(
+      hand,
+      [`Bip001 ${side} Finger0_30`, `Bip001 ${side} Finger01_31`, `Bip001 ${side} Finger02_32`],
+      nodes
+    );
+    appendFingerChain(
+      hand,
+      [`Bip001 ${side} Finger1_33`, `Bip001 ${side} Finger11_34`, `Bip001 ${side} Finger12_35`],
+      nodes
+    );
+    appendFingerChain(
+      hand,
+      [`Bip001 ${side} Finger2_36`, `Bip001 ${side} Finger21_37`, `Bip001 ${side} Finger22_38`],
+      nodes
+    );
+    appendFingerChain(
+      hand,
+      [`Bip001 ${side} Finger3_39`, `Bip001 ${side} Finger31_40`, `Bip001 ${side} Finger32_41`],
+      nodes
+    );
+    appendFingerChain(
+      hand,
+      [`Bip001 ${side} Finger4_42`, `Bip001 ${side} Finger41_43`, `Bip001 ${side} Finger42_44`],
+      nodes
+    );
   }
 
   return { root, nodes };

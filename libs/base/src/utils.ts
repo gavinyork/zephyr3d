@@ -173,6 +173,69 @@ export function objectKeys<T extends {}>(obj: T) {
 }
 
 /**
+ * Tool：constructs a counter with value N
+ *
+ * @public
+ */
+type BuildTuple<Length extends number, T extends unknown[] = []> = T['length'] extends Length
+  ? T
+  : BuildTuple<Length, [...T, unknown]>;
+
+/**
+ * Tool: Decrement
+ *
+ * @public
+ */
+export type Decrement<N extends number> =
+  BuildTuple<N> extends [infer _, ...infer Rest] ? Rest['length'] : never;
+
+type Primitive = string | number | boolean | bigint | symbol | null | undefined;
+type Builtin = Primitive | Function | Date | RegExp | ArrayBuffer | ArrayBufferView;
+type HasFunctionProperty<T> = T extends object
+  ? {
+      [K in keyof T]-?: T[K] extends (...args: any[]) => any ? true : never;
+    }[keyof T] extends never
+    ? false
+    : true
+  : false;
+
+/**
+ * Deep Partial
+ *
+ * @template T - 目标类型
+ * @template Depth - 最大递归深度（默认 5）
+ *
+ * @public
+ */
+export type DeepPartial<T, Depth extends number = 5> =
+  // Depth limitation reached
+  Depth extends 0
+    ? T
+    : // builtin / leaf types
+      T extends Builtin
+      ? T
+      : // array
+        T extends Array<infer U>
+        ? Array<DeepPartial<U, Decrement<Depth>>>
+        : // readonly array
+          T extends ReadonlyArray<infer U>
+          ? ReadonlyArray<DeepPartial<U, Decrement<Depth>>>
+          : // class instance-like objects are preserved to avoid turning methods into optional members
+            HasFunctionProperty<T> extends true
+            ? T
+            : // plain object
+              T extends object
+              ? {
+                  [K in keyof T]?: T[K] extends (...args: any[]) => any
+                    ? T[K]
+                    : DeepPartial<T[K], Decrement<Depth>>;
+                }
+              : // primitive
+                T;
+
+//type X = DeepPartial<{ m: URL }>;
+
+/**
  * Make optional properties as required
  * @public
  */

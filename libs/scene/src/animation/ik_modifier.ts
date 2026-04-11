@@ -14,6 +14,7 @@ import type { Vector3 } from '@zephyr3d/base';
 export class IKModifier<Solver extends IKSolver = IKSolver> extends SkeletonModifier {
   private _solver: Solver;
   private _target: Vector3;
+  private _weight: number;
 
   /**
    * Create an IK post-processor.
@@ -23,7 +24,8 @@ export class IKModifier<Solver extends IKSolver = IKSolver> extends SkeletonModi
    * @param weight - Blend weight [0-1] (default: 1.0)
    */
   constructor(solver: Solver, target: Vector3, weight: number = 1.0) {
-    super(weight);
+    super();
+    this._weight = weight;
     this._solver = solver;
     this._target = target.clone();
   }
@@ -72,5 +74,13 @@ export class IKModifier<Solver extends IKSolver = IKSolver> extends SkeletonModi
   reset(): void {
     // IK solvers typically don't need explicit reset
     // as they solve based on current joint positions
+  }
+
+  protected _getWeight(): number {
+    return this._weight;
+  }
+
+  protected _setWeight(value: number): void {
+    this._weight = Math.max(0, Math.min(1, value));
   }
 }

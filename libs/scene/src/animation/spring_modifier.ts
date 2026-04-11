@@ -8,10 +8,13 @@ import type { SpringSystem } from './spring/spring_system';
  * Integrates spring-based physics simulation into the skeleton post-processing pipeline.
  * The spring system is updated each frame and results are blended with the base animation.
  *
+ * @deprecated Use the new {@link JointDynamicsModifier} class instead.
+ *
  * @public
  */
 export class SpringModifier extends SkeletonModifier {
   private _springSystem: SpringSystem;
+  private _weight: number;
 
   /**
    * Create a spring post-processor.
@@ -20,7 +23,8 @@ export class SpringModifier extends SkeletonModifier {
    * @param weight - Blend weight [0-1] (default: 1.0)
    */
   constructor(springSystem: SpringSystem, weight: number = 1.0) {
-    super(weight);
+    super();
+    this._weight = weight;
     this._springSystem = springSystem;
   }
 
@@ -51,5 +55,21 @@ export class SpringModifier extends SkeletonModifier {
    */
   reset(): void {
     this._springSystem.reset();
+  }
+
+  /**
+   * Get the blend weight for this processor.
+   * @returns The current blend weight (0-1)
+   */
+  protected _getWeight(): number {
+    return this._weight;
+  }
+
+  /**
+   * Set the blend weight for this processor.
+   * @param value - New blend weight (0-1)
+   */
+  protected _setWeight(value: number): void {
+    this._weight = Math.max(0, Math.min(1, value));
   }
 }

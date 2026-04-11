@@ -1,45 +1,18 @@
 // Bone chain demo — 8-bone pendulum with sphere collider
 
-import { InterpolatorScalar } from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
 import type { BoneNode, ColliderR, GrabberR, Scene } from '@zephyr3d/scene';
-import { SpringSystem2 } from '@zephyr3d/scene';
+import { BoxShape, JointDynamicsSystem } from '@zephyr3d/scene';
 import { LambertMaterial, Mesh, SceneNode, SphereShape } from '@zephyr3d/scene';
-import { type ControllerConfig, type PhysicsCurves } from '@zephyr3d/scene';
 import { createTransformAccess } from './three-bridge';
 import { Vector3 } from '@zephyr3d/base';
-
-function defaultCurves(): PhysicsCurves {
-  return {
-    massScale: InterpolatorScalar.constant(1),
-    gravityScale: InterpolatorScalar.constant(1),
-    windForceScale: InterpolatorScalar.linear(0, 1),
-    resistance: InterpolatorScalar.constant(0.95),
-    hardness: InterpolatorScalar.constant(0.0),
-    friction: InterpolatorScalar.constant(0.5),
-    sliderJointLength: InterpolatorScalar.constant(0),
-    allShrinkScale: InterpolatorScalar.constant(1),
-    allStretchScale: InterpolatorScalar.constant(1),
-    structuralShrinkVertical: InterpolatorScalar.constant(1),
-    structuralStretchVertical: InterpolatorScalar.constant(1),
-    structuralShrinkHorizontal: InterpolatorScalar.constant(0.5),
-    structuralStretchHorizontal: InterpolatorScalar.constant(0.5),
-    shearShrink: InterpolatorScalar.constant(0.5),
-    shearStretch: InterpolatorScalar.constant(0.5),
-    bendingShrinkVertical: InterpolatorScalar.constant(0.5),
-    bendingStretchVertical: InterpolatorScalar.constant(0.5),
-    bendingShrinkHorizontal: InterpolatorScalar.constant(0.5),
-    bendingStretchHorizontal: InterpolatorScalar.constant(0.5),
-    fakeWavePower: InterpolatorScalar.constant(0),
-    fakeWaveFreq: InterpolatorScalar.constant(0)
-  };
-}
 
 export interface BoneChainDemo {
   root: SceneNode;
   bones: SceneNode[];
   colliderObj: SceneNode;
   grabberObj: SceneNode;
-  springSystem: SpringSystem2;
+  springSystem: JointDynamicsSystem;
   rootPoints: BoneNode[];
   collidersR: ColliderR[];
   update: (time: number, dt: number) => void;
@@ -50,8 +23,16 @@ export function createBoneChainDemo(scene: Scene): BoneChainDemo {
   const BONE_SPACING = 0.2;
 
   // Create bone hierarchy
+  const sysroot = new SceneNode(scene);
+  sysroot.position.setXYZ(0, 2, 0);
+  const rootGeo = new BoxShape({ size: 0.1 });
+  const rootMat = new LambertMaterial();
+  rootMat.albedoColor = new Vector4(0, 0, 1, 1);
+  const rootMesh = new Mesh(scene, rootGeo, rootMat);
+  rootMesh.parent = sysroot;
+
   const root = new SceneNode(scene);
-  root.position.setXYZ(0, 2, 0);
+  root.parent = sysroot;
 
   const bones: SceneNode[] = [];
   let parent: SceneNode = root;
@@ -65,7 +46,7 @@ export function createBoneChainDemo(scene: Scene): BoneChainDemo {
 
   // Visual: small spheres at each bone
   const boneMat = new LambertMaterial();
-  const boneGeo = new SphereShape({ radius: 0.03 });
+  const boneGeo = new BoxShape({ size: 0.06 });
   for (const b of bones) {
     const mesh = new Mesh(scene, boneGeo, boneMat);
     mesh.parent = b;
@@ -117,57 +98,34 @@ export function createBoneChainDemo(scene: Scene): BoneChainDemo {
     }
   ];
 
-  const config: ControllerConfig = {
-    gravity: new Vector3(0, -9.8, 0),
-    windForce: Vector3.zero(),
-    relaxation: 3,
-    subSteps: 3,
-    rootSlideLimit: -1,
-    rootRotateLimit: -1,
-    constraintShrinkLimit: 1,
-    blendRatio: 0,
-    stabilizationFrameRate: 60,
-    isFakeWave: false,
-    fakeWaveSpeed: 0,
-    fakeWavePower: 0,
-    enableSurfaceCollision: false,
-    enableBroadPhase: true,
-    angleLimitConfig: { angleLimit: -1, limitFromRoot: false },
-    curves: defaultCurves(),
-    constraintOptions: {
-      structuralVertical: true,
-      structuralHorizontal: false,
-      shear: false,
-      bendingVertical: true,
-      bendingHorizontal: false,
-      isLoop: false,
-      collideStructuralVertical: true,
-      collideStructuralHorizontal: false,
-      collideShear: false,
-      enableSurfaceCollision: false
-    }
-  };
-
-  const springSystem = new SpringSystem2(
-    config,
-    { systemRoot: root, chains: [{ start: root, end: bones[bones.length - 1] }] },
+  const jointDynamicSystem = new JointDynamicsSystem(
+    {
+      chainConfig: { systemRoot: sysroot, chains: [{ start: root, end: bones[bones.length - 1] }] },
+      controllerConfig: {
+        constraintOptions: {
+          structuralVertical: true,
+          bendingVertical: true
+        }
+      }
+    },
     [{ r: collidersR[0], transform: createTransformAccess(colliderObj) }],
     [{ r: grabbersR[0], transform: createTransformAccess(grabberObj), enabled: false }],
     [{ up: new Vector3(0, 1, 0), position: new Vector3(0, 0, 0) }]
   );
   const update = (time: number, dt: number) => {
     // Oscillate root
-    root.position.x = Math.sin(time * 2) * 0.5;
-    root.position.y = 2 + Math.sin(time * 1.5) * 0.1;
-    springSystem.update(dt);
+    sysroot.position.x = Math.sin(time * 2) * 0.5;
+    sysroot.position.y = 2 + Math.sin(time * 1.5) * 0.1;
+    sysroot.rotation.fromAxisAngle(Vector3.axisPY(), time * 2);
+    jointDynamicSystem.update(dt);
   };
 
   return {
-    root,
+    root: sysroot,
     bones,
     colliderObj,
     grabberObj,
-    springSystem,
+    springSystem: jointDynamicSystem,
     rootPoints,
     collidersR,
     update

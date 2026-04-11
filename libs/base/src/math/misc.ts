@@ -71,6 +71,50 @@ export function nextPowerOf2(value: number) {
 }
 
 /**
+ * Clamps a number within the inclusive range [min, max].
+ *
+ * @param v - The input value.
+ * @param min - The lower bound.
+ * @param max - The upper bound.
+ * @returns The value constrained to the range [min, max].
+ *
+ * @public
+ */
+export function clamp(v: number, min: number, max: number): number {
+  return v < min ? min : v > max ? max : v;
+}
+
+/**
+ * Clamps a number to the range [0, 1].
+ *
+ * @param v - The input value.
+ * @returns The value constrained to the range [0, 1].
+ *
+ * @public
+ */
+export function clamp01(v: number): number {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+/**
+ * Smoothstep interpolation function.
+ *
+ * Performs smooth Hermite interpolation between 0 and 1 when `t` is within [from, to].
+ * The result is clamped to [0, 1], with zero first derivatives at both ends (ease-in-out).
+ *
+ * @param from - The lower edge of the interpolation range (maps to 0).
+ * @param to - The upper edge of the interpolation range (maps to 1).
+ * @param t - The input value.
+ * @returns A smoothly interpolated value between 0 and 1.
+ *
+ * @public
+ */
+export function smoothStep(from: number, to: number, t: number): number {
+  const c = clamp01((t - from) / (to - from));
+  return c * c * (3 - 2 * c);
+}
+
+/**
  * Converts half float value to float
  *
  * @param val - A 16-bits integer presents the half float value to be converted.

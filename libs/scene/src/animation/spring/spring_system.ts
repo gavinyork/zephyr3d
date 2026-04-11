@@ -42,6 +42,8 @@ export interface SpringSystemOptions {
  * Physics engine for spring-based particle simulation
  * Uses Verlet integration and iterative constraint solving
  *
+ * @deprecated Use the new {@link JointDynamicsSystem} class instead.
+ *
  * @public
  */
 export class SpringSystem {

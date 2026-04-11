@@ -2,48 +2,19 @@
 
 import { InterpolatorScalar } from '@zephyr3d/base';
 import type { BoneNode, ColliderR, GrabberR, Scene } from '@zephyr3d/scene';
-import { SpringSystem2 } from '@zephyr3d/scene';
+import { JointDynamicsSystem } from '@zephyr3d/scene';
 import { BoxShape, CapsuleShape, LambertMaterial, Mesh, SceneNode, SphereShape } from '@zephyr3d/scene';
-import { type ControllerConfig, type PhysicsCurves } from '@zephyr3d/scene';
 import { createTransformAccess } from './three-bridge';
 import { Vector3 } from '@zephyr3d/base';
-
-function defaultCurves(): PhysicsCurves {
-  return {
-    massScale: InterpolatorScalar.constant(1),
-    gravityScale: InterpolatorScalar.constant(15),
-    windForceScale: InterpolatorScalar.linear(0, 1),
-    resistance: InterpolatorScalar.constant(0.85),
-    hardness: InterpolatorScalar.constant(0),
-    friction: InterpolatorScalar.constant(0.01),
-    sliderJointLength: InterpolatorScalar.constant(0),
-    allShrinkScale: InterpolatorScalar.constant(1),
-    allStretchScale: InterpolatorScalar.constant(1),
-    structuralShrinkVertical: InterpolatorScalar.constant(0.5),
-    structuralStretchVertical: InterpolatorScalar.constant(0.5),
-    structuralShrinkHorizontal: InterpolatorScalar.constant(0.5),
-    structuralStretchHorizontal: InterpolatorScalar.constant(0.5),
-    shearShrink: InterpolatorScalar.constant(0.8),
-    shearStretch: InterpolatorScalar.constant(0.8),
-    bendingShrinkVertical: InterpolatorScalar.constant(0.59),
-    bendingStretchVertical: InterpolatorScalar.constant(0.59),
-    bendingShrinkHorizontal: InterpolatorScalar.constant(0.59),
-    bendingStretchHorizontal: InterpolatorScalar.constant(0.59),
-    fakeWavePower: InterpolatorScalar.constant(0),
-    fakeWaveFreq: InterpolatorScalar.constant(0)
-  };
-}
 
 export interface ClothGridDemo {
   group: SceneNode;
   bones: SceneNode[];
   colliderObj: SceneNode;
   grabberObj: SceneNode;
-  springSystem: SpringSystem2;
+  springSystem: JointDynamicsSystem;
   rootPoints: BoneNode[];
-  //constraints: ReturnType<typeof buildConstraints>;
   collidersR: ColliderR[];
-  /** Indices of the top-row fixed points (one per column) */
   fixedIndices: number[];
   cols: number;
   rows: number;
@@ -150,45 +121,38 @@ export function createClothGridDemo(scene: Scene): ClothGridDemo {
     forceType: 0
   }));
 
-  const config: ControllerConfig = {
-    gravity: new Vector3(0, -9.8, 0),
-    windForce: Vector3.zero(),
-    relaxation: 4,
-    subSteps: 3,
-    rootSlideLimit: -1,
-    rootRotateLimit: -1,
-    constraintShrinkLimit: 1,
-    blendRatio: 0,
-    stabilizationFrameRate: 60,
-    isFakeWave: false,
-    fakeWaveSpeed: 0,
-    fakeWavePower: 0,
-    enableSurfaceCollision: true,
-    enableBroadPhase: true,
-    angleLimitConfig: { angleLimit: -1, limitFromRoot: false },
-    curves: defaultCurves(),
-    constraintOptions: {
-      structuralVertical: true,
-      structuralHorizontal: true,
-      shear: true,
-      bendingVertical: true,
-      bendingHorizontal: true,
-      isLoop: false,
-      collideStructuralVertical: true,
-      collideStructuralHorizontal: true,
-      collideShear: true,
-      enableSurfaceCollision: true
-    }
-  };
-
   const colliderTAs = colliderNodes.map((node) => createTransformAccess(node));
   const grabberTA = createTransformAccess(grabberObj);
 
-  const springSystem = new SpringSystem2(
-    config,
+  const springSystem = new JointDynamicsSystem(
     {
-      systemRoot: group,
-      chains: boneGrid.map((chain) => ({ start: chain[0], end: chain[chain.length - 1] }))
+      chainConfig: {
+        systemRoot: group,
+        chains: boneGrid.map((chain) => ({ start: chain[0], end: chain[chain.length - 1] }))
+      },
+      controllerConfig: {
+        enableSurfaceCollision: true,
+        enableBroadPhase: true,
+        curves: {
+          windForceScale: InterpolatorScalar.linear(0, 1),
+          resistance: InterpolatorScalar.constant(0.85),
+          structuralShrinkVertical: InterpolatorScalar.constant(0.5),
+          structuralStretchVertical: InterpolatorScalar.constant(0.5),
+          shearShrink: InterpolatorScalar.constant(0.8),
+          shearStretch: InterpolatorScalar.constant(0.8)
+        },
+        constraintOptions: {
+          structuralVertical: true,
+          structuralHorizontal: true,
+          shear: true,
+          bendingVertical: true,
+          bendingHorizontal: true,
+          collideStructuralVertical: true,
+          collideStructuralHorizontal: true,
+          collideShear: true,
+          enableSurfaceCollision: true
+        }
+      }
     },
     collidersR.map((r, index) => ({ r, transform: colliderTAs[index] })),
     [{ r: grabbersR[0], transform: grabberTA, enabled: false }],

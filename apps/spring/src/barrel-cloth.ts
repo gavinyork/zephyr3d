@@ -7,56 +7,18 @@
 
 import { InterpolatorScalar, Quaternion } from '@zephyr3d/base';
 import type { BoneNode, ColliderR, GrabberR, Scene } from '@zephyr3d/scene';
-import { SpringSystem2 } from '@zephyr3d/scene';
-import {
-  CapsuleShape,
-  LambertMaterial,
-  Mesh,
-  SphereShape,
-  type ControllerConfig,
-  type PhysicsCurves
-} from '@zephyr3d/scene';
+import { BoxShape, JointDynamicsSystem } from '@zephyr3d/scene';
+import { CapsuleShape, LambertMaterial, Mesh, SphereShape } from '@zephyr3d/scene';
 import { createTransformAccess } from './three-bridge';
-import { /*buildConstraints, */ SceneNode } from '@zephyr3d/scene';
+import { SceneNode } from '@zephyr3d/scene';
 import { Vector3 } from '@zephyr3d/base';
-
-function defaultCurves(): PhysicsCurves {
-  return {
-    massScale: InterpolatorScalar.constant(0.5),
-    gravityScale: InterpolatorScalar.constant(1),
-    windForceScale: InterpolatorScalar.linear(0, 1),
-    // resistance applied per-substep: effective = 0.93^3 ≈ 0.80/frame
-    // Moderate damping — cloth settles without spring-like oscillation
-    resistance: InterpolatorScalar.constant(0.93),
-    hardness: InterpolatorScalar.constant(0.0),
-    friction: InterpolatorScalar.constant(0.2),
-    sliderJointLength: InterpolatorScalar.constant(0),
-    allShrinkScale: InterpolatorScalar.constant(1),
-    allStretchScale: InterpolatorScalar.constant(1),
-    // ── KEY: stiff structural = inextensible fabric ──
-    structuralShrinkVertical: InterpolatorScalar.constant(0.95),
-    structuralStretchVertical: InterpolatorScalar.constant(0.95),
-    structuralShrinkHorizontal: InterpolatorScalar.constant(0.7),
-    structuralStretchHorizontal: InterpolatorScalar.constant(0.7),
-    // Moderate shear keeps the grid from collapsing diagonally
-    shearShrink: InterpolatorScalar.constant(0.025),
-    shearStretch: InterpolatorScalar.constant(0.025),
-    // ── KEY: very soft bending = cloth folds/drapes freely ──
-    bendingShrinkVertical: InterpolatorScalar.constant(0.02),
-    bendingStretchVertical: InterpolatorScalar.constant(0.02),
-    bendingShrinkHorizontal: InterpolatorScalar.constant(0.02),
-    bendingStretchHorizontal: InterpolatorScalar.constant(0.02),
-    fakeWavePower: InterpolatorScalar.constant(0),
-    fakeWaveFreq: InterpolatorScalar.constant(0)
-  };
-}
 
 export interface BarrelClothDemo {
   group: SceneNode;
   bones: SceneNode[];
   colliderObj: SceneNode;
   grabberObj: SceneNode;
-  springSystem: SpringSystem2;
+  springSystem: JointDynamicsSystem;
   rootPoints: BoneNode[];
   //constraints: ReturnType<typeof buildConstraints>;
   collidersR: ColliderR[];
@@ -67,8 +29,8 @@ export interface BarrelClothDemo {
 }
 
 export function createBarrelClothDemo(scene: Scene): BarrelClothDemo {
-  const COLS = 22;
-  const ROWS = 20; // longer skirt for visible draping
+  const COLS = 12;
+  const ROWS = 10; // longer skirt for visible draping
   const WAIST_RADIUS = 0.15;
   const FLARE_PER_ROW = 0.063; // subtle flare: hem radius ≈ 0.15 + 9×0.03 = 0.42
   const ROW_SPACING = 0.12; // denser rows for smoother draping
@@ -83,7 +45,7 @@ export function createBarrelClothDemo(scene: Scene): BarrelClothDemo {
   const boneGrid: SceneNode[][] = [];
   const allBones: SceneNode[] = [];
   const boneMat = new LambertMaterial();
-  const boneGeo = new SphereShape({ radius: 0.015 });
+  const boneGeo = new BoxShape({ size: 0.03 });
 
   for (let col = 0; col < COLS; col++) {
     const angle = (col / COLS) * Math.PI * 2;
@@ -165,45 +127,45 @@ export function createBarrelClothDemo(scene: Scene): BarrelClothDemo {
     }
   ];
 
-  const config: ControllerConfig = {
-    gravity: new Vector3(0, -9.8, 0),
-    windForce: Vector3.zero(),
-    relaxation: 2,
-    subSteps: 3,
-    rootSlideLimit: -1,
-    rootRotateLimit: -1,
-    constraintShrinkLimit: 1,
-    blendRatio: 0,
-    stabilizationFrameRate: 60,
-    isFakeWave: false,
-    fakeWaveSpeed: 0,
-    fakeWavePower: 0,
-    enableSurfaceCollision: false,
-    angleLimitConfig: { angleLimit: -1, limitFromRoot: false },
-    curves: defaultCurves(),
-    constraintOptions: {
-      structuralVertical: true,
-      structuralHorizontal: true,
-      shear: true,
-      bendingVertical: true,
-      bendingHorizontal: false, // DISABLE: allows horizontal folding when fallen
-      isLoop: true,
-      collideStructuralVertical: true,
-      collideStructuralHorizontal: true,
-      collideShear: true,
-      enableSurfaceCollision: false
-    },
-    enableBroadPhase: true
-  };
-
   const colliderTA = createTransformAccess(colliderObj);
   const grabberTA = createTransformAccess(grabberObj);
 
-  const springSystem = new SpringSystem2(
-    config,
+  const springSystem = new JointDynamicsSystem(
     {
-      systemRoot: group,
-      chains: boneGrid.map((chain) => ({ start: chain[0], end: chain[chain.length - 1] }))
+      chainConfig: {
+        systemRoot: group,
+        chains: boneGrid.map((chain) => ({ start: chain[0], end: chain[chain.length - 1] }))
+      },
+      controllerConfig: {
+        enableBroadPhase: true,
+        curves: {
+          hardness: InterpolatorScalar.constant(0.18),
+          friction: InterpolatorScalar.constant(0.2),
+          // ── KEY: stiff structural = inextensible fabric ──
+          structuralShrinkVertical: InterpolatorScalar.constant(0.95),
+          structuralStretchVertical: InterpolatorScalar.constant(0.95),
+          structuralShrinkHorizontal: InterpolatorScalar.constant(0.7),
+          structuralStretchHorizontal: InterpolatorScalar.constant(0.7),
+          // Moderate shear keeps the grid from collapsing diagonally
+          shearShrink: InterpolatorScalar.constant(0.025),
+          shearStretch: InterpolatorScalar.constant(0.025),
+          // ── KEY: very soft bending = cloth folds/drapes freely ──
+          bendingShrinkVertical: InterpolatorScalar.constant(0.02),
+          bendingStretchVertical: InterpolatorScalar.constant(0.02),
+          bendingShrinkHorizontal: InterpolatorScalar.constant(0.02),
+          bendingStretchHorizontal: InterpolatorScalar.constant(0.02)
+        },
+        constraintOptions: {
+          structuralVertical: true,
+          structuralHorizontal: true,
+          shear: true,
+          bendingVertical: true,
+          isLoop: true,
+          collideStructuralVertical: true,
+          collideStructuralHorizontal: true,
+          collideShear: true
+        }
+      }
     },
     [{ r: collidersR[0], transform: colliderTA }],
     [{ r: grabbersR[0], transform: grabberTA, enabled: false }],

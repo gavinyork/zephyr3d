@@ -9,13 +9,10 @@ import type { Skeleton } from './skeleton';
  * @public
  */
 export abstract class SkeletonModifier {
-  /** Blend weight for this processor [0-1] */
-  protected _weight: number;
   /** Whether this processor is enabled */
   protected _enabled: boolean;
 
-  constructor(weight: number = 1.0) {
-    this._weight = Math.max(0, Math.min(1, weight));
+  constructor() {
     this._enabled = true;
   }
 
@@ -23,14 +20,14 @@ export abstract class SkeletonModifier {
    * Get the blend weight [0-1]
    */
   get weight(): number {
-    return this._weight;
+    return this._getWeight();
   }
 
   /**
    * Set the blend weight [0-1]
    */
   set weight(value: number) {
-    this._weight = Math.max(0, Math.min(1, value));
+    this._setWeight(value);
   }
 
   /**
@@ -65,4 +62,15 @@ export abstract class SkeletonModifier {
    * Called when the skeleton or animation state changes significantly.
    */
   abstract reset(): void;
+
+  /**
+   * Get the blend weight for this processor.
+   */
+  protected abstract _getWeight(): number;
+
+  /**
+   * Set the blend weight for this processor.
+   * @param _value - New blend weight (0-1)
+   */
+  protected abstract _setWeight(_value: number): void;
 }

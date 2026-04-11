@@ -1,7 +1,14 @@
 // Core physics simulation 閳?direct port of JobExecuteSimulation from SPCRJointDynamicsJob.cs
 
-import { Quaternion, Vector3, Matrix4x4, degree2radian, radian2degree } from '@zephyr3d/base';
-import { clamp01, smoothStep } from './math';
+import {
+  Quaternion,
+  Vector3,
+  Matrix4x4,
+  degree2radian,
+  radian2degree,
+  clamp01,
+  smoothStep
+} from '@zephyr3d/base';
 import {
   EPSILON,
   ConstraintType,
@@ -205,8 +212,6 @@ export function simulate(
   return { positionsToTransform, fakeWaveCounter: fakeWaveFreq };
 }
 
-// 閳光偓閳光偓 Collider interpolation 閳光偓閳光偓
-
 function computeCapsule(
   pos: Vector3,
   rot: Quaternion,
@@ -275,8 +280,6 @@ function colliderUpdate(
   }
 }
 
-// 閳光偓閳光偓 Apply root motion transform 閳光偓閳光偓
-
 function applySystemTransform(
   point: Vector3,
   pivot: Vector3,
@@ -312,7 +315,7 @@ function segmentMayCollideBroadPhase(point1: Vector3, point2: Vector3, colRW: Co
   return delta.magnitudeSq <= colRW.boundsRadius * colRW.boundsRadius;
 }
 
-// 閳光偓閳光偓 Pass 1: Verlet integration + forces 閳光偓閳光偓
+// Pass 1: Verlet integration + forces
 
 function pointUpdatePass1(
   pointsR: readonly PointR[],
@@ -453,7 +456,7 @@ function pointUpdatePass1(
   }
 }
 
-// 閳光偓閳光偓 Surface collision (triangle-based cloth collision) 閳光偓閳光偓
+// Surface collision (triangle-based cloth collision)
 
 function surfaceCollision(
   pointsRW: PointRW[],
@@ -530,8 +533,6 @@ function surfaceCollision(
     }
   }
 }
-
-// 閳光偓閳光偓 Constraint relaxation 閳光偓閳光偓
 
 function constraintUpdate(
   pointsR: readonly PointR[],
@@ -799,8 +800,6 @@ function constraintUpdate(
   }
 }
 
-// 閳光偓閳光偓 Pass 2: blend + fake wave 閳光偓閳光偓
-
 function pointUpdatePass2(
   pointsR: readonly PointR[],
   pointsRW: PointRW[],
@@ -839,8 +838,6 @@ function pointUpdatePass2(
     positionsToTransform[index] = ptRW.positionToTransform.clone();
   }
 }
-
-// 閳光偓閳光偓 Apply simulation result to transforms 閳光偓閳光偓
 
 export interface ApplyResultOutput {
   position: Vector3;
@@ -908,22 +905,19 @@ export function applyResult(
         localRotation: localRot
       };
     } else {
-      // Fixed point 閳?follow transform, blend rotation
       const childBlend =
         ptR.child !== -1 ? Math.max(pointsR[ptR.child].forceFadeRatio, blendRatio) : blendRatio;
 
-      // Step 1: Blend localRotation
-      localRot = Quaternion.slerp(ptR.initialLocalRotation, localRot, childBlend);
+      // Fixed joints are fully driven by the scene graph (animation + parent transforms).
+      // Use the engine's current world rotation directly as the baseline — do NOT
+      // reconstruct it from localRot, because localRot was read from the transform that
+      // was written back last frame (after aim correction), so it carries stale physics
+      // noise that would accumulate each frame and cause periodic spin artifacts.
+      // transformRotations[index] is read before applyResult runs, so it still holds
+      // the correct animated world rotation for this frame.
+      worldRot = transformRotations[index];
 
-      // Step 2: Recompute worldRot from blended localRot
-      if (ptR.parent !== -1) {
-        const parentRot = results[ptR.parent] ? results[ptR.parent].rotation : transformRotations[ptR.parent];
-        worldRot = Quaternion.multiply(parentRot, localRot);
-      } else {
-        worldRot = localRot.clone();
-      }
-
-      // Step 3: Aim toward child with blend
+      // Aim toward simulated child position, blended back toward the animated direction.
       if (ptR.child !== -1) {
         const childDir = Vector3.sub(positionsToTransform[ptR.child], ptRW.positionToTransform);
         if (childDir.magnitudeSq > EPSILON) {
@@ -942,8 +936,6 @@ export function applyResult(
 
   return results;
 }
-
-// 閳光偓閳光偓 Angle limiting (post-simulation) 閳光偓閳光偓
 
 export function applyAngleLimits(
   pointsR: readonly PointR[],

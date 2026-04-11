@@ -61,6 +61,8 @@ export interface MultiChainSpringSystemOptions {
  * Physics engine for multiple spring chains with inter-chain constraints
  * Suitable for cloth, skirts, capes, and other multi-chain simulations
  *
+ * @deprecated Use the new {@link JointDynamicsSystem} class instead.
+ *
  * @public
  */
 export class MultiChainSpringSystem {

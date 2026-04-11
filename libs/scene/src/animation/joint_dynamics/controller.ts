@@ -1,6 +1,5 @@
 // High-level orchestrator — SPCRJointDynamicsController API
 
-import { clamp01 } from './math';
 import {
   EPSILON,
   type PointR,
@@ -18,7 +17,7 @@ import {
 import { buildConstraints, buildSurfaceFaces, type ConstraintBuildOptions } from './constraints';
 import { simulate, applyResult, applyAngleLimits, type SimulationParams } from './solver';
 import type { InterpolatorScalar } from '@zephyr3d/base';
-import { Vector3, Quaternion, Matrix4x4 } from '@zephyr3d/base';
+import { Vector3, Quaternion, Matrix4x4, clamp01 } from '@zephyr3d/base';
 
 /**
  * Depth-based physics parameter curves.
@@ -108,7 +107,7 @@ export interface ControllerConfig {
   constraintOptions: ConstraintBuildOptions;
 }
 
-export class SpringSystemController {
+export class JointDynamicsSystemController {
   private _config: ControllerConfig;
   private _pointsR: PointR[] = [];
   private _pointsRW: PointRW[] = [];
@@ -495,6 +494,15 @@ export class SpringSystemController {
   /** Enable/disable broad-phase pruning for runtime performance comparison */
   setBroadPhaseEnabled(enabled: boolean): void {
     this._config.enableBroadPhase = enabled;
+  }
+
+  /** The blend ratio for the physics simulation */
+  get blendRatio(): number {
+    return this._config.blendRatio;
+  }
+
+  set blendRatio(value: number) {
+    this._config.blendRatio = clamp01(value);
   }
 
   /**

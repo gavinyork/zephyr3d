@@ -1,8 +1,9 @@
-import type { Vector3 } from '@zephyr3d/base';
+import type { DeepPartial } from '@zephyr3d/base';
+import { InterpolatorScalar, Vector3 } from '@zephyr3d/base';
 import { Quaternion } from '@zephyr3d/base';
 import type { SceneNode } from '../../scene';
 import type { ControllerConfig } from './controller';
-import { SpringSystemController } from './controller';
+import { JointDynamicsSystemController } from './controller';
 import type { BoneNode, ColliderR, GrabberR, TransformAccess } from './types';
 
 const _quat = new Quaternion();
@@ -54,9 +55,14 @@ export function createTransformAccess(obj: SceneNode): TransformAccess {
   };
 }
 
-export type SpringChainConfig = {
+export type JointChainConfig = {
   systemRoot: SceneNode;
   chains: { start: SceneNode; end: SceneNode }[];
+};
+
+export type JointDynamicSystemConfig = {
+  chainConfig: JointChainConfig;
+  controllerConfig?: DeepPartial<ControllerConfig, 2>;
 };
 
 /**
@@ -65,11 +71,10 @@ export type SpringChainConfig = {
  *
  * @public
  */
-export class SpringSystem2 {
-  private _controller: SpringSystemController;
+export class JointDynamicsSystem {
+  private _controller: JointDynamicsSystemController;
   constructor(
-    options: ControllerConfig,
-    chainConfig: SpringChainConfig,
+    config: JointDynamicSystemConfig,
     colliders: { r: ColliderR; transform: TransformAccess }[],
     grabbers: {
       r: GrabberR;
@@ -82,7 +87,7 @@ export class SpringSystem2 {
     const boneNodes: BoneNode[] = [];
     const pointTransforms: TransformAccess[] = [];
     let index = 0;
-    for (const chain of chainConfig.chains) {
+    for (const chain of config.chainConfig.chains) {
       const chainNodes = this.collectChainNodes(chain.start, chain.end);
       for (let i = 0; i < chainNodes.length; i++) {
         const node = chainNodes[i];
@@ -103,8 +108,19 @@ export class SpringSystem2 {
         }
       }
     }
-    const systemRoot = createTransformAccess(chainConfig.systemRoot);
-    this._controller = new SpringSystemController(options);
+    const systemRoot = createTransformAccess(config.chainConfig.systemRoot);
+    const defaultConfig = this.getDefaultControllerConfig();
+    const controllerConfig: ControllerConfig = {
+      ...defaultConfig,
+      ...config?.controllerConfig,
+      angleLimitConfig: { ...defaultConfig.angleLimitConfig, ...config?.controllerConfig?.angleLimitConfig },
+      curves: { ...defaultConfig.curves, ...config?.controllerConfig?.curves },
+      constraintOptions: {
+        ...defaultConfig.constraintOptions,
+        ...config?.controllerConfig?.constraintOptions
+      }
+    };
+    this._controller = new JointDynamicsSystemController(controllerConfig);
     this._controller.initialize(systemRoot, rootPoints, pointTransforms, colliders, grabbers, flatPlanes);
   }
 
@@ -136,5 +152,60 @@ export class SpringSystem2 {
     const dt = Math.min(deltaTime, 0.033); // Max 30 FPS
     // simulation
     this._controller.step(dt);
+  }
+  /** @internal */
+  private getDefaultControllerConfig(): ControllerConfig {
+    return {
+      gravity: new Vector3(0, -9.8, 0),
+      relaxation: 3,
+      subSteps: 3,
+      enableSurfaceCollision: false,
+      windForce: Vector3.zero(),
+      rootSlideLimit: -1,
+      rootRotateLimit: -1,
+      constraintShrinkLimit: 1,
+      blendRatio: 0,
+      stabilizationFrameRate: 60,
+      isFakeWave: false,
+      fakeWaveSpeed: 0,
+      fakeWavePower: 0,
+      angleLimitConfig: { angleLimit: -1, limitFromRoot: false },
+      enableBroadPhase: false,
+      curves: {
+        gravityScale: InterpolatorScalar.constant(1),
+        windForceScale: InterpolatorScalar.constant(1),
+        massScale: InterpolatorScalar.constant(1),
+        resistance: InterpolatorScalar.constant(0.95),
+        hardness: InterpolatorScalar.constant(0.001),
+        friction: InterpolatorScalar.constant(0.5),
+        sliderJointLength: InterpolatorScalar.constant(0),
+        allShrinkScale: InterpolatorScalar.constant(1),
+        allStretchScale: InterpolatorScalar.constant(1),
+        structuralShrinkVertical: InterpolatorScalar.constant(1),
+        structuralStretchVertical: InterpolatorScalar.constant(1),
+        structuralShrinkHorizontal: InterpolatorScalar.constant(0.5),
+        structuralStretchHorizontal: InterpolatorScalar.constant(0.5),
+        shearShrink: InterpolatorScalar.constant(0.5),
+        shearStretch: InterpolatorScalar.constant(0.5),
+        bendingShrinkVertical: InterpolatorScalar.constant(0.5),
+        bendingStretchVertical: InterpolatorScalar.constant(0.5),
+        bendingShrinkHorizontal: InterpolatorScalar.constant(0.5),
+        bendingStretchHorizontal: InterpolatorScalar.constant(0.5),
+        fakeWavePower: InterpolatorScalar.constant(0),
+        fakeWaveFreq: InterpolatorScalar.constant(0)
+      },
+      constraintOptions: {
+        structuralVertical: false,
+        structuralHorizontal: false,
+        shear: false,
+        bendingVertical: false,
+        bendingHorizontal: false,
+        isLoop: false,
+        collideStructuralVertical: false,
+        collideStructuralHorizontal: false,
+        collideShear: false,
+        enableSurfaceCollision: false
+      }
+    };
   }
 }
