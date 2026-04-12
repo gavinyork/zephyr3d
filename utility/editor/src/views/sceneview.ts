@@ -1146,13 +1146,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.on('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.on('request_save_prefab', this.handleSavePrefab, this);
       this._sceneHierarchy.on('request_add_collider', this.handleAddCollider, this);
+      this.controller.model.scene.rootNode.on('nodeattached', this.handleNodeAttached, this);
       this.controller.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
-      this.controller.model.scene.rootNode.iterate((node) => {
-        this._proxy!.createProxy(node);
-        if (node === this.controller.model.scene.mainCamera) {
-          this._proxy!.hideProxy(node);
-        }
-      });
+      this.syncNodeProxyTree(this.controller.model.scene.rootNode);
       this._propGrid.clear();
       this._propGrid.object = this.controller.model.scene;
       this.controller.model.scene.on('startrender', this.handleStartRender, this);
@@ -1186,6 +1182,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy = null;
     }
     if (this.controller.model.scene) {
+      this.controller.model.scene.rootNode.off('nodeattached', this.handleNodeAttached, this);
       this.controller.model.scene.rootNode.off('noderemoved', this.handleNodeRemoved, this);
       this.controller.model.scene.off('startrender', this.handleStartRender, this);
       this.controller.model.scene.off('endrender', this.handleEndRender, this);
@@ -2197,6 +2194,21 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (selectedNodes.some((selected) => node.isParentOf(selected))) {
       this._sceneHierarchy!.selectNode(null);
     }
+  }
+  private handleNodeAttached(node: SceneNode) {
+    this.syncNodeProxyTree(node);
+  }
+  private syncNodeProxyTree(root: Nullable<SceneNode>) {
+    if (!root || !this._proxy) {
+      return;
+    }
+    root.iterate((node) => {
+      this._proxy!.createProxy(node);
+      this._proxy!.updateProxy(node);
+      if (node === this.controller.model.scene.mainCamera) {
+        this._proxy!.hideProxy(node);
+      }
+    });
   }
   private handleBeginTransformNode(node: SceneNode) {
     const isPivot = node === this._multiTransformPivot;
