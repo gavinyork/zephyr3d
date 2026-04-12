@@ -171,6 +171,11 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
   }
   beginSyncChanges(encoder: GPUCommandEncoder) {
     if (this._pendingUploads.length > 0) {
+      if (!this._object) {
+        this._pendingUploads.length = 0;
+        this._ringBuffer.beginUploads();
+        return;
+      }
       const cmdEncoder = encoder || this._device.device.createCommandEncoder();
       for (const upload of this._pendingUploads) {
         cmdEncoder.copyBufferToBuffer(

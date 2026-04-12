@@ -109,7 +109,11 @@ export class ABufferOIT extends Disposable implements OIT {
         offsetBuffer[i * (ubAlignment >> 2)] = i * this._scissorHeight;
       }
       if (!this._scissorOffsetBuffer || this._scissorOffsetBuffer.byteLength < offsetBuffer.byteLength) {
-        this._scissorOffsetBuffer?.dispose();
+        if (this._scissorOffsetBuffer) {
+          // Drain queued uploads before replacing the buffer.
+          device.flush();
+          this._scissorOffsetBuffer.dispose();
+        }
         this._scissorOffsetBuffer = device.createBuffer(offsetBuffer.byteLength, { usage: 'uniform' });
       }
       this._scissorOffsetBuffer.bufferSubData(0, offsetBuffer);
@@ -117,15 +121,24 @@ export class ABufferOIT extends Disposable implements OIT {
       const size = screenWidth * this._scissorHeight * 4;
       const nodeBufferSize = size * 4 * this._numLayers;
       if (!this._nodeBuffer || nodeBufferSize > this._nodeBuffer.byteLength) {
-        this._nodeBuffer?.dispose();
+        if (this._nodeBuffer) {
+          device.flush();
+          this._nodeBuffer.dispose();
+        }
         this._nodeBuffer = device.createBuffer(nodeBufferSize, { storage: true, usage: 'uniform' });
       }
       // resize head buffer
       const headBufferSize = size + 4;
       if (!this._headBuffer || headBufferSize > this._headBuffer.byteLength) {
-        this._headBuffer?.dispose();
+        if (this._headBuffer) {
+          device.flush();
+          this._headBuffer.dispose();
+        }
         this._headBuffer = device.createBuffer(headBufferSize, { storage: true, usage: 'uniform' });
-        this._headStagingBuffer?.dispose();
+        if (this._headStagingBuffer) {
+          device.flush();
+          this._headStagingBuffer.dispose();
+        }
         this._headStagingBuffer = device.createBuffer(headBufferSize, { storage: true, usage: 'uniform' });
         const tmpArray = new Uint32Array(headBufferSize >> 2);
         tmpArray.fill(0xffffffff);

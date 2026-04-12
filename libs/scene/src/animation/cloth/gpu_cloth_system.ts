@@ -79,6 +79,15 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function getInitialColliderBufferFloatCount(
+  colliders: SpringCollider[] | undefined,
+  type: SpringCollider['type'],
+  stride: number
+) {
+  const count = (colliders ?? []).reduce((total, collider) => total + (collider?.type === type ? 1 : 0), 0);
+  return Math.max(1, count) * stride;
+}
+
 function getPrimitiveScalarByteSize(type: PBPrimitiveType) {
   switch (type) {
     case PBPrimitiveType.I16:
@@ -1048,9 +1057,15 @@ export class GPUClothSystem {
     this._sphereColliderBuffer = null;
     this._capsuleColliderBuffer = null;
     this._planeColliderBuffer = null;
-    this._sphereColliderData = new Float32Array(4);
-    this._capsuleColliderData = new Float32Array(8);
-    this._planeColliderData = new Float32Array(8);
+    this._sphereColliderData = new Float32Array(
+      getInitialColliderBufferFloatCount(this._colliders, 'sphere', 4)
+    );
+    this._capsuleColliderData = new Float32Array(
+      getInitialColliderBufferFloatCount(this._colliders, 'capsule', 8)
+    );
+    this._planeColliderData = new Float32Array(
+      getInitialColliderBufferFloatCount(this._colliders, 'plane', 8)
+    );
     this._triangleIndexBuffer = null;
     this._triangleNormalBuffer = null;
     this._vertexTriangleAdjacencyBuffer = null;
@@ -1716,7 +1731,11 @@ export class GPUClothSystem {
     }
 
     if (!this._sphereColliderBuffer || this._sphereColliderBuffer.byteLength < sphereData.byteLength) {
-      this._sphereColliderBuffer?.dispose();
+      if (this._sphereColliderBuffer) {
+        // Drain queued uploads for the old buffer before replacing it.
+        this._device.flush();
+        this._sphereColliderBuffer.dispose();
+      }
       this._sphereColliderBuffer = this._device.createBuffer(sphereData.byteLength, {
         usage: 'uniform',
         storage: true,
@@ -1729,7 +1748,11 @@ export class GPUClothSystem {
     this._sphereColliderBuffer.bufferSubData(0, sphereData);
 
     if (!this._capsuleColliderBuffer || this._capsuleColliderBuffer.byteLength < capsuleData.byteLength) {
-      this._capsuleColliderBuffer?.dispose();
+      if (this._capsuleColliderBuffer) {
+        // Drain queued uploads for the old buffer before replacing it.
+        this._device.flush();
+        this._capsuleColliderBuffer.dispose();
+      }
       this._capsuleColliderBuffer = this._device.createBuffer(capsuleData.byteLength, {
         usage: 'uniform',
         storage: true,
@@ -1742,7 +1765,11 @@ export class GPUClothSystem {
     this._capsuleColliderBuffer.bufferSubData(0, capsuleData);
 
     if (!this._planeColliderBuffer || this._planeColliderBuffer.byteLength < planeData.byteLength) {
-      this._planeColliderBuffer?.dispose();
+      if (this._planeColliderBuffer) {
+        // Drain queued uploads for the old buffer before replacing it.
+        this._device.flush();
+        this._planeColliderBuffer.dispose();
+      }
       this._planeColliderBuffer = this._device.createBuffer(planeData.byteLength, {
         usage: 'uniform',
         storage: true,
