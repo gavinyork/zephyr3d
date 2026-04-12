@@ -19,11 +19,9 @@ import {
   Water,
   ClipmapTerrain,
   PerspectiveCamera,
-  //OrthoCamera,
   getDevice,
   getEngine,
-  Sprite,
-  Skeleton
+  Sprite
 } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { DirectionalLight } from '@zephyr3d/scene';

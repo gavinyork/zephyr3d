@@ -21,7 +21,7 @@ import { DlgSaveFile } from '../views/dlg/savefiledlg';
 import type { MeshMaterial } from '@zephyr3d/scene';
 import { getEngine, PBRBluePrintMaterial, SpriteBlueprintMaterial } from '@zephyr3d/scene';
 import { exportFile, exportMultipleFilesAsZip } from '../helpers/downloader';
-import { SharedModel } from '../loaders/model';
+import type { SharedModel } from '../loaders/model';
 import { DlgImportOptions } from '../views/dlg/importoptionsdlg';
 
 export type FileInfo = {

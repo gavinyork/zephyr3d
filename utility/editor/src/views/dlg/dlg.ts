@@ -17,7 +17,7 @@ import { DlgPBRMaterialEditor } from './materialeditor';
 import { DlgImport } from './importdlg';
 import { DlgMaterialFunctionEditor } from './materialfunceditor';
 import type { MeshMaterial } from '@zephyr3d/scene';
-import { SharedModel } from '../../loaders/model';
+import type { SharedModel } from '../../loaders/model';
 import { DlgImportOptions } from './importoptionsdlg';
 
 export class Dialog {
@@ -49,10 +49,11 @@ export class Dialog {
     title: string,
     vfs: VFS,
     models: SharedModel[],
+    names: string[],
     width?: number,
     height?: number
   ) {
-    return DlgImportOptions.promptImportOptions(title, vfs, models, width, height);
+    return DlgImportOptions.promptImportOptions(title, vfs, models, names, width, height);
   }
   public static async promptImport(title: string, vfs: VFS, width?: number, height?: number) {
     return DlgImport.promptImport(`${title}##Dialog`, vfs, width, height);
