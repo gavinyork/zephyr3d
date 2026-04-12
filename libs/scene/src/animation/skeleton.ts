@@ -122,6 +122,11 @@ type HumanoidJointNodeInfo<T extends { name: string; children: T[] }> = {
   tokenSet: Set<string>;
 };
 
+type HumanoidJointMatchCandidate<T extends { name: string; children: T[] }> = {
+  node: T;
+  score: number;
+};
+
 function jointPattern(all: string[], none?: string[], any?: string[]): HumanoidJointPattern {
   return {
     all,
@@ -677,13 +682,12 @@ export class Skeleton extends Disposable {
     }
     return priority * 100000 + matchedTokens.size * 100 - extraTokenCount * 5 - info.depth;
   }
-  private static findBestHumanoidJoint<T extends { name: string; children: T[] }>(
+  private static collectHumanoidJointCandidates<T extends { name: string; children: T[] }>(
     nodes: HumanoidJointNodeInfo<T>[],
     patterns: HumanoidJointPattern[],
     used: Set<T>
-  ) {
-    let bestNode: Nullable<T> = null;
-    let bestScore = Number.NEGATIVE_INFINITY;
+  ): HumanoidJointMatchCandidate<T>[] {
+    const candidates = new Map<T, number>();
     for (let index = 0; index < patterns.length; index++) {
       const pattern = patterns[index];
       const priority = patterns.length - index;
@@ -692,13 +696,20 @@ export class Skeleton extends Disposable {
           continue;
         }
         const score = this.scoreHumanoidJointPattern(info, pattern, priority);
-        if (score > bestScore) {
-          bestScore = score;
-          bestNode = info.node;
+        const current = candidates.get(info.node);
+        if (current === undefined || score > current) {
+          candidates.set(info.node, score);
         }
       }
     }
-    return bestNode;
+    return Array.from(candidates, ([node, score]) => ({ node, score })).sort((a, b) => b.score - a.score);
+  }
+  private static findBestHumanoidJoint<T extends { name: string; children: T[] }>(
+    nodes: HumanoidJointNodeInfo<T>[],
+    patterns: HumanoidJointPattern[],
+    used: Set<T>
+  ) {
+    return this.collectHumanoidJointCandidates(nodes, patterns, used)[0]?.node ?? null;
   }
   private static matchHumanoidJointProfile<T extends string, U extends { name: string; children: U[] }>(
     nodes: HumanoidJointNodeInfo<U>[],
@@ -723,6 +734,99 @@ export class Skeleton extends Disposable {
       used.add(node);
     }
     return result;
+  }
+  private static validateHumanoidBodyPartial<T extends { name: string; parent: Nullable<T>; children: T[] }>(
+    body: Partial<Record<HumanoidBodyRig, T>>
+  ) {
+    const validateAncestor = (ancestor: HumanoidBodyRig, descendant: HumanoidBodyRig) =>
+      !body[ancestor] || !body[descendant] || this.isSameOrAncestor(body[ancestor]!, body[descendant]!);
+    return (
+      validateAncestor(HumanoidBodyRig.Hips, HumanoidBodyRig.Spine) &&
+      validateAncestor(HumanoidBodyRig.Hips, HumanoidBodyRig.Neck) &&
+      validateAncestor(HumanoidBodyRig.Hips, HumanoidBodyRig.LeftUpperLeg) &&
+      validateAncestor(HumanoidBodyRig.Hips, HumanoidBodyRig.RightUpperLeg) &&
+      validateAncestor(HumanoidBodyRig.Spine, HumanoidBodyRig.Chest) &&
+      validateAncestor(HumanoidBodyRig.Spine, HumanoidBodyRig.UpperChest) &&
+      validateAncestor(HumanoidBodyRig.Spine, HumanoidBodyRig.Neck) &&
+      validateAncestor(HumanoidBodyRig.Spine, HumanoidBodyRig.Head) &&
+      validateAncestor(HumanoidBodyRig.Spine, HumanoidBodyRig.LeftShoulder) &&
+      validateAncestor(HumanoidBodyRig.Spine, HumanoidBodyRig.RightShoulder) &&
+      validateAncestor(HumanoidBodyRig.Chest, HumanoidBodyRig.UpperChest) &&
+      validateAncestor(HumanoidBodyRig.Chest, HumanoidBodyRig.Neck) &&
+      validateAncestor(HumanoidBodyRig.Chest, HumanoidBodyRig.Head) &&
+      validateAncestor(HumanoidBodyRig.Chest, HumanoidBodyRig.LeftShoulder) &&
+      validateAncestor(HumanoidBodyRig.Chest, HumanoidBodyRig.RightShoulder) &&
+      validateAncestor(HumanoidBodyRig.UpperChest, HumanoidBodyRig.Neck) &&
+      validateAncestor(HumanoidBodyRig.UpperChest, HumanoidBodyRig.Head) &&
+      validateAncestor(HumanoidBodyRig.UpperChest, HumanoidBodyRig.LeftShoulder) &&
+      validateAncestor(HumanoidBodyRig.UpperChest, HumanoidBodyRig.RightShoulder) &&
+      validateAncestor(HumanoidBodyRig.Neck, HumanoidBodyRig.Head) &&
+      validateAncestor(HumanoidBodyRig.LeftShoulder, HumanoidBodyRig.LeftUpperArm) &&
+      validateAncestor(HumanoidBodyRig.LeftUpperArm, HumanoidBodyRig.LeftLowerArm) &&
+      validateAncestor(HumanoidBodyRig.LeftLowerArm, HumanoidBodyRig.LeftHand) &&
+      validateAncestor(HumanoidBodyRig.RightShoulder, HumanoidBodyRig.RightUpperArm) &&
+      validateAncestor(HumanoidBodyRig.RightUpperArm, HumanoidBodyRig.RightLowerArm) &&
+      validateAncestor(HumanoidBodyRig.RightLowerArm, HumanoidBodyRig.RightHand) &&
+      validateAncestor(HumanoidBodyRig.LeftUpperLeg, HumanoidBodyRig.LeftLowerLeg) &&
+      validateAncestor(HumanoidBodyRig.LeftLowerLeg, HumanoidBodyRig.LeftFoot) &&
+      validateAncestor(HumanoidBodyRig.LeftFoot, HumanoidBodyRig.LeftToes) &&
+      validateAncestor(HumanoidBodyRig.RightUpperLeg, HumanoidBodyRig.RightLowerLeg) &&
+      validateAncestor(HumanoidBodyRig.RightLowerLeg, HumanoidBodyRig.RightFoot) &&
+      validateAncestor(HumanoidBodyRig.RightFoot, HumanoidBodyRig.RightToes)
+    );
+  }
+  private static matchHumanoidBodyProfile<T extends { name: string; parent: Nullable<T>; children: T[] }>(
+    nodes: HumanoidJointNodeInfo<T>[],
+    profile: HumanoidJointProfile<HumanoidBodyRig>,
+    used: Set<T>,
+    optional?: Set<HumanoidBodyRig>
+  ): Partial<Record<HumanoidBodyRig, T>> | null {
+    const joints = Object.keys(profile) as HumanoidBodyRig[];
+    const candidates = new Map<HumanoidBodyRig, HumanoidJointMatchCandidate<T>[]>();
+    for (const joint of joints) {
+      candidates.set(joint, this.collectHumanoidJointCandidates(nodes, profile[joint], used));
+    }
+    const current = {} as Partial<Record<HumanoidBodyRig, T>>;
+    const reserved = new Set<T>();
+    let bestScore = Number.NEGATIVE_INFINITY;
+    let bestResult: Partial<Record<HumanoidBodyRig, T>> | null = null;
+    const search = (index: number, score: number) => {
+      if (index >= joints.length) {
+        if (score > bestScore) {
+          bestScore = score;
+          bestResult = { ...current };
+        }
+        return;
+      }
+      const joint = joints[index];
+      let matched = false;
+      for (const candidate of candidates.get(joint) ?? []) {
+        if (reserved.has(candidate.node)) {
+          continue;
+        }
+        current[joint] = candidate.node;
+        reserved.add(candidate.node);
+        if (this.validateHumanoidBodyPartial(current)) {
+          matched = true;
+          search(index + 1, score + candidate.score);
+        }
+        reserved.delete(candidate.node);
+        delete current[joint];
+      }
+      if (optional?.has(joint)) {
+        search(index + 1, score);
+      } else if (!matched) {
+        return;
+      }
+    };
+    search(0, 0);
+    if (!bestResult) {
+      return null;
+    }
+    for (const node of Object.values(bestResult) as T[]) {
+      used.add(node);
+    }
+    return bestResult;
   }
   private static getHumanoidIntermediateChain<T extends { name: string; parent: Nullable<T>; children: T[] }>(
     ancestor: T,
@@ -1246,7 +1350,7 @@ export class Skeleton extends Disposable {
   >(root: T, bodyProfile: HumanoidJointProfile<HumanoidBodyRig>): HumanoidJointMapping<T> | null {
     const nodes = this.collectHumanoidJointNodeInfos(root);
     const used = new Set<T>();
-    const bodyCandidates = this.matchHumanoidJointProfile(
+    const bodyCandidates = this.matchHumanoidBodyProfile(
       nodes,
       bodyProfile,
       used,

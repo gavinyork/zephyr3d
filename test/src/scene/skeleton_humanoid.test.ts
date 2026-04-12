@@ -204,6 +204,63 @@ function buildUnityHumanoidSkeleton() {
   return { root, nodes };
 }
 
+function buildHumanoidSkeletonWithDecoyTorsoChain() {
+  const root = new SceneNode(null);
+  root.name = 'HumanoidRoot';
+
+  const hips = appendNode(root, 'BodyHips');
+  const spine = appendNode(hips, 'BodySpine');
+  const chest = appendNode(spine, 'BodyChest');
+  const upperChest = appendNode(chest, 'BodyUpperChest');
+  const neck = appendNode(upperChest, 'BodyNeck');
+  appendNode(neck, 'BodyHead');
+
+  for (const side of ['Left', 'Right'] as const) {
+    const shoulder = appendNode(upperChest, `Body${side}Shoulder`);
+    const upperArm = appendNode(shoulder, `Body${side}UpperArm`);
+    const lowerArm = appendNode(upperArm, `Body${side}LowerArm`);
+    const hand = appendNode(lowerArm, `Body${side}Hand`);
+    const upperLeg = appendNode(hips, `Body${side}UpperLeg`);
+    const lowerLeg = appendNode(upperLeg, `Body${side}LowerLeg`);
+    const foot = appendNode(lowerLeg, `Body${side}Foot`);
+    appendNode(foot, `Body${side}Toes`);
+
+    appendFingerChain(
+      hand,
+      [`Body${side}ThumbProximal`, `Body${side}ThumbIntermediate`, `Body${side}ThumbDistal`],
+      {}
+    );
+    appendFingerChain(
+      hand,
+      [`Body${side}IndexProximal`, `Body${side}IndexIntermediate`, `Body${side}IndexDistal`],
+      {}
+    );
+    appendFingerChain(
+      hand,
+      [`Body${side}MiddleProximal`, `Body${side}MiddleIntermediate`, `Body${side}MiddleDistal`],
+      {}
+    );
+    appendFingerChain(
+      hand,
+      [`Body${side}RingProximal`, `Body${side}RingIntermediate`, `Body${side}RingDistal`],
+      {}
+    );
+    appendFingerChain(
+      hand,
+      [`Body${side}PinkyProximal`, `Body${side}PinkyIntermediate`, `Body${side}PinkyDistal`],
+      {}
+    );
+  }
+
+  const decoySpine = appendNode(root, 'Spine');
+  const decoyChest = appendNode(decoySpine, 'Chest');
+  const decoyUpperChest = appendNode(decoyChest, 'UpperChest');
+  const decoyNeck = appendNode(decoyUpperChest, 'Neck');
+  appendNode(decoyNeck, 'Head');
+
+  return root;
+}
+
 function buildBipedSkeleton() {
   const nodes: Record<string, SceneNode> = {};
   const root = new SceneNode(null);
@@ -503,5 +560,17 @@ describe('Skeleton.tryExtractHumanoidBones', () => {
     expect(result!.body[HumanoidBodyRig.RightHand].name).toBe('Bip001 R Hand_23');
     expect(result!.leftHand).toBeUndefined();
     expect(result!.rightHand).toBeUndefined();
+  });
+
+  test('prefers the torso chain that is hierarchy-consistent with the limbs', () => {
+    const root = buildHumanoidSkeletonWithDecoyTorsoChain();
+    const result = Skeleton.tryExtractHumanoidJoints(root);
+    expect(result).not.toBeNull();
+    expect(result!.body[HumanoidBodyRig.Hips].name).toBe('BodyHips');
+    expect(result!.body[HumanoidBodyRig.Spine].name).toBe('BodySpine');
+    expect(result!.body[HumanoidBodyRig.Chest].name).toBe('BodyChest');
+    expect(result!.body[HumanoidBodyRig.UpperChest].name).toBe('BodyUpperChest');
+    expect(result!.body[HumanoidBodyRig.Neck].name).toBe('BodyNeck');
+    expect(result!.body[HumanoidBodyRig.Head].name).toBe('BodyHead');
   });
 });

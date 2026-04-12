@@ -21,6 +21,8 @@ import { DlgSaveFile } from '../views/dlg/savefiledlg';
 import type { MeshMaterial } from '@zephyr3d/scene';
 import { getEngine, PBRBluePrintMaterial, SpriteBlueprintMaterial } from '@zephyr3d/scene';
 import { exportFile, exportMultipleFilesAsZip } from '../helpers/downloader';
+import { SharedModel } from '../loaders/model';
+import { DlgImportOptions } from '../views/dlg/importoptionsdlg';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -1252,18 +1254,45 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           });
           dlgProgressBar.close();
         } else if (result?.op === 'import') {
+          const models: SharedModel[] = [];
           const dlgProgressBar = new DlgProgress('Import File##ImportProgress', 300);
           dlgProgressBar.showModal();
           for (let i = 0; i < result.paths.length; i++) {
             dlgProgressBar.setProgress(i + 1, result.paths.length);
             try {
               const sharedModel = await ResourceService.importModel(dtVFS, result.paths[i]);
-              await sharedModel.savePrefab(getEngine().resourceManager, info.targetDirectory.path);
+              models.push(sharedModel);
+              //await sharedModel.savePrefab(getEngine().resourceManager, info.targetDirectory.path);
             } catch (err) {
               console.error(`Load model ${result.paths[i]} failed: ${err}`);
             }
           }
           dlgProgressBar.close();
+          if (models.length > 0) {
+            const dlgImportOptions = new DlgImportOptions(
+              'Import options',
+              this._vfs,
+              models,
+              result.paths,
+              300
+            );
+            const saveOptions = await dlgImportOptions.showModal();
+            const dlgProgressBar = new DlgProgress('Write File##ImportProgress', 300);
+            dlgProgressBar.showModal();
+            for (let i = 0; i < result.paths.length; i++) {
+              dlgProgressBar.setProgress(i + 1, result.paths.length);
+              try {
+                await models[i].savePrefab(
+                  getEngine().resourceManager,
+                  info.targetDirectory.path,
+                  saveOptions[i]
+                );
+              } catch (err) {
+                console.error(`Write model ${result.paths[i]} failed: ${err}`);
+              }
+            }
+            dlgProgressBar.close();
+          }
         }
       });
     }

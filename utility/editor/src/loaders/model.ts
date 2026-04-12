@@ -517,6 +517,12 @@ export class AssetScene extends NamedObject {
   }
 }
 
+export type SaveOptions = {
+  importMeshes: boolean;
+  importSkeletons: boolean;
+  importAnimations: boolean;
+};
+
 /**
  * Model information that can be shared by multiple model nodes
  * @public
@@ -623,10 +629,20 @@ export class SharedModel extends Disposable {
     this._animations.push(animation);
   }
   /** save as prefab */
-  async savePrefab(manager: ResourceManager, path: string): Promise<void> {
+  async savePrefab(manager: ResourceManager, path: string, saveOptions?: SaveOptions): Promise<void> {
     await this.preprocess(manager, path);
+    const saveMeshes = saveOptions?.importMeshes ?? true;
+    const saveSkeletons = saveOptions?.importSkeletons ?? true;
+    const saveAnimations = saveOptions?.importAnimations ?? true;
     const tmpScene = new Scene();
-    const node = await this.createSceneNode(manager, tmpScene, false);
+    const node = await this.createSceneNode(
+      manager,
+      tmpScene,
+      false,
+      saveMeshes,
+      saveSkeletons,
+      saveAnimations
+    );
     const numSkeletons = node.animationSet?.skeletons?.length ?? 0;
     const numAnimations = node.animationSet?.getAnimationNames().length ?? 0;
     await ResourceService.savePrefab(node, manager, path, this._name);
@@ -721,7 +737,14 @@ export class SharedModel extends Disposable {
       }
     }
   }
-  async createSceneNode(manager: ResourceManager, scene: Scene, instancing: boolean): Promise<SceneNode> {
+  async createSceneNode(
+    manager: ResourceManager,
+    scene: Scene,
+    instancing: boolean,
+    saveMeshes: boolean,
+    saveSkeletons: boolean,
+    saveAnimations: boolean
+  ): Promise<SceneNode> {
     const group = new SceneNode(scene);
     group.name = this.name;
     const animationSet = group.animationSet;
@@ -740,96 +763,106 @@ export class SharedModel extends Disposable {
           assetScene.rootNodes[k],
           skeletonMeshMap,
           nodeMap,
-          instancing
+          instancing,
+          saveMeshes,
+          saveSkeletons,
+          saveAnimations
         );
       }
-      for (const sk of this.skeletons) {
-        if (!skeletonMeshMap.has(sk)) {
-          skeletonMeshMap.set(sk, {
-            mesh: [],
-            bounding: []
-          });
-        }
-      }
-      for (const v of skeletonMeshMap) {
-        const sk = v[0];
-        const skeleton = new Skeleton(
-          sk.joints.map((val) => {
-            const node = nodeMap.get(val);
-            node.jointTypeT = 'static';
-            node.jointTypeS = 'static';
-            node.jointTypeR = 'static';
-            return node;
-          }),
-          sk.inverseBindMatrices,
-          sk.bindPose
-        );
-        const nodes = skeletonMeshMap.get(sk);
-        if (nodes) {
-          if (!nodes.skeleton) {
-            nodes.skeleton = skeleton;
-            for (let i = 0; i < nodes.mesh.length; i++) {
-              const mesh = nodes.mesh[i];
-              const v = {
-                positions: nodes.bounding[i].rawPositions,
-                blendIndices: nodes.bounding[i].rawBlendIndices,
-                weights: nodes.bounding[i].rawJointWeights
-              };
-              mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
-              mesh.skeletonName = nodes.skeleton.persistentId;
-            }
+      if (saveSkeletons) {
+        for (const sk of this.skeletons) {
+          if (!skeletonMeshMap.has(sk)) {
+            skeletonMeshMap.set(sk, {
+              mesh: [],
+              bounding: []
+            });
           }
         }
-        animationSet.skeletons.push(new DRef(nodes.skeleton));
-      }
-      for (const animationData of this.animations) {
-        let name = animationData.name ?? `_embbeded_animation`;
-        if (animationSet.getAnimationClip(name)) {
-          const baseName = name;
-          for (let t = 1; ; t++) {
-            name = `${baseName}_${t}`;
-            if (!animationSet.getAnimationClip(name)) {
-              break;
-            }
-          }
-        }
-        const animation = animationSet.createAnimation(name, true);
-        for (const sk of animationData.skeletons) {
+        for (const v of skeletonMeshMap) {
+          const sk = v[0];
+          const skeleton = new Skeleton(
+            sk.joints.map((val) => {
+              const node = nodeMap.get(val);
+              node.jointTypeT = 'static';
+              node.jointTypeS = 'static';
+              node.jointTypeR = 'static';
+              return node;
+            }),
+            sk.inverseBindMatrices,
+            sk.bindPose
+          );
           const nodes = skeletonMeshMap.get(sk);
           if (nodes) {
-            animation.addSkeleton(nodes.skeleton.persistentId);
-          }
-        }
-        for (const track of animationData.tracks) {
-          const target = nodeMap.get(track.node);
-          if (track.type === 'translation') {
-            animation.addTrack(target, new NodeTranslationTrack(track.interpolator, true));
-            target.jointTypeT = 'animated';
-          } else if (track.type === 'scale') {
-            animation.addTrack(target, new NodeScaleTrack(track.interpolator, true));
-            target.jointTypeS = 'animated';
-          } else if (track.type === 'rotation') {
-            animation.addTrack(target, new NodeRotationTrack(track.interpolator, true));
-            target.jointTypeR = 'animated';
-          } else if (track.type === 'weights') {
-            for (const m of track.node.mesh.subMeshes) {
-              if (track.interpolator.stride > MAX_MORPH_TARGETS) {
-                console.error(
-                  `Morph target too large: ${track.interpolator.stride}, the maximum is ${MAX_MORPH_TARGETS}`
-                );
-              } else {
-                const morphTrack = new MorphTargetTrack(
-                  track.interpolator,
-                  track.defaultMorphWeights,
-                  m.targetBox,
-                  m.mesh.getBoundingVolume().toAABB(),
-                  true
-                );
-                animation.addTrack(m.mesh, morphTrack);
+            if (!nodes.skeleton) {
+              nodes.skeleton = skeleton;
+              for (let i = 0; i < nodes.mesh.length; i++) {
+                const mesh = nodes.mesh[i];
+                const v = {
+                  positions: nodes.bounding[i].rawPositions,
+                  blendIndices: nodes.bounding[i].rawBlendIndices,
+                  weights: nodes.bounding[i].rawJointWeights
+                };
+                mesh.setSkinnedBoundingInfo(nodes.skeleton.getBoundingInfo(v));
+                mesh.skeletonName = nodes.skeleton.persistentId;
               }
             }
-          } else {
-            console.error(`Invalid animation track type: ${track.type}`);
+          }
+          animationSet.skeletons.push(new DRef(nodes.skeleton));
+        }
+      }
+      if (saveAnimations) {
+        for (const animationData of this.animations) {
+          if (animationData.skeletons.length > 0 && !saveSkeletons) {
+            continue;
+          }
+          let name = animationData.name ?? `_embbeded_animation`;
+          if (animationSet.getAnimationClip(name)) {
+            const baseName = name;
+            for (let t = 1; ; t++) {
+              name = `${baseName}_${t}`;
+              if (!animationSet.getAnimationClip(name)) {
+                break;
+              }
+            }
+          }
+          const animation = animationSet.createAnimation(name, true);
+          for (const sk of animationData.skeletons) {
+            const nodes = skeletonMeshMap.get(sk);
+            if (nodes) {
+              animation.addSkeleton(nodes.skeleton.persistentId);
+            }
+          }
+          for (const track of animationData.tracks) {
+            const target = nodeMap.get(track.node);
+            if (track.type === 'translation') {
+              animation.addTrack(target, new NodeTranslationTrack(track.interpolator, true));
+              target.jointTypeT = 'animated';
+            } else if (track.type === 'scale') {
+              animation.addTrack(target, new NodeScaleTrack(track.interpolator, true));
+              target.jointTypeS = 'animated';
+            } else if (track.type === 'rotation') {
+              animation.addTrack(target, new NodeRotationTrack(track.interpolator, true));
+              target.jointTypeR = 'animated';
+            } else if (track.type === 'weights') {
+              for (const m of track.node.mesh.subMeshes) {
+                if (track.interpolator.stride > MAX_MORPH_TARGETS) {
+                  console.error(
+                    `Morph target too large: ${track.interpolator.stride}, the maximum is ${MAX_MORPH_TARGETS}`
+                  );
+                } else {
+                  const morphTrack = new MorphTargetTrack(
+                    track.interpolator,
+                    track.defaultMorphWeights,
+                    m.targetBox,
+                    m.mesh.getBoundingVolume().toAABB(),
+                    true
+                  );
+                  animation.addTrack(m.mesh, morphTrack);
+                }
+              }
+            } else {
+              console.error(`Invalid animation track type: ${track.type}`);
+            }
           }
         }
       }
@@ -849,7 +882,10 @@ export class SharedModel extends Disposable {
     assetNode: AssetHierarchyNode,
     skeletonMeshMap: Map<AssetSkeleton, { mesh: Mesh[]; bounding: AssetSubMeshData[] }>,
     nodeMap: Map<AssetHierarchyNode, SceneNode>,
-    instancing: boolean
+    instancing: boolean,
+    saveMeshes: boolean,
+    saveSkeletons: boolean,
+    saveAnimations: boolean
   ) {
     const node: SceneNode = new SceneNode(scene);
     nodeMap.set(assetNode, node);
@@ -857,9 +893,9 @@ export class SharedModel extends Disposable {
     node.position.set(assetNode.position);
     node.rotation.set(assetNode.rotation);
     node.scale.set(assetNode.scaling);
-    if (assetNode.mesh) {
+    if (saveMeshes && assetNode.mesh) {
       const meshData = assetNode.mesh;
-      const skeleton = assetNode.skeleton;
+      const skeleton = saveSkeletons ? assetNode.skeleton : null;
       for (const subMesh of meshData.subMeshes) {
         for (const instance of assetNode.instances) {
           const meshNode = new Mesh(scene);
@@ -889,7 +925,18 @@ export class SharedModel extends Disposable {
     }
     node.parent = parent;
     for (const child of assetNode.children) {
-      await this.setAssetNodeToSceneNode(manager, scene, node, child, skeletonMeshMap, nodeMap, instancing);
+      await this.setAssetNodeToSceneNode(
+        manager,
+        scene,
+        node,
+        child,
+        skeletonMeshMap,
+        nodeMap,
+        instancing,
+        saveMeshes,
+        saveSkeletons,
+        saveAnimations
+      );
     }
   }
   private async image2Texture(manager: ResourceManager, info: AssetTextureInfo): Promise<Texture2D> {
