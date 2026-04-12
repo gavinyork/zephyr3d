@@ -52,8 +52,9 @@ export class SpringChain {
         break;
       }
 
-      if (current.children && current.children.length > 0) {
-        current = current.children[0].get();
+      const children: SceneNode[] = current.children;
+      if (children.length > 0) {
+        current = children[0];
       } else {
         break;
       }

@@ -15,9 +15,7 @@ function findNodesByPath(parentNode: SceneNode, path: string): SceneNode[] {
   while (parts.length > 0) {
     const part = parts.shift();
     for (let i = result.length - 1; i >= 0; i--) {
-      const insert = result[i].children
-        .filter((node) => node.get()!.persistentId === part)
-        .map((node) => node.get()!);
+      const insert = result[i].children.filter((node) => node.persistentId === part);
       result.splice(i, 1, ...insert);
     }
   }

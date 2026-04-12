@@ -22,7 +22,8 @@ import {
   //OrthoCamera,
   getDevice,
   getEngine,
-  Sprite
+  Sprite,
+  Skeleton
 } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { DirectionalLight } from '@zephyr3d/scene';

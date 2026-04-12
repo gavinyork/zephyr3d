@@ -47,6 +47,10 @@ export class DlgImport extends DialogRenderer<{ op: string; paths?: string[] }> 
           for (let i = 0; i < this._paths.length; i++) {
             ImGui.PushID(i);
             ImGui.Checkbox(this._paths[i], this._selected[i]);
+            ImGui.SameLine();
+            if (ImGui.Button('Import options...')) {
+              console.log(`Import options ${i}`);
+            }
             ImGui.PopID();
           }
         }

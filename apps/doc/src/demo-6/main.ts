@@ -74,8 +74,9 @@ app.ready().then(async () => {
     return instanceCount;
   };
   const removeNBoxes = function (n: number) {
-    for (let i = 0; i < Math.min(batchGroup.children.length, n); i++) {
-      batchGroup.children[0].get().remove();
+    const children = batchGroup.children;
+    for (let i = 0; i < Math.min(children.length, n); i++) {
+      children[0].remove();
       instanceCount--;
     }
     return instanceCount;

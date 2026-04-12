@@ -367,7 +367,7 @@ function expectHumanoidExtraction(
     rightHand: Partial<Record<HumanoidHandRig, string>>;
   }
 ) {
-  const result = Skeleton.tryExtractHumanoidBones(root);
+  const result = Skeleton.tryExtractHumanoidJoints(root);
   expect(result).not.toBeNull();
   for (const [bone, name] of Object.entries(expected.body)) {
     expect(result!.body[bone as HumanoidBodyRig].name).toBe(name);
@@ -496,7 +496,7 @@ describe('Skeleton.tryExtractHumanoidBones', () => {
 
   test('extracts body when hand bones are missing', () => {
     const root = buildBipedBodyOnlySkeleton();
-    const result = Skeleton.tryExtractHumanoidBones(root);
+    const result = Skeleton.tryExtractHumanoidJoints(root);
     expect(result).not.toBeNull();
     expect(result!.body[HumanoidBodyRig.Hips].name).toBe('Bip001 Pelvis_02');
     expect(result!.body[HumanoidBodyRig.LeftHand].name).toBe('Bip001 L Hand_23');

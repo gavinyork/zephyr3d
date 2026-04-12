@@ -313,7 +313,7 @@ export interface AssetScaleTrack extends AssetAnimationTrack {
  * @public
  */
 export class AssetHierarchyNode extends NamedObject {
-  private _parent: AssetHierarchyNode;
+  private _parent: Nullable<AssetHierarchyNode>;
   private _position: Vector3;
   private _rotation: Quaternion;
   private _scaling: Vector3;
@@ -347,7 +347,7 @@ export class AssetHierarchyNode extends NamedObject {
     parent?.addChild(this);
   }
   /** Parent of the node */
-  get parent(): AssetHierarchyNode {
+  get parent(): Nullable<AssetHierarchyNode> {
     return this._parent;
   }
   /** Local transformation matrix of the node */

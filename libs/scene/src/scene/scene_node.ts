@@ -775,7 +775,7 @@ export class SceneNode
       }
       if (this._parent) {
         const index = this._parent._children.findIndex((val) => val.get() === this);
-        this._parent.children[index].dispose();
+        this._parent._children[index].dispose();
         this._parent._children.splice(index, 1);
       }
       this._parent = p;
@@ -858,8 +858,8 @@ export class SceneNode
     }
   }
   /** Children of this xform */
-  get children() {
-    return this._children;
+  get children(): SceneNode[] {
+    return this._children.map((child) => child.get()!);
   }
   /**
    * Position of the xform relative to it's parent

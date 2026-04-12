@@ -330,12 +330,12 @@ export class GLTFViewer {
   }
   private traverseModel(func: (node: SceneNode) => void, context?: any) {
     if (this._modelNode) {
-      const queue: DRef<SceneNode>[] = [this._modelNode];
+      const queue: SceneNode[] = [this._modelNode.get()];
       while (queue.length > 0) {
         const node = queue.shift();
-        queue.push(...node.get().children);
-        if (node.get().isMesh()) {
-          func.call(context, node.get());
+        queue.push(...node.children);
+        if (node.isMesh()) {
+          func.call(context, node);
         }
       }
     }

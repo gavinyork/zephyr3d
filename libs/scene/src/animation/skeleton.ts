@@ -101,10 +101,10 @@ const tmpV1 = new Vector3();
 const tmpV2 = new Vector3();
 const tmpV3 = new Vector3();
 
-type HumanoidJointMapping = {
-  body: Record<HumanoidBodyRig, SceneNode>;
-  leftHand?: Record<HumanoidHandRig, SceneNode>;
-  rightHand?: Record<HumanoidHandRig, SceneNode>;
+type HumanoidJointMapping<T extends { name: string; parent: Nullable<T>; children: T[] }> = {
+  body: Record<HumanoidBodyRig, T>;
+  leftHand?: Record<HumanoidHandRig, T>;
+  rightHand?: Record<HumanoidHandRig, T>;
 };
 
 type HumanoidJointPattern = {
@@ -115,8 +115,8 @@ type HumanoidJointPattern = {
 
 type HumanoidJointProfile<T extends string> = Record<T, HumanoidJointPattern[]>;
 
-type HumanoidJointNodeInfo = {
-  node: SceneNode;
+type HumanoidJointNodeInfo<T extends { name: string; children: T[] }> = {
+  node: T;
   depth: number;
   tokens: string[];
   tokenSet: Set<string>;
@@ -221,7 +221,7 @@ export class Skeleton extends Disposable {
     if (!skeletonRoot || !this._joints.includes(skeletonRoot)) {
       throw new Error('Skeleton root must be included in the joint list');
     }
-    const humanoid = Skeleton.tryExtractHumanoidJoints(skeletonRoot);
+    const humanoid = Skeleton.tryExtractHumanoidJoints(skeletonRoot.scene!.rootNode);
     console.log(humanoid);
     while (skeletonRoot.parent && this._joints.includes(skeletonRoot.parent)) {
       skeletonRoot = skeletonRoot.parent;
@@ -608,18 +608,23 @@ export class Skeleton extends Disposable {
       .replace(/\s+/g, ' ')
       .trim();
   }
-  private static getHumanoidJointNodeDepth(root: SceneNode, node: SceneNode) {
+  private static getHumanoidJointNodeDepth<T extends { name: string; parent: Nullable<T>; children: T[] }>(
+    root: T,
+    node: T
+  ) {
     let depth = 0;
-    let current: Nullable<SceneNode> = node;
+    let current: Nullable<T> = node;
     while (current && current !== root) {
       depth++;
       current = current.parent;
     }
     return depth;
   }
-  private static collectHumanoidJointNodeInfos(root: SceneNode): HumanoidJointNodeInfo[] {
-    const nodes: HumanoidJointNodeInfo[] = [];
-    root.iterate((node) => {
+  private static collectHumanoidJointNodeInfos<
+    T extends { name: string; parent: Nullable<T>; children: T[] }
+  >(root: T): HumanoidJointNodeInfo<T>[] {
+    const nodes: HumanoidJointNodeInfo<T>[] = [];
+    this.iterateNode(root, (node) => {
       const normalizedName = this.normalizeHumanoidJointName(node.name || '');
       if (!normalizedName) {
         return false;
@@ -638,7 +643,10 @@ export class Skeleton extends Disposable {
     });
     return nodes;
   }
-  private static matchesHumanoidJointPattern(info: HumanoidJointNodeInfo, pattern: HumanoidJointPattern) {
+  private static matchesHumanoidJointPattern<T extends { name: string; children: T[] }>(
+    info: HumanoidJointNodeInfo<T>,
+    pattern: HumanoidJointPattern
+  ) {
     if (pattern.all?.some((token) => !info.tokenSet.has(token))) {
       return false;
     }
@@ -650,8 +658,8 @@ export class Skeleton extends Disposable {
     }
     return true;
   }
-  private static scoreHumanoidJointPattern(
-    info: HumanoidJointNodeInfo,
+  private static scoreHumanoidJointPattern<T extends { name: string; children: T[] }>(
+    info: HumanoidJointNodeInfo<T>,
     pattern: HumanoidJointPattern,
     priority: number
   ) {
@@ -669,12 +677,12 @@ export class Skeleton extends Disposable {
     }
     return priority * 100000 + matchedTokens.size * 100 - extraTokenCount * 5 - info.depth;
   }
-  private static findBestHumanoidJoint(
-    nodes: HumanoidJointNodeInfo[],
+  private static findBestHumanoidJoint<T extends { name: string; children: T[] }>(
+    nodes: HumanoidJointNodeInfo<T>[],
     patterns: HumanoidJointPattern[],
-    used: Set<SceneNode>
+    used: Set<T>
   ) {
-    let bestNode: Nullable<SceneNode> = null;
+    let bestNode: Nullable<T> = null;
     let bestScore = Number.NEGATIVE_INFINITY;
     for (let index = 0; index < patterns.length; index++) {
       const pattern = patterns[index];
@@ -692,20 +700,16 @@ export class Skeleton extends Disposable {
     }
     return bestNode;
   }
-  private static matchHumanoidJointProfile<T extends string>(
-    nodes: HumanoidJointNodeInfo[],
+  private static matchHumanoidJointProfile<T extends string, U extends { name: string; children: U[] }>(
+    nodes: HumanoidJointNodeInfo<U>[],
     profile: HumanoidJointProfile<T>,
-    used: Set<SceneNode>,
+    used: Set<U>,
     optional?: Set<T>
-  ): Partial<Record<T, SceneNode>> | null {
-    const result = {} as Partial<Record<T, SceneNode>>;
-    const reserved = new Set<SceneNode>();
+  ): Partial<Record<T, U>> | null {
+    const result = {} as Partial<Record<T, U>>;
+    const reserved = new Set<U>();
     for (const joint of Object.keys(profile) as T[]) {
-      const node = this.findBestHumanoidJoint(
-        nodes,
-        profile[joint],
-        new Set<SceneNode>([...used, ...reserved])
-      );
+      const node = this.findBestHumanoidJoint(nodes, profile[joint], new Set<U>([...used, ...reserved]));
       if (!node) {
         if (optional?.has(joint)) {
           continue;
@@ -720,11 +724,14 @@ export class Skeleton extends Disposable {
     }
     return result;
   }
-  private static getHumanoidIntermediateChain(ancestor: SceneNode, descendant: SceneNode) {
+  private static getHumanoidIntermediateChain<T extends { name: string; parent: Nullable<T>; children: T[] }>(
+    ancestor: T,
+    descendant: T
+  ) {
     if (!this.isSameOrAncestor(ancestor, descendant)) {
       return null;
     }
-    const chain: SceneNode[] = [];
+    const chain: T[] = [];
     let current = descendant.parent;
     while (current && current !== ancestor) {
       chain.unshift(current);
@@ -732,9 +739,9 @@ export class Skeleton extends Disposable {
     }
     return chain;
   }
-  private static completeHumanoidBody(
-    body: Partial<Record<HumanoidBodyRig, SceneNode>>
-  ): Record<HumanoidBodyRig, SceneNode> | null {
+  private static completeHumanoidBody<T extends { name: string; parent: Nullable<T>; children: T[] }>(
+    body: Partial<Record<HumanoidBodyRig, T>>
+  ): Record<HumanoidBodyRig, T> | null {
     const requiredJoints = [
       HumanoidBodyRig.Hips,
       HumanoidBodyRig.Spine,
@@ -807,9 +814,9 @@ export class Skeleton extends Disposable {
       [HumanoidBodyRig.RightToes]: body[HumanoidBodyRig.RightToes]!
     };
   }
-  private static completeHumanoidHand(
-    hand: Partial<Record<HumanoidHandRig, SceneNode>>
-  ): Record<HumanoidHandRig, SceneNode> | null {
+  private static completeHumanoidHand<T extends { name: string; children: T[] }>(
+    hand: Partial<Record<HumanoidHandRig, T>>
+  ): Record<HumanoidHandRig, T> | null {
     for (const joint of Object.values(HumanoidHandRig)) {
       if (!hand[joint]) {
         return null;
@@ -833,11 +840,11 @@ export class Skeleton extends Disposable {
       [HumanoidHandRig.PinkyDistal]: hand[HumanoidHandRig.PinkyDistal]!
     };
   }
-  private static tryExtractOptionalHumanoidHand(
-    nodes: HumanoidJointNodeInfo[],
+  private static tryExtractOptionalHumanoidHand<T extends { name: string; children: T[] }>(
+    nodes: HumanoidJointNodeInfo<T>[],
     side: 'left' | 'right',
-    used: Set<SceneNode>
-  ): Record<HumanoidHandRig, SceneNode> | undefined {
+    used: Set<T>
+  ): Record<HumanoidHandRig, T> | undefined {
     const handCandidates = this.matchHumanoidJointProfile(
       nodes,
       this.createCommonHumanoidHandProfile(side),
@@ -848,10 +855,15 @@ export class Skeleton extends Disposable {
     }
     return this.completeHumanoidHand(handCandidates) ?? undefined;
   }
-  private static isSameOrAncestor(parent: SceneNode, child: SceneNode) {
-    return parent === child || parent.isParentOf(child);
+  private static isSameOrAncestor<T extends { name: string; parent: Nullable<T>; children: T[] }>(
+    parent: T,
+    child: T
+  ) {
+    return parent === child || this.isParentOf(parent, child);
   }
-  private static validateHumanoidHandHierarchy(hand: SceneNode, joints: Record<HumanoidHandRig, SceneNode>) {
+  private static validateHumanoidHandHierarchy<
+    T extends { name: string; parent: Nullable<T>; children: T[] }
+  >(hand: T, joints: Record<HumanoidHandRig, T>) {
     const chains: [HumanoidHandRig, HumanoidHandRig, HumanoidHandRig][] = [
       [HumanoidHandRig.ThumbProximal, HumanoidHandRig.ThumbIntermediate, HumanoidHandRig.ThumbDistal],
       [HumanoidHandRig.IndexProximal, HumanoidHandRig.IndexIntermediate, HumanoidHandRig.IndexDistal],
@@ -866,7 +878,9 @@ export class Skeleton extends Disposable {
         this.isSameOrAncestor(joints[intermediate], joints[distal])
     );
   }
-  private static validateHumanoidJointExtraction(result: HumanoidJointMapping) {
+  private static validateHumanoidJointExtraction<
+    T extends { name: string; parent: Nullable<T>; children: T[] }
+  >(result: HumanoidJointMapping<T>) {
     const body = result.body;
     return (
       this.isSameOrAncestor(body[HumanoidBodyRig.Hips], body[HumanoidBodyRig.Spine]) &&
@@ -1203,12 +1217,35 @@ export class Skeleton extends Disposable {
       ])
     };
   }
-  private static tryExtractHumanoidJointsByBodyProfile(
-    root: SceneNode,
-    bodyProfile: HumanoidJointProfile<HumanoidBodyRig>
-  ): HumanoidJointMapping | null {
+  private static isParentOf<T extends { name: string; parent: Nullable<T>; children: T[] }>(
+    parent: T,
+    child: Nullable<T>
+  ) {
+    while (child && child !== parent) {
+      child = child.parent!;
+    }
+    return child === parent;
+  }
+
+  private static iterateNode<T extends { name: string; children: T[] }>(
+    root: T,
+    callback: (node: T) => boolean
+  ) {
+    if (callback(root)) {
+      return true;
+    }
+    for (const child of root.children) {
+      if (this.iterateNode(child, callback)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  private static tryExtractHumanoidJointsByBodyProfile<
+    T extends { name: string; parent: Nullable<T>; children: T[] }
+  >(root: T, bodyProfile: HumanoidJointProfile<HumanoidBodyRig>): HumanoidJointMapping<T> | null {
     const nodes = this.collectHumanoidJointNodeInfos(root);
-    const used = new Set<SceneNode>();
+    const used = new Set<T>();
     const bodyCandidates = this.matchHumanoidJointProfile(
       nodes,
       bodyProfile,
@@ -1224,7 +1261,7 @@ export class Skeleton extends Disposable {
     }
     const leftHand = this.tryExtractOptionalHumanoidHand(nodes, 'left', used);
     const rightHand = this.tryExtractOptionalHumanoidHand(nodes, 'right', used);
-    const result: HumanoidJointMapping = {
+    const result: HumanoidJointMapping<T> = {
       body,
       leftHand,
       rightHand
@@ -1245,7 +1282,9 @@ export class Skeleton extends Disposable {
    * @param root - The root scene node to search for humanoid joints.
    * @returns An object containing the mapped body and hand joints if a complete humanoid rig is detected, otherwise `null`.
    */
-  static tryExtractHumanoidJoints(root: SceneNode): HumanoidJointMapping | null {
+  static tryExtractHumanoidJoints<T extends { name: string; parent: Nullable<T>; children: T[] }>(
+    root: T
+  ): HumanoidJointMapping<T> | null {
     return (
       this.tryExtractHumanoidJointsMixamo(root) ??
       this.tryExtractHumanoidJointsVRM(root) ??
@@ -1253,16 +1292,24 @@ export class Skeleton extends Disposable {
       this.tryExtractHumanoidJointsBiped(root)
     );
   }
-  static tryExtractHumanoidJointsMixamo(root: SceneNode): HumanoidJointMapping | null {
+  static tryExtractHumanoidJointsMixamo<T extends { name: string; parent: Nullable<T>; children: T[] }>(
+    root: T
+  ): HumanoidJointMapping<T> | null {
     return this.tryExtractHumanoidJointsByBodyProfile(root, this.createMixamoHumanoidBodyProfile());
   }
-  static tryExtractHumanoidJointsVRM(root: SceneNode): HumanoidJointMapping | null {
+  static tryExtractHumanoidJointsVRM<T extends { name: string; parent: Nullable<T>; children: T[] }>(
+    root: T
+  ): HumanoidJointMapping<T> | null {
     return this.tryExtractHumanoidJointsByBodyProfile(root, this.createStandardHumanoidBodyProfile());
   }
-  static tryExtractHumanoidJointsUnityHumanoid(root: SceneNode): HumanoidJointMapping | null {
+  static tryExtractHumanoidJointsUnityHumanoid<
+    T extends { name: string; parent: Nullable<T>; children: T[] }
+  >(root: T): HumanoidJointMapping<T> | null {
     return this.tryExtractHumanoidJointsByBodyProfile(root, this.createStandardHumanoidBodyProfile());
   }
-  static tryExtractHumanoidJointsBiped(root: SceneNode): HumanoidJointMapping | null {
+  static tryExtractHumanoidJointsBiped<T extends { name: string; parent: Nullable<T>; children: T[] }>(
+    root: T
+  ): HumanoidJointMapping<T> | null {
     return this.tryExtractHumanoidJointsByBodyProfile(root, this.createBipedHumanoidBodyProfile());
   }
 }

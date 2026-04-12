@@ -23,7 +23,7 @@ class SceneData extends TreeViewData<SceneNode> {
     return this._scene.rootNode;
   }
   getChildren(parent: SceneNode): SceneNode[] {
-    return parent?.children?.map((c) => c.get()).filter((c) => !c.sealed) ?? [];
+    return parent?.children?.filter((c) => !c.sealed) ?? [];
   }
   getParent(node: SceneNode): SceneNode {
     return node.parent;

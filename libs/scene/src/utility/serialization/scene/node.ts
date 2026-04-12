@@ -220,14 +220,15 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           get(this: SceneNode, value) {
             value.object = [];
             for (const child of this.children) {
-              if (!child.get()!.sealed) {
-                value.object.push(child.get());
+              if (!child.sealed) {
+                value.object.push(child);
               }
             }
           },
           set(this: SceneNode, value) {
-            for (let i = this.children.length - 1; i >= 0; i--) {
-              const child = this.children[i].get()!;
+            const children = this.children;
+            for (let i = children.length - 1; i >= 0; i--) {
+              const child = children[i];
               if (!value.object.includes(child) && !child.sealed) {
                 child.remove();
               }

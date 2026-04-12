@@ -315,7 +315,7 @@ function moveGrabberToMouse() {
   if (grabber) {
     grabber.position.set(grabIntersect);
     // Show grabber radius visualization
-    const vis = grabber.children[0].get()!;
+    const vis = grabber.children[0];
     if (vis) {
       vis.showState = 'visible';
     }
@@ -364,7 +364,7 @@ getInput().useFirst((evt) => {
     }
     const grabber = getActiveGrabber();
     if (grabber) {
-      const vis = grabber.children[0].get()!;
+      const vis = grabber.children[0];
       if (vis) {
         vis.showState = 'hidden';
       }

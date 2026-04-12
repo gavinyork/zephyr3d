@@ -579,8 +579,8 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
             const sceneNode = value.object[0] as SceneNode;
             if (sceneNode) {
               sceneNode.remove();
-              for (const child of sceneNode.children.slice()) {
-                child.get()!.parent = this.rootNode;
+              for (const child of sceneNode.children) {
+                child.parent = this.rootNode;
               }
             }
           }

@@ -40,7 +40,7 @@ export class NodeProxy extends Disposable {
     if (this.isProxy(src)) {
       return;
     }
-    const index = src.children.findIndex((val) => this.isProxy(val.get()));
+    const index = src.children.findIndex((val) => this.isProxy(val));
     if (index >= 0) {
       return;
     }
@@ -67,9 +67,10 @@ export class NodeProxy extends Disposable {
   }
   updateProxy(src: SceneNode) {
     if (src) {
-      const index = src.children.findIndex((val) => this.isProxy(val.get()));
+      const children = src.children;
+      const index = children.findIndex((val) => this.isProxy(val));
       if (index >= 0) {
-        const proxy = src.children[index].get() as Mesh;
+        const proxy = children[index] as Mesh;
         const material = proxy.material;
         const primitive = proxy.primitive;
         if (src.isPunctualLight()) {
@@ -93,18 +94,20 @@ export class NodeProxy extends Disposable {
   }
   hideProxy(src: SceneNode) {
     if (src) {
-      const index = src.children.findIndex((val) => this.isProxy(val.get()));
+      const children = src.children;
+      const index = children.findIndex((val) => this.isProxy(val));
       if (index >= 0) {
-        const proxy = src.children[index].get() as Mesh;
+        const proxy = children[index] as Mesh;
         proxy.showState = 'hidden';
       }
     }
   }
   showProxy(src: SceneNode) {
     if (src) {
-      const index = src.children.findIndex((val) => this.isProxy(val.get()));
+      const children = src.children;
+      const index = children.findIndex((val) => this.isProxy(val));
       if (index >= 0) {
-        const proxy = src.children[index].get() as Mesh;
+        const proxy = src.children[index] as Mesh;
         proxy.showState = 'visible';
       }
     }
