@@ -412,6 +412,15 @@ export class AssetHierarchyNode extends NamedObject {
   get skeletonAttached(): Set<AssetSkeleton> {
     return this._attachToSkeleton;
   }
+  isParentOf(child: Nullable<AssetHierarchyNode>) {
+    while (child && child !== this) {
+      child = child.parent!;
+    }
+    return child === this;
+  }
+  getWorldPosition() {
+    return new Vector3(this.worldMatrix.m03, this.worldMatrix.m13, this.worldMatrix.m23);
+  }
   /** @internal */
   computeTransforms(parentTransform: Matrix4x4) {
     this._matrix = Matrix4x4.scaling(this._scaling).rotateLeft(this._rotation).translateLeft(this._position);
@@ -497,6 +506,18 @@ export class AssetSkeleton extends NamedObject {
       rotation: joint.rotation.clone(),
       scale: joint.scaling.clone()
     });
+  }
+  get root() {
+    if (this.pivot) {
+      return this.pivot;
+    }
+    let root = this.joints[0];
+    for (let i = 1; i < this.joints.length; i++) {
+      while (root && !root.isParentOf(this.joints[i])) {
+        root = root.parent;
+      }
+    }
+    return root;
   }
 }
 

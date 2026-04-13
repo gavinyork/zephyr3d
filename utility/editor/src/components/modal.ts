@@ -35,6 +35,9 @@ export class DialogRenderer<T> extends Observable<{
       }
     }
   }
+  static isModalDialogOpened() {
+    return this._currentModal.length > 0;
+  }
   constructor(
     id: string,
     width = 0,

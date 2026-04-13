@@ -253,7 +253,7 @@ export class Skeleton extends Disposable {
     }
     return m ? m.get() : null;
   }
-  /** @internal */
+  /** Gets joint nodes */
   get joints() {
     return this._joints;
   }

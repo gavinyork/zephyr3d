@@ -23,6 +23,7 @@ import { getEngine, PBRBluePrintMaterial, SpriteBlueprintMaterial } from '@zephy
 import { exportFile, exportMultipleFilesAsZip } from '../helpers/downloader';
 import type { SharedModel } from '../loaders/model';
 import { DlgImportOptions } from '../views/dlg/importoptionsdlg';
+import { DialogRenderer } from './modal';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -1217,6 +1218,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   }
 
   async handleDragEvent(ev: DragEvent) {
+    if (DialogRenderer.isModalDialogOpened()) {
+      return;
+    }
     const info = this.getDragDropInfo();
     this.setDragOverState(
       new ImGui.ImVec2(ev.offsetX, ev.offsetY),
@@ -1277,21 +1281,23 @@ export class VFSRenderer extends makeObservable(Disposable)<{
               300
             );
             const saveOptions = await dlgImportOptions.showModal();
-            const dlgProgressBar = new DlgProgress('Write File##ImportProgress', 300);
-            dlgProgressBar.showModal();
-            for (let i = 0; i < result.paths.length; i++) {
-              dlgProgressBar.setProgress(i + 1, result.paths.length);
-              try {
-                await models[i].savePrefab(
-                  getEngine().resourceManager,
-                  info.targetDirectory.path,
-                  saveOptions[i]
-                );
-              } catch (err) {
-                console.error(`Write model ${result.paths[i]} failed: ${err}`);
+            if (saveOptions) {
+              const dlgProgressBar = new DlgProgress('Write File##ImportProgress', 300);
+              dlgProgressBar.showModal();
+              for (let i = 0; i < result.paths.length; i++) {
+                dlgProgressBar.setProgress(i + 1, result.paths.length);
+                try {
+                  await models[i].savePrefab(
+                    getEngine().resourceManager,
+                    info.targetDirectory.path,
+                    saveOptions[i]
+                  );
+                } catch (err) {
+                  console.error(`Write model ${result.paths[i]} failed: ${err}`);
+                }
               }
+              dlgProgressBar.close();
             }
-            dlgProgressBar.close();
           }
         }
       });

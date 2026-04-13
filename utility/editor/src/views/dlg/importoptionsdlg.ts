@@ -2,6 +2,7 @@ import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 import type { VFS } from '@zephyr3d/base';
 import type { SaveOptions, SharedModel } from '../../loaders/model';
+import { DlgSkeletonEditor } from './skeletoneditor';
 
 export class DlgImportOptions extends DialogRenderer<SaveOptions[]> {
   protected _vfs: VFS;
@@ -53,6 +54,12 @@ export class DlgImportOptions extends DialogRenderer<SaveOptions[]> {
     }
     if (!hasSkeletons) {
       ImGui.PopStyleVar();
+    }
+    if (this._options[this._current].importSkeletons) {
+      ImGui.SameLine();
+      if (ImGui.Button('Settings...')) {
+        DlgSkeletonEditor.editSkeleton('SkeletonEditor', this._models[this._current].skeletons, 500, 500);
+      }
     }
     const hasAnimations = hasSkeletons && this._models[this._current].animations.length > 0;
     if (!hasAnimations) {

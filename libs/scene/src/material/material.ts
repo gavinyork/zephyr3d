@@ -68,6 +68,10 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    */
   private static _nextId = 0;
   /**
+   * Global program cache keyed by global hash
+   */
+  private static _programCache: { [hash: string]: GPUProgram } = {};
+  /**
    * Per-material state cache keyed by global hash (material + context + pass).
    * @internal
    */
@@ -279,8 +283,12 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
       const hash = this.calcGlobalHash(ctx, pass);
       let state = this._states[hash];
       if (!state) {
-        const program = this.createProgram(ctx, pass) ?? null;
-        program.name = `@${this.constructor.name}_program_${this._nextProgramId++}`;
+        let program = Material._programCache[hash];
+        if (!program) {
+          program = this.createProgram(ctx, pass) ?? null;
+          program.name = `@${this.constructor.name}_program_${this._nextProgramId++}`;
+          Material._programCache[hash] = program;
+        }
         const bindGroup =
           program.bindGroupLayouts.length > 2
             ? ctx.device.createBindGroup(program.bindGroupLayouts[2])
@@ -408,7 +416,6 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
   clearCache() {
     for (const k in this._states) {
       this._states[k]?.bindGroup?.dispose();
-      this._states[k]?.program?.dispose();
     }
     this._states = {};
   }
