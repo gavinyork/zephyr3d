@@ -70,7 +70,7 @@ import { DlgSaveFile } from './dlg/savefiledlg';
 import { ResourceService } from '../core/services/resource';
 import { DlgMessage } from './dlg/messagedlg';
 
-type SpringColliderKind = 'sphere' | 'capsule' | 'plane';
+type ColliderKind = 'sphere' | 'capsule' | 'plane';
 type MultiTransformItem = {
   node: SceneNode;
   startWorld: Matrix4x4;
@@ -650,6 +650,17 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           action: () => {
             this.play();
           }
+        },
+        {
+          label: FontGlyph.glyphs['eye'],
+          id: 'PLAY_CURRENT_SCENE',
+          selected: () => true,
+          tooltip: () => {
+            return 'Preview current scene in new tab';
+          },
+          action: () => {
+            this.playCurrentScene();
+          }
         }
       ],
       0,
@@ -781,21 +792,39 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         if (!settings!.startupScene && !settings!.startupScript) {
           DlgMessage.messageBox('Error', 'Please set startup scene or startup script in <Project Settings>');
         } else {
-          const projectId = this.controller.editor.currentProject.uuid!;
-          const url = new URL(window.location.href);
-          url.search = '';
-          url.searchParams.append('project', projectId);
-          if (ProjectService.VFS instanceof HttpFS) {
-            url.searchParams.append('remote', '');
-          }
-          const a = document.createElement('a');
-          a.href = url.href;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
-          a.click();
+          this.openPreviewInNewTab();
         }
       });
     });
+  }
+  async playCurrentScene() {
+    await ensureDependencies();
+    if (!(await this.controller.ensureSceneSaved())) {
+      return;
+    }
+    const scenePath = this.controller.scenePath;
+    if (!scenePath) {
+      await DlgMessage.messageBox('Error', 'Please save current scene first.');
+      return;
+    }
+    this.openPreviewInNewTab(scenePath);
+  }
+  private openPreviewInNewTab(sceneOverride?: string) {
+    const projectId = this.controller.editor.currentProject.uuid!;
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.searchParams.append('project', projectId);
+    if (sceneOverride) {
+      url.searchParams.append('scene', sceneOverride);
+    }
+    if (ProjectService.VFS instanceof HttpFS) {
+      url.searchParams.append('remote', '');
+    }
+    const a = document.createElement('a');
+    a.href = url.href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.click();
   }
   renderDropZone(x: number, y: number, w: number, h: number) {
     const color = new ImGui.ImVec4(0, 0, 0, 0);
@@ -1116,14 +1145,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.on('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.on('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.on('request_save_prefab', this.handleSavePrefab, this);
-      this._sceneHierarchy.on('request_add_spring_collider', this.handleAddSpringCollider, this);
+      this._sceneHierarchy.on('request_add_collider', this.handleAddCollider, this);
+      this.controller.model.scene.rootNode.on('nodeattached', this.handleNodeAttached, this);
       this.controller.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
-      this.controller.model.scene.rootNode.iterate((node) => {
-        this._proxy!.createProxy(node);
-        if (node === this.controller.model.scene.mainCamera) {
-          this._proxy!.hideProxy(node);
-        }
-      });
+      this.syncNodeProxyTree(this.controller.model.scene.rootNode);
       this._propGrid.clear();
       this._propGrid.object = this.controller.model.scene;
       this.controller.model.scene.on('startrender', this.handleStartRender, this);
@@ -1153,10 +1178,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.off('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.off('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.off('request_save_prefab', this.handleSavePrefab, this);
-      this._sceneHierarchy.off('request_add_spring_collider', this.handleAddSpringCollider, this);
+      this._sceneHierarchy.off('request_add_collider', this.handleAddCollider, this);
       this._sceneHierarchy = null;
     }
     if (this.controller.model.scene) {
+      this.controller.model.scene.rootNode.off('nodeattached', this.handleNodeAttached, this);
       this.controller.model.scene.rootNode.off('noderemoved', this.handleNodeRemoved, this);
       this.controller.model.scene.off('startrender', this.handleStartRender, this);
       this.controller.model.scene.off('endrender', this.handleEndRender, this);
@@ -1234,7 +1260,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (object instanceof SceneNode) {
       this._proxy!.updateProxy(object);
       this.syncPropertyToMultiSelection(object, prop);
-    } else if (this.shouldRefreshSelectedSpringColliderProxy(prop)) {
+    } else if (this.shouldRefreshSelectedColliderProxy(prop)) {
       const selectedNode = this._sceneHierarchy?.selectedNode;
       if (selectedNode) {
         this._proxy!.updateProxy(selectedNode);
@@ -1300,13 +1326,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     eventBus.dispatchEvent('scene_changed');
   }
-  private shouldRefreshSelectedSpringColliderProxy(prop: PropertyAccessor) {
+  private shouldRefreshSelectedColliderProxy(prop: PropertyAccessor) {
     const selectedNode = this._sceneHierarchy?.selectedNode;
     if (!selectedNode || !selectedNode.metaData || typeof selectedNode.metaData !== 'object') {
       return false;
     }
-    const springCollider = (selectedNode.metaData as any).springCollider;
-    if (!springCollider || typeof springCollider !== 'object') {
+    const collider = (selectedNode.metaData as any).sceneCollider ?? (selectedNode.metaData as any).springCollider;
+    if (!collider || typeof collider !== 'object') {
       return false;
     }
     const cls = getEngine().resourceManager.getClassByProperty(prop);
@@ -2110,75 +2136,35 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       }
     });
   }
-  private isSpringTestScript(script: string): boolean {
-    const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
-    return /(^|\/)springtest(\.ts|\.js)?$/.test(normalized);
-  }
-  private isGPUClothScript(script: string): boolean {
-    const normalized = (script ?? '').trim().toLowerCase().replace(/\\/g, '/');
-    return /(^|\/)gpucloth(\.ts|\.js)?$/.test(normalized);
-  }
-  private findSpringHost(startNode: SceneNode): Nullable<SceneNode> {
-    let current: Nullable<SceneNode> = startNode;
-    while (current) {
-      if (this.isSpringTestScript((current as any).script ?? '')) {
-        return current;
-      }
-      current = current.parent;
-    }
-    return null;
-  }
-  private findClothHost(startNode: SceneNode): Nullable<SceneNode> {
-    let current: Nullable<SceneNode> = startNode;
-    while (current) {
-      if (this.isGPUClothScript((current as any).script ?? '')) {
-        return current;
-      }
-      current = current.parent;
-    }
-    return null;
-  }
-  private handleAddSpringCollider(node: SceneNode, type: SpringColliderKind) {
-    const springHost = this.findSpringHost(node);
-    const clothHost = this.findClothHost(node);
-    const sharedColliderHost = springHost ?? clothHost;
-    if (!sharedColliderHost) {
-      DlgMessage.messageBox(
-        'Shared Collider',
-        'No Spring Test or GPU Cloth script host found in this hierarchy. Please attach one first.'
-      );
-      return;
-    }
+  private handleAddCollider(node: SceneNode, type: ColliderKind) {
     const defaultMeta =
       type === 'sphere'
         ? {
-            springCollider: {
+            sceneCollider: {
               type: 'sphere',
               enabled: true,
               visible: true,
-              offset: [0, 0, 0],
-              radius: 1.5
+              radius: 0.15
             }
           }
         : type === 'capsule'
           ? {
-              springCollider: {
+              sceneCollider: {
                 type: 'capsule',
                 enabled: true,
                 visible: true,
-                offset: [0, 0, 0],
-                endOffset: [0, 2, 0],
-                radius: 1
+                offset: 0.1,
+                endOffset: 0.1,
+                radius: 0.1
               }
             }
           : {
-              springCollider: {
+              sceneCollider: {
                 type: 'plane',
                 enabled: true,
                 visible: true,
-                offset: [0, 0, 0],
-                normal: [0, 1, 0],
-                planeSize: 5
+                normal: 1,
+                planeSize: 0.5
               }
             };
     const typeName = type === 'sphere' ? 'Sphere' : type === 'capsule' ? 'Capsule' : 'Plane';
@@ -2208,6 +2194,21 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (selectedNodes.some((selected) => node.isParentOf(selected))) {
       this._sceneHierarchy!.selectNode(null);
     }
+  }
+  private handleNodeAttached(node: SceneNode) {
+    this.syncNodeProxyTree(node);
+  }
+  private syncNodeProxyTree(root: Nullable<SceneNode>) {
+    if (!root || !this._proxy) {
+      return;
+    }
+    root.iterate((node) => {
+      this._proxy!.createProxy(node);
+      this._proxy!.updateProxy(node);
+      if (node === this.controller.model.scene.mainCamera) {
+        this._proxy!.hideProxy(node);
+      }
+    });
   }
   private handleBeginTransformNode(node: SceneNode) {
     const isPivot = node === this._multiTransformPivot;

@@ -51,33 +51,139 @@ export default class extends RuntimeScript {
     if (!skeleton) {
       return;
     }
-    const parseVec3 = (value, fallback) => {
+    const parseVec3 = (value, fallback, scale = 1) => {
       if (Array.isArray(value) && value.length >= 3) {
-        return new Vector3(Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0);
+        return new Vector3(
+          (Number(value[0]) || 0) * scale,
+          (Number(value[1]) || 0) * scale,
+          (Number(value[2]) || 0) * scale
+        );
       }
       return fallback.clone();
     };
-    const COLLIDER_PANEL_SCALE = 10;
-    const scaleCapsuleAroundCenter = (start, end, scale) => {
-      const center = Vector3.scale(Vector3.add(start, end, new Vector3()), 0.5, new Vector3());
-      const half = Vector3.scale(Vector3.sub(end, start, new Vector3()), 0.5 * scale, new Vector3());
-      return {
-        start: Vector3.sub(center, half, new Vector3()),
-        end: Vector3.add(center, half, new Vector3())
-      };
+    const parseCapsuleDistance = (value, fallback, scale = 1) => {
+      const minValue = 0.0001 * scale;
+      let distance = Math.abs(Number(fallback) || 0);
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        distance = Math.abs(value);
+      } else if (Array.isArray(value) && value.length >= 3) {
+        const x = Number(value[0]) || 0;
+        const y = Number(value[1]) || 0;
+        const z = Number(value[2]) || 0;
+        const legacyDistance = Math.abs(x) > 1e-6 ? Math.abs(x) : Math.hypot(x, y, z);
+        distance = legacyDistance || distance;
+      }
+      return Math.max(minValue, distance * scale);
     };
-    const hierarchyColliders = [];
-    root.iterate((node) => {
-      const c = node?.metaData?.springCollider;
-      if (!c || typeof c !== 'object') {
-        return false;
+    const parsePlaneNormalY = (value, fallback = 1) => {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value < 0 ? -1 : 1;
       }
-      if (c.type !== 'sphere' && c.type !== 'capsule' && c.type !== 'plane') {
-        return false;
+      if (Array.isArray(value) && value.length >= 3) {
+        return (Number(value[1]) || 0) < 0 ? -1 : 1;
       }
-      hierarchyColliders.push({ node, config: c });
-      return false;
-    });
+      return fallback < 0 ? -1 : 1;
+    };
+    const getSceneColliderMeta = (node) => {
+      const meta = node?.metaData;
+      const collider = meta?.sceneCollider;
+      if (collider && typeof collider === 'object') {
+        return { config: collider, legacy: false };
+      }
+      const legacyCollider = meta?.springCollider;
+      if (legacyCollider && typeof legacyCollider === 'object') {
+        return { config: legacyCollider, legacy: true };
+      }
+      return null;
+    };
+    const buildSceneColliders = (host, includePlane = true) => {
+      const colliders = [];
+      const scope =
+        host?.scene?.rootNode ||
+        (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
+        host;
+      scope?.iterate?.((node) => {
+        const entry = getSceneColliderMeta(node);
+        const colliderConfig = entry?.config;
+        if (
+          !colliderConfig ||
+          (colliderConfig.type !== 'sphere' &&
+            colliderConfig.type !== 'capsule' &&
+            colliderConfig.type !== 'plane')
+        ) {
+          return false;
+        }
+        if (colliderConfig.type === 'plane' && !includePlane) {
+          return false;
+        }
+        const unitScale = entry?.legacy ? 0.1 : 1;
+        let collider = null;
+        if (colliderConfig.type === 'sphere') {
+          collider = createSphereCollider(
+            Vector3.zero(),
+            Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
+            node
+          );
+          collider.localRadiusScaleRef = 1;
+        } else if (colliderConfig.type === 'capsule') {
+          const startDistance = parseCapsuleDistance(colliderConfig.offset, 0.1, unitScale);
+          const endDistance = parseCapsuleDistance(colliderConfig.endOffset, 0.1, unitScale);
+          collider = createCapsuleCollider(
+            new Vector3(startDistance, 0, 0),
+            new Vector3(-endDistance, 0, 0),
+            Math.max(0, (Number(colliderConfig.radius) || 0.1) * unitScale),
+            node
+          );
+          collider.localRadiusScaleRef = 1;
+        } else if (colliderConfig.type === 'plane') {
+          collider = createPlaneCollider(
+            Vector3.zero(),
+            new Vector3(0, parsePlaneNormalY(colliderConfig.normal), 0),
+            node
+          );
+        }
+        if (collider) {
+          collider.enabled = colliderConfig.enabled !== false;
+          colliders.push(collider);
+        }
+        return false;
+      });
+      return colliders;
+    };
+    const buildConfigColliders = (host, config) => {
+      const colliders = [];
+      for (const colliderConfig of config?.colliders ?? []) {
+        const attachNode = root.findNodeByName(colliderConfig.bone) ?? host;
+        let collider = null;
+        if (colliderConfig.type === 'sphere') {
+          collider = createSphereCollider(
+            new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
+            Math.max(0, Number(colliderConfig.radius) || 0.15),
+            attachNode
+          );
+        } else if (colliderConfig.type === 'capsule') {
+          collider = createCapsuleCollider(
+            new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
+            new Vector3(colliderConfig.endOffsetX, colliderConfig.endOffsetY, colliderConfig.endOffsetZ),
+            Math.max(0, Number(colliderConfig.radius) || 0.1),
+            attachNode
+          );
+        } else if (colliderConfig.type === 'plane') {
+          collider = createPlaneCollider(
+            new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
+            new Vector3(colliderConfig.normalX, colliderConfig.normalY, colliderConfig.normalZ),
+            attachNode
+          );
+        }
+        if (collider) {
+          collider.enabled = colliderConfig.enabled !== false;
+          colliders.push(collider);
+        }
+      }
+      return colliders;
+    };
+    const sharedColliders = buildSceneColliders(root, true);
+    const configColliders = buildConfigColliders(root, config);
     for (const chainConfig of config.chains ?? []) {
       const chainStart = root.findNodeByName(chainConfig.startBone);
       const chainEnd = root.findNodeByName(chainConfig.endBone);
@@ -103,79 +209,11 @@ export default class extends RuntimeScript {
         maxPoseOffsetRoot: config.maxPoseOffsetRoot,
         maxPoseOffsetTip: config.maxPoseOffsetTip
       });
-      if (hierarchyColliders.length > 0) {
-        for (const item of hierarchyColliders) {
-          const colliderConfig = item.config;
-          let collider = null;
-          if (colliderConfig.type === 'sphere') {
-            collider = createSphereCollider(
-              parseVec3(colliderConfig.offset, Vector3.zero()),
-              Math.max(0, (Number(colliderConfig.radius) || 0.15) * COLLIDER_PANEL_SCALE),
-              item.node
-            );
-            // Keep collider radius authored by node scale in editor gizmo workflow.
-            collider.localRadiusScaleRef = 1;
-          } else if (colliderConfig.type === 'capsule') {
-            const startOffset = parseVec3(colliderConfig.offset, Vector3.zero());
-            const endOffset = parseVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0));
-            const scaledCapsule = scaleCapsuleAroundCenter(startOffset, endOffset, COLLIDER_PANEL_SCALE);
-            collider = createCapsuleCollider(
-              scaledCapsule.start,
-              scaledCapsule.end,
-              Math.max(0, (Number(colliderConfig.radius) || 0.1) * COLLIDER_PANEL_SCALE),
-              item.node
-            );
-            // Keep collider radius authored by node scale in editor gizmo workflow.
-            collider.localRadiusScaleRef = 1;
-          } else if (colliderConfig.type === 'plane') {
-            collider = createPlaneCollider(
-              parseVec3(colliderConfig.offset, Vector3.zero()),
-              parseVec3(colliderConfig.normal, Vector3.axisPY()),
-              item.node
-            );
-          }
-          if (collider) {
-            collider.enabled = colliderConfig.enabled !== false;
-            springSystem.addCollider(collider);
-          }
-        }
-      } else if ((config.colliders ?? []).length > 0) {
-        const colliderConfigs = config.colliders ?? [];
-        for (const colliderConfig of colliderConfigs) {
-          const attachNode = root.findNodeByName(colliderConfig.bone) ?? root;
-          let collider = null;
-          if (colliderConfig.type === 'sphere') {
-            collider = createSphereCollider(
-              new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
-              Math.max(0, Number(colliderConfig.radius) * COLLIDER_PANEL_SCALE),
-              attachNode
-            );
-          } else if (colliderConfig.type === 'capsule') {
-            const startOffset = new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ);
-            const endOffset = new Vector3(
-              colliderConfig.endOffsetX,
-              colliderConfig.endOffsetY,
-              colliderConfig.endOffsetZ
-            );
-            const scaledCapsule = scaleCapsuleAroundCenter(startOffset, endOffset, COLLIDER_PANEL_SCALE);
-            collider = createCapsuleCollider(
-              scaledCapsule.start,
-              scaledCapsule.end,
-              Math.max(0, Number(colliderConfig.radius) * COLLIDER_PANEL_SCALE),
-              attachNode
-            );
-          } else if (colliderConfig.type === 'plane') {
-            collider = createPlaneCollider(
-              new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
-              new Vector3(colliderConfig.normalX, colliderConfig.normalY, colliderConfig.normalZ),
-              attachNode
-            );
-          }
-          if (collider) {
-            collider.enabled = colliderConfig.enabled !== false;
-            springSystem.addCollider(collider);
-          }
-        }
+      for (const collider of sharedColliders) {
+        springSystem.addCollider(collider);
+      }
+      for (const collider of configColliders) {
+        springSystem.addCollider(collider);
       }
       const springModifier = new SpringModifier(springSystem, config.modifierWeight);
       skeleton.modifiers.push(springModifier);
@@ -189,7 +227,8 @@ import {
   RuntimeScript,
   GPUClothSystem,
   createSphereCollider,
-  createCapsuleCollider
+  createCapsuleCollider,
+  createPlaneCollider
 } from '@zephyr3d/scene';
 
 function parseTargetEncodedMap(source) {
@@ -295,6 +334,170 @@ function readNumber(value, fallback) {
   return Number.isFinite(num) ? num : fallback;
 }
 
+function getSceneColliderMetaEntry(node) {
+  const meta = node?.metaData;
+  const collider = meta?.sceneCollider;
+  if (
+    collider &&
+    typeof collider === 'object' &&
+    (collider.type === 'sphere' || collider.type === 'capsule' || collider.type === 'plane')
+  ) {
+    return { config: collider, legacy: false };
+  }
+  const legacyCollider = meta?.springCollider;
+  if (
+    legacyCollider &&
+    typeof legacyCollider === 'object' &&
+    (legacyCollider.type === 'sphere' || legacyCollider.type === 'capsule' || legacyCollider.type === 'plane')
+  ) {
+    return { config: legacyCollider, legacy: true };
+  }
+  return null;
+}
+
+function parseSceneColliderVec3(value, fallback, scale = 1) {
+  if (Array.isArray(value) && value.length >= 3) {
+    return new Vector3(
+      (Number(value[0]) || 0) * scale,
+      (Number(value[1]) || 0) * scale,
+      (Number(value[2]) || 0) * scale
+    );
+  }
+  return fallback.clone();
+}
+
+function parseSceneColliderDistance(value, fallback, scale = 1) {
+  const minValue = 0.0001 * scale;
+  let distance = Math.abs(Number(fallback) || 0);
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    distance = Math.abs(value);
+  } else if (Array.isArray(value) && value.length >= 3) {
+    const x = Number(value[0]) || 0;
+    const y = Number(value[1]) || 0;
+    const z = Number(value[2]) || 0;
+    const legacyDistance = Math.abs(x) > 1e-6 ? Math.abs(x) : Math.hypot(x, y, z);
+    distance = legacyDistance || distance;
+  }
+  return Math.max(minValue, distance * scale);
+}
+
+function parseSceneColliderPlaneNormalY(value, fallback = 1) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value < 0 ? -1 : 1;
+  }
+  if (Array.isArray(value) && value.length >= 3) {
+    return (Number(value[1]) || 0) < 0 ? -1 : 1;
+  }
+  return fallback < 0 ? -1 : 1;
+}
+
+function buildSceneColliderPlaneNormal(value) {
+  return new Vector3(0, parseSceneColliderPlaneNormalY(value), 0);
+}
+
+function buildSceneColliderCapsulePoints(offset, endOffset, scale = 1) {
+  return {
+    start: new Vector3(parseSceneColliderDistance(offset, 0.1, scale), 0, 0),
+    end: new Vector3(-parseSceneColliderDistance(endOffset, 0.1, scale), 0, 0)
+  };
+}
+
+function sceneColliderVec3ToArray(value) {
+  return [value.x, value.y, value.z];
+}
+
+function collectSceneNodeColliders(host, includePlane = false) {
+  const colliders = [];
+  const scope =
+    host?.scene?.rootNode ||
+    (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
+    host;
+  scope?.iterate?.((node) => {
+    const entry = getSceneColliderMetaEntry(node);
+    const colliderConfig = entry?.config;
+    if (!colliderConfig) {
+      return false;
+    }
+    if (colliderConfig.type === 'plane' && !includePlane) {
+      return false;
+    }
+    const unitScale = entry?.legacy ? 0.1 : 1;
+    let collider = null;
+    if (colliderConfig.type === 'sphere') {
+      collider = createSphereCollider(
+        Vector3.zero(),
+        Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
+        node
+      );
+      collider.localRadiusScaleRef = 1;
+    } else if (colliderConfig.type === 'capsule') {
+      const capsulePoints = buildSceneColliderCapsulePoints(colliderConfig.offset, colliderConfig.endOffset, unitScale);
+      collider = createCapsuleCollider(
+        capsulePoints.start,
+        capsulePoints.end,
+        Math.max(0, (Number(colliderConfig.radius) || 0.1) * unitScale),
+        node
+      );
+      collider.localRadiusScaleRef = 1;
+    } else if (colliderConfig.type === 'plane') {
+      collider = createPlaneCollider(
+        Vector3.zero(),
+        buildSceneColliderPlaneNormal(colliderConfig.normal),
+        node
+      );
+    }
+    if (collider) {
+      collider.enabled = colliderConfig.enabled !== false;
+      colliders.push(collider);
+    }
+    return false;
+  });
+  return colliders;
+}
+
+function serializeSceneColliderConfig(host, includePlane = false) {
+  const scope =
+    host?.scene?.rootNode ||
+    (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
+    host;
+  const colliders = [];
+  scope?.iterate?.((node) => {
+    const entry = getSceneColliderMetaEntry(node);
+    const colliderConfig = entry?.config;
+    if (!colliderConfig) {
+      return false;
+    }
+    if (colliderConfig.type === 'plane' && !includePlane) {
+      return false;
+    }
+    const unitScale = entry?.legacy ? 0.1 : 1;
+    const isCapsule = colliderConfig.type === 'capsule';
+    const isSphere = colliderConfig.type === 'sphere';
+    const isPlane = colliderConfig.type === 'plane';
+    colliders.push({
+      type: colliderConfig.type,
+      enabled: colliderConfig.enabled !== false,
+      offset: isSphere || isPlane
+        ? undefined
+        : isCapsule
+        ? parseSceneColliderDistance(colliderConfig.offset, 0.1, unitScale)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale)),
+      endOffset: isSphere || isPlane
+        ? undefined
+        : isCapsule
+        ? parseSceneColliderDistance(colliderConfig.endOffset, 0.1, unitScale)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale)),
+      normal: isPlane
+        ? parseSceneColliderPlaneNormalY(colliderConfig.normal)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY())),
+      radius: Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
+      planeSize: Math.max(0, (Number(colliderConfig.planeSize) || 0.5) * unitScale)
+    });
+    return false;
+  });
+  return JSON.stringify(colliders);
+}
+
 function serializeColliderConfig(colliders) {
   return JSON.stringify(
     (colliders || []).map((collider) => ({
@@ -307,45 +510,16 @@ function serializeColliderConfig(colliders) {
       endOffsetX: Number(collider?.endOffsetX) || 0,
       endOffsetY: Number(collider?.endOffsetY) || 0,
       endOffsetZ: Number(collider?.endOffsetZ) || 0,
+      normalY: Number(collider?.normalY) < 0 ? -1 : 1,
       radius: Number(collider?.radius) || 0
     }))
   );
-}
-
-function serializeSharedHierarchyColliders(host) {
-  const entries = [];
-  host?.iterate?.((node) => {
-    const collider = node?.metaData?.springCollider;
-    if (!collider || typeof collider !== 'object') {
-      return false;
-    }
-    if (collider.type !== 'sphere' && collider.type !== 'capsule') {
-      return false;
-    }
-    entries.push(
-      JSON.stringify({
-        id: String(node?.persistentId || ''),
-        type: collider.type,
-        enabled: collider.enabled !== false,
-        offset: Array.isArray(collider.offset) ? collider.offset.map((v) => Number(v) || 0) : [0, 0, 0],
-        endOffset:
-          collider.type === 'capsule' && Array.isArray(collider.endOffset)
-            ? collider.endOffset.map((v) => Number(v) || 0)
-            : [0, 0.2, 0],
-        radius: readNumber(collider.radius, collider.type === 'capsule' ? 0.1 : 0.15)
-      })
-    );
-    return false;
-  });
-  entries.sort();
-  return JSON.stringify(entries);
 }
 
 function buildStructureSignature(host, config) {
   return JSON.stringify({
     primitiveId: Number(host?.primitive?.id) || 0,
     vertexPinWeightsByTarget: getVertexWeightSource(config, host),
-    sharedSpringColliders: serializeSharedHierarchyColliders(host),
     maxNeighbors: Number(config?.maxNeighbors) || 8,
     maxTrianglesPerVertex: Number(config?.maxTrianglesPerVertex) || 16,
     workgroupSize: Number(config?.workgroupSize) || 64,
@@ -353,69 +527,203 @@ function buildStructureSignature(host, config) {
   });
 }
 
-function buildRuntimeSignature(config) {
+function buildRuntimeSignature(config, host) {
   return JSON.stringify({
     enabled: config?.enabled !== false,
     autoUpdate: config?.autoUpdate !== false,
     damping: Number(config?.damping),
+    dynamicFriction: Number(config?.dynamicFriction),
+    staticFriction: Number(config?.staticFriction),
     stiffness: Number(config?.stiffness),
+    poseFollow: Number(config?.poseFollow),
+    substeps: Number(config?.substeps),
     gravityX: Number(config?.gravityX),
     gravityY: Number(config?.gravityY),
     gravityZ: Number(config?.gravityZ),
     solverIterations: Number(config?.solverIterations),
+    sceneColliders: serializeSceneColliderConfig(host, true),
     colliders: serializeColliderConfig(config?.colliders)
   });
 }
 
-function buildColliders(host, config) {
-  const colliders = [];
-  host?.iterate?.((node) => {
-    const springCollider = node?.metaData?.springCollider;
-    if (!springCollider || typeof springCollider !== 'object') {
+function getSceneColliderMetaEntry(node: any) {
+  const meta = node?.metaData;
+  const collider = meta?.sceneCollider;
+  if (
+    collider &&
+    typeof collider === 'object' &&
+    (collider.type === 'sphere' || collider.type === 'capsule' || collider.type === 'plane')
+  ) {
+    return {
+      config: collider,
+      legacy: false
+    };
+  }
+  const legacyCollider = meta?.springCollider;
+  if (
+    legacyCollider &&
+    typeof legacyCollider === 'object' &&
+    (legacyCollider.type === 'sphere' ||
+      legacyCollider.type === 'capsule' ||
+      legacyCollider.type === 'plane')
+  ) {
+    return {
+      config: legacyCollider,
+      legacy: true
+    };
+  }
+  return null;
+}
+
+function parseSceneColliderVec3(value: unknown, fallback: Vector3, scale = 1) {
+  if (Array.isArray(value) && value.length >= 3) {
+    return new Vector3(
+      (Number(value[0]) || 0) * scale,
+      (Number(value[1]) || 0) * scale,
+      (Number(value[2]) || 0) * scale
+    );
+  }
+  return fallback.clone();
+}
+
+function parseSceneColliderDistance(value: unknown, fallback: number, scale = 1): number {
+  const minValue = 0.0001 * scale;
+  let distance = Math.abs(Number(fallback) || 0);
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    distance = Math.abs(value);
+  } else if (Array.isArray(value) && value.length >= 3) {
+    const x = Number(value[0]) || 0;
+    const y = Number(value[1]) || 0;
+    const z = Number(value[2]) || 0;
+    const legacyDistance = Math.abs(x) > 1e-6 ? Math.abs(x) : Math.hypot(x, y, z);
+    distance = legacyDistance || distance;
+  }
+  return Math.max(minValue, distance * scale);
+}
+
+function parseSceneColliderPlaneNormalY(value: unknown, fallback = 1): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value < 0 ? -1 : 1;
+  }
+  if (Array.isArray(value) && value.length >= 3) {
+    return (Number(value[1]) || 0) < 0 ? -1 : 1;
+  }
+  return fallback < 0 ? -1 : 1;
+}
+
+function buildSceneColliderPlaneNormal(value: unknown): Vector3 {
+  return new Vector3(0, parseSceneColliderPlaneNormalY(value), 0);
+}
+
+function buildSceneColliderCapsulePoints(
+  offset: unknown,
+  endOffset: unknown,
+  scale = 1
+): { start: Vector3; end: Vector3 } {
+  return {
+    start: new Vector3(parseSceneColliderDistance(offset, 0.1, scale), 0, 0),
+    end: new Vector3(-parseSceneColliderDistance(endOffset, 0.1, scale), 0, 0)
+  };
+}
+
+function sceneColliderVec3ToArray(value: Vector3): [number, number, number] {
+  return [value.x, value.y, value.z];
+}
+
+function collectSceneNodeColliders(host: any, includePlane = false) {
+  const colliders: any[] = [];
+  const scope =
+    host?.scene?.rootNode ||
+    (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
+    host;
+  scope?.iterate?.((node: any) => {
+    const entry = getSceneColliderMetaEntry(node);
+    const colliderConfig = entry?.config;
+    if (!colliderConfig) {
       return false;
     }
-    if (springCollider.type === 'sphere') {
-      const collider = createSphereCollider(
-        Array.isArray(springCollider.offset)
-          ? new Vector3(
-              readNumber(springCollider.offset[0], 0),
-              readNumber(springCollider.offset[1], 0),
-              readNumber(springCollider.offset[2], 0)
-            )
-          : Vector3.zero(),
-        Math.max(0, readNumber(springCollider.radius, 0.15)),
+    if (colliderConfig.type === 'plane' && !includePlane) {
+      return false;
+    }
+    const unitScale = entry?.legacy ? 0.1 : 1;
+    let collider = null;
+    if (colliderConfig.type === 'sphere') {
+      collider = createSphereCollider(
+        Vector3.zero(),
+        Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
         node
       );
-      collider.enabled = springCollider.enabled !== false;
       collider.localRadiusScaleRef = 1;
-      colliders.push(collider);
-    } else if (springCollider.type === 'capsule') {
-      const startOffset = Array.isArray(springCollider.offset)
-        ? new Vector3(
-            readNumber(springCollider.offset[0], 0),
-            readNumber(springCollider.offset[1], 0),
-            readNumber(springCollider.offset[2], 0)
-          )
-        : Vector3.zero();
-      const endOffset = Array.isArray(springCollider.endOffset)
-        ? new Vector3(
-            readNumber(springCollider.endOffset[0], 0),
-            readNumber(springCollider.endOffset[1], 0.2),
-            readNumber(springCollider.endOffset[2], 0)
-          )
-        : new Vector3(0, 0.2, 0);
-      const collider = createCapsuleCollider(
-        startOffset,
-        endOffset,
-        Math.max(0, readNumber(springCollider.radius, 0.1)),
+    } else if (colliderConfig.type === 'capsule') {
+      const capsulePoints = buildSceneColliderCapsulePoints(colliderConfig.offset, colliderConfig.endOffset, unitScale);
+      collider = createCapsuleCollider(
+        capsulePoints.start,
+        capsulePoints.end,
+        Math.max(0, (Number(colliderConfig.radius) || 0.1) * unitScale),
         node
       );
-      collider.enabled = springCollider.enabled !== false;
       collider.localRadiusScaleRef = 1;
+    } else if (colliderConfig.type === 'plane') {
+      collider = createPlaneCollider(
+        Vector3.zero(),
+        buildSceneColliderPlaneNormal(colliderConfig.normal),
+        node
+      );
+    }
+    if (collider) {
+      collider.enabled = colliderConfig.enabled !== false;
       colliders.push(collider);
     }
     return false;
   });
+  return colliders;
+}
+
+function serializeSceneNodeColliderConfig(host: any, includePlane = false) {
+  const colliders: any[] = [];
+  const scope =
+    host?.scene?.rootNode ||
+    (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
+    host;
+  scope?.iterate?.((node: any) => {
+    const entry = getSceneColliderMetaEntry(node);
+    const colliderConfig = entry?.config;
+    if (!colliderConfig) {
+      return false;
+    }
+    if (colliderConfig.type === 'plane' && !includePlane) {
+      return false;
+    }
+    const unitScale = entry?.legacy ? 0.1 : 1;
+    const isCapsule = colliderConfig.type === 'capsule';
+    const isSphere = colliderConfig.type === 'sphere';
+    const isPlane = colliderConfig.type === 'plane';
+    colliders.push({
+      type: colliderConfig.type,
+      enabled: colliderConfig.enabled !== false,
+      offset: isSphere || isPlane
+        ? undefined
+        : isCapsule
+        ? parseSceneColliderDistance(colliderConfig.offset, 0.1, unitScale)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale)),
+      endOffset: isSphere || isPlane
+        ? undefined
+        : isCapsule
+        ? parseSceneColliderDistance(colliderConfig.endOffset, 0.1, unitScale)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale)),
+      normal: isPlane
+        ? parseSceneColliderPlaneNormalY(colliderConfig.normal)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY())),
+      radius: Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
+      planeSize: Math.max(0, (Number(colliderConfig.planeSize) || 0.5) * unitScale)
+    });
+    return false;
+  });
+  return JSON.stringify(colliders);
+}
+
+function buildColliders(host, config) {
+  const colliders = collectSceneNodeColliders(host, true);
   const scope =
     (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
     host?.scene?.rootNode ||
@@ -436,6 +744,12 @@ function buildColliders(host, config) {
           Number(colliderConfig?.endOffsetZ) || 0
         ),
         Math.max(0, Number(colliderConfig?.radius) || 0.15),
+        attachNode
+      );
+    } else if (colliderConfig?.type === 'plane') {
+      collider = createPlaneCollider(
+        Vector3.zero(),
+        new Vector3(0, Number(colliderConfig?.normalY) < 0 ? -1 : 1, 0),
         attachNode
       );
     } else {
@@ -486,7 +800,7 @@ export default class extends RuntimeScript {
       }
       return;
     }
-    const runtimeSignature = buildRuntimeSignature(config);
+    const runtimeSignature = buildRuntimeSignature(config, host);
     if (runtimeSignature !== this._runtimeSignature) {
       this._applyRuntimeConfig();
     }
@@ -526,8 +840,12 @@ export default class extends RuntimeScript {
           readNumber(config.gravityY, -9.8),
           readNumber(config.gravityZ, 0)
         ),
-        damping: readNumber(config.damping, 0.995),
+        damping: readNumber(config.damping, 0.02),
+        dynamicFriction: readNumber(config.dynamicFriction, 0.15),
+        staticFriction: readNumber(config.staticFriction, 0.3),
         stiffness: readNumber(config.stiffness, 0.3),
+        poseFollow: readNumber(config.poseFollow, 0),
+        substeps: Math.max(1, Math.min(8, Number(config.substeps) || 2)),
         solverIterations: Math.max(1, Number(config.solverIterations) || 5),
         maxNeighbors: Math.max(1, Number(config.maxNeighbors) || 8),
         workgroupSize: Math.max(1, Number(config.workgroupSize) || 64),
@@ -561,12 +879,16 @@ export default class extends RuntimeScript {
       readNumber(config.gravityY, -9.8),
       readNumber(config.gravityZ, 0)
     );
-    cloth.damping = readNumber(config.damping, 0.995);
+    cloth.damping = readNumber(config.damping, 0.02);
+    cloth.dynamicFriction = readNumber(config.dynamicFriction, 0.15);
+    cloth.staticFriction = readNumber(config.staticFriction, 0.3);
     cloth.stiffness = readNumber(config.stiffness, 0.3);
+    cloth.poseFollow = readNumber(config.poseFollow, 0);
+    cloth.substeps = Math.max(1, Math.min(8, Number(config.substeps) || 2));
     cloth.solverIterations = Math.max(1, Number(config.solverIterations) || 5);
     cloth.colliders = buildColliders(host, config);
     cloth.bindToScene(config.autoUpdate === false ? null : host.scene || null);
-    this._runtimeSignature = buildRuntimeSignature(config);
+    this._runtimeSignature = buildRuntimeSignature(config, host);
   }
 
   _disposeCloth() {
@@ -711,6 +1033,182 @@ function readClothNumber(value: unknown, fallback: number): number {
   return Number.isFinite(num) ? num : fallback;
 }
 
+function getSceneColliderMetaEntry(node: any) {
+  const meta = node?.metaData;
+  const collider = meta?.sceneCollider;
+  if (
+    collider &&
+    typeof collider === 'object' &&
+    (collider.type === 'sphere' || collider.type === 'capsule' || collider.type === 'plane')
+  ) {
+    return {
+      config: collider,
+      legacy: false
+    };
+  }
+  const legacyCollider = meta?.springCollider;
+  if (
+    legacyCollider &&
+    typeof legacyCollider === 'object' &&
+    (legacyCollider.type === 'sphere' ||
+      legacyCollider.type === 'capsule' ||
+      legacyCollider.type === 'plane')
+  ) {
+    return {
+      config: legacyCollider,
+      legacy: true
+    };
+  }
+  return null;
+}
+
+function parseSceneColliderVec3(value: unknown, fallback: Vector3, scale = 1) {
+  if (Array.isArray(value) && value.length >= 3) {
+    return new Vector3(
+      (Number(value[0]) || 0) * scale,
+      (Number(value[1]) || 0) * scale,
+      (Number(value[2]) || 0) * scale
+    );
+  }
+  return fallback.clone();
+}
+
+function parseSceneColliderDistance(value: unknown, fallback: number, scale = 1): number {
+  const minValue = 0.0001 * scale;
+  let distance = Math.abs(Number(fallback) || 0);
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    distance = Math.abs(value);
+  } else if (Array.isArray(value) && value.length >= 3) {
+    const x = Number(value[0]) || 0;
+    const y = Number(value[1]) || 0;
+    const z = Number(value[2]) || 0;
+    const legacyDistance = Math.abs(x) > 1e-6 ? Math.abs(x) : Math.hypot(x, y, z);
+    distance = legacyDistance || distance;
+  }
+  return Math.max(minValue, distance * scale);
+}
+
+function parseSceneColliderPlaneNormalY(value: unknown, fallback = 1): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value < 0 ? -1 : 1;
+  }
+  if (Array.isArray(value) && value.length >= 3) {
+    return (Number(value[1]) || 0) < 0 ? -1 : 1;
+  }
+  return fallback < 0 ? -1 : 1;
+}
+
+function buildSceneColliderPlaneNormal(value: unknown): Vector3 {
+  return new Vector3(0, parseSceneColliderPlaneNormalY(value), 0);
+}
+
+function buildSceneColliderCapsulePoints(
+  offset: unknown,
+  endOffset: unknown,
+  scale = 1
+): { start: Vector3; end: Vector3 } {
+  return {
+    start: new Vector3(parseSceneColliderDistance(offset, 0.1, scale), 0, 0),
+    end: new Vector3(-parseSceneColliderDistance(endOffset, 0.1, scale), 0, 0)
+  };
+}
+
+function sceneColliderVec3ToArray(value: Vector3): [number, number, number] {
+  return [value.x, value.y, value.z];
+}
+
+function collectSceneNodeColliders(host: any, includePlane = false) {
+  const colliders: any[] = [];
+  const scope =
+    host?.scene?.rootNode ||
+    (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
+    host;
+  scope?.iterate?.((node: any) => {
+    const entry = getSceneColliderMetaEntry(node);
+    const colliderConfig = entry?.config;
+    if (!colliderConfig) {
+      return false;
+    }
+    if (colliderConfig.type === 'plane' && !includePlane) {
+      return false;
+    }
+    const unitScale = entry?.legacy ? 0.1 : 1;
+    let collider = null;
+    if (colliderConfig.type === 'sphere') {
+      collider = createSphereCollider(
+        Vector3.zero(),
+        Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
+        node
+      );
+      collider.localRadiusScaleRef = 1;
+    } else if (colliderConfig.type === 'capsule') {
+      const capsulePoints = buildSceneColliderCapsulePoints(colliderConfig.offset, colliderConfig.endOffset, unitScale);
+      collider = createCapsuleCollider(
+        capsulePoints.start,
+        capsulePoints.end,
+        Math.max(0, (Number(colliderConfig.radius) || 0.1) * unitScale),
+        node
+      );
+      collider.localRadiusScaleRef = 1;
+    } else if (colliderConfig.type === 'plane') {
+      collider = createPlaneCollider(
+        Vector3.zero(),
+        buildSceneColliderPlaneNormal(colliderConfig.normal),
+        node
+      );
+    }
+    if (collider) {
+      collider.enabled = colliderConfig.enabled !== false;
+      colliders.push(collider);
+    }
+    return false;
+  });
+  return colliders;
+}
+
+function serializeSceneNodeColliderConfig(host: any, includePlane = false) {
+  const colliders: any[] = [];
+  const scope =
+    host?.scene?.rootNode ||
+    (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
+    host;
+  scope?.iterate?.((node: any) => {
+    const entry = getSceneColliderMetaEntry(node);
+    const colliderConfig = entry?.config;
+    if (!colliderConfig) {
+      return false;
+    }
+    if (colliderConfig.type === 'plane' && !includePlane) {
+      return false;
+    }
+    const unitScale = entry?.legacy ? 0.1 : 1;
+    const isCapsule = colliderConfig.type === 'capsule';
+    const isSphere = colliderConfig.type === 'sphere';
+    const isPlane = colliderConfig.type === 'plane';
+    colliders.push({
+      type: colliderConfig.type,
+      enabled: colliderConfig.enabled !== false,
+      offset: isSphere || isPlane
+        ? undefined
+        : isCapsule
+        ? parseSceneColliderDistance(colliderConfig.offset, 0.1, unitScale)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.offset, Vector3.zero(), unitScale)),
+      endOffset: isSphere || isPlane
+        ? undefined
+        : isCapsule
+        ? parseSceneColliderDistance(colliderConfig.endOffset, 0.1, unitScale)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0), unitScale)),
+      normal: isPlane
+        ? parseSceneColliderPlaneNormalY(colliderConfig.normal)
+        : sceneColliderVec3ToArray(parseSceneColliderVec3(colliderConfig.normal, Vector3.axisPY())),
+      radius: Math.max(0, (Number(colliderConfig.radius) || 0.15) * unitScale),
+      planeSize: Math.max(0, (Number(colliderConfig.planeSize) || 0.5) * unitScale)
+    });
+    return false;
+  });
+  return JSON.stringify(colliders);
+}
+
 function serializeClothColliderConfig(colliders: any[]) {
   return JSON.stringify(
     (colliders || []).map((collider) => ({
@@ -723,45 +1221,16 @@ function serializeClothColliderConfig(colliders: any[]) {
       endOffsetX: readClothNumber(collider?.endOffsetX, 0),
       endOffsetY: readClothNumber(collider?.endOffsetY, 0),
       endOffsetZ: readClothNumber(collider?.endOffsetZ, 0),
+      normalY: readClothNumber(collider?.normalY, 1) < 0 ? -1 : 1,
       radius: readClothNumber(collider?.radius, 0)
     }))
   );
 }
 
-function serializeSharedClothHierarchyColliders(host: any) {
-  const entries: string[] = [];
-  host?.iterate?.((node: any) => {
-    const collider = node?.metaData?.springCollider;
-    if (!collider || typeof collider !== 'object') {
-      return false;
-    }
-    if (collider.type !== 'sphere' && collider.type !== 'capsule') {
-      return false;
-    }
-    entries.push(
-      JSON.stringify({
-        id: String(node?.persistentId ?? ''),
-        type: collider.type,
-        enabled: collider.enabled !== false,
-        offset: Array.isArray(collider.offset) ? collider.offset.map((v: any) => Number(v) || 0) : [0, 0, 0],
-        endOffset:
-          collider.type === 'capsule' && Array.isArray(collider.endOffset)
-            ? collider.endOffset.map((v: any) => Number(v) || 0)
-            : [0, 0.2, 0],
-        radius: readClothNumber(collider.radius, collider.type === 'capsule' ? 0.1 : 0.15)
-      })
-    );
-    return false;
-  });
-  entries.sort();
-  return JSON.stringify(entries);
-}
-
-function buildClothStructureSignature(scopeHost: any, target: any, config: any) {
+function buildClothStructureSignature(host: any, config: any) {
   return JSON.stringify({
-    primitiveId: Number(target?.primitive?.id) || 0,
-    vertexPinWeightsByTarget: getClothVertexWeightSource(config, target),
-    sharedSpringColliders: serializeSharedClothHierarchyColliders(scopeHost),
+    primitiveId: Number(host?.primitive?.id) || 0,
+    vertexPinWeightsByTarget: getClothVertexWeightSource(config, host),
     maxNeighbors: Math.max(1, Number(config?.maxNeighbors) || 8),
     maxTrianglesPerVertex: Math.max(1, Number(config?.maxTrianglesPerVertex) || 16),
     workgroupSize: Math.max(1, Number(config?.workgroupSize) || 64),
@@ -769,75 +1238,33 @@ function buildClothStructureSignature(scopeHost: any, target: any, config: any) 
   });
 }
 
-function buildClothRuntimeSignature(config: any) {
+function buildClothRuntimeSignature(config: any, host: any) {
   return JSON.stringify({
     enabled: config?.enabled !== false,
     autoUpdate: config?.autoUpdate !== false,
-    damping: readClothNumber(config?.damping, 0.995),
+    damping: readClothNumber(config?.damping, 0.02),
+    dynamicFriction: readClothNumber(config?.dynamicFriction, 0.15),
+    staticFriction: readClothNumber(config?.staticFriction, 0.3),
     stiffness: readClothNumber(config?.stiffness, 0.3),
+    poseFollow: readClothNumber(config?.poseFollow, 0),
+    substeps: Math.max(1, Math.min(8, Number(config?.substeps) || 2)),
     gravityX: readClothNumber(config?.gravityX, 0),
     gravityY: readClothNumber(config?.gravityY, -9.8),
     gravityZ: readClothNumber(config?.gravityZ, 0),
     solverIterations: Math.max(1, Number(config?.solverIterations) || 5),
+    sceneColliders: serializeSceneNodeColliderConfig(host, true),
     colliders: serializeClothColliderConfig(config?.colliders ?? [])
   });
 }
 
-function buildClothColliders(scopeHost: any, config: any) {
-  const colliders = [];
-  scopeHost?.iterate?.((node: any) => {
-    const springCollider = node?.metaData?.springCollider;
-    if (!springCollider || typeof springCollider !== 'object') {
-      return false;
-    }
-    if (springCollider.type === 'sphere') {
-      const collider = createSphereCollider(
-        Array.isArray(springCollider.offset)
-          ? new Vector3(
-              readClothNumber(springCollider.offset[0], 0),
-              readClothNumber(springCollider.offset[1], 0),
-              readClothNumber(springCollider.offset[2], 0)
-            )
-          : Vector3.zero(),
-        Math.max(0, readClothNumber(springCollider.radius, 0.15)),
-        node
-      );
-      collider.enabled = springCollider.enabled !== false;
-      collider.localRadiusScaleRef = 1;
-      colliders.push(collider);
-    } else if (springCollider.type === 'capsule') {
-      const startOffset = Array.isArray(springCollider.offset)
-        ? new Vector3(
-            readClothNumber(springCollider.offset[0], 0),
-            readClothNumber(springCollider.offset[1], 0),
-            readClothNumber(springCollider.offset[2], 0)
-          )
-        : Vector3.zero();
-      const endOffset = Array.isArray(springCollider.endOffset)
-        ? new Vector3(
-            readClothNumber(springCollider.endOffset[0], 0),
-            readClothNumber(springCollider.endOffset[1], 0.2),
-            readClothNumber(springCollider.endOffset[2], 0)
-          )
-        : new Vector3(0, 0.2, 0);
-      const collider = createCapsuleCollider(
-        startOffset,
-        endOffset,
-        Math.max(0, readClothNumber(springCollider.radius, 0.1)),
-        node
-      );
-      collider.enabled = springCollider.enabled !== false;
-      collider.localRadiusScaleRef = 1;
-      colliders.push(collider);
-    }
-    return false;
-  });
+function buildClothColliders(host: any, config: any) {
+  const colliders = collectSceneNodeColliders(host, true);
   const scope =
-    (typeof scopeHost?.getPrefabNode === 'function' && scopeHost.getPrefabNode()) ||
-    scopeHost?.scene?.rootNode ||
-    scopeHost;
+    (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
+    host?.scene?.rootNode ||
+    host;
   for (const colliderConfig of config?.colliders ?? []) {
-    const attachNode = (colliderConfig?.bone && scope?.findNodeByName?.(colliderConfig.bone)) || scopeHost;
+    const attachNode = (colliderConfig?.bone && scope?.findNodeByName?.(colliderConfig.bone)) || host;
     let collider = null;
     if (colliderConfig?.type === 'capsule') {
       collider = createCapsuleCollider(
@@ -852,6 +1279,12 @@ function buildClothColliders(scopeHost: any, config: any) {
           readClothNumber(colliderConfig?.endOffsetZ, 0)
         ),
         Math.max(0, readClothNumber(colliderConfig?.radius, 0.15)),
+        attachNode
+      );
+    } else if (colliderConfig?.type === 'plane') {
+      collider = createPlaneCollider(
+        Vector3.zero(),
+        new Vector3(0, readClothNumber(colliderConfig?.normalY, 1) < 0 ? -1 : 1, 0),
         attachNode
       );
     } else {
@@ -1322,10 +1755,10 @@ export class Engine {
       }
     }
     (host as any).__builtinClothTargets = targets;
-    const runtimeSignature = buildClothRuntimeSignature(config);
     for (const target of targets) {
       const state = ensureBuiltinClothState(target);
-      const structureSignature = buildClothStructureSignature(host, target, config);
+      const structureSignature = buildClothStructureSignature(target, config);
+      const runtimeSignature = buildClothRuntimeSignature(config, target);
       if (!state.cloth || structureSignature !== state.structureSignature) {
         if (!state.rebuilding) {
           state.rebuilding = true;
@@ -1354,7 +1787,7 @@ export class Engine {
       return;
     }
     const state = ensureBuiltinClothState(target);
-    const structureSignature = buildClothStructureSignature(host, target, config);
+    const structureSignature = buildClothStructureSignature(target, config);
     if (state.cloth && structureSignature === state.structureSignature) {
       this.applyBuiltinClothRuntimeConfig(host, target);
       return;
@@ -1364,15 +1797,19 @@ export class Engine {
       const cloth = await GPUClothSystem.createFromMesh(target, {
         enabled: config.enabled !== false,
         gravity: resolveClothGravity(target, config),
-        damping: readClothNumber(config.damping, 0.995),
+        damping: readClothNumber(config.damping, 0.02),
+        dynamicFriction: readClothNumber(config.dynamicFriction, 0.15),
+        staticFriction: readClothNumber(config.staticFriction, 0.3),
         stiffness: readClothNumber(config.stiffness, 0.3),
+        poseFollow: readClothNumber(config.poseFollow, 0),
+        substeps: Math.max(1, Math.min(8, Number(config.substeps) || 2)),
         solverIterations: Math.max(1, Number(config.solverIterations) || 5),
         maxNeighbors: Math.max(1, Number(config.maxNeighbors) || 8),
         workgroupSize: Math.max(1, Number(config.workgroupSize) || 64),
         maxTrianglesPerVertex: Math.max(1, Number(config.maxTrianglesPerVertex) || 16),
         rebuildNormals: config.rebuildNormals !== false,
         pinnedVertexWeights: parseClothPinnedVertexIndices(config, target),
-        colliders: buildClothColliders(host, config),
+        colliders: buildClothColliders(target, config),
         autoUpdate: config.autoUpdate !== false,
         device: getDevice()
       });
@@ -1399,12 +1836,16 @@ export class Engine {
     }
     cloth.enabled = config.enabled !== false;
     cloth.gravity = resolveClothGravity(target, config);
-    cloth.damping = readClothNumber(config.damping, 0.995);
+    cloth.damping = readClothNumber(config.damping, 0.02);
+    cloth.dynamicFriction = readClothNumber(config.dynamicFriction, 0.15);
+    cloth.staticFriction = readClothNumber(config.staticFriction, 0.3);
     cloth.stiffness = readClothNumber(config.stiffness, 0.3);
+    cloth.poseFollow = readClothNumber(config.poseFollow, 0);
+    cloth.substeps = Math.max(1, Math.min(8, Number(config.substeps) || 2));
     cloth.solverIterations = Math.max(1, Number(config.solverIterations) || 5);
-    cloth.colliders = buildClothColliders(host, config);
+    cloth.colliders = buildClothColliders(target, config);
     cloth.bindToScene(config.autoUpdate === false ? null : target.scene || host.scene || null);
-    state.runtimeSignature = buildClothRuntimeSignature(config);
+    state.runtimeSignature = buildClothRuntimeSignature(config, target);
   }
   private disposeBuiltinClothHost(host: any) {
     const targets = ((host as any)?.__builtinClothTargets as any[] | undefined) ?? [];
@@ -1452,33 +1893,36 @@ export class Engine {
       // 链条骨骼尚未形成有效世界距离，延后到后续帧再初始化。
       return false;
     }
-    const parseVec3 = (value: any, fallback: Vector3) => {
-      if (Array.isArray(value) && value.length >= 3) {
-        return new Vector3(Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0);
+    const sharedColliders = collectSceneNodeColliders(root, true);
+    const configColliders = [];
+    for (const colliderConfig of config?.colliders ?? []) {
+      const attachNode = root.findNodeByName(colliderConfig.bone) ?? root;
+      let collider: any = null;
+      if (colliderConfig.type === 'sphere') {
+        collider = createSphereCollider(
+          new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
+          Math.max(0, Number(colliderConfig.radius) || 0.15),
+          attachNode
+        );
+      } else if (colliderConfig.type === 'capsule') {
+        collider = createCapsuleCollider(
+          new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
+          new Vector3(colliderConfig.endOffsetX, colliderConfig.endOffsetY, colliderConfig.endOffsetZ),
+          Math.max(0, Number(colliderConfig.radius) || 0.1),
+          attachNode
+        );
+      } else if (colliderConfig.type === 'plane') {
+        collider = createPlaneCollider(
+          new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
+          new Vector3(colliderConfig.normalX, colliderConfig.normalY, colliderConfig.normalZ),
+          attachNode
+        );
       }
-      return fallback.clone();
-    };
-    const COLLIDER_PANEL_SCALE = 10;
-    const scaleCapsuleAroundCenter = (start: Vector3, end: Vector3, scale: number) => {
-      const center = Vector3.scale(Vector3.add(start, end, new Vector3()), 0.5, new Vector3());
-      const half = Vector3.scale(Vector3.sub(end, start, new Vector3()), 0.5 * scale, new Vector3());
-      return {
-        start: Vector3.sub(center, half, new Vector3()),
-        end: Vector3.add(center, half, new Vector3())
-      };
-    };
-    const hierarchyColliders: Array<{ node: any; config: any }> = [];
-    root.iterate((node: any) => {
-      const c = node?.metaData?.springCollider;
-      if (!c || typeof c !== 'object') {
-        return false;
+      if (collider) {
+        collider.enabled = colliderConfig.enabled !== false;
+        configColliders.push(collider);
       }
-      if (c.type !== 'sphere' && c.type !== 'capsule' && c.type !== 'plane') {
-        return false;
-      }
-      hierarchyColliders.push({ node, config: c });
-      return false;
-    });
+    }
     for (const chainConfig of config.chains ?? []) {
       const chainStart = root.findNodeByName(chainConfig.startBone);
       const chainEnd = root.findNodeByName(chainConfig.endBone);
@@ -1504,77 +1948,11 @@ export class Engine {
         maxPoseOffsetRoot: config.maxPoseOffsetRoot,
         maxPoseOffsetTip: config.maxPoseOffsetTip
       });
-      if (hierarchyColliders.length > 0) {
-        for (const item of hierarchyColliders) {
-          const colliderConfig = item.config;
-          let collider: any = null;
-          if (colliderConfig.type === 'sphere') {
-            collider = createSphereCollider(
-              parseVec3(colliderConfig.offset, Vector3.zero()),
-              Math.max(0, (Number(colliderConfig.radius) || 0.15) * COLLIDER_PANEL_SCALE),
-              item.node
-            );
-            collider.localRadiusScaleRef = 1;
-          } else if (colliderConfig.type === 'capsule') {
-            const startOffset = parseVec3(colliderConfig.offset, Vector3.zero());
-            const endOffset = parseVec3(colliderConfig.endOffset, new Vector3(0, 0.2, 0));
-            const scaledCapsule = scaleCapsuleAroundCenter(startOffset, endOffset, COLLIDER_PANEL_SCALE);
-            collider = createCapsuleCollider(
-              scaledCapsule.start,
-              scaledCapsule.end,
-              Math.max(0, (Number(colliderConfig.radius) || 0.1) * COLLIDER_PANEL_SCALE),
-              item.node
-            );
-            collider.localRadiusScaleRef = 1;
-          } else if (colliderConfig.type === 'plane') {
-            collider = createPlaneCollider(
-              parseVec3(colliderConfig.offset, Vector3.zero()),
-              parseVec3(colliderConfig.normal, Vector3.axisPY()),
-              item.node
-            );
-          }
-          if (collider) {
-            collider.enabled = colliderConfig.enabled !== false;
-            springSystem.addCollider(collider);
-          }
-        }
-      } else if ((config.colliders ?? []).length > 0) {
-        const colliderConfigs = config.colliders ?? [];
-        for (const colliderConfig of colliderConfigs) {
-          const attachNode = root.findNodeByName(colliderConfig.bone) ?? root;
-          let collider: any = null;
-          if (colliderConfig.type === 'sphere') {
-            collider = createSphereCollider(
-              new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
-              Math.max(0, Number(colliderConfig.radius) * COLLIDER_PANEL_SCALE),
-              attachNode
-            );
-          } else if (colliderConfig.type === 'capsule') {
-            const startOffset = new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ);
-            const endOffset = new Vector3(
-              colliderConfig.endOffsetX,
-              colliderConfig.endOffsetY,
-              colliderConfig.endOffsetZ
-            );
-            const scaledCapsule = scaleCapsuleAroundCenter(startOffset, endOffset, COLLIDER_PANEL_SCALE);
-            collider = createCapsuleCollider(
-              scaledCapsule.start,
-              scaledCapsule.end,
-              Math.max(0, Number(colliderConfig.radius) * COLLIDER_PANEL_SCALE),
-              attachNode
-            );
-          } else if (colliderConfig.type === 'plane') {
-            collider = createPlaneCollider(
-              new Vector3(colliderConfig.offsetX, colliderConfig.offsetY, colliderConfig.offsetZ),
-              new Vector3(colliderConfig.normalX, colliderConfig.normalY, colliderConfig.normalZ),
-              attachNode
-            );
-          }
-          if (collider) {
-            collider.enabled = colliderConfig.enabled !== false;
-            springSystem.addCollider(collider);
-          }
-        }
+      for (const collider of sharedColliders) {
+        springSystem.addCollider(collider);
+      }
+      for (const collider of configColliders) {
+        springSystem.addCollider(collider);
       }
       const springModifier = new SpringModifier(springSystem, config.modifierWeight);
       skeleton.modifiers.push(springModifier);

@@ -1,5 +1,5 @@
 import { weightedAverage, Disposable, Interpolator, Quaternion } from '@zephyr3d/base';
-import type { DRef, IDisposable } from '@zephyr3d/base';
+import type { DRef, IDisposable, Nullable } from '@zephyr3d/base';
 import type { SceneNode } from '../scene';
 import { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
@@ -467,51 +467,76 @@ export class AnimationSet extends Disposable implements IDisposable {
       dstBindRot: Quaternion;
       translationScale: number;
     };
+    if (sourceClip.skeletons.size !== 1) {
+      console.error(`copyAnimationFrom: source animation clip must be affected by exactly one skeleton`);
+      return null;
+    }
+    const srcSkeletonId = [...sourceClip.skeletons][0];
+    const srcSkeleton = Skeleton.findSkeletonById(srcSkeletonId);
+    if (!srcSkeleton) {
+      console.error(`copyAnimationFrom: source skeleton '${srcSkeletonId}' not found`);
+      return null;
+    }
     const nodeMap = new Map<object, SceneNode>();
     const jointRemapBySrcNode = new Map<object, JointRemap>();
 
-    for (const srcSkeletonId of sourceClip.skeletons) {
-      const srcSkeleton = Skeleton.findSkeletonById(srcSkeletonId);
-      if (!srcSkeleton) {
-        console.error(`copyAnimationFrom: source skeleton '${srcSkeletonId}' not found`);
-        return null;
-      }
-      // Build filtered joint lists for matching (exclude joints rejected by filterJoint)
-      const srcJointsFiltered = srcSkeleton.joints.filter((j) => !excludeJoint?.(j.name));
-      const dstSkeleton = this._skeletons
-        .map((ref) => ref.get())
-        .find((sk) => {
-          if (!sk) {
-            return false;
-          }
-          const dstJointsFiltered = sk.joints.filter((j) => !excludeJoint?.(j.name));
-          return (
-            dstJointsFiltered.length === srcJointsFiltered.length &&
-            srcJointsFiltered.every((j, i) => j.name === dstJointsFiltered[i].name)
-          );
-        });
-      if (!dstSkeleton) {
-        console.error(`copyAnimationFrom: no matching skeleton in target set for '${srcSkeletonId}'`);
-        return null;
-      }
-      // Build remap only for joints that pass the filter
-      const dstJointsFiltered = dstSkeleton.joints.filter((j) => !excludeJoint?.(j.name));
-      for (let fi = 0; fi < srcJointsFiltered.length; fi++) {
-        const srcJoint = srcJointsFiltered[fi];
-        const dstJoint = dstJointsFiltered[fi];
-        const si = srcSkeleton.joints.indexOf(srcJoint);
-        const di = dstSkeleton.joints.indexOf(dstJoint);
-        const srcLen = srcSkeleton.bindPose[si].position.magnitude;
-        const dstLen = dstSkeleton.bindPose[di].position.magnitude;
-        const translationScale = srcLen > 1e-6 ? dstLen / srcLen : 1;
-        nodeMap.set(srcJoint, dstJoint);
-        jointRemapBySrcNode.set(srcJoint, {
-          dstNode: dstJoint,
-          srcBindRot: srcSkeleton.bindPose[si].rotation,
-          dstBindRot: dstSkeleton.bindPose[di].rotation,
-          translationScale
-        });
-      }
+    const jointsFiltered = srcSkeleton.joints.filter((j) => !excludeJoint?.(j.name));
+    const srcRootNode = findRootJoint(jointsFiltered);
+    if (!srcRootNode) {
+      console.error(`copyAnimationFrom: cannot determine the root joint for source skeleton`);
+      return null;
+    }
+    // Build filtered joint lists for matching (exclude joints rejected by filterJoint)
+    const srcJointsFiltered = sortJoints(srcRootNode, jointsFiltered);
+    if (!srcJointsFiltered) {
+      console.error(`copyAnimationFrom: invalid source skeleton structure`);
+      return null;
+    }
+    let dstJointsFiltered: SceneNode[] = [];
+    const dstSkeleton = this._skeletons
+      .map((ref) => ref.get())
+      .find((sk) => {
+        if (!sk) {
+          return false;
+        }
+        const jointsFiltered = sk.joints.filter((j) => !excludeJoint?.(j.name));
+        if (jointsFiltered.length !== srcJointsFiltered.length) {
+          return false;
+        }
+        const rootNode = findRootJoint(jointsFiltered);
+        if (!rootNode) {
+          return false;
+        }
+        const sortedJointsFiltered = sortJoints(rootNode, jointsFiltered);
+        if (
+          sortedJointsFiltered &&
+          srcJointsFiltered.every((j, i) => j.name === sortedJointsFiltered[i].name)
+        ) {
+          dstJointsFiltered = sortedJointsFiltered;
+          return true;
+        }
+        return false;
+      });
+    if (!dstJointsFiltered || !dstSkeleton) {
+      console.error(`copyAnimationFrom: no matching skeleton in target set for '${srcSkeletonId}'`);
+      return null;
+    }
+    // Build remap only for joints that pass the filter
+    for (let fi = 0; fi < srcJointsFiltered.length; fi++) {
+      const srcJoint = srcJointsFiltered[fi];
+      const dstJoint = dstJointsFiltered[fi];
+      const si = srcSkeleton.joints.indexOf(srcJoint);
+      const di = dstSkeleton.joints.indexOf(dstJoint);
+      const srcLen = srcSkeleton.bindPose[si].position.magnitude;
+      const dstLen = dstSkeleton.bindPose[di].position.magnitude;
+      const translationScale = srcLen > 1e-6 ? dstLen / srcLen : 1;
+      nodeMap.set(srcJoint, dstJoint);
+      jointRemapBySrcNode.set(srcJoint, {
+        dstNode: dstJoint,
+        srcBindRot: srcSkeleton.bindPose[si].rotation,
+        dstBindRot: dstSkeleton.bindPose[di].rotation,
+        translationScale
+      });
     }
 
     const dstClip = this.createAnimation(destName);
@@ -522,32 +547,23 @@ export class AnimationSet extends Disposable implements IDisposable {
     dstClip.weight = sourceClip.weight;
     dstClip.autoPlay = sourceClip.autoPlay;
 
-    // Register destination skeleton ids
-    for (const srcSkeletonId of sourceClip.skeletons) {
-      const srcSkeleton = Skeleton.findSkeletonById(srcSkeletonId)!;
-      const firstSrcJoint = srcSkeleton.joints[0];
-      const firstDstJoint = nodeMap.get(firstSrcJoint);
-      const dstSkeleton = this._skeletons
-        .map((r) => r.get())
-        .find((sk) => sk && sk.joints[0] === firstDstJoint);
-      if (dstSkeleton) {
-        dstClip.addSkeleton(dstSkeleton.persistentId);
-      }
-    }
+    // Register destination skeleton
+    dstClip.addSkeleton(dstSkeleton.persistentId);
 
     const tmpSrcBind = new Quaternion();
     const tmpDstBindInv = new Quaternion();
 
-    for (const [srcNode, srcTracks] of sourceClip.tracks) {
-      const dstNode = nodeMap.get(srcNode);
-      if (!dstNode) {
-        continue;
+    for (const srcNode of srcJointsFiltered) {
+      const srcTracks = sourceClip.tracks.get(srcNode);
+      if (!srcTracks) {
+        console.error(`copyAnimationFrom: no track for joint: ${srcNode.name}`);
+        return null;
       }
+      const dstNode = nodeMap.get(srcNode)!;
       const remap = jointRemapBySrcNode.get(srcNode) ?? null;
 
       for (const srcTrack of srcTracks) {
         let dstTrack: AnimationTrack;
-
         if (srcTrack instanceof NodeRotationTrack) {
           dstTrack = retargetRotationTrack(srcTrack, remap);
         } else if (srcTrack instanceof NodeEulerRotationTrack) {
@@ -570,6 +586,49 @@ export class AnimationSet extends Disposable implements IDisposable {
 
     return dstClip;
 
+    function findRootJoint(joints: SceneNode[]) {
+      let root: Nullable<SceneNode> = null;
+      for (const joint of joints) {
+        if (!root) {
+          root = joint;
+        }
+        while (!root!.isParentOf(joint)) {
+          root = root!.parent;
+        }
+        if (!root) {
+          break;
+        }
+      }
+      if (!root || !joints.includes(root)) {
+        return null;
+      }
+      return root;
+    }
+
+    function sortJoints(root: SceneNode, joints: SceneNode[]): Nullable<SceneNode[]> {
+      const ordered: SceneNode[] = [];
+      const visited = new Set<SceneNode>();
+      function visit(joint: SceneNode) {
+        if (visited.has(joint)) {
+          return true;
+        }
+        if (!joints.includes(joint)) {
+          return false;
+        }
+        if (joint !== root) {
+          visit(joint.parent!);
+        }
+        visited.add(joint);
+        ordered.push(joint);
+        return true;
+      }
+      for (const joint of joints) {
+        if (!visit(joint)) {
+          return null;
+        }
+      }
+      return ordered;
+    }
     function retargetTranslationTrack(
       src: NodeTranslationTrack,
       remap: JointRemap | null
@@ -617,7 +676,7 @@ export class AnimationSet extends Disposable implements IDisposable {
       for (let f = 0; f < numFrames; f++) {
         const base = f * frameStride;
         if (isCubic) {
-          // layout per frame: [inTangent×4, value×4, outTangent×4] — only retarget value
+          // layout per frame: [inTangent x4, value x4, outTangent x4] - only retarget value
           newOutputs.set(srcOutputs.subarray(base, base + 4), base);
           q.set(srcOutputs.subarray(base + 4, base + 8));
           Quaternion.multiply(tmpSrcBind, q, q);

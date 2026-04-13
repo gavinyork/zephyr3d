@@ -8,10 +8,15 @@ import { ClothWeightPaintCommand, type ClothWeightState } from '../../commands/s
 import type { Editor } from '../../core/editor';
 import type { EditTool, EditToolContext } from './edittool';
 
-type ClothPaintMode = 'pin' | 'unpin' | 'smooth';
+type ClothPaintMode = 'pin' | 'unpin' | 'smooth' | 'set';
 type ClothMeshData = {
   vertexCount: number;
   positions: Nullable<Float32Array>;
+  basePositions: Nullable<Float32Array>;
+  blendIndices: Nullable<Float32Array>;
+  blendWeights: Nullable<Float32Array>;
+  indexData: Nullable<Uint32Array>;
+  adjacency: Nullable<number[][]>;
   loading: boolean;
   error: string;
   primitiveSignature: string;
@@ -140,32 +145,134 @@ function sameClothWeightState(a: ClothWeightState, b: ClothWeightState) {
   );
 }
 
-async function readMeshPositionData(mesh: Mesh): Promise<Float32Array> {
+async function readMeshVertexAttributeData(
+  mesh: Mesh,
+  semantic: 'position' | 'blendIndices' | 'blendWeights',
+  minComponents: number
+): Promise<Nullable<Float32Array>> {
   const primitive = mesh.primitive;
   if (!primitive) {
     throw new Error('Mesh has no primitive.');
   }
-  const info = primitive.getVertexBufferInfo('position');
+  const info = primitive.getVertexBufferInfo(semantic);
   if (!info) {
-    throw new Error('Mesh has no position buffer.');
+    return null;
   }
-  if (!info.type.isPrimitiveType() || info.type.scalarType !== PBPrimitiveType.F32 || info.type.cols < 3) {
-    throw new Error('Only float3/float4 position buffers are supported.');
+  if (!info.type.isPrimitiveType() || info.type.scalarType !== PBPrimitiveType.F32 || info.type.cols < minComponents) {
+    throw new Error(`Only float ${semantic} buffers are supported.`);
   }
   const bytes = await info.buffer.getBufferSubData();
   const raw = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
   const stride = info.stride >> 2;
-  const drawOffset = info.drawOffset >> 2;
+  const drawOffset = (info.drawOffset + info.offset) >> 2;
   const vertexCount = primitive.getNumVertices();
-  const positions = new Float32Array(vertexCount * 3);
+  const positions = new Float32Array(vertexCount * minComponents);
   for (let i = 0; i < vertexCount; i++) {
     const src = drawOffset + i * stride;
-    const dst = i * 3;
-    positions[dst] = raw[src];
-    positions[dst + 1] = raw[src + 1];
-    positions[dst + 2] = raw[src + 2];
+    const dst = i * minComponents;
+    for (let c = 0; c < minComponents; c++) {
+      positions[dst + c] = raw[src + c];
+    }
   }
   return positions;
+}
+
+async function readMeshPositionData(mesh: Mesh): Promise<Float32Array> {
+  const positions = await readMeshVertexAttributeData(mesh, 'position', 3);
+  if (!positions) {
+    throw new Error('Mesh has no position buffer.');
+  }
+  return positions;
+}
+
+async function readMeshSkinningData(mesh: Mesh): Promise<{
+  blendIndices: Nullable<Float32Array>;
+  blendWeights: Nullable<Float32Array>;
+}> {
+  const [blendIndices, blendWeights] = await Promise.all([
+    readMeshVertexAttributeData(mesh, 'blendIndices', 4),
+    readMeshVertexAttributeData(mesh, 'blendWeights', 4)
+  ]);
+  return {
+    blendIndices,
+    blendWeights
+  };
+}
+
+function buildNonIndexedTriangles(mesh: Mesh, vertexCount: number) {
+  const primitive = mesh.primitive;
+  if (!primitive || primitive.primitiveType !== 'triangle-list') {
+    throw new Error('Only triangle-list cloth meshes are supported.');
+  }
+  const start = primitive.indexStart;
+  const count = primitive.indexCount;
+  if (count <= 0 || count % 3 !== 0 || start < 0 || start + count > vertexCount) {
+    throw new Error('Invalid non-indexed triangle range.');
+  }
+  const indices = new Uint32Array(count);
+  for (let i = 0; i < count; i++) {
+    indices[i] = start + i;
+  }
+  return indices;
+}
+
+async function readMeshIndexData(mesh: Mesh): Promise<Uint32Array> {
+  const primitive = mesh.primitive;
+  if (!primitive) {
+    throw new Error('Mesh has no primitive.');
+  }
+  if (primitive.primitiveType !== 'triangle-list') {
+    throw new Error('Only triangle-list cloth meshes are supported.');
+  }
+  const vertexCount = primitive.getNumVertices();
+  const indexBuffer = primitive.getIndexBuffer();
+  if (!indexBuffer) {
+    return buildNonIndexedTriangles(mesh, vertexCount);
+  }
+  const start = primitive.indexStart;
+  const count = primitive.indexCount;
+  const bytes = await indexBuffer.getBufferSubData();
+  if (indexBuffer.indexType.primitiveType === PBPrimitiveType.U16) {
+    const src = new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 1);
+    if (count <= 0 || count % 3 !== 0 || start < 0 || start + count > src.length) {
+      throw new Error('Invalid index buffer range.');
+    }
+    const out = new Uint32Array(count);
+    for (let i = 0; i < count; i++) {
+      out[i] = src[start + i];
+    }
+    return out;
+  }
+  const src = new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
+  if (count <= 0 || count % 3 !== 0 || start < 0 || start + count > src.length) {
+    throw new Error('Invalid index buffer range.');
+  }
+  return src.slice(start, start + count);
+}
+
+function buildVertexAdjacency(vertexCount: number, indexData: Uint32Array) {
+  const adjacencySets = Array.from({ length: vertexCount }, () => new Set<number>());
+  for (let i = 0; i + 2 < indexData.length; i += 3) {
+    const a = indexData[i];
+    const b = indexData[i + 1];
+    const c = indexData[i + 2];
+    if (a >= vertexCount || b >= vertexCount || c >= vertexCount) {
+      continue;
+    }
+    if (a !== b) {
+      adjacencySets[a].add(b);
+      adjacencySets[b].add(a);
+    }
+    if (b !== c) {
+      adjacencySets[b].add(c);
+      adjacencySets[c].add(b);
+    }
+    if (c !== a) {
+      adjacencySets[c].add(a);
+      adjacencySets[a].add(c);
+    }
+  }
+  return adjacencySets.map((neighbors) => [...neighbors]);
 }
 
 export class ClothPaintTool extends Disposable implements EditTool {
@@ -178,6 +285,7 @@ export class ClothPaintTool extends Disposable implements EditTool {
   private _brushRadius: number;
   private _brushFalloff: number;
   private _brushStrength: number;
+  private _brushValue: number;
   private _strokeActive: boolean;
   private _strokeStartState: Nullable<ClothWeightState>;
   private _lastStrokePos: Nullable<Vector3>;
@@ -207,6 +315,7 @@ export class ClothPaintTool extends Disposable implements EditTool {
     this._brushRadius = 0.1;
     this._brushFalloff = 0.35;
     this._brushStrength = 0.1;
+    this._brushValue = 1;
     this._strokeActive = false;
     this._strokeStartState = null;
     this._lastStrokePos = null;
@@ -284,9 +393,9 @@ export class ClothPaintTool extends Disposable implements EditTool {
       } else if (activeMesh) {
         ImGui.Text(`Target: ${this.getMeshLabel(activeMesh, this._activeTargetIndex)}`);
       }
-      const modeIndex = [this._paintMode === 'pin' ? 0 : this._paintMode === 'unpin' ? 1 : 2] as [number];
-      if (ImGui.Combo('Mode', modeIndex, ['Pin', 'Unpin', 'Smooth'])) {
-        this._paintMode = modeIndex[0] === 0 ? 'pin' : modeIndex[0] === 1 ? 'unpin' : 'smooth';
+      const modeIndex = [this._paintMode === 'pin' ? 0 : this._paintMode === 'unpin' ? 1 : this._paintMode === 'smooth' ? 2 : 3] as [number];
+      if (ImGui.Combo('Mode', modeIndex, ['Pin', 'Unpin', 'Smooth', 'Set'])) {
+        this._paintMode = modeIndex[0] === 0 ? 'pin' : modeIndex[0] === 1 ? 'unpin' : modeIndex[0] === 2 ? 'smooth' : 'set';
       }
       const radius = [this._brushRadius] as [number];
       if (ImGui.SliderFloat('Radius', radius, 0.01, 2, '%.2f')) {
@@ -296,6 +405,12 @@ export class ClothPaintTool extends Disposable implements EditTool {
       if (ImGui.SliderFloat('Strength', strength, 0, 1, '%.2f')) {
         this._brushStrength = clampWeight(strength[0]);
       }
+      if (this._paintMode === 'set') {
+        const value = [this._brushValue] as [number];
+        if (ImGui.SliderFloat('Value', value, 0, 1, '%.2f')) {
+          this._brushValue = clampWeight(value[0]);
+        }
+      }
       const falloff = [this._brushFalloff] as [number];
       if (ImGui.SliderFloat('Falloff', falloff, 0, 1, '%.2f')) {
         this._brushFalloff = clampWeight(falloff[0]);
@@ -303,7 +418,7 @@ export class ClothPaintTool extends Disposable implements EditTool {
       ImGui.TextColored(new ImGui.ImVec4(0.95, 0.35, 0.35, 1), 'Fixed = Red');
       ImGui.SameLine();
       ImGui.TextColored(new ImGui.ImVec4(0.35, 0.95, 0.4, 1), 'Active = Green');
-      ImGui.Text('Brush Preview: strength * falloff per dab');
+      ImGui.Text(this._paintMode === 'set' ? 'Brush Preview: move toward Value by strength * falloff' : 'Brush Preview: strength * falloff per dab');
       ImGui.Text(`Edited Count: ${this._vertexWeights.size}`);
       if (meshInfo) {
         if (meshInfo.loading) {
@@ -327,6 +442,10 @@ export class ClothPaintTool extends Disposable implements EditTool {
           'Set all cloth weights to fixed'
         );
       }
+      ImGui.SameLine();
+      if (ImGui.Button('Smooth') && meshInfo?.adjacency && !meshInfo.loading && !meshInfo.error) {
+        this.smoothAllWeights();
+      }
       if (this._targets.length > 1) {
         ImGui.TextWrapped('This tool stores painted weights per mesh target to avoid index collisions between submeshes.');
       }
@@ -336,6 +455,7 @@ export class ClothPaintTool extends Disposable implements EditTool {
   }
   update(): void {
     this.ensureActiveMeshData();
+    this.updateSkinnedMeshData();
     if (!this._strokeActive) {
       this.syncVertexWeightsFromConfig();
     }
@@ -421,6 +541,7 @@ export class ClothPaintTool extends Disposable implements EditTool {
     if (!camera || !viewportRect || !activeMesh || !meshInfo?.positions || meshInfo.loading) {
       return;
     }
+    this.updateSkinnedMeshData(activeMesh);
     const drawList = ImGui.GetForegroundDrawList();
     const clipMin = new ImGui.ImVec2(viewportRect[0], viewportRect[1]);
     const clipMax = new ImGui.ImVec2(viewportRect[0] + viewportRect[2], viewportRect[1] + viewportRect[3]);
@@ -477,7 +598,14 @@ export class ClothPaintTool extends Disposable implements EditTool {
         ? new ImGui.ImVec4(0.35, 1, 0.45, 1)
         : this._paintMode === 'unpin'
           ? new ImGui.ImVec4(1, 0.28, 0.28, 1)
-          : new ImGui.ImVec4(1, 0.85, 0.25, 1);
+          : this._paintMode === 'smooth'
+            ? new ImGui.ImVec4(1, 0.85, 0.25, 1)
+            : new ImGui.ImVec4(
+                0.96 + (0.2 - 0.96) * this._brushValue,
+                0.22 + (0.9 - 0.22) * this._brushValue,
+                0.22 + (0.28 - 0.22) * this._brushValue,
+                1
+              );
     const fillOuterColor = ImGui.ColorConvertFloat4ToU32(
       new ImGui.ImVec4(brushColor.x, brushColor.y, brushColor.z, 0.05)
     );
@@ -509,7 +637,9 @@ export class ClothPaintTool extends Disposable implements EditTool {
     drawList.AddText(
       new ImGui.ImVec2(this._tmpScreenPos.x + brushRadiusPx + 8, this._tmpScreenPos.y - 8),
       textColor,
-      `${this._paintMode.toUpperCase()} ${this._brushRadius.toFixed(2)} / ${this._brushStrength.toFixed(2)}`
+      this._paintMode === 'set'
+        ? `SET ${this._brushRadius.toFixed(2)} / ${this._brushStrength.toFixed(2)} / ${this._brushValue.toFixed(2)}`
+        : `${this._paintMode.toUpperCase()} ${this._brushRadius.toFixed(2)} / ${this._brushStrength.toFixed(2)}`
     );
   }
   private getBrushRadiusInScreenSpace(
@@ -600,6 +730,8 @@ export class ClothPaintTool extends Disposable implements EditTool {
         ? clampWeight(clampedWeight + this._brushStrength * influence)
         : this._paintMode === 'unpin'
           ? clampWeight(clampedWeight - this._brushStrength * influence)
+          : this._paintMode === 'set'
+            ? clampWeight(clampedWeight + (this._brushValue - clampedWeight) * this._brushStrength * influence)
           : clampedWeight;
     const preview =
       this._paintMode === 'smooth'
@@ -730,21 +862,32 @@ export class ClothPaintTool extends Disposable implements EditTool {
     data = {
       vertexCount: primitive.getNumVertices(),
       positions: data?.positions ?? null,
+      basePositions: data?.basePositions ?? null,
+      blendIndices: data?.blendIndices ?? null,
+      blendWeights: data?.blendWeights ?? null,
+      indexData: data?.indexData ?? null,
+      adjacency: data?.adjacency ?? null,
       loading: true,
       error: '',
       primitiveSignature
     };
     this._meshData.set(mesh, data);
-    void readMeshPositionData(mesh)
-      .then((positions) => {
+    void Promise.all([readMeshPositionData(mesh), readMeshSkinningData(mesh), readMeshIndexData(mesh)])
+      .then(([positions, skinning, indexData]) => {
         const next = this._meshData.get(mesh);
         if (!next || next.primitiveSignature !== primitiveSignature) {
           return;
         }
-        next.positions = positions;
+        next.basePositions = positions;
+        next.positions = positions.slice();
+        next.blendIndices = skinning.blendIndices;
+        next.blendWeights = skinning.blendWeights;
+        next.indexData = indexData;
+        next.adjacency = buildVertexAdjacency((positions.length / 3) >> 0, indexData);
         next.vertexCount = positions.length / 3;
         next.loading = false;
         next.error = '';
+        this.updateSkinnedMeshData(mesh);
       })
       .catch((err) => {
         const next = this._meshData.get(mesh);
@@ -752,9 +895,82 @@ export class ClothPaintTool extends Disposable implements EditTool {
           return;
         }
         next.positions = null;
+        next.basePositions = null;
+        next.blendIndices = null;
+        next.blendWeights = null;
+        next.indexData = null;
+        next.adjacency = null;
         next.loading = false;
         next.error = err instanceof Error ? err.message : String(err);
       });
+  }
+  private smoothAllWeights() {
+    const mesh = this.getActiveTarget();
+    const data = mesh ? this._meshData.get(mesh) : null;
+    if (!mesh || !data?.adjacency || data.loading) {
+      return;
+    }
+    const strength = clampWeight(this._brushStrength);
+    if (strength <= 1e-4) {
+      return;
+    }
+    this.syncVertexWeightsFromConfig();
+    const nextWeights = new Map<number, number>();
+    for (let index = 0; index < data.vertexCount; index++) {
+      const currentWeight = this.getStoredWeight(index);
+      const neighbors = data.adjacency[index] ?? [];
+      if (neighbors.length === 0) {
+        if (currentWeight < 1 - 1e-4) {
+          nextWeights.set(index, currentWeight);
+        }
+        continue;
+      }
+      let sum = currentWeight;
+      let total = 1;
+      for (const neighbor of neighbors) {
+        if (neighbor < 0 || neighbor >= data.vertexCount) {
+          continue;
+        }
+        sum += this.getStoredWeight(neighbor);
+        total++;
+      }
+      const averageWeight = total > 0 ? sum / total : currentWeight;
+      const nextWeight = clampWeight(currentWeight + (averageWeight - currentWeight) * strength);
+      if (nextWeight < 1 - 1e-4) {
+        nextWeights.set(index, nextWeight);
+      }
+    }
+    this.applyImmediateChange(nextWeights, 'Smooth cloth weights');
+  }
+  private updateSkinnedMeshData(targetMesh?: Mesh) {
+    const meshes = targetMesh ? [targetMesh] : [this.getActiveTarget()].filter((mesh): mesh is Mesh => !!mesh);
+    for (const mesh of meshes) {
+      const data = this._meshData.get(mesh);
+      if (!data || data.loading || !data.basePositions || !data.positions) {
+        continue;
+      }
+      const skeletonId = String((mesh as any).skeletonName ?? '');
+      const skeleton =
+        skeletonId && typeof (mesh as any).findSkeletonById === 'function'
+          ? (mesh as any).findSkeletonById(skeletonId)
+          : null;
+      if (
+        skeleton?.skinPositionsToLocal &&
+        data.blendIndices &&
+        data.blendWeights &&
+        (mesh as any).invWorldMatrix
+      ) {
+        skeleton.skinPositionsToLocal(
+          data.basePositions,
+          data.blendIndices,
+          data.blendWeights,
+          (mesh as any).invWorldMatrix,
+          data.positions
+        );
+      } else if (data.positions !== data.basePositions) {
+        data.positions.set(data.basePositions);
+      }
+    }
   }
   private applyBrushDab(hitPos: Vector3) {
     const mesh = this.getActiveTarget();
@@ -762,6 +978,7 @@ export class ClothPaintTool extends Disposable implements EditTool {
     if (!mesh || !data?.positions || data.loading) {
       return;
     }
+    this.updateSkinnedMeshData(mesh);
     const spacing = Math.max(this._brushRadius * 0.15, 0.005);
     if (this._lastStrokePos) {
       const dx = hitPos.x - this._lastStrokePos.x;
@@ -839,7 +1056,13 @@ export class ClothPaintTool extends Disposable implements EditTool {
       for (let i = 0; i < affectedIndices.length; i++) {
         const index = affectedIndices[i];
         const currentWeight = this.getStoredWeight(index);
-        const nextWeight = clampWeight(currentWeight + direction * this._brushStrength * affectedInfluences[i]);
+        const nextWeight =
+          this._paintMode === 'set'
+            ? clampWeight(
+                currentWeight +
+                  (this._brushValue - currentWeight) * this._brushStrength * affectedInfluences[i]
+              )
+            : clampWeight(currentWeight + direction * this._brushStrength * affectedInfluences[i]);
         if (Math.abs(nextWeight - currentWeight) <= 1e-4) {
           continue;
         }

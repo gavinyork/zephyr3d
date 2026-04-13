@@ -1,6 +1,14 @@
 import { defineProps, type SerializableClass } from '../types';
 
-export type ClothColliderType = 'sphere' | 'capsule';
+export type ClothColliderType = 'sphere' | 'capsule' | 'plane';
+
+function clamp01(value: number) {
+  return Math.min(Math.max(value, 0), 1);
+}
+
+function normalizePlaneDirection(value: number) {
+  return value < 0 ? -1 : 1;
+}
 
 export class ClothColliderConfig {
   type: ClothColliderType;
@@ -12,6 +20,9 @@ export class ClothColliderConfig {
   endOffsetX: number;
   endOffsetY: number;
   endOffsetZ: number;
+  normalX: number;
+  normalY: number;
+  normalZ: number;
   radius: number;
 
   constructor(type: ClothColliderType = 'sphere') {
@@ -24,6 +35,9 @@ export class ClothColliderConfig {
     this.endOffsetX = 0;
     this.endOffsetY = 0.2;
     this.endOffsetZ = 0;
+    this.normalX = 0;
+    this.normalY = 1;
+    this.normalZ = 0;
     this.radius = 0.15;
   }
 }
@@ -32,7 +46,11 @@ export class ClothScriptConfig {
   enabled: boolean;
   autoUpdate: boolean;
   damping: number;
+  dynamicFriction: number;
+  staticFriction: number;
   stiffness: number;
+  poseFollow: number;
+  substeps: number;
   gravityX: number;
   gravityY: number;
   gravityZ: number;
@@ -48,8 +66,12 @@ export class ClothScriptConfig {
   constructor() {
     this.enabled = true;
     this.autoUpdate = true;
-    this.damping = 0.995;
+    this.damping = 0.02;
+    this.dynamicFriction = 0.15;
+    this.staticFriction = 0.3;
     this.stiffness = 0.3;
+    this.poseFollow = 0;
+    this.substeps = 2;
     this.gravityX = 0;
     this.gravityY = -9.8;
     this.gravityZ = 0;
@@ -80,8 +102,8 @@ export function getClothColliderConfigClass(): SerializableClass {
           options: {
             group: 'Shape',
             enum: {
-              labels: ['Sphere', 'Capsule'],
-              values: ['sphere', 'capsule']
+              labels: ['Sphere', 'Capsule', 'Plane'],
+              values: ['sphere', 'capsule', 'plane']
             }
           },
           get(this: ClothColliderConfig, value) {
@@ -123,6 +145,9 @@ export function getClothColliderConfigClass(): SerializableClass {
           options: {
             group: 'Shape'
           },
+          isValid(this: ClothColliderConfig) {
+            return this.type !== 'plane';
+          },
           get(this: ClothColliderConfig, value) {
             value.num[0] = this.offsetX;
             value.num[1] = this.offsetY;
@@ -161,11 +186,34 @@ export function getClothColliderConfigClass(): SerializableClass {
             group: 'Shape',
             minValue: 0
           },
+          isValid(this: ClothColliderConfig) {
+            return this.type !== 'plane';
+          },
           get(this: ClothColliderConfig, value) {
             value.num[0] = this.radius;
           },
           set(this: ClothColliderConfig, value) {
             this.radius = value.num[0];
+          }
+        },
+        {
+          name: 'Normal',
+          type: 'float',
+          options: {
+            group: 'Shape',
+            minValue: -1,
+            maxValue: 1
+          },
+          isValid(this: ClothColliderConfig) {
+            return this.type === 'plane';
+          },
+          get(this: ClothColliderConfig, value) {
+            value.num[0] = this.normalY;
+          },
+          set(this: ClothColliderConfig, value) {
+            this.normalX = 0;
+            this.normalY = normalizePlaneDirection(value.num[0]);
+            this.normalZ = 0;
           }
         }
       ]);
@@ -264,7 +312,7 @@ export function getClothScriptConfigClass(): SerializableClass {
             value.num[0] = this.damping;
           },
           set(this: ClothScriptConfig, value) {
-            this.damping = value.num[0];
+            this.damping = clamp01(value.num[0]);
           }
         },
         {
@@ -279,7 +327,52 @@ export function getClothScriptConfigClass(): SerializableClass {
             value.num[0] = this.stiffness;
           },
           set(this: ClothScriptConfig, value) {
-            this.stiffness = value.num[0];
+            this.stiffness = clamp01(value.num[0]);
+          }
+        },
+        {
+          name: 'DynamicFriction',
+          type: 'float',
+          options: {
+            group: 'Simulation',
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: ClothScriptConfig, value) {
+            value.num[0] = this.dynamicFriction;
+          },
+          set(this: ClothScriptConfig, value) {
+            this.dynamicFriction = clamp01(value.num[0]);
+          }
+        },
+        {
+          name: 'PoseFollow',
+          type: 'float',
+          options: {
+            group: 'PoseFollow',
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: ClothScriptConfig, value) {
+            value.num[0] = this.poseFollow;
+          },
+          set(this: ClothScriptConfig, value) {
+            this.poseFollow = clamp01(value.num[0]);
+          }
+        },
+        {
+          name: 'StaticFriction',
+          type: 'float',
+          options: {
+            group: 'Simulation',
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: ClothScriptConfig, value) {
+            value.num[0] = this.staticFriction;
+          },
+          set(this: ClothScriptConfig, value) {
+            this.staticFriction = clamp01(value.num[0]);
           }
         },
         {
@@ -295,6 +388,21 @@ export function getClothScriptConfigClass(): SerializableClass {
           },
           set(this: ClothScriptConfig, value) {
             this.solverIterations = value.num[0];
+          }
+        },
+        {
+          name: 'Substeps',
+          type: 'int',
+          options: {
+            group: 'Simulation',
+            minValue: 1,
+            maxValue: 8
+          },
+          get(this: ClothScriptConfig, value) {
+            value.num[0] = this.substeps;
+          },
+          set(this: ClothScriptConfig, value) {
+            this.substeps = Math.max(1, Math.min(8, value.num[0] | 0));
           }
         },
         {
