@@ -6,12 +6,12 @@ import type {
   IControllerPointerDownEvent,
   IControllerPointerMoveEvent,
   IControllerPointerUpEvent,
-  IControllerWheelEvent
+  IControllerWheelEvent,
+  SceneNode
 } from '@zephyr3d/scene';
-import { CopyBlitter } from '@zephyr3d/scene';
-import { getDevice, SceneNode } from '@zephyr3d/scene';
+import { BatchGroup, CopyBlitter, TetrahedronShape } from '@zephyr3d/scene';
+import { getDevice } from '@zephyr3d/scene';
 import {
-  CylinderShape,
   DirectionalLight,
   LambertMaterial,
   Mesh,
@@ -98,6 +98,15 @@ export class SkeletonView {
     ImGui.SetCursorPos(cursorPos);
     ImGui.InvisibleButton('Button##previewScene', size);
     const io = ImGui.GetIO();
+    if (ImGui.IsItemHovered()) {
+      const x = io.MousePos.x - cursorScreenPos.x;
+      const y = io.MousePos.y - cursorScreenPos.y;
+      const ray = this._scene.get().mainCamera!.constructRay(x, y, size.x, size.y);
+      const pickResult = this._scene.get()!.raycast(ray);
+      if (pickResult?.target?.node) {
+        console.log(pickResult.target.node.name);
+      }
+    }
     if (ImGui.IsItemHovered() && io.MouseWheel !== 0) {
       const evtWheel: IControllerWheelEvent = {
         type: 'wheel',
@@ -174,12 +183,15 @@ export class SkeletonView {
     light.intensity = 10;
     light.sunLight = true;
     light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
+    const matJoint = new LambertMaterial();
+    matJoint.albedoColor = new Vector4(0.8, 0.2, 0.2, 1);
+    const matBone = new LambertMaterial();
     if (this._skeleton && this._skeletonRoot) {
       const aabb = this.calculateBoundingBox();
       const extents = aabb.extents;
       const size = Math.max(extents.x, extents.y, extents.z);
-      const parent = new SceneNode(scene);
-      this.createBonePrimitive(scene, size, this._skeleton, this._skeletonRoot, parent);
+      const parent = new BatchGroup(scene);
+      this.createBonePrimitive(scene, size, this._skeleton, this._skeletonRoot, parent, matJoint, matBone);
       this.lookAt(aabb, camera, parent);
     }
     this._scene.set(scene);
@@ -221,13 +233,17 @@ export class SkeletonView {
     size: number,
     skeleton: AssetSkeleton,
     bone: AssetHierarchyNode,
-    parent: SceneNode
+    parent: SceneNode,
+    matJoint: LambertMaterial,
+    matBone: LambertMaterial
   ) {
     const jointRadius = size * 0.02;
-    const jointMesh = new Mesh(scene, new SphereShape({ radius: jointRadius }), new LambertMaterial());
+    const jointMesh = new Mesh(scene, new SphereShape({ radius: jointRadius }), matJoint);
     const pos = bone.getWorldPosition();
     jointMesh.position = pos;
     jointMesh.parent = parent;
+    jointMesh.name = bone.name;
+    jointMesh.pickable = true;
     for (const child of bone.children) {
       if (skeleton.joints.includes(child)) {
         const childPos = child.getWorldPosition();
@@ -235,12 +251,14 @@ export class SkeletonView {
         const length = dir.magnitude;
         dir.scaleBy(1 / length);
         const height = Math.max(0, length - 2 * jointRadius);
-        const cone = new CylinderShape({ bottomRadius: length * 0.05, topRadius: 0, height });
-        const coneMesh = new Mesh(scene, cone, new LambertMaterial());
+        const cone = new TetrahedronShape({ sizeX: length * 0.05, sizeZ: length * 0.05, height });
+        const coneMesh = new Mesh(scene, cone, matBone);
         Vector3.add(Vector3.scale(dir, jointRadius, coneMesh.position), pos, coneMesh.position);
         Quaternion.unitVectorToUnitVector(Vector3.axisPY(), dir, coneMesh.rotation);
         coneMesh.parent = parent;
-        this.createBonePrimitive(scene, size, skeleton, child, parent);
+        coneMesh.name = bone.name;
+        coneMesh.pickable = true;
+        this.createBonePrimitive(scene, size, skeleton, child, parent, matJoint, matBone);
       }
     }
   }

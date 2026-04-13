@@ -848,11 +848,13 @@ export class Camera extends SceneNode {
    *
    * @param x - The x-component of the screen coordinates, relative to the top-left corner of the viewport.
    * @param y - The y-component of the screen coordinates, relative to the top-left corner of the viewport.
+   * @param viewportWidth - Optional width of the viewport for normalizing screen coordinates. If not provided, it will be derived from the camera's viewport or the device's viewport.
+   * @param viewportHeight - Optional height of the viewport for normalizing screen coordinates. If not provided, it will be derived from the camera's viewport or the device's viewport.
    * @returns The ray originating from the camera position and passing through the given screen coordinates.
    */
-  constructRay(x: number, y: number) {
-    const width = this.viewport ? this.viewport[2] : getDevice().getViewport().width;
-    const height = this.viewport ? this.viewport[3] : getDevice().getViewport().height;
+  constructRay(x: number, y: number, viewportWidth?: number, viewportHeight?: number): Ray {
+    const width = viewportWidth ?? (this.viewport ? this.viewport[2] : getDevice().getViewport().width);
+    const height = viewportHeight ?? (this.viewport ? this.viewport[3] : getDevice().getViewport().height);
     const ndcX = (2 * x) / width - 1;
     const ndcY = 1 - (2 * y) / height;
     const nearClip = new Vector4(ndcX, ndcY, -1, 1);

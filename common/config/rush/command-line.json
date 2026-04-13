@@ -65,6 +65,12 @@
       "commandKind": "global",
       "summary": "Run tests in ./test",
       "shellCommand": "npm test --prefix ./test"
+    },
+    {
+      "name": "editor",
+      "commandKind": "global",
+      "summary": "Run editor",
+      "shellCommand": "rush build -t editor && npm run serve --prefix ./utility/editor"
     }
     // {
     //   /**

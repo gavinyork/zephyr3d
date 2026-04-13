@@ -63,6 +63,14 @@ export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
       return this.visitMesh(target);
     } else if (target.isWater()) {
       return this.visitWater(target);
+    } else if (target.isBatchGroup()) {
+      let b = false;
+      target.iterate((child) => {
+        if (child !== target) {
+          b ||= this.visit(child);
+        }
+      });
+      return b;
     }
     return false;
   }
