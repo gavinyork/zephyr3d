@@ -101,7 +101,11 @@ const tmpV1 = new Vector3();
 const tmpV2 = new Vector3();
 const tmpV3 = new Vector3();
 
-type HumanoidJointMapping<T extends { name: string; parent: Nullable<T>; children: T[] }> = {
+/**
+ * Humanoid joint mapping
+ * @public
+ */
+export type HumanoidJointMapping<T extends { name: string; parent: Nullable<T>; children: T[] }> = {
   body: Record<HumanoidBodyRig, T>;
   leftHand?: Record<HumanoidHandRig, T>;
   rightHand?: Record<HumanoidHandRig, T>;
@@ -181,8 +185,6 @@ export class Skeleton extends Disposable {
   /** @internal */
   protected _inverseBindMatrices: Matrix4x4[];
   /** @internal */
-  protected _bindPoseModelSpace: Matrix4x4[];
-  /** @internal */
   protected _bindPose: { rotation: Quaternion; scale: Vector3; position: Vector3 }[];
   /** @internal */
   protected _jointMatrices!: Matrix4x4[];
@@ -198,6 +200,8 @@ export class Skeleton extends Disposable {
   protected _modifiers: SkeletonModifier[];
   /** @internal */
   protected _lastUpdateTime: number;
+  /** @internal */
+  protected _humanoidJointMapping: Nullable<HumanoidJointMapping<SceneNode>>;
   /**
    * Create a skeleton instance.
    *
@@ -219,23 +223,13 @@ export class Skeleton extends Disposable {
     this._playing = false;
     this._modifiers = [];
     this._lastUpdateTime = 0;
-    this._bindPoseModelSpace = [];
     this.computeBindPose();
     this.updateJointMatrices(0);
     let skeletonRoot = this.findRootJoint(this._joints);
     if (!skeletonRoot || !this._joints.includes(skeletonRoot)) {
       throw new Error('Skeleton root must be included in the joint list');
     }
-    const humanoid = Skeleton.tryExtractHumanoidJoints(skeletonRoot.scene!.rootNode);
-    console.log(humanoid);
-    while (skeletonRoot.parent && this._joints.includes(skeletonRoot.parent)) {
-      skeletonRoot = skeletonRoot.parent;
-    }
-    const im = skeletonRoot.parent!.invWorldMatrix;
-    for (const joint of this._joints) {
-      const m = Matrix4x4.multiplyAffine(im, joint.worldMatrix);
-      this._bindPoseModelSpace.push(m);
-    }
+    this._humanoidJointMapping = Skeleton.tryExtractHumanoidJoints(skeletonRoot.scene!.rootNode);
     Skeleton._registry.set(this._id, new DWeakRef(this));
   }
   /**
@@ -257,6 +251,10 @@ export class Skeleton extends Disposable {
   get joints() {
     return this._joints;
   }
+  /** Gets the humanoid joint mapping */
+  get humanoidJointMapping(): Nullable<HumanoidJointMapping<SceneNode>> {
+    return this._humanoidJointMapping;
+  }
   /** @internal */
   get inverseBindMatrices() {
     return this._inverseBindMatrices;
@@ -264,9 +262,6 @@ export class Skeleton extends Disposable {
   /** @internal */
   get bindPose() {
     return this._bindPose;
-  }
-  get bindPoseModelSpace() {
-    return this._bindPoseModelSpace;
   }
   /** @internal */
   get playing() {

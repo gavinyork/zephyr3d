@@ -430,6 +430,270 @@ export class AnimationSet extends Disposable implements IDisposable {
     }
   }
   /**
+   * Copy a humanoid animation clip from another AnimationSet into this one via humanoid rig mapping.
+   *
+   * Prerequisites:
+   * - Both source and destination skeletons must have a non-null `humanoidJointMapping`.
+   * - Joints are matched by shared `HumanoidBodyRig` / `HumanoidHandRig` keys instead of joint names.
+   * - The source clip must exist in `sourceSet` and must be driven by exactly one skeleton.
+   *
+   * @param sourceSet - The AnimationSet to copy from.
+   * @param animationName - Name of the clip to copy.
+   * @param targetName - Name for the new clip in this set. Defaults to `animationName`.
+   * @returns The newly created AnimationClip, or null on failure.
+   */
+  copyHumanoidAnimationFrom(
+    sourceSet: AnimationSet,
+    animationName: string,
+    targetName?: string
+  ): AnimationClip | null {
+    const destName = targetName ?? animationName;
+    const sourceClip = sourceSet.get(animationName);
+    if (!sourceClip) {
+      console.error(`copyHumanoidAnimationFrom: animation '${animationName}' not found in source set`);
+      return null;
+    }
+    if (this._animations[destName]) {
+      console.error(`copyHumanoidAnimationFrom: animation '${destName}' already exists in target set`);
+      return null;
+    }
+
+    // Per-joint retargeting info indexed by source joint node
+    type JointRemap = {
+      dstNode: SceneNode;
+      srcBindRot: Quaternion;
+      dstBindRot: Quaternion;
+      translationScale: number;
+    };
+
+    if (sourceClip.skeletons.size !== 1) {
+      console.error(
+        `copyHumanoidAnimationFrom: source animation clip must be affected by exactly one skeleton`
+      );
+      return null;
+    }
+    const srcSkeletonId = [...sourceClip.skeletons][0];
+    const srcSkeleton = Skeleton.findSkeletonById(srcSkeletonId);
+    if (!srcSkeleton) {
+      console.error(`copyHumanoidAnimationFrom: source skeleton '${srcSkeletonId}' not found`);
+      return null;
+    }
+
+    // Check that source skeleton has humanoid mapping
+    const srcHumanoidMapping = srcSkeleton.humanoidJointMapping;
+    if (!srcHumanoidMapping) {
+      console.error(`copyHumanoidAnimationFrom: source skeleton does not have a humanoid joint mapping`);
+      return null;
+    }
+
+    const nodeMap = new Map<object, SceneNode>();
+    const jointRemapBySrcNode = new Map<object, JointRemap>();
+
+    // Find a destination skeleton that has a humanoid mapping and share at least the body rig keys
+    let srcJointsFiltered: SceneNode[] = [];
+    let dstJointsFiltered: SceneNode[] = [];
+
+    const dstSkeleton = this._skeletons
+      .map((ref) => ref.get())
+      .find((sk) => {
+        if (!sk) {
+          return false;
+        }
+        // Check that destination skeleton has humanoid mapping
+        const dstHumanoidMapping = sk.humanoidJointMapping;
+        if (!dstHumanoidMapping) {
+          return false;
+        }
+
+        // Collect matched (srcJoint, dstJoint) pairs via shared humanoid rig keys
+        const srcMatched: SceneNode[] = [];
+        const dstMatched: SceneNode[] = [];
+
+        // Match body rig joints
+        for (const key of Object.keys(srcHumanoidMapping.body) as (keyof typeof srcHumanoidMapping.body)[]) {
+          const srcJoint = srcHumanoidMapping.body[key];
+          const dstJoint = dstHumanoidMapping.body[key];
+          if (srcJoint && dstJoint) {
+            srcMatched.push(srcJoint);
+            dstMatched.push(dstJoint);
+          }
+        }
+
+        // Match left hand rig joints only when both sides define them; skip silently if either is absent
+        if (srcHumanoidMapping.leftHand && dstHumanoidMapping.leftHand) {
+          for (const key of Object.keys(
+            srcHumanoidMapping.leftHand
+          ) as (keyof typeof srcHumanoidMapping.leftHand)[]) {
+            const srcJoint = srcHumanoidMapping.leftHand[key];
+            const dstJoint = dstHumanoidMapping.leftHand[key];
+            if (srcJoint && dstJoint) {
+              srcMatched.push(srcJoint);
+              dstMatched.push(dstJoint);
+            }
+          }
+        }
+
+        // Match right hand rig joints only when both sides define them; skip silently if either is absent
+        if (srcHumanoidMapping.rightHand && dstHumanoidMapping.rightHand) {
+          for (const key of Object.keys(
+            srcHumanoidMapping.rightHand
+          ) as (keyof typeof srcHumanoidMapping.rightHand)[]) {
+            const srcJoint = srcHumanoidMapping.rightHand[key];
+            const dstJoint = dstHumanoidMapping.rightHand[key];
+            if (srcJoint && dstJoint) {
+              srcMatched.push(srcJoint);
+              dstMatched.push(dstJoint);
+            }
+          }
+        }
+
+        if (srcMatched.length === 0) {
+          return false;
+        }
+
+        srcJointsFiltered = srcMatched;
+        dstJointsFiltered = dstMatched;
+        return true;
+      });
+
+    if (!dstSkeleton) {
+      console.error(
+        `copyHumanoidAnimationFrom: no matching humanoid skeleton in target set for '${srcSkeletonId}'`
+      );
+      return null;
+    }
+
+    // Build remap for matched joint pairs
+    for (let fi = 0; fi < srcJointsFiltered.length; fi++) {
+      const srcJoint = srcJointsFiltered[fi];
+      const dstJoint = dstJointsFiltered[fi];
+      const si = srcSkeleton.joints.indexOf(srcJoint);
+      const di = dstSkeleton.joints.indexOf(dstJoint);
+      const srcLen = srcSkeleton.bindPose[si].position.magnitude;
+      const dstLen = dstSkeleton.bindPose[di].position.magnitude;
+      const translationScale = srcLen > 1e-6 ? dstLen / srcLen : 1;
+      nodeMap.set(srcJoint, dstJoint);
+      jointRemapBySrcNode.set(srcJoint, {
+        dstNode: dstJoint,
+        srcBindRot: srcSkeleton.bindPose[si].rotation,
+        dstBindRot: dstSkeleton.bindPose[di].rotation,
+        translationScale
+      });
+    }
+
+    const dstClip = this.createAnimation(destName);
+    if (!dstClip) {
+      return null;
+    }
+    dstClip.timeDuration = sourceClip.timeDuration;
+    dstClip.weight = sourceClip.weight;
+    dstClip.autoPlay = sourceClip.autoPlay;
+
+    // Register destination skeleton
+    dstClip.addSkeleton(dstSkeleton.persistentId);
+
+    for (const srcNode of srcJointsFiltered) {
+      const srcTracks = sourceClip.tracks.get(srcNode);
+      if (!srcTracks) {
+        // Not every humanoid joint must have a track; skip silently
+        continue;
+      }
+      const dstNode = nodeMap.get(srcNode)!;
+      const remap = jointRemapBySrcNode.get(srcNode) ?? null;
+
+      for (const srcTrack of srcTracks) {
+        let dstTrack: AnimationTrack;
+        if (srcTrack instanceof NodeRotationTrack) {
+          dstTrack = retargetRotationTrack(srcTrack);
+        } else if (srcTrack instanceof NodeEulerRotationTrack) {
+          dstTrack = retargetEulerToRotationTrack(srcTrack);
+        } else if (srcTrack instanceof NodeTranslationTrack) {
+          dstTrack = retargetTranslationTrack(srcTrack, remap);
+        } else if (srcTrack instanceof NodeScaleTrack) {
+          dstTrack = new NodeScaleTrack(cloneInterpolator(srcTrack.interpolator));
+        } else {
+          console.warn(
+            `copyHumanoidAnimationFrom: unsupported track type '${srcTrack.constructor.name}', skipping`
+          );
+          continue;
+        }
+
+        dstTrack.name = srcTrack.name;
+        dstTrack.target = srcTrack.target;
+        dstTrack.jointIndex = srcTrack.jointIndex;
+        dstClip.addTrack(dstNode, dstTrack);
+      }
+    }
+
+    return dstClip;
+
+    function retargetTranslationTrack(
+      src: NodeTranslationTrack,
+      remap: JointRemap | null
+    ): NodeTranslationTrack {
+      if (!remap || Math.abs(remap.translationScale - 1) < 1e-6) {
+        return new NodeTranslationTrack(cloneInterpolator(src.interpolator));
+      }
+      const scale = remap.translationScale;
+      const srcOutputs = src.interpolator.outputs as Float32Array;
+      const newOutputs = new Float32Array(srcOutputs.length);
+      for (let i = 0; i < newOutputs.length; i++) {
+        newOutputs[i] = srcOutputs[i] * scale;
+      }
+      return new NodeTranslationTrack(
+        new Interpolator(
+          src.interpolator.mode,
+          'vec3',
+          new Float32Array(src.interpolator.inputs as Float32Array),
+          newOutputs
+        )
+      );
+    }
+
+    function cloneInterpolator(src: Interpolator): Interpolator {
+      return new Interpolator(
+        src.mode,
+        src.target,
+        src.inputs instanceof Float32Array ? new Float32Array(src.inputs) : [...src.inputs],
+        src.outputs instanceof Float32Array ? new Float32Array(src.outputs) : [...src.outputs]
+      );
+    }
+
+    function retargetRotationTrack(src: NodeRotationTrack): NodeRotationTrack {
+      const isCubic = src.interpolator.mode === 'cubicspline';
+      const frameStride = isCubic ? 12 : 4;
+      const numFrames = (src.interpolator.inputs as Float32Array).length;
+      const srcOutputs = src.interpolator.outputs as Float32Array;
+      const newOutputs = new Float32Array(srcOutputs.length);
+      for (let f = 0; f < numFrames; f++) {
+        const base = f * frameStride;
+        newOutputs.set(srcOutputs.subarray(base, base + (isCubic ? 12 : 4)), base);
+      }
+      return new NodeRotationTrack(
+        new Interpolator(
+          src.interpolator.mode,
+          'quat',
+          new Float32Array(src.interpolator.inputs as Float32Array),
+          newOutputs
+        )
+      );
+    }
+
+    function retargetEulerToRotationTrack(src: NodeEulerRotationTrack): NodeRotationTrack {
+      const srcInputs = src.interpolator.inputs as Float32Array;
+      const srcOutputs = src.interpolator.outputs as Float32Array;
+      const numFrames = srcInputs.length;
+      const newOutputs = new Float32Array(numFrames * 3);
+      for (let f = 0; f < numFrames; f++) {
+        const base = f * 3;
+        newOutputs.set(srcOutputs.subarray(base, base + 3), base);
+      }
+      return new NodeRotationTrack(
+        new Interpolator('linear', 'quat', new Float32Array(srcInputs), newOutputs)
+      );
+    }
+  }
+  /**
    * Copy an animation clip from another AnimationSet into this one.
    *
    * Prerequisites:
