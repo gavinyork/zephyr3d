@@ -29,9 +29,29 @@ function isGPUClothScript(script: string) {
   return /(^|\/)gpucloth(\.ts|\.js)?$/.test(normalized);
 }
 
+function resolveClothSimulationMesh(host: Nullable<SceneNode>): Nullable<Mesh> {
+  const simulationMeshName = String((host as any)?.scriptConfig?.simulationMesh ?? '').trim();
+  if (!host || !simulationMeshName) {
+    return null;
+  }
+  if (host.isMesh() && host.name === simulationMeshName && host.primitive) {
+    return host;
+  }
+  const prefabScope =
+    (typeof (host as any)?.getPrefabNode === 'function' && (host as any).getPrefabNode()) ||
+    host.scene?.rootNode ||
+    host;
+  const candidate = prefabScope?.findNodeByName?.(simulationMeshName);
+  return candidate?.isMesh?.() && candidate.primitive ? candidate : null;
+}
+
 export function collectClothTargetMeshes(host: SceneNode): Mesh[] {
   if (!host) {
     return [];
+  }
+  const simulationMesh = resolveClothSimulationMesh(host);
+  if (simulationMesh) {
+    return [simulationMesh];
   }
   if (host.isMesh() && host.primitive) {
     return [host];

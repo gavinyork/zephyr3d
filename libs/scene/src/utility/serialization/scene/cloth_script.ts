@@ -45,6 +45,7 @@ export class ClothColliderConfig {
 export class ClothScriptConfig {
   enabled: boolean;
   autoUpdate: boolean;
+  simulationMesh: string;
   damping: number;
   dynamicFriction: number;
   staticFriction: number;
@@ -66,6 +67,7 @@ export class ClothScriptConfig {
   constructor() {
     this.enabled = true;
     this.autoUpdate = true;
+    this.simulationMesh = '';
     this.damping = 0.02;
     this.dynamicFriction = 0.15;
     this.staticFriction = 0.3;
@@ -255,6 +257,19 @@ export function getClothScriptConfigClass(): SerializableClass {
           },
           set(this: ClothScriptConfig, value) {
             this.autoUpdate = !!value.bool[0];
+          }
+        },
+        {
+          name: 'SimulationMesh',
+          type: 'string',
+          options: {
+            group: 'General'
+          },
+          get(this: ClothScriptConfig, value) {
+            value.str[0] = this.simulationMesh;
+          },
+          set(this: ClothScriptConfig, value) {
+            this.simulationMesh = value.str[0] ?? '';
           }
         },
         {

@@ -1228,8 +1228,10 @@ function serializeClothColliderConfig(colliders: any[]) {
 }
 
 function buildClothStructureSignature(host: any, config: any) {
+  const simulationMeshName = String(config?.simulationMesh ?? '').trim();
   return JSON.stringify({
     primitiveId: Number(host?.primitive?.id) || 0,
+    simulationMesh: simulationMeshName,
     vertexPinWeightsByTarget: getClothVertexWeightSource(config, host),
     maxNeighbors: Math.max(1, Number(config?.maxNeighbors) || 8),
     maxTrianglesPerVertex: Math.max(1, Number(config?.maxTrianglesPerVertex) || 16),
@@ -1332,6 +1334,26 @@ function collectBuiltinClothTargetMeshes(host: any): any[] {
     return false;
   });
   return targets;
+}
+
+function resolveBuiltinClothSimulationMesh(host: any, config: any) {
+  const simulationMeshName = String(config?.simulationMesh ?? '').trim();
+  if (!host || !simulationMeshName) {
+    return null;
+  }
+  if (host.isMesh?.() && host.primitive && host.name === simulationMeshName) {
+    return host;
+  }
+  const scope =
+    (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
+    host?.scene?.rootNode ||
+    host;
+  const candidate = scope?.findNodeByName?.(simulationMeshName);
+  return candidate?.isMesh?.() && candidate.primitive ? candidate : null;
+}
+
+function collectBuiltinClothRenderMeshes(host: any, simulationMesh: any) {
+  return collectBuiltinClothTargetMeshes(host).filter((mesh) => mesh !== simulationMesh);
 }
 
 function ensureBuiltinClothState(host: any) {
@@ -1743,7 +1765,9 @@ export class Engine {
   }
   private updateBuiltinClothHost(host: any, deltaTime: number) {
     const config = host?.scriptConfig;
-    const targets = collectBuiltinClothTargetMeshes(host);
+    const simulationMesh = resolveBuiltinClothSimulationMesh(host, config);
+    const renderTargets = simulationMesh ? collectBuiltinClothRenderMeshes(host, simulationMesh) : [];
+    const targets = simulationMesh ? [simulationMesh] : collectBuiltinClothTargetMeshes(host);
     if (!host || !config || targets.length === 0) {
       this.disposeBuiltinClothHost(host);
       return;
@@ -1757,12 +1781,18 @@ export class Engine {
     (host as any).__builtinClothTargets = targets;
     for (const target of targets) {
       const state = ensureBuiltinClothState(target);
-      const structureSignature = buildClothStructureSignature(target, config);
+      const structureSignature = JSON.stringify({
+        ...JSON.parse(buildClothStructureSignature(target, config)),
+        renderTargets: renderTargets.map((mesh) => ({
+          id: String(mesh?.persistentId ?? ''),
+          primitiveId: Number(mesh?.primitive?.id) || 0
+        }))
+      });
       const runtimeSignature = buildClothRuntimeSignature(config, target);
       if (!state.cloth || structureSignature !== state.structureSignature) {
         if (!state.rebuilding) {
           state.rebuilding = true;
-          Promise.resolve(this.ensureBuiltinClothHost(host, target)).finally(() => {
+          Promise.resolve(this.ensureBuiltinClothHost(host, target, renderTargets)).finally(() => {
             const latestState = (target as any)?.__builtinClothState;
             if (latestState) {
               latestState.rebuilding = false;
@@ -1780,14 +1810,20 @@ export class Engine {
       }
     }
   }
-  private async ensureBuiltinClothHost(host: any, target: any) {
+  private async ensureBuiltinClothHost(host: any, target: any, renderTargets: any[] = []) {
     const config = host?.scriptConfig;
     if (!host || !config || !target || !target.isMesh?.() || !target.primitive) {
       this.disposeBuiltinClothTarget(target);
       return;
     }
     const state = ensureBuiltinClothState(target);
-    const structureSignature = buildClothStructureSignature(target, config);
+    const structureSignature = JSON.stringify({
+      ...JSON.parse(buildClothStructureSignature(target, config)),
+      renderTargets: renderTargets.map((mesh) => ({
+        id: String(mesh?.persistentId ?? ''),
+        primitiveId: Number(mesh?.primitive?.id) || 0
+      }))
+    });
     if (state.cloth && structureSignature === state.structureSignature) {
       this.applyBuiltinClothRuntimeConfig(host, target);
       return;
@@ -1813,6 +1849,9 @@ export class Engine {
         autoUpdate: config.autoUpdate !== false,
         device: getDevice()
       });
+      if (renderTargets.length > 0) {
+        await cloth.setWrapTargets(renderTargets);
+      }
       (target as any).__builtinClothState = {
         cloth,
         structureSignature,
