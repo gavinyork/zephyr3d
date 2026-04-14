@@ -129,7 +129,7 @@ async function bindClothTargetMeshes(config: ClothScriptConfig) {
         const data = await createGPUClothWrapBindingData(simulationMesh, targetMesh);
         entry.bindingData = JSON.stringify(data);
         entry.bindingSignature =
-          `${data.version}:${data.vertexCount}:${data.sourceVertexCount}:${data.sourceIndexCount}:${data.hasNormals ? 1 : 0}`;
+          `${data.version}:${data.vertexCount}:${data.sourceVertexCount}:${data.influenceCount}`;
         successCount++;
       } catch (err) {
         clearClothTargetBinding(entry);

@@ -52,16 +52,14 @@ export type GPUClothSystemOptions = {
 };
 
 export type GPUClothWrapBindingData = {
-  version: 1;
+  version: 2;
   vertexCount: number;
   sourceVertexCount: number;
-  sourceIndexCount: number;
-  hasNormals: boolean;
+  influenceCount: number;
   maxOffsetDistance: number;
-  triangleIndices: string;
-  weights: string;
-  offsets: string;
-  normals?: string;
+  sourceIndices: string;
+  sourceWeights: string;
+  targetOffsets: string;
 };
 
 export type GPUClothWrapBindingTarget = {
@@ -97,14 +95,13 @@ function decodeTypedArrayFromBase64<T extends Uint32Array | Float32Array>(
 function isWrapBindingDataCompatible(
   data: GPUClothWrapBindingData,
   sourceRestPositions: Float32Array<ArrayBuffer>,
-  sourceIndexData: Uint32Array<ArrayBuffer>,
   targetVertexCount: number
 ) {
   return (
-    data?.version === 1 &&
+    data?.version === 2 &&
     data.vertexCount === targetVertexCount &&
     data.sourceVertexCount === ((sourceRestPositions.length / 3) >> 0) &&
-    data.sourceIndexCount === sourceIndexData.length
+    data.influenceCount === WRAP_INFLUENCE_COUNT
   );
 }
 
@@ -139,6 +136,7 @@ const DEFAULT_SOLVER_ITERATIONS = 5;
 const DEFAULT_MAX_NEIGHBORS = 8;
 const DEFAULT_WORKGROUP_SIZE = 64;
 const DEFAULT_MAX_TRIANGLES_PER_VERTEX = 16;
+const WRAP_INFLUENCE_COUNT = 4;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -962,10 +960,6 @@ async function readVertexAttributeDataFromPrimitive(
   return result;
 }
 
-async function readNormalDataFromPrimitive(primitive: Primitive) {
-  return await readVertexAttributeDataFromPrimitive(primitive, 'normal', 3);
-}
-
 async function readSkinningDataFromPrimitive(primitive: Primitive) {
   try {
     const [blendIndices, blendWeights] = await Promise.all([
@@ -1014,136 +1008,54 @@ async function readIndexDataFromPrimitive(primitive: Primitive, vertexCount: num
   return new Uint32Array(src);
 }
 
-function createWrapDeformerProgram(
-  device: AbstractDevice,
-  workgroupSize: number,
-  writeNormals: boolean
-) {
+function createWrapDeformerProgram(device: AbstractDevice, workgroupSize: number, influenceCount: number) {
   const program = device.buildComputeProgram({
     workgroupSize: [workgroupSize, 1, 1],
     compute(pb) {
       this.sourcePositions = pb.float[0]().storageBufferReadonly(0);
-      this.wrapTriangleIndices = pb.uint[0]().storageBufferReadonly(0);
-      this.wrapWeights = pb.float[0]().storageBufferReadonly(0);
-      this.wrapOffsets = pb.float[0]().storageBufferReadonly(0);
-      if (writeNormals) {
-        this.wrapNormals = pb.float[0]().storageBufferReadonly(0);
-      }
+      this.sourceIndices = pb.uint[0]().storageBufferReadonly(0);
+      this.sourceWeights = pb.float[0]().storageBufferReadonly(0);
+      this.targetOffsets = pb.float[0]().storageBufferReadonly(0);
       this.targetPositions = pb.float[0]().storageBuffer(0);
-      if (writeNormals) {
-        this.targetNormals = pb.float[0]().storageBuffer(0);
-      }
       this.vertexCount = pb.uint().uniform(0);
-      this.minDistance = pb.float().uniform(0);
       this.sourceToTargetMatrix = pb.mat4().uniform(0);
       pb.main(function () {
         this.$l.vertex = this.$builtins.globalInvocationId.x;
         this.$if(pb.lessThan(this.vertex, this.vertexCount), function () {
-          this.$l.wrapBase = pb.mul(this.vertex, 3);
-          this.$l.i0 = this.wrapTriangleIndices.at(this.wrapBase);
-          this.$l.i1 = this.wrapTriangleIndices.at(pb.add(this.wrapBase, 1));
-          this.$l.i2 = this.wrapTriangleIndices.at(pb.add(this.wrapBase, 2));
-          this.$l.sourceBase0 = pb.mul(this.i0, 3);
-          this.$l.sourceBase1 = pb.mul(this.i1, 3);
-          this.$l.sourceBase2 = pb.mul(this.i2, 3);
-          this.$l.p0 = pb.mul(
-            this.sourceToTargetMatrix,
-            pb.vec4(
-              this.sourcePositions.at(this.sourceBase0),
-              this.sourcePositions.at(pb.add(this.sourceBase0, 1)),
-              this.sourcePositions.at(pb.add(this.sourceBase0, 2)),
-              1
-            )
-          ).xyz;
-          this.$l.p1 = pb.mul(
-            this.sourceToTargetMatrix,
-            pb.vec4(
-              this.sourcePositions.at(this.sourceBase1),
-              this.sourcePositions.at(pb.add(this.sourceBase1, 1)),
-              this.sourcePositions.at(pb.add(this.sourceBase1, 2)),
-              1
-            )
-          ).xyz;
-          this.$l.p2 = pb.mul(
-            this.sourceToTargetMatrix,
-            pb.vec4(
-              this.sourcePositions.at(this.sourceBase2),
-              this.sourcePositions.at(pb.add(this.sourceBase2, 1)),
-              this.sourcePositions.at(pb.add(this.sourceBase2, 2)),
-              1
-            )
-          ).xyz;
-          this.$l.edge1 = pb.sub(this.p1, this.p0);
-          this.$l.edge2 = pb.sub(this.p2, this.p0);
-          this.$l.edge1Length = pb.length(this.edge1);
-          this.$l.tangent = pb.vec3(1, 0, 0);
-          this.$if(pb.greaterThan(this.edge1Length, this.minDistance), function () {
-            this.tangent = pb.div(this.edge1, this.edge1Length);
-          });
-          this.$l.normal = pb.cross(this.edge1, this.edge2);
-          this.$l.normalLength = pb.length(this.normal);
-          this.$if(pb.greaterThan(this.normalLength, this.minDistance), function () {
-            this.normal = pb.div(this.normal, this.normalLength);
-          }).$else(function () {
-            this.normal = pb.vec3(0, 1, 0);
-          });
-          this.$l.bitangent = pb.cross(this.normal, this.tangent);
-          this.$l.bitangentLength = pb.length(this.bitangent);
-          this.$if(pb.greaterThan(this.bitangentLength, this.minDistance), function () {
-            this.bitangent = pb.div(this.bitangent, this.bitangentLength);
-          }).$else(function () {
-            this.bitangent = pb.vec3(0, 0, 1);
-            this.$l.fallbackLength = pb.length(pb.cross(this.normal, this.bitangent));
-            this.$if(pb.lessThanEqual(this.fallbackLength, this.minDistance), function () {
-              this.bitangent = pb.vec3(1, 0, 0);
-            });
-          });
-          this.tangent = pb.normalize(pb.cross(this.bitangent, this.normal));
-          this.$l.w0 = this.wrapWeights.at(this.wrapBase);
-          this.$l.w1 = this.wrapWeights.at(pb.add(this.wrapBase, 1));
-          this.$l.w2 = this.wrapWeights.at(pb.add(this.wrapBase, 2));
-          this.$l.basePosition = pb.add(
-            pb.mul(this.p0, this.w0),
-            pb.mul(this.p1, this.w1),
-            pb.mul(this.p2, this.w2)
-          );
-          this.$l.localOffset = pb.vec3(
-            this.wrapOffsets.at(this.wrapBase),
-            this.wrapOffsets.at(pb.add(this.wrapBase, 1)),
-            this.wrapOffsets.at(pb.add(this.wrapBase, 2))
-          );
-          this.$l.deformedPosition = pb.add(
-            this.basePosition,
-            pb.mul(this.tangent, this.localOffset.x),
-            pb.mul(this.bitangent, this.localOffset.y),
-            pb.mul(this.normal, this.localOffset.z)
-          );
-          this.targetPositions.setAt(this.wrapBase, this.deformedPosition.x);
-          this.targetPositions.setAt(pb.add(this.wrapBase, 1), this.deformedPosition.y);
-          this.targetPositions.setAt(pb.add(this.wrapBase, 2), this.deformedPosition.z);
-          if (writeNormals) {
-            this.$l.localNormal = pb.vec3(
-              this.wrapNormals.at(this.wrapBase),
-              this.wrapNormals.at(pb.add(this.wrapBase, 1)),
-              this.wrapNormals.at(pb.add(this.wrapBase, 2))
-            );
-            this.$l.deformedNormal = pb.normalize(
-              pb.add(
-                pb.mul(this.tangent, this.localNormal.x),
-                pb.mul(this.bitangent, this.localNormal.y),
-                pb.mul(this.normal, this.localNormal.z)
+          this.$l.targetBase = pb.mul(this.vertex, 3);
+          this.$l.influenceBase = pb.mul(this.vertex, influenceCount);
+          this.$l.accum = pb.vec3(0, 0, 0);
+          for (let i = 0; i < influenceCount; i++) {
+            this.$l.influenceIndex = pb.add(this.influenceBase, i);
+            this.$l.sourceIndex = this.sourceIndices.at(this.influenceIndex);
+            this.$l.sourceBase = pb.mul(this.sourceIndex, 3);
+            this.$l.weight = this.sourceWeights.at(this.influenceIndex);
+            this.$l.sourcePosition = pb.mul(
+              this.sourceToTargetMatrix,
+              pb.vec4(
+                this.sourcePositions.at(this.sourceBase),
+                this.sourcePositions.at(pb.add(this.sourceBase, 1)),
+                this.sourcePositions.at(pb.add(this.sourceBase, 2)),
+                1
               )
-            );
-            this.targetNormals.setAt(this.wrapBase, this.deformedNormal.x);
-            this.targetNormals.setAt(pb.add(this.wrapBase, 1), this.deformedNormal.y);
-            this.targetNormals.setAt(pb.add(this.wrapBase, 2), this.deformedNormal.z);
+            ).xyz;
+            this.accum = pb.add(this.accum, pb.mul(this.sourcePosition, this.weight));
           }
+          this.$l.offset = pb.vec3(
+            this.targetOffsets.at(this.targetBase),
+            this.targetOffsets.at(pb.add(this.targetBase, 1)),
+            this.targetOffsets.at(pb.add(this.targetBase, 2))
+          );
+          this.$l.deformedPosition = pb.add(this.accum, this.offset);
+          this.targetPositions.setAt(this.targetBase, this.deformedPosition.x);
+          this.targetPositions.setAt(pb.add(this.targetBase, 1), this.deformedPosition.y);
+          this.targetPositions.setAt(pb.add(this.targetBase, 2), this.deformedPosition.z);
         });
       });
     }
   });
   if (program) {
-    program.name = writeNormals ? '@GPUCloth_WrapTargetWithNormal' : '@GPUCloth_WrapTarget';
+    program.name = '@GPUCloth_DisplacementWrapTarget';
   }
   return program;
 }
@@ -1172,189 +1084,6 @@ function getWrapSourceToTargetMatrix(source: any, target: any, out?: Matrix4x4) 
   return Matrix4x4.multiplyAffine(target.invWorldMatrix, source.worldMatrix, out);
 }
 
-function closestPointOnTriangle(
-  px: number,
-  py: number,
-  pz: number,
-  ax: number,
-  ay: number,
-  az: number,
-  bx: number,
-  by: number,
-  bz: number,
-  cx: number,
-  cy: number,
-  cz: number
-) {
-  const abx = bx - ax;
-  const aby = by - ay;
-  const abz = bz - az;
-  const acx = cx - ax;
-  const acy = cy - ay;
-  const acz = cz - az;
-  const apx = px - ax;
-  const apy = py - ay;
-  const apz = pz - az;
-  const d1 = abx * apx + aby * apy + abz * apz;
-  const d2 = acx * apx + acy * apy + acz * apz;
-  if (d1 <= 0 && d2 <= 0) {
-    return { x: ax, y: ay, z: az, w0: 1, w1: 0, w2: 0 };
-  }
-
-  const bpx = px - bx;
-  const bpy = py - by;
-  const bpz = pz - bz;
-  const d3 = abx * bpx + aby * bpy + abz * bpz;
-  const d4 = acx * bpx + acy * bpy + acz * bpz;
-  if (d3 >= 0 && d4 <= d3) {
-    return { x: bx, y: by, z: bz, w0: 0, w1: 1, w2: 0 };
-  }
-
-  const vc = d1 * d4 - d3 * d2;
-  if (vc <= 0 && d1 >= 0 && d3 <= 0) {
-    const v = d1 / (d1 - d3);
-    return {
-      x: ax + abx * v,
-      y: ay + aby * v,
-      z: az + abz * v,
-      w0: 1 - v,
-      w1: v,
-      w2: 0
-    };
-  }
-
-  const cpx = px - cx;
-  const cpy = py - cy;
-  const cpz = pz - cz;
-  const d5 = abx * cpx + aby * cpy + abz * cpz;
-  const d6 = acx * cpx + acy * cpy + acz * cpz;
-  if (d6 >= 0 && d5 <= d6) {
-    return { x: cx, y: cy, z: cz, w0: 0, w1: 0, w2: 1 };
-  }
-
-  const vb = d5 * d2 - d1 * d6;
-  if (vb <= 0 && d2 >= 0 && d6 <= 0) {
-    const w = d2 / (d2 - d6);
-    return {
-      x: ax + acx * w,
-      y: ay + acy * w,
-      z: az + acz * w,
-      w0: 1 - w,
-      w1: 0,
-      w2: w
-    };
-  }
-
-  const va = d3 * d6 - d5 * d4;
-  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
-    const edgeX = cx - bx;
-    const edgeY = cy - by;
-    const edgeZ = cz - bz;
-    const w = (d4 - d3) / (d4 - d3 + (d5 - d6));
-    return {
-      x: bx + edgeX * w,
-      y: by + edgeY * w,
-      z: bz + edgeZ * w,
-      w0: 0,
-      w1: 1 - w,
-      w2: w
-    };
-  }
-
-  const denom = 1 / (va + vb + vc);
-  const v = vb * denom;
-  const w = vc * denom;
-  const u = 1 - v - w;
-  return {
-    x: ax * u + bx * v + cx * w,
-    y: ay * u + by * v + cy * w,
-    z: az * u + bz * v + cz * w,
-    w0: u,
-    w1: v,
-    w2: w
-  };
-}
-
-function buildTriangleBasisFromPositions(
-  p0x: number,
-  p0y: number,
-  p0z: number,
-  p1x: number,
-  p1y: number,
-  p1z: number,
-  p2x: number,
-  p2y: number,
-  p2z: number
-) {
-  let tx = p1x - p0x;
-  let ty = p1y - p0y;
-  let tz = p1z - p0z;
-  let tLen = Math.hypot(tx, ty, tz);
-  if (tLen <= 1e-6) {
-    tx = 1;
-    ty = 0;
-    tz = 0;
-    tLen = 1;
-  }
-  tx /= tLen;
-  ty /= tLen;
-  tz /= tLen;
-
-  let nx = ty * (p2z - p0z) - tz * (p2y - p0y);
-  let ny = tz * (p2x - p0x) - tx * (p2z - p0z);
-  let nz = tx * (p2y - p0y) - ty * (p2x - p0x);
-  let nLen = Math.hypot(nx, ny, nz);
-  if (nLen <= 1e-6) {
-    nx = 0;
-    ny = 1;
-    nz = 0;
-    nLen = 1;
-  }
-  nx /= nLen;
-  ny /= nLen;
-  nz /= nLen;
-
-  let bx = ny * tz - nz * ty;
-  let by = nz * tx - nx * tz;
-  let bz = nx * ty - ny * tx;
-  let bLen = Math.hypot(bx, by, bz);
-  if (bLen <= 1e-6) {
-    bx = 0;
-    by = 0;
-    bz = 1;
-    bLen = 1;
-  }
-  bx /= bLen;
-  by /= bLen;
-  bz /= bLen;
-
-  tx = by * nz - bz * ny;
-  ty = bz * nx - bx * nz;
-  tz = bx * ny - by * nx;
-  tLen = Math.hypot(tx, ty, tz);
-  if (tLen <= 1e-6) {
-    tx = 1;
-    ty = 0;
-    tz = 0;
-    tLen = 1;
-  }
-  tx /= tLen;
-  ty /= tLen;
-  tz /= tLen;
-
-  return {
-    tx,
-    ty,
-    tz,
-    bx,
-    by,
-    bz,
-    nx,
-    ny,
-    nz
-  };
-}
-
 class GPUClothWrapBinding {
   private readonly _device: AbstractDevice;
   private readonly _source: any;
@@ -1369,8 +1098,6 @@ class GPUClothWrapBinding {
   private readonly _maxOffsetDistance: number;
   private readonly _sourceToTargetMatrix: Matrix4x4;
   private readonly _positionBuffer: StructuredBuffer;
-  private readonly _wrapNormalBuffer: Nullable<GPUDataBuffer>;
-  private readonly _normalBuffer: Nullable<StructuredBuffer>;
   private readonly _originalPositionBuffer: Nullable<StructuredBuffer>;
   private readonly _originalNormalBuffer: Nullable<StructuredBuffer>;
   private readonly _restoreSkinning: Nullable<boolean>;
@@ -1383,11 +1110,9 @@ class GPUClothWrapBinding {
     wrapTriangleIndexBuffer: GPUDataBuffer,
     wrapWeightBuffer: GPUDataBuffer,
     wrapOffsetBuffer: GPUDataBuffer,
-    wrapNormalBuffer: Nullable<GPUDataBuffer>,
     program: GPUProgram,
     bindGroup: BindGroup,
     positionBuffer: StructuredBuffer,
-    normalBuffer: Nullable<StructuredBuffer>,
     originalPositionBuffer: Nullable<StructuredBuffer>,
     originalNormalBuffer: Nullable<StructuredBuffer>,
     workgroupCount: number,
@@ -1401,14 +1126,12 @@ class GPUClothWrapBinding {
     this._wrapTriangleIndexBuffer = wrapTriangleIndexBuffer;
     this._wrapWeightBuffer = wrapWeightBuffer;
     this._wrapOffsetBuffer = wrapOffsetBuffer;
-    this._wrapNormalBuffer = wrapNormalBuffer;
     this._program = program;
     this._bindGroup = bindGroup;
     this._workgroupCount = workgroupCount;
     this._maxOffsetDistance = maxOffsetDistance;
     this._sourceToTargetMatrix = new Matrix4x4();
     this._positionBuffer = positionBuffer;
-    this._normalBuffer = normalBuffer;
     this._originalPositionBuffer = originalPositionBuffer;
     this._originalNormalBuffer = originalNormalBuffer;
     this._restoreSkinning = restoreSkinning;
@@ -1419,17 +1142,17 @@ class GPUClothWrapBinding {
     source: any,
     sourcePositionBuffer: StructuredBuffer,
     sourceRestPositions: Float32Array<ArrayBuffer>,
-    sourceIndexData: Uint32Array<ArrayBuffer>,
+    _sourceIndexData: Uint32Array<ArrayBuffer>,
     target: any,
     workgroupSize: number
   ) {
-    const data = await GPUClothWrapBinding.createBindingData(source, sourceRestPositions, sourceIndexData, target);
+    const data = await GPUClothWrapBinding.createBindingData(source, sourceRestPositions, target);
     return GPUClothWrapBinding.createFromData(
       device,
       source,
       sourcePositionBuffer,
       sourceRestPositions,
-      sourceIndexData,
+      _sourceIndexData,
       target,
       workgroupSize,
       data
@@ -1439,7 +1162,6 @@ class GPUClothWrapBinding {
   static async createBindingData(
     source: any,
     sourceRestPositions: Float32Array<ArrayBuffer>,
-    sourceIndexData: Uint32Array<ArrayBuffer>,
     target: any
   ): Promise<GPUClothWrapBindingData> {
     if (!target?.primitive) {
@@ -1447,121 +1169,89 @@ class GPUClothWrapBinding {
     }
     const targetPrimitive = target.primitive as Primitive;
     const targetPositions = await readPositionDataFromPrimitive(targetPrimitive);
-    const targetNormals = await readNormalDataFromPrimitive(targetPrimitive);
     const sourceToTargetBindMatrix = getWrapSourceToTargetMatrix(source, target);
     const sourcePositionsInTargetSpace = transformPointArrayByMatrix(sourceToTargetBindMatrix, sourceRestPositions);
-    const triangleCount = (sourceIndexData.length / 3) >> 0;
-    if (triangleCount <= 0) {
-      throw new Error('GPU cloth wrap failed: source mesh has no triangles.');
+    const sourceVertexCount = (sourcePositionsInTargetSpace.length / 3) >> 0;
+    if (sourceVertexCount <= 0) {
+      throw new Error('GPU cloth wrap failed: source mesh has no vertices.');
     }
     const vertexCount = (targetPositions.length / 3) >> 0;
-    const wrapTriangleIndices = new Uint32Array(vertexCount * 3);
-    const wrapWeights = new Float32Array(vertexCount * 3);
-    const wrapOffsets = new Float32Array(vertexCount * 3);
-    const wrapNormals = targetNormals ? new Float32Array(vertexCount * 3) : null;
+    const sourceIndices = new Uint32Array(vertexCount * WRAP_INFLUENCE_COUNT);
+    const sourceWeights = new Float32Array(vertexCount * WRAP_INFLUENCE_COUNT);
+    const targetOffsets = new Float32Array(vertexCount * 3);
     let maxOffsetDistance = 0;
     for (let vertex = 0; vertex < vertexCount; vertex++) {
-      const vx = targetPositions[vertex * 3];
-      const vy = targetPositions[vertex * 3 + 1];
-      const vz = targetPositions[vertex * 3 + 2];
-      let bestDistance = Number.POSITIVE_INFINITY;
-      let bestTriangle = 0;
-      let bestResult = {
-        x: 0,
-        y: 0,
-        z: 0,
-        w0: 1,
-        w1: 0,
-        w2: 0
-      };
-      for (let tri = 0; tri < triangleCount; tri++) {
-        const triBase = tri * 3;
-        const i0 = sourceIndexData[triBase];
-        const i1 = sourceIndexData[triBase + 1];
-        const i2 = sourceIndexData[triBase + 2];
-        const p0Base = i0 * 3;
-        const p1Base = i1 * 3;
-        const p2Base = i2 * 3;
-        const closest = closestPointOnTriangle(
-          vx,
-          vy,
-          vz,
-          sourcePositionsInTargetSpace[p0Base],
-          sourcePositionsInTargetSpace[p0Base + 1],
-          sourcePositionsInTargetSpace[p0Base + 2],
-          sourcePositionsInTargetSpace[p1Base],
-          sourcePositionsInTargetSpace[p1Base + 1],
-          sourcePositionsInTargetSpace[p1Base + 2],
-          sourcePositionsInTargetSpace[p2Base],
-          sourcePositionsInTargetSpace[p2Base + 1],
-          sourcePositionsInTargetSpace[p2Base + 2]
-        );
-        const dx = vx - closest.x;
-        const dy = vy - closest.y;
-        const dz = vz - closest.z;
-        const distance = dx * dx + dy * dy + dz * dz;
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          bestTriangle = tri;
-          bestResult = closest;
+      const targetBase = vertex * 3;
+      const vx = targetPositions[targetBase];
+      const vy = targetPositions[targetBase + 1];
+      const vz = targetPositions[targetBase + 2];
+      const nearestDistances = new Float32Array(WRAP_INFLUENCE_COUNT);
+      const nearestIndices = new Uint32Array(WRAP_INFLUENCE_COUNT);
+      for (let i = 0; i < WRAP_INFLUENCE_COUNT; i++) {
+        nearestDistances[i] = Number.POSITIVE_INFINITY;
+        nearestIndices[i] = 0;
+      }
+      for (let sourceVertex = 0; sourceVertex < sourceVertexCount; sourceVertex++) {
+        const sourceBase = sourceVertex * 3;
+        const dx = vx - sourcePositionsInTargetSpace[sourceBase];
+        const dy = vy - sourcePositionsInTargetSpace[sourceBase + 1];
+        const dz = vz - sourcePositionsInTargetSpace[sourceBase + 2];
+        const distanceSq = dx * dx + dy * dy + dz * dz;
+        for (let slot = 0; slot < WRAP_INFLUENCE_COUNT; slot++) {
+          if (distanceSq < nearestDistances[slot]) {
+            for (let shift = WRAP_INFLUENCE_COUNT - 1; shift > slot; shift--) {
+              nearestDistances[shift] = nearestDistances[shift - 1];
+              nearestIndices[shift] = nearestIndices[shift - 1];
+            }
+            nearestDistances[slot] = distanceSq;
+            nearestIndices[slot] = sourceVertex;
+            break;
+          }
         }
       }
-      const bestBase = bestTriangle * 3;
-      const i0 = sourceIndexData[bestBase];
-      const i1 = sourceIndexData[bestBase + 1];
-      const i2 = sourceIndexData[bestBase + 2];
-      const p0Base = i0 * 3;
-      const p1Base = i1 * 3;
-      const p2Base = i2 * 3;
-      const basis = buildTriangleBasisFromPositions(
-        sourcePositionsInTargetSpace[p0Base],
-        sourcePositionsInTargetSpace[p0Base + 1],
-        sourcePositionsInTargetSpace[p0Base + 2],
-        sourcePositionsInTargetSpace[p1Base],
-        sourcePositionsInTargetSpace[p1Base + 1],
-        sourcePositionsInTargetSpace[p1Base + 2],
-        sourcePositionsInTargetSpace[p2Base],
-        sourcePositionsInTargetSpace[p2Base + 1],
-        sourcePositionsInTargetSpace[p2Base + 2]
-      );
-      const deltaX = vx - bestResult.x;
-      const deltaY = vy - bestResult.y;
-      const deltaZ = vz - bestResult.z;
-      const targetBase = vertex * 3;
-      wrapTriangleIndices[targetBase] = i0;
-      wrapTriangleIndices[targetBase + 1] = i1;
-      wrapTriangleIndices[targetBase + 2] = i2;
-      wrapWeights[targetBase] = bestResult.w0;
-      wrapWeights[targetBase + 1] = bestResult.w1;
-      wrapWeights[targetBase + 2] = bestResult.w2;
-      wrapOffsets[targetBase] = deltaX * basis.tx + deltaY * basis.ty + deltaZ * basis.tz;
-      wrapOffsets[targetBase + 1] = deltaX * basis.bx + deltaY * basis.by + deltaZ * basis.bz;
-      wrapOffsets[targetBase + 2] = deltaX * basis.nx + deltaY * basis.ny + deltaZ * basis.nz;
-      maxOffsetDistance = Math.max(
-        maxOffsetDistance,
-        Math.hypot(wrapOffsets[targetBase], wrapOffsets[targetBase + 1], wrapOffsets[targetBase + 2])
-      );
-      if (wrapNormals && targetNormals) {
-        const nx = targetNormals[targetBase];
-        const ny = targetNormals[targetBase + 1];
-        const nz = targetNormals[targetBase + 2];
-        wrapNormals[targetBase] = nx * basis.tx + ny * basis.ty + nz * basis.tz;
-        wrapNormals[targetBase + 1] = nx * basis.bx + ny * basis.by + nz * basis.bz;
-        wrapNormals[targetBase + 2] = nx * basis.nx + ny * basis.ny + nz * basis.nz;
+      let totalWeight = 0;
+      const influenceBase = vertex * WRAP_INFLUENCE_COUNT;
+      for (let slot = 0; slot < WRAP_INFLUENCE_COUNT; slot++) {
+        const distanceSq = nearestDistances[slot];
+        const weight = 1 / Math.max(1e-8, distanceSq);
+        sourceIndices[influenceBase + slot] = nearestIndices[slot];
+        sourceWeights[influenceBase + slot] = weight;
+        totalWeight += weight;
       }
+      if (totalWeight <= 1e-8) {
+        sourceWeights[influenceBase] = 1;
+        totalWeight = 1;
+        for (let slot = 1; slot < WRAP_INFLUENCE_COUNT; slot++) {
+          sourceWeights[influenceBase + slot] = 0;
+          sourceIndices[influenceBase + slot] = sourceIndices[influenceBase];
+        }
+      }
+      let baseX = 0;
+      let baseY = 0;
+      let baseZ = 0;
+      for (let slot = 0; slot < WRAP_INFLUENCE_COUNT; slot++) {
+        const normalizedWeight = sourceWeights[influenceBase + slot] / totalWeight;
+        sourceWeights[influenceBase + slot] = normalizedWeight;
+        const sourceBase = sourceIndices[influenceBase + slot] * 3;
+        baseX += sourcePositionsInTargetSpace[sourceBase] * normalizedWeight;
+        baseY += sourcePositionsInTargetSpace[sourceBase + 1] * normalizedWeight;
+        baseZ += sourcePositionsInTargetSpace[sourceBase + 2] * normalizedWeight;
+      }
+      targetOffsets[targetBase] = vx - baseX;
+      targetOffsets[targetBase + 1] = vy - baseY;
+      targetOffsets[targetBase + 2] = vz - baseZ;
+      maxOffsetDistance = Math.max(maxOffsetDistance, Math.hypot(vx - baseX, vy - baseY, vz - baseZ));
     }
 
     return {
-      version: 1,
+      version: 2,
       vertexCount,
-      sourceVertexCount: (sourceRestPositions.length / 3) >> 0,
-      sourceIndexCount: sourceIndexData.length,
-      hasNormals: !!wrapNormals,
+      sourceVertexCount,
+      influenceCount: WRAP_INFLUENCE_COUNT,
       maxOffsetDistance,
-      triangleIndices: encodeTypedArrayBase64(wrapTriangleIndices),
-      weights: encodeTypedArrayBase64(wrapWeights),
-      offsets: encodeTypedArrayBase64(wrapOffsets),
-      normals: wrapNormals ? encodeTypedArrayBase64(wrapNormals) : undefined
+      sourceIndices: encodeTypedArrayBase64(sourceIndices),
+      sourceWeights: encodeTypedArrayBase64(sourceWeights),
+      targetOffsets: encodeTypedArrayBase64(targetOffsets)
     };
   }
 
@@ -1570,7 +1260,7 @@ class GPUClothWrapBinding {
     source: any,
     sourcePositionBuffer: StructuredBuffer,
     sourceRestPositions: Float32Array<ArrayBuffer>,
-    sourceIndexData: Uint32Array<ArrayBuffer>,
+    _sourceIndexData: Uint32Array<ArrayBuffer>,
     target: any,
     workgroupSize: number,
     data: GPUClothWrapBindingData
@@ -1580,81 +1270,55 @@ class GPUClothWrapBinding {
     }
     const targetPrimitive = target.primitive as Primitive;
     const vertexCount = targetPrimitive.getNumVertices();
-    if (!isWrapBindingDataCompatible(data, sourceRestPositions, sourceIndexData, vertexCount)) {
+    if (!isWrapBindingDataCompatible(data, sourceRestPositions, vertexCount)) {
       throw new Error('GPU cloth wrap failed: binding cache is incompatible with current meshes.');
     }
     const expectedElementCount = vertexCount * 3;
-    const wrapTriangleIndices = decodeTypedArrayFromBase64(Uint32Array, data.triangleIndices, expectedElementCount);
-    const wrapWeights = decodeTypedArrayFromBase64(Float32Array, data.weights, expectedElementCount);
-    const wrapOffsets = decodeTypedArrayFromBase64(Float32Array, data.offsets, expectedElementCount);
-    const wrapNormals =
-      data.hasNormals && data.normals
-        ? decodeTypedArrayFromBase64(Float32Array, data.normals, expectedElementCount)
-        : null;
+    const influenceElementCount = vertexCount * data.influenceCount;
+    const wrapSourceIndices = decodeTypedArrayFromBase64(Uint32Array, data.sourceIndices, influenceElementCount);
+    const wrapSourceWeights = decodeTypedArrayFromBase64(Float32Array, data.sourceWeights, influenceElementCount);
+    const wrapTargetOffsets = decodeTypedArrayFromBase64(Float32Array, data.targetOffsets, expectedElementCount);
     const positionBuffer = device.createVertexBuffer('position_f32x3', new Float32Array(expectedElementCount), {
       storage: true,
       managed: false
     });
-    const normalBuffer = wrapNormals
-      ? device.createVertexBuffer('normal_f32x3', new Float32Array(expectedElementCount), {
-          storage: true,
-          managed: false
-        })
-      : null;
     if (!positionBuffer) {
       throw new Error('GPU cloth wrap failed: could not create target position buffer.');
     }
 
-    const wrapTriangleIndexBuffer = device.createBuffer(wrapTriangleIndices.byteLength, {
+    const wrapTriangleIndexBuffer = device.createBuffer(wrapSourceIndices.byteLength, {
       usage: 'uniform',
       storage: true,
       dynamic: false,
       managed: false
     });
-    wrapTriangleIndexBuffer.bufferSubData(0, wrapTriangleIndices);
-    const wrapWeightBuffer = device.createBuffer(wrapWeights.byteLength, {
+    wrapTriangleIndexBuffer.bufferSubData(0, wrapSourceIndices);
+    const wrapWeightBuffer = device.createBuffer(wrapSourceWeights.byteLength, {
       usage: 'uniform',
       storage: true,
       dynamic: false,
       managed: false
     });
-    wrapWeightBuffer.bufferSubData(0, wrapWeights);
-    const wrapOffsetBuffer = device.createBuffer(wrapOffsets.byteLength, {
+    wrapWeightBuffer.bufferSubData(0, wrapSourceWeights);
+    const wrapOffsetBuffer = device.createBuffer(wrapTargetOffsets.byteLength, {
       usage: 'uniform',
       storage: true,
       dynamic: false,
       managed: false
     });
-    wrapOffsetBuffer.bufferSubData(0, wrapOffsets);
-    let wrapNormalBuffer: Nullable<GPUDataBuffer> = null;
-    if (wrapNormals) {
-      wrapNormalBuffer = device.createBuffer(wrapNormals.byteLength, {
-        usage: 'uniform',
-        storage: true,
-        dynamic: false,
-        managed: false
-      });
-      wrapNormalBuffer.bufferSubData(0, wrapNormals);
-    }
-    const program = createWrapDeformerProgram(device, workgroupSize, !!wrapNormals);
+    wrapOffsetBuffer.bufferSubData(0, wrapTargetOffsets);
+    const program = createWrapDeformerProgram(device, workgroupSize, data.influenceCount);
     if (!program) {
       throw new Error('GPU cloth wrap failed: could not create compute program.');
     }
     const bindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
     bindGroup.setBuffer('sourcePositions', sourcePositionBuffer);
-    bindGroup.setBuffer('wrapTriangleIndices', wrapTriangleIndexBuffer);
-    bindGroup.setBuffer('wrapWeights', wrapWeightBuffer);
-    bindGroup.setBuffer('wrapOffsets', wrapOffsetBuffer);
-    if (wrapNormalBuffer) {
-      bindGroup.setBuffer('wrapNormals', wrapNormalBuffer);
-    }
+    bindGroup.setBuffer('sourceIndices', wrapTriangleIndexBuffer);
+    bindGroup.setBuffer('sourceWeights', wrapWeightBuffer);
+    bindGroup.setBuffer('targetOffsets', wrapOffsetBuffer);
     bindGroup.setBuffer('targetPositions', positionBuffer);
-    if (normalBuffer) {
-      bindGroup.setBuffer('targetNormals', normalBuffer);
-    }
     const sourceToTargetBindMatrix = getWrapSourceToTargetMatrix(source, target);
     bindGroup.setValue('vertexCount', vertexCount);
-    bindGroup.setValue('minDistance', 1e-5);
     bindGroup.setValue('sourceToTargetMatrix', sourceToTargetBindMatrix);
 
     const originalPositionBuffer = targetPrimitive.getVertexBuffer('position');
@@ -1663,10 +1327,6 @@ class GPUClothWrapBinding {
     retainObject(originalNormalBuffer);
     targetPrimitive.removeVertexBuffer('position');
     targetPrimitive.setVertexBuffer(positionBuffer);
-    if (normalBuffer) {
-      targetPrimitive.removeVertexBuffer('normal');
-      targetPrimitive.setVertexBuffer(normalBuffer);
-    }
 
     let restoreSkinning: Nullable<boolean> = null;
     if (typeof target?.suspendSkinning === 'boolean') {
@@ -1684,11 +1344,9 @@ class GPUClothWrapBinding {
       wrapTriangleIndexBuffer,
       wrapWeightBuffer,
       wrapOffsetBuffer,
-      wrapNormalBuffer,
       program,
       bindGroup,
       positionBuffer,
-      normalBuffer,
       originalPositionBuffer,
       originalNormalBuffer,
       Math.max(1, Math.ceil(vertexCount / workgroupSize)),
@@ -1714,23 +1372,19 @@ class GPUClothWrapBinding {
     this._wrapTriangleIndexBuffer.dispose();
     this._wrapWeightBuffer.dispose();
     this._wrapOffsetBuffer.dispose();
-    this._wrapNormalBuffer?.dispose();
     if (this._targetPrimitive) {
       this._targetPrimitive.removeVertexBuffer('position');
       if (this._originalPositionBuffer) {
         this._targetPrimitive.setVertexBuffer(this._originalPositionBuffer);
       }
-      if (this._normalBuffer || this._originalNormalBuffer) {
+      if (this._originalNormalBuffer) {
         this._targetPrimitive.removeVertexBuffer('normal');
-        if (this._originalNormalBuffer) {
-          this._targetPrimitive.setVertexBuffer(this._originalNormalBuffer);
-        }
+        this._targetPrimitive.setVertexBuffer(this._originalNormalBuffer);
       }
     }
     releaseObject(this._originalPositionBuffer);
     releaseObject(this._originalNormalBuffer);
     this._positionBuffer.dispose();
-    this._normalBuffer?.dispose();
     if (this._target && this._restoreSkinning !== null) {
       this._target.setAnimatedBoundingBox?.(null);
       this._target.suspendSkinning = this._restoreSkinning;
@@ -1801,10 +1455,7 @@ export async function createGPUClothWrapBindingData(source: any, target: any): P
   }
   const sourcePrimitive = source.primitive as Primitive;
   const sourcePositions = await readPositionDataFromPrimitive(sourcePrimitive);
-  const sourceIndexData = toUInt32Indices(
-    await readIndexDataFromPrimitive(sourcePrimitive, (sourcePositions.length / 3) >> 0)
-  );
-  return GPUClothWrapBinding.createBindingData(source, sourcePositions, sourceIndexData, target);
+  return GPUClothWrapBinding.createBindingData(source, sourcePositions, target);
 }
 
 /**

@@ -1837,7 +1837,7 @@ export class Engine {
           primitiveId: Number(entry.target?.primitive?.id) || 0,
           bindingSignature: `${Number(entry.data?.version) || 0}:${Number(entry.data?.vertexCount) || 0}:${
             Number(entry.data?.sourceVertexCount) || 0
-          }:${Number(entry.data?.sourceIndexCount) || 0}:${entry.data?.hasNormals ? 1 : 0}`
+          }:${Number(entry.data?.influenceCount) || 0}`
         }))
       });
       const runtimeSignature = buildClothRuntimeSignature(config, target);
@@ -1876,7 +1876,7 @@ export class Engine {
         primitiveId: Number(entry.target?.primitive?.id) || 0,
         bindingSignature: `${Number(entry.data?.version) || 0}:${Number(entry.data?.vertexCount) || 0}:${
           Number(entry.data?.sourceVertexCount) || 0
-        }:${Number(entry.data?.sourceIndexCount) || 0}:${entry.data?.hasNormals ? 1 : 0}`
+        }:${Number(entry.data?.influenceCount) || 0}`
       }))
     });
     if (state.cloth && structureSignature === state.structureSignature) {
