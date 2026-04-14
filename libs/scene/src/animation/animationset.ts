@@ -1,5 +1,5 @@
-import { weightedAverage, Disposable, Interpolator } from '@zephyr3d/base';
-import type { DRef, IDisposable, Nullable, Quaternion } from '@zephyr3d/base';
+import { weightedAverage, Disposable, Interpolator, Vector3 } from '@zephyr3d/base';
+import { DRef, IDisposable, Nullable, Quaternion } from '@zephyr3d/base';
 import type { SceneNode } from '../scene';
 import { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
@@ -7,7 +7,7 @@ import { NodeRotationTrack } from './rotationtrack';
 import { NodeEulerRotationTrack } from './eulerrotationtrack';
 import { NodeTranslationTrack } from './translationtrack';
 import { NodeScaleTrack } from './scaletrack';
-import { Skeleton } from './skeleton';
+import { HumanoidBodyRig, Skeleton } from './skeleton';
 
 /**
  * Options for playing an animation.
@@ -563,6 +563,10 @@ export class AnimationSet extends Disposable implements IDisposable {
       return null;
     }
 
+    const deltaRotation = Quaternion.multiply(
+      Quaternion.inverse(dstSkeleton.humanoidRootRotation),
+      srcSkeleton.humanoidRootRotation
+    );
     // Build remap for matched joint pairs
     for (let fi = 0; fi < srcJointsFiltered.length; fi++) {
       const srcJoint = srcJointsFiltered[fi];
@@ -600,15 +604,14 @@ export class AnimationSet extends Disposable implements IDisposable {
       }
       const dstNode = nodeMap.get(srcNode)!;
       const remap = jointRemapBySrcNode.get(srcNode) ?? null;
+      const isHipsBone = srcNode === srcSkeleton.humanoidJointMapping?.body[HumanoidBodyRig.Hips];
 
       for (const srcTrack of srcTracks) {
         let dstTrack: AnimationTrack;
         if (srcTrack instanceof NodeRotationTrack) {
-          dstTrack = retargetRotationTrack(srcTrack);
-        } else if (srcTrack instanceof NodeEulerRotationTrack) {
-          dstTrack = retargetEulerToRotationTrack(srcTrack);
+          dstTrack = retargetRotationTrack(srcTrack, isHipsBone ? deltaRotation : undefined);
         } else if (srcTrack instanceof NodeTranslationTrack) {
-          dstTrack = retargetTranslationTrack(srcTrack, remap);
+          dstTrack = retargetTranslationTrack(srcTrack, remap, isHipsBone ? deltaRotation : undefined);
         } else if (srcTrack instanceof NodeScaleTrack) {
           dstTrack = new NodeScaleTrack(cloneInterpolator(srcTrack.interpolator));
         } else {
@@ -629,16 +632,34 @@ export class AnimationSet extends Disposable implements IDisposable {
 
     function retargetTranslationTrack(
       src: NodeTranslationTrack,
-      remap: JointRemap | null
+      remap: JointRemap | null,
+      deltaRotation?: Quaternion
     ): NodeTranslationTrack {
       if (!remap || Math.abs(remap.translationScale - 1) < 1e-6) {
         return new NodeTranslationTrack(cloneInterpolator(src.interpolator));
       }
       const scale = remap.translationScale;
+      const isCubic = src.interpolator.mode === 'cubicspline';
+      const frameStride = isCubic ? 9 : 3;
+      const numFrames = (src.interpolator.inputs as Float32Array).length;
       const srcOutputs = src.interpolator.outputs as Float32Array;
       const newOutputs = new Float32Array(srcOutputs.length);
-      for (let i = 0; i < newOutputs.length; i++) {
-        newOutputs[i] = srcOutputs[i] * scale;
+      const t = isCubic ? 3 : 0;
+      const v = new Vector3();
+      for (let f = 0; f < numFrames; f++) {
+        const base = f * frameStride;
+        v.setXYZ(srcOutputs[base + t], srcOutputs[base + t + 1], srcOutputs[base + t + 2]);
+        v.scaleBy(scale);
+        if (deltaRotation) {
+          deltaRotation.transform(v, v);
+        }
+        if (isCubic) {
+          newOutputs.set(srcOutputs.subarray(base, base + 3), base);
+          newOutputs.set(v, base + 3);
+          newOutputs.set(srcOutputs.subarray(base + 6, base + 9), base + 6);
+        } else {
+          newOutputs.set(v, base);
+        }
       }
       return new NodeTranslationTrack(
         new Interpolator(
@@ -659,15 +680,32 @@ export class AnimationSet extends Disposable implements IDisposable {
       );
     }
 
-    function retargetRotationTrack(src: NodeRotationTrack): NodeRotationTrack {
+    function retargetRotationTrack(src: NodeRotationTrack, deltaRotation?: Quaternion): NodeRotationTrack {
       const isCubic = src.interpolator.mode === 'cubicspline';
       const frameStride = isCubic ? 12 : 4;
       const numFrames = (src.interpolator.inputs as Float32Array).length;
       const srcOutputs = src.interpolator.outputs as Float32Array;
       const newOutputs = new Float32Array(srcOutputs.length);
+      const t = isCubic ? 4 : 0;
+      const q = new Quaternion();
       for (let f = 0; f < numFrames; f++) {
         const base = f * frameStride;
-        newOutputs.set(srcOutputs.subarray(base, base + (isCubic ? 12 : 4)), base);
+        q.setXYZW(
+          srcOutputs[base + t],
+          srcOutputs[base + t + 1],
+          srcOutputs[base + t + 2],
+          srcOutputs[base + t + 3]
+        );
+        if (deltaRotation) {
+          Quaternion.multiply(deltaRotation, q, q);
+        }
+        if (isCubic) {
+          newOutputs.set(srcOutputs.subarray(base, base + 4), base);
+          newOutputs.set(q, base + 4);
+          newOutputs.set(srcOutputs.subarray(base + 8, base + 12), base + 8);
+        } else {
+          newOutputs.set(q, base);
+        }
       }
       return new NodeRotationTrack(
         new Interpolator(
@@ -676,20 +714,6 @@ export class AnimationSet extends Disposable implements IDisposable {
           new Float32Array(src.interpolator.inputs as Float32Array),
           newOutputs
         )
-      );
-    }
-
-    function retargetEulerToRotationTrack(src: NodeEulerRotationTrack): NodeRotationTrack {
-      const srcInputs = src.interpolator.inputs as Float32Array;
-      const srcOutputs = src.interpolator.outputs as Float32Array;
-      const numFrames = srcInputs.length;
-      const newOutputs = new Float32Array(numFrames * 3);
-      for (let f = 0; f < numFrames; f++) {
-        const base = f * 3;
-        newOutputs.set(srcOutputs.subarray(base, base + 3), base);
-      }
-      return new NodeRotationTrack(
-        new Interpolator('linear', 'quat', new Float32Array(srcInputs), newOutputs)
       );
     }
   }

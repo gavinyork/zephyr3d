@@ -1,5 +1,5 @@
 import { DRef, randomUUID, DWeakRef } from '@zephyr3d/base';
-import type { Nullable, Quaternion, TypedArray } from '@zephyr3d/base';
+import { Nullable, Quaternion, TypedArray } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Vector3, nextPowerOf2 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';
@@ -202,6 +202,8 @@ export class Skeleton extends Disposable {
   protected _lastUpdateTime: number;
   /** @internal */
   protected _humanoidJointMapping: Nullable<HumanoidJointMapping<SceneNode>>;
+  /** @internal */
+  protected _humanoidRootRotation: Quaternion;
   /**
    * Create a skeleton instance.
    *
@@ -229,7 +231,15 @@ export class Skeleton extends Disposable {
     if (!skeletonRoot || !this._joints.includes(skeletonRoot)) {
       throw new Error('Skeleton root must be included in the joint list');
     }
-    this._humanoidJointMapping = Skeleton.tryExtractHumanoidJoints(skeletonRoot.scene!.rootNode);
+    this._humanoidJointMapping = Skeleton.tryExtractHumanoidJoints(skeletonRoot);
+    this._humanoidRootRotation = Quaternion.identity();
+    if (this._humanoidJointMapping) {
+      let p = this._humanoidJointMapping.body[HumanoidBodyRig.Hips];
+      while (this._joints.includes(p.parent!)) {
+        Quaternion.multiply(p.parent!.rotation, this._humanoidRootRotation, this._humanoidRootRotation);
+        p = p.parent!;
+      }
+    }
     Skeleton._registry.set(this._id, new DWeakRef(this));
   }
   /**
@@ -254,6 +264,10 @@ export class Skeleton extends Disposable {
   /** Gets the humanoid joint mapping */
   get humanoidJointMapping(): Nullable<HumanoidJointMapping<SceneNode>> {
     return this._humanoidJointMapping;
+  }
+  /** Root rotation of humanoid hips bone */
+  get humanoidRootRotation(): Quaternion {
+    return this._humanoidRootRotation;
   }
   /** @internal */
   get inverseBindMatrices() {
