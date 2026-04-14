@@ -353,6 +353,9 @@ export class PropertyEditor extends Observable<{
     if (group.prop?.isValid && group.object && !group.prop.isValid.call(group.object)) {
       return;
     }
+    if (this.renderInlineObjectArrayGroup(group, level)) {
+      return;
+    }
     ImGui.TableNextRow();
     ImGui.TableNextColumn();
     ImGui.TableNextColumn();
@@ -495,6 +498,106 @@ export class PropertyEditor extends Observable<{
     if (level > 0) {
       ImGui.SetCursorPosX(baseX);
     }
+  }
+  private renderInlineObjectArrayGroup(group: PropertyGroup, level: number) {
+    if (
+      !group.object ||
+      !group.prop ||
+      group.prop.type !== 'object_array' ||
+      !group.prop.options?.inlineObjectArray ||
+      !group.value.object?.[0] ||
+      group.properties.length !== 1 ||
+      group.subgroups.length > 0 ||
+      group.rawProperties.length > 0 ||
+      group.properties[0] instanceof PropertyGroup
+    ) {
+      return false;
+    }
+    const inlineProperty = group.properties[0].property;
+    const value = inlineProperty.value;
+    const object = inlineProperty.object;
+    if (!value || value.type !== 'string') {
+      return false;
+    }
+
+    ImGui.TableNextRow();
+    ImGui.TableNextColumn();
+    ImGui.TableNextColumn();
+    const baseX = ImGui.GetCursorPosX();
+    if (level > 0) {
+      ImGui.SetCursorPosX(baseX + level * 10);
+    }
+    ImGui.AlignTextToFramePadding();
+    ImGui.Text(value.options?.label ?? group.prop.options?.label ?? inlineProperty.name);
+    if (level > 0) {
+      ImGui.SetCursorPosX(baseX);
+    }
+
+    ImGui.TableNextColumn();
+    const tmpProperty: RequireOptionals<PropertyValue> = {
+      num: [0, 0, 0, 0],
+      str: [''],
+      bool: [false],
+      object: []
+    };
+    value.get.call(object, tmpProperty);
+    const readonly = !value.set;
+    const val = tmpProperty.str as [string];
+    const isSceneNodeRef = !!value.options?.sceneNode;
+    const hasValue = !!String(val[0] ?? '').trim();
+    const addable = !!group.prop.add && group.index === group.count - 1;
+    const deletable = !!group.prop.delete && group.index < group.count && (group.count > 1 || hasValue);
+    const extraButtons = (addable ? 1 : 0) + (deletable ? 1 : 0);
+    if (extraButtons > 0) {
+      ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
+      ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - extraButtons * ImGui.GetFrameHeight());
+    } else {
+      ImGui.SetNextItemWidth(-1);
+    }
+    let changed = false;
+    if (isSceneNodeRef) {
+      const displayValue = [val[0]] as [string];
+      ImGui.InputText('##value', displayValue, undefined, ImGui.InputTextFlags.ReadOnly);
+    } else {
+      changed = ImGui.InputText(
+        '##value',
+        val,
+        undefined,
+        readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+      );
+    }
+    this.setDragDropProperty(object, value, tmpProperty);
+    if (addable) {
+      ImGui.SameLine(0, 0);
+      if (ImGui.Button(`${FontGlyph.glyphs['plus']}##add`, new ImGui.ImVec2(ImGui.GetFrameHeight(), 0))) {
+        const ctor = group.objectTypes?.[0]?.ctor;
+        const newObj = ctor
+          ? group.prop.create
+            ? group.prop.create.call(group.object, ctor, group.index + 1)
+            : new ctor()
+          : null;
+        (group.prop.add<'object'>).call(group.object, { object: [newObj] }, group.index + 1);
+        this.dispatchEvent('object_property_changed', group.object, group.prop);
+        this.refresh();
+      }
+    }
+    if (deletable) {
+      ImGui.SameLine(0, 0);
+      if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##delete`, new ImGui.ImVec2(ImGui.GetFrameHeight(), 0))) {
+        group.prop.delete!.call(group.object, group.index);
+        this.dispatchEvent('object_property_changed', group.object, group.prop);
+        this.refresh();
+      }
+    }
+    if (extraButtons > 0) {
+      ImGui.EndChild();
+    }
+    if (changed && value.set) {
+      value.set.call(object, tmpProperty);
+      this.refresh();
+      this.dispatchEvent('object_property_changed', object, value);
+    }
+    return true;
   }
   private renderRawProperty(
     value: {
@@ -843,22 +946,28 @@ export class PropertyEditor extends Observable<{
             }
           } else {
             const val = tmpProperty.str as [string];
-            const canClearAssetPath = !!value.options?.mimeTypes?.length && !!value.set && !!val[0];
-            if (canClearAssetPath) {
+            const isSceneNodeRef = !!value.options?.sceneNode;
+            const canClearValue = (!!value.options?.mimeTypes?.length || isSceneNodeRef) && !!value.set && !!val[0];
+            if (canClearValue) {
               ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
               ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
             }
-            changed = ImGui.InputText(
-              '##value',
-              val,
-              undefined,
-              readonly ? ImGui.InputTextFlags.ReadOnly : undefined
-            );
+            if (isSceneNodeRef) {
+              const displayValue = [val[0]] as [string];
+              ImGui.InputText('##value', displayValue, undefined, ImGui.InputTextFlags.ReadOnly);
+            } else {
+              changed = ImGui.InputText(
+                '##value',
+                val,
+                undefined,
+                readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+              );
+            }
             if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
               this.revealAsset(val[0]);
             }
             this.setDragDropProperty(object, value, tmpProperty);
-            if (canClearAssetPath) {
+            if (canClearValue) {
               ImGui.SameLine(0, 0);
               if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
                 tmpProperty.str[0] = '';
@@ -1127,6 +1236,27 @@ export class PropertyEditor extends Observable<{
   }
   private setDragDropProperty(obj: any, prop: PropertyAccessor, value: PropertyValue) {
     if (prop.set) {
+      if (prop.options?.sceneNode && ImGui.BeginDragDropTarget()) {
+        const peekPayload = ImGui.AcceptDragDropPayload('NODE', ImGui.DragDropFlags.AcceptBeforeDelivery);
+        if (peekPayload) {
+          const data = peekPayload.Data as SceneNode;
+          if (
+            data instanceof SceneNode &&
+            (!prop.options.sceneNode.kind || prop.options.sceneNode.kind === 'node' || data.isMesh?.())
+          ) {
+            const payload = ImGui.AcceptDragDropPayload('NODE');
+            if (payload) {
+              const droppedNode = payload.Data as SceneNode;
+              value.str[0] = droppedNode?.persistentId ?? '';
+              Promise.resolve(prop.set.call(obj, value as RequireOptionals<PropertyValue>)).then(() => {
+                this.refresh();
+                this.dispatchEvent('object_property_changed', obj, prop);
+              });
+            }
+          }
+        }
+        ImGui.EndDragDropTarget();
+      }
       if (prop.options?.mimeTypes?.length > 0 && ImGui.BeginDragDropTarget()) {
         const peekPayload = ImGui.AcceptDragDropPayload('ASSET', ImGui.DragDropFlags.AcceptBeforeDelivery);
         if (peekPayload) {

@@ -65,6 +65,10 @@ export type PropertyValue = {
  */
 export type PropEdit = 'aabb' | 'quaternion' | 'proptrack';
 
+export type PropertySceneNodeOptions = {
+  kind?: 'node' | 'mesh';
+};
+
 /**
  * Additional options controlling how a property is displayed, constrained, and edited.
  *
@@ -90,6 +94,10 @@ export type PropertyAccessorOptions = {
   animatable?: boolean;
   /** Allowed MIME types for file-picker-like editors. */
   mimeTypes?: string[];
+  /** Accept scene hierarchy node drag-drop in the inspector. */
+  sceneNode?: PropertySceneNodeOptions;
+  /** Render object-array entries inline instead of expandable nested groups. */
+  inlineObjectArray?: boolean;
   /** Allowed constructor types when choosing/creating object references. */
   objectTypes?: GenericConstructor[];
   /**

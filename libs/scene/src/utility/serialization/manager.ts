@@ -188,7 +188,7 @@ import {
   getSpringColliderConfigClass,
   getSpringScriptConfigClass
 } from './scene/spring_script';
-import { getClothColliderConfigClass, getClothScriptConfigClass } from './scene/cloth_script';
+import { getClothColliderConfigClass, getClothScriptConfigClass, getClothTargetMeshConfigClass } from './scene/cloth_script';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -267,6 +267,7 @@ export class ResourceManager {
         getSpringColliderConfigClass(),
         getSpringScriptConfigClass(),
         getClothColliderConfigClass(),
+        getClothTargetMeshConfigClass(),
         getClothScriptConfigClass(),
         getAABBClass(),
         getInterpolatorClass(),

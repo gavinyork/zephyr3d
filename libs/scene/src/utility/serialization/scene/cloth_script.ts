@@ -1,6 +1,13 @@
+import type { Mesh } from '../../../scene/mesh';
+import type { SceneNode } from '../../../scene/scene_node';
+import { createGPUClothWrapBindingData } from '../../../animation/cloth/gpu_cloth_system';
 import { defineProps, type SerializableClass } from '../types';
 
 export type ClothColliderType = 'sphere' | 'capsule' | 'plane';
+
+const clothConfigHostMap = new WeakMap<ClothScriptConfig, SceneNode>();
+const clothTargetHostMap = new WeakMap<ClothTargetMeshConfig, SceneNode>();
+const clothTargetOwnerMap = new WeakMap<ClothTargetMeshConfig, ClothScriptConfig>();
 
 function clamp01(value: number) {
   return Math.min(Math.max(value, 0), 1);
@@ -8,6 +15,150 @@ function clamp01(value: number) {
 
 function normalizePlaneDirection(value: number) {
   return value < 0 ? -1 : 1;
+}
+
+function resolveClothHostScope(host: SceneNode) {
+  return (
+    (typeof (host as any)?.getPrefabNode === 'function' && (host as any).getPrefabNode()) ||
+    host.scene?.rootNode ||
+    host
+  );
+}
+
+function resolveClothMeshById(host: SceneNode | null | undefined, meshId: string): Mesh | null {
+  const id = String(meshId ?? '').trim();
+  if (!host || !id) {
+    return null;
+  }
+  const scope = resolveClothHostScope(host);
+  const candidate = scope?.findNodeById?.(id);
+  return candidate?.isMesh?.() && candidate.primitive ? (candidate as Mesh) : null;
+}
+
+function resolveClothMeshLabel(host: SceneNode | null | undefined, meshId: string) {
+  const id = String(meshId ?? '').trim();
+  if (!id) {
+    return '';
+  }
+  const mesh = resolveClothMeshById(host, id);
+  if (mesh) {
+    const name = String(mesh.name ?? '').trim();
+    return name || mesh.persistentId || id;
+  }
+  return `[Missing] ${id}`;
+}
+
+function getClothConfigHost(config: ClothScriptConfig) {
+  return clothConfigHostMap.get(config) ?? null;
+}
+
+function getClothTargetHost(target: ClothTargetMeshConfig) {
+  const owner = clothTargetOwnerMap.get(target);
+  return clothTargetHostMap.get(target) ?? (owner ? clothConfigHostMap.get(owner) : null) ?? null;
+}
+
+function setClothTargetOwner(target: ClothTargetMeshConfig, owner: ClothScriptConfig, host?: SceneNode | null) {
+  clothTargetOwnerMap.set(target, owner);
+  if (host) {
+    clothTargetHostMap.set(target, host);
+  }
+}
+
+function clearClothTargetBinding(target: ClothTargetMeshConfig) {
+  target.bindingData = '';
+  target.bindingSignature = '';
+}
+
+function clearClothBindings(config: ClothScriptConfig) {
+  for (const target of config.targetMeshes) {
+    clearClothTargetBinding(target);
+  }
+}
+
+function setClothBindingStatus(config: ClothScriptConfig, status: string) {
+  config.bindingStatus = status;
+}
+
+function ensureDefaultTargetMeshEntry(config: ClothScriptConfig) {
+  if (config.targetMeshes.length === 0) {
+    const target = new ClothTargetMeshConfig();
+    config.targetMeshes.push(target);
+    setClothTargetOwner(target, config, getClothConfigHost(config));
+  }
+}
+
+function invalidateClothBindings(config: ClothScriptConfig, status = 'Binding cache needs rebuild') {
+  clearClothBindings(config);
+  setClothBindingStatus(config, status);
+}
+
+async function bindClothTargetMeshes(config: ClothScriptConfig) {
+  const host = getClothConfigHost(config);
+  if (config.bindingInProgress) {
+    return;
+  }
+  const simulationMesh =
+    resolveClothMeshById(host, config.simulationMeshId) || (host?.isMesh?.() && host.primitive ? (host as Mesh) : null);
+  if (!simulationMesh) {
+    setClothBindingStatus(config, 'Set Simulation Mesh before binding.');
+    return;
+  }
+  const targetEntries = config.targetMeshes.filter((entry) => String(entry.meshId ?? '').trim().length > 0);
+  if (targetEntries.length === 0) {
+    setClothBindingStatus(config, 'Add at least one Target Mesh before binding.');
+    return;
+  }
+  config.bindingInProgress = true;
+  setClothBindingStatus(config, 'Binding target meshes...');
+  let successCount = 0;
+  const failedTargets: string[] = [];
+  try {
+    for (const entry of targetEntries) {
+      const targetMesh = resolveClothMeshById(getClothTargetHost(entry), entry.meshId);
+      if (!targetMesh) {
+        clearClothTargetBinding(entry);
+        failedTargets.push(resolveClothMeshLabel(host, entry.meshId));
+        continue;
+      }
+      if (targetMesh === simulationMesh) {
+        clearClothTargetBinding(entry);
+        failedTargets.push(resolveClothMeshLabel(host, entry.meshId));
+        continue;
+      }
+      try {
+        const data = await createGPUClothWrapBindingData(simulationMesh, targetMesh);
+        entry.bindingData = JSON.stringify(data);
+        entry.bindingSignature =
+          `${data.version}:${data.vertexCount}:${data.sourceVertexCount}:${data.sourceIndexCount}:${data.hasNormals ? 1 : 0}`;
+        successCount++;
+      } catch (err) {
+        clearClothTargetBinding(entry);
+        failedTargets.push(
+          `${resolveClothMeshLabel(host, entry.meshId)}: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+  } finally {
+    config.bindingInProgress = false;
+  }
+  if (successCount > 0 && failedTargets.length === 0) {
+    setClothBindingStatus(config, `Bound ${successCount} target mesh(es).`);
+  } else if (successCount > 0) {
+    setClothBindingStatus(
+      config,
+      `Bound ${successCount} target mesh(es), ${failedTargets.length} failed: ${failedTargets.join('; ')}`
+    );
+  } else {
+    setClothBindingStatus(config, failedTargets[0] || 'Binding failed.');
+  }
+}
+
+export function bindClothScriptConfigHost(config: ClothScriptConfig, host: SceneNode) {
+  clothConfigHostMap.set(config, host);
+  ensureDefaultTargetMeshEntry(config);
+  for (const target of config.targetMeshes) {
+    setClothTargetOwner(target, config, host);
+  }
 }
 
 export class ClothColliderConfig {
@@ -42,10 +193,25 @@ export class ClothColliderConfig {
   }
 }
 
+export class ClothTargetMeshConfig {
+  meshId: string;
+  bindingData: string;
+  bindingSignature: string;
+
+  constructor() {
+    this.meshId = '';
+    this.bindingData = '';
+    this.bindingSignature = '';
+  }
+}
+
 export class ClothScriptConfig {
   enabled: boolean;
   autoUpdate: boolean;
-  simulationMesh: string;
+  simulationMeshId: string;
+  targetMeshes: ClothTargetMeshConfig[];
+  bindingStatus: string;
+  bindingInProgress: boolean;
   damping: number;
   dynamicFriction: number;
   staticFriction: number;
@@ -67,7 +233,10 @@ export class ClothScriptConfig {
   constructor() {
     this.enabled = true;
     this.autoUpdate = true;
-    this.simulationMesh = '';
+    this.simulationMeshId = '';
+    this.targetMeshes = [new ClothTargetMeshConfig()];
+    this.bindingStatus = 'Binding cache needs rebuild';
+    this.bindingInProgress = false;
     this.damping = 0.02;
     this.dynamicFriction = 0.15;
     this.staticFriction = 0.3;
@@ -223,6 +392,86 @@ export function getClothColliderConfigClass(): SerializableClass {
   };
 }
 
+export function getClothTargetMeshConfigClass(): SerializableClass {
+  return {
+    ctor: ClothTargetMeshConfig,
+    name: 'ClothTargetMeshConfig',
+    noTitle: true,
+    createFunc() {
+      return { obj: new ClothTargetMeshConfig() };
+    },
+    getProps() {
+      return defineProps([
+        {
+          name: 'TargetMesh',
+          type: 'string',
+          options: {
+            sceneNode: {
+              kind: 'mesh'
+            }
+          },
+          isPersistent() {
+            return false;
+          },
+          get(this: ClothTargetMeshConfig, value) {
+            value.str[0] = resolveClothMeshLabel(getClothTargetHost(this), this.meshId);
+          },
+          set(this: ClothTargetMeshConfig, value) {
+            const nextId = String(value.str[0] ?? '').trim();
+            if (this.meshId !== nextId) {
+              this.meshId = nextId;
+              clearClothTargetBinding(this);
+              const owner = clothTargetOwnerMap.get(this);
+              if (owner) {
+                setClothBindingStatus(owner, 'Binding cache needs rebuild');
+              }
+            }
+          }
+        },
+        {
+          name: 'MeshId',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: ClothTargetMeshConfig, value) {
+            value.str[0] = this.meshId;
+          },
+          set(this: ClothTargetMeshConfig, value) {
+            this.meshId = value.str[0] ?? '';
+          }
+        },
+        {
+          name: 'BindingData',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: ClothTargetMeshConfig, value) {
+            value.str[0] = this.bindingData;
+          },
+          set(this: ClothTargetMeshConfig, value) {
+            this.bindingData = value.str[0] ?? '';
+          }
+        },
+        {
+          name: 'BindingSignature',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: ClothTargetMeshConfig, value) {
+            value.str[0] = this.bindingSignature;
+          },
+          set(this: ClothTargetMeshConfig, value) {
+            this.bindingSignature = value.str[0] ?? '';
+          }
+        }
+      ]);
+    }
+  };
+}
+
 export function getClothScriptConfigClass(): SerializableClass {
   return {
     ctor: ClothScriptConfig,
@@ -263,13 +512,109 @@ export function getClothScriptConfigClass(): SerializableClass {
           name: 'SimulationMesh',
           type: 'string',
           options: {
-            group: 'General'
+            group: 'General',
+            sceneNode: {
+              kind: 'mesh'
+            }
+          },
+          isPersistent() {
+            return false;
           },
           get(this: ClothScriptConfig, value) {
-            value.str[0] = this.simulationMesh;
+            value.str[0] = resolveClothMeshLabel(getClothConfigHost(this), this.simulationMeshId);
           },
           set(this: ClothScriptConfig, value) {
-            this.simulationMesh = value.str[0] ?? '';
+            const nextId = String(value.str[0] ?? '').trim();
+            if (this.simulationMeshId !== nextId) {
+              this.simulationMeshId = nextId;
+              invalidateClothBindings(this);
+            }
+          }
+        },
+        {
+          name: 'SimulationMeshId',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: ClothScriptConfig, value) {
+            value.str[0] = this.simulationMeshId;
+          },
+          set(this: ClothScriptConfig, value) {
+            this.simulationMeshId = value.str[0] ?? '';
+          }
+        },
+        {
+          name: 'TargetMesh',
+          type: 'object_array',
+          options: {
+            group: 'Binding',
+            objectTypes: [ClothTargetMeshConfig],
+            inlineObjectArray: true
+          },
+          get(this: ClothScriptConfig, value) {
+            ensureDefaultTargetMeshEntry(this);
+            value.object = this.targetMeshes;
+          },
+          set(this: ClothScriptConfig, value) {
+            this.targetMeshes = ((value.object ?? []) as ClothTargetMeshConfig[]).filter(
+              (entry): entry is ClothTargetMeshConfig => entry instanceof ClothTargetMeshConfig
+            );
+            ensureDefaultTargetMeshEntry(this);
+            const host = getClothConfigHost(this);
+            for (const entry of this.targetMeshes) {
+              setClothTargetOwner(entry, this, host);
+            }
+          },
+          add(this: ClothScriptConfig, value, index) {
+            const target = (value.object?.[0] as ClothTargetMeshConfig) ?? new ClothTargetMeshConfig();
+            setClothTargetOwner(target, this, getClothConfigHost(this));
+            this.targetMeshes.splice(index ?? this.targetMeshes.length, 0, target);
+            setClothBindingStatus(this, 'Binding cache needs rebuild');
+          },
+          delete(this: ClothScriptConfig, index) {
+            this.targetMeshes.splice(index, 1);
+            ensureDefaultTargetMeshEntry(this);
+            setClothBindingStatus(this, 'Binding cache needs rebuild');
+          },
+          create() {
+            return new ClothTargetMeshConfig();
+          }
+        },
+        {
+          name: 'BindingStatus',
+          type: 'string',
+          readonly: true,
+          options: {
+            group: 'Binding'
+          },
+          isPersistent() {
+            return false;
+          },
+          get(this: ClothScriptConfig, value) {
+            value.str[0] = this.bindingStatus;
+          }
+        },
+        {
+          name: 'Binding',
+          type: 'command',
+          options: {
+            group: 'Binding'
+          },
+          get(this: ClothScriptConfig, value) {
+            value.str[0] = this.bindingInProgress ? 'Binding...' : 'Bind';
+            value.str[1] = 'Clear';
+          },
+          command(this: ClothScriptConfig, index) {
+            if (index === 0) {
+              if (!this.bindingInProgress) {
+                void bindClothTargetMeshes(this);
+              }
+            } else {
+              clearClothBindings(this);
+              setClothBindingStatus(this, 'Binding cache cleared.');
+            }
+            return true;
           }
         },
         {

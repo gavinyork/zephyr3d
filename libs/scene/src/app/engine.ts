@@ -20,6 +20,7 @@ import {
 import { StandardSpriteMaterial } from '../material/sprite_std';
 import {
   GPUClothSystem,
+  type GPUClothWrapBindingTarget,
   createCapsuleCollider,
   createPlaneCollider,
   createSphereCollider,
@@ -1228,10 +1229,9 @@ function serializeClothColliderConfig(colliders: any[]) {
 }
 
 function buildClothStructureSignature(host: any, config: any) {
-  const simulationMeshName = String(config?.simulationMesh ?? '').trim();
   return JSON.stringify({
     primitiveId: Number(host?.primitive?.id) || 0,
-    simulationMesh: simulationMeshName,
+    simulationMeshId: String(config?.simulationMeshId ?? '').trim(),
     vertexPinWeightsByTarget: getClothVertexWeightSource(config, host),
     maxNeighbors: Math.max(1, Number(config?.maxNeighbors) || 8),
     maxTrianglesPerVertex: Math.max(1, Number(config?.maxTrianglesPerVertex) || 16),
@@ -1323,37 +1323,86 @@ function collectBuiltinClothTargetMeshes(host: any): any[] {
   if (!host) {
     return [];
   }
-  if (host.isMesh?.() && host.primitive) {
-    return [host];
-  }
-  const targets: any[] = [];
-  host.iterate?.((node: any) => {
-    if (node?.isMesh?.() && node.primitive) {
-      targets.push(node);
-    }
-    return false;
-  });
-  return targets;
+  return host.isMesh?.() && host.primitive ? [host] : [];
 }
 
-function resolveBuiltinClothSimulationMesh(host: any, config: any) {
-  const simulationMeshName = String(config?.simulationMesh ?? '').trim();
-  if (!host || !simulationMeshName) {
+function resolveBuiltinClothMeshById(host: any, meshId: string) {
+  const id = String(meshId ?? '').trim();
+  if (!host || !id) {
     return null;
-  }
-  if (host.isMesh?.() && host.primitive && host.name === simulationMeshName) {
-    return host;
   }
   const scope =
     (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
     host?.scene?.rootNode ||
     host;
-  const candidate = scope?.findNodeByName?.(simulationMeshName);
+  const candidate = scope?.findNodeById?.(id);
   return candidate?.isMesh?.() && candidate.primitive ? candidate : null;
 }
 
-function collectBuiltinClothRenderMeshes(host: any, simulationMesh: any) {
-  return collectBuiltinClothTargetMeshes(host).filter((mesh) => mesh !== simulationMesh);
+function resolveBuiltinClothSimulationMesh(host: any, config: any) {
+  const simulationMeshId = String(config?.simulationMeshId ?? '').trim();
+  if (!host || !simulationMeshId) {
+    return null;
+  }
+  return resolveBuiltinClothMeshById(host, simulationMeshId);
+}
+
+function parseBuiltinClothWrapBindingData(entry: any) {
+  const source = String(entry?.bindingData ?? '');
+  const cached = entry?.__builtinWrapBindingCache;
+  if (cached && cached.source === source) {
+    return cached.data;
+  }
+  const text = source.trim();
+  if (!text) {
+    if (entry) {
+      entry.__builtinWrapBindingCache = {
+        source,
+        data: null
+      };
+    }
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(text);
+    const data = parsed && typeof parsed === 'object' ? parsed : null;
+    if (entry) {
+      entry.__builtinWrapBindingCache = {
+        source,
+        data
+      };
+    }
+    return data;
+  } catch {
+    if (entry) {
+      entry.__builtinWrapBindingCache = {
+        source,
+        data: null
+      };
+    }
+    return null;
+  }
+}
+
+function resolveBuiltinClothWrapTargets(host: any, simulationMesh: any, config: any): GPUClothWrapBindingTarget[] {
+  const targets: GPUClothWrapBindingTarget[] = [];
+  const used = new Set<any>();
+  for (const entry of config?.targetMeshes ?? []) {
+    const target = resolveBuiltinClothMeshById(host, String(entry?.meshId ?? ''));
+    if (!target || target === simulationMesh || used.has(target)) {
+      continue;
+    }
+    const data = parseBuiltinClothWrapBindingData(entry);
+    if (!data) {
+      continue;
+    }
+    used.add(target);
+    targets.push({
+      target,
+      data
+    });
+  }
+  return targets;
 }
 
 function ensureBuiltinClothState(host: any) {
@@ -1766,7 +1815,7 @@ export class Engine {
   private updateBuiltinClothHost(host: any, deltaTime: number) {
     const config = host?.scriptConfig;
     const simulationMesh = resolveBuiltinClothSimulationMesh(host, config);
-    const renderTargets = simulationMesh ? collectBuiltinClothRenderMeshes(host, simulationMesh) : [];
+    const wrapTargets = simulationMesh ? resolveBuiltinClothWrapTargets(host, simulationMesh, config) : [];
     const targets = simulationMesh ? [simulationMesh] : collectBuiltinClothTargetMeshes(host);
     if (!host || !config || targets.length === 0) {
       this.disposeBuiltinClothHost(host);
@@ -1783,16 +1832,19 @@ export class Engine {
       const state = ensureBuiltinClothState(target);
       const structureSignature = JSON.stringify({
         ...JSON.parse(buildClothStructureSignature(target, config)),
-        renderTargets: renderTargets.map((mesh) => ({
-          id: String(mesh?.persistentId ?? ''),
-          primitiveId: Number(mesh?.primitive?.id) || 0
+        wrapTargets: wrapTargets.map((entry) => ({
+          id: String(entry.target?.persistentId ?? ''),
+          primitiveId: Number(entry.target?.primitive?.id) || 0,
+          bindingSignature: `${Number(entry.data?.version) || 0}:${Number(entry.data?.vertexCount) || 0}:${
+            Number(entry.data?.sourceVertexCount) || 0
+          }:${Number(entry.data?.sourceIndexCount) || 0}:${entry.data?.hasNormals ? 1 : 0}`
         }))
       });
       const runtimeSignature = buildClothRuntimeSignature(config, target);
       if (!state.cloth || structureSignature !== state.structureSignature) {
         if (!state.rebuilding) {
           state.rebuilding = true;
-          Promise.resolve(this.ensureBuiltinClothHost(host, target, renderTargets)).finally(() => {
+          Promise.resolve(this.ensureBuiltinClothHost(host, target, wrapTargets)).finally(() => {
             const latestState = (target as any)?.__builtinClothState;
             if (latestState) {
               latestState.rebuilding = false;
@@ -1810,7 +1862,7 @@ export class Engine {
       }
     }
   }
-  private async ensureBuiltinClothHost(host: any, target: any, renderTargets: any[] = []) {
+  private async ensureBuiltinClothHost(host: any, target: any, wrapTargets: GPUClothWrapBindingTarget[] = []) {
     const config = host?.scriptConfig;
     if (!host || !config || !target || !target.isMesh?.() || !target.primitive) {
       this.disposeBuiltinClothTarget(target);
@@ -1819,9 +1871,12 @@ export class Engine {
     const state = ensureBuiltinClothState(target);
     const structureSignature = JSON.stringify({
       ...JSON.parse(buildClothStructureSignature(target, config)),
-      renderTargets: renderTargets.map((mesh) => ({
-        id: String(mesh?.persistentId ?? ''),
-        primitiveId: Number(mesh?.primitive?.id) || 0
+      wrapTargets: wrapTargets.map((entry) => ({
+        id: String(entry.target?.persistentId ?? ''),
+        primitiveId: Number(entry.target?.primitive?.id) || 0,
+        bindingSignature: `${Number(entry.data?.version) || 0}:${Number(entry.data?.vertexCount) || 0}:${
+          Number(entry.data?.sourceVertexCount) || 0
+        }:${Number(entry.data?.sourceIndexCount) || 0}:${entry.data?.hasNormals ? 1 : 0}`
       }))
     });
     if (state.cloth && structureSignature === state.structureSignature) {
@@ -1849,8 +1904,8 @@ export class Engine {
         autoUpdate: config.autoUpdate !== false,
         device: getDevice()
       });
-      if (renderTargets.length > 0) {
-        await cloth.setWrapTargets(renderTargets);
+      if (wrapTargets.length > 0) {
+        cloth.setWrapTargetsFromBindingData(wrapTargets);
       }
       (target as any).__builtinClothState = {
         cloth,

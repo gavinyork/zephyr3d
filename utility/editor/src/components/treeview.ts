@@ -36,6 +36,10 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
   private _data: TreeViewData<T>;
   private _id: string;
   private _pendingFocusId: Nullable<string>;
+  private _pendingClickNode: Nullable<T>;
+  private _pendingClickRowIndex: number;
+  private _pendingClickCtrl: boolean;
+  private _pendingClickShift: boolean;
 
   constructor(id: string, data: TreeViewData<T>, multiSelect = false) {
     super();
@@ -50,6 +54,10 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
     this._data = data;
     this._id = id;
     this._pendingFocusId = null;
+    this._pendingClickNode = null;
+    this._pendingClickRowIndex = -1;
+    this._pendingClickCtrl = false;
+    this._pendingClickShift = false;
     this._clipper = new ImGui.ListClipper();
   }
 
@@ -97,6 +105,7 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
       }
     }
     this._clipper.End();
+    this.flushPendingClick();
     this.handleAutoScrollWhileDragging();
     this.ensureSelectionVisible();
     ImGui.PopID();
@@ -158,7 +167,11 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
     const clickedOpen = ImGui.TreeNodeEx(label, flags);
 
     if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
-      this.handleNodeClick(node, rowIndex);
+      if (this._data.getDragSourcePayloadType(node)) {
+        this.queuePendingClick(node, rowIndex);
+      } else {
+        this.handleNodeClick(node, rowIndex);
+      }
     }
     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGui.MouseButton.Left)) {
       this.onNodeDblClicked(node);
@@ -186,6 +199,7 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
     const sourcePayloadType = this._data.getDragSourcePayloadType(node);
     if (sourcePayloadType && ImGui.BeginDragDropSource()) {
       this._draggingItem = true;
+      this.clearPendingClick();
       const payload = this._data.getDragSourcePayload(node);
       if (payload) {
         ImGui.SetDragDropPayload(sourcePayloadType, payload);
@@ -360,8 +374,31 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
       this.onSelectionChanged(this._selectedNodes, this._selectedNode);
     }
   }
-  private handleNodeClick(node: T, rowIndex: number) {
+  private queuePendingClick(node: T, rowIndex: number) {
     const io = ImGui.GetIO();
+    this._pendingClickNode = node;
+    this._pendingClickRowIndex = rowIndex;
+    this._pendingClickCtrl = !!io.KeyCtrl;
+    this._pendingClickShift = !!io.KeyShift;
+  }
+  private clearPendingClick() {
+    this._pendingClickNode = null;
+    this._pendingClickRowIndex = -1;
+    this._pendingClickCtrl = false;
+    this._pendingClickShift = false;
+  }
+  private flushPendingClick() {
+    if (!this._pendingClickNode || this._draggingItem || ImGui.GetIO().MouseDown[0]) {
+      return;
+    }
+    const node = this._pendingClickNode;
+    const rowIndex = this._pendingClickRowIndex;
+    const withCtrl = this._pendingClickCtrl;
+    const withShift = this._pendingClickShift;
+    this.clearPendingClick();
+    this.handleNodeClick(node, rowIndex, withCtrl, withShift);
+  }
+  private handleNodeClick(node: T, rowIndex: number, ctrl = ImGui.GetIO().KeyCtrl, shift = ImGui.GetIO().KeyShift) {
     if (!this._multiSelect) {
       this.applySelection([node], node, true);
       this._selectionAnchorId = this._data.getId(node);
@@ -369,8 +406,6 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
     }
 
     const nodeId = this._data.getId(node);
-    const withCtrl = io.KeyCtrl;
-    const withShift = io.KeyShift;
     const currentRows = this._visibleRows;
     const anchorIndex =
       this._selectionAnchorId !== null
@@ -381,11 +416,11 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
       : -1;
     const fromIndex = anchorIndex >= 0 ? anchorIndex : fallbackActiveIndex >= 0 ? fallbackActiveIndex : rowIndex;
 
-    if (withShift) {
+    if (shift) {
       const start = Math.min(fromIndex, rowIndex);
       const end = Math.max(fromIndex, rowIndex);
       const rangeNodes = currentRows.slice(start, end + 1).map((r) => r.node);
-      if (withCtrl) {
+      if (ctrl) {
         const selected = new Set(this._selectedNodes);
         for (const item of rangeNodes) {
           selected.add(item);
@@ -400,7 +435,7 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
       return;
     }
 
-    if (withCtrl) {
+    if (ctrl) {
       const selected = new Set(this._selectedNodes);
       if (selected.has(node)) {
         selected.delete(node);

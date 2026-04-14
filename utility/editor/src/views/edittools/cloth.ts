@@ -30,18 +30,15 @@ function isGPUClothScript(script: string) {
 }
 
 function resolveClothSimulationMesh(host: Nullable<SceneNode>): Nullable<Mesh> {
-  const simulationMeshName = String((host as any)?.scriptConfig?.simulationMesh ?? '').trim();
-  if (!host || !simulationMeshName) {
+  const simulationMeshId = String((host as any)?.scriptConfig?.simulationMeshId ?? '').trim();
+  if (!host || !simulationMeshId) {
     return null;
-  }
-  if (host.isMesh() && host.name === simulationMeshName && host.primitive) {
-    return host;
   }
   const prefabScope =
     (typeof (host as any)?.getPrefabNode === 'function' && (host as any).getPrefabNode()) ||
     host.scene?.rootNode ||
     host;
-  const candidate = prefabScope?.findNodeByName?.(simulationMeshName);
+  const candidate = prefabScope?.findNodeById?.(simulationMeshId);
   return candidate?.isMesh?.() && candidate.primitive ? candidate : null;
 }
 
@@ -56,14 +53,7 @@ export function collectClothTargetMeshes(host: SceneNode): Mesh[] {
   if (host.isMesh() && host.primitive) {
     return [host];
   }
-  const targets: Mesh[] = [];
-  host.iterate((node) => {
-    if (node.isMesh() && node.primitive) {
-      targets.push(node);
-    }
-    return false;
-  });
-  return targets;
+  return [];
 }
 
 export function findClothPaintHost(startNode: Nullable<SceneNode>): Nullable<SceneNode> {

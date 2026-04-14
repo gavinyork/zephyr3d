@@ -6,7 +6,15 @@ import type {
   StructuredBuffer
 } from '@zephyr3d/device';
 import { PBPrimitiveType } from '@zephyr3d/device';
-import { Matrix4x4, releaseObject, retainObject, Vector3, type Nullable } from '@zephyr3d/base';
+import {
+  Matrix4x4,
+  base64ToUint8Array,
+  releaseObject,
+  retainObject,
+  uint8ArrayToBase64,
+  Vector3,
+  type Nullable
+} from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
 import type { Primitive } from '../../render';
 import type { Scene } from '../../scene';
@@ -42,6 +50,63 @@ export type GPUClothSystemOptions = {
   scene?: Nullable<Scene>;
   autoUpdate?: boolean;
 };
+
+export type GPUClothWrapBindingData = {
+  version: 1;
+  vertexCount: number;
+  sourceVertexCount: number;
+  sourceIndexCount: number;
+  hasNormals: boolean;
+  maxOffsetDistance: number;
+  triangleIndices: string;
+  weights: string;
+  offsets: string;
+  normals?: string;
+};
+
+export type GPUClothWrapBindingTarget = {
+  target: any;
+  data: GPUClothWrapBindingData;
+};
+
+function encodeTypedArrayBase64(view: ArrayBufferView) {
+  return uint8ArrayToBase64(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
+}
+
+function decodeTypedArrayFromBase64<T extends Uint32Array | Float32Array>(
+  ctor: {
+    new (buffer: ArrayBuffer): T;
+    BYTES_PER_ELEMENT: number;
+  },
+  base64: string,
+  expectedLength: number
+) {
+  const bytes = base64ToUint8Array(base64);
+  const byteLength = bytes.byteLength;
+  if (byteLength % ctor.BYTES_PER_ELEMENT !== 0) {
+    throw new Error('GPU cloth wrap failed: binding cache data is corrupted.');
+  }
+  const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  const result = new ctor(buffer);
+  if (expectedLength >= 0 && result.length !== expectedLength) {
+    throw new Error('GPU cloth wrap failed: binding cache size does not match target mesh.');
+  }
+  return result;
+}
+
+function isWrapBindingDataCompatible(
+  data: GPUClothWrapBindingData,
+  sourceRestPositions: Float32Array<ArrayBuffer>,
+  sourceIndexData: Uint32Array<ArrayBuffer>,
+  targetVertexCount: number
+) {
+  return (
+    data?.version === 1 &&
+    data.vertexCount === targetVertexCount &&
+    data.sourceVertexCount === ((sourceRestPositions.length / 3) >> 0) &&
+    data.sourceIndexCount === sourceIndexData.length
+  );
+}
 
 function resolveDevice(explicitDevice?: Nullable<AbstractDevice>) {
   if (explicitDevice) {
@@ -1358,6 +1423,25 @@ class GPUClothWrapBinding {
     target: any,
     workgroupSize: number
   ) {
+    const data = await GPUClothWrapBinding.createBindingData(source, sourceRestPositions, sourceIndexData, target);
+    return GPUClothWrapBinding.createFromData(
+      device,
+      source,
+      sourcePositionBuffer,
+      sourceRestPositions,
+      sourceIndexData,
+      target,
+      workgroupSize,
+      data
+    );
+  }
+
+  static async createBindingData(
+    source: any,
+    sourceRestPositions: Float32Array<ArrayBuffer>,
+    sourceIndexData: Uint32Array<ArrayBuffer>,
+    target: any
+  ): Promise<GPUClothWrapBindingData> {
     if (!target?.primitive) {
       throw new Error('GPU cloth wrap failed: target mesh has no primitive.');
     }
@@ -1467,21 +1551,56 @@ class GPUClothWrapBinding {
       }
     }
 
-    const positionBuffer = device.createVertexBuffer(
-      'position_f32x3',
-      new Float32Array(targetPositions.length),
-      {
-        storage: true,
-        managed: false
-      }
-    );
-    const normalBuffer =
-      wrapNormals && targetNormals
-        ? device.createVertexBuffer('normal_f32x3', new Float32Array(targetNormals.length), {
-            storage: true,
-            managed: false
-          })
+    return {
+      version: 1,
+      vertexCount,
+      sourceVertexCount: (sourceRestPositions.length / 3) >> 0,
+      sourceIndexCount: sourceIndexData.length,
+      hasNormals: !!wrapNormals,
+      maxOffsetDistance,
+      triangleIndices: encodeTypedArrayBase64(wrapTriangleIndices),
+      weights: encodeTypedArrayBase64(wrapWeights),
+      offsets: encodeTypedArrayBase64(wrapOffsets),
+      normals: wrapNormals ? encodeTypedArrayBase64(wrapNormals) : undefined
+    };
+  }
+
+  static createFromData(
+    device: AbstractDevice,
+    source: any,
+    sourcePositionBuffer: StructuredBuffer,
+    sourceRestPositions: Float32Array<ArrayBuffer>,
+    sourceIndexData: Uint32Array<ArrayBuffer>,
+    target: any,
+    workgroupSize: number,
+    data: GPUClothWrapBindingData
+  ) {
+    if (!target?.primitive) {
+      throw new Error('GPU cloth wrap failed: target mesh has no primitive.');
+    }
+    const targetPrimitive = target.primitive as Primitive;
+    const vertexCount = targetPrimitive.getNumVertices();
+    if (!isWrapBindingDataCompatible(data, sourceRestPositions, sourceIndexData, vertexCount)) {
+      throw new Error('GPU cloth wrap failed: binding cache is incompatible with current meshes.');
+    }
+    const expectedElementCount = vertexCount * 3;
+    const wrapTriangleIndices = decodeTypedArrayFromBase64(Uint32Array, data.triangleIndices, expectedElementCount);
+    const wrapWeights = decodeTypedArrayFromBase64(Float32Array, data.weights, expectedElementCount);
+    const wrapOffsets = decodeTypedArrayFromBase64(Float32Array, data.offsets, expectedElementCount);
+    const wrapNormals =
+      data.hasNormals && data.normals
+        ? decodeTypedArrayFromBase64(Float32Array, data.normals, expectedElementCount)
         : null;
+    const positionBuffer = device.createVertexBuffer('position_f32x3', new Float32Array(expectedElementCount), {
+      storage: true,
+      managed: false
+    });
+    const normalBuffer = wrapNormals
+      ? device.createVertexBuffer('normal_f32x3', new Float32Array(expectedElementCount), {
+          storage: true,
+          managed: false
+        })
+      : null;
     if (!positionBuffer) {
       throw new Error('GPU cloth wrap failed: could not create target position buffer.');
     }
@@ -1533,6 +1652,7 @@ class GPUClothWrapBinding {
     if (normalBuffer) {
       bindGroup.setBuffer('targetNormals', normalBuffer);
     }
+    const sourceToTargetBindMatrix = getWrapSourceToTargetMatrix(source, target);
     bindGroup.setValue('vertexCount', vertexCount);
     bindGroup.setValue('minDistance', 1e-5);
     bindGroup.setValue('sourceToTargetMatrix', sourceToTargetBindMatrix);
@@ -1572,7 +1692,7 @@ class GPUClothWrapBinding {
       originalPositionBuffer,
       originalNormalBuffer,
       Math.max(1, Math.ceil(vertexCount / workgroupSize)),
-      maxOffsetDistance,
+      Math.max(0, Number(data.maxOffsetDistance) || 0),
       restoreSkinning
     );
     binding.update();
@@ -1673,6 +1793,18 @@ class GPUClothWrapBinding {
       )
     );
   }
+}
+
+export async function createGPUClothWrapBindingData(source: any, target: any): Promise<GPUClothWrapBindingData> {
+  if (!source?.primitive) {
+    throw new Error('GPU cloth wrap failed: source mesh has no primitive.');
+  }
+  const sourcePrimitive = source.primitive as Primitive;
+  const sourcePositions = await readPositionDataFromPrimitive(sourcePrimitive);
+  const sourceIndexData = toUInt32Indices(
+    await readIndexDataFromPrimitive(sourcePrimitive, (sourcePositions.length / 3) >> 0)
+  );
+  return GPUClothWrapBinding.createBindingData(source, sourcePositions, sourceIndexData, target);
 }
 
 /**
@@ -2141,7 +2273,9 @@ export class GPUClothSystem {
     if (!this.supported || !this._device || !this._positionBuffer || !this._sourcePositionData || !this._sourceIndexData) {
       return;
     }
-    const uniqueTargets = [...new Set((targets ?? []).filter((target) => target?.primitive && target !== this._collisionSpaceNode))];
+    const uniqueTargets = [
+      ...new Set((targets ?? []).filter((target) => target?.primitive && target !== this._collisionSpaceNode))
+    ];
     for (const target of uniqueTargets) {
       try {
         const binding = await GPUClothWrapBinding.create(
@@ -2156,6 +2290,36 @@ export class GPUClothSystem {
         this._wrapBindings.push(binding);
       } catch (err) {
         console.error('GPU cloth wrap target initialization failed:', err);
+      }
+    }
+  }
+
+  setWrapTargetsFromBindingData(targets: GPUClothWrapBindingTarget[]) {
+    this.clearWrapTargets();
+    if (!this.supported || !this._device || !this._positionBuffer || !this._sourcePositionData || !this._sourceIndexData) {
+      return;
+    }
+    const seen = new Set<any>();
+    for (const entry of targets ?? []) {
+      const target = entry?.target;
+      if (!target?.primitive || target === this._collisionSpaceNode || seen.has(target)) {
+        continue;
+      }
+      seen.add(target);
+      try {
+        const binding = GPUClothWrapBinding.createFromData(
+          this._device,
+          this._collisionSpaceNode,
+          this._positionBuffer,
+          this._sourcePositionData,
+          this._sourceIndexData,
+          target,
+          this._workgroupSize,
+          entry.data
+        );
+        this._wrapBindings.push(binding);
+      } catch (err) {
+        console.error('GPU cloth wrap target binding cache initialization failed:', err);
       }
     }
   }

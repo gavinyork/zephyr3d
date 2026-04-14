@@ -9,7 +9,7 @@ import type { ResourceManager } from '../manager';
 import { AnimationClip, NodeRotationTrack, NodeScaleTrack, NodeTranslationTrack } from '../../../animation';
 import { JSONData } from '../json';
 import { SpringScriptConfig } from './spring_script';
-import { ClothScriptConfig } from './cloth_script';
+import { bindClothScriptConfigHost, ClothScriptConfig } from './cloth_script';
 import { parseZABCBlob, attachZABCAnimationsToSceneNode } from '../../../asset/loaders/zabc/zabc_loader';
 import { restoreGeometryCacheMeshBinding } from '../../../animation/geometry_cache_utils';
 
@@ -48,6 +48,7 @@ function ensureDefaultClothScriptConfig(node: SceneNode, reset = false) {
   if (reset || !(node.scriptConfig instanceof ClothScriptConfig)) {
     node.scriptConfig = new ClothScriptConfig();
   }
+  bindClothScriptConfigHost(node.scriptConfig as ClothScriptConfig, node);
 }
 
 function normalizeSerializedSceneNodeData(data: DiffValue): Record<string, unknown> {
@@ -622,11 +623,14 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           get(this: SceneNode, value) {
             if (!(this.scriptConfig instanceof ClothScriptConfig)) {
               ensureDefaultClothScriptConfig(this, true);
+            } else {
+              bindClothScriptConfigHost(this.scriptConfig, this);
             }
             value.object[0] = this.scriptConfig;
           },
           set(this: SceneNode, value) {
             this.scriptConfig = (value?.object?.[0] as ClothScriptConfig | null) ?? new ClothScriptConfig();
+            bindClothScriptConfigHost(this.scriptConfig as ClothScriptConfig, this);
           }
         },
         {
