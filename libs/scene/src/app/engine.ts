@@ -1579,6 +1579,43 @@ export class Engine {
     }
     return this._loadingScenes[path]!;
   }
+  /**
+   * 运行时角色子树脚本挂载的向后兼容入口。
+   * Digitalman 动捕集成会在角色子树实例化后调用该方法挂载脚本。
+   * 删除该方法会导致内置 spring/cloth（springtest/gpucloth）失效，
+   * 因为这两类脚本依赖此入口完成注册。
+   * 除非调用方与回归验证一起迁移，否则不要删除此方法。
+   */
+  async attachScriptsInSubtree(root: any) {
+    if (!this._enabled || !root) {
+      return;
+    }
+    const tasks: Promise<any>[] = [];
+    const scripts: string[] = [];
+    root.iterate((node: any) => {
+      if (!node?.script) {
+        return false;
+      }
+      // 保持内置脚本分流顺序，确保 spring/cloth 宿主能被正确注册。
+      if (this.tryAttachBuiltinSpringScript(node, node.script)) {
+        return false;
+      }
+      if (this.tryAttachBuiltinGPUClothScript(node, node.script)) {
+        return false;
+      }
+      scripts.push(node.script);
+      tasks.push(this.attachScript(node, node.script));
+      return false;
+    });
+    if (tasks.length > 0) {
+      const result = await Promise.allSettled(tasks);
+      for (let i = 0; i < result.length; i++) {
+        if (result[i].status === 'rejected') {
+          console.error(`Attach script failed: ${scripts[i]}`);
+        }
+      }
+    }
+  }
   setRenderable(renderable: Nullable<IRenderable>, layer = 0, hook?: IRenderHook) {
     if (!this._activeRenderables[layer]) {
       this._activeRenderables[layer] = {
