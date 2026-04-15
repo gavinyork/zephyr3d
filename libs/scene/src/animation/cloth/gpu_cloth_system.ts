@@ -52,14 +52,14 @@ export type GPUClothSystemOptions = {
 };
 
 export type GPUClothWrapBindingData = {
-  version: 2;
+  version: 4;
   vertexCount: number;
   sourceVertexCount: number;
   influenceCount: number;
   maxOffsetDistance: number;
-  sourceIndices: string;
-  sourceWeights: string;
-  targetOffsets: string;
+  sourceTriangleIndices: string;
+  sourceBarycentrics: string;
+  targetLocalOffsets: string;
 };
 
 export type GPUClothWrapBindingTarget = {
@@ -98,10 +98,10 @@ function isWrapBindingDataCompatible(
   targetVertexCount: number
 ) {
   return (
-    data?.version === 2 &&
+    data?.version === 4 &&
     data.vertexCount === targetVertexCount &&
     data.sourceVertexCount === ((sourceRestPositions.length / 3) >> 0) &&
-    data.influenceCount === WRAP_INFLUENCE_COUNT
+    data.influenceCount === WRAP_TRIANGLE_VERTEX_COUNT
   );
 }
 
@@ -136,7 +136,8 @@ const DEFAULT_SOLVER_ITERATIONS = 5;
 const DEFAULT_MAX_NEIGHBORS = 8;
 const DEFAULT_WORKGROUP_SIZE = 64;
 const DEFAULT_MAX_TRIANGLES_PER_VERTEX = 16;
-const WRAP_INFLUENCE_COUNT = 4;
+const WRAP_TRIANGLE_VERTEX_COUNT = 3;
+const WRAP_MIN_DISTANCE = 1e-8;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -221,6 +222,199 @@ function distance3(positions: Float32Array<ArrayBuffer>, a: number, b: number) {
   const dy = positions[a0 + 1] - positions[b0 + 1];
   const dz = positions[a0 + 2] - positions[b0 + 2];
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+function dot3(ax: number, ay: number, az: number, bx: number, by: number, bz: number) {
+  return ax * bx + ay * by + az * bz;
+}
+
+function normalize3(x: number, y: number, z: number, fallback: [number, number, number]): [number, number, number] {
+  const length = Math.hypot(x, y, z);
+  if (length <= WRAP_MIN_DISTANCE) {
+    return fallback;
+  }
+  return [x / length, y / length, z / length];
+}
+
+function buildWrapTriangleFrame(
+  p0x: number,
+  p0y: number,
+  p0z: number,
+  p1x: number,
+  p1y: number,
+  p1z: number,
+  p2x: number,
+  p2y: number,
+  p2z: number,
+  out: Float32Array<ArrayBuffer> | number[]
+) {
+  const edge01x = p1x - p0x;
+  const edge01y = p1y - p0y;
+  const edge01z = p1z - p0z;
+  const edge02x = p2x - p0x;
+  const edge02y = p2y - p0y;
+  const edge02z = p2z - p0z;
+
+  let tangent = normalize3(edge01x, edge01y, edge01z, [0, 0, 0]);
+  if (tangent[0] === 0 && tangent[1] === 0 && tangent[2] === 0) {
+    tangent = normalize3(edge02x, edge02y, edge02z, [1, 0, 0]);
+  }
+
+  let normal = normalize3(
+    edge01y * edge02z - edge01z * edge02y,
+    edge01z * edge02x - edge01x * edge02z,
+    edge01x * edge02y - edge01y * edge02x,
+    [0, 0, 0]
+  );
+  if (normal[0] === 0 && normal[1] === 0 && normal[2] === 0) {
+    const fallbackAxis = Math.abs(tangent[1]) < 0.999 ? [0, 1, 0] : [1, 0, 0];
+    normal = normalize3(
+      tangent[1] * fallbackAxis[2] - tangent[2] * fallbackAxis[1],
+      tangent[2] * fallbackAxis[0] - tangent[0] * fallbackAxis[2],
+      tangent[0] * fallbackAxis[1] - tangent[1] * fallbackAxis[0],
+      [0, 0, 1]
+    );
+  }
+
+  let bitangent = normalize3(
+    normal[1] * tangent[2] - normal[2] * tangent[1],
+    normal[2] * tangent[0] - normal[0] * tangent[2],
+    normal[0] * tangent[1] - normal[1] * tangent[0],
+    [0, 0, 0]
+  );
+  if (bitangent[0] === 0 && bitangent[1] === 0 && bitangent[2] === 0) {
+    bitangent = Math.abs(tangent[1]) < 0.999 ? [0, 1, 0] : [1, 0, 0];
+  }
+
+  normal = normalize3(
+    tangent[1] * bitangent[2] - tangent[2] * bitangent[1],
+    tangent[2] * bitangent[0] - tangent[0] * bitangent[2],
+    tangent[0] * bitangent[1] - tangent[1] * bitangent[0],
+    [0, 0, 1]
+  );
+
+  out[0] = tangent[0];
+  out[1] = tangent[1];
+  out[2] = tangent[2];
+  out[3] = bitangent[0];
+  out[4] = bitangent[1];
+  out[5] = bitangent[2];
+  out[6] = normal[0];
+  out[7] = normal[1];
+  out[8] = normal[2];
+}
+
+function closestPointOnTriangle(
+  px: number,
+  py: number,
+  pz: number,
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+  cx: number,
+  cy: number,
+  cz: number,
+  closestOut: Float32Array<ArrayBuffer> | number[],
+  baryOut: Float32Array<ArrayBuffer> | number[]
+) {
+  const abx = bx - ax;
+  const aby = by - ay;
+  const abz = bz - az;
+  const acx = cx - ax;
+  const acy = cy - ay;
+  const acz = cz - az;
+  const apx = px - ax;
+  const apy = py - ay;
+  const apz = pz - az;
+  const d1 = dot3(abx, aby, abz, apx, apy, apz);
+  const d2 = dot3(acx, acy, acz, apx, apy, apz);
+  if (d1 <= 0 && d2 <= 0) {
+    closestOut[0] = ax;
+    closestOut[1] = ay;
+    closestOut[2] = az;
+    baryOut[0] = 1;
+    baryOut[1] = 0;
+    baryOut[2] = 0;
+  } else {
+    const bpx = px - bx;
+    const bpy = py - by;
+    const bpz = pz - bz;
+    const d3 = dot3(abx, aby, abz, bpx, bpy, bpz);
+    const d4 = dot3(acx, acy, acz, bpx, bpy, bpz);
+    if (d3 >= 0 && d4 <= d3) {
+      closestOut[0] = bx;
+      closestOut[1] = by;
+      closestOut[2] = bz;
+      baryOut[0] = 0;
+      baryOut[1] = 1;
+      baryOut[2] = 0;
+    } else {
+      const vc = d1 * d4 - d3 * d2;
+      if (vc <= 0 && d1 >= 0 && d3 <= 0) {
+        const v = d1 / Math.max(WRAP_MIN_DISTANCE, d1 - d3);
+        closestOut[0] = ax + abx * v;
+        closestOut[1] = ay + aby * v;
+        closestOut[2] = az + abz * v;
+        baryOut[0] = 1 - v;
+        baryOut[1] = v;
+        baryOut[2] = 0;
+      } else {
+        const cpx = px - cx;
+        const cpy = py - cy;
+        const cpz = pz - cz;
+        const d5 = dot3(abx, aby, abz, cpx, cpy, cpz);
+        const d6 = dot3(acx, acy, acz, cpx, cpy, cpz);
+        if (d6 >= 0 && d5 <= d6) {
+          closestOut[0] = cx;
+          closestOut[1] = cy;
+          closestOut[2] = cz;
+          baryOut[0] = 0;
+          baryOut[1] = 0;
+          baryOut[2] = 1;
+        } else {
+          const vb = d5 * d2 - d1 * d6;
+          if (vb <= 0 && d2 >= 0 && d6 <= 0) {
+            const w = d2 / Math.max(WRAP_MIN_DISTANCE, d2 - d6);
+            closestOut[0] = ax + acx * w;
+            closestOut[1] = ay + acy * w;
+            closestOut[2] = az + acz * w;
+            baryOut[0] = 1 - w;
+            baryOut[1] = 0;
+            baryOut[2] = w;
+          } else {
+            const va = d3 * d6 - d5 * d4;
+            if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
+              const w = (d4 - d3) / Math.max(WRAP_MIN_DISTANCE, d4 - d3 + d5 - d6);
+              closestOut[0] = bx + (cx - bx) * w;
+              closestOut[1] = by + (cy - by) * w;
+              closestOut[2] = bz + (cz - bz) * w;
+              baryOut[0] = 0;
+              baryOut[1] = 1 - w;
+              baryOut[2] = w;
+            } else {
+              const denom = 1 / Math.max(WRAP_MIN_DISTANCE, va + vb + vc);
+              const v = vb * denom;
+              const w = vc * denom;
+              const u = 1 - v - w;
+              closestOut[0] = ax * u + bx * v + cx * w;
+              closestOut[1] = ay * u + by * v + cy * w;
+              closestOut[2] = az * u + bz * v + cz * w;
+              baryOut[0] = u;
+              baryOut[1] = v;
+              baryOut[2] = w;
+            }
+          }
+        }
+      }
+    }
+  }
+  const dx = px - closestOut[0];
+  const dy = py - closestOut[1];
+  const dz = pz - closestOut[2];
+  return dx * dx + dy * dy + dz * dz;
 }
 
 function buildPinWeightArray(
@@ -380,6 +574,39 @@ function buildInitialSimulationPositions(options?: GPUClothSystemOptions) {
     blendIndices,
     blendWeights,
     target.invWorldMatrix
+  );
+}
+
+async function resolveWrapBindPositions(
+  mesh: any,
+  basePositions: Float32Array<ArrayBuffer>
+): Promise<Float32Array<ArrayBuffer>> {
+  if (!basePositions || basePositions.length === 0) {
+    return new Float32Array(0);
+  }
+  const primitive = mesh?.primitive;
+  if (!primitive) {
+    return new Float32Array(basePositions);
+  }
+  const blendData = await readSkinningDataFromPrimitive(primitive);
+  if (
+    !mesh?.invWorldMatrix ||
+    !blendData?.blendIndices ||
+    !blendData?.blendWeights ||
+    typeof mesh?.findSkeletonById !== 'function'
+  ) {
+    return new Float32Array(basePositions);
+  }
+  const skeletonId = String(mesh.skeletonName ?? '');
+  const skeleton = skeletonId ? mesh.findSkeletonById(skeletonId) : null;
+  if (!skeleton?.skinPositionsToLocal) {
+    return new Float32Array(basePositions);
+  }
+  return skeleton.skinPositionsToLocal(
+    basePositions,
+    blendData.blendIndices,
+    blendData.blendWeights,
+    mesh.invWorldMatrix
   );
 }
 
@@ -1008,45 +1235,120 @@ async function readIndexDataFromPrimitive(primitive: Primitive, vertexCount: num
   return new Uint32Array(src);
 }
 
-function createWrapDeformerProgram(device: AbstractDevice, workgroupSize: number, influenceCount: number) {
+function createWrapDeformerProgram(device: AbstractDevice, workgroupSize: number) {
   const program = device.buildComputeProgram({
     workgroupSize: [workgroupSize, 1, 1],
     compute(pb) {
       this.sourcePositions = pb.float[0]().storageBufferReadonly(0);
-      this.sourceIndices = pb.uint[0]().storageBufferReadonly(0);
-      this.sourceWeights = pb.float[0]().storageBufferReadonly(0);
-      this.targetOffsets = pb.float[0]().storageBufferReadonly(0);
+      this.sourceTriangleIndices = pb.uint[0]().storageBufferReadonly(0);
+      this.sourceBarycentrics = pb.float[0]().storageBufferReadonly(0);
+      this.targetLocalOffsets = pb.float[0]().storageBufferReadonly(0);
       this.targetPositions = pb.float[0]().storageBuffer(0);
       this.vertexCount = pb.uint().uniform(0);
       this.sourceToTargetMatrix = pb.mat4().uniform(0);
+      this.minDistance = pb.float().uniform(0);
       pb.main(function () {
         this.$l.vertex = this.$builtins.globalInvocationId.x;
         this.$if(pb.lessThan(this.vertex, this.vertexCount), function () {
           this.$l.targetBase = pb.mul(this.vertex, 3);
-          this.$l.influenceBase = pb.mul(this.vertex, influenceCount);
-          this.$l.accum = pb.vec3(0, 0, 0);
-          for (let i = 0; i < influenceCount; i++) {
-            this.$l.influenceIndex = pb.add(this.influenceBase, i);
-            this.$l.sourceIndex = this.sourceIndices.at(this.influenceIndex);
-            this.$l.sourceBase = pb.mul(this.sourceIndex, 3);
-            this.$l.weight = this.sourceWeights.at(this.influenceIndex);
-            this.$l.sourcePosition = pb.mul(
-              this.sourceToTargetMatrix,
-              pb.vec4(
-                this.sourcePositions.at(this.sourceBase),
-                this.sourcePositions.at(pb.add(this.sourceBase, 1)),
-                this.sourcePositions.at(pb.add(this.sourceBase, 2)),
-                1
-              )
-            ).xyz;
-            this.accum = pb.add(this.accum, pb.mul(this.sourcePosition, this.weight));
-          }
-          this.$l.offset = pb.vec3(
-            this.targetOffsets.at(this.targetBase),
-            this.targetOffsets.at(pb.add(this.targetBase, 1)),
-            this.targetOffsets.at(pb.add(this.targetBase, 2))
+          this.$l.influenceBase = pb.mul(this.vertex, WRAP_TRIANGLE_VERTEX_COUNT);
+          this.$l.i0 = this.sourceTriangleIndices.at(this.influenceBase);
+          this.$l.i1 = this.sourceTriangleIndices.at(pb.add(this.influenceBase, 1));
+          this.$l.i2 = this.sourceTriangleIndices.at(pb.add(this.influenceBase, 2));
+          this.$l.base0 = pb.mul(this.i0, 3);
+          this.$l.base1 = pb.mul(this.i1, 3);
+          this.$l.base2 = pb.mul(this.i2, 3);
+          this.$l.w0 = this.sourceBarycentrics.at(this.influenceBase);
+          this.$l.w1 = this.sourceBarycentrics.at(pb.add(this.influenceBase, 1));
+          this.$l.w2 = this.sourceBarycentrics.at(pb.add(this.influenceBase, 2));
+          this.$l.p0 = pb.mul(
+            this.sourceToTargetMatrix,
+            pb.vec4(
+              this.sourcePositions.at(this.base0),
+              this.sourcePositions.at(pb.add(this.base0, 1)),
+              this.sourcePositions.at(pb.add(this.base0, 2)),
+              1
+            )
+          ).xyz;
+          this.$l.p1 = pb.mul(
+            this.sourceToTargetMatrix,
+            pb.vec4(
+              this.sourcePositions.at(this.base1),
+              this.sourcePositions.at(pb.add(this.base1, 1)),
+              this.sourcePositions.at(pb.add(this.base1, 2)),
+              1
+            )
+          ).xyz;
+          this.$l.p2 = pb.mul(
+            this.sourceToTargetMatrix,
+            pb.vec4(
+              this.sourcePositions.at(this.base2),
+              this.sourcePositions.at(pb.add(this.base2, 1)),
+              this.sourcePositions.at(pb.add(this.base2, 2)),
+              1
+            )
+          ).xyz;
+          this.$l.basePoint = pb.add(pb.mul(this.p0, this.w0), pb.mul(this.p1, this.w1), pb.mul(this.p2, this.w2));
+          this.$l.edge01 = pb.sub(this.p1, this.p0);
+          this.$l.edge02 = pb.sub(this.p2, this.p0);
+          this.$l.tangent = this.edge01;
+          this.$l.tangentLen = pb.length(this.tangent);
+          this.$if(pb.lessThanEqual(this.tangentLen, this.minDistance), function () {
+            this.tangent = this.edge02;
+            this.tangentLen = pb.length(this.tangent);
+          });
+          this.$if(pb.greaterThan(this.tangentLen, this.minDistance), function () {
+            this.tangent = pb.div(this.tangent, this.tangentLen);
+          }).$else(function () {
+            this.tangent = pb.vec3(1, 0, 0);
+          });
+          this.$l.normal = pb.cross(this.edge01, this.edge02);
+          this.$l.normalLen = pb.length(this.normal);
+          this.$if(pb.greaterThan(this.normalLen, this.minDistance), function () {
+            this.normal = pb.div(this.normal, this.normalLen);
+          }).$else(function () {
+            this.$l.fallbackAxis = pb.vec3(0, 1, 0);
+            this.$if(
+              pb.or(pb.greaterThan(this.tangent.y, 0.999), pb.lessThan(this.tangent.y, -0.999)),
+              function () {
+                this.fallbackAxis = pb.vec3(1, 0, 0);
+              }
+            );
+            this.normal = pb.cross(this.tangent, this.fallbackAxis);
+            this.normalLen = pb.length(this.normal);
+            this.$if(pb.greaterThan(this.normalLen, this.minDistance), function () {
+              this.normal = pb.div(this.normal, this.normalLen);
+            }).$else(function () {
+              this.normal = pb.vec3(0, 0, 1);
+            });
+          });
+          this.$l.bitangent = pb.cross(this.normal, this.tangent);
+          this.$l.bitangentLen = pb.length(this.bitangent);
+          this.$if(pb.greaterThan(this.bitangentLen, this.minDistance), function () {
+            this.bitangent = pb.div(this.bitangent, this.bitangentLen);
+          }).$else(function () {
+            this.bitangent = pb.vec3(0, 1, 0);
+          });
+          this.normal = pb.cross(this.tangent, this.bitangent);
+          this.normalLen = pb.length(this.normal);
+          this.$if(pb.greaterThan(this.normalLen, this.minDistance), function () {
+            this.normal = pb.div(this.normal, this.normalLen);
+          }).$else(function () {
+            this.normal = pb.vec3(0, 0, 1);
+          });
+          this.$l.localOffset = pb.vec3(
+            this.targetLocalOffsets.at(this.targetBase),
+            this.targetLocalOffsets.at(pb.add(this.targetBase, 1)),
+            this.targetLocalOffsets.at(pb.add(this.targetBase, 2))
           );
-          this.$l.deformedPosition = pb.add(this.accum, this.offset);
+          this.$l.deformedPosition = pb.add(
+            this.basePoint,
+            pb.add(
+              pb.mul(this.tangent, this.localOffset.x),
+              pb.mul(this.bitangent, this.localOffset.y),
+              pb.mul(this.normal, this.localOffset.z)
+            )
+          );
           this.targetPositions.setAt(this.targetBase, this.deformedPosition.x);
           this.targetPositions.setAt(pb.add(this.targetBase, 1), this.deformedPosition.y);
           this.targetPositions.setAt(pb.add(this.targetBase, 2), this.deformedPosition.z);
@@ -1090,8 +1392,8 @@ class GPUClothWrapBinding {
   private readonly _target: any;
   private readonly _targetPrimitive: Primitive;
   private readonly _wrapTriangleIndexBuffer: GPUDataBuffer;
-  private readonly _wrapWeightBuffer: GPUDataBuffer;
-  private readonly _wrapOffsetBuffer: GPUDataBuffer;
+  private readonly _wrapBarycentricBuffer: GPUDataBuffer;
+  private readonly _wrapLocalOffsetBuffer: GPUDataBuffer;
   private readonly _program: GPUProgram;
   private readonly _bindGroup: BindGroup;
   private readonly _workgroupCount: number;
@@ -1108,8 +1410,8 @@ class GPUClothWrapBinding {
     target: any,
     targetPrimitive: Primitive,
     wrapTriangleIndexBuffer: GPUDataBuffer,
-    wrapWeightBuffer: GPUDataBuffer,
-    wrapOffsetBuffer: GPUDataBuffer,
+    wrapBarycentricBuffer: GPUDataBuffer,
+    wrapLocalOffsetBuffer: GPUDataBuffer,
     program: GPUProgram,
     bindGroup: BindGroup,
     positionBuffer: StructuredBuffer,
@@ -1124,8 +1426,8 @@ class GPUClothWrapBinding {
     this._target = target;
     this._targetPrimitive = targetPrimitive;
     this._wrapTriangleIndexBuffer = wrapTriangleIndexBuffer;
-    this._wrapWeightBuffer = wrapWeightBuffer;
-    this._wrapOffsetBuffer = wrapOffsetBuffer;
+    this._wrapBarycentricBuffer = wrapBarycentricBuffer;
+    this._wrapLocalOffsetBuffer = wrapLocalOffsetBuffer;
     this._program = program;
     this._bindGroup = bindGroup;
     this._workgroupCount = workgroupCount;
@@ -1142,17 +1444,17 @@ class GPUClothWrapBinding {
     source: any,
     sourcePositionBuffer: StructuredBuffer,
     sourceRestPositions: Float32Array<ArrayBuffer>,
-    _sourceIndexData: Uint32Array<ArrayBuffer>,
+    sourceIndexData: Uint32Array<ArrayBuffer>,
     target: any,
     workgroupSize: number
   ) {
-    const data = await GPUClothWrapBinding.createBindingData(source, sourceRestPositions, target);
+    const data = await GPUClothWrapBinding.createBindingData(source, sourceRestPositions, sourceIndexData, target);
     return GPUClothWrapBinding.createFromData(
       device,
       source,
       sourcePositionBuffer,
       sourceRestPositions,
-      _sourceIndexData,
+      sourceIndexData,
       target,
       workgroupSize,
       data
@@ -1162,96 +1464,134 @@ class GPUClothWrapBinding {
   static async createBindingData(
     source: any,
     sourceRestPositions: Float32Array<ArrayBuffer>,
+    sourceIndexData: Uint32Array<ArrayBuffer>,
     target: any
   ): Promise<GPUClothWrapBindingData> {
     if (!target?.primitive) {
       throw new Error('GPU cloth wrap failed: target mesh has no primitive.');
     }
     const targetPrimitive = target.primitive as Primitive;
-    const targetPositions = await readPositionDataFromPrimitive(targetPrimitive);
+    const targetBasePositions = await readPositionDataFromPrimitive(targetPrimitive);
     const sourceToTargetBindMatrix = getWrapSourceToTargetMatrix(source, target);
-    const sourcePositionsInTargetSpace = transformPointArrayByMatrix(sourceToTargetBindMatrix, sourceRestPositions);
+    const [resolvedSourcePositions, targetPositions] = await Promise.all([
+      resolveWrapBindPositions(source, sourceRestPositions),
+      resolveWrapBindPositions(target, targetBasePositions)
+    ]);
+    const sourcePositionsInTargetSpace = transformPointArrayByMatrix(sourceToTargetBindMatrix, resolvedSourcePositions);
     const sourceVertexCount = (sourcePositionsInTargetSpace.length / 3) >> 0;
+    const sourceTriangleCount = (sourceIndexData.length / 3) >> 0;
     if (sourceVertexCount <= 0) {
       throw new Error('GPU cloth wrap failed: source mesh has no vertices.');
     }
+    if (sourceTriangleCount <= 0) {
+      throw new Error('GPU cloth wrap failed: source mesh has no triangles.');
+    }
     const vertexCount = (targetPositions.length / 3) >> 0;
-    const sourceIndices = new Uint32Array(vertexCount * WRAP_INFLUENCE_COUNT);
-    const sourceWeights = new Float32Array(vertexCount * WRAP_INFLUENCE_COUNT);
-    const targetOffsets = new Float32Array(vertexCount * 3);
+    const sourceTriangleIndices = new Uint32Array(vertexCount * WRAP_TRIANGLE_VERTEX_COUNT);
+    const sourceBarycentrics = new Float32Array(vertexCount * WRAP_TRIANGLE_VERTEX_COUNT);
+    const targetLocalOffsets = new Float32Array(vertexCount * 3);
     let maxOffsetDistance = 0;
+    const closestPoint = new Float32Array(3);
+    const barycentrics = new Float32Array(3);
+    const frame = new Float32Array(9);
     for (let vertex = 0; vertex < vertexCount; vertex++) {
       const targetBase = vertex * 3;
       const vx = targetPositions[targetBase];
       const vy = targetPositions[targetBase + 1];
       const vz = targetPositions[targetBase + 2];
-      const nearestDistances = new Float32Array(WRAP_INFLUENCE_COUNT);
-      const nearestIndices = new Uint32Array(WRAP_INFLUENCE_COUNT);
-      for (let i = 0; i < WRAP_INFLUENCE_COUNT; i++) {
-        nearestDistances[i] = Number.POSITIVE_INFINITY;
-        nearestIndices[i] = 0;
-      }
-      for (let sourceVertex = 0; sourceVertex < sourceVertexCount; sourceVertex++) {
-        const sourceBase = sourceVertex * 3;
-        const dx = vx - sourcePositionsInTargetSpace[sourceBase];
-        const dy = vy - sourcePositionsInTargetSpace[sourceBase + 1];
-        const dz = vz - sourcePositionsInTargetSpace[sourceBase + 2];
-        const distanceSq = dx * dx + dy * dy + dz * dz;
-        for (let slot = 0; slot < WRAP_INFLUENCE_COUNT; slot++) {
-          if (distanceSq < nearestDistances[slot]) {
-            for (let shift = WRAP_INFLUENCE_COUNT - 1; shift > slot; shift--) {
-              nearestDistances[shift] = nearestDistances[shift - 1];
-              nearestIndices[shift] = nearestIndices[shift - 1];
-            }
-            nearestDistances[slot] = distanceSq;
-            nearestIndices[slot] = sourceVertex;
-            break;
-          }
+      let bestDistanceSq = Number.POSITIVE_INFINITY;
+      let bestI0 = 0;
+      let bestI1 = 0;
+      let bestI2 = 0;
+      let bestClosestX = vx;
+      let bestClosestY = vy;
+      let bestClosestZ = vz;
+      let bestBary0 = 1;
+      let bestBary1 = 0;
+      let bestBary2 = 0;
+      for (let tri = 0; tri < sourceTriangleCount; tri++) {
+        const triBase = tri * 3;
+        const i0 = sourceIndexData[triBase];
+        const i1 = sourceIndexData[triBase + 1];
+        const i2 = sourceIndexData[triBase + 2];
+        if (i0 >= sourceVertexCount || i1 >= sourceVertexCount || i2 >= sourceVertexCount) {
+          continue;
+        }
+        const base0 = i0 * 3;
+        const base1 = i1 * 3;
+        const base2 = i2 * 3;
+        const distanceSq = closestPointOnTriangle(
+          vx,
+          vy,
+          vz,
+          sourcePositionsInTargetSpace[base0],
+          sourcePositionsInTargetSpace[base0 + 1],
+          sourcePositionsInTargetSpace[base0 + 2],
+          sourcePositionsInTargetSpace[base1],
+          sourcePositionsInTargetSpace[base1 + 1],
+          sourcePositionsInTargetSpace[base1 + 2],
+          sourcePositionsInTargetSpace[base2],
+          sourcePositionsInTargetSpace[base2 + 1],
+          sourcePositionsInTargetSpace[base2 + 2],
+          closestPoint,
+          barycentrics
+        );
+        if (distanceSq < bestDistanceSq) {
+          bestDistanceSq = distanceSq;
+          bestI0 = i0;
+          bestI1 = i1;
+          bestI2 = i2;
+          bestClosestX = closestPoint[0];
+          bestClosestY = closestPoint[1];
+          bestClosestZ = closestPoint[2];
+          bestBary0 = barycentrics[0];
+          bestBary1 = barycentrics[1];
+          bestBary2 = barycentrics[2];
         }
       }
-      let totalWeight = 0;
-      const influenceBase = vertex * WRAP_INFLUENCE_COUNT;
-      for (let slot = 0; slot < WRAP_INFLUENCE_COUNT; slot++) {
-        const distanceSq = nearestDistances[slot];
-        const weight = 1 / Math.max(1e-8, distanceSq);
-        sourceIndices[influenceBase + slot] = nearestIndices[slot];
-        sourceWeights[influenceBase + slot] = weight;
-        totalWeight += weight;
+      if (!Number.isFinite(bestDistanceSq)) {
+        throw new Error('GPU cloth wrap failed: source mesh triangle data is invalid.');
       }
-      if (totalWeight <= 1e-8) {
-        sourceWeights[influenceBase] = 1;
-        totalWeight = 1;
-        for (let slot = 1; slot < WRAP_INFLUENCE_COUNT; slot++) {
-          sourceWeights[influenceBase + slot] = 0;
-          sourceIndices[influenceBase + slot] = sourceIndices[influenceBase];
-        }
-      }
-      let baseX = 0;
-      let baseY = 0;
-      let baseZ = 0;
-      for (let slot = 0; slot < WRAP_INFLUENCE_COUNT; slot++) {
-        const normalizedWeight = sourceWeights[influenceBase + slot] / totalWeight;
-        sourceWeights[influenceBase + slot] = normalizedWeight;
-        const sourceBase = sourceIndices[influenceBase + slot] * 3;
-        baseX += sourcePositionsInTargetSpace[sourceBase] * normalizedWeight;
-        baseY += sourcePositionsInTargetSpace[sourceBase + 1] * normalizedWeight;
-        baseZ += sourcePositionsInTargetSpace[sourceBase + 2] * normalizedWeight;
-      }
-      targetOffsets[targetBase] = vx - baseX;
-      targetOffsets[targetBase + 1] = vy - baseY;
-      targetOffsets[targetBase + 2] = vz - baseZ;
-      maxOffsetDistance = Math.max(maxOffsetDistance, Math.hypot(vx - baseX, vy - baseY, vz - baseZ));
+      const influenceBase = vertex * WRAP_TRIANGLE_VERTEX_COUNT;
+      sourceTriangleIndices[influenceBase] = bestI0;
+      sourceTriangleIndices[influenceBase + 1] = bestI1;
+      sourceTriangleIndices[influenceBase + 2] = bestI2;
+      sourceBarycentrics[influenceBase] = bestBary0;
+      sourceBarycentrics[influenceBase + 1] = bestBary1;
+      sourceBarycentrics[influenceBase + 2] = bestBary2;
+      const bestBase0 = bestI0 * 3;
+      const bestBase1 = bestI1 * 3;
+      const bestBase2 = bestI2 * 3;
+      buildWrapTriangleFrame(
+        sourcePositionsInTargetSpace[bestBase0],
+        sourcePositionsInTargetSpace[bestBase0 + 1],
+        sourcePositionsInTargetSpace[bestBase0 + 2],
+        sourcePositionsInTargetSpace[bestBase1],
+        sourcePositionsInTargetSpace[bestBase1 + 1],
+        sourcePositionsInTargetSpace[bestBase1 + 2],
+        sourcePositionsInTargetSpace[bestBase2],
+        sourcePositionsInTargetSpace[bestBase2 + 1],
+        sourcePositionsInTargetSpace[bestBase2 + 2],
+        frame
+      );
+      const deltaX = vx - bestClosestX;
+      const deltaY = vy - bestClosestY;
+      const deltaZ = vz - bestClosestZ;
+      targetLocalOffsets[targetBase] = dot3(deltaX, deltaY, deltaZ, frame[0], frame[1], frame[2]);
+      targetLocalOffsets[targetBase + 1] = dot3(deltaX, deltaY, deltaZ, frame[3], frame[4], frame[5]);
+      targetLocalOffsets[targetBase + 2] = dot3(deltaX, deltaY, deltaZ, frame[6], frame[7], frame[8]);
+      maxOffsetDistance = Math.max(maxOffsetDistance, Math.sqrt(bestDistanceSq));
     }
 
     return {
-      version: 2,
+      version: 4,
       vertexCount,
       sourceVertexCount,
-      influenceCount: WRAP_INFLUENCE_COUNT,
+      influenceCount: WRAP_TRIANGLE_VERTEX_COUNT,
       maxOffsetDistance,
-      sourceIndices: encodeTypedArrayBase64(sourceIndices),
-      sourceWeights: encodeTypedArrayBase64(sourceWeights),
-      targetOffsets: encodeTypedArrayBase64(targetOffsets)
+      sourceTriangleIndices: encodeTypedArrayBase64(sourceTriangleIndices),
+      sourceBarycentrics: encodeTypedArrayBase64(sourceBarycentrics),
+      targetLocalOffsets: encodeTypedArrayBase64(targetLocalOffsets)
     };
   }
 
@@ -1275,9 +1615,21 @@ class GPUClothWrapBinding {
     }
     const expectedElementCount = vertexCount * 3;
     const influenceElementCount = vertexCount * data.influenceCount;
-    const wrapSourceIndices = decodeTypedArrayFromBase64(Uint32Array, data.sourceIndices, influenceElementCount);
-    const wrapSourceWeights = decodeTypedArrayFromBase64(Float32Array, data.sourceWeights, influenceElementCount);
-    const wrapTargetOffsets = decodeTypedArrayFromBase64(Float32Array, data.targetOffsets, expectedElementCount);
+    const wrapSourceTriangleIndices = decodeTypedArrayFromBase64(
+      Uint32Array,
+      data.sourceTriangleIndices,
+      influenceElementCount
+    );
+    const wrapSourceBarycentrics = decodeTypedArrayFromBase64(
+      Float32Array,
+      data.sourceBarycentrics,
+      influenceElementCount
+    );
+    const wrapTargetLocalOffsets = decodeTypedArrayFromBase64(
+      Float32Array,
+      data.targetLocalOffsets,
+      expectedElementCount
+    );
     const positionBuffer = device.createVertexBuffer('position_f32x3', new Float32Array(expectedElementCount), {
       storage: true,
       managed: false
@@ -1286,40 +1638,41 @@ class GPUClothWrapBinding {
       throw new Error('GPU cloth wrap failed: could not create target position buffer.');
     }
 
-    const wrapTriangleIndexBuffer = device.createBuffer(wrapSourceIndices.byteLength, {
+    const wrapTriangleIndexBuffer = device.createBuffer(wrapSourceTriangleIndices.byteLength, {
       usage: 'uniform',
       storage: true,
       dynamic: false,
       managed: false
     });
-    wrapTriangleIndexBuffer.bufferSubData(0, wrapSourceIndices);
-    const wrapWeightBuffer = device.createBuffer(wrapSourceWeights.byteLength, {
+    wrapTriangleIndexBuffer.bufferSubData(0, wrapSourceTriangleIndices);
+    const wrapBarycentricBuffer = device.createBuffer(wrapSourceBarycentrics.byteLength, {
       usage: 'uniform',
       storage: true,
       dynamic: false,
       managed: false
     });
-    wrapWeightBuffer.bufferSubData(0, wrapSourceWeights);
-    const wrapOffsetBuffer = device.createBuffer(wrapTargetOffsets.byteLength, {
+    wrapBarycentricBuffer.bufferSubData(0, wrapSourceBarycentrics);
+    const wrapLocalOffsetBuffer = device.createBuffer(wrapTargetLocalOffsets.byteLength, {
       usage: 'uniform',
       storage: true,
       dynamic: false,
       managed: false
     });
-    wrapOffsetBuffer.bufferSubData(0, wrapTargetOffsets);
-    const program = createWrapDeformerProgram(device, workgroupSize, data.influenceCount);
+    wrapLocalOffsetBuffer.bufferSubData(0, wrapTargetLocalOffsets);
+    const program = createWrapDeformerProgram(device, workgroupSize);
     if (!program) {
       throw new Error('GPU cloth wrap failed: could not create compute program.');
     }
     const bindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
     bindGroup.setBuffer('sourcePositions', sourcePositionBuffer);
-    bindGroup.setBuffer('sourceIndices', wrapTriangleIndexBuffer);
-    bindGroup.setBuffer('sourceWeights', wrapWeightBuffer);
-    bindGroup.setBuffer('targetOffsets', wrapOffsetBuffer);
+    bindGroup.setBuffer('sourceTriangleIndices', wrapTriangleIndexBuffer);
+    bindGroup.setBuffer('sourceBarycentrics', wrapBarycentricBuffer);
+    bindGroup.setBuffer('targetLocalOffsets', wrapLocalOffsetBuffer);
     bindGroup.setBuffer('targetPositions', positionBuffer);
     const sourceToTargetBindMatrix = getWrapSourceToTargetMatrix(source, target);
     bindGroup.setValue('vertexCount', vertexCount);
     bindGroup.setValue('sourceToTargetMatrix', sourceToTargetBindMatrix);
+    bindGroup.setValue('minDistance', 1e-5);
 
     const originalPositionBuffer = targetPrimitive.getVertexBuffer('position');
     const originalNormalBuffer = targetPrimitive.getVertexBuffer('normal');
@@ -1342,8 +1695,8 @@ class GPUClothWrapBinding {
       target,
       targetPrimitive,
       wrapTriangleIndexBuffer,
-      wrapWeightBuffer,
-      wrapOffsetBuffer,
+      wrapBarycentricBuffer,
+      wrapLocalOffsetBuffer,
       program,
       bindGroup,
       positionBuffer,
@@ -1370,8 +1723,8 @@ class GPUClothWrapBinding {
     this._bindGroup.dispose();
     this._program.dispose();
     this._wrapTriangleIndexBuffer.dispose();
-    this._wrapWeightBuffer.dispose();
-    this._wrapOffsetBuffer.dispose();
+    this._wrapBarycentricBuffer.dispose();
+    this._wrapLocalOffsetBuffer.dispose();
     if (this._targetPrimitive) {
       this._targetPrimitive.removeVertexBuffer('position');
       if (this._originalPositionBuffer) {
@@ -1455,7 +1808,8 @@ export async function createGPUClothWrapBindingData(source: any, target: any): P
   }
   const sourcePrimitive = source.primitive as Primitive;
   const sourcePositions = await readPositionDataFromPrimitive(sourcePrimitive);
-  return GPUClothWrapBinding.createBindingData(source, sourcePositions, target);
+  const sourceIndices = toUInt32Indices(await readIndexDataFromPrimitive(sourcePrimitive, (sourcePositions.length / 3) >> 0));
+  return GPUClothWrapBinding.createBindingData(source, sourcePositions, sourceIndices, target);
 }
 
 /**
