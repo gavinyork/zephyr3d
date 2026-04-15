@@ -177,11 +177,13 @@ export interface ColliderRW {
   directionPreviousTransform: Quaternion;
   /** World-to-local matrix for AABB bounds computation */
   worldToLocal: Matrix4x4;
+  /** World-space scale of the collider node (product of all ancestor scales × own local scale) */
+  worldScale: Vector3;
   /** Local-space AABB min corner */
   localBoundsMin: Vector3;
   /** Local-space AABB max corner */
   localBoundsMax: Vector3;
-  /** Scaled radius for current frame (base radius × collisionScale) */
+  /** Scaled radius for current frame (base radius × world scale) */
   radius: number;
   /** Whether this collider is active (0 = disabled, 1 = enabled) */
   enabled: number;
@@ -295,6 +297,8 @@ export interface TransformAccess {
   getWorldPosition(): Vector3;
   /** Read world-space rotation */
   getWorldRotation(): Quaternion;
+  /** Read world-space scale (product of all ancestor scales and own local scale) */
+  getWorldScale(): Vector3;
   /** Read local-space position (relative to parent) */
   getLocalPosition(): Vector3;
   /** Read local-space rotation (relative to parent) */

@@ -1,10 +1,9 @@
 // Bone chain demo — 8-bone pendulum with sphere collider
 
-import { Vector4 } from '@zephyr3d/base';
+import { InterpolatorScalar, Vector4 } from '@zephyr3d/base';
 import type { BoneNode, ColliderR, GrabberR, Scene } from '@zephyr3d/scene';
-import { BoxShape, JointDynamicsSystem } from '@zephyr3d/scene';
+import { BoxShape, JointDynamicsSystem, createTransformAccess } from '@zephyr3d/scene';
 import { LambertMaterial, Mesh, SceneNode, SphereShape } from '@zephyr3d/scene';
-import { createTransformAccess } from './three-bridge';
 import { Vector3 } from '@zephyr3d/base';
 
 export interface BoneChainDemo {
@@ -102,6 +101,10 @@ export function createBoneChainDemo(scene: Scene): BoneChainDemo {
     {
       chainConfig: { systemRoot: sysroot, chains: [{ start: root, end: bones[bones.length - 1] }] },
       controllerConfig: {
+        curves: {
+          resistance: InterpolatorScalar.constant(1),
+          hardness: InterpolatorScalar.constant(0)
+        },
         constraintOptions: {
           structuralVertical: true,
           bendingVertical: true

@@ -290,8 +290,9 @@ export class JointDynamicsSystemController {
         this._collidersRW[i].directionCurrentTransform.clone();
       this._collidersRW[i].positionCurrentTransform = t.getWorldPosition();
       this._collidersRW[i].directionCurrentTransform = t.getWorldRotation();
+      this._collidersRW[i].worldScale = t.getWorldScale();
       this._collidersRW[i].worldToLocal = Matrix4x4.compose(
-        t.getLocalScale(),
+        this._collidersRW[i].worldScale,
         this._collidersRW[i].directionCurrentTransform,
         this._collidersRW[i].positionCurrentTransform
       ).inplaceInvertAffine();
@@ -637,6 +638,7 @@ export class JointDynamicsSystemController {
   private _createColliderRW(transform: TransformAccess): ColliderRW {
     const pos = transform.getWorldPosition();
     const rot = transform.getWorldRotation();
+    const scale = transform.getWorldScale();
     return {
       positionCurrent: pos.clone(),
       directionCurrent: Vector3.zero(),
@@ -647,6 +649,7 @@ export class JointDynamicsSystemController {
       directionCurrentTransform: rot.clone(),
       directionPreviousTransform: rot.clone(),
       worldToLocal: Matrix4x4.identity(),
+      worldScale: scale.clone(),
       localBoundsMin: Vector3.zero(),
       localBoundsMax: Vector3.zero(),
       radius: 0,

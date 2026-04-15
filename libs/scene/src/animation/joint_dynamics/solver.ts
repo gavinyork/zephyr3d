@@ -30,7 +30,6 @@ import {
   collisionDetection,
   checkSurfaceCollision,
   type CollisionResult,
-  type LineCollisionResult,
   type SurfaceCheckResult
 } from './collision';
 
@@ -140,8 +139,12 @@ export function simulate(
   }
 
   if (params.rootRotateLimit >= 0 && Math.abs(rotateAngle) > params.rootRotateLimit) {
-    let rotateAxis = new Vector3();
-    if (!isFinite(rotateAxis.x) || !isFinite(rotateAxis.y) || !isFinite(rotateAxis.z)) {
+    // Extract the rotation axis from the delta quaternion
+    const sinHalf = Math.sqrt(Math.max(0, 1 - rootDeltaRot.w * rootDeltaRot.w));
+    let rotateAxis: Vector3;
+    if (sinHalf > 0.0001) {
+      rotateAxis = new Vector3(rootDeltaRot.x / sinHalf, rootDeltaRot.y / sinHalf, rootDeltaRot.z / sinHalf);
+    } else {
       rotateAxis = Vector3.axisPY();
     }
     let angle = rotateAngle > 0 ? rotateAngle - params.rootRotateLimit : rotateAngle + params.rootRotateLimit;
@@ -160,7 +163,7 @@ export function simulate(
     const stepDelta = iSubStep / subSteps;
     const stepTime_x2_half = stepTime * stepTime * 0.5;
 
-    colliderUpdate(collidersR, collidersRW, stepDelta, params.collisionScale);
+    colliderUpdate(collidersR, collidersRW, stepDelta);
     pointUpdatePass1(
       pointsR,
       pointsRW,
@@ -174,7 +177,9 @@ export function simulate(
       grabbersR,
       grabbersRW,
       movableLimitTargets,
-      flatPlanes
+      flatPlanes,
+      collidersR,
+      collidersRW
     );
 
     if (!params.isPaused) {
@@ -183,6 +188,17 @@ export function simulate(
       if (params.enableSurfaceCollision) {
         surfaceCollision(pointsRW, collidersR, collidersRW, params.surfaceConstraints);
       }
+
+      // Push fixed points out of colliders before constraint solving.
+      // Fixed points follow animation and cannot be moved by the solver, but if
+      // their animated position is inside a collider, the distance constraint will
+      // pull free children inward through the surface — causing the characteristic
+      // "hair flipping outward" artifact at the back of the head.
+      // By temporarily clamping fixed-point positionCurrent to the collider surface
+      // before each substep's constraint pass, we ensure constraints operate from
+      // a geometrically valid anchor.  The original animated position is restored
+      // at the start of the next substep via positionCurrentTransform.
+      fixedPointColliderPushout(pointsR, pointsRW, collidersR, collidersRW);
 
       for (let iRelax = params.relaxation - 1; iRelax >= 0; --iRelax) {
         constraintUpdate(
@@ -195,6 +211,13 @@ export function simulate(
           params.enableBroadPhase
         );
       }
+
+      // After all constraint/collision iterations are done, cancel any residual
+      // normal velocity that would push points back into colliders next frame.
+      // We compare the final positionCurrent (guaranteed outside all colliders)
+      // against positionPrevious (the Verlet integration start point) and zero
+      // out the component pointing into each collider.
+      postCollisionVelocityFix(pointsR, pointsRW, collidersR, collidersRW);
     }
 
     pointUpdatePass2(
@@ -224,12 +247,7 @@ function computeCapsule(
   Vector3.sub(pos, _computeCapsuleHalfDir, head);
 }
 
-function colliderUpdate(
-  collidersR: readonly ColliderR[],
-  collidersRW: ColliderRW[],
-  stepDelta: number,
-  collisionScale: number
-) {
+function colliderUpdate(collidersR: readonly ColliderR[], collidersRW: ColliderRW[], stepDelta: number) {
   const curPos = new Vector3();
   const curDir = new Quaternion();
   const corner = new Vector3();
@@ -239,7 +257,11 @@ function colliderUpdate(
   for (let i = 0; i < collidersR.length; i++) {
     const colR = collidersR[i];
     const colRW = collidersRW[i];
-    colRW.radius = colR.radius * collisionScale;
+    // Scale radius by the uniform world scale of the collider node.
+    // Use the average of x/y/z components to handle non-uniform scale gracefully.
+    const ws = colRW.worldScale;
+    const worldScaleUniform = (ws.x + ws.y + ws.z) / 3;
+    colRW.radius = colR.radius * worldScaleUniform;
 
     Vector3.lerp(colRW.positionPreviousTransform, colRW.positionCurrentTransform, stepDelta, curPos);
     Quaternion.slerp(colRW.directionPreviousTransform, colRW.directionCurrentTransform, stepDelta, curDir);
@@ -330,7 +352,9 @@ function pointUpdatePass1(
   grabbersR: readonly GrabberR[],
   grabbersRW: readonly GrabberRW[],
   movableLimitTargets: readonly Vector3[],
-  flatPlanes: readonly FlatPlane[]
+  flatPlanes: readonly FlatPlane[],
+  collidersR: readonly ColliderR[],
+  collidersRW: readonly ColliderRW[]
 ) {
   const currentTransformPos = new Vector3();
   const moveDir = new Vector3();
@@ -377,9 +401,38 @@ function pointUpdatePass1(
         Vector3.add(ptR.gravity, extForce, extForce);
         Vector3.scale(extForce, stepTime_x2_half, extForce);
 
+        // Clamp the per-step force displacement to half the bone's rest length.
+        // Without this, large gravity values (e.g. -50 in world space) produce a
+        // per-step displacement comparable to the bone spacing, which exceeds what
+        // the constraint relaxation can correct in one pass and causes surface jitter.
+        if (ptR.parentLength > EPSILON) {
+          const maxForceDisp = ptR.parentLength * 0.5;
+          const forceDispSq = extForce.magnitudeSq;
+          if (forceDispSq > maxForceDisp * maxForceDisp) {
+            Vector3.scale(extForce, maxForceDisp / Math.sqrt(forceDispSq), extForce);
+          }
+        }
+
+        // Apply resistance (damping) only to the velocity term, not to external forces.
+        // Applying resistance to gravity would incorrectly attenuate acceleration each frame,
+        // causing energy errors and instability under high gravity.
+        Vector3.scale(moveDir, ptR.resistance, moveDir);
+        Vector3.scale(moveDir, 1.0 - clamp01(ptRW.friction * ptR.frictionScale), moveDir);
+
+        // Clamp per-step velocity to a multiple of bone rest length.
+        // During fast root rotations the Verlet velocity can become very large,
+        // overwhelming the constraint solver and causing the hair to lose shape.
+        // Limiting velocity keeps the simulation stable regardless of how fast
+        // the root moves, while still allowing natural large-amplitude swings.
+        if (ptR.parentLength > EPSILON) {
+          const maxVelDisp = ptR.parentLength * 2.0;
+          const velDispSq = moveDir.magnitudeSq;
+          if (velDispSq > maxVelDisp * maxVelDisp) {
+            Vector3.scale(moveDir, maxVelDisp / Math.sqrt(velDispSq), moveDir);
+          }
+        }
+
         Vector3.add(moveDir, extForce, displacement);
-        Vector3.scale(displacement, ptR.resistance, displacement);
-        Vector3.scale(displacement, 1.0 - clamp01(ptRW.friction * ptR.frictionScale), displacement);
       }
 
       ptRW.positionPrevious.set(ptRW.positionCurrent);
@@ -396,6 +449,28 @@ function pointUpdatePass1(
         // Force fade ratio
         if (ptR.forceFadeRatio > 0) {
           Vector3.lerp(ptRW.positionCurrent, currentTransformPos, ptR.forceFadeRatio, ptRW.positionCurrent);
+        }
+        // Push out of colliders immediately after hardness/fade pulls the point
+        // toward the animated position (which may be inside a collider).
+        // This prevents the hardness↔collision tug-of-war that causes jitter.
+        for (let ci = 0; ci < collidersR.length; ci++) {
+          const colRci = collidersR[ci];
+          const colRWci = collidersRW[ci];
+          if (colRWci.enabled === 0 || colRci.isInverseCollider) {
+            continue;
+          }
+          const hRes =
+            colRci.height <= EPSILON
+              ? pushoutFromSphere(
+                  colRWci.positionCurrent,
+                  colRWci.radius,
+                  ptR.pointRadius,
+                  ptRW.positionCurrent
+                )
+              : pushoutFromCapsule(colRci, colRWci, ptRW.positionCurrent, ptR);
+          if (hRes.hit) {
+            ptRW.positionCurrent.set(hRes.point);
+          }
         }
         // Grabber
         if (ptRW.grabberIndex !== -1) {
@@ -534,6 +609,134 @@ function surfaceCollision(
   }
 }
 
+const _postFixNormal = new Vector3();
+const _fixedPushResult: CollisionResult = { hit: false, point: new Vector3() };
+
+/**
+ * Before constraint solving each substep, push fixed points (weight=0) out of
+ * any colliders they animate into.  Fixed points normally follow animation
+ * exactly, but when their animated position lies inside a collider the distance
+ * constraint pulls free children inward through the surface, producing the
+ * classic "hair flipping outward" artifact.
+ *
+ * We clamp positionCurrent to the collider surface so that constraints operate
+ * from a geometrically valid anchor.  The temporary change is overwritten at the
+ * start of the next substep when positionCurrent is refreshed from the animation
+ * transform, so the skeleton itself is never permanently altered.
+ */
+function fixedPointColliderPushout(
+  pointsR: readonly PointR[],
+  pointsRW: PointRW[],
+  collidersR: readonly ColliderR[],
+  collidersRW: readonly ColliderRW[]
+): void {
+  for (let pi = 0; pi < pointsR.length; pi++) {
+    if (pointsR[pi].weight > EPSILON) {
+      continue;
+    }
+    const ptRW = pointsRW[pi];
+    const ptR = pointsR[pi];
+    for (let ci = 0; ci < collidersR.length; ci++) {
+      const colR = collidersR[ci];
+      const colRW = collidersRW[ci];
+      if (colRW.enabled === 0 || colR.isInverseCollider) {
+        continue;
+      }
+      const res =
+        colR.height <= EPSILON
+          ? pushoutFromSphere(
+              colRW.positionCurrent,
+              colRW.radius,
+              ptR.pointRadius,
+              ptRW.positionCurrent,
+              _fixedPushResult
+            )
+          : pushoutFromCapsule(colR, colRW, ptRW.positionCurrent, ptR, _fixedPushResult);
+      if (res.hit) {
+        ptRW.positionCurrent.set(res.point);
+      }
+    }
+  }
+}
+
+/**
+ * Called once per substep after ALL constraint + collision relaxation iterations finish.
+ * For each dynamic point that is actually touching a collider surface (within radius),
+ * cancel the normal-direction component of the Verlet velocity from positionPrevious.
+ * Points far from all colliders are untouched, preserving wind-driven velocity.
+ */
+function postCollisionVelocityFix(
+  pointsR: readonly PointR[],
+  pointsRW: PointRW[],
+  collidersR: readonly ColliderR[],
+  collidersRW: readonly ColliderRW[]
+): void {
+  for (let pi = 0; pi < pointsR.length; pi++) {
+    const ptR = pointsR[pi];
+    if (ptR.weight <= EPSILON) {
+      continue;
+    }
+    const ptRW = pointsRW[pi];
+
+    for (let ci = 0; ci < collidersR.length; ci++) {
+      const colR = collidersR[ci];
+      const colRW = collidersRW[ci];
+      if (colRW.enabled === 0 || colR.isInverseCollider) {
+        continue;
+      }
+
+      let nx = 0,
+        ny = 0,
+        nz = 0;
+      if (colR.height <= EPSILON) {
+        nx = ptRW.positionCurrent.x - colRW.positionCurrent.x;
+        ny = ptRW.positionCurrent.y - colRW.positionCurrent.y;
+        nz = ptRW.positionCurrent.z - colRW.positionCurrent.z;
+      } else {
+        const capsuleVec = colRW.directionCurrent;
+        const capsuleVecLenSq = capsuleVec.magnitudeSq;
+        if (capsuleVecLenSq > EPSILON) {
+          const tx = ptRW.positionCurrent.x - colRW.positionCurrent.x;
+          const ty = ptRW.positionCurrent.y - colRW.positionCurrent.y;
+          const tz = ptRW.positionCurrent.z - colRW.positionCurrent.z;
+          const t = Math.max(
+            0,
+            Math.min(1, (tx * capsuleVec.x + ty * capsuleVec.y + tz * capsuleVec.z) / capsuleVecLenSq)
+          );
+          nx = ptRW.positionCurrent.x - (colRW.positionCurrent.x + capsuleVec.x * t);
+          ny = ptRW.positionCurrent.y - (colRW.positionCurrent.y + capsuleVec.y * t);
+          nz = ptRW.positionCurrent.z - (colRW.positionCurrent.z + capsuleVec.z * t);
+        } else {
+          nx = ptRW.positionCurrent.x - colRW.positionCurrent.x;
+          ny = ptRW.positionCurrent.y - colRW.positionCurrent.y;
+          nz = ptRW.positionCurrent.z - colRW.positionCurrent.z;
+        }
+      }
+
+      const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (nLen < EPSILON) {
+        continue;
+      }
+
+      const surfaceDist = nLen - colRW.radius - ptR.pointRadius;
+      if (surfaceDist > colRW.radius * 0.05) {
+        continue;
+      }
+
+      _postFixNormal.setXYZ(nx / nLen, ny / nLen, nz / nLen);
+      const vx = ptRW.positionCurrent.x - ptRW.positionPrevious.x;
+      const vy = ptRW.positionCurrent.y - ptRW.positionPrevious.y;
+      const vz = ptRW.positionCurrent.z - ptRW.positionPrevious.z;
+      const vDotN = vx * _postFixNormal.x + vy * _postFixNormal.y + vz * _postFixNormal.z;
+      if (vDotN < 0) {
+        ptRW.positionPrevious.x += _postFixNormal.x * vDotN;
+        ptRW.positionPrevious.y += _postFixNormal.y * vDotN;
+        ptRW.positionPrevious.z += _postFixNormal.z * vDotN;
+      }
+    }
+  }
+}
+
 function constraintUpdate(
   pointsR: readonly PointR[],
   pointsRW: PointRW[],
@@ -549,7 +752,7 @@ function constraintUpdate(
   const scaledDisp = new Vector3();
   const pointResultA: CollisionResult = { hit: false, point: new Vector3() };
   const pointResultB: CollisionResult = { hit: false, point: new Vector3() };
-  const lineResult: LineCollisionResult = {
+  const lineResult = {
     hit: false,
     pointOnLine: new Vector3(),
     pointOnCollider: new Vector3(),

@@ -2,9 +2,8 @@
 
 import { InterpolatorScalar } from '@zephyr3d/base';
 import type { BoneNode, ColliderR, GrabberR, Scene } from '@zephyr3d/scene';
-import { JointDynamicsSystem } from '@zephyr3d/scene';
+import { JointDynamicsSystem, createTransformAccess } from '@zephyr3d/scene';
 import { BoxShape, CapsuleShape, LambertMaterial, Mesh, SceneNode, SphereShape } from '@zephyr3d/scene';
-import { createTransformAccess } from './three-bridge';
 import { Vector3 } from '@zephyr3d/base';
 
 export interface ClothGridDemo {

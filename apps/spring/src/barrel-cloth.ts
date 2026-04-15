@@ -7,9 +7,8 @@
 
 import { InterpolatorScalar, Quaternion } from '@zephyr3d/base';
 import type { BoneNode, ColliderR, GrabberR, Scene } from '@zephyr3d/scene';
-import { BoxShape, JointDynamicsSystem } from '@zephyr3d/scene';
+import { BoxShape, createTransformAccess, JointDynamicsSystem } from '@zephyr3d/scene';
 import { CapsuleShape, LambertMaterial, Mesh, SphereShape } from '@zephyr3d/scene';
-import { createTransformAccess } from './three-bridge';
 import { SceneNode } from '@zephyr3d/scene';
 import { Vector3 } from '@zephyr3d/base';
 

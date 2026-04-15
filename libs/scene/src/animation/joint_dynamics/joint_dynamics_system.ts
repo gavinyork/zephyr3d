@@ -18,6 +18,11 @@ export function createTransformAccess(obj: SceneNode): TransformAccess {
       obj.worldMatrix.decompose(null, q, null);
       return q;
     },
+    getWorldScale(): Vector3 {
+      const s = new Vector3();
+      obj.worldMatrix.decompose(s, null, null);
+      return s;
+    },
     getLocalPosition(): Vector3 {
       return obj.position.clone();
     },
