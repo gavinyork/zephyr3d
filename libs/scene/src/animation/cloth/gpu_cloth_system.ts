@@ -1244,6 +1244,7 @@ function createWrapDeformerProgram(device: AbstractDevice, workgroupSize: number
       this.sourceBarycentrics = pb.float[0]().storageBufferReadonly(0);
       this.targetLocalOffsets = pb.float[0]().storageBufferReadonly(0);
       this.targetPositions = pb.float[0]().storageBuffer(0);
+      this.targetNormals = pb.float[0]().storageBuffer(0);
       this.vertexCount = pb.uint().uniform(0);
       this.sourceToTargetMatrix = pb.mat4().uniform(0);
       this.minDistance = pb.float().uniform(0);
@@ -1352,6 +1353,9 @@ function createWrapDeformerProgram(device: AbstractDevice, workgroupSize: number
           this.targetPositions.setAt(this.targetBase, this.deformedPosition.x);
           this.targetPositions.setAt(pb.add(this.targetBase, 1), this.deformedPosition.y);
           this.targetPositions.setAt(pb.add(this.targetBase, 2), this.deformedPosition.z);
+          this.targetNormals.setAt(this.targetBase, this.normal.x);
+          this.targetNormals.setAt(pb.add(this.targetBase, 1), this.normal.y);
+          this.targetNormals.setAt(pb.add(this.targetBase, 2), this.normal.z);
         });
       });
     }
@@ -1400,6 +1404,7 @@ class GPUClothWrapBinding {
   private readonly _maxOffsetDistance: number;
   private readonly _sourceToTargetMatrix: Matrix4x4;
   private readonly _positionBuffer: StructuredBuffer;
+  private readonly _normalBuffer: StructuredBuffer;
   private readonly _originalPositionBuffer: Nullable<StructuredBuffer>;
   private readonly _originalNormalBuffer: Nullable<StructuredBuffer>;
   private readonly _restoreSkinning: Nullable<boolean>;
@@ -1415,6 +1420,7 @@ class GPUClothWrapBinding {
     program: GPUProgram,
     bindGroup: BindGroup,
     positionBuffer: StructuredBuffer,
+    normalBuffer: StructuredBuffer,
     originalPositionBuffer: Nullable<StructuredBuffer>,
     originalNormalBuffer: Nullable<StructuredBuffer>,
     workgroupCount: number,
@@ -1434,6 +1440,7 @@ class GPUClothWrapBinding {
     this._maxOffsetDistance = maxOffsetDistance;
     this._sourceToTargetMatrix = new Matrix4x4();
     this._positionBuffer = positionBuffer;
+    this._normalBuffer = normalBuffer;
     this._originalPositionBuffer = originalPositionBuffer;
     this._originalNormalBuffer = originalNormalBuffer;
     this._restoreSkinning = restoreSkinning;
@@ -1637,6 +1644,13 @@ class GPUClothWrapBinding {
     if (!positionBuffer) {
       throw new Error('GPU cloth wrap failed: could not create target position buffer.');
     }
+    const normalBuffer = device.createVertexBuffer('normal_f32x3', new Float32Array(expectedElementCount), {
+      storage: true,
+      managed: false
+    });
+    if (!normalBuffer) {
+      throw new Error('GPU cloth wrap failed: could not create target normal buffer.');
+    }
 
     const wrapTriangleIndexBuffer = device.createBuffer(wrapSourceTriangleIndices.byteLength, {
       usage: 'uniform',
@@ -1669,6 +1683,7 @@ class GPUClothWrapBinding {
     bindGroup.setBuffer('sourceBarycentrics', wrapBarycentricBuffer);
     bindGroup.setBuffer('targetLocalOffsets', wrapLocalOffsetBuffer);
     bindGroup.setBuffer('targetPositions', positionBuffer);
+    bindGroup.setBuffer('targetNormals', normalBuffer);
     const sourceToTargetBindMatrix = getWrapSourceToTargetMatrix(source, target);
     bindGroup.setValue('vertexCount', vertexCount);
     bindGroup.setValue('sourceToTargetMatrix', sourceToTargetBindMatrix);
@@ -1679,7 +1694,9 @@ class GPUClothWrapBinding {
     retainObject(originalPositionBuffer);
     retainObject(originalNormalBuffer);
     targetPrimitive.removeVertexBuffer('position');
-    targetPrimitive.setVertexBuffer(positionBuffer);
+    targetPrimitive.setVertexBuffer(positionBuffer!);
+    targetPrimitive.removeVertexBuffer('normal');
+    targetPrimitive.setVertexBuffer(normalBuffer!);
 
     let restoreSkinning: Nullable<boolean> = null;
     if (typeof target?.suspendSkinning === 'boolean') {
@@ -1699,7 +1716,8 @@ class GPUClothWrapBinding {
       wrapLocalOffsetBuffer,
       program,
       bindGroup,
-      positionBuffer,
+      positionBuffer!,
+      normalBuffer!,
       originalPositionBuffer,
       originalNormalBuffer,
       Math.max(1, Math.ceil(vertexCount / workgroupSize)),
@@ -1730,14 +1748,15 @@ class GPUClothWrapBinding {
       if (this._originalPositionBuffer) {
         this._targetPrimitive.setVertexBuffer(this._originalPositionBuffer);
       }
+      this._targetPrimitive.removeVertexBuffer('normal');
       if (this._originalNormalBuffer) {
-        this._targetPrimitive.removeVertexBuffer('normal');
         this._targetPrimitive.setVertexBuffer(this._originalNormalBuffer);
       }
     }
     releaseObject(this._originalPositionBuffer);
     releaseObject(this._originalNormalBuffer);
     this._positionBuffer.dispose();
+    this._normalBuffer.dispose();
     if (this._target && this._restoreSkinning !== null) {
       this._target.setAnimatedBoundingBox?.(null);
       this._target.suspendSkinning = this._restoreSkinning;
