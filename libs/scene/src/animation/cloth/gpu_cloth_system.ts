@@ -136,6 +136,14 @@ const DEFAULT_SOLVER_ITERATIONS = 5;
 const DEFAULT_MAX_NEIGHBORS = 8;
 const DEFAULT_WORKGROUP_SIZE = 64;
 const DEFAULT_MAX_TRIANGLES_PER_VERTEX = 16;
+const DEFAULT_REST_POSITION_SMOOTHING_TIME = 1 / 25;
+const DEFAULT_COLLIDER_SMOOTHING_TIME = 1 / 30;
+const FIXED_SIMULATION_TIME_STEP = 1 / 60;
+const MAX_ACCUMULATED_SIMULATION_TIME = 1 / 20;
+const MAX_SIMULATION_STEPS_PER_UPDATE = Math.max(
+  1,
+  Math.ceil(MAX_ACCUMULATED_SIMULATION_TIME / FIXED_SIMULATION_TIME_STEP)
+);
 const WRAP_TRIANGLE_VERTEX_COUNT = 3;
 const WRAP_MIN_DISTANCE = 1e-8;
 
@@ -1890,6 +1898,7 @@ export class GPUClothSystem {
   private _skinningBlendIndices: Nullable<Float32Array<ArrayBuffer>>;
   private _skinningBlendWeights: Nullable<Float32Array<ArrayBuffer>>;
   private _dynamicRestPositionData: Nullable<Float32Array<ArrayBuffer>>;
+  private _smoothedRestPositionData: Nullable<Float32Array<ArrayBuffer>>;
   private _usingDynamicRestPose: boolean;
   private _skinAnimationTarget: any;
   private _restoreSkinAnimation: Nullable<boolean>;
@@ -1897,6 +1906,11 @@ export class GPUClothSystem {
   private _autoUpdate: boolean;
   private _workgroupSize: number;
   private _wrapBindings: GPUClothWrapBinding[];
+  private _latestInputDeltaTime: number;
+  private _smoothedSphereCenters: WeakMap<SphereCollider, Vector3>;
+  private _smoothedCapsuleEndpoints: WeakMap<CapsuleCollider, { start: Vector3; end: Vector3 }>;
+  private _smoothedPlaneData: WeakMap<PlaneCollider, { point: Vector3; normal: Vector3 }>;
+  private _timeAccumulator: number;
   private _pendingAutoUpdateDeltaTime: number;
   private readonly _meshPostUpdateCallback: MeshUpdateCallback;
 
@@ -1970,6 +1984,7 @@ export class GPUClothSystem {
       ? new Float32Array(options.skinningBlendWeights)
       : null;
     this._dynamicRestPositionData = null;
+    this._smoothedRestPositionData = null;
     this._usingDynamicRestPose = false;
     this._skinAnimationTarget = null;
     this._restoreSkinAnimation = null;
@@ -1977,6 +1992,11 @@ export class GPUClothSystem {
     this._autoUpdate = options?.autoUpdate ?? true;
     this._workgroupSize = clamp(options?.workgroupSize ?? DEFAULT_WORKGROUP_SIZE, 1, 256) | 0;
     this._wrapBindings = [];
+    this._latestInputDeltaTime = 0;
+    this._smoothedSphereCenters = new WeakMap();
+    this._smoothedCapsuleEndpoints = new WeakMap();
+    this._smoothedPlaneData = new WeakMap();
+    this._timeAccumulator = 0;
     this._pendingAutoUpdateDeltaTime = 0;
     this._meshPostUpdateCallback = (_frameId, _elapsedInSeconds, deltaInSeconds) => {
       const dt = this._pendingAutoUpdateDeltaTime || deltaInSeconds;
@@ -2363,7 +2383,11 @@ export class GPUClothSystem {
   }
 
   set enabled(value: boolean) {
-    this._enabled = this.supported && !!value;
+    const enabled = this.supported && !!value;
+    if (this._enabled !== enabled) {
+      this.resetSimulationTiming();
+    }
+    this._enabled = enabled;
   }
 
   get supported() {
@@ -2380,6 +2404,7 @@ export class GPUClothSystem {
 
   set colliders(value: SpringCollider[]) {
     this._colliders = [...(value ?? [])];
+    this.resetColliderSmoothing();
     this.updateColliderBuffers();
   }
 
@@ -2400,6 +2425,7 @@ export class GPUClothSystem {
 
   clearColliders() {
     this._colliders.length = 0;
+    this.resetColliderSmoothing();
     this.updateColliderBuffers();
   }
 
@@ -2503,57 +2529,29 @@ export class GPUClothSystem {
     ) {
       return;
     }
-    this.updateSkinnedRestPositions();
-    this.updateColliderBuffers();
-    const dt = clamp(Number(deltaTime) || 0, 1 / 240, 1 / 20);
-    const substeps = this._substeps;
-    const substepDt = dt / substeps;
+    const frameDt = clamp(Number(deltaTime) || 0, 0, MAX_ACCUMULATED_SIMULATION_TIME);
+    this._latestInputDeltaTime = frameDt;
+    this.updateSkinnedRestPositions(frameDt);
+    this.updateColliderBuffers(frameDt);
+    if (frameDt <= 0) {
+      return;
+    }
+    this._timeAccumulator = Math.min(this._timeAccumulator + frameDt, MAX_ACCUMULATED_SIMULATION_TIME);
+    const stepCount = Math.min(
+      MAX_SIMULATION_STEPS_PER_UPDATE,
+      Math.floor((this._timeAccumulator + 1e-8) / FIXED_SIMULATION_TIME_STEP)
+    );
+    if (stepCount <= 0) {
+      return;
+    }
+    this._timeAccumulator = Math.max(0, this._timeAccumulator - stepCount * FIXED_SIMULATION_TIME_STEP);
     this._device.pushDeviceStates();
     try {
-      for (let substep = 0; substep < substeps; substep++) {
-        this._integrateBindGroup.setValue('deltaTime', substepDt);
-        this._integrateBindGroup.setValue('damping', this._damping);
-        this._integrateBindGroup.setValue('gravity', this._gravity);
-        this._integrateBindGroup.setValue('dynamicFriction', this._dynamicFriction);
-        this._integrateBindGroup.setValue('staticFriction', this._staticFriction);
-        this._device.setProgram(this._integrateProgram);
-        this._device.setBindGroup(0, this._integrateBindGroup);
-        this._device.compute(this._workgroupCount, 1, 1);
-
-        this._constraintBindGroup.setValue('stiffness', this._stiffness);
-        this._constraintBindGroup.setValue('dynamicFriction', this._dynamicFriction);
-        this._constraintBindGroup.setValue('staticFriction', this._staticFriction);
-        this._device.setProgram(this._constraintProgram);
-        this._device.setBindGroup(0, this._constraintBindGroup);
-        for (let i = 0; i < this._solverIterations; i++) {
-          this._constraintBindGroup.setValue(
-            'poseFollow',
-            i === this._solverIterations - 1 ? this.getSubstepPoseFollow() : 0
-          );
-          this._device.compute(this._workgroupCount, 1, 1);
-        }
+      for (let step = 0; step < stepCount; step++) {
+        this.simulateStep(FIXED_SIMULATION_TIME_STEP);
       }
-
-      if (
-        this._rebuildNormals &&
-        this._faceNormalProgram &&
-        this._vertexNormalProgram &&
-        this._faceNormalBindGroup &&
-        this._vertexNormalBindGroup
-      ) {
-        this._device.setProgram(this._faceNormalProgram);
-        this._device.setBindGroup(0, this._faceNormalBindGroup);
-        this._device.compute(this._triangleWorkgroupCount, 1, 1);
-
-        this._device.setProgram(this._vertexNormalProgram);
-        this._device.setBindGroup(0, this._vertexNormalBindGroup);
-        this._device.compute(this._workgroupCount, 1, 1);
-      }
-      for (const binding of this._wrapBindings) {
-        binding.update();
-      }
+      this.updateSimulationOutputs();
     } finally {
-      this.commitRestPositions();
       this._device.popDeviceStates();
     }
   }
@@ -2621,16 +2619,87 @@ export class GPUClothSystem {
     releaseObject(this._originalNormalBuffer);
     this._originalNormalBuffer = null;
     this._enabled = false;
+    this.resetSimulationTiming();
   }
 
-  private updateColliderBuffers() {
+  private simulateStep(deltaTime: number) {
+    const substeps = this._substeps;
+    const substepDt = deltaTime / substeps;
+    try {
+      for (let substep = 0; substep < substeps; substep++) {
+        this._integrateBindGroup!.setValue('deltaTime', substepDt);
+        this._integrateBindGroup!.setValue('damping', this._damping);
+        this._integrateBindGroup!.setValue('gravity', this._gravity);
+        this._integrateBindGroup!.setValue('dynamicFriction', this._dynamicFriction);
+        this._integrateBindGroup!.setValue('staticFriction', this._staticFriction);
+        this._device!.setProgram(this._integrateProgram!);
+        this._device!.setBindGroup(0, this._integrateBindGroup!);
+        this._device!.compute(this._workgroupCount, 1, 1);
+
+        this._constraintBindGroup!.setValue('stiffness', this._stiffness);
+        this._constraintBindGroup!.setValue('dynamicFriction', this._dynamicFriction);
+        this._constraintBindGroup!.setValue('staticFriction', this._staticFriction);
+        this._device!.setProgram(this._constraintProgram!);
+        this._device!.setBindGroup(0, this._constraintBindGroup!);
+        for (let i = 0; i < this._solverIterations; i++) {
+          this._constraintBindGroup!.setValue(
+            'poseFollow',
+            i === this._solverIterations - 1 ? this.getSubstepPoseFollow() : 0
+          );
+          this._device!.compute(this._workgroupCount, 1, 1);
+        }
+      }
+    } finally {
+      // Advance the animated rest pose once per fixed simulation step so a
+      // single dropped frame does not inject the same pose delta repeatedly.
+      this.commitRestPositions();
+    }
+  }
+
+  private updateSimulationOutputs() {
+    if (
+      this._rebuildNormals &&
+      this._faceNormalProgram &&
+      this._vertexNormalProgram &&
+      this._faceNormalBindGroup &&
+      this._vertexNormalBindGroup
+    ) {
+      this._device!.setProgram(this._faceNormalProgram);
+      this._device!.setBindGroup(0, this._faceNormalBindGroup);
+      this._device!.compute(this._triangleWorkgroupCount, 1, 1);
+
+      this._device!.setProgram(this._vertexNormalProgram);
+      this._device!.setBindGroup(0, this._vertexNormalBindGroup);
+      this._device!.compute(this._workgroupCount, 1, 1);
+    }
+    for (const binding of this._wrapBindings) {
+      binding.update();
+    }
+  }
+
+  private resetSimulationTiming() {
+    this._timeAccumulator = 0;
+    this._latestInputDeltaTime = 0;
+    this._pendingAutoUpdateDeltaTime = 0;
+    this._smoothedRestPositionData = null;
+    this.resetColliderSmoothing();
+  }
+
+  private resetColliderSmoothing() {
+    this._smoothedSphereCenters = new WeakMap();
+    this._smoothedCapsuleEndpoints = new WeakMap();
+    this._smoothedPlaneData = new WeakMap();
+  }
+
+  private updateColliderBuffers(deltaTime = this._latestInputDeltaTime) {
     if (!this._device || !this._integrateBindGroup) {
       return;
     }
 
-    const spheres: SphereCollider[] = [];
-    const capsules: CapsuleCollider[] = [];
-    const planes: PlaneCollider[] = [];
+    const spheres: { collider: SphereCollider; center: Vector3 }[] = [];
+    const capsules: { collider: CapsuleCollider; start: Vector3; end: Vector3 }[] = [];
+    const planes: { collider: PlaneCollider; point: Vector3; normal: Vector3 }[] = [];
+    const blend = this.getTemporalBlendFactor(deltaTime, DEFAULT_COLLIDER_SMOOTHING_TIME);
     for (const collider of this._colliders) {
       if (!collider?.enabled) {
         continue;
@@ -2639,11 +2708,27 @@ export class GPUClothSystem {
         updateColliderFromNode(collider);
       }
       if (collider.type === 'sphere') {
-        spheres.push(collider as SphereCollider);
+        const sphere = collider as SphereCollider;
+        spheres.push({
+          collider: sphere,
+          center: this.getSmoothedSphereCenter(sphere, blend)
+        });
       } else if (collider.type === 'capsule') {
-        capsules.push(collider as CapsuleCollider);
+        const capsule = collider as CapsuleCollider;
+        const smoothed = this.getSmoothedCapsuleEndpoints(capsule, blend);
+        capsules.push({
+          collider: capsule,
+          start: smoothed.start,
+          end: smoothed.end
+        });
       } else if (collider.type === 'plane') {
-        planes.push(collider as PlaneCollider);
+        const plane = collider as PlaneCollider;
+        const smoothed = this.getSmoothedPlaneData(plane, blend);
+        planes.push({
+          collider: plane,
+          point: smoothed.point,
+          normal: smoothed.normal
+        });
       }
     }
 
@@ -2654,7 +2739,7 @@ export class GPUClothSystem {
       sphereData[base] = center.x;
       sphereData[base + 1] = center.y;
       sphereData[base + 2] = center.z;
-      sphereData[base + 3] = this.toCollisionSpaceRadius(spheres[i].radius);
+      sphereData[base + 3] = this.toCollisionSpaceRadius(spheres[i].collider.radius);
     }
 
     const capsuleData = new Float32Array(Math.max(1, capsules.length) * 8);
@@ -2666,7 +2751,7 @@ export class GPUClothSystem {
       capsuleData[base] = start.x;
       capsuleData[base + 1] = start.y;
       capsuleData[base + 2] = start.z;
-      capsuleData[base + 3] = this.toCollisionSpaceRadius(capsules[i].radius, axis);
+      capsuleData[base + 3] = this.toCollisionSpaceRadius(capsules[i].collider.radius, axis);
       capsuleData[base + 4] = end.x;
       capsuleData[base + 5] = end.y;
       capsuleData[base + 6] = end.z;
@@ -2837,7 +2922,7 @@ export class GPUClothSystem {
     }
     this._pendingAutoUpdateDeltaTime = 0;
   }
-  private updateSkinnedRestPositions() {
+  private updateSkinnedRestPositions(deltaTime = 0) {
     if (
       !this._sourcePositionData ||
       !this._skinningBlendIndices ||
@@ -2863,19 +2948,129 @@ export class GPUClothSystem {
         target.invWorldMatrix,
         restPositions
       );
+      const smoothedRestPositions = this.smoothRestPositions(restPositions, deltaTime, restPositions);
       this._dynamicRestPositionData = restPositions;
-      this._restPositionBuffer.bufferSubData(0, restPositions);
+      this._restPositionBuffer.bufferSubData(0, smoothedRestPositions);
       this._usingDynamicRestPose = true;
-      this.updateTargetBoundingBox(restPositions);
+      this.updateTargetBoundingBox(smoothedRestPositions);
       return;
     }
     if (this._usingDynamicRestPose) {
       this._restPositionBuffer.bufferSubData(0, this._sourcePositionData);
       this._prevRestPositionBuffer.bufferSubData(0, this._sourcePositionData);
       this._usingDynamicRestPose = false;
+      this._dynamicRestPositionData = null;
+      this._smoothedRestPositionData = null;
       this.updateTargetBoundingBox(this._sourcePositionData);
     }
   }
+
+  private smoothRestPositions(
+    rawRestPositions: Float32Array<ArrayBuffer>,
+    deltaTime: number,
+    out: Float32Array<ArrayBuffer>
+  ) {
+    const blend = this.getTemporalBlendFactor(deltaTime, DEFAULT_REST_POSITION_SMOOTHING_TIME);
+    const smoothed =
+      this._smoothedRestPositionData && this._smoothedRestPositionData.length === rawRestPositions.length
+        ? this._smoothedRestPositionData
+        : new Float32Array(rawRestPositions.length);
+    if (!this._smoothedRestPositionData || blend >= 1) {
+      smoothed.set(rawRestPositions);
+    } else {
+      const retain = 1 - blend;
+      for (let i = 0; i < rawRestPositions.length; i++) {
+        smoothed[i] = smoothed[i] * retain + rawRestPositions[i] * blend;
+      }
+    }
+    out.set(smoothed);
+    this._smoothedRestPositionData = smoothed;
+    return out;
+  }
+
+  private getTemporalBlendFactor(deltaTime: number, smoothingTime: number) {
+    const dt = clamp(Number(deltaTime) || 0, 0, MAX_ACCUMULATED_SIMULATION_TIME);
+    if (dt <= 0 || smoothingTime <= 0) {
+      return 1;
+    }
+    return 1 - Math.exp(-dt / smoothingTime);
+  }
+
+  private getSmoothedSphereCenter(collider: SphereCollider, blend: number) {
+    const current = collider.center?.clone() ?? new Vector3();
+    const cached = this._smoothedSphereCenters.get(collider);
+    if (!cached || blend >= 1) {
+      this._smoothedSphereCenters.set(collider, current);
+      return current;
+    }
+    cached.setXYZ(
+      cached.x + (current.x - cached.x) * blend,
+      cached.y + (current.y - cached.y) * blend,
+      cached.z + (current.z - cached.z) * blend
+    );
+    return cached;
+  }
+
+  private getSmoothedCapsuleEndpoints(collider: CapsuleCollider, blend: number) {
+    const currentStart = collider.start?.clone() ?? new Vector3();
+    const currentEnd = collider.end?.clone() ?? new Vector3();
+    const cached = this._smoothedCapsuleEndpoints.get(collider);
+    if (!cached || blend >= 1) {
+      const next = {
+        start: currentStart,
+        end: currentEnd
+      };
+      this._smoothedCapsuleEndpoints.set(collider, next);
+      return next;
+    }
+    cached.start.setXYZ(
+      cached.start.x + (currentStart.x - cached.start.x) * blend,
+      cached.start.y + (currentStart.y - cached.start.y) * blend,
+      cached.start.z + (currentStart.z - cached.start.z) * blend
+    );
+    cached.end.setXYZ(
+      cached.end.x + (currentEnd.x - cached.end.x) * blend,
+      cached.end.y + (currentEnd.y - cached.end.y) * blend,
+      cached.end.z + (currentEnd.z - cached.end.z) * blend
+    );
+    return cached;
+  }
+
+  private getSmoothedPlaneData(collider: PlaneCollider, blend: number) {
+    const currentPoint = collider.point?.clone() ?? new Vector3();
+    const currentNormal = collider.normal?.clone() ?? Vector3.axisPY();
+    if (currentNormal.magnitudeSq > 1e-8) {
+      currentNormal.inplaceNormalize();
+    } else {
+      currentNormal.setXYZ(0, 1, 0);
+    }
+    const cached = this._smoothedPlaneData.get(collider);
+    if (!cached || blend >= 1) {
+      const next = {
+        point: currentPoint,
+        normal: currentNormal
+      };
+      this._smoothedPlaneData.set(collider, next);
+      return next;
+    }
+    cached.point.setXYZ(
+      cached.point.x + (currentPoint.x - cached.point.x) * blend,
+      cached.point.y + (currentPoint.y - cached.point.y) * blend,
+      cached.point.z + (currentPoint.z - cached.point.z) * blend
+    );
+    cached.normal.setXYZ(
+      cached.normal.x + (currentNormal.x - cached.normal.x) * blend,
+      cached.normal.y + (currentNormal.y - cached.normal.y) * blend,
+      cached.normal.z + (currentNormal.z - cached.normal.z) * blend
+    );
+    if (cached.normal.magnitudeSq > 1e-8) {
+      cached.normal.inplaceNormalize();
+    } else {
+      cached.normal.setXYZ(0, 1, 0);
+    }
+    return cached;
+  }
+
   private updateTargetBoundingBox(positions: Float32Array<ArrayBuffer>) {
     if (!positions || positions.length < 3) {
       return;
