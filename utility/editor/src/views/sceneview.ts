@@ -1000,25 +1000,62 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           ev.button === 0 &&
           ev.type === 'pointerdown'
         ) {
-          if (node) {
-            let assetNode = node;
-            while (assetNode && !getEngine().resourceManager.getAssetId(assetNode)) {
-              assetNode = assetNode.parent!;
-            }
-            if (assetNode) {
-              node = assetNode;
-            }
-          }
           node = this._proxy!.getProto(node!);
-          if (!ImGui.GetIO().KeyCtrl) {
-            this._sceneHierarchy!.selectNode(node?.getPrefabNode() ?? node);
-          } else {
-            this._sceneHierarchy!.selectNode(node);
-          }
+          this.applySceneViewSelection(node, ImGui.GetIO().KeyCtrl, ImGui.GetIO().KeyShift);
         }
       }
     }
     return true;
+  }
+  private applySceneViewSelection(node: Nullable<SceneNode>, ctrl: boolean, shift: boolean) {
+    const targetNode = this.resolvePickedSelectionTarget(node);
+    if (!ctrl && !shift) {
+      this._sceneHierarchy!.selectNode(targetNode);
+      return;
+    }
+    if (!targetNode) {
+      return;
+    }
+    const currentSelection = new Set(this.getSelectedSceneNodes());
+    if (ctrl) {
+      if (currentSelection.has(targetNode)) {
+        currentSelection.delete(targetNode);
+      } else {
+        currentSelection.add(targetNode);
+      }
+      const nextSelection = [...currentSelection];
+      const activeNode =
+        nextSelection.length > 0 ? (currentSelection.has(targetNode) ? targetNode : nextSelection[nextSelection.length - 1]) : null;
+      this._sceneHierarchy!.selectNodes(nextSelection, activeNode);
+      return;
+    }
+    currentSelection.add(targetNode);
+    this._sceneHierarchy!.selectNodes([...currentSelection], targetNode);
+  }
+  private getPickSelectionRoot(node: Nullable<SceneNode>): Nullable<SceneNode> {
+    if (!node) {
+      return null;
+    }
+    let assetNode = node;
+    while (assetNode && !getEngine().resourceManager.getAssetId(assetNode)) {
+      assetNode = assetNode.parent!;
+    }
+    const targetNode = assetNode ?? node;
+    return targetNode.getPrefabNode() ?? targetNode;
+  }
+  private resolvePickedSelectionTarget(node: Nullable<SceneNode>): Nullable<SceneNode> {
+    if (!node) {
+      return null;
+    }
+    const rootNode = this.getPickSelectionRoot(node);
+    const selectedNode = this._sceneHierarchy?.selectedNode ?? null;
+    const selectedRootNode = this.getPickSelectionRoot(selectedNode);
+    const isSameRootSubNodeSelection =
+      !!selectedNode && !!selectedRootNode && selectedRootNode === rootNode && selectedNode !== selectedRootNode;
+    if (isSameRootSubNodeSelection && node !== rootNode) {
+      return node;
+    }
+    return selectedNode === rootNode && node !== rootNode ? node : rootNode;
   }
   lookAt(camera: Camera, node: SceneNode) {
     if (camera === node) {
@@ -1943,6 +1980,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleHierarchySelectionChanged(_selectedNodes: SceneNode[], activeNode: Nullable<SceneNode>) {
     this._lastDuplicateTarget = 'scene';
     this._syncedPropertySessions.clear();
+    const outlineNodes = this
+      .getSelectedSceneNodes()
+      .filter((node) => node !== this.controller.model.scene.rootNode && node !== this.controller.model.scene.mainCamera);
+    this._postGizmoRenderer!.selectedNodes = outlineNodes;
     const editTarget = this._currentEditTool.get()?.getTarget();
     if (
       this._currentEditTool.get() &&

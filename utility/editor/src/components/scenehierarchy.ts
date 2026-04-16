@@ -116,6 +116,9 @@ export class SceneHierarchy extends TreeView<
   protected onNodeDblClicked(node: SceneNode) {
     this.dispatchEvent('node_double_clicked', node);
   }
+  protected onGetNodeTextColor(node: SceneNode): Nullable<ImGui.ImVec4> {
+    return node.hidden ? ImGui.GetStyle().Colors[ImGui.Col.TextDisabled] : null;
+  }
   protected onGetContextMenuId(node: SceneNode): string {
     return `context_${node.runtimeId}`;
   }

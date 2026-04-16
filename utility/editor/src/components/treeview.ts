@@ -164,7 +164,14 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
     const isOpen = this.isNodeOpen(id, row.defaultOpen);
 
     ImGui.SetNextItemOpen(isOpen, ImGui.Cond.Always);
+    const textColor = this.onGetNodeTextColor(node);
+    if (textColor) {
+      ImGui.PushStyleColor(ImGui.Col.Text, textColor);
+    }
     const clickedOpen = ImGui.TreeNodeEx(label, flags);
+    if (textColor) {
+      ImGui.PopStyleColor();
+    }
 
     if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
       if (this._data.getDragSourcePayloadType(node)) {
@@ -280,6 +287,9 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
   protected onNodeSelected(_node: T) {}
   protected onSelectionChanged(_selectedNodes: Set<T>, _activeNode: Nullable<T>) {}
   protected onNodeDblClicked(_node: T) {}
+  protected onGetNodeTextColor(_node: T): Nullable<ImGui.ImVec4> {
+    return null;
+  }
   protected onGetContextMenuId(_node: T): string {
     return '';
   }

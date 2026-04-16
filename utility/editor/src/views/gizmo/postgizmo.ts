@@ -161,6 +161,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _orthoDirection: Nullable<CubeFace>;
   private _orthoAxis: number;
   private _node: Nullable<SceneNode>;
+  private _selectedNodes: SceneNode[];
   private _mode: GizmoMode;
   private readonly _axisLength: number;
   private readonly _arrowLength: number;
@@ -197,6 +198,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             ? 1
             : 2;
     this._node = binding;
+    this._selectedNodes = [];
     this._snapping = 0;
     this._aabbForEdit = null;
     this._allowRotate = true;
@@ -327,6 +329,12 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             ? 1
             : 2;
   }
+  get selectedNodes(): SceneNode[] {
+    return this._selectedNodes;
+  }
+  set selectedNodes(nodes: SceneNode[]) {
+    this._selectedNodes = [...nodes];
+  }
   get drawGrid(): boolean {
     return this._drawGrid;
   }
@@ -435,15 +443,13 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this.renderSelectSpriteGizmo(ctx, destFramebuffer!.getDepthAttachment()!, 0.5);
         this.renderRectGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       } else if (this._mode === 'select') {
-        if (this._node.isSprite()) {
-          this.renderSelectSpriteGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
-        } else {
-          this.renderSelectGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
-        }
+        // Selection outlines are rendered from the selected node list to avoid
+        // drawing an extra box around the multi-selection pivot.
       } else {
         this.renderTransformGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       }
     }
+    this.renderSelectionOutlines(ctx, destFramebuffer!.getDepthAttachment()!);
     PostGizmoRenderer._blendBlitter.renderStates = PostGizmoRenderer._blendRenderState;
     PostGizmoRenderer._blendBlitter.srgbOut = srgbOutput;
     PostGizmoRenderer._blendBlitter.blit(
@@ -2100,6 +2106,27 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup!);
     PostGizmoRenderer._primitives!['select'][0]!.draw();
     */
+  }
+  private renderSelectionOutlines(ctx: DrawContext, depthTex: BaseTexture) {
+    if (this._selectedNodes.length === 0) {
+      return;
+    }
+    const rendered = new Set<SceneNode>();
+    for (const node of this._selectedNodes) {
+      if (!node || rendered.has(node)) {
+        continue;
+      }
+      rendered.add(node);
+      const prevNode = this._node;
+      this._node = node;
+      this._calcGizmoMVPMatrix('select', false, PostGizmoRenderer._mvpMatrix);
+      if (node.isSprite()) {
+        this.renderSelectSpriteGizmo(ctx, depthTex);
+      } else {
+        this.renderSelectGizmo(ctx, depthTex);
+      }
+      this._node = prevNode;
+    }
   }
   private renderAABBGizmo(ctx: DrawContext, depthTex: BaseTexture) {
     ctx.device.setRenderStates(PostGizmoRenderer._aabbRenderState);
