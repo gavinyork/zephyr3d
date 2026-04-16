@@ -1,5 +1,6 @@
 import { DRef, randomUUID, DWeakRef } from '@zephyr3d/base';
-import { Nullable, Quaternion, TypedArray } from '@zephyr3d/base';
+import type { Nullable, TypedArray } from '@zephyr3d/base';
+import { Quaternion } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Vector3, nextPowerOf2 } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import type { SceneNode } from '../scene/scene_node';
@@ -370,6 +371,7 @@ export class Skeleton extends Disposable {
       const bindpose = this._bindPose[i];
       joint.position.set(bindpose.position);
       joint.rotation.set(bindpose.rotation);
+      joint.rotation.identity();
       joint.scale.set(bindpose.scale);
     }
   }

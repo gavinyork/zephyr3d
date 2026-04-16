@@ -1,5 +1,6 @@
 import { weightedAverage, Disposable, Interpolator, Vector3 } from '@zephyr3d/base';
-import { DRef, IDisposable, Nullable, Quaternion } from '@zephyr3d/base';
+import type { DRef, IDisposable, Nullable } from '@zephyr3d/base';
+import { Quaternion } from '@zephyr3d/base';
 import type { SceneNode } from '../scene';
 import { AnimationClip } from './animation';
 import type { AnimationTrack } from './animationtrack';
@@ -563,10 +564,26 @@ export class AnimationSet extends Disposable implements IDisposable {
       return null;
     }
 
-    const deltaRotation = Quaternion.multiply(
-      Quaternion.inverse(dstSkeleton.humanoidRootRotation),
-      srcSkeleton.humanoidRootRotation
-    );
+    // Compute the world-space rotation of the parent chain above the Hips joint,
+    // walking ALL ancestor nodes up to (but not including) the model root.
+    // This must include non-joint nodes such as "Armature" in Mixamo rigs, which
+    // carry a 90° X rotation that is NOT captured by humanoidRootRotation (which
+    // only traverses nodes inside the skeleton joints list).
+    function computeHipsParentChainRotation(hipsNode: SceneNode, modelRoot: SceneNode): Quaternion {
+      const result = Quaternion.identity();
+      let p = hipsNode.parent;
+      while (p && p !== modelRoot) {
+        Quaternion.multiply(p.rotation, result, result);
+        p = p.parent;
+      }
+      return result;
+    }
+
+    const srcHipsNode = srcSkeleton.humanoidJointMapping!.body[HumanoidBodyRig.Hips];
+    const dstHipsNode = dstSkeleton.humanoidJointMapping!.body[HumanoidBodyRig.Hips];
+    const srcRootRot = computeHipsParentChainRotation(srcHipsNode, sourceSet.model);
+    const dstRootRot = computeHipsParentChainRotation(dstHipsNode, this._model);
+    const deltaRotation = true ? undefined : Quaternion.multiply(Quaternion.inverse(dstRootRot), srcRootRot);
     // Build remap for matched joint pairs
     for (let fi = 0; fi < srcJointsFiltered.length; fi++) {
       const srcJoint = srcJointsFiltered[fi];
