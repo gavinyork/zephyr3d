@@ -1055,7 +1055,8 @@ export function applyResult(
   blendRatio: number,
   // Current transform rotations (world and local) read from engine
   transformRotations: readonly Quaternion[],
-  transformLocalRotations: readonly Quaternion[]
+  transformLocalRotations: readonly Quaternion[],
+  preserveTwist: boolean
 ): ApplyResultOutput[] {
   const results: ApplyResultOutput[] = new Array(pointsR.length);
 
@@ -1093,13 +1094,13 @@ export function applyResult(
         worldRot = localRot.clone();
       }
 
-      // Step 3: Aim toward child using updated worldRot
+      // Step 3: Aim toward child (simple shortest-arc, no twist correction here)
       if (ptR.child !== -1) {
         const childDir = Vector3.sub(positionsToTransform[ptR.child], ptRW.positionToTransform);
         if (childDir.magnitudeSq > EPSILON) {
           const aimVec = worldRot.transform(ptR.boneAxis);
           const aimRot = Quaternion.unitVectorToUnitVector(aimVec, childDir);
-          worldRot = Quaternion.multiply(aimRot, worldRot);
+          Quaternion.multiply(aimRot, worldRot, worldRot);
         }
       }
       results[index] = {
@@ -1134,6 +1135,24 @@ export function applyResult(
         rotation: worldRot,
         localRotation: localRot
       };
+    }
+  }
+
+  // Post-process: twist correction pass (parent → child order).
+  if (preserveTwist) {
+    for (let index = 0; index < pointsR.length; index++) {
+      const ptR = pointsR[index];
+      if (ptR.weight < EPSILON || ptR.child === -1) {
+        continue;
+      }
+      const result = results[index];
+      const parentWorldRot = ptR.parent !== -1 ? results[ptR.parent].rotation : Quaternion.identity();
+      const effectiveLocal = Quaternion.multiply(Quaternion.inverse(parentWorldRot), result.rotation);
+      const curTwist = new Quaternion();
+      effectiveLocal.decomposeSwingTwist(ptR.boneAxis, undefined, curTwist);
+      const swingTF = Quaternion.multiply(effectiveLocal, Quaternion.inverse(curTwist));
+      const correctedLocal = Quaternion.multiply(swingTF, ptR.initialLocalTwist);
+      Quaternion.multiply(parentWorldRot, correctedLocal, result.rotation);
     }
   }
 

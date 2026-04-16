@@ -176,6 +176,7 @@ export class JointDynamicsSystem {
       fakeWavePower: 0,
       angleLimitConfig: { angleLimit: -1, limitFromRoot: false },
       enableBroadPhase: false,
+      preserveTwist: false,
       curves: {
         gravityScale: InterpolatorScalar.constant(1),
         windForceScale: InterpolatorScalar.constant(1),

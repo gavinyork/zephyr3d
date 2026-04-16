@@ -96,6 +96,8 @@ export interface PointR {
   initialLocalScale: Vector3;
   /** Initial local rotation captured at init (for rotation blending) */
   initialLocalRotation: Quaternion;
+  /** Initial twist component of localRotation around boneAxis (for twist preservation) */
+  initialLocalTwist: Quaternion;
   /** Initial local position captured at init (for transform reset) */
   initialLocalPosition: Vector3;
 }

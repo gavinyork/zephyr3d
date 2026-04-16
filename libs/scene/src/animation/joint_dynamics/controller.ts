@@ -99,6 +99,8 @@ export interface ControllerConfig {
   enableSurfaceCollision: boolean;
   /** Enable broad-phase pruning before precise collider tests */
   enableBroadPhase: boolean;
+  /** Preserve each joint's initial local twist (axial roll) after physics simulation */
+  preserveTwist: boolean;
   /** Post-simulation angle limiting between parent-child bones */
   angleLimitConfig: AngleLimitConfig;
   /** Depth-based physics parameter curves */
@@ -357,7 +359,8 @@ export class JointDynamicsSystemController {
       this._positionsToTransform,
       blendRatio,
       transformRots,
-      transformLocalRots
+      transformLocalRots,
+      this._config.preserveTwist
     );
 
     for (let i = 0; i < outputs.length; i++) {
@@ -383,7 +386,8 @@ export class JointDynamicsSystemController {
       this._positionsToTransform,
       this._config.blendRatio,
       transformRots,
-      transformLocalRots
+      transformLocalRots,
+      this._config.preserveTwist
     );
     return outputs.map((o) => ({ position: o.position, rotation: o.rotation }));
   }
@@ -616,6 +620,11 @@ export class JointDynamicsSystemController {
       boneAxis,
       initialLocalScale: initLocalScale,
       initialLocalRotation: initLocalRot,
+      initialLocalTwist: (() => {
+        const tw = new Quaternion();
+        initLocalRot.decomposeSwingTwist(boneAxis, undefined, tw);
+        return tw;
+      })(),
       initialLocalPosition: initLocalPos
     };
   }
