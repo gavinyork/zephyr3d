@@ -292,8 +292,7 @@ function bakeHumanoidRotationTracks(
   srcRootRotation: Quaternion,
   dstRootRotation: Quaternion,
   dstClip: AnimationClip,
-  remaps: JointRetargetRemap[],
-  remapsBySrcNode: Map<object, JointRetargetRemap>
+  remaps: JointRetargetRemap[]
 ) {
   const rotationTracksByRemap = new Map<
     JointRetargetRemap,
@@ -1015,8 +1014,7 @@ export class AnimationSet extends Disposable implements IDisposable {
       srcRootRot,
       dstRootRot,
       dstClip,
-      jointRemaps,
-      jointRemapBySrcNode
+      jointRemaps
     );
 
     for (const srcNode of srcJointsFiltered) {
