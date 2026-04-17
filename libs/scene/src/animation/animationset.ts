@@ -65,6 +65,395 @@ export type StopAnimationOptions = {
   fadeOut?: number;
 };
 
+type JointRetargetRemap = {
+  dstNode: SceneNode;
+  dstJointIndex: number;
+  srcNode: SceneNode;
+  srcBindRotInv: Quaternion;
+  dstBindRot: Quaternion;
+  srcBindPos: Vector3;
+  dstBindPos: Vector3;
+  translationScale: number;
+  translationRotation?: Quaternion;
+};
+
+function cloneInterpolator(src: Interpolator): Interpolator {
+  return new Interpolator(
+    src.mode,
+    src.target,
+    src.inputs instanceof Float32Array ? new Float32Array(src.inputs) : [...src.inputs],
+    src.outputs instanceof Float32Array ? new Float32Array(src.outputs) : [...src.outputs]
+  );
+}
+
+function createJointRetargetRemap(
+  srcSkeleton: Skeleton,
+  dstSkeleton: Skeleton,
+  srcJoint: SceneNode,
+  dstJoint: SceneNode,
+  translationRotation?: Quaternion
+): JointRetargetRemap {
+  const si = srcSkeleton.joints.indexOf(srcJoint);
+  const di = dstSkeleton.joints.indexOf(dstJoint);
+  const srcBindPose = srcSkeleton.bindPose[si];
+  const dstBindPose = dstSkeleton.bindPose[di];
+  const srcLen = srcBindPose.position.magnitude;
+  const dstLen = dstBindPose.position.magnitude;
+  return {
+    dstNode: dstJoint,
+    dstJointIndex: di,
+    srcNode: srcJoint,
+    srcBindRotInv: Quaternion.inverse(srcBindPose.rotation),
+    dstBindRot: dstBindPose.rotation.clone(),
+    srcBindPos: srcBindPose.position.clone(),
+    dstBindPos: dstBindPose.position.clone(),
+    translationScale: srcLen > 1e-6 ? dstLen / srcLen : 1,
+    translationRotation
+  };
+}
+
+function retargetRotation(qSrcAnim: Quaternion, remap: JointRetargetRemap, out: Quaternion): Quaternion {
+  Quaternion.multiply(remap.srcBindRotInv, qSrcAnim, out);
+  Quaternion.multiply(remap.dstBindRot, out, out);
+  return out.inplaceNormalize();
+}
+
+function retargetRotationTangent(
+  qSrcTangent: Quaternion,
+  remap: JointRetargetRemap,
+  out: Quaternion
+): Quaternion {
+  Quaternion.multiply(remap.srcBindRotInv, qSrcTangent, out);
+  Quaternion.multiply(remap.dstBindRot, out, out);
+  return out;
+}
+
+function retargetTranslationValue(srcValue: Vector3, remap: JointRetargetRemap, out: Vector3): Vector3 {
+  out.setXYZ(srcValue.x, srcValue.y, srcValue.z);
+  out.subBy(remap.srcBindPos);
+  out.scaleBy(remap.translationScale);
+  if (remap.translationRotation) {
+    remap.translationRotation.transform(out, out);
+  }
+  out.addBy(remap.dstBindPos);
+  return out;
+}
+
+function retargetTranslationTangent(srcValue: Vector3, remap: JointRetargetRemap, out: Vector3): Vector3 {
+  out.setXYZ(srcValue.x, srcValue.y, srcValue.z);
+  out.scaleBy(remap.translationScale);
+  if (remap.translationRotation) {
+    remap.translationRotation.transform(out, out);
+  }
+  return out;
+}
+
+function retargetRotationTrack(src: NodeRotationTrack, remap: JointRetargetRemap): NodeRotationTrack {
+  const isCubic = src.interpolator.mode === 'cubicspline';
+  const frameStride = isCubic ? 12 : 4;
+  const numFrames = (src.interpolator.inputs as Float32Array).length;
+  const srcOutputs = src.interpolator.outputs as Float32Array;
+  const newOutputs = new Float32Array(srcOutputs.length);
+  const t = isCubic ? 4 : 0;
+  const q = new Quaternion();
+  for (let f = 0; f < numFrames; f++) {
+    const base = f * frameStride;
+    q.setXYZW(
+      srcOutputs[base + t],
+      srcOutputs[base + t + 1],
+      srcOutputs[base + t + 2],
+      srcOutputs[base + t + 3]
+    );
+    retargetRotation(q, remap, q);
+    if (isCubic) {
+      // Cubic quaternion tangents live in the same component space, so apply the
+      // same constant bind-pose transform without normalizing them.
+      q.setXYZW(srcOutputs[base], srcOutputs[base + 1], srcOutputs[base + 2], srcOutputs[base + 3]);
+      newOutputs.set(retargetRotationTangent(q, remap, q), base);
+      newOutputs.set(
+        retargetRotation(new Quaternion(srcOutputs.subarray(base + 4, base + 8)), remap, q),
+        base + 4
+      );
+      q.setXYZW(srcOutputs[base + 8], srcOutputs[base + 9], srcOutputs[base + 10], srcOutputs[base + 11]);
+      newOutputs.set(retargetRotationTangent(q, remap, q), base + 8);
+    } else {
+      newOutputs.set(q, base);
+    }
+  }
+  return new NodeRotationTrack(
+    new Interpolator(
+      src.interpolator.mode,
+      'quat',
+      new Float32Array(src.interpolator.inputs as Float32Array),
+      newOutputs
+    )
+  );
+}
+
+function retargetEulerToRotationTrack(
+  src: NodeEulerRotationTrack,
+  remap: JointRetargetRemap
+): NodeRotationTrack {
+  const srcInputs = src.interpolator.inputs as Float32Array;
+  const srcOutputs = src.interpolator.outputs as Float32Array;
+  const isCubic = src.interpolator.mode === 'cubicspline';
+  const frameStride = isCubic ? 9 : 3;
+  const t = isCubic ? 3 : 0;
+  const numFrames = srcInputs.length;
+  const newOutputs = new Float32Array(numFrames * 4);
+  const q = new Quaternion();
+  for (let f = 0; f < numFrames; f++) {
+    const base = f * frameStride + t;
+    q.fromEulerAngle(srcOutputs[base], srcOutputs[base + 1], srcOutputs[base + 2]);
+    retargetRotation(q, remap, q);
+    newOutputs.set(q, f * 4);
+  }
+  return new NodeRotationTrack(
+    new Interpolator(
+      src.interpolator.mode === 'step' ? 'step' : 'linear',
+      'quat',
+      new Float32Array(srcInputs),
+      newOutputs
+    )
+  );
+}
+
+function retargetTranslationTrack(
+  src: NodeTranslationTrack,
+  remap: JointRetargetRemap
+): NodeTranslationTrack {
+  const isCubic = src.interpolator.mode === 'cubicspline';
+  const frameStride = isCubic ? 9 : 3;
+  const numFrames = (src.interpolator.inputs as Float32Array).length;
+  const srcOutputs = src.interpolator.outputs as Float32Array;
+  const newOutputs = new Float32Array(srcOutputs.length);
+  const t = isCubic ? 3 : 0;
+  const v = new Vector3();
+  for (let f = 0; f < numFrames; f++) {
+    const base = f * frameStride;
+    v.setXYZ(srcOutputs[base + t], srcOutputs[base + t + 1], srcOutputs[base + t + 2]);
+    retargetTranslationValue(v, remap, v);
+    if (isCubic) {
+      v.setXYZ(srcOutputs[base], srcOutputs[base + 1], srcOutputs[base + 2]);
+      newOutputs.set(retargetTranslationTangent(v, remap, v), base);
+      v.setXYZ(srcOutputs[base + 3], srcOutputs[base + 4], srcOutputs[base + 5]);
+      newOutputs.set(retargetTranslationValue(v, remap, v), base + 3);
+      v.setXYZ(srcOutputs[base + 6], srcOutputs[base + 7], srcOutputs[base + 8]);
+      newOutputs.set(retargetTranslationTangent(v, remap, v), base + 6);
+    } else {
+      newOutputs.set(v, base);
+    }
+  }
+  return new NodeTranslationTrack(
+    new Interpolator(
+      src.interpolator.mode,
+      'vec3',
+      new Float32Array(src.interpolator.inputs as Float32Array),
+      newOutputs
+    )
+  );
+}
+
+function findRotationTrack(
+  tracks: AnimationTrack[] | undefined
+): NodeRotationTrack | NodeEulerRotationTrack | null {
+  return (tracks?.find(
+    (track) => track instanceof NodeRotationTrack || track instanceof NodeEulerRotationTrack
+  ) ?? null) as NodeRotationTrack | NodeEulerRotationTrack | null;
+}
+
+function collectTrackTimes(track: AnimationTrack | null, times: Set<number>) {
+  if (track instanceof NodeRotationTrack || track instanceof NodeEulerRotationTrack) {
+    for (const time of track.interpolator.inputs as Float32Array) {
+      times.add(time);
+    }
+  }
+}
+
+function sampleRotationTrack(
+  track: NodeRotationTrack | NodeEulerRotationTrack | null,
+  time: number,
+  fallback: Quaternion,
+  out: Quaternion
+): Quaternion {
+  if (!track) {
+    out.set(fallback);
+    return out;
+  }
+  const state = track.calculateState({}, time);
+  out.set(state);
+  return out;
+}
+
+function bakeHumanoidRotationTracks(
+  sourceClip: AnimationClip,
+  srcSkeleton: Skeleton,
+  dstSkeleton: Skeleton,
+  srcRootRotation: Quaternion,
+  dstRootRotation: Quaternion,
+  dstClip: AnimationClip,
+  remaps: JointRetargetRemap[],
+  remapsBySrcNode: Map<object, JointRetargetRemap>
+) {
+  const rotationTracksByRemap = new Map<
+    JointRetargetRemap,
+    NodeRotationTrack | NodeEulerRotationTrack | null
+  >();
+  const times = new Set<number>([0, sourceClip.timeDuration]);
+  const remapsByDstNode = new Map<object, JointRetargetRemap>();
+  const srcJointSet = new Set(srcSkeleton.joints);
+  const dstJointSet = new Set(dstSkeleton.joints);
+  const srcBindRotByNode = new Map<SceneNode, Quaternion>();
+  const dstBindRotByNode = new Map<SceneNode, Quaternion>();
+  const srcRotationTrackByNode = new Map<SceneNode, NodeRotationTrack | NodeEulerRotationTrack | null>();
+
+  for (let i = 0; i < srcSkeleton.joints.length; i++) {
+    const joint = srcSkeleton.joints[i];
+    srcBindRotByNode.set(joint, srcSkeleton.bindPose[i].rotation);
+    const track = findRotationTrack(sourceClip.tracks.get(joint));
+    srcRotationTrackByNode.set(joint, track);
+    collectTrackTimes(track, times);
+  }
+  for (let i = 0; i < dstSkeleton.joints.length; i++) {
+    dstBindRotByNode.set(dstSkeleton.joints[i], dstSkeleton.bindPose[i].rotation);
+  }
+  for (const remap of remaps) {
+    const track = findRotationTrack(sourceClip.tracks.get(remap.srcNode));
+    rotationTracksByRemap.set(remap, track);
+    remapsByDstNode.set(remap.dstNode, remap);
+  }
+  const inputs = new Float32Array([...times].sort((a, b) => a - b));
+  const srcBindWorldRots = new Map<SceneNode, Quaternion>();
+  const dstBindWorldRots = new Map<SceneNode, Quaternion>();
+  const srcAnimWorldRots = new Map<SceneNode, Quaternion>();
+  const dstAnimWorldRots = new Map<SceneNode, Quaternion>();
+  const outputsByRemap = new Map<JointRetargetRemap, Float32Array>();
+  const tmpLocalRot = new Quaternion();
+  const tmpWorldDelta = new Quaternion();
+  const tmpParentInv = new Quaternion();
+
+  for (const remap of remaps) {
+    outputsByRemap.set(remap, new Float32Array(inputs.length * 4));
+  }
+
+  function getSrcBindWorldRot(node: SceneNode): Quaternion {
+    let rot = srcBindWorldRots.get(node);
+    if (!rot) {
+      rot = (srcBindRotByNode.get(node) ?? Quaternion.identity()).clone();
+      const parent = node.parent;
+      if (parent && srcJointSet.has(parent)) {
+        Quaternion.multiply(getSrcBindWorldRot(parent), rot, rot);
+      } else {
+        Quaternion.multiply(srcRootRotation, rot, rot);
+      }
+      srcBindWorldRots.set(node, rot);
+    }
+    return rot;
+  }
+
+  function getDstBindWorldRot(node: SceneNode): Quaternion {
+    let rot = dstBindWorldRots.get(node);
+    if (!rot) {
+      rot = (dstBindRotByNode.get(node) ?? Quaternion.identity()).clone();
+      const parent = node.parent;
+      if (parent && dstJointSet.has(parent)) {
+        Quaternion.multiply(getDstBindWorldRot(parent), rot, rot);
+      } else {
+        Quaternion.multiply(dstRootRotation, rot, rot);
+      }
+      dstBindWorldRots.set(node, rot);
+    }
+    return rot;
+  }
+
+  function getSrcAnimWorldRot(node: SceneNode, time: number): Quaternion {
+    let rot = srcAnimWorldRots.get(node);
+    if (!rot) {
+      rot = new Quaternion();
+      srcAnimWorldRots.set(node, rot);
+    }
+    const parent = node.parent;
+    const parentWorldRot = parent && srcJointSet.has(parent) ? getSrcAnimWorldRot(parent, time) : null;
+    sampleRotationTrack(
+      srcRotationTrackByNode.get(node) ?? null,
+      time,
+      srcBindRotByNode.get(node) ?? Quaternion.identity(),
+      tmpLocalRot
+    );
+    if (parentWorldRot) {
+      Quaternion.multiply(parentWorldRot, tmpLocalRot, rot);
+    } else {
+      Quaternion.multiply(srcRootRotation, tmpLocalRot, rot);
+    }
+    return rot;
+  }
+
+  function getDstAnimWorldRot(remap: JointRetargetRemap, time: number): Quaternion {
+    let rot = dstAnimWorldRots.get(remap.dstNode);
+    if (!rot) {
+      rot = new Quaternion();
+      dstAnimWorldRots.set(remap.dstNode, rot);
+    }
+    const srcBindWorldRot = getSrcBindWorldRot(remap.srcNode);
+    const srcAnimWorldRot = getSrcAnimWorldRot(remap.srcNode, time);
+    Quaternion.multiply(srcAnimWorldRot, Quaternion.inverse(srcBindWorldRot, tmpWorldDelta), tmpWorldDelta);
+    Quaternion.multiply(tmpWorldDelta, getDstBindWorldRot(remap.dstNode), rot);
+    return rot;
+  }
+
+  function getDstParentAnimWorldRot(node: SceneNode, time: number): Quaternion | null {
+    const parent = node.parent;
+    if (!parent || !dstJointSet.has(parent)) {
+      return dstRootRotation;
+    }
+    const mappedParent = remapsByDstNode.get(parent);
+    if (mappedParent) {
+      return getDstAnimWorldRot(mappedParent, time);
+    }
+    let rot = dstAnimWorldRots.get(parent);
+    if (!rot) {
+      rot = (dstBindRotByNode.get(parent) ?? Quaternion.identity()).clone();
+      const parentWorldRot = getDstParentAnimWorldRot(parent, time);
+      if (parentWorldRot) {
+        Quaternion.multiply(parentWorldRot, rot, rot);
+      }
+      dstAnimWorldRots.set(parent, rot);
+    }
+    return rot;
+  }
+
+  for (let i = 0; i < inputs.length; i++) {
+    const time = inputs[i];
+    srcAnimWorldRots.clear();
+    dstAnimWorldRots.clear();
+    for (const remap of remaps) {
+      const dstAnimWorldRot = getDstAnimWorldRot(remap, time);
+      const parentWorldRot = getDstParentAnimWorldRot(remap.dstNode, time);
+      if (parentWorldRot) {
+        Quaternion.multiply(Quaternion.inverse(parentWorldRot, tmpParentInv), dstAnimWorldRot, tmpLocalRot);
+      } else {
+        tmpLocalRot.set(dstAnimWorldRot);
+      }
+      tmpLocalRot.inplaceNormalize();
+      outputsByRemap.get(remap)!.set(tmpLocalRot, i * 4);
+    }
+  }
+
+  for (const remap of remaps) {
+    if (!rotationTracksByRemap.get(remap)) {
+      continue;
+    }
+    const outputs = new Float32Array(outputsByRemap.get(remap)!);
+    const track = new NodeRotationTrack(
+      new Interpolator('linear', 'quat', new Float32Array(inputs), outputs)
+    );
+    track.name = 'rotation';
+    track.target = remap.dstNode.persistentId;
+    track.jointIndex = remap.dstJointIndex;
+    dstClip.addTrack(remap.dstNode, track);
+  }
+}
+
 /**
  * Animation set
  *
@@ -459,14 +848,6 @@ export class AnimationSet extends Disposable implements IDisposable {
       return null;
     }
 
-    // Per-joint retargeting info indexed by source joint node
-    type JointRemap = {
-      dstNode: SceneNode;
-      srcBindRot: Quaternion;
-      dstBindRot: Quaternion;
-      translationScale: number;
-    };
-
     if (sourceClip.skeletons.size !== 1) {
       console.error(
         `copyHumanoidAnimationFrom: source animation clip must be affected by exactly one skeleton`
@@ -488,7 +869,7 @@ export class AnimationSet extends Disposable implements IDisposable {
     }
 
     const nodeMap = new Map<object, SceneNode>();
-    const jointRemapBySrcNode = new Map<object, JointRemap>();
+    const jointRemapBySrcNode = new Map<object, JointRetargetRemap>();
 
     // Find a destination skeleton that has a humanoid mapping and share at least the body rig keys
     let srcJointsFiltered: SceneNode[] = [];
@@ -569,11 +950,18 @@ export class AnimationSet extends Disposable implements IDisposable {
     // This must include non-joint nodes such as "Armature" in Mixamo rigs, which
     // carry a 90° X rotation that is NOT captured by humanoidRootRotation (which
     // only traverses nodes inside the skeleton joints list).
-    function computeHipsParentChainRotation(hipsNode: SceneNode, modelRoot: SceneNode): Quaternion {
+    function computeHipsParentChainRotation(
+      hipsNode: SceneNode,
+      modelRoot: SceneNode,
+      skeleton: Skeleton
+    ): Quaternion {
       const result = Quaternion.identity();
+      const jointSet = new Set(skeleton.joints);
       let p = hipsNode.parent;
       while (p && p !== modelRoot) {
-        Quaternion.multiply(p.rotation, result, result);
+        if (!jointSet.has(p)) {
+          Quaternion.multiply(p.rotation, result, result);
+        }
         p = p.parent;
       }
       return result;
@@ -581,25 +969,32 @@ export class AnimationSet extends Disposable implements IDisposable {
 
     const srcHipsNode = srcSkeleton.humanoidJointMapping!.body[HumanoidBodyRig.Hips];
     const dstHipsNode = dstSkeleton.humanoidJointMapping!.body[HumanoidBodyRig.Hips];
-    const srcRootRot = computeHipsParentChainRotation(srcHipsNode, sourceSet.model);
-    const dstRootRot = computeHipsParentChainRotation(dstHipsNode, this._model);
-    const deltaRotation = true ? undefined : Quaternion.multiply(Quaternion.inverse(dstRootRot), srcRootRot);
+    const srcRootRot = computeHipsParentChainRotation(srcHipsNode, sourceSet.model, srcSkeleton);
+    const dstRootRot = computeHipsParentChainRotation(dstHipsNode, this._model, dstSkeleton);
+    const hipsTranslationRotation = Quaternion.multiply(Quaternion.inverse(dstRootRot), srcRootRot);
+    const jointRemaps: JointRetargetRemap[] = [];
+    const mappedSrcNodes = new Set<SceneNode>();
+    const mappedDstNodes = new Set<SceneNode>();
     // Build remap for matched joint pairs
     for (let fi = 0; fi < srcJointsFiltered.length; fi++) {
       const srcJoint = srcJointsFiltered[fi];
       const dstJoint = dstJointsFiltered[fi];
-      const si = srcSkeleton.joints.indexOf(srcJoint);
-      const di = dstSkeleton.joints.indexOf(dstJoint);
-      const srcLen = srcSkeleton.bindPose[si].position.magnitude;
-      const dstLen = dstSkeleton.bindPose[di].position.magnitude;
-      const translationScale = srcLen > 1e-6 ? dstLen / srcLen : 1;
+      if (mappedSrcNodes.has(srcJoint) || mappedDstNodes.has(dstJoint)) {
+        continue;
+      }
+      mappedSrcNodes.add(srcJoint);
+      mappedDstNodes.add(dstJoint);
+      const isHipsBone = srcJoint === srcHipsNode;
       nodeMap.set(srcJoint, dstJoint);
-      jointRemapBySrcNode.set(srcJoint, {
-        dstNode: dstJoint,
-        srcBindRot: srcSkeleton.bindPose[si].rotation,
-        dstBindRot: dstSkeleton.bindPose[di].rotation,
-        translationScale
-      });
+      const remap = createJointRetargetRemap(
+        srcSkeleton,
+        dstSkeleton,
+        srcJoint,
+        dstJoint,
+        isHipsBone ? hipsTranslationRotation : undefined
+      );
+      jointRemaps.push(remap);
+      jointRemapBySrcNode.set(srcJoint, remap);
     }
 
     const dstClip = this.createAnimation(destName);
@@ -613,6 +1008,17 @@ export class AnimationSet extends Disposable implements IDisposable {
     // Register destination skeleton
     dstClip.addSkeleton(dstSkeleton.persistentId);
 
+    bakeHumanoidRotationTracks(
+      sourceClip,
+      srcSkeleton,
+      dstSkeleton,
+      srcRootRot,
+      dstRootRot,
+      dstClip,
+      jointRemaps,
+      jointRemapBySrcNode
+    );
+
     for (const srcNode of srcJointsFiltered) {
       const srcTracks = sourceClip.tracks.get(srcNode);
       if (!srcTracks) {
@@ -620,15 +1026,16 @@ export class AnimationSet extends Disposable implements IDisposable {
         continue;
       }
       const dstNode = nodeMap.get(srcNode)!;
-      const remap = jointRemapBySrcNode.get(srcNode) ?? null;
-      const isHipsBone = srcNode === srcSkeleton.humanoidJointMapping?.body[HumanoidBodyRig.Hips];
+      const remap = jointRemapBySrcNode.get(srcNode)!;
 
       for (const srcTrack of srcTracks) {
         let dstTrack: AnimationTrack;
         if (srcTrack instanceof NodeRotationTrack) {
-          dstTrack = retargetRotationTrack(srcTrack, isHipsBone ? deltaRotation : undefined);
+          continue;
+        } else if (srcTrack instanceof NodeEulerRotationTrack) {
+          continue;
         } else if (srcTrack instanceof NodeTranslationTrack) {
-          dstTrack = retargetTranslationTrack(srcTrack, remap, isHipsBone ? deltaRotation : undefined);
+          dstTrack = retargetTranslationTrack(srcTrack, remap);
         } else if (srcTrack instanceof NodeScaleTrack) {
           dstTrack = new NodeScaleTrack(cloneInterpolator(srcTrack.interpolator));
         } else {
@@ -639,100 +1046,13 @@ export class AnimationSet extends Disposable implements IDisposable {
         }
 
         dstTrack.name = srcTrack.name;
-        dstTrack.target = srcTrack.target;
-        dstTrack.jointIndex = srcTrack.jointIndex;
+        dstTrack.target = dstNode.persistentId;
+        dstTrack.jointIndex = remap.dstJointIndex;
         dstClip.addTrack(dstNode, dstTrack);
       }
     }
 
     return dstClip;
-
-    function retargetTranslationTrack(
-      src: NodeTranslationTrack,
-      remap: JointRemap | null,
-      deltaRotation?: Quaternion
-    ): NodeTranslationTrack {
-      if (!remap || Math.abs(remap.translationScale - 1) < 1e-6) {
-        return new NodeTranslationTrack(cloneInterpolator(src.interpolator));
-      }
-      const scale = remap.translationScale;
-      const isCubic = src.interpolator.mode === 'cubicspline';
-      const frameStride = isCubic ? 9 : 3;
-      const numFrames = (src.interpolator.inputs as Float32Array).length;
-      const srcOutputs = src.interpolator.outputs as Float32Array;
-      const newOutputs = new Float32Array(srcOutputs.length);
-      const t = isCubic ? 3 : 0;
-      const v = new Vector3();
-      for (let f = 0; f < numFrames; f++) {
-        const base = f * frameStride;
-        v.setXYZ(srcOutputs[base + t], srcOutputs[base + t + 1], srcOutputs[base + t + 2]);
-        v.scaleBy(scale);
-        if (deltaRotation) {
-          deltaRotation.transform(v, v);
-        }
-        if (isCubic) {
-          newOutputs.set(srcOutputs.subarray(base, base + 3), base);
-          newOutputs.set(v, base + 3);
-          newOutputs.set(srcOutputs.subarray(base + 6, base + 9), base + 6);
-        } else {
-          newOutputs.set(v, base);
-        }
-      }
-      return new NodeTranslationTrack(
-        new Interpolator(
-          src.interpolator.mode,
-          'vec3',
-          new Float32Array(src.interpolator.inputs as Float32Array),
-          newOutputs
-        )
-      );
-    }
-
-    function cloneInterpolator(src: Interpolator): Interpolator {
-      return new Interpolator(
-        src.mode,
-        src.target,
-        src.inputs instanceof Float32Array ? new Float32Array(src.inputs) : [...src.inputs],
-        src.outputs instanceof Float32Array ? new Float32Array(src.outputs) : [...src.outputs]
-      );
-    }
-
-    function retargetRotationTrack(src: NodeRotationTrack, deltaRotation?: Quaternion): NodeRotationTrack {
-      const isCubic = src.interpolator.mode === 'cubicspline';
-      const frameStride = isCubic ? 12 : 4;
-      const numFrames = (src.interpolator.inputs as Float32Array).length;
-      const srcOutputs = src.interpolator.outputs as Float32Array;
-      const newOutputs = new Float32Array(srcOutputs.length);
-      const t = isCubic ? 4 : 0;
-      const q = new Quaternion();
-      for (let f = 0; f < numFrames; f++) {
-        const base = f * frameStride;
-        q.setXYZW(
-          srcOutputs[base + t],
-          srcOutputs[base + t + 1],
-          srcOutputs[base + t + 2],
-          srcOutputs[base + t + 3]
-        );
-        if (deltaRotation) {
-          Quaternion.multiply(deltaRotation, q, q);
-        }
-        if (isCubic) {
-          newOutputs.set(srcOutputs.subarray(base, base + 4), base);
-          newOutputs.set(q, base + 4);
-          newOutputs.set(srcOutputs.subarray(base + 8, base + 12), base + 8);
-        } else {
-          newOutputs.set(q, base);
-        }
-      }
-      return new NodeRotationTrack(
-        new Interpolator(
-          src.interpolator.mode,
-          'quat',
-          new Float32Array(src.interpolator.inputs as Float32Array),
-          newOutputs
-        )
-      );
-    }
   }
   /**
    * Copy an animation clip from another AnimationSet into this one.
@@ -765,13 +1085,6 @@ export class AnimationSet extends Disposable implements IDisposable {
       return null;
     }
 
-    // Per-joint retargeting info indexed by source joint node
-    type JointRemap = {
-      dstNode: SceneNode;
-      srcBindRot: Quaternion;
-      dstBindRot: Quaternion;
-      translationScale: number;
-    };
     if (sourceClip.skeletons.size !== 1) {
       console.error(`copyAnimationFrom: source animation clip must be affected by exactly one skeleton`);
       return null;
@@ -783,7 +1096,7 @@ export class AnimationSet extends Disposable implements IDisposable {
       return null;
     }
     const nodeMap = new Map<object, SceneNode>();
-    const jointRemapBySrcNode = new Map<object, JointRemap>();
+    const jointRemapBySrcNode = new Map<object, JointRetargetRemap>();
 
     const jointsFiltered = srcSkeleton.joints.filter((j) => !excludeJoint?.(j.name));
     const srcRootNode = findRootJoint(jointsFiltered);
@@ -830,18 +1143,11 @@ export class AnimationSet extends Disposable implements IDisposable {
     for (let fi = 0; fi < srcJointsFiltered.length; fi++) {
       const srcJoint = srcJointsFiltered[fi];
       const dstJoint = dstJointsFiltered[fi];
-      const si = srcSkeleton.joints.indexOf(srcJoint);
-      const di = dstSkeleton.joints.indexOf(dstJoint);
-      const srcLen = srcSkeleton.bindPose[si].position.magnitude;
-      const dstLen = dstSkeleton.bindPose[di].position.magnitude;
-      const translationScale = srcLen > 1e-6 ? dstLen / srcLen : 1;
       nodeMap.set(srcJoint, dstJoint);
-      jointRemapBySrcNode.set(srcJoint, {
-        dstNode: dstJoint,
-        srcBindRot: srcSkeleton.bindPose[si].rotation,
-        dstBindRot: dstSkeleton.bindPose[di].rotation,
-        translationScale
-      });
+      jointRemapBySrcNode.set(
+        srcJoint,
+        createJointRetargetRemap(srcSkeleton, dstSkeleton, srcJoint, dstJoint)
+      );
     }
 
     const dstClip = this.createAnimation(destName);
@@ -862,14 +1168,14 @@ export class AnimationSet extends Disposable implements IDisposable {
         return null;
       }
       const dstNode = nodeMap.get(srcNode)!;
-      const remap = jointRemapBySrcNode.get(srcNode) ?? null;
+      const remap = jointRemapBySrcNode.get(srcNode)!;
 
       for (const srcTrack of srcTracks) {
         let dstTrack: AnimationTrack;
         if (srcTrack instanceof NodeRotationTrack) {
-          dstTrack = retargetRotationTrack(srcTrack);
+          dstTrack = retargetRotationTrack(srcTrack, remap);
         } else if (srcTrack instanceof NodeEulerRotationTrack) {
-          dstTrack = retargetEulerToRotationTrack(srcTrack);
+          dstTrack = retargetEulerToRotationTrack(srcTrack, remap);
         } else if (srcTrack instanceof NodeTranslationTrack) {
           dstTrack = retargetTranslationTrack(srcTrack, remap);
         } else if (srcTrack instanceof NodeScaleTrack) {
@@ -880,8 +1186,8 @@ export class AnimationSet extends Disposable implements IDisposable {
         }
 
         dstTrack.name = srcTrack.name;
-        dstTrack.target = srcTrack.target;
-        dstTrack.jointIndex = srcTrack.jointIndex;
+        dstTrack.target = dstNode.persistentId;
+        dstTrack.jointIndex = remap.dstJointIndex;
         dstClip.addTrack(dstNode, dstTrack);
       }
     }
@@ -930,71 +1236,6 @@ export class AnimationSet extends Disposable implements IDisposable {
         }
       }
       return ordered;
-    }
-    function retargetTranslationTrack(
-      src: NodeTranslationTrack,
-      remap: JointRemap | null
-    ): NodeTranslationTrack {
-      if (!remap || Math.abs(remap.translationScale - 1) < 1e-6) {
-        return new NodeTranslationTrack(cloneInterpolator(src.interpolator));
-      }
-      const scale = remap.translationScale;
-      const srcOutputs = src.interpolator.outputs as Float32Array;
-      const newOutputs = new Float32Array(srcOutputs.length);
-      for (let i = 0; i < newOutputs.length; i++) {
-        newOutputs[i] = srcOutputs[i] * scale;
-      }
-      return new NodeTranslationTrack(
-        new Interpolator(
-          src.interpolator.mode,
-          'vec3',
-          new Float32Array(src.interpolator.inputs as Float32Array),
-          newOutputs
-        )
-      );
-    }
-
-    function cloneInterpolator(src: Interpolator): Interpolator {
-      return new Interpolator(
-        src.mode,
-        src.target,
-        src.inputs instanceof Float32Array ? new Float32Array(src.inputs) : [...src.inputs],
-        src.outputs instanceof Float32Array ? new Float32Array(src.outputs) : [...src.outputs]
-      );
-    }
-
-    function retargetRotationTrack(src: NodeRotationTrack): NodeRotationTrack {
-      const isCubic = src.interpolator.mode === 'cubicspline';
-      const frameStride = isCubic ? 12 : 4;
-      const numFrames = (src.interpolator.inputs as Float32Array).length;
-      const srcOutputs = src.interpolator.outputs as Float32Array;
-      const newOutputs = new Float32Array(srcOutputs.length);
-      for (let f = 0; f < numFrames; f++) {
-        const base = f * frameStride;
-        newOutputs.set(srcOutputs.subarray(base, base + (isCubic ? 12 : 4)), base);
-      }
-      return new NodeRotationTrack(
-        new Interpolator(
-          src.interpolator.mode,
-          'quat',
-          new Float32Array(src.interpolator.inputs as Float32Array),
-          newOutputs
-        )
-      );
-    }
-
-    function retargetEulerToRotationTrack(src: NodeEulerRotationTrack): NodeRotationTrack {
-      const srcInputs = src.interpolator.inputs as Float32Array;
-      const srcOutputs = src.interpolator.outputs as Float32Array;
-      const numFrames = srcInputs.length;
-      const newOutputs = new Float32Array(numFrames * 3);
-      for (let f = 0; f < numFrames; f++) {
-        const base = f * 3;
-        newOutputs.set(srcOutputs.subarray(base, base + 3), base);
-      }
-      return new NodeRotationTrack(
-        new Interpolator('linear', 'quat', new Float32Array(srcInputs), newOutputs)
-      );
     }
   }
 

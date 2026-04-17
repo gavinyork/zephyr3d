@@ -371,7 +371,7 @@ export class Skeleton extends Disposable {
       const bindpose = this._bindPose[i];
       joint.position.set(bindpose.position);
       joint.rotation.set(bindpose.rotation);
-      joint.rotation.identity();
+      //joint.rotation.identity();
       joint.scale.set(bindpose.scale);
     }
   }
