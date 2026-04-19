@@ -111,6 +111,18 @@ export interface ControllerConfig {
   constraintOptions: ConstraintBuildOptions;
 }
 
+/** Stable runtime handle for a JointDynamics collider. */
+export interface JointDynamicsColliderHandle {
+  readonly type: 'collider';
+  readonly id: number;
+}
+
+/** Stable runtime handle for a JointDynamics grabber. */
+export interface JointDynamicsGrabberHandle {
+  readonly type: 'grabber';
+  readonly id: number;
+}
+
 export class JointDynamicsSystemController {
   private _config: ControllerConfig;
   private _pointsR: PointR[] = [];
@@ -131,6 +143,12 @@ export class JointDynamicsSystemController {
   private _pointTransforms: TransformAccess[] = [];
   private _colliderTransforms: TransformAccess[] = [];
   private _grabberTransforms: TransformAccess[] = [];
+  private _colliderHandleIds: number[] = [];
+  private _grabberHandleIds: number[] = [];
+  private _colliderHandleToIndex = new Map<number, number>();
+  private _grabberHandleToIndex = new Map<number, number>();
+  private _nextColliderHandleId = 1;
+  private _nextGrabberHandleId = 1;
   private _initialized = false;
   private _isPaused = false;
   private _fadeState: 'none' | 'in' | 'out' = 'none';
@@ -222,6 +240,8 @@ export class JointDynamicsSystemController {
     // Initialize colliders
     this._collidersR = colliders.map((c) => c.r);
     this._collidersRW = colliders.map((c) => this._createColliderRW(c.transform));
+    this._colliderHandleIds = this._collidersR.map(() => this._nextColliderHandleId++);
+    this._rebuildColliderHandleMap();
 
     // Initialize grabbers
     this._grabbersR = grabbers.map((g) => g.r);
@@ -229,6 +249,8 @@ export class JointDynamicsSystemController {
       enabled: g.enabled ? 1 : 0,
       position: g.transform.getWorldPosition()
     }));
+    this._grabberHandleIds = this._grabbersR.map(() => this._nextGrabberHandleId++);
+    this._rebuildGrabberHandleMap();
 
     // Flat planes
     this._flatPlanes = flatPlanes.map((fp) => ({
@@ -522,33 +544,160 @@ export class JointDynamicsSystemController {
   }
 
   /**
-   * 运行时更新碰撞器状态
-   * 用于外部直接控制碰撞器的启用/禁用和位置，而不通过 TransformAccess 读取
-   * @param index 碰撞器索引
-   * @param enabled 是否启用
-   * @param position 世界坐标位置
-   * @param rotation 世界旋转
+   * Enable or disable a collider by current array index.
+   * Transform state is still read from the collider's TransformAccess each frame.
+   * Prefer setColliderEnabled(handle, enabled) for runtime-owned colliders.
    */
-  updateColliderState(index: number, enabled: boolean, position: Vector3, rotation: Quaternion): void {
+  setColliderEnabledAt(index: number, enabled: boolean): boolean {
     if (index >= 0 && index < this._collidersRW.length) {
       this._collidersRW[index].enabled = enabled ? 1 : 0;
-      this._collidersRW[index].positionCurrentTransform = position;
-      this._collidersRW[index].directionCurrentTransform = rotation;
+      return true;
     }
+    return false;
   }
 
   /**
-   * 运行时更新抓取器状态
-   * 用于鼠标拖拽等交互场景，控制抓取器的启用和位置
-   * @param index 抓取器索引
-   * @param enabled 是否启用（鼠标按下=true，松开=false）
-   * @param position 抓取器世界坐标位置
+   * Enable or disable a runtime collider by stable handle.
+   * @returns true if the handle is still valid.
    */
-  updateGrabberState(index: number, enabled: boolean, position: Vector3): void {
+  setColliderEnabled(handle: JointDynamicsColliderHandle, enabled: boolean): boolean {
+    const index = this._getColliderIndex(handle);
+    if (index === -1) {
+      return false;
+    }
+    return this.setColliderEnabledAt(index, enabled);
+  }
+
+  /**
+   * Add a collider at runtime.
+   * @returns A stable handle that remains valid until this collider is removed.
+   */
+  addCollider(r: ColliderR, transform: TransformAccess): JointDynamicsColliderHandle {
+    const id = this._nextColliderHandleId++;
+    this._collidersR.push(r);
+    this._colliderTransforms.push(transform);
+    this._collidersRW.push(this._createColliderRW(transform));
+    this._colliderHandleIds.push(id);
+    this._colliderHandleToIndex.set(id, this._collidersR.length - 1);
+    return { type: 'collider', id };
+  }
+
+  /**
+   * Remove a collider by stable handle.
+   * @returns true if the collider existed and was removed.
+   */
+  removeCollider(handle: JointDynamicsColliderHandle): boolean {
+    const index = this._getColliderIndex(handle);
+    if (index === -1) {
+      return false;
+    }
+    return this.removeColliderAt(index);
+  }
+
+  /**
+   * Remove a collider by current array index.
+   * Prefer removeCollider(handle) for runtime-owned colliders.
+   */
+  removeColliderAt(index: number): boolean {
+    if (index < 0 || index >= this._collidersR.length) {
+      return false;
+    }
+    this._collidersR.splice(index, 1);
+    this._colliderTransforms.splice(index, 1);
+    this._collidersRW.splice(index, 1);
+    this._colliderHandleIds.splice(index, 1);
+    this._rebuildColliderHandleMap();
+    return true;
+  }
+
+  /**
+   * Enable or disable a grabber by current array index.
+   * Transform state is still read from the grabber's TransformAccess each frame.
+   * Prefer setGrabberEnabled(handle, enabled) for runtime-owned grabbers.
+   */
+  setGrabberEnabledAt(index: number, enabled: boolean): boolean {
     if (index >= 0 && index < this._grabbersRW.length) {
       this._grabbersRW[index].enabled = enabled ? 1 : 0;
-      this._grabbersRW[index].position = position;
+      if (!enabled) {
+        this._releaseGrabber(index);
+      }
+      return true;
     }
+    return false;
+  }
+
+  /**
+   * Enable or disable a runtime grabber by stable handle.
+   * @returns true if the handle is still valid.
+   */
+  setGrabberEnabled(handle: JointDynamicsGrabberHandle, enabled: boolean): boolean {
+    const index = this._getGrabberIndex(handle);
+    if (index === -1) {
+      return false;
+    }
+    return this.setGrabberEnabledAt(index, enabled);
+  }
+
+  /**
+   * Add a grabber at runtime.
+   * @returns A stable handle that remains valid until this grabber is removed.
+   */
+  addGrabber(r: GrabberR, transform: TransformAccess, enabled = false): JointDynamicsGrabberHandle {
+    const id = this._nextGrabberHandleId++;
+    this._grabbersR.push(r);
+    this._grabberTransforms.push(transform);
+    this._grabbersRW.push({
+      enabled: enabled ? 1 : 0,
+      position: transform.getWorldPosition()
+    });
+    this._grabberHandleIds.push(id);
+    this._grabberHandleToIndex.set(id, this._grabbersR.length - 1);
+    return { type: 'grabber', id };
+  }
+
+  /**
+   * Remove a grabber by stable handle.
+   * @returns true if the grabber existed and was removed.
+   */
+  removeGrabber(handle: JointDynamicsGrabberHandle): boolean {
+    const index = this._getGrabberIndex(handle);
+    if (index === -1) {
+      return false;
+    }
+    return this.removeGrabberAt(index);
+  }
+
+  /**
+   * Remove a grabber by current array index.
+   * Prefer removeGrabber(handle) for runtime-owned grabbers.
+   */
+  removeGrabberAt(index: number): boolean {
+    if (index < 0 || index >= this._grabbersR.length) {
+      return false;
+    }
+    this._grabbersR.splice(index, 1);
+    this._grabberTransforms.splice(index, 1);
+    this._grabbersRW.splice(index, 1);
+    this._grabberHandleIds.splice(index, 1);
+    this._rebuildGrabberHandleMap();
+
+    this._releaseGrabber(index);
+    for (const ptRW of this._pointsRW) {
+      if (ptRW.grabberIndex > index) {
+        ptRW.grabberIndex--;
+      }
+    }
+    return true;
+  }
+
+  /** Gets the number of runtime colliders. */
+  get colliderCount(): number {
+    return this._collidersR.length;
+  }
+
+  /** Gets the number of runtime grabbers. */
+  get grabberCount(): number {
+    return this._grabbersR.length;
   }
 
   private _computeBlendRatio(): number {
@@ -559,6 +708,43 @@ export class JointDynamicsSystemController {
       return clamp01(this._fadeTimer / this._fadeDuration);
     }
     return this._config.blendRatio;
+  }
+
+  private _getColliderIndex(handle: JointDynamicsColliderHandle): number {
+    if (handle.type !== 'collider') {
+      return -1;
+    }
+    return this._colliderHandleToIndex.get(handle.id) ?? -1;
+  }
+
+  private _getGrabberIndex(handle: JointDynamicsGrabberHandle): number {
+    if (handle.type !== 'grabber') {
+      return -1;
+    }
+    return this._grabberHandleToIndex.get(handle.id) ?? -1;
+  }
+
+  private _releaseGrabber(index: number): void {
+    for (const ptRW of this._pointsRW) {
+      if (ptRW.grabberIndex === index) {
+        ptRW.grabberIndex = -1;
+        ptRW.grabberDistance = 0;
+      }
+    }
+  }
+
+  private _rebuildColliderHandleMap(): void {
+    this._colliderHandleToIndex.clear();
+    for (let i = 0; i < this._colliderHandleIds.length; i++) {
+      this._colliderHandleToIndex.set(this._colliderHandleIds[i], i);
+    }
+  }
+
+  private _rebuildGrabberHandleMap(): void {
+    this._grabberHandleToIndex.clear();
+    for (let i = 0; i < this._grabberHandleIds.length; i++) {
+      this._grabberHandleToIndex.set(this._grabberHandleIds[i], i);
+    }
   }
 
   private _createPointR(

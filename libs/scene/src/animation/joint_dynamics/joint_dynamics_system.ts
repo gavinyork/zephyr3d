@@ -1,13 +1,23 @@
 import type { DeepPartial } from '@zephyr3d/base';
 import { InterpolatorScalar, Vector3 } from '@zephyr3d/base';
 import { Quaternion } from '@zephyr3d/base';
-import type { SceneNode } from '../../scene';
-import type { ControllerConfig } from './controller';
+import { SceneNode } from '../../scene/scene_node';
+import type { ControllerConfig, JointDynamicsColliderHandle, JointDynamicsGrabberHandle } from './controller';
 import { JointDynamicsSystemController } from './controller';
-import type { BoneNode, ColliderR, GrabberR, TransformAccess } from './types';
+import { ColliderForce, type BoneNode, type ColliderR, type GrabberR, type TransformAccess } from './types';
 
 const _quat = new Quaternion();
 
+const _defaultTA = createTransformAccess(new SceneNode(null));
+
+/**
+ * Create a transform adapter that lets the joint dynamics solver read from and write to a SceneNode.
+ *
+ * @param obj - Scene node to expose through the TransformAccess interface.
+ * @returns A TransformAccess wrapper backed by the supplied scene node.
+ *
+ * @public
+ */
 export function createTransformAccess(obj: SceneNode): TransformAccess {
   return {
     getWorldPosition(): Vector3 {
@@ -60,33 +70,61 @@ export function createTransformAccess(obj: SceneNode): TransformAccess {
   };
 }
 
+/**
+ * Describes the bone chains simulated by a JointDynamicsSystem.
+ *
+ * Each chain is defined by an inclusive start and end node. The end node must be
+ * a descendant of the start node.
+ *
+ * @public
+ */
 export type JointChainConfig = {
+  /** Root transform used for root motion compensation. */
   systemRoot: SceneNode;
+  /** Bone chains to simulate. */
   chains: { start: SceneNode; end: SceneNode }[];
 };
 
+/**
+ * Configuration used to construct a JointDynamicsSystem.
+ *
+ * @public
+ */
 export type JointDynamicSystemConfig = {
+  /** Bone chain topology and root transform. */
   chainConfig: JointChainConfig;
+  /** Optional controller configuration overrides. */
   controllerConfig?: DeepPartial<ControllerConfig, 2>;
 };
 
 /**
- * Physics engine for spring-based particle simulation
- * Uses Verlet integration and iterative constraint solving
+ * Physics system for spring-like joint dynamics on scene node bone chains.
+ *
+ * The system builds particles and constraints from one or more bone chains,
+ * advances them with Verlet integration, solves constraints and collisions, and
+ * writes the resulting positions and rotations back to the scene graph.
  *
  * @public
  */
 export class JointDynamicsSystem {
   private _controller: JointDynamicsSystemController;
+  /**
+   * Create a joint dynamics system for one or more bone chains.
+   *
+   * @param config - Bone chain topology and controller configuration.
+   * @param colliders - Optional colliders to register during initialization.
+   * @param grabbers - Optional grabbers to register during initialization.
+   * @param flatPlanes - Optional world-space planes that dynamic points cannot cross.
+   */
   constructor(
     config: JointDynamicSystemConfig,
-    colliders: { r: ColliderR; transform: TransformAccess }[],
+    colliders: { r: ColliderR; transform: TransformAccess }[] = [],
     grabbers: {
       r: GrabberR;
       transform: TransformAccess;
       enabled: boolean;
-    }[],
-    flatPlanes: { up: Vector3; position: Vector3 }[]
+    }[] = [],
+    flatPlanes: { up: Vector3; position: Vector3 }[] = []
   ) {
     const rootPoints: BoneNode[] = [];
     const boneNodes: BoneNode[] = [];
@@ -129,8 +167,180 @@ export class JointDynamicsSystem {
     this._controller.initialize(systemRoot, rootPoints, pointTransforms, colliders, grabbers, flatPlanes);
   }
 
-  get controller() {
+  /**
+   * Get the low-level controller that owns simulation state and advanced runtime controls.
+   *
+   * Most callers should prefer the convenience methods on JointDynamicsSystem.
+   *
+   * @returns The underlying joint dynamics controller.
+   */
+  get controller(): JointDynamicsSystemController {
     return this._controller;
+  }
+
+  /**
+   * Add a fully configured collider at runtime.
+   *
+   * The collider transform is read from the supplied scene node every simulation step.
+   * If no transform is supplied, the collider is created at the identity transform.
+   *
+   * @param r - Read-only collider parameters.
+   * @param transform - Optional scene node that drives the collider transform.
+   * @returns A stable handle that remains valid until this collider is removed.
+   */
+  addCollider(r: ColliderR, transform?: SceneNode): JointDynamicsColliderHandle {
+    return this._controller.addCollider(r, transform ? createTransformAccess(transform) : _defaultTA);
+  }
+
+  /**
+   * Add a spherical collider at runtime.
+   *
+   * The collider transform is read from the supplied scene node every simulation step.
+   * If no transform is supplied, the collider is created at the identity transform.
+   *
+   * @param radius - Sphere radius in world units before transform scaling.
+   * @param transform - Optional scene node that drives the collider transform.
+   * @param friction - Contact friction coefficient applied by this collider. Defaults to 0.
+   * @param inversed - If true, points are constrained inside the sphere instead of pushed out.
+   * @returns A stable handle that remains valid until this collider is removed.
+   */
+  addSphereCollider(
+    radius: number,
+    transform?: SceneNode,
+    friction?: number,
+    inversed?: boolean
+  ): JointDynamicsColliderHandle {
+    return this.addCollider(
+      {
+        forceType: ColliderForce.Off,
+        friction: friction ?? 0,
+        height: 0,
+        isInverseCollider: inversed ?? false,
+        radius,
+        radiusTailScale: 1
+      },
+      transform
+    );
+  }
+
+  /**
+   * Add a capsule collider at runtime.
+   *
+   * The capsule is aligned to the collider transform's local Y axis. Its head radius is
+   * `radius`, its tail radius is `radius * radiusTailScale`, and `height` defines the
+   * distance between the capsule ends before transform scaling.
+   *
+   * @param radius - Capsule head radius in world units before transform scaling.
+   * @param height - Capsule length in world units before transform scaling.
+   * @param transform - Optional scene node that drives the collider transform.
+   * @param radiusTailScale - Tail radius multiplier relative to the head radius. Defaults to 1.
+   * @param friction - Contact friction coefficient applied by this collider. Defaults to 0.
+   * @param inversed - If true, points are constrained inside the capsule instead of pushed out.
+   * @returns A stable handle that remains valid until this collider is removed.
+   */
+  addCapsuleCollider(
+    radius: number,
+    height: number,
+    transform?: SceneNode,
+    radiusTailScale?: number,
+    friction?: number,
+    inversed?: boolean
+  ): JointDynamicsColliderHandle {
+    return this.addCollider(
+      {
+        forceType: ColliderForce.Off,
+        friction: friction ?? 0,
+        height,
+        isInverseCollider: inversed ?? false,
+        radius,
+        radiusTailScale: radiusTailScale ?? 1
+      },
+      transform
+    );
+  }
+
+  /**
+   * Enable or disable a collider by stable handle.
+   *
+   * Disabled colliders remain registered but are ignored by simulation until re-enabled.
+   *
+   * @param handle - Collider handle returned by addCollider, addSphereCollider, or addCapsuleCollider.
+   * @param enabled - Whether the collider should participate in simulation.
+   * @returns true if the handle is valid and the enabled state was updated.
+   */
+  setColliderEnabled(handle: JointDynamicsColliderHandle, enabled: boolean): boolean {
+    return this._controller.setColliderEnabled(handle, enabled);
+  }
+
+  /**
+   * Remove a collider by stable handle.
+   *
+   * @param handle - Collider handle returned by addCollider, addSphereCollider, or addCapsuleCollider.
+   * @returns true if the collider existed and was removed.
+   */
+  removeCollider(handle: JointDynamicsColliderHandle): boolean {
+    return this._controller.removeCollider(handle);
+  }
+
+  /**
+   * Remove a collider by current array index.
+   *
+   * Prefer removeCollider(handle) for runtime-owned colliders.
+   *
+   * @param index - Current collider array index.
+   * @returns true if the collider existed and was removed.
+   */
+  removeColliderAt(index: number): boolean {
+    return this._controller.removeColliderAt(index);
+  }
+
+  /**
+   * Add a grabber at runtime.
+   *
+   * The grabber transform is read from the supplied scene node every simulation step.
+   * If no transform is supplied, the grabber is created at the identity transform.
+   *
+   * @param r - Read-only grabber parameters.
+   * @param transform - Optional scene node that drives the grabber transform.
+   * @returns A stable handle that remains valid until this grabber is removed.
+   */
+  addGrabber(r: GrabberR, transform?: SceneNode): JointDynamicsGrabberHandle {
+    return this._controller.addGrabber(r, transform ? createTransformAccess(transform) : _defaultTA, false);
+  }
+
+  /**
+   * Enable or disable a grabber by stable handle.
+   *
+   * Disabling a grabber also releases any points currently held by it.
+   *
+   * @param handle - Grabber handle returned by addGrabber.
+   * @param enabled - Whether the grabber should participate in simulation.
+   * @returns true if the handle is valid and the enabled state was updated.
+   */
+  setGrabberEnabled(handle: JointDynamicsGrabberHandle, enabled: boolean): boolean {
+    return this._controller.setGrabberEnabled(handle, enabled);
+  }
+
+  /**
+   * Remove a grabber by stable handle.
+   *
+   * @param handle - Grabber handle returned by addGrabber.
+   * @returns true if the grabber existed and was removed.
+   */
+  removeGrabber(handle: JointDynamicsGrabberHandle): boolean {
+    return this._controller.removeGrabber(handle);
+  }
+
+  /**
+   * Remove a grabber by current array index.
+   *
+   * Prefer removeGrabber(handle) for runtime-owned grabbers.
+   *
+   * @param index - Current grabber array index.
+   * @returns true if the grabber existed and was removed.
+   */
+  removeGrabberAt(index: number): boolean {
+    return this._controller.removeGrabberAt(index);
   }
 
   private collectChainNodes(start: SceneNode, end: SceneNode): SceneNode[] {
@@ -149,8 +359,9 @@ export class JointDynamicsSystem {
     return nodes;
   }
   /**
-   * Updates the physics simulation
-   * @param deltaTime - Time step in seconds
+   * Advance the physics simulation and write the resulting transforms back to the chain nodes.
+   *
+   * @param deltaTime - Frame time step in seconds. Values larger than 0.033 are clamped for stability.
    */
   update(deltaTime: number): void {
     // Clamp deltaTime to prevent instability

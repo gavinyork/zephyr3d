@@ -334,9 +334,7 @@ getInput().useFirst((evt) => {
     moveGrabberToMouse();
     const ctrl = getActiveController();
     if (ctrl) {
-      const grabber = getActiveGrabber()!;
-      const p = grabber.position;
-      ctrl.updateGrabberState(0, true, new Vector3(p.x, p.y, p.z));
+      ctrl.setGrabberEnabledAt(0, true);
     }
     return true;
   } else if (evt.type === 'pointermove') {
@@ -348,9 +346,7 @@ getInput().useFirst((evt) => {
     moveGrabberToMouse();
     const ctrl = getActiveController();
     if (ctrl) {
-      const grabber = getActiveGrabber()!;
-      const p = grabber.position;
-      ctrl.updateGrabberState(0, true, new Vector3(p.x, p.y, p.z));
+      ctrl.setGrabberEnabledAt(0, true);
     }
     return true;
   } else if (evt.type === 'pointerup') {
@@ -360,7 +356,7 @@ getInput().useFirst((evt) => {
     grabbing = false;
     const ctrl = getActiveController();
     if (ctrl) {
-      ctrl.updateGrabberState(0, false, Vector3.zero());
+      ctrl.setGrabberEnabledAt(0, false);
     }
     const grabber = getActiveGrabber();
     if (grabber) {

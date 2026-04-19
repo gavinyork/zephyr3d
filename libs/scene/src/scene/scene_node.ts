@@ -11,7 +11,7 @@ import { Disposable, DRef, makeObservable, randomUUID } from '@zephyr3d/base';
 import { Matrix4x4, ObservableQuaternion, ObservableVector3, Vector3, Vector4 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
 import type { Skeleton } from '../animation';
-import { AnimationSet } from '../animation';
+import { AnimationSet } from '../animation/animationset';
 import type { SharedModel } from '../asset';
 import type { Water } from './water';
 import type { ClipmapTerrain } from './terrain-cm/terrain-cm';
