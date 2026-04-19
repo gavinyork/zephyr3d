@@ -37,6 +37,8 @@ export interface PhysicsCurves {
   hardness: InterpolatorScalar;
   /** Friction multiplier by depth. Scales collision friction accumulation */
   friction: InterpolatorScalar;
+  /** Collision radius by depth, mapped from VRM SpringBone hitRadius when available */
+  pointRadius: InterpolatorScalar;
   /** Extra slack length for horizontal/shear constraints (allows stretching) */
   sliderJointLength: InterpolatorScalar;
   /** Global shrink stiffness multiplier (applied to all constraint types) */
@@ -615,7 +617,7 @@ export class JointDynamicsSystemController {
       fakeWavePower: c.fakeWavePower.evaluate(rate),
       fakeWaveFreq: c.fakeWaveFreq.evaluate(rate),
       forceFadeRatio: 0,
-      pointRadius: 0.05,
+      pointRadius: Math.max(0, c.pointRadius.evaluate(rate)),
       gravity: Vector3.scale(this._config.gravity, c.gravityScale.evaluate(rate)),
       boneAxis,
       initialLocalScale: initLocalScale,

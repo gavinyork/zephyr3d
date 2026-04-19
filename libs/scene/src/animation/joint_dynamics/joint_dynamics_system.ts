@@ -184,6 +184,7 @@ export class JointDynamicsSystem {
         resistance: InterpolatorScalar.constant(0.95),
         hardness: InterpolatorScalar.constant(0.001),
         friction: InterpolatorScalar.constant(0.5),
+        pointRadius: InterpolatorScalar.constant(0.05),
         sliderJointLength: InterpolatorScalar.constant(0),
         allShrinkScale: InterpolatorScalar.constant(1),
         allStretchScale: InterpolatorScalar.constant(1),
