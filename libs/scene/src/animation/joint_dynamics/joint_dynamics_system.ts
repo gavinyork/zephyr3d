@@ -2,7 +2,12 @@ import type { DeepPartial } from '@zephyr3d/base';
 import { InterpolatorScalar, Vector3 } from '@zephyr3d/base';
 import { Quaternion } from '@zephyr3d/base';
 import { SceneNode } from '../../scene/scene_node';
-import type { ControllerConfig, JointDynamicsColliderHandle, JointDynamicsGrabberHandle } from './controller';
+import type {
+  ControllerConfig,
+  JointDynamicsColliderHandle,
+  JointDynamicsFlatPlaneHandle,
+  JointDynamicsGrabberHandle
+} from './controller';
 import { JointDynamicsSystemController } from './controller';
 import { ColliderForce, type BoneNode, type ColliderR, type GrabberR, type TransformAccess } from './types';
 
@@ -292,6 +297,54 @@ export class JointDynamicsSystem {
    */
   removeColliderAt(index: number): boolean {
     return this._controller.removeColliderAt(index);
+  }
+
+  /**
+   * Add a flat plane collider at runtime.
+   *
+   * Flat planes are infinite world-space planes. The normal points toward the allowed side,
+   * and dynamic points are pushed back when they move behind the plane.
+   *
+   * @param up - Plane normal in world space.
+   * @param position - A point on the plane in world space.
+   * @returns A stable handle that remains valid until this flat plane is removed.
+   */
+  addFlatPlane(up: Vector3, position: Vector3): JointDynamicsFlatPlaneHandle {
+    return this._controller.addFlatPlane(up, position);
+  }
+
+  /**
+   * Enable or disable a flat plane by stable handle.
+   *
+   * Disabled flat planes remain registered but are ignored by simulation until re-enabled.
+   *
+   * @param handle - Flat plane handle returned by addFlatPlane.
+   * @param enabled - Whether the flat plane should participate in simulation.
+   * @returns true if the handle is valid and the enabled state was updated.
+   */
+  setFlatPlaneEnabled(handle: JointDynamicsFlatPlaneHandle, enabled: boolean): boolean {
+    return this._controller.setFlatPlaneEnabled(handle, enabled);
+  }
+
+  /**
+   * Remove a flat plane by stable handle.
+   *
+   * @param handle - Flat plane handle returned by addFlatPlane.
+   * @returns true if the flat plane existed and was removed.
+   */
+  removeFlatPlane(handle: JointDynamicsFlatPlaneHandle): boolean {
+    return this._controller.removeFlatPlane(handle);
+  }
+
+  /**
+   * Remove a flat plane by current array index.
+   * Prefer removeFlatPlane(handle) for runtime-owned flat planes.
+   *
+   * @param index - Current flat plane array index.
+   * @returns true if the flat plane existed and was removed.
+   */
+  removeFlatPlaneAt(index: number): boolean {
+    return this._controller.removeFlatPlaneAt(index);
   }
 
   /**

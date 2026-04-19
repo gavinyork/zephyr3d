@@ -1,8 +1,18 @@
 import type * as draco3d from 'draco3d';
 import type { InterpolationMode, TypedArray } from '@zephyr3d/base';
-import { Vector3, Vector4, Matrix4x4, Quaternion, Interpolator, ASSERT } from '@zephyr3d/base';
+import {
+  Vector3,
+  Vector4,
+  Matrix4x4,
+  Quaternion,
+  Interpolator,
+  InterpolatorScalar,
+  ASSERT
+} from '@zephyr3d/base';
 import { AssetHierarchyNode } from '../model';
 import type {
+  AssetJointDynamicsCollider,
+  AssetJointDynamicsFlatPlane,
   AssetMeshData,
   AssetAnimationData,
   AssetSubMeshData,
@@ -15,6 +25,9 @@ import type {
   AssetAnimationTrack,
   AssetPrimitiveInfo,
   AssetTextureInfo,
+  AssetSpringBoneCollider,
+  AssetSpringBoneColliderGroup,
+  AssetSpringBoneJoint,
   SharedModel
 } from '../model';
 import { AssetSkeleton, AssetScene } from '../model';
@@ -31,6 +44,7 @@ import {
   MORPH_TARGET_TEX3,
   getDevice
 } from '@zephyr3d/scene';
+import { ColliderForce } from '@zephyr3d/scene';
 import { ComponentType, GLTFAccessor } from './helpers';
 import type { VertexAttribFormat } from '@zephyr3d/device';
 import {
@@ -156,6 +170,7 @@ export class GLTFImporter implements ModelImporter {
         gltf._nodes[i].skeleton = sharedModel.skeletons[gltf.nodes[i].skin];
       }
     }
+    this._loadSpringBones(gltf, sharedModel);
     this._loadAnimations(gltf, sharedModel);
     for (const scene of scenes) {
       const assetScene = new AssetScene(scene.name);
@@ -168,6 +183,380 @@ export class GLTFImporter implements ModelImporter {
       sharedModel.activeScene = gltf.scene;
     }
   }
+  /** @internal */
+  private _loadSpringBones(gltf: GLTFContent, model: SharedModel) {
+    this._loadVRMC0SpringBones(gltf, model);
+    this._loadVRMC1SpringBones(gltf, model);
+    this._buildJointDynamicsSpringBones(model);
+  }
+
+  private _loadVRMC1SpringBones(gltf: GLTFContent, model: SharedModel) {
+    const ext = gltf.extensions?.VRMC_springBone;
+    if (!ext) {
+      return;
+    }
+
+    const colliders: AssetSpringBoneCollider[] = [];
+    for (const colliderInfo of ext.colliders ?? []) {
+      const node = this._getNode(gltf, colliderInfo.node);
+      if (!node || !colliderInfo.shape) {
+        continue;
+      }
+      const sphere = colliderInfo.shape.sphere;
+      const capsule = colliderInfo.shape.capsule;
+      const extendedShape = colliderInfo.extensions?.VRMC_springBone_extended_collider?.shape;
+      const extendedSphere = extendedShape?.sphere;
+      const extendedCapsule = extendedShape?.capsule;
+      const extendedPlane = extendedShape?.plane;
+      let collider: AssetSpringBoneCollider = null;
+      if (sphere) {
+        collider = {
+          name: colliderInfo.name,
+          node,
+          shape: {
+            type: 'sphere',
+            offset: this._arrayToVector3(sphere.offset, Vector3.zero()),
+            radius: sphere.radius ?? 0,
+            inside: sphere.inside
+          }
+        };
+      } else if (extendedSphere) {
+        collider = {
+          name: colliderInfo.name,
+          node,
+          shape: {
+            type: 'sphere',
+            offset: this._arrayToVector3(extendedSphere.offset, Vector3.zero()),
+            radius: extendedSphere.radius ?? 0,
+            inside: extendedSphere.inside
+          }
+        };
+      } else if (capsule) {
+        collider = {
+          name: colliderInfo.name,
+          node,
+          shape: {
+            type: 'capsule',
+            offset: this._arrayToVector3(capsule.offset, Vector3.zero()),
+            tail: this._arrayToVector3(capsule.tail, Vector3.zero()),
+            radius: capsule.radius ?? 0,
+            inside: capsule.inside
+          }
+        };
+      } else if (extendedCapsule) {
+        collider = {
+          name: colliderInfo.name,
+          node,
+          shape: {
+            type: 'capsule',
+            offset: this._arrayToVector3(extendedCapsule.offset, Vector3.zero()),
+            tail: this._arrayToVector3(extendedCapsule.tail, Vector3.zero()),
+            radius: extendedCapsule.radius ?? 0,
+            inside: extendedCapsule.inside
+          }
+        };
+      } else if (extendedPlane) {
+        collider = {
+          name: colliderInfo.name,
+          node,
+          shape: {
+            type: 'plane',
+            offset: this._arrayToVector3(extendedPlane.offset, Vector3.zero()),
+            normal: this._arrayToVector3(extendedPlane.normal, Vector3.axisPY())
+          }
+        };
+      }
+      if (collider) {
+        colliders.push(collider);
+        model.springBoneColliders.push(collider);
+      }
+    }
+
+    const colliderGroups: AssetSpringBoneColliderGroup[] = [];
+    for (const groupInfo of ext.colliderGroups ?? []) {
+      const group: AssetSpringBoneColliderGroup = {
+        name: groupInfo.name,
+        colliders: (groupInfo.colliders ?? [])
+          .map((index: number) => colliders[index])
+          .filter((collider: AssetSpringBoneCollider) => !!collider)
+      };
+      colliderGroups.push(group);
+      model.springBoneColliderGroups.push(group);
+    }
+
+    for (const springInfo of ext.springs ?? []) {
+      const joints: AssetSpringBoneJoint[] = [];
+      for (const jointRef of springInfo.joints ?? []) {
+        const jointInfo = typeof jointRef === 'number' ? ext.joints?.[jointRef] : jointRef;
+        const node = this._getNode(gltf, jointInfo?.node);
+        if (!node) {
+          continue;
+        }
+        joints.push({
+          node,
+          hitRadius: jointInfo.hitRadius ?? 0,
+          stiffness: jointInfo.stiffness ?? 0,
+          gravityPower: jointInfo.gravityPower ?? 0,
+          gravityDir: this._arrayToVector3(jointInfo.gravityDir, new Vector3(0, -1, 0)),
+          dragForce: jointInfo.dragForce ?? 0
+        });
+      }
+      model.springBones.push({
+        name: springInfo.name,
+        center: this._getNode(gltf, springInfo.center),
+        joints,
+        colliderGroups: (springInfo.colliderGroups ?? [])
+          .map((index: number) => colliderGroups[index])
+          .filter((group: AssetSpringBoneColliderGroup) => !!group)
+      });
+    }
+  }
+
+  private _loadVRMC0SpringBones(gltf: GLTFContent, model: SharedModel) {
+    const secondaryAnimation = gltf.extensions?.VRM?.secondaryAnimation;
+    if (!secondaryAnimation) {
+      return;
+    }
+
+    const colliderGroups: AssetSpringBoneColliderGroup[] = [];
+    for (const groupInfo of secondaryAnimation.colliderGroups ?? []) {
+      const node = this._getNode(gltf, groupInfo.node);
+      if (!node) {
+        continue;
+      }
+      const group: AssetSpringBoneColliderGroup = {
+        colliders: []
+      };
+      for (const colliderInfo of groupInfo.colliders ?? []) {
+        const collider: AssetSpringBoneCollider = {
+          node,
+          shape: {
+            type: 'sphere',
+            offset: this._arrayToVector3(colliderInfo.offset, Vector3.zero()),
+            radius: colliderInfo.radius ?? 0
+          }
+        };
+        group.colliders.push(collider);
+        model.springBoneColliders.push(collider);
+      }
+      colliderGroups.push(group);
+      model.springBoneColliderGroups.push(group);
+    }
+
+    for (const boneGroupInfo of secondaryAnimation.boneGroups ?? []) {
+      const rootBones = (boneGroupInfo.bones ?? [])
+        .map((index: number) => this._getNode(gltf, index))
+        .filter((node: AssetHierarchyNode) => !!node);
+      const joints: AssetSpringBoneJoint[] = rootBones.map((node: AssetHierarchyNode) => ({
+        node,
+        hitRadius: boneGroupInfo.hitRadius ?? 0,
+        stiffness: boneGroupInfo.stiffiness ?? boneGroupInfo.stiffness ?? 0,
+        gravityPower: boneGroupInfo.gravityPower ?? 0,
+        gravityDir: this._arrayToVector3(boneGroupInfo.gravityDir, new Vector3(0, -1, 0)),
+        dragForce: boneGroupInfo.dragForce ?? 0
+      }));
+      model.springBones.push({
+        name: boneGroupInfo.comment,
+        center: this._getNode(gltf, boneGroupInfo.center),
+        joints,
+        rootBones,
+        colliderGroups: (boneGroupInfo.colliderGroups ?? [])
+          .map((index: number) => colliderGroups[index])
+          .filter((group: AssetSpringBoneColliderGroup) => !!group)
+      });
+    }
+  }
+
+  private _getNode(gltf: GLTFContent, index: unknown): AssetHierarchyNode {
+    return typeof index === 'number' && index >= 0 ? gltf._nodes[index] : null;
+  }
+
+  private _arrayToVector3(value: unknown, fallback: Vector3): Vector3 {
+    if (Array.isArray(value)) {
+      return new Vector3(value[0] ?? fallback.x, value[1] ?? fallback.y, value[2] ?? fallback.z);
+    }
+    return fallback.clone();
+  }
+
+  private _buildJointDynamicsSpringBones(model: SharedModel) {
+    const colliderMap = new Map<AssetSpringBoneCollider, AssetJointDynamicsCollider>();
+    const flatPlaneMap = new Map<AssetSpringBoneCollider, AssetJointDynamicsFlatPlane>();
+    for (const collider of model.springBoneColliders) {
+      const converted = this._toJointDynamicsCollider(collider);
+      if (converted) {
+        colliderMap.set(collider, converted);
+        model.jointDynamicsColliders.push(converted);
+        continue;
+      }
+      const flatPlane = this._toJointDynamicsFlatPlane(collider);
+      if (flatPlane) {
+        flatPlaneMap.set(collider, flatPlane);
+      }
+    }
+
+    for (const spring of model.springBones) {
+      const chains = spring.rootBones
+        ? this._collectJointDynamicsChainsFromRoots(spring.rootBones)
+        : this._collectJointDynamicsChains(spring.joints);
+      if (chains.length === 0 || spring.joints.length === 0) {
+        continue;
+      }
+      const colliders: AssetJointDynamicsCollider[] = [];
+      const flatPlanes: AssetJointDynamicsFlatPlane[] = [];
+      for (const group of spring.colliderGroups) {
+        for (const collider of group.colliders) {
+          const converted = colliderMap.get(collider);
+          if (converted && colliders.indexOf(converted) < 0) {
+            colliders.push(converted);
+          }
+          const flatPlane = flatPlaneMap.get(collider);
+          if (flatPlane && flatPlanes.indexOf(flatPlane) < 0) {
+            flatPlanes.push(flatPlane);
+          }
+        }
+      }
+      model.jointDynamicsSpringBones.push({
+        name: spring.name,
+        center: spring.center,
+        chains,
+        colliders,
+        flatPlanes,
+        controllerConfig: this._mapSpringJointsToControllerConfig(spring.joints)
+      });
+    }
+  }
+
+  private _collectJointDynamicsChains(joints: AssetSpringBoneJoint[]) {
+    const chains: { start: AssetHierarchyNode; end: AssetHierarchyNode }[] = [];
+    if (joints.length === 0) {
+      return chains;
+    }
+    if (joints.length === 1) {
+      const start = joints[0].node;
+      const end = this._findSingleChildChainEnd(start);
+      if (end && end !== start) {
+        chains.push({ start, end });
+      }
+      return chains;
+    }
+    for (let i = 0; i < joints.length - 1; i++) {
+      const parent = joints[i].node;
+      const child = joints[i + 1].node;
+      if (!parent.isParentOf(child)) {
+        return [];
+      }
+    }
+    chains.push({ start: joints[0].node, end: joints[joints.length - 1].node });
+    return chains;
+  }
+
+  private _collectJointDynamicsChainsFromRoots(rootBones: AssetHierarchyNode[]) {
+    const chains: { start: AssetHierarchyNode; end: AssetHierarchyNode }[] = [];
+    for (const start of rootBones) {
+      const end = this._findSingleChildChainEnd(start);
+      if (end && end !== start) {
+        chains.push({ start, end });
+      }
+    }
+    return chains;
+  }
+
+  private _findSingleChildChainEnd(start: AssetHierarchyNode): AssetHierarchyNode {
+    let current = start;
+    while (current.children.length > 0) {
+      if (current.children.length !== 1) {
+        return null;
+      }
+      current = current.children[0];
+    }
+    return current;
+  }
+
+  private _mapSpringJointsToControllerConfig(joints: AssetSpringBoneJoint[]) {
+    let stiffness = 0;
+    let dragForce = 0;
+    let hitRadius = 0;
+    const gravity = Vector3.zero();
+    for (const joint of joints) {
+      stiffness += joint.stiffness;
+      dragForce += joint.dragForce;
+      hitRadius = Math.max(hitRadius, joint.hitRadius);
+      const gravityDir =
+        joint.gravityDir.magnitudeSq > 0 ? Vector3.normalize(joint.gravityDir) : new Vector3(0, -1, 0);
+      Vector3.add(gravity, Vector3.scale(gravityDir, Math.max(0, joint.gravityPower)), gravity);
+    }
+    const invCount = joints.length > 0 ? 1 / joints.length : 1;
+    stiffness *= invCount;
+    dragForce *= invCount;
+    Vector3.scale(gravity, invCount, gravity);
+    return {
+      gravity,
+      curves: {
+        hardness: InterpolatorScalar.constant(Math.max(0, Math.min(1, stiffness * 0.002))),
+        resistance: InterpolatorScalar.constant(Math.max(0, Math.min(1, 1 - dragForce))),
+        pointRadius: InterpolatorScalar.constant(Math.max(0, hitRadius))
+      },
+      constraintOptions: {
+        structuralVertical: true,
+        bendingVertical: true
+      }
+    };
+  }
+
+  private _toJointDynamicsCollider(collider: AssetSpringBoneCollider): AssetJointDynamicsCollider {
+    const shape = collider.shape;
+    if (shape.type === 'plane') {
+      return null;
+    }
+    if (shape.type === 'sphere') {
+      return {
+        name: collider.name,
+        node: collider.node,
+        localPosition: shape.offset.clone(),
+        localRotation: Quaternion.identity(),
+        collider: {
+          radius: shape.radius,
+          radiusTailScale: 1,
+          height: 0,
+          friction: 0,
+          isInverseCollider: shape.inside ?? false,
+          forceType: ColliderForce.Off
+        }
+      };
+    }
+    const localDirection = Vector3.sub(shape.tail, shape.offset);
+    const height = localDirection.magnitude;
+    const localRotation =
+      height > 0 ? Quaternion.unitVectorToUnitVector(Vector3.axisPY(), localDirection) : Quaternion.identity();
+    const localPosition = Vector3.scale(Vector3.add(shape.offset, shape.tail), 0.5);
+    return {
+      name: collider.name,
+      node: collider.node,
+      localPosition,
+      localRotation,
+      collider: {
+        radius: shape.radius,
+        radiusTailScale: 1,
+        height,
+        friction: 0,
+        isInverseCollider: shape.inside ?? false,
+        forceType: ColliderForce.Off
+      }
+    };
+  }
+
+  private _toJointDynamicsFlatPlane(collider: AssetSpringBoneCollider): AssetJointDynamicsFlatPlane {
+    const shape = collider.shape;
+    if (shape.type !== 'plane') {
+      return null;
+    }
+    return {
+      node: collider.node,
+      position: shape.offset.clone(),
+      up: shape.normal.magnitudeSq > 0 ? Vector3.normalize(shape.normal) : Vector3.axisPY()
+    };
+  }
+
   /** @internal */
   private _loadNodes(gltf: GLTFContent, model: SharedModel) {
     if (gltf.nodes) {

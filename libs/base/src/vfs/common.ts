@@ -294,6 +294,7 @@ export function guessMimeType(path: string) {
     '.obj': 'model/obj',
     '.gltf': 'model/gltf+json',
     '.glb': 'model/gltf-binary',
+    '.vrm': 'model/gltf-binary',
     '.ktx': 'image/ktx',
     '.ktx2': 'image/ktx2',
     // zephyr3d specific

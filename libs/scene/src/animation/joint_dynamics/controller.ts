@@ -117,6 +117,12 @@ export interface JointDynamicsColliderHandle {
   readonly id: number;
 }
 
+/** Stable runtime handle for a JointDynamics flat plane. */
+export interface JointDynamicsFlatPlaneHandle {
+  readonly type: 'flatPlane';
+  readonly id: number;
+}
+
 /** Stable runtime handle for a JointDynamics grabber. */
 export interface JointDynamicsGrabberHandle {
   readonly type: 'grabber';
@@ -134,6 +140,8 @@ export class JointDynamicsSystemController {
   private _grabbersRW: GrabberRW[] = [];
   private _movableLimitTargets: Vector3[] = [];
   private _flatPlanes: FlatPlane[] = [];
+  private _flatPlaneEnabled: boolean[] = [];
+  private _flatPlaneAll: FlatPlane[] = [];
   private _surfaceConstraints: number[] = [];
   private _positionsToTransform: Vector3[] = [];
   private _fakeWaveCounter = 0;
@@ -144,10 +152,13 @@ export class JointDynamicsSystemController {
   private _colliderTransforms: TransformAccess[] = [];
   private _grabberTransforms: TransformAccess[] = [];
   private _colliderHandleIds: number[] = [];
+  private _flatPlaneHandleIds: number[] = [];
   private _grabberHandleIds: number[] = [];
   private _colliderHandleToIndex = new Map<number, number>();
+  private _flatPlaneHandleToIndex = new Map<number, number>();
   private _grabberHandleToIndex = new Map<number, number>();
   private _nextColliderHandleId = 1;
+  private _nextFlatPlaneHandleId = 1;
   private _nextGrabberHandleId = 1;
   private _initialized = false;
   private _isPaused = false;
@@ -257,6 +268,10 @@ export class JointDynamicsSystemController {
       normal: Vector3.normalize(fp.up),
       distance: -Vector3.dot(Vector3.normalize(fp.up), fp.position)
     }));
+    this._flatPlaneAll = [...this._flatPlanes];
+    this._flatPlaneEnabled = this._flatPlaneAll.map(() => true);
+    this._flatPlaneHandleIds = this._flatPlaneAll.map(() => this._nextFlatPlaneHandleId++);
+    this._rebuildFlatPlaneHandleMap();
 
     // Capture initial state
     this._previousRootPosition = rootTransform.getWorldPosition();
@@ -611,6 +626,77 @@ export class JointDynamicsSystemController {
   }
 
   /**
+   * Enable or disable a flat plane by current array index.
+   * Prefer setFlatPlaneEnabled(handle, enabled) for runtime-owned flat planes.
+   */
+  setFlatPlaneEnabledAt(index: number, enabled: boolean): boolean {
+    if (index < 0 || index >= this._flatPlaneAll.length) {
+      return false;
+    }
+    this._flatPlaneEnabled[index] = enabled;
+    this._rebuildActiveFlatPlanes();
+    return true;
+  }
+
+  /**
+   * Enable or disable a runtime flat plane by stable handle.
+   * @returns true if the handle is still valid.
+   */
+  setFlatPlaneEnabled(handle: JointDynamicsFlatPlaneHandle, enabled: boolean): boolean {
+    const index = this._getFlatPlaneIndex(handle);
+    if (index === -1) {
+      return false;
+    }
+    return this.setFlatPlaneEnabledAt(index, enabled);
+  }
+
+  /**
+   * Add a flat plane at runtime.
+   * @returns A stable handle that remains valid until this flat plane is removed.
+   */
+  addFlatPlane(up: Vector3, position: Vector3): JointDynamicsFlatPlaneHandle {
+    const id = this._nextFlatPlaneHandleId++;
+    const normal = Vector3.normalize(up);
+    this._flatPlaneAll.push({
+      normal,
+      distance: -Vector3.dot(normal, position)
+    });
+    this._flatPlaneEnabled.push(true);
+    this._flatPlaneHandleIds.push(id);
+    this._flatPlaneHandleToIndex.set(id, this._flatPlaneAll.length - 1);
+    this._rebuildActiveFlatPlanes();
+    return { type: 'flatPlane', id };
+  }
+
+  /**
+   * Remove a flat plane by stable handle.
+   * @returns true if the flat plane existed and was removed.
+   */
+  removeFlatPlane(handle: JointDynamicsFlatPlaneHandle): boolean {
+    const index = this._getFlatPlaneIndex(handle);
+    if (index === -1) {
+      return false;
+    }
+    return this.removeFlatPlaneAt(index);
+  }
+
+  /**
+   * Remove a flat plane by current array index.
+   * Prefer removeFlatPlane(handle) for runtime-owned flat planes.
+   */
+  removeFlatPlaneAt(index: number): boolean {
+    if (index < 0 || index >= this._flatPlaneAll.length) {
+      return false;
+    }
+    this._flatPlaneAll.splice(index, 1);
+    this._flatPlaneEnabled.splice(index, 1);
+    this._flatPlaneHandleIds.splice(index, 1);
+    this._rebuildFlatPlaneHandleMap();
+    this._rebuildActiveFlatPlanes();
+    return true;
+  }
+
+  /**
    * Enable or disable a grabber by current array index.
    * Transform state is still read from the grabber's TransformAccess each frame.
    * Prefer setGrabberEnabled(handle, enabled) for runtime-owned grabbers.
@@ -695,6 +781,11 @@ export class JointDynamicsSystemController {
     return this._collidersR.length;
   }
 
+  /** Gets the number of runtime flat planes. */
+  get flatPlaneCount(): number {
+    return this._flatPlaneAll.length;
+  }
+
   /** Gets the number of runtime grabbers. */
   get grabberCount(): number {
     return this._grabbersR.length;
@@ -724,6 +815,13 @@ export class JointDynamicsSystemController {
     return this._grabberHandleToIndex.get(handle.id) ?? -1;
   }
 
+  private _getFlatPlaneIndex(handle: JointDynamicsFlatPlaneHandle): number {
+    if (handle.type !== 'flatPlane') {
+      return -1;
+    }
+    return this._flatPlaneHandleToIndex.get(handle.id) ?? -1;
+  }
+
   private _releaseGrabber(index: number): void {
     for (const ptRW of this._pointsRW) {
       if (ptRW.grabberIndex === index) {
@@ -737,6 +835,22 @@ export class JointDynamicsSystemController {
     this._colliderHandleToIndex.clear();
     for (let i = 0; i < this._colliderHandleIds.length; i++) {
       this._colliderHandleToIndex.set(this._colliderHandleIds[i], i);
+    }
+  }
+
+  private _rebuildFlatPlaneHandleMap(): void {
+    this._flatPlaneHandleToIndex.clear();
+    for (let i = 0; i < this._flatPlaneHandleIds.length; i++) {
+      this._flatPlaneHandleToIndex.set(this._flatPlaneHandleIds[i], i);
+    }
+  }
+
+  private _rebuildActiveFlatPlanes(): void {
+    this._flatPlanes = [];
+    for (let i = 0; i < this._flatPlaneAll.length; i++) {
+      if (this._flatPlaneEnabled[i]) {
+        this._flatPlanes.push(this._flatPlaneAll[i]);
+      }
     }
   }
 

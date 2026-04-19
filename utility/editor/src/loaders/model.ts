@@ -1,4 +1,4 @@
-import type { TypedArray, Interpolator, VFS, Nullable } from '@zephyr3d/base';
+import type { TypedArray, Interpolator, VFS, Nullable, DeepPartial } from '@zephyr3d/base';
 import { ASSERT, DRef, uint8ArrayToBase64, Vector4 } from '@zephyr3d/base';
 import { Disposable, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type {
@@ -11,7 +11,7 @@ import type {
   VertexSemantic
 } from '@zephyr3d/device';
 import { getVertexFormatComponentCount } from '@zephyr3d/device';
-import type { MeshMaterial, ResourceManager } from '@zephyr3d/scene';
+import type { ColliderR, ControllerConfig, MeshMaterial, ResourceManager } from '@zephyr3d/scene';
 import { Scene } from '@zephyr3d/scene';
 import {
   PBRMetallicRoughnessMaterial,
@@ -538,6 +538,82 @@ export class AssetScene extends NamedObject {
   }
 }
 
+export type AssetSpringBoneColliderShape =
+  | {
+      type: 'sphere';
+      offset: Vector3;
+      radius: number;
+      inside?: boolean;
+    }
+  | {
+      type: 'capsule';
+      offset: Vector3;
+      tail: Vector3;
+      radius: number;
+      inside?: boolean;
+    }
+  | {
+      type: 'plane';
+      offset: Vector3;
+      normal: Vector3;
+    };
+
+export interface AssetSpringBoneCollider {
+  name?: string;
+  node: AssetHierarchyNode;
+  shape: AssetSpringBoneColliderShape;
+}
+
+export interface AssetSpringBoneColliderGroup {
+  name?: string;
+  colliders: AssetSpringBoneCollider[];
+}
+
+export interface AssetSpringBoneJoint {
+  node: AssetHierarchyNode;
+  hitRadius: number;
+  stiffness: number;
+  gravityPower: number;
+  gravityDir: Vector3;
+  dragForce: number;
+}
+
+export interface AssetSpringBone {
+  name?: string;
+  center?: AssetHierarchyNode;
+  joints: AssetSpringBoneJoint[];
+  rootBones?: AssetHierarchyNode[];
+  colliderGroups: AssetSpringBoneColliderGroup[];
+}
+
+export interface AssetJointDynamicsCollider {
+  name?: string;
+  node: AssetHierarchyNode;
+  localPosition: Vector3;
+  localRotation: Quaternion;
+  collider: ColliderR;
+}
+
+export interface AssetJointDynamicsChain {
+  start: AssetHierarchyNode;
+  end: AssetHierarchyNode;
+}
+
+export interface AssetJointDynamicsFlatPlane {
+  node: AssetHierarchyNode;
+  position: Vector3;
+  up: Vector3;
+}
+
+export interface AssetJointDynamicsSpringBone {
+  name?: string;
+  center?: AssetHierarchyNode;
+  chains: AssetJointDynamicsChain[];
+  controllerConfig: DeepPartial<ControllerConfig, 2>;
+  colliders: AssetJointDynamicsCollider[];
+  flatPlanes: AssetJointDynamicsFlatPlane[];
+}
+
 export type SaveOptions = {
   importMeshes: boolean;
   importSkeletons: boolean;
@@ -569,6 +645,16 @@ export class SharedModel extends Disposable {
   private _primitiveList: AssetPrimitiveInfo[];
   /** @internal */
   private _materialList: Record<string, AssetMaterial>;
+  /** @internal */
+  private _springBoneColliders: AssetSpringBoneCollider[];
+  /** @internal */
+  private _springBoneColliderGroups: AssetSpringBoneColliderGroup[];
+  /** @internal */
+  private _springBones: AssetSpringBone[];
+  /** @internal */
+  private _jointDynamicsColliders: AssetJointDynamicsCollider[];
+  /** @internal */
+  private _jointDynamicsSpringBones: AssetJointDynamicsSpringBone[];
   /**
    * Creates an instance of SharedModel
    * @param name - Name of the model
@@ -584,6 +670,11 @@ export class SharedModel extends Disposable {
     this._imageList = [];
     this._primitiveList = [];
     this._materialList = {};
+    this._springBoneColliders = [];
+    this._springBoneColliderGroups = [];
+    this._springBones = [];
+    this._jointDynamicsColliders = [];
+    this._jointDynamicsSpringBones = [];
     this._activeScene = -1;
   }
   /** VFS */
@@ -612,6 +703,26 @@ export class SharedModel extends Disposable {
   /** All skeletons that the model contains */
   get skeletons(): AssetSkeleton[] {
     return this._skeletons;
+  }
+  /** All SpringBone colliders that the model contains */
+  get springBoneColliders(): AssetSpringBoneCollider[] {
+    return this._springBoneColliders;
+  }
+  /** All SpringBone collider groups that the model contains */
+  get springBoneColliderGroups(): AssetSpringBoneColliderGroup[] {
+    return this._springBoneColliderGroups;
+  }
+  /** All SpringBone springs that the model contains */
+  get springBones(): AssetSpringBone[] {
+    return this._springBones;
+  }
+  /** SpringBone colliders converted to Zephyr3D JointDynamics collider format */
+  get jointDynamicsColliders(): AssetJointDynamicsCollider[] {
+    return this._jointDynamicsColliders;
+  }
+  /** SpringBone springs converted to Zephyr3D JointDynamics system format */
+  get jointDynamicsSpringBones(): AssetJointDynamicsSpringBone[] {
+    return this._jointDynamicsSpringBones;
   }
   /** The active scene of the model */
   get activeScene(): number {
