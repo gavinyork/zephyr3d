@@ -413,7 +413,16 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   async createIR(editor: NodeEditor) {
     const state = await editor.saveState();
-    const dag = this.createDAG(editor);
+    let dag: Nullable<BlueprintDAG> = null;
+    try {
+      dag = this.createDAG(editor);
+    } catch (err) {
+      console.error(`Create blueprint DAG failed: ${err}`);
+      return null;
+    }
+    if (!dag) {
+      return null;
+    }
     for (const [, v] of editor.nodes) {
       v.impl.reset();
     }
@@ -424,11 +433,16 @@ export class PBRMaterialEditor extends GraphEditor {
         return null;
       }
     }
-    const ir = new MaterialBlueprintIR(dag, randomUUID(), state);
-    if (!ir.ok) {
+    try {
+      const ir = new MaterialBlueprintIR(dag, randomUUID(), state);
+      if (!ir.ok) {
+        return null;
+      }
+      return ir;
+    } catch (err) {
+      console.error(`Build MaterialBlueprintIR failed: ${err}`);
       return null;
     }
-    return ir;
   }
   createDAG(editor: NodeEditor): BlueprintDAG {
     const nodeMap: Record<number, IGraphNode> = {};

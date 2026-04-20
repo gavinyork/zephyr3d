@@ -9,6 +9,7 @@ import {
   getPunctualLightClass,
   getDirectionalLightClass,
   getSpotLightClass,
+  getRectLightClass,
   getPointLightClass
 } from './scene/light';
 import {
@@ -78,6 +79,7 @@ import {
   ConstantTexture2DArrayNode,
   ConstantTexture2DNode,
   ConstantTextureCubeNode,
+  PannerNode,
   TextureSampleNode
 } from '../blueprint/material/texture';
 import {
@@ -147,15 +149,19 @@ import {
   NotEqualNode,
   LogicallyAndNode,
   LogicallyOrNode,
-  SmoothStepNode
+  SmoothStepNode,
+  RotateAboutAxisNode
 } from '../blueprint/common/math';
 import {
   BillboardMatrixNode,
   CameraNearFarNode,
   CameraPositionNode,
+  CameraVectorNode,
   ElapsedTimeNode,
   InvProjMatrixNode,
   InvViewProjMatrixNode,
+  PixelNormalNode,
+  PixelWorldPositionNode,
   ProjectionMatrixNode,
   ResolveVertexNormalNode,
   ResolveVertexPositionNode,
@@ -272,6 +278,7 @@ export class ResourceManager {
         getPunctualLightClass(),
         getDirectionalLightClass(),
         getSpotLightClass(),
+        getRectLightClass(),
         getPointLightClass(),
         getCameraClass(),
         getPerspectiveCameraClass(),
@@ -363,6 +370,7 @@ export class ResourceManager {
         MixNode.getSerializationCls(),
         NormalizeNode.getSerializationCls(),
         TransformNode.getSerializationCls(),
+        RotateAboutAxisNode.getSerializationCls(),
         FaceForwardNode.getSerializationCls(),
         ReflectNode.getSerializationCls(),
         RefractNode.getSerializationCls(),
@@ -378,7 +386,9 @@ export class ResourceManager {
         VertexColorNode.getSerializationCls(),
         VertexUVNode.getSerializationCls(),
         VertexPositionNode.getSerializationCls(),
+        PixelWorldPositionNode.getSerializationCls(),
         VertexNormalNode.getSerializationCls(),
+        PixelNormalNode.getSerializationCls(),
         VertexTangentNode.getSerializationCls(),
         VertexBinormalNode.getSerializationCls(),
         ViewMatrixNode.getSerializationCls(),
@@ -388,6 +398,7 @@ export class ResourceManager {
         InvViewProjMatrixNode.getSerializationCls(),
         BillboardMatrixNode.getSerializationCls(),
         CameraPositionNode.getSerializationCls(),
+        CameraVectorNode.getSerializationCls(),
         CameraNearFarNode.getSerializationCls(),
         SkyEnvTextureNode.getSerializationCls(),
         ElapsedTimeNode.getSerializationCls(),
@@ -400,6 +411,7 @@ export class ResourceManager {
         FunctionInputNode.getSerializationCls(),
         FunctionOutputNode.getSerializationCls(),
         FunctionCallNode.getSerializationCls(this),
+        PannerNode.getSerializationCls(),
         TextureSampleNode.getSerializationCls()
       ].map((val) => [val.ctor, val])
     );
