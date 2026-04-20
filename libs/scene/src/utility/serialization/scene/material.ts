@@ -1,5 +1,5 @@
 import type { FaceMode, Texture2D } from '@zephyr3d/device';
-import type { BlendMode } from '../../../material';
+import type { BlendMode, PBRReflectionMode } from '../../../material';
 import {
   BlinnMaterial,
   LambertMaterial,
@@ -13,7 +13,7 @@ import {
 } from '../../../material';
 import { defineProps, type PropertyAccessor, type SerializableClass } from '../types';
 import type { Nullable } from '@zephyr3d/base';
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { getTextureProps } from './common';
 import type { ResourceManager } from '../manager';
 import { getMeshMaterialInstanceUniformsClass } from './common';
@@ -1043,6 +1043,222 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
               return this.$isInstance ? this.coreMaterial.specularFactor : [1, 1, 1, 1];
             }
           },
+          {
+            name: 'Reflection',
+            type: 'string',
+            default: 'ggx',
+            options: {
+              enum: {
+                labels: ['None', 'GGX', 'Anisotropic', 'Glint'],
+                values: ['none', 'ggx', 'anisotropic', 'glint']
+              }
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.str[0] = this.reflectionMode;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              this.reflectionMode = value.str[0] as PBRReflectionMode;
+            },
+            getDefaultValue(this: PBRMetallicRoughnessMaterial) {
+              return this.$isInstance ? this.coreMaterial.reflectionMode : 'ggx';
+            }
+          },
+          {
+            name: 'Anisotropy',
+            type: 'float',
+            default: 0.75,
+            options: {
+              animatable: true,
+              minValue: -0.95,
+              maxValue: 0.95
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.anisotropy;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              this.anisotropy = value.num[0];
+            },
+            getDefaultValue(this: PBRMetallicRoughnessMaterial) {
+              return this.$isInstance ? this.coreMaterial.anisotropy : 0.75;
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return this.reflectionMode === 'anisotropic';
+            }
+          },
+          {
+            name: 'AnisotropyDirection',
+            type: 'float',
+            default: 0,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 360
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.anisotropyDirection;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              this.anisotropyDirection = value.num[0];
+            },
+            getDefaultValue(this: PBRMetallicRoughnessMaterial) {
+              return this.$isInstance ? this.coreMaterial.anisotropyDirection : 0;
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return this.reflectionMode === 'anisotropic';
+            }
+          },
+          ...getTextureProps<PBRMetallicRoughnessMaterial>(
+            manager,
+            'anisotropyDirectionTexture',
+            '2D',
+            false,
+            0,
+            function () {
+              return this.reflectionMode === 'anisotropic';
+            }
+          ),
+          {
+            name: 'AnisotropyDirectionScaleBias',
+            type: 'vec2',
+            default: [1, 0],
+            options: {
+              animatable: true
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.anisotropyDirectionScaleBias.x;
+              value.num[1] = this.anisotropyDirectionScaleBias.y;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              this.anisotropyDirectionScaleBias = new Vector2(value.num[0], value.num[1]);
+            },
+            getDefaultValue(this: PBRMetallicRoughnessMaterial) {
+              return this.$isInstance ? this.coreMaterial.anisotropyDirectionScaleBias : [1, 0];
+            },
+            isValid() {
+              return (
+                !this.$isInstance &&
+                this.reflectionMode === 'anisotropic' &&
+                !!this.anisotropyDirectionTexture
+              );
+            }
+          },
+          {
+            name: 'SubsurfaceScattering',
+            type: 'bool',
+            phase: 0,
+            default: false,
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.bool[0] = this.subsurfaceScattering;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              this.subsurfaceScattering = value.bool[0];
+            },
+            isValid() {
+              return !this.$isInstance;
+            }
+          },
+          {
+            name: 'SubsurfaceColor',
+            type: 'rgb',
+            phase: 1,
+            default: [1, 0.3, 0.2],
+            options: {
+              animatable: true
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceColor.x;
+              value.num[1] = this.subsurfaceColor.y;
+              value.num[2] = this.subsurfaceColor.z;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              this.subsurfaceColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+            },
+            getDefaultValue(this: PBRMetallicRoughnessMaterial) {
+              return this.$isInstance ? this.coreMaterial.subsurfaceColor : [1, 0.3, 0.2];
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return this.subsurfaceScattering;
+            }
+          },
+          {
+            name: 'SubsurfaceScale',
+            type: 'float',
+            phase: 1,
+            default: 0.5,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 8
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceScale;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              this.subsurfaceScale = value.num[0];
+            },
+            getDefaultValue(this: PBRMetallicRoughnessMaterial) {
+              return this.$isInstance ? this.coreMaterial.subsurfaceScale : 0.5;
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return this.subsurfaceScattering;
+            }
+          },
+          {
+            name: 'SubsurfacePower',
+            type: 'float',
+            phase: 1,
+            default: 1.5,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 16
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfacePower;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              this.subsurfacePower = value.num[0];
+            },
+            getDefaultValue(this: PBRMetallicRoughnessMaterial) {
+              return this.$isInstance ? this.coreMaterial.subsurfacePower : 1.5;
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return this.subsurfaceScattering;
+            }
+          },
+          {
+            name: 'SubsurfaceIntensity',
+            type: 'float',
+            phase: 1,
+            default: 0.5,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 4
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceIntensity;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              this.subsurfaceIntensity = value.num[0];
+            },
+            getDefaultValue(this: PBRMetallicRoughnessMaterial) {
+              return this.$isInstance ? this.coreMaterial.subsurfaceIntensity : 0.5;
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return this.subsurfaceScattering;
+            }
+          },
+          ...getTextureProps<PBRMetallicRoughnessMaterial>(
+            manager,
+            'subsurfaceTexture',
+            '2D',
+            false,
+            1,
+            function () {
+              return this.subsurfaceScattering;
+            }
+          ),
           ...getTextureProps<PBRMetallicRoughnessMaterial>(
             manager,
             'metallicRoughnessTexture',

@@ -2,7 +2,7 @@ import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } f
 import {
   LIGHT_TYPE_DIRECTIONAL,
   LIGHT_TYPE_POINT,
-  LIGHT_TYPE_SPOT,
+  LIGHT_TYPE_RECT,
   RENDER_PASS_TYPE_LIGHT
 } from '../../values';
 import type { DrawContext } from '../../render';
@@ -80,6 +80,7 @@ export type IMixinLight = {
       posRange: PBShaderExp,
       dirCutoff: PBShaderExp,
       colorIntensity: PBShaderExp,
+      extra: PBShaderExp,
       shadow: boolean
     ) => void
   ): void;
@@ -549,7 +550,11 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         scope.$choice(
           pb.equal(type, LIGHT_TYPE_POINT),
           this.calculatePointLightAttenuation(scope, worldPos.xyz, posRange),
-          this.calculateSpotLightAttenuation(scope, worldPos.xyz, posRange, dirCutoff)
+          scope.$choice(
+            pb.equal(type, LIGHT_TYPE_RECT),
+            this.calculatePointLightAttenuation(scope, worldPos.xyz, posRange),
+            this.calculateSpotLightAttenuation(scope, worldPos.xyz, posRange, dirCutoff)
+          )
         )
       );
     }
@@ -575,6 +580,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         posRange: PBShaderExp,
         dirCutoff: PBShaderExp,
         colorIntensity: PBShaderExp,
+        extra: PBShaderExp,
         shadow: boolean
       ) => void
     ) {
@@ -588,13 +594,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         const posRange = scope.light.positionAndRange;
         const dirCutoff = scope.light.directionAndCutoff;
         const colorIntensity = scope.light.diffuseAndIntensity;
+        const extra = scope.light.extraParams ?? pb.vec4(0);
         scope.$scope(function () {
-          const lightType = scope.$choice(
-            pb.lessThan(posRange.w, 0),
-            pb.int(LIGHT_TYPE_DIRECTIONAL),
-            scope.$choice(pb.lessThan(dirCutoff.w, 0), pb.int(LIGHT_TYPE_POINT), pb.int(LIGHT_TYPE_SPOT))
-          );
-          callback.call(this, lightType, posRange, dirCutoff, colorIntensity, true);
+          const lightType = pb.int(extra.w);
+          callback.call(this, lightType, posRange, dirCutoff, colorIntensity, extra, true);
         });
       } else {
         scope.$scope(function () {
@@ -642,15 +645,8 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                       this.$l.positionRange = ShaderHelper.getLightPositionAndRange(this, this.j);
                       this.$l.directionCutoff = ShaderHelper.getLightDirectionAndCutoff(this, this.j);
                       this.$l.diffuseIntensity = ShaderHelper.getLightColorAndIntensity(this, this.j);
-                      this.$l.lightType = this.$choice(
-                        pb.lessThan(this.positionRange.w, 0),
-                        pb.int(LIGHT_TYPE_DIRECTIONAL),
-                        this.$choice(
-                          pb.lessThan(this.directionCutoff.w, 0),
-                          pb.int(LIGHT_TYPE_POINT),
-                          pb.int(LIGHT_TYPE_SPOT)
-                        )
-                      );
+                      this.$l.extra = ShaderHelper.getLightExtra(this, this.j);
+                      this.$l.lightType = pb.int(this.extra.w);
                       this.$scope(function () {
                         callback.call(
                           this,
@@ -658,6 +654,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                           this.positionRange,
                           this.directionCutoff,
                           this.diffuseIntensity,
+                          this.extra,
                           false
                         );
                       });
@@ -675,15 +672,8 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                   this.$l.positionRange = ShaderHelper.getLightPositionAndRange(this, this.c);
                   this.$l.directionCutoff = ShaderHelper.getLightDirectionAndCutoff(this, this.c);
                   this.$l.diffuseIntensity = ShaderHelper.getLightColorAndIntensity(this, this.c);
-                  this.$l.lightType = this.$choice(
-                    pb.lessThan(this.positionRange.w, 0),
-                    pb.int(LIGHT_TYPE_DIRECTIONAL),
-                    this.$choice(
-                      pb.lessThan(this.directionCutoff.w, 0),
-                      pb.int(LIGHT_TYPE_POINT),
-                      pb.int(LIGHT_TYPE_SPOT)
-                    )
-                  );
+                  this.$l.extra = ShaderHelper.getLightExtra(this, this.c);
+                  this.$l.lightType = pb.int(this.extra.w);
                   this.$scope(function () {
                     callback.call(
                       this,
@@ -691,6 +681,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                       this.positionRange,
                       this.directionCutoff,
                       this.diffuseIntensity,
+                      this.extra,
                       false
                     );
                   });

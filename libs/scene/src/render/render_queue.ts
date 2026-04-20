@@ -72,6 +72,7 @@ export class InstanceBindGroupAllocator {
 }
 
 const defaultInstanceBindGroupAlloator = new InstanceBindGroupAllocator();
+const tmpDrawablePos = new Vector3();
 
 /**
  * Instance data
@@ -602,7 +603,7 @@ export class RenderQueue extends Disposable {
   }
 
   private drawableDistanceToCamera(drawable: Drawable, cameraPos: Vector3) {
-    const drawablePos = drawable.getNode().position;
+    const drawablePos = drawable.getNode().getWorldPosition(tmpDrawablePos);
     return Vector3.distanceSq(drawablePos, cameraPos);
   }
   private newRenderItemListInfo() {

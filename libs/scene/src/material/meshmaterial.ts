@@ -939,7 +939,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
               pb.discard();
             });
           }
-          if (!that.drawContext.oit || that.drawContext.oit.wantsPremultipliedAlpha()) {
+          if (that.drawContext.oit && that.drawContext.lightBlending) {
+            // For OIT with multi-light decomposition, keep additive light passes
+            // color-only to avoid duplicating per-fragment transmittance.
+            this.outColor = pb.vec4(this.outColor.rgb, 0);
+          } else if (!that.drawContext.oit || that.drawContext.oit.wantsPremultipliedAlpha()) {
             this.outColor = pb.vec4(
               pb.mul(this.outColor.rgb, this.outColor.a),
               that.featureUsed<BlendMode>(FEATURE_ALPHABLEND) === 'additive' ? 0 : this.outColor.a
@@ -1030,8 +1034,19 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       pb.getGlobalScope()[funcName](worldPos);
     }
     if (that.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
-      scope.$outputs.zSSRRoughness = ssrRoughness ?? pb.vec4(1, 0, 0, 1);
-      scope.$outputs.zSSRNormal = ssrNormal ?? pb.vec4(0);
+      // Transparent/blended passes (and materials that depend on scene color like transmission)
+      // do not have a stable depth match for SSR, so force-disable SSR contribution on those pixels.
+      const disableSSR =
+        that.isTransparentPass(that.pass) && that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT;
+      const disableSceneColorSSR =
+        that.needSceneColor() && that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT;
+      if (disableSSR || disableSceneColorSSR) {
+        scope.$outputs.zSSRRoughness = pb.vec4(0, 0, 0, 1);
+        scope.$outputs.zSSRNormal = pb.vec4(0);
+      } else {
+        scope.$outputs.zSSRRoughness = ssrRoughness ?? pb.vec4(1, 0, 0, 1);
+        scope.$outputs.zSSRNormal = ssrNormal ?? pb.vec4(0);
+      }
     }
   }
 }

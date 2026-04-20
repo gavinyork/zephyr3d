@@ -10,6 +10,7 @@ import type { MaterialBlueprintIR } from '../../../utility/blueprint/material/ir
 import { ShaderHelper } from '../../shader/helper';
 import type { DrawContext } from '../../../render';
 import { getGGXLUT } from '../../../utility/textures/ggxlut';
+import { LIGHT_TYPE_POINT, LIGHT_TYPE_RECT } from '../../../values';
 
 /**
  * Interface for mixinPBRBluePrint lighting model mixin
@@ -54,6 +55,9 @@ export type IMixinPBRBluePrint = {
     lightColor: PBShaderExp,
     viewVec: PBShaderExp,
     commonData: PBShaderExp,
+    diffuseScale: PBShaderExp,
+    specularScale: PBShaderExp,
+    sourceRadiusFactor: PBShaderExp,
     outColor: PBShaderExp
   ): void;
   indirectLighting(
@@ -153,30 +157,110 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           } else {
             that.indirectLighting(this, this.viewVec, this.pbrData, this.lightingColor);
           }
-          that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
-            this.$l.diffuse = pb.vec3();
-            this.$l.specular = pb.vec3();
-            this.$l.lightAtten = that.calculateLightAttenuation(
-              this,
-              type,
-              this.worldPos,
-              posRange,
-              dirCutoff
-            );
-            this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
-            this.$l.NoL = pb.clamp(pb.dot(this.pbrData.normal, this.lightDir), 0, 1);
-            this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
-            if (shadow) {
-              this.lightColor = pb.mul(this.lightColor, that.calculateShadow(this, this.worldPos, this.NoL));
-            }
-            that.directLighting(
-              this,
-              this.lightDir,
-              this.lightColor,
-              this.viewVec,
-              this.pbrData,
-              this.lightingColor
-            );
+          that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
+            this.$if(pb.equal(type, LIGHT_TYPE_RECT), function () {
+              this.$l.center = posRange.xyz;
+              this.$l.range = posRange.w;
+              this.$l.ax = dirCutoff.xyz;
+              this.$l.ay = extra.xyz;
+              this.$l.halfWidth = pb.length(this.ax);
+              this.$l.halfHeight = pb.length(this.ay);
+              this.$l.area = pb.mul(this.halfWidth, this.halfHeight, 4);
+              this.$l.lightNormal = pb.normalize(pb.cross(this.ax, this.ay));
+              this.lightNormal = pb.neg(this.lightNormal);
+              this.$if(pb.greaterThan(this.area, 0), function () {
+                this.$l.baseColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.area, 0.25);
+                this.$l.samplePos = pb.vec3();
+                this.$l.Lvec = pb.vec3();
+                this.$l.L = pb.vec3();
+                this.$l.dist = pb.float();
+                this.$l.invDist2 = pb.float();
+                this.$l.NoL = pb.float();
+                this.$l.NoL_light = pb.float();
+                this.$l.falloff = pb.float();
+                this.$l.atten = pb.float();
+                this.$l.lightColor = pb.vec3();
+
+                const sample = (u: number, v: number) => {
+                  this.samplePos = pb.add(
+                    this.center,
+                    pb.add(pb.mul(this.ax, pb.sub(pb.mul(u, 2), 1)), pb.mul(this.ay, pb.sub(pb.mul(v, 2), 1)))
+                  );
+                  this.Lvec = pb.sub(this.samplePos, this.worldPos);
+                  this.dist = pb.length(this.Lvec);
+                  this.invDist2 = pb.div(1, pb.max(pb.mul(this.dist, this.dist), 0.0001));
+                  this.L = pb.normalize(this.Lvec);
+                  this.NoL = pb.clamp(pb.dot(this.pbrData.normal, this.L), 0, 1);
+                  this.NoL_light = pb.clamp(pb.dot(this.lightNormal, pb.neg(this.L)), 0, 1);
+                  this.$if(pb.greaterThan(this.NoL_light, 0), function () {
+                    this.falloff = pb.float(1);
+                    this.$if(pb.greaterThan(this.range, 0), function () {
+                      this.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.range)));
+                      this.falloff = pb.mul(this.falloff, this.falloff);
+                    });
+                    this.atten = pb.mul(this.invDist2, this.NoL_light, this.falloff);
+                    this.lightColor = pb.mul(this.baseColor, this.atten, this.NoL);
+                    that.directLighting(
+                      this,
+                      this.L,
+                      this.lightColor,
+                      this.viewVec,
+                      this.pbrData,
+                      pb.float(1),
+                      pb.float(1),
+                      pb.float(0),
+                      this.lightingColor
+                    );
+                  });
+                };
+
+                sample(0.25, 0.25);
+                sample(0.75, 0.25);
+                sample(0.25, 0.75);
+                sample(0.75, 0.75);
+              });
+            }).$else(function () {
+              this.$l.diffuse = pb.vec3();
+              this.$l.specular = pb.vec3();
+              this.$l.diffuseScale = pb.float(1);
+              this.$l.specularScale = pb.float(1);
+              this.$l.sourceRadiusFactor = pb.float(0);
+              this.$if(pb.equal(type, LIGHT_TYPE_POINT), function () {
+                this.diffuseScale = extra.x;
+                this.specularScale = extra.y;
+                this.sourceRadiusFactor = pb.div(
+                  extra.z,
+                  pb.max(pb.distance(posRange.xyz, this.worldPos), 0.0001)
+                );
+              });
+              this.$l.lightAtten = that.calculateLightAttenuation(
+                this,
+                type,
+                this.worldPos,
+                posRange,
+                dirCutoff
+              );
+              this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
+              this.$l.NoL = pb.clamp(pb.dot(this.pbrData.normal, this.lightDir), 0, 1);
+              this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
+              if (shadow) {
+                this.lightColor = pb.mul(
+                  this.lightColor,
+                  that.calculateShadow(this, this.worldPos, this.NoL)
+                );
+              }
+              that.directLighting(
+                this,
+                this.lightDir,
+                this.lightColor,
+                this.viewVec,
+                this.pbrData,
+                this.diffuseScale,
+                this.specularScale,
+                this.sourceRadiusFactor,
+                this.lightingColor
+              );
+            });
           });
           this.$return(pb.vec4(pb.add(this.lightingColor, this.emissiveColor), this.pbrData.albedo.a));
         }
@@ -301,6 +385,9 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
       lightColor: PBShaderExp,
       viewVec: PBShaderExp,
       commonData: PBShaderExp,
+      diffuseScale: PBShaderExp,
+      specularScale: PBShaderExp,
+      sourceRadiusFactor: PBShaderExp,
       outColor: PBShaderExp
     ) {
       const pb = scope.$builder;
@@ -313,6 +400,9 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           pb.vec3('lightColor'),
           pb.vec3('viewVec'),
           that.getCommonDatasStruct(scope)('data'),
+          pb.float('diffuseScale'),
+          pb.float('specularScale'),
+          pb.float('sourceRadiusFactor'),
           pb.vec3('outColor').inout()
         ],
         function () {
@@ -324,18 +414,32 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
             this.$l.VoH = pb.clamp(pb.dot(this.viewVec, this.H), 0, 1);
             this.$l.schlickFresnel = that.fresnelSchlick(this, this.VoH, this.data.f0.rgb, this.data.f90);
             this.$l.F = this.schlickFresnel;
-            this.$l.alphaRoughness = pb.mul(this.data.roughness, this.data.roughness);
+            this.$l.specularRoughness = pb.clamp(pb.add(this.data.roughness, this.sourceRadiusFactor), 0, 1);
+            this.$l.alphaRoughness = pb.mul(this.specularRoughness, this.specularRoughness);
             this.$l.D = that.distributionGGX(this, this.NoH, this.alphaRoughness);
             this.$l.V = that.visGGX(this, this.NoV, this.NoL, this.alphaRoughness);
-            this.$l.specular = pb.mul(this.lightColor, this.D, this.V, this.F);
+            this.$l.specular = pb.mul(this.lightColor, this.D, this.V, this.F, this.specularScale);
             this.outColor = pb.add(this.outColor, this.specular);
             this.$l.diffuseBRDF = pb.mul(pb.sub(pb.vec3(1), this.F), pb.div(this.data.diffuse.rgb, Math.PI));
-            this.$l.diffuse = pb.mul(this.lightColor, pb.max(this.diffuseBRDF, pb.vec3(0)));
+            this.$l.diffuse = pb.mul(
+              this.lightColor,
+              pb.max(this.diffuseBRDF, pb.vec3(0)),
+              this.diffuseScale
+            );
             this.outColor = pb.add(this.outColor, this.diffuse);
           });
         }
       );
-      scope.$g[funcName](lightDir, lightColor, viewVec, commonData, outColor);
+      scope.$g[funcName](
+        lightDir,
+        lightColor,
+        viewVec,
+        commonData,
+        diffuseScale,
+        specularScale,
+        sourceRadiusFactor,
+        outColor
+      );
     }
     indirectLighting(
       scope: PBInsideFunctionScope,

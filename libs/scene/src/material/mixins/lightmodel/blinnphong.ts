@@ -5,7 +5,7 @@ import type { IMixinLight } from '../lit';
 import { mixinLight } from '../lit';
 import type { DrawContext } from '../../../render';
 import { ShaderHelper } from '../../shader/helper';
-import { MaterialVaryingFlags } from '../../../values';
+import { LIGHT_TYPE_POINT, MaterialVaryingFlags } from '../../../values';
 import type { Immutable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 
@@ -166,7 +166,18 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
               this.$l.diffuseColor = pb.vec3(0);
             }
             this.$l.specularColor = pb.vec3(0);
-            that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, shadow) {
+            that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
+              this.$l.diffuseScale = pb.float(1);
+              this.$l.specularScale = pb.float(1);
+              this.$l.sourceRadiusFactor = pb.float(0);
+              this.$if(pb.equal(type, LIGHT_TYPE_POINT), function () {
+                this.diffuseScale = extra.x;
+                this.specularScale = extra.y;
+                this.sourceRadiusFactor = pb.div(
+                  extra.z,
+                  pb.max(pb.distance(posRange.xyz, this.worldPos), 0.0001)
+                );
+              });
               this.$l.lightAtten = that.calculateLightAttenuation(
                 this,
                 type,
@@ -179,6 +190,8 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
               this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
               this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
               this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
+              this.$l.pointShininess = pb.div(shininess, pb.add(1, pb.mul(this.sourceRadiusFactor, 32)));
+              this.$l.pointShininess = pb.max(this.pointShininess, 1);
               if (that.featureUsed(FEATURE_WRAP_LIGHTING)) {
                 this.$l.NoLwrap = pb.div(pb.add(this.NoL, this.zScatterWrap), pb.add(1, this.zScatterWrap));
                 this.$l.diff = pb.max(this.NoLwrap, 0);
@@ -189,18 +202,22 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
                 this.$l.spec = this.$choice(
                   pb.lessThanEqual(this.NoLwrap, 0),
                   pb.float(0),
-                  pb.pow(this.NoH, shininess)
+                  pb.pow(this.NoH, this.pointShininess)
                 );
                 this.$l.diffuse = pb.mul(
                   this.lightColor,
                   1 / Math.PI,
-                  pb.add(pb.vec3(this.diff), pb.mul(this.zScatterColor.rgb, this.scatter))
+                  pb.add(pb.vec3(this.diff), pb.mul(this.zScatterColor.rgb, this.scatter), this.diffuseScale)
                 );
-                this.$l.specular = pb.mul(this.lightColor, this.spec);
+                this.$l.specular = pb.mul(this.lightColor, this.spec, this.specularScale);
               } else {
                 this.NoL = pb.clamp(this.NoL, 0, 1);
-                this.$l.diffuse = pb.mul(this.lightColor, 1 / Math.PI, this.NoL);
-                this.$l.specular = pb.mul(this.lightColor, pb.pow(this.NoH, shininess));
+                this.$l.diffuse = pb.mul(this.lightColor, 1 / Math.PI, this.NoL, this.diffuseScale);
+                this.$l.specular = pb.mul(
+                  this.lightColor,
+                  pb.pow(this.NoH, this.pointShininess),
+                  this.specularScale
+                );
               }
               if (shadow) {
                 this.$if(pb.greaterThan(this.NoL, 0), function () {
