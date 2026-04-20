@@ -1,4 +1,5 @@
 import { defineProps, type SerializableClass } from '../types';
+import type { CameraOITMode } from '../../../camera';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import { SceneNode } from '../../../scene';
 import {
@@ -106,6 +107,44 @@ export function getCameraClass(): SerializableClass {
           },
           set(this: Camera, value) {
             this.HiZ = value.bool[0];
+          }
+        },
+        {
+          name: 'OITMode',
+          type: 'string',
+          default: 'none',
+          options: {
+            label: 'OIT',
+            group: 'Rendering',
+            enum: {
+              labels: ['None', 'Weighted', 'ABuffer'],
+              values: ['none', 'weighted', 'abuffer']
+            }
+          },
+          get(this: Camera, value) {
+            value.str[0] = this.oitMode;
+          },
+          set(this: Camera, value) {
+            this.oitMode = value.str[0] as CameraOITMode;
+          }
+        },
+        {
+          name: 'ABufferLayers',
+          type: 'int',
+          default: 20,
+          options: {
+            label: 'ABuffer Layers',
+            group: 'Rendering',
+            minValue: 1
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.oitABufferLayers;
+          },
+          set(this: Camera, value) {
+            this.oitABufferLayers = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.oitMode === 'abuffer';
           }
         },
         {
