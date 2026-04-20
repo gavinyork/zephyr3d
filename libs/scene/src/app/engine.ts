@@ -21,7 +21,8 @@ import {
   LambertMaterial,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
-  UnlitMaterial
+  UnlitMaterial,
+  CustomScatteringMaterial
 } from '../material';
 import { StandardSpriteMaterial } from '../material/sprite_std';
 import { ScreenAdapter } from './screen';
@@ -276,7 +277,10 @@ export class Engine {
       '/materials/blinnphong.zmtl': BlinnMaterial,
       '/materials/pbr_metallic_roughness.zmtl': PBRMetallicRoughnessMaterial,
       '/materials/pbr_specular_glossiness.zmtl': PBRSpecularGlossinessMaterial,
-      '/materials/sprite_std.zmtl': StandardSpriteMaterial
+      '/materials/sprite_std.zmtl': StandardSpriteMaterial,
+
+      //自定义材质
+      '/materials/custom_scattering.zmtl': CustomScatteringMaterial
     } as const;
     for (const [key] of objectEntries(shapeClsMap)) {
       const obj = new shapeClsMap[key]();

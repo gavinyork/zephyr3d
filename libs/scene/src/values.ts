@@ -56,6 +56,11 @@ export const LIGHT_TYPE_POINT = 2;
  * @public
  */
 export const LIGHT_TYPE_SPOT = 3;
+/**
+ * Rectangular area light type
+ * @public
+ */
+export const LIGHT_TYPE_RECT = 4;
 
 /**
  * Max light size for clustered lighting
