@@ -16,11 +16,7 @@
     "sourceMap": true,
     "stripInternal": true,
     "keyofStringsOnly": false,
-    "typeRoots": ["./node_modules/@types"],
-    "baseUrl": ".",
-    "paths": {
-      "@zephyr3d/*": ["build/@zephyr3d/*"]
-    }
+    "typeRoots": ["./node_modules/@types"]
   },
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts"]
 }

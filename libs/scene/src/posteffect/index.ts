@@ -1,5 +1,6 @@
 export * from './posteffect';
 export * from './grayscale';
+export * from './coloradjust';
 export * from './tonemap';
 export * from './bloom';
 export * from './sao';
