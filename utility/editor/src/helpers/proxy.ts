@@ -1,14 +1,7 @@
 import { Matrix4x4, Quaternion, Vector3, Vector4, DRef, DWeakRef, Disposable } from '@zephyr3d/base';
 import type { Scene, SceneNode } from '@zephyr3d/scene';
 import { TetrahedronFrameShape } from '@zephyr3d/scene';
-import {
-  BoundingBox,
-  CylinderShape,
-  Mesh,
-  Primitive,
-  UnlitMaterial,
-  PerspectiveCamera
-} from '@zephyr3d/scene';
+import { BoundingBox, Mesh, Primitive, UnlitMaterial, PerspectiveCamera } from '@zephyr3d/scene';
 
 const PROXY_NAME = '$__PROXY__$';
 
@@ -16,6 +9,7 @@ export class NodeProxy extends Disposable {
   private readonly _diamondPrimitive: DRef<Primitive>;
   private readonly _spotLightPrimitive: DRef<Primitive>;
   private readonly _directionalLightPrimitive: DRef<Primitive>;
+  private readonly _rectLightPrimitive: DRef<Primitive>;
   private readonly _perspectiveCameraPrimitive: DRef<TetrahedronFrameShape>;
   private readonly _lightProxyMaterial: DRef<UnlitMaterial>;
   private _scene: Scene;
@@ -26,6 +20,7 @@ export class NodeProxy extends Disposable {
     this._diamondPrimitive = new DRef();
     this._spotLightPrimitive = new DRef();
     this._directionalLightPrimitive = new DRef();
+    this._rectLightPrimitive = new DRef();
     this._perspectiveCameraPrimitive = new DRef();
     this._lightProxyMaterial = new DRef(new UnlitMaterial());
     this._proxyList = [];
@@ -51,6 +46,8 @@ export class NodeProxy extends Disposable {
       proxy = this.getSpotLightProxyMesh();
     } else if (src.isPunctualLight() && src.isPointLight()) {
       proxy = this.getPointLightProxyMesh();
+    } else if (src.isPunctualLight() && src.isRectLight()) {
+      proxy = this.getRectLightProxyMesh();
     } else if (src instanceof PerspectiveCamera) {
       proxy = this.getPerspectiveCameraProxyMesh();
     }
@@ -83,6 +80,8 @@ export class NodeProxy extends Disposable {
           } else if (src.isSpotLight()) {
             const s = Math.tan(Math.acos(src.cutoff)) / 0.2;
             proxy.scale.setXYZ(s, s, 1);
+          } else if (src.isRectLight()) {
+            proxy.scale.setXYZ(src.width, src.height, 1);
           }
         } else if (src instanceof PerspectiveCamera) {
           proxy.scale.z = src.getFarPlane();
@@ -107,7 +106,7 @@ export class NodeProxy extends Disposable {
       const children = src.children;
       const index = children.findIndex((val) => this.isProxy(val));
       if (index >= 0) {
-        const proxy = src.children[index] as Mesh;
+        const proxy = children[index] as Mesh;
         proxy.showState = 'visible';
       }
     }
@@ -118,58 +117,39 @@ export class NodeProxy extends Disposable {
     this._diamondPrimitive.dispose();
     this._spotLightPrimitive.dispose();
     this._directionalLightPrimitive.dispose();
+    this._rectLightPrimitive.dispose();
     this._lightProxyMaterial.dispose();
     for (const ref of this._proxyList) {
       ref.dispose();
     }
     this._proxyList = [];
   }
+  private static createLinePrimitive(vertices: number[], indices: number[], bbox: BoundingBox) {
+    const primitive = new Primitive();
+    primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
+    primitive.createAndSetIndexBuffer(new Uint16Array(indices));
+    primitive.primitiveType = 'line-list';
+    primitive.indexStart = 0;
+    primitive.indexCount = indices.length;
+    primitive.setBoundingVolume(bbox);
+    return primitive;
+  }
   private getDirectionalLightProxyMesh() {
     if (!this._directionalLightPrimitive.get()) {
-      const bbox = new BoundingBox();
-      bbox.beginExtend();
-      const vertices: number[] = [];
-      const indices: number[] = [];
-      CylinderShape.generateData(
-        {
-          topRadius: 0.1,
-          bottomRadius: 0.1,
-          height: 0.8,
-          anchor: 0,
-          transform: Matrix4x4.rotation(new Vector3(1, 0, 0), -Math.PI * 0.5)
-        },
+      const vertices = [
+        -0.095, -0.095, 0, -0.095, -0.095, 0.5, 0.095, -0.095, 0.5, 0.095, -0.095, 0, -0.095, 0.095, 0,
+        -0.095, 0.095, 0.5, 0.095, 0.095, 0.5, 0.095, 0.095, 0, -0.18, -0.18, 0, -0.18, 0.18, 0, 0.18, 0.18,
+        0, 0.18, -0.18, 0, 0, 0, -0.34, 0, 0, 0.5
+      ];
+      const indices = [
+        0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7, 8, 9, 9, 10, 10, 11, 11, 8, 8,
+        12, 9, 12, 10, 12, 11, 12, 13
+      ];
+      const primitive = NodeProxy.createLinePrimitive(
         vertices,
-        null,
-        null,
-        null,
         indices,
-        bbox,
-        vertices.length / 3
+        new BoundingBox(new Vector3(-0.18, -0.18, -0.34), new Vector3(0.18, 0.18, 0.5))
       );
-      CylinderShape.generateData(
-        {
-          topRadius: 0,
-          bottomRadius: 0.2,
-          height: 0.5,
-          anchor: 0,
-          transform: Matrix4x4.translation(new Vector3(0, 0.8, 0)).rotateLeft(
-            Quaternion.fromAxisAngle(new Vector3(1, 0, 0), -Math.PI * 0.5)
-          )
-        },
-        vertices,
-        null,
-        null,
-        null,
-        indices,
-        bbox,
-        vertices.length / 3
-      );
-      const primitive = new Primitive();
-      primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
-      primitive.createAndSetIndexBuffer(new Uint16Array(indices));
-      primitive.primitiveType = 'triangle-list';
-      primitive.indexCount = indices.length;
-      primitive.setBoundingVolume(bbox);
       this._directionalLightPrimitive.set(primitive);
     }
     return new Mesh(
@@ -180,14 +160,25 @@ export class NodeProxy extends Disposable {
   }
   private getSpotLightProxyMesh() {
     if (!this._spotLightPrimitive.get()) {
+      const vertices: number[] = [0, 0, 0];
+      const indices: number[] = [];
+      const segmentCount = 8;
+      for (let i = 0; i < segmentCount; i++) {
+        const angle = (i / segmentCount) * Math.PI * 2;
+        vertices.push(Math.cos(angle) * 0.2, Math.sin(angle) * 0.2, -1);
+      }
+      for (let i = 0; i < segmentCount; i++) {
+        const thisIndex = i + 1;
+        const nextIndex = ((i + 1) % segmentCount) + 1;
+        indices.push(0, thisIndex);
+        indices.push(thisIndex, nextIndex);
+      }
       this._spotLightPrimitive.set(
-        new CylinderShape({
-          topRadius: 0.2,
-          bottomRadius: 0,
-          topCap: true,
-          height: 1,
-          transform: Quaternion.fromAxisAngle(new Vector3(1, 0, 0), -Math.PI * 0.5).toMatrix4x4()
-        })
+        NodeProxy.createLinePrimitive(
+          vertices,
+          indices,
+          new BoundingBox(new Vector3(-0.2, -0.2, -1), new Vector3(0.2, 0.2, 0))
+        )
       );
     }
     return new Mesh(
@@ -204,9 +195,9 @@ export class NodeProxy extends Disposable {
         new Float32Array([0, 0.2, 0, -0.1, 0, 0.1, 0.1, 0, 0.1, 0.1, 0, -0.1, -0.1, 0, -0.1, 0, -0.2, 0])
       );
       primitive.createAndSetIndexBuffer(
-        new Uint16Array([0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 5, 2, 1, 5, 3, 2, 5, 4, 3, 5, 1, 4])
+        new Uint16Array([0, 1, 0, 2, 0, 3, 0, 4, 5, 1, 5, 2, 5, 3, 5, 4, 1, 2, 2, 3, 3, 4, 4, 1])
       );
-      primitive.primitiveType = 'triangle-list';
+      primitive.primitiveType = 'line-list';
       primitive.indexStart = 0;
       primitive.indexCount = primitive.getIndexBuffer().length;
       primitive.setBoundingVolume(new BoundingBox(new Vector3(-0.1, -0.2, -0.1), new Vector3(0.1, 0.2, 0.1)));
@@ -215,6 +206,21 @@ export class NodeProxy extends Disposable {
     return new Mesh(
       this._scene,
       this._diamondPrimitive.get(),
+      this._lightProxyMaterial.get().createInstance()
+    );
+  }
+  private getRectLightProxyMesh() {
+    if (!this._rectLightPrimitive.get()) {
+      const primitive = NodeProxy.createLinePrimitive(
+        [-0.5, -0.5, 0, -0.5, 0.5, 0, 0.5, 0.5, 0, 0.5, -0.5, 0, 0, 0, 0, 0, 0, -0.25],
+        [0, 1, 1, 2, 2, 3, 3, 0, 4, 5],
+        new BoundingBox(new Vector3(-0.5, -0.5, -0.25), new Vector3(0.5, 0.5, 0))
+      );
+      this._rectLightPrimitive.set(primitive);
+    }
+    return new Mesh(
+      this._scene,
+      this._rectLightPrimitive.get(),
       this._lightProxyMaterial.get().createInstance()
     );
   }

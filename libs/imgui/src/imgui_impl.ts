@@ -19,16 +19,28 @@ export class Input {
   public _dom_input: HTMLInputElement;
   constructor(cvs: HTMLCanvasElement) {
     this._dom_input = document.createElement('input');
+    // 该输入框仅用于 IME/文本输入中转，不应参与浏览器原生 Tab 焦点链。
+    // 否则按 Tab 时会在真实控件与隐藏输入框之间来回切换，出现“无限自动切换”现象。
+    this._dom_input.tabIndex = -1;
     this._dom_input.style.position = 'fixed';
     this._dom_input.style.top = -10000 + 'px';
     this._dom_input.style.left = -10000 + 'px';
     this._dom_input.addEventListener('keydown', (e) => {
       e.stopPropagation();
       this.onKeydown(e as KeyboardEvent);
+      // 只拦截 Tab，避免触发浏览器原生焦点跳转；其余按键保留默认行为，
+      // 否则会导致输入框内字符按键失效。
+      if ((e as KeyboardEvent).key === 'Tab') {
+        e.preventDefault();
+      }
     });
     this._dom_input.addEventListener('keyup', (e) => {
       e.stopPropagation();
       this.onKeyup(e as KeyboardEvent);
+      // 同上：仅拦截 Tab，避免影响文本输入。
+      if ((e as KeyboardEvent).key === 'Tab') {
+        e.preventDefault();
+      }
     });
     this._dom_input.addEventListener('keypress', (e) => {
       e.stopPropagation();
@@ -40,11 +52,11 @@ export class Input {
     cvs.appendChild(this._dom_input);
     this.blur();
   }
-  onKeydown(e: KeyboardEvent) {
-    canvas_on_keydown(e);
+  onKeydown(e: KeyboardEvent): boolean {
+    return canvas_on_keydown(e);
   }
-  onKeyup(e: KeyboardEvent) {
-    canvas_on_keyup(e);
+  onKeyup(e: KeyboardEvent): boolean {
+    return canvas_on_keyup(e);
   }
   onKeypress(e: KeyboardEvent) {
     e.preventDefault();

@@ -15,6 +15,7 @@ import {
   Mesh,
   ParticleSystem,
   PointLight,
+  RectLight,
   SpotLight,
   Water,
   ClipmapTerrain,
@@ -286,6 +287,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 {
                   label: 'Spot Light',
                   action: () => this.handleAddNode(SpotLight, 'Add spot light')
+                },
+                {
+                  label: 'Rect Light',
+                  action: () => this.handleAddNode(RectLight, 'Add rect light')
                 }
               ]
             },
@@ -351,45 +356,68 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       [
         {
           label: FontGlyph.glyphs['mouse-pointer'],
-          shortcut: 'Esc',
+          shortcut: 'Q',
           tooltip: () => 'Select node',
           selected: () => {
             return this._postGizmoRenderer!.mode === 'select';
           },
           action: () => {
+            const cameraController = this.controller.model.scene.mainCamera
+              ?.controller as EditorCameraController;
+            if (cameraController && cameraController.isRightMouseDown()) {
+              return; // 如果正在处理摄像机移动，不激活选择工具
+            }
             this._postGizmoRenderer!.mode = 'select';
           }
         },
         {
           label: FontGlyph.glyphs['move'],
-          shortcut: 'T',
+          shortcut: 'W',
           tooltip: () => 'Move selected node',
           selected: () => {
             return this._postGizmoRenderer!.mode === 'translation';
           },
           action: () => {
+            // 检查是否正在处理摄像机移动
+            const cameraController = this.controller.model.scene.mainCamera
+              ?.controller as EditorCameraController;
+            if (cameraController && cameraController.isRightMouseDown()) {
+              return; // 如果正在处理摄像机移动，不激活选择工具
+            }
             this._postGizmoRenderer!.mode = 'translation';
           }
         },
         {
           label: FontGlyph.glyphs['arrows-cw'],
-          shortcut: 'R',
+          shortcut: 'E',
           tooltip: () => 'Rotate selected node',
           selected: () => {
             return this._postGizmoRenderer!.mode === 'rotation';
           },
           action: () => {
+            // 检查是否正在处理摄像机移动
+            const cameraController = this.controller.model.scene.mainCamera
+              ?.controller as EditorCameraController;
+            if (cameraController && cameraController.isRightMouseDown()) {
+              return; // 如果正在处理摄像机移动，不激活选择工具
+            }
             this._postGizmoRenderer!.mode = 'rotation';
           }
         },
         {
           label: FontGlyph.glyphs['resize-vertical'],
-          shortcut: 'S',
+          shortcut: 'R',
           tooltip: () => 'Scale selected node',
           selected: () => {
             return this._postGizmoRenderer!.mode === 'scaling';
           },
           action: () => {
+            // 检查是否正在处理摄像机移动
+            const cameraController = this.controller.model.scene.mainCamera
+              ?.controller as EditorCameraController;
+            if (cameraController && cameraController.isRightMouseDown()) {
+              return; // 如果正在处理摄像机移动，不激活选择工具
+            }
             this._postGizmoRenderer!.mode = 'scaling';
           }
         },
@@ -895,7 +923,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             }
           }
           node = this._proxy!.getProto(node!);
-          if (!ImGui.GetIO().KeyAlt) {
+          if (!ImGui.GetIO().KeyCtrl) {
             this._sceneHierarchy!.selectNode(node?.getPrefabNode() ?? node);
           } else {
             this._sceneHierarchy!.selectNode(node);
@@ -918,6 +946,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     const localEye = camera.parent!.invWorldMatrix.transformPointAffine(worldPos);
     const localTarget = camera.parent!.invWorldMatrix.transformPointAffine(nodePos);
     //camera.controller.lookAt(localEye, localTarget, Vector3.axisPY());
+
+    // 新增：更新视图中心到选中物体的中心
+    const controller = camera.controller as EditorCameraController;
+    if (controller && controller.setViewCenter) {
+      controller.setViewCenter(nodePos);
+    }
+
     this._animatedCamera = camera;
     camera.getWorldPosition(this._cameraAnimationEyeFrom);
     Vector3.sub(this._cameraAnimationEyeFrom, cameraZ, this._cameraAnimationTargetFrom);
