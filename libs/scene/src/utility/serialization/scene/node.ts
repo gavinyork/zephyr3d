@@ -9,6 +9,27 @@ import type { ResourceManager } from '../manager';
 import { AnimationClip, NodeRotationTrack, NodeScaleTrack, NodeTranslationTrack } from '../../../animation';
 import { JSONData } from '../json';
 
+function normalizeSerializedSceneNodeData(data: DiffValue): Record<string, unknown> {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return {
+      ClassName: 'SceneNode',
+      Object: {}
+    };
+  }
+  const serialized = data as Record<string, unknown>;
+  if (typeof serialized.ClassName === 'string') {
+    return serialized;
+  }
+  const objectData =
+    serialized.Object && typeof serialized.Object === 'object' && !Array.isArray(serialized.Object)
+      ? (serialized.Object as Record<string, unknown>)
+      : serialized;
+  return {
+    ClassName: 'SceneNode',
+    Object: objectData
+  };
+}
+
 /** @internal */
 export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
   return {
@@ -18,7 +39,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
       const scene = ctx instanceof Scene ? ctx : ctx.scene;
       if (init) {
         const prefabData = (await manager.loadPrefabContent(init.prefabId))!.data as DiffValue;
-        const nodeData = applyPatch(prefabData, init.patch) as Record<string, unknown>;
+        const nodeData = normalizeSerializedSceneNodeData(applyPatch(prefabData, init.patch) as DiffValue);
         const tmpNode = new DRef(new SceneNode(scene));
         tmpNode.get()!.remove();
         tmpNode.get()!.prefabId = init.prefabId;
@@ -334,7 +355,8 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
             value.object[0] = this.metaData ? new JSONData(null, this.metaData) : null;
           },
           set(this: SceneNode, value) {
-            this.metaData = (value?.object[0] as JSONData)?.data ?? null;
+            const data = value?.object[0] as JSONData | Record<string, unknown> | null | undefined;
+            this.metaData = data instanceof JSONData ? data.data : (data ?? null);
           }
         }
       ]);

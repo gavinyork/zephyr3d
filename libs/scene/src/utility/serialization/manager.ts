@@ -700,7 +700,9 @@ export class ResourceManager {
     const className = json['ClassName'];
     const index = cls.findIndex((val) => val.name === className);
     if (index < 0) {
-      throw new Error('Deserialize object failed: Cannot found serialization meta data');
+      throw new Error(
+        `Deserialize object failed: Cannot found serialization meta data for class "${String(className)}"`
+      );
     }
     let info = cls[index];
     const initParams = json['Init'] as { asset?: string };
@@ -1157,6 +1159,14 @@ export class ResourceManager {
     }
     return v;
   }
+  private isSerializedObjectEnvelope(v: unknown): v is Record<string, unknown> {
+    return (
+      !!v &&
+      typeof v === 'object' &&
+      !Array.isArray(v) &&
+      typeof (v as Record<string, unknown>).ClassName === 'string'
+    );
+  }
   private async deserializeObjectPropsForCls<T extends object>(
     obj: T,
     cls: SerializableClass,
@@ -1202,7 +1212,9 @@ export class ResourceManager {
             tmpVal.object[0] = v
               ? Array.isArray(v)
                 ? v
-                : ((await this.deserializeObject<any>(obj, v)) ?? null)
+                : this.isSerializedObjectEnvelope(v)
+                  ? ((await this.deserializeObject<any>(obj, v)) ?? null)
+                  : v
               : null;
           }
           break;
