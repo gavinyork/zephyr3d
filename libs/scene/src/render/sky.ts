@@ -126,6 +126,7 @@ export class SkyRenderer extends Disposable {
   private _cloudIntensity: number;
   private _debugAerialPerspective: number;
   private readonly _wind: Vector2;
+  private readonly _skyboxRotation: Vector3;
   private _skyWorldMatrix: Matrix4x4;
   private readonly _lastSunDir: Vector3;
   private readonly _lastSunColor: Vector4;
@@ -168,6 +169,7 @@ export class SkyRenderer extends Disposable {
     this._cloudy = 0.45;
     this._cloudIntensity = 15;
     this._wind = new Vector2(0, 0);
+    this._skyboxRotation = new Vector3(0, 0, 0);
     this._skyWorldMatrix = defaultSkyWorldMatrix;
     this._lastSunDir = SkyRenderer._getSunDir(null);
     this._lastSunColor = SkyRenderer._getSunColor(null);
@@ -510,7 +512,12 @@ export class SkyRenderer extends Disposable {
   get irradianceSHFB() {
     if (!this._irradianceSHFB.get()) {
       const device = getDevice();
-      const texture = device.createTexture2D('rgba32f', 3, 3, {
+      const texCaps = device.getDeviceCaps().textureCaps;
+      const format =
+        !device.getDeviceCaps().framebufferCaps.supportFloatBlending && texCaps.supportHalfFloatColorBuffer
+          ? 'rgba16f'
+          : 'rgba32f';
+      const texture = device.createTexture2D(format, 3, 3, {
         mipmapping: false
       })!;
       this._irradianceSHFB.set(device.createFrameBuffer([texture], null));
@@ -531,13 +538,27 @@ export class SkyRenderer extends Disposable {
       }
     }
   }
+  /**
+   * Additional euler rotation (in degrees) applied to skybox.
+   */
+  get skyboxRotation(): Immutable<Vector3> {
+    return this._skyboxRotation;
+  }
+  set skyboxRotation(val: Immutable<Vector3>) {
+    if (!val.equalsTo(this._skyboxRotation)) {
+      this._skyboxRotation.set(val);
+      if (this._skyType === 'skybox') {
+        this.invalidate();
+      }
+    }
+  }
   /** @internal */
   get skyWorldMatrix(): Immutable<Matrix4x4> {
     return this._skyWorldMatrix;
   }
   set skyWorldMatrix(val: Immutable<Matrix4x4>) {
     val = val ?? defaultSkyWorldMatrix;
-    if (val !== this._skyWorldMatrix) {
+    if (!val.equalsTo(this._skyWorldMatrix)) {
       this._skyWorldMatrix = val;
       this.invalidate();
     }
@@ -623,12 +644,9 @@ export class SkyRenderer extends Disposable {
           this.radianceFramebuffer!,
           this._radianceConvSamples
         );
-        if (ctx.device.type === 'webgl' || !ctx.device.getDeviceCaps().framebufferCaps.supportFloatBlending) {
-          this._shProjector.projectCubemapToTexture(this._bakedSkyboxTexture.get()!, this.irradianceSHFB);
-        } else {
-          this._shProjector.projectCubemap(this._bakedSkyboxTexture.get()!, this.irradianceSH);
-        }
-        ctx.scene.env.light.irradianceSH = this.irradianceSH;
+        this._shProjector.projectCubemapToTexture(this._bakedSkyboxTexture.get()!, this.irradianceSHFB);
+        ctx.scene.env.light.irradianceSHFB = this.irradianceSHFB;
+        ctx.scene.env.light.irradianceSH = null;
         ctx.scene.env.light.irradianceWindow = this._shWindowWeights;
       }
     }
@@ -814,7 +832,7 @@ export class SkyRenderer extends Disposable {
   private _updateSkyboxTexture() {
     if (this._panoramaAsset) {
       getEngine()
-        .resourceManager.fetchTexture<Texture2D>(this._panoramaAsset)
+        .resourceManager.fetchTexture<Texture2D>(this._panoramaAsset, { linearColorSpace: true })
         .then((tex) => {
           if (!tex.isTexture2D()) {
             console.error(`Invalid panorama texture asset: ${this._panoramaAsset}`);

@@ -15,6 +15,25 @@ let fontSizeGlyph = 0;
 const fonts: Record<string, DeviceFont> = {};
 const glyphFonts: Record<string, DeviceFont> = {};
 
+function isPasteShortcut(event: KeyboardEvent) {
+  const key = event.key?.toLowerCase?.() ?? '';
+  return (event.ctrlKey || event.metaKey) && !event.altKey && key === 'v';
+}
+
+async function readClipboardTextPreferSystem() {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (typeof text === 'string') {
+        clipboard_text = text;
+      }
+    } catch {
+      // Ignore clipboard read failures and fallback to in-memory clipboard.
+    }
+  }
+  return clipboard_text;
+}
+
 export class Input {
   public _dom_input: HTMLInputElement;
   constructor(cvs: HTMLCanvasElement) {
@@ -49,14 +68,17 @@ export class Input {
     this._dom_input.addEventListener('compositionend', (e) => {
       this.onCompositionEnd(e as CompositionEvent);
     });
+    this._dom_input.addEventListener('paste', (e) => {
+      this.onPaste(e as ClipboardEvent);
+    });
     cvs.appendChild(this._dom_input);
     this.blur();
   }
-  onKeydown(e: KeyboardEvent): boolean {
-    return canvas_on_keydown(e);
+  onKeydown(e: KeyboardEvent) {
+    canvas_on_keydown(e);
   }
-  onKeyup(e: KeyboardEvent): boolean {
-    return canvas_on_keyup(e);
+  onKeyup(e: KeyboardEvent) {
+    canvas_on_keyup(e);
   }
   onKeypress(e: KeyboardEvent) {
     e.preventDefault();
@@ -67,6 +89,13 @@ export class Input {
     for (let i = 0; i < e.data.length; i++) {
       const io = ImGui.GetIO();
       io.AddInputCharacter(e.data.codePointAt(i)!);
+    }
+  }
+  onPaste(e: ClipboardEvent) {
+    e.stopPropagation();
+    const text = e.clipboardData?.getData('text/plain');
+    if (typeof text === 'string') {
+      clipboard_text = text;
     }
   }
   blur() {
@@ -104,6 +133,13 @@ function document_on_paste(event: ClipboardEvent) {
 */
 function window_on_resize() {}
 
+function document_on_paste(event: ClipboardEvent) {
+  const text = event.clipboardData?.getData('text/plain');
+  if (typeof text === 'string') {
+    clipboard_text = text;
+  }
+}
+
 function window_on_gamepadconnected(event: any /* GamepadEvent */) {
   console.info(
     'Gamepad connected at index %d: %s. %d buttons, %d axes.',
@@ -130,6 +166,8 @@ function canvas_on_blur(_event: FocusEvent) {
   for (let i = 0; i < io.MouseDown.length; ++i) {
     io.MouseDown[i] = false;
   }
+  leftMouseDown = false;
+  releasePointerLock();
 }
 
 const key_code_to_index: Record<string, number> = {
@@ -163,6 +201,9 @@ export function canvas_on_keydown(event: KeyboardEvent) {
   io.KeyShift = event.shiftKey;
   io.KeyAlt = event.altKey;
   io.KeySuper = event.metaKey;
+  if (isPasteShortcut(event)) {
+    readClipboardTextPreferSystem();
+  }
   const key_index = key_code_to_index[event.code];
   if (key_index) {
     ImGui.ASSERT(key_index >= 0 && key_index < ImGui.ARRAYSIZE(io.KeysDown));
@@ -203,8 +244,23 @@ export function canvas_on_keypress(event: KeyboardEvent) {
 
 function canvas_on_pointermove(event: PointerEvent) {
   const io = ImGui.GetIO();
-  io.MousePos.x = event.offsetX;
-  io.MousePos.y = event.offsetY;
+  if (isPointerLocked()) {
+    io.MousePos.x += event.movementX || 0;
+    io.MousePos.y += event.movementY || 0;
+  } else {
+    io.MousePos.x = event.offsetX;
+    io.MousePos.y = event.offsetY;
+    if (
+      event.pointerType === 'mouse' &&
+      leftMouseDown &&
+      (event.buttons & 1) !== 0 &&
+      io.WantCaptureMouse &&
+      isDraggingFromMouseDown(event) &&
+      isPointerNearScreenEdge(event)
+    ) {
+      requestPointerLock();
+    }
+  }
   if (io.WantCaptureMouse) {
     return true;
   }
@@ -236,11 +292,78 @@ export function any_pointerdown() {
   return false;
 }
 
+function isPointerLocked() {
+  if (typeof document === 'undefined') {
+    return false;
+  }
+  return document.pointerLockElement === renderer?.device.canvas;
+}
+
+function requestPointerLock() {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  const canvas = renderer?.device.canvas;
+  if (!canvas || isPointerLocked() || typeof canvas.requestPointerLock !== 'function') {
+    return;
+  }
+  try {
+    const ret = canvas.requestPointerLock();
+    if (ret && typeof (ret as Promise<void>).catch === 'function') {
+      (ret as Promise<void>).catch(() => {
+        // Ignore pointer lock denial and keep default behavior.
+      });
+    }
+  } catch {
+    // Ignore pointer lock denial and keep default behavior.
+  }
+}
+
+function releasePointerLock() {
+  if (typeof document === 'undefined' || !isPointerLocked()) {
+    return;
+  }
+  if (typeof document.exitPointerLock === 'function') {
+    document.exitPointerLock();
+  }
+}
+
+const DRAG_LOCK_THRESHOLD_PX = 2;
+const EDGE_LOCK_PADDING_PX = 1;
+let leftMouseDown = false;
+let leftMouseDownClientX = 0;
+let leftMouseDownClientY = 0;
+
+function isDraggingFromMouseDown(event: PointerEvent) {
+  const dx = event.clientX - leftMouseDownClientX;
+  const dy = event.clientY - leftMouseDownClientY;
+  return dx * dx + dy * dy >= DRAG_LOCK_THRESHOLD_PX * DRAG_LOCK_THRESHOLD_PX;
+}
+
+function isPointerNearScreenEdge(event: PointerEvent) {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const x = event.clientX;
+  const y = event.clientY;
+  return (
+    x <= EDGE_LOCK_PADDING_PX ||
+    y <= EDGE_LOCK_PADDING_PX ||
+    x >= window.innerWidth - EDGE_LOCK_PADDING_PX ||
+    y >= window.innerHeight - EDGE_LOCK_PADDING_PX
+  );
+}
+
 function canvas_on_pointerdown(event: PointerEvent) {
   const io = ImGui.GetIO();
   io.MousePos.x = event.offsetX;
   io.MousePos.y = event.offsetY;
   io.MouseDown[mouseButtonToImGui(event.button)] = true;
+  if (event.button === 0 && event.pointerType === 'mouse') {
+    leftMouseDown = true;
+    leftMouseDownClientX = event.clientX;
+    leftMouseDownClientY = event.clientY;
+  }
   if (io.WantCaptureMouse) {
     return true;
   }
@@ -258,6 +381,12 @@ function canvas_on_contextmenu(_event: Event) {
 function canvas_on_pointerup(event: PointerEvent) {
   const io = ImGui.GetIO();
   io.MouseDown[mouse_button_map[event.button]] = false;
+  if (event.button === 0) {
+    leftMouseDown = false;
+  }
+  if (!any_pointerdown()) {
+    releasePointerLock();
+  }
   if (io.WantCaptureMouse) {
     return true;
   }
@@ -401,19 +530,16 @@ export function Init(device: AbstractDevice, glyphSize: number) {
     io.ConfigMacOSXBehaviors = navigator.platform.match(/Mac/) !== null;
   }
 
-  /*
-    if (typeof(document) !== "undefined") {
-        document.body.addEventListener("copy", document_on_copy);
-        document.body.addEventListener("cut", document_on_cut);
-        document.body.addEventListener("paste", document_on_paste);
-    }
-    */
+  if (typeof document !== 'undefined') {
+    document.body.addEventListener('paste', document_on_paste);
+  }
 
   io.SetClipboardTextFn = (user_data: any, text: string) => {
     clipboard_text = text;
     navigator.clipboard.writeText(clipboard_text);
   };
   io.GetClipboardTextFn = (_user_data: any) => {
+    readClipboardTextPreferSystem();
     return clipboard_text;
   };
   io.ClipboardUserData = null;

@@ -3,6 +3,7 @@ import { Vector3, Vector4 } from './vector';
 import { BoxSide, ClipState } from './types';
 import type { Plane } from './plane';
 import type { Frustum } from './frustum';
+import type { Immutable } from '../utils';
 
 /**
  * Axis aligned bounding box
@@ -349,7 +350,7 @@ export class AABB {
    * @param frustum - The frustum object.
    * @returns The clip test result.
    */
-  getClipStateWithFrustum(frustum: Frustum) {
+  getClipStateWithFrustum(frustum: Pick<Frustum, 'planes'> | Immutable<Frustum>) {
     let badIntersect = false;
     const cx = (this._maxPoint.x + this._minPoint.x) * 0.5;
     const cy = (this._maxPoint.y + this._minPoint.y) * 0.5;
@@ -374,7 +375,7 @@ export class AABB {
    * @param mask - The frustum planes that needs to be tested.
    * @returns The clip test result.
    */
-  getClipStateWithFrustumMask(frustum: Frustum, mask: number) {
+  getClipStateWithFrustumMask(frustum: Pick<Frustum, 'planes'> | Immutable<Frustum>, mask: number) {
     let badIntersect = false;
     const cx = (this._maxPoint.x + this._minPoint.x) * 0.5;
     const cy = (this._maxPoint.y + this._minPoint.y) * 0.5;

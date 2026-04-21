@@ -165,6 +165,9 @@ export class ScriptRegistry {
    */
   async resolveRuntimeUrl(entryId: string) {
     const id = await this.resolveLogicalId(entryId);
+    if (id.startsWith('/assets/@builtins/')) {
+      return await this.build(String(id));
+    }
     return getApp().editorMode !== 'none'
       ? await this.build(String(id))
       : id.endsWith('.js')

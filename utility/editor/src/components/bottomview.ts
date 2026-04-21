@@ -17,6 +17,9 @@ export class BottomView extends Disposable {
   get panel() {
     return this._panel;
   }
+  get renderer() {
+    return this._renderer;
+  }
   render() {
     if (this._panel.begin('##BottomPanel')) {
       if (ImGui.BeginTabBar('##BottomTabBar')) {

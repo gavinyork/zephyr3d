@@ -475,7 +475,8 @@ export class ConstantTexture2DNode extends BaseTextureNode {
               value.str[0] = this.textureId;
             },
             async set(this: ConstantTexture2DNode, value) {
-              this.textureId = value.str[0] ?? '';
+              const path = value?.str?.[0];
+              this.textureId = typeof path === 'string' ? path : '';
             }
           },
           ...textureNodeProps
@@ -582,7 +583,8 @@ export class ConstantTexture2DArrayNode extends BaseTextureNode {
               value.str[0] = this.textureId;
             },
             async set(this: ConstantTexture2DArrayNode, value) {
-              this.textureId = value.str[0] ?? '';
+              const path = value?.str?.[0];
+              this.textureId = typeof path === 'string' ? path : '';
             }
           },
           ...textureNodeProps
@@ -702,7 +704,8 @@ export class ConstantTextureCubeNode extends BaseTextureNode {
               value.str[0] = this.textureId;
             },
             async set(this: ConstantTextureCubeNode, value) {
-              this.textureId = value.str[0] ?? '';
+              const path = value?.str?.[0];
+              this.textureId = typeof path === 'string' ? path : '';
             }
           },
           ...textureNodeProps
@@ -960,6 +963,22 @@ export class PannerNode extends BaseGraphNode {
 export class TextureSampleNode extends BaseGraphNode {
   /** The type of sampling (Color or Normal) */
   samplerType: 'Color' | 'Normal';
+  /** The shader parameter name for fallback texture uniform */
+  private _paramName: string;
+  /** Asset ID for fallback texture (used when texture input is not connected) */
+  textureId: string;
+  /** Whether fallback texture should be loaded in sRGB color space */
+  sRGB: boolean;
+  /** Horizontal texture coordinate wrapping mode for fallback texture */
+  addressU: TextureAddressMode;
+  /** Vertical texture coordinate wrapping mode for fallback texture */
+  addressV: TextureAddressMode;
+  /** Minification filter mode for fallback texture */
+  filterMin: TextureFilterMode;
+  /** Magnification filter mode for fallback texture */
+  filterMag: TextureFilterMode;
+  /** Mipmap filter mode for fallback texture */
+  filterMip: TextureFilterMode;
   /**
    * Creates a new texture sample node
    *
@@ -972,6 +991,14 @@ export class TextureSampleNode extends BaseGraphNode {
   constructor() {
     super();
     this.samplerType = 'Color';
+    this._paramName = getParamName();
+    this.textureId = '';
+    this.sRGB = true;
+    this.addressU = 'clamp';
+    this.addressV = 'clamp';
+    this.filterMin = 'linear';
+    this.filterMag = 'linear';
+    this.filterMip = 'nearest';
     this._outputs = [
       {
         id: 1,
@@ -1008,15 +1035,33 @@ export class TextureSampleNode extends BaseGraphNode {
         id: 1,
         name: 'texture',
         type: ['tex2D', 'tex2DArray', 'texCube'],
-        required: true
+        required: false
       },
       {
         id: 2,
         name: 'coord',
         type: ['vec2', 'vec3'],
-        required: true
+        required: false
       }
     ];
+  }
+  /**
+   * Indicates this node can provide a texture uniform when texture input is not connected.
+   */
+  get isUniform() {
+    return !this._inputs[0].inputNode;
+  }
+  /**
+   * Gets fallback texture uniform parameter name.
+   */
+  get paramName() {
+    return this._paramName;
+  }
+  set paramName(val: string) {
+    if (this._paramName !== val) {
+      this._paramName = val;
+      this.dispatchEvent('changed');
+    }
   }
   /**
    * Gets the serialization descriptor for this node type
@@ -1033,6 +1078,23 @@ export class TextureSampleNode extends BaseGraphNode {
       getProps(): PropertyAccessor<TextureSampleNode>[] {
         return defineProps([
           {
+            name: 'Name',
+            type: 'string',
+            isNullable() {
+              return false;
+            },
+            get(this: TextureSampleNode, value) {
+              value.str[0] = this.paramName ? this.paramName.slice(2) : '';
+            },
+            set(this: TextureSampleNode, value) {
+              if (!/^[A-Za-z0-9_]+$/.test(value.str[0])) {
+                console.log(`Invalid parameter name: ${value.str[0]}`);
+              } else {
+                this.paramName = `u_${value.str[0]}`;
+              }
+            }
+          },
+          {
             name: 'SamplerType',
             type: 'string',
             options: {
@@ -1046,6 +1108,31 @@ export class TextureSampleNode extends BaseGraphNode {
             },
             set(this: TextureSampleNode, value) {
               this.samplerType = value.str[0] as any;
+            }
+          },
+          {
+            name: 'Texture',
+            type: 'object',
+            default: null,
+            options: {
+              mimeTypes: [
+                'image/jpeg',
+                'image/png',
+                'image/tga',
+                'image/vnd.radiance',
+                'image/x-dds',
+                'image/webp'
+              ]
+            },
+            isNullable() {
+              return true;
+            },
+            get(this: TextureSampleNode, value) {
+              value.str[0] = this.textureId;
+            },
+            async set(this: TextureSampleNode, value) {
+              const path = value?.str?.[0];
+              this.textureId = typeof path === 'string' ? path : '';
             }
           }
         ]);
@@ -1079,20 +1166,28 @@ export class TextureSampleNode extends BaseGraphNode {
     if (err) {
       return err;
     }
-    const type0 = this._inputs[0].inputNode!.getOutputType(this._inputs[0].inputId!);
-    if (!type0) {
-      return `Cannot determine type of argument \`${this._inputs[0].name}\``;
+    const texInput = this._inputs[0];
+    const coordInput = this._inputs[1];
+    const type0 = texInput.inputNode ? texInput.inputNode.getOutputType(texInput.inputId!) : 'tex2D';
+    if (texInput.inputNode) {
+      if (!type0) {
+        return `Cannot determine type of argument \`${texInput.name}\``;
+      }
+      if (!texInput.type.includes(type0)) {
+        return `Invalid input type of argument \`${texInput.name}\`: ${type0}`;
+      }
+    } else if (!this.textureId) {
+      return 'Texture not specified';
     }
-    if (!this._inputs[0].type.includes(type0)) {
-      return `Invalid input type of argument \`${this._inputs[0].name}\`: ${type0}`;
-    }
-    const type1 = this._inputs[1].inputNode!.getOutputType(this._inputs[1].inputId!);
-    if (!type1) {
-      return `Cannot determine type of argument \`${this._inputs[1].name}\``;
-    }
-    const expectedType1 = type0 === 'tex2D' ? 'vec2' : 'vec3';
-    if (type1 !== expectedType1) {
-      return `Texture coordinate type should be ${expectedType1}`;
+    if (coordInput.inputNode) {
+      const type1 = coordInput.inputNode.getOutputType(coordInput.inputId!);
+      if (!type1) {
+        return `Cannot determine type of argument \`${coordInput.name}\``;
+      }
+      const expectedType1 = type0 === 'tex2D' ? 'vec2' : 'vec3';
+      if (type1 !== expectedType1) {
+        return `Texture coordinate type should be ${expectedType1}`;
+      }
     }
     return '';
   }

@@ -536,6 +536,28 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'SkyBoxRotation',
+          type: 'vec3',
+          default: [0, 0, 0],
+          phase: 1,
+          options: {
+            label: 'Rotation',
+            edit: 'quaternion',
+            animatable: true
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.skyboxRotation.x;
+            value.num[1] = this.env.sky.skyboxRotation.y;
+            value.num[2] = this.env.sky.skyboxRotation.z;
+          },
+          set(this: Scene, value) {
+            this.env.sky.skyboxRotation = new Vector3(value.num[0], value.num[1], value.num[2]);
+          },
+          isValid() {
+            return this.env.sky.skyType === 'skybox';
+          }
+        },
+        {
           name: 'SkyBoxTextureSize',
           type: 'int',
           default: 1024,

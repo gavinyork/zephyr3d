@@ -562,6 +562,20 @@ export function getMeshMaterialClass(): SerializableClass[] {
             }
           },
           {
+            name: 'AlphaDither',
+            type: 'bool',
+            default: false,
+            get(this: MeshMaterial, value) {
+              value.bool[0] = this.alphaDither;
+            },
+            set(this: MeshMaterial, value) {
+              this.alphaDither = value.bool[0];
+            },
+            isValid(this: MeshMaterial) {
+              return !this.$isInstance && this.alphaCutoff > 0;
+            }
+          },
+          {
             name: 'BlendMode',
             type: 'string',
             options: {
@@ -830,6 +844,198 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
             },
             set(this: LitPropTypes, value) {
               this.doubleSidedLighting = value.bool[0];
+            }
+          },
+          {
+            name: 'Reflection',
+            type: 'string',
+            default: 'ggx',
+            options: {
+              enum: {
+                labels: ['None', 'GGX', 'Anisotropic', 'Glint'],
+                values: ['none', 'ggx', 'anisotropic', 'glint']
+              }
+            },
+            get(this: PBRBluePrintMaterial, value) {
+              value.str[0] = this.reflectionMode;
+            },
+            set(this: PBRBluePrintMaterial, value) {
+              this.reflectionMode = value.str[0] as PBRReflectionMode;
+            },
+            getDefaultValue(this: PBRBluePrintMaterial) {
+              return this.$isInstance ? this.coreMaterial.reflectionMode : 'ggx';
+            }
+          },
+          {
+            name: 'SubsurfaceScattering',
+            type: 'bool',
+            phase: 0,
+            default: false,
+            get(this: PBRBluePrintMaterial, value) {
+              value.bool[0] = this.subsurfaceScattering;
+            },
+            set(this: PBRBluePrintMaterial, value) {
+              this.subsurfaceScattering = value.bool[0];
+            },
+            isValid(this: PBRBluePrintMaterial) {
+              return !this.$isInstance;
+            }
+          },
+          {
+            name: 'SubsurfaceColor',
+            type: 'rgb',
+            phase: 1,
+            default: [1, 0.3, 0.2],
+            options: {
+              animatable: true
+            },
+            get(this: PBRBluePrintMaterial, value) {
+              value.num[0] = this.subsurfaceColor.x;
+              value.num[1] = this.subsurfaceColor.y;
+              value.num[2] = this.subsurfaceColor.z;
+            },
+            set(this: PBRBluePrintMaterial, value) {
+              this.subsurfaceColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+            },
+            getDefaultValue(this: PBRBluePrintMaterial) {
+              return this.$isInstance ? this.coreMaterial.subsurfaceColor : [1, 0.3, 0.2];
+            },
+            isValid(this: PBRBluePrintMaterial) {
+              return this.subsurfaceScattering;
+            }
+          },
+          {
+            name: 'SubsurfaceScale',
+            type: 'float',
+            phase: 1,
+            default: 0.5,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 8
+            },
+            get(this: PBRBluePrintMaterial, value) {
+              value.num[0] = this.subsurfaceScale;
+            },
+            set(this: PBRBluePrintMaterial, value) {
+              this.subsurfaceScale = value.num[0];
+            },
+            getDefaultValue(this: PBRBluePrintMaterial) {
+              return this.$isInstance ? this.coreMaterial.subsurfaceScale : 0.5;
+            },
+            isValid(this: PBRBluePrintMaterial) {
+              return this.subsurfaceScattering;
+            }
+          },
+          {
+            name: 'SubsurfacePower',
+            type: 'float',
+            phase: 1,
+            default: 1.5,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 16
+            },
+            get(this: PBRBluePrintMaterial, value) {
+              value.num[0] = this.subsurfacePower;
+            },
+            set(this: PBRBluePrintMaterial, value) {
+              this.subsurfacePower = value.num[0];
+            },
+            getDefaultValue(this: PBRBluePrintMaterial) {
+              return this.$isInstance ? this.coreMaterial.subsurfacePower : 1.5;
+            },
+            isValid(this: PBRBluePrintMaterial) {
+              return this.subsurfaceScattering;
+            }
+          },
+          {
+            name: 'SubsurfaceIntensity',
+            type: 'float',
+            phase: 1,
+            default: 0.5,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 4
+            },
+            get(this: PBRBluePrintMaterial, value) {
+              value.num[0] = this.subsurfaceIntensity;
+            },
+            set(this: PBRBluePrintMaterial, value) {
+              this.subsurfaceIntensity = value.num[0];
+            },
+            getDefaultValue(this: PBRBluePrintMaterial) {
+              return this.$isInstance ? this.coreMaterial.subsurfaceIntensity : 0.5;
+            },
+            isValid(this: PBRBluePrintMaterial) {
+              return this.subsurfaceScattering;
+            }
+          },
+          {
+            name: 'Anisotropy',
+            type: 'float',
+            default: 0.75,
+            options: {
+              animatable: true,
+              minValue: -0.95,
+              maxValue: 0.95
+            },
+            get(this: PBRBluePrintMaterial, value) {
+              value.num[0] = this.anisotropy;
+            },
+            set(this: PBRBluePrintMaterial, value) {
+              this.anisotropy = value.num[0];
+            },
+            getDefaultValue(this: PBRBluePrintMaterial) {
+              return this.$isInstance ? this.coreMaterial.anisotropy : 0.75;
+            },
+            isValid(this: PBRBluePrintMaterial) {
+              return this.reflectionMode === 'anisotropic';
+            }
+          },
+          {
+            name: 'AnisotropyDirection',
+            type: 'float',
+            default: 0,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 360
+            },
+            get(this: PBRBluePrintMaterial, value) {
+              value.num[0] = this.anisotropyDirection;
+            },
+            set(this: PBRBluePrintMaterial, value) {
+              this.anisotropyDirection = value.num[0];
+            },
+            getDefaultValue(this: PBRBluePrintMaterial) {
+              return this.$isInstance ? this.coreMaterial.anisotropyDirection : 0;
+            },
+            isValid(this: PBRBluePrintMaterial) {
+              return this.reflectionMode === 'anisotropic';
+            }
+          },
+          {
+            name: 'AnisotropyDirectionScaleBias',
+            type: 'vec2',
+            default: [1, 0],
+            options: {
+              animatable: true
+            },
+            get(this: PBRBluePrintMaterial, value) {
+              value.num[0] = this.anisotropyDirectionScaleBias.x;
+              value.num[1] = this.anisotropyDirectionScaleBias.y;
+            },
+            set(this: PBRBluePrintMaterial, value) {
+              this.anisotropyDirectionScaleBias = new Vector2(value.num[0], value.num[1]);
+            },
+            getDefaultValue(this: PBRBluePrintMaterial) {
+              return this.$isInstance ? this.coreMaterial.anisotropyDirectionScaleBias : [1, 0];
+            },
+            isValid(this: PBRBluePrintMaterial) {
+              return this.reflectionMode === 'anisotropic';
             }
           }
         ]);

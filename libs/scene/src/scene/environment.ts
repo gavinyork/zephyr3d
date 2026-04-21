@@ -50,10 +50,18 @@ export class EnvLightWrapper extends Disposable {
   }
   /** @internal */
   getHash(ctx?: DrawContext) {
+    const irradianceSource =
+      this.type === 'ibl'
+        ? this._irradianceSHFB.get()
+          ? 'fb'
+          : this._irradianceSH.get()
+            ? 'buf'
+            : 'none'
+        : 'na';
     return !ctx || ctx.drawEnvLight
       ? `${this.type}:${this._envLight!.hasRadiance() ? '1' : '0'}:${
           this._envLight!.hasIrradiance() ? '1' : '0'
-        }`
+        }:${irradianceSource}`
       : 'none';
   }
   /** @internal */
@@ -139,10 +147,11 @@ export class EnvLightWrapper extends Disposable {
         break;
       case 'ibl':
         if (this._envLight?.getType() !== val) {
-          this._envLight = new EnvShIBL(this.radianceMap!, this.irradianceSH!);
+          this._envLight = new EnvShIBL(this.radianceMap!, this.irradianceSH!, this.irradianceSHFB!);
         }
         (this._envLight as EnvShIBL).radianceMap = this.radianceMap;
         (this._envLight as EnvShIBL).irradianceSH = this.irradianceSH;
+        (this._envLight as EnvShIBL).irradianceSHFB = this.irradianceSHFB;
         (this._envLight as EnvShIBL).irradianceWindow = this.irradianceWindow;
         break;
       case 'constant':

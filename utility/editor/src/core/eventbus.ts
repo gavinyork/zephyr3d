@@ -24,6 +24,7 @@ type EventBusEventMap = {
   action: [action: string, ...args: any];
   edit_material: [label: string, outputName: string, type: GenericConstructor<MeshMaterial>, path: string];
   edit_material_function: [path: string];
+  reveal_asset: [path: string];
 };
 
 export class EventBus extends Observable<EventBusEventMap> {}

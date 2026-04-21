@@ -77,6 +77,7 @@ let FEATURE_ALPHATEST = 0;
 let FEATURE_ALPHABLEND = 0;
 let FEATURE_CULLMODE = 0;
 let FEATURE_ALPHATOCOVERAGE = 0;
+let FEATURE_ALPHADITHER = 0;
 let FEATURE_DISABLE_TAA = 0;
 
 /**
@@ -149,6 +150,8 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   private _featureStates: unknown[];
   /** @internal Alpha test cutoff in [0, 1]. */
   private _alphaCutoff: number;
+  /** @internal Whether alpha-test uses temporal dither coverage. */
+  private _alphaDither: boolean;
   /** @internal Blending mode. */
   private _blendMode: BlendMode;
   /** @internal Face culling mode. */
@@ -180,6 +183,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     super();
     this._featureStates = [];
     this._alphaCutoff = 0;
+    this._alphaDither = false;
     this._blendMode = 'none';
     this._cullMode = 'back';
     this._opacity = 1;
@@ -188,6 +192,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     this._ctx = null;
     this._materialPass = -1;
     this.useFeature(FEATURE_ALPHABLEND, this._blendMode);
+    this.useFeature(FEATURE_ALPHADITHER, this._alphaDither);
     this.useFeature(FEATURE_CULLMODE, this._cullMode);
   }
   /**
@@ -208,6 +213,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   copyFrom(other: this) {
     super.copyFrom(other);
     this.alphaCutoff = other.alphaCutoff;
+    this.alphaDither = other.alphaDither;
     this.blendMode = other.blendMode;
     this.cullMode = other.cullMode;
     this.opacity = other.opacity;
@@ -501,6 +507,20 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       this.useFeature(FEATURE_ALPHATEST, val > 0);
       this._alphaCutoff = val;
       this.uniformChanged();
+    }
+  }
+  /**
+   * Whether alpha clipping uses frame-varying dither coverage.
+   * - Effective only when alpha cutoff is enabled.
+   * - Intended for masked materials (blendMode='none') to emulate soft transparency with TAA.
+   */
+  get alphaDither() {
+    return this._alphaDither;
+  }
+  set alphaDither(val) {
+    if (this._alphaDither !== !!val) {
+      this._alphaDither = !!val;
+      this.useFeature(FEATURE_ALPHADITHER, this._alphaDither);
     }
   }
   /**
@@ -920,6 +940,25 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     const pb = scope.$builder;
     const that = this;
     const funcName = 'Z_outputFragmentColor';
+    const alphaClipFuncName = 'Z_shouldDiscardAlpha';
+    pb.func(alphaClipFuncName, [pb.float('alpha'), pb.float('cutoff')], function () {
+      if (that.featureUsed<boolean>(FEATURE_ALPHADITHER) && !that.isTransparentPass(that.pass)) {
+        this.$l.frame = pb.float(ShaderHelper.getFramestamp(this));
+        this.$l.phase = pb.add(
+          this.$builtins.fragCoord.xy,
+          pb.vec2(this.frame, pb.mul(this.frame, 0.754877666))
+        );
+        this.$l.noise = pb.fract(pb.mul(pb.sin(pb.dot(this.phase, pb.vec2(12.9898, 78.233))), 43758.5453));
+        this.$l.coverage = pb.clamp(
+          pb.div(pb.sub(this.alpha, this.cutoff), pb.max(pb.sub(1, this.cutoff), 1e-4)),
+          0,
+          1
+        );
+        this.$return(pb.lessThan(this.coverage, this.noise));
+      } else {
+        this.$return(pb.lessThan(this.alpha, this.cutoff));
+      }
+    });
     pb.func(funcName, color ? [pb.vec3('worldPos'), pb.vec4('color')] : [pb.vec3('worldPos')], function () {
       this.$l.outColor = color ? this.color : pb.vec4();
       if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
@@ -935,7 +974,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         }
         if (that.isTransparentPass(that.pass)) {
           if (this.zAlphaCutoff) {
-            this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
+            this.$if(pb.getGlobalScope()[alphaClipFuncName](this.outColor.a, this.zAlphaCutoff), function () {
               pb.discard();
             });
           }
@@ -958,7 +997,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_DEPTH) {
         if (color) {
           if (this.zAlphaCutoff) {
-            this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
+            this.$if(pb.getGlobalScope()[alphaClipFuncName](this.outColor.a, this.zAlphaCutoff), function () {
               pb.discard();
             });
           }
@@ -995,7 +1034,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         }
       } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
         if (color) {
-          this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
+          this.$if(pb.getGlobalScope()[alphaClipFuncName](this.outColor.a, this.zAlphaCutoff), function () {
             pb.discard();
           });
         }
@@ -1014,7 +1053,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         }
       } /*if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ else {
         if (color) {
-          this.$if(pb.lessThan(this.outColor.a, this.zAlphaCutoff), function () {
+          this.$if(pb.getGlobalScope()[alphaClipFuncName](this.outColor.a, this.zAlphaCutoff), function () {
             pb.discard();
           });
         }
@@ -1045,7 +1084,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         scope.$outputs.zSSRNormal = pb.vec4(0);
       } else {
         scope.$outputs.zSSRRoughness = ssrRoughness ?? pb.vec4(1, 0, 0, 1);
-        scope.$outputs.zSSRNormal = ssrNormal ?? pb.vec4(0);
+        scope.$outputs.zSSRNormal = ssrNormal
+          ? ssrNormal
+          : scope.$inputs.wNorm
+            ? pb.vec4(pb.add(pb.mul(pb.normalize(scope.$inputs.wNorm), 0.5), pb.vec3(0.5)), 1)
+            : pb.vec4(0.5, 0.5, 1, 1);
       }
     }
   }
@@ -1054,4 +1097,5 @@ FEATURE_ALPHATEST = MeshMaterial.defineFeature();
 FEATURE_ALPHABLEND = MeshMaterial.defineFeature();
 FEATURE_CULLMODE = MeshMaterial.defineFeature();
 FEATURE_ALPHATOCOVERAGE = MeshMaterial.defineFeature();
+FEATURE_ALPHADITHER = MeshMaterial.defineFeature();
 FEATURE_DISABLE_TAA = MeshMaterial.defineFeature();

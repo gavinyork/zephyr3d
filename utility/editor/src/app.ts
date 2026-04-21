@@ -14,6 +14,7 @@ const searchParams = new URL(window.location.href).searchParams;
 const project = searchParams.get('project');
 const open = searchParams.get('open') !== null;
 const remote = searchParams.get('remote') !== null;
+const previewScene = searchParams.get('scene');
 let rhiList: string[] = [];
 let settings: Nullable<ProjectSettings> = null;
 let editorMode: EditorMode;
@@ -150,7 +151,11 @@ editorApp.ready().then(async () => {
     }
   } else {
     // start engine
-    getEngine().startup(settings!.startupScene, settings!.splashScreen, settings!.startupScript);
+    getEngine().startup(
+      previewScene ?? settings!.startupScene,
+      settings!.splashScreen,
+      settings!.startupScript
+    );
   }
   editorApp.run();
 });

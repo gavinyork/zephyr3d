@@ -64,6 +64,7 @@ export type GizmoMode =
   | 'edit-aabb'
   | 'edit-rect'
   | 'select';
+export type TransformSpace = 'world' | 'local';
 export type GizmoHitInfo = {
   axis: number;
   type?: Nullable<HitType>;
@@ -160,6 +161,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _orthoDirection: Nullable<CubeFace>;
   private _orthoAxis: number;
   private _node: Nullable<SceneNode>;
+  private _selectedNodes: SceneNode[];
   private _mode: GizmoMode;
   private readonly _axisLength: number;
   private readonly _arrowLength: number;
@@ -173,6 +175,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _aabbInfo: Nullable<AABBInfo>;
   private _rectInfo: Nullable<RectInfo>;
   private _hitInfo: Nullable<GizmoHitInfo>;
+  private _transformSpace: TransformSpace;
   private readonly _screenSize: number;
   private _drawGrid: boolean;
   private readonly _scaleBox: AABB;
@@ -195,6 +198,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             ? 1
             : 2;
     this._node = binding;
+    this._selectedNodes = [];
     this._snapping = 0;
     this._aabbForEdit = null;
     this._allowRotate = true;
@@ -212,6 +216,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._aabbInfo = null;
     this._rectInfo = null;
     this._hitInfo = null;
+    this._transformSpace = 'world';
     this._screenSize = 0.4;
     this._gridParams = new Vector4(10000, 500, 0, 0);
     this._rectHandles = [
@@ -324,6 +329,12 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             ? 1
             : 2;
   }
+  get selectedNodes(): SceneNode[] {
+    return this._selectedNodes;
+  }
+  set selectedNodes(nodes: SceneNode[]) {
+    this._selectedNodes = [...nodes];
+  }
   get drawGrid(): boolean {
     return this._drawGrid;
   }
@@ -344,6 +355,12 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   }
   set gridDistance(val: number) {
     this._gridParams.y = val;
+  }
+  get transformSpace(): TransformSpace {
+    return this._transformSpace;
+  }
+  set transformSpace(val: TransformSpace) {
+    this._transformSpace = val;
   }
   endEditAABB(aabb: AABB) {
     if (aabb && aabb === this._aabbForEdit) {
@@ -426,15 +443,13 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this.renderSelectSpriteGizmo(ctx, destFramebuffer!.getDepthAttachment()!, 0.5);
         this.renderRectGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       } else if (this._mode === 'select') {
-        if (this._node.isSprite()) {
-          this.renderSelectSpriteGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
-        } else {
-          this.renderSelectGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
-        }
+        // Selection outlines are rendered from the selected node list to avoid
+        // drawing an extra box around the multi-selection pivot.
       } else {
         this.renderTransformGizmo(ctx, destFramebuffer!.getDepthAttachment()!);
       }
     }
+    this.renderSelectionOutlines(ctx, destFramebuffer!.getDepthAttachment()!);
     PostGizmoRenderer._blendBlitter.renderStates = PostGizmoRenderer._blendRenderState;
     PostGizmoRenderer._blendBlitter.srgbOut = srgbOutput;
     PostGizmoRenderer._blendBlitter.blit(
@@ -718,29 +733,40 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     const worldMatrix = this._calcGizmoWorldMatrix(this._mode, false);
     const invWorldMatrix = Matrix4x4.invertAffine(worldMatrix);
     let angle = 0;
-    let cameraPos: Vector3;
     if (this._rotateInfo.axis >= 0) {
       const { startX, startY, centerX, centerY } = this._rotateInfo;
       const edgeStart = new Vector2(startX - centerX, startY - centerY).inplaceNormalize();
       const edgeEnd = new Vector2(x - centerX, y - centerY).inplaceNormalize();
       angle = Math.atan2(Vector2.cross(edgeEnd, edgeStart), Vector2.dot(edgeStart, edgeEnd));
-      cameraPos = this._camera.getWorldPosition();
     }
+    const centerWorld = new Vector3(worldMatrix.m03, worldMatrix.m13, worldMatrix.m23);
     if (this._rotateInfo.axis === 0) {
-      axis.setXYZ(1, 0, 0);
-      if (cameraPos!.x < worldMatrix.m03) {
+      if (this._transformSpace === 'local') {
+        axis.set(worldMatrix.getRow(0).xyz());
+      } else {
+        axis.setXYZ(1, 0, 0);
+      }
+      if (Vector3.dot(Vector3.sub(this._camera.getWorldPosition(), centerWorld), axis) < 0) {
         angle *= -1;
       }
       //angle = -(deltaY * 0.5) / this._rotateInfo.speed;
     } else if (this._rotateInfo.axis === 1) {
-      axis.setXYZ(0, 1, 0);
-      if (cameraPos!.y < worldMatrix.m13) {
+      if (this._transformSpace === 'local') {
+        axis.set(worldMatrix.getRow(1).xyz());
+      } else {
+        axis.setXYZ(0, 1, 0);
+      }
+      if (Vector3.dot(Vector3.sub(this._camera.getWorldPosition(), centerWorld), axis) < 0) {
         angle *= -1;
       }
       //angle = (deltaX * 0.5) / this._rotateInfo.speed;
     } else if (this._rotateInfo.axis === 2) {
-      axis.setXYZ(0, 0, 1);
-      if (cameraPos!.z < worldMatrix.m23) {
+      if (this._transformSpace === 'local') {
+        axis.set(worldMatrix.getRow(2).xyz());
+      } else {
+        axis.setXYZ(0, 0, 1);
+      }
+      if (Vector3.dot(Vector3.sub(this._camera.getWorldPosition(), centerWorld), axis) < 0) {
         angle *= -1;
       }
       //angle = -(deltaY * 0.5) / this._rotateInfo.speed;
@@ -774,10 +800,24 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       Vector3.cross(edge1, edge2, axis).inplaceNormalize();
       angle = movement / this._rotateInfo.speed;
     }
-    invWorldMatrix.transformVectorAffine(axis, axis);
     axis.inplaceNormalize();
     const deltaRotation = Quaternion.fromAxisAngle(axis, angle);
-    this._node!.rotation = Quaternion.multiply(deltaRotation, this._rotateInfo.startRotation);
+    if (this._node!.parent) {
+      const parentWorldRotation = new Quaternion();
+      this._node!.parent.worldMatrix.decompose(null, parentWorldRotation, null);
+      const invParentWorldRotation = Quaternion.conjugate(
+        parentWorldRotation,
+        new Quaternion()
+      ).inplaceNormalize();
+      const localDeltaRotation = Quaternion.multiply(
+        Quaternion.multiply(invParentWorldRotation, deltaRotation, new Quaternion()),
+        parentWorldRotation,
+        new Quaternion()
+      );
+      this._node!.rotation = Quaternion.multiply(localDeltaRotation, this._rotateInfo.startRotation);
+    } else {
+      this._node!.rotation = Quaternion.multiply(deltaRotation, this._rotateInfo.startRotation);
+    }
   }
   private _endRotate() {
     getDevice().canvas.style.cursor = 'default';
@@ -1080,8 +1120,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     if (this._translatePlaneInfo.type === 'move_free') {
       const hitPos = pickResult?.intersectedPoint ?? null;
       if (hitPos) {
-        const parentPos = this._node!.parent!.getWorldPosition();
-        this._node!.position.set(Vector3.sub(hitPos, parentPos, parentPos));
+        this._setNodeWorldPosition(hitPos);
       } else {
         const ray = this.camera.constructRay(x, y);
         let hitDistance = -ray.origin.y / ray.direction.y;
@@ -1091,7 +1130,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         const px = ray.origin.x + ray.direction.x * hitDistance;
         const py = ray.origin.y + ray.direction.y * hitDistance;
         const pz = ray.origin.z + ray.direction.z * hitDistance;
-        this._node!.position.setXYZ(px, py, pz);
+        this._setNodeWorldPosition(new Vector3(px, py, pz));
       }
     } else {
       const ray = this._camera.constructRay(x, y);
@@ -1110,12 +1149,22 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           const delta =
             p[this._translatePlaneInfo.axis] -
             this._translatePlaneInfo.lastPlanePos[this._translatePlaneInfo.axis];
-          this._node!.position[c] += delta;
+          const worldDelta = new Vector3();
+          worldDelta[c] = delta;
+          if (this._transformSpace === 'local') {
+            worldMatrix.transformVectorAffine(worldDelta, worldDelta);
+          }
+          this._addWorldTranslation(worldDelta);
         } else {
           const dx = p[t[0]] - this._translatePlaneInfo.lastPlanePos[t[0]];
           const dy = p[t[1]] - this._translatePlaneInfo.lastPlanePos[t[1]];
-          this._node!.position[t[0]] += dx;
-          this._node!.position[t[1]] += dy;
+          const worldDelta = new Vector3();
+          worldDelta[t[0]] = dx;
+          worldDelta[t[1]] = dy;
+          if (this._transformSpace === 'local') {
+            worldMatrix.transformVectorAffine(worldDelta, worldDelta);
+          }
+          this._addWorldTranslation(worldDelta);
         }
       }
     }
@@ -1128,6 +1177,28 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       if (this._node) {
         this.dispatchEvent('end_translate', this._node);
       }
+    }
+  }
+  private _setNodeWorldPosition(worldPos: Vector3) {
+    if (!this._node) {
+      return;
+    }
+    if (this._node.parent) {
+      this._node.parent.invWorldMatrix.transformPointAffine(worldPos, tmpVecT);
+      this._node.position.set(tmpVecT);
+    } else {
+      this._node.position.set(worldPos);
+    }
+  }
+  private _addWorldTranslation(worldDelta: Vector3) {
+    if (!this._node) {
+      return;
+    }
+    if (this._node.parent) {
+      this._node.parent.invWorldMatrix.transformVectorAffine(worldDelta, tmpVecT);
+      this._node.position.addBy(tmpVecT);
+    } else {
+      this._node.position.addBy(worldDelta);
     }
   }
   private _measureRotateSpeed() {
@@ -1160,12 +1231,26 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           matrix.set(this._node.worldMatrix);
         } else {
           this._node.worldMatrix.decompose(tmpVecS, tmpQuatR, tmpVecT);
-          matrix.translation(tmpVecT);
+          const useLocalOrientation =
+            this._transformSpace === 'local' &&
+            (mode === 'translation' || mode === 'rotation' || mode === 'scaling');
+          if (useLocalOrientation) {
+            matrix.identity().rotateLeft(tmpQuatR).translateLeft(tmpVecT);
+          } else {
+            matrix.translation(tmpVecT);
+          }
           if (!noScale) {
             if (this._camera.isPerspective()) {
               const d = Vector3.distance(this._camera.getWorldPosition(), tmpVecT);
               const scale = (this._screenSize * d * this._camera.getTanHalfFovy()) / (2 * this._axisLength);
-              matrix.scaling(new Vector3(scale, scale, scale)).translateLeft(tmpVecT);
+              if (useLocalOrientation) {
+                matrix
+                  .scaling(new Vector3(scale, scale, scale))
+                  .rotateLeft(tmpQuatR)
+                  .translateLeft(tmpVecT);
+              } else {
+                matrix.scaling(new Vector3(scale, scale, scale)).translateLeft(tmpVecT);
+              }
             } else {
               const projMatrix = this._camera.getProjectionMatrix();
               const projWidth = Math.abs(projMatrix.getRightPlane() - projMatrix.getLeftPlane());
@@ -1178,7 +1263,14 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
                 ? this._camera.viewport[3]
                 : getDevice().getDrawingBufferHeight();
               const scaleX = scaleY * (vpHeight / vpWidth) * (projWidth / projHeight);
-              matrix.scaling(new Vector3(scaleX, scaleY, scaleY)).translateLeft(tmpVecT);
+              if (useLocalOrientation) {
+                matrix
+                  .scaling(new Vector3(scaleX, scaleY, scaleY))
+                  .rotateLeft(tmpQuatR)
+                  .translateLeft(tmpVecT);
+              } else {
+                matrix.scaling(new Vector3(scaleX, scaleY, scaleY)).translateLeft(tmpVecT);
+              }
             }
           }
         }
@@ -2022,6 +2114,27 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup!);
     PostGizmoRenderer._primitives!['select'][0]!.draw();
     */
+  }
+  private renderSelectionOutlines(ctx: DrawContext, depthTex: BaseTexture) {
+    if (this._selectedNodes.length === 0) {
+      return;
+    }
+    const rendered = new Set<SceneNode>();
+    for (const node of this._selectedNodes) {
+      if (!node || rendered.has(node)) {
+        continue;
+      }
+      rendered.add(node);
+      const prevNode = this._node;
+      this._node = node;
+      this._calcGizmoMVPMatrix('select', false, PostGizmoRenderer._mvpMatrix);
+      if (node.isSprite()) {
+        this.renderSelectSpriteGizmo(ctx, depthTex);
+      } else {
+        this.renderSelectGizmo(ctx, depthTex);
+      }
+      this._node = prevNode;
+    }
   }
   private renderAABBGizmo(ctx: DrawContext, depthTex: BaseTexture) {
     ctx.device.setRenderStates(PostGizmoRenderer._aabbRenderState);

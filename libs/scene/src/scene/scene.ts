@@ -338,17 +338,10 @@ export class Scene
    */
   private updateEnvLight() {
     if (this.env.light.type === 'ibl') {
-      const useSHFB =
-        getDevice().type === 'webgl' || !getDevice().getDeviceCaps().framebufferCaps.supportFloatBlending;
-      if (!this.env.light.radianceMap) {
-        this.env.light.radianceMap = this.env.sky.radianceMap;
-      }
-      if (useSHFB && !this.env.light.irradianceSHFB) {
-        this.env.light.irradianceSHFB = this.env.sky.irradianceSHFB;
-      }
-      if (!useSHFB && !this.env.light.irradianceSH) {
-        this.env.light.irradianceSH = this.env.sky.irradianceSH;
-      }
+      this.env.light.radianceMap = this.env.sky.radianceMap;
+      this.env.light.irradianceWindow = this.env.sky.shWindowWeights;
+      this.env.light.irradianceSHFB = this.env.sky.irradianceSHFB;
+      this.env.light.irradianceSH = null;
     }
   }
   /**

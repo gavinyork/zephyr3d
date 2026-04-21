@@ -527,7 +527,9 @@ export class GLTFImporter implements ModelImporter {
     const localDirection = Vector3.sub(shape.tail, shape.offset);
     const height = localDirection.magnitude;
     const localRotation =
-      height > 0 ? Quaternion.unitVectorToUnitVector(Vector3.axisPY(), localDirection) : Quaternion.identity();
+      height > 0
+        ? Quaternion.unitVectorToUnitVector(Vector3.axisPY(), localDirection)
+        : Quaternion.identity();
     const localPosition = Vector3.scale(Vector3.add(shape.offset, shape.tail), 0.5);
     return {
       name: collider.name,

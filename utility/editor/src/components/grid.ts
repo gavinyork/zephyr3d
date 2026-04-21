@@ -260,17 +260,25 @@ export class PropertyEditor extends Observable<{
   request_edit_track: [track: PropertyTrack, target: object];
   end_edit_track: [track: PropertyTrack, target: object, edited: boolean];
   object_property_changed: [object: Nullable<object>, prop: PropertyAccessor];
+  object_property_edit_finished: [
+    object: Nullable<object>,
+    prop: PropertyAccessor,
+    oldValue: RequireOptionals<PropertyValue>,
+    newValue: RequireOptionals<PropertyValue>
+  ];
 }> {
   private _rootGroup: PropertyGroup;
   private readonly _labelPercent: number;
   private _dragging: boolean;
   private _dirty: boolean;
+  private _editSessions: Map<string, RequireOptionals<PropertyValue>>;
   constructor(labelPercent: number) {
     super();
     this._rootGroup = new PropertyGroup('Root', this);
     this._labelPercent = labelPercent;
     this._dragging = false;
     this._dirty = false;
+    this._editSessions = new Map();
   }
   get object(): any {
     return this._rootGroup.getObject();
@@ -343,6 +351,9 @@ export class PropertyEditor extends Observable<{
   }
   private renderGroup(group: PropertyGroup, level = 0, toplevel = false) {
     if (group.prop?.isValid && group.object && !group.prop.isValid.call(group.object)) {
+      return;
+    }
+    if (this.renderInlineObjectArrayGroup(group, level)) {
       return;
     }
     ImGui.TableNextRow();
@@ -488,6 +499,108 @@ export class PropertyEditor extends Observable<{
       ImGui.SetCursorPosX(baseX);
     }
   }
+  private renderInlineObjectArrayGroup(group: PropertyGroup, level: number) {
+    if (
+      !group.object ||
+      !group.prop ||
+      group.prop.type !== 'object_array' ||
+      !group.prop.options?.inlineObjectArray ||
+      !group.value.object?.[0] ||
+      group.properties.length !== 1 ||
+      group.subgroups.length > 0 ||
+      group.rawProperties.length > 0 ||
+      group.properties[0] instanceof PropertyGroup
+    ) {
+      return false;
+    }
+    const inlineProperty = group.properties[0].property;
+    const value = inlineProperty.value;
+    const object = inlineProperty.object;
+    if (!value || value.type !== 'string') {
+      return false;
+    }
+
+    ImGui.TableNextRow();
+    ImGui.TableNextColumn();
+    ImGui.TableNextColumn();
+    const baseX = ImGui.GetCursorPosX();
+    if (level > 0) {
+      ImGui.SetCursorPosX(baseX + level * 10);
+    }
+    ImGui.AlignTextToFramePadding();
+    ImGui.Text(value.options?.label ?? group.prop.options?.label ?? inlineProperty.name);
+    if (level > 0) {
+      ImGui.SetCursorPosX(baseX);
+    }
+
+    ImGui.TableNextColumn();
+    const tmpProperty: RequireOptionals<PropertyValue> = {
+      num: [0, 0, 0, 0],
+      str: [''],
+      bool: [false],
+      object: []
+    };
+    value.get.call(object, tmpProperty);
+    const readonly = !value.set;
+    const val = tmpProperty.str as [string];
+    const isSceneNodeRef = !!value.options?.sceneNode;
+    const hasValue = !!String(val[0] ?? '').trim();
+    const addable = !!group.prop.add && group.index === group.count - 1;
+    const deletable = !!group.prop.delete && group.index < group.count && (group.count > 1 || hasValue);
+    const extraButtons = (addable ? 1 : 0) + (deletable ? 1 : 0);
+    if (extraButtons > 0) {
+      ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
+      ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - extraButtons * ImGui.GetFrameHeight());
+    } else {
+      ImGui.SetNextItemWidth(-1);
+    }
+    let changed = false;
+    if (isSceneNodeRef) {
+      const displayValue = [val[0]] as [string];
+      ImGui.InputText('##value', displayValue, undefined, ImGui.InputTextFlags.ReadOnly);
+    } else {
+      changed = ImGui.InputText(
+        '##value',
+        val,
+        undefined,
+        readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+      );
+    }
+    this.setDragDropProperty(object, value, tmpProperty);
+    if (addable) {
+      ImGui.SameLine(0, 0);
+      if (ImGui.Button(`${FontGlyph.glyphs['plus']}##add`, new ImGui.ImVec2(ImGui.GetFrameHeight(), 0))) {
+        const ctor = group.objectTypes?.[0]?.ctor;
+        const newObj = ctor
+          ? group.prop.create
+            ? group.prop.create.call(group.object, ctor, group.index + 1)
+            : new ctor()
+          : null;
+        (group.prop.add<'object'>).call(group.object, { object: [newObj] }, group.index + 1);
+        this.dispatchEvent('object_property_changed', group.object, group.prop);
+        this.refresh();
+      }
+    }
+    if (deletable) {
+      ImGui.SameLine(0, 0);
+      if (
+        ImGui.Button(`${FontGlyph.glyphs['cancel']}##delete`, new ImGui.ImVec2(ImGui.GetFrameHeight(), 0))
+      ) {
+        group.prop.delete!.call(group.object, group.index);
+        this.dispatchEvent('object_property_changed', group.object, group.prop);
+        this.refresh();
+      }
+    }
+    if (extraButtons > 0) {
+      ImGui.EndChild();
+    }
+    if (changed && value.set) {
+      value.set.call(object, tmpProperty);
+      this.refresh();
+      this.dispatchEvent('object_property_changed', object, value);
+    }
+    return true;
+  }
   private renderRawProperty(
     value: {
       name: string;
@@ -595,46 +708,70 @@ export class PropertyEditor extends Observable<{
       }
       case 'int2': {
         const val = tmpProperty.num as [number, number];
-        changed = ImGui.InputInt2('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+        changed = ImGui.DragInt2(
+          '##value',
+          val,
+          readonly ? 0 : (value.options?.speed ?? 0.1),
+          value.options?.minValue ?? undefined,
+          value.options?.maxValue ?? undefined
+        );
         break;
       }
       case 'int3': {
         const val = tmpProperty.num as [number, number, number];
-        changed = ImGui.InputInt3('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+        changed = ImGui.DragInt3(
+          '##value',
+          val,
+          readonly ? 0 : (value.options?.speed ?? 0.1),
+          value.options?.minValue ?? undefined,
+          value.options?.maxValue ?? undefined
+        );
         break;
       }
       case 'int4': {
         const val = tmpProperty.num as [number, number, number, number];
-        changed = ImGui.InputInt4('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+        changed = ImGui.DragInt4(
+          '##value',
+          val,
+          readonly ? 0 : (value.options?.speed ?? 0.1),
+          value.options?.minValue ?? undefined,
+          value.options?.maxValue ?? undefined
+        );
         break;
       }
       case 'vec2': {
         const val = tmpProperty.num as [number, number];
-        changed = ImGui.InputFloat2(
+        changed = ImGui.DragFloat2(
           '##value',
           val,
-          undefined,
-          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+          readonly ? 0 : (value.options?.speed ?? 0.01),
+          value.options?.minValue ?? undefined,
+          value.options?.maxValue ?? undefined,
+          '%.3f'
         );
         break;
       }
       case 'vec3': {
         const val = tmpProperty.num as [number, number, number];
-        changed = ImGui.InputFloat3(
+        changed = ImGui.DragFloat3(
           '##value',
           val,
-          undefined,
-          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+          readonly ? 0 : (value.options?.speed ?? 0.01),
+          value.options?.minValue ?? undefined,
+          value.options?.maxValue ?? undefined,
+          '%.3f'
         );
         break;
       }
       case 'vec4': {
         const val = tmpProperty.num as [number, number, number, number];
-        changed = ImGui.InputFloat4(
+        changed = ImGui.DragFloat4(
           '##value',
           val,
-          undefined,
-          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+          readonly ? 0 : (value.options?.speed ?? 0.01),
+          value.options?.minValue ?? undefined,
+          value.options?.maxValue ?? undefined,
+          '%.3f'
         );
         break;
       }
@@ -667,6 +804,25 @@ export class PropertyEditor extends Observable<{
   private sRGBToLinear(x: number): number {
     // sRGB -> 线性
     return Math.pow(Math.max(0, Math.min(1, x)), 2.2);
+  }
+  private revealAsset(path: string) {
+    if (!path || !path.startsWith('/')) {
+      return;
+    }
+    eventBus.dispatchEvent('reveal_asset', ProjectService.VFS.normalizePath(path));
+  }
+  private revealAssetFromProperty(object: any, prop: PropertyAccessor<any>) {
+    if (!prop.options?.mimeTypes?.length) {
+      return;
+    }
+    const tmpProperty: RequireOptionals<PropertyValue> = {
+      num: [0, 0, 0, 0],
+      str: [''],
+      bool: [false],
+      object: []
+    };
+    prop.get.call(object, tmpProperty);
+    this.revealAsset(tmpProperty.str[0]);
   }
   private renderProperty(property: PropertyGroup | Property<any>, level: number) {
     if (property instanceof PropertyGroup) {
@@ -716,11 +872,15 @@ export class PropertyEditor extends Observable<{
       ImGui.TextDisabled(name ?? '');
     } else {
       ImGui.Text(value.options?.label ?? name);
+      if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
+        this.revealAssetFromProperty(object, value);
+      }
       if (level > 0) {
         ImGui.SetCursorPosX(baseX);
       }
     }
     if (value) {
+      const editSessionKey = this.getEditSessionKey(object, property.path);
       ImGui.TableNextColumn();
       ImGui.SetNextItemWidth(-1);
       const readonly = !value.set;
@@ -732,6 +892,7 @@ export class PropertyEditor extends Observable<{
         object: []
       };
       value.get.call(object, tmpProperty);
+      const oldValue = this.clonePropertyValue(tmpProperty);
       switch (value.type) {
         case 'bool': {
           const val = tmpProperty.bool as [boolean];
@@ -787,38 +948,84 @@ export class PropertyEditor extends Observable<{
             }
           } else {
             const val = tmpProperty.str as [string];
-            changed = ImGui.InputText(
-              '##value',
-              val,
-              undefined,
-              readonly ? ImGui.InputTextFlags.ReadOnly : undefined
-            );
+            const isSceneNodeRef = !!value.options?.sceneNode;
+            const canClearValue =
+              (!!value.options?.mimeTypes?.length || isSceneNodeRef) && !!value.set && !!val[0];
+            if (canClearValue) {
+              ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
+              ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
+            }
+            if (isSceneNodeRef) {
+              const displayValue = [val[0]] as [string];
+              ImGui.InputText('##value', displayValue, undefined, ImGui.InputTextFlags.ReadOnly);
+            } else {
+              changed = ImGui.InputText(
+                '##value',
+                val,
+                undefined,
+                readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+              );
+            }
+            if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
+              this.revealAsset(val[0]);
+            }
             this.setDragDropProperty(object, value, tmpProperty);
+            if (canClearValue) {
+              ImGui.SameLine(0, 0);
+              if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
+                tmpProperty.str[0] = '';
+                Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
+                  this.refresh();
+                  this.dispatchEvent('object_property_changed', object, value);
+                });
+              }
+              ImGui.EndChild();
+            }
           }
           break;
         }
         case 'int2': {
           const val = tmpProperty.num as [number, number];
-          changed = ImGui.InputInt2('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+          changed = ImGui.DragInt2(
+            '##value',
+            val,
+            readonly ? 0 : (value.options?.speed ?? 0.1),
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined
+          );
           break;
         }
         case 'int3': {
           const val = tmpProperty.num as [number, number, number];
-          changed = ImGui.InputInt3('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+          changed = ImGui.DragInt3(
+            '##value',
+            val,
+            readonly ? 0 : (value.options?.speed ?? 0.1),
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined
+          );
           break;
         }
         case 'int4': {
           const val = tmpProperty.num as [number, number, number, number];
-          changed = ImGui.InputInt4('##value', val, readonly ? ImGui.InputTextFlags.ReadOnly : undefined);
+          changed = ImGui.DragInt4(
+            '##value',
+            val,
+            readonly ? 0 : (value.options?.speed ?? 0.1),
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined
+          );
           break;
         }
         case 'vec2': {
           const val = tmpProperty.num as [number, number];
-          changed = ImGui.InputFloat2(
+          changed = ImGui.DragFloat2(
             '##value',
             val,
-            undefined,
-            readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+            readonly ? 0 : (value.options?.speed ?? 0.01),
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined,
+            '%.3f'
           );
           break;
         }
@@ -830,11 +1037,13 @@ export class PropertyEditor extends Observable<{
             ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
           }
-          changed = ImGui.InputFloat3(
+          changed = ImGui.DragFloat3(
             '##value',
             val,
-            undefined,
-            readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+            readonly ? 0 : (value.options?.speed ?? 0.01),
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined,
+            '%.3f'
           );
           if (editRotation) {
             ImGui.SameLine(0, 0);
@@ -869,11 +1078,13 @@ export class PropertyEditor extends Observable<{
         }
         case 'vec4': {
           const val = tmpProperty.num as [number, number, number, number];
-          changed = ImGui.InputFloat4(
+          changed = ImGui.DragFloat4(
             '##value',
             val,
-            undefined,
-            readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+            readonly ? 0 : (value.options?.speed ?? 0.01),
+            value.options?.minValue ?? undefined,
+            value.options?.maxValue ?? undefined,
+            '%.3f'
           );
           break;
         }
@@ -926,6 +1137,9 @@ export class PropertyEditor extends Observable<{
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
           }
           ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
+          if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
+            this.revealAsset(val[0]);
+          }
           this.setDragDropProperty(object, value, tmpProperty);
           if (value.isNullable?.call(object, 0)) {
             ImGui.SameLine(0, 0);
@@ -979,11 +1193,73 @@ export class PropertyEditor extends Observable<{
         this.refresh();
         this.dispatchEvent('object_property_changed', object, value);
       }
+      if (value.set && ImGui.IsItemActivated() && !this._editSessions.has(editSessionKey)) {
+        this._editSessions.set(editSessionKey, oldValue);
+      }
+      if (value.set && ImGui.IsItemDeactivatedAfterEdit()) {
+        const oldSnapshot = this._editSessions.get(editSessionKey) ?? oldValue;
+        const newSnapshot = {
+          num: [0, 0, 0, 0],
+          str: [''],
+          bool: [false],
+          object: []
+        } as RequireOptionals<PropertyValue>;
+        value.get.call(object, newSnapshot);
+        this.dispatchEvent(
+          'object_property_edit_finished',
+          object,
+          value,
+          this.clonePropertyValue(oldSnapshot),
+          this.clonePropertyValue(newSnapshot)
+        );
+        this._editSessions.delete(editSessionKey);
+      }
     }
     ImGui.PopID();
   }
+  private getEditSessionKey(object: any, propertyPath: string) {
+    const objectId =
+      object?.runtimeId !== undefined
+        ? `${object.runtimeId}`
+        : `${object?.constructor?.name ?? 'Object'}:${Object.prototype.toString.call(object)}`;
+    return `${objectId}::${propertyPath}`;
+  }
+  private clonePropertyValue(value: {
+    num: number[];
+    str: string[];
+    bool: boolean[];
+    object: object[];
+  }): RequireOptionals<PropertyValue> {
+    return {
+      num: [...(value.num ?? [])],
+      str: [...(value.str ?? [])],
+      bool: [...(value.bool ?? [])],
+      object: [...(value.object ?? [])]
+    };
+  }
   private setDragDropProperty(obj: any, prop: PropertyAccessor, value: PropertyValue) {
     if (prop.set) {
+      if (prop.options?.sceneNode && ImGui.BeginDragDropTarget()) {
+        const peekPayload = ImGui.AcceptDragDropPayload('NODE', ImGui.DragDropFlags.AcceptBeforeDelivery);
+        if (peekPayload) {
+          const data = peekPayload.Data as SceneNode;
+          if (
+            data instanceof SceneNode &&
+            (!prop.options.sceneNode.kind || prop.options.sceneNode.kind === 'node' || data.isMesh?.())
+          ) {
+            const payload = ImGui.AcceptDragDropPayload('NODE');
+            if (payload) {
+              const droppedNode = payload.Data as SceneNode;
+              value.str[0] = droppedNode?.persistentId ?? '';
+              Promise.resolve(prop.set.call(obj, value as RequireOptionals<PropertyValue>)).then(() => {
+                this.refresh();
+                this.dispatchEvent('object_property_changed', obj, prop);
+              });
+            }
+          }
+        }
+        ImGui.EndDragDropTarget();
+      }
       if (prop.options?.mimeTypes?.length > 0 && ImGui.BeginDragDropTarget()) {
         const peekPayload = ImGui.AcceptDragDropPayload('ASSET', ImGui.DragDropFlags.AcceptBeforeDelivery);
         if (peekPayload) {

@@ -496,9 +496,9 @@ export function getSkeletonClass(): SerializableClass {
         id: string;
       }
     ) {
-      const prefabNode = ctx.getPrefabNode();
+      const prefabNode = ctx.getPrefabNode() ?? ctx;
       const joints = init.joints
-        .map((id) => prefabNode!.findNodeById(id)!)
+        .map((id) => prefabNode.findNodeById(id)!)
         .map((node) => {
           node!.jointTypeT = 'static';
           node!.jointTypeS = 'static';
@@ -676,8 +676,8 @@ export function getAnimationClass(manager: ResourceManager): SerializableClass {
                   this.addTrack(targetObj, track);
                 }
               } else if (track instanceof AnimationTrack) {
-                const prefabNode = this._animationSet.model.getPrefabNode();
-                const node = prefabNode!.findNodeById(track.target);
+                const prefabNode = this._animationSet.model.getPrefabNode() ?? this._animationSet.model;
+                const node = prefabNode.findNodeById(track.target);
                 if (node) {
                   this.addTrack(node, track);
                 } else {

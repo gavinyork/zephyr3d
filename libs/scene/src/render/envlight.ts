@@ -149,16 +149,19 @@ export class EnvShIBL extends EnvironmentLighting {
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP] = pb.texCube().uniform(0);
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD] = pb.float().uniform(0);
       }
-      if (getDevice().type === 'webgl' || !getDevice().getDeviceCaps().framebufferCaps.supportFloatBlending) {
-        if (this.irradianceSHFB) {
-          pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.tex2D().uniform(0);
-          pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
+      if (this.irradianceSHFB) {
+        const tex = pb.tex2D();
+        const formatInfo = getDevice()
+          .getDeviceCaps()
+          .textureCaps.getTextureFormatInfo(this.irradianceSHFB.getColorAttachments()[0].format);
+        if (formatInfo && !formatInfo.filterable) {
+          tex.sampleType('unfilterable-float');
         }
-      } else {
-        if (this.irradianceSH) {
-          pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.vec4[9]().uniformBuffer(0);
-          pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
-        }
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = tex.uniform(0);
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
+      } else if (this.irradianceSH) {
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.vec4[9]().uniformBuffer(0);
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
       }
     }
   }
@@ -171,20 +174,16 @@ export class EnvShIBL extends EnvironmentLighting {
       bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this.radianceMap.mipLevelCount - 1);
       bg.setTexture(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this.radianceMap);
     }
-    if (getDevice().type === 'webgl' || !getDevice().getDeviceCaps().framebufferCaps.supportFloatBlending) {
-      if (this.irradianceSHFB) {
-        bg.setTexture(
-          EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH,
-          this.irradianceSHFB.getColorAttachments()[0],
-          fetchSampler('clamp_nearest_nomip')
-        );
-        bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW, this.irradianceWindow);
-      }
-    } else {
-      if (this.irradianceSH) {
-        bg.setBuffer(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH, this.irradianceSH);
-        bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW, this.irradianceWindow);
-      }
+    if (this.irradianceSHFB) {
+      bg.setTexture(
+        EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH,
+        this.irradianceSHFB.getColorAttachments()[0],
+        fetchSampler('clamp_nearest_nomip')
+      );
+      bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW, this.irradianceWindow);
+    } else if (this.irradianceSH) {
+      bg.setBuffer(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH, this.irradianceSH);
+      bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW, this.irradianceWindow);
     }
   }
   /**
@@ -207,6 +206,7 @@ export class EnvShIBL extends EnvironmentLighting {
    */
   getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp) {
     const pb = scope.$builder;
+    const that = this;
     pb.func('Z_sh_Y0', [pb.vec3('v')], function () {
       this.$return(0.2820947917);
     });
@@ -236,7 +236,7 @@ export class EnvShIBL extends EnvironmentLighting {
     });
     pb.func('Z_sh_eval', [pb.vec3('v')], function () {
       this.$l.window = this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW];
-      if (getDevice().type === 'webgl' || !getDevice().getDeviceCaps().framebufferCaps.supportFloatBlending) {
+      if (that.irradianceSHFB) {
         this.$l.c = pb.mul(
           pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH], pb.vec2(0.5 / 3, 0.5 / 3), 0)
             .rgb,
@@ -363,14 +363,14 @@ export class EnvShIBL extends EnvironmentLighting {
    * @override
    */
   hasRadiance() {
-    return !!this._radianceMap;
+    return !!this._radianceMap.get();
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasIrradiance}
    * @override
    */
   hasIrradiance() {
-    return !!this._irradianceSH;
+    return !!this._irradianceSH.get() || !!this._irradianceSHFB.get();
   }
   /**
    * Disposes the object and releases all GPU resources

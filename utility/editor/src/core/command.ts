@@ -60,3 +60,26 @@ export class CommandManager {
     }
   }
 }
+
+export class CompositeCommand extends Command<any[]> {
+  private readonly _commands: Command<any>[];
+  constructor(desc: string, commands: Command<any>[]) {
+    super(desc);
+    this._commands = commands;
+  }
+  get commands() {
+    return this._commands;
+  }
+  async execute(): Promise<any[]> {
+    const result: any[] = [];
+    for (const command of this._commands) {
+      result.push(await command.execute());
+    }
+    return result;
+  }
+  async undo(): Promise<void> {
+    for (let i = this._commands.length - 1; i >= 0; i--) {
+      await this._commands[i].undo();
+    }
+  }
+}

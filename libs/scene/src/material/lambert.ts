@@ -3,7 +3,7 @@ import { mixinVertexColor } from './mixins/vertexcolor';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import type { PBFunctionScope } from '@zephyr3d/device';
 import { ShaderHelper } from './shader/helper';
-import { LIGHT_TYPE_POINT, MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Clonable } from '@zephyr3d/base';
 
 /**
@@ -85,8 +85,7 @@ export class LambertMaterial
         if (this.needCalculateEnvLight()) {
           scope.color = pb.add(scope.color, this.getEnvLightIrradiance(scope, scope.normal));
         }
-        this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
-          this.$l.diffuseScale = this.$choice(pb.equal(type, LIGHT_TYPE_POINT), extra.x, pb.float(1));
+        this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, _extra, shadow) {
           this.$l.lightAtten = that.calculateLightAttenuation(
             this,
             type,
@@ -107,8 +106,7 @@ export class LambertMaterial
             colorIntensity.a,
             this.NoL,
             this.lightAtten,
-            1 / Math.PI,
-            this.diffuseScale
+            1 / Math.PI
           );
           if (shadow) {
             this.$l.shadow = pb.vec3(that.calculateShadow(this, scope.$inputs.worldPos, this.NoL));

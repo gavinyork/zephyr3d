@@ -28,6 +28,18 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
   get sceneChanged() {
     return this._sceneChanged;
   }
+  get scenePath() {
+    return this._scenePath;
+  }
+  get openedSceneName() {
+    if (!this._scenePath) {
+      return 'Untitled';
+    }
+    const normalized = this._scenePath.replace(/\\/g, '/');
+    const index = normalized.lastIndexOf('/');
+    const fileName = index >= 0 ? normalized.slice(index + 1) : normalized;
+    return fileName.replace(/\.zscn$/i, '');
+  }
   getModel(): SceneModel {
     return this._model;
   }

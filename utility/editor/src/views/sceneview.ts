@@ -1,6 +1,7 @@
 import { ImGui } from '@zephyr3d/imgui';
 import type { SceneModel } from '../models/scenemodel';
 import { PostGizmoRenderer } from './gizmo/postgizmo';
+import type { TransformSpace } from './gizmo/postgizmo';
 import { PropertyEditor } from '../components/grid';
 import type {
   Camera,
@@ -20,6 +21,7 @@ import {
   Water,
   ClipmapTerrain,
   PerspectiveCamera,
+  //OrthoCamera,
   getDevice,
   getEngine,
   Sprite
@@ -31,26 +33,27 @@ import { ToolBar } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import type { AABB, GenericConstructor, Nullable } from '@zephyr3d/base';
 import { DRef, HttpFS } from '@zephyr3d/base';
-import { ASSERT, Quaternion, Vector3 } from '@zephyr3d/base';
+import { ASSERT, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { Dialog } from './dlg/dlg';
 import { renderTextureViewer } from '../components/textureviewer';
 import { MenubarView } from '../components/menubar';
 import { StatusBar } from '../components/statusbar';
 import { BaseView } from './baseview';
-import { CommandManager } from '../core/command';
+import { CommandManager, CompositeCommand } from '../core/command';
 import {
   AddAssetCommand,
   AddChildCommand,
   AddPrefabCommand,
   AddShapeCommand,
+  PropertyEditCommand,
   NodeCloneCommand,
   NodeDeleteCommand,
   NodeReparentCommand,
   NodeTransformCommand
 } from '../commands/scenecommands';
 import { NodeProxy } from '../helpers/proxy';
-import type { EditTool } from './edittools/edittool';
+import type { EditTool, EditToolContext } from './edittools/edittool';
 import { createEditTool, isObjectEditable } from './edittools/edittool';
 import { calcHierarchyBoundingBoxWorld } from '../helpers/misc';
 import { DialogRenderer } from '../components/modal';
@@ -66,6 +69,23 @@ import { DockPannel, ResizeDirection } from '../components/dockpanel';
 import { DlgSaveFile } from './dlg/savefiledlg';
 import { ResourceService } from '../core/services/resource';
 import { DlgMessage } from './dlg/messagedlg';
+
+type ColliderKind = 'sphere' | 'capsule' | 'plane';
+type MultiTransformItem = {
+  node: SceneNode;
+  startWorld: Matrix4x4;
+  startTransform: TRS;
+};
+type PropertySnapshot = {
+  num: number[];
+  str: string[];
+  bool: boolean[];
+  object: object[];
+};
+type SyncedPropertyRecord = {
+  oldValue: PropertySnapshot;
+  newValue: PropertySnapshot;
+};
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -95,6 +115,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
   private readonly _clipBoardData: DRef<SceneNode>;
+  private _clipBoardNodes: SceneNode[];
   private _proxy: Nullable<NodeProxy>;
   private readonly _currentEditTool: DRef<EditTool>;
   private readonly _cameraAnimationEyeFrom: Vector3;
@@ -106,6 +127,14 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _animatedCamera: Nullable<Camera>;
   private readonly _editingProps: Map<object, Map<PropertyAccessor, { id: string; value: number[] }>>;
   private _trackId: number;
+  private _lastDuplicateTarget: 'scene' | 'asset';
+  private _multiTransformItems: MultiTransformItem[];
+  private _multiTransformMasterStartWorld: Nullable<Matrix4x4>;
+  private _multiTransformPivot: Nullable<SceneNode>;
+  private _preferredTransformSpace: TransformSpace;
+  private _suspendMultiPropertySync: boolean;
+  private _syncedPropertySessions: Map<string, Map<SceneNode, SyncedPropertyRecord>>;
+  private readonly _editToolContext: EditToolContext;
   constructor(controller: SceneController) {
     super(controller);
     this._cmdManager = new CommandManager();
@@ -126,6 +155,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
+    this._clipBoardNodes = [];
     this._proxy = null;
     this._currentEditTool = new DRef();
     this._cameraAnimationEyeFrom = new Vector3();
@@ -137,6 +167,31 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._animatedCamera = null;
     this._editingProps = new Map();
     this._trackId = 0;
+    this._lastDuplicateTarget = 'scene';
+    this._multiTransformItems = [];
+    this._multiTransformMasterStartWorld = null;
+    this._multiTransformPivot = null;
+    this._preferredTransformSpace = 'world';
+    this._suspendMultiPropertySync = false;
+    this._syncedPropertySessions = new Map();
+    this._editToolContext = {
+      executeCommand: (command) => this._cmdManager.execute(command),
+      notifySceneChanged: () => eventBus.dispatchEvent('scene_changed'),
+      refreshProperties: () => this._propGrid.refresh(),
+      getCamera: () => this.controller.model.scene.mainCamera ?? null,
+      getViewportRect: () => {
+        const viewport = this.controller.model.scene.mainCamera?.viewport;
+        if (!viewport) {
+          return null;
+        }
+        return [
+          viewport[0],
+          getDevice().canvas.clientHeight - viewport[1] - viewport[3],
+          viewport[2],
+          viewport[3]
+        ];
+      }
+    };
     this._statusbar = new StatusBar();
     this._menubar = new MenubarView({
       items: [
@@ -158,6 +213,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             {
               label: 'Export Project',
               action: () => eventBus.dispatchEvent('action', 'EXPORT_PROJECT')
+            },
+            {
+              label: 'Export to OSS...',
+              action: () => eventBus.dispatchEvent('action', 'EXPORT_ASSETS_OSS')
             },
             {
               label: 'Delete Project',
@@ -222,10 +281,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               label: 'Copy',
               shortCut: 'Ctrl+C',
               action: () => {
-                const node = this._sceneHierarchy!.selectedNode;
-                if (node) {
-                  this.handleCopyNode(node);
-                }
+                this.handleCopySelectedNodes();
               }
             },
             {
@@ -266,10 +322,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 {
                   label: 'Tetrahedron',
                   action: () => this.handleAddShape('/assets/@builtins/primitives/tetrahedron.zmsh')
-                },
-                {
-                  label: 'Capsule',
-                  action: () => this.handleAddShape('/assets/@builtins/primitives/capsule.zmsh')
                 }
               ]
             },
@@ -362,6 +414,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             return this._postGizmoRenderer!.mode === 'select';
           },
           action: () => {
+            // 检查是否正在处理摄像机移动
             const cameraController = this.controller.model.scene.mainCamera
               ?.controller as EditorCameraController;
             if (cameraController && cameraController.isRightMouseDown()) {
@@ -441,17 +494,32 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           shortcut: 'Delete',
           tooltip: () => 'Delete selected node',
           selected: () => {
-            return !!this._sceneHierarchy!.selectedNode;
+            return (this._sceneHierarchy?.selectedNodes.size ?? 0) > 0;
           },
           action: () => {
-            const node = this._sceneHierarchy!.selectedNode;
-            if (node?.parent) {
-              this.handleDeleteNode(node);
-            }
+            this.handleDeleteSelectedNodes();
           }
         },
         {
           label: '-'
+        },
+        {
+          label: '',
+          tooltip: () =>
+            this.isTransformSpaceForcedWorld()
+              ? 'Transform space (multi-selection uses World): click to set preferred space'
+              : 'Transform space for move/rotate/scale',
+          visible: () => this.isTransformModeActive(),
+          selected: () => this._preferredTransformSpace === 'local',
+          render: () => ImGui.Button(this._preferredTransformSpace === 'local' ? 'Local' : 'World'),
+          action: () => {
+            this._preferredTransformSpace = this._preferredTransformSpace === 'local' ? 'world' : 'local';
+            this.updateGizmoTransformSpace();
+          }
+        },
+        {
+          label: '-',
+          visible: () => this.isTransformModeActive()
         },
         {
           label: '',
@@ -480,13 +548,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           shortcut: 'Ctrl+D',
           tooltip: () => 'Creatas an instance of current node',
           selected: () => {
-            return !!this._sceneHierarchy!.selectedNode;
+            return (this._sceneHierarchy?.selectedNodes.size ?? 0) > 0;
           },
           action: () => {
-            const selectedNode = this._sceneHierarchy!.selectedNode;
-            if (selectedNode) {
-              this.handleCloneNode(selectedNode);
-            }
+            this.handleCloneSelectedNodes();
           }
         },
         {
@@ -527,13 +592,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           shortcut: 'Ctrl+C',
           tooltip: () => 'Copy',
           selected: () => {
-            return !!this._sceneHierarchy!.selectedNode;
+            return (this._sceneHierarchy?.selectedNodes.size ?? 0) > 0;
           },
           action: () => {
-            const node = this._sceneHierarchy!.selectedNode;
-            if (node) {
-              this.handleCopyNode(node);
-            }
+            this.handleCopySelectedNodes();
           }
         },
         {
@@ -541,7 +603,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           shortcut: 'Ctrl+V',
           tooltip: () => 'Paste',
           selected: () => {
-            return !!this._clipBoardData.get();
+            return this._clipBoardNodes.length > 0 || !!this._clipBoardData.get();
           },
           action: () => {
             this.handlePasteNode();
@@ -591,6 +653,17 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           },
           action: () => {
             this.play();
+          }
+        },
+        {
+          label: FontGlyph.glyphs['eye'],
+          id: 'PLAY_CURRENT_SCENE',
+          selected: () => true,
+          tooltip: () => {
+            return 'Preview current scene in new tab';
+          },
+          action: () => {
+            this.playCurrentScene();
           }
         }
       ],
@@ -723,21 +796,39 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         if (!settings!.startupScene && !settings!.startupScript) {
           DlgMessage.messageBox('Error', 'Please set startup scene or startup script in <Project Settings>');
         } else {
-          const projectId = this.controller.editor.currentProject.uuid!;
-          const url = new URL(window.location.href);
-          url.search = '';
-          url.searchParams.append('project', projectId);
-          if (ProjectService.VFS instanceof HttpFS) {
-            url.searchParams.append('remote', '');
-          }
-          const a = document.createElement('a');
-          a.href = url.href;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
-          a.click();
+          this.openPreviewInNewTab();
         }
       });
     });
+  }
+  async playCurrentScene() {
+    await ensureDependencies();
+    if (!(await this.controller.ensureSceneSaved())) {
+      return;
+    }
+    const scenePath = this.controller.scenePath;
+    if (!scenePath) {
+      await DlgMessage.messageBox('Error', 'Please save current scene first.');
+      return;
+    }
+    this.openPreviewInNewTab(scenePath);
+  }
+  private openPreviewInNewTab(sceneOverride?: string) {
+    const projectId = this.controller.editor.currentProject.uuid!;
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.searchParams.append('project', projectId);
+    if (sceneOverride) {
+      url.searchParams.append('scene', sceneOverride);
+    }
+    if (ProjectService.VFS instanceof HttpFS) {
+      url.searchParams.append('remote', '');
+    }
+    const a = document.createElement('a');
+    a.href = url.href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.click();
   }
   renderDropZone(x: number, y: number, w: number, h: number) {
     const color = new ImGui.ImVec4(0, 0, 0, 0);
@@ -913,25 +1004,69 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           ev.button === 0 &&
           ev.type === 'pointerdown'
         ) {
-          if (node) {
-            let assetNode = node;
-            while (assetNode && !getEngine().resourceManager.getAssetId(assetNode)) {
-              assetNode = assetNode.parent!;
-            }
-            if (assetNode) {
-              node = assetNode;
-            }
-          }
           node = this._proxy!.getProto(node!);
-          if (!ImGui.GetIO().KeyCtrl) {
-            this._sceneHierarchy!.selectNode(node?.getPrefabNode() ?? node);
-          } else {
-            this._sceneHierarchy!.selectNode(node);
-          }
+          this.applySceneViewSelection(node, ImGui.GetIO().KeyCtrl, ImGui.GetIO().KeyShift);
         }
       }
     }
     return true;
+  }
+  private applySceneViewSelection(node: Nullable<SceneNode>, ctrl: boolean, shift: boolean) {
+    const targetNode = this.resolvePickedSelectionTarget(node);
+    if (!ctrl && !shift) {
+      this._sceneHierarchy!.selectNode(targetNode);
+      return;
+    }
+    if (!targetNode) {
+      return;
+    }
+    const currentSelection = new Set(this.getSelectedSceneNodes());
+    if (ctrl) {
+      if (currentSelection.has(targetNode)) {
+        currentSelection.delete(targetNode);
+      } else {
+        currentSelection.add(targetNode);
+      }
+      const nextSelection = [...currentSelection];
+      const activeNode =
+        nextSelection.length > 0
+          ? currentSelection.has(targetNode)
+            ? targetNode
+            : nextSelection[nextSelection.length - 1]
+          : null;
+      this._sceneHierarchy!.selectNodes(nextSelection, activeNode);
+      return;
+    }
+    currentSelection.add(targetNode);
+    this._sceneHierarchy!.selectNodes([...currentSelection], targetNode);
+  }
+  private getPickSelectionRoot(node: Nullable<SceneNode>): Nullable<SceneNode> {
+    if (!node) {
+      return null;
+    }
+    let assetNode = node;
+    while (assetNode && !getEngine().resourceManager.getAssetId(assetNode)) {
+      assetNode = assetNode.parent!;
+    }
+    const targetNode = assetNode ?? node;
+    return targetNode.getPrefabNode() ?? targetNode;
+  }
+  private resolvePickedSelectionTarget(node: Nullable<SceneNode>): Nullable<SceneNode> {
+    if (!node) {
+      return null;
+    }
+    const rootNode = this.getPickSelectionRoot(node);
+    const selectedNode = this._sceneHierarchy?.selectedNode ?? null;
+    const selectedRootNode = this.getPickSelectionRoot(selectedNode);
+    const isSameRootSubNodeSelection =
+      !!selectedNode &&
+      !!selectedRootNode &&
+      selectedRootNode === rootNode &&
+      selectedNode !== selectedRootNode;
+    if (isSameRootSubNodeSelection && node !== rootNode) {
+      return node;
+    }
+    return selectedNode === rootNode && node !== rootNode ? node : rootNode;
   }
   lookAt(camera: Camera, node: SceneNode) {
     if (camera === node) {
@@ -983,8 +1118,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._menubar.registerShortcuts(this);
     this._menubar.on('action', this.handleSceneAction, this);
     this._toolbar.registerShortcuts(this);
+    this.registerShortcut('Ctrl+D', () => {
+      this.handleDuplicateShortcut();
+    });
     this._toolbar.on('action', this.handleSceneAction, this);
+    this._assetView.renderer.on('selection_changed', this.handleAssetSelectionChanged, this);
     this._propGrid.on('object_property_changed', this.handleObjectPropertyChanged, this);
+    this._propGrid.on('object_property_edit_finished', this.handleObjectPropertyEditFinished, this);
     this._propGrid.on('request_edit_aabb', this.editAABB, this);
     this._propGrid.on('end_edit_aabb', this.endEditAABB, this);
     this._propGrid.on('request_edit_track', this.editPropAnimation, this);
@@ -1001,6 +1141,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   protected onDeactivate(): void {
     super.onDeactivate();
+    this._assetView?.renderer.off('selection_changed', this.handleAssetSelectionChanged, this);
     this._assetView?.dispose();
     this._assetView = null;
     this._menubar.unregisterShortcuts(this);
@@ -1008,6 +1149,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._toolbar.unregisterShortcuts(this);
     this._toolbar.off('action', this.handleSceneAction, this);
     this._propGrid.off('object_property_changed', this.handleObjectPropertyChanged, this);
+    this._propGrid.off('object_property_edit_finished', this.handleObjectPropertyEditFinished, this);
     this._propGrid.off('request_edit_aabb', this.editAABB, this);
     this._propGrid.off('end_edit_aabb', this.endEditAABB, this);
     this._propGrid.off('request_edit_track', this.editPropAnimation, this);
@@ -1026,6 +1168,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._proxy = new NodeProxy(this.controller.model.scene);
       this._postGizmoRenderer = new PostGizmoRenderer(this.controller.model.scene.mainCamera!, null);
       this._postGizmoRenderer.mode = 'select';
+      this.updateGizmoTransformSpace();
       this._leftDockPanel = new DockPannel(
         0,
         this._menubar.height + this._toolbar.height,
@@ -1036,22 +1179,24 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         600,
         ResizeDirection.Right
       );
-      this._sceneHierarchy = new SceneHierarchy(this.controller.model.scene);
+      this._sceneHierarchy = new SceneHierarchy(
+        this.controller.model.scene,
+        () => this.controller.openedSceneName
+      );
+      this._sceneHierarchy.on('selection_changed', this.handleHierarchySelectionChanged, this);
       this._sceneHierarchy.on('node_selected', this.handleNodeSelected, this);
       this._sceneHierarchy.on('node_deselected', this.handleNodeDeselected, this);
       this._sceneHierarchy.on('node_request_delete', this.handleDeleteNode, this);
       this._sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
       this._sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
       this._sceneHierarchy.on('set_main_camera', this.handleSetMainCamera, this);
+      this._sceneHierarchy.on('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.on('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.on('request_save_prefab', this.handleSavePrefab, this);
+      this._sceneHierarchy.on('request_add_collider', this.handleAddCollider, this);
+      this.controller.model.scene.rootNode.on('nodeattached', this.handleNodeAttached, this);
       this.controller.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
-      this.controller.model.scene.rootNode.iterate((node) => {
-        this._proxy!.createProxy(node);
-        if (node === this.controller.model.scene.mainCamera) {
-          this._proxy!.hideProxy(node);
-        }
-      });
+      this.syncNodeProxyTree(this.controller.model.scene.rootNode);
       this._propGrid.clear();
       this._propGrid.object = this.controller.model.scene;
       this.controller.model.scene.on('startrender', this.handleStartRender, this);
@@ -1066,20 +1211,26 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   private sceneFinialize() {
     this._leftDockPanel = null;
+    this._multiTransformPivot = null;
+    this._syncedPropertySessions.clear();
     this._propGrid.object = null;
     this._propGrid.clear();
     if (this._sceneHierarchy) {
+      this._sceneHierarchy.off('selection_changed', this.handleHierarchySelectionChanged, this);
       this._sceneHierarchy.off('node_selected', this.handleNodeSelected, this);
       this._sceneHierarchy.off('node_deselected', this.handleNodeDeselected, this);
       this._sceneHierarchy.off('node_request_delete', this.handleDeleteNode, this);
       this._sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
       this._sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
       this._sceneHierarchy.off('set_main_camera', this.handleSetMainCamera, this);
+      this._sceneHierarchy.off('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.off('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.off('request_save_prefab', this.handleSavePrefab, this);
+      this._sceneHierarchy.off('request_add_collider', this.handleAddCollider, this);
       this._sceneHierarchy = null;
     }
     if (this.controller.model.scene) {
+      this.controller.model.scene.rootNode.off('nodeattached', this.handleNodeAttached, this);
       this.controller.model.scene.rootNode.off('noderemoved', this.handleNodeRemoved, this);
       this.controller.model.scene.off('startrender', this.handleStartRender, this);
       this.controller.model.scene.off('endrender', this.handleEndRender, this);
@@ -1156,6 +1307,12 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleObjectPropertyChanged(object: object, prop: PropertyAccessor) {
     if (object instanceof SceneNode) {
       this._proxy!.updateProxy(object);
+      this.syncPropertyToMultiSelection(object, prop);
+    } else if (this.shouldRefreshSelectedColliderProxy(prop)) {
+      const selectedNode = this._sceneHierarchy?.selectedNode;
+      if (selectedNode) {
+        this._proxy!.updateProxy(selectedNode);
+      }
     }
     const info = this._editingProps.get(object)?.get(prop);
     if (info) {
@@ -1172,6 +1329,78 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       }
     }
     eventBus.dispatchEvent('scene_changed');
+  }
+  private async handleObjectPropertyEditFinished(
+    object: Nullable<object>,
+    prop: PropertyAccessor,
+    oldValue: PropertySnapshot,
+    newValue: PropertySnapshot
+  ) {
+    if (!object || !prop?.set) {
+      return;
+    }
+    const source = object as object;
+    const commands: PropertyEditCommand[] = [];
+    if (!this.isSamePropertyValue(oldValue, newValue)) {
+      commands.push(
+        new PropertyEditCommand(
+          source,
+          prop,
+          this.clonePropertyValue(oldValue),
+          this.clonePropertyValue(newValue)
+        )
+      );
+    }
+
+    if (source instanceof SceneNode) {
+      const sessionKey = this.getPropertySessionKey(source, prop);
+      const syncedTargets = this._syncedPropertySessions.get(sessionKey);
+      if (syncedTargets?.size) {
+        for (const [target, record] of syncedTargets) {
+          if (!this.isSamePropertyValue(record.oldValue, record.newValue)) {
+            commands.push(
+              new PropertyEditCommand(
+                target,
+                prop,
+                this.clonePropertyValue(record.oldValue),
+                this.clonePropertyValue(record.newValue),
+                `Edit property ${prop.name} (multi)`
+              )
+            );
+          }
+        }
+      }
+      this._syncedPropertySessions.delete(sessionKey);
+    }
+    if (commands.length === 1) {
+      await this._cmdManager.execute(commands[0]);
+    } else if (commands.length > 1) {
+      await this._cmdManager.execute(new CompositeCommand(`Edit property ${prop.name}`, commands));
+    }
+    eventBus.dispatchEvent('scene_changed');
+  }
+  private shouldRefreshSelectedColliderProxy(prop: PropertyAccessor) {
+    const selectedNode = this._sceneHierarchy?.selectedNode;
+    if (!selectedNode || !selectedNode.metaData || typeof selectedNode.metaData !== 'object') {
+      return false;
+    }
+    const collider =
+      (selectedNode.metaData as any).sceneCollider ?? (selectedNode.metaData as any).springCollider;
+    if (!collider || typeof collider !== 'object') {
+      return false;
+    }
+    const cls = getEngine().resourceManager.getClassByProperty(prop);
+    if (!cls) {
+      return false;
+    }
+    return (
+      cls.name === 'JSONProp' ||
+      cls.name === 'JSONString' ||
+      cls.name === 'JSONNumber' ||
+      cls.name === 'JSONBool' ||
+      cls.name === 'JSONData' ||
+      cls.name === 'JSONArray'
+    );
   }
   update(dt: number) {
     const selectedNode = this._sceneHierarchy!.selectedNode;
@@ -1201,7 +1430,18 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         Vector3.axisPY()
       );
       if (this._cameraAnimationTime >= this._cameraAnimationDuration) {
+        const controller = this._animatedCamera.controller as EditorCameraController;
+        controller?.syncCameraDistanceToViewCenter?.();
         this._animatedCamera = null;
+      }
+    }
+    if (!this._postGizmoCaptured && this._postGizmoRenderer?.node === this._multiTransformPivot) {
+      this.updateMultiTransformPivot();
+    }
+    if (this._postGizmoCaptured) {
+      const masterNode = this._transformNode.get();
+      if (masterNode) {
+        this.applyMultiTransformFromMaster(masterNode);
       }
     }
     if (this._currentEditTool.get()) {
@@ -1277,61 +1517,349 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private endEditAABB(aabb: AABB) {
     this._postGizmoRenderer!.endEditAABB(aabb);
   }
-  private handleCopyNode(node: SceneNode) {
-    if (node) {
-      this._clipBoardData.set(node);
-    }
-  }
-  private handlePasteNode() {
-    if (this._clipBoardData.get()) {
-      this.handleCloneNode(this._clipBoardData.get()!);
-    }
-  }
-  private handleCloneNode(node: SceneNode) {
-    if (!node) {
+  private handleCopySelectedNodes() {
+    const selectedNodes = this.getTopLevelSelection(this.getSelectedSceneNodes()).filter(
+      (node) => node !== this.controller.model.scene.rootNode
+    );
+    if (selectedNodes.length === 0) {
+      this._clipBoardData.dispose();
+      this._clipBoardNodes = [];
       return;
     }
-    let hasTerrain = false;
-    node.iterate((node) => {
-      if (node.isClipmapTerrain()) {
-        hasTerrain = true;
-        return true;
+    this._clipBoardData.set(selectedNodes[0]);
+    this._clipBoardNodes = selectedNodes;
+  }
+  private async handlePasteNode() {
+    const clipNodes = this._clipBoardNodes.length
+      ? this._clipBoardNodes
+      : this._clipBoardData.get()
+        ? [this._clipBoardData.get()!]
+        : [];
+    if (clipNodes.length === 0) {
+      return;
+    }
+    const commands: NodeCloneCommand[] = [];
+    for (const node of clipNodes) {
+      if (!node || node === this.controller.model.scene.rootNode) {
+        continue;
       }
-      return false;
-    });
-    if (hasTerrain) {
-      DlgMessage.messageBox('Error', 'Cloning terrain node is not allowed');
+      let hasTerrain = false;
+      node.iterate((child) => {
+        if (child.isClipmapTerrain()) {
+          hasTerrain = true;
+          return true;
+        }
+        return false;
+      });
+      if (hasTerrain) {
+        DlgMessage.messageBox('Error', 'Cloning terrain node is not allowed');
+        continue;
+      }
+      commands.push(new NodeCloneCommand(node));
+    }
+    if (commands.length === 0) {
       return;
     }
-    this._cmdManager.execute(new NodeCloneCommand(node)).then((sceneNode) => {
+    const result =
+      commands.length === 1
+        ? [await this._cmdManager.execute(commands[0])]
+        : ((await this._cmdManager.execute(new CompositeCommand('Paste nodes', commands))) as SceneNode[]);
+    const clonedNodes: SceneNode[] = [];
+    let lastCloned: Nullable<SceneNode> = null;
+    for (let i = 0; i < result.length; i++) {
+      const sceneNode = result[i];
+      if (!sceneNode) {
+        continue;
+      }
       sceneNode.position.x += 1;
-      this._sceneHierarchy!.selectNode(sceneNode);
-    });
-    eventBus.dispatchEvent('scene_changed');
+      clonedNodes.push(sceneNode);
+      lastCloned = sceneNode;
+    }
+    if (clonedNodes.length > 0) {
+      this._sceneHierarchy!.selectNodes(clonedNodes, lastCloned);
+      eventBus.dispatchEvent('scene_changed');
+    }
   }
   private handleEditNode(node: SceneNode) {
     if (!node) {
       return;
     }
-    if (!this._currentEditTool.get()) {
-      this._currentEditTool.set(createEditTool(this.editor, node));
-    } else {
+    const currentTool = this._currentEditTool.get();
+    if (!currentTool) {
+      this._currentEditTool.set(createEditTool(this.editor, node, this._editToolContext));
+      return;
+    }
+    const currentTarget = currentTool.getTarget();
+    const sameTarget =
+      currentTarget === node || (currentTarget instanceof SceneNode && currentTarget.isParentOf(node));
+    if (sameTarget) {
       this._currentEditTool.dispose();
+    } else {
+      this._currentEditTool.set(createEditTool(this.editor, node, this._editToolContext));
     }
   }
-  private handleDeleteNode(node: SceneNode) {
-    if (!node) {
+  private getSelectedSceneNodes() {
+    return this._sceneHierarchy ? [...this._sceneHierarchy.selectedNodes] : [];
+  }
+  private getTransformSelectionNodes(source?: SceneNode) {
+    const selected = this.getTopLevelSelection(this.getSelectedSceneNodes()).filter(
+      (node) =>
+        node !== this.controller.model.scene.rootNode &&
+        node !== this.controller.model.scene.mainCamera &&
+        (!source || node !== source)
+    );
+    return selected;
+  }
+  private getTopLevelSelection(nodes: SceneNode[]) {
+    return nodes.filter((node) => !nodes.some((other) => other !== node && other.isParentOf(node)));
+  }
+  private ensureMultiTransformPivot() {
+    if (!this._multiTransformPivot) {
+      this._multiTransformPivot = new SceneNode(this.controller.model.scene);
+      this._multiTransformPivot.name = '__multi_transform_pivot__';
+      this._multiTransformPivot.sealed = true;
+      this._multiTransformPivot.gpuPickable = false;
+      this._multiTransformPivot.parent = null;
+    }
+    return this._multiTransformPivot;
+  }
+  private updateMultiTransformPivot() {
+    const nodes = this.getTransformSelectionNodes();
+    if (nodes.length <= 1) {
+      return null;
+    }
+    const pivot = this.ensureMultiTransformPivot();
+    const center = new Vector3();
+    for (const node of nodes) {
+      center.addBy(node.getWorldPosition());
+    }
+    center.scaleBy(1 / nodes.length);
+    pivot.position.set(center);
+    pivot.rotation.identity();
+    pivot.scale.setXYZ(1, 1, 1);
+    return pivot;
+  }
+  private buildTRS(node: SceneNode): TRS {
+    return {
+      position: new Vector3(node.position),
+      rotation: new Quaternion(node.rotation),
+      scale: new Vector3(node.scale)
+    };
+  }
+  private clonePropertyValue(value: {
+    num: number[];
+    str: string[];
+    bool: boolean[];
+    object: object[];
+  }): PropertySnapshot {
+    return {
+      num: [...(value.num ?? [])],
+      str: [...(value.str ?? [])],
+      bool: [...(value.bool ?? [])],
+      object: [...(value.object ?? [])]
+    };
+  }
+  private isSamePropertyValue(a: PropertySnapshot, b: PropertySnapshot) {
+    if (a.num.length !== b.num.length || a.str.length !== b.str.length || a.bool.length !== b.bool.length) {
+      return false;
+    }
+    for (let i = 0; i < a.num.length; i++) {
+      if (a.num[i] !== b.num[i]) {
+        return false;
+      }
+    }
+    for (let i = 0; i < a.str.length; i++) {
+      if (a.str[i] !== b.str[i]) {
+        return false;
+      }
+    }
+    for (let i = 0; i < a.bool.length; i++) {
+      if (a.bool[i] !== b.bool[i]) {
+        return false;
+      }
+    }
+    if (a.object.length !== b.object.length) {
+      return false;
+    }
+    for (let i = 0; i < a.object.length; i++) {
+      if (a.object[i] !== b.object[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+  private getPropertySessionKey(object: SceneNode, prop: PropertyAccessor) {
+    const propName = getEngine().resourceManager.getPropertyName(prop) ?? prop.name;
+    return `${object.runtimeId}:${propName}`;
+  }
+  private syncPropertyToMultiSelection(object: object, prop: PropertyAccessor) {
+    if (this._suspendMultiPropertySync || !(object instanceof SceneNode) || !prop?.set) {
       return;
+    }
+    if (this._propGrid.object !== object) {
+      return;
+    }
+    const selectedNodes = this.getSelectedSceneNodes().filter(
+      (node) =>
+        node !== object && node !== this.controller.model.scene.rootNode && node !== this._multiTransformPivot
+    );
+    if (selectedNodes.length === 0) {
+      return;
+    }
+    const value = { num: [0, 0, 0, 0], str: [] as string[], object: [] as any[], bool: [false] };
+    prop.get.call(object, value);
+    const newValue = this.clonePropertyValue(value);
+    const resourceManager = getEngine().resourceManager;
+    const propPath = resourceManager.getPropertyName(prop);
+    const pathProp = propPath ? resourceManager.getPropertyByName(propPath) : null;
+    const sessionKey = this.getPropertySessionKey(object, prop);
+    let session = this._syncedPropertySessions.get(sessionKey);
+    if (!session) {
+      session = new Map();
+      this._syncedPropertySessions.set(sessionKey, session);
+    }
+    this._suspendMultiPropertySync = true;
+    try {
+      for (const target of selectedNodes) {
+        const targetProp = prop.isValid?.call(target) === false ? pathProp : prop;
+        if (!targetProp || !targetProp.set) {
+          continue;
+        }
+        if (targetProp.isValid && !targetProp.isValid.call(target)) {
+          continue;
+        }
+        let record = session.get(target);
+        if (!record) {
+          const oldValue = {
+            num: [0, 0, 0, 0],
+            str: [''],
+            bool: [false],
+            object: []
+          } as PropertySnapshot;
+          targetProp.get.call(target, oldValue);
+          record = {
+            oldValue: this.clonePropertyValue(oldValue),
+            newValue: this.clonePropertyValue(oldValue)
+          };
+          session.set(target, record);
+        }
+        record.newValue = this.clonePropertyValue(newValue);
+        targetProp.set.call(target, this.clonePropertyValue(newValue));
+        this._proxy?.updateProxy(target);
+      }
+    } finally {
+      this._suspendMultiPropertySync = false;
+    }
+  }
+  private applyWorldMatrixToNode(node: SceneNode, worldMatrix: Matrix4x4) {
+    const localMatrix = node.parent
+      ? Matrix4x4.invertAffine(node.parent.worldMatrix).multiplyRight(worldMatrix)
+      : new Matrix4x4(worldMatrix);
+    localMatrix.decompose(node.scale, node.rotation, node.position);
+  }
+  private applyMultiTransformFromMaster(master: SceneNode) {
+    if (!this._multiTransformMasterStartWorld || this._multiTransformItems.length === 0) {
+      return;
+    }
+    const masterCurrentWorld = new Matrix4x4(master.worldMatrix);
+    const invMasterStart = Matrix4x4.invertAffine(this._multiTransformMasterStartWorld);
+    const deltaWorld = masterCurrentWorld.multiplyRight(invMasterStart);
+    for (const item of this._multiTransformItems) {
+      const targetWorld = new Matrix4x4(deltaWorld).multiplyRight(item.startWorld);
+      this.applyWorldMatrixToNode(item.node, targetWorld);
+    }
+  }
+  private async handleCloneSelectedNodes() {
+    const selectedNodes = this.getTopLevelSelection(this.getSelectedSceneNodes()).filter(
+      (node) => node !== this.controller.model.scene.rootNode
+    );
+    if (selectedNodes.length === 0) {
+      return;
+    }
+    const commands: NodeCloneCommand[] = [];
+    for (const node of selectedNodes) {
+      let hasTerrain = false;
+      node.iterate((child) => {
+        if (child.isClipmapTerrain()) {
+          hasTerrain = true;
+          return true;
+        }
+        return false;
+      });
+      if (hasTerrain) {
+        DlgMessage.messageBox('Error', 'Cloning terrain node is not allowed');
+        continue;
+      }
+      commands.push(new NodeCloneCommand(node));
+    }
+    if (commands.length === 0) {
+      return;
+    }
+    const result =
+      commands.length === 1
+        ? [await this._cmdManager.execute(commands[0])]
+        : ((await this._cmdManager.execute(new CompositeCommand('Clone nodes', commands))) as SceneNode[]);
+    const clonedNodes: SceneNode[] = [];
+    let lastCloned: Nullable<SceneNode> = null;
+    for (const sceneNode of result) {
+      if (!sceneNode) {
+        continue;
+      }
+      sceneNode.position.x += 1;
+      clonedNodes.push(sceneNode);
+      lastCloned = sceneNode;
+    }
+    if (clonedNodes.length > 0) {
+      this._sceneHierarchy!.selectNodes(clonedNodes, lastCloned);
+      eventBus.dispatchEvent('scene_changed');
+    }
+  }
+  private async handleDeleteSelectedNodes() {
+    const selectedNodes = this.getTopLevelSelection(this.getSelectedSceneNodes());
+    if (selectedNodes.length === 0) {
+      return;
+    }
+    const commands: NodeDeleteCommand[] = [];
+    for (const node of selectedNodes) {
+      if (node?.parent) {
+        const command = this.prepareDeleteNodeCommand(node);
+        if (command) {
+          commands.push(command);
+        }
+      }
+    }
+    if (commands.length === 0) {
+      return;
+    }
+    if (commands.length === 1) {
+      await this._cmdManager.execute(commands[0]);
+    } else {
+      await this._cmdManager.execute(new CompositeCommand('Delete nodes', commands));
+    }
+    eventBus.dispatchEvent('scene_changed');
+  }
+  private async handleDeleteNode(node: SceneNode) {
+    const command = this.prepareDeleteNodeCommand(node);
+    if (!command) {
+      return;
+    }
+    await this._cmdManager.execute(command);
+    eventBus.dispatchEvent('scene_changed');
+  }
+  private prepareDeleteNodeCommand(node: SceneNode): Nullable<NodeDeleteCommand> {
+    if (!node) {
+      return null;
     }
     if (node === this.controller.model.scene.mainCamera) {
       Dialog.messageBox('Zephyr3d editor', 'Cannot delete main camera');
-      return;
+      return null;
     }
     const editTarget = this._currentEditTool.get()?.getTarget();
     if (editTarget instanceof SceneNode && editTarget.isParentOf(node)) {
       this._currentEditTool.dispose();
     }
-    if (node.isParentOf(this._sceneHierarchy!.selectedNode)) {
+    const selectedNodes = this.getSelectedSceneNodes();
+    if (selectedNodes.some((selected) => node.isParentOf(selected))) {
       this._sceneHierarchy!.selectNode(null);
     }
     if (this._propGrid.object instanceof SceneNode && node.isParentOf(this._propGrid.object)) {
@@ -1340,8 +1868,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (node.isParentOf(this._postGizmoRenderer!.node)) {
       this._postGizmoRenderer!.node = null;
     }
-    this._cmdManager.execute(new NodeDeleteCommand(node));
-    eventBus.dispatchEvent('scene_changed');
+    return new NodeDeleteCommand(node);
   }
   private handleWorkspaceDragEnter(_type: string, payload: { isDir: boolean; path: string }) {
     const mimeType = getEngine().VFS.guessMIMEType(payload.path);
@@ -1413,15 +1940,132 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       }
     }
   }
-  private handleNodeSelected(node: SceneNode) {
-    this._postGizmoRenderer!.node =
-      node === node.scene!.rootNode || node === this.controller.model.scene.mainCamera ? null : node;
-    this._propGrid.object = node === node.scene!.rootNode ? node.scene : node;
+  private handleNodeSelected(_node: SceneNode) {}
+  private resolveNodeAssetPath(node: SceneNode): Nullable<string> {
+    if (node === this.controller.model.scene.rootNode) {
+      const scenePath = this.controller.scenePath;
+      return scenePath && scenePath.startsWith('/') ? ProjectService.VFS.normalizePath(scenePath) : null;
+    }
+
+    const prefabNode = node.getPrefabNode();
+    if (prefabNode?.prefabId?.startsWith('/')) {
+      return ProjectService.VFS.normalizePath(prefabNode.prefabId);
+    }
+
+    let assetNode: Nullable<SceneNode> = node;
+    while (assetNode) {
+      const assetId = getEngine().resourceManager.getAssetId(assetNode);
+      if (typeof assetId === 'string' && assetId.startsWith('/')) {
+        return ProjectService.VFS.normalizePath(assetId);
+      }
+      assetNode = assetNode.parent;
+    }
+
+    let ctor: any = node.constructor;
+    const resourceManager = getEngine().resourceManager;
+    while (ctor) {
+      const cls = resourceManager.getClassByConstructor(ctor);
+      if (cls) {
+        const props = resourceManager.getPropertiesByClass(cls) ?? [];
+        for (const prop of props) {
+          if (!prop.options?.mimeTypes?.length) {
+            continue;
+          }
+          if (prop.isValid && !prop.isValid.call(node)) {
+            continue;
+          }
+          const value = { num: [0, 0, 0, 0], str: [''], bool: [false], object: [] };
+          prop.get.call(node, value);
+          const path = value.str[0];
+          if (typeof path === 'string' && path.startsWith('/')) {
+            return ProjectService.VFS.normalizePath(path);
+          }
+        }
+      }
+      ctor = cls ? cls.parent : Object.getPrototypeOf(ctor);
+    }
+    return null;
   }
-  private handleNodeDeselected(node: SceneNode) {
-    this._postGizmoRenderer!.node = null;
-    if (this._propGrid.object === node) {
+  private handleGoToAssets(node: SceneNode) {
+    const path = this.resolveNodeAssetPath(node);
+    if (path) {
+      eventBus.dispatchEvent('reveal_asset', path);
+    }
+  }
+  private handleHierarchySelectionChanged(_selectedNodes: SceneNode[], activeNode: Nullable<SceneNode>) {
+    this._lastDuplicateTarget = 'scene';
+    this._syncedPropertySessions.clear();
+    const outlineNodes = this.getSelectedSceneNodes().filter(
+      (node) =>
+        node !== this.controller.model.scene.rootNode && node !== this.controller.model.scene.mainCamera
+    );
+    this._postGizmoRenderer!.selectedNodes = outlineNodes;
+    const editTarget = this._currentEditTool.get()?.getTarget();
+    if (
+      this._currentEditTool.get() &&
+      (!(editTarget instanceof SceneNode) ||
+        !activeNode ||
+        (editTarget !== activeNode && !editTarget.isParentOf(activeNode)))
+    ) {
+      this._currentEditTool.dispose();
+    }
+    if (!activeNode) {
+      this._postGizmoRenderer!.node = null;
+      this.updateGizmoTransformSpace();
       this._propGrid.object = this.controller.model.scene;
+      return;
+    }
+    const pivot = this.updateMultiTransformPivot();
+    this._postGizmoRenderer!.node =
+      pivot ??
+      (activeNode === activeNode.scene!.rootNode || activeNode === this.controller.model.scene.mainCamera
+        ? null
+        : activeNode);
+    this.updateGizmoTransformSpace();
+    this._propGrid.object = activeNode === activeNode.scene!.rootNode ? activeNode.scene : activeNode;
+  }
+  private isTransformModeActive() {
+    const mode = this._postGizmoRenderer?.mode;
+    return mode === 'translation' || mode === 'rotation' || mode === 'scaling';
+  }
+  private isTransformSpaceForcedWorld() {
+    return !!this._postGizmoRenderer && this._postGizmoRenderer.node === this._multiTransformPivot;
+  }
+  private updateGizmoTransformSpace() {
+    if (!this._postGizmoRenderer) {
+      return;
+    }
+    this._postGizmoRenderer.transformSpace = this.isTransformSpaceForcedWorld()
+      ? 'world'
+      : this._preferredTransformSpace;
+  }
+  private handleNodeDeselected(_node: SceneNode) {}
+  private handleAssetSelectionChanged() {
+    this._lastDuplicateTarget = 'asset';
+  }
+  private async handleDuplicateShortcut() {
+    const selectedNodes = this.getSelectedSceneNodes();
+    const assetRenderer = this._assetView?.renderer;
+    if (this._lastDuplicateTarget === 'asset' && assetRenderer) {
+      try {
+        if (await assetRenderer.duplicateSelectedItems()) {
+          return;
+        }
+      } catch (err) {
+        DlgMessage.messageBox('Error', `Duplicate asset failed: ${err}`);
+        return;
+      }
+    }
+    if (selectedNodes.length > 0) {
+      await this.handleCloneSelectedNodes();
+      return;
+    }
+    if (assetRenderer) {
+      try {
+        await assetRenderer.duplicateSelectedItems();
+      } catch (err) {
+        DlgMessage.messageBox('Error', `Duplicate asset failed: ${err}`);
+      }
     }
   }
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {
@@ -1549,74 +2193,202 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       }
     });
   }
+  private handleAddCollider(node: SceneNode, type: ColliderKind) {
+    const defaultMeta =
+      type === 'sphere'
+        ? {
+            sceneCollider: {
+              type: 'sphere',
+              enabled: true,
+              visible: true,
+              radius: 0.15
+            }
+          }
+        : type === 'capsule'
+          ? {
+              sceneCollider: {
+                type: 'capsule',
+                enabled: true,
+                visible: true,
+                offset: 0.1,
+                endOffset: 0.1,
+                radius: 0.1
+              }
+            }
+          : {
+              sceneCollider: {
+                type: 'plane',
+                enabled: true,
+                visible: true,
+                normal: 1,
+                planeSize: 0.5
+              }
+            };
+    const typeName = type === 'sphere' ? 'Sphere' : type === 'capsule' ? 'Capsule' : 'Plane';
+    this._cmdManager.execute(new AddChildCommand(node, SceneNode)).then((colliderNode) => {
+      if (!colliderNode) {
+        return;
+      }
+      let index = 1;
+      while (node.children.find((c) => c.name === `${typeName}Collider_${index}`)) {
+        index++;
+      }
+      colliderNode.name = `${typeName}Collider_${index}`;
+      colliderNode.metaData = defaultMeta as any;
+      colliderNode.gpuPickable = true;
+      this._proxy!.createProxy(colliderNode);
+      this._proxy!.updateProxy(colliderNode);
+      this._sceneHierarchy?.selectNode(colliderNode);
+      this._propGrid.refresh();
+      eventBus.dispatchEvent('scene_changed');
+    });
+  }
   private handleNodeRemoved(node: SceneNode) {
     if (node.isParentOf(this._postGizmoRenderer!.node!)) {
       this._postGizmoRenderer!.node = null;
     }
-    if (node.isParentOf(this._sceneHierarchy!.selectedNode)) {
+    const selectedNodes = this.getSelectedSceneNodes();
+    if (selectedNodes.some((selected) => node.isParentOf(selected))) {
       this._sceneHierarchy!.selectNode(null);
     }
   }
-  private handleBeginTransformNode(node: SceneNode) {
-    this._transformNode.set(node);
-    this._oldTransform = {
-      position: new Vector3(node.position),
-      rotation: new Quaternion(node.rotation),
-      scale: new Vector3(node.scale)
-    };
-    node.iterate((child) => {
-      child.gpuPickable = false;
-      return false;
-    });
-    this._postGizmoCaptured = true;
+  private handleNodeAttached(node: SceneNode) {
+    this.syncNodeProxyTree(node);
   }
-  private handleEndTransformNode(node: SceneNode, desc: string) {
-    if (node && node === this._transformNode.get()) {
-      this._cmdManager.execute(
-        new NodeTransformCommand(
-          node,
-          this._oldTransform!,
-          {
-            position: node.position,
-            rotation: node.rotation,
-            scale: node.scale
-          },
-          desc
-        )
-      );
-      this._oldTransform = null;
+  private syncNodeProxyTree(root: Nullable<SceneNode>) {
+    if (!root || !this._proxy) {
+      return;
+    }
+    root.iterate((node) => {
+      this._proxy!.createProxy(node);
+      this._proxy!.updateProxy(node);
+      if (node === this.controller.model.scene.mainCamera) {
+        this._proxy!.hideProxy(node);
+      }
+    });
+  }
+  private handleBeginTransformNode(node: SceneNode) {
+    const isPivot = node === this._multiTransformPivot;
+    this._transformNode.set(node);
+    this._oldTransform = this.buildTRS(node);
+    this._multiTransformMasterStartWorld = new Matrix4x4(node.worldMatrix);
+    const selectedNodes = isPivot
+      ? this.getTransformSelectionNodes()
+      : this.getTopLevelSelection(this.getSelectedSceneNodes()).filter(
+          (n) => n !== node && n !== this.controller.model.scene.rootNode
+        );
+    this._multiTransformItems = selectedNodes.map((n) => ({
+      node: n,
+      startWorld: new Matrix4x4(n.worldMatrix),
+      startTransform: this.buildTRS(n)
+    }));
+    if (!isPivot) {
       node.iterate((child) => {
-        child.gpuPickable = true;
+        child.gpuPickable = false;
         return false;
       });
+    }
+    for (const item of this._multiTransformItems) {
+      item.node.iterate((child) => {
+        child.gpuPickable = false;
+        return false;
+      });
+    }
+    this._postGizmoCaptured = true;
+  }
+  private async handleEndTransformNode(node: SceneNode, desc: string) {
+    if (node && node === this._transformNode.get()) {
+      const isPivot = node === this._multiTransformPivot;
+      this.applyMultiTransformFromMaster(node);
+      const commands: NodeTransformCommand[] = [];
+      if (!isPivot) {
+        commands.push(
+          new NodeTransformCommand(
+            node,
+            this._oldTransform!,
+            {
+              position: node.position,
+              rotation: node.rotation,
+              scale: node.scale
+            },
+            desc
+          )
+        );
+      }
+      for (const item of this._multiTransformItems) {
+        commands.push(
+          new NodeTransformCommand(
+            item.node,
+            item.startTransform,
+            this.buildTRS(item.node),
+            `${desc} (multi)`
+          )
+        );
+      }
+      if (commands.length === 1) {
+        await this._cmdManager.execute(commands[0]);
+      } else if (commands.length > 1) {
+        await this._cmdManager.execute(new CompositeCommand(desc, commands));
+      }
+      this._oldTransform = null;
+      if (!isPivot) {
+        node.iterate((child) => {
+          child.gpuPickable = true;
+          return false;
+        });
+      }
+      for (const item of this._multiTransformItems) {
+        item.node.iterate((child) => {
+          child.gpuPickable = true;
+          return false;
+        });
+      }
+      this._multiTransformItems = [];
+      this._multiTransformMasterStartWorld = null;
       this._transformNode.dispose();
       this.controller.model.scene.octree.prune();
+      eventBus.dispatchEvent('scene_changed');
     }
     this._postGizmoCaptured = false;
   }
-  private handleEndTranslateNode(node: SceneNode) {
-    this.handleEndTransformNode(node, 'moving object');
-    this._propGrid.dispatchEvent(
-      'object_property_changed',
-      node,
-      getEngine().resourceManager.getPropertyByName('/SceneNode/Position')
-    );
+  private async handleEndTranslateNode(node: SceneNode) {
+    await this.handleEndTransformNode(node, 'moving object');
+    this._suspendMultiPropertySync = true;
+    try {
+      this._propGrid.dispatchEvent(
+        'object_property_changed',
+        node,
+        getEngine().resourceManager.getPropertyByName('/SceneNode/Position')
+      );
+    } finally {
+      this._suspendMultiPropertySync = false;
+    }
   }
-  private handleEndRotateNode(node: SceneNode) {
-    this.handleEndTransformNode(node, 'rotating object');
-    this._propGrid.dispatchEvent(
-      'object_property_changed',
-      node,
-      getEngine().resourceManager.getPropertyByName('/SceneNode/Rotation')
-    );
+  private async handleEndRotateNode(node: SceneNode) {
+    await this.handleEndTransformNode(node, 'rotating object');
+    this._suspendMultiPropertySync = true;
+    try {
+      this._propGrid.dispatchEvent(
+        'object_property_changed',
+        node,
+        getEngine().resourceManager.getPropertyByName('/SceneNode/Rotation')
+      );
+    } finally {
+      this._suspendMultiPropertySync = false;
+    }
   }
-  private handleEndScaleNode(node: SceneNode) {
-    this.handleEndTransformNode(node, 'scaling object');
-    this._propGrid.dispatchEvent(
-      'object_property_changed',
-      node,
-      getEngine().resourceManager.getPropertyByName('/SceneNode/Scale')
-    );
+  private async handleEndScaleNode(node: SceneNode) {
+    await this.handleEndTransformNode(node, 'scaling object');
+    this._suspendMultiPropertySync = true;
+    try {
+      this._propGrid.dispatchEvent(
+        'object_property_changed',
+        node,
+        getEngine().resourceManager.getPropertyByName('/SceneNode/Scale')
+      );
+    } finally {
+      this._suspendMultiPropertySync = false;
+    }
   }
   private handleSceneAction(action: string) {
     eventBus.dispatchEvent('action', action);

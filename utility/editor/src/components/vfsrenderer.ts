@@ -7,6 +7,7 @@ import { convertEmojiString } from '../helpers/emoji';
 import { ProjectService } from '../core/services/project';
 import { eventBus } from '../core/eventbus';
 import { DlgPromptName } from '../views/dlg/promptnamedlg';
+import { DlgRename } from '../views/dlg/renamedlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgProgress } from '../views/dlg/progressdlg';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
@@ -54,6 +55,12 @@ type VFSRendererOptions = {
   allowDrop?: boolean;
   allowDblClickOpen?: boolean;
   multiSelect?: boolean;
+};
+
+type PathRewriteRule = {
+  oldPath: string;
+  newPath: string;
+  isDirectory: boolean;
 };
 
 class VFSDirData extends TreeViewData<DirectoryInfo> {
@@ -439,6 +446,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   private _contentBounds: AreaBounds | null = null;
   private _isDragOverNavigation = false;
   private _isDragOverContent = false;
+  private _pendingRevealAssetPath: string | null = null;
   private readonly _options: VFSRendererOptions = null;
 
   constructor(vfs: VFS, fileFilter: string[] = [], treePanelWidth = 200, options?: VFSRendererOptions) {
@@ -986,6 +994,26 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     }
   }
 
+  async duplicateSelectedItems(): Promise<boolean> {
+    if (this._vfs.readOnly || this.selectedItems.size === 0) {
+      return false;
+    }
+    const items = Array.from(this.selectedItems);
+    for (const item of items) {
+      const isDir = 'subDir' in item;
+      const sourcePath = isDir ? item.path : item.meta.path;
+      const targetPath = await this.makeDuplicatedPath(sourcePath, isDir);
+      if (isDir) {
+        await this.copyDirectoryRecursive(sourcePath, targetPath);
+      } else {
+        await this._vfs.copyFile(sourcePath, targetPath, {
+          overwrite: false
+        });
+      }
+    }
+    return true;
+  }
+
   deleteSelectedItems() {
     if (this.selectedItems.size === 0) {
       return;
@@ -1011,22 +1039,81 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       });
   }
 
+  private async makeDuplicatedPath(sourcePath: string, isDir: boolean): Promise<string> {
+    const parentPath = this._vfs.dirname(sourcePath);
+    const basename = this._vfs.basename(sourcePath);
+    const ext = isDir ? '' : this._vfs.extname(basename);
+    const stem = ext ? basename.slice(0, -ext.length) : basename;
+    let index = 1;
+    while (true) {
+      const suffix = index === 1 ? ' copy' : ` copy ${index}`;
+      const candidateName = `${stem}${suffix}${ext}`;
+      const candidatePath = this._vfs.join(parentPath, candidateName);
+      if (!(await this._vfs.exists(candidatePath))) {
+        return candidatePath;
+      }
+      index++;
+    }
+  }
+
+  private async copyDirectoryRecursive(sourceDir: string, targetDir: string): Promise<void> {
+    await this._vfs.makeDirectory(targetDir, true);
+    const entries = await this._vfs.readDirectory(sourceDir, {
+      includeHidden: true,
+      recursive: true
+    });
+    for (const entry of entries) {
+      const relativePath = PathUtils.relative(sourceDir, entry.path);
+      if (!relativePath || relativePath === '.') {
+        continue;
+      }
+      const targetPath = this._vfs.join(targetDir, relativePath);
+      if (entry.type === 'directory') {
+        await this._vfs.makeDirectory(targetPath, true);
+      } else if (entry.type === 'file') {
+        const parentDir = this._vfs.dirname(targetPath);
+        if (!(await this._vfs.exists(parentDir))) {
+          await this._vfs.makeDirectory(parentDir, true);
+        }
+        await this._vfs.copyFile(entry.path, targetPath, {
+          overwrite: false
+        });
+      }
+    }
+  }
+
   renameItem(item: DirectoryInfo | FileInfo) {
     const isDir = 'subDir' in item;
     const currentName = isDir
       ? item.path.slice(item.path.lastIndexOf('/') + 1)
       : (item as FileInfo).meta.name;
-    DlgPromptName.promptName('Rename', 'Name', currentName).then((newName) => {
+    DlgRename.rename('Rename', currentName).then(async (newName) => {
       newName = newName.trim();
       if (newName && newName !== currentName) {
         if (PathUtils.sanitizeFilename(newName) !== newName) {
           DlgMessage.messageBox('Error', 'Invalid name');
         } else {
-          const parentPath = isDir
-            ? item.path.slice(0, item.path.lastIndexOf('/'))
-            : (item as FileInfo).meta.path.slice(0, (item as FileInfo).meta.path.lastIndexOf('/'));
-          const newPath = this._vfs.join(parentPath, newName);
-          this._vfs.move(isDir ? item.path : item.meta.path, newPath);
+          try {
+            const oldPath = isDir ? item.path : item.meta.path;
+            const parentPath = isDir
+              ? item.path.slice(0, item.path.lastIndexOf('/'))
+              : (item as FileInfo).meta.path.slice(0, (item as FileInfo).meta.path.lastIndexOf('/'));
+            const newPath = this._vfs.join(parentPath, newName);
+            await this._vfs.move(oldPath, newPath);
+            try {
+              await this.rewriteAssetReferencesAfterMove([
+                {
+                  oldPath,
+                  newPath,
+                  isDirectory: isDir
+                }
+              ]);
+            } catch (err) {
+              console.warn(`Rewrite references after rename failed: ${err}`);
+            }
+          } catch (err) {
+            DlgMessage.messageBox('Error', `Rename failed: ${err}`);
+          }
         }
       }
     });
@@ -1052,6 +1139,36 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     this._currentDirContent = [...this.selectedDir.subDir, ...this.selectedDir.files];
     this.sortContent();
     this._contentView.deselectAll();
+  }
+
+  private revealAsset(path: string) {
+    if (!path) {
+      return;
+    }
+    const normalizedPath = this._vfs.normalizePath(path);
+    if (!this._filesystem) {
+      this._pendingRevealAssetPath = normalizedPath;
+      return;
+    }
+    this.selectAssetByPath(normalizedPath);
+  }
+
+  private selectAssetByPath(path: string) {
+    if (!path) {
+      return;
+    }
+    const normalizedPath = this._vfs.normalizePath(path);
+    const dirPath = this._vfs.dirname(normalizedPath);
+    const dir = this.findDirectoryByPath(this._filesystem, dirPath);
+    if (!dir) {
+      return;
+    }
+    this._nav.selectNode(dir);
+    const file = dir.files.find((item) => this._vfs.normalizePath(item.meta.path) === normalizedPath);
+    if (file) {
+      this._contentView.deselectAll();
+      this._contentView.selectItems([file]);
+    }
   }
 
   renderDir(dir: DirectoryInfo) {
@@ -1147,6 +1264,11 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       this._nav.selectNode(newSelectedDir ?? null);
     } else {
       this._nav.selectNode(this._filesystem);
+    }
+    if (this._pendingRevealAssetPath) {
+      const path = this._pendingRevealAssetPath;
+      this._pendingRevealAssetPath = null;
+      this.selectAssetByPath(path);
     }
   }
 
@@ -1318,6 +1440,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   protected onDispose() {
     super.onDispose();
     this._vfs.off('changed', this.onVFSChanged, this);
+    eventBus.off('reveal_asset', this.revealAsset, this);
     if (this._options.allowDrop) {
       eventBus.off('external_dragenter', this.handleDragEvent, this);
       eventBus.off('external_dragover', this.handleDragEvent, this);
@@ -1373,6 +1496,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   async handleFileMoveOrCopy(targetDir: string, payload: { isDir: boolean; path: string }[]) {
     const copy = ImGui.GetIO().KeyCtrl;
     const dlg = copy ? new DlgProgress('CopyFile##CopyProgress', 300, true) : null;
+    const movedRules: PathRewriteRule[] = [];
     if (dlg) {
       dlg.showModal();
       dlg.setProgress(0, payload.length);
@@ -1394,6 +1518,11 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           await vfs.move(sourceDir, targetPath, {
             overwrite: true
           });
+          movedRules.push({
+            oldPath: sourceDir,
+            newPath: targetPath,
+            isDirectory: false
+          });
         }
       } else {
         if (vfs.isParentOf(sourceDir, targetDir)) {
@@ -1411,6 +1540,11 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             });
           } else {
             await vfs.move(sourceDir, dest);
+            movedRules.push({
+              oldPath: sourceDir,
+              newPath: dest,
+              isDirectory: true
+            });
           }
         }
       }
@@ -1418,8 +1552,116 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         dlg.setProgress(i + 1, payload.length);
       }
     }
+    if (!copy && movedRules.length > 0) {
+      try {
+        await this.rewriteAssetReferencesAfterMove(movedRules);
+      } catch (err) {
+        console.warn(`Rewrite references after move failed: ${err}`);
+      }
+    }
     if (dlg) {
       dlg.close();
     }
+  }
+
+  private async rewriteAssetReferencesAfterMove(rules: PathRewriteRule[]) {
+    const deduplicated = this.prepareRewriteRules(rules);
+    if (deduplicated.length === 0) {
+      return;
+    }
+    const rootDir = this._options.rootDir || '/assets';
+    const entries = await this._vfs.readDirectory(rootDir, {
+      includeHidden: true,
+      recursive: true
+    });
+    const targetFiles = entries.filter(
+      (entry) =>
+        entry.type === 'file' &&
+        (entry.path.toLowerCase().endsWith('.zscn') ||
+          entry.path.toLowerCase().endsWith('.prefab') ||
+          entry.path.toLowerCase().endsWith('.zprefab') ||
+          entry.path.toLowerCase().endsWith('.zmtl'))
+    );
+    for (const file of targetFiles) {
+      try {
+        const text = (await this._vfs.readFile(file.path, { encoding: 'utf8' })) as string;
+        const json = JSON.parse(text);
+        if (this.rewriteJsonPathValues(json, deduplicated)) {
+          await this._vfs.writeFile(file.path, JSON.stringify(json, null, 2), {
+            encoding: 'utf8',
+            create: true
+          });
+        }
+      } catch (err) {
+        console.warn(`Skip reference rewrite for ${file.path}: ${err}`);
+      }
+    }
+  }
+
+  private prepareRewriteRules(rules: PathRewriteRule[]): PathRewriteRule[] {
+    const map = new Map<string, PathRewriteRule>();
+    for (const rule of rules) {
+      const oldPath = this._vfs.normalizePath(rule.oldPath);
+      const newPath = this._vfs.normalizePath(rule.newPath);
+      if (!oldPath || !newPath || oldPath === newPath) {
+        continue;
+      }
+      map.set(oldPath, {
+        oldPath,
+        newPath,
+        isDirectory: rule.isDirectory
+      });
+    }
+    return [...map.values()].sort((a, b) => b.oldPath.length - a.oldPath.length);
+  }
+
+  private rewriteJsonPathValues(node: unknown, rules: PathRewriteRule[]): boolean {
+    let changed = false;
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i++) {
+        const value = node[i];
+        if (typeof value === 'string') {
+          const rewritten = this.rewritePathString(value, rules);
+          if (rewritten !== value) {
+            node[i] = rewritten;
+            changed = true;
+          }
+        } else if (value && typeof value === 'object') {
+          changed = this.rewriteJsonPathValues(value, rules) || changed;
+        }
+      }
+      return changed;
+    }
+    if (!node || typeof node !== 'object') {
+      return false;
+    }
+    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+      if (typeof value === 'string') {
+        const rewritten = this.rewritePathString(value, rules);
+        if (rewritten !== value) {
+          (node as Record<string, unknown>)[key] = rewritten;
+          changed = true;
+        }
+      } else if (value && typeof value === 'object') {
+        changed = this.rewriteJsonPathValues(value, rules) || changed;
+      }
+    }
+    return changed;
+  }
+
+  private rewritePathString(value: string, rules: PathRewriteRule[]): string {
+    for (const rule of rules) {
+      if (rule.isDirectory) {
+        if (value === rule.oldPath) {
+          return rule.newPath;
+        }
+        if (value.startsWith(`${rule.oldPath}/`)) {
+          return `${rule.newPath}${value.slice(rule.oldPath.length)}`;
+        }
+      } else if (value === rule.oldPath) {
+        return rule.newPath;
+      }
+    }
+    return value;
   }
 }

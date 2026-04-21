@@ -169,10 +169,12 @@ export class SceneNode
 
   /** @internal Arbitrary metadata payload for this node. */
   protected _metaData: Nullable<Metadata>;
-  /** @internal If true, suppress transform-change callbacks (during bulk updates). */
+  /** @internal If greater than zero, suppress transform-change callbacks (during bulk updates). */
   private _disableCallback: number;
   /** @internal User-attached script entry (engine-defined). */
   private _script: string;
+  /** @internal Script component configuration object (engine/editor-defined). */
+  private _scriptConfig: Nullable<object>;
   /**
    * Construct a scene node.
    *
@@ -218,6 +220,7 @@ export class SceneNode
     this._tmpLocalMatrix = Matrix4x4.identity();
     this._tmpWorldMatrix = Matrix4x4.identity();
     this._script = '';
+    this._scriptConfig = null;
     this._metaData = null;
     this._parent = null;
     this.reparent(scene?.rootNode ?? null);
@@ -335,6 +338,15 @@ export class SceneNode
   }
   set script(fileName: string) {
     this._script = fileName ?? '';
+  }
+  /**
+   * Script component configuration payload used by editor/runtime script components.
+   */
+  get scriptConfig() {
+    return this._scriptConfig;
+  }
+  set scriptConfig(value: Nullable<object>) {
+    this._scriptConfig = value ?? null;
   }
   /**
    * Display name of the node (for UI/debugging).

@@ -31,6 +31,7 @@ import type { SceneNode } from './scene_node';
 import { getDevice } from '../app/api';
 import type { SkinnedBoundingBox } from '../animation';
 
+export type MeshUpdateCallback = (frameId: number, elapsedInSeconds: number, deltaInSeconds: number) => void;
 /**
  * Mesh node
  * @public
@@ -65,6 +66,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   protected _skinAnimation: boolean;
   /** @internal */
+  protected _suspendSkinning: boolean;
+  /** @internal */
   protected _morphAnimation: boolean;
   /** @internal */
   protected _renderBundle: Nullable<Record<string, RenderBundle>>;
@@ -74,6 +77,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   protected _materialChangeTag: Nullable<number>;
   /** @internal */
   protected _primitiveChangeTag: Nullable<number>;
+  /** @internal */
+  protected _postUpdateCallbacks: Set<MeshUpdateCallback>;
   /**
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
@@ -95,12 +100,14 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this.primitive = primitive ?? null;
     this.material = material ?? Mesh._getDefaultMaterial();
     this._skinAnimation = false;
+    this._suspendSkinning = false;
     this._skeletonName = '';
     this._morphAnimation = false;
     this._renderBundle = {};
     this._useRenderBundle = true;
     this._materialChangeTag = null;
     this._primitiveChangeTag = null;
+    this._postUpdateCallbacks = new Set();
   }
   /**
    * {@inheritDoc Drawable.getName}
@@ -148,6 +155,13 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   }
   set skinAnimation(val) {
     this._skinAnimation = val;
+  }
+  /** @internal */
+  get suspendSkinning() {
+    return this._suspendSkinning;
+  }
+  set suspendSkinning(val) {
+    this._suspendSkinning = !!val;
   }
   /** @internal */
   get morphAnimation() {
@@ -408,6 +422,23 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     super.update(frameId, elapsedInSeconds, deltaInSeconds);
     this.updateSkeletonState();
     this.updateMorphState();
+    if (this._postUpdateCallbacks.size > 0) {
+      for (const callback of this._postUpdateCallbacks) {
+        callback(frameId, elapsedInSeconds, deltaInSeconds);
+      }
+    }
+  }
+  /** @internal */
+  addPostUpdateCallback(callback: MeshUpdateCallback) {
+    if (callback) {
+      this._postUpdateCallbacks.add(callback);
+    }
+  }
+  /** @internal */
+  removePostUpdateCallback(callback: MeshUpdateCallback) {
+    if (callback) {
+      this._postUpdateCallbacks.delete(callback);
+    }
   }
   /**
    * {@inheritDoc Drawable.isBatchable}
@@ -454,6 +485,11 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   }
   /** @internal */
   private updateSkeletonState() {
+    if (this._suspendSkinning) {
+      this.setBoneMatrices(null);
+      this.setAnimatedBoundingBox(null);
+      return;
+    }
     const skeleton = this._skeletonName && this.findSkeletonById(this._skeletonName);
     if (skeleton) {
       this.setBoneMatrices(skeleton.jointTexture);

@@ -6,6 +6,9 @@ import {
   resolveSphereCollision,
   resolveCapsuleCollision,
   resolvePlaneCollision,
+  type CapsuleCollider,
+  type PlaneCollider,
+  type SphereCollider,
   updateColliderFromNode
 } from './spring_collider';
 
@@ -74,6 +77,15 @@ export interface SpringSystemOptions {
   maxPoseOffsetTip?: number;
 }
 
+const FIXED_SIMULATION_TIME_STEP = 1 / 60;
+const MAX_ACCUMULATED_SIMULATION_TIME = 1 / 20;
+const MAX_SIMULATION_STEPS_PER_UPDATE = Math.max(
+  1,
+  Math.ceil(MAX_ACCUMULATED_SIMULATION_TIME / FIXED_SIMULATION_TIME_STEP)
+);
+const DEFAULT_PARTICLE_TARGET_SMOOTHING_TIME = 1 / 30;
+const DEFAULT_COLLIDER_SMOOTHING_TIME = 1 / 30;
+
 /**
  * Physics engine for spring-based particle simulation
  * Uses Verlet integration and iterative constraint solving
@@ -97,6 +109,11 @@ export class SpringSystem {
   private _poseFollowExponent: number;
   private _maxPoseOffsetRoot: number;
   private _maxPoseOffsetTip: number;
+  private _timeAccumulator: number;
+  private _smoothedParticleTargets: WeakMap<object, Vector3>;
+  private _smoothedSphereCenters: WeakMap<SphereCollider, Vector3>;
+  private _smoothedCapsuleEndpoints: WeakMap<CapsuleCollider, { start: Vector3; end: Vector3 }>;
+  private _smoothedPlaneData: WeakMap<PlaneCollider, { point: Vector3; normal: Vector3 }>;
 
   constructor(chain: SpringChain, options?: SpringSystemOptions) {
     this._chain = chain;
@@ -115,6 +132,11 @@ export class SpringSystem {
     this._poseFollowExponent = Math.max(0.1, options?.poseFollowExponent ?? 1.6);
     this._maxPoseOffsetRoot = Math.max(0, options?.maxPoseOffsetRoot ?? this._maxPoseOffset);
     this._maxPoseOffsetTip = Math.max(0, options?.maxPoseOffsetTip ?? this._maxPoseOffset);
+    this._timeAccumulator = 0;
+    this._smoothedParticleTargets = new WeakMap();
+    this._smoothedSphereCenters = new WeakMap();
+    this._smoothedCapsuleEndpoints = new WeakMap();
+    this._smoothedPlaneData = new WeakMap();
   }
 
   /**
@@ -122,9 +144,25 @@ export class SpringSystem {
    * @param deltaTime - Time step in seconds
    */
   update(deltaTime: number): void {
-    // Clamp deltaTime to prevent instability
-    const dt = Math.min(deltaTime, 0.033); // Max 30 FPS
+    const frameDt = Math.min(Math.max(Number(deltaTime) || 0, 0), MAX_ACCUMULATED_SIMULATION_TIME);
+    if (frameDt <= 0) {
+      return;
+    }
+    this._timeAccumulator = Math.min(this._timeAccumulator + frameDt, MAX_ACCUMULATED_SIMULATION_TIME);
+    const stepCount = Math.min(
+      MAX_SIMULATION_STEPS_PER_UPDATE,
+      Math.floor((this._timeAccumulator + 1e-8) / FIXED_SIMULATION_TIME_STEP)
+    );
+    if (stepCount <= 0) {
+      return;
+    }
+    this._timeAccumulator = Math.max(0, this._timeAccumulator - stepCount * FIXED_SIMULATION_TIME_STEP);
+    for (let i = 0; i < stepCount; i++) {
+      this.simulateStep(FIXED_SIMULATION_TIME_STEP, i === 0 ? frameDt : 0);
+    }
+  }
 
+  private simulateStep(dt: number, inputDeltaTime: number): void {
     // Step 1: Save all particle positions before updating
     if (this._enableInertialForces) {
       for (const p of this._chain.particles) {
@@ -133,7 +171,7 @@ export class SpringSystem {
     }
 
     // Step 2: Update fixed particles from their scene nodes
-    this.updateFixedParticles();
+    this.updateFixedParticles(inputDeltaTime);
 
     // Step 3: Calculate global rotation parameters
     let rotationCenter: Vector3 | null = null;
@@ -201,37 +239,38 @@ export class SpringSystem {
       this.solvePosePreservation(this._iterations);
 
       // Apply collision constraints
-      this.solveCollisions();
+      this.solveCollisions(inputDeltaTime);
     }
   }
 
   /**
    * Updates fixed particles to match their scene node positions
    */
-  private updateFixedParticles(): void {
+  private updateFixedParticles(deltaTime: number): void {
+    const blend = this.getTemporalBlendFactor(deltaTime, DEFAULT_PARTICLE_TARGET_SMOOTHING_TIME);
     for (const particle of this._chain.particles) {
-      if (particle.node && particle.fixed) {
-        const worldMatrix = particle.node.worldMatrix;
-        const worldPos = new Vector3(worldMatrix.m03, worldMatrix.m13, worldMatrix.m23);
-        particle.animPosition.set(worldPos);
-        particle.position.set(worldPos);
-        particle.prevPosition.set(worldPos);
+      if (!particle.node) {
+        continue;
+      }
+      const worldMatrix = particle.node.worldMatrix;
+      const worldPos = new Vector3(worldMatrix.m03, worldMatrix.m13, worldMatrix.m23);
+      const smoothedTarget = this.getSmoothedParticleTarget(particle, worldPos, blend);
+      particle.animPosition.set(smoothedTarget);
+      if (particle.fixed) {
+        particle.position.set(smoothedTarget);
+        particle.prevPosition.set(smoothedTarget);
 
         // Maintain position history for rotation center estimation
         if (this._enableInertialForces) {
           if (!particle.positionHistory) {
             particle.positionHistory = [];
           }
-          particle.positionHistory.push(worldPos.clone());
+          particle.positionHistory.push(smoothedTarget.clone());
           // Keep only last 5 frames
           if (particle.positionHistory.length > 5) {
             particle.positionHistory.shift();
           }
         }
-      }
-      if (particle.node && !particle.fixed) {
-        const worldMatrix = particle.node.worldMatrix;
-        particle.animPosition.setXYZ(worldMatrix.m03, worldMatrix.m13, worldMatrix.m23);
       }
     }
   }
@@ -572,11 +611,57 @@ export class SpringSystem {
   /**
    * Solves collisions for all particles
    */
-  private solveCollisions(): void {
+  private solveCollisions(deltaTime: number): void {
     // Update dynamic colliders from their nodes
+    const blend = this.getTemporalBlendFactor(deltaTime, DEFAULT_COLLIDER_SMOOTHING_TIME);
+    const spheres: { particleCollider: SphereCollider; collider: SphereCollider }[] = [];
+    const capsules: { particleCollider: CapsuleCollider; collider: CapsuleCollider }[] = [];
+    const planes: { particleCollider: PlaneCollider; collider: PlaneCollider }[] = [];
     for (const collider of this._colliders) {
       if (collider.node) {
         updateColliderFromNode(collider);
+      }
+      if (!collider.enabled) {
+        continue;
+      }
+      switch (collider.type) {
+        case 'sphere': {
+          const source = collider as SphereCollider;
+          spheres.push({
+            particleCollider: source,
+            collider: {
+              ...source,
+              center: this.getSmoothedSphereCenter(source, blend)
+            }
+          });
+          break;
+        }
+        case 'capsule': {
+          const source = collider as CapsuleCollider;
+          const endpoints = this.getSmoothedCapsuleEndpoints(source, blend);
+          capsules.push({
+            particleCollider: source,
+            collider: {
+              ...source,
+              start: endpoints.start,
+              end: endpoints.end
+            }
+          });
+          break;
+        }
+        case 'plane': {
+          const source = collider as PlaneCollider;
+          const plane = this.getSmoothedPlaneData(source, blend);
+          planes.push({
+            particleCollider: source,
+            collider: {
+              ...source,
+              point: plane.point,
+              normal: plane.normal
+            }
+          });
+          break;
+        }
       }
     }
 
@@ -586,22 +671,14 @@ export class SpringSystem {
         continue; // Skip fixed particles
       }
 
-      for (const collider of this._colliders) {
-        if (!collider.enabled) {
-          continue;
-        }
-
-        switch (collider.type) {
-          case 'sphere':
-            resolveSphereCollision(particle.position, collider as any);
-            break;
-          case 'capsule':
-            resolveCapsuleCollision(particle.position, collider as any);
-            break;
-          case 'plane':
-            resolvePlaneCollision(particle.position, collider as any);
-            break;
-        }
+      for (const collider of spheres) {
+        resolveSphereCollision(particle.position, collider.collider);
+      }
+      for (const collider of capsules) {
+        resolveCapsuleCollision(particle.position, collider.collider);
+      }
+      for (const collider of planes) {
+        resolvePlaneCollision(particle.position, collider.collider);
       }
     }
   }
@@ -679,6 +756,18 @@ export class SpringSystem {
    */
   reset(): void {
     this._chain.reset();
+    for (const particle of this._chain.particles) {
+      particle.animPosition.set(particle.originalPosition);
+      particle.lastFramePosition.set(particle.originalPosition);
+      if (particle.positionHistory) {
+        particle.positionHistory.length = 0;
+      }
+    }
+    this._timeAccumulator = 0;
+    this._smoothedParticleTargets = new WeakMap();
+    this._smoothedSphereCenters = new WeakMap();
+    this._smoothedCapsuleEndpoints = new WeakMap();
+    this._smoothedPlaneData = new WeakMap();
   }
 
   /**
@@ -888,6 +977,9 @@ export class SpringSystem {
    */
   addCollider(collider: SpringCollider): void {
     this._colliders.push(collider);
+    this._smoothedSphereCenters = new WeakMap();
+    this._smoothedCapsuleEndpoints = new WeakMap();
+    this._smoothedPlaneData = new WeakMap();
   }
 
   /**
@@ -897,6 +989,9 @@ export class SpringSystem {
     const index = this._colliders.indexOf(collider);
     if (index >= 0) {
       this._colliders.splice(index, 1);
+      this._smoothedSphereCenters = new WeakMap();
+      this._smoothedCapsuleEndpoints = new WeakMap();
+      this._smoothedPlaneData = new WeakMap();
       return true;
     }
     return false;
@@ -907,6 +1002,9 @@ export class SpringSystem {
    */
   clearColliders(): void {
     this._colliders = [];
+    this._smoothedSphereCenters = new WeakMap();
+    this._smoothedCapsuleEndpoints = new WeakMap();
+    this._smoothedPlaneData = new WeakMap();
   }
 
   /**
@@ -914,5 +1012,109 @@ export class SpringSystem {
    */
   get colliders(): SpringCollider[] {
     return this._colliders;
+  }
+
+  private getTemporalBlendFactor(deltaTime: number, smoothingTime: number): number {
+    const dt = Math.min(Math.max(Number(deltaTime) || 0, 0), MAX_ACCUMULATED_SIMULATION_TIME);
+    if (smoothingTime <= 0) {
+      return 1;
+    }
+    if (dt <= 0) {
+      return 0;
+    }
+    return 1 - Math.exp(-dt / smoothingTime);
+  }
+
+  private getSmoothedParticleTarget(target: object, current: Vector3, blend: number): Vector3 {
+    const cached = this._smoothedParticleTargets.get(target);
+    if (!cached || blend >= 1) {
+      const next = current.clone();
+      this._smoothedParticleTargets.set(target, next);
+      return next;
+    }
+    cached.setXYZ(
+      cached.x + (current.x - cached.x) * blend,
+      cached.y + (current.y - cached.y) * blend,
+      cached.z + (current.z - cached.z) * blend
+    );
+    return cached;
+  }
+
+  private getSmoothedSphereCenter(collider: SphereCollider, blend: number): Vector3 {
+    const current = collider.center?.clone() ?? new Vector3();
+    const cached = this._smoothedSphereCenters.get(collider);
+    if (!cached || blend >= 1) {
+      this._smoothedSphereCenters.set(collider, current);
+      return current;
+    }
+    cached.setXYZ(
+      cached.x + (current.x - cached.x) * blend,
+      cached.y + (current.y - cached.y) * blend,
+      cached.z + (current.z - cached.z) * blend
+    );
+    return cached;
+  }
+
+  private getSmoothedCapsuleEndpoints(
+    collider: CapsuleCollider,
+    blend: number
+  ): { start: Vector3; end: Vector3 } {
+    const currentStart = collider.start?.clone() ?? new Vector3();
+    const currentEnd = collider.end?.clone() ?? new Vector3();
+    const cached = this._smoothedCapsuleEndpoints.get(collider);
+    if (!cached || blend >= 1) {
+      const next = {
+        start: currentStart,
+        end: currentEnd
+      };
+      this._smoothedCapsuleEndpoints.set(collider, next);
+      return next;
+    }
+    cached.start.setXYZ(
+      cached.start.x + (currentStart.x - cached.start.x) * blend,
+      cached.start.y + (currentStart.y - cached.start.y) * blend,
+      cached.start.z + (currentStart.z - cached.start.z) * blend
+    );
+    cached.end.setXYZ(
+      cached.end.x + (currentEnd.x - cached.end.x) * blend,
+      cached.end.y + (currentEnd.y - cached.end.y) * blend,
+      cached.end.z + (currentEnd.z - cached.end.z) * blend
+    );
+    return cached;
+  }
+
+  private getSmoothedPlaneData(collider: PlaneCollider, blend: number): { point: Vector3; normal: Vector3 } {
+    const currentPoint = collider.point?.clone() ?? new Vector3();
+    const currentNormal = collider.normal?.clone() ?? Vector3.axisPY();
+    if (currentNormal.magnitudeSq > 1e-8) {
+      currentNormal.inplaceNormalize();
+    } else {
+      currentNormal.setXYZ(0, 1, 0);
+    }
+    const cached = this._smoothedPlaneData.get(collider);
+    if (!cached || blend >= 1) {
+      const next = {
+        point: currentPoint,
+        normal: currentNormal
+      };
+      this._smoothedPlaneData.set(collider, next);
+      return next;
+    }
+    cached.point.setXYZ(
+      cached.point.x + (currentPoint.x - cached.point.x) * blend,
+      cached.point.y + (currentPoint.y - cached.point.y) * blend,
+      cached.point.z + (currentPoint.z - cached.point.z) * blend
+    );
+    cached.normal.setXYZ(
+      cached.normal.x + (currentNormal.x - cached.normal.x) * blend,
+      cached.normal.y + (currentNormal.y - cached.normal.y) * blend,
+      cached.normal.z + (currentNormal.z - cached.normal.z) * blend
+    );
+    if (cached.normal.magnitudeSq > 1e-8) {
+      cached.normal.inplaceNormalize();
+    } else {
+      cached.normal.setXYZ(0, 1, 0);
+    }
+    return cached;
   }
 }
