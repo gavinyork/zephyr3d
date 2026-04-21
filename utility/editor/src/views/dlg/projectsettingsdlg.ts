@@ -83,6 +83,8 @@ export class DepsListView extends ListView<{}, { name: string; version: string }
 }
 
 export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
+  private static readonly RENDER_SCALE_ITEMS = [0, 1, 1.25, 1.5, 2];
+  private static readonly RENDER_SCALE_LABELS = ['System', '1.0', '1.25', '1.5', '2.0'];
   private _vfs: VFS;
   private _info: ProjectInfo;
   private _settings: ProjectSettings;
@@ -217,6 +219,21 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
       })
     ) {
       this._settings.preferredRHI = items.filter((val) => val.selected).map((val) => val.text);
+    }
+    const enableMSAA = [!!this._settings.enableMSAA] as [boolean];
+    if (ImGui.Checkbox('Enable MSAA', enableMSAA)) {
+      this._settings.enableMSAA = enableMSAA[0];
+    }
+
+    let renderScaleIndex = DlgProjectSettings.RENDER_SCALE_ITEMS.findIndex(
+      (val) => Math.abs(val - (this._settings.renderScale ?? 1)) < 1e-6
+    );
+    if (renderScaleIndex < 0) {
+      renderScaleIndex = 0;
+    }
+    const selectedRenderScaleIndex = [renderScaleIndex] as [number];
+    if (ImGui.Combo('Render Scale', selectedRenderScaleIndex, DlgProjectSettings.RENDER_SCALE_LABELS)) {
+      this._settings.renderScale = DlgProjectSettings.RENDER_SCALE_ITEMS[selectedRenderScaleIndex[0]];
     }
     if (ImGui.BeginChild('ListBox', new ImGui.ImVec2(0, 100), true)) {
       ImGui.TextDisabled('Additional packages');

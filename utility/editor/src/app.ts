@@ -93,9 +93,16 @@ if (!backend) {
   throw new Error('No supported rendering device found');
 }
 
+const renderScale =
+  typeof settings?.renderScale === 'number' && Number.isFinite(settings.renderScale)
+    ? settings.renderScale
+    : 1;
+
 const editorApp = new Application({
   backend,
   canvas: document.querySelector('#canvas')!,
+  enableMSAA: !!settings?.enableMSAA,
+  pixelRatio: renderScale <= 0 ? undefined : renderScale,
   runtimeOptions: {
     VFS: ProjectService.VFS,
     scriptsRoot: '/assets',

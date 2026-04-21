@@ -98,6 +98,8 @@ if (!backend) {
 const application = new Application({
   backend,
   canvas: document.querySelector('#canvas'),
+  enableMSAA: ${settings.enableMSAA ? 'true' : 'false'},
+  pixelRatio: ${(settings.renderScale ?? 0) <= 0 ? 'undefined' : settings.renderScale},
   runtimeOptions: {
     scriptsRoot: '/assets'
   }
@@ -115,6 +117,7 @@ import type { DeviceBackend } from '@zephyr3d/device';
 const VFS = new HttpFS('./');
 const settingsJson = await VFS.readFile('/${projectFileName}', { encoding: 'utf8' }) as string;
 const settings = JSON.parse(settingsJson);
+const renderScale = typeof settings.renderScale === 'number' && Number.isFinite(settings.renderScale) ? settings.renderScale : 1;
 const rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
 let backend: DeviceBackend = null;
 if (rhiList.includes('webgpu')) {
@@ -142,6 +145,8 @@ if (!backend) {
 const application = new Application({
   backend,
   canvas: document.querySelector('#canvas'),
+  enableMSAA: !!settings.enableMSAA,
+  pixelRatio: renderScale <= 0 ? undefined : renderScale,
   runtimeOptions: {
     VFS,
     scriptsRoot: '/assets'
