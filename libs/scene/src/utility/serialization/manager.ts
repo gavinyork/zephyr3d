@@ -1225,7 +1225,13 @@ export class ResourceManager {
               if (typeof p === 'string' && p) {
                 tmpVal.str[0] = p;
               } else {
-                tmpVal.object.push(p ? ((await this.deserializeObject<any>(obj, p)) ?? null) : null);
+                tmpVal.object.push(
+                  p
+                    ? this.isSerializedObjectEnvelope(p)
+                      ? ((await this.deserializeObject<any>(obj, p)) ?? null)
+                      : p
+                    : null
+                );
               }
             }
           }

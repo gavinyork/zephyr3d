@@ -13,6 +13,8 @@ export interface SpringParticle {
   prevPosition: Vector3;
   /** Original position for reset */
   originalPosition: Vector3;
+  /** Animated (target) position for pose preservation */
+  animPosition: Vector3;
   /** Original world rotation (for calculating rotation delta) */
   originalRotation: Quaternion | null;
   /** Mass of the particle (affects inertia) */
@@ -48,6 +50,7 @@ export function createSpringParticle(
     position: position.clone(),
     prevPosition: position.clone(),
     originalPosition: position.clone(),
+    animPosition: position.clone(),
     originalRotation: options?.originalRotation?.clone() ?? null,
     mass: options?.mass ?? 1.0,
     damping: options?.damping ?? 0.95,
