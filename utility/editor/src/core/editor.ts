@@ -24,9 +24,19 @@ import { initLogView } from '../components/logview';
 import { loadTypes } from './build/loadtypes';
 import { ensureDependencies, installDeps } from './build/dep';
 import { FilePicker } from '../components/filepicker';
-import { fileListFileName, generateIndexTS, libDir } from './build/templates';
+import {
+  editorPluginModuleName,
+  editorPluginTypeDeclarations,
+  fileListFileName,
+  generateIndexTS,
+  libDir
+} from './build/templates';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
+import { EditorPluginManager, type EditorPlugin } from './plugin';
+import { sampleOSSExportPlugin, sampleOSSExportPluginSource } from '../plugins/sample-oss-export';
+import { ScriptRegistry } from '@zephyr3d/scene';
+import { SystemPluginService, type InstalledSystemPlugin, type SystemPluginRecord } from './services/systemplugin';
 
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
 
@@ -94,6 +104,9 @@ export class Editor {
   private _isRemoteProject: boolean;
   private _codeEditor: CodeEditor;
   private _extraLibs: Record<string, Monaco.IDisposable>;
+  private readonly _plugins: EditorPluginManager;
+  private readonly _systemPluginRegistrations: Map<string, SystemPluginRecord>;
+  private readonly _monacoExtraLibs: Record<string, Monaco.IDisposable>;
   constructor() {
     this._moduleManager = new ModuleManager();
     this._assetImages = { brushes: {}, app: {} };
@@ -102,13 +115,22 @@ export class Editor {
     this._isRemoteProject = false;
     this._codeEditor = null;
     this._extraLibs = {};
+    this._plugins = new EditorPluginManager(this);
+    this._systemPluginRegistrations = new Map();
+    this._monacoExtraLibs = {};
+  }
+  get plugins() {
+    return this._plugins;
+  }
+  registerPlugin(plugin: EditorPlugin) {
+    this._plugins.registerPlugin(plugin);
   }
   get sceneChanged() {
     return !!(this._moduleManager.currentModule?.controller as SceneController)?.sceneChanged;
   }
   async loadScriptDependencies(path: string) {
     const dependencies: Record<string, string> = {};
-    await getEngine().scriptingSystem.registry.getDependencies(path, null, dependencies);
+    await this.getScriptRegistryForPath(path).getDependencies(path, null, dependencies);
     for (const k of Object.keys(dependencies)) {
       // Must delete old lib reference first!!!
       const oldDisposable = this._extraLibs[k];
@@ -117,7 +139,8 @@ export class Editor {
         delete this._extraLibs[k];
       }
       // And then add lib
-      const f = `file:///${ProjectService.VFS.relative(k, '/')}`;
+      const vfs = this.getVFSForPath(k);
+      const f = `file:///${vfs.relative(k, '/')}`;
       const disposable = window.monaco.languages.typescript.typescriptDefaults.addExtraLib(
         dependencies[k],
         f
@@ -213,6 +236,9 @@ export class Editor {
     await this.loadAssets();
     initLogView({ maxLines: 8000 });
     eventBus.on('action', this.onAction, this);
+    this.ensurePluginAuthoringTypes();
+    await this.ensureBuiltinSystemPlugins();
+    await this.loadSystemPlugins();
   }
   async loadAssets() {
     const assetManager = new AssetManager(
@@ -276,7 +302,7 @@ export class Editor {
       }
       this._codeEditor = null;
     }
-    const content = (await ProjectService.VFS.readFile(fileName, { encoding: 'utf8' })) as string;
+    const content = (await this.getVFSForPath(fileName).readFile(fileName, { encoding: 'utf8' })) as string;
     this._codeEditor = new CodeEditor(fileName);
     this._codeEditor.show(content, language);
   }
@@ -632,11 +658,142 @@ export class Editor {
         this.editCode(fileName, 'plaintext');
       }
     } else if (action === 'SAVE_CODE') {
-      ProjectService.VFS.writeFile(fileName, arg, { encoding: 'utf8', create: true });
+      this.getVFSForPath(fileName).writeFile(fileName, arg, { encoding: 'utf8', create: true });
     } else if (action === 'BUILD_PROJECT') {
       this.buildProject().then(() => {
         console.info('Project build succeeded');
       });
     }
+  }
+
+  async getPluginState<T = unknown>(pluginId: string): Promise<T | null> {
+    return SystemPluginService.readPluginState<T>(pluginId);
+  }
+
+  async savePluginState<T = unknown>(pluginId: string, state: T) {
+    await SystemPluginService.writePluginState(pluginId, state);
+  }
+
+  async listSystemPlugins() {
+    return SystemPluginService.listPlugins();
+  }
+
+  async installSystemPluginFromFile(file: File) {
+    const plugin = await SystemPluginService.installPluginFromFile(file);
+    await this.loadSystemPlugin(plugin.id, true);
+    return plugin;
+  }
+
+  async setSystemPluginEnabled(id: string, enabled: boolean) {
+    const plugin = await SystemPluginService.setPluginEnabled(id, enabled);
+    if (enabled) {
+      await this.loadSystemPlugin(id, true);
+    } else if (this._plugins.hasPlugin(id) && this._plugins.isPluginActive(id)) {
+      await this._plugins.deactivatePlugin(id);
+    }
+    return plugin;
+  }
+
+  async removeSystemPlugin(id: string) {
+    if (this._plugins.hasPlugin(id) && this._plugins.isPluginActive(id)) {
+      await this._plugins.deactivatePlugin(id);
+    }
+    if (this._plugins.hasPlugin(id)) {
+      this._plugins.unregisterPlugin(id);
+    }
+    await SystemPluginService.removePlugin(id);
+    this._systemPluginRegistrations.delete(id);
+  }
+
+  async loadSystemPlugins() {
+    const plugins = await SystemPluginService.listPlugins();
+    for (const plugin of plugins) {
+      if (plugin.enabled) {
+        await this.loadSystemPlugin(plugin.id, false);
+      } else if (this._plugins.hasPlugin(plugin.id) && this._plugins.isPluginActive(plugin.id)) {
+        await this._plugins.deactivatePlugin(plugin.id);
+      }
+    }
+  }
+
+  private async loadSystemPlugin(id: string, reactivate: boolean) {
+    const installed = await SystemPluginService.getInstalledPluginSource(id);
+    if (!installed) {
+      return;
+    }
+    if (reactivate && this._plugins.hasPlugin(id)) {
+      if (this._plugins.isPluginActive(id)) {
+        await this._plugins.deactivatePlugin(id);
+      }
+      this._plugins.unregisterPlugin(id);
+    }
+    const plugin = await this.importSystemPlugin(installed);
+    if (!this._plugins.hasPlugin(plugin.id)) {
+      this.registerPlugin(plugin);
+      this._systemPluginRegistrations.set(plugin.id, installed.manifest);
+      await this._plugins.activatePlugin(plugin.id);
+      return;
+    }
+    this._systemPluginRegistrations.set(plugin.id, installed.manifest);
+    if (reactivate && this._plugins.isPluginActive(plugin.id)) {
+      await this._plugins.deactivatePlugin(plugin.id);
+    }
+    if (!this._plugins.isPluginActive(plugin.id)) {
+      await this._plugins.activatePlugin(plugin.id);
+    }
+  }
+
+  private async importSystemPlugin(installed: InstalledSystemPlugin) {
+    SystemPluginService.validatePluginSource(installed.source);
+    const registry = new ScriptRegistry(SystemPluginService.VFS, SystemPluginService.packagesDir);
+    const moduleUrl = await registry.resolveRuntimeUrl(installed.entryPath);
+    if (!moduleUrl) {
+      throw new Error(`Cannot load system plugin '${installed.id}'`);
+    }
+    const mod = await import(/* @vite-ignore */ moduleUrl);
+    const plugin = (mod.default ?? mod.plugin ?? mod) as EditorPlugin;
+    if (!plugin?.id || typeof plugin.activate !== 'function') {
+      throw new Error(`System plugin '${installed.id}' does not export a valid editor plugin`);
+    }
+    return plugin;
+  }
+
+  private async ensureBuiltinSystemPlugins() {
+    const existing = await SystemPluginService.getPlugin(sampleOSSExportPlugin.id);
+    if (!existing) {
+      await SystemPluginService.installPlugin({
+        id: sampleOSSExportPlugin.id,
+        name: sampleOSSExportPlugin.name,
+        version: sampleOSSExportPlugin.version,
+        description: sampleOSSExportPlugin.description,
+        source: sampleOSSExportPluginSource,
+        enabled: true,
+        builtin: true
+      });
+    }
+  }
+
+  private ensurePluginAuthoringTypes() {
+    const virtualPath = `file:///types/${editorPluginModuleName.replace(/[/:]/g, '_')}.d.ts`;
+    if (!this._monacoExtraLibs[virtualPath]) {
+      this._monacoExtraLibs[virtualPath] = window.monaco.languages.typescript.typescriptDefaults.addExtraLib(
+        editorPluginTypeDeclarations,
+        virtualPath
+      );
+    }
+  }
+
+  private getVFSForPath(path: string) {
+    return this.isSystemPluginPath(path) ? SystemPluginService.VFS : ProjectService.VFS;
+  }
+
+  private getScriptRegistryForPath(path: string) {
+    return this.isSystemPluginPath(path)
+      ? new ScriptRegistry(SystemPluginService.VFS, SystemPluginService.packagesDir)
+      : getEngine().scriptingSystem.registry;
+  }
+
+  private isSystemPluginPath(path: string) {
+    return path?.startsWith('/system/plugins/');
   }
 }

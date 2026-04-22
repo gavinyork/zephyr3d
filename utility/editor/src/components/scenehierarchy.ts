@@ -13,6 +13,7 @@ import {
 import { TreeViewData, TreeView } from './treeview';
 import { ImGui } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
+import type { EditorMenuContext, EditorMenuItem } from '../core/plugin';
 
 class SceneData extends TreeViewData<SceneNode> {
   private _scene: Scene;
@@ -86,13 +87,23 @@ export class SceneHierarchy extends TreeView<
     request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }];
     request_save_prefab: [node: SceneNode];
     request_add_collider: [node: SceneNode, type: 'sphere' | 'capsule' | 'plane'];
+    draw_context_menu: [node: SceneNode, menuId: string];
   },
   SceneNode
 > {
   private _scene: Scene;
-  constructor(scene: Scene, getOpenedSceneName?: () => string) {
+  private _getPluginContext: (node: SceneNode) => EditorMenuContext;
+  private _renderPluginMenuItems: (items: readonly EditorMenuItem[], ctx: EditorMenuContext) => void;
+  constructor(
+    scene: Scene,
+    getOpenedSceneName?: () => string,
+    getPluginContext?: (node: SceneNode) => EditorMenuContext,
+    renderPluginMenuItems?: (items: readonly EditorMenuItem[], ctx: EditorMenuContext) => void
+  ) {
     super('###SceneHierarchyInner', new SceneData(scene, getOpenedSceneName), true);
     this._scene = scene;
+    this._getPluginContext = getPluginContext ?? (() => ({ location: 'scene-hierarchy' }));
+    this._renderPluginMenuItems = renderPluginMenuItems ?? (() => {});
   }
   get scene() {
     return this._scene;
@@ -123,6 +134,13 @@ export class SceneHierarchy extends TreeView<
     return `context_${node.runtimeId}`;
   }
   protected onDrawContextMenu(node: SceneNode, _menuId: string) {
+    const pluginCtx = this._getPluginContext(node);
+    const pluginItems = pluginCtx.scene?.editor.plugins.getContextMenuItems('scene-hierarchy', pluginCtx) ?? [];
+    if (pluginItems.length > 0) {
+      this._renderPluginMenuItems(pluginItems, pluginCtx);
+      ImGui.Separator();
+    }
+    this.dispatchEvent('draw_context_menu', node, _menuId);
     if (ImGui.MenuItem('Go to Assets')) {
       this.dispatchEvent('request_go_to_assets', node);
     }

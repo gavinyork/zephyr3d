@@ -1,33 +1,40 @@
-import { ImGui } from '@zephyr3d/imgui';
-import { DialogRenderer } from '../../components/modal';
-import { type ProjectSettings, type ProjectInfo, ProjectService } from '../../core/services/project';
-import { DlgOpenFile } from './openfiledlg';
 import type { VFS } from '@zephyr3d/base';
-import { renderMultiSelectedCombo } from '../../components/multicombo';
+import { ImGui } from '@zephyr3d/imgui';
 import { ListView, ListViewData } from '../../components/listview';
+import { renderMultiSelectedCombo } from '../../components/multicombo';
+import { DialogRenderer } from '../../components/modal';
 import { libDir } from '../../core/build/templates';
+import { type ProjectInfo, type ProjectSettings, ProjectService } from '../../core/services/project';
+import { DlgOpenFile } from './openfiledlg';
 
 class DepsContentData extends ListViewData<{ name: string; version: string }> {
   elements: { name: string; version: string }[];
+
   constructor(deps: { [name: string]: string }) {
     super();
     this.elements = Object.keys(deps).map((k) => ({ name: k, version: deps[k] }));
   }
+
   getItems() {
     return this.elements;
   }
+
   getItemIcon(): string {
-    return '📦';
+    return '馃摝';
   }
+
   getItemName(item: { name: string; version: string }): string {
     return item.name;
   }
+
   getDetailColumn(item: { name: string; version: string }): string {
     return item.version;
   }
+
   getDetailColumnsInfo(): string[] {
     return ['Version'];
   }
+
   sortDetailItems(
     a: { name: string; version: string },
     b: { name: string; version: string },
@@ -36,30 +43,30 @@ class DepsContentData extends ListViewData<{ name: string; version: string }> {
   ): number {
     let comparison = 0;
     switch (sortBy) {
-      case 0: {
-        const nameA = a.name;
-        const nameB = b.name;
-        comparison = nameA.localeCompare(nameB);
+      case 0:
+        comparison = a.name.localeCompare(b.name);
         break;
-      }
-      case 1: {
-        const nameA = a.version;
-        const nameB = b.version;
-        comparison = nameA.localeCompare(nameB);
+      case 1:
+        comparison = a.version.localeCompare(b.version);
         break;
-      }
+      default:
+        break;
     }
     return sortAscending ? comparison : -comparison;
   }
+
   getDragSourcePayloadType(): string {
     return '';
   }
+
   getDragSourceHint(): string {
     return '';
   }
+
   getDragSourcePayload(): unknown {
     return null;
   }
+
   getDragTargetPayloadType(): string {
     return null;
   }
@@ -69,7 +76,9 @@ export class DepsListView extends ListView<{}, { name: string; version: string }
   constructor(data: DepsContentData) {
     super('##ProjectDepsList', data, false);
   }
+
   protected onSelectionChanged(): void {}
+
   protected onItemContextMenu(): void {
     if (ImGui.MenuItem('Remove')) {
       const item = [...this.selectedItems][0];
@@ -89,6 +98,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
   private _info: ProjectInfo;
   private _settings: ProjectSettings;
   private _depList: DepsListView;
+
   public static async editProjectSettings(
     title: string,
     vfs: VFS,
@@ -98,6 +108,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
   ): Promise<ProjectSettings> {
     return new DlgProjectSettings(title, vfs, projectInfo, projectSettings, width).showModal();
   }
+
   constructor(id: string, vfs: VFS, projectInfo: ProjectInfo, projectSettings: ProjectSettings, width = 300) {
     super(id, width, 0, true, true);
     this._vfs = vfs;
@@ -106,11 +117,13 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     this._depList = new DepsListView(new DepsContentData(this._settings.dependencies ?? {}));
     this._depList.type = 'detail';
   }
+
   doRender(): void {
     const title = [this._settings.title ?? this._info.name] as [string];
     if (ImGui.InputText('Title', title, undefined, ImGui.InputTextFlags.None)) {
       this._settings.title = title[0];
     }
+
     const favicon = [this._settings.favicon ?? ''] as [string];
     if (ImGui.InputText('Favicon', favicon, undefined, ImGui.InputTextFlags.None)) {
       this._settings.favicon = favicon[0];
@@ -132,6 +145,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
         });
       }
     }
+
     const splashScreen = [this._settings.splashScreen ?? ''] as [string];
     if (ImGui.InputText('Splash Screen', splashScreen, undefined, ImGui.InputTextFlags.None)) {
       this._settings.splashScreen = splashScreen[0];
@@ -153,6 +167,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
         });
       }
     }
+
     const startupScene = [this._settings.startupScene ?? ''] as [string];
     if (ImGui.InputText('Startup Scene', startupScene, undefined, ImGui.InputTextFlags.None)) {
       this._settings.startupScene = startupScene[0];
@@ -174,6 +189,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
         });
       }
     }
+
     const startupScript = [this._settings.startupScript ?? ''] as [string];
     if (ImGui.InputText('Startup Script', startupScript, undefined, ImGui.InputTextFlags.None)) {
       this._settings.startupScript = startupScript[0];
@@ -195,6 +211,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
         });
       }
     }
+
     const items = [
       {
         text: 'WebGL',
@@ -213,13 +230,13 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
       renderMultiSelectedCombo('##RHI', 'Targeted RHIs', items, (selected) => {
         if (selected.length === 0) {
           return 'Please select target RHI...';
-        } else {
-          return selected.join(';');
         }
+        return selected.join(';');
       })
     ) {
       this._settings.preferredRHI = items.filter((val) => val.selected).map((val) => val.text);
     }
+
     const enableMSAA = [!!this._settings.enableMSAA] as [boolean];
     if (ImGui.Checkbox('Enable MSAA', enableMSAA)) {
       this._settings.enableMSAA = enableMSAA[0];
@@ -235,6 +252,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     if (ImGui.Combo('Render Scale', selectedRenderScaleIndex, DlgProjectSettings.RENDER_SCALE_LABELS)) {
       this._settings.renderScale = DlgProjectSettings.RENDER_SCALE_ITEMS[selectedRenderScaleIndex[0]];
     }
+
     if (ImGui.BeginChild('ListBox', new ImGui.ImVec2(0, 100), true)) {
       ImGui.TextDisabled('Additional packages');
       this._depList.render();
@@ -253,6 +271,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
       this.close(null);
     }
   }
+
   async removePackages() {
     if (this._settings.dependencies) {
       const lockFile = (await ProjectService.VFS.readFile(`/${libDir}/deps.lock.json`, {
@@ -267,15 +286,12 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
           };
         };
       };
-      console.log('Dependencies lock file loaded');
       const newPackages = this._depList.data.getItems();
       let removed = false;
       for (const k of Object.keys(this._settings.dependencies)) {
         if (newPackages.findIndex((p) => p.name === k) < 0) {
-          console.log(`Remove package: ${k}`);
           const dir = `/${libDir}/deps/${k}@${this._settings.dependencies[k]}`;
           await ProjectService.VFS.deleteDirectory(dir, true);
-          console.log(`Directory removed: '${dir}'`);
           delete this._settings.dependencies[k];
           delete lock.dependencies[k];
           removed = true;
@@ -284,15 +300,12 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
       if (removed) {
         if (Object.keys(this._settings.dependencies).length === 0) {
           await ProjectService.VFS.deleteDirectory(`/${libDir}/deps`, true);
-          console.log(`Directory removed: '/deps'`);
           await ProjectService.VFS.deleteFile(`/${libDir}/deps.lock.json`);
-          console.log('Dependencies lock file deleted');
         } else {
           await ProjectService.VFS.writeFile(`/${libDir}/deps.lock.json`, JSON.stringify(lock, null, 2), {
             encoding: 'utf8',
             create: true
           });
-          console.log('Dependencies lock file updated');
         }
       }
     }

@@ -3,14 +3,15 @@ import { DockPannel, ResizeDirection } from './dockpanel';
 import { VFSRenderer } from './vfsrenderer';
 import { ImGui } from '@zephyr3d/imgui';
 import { renderLogView } from './logview';
+import type { Editor } from '../core/editor';
 
 export class BottomView extends Disposable {
   private readonly _panel: DockPannel;
   private _renderer: VFSRenderer;
 
-  constructor(vfs: VFS, left: number, top: number, width: number, height: number) {
+  constructor(vfs: VFS, left: number, top: number, width: number, height: number, editor?: Editor) {
     super();
-    this._renderer = new VFSRenderer(vfs);
+    this._renderer = new VFSRenderer(vfs, [], 200, { editor });
     this._panel = new DockPannel(left, top, width, height, 8, 0, 99999, ResizeDirection.Top, 200, 600);
   }
 

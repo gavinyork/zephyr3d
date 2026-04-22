@@ -17,6 +17,10 @@
     "sourceMap": true,
     "stripInternal": true,
     "rootDir": "./src",
+    "baseUrl": "./src",
+    "paths": {
+      "zephyr3d/editor-plugin": ["./core/pluginapi"]
+    },
     "typeRoots": ["./node_modules/@webgpu/types"]
   },
   "include": ["./src"],

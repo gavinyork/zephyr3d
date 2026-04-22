@@ -17,7 +17,7 @@ export class ToolBar extends Observable<{
   action: [id: string];
 }> {
   private readonly _id: string;
-  private readonly _tools: ToolBarItem[];
+  private _tools: ToolBarItem[];
   private readonly _pos: ImGui.ImVec2;
   private readonly _size: ImGui.ImVec2;
   private readonly _size2: ImGui.ImVec2;
@@ -79,6 +79,11 @@ export class ToolBar extends Observable<{
   }
   get tools() {
     return this._tools;
+  }
+  set tools(items: ToolBarItem[]) {
+    this._tools = (items ?? []).map((item) => ({
+      ...item
+    }));
   }
   registerShortcuts(view: BaseView<any, any>) {
     for (const tool of this._tools) {

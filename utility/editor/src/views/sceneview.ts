@@ -30,6 +30,7 @@ import { SceneNode } from '@zephyr3d/scene';
 import { DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
+import type { ToolBarItem } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import type { AABB, GenericConstructor, Nullable } from '@zephyr3d/base';
 import { DRef, HttpFS } from '@zephyr3d/base';
@@ -38,6 +39,7 @@ import type { TRS } from '../types';
 import { Dialog } from './dlg/dlg';
 import { renderTextureViewer } from '../components/textureviewer';
 import { MenubarView } from '../components/menubar';
+import type { MenuBarOptions } from '../components/menubar';
 import { StatusBar } from '../components/statusbar';
 import { BaseView } from './baseview';
 import { CommandManager, CompositeCommand } from '../core/command';
@@ -69,6 +71,8 @@ import { DockPannel, ResizeDirection } from '../components/dockpanel';
 import { DlgSaveFile } from './dlg/savefiledlg';
 import { ResourceService } from '../core/services/resource';
 import { DlgMessage } from './dlg/messagedlg';
+import type { EditorMenuContext, EditorSceneContext } from '../core/plugin';
+import type { EditorMenuItem } from '../core/plugin';
 
 type ColliderKind = 'sphere' | 'capsule' | 'plane';
 type MultiTransformItem = {
@@ -135,6 +139,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _suspendMultiPropertySync: boolean;
   private _syncedPropertySessions: Map<string, Map<SceneNode, SyncedPropertyRecord>>;
   private readonly _editToolContext: EditToolContext;
+  private _activePluginContributionShortcuts: boolean;
   constructor(controller: SceneController) {
     super(controller);
     this._cmdManager = new CommandManager();
@@ -174,6 +179,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._preferredTransformSpace = 'world';
     this._suspendMultiPropertySync = false;
     this._syncedPropertySessions = new Map();
+    this._activePluginContributionShortcuts = false;
     this._editToolContext = {
       executeCommand: (command) => this._cmdManager.execute(command),
       notifySceneChanged: () => eventBus.dispatchEvent('scene_changed'),
@@ -193,10 +199,40 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       }
     };
     this._statusbar = new StatusBar();
-    this._menubar = new MenubarView({
+    this._menubar = new MenubarView(this.createMenuOptions());
+    this._toolbar = new ToolBar(
+      'MainToolBar',
+      this.createToolbarItems(),
+      0,
+      this._menubar.height,
+      -1,
+      30,
+      16,
+      16,
+      10
+    );
+    this._rightDockPanel = new DockPannel(0, 0, 400, 0, 8, 200, 600, ResizeDirection.Left);
+    this._propGrid = new PropertyEditor(0.4);
+    this._postGizmoRenderer = null;
+    this._leftDockPanel = null;
+    this._sceneHierarchy = null;
+    this._assetView = null;
+  }
+  get editor() {
+    return this.controller.editor;
+  }
+  get toolbar() {
+    return this._toolbar;
+  }
+  get cmdManager() {
+    return this._cmdManager;
+  }
+  private createMenuOptions(): MenuBarOptions {
+    const menuOptions: MenuBarOptions = {
       items: [
         {
           label: 'Project',
+          id: 'project',
           subMenus: [
             {
               label: 'New Project...',
@@ -215,10 +251,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               action: () => eventBus.dispatchEvent('action', 'EXPORT_PROJECT')
             },
             {
-              label: 'Export to OSS...',
-              action: () => eventBus.dispatchEvent('action', 'EXPORT_ASSETS_OSS')
-            },
-            {
               label: 'Delete Project',
               action: () => eventBus.dispatchEvent('action', 'DELETE_PROJECT')
             },
@@ -230,6 +262,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               action: () => eventBus.dispatchEvent('action', 'PROJECT_SETTINGS')
             },
             {
+              label: 'System Plugins...',
+              action: () => eventBus.dispatchEvent('action', 'SYSTEM_PLUGINS')
+            },
+            {
               label: 'Build Project',
               action: () => eventBus.dispatchEvent('action', 'BUILD_PROJECT')
             }
@@ -237,6 +273,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         },
         {
           label: 'Scene',
+          id: 'scene',
           subMenus: [
             {
               label: 'New Scene',
@@ -262,6 +299,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         },
         {
           label: 'Edit',
+          id: 'edit',
           subMenus: [
             {
               label: 'Undo',
@@ -295,6 +333,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         },
         {
           label: 'Add',
+          id: 'add',
           subMenus: [
             {
               label: 'Mesh',
@@ -381,6 +420,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         },
         {
           label: 'View',
+          id: 'view',
           subMenus: [
             {
               label: 'Grid',
@@ -402,10 +442,15 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           ]
         }
       ]
+    };
+    this.editor.plugins.applyMainMenuContributions(menuOptions.items, {
+      location: 'main',
+      scene: this.createSceneContext()
     });
-    this._toolbar = new ToolBar(
-      'MainToolBar',
-      [
+    return menuOptions;
+  }
+  private createToolbarItems(): ToolBarItem[] {
+    return ([
         {
           label: FontGlyph.glyphs['mouse-pointer'],
           shortcut: 'Q',
@@ -573,7 +618,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           tooltip: () => 'Edit selected node',
           visible: () =>
             !!this._currentEditTool.get() ||
-            (!this._currentEditTool.get() && isObjectEditable(this._sceneHierarchy!.selectedNode)),
+            (!this._currentEditTool.get() &&
+              isObjectEditable(this.editor, this._sceneHierarchy!.selectedNode, this._editToolContext)),
           selected: () => {
             return !!this._currentEditTool.get();
           },
@@ -666,30 +712,36 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             this.playCurrentScene();
           }
         }
-      ],
-      0,
-      this._menubar.height,
-      -1,
-      30,
-      16,
-      16,
-      10
-    );
-    this._rightDockPanel = new DockPannel(0, 0, 400, 0, 8, 200, 600, ResizeDirection.Left);
-    this._propGrid = new PropertyEditor(0.4);
-    this._postGizmoRenderer = null;
-    this._leftDockPanel = null;
-    this._sceneHierarchy = null;
-    this._assetView = null;
+      ] as ToolBarItem[]).concat(this.editor.plugins.getToolbarItems({ scene: this.createSceneContext() }));
   }
-  get editor() {
-    return this.controller.editor;
+  private refreshPluginContributions() {
+    if (this._activePluginContributionShortcuts) {
+      this._menubar.unregisterShortcuts(this);
+      this._toolbar.unregisterShortcuts(this);
+    }
+    this._menubar.options = this.createMenuOptions();
+    this._toolbar.tools = this.createToolbarItems();
+    if (this._activePluginContributionShortcuts) {
+      this._menubar.registerShortcuts(this);
+      this._toolbar.registerShortcuts(this);
+    }
   }
-  get toolbar() {
-    return this._toolbar;
+  private createSceneContext(): EditorSceneContext {
+    return {
+      editor: this.editor,
+      scene: this.controller.model.scene,
+      selectedNodes: this.getSelectedSceneNodes(),
+      activeNode: this._sceneHierarchy?.selectedNode ?? null,
+      commandManager: this._cmdManager,
+      executeCommand: (command) => this._cmdManager.execute(command),
+      notifySceneChanged: () => eventBus.dispatchEvent('scene_changed'),
+      refreshProperties: () => this._propGrid.refresh(),
+      getCamera: () => this.controller.model.scene?.mainCamera ?? null,
+      getViewportRect: () => this._editToolContext.getViewportRect()
+    };
   }
-  get cmdManager() {
-    return this._cmdManager;
+  private renderContextMenuItems(items: readonly EditorMenuItem[], ctx: EditorMenuContext) {
+    this.editor.plugins.renderMenuItems(items, ctx);
   }
   reset() {
     this.sceneFinialize();
@@ -925,6 +977,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                   .then((node) => {
                     this._sceneHierarchy!.selectNode(node);
                     placeNode.parent = null;
+                    this.editor.plugins.dispatchEvent('nodeAdded', node);
                     eventBus.dispatchEvent('scene_changed');
                   });
                 break;
@@ -934,6 +987,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                   .then((node) => {
                     this._sceneHierarchy!.selectNode(node);
                     placeNode.parent = null;
+                    this.editor.plugins.dispatchEvent('nodeAdded', node);
                     eventBus.dispatchEvent('scene_changed');
                   });
                 break;
@@ -943,6 +997,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                   .then((mesh) => {
                     this._sceneHierarchy!.selectNode(mesh);
                     placeNode.parent = null;
+                    this.editor.plugins.dispatchEvent('nodeAdded', mesh);
                     eventBus.dispatchEvent('scene_changed');
                   });
                 break;
@@ -962,6 +1017,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                     this._sceneHierarchy!.selectNode(node);
                     placeNode.parent = null;
                     this._proxy!.createProxy(node!);
+                    this.editor.plugins.dispatchEvent('nodeAdded', node);
                     eventBus.dispatchEvent('scene_changed');
                   });
                 break;
@@ -1113,15 +1169,18 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       0,
       ImGui.GetIO().DisplaySize.y - this._statusbar.height - 300,
       ImGui.GetIO().DisplaySize.x,
-      300
+      300,
+      this.editor
     );
     this._menubar.registerShortcuts(this);
     this._menubar.on('action', this.handleSceneAction, this);
     this._toolbar.registerShortcuts(this);
+    this._activePluginContributionShortcuts = true;
     this.registerShortcut('Ctrl+D', () => {
       this.handleDuplicateShortcut();
     });
     this._toolbar.on('action', this.handleSceneAction, this);
+    this.editor.plugins.on('pluginContributionsChanged', this.refreshPluginContributions, this);
     this._assetView.renderer.on('selection_changed', this.handleAssetSelectionChanged, this);
     this._propGrid.on('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.on('object_property_edit_finished', this.handleObjectPropertyEditFinished, this);
@@ -1147,7 +1206,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._menubar.unregisterShortcuts(this);
     this._menubar.off('action', this.handleSceneAction, this);
     this._toolbar.unregisterShortcuts(this);
+    this._activePluginContributionShortcuts = false;
     this._toolbar.off('action', this.handleSceneAction, this);
+    this.editor.plugins.off('pluginContributionsChanged', this.refreshPluginContributions, this);
     this._propGrid.off('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.off('object_property_edit_finished', this.handleObjectPropertyEditFinished, this);
     this._propGrid.off('request_edit_aabb', this.editAABB, this);
@@ -1181,7 +1242,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       );
       this._sceneHierarchy = new SceneHierarchy(
         this.controller.model.scene,
-        () => this.controller.openedSceneName
+        () => this.controller.openedSceneName,
+        (node) => ({
+          location: 'scene-hierarchy',
+          scene: this.createSceneContext(),
+          target: node
+        }),
+        (items, ctx) => this.renderContextMenuItems(items, ctx)
       );
       this._sceneHierarchy.on('selection_changed', this.handleHierarchySelectionChanged, this);
       this._sceneHierarchy.on('node_selected', this.handleNodeSelected, this);
@@ -1328,6 +1395,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         }
       }
     }
+    this.editor.plugins.dispatchEvent('propertyChanged', object, prop);
     eventBus.dispatchEvent('scene_changed');
   }
   private async handleObjectPropertyEditFinished(
@@ -1377,6 +1445,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     } else if (commands.length > 1) {
       await this._cmdManager.execute(new CompositeCommand(`Edit property ${prop.name}`, commands));
     }
+    this.editor.plugins.dispatchEvent('propertyEditFinished', object, prop, oldValue, newValue);
     eventBus.dispatchEvent('scene_changed');
   }
   private shouldRefreshSelectedColliderProxy(prop: PropertyAccessor) {
@@ -1577,6 +1646,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     if (clonedNodes.length > 0) {
       this._sceneHierarchy!.selectNodes(clonedNodes, lastCloned);
+      for (const node of clonedNodes) {
+        this.editor.plugins.dispatchEvent('nodeAdded', node);
+      }
       eventBus.dispatchEvent('scene_changed');
     }
   }
@@ -1586,16 +1658,26 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     const currentTool = this._currentEditTool.get();
     if (!currentTool) {
-      this._currentEditTool.set(createEditTool(this.editor, node, this._editToolContext));
+      const tool = createEditTool(this.editor, node, this._editToolContext);
+      this._currentEditTool.set(tool);
+      if (tool) {
+        this.editor.plugins.dispatchEvent('editToolActivated', tool, node);
+      }
       return;
     }
     const currentTarget = currentTool.getTarget();
     const sameTarget =
       currentTarget === node || (currentTarget instanceof SceneNode && currentTarget.isParentOf(node));
     if (sameTarget) {
+      this.editor.plugins.dispatchEvent('editToolDeactivated', currentTool, currentTarget);
       this._currentEditTool.dispose();
     } else {
-      this._currentEditTool.set(createEditTool(this.editor, node, this._editToolContext));
+      this.editor.plugins.dispatchEvent('editToolDeactivated', currentTool, currentTarget);
+      const tool = createEditTool(this.editor, node, this._editToolContext);
+      this._currentEditTool.set(tool);
+      if (tool) {
+        this.editor.plugins.dispatchEvent('editToolActivated', tool, node);
+      }
     }
   }
   private getSelectedSceneNodes() {
@@ -1811,6 +1893,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     if (clonedNodes.length > 0) {
       this._sceneHierarchy!.selectNodes(clonedNodes, lastCloned);
+      for (const node of clonedNodes) {
+        this.editor.plugins.dispatchEvent('nodeAdded', node);
+      }
       eventBus.dispatchEvent('scene_changed');
     }
   }
@@ -1836,6 +1921,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     } else {
       await this._cmdManager.execute(new CompositeCommand('Delete nodes', commands));
     }
+    for (const node of selectedNodes) {
+      this.editor.plugins.dispatchEvent('nodeDeleted', node);
+    }
     eventBus.dispatchEvent('scene_changed');
   }
   private async handleDeleteNode(node: SceneNode) {
@@ -1844,6 +1932,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       return;
     }
     await this._cmdManager.execute(command);
+    this.editor.plugins.dispatchEvent('nodeDeleted', node);
     eventBus.dispatchEvent('scene_changed');
   }
   private prepareDeleteNodeCommand(node: SceneNode): Nullable<NodeDeleteCommand> {
@@ -1856,6 +1945,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     const editTarget = this._currentEditTool.get()?.getTarget();
     if (editTarget instanceof SceneNode && editTarget.isParentOf(node)) {
+      this.editor.plugins.dispatchEvent('editToolDeactivated', this._currentEditTool.get()!, editTarget);
       this._currentEditTool.dispose();
     }
     const selectedNodes = this.getSelectedSceneNodes();
@@ -1920,6 +2010,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           : new AddPrefabCommand(this.controller.model.scene, this._assetToBeAdded!, pos);
       this._cmdManager.execute(command).then((node) => {
         this._sceneHierarchy!.selectNode(node);
+        this.editor.plugins.dispatchEvent('nodeAdded', node);
         eventBus.dispatchEvent('scene_changed');
       });
     }
@@ -1995,6 +2086,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleHierarchySelectionChanged(_selectedNodes: SceneNode[], activeNode: Nullable<SceneNode>) {
     this._lastDuplicateTarget = 'scene';
     this._syncedPropertySessions.clear();
+    this.editor.plugins.dispatchEvent('selectionChanged', _selectedNodes, activeNode);
     const outlineNodes = this.getSelectedSceneNodes().filter(
       (node) =>
         node !== this.controller.model.scene.rootNode && node !== this.controller.model.scene.mainCamera
@@ -2007,6 +2099,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         !activeNode ||
         (editTarget !== activeNode && !editTarget.isParentOf(activeNode)))
     ) {
+      this.editor.plugins.dispatchEvent('editToolDeactivated', this._currentEditTool.get()!, editTarget);
       this._currentEditTool.dispose();
     }
     if (!activeNode) {
@@ -2070,8 +2163,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {
     if (src.parent !== dst && !src.isParentOf(dst)) {
-      this._cmdManager.execute(new NodeReparentCommand(src, dst));
-      eventBus.dispatchEvent('scene_changed');
+      this._cmdManager.execute(new NodeReparentCommand(src, dst)).then(() => {
+        this.editor.plugins.dispatchEvent('nodeTransformed', src);
+        eventBus.dispatchEvent('scene_changed');
+      });
     }
   }
   private handleNodeDoubleClicked(node: SceneNode) {
@@ -2159,6 +2254,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleAddChild(parent: SceneNode, ctor: { new (scene: Scene): SceneNode }) {
     this._cmdManager.execute(new AddChildCommand(parent, ctor)).then((node) => {
       this._sceneHierarchy!.selectNode(node);
+      this.editor.plugins.dispatchEvent('nodeAdded', node);
       eventBus.dispatchEvent('scene_changed');
     });
   }
@@ -2240,6 +2336,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._proxy!.updateProxy(colliderNode);
       this._sceneHierarchy?.selectNode(colliderNode);
       this._propGrid.refresh();
+      this.editor.plugins.dispatchEvent('nodeAdded', colliderNode);
       eventBus.dispatchEvent('scene_changed');
     });
   }
@@ -2251,9 +2348,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (selectedNodes.some((selected) => node.isParentOf(selected))) {
       this._sceneHierarchy!.selectNode(null);
     }
+    this.editor.plugins.dispatchEvent('nodeRemoved', node);
   }
   private handleNodeAttached(node: SceneNode) {
     this.syncNodeProxyTree(node);
+    this.editor.plugins.dispatchEvent('nodeAdded', node);
   }
   private syncNodeProxyTree(root: Nullable<SceneNode>) {
     if (!root || !this._proxy) {
@@ -2343,6 +2442,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           return false;
         });
       }
+      this.editor.plugins.dispatchEvent(
+        'nodeTransformed',
+        this._multiTransformItems.length > 0 ? [node, ...this._multiTransformItems.map((item) => item.node)] : node
+      );
       this._multiTransformItems = [];
       this._multiTransformMasterStartWorld = null;
       this._transformNode.dispose();

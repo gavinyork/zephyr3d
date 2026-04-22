@@ -9,6 +9,7 @@ export type MenuItemOptions = {
   id?: string;
   action?: () => void;
   checked?: () => boolean;
+  enabled?: (ctx?: any) => boolean;
   subMenus?: MenuItemOptions[];
 };
 
@@ -63,6 +64,7 @@ export class MenubarView extends Observable<{
     }
   }
   addMenuItem(parentId: string, label: string, id: string, shortCut?: string): string {
+    let parentItem: MenuItemOptions = null;
     if (id === null || id === undefined) {
       id = this.uniqueId();
     }
@@ -77,11 +79,12 @@ export class MenubarView extends Observable<{
       if (!parent) {
         throw new Error(`Parent menu item with id ${parentId} does not exist`);
       }
+      parentItem = parent.item;
       const subMenus = parent.item.subMenus ?? [];
       subMenus.push(newItem);
       parent.item.subMenus = subMenus;
     }
-    this._map.set(id, { item: newItem, parent: null });
+    this._map.set(id, { item: newItem, parent: parentItem });
     return id;
   }
   removeMenuItem(id: string) {
@@ -168,7 +171,14 @@ export class MenubarView extends Observable<{
     } else {
       if (item.label === '-') {
         ImGui.Separator();
-      } else if (ImGui.MenuItem(`${item.label}##${item.id}`, item.shortCut ?? null, !!item.checked?.())) {
+      } else if (
+        ImGui.MenuItem(
+          `${item.label}##${item.id}`,
+          item.shortCut ?? null,
+          !!item.checked?.(),
+          item.enabled?.() ?? true
+        )
+      ) {
         if (item.action) {
           item.action();
         } else if (item.id) {
@@ -186,6 +196,7 @@ export class MenubarView extends Observable<{
       id: item.id,
       action: item.action,
       checked: item.checked,
+      enabled: item.enabled,
       shortCut: item.shortCut,
       subMenus: item.subMenus?.map((subItem) => this.copyItem(subItem))
     };

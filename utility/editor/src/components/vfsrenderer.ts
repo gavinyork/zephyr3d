@@ -25,6 +25,8 @@ import { exportFile, exportMultipleFilesAsZip } from '../helpers/downloader';
 import type { SharedModel } from '../loaders/model';
 import { DlgImportOptions } from '../views/dlg/importoptionsdlg';
 import { DialogRenderer } from './modal';
+import type { Editor } from '../core/editor';
+import type { EditorAssetContext, EditorMenuContext } from '../core/plugin';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -55,7 +57,10 @@ type VFSRendererOptions = {
   allowDrop?: boolean;
   allowDblClickOpen?: boolean;
   multiSelect?: boolean;
+  editor?: Editor;
 };
+
+export type VFSRendererContextMenuLocation = 'asset-content' | 'asset-directory';
 
 type PathRewriteRule = {
   oldPath: string;
@@ -223,6 +228,7 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
     }
   }
   protected onContentContextMenu(): void {
+    this.renderer.renderPluginContextMenu('asset-content', null);
     if (!this.renderer.VFS.readOnly) {
       if (ImGui.BeginMenu('Create New')) {
         if (ImGui.MenuItem('Folder...')) {
@@ -373,6 +379,7 @@ export class DirTreeView extends TreeView<{}, DirectoryInfo> {
     this._renderer.refreshFileView();
   }
   protected onDrawContextMenu(dir: DirectoryInfo) {
+    this._renderer.renderPluginContextMenu('asset-directory', dir);
     if (ImGui.BeginMenu('Create New##VFSCreate')) {
       if (ImGui.MenuItem('Folder...##VFSCreateFolder')) {
         DlgPromptName.promptName('Create Folder', 'NewFolder').then((name) => {
@@ -1428,6 +1435,34 @@ export class VFSRenderer extends makeObservable(Disposable)<{
 
   emitSelectedChanged() {
     this.dispatchEvent('selection_changed', this.selectedDir ?? null, this.selectedFiles);
+    this._options.editor?.plugins.dispatchEvent('assetSelectionChanged', this.getAssetContext());
+  }
+
+  getAssetContext(): EditorAssetContext {
+    return {
+      editor: this._options.editor,
+      vfs: this._vfs,
+      selectedDir: this.selectedDir,
+      selectedFiles: this.selectedFiles,
+      selectedItems: [...this.selectedItems]
+    };
+  }
+
+  renderPluginContextMenu(location: VFSRendererContextMenuLocation, target: unknown) {
+    const editor = this._options.editor;
+    if (!editor) {
+      return;
+    }
+    const ctx: EditorMenuContext = {
+      location,
+      assets: this.getAssetContext(),
+      target
+    };
+    const items = editor.plugins.getContextMenuItems(location, ctx);
+    if (items.length > 0) {
+      editor.plugins.renderMenuItems(items, ctx);
+      ImGui.Separator();
+    }
   }
 
   onVFSChanged(type: 'created' | 'deleted' | 'moved' | 'modified') {

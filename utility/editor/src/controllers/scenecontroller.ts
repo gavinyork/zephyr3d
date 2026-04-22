@@ -8,6 +8,7 @@ import type { Editor } from '../core/editor';
 import { ProjectService } from '../core/services/project';
 import { DlgProjectSettings } from '../views/dlg/projectsettingsdlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
+import { DlgSystemPlugins } from '../views/dlg/systempluginsdlg';
 
 export class SceneController extends BaseController<SceneModel, SceneView> {
   protected _editor: Editor;
@@ -75,6 +76,9 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
   }
   private invalidateScene() {
     this._sceneChanged = true;
+    if (this._model.scene) {
+      this._editor.plugins.dispatchEvent('sceneDirty', this._model.scene);
+    }
   }
   private async sceneAction(action: string, ...args: any[]) {
     switch (action) {
@@ -109,6 +113,9 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
         }
         break;
       }
+      case 'SYSTEM_PLUGINS':
+        await DlgSystemPlugins.show(this._editor);
+        break;
       case 'EXPORT_PROJECT':
         if (await this.ensureSceneSaved()) {
           await this._editor.exportProject();
@@ -193,27 +200,32 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
       console.error(msg);
       await DlgMessage.messageBox('Error', msg);
     } else {
+      this._editor.plugins.dispatchEvent('sceneSaving', this.model.scene, this._scenePath);
       await getEngine().resourceManager.saveScene(this.model.scene, this._scenePath);
       this._editor.currentProject.lastEditScene = this._scenePath;
       await this._editor.saveProject();
       this._sceneChanged = false;
+      this._editor.plugins.dispatchEvent('sceneSaved', this.model.scene, this._scenePath);
     }
   }
   async loadScene(path: string): Promise<Scene> {
     return getEngine().resourceManager.loadScene(path);
   }
   async openScene(path: string, resetView: boolean) {
+    this._editor.plugins.dispatchEvent('sceneOpening', path);
     const scene = await this.loadScene(path);
     this._editor.currentProject.lastEditScene = path;
     await this._editor.saveProject();
     this._scenePath = path;
     this._sceneChanged = false;
     this.reset(scene, resetView);
+    this._editor.plugins.dispatchEvent('sceneOpened', this.model.scene, path);
   }
   createScene(resetView: boolean, path?: string) {
     this._scenePath = path ?? '';
     this._sceneChanged = true;
     this.reset(null, resetView);
+    this._editor.plugins.dispatchEvent('sceneCreated', this.model.scene, this._scenePath);
   }
   async ensureSceneSaved(): Promise<boolean> {
     if (this._sceneChanged) {
