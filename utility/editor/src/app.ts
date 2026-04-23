@@ -97,7 +97,7 @@ if (!backend) {
 const renderScale =
   typeof settings?.renderScale === 'number' && Number.isFinite(settings.renderScale)
     ? settings.renderScale
-    : 1;
+    : 0;
 
 const editorApp = new Application({
   backend,

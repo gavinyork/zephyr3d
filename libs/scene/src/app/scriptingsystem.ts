@@ -1,4 +1,4 @@
-import type { IDisposable, Nullable, VFS } from '@zephyr3d/base';
+import type { GenericConstructor, IDisposable, Nullable, VFS } from '@zephyr3d/base';
 import { HttpFS } from '@zephyr3d/base';
 import { ScriptRegistry } from './scriptregistry';
 import { RuntimeScript } from './runtimescript';
@@ -95,7 +95,33 @@ export class ScriptingSystem {
   get registry() {
     return this._registry;
   }
-
+  /**
+   * Loads a runtime script class from file
+   * @param module - file path
+   * @returns The runtime script class or null
+   */
+  async loadRuntimeScriptClass<T extends Host = Host>(
+    module: string
+  ): Promise<Nullable<{ url: string; cls: GenericConstructor<RuntimeScript<T>> }>> {
+    let mod: any = null;
+    const moduleName = module ? String(module).slice(0, 64) : '';
+    let url = '';
+    try {
+      url = await this._registry.resolveRuntimeUrl(module);
+      if (!url) {
+        return null;
+      }
+      mod = await import(url + (this._importComment ?? ''));
+    } catch (e) {
+      console.error(`Load module '${moduleName}' failed: ${e}`);
+    }
+    if (mod && typeof mod.default === 'function') {
+      return { url, cls: mod.default as GenericConstructor<RuntimeScript<T>> };
+    } else {
+      console.error(`No runtime class exported from '${moduleName}'`);
+      return null;
+    }
+  }
   /**
    * Attaches a script to a host and returns the `RuntimeScript` instance.
    *
@@ -117,25 +143,21 @@ export class ScriptingSystem {
    */
   async attachScript<T extends Host>(host: Nullable<T>, module: string): Promise<Nullable<RuntimeScript<T>>> {
     try {
-      const url = await this._registry.resolveRuntimeUrl(module);
-      if (!url) {
+      const info = await this.loadRuntimeScriptClass(module);
+      if (!info) {
         return null;
       }
-      const mod = await import(url + (this._importComment ?? ''));
-      let instance: Nullable<RuntimeScript<T>> = null;
-      if (typeof mod?.default === 'function') {
-        // default export
-        instance = new mod.default();
-        if (instance instanceof RuntimeScript) {
-          if (!this._scriptHosts.has(instance)) {
-            const P = instance.onCreated();
-            if (P instanceof Promise) {
-              await P;
-            }
+      const { url, cls } = info;
+      let instance: Nullable<RuntimeScript<T>> = new cls();
+      if (instance instanceof RuntimeScript) {
+        if (!this._scriptHosts.has(instance)) {
+          const P = instance.onCreated();
+          if (P instanceof Promise) {
+            await P;
           }
-        } else {
-          instance = null;
         }
+      } else {
+        instance = null;
       }
       if (!instance) {
         console.warn(`Script '${module}' does not have RuntimeScript class exported as default`);

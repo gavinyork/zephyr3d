@@ -1,4 +1,4 @@
-import type { IDisposable, Nullable, ReadOptions } from '@zephyr3d/base';
+import type { GenericConstructor, IDisposable, Nullable, ReadOptions } from '@zephyr3d/base';
 import { MemoryFS, objectEntries } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { HttpFS, type VFS } from '@zephyr3d/base';
@@ -86,7 +86,7 @@ export class Engine {
     VFS = VFS ?? new HttpFS('./');
     this._builtinsVFS = null;
     this._scriptingSystem = new ScriptingSystem({ VFS, scriptsRoot });
-    this._resourceManager = new ResourceManager(VFS);
+    this._resourceManager = new ResourceManager(this, VFS);
     this._enabled = enabled ?? true;
     this._activeRenderables = [];
     this._loadingScenes = {};
@@ -137,6 +137,16 @@ export class Engine {
     if (this._enabled) {
       this._scriptingSystem.detachAllScripts();
     }
+  }
+  /**
+   * Loads a runtime script class from file
+   * @param module - file path
+   * @returns The runtime script class or null
+   */
+  async loadRuntimeScriptClass<T extends Host = Host>(
+    module: string
+  ): Promise<Nullable<{ url: string; cls: GenericConstructor<RuntimeScript<T>> }>> {
+    return await this._scriptingSystem.loadRuntimeScriptClass(module);
   }
   /**
    * Attaches a script module to the given host, if enabled.
