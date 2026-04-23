@@ -13,7 +13,7 @@ import {
   getGPUObjectStatistics
 } from '../helpers/leakdetector';
 import type { FileMetadata, HttpDirectoryReader, HttpDirectoryReaderContext } from '@zephyr3d/base';
-import { DRef, HttpFS, MemoryFS, PathUtils } from '@zephyr3d/base';
+import { DRef, HttpFS, MemoryFS, PathUtils, Vector3 } from '@zephyr3d/base';
 import type { ProjectInfo, ProjectSettings } from './services/project';
 import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
@@ -24,13 +24,7 @@ import { initLogView } from '../components/logview';
 import { loadTypes } from './build/loadtypes';
 import { ensureDependencies, installDeps } from './build/dep';
 import { FilePicker } from '../components/filepicker';
-import {
-  editorPluginModuleName,
-  editorPluginTypeDeclarations,
-  fileListFileName,
-  generateIndexTS,
-  libDir
-} from './build/templates';
+import { fileListFileName, generateIndexTS, libDir } from './build/templates';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { EditorPluginManager, type EditorPlugin } from './plugin';
@@ -113,7 +107,6 @@ export class Editor {
   private _extraLibs: Record<string, Monaco.IDisposable>;
   private readonly _plugins: EditorPluginManager;
   private readonly _systemPluginRegistrations: Map<string, SystemPluginRecord>;
-  private readonly _monacoExtraLibs: Record<string, Monaco.IDisposable>;
   constructor() {
     this._moduleManager = new ModuleManager();
     this._assetImages = { brushes: {}, app: {} };
@@ -124,7 +117,9 @@ export class Editor {
     this._extraLibs = {};
     this._plugins = new EditorPluginManager(this);
     this._systemPluginRegistrations = new Map();
-    this._monacoExtraLibs = {};
+  }
+  testPackage(ctorVector3: any) {
+    return ctorVector3 === Vector3;
   }
   get plugins() {
     return this._plugins;
@@ -244,7 +239,6 @@ export class Editor {
     await this.loadAssets();
     initLogView({ maxLines: 8000 });
     eventBus.on('action', this.onAction, this);
-    await this.ensurePluginAuthoringTypes();
     await this.ensureBuiltinSystemPlugins();
     await this.loadSystemPlugins();
   }
@@ -704,14 +698,16 @@ export class Editor {
 
   async installSystemPluginFromFile(file: File) {
     const plugin = await SystemPluginService.installPluginFromFile(file);
-    await this.loadSystemPlugin(plugin.id, true);
-    return plugin;
+    return (await this.tryLoadSystemPlugin(plugin.id, true))
+      ? plugin
+      : ((await SystemPluginService.getPlugin(plugin.id)) ?? plugin);
   }
 
   async installSystemPluginFromDirectory(files: File[]) {
     const plugin = await SystemPluginService.installPluginFromDirectory(files);
-    await this.loadSystemPlugin(plugin.id, true);
-    return plugin;
+    return (await this.tryLoadSystemPlugin(plugin.id, true))
+      ? plugin
+      : ((await SystemPluginService.getPlugin(plugin.id)) ?? plugin);
   }
 
   async installSystemPluginFiles(input: {
@@ -725,8 +721,9 @@ export class Editor {
     builtin?: boolean;
   }) {
     const plugin = await SystemPluginService.installPluginFiles(input);
-    await this.loadSystemPlugin(plugin.id, true);
-    return plugin;
+    return (await this.tryLoadSystemPlugin(plugin.id, true))
+      ? plugin
+      : ((await SystemPluginService.getPlugin(plugin.id)) ?? plugin);
   }
 
   async listSystemPluginFiles(id: string): Promise<SystemPluginFileRecord[]> {
@@ -761,7 +758,7 @@ export class Editor {
     const filePath = await SystemPluginService.createPluginFile(id, relativePath, source);
     const plugin = await SystemPluginService.getPlugin(id);
     if (plugin?.enabled) {
-      await this.loadSystemPlugin(id, true);
+      await this.tryLoadSystemPlugin(id, true);
     }
     return filePath;
   }
@@ -770,7 +767,7 @@ export class Editor {
     const dirPath = await SystemPluginService.createPluginDirectory(id, relativePath);
     const plugin = await SystemPluginService.getPlugin(id);
     if (plugin?.enabled) {
-      await this.loadSystemPlugin(id, true);
+      await this.tryLoadSystemPlugin(id, true);
     }
     return dirPath;
   }
@@ -779,7 +776,7 @@ export class Editor {
     const filePath = await SystemPluginService.renamePluginFile(id, oldRelativePath, newRelativePath);
     const plugin = await SystemPluginService.getPlugin(id);
     if (plugin?.enabled) {
-      await this.loadSystemPlugin(id, true);
+      await this.tryLoadSystemPlugin(id, true);
     }
     return filePath;
   }
@@ -788,23 +785,23 @@ export class Editor {
     await SystemPluginService.deletePluginFile(id, relativePath);
     const plugin = await SystemPluginService.getPlugin(id);
     if (plugin?.enabled) {
-      await this.loadSystemPlugin(id, true);
+      await this.tryLoadSystemPlugin(id, true);
     }
   }
 
   async updateSystemPluginFile(path: string, source: string) {
     const plugin = await SystemPluginService.updatePluginFile(path, source);
     if (plugin.enabled) {
-      await this.loadSystemPlugin(plugin.id, true);
+      await this.tryLoadSystemPlugin(plugin.id, true);
     }
-    return plugin;
+    return (await SystemPluginService.getPlugin(plugin.id)) ?? plugin;
   }
 
   async renameSystemPluginDirectory(id: string, oldRelativePath: string, newRelativePath: string) {
     const dirPath = await SystemPluginService.renamePluginDirectory(id, oldRelativePath, newRelativePath);
     const plugin = await SystemPluginService.getPlugin(id);
     if (plugin?.enabled) {
-      await this.loadSystemPlugin(id, true);
+      await this.tryLoadSystemPlugin(id, true);
     }
     return dirPath;
   }
@@ -813,14 +810,16 @@ export class Editor {
     await SystemPluginService.deletePluginDirectory(id, relativePath);
     const plugin = await SystemPluginService.getPlugin(id);
     if (plugin?.enabled) {
-      await this.loadSystemPlugin(id, true);
+      await this.tryLoadSystemPlugin(id, true);
     }
   }
 
   async setSystemPluginEnabled(id: string, enabled: boolean) {
     const plugin = await SystemPluginService.setPluginEnabled(id, enabled);
     if (enabled) {
-      await this.loadSystemPlugin(id, true);
+      return (await this.tryLoadSystemPlugin(id, true))
+        ? plugin
+        : ((await SystemPluginService.getPlugin(id)) ?? plugin);
     } else if (this._plugins.hasPlugin(id) && this._plugins.isPluginActive(id)) {
       await this._plugins.deactivatePlugin(id);
     }
@@ -842,10 +841,22 @@ export class Editor {
     const plugins = await SystemPluginService.listPlugins();
     for (const plugin of plugins) {
       if (plugin.enabled) {
-        await this.loadSystemPlugin(plugin.id, false);
+        await this.tryLoadSystemPlugin(plugin.id, false);
       } else if (this._plugins.hasPlugin(plugin.id) && this._plugins.isPluginActive(plugin.id)) {
         await this._plugins.deactivatePlugin(plugin.id);
       }
+    }
+  }
+
+  private async tryLoadSystemPlugin(id: string, reactivate: boolean) {
+    try {
+      await this.loadSystemPlugin(id, reactivate);
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`Failed to load system plugin '${id}'. The plugin has been disabled.`, err);
+      await this.disableFailedSystemPlugin(id, message);
+      return false;
     }
   }
 
@@ -876,6 +887,30 @@ export class Editor {
     }
   }
 
+  private async disableFailedSystemPlugin(id: string, reason: string) {
+    try {
+      if (this._plugins.hasPlugin(id) && this._plugins.isPluginActive(id)) {
+        await this._plugins.deactivatePlugin(id);
+      }
+    } catch (err) {
+      console.warn(`Failed to deactivate system plugin '${id}' after load error:`, err);
+    }
+    if (this._plugins.hasPlugin(id)) {
+      try {
+        this._plugins.unregisterPlugin(id);
+      } catch (err) {
+        console.warn(`Failed to unregister system plugin '${id}' after load error:`, err);
+      }
+    }
+    this._systemPluginRegistrations.delete(id);
+    try {
+      await SystemPluginService.setPluginEnabled(id, false);
+      console.warn(`System plugin '${id}' was disabled because it failed to load: ${reason}`);
+    } catch (err) {
+      console.error(`Failed to disable system plugin '${id}' after load error:`, err);
+    }
+  }
+
   private async importSystemPlugin(installed: InstalledSystemPlugin) {
     SystemPluginService.validatePluginSource(installed.source);
     const registry = new ScriptRegistry(SystemPluginService.VFS, SystemPluginService.packagesDir);
@@ -892,32 +927,42 @@ export class Editor {
   }
 
   private async ensureBuiltinSystemPlugins() {
-    const existing = await SystemPluginService.getPlugin(sampleOSSExportPlugin.id);
-    if (!existing) {
-      await SystemPluginService.installPlugin({
-        id: sampleOSSExportPlugin.id,
-        name: sampleOSSExportPlugin.name,
-        version: sampleOSSExportPlugin.version,
-        description: sampleOSSExportPlugin.description,
-        source: sampleOSSExportPluginSource,
-        enabled: true,
-        builtin: true
-      });
-    }
-  }
-
-  private async ensurePluginAuthoringTypes() {
-    const monaco = await this.waitForMonaco();
-    if (!monaco) {
-      console.warn('Monaco is not ready, skipped plugin authoring types registration');
-      return;
-    }
-    const virtualPath = `file:///types/${editorPluginModuleName.replace(/[/:]/g, '_')}.d.ts`;
-    if (!this._monacoExtraLibs[virtualPath]) {
-      this._monacoExtraLibs[virtualPath] = monaco.languages.typescript.typescriptDefaults.addExtraLib(
-        editorPluginTypeDeclarations,
-        virtualPath
-      );
+    try {
+      const existing = await SystemPluginService.getPlugin(sampleOSSExportPlugin.id);
+      if (!existing) {
+        await SystemPluginService.installPlugin({
+          id: sampleOSSExportPlugin.id,
+          name: sampleOSSExportPlugin.name,
+          version: sampleOSSExportPlugin.version,
+          description: sampleOSSExportPlugin.description,
+          source: sampleOSSExportPluginSource,
+          enabled: true,
+          builtin: true
+        });
+        return;
+      }
+      if (existing.builtin) {
+        const installed = await SystemPluginService.getInstalledPluginSource(sampleOSSExportPlugin.id);
+        if (installed?.source !== sampleOSSExportPluginSource) {
+          await SystemPluginService.installPlugin({
+            id: sampleOSSExportPlugin.id,
+            name: sampleOSSExportPlugin.name,
+            version: sampleOSSExportPlugin.version,
+            description: sampleOSSExportPlugin.description,
+            source: sampleOSSExportPluginSource,
+            enabled: existing.enabled,
+            builtin: true
+          });
+        }
+      }
+    } catch (err) {
+      console.error(`Failed to install or update builtin system plugin '${sampleOSSExportPlugin.id}'.`, err);
+      if (await SystemPluginService.getPlugin(sampleOSSExportPlugin.id).catch(() => null)) {
+        await this.disableFailedSystemPlugin(
+          sampleOSSExportPlugin.id,
+          err instanceof Error ? err.message : String(err)
+        );
+      }
     }
   }
 
@@ -961,7 +1006,7 @@ export class Editor {
       if (this.isSystemPluginPath(fileName)) {
         const plugin = await SystemPluginService.updatePluginFile(fileName, content);
         if (plugin.enabled) {
-          await this.loadSystemPlugin(plugin.id, true);
+          await this.tryLoadSystemPlugin(plugin.id, true);
         }
       } else {
         await this.getVFSForPath(fileName).writeFile(fileName, content, { encoding: 'utf8', create: true });

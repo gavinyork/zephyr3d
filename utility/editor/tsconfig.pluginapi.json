@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": false,
+    "outDir": "./public/vendor/zephyr3d/editor/dist/pluginapi",
+    "rootDir": "./src",
+    "sourceMap": false
+  },
+  "include": ["./src/editor-plugin.ts", "./src/core/pluginapi.ts"]
+}

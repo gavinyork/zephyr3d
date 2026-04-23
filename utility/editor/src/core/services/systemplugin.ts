@@ -583,9 +583,6 @@ export class SystemPluginService {
       if (spec.startsWith('./') || spec.startsWith('../') || spec.startsWith('/')) {
         continue;
       }
-      if (spec === 'zephyr3d/editor-plugin') {
-        continue;
-      }
       if (spec.startsWith('@zephyr3d/')) {
         continue;
       }

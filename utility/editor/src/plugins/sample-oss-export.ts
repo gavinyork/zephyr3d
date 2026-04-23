@@ -1,4 +1,4 @@
-import type { EditorPlugin } from 'zephyr3d/editor-plugin';
+import type { EditorPlugin } from '@zephyr3d/editor/editor-plugin';
 export const sampleOSSExportPlugin: EditorPlugin = {
   id: 'zephyr3d.sample.oss-export',
   name: 'Sample OSS Export',
@@ -36,7 +36,7 @@ export const sampleOSSExportPlugin: EditorPlugin = {
   }
 };
 
-export const sampleOSSExportPluginSource = `import type { EditorPlugin } from 'zephyr3d/editor-plugin';
+export const sampleOSSExportPluginSource = `import type { EditorPlugin } from '@zephyr3d/editor/editor-plugin';
 
 const plugin: EditorPlugin = {
   id: 'zephyr3d.sample.oss-export',

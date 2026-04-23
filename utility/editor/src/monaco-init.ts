@@ -17,7 +17,11 @@ const typeFiles = [
   { path: './vendor/zephyr3d/scene/dist/index.d.ts', name: '@zephyr3d/scene' },
   { path: './vendor/zephyr3d/imgui/dist/index.d.ts', name: '@zephyr3d/imgui' },
   { path: './vendor/zephyr3d/backend-webgl/dist/index.d.ts', name: '@zephyr3d/backend-webgl' },
-  { path: './vendor/zephyr3d/backend-webgpu/dist/index.d.ts', name: '@zephyr3d/backend-webgpu' }
+  { path: './vendor/zephyr3d/backend-webgpu/dist/index.d.ts', name: '@zephyr3d/backend-webgpu' },
+  {
+    path: './vendor/zephyr3d/editor/dist/pluginapi/core/pluginapi.d.ts',
+    name: '@zephyr3d/editor/editor-plugin'
+  }
 ] as const;
 
 const zephyrPackages = [
@@ -25,7 +29,8 @@ const zephyrPackages = [
   '@zephyr3d/device',
   '@zephyr3d/scene',
   '@zephyr3d/backend-webgl',
-  '@zephyr3d/backend-webgpu'
+  '@zephyr3d/backend-webgpu',
+  '@zephyr3d/editor/editor-plugin'
 ] as const;
 
 let monacoInitPromise: Promise<void> | null = null;

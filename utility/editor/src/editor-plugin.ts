@@ -1,0 +1,20 @@
+export type {
+  DisposableLike,
+  EditorAssetContext,
+  EditorEditToolFactory,
+  EditorEditToolFactoryContext,
+  EditorEventMap,
+  EditorEventSource,
+  EditorHost,
+  EditorMenuContext,
+  EditorMenuContribution,
+  EditorMenuItem,
+  EditorMenuLocation,
+  EditorPlugin,
+  EditorPluginContext,
+  EditorProjectInfo,
+  EditorSceneContext,
+  EditorToolbarContext,
+  EditorToolbarContribution,
+  EditorToolbarItem
+} from './core/pluginapi';
