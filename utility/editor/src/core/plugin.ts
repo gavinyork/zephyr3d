@@ -112,7 +112,12 @@ export type EditorEventMap = {
   nodeDeleted: [node: SceneNode];
   nodeTransformed: [node: SceneNode | readonly SceneNode[]];
   propertyChanged: [target: Nullable<object>, prop: PropertyAccessor];
-  propertyEditFinished: [target: Nullable<object>, prop: PropertyAccessor, oldValue: unknown, newValue: unknown];
+  propertyEditFinished: [
+    target: Nullable<object>,
+    prop: PropertyAccessor,
+    oldValue: unknown,
+    newValue: unknown
+  ];
   editToolActivated: [tool: EditTool, target: unknown];
   editToolDeactivated: [tool: EditTool, target: unknown];
   assetSelectionChanged: [ctx: EditorAssetContext];

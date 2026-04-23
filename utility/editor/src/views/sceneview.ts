@@ -450,7 +450,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     return menuOptions;
   }
   private createToolbarItems(): ToolBarItem[] {
-    return ([
+    return (
+      [
         {
           label: FontGlyph.glyphs['mouse-pointer'],
           shortcut: 'Q',
@@ -712,7 +713,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             this.playCurrentScene();
           }
         }
-      ] as ToolBarItem[]).concat(this.editor.plugins.getToolbarItems({ scene: this.createSceneContext() }));
+      ] as ToolBarItem[]
+    ).concat(this.editor.plugins.getToolbarItems({ scene: this.createSceneContext() }));
   }
   private refreshPluginContributions() {
     if (this._activePluginContributionShortcuts) {
@@ -2444,7 +2446,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       }
       this.editor.plugins.dispatchEvent(
         'nodeTransformed',
-        this._multiTransformItems.length > 0 ? [node, ...this._multiTransformItems.map((item) => item.node)] : node
+        this._multiTransformItems.length > 0
+          ? [node, ...this._multiTransformItems.map((item) => item.node)]
+          : node
       );
       this._multiTransformItems = [];
       this._multiTransformMasterStartWorld = null;

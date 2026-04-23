@@ -58,6 +58,10 @@ type VFSRendererOptions = {
   allowDblClickOpen?: boolean;
   multiSelect?: boolean;
   editor?: Editor;
+  rootLabel?: string;
+  showDependencyTools?: boolean;
+  showGenericFileCreate?: boolean;
+  openFile?: (path: string, mimeType: string) => void;
 };
 
 export type VFSRendererContextMenuLocation = 'asset-content' | 'asset-directory';
@@ -70,11 +74,11 @@ type PathRewriteRule = {
 
 class VFSDirData extends TreeViewData<DirectoryInfo> {
   private _renderer: VFSRenderer;
-  private _projectName: string;
-  constructor(renderer: VFSRenderer, projectName: string) {
+  private _rootLabel: string;
+  constructor(renderer: VFSRenderer, rootLabel: string) {
     super();
     this._renderer = renderer;
-    this._projectName = projectName;
+    this._rootLabel = rootLabel;
   }
   getRoot(): DirectoryInfo {
     return this._renderer.root;
@@ -92,7 +96,7 @@ class VFSDirData extends TreeViewData<DirectoryInfo> {
     const name = node.path.slice(node.path.lastIndexOf('/') + 1);
     const emoji = '📁';
     const id = node.path;
-    return convertEmojiString(`${emoji}${node === this._renderer.root ? this._projectName : name}##${id}`);
+    return convertEmojiString(`${emoji}${node === this._renderer.root ? this._rootLabel : name}##${id}`);
   }
   getDragSourcePayloadType(): string {
     return '';
@@ -234,6 +238,14 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
         if (ImGui.MenuItem('Folder...')) {
           this.renderer.createNewFolder();
         }
+        if (this.renderer.showGenericFileCreate && ImGui.MenuItem('File...')) {
+          this.renderer.createNewFile('Create File', 'untitled.ts', async (path) => {
+            await this.renderer.VFS.writeFile(path, '', {
+              encoding: 'utf8',
+              create: true
+            });
+          });
+        }
         if (this.renderer.VFS.isParentOf('/assets', this.renderer.selectedDir.path)) {
           ImGui.Separator();
           if (ImGui.MenuItem('Scene...')) {
@@ -331,7 +343,7 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
           }
           ImGui.Separator();
           if (ImGui.MenuItem('Edit as text')) {
-            eventBus.dispatchEvent('action', 'EDIT_CODE', item.meta.path, mimeType);
+            this.renderer.openFile(item.meta.path, mimeType);
           }
         }
         ImGui.Separator();
@@ -407,6 +419,14 @@ export class DirTreeView extends TreeView<{}, DirectoryInfo> {
           }
         });
       }
+      if (this._renderer.showGenericFileCreate && ImGui.MenuItem('File...##VFSCreateFile')) {
+        this._renderer.createNewFile('Create File', 'untitled.ts', async (path) => {
+          await this._renderer.VFS.writeFile(path, '', {
+            encoding: 'utf8',
+            create: true
+          });
+        });
+      }
       ImGui.EndMenu();
     }
     if (dir !== this._renderer.root && dir.path !== '/assets' && dir.path !== '/src') {
@@ -469,9 +489,12 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       allowDrop: true,
       allowDblClickOpen: true,
       multiSelect: true,
+      rootLabel: null,
+      showDependencyTools: true,
+      showGenericFileCreate: false,
       ...options
     };
-    this._nav = new DirTreeView(this, this._options.rootDir);
+    this._nav = new DirTreeView(this, this._options.rootLabel || this._options.rootDir);
     this._contentView = new ContentListView(new VFSContentData(this));
     this.loadFileSystem();
     if (this._options.allowDrop) {
@@ -508,6 +531,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   }
   get selectedItems() {
     return this._contentView.selectedItems;
+  }
+  get showGenericFileCreate() {
+    return !!this._options.showGenericFileCreate;
   }
   get currentDirContent() {
     return this._currentDirContent;
@@ -699,7 +725,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     if (ImGui.IsItemHovered()) {
       ImGui.SetTooltip(canGoUp ? 'Go to parent directory' : 'Already at root directory');
     }
-    if (!this._vfs.readOnly) {
+    if (!this._vfs.readOnly && this._options.showDependencyTools) {
       ImGui.SameLine();
       if (ImGui.Button(convertEmojiString('📦##ImportPackage'))) {
         DlgPromptName.promptName('Install Package', 'package', 'packageName@x.y.z').then((val) => {
@@ -796,10 +822,18 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         eventBus.dispatchEvent('edit_material_function', file.meta.path);
       } else {
         const mimeType = this._vfs.guessMIMEType(file.meta.path);
-        eventBus.dispatchEvent('action', 'EDIT_CODE', file.meta.path, mimeType);
+        this.openFile(file.meta.path, mimeType);
       }
     }
     this.dispatchEvent('file_dbl_clicked', file);
+  }
+
+  openFile(path: string, mimeType: string) {
+    if (this._options.openFile) {
+      this._options.openFile(path, mimeType);
+    } else {
+      eventBus.dispatchEvent('action', 'EDIT_CODE', path, mimeType);
+    }
   }
 
   private sortContent() {
@@ -997,7 +1031,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       const dirs = (items.filter((items) => 'subDir' in items) as DirectoryInfo[]).map(
         (item: DirectoryInfo) => item.path
       );
-      exportMultipleFilesAsZip(files, dirs, 'export.zip');
+      exportMultipleFilesAsZip(files, dirs, 'export.zip', this._vfs);
     }
   }
 

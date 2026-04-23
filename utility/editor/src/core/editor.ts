@@ -36,7 +36,14 @@ import { DlgMessage } from '../views/dlg/messagedlg';
 import { EditorPluginManager, type EditorPlugin } from './plugin';
 import { sampleOSSExportPlugin, sampleOSSExportPluginSource } from '../plugins/sample-oss-export';
 import { ScriptRegistry } from '@zephyr3d/scene';
-import { SystemPluginService, type InstalledSystemPlugin, type SystemPluginRecord } from './services/systemplugin';
+import {
+  SystemPluginService,
+  type SystemPluginDirectoryRecord,
+  type InstalledSystemPlugin,
+  type SystemPluginFileInput,
+  type SystemPluginFileRecord,
+  type SystemPluginRecord
+} from './services/systemplugin';
 
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
 
@@ -129,6 +136,10 @@ export class Editor {
     return !!(this._moduleManager.currentModule?.controller as SceneController)?.sceneChanged;
   }
   async loadScriptDependencies(path: string) {
+    const monaco = await this.waitForMonaco();
+    if (!monaco) {
+      return;
+    }
     const dependencies: Record<string, string> = {};
     await this.getScriptRegistryForPath(path).getDependencies(path, null, dependencies);
     for (const k of Object.keys(dependencies)) {
@@ -141,10 +152,7 @@ export class Editor {
       // And then add lib
       const vfs = this.getVFSForPath(k);
       const f = `file:///${vfs.relative(k, '/')}`;
-      const disposable = window.monaco.languages.typescript.typescriptDefaults.addExtraLib(
-        dependencies[k],
-        f
-      );
+      const disposable = monaco.languages.typescript.typescriptDefaults.addExtraLib(dependencies[k], f);
       if (disposable) {
         this._extraLibs[k] = disposable;
       }
@@ -236,7 +244,7 @@ export class Editor {
     await this.loadAssets();
     initLogView({ maxLines: 8000 });
     eventBus.on('action', this.onAction, this);
-    this.ensurePluginAuthoringTypes();
+    await this.ensurePluginAuthoringTypes();
     await this.ensureBuiltinSystemPlugins();
     await this.loadSystemPlugins();
   }
@@ -258,6 +266,10 @@ export class Editor {
     }
   }
   async loadDepTypes() {
+    const monaco = await this.waitForMonaco();
+    if (!monaco) {
+      return;
+    }
     if (await ProjectService.VFS.exists(`/${libDir}/deps.lock.json`)) {
       const content = (await ProjectService.VFS.readFile(`/${libDir}/deps.lock.json`, {
         encoding: 'utf8'
@@ -270,7 +282,7 @@ export class Editor {
           const pkg = `${k}@${deps.dependencies[k].version}`;
           console.info(`Loading DTS for package ${pkg}`);
           try {
-            const libs = await loadTypes(this._currentProject.uuid, pkg, window.monaco);
+            const libs = await loadTypes(this._currentProject.uuid, pkg, monaco);
             if (libs.project === this._currentProject?.uuid) {
               for (const k of Object.keys(libs.libs)) {
                 this._extraLibs[k] = libs.libs[k];
@@ -296,6 +308,11 @@ export class Editor {
     });
   }
   async editCode(fileName: string, language: string) {
+    const monaco = await this.waitForMonaco();
+    if (!monaco) {
+      await DlgMessage.messageBox('Error', 'Code editor is not ready yet. Please try again in a moment.');
+      return;
+    }
     if (this._codeEditor) {
       if (!this._codeEditor.close()) {
         return;
@@ -305,6 +322,13 @@ export class Editor {
     const content = (await this.getVFSForPath(fileName).readFile(fileName, { encoding: 'utf8' })) as string;
     this._codeEditor = new CodeEditor(fileName);
     this._codeEditor.show(content, language);
+  }
+
+  async openCodeFile(fileName: string, language: string) {
+    if (language === 'typescript' || language === 'javascript') {
+      await this.loadScriptDependencies(fileName);
+    }
+    await this.editCode(fileName, language);
   }
   render() {
     imGuiNewFrame();
@@ -658,7 +682,7 @@ export class Editor {
         this.editCode(fileName, 'plaintext');
       }
     } else if (action === 'SAVE_CODE') {
-      this.getVFSForPath(fileName).writeFile(fileName, arg, { encoding: 'utf8', create: true });
+      void this.handleSaveCode(fileName, arg);
     } else if (action === 'BUILD_PROJECT') {
       this.buildProject().then(() => {
         console.info('Project build succeeded');
@@ -682,6 +706,115 @@ export class Editor {
     const plugin = await SystemPluginService.installPluginFromFile(file);
     await this.loadSystemPlugin(plugin.id, true);
     return plugin;
+  }
+
+  async installSystemPluginFromDirectory(files: File[]) {
+    const plugin = await SystemPluginService.installPluginFromDirectory(files);
+    await this.loadSystemPlugin(plugin.id, true);
+    return plugin;
+  }
+
+  async installSystemPluginFiles(input: {
+    id: string;
+    name?: string;
+    version?: string;
+    description?: string;
+    entryFileName?: string;
+    files: SystemPluginFileInput[];
+    enabled?: boolean;
+    builtin?: boolean;
+  }) {
+    const plugin = await SystemPluginService.installPluginFiles(input);
+    await this.loadSystemPlugin(plugin.id, true);
+    return plugin;
+  }
+
+  async listSystemPluginFiles(id: string): Promise<SystemPluginFileRecord[]> {
+    return SystemPluginService.listPluginFiles(id);
+  }
+
+  async listSystemPluginDirectories(id: string): Promise<SystemPluginDirectoryRecord[]> {
+    return SystemPluginService.listPluginDirectories(id);
+  }
+
+  async exportSystemPlugin(id: string) {
+    const plugin = await SystemPluginService.getPlugin(id);
+    if (!plugin) {
+      throw new Error(`System plugin '${id}' is not installed`);
+    }
+    const files = await SystemPluginService.listPluginFiles(id);
+    if (!files.length) {
+      throw new Error(`System plugin '${id}' does not contain any source files`);
+    }
+
+    const zipDownloader = new ZipDownloader(`${plugin.id}.zip`);
+    for (const file of files) {
+      const content = (await SystemPluginService.VFS.readFile(file.path, {
+        encoding: 'binary'
+      })) as ArrayBuffer;
+      await zipDownloader.zipWriter.add(file.relativePath, new Blob([content]).stream());
+    }
+    await zipDownloader.finish();
+  }
+
+  async createSystemPluginFile(id: string, relativePath: string, source = '') {
+    const filePath = await SystemPluginService.createPluginFile(id, relativePath, source);
+    const plugin = await SystemPluginService.getPlugin(id);
+    if (plugin?.enabled) {
+      await this.loadSystemPlugin(id, true);
+    }
+    return filePath;
+  }
+
+  async createSystemPluginDirectory(id: string, relativePath: string) {
+    const dirPath = await SystemPluginService.createPluginDirectory(id, relativePath);
+    const plugin = await SystemPluginService.getPlugin(id);
+    if (plugin?.enabled) {
+      await this.loadSystemPlugin(id, true);
+    }
+    return dirPath;
+  }
+
+  async renameSystemPluginFile(id: string, oldRelativePath: string, newRelativePath: string) {
+    const filePath = await SystemPluginService.renamePluginFile(id, oldRelativePath, newRelativePath);
+    const plugin = await SystemPluginService.getPlugin(id);
+    if (plugin?.enabled) {
+      await this.loadSystemPlugin(id, true);
+    }
+    return filePath;
+  }
+
+  async deleteSystemPluginFile(id: string, relativePath: string) {
+    await SystemPluginService.deletePluginFile(id, relativePath);
+    const plugin = await SystemPluginService.getPlugin(id);
+    if (plugin?.enabled) {
+      await this.loadSystemPlugin(id, true);
+    }
+  }
+
+  async updateSystemPluginFile(path: string, source: string) {
+    const plugin = await SystemPluginService.updatePluginFile(path, source);
+    if (plugin.enabled) {
+      await this.loadSystemPlugin(plugin.id, true);
+    }
+    return plugin;
+  }
+
+  async renameSystemPluginDirectory(id: string, oldRelativePath: string, newRelativePath: string) {
+    const dirPath = await SystemPluginService.renamePluginDirectory(id, oldRelativePath, newRelativePath);
+    const plugin = await SystemPluginService.getPlugin(id);
+    if (plugin?.enabled) {
+      await this.loadSystemPlugin(id, true);
+    }
+    return dirPath;
+  }
+
+  async deleteSystemPluginDirectory(id: string, relativePath: string) {
+    await SystemPluginService.deletePluginDirectory(id, relativePath);
+    const plugin = await SystemPluginService.getPlugin(id);
+    if (plugin?.enabled) {
+      await this.loadSystemPlugin(id, true);
+    }
   }
 
   async setSystemPluginEnabled(id: string, enabled: boolean) {
@@ -721,13 +854,13 @@ export class Editor {
     if (!installed) {
       return;
     }
+    const plugin = await this.importSystemPlugin(installed);
     if (reactivate && this._plugins.hasPlugin(id)) {
       if (this._plugins.isPluginActive(id)) {
         await this._plugins.deactivatePlugin(id);
       }
       this._plugins.unregisterPlugin(id);
     }
-    const plugin = await this.importSystemPlugin(installed);
     if (!this._plugins.hasPlugin(plugin.id)) {
       this.registerPlugin(plugin);
       this._systemPluginRegistrations.set(plugin.id, installed.manifest);
@@ -773,18 +906,69 @@ export class Editor {
     }
   }
 
-  private ensurePluginAuthoringTypes() {
+  private async ensurePluginAuthoringTypes() {
+    const monaco = await this.waitForMonaco();
+    if (!monaco) {
+      console.warn('Monaco is not ready, skipped plugin authoring types registration');
+      return;
+    }
     const virtualPath = `file:///types/${editorPluginModuleName.replace(/[/:]/g, '_')}.d.ts`;
     if (!this._monacoExtraLibs[virtualPath]) {
-      this._monacoExtraLibs[virtualPath] = window.monaco.languages.typescript.typescriptDefaults.addExtraLib(
+      this._monacoExtraLibs[virtualPath] = monaco.languages.typescript.typescriptDefaults.addExtraLib(
         editorPluginTypeDeclarations,
         virtualPath
       );
     }
   }
 
+  private async waitForMonaco(timeoutMs = 15000): Promise<typeof Monaco | null> {
+    const monacoNow = (window as any).monaco as typeof Monaco | undefined;
+    if (monacoNow?.languages?.typescript?.typescriptDefaults) {
+      return monacoNow;
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const cleanup = () => {
+        window.removeEventListener('monaco-ready', onReady);
+        clearTimeout(timer);
+      };
+      const finish = (value: typeof Monaco | null) => {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          resolve(value);
+        }
+      };
+      const onReady = () => {
+        const monaco = (window as any).monaco as typeof Monaco | undefined;
+        if (monaco?.languages?.typescript?.typescriptDefaults) {
+          finish(monaco);
+        }
+      };
+      const timer = window.setTimeout(() => finish(null), timeoutMs);
+      window.addEventListener('monaco-ready', onReady, { once: true });
+      onReady();
+    });
+  }
+
   private getVFSForPath(path: string) {
     return this.isSystemPluginPath(path) ? SystemPluginService.VFS : ProjectService.VFS;
+  }
+
+  private async handleSaveCode(fileName: string, content: string) {
+    try {
+      if (this.isSystemPluginPath(fileName)) {
+        const plugin = await SystemPluginService.updatePluginFile(fileName, content);
+        if (plugin.enabled) {
+          await this.loadSystemPlugin(plugin.id, true);
+        }
+      } else {
+        await this.getVFSForPath(fileName).writeFile(fileName, content, { encoding: 'utf8', create: true });
+      }
+    } catch (err) {
+      await DlgMessage.messageBox('Error', `Save failed: ${err}`);
+    }
   }
 
   private getScriptRegistryForPath(path: string) {

@@ -1,4 +1,5 @@
 import { configure, ZipWriter } from '@zip.js/zip.js';
+import type { VFS } from '@zephyr3d/base';
 import * as streamSaver from 'streamsaver';
 import { ProjectService } from '../core/services/project';
 
@@ -58,38 +59,43 @@ export async function exportFile(arrayBuffer: ArrayBuffer, filename: string) {
   await writer.close();
 }
 
-export async function exportMultipleFilesAsZip(files: string[], directories: string[], zipFilename: string) {
+export async function exportMultipleFilesAsZip(
+  files: string[],
+  directories: string[],
+  zipFilename: string,
+  vfs: VFS = ProjectService.VFS
+) {
   const zipDownloader = new ZipDownloader(zipFilename);
   const zipWriter = zipDownloader.zipWriter;
   const fileSet: Set<string> = new Set();
   const fileList = [...files];
   for (const dir of directories) {
-    const path = ProjectService.VFS.normalizePath(dir);
+    const path = vfs.normalizePath(dir);
     const pattern = path === '/' ? '/**/*' : `${path}/**/*`;
-    const subFiles = await ProjectService.VFS.glob(pattern, { includeDirs: false });
+    const subFiles = await vfs.glob(pattern, { includeDirs: false });
     for (const f of subFiles) {
       fileList.push(f.path);
     }
   }
   for (const f of fileList) {
-    const filename = ProjectService.VFS.normalizePath(f);
+    const filename = vfs.normalizePath(f);
     fileSet.add(filename);
   }
   // Remove common path prefix
   const uniqueFiles = Array.from(fileSet);
-  const prefixes = uniqueFiles.map((f) => ProjectService.VFS.dirname(f));
+  const prefixes = uniqueFiles.map((f) => vfs.dirname(f));
   let commonPrefix = prefixes[0];
   while (commonPrefix) {
     if (prefixes.every((p) => p.startsWith(commonPrefix))) {
       break;
     }
-    commonPrefix = ProjectService.VFS.dirname(commonPrefix);
+    commonPrefix = vfs.dirname(commonPrefix);
   }
   if (commonPrefix && !commonPrefix.endsWith('/')) {
     commonPrefix += '/';
   }
   for (const f of uniqueFiles) {
-    const content = (await ProjectService.VFS.readFile(f, { encoding: 'binary' })) as ArrayBuffer;
+    const content = (await vfs.readFile(f, { encoding: 'binary' })) as ArrayBuffer;
     await zipWriter.add(f.slice(commonPrefix.length), new Blob([content]).stream());
   }
   await zipDownloader.finish();

@@ -135,7 +135,8 @@ export class SceneHierarchy extends TreeView<
   }
   protected onDrawContextMenu(node: SceneNode, _menuId: string) {
     const pluginCtx = this._getPluginContext(node);
-    const pluginItems = pluginCtx.scene?.editor.plugins.getContextMenuItems('scene-hierarchy', pluginCtx) ?? [];
+    const pluginItems =
+      pluginCtx.scene?.editor.plugins.getContextMenuItems('scene-hierarchy', pluginCtx) ?? [];
     if (pluginItems.length > 0) {
       this._renderPluginMenuItems(pluginItems, pluginCtx);
       ImGui.Separator();

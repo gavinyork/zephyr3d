@@ -64,6 +64,16 @@ export const editorPluginTypeDeclarations = `declare module '${editorPluginModul
     dispose(): void;
   };
 
+  export type EditorProjectInfo = {
+    uuid: string;
+    name: string;
+    lastEditScene?: string;
+  };
+
+  export type EditorHost = {
+    currentProject: EditorProjectInfo | null;
+  };
+
   export type EditorMenuLocation = 'main' | 'scene-hierarchy' | 'asset-content' | 'asset-directory';
 
   export type EditorMenuItem = {
@@ -105,7 +115,7 @@ export const editorPluginTypeDeclarations = `declare module '${editorPluginModul
   };
 
   export type EditorSceneContext = {
-    editor: unknown;
+    editor: EditorHost;
     scene: unknown | null;
     selectedNodes: readonly unknown[];
     activeNode: unknown | null;
@@ -118,7 +128,7 @@ export const editorPluginTypeDeclarations = `declare module '${editorPluginModul
   };
 
   export type EditorAssetContext = {
-    editor: unknown;
+    editor: EditorHost;
     vfs: unknown;
     selectedDir: { path: string } | null;
     selectedFiles: readonly { meta: { path: string; name?: string; size?: number } }[];
@@ -137,7 +147,7 @@ export const editorPluginTypeDeclarations = `declare module '${editorPluginModul
   };
 
   export type EditorEditToolFactoryContext = {
-    editor: unknown;
+    editor: EditorHost;
     executeCommand<T>(command: unknown): Promise<T>;
     notifySceneChanged(): void;
     refreshProperties(): void;
@@ -169,7 +179,7 @@ export const editorPluginTypeDeclarations = `declare module '${editorPluginModul
   };
 
   export type EditorPluginContext = {
-    editor: unknown;
+    editor: EditorHost;
     events: EditorEventSource;
     project: {
       getSettings(): Promise<Record<string, unknown> | null>;
@@ -240,6 +250,50 @@ const plugin: EditorPlugin = {
 
 export default plugin;
 `;
+
+export const templateEditorPluginFiles = [
+  {
+    path: 'index.ts',
+    source: `import type { EditorPlugin } from '${editorPluginModuleName}';
+import { createAboutMessage } from './about';
+
+const plugin: EditorPlugin = {
+  id: 'com.example.editor-plugin',
+  name: 'Example Editor Plugin',
+  version: '0.1.0',
+  description: 'A multi-file system-level zephyr3d editor plugin.',
+  activate(ctx) {
+    ctx.registerMenuItems({
+      location: 'main',
+      parentId: 'project',
+      items: [
+        {
+          id: 'example-editor-plugin.about',
+          label: 'Example Plugin...',
+          action: async () => {
+            await ctx.ui.message('Example Plugin', createAboutMessage(), 480, 0);
+          }
+        }
+      ]
+    });
+  }
+};
+
+export default plugin;
+`
+  },
+  {
+    path: 'about.ts',
+    source: `export function createAboutMessage() {
+  return [
+    'This command is provided by a multi-file system plugin.',
+    '',
+    'Use this template as the starting point for splitting your plugin into modules.'
+  ].join('\\n');
+}
+`
+  }
+] as const;
 
 export function generateIndexTS(settings: ProjectSettings) {
   const rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
