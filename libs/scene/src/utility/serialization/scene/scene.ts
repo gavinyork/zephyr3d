@@ -637,6 +637,39 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'ScriptConfig',
+          type: 'object',
+          default: null,
+          options: { objectTypes: [JSONData, JSONArray] },
+          isHidden() {
+            return true;
+          },
+          isNullable() {
+            return true;
+          },
+          isPersistent(this: Scene) {
+            return !!this.script;
+          },
+          get(this: Scene, value) {
+            value.object[0] = this.scriptConfig
+              ? Array.isArray(this.scriptConfig)
+                ? new JSONArray(null, this.scriptConfig)
+                : new JSONData(null, this.scriptConfig)
+              : null;
+          },
+          set(this: Scene, value) {
+            const data = value?.object[0] as
+              | JSONData
+              | JSONArray
+              | Record<string, unknown>
+              | unknown[]
+              | null
+              | undefined;
+            this.scriptConfig =
+              data instanceof JSONData || data instanceof JSONArray ? data.data : (data ?? null);
+          }
+        },
+        {
           name: 'Metadata',
           type: 'object',
           default: null,

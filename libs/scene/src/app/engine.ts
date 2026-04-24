@@ -4,7 +4,7 @@ import { DRef } from '@zephyr3d/base';
 import { HttpFS, type VFS } from '@zephyr3d/base';
 import { ScriptingSystem } from './scriptingsystem';
 import type { Host } from './scriptingsystem';
-import type { RuntimeScript } from './runtimescript';
+import type { RuntimeScript, RuntimeScriptConfig } from './runtimescript';
 import { ResourceManager } from '../utility/serialization/manager';
 import type { Scene } from '../scene';
 import {
@@ -158,8 +158,12 @@ export class Engine {
    * @param module - Module identifier to resolve and load.
    * @returns The `RuntimeScript<T>` instance, or `null` if disabled or on failure.
    */
-  async attachScript<T extends Host>(host: Nullable<T>, module: string) {
-    return this._enabled ? await this._scriptingSystem.attachScript(host, module) : null;
+  async attachScript<T extends Host>(
+    host: Nullable<T>,
+    module: string,
+    config?: Nullable<RuntimeScriptConfig>
+  ) {
+    return this._enabled ? await this._scriptingSystem.attachScript(host, module, config) : null;
   }
   /**
    * Detaches a script from a host, by module ID or instance, if enabled.
@@ -311,7 +315,11 @@ export class Engine {
       if (scene) {
         if (scene.script) {
           try {
-            await this.attachScript(scene, scene.script);
+            await this.attachScript(
+              scene,
+              scene.script,
+              ((scene as any).scriptConfig ?? null) as RuntimeScriptConfig | null
+            );
           } catch (err) {
             console.error(`Attach script failed: ${err}`);
           }
@@ -321,7 +329,9 @@ export class Engine {
         scene.rootNode.iterate((node) => {
           if (node.script) {
             scripts.push(node.script);
-            P.push(this.attachScript(node, node.script));
+            P.push(
+              this.attachScript(node, node.script, (node.scriptConfig ?? null) as RuntimeScriptConfig | null)
+            );
           }
         });
         if (P.length > 0) {

@@ -1,4 +1,4 @@
-import type { FileMetadata, GenericConstructor, VFS } from '@zephyr3d/base';
+import type { FileMetadata, GenericConstructor, Nullable, VFS } from '@zephyr3d/base';
 import UPNG from 'upng-js';
 import { DataTransferVFS, Disposable, guessMimeType, makeObservable, PathUtils } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
@@ -22,11 +22,13 @@ import { DlgSaveFile } from '../views/dlg/savefiledlg';
 import type { MeshMaterial } from '@zephyr3d/scene';
 import { getEngine, PBRBluePrintMaterial, SpriteBlueprintMaterial } from '@zephyr3d/scene';
 import { exportFile, exportMultipleFilesAsZip } from '../helpers/downloader';
+import { matchesMimeType } from '../helpers/mimematch';
 import type { SharedModel } from '../loaders/model';
 import { DlgImportOptions } from '../views/dlg/importoptionsdlg';
 import { DialogRenderer } from './modal';
 import type { Editor } from '../core/editor';
 import type { EditorAssetContext, EditorMenuContext } from '../core/plugin';
+import type { PropertyAccessor } from '@zephyr3d/scene';
 
 export type FileInfo = {
   meta: FileMetadata;
@@ -65,6 +67,11 @@ type VFSRendererOptions = {
 };
 
 export type VFSRendererContextMenuLocation = 'asset-content' | 'asset-directory';
+export type VFSRendererAssetPickerPayload = {
+  type: 'asset-picker';
+  object: object;
+  prop: PropertyAccessor<any>;
+};
 
 type PathRewriteRule = {
   oldPath: string;
@@ -214,7 +221,7 @@ class VFSContentData extends ListViewData<FileInfo | DirectoryInfo> {
     return null;
   }
   getDragTargetPayloadType(): string {
-    return null;
+    return 'ASSET';
   }
 }
 
@@ -364,6 +371,10 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
   protected onSelectionChanged(): void {
     this.renderer.emitSelectedChanged();
   }
+  protected onDragDrop(item: FileInfo | DirectoryInfo, _type: string, payload: unknown): void {
+    const path = 'subDir' in item ? item.path : item.meta.path;
+    this.renderer.handleAssetDrop(path, payload);
+  }
   protected handleItemDoubleClick(item: FileInfo | DirectoryInfo): void {
     const isDir = 'subDir' in item;
     if (isDir) {
@@ -447,13 +458,14 @@ export class DirTreeView extends TreeView<{}, DirectoryInfo> {
     }
   }
   protected onDragDrop(node: DirectoryInfo, _type: string, payload: unknown) {
-    this._renderer.handleFileMoveOrCopy(node.path, payload as { isDir: boolean; path: string }[]);
+    this._renderer.handleAssetDrop(node.path, payload);
   }
 }
 
 export class VFSRenderer extends makeObservable(Disposable)<{
   selection_changed: [selectedDir: DirectoryInfo, selectedFiles: FileInfo[]];
   file_dbl_clicked: [file: FileInfo];
+  asset_picker_drop: [payload: VFSRendererAssetPickerPayload, path: string];
 }>() {
   private static VFSId = 1;
   private static readonly baseFlags =
@@ -1519,12 +1531,57 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   }
   acceptFileMoveOrCopy(path: string) {
     if (ImGui.BeginDragDropTarget()) {
-      const payload = ImGui.AcceptDragDropPayload('ASSET')?.Data as { isDir: boolean; path: string }[];
+      const payload = ImGui.AcceptDragDropPayload('ASSET')?.Data as unknown;
       if (payload) {
-        this.handleFileMoveOrCopy(path, payload);
+        this.handleAssetDrop(path, payload);
       }
       ImGui.EndDragDropTarget();
     }
+  }
+  handleAssetDrop(targetPath: string, payload: unknown) {
+    const data = payload as { isDir: boolean; path: string }[] | VFSRendererAssetPickerPayload;
+    if (Array.isArray(data)) {
+      void this.handleFileMoveOrCopy(targetPath, data);
+    } else if (
+      data &&
+      typeof data === 'object' &&
+      (data as VFSRendererAssetPickerPayload).type === 'asset-picker'
+    ) {
+      const path = this.normalizeAssetPickerTargetPath(targetPath);
+      if (path && this.isAssetPickerPathAccepted(data as VFSRendererAssetPickerPayload, path)) {
+        this.dispatchEvent('asset_picker_drop', data as VFSRendererAssetPickerPayload, path);
+      }
+    }
+  }
+  private isAssetPickerPathAccepted(payload: VFSRendererAssetPickerPayload, path: string) {
+    const mimeTypes = payload.prop?.options?.mimeTypes;
+    if (!mimeTypes?.length) {
+      return true;
+    }
+    const mimeType = this._vfs.guessMIMEType(path);
+    return matchesMimeType(mimeTypes, mimeType);
+  }
+  private normalizeAssetPickerTargetPath(path: string) {
+    const normalized = this._vfs.normalizePath(path);
+    const file = this.findFileByPath(this._filesystem, normalized);
+    return file ? normalized : null;
+  }
+  private findFileByPath(root: Nullable<DirectoryInfo>, path: string): Nullable<FileInfo> {
+    if (!root) {
+      return null;
+    }
+    const normalizedPath = this._vfs.normalizePath(path);
+    const file = root.files.find((item) => this._vfs.normalizePath(item.meta.path) === normalizedPath);
+    if (file) {
+      return file;
+    }
+    for (const subDir of root.subDir) {
+      const found = this.findFileByPath(subDir, normalizedPath);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
   }
   async copyFile(src: string, dst: string, overwriteMode: 'overwrite' | 'prompt' | 'cancel') {
     src = this.VFS.normalizePath(src);

@@ -10,6 +10,7 @@ import {
   SceneNode,
   Water
 } from '@zephyr3d/scene';
+import type { PropertyAccessor } from '@zephyr3d/scene';
 import { TreeViewData, TreeView } from './treeview';
 import { ImGui } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
@@ -74,6 +75,12 @@ class SceneData extends TreeViewData<SceneNode> {
   }
 }
 
+export type SceneHierarchyNodePickerPayload = {
+  type: 'node-picker';
+  object: object;
+  prop: PropertyAccessor<any>;
+};
+
 export class SceneHierarchy extends TreeView<
   {
     node_deselected: [node: SceneNode];
@@ -82,6 +89,7 @@ export class SceneHierarchy extends TreeView<
     node_request_delete: [node: SceneNode];
     node_double_clicked: [node: SceneNode];
     node_drag_drop: [from: SceneNode, target: SceneNode];
+    node_picker_drop: [payload: SceneHierarchyNodePickerPayload, target: SceneNode];
     set_main_camera: [camea: Camera];
     request_go_to_assets: [node: SceneNode];
     request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }];
@@ -216,6 +224,15 @@ export class SceneHierarchy extends TreeView<
     }
   }
   protected onDragDrop(node: SceneNode, _type: string, payload: unknown) {
-    this.dispatchEvent('node_drag_drop', payload as SceneNode, node);
+    const data = payload as SceneNode | SceneHierarchyNodePickerPayload;
+    if (data instanceof SceneNode) {
+      this.dispatchEvent('node_drag_drop', data, node);
+    } else if (
+      data &&
+      typeof data === 'object' &&
+      (data as SceneHierarchyNodePickerPayload).type === 'node-picker'
+    ) {
+      this.dispatchEvent('node_picker_drop', data as SceneHierarchyNodePickerPayload, node);
+    }
   }
 }

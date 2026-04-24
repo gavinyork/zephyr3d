@@ -17,6 +17,9 @@ import { RotationEditor } from './rotationeditor';
 import { Dialog } from '../views/dlg/dlg';
 import { ProjectService } from '../core/services/project';
 import { eventBus } from '../core/eventbus';
+import type { SceneHierarchyNodePickerPayload } from './scenehierarchy';
+import type { VFSRendererAssetPickerPayload } from './vfsrenderer';
+import { matchesMimeType } from '../helpers/mimematch';
 
 interface Property<T extends {}> {
   objectPath: string;
@@ -272,6 +275,12 @@ export class PropertyEditor extends Observable<{
   private _dragging: boolean;
   private _dirty: boolean;
   private _editSessions: Map<string, RequireOptionals<PropertyValue>>;
+  private _activeStringEditors: Set<string>;
+  private _pendingStringEditorFocus: Nullable<string>;
+  private _extraPropertiesProvider: Nullable<
+    (object: any) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>
+  >;
+  private _extraPropertiesVersion: number;
   constructor(labelPercent: number) {
     super();
     this._rootGroup = new PropertyGroup('Root', this);
@@ -279,15 +288,29 @@ export class PropertyEditor extends Observable<{
     this._dragging = false;
     this._dirty = false;
     this._editSessions = new Map();
+    this._activeStringEditors = new Set();
+    this._pendingStringEditorFocus = null;
+    this._extraPropertiesProvider = null;
+    this._extraPropertiesVersion = 0;
   }
   get object(): any {
     return this._rootGroup.getObject();
   }
   set object(value: any) {
     this._rootGroup.setObject(value);
+    if (this._extraPropertiesProvider) {
+      const version = ++this._extraPropertiesVersion;
+      void this.appendExtraProperties(value, version);
+    }
   }
   get root() {
     return this._rootGroup;
+  }
+  set extraPropertiesProvider(
+    provider: Nullable<(object: any) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>>
+  ) {
+    this._extraPropertiesProvider = provider;
+    this.refresh();
   }
   clear() {
     this._rootGroup = new PropertyGroup('Root', this);
@@ -295,14 +318,31 @@ export class PropertyEditor extends Observable<{
   refresh() {
     this._dirty = true;
   }
+  async rebuild() {
+    const object = this.object;
+    const rawProps = this._rootGroup.rawProperties;
+    this.clear();
+    const version = ++this._extraPropertiesVersion;
+    this._rootGroup.setObject(object);
+    this._rootGroup.rawProperties = rawProps;
+    await this.appendExtraProperties(object, version);
+  }
+  private async appendExtraProperties(object: any, version: number) {
+    if (!object || !this._extraPropertiesProvider) {
+      return;
+    }
+    const extraProps = await this._extraPropertiesProvider(object);
+    if (version !== this._extraPropertiesVersion || object !== this.object) {
+      return;
+    }
+    for (const prop of extraProps ?? []) {
+      this._rootGroup.addProperty(object, prop);
+    }
+  }
   render() {
     if (this._dirty) {
       this._dirty = false;
-      const object = this.object;
-      const rawProps = this._rootGroup.rawProperties;
-      this.clear();
-      this.object = object;
-      this._rootGroup.rawProperties = rawProps;
+      void this.rebuild();
     }
     const animateLabelWidth = ImGui.GetFrameHeight();
     const availableWidth = ImGui.GetContentRegionAvail().x;
@@ -949,37 +989,90 @@ export class PropertyEditor extends Observable<{
           } else {
             const val = tmpProperty.str as [string];
             const isSceneNodeRef = !!value.options?.sceneNode;
-            const canClearValue =
-              (!!value.options?.mimeTypes?.length || isSceneNodeRef) && !!value.set && !!val[0];
-            if (canClearValue) {
-              ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
-              ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
-            }
-            if (isSceneNodeRef) {
-              const displayValue = [val[0]] as [string];
-              ImGui.InputText('##value', displayValue, undefined, ImGui.InputTextFlags.ReadOnly);
-            } else {
+            const isAssetRef = !!value.options?.mimeTypes?.length;
+            const canInlineEdit = !!value.set && !readonly && !isSceneNodeRef && !isAssetRef;
+            const stringEditorActive = canInlineEdit && this._activeStringEditors.has(editSessionKey);
+            const canClearValue = (isAssetRef || isSceneNodeRef) && !!value.set && !!val[0];
+            const pickerButtonCount = (isSceneNodeRef || isAssetRef) && value.set ? 1 : 0;
+            const clearButtonCount = canClearValue ? 1 : 0;
+            const totalButtonCount = pickerButtonCount + clearButtonCount;
+            const fieldWidth =
+              totalButtonCount > 0
+                ? ImGui.GetContentRegionAvail().x - totalButtonCount * ImGui.GetFrameHeight()
+                : ImGui.GetContentRegionAvail().x;
+            if (stringEditorActive) {
+              ImGui.SetNextItemWidth(fieldWidth);
+              if (this._pendingStringEditorFocus === editSessionKey) {
+                ImGui.SetKeyboardFocusHere();
+                this._pendingStringEditorFocus = null;
+              }
               changed = ImGui.InputText(
                 '##value',
                 val,
                 undefined,
                 readonly ? ImGui.InputTextFlags.ReadOnly : undefined
               );
+            } else {
+              const clicked = this.renderClippedStringField(
+                '##value_display',
+                val[0],
+                fieldWidth,
+                canInlineEdit
+              );
+              if (clicked && canInlineEdit) {
+                this.activateStringEditor(editSessionKey);
+                this.refresh();
+              }
             }
             if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
               this.revealAsset(val[0]);
             }
             this.setDragDropProperty(object, value, tmpProperty);
-            if (canClearValue) {
+            if (pickerButtonCount > 0) {
               ImGui.SameLine(0, 0);
-              if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
+              this.pushInlineActionButtonStyle();
+              if (
+                ImGui.Button(`${FontGlyph.glyphs['link']}##pick`, new ImGui.ImVec2(ImGui.GetFrameHeight(), 0))
+              ) {
+              }
+              if (ImGui.BeginDragDropSource()) {
+                if (isSceneNodeRef) {
+                  const payload: SceneHierarchyNodePickerPayload = {
+                    type: 'node-picker',
+                    object,
+                    prop: value
+                  };
+                  ImGui.SetDragDropPayload('NODE', payload);
+                  ImGui.Text('Drop on a scene node');
+                } else {
+                  const payload: VFSRendererAssetPickerPayload = {
+                    type: 'asset-picker',
+                    object,
+                    prop: value
+                  };
+                  ImGui.SetDragDropPayload('ASSET', payload);
+                  ImGui.Text('Drop on an asset');
+                }
+                ImGui.EndDragDropSource();
+              }
+              this.popInlineActionButtonStyle();
+            }
+            if (clearButtonCount > 0) {
+              ImGui.SameLine(0, 0);
+              this.pushInlineActionButtonStyle();
+              if (
+                ImGui.Button(
+                  `${FontGlyph.glyphs['cancel']}##clear`,
+                  new ImGui.ImVec2(ImGui.GetFrameHeight(), 0)
+                )
+              ) {
                 tmpProperty.str[0] = '';
                 Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
                   this.refresh();
                   this.dispatchEvent('object_property_changed', object, value);
                 });
               }
-              ImGui.EndChild();
+              this.popInlineActionButtonStyle();
             }
           }
           break;
@@ -1133,17 +1226,24 @@ export class PropertyEditor extends Observable<{
         }
         case 'object': {
           const val = tmpProperty.str as [string];
-          if (value.isNullable?.call(object, 0)) {
-            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight());
-          }
-          ImGui.InputText('##value', val, undefined, ImGui.InputTextFlags.ReadOnly);
+          const hasClearButton = !!value.isNullable?.call(object, 0);
+          const fieldWidth = hasClearButton
+            ? ImGui.GetContentRegionAvail().x - ImGui.GetFrameHeight()
+            : ImGui.GetContentRegionAvail().x;
+          this.renderClippedStringField('##value_object', val[0], fieldWidth, false);
           if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
             this.revealAsset(val[0]);
           }
           this.setDragDropProperty(object, value, tmpProperty);
-          if (value.isNullable?.call(object, 0)) {
+          if (hasClearButton) {
             ImGui.SameLine(0, 0);
-            if (ImGui.Button('X##clear', new ImGui.ImVec2(-1, 0))) {
+            this.pushInlineActionButtonStyle();
+            if (
+              ImGui.Button(
+                `${FontGlyph.glyphs['cancel']}##clear`,
+                new ImGui.ImVec2(ImGui.GetFrameHeight(), 0)
+              )
+            ) {
               Promise.resolve(value.set!.call(object, null)).then(() => {
                 this.refresh();
                 this.dispatchEvent('object_property_changed', object, value);
@@ -1161,7 +1261,9 @@ export class PropertyEditor extends Observable<{
                 }
               }
             }
+            this.popInlineActionButtonStyle();
           }
+          break;
         }
       }
       /*
@@ -1190,7 +1292,9 @@ export class PropertyEditor extends Observable<{
       */
       if (changed && value.set) {
         value.set.call(object, tmpProperty);
-        this.refresh();
+        if (value.type !== 'rgb' && value.type !== 'rgba') {
+          this.refresh();
+        }
         this.dispatchEvent('object_property_changed', object, value);
       }
       if (value.set && ImGui.IsItemActivated() && !this._editSessions.has(editSessionKey)) {
@@ -1213,6 +1317,11 @@ export class PropertyEditor extends Observable<{
           this.clonePropertyValue(newSnapshot)
         );
         this._editSessions.delete(editSessionKey);
+        this.deactivateStringEditor(editSessionKey);
+      } else if (value.type === 'string' && !ImGui.IsItemActive() && !ImGui.IsItemHovered()) {
+        if (this._activeStringEditors.has(editSessionKey) && !ImGui.GetIO().MouseDown[0]) {
+          this.deactivateStringEditor(editSessionKey);
+        }
       }
     }
     ImGui.PopID();
@@ -1237,6 +1346,57 @@ export class PropertyEditor extends Observable<{
       object: [...(value.object ?? [])]
     };
   }
+  private activateStringEditor(key: string) {
+    this._activeStringEditors.add(key);
+    this._pendingStringEditorFocus = key;
+  }
+  private deactivateStringEditor(key: string) {
+    this._activeStringEditors.delete(key);
+    if (this._pendingStringEditorFocus === key) {
+      this._pendingStringEditorFocus = null;
+    }
+  }
+  private renderClippedStringField(id: string, text: string, width?: number, editable?: boolean) {
+    const style = ImGui.GetStyle();
+    const fieldWidth = width && width > 0 ? width : ImGui.GetContentRegionAvail().x;
+    const fieldSize = new ImGui.ImVec2(fieldWidth, ImGui.GetFrameHeight());
+    const clicked = ImGui.InvisibleButton(id, fieldSize, 0);
+    const hovered = ImGui.IsItemHovered();
+    const drawList = ImGui.GetWindowDrawList();
+    const rectMin = ImGui.GetItemRectMin();
+    const rectMax = ImGui.GetItemRectMax();
+    const bgColor = ImGui.GetColorU32(hovered && editable ? ImGui.Col.FrameBgHovered : ImGui.Col.FrameBg);
+    const borderColor = ImGui.GetColorU32(ImGui.Col.Border);
+    const textColor = ImGui.GetColorU32(ImGui.Col.Text);
+    drawList.AddRectFilled(rectMin, rectMax, bgColor, style.FrameRounding);
+    drawList.AddRect(rectMin, rectMax, borderColor, style.FrameRounding, ImGui.DrawCornerFlags.None, 1);
+    const textPos = new ImGui.ImVec2(rectMin.x + style.FramePadding.x, rectMin.y + style.FramePadding.y);
+    const clipMin = new ImGui.ImVec2(rectMin.x + style.FramePadding.x, rectMin.y);
+    const clipMax = new ImGui.ImVec2(rectMax.x - style.FramePadding.x, rectMax.y);
+    drawList.PushClipRect(clipMin, clipMax, true);
+    drawList.AddText(textPos, textColor, text ?? '');
+    drawList.PopClipRect();
+    const textWidth = ImGui.CalcTextSize(text ?? '').x;
+    const availableWidth = Math.max(0, clipMax.x - clipMin.x);
+    if (hovered && text && textWidth > availableWidth) {
+      ImGui.SetTooltip(text);
+    }
+    return clicked;
+  }
+  private pushInlineActionButtonStyle() {
+    const style = ImGui.GetStyle();
+    const normal = style.Colors[ImGui.Col.FrameBg];
+    const hovered = style.Colors[ImGui.Col.FrameBgHovered];
+    const active = style.Colors[ImGui.Col.FrameBgActive];
+    ImGui.PushStyleColor(ImGui.Col.Button, new ImGui.ImVec4(normal.x, normal.y, normal.z, 1));
+    ImGui.PushStyleColor(ImGui.Col.ButtonHovered, new ImGui.ImVec4(hovered.x, hovered.y, hovered.z, 1));
+    ImGui.PushStyleColor(ImGui.Col.ButtonActive, new ImGui.ImVec4(active.x, active.y, active.z, 1));
+    ImGui.PushStyleVar(ImGui.StyleVar.FrameBorderSize, 1);
+  }
+  private popInlineActionButtonStyle() {
+    ImGui.PopStyleVar();
+    ImGui.PopStyleColor(3);
+  }
   private setDragDropProperty(obj: any, prop: PropertyAccessor, value: PropertyValue) {
     if (prop.set) {
       if (prop.options?.sceneNode && ImGui.BeginDragDropTarget()) {
@@ -1249,12 +1409,14 @@ export class PropertyEditor extends Observable<{
           ) {
             const payload = ImGui.AcceptDragDropPayload('NODE');
             if (payload) {
-              const droppedNode = payload.Data as SceneNode;
-              value.str[0] = droppedNode?.persistentId ?? '';
-              Promise.resolve(prop.set.call(obj, value as RequireOptionals<PropertyValue>)).then(() => {
-                this.refresh();
-                this.dispatchEvent('object_property_changed', obj, prop);
-              });
+              const dropped = payload.Data as unknown;
+              if (dropped instanceof SceneNode) {
+                value.str[0] = dropped?.persistentId ?? '';
+                Promise.resolve(prop.set.call(obj, value as RequireOptionals<PropertyValue>)).then(() => {
+                  this.refresh();
+                  this.dispatchEvent('object_property_changed', obj, prop);
+                });
+              }
             }
           }
         }
@@ -1266,7 +1428,7 @@ export class PropertyEditor extends Observable<{
           const data = peekPayload.Data as { isDir: boolean; path: string }[];
           if (data.length === 1 && !data[0].isDir) {
             const mimeType = ProjectService.VFS.guessMIMEType(data[0].path);
-            if (prop.options.mimeTypes.includes(mimeType)) {
+            if (matchesMimeType(prop.options.mimeTypes, mimeType)) {
               const payload = ImGui.AcceptDragDropPayload('ASSET');
               if (payload) {
                 value.str[0] = data[0].path;

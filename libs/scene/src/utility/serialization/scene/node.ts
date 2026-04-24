@@ -345,6 +345,27 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'ScriptConfig',
+          type: 'object',
+          options: { objectTypes: [JSONData] },
+          isHidden() {
+            return true;
+          },
+          isNullable() {
+            return true;
+          },
+          isPersistent(this: SceneNode) {
+            return !!this.script;
+          },
+          get(this: SceneNode, value) {
+            value.object[0] = this.scriptConfig ? new JSONData(null, this.scriptConfig) : null;
+          },
+          set(this: SceneNode, value) {
+            const data = value?.object[0] as JSONData | Record<string, unknown> | null | undefined;
+            this.scriptConfig = data instanceof JSONData ? data.data : (data ?? null);
+          }
+        },
+        {
           name: 'Metadata',
           type: 'object',
           options: { objectTypes: [JSONData] },

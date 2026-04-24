@@ -9,7 +9,6 @@ import type {
   PickResult,
   PropertyAccessor,
   PropertyTrack,
-  Scene,
   MeshMaterial
 } from '@zephyr3d/scene';
 import {
@@ -17,6 +16,7 @@ import {
   ParticleSystem,
   PointLight,
   RectLight,
+  Scene,
   SpotLight,
   Water,
   ClipmapTerrain,
@@ -55,6 +55,7 @@ import {
   NodeTransformCommand
 } from '../commands/scenecommands';
 import { NodeProxy } from '../helpers/proxy';
+import { clearScriptPropertyAccessorCache, getScriptPropertyAccessors } from '../helpers/scriptprops';
 import type { EditTool, EditToolContext } from './edittools/edittool';
 import { createEditTool, isObjectEditable } from './edittools/edittool';
 import { calcHierarchyBoundingBoxWorld } from '../helpers/misc';
@@ -62,11 +63,13 @@ import { DialogRenderer } from '../components/modal';
 import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
 import { BottomView } from '../components/bottomview';
+import type { VFSRendererAssetPickerPayload } from '../components/vfsrenderer';
 import { ProjectService } from '../core/services/project';
 import type { SceneController } from '../controllers/scenecontroller';
 import { EditorCameraController } from '../helpers/editorcontroller';
 import { ensureDependencies } from '../core/build/dep';
 import { SceneHierarchy } from '../components/scenehierarchy';
+import type { SceneHierarchyNodePickerPayload } from '../components/scenehierarchy';
 import { DockPannel, ResizeDirection } from '../components/dockpanel';
 import { DlgSaveFile } from './dlg/savefiledlg';
 import { ResourceService } from '../core/services/resource';
@@ -213,6 +216,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     );
     this._rightDockPanel = new DockPannel(0, 0, 400, 0, 8, 200, 600, ResizeDirection.Left);
     this._propGrid = new PropertyEditor(0.4);
+    this._propGrid.extraPropertiesProvider = getScriptPropertyAccessors;
     this._postGizmoRenderer = null;
     this._leftDockPanel = null;
     this._sceneHierarchy = null;
@@ -1184,6 +1188,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._toolbar.on('action', this.handleSceneAction, this);
     this.editor.plugins.on('pluginContributionsChanged', this.refreshPluginContributions, this);
     this._assetView.renderer.on('selection_changed', this.handleAssetSelectionChanged, this);
+    this._assetView.renderer.on('asset_picker_drop', this.handleAssetPickerDrop, this);
     this._propGrid.on('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.on('object_property_edit_finished', this.handleObjectPropertyEditFinished, this);
     this._propGrid.on('request_edit_aabb', this.editAABB, this);
@@ -1203,6 +1208,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   protected onDeactivate(): void {
     super.onDeactivate();
     this._assetView?.renderer.off('selection_changed', this.handleAssetSelectionChanged, this);
+    this._assetView?.renderer.off('asset_picker_drop', this.handleAssetPickerDrop, this);
     this._assetView?.dispose();
     this._assetView = null;
     this._menubar.unregisterShortcuts(this);
@@ -1257,6 +1263,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.on('node_deselected', this.handleNodeDeselected, this);
       this._sceneHierarchy.on('node_request_delete', this.handleDeleteNode, this);
       this._sceneHierarchy.on('node_drag_drop', this.handleNodeDragDrop, this);
+      this._sceneHierarchy.on('node_picker_drop', this.handleNodePickerDrop, this);
       this._sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
       this._sceneHierarchy.on('set_main_camera', this.handleSetMainCamera, this);
       this._sceneHierarchy.on('request_go_to_assets', this.handleGoToAssets, this);
@@ -1290,6 +1297,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.off('node_deselected', this.handleNodeDeselected, this);
       this._sceneHierarchy.off('node_request_delete', this.handleDeleteNode, this);
       this._sceneHierarchy.off('node_drag_drop', this.handleNodeDragDrop, this);
+      this._sceneHierarchy.off('node_picker_drop', this.handleNodePickerDrop, this);
       this._sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
       this._sceneHierarchy.off('set_main_camera', this.handleSetMainCamera, this);
       this._sceneHierarchy.off('request_go_to_assets', this.handleGoToAssets, this);
@@ -1374,6 +1382,15 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
   }
   private handleObjectPropertyChanged(object: object, prop: PropertyAccessor) {
+    const shouldRefreshScriptProps =
+      (object instanceof Scene || object instanceof SceneNode) &&
+      (prop.name === 'Script' || prop.name === 'ScriptConfig');
+    if (shouldRefreshScriptProps) {
+      if (prop.name === 'Script') {
+        clearScriptPropertyAccessorCache((object as Scene | SceneNode).script);
+      }
+      this._propGrid.refresh();
+    }
     if (object instanceof SceneNode) {
       this._proxy!.updateProxy(object);
       this.syncPropertyToMultiSelection(object, prop);
@@ -1408,6 +1425,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   ) {
     if (!object || !prop?.set) {
       return;
+    }
+    if ((object instanceof Scene || object instanceof SceneNode) && prop.name === 'Script') {
+      clearScriptPropertyAccessorCache((object as Scene | SceneNode).script);
+      this._propGrid.refresh();
     }
     const source = object as object;
     const commands: PropertyEditCommand[] = [];
@@ -2170,6 +2191,36 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         eventBus.dispatchEvent('scene_changed');
       });
     }
+  }
+  private handleNodePickerDrop(payload: SceneHierarchyNodePickerPayload, dst: SceneNode) {
+    if (!payload?.prop?.set || !payload.object) {
+      return;
+    }
+    const value = {
+      num: [0, 0, 0, 0],
+      str: [dst?.persistentId ?? ''],
+      bool: [false],
+      object: []
+    };
+    Promise.resolve(payload.prop.set.call(payload.object, value)).then(() => {
+      this._propGrid.refresh();
+      this.handleObjectPropertyChanged(payload.object, payload.prop);
+    });
+  }
+  private handleAssetPickerDrop(payload: VFSRendererAssetPickerPayload, path: string) {
+    if (!payload?.prop?.set || !payload.object || !path) {
+      return;
+    }
+    const value = {
+      num: [0, 0, 0, 0],
+      str: [path],
+      bool: [false],
+      object: []
+    };
+    Promise.resolve(payload.prop.set.call(payload.object, value)).then(() => {
+      this._propGrid.refresh();
+      this.handleObjectPropertyChanged(payload.object, payload.prop);
+    });
   }
   private handleNodeDoubleClicked(node: SceneNode) {
     this.lookAt(this.controller.model.scene.mainCamera!, node);

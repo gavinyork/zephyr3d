@@ -134,7 +134,9 @@ function configureMonacoDefaults(monaco: any) {
     declaration: true,
     baseUrl: '.',
     typeRoots: ['file:///node_modules/@types'],
-    resolveJsonModule: true
+    resolveJsonModule: true,
+    experimentalDecorators: true,
+    useDefineForClassFields: false
   });
 }
 

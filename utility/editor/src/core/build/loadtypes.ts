@@ -403,7 +403,9 @@ export async function loadTypes(
       paths: nextPaths,
       allowJs: true,
       checkJs: false,
-      strict: true
+      strict: true,
+      experimentalDecorators: true,
+      useDefineForClassFields: false
     });
   }
 

@@ -72,6 +72,8 @@ export class Scene
   protected _metaData: Nullable<Metadata>;
   /** @internal User-attached script entry (engine-defined). */
   private _script: string;
+  /** @internal Script component configuration object (engine/editor-defined). */
+  private _scriptConfig: Nullable<object>;
   /**
    * Creates an instance of Scene.
    *
@@ -99,6 +101,7 @@ export class Scene
     this._rootNode.get()!.name = 'Root';
     this._metaData = null;
     this._script = '';
+    this._scriptConfig = null;
     this._mainCamera = new DRef();
   }
   /**
@@ -177,6 +180,15 @@ export class Scene
   }
   set script(fileName: string) {
     this._script = fileName ?? '';
+  }
+  /**
+   * Script component configuration payload used by editor/runtime script components.
+   */
+  get scriptConfig() {
+    return this._scriptConfig;
+  }
+  set scriptConfig(value: Nullable<object>) {
+    this._scriptConfig = value ?? null;
   }
   /**
    * Finds a scene node by its persistent ID.

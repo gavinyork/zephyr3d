@@ -6,12 +6,29 @@ export const libDir = 'libs';
 export const editorPluginModuleName = '@zephyr3d/editor/editor-plugin';
 
 export const templateScript = `import type { IDisposable } from '@zephyr3d/base';
-import { RuntimeScript } from '@zephyr3d/scene';
+import { RuntimeScript, scriptProp } from '@zephyr3d/scene';
 
 // Change HostType to your attachment type
 type HostType = IDisposable;
 
 export default class extends RuntimeScript<HostType> {
+  @scriptProp({ type: 'float', label: 'Speed', default: 1, minValue: 0 })
+  speed = 1;
+
+  @scriptProp({ type: 'asset', label: 'Texture', mimeTypes: ['image/png', 'image/jpeg', 'image/webp'] })
+  texture = '';
+
+  @scriptProp({ type: 'node', label: 'Target Node', sceneNode: { kind: 'node' } })
+  targetNode = '';
+
+  @scriptProp({
+    type: 'object_array',
+    label: 'Waypoints',
+    element: { type: 'node', sceneNode: { kind: 'node' } },
+    default: []
+  })
+  waypoints: string[] = [];
+
   /**
    * Called exactly once right after the constructor.
    * Use this for initialization that may be asynchronous (e.g., loading assets).

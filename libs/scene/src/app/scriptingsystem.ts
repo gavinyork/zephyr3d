@@ -1,7 +1,7 @@
 import type { GenericConstructor, IDisposable, Nullable, VFS } from '@zephyr3d/base';
 import { HttpFS } from '@zephyr3d/base';
 import { ScriptRegistry } from './scriptregistry';
-import { RuntimeScript } from './runtimescript';
+import { applyRuntimeScriptConfig, RuntimeScript, type RuntimeScriptConfig } from './runtimescript';
 
 /**
  * A host object that supports disposal.
@@ -102,7 +102,13 @@ export class ScriptingSystem {
    */
   async loadRuntimeScriptClass<T extends Host = Host>(
     module: string
-  ): Promise<Nullable<{ url: string; id: string; cls: GenericConstructor<RuntimeScript<T>> }>> {
+  ): Promise<
+    Nullable<{
+      url: string;
+      id: string;
+      cls: GenericConstructor<RuntimeScript<T>>;
+    }>
+  > {
     let mod: any = null;
     const moduleName = module ? String(module).slice(0, 64) : '';
     let url = '';
@@ -136,12 +142,14 @@ export class ScriptingSystem {
       url: string;
       id: string;
       cls: GenericConstructor<RuntimeScript<T>>;
-    }
+    },
+    config?: Nullable<RuntimeScriptConfig>
   ): Promise<Nullable<RuntimeScript<T>>> {
     try {
       const { url, id, cls } = classInfo;
       let instance: Nullable<RuntimeScript<T>> = new cls();
       if (instance instanceof RuntimeScript) {
+        applyRuntimeScriptConfig(instance, config);
         if (!this._scriptHosts.has(instance)) {
           const P = instance.onCreated();
           if (P instanceof Promise) {
@@ -217,9 +225,13 @@ export class ScriptingSystem {
    * @param module - Module identifier used by the registry (logical ID or path).
    * @returns The instantiated `RuntimeScript<T>` or `null` on failure.
    */
-  async attachScript<T extends Host>(host: Nullable<T>, module: string): Promise<Nullable<RuntimeScript<T>>> {
+  async attachScript<T extends Host>(
+    host: Nullable<T>,
+    module: string,
+    config?: Nullable<RuntimeScriptConfig>
+  ): Promise<Nullable<RuntimeScript<T>>> {
     const info = await this.loadRuntimeScriptClass(module);
-    return info ? await this.attachScriptIndirect(host, info) : null;
+    return info ? await this.attachScriptIndirect(host, info, config) : null;
   }
 
   /**
