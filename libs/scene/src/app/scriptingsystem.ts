@@ -102,7 +102,7 @@ export class ScriptingSystem {
    */
   async loadRuntimeScriptClass<T extends Host = Host>(
     module: string
-  ): Promise<Nullable<{ url: string; cls: GenericConstructor<RuntimeScript<T>> }>> {
+  ): Promise<Nullable<{ url: string; id: string; cls: GenericConstructor<RuntimeScript<T>> }>> {
     let mod: any = null;
     const moduleName = module ? String(module).slice(0, 64) : '';
     let url = '';
@@ -116,9 +116,85 @@ export class ScriptingSystem {
       console.error(`Load module '${moduleName}' failed: ${e}`);
     }
     if (mod && typeof mod.default === 'function') {
-      return { url, cls: mod.default as GenericConstructor<RuntimeScript<T>> };
+      return { url, id: module, cls: mod.default as GenericConstructor<RuntimeScript<T>> };
     } else {
       console.error(`No runtime class exported from '${moduleName}'`);
+      return null;
+    }
+  }
+  /**
+   * Creates a script from a dynamic loaded class and attachs it to a host and returns the `RuntimeScript` instance.
+   *
+   * @typeParam T - Host type.
+   * @param host - The host object to attach the script to.
+   * @param classInfo - The dynamic loaded class information
+   * @returns The instantiated `RuntimeScript<T>` or `null` on failure.
+   */
+  async attachScriptIndirect<T extends Host>(
+    host: Nullable<T>,
+    classInfo: {
+      url: string;
+      id: string;
+      cls: GenericConstructor<RuntimeScript<T>>;
+    }
+  ): Promise<Nullable<RuntimeScript<T>>> {
+    try {
+      const { url, id, cls } = classInfo;
+      let instance: Nullable<RuntimeScript<T>> = new cls();
+      if (instance instanceof RuntimeScript) {
+        if (!this._scriptHosts.has(instance)) {
+          const P = instance.onCreated();
+          if (P instanceof Promise) {
+            await P;
+          }
+        }
+      } else {
+        instance = null;
+      }
+      if (!instance) {
+        console.warn(`Script '${url}' does not have RuntimeScript class exported as default`);
+        return null;
+      }
+
+      let hostList = this._scriptHosts.get(instance);
+      if (!hostList) {
+        hostList = [];
+        this._scriptHosts.set(instance, hostList);
+      }
+      if (hostList.includes(host)) {
+        console.warn(`Script '${url}' already attached`);
+        return instance;
+      }
+      hostList.push(host);
+
+      const P = instance.onAttached(host);
+      if (P instanceof Promise) {
+        await P;
+      }
+
+      const attached: IAttachedScript = {
+        id,
+        url,
+        instance
+      };
+
+      let list = this._hostScripts.get(host);
+      if (!list) {
+        list = [];
+        this._hostScripts.set(host, list);
+        if (host) {
+          host.on('dispose', () => {
+            this.detachScript(host);
+          });
+        }
+      }
+      list.push(attached);
+
+      return attached.instance;
+    } catch (e) {
+      const moduleName = classInfo.id ? String(classInfo.id).slice(0, 64) : '';
+      console.error(`Load module '${moduleName}' failed: ${e}`);
+      this._onLoadError?.(e, classInfo.id);
       return null;
     }
   }
@@ -142,69 +218,8 @@ export class ScriptingSystem {
    * @returns The instantiated `RuntimeScript<T>` or `null` on failure.
    */
   async attachScript<T extends Host>(host: Nullable<T>, module: string): Promise<Nullable<RuntimeScript<T>>> {
-    try {
-      const info = await this.loadRuntimeScriptClass(module);
-      if (!info) {
-        return null;
-      }
-      const { url, cls } = info;
-      let instance: Nullable<RuntimeScript<T>> = new cls();
-      if (instance instanceof RuntimeScript) {
-        if (!this._scriptHosts.has(instance)) {
-          const P = instance.onCreated();
-          if (P instanceof Promise) {
-            await P;
-          }
-        }
-      } else {
-        instance = null;
-      }
-      if (!instance) {
-        console.warn(`Script '${module}' does not have RuntimeScript class exported as default`);
-        return null;
-      }
-
-      let hostList = this._scriptHosts.get(instance);
-      if (!hostList) {
-        hostList = [];
-        this._scriptHosts.set(instance, hostList);
-      }
-      if (hostList.includes(host)) {
-        console.warn(`Script '${module}' already attached`);
-        return instance;
-      }
-      hostList.push(host);
-
-      const P = instance.onAttached(host);
-      if (P instanceof Promise) {
-        await P;
-      }
-
-      const attached: IAttachedScript = {
-        id: module,
-        url,
-        instance
-      };
-
-      let list = this._hostScripts.get(host);
-      if (!list) {
-        list = [];
-        this._hostScripts.set(host, list);
-        if (host) {
-          host.on('dispose', () => {
-            this.detachScript(host);
-          });
-        }
-      }
-      list.push(attached);
-
-      return attached.instance;
-    } catch (e) {
-      const moduleName = module ? String(module).slice(0, 64) : '';
-      console.error(`Load module '${moduleName}' failed: ${e}`);
-      this._onLoadError?.(e, module);
-      return null;
-    }
+    const info = await this.loadRuntimeScriptClass(module);
+    return info ? await this.attachScriptIndirect(host, info) : null;
   }
 
   /**
