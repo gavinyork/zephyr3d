@@ -327,6 +327,12 @@ export class ScriptRegistry {
     let last = 0;
 
     for (const im of list) {
+      // Skip import.meta entries reported by es-module-lexer.
+      // Their "specifier" span points to the whole "import.meta" expression,
+      // which must remain untouched.
+      if (im.d === -2) {
+        continue;
+      }
       // must have quotes
       const hasQuote = im.ss != null && im.se != null;
       if (!hasQuote || im.se <= im.ss) {

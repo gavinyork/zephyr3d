@@ -54,7 +54,7 @@ function transpileTS(fileName: string, code: string) {
 
   const res = ts.transpileModule(code, {
     compilerOptions: {
-      target: ts.ScriptTarget.ES2015,
+      target: ts.ScriptTarget.ES2020,
       module: ts.ModuleKind.ESNext,
       sourceMap: true,
       inlineSources: true,
