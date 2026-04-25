@@ -445,7 +445,7 @@ export class PropertyEditor extends Observable<{
       const showTypeSelector = group.objectTypes.length > 1;
 
       const buttonSize = ImGui.GetFrameHeight();
-      const spacing =
+      const buttonCount =
         (editable ? buttonSize : 0) +
         (settable ? buttonSize : 0) +
         (addable ? buttonSize : 0) +
@@ -454,15 +454,29 @@ export class PropertyEditor extends Observable<{
       if (showTypeSelector || settable || addable || deletable || editable) {
         ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
         if (showTypeSelector) {
-          ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - spacing);
-          ImGui.Combo(
-            '',
-            group.selected,
-            group.objectTypes.map((val) => val?.name ?? 'NULL'),
-            group.objectTypes.length
+          const fieldWidth = Math.max(0, ImGui.GetContentRegionAvail().x - buttonCount);
+          const currentTypeName = group.objectTypes[group.selected[0]]?.name ?? 'NULL';
+          const clicked = this.renderClippedStringField(
+            `##group_type_${group.path}`,
+            currentTypeName,
+            fieldWidth,
+            true
           );
+          if (clicked) {
+            ImGui.OpenPopup(`##group_type_popup_${group.path}`);
+          }
+          if (ImGui.BeginPopup(`##group_type_popup_${group.path}`)) {
+            for (let i = 0; i < group.objectTypes.length; i++) {
+              const typeName = group.objectTypes[i]?.name ?? 'NULL';
+              if (ImGui.Selectable(typeName, group.selected[0] === i)) {
+                group.selected[0] = i;
+              }
+            }
+            ImGui.EndPopup();
+          }
           if (settable) {
             ImGui.SameLine(0, 0);
+            this.pushInlineActionButtonStyle();
             if (ImGui.Button(`${FontGlyph.glyphs['ok']}##set`, new ImGui.ImVec2(buttonSize, 0))) {
               const ctor = group.objectTypes[group.selected[0]]?.ctor;
               const newObj = ctor
@@ -475,9 +489,11 @@ export class PropertyEditor extends Observable<{
               this.dispatchEvent('object_property_changed', group.object, group.prop);
               this.refresh();
             }
+            this.popInlineActionButtonStyle();
           }
           if (addable) {
             ImGui.SameLine(0, 0);
+            this.pushInlineActionButtonStyle();
             if (
               ImGui.Button(`${FontGlyph.glyphs['plus']}##add`, new ImGui.ImVec2(buttonSize, 0)) &&
               group.selected[0] >= 0
@@ -492,9 +508,11 @@ export class PropertyEditor extends Observable<{
               this.dispatchEvent('object_property_changed', group.object, group.prop);
               this.refresh();
             }
+            this.popInlineActionButtonStyle();
           }
           if (deletable) {
             ImGui.SameLine(0, 0);
+            this.pushInlineActionButtonStyle();
             if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##delete`, new ImGui.ImVec2(buttonSize, 0))) {
               group.prop.delete!.call(group.object, group.index);
               this.dispatchEvent('object_property_changed', group.object, group.prop);
@@ -519,9 +537,11 @@ export class PropertyEditor extends Observable<{
                 }
               }
             }
+            this.popInlineActionButtonStyle();
           }
           if (editable) {
             ImGui.SameLine(0, 0);
+            this.pushInlineActionButtonStyle();
             if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
               if (group.prop.options?.edit === 'aabb') {
                 this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
@@ -540,9 +560,11 @@ export class PropertyEditor extends Observable<{
                 );
               }
             }
+            this.popInlineActionButtonStyle();
           }
         } else {
           if (settable) {
+            this.pushInlineActionButtonStyle();
             if (ImGui.Button(`${FontGlyph.glyphs['ok']}##set`, new ImGui.ImVec2(buttonSize, 0))) {
               const ctor = group.objectTypes[0]?.ctor;
               const newObj = ctor
@@ -555,11 +577,13 @@ export class PropertyEditor extends Observable<{
               this.dispatchEvent('object_property_changed', group.object, group.prop);
               this.refresh();
             }
+            this.popInlineActionButtonStyle();
           }
           if (addable) {
             if (settable) {
               ImGui.SameLine(0, 0);
             }
+            this.pushInlineActionButtonStyle();
             if (ImGui.Button(`${FontGlyph.glyphs['plus']}##add`, new ImGui.ImVec2(buttonSize, 0))) {
               const ctor = group.objectTypes[0]?.ctor;
               const newObj = ctor
@@ -571,11 +595,13 @@ export class PropertyEditor extends Observable<{
               this.dispatchEvent('object_property_changed', group.object, group.prop);
               this.refresh();
             }
+            this.popInlineActionButtonStyle();
           }
           if (deletable) {
             if (settable || addable) {
               ImGui.SameLine(0, 0);
             }
+            this.pushInlineActionButtonStyle();
             if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##delete`, new ImGui.ImVec2(buttonSize, 0))) {
               group.prop.delete!.call(group.object, group.index);
               this.dispatchEvent('object_property_changed', group.object, group.prop);
@@ -600,11 +626,13 @@ export class PropertyEditor extends Observable<{
                 }
               }
             }
+            this.popInlineActionButtonStyle();
           }
           if (editable) {
             if (settable || addable || deletable) {
               ImGui.SameLine(0, 0);
             }
+            this.pushInlineActionButtonStyle();
             if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(buttonSize, 0))) {
               if (group.prop.options?.edit === 'aabb') {
                 this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
@@ -623,6 +651,7 @@ export class PropertyEditor extends Observable<{
                 );
               }
             }
+            this.popInlineActionButtonStyle();
           }
         }
         ImGui.EndChild();
