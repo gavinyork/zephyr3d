@@ -38,6 +38,7 @@ import {
   getCapsuleShapeClass
 } from './scene/primitive';
 import { getSceneClass } from './scene/scene';
+import { getScriptAttachmentClass } from './scene/script';
 import { getTerrainClass } from './scene/terrain';
 import { getWaterClass, getFFTWaveGeneratorClass, getFBMWaveGeneratorClass } from './scene/water';
 import {
@@ -259,6 +260,7 @@ export class ResourceManager {
         getJSONBoolClass(),
         getJSONObjectClass(),
         getJSONArrayClass(),
+        getScriptAttachmentClass(),
         getAABBClass(),
         getInterpolatorClass(),
         getSkeletonClass(),

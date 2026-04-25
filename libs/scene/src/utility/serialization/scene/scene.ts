@@ -8,6 +8,7 @@ import type { ResourceManager } from '../manager';
 import { JSONArray, JSONData } from '../json';
 import type { Camera } from '../../../camera';
 import type { SceneNode } from '../../../scene';
+import { ScriptAttachment, normalizeScriptAttachmentConfig } from '../../../scene/script_attachment';
 
 /** @internal */
 export function getSceneClass(manager: ResourceManager): SerializableClass {
@@ -626,6 +627,9 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           options: {
             mimeTypes: ['text/x-typescript']
           },
+          isHidden() {
+            return true;
+          },
           isNullable() {
             return true;
           },
@@ -634,6 +638,43 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Scene, value) {
             this.script = value?.str?.[0] ?? '';
+          }
+        },
+        {
+          name: 'Scripts',
+          type: 'object_array',
+          options: {
+            objectTypes: [ScriptAttachment]
+          },
+          isHidden() {
+            return true;
+          },
+          getDefaultValue(this: Scene) {
+            return this.scripts;
+          },
+          isNullable() {
+            return false;
+          },
+          get(this: Scene, value) {
+            value.object = this.scripts;
+          },
+          set(this: Scene, value) {
+            this.scripts = (value.object as ScriptAttachment[]) ?? [];
+          },
+          create() {
+            return new ScriptAttachment();
+          },
+          add(this: Scene, value, index) {
+            const attachments = this.scripts;
+            attachments.splice(index ?? attachments.length, 0, (value.object?.[0] as ScriptAttachment) ?? new ScriptAttachment());
+            this.scripts = attachments;
+          },
+          delete(this: Scene, index) {
+            const attachments = this.scripts;
+            if (index >= 0 && index < attachments.length) {
+              attachments.splice(index, 1);
+              this.scripts = attachments;
+            }
           }
         },
         {
@@ -651,11 +692,9 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
             return !!this.script;
           },
           get(this: Scene, value) {
-            value.object[0] = this.scriptConfig
-              ? Array.isArray(this.scriptConfig)
-                ? new JSONArray(null, this.scriptConfig)
-                : new JSONData(null, this.scriptConfig)
-              : null;
+            const config = normalizeScriptAttachmentConfig(this.scriptConfig);
+            value.object[0] =
+              config == null ? null : Array.isArray(config) ? new JSONArray(null, config) : new JSONData(null, config);
           },
           set(this: Scene, value) {
             const data = value?.object[0] as
@@ -666,7 +705,34 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
               | null
               | undefined;
             this.scriptConfig =
-              data instanceof JSONData || data instanceof JSONArray ? data.data : (data ?? null);
+              data instanceof JSONData || data instanceof JSONArray
+                ? normalizeScriptAttachmentConfig(data.data)
+                : normalizeScriptAttachmentConfig(data);
+          }
+        },
+        {
+          name: 'ScriptConfigs',
+          type: 'object',
+          default: null,
+          options: { objectTypes: [JSONArray] },
+          getDefaultValue(this: Scene) {
+            return this.scriptConfigs;
+          },
+          isHidden() {
+            return true;
+          },
+          isNullable() {
+            return true;
+          },
+          isPersistent(this: Scene) {
+            return this.scripts.length > 0;
+          },
+          get(this: Scene, value) {
+            value.object[0] = this.scriptConfigs.length > 0 ? new JSONArray(null, this.scriptConfigs) : null;
+          },
+          set(this: Scene, value) {
+            const data = value?.object[0] as JSONArray | unknown[] | null | undefined;
+            this.scriptConfigs = data instanceof JSONArray ? data.data : Array.isArray(data) ? data : [];
           }
         },
         {

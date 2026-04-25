@@ -313,13 +313,13 @@ export class Engine {
     try {
       const scene = await this._resourceManager.loadScene(path);
       if (scene) {
-        if (scene.script) {
+        const sceneScripts = scene.scripts.length > 0 ? scene.scripts : scene.script ? [{ script: scene.script, config: scene.scriptConfig }] : [];
+        for (const attachment of sceneScripts) {
+          if (!attachment.script) {
+            continue;
+          }
           try {
-            await this.attachScript(
-              scene,
-              scene.script,
-              ((scene as any).scriptConfig ?? null) as RuntimeScriptConfig | null
-            );
+            await this.attachScript(scene, attachment.script, (attachment.config ?? null) as RuntimeScriptConfig | null);
           } catch (err) {
             console.error(`Attach script failed: ${err}`);
           }
@@ -327,11 +327,14 @@ export class Engine {
         const P: Promise<any>[] = [];
         const scripts: string[] = [];
         scene.rootNode.iterate((node) => {
-          if (node.script) {
-            scripts.push(node.script);
-            P.push(
-              this.attachScript(node, node.script, (node.scriptConfig ?? null) as RuntimeScriptConfig | null)
-            );
+          const attachments =
+            node.scripts.length > 0 ? node.scripts : node.script ? [{ script: node.script, config: node.scriptConfig }] : [];
+          for (const attachment of attachments) {
+            if (!attachment.script) {
+              continue;
+            }
+            scripts.push(attachment.script);
+            P.push(this.attachScript(node, attachment.script, (attachment.config ?? null) as RuntimeScriptConfig | null));
           }
         });
         if (P.length > 0) {

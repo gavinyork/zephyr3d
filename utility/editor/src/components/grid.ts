@@ -278,6 +278,7 @@ export class PropertyEditor extends Observable<{
   private _editSessions: Map<string, RequireOptionals<PropertyValue>>;
   private _activeStringEditors: Set<string>;
   private _pendingStringEditorFocus: Nullable<string>;
+  private _showLeadingColumn: boolean;
   private readonly _extraPropertiesProviders: Map<
     string,
     (object: any) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>
@@ -292,6 +293,7 @@ export class PropertyEditor extends Observable<{
     this._editSessions = new Map();
     this._activeStringEditors = new Set();
     this._pendingStringEditorFocus = null;
+    this._showLeadingColumn = true;
     this._extraPropertiesProviders = new Map();
     this._extraPropertiesVersion = 0;
   }
@@ -332,6 +334,12 @@ export class PropertyEditor extends Observable<{
   clear() {
     this._rootGroup = new PropertyGroup('Root', this);
   }
+  set showLeadingColumn(value: boolean) {
+    this._showLeadingColumn = !!value;
+  }
+  get showLeadingColumn() {
+    return this._showLeadingColumn;
+  }
   refresh() {
     this._dirty = true;
   }
@@ -365,10 +373,11 @@ export class PropertyEditor extends Observable<{
       this._dirty = false;
       void this.rebuild();
     }
-    const animateLabelWidth = ImGui.GetFrameHeight();
     const availableWidth = ImGui.GetContentRegionAvail().x;
-    const labelWidth = Math.max(0, availableWidth * this._labelPercent);
-    const valueWidth = Math.max(0, availableWidth * (1 - this._labelPercent));
+    const animateLabelWidth = this._showLeadingColumn ? ImGui.GetFrameHeight() : 0;
+    const contentWidth = this._showLeadingColumn ? availableWidth - animateLabelWidth : availableWidth;
+    const labelWidth = Math.max(0, contentWidth * this._labelPercent);
+    const valueWidth = Math.max(0, contentWidth * (1 - this._labelPercent));
     // Prevent unexpected scrolling
     if (
       ImGui.IsWindowHovered(ImGui.HoveredFlags.AllowWhenBlockedByActiveItem) &&
@@ -386,15 +395,17 @@ export class PropertyEditor extends Observable<{
     if (
       ImGui.BeginTable(
         'PropertyTable',
-        3,
+        this._showLeadingColumn ? 3 : 2,
         ImGui.TableFlags.BordersInnerV | ImGui.TableFlags.PadOuterX | ImGui.TableFlags.SizingFixedFit
       )
     ) {
-      ImGui.TableSetupColumn(
-        'Animatable',
-        ImGui.TableColumnFlags.NoResize | ImGui.TableColumnFlags.WidthFixed,
-        animateLabelWidth
-      );
+      if (this._showLeadingColumn) {
+        ImGui.TableSetupColumn(
+          'Animatable',
+          ImGui.TableColumnFlags.NoResize | ImGui.TableColumnFlags.WidthFixed,
+          animateLabelWidth
+        );
+      }
       ImGui.TableSetupColumn('Name', ImGui.TableColumnFlags.WidthFixed, labelWidth);
       ImGui.TableSetupColumn('Value', ImGui.TableColumnFlags.WidthFixed, valueWidth);
       this.renderGroup(this._rootGroup, 0, true);
@@ -418,7 +429,9 @@ export class PropertyEditor extends Observable<{
       return;
     }
     ImGui.TableNextRow();
-    ImGui.TableNextColumn();
+    if (this._showLeadingColumn) {
+      ImGui.TableNextColumn();
+    }
     ImGui.TableNextColumn();
     const baseX = ImGui.GetCursorPosX();
     if (level > 0) {
@@ -679,7 +692,6 @@ export class PropertyEditor extends Observable<{
       !group.prop ||
       group.prop.type !== 'object_array' ||
       !group.prop.options?.inlineObjectArray ||
-      !group.value.object?.[0] ||
       group.properties.length !== 1 ||
       group.subgroups.length > 0 ||
       group.rawProperties.length > 0 ||
@@ -695,7 +707,9 @@ export class PropertyEditor extends Observable<{
     }
 
     ImGui.TableNextRow();
-    ImGui.TableNextColumn();
+    if (this._showLeadingColumn) {
+      ImGui.TableNextColumn();
+    }
     ImGui.TableNextColumn();
     const baseX = ImGui.GetCursorPosX();
     if (level > 0) {
@@ -718,31 +732,96 @@ export class PropertyEditor extends Observable<{
     const readonly = !value.set;
     const val = tmpProperty.str as [string];
     const isSceneNodeRef = !!value.options?.sceneNode;
+    const isAssetRef = !!value.options?.mimeTypes?.length;
+    const canInlineEdit = !!value.set && !readonly && !isSceneNodeRef && !isAssetRef;
     const hasValue = !!String(val[0] ?? '').trim();
     const addable = !!group.prop.add && group.index === group.count - 1;
-    const deletable = !!group.prop.delete && group.index < group.count && (group.count > 1 || hasValue);
-    const extraButtons = (addable ? 1 : 0) + (deletable ? 1 : 0);
+    const deletable =
+      !!group.prop.delete &&
+      group.index < group.count &&
+      (group.count > 1 || hasValue);
+    const pickerButtonCount = (isSceneNodeRef || isAssetRef) && value.set ? 1 : 0;
+    const clearButtonCount = (isSceneNodeRef || isAssetRef) && !!value.set && !!val[0] ? 1 : 0;
+    const extraButtons = pickerButtonCount + clearButtonCount + (addable ? 1 : 0) + (deletable ? 1 : 0);
     if (extraButtons > 0) {
       ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
-      ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - extraButtons * ImGui.GetFrameHeight());
-    } else {
-      ImGui.SetNextItemWidth(-1);
     }
+    const fieldWidth =
+      extraButtons > 0
+        ? ImGui.GetContentRegionAvail().x - extraButtons * ImGui.GetFrameHeight()
+        : ImGui.GetContentRegionAvail().x;
     let changed = false;
-    if (isSceneNodeRef) {
-      const displayValue = [val[0]] as [string];
-      ImGui.InputText('##value', displayValue, undefined, ImGui.InputTextFlags.ReadOnly);
+    if (isSceneNodeRef || isAssetRef) {
+      this.renderClippedStringField('##value_display', val[0], fieldWidth, false);
     } else {
-      changed = ImGui.InputText(
-        '##value',
-        val,
-        undefined,
-        readonly ? ImGui.InputTextFlags.ReadOnly : undefined
-      );
+      const clicked = this.renderClippedStringField('##value_display', val[0], fieldWidth, canInlineEdit);
+      if (clicked && canInlineEdit) {
+        changed = ImGui.InputText(
+          '##value',
+          val,
+          undefined,
+          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
+        );
+      }
+    }
+    if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
+      this.revealAsset(val[0]);
     }
     this.setDragDropProperty(object, value, tmpProperty);
+    if (pickerButtonCount > 0) {
+      ImGui.SameLine(0, 0);
+      this.pushInlineActionButtonStyle();
+      if (ImGui.Button(`${FontGlyph.glyphs['link']}##pick`, new ImGui.ImVec2(ImGui.GetFrameHeight(), 0))) {
+      }
+      if (ImGui.IsItemHovered()) {
+        ImGui.SetTooltip(
+          isSceneNodeRef
+            ? 'Drag this button onto a node in the scene hierarchy to set the reference'
+            : 'Drag this button onto an asset to set the reference'
+        );
+      }
+      if (ImGui.BeginDragDropSource()) {
+        if (isSceneNodeRef) {
+          const payload: SceneHierarchyNodePickerPayload = {
+            type: 'node-picker',
+            object,
+            prop: value
+          };
+          ImGui.SetDragDropPayload('NODE', payload);
+          ImGui.Text('Drop on a scene node');
+        } else {
+          const payload: VFSRendererAssetPickerPayload = {
+            type: 'asset-picker',
+            object,
+            prop: value
+          };
+          ImGui.SetDragDropPayload('ASSET', payload);
+          ImGui.Text('Drop on an asset');
+        }
+        ImGui.EndDragDropSource();
+      }
+      this.popInlineActionButtonStyle();
+    }
+    if (clearButtonCount > 0) {
+      ImGui.SameLine(0, 0);
+      this.pushInlineActionButtonStyle();
+      if (
+        ImGui.Button(
+          `${FontGlyph.glyphs['cancel']}##clear`,
+          new ImGui.ImVec2(ImGui.GetFrameHeight(), 0)
+        )
+      ) {
+        tmpProperty.str[0] = '';
+        Promise.resolve(value.set!.call(object, tmpProperty)).then(() => {
+          this.refresh();
+          this.dispatchEvent('object_property_changed', object, value);
+        });
+      }
+      this.popInlineActionButtonStyle();
+    }
     if (addable) {
       ImGui.SameLine(0, 0);
+      this.pushInlineActionButtonStyle();
       if (ImGui.Button(`${FontGlyph.glyphs['plus']}##add`, new ImGui.ImVec2(ImGui.GetFrameHeight(), 0))) {
         const ctor = group.objectTypes?.[0]?.ctor;
         const newObj = ctor
@@ -754,9 +833,11 @@ export class PropertyEditor extends Observable<{
         this.dispatchEvent('object_property_changed', group.object, group.prop);
         this.refresh();
       }
+      this.popInlineActionButtonStyle();
     }
     if (deletable) {
       ImGui.SameLine(0, 0);
+      this.pushInlineActionButtonStyle();
       if (
         ImGui.Button(`${FontGlyph.glyphs['cancel']}##delete`, new ImGui.ImVec2(ImGui.GetFrameHeight(), 0))
       ) {
@@ -764,6 +845,7 @@ export class PropertyEditor extends Observable<{
         this.dispatchEvent('object_property_changed', group.object, group.prop);
         this.refresh();
       }
+      this.popInlineActionButtonStyle();
     }
     if (extraButtons > 0) {
       ImGui.EndChild();
@@ -795,7 +877,9 @@ export class PropertyEditor extends Observable<{
   ) {
     ImGui.PushID(value.name);
     ImGui.TableNextRow();
-    ImGui.TableNextColumn();
+    if (this._showLeadingColumn) {
+      ImGui.TableNextColumn();
+    }
     ImGui.TableNextColumn();
     const baseX = ImGui.GetCursorPosX();
     if (level > 0) {
@@ -1009,31 +1093,33 @@ export class PropertyEditor extends Observable<{
     }
     ImGui.PushID(property.path);
     ImGui.TableNextRow();
-    ImGui.TableNextColumn();
-    ImGui.SetNextItemWidth(-1);
-    const animatable = value && !!value.options?.animatable;
-    if (animatable && this.object instanceof SceneNode) {
-      if (ImGui.Button('A')) {
-        Dialog.selectAnimationAndTrack(
-          'Create animation track',
-          this.object.animationSet.getAnimationNames(),
-          300
-        ).then((val) => {
-          if (val) {
-            let animation = this.object.animationSet.getAnimationClip(val.animationName);
-            if (!animation) {
-              animation = this.object.animationSet.createAnimation(val.animationName, false);
+    if (this._showLeadingColumn) {
+      ImGui.TableNextColumn();
+      ImGui.SetNextItemWidth(-1);
+      const animatable = value && !!value.options?.animatable;
+      if (animatable && this.object instanceof SceneNode) {
+        if (ImGui.Button('A')) {
+          Dialog.selectAnimationAndTrack(
+            'Create animation track',
+            this.object.animationSet.getAnimationNames(),
+            300
+          ).then((val) => {
+            if (val) {
+              let animation = this.object.animationSet.getAnimationClip(val.animationName);
+              if (!animation) {
+                animation = this.object.animationSet.createAnimation(val.animationName, false);
+              }
+              const propValue = { num: [0, 0, 0, 0], str: [], bool: [], object: [] };
+              value.get.call(object, propValue);
+              const track = new PropertyTrack(value, propValue.num);
+              track.target = property.objectPath;
+              track.name = val.trackName;
+              animation.addTrack(object, track);
+              this.refresh();
+              eventBus.dispatchEvent('scene_changed');
             }
-            const propValue = { num: [0, 0, 0, 0], str: [], bool: [], object: [] };
-            value.get.call(object, propValue);
-            const track = new PropertyTrack(value, propValue.num);
-            track.target = property.objectPath;
-            track.name = val.trackName;
-            animation.addTrack(object, track);
-            this.refresh();
-            eventBus.dispatchEvent('scene_changed');
-          }
-        });
+          });
+        }
       }
     }
     ImGui.TableNextColumn();
@@ -1168,6 +1254,13 @@ export class PropertyEditor extends Observable<{
               if (
                 ImGui.Button(`${FontGlyph.glyphs['link']}##pick`, new ImGui.ImVec2(ImGui.GetFrameHeight(), 0))
               ) {
+              }
+              if (ImGui.IsItemHovered()) {
+                ImGui.SetTooltip(
+                  isSceneNodeRef
+                    ? 'Drag this button onto a node in the scene hierarchy to set the reference'
+                    : 'Drag this button onto an asset to set the reference'
+                );
               }
               if (ImGui.BeginDragDropSource()) {
                 if (isSceneNodeRef) {

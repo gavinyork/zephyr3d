@@ -28,6 +28,7 @@ import {
 } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { DirectionalLight } from '@zephyr3d/scene';
+import { ScriptAttachment } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
 import type { ToolBarItem } from '../components/toolbar';
@@ -55,7 +56,7 @@ import {
   NodeTransformCommand
 } from '../commands/scenecommands';
 import { NodeProxy } from '../helpers/proxy';
-import { clearScriptPropertyAccessorCache, getScriptPropertyAccessors } from '../helpers/scriptprops';
+import { clearScriptPropertyAccessorCache, getSingleScriptPropertyAccessors } from '../helpers/scriptprops';
 import type { EditTool, EditToolContext } from './edittools/edittool';
 import { createEditTool, isObjectEditable } from './edittools/edittool';
 import { calcHierarchyBoundingBoxWorld } from '../helpers/misc';
@@ -93,12 +94,17 @@ type SyncedPropertyRecord = {
   oldValue: PropertySnapshot;
   newValue: PropertySnapshot;
 };
+type ScriptConfigEditorHost = {
+  scriptHost: Scene | SceneNode;
+  scriptPath: string;
+};
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
   private _postGizmoRenderer: Nullable<PostGizmoRenderer>;
   private _rightDockPanel: DockPannel;
   private readonly _propGrid: PropertyEditor;
+  private readonly _scriptConfigGrid: PropertyEditor;
   private readonly _toolbar: ToolBar;
   private _leftDockPanel: Nullable<DockPannel>;
   private _sceneHierarchy: Nullable<SceneHierarchy>;
@@ -143,6 +149,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _syncedPropertySessions: Map<string, Map<SceneNode, SyncedPropertyRecord>>;
   private readonly _editToolContext: EditToolContext;
   private _activePluginContributionShortcuts: boolean;
+  private _scriptPanelHeight: number;
+  private _selectedScriptIndex: number;
+  private _scriptConfigEditorHost: Nullable<ScriptConfigEditorHost>;
   constructor(controller: SceneController) {
     super(controller);
     this._cmdManager = new CommandManager();
@@ -216,7 +225,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     );
     this._rightDockPanel = new DockPannel(0, 0, 400, 0, 8, 200, 600, ResizeDirection.Left);
     this._propGrid = new PropertyEditor(0.4);
-    this._propGrid.setExtraPropertiesProvider('runtime-script', getScriptPropertyAccessors);
+    this._scriptConfigGrid = new PropertyEditor(0.4);
+    this._scriptConfigGrid.showLeadingColumn = false;
     this._propGrid.setExtraPropertiesProvider('plugin-contributions', (object) =>
       this.editor.plugins.getPropertyAccessors(object)
     );
@@ -224,6 +234,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._leftDockPanel = null;
     this._sceneHierarchy = null;
     this._assetView = null;
+    this._scriptPanelHeight = 260;
+    this._selectedScriptIndex = 0;
+    this._scriptConfigEditorHost = null;
   }
   get editor() {
     return this.controller.editor;
@@ -799,7 +812,32 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._leftDockPanel!.end();
 
     if (this._rightDockPanel.begin('##PropertyGridPanel')) {
-      this._propGrid.render();
+      const contentHeight = ImGui.GetContentRegionAvail().y;
+      const splitterHeight = 6;
+      const minScriptPanelHeight = 140;
+      const minPropPanelHeight = 80;
+      const maxScriptPanelHeight = Math.max(
+        minScriptPanelHeight,
+        contentHeight - minPropPanelHeight - splitterHeight
+      );
+      const scriptPanelHeight = Math.max(
+        minScriptPanelHeight,
+        Math.min(this._scriptPanelHeight, maxScriptPanelHeight)
+      );
+      this._scriptPanelHeight = scriptPanelHeight;
+      const propPanelHeight = Math.max(
+        minPropPanelHeight,
+        contentHeight - scriptPanelHeight - splitterHeight
+      );
+      if (ImGui.BeginChild('##PropGridRegion', new ImGui.ImVec2(-1, propPanelHeight), false)) {
+        this._propGrid.render();
+      }
+      ImGui.EndChild();
+      this.renderScriptPanelSplitter(contentHeight, splitterHeight, minPropPanelHeight, minScriptPanelHeight);
+      if (ImGui.BeginChild('##ScriptPanelRegion', new ImGui.ImVec2(-1, 0), false)) {
+        this.renderScriptPanel();
+      }
+      ImGui.EndChild();
     }
     this._rightDockPanel.end();
 
@@ -1203,6 +1241,12 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._propGrid.on('end_edit_aabb', this.endEditAABB, this);
     this._propGrid.on('request_edit_track', this.editPropAnimation, this);
     this._propGrid.on('end_edit_track', this.endEditPropAnimation, this);
+    this._scriptConfigGrid.on('object_property_changed', this.handleScriptConfigPropertyChanged, this);
+    this._scriptConfigGrid.on(
+      'object_property_edit_finished',
+      this.handleScriptConfigPropertyEditFinished,
+      this
+    );
     eventBus.on('scene_add_asset', this.handleAddAsset, this);
     eventBus.on('workspace_drag_start', this.handleWorkspaceDragStart, this);
     eventBus.on('workspace_drag_end', this.handleWorkspaceDragEnd, this);
@@ -1232,6 +1276,12 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._propGrid.off('end_edit_aabb', this.endEditAABB, this);
     this._propGrid.off('request_edit_track', this.editPropAnimation, this);
     this._propGrid.off('end_edit_track', this.endEditPropAnimation, this);
+    this._scriptConfigGrid.off('object_property_changed', this.handleScriptConfigPropertyChanged, this);
+    this._scriptConfigGrid.off(
+      'object_property_edit_finished',
+      this.handleScriptConfigPropertyEditFinished,
+      this
+    );
     eventBus.off('scene_add_asset', this.handleAddAsset, this);
     eventBus.off('workspace_drag_start', this.handleWorkspaceDragStart, this);
     eventBus.off('workspace_drag_end', this.handleWorkspaceDragEnd, this);
@@ -1284,6 +1334,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this.syncNodeProxyTree(this.controller.model.scene.rootNode);
       this._propGrid.clear();
       this._propGrid.object = this.controller.model.scene;
+      this.syncScriptConfigEditor();
       this.controller.model.scene.on('startrender', this.handleStartRender, this);
       this.controller.model.scene.on('endrender', this.handleEndRender, this);
       this._postGizmoRenderer.on('begin_translate', this.handleBeginTransformNode, this);
@@ -1300,6 +1351,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._syncedPropertySessions.clear();
     this._propGrid.object = null;
     this._propGrid.clear();
+    this._scriptConfigEditorHost = null;
+    this._scriptConfigGrid.object = null;
+    this._scriptConfigGrid.clear();
     if (this._sceneHierarchy) {
       this._sceneHierarchy.off('selection_changed', this.handleHierarchySelectionChanged, this);
       this._sceneHierarchy.off('node_selected', this.handleNodeSelected, this);
@@ -1393,12 +1447,14 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleObjectPropertyChanged(object: object, prop: PropertyAccessor) {
     const shouldRefreshScriptProps =
       (object instanceof Scene || object instanceof SceneNode) &&
-      (prop.name === 'Script' || prop.name === 'ScriptConfig');
+      (prop.name === 'Script' ||
+        prop.name === 'Scripts' ||
+        prop.name === 'ScriptConfig' ||
+        prop.name === 'ScriptConfigs');
     if (shouldRefreshScriptProps) {
-      if (prop.name === 'Script') {
-        clearScriptPropertyAccessorCache((object as Scene | SceneNode).script);
-      }
+      clearScriptPropertyAccessorCache();
       this._propGrid.refresh();
+      this.syncScriptConfigEditor();
     }
     if (object instanceof SceneNode) {
       this._proxy!.updateProxy(object);
@@ -1435,9 +1491,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (!object || !prop?.set) {
       return;
     }
-    if ((object instanceof Scene || object instanceof SceneNode) && prop.name === 'Script') {
-      clearScriptPropertyAccessorCache((object as Scene | SceneNode).script);
+    if (
+      (object instanceof Scene || object instanceof SceneNode) &&
+      (prop.name === 'Script' || prop.name === 'Scripts')
+    ) {
+      clearScriptPropertyAccessorCache();
       this._propGrid.refresh();
+      this.syncScriptConfigEditor();
     }
     const source = object as object;
     const commands: PropertyEditCommand[] = [];
@@ -2138,6 +2198,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._postGizmoRenderer!.node = null;
       this.updateGizmoTransformSpace();
       this._propGrid.object = this.controller.model.scene;
+      this.syncScriptConfigEditor();
       return;
     }
     const pivot = this.updateMultiTransformPivot();
@@ -2148,6 +2209,281 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         : activeNode);
     this.updateGizmoTransformSpace();
     this._propGrid.object = activeNode === activeNode.scene!.rootNode ? activeNode.scene : activeNode;
+    this._selectedScriptIndex = 0;
+    this.syncScriptConfigEditor();
+  }
+  private getScriptHost() {
+    const object = this._propGrid.object;
+    return object instanceof Scene || object instanceof SceneNode ? object : null;
+  }
+  private getScriptAttachments(host: Scene | SceneNode) {
+    return Array.isArray((host as any).scripts) ? ((host as any).scripts as ScriptAttachment[]) : [];
+  }
+  private syncScriptConfigEditor() {
+    const host = this.getScriptHost();
+    const attachments = host ? this.getScriptAttachments(host) : [];
+    if (attachments.length === 0) {
+      this._selectedScriptIndex = 0;
+      this._scriptConfigEditorHost = null;
+      this._scriptConfigGrid.object = null;
+      this._scriptConfigGrid.clear();
+      return;
+    }
+    this._selectedScriptIndex = Math.max(0, Math.min(this._selectedScriptIndex, attachments.length - 1));
+    const attachment = attachments[this._selectedScriptIndex];
+    this._scriptConfigEditorHost = attachment?.script ? { scriptHost: host, scriptPath: attachment.script } : null;
+    this._scriptConfigGrid.object = this._scriptConfigEditorHost;
+    this._scriptConfigGrid.setExtraPropertiesProvider(
+      'script-config',
+      this._scriptConfigEditorHost
+        ? async (object) =>
+            object === this._scriptConfigEditorHost
+              ? this.bindScriptPropertyAccessors(
+                  this._scriptConfigEditorHost.scriptHost,
+                  await getSingleScriptPropertyAccessors(
+                    this._scriptConfigEditorHost.scriptHost,
+                    this._scriptConfigEditorHost.scriptPath
+                  )
+                )
+              : []
+        : null
+    );
+    this._scriptConfigGrid.refresh();
+  }
+  private bindScriptPropertyAccessors(host: Scene | SceneNode, accessors: PropertyAccessor<any>[]) {
+    return accessors.map((prop) => ({
+      ...prop,
+      get: prop.get
+        ? ((value) => prop.get!.call(host as never, value as never)) as typeof prop.get
+        : undefined,
+      set: prop.set
+        ? ((value, index) => prop.set!.call(host as never, value as never, index)) as typeof prop.set
+        : undefined,
+      create: prop.create ? ((ctor, index) => prop.create!.call(host as never, ctor, index)) : undefined,
+      delete: prop.delete ? ((index) => prop.delete!.call(host as never, index)) : undefined,
+      add: prop.add
+        ? ((value, index) => prop.add!.call(host as never, value as never, index)) as typeof prop.add
+        : undefined,
+      isValid: prop.isValid ? (() => prop.isValid!.call(host as never)) : undefined,
+      isPersistent: prop.isPersistent ? (() => prop.isPersistent!.call(host as never)) : undefined,
+      isNullable: prop.isNullable ? ((index) => prop.isNullable!.call(host as never, index)) : undefined,
+      isHidden: prop.isHidden
+        ? ((index, obj) => prop.isHidden!.call(host as never, index, obj)) as typeof prop.isHidden
+        : undefined,
+      command: prop.command ? ((index) => prop.command!.call(host as never, index)) : undefined,
+      getDefaultValue: prop.getDefaultValue ? (() => prop.getDefaultValue!.call(host as never)) : undefined
+    }));
+  }
+  private appendScriptAttachment(host: Scene | SceneNode, path: string) {
+    if (!path) {
+      return;
+    }
+    const attachments = [...this.getScriptAttachments(host)];
+    attachments.push(new ScriptAttachment(path, null));
+    (host as any).scripts = attachments;
+    this._selectedScriptIndex = attachments.length - 1;
+    this.syncScriptConfigEditor();
+    clearScriptPropertyAccessorCache();
+    this._propGrid.refresh();
+    eventBus.dispatchEvent('scene_changed');
+  }
+  private removeScriptAttachment(host: Scene | SceneNode, index: number) {
+    const attachments = [...this.getScriptAttachments(host)];
+    if (index < 0 || index >= attachments.length) {
+      return;
+    }
+    attachments.splice(index, 1);
+    (host as any).scripts = attachments;
+    this._selectedScriptIndex = Math.max(0, Math.min(this._selectedScriptIndex, attachments.length - 1));
+    this.syncScriptConfigEditor();
+    clearScriptPropertyAccessorCache();
+    this._propGrid.refresh();
+    eventBus.dispatchEvent('scene_changed');
+  }
+  private renderScriptPanel() {
+    const host = this.getScriptHost();
+    ImGui.Text('Scripts');
+    if (!host) {
+      ImGui.Separator();
+      ImGui.TextDisabled('Select a scene or node to edit scripts');
+      return;
+    }
+    const attachments = this.getScriptAttachments(host);
+    ImGui.Separator();
+    if (attachments.length === 0) {
+      ImGui.TextDisabled('No scripts attached');
+    }
+    if (attachments.length > 0 && ImGui.BeginTable('##ScriptList', 2, ImGui.TableFlags.SizingStretchProp)) {
+      ImGui.TableSetupColumn('Script', ImGui.TableColumnFlags.WidthStretch);
+      ImGui.TableSetupColumn('Action', ImGui.TableColumnFlags.WidthFixed, ImGui.GetFrameHeight());
+      for (let i = 0; i < attachments.length; i++) {
+        const attachment = attachments[i];
+        const selected = i === this._selectedScriptIndex;
+        ImGui.TableNextRow();
+        ImGui.TableNextColumn();
+        const clicked = this.renderScriptListItem(
+          `##script_item_${i}`,
+          attachment.script || '<Empty Script>',
+          selected
+        );
+        if (clicked) {
+          this._selectedScriptIndex = i;
+          this.syncScriptConfigEditor();
+        }
+        ImGui.TableNextColumn();
+        if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##remove_script_${i}`, new ImGui.ImVec2(-1, 0))) {
+          this.removeScriptAttachment(host, i);
+          ImGui.EndTable();
+          return;
+        }
+      }
+      ImGui.EndTable();
+    }
+    ImGui.Separator();
+    if (this.renderScriptDropTarget(host)) {
+      return;
+    }
+    if (attachments.length > 0) {
+      ImGui.Separator();
+      ImGui.Text('Config');
+      this._scriptConfigGrid.render();
+      if (!attachments[this._selectedScriptIndex]?.script) {
+        ImGui.TextDisabled('Select a valid script to edit config');
+      }
+    }
+  }
+  private renderScriptListItem(id: string, text: string, selected: boolean) {
+    const style = ImGui.GetStyle();
+    const size = new ImGui.ImVec2(ImGui.GetContentRegionAvail().x, ImGui.GetFrameHeight());
+    const clicked = ImGui.InvisibleButton(id, size, 0);
+    const hovered = ImGui.IsItemHovered();
+    const drawList = ImGui.GetWindowDrawList();
+    const rectMin = ImGui.GetItemRectMin();
+    const rectMax = ImGui.GetItemRectMax();
+    const bgColor = ImGui.GetColorU32(
+      selected ? ImGui.Col.Header : hovered ? ImGui.Col.FrameBgHovered : ImGui.Col.FrameBg
+    );
+    const borderColor = ImGui.GetColorU32(ImGui.Col.Border);
+    const textColor = ImGui.GetColorU32(ImGui.Col.Text);
+    drawList.AddRectFilled(rectMin, rectMax, bgColor, style.FrameRounding);
+    drawList.AddRect(rectMin, rectMax, borderColor, style.FrameRounding, ImGui.DrawCornerFlags.None, 1);
+    const textPos = new ImGui.ImVec2(rectMin.x + style.FramePadding.x, rectMin.y + style.FramePadding.y);
+    const clipMin = new ImGui.ImVec2(rectMin.x + style.FramePadding.x, rectMin.y);
+    const clipMax = new ImGui.ImVec2(rectMax.x - style.FramePadding.x, rectMax.y);
+    drawList.PushClipRect(clipMin, clipMax, true);
+    drawList.AddText(textPos, textColor, text);
+    drawList.PopClipRect();
+    const textWidth = ImGui.CalcTextSize(text).x;
+    const availableWidth = Math.max(0, clipMax.x - clipMin.x);
+    if (hovered && textWidth > availableWidth) {
+      ImGui.SetTooltip(text);
+    }
+    return clicked;
+  }
+  private renderScriptDropTarget(host: Scene | SceneNode) {
+    const style = ImGui.GetStyle();
+    const size = new ImGui.ImVec2(ImGui.GetContentRegionAvail().x, ImGui.GetFrameHeight());
+    ImGui.InvisibleButton('##script_drop_target', size, 0);
+    const hovered = ImGui.IsItemHovered();
+    const drawList = ImGui.GetWindowDrawList();
+    const rectMin = ImGui.GetItemRectMin();
+    const rectMax = ImGui.GetItemRectMax();
+    const bgColor = ImGui.GetColorU32(hovered ? ImGui.Col.FrameBgHovered : ImGui.Col.FrameBg);
+    const borderColor = ImGui.GetColorU32(ImGui.Col.Border);
+    const textColor = ImGui.GetColorU32(ImGui.Col.TextDisabled);
+    drawList.AddRectFilled(rectMin, rectMax, bgColor, style.FrameRounding);
+    drawList.AddRect(rectMin, rectMax, borderColor, style.FrameRounding, ImGui.DrawCornerFlags.None, 1);
+    const hint = 'Drop a script here to attach';
+    const textSize = ImGui.CalcTextSize(hint);
+    drawList.AddText(
+      new ImGui.ImVec2(
+        rectMin.x + Math.max(style.FramePadding.x, (size.x - textSize.x) * 0.5),
+        rectMin.y + style.FramePadding.y
+      ),
+      textColor,
+      hint
+    );
+
+    if (ImGui.BeginDragDropTarget()) {
+      const peekPayload = ImGui.AcceptDragDropPayload('ASSET', ImGui.DragDropFlags.AcceptBeforeDelivery);
+      if (peekPayload) {
+        const data = peekPayload.Data as { isDir: boolean; path: string }[];
+        if (data.length === 1 && !data[0].isDir) {
+          const mimeType = ProjectService.VFS.guessMIMEType(data[0].path);
+          if (mimeType === 'text/x-typescript' || mimeType === 'text/javascript') {
+            const payload = ImGui.AcceptDragDropPayload('ASSET');
+            if (payload) {
+              this.appendScriptAttachment(host, data[0].path);
+              ImGui.EndDragDropTarget();
+              return true;
+            }
+          }
+        }
+      }
+      ImGui.EndDragDropTarget();
+    }
+    return false;
+  }
+  private handleScriptConfigPropertyChanged(_object: object, prop: PropertyAccessor) {
+    const host = this._scriptConfigEditorHost?.scriptHost;
+    if (!host) {
+      return;
+    }
+    this.handleObjectPropertyChanged(host, prop);
+  }
+  private handleScriptConfigPropertyEditFinished(
+    _object: Nullable<object>,
+    prop: PropertyAccessor,
+    oldValue: PropertySnapshot,
+    newValue: PropertySnapshot
+  ) {
+    const host = this._scriptConfigEditorHost?.scriptHost;
+    if (!host) {
+      return;
+    }
+    void this.handleObjectPropertyEditFinished(host, prop, oldValue, newValue);
+  }
+  private renderScriptPanelSplitter(
+    totalHeight: number,
+    splitterHeight: number,
+    minPropPanelHeight: number,
+    minScriptPanelHeight: number
+  ) {
+    const width = ImGui.GetContentRegionAvail().x;
+    const style = ImGui.GetStyle();
+    const size = new ImGui.ImVec2(width, splitterHeight);
+    ImGui.InvisibleButton('##script_panel_splitter', size, 0);
+    const hovered = ImGui.IsItemHovered();
+    const active = ImGui.IsItemActive();
+    const rectMin = ImGui.GetItemRectMin();
+    const rectMax = ImGui.GetItemRectMax();
+    const drawList = ImGui.GetWindowDrawList();
+    const color = ImGui.GetColorU32(
+      active ? ImGui.Col.SeparatorActive : hovered ? ImGui.Col.SeparatorHovered : ImGui.Col.Separator
+    );
+    const lineY = (rectMin.y + rectMax.y) * 0.5;
+    drawList.AddLine(
+      new ImGui.ImVec2(rectMin.x, lineY),
+      new ImGui.ImVec2(rectMax.x, lineY),
+      color,
+      1
+    );
+    if (hovered || active) {
+      ImGui.SetMouseCursor(ImGui.MouseCursor.ResizeNS);
+    }
+    if (active) {
+      const maxScriptPanelHeight = Math.max(
+        minScriptPanelHeight,
+        totalHeight - minPropPanelHeight - splitterHeight
+      );
+      this._scriptPanelHeight = Math.max(
+        minScriptPanelHeight,
+        Math.min(this._scriptPanelHeight - ImGui.GetIO().MouseDelta.y, maxScriptPanelHeight)
+      );
+    }
+    if (style.ItemSpacing.y > 0) {
+      ImGui.Dummy(new ImGui.ImVec2(0, Math.max(0, style.ItemSpacing.y - splitterHeight)));
+    }
   }
   private isTransformModeActive() {
     const mode = this._postGizmoRenderer?.mode;

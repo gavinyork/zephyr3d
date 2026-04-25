@@ -44,15 +44,20 @@ async function ensureProjectScript(
 
 // 挂载脚本时只设置脚本路径。
 // 具体默认配置由脚本内部的 @scriptProp 装饰器声明负责，插件层不再手动注入 scriptConfig。
+function listNodeScripts(node: SceneNode) {
+  const attachments = Array.isArray((node as any).scripts) ? ((node as any).scripts as { script?: string }[]) : [];
+  return attachments.map((item) => String(item?.script ?? '').trim()).filter((item) => !!item);
+}
+
 function initializeScriptHost(node: SceneNode, scriptPath: string) {
-  node.script = scriptPath;
+  const attachments = Array.isArray((node as any).scripts) ? [...((node as any).scripts as any[])] : [];
+  if (!attachments.some((item) => String(item?.script ?? '').trim() === scriptPath)) {
+    attachments.push({ script: scriptPath, config: null });
+    (node as any).scripts = attachments;
+  }
 }
 
 async function attachGPUClothToNode(ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0], node: SceneNode) {
-  const currentScript = String((node as any).script ?? '').trim();
-  if (currentScript && !isGPUClothHost(node)) {
-    throw new Error('Selected node already has a different script attached');
-  }
   const path = await ensureProjectScript(ctx, DEFAULT_GPU_CLOTH_SCRIPT_PATH, gpuClothRuntimeScriptSource);
   initializeScriptHost(node, path);
   // 通过 PluginAPI 主动刷新属性面板，并把场景标记为已修改。
@@ -61,10 +66,6 @@ async function attachGPUClothToNode(ctx: Parameters<NonNullable<EditorPlugin['ac
 }
 
 async function attachSpringToNode(ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0], node: SceneNode) {
-  const currentScript = String((node as any).script ?? '').trim();
-  if (currentScript && !isSpringHost(node)) {
-    throw new Error('Selected node already has a different script attached');
-  }
   const path = await ensureProjectScript(ctx, DEFAULT_SPRING_SCRIPT_PATH, springRuntimeScriptSource);
   initializeScriptHost(node, path);
   ctx.refreshProperties();
@@ -124,8 +125,7 @@ const plugin: EditorPlugin = {
               if (!node || !ctx.editor.currentProject || ctx.project.isReadOnly()) {
                 return false;
               }
-              const currentScript = String((node as any).script ?? '').trim();
-              return !currentScript || isGPUClothHost(node);
+              return !listNodeScripts(node).length || isGPUClothHost(node) || true;
             },
             action: async () => {
               if (!node) {
@@ -135,7 +135,8 @@ const plugin: EditorPlugin = {
                 await attachGPUClothToNode(ctx, node);
               }
               await ctx.project.openCode(
-                String((node as any).script ?? DEFAULT_GPU_CLOTH_SCRIPT_PATH),
+                listNodeScripts(node).find((item) => item === DEFAULT_GPU_CLOTH_SCRIPT_PATH) ??
+                  String((node as any).script ?? DEFAULT_GPU_CLOTH_SCRIPT_PATH),
                 'typescript'
               );
             }
@@ -148,8 +149,7 @@ const plugin: EditorPlugin = {
               if (!node || !ctx.editor.currentProject || ctx.project.isReadOnly()) {
                 return false;
               }
-              const currentScript = String((node as any).script ?? '').trim();
-              return !currentScript || isSpringHost(node);
+              return !listNodeScripts(node).length || isSpringHost(node) || true;
             },
             action: async () => {
               if (!node) {
@@ -159,7 +159,8 @@ const plugin: EditorPlugin = {
                 await attachSpringToNode(ctx, node);
               }
               await ctx.project.openCode(
-                String((node as any).script ?? DEFAULT_SPRING_SCRIPT_PATH),
+                listNodeScripts(node).find((item) => item === DEFAULT_SPRING_SCRIPT_PATH) ??
+                  String((node as any).script ?? DEFAULT_SPRING_SCRIPT_PATH),
                 'typescript'
               );
             }

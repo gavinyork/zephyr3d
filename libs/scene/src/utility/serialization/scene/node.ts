@@ -7,7 +7,8 @@ import { applyPatch, ASSERT, degree2radian, diff, DRef, radian2degree } from '@z
 import { GraphNode } from '../../../scene';
 import type { ResourceManager } from '../manager';
 import { AnimationClip, NodeRotationTrack, NodeScaleTrack, NodeTranslationTrack } from '../../../animation';
-import { JSONData } from '../json';
+import { JSONArray, JSONData } from '../json';
+import { ScriptAttachment, normalizeScriptAttachmentConfig } from '../../../scene/script_attachment';
 
 function normalizeSerializedSceneNodeData(data: DiffValue): Record<string, unknown> {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -334,6 +335,9 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           options: {
             mimeTypes: ['text/x-typescript']
           },
+          isHidden() {
+            return true;
+          },
           isNullable() {
             return true;
           },
@@ -345,9 +349,46 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'Scripts',
+          type: 'object_array',
+          options: {
+            objectTypes: [ScriptAttachment]
+          },
+          isHidden() {
+            return true;
+          },
+          getDefaultValue(this: SceneNode) {
+            return this.scripts;
+          },
+          isNullable() {
+            return false;
+          },
+          get(this: SceneNode, value) {
+            value.object = this.scripts;
+          },
+          set(this: SceneNode, value) {
+            this.scripts = (value.object as ScriptAttachment[]) ?? [];
+          },
+          create() {
+            return new ScriptAttachment();
+          },
+          add(this: SceneNode, value, index) {
+            const attachments = this.scripts;
+            attachments.splice(index ?? attachments.length, 0, (value.object?.[0] as ScriptAttachment) ?? new ScriptAttachment());
+            this.scripts = attachments;
+          },
+          delete(this: SceneNode, index) {
+            const attachments = this.scripts;
+            if (index >= 0 && index < attachments.length) {
+              attachments.splice(index, 1);
+              this.scripts = attachments;
+            }
+          }
+        },
+        {
           name: 'ScriptConfig',
           type: 'object',
-          options: { objectTypes: [JSONData] },
+          options: { objectTypes: [JSONData, JSONArray] },
           isHidden() {
             return true;
           },
@@ -358,11 +399,46 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
             return !!this.script;
           },
           get(this: SceneNode, value) {
-            value.object[0] = this.scriptConfig ? new JSONData(null, this.scriptConfig) : null;
+            const config = normalizeScriptAttachmentConfig(this.scriptConfig);
+            value.object[0] =
+              config == null ? null : Array.isArray(config) ? new JSONArray(null, config) : new JSONData(null, config);
           },
           set(this: SceneNode, value) {
-            const data = value?.object[0] as JSONData | Record<string, unknown> | null | undefined;
-            this.scriptConfig = data instanceof JSONData ? data.data : (data ?? null);
+            const data = value?.object[0] as
+              | JSONData
+              | JSONArray
+              | Record<string, unknown>
+              | unknown[]
+              | null
+              | undefined;
+            this.scriptConfig =
+              data instanceof JSONData || data instanceof JSONArray
+                ? normalizeScriptAttachmentConfig(data.data)
+                : normalizeScriptAttachmentConfig(data);
+          }
+        },
+        {
+          name: 'ScriptConfigs',
+          type: 'object',
+          options: { objectTypes: [JSONArray] },
+          getDefaultValue(this: SceneNode) {
+            return this.scriptConfigs;
+          },
+          isHidden() {
+            return true;
+          },
+          isNullable() {
+            return true;
+          },
+          isPersistent(this: SceneNode) {
+            return this.scripts.length > 0;
+          },
+          get(this: SceneNode, value) {
+            value.object[0] = this.scriptConfigs.length > 0 ? new JSONArray(null, this.scriptConfigs) : null;
+          },
+          set(this: SceneNode, value) {
+            const data = value?.object[0] as JSONArray | unknown[] | null | undefined;
+            this.scriptConfigs = data instanceof JSONArray ? data.data : Array.isArray(data) ? data : [];
           }
         },
         {

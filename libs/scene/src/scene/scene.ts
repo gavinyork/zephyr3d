@@ -12,6 +12,11 @@ import type { Compositor } from '../posteffect';
 import type { Metadata } from 'draco3d';
 import { getDevice } from '../app/api';
 import type { IRenderable } from '../app';
+import {
+  normalizeScriptAttachmentConfig,
+  normalizeScriptAttachments,
+  ScriptAttachment
+} from './script_attachment';
 
 /**
  * Represents a renderable world that manages scene graph, spatial indexing, and environment.
@@ -70,10 +75,8 @@ export class Scene
   protected _mainCamera: DRef<Camera>;
   /** @internal Arbitrary metadata loaded with the scene (optional). */
   protected _metaData: Nullable<Metadata>;
-  /** @internal User-attached script entry (engine-defined). */
-  private _script: string;
-  /** @internal Script component configuration object (engine/editor-defined). */
-  private _scriptConfig: Nullable<object>;
+  /** @internal User-attached script entries (engine-defined). */
+  private _scripts: ScriptAttachment[];
   /**
    * Creates an instance of Scene.
    *
@@ -100,8 +103,7 @@ export class Scene
     this._rootNode.set(new SceneNode(this));
     this._rootNode.get()!.name = 'Root';
     this._metaData = null;
-    this._script = '';
-    this._scriptConfig = null;
+    this._scripts = [];
     this._mainCamera = new DRef();
   }
   /**
@@ -176,22 +178,61 @@ export class Scene
    * Integrates with the engine’s scripting system if available.
    */
   get script() {
-    return this._script;
+    return this._scripts[0]?.script ?? '';
   }
   set script(fileName: string) {
-    this._script = fileName ?? '';
-    if (!this._script) {
-      this._scriptConfig = null;
+    const script = fileName ?? '';
+    if (!script) {
+      this._scripts.splice(0, 1);
+    } else if (this._scripts[0]) {
+      this._scripts[0].script = script;
+    } else {
+      this._scripts.unshift(new ScriptAttachment(script));
     }
   }
   /**
    * Script component configuration payload used by editor/runtime script components.
    */
   get scriptConfig() {
-    return this._scriptConfig;
+    return this._scripts[0]?.config ?? null;
   }
-  set scriptConfig(value: Nullable<object>) {
-    this._scriptConfig = value ?? null;
+  set scriptConfig(value: Nullable<object | unknown[]>) {
+    const normalized = normalizeScriptAttachmentConfig(value);
+    if (this._scripts[0]) {
+      this._scripts[0].config = normalized;
+    } else if (normalized != null) {
+      this._scripts.unshift(new ScriptAttachment('', normalized));
+    }
+    if (this._scripts[0] && !this._scripts[0].script && this._scripts[0].config == null) {
+      this._scripts.splice(0, 1);
+    }
+  }
+  /**
+   * All script attachments on this scene.
+   */
+  get scripts() {
+    return this._scripts;
+  }
+  set scripts(value: ScriptAttachment[]) {
+    this._scripts = normalizeScriptAttachments(value);
+  }
+  /**
+   * Script configs for all script attachments.
+   */
+  get scriptConfigs() {
+    return this._scripts.map((item) => item.config);
+  }
+  set scriptConfigs(value: unknown[]) {
+    const next = Array.isArray(value) ? value : [];
+    for (let i = 0; i < Math.max(this._scripts.length, next.length); i++) {
+      const config = normalizeScriptAttachmentConfig(next[i]);
+      if (this._scripts[i]) {
+        this._scripts[i].config = config;
+      } else if (config != null) {
+        this._scripts.push(new ScriptAttachment('', config));
+      }
+    }
+    this._scripts = this._scripts.filter((item) => item.script || item.config != null);
   }
   /**
    * Finds a scene node by its persistent ID.

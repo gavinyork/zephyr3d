@@ -18,6 +18,11 @@ import type { ClipmapTerrain } from './terrain-cm/terrain-cm';
 import type { Metadata } from 'draco3d';
 import { getEngine } from '../app/api';
 import type { Sprite } from './sprite';
+import {
+  normalizeScriptAttachmentConfig,
+  normalizeScriptAttachments,
+  ScriptAttachment
+} from './script_attachment';
 
 /**
  * Iteration callback used by traversal helpers.
@@ -171,10 +176,8 @@ export class SceneNode
   protected _metaData: Nullable<Metadata>;
   /** @internal If greater than zero, suppress transform-change callbacks (during bulk updates). */
   private _disableCallback: number;
-  /** @internal User-attached script entry (engine-defined). */
-  private _script: string;
-  /** @internal Script component configuration object (engine/editor-defined). */
-  private _scriptConfig: Nullable<object>;
+  /** @internal User-attached script entries (engine-defined). */
+  private _scripts: ScriptAttachment[];
   /**
    * Construct a scene node.
    *
@@ -219,8 +222,7 @@ export class SceneNode
     this._disableCallback = 0;
     this._tmpLocalMatrix = Matrix4x4.identity();
     this._tmpWorldMatrix = Matrix4x4.identity();
-    this._script = '';
-    this._scriptConfig = null;
+    this._scripts = [];
     this._metaData = null;
     this._parent = null;
     this.reparent(scene?.rootNode ?? null);
@@ -334,22 +336,61 @@ export class SceneNode
    * Integrates with the engine’s scripting system if available.
    */
   get script() {
-    return this._script;
+    return this._scripts[0]?.script ?? '';
   }
   set script(fileName: string) {
-    this._script = fileName ?? '';
-    if (!this._script) {
-      this._scriptConfig = null;
+    const script = fileName ?? '';
+    if (!script) {
+      this._scripts.splice(0, 1);
+    } else if (this._scripts[0]) {
+      this._scripts[0].script = script;
+    } else {
+      this._scripts.unshift(new ScriptAttachment(script));
     }
   }
   /**
    * Script component configuration payload used by editor/runtime script components.
    */
   get scriptConfig() {
-    return this._scriptConfig;
+    return this._scripts[0]?.config ?? null;
   }
-  set scriptConfig(value: Nullable<object>) {
-    this._scriptConfig = value ?? null;
+  set scriptConfig(value: Nullable<object | unknown[]>) {
+    const normalized = normalizeScriptAttachmentConfig(value);
+    if (this._scripts[0]) {
+      this._scripts[0].config = normalized;
+    } else if (normalized != null) {
+      this._scripts.unshift(new ScriptAttachment('', normalized));
+    }
+    if (this._scripts[0] && !this._scripts[0].script && this._scripts[0].config == null) {
+      this._scripts.splice(0, 1);
+    }
+  }
+  /**
+   * All script attachments on this node.
+   */
+  get scripts() {
+    return this._scripts;
+  }
+  set scripts(value: ScriptAttachment[]) {
+    this._scripts = normalizeScriptAttachments(value);
+  }
+  /**
+   * Script configs for all script attachments.
+   */
+  get scriptConfigs() {
+    return this._scripts.map((item) => item.config);
+  }
+  set scriptConfigs(value: unknown[]) {
+    const next = Array.isArray(value) ? value : [];
+    for (let i = 0; i < Math.max(this._scripts.length, next.length); i++) {
+      const config = normalizeScriptAttachmentConfig(next[i]);
+      if (this._scripts[i]) {
+        this._scripts[i].config = config;
+      } else if (config != null) {
+        this._scripts.push(new ScriptAttachment('', config));
+      }
+    }
+    this._scripts = this._scripts.filter((item) => item.script || item.config != null);
   }
   /**
    * Display name of the node (for UI/debugging).
