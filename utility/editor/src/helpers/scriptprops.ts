@@ -165,9 +165,13 @@ function setScriptAttachments(host: ScriptHost, attachments: { script: string; c
   target.scriptConfig = (attachments[0]?.config ?? null) as ScriptConfigValue;
 }
 
-function getScriptConfigObject(host: ScriptHost, scriptPath?: string) {
+function getScriptConfigObject(host: ScriptHost, scriptPath?: string, attachmentIndex?: number) {
   if (scriptPath) {
-    const attachment = getScriptAttachments(host).find((item) => item.script === scriptPath);
+    const attachments = getScriptAttachments(host);
+    const attachment =
+      typeof attachmentIndex === 'number' && attachmentIndex >= 0
+        ? attachments[attachmentIndex]
+        : attachments.find((item) => item.script === scriptPath);
     const config = attachment?.config;
     return config && !Array.isArray(config) && typeof config === 'object'
       ? (config as Record<string, unknown>)
@@ -271,15 +275,20 @@ function readDefaultValue(
   }
 }
 
-function getConfiguredValue(host: ScriptHost, propName: string, scriptPath?: string) {
-  const config = getScriptConfigObject(host, scriptPath);
+function getConfiguredValue(host: ScriptHost, propName: string, scriptPath?: string, attachmentIndex?: number) {
+  const config = getScriptConfigObject(host, scriptPath, attachmentIndex);
   return config && Object.prototype.hasOwnProperty.call(config, propName)
     ? cloneValue(config[propName])
     : undefined;
 }
 
-function readPropertyValue(host: ScriptHost, info: RuntimeScriptPropertyInfo, scriptPath?: string) {
-  const configured = getConfiguredValue(host, info.name, scriptPath);
+function readPropertyValue(
+  host: ScriptHost,
+  info: RuntimeScriptPropertyInfo,
+  scriptPath?: string,
+  attachmentIndex?: number
+) {
+  const configured = getConfiguredValue(host, info.name, scriptPath, attachmentIndex);
   return configured !== undefined ? configured : readDefaultValue(info);
 }
 
@@ -288,13 +297,17 @@ function writeConfigValue(
   propName: string,
   next: unknown,
   defaultValue: unknown,
-  scriptPath?: string
+  scriptPath?: string,
+  attachmentIndex?: number
 ) {
   const cloned = cloneValue(next);
   const isSameDefault = isSameValue(cloned, defaultValue);
   if (scriptPath) {
     const attachments = getScriptAttachments(host);
-    let index = attachments.findIndex((item) => item.script === scriptPath);
+    let index =
+      typeof attachmentIndex === 'number' && attachmentIndex >= 0
+        ? attachmentIndex
+        : attachments.findIndex((item) => item.script === scriptPath);
     if (index < 0) {
       if (isSameDefault) {
         return;
@@ -341,9 +354,10 @@ function writeScalarPropertyValue(
   host: ScriptHost,
   info: RuntimeScriptValueDeclaration & { name: string },
   value: unknown,
-  scriptPath?: string
+  scriptPath?: string,
+  attachmentIndex?: number
 ) {
-  writeConfigValue(host, info.name, value, readDefaultValue(info), scriptPath);
+  writeConfigValue(host, info.name, value, readDefaultValue(info), scriptPath, attachmentIndex);
 }
 
 function getScalarPropertyType(type: RuntimeScriptValueType) {
@@ -442,18 +456,21 @@ function writeScalarFromInput(type: RuntimeScriptValueType, value: any) {
 class ScriptArrayElement {
   host: ScriptHost;
   scriptPath: string;
+  attachmentIndex: number;
   propertyName: string;
   index: number;
   element: RuntimeScriptArrayElementDeclaration;
   constructor(
     host: ScriptHost,
     scriptPath: string,
+    attachmentIndex: number,
     propertyName: string,
     index: number,
     element: RuntimeScriptArrayElementDeclaration
   ) {
     this.host = host;
     this.scriptPath = scriptPath;
+    this.attachmentIndex = attachmentIndex;
     this.propertyName = propertyName;
     this.index = index;
     this.element = element;
@@ -463,9 +480,10 @@ class ScriptArrayElement {
 function getArrayValue(
   host: ScriptHost,
   info: Extract<RuntimeScriptPropertyInfo, { type: 'object_array' }>,
-  scriptPath?: string
+  scriptPath?: string,
+  attachmentIndex?: number
 ) {
-  const value = readPropertyValue(host, info, scriptPath);
+  const value = readPropertyValue(host, info, scriptPath, attachmentIndex);
   return Array.isArray(value) ? cloneValue(value) : [];
 }
 
@@ -473,9 +491,10 @@ function setArrayValue(
   host: ScriptHost,
   info: Extract<RuntimeScriptPropertyInfo, { type: 'object_array' }>,
   value: unknown[],
-  scriptPath?: string
+  scriptPath?: string,
+  attachmentIndex?: number
 ) {
-  writeConfigValue(host, info.name, value, readDefaultValue(info), scriptPath);
+  writeConfigValue(host, info.name, value, readDefaultValue(info), scriptPath, attachmentIndex);
 }
 
 function getArrayElementSerializationClass(
@@ -555,6 +574,7 @@ function getArrayElementSerializationClass(
 function createScalarAccessor(
   info: Exclude<RuntimeScriptPropertyInfo, { type: 'object_array' }>,
   scriptPath: string,
+  attachmentIndex: number,
   scriptGroup?: string
 ): PropertyAccessor<ScriptHost> {
   return {
@@ -569,10 +589,16 @@ function createScalarAccessor(
       return !!this.script;
     },
     get(this: ScriptHost, value) {
-      readScalarInto(value as any, info.type, readPropertyValue(this, info, scriptPath));
+      readScalarInto(value as any, info.type, readPropertyValue(this, info, scriptPath, attachmentIndex));
     },
     set(this: ScriptHost, value) {
-      writeScalarPropertyValue(this, info, writeScalarFromInput(info.type, value as any), scriptPath);
+      writeScalarPropertyValue(
+        this,
+        info,
+        writeScalarFromInput(info.type, value as any),
+        scriptPath,
+        attachmentIndex
+      );
     }
   };
 }
@@ -580,6 +606,7 @@ function createScalarAccessor(
 function createObjectArrayAccessor(
   info: Extract<RuntimeScriptPropertyInfo, { type: 'object_array' }>,
   scriptPath: string,
+  attachmentIndex: number,
   scriptGroup?: string
 ): PropertyAccessor<ScriptHost> {
   const elementClass = getArrayElementSerializationClass(info);
@@ -603,69 +630,71 @@ function createObjectArrayAccessor(
     },
     get(this: ScriptHost, value) {
       const target = value as any;
-      const arr = getArrayValue(this, info, scriptPath);
+      const arr = getArrayValue(this, info, scriptPath, attachmentIndex);
       target.object = arr.map(
         (_item, index) =>
           new (elementClass.ctor as unknown as {
             new (
               host: ScriptHost,
               scriptPath: string,
+              attachmentIndex: number,
               propertyName: string,
               index: number,
               element: RuntimeScriptArrayElementDeclaration
             ): ScriptArrayElement;
-          })(this, scriptPath, info.name, index, info.element)
+          })(this, scriptPath, attachmentIndex, info.name, index, info.element)
       );
     },
     set(this: ScriptHost, value, index) {
       const target = value as any;
-      const arr = getArrayValue(this, info, scriptPath);
+      const arr = getArrayValue(this, info, scriptPath, attachmentIndex);
       if (typeof index === 'number' && index >= 0 && target.object?.[0] instanceof ScriptArrayElement) {
-        arr[index] = getArrayValue(this, info, scriptPath)[target.object[0].index];
+        arr[index] = getArrayValue(this, info, scriptPath, attachmentIndex)[target.object[0].index];
       } else if (target.object) {
         const next: unknown[] = [];
         for (const item of target.object) {
           if (item instanceof ScriptArrayElement) {
-            next.push(getArrayValue(this, info, scriptPath)[item.index]);
+            next.push(getArrayValue(this, info, scriptPath, attachmentIndex)[item.index]);
           }
         }
-        setArrayValue(this, info, next, scriptPath);
+        setArrayValue(this, info, next, scriptPath, attachmentIndex);
         return;
       }
-      setArrayValue(this, info, arr, scriptPath);
+      setArrayValue(this, info, arr, scriptPath, attachmentIndex);
     },
     create(this: ScriptHost, _ctor, index) {
-      const arr = getArrayValue(this, info, scriptPath);
+      const arr = getArrayValue(this, info, scriptPath, attachmentIndex);
       const insertIndex = Math.max(0, Math.min(index ?? arr.length, arr.length));
       arr.splice(insertIndex, 0, cloneValue(readDefaultValue(info.element)));
-      setArrayValue(this, info, arr, scriptPath);
+      setArrayValue(this, info, arr, scriptPath, attachmentIndex);
       return new (elementClass.ctor as unknown as {
         new (
           host: ScriptHost,
           scriptPath: string,
+          attachmentIndex: number,
           propertyName: string,
           index: number,
           element: RuntimeScriptArrayElementDeclaration
         ): ScriptArrayElement;
-      })(this, scriptPath, info.name, insertIndex, info.element);
+      })(this, scriptPath, attachmentIndex, info.name, insertIndex, info.element);
     },
     add(this: ScriptHost, value, index) {
       const target = value as any;
-      const arr = getArrayValue(this, info, scriptPath);
+      const arr = getArrayValue(this, info, scriptPath, attachmentIndex);
       const item = target.object?.[0] as ScriptArrayElement | undefined;
       const insertIndex = Math.max(0, Math.min(index ?? arr.length, arr.length));
       const nextValue =
         item instanceof ScriptArrayElement
-          ? getArrayValue(this, info, scriptPath)[item.index]
+          ? getArrayValue(this, info, scriptPath, attachmentIndex)[item.index]
           : cloneValue(readDefaultValue(info.element));
       arr.splice(insertIndex, 0, cloneValue(nextValue));
-      setArrayValue(this, info, arr, scriptPath);
+      setArrayValue(this, info, arr, scriptPath, attachmentIndex);
     },
     delete(this: ScriptHost, index) {
-      const arr = getArrayValue(this, info, scriptPath);
+      const arr = getArrayValue(this, info, scriptPath, attachmentIndex);
       if (index >= 0 && index < arr.length) {
         arr.splice(index, 1);
-        setArrayValue(this, info, arr, scriptPath);
+        setArrayValue(this, info, arr, scriptPath, attachmentIndex);
       }
     }
   };
@@ -674,11 +703,12 @@ function createObjectArrayAccessor(
 function createAccessor(
   info: RuntimeScriptPropertyInfo,
   scriptPath: string,
+  attachmentIndex: number,
   scriptGroup?: string
 ): PropertyAccessor<ScriptHost> {
   return info.type === 'object_array'
-    ? createObjectArrayAccessor(info, scriptPath, scriptGroup)
-    : createScalarAccessor(info, scriptPath, scriptGroup);
+    ? createObjectArrayAccessor(info, scriptPath, attachmentIndex, scriptGroup)
+    : createScalarAccessor(info, scriptPath, attachmentIndex, scriptGroup);
 }
 
 async function loadScriptPropertyInfo(path: string) {
@@ -709,16 +739,19 @@ function getScriptDisplayName(path: string) {
 export async function getSingleScriptPropertyAccessors(
   host: unknown,
   scriptPath: string,
+  attachmentIndex = -1,
   scriptGroup?: string
 ): Promise<PropertyAccessor<ScriptHost>[]> {
   if (!isScriptHost(host) || !scriptPath.trim()) {
     return [];
   }
-  const cacheKey = `${scriptPath}::${scriptGroup ?? ''}`;
+  const cacheKey = `${scriptPath}::${attachmentIndex}::${scriptGroup ?? ''}`;
   if (propertyCache.has(cacheKey)) {
     return propertyCache.get(cacheKey)!;
   }
-  const props = (await loadScriptPropertyInfo(scriptPath)).map((info) => createAccessor(info, scriptPath, scriptGroup));
+  const props = (await loadScriptPropertyInfo(scriptPath)).map((info) =>
+    createAccessor(info, scriptPath, attachmentIndex, scriptGroup)
+  );
   propertyCache.set(cacheKey, props);
   return props;
 }
@@ -728,8 +761,11 @@ export async function getScriptPropertyAccessors(host: unknown): Promise<Propert
     return [];
   }
   const attachments = (host as ScriptHostWithConfig).scripts ?? [];
-  const scriptPaths = attachments
-    .map((item) => String(item?.script ?? '').trim())
+  const scriptEntries = attachments
+    .map((item, index) => ({ path: String(item?.script ?? '').trim(), index }))
+    .filter((item) => !!item.path);
+  const scriptPaths = scriptEntries
+    .map((item) => item.path)
     .filter((item) => !!item);
   if (scriptPaths.length === 0) {
     const scriptPath = host.script.trim();
@@ -745,8 +781,13 @@ export async function getScriptPropertyAccessors(host: unknown): Promise<Propert
   const multipleScripts = scriptPaths.length > 1;
   const props = (
     await Promise.all(
-      scriptPaths.map((path) =>
-        getSingleScriptPropertyAccessors(host, path, multipleScripts ? getScriptDisplayName(path) : undefined)
+      (scriptEntries.length > 0 ? scriptEntries : [{ path: scriptPaths[0], index: 0 }]).map((entry) =>
+        getSingleScriptPropertyAccessors(
+          host,
+          entry.path,
+          entry.index,
+          multipleScripts ? getScriptDisplayName(entry.path) : undefined
+        )
       )
     )
   ).flat();

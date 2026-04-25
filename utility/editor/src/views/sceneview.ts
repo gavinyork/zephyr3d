@@ -2242,7 +2242,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                   this._scriptConfigEditorHost.scriptHost,
                   await getSingleScriptPropertyAccessors(
                     this._scriptConfigEditorHost.scriptHost,
-                    this._scriptConfigEditorHost.scriptPath
+                    this._scriptConfigEditorHost.scriptPath,
+                    this._selectedScriptIndex
                   )
                 )
               : []
@@ -2300,6 +2301,20 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._propGrid.refresh();
     eventBus.dispatchEvent('scene_changed');
   }
+  private moveScriptAttachment(host: Scene | SceneNode, index: number, direction: -1 | 1) {
+    const attachments = [...this.getScriptAttachments(host)];
+    const targetIndex = index + direction;
+    if (index < 0 || index >= attachments.length || targetIndex < 0 || targetIndex >= attachments.length) {
+      return;
+    }
+    const [item] = attachments.splice(index, 1);
+    attachments.splice(targetIndex, 0, item);
+    (host as any).scripts = attachments;
+    this.syncScriptConfigEditor();
+    clearScriptPropertyAccessorCache();
+    this._propGrid.refresh();
+    eventBus.dispatchEvent('scene_changed');
+  }
   private renderScriptPanel() {
     const host = this.getScriptHost();
     ImGui.Text('Scripts');
@@ -2314,8 +2329,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       ImGui.TextDisabled('No scripts attached');
     }
     if (attachments.length > 0 && ImGui.BeginTable('##ScriptList', 2, ImGui.TableFlags.SizingStretchProp)) {
+      const buttonWidth = ImGui.GetFrameHeight();
+      const actionColumnWidth = buttonWidth * 3 + ImGui.GetStyle().ItemSpacing.x * 2;
       ImGui.TableSetupColumn('Script', ImGui.TableColumnFlags.WidthStretch);
-      ImGui.TableSetupColumn('Action', ImGui.TableColumnFlags.WidthFixed, ImGui.GetFrameHeight());
+      ImGui.TableSetupColumn('Action', ImGui.TableColumnFlags.WidthFixed, actionColumnWidth);
       for (let i = 0; i < attachments.length; i++) {
         const attachment = attachments[i];
         const selected = i === this._selectedScriptIndex;
@@ -2331,11 +2348,40 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           this.syncScriptConfigEditor();
         }
         ImGui.TableNextColumn();
-        if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##remove_script_${i}`, new ImGui.ImVec2(-1, 0))) {
+        this.pushInlineActionButtonStyle();
+        if (i > 0) {
+          if (ImGui.Button(`⬆##move_script_up_${i}`, new ImGui.ImVec2(buttonWidth, 0))) {
+            this.moveScriptAttachment(host, i, -1);
+            this.popInlineActionButtonStyle();
+            ImGui.EndTable();
+            return;
+          }
+        } else {
+          ImGui.PushStyleVar(ImGui.StyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5);
+          ImGui.Button(`⬆##move_script_up_${i}`, new ImGui.ImVec2(buttonWidth, 0));
+          ImGui.PopStyleVar();
+        }
+        ImGui.SameLine();
+        if (i < attachments.length - 1) {
+          if (ImGui.Button(`⬇##move_script_down_${i}`, new ImGui.ImVec2(buttonWidth, 0))) {
+            this.moveScriptAttachment(host, i, 1);
+            this.popInlineActionButtonStyle();
+            ImGui.EndTable();
+            return;
+          }
+        } else {
+          ImGui.PushStyleVar(ImGui.StyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5);
+          ImGui.Button(`⬇##move_script_down_${i}`, new ImGui.ImVec2(buttonWidth, 0));
+          ImGui.PopStyleVar();
+        }
+        ImGui.SameLine();
+        if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##remove_script_${i}`, new ImGui.ImVec2(buttonWidth, 0))) {
+          this.popInlineActionButtonStyle();
           this.removeScriptAttachment(host, i);
           ImGui.EndTable();
           return;
         }
+        this.popInlineActionButtonStyle();
       }
       ImGui.EndTable();
     }
@@ -2352,6 +2398,20 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       }
     }
   }
+  private pushInlineActionButtonStyle() {
+    const style = ImGui.GetStyle();
+    const normal = style.Colors[ImGui.Col.FrameBg];
+    const hovered = style.Colors[ImGui.Col.FrameBgHovered];
+    const active = style.Colors[ImGui.Col.FrameBgActive];
+    ImGui.PushStyleColor(ImGui.Col.Button, new ImGui.ImVec4(normal.x, normal.y, normal.z, 1));
+    ImGui.PushStyleColor(ImGui.Col.ButtonHovered, new ImGui.ImVec4(hovered.x, hovered.y, hovered.z, 1));
+    ImGui.PushStyleColor(ImGui.Col.ButtonActive, new ImGui.ImVec4(active.x, active.y, active.z, 1));
+    ImGui.PushStyleVar(ImGui.StyleVar.FrameBorderSize, 1);
+  }
+  private popInlineActionButtonStyle() {
+    ImGui.PopStyleVar();
+    ImGui.PopStyleColor(3);
+  }
   private renderScriptListItem(id: string, text: string, selected: boolean) {
     const style = ImGui.GetStyle();
     const size = new ImGui.ImVec2(ImGui.GetContentRegionAvail().x, ImGui.GetFrameHeight());
@@ -2361,9 +2421,15 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     const rectMin = ImGui.GetItemRectMin();
     const rectMax = ImGui.GetItemRectMax();
     const bgColor = ImGui.GetColorU32(
-      selected ? ImGui.Col.Header : hovered ? ImGui.Col.FrameBgHovered : ImGui.Col.FrameBg
+      selected
+        ? hovered
+          ? ImGui.Col.HeaderHovered
+          : ImGui.Col.Header
+        : hovered
+          ? ImGui.Col.FrameBgHovered
+          : ImGui.Col.FrameBg
     );
-    const borderColor = ImGui.GetColorU32(ImGui.Col.Border);
+    const borderColor = ImGui.GetColorU32(selected ? ImGui.Col.HeaderActive : ImGui.Col.Border);
     const textColor = ImGui.GetColorU32(ImGui.Col.Text);
     drawList.AddRectFilled(rectMin, rectMax, bgColor, style.FrameRounding);
     drawList.AddRect(rectMin, rectMax, borderColor, style.FrameRounding, ImGui.DrawCornerFlags.None, 1);

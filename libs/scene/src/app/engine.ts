@@ -324,26 +324,34 @@ export class Engine {
             console.error(`Attach script failed: ${err}`);
           }
         }
-        const P: Promise<any>[] = [];
-        const scripts: string[] = [];
+        const nodes: typeof scene.rootNode[] = [];
         scene.rootNode.iterate((node) => {
+          nodes.push(node);
+        });
+        const attachTasks = nodes.map(async (node) => {
           const attachments =
-            node.scripts.length > 0 ? node.scripts : node.script ? [{ script: node.script, config: node.scriptConfig }] : [];
+            node.scripts.length > 0
+              ? node.scripts
+              : node.script
+                ? [{ script: node.script, config: node.scriptConfig }]
+                : [];
           for (const attachment of attachments) {
             if (!attachment.script) {
               continue;
             }
-            scripts.push(attachment.script);
-            P.push(this.attachScript(node, attachment.script, (attachment.config ?? null) as RuntimeScriptConfig | null));
-          }
-        });
-        if (P.length > 0) {
-          const result = await Promise.allSettled(P);
-          for (let i = 0; i < result.length; i++) {
-            if (result[i].status === 'rejected') {
-              console.error(`Attach script failed: ${scripts[i]}`);
+            try {
+              await this.attachScript(
+                node,
+                attachment.script,
+                (attachment.config ?? null) as RuntimeScriptConfig | null
+              );
+            } catch (err) {
+              console.error(`Attach script failed: ${err}`);
             }
           }
+        });
+        if (attachTasks.length > 0) {
+          await Promise.allSettled(attachTasks);
         }
       }
       return scene;
