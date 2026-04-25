@@ -24,6 +24,7 @@ type RuntimeScriptValueDeclaration = {
   default?: unknown;
   label?: string;
   group?: string;
+  hidden?: boolean;
   minValue?: number;
   maxValue?: number;
   speed?: number;
@@ -36,15 +37,25 @@ type RuntimeScriptValueDeclaration = {
     values: unknown[];
   };
 };
+type RuntimeScriptObjectFieldDeclaration = RuntimeScriptValueDeclaration & {
+  name: string;
+};
+type RuntimeScriptObjectDeclaration = {
+  type: 'object';
+  fields: RuntimeScriptObjectFieldDeclaration[];
+  default?: Record<string, unknown>;
+};
+type RuntimeScriptArrayElementDeclaration = RuntimeScriptValueDeclaration | RuntimeScriptObjectDeclaration;
 type RuntimeScriptPropertyInfo =
   | (RuntimeScriptValueDeclaration & { name: string })
   | {
       name: string;
       type: 'object_array';
-      element: RuntimeScriptValueDeclaration;
+      element: RuntimeScriptArrayElementDeclaration;
       default?: unknown[];
       label?: string;
       group?: string;
+      hidden?: boolean;
       minValue?: number;
       maxValue?: number;
       speed?: number;
@@ -60,6 +71,26 @@ type RuntimeScriptPropertyInfo =
 
 const propertyCache = new Map<string, PropertyAccessor<ScriptHost>[]>();
 const arrayElementClassCache = new Map<string, SerializableClass>();
+
+function hashString(value: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+function createArrayElementClassName(
+  info: Extract<RuntimeScriptPropertyInfo, { type: 'object_array' }>,
+  key: string
+) {
+  const baseName = String(info.label ?? info.name ?? 'Array Element')
+    .replace(/[^0-9A-Za-z_]+/g, ' ')
+    .trim();
+  const readableName = baseName.length > 0 ? baseName : 'Array Element';
+  return `${readableName} Item ${hashString(key)}`;
+}
 
 function isScriptHost(value: unknown): value is ScriptHost {
   return value instanceof Scene || value instanceof SceneNode;
@@ -77,6 +108,18 @@ function cloneValue(value: unknown) {
     return result;
   }
   return value;
+}
+
+function isObjectElementDeclaration(
+  value: RuntimeScriptValueDeclaration | RuntimeScriptPropertyInfo | RuntimeScriptArrayElementDeclaration
+): value is RuntimeScriptObjectDeclaration {
+  return value.type === 'object';
+}
+
+function isScalarElementDeclaration(
+  value: RuntimeScriptArrayElementDeclaration
+): value is RuntimeScriptValueDeclaration {
+  return value.type !== 'object';
 }
 
 function isSameValue(a: unknown, b: unknown): boolean {
@@ -140,7 +183,20 @@ function getPropertyOptions(
   };
 }
 
-function readDefaultValue(info: RuntimeScriptPropertyInfo | RuntimeScriptValueDeclaration) {
+function readDefaultValue(
+  info: RuntimeScriptPropertyInfo | RuntimeScriptValueDeclaration | RuntimeScriptObjectDeclaration
+) {
+  if (isObjectElementDeclaration(info)) {
+    const objInfo = info;
+    if (objInfo.default !== undefined) {
+      return cloneValue(objInfo.default);
+    }
+    const result: Record<string, unknown> = {};
+    for (const field of objInfo.fields) {
+      result[field.name] = readDefaultValue(field);
+    }
+    return result;
+  }
   if (info.default !== undefined) {
     return cloneValue(info.default);
   }
@@ -306,8 +362,13 @@ class ScriptArrayElement {
   host: ScriptHost;
   propertyName: string;
   index: number;
-  element: RuntimeScriptValueDeclaration;
-  constructor(host: ScriptHost, propertyName: string, index: number, element: RuntimeScriptValueDeclaration) {
+  element: RuntimeScriptArrayElementDeclaration;
+  constructor(
+    host: ScriptHost,
+    propertyName: string,
+    index: number,
+    element: RuntimeScriptArrayElementDeclaration
+  ) {
     this.host = host;
     this.propertyName = propertyName;
     this.index = index;
@@ -339,25 +400,62 @@ function getArrayElementSerializationClass(
   const cls = class ScriptArrayElementWrapper extends ScriptArrayElement {};
   const serializationClass: SerializableClass = {
     ctor: cls as unknown as GenericConstructor,
-    name: `ScriptArrayElement_${key}`,
+    name: createArrayElementClassName(info, key),
     noTitle: true,
     getProps() {
-      return [
-        {
-          name: 'Value',
-          type: getScalarPropertyType(info.element.type),
-          options: getPropertyOptions(info.element),
-          get(this: ScriptArrayElement, value) {
-            const data = getArrayValue(this.host, info)[this.index];
-            readScalarInto(value as any, info.element.type, data);
-          },
-          set(this: ScriptArrayElement, value) {
-            const arr = getArrayValue(this.host, info);
-            arr[this.index] = writeScalarFromInput(info.element.type, value as any);
-            setArrayValue(this.host, info, arr);
+      if (isScalarElementDeclaration(info.element)) {
+        const scalarElement = info.element;
+        return [
+          {
+            name: 'Value',
+            type: getScalarPropertyType(scalarElement.type),
+            options: getPropertyOptions(scalarElement),
+            isHidden() {
+              return !!scalarElement.hidden;
+            },
+            get(this: ScriptArrayElement, value) {
+              const data = getArrayValue(this.host, info)[this.index];
+              readScalarInto(value as any, scalarElement.type, data);
+            },
+            set(this: ScriptArrayElement, value) {
+              const arr = getArrayValue(this.host, info);
+              arr[this.index] = writeScalarFromInput(scalarElement.type, value as any);
+              setArrayValue(this.host, info, arr);
+            }
           }
-        }
-      ] as PropertyAccessor<any>[];
+        ] as PropertyAccessor<any>[];
+      }
+      const objectElement = info.element;
+      return objectElement.fields.map(
+        (field) =>
+          ({
+            name: field.name,
+            type: getScalarPropertyType(field.type),
+            options: getPropertyOptions(field),
+            isHidden() {
+              return !!field.hidden;
+            },
+            get(this: ScriptArrayElement, value) {
+              const item = getArrayValue(this.host, info)[this.index];
+              const data =
+                item && typeof item === 'object' && !Array.isArray(item)
+                  ? (item as Record<string, unknown>)[field.name]
+                  : undefined;
+              readScalarInto(value as any, field.type, data ?? readDefaultValue(field));
+            },
+            set(this: ScriptArrayElement, value) {
+              const arr = getArrayValue(this.host, info);
+              const current = arr[this.index];
+              const next =
+                current && typeof current === 'object' && !Array.isArray(current)
+                  ? { ...(current as Record<string, unknown>) }
+                  : ((readDefaultValue(objectElement) as Record<string, unknown>) ?? {});
+              next[field.name] = writeScalarFromInput(field.type, value as any);
+              arr[this.index] = next;
+              setArrayValue(this.host, info, arr);
+            }
+          }) as PropertyAccessor<any>
+      );
     }
   };
   getEngine().resourceManager.registerClass(serializationClass);
@@ -374,7 +472,7 @@ function createScalarAccessor(
     default: cloneValue(info.default),
     options: getPropertyOptions(info),
     isHidden(this: ScriptHost) {
-      return !this.script;
+      return !this.script || !!info.hidden;
     },
     isPersistent(this: ScriptHost) {
       return !!this.script;
@@ -402,7 +500,7 @@ function createObjectArrayAccessor(
       inlineObjectArray: true
     },
     isHidden(this: ScriptHost) {
-      return !this.script;
+      return !this.script || !!info.hidden;
     },
     isPersistent(this: ScriptHost) {
       return !!this.script;
@@ -420,7 +518,7 @@ function createObjectArrayAccessor(
               host: ScriptHost,
               propertyName: string,
               index: number,
-              element: RuntimeScriptValueDeclaration
+              element: RuntimeScriptArrayElementDeclaration
             ): ScriptArrayElement;
           })(this, info.name, index, info.element)
       );
@@ -452,7 +550,7 @@ function createObjectArrayAccessor(
           host: ScriptHost,
           propertyName: string,
           index: number,
-          element: RuntimeScriptValueDeclaration
+          element: RuntimeScriptArrayElementDeclaration
         ): ScriptArrayElement;
       })(this, info.name, insertIndex, info.element);
     },

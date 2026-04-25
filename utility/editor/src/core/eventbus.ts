@@ -7,6 +7,7 @@ type EventBusEventMap = {
   resize: [width: number, height: number];
   update: [frameElapsed: number];
   scene_changed: [];
+  refresh_properties: [];
   shortcut: [key: string];
   project_closed: [uuid: string];
   project_opened: [uuid: string];

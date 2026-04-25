@@ -145,6 +145,24 @@ export class SystemPluginService {
       .sort((a, b) => a.path.localeCompare(b.path));
   }
 
+  static async readPluginTextFile(id: string, relativePath: string): Promise<string> {
+    const plugin = await this.getPlugin(id);
+    if (!plugin) {
+      throw new Error(`System plugin '${id}' is not installed`);
+    }
+    const normalizedRelativePath = this.normalizePluginFilePath(relativePath);
+    if (!normalizedRelativePath) {
+      throw new Error('Plugin file path must not be empty');
+    }
+    const fullPath = systemPluginVFS.normalizePath(
+      systemPluginVFS.join(plugin.packageDir, normalizedRelativePath)
+    );
+    if (!(await systemPluginVFS.exists(fullPath))) {
+      throw new Error(`Plugin file '${normalizedRelativePath}' does not exist`);
+    }
+    return (await systemPluginVFS.readFile(fullPath, { encoding: 'utf8' })) as string;
+  }
+
   static async listPluginDirectories(id: string): Promise<SystemPluginDirectoryRecord[]> {
     const plugin = await this.getPlugin(id);
     if (!plugin) {

@@ -270,6 +270,7 @@ export class PropertyEditor extends Observable<{
     newValue: RequireOptionals<PropertyValue>
   ];
 }> {
+  static readonly defaultExtraPropertyProviderId = '__default__';
   private _rootGroup: PropertyGroup;
   private readonly _labelPercent: number;
   private _dragging: boolean;
@@ -277,7 +278,8 @@ export class PropertyEditor extends Observable<{
   private _editSessions: Map<string, RequireOptionals<PropertyValue>>;
   private _activeStringEditors: Set<string>;
   private _pendingStringEditorFocus: Nullable<string>;
-  private _extraPropertiesProvider: Nullable<
+  private readonly _extraPropertiesProviders: Map<
+    string,
     (object: any) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>
   >;
   private _extraPropertiesVersion: number;
@@ -290,7 +292,7 @@ export class PropertyEditor extends Observable<{
     this._editSessions = new Map();
     this._activeStringEditors = new Set();
     this._pendingStringEditorFocus = null;
-    this._extraPropertiesProvider = null;
+    this._extraPropertiesProviders = new Map();
     this._extraPropertiesVersion = 0;
   }
   get object(): any {
@@ -298,7 +300,7 @@ export class PropertyEditor extends Observable<{
   }
   set object(value: any) {
     this._rootGroup.setObject(value);
-    if (this._extraPropertiesProvider) {
+    if (this._extraPropertiesProviders.size > 0) {
       const version = ++this._extraPropertiesVersion;
       void this.appendExtraProperties(value, version);
     }
@@ -309,7 +311,22 @@ export class PropertyEditor extends Observable<{
   set extraPropertiesProvider(
     provider: Nullable<(object: any) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>>
   ) {
-    this._extraPropertiesProvider = provider;
+    if (provider) {
+      this._extraPropertiesProviders.set(PropertyEditor.defaultExtraPropertyProviderId, provider);
+    } else {
+      this._extraPropertiesProviders.delete(PropertyEditor.defaultExtraPropertyProviderId);
+    }
+    this.refresh();
+  }
+  setExtraPropertiesProvider(
+    id: string,
+    provider: Nullable<(object: any) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>>
+  ) {
+    if (provider) {
+      this._extraPropertiesProviders.set(id, provider);
+    } else {
+      this._extraPropertiesProviders.delete(id);
+    }
     this.refresh();
   }
   clear() {
@@ -328,15 +345,19 @@ export class PropertyEditor extends Observable<{
     await this.appendExtraProperties(object, version);
   }
   private async appendExtraProperties(object: any, version: number) {
-    if (!object || !this._extraPropertiesProvider) {
+    if (!object || this._extraPropertiesProviders.size === 0) {
       return;
     }
-    const extraProps = await this._extraPropertiesProvider(object);
+    const results = await Promise.all(
+      [...this._extraPropertiesProviders.values()].map((provider) => Promise.resolve(provider(object)))
+    );
     if (version !== this._extraPropertiesVersion || object !== this.object) {
       return;
     }
-    for (const prop of extraProps ?? []) {
-      this._rootGroup.addProperty(object, prop);
+    for (const extraProps of results) {
+      for (const prop of extraProps ?? []) {
+        this._rootGroup.addProperty(object, prop);
+      }
     }
   }
   render() {
@@ -421,6 +442,7 @@ export class PropertyEditor extends Observable<{
         (group.prop.type === 'object' || group.index < group.count);
       const addable = group.prop.type === 'object_array' && !!group.prop.add;
       const deletable = group.prop.type === 'object_array' && group.prop.delete && group.index < group.count;
+      const showTypeSelector = group.objectTypes.length > 1;
 
       const buttonSize = ImGui.GetFrameHeight();
       const spacing =
@@ -429,10 +451,10 @@ export class PropertyEditor extends Observable<{
         (addable ? buttonSize : 0) +
         (deletable ? buttonSize : 0);
       ImGui.TableNextColumn();
-      if (settable || addable || deletable || editable) {
+      if (showTypeSelector || settable || addable || deletable || editable) {
         ImGui.BeginChild('', new ImGui.ImVec2(-1, ImGui.GetFrameHeight()));
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - spacing);
-        if (group.objectTypes.length > 0) {
+        if (showTypeSelector) {
+          ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().x - spacing);
           ImGui.Combo(
             '',
             group.selected,
@@ -501,6 +523,89 @@ export class PropertyEditor extends Observable<{
           if (editable) {
             ImGui.SameLine(0, 0);
             if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(-1, 0))) {
+              if (group.prop.options?.edit === 'aabb') {
+                this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
+              } else if (group.prop.options?.edit === 'proptrack') {
+                const animation: unknown = group.object;
+                ASSERT(
+                  animation instanceof AnimationClip,
+                  'PropertyTrack can only be edited in AnimationClip'
+                );
+                ASSERT(group.value.object[0] instanceof PropertyTrack);
+                const node = animation.animationSet.model;
+                this.dispatchEvent(
+                  'request_edit_track',
+                  group.value.object[0],
+                  getEngine().resourceManager.findAnimationTarget(node, group.value.object[0])!
+                );
+              }
+            }
+          }
+        } else {
+          if (settable) {
+            if (ImGui.Button(`${FontGlyph.glyphs['ok']}##set`, new ImGui.ImVec2(buttonSize, 0))) {
+              const ctor = group.objectTypes[0]?.ctor;
+              const newObj = ctor
+                ? group.prop.create
+                  ? group.prop.create.call(group.object, ctor, group.index)
+                  : new ctor()
+                : null;
+              const value = { object: [newObj], str: [], bool: [], num: [] };
+              group.prop.set!.call(group.object, value, group.index);
+              this.dispatchEvent('object_property_changed', group.object, group.prop);
+              this.refresh();
+            }
+          }
+          if (addable) {
+            if (settable) {
+              ImGui.SameLine(0, 0);
+            }
+            if (ImGui.Button(`${FontGlyph.glyphs['plus']}##add`, new ImGui.ImVec2(buttonSize, 0))) {
+              const ctor = group.objectTypes[0]?.ctor;
+              const newObj = ctor
+                ? group.prop.create
+                  ? group.prop.create.call(group.object, ctor, group.index)
+                  : new ctor()
+                : null;
+              (group.prop.add<'object'>).call(group.object, { object: [newObj] }, group.index);
+              this.dispatchEvent('object_property_changed', group.object, group.prop);
+              this.refresh();
+            }
+          }
+          if (deletable) {
+            if (settable || addable) {
+              ImGui.SameLine(0, 0);
+            }
+            if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##delete`, new ImGui.ImVec2(buttonSize, 0))) {
+              group.prop.delete!.call(group.object, group.index);
+              this.dispatchEvent('object_property_changed', group.object, group.prop);
+              this.refresh();
+              if (editable) {
+                if (group.prop.options?.edit === 'aabb') {
+                  this.dispatchEvent('end_edit_aabb', group.value.object[0] as AABB);
+                } else if (group.prop.options?.edit === 'proptrack') {
+                  const animation: unknown = group.object;
+                  ASSERT(
+                    animation instanceof AnimationClip,
+                    'PropertyTrack can only be edited in AnimationClip'
+                  );
+                  ASSERT(group.value.object[0] instanceof PropertyTrack);
+                  const node = animation.animationSet.model;
+                  this.dispatchEvent(
+                    'end_edit_track',
+                    group.value.object[0],
+                    getEngine().resourceManager.findAnimationTarget(node, group.value.object[0])!,
+                    false
+                  );
+                }
+              }
+            }
+          }
+          if (editable) {
+            if (settable || addable || deletable) {
+              ImGui.SameLine(0, 0);
+            }
+            if (ImGui.Button(`${FontGlyph.glyphs['pencil']}##edit`, new ImGui.ImVec2(buttonSize, 0))) {
               if (group.prop.options?.edit === 'aabb') {
                 this.dispatchEvent('request_edit_aabb', group.value.object[0] as AABB);
               } else if (group.prop.options?.edit === 'proptrack') {

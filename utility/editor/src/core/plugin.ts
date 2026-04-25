@@ -11,6 +11,7 @@ import type { EditTool, EditToolContext } from '../views/edittools/edittool';
 import { TerrainEditTool } from '../views/edittools/terrain';
 import { ProjectService, type ProjectSettings } from './services/project';
 import { DlgMessage } from '../views/dlg/messagedlg';
+import { eventBus } from './eventbus';
 
 class EditorPluginSubscription extends Disposable {
   private readonly _disposeCallback: () => void;
@@ -98,6 +99,10 @@ export type EditorEditToolFactoryContext = EditToolContext & {
   editor: Editor;
 };
 
+export type EditorPropertyAccessorProvider = (
+  object: unknown
+) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>;
+
 export type EditorEventMap = {
   pluginContributionsChanged: [];
   sceneOpening: [path: string];
@@ -131,6 +136,7 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
   private readonly _contextMenuItems: EditorMenuContribution[] = [];
   private readonly _toolbarItems: EditorToolbarContribution[] = [];
   private readonly _editToolFactories: EditorEditToolFactory[] = [];
+  private readonly _propertyAccessorProviders = new Map<string, EditorPropertyAccessorProvider>();
 
   constructor(editor: Editor) {
     super();
@@ -238,6 +244,26 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
     };
   }
 
+  addPropertyAccessorProvider(id: string, provider: EditorPropertyAccessorProvider) {
+    if (this._propertyAccessorProviders.has(id)) {
+      throw new Error(`Editor property accessor provider '${id}' already registered`);
+    }
+    this._propertyAccessorProviders.set(id, provider);
+    this.dispatchContributionChanged();
+    return () => {
+      if (this._propertyAccessorProviders.delete(id)) {
+        this.dispatchContributionChanged();
+      }
+    };
+  }
+
+  async getPropertyAccessors(object: unknown) {
+    const results = await Promise.all(
+      [...this._propertyAccessorProviders.values()].map((provider) => Promise.resolve(provider(object)))
+    );
+    return results.flatMap((props) => props ?? []);
+  }
+
   getContextMenuItems(location: EditorMenuLocation, ctx: EditorMenuContext) {
     return this._contextMenuItems
       .filter((contribution) => contribution.location === location)
@@ -324,8 +350,14 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
       editor: this._editor,
       events: this,
       project: {
+        isReadOnly: () => this._editor.isProjectReadOnly(),
         getSettings: () => ProjectService.getCurrentProjectSettings(),
-        saveSettings: (settings) => ProjectService.saveCurrentProjectSettings(settings)
+        saveSettings: (settings) => ProjectService.saveCurrentProjectSettings(settings),
+        exists: (path) => this._editor.projectFileExists(path),
+        ensureDirectory: (path) => this._editor.ensureProjectDirectory(path),
+        readText: (path) => this._editor.readProjectTextFile(path),
+        writeText: (path, content) => this._editor.writeProjectTextFile(path, content),
+        openCode: (path, language) => this._editor.openProjectCodeFile(path, language)
       },
       system: {
         getState: <T = unknown>() => this._editor.getPluginState<T>(plugin.id),
@@ -334,6 +366,8 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
       ui: {
         message: (title, message, width, height) => DlgMessage.messageBox(title, message, width, height)
       },
+      refreshProperties: () => eventBus.dispatchEvent('refresh_properties'),
+      notifySceneChanged: () => eventBus.dispatchEvent('scene_changed'),
       registerMenuItems: (contribution) => {
         const dispose = this.addMenuItems(contribution);
         context.subscriptions.push(new EditorPluginSubscription(dispose));
@@ -346,6 +380,11 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
       },
       registerEditTool: (factory) => {
         const dispose = this.addEditToolFactory(factory);
+        context.subscriptions.push(new EditorPluginSubscription(dispose));
+        return dispose;
+      },
+      registerPropertyAccessors: (providerId, provider) => {
+        const dispose = this.addPropertyAccessorProvider(`${plugin.id}:${providerId}`, provider);
         context.subscriptions.push(new EditorPluginSubscription(dispose));
         return dispose;
       },
@@ -401,8 +440,14 @@ export type EditorPluginContext = {
   editor: Editor;
   events: EditorPluginManager;
   project: {
+    isReadOnly(): boolean;
     getSettings(): Promise<ProjectSettings>;
     saveSettings(settings: ProjectSettings): Promise<void>;
+    exists(path: string): Promise<boolean>;
+    ensureDirectory(path: string): Promise<void>;
+    readText(path: string): Promise<Nullable<string>>;
+    writeText(path: string, content: string): Promise<void>;
+    openCode(path: string, language?: string): Promise<void>;
   };
   system: {
     getState<T = unknown>(): Promise<Nullable<T>>;
@@ -411,9 +456,12 @@ export type EditorPluginContext = {
   ui: {
     message(title: string, message: string, width?: number, height?: number): Promise<void>;
   };
+  refreshProperties(): void;
+  notifySceneChanged(): void;
   registerMenuItems(contribution: EditorMenuContribution): () => void;
   registerToolbarItem(item: EditorToolbarContribution): () => void;
   registerEditTool(factory: EditorEditToolFactory): () => void;
+  registerPropertyAccessors(id: string, provider: EditorPropertyAccessorProvider): () => void;
   /**
    * Subscribe to editor events. Subscriptions are automatically disposed when the plugin is deactivated.
    */

@@ -10,6 +10,7 @@ export type {
   EditorMenuContribution,
   EditorMenuItem,
   EditorMenuLocation,
+  EditorPropertyAccessorProvider,
   EditorPlugin,
   EditorPluginContext,
   EditorProjectInfo,

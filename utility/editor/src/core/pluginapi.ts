@@ -52,6 +52,8 @@ export type EditorEditToolFactory = {
   priority?: number;
 };
 
+export type EditorPropertyAccessorProvider = (object: unknown) => unknown[] | Promise<unknown[]>;
+
 export type EditorSceneContext = {
   editor: EditorHost;
   scene: unknown | null;
@@ -120,8 +122,14 @@ export type EditorPluginContext = {
   editor: EditorHost;
   events: EditorEventSource;
   project: {
+    isReadOnly(): boolean;
     getSettings(): Promise<Record<string, unknown> | null>;
     saveSettings(settings: Record<string, unknown>): Promise<void>;
+    exists(path: string): Promise<boolean>;
+    ensureDirectory(path: string): Promise<void>;
+    readText(path: string): Promise<string | null>;
+    writeText(path: string, content: string): Promise<void>;
+    openCode(path: string, language?: string): Promise<void>;
   };
   system: {
     getState<T = unknown>(): Promise<T | null>;
@@ -130,9 +138,12 @@ export type EditorPluginContext = {
   ui: {
     message(title: string, message: string, width?: number, height?: number): Promise<void>;
   };
+  refreshProperties(): void;
+  notifySceneChanged(): void;
   registerMenuItems(contribution: EditorMenuContribution): () => void;
   registerToolbarItem(item: EditorToolbarContribution): () => void;
   registerEditTool(factory: EditorEditToolFactory): () => void;
+  registerPropertyAccessors(id: string, provider: EditorPropertyAccessorProvider): () => void;
   on<K extends keyof EditorEventMap>(
     type: K,
     listener: (...args: EditorEventMap[K]) => void,

@@ -180,6 +180,9 @@ export class Scene
   }
   set script(fileName: string) {
     this._script = fileName ?? '';
+    if (!this._script) {
+      this._scriptConfig = null;
+    }
   }
   /**
    * Script component configuration payload used by editor/runtime script components.

@@ -1,0 +1,1083 @@
+import { Disposable, DRef, Vector3, type Nullable } from '@zephyr3d/base';
+import { PBPrimitiveType } from '@zephyr3d/device';
+import { ImGui } from '@zephyr3d/imgui';
+import type { Camera } from '@zephyr3d/scene';
+import { Mesh, SceneNode } from '@zephyr3d/scene';
+import type { EditorEditToolFactoryContext, EditorPluginContext } from '@zephyr3d/editor/editor-plugin';
+import type { ClothWeightState } from './paint-command';
+import { ClothWeightPaintCommand } from './paint-command';
+import {
+  clamp01,
+  collectClothTargetMeshes,
+  findClothPaintHost,
+  parseLegacyPinnedVertexIndices,
+  parsePinnedVertexMap,
+  parseVertexWeights,
+  serializePinnedVertexMap,
+  serializeVertexWeights
+} from './shared';
+
+type EditToolLike = {
+  handlePointerEvent(evt: PointerEvent, hitObject: unknown, hitPos: Vector3): boolean;
+  handleKeyboardEvent(evt: KeyboardEvent): boolean;
+  render(): void;
+  update(dt: number): void;
+  getSubMenuItems(): unknown[];
+  getToolBarItems(): unknown[];
+  getTarget(): unknown;
+  dispose(): void;
+};
+
+type ClothPaintMode = 'pin' | 'unpin' | 'smooth' | 'set';
+type ClothMeshData = {
+  vertexCount: number;
+  positions: Nullable<Float32Array>;
+  basePositions: Nullable<Float32Array>;
+  blendIndices: Nullable<Float32Array>;
+  blendWeights: Nullable<Float32Array>;
+  indexData: Nullable<Uint32Array>;
+  adjacency: Nullable<number[][]>;
+  loading: boolean;
+  error: string;
+  primitiveSignature: string;
+};
+
+const MAX_WEIGHT_OVERLAY_POINTS = 6000;
+
+function sameClothWeightState(a: ClothWeightState, b: ClothWeightState) {
+  return (
+    a.vertexPinWeightsByTarget === b.vertexPinWeightsByTarget &&
+    a.pinnedVertexIndicesByTarget === b.pinnedVertexIndicesByTarget
+  );
+}
+
+async function readMeshVertexAttributeData(
+  mesh: Mesh,
+  semantic: 'position' | 'blendIndices' | 'blendWeights',
+  minComponents: number
+): Promise<Nullable<Float32Array>> {
+  const primitive = mesh.primitive;
+  if (!primitive) {
+    throw new Error('Mesh has no primitive.');
+  }
+  const info = primitive.getVertexBufferInfo(semantic);
+  if (!info) {
+    return null;
+  }
+  if (
+    !info.type.isPrimitiveType() ||
+    info.type.scalarType !== PBPrimitiveType.F32 ||
+    info.type.cols < minComponents
+  ) {
+    throw new Error(`Only float ${semantic} buffers are supported.`);
+  }
+  const bytes = await info.buffer.getBufferSubData();
+  const raw = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
+  const stride = info.stride >> 2;
+  const drawOffset = (info.drawOffset + info.offset) >> 2;
+  const vertexCount = primitive.getNumVertices();
+  const positions = new Float32Array(vertexCount * minComponents);
+  for (let i = 0; i < vertexCount; i++) {
+    const src = drawOffset + i * stride;
+    const dst = i * minComponents;
+    for (let c = 0; c < minComponents; c++) {
+      positions[dst + c] = raw[src + c];
+    }
+  }
+  return positions;
+}
+
+async function readMeshPositionData(mesh: Mesh): Promise<Float32Array> {
+  const positions = await readMeshVertexAttributeData(mesh, 'position', 3);
+  if (!positions) {
+    throw new Error('Mesh has no position buffer.');
+  }
+  return positions;
+}
+
+async function readMeshSkinningData(mesh: Mesh) {
+  const [blendIndices, blendWeights] = await Promise.all([
+    readMeshVertexAttributeData(mesh, 'blendIndices', 4),
+    readMeshVertexAttributeData(mesh, 'blendWeights', 4)
+  ]);
+  return {
+    blendIndices,
+    blendWeights
+  };
+}
+
+function buildNonIndexedTriangles(mesh: Mesh, vertexCount: number) {
+  const primitive = mesh.primitive;
+  if (!primitive || primitive.primitiveType !== 'triangle-list') {
+    throw new Error('Only triangle-list cloth meshes are supported.');
+  }
+  const start = primitive.indexStart;
+  const count = primitive.indexCount;
+  if (count <= 0 || count % 3 !== 0 || start < 0 || start + count > vertexCount) {
+    throw new Error('Invalid non-indexed triangle range.');
+  }
+  const indices = new Uint32Array(count);
+  for (let i = 0; i < count; i++) {
+    indices[i] = start + i;
+  }
+  return indices;
+}
+
+async function readMeshIndexData(mesh: Mesh): Promise<Uint32Array> {
+  const primitive = mesh.primitive;
+  if (!primitive) {
+    throw new Error('Mesh has no primitive.');
+  }
+  if (primitive.primitiveType !== 'triangle-list') {
+    throw new Error('Only triangle-list cloth meshes are supported.');
+  }
+  const vertexCount = primitive.getNumVertices();
+  const indexBuffer = primitive.getIndexBuffer();
+  if (!indexBuffer) {
+    return buildNonIndexedTriangles(mesh, vertexCount);
+  }
+  const start = primitive.indexStart;
+  const count = primitive.indexCount;
+  const bytes = await indexBuffer.getBufferSubData();
+  if (indexBuffer.indexType.primitiveType === PBPrimitiveType.U16) {
+    const src = new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 1);
+    if (count <= 0 || count % 3 !== 0 || start < 0 || start + count > src.length) {
+      throw new Error('Invalid index buffer range.');
+    }
+    const out = new Uint32Array(count);
+    for (let i = 0; i < count; i++) {
+      out[i] = src[start + i];
+    }
+    return out;
+  }
+  const src = new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
+  if (count <= 0 || count % 3 !== 0 || start < 0 || start + count > src.length) {
+    throw new Error('Invalid index buffer range.');
+  }
+  return src.slice(start, start + count);
+}
+
+function buildVertexAdjacency(vertexCount: number, indexData: Uint32Array) {
+  const adjacencySets = Array.from({ length: vertexCount }, () => new Set<number>());
+  for (let i = 0; i + 2 < indexData.length; i += 3) {
+    const a = indexData[i];
+    const b = indexData[i + 1];
+    const c = indexData[i + 2];
+    if (a >= vertexCount || b >= vertexCount || c >= vertexCount) {
+      continue;
+    }
+    if (a !== b) {
+      adjacencySets[a].add(b);
+      adjacencySets[b].add(a);
+    }
+    if (b !== c) {
+      adjacencySets[b].add(c);
+      adjacencySets[c].add(b);
+    }
+    if (c !== a) {
+      adjacencySets[c].add(a);
+      adjacencySets[a].add(c);
+    }
+  }
+  return adjacencySets.map((neighbors) => [...neighbors]);
+}
+
+class ClothPaintTool extends Disposable implements EditToolLike {
+  private readonly _host: DRef<SceneNode>;
+  private readonly _ctx: EditorEditToolFactoryContext;
+  private readonly _targets: Mesh[];
+  private readonly _meshData: Map<Mesh, ClothMeshData>;
+  private _activeTargetIndex: number;
+  private _paintMode: ClothPaintMode;
+  private _brushRadius: number;
+  private _brushFalloff: number;
+  private _brushStrength: number;
+  private _brushValue: number;
+  private _strokeActive: boolean;
+  private _strokeStartState: Nullable<ClothWeightState>;
+  private _lastStrokePos: Nullable<Vector3>;
+  private _hoverHitPos: Nullable<Vector3>;
+  private _vertexWeights: Map<number, number>;
+  private readonly _tmpLocalPos: Vector3;
+  private readonly _tmpWorldPos: Vector3;
+  private readonly _tmpCameraAxisX: Vector3;
+  private readonly _tmpCameraAxisY: Vector3;
+  private readonly _tmpNdcPos: Vector3;
+  private readonly _tmpScreenPos: Vector3;
+
+  constructor(host: SceneNode, ctx: EditorEditToolFactoryContext, preferredTarget?: Nullable<Mesh>) {
+    super();
+    this._host = new DRef(host);
+    this._ctx = ctx;
+    this._targets = collectClothTargetMeshes(host);
+    this._meshData = new Map();
+    this._activeTargetIndex = Math.max(
+      0,
+      preferredTarget ? this._targets.findIndex((mesh) => mesh === preferredTarget) : 0
+    );
+    if (this._activeTargetIndex < 0) {
+      this._activeTargetIndex = 0;
+    }
+    this._paintMode = 'pin';
+    this._brushRadius = 0.1;
+    this._brushFalloff = 0.35;
+    this._brushStrength = 0.1;
+    this._brushValue = 1;
+    this._strokeActive = false;
+    this._strokeStartState = null;
+    this._lastStrokePos = null;
+    this._hoverHitPos = null;
+    this._vertexWeights = new Map();
+    this._tmpLocalPos = new Vector3();
+    this._tmpWorldPos = new Vector3();
+    this._tmpCameraAxisX = new Vector3();
+    this._tmpCameraAxisY = new Vector3();
+    this._tmpNdcPos = new Vector3();
+    this._tmpScreenPos = new Vector3();
+    this.syncVertexWeightsFromConfig();
+    this.ensureActiveMeshData();
+  }
+
+  handlePointerEvent(evt: PointerEvent, hitObject: unknown, hitPos: Vector3): boolean {
+    if (!this._host.get() || this._targets.length === 0) {
+      return false;
+    }
+    const hitMesh = this.resolveHitMesh(hitObject);
+    if (hitMesh) {
+      this.setActiveTarget(hitMesh);
+    }
+    this.updateHoverHit(hitMesh, hitPos);
+    if (evt.type === 'pointerup' && evt.button === 0) {
+      const handled = this._strokeActive;
+      this.finishStroke();
+      return handled;
+    }
+    if (evt.type === 'pointermove' && (evt.buttons & 1) === 0) {
+      const handled = this._strokeActive;
+      this.finishStroke();
+      return handled;
+    }
+    if (ImGui.GetIO().WantCaptureMouse) {
+      return false;
+    }
+    if (evt.type === 'pointerdown' && evt.button === 0) {
+      if (!hitPos || !this.getActiveTarget() || hitMesh !== this.getActiveTarget()) {
+        return false;
+      }
+      this.beginStroke();
+      this.applyBrushDab(hitPos);
+      return true;
+    }
+    if (evt.type === 'pointermove' && this._strokeActive) {
+      if (hitPos && hitMesh === this.getActiveTarget()) {
+        this.applyBrushDab(hitPos);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  handleKeyboardEvent(_evt: KeyboardEvent): boolean {
+    return false;
+  }
+
+  render(): void {
+    const activeMesh = this.getActiveTarget();
+    const meshInfo = activeMesh ? (this._meshData.get(activeMesh) ?? null) : null;
+    if (ImGui.Begin('Cloth Paint', null, ImGui.WindowFlags.AlwaysAutoResize | ImGui.WindowFlags.NoResize)) {
+      ImGui.Dummy(new ImGui.ImVec2(320, 0));
+      ImGui.Text('Brush weight painting for GPU cloth.');
+      if (this._targets.length > 1) {
+        const current = [this._activeTargetIndex] as [number];
+        if (
+          ImGui.Combo(
+            'Target Mesh',
+            current,
+            this._targets.map((mesh, index) => this.getMeshLabel(mesh, index))
+          )
+        ) {
+          this._activeTargetIndex = current[0];
+          this.syncVertexWeightsFromConfig();
+          this.ensureActiveMeshData();
+        }
+      } else if (activeMesh) {
+        ImGui.Text(`Target: ${this.getMeshLabel(activeMesh, this._activeTargetIndex)}`);
+      }
+      const modeIndex = [
+        this._paintMode === 'pin' ? 0 : this._paintMode === 'unpin' ? 1 : this._paintMode === 'smooth' ? 2 : 3
+      ] as [number];
+      if (ImGui.Combo('Mode', modeIndex, ['Pin', 'Unpin', 'Smooth', 'Set'])) {
+        this._paintMode =
+          modeIndex[0] === 0 ? 'pin' : modeIndex[0] === 1 ? 'unpin' : modeIndex[0] === 2 ? 'smooth' : 'set';
+      }
+      const radius = [this._brushRadius] as [number];
+      if (ImGui.SliderFloat('Radius', radius, 0.01, 2, '%.2f')) {
+        this._brushRadius = Math.max(0.01, radius[0]);
+      }
+      const strength = [this._brushStrength] as [number];
+      if (ImGui.SliderFloat('Strength', strength, 0, 1, '%.2f')) {
+        this._brushStrength = clamp01(strength[0]);
+      }
+      if (this._paintMode === 'set') {
+        const value = [this._brushValue] as [number];
+        if (ImGui.SliderFloat('Value', value, 0, 1, '%.2f')) {
+          this._brushValue = clamp01(value[0]);
+        }
+      }
+      const falloff = [this._brushFalloff] as [number];
+      if (ImGui.SliderFloat('Falloff', falloff, 0, 1, '%.2f')) {
+        this._brushFalloff = clamp01(falloff[0]);
+      }
+      ImGui.TextColored(new ImGui.ImVec4(0.95, 0.35, 0.35, 1), 'Fixed = Red');
+      ImGui.SameLine();
+      ImGui.TextColored(new ImGui.ImVec4(0.35, 0.95, 0.4, 1), 'Active = Green');
+      ImGui.Text(
+        this._paintMode === 'set'
+          ? 'Brush Preview: move toward Value by strength * falloff'
+          : 'Brush Preview: strength * falloff per dab'
+      );
+      ImGui.Text(`Edited Count: ${this._vertexWeights.size}`);
+      if (meshInfo) {
+        if (meshInfo.loading) {
+          ImGui.Text('Reading mesh vertices...');
+        } else if (meshInfo.error) {
+          ImGui.TextWrapped(`Vertex cache failed: ${meshInfo.error}`);
+        } else {
+          ImGui.Text(`Vertex Count: ${meshInfo.vertexCount}`);
+        }
+      }
+      if (ImGui.Button('All Active')) {
+        this.applyImmediateChange(new Map<number, number>(), 'Set all cloth weights to active');
+      }
+      ImGui.SameLine();
+      if (ImGui.Button('All Fixed') && meshInfo?.positions) {
+        this.applyImmediateChange(
+          new Map(Array.from({ length: meshInfo.vertexCount }, (_, index) => [index, 0] as const)),
+          'Set all cloth weights to fixed'
+        );
+      }
+      ImGui.SameLine();
+      if (ImGui.Button('Smooth') && meshInfo?.adjacency && !meshInfo.loading && !meshInfo.error) {
+        this.smoothAllWeights();
+      }
+      if (this._targets.length > 1) {
+        ImGui.TextWrapped(
+          'This tool stores painted weights per mesh target to avoid index collisions between submeshes.'
+        );
+      }
+    }
+    ImGui.End();
+    this.renderViewportOverlay(activeMesh, meshInfo);
+  }
+
+  update(): void {
+    this.ensureActiveMeshData();
+    this.updateSkinnedMeshData();
+    if (!this._strokeActive) {
+      this.syncVertexWeightsFromConfig();
+    }
+  }
+
+  getSubMenuItems(): unknown[] {
+    return [];
+  }
+
+  getToolBarItems(): unknown[] {
+    return [];
+  }
+
+  getTarget(): unknown {
+    return this._host.get();
+  }
+
+  protected onDispose(): void {
+    super.onDispose();
+    this.finishStroke();
+    this._hoverHitPos = null;
+    this._host.dispose();
+    this._meshData.clear();
+  }
+
+  private getActiveTarget() {
+    return this._targets[this._activeTargetIndex] ?? null;
+  }
+
+  private getMeshLabel(mesh: Mesh, index: number) {
+    return mesh.name?.trim() ? mesh.name : `Mesh ${index + 1}`;
+  }
+
+  private resolveHitMesh(hitObject: unknown): Nullable<Mesh> {
+    let current = hitObject instanceof SceneNode ? hitObject : null;
+    while (current) {
+      if (current.isMesh()) {
+        return this._targets.find((mesh) => mesh === current) ?? null;
+      }
+      if (current === this._host.get()) {
+        break;
+      }
+      current = current.parent;
+    }
+    return null;
+  }
+
+  private setActiveTarget(mesh: Mesh) {
+    const nextIndex = this._targets.findIndex((target) => target === mesh);
+    if (nextIndex >= 0 && nextIndex !== this._activeTargetIndex) {
+      this._activeTargetIndex = nextIndex;
+      this.syncVertexWeightsFromConfig();
+      this.ensureActiveMeshData();
+    }
+  }
+
+  private beginStroke() {
+    if (this._strokeActive) {
+      return;
+    }
+    this.syncVertexWeightsFromConfig();
+    this._strokeActive = true;
+    this._strokeStartState = this.captureState();
+    this._lastStrokePos = null;
+  }
+
+  private finishStroke() {
+    if (!this._strokeActive) {
+      return;
+    }
+    const oldState = this._strokeStartState;
+    const newState = this.captureState();
+    this._strokeActive = false;
+    this._strokeStartState = null;
+    this._lastStrokePos = null;
+    if (oldState && !sameClothWeightState(oldState, newState)) {
+      void this._ctx.executeCommand(new ClothWeightPaintCommand(this._host.get()!, oldState, newState));
+      this._ctx.refreshProperties();
+      this._ctx.notifySceneChanged();
+    }
+  }
+
+  private updateHoverHit(hitMesh: Nullable<Mesh>, hitPos: Nullable<Vector3>) {
+    if (hitMesh && hitMesh === this.getActiveTarget() && hitPos) {
+      this._hoverHitPos = this._hoverHitPos ?? new Vector3();
+      this._hoverHitPos.set(hitPos);
+    } else if (!this._strokeActive) {
+      this._hoverHitPos = null;
+    }
+  }
+
+  private renderViewportOverlay(activeMesh: Nullable<Mesh>, meshInfo: Nullable<ClothMeshData>) {
+    const camera = this._ctx.getCamera() as Camera | null;
+    const viewportRect = this._ctx.getViewportRect();
+    if (!camera || !viewportRect || !activeMesh || !meshInfo?.positions || meshInfo.loading) {
+      return;
+    }
+    this.updateSkinnedMeshData(activeMesh);
+    const drawList = ImGui.GetForegroundDrawList();
+    const clipMin = new ImGui.ImVec2(viewportRect[0], viewportRect[1]);
+    const clipMax = new ImGui.ImVec2(viewportRect[0] + viewportRect[2], viewportRect[1] + viewportRect[3]);
+    drawList.PushClipRect(clipMin, clipMax, true);
+    this.drawWeightOverlay(drawList, camera, viewportRect, activeMesh, meshInfo);
+    this.drawBrushOverlay(drawList, camera, viewportRect);
+    drawList.PopClipRect();
+  }
+
+  private drawWeightOverlay(
+    drawList: ReturnType<typeof ImGui.GetForegroundDrawList>,
+    camera: Camera,
+    viewportRect: readonly [number, number, number, number],
+    mesh: Mesh,
+    meshInfo: ClothMeshData
+  ) {
+    const pointRadius = meshInfo.vertexCount > 4000 ? 2 : meshInfo.vertexCount > 1500 ? 2.5 : 3;
+    const sampleStep = Math.max(1, Math.ceil(meshInfo.vertexCount / MAX_WEIGHT_OVERLAY_POINTS));
+    const worldMatrix = mesh.worldMatrix;
+    for (let i = 0; i < meshInfo.vertexCount; i += sampleStep) {
+      const offset = i * 3;
+      this._tmpLocalPos.setXYZ(
+        meshInfo.positions[offset],
+        meshInfo.positions[offset + 1],
+        meshInfo.positions[offset + 2]
+      );
+      worldMatrix.transformPointAffine(this._tmpLocalPos, this._tmpWorldPos);
+      if (!this.projectWorldToScreen(camera, viewportRect, this._tmpWorldPos, this._tmpScreenPos)) {
+        continue;
+      }
+      const weight = this.getStoredWeight(i);
+      const influence = this.getBrushInfluenceAt(this._tmpWorldPos);
+      const halfSize = pointRadius + influence * 1.5;
+      const color = this.getVertexOverlayColor(weight, influence);
+      drawList.AddRectFilled(
+        new ImGui.ImVec2(this._tmpScreenPos.x - halfSize, this._tmpScreenPos.y - halfSize),
+        new ImGui.ImVec2(this._tmpScreenPos.x + halfSize, this._tmpScreenPos.y + halfSize),
+        color,
+        0,
+        0
+      );
+    }
+  }
+
+  private drawBrushOverlay(
+    drawList: ReturnType<typeof ImGui.GetForegroundDrawList>,
+    camera: Camera,
+    viewportRect: readonly [number, number, number, number]
+  ) {
+    if (
+      !this._hoverHitPos ||
+      !this.projectWorldToScreen(camera, viewportRect, this._hoverHitPos, this._tmpScreenPos)
+    ) {
+      return;
+    }
+    const brushRadiusPx = this.getBrushRadiusInScreenSpace(camera, viewportRect, this._hoverHitPos);
+    if (!(brushRadiusPx > 1)) {
+      return;
+    }
+    const innerRadiusPx = brushRadiusPx * this.getBrushInnerRatio();
+    const brushColor =
+      this._paintMode === 'pin'
+        ? new ImGui.ImVec4(0.35, 1, 0.45, 1)
+        : this._paintMode === 'unpin'
+          ? new ImGui.ImVec4(1, 0.28, 0.28, 1)
+          : this._paintMode === 'smooth'
+            ? new ImGui.ImVec4(1, 0.85, 0.25, 1)
+            : new ImGui.ImVec4(
+                0.96 + (0.2 - 0.96) * this._brushValue,
+                0.22 + (0.9 - 0.22) * this._brushValue,
+                0.22 + (0.28 - 0.22) * this._brushValue,
+                1
+              );
+    const fillOuterColor = ImGui.ColorConvertFloat4ToU32(
+      new ImGui.ImVec4(brushColor.x, brushColor.y, brushColor.z, 0.05)
+    );
+    const fillInnerColor = ImGui.ColorConvertFloat4ToU32(
+      new ImGui.ImVec4(brushColor.x, brushColor.y, brushColor.z, 0.12)
+    );
+    const borderColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1, 1, 1, 0.95));
+    const falloffColor = ImGui.ColorConvertFloat4ToU32(
+      new ImGui.ImVec4(brushColor.x, brushColor.y, brushColor.z, 0.65)
+    );
+    const textColor = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(1, 1, 1, 0.95));
+    const center = new ImGui.ImVec2(this._tmpScreenPos.x, this._tmpScreenPos.y);
+    drawList.AddCircleFilled(center, brushRadiusPx, fillOuterColor, 48);
+    drawList.AddCircleFilled(center, innerRadiusPx, fillInnerColor, 40);
+    for (let i = 1; i <= 4; i++) {
+      const t = i / 4;
+      const radius = innerRadiusPx + (brushRadiusPx - innerRadiusPx) * t;
+      const alpha = 0.45 * (1 - t) + 0.08;
+      drawList.AddCircle(
+        center,
+        radius,
+        ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(brushColor.x, brushColor.y, brushColor.z, alpha)),
+        48,
+        1
+      );
+    }
+    drawList.AddCircle(center, innerRadiusPx, falloffColor, 40, 1);
+    drawList.AddCircle(center, brushRadiusPx, borderColor, 48, 1.5);
+    drawList.AddText(
+      new ImGui.ImVec2(this._tmpScreenPos.x + brushRadiusPx + 8, this._tmpScreenPos.y - 8),
+      textColor,
+      this._paintMode === 'set'
+        ? `SET ${this._brushRadius.toFixed(2)} / ${this._brushStrength.toFixed(2)} / ${this._brushValue.toFixed(2)}`
+        : `${this._paintMode.toUpperCase()} ${this._brushRadius.toFixed(2)} / ${this._brushStrength.toFixed(2)}`
+    );
+  }
+
+  private getBrushRadiusInScreenSpace(
+    camera: Camera,
+    viewportRect: readonly [number, number, number, number],
+    centerWorldPos: Vector3
+  ) {
+    const cameraWorldMatrix = camera.worldMatrix;
+    this._tmpCameraAxisX
+      .setXYZ(cameraWorldMatrix[0], cameraWorldMatrix[1], cameraWorldMatrix[2])
+      .inplaceNormalize();
+    this._tmpCameraAxisY
+      .setXYZ(cameraWorldMatrix[4], cameraWorldMatrix[5], cameraWorldMatrix[6])
+      .inplaceNormalize();
+    const centerScreenX = this._tmpScreenPos.x;
+    const centerScreenY = this._tmpScreenPos.y;
+    let radiusPx = 0;
+    this._tmpWorldPos.set(centerWorldPos);
+    this._tmpWorldPos.addBy(Vector3.scale(this._tmpCameraAxisX, this._brushRadius, this._tmpLocalPos));
+    if (this.projectWorldToScreen(camera, viewportRect, this._tmpWorldPos, this._tmpNdcPos)) {
+      radiusPx = Math.max(
+        radiusPx,
+        Math.hypot(this._tmpNdcPos.x - centerScreenX, this._tmpNdcPos.y - centerScreenY)
+      );
+    }
+    this._tmpWorldPos.set(centerWorldPos);
+    this._tmpWorldPos.addBy(Vector3.scale(this._tmpCameraAxisY, this._brushRadius, this._tmpLocalPos));
+    if (this.projectWorldToScreen(camera, viewportRect, this._tmpWorldPos, this._tmpNdcPos)) {
+      radiusPx = Math.max(
+        radiusPx,
+        Math.hypot(this._tmpNdcPos.x - centerScreenX, this._tmpNdcPos.y - centerScreenY)
+      );
+    }
+    return radiusPx;
+  }
+
+  private projectWorldToScreen(
+    camera: Camera,
+    viewportRect: readonly [number, number, number, number],
+    worldPos: Vector3,
+    out: Vector3
+  ) {
+    camera.viewProjectionMatrix.transformPointP(worldPos, this._tmpNdcPos);
+    if (
+      !Number.isFinite(this._tmpNdcPos.x) ||
+      !Number.isFinite(this._tmpNdcPos.y) ||
+      !Number.isFinite(this._tmpNdcPos.z) ||
+      this._tmpNdcPos.x < -1 ||
+      this._tmpNdcPos.x > 1 ||
+      this._tmpNdcPos.y < -1 ||
+      this._tmpNdcPos.y > 1 ||
+      this._tmpNdcPos.z < -1 ||
+      this._tmpNdcPos.z > 1
+    ) {
+      return false;
+    }
+    out.setXYZ(
+      viewportRect[0] + (this._tmpNdcPos.x * 0.5 + 0.5) * viewportRect[2],
+      viewportRect[1] + (1 - (this._tmpNdcPos.y * 0.5 + 0.5)) * viewportRect[3],
+      this._tmpNdcPos.z
+    );
+    return true;
+  }
+
+  private getBrushInfluenceAt(worldPos: Vector3) {
+    if (!this._hoverHitPos || this._brushRadius <= 0) {
+      return 0;
+    }
+    const distanceSq = Vector3.distanceSq(worldPos, this._hoverHitPos);
+    const radiusSq = this._brushRadius * this._brushRadius;
+    if (distanceSq >= radiusSq) {
+      return 0;
+    }
+    const innerRadius = this._brushRadius * this.getBrushInnerRatio();
+    const innerRadiusSq = innerRadius * innerRadius;
+    if (distanceSq <= innerRadiusSq) {
+      return 1;
+    }
+    const distance = Math.sqrt(distanceSq);
+    const t = (distance - innerRadius) / Math.max(this._brushRadius - innerRadius, 1e-5);
+    const smoothT = t * t * (3 - 2 * t);
+    return 1 - smoothT;
+  }
+
+  private getVertexOverlayColor(weight: number, influence: number) {
+    const clampedWeight = clamp01(weight);
+    const base = [
+      0.96 + (0.2 - 0.96) * clampedWeight,
+      0.22 + (0.9 - 0.22) * clampedWeight,
+      0.22 + (0.28 - 0.22) * clampedWeight,
+      0.82
+    ];
+    const previewWeight =
+      this._paintMode === 'pin'
+        ? clamp01(clampedWeight + this._brushStrength * influence)
+        : this._paintMode === 'unpin'
+          ? clamp01(clampedWeight - this._brushStrength * influence)
+          : this._paintMode === 'set'
+            ? clamp01(clampedWeight + (this._brushValue - clampedWeight) * this._brushStrength * influence)
+            : clampedWeight;
+    const preview =
+      this._paintMode === 'smooth'
+        ? [1, 0.9, 0.3, 0.95]
+        : [
+            0.96 + (0.2 - 0.96) * previewWeight,
+            0.22 + (0.96 - 0.22) * previewWeight,
+            0.22 + (0.3 - 0.22) * previewWeight,
+            0.98
+          ];
+    const blend = this._paintMode === 'smooth' ? influence * 0.55 : influence * 0.9;
+    return ImGui.ColorConvertFloat4ToU32(
+      new ImGui.ImVec4(
+        base[0] + (preview[0] - base[0]) * blend,
+        base[1] + (preview[1] - base[1]) * blend,
+        base[2] + (preview[2] - base[2]) * blend,
+        base[3] + (preview[3] - base[3]) * blend
+      )
+    );
+  }
+
+  private getBrushInnerRatio() {
+    return clamp01(1 - this._brushFalloff);
+  }
+
+  private getStoredWeight(index: number) {
+    return this._vertexWeights.get(index) ?? 1;
+  }
+
+  private setStoredWeight(index: number, weight: number) {
+    const clamped = clamp01(weight);
+    if (clamped >= 1 - 1e-4) {
+      this._vertexWeights.delete(index);
+    } else {
+      this._vertexWeights.set(index, clamped);
+    }
+  }
+
+  private applyImmediateChange(weights: Map<number, number>, desc: string) {
+    if (!this._host.get()) {
+      return;
+    }
+    this.syncVertexWeightsFromConfig();
+    const oldState = this.captureState();
+    this._vertexWeights = new Map(weights);
+    const newState = this.buildStateForActiveTarget();
+    if (sameClothWeightState(oldState, newState)) {
+      return;
+    }
+    this.applyState(newState);
+    this._ctx.refreshProperties();
+    this._ctx.notifySceneChanged();
+    void this._ctx.executeCommand(new ClothWeightPaintCommand(this._host.get()!, oldState, newState, desc));
+  }
+
+  private syncVertexWeightsFromConfig() {
+    const host = this._host.get();
+    const activeMesh = this.getActiveTarget();
+    if (!host || !activeMesh) {
+      this._vertexWeights = new Map();
+      return;
+    }
+    // 权重按“目标 mesh -> 权重串”存储。
+    // 这样同一个 cloth 宿主即使对应多个目标网格，也不会出现顶点索引互相冲突。
+    const config = ((host as any).scriptConfig ?? {}) as {
+      vertexPinWeightsByTarget?: string;
+      pinnedVertexIndicesByTarget?: string;
+    };
+    const map = parsePinnedVertexMap(config.vertexPinWeightsByTarget ?? '');
+    const legacyMap = parsePinnedVertexMap(config.pinnedVertexIndicesByTarget ?? '');
+    const targetId = String(activeMesh.persistentId ?? '');
+    const source =
+      targetId && Object.prototype.hasOwnProperty.call(map, targetId) ? (map[targetId] ?? '') : '';
+    const legacySource =
+      targetId && Object.prototype.hasOwnProperty.call(legacyMap, targetId)
+        ? (legacyMap[targetId] ?? '')
+        : '';
+    this._vertexWeights =
+      source.trim().length > 0 ? parseVertexWeights(source) : parseLegacyPinnedVertexIndices(legacySource);
+  }
+
+  private captureState(): ClothWeightState {
+    const host = this._host.get();
+    const config = ((host as any)?.scriptConfig ?? {}) as {
+      vertexPinWeightsByTarget?: string;
+      pinnedVertexIndicesByTarget?: string;
+    };
+    return {
+      vertexPinWeightsByTarget: String(config.vertexPinWeightsByTarget ?? ''),
+      pinnedVertexIndicesByTarget: String(config.pinnedVertexIndicesByTarget ?? '')
+    };
+  }
+
+  private buildStateForActiveTarget(): ClothWeightState {
+    const current = this.captureState();
+    const mesh = this.getActiveTarget();
+    if (!mesh) {
+      return current;
+    }
+    // 每次只改当前激活 mesh 的那一桶数据，其它目标网格的权重保持不变。
+    const targetId = String(mesh.persistentId ?? '');
+    const nextByTarget = parsePinnedVertexMap(current.vertexPinWeightsByTarget);
+    const serializedWeights = serializeVertexWeights(this._vertexWeights);
+    if (targetId) {
+      if (serializedWeights) {
+        nextByTarget[targetId] = serializedWeights;
+      } else {
+        delete nextByTarget[targetId];
+      }
+    }
+    return {
+      vertexPinWeightsByTarget: serializePinnedVertexMap(nextByTarget),
+      pinnedVertexIndicesByTarget: ''
+    };
+  }
+
+  private applyState(state: ClothWeightState) {
+    const host = this._host.get();
+    if (!host) {
+      return;
+    }
+    // 绘制工具最终仍然回写到 scriptConfig。
+    // 这样撤销/重做、场景保存、运行时脚本读取都继续沿用统一的数据通道。
+    const config = ((host as any).scriptConfig ??= {}) as {
+      vertexPinWeightsByTarget?: string;
+      pinnedVertexIndicesByTarget?: string;
+    };
+    config.vertexPinWeightsByTarget = state.vertexPinWeightsByTarget;
+    config.pinnedVertexIndicesByTarget = state.pinnedVertexIndicesByTarget;
+  }
+
+  private ensureActiveMeshData() {
+    const mesh = this.getActiveTarget();
+    if (!mesh?.primitive) {
+      return;
+    }
+    const primitive = mesh.primitive;
+    const primitiveSignature = `${mesh.persistentId ?? mesh.name ?? 'mesh'}:${primitive.changeTag}`;
+    let data = this._meshData.get(mesh);
+    if (data?.loading || data?.primitiveSignature === primitiveSignature) {
+      return;
+    }
+    data = {
+      vertexCount: primitive.getNumVertices(),
+      positions: data?.positions ?? null,
+      basePositions: data?.basePositions ?? null,
+      blendIndices: data?.blendIndices ?? null,
+      blendWeights: data?.blendWeights ?? null,
+      indexData: data?.indexData ?? null,
+      adjacency: data?.adjacency ?? null,
+      loading: true,
+      error: '',
+      primitiveSignature
+    };
+    this._meshData.set(mesh, data);
+    void Promise.all([readMeshPositionData(mesh), readMeshSkinningData(mesh), readMeshIndexData(mesh)])
+      .then(([positions, skinning, indexData]) => {
+        const next = this._meshData.get(mesh);
+        if (!next || next.primitiveSignature !== primitiveSignature) {
+          return;
+        }
+        next.basePositions = positions;
+        next.positions = positions.slice();
+        next.blendIndices = skinning.blendIndices;
+        next.blendWeights = skinning.blendWeights;
+        next.indexData = indexData;
+        next.adjacency = buildVertexAdjacency((positions.length / 3) >> 0, indexData);
+        next.vertexCount = positions.length / 3;
+        next.loading = false;
+        next.error = '';
+        this.updateSkinnedMeshData(mesh);
+      })
+      .catch((err) => {
+        const next = this._meshData.get(mesh);
+        if (!next || next.primitiveSignature !== primitiveSignature) {
+          return;
+        }
+        next.positions = null;
+        next.basePositions = null;
+        next.blendIndices = null;
+        next.blendWeights = null;
+        next.indexData = null;
+        next.adjacency = null;
+        next.loading = false;
+        next.error = err instanceof Error ? err.message : String(err);
+      });
+  }
+
+  private smoothAllWeights() {
+    const mesh = this.getActiveTarget();
+    const data = mesh ? this._meshData.get(mesh) : null;
+    if (!mesh || !data?.adjacency || data.loading) {
+      return;
+    }
+    const strength = clamp01(this._brushStrength);
+    if (strength <= 1e-4) {
+      return;
+    }
+    this.syncVertexWeightsFromConfig();
+    const nextWeights = new Map<number, number>();
+    for (let index = 0; index < data.vertexCount; index++) {
+      const currentWeight = this.getStoredWeight(index);
+      const neighbors = data.adjacency[index] ?? [];
+      if (neighbors.length === 0) {
+        if (currentWeight < 1 - 1e-4) {
+          nextWeights.set(index, currentWeight);
+        }
+        continue;
+      }
+      let sum = currentWeight;
+      let total = 1;
+      for (const neighbor of neighbors) {
+        if (neighbor < 0 || neighbor >= data.vertexCount) {
+          continue;
+        }
+        sum += this.getStoredWeight(neighbor);
+        total++;
+      }
+      const averageWeight = total > 0 ? sum / total : currentWeight;
+      const nextWeight = clamp01(currentWeight + (averageWeight - currentWeight) * strength);
+      if (nextWeight < 1 - 1e-4) {
+        nextWeights.set(index, nextWeight);
+      }
+    }
+    this.applyImmediateChange(nextWeights, 'Smooth cloth weights');
+  }
+
+  private updateSkinnedMeshData(targetMesh?: Mesh) {
+    const meshes = targetMesh
+      ? [targetMesh]
+      : [this.getActiveTarget()].filter((mesh): mesh is Mesh => !!mesh);
+    for (const mesh of meshes) {
+      const data = this._meshData.get(mesh);
+      if (!data || data.loading || !data.basePositions || !data.positions) {
+        continue;
+      }
+      const skeletonId = String((mesh as any).skeletonName ?? '');
+      const skeleton =
+        skeletonId && typeof (mesh as any).findSkeletonById === 'function'
+          ? (mesh as any).findSkeletonById(skeletonId)
+          : null;
+      if (
+        skeleton?.skinPositionsToLocal &&
+        data.blendIndices &&
+        data.blendWeights &&
+        (mesh as any).invWorldMatrix
+      ) {
+        skeleton.skinPositionsToLocal(
+          data.basePositions,
+          data.blendIndices,
+          data.blendWeights,
+          (mesh as any).invWorldMatrix,
+          data.positions
+        );
+      } else if (data.positions !== data.basePositions) {
+        data.positions.set(data.basePositions);
+      }
+    }
+  }
+
+  private applyBrushDab(hitPos: Vector3) {
+    const mesh = this.getActiveTarget();
+    const data = mesh ? this._meshData.get(mesh) : null;
+    if (!mesh || !data?.positions || data.loading) {
+      return;
+    }
+    this.updateSkinnedMeshData(mesh);
+    const spacing = Math.max(this._brushRadius * 0.15, 0.005);
+    if (this._lastStrokePos) {
+      const dx = hitPos.x - this._lastStrokePos.x;
+      const dy = hitPos.y - this._lastStrokePos.y;
+      const dz = hitPos.z - this._lastStrokePos.z;
+      if (dx * dx + dy * dy + dz * dz < spacing * spacing) {
+        return;
+      }
+    }
+    const radiusSq = this._brushRadius * this._brushRadius;
+    const worldMatrix = mesh.worldMatrix;
+    const affectedIndices: number[] = [];
+    const affectedInfluences: number[] = [];
+    const affectedPositions: number[] = [];
+    let changed = false;
+    for (let i = 0; i < data.vertexCount; i++) {
+      const offset = i * 3;
+      this._tmpLocalPos.setXYZ(
+        data.positions[offset],
+        data.positions[offset + 1],
+        data.positions[offset + 2]
+      );
+      worldMatrix.transformPointAffine(this._tmpLocalPos, this._tmpWorldPos);
+      const dx = this._tmpWorldPos.x - hitPos.x;
+      const dy = this._tmpWorldPos.y - hitPos.y;
+      const dz = this._tmpWorldPos.z - hitPos.z;
+      if (dx * dx + dy * dy + dz * dz > radiusSq) {
+        continue;
+      }
+      const influence = this.getBrushInfluenceAt(this._tmpWorldPos);
+      if (influence <= 0) {
+        continue;
+      }
+      affectedIndices.push(i);
+      affectedInfluences.push(influence);
+      affectedPositions.push(this._tmpWorldPos.x, this._tmpWorldPos.y, this._tmpWorldPos.z);
+    }
+    if (affectedIndices.length === 0) {
+      return;
+    }
+    if (this._paintMode === 'smooth') {
+      const nextWeights: number[] = new Array(affectedIndices.length);
+      for (let i = 0; i < affectedIndices.length; i++) {
+        const currentWeight = this.getStoredWeight(affectedIndices[i]);
+        let sum = 0;
+        let total = 0;
+        const ax = affectedPositions[i * 3];
+        const ay = affectedPositions[i * 3 + 1];
+        const az = affectedPositions[i * 3 + 2];
+        for (let j = 0; j < affectedIndices.length; j++) {
+          const dx = affectedPositions[j * 3] - ax;
+          const dy = affectedPositions[j * 3 + 1] - ay;
+          const dz = affectedPositions[j * 3 + 2] - az;
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          const neighborInfluence = Math.max(0, 1 - dist / Math.max(this._brushRadius, 1e-5));
+          if (neighborInfluence <= 0) {
+            continue;
+          }
+          total += neighborInfluence;
+          sum += this.getStoredWeight(affectedIndices[j]) * neighborInfluence;
+        }
+        const averageWeight = total > 1e-5 ? sum / total : currentWeight;
+        nextWeights[i] = clamp01(
+          currentWeight + (averageWeight - currentWeight) * this._brushStrength * affectedInfluences[i]
+        );
+      }
+      for (let i = 0; i < affectedIndices.length; i++) {
+        const index = affectedIndices[i];
+        const currentWeight = this.getStoredWeight(index);
+        const nextWeight = nextWeights[i];
+        if (Math.abs(nextWeight - currentWeight) <= 1e-4) {
+          continue;
+        }
+        this.setStoredWeight(index, nextWeight);
+        changed = true;
+      }
+    } else {
+      const direction = this._paintMode === 'pin' ? 1 : -1;
+      for (let i = 0; i < affectedIndices.length; i++) {
+        const index = affectedIndices[i];
+        const currentWeight = this.getStoredWeight(index);
+        const nextWeight =
+          this._paintMode === 'set'
+            ? clamp01(
+                currentWeight +
+                  (this._brushValue - currentWeight) * this._brushStrength * affectedInfluences[i]
+              )
+            : clamp01(currentWeight + direction * this._brushStrength * affectedInfluences[i]);
+        if (Math.abs(nextWeight - currentWeight) <= 1e-4) {
+          continue;
+        }
+        this.setStoredWeight(index, nextWeight);
+        changed = true;
+      }
+    }
+    this._lastStrokePos = this._lastStrokePos ?? new Vector3();
+    this._lastStrokePos.set(hitPos);
+    if (changed) {
+      const state = this.buildStateForActiveTarget();
+      this.applyState(state);
+      this._ctx.refreshProperties();
+      this._ctx.notifySceneChanged();
+    }
+  }
+}
+
+export function initGPUClothPaintTool(ctx: EditorPluginContext) {
+  // registerEditTool 用于向编辑器注册“专用编辑模式”。
+  // canEdit 决定当前选中对象是否可以切换到该工具；
+  // create 则在真正激活时创建工具实例。
+  ctx.registerEditTool({
+    id: 'zephyr3d.gpu-cloth.paint',
+    canEdit: (obj) => {
+      const host =
+        (obj instanceof SceneNode && findClothPaintHost(obj)) ||
+        (obj instanceof Mesh && findClothPaintHost(obj)) ||
+        null;
+      return !!host;
+    },
+    create: (obj, editCtx) => {
+      const host =
+        (obj instanceof SceneNode && findClothPaintHost(obj)) ||
+        (obj instanceof Mesh && findClothPaintHost(obj)) ||
+        null;
+      if (!host) {
+        return null;
+      }
+      // 这里返回的对象不需要了解插件系统本身，
+      // 编辑器只要求它满足 EditTool 所需的交互接口即可。
+      return new ClothPaintTool(host, editCtx, obj instanceof Mesh ? obj : null) as unknown as {
+        dispose(): void;
+      };
+    },
+    priority: 200
+  });
+}

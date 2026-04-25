@@ -1,4 +1,5 @@
-import type { EditorPlugin } from '@zephyr3d/editor/editor-plugin';
+import type { EditorPlugin } from '../core/plugin';
+import type { SystemPluginFileInput } from '../core/services/systemplugin';
 export const sampleOSSExportPlugin: EditorPlugin = {
   id: 'zephyr3d.sample.oss-export',
   name: 'Sample OSS Export',
@@ -77,3 +78,10 @@ const plugin: EditorPlugin = {
 
 export default plugin;
 `;
+
+export const sampleOSSExportPluginFiles: SystemPluginFileInput[] = [
+  {
+    path: 'index.ts',
+    source: sampleOSSExportPluginSource
+  }
+];

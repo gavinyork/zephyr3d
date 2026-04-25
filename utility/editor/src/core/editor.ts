@@ -28,7 +28,11 @@ import { fileListFileName, generateIndexTS, libDir } from './build/templates';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { EditorPluginManager, type EditorPlugin } from './plugin';
-import { sampleOSSExportPlugin, sampleOSSExportPluginSource } from '../plugins/sample-oss-export';
+import { sampleOSSExportPlugin, sampleOSSExportPluginFiles } from '../plugins/sample-oss-export';
+import {
+  characterDynamicsToolsPlugin,
+  characterDynamicsToolsPluginFiles
+} from '../plugins/character-dynamics-tools';
 import { ScriptRegistry } from '@zephyr3d/scene';
 import {
   SystemPluginService,
@@ -232,6 +236,57 @@ export class Editor {
     if (this._currentProject) {
       await ProjectService.saveCurrentProjectSettings(settings);
     }
+  }
+  isProjectReadOnly() {
+    return !this._currentProject || !!ProjectService.VFS.readOnly;
+  }
+  async projectFileExists(path: string) {
+    return this._currentProject ? await ProjectService.VFS.exists(path) : false;
+  }
+  async ensureProjectDirectory(path: string) {
+    if (!this._currentProject) {
+      throw new Error('No project is currently open');
+    }
+    if (ProjectService.VFS.readOnly) {
+      throw new Error('Current project is read-only');
+    }
+    await ProjectService.VFS.makeDirectory(path, true);
+  }
+  async readProjectTextFile(path: string) {
+    if (!this._currentProject) {
+      return null;
+    }
+    return (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
+  }
+  async writeProjectTextFile(path: string, content: string) {
+    if (!this._currentProject) {
+      throw new Error('No project is currently open');
+    }
+    if (ProjectService.VFS.readOnly) {
+      throw new Error('Current project is read-only');
+    }
+    const dir = ProjectService.VFS.dirname(path);
+    if (dir && dir !== '/' && !(await ProjectService.VFS.exists(dir))) {
+      await ProjectService.VFS.makeDirectory(dir, true);
+    }
+    await ProjectService.VFS.writeFile(path, content, { encoding: 'utf8', create: true });
+  }
+  async openProjectCodeFile(path: string, language?: string) {
+    if (!this._currentProject) {
+      throw new Error('No project is currently open');
+    }
+    const nextLanguage =
+      language ??
+      (path.endsWith('.ts')
+        ? 'typescript'
+        : path.endsWith('.js')
+          ? 'javascript'
+          : path.endsWith('.json')
+            ? 'json'
+            : path.endsWith('.html')
+              ? 'html'
+              : 'plaintext');
+    await this.openCodeFile(path, nextLanguage);
   }
   async init(fontSize: number) {
     //await Database.init();
@@ -930,43 +985,82 @@ export class Editor {
   }
 
   private async ensureBuiltinSystemPlugins() {
-    try {
-      const existing = await SystemPluginService.getPlugin(sampleOSSExportPlugin.id);
-      if (!existing) {
-        await SystemPluginService.installPlugin({
-          id: sampleOSSExportPlugin.id,
-          name: sampleOSSExportPlugin.name,
-          version: sampleOSSExportPlugin.version,
-          description: sampleOSSExportPlugin.description,
-          source: sampleOSSExportPluginSource,
-          enabled: true,
-          builtin: true
-        });
-        return;
+    await this.migrateDeprecatedBuiltinSystemPlugins();
+    await this.ensureBuiltinSystemPlugin(sampleOSSExportPlugin, sampleOSSExportPluginFiles);
+    await this.ensureBuiltinSystemPlugin(characterDynamicsToolsPlugin, characterDynamicsToolsPluginFiles);
+  }
+
+  private async migrateDeprecatedBuiltinSystemPlugins() {
+    const deprecatedPluginIds = ['zephyr3d.gpu-cloth-tools', 'zephyr3d.spring-tools'];
+    for (const id of deprecatedPluginIds) {
+      const plugin = await SystemPluginService.getPlugin(id).catch(() => null);
+      if (!plugin) {
+        continue;
       }
-      if (existing.builtin) {
-        const installed = await SystemPluginService.getInstalledPluginSource(sampleOSSExportPlugin.id);
-        if (installed?.source !== sampleOSSExportPluginSource) {
-          await SystemPluginService.installPlugin({
-            id: sampleOSSExportPlugin.id,
-            name: sampleOSSExportPlugin.name,
-            version: sampleOSSExportPlugin.version,
-            description: sampleOSSExportPlugin.description,
-            source: sampleOSSExportPluginSource,
-            enabled: existing.enabled,
-            builtin: true
-          });
+      if (plugin.enabled) {
+        await SystemPluginService.setPluginEnabled(id, false).catch(() => undefined);
+      }
+      if (this._plugins.hasPlugin(id) && this._plugins.isPluginActive(id)) {
+        await this._plugins.deactivatePlugin(id).catch(() => undefined);
+      }
+      if (this._plugins.hasPlugin(id)) {
+        try {
+          this._plugins.unregisterPlugin(id);
+        } catch {
+          // Ignore stale registration cleanup failures during builtin migration.
         }
       }
+      this._systemPluginRegistrations.delete(id);
+    }
+  }
+
+  private async ensureBuiltinSystemPlugin(plugin: EditorPlugin, files: SystemPluginFileInput[]) {
+    try {
+      const existing = await SystemPluginService.getPlugin(plugin.id);
+      const installedFiles = existing
+        ? await SystemPluginService.listPluginFiles(plugin.id).catch(() => [])
+        : [];
+      const needsInstall =
+        !existing ||
+        !existing.builtin ||
+        installedFiles.length !== files.length ||
+        !(await this.matchSystemPluginFiles(plugin.id, files));
+      if (needsInstall) {
+        await SystemPluginService.installPluginFiles({
+          id: plugin.id,
+          name: plugin.name,
+          version: plugin.version,
+          description: plugin.description,
+          entryFileName: 'index.ts',
+          files,
+          enabled: existing?.enabled ?? true,
+          builtin: true
+        });
+      }
     } catch (err) {
-      console.error(`Failed to install or update builtin system plugin '${sampleOSSExportPlugin.id}'.`, err);
-      if (await SystemPluginService.getPlugin(sampleOSSExportPlugin.id).catch(() => null)) {
-        await this.disableFailedSystemPlugin(
-          sampleOSSExportPlugin.id,
-          err instanceof Error ? err.message : String(err)
-        );
+      console.error(`Failed to install or update builtin system plugin '${plugin.id}'.`, err);
+      if (await SystemPluginService.getPlugin(plugin.id).catch(() => null)) {
+        await this.disableFailedSystemPlugin(plugin.id, err instanceof Error ? err.message : String(err));
       }
     }
+  }
+
+  private async matchSystemPluginFiles(pluginId: string, expectedFiles: SystemPluginFileInput[]) {
+    const actualFiles = await SystemPluginService.listPluginFiles(pluginId).catch(() => []);
+    if (actualFiles.length !== expectedFiles.length) {
+      return false;
+    }
+    const actualMap = new Map<string, string>();
+    for (const file of actualFiles) {
+      const content = (await SystemPluginService.VFS.readFile(file.path, { encoding: 'utf8' })) as string;
+      actualMap.set(file.relativePath, content);
+    }
+    for (const file of expectedFiles) {
+      if (actualMap.get(file.path) !== file.source) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private async waitForMonaco(timeoutMs = 15000): Promise<typeof Monaco | null> {

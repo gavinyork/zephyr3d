@@ -216,7 +216,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     );
     this._rightDockPanel = new DockPannel(0, 0, 400, 0, 8, 200, 600, ResizeDirection.Left);
     this._propGrid = new PropertyEditor(0.4);
-    this._propGrid.extraPropertiesProvider = getScriptPropertyAccessors;
+    this._propGrid.setExtraPropertiesProvider('runtime-script', getScriptPropertyAccessors);
+    this._propGrid.setExtraPropertiesProvider('plugin-contributions', (object) =>
+      this.editor.plugins.getPropertyAccessors(object)
+    );
     this._postGizmoRenderer = null;
     this._leftDockPanel = null;
     this._sceneHierarchy = null;
@@ -731,6 +734,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._menubar.registerShortcuts(this);
       this._toolbar.registerShortcuts(this);
     }
+    this._propGrid.refresh();
+  }
+  private handleRefreshProperties() {
+    this._propGrid.refresh();
   }
   private createSceneContext(): EditorSceneContext {
     return {
@@ -1187,6 +1194,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     });
     this._toolbar.on('action', this.handleSceneAction, this);
     this.editor.plugins.on('pluginContributionsChanged', this.refreshPluginContributions, this);
+    eventBus.on('refresh_properties', this.handleRefreshProperties, this);
     this._assetView.renderer.on('selection_changed', this.handleAssetSelectionChanged, this);
     this._assetView.renderer.on('asset_picker_drop', this.handleAssetPickerDrop, this);
     this._propGrid.on('object_property_changed', this.handleObjectPropertyChanged, this);
@@ -1217,6 +1225,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._activePluginContributionShortcuts = false;
     this._toolbar.off('action', this.handleSceneAction, this);
     this.editor.plugins.off('pluginContributionsChanged', this.refreshPluginContributions, this);
+    eventBus.off('refresh_properties', this.handleRefreshProperties, this);
     this._propGrid.off('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.off('object_property_edit_finished', this.handleObjectPropertyEditFinished, this);
     this._propGrid.off('request_edit_aabb', this.editAABB, this);

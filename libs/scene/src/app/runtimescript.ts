@@ -37,6 +37,7 @@ export type RuntimeScriptValueType = Exclude<RuntimeScriptPropertyType, 'object_
 export type RuntimeScriptPropertyOptions = {
   label?: string;
   group?: string;
+  hidden?: boolean;
   minValue?: number;
   maxValue?: number;
   speed?: number;
@@ -63,13 +64,44 @@ export type RuntimeScriptValueDeclaration = RuntimeScriptPropertyOptions & {
 };
 
 /**
+ * Decorator configuration for a named field inside a structured object-array element.
+ *
+ * @public
+ */
+export type RuntimeScriptObjectFieldDeclaration = RuntimeScriptValueDeclaration & {
+  name: string;
+};
+
+/**
+ * Decorator configuration for a structured object-array element.
+ *
+ * This is only valid as `object_array.element`.
+ *
+ * @public
+ */
+export type RuntimeScriptObjectDeclaration = {
+  type: 'object';
+  fields: RuntimeScriptObjectFieldDeclaration[];
+  default?: Record<string, unknown>;
+};
+
+/**
+ * Supported element declarations for `object_array`.
+ *
+ * @public
+ */
+export type RuntimeScriptArrayElementDeclaration =
+  | RuntimeScriptValueDeclaration
+  | RuntimeScriptObjectDeclaration;
+
+/**
  * Decorator configuration for an array-typed runtime script parameter.
  *
  * @public
  */
 export type RuntimeScriptArrayDeclaration = RuntimeScriptPropertyOptions & {
   type: 'object_array';
-  element: RuntimeScriptValueDeclaration;
+  element: RuntimeScriptArrayElementDeclaration;
   default?: unknown[];
 };
 
