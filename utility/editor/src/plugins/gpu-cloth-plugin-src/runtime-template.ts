@@ -512,12 +512,16 @@ export default class extends RuntimeScript {
     this._structureSignature = '';
     this._runtimeSignature = '';
     this._disposed = false;
+    this._initDelayFrames = 1;
+    this._initRetryFrames = 120;
   }
 
   onDetached(host) {
     if (host === this._host) {
       this.disposeCloth();
       this._host = null;
+      this._initDelayFrames = 0;
+      this._initRetryFrames = 0;
     }
   }
 
@@ -525,6 +529,8 @@ export default class extends RuntimeScript {
     this._disposed = true;
     this.disposeCloth();
     this._host = null;
+    this._initDelayFrames = 0;
+    this._initRetryFrames = 0;
   }
 
   // 每帧只做两件事：
@@ -536,13 +542,21 @@ export default class extends RuntimeScript {
       this.disposeCloth();
       return;
     }
+    if (this._initDelayFrames > 0) {
+      this._initDelayFrames -= 1;
+      return;
+    }
     const config = host.scriptConfig ?? {};
     const simulationMesh = resolveSimulationMesh(host, config);
     if (!simulationMesh?.primitive) {
+      if (this._initRetryFrames > 0) {
+        this._initRetryFrames -= 1;
+      }
       this.disposeCloth();
       return;
     }
     const wrapTargets = resolveWrapTargets(host, simulationMesh, config);
+    this._initRetryFrames = 120;
     const structureSignature = buildStructureSignature(simulationMesh, config, wrapTargets);
     if (!this._cloth || this._structureSignature !== structureSignature) {
       this.ensureCloth(host, simulationMesh, config, wrapTargets, structureSignature);

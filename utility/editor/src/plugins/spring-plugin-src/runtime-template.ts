@@ -357,6 +357,8 @@ export default class extends RuntimeScript {
     this._modifiers = [];
     this._configColliders = [];
     this._signature = '';
+    this._initDelayFrames = 1;
+    this._initRetryFrames = 120;
   }
 
   // spring 的运行策略是：
@@ -369,9 +371,16 @@ export default class extends RuntimeScript {
       this.disposeSpringState();
       return;
     }
+    if (this._initDelayFrames > 0) {
+      this._initDelayFrames -= 1;
+      return;
+    }
     const skeletonRef = root.animationSet?.skeletons?.[0];
     const skeleton = typeof skeletonRef?.get === 'function' ? skeletonRef.get() : skeletonRef;
     if (!skeleton) {
+      if (this._initRetryFrames > 0) {
+        this._initRetryFrames -= 1;
+      }
       this.disposeSpringState();
       return;
     }
@@ -390,9 +399,13 @@ export default class extends RuntimeScript {
       }
     }
     if (!hasValidChainPose) {
+      if (this._initRetryFrames > 0) {
+        this._initRetryFrames -= 1;
+      }
       this.disposeSpringState();
       return;
     }
+    this._initRetryFrames = 120;
     const signature = buildSignature(config);
     if (this._skeleton === skeleton && this._signature === signature && this._modifiers.length > 0) {
       return;
@@ -451,12 +464,16 @@ export default class extends RuntimeScript {
     if (host === this._host) {
       this.disposeSpringState();
       this._host = null;
+      this._initDelayFrames = 0;
+      this._initRetryFrames = 0;
     }
   }
 
   onDestroy() {
     this.disposeSpringState();
     this._host = null;
+    this._initDelayFrames = 0;
+    this._initRetryFrames = 0;
   }
 
   disposeSpringState() {
