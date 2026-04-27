@@ -19,6 +19,7 @@ import { DlgMaterialFunctionEditor } from './materialfunceditor';
 import type { MeshMaterial } from '@zephyr3d/scene';
 import type { SharedModel } from '../../loaders/model';
 import { DlgImportOptions } from './importoptionsdlg';
+import { DlgOpenFolder } from './openfolderdlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -94,11 +95,22 @@ export class Dialog {
     title: string,
     vfs: VFS,
     rootDir: string,
-    filter: string,
+    filter: string | null,
+    multi: boolean,
     width: number,
     height: number
   ) {
-    return DlgOpenFile.openFile(title, vfs, rootDir, filter, width, height);
+    return DlgOpenFile.openFile(title, vfs, rootDir, filter, multi, width, height);
+  }
+  public static async openFolder(
+    title: string,
+    vfs: VFS,
+    rootDir: string,
+    multi: boolean,
+    width: number,
+    height: number
+  ) {
+    return DlgOpenFolder.openFolder(title, vfs, rootDir, multi, width, height);
   }
   public static async openFromList(
     title: string,

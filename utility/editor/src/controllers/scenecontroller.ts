@@ -169,19 +169,21 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
       }
       case 'OPEN_DOC': {
         if (await this.ensureSceneSaved()) {
-          const name =
-            typeof args[0] === 'string'
-              ? args[0]
-              : await Dialog.openFile(
-                  'Open Scene',
-                  ProjectService.VFS,
-                  '/assets',
-                  'Scene (*.zscn)|*.zscn|All files (*)|*',
-                  500,
-                  400
-                );
-          if (name) {
-            await this.openScene(name, true);
+          if (typeof args[0] === 'string') {
+            await this.openScene(args[0], true);
+          } else {
+            const name = await Dialog.openFile(
+              'Open Scene',
+              ProjectService.VFS,
+              '/assets',
+              'Scene (*.zscn)|*.zscn|All files (*)|*',
+              false,
+              500,
+              400
+            );
+            if (name.length > 0) {
+              await this.openScene(name[0].meta.path, true);
+            }
           }
         }
         break;

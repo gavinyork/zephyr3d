@@ -131,7 +131,10 @@ function isBinaryZABC(arrayBuffer: ArrayBuffer) {
   }
   const magic = new Uint8Array(arrayBuffer, 0, 4);
   return (
-    magic[0] === ZABC_MAGIC[0] && magic[1] === ZABC_MAGIC[1] && magic[2] === ZABC_MAGIC[2] && magic[3] === ZABC_MAGIC[3]
+    magic[0] === ZABC_MAGIC[0] &&
+    magic[1] === ZABC_MAGIC[1] &&
+    magic[2] === ZABC_MAGIC[2] &&
+    magic[3] === ZABC_MAGIC[3]
   );
 }
 
@@ -275,7 +278,7 @@ function computeTopEigenSymmetric(gram: Float64Array, n: number, maxComponents: 
   for (let c = 0; c < maxComponents; c++) {
     const v = new Float64Array(n);
     for (let i = 0; i < n; i++) {
-      v[i] = ((i + 1) * (c + 3)) % 17 + 1;
+      v[i] = (((i + 1) * (c + 3)) % 17) + 1;
     }
     normalize(v);
     const y = new Float64Array(n);
@@ -409,7 +412,11 @@ function identityFields(track: ZABCTrack) {
   return info;
 }
 
-function estimateFixedPayloadBytes(times: Float32Array, positions: Float32Array[], normals: Float32Array[] | null) {
+function estimateFixedPayloadBytes(
+  times: Float32Array,
+  positions: Float32Array[],
+  normals: Float32Array[] | null
+) {
   let total = times.byteLength;
   for (const p of positions) {
     total += p.byteLength;
@@ -537,7 +544,9 @@ function compressManifest(parsed: ParsedZABC, components: number, compressNormal
 
       const positionFramesRef = track.positionFrames ?? [];
       const positions = positionFramesRef.map((ref) => decodeFloat32Array(ref, parsed));
-      const normals = track.normalFrames?.length ? track.normalFrames.map((ref) => decodeFloat32Array(ref, parsed)) : null;
+      const normals = track.normalFrames?.length
+        ? track.normalFrames.map((ref) => decodeFloat32Array(ref, parsed))
+        : null;
       const times = decodeTimes(track, parsed);
       const bounds = track.bounds ?? [];
       stats.sourcePayloadBytes += estimateFixedPayloadBytes(times, positions, normals);

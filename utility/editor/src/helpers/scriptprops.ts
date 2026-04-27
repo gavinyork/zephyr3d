@@ -158,7 +158,10 @@ function getScriptAttachments(host: ScriptHost) {
   return cloneScriptAttachmentList((host as ScriptHostWithConfig).scripts);
 }
 
-function setScriptAttachments(host: ScriptHost, attachments: { script: string; config: ScriptConfigValue }[]) {
+function setScriptAttachments(
+  host: ScriptHost,
+  attachments: { script: string; config: ScriptConfigValue }[]
+) {
   const target = host as ScriptHostWithConfig;
   target.scripts = cloneScriptAttachmentList(attachments);
   target.script = attachments[0]?.script ?? '';
@@ -275,7 +278,12 @@ function readDefaultValue(
   }
 }
 
-function getConfiguredValue(host: ScriptHost, propName: string, scriptPath?: string, attachmentIndex?: number) {
+function getConfiguredValue(
+  host: ScriptHost,
+  propName: string,
+  scriptPath?: string,
+  attachmentIndex?: number
+) {
   const config = getScriptConfigObject(host, scriptPath, attachmentIndex);
   return config && Object.prototype.hasOwnProperty.call(config, propName)
     ? cloneValue(config[propName])
@@ -764,9 +772,7 @@ export async function getScriptPropertyAccessors(host: unknown): Promise<Propert
   const scriptEntries = attachments
     .map((item, index) => ({ path: String(item?.script ?? '').trim(), index }))
     .filter((item) => !!item.path);
-  const scriptPaths = scriptEntries
-    .map((item) => item.path)
-    .filter((item) => !!item);
+  const scriptPaths = scriptEntries.map((item) => item.path).filter((item) => !!item);
   if (scriptPaths.length === 0) {
     const scriptPath = host.script.trim();
     if (!scriptPath) {

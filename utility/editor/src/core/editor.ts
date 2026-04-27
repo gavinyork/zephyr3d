@@ -28,9 +28,9 @@ import { fileListFileName, generateIndexTS, libDir } from './build/templates';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { EditorPluginManager, type EditorPlugin } from './plugin';
-import { sampleOSSExportPlugin, sampleOSSExportPluginFiles } from '../plugins/sample-oss-export';
 import {
   characterDynamicsToolsPlugin,
+  characterDynamicsToolsPluginDependencies,
   characterDynamicsToolsPluginFiles
 } from '../plugins/character-dynamics-tools';
 import { ScriptRegistry } from '@zephyr3d/scene';
@@ -348,6 +348,52 @@ export class Editor {
       }
     }
   }
+  private async loadDependencyTypesFromLock(
+    ownerId: string,
+    vfs: typeof ProjectService.VFS,
+    projectRoot: string,
+    monaco: typeof Monaco
+  ) {
+    const lockPath = vfs.join(projectRoot, `/${libDir}/deps.lock.json`);
+    if (!(await vfs.exists(lockPath))) {
+      return;
+    }
+    const content = (await vfs.readFile(lockPath, {
+      encoding: 'utf8'
+    })) as string;
+    const deps = JSON.parse(content) as {
+      dependencies: Record<string, { version: string; entry: string }>;
+    };
+    for (const depName of Object.keys(deps.dependencies ?? {})) {
+      const pkg = `${depName}@${deps.dependencies[depName].version}`;
+      console.info(`Loading DTS for package ${pkg}`);
+      try {
+        const libs = await loadTypes(ownerId, pkg, monaco);
+        for (const libPath of Object.keys(libs.libs)) {
+          const oldDisposable = this._extraLibs[libPath];
+          if (oldDisposable) {
+            oldDisposable.dispose();
+          }
+          const disposable = libs.libs[libPath] as Monaco.IDisposable & { ownerId?: string };
+          disposable.ownerId = ownerId;
+          this._extraLibs[libPath] = disposable;
+        }
+      } catch (err) {
+        console.error(`Failed to load DTS for package ${pkg}: ${err}`);
+      }
+    }
+  }
+  private async loadSystemPluginDepTypes(path: string) {
+    const monaco = await this.waitForMonaco();
+    if (!monaco) {
+      return;
+    }
+    const plugin = await SystemPluginService.findPluginByPath(path);
+    if (!plugin) {
+      return;
+    }
+    await this.refreshSystemPluginDependencyTypes(plugin.id, plugin.packageDir, monaco);
+  }
   registerModules() {
     const sceneController = new SceneController(this);
     this._moduleManager.register('Scene', sceneController);
@@ -376,6 +422,9 @@ export class Editor {
   async openCodeFile(fileName: string, language: string) {
     if (language === 'typescript' || language === 'javascript') {
       await this.loadScriptDependencies(fileName);
+      if (this.isSystemPluginPath(fileName)) {
+        await this.loadSystemPluginDepTypes(fileName);
+      }
     }
     await this.editCode(fileName, language);
   }
@@ -747,6 +796,40 @@ export class Editor {
     await SystemPluginService.writePluginState(pluginId, state);
   }
 
+  async getPluginSettings<T = Record<string, unknown>>(pluginId: string): Promise<T | null> {
+    return SystemPluginService.readPluginSettings<T>(pluginId);
+  }
+
+  async savePluginSettings<T = Record<string, unknown>>(pluginId: string, settings: T) {
+    await SystemPluginService.writePluginSettings(pluginId, settings);
+  }
+
+  async saveSystemPluginSettings<T = Record<string, unknown>>(pluginId: string, settings: T, reload = true) {
+    await SystemPluginService.writePluginSettings(pluginId, settings);
+    const plugin = await SystemPluginService.getPlugin(pluginId);
+    if (reload && plugin?.enabled) {
+      return (await this.tryLoadSystemPlugin(pluginId, true))
+        ? plugin
+        : ((await SystemPluginService.getPlugin(pluginId)) ?? plugin);
+    }
+    return plugin;
+  }
+
+  async getSystemPluginSettingsSchema(pluginId: string) {
+    if (this._plugins.hasPlugin(pluginId)) {
+      const plugin = this._plugins.getPlugin(pluginId);
+      if (plugin) {
+        return plugin.settings ?? null;
+      }
+    }
+    const installed = await SystemPluginService.getInstalledPluginSource(pluginId);
+    if (!installed) {
+      return null;
+    }
+    const plugin = await this.importSystemPlugin(installed);
+    return plugin.settings ?? null;
+  }
+
   async listSystemPlugins() {
     return SystemPluginService.listPlugins();
   }
@@ -807,6 +890,30 @@ export class Editor {
       await zipDownloader.zipWriter.add(file.relativePath, new Blob([content]).stream());
     }
     await zipDownloader.finish();
+  }
+
+  async installSystemPluginDependency(id: string, spec: string, onProgress?: (msg: string) => void) {
+    const result = await SystemPluginService.installPluginDependency(id, spec, onProgress);
+    const plugin = await SystemPluginService.getPlugin(id);
+    if (plugin?.enabled) {
+      await this.tryLoadSystemPlugin(id, true);
+    }
+    if (plugin) {
+      await this.refreshSystemPluginDependencyTypes(plugin.id, plugin.packageDir).catch(() => undefined);
+    }
+    return result;
+  }
+
+  async removeSystemPluginDependency(id: string, packageName: string) {
+    const plugin = await SystemPluginService.getPlugin(id);
+    if (!plugin) {
+      throw new Error(`System plugin '${id}' is not installed`);
+    }
+    await this.removeSystemPluginDependencyTypes(plugin.id, packageName);
+    await SystemPluginService.removePluginDependency(id, packageName);
+    if (plugin.enabled) {
+      await this.tryLoadSystemPlugin(id, true);
+    }
   }
 
   async createSystemPluginFile(id: string, relativePath: string, source = '') {
@@ -968,7 +1075,7 @@ export class Editor {
 
   private async importSystemPlugin(installed: InstalledSystemPlugin) {
     SystemPluginService.validatePluginSource(installed.source);
-    const registry = new ScriptRegistry(SystemPluginService.VFS, SystemPluginService.packagesDir);
+    const registry = new ScriptRegistry(SystemPluginService.VFS, installed.manifest.packageDir);
     const moduleUrl = await registry.resolveRuntimeUrl(installed.entryPath);
     if (!moduleUrl) {
       throw new Error(`Cannot load system plugin '${installed.id}'`);
@@ -983,12 +1090,19 @@ export class Editor {
 
   private async ensureBuiltinSystemPlugins() {
     await this.migrateDeprecatedBuiltinSystemPlugins();
-    await this.ensureBuiltinSystemPlugin(sampleOSSExportPlugin, sampleOSSExportPluginFiles);
-    await this.ensureBuiltinSystemPlugin(characterDynamicsToolsPlugin, characterDynamicsToolsPluginFiles);
+    await this.ensureBuiltinSystemPlugin(
+      characterDynamicsToolsPlugin,
+      characterDynamicsToolsPluginFiles,
+      characterDynamicsToolsPluginDependencies
+    );
   }
 
   private async migrateDeprecatedBuiltinSystemPlugins() {
-    const deprecatedPluginIds = ['zephyr3d.gpu-cloth-tools', 'zephyr3d.spring-tools'];
+    const deprecatedPluginIds = [
+      'zephyr3d.gpu-cloth-tools',
+      'zephyr3d.spring-tools',
+      'zephyr3d.sample.oss-export'
+    ];
     for (const id of deprecatedPluginIds) {
       const plugin = await SystemPluginService.getPlugin(id).catch(() => null);
       if (!plugin) {
@@ -1008,10 +1122,18 @@ export class Editor {
         }
       }
       this._systemPluginRegistrations.delete(id);
+      if (!plugin.builtin) {
+        continue;
+      }
+      await SystemPluginService.removePlugin(id).catch(() => undefined);
     }
   }
 
-  private async ensureBuiltinSystemPlugin(plugin: EditorPlugin, files: SystemPluginFileInput[]) {
+  private async ensureBuiltinSystemPlugin(
+    plugin: EditorPlugin,
+    files: SystemPluginFileInput[],
+    dependencies?: Record<string, string>
+  ) {
     try {
       const existing = await SystemPluginService.getPlugin(plugin.id);
       const installedFiles = existing
@@ -1030,9 +1152,17 @@ export class Editor {
           description: plugin.description,
           entryFileName: 'index.ts',
           files,
+          dependencies,
           enabled: existing?.enabled ?? true,
           builtin: true
         });
+        for (const [packageName, versionSpec] of Object.entries(dependencies ?? {})) {
+          await SystemPluginService.installPluginDependency(plugin.id, `${packageName}@${versionSpec}`).catch(
+            (err) => {
+              throw new Error(`Failed to install builtin dependency '${packageName}': ${err}`);
+            }
+          );
+        }
       }
     } catch (err) {
       console.error(`Failed to install or update builtin system plugin '${plugin.id}'.`, err);
@@ -1112,11 +1242,82 @@ export class Editor {
 
   private getScriptRegistryForPath(path: string) {
     return this.isSystemPluginPath(path)
-      ? new ScriptRegistry(SystemPluginService.VFS, SystemPluginService.packagesDir)
+      ? new ScriptRegistry(SystemPluginService.VFS, this.getSystemPluginPackageDir(path))
       : getEngine().scriptingSystem.registry;
+  }
+
+  private async refreshSystemPluginDependencyTypes(
+    pluginId: string,
+    pluginPackageDir: string,
+    monaco?: typeof Monaco
+  ) {
+    const monacoInstance = monaco ?? (await this.waitForMonaco());
+    if (!monacoInstance) {
+      return;
+    }
+    this.clearDependencyTypesForOwner(pluginId);
+    await this.loadDependencyTypesFromLock(
+      pluginId,
+      SystemPluginService.VFS,
+      pluginPackageDir,
+      monacoInstance
+    );
+  }
+
+  private async removeSystemPluginDependencyTypes(pluginId: string, packageName: string) {
+    await this.waitForMonaco();
+    const encodedName = encodeURIComponent(packageName);
+    for (const libPath of Object.keys(this._extraLibs)) {
+      if (
+        libPath.startsWith(`file:///types/esm.sh/${encodedName}/`) ||
+        libPath.startsWith(`file:///types/${encodedName}/`) ||
+        libPath.startsWith(`file:///types/${packageName}/`)
+      ) {
+        this.deleteScriptDependence(libPath);
+      }
+    }
+    this.removeCompilerPathMapping(packageName);
+  }
+
+  private clearDependencyTypesForOwner(ownerId: string) {
+    for (const libPath of Object.keys(this._extraLibs)) {
+      const disposable = this._extraLibs[libPath] as Monaco.IDisposable & { ownerId?: string };
+      if (disposable?.ownerId === ownerId) {
+        this.deleteScriptDependence(libPath);
+      }
+    }
+  }
+
+  private removeCompilerPathMapping(packageName: string) {
+    const monaco = (window as any).monaco as typeof Monaco | undefined;
+    if (!monaco?.languages?.typescript?.typescriptDefaults) {
+      return;
+    }
+    const defaults = monaco.languages.typescript.typescriptDefaults;
+    const prev = defaults.getCompilerOptions?.() ?? {};
+    const nextPaths = { ...(prev.paths || {}) };
+    delete nextPaths[packageName];
+    defaults.setCompilerOptions({
+      ...prev,
+      paths: nextPaths
+    });
   }
 
   private isSystemPluginPath(path: string) {
     return path?.startsWith('/system/plugins/');
+  }
+
+  private getSystemPluginPackageDir(path: string) {
+    const normalizedPath = SystemPluginService.VFS.normalizePath(path);
+    const packagesDir = SystemPluginService.VFS.normalizePath(SystemPluginService.packagesDir);
+    const packagePrefix = `${packagesDir}/`;
+    if (!normalizedPath.startsWith(packagePrefix)) {
+      return SystemPluginService.packagesDir;
+    }
+    const relativePath = normalizedPath.slice(packagePrefix.length);
+    const pluginId = relativePath.split('/')[0];
+    return pluginId
+      ? SystemPluginService.VFS.join(SystemPluginService.packagesDir, pluginId)
+      : SystemPluginService.packagesDir;
   }
 }

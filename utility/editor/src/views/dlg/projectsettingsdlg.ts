@@ -136,11 +136,12 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
           this._vfs,
           '/assets',
           'Image (*.ico;*.jpg;*.png;*.webp)|*.ico;*.jpg;*.png;*.webp',
+          false,
           500,
           400
         ).then((value) => {
-          if (value) {
-            this._settings.favicon = value;
+          if (value.length > 0) {
+            this._settings.favicon = value[0].meta.path;
           }
         });
       }
@@ -158,11 +159,12 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
           this._vfs,
           '/assets',
           'Scene (*.zscn)|*.zscn',
+          false,
           500,
           400
         ).then((value) => {
-          if (value) {
-            this._settings.splashScreen = value;
+          if (value.length > 0) {
+            this._settings.splashScreen = value[0].meta.path;
           }
         });
       }
@@ -180,11 +182,12 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
           this._vfs,
           '/assets',
           'Scene (*.zscn)|*.zscn',
+          false,
           500,
           400
         ).then((value) => {
-          if (value) {
-            this._settings.startupScene = value;
+          if (value.length > 0) {
+            this._settings.startupScene = value[0].meta.path;
           }
         });
       }
@@ -202,11 +205,12 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
           this._vfs,
           '/assets',
           'Script file (*.ts;*.js)|*.ts;*.js',
+          false,
           500,
           400
         ).then((value) => {
-          if (value) {
-            this._settings.startupScript = value;
+          if (value.length > 0) {
+            this._settings.startupScript = value[0].meta.path;
           }
         });
       }

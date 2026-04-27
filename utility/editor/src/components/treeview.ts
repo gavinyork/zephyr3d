@@ -134,7 +134,9 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
       }
     };
 
-    dfs(root, 0);
+    if (root) {
+      dfs(root, 0);
+    }
     this._visibleRows = out;
   }
 

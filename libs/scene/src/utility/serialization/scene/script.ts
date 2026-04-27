@@ -42,7 +42,11 @@ export function getScriptAttachmentClass(): SerializableClass {
           get(this: ScriptAttachment, value) {
             const config = normalizeScriptAttachmentConfig(this.config);
             value.object[0] =
-              config == null ? null : Array.isArray(config) ? new JSONArray(null, config) : new JSONData(null, config);
+              config == null
+                ? null
+                : Array.isArray(config)
+                  ? new JSONArray(null, config)
+                  : new JSONData(null, config);
           },
           set(this: ScriptAttachment, value) {
             const data = value?.object?.[0] as

@@ -1,4 +1,4 @@
-import type { EventListener, FileMetadata, Nullable, VFS, IDisposable } from '@zephyr3d/base';
+import type { EventListener, FileMetadata, Nullable, VFS } from '@zephyr3d/base';
 import { Disposable, Observable } from '@zephyr3d/base';
 import type { Scene, SceneNode, Camera, PropertyAccessor } from '@zephyr3d/scene';
 import { ClipmapTerrain } from '@zephyr3d/scene';
@@ -9,9 +9,29 @@ import type { Command, CommandManager } from './command';
 import type { Editor } from './editor';
 import type { EditTool, EditToolContext } from '../views/edittools/edittool';
 import { TerrainEditTool } from '../views/edittools/terrain';
-import { ProjectService, type ProjectSettings } from './services/project';
+import { ProjectService } from './services/project';
 import { DlgMessage } from '../views/dlg/messagedlg';
+import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { eventBus } from './eventbus';
+import type {
+  EditorMenuLocation as PublicEditorMenuLocation,
+  EditorMenuItem as PublicEditorMenuItem,
+  EditorMenuContribution as PublicEditorMenuContribution,
+  EditorToolbarContribution as PublicEditorToolbarContribution,
+  EditorEditToolFactory as PublicEditorEditToolFactory,
+  EditorSceneContext as PublicEditorSceneContext,
+  EditorAssetContext as PublicEditorAssetContext,
+  EditorMenuContext as PublicEditorMenuContext,
+  EditorToolbarContext as PublicEditorToolbarContext,
+  EditorEditToolFactoryContext as PublicEditorEditToolFactoryContext,
+  EditorPropertyAccessorProvider as PublicEditorPropertyAccessorProvider,
+  EditorEventMap as PublicEditorEventMap,
+  EditorPlugin as PublicEditorPlugin,
+  EditorPluginContext as PublicEditorPluginContext,
+  EditorPluginSetting as PublicEditorPluginSetting,
+  EditorPluginSettingsSchema as PublicEditorPluginSettingsSchema
+} from './pluginapi';
+import { Dialog } from '../views/dlg/dlg';
 
 class EditorPluginSubscription extends Disposable {
   private readonly _disposeCallback: () => void;
@@ -26,44 +46,82 @@ class EditorPluginSubscription extends Disposable {
   }
 }
 
-type EditorPluginEntry = {
-  plugin: EditorPlugin;
-  context: Nullable<EditorPluginContext>;
+export type EditorMenuLocation = PublicEditorMenuLocation;
+export type EditorMenuItem = PublicEditorMenuItem;
+export type EditorMenuContribution = PublicEditorMenuContribution;
+export type EditorToolbarContribution = PublicEditorToolbarContribution;
+export type EditorEditToolFactory = PublicEditorEditToolFactory;
+export type EditorSceneContext = PublicEditorSceneContext;
+export type EditorAssetContext = PublicEditorAssetContext;
+export type EditorMenuContext = PublicEditorMenuContext;
+export type EditorToolbarContext = PublicEditorToolbarContext;
+export type EditorEditToolFactoryContext = PublicEditorEditToolFactoryContext;
+export type EditorPropertyAccessorProvider = PublicEditorPropertyAccessorProvider;
+export type EditorEventMap = PublicEditorEventMap;
+export type EditorPlugin = PublicEditorPlugin;
+export type EditorPluginContext = PublicEditorPluginContext;
+export type EditorPluginSetting = PublicEditorPluginSetting;
+export type EditorPluginSettingsSchema = PublicEditorPluginSettingsSchema;
+
+function normalizePluginSettings(
+  schema: EditorPluginSettingsSchema | undefined,
+  settings: Record<string, unknown> | null | undefined
+) {
+  if (!schema) {
+    return settings ? { ...settings } : null;
+  }
+  const result: Record<string, unknown> = {};
+  for (const [key, descriptor] of Object.entries(schema)) {
+    const value = settings?.[key];
+    if (value === undefined || value === null) {
+      if (descriptor.default !== undefined) {
+        result[key] = descriptor.default;
+      }
+      continue;
+    }
+    if (descriptor.type === 'boolean') {
+      result[key] = !!value;
+      continue;
+    }
+    if (descriptor.type === 'number') {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        result[key] = value;
+      } else if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) {
+        result[key] = Number(value);
+      } else if (descriptor.default !== undefined) {
+        result[key] = descriptor.default;
+      }
+      continue;
+    }
+    result[key] = typeof value === 'string' ? value : String(value);
+  }
+  return result;
+}
+
+export type InternalEditorMenuItem = Omit<MenuItemOptions, 'enabled' | 'subMenus'> & {
+  visible?: (ctx: InternalEditorMenuContext) => boolean;
+  enabled?: (ctx: InternalEditorMenuContext) => boolean;
+  subMenus?: InternalEditorMenuItem[];
 };
 
-export type EditorMenuLocation = 'main' | 'scene-hierarchy' | 'asset-content' | 'asset-directory';
-
-export type EditorMenuItem = Omit<MenuItemOptions, 'enabled' | 'subMenus'> & {
-  visible?: (ctx: EditorMenuContext) => boolean;
-  enabled?: (ctx: EditorMenuContext) => boolean;
-  subMenus?: EditorMenuItem[];
-};
-
-export type EditorMenuContribution = {
+export type InternalEditorMenuContribution = {
   location: EditorMenuLocation;
   parentId?: string;
-  items: EditorMenuItem[] | ((ctx: EditorMenuContext) => EditorMenuItem[]);
+  items: InternalEditorMenuItem[] | ((ctx: InternalEditorMenuContext) => InternalEditorMenuItem[]);
 };
 
-export type EditorToolbarContribution = ToolBarItem | ((ctx: EditorToolbarContext) => ToolBarItem);
+export type InternalEditorToolbarContribution =
+  | ToolBarItem
+  | ((ctx: InternalEditorToolbarContext) => ToolBarItem);
 
-export type EditorEditToolFactory = {
+export type InternalEditorEditToolFactory = {
   id: string;
-  canEdit: (obj: unknown, ctx: EditorEditToolFactoryContext) => boolean;
-  create: (obj: unknown, ctx: EditorEditToolFactoryContext) => Nullable<EditTool>;
+  canEdit: (obj: unknown, ctx: InternalEditorEditToolFactoryContext) => boolean;
+  create: (obj: unknown, ctx: InternalEditorEditToolFactoryContext) => Nullable<EditTool>;
   priority?: number;
 };
 
-export type EditorPlugin = {
-  id: string;
-  name?: string;
-  version?: string;
-  description?: string;
-  activate: (ctx: EditorPluginContext) => void | Promise<void>;
-  deactivate?: (ctx: EditorPluginContext) => void | Promise<void>;
-};
-
-export type EditorSceneContext = {
+export type InternalEditorSceneContext = {
   editor: Editor;
   scene: Nullable<Scene>;
   selectedNodes: readonly SceneNode[];
@@ -76,7 +134,7 @@ export type EditorSceneContext = {
   getViewportRect(): readonly [number, number, number, number] | null;
 };
 
-export type EditorAssetContext = {
+export type InternalEditorAssetContext = {
   editor: Editor;
   vfs: VFS;
   selectedDir: Nullable<{ path: string }>;
@@ -84,26 +142,26 @@ export type EditorAssetContext = {
   selectedItems: readonly unknown[];
 };
 
-export type EditorMenuContext = {
+export type InternalEditorMenuContext = {
   location: EditorMenuLocation;
-  scene?: EditorSceneContext;
-  assets?: EditorAssetContext;
+  scene?: InternalEditorSceneContext;
+  assets?: InternalEditorAssetContext;
   target?: unknown;
 };
 
-export type EditorToolbarContext = {
-  scene: EditorSceneContext;
+export type InternalEditorToolbarContext = {
+  scene: InternalEditorSceneContext;
 };
 
-export type EditorEditToolFactoryContext = EditToolContext & {
+export type InternalEditorEditToolFactoryContext = EditToolContext & {
   editor: Editor;
 };
 
-export type EditorPropertyAccessorProvider = (
+export type InternalEditorPropertyAccessorProvider = (
   object: unknown
 ) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>;
 
-export type EditorEventMap = {
+export type InternalEditorEventMap = {
   pluginContributionsChanged: [];
   sceneOpening: [path: string];
   sceneOpened: [scene: Scene, path: string];
@@ -125,18 +183,23 @@ export type EditorEventMap = {
   ];
   editToolActivated: [tool: EditTool, target: unknown];
   editToolDeactivated: [tool: EditTool, target: unknown];
-  assetSelectionChanged: [ctx: EditorAssetContext];
+  assetSelectionChanged: [ctx: InternalEditorAssetContext];
 };
 
-export class EditorPluginManager extends Observable<EditorEventMap> {
+type EditorPluginEntry = {
+  plugin: EditorPlugin;
+  context: Nullable<EditorPluginContext>;
+};
+
+export class EditorPluginManager extends Observable<InternalEditorEventMap> {
   private readonly _editor: Editor;
   private readonly _plugins = new Map<string, EditorPluginEntry>();
   private readonly _activePlugins = new Set<string>();
-  private readonly _mainMenuItems: EditorMenuContribution[] = [];
-  private readonly _contextMenuItems: EditorMenuContribution[] = [];
-  private readonly _toolbarItems: EditorToolbarContribution[] = [];
-  private readonly _editToolFactories: EditorEditToolFactory[] = [];
-  private readonly _propertyAccessorProviders = new Map<string, EditorPropertyAccessorProvider>();
+  private readonly _mainMenuItems: InternalEditorMenuContribution[] = [];
+  private readonly _contextMenuItems: InternalEditorMenuContribution[] = [];
+  private readonly _toolbarItems: InternalEditorToolbarContribution[] = [];
+  private readonly _editToolFactories: InternalEditorEditToolFactory[] = [];
+  private readonly _propertyAccessorProviders = new Map<string, InternalEditorPropertyAccessorProvider>();
 
   constructor(editor: Editor) {
     super();
@@ -191,6 +254,10 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
     return this._plugins.has(id);
   }
 
+  getPlugin(id: string) {
+    return this._plugins.get(id)?.plugin ?? null;
+  }
+
   unregisterPlugin(id: string) {
     if (this._activePlugins.has(id)) {
       throw new Error(`Editor plugin '${id}' is still active`);
@@ -202,7 +269,7 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
     return this._activePlugins.has(id);
   }
 
-  addMenuItems(contribution: EditorMenuContribution) {
+  addMenuItems(contribution: InternalEditorMenuContribution) {
     const list = contribution.location === 'main' ? this._mainMenuItems : this._contextMenuItems;
     list.push(contribution);
     this.dispatchContributionChanged();
@@ -216,7 +283,7 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
     return dispose;
   }
 
-  addToolbarItem(item: EditorToolbarContribution) {
+  addToolbarItem(item: InternalEditorToolbarContribution) {
     this._toolbarItems.push(item);
     this.dispatchContributionChanged();
     return () => {
@@ -228,7 +295,7 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
     };
   }
 
-  addEditToolFactory(factory: EditorEditToolFactory) {
+  addEditToolFactory(factory: InternalEditorEditToolFactory) {
     if (this._editToolFactories.some((item) => item.id === factory.id)) {
       throw new Error(`Editor edit tool factory '${factory.id}' already registered`);
     }
@@ -244,7 +311,7 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
     };
   }
 
-  addPropertyAccessorProvider(id: string, provider: EditorPropertyAccessorProvider) {
+  addPropertyAccessorProvider(id: string, provider: InternalEditorPropertyAccessorProvider) {
     if (this._propertyAccessorProviders.has(id)) {
       throw new Error(`Editor property accessor provider '${id}' already registered`);
     }
@@ -264,28 +331,28 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
     return results.flatMap((props) => props ?? []);
   }
 
-  getContextMenuItems(location: EditorMenuLocation, ctx: EditorMenuContext) {
+  getContextMenuItems(location: EditorMenuLocation, ctx: InternalEditorMenuContext) {
     return this._contextMenuItems
       .filter((contribution) => contribution.location === location)
       .flatMap((contribution) => this.resolveMenuItems(contribution, ctx));
   }
 
-  getToolbarItems(ctx: EditorToolbarContext) {
+  getToolbarItems(ctx: InternalEditorToolbarContext) {
     return this._toolbarItems
       .map((item) => (typeof item === 'function' ? item(ctx) : item))
       .filter((item): item is ToolBarItem => !!item);
   }
 
-  canEditObject(obj: unknown, ctx: EditorEditToolFactoryContext) {
+  canEditObject(obj: unknown, ctx: InternalEditorEditToolFactoryContext) {
     return this._editToolFactories.some((factory) => factory.canEdit(obj, ctx));
   }
 
-  createEditTool(obj: unknown, ctx: EditorEditToolFactoryContext): Nullable<EditTool> {
+  createEditTool(obj: unknown, ctx: InternalEditorEditToolFactoryContext): Nullable<EditTool> {
     const factory = this._editToolFactories.find((item) => item.canEdit(obj, ctx));
     return factory?.create(obj, ctx) ?? null;
   }
 
-  applyMainMenuContributions(items: MenuItemOptions[], ctx: EditorMenuContext) {
+  applyMainMenuContributions(items: MenuItemOptions[], ctx: InternalEditorMenuContext) {
     for (const contribution of this._mainMenuItems) {
       const contributed = this.resolveMenuItems(contribution, ctx);
       if (contributed.length === 0) {
@@ -305,7 +372,7 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
     }
   }
 
-  renderMenuItems(items: readonly EditorMenuItem[], ctx: EditorMenuContext) {
+  renderMenuItems(items: readonly InternalEditorMenuItem[], ctx: InternalEditorMenuContext) {
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (item.visible && !item.visible(ctx)) {
@@ -333,7 +400,10 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
     }
   }
 
-  toMenuItemOptions(items: readonly EditorMenuItem[], ctx: EditorMenuContext): MenuItemOptions[] {
+  toMenuItemOptions(
+    items: readonly InternalEditorMenuItem[],
+    ctx: InternalEditorMenuContext
+  ): MenuItemOptions[] {
     return items.map((item) => ({
       label: item.label,
       shortCut: item.shortCut,
@@ -346,8 +416,8 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
   }
 
   private createPluginContext(plugin: EditorPlugin): EditorPluginContext {
-    const context: EditorPluginContext = {
-      editor: this._editor,
+    const context = {
+      editor: this._editor as unknown as EditorPluginContext['editor'],
       events: this,
       project: {
         isReadOnly: () => this._editor.isProjectReadOnly(),
@@ -356,56 +426,86 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
         exists: (path) => this._editor.projectFileExists(path),
         ensureDirectory: (path) => this._editor.ensureProjectDirectory(path),
         readText: (path) => this._editor.readProjectTextFile(path),
+        readBinary: async (path) =>
+          (await ProjectService.VFS.readFile(path, { encoding: 'binary' })) as ArrayBuffer,
         writeText: (path, content) => this._editor.writeProjectTextFile(path, content),
+        writeBinary: async (path, data) =>
+          await ProjectService.VFS.writeFile(path, data, { encoding: 'binary' }),
         openCode: (path, language) => this._editor.openProjectCodeFile(path, language)
       },
       system: {
         getState: <T = unknown>() => this._editor.getPluginState<T>(plugin.id),
-        saveState: <T = unknown>(state: T) => this._editor.savePluginState(plugin.id, state)
+        saveState: <T = unknown>(state: T) => this._editor.savePluginState(plugin.id, state),
+        getSettings: async <T = Record<string, unknown>>() =>
+          normalizePluginSettings(
+            plugin.settings,
+            (await this._editor.getPluginSettings<Record<string, unknown>>(plugin.id)) ?? null
+          ) as T | null,
+        saveSettings: async <T extends Record<string, unknown> = Record<string, unknown>>(settings: T) =>
+          this._editor.savePluginSettings(
+            plugin.id,
+            normalizePluginSettings(plugin.settings, settings) as Record<string, unknown>
+          )
       },
       ui: {
-        message: (title, message, width, height) => DlgMessage.messageBox(title, message, width, height)
+        message: (title, message, width, height) => DlgMessage.messageBox(title, message, width, height),
+        confirm: async (title, message, okLabel = 'Ok', cancelLabel = 'Cancel') =>
+          (await DlgMessageBoxEx.messageBoxEx(title, message, [okLabel, cancelLabel], 420, 0, true)) ===
+          okLabel,
+        selectProjectFiles: async (title, rootDir, multi, filter, width, height) =>
+          await Dialog.openFile(title, ProjectService.VFS, rootDir, filter, multi, width, height),
+        selectProjectFolders: async (title, rootDir, multi, width, height) =>
+          await Dialog.openFolder(title, ProjectService.VFS, rootDir, multi, width, height)
       },
       refreshProperties: () => eventBus.dispatchEvent('refresh_properties'),
       notifySceneChanged: () => eventBus.dispatchEvent('scene_changed'),
-      registerMenuItems: (contribution) => {
-        const dispose = this.addMenuItems(contribution);
+      registerMenuItems: (contribution: EditorMenuContribution) => {
+        const dispose = this.addMenuItems(contribution as unknown as InternalEditorMenuContribution);
         context.subscriptions.push(new EditorPluginSubscription(dispose));
         return dispose;
       },
-      registerToolbarItem: (item) => {
-        const dispose = this.addToolbarItem(item);
+      registerToolbarItem: (item: EditorToolbarContribution) => {
+        const dispose = this.addToolbarItem(item as InternalEditorToolbarContribution);
         context.subscriptions.push(new EditorPluginSubscription(dispose));
         return dispose;
       },
-      registerEditTool: (factory) => {
-        const dispose = this.addEditToolFactory(factory);
+      registerEditTool: (factory: EditorEditToolFactory) => {
+        const dispose = this.addEditToolFactory(factory as unknown as InternalEditorEditToolFactory);
         context.subscriptions.push(new EditorPluginSubscription(dispose));
         return dispose;
       },
-      registerPropertyAccessors: (providerId, provider) => {
+      registerPropertyAccessors: (providerId: string, provider: EditorPropertyAccessorProvider) => {
         const dispose = this.addPropertyAccessorProvider(`${plugin.id}:${providerId}`, provider);
         context.subscriptions.push(new EditorPluginSubscription(dispose));
         return dispose;
       },
       on: (type, listener, listenerContext) => {
         const eventContext = listenerContext ?? context;
-        this.on(type, listener as EventListener<EditorEventMap, keyof EditorEventMap>, eventContext);
+        this.on(
+          type as keyof InternalEditorEventMap,
+          listener as EventListener<InternalEditorEventMap, keyof InternalEditorEventMap>,
+          eventContext
+        );
         const subscription = new EditorPluginSubscription(() =>
-          this.off(type, listener as EventListener<EditorEventMap, keyof EditorEventMap>, eventContext)
+          this.off(
+            type as keyof InternalEditorEventMap,
+            listener as EventListener<InternalEditorEventMap, keyof InternalEditorEventMap>,
+            eventContext
+          )
         );
         context.subscriptions.push(subscription);
         return subscription;
       },
       subscriptions: [],
       log: (...args) => console.info(`[editor-plugin:${plugin.id}]`, ...args)
-    };
-    return {
-      ...context
-    };
+    } as EditorPluginContext;
+    return context;
   }
 
-  private resolveMenuItems(contribution: EditorMenuContribution, ctx: EditorMenuContext): EditorMenuItem[] {
+  private resolveMenuItems(
+    contribution: InternalEditorMenuContribution,
+    ctx: InternalEditorMenuContext
+  ): InternalEditorMenuItem[] {
     const items = typeof contribution.items === 'function' ? contribution.items(ctx) : contribution.items;
     return (items ?? []).filter((item) => !item.visible || item.visible(ctx));
   }
@@ -435,41 +535,3 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
     this.dispatchEvent('pluginContributionsChanged');
   }
 }
-
-export type EditorPluginContext = {
-  editor: Editor;
-  events: EditorPluginManager;
-  project: {
-    isReadOnly(): boolean;
-    getSettings(): Promise<ProjectSettings>;
-    saveSettings(settings: ProjectSettings): Promise<void>;
-    exists(path: string): Promise<boolean>;
-    ensureDirectory(path: string): Promise<void>;
-    readText(path: string): Promise<Nullable<string>>;
-    writeText(path: string, content: string): Promise<void>;
-    openCode(path: string, language?: string): Promise<void>;
-  };
-  system: {
-    getState<T = unknown>(): Promise<Nullable<T>>;
-    saveState<T = unknown>(state: T): Promise<void>;
-  };
-  ui: {
-    message(title: string, message: string, width?: number, height?: number): Promise<void>;
-  };
-  refreshProperties(): void;
-  notifySceneChanged(): void;
-  registerMenuItems(contribution: EditorMenuContribution): () => void;
-  registerToolbarItem(item: EditorToolbarContribution): () => void;
-  registerEditTool(factory: EditorEditToolFactory): () => void;
-  registerPropertyAccessors(id: string, provider: EditorPropertyAccessorProvider): () => void;
-  /**
-   * Subscribe to editor events. Subscriptions are automatically disposed when the plugin is deactivated.
-   */
-  on<K extends keyof EditorEventMap>(
-    type: K,
-    listener: EventListener<EditorEventMap, K>,
-    context?: unknown
-  ): IDisposable;
-  subscriptions: IDisposable[];
-  log(...args: unknown[]): void;
-};

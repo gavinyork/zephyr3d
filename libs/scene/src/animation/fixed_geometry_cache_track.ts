@@ -23,8 +23,7 @@ export class FixedGeometryCacheTrack extends AnimationTrack<FixedGeometryCacheSt
     super(embedded);
     this._times = times ?? new Float32Array();
     this._frames = frames ?? [];
-    this._state =
-      this._frames.length > 0 ? createGeometryCacheState(this._frames[0]) : null;
+    this._state = this._frames.length > 0 ? createGeometryCacheState(this._frames[0]) : null;
     this._meshBindings = new WeakMap();
   }
 

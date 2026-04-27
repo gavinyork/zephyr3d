@@ -24,7 +24,9 @@ export class DlgZABCCompress extends DialogRenderer<ZABCCompressDialogResult> {
   private readonly _components: [number];
   private readonly _compressNormals: [boolean];
   private readonly _fileCount: number;
-  private readonly _previewProvider: ((components: number, compressNormals: boolean) => Promise<ZABCPreviewStats>) | null;
+  private readonly _previewProvider:
+    | ((components: number, compressNormals: boolean) => Promise<ZABCPreviewStats>)
+    | null;
   private _previewLoading: boolean;
   private _previewStats: ZABCPreviewStats | null;
   private _previewError: string;
@@ -34,7 +36,12 @@ export class DlgZABCCompress extends DialogRenderer<ZABCCompressDialogResult> {
     previewProvider?: (components: number, compressNormals: boolean) => Promise<ZABCPreviewStats>,
     width = 460
   ): Promise<ZABCCompressDialogResult> {
-    return new DlgZABCCompress('ZABC Import Options##Dialog', fileCount, previewProvider ?? null, width).showModal();
+    return new DlgZABCCompress(
+      'ZABC Import Options##Dialog',
+      fileCount,
+      previewProvider ?? null,
+      width
+    ).showModal();
   }
 
   constructor(

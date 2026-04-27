@@ -1,4 +1,6 @@
 import { IndexedDBFS, PathUtils } from '@zephyr3d/base';
+import { libDir } from '../build/templates';
+import { installDeps } from '../build/dep';
 
 const META_DATABASE_NAME = 'zephyr3d-editor';
 const systemPluginVFS = new IndexedDBFS(META_DATABASE_NAME, '$');
@@ -14,6 +16,7 @@ export type SystemPluginManifestEntry = {
   version?: string;
   description?: string;
   entry: string;
+  dependencies?: Record<string, string>;
   enabled: boolean;
   installedAt: number;
   updatedAt: number;
@@ -27,6 +30,9 @@ type SystemPluginManifest = {
 export type SystemPluginRecord = SystemPluginManifestEntry & {
   packageDir: string;
   statePath: string;
+  settingsPath: string;
+  depsRoot: string;
+  depsLockPath: string;
 };
 
 export type InstalledSystemPlugin = {
@@ -43,6 +49,7 @@ export type InstallSystemPluginInput = {
   description?: string;
   entryFileName?: string;
   source: string;
+  dependencies?: Record<string, string>;
   enabled?: boolean;
   builtin?: boolean;
 };
@@ -59,6 +66,7 @@ export type InstallSystemPluginFilesInput = {
   description?: string;
   entryFileName?: string;
   files: SystemPluginFileInput[];
+  dependencies?: Record<string, string>;
   enabled?: boolean;
   builtin?: boolean;
 };
@@ -180,6 +188,18 @@ export class SystemPluginService {
         name: PathUtils.basename(item.path)
       }))
       .sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  static async findPluginByPath(path: string): Promise<SystemPluginRecord | null> {
+    const normalizedPath = systemPluginVFS.normalizePath(path);
+    const plugins = await this.listPlugins();
+    for (const plugin of plugins) {
+      const packageDir = systemPluginVFS.normalizePath(plugin.packageDir);
+      if (normalizedPath === packageDir || normalizedPath.startsWith(`${packageDir}/`)) {
+        return plugin;
+      }
+    }
+    return null;
   }
 
   static async createPluginFile(pluginId: string, relativePath: string, source = ''): Promise<string> {
@@ -386,6 +406,7 @@ export class SystemPluginService {
       version: input.version,
       description: input.description,
       entryFileName: input.entryFileName,
+      dependencies: input.dependencies,
       files: [
         {
           path: input.entryFileName ?? 'index.ts',
@@ -421,6 +442,9 @@ export class SystemPluginService {
         create: true
       });
     }
+    if (input.dependencies && Object.keys(input.dependencies).length > 0) {
+      await systemPluginVFS.makeDirectory(systemPluginVFS.join(packageDir, libDir), true);
+    }
 
     manifest.plugins[input.id] = {
       id: input.id,
@@ -428,6 +452,7 @@ export class SystemPluginService {
       version: input.version,
       description: input.description,
       entry: `/${entryFileName}`,
+      dependencies: input.dependencies ? { ...input.dependencies } : oldEntry?.dependencies,
       enabled: input.enabled ?? true,
       installedAt: oldEntry?.installedAt ?? now,
       updatedAt: now,
@@ -450,6 +475,7 @@ export class SystemPluginService {
     await this.writeManifest(manifest);
     await systemPluginVFS.deleteDirectory(this.getPackageDir(id), true).catch(() => undefined);
     await systemPluginVFS.deleteFile(this.getStatePath(id)).catch(() => undefined);
+    await systemPluginVFS.deleteFile(this.getSettingsPath(id)).catch(() => undefined);
   }
 
   static async setPluginEnabled(id: string, enabled: boolean): Promise<SystemPluginRecord> {
@@ -476,6 +502,23 @@ export class SystemPluginService {
   static async writePluginState<T = unknown>(id: string, state: T): Promise<void> {
     await this.ensureLayout();
     await systemPluginVFS.writeFile(this.getStatePath(id), JSON.stringify(state ?? null, null, 2), {
+      encoding: 'utf8',
+      create: true
+    });
+  }
+
+  static async readPluginSettings<T = unknown>(id: string): Promise<T | null> {
+    const path = this.getSettingsPath(id);
+    if (!(await systemPluginVFS.exists(path))) {
+      return null;
+    }
+    const content = (await systemPluginVFS.readFile(path, { encoding: 'utf8' })) as string;
+    return JSON.parse(content) as T;
+  }
+
+  static async writePluginSettings<T = unknown>(id: string, settings: T): Promise<void> {
+    await this.ensureLayout();
+    await systemPluginVFS.writeFile(this.getSettingsPath(id), JSON.stringify(settings ?? null, null, 2), {
       encoding: 'utf8',
       create: true
     });
@@ -527,6 +570,93 @@ export class SystemPluginService {
       files: inputFiles,
       enabled: true
     });
+  }
+
+  static async installPluginDependency(
+    pluginId: string,
+    spec: string,
+    onProgress?: (msg: string) => void
+  ): Promise<{ name: string; version: string }> {
+    const plugin = await this.getPlugin(pluginId);
+    if (!plugin) {
+      throw new Error(`System plugin '${pluginId}' is not installed`);
+    }
+    const match = spec.match(/^((?:@[^/]+\/)?[^@/]+)(?:@(.+))?$/);
+    const packageName = match?.[1] ?? spec;
+    const previousVersion = plugin.dependencies?.[packageName];
+    await systemPluginVFS.makeDirectory(plugin.depsRoot, true);
+    const result = await installDeps(plugin.id, systemPluginVFS, plugin.packageDir, spec, onProgress, true);
+    if (previousVersion && previousVersion !== result.version) {
+      const oldDir = systemPluginVFS.join(plugin.depsRoot, `${result.name}@${previousVersion}`);
+      await systemPluginVFS.deleteDirectory(oldDir, true).catch(() => undefined);
+    }
+    const manifest = await this.readManifest();
+    const manifestEntry = manifest.plugins[pluginId];
+    if (manifestEntry) {
+      manifestEntry.dependencies = {
+        ...(manifestEntry.dependencies ?? {}),
+        [result.name]: result.version
+      };
+      manifestEntry.updatedAt = Date.now();
+      await this.writeManifest(manifest);
+    }
+    return result;
+  }
+
+  static async removePluginDependency(pluginId: string, packageName: string): Promise<void> {
+    const plugin = await this.getPlugin(pluginId);
+    if (!plugin) {
+      throw new Error(`System plugin '${pluginId}' is not installed`);
+    }
+    const manifest = await this.readManifest();
+    const manifestEntry = manifest.plugins[pluginId];
+    if (!manifestEntry) {
+      throw new Error(`System plugin '${pluginId}' is not installed`);
+    }
+    const existingVersion = manifestEntry.dependencies?.[packageName];
+    if (!existingVersion) {
+      throw new Error(`Dependency '${packageName}' is not installed for plugin '${pluginId}'`);
+    }
+
+    const lock = await this.readPluginDependencyLock(plugin);
+    if (lock?.dependencies?.[packageName]) {
+      const cachedDir = systemPluginVFS.join(
+        plugin.depsRoot,
+        `${packageName}@${lock.dependencies[packageName].version}`
+      );
+      await systemPluginVFS.deleteDirectory(cachedDir, true).catch(() => undefined);
+      delete lock.dependencies[packageName];
+      if (Object.keys(lock.dependencies).length === 0) {
+        await systemPluginVFS.deleteFile(plugin.depsLockPath).catch(() => undefined);
+      } else {
+        await systemPluginVFS.writeFile(plugin.depsLockPath, JSON.stringify(lock, null, 2), {
+          encoding: 'utf8',
+          create: true
+        });
+      }
+    } else {
+      const cachedDir = systemPluginVFS.join(plugin.depsRoot, `${packageName}@${existingVersion}`);
+      await systemPluginVFS.deleteDirectory(cachedDir, true).catch(() => undefined);
+    }
+
+    delete manifestEntry.dependencies?.[packageName];
+    if (manifestEntry.dependencies && Object.keys(manifestEntry.dependencies).length === 0) {
+      delete manifestEntry.dependencies;
+    }
+    manifestEntry.updatedAt = Date.now();
+    await this.writeManifest(manifest);
+
+    if (!(await this.hasDependencyCacheFiles(plugin.depsRoot))) {
+      await systemPluginVFS.deleteDirectory(plugin.depsRoot, true).catch(() => undefined);
+    }
+  }
+
+  static getDependenciesRoot(id: string) {
+    return systemPluginVFS.join(this.getPackageDir(id), libDir);
+  }
+
+  static getDependenciesLockPath(id: string) {
+    return systemPluginVFS.join(this.getDependenciesRoot(id), 'deps.lock.json');
   }
 
   static async updatePluginSourceByEntryPath(entryPath: string, source: string): Promise<SystemPluginRecord> {
@@ -604,9 +734,8 @@ export class SystemPluginService {
       if (spec.startsWith('@zephyr3d/')) {
         continue;
       }
-      throw new Error(
-        `System plugin imports must be relative or use import-map/host-provided modules. Unsupported import: '${spec}'`
-      );
+      // Bare imports are allowed for third-party packages declared and installed inside the plugin package.
+      continue;
     }
   }
 
@@ -765,6 +894,35 @@ export class SystemPluginService {
     return systemPluginVFS.join(SYSTEM_PLUGIN_STATE_DIR, `${id}.json`);
   }
 
+  private static getSettingsPath(id: string) {
+    return systemPluginVFS.join(SYSTEM_PLUGIN_STATE_DIR, `${id}.settings.json`);
+  }
+
+  private static async readPluginDependencyLock(plugin: SystemPluginRecord): Promise<{
+    dependencies: Record<string, { version: string; entry: string; url: string }>;
+  } | null> {
+    if (!(await systemPluginVFS.exists(plugin.depsLockPath))) {
+      return null;
+    }
+    const content = (await systemPluginVFS.readFile(plugin.depsLockPath, {
+      encoding: 'utf8'
+    })) as string;
+    return JSON.parse(content) as {
+      dependencies: Record<string, { version: string; entry: string; url: string }>;
+    };
+  }
+
+  private static async hasDependencyCacheFiles(depsRoot: string): Promise<boolean> {
+    if (!(await systemPluginVFS.exists(depsRoot))) {
+      return false;
+    }
+    const entries = await systemPluginVFS.readDirectory(depsRoot, {
+      includeHidden: true,
+      recursive: true
+    });
+    return entries.some((entry) => entry.type === 'file');
+  }
+
   private static async readManifest(): Promise<SystemPluginManifest> {
     await this.ensureLayout();
     if (!(await systemPluginVFS.exists(SYSTEM_PLUGIN_MANIFEST))) {
@@ -793,7 +951,10 @@ export class SystemPluginService {
     return {
       ...plugin,
       packageDir: this.getPackageDir(plugin.id),
-      statePath: this.getStatePath(plugin.id)
+      statePath: this.getStatePath(plugin.id),
+      settingsPath: this.getSettingsPath(plugin.id),
+      depsRoot: this.getDependenciesRoot(plugin.id),
+      depsLockPath: this.getDependenciesLockPath(plugin.id)
     };
   }
 }

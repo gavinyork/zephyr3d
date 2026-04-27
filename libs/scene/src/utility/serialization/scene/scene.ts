@@ -666,7 +666,11 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           },
           add(this: Scene, value, index) {
             const attachments = this.scripts;
-            attachments.splice(index ?? attachments.length, 0, (value.object?.[0] as ScriptAttachment) ?? new ScriptAttachment());
+            attachments.splice(
+              index ?? attachments.length,
+              0,
+              (value.object?.[0] as ScriptAttachment) ?? new ScriptAttachment()
+            );
             this.scripts = attachments;
           },
           delete(this: Scene, index) {
@@ -694,7 +698,11 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           get(this: Scene, value) {
             const config = normalizeScriptAttachmentConfig(this.scriptConfig);
             value.object[0] =
-              config == null ? null : Array.isArray(config) ? new JSONArray(null, config) : new JSONData(null, config);
+              config == null
+                ? null
+                : Array.isArray(config)
+                  ? new JSONArray(null, config)
+                  : new JSONData(null, config);
           },
           set(this: Scene, value) {
             const data = value?.object[0] as

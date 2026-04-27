@@ -736,10 +736,7 @@ export class PropertyEditor extends Observable<{
     const canInlineEdit = !!value.set && !readonly && !isSceneNodeRef && !isAssetRef;
     const hasValue = !!String(val[0] ?? '').trim();
     const addable = !!group.prop.add && group.index === group.count - 1;
-    const deletable =
-      !!group.prop.delete &&
-      group.index < group.count &&
-      (group.count > 1 || hasValue);
+    const deletable = !!group.prop.delete && group.index < group.count && (group.count > 1 || hasValue);
     const pickerButtonCount = (isSceneNodeRef || isAssetRef) && value.set ? 1 : 0;
     const clearButtonCount = (isSceneNodeRef || isAssetRef) && !!value.set && !!val[0] ? 1 : 0;
     const extraButtons = pickerButtonCount + clearButtonCount + (addable ? 1 : 0) + (deletable ? 1 : 0);
@@ -805,12 +802,7 @@ export class PropertyEditor extends Observable<{
     if (clearButtonCount > 0) {
       ImGui.SameLine(0, 0);
       this.pushInlineActionButtonStyle();
-      if (
-        ImGui.Button(
-          `${FontGlyph.glyphs['cancel']}##clear`,
-          new ImGui.ImVec2(ImGui.GetFrameHeight(), 0)
-        )
-      ) {
+      if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##clear`, new ImGui.ImVec2(ImGui.GetFrameHeight(), 0))) {
         tmpProperty.str[0] = '';
         Promise.resolve(value.set!.call(object, tmpProperty)).then(() => {
           this.refresh();

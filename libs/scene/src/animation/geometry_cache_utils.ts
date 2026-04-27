@@ -1,6 +1,6 @@
 import { getDevice, getEngine } from '../app/api';
 import type { Mesh } from '../scene';
-import { Primitive } from '../render/primitive';
+import type { Primitive } from '../render/primitive';
 import { BoundingBox } from '../utility/bounding_volume';
 import type { Nullable } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
@@ -35,7 +35,9 @@ type GeometryCacheMeshState = {
 
 const geometryCacheMeshStates = new WeakMap<Mesh, GeometryCacheMeshState>();
 
-export function createGeometryCacheState(frame: Pick<GeometryCacheFrame, 'positions' | 'normals'>): GeometryCacheState {
+export function createGeometryCacheState(
+  frame: Pick<GeometryCacheFrame, 'positions' | 'normals'>
+): GeometryCacheState {
   return {
     positions: new Float32Array(frame.positions.length),
     normals: frame.normals ? new Float32Array(frame.normals.length) : null,
@@ -191,7 +193,9 @@ function ensureGeometryCacheNormalBuffer(
 
 async function resolveOriginalPrimitive(meshState: GeometryCacheMeshState) {
   if (meshState.originalPrimitiveAssetId) {
-    const restoredPrimitive = await getEngine().resourceManager.fetchPrimitive(meshState.originalPrimitiveAssetId);
+    const restoredPrimitive = await getEngine().resourceManager.fetchPrimitive(
+      meshState.originalPrimitiveAssetId
+    );
     if (restoredPrimitive) {
       return restoredPrimitive;
     }

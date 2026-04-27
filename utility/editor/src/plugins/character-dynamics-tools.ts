@@ -9,7 +9,8 @@ import springPropertyProviderSource from './spring-plugin-src/property-provider.
 import springRuntimeTemplateSource from './spring-plugin-src/runtime-template.ts?raw';
 import springSharedSource from './spring-plugin-src/shared.ts?raw';
 
-export const characterDynamicsToolsPluginSource = `import type { EditorPlugin } from '@zephyr3d/editor/editor-plugin';
+export const characterDynamicsToolsPluginSource = `import OSS from 'ali-oss';
+import type { EditorPlugin } from '@zephyr3d/editor/editor-plugin';
 import { SceneNode } from '@zephyr3d/scene';
 import { initGPUClothPaintTool } from './gpu-cloth/paint-tool';
 import { initGPUClothPropertyProvider } from './gpu-cloth/property-provider';
@@ -22,8 +23,7 @@ import { isSpringHost } from './spring/shared';
 const DEFAULT_GPU_CLOTH_SCRIPT_PATH = '/assets/scripts/gpucloth.ts';
 const DEFAULT_SPRING_SCRIPT_PATH = '/assets/scripts/springtest.ts';
 
-// 通过 ctx.project 访问当前工程的虚拟文件系统。
-// 这里统一负责“确保脚本文件存在”，这样菜单项和右键挂载逻辑都可以复用同一套入口。
+// 统一确保运行时脚本存在，主菜单和右键菜单都复用这一个入口。
 async function ensureProjectScript(
   ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0],
   path: string,
@@ -42,10 +42,88 @@ async function ensureProjectScript(
   return path;
 }
 
-// 挂载脚本时只设置脚本路径。
-// 具体默认配置由脚本内部的 @scriptProp 装饰器声明负责，插件层不再手动注入 scriptConfig。
+type OSSPluginSettings = {
+  region?: string;
+  bucket?: string;
+  accessKeyId?: string;
+  accessKeySecret?: string;
+  endpoint?: string;
+  prefix?: string;
+};
+
+async function getOSSSettings(ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0]) {
+  return ((await ctx.system.getSettings<OSSPluginSettings>()) ?? {}) as OSSPluginSettings;
+}
+
+// OSS 导出逻辑放在插件内，便于业务方后续继续维护上传流程。
+async function exportProjectToOSS(ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0]) {
+  if (!ctx.editor.currentProject) {
+    await ctx.ui.message('Export to OSS', 'No project is currently open.');
+    return;
+  }
+
+  const settings = await getOSSSettings(ctx);
+  const region = settings.region?.trim() ?? '';
+  const bucket = settings.bucket?.trim() ?? '';
+  const accessKeyId = settings.accessKeyId?.trim() ?? '';
+  const accessKeySecret = settings.accessKeySecret?.trim() ?? '';
+  const endpoint = settings.endpoint?.trim() ?? '';
+  const prefix = settings.prefix?.trim() ?? '';
+
+  if (!region || !bucket || !accessKeyId || !accessKeySecret) {
+    await ctx.ui.message(
+      'Export to OSS',
+      'OSS not configured. Open the plugin manager and configure Character Dynamics Tools settings first.'
+    );
+    return;
+  }
+
+  const folders = await ctx.ui.selectProjectFolders('Export to OSS', '/assets', true, 520, 620);
+  console.log(folders);
+
+  const selectedPaths = await ctx.ui.selectProjectFiles('Export to OSS', '/assets', true, null, 520, 620);
+  if (!selectedPaths || selectedPaths.length === 0) {
+    return;
+  }
+
+  const confirmed = await ctx.ui.confirm(
+    'Export to OSS',
+    \`Upload \${selectedPaths.length} item(s) to OSS?\`,
+    'Upload',
+    'Cancel'
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  const client = new OSS({
+    region,
+    bucket,
+    accessKeyId,
+    accessKeySecret,
+    endpoint: endpoint || undefined
+  });
+  const prefixStr = prefix ? prefix.replace(/^\\/+|\\/+$/g, '') + '/' : '';
+  let uploaded = 0;
+
+  for (const file of selectedPaths) {
+    const filePath = file.meta.path;
+    const content = await ctx.project.readBinary(filePath);
+    const relativePath = filePath.replace(/^\\/+/, '');
+    const objectKey = \`\${prefixStr}\${relativePath}\`;
+    await client.put(objectKey, new Blob([content]));
+    uploaded++;
+    ctx.log(\`[OSS] uploaded \${uploaded}/\${selectedPaths.length}: \${objectKey}\`);
+  }
+
+  await ctx.ui.message('Export to OSS', \`Upload complete: \${uploaded} file(s) uploaded.\`);
+}
+
+// 脚本默认配置由运行时脚本内部的 @scriptProp 装饰器声明负责。
 function listNodeScripts(node: SceneNode) {
-  const attachments = Array.isArray((node as any).scripts) ? ((node as any).scripts as { script?: string }[]) : [];
+  const attachments = Array.isArray((node as any).scripts)
+    ? ((node as any).scripts as { script?: string }[])
+    : [];
   return attachments.map((item) => String(item?.script ?? '').trim()).filter((item) => !!item);
 }
 
@@ -60,7 +138,6 @@ function initializeScriptHost(node: SceneNode, scriptPath: string) {
 async function attachGPUClothToNode(ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0], node: SceneNode) {
   const path = await ensureProjectScript(ctx, DEFAULT_GPU_CLOTH_SCRIPT_PATH, gpuClothRuntimeScriptSource);
   initializeScriptHost(node, path);
-  // 通过 PluginAPI 主动刷新属性面板，并把场景标记为已修改。
   ctx.refreshProperties();
   ctx.notifySceneChanged();
 }
@@ -76,10 +153,43 @@ const plugin: EditorPlugin = {
   id: 'zephyr3d.character-dynamics-tools',
   name: 'Character Dynamics Tools',
   version: '1.0.0',
-  description: 'Character spring and GPU cloth authoring tools implemented as an editor system plugin.',
+  description: 'Character spring, GPU cloth, and OSS export tools implemented as an editor system plugin.',
+  settings: {
+    region: {
+      type: 'string',
+      label: 'OSS Region',
+      description: 'Alibaba Cloud OSS region, for example oss-cn-hangzhou.'
+    },
+    bucket: {
+      type: 'string',
+      label: 'OSS Bucket',
+      description: 'Target OSS bucket name.'
+    },
+    accessKeyId: {
+      type: 'string',
+      label: 'Access Key ID',
+      description: 'OSS access key id used for upload.',
+      secret: true
+    },
+    accessKeySecret: {
+      type: 'string',
+      label: 'Access Key Secret',
+      description: 'OSS access key secret used for upload.',
+      secret: true
+    },
+    endpoint: {
+      type: 'string',
+      label: 'OSS Endpoint',
+      description: 'Optional custom endpoint. Leave empty to use the default endpoint.'
+    },
+    prefix: {
+      type: 'string',
+      label: 'Object Key Prefix',
+      description: 'Optional prefix added before uploaded asset paths.'
+    }
+  },
   activate(ctx) {
-    // 主菜单入口：用于创建或打开插件附带的运行时脚本模板。
-    // 这里演示了最常见的 PluginAPI 用法之一：向编辑器主菜单注册顶级菜单项。
+    // 主菜单入口，统一放在插件自己的顶级菜单下。
     ctx.registerMenuItems({
       location: 'main',
       items: [
@@ -104,14 +214,21 @@ const plugin: EditorPlugin = {
                 const path = await ensureProjectScript(ctx, DEFAULT_SPRING_SCRIPT_PATH, springRuntimeScriptSource);
                 await ctx.project.openCode(path, 'typescript');
               }
+            },
+            {
+              id: 'zephyr3d.character-dynamics.export-oss',
+              label: 'Export to OSS...',
+              enabled: () => !!ctx.editor.currentProject,
+              action: async () => {
+                await exportProjectToOSS(ctx);
+              }
             }
           ]
         }
       ]
     });
 
-    // 场景树右键菜单入口：把脚本挂到当前节点，并复用同一个代码编辑器打开脚本文件。
-    // items 使用函数形式，可以根据当前右键目标动态控制菜单文本和可用状态。
+    // 右键菜单用于把脚本挂到当前节点，并复用同一套脚本打开逻辑。
     ctx.registerMenuItems({
       location: 'scene-hierarchy',
       items: (menuCtx) => {
@@ -169,11 +286,7 @@ const plugin: EditorPlugin = {
       }
     });
 
-    // 下面三个初始化函数分别接入：
-    // 1. GPU cloth 的属性面板扩展
-    // 2. GPU cloth 的自定义编辑工具
-    // 3. Spring 的属性扩展入口
-    // 这类逻辑适合放在 activate() 中统一注册。
+    // 插件激活时统一注册属性扩展和 GPU cloth 专用编辑工具。
     initGPUClothPropertyProvider(ctx);
     initGPUClothPaintTool(ctx);
     initSpringPropertyProvider(ctx);
@@ -187,9 +300,47 @@ export const characterDynamicsToolsPlugin: EditorPlugin = {
   id: 'zephyr3d.character-dynamics-tools',
   name: 'Character Dynamics Tools',
   version: '1.0.0',
-  description: 'Character spring and GPU cloth authoring tools implemented as an editor system plugin.',
+  description: 'Character spring, GPU cloth, and OSS export tools implemented as an editor system plugin.',
+  settings: {
+    region: {
+      type: 'string',
+      label: 'OSS Region',
+      description: 'Alibaba Cloud OSS region, for example oss-cn-hangzhou.'
+    },
+    bucket: {
+      type: 'string',
+      label: 'OSS Bucket',
+      description: 'Target OSS bucket name.'
+    },
+    accessKeyId: {
+      type: 'string',
+      label: 'Access Key ID',
+      description: 'OSS access key id used for upload.',
+      secret: true
+    },
+    accessKeySecret: {
+      type: 'string',
+      label: 'Access Key Secret',
+      description: 'OSS access key secret used for upload.',
+      secret: true
+    },
+    endpoint: {
+      type: 'string',
+      label: 'OSS Endpoint',
+      description: 'Optional custom endpoint. Leave empty to use the default endpoint.'
+    },
+    prefix: {
+      type: 'string',
+      label: 'Object Key Prefix',
+      description: 'Optional prefix added before uploaded asset paths.'
+    }
+  },
   activate() {}
 };
+
+export const characterDynamicsToolsPluginDependencies = {
+  'ali-oss': '^6.21.0'
+} as const;
 
 export const characterDynamicsToolsPluginFiles: SystemPluginFileInput[] = [
   {

@@ -75,8 +75,8 @@ import { ScriptPanel } from '../components/scriptpanel';
 import { DlgSaveFile } from './dlg/savefiledlg';
 import { ResourceService } from '../core/services/resource';
 import { DlgMessage } from './dlg/messagedlg';
-import type { EditorMenuContext, EditorSceneContext } from '../core/plugin';
-import type { EditorMenuItem } from '../core/plugin';
+import type { InternalEditorMenuContext, InternalEditorSceneContext } from '../core/plugin';
+import type { InternalEditorMenuItem } from '../core/plugin';
 
 type ColliderKind = 'sphere' | 'capsule' | 'plane';
 type MultiTransformItem = {
@@ -747,7 +747,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleRefreshProperties() {
     this._propGrid.refresh();
   }
-  private createSceneContext(): EditorSceneContext {
+  private createSceneContext(): InternalEditorSceneContext {
     return {
       editor: this.editor,
       scene: this.controller.model.scene,
@@ -761,7 +761,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       getViewportRect: () => this._editToolContext.getViewportRect()
     };
   }
-  private renderContextMenuItems(items: readonly EditorMenuItem[], ctx: EditorMenuContext) {
+  private renderContextMenuItems(items: readonly InternalEditorMenuItem[], ctx: InternalEditorMenuContext) {
     this.editor.plugins.renderMenuItems(items, ctx);
   }
   reset() {

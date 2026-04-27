@@ -1,6 +1,7 @@
 import { ImGui } from '@zephyr3d/imgui';
 import type { Nullable } from '@zephyr3d/base';
-import { Scene, SceneNode, ScriptAttachment, type PropertyAccessor } from '@zephyr3d/scene';
+import type { Scene, SceneNode } from '@zephyr3d/scene';
+import { ScriptAttachment, type PropertyAccessor } from '@zephyr3d/scene';
 import { FontGlyph } from '../core/fontglyph';
 import { ProjectService } from '../core/services/project';
 import { PropertyEditor } from './grid';
@@ -108,7 +109,11 @@ export class ScriptPanel {
         const selected = i === this._selectedScriptIndex;
         ImGui.TableNextRow();
         ImGui.TableNextColumn();
-        const clicked = this.renderScriptListItem(`##script_item_${i}`, attachment.script || '<Empty Script>', selected);
+        const clicked = this.renderScriptListItem(
+          `##script_item_${i}`,
+          attachment.script || '<Empty Script>',
+          selected
+        );
         if (clicked) {
           this._selectedScriptIndex = i;
           this.syncScriptConfigEditor();
@@ -141,7 +146,9 @@ export class ScriptPanel {
           ImGui.PopStyleVar();
         }
         ImGui.SameLine();
-        if (ImGui.Button(`${FontGlyph.glyphs['cancel']}##remove_script_${i}`, new ImGui.ImVec2(buttonWidth, 0))) {
+        if (
+          ImGui.Button(`${FontGlyph.glyphs['cancel']}##remove_script_${i}`, new ImGui.ImVec2(buttonWidth, 0))
+        ) {
           this.popInlineActionButtonStyle();
           this.removeScriptAttachment(host, i);
           ImGui.EndTable();
@@ -181,7 +188,9 @@ export class ScriptPanel {
     }
     this._selectedScriptIndex = Math.max(0, Math.min(this._selectedScriptIndex, attachments.length - 1));
     const attachment = attachments[this._selectedScriptIndex];
-    this._scriptConfigEditorHost = attachment?.script ? { scriptHost: host!, scriptPath: attachment.script } : null;
+    this._scriptConfigEditorHost = attachment?.script
+      ? { scriptHost: host!, scriptPath: attachment.script }
+      : null;
     this._scriptConfigGrid.object = this._scriptConfigEditorHost;
     this._scriptConfigGrid.setExtraPropertiesProvider(
       'script-config',
@@ -205,23 +214,25 @@ export class ScriptPanel {
   private bindScriptPropertyAccessors(host: Scene | SceneNode, accessors: PropertyAccessor<any>[]) {
     return accessors.map((prop) => ({
       ...prop,
-      get: prop.get ? ((value) => prop.get!.call(host as never, value as never)) as typeof prop.get : undefined,
+      get: prop.get
+        ? (((value) => prop.get!.call(host as never, value as never)) as typeof prop.get)
+        : undefined,
       set: prop.set
-        ? ((value, index) => prop.set!.call(host as never, value as never, index)) as typeof prop.set
+        ? (((value, index) => prop.set!.call(host as never, value as never, index)) as typeof prop.set)
         : undefined,
-      create: prop.create ? ((ctor, index) => prop.create!.call(host as never, ctor, index)) : undefined,
-      delete: prop.delete ? ((index) => prop.delete!.call(host as never, index)) : undefined,
+      create: prop.create ? (ctor, index) => prop.create!.call(host as never, ctor, index) : undefined,
+      delete: prop.delete ? (index) => prop.delete!.call(host as never, index) : undefined,
       add: prop.add
-        ? ((value, index) => prop.add!.call(host as never, value as never, index)) as typeof prop.add
+        ? (((value, index) => prop.add!.call(host as never, value as never, index)) as typeof prop.add)
         : undefined,
-      isValid: prop.isValid ? (() => prop.isValid!.call(host as never)) : undefined,
-      isPersistent: prop.isPersistent ? (() => prop.isPersistent!.call(host as never)) : undefined,
-      isNullable: prop.isNullable ? ((index) => prop.isNullable!.call(host as never, index)) : undefined,
+      isValid: prop.isValid ? () => prop.isValid!.call(host as never) : undefined,
+      isPersistent: prop.isPersistent ? () => prop.isPersistent!.call(host as never) : undefined,
+      isNullable: prop.isNullable ? (index) => prop.isNullable!.call(host as never, index) : undefined,
       isHidden: prop.isHidden
-        ? ((index, obj) => prop.isHidden!.call(host as never, index, obj)) as typeof prop.isHidden
+        ? (((index, obj) => prop.isHidden!.call(host as never, index, obj)) as typeof prop.isHidden)
         : undefined,
-      command: prop.command ? ((index) => prop.command!.call(host as never, index)) : undefined,
-      getDefaultValue: prop.getDefaultValue ? (() => prop.getDefaultValue!.call(host as never)) : undefined
+      command: prop.command ? (index) => prop.command!.call(host as never, index) : undefined,
+      getDefaultValue: prop.getDefaultValue ? () => prop.getDefaultValue!.call(host as never) : undefined
     }));
   }
 

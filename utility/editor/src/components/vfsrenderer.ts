@@ -1,4 +1,4 @@
-import type { FileMetadata, GenericConstructor, Nullable, VFS } from '@zephyr3d/base';
+import type { FileMetadata, GenericConstructor, Immutable, Nullable, VFS } from '@zephyr3d/base';
 import UPNG from 'upng-js';
 import { DataTransferVFS, Disposable, guessMimeType, makeObservable, PathUtils } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
@@ -28,7 +28,7 @@ import type { SharedModel } from '../loaders/model';
 import { DlgImportOptions } from '../views/dlg/importoptionsdlg';
 import { DialogRenderer } from './modal';
 import type { Editor } from '../core/editor';
-import type { EditorAssetContext, EditorMenuContext } from '../core/plugin';
+import type { InternalEditorAssetContext, InternalEditorMenuContext } from '../core/plugin';
 import type { PropertyAccessor } from '@zephyr3d/scene';
 
 export type FileInfo = {
@@ -60,6 +60,7 @@ type VFSRendererOptions = {
   allowDrop?: boolean;
   allowDblClickOpen?: boolean;
   multiSelect?: boolean;
+  foldersOnly?: boolean;
   editor?: Editor;
   rootLabel?: string;
   showDependencyTools?: boolean;
@@ -126,7 +127,9 @@ class VFSContentData extends ListViewData<FileInfo | DirectoryInfo> {
     this._columnNames = ['Size', 'Type', 'Modified'];
   }
   getItems() {
-    return this.renderer.currentDirContent;
+    return this.renderer.options.foldersOnly
+      ? this.renderer.currentDirContent.filter((val) => 'subDir' in val)
+      : this.renderer.currentDirContent;
   }
   getItemIcon(item: FileInfo | DirectoryInfo): string {
     const isDir = 'subDir' in item;
@@ -389,8 +392,8 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
 
 export class DirTreeView extends TreeView<{}, DirectoryInfo> {
   private _renderer: VFSRenderer;
-  constructor(renderer: VFSRenderer, projectName: string) {
-    super(`###VFSNavigator${renderer.id}`, new VFSDirData(renderer, projectName));
+  constructor(renderer: VFSRenderer, projectName: string, multi?: boolean) {
+    super(`###VFSNavigator${renderer.id}`, new VFSDirData(renderer, projectName), multi);
     this._renderer = renderer;
   }
   protected onGetContextMenuId(node: DirectoryInfo): string {
@@ -464,7 +467,12 @@ export class DirTreeView extends TreeView<{}, DirectoryInfo> {
 }
 
 export class VFSRenderer extends makeObservable(Disposable)<{
-  selection_changed: [selectedDir: DirectoryInfo, selectedFiles: FileInfo[]];
+  loaded: [];
+  selection_changed: [
+    selectedDir: DirectoryInfo,
+    selectedFiles: FileInfo[],
+    selectedItems: (FileInfo | DirectoryInfo)[]
+  ];
   file_dbl_clicked: [file: FileInfo];
   asset_picker_drop: [payload: VFSRendererAssetPickerPayload, path: string];
 }>() {
@@ -502,6 +510,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       allowDrop: true,
       allowDblClickOpen: true,
       multiSelect: true,
+      foldersOnly: false,
       rootLabel: null,
       showDependencyTools: true,
       showGenericFileCreate: false,
@@ -521,6 +530,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
 
   get VFS() {
     return this._vfs;
+  }
+  get options(): Immutable<VFSRendererOptions> {
+    return this._options;
   }
   get nav() {
     return this._nav;
@@ -1325,6 +1337,8 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       this._pendingRevealAssetPath = null;
       this.selectAssetByPath(path);
     }
+
+    this.dispatchEvent('loaded');
   }
 
   private findDirectoryByPath(root: DirectoryInfo, path: string): DirectoryInfo | null {
@@ -1520,11 +1534,13 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   }
 
   emitSelectedChanged() {
-    this.dispatchEvent('selection_changed', this.selectedDir ?? null, this.selectedFiles);
+    this.dispatchEvent('selection_changed', this.selectedDir ?? null, this.selectedFiles, [
+      ...this.selectedItems
+    ]);
     this._options.editor?.plugins.dispatchEvent('assetSelectionChanged', this.getAssetContext());
   }
 
-  getAssetContext(): EditorAssetContext {
+  getAssetContext(): InternalEditorAssetContext {
     return {
       editor: this._options.editor,
       vfs: this._vfs,
@@ -1539,7 +1555,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     if (!editor) {
       return;
     }
-    const ctx: EditorMenuContext = {
+    const ctx: InternalEditorMenuContext = {
       location,
       assets: this.getAssetContext(),
       target

@@ -77,6 +77,9 @@ export default class extends RuntimeScript<HostType> {
 `;
 
 export const templateEditorPlugin = `import type { EditorPlugin } from '${editorPluginModuleName}';
+// If your plugin needs a third-party package, install it from
+// System Plugins -> Install Package..., then import it directly:
+// import { nanoid } from 'nanoid';
 
 const plugin: EditorPlugin = {
   id: 'com.example.editor-plugin',
@@ -116,6 +119,9 @@ export const templateEditorPluginFiles = [
   {
     path: 'index.ts',
     source: `import type { EditorPlugin } from '${editorPluginModuleName}';
+// If your plugin needs a third-party package, install it from
+// System Plugins -> Install Package..., then import it directly:
+// import { nanoid } from 'nanoid';
 import { createAboutMessage } from './about';
 
 const plugin: EditorPlugin = {
@@ -149,7 +155,9 @@ export default plugin;
   return [
     'This command is provided by a multi-file system plugin.',
     '',
-    'Use this template as the starting point for splitting your plugin into modules.'
+    'Use this template as the starting point for splitting your plugin into modules.',
+    '',
+    'Third-party packages can be installed from the System Plugins dialog.'
   ].join('\\n');
 }
 `

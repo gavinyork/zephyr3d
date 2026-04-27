@@ -16,8 +16,12 @@ export type LockFile = {
   dependencies: Record<string, LockEntry>;
 };
 
+function getProjectDepsPath(vfs: VFS, projectRoot: string, relativePath: string): string {
+  return vfs.join(projectRoot, relativePath.replace(/^\/+/, ''));
+}
+
 export async function readLock(vfs: VFS, projectRoot: string): Promise<LockFile | null> {
-  const p = vfs.join(projectRoot, `/${libDir}/deps.lock.json`);
+  const p = getProjectDepsPath(vfs, projectRoot, `${libDir}/deps.lock.json`);
   if (!(await vfs.exists(p))) {
     return null;
   }
@@ -31,7 +35,7 @@ export async function readLock(vfs: VFS, projectRoot: string): Promise<LockFile 
 }
 
 export async function writeLock(vfs: VFS, projectRoot: string, lock: LockFile): Promise<void> {
-  const p = vfs.join(projectRoot, `/${libDir}/deps.lock.json`);
+  const p = getProjectDepsPath(vfs, projectRoot, `${libDir}/deps.lock.json`);
   const pretty = JSON.stringify(lock, null, 2);
   await vfs.writeFile(p, pretty, { encoding: 'utf8', create: true });
 }
@@ -221,7 +225,13 @@ export function depsPathOf(cdnUrl: string, name: string, version: string): strin
   return `/${libDir}/deps/${name}@${version}${sub}`;
 }
 
-export async function crawlAndCache(vfs: VFS, entryUrl: string, name: string, version: string) {
+export async function crawlAndCache(
+  vfs: VFS,
+  projectRoot: string,
+  entryUrl: string,
+  name: string,
+  version: string
+) {
   await init;
   const queue: string[] = [entryUrl];
   const seen = new Set<string>();
@@ -233,7 +243,7 @@ export async function crawlAndCache(vfs: VFS, entryUrl: string, name: string, ve
     }
     seen.add(url);
 
-    const localPath = depsPathOf(url, name, version);
+    const localPath = getProjectDepsPath(vfs, projectRoot, depsPathOf(url, name, version));
     if (await vfs.exists(localPath)) {
       continue;
     }
@@ -265,12 +275,12 @@ export async function crawlAndCache(vfs: VFS, entryUrl: string, name: string, ve
       let replaced: string;
       if (specRaw.startsWith('http')) {
         childAbs = specRaw;
-        replaced = `./${vfs.relative(depsPathOf(specRaw, name, version), vfs.dirname(localPath))}`;
+        replaced = `./${vfs.relative(getProjectDepsPath(vfs, projectRoot, depsPathOf(specRaw, name, version)), vfs.dirname(localPath))}`;
       } else if (specRaw.startsWith('.') || specRaw.startsWith('/')) {
         childAbs = new URL(specRaw, url).href;
         replaced = specRaw.startsWith('.')
           ? specRaw
-          : `./${vfs.relative(depsPathOf(childAbs, name, version), vfs.dirname(localPath))}`;
+          : `./${vfs.relative(getProjectDepsPath(vfs, projectRoot, depsPathOf(childAbs, name, version)), vfs.dirname(localPath))}`;
       } else {
         childAbs = new URL(specRaw, url).href;
         replaced = specRaw;
@@ -361,8 +371,8 @@ export async function installDeps(
     onProgress?.(`Installing package ${spec}...`);
     const { name, version, entryUrl } = await resolveOnEsmSh(spec);
 
-    await crawlAndCache(vfs, entryUrl, name, version);
-    const entry = `./${vfs.relative(depsPathOf(entryUrl, name, version), '/')}`;
+    await crawlAndCache(vfs, projectRoot, entryUrl, name, version);
+    const entry = `./${vfs.relative(getProjectDepsPath(vfs, projectRoot, depsPathOf(entryUrl, name, version)), projectRoot)}`;
 
     lock.dependencies[name] = { version, entry, url: entryUrl };
     numPackagesInstalled++;
@@ -378,5 +388,6 @@ export async function installDeps(
     return { name, version };
   } catch (err) {
     onProgress?.(`Failed to fetch ${spec}: ${err}`);
+    throw err;
   }
 }

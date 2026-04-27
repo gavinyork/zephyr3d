@@ -1,9 +1,23 @@
-export type DisposableLike = {
-  dispose(): void;
+import type { FileMetadata, IDisposable, VFS } from '@zephyr3d/base';
+import type { PropertyAccessor } from '@zephyr3d/scene';
+
+export type EditorDirectoryInfo = {
+  path: string;
+  files: EditorFileInfo[];
+  subDir: EditorDirectoryInfo[];
+  parent: EditorDirectoryInfo | null;
+  open: boolean;
 };
 
+export type EditorFileInfo = {
+  meta: FileMetadata;
+  parent: EditorDirectoryInfo | null;
+};
+
+export type DisposableLike = IDisposable;
+
 export type EditorProjectInfo = {
-  uuid: string;
+  uuid?: string;
   name: string;
   lastEditScene?: string;
 };
@@ -32,18 +46,18 @@ export type EditorMenuContribution = {
 };
 
 export type EditorToolbarItem = {
-  label?: string;
+  label: string;
   shortcut?: string;
   tooltip?: () => string;
   visible?: () => boolean;
   selected?: () => boolean;
-  render?: () => boolean;
+  render?: (buttonSize: unknown) => boolean;
   action?: () => void;
 };
 
 export type EditorToolbarContribution =
   | EditorToolbarItem
-  | ((ctx: EditorToolbarContext) => EditorToolbarItem | null | undefined);
+  | ((ctx: EditorToolbarContext) => EditorToolbarItem);
 
 export type EditorEditToolFactory = {
   id: string;
@@ -52,7 +66,9 @@ export type EditorEditToolFactory = {
   priority?: number;
 };
 
-export type EditorPropertyAccessorProvider = (object: unknown) => unknown[] | Promise<unknown[]>;
+export type EditorPropertyAccessorProvider = (
+  object: unknown
+) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>;
 
 export type EditorSceneContext = {
   editor: EditorHost;
@@ -69,9 +85,9 @@ export type EditorSceneContext = {
 
 export type EditorAssetContext = {
   editor: EditorHost;
-  vfs: unknown;
+  vfs: VFS;
   selectedDir: { path: string } | null;
-  selectedFiles: readonly { meta: { path: string; name?: string; size?: number } }[];
+  selectedFiles: readonly { meta: FileMetadata }[];
   selectedItems: readonly unknown[];
 };
 
@@ -118,6 +134,49 @@ export type EditorEventSource = {
   dispatchEvent<K extends keyof EditorEventMap>(type: K, ...args: EditorEventMap[K]): void;
 };
 
+export type EditorPluginSettingOption<T extends string | number = string | number> = {
+  label: string;
+  value: T;
+};
+
+export type EditorPluginStringSetting = {
+  type: 'string';
+  label?: string;
+  description?: string;
+  default?: string;
+  placeholder?: string;
+  secret?: boolean;
+  multiline?: boolean;
+  options?: EditorPluginSettingOption<string>[];
+};
+
+export type EditorPluginNumberSetting = {
+  type: 'number';
+  label?: string;
+  description?: string;
+  default?: number;
+  placeholder?: string;
+  integer?: boolean;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: EditorPluginSettingOption<number>[];
+};
+
+export type EditorPluginBooleanSetting = {
+  type: 'boolean';
+  label?: string;
+  description?: string;
+  default?: boolean;
+};
+
+export type EditorPluginSetting =
+  | EditorPluginStringSetting
+  | EditorPluginNumberSetting
+  | EditorPluginBooleanSetting;
+
+export type EditorPluginSettingsSchema = Record<string, EditorPluginSetting>;
+
 export type EditorPluginContext = {
   editor: EditorHost;
   events: EditorEventSource;
@@ -128,15 +187,35 @@ export type EditorPluginContext = {
     exists(path: string): Promise<boolean>;
     ensureDirectory(path: string): Promise<void>;
     readText(path: string): Promise<string | null>;
+    readBinary(path: string): Promise<ArrayBuffer>;
     writeText(path: string, content: string): Promise<void>;
+    writeBinary(path: string, data: string | ArrayBuffer): Promise<void>;
     openCode(path: string, language?: string): Promise<void>;
   };
   system: {
     getState<T = unknown>(): Promise<T | null>;
     saveState<T = unknown>(state: T): Promise<void>;
+    getSettings<T = Record<string, unknown>>(): Promise<T | null>;
+    saveSettings<T = Record<string, unknown>>(settings: T): Promise<void>;
   };
   ui: {
     message(title: string, message: string, width?: number, height?: number): Promise<void>;
+    confirm(title: string, message: string, okLabel?: string, cancelLabel?: string): Promise<boolean>;
+    selectProjectFiles(
+      title: string,
+      rootDir: string,
+      multi?: boolean,
+      filter?: string,
+      width?: number,
+      height?: number
+    ): Promise<EditorFileInfo[]>;
+    selectProjectFolders(
+      title: string,
+      rootDir: string,
+      multi?: boolean,
+      width?: number,
+      height?: number
+    ): Promise<EditorDirectoryInfo[]>;
   };
   refreshProperties(): void;
   notifySceneChanged(): void;
@@ -158,6 +237,7 @@ export type EditorPlugin = {
   name?: string;
   version?: string;
   description?: string;
+  settings?: EditorPluginSettingsSchema;
   activate: (ctx: EditorPluginContext) => void | Promise<void>;
   deactivate?: (ctx: EditorPluginContext) => void | Promise<void>;
 };
