@@ -299,10 +299,7 @@ export class Editor {
   }
   async loadAssets() {
     const assetManager = new AssetManager(
-      new ResourceManager(
-        getEngine(),
-        new HttpFS(window.location.href.slice(0, window.location.href.lastIndexOf('/')))
-      )
+      new ResourceManager(new HttpFS(window.location.href.slice(0, window.location.href.lastIndexOf('/'))))
     );
     const brushConfig = await assetManager.fetchJsonData('conf/brushes.json');
     for (const name in brushConfig) {

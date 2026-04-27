@@ -43,8 +43,10 @@ import { getTerrainClass } from './scene/terrain';
 import { getWaterClass, getFFTWaveGeneratorClass, getFBMWaveGeneratorClass } from './scene/water';
 import {
   getAnimationClass,
+  getFixedGeometryCacheTrackClass,
   getInterpolatorClass,
   getMorphTrackClass,
+  getPCAGeometryCacheTrackClass,
   getNodeEulerRotationTrackClass,
   getNodeRotationTrackClass,
   getNodeScaleTrackClass,
@@ -183,7 +185,6 @@ import type { Material, MeshMaterial, PBRBluePrintMaterial } from '../../materia
 import type { Primitive } from '../../render';
 import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
 import { getSpriteClass } from './scene/sprite';
-import type { Engine } from '../../app';
 
 const defaultValues: Record<PropertyType, any> = {
   bool: false,
@@ -231,7 +232,6 @@ const defaultValues: Record<PropertyType, any> = {
 export class ResourceManager {
   private readonly _classMap: Map<GenericConstructor, SerializableClass>;
   private _vfs: VFS;
-  private _engine: Engine;
   private _propMap: Record<string, PropertyAccessor>;
   private readonly _propNameMap: Map<PropertyAccessor, string>;
   private readonly _clsPropMap: Map<SerializableClass, PropertyAccessor[]>;
@@ -243,9 +243,8 @@ export class ResourceManager {
    *
    * @param vfs - Virtual file system used for reading/writing assets and scenes.
    */
-  constructor(engine: Engine, vfs: VFS, editorMode = false) {
+  constructor(vfs: VFS, editorMode = false) {
     this._vfs = vfs;
-    this._engine = engine;
     this._editorMode = editorMode;
     this._allocated = new WeakMap();
     this._assetManager = new AssetManager(this);
@@ -270,6 +269,8 @@ export class ResourceManager {
         getNodeScaleTrackClass(),
         getNodeTranslationTrackClass(),
         getNodeEulerRotationTrackClass(),
+        getFixedGeometryCacheTrackClass(),
+        getPCAGeometryCacheTrackClass(),
         getMorphTrackClass(),
         getSceneNodeClass(this),
         getGraphNodeClass(),
@@ -649,9 +650,6 @@ export class ResourceManager {
     const initParams = await info?.getInitParams?.(obj, flags);
     json = json ?? {};
     json.ClassName = info.name;
-    if (info.scriptPath) {
-      json.ScriptPath = info.scriptPath ?? '';
-    }
     json.Object = {};
     if (initParams !== undefined && initParams !== null) {
       json.Init = initParams;
@@ -706,27 +704,13 @@ export class ResourceManager {
   async deserializeObject<T extends object>(ctx: any, json: Record<string, unknown>): Promise<Nullable<T>> {
     const cls = this.getClasses();
     const className = json['ClassName'];
-    let info = cls.find((val) => val.name === className);
-    if (!info) {
-      if (typeof json['ScriptPath'] === 'string') {
-        const ctor = (await this._engine.loadRuntimeScriptClass(json['ScriptPath']))?.cls;
-        if (ctor) {
-          info = {
-            ctor,
-            name: className as string,
-            getProps() {
-              return [];
-            }
-          };
-          this.registerClass(info);
-        }
-      }
-      if (!info) {
-        throw new Error(
-          `Deserialize object failed: Cannot found serialization meta data for class "${String(className)}"`
-        );
-      }
+    const index = cls.findIndex((val) => val.name === className);
+    if (index < 0) {
+      throw new Error(
+        `Deserialize object failed: Cannot found serialization meta data for class "${String(className)}"`
+      );
     }
+    let info = cls[index];
     const initParams = json['Init'] as { asset?: string };
     json = json['Object'] as Record<string, unknown>;
     let p: T | Promise<T>;

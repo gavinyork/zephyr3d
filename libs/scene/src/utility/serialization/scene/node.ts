@@ -9,6 +9,16 @@ import type { ResourceManager } from '../manager';
 import { AnimationClip, NodeRotationTrack, NodeScaleTrack, NodeTranslationTrack } from '../../../animation';
 import { JSONArray, JSONData } from '../json';
 import { ScriptAttachment, normalizeScriptAttachmentConfig } from '../../../scene/script_attachment';
+import { parseZABCBlob, attachZABCAnimationsToSceneNode } from '../../../asset/loaders/zabc/zabc_loader';
+import { restoreGeometryCacheMeshBinding } from '../../../animation/geometry_cache_utils';
+const geometryCacheBindings = new WeakMap<
+  SceneNode,
+  {
+    assetId: string;
+    autoPlay: boolean;
+    animationNames: string[];
+  }
+>();
 
 function normalizeSerializedSceneNodeData(data: DiffValue): Record<string, unknown> {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -31,16 +41,62 @@ function normalizeSerializedSceneNodeData(data: DiffValue): Record<string, unkno
   };
 }
 
+function hasMeshDescendants(node: SceneNode) {
+  let hasMesh = false;
+  node.iterate((child) => {
+    if (child.isMesh()) {
+      hasMesh = true;
+      return true;
+    }
+    return false;
+  });
+  return hasMesh;
+}
+
+async function restoreGeometryCacheMeshes(node: SceneNode) {
+  const tasks: Promise<boolean>[] = [];
+  node.iterate((child) => {
+    if (child.isMesh()) {
+      tasks.push(restoreGeometryCacheMeshBinding(child));
+    }
+    return false;
+  });
+  if (tasks.length > 0) {
+    await Promise.all(tasks);
+  }
+}
+
+async function clearGeometryCacheBinding(node: SceneNode) {
+  const previous = geometryCacheBindings.get(node);
+  if (!previous) {
+    return null;
+  }
+  for (const name of previous.animationNames) {
+    if (node.animationSet.isPlayingAnimation(name)) {
+      node.animationSet.stopAnimation(name);
+    }
+    node.animationSet.deleteAnimation(name);
+  }
+  await restoreGeometryCacheMeshes(node);
+  geometryCacheBindings.delete(node);
+  return previous;
+}
+
 /** @internal */
 export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
   return {
     ctor: SceneNode,
     name: 'SceneNode',
-    async createFunc(ctx: Scene | SceneNode, init?: { prefabId: string; patch: DiffPatch }) {
+    async createFunc(
+      ctx: Scene | SceneNode,
+      init?: { prefabId?: string; assetId?: string; patch?: DiffPatch }
+    ) {
       const scene = ctx instanceof Scene ? ctx : ctx.scene;
-      if (init) {
+      if (init?.prefabId) {
         const prefabData = (await manager.loadPrefabContent(init.prefabId))!.data as DiffValue;
-        const nodeData = normalizeSerializedSceneNodeData(applyPatch(prefabData, init.patch) as DiffValue);
+        const nodeData = normalizeSerializedSceneNodeData(
+          applyPatch(prefabData, init.patch ?? []) as DiffValue
+        );
         const tmpNode = new DRef(new SceneNode(scene));
         tmpNode.get()!.remove();
         tmpNode.get()!.prefabId = init.prefabId;
@@ -52,6 +108,25 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         tmpNode.dispose();
         return { obj: sceneNode, loadProps: false };
       }
+      if (init?.assetId) {
+        const fetchedModel = await manager.fetchModel(init.assetId, scene!);
+        const sceneNode = fetchedModel?.group ?? null;
+        if (sceneNode) {
+          const originalAssetId = manager.getAssetId(sceneNode);
+          try {
+            manager.setAssetId(sceneNode, null);
+            const baseNodeData = await manager.serializeObject(sceneNode);
+            const nodeData = normalizeSerializedSceneNodeData(
+              applyPatch(baseNodeData as DiffValue, init.patch ?? []) as DiffValue
+            );
+            await manager.deserializeObjectProps(sceneNode, nodeData.Object as Record<string, unknown>);
+          } finally {
+            manager.setAssetId(sceneNode, originalAssetId ?? init.assetId);
+          }
+          sceneNode.parent = ctx instanceof SceneNode ? ctx : ctx.rootNode;
+        }
+        return { obj: sceneNode, loadProps: false };
+      }
       const node = new SceneNode(scene);
       if (ctx instanceof SceneNode) {
         node.parent = ctx;
@@ -60,6 +135,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
     },
     async getInitParams(obj: SceneNode, flags) {
       const prefabId = obj.prefabId;
+      const assetId = manager.getAssetId(obj);
       let patch: DiffPatch | undefined = undefined;
       if (prefabId) {
         try {
@@ -73,12 +149,37 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         }
         flags.saveProps = false;
       }
+      if (!prefabId && assetId) {
+        const baseNode = (await manager.fetchModel(assetId, obj.scene!))?.group ?? null;
+        if (baseNode) {
+          const originalObjectAssetId = manager.getAssetId(obj);
+          const originalBaseAssetId = manager.getAssetId(baseNode);
+          try {
+            manager.setAssetId(obj, null);
+            manager.setAssetId(baseNode, null);
+            const baseNodeData = await manager.serializeObject(baseNode);
+            const nodeData = await manager.serializeObject(obj);
+            patch = diff(baseNodeData, nodeData);
+            ASSERT(diff(applyPatch(baseNodeData, patch), nodeData).length === 0, 'Patch test failed');
+          } finally {
+            manager.setAssetId(obj, originalObjectAssetId);
+            manager.setAssetId(baseNode, originalBaseAssetId);
+            baseNode.remove();
+          }
+          flags.saveProps = false;
+        }
+      }
       return prefabId
         ? {
             prefabId,
             patch
           }
-        : null;
+        : assetId
+          ? {
+              assetId,
+              patch
+            }
+          : null;
     },
     getProps() {
       return defineProps([
@@ -265,6 +366,81 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'GeometryCache',
+          type: 'string',
+          options: {
+            group: 'Animation',
+            label: 'Geometry Cache',
+            mimeTypes: ['application/vnd.zephyr3d.alembic-cache+json']
+          },
+          isValid(this: SceneNode) {
+            return this !== this.scene?.rootNode && hasMeshDescendants(this);
+          },
+          get(this: SceneNode, value) {
+            value.str[0] = geometryCacheBindings.get(this)?.assetId ?? '';
+          },
+          async set(this: SceneNode, value) {
+            const previous = await clearGeometryCacheBinding(this);
+            const assetId = value?.str?.[0]?.trim() ?? '';
+            if (!assetId) {
+              return;
+            }
+            const binary = (await manager.assetManager.fetchBinaryData(assetId)) as ArrayBuffer;
+            const parsed = await parseZABCBlob(
+              new Blob([binary], { type: manager.VFS.guessMIMEType(assetId) || 'application/octet-stream' })
+            );
+            const autoPlay = previous?.autoPlay ?? false;
+            const result = await attachZABCAnimationsToSceneNode(this, parsed, {
+              sourcePath: assetId,
+              autoPlay,
+              replaceAnimationNames: []
+            });
+            geometryCacheBindings.set(this, {
+              assetId,
+              autoPlay,
+              animationNames: result.animationNames
+            });
+          }
+        },
+        {
+          name: 'GeometryCacheAutoPlay',
+          type: 'bool',
+          default: false,
+          options: {
+            group: 'Animation',
+            label: 'Cache AutoPlay'
+          },
+          isValid(this: SceneNode) {
+            return this !== this.scene?.rootNode && hasMeshDescendants(this);
+          },
+          get(this: SceneNode, value) {
+            value.bool[0] = geometryCacheBindings.get(this)?.autoPlay ?? false;
+          },
+          async set(this: SceneNode, value) {
+            const current = geometryCacheBindings.get(this);
+            if (!current) {
+              return;
+            }
+            const autoPlay = !!value.bool[0];
+            geometryCacheBindings.set(this, {
+              assetId: current.assetId,
+              autoPlay,
+              animationNames: current.animationNames
+            });
+            for (const name of current.animationNames) {
+              const animation = this.animationSet.getAnimationClip(name);
+              if (animation) {
+                animation.autoPlay = autoPlay;
+                if (autoPlay) {
+                  this.animationSet.playAnimation(name, { repeat: 0 });
+                } else if (this.animationSet.isPlayingAnimation(name)) {
+                  this.animationSet.stopAnimation(name);
+                }
+              }
+            }
+          }
+        },
+        {
           name: 'Animations',
           type: 'object_array',
           phase: 2,
@@ -374,7 +550,11 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           },
           add(this: SceneNode, value, index) {
             const attachments = this.scripts;
-            attachments.splice(index ?? attachments.length, 0, (value.object?.[0] as ScriptAttachment) ?? new ScriptAttachment());
+            attachments.splice(
+              index ?? attachments.length,
+              0,
+              (value.object?.[0] as ScriptAttachment) ?? new ScriptAttachment()
+            );
             this.scripts = attachments;
           },
           delete(this: SceneNode, index) {
@@ -401,7 +581,11 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           get(this: SceneNode, value) {
             const config = normalizeScriptAttachmentConfig(this.scriptConfig);
             value.object[0] =
-              config == null ? null : Array.isArray(config) ? new JSONArray(null, config) : new JSONData(null, config);
+              config == null
+                ? null
+                : Array.isArray(config)
+                  ? new JSONArray(null, config)
+                  : new JSONData(null, config);
           },
           set(this: SceneNode, value) {
             const data = value?.object[0] as

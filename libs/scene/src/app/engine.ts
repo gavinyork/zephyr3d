@@ -86,7 +86,7 @@ export class Engine {
     VFS = VFS ?? new HttpFS('./');
     this._builtinsVFS = null;
     this._scriptingSystem = new ScriptingSystem({ VFS, scriptsRoot });
-    this._resourceManager = new ResourceManager(this, VFS);
+    this._resourceManager = new ResourceManager(VFS);
     this._enabled = enabled ?? true;
     this._activeRenderables = [];
     this._loadingScenes = {};
@@ -313,18 +313,27 @@ export class Engine {
     try {
       const scene = await this._resourceManager.loadScene(path);
       if (scene) {
-        const sceneScripts = scene.scripts.length > 0 ? scene.scripts : scene.script ? [{ script: scene.script, config: scene.scriptConfig }] : [];
+        const sceneScripts =
+          scene.scripts.length > 0
+            ? scene.scripts
+            : scene.script
+              ? [{ script: scene.script, config: scene.scriptConfig }]
+              : [];
         for (const attachment of sceneScripts) {
           if (!attachment.script) {
             continue;
           }
           try {
-            await this.attachScript(scene, attachment.script, (attachment.config ?? null) as RuntimeScriptConfig | null);
+            await this.attachScript(
+              scene,
+              attachment.script,
+              (attachment.config ?? null) as RuntimeScriptConfig | null
+            );
           } catch (err) {
             console.error(`Attach script failed: ${err}`);
           }
         }
-        const nodes: typeof scene.rootNode[] = [];
+        const nodes: (typeof scene.rootNode)[] = [];
         scene.rootNode.iterate((node) => {
           nodes.push(node);
         });

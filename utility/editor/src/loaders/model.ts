@@ -20,6 +20,10 @@ import {
   UnlitMaterial
 } from '@zephyr3d/scene';
 import {
+  type FixedGeometryCacheFrame,
+  FixedGeometryCacheTrack,
+  PCAGeometryCacheTrack,
+  type PCAGeometryCacheTrackData,
   Mesh,
   SceneNode,
   NodeRotationTrack,
@@ -261,13 +265,48 @@ export interface AssetAnimationTrack {
   defaultMorphWeights?: number[];
 }
 
+export interface AssetGeometryCacheFrame {
+  positions: Float32Array;
+  normals?: Nullable<Float32Array>;
+  boundingBox: BoundingBox;
+}
+
+export interface AssetFixedGeometryCacheAnimationTrack {
+  node: AssetHierarchyNode;
+  type: 'geometry-cache';
+  codec?: 'fixed';
+  subMeshIndex: number;
+  times: Float32Array;
+  frames: AssetGeometryCacheFrame[];
+}
+
+export interface AssetPCAGeometryCacheAnimationTrack {
+  node: AssetHierarchyNode;
+  type: 'geometry-cache';
+  codec: 'pca';
+  subMeshIndex: number;
+  times: Float32Array;
+  bounds: [number, number, number, number, number, number][];
+  positionReference?: Nullable<Float32Array>;
+  positionMean: Float32Array;
+  positionBases: Float32Array[];
+  positionCoefficients: Float32Array[];
+  normalMean?: Nullable<Float32Array>;
+  normalBases?: Nullable<Float32Array[]>;
+  normalCoefficients?: Nullable<Float32Array[]>;
+}
+
+export type AssetGeometryCacheAnimationTrack =
+  | AssetFixedGeometryCacheAnimationTrack
+  | AssetPCAGeometryCacheAnimationTrack;
+
 /**
  * Animation data interface for model loading
  * @public
  */
 export interface AssetAnimationData {
   name: string;
-  tracks: AssetAnimationTrack[];
+  tracks: (AssetAnimationTrack | AssetGeometryCacheAnimationTrack)[];
   skeletons: AssetSkeleton[];
   nodes: AssetHierarchyNode[];
 }
@@ -992,6 +1031,19 @@ export class SharedModel extends Disposable {
                   animation.addTrack(m.mesh, morphTrack);
                 }
               }
+            } else if (track.type === 'geometry-cache') {
+              const subMesh = track.node.mesh?.subMeshes[track.subMeshIndex];
+              if (!subMesh?.mesh) {
+                console.error(`Invalid geometry cache sub mesh: ${track.subMeshIndex}`);
+              } else {
+                if (track.codec === 'pca') {
+                  const pcaData = this.remapPCAGeometryCacheData(subMesh, track);
+                  animation.addTrack(subMesh.mesh, new PCAGeometryCacheTrack(pcaData, true));
+                } else {
+                  const frames = this.remapGeometryCacheFrames(subMesh, track.frames);
+                  animation.addTrack(subMesh.mesh, new FixedGeometryCacheTrack(track.times, frames, true));
+                }
+              }
             } else {
               console.error(`Invalid animation track type: ${track.type}`);
             }
@@ -1001,6 +1053,223 @@ export class SharedModel extends Disposable {
     }
     return group;
   }
+
+  private remapGeometryCacheFrames(subMesh: AssetSubMeshData, frames: FixedGeometryCacheFrame[]) {
+    if (!subMesh.rawPositions || frames.length === 0) {
+      return frames;
+    }
+    const sourcePositions = frames[0].positions;
+    const sourceVertexCount = (sourcePositions.length / 3) >> 0;
+    const targetVertexCount = (subMesh.rawPositions.length / 3) >> 0;
+    if (sourceVertexCount === targetVertexCount) {
+      return frames;
+    }
+    const remap = this.buildGeometryCacheRemap(subMesh.rawPositions, sourcePositions);
+    if (!remap) {
+      console.error(
+        `Geometry cache vertex layout mismatch: source=${sourceVertexCount}, target=${targetVertexCount}. ` +
+          `Export the base glb and zabc from the same final mesh layout.`
+      );
+      return frames;
+    }
+    return frames.map((frame) => ({
+      positions: this.expandGeometryCacheData(frame.positions, remap),
+      normals:
+        frame.normals && (frame.normals.length / 3) >> 0 === sourceVertexCount
+          ? this.expandGeometryCacheData(frame.normals, remap)
+          : null,
+      boundingBox: frame.boundingBox
+    }));
+  }
+
+  private remapPCAGeometryCacheData(
+    subMesh: AssetSubMeshData,
+    track: AssetPCAGeometryCacheAnimationTrack
+  ): PCAGeometryCacheTrackData {
+    const remapReference = track.positionReference ?? this.reconstructPCAGeometryCacheReference(track);
+    if (!subMesh.rawPositions || remapReference.length === 0) {
+      return {
+        times: track.times,
+        bounds: track.bounds,
+        positionReference: track.positionReference ?? null,
+        positionMean: track.positionMean,
+        positionBases: track.positionBases,
+        positionCoefficients: track.positionCoefficients,
+        normalMean: track.normalMean ?? null,
+        normalBases: track.normalBases ?? null,
+        normalCoefficients: track.normalCoefficients ?? null
+      };
+    }
+    const sourceVertexCount = (remapReference.length / 3) >> 0;
+    const targetVertexCount = (subMesh.rawPositions.length / 3) >> 0;
+    if (sourceVertexCount === targetVertexCount) {
+      return {
+        times: track.times,
+        bounds: track.bounds,
+        positionReference: track.positionReference ?? null,
+        positionMean: track.positionMean,
+        positionBases: track.positionBases,
+        positionCoefficients: track.positionCoefficients,
+        normalMean: track.normalMean ?? null,
+        normalBases: track.normalBases ?? null,
+        normalCoefficients: track.normalCoefficients ?? null
+      };
+    }
+    const remap = this.buildGeometryCacheRemap(subMesh.rawPositions, remapReference);
+    if (!remap) {
+      console.error(
+        `Geometry cache vertex layout mismatch: source=${sourceVertexCount}, target=${targetVertexCount}. ` +
+          `Export the base glb and zabc from the same final mesh layout.`
+      );
+      return {
+        times: track.times,
+        bounds: track.bounds,
+        positionReference: track.positionReference ?? null,
+        positionMean: track.positionMean,
+        positionBases: track.positionBases,
+        positionCoefficients: track.positionCoefficients,
+        normalMean: track.normalMean ?? null,
+        normalBases: track.normalBases ?? null,
+        normalCoefficients: track.normalCoefficients ?? null
+      };
+    }
+    return {
+      times: track.times,
+      bounds: track.bounds,
+      positionReference: this.expandGeometryCacheData(remapReference, remap),
+      positionMean: this.expandGeometryCacheData(track.positionMean, remap),
+      positionBases: track.positionBases.map((basis) => this.expandGeometryCacheData(basis, remap)),
+      positionCoefficients: track.positionCoefficients,
+      normalMean:
+        track.normalMean && (track.normalMean.length / 3) >> 0 === sourceVertexCount
+          ? this.expandGeometryCacheData(track.normalMean, remap)
+          : null,
+      normalBases:
+        track.normalBases?.map((basis) =>
+          (basis.length / 3) >> 0 === sourceVertexCount ? this.expandGeometryCacheData(basis, remap) : basis
+        ) ?? null,
+      normalCoefficients: track.normalCoefficients ?? null
+    };
+  }
+
+  private reconstructPCAGeometryCacheReference(track: AssetPCAGeometryCacheAnimationTrack) {
+    const reference = new Float32Array(track.positionMean);
+    const coefficients = track.positionCoefficients[0];
+    if (!coefficients) {
+      return reference;
+    }
+    const componentCount = Math.min(track.positionBases.length, coefficients.length);
+    for (let component = 0; component < componentCount; component++) {
+      const basis = track.positionBases[component];
+      const coefficient = coefficients[component];
+      if (!basis || coefficient === 0) {
+        continue;
+      }
+      const count = Math.min(reference.length, basis.length);
+      for (let i = 0; i < count; i++) {
+        reference[i] += basis[i] * coefficient;
+      }
+    }
+    return reference;
+  }
+
+  private buildGeometryCacheRemap(targetPositions: Float32Array, sourcePositions: Float32Array) {
+    const sourceCount = (sourcePositions.length / 3) >> 0;
+    const targetCount = (targetPositions.length / 3) >> 0;
+    const buckets = new Map<string, number[]>();
+    for (let i = 0; i < sourceCount; i++) {
+      const key = this.geometryCachePositionKey(
+        sourcePositions[i * 3],
+        sourcePositions[i * 3 + 1],
+        sourcePositions[i * 3 + 2]
+      );
+      const bucket = buckets.get(key);
+      if (bucket) {
+        bucket.push(i);
+      } else {
+        buckets.set(key, [i]);
+      }
+    }
+    const remap = new Uint32Array(targetCount);
+    for (let i = 0; i < targetCount; i++) {
+      const x = targetPositions[i * 3];
+      const y = targetPositions[i * 3 + 1];
+      const z = targetPositions[i * 3 + 2];
+      let sourceIndex = this.findGeometryCacheSourceIndex(sourcePositions, buckets, x, y, z);
+      if (sourceIndex < 0) {
+        sourceIndex = this.findNearestGeometryCacheSourceIndex(sourcePositions, x, y, z);
+      }
+      if (sourceIndex < 0) {
+        return null;
+      }
+      remap[i] = sourceIndex;
+    }
+    return remap;
+  }
+
+  private expandGeometryCacheData(source: Float32Array, remap: Uint32Array) {
+    const expanded = new Float32Array(remap.length * 3);
+    for (let i = 0; i < remap.length; i++) {
+      const sourceOffset = remap[i] * 3;
+      const targetOffset = i * 3;
+      expanded[targetOffset] = source[sourceOffset];
+      expanded[targetOffset + 1] = source[sourceOffset + 1];
+      expanded[targetOffset + 2] = source[sourceOffset + 2];
+    }
+    return expanded;
+  }
+
+  private findGeometryCacheSourceIndex(
+    sourcePositions: Float32Array,
+    buckets: Map<string, number[]>,
+    x: number,
+    y: number,
+    z: number
+  ) {
+    const bucket = buckets.get(this.geometryCachePositionKey(x, y, z));
+    if (!bucket) {
+      return -1;
+    }
+    const epsilon = 1e-5;
+    for (const index of bucket) {
+      const offset = index * 3;
+      if (
+        Math.abs(sourcePositions[offset] - x) <= epsilon &&
+        Math.abs(sourcePositions[offset + 1] - y) <= epsilon &&
+        Math.abs(sourcePositions[offset + 2] - z) <= epsilon
+      ) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  private findNearestGeometryCacheSourceIndex(
+    sourcePositions: Float32Array,
+    x: number,
+    y: number,
+    z: number
+  ) {
+    const epsilonSquared = 1e-8;
+    let bestIndex = -1;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < sourcePositions.length; i += 3) {
+      const dx = sourcePositions[i] - x;
+      const dy = sourcePositions[i + 1] - y;
+      const dz = sourcePositions[i + 2] - z;
+      const distance = dx * dx + dy * dy + dz * dz;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = i / 3;
+      }
+    }
+    return bestDistance <= epsilonSquared ? bestIndex : -1;
+  }
+
+  private geometryCachePositionKey(x: number, y: number, z: number) {
+    return `${Math.round(x * 100000)}|${Math.round(y * 100000)}|${Math.round(z * 100000)}`;
+  }
+
   protected onDispose() {
     super.onDispose();
     this._skeletons = [];

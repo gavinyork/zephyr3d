@@ -2211,12 +2211,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       active ? ImGui.Col.SeparatorActive : hovered ? ImGui.Col.SeparatorHovered : ImGui.Col.Separator
     );
     const lineY = (rectMin.y + rectMax.y) * 0.5;
-    drawList.AddLine(
-      new ImGui.ImVec2(rectMin.x, lineY),
-      new ImGui.ImVec2(rectMax.x, lineY),
-      color,
-      1
-    );
+    drawList.AddLine(new ImGui.ImVec2(rectMin.x, lineY), new ImGui.ImVec2(rectMax.x, lineY), color, 1);
     if (hovered || active) {
       ImGui.SetMouseCursor(ImGui.MouseCursor.ResizeNS);
     }

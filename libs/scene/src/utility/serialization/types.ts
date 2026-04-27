@@ -267,8 +267,6 @@ export type SerializableClass = {
   ctor: GenericConstructor;
   /** Optional parent/superclass constructor to represent inheritance in tooling. */
   parent?: GenericConstructor;
-  /** Script path of this class for dynamic loading */
-  scriptPath?: string;
   /** If true, suppresses title rendering in UI for compact displays. */
   noTitle?: boolean;
   /** Display name used by tooling and editors. */
