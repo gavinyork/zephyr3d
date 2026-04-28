@@ -1,5 +1,5 @@
-import type { FileMetadata, IDisposable, VFS } from '@zephyr3d/base';
-import type { PropertyAccessor } from '@zephyr3d/scene';
+import type { FileMetadata, IDisposable, Vector3, VFS } from '@zephyr3d/base';
+import type { Mesh, PropertyAccessor, Scene, SceneNode } from '@zephyr3d/scene';
 
 export type EditorDirectoryInfo = {
   path: string;
@@ -70,13 +70,31 @@ export type EditorPropertyAccessorProvider = (
   object: unknown
 ) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>;
 
+export type EditorCommands = {
+  addChildNode<T extends SceneNode = SceneNode>(
+    parent: SceneNode,
+    ctor: { new (scene: Scene): T },
+    position?: Vector3
+  ): Promise<T>;
+  addShapeNode<T extends 'box' | 'sphere' | 'plane' | 'cylinder' | 'torus' | 'tetrahedron'>(
+    scene: Scene,
+    type: T,
+    position?: Vector3
+  ): Promise<Mesh>;
+  instantiatePrefab(scene: Scene, prefabPath: string, position?: Vector3): Promise<SceneNode>;
+  deleteNode(node: SceneNode): Promise<void>;
+  reparentNode(node: SceneNode, newParent: SceneNode): Promise<void>;
+  cloneNode(node: SceneNode): Promise<SceneNode>;
+  executeCommand<T>(command: unknown): Promise<T>;
+  executeUserCallback<T>(execute: () => T | Promise<T>, undo: () => void | Promise<void>): Promise<null | T>;
+};
+
 export type EditorSceneContext = {
   editor: EditorHost;
   scene: unknown | null;
   selectedNodes: readonly unknown[];
   activeNode: unknown | null;
-  commandManager: unknown;
-  executeCommand<T>(command: unknown): Promise<T>;
+  commands: EditorCommands;
   notifySceneChanged(): void;
   refreshProperties(): void;
   getCamera(): unknown | null;
@@ -104,7 +122,7 @@ export type EditorToolbarContext = {
 
 export type EditorEditToolFactoryContext = {
   editor: EditorHost;
-  executeCommand<T>(command: unknown): Promise<T>;
+  scene: EditorSceneContext;
   notifySceneChanged(): void;
   refreshProperties(): void;
   getCamera(): unknown | null;

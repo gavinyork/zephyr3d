@@ -14,7 +14,7 @@ import type { PropertyAccessor } from '@zephyr3d/scene';
 import { TreeViewData, TreeView } from './treeview';
 import { ImGui } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
-import type { InternalEditorMenuContext, InternalEditorMenuItem } from '../core/plugin';
+import type { RuntimeEditorMenuContext, RuntimeEditorMenuItem } from '../core/plugin';
 
 class SceneData extends TreeViewData<SceneNode> {
   private _scene: Scene;
@@ -100,16 +100,16 @@ export class SceneHierarchy extends TreeView<
   SceneNode
 > {
   private _scene: Scene;
-  private _getPluginContext: (node: SceneNode) => InternalEditorMenuContext;
+  private _getPluginContext: (node: SceneNode) => RuntimeEditorMenuContext;
   private _renderPluginMenuItems: (
-    items: readonly InternalEditorMenuItem[],
-    ctx: InternalEditorMenuContext
+    items: readonly RuntimeEditorMenuItem[],
+    ctx: RuntimeEditorMenuContext
   ) => void;
   constructor(
     scene: Scene,
     getOpenedSceneName?: () => string,
-    getPluginContext?: (node: SceneNode) => InternalEditorMenuContext,
-    renderPluginMenuItems?: (items: readonly InternalEditorMenuItem[], ctx: InternalEditorMenuContext) => void
+    getPluginContext?: (node: SceneNode) => RuntimeEditorMenuContext,
+    renderPluginMenuItems?: (items: readonly RuntimeEditorMenuItem[], ctx: RuntimeEditorMenuContext) => void
   ) {
     super('###SceneHierarchyInner', new SceneData(scene, getOpenedSceneName), true);
     this._scene = scene;

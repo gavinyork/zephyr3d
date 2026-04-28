@@ -39,6 +39,22 @@ function getNodePath(node: SceneNode) {
   return parts.join('/');
 }
 
+export class CustomCommand<T> extends Command<T> {
+  private readonly _execute: () => T | Promise<T>;
+  private readonly _undo: () => void | Promise<void>;
+  constructor(execute: () => T | Promise<T>, undo: () => void | Promise<void>) {
+    super();
+    this._execute = execute;
+    this._undo = undo;
+  }
+  async execute(): Promise<T> {
+    return await this._execute();
+  }
+  async undo() {
+    return await this._undo();
+  }
+}
+
 export class AddPrefabCommand extends Command<Nullable<SceneNode>> {
   private readonly _scene: Scene;
   private readonly _prefab: string;

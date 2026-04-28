@@ -28,7 +28,7 @@ import type { SharedModel } from '../loaders/model';
 import { DlgImportOptions } from '../views/dlg/importoptionsdlg';
 import { DialogRenderer } from './modal';
 import type { Editor } from '../core/editor';
-import type { InternalEditorAssetContext, InternalEditorMenuContext } from '../core/plugin';
+import type { RuntimeEditorAssetContext, RuntimeEditorMenuContext } from '../core/plugin';
 import type { PropertyAccessor } from '@zephyr3d/scene';
 
 export type FileInfo = {
@@ -1540,7 +1540,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     this._options.editor?.plugins.dispatchEvent('assetSelectionChanged', this.getAssetContext());
   }
 
-  getAssetContext(): InternalEditorAssetContext {
+  getAssetContext(): RuntimeEditorAssetContext {
     return {
       editor: this._options.editor,
       vfs: this._vfs,
@@ -1555,7 +1555,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     if (!editor) {
       return;
     }
-    const ctx: InternalEditorMenuContext = {
+    const ctx: RuntimeEditorMenuContext = {
       location,
       assets: this.getAssetContext(),
       target

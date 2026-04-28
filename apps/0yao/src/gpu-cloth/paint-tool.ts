@@ -449,7 +449,9 @@ class ClothPaintTool extends Disposable implements EditToolLike {
     this._strokeStartState = null;
     this._lastStrokePos = null;
     if (oldState && !sameClothWeightState(oldState, newState)) {
-      void this._ctx.executeCommand(new ClothWeightPaintCommand(this._host.get()!, oldState, newState));
+      void this._ctx.scene.commands.executeCommand(
+        new ClothWeightPaintCommand(this._host.get()!, oldState, newState)
+      );
       this._ctx.refreshProperties();
       this._ctx.notifySceneChanged();
     }
@@ -730,7 +732,9 @@ class ClothPaintTool extends Disposable implements EditToolLike {
     this.applyState(newState);
     this._ctx.refreshProperties();
     this._ctx.notifySceneChanged();
-    void this._ctx.executeCommand(new ClothWeightPaintCommand(this._host.get()!, oldState, newState, desc));
+    void this._ctx.scene.commands.executeCommand(
+      new ClothWeightPaintCommand(this._host.get()!, oldState, newState, desc)
+    );
   }
 
   private syncVertexWeightsFromConfig() {

@@ -13,7 +13,7 @@ import {
   getGPUObjectStatistics
 } from '../helpers/leakdetector';
 import type { FileMetadata, HttpDirectoryReader, HttpDirectoryReaderContext } from '@zephyr3d/base';
-import { DRef, HttpFS, MemoryFS, PathUtils, Vector3 } from '@zephyr3d/base';
+import { DRef, HttpFS, MemoryFS, PathUtils } from '@zephyr3d/base';
 import type { ProjectInfo, ProjectSettings } from './services/project';
 import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
@@ -117,8 +117,8 @@ export class Editor {
     this._plugins = new EditorPluginManager(this);
     this._systemPluginRegistrations = new Map();
   }
-  testPackage(ctorVector3: any) {
-    return ctorVector3 === Vector3;
+  get moduleManager() {
+    return this._moduleManager;
   }
   get plugins() {
     return this._plugins;

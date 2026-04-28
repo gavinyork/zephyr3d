@@ -42,7 +42,7 @@ import { MenubarView } from '../components/menubar';
 import type { MenuBarOptions } from '../components/menubar';
 import { StatusBar } from '../components/statusbar';
 import { BaseView } from './baseview';
-import { CommandManager, CompositeCommand } from '../core/command';
+import { CommandManager, CompositeCommand, type Command } from '../core/command';
 import {
   AddAssetCommand,
   AddChildCommand,
@@ -52,7 +52,8 @@ import {
   NodeCloneCommand,
   NodeDeleteCommand,
   NodeReparentCommand,
-  NodeTransformCommand
+  NodeTransformCommand,
+  CustomCommand
 } from '../commands/scenecommands';
 import { NodeProxy } from '../helpers/proxy';
 import { clearScriptPropertyAccessorCache } from '../helpers/scriptprops';
@@ -75,8 +76,8 @@ import { ScriptPanel } from '../components/scriptpanel';
 import { DlgSaveFile } from './dlg/savefiledlg';
 import { ResourceService } from '../core/services/resource';
 import { DlgMessage } from './dlg/messagedlg';
-import type { InternalEditorMenuContext, InternalEditorSceneContext } from '../core/plugin';
-import type { InternalEditorMenuItem } from '../core/plugin';
+import type { RuntimeEditorMenuContext, RuntimeEditorSceneContext } from '../core/plugin';
+import type { RuntimeEditorMenuItem } from '../core/plugin';
 
 type ColliderKind = 'sphere' | 'capsule' | 'plane';
 type MultiTransformItem = {
@@ -94,6 +95,15 @@ type SyncedPropertyRecord = {
   oldValue: PropertySnapshot;
   newValue: PropertySnapshot;
 };
+
+const shapePrimitivePaths = {
+  box: '/assets/@builtins/primitives/box.zmsh',
+  sphere: '/assets/@builtins/primitives/sphere.zmsh',
+  plane: '/assets/@builtins/primitives/plane.zmsh',
+  cylinder: '/assets/@builtins/primitives/cylinder.zmsh',
+  torus: '/assets/@builtins/primitives/torus.zmsh',
+  tetrahedron: '/assets/@builtins/primitives/tetrahedron.zmsh'
+} as const;
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -635,7 +645,12 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           visible: () =>
             !!this._currentEditTool.get() ||
             (!this._currentEditTool.get() &&
-              isObjectEditable(this.editor, this._sceneHierarchy!.selectedNode, this._editToolContext)),
+              isObjectEditable(
+                this.editor,
+                this._sceneHierarchy!.selectedNode,
+                this._editToolContext,
+                this.createSceneContext()
+              )),
           selected: () => {
             return !!this._currentEditTool.get();
           },
@@ -747,12 +762,89 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleRefreshProperties() {
     this._propGrid.refresh();
   }
-  private createSceneContext(): InternalEditorSceneContext {
+
+  private createEditorCommands(): RuntimeEditorSceneContext['commands'] {
+    return {
+      addChildNode: async <T extends SceneNode = SceneNode>(
+        parent: SceneNode,
+        ctor: { new (scene: Scene): T },
+        position?: Vector3
+      ) => {
+        const node = await this._cmdManager.execute(new AddChildCommand(parent, ctor, position));
+        if (!node) {
+          console.error('Failed to add child node');
+          return null;
+        }
+        this.editor.plugins.dispatchEvent('nodeAdded', node);
+        eventBus.dispatchEvent('scene_changed');
+        return node;
+      },
+      addShapeNode: async <T extends keyof typeof shapePrimitivePaths>(
+        scene: Scene,
+        type: T,
+        position?: Vector3
+      ) => {
+        const node = await this._cmdManager.execute(
+          new AddShapeCommand(scene, shapePrimitivePaths[type], position ?? new Vector3())
+        );
+        if (!node) {
+          console.error(`Failed to add shape node: ${type}`);
+          return null;
+        }
+        this.editor.plugins.dispatchEvent('nodeAdded', node);
+        eventBus.dispatchEvent('scene_changed');
+        return node;
+      },
+      instantiatePrefab: async (scene: Scene, prefabPath: string, position?: Vector3) => {
+        const node = await this._cmdManager.execute(
+          new AddPrefabCommand(scene, prefabPath, position ?? new Vector3())
+        );
+        if (!node) {
+          console.error(`Failed to instantiate prefab '${prefabPath}'`);
+          return null;
+        }
+        this.editor.plugins.dispatchEvent('nodeAdded', node);
+        eventBus.dispatchEvent('scene_changed');
+        return node;
+      },
+      deleteNode: async (node: SceneNode) => {
+        const command = this.prepareDeleteNodeCommand(node);
+        if (!command) {
+          console.error('Cannot delete node');
+          return;
+        }
+        await this._cmdManager.execute(command);
+        this.editor.plugins.dispatchEvent('nodeDeleted', node);
+        eventBus.dispatchEvent('scene_changed');
+      },
+      reparentNode: async (node: SceneNode, newParent: SceneNode) => {
+        await this._cmdManager.execute(new NodeReparentCommand(node, newParent));
+        this.editor.plugins.dispatchEvent('nodeTransformed', node);
+        eventBus.dispatchEvent('scene_changed');
+      },
+      cloneNode: async (node: SceneNode) => {
+        const cloned = await this._cmdManager.execute(new NodeCloneCommand(node));
+        if (!cloned) {
+          console.error('Failed to clone node');
+          return null;
+        }
+        this.editor.plugins.dispatchEvent('nodeAdded', cloned);
+        eventBus.dispatchEvent('scene_changed');
+        return cloned;
+      },
+      executeCommand: <T>(command: unknown) => this._cmdManager.execute(command as Command<T>),
+      executeUserCallback: <T>(execute: () => T | Promise<T>, undo: () => void | Promise<void>) =>
+        this._cmdManager.execute(new CustomCommand(execute, undo))
+    };
+  }
+
+  private createSceneContext(): RuntimeEditorSceneContext {
     return {
       editor: this.editor,
       scene: this.controller.model.scene,
       selectedNodes: this.getSelectedSceneNodes(),
       activeNode: this._sceneHierarchy?.selectedNode ?? null,
+      commands: this.createEditorCommands(),
       commandManager: this._cmdManager,
       executeCommand: (command) => this._cmdManager.execute(command),
       notifySceneChanged: () => eventBus.dispatchEvent('scene_changed'),
@@ -761,7 +853,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       getViewportRect: () => this._editToolContext.getViewportRect()
     };
   }
-  private renderContextMenuItems(items: readonly InternalEditorMenuItem[], ctx: InternalEditorMenuContext) {
+  private renderContextMenuItems(items: readonly RuntimeEditorMenuItem[], ctx: RuntimeEditorMenuContext) {
     this.editor.plugins.renderMenuItems(items, ctx);
   }
   reset() {
@@ -1731,7 +1823,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     const currentTool = this._currentEditTool.get();
     if (!currentTool) {
-      const tool = createEditTool(this.editor, node, this._editToolContext);
+      const tool = createEditTool(this.editor, node, this._editToolContext, this.createSceneContext());
       this._currentEditTool.set(tool);
       if (tool) {
         this.editor.plugins.dispatchEvent('editToolActivated', tool, node);
@@ -1746,7 +1838,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._currentEditTool.dispose();
     } else {
       this.editor.plugins.dispatchEvent('editToolDeactivated', currentTool, currentTarget);
-      const tool = createEditTool(this.editor, node, this._editToolContext);
+      const tool = createEditTool(this.editor, node, this._editToolContext, this.createSceneContext());
       this._currentEditTool.set(tool);
       if (tool) {
         this.editor.plugins.dispatchEvent('editToolActivated', tool, node);
