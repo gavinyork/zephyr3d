@@ -317,12 +317,20 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
         const label = convertEmojiString(`${icon ? `${icon} ` : ''}${name}##row_${i}`);
         const isSelected = this._selectedItems.has(item);
         const keyCtrlOrShift = ImGui.GetIO().KeyCtrl || ImGui.GetIO().KeyShift;
+        const hasLeadingContent = this.renderDetailLeadingContent(item, i);
+        if (hasLeadingContent) {
+          ImGui.SameLine();
+        }
+        const selectableFlags =
+          ImGui.SelectableFlags.AllowDoubleClick |
+          (hasLeadingContent ? 0 : ImGui.SelectableFlags.SpanAllColumns);
 
         if (
           ImGui.Selectable(
             label,
             isSelected,
-            ImGui.SelectableFlags.SpanAllColumns | ImGui.SelectableFlags.AllowDoubleClick
+            selectableFlags,
+            hasLeadingContent ? new ImGui.ImVec2(ImGui.GetContentRegionAvail().x, 0) : undefined
           )
         ) {
           if (isSelected && !keyCtrlOrShift) {
@@ -441,6 +449,9 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     this.onSelectionChanged();
   }
   protected handleItemDoubleClick(_item: T) {}
+  protected renderDetailLeadingContent(_item: T, _index: number): boolean {
+    return false;
+  }
   protected handleListItemRendered(_item: T): boolean {
     return false;
   }

@@ -1,4 +1,4 @@
-import { ImGui } from '@zephyr3d/imgui';
+﻿import { ImGui } from '@zephyr3d/imgui';
 import { ListView, ListViewData } from '../../components/listview';
 import { DialogRenderer } from '../../components/modal';
 import type { Editor } from '../../core/editor';
@@ -78,8 +78,8 @@ class SystemPluginListData extends ListViewData<SystemPluginRecord> {
     return this.elements;
   }
 
-  getItemIcon(item: SystemPluginRecord): string {
-    return item.enabled ? '🔌' : '🚫';
+  getItemIcon(_item: SystemPluginRecord): string {
+    return '';
   }
 
   getItemName(item: SystemPluginRecord): string {
@@ -87,7 +87,7 @@ class SystemPluginListData extends ListViewData<SystemPluginRecord> {
   }
 
   getDetailColumnsInfo(): string[] {
-    return ['Id', 'Version', 'Status'];
+    return ['Id', 'Version'];
   }
 
   getDetailColumn(item: SystemPluginRecord, col: number): string {
@@ -96,8 +96,6 @@ class SystemPluginListData extends ListViewData<SystemPluginRecord> {
         return item.id;
       case 1:
         return item.version ?? '-';
-      case 2:
-        return item.enabled ? 'Enabled' : 'Disabled';
       default:
         return '';
     }
@@ -119,9 +117,6 @@ class SystemPluginListData extends ListViewData<SystemPluginRecord> {
         break;
       case 2:
         comparison = (a.version ?? '').localeCompare(b.version ?? '');
-        break;
-      case 3:
-        comparison = Number(a.enabled) - Number(b.enabled);
         break;
       default:
         break;
@@ -147,9 +142,27 @@ class SystemPluginListData extends ListViewData<SystemPluginRecord> {
 }
 
 class SystemPluginListView extends ListView<{}, SystemPluginRecord> {
-  constructor(data: SystemPluginListData) {
+  constructor(
+    data: SystemPluginListData,
+    private readonly _togglePlugin: (plugin: SystemPluginRecord) => void,
+    private readonly _isBusy: () => boolean
+  ) {
     super('##SystemPluginList', data, false);
     this.type = 'detail';
+  }
+
+  protected renderDetailLeadingContent(item: SystemPluginRecord): boolean {
+    const value = [item.enabled] as [boolean];
+    if (ImGui.Checkbox(`##plugin-enabled-${item.id}`, value)) {
+      this.handleItemClick(item);
+      if (!this._isBusy()) {
+        this._togglePlugin(item);
+      }
+    }
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip(item.enabled ? 'Disable plugin' : 'Enable plugin');
+    }
+    return true;
   }
 
   protected postRenderItem(item: SystemPluginRecord): void {
@@ -407,10 +420,6 @@ class DlgPluginFiles extends DialogRenderer<void> {
       this.installPackage();
     }
     ImGui.SameLine();
-    if (ImGui.Button('Update Package...')) {
-      this.updatePackage();
-    }
-    ImGui.SameLine();
     if (ImGui.Button('Remove Package...')) {
       this.removePackage();
     }
@@ -483,33 +492,6 @@ class DlgPluginFiles extends DialogRenderer<void> {
     });
   }
 
-  private async updatePackage() {
-    const dependencyNames = Object.keys(this._plugin.dependencies ?? {}).sort((a, b) => a.localeCompare(b));
-    if (dependencyNames.length === 0) {
-      this.showInfo('No packages', `Plugin '${this._plugin.id}' does not have any installed package.`);
-      return;
-    }
-    const selected = await Dialog.openFromList(
-      'Update Package',
-      dependencyNames.map((name) => `${name}@${this._plugin.dependencies[name]}`),
-      dependencyNames,
-      420,
-      320
-    );
-    if (!selected) {
-      return;
-    }
-    const val = await DlgPromptName.promptName(
-      'Update Package',
-      'package',
-      `${selected}@${this._plugin.dependencies[selected] ?? 'latest'}`
-    );
-    if (!val) {
-      return;
-    }
-    this.runPackageInstall(val, `Updated package for plugin '${this._plugin.id}'.`);
-  }
-
   private async removePackage() {
     const dependencyNames = Object.keys(this._plugin.dependencies ?? {}).sort((a, b) => a.localeCompare(b));
     if (dependencyNames.length === 0) {
@@ -554,24 +536,6 @@ class DlgPluginFiles extends DialogRenderer<void> {
       })
       .catch((err) => {
         dlgMessageBoxEx.text = `Remove failed: ${err}`;
-        dlgMessageBoxEx.buttons[0] = 'Ok';
-      });
-  }
-
-  private runPackageInstall(spec: string, _successMessage: string) {
-    const dlgMessageBoxEx = new DlgMessageBoxEx('Install package', '', ['Installing...'], 400, 0, false);
-    dlgMessageBoxEx.showModal();
-    this._editor
-      .installSystemPluginDependency(this._plugin.id, spec, (msg) => {
-        dlgMessageBoxEx.text = msg;
-      })
-      .then(async (result) => {
-        await this.refreshPluginRecord();
-        dlgMessageBoxEx.text = `Installed ${result.name}@${result.version}`;
-        dlgMessageBoxEx.buttons[0] = 'Ok';
-      })
-      .catch((err) => {
-        dlgMessageBoxEx.text = `Install failed: ${err}`;
         dlgMessageBoxEx.buttons[0] = 'Ok';
       });
   }
@@ -739,7 +703,7 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
     super('System Plugins', 760, 480, true, false, false);
     this._editor = editor;
     this._listData = new SystemPluginListData([]);
-    this._listView = new SystemPluginListView(this._listData);
+    this._listView = new SystemPluginListView(this._listData, (plugin) => this.toggleSelected(plugin), () => this._busy);
     this.reload().catch(() => undefined);
   }
 
@@ -779,10 +743,6 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
 
     const selected = [...this._listView.selectedItems][0] ?? null;
     if (selected) {
-      if (ImGui.Button(selected.enabled ? 'Disable' : 'Enable') && !this._busy) {
-        this.toggleSelected(selected);
-      }
-      ImGui.SameLine();
       if (ImGui.Button('Export Zip...') && !this._busy) {
         this.exportPlugin(selected);
       }
@@ -791,27 +751,16 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
         this.removeSelected(selected);
       }
       ImGui.SameLine();
-      if (ImGui.Button('Open Source') && !this._busy) {
-        const entryPath = SystemPluginService.VFS.normalizePath(
-          selected.packageDir + '/' + selected.entry.replace(/^\/+/, '')
-        );
-        this._editor.openCodeFile(entryPath, entryPath.endsWith('.ts') ? 'typescript' : 'javascript');
+      if (ImGui.Button('Browse Files...') && !this._busy) {
+        this.browseFiles(selected);
       }
       ImGui.SameLine();
       if (ImGui.Button('Install Package...') && !this._busy) {
         this.installPluginPackage(selected);
       }
       ImGui.SameLine();
-      if (ImGui.Button('Update Package...') && !this._busy) {
-        this.updatePluginPackage(selected);
-      }
-      ImGui.SameLine();
       if (ImGui.Button('Remove Package...') && !this._busy) {
         this.removePluginPackage(selected);
-      }
-      ImGui.SameLine();
-      if (ImGui.Button('Browse Files...') && !this._busy) {
-        this.browseFiles(selected);
       }
       ImGui.SameLine();
       if (ImGui.Button('Settings...') && !this._busy) {
@@ -819,7 +768,7 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
       }
       ImGui.TextWrapped(getPluginDependencySummary(selected));
     } else {
-      ImGui.TextDisabled('Select a plugin to enable, disable, remove, or inspect it.');
+      ImGui.TextDisabled('Select a plugin to inspect or remove it.');
     }
 
     ImGui.Separator();
@@ -992,32 +941,6 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
     });
   }
 
-  private async updatePluginPackage(plugin: SystemPluginRecord) {
-    const dependencyNames = Object.keys(plugin.dependencies ?? {}).sort((a, b) => a.localeCompare(b));
-    if (dependencyNames.length === 0) {
-      return;
-    }
-    const selectedDependency = await Dialog.openFromList(
-      'Update Package',
-      dependencyNames.map((name) => `${name}@${plugin.dependencies[name]}`),
-      dependencyNames,
-      420,
-      320
-    );
-    if (!selectedDependency) {
-      return;
-    }
-    const spec = await DlgPromptName.promptName(
-      'Update Package',
-      'package',
-      `${selectedDependency}@${plugin.dependencies[selectedDependency] ?? 'latest'}`
-    );
-    if (!spec) {
-      return;
-    }
-    this.installPluginPackageWithSpec(plugin, spec, 'Update package');
-  }
-
   private async removePluginPackage(plugin: SystemPluginRecord) {
     const dependencyNames = Object.keys(plugin.dependencies ?? {}).sort((a, b) => a.localeCompare(b));
     if (dependencyNames.length === 0) {
@@ -1068,23 +991,5 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
       });
   }
 
-  private installPluginPackageWithSpec(plugin: SystemPluginRecord, spec: string, title: string) {
-    this._busy = true;
-    const dlgMessageBoxEx = new DlgMessageBoxEx(title, '', ['Installing...'], 400, 0, false);
-    dlgMessageBoxEx.showModal();
-    this._editor
-      .installSystemPluginDependency(plugin.id, spec, (msg) => {
-        dlgMessageBoxEx.text = msg;
-      })
-      .then(async () => {
-        dlgMessageBoxEx.close('');
-        await this.reload();
-      })
-      .catch(() => {
-        dlgMessageBoxEx.close('');
-      })
-      .finally(() => {
-        this._busy = false;
-      });
-  }
 }
+
