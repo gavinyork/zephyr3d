@@ -1,4 +1,5 @@
 import { IndexedDBFS, PathUtils } from '@zephyr3d/base';
+import { BlobReader, BlobWriter, ZipReader, type FileEntry } from '@zip.js/zip.js';
 import { libDir } from '../build/templates';
 import { installDeps } from '../build/dep';
 
@@ -9,6 +10,7 @@ const SYSTEM_PLUGIN_ROOT = '/system/plugins';
 const SYSTEM_PLUGIN_PACKAGES_DIR = `${SYSTEM_PLUGIN_ROOT}/packages`;
 const SYSTEM_PLUGIN_STATE_DIR = `${SYSTEM_PLUGIN_ROOT}/state`;
 const SYSTEM_PLUGIN_MANIFEST = `${SYSTEM_PLUGIN_ROOT}/manifest.json`;
+const SYSTEM_PLUGIN_PACKAGE_MANIFEST = 'plugin.json';
 
 export type SystemPluginManifestEntry = {
   id: string;
@@ -20,7 +22,15 @@ export type SystemPluginManifestEntry = {
   enabled: boolean;
   installedAt: number;
   updatedAt: number;
-  builtin?: boolean;
+};
+
+export type SystemPluginPackageManifest = {
+  id: string;
+  entry: string;
+  name?: string;
+  version?: string;
+  description?: string;
+  dependencies?: Record<string, string>;
 };
 
 type SystemPluginManifest = {
@@ -51,7 +61,6 @@ export type InstallSystemPluginInput = {
   source: string;
   dependencies?: Record<string, string>;
   enabled?: boolean;
-  builtin?: boolean;
 };
 
 export type SystemPluginFileInput = {
@@ -68,7 +77,6 @@ export type InstallSystemPluginFilesInput = {
   files: SystemPluginFileInput[];
   dependencies?: Record<string, string>;
   enabled?: boolean;
-  builtin?: boolean;
 };
 
 export type SystemPluginFileRecord = {
@@ -99,6 +107,10 @@ export class SystemPluginService {
 
   static get stateDir() {
     return SYSTEM_PLUGIN_STATE_DIR;
+  }
+
+  static get packageManifestFileName() {
+    return SYSTEM_PLUGIN_PACKAGE_MANIFEST;
   }
 
   static async ensureLayout() {
@@ -212,6 +224,9 @@ export class SystemPluginService {
     if (!normalizedRelativePath) {
       throw new Error('Plugin file path must not be empty');
     }
+    if (normalizedRelativePath === SYSTEM_PLUGIN_PACKAGE_MANIFEST) {
+      throw new Error(`Plugin file '${SYSTEM_PLUGIN_PACKAGE_MANIFEST}' is managed by the plugin manifest`);
+    }
     const fullPath = systemPluginVFS.normalizePath(
       systemPluginVFS.join(plugin.packageDir, normalizedRelativePath)
     );
@@ -268,6 +283,9 @@ export class SystemPluginService {
     if (!oldPath || !nextPath) {
       throw new Error('Plugin file path must not be empty');
     }
+    if (oldPath === SYSTEM_PLUGIN_PACKAGE_MANIFEST || nextPath === SYSTEM_PLUGIN_PACKAGE_MANIFEST) {
+      throw new Error(`Plugin file '${SYSTEM_PLUGIN_PACKAGE_MANIFEST}' cannot be renamed`);
+    }
     if (oldPath === plugin.entry.replace(/^\/+/, '')) {
       throw new Error('Renaming the plugin entry file is not supported yet');
     }
@@ -303,6 +321,9 @@ export class SystemPluginService {
     const normalizedRelativePath = this.normalizePluginFilePath(relativePath);
     if (!normalizedRelativePath) {
       throw new Error('Plugin file path must not be empty');
+    }
+    if (normalizedRelativePath === SYSTEM_PLUGIN_PACKAGE_MANIFEST) {
+      throw new Error(`Cannot delete '${SYSTEM_PLUGIN_PACKAGE_MANIFEST}'`);
     }
     if (normalizedRelativePath === plugin.entry.replace(/^\/+/, '')) {
       throw new Error('Cannot delete the plugin entry file');
@@ -413,24 +434,24 @@ export class SystemPluginService {
           source: input.source
         }
       ],
-      enabled: input.enabled,
-      builtin: input.builtin
+      enabled: input.enabled
     });
   }
 
   static async installPluginFiles(input: InstallSystemPluginFilesInput): Promise<SystemPluginRecord> {
-    if (!input.id?.trim()) {
-      throw new Error('System plugin id must not be empty');
-    }
     await this.ensureLayout();
-    const normalizedFiles = this.normalizePluginFiles(input.files);
-    const entryFileName = this.normalizeEntryFileName(input.entryFileName ?? 'index.ts');
-    this.validatePluginFiles(normalizedFiles, entryFileName);
+    const packageManifest = this.resolvePackageManifestForInstall(input);
+    const normalizedFiles = this.withPackageManifestFile(
+      this.normalizePluginFiles(input.files),
+      packageManifest
+    );
+    const entryFileName = this.normalizeEntryFileName(packageManifest.entry);
+    this.validatePluginFiles(normalizedFiles, entryFileName, packageManifest.id);
 
     const now = Date.now();
     const manifest = await this.readManifest();
-    const oldEntry = manifest.plugins[input.id];
-    const packageDir = this.getPackageDir(input.id);
+    const oldEntry = manifest.plugins[packageManifest.id];
+    const packageDir = this.getPackageDir(packageManifest.id);
 
     await systemPluginVFS.deleteDirectory(packageDir, true).catch(() => undefined);
     await systemPluginVFS.makeDirectory(packageDir, true);
@@ -442,24 +463,23 @@ export class SystemPluginService {
         create: true
       });
     }
-    if (input.dependencies && Object.keys(input.dependencies).length > 0) {
+    if (packageManifest.dependencies && Object.keys(packageManifest.dependencies).length > 0) {
       await systemPluginVFS.makeDirectory(systemPluginVFS.join(packageDir, libDir), true);
     }
 
-    manifest.plugins[input.id] = {
-      id: input.id,
-      name: input.name,
-      version: input.version,
-      description: input.description,
+    manifest.plugins[packageManifest.id] = {
+      id: packageManifest.id,
+      name: packageManifest.name,
+      version: packageManifest.version,
+      description: packageManifest.description,
       entry: `/${entryFileName}`,
-      dependencies: input.dependencies ? { ...input.dependencies } : oldEntry?.dependencies,
+      dependencies: packageManifest.dependencies ? { ...packageManifest.dependencies } : oldEntry?.dependencies,
       enabled: input.enabled ?? true,
       installedAt: oldEntry?.installedAt ?? now,
-      updatedAt: now,
-      builtin: !!input.builtin
+      updatedAt: now
     };
     await this.writeManifest(manifest);
-    return this.toRecord(manifest.plugins[input.id]);
+    return this.toRecord(manifest.plugins[packageManifest.id]);
   }
 
   static async removePlugin(id: string): Promise<void> {
@@ -467,9 +487,6 @@ export class SystemPluginService {
     const plugin = manifest.plugins[id];
     if (!plugin) {
       return;
-    }
-    if (plugin.builtin) {
-      throw new Error(`Builtin system plugin '${id}' cannot be removed. Disable it instead.`);
     }
     delete manifest.plugins[id];
     await this.writeManifest(manifest);
@@ -524,23 +541,27 @@ export class SystemPluginService {
     });
   }
 
+  static createPackageManifestContent(plugin: Pick<SystemPluginManifestEntry, 'id' | 'entry' | 'name' | 'version' | 'description' | 'dependencies'>) {
+    return `${JSON.stringify(
+      this.normalizePackageManifest({
+        id: plugin.id,
+        entry: plugin.entry.replace(/^\/+/, ''),
+        name: plugin.name,
+        version: plugin.version,
+        description: plugin.description,
+        dependencies: plugin.dependencies
+      }),
+      null,
+      2
+    )}\n`;
+  }
+
   static async installPluginFromFile(file: File): Promise<SystemPluginRecord> {
-    const source = await file.text();
-    const entryFileName = file.name || 'index.ts';
-    const id = this.inferPluginId(source) ?? this.createPluginIdFromName(PathUtils.basename(entryFileName));
-    const name =
-      this.inferPluginMetaString(source, 'name') ?? PathUtils.basename(entryFileName).replace(/\.[^.]+$/, '');
-    const version = this.inferPluginMetaString(source, 'version') ?? '0.1.0';
-    const description = this.inferPluginMetaString(source, 'description') ?? '';
-    return this.installPlugin({
-      id,
-      name,
-      version,
-      description,
-      entryFileName,
-      source,
-      enabled: true
-    });
+    const fileName = (file.name || '').toLowerCase();
+    if (!fileName.endsWith('.zip')) {
+      throw new Error("Install Plugin only accepts '.zip' plugin packages. Use Install Folder for unpacked plugins.");
+    }
+    return this.installPluginFromZip(file);
   }
 
   static async installPluginFromDirectory(files: File[]): Promise<SystemPluginRecord> {
@@ -550,26 +571,50 @@ export class SystemPluginService {
         source: await file.text()
       }))
     );
-    const entryFile = this.findPluginEntryFile(inputFiles);
-    if (!entryFile) {
-      throw new Error('Cannot determine plugin entry file from selected directory');
-    }
-    const id =
-      this.inferPluginId(entryFile.source) ?? this.createPluginIdFromName(PathUtils.basename(entryFile.path));
-    const name =
-      this.inferPluginMetaString(entryFile.source, 'name') ??
-      PathUtils.basename(entryFile.path).replace(/\.[^.]+$/, '');
-    const version = this.inferPluginMetaString(entryFile.source, 'version') ?? '0.1.0';
-    const description = this.inferPluginMetaString(entryFile.source, 'description') ?? '';
+    const packageFiles = this.normalizeImportedPluginFiles(inputFiles);
+    const packageManifest = this.readPackageManifestFromFiles(packageFiles);
     return this.installPluginFiles({
-      id,
-      name,
-      version,
-      description,
-      entryFileName: entryFile.path,
-      files: inputFiles,
+      id: packageManifest.id,
+      name: packageManifest.name,
+      version: packageManifest.version,
+      description: packageManifest.description,
+      entryFileName: packageManifest.entry,
+      dependencies: packageManifest.dependencies,
+      files: packageFiles,
       enabled: true
     });
+  }
+
+  static async installPluginFromZip(file: Blob): Promise<SystemPluginRecord> {
+    const zipReader = new ZipReader(new BlobReader(file));
+    try {
+      const entries = await zipReader.getEntries();
+      const inputFiles: SystemPluginFileInput[] = [];
+      for (const entry of entries) {
+        if (entry.directory) {
+          continue;
+        }
+        const blob = await (entry as FileEntry).getData(new BlobWriter());
+        inputFiles.push({
+          path: this.normalizePluginFilePath(entry.filename),
+          source: await blob.text()
+        });
+      }
+      const packageFiles = this.normalizeImportedPluginFiles(inputFiles);
+      const packageManifest = this.readPackageManifestFromFiles(packageFiles);
+      return this.installPluginFiles({
+        id: packageManifest.id,
+        name: packageManifest.name,
+        version: packageManifest.version,
+        description: packageManifest.description,
+        entryFileName: packageManifest.entry,
+        dependencies: packageManifest.dependencies,
+        files: packageFiles,
+        enabled: true
+      });
+    } finally {
+      await zipReader.close();
+    }
   }
 
   static async installPluginDependency(
@@ -599,6 +644,7 @@ export class SystemPluginService {
       };
       manifestEntry.updatedAt = Date.now();
       await this.writeManifest(manifest);
+      await this.syncPackageManifestFile(this.toRecord(manifestEntry));
     }
     return result;
   }
@@ -645,6 +691,7 @@ export class SystemPluginService {
     }
     manifestEntry.updatedAt = Date.now();
     await this.writeManifest(manifest);
+    await this.syncPackageManifestFile(this.toRecord(manifestEntry));
 
     if (!(await this.hasDependencyCacheFiles(plugin.depsRoot))) {
       await systemPluginVFS.deleteDirectory(plugin.depsRoot, true).catch(() => undefined);
@@ -673,7 +720,6 @@ export class SystemPluginService {
 
     const manifest = await this.readManifest();
     const manifestEntry = manifest.plugins[plugin.id];
-    const entryPath = this.normalizePluginEntry(plugin.id, manifestEntry.entry);
     const files = await this.readPluginFiles(plugin.id);
     const relativePath = systemPluginVFS.relative(normalizedPath, plugin.packageDir);
     const existing = files.find((file) => file.path === relativePath);
@@ -683,19 +729,23 @@ export class SystemPluginService {
       files.push({ path: relativePath, source });
     }
 
-    this.validatePluginFiles(files, manifestEntry.entry.replace(/^\/+/, ''), plugin.id);
+    let nextPackageManifest = this.readPackageManifestFromFiles(files);
+    if (nextPackageManifest.id !== plugin.id) {
+      throw new Error(`System plugin id cannot be changed from '${plugin.id}' to '${nextPackageManifest.id}'`);
+    }
+    this.validatePluginFiles(files, nextPackageManifest.entry, plugin.id);
 
     await systemPluginVFS.writeFile(normalizedPath, source, {
       encoding: 'utf8',
       create: true
     });
 
-    if (normalizedPath === entryPath) {
-      manifestEntry.name = this.inferPluginMetaString(source, 'name') ?? manifestEntry.name;
-      manifestEntry.version = this.inferPluginMetaString(source, 'version') ?? manifestEntry.version;
-      manifestEntry.description =
-        this.inferPluginMetaString(source, 'description') ?? manifestEntry.description;
-    }
+    nextPackageManifest = this.normalizePackageManifest(nextPackageManifest);
+    manifestEntry.name = nextPackageManifest.name;
+    manifestEntry.version = nextPackageManifest.version;
+    manifestEntry.description = nextPackageManifest.description;
+    manifestEntry.entry = `/${nextPackageManifest.entry}`;
+    manifestEntry.dependencies = nextPackageManifest.dependencies;
     manifestEntry.updatedAt = Date.now();
     await this.writeManifest(manifest);
     return this.toRecord(manifestEntry);
@@ -708,17 +758,23 @@ export class SystemPluginService {
   static validatePluginFiles(files: SystemPluginFileInput[], entryFileName: string, pluginId?: string) {
     const normalizedFiles = this.normalizePluginFiles(files);
     const entryPath = this.normalizePluginFilePath(entryFileName);
+    const packageManifest = this.readPackageManifestFromFiles(normalizedFiles);
+    if (packageManifest.entry !== entryPath) {
+      throw new Error(
+        `System plugin package manifest entry '${packageManifest.entry}' does not match expected entry '${entryPath}'`
+      );
+    }
+    if (pluginId && packageManifest.id !== pluginId) {
+      throw new Error(
+        `System plugin package manifest id cannot be changed from '${pluginId}' to '${packageManifest.id}'`
+      );
+    }
     if (!normalizedFiles.some((file) => file.path === entryPath)) {
       throw new Error(`System plugin entry '${entryPath}' does not exist in plugin package`);
     }
     for (const file of normalizedFiles) {
-      if (pluginId && file.path === entryPath) {
-        const inferredId = this.inferPluginId(file.source);
-        if (inferredId && inferredId !== pluginId) {
-          throw new Error(
-            `System plugin id cannot be changed from '${pluginId}' to '${inferredId}' by editing the entry source`
-          );
-        }
+      if (file.path === SYSTEM_PLUGIN_PACKAGE_MANIFEST) {
+        continue;
       }
       this.validatePluginImports(file.source);
       this.validateRelativeImportsStayWithinPlugin(file.path, file.source);
@@ -756,26 +812,6 @@ export class SystemPluginService {
       }
     }
     return [...importSpecs];
-  }
-
-  static inferPluginId(source: string): string | null {
-    return this.inferPluginMetaString(source, 'id');
-  }
-
-  private static inferPluginMetaString(source: string, key: 'id' | 'name' | 'version' | 'description') {
-    const pattern = new RegExp(`${key}\\s*:\\s*['"]([^'"]+)['"]`);
-    const match = source.match(pattern);
-    return match?.[1] ?? null;
-  }
-
-  private static createPluginIdFromName(name: string) {
-    const normalized = name
-      .replace(/\.[^.]+$/, '')
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-    return `user.${normalized || 'plugin'}`;
   }
 
   private static normalizeEntryFileName(name: string) {
@@ -817,6 +853,140 @@ export class SystemPluginService {
       normalized.set(path, file.source);
     }
     return [...normalized.entries()].map(([path, source]) => ({ path, source }));
+  }
+
+  private static normalizeImportedPluginFiles(files: SystemPluginFileInput[]) {
+    const normalizedFiles = this.normalizePluginFiles(files);
+    if (normalizedFiles.some((file) => file.path === SYSTEM_PLUGIN_PACKAGE_MANIFEST)) {
+      return normalizedFiles;
+    }
+    const commonPrefix = this.findCommonDirectoryPrefix(normalizedFiles.map((file) => file.path));
+    for (let i = commonPrefix.length; i > 0; i--) {
+      const prefix = commonPrefix.slice(0, i).join('/');
+      const stripped = normalizedFiles
+        .filter((file) => file.path === prefix || file.path.startsWith(`${prefix}/`))
+        .map((file) => ({
+          path: file.path === prefix ? '' : file.path.slice(prefix.length + 1),
+          source: file.source
+        }))
+        .filter((file) => !!file.path);
+      if (stripped.some((file) => file.path === SYSTEM_PLUGIN_PACKAGE_MANIFEST)) {
+        return stripped;
+      }
+    }
+    throw new Error(`Plugin package must contain '${SYSTEM_PLUGIN_PACKAGE_MANIFEST}' at its root`);
+  }
+
+  private static findCommonDirectoryPrefix(paths: string[]) {
+    if (paths.length === 0) {
+      return [];
+    }
+    const segmentsList = paths.map((path) => path.split('/').filter(Boolean));
+    const minLength = Math.min(...segmentsList.map((segments) => segments.length));
+    const prefix: string[] = [];
+    for (let i = 0; i < minLength - 1; i++) {
+      const segment = segmentsList[0][i];
+      if (!segmentsList.every((segments) => segments[i] === segment)) {
+        break;
+      }
+      prefix.push(segment);
+    }
+    return prefix;
+  }
+
+  private static readPackageManifestFromFiles(files: SystemPluginFileInput[]) {
+    const manifestFile = files.find((file) => file.path === SYSTEM_PLUGIN_PACKAGE_MANIFEST);
+    if (!manifestFile) {
+      throw new Error(`Plugin package is missing '${SYSTEM_PLUGIN_PACKAGE_MANIFEST}'`);
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(manifestFile.source);
+    } catch (err) {
+      throw new Error(`Invalid '${SYSTEM_PLUGIN_PACKAGE_MANIFEST}': ${err}`);
+    }
+    return this.normalizePackageManifest(parsed);
+  }
+
+  private static resolvePackageManifestForInstall(input: InstallSystemPluginFilesInput) {
+    const normalizedFiles = this.normalizePluginFiles(input.files);
+    const manifestFile = normalizedFiles.find((file) => file.path === SYSTEM_PLUGIN_PACKAGE_MANIFEST);
+    if (manifestFile) {
+      const packageManifest = this.readPackageManifestFromFiles(normalizedFiles);
+      if (input.id && input.id !== packageManifest.id) {
+        throw new Error(
+          `Install input id '${input.id}' does not match '${SYSTEM_PLUGIN_PACKAGE_MANIFEST}' id '${packageManifest.id}'`
+        );
+      }
+      return packageManifest;
+    }
+    return this.normalizePackageManifest({
+      id: input.id,
+      name: input.name,
+      version: input.version,
+      description: input.description,
+      entry: input.entryFileName ?? 'index.ts',
+      dependencies: input.dependencies
+    });
+  }
+
+  private static withPackageManifestFile(files: SystemPluginFileInput[], packageManifest: SystemPluginPackageManifest) {
+    const normalized = new Map<string, string>();
+    for (const file of files) {
+      if (file.path === SYSTEM_PLUGIN_PACKAGE_MANIFEST) {
+        continue;
+      }
+      normalized.set(file.path, file.source);
+    }
+    normalized.set(
+      SYSTEM_PLUGIN_PACKAGE_MANIFEST,
+      `${JSON.stringify(packageManifest, null, 2)}\n`
+    );
+    return [...normalized.entries()].map(([path, source]) => ({ path, source }));
+  }
+
+  private static normalizePackageManifest(manifest: unknown): SystemPluginPackageManifest {
+    if (!manifest || typeof manifest !== 'object') {
+      throw new Error(`'${SYSTEM_PLUGIN_PACKAGE_MANIFEST}' must contain a JSON object`);
+    }
+    const value = manifest as Record<string, unknown>;
+    const id = typeof value.id === 'string' ? value.id.trim() : '';
+    if (!id) {
+      throw new Error(`'${SYSTEM_PLUGIN_PACKAGE_MANIFEST}.id' must be a non-empty string`);
+    }
+    const entry = this.normalizeEntryFileName(typeof value.entry === 'string' ? value.entry : '');
+    if (!entry) {
+      throw new Error(`'${SYSTEM_PLUGIN_PACKAGE_MANIFEST}.entry' must be a non-empty string`);
+    }
+    const dependencies = this.normalizePackageDependencies(value.dependencies);
+    return {
+      id,
+      entry,
+      name: typeof value.name === 'string' && value.name.trim() ? value.name.trim() : undefined,
+      version: typeof value.version === 'string' && value.version.trim() ? value.version.trim() : undefined,
+      description:
+        typeof value.description === 'string' && value.description.trim() ? value.description.trim() : undefined,
+      dependencies
+    };
+  }
+
+  private static normalizePackageDependencies(value: unknown) {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+    if (typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error(`'${SYSTEM_PLUGIN_PACKAGE_MANIFEST}.dependencies' must be an object`);
+    }
+    const result: Record<string, string> = {};
+    for (const [key, version] of Object.entries(value as Record<string, unknown>)) {
+      const packageName = key.trim();
+      const packageVersion = typeof version === 'string' ? version.trim() : '';
+      if (!packageName || !packageVersion) {
+        throw new Error(`'${SYSTEM_PLUGIN_PACKAGE_MANIFEST}.dependencies' must map package names to versions`);
+      }
+      result[packageName] = packageVersion;
+    }
+    return Object.keys(result).length > 0 ? result : undefined;
   }
 
   private static validateRelativeImportsStayWithinPlugin(filePath: string, source: string) {
@@ -923,6 +1093,14 @@ export class SystemPluginService {
     return entries.some((entry) => entry.type === 'file');
   }
 
+  private static async syncPackageManifestFile(plugin: SystemPluginRecord) {
+    const packageManifestPath = systemPluginVFS.join(plugin.packageDir, SYSTEM_PLUGIN_PACKAGE_MANIFEST);
+    await systemPluginVFS.writeFile(packageManifestPath, this.createPackageManifestContent(plugin), {
+      encoding: 'utf8',
+      create: true
+    });
+  }
+
   private static async readManifest(): Promise<SystemPluginManifest> {
     await this.ensureLayout();
     if (!(await systemPluginVFS.exists(SYSTEM_PLUGIN_MANIFEST))) {
@@ -934,9 +1112,20 @@ export class SystemPluginService {
       encoding: 'utf8'
     })) as string;
     const manifest = JSON.parse(content) as SystemPluginManifest;
-    return {
+    const normalized: SystemPluginManifest = {
       plugins: manifest?.plugins ?? {}
     };
+    let dirty = false;
+    for (const plugin of Object.values(normalized.plugins) as (SystemPluginManifestEntry & { builtin?: boolean })[]) {
+      if ('builtin' in plugin) {
+        delete plugin.builtin;
+        dirty = true;
+      }
+    }
+    if (dirty) {
+      await this.writeManifest(normalized);
+    }
+    return normalized;
   }
 
   private static async writeManifest(manifest: SystemPluginManifest) {

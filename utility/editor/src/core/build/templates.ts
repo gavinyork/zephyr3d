@@ -117,18 +117,25 @@ export default plugin;
 
 export const templateEditorPluginFiles = [
   {
+    path: 'plugin.json',
+    source: `{
+  "id": "com.example.editor-plugin",
+  "name": "Example Editor Plugin",
+  "version": "0.1.0",
+  "description": "A multi-file system-level zephyr3d editor plugin.",
+  "entry": "index.ts"
+}
+`
+  },
+  {
     path: 'index.ts',
-    source: `import type { EditorPlugin } from '${editorPluginModuleName}';
+    source: `import type { EditorPluginDefinition } from '${editorPluginModuleName}';
 // If your plugin needs a third-party package, install it from
 // System Plugins -> Install Package..., then import it directly:
 // import { nanoid } from 'nanoid';
 import { createAboutMessage } from './about';
 
-const plugin: EditorPlugin = {
-  id: 'com.example.editor-plugin',
-  name: 'Example Editor Plugin',
-  version: '0.1.0',
-  description: 'A multi-file system-level zephyr3d editor plugin.',
+const plugin: EditorPluginDefinition = {
   activate(ctx) {
     ctx.registerMenuItems({
       location: 'main',

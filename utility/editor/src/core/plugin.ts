@@ -26,6 +26,7 @@ import type {
   EditorEditToolFactoryContext as PublicEditorEditToolFactoryContext,
   EditorPropertyAccessorProvider as PublicEditorPropertyAccessorProvider,
   EditorEventMap as PublicEditorEventMap,
+  EditorPluginDefinition as PublicEditorPluginDefinition,
   EditorPlugin as PublicEditorPlugin,
   EditorPluginContext as PublicEditorPluginContext,
   EditorPluginSetting as PublicEditorPluginSetting,
@@ -58,6 +59,7 @@ export type EditorToolbarContext = PublicEditorToolbarContext;
 export type EditorEditToolFactoryContext = PublicEditorEditToolFactoryContext;
 export type EditorPropertyAccessorProvider = PublicEditorPropertyAccessorProvider;
 export type EditorEventMap = PublicEditorEventMap;
+export type EditorPluginDefinition = PublicEditorPluginDefinition;
 export type EditorPlugin = PublicEditorPlugin;
 export type EditorPluginContext = PublicEditorPluginContext;
 export type EditorPluginSetting = PublicEditorPluginSetting;

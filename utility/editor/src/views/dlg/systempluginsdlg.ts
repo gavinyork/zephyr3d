@@ -749,12 +749,18 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
     );
     ImGui.Separator();
 
-    if (ImGui.Button(this._busy ? 'Installing...' : 'Install Plugin...') && !this._busy) {
+    if (ImGui.Button(this._busy ? 'Installing...' : 'Install...') && !this._busy) {
       this.installPlugin();
+    }
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip('Installs a plugin from ZIP file');
     }
     ImGui.SameLine();
     if (ImGui.Button('Install Folder...') && !this._busy) {
       this.installPluginFolder();
+    }
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip('Installs a plugin from directory');
     }
     ImGui.SameLine();
     if (ImGui.Button('New Template...') && !this._busy) {
@@ -780,11 +786,9 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
       if (ImGui.Button('Export Zip...') && !this._busy) {
         this.exportPlugin(selected);
       }
-      if (!selected.builtin) {
-        ImGui.SameLine();
-        if (ImGui.Button('Remove') && !this._busy) {
-          this.removeSelected(selected);
-        }
+      ImGui.SameLine();
+      if (ImGui.Button('Remove') && !this._busy) {
+        this.removeSelected(selected);
       }
       ImGui.SameLine();
       if (ImGui.Button('Open Source') && !this._busy) {
@@ -862,9 +866,6 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
       const template = await this.createUniqueTemplatePluginInput();
       await this._editor.installSystemPluginFiles({
         id: template.id,
-        name: template.name,
-        version: '0.1.0',
-        description: 'A multi-file system-level zephyr3d editor plugin.',
         entryFileName: 'index.ts',
         files: template.files.map((file) => ({
           path: file.path,
@@ -899,12 +900,11 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
     const title = index === 1 ? 'Example Plugin' : `Example Plugin ${index}`;
     return {
       id,
-      name,
       files: templateEditorPluginFiles.map((file) => ({
         path: file.path,
         source: file.source
-          .replace("id: 'com.example.editor-plugin'", `id: '${id}'`)
-          .replace("name: 'Example Editor Plugin'", `name: '${name}'`)
+          .replace('"id": "com.example.editor-plugin"', `"id": "${id}"`)
+          .replace('"name": "Example Editor Plugin"', `"name": "${name}"`)
           .replace("id: 'example-editor-plugin.about'", `id: '${commandId}'`)
           .replace("label: 'Example Plugin...'", `label: '${label}'`)
           .replace("ctx.ui.message('Example Plugin'", `ctx.ui.message('${title}'`)

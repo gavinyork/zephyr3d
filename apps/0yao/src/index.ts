@@ -1,16 +1,9 @@
-import type { EditorPlugin } from '../core/plugin';
-import type { SystemPluginFileInput } from '../core/services/systemplugin';
-import gpuClothPaintCommandSource from './gpu-cloth-plugin-src/paint-command.ts?raw';
-import gpuClothPaintToolSource from './gpu-cloth-plugin-src/paint-tool.ts?raw';
-import gpuClothPropertyProviderSource from './gpu-cloth-plugin-src/property-provider.ts?raw';
-import gpuClothRuntimeTemplateSource from './gpu-cloth-plugin-src/runtime-template.ts?raw';
-import gpuClothSharedSource from './gpu-cloth-plugin-src/shared.ts?raw';
-import springPropertyProviderSource from './spring-plugin-src/property-provider.ts?raw';
-import springRuntimeTemplateSource from './spring-plugin-src/runtime-template.ts?raw';
-import springSharedSource from './spring-plugin-src/shared.ts?raw';
-
-export const characterDynamicsToolsPluginSource = `import OSS from 'ali-oss';
-import type { EditorPlugin } from '@zephyr3d/editor/editor-plugin';
+import OSS from 'ali-oss';
+import type {
+  EditorPlugin,
+  EditorPluginDefinition,
+  EditorDirectoryInfo
+} from '@zephyr3d/editor/editor-plugin';
 import { SceneNode } from '@zephyr3d/scene';
 import { initGPUClothPaintTool } from './gpu-cloth/paint-tool';
 import { initGPUClothPropertyProvider } from './gpu-cloth/property-provider';
@@ -73,22 +66,32 @@ async function exportProjectToOSS(ctx: Parameters<NonNullable<EditorPlugin['acti
   if (!region || !bucket || !accessKeyId || !accessKeySecret) {
     await ctx.ui.message(
       'Export to OSS',
-      'OSS not configured. Open the plugin manager and configure Character Dynamics Tools settings first.'
+      'OSS not configured. Open the plugin manager and configure 0yao settings first.'
     );
     return;
   }
 
   const folders = await ctx.ui.selectProjectFolders('Export to OSS', '/assets', true, 520, 620);
-  console.log(folders);
+  if (!folders || folders.length === 0) {
+    return;
+  }
+  const selectedPaths: Set<string> = new Set();
+  const queue: EditorDirectoryInfo[] = [...folders];
+  while (queue.length > 0) {
+    const info = queue.shift();
+    for (const f of info.files) {
+      selectedPaths.add(f.meta.path);
+    }
+    queue.push(...info.subDir);
+  }
 
-  const selectedPaths = await ctx.ui.selectProjectFiles('Export to OSS', '/assets', true, null, 520, 620);
-  if (!selectedPaths || selectedPaths.length === 0) {
+  if (!selectedPaths || selectedPaths.size === 0) {
     return;
   }
 
   const confirmed = await ctx.ui.confirm(
     'Export to OSS',
-    \`Upload \${selectedPaths.length} item(s) to OSS?\`,
+    `Upload ${selectedPaths.size} item(s) to OSS?`,
     'Upload',
     'Cancel'
   );
@@ -103,20 +106,19 @@ async function exportProjectToOSS(ctx: Parameters<NonNullable<EditorPlugin['acti
     accessKeySecret,
     endpoint: endpoint || undefined
   });
-  const prefixStr = prefix ? prefix.replace(/^\\/+|\\/+$/g, '') + '/' : '';
+  const prefixStr = prefix ? prefix.replace(/^\/+|\/+$/g, '') + '/' : '';
   let uploaded = 0;
 
-  for (const file of selectedPaths) {
-    const filePath = file.meta.path;
+  for (const filePath of selectedPaths) {
     const content = await ctx.project.readBinary(filePath);
-    const relativePath = filePath.replace(/^\\/+/, '');
-    const objectKey = \`\${prefixStr}\${relativePath}\`;
+    const relativePath = filePath.replace(/^\/+/, '');
+    const objectKey = `${prefixStr}${relativePath}`;
     await client.put(objectKey, new Blob([content]));
     uploaded++;
-    ctx.log(\`[OSS] uploaded \${uploaded}/\${selectedPaths.length}: \${objectKey}\`);
+    ctx.log(`[OSS] uploaded ${uploaded}/${selectedPaths.size}: ${objectKey}`);
   }
 
-  await ctx.ui.message('Export to OSS', \`Upload complete: \${uploaded} file(s) uploaded.\`);
+  await ctx.ui.message('Export to OSS', `Upload complete: ${uploaded} file(s) uploaded.`);
 }
 
 // 脚本默认配置由运行时脚本内部的 @scriptProp 装饰器声明负责。
@@ -135,25 +137,27 @@ function initializeScriptHost(node: SceneNode, scriptPath: string) {
   }
 }
 
-async function attachGPUClothToNode(ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0], node: SceneNode) {
+async function attachGPUClothToNode(
+  ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0],
+  node: SceneNode
+) {
   const path = await ensureProjectScript(ctx, DEFAULT_GPU_CLOTH_SCRIPT_PATH, gpuClothRuntimeScriptSource);
   initializeScriptHost(node, path);
   ctx.refreshProperties();
   ctx.notifySceneChanged();
 }
 
-async function attachSpringToNode(ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0], node: SceneNode) {
+async function attachSpringToNode(
+  ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0],
+  node: SceneNode
+) {
   const path = await ensureProjectScript(ctx, DEFAULT_SPRING_SCRIPT_PATH, springRuntimeScriptSource);
   initializeScriptHost(node, path);
   ctx.refreshProperties();
   ctx.notifySceneChanged();
 }
 
-const plugin: EditorPlugin = {
-  id: 'zephyr3d.character-dynamics-tools',
-  name: 'Character Dynamics Tools',
-  version: '1.0.0',
-  description: 'Character spring, GPU cloth, and OSS export tools implemented as an editor system plugin.',
+const plugin: EditorPluginDefinition = {
   settings: {
     region: {
       type: 'string',
@@ -194,29 +198,37 @@ const plugin: EditorPlugin = {
       location: 'main',
       items: [
         {
-          id: 'zephyr3d.character-dynamics.menu',
-          label: 'Character Dynamics Tools',
+          id: 'com.0yao.menu',
+          label: '0yao',
           subMenus: [
             {
-              id: 'zephyr3d.character-dynamics.create-gpu-cloth-script',
+              id: 'com.0yao.create-gpu-cloth-script',
               label: 'Create GPU Cloth Script...',
               enabled: () => !!ctx.editor.currentProject && !ctx.project.isReadOnly(),
               action: async () => {
-                const path = await ensureProjectScript(ctx, DEFAULT_GPU_CLOTH_SCRIPT_PATH, gpuClothRuntimeScriptSource);
+                const path = await ensureProjectScript(
+                  ctx,
+                  DEFAULT_GPU_CLOTH_SCRIPT_PATH,
+                  gpuClothRuntimeScriptSource
+                );
                 await ctx.project.openCode(path, 'typescript');
               }
             },
             {
-              id: 'zephyr3d.character-dynamics.create-spring-script',
+              id: 'com.0yao.create-spring-script',
               label: 'Create Spring Script...',
               enabled: () => !!ctx.editor.currentProject && !ctx.project.isReadOnly(),
               action: async () => {
-                const path = await ensureProjectScript(ctx, DEFAULT_SPRING_SCRIPT_PATH, springRuntimeScriptSource);
+                const path = await ensureProjectScript(
+                  ctx,
+                  DEFAULT_SPRING_SCRIPT_PATH,
+                  springRuntimeScriptSource
+                );
                 await ctx.project.openCode(path, 'typescript');
               }
             },
             {
-              id: 'zephyr3d.character-dynamics.export-oss',
+              id: 'com.0yao.export-oss',
               label: 'Export to OSS...',
               enabled: () => !!ctx.editor.currentProject,
               action: async () => {
@@ -235,7 +247,7 @@ const plugin: EditorPlugin = {
         const node = menuCtx.target instanceof SceneNode ? menuCtx.target : null;
         return [
           {
-            id: 'zephyr3d.character-dynamics.attach-gpu-cloth',
+            id: 'com.0yao.attach-gpu-cloth',
             label: node && isGPUClothHost(node) ? 'Open GPU Cloth Script' : 'Attach GPU Cloth',
             visible: () => !!node,
             enabled: () => {
@@ -259,7 +271,7 @@ const plugin: EditorPlugin = {
             }
           },
           {
-            id: 'zephyr3d.character-dynamics.attach-spring',
+            id: 'com.0yao.attach-spring',
             label: node && isSpringHost(node) ? 'Open Spring Script' : 'Attach Spring Dynamics',
             visible: () => !!node,
             enabled: () => {
@@ -294,89 +306,3 @@ const plugin: EditorPlugin = {
 };
 
 export default plugin;
-`;
-
-export const characterDynamicsToolsPlugin: EditorPlugin = {
-  id: 'zephyr3d.character-dynamics-tools',
-  name: 'Character Dynamics Tools',
-  version: '1.0.0',
-  description: 'Character spring, GPU cloth, and OSS export tools implemented as an editor system plugin.',
-  settings: {
-    region: {
-      type: 'string',
-      label: 'OSS Region',
-      description: 'Alibaba Cloud OSS region, for example oss-cn-hangzhou.'
-    },
-    bucket: {
-      type: 'string',
-      label: 'OSS Bucket',
-      description: 'Target OSS bucket name.'
-    },
-    accessKeyId: {
-      type: 'string',
-      label: 'Access Key ID',
-      description: 'OSS access key id used for upload.',
-      secret: true
-    },
-    accessKeySecret: {
-      type: 'string',
-      label: 'Access Key Secret',
-      description: 'OSS access key secret used for upload.',
-      secret: true
-    },
-    endpoint: {
-      type: 'string',
-      label: 'OSS Endpoint',
-      description: 'Optional custom endpoint. Leave empty to use the default endpoint.'
-    },
-    prefix: {
-      type: 'string',
-      label: 'Object Key Prefix',
-      description: 'Optional prefix added before uploaded asset paths.'
-    }
-  },
-  activate() {}
-};
-
-export const characterDynamicsToolsPluginDependencies = {
-  'ali-oss': '^6.21.0'
-} as const;
-
-export const characterDynamicsToolsPluginFiles: SystemPluginFileInput[] = [
-  {
-    path: 'index.ts',
-    source: characterDynamicsToolsPluginSource
-  },
-  {
-    path: 'gpu-cloth/property-provider.ts',
-    source: gpuClothPropertyProviderSource
-  },
-  {
-    path: 'gpu-cloth/paint-tool.ts',
-    source: gpuClothPaintToolSource
-  },
-  {
-    path: 'gpu-cloth/paint-command.ts',
-    source: gpuClothPaintCommandSource
-  },
-  {
-    path: 'gpu-cloth/runtime-template.ts',
-    source: gpuClothRuntimeTemplateSource
-  },
-  {
-    path: 'gpu-cloth/shared.ts',
-    source: gpuClothSharedSource
-  },
-  {
-    path: 'spring/property-provider.ts',
-    source: springPropertyProviderSource
-  },
-  {
-    path: 'spring/runtime-template.ts',
-    source: springRuntimeTemplateSource
-  },
-  {
-    path: 'spring/shared.ts',
-    source: springSharedSource
-  }
-];

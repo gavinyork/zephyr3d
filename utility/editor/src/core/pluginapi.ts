@@ -232,11 +232,20 @@ export type EditorPluginContext = {
   log(...args: unknown[]): void;
 };
 
-export type EditorPlugin = {
+export type EditorPluginMetadata = {
   id: string;
   name?: string;
   version?: string;
   description?: string;
+};
+
+export type EditorPluginDefinition = Partial<EditorPluginMetadata> & {
+  settings?: EditorPluginSettingsSchema;
+  activate: (ctx: EditorPluginContext) => void | Promise<void>;
+  deactivate?: (ctx: EditorPluginContext) => void | Promise<void>;
+};
+
+export type EditorPlugin = EditorPluginMetadata & {
   settings?: EditorPluginSettingsSchema;
   activate: (ctx: EditorPluginContext) => void | Promise<void>;
   deactivate?: (ctx: EditorPluginContext) => void | Promise<void>;
