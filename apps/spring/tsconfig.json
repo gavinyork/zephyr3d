@@ -17,5 +17,5 @@
     "stripInternal": true,
     "typeRoots": ["./node_modules/@webgpu/types"]
   },
-  "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts"]
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts", "common/temp", "**/common/temp"]
 }

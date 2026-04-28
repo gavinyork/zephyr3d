@@ -255,7 +255,8 @@ export class WebGPURenderPass {
         colorAttachmentDesc.view = this._device.context!.getCurrentTexture().createView();
       }
       colorAttachmentDesc.loadOp = color ? 'clear' : 'load';
-      colorAttachmentDesc.clearValue = color ?? undefined;
+      // TODO: GPUColor type in @webgpu/types conficts with lib.dom，use `any` type to make ts-server happy
+      colorAttachmentDesc.clearValue = (color as any) ?? undefined;
       const depthAttachmentDesc = this._device.defaultRenderPassDesc.depthStencilAttachment;
       depthAttachmentDesc!.depthLoadOp = typeof depth === 'number' ? 'clear' : 'load';
       depthAttachmentDesc!.depthClearValue = depth ?? undefined;

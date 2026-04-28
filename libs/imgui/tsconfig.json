@@ -22,5 +22,5 @@
     "typeRoots": ["./node_modules/@types", "./node_modules/@webgpu/types"]
   },
   "include": ["./src"],
-  "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts", "tests"]
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts", "common/temp", "**/common/temp"]
 }
