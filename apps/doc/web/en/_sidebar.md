@@ -71,6 +71,9 @@
     - [Overview](en/editor/scripting.md)
     - [Creating Scripts](en/editor/create-script.md)
 
+  - Plugins
+    - [Editor Plugins](en/editor/plugins.md)
+
   - Terrain
     - [Terrain Tools](en/editor/terrain-tools.md)
 

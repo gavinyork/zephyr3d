@@ -71,6 +71,9 @@
     - [概述](zh-cn/editor/scripting.md)
     - [创建脚本](zh-cn/editor/create-script.md)
 
+  - 插件系统
+    - [编辑器插件](zh-cn/editor/plugins.md)
+
   - 地形系统
     - [编辑地形](zh-cn/editor/terrain-tools.md)
 

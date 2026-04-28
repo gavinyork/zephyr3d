@@ -700,7 +700,7 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
   }
 
   constructor(editor: Editor) {
-    super('System Plugins', 760, 480, true, false, false);
+    super('Plugin Manager', 760, 480, true, false, false);
     this._editor = editor;
     this._listData = new SystemPluginListData([]);
     this._listView = new SystemPluginListView(
@@ -712,11 +712,6 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
   }
 
   doRender(): void {
-    ImGui.TextWrapped(
-      'System plugins are stored in the global zephyr3d-editor database and are available to all projects.'
-    );
-    ImGui.Separator();
-
     if (ImGui.Button(this._busy ? 'Installing...' : 'Install...') && !this._busy) {
       this.installPlugin();
     }
