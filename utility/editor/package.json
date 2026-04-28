@@ -9,18 +9,13 @@
   ],
   "exports": {
     "./editor-plugin": {
-      "types": "./dist/vendor/zephyr3d/editor/dist/pluginapi/editor-plugin.d.ts",
-      "import": "./dist/vendor/zephyr3d/editor/dist/pluginapi/editor-plugin.js",
-      "default": "./dist/vendor/zephyr3d/editor/dist/pluginapi/editor-plugin.js"
+      "types": "./dist/vendor/zephyr3d/editor/dist/pluginapi/editor-plugin.d.ts"
     }
   },
   "typesVersions": {
     "*": {
       "editor-plugin": [
         "dist/vendor/zephyr3d/editor/dist/pluginapi/editor-plugin.d.ts"
-      ],
-      "plugin-build": [
-        "dist/vendor/zephyr3d/editor/dist/pluginapi/plugin-build.d.ts"
       ]
     }
   },
@@ -35,7 +30,7 @@
     "lint": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint \"src/**/*.ts\" -f compact",
     "lint-fix": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint --fix \"src/**/*.ts\" -f compact",
     "build": "npm run build:pluginapi-types && npm run build:app && npm run build:lib",
-    "build:pluginapi-types": "tsc -p tsconfig.pluginapi.json && shx mkdir -p ./dist/vendor/zephyr3d/editor/dist/pluginapi/core && shx cp ./public/vendor/zephyr3d/editor/dist/pluginapi/editor-plugin.d.ts ./dist/vendor/zephyr3d/editor/dist/pluginapi/editor-plugin.d.ts && shx cp ./public/vendor/zephyr3d/editor/dist/pluginapi/editor-plugin.js ./dist/vendor/zephyr3d/editor/dist/pluginapi/editor-plugin.js && shx cp ./public/vendor/zephyr3d/editor/dist/pluginapi/plugin-build.d.ts ./dist/vendor/zephyr3d/editor/dist/pluginapi/plugin-build.d.ts && shx cp ./public/vendor/zephyr3d/editor/dist/pluginapi/plugin-build.js ./dist/vendor/zephyr3d/editor/dist/pluginapi/plugin-build.js && shx cp ./public/vendor/zephyr3d/editor/dist/pluginapi/core/pluginapi.d.ts ./dist/vendor/zephyr3d/editor/dist/pluginapi/core/pluginapi.d.ts",
+    "build:pluginapi-types": "tsc -p tsconfig.pluginapi.json",
     "build:app": "cross-env NODE_OPTIONS=--max_old_space_size=8192 vite build --mode production",
     "build:lib": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent",
     "serve": "web-dev-server --no-cache --open dist/index.html"
@@ -44,7 +39,6 @@
     "node": ">=16.18.0"
   },
   "devDependencies": {
-
     "@web/dev-server": "^0.1.35",
     "@babel/core": "^7.20.12",
     "@babel/preset-env": "^7.20.2",
