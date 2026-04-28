@@ -473,7 +473,9 @@ export class SystemPluginService {
       version: packageManifest.version,
       description: packageManifest.description,
       entry: `/${entryFileName}`,
-      dependencies: packageManifest.dependencies ? { ...packageManifest.dependencies } : oldEntry?.dependencies,
+      dependencies: packageManifest.dependencies
+        ? { ...packageManifest.dependencies }
+        : oldEntry?.dependencies,
       enabled: input.enabled ?? true,
       installedAt: oldEntry?.installedAt ?? now,
       updatedAt: now
@@ -541,7 +543,12 @@ export class SystemPluginService {
     });
   }
 
-  static createPackageManifestContent(plugin: Pick<SystemPluginManifestEntry, 'id' | 'entry' | 'name' | 'version' | 'description' | 'dependencies'>) {
+  static createPackageManifestContent(
+    plugin: Pick<
+      SystemPluginManifestEntry,
+      'id' | 'entry' | 'name' | 'version' | 'description' | 'dependencies'
+    >
+  ) {
     return `${JSON.stringify(
       this.normalizePackageManifest({
         id: plugin.id,
@@ -559,7 +566,9 @@ export class SystemPluginService {
   static async installPluginFromFile(file: File): Promise<SystemPluginRecord> {
     const fileName = (file.name || '').toLowerCase();
     if (!fileName.endsWith('.zip')) {
-      throw new Error("Install Plugin only accepts '.zip' plugin packages. Use Install Folder for unpacked plugins.");
+      throw new Error(
+        "Install Plugin only accepts '.zip' plugin packages. Use Install Folder for unpacked plugins."
+      );
     }
     return this.installPluginFromZip(file);
   }
@@ -731,7 +740,9 @@ export class SystemPluginService {
 
     let nextPackageManifest = this.readPackageManifestFromFiles(files);
     if (nextPackageManifest.id !== plugin.id) {
-      throw new Error(`System plugin id cannot be changed from '${plugin.id}' to '${nextPackageManifest.id}'`);
+      throw new Error(
+        `System plugin id cannot be changed from '${plugin.id}' to '${nextPackageManifest.id}'`
+      );
     }
     this.validatePluginFiles(files, nextPackageManifest.entry, plugin.id);
 
@@ -930,7 +941,10 @@ export class SystemPluginService {
     });
   }
 
-  private static withPackageManifestFile(files: SystemPluginFileInput[], packageManifest: SystemPluginPackageManifest) {
+  private static withPackageManifestFile(
+    files: SystemPluginFileInput[],
+    packageManifest: SystemPluginPackageManifest
+  ) {
     const normalized = new Map<string, string>();
     for (const file of files) {
       if (file.path === SYSTEM_PLUGIN_PACKAGE_MANIFEST) {
@@ -938,10 +952,7 @@ export class SystemPluginService {
       }
       normalized.set(file.path, file.source);
     }
-    normalized.set(
-      SYSTEM_PLUGIN_PACKAGE_MANIFEST,
-      `${JSON.stringify(packageManifest, null, 2)}\n`
-    );
+    normalized.set(SYSTEM_PLUGIN_PACKAGE_MANIFEST, `${JSON.stringify(packageManifest, null, 2)}\n`);
     return [...normalized.entries()].map(([path, source]) => ({ path, source }));
   }
 
@@ -965,7 +976,9 @@ export class SystemPluginService {
       name: typeof value.name === 'string' && value.name.trim() ? value.name.trim() : undefined,
       version: typeof value.version === 'string' && value.version.trim() ? value.version.trim() : undefined,
       description:
-        typeof value.description === 'string' && value.description.trim() ? value.description.trim() : undefined,
+        typeof value.description === 'string' && value.description.trim()
+          ? value.description.trim()
+          : undefined,
       dependencies
     };
   }
@@ -982,7 +995,9 @@ export class SystemPluginService {
       const packageName = key.trim();
       const packageVersion = typeof version === 'string' ? version.trim() : '';
       if (!packageName || !packageVersion) {
-        throw new Error(`'${SYSTEM_PLUGIN_PACKAGE_MANIFEST}.dependencies' must map package names to versions`);
+        throw new Error(
+          `'${SYSTEM_PLUGIN_PACKAGE_MANIFEST}.dependencies' must map package names to versions`
+        );
       }
       result[packageName] = packageVersion;
     }
@@ -1039,21 +1054,6 @@ export class SystemPluginService {
       });
     }
     return result;
-  }
-
-  private static findPluginEntryFile(files: SystemPluginFileInput[]) {
-    const explicit = files.find((file) => !!this.inferPluginId(file.source));
-    if (explicit) {
-      return explicit;
-    }
-    const preferredNames = ['index.ts', 'index.js', 'main.ts', 'main.js'];
-    for (const name of preferredNames) {
-      const found = files.find((file) => file.path === name || file.path.endsWith(`/${name}`));
-      if (found) {
-        return found;
-      }
-    }
-    return files[0] ?? null;
   }
 
   private static getPackageDir(id: string) {
@@ -1116,7 +1116,9 @@ export class SystemPluginService {
       plugins: manifest?.plugins ?? {}
     };
     let dirty = false;
-    for (const plugin of Object.values(normalized.plugins) as (SystemPluginManifestEntry & { builtin?: boolean })[]) {
+    for (const plugin of Object.values(normalized.plugins) as (SystemPluginManifestEntry & {
+      builtin?: boolean;
+    })[]) {
       if ('builtin' in plugin) {
         delete plugin.builtin;
         dirty = true;

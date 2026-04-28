@@ -703,7 +703,11 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
     super('System Plugins', 760, 480, true, false, false);
     this._editor = editor;
     this._listData = new SystemPluginListData([]);
-    this._listView = new SystemPluginListView(this._listData, (plugin) => this.toggleSelected(plugin), () => this._busy);
+    this._listView = new SystemPluginListView(
+      this._listData,
+      (plugin) => this.toggleSelected(plugin),
+      () => this._busy
+    );
     this.reload().catch(() => undefined);
   }
 
@@ -990,6 +994,4 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
         this._busy = false;
       });
   }
-
 }
-
