@@ -316,7 +316,9 @@ export class Pool {
   releaseTexture(texture: BaseTexture) {
     const info = this._allocatedTextures.get(texture);
     if (!info) {
-      console.error(`ObjectPool.releaseTexture(): texture is not allocated from pool`);
+      console.error(
+        `ObjectPool.releaseTexture(): texture is not allocated from pool: ${this._device.getGPUObjects().stacks.get(texture) ?? '<No stack>'}`
+      );
     } else {
       this.safeReleaseTexture(texture);
     }
@@ -328,7 +330,9 @@ export class Pool {
   retainTexture(texture: BaseTexture) {
     const info = this._allocatedTextures.get(texture);
     if (!info) {
-      console.error(`ObjectPool.retainTexture(): texture is not allocated from pool`);
+      console.error(
+        `ObjectPool.retainTexture(): texture is not allocated from pool: ${this._device.getGPUObjects().stacks.get(texture) ?? '<No stack>'}`
+      );
     } else {
       info.refcount++;
     }

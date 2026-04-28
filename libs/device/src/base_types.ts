@@ -2128,6 +2128,8 @@ export interface FrameInfo {
  * @public
  */
 export interface GPUObjectList {
+  /** Creation stack */
+  stacks: Map<GPUObject, string>;
   /** list of textures */
   textures: BaseTexture[];
   /** list of samplers */

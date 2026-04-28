@@ -248,6 +248,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._dpr = dpr ?? window.devicePixelRatio ?? 1;
     this._backend = backend;
     this._gpuObjectList = {
+      stacks: new Map(),
       textures: [],
       samplers: [],
       buffers: [],
@@ -786,10 +787,14 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   buildComputeProgram(options: PBComputeOptions) {
     return this._programBuilder.buildComputeProgram(options);
   }
+  getGPUObjectStack(obj: GPUObject): string {
+    return this._gpuObjectList.stacks.get(obj) ?? '';
+  }
   addGPUObject(obj: GPUObject) {
     const list = this.getGPUObjectList(obj);
     if (list && list.indexOf(obj) < 0) {
       list.push(obj);
+      this._gpuObjectList.stacks.set(obj, new Error().stack ?? '');
       this.dispatchEvent('gpuobject_added', obj);
     }
   }
@@ -799,6 +804,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       const index = list.indexOf(obj);
       if (index >= 0) {
         list.splice(index, 1);
+        this._gpuObjectList.stacks.delete(obj);
         this.dispatchEvent('gpuobject_removed', obj);
       }
     }

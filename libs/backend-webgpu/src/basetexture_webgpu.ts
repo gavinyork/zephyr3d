@@ -1,3 +1,5 @@
+/// <reference types="@webgpu/types" />
+
 import { WebGPUObject } from './gpuobject_webgpu';
 import type {
   SamplerOptions,

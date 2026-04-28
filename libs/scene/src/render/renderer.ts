@@ -93,7 +93,7 @@ export class SceneRenderer {
     scene.frameUpdate();
     scene.frameUpdatePerCamera(camera);
     if (camera && !device.isContextLost()) {
-      const defaultViewport = !camera.viewport && !camera.scissor;
+      const defaultViewport = (!camera.TAA || device.type === 'webgl') && !camera.viewport && !camera.scissor;
       const renderX = camera.viewport ? device.screenXToDevice(camera.viewport[0]) : 0;
       const renderY = camera.viewport ? device.screenYToDevice(camera.viewport[1]) : 0;
       const renderWidth = camera.viewport
