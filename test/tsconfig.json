@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
     "moduleResolution": "bundler",
-    "target": "ES2015",
-    "module": "ES2015",
-    "lib": ["ES6", "ES2020", "DOM"],
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM"],
     "strict": true,
     "noImplicitAny": false,
     "preserveConstEnums": false,

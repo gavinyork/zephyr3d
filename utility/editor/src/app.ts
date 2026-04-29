@@ -39,14 +39,11 @@ if (project && !open) {
     });
   };
 
-  if (remote) {
-    await ProjectService.openRemoteProject(project, new GenericHtmlDirectoryReader());
-  } else {
-    await ProjectService.openProject(project);
-  }
-  const info = await ProjectService.getCurrentProjectInfo();
+  const info = remote
+    ? await ProjectService.openRemoteProject(project, new GenericHtmlDirectoryReader())
+    : await ProjectService.openProject(project);
   if (!info) {
-    throw new Error('Get project information failed');
+    throw new Error('Open remote project failed');
   }
   settings = await ProjectService.getCurrentProjectSettings();
   if (!settings) {
