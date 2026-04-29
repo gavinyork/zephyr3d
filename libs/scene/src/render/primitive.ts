@@ -95,7 +95,7 @@ export class Primitive
    * Unique runtime identifier of this primitive.
    *
    * @returns The numeric instance id.
-   * @internal
+   * @public
    */
   get id() {
     return this._id;

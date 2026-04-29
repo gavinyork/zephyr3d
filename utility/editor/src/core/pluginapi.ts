@@ -207,6 +207,7 @@ export type EditorPluginContext = {
   editor: EditorHost;
   events: EditorEventSource;
   project: {
+    getVFS(): VFS;
     isReadOnly(): boolean;
     getSettings(): Promise<Record<string, unknown> | null>;
     saveSettings(settings: Record<string, unknown>): Promise<void>;

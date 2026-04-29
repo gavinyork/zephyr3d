@@ -81,7 +81,6 @@ import type { RuntimeEditorMenuContext, RuntimeEditorSceneContext } from '../cor
 import type { RuntimeEditorMenuItem } from '../core/plugin';
 import type { EditorCommands, EditorProxy } from '../core/pluginapi';
 
-type ColliderKind = 'sphere' | 'capsule' | 'plane';
 type MultiTransformItem = {
   node: SceneNode;
   startWorld: Matrix4x4;
@@ -1416,7 +1415,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.on('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.on('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.on('request_save_prefab', this.handleSavePrefab, this);
-      this._sceneHierarchy.on('request_add_collider', this.handleAddCollider, this);
       this.controller.model.scene.rootNode.on('nodeattached', this.handleNodeAttached, this);
       this.controller.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
       this.syncNodeProxyTree(this.controller.model.scene.rootNode);
@@ -1452,7 +1450,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.off('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.off('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.off('request_save_prefab', this.handleSavePrefab, this);
-      this._sceneHierarchy.off('request_add_collider', this.handleAddCollider, this);
       this._sceneHierarchy = null;
     }
     if (this.controller.model.scene) {
@@ -2519,56 +2516,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           getEngine().VFS.basename(name)
         );
       }
-    });
-  }
-  private handleAddCollider(node: SceneNode, type: ColliderKind) {
-    const defaultMeta =
-      type === 'sphere'
-        ? {
-            sceneCollider: {
-              type: 'sphere',
-              enabled: true,
-              visible: true,
-              radius: 0.15
-            }
-          }
-        : type === 'capsule'
-          ? {
-              sceneCollider: {
-                type: 'capsule',
-                enabled: true,
-                visible: true,
-                offset: 0.1,
-                endOffset: 0.1,
-                radius: 0.1
-              }
-            }
-          : {
-              sceneCollider: {
-                type: 'plane',
-                enabled: true,
-                visible: true,
-                normal: 1,
-                planeSize: 0.5
-              }
-            };
-    const typeName = type === 'sphere' ? 'Sphere' : type === 'capsule' ? 'Capsule' : 'Plane';
-    this._cmdManager.execute(new AddChildCommand(node, SceneNode)).then((colliderNode) => {
-      if (!colliderNode) {
-        return;
-      }
-      let index = 1;
-      while (node.children.find((c) => c.name === `${typeName}Collider_${index}`)) {
-        index++;
-      }
-      colliderNode.name = `${typeName}Collider_${index}`;
-      colliderNode.metaData = defaultMeta as any;
-      colliderNode.gpuPickable = true;
-      this._proxy!.createProxy(colliderNode);
-      this._proxy!.updateProxy(colliderNode);
-      this._sceneHierarchy?.selectNode(colliderNode);
-      this._propGrid.refresh();
-      eventBus.dispatchEvent('scene_changed');
     });
   }
   private handleNodeRemoved(node: SceneNode) {

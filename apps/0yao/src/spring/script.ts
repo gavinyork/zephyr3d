@@ -1,4 +1,4 @@
-export const springRuntimeScriptSource = `import { Vector3 } from '@zephyr3d/base';
+import { Vector3 } from '@zephyr3d/base';
 import {
   RuntimeScript,
   scriptProp,
@@ -7,7 +7,10 @@ import {
   createPlaneCollider,
   SpringModifier,
   SpringSystem,
-  SpringChain
+  SpringChain,
+  SceneNode,
+  Skeleton,
+  SpringCollider
 } from '@zephyr3d/scene';
 
 // 这里保留对旧格式 capsule / plane 数据的兼容解析，
@@ -38,11 +41,7 @@ function parsePlaneNormalY(value, fallback = 1) {
 }
 
 function resolveHostScope(host) {
-  return (
-    host?.scene?.rootNode ||
-    (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
-    host
-  );
+  return host?.scene?.rootNode || (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) || host;
 }
 
 function getSceneColliderMeta(node) {
@@ -192,7 +191,7 @@ function buildSignature(config) {
   });
 }
 
-export default class extends RuntimeScript {
+export default class extends RuntimeScript<SceneNode> {
   // 隐藏标记只用于编辑器识别这是 spring 插件脚本宿主。
   @scriptProp({ type: 'string', default: 'springtest', hidden: true })
   __editorPluginType = 'springtest';
@@ -200,7 +199,14 @@ export default class extends RuntimeScript {
   @scriptProp({ type: 'bool', label: 'Enabled', group: 'General', default: true })
   enabled = true;
 
-  @scriptProp({ type: 'float', label: 'Modifier Weight', group: 'General', default: 1, minValue: 0, maxValue: 1 })
+  @scriptProp({
+    type: 'float',
+    label: 'Modifier Weight',
+    group: 'General',
+    default: 1,
+    minValue: 0,
+    maxValue: 1
+  })
   modifierWeight = 1;
 
   @scriptProp({ type: 'float', label: 'Damping', group: 'Chain', default: 0.9, minValue: 0, maxValue: 1 })
@@ -212,7 +218,14 @@ export default class extends RuntimeScript {
   @scriptProp({ type: 'vec3', label: 'Gravity', group: 'Simulation', default: [0, -9.8, 0] })
   gravity = [0, -9.8, 0];
 
-  @scriptProp({ type: 'int', label: 'Iterations', group: 'Simulation', default: 6, minValue: 1, maxValue: 32 })
+  @scriptProp({
+    type: 'int',
+    label: 'Iterations',
+    group: 'Simulation',
+    default: 6,
+    minValue: 1,
+    maxValue: 32
+  })
   iterations = 6;
 
   @scriptProp({ type: 'bool', label: 'Enable Inertial Forces', group: 'Simulation', default: true })
@@ -236,7 +249,14 @@ export default class extends RuntimeScript {
   })
   solver = 'xpbd';
 
-  @scriptProp({ type: 'float', label: 'Pose Follow', group: 'PoseFollow', default: 0.3, minValue: 0, maxValue: 1 })
+  @scriptProp({
+    type: 'float',
+    label: 'Pose Follow',
+    group: 'PoseFollow',
+    default: 0.3,
+    minValue: 0,
+    maxValue: 1
+  })
   poseFollow = 0.3;
 
   @scriptProp({
@@ -351,7 +371,14 @@ export default class extends RuntimeScript {
   })
   colliders = [];
 
-  onAttached(host) {
+  _host: SceneNode;
+  _skeleton: Skeleton = null;
+  _modifiers: SpringModifier[] = [];
+  _configColliders: SpringCollider[] = [];
+  _signature = '';
+  _initDelayFrames = 1;
+  _initRetryFrames = 120;
+  onAttached(host: SceneNode) {
     this._host = host;
     this._skeleton = null;
     this._modifiers = [];
@@ -367,7 +394,7 @@ export default class extends RuntimeScript {
   onUpdate() {
     const root = this._host;
     const config = root?.scriptConfig;
-    if (!root || !config || !config.enabled) {
+    if (!root || !this.enabled) {
       this.disposeSpringState();
       return;
     }
@@ -375,8 +402,7 @@ export default class extends RuntimeScript {
       this._initDelayFrames -= 1;
       return;
     }
-    const skeletonRef = root.animationSet?.skeletons?.[0];
-    const skeleton = typeof skeletonRef?.get === 'function' ? skeletonRef.get() : skeletonRef;
+    const skeleton = root.animationSet?.skeletons?.[0]?.get();
     if (!skeleton) {
       if (this._initRetryFrames > 0) {
         this._initRetryFrames -= 1;
@@ -385,7 +411,7 @@ export default class extends RuntimeScript {
       return;
     }
     let hasValidChainPose = false;
-    for (const chainConfig of config.chains ?? []) {
+    for (const chainConfig of this.chains ?? []) {
       const chainStart = root.findNodeByName(chainConfig.startBone);
       const chainEnd = root.findNodeByName(chainConfig.endBone);
       if (!chainStart || !chainEnd) {
@@ -415,34 +441,34 @@ export default class extends RuntimeScript {
     const sharedColliders = collectSceneNodeColliders(root, true);
     const configColliders = buildConfigColliders(root, config);
     const modifiers = [];
-    for (const chainConfig of config.chains ?? []) {
+    for (const chainConfig of this.chains ?? []) {
       const chainStart = root.findNodeByName(chainConfig.startBone);
       const chainEnd = root.findNodeByName(chainConfig.endBone);
       if (!chainStart || !chainEnd) {
         continue;
       }
       const chain = SpringChain.fromBoneChain(chainStart, chainEnd, {
-        damping: Number(config.chainDamping ?? 0.9),
-        stiffness: Number(config.chainStiffness ?? 0.82)
+        damping: Number(this.chainDamping ?? 0.9),
+        stiffness: Number(this.chainStiffness ?? 0.82)
       });
       const springSystem = new SpringSystem(chain, {
         gravity: new Vector3(
-          Number((Array.isArray(config.gravity) ? config.gravity[0] : 0) ?? 0),
-          Number((Array.isArray(config.gravity) ? config.gravity[1] : -9.8) ?? -9.8),
-          Number((Array.isArray(config.gravity) ? config.gravity[2] : 0) ?? 0)
+          Number((Array.isArray(this.gravity) ? this.gravity[0] : 0) ?? 0),
+          Number((Array.isArray(this.gravity) ? this.gravity[1] : -9.8) ?? -9.8),
+          Number((Array.isArray(this.gravity) ? this.gravity[2] : 0) ?? 0)
         ),
-        iterations: Math.max(1, Number(config.iterations) || 6),
-        enableInertialForces: config.enableInertialForces !== false,
-        centrifugalScale: Math.max(0, Number(config.centrifugalScale) || 2),
-        coriolisScale: Math.max(0, Number(config.coriolisScale) || 1),
-        solver: String(config.solver ?? 'xpbd'),
-        poseFollow: Number(config.poseFollow ?? 0.3),
-        poseFollowRoot: Number(config.poseFollowRoot ?? 0.15),
-        poseFollowTip: Number(config.poseFollowTip ?? 0.05),
-        poseFollowExponent: Math.max(0.1, Number(config.poseFollowExponent) || 1.6),
-        maxPoseOffset: Math.max(0, Number(config.maxPoseOffset) || 0.3),
-        maxPoseOffsetRoot: Math.max(0, Number(config.maxPoseOffsetRoot) || 0.2),
-        maxPoseOffsetTip: Math.max(0, Number(config.maxPoseOffsetTip) || 0.4)
+        iterations: Math.max(1, Number(this.iterations) || 6),
+        enableInertialForces: this.enableInertialForces !== false,
+        centrifugalScale: Math.max(0, Number(this.centrifugalScale) || 2),
+        coriolisScale: Math.max(0, Number(this.coriolisScale) || 1),
+        solver: String(this.solver ?? 'xpbd') as 'xpbd' | 'verlet',
+        poseFollow: Number(this.poseFollow ?? 0.3),
+        poseFollowRoot: Number(this.poseFollowRoot ?? 0.15),
+        poseFollowTip: Number(this.poseFollowTip ?? 0.05),
+        poseFollowExponent: Math.max(0.1, Number(this.poseFollowExponent) || 1.6),
+        maxPoseOffset: Math.max(0, Number(this.maxPoseOffset) || 0.3),
+        maxPoseOffsetRoot: Math.max(0, Number(this.maxPoseOffsetRoot) || 0.2),
+        maxPoseOffsetTip: Math.max(0, Number(this.maxPoseOffsetTip) || 0.4)
       });
       for (const collider of sharedColliders) {
         springSystem.addCollider(collider);
@@ -450,7 +476,7 @@ export default class extends RuntimeScript {
       for (const collider of configColliders) {
         springSystem.addCollider(collider);
       }
-      const modifier = new SpringModifier(springSystem, Math.max(0, Number(config.modifierWeight) || 1));
+      const modifier = new SpringModifier(springSystem, Math.max(0, Number(this.modifierWeight) || 1));
       skeleton.modifiers.push(modifier);
       modifiers.push(modifier);
     }
@@ -478,13 +504,11 @@ export default class extends RuntimeScript {
 
   disposeSpringState() {
     if (this._skeleton && this._modifiers.length > 0) {
-      this._skeleton.modifiers = this._skeleton.modifiers.filter(
-        (modifier) => !this._modifiers.includes(modifier)
-      );
-    }
-    for (const modifier of this._modifiers) {
-      if (typeof modifier.dispose === 'function') {
-        modifier.dispose();
+      for (const modifier of this._modifiers) {
+        const index = this._skeleton.modifiers.indexOf(modifier);
+        if (index >= 0) {
+          this._skeleton.modifiers.splice(index, 1);
+        }
       }
     }
     this._modifiers = [];
@@ -493,4 +517,3 @@ export default class extends RuntimeScript {
     this._signature = '';
   }
 }
-`;

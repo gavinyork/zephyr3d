@@ -94,7 +94,6 @@ export class SceneHierarchy extends TreeView<
     request_go_to_assets: [node: SceneNode];
     request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }];
     request_save_prefab: [node: SceneNode];
-    request_add_collider: [node: SceneNode, type: 'sphere' | 'capsule' | 'plane'];
     draw_context_menu: [node: SceneNode, menuId: string];
   },
   SceneNode
@@ -174,21 +173,6 @@ export class SceneHierarchy extends TreeView<
     if (ImGui.MenuItem('Create Prefab...')) {
       this.dispatchEvent('request_save_prefab', node);
     }
-    /*
-    ImGui.Separator();
-    if (ImGui.BeginMenu('Add Collider')) {
-      if (ImGui.MenuItem('Sphere')) {
-        this.dispatchEvent('request_add_collider', node, 'sphere');
-      }
-      if (ImGui.MenuItem('Capsule')) {
-        this.dispatchEvent('request_add_collider', node, 'capsule');
-      }
-      if (ImGui.MenuItem('Plane')) {
-        this.dispatchEvent('request_add_collider', node, 'plane');
-      }
-      ImGui.EndMenu();
-    }
-    */
     const animationSet = node.animationSet;
     if (animationSet && animationSet.getAnimationNames().length > 0) {
       ImGui.Separator();

@@ -11,11 +11,12 @@
     "noUnusedLocals": true,
     "strictNullChecks": false,
     "allowSyntheticDefaultImports": true,
-    "experimentalDecorators": false,
+    "experimentalDecorators": true,
     "emitDecoratorMetadata": false,
     "sourceMap": true,
     "stripInternal": true,
     "typeRoots": ["./node_modules/@webgpu/types"]
   },
-  "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts", "common/temp", "**/common/temp"]
+  "include": ["src", "types/raw.d.ts"],
+  "exclude": ["node_modules", "**/*.spec.ts", "common/temp", "**/common/temp"]
 }

@@ -462,6 +462,7 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
       editor: this._editor as unknown as EditorPluginContext['editor'],
       events: this,
       project: {
+        getVFS: () => ProjectService.VFS,
         isReadOnly: () => this._editor.isProjectReadOnly(),
         getSettings: () => ProjectService.getCurrentProjectSettings(),
         saveSettings: (settings) => ProjectService.saveCurrentProjectSettings(settings),

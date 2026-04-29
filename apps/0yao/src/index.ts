@@ -1,16 +1,16 @@
 import OSS from 'ali-oss';
 import type {
-  EditorPlugin,
   EditorPluginDefinition,
-  EditorDirectoryInfo
+  EditorDirectoryInfo,
+  EditorPluginContext
 } from '@zephyr3d/editor/editor-plugin';
 import { PlaneShape, SceneNode, SphereShape } from '@zephyr3d/scene';
 import { initGPUClothPaintTool } from './gpu-cloth/paint-tool';
 import { initGPUClothPropertyProvider } from './gpu-cloth/property-provider';
-import { gpuClothRuntimeScriptSource } from './gpu-cloth/runtime-template';
+import gpuClothRuntimeScriptSource from './gpu-cloth/script.ts?raw';
 import { isGPUClothHost } from './gpu-cloth/shared';
 import { initSpringPropertyProvider } from './spring/property-provider';
-import { springRuntimeScriptSource } from './spring/runtime-template';
+import springRuntimeScriptSource from './spring/script.ts?raw';
 import { isSpringHost } from './spring/shared';
 import {
   getSpringColliderMeta,
@@ -23,20 +23,17 @@ const DEFAULT_GPU_CLOTH_SCRIPT_PATH = '/assets/scripts/gpucloth.ts';
 const DEFAULT_SPRING_SCRIPT_PATH = '/assets/scripts/springtest.ts';
 
 // 统一确保运行时脚本存在，主菜单和右键菜单都复用这一个入口。
-async function ensureProjectScript(
-  ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0],
-  path: string,
-  source: string
-) {
-  if (!ctx.editor.currentProject) {
-    throw new Error('No project is currently open');
-  }
-  if (ctx.project.isReadOnly()) {
-    throw new Error('Current project is read-only');
-  }
-  await ctx.project.ensureDirectory('/assets/scripts');
-  if (!(await ctx.project.exists(path))) {
+async function ensureProjectScript(ctx: EditorPluginContext, path: string, source: string) {
+  let err = '';
+  try {
+    await ctx.project.ensureDirectory('/assets/scripts');
     await ctx.project.writeText(path, source);
+  } catch (e) {
+    err = `${e}`;
+  }
+  if (!path) {
+    await ctx.ui.message('Error', `Create script failed ${err ? `: \n${err}` : ''}`);
+    return null;
   }
   return path;
 }
@@ -50,12 +47,12 @@ type OSSPluginSettings = {
   prefix?: string;
 };
 
-async function getOSSSettings(ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0]) {
+async function getOSSSettings(ctx: EditorPluginContext) {
   return ((await ctx.system.getSettings<OSSPluginSettings>()) ?? {}) as OSSPluginSettings;
 }
 
 // OSS 导出逻辑放在插件内，便于业务方后续继续维护上传流程。
-async function exportProjectToOSS(ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0]) {
+async function exportProjectToOSS(ctx: EditorPluginContext) {
   if (!ctx.editor.currentProject) {
     await ctx.ui.message('Export to OSS', 'No project is currently open.');
     return;
@@ -143,24 +140,22 @@ function initializeScriptHost(node: SceneNode, scriptPath: string) {
   }
 }
 
-async function attachGPUClothToNode(
-  ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0],
-  node: SceneNode
-) {
+async function attachGPUClothToNode(ctx: EditorPluginContext, node: SceneNode) {
   const path = await ensureProjectScript(ctx, DEFAULT_GPU_CLOTH_SCRIPT_PATH, gpuClothRuntimeScriptSource);
-  initializeScriptHost(node, path);
-  ctx.refreshProperties();
-  ctx.notifySceneChanged();
+  if (path) {
+    initializeScriptHost(node, path);
+    ctx.refreshProperties();
+    ctx.notifySceneChanged();
+  }
 }
 
-async function attachSpringToNode(
-  ctx: Parameters<NonNullable<EditorPlugin['activate']>>[0],
-  node: SceneNode
-) {
+async function attachSpringToNode(ctx: EditorPluginContext, node: SceneNode) {
   const path = await ensureProjectScript(ctx, DEFAULT_SPRING_SCRIPT_PATH, springRuntimeScriptSource);
-  initializeScriptHost(node, path);
-  ctx.refreshProperties();
-  ctx.notifySceneChanged();
+  if (path) {
+    initializeScriptHost(node, path);
+    ctx.refreshProperties();
+    ctx.notifySceneChanged();
+  }
 }
 
 const plugin: EditorPluginDefinition = {
@@ -243,7 +238,12 @@ const plugin: EditorPluginDefinition = {
                   DEFAULT_GPU_CLOTH_SCRIPT_PATH,
                   gpuClothRuntimeScriptSource
                 );
-                await ctx.project.openCode(path, 'typescript');
+                if (path) {
+                  await ctx.ui.message(
+                    'Create GPU Cloth Script',
+                    `GPU cloth script successfully created at: \n ${path}`
+                  );
+                }
               }
             },
             {
@@ -256,7 +256,12 @@ const plugin: EditorPluginDefinition = {
                   DEFAULT_SPRING_SCRIPT_PATH,
                   springRuntimeScriptSource
                 );
-                await ctx.project.openCode(path, 'typescript');
+                if (path) {
+                  await ctx.ui.message(
+                    'Create Spring Script',
+                    `Spring script successfully created at: \n${path}`
+                  );
+                }
               }
             },
             {
@@ -289,11 +294,17 @@ const plugin: EditorPluginDefinition = {
                 }
               },
               {
+                label: '-'
+              },
+              {
                 id: 'com.0yao.add-capsule-collider',
                 label: 'Capsule',
                 action: () => {
                   handleAddCollider(menuCtx, node, 'capsule');
                 }
+              },
+              {
+                label: '-'
               },
               {
                 id: 'com.0yao.add-plane-collider',
@@ -303,6 +314,9 @@ const plugin: EditorPluginDefinition = {
                 }
               }
             ]
+          },
+          {
+            label: '-'
           },
           {
             id: 'com.0yao.attach-gpu-cloth',
@@ -321,12 +335,10 @@ const plugin: EditorPluginDefinition = {
               if (!isGPUClothHost(node)) {
                 await attachGPUClothToNode(ctx, node);
               }
-              await ctx.project.openCode(
-                listNodeScripts(node).find((item) => item === DEFAULT_GPU_CLOTH_SCRIPT_PATH) ??
-                  String((node as any).script ?? DEFAULT_GPU_CLOTH_SCRIPT_PATH),
-                'typescript'
-              );
             }
+          },
+          {
+            label: '-'
           },
           {
             id: 'com.0yao.attach-spring',
@@ -345,11 +357,6 @@ const plugin: EditorPluginDefinition = {
               if (!isSpringHost(node)) {
                 await attachSpringToNode(ctx, node);
               }
-              await ctx.project.openCode(
-                listNodeScripts(node).find((item) => item === DEFAULT_SPRING_SCRIPT_PATH) ??
-                  String((node as any).script ?? DEFAULT_SPRING_SCRIPT_PATH),
-                'typescript'
-              );
             }
           }
         ];

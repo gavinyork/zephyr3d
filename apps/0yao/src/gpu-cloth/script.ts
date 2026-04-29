@@ -1,4 +1,5 @@
-export const gpuClothRuntimeScriptSource = `import { Vector3 } from '@zephyr3d/base';
+import { Vector3 } from '@zephyr3d/base';
+import type { GPUClothWrapBindingTarget, Mesh, SceneNode } from '@zephyr3d/scene';
 import {
   RuntimeScript,
   scriptProp,
@@ -8,13 +9,13 @@ import {
   createPlaneCollider
 } from '@zephyr3d/scene';
 
-function clamp01(value) {
+function clamp01(value: number) {
   return Math.min(Math.max(Number.isFinite(value) ? value : 0, 0), 1);
 }
 
 // 编辑器把“按目标网格分桶”的权重数据存成 JSON 字符串，
 // 运行时脚本负责把它解析回可供 GPU cloth 使用的数据结构。
-function parseTargetEncodedMap(source) {
+function parseTargetEncodedMap(source: string) {
   const text = String(source ?? '').trim();
   if (!text) {
     return {};
@@ -34,20 +35,16 @@ function parseTargetEncodedMap(source) {
   }
 }
 
-function readNumber(value, fallback) {
+function readNumber(value: number, fallback: number) {
   const num = Number(value);
   return Number.isFinite(num) ? num : fallback;
 }
 
-function resolveHostScope(host) {
-  return (
-    (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) ||
-    host?.scene?.rootNode ||
-    host
-  );
+function resolveHostScope(host: SceneNode) {
+  return (typeof host?.getPrefabNode === 'function' && host.getPrefabNode()) || host?.scene?.rootNode || host;
 }
 
-function resolveMeshById(host, meshId) {
+function resolveMeshById(host: SceneNode, meshId: string): Mesh | null {
   const id = String(meshId ?? '').trim();
   if (!host || !id) {
     return null;
@@ -56,7 +53,7 @@ function resolveMeshById(host, meshId) {
   return candidate?.isMesh?.() && candidate.primitive ? candidate : null;
 }
 
-function resolveSimulationMesh(host, config) {
+function resolveSimulationMesh(host: SceneNode, config: GPUClothScript): Mesh | null {
   const simulationMeshId = String(config?.simulationMeshId ?? '').trim();
   if (simulationMeshId) {
     return resolveMeshById(host, simulationMeshId);
@@ -66,37 +63,37 @@ function resolveSimulationMesh(host, config) {
 
 // 新格式存储的是 cloth weight，运行时需要转换成 GPUClothSystem 使用的 pinned weight。
 // 为兼容旧数据，这里仍保留对 legacy pinnedVertexIndicesByTarget 的读取。
-function parsePinnedVertexMap(config) {
+function parsePinnedVertexMap(config: GPUClothScript) {
   return parseTargetEncodedMap(config?.vertexPinWeightsByTarget);
 }
 
-function parseTargetMeshBindingDataByTarget(config) {
+function parseTargetMeshBindingDataByTarget(config: GPUClothScript) {
   return parseTargetEncodedMap(config?.targetMeshBindingDataByTarget);
 }
 
-function parseTargetMeshBindingSignatureByTarget(config) {
+function parseTargetMeshBindingSignatureByTarget(config: GPUClothScript) {
   return parseTargetEncodedMap(config?.targetMeshBindingSignatureByTarget);
 }
 
-function getPinnedVertexSource(config, target) {
+function getPinnedVertexSource(config: GPUClothScript, target: Mesh) {
   const targetId = String(target?.persistentId ?? '');
   if (!targetId) {
     return '';
   }
   const byTarget = parsePinnedVertexMap(config);
-  return Object.prototype.hasOwnProperty.call(byTarget, targetId) ? byTarget[targetId] ?? '' : '';
+  return Object.prototype.hasOwnProperty.call(byTarget, targetId) ? (byTarget[targetId] ?? '') : '';
 }
 
-function getLegacyPinnedVertexSource(config, target) {
+function getLegacyPinnedVertexSource(config: GPUClothScript, target: Mesh) {
   const targetId = String(target?.persistentId ?? '');
   if (!targetId) {
     return '';
   }
   const byTarget = parseTargetEncodedMap(config?.pinnedVertexIndicesByTarget);
-  return Object.prototype.hasOwnProperty.call(byTarget, targetId) ? byTarget[targetId] ?? '' : '';
+  return Object.prototype.hasOwnProperty.call(byTarget, targetId) ? (byTarget[targetId] ?? '') : '';
 }
 
-function parsePinnedVertexWeights(config, target) {
+function parsePinnedVertexWeights(config: GPUClothScript, target: Mesh) {
   const vertexCount = Math.max(0, Number(target?.primitive?.getNumVertices?.()) || 0);
   if (vertexCount <= 0) {
     return undefined;
@@ -138,12 +135,12 @@ function parsePinnedVertexWeights(config, target) {
   return weights;
 }
 
-function normalizePlaneDirection(value) {
+function normalizePlaneDirection(value: unknown) {
   return Number(value) < 0 ? -1 : 1;
 }
 
-function getSceneColliderMetaEntry(node) {
-  const meta = node?.metaData;
+function getSceneColliderMetaEntry(node: SceneNode) {
+  const meta = node?.metaData as any;
   const collider = meta?.sceneCollider;
   if (
     collider &&
@@ -163,7 +160,7 @@ function getSceneColliderMetaEntry(node) {
   return null;
 }
 
-function parseSceneColliderDistance(value, fallback, scale = 1) {
+function parseSceneColliderDistance(value: unknown, fallback: unknown, scale = 1) {
   const minValue = 0.0001 * scale;
   let distance = Math.abs(Number(fallback) || 0);
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -178,7 +175,7 @@ function parseSceneColliderDistance(value, fallback, scale = 1) {
   return Math.max(minValue, distance * scale);
 }
 
-function collectSceneNodeColliders(host, includePlane = true) {
+function collectSceneNodeColliders(host: SceneNode, includePlane = true) {
   const colliders = [];
   const scope = resolveHostScope(host);
   scope?.iterate?.((node) => {
@@ -223,7 +220,7 @@ function collectSceneNodeColliders(host, includePlane = true) {
   return colliders;
 }
 
-function buildConfigColliders(host, config) {
+function buildConfigColliders(host: SceneNode, config: GPUClothScript) {
   const colliders = [];
   for (const colliderConfig of config?.colliders ?? []) {
     const attachNode = host?.findNodeByName?.(String(colliderConfig?.bone ?? '')) ?? host;
@@ -276,13 +273,17 @@ function buildConfigColliders(host, config) {
   return colliders;
 }
 
-function buildClothColliders(host, config) {
+function buildClothColliders(host: SceneNode, config: GPUClothScript) {
   return [...collectSceneNodeColliders(host, true), ...buildConfigColliders(host, config)];
 }
 
 // targetMeshIds 只保存可编辑的目标 mesh 列表；
 // 绑定缓存则单独存放在按 target id 分桶的字符串映射中。
-function resolveWrapTargets(host, simulationMesh, config) {
+function resolveWrapTargets(
+  host: SceneNode,
+  simulationMesh: Mesh,
+  config: GPUClothScript
+): { target: Mesh; data: any }[] {
   const result = [];
   const targetMeshIds = Array.isArray(config?.targetMeshIds) ? config.targetMeshIds : [];
   const bindingDataByTarget = parseTargetMeshBindingDataByTarget(config);
@@ -310,13 +311,18 @@ function resolveWrapTargets(host, simulationMesh, config) {
 
 // 结构签名用于判断“是否需要整套重建 GPU cloth 对象”。
 // 只要网格拓扑、包裹目标、绑定缓存或影响结构的数据变了，就必须重新 createFromMesh。
-function buildStructureSignature(simulationMesh, config, wrapTargets) {
+function buildStructureSignature(
+  simulationMesh: Mesh,
+  config: GPUClothScript,
+  wrapTargets: { target: Mesh; data: any }[]
+) {
   const primitive = simulationMesh?.primitive;
   const bindingSignatureByTarget = parseTargetMeshBindingSignatureByTarget(config);
   return JSON.stringify({
     meshId: String(simulationMesh?.persistentId ?? ''),
     primitiveId: Number(primitive?.id) || 0,
-    weights: getPinnedVertexSource(config, simulationMesh) || getLegacyPinnedVertexSource(config, simulationMesh),
+    weights:
+      getPinnedVertexSource(config, simulationMesh) || getLegacyPinnedVertexSource(config, simulationMesh),
     maxNeighbors: Math.max(1, Number(config?.maxNeighbors) || 8),
     maxTrianglesPerVertex: Math.max(1, Number(config?.maxTrianglesPerVertex) || 16),
     workgroupSize: Math.max(1, Number(config?.workgroupSize) || 64),
@@ -328,13 +334,13 @@ function buildStructureSignature(simulationMesh, config, wrapTargets) {
         primitiveId: Number(entry.target?.primitive?.id) || 0,
         bindingSignature:
           bindingSignatureByTarget[targetId] ??
-          (String(entry.data?.version ?? '') +
+          String(entry.data?.version ?? '') +
             ':' +
             String(entry.data?.vertexCount ?? '') +
             ':' +
             String(entry.data?.sourceVertexCount ?? '') +
             ':' +
-            String(entry.data?.influenceCount ?? ''))
+            String(entry.data?.influenceCount ?? '')
       };
     })
   });
@@ -342,7 +348,7 @@ function buildStructureSignature(simulationMesh, config, wrapTargets) {
 
 // 运行时签名用于判断“是否只需要更新现有 cloth 实例的参数”。
 // 这类参数变化不涉及拓扑重建，因此可以直接 apply 到现有实例。
-function buildRuntimeSignature(host, simulationMesh, config) {
+function buildRuntimeSignature(host: SceneNode, simulationMesh: Mesh, config: GPUClothScript) {
   const gravity = Array.isArray(config?.gravity) ? config.gravity : [0, -9.8, 0];
   return JSON.stringify({
     sceneId: String(simulationMesh?.scene?.name ?? host?.scene?.name ?? ''),
@@ -365,7 +371,7 @@ function buildRuntimeSignature(host, simulationMesh, config) {
   });
 }
 
-export default class extends RuntimeScript {
+export default class GPUClothScript extends RuntimeScript<SceneNode> {
   // 这是供编辑器识别插件宿主用的隐藏标记，不属于用户需要直接编辑的配置。
   @scriptProp({ type: 'string', default: 'gpucloth', hidden: true })
   __editorPluginType = 'gpucloth';
@@ -388,7 +394,14 @@ export default class extends RuntimeScript {
   @scriptProp({ type: 'vec3', label: 'Gravity', group: 'Simulation', default: [0, -9.8, 0] })
   gravity = [0, -9.8, 0];
 
-  @scriptProp({ type: 'float', label: 'Damping', group: 'Simulation', default: 0.02, minValue: 0, maxValue: 1 })
+  @scriptProp({
+    type: 'float',
+    label: 'Damping',
+    group: 'Simulation',
+    default: 0.02,
+    minValue: 0,
+    maxValue: 1
+  })
   damping = 0.02;
 
   @scriptProp({
@@ -411,19 +424,47 @@ export default class extends RuntimeScript {
   })
   staticFriction = 0.3;
 
-  @scriptProp({ type: 'float', label: 'Stiffness', group: 'Simulation', default: 0.3, minValue: 0, maxValue: 1 })
+  @scriptProp({
+    type: 'float',
+    label: 'Stiffness',
+    group: 'Simulation',
+    default: 0.3,
+    minValue: 0,
+    maxValue: 1
+  })
   stiffness = 0.3;
 
-  @scriptProp({ type: 'float', label: 'Pose Follow', group: 'PoseFollow', default: 0, minValue: 0, maxValue: 1 })
+  @scriptProp({
+    type: 'float',
+    label: 'Pose Follow',
+    group: 'PoseFollow',
+    default: 0,
+    minValue: 0,
+    maxValue: 1
+  })
   poseFollow = 0;
 
-  @scriptProp({ type: 'int', label: 'Solver Iterations', group: 'Simulation', default: 5, minValue: 1, maxValue: 32 })
+  @scriptProp({
+    type: 'int',
+    label: 'Solver Iterations',
+    group: 'Simulation',
+    default: 5,
+    minValue: 1,
+    maxValue: 32
+  })
   solverIterations = 5;
 
   @scriptProp({ type: 'int', label: 'Substeps', group: 'Simulation', default: 2, minValue: 1, maxValue: 8 })
   substeps = 2;
 
-  @scriptProp({ type: 'int', label: 'Max Neighbors', group: 'Advanced', default: 8, minValue: 1, maxValue: 64 })
+  @scriptProp({
+    type: 'int',
+    label: 'Max Neighbors',
+    group: 'Advanced',
+    default: 8,
+    minValue: 1,
+    maxValue: 64
+  })
   maxNeighbors = 8;
 
   @scriptProp({
@@ -436,7 +477,14 @@ export default class extends RuntimeScript {
   })
   maxTrianglesPerVertex = 16;
 
-  @scriptProp({ type: 'int', label: 'Workgroup Size', group: 'Advanced', default: 64, minValue: 1, maxValue: 256 })
+  @scriptProp({
+    type: 'int',
+    label: 'Workgroup Size',
+    group: 'Advanced',
+    default: 64,
+    minValue: 1,
+    maxValue: 256
+  })
   workgroupSize = 64;
 
   @scriptProp({ type: 'bool', label: 'Rebuild Normals', group: 'Advanced', default: true })
@@ -503,20 +551,21 @@ export default class extends RuntimeScript {
     },
     default: []
   })
-  colliders = [];
+  colliders: any[] = [];
+  _host: SceneNode = null;
+  _cloth: GPUClothSystem = null;
+  _rebuilding: Promise<void> = null;
+  _structureSignature = '';
+  _runtimeSignature = '';
+  _disposed = false;
+  _initDelayFrames = 1;
+  _initRetryFrames = 120;
 
-  onAttached(host) {
+  onAttached(host: SceneNode) {
     this._host = host;
-    this._cloth = null;
-    this._rebuilding = null;
-    this._structureSignature = '';
-    this._runtimeSignature = '';
-    this._disposed = false;
-    this._initDelayFrames = 1;
-    this._initRetryFrames = 120;
   }
 
-  onDetached(host) {
+  onDetached(host: SceneNode) {
     if (host === this._host) {
       this.disposeCloth();
       this._host = null;
@@ -536,7 +585,7 @@ export default class extends RuntimeScript {
   // 每帧只做两件事：
   // 1. 根据结构签名判断是否需要重建 cloth
   // 2. 根据运行时签名判断是否只需刷新参数
-  onUpdate(deltaTime) {
+  onUpdate(deltaTime: number) {
     const host = this._host;
     if (!host || host.disposed) {
       this.disposeCloth();
@@ -546,8 +595,7 @@ export default class extends RuntimeScript {
       this._initDelayFrames -= 1;
       return;
     }
-    const config = host.scriptConfig ?? {};
-    const simulationMesh = resolveSimulationMesh(host, config);
+    const simulationMesh = resolveSimulationMesh(host, this);
     if (!simulationMesh?.primitive) {
       if (this._initRetryFrames > 0) {
         this._initRetryFrames -= 1;
@@ -555,52 +603,57 @@ export default class extends RuntimeScript {
       this.disposeCloth();
       return;
     }
-    const wrapTargets = resolveWrapTargets(host, simulationMesh, config);
+    const wrapTargets = resolveWrapTargets(host, simulationMesh, this);
     this._initRetryFrames = 120;
-    const structureSignature = buildStructureSignature(simulationMesh, config, wrapTargets);
+    const structureSignature = buildStructureSignature(simulationMesh, this, wrapTargets);
     if (!this._cloth || this._structureSignature !== structureSignature) {
-      this.ensureCloth(host, simulationMesh, config, wrapTargets, structureSignature);
+      this.ensureCloth(host, simulationMesh, wrapTargets, structureSignature);
       return;
     }
-    const runtimeSignature = buildRuntimeSignature(host, simulationMesh, config);
+    const runtimeSignature = buildRuntimeSignature(host, simulationMesh, this);
     if (this._runtimeSignature !== runtimeSignature) {
-      this.applyRuntimeConfig(host, simulationMesh, config);
+      this.applyRuntimeConfig(host, simulationMesh);
     }
-    if (this._cloth && config.autoUpdate === false) {
+    if (this._cloth && this.autoUpdate === false) {
       this._cloth.update(deltaTime);
     }
   }
 
   // createFromMesh 成本较高，因此单独封装成异步重建流程，
   // 并用 _rebuilding 防止一帧内重复发起多次重建。
-  async ensureCloth(host, simulationMesh, config, wrapTargets, structureSignature) {
+  async ensureCloth(
+    host: SceneNode,
+    simulationMesh: Mesh,
+    wrapTargets: GPUClothWrapBindingTarget[],
+    structureSignature: string
+  ) {
     if (this._rebuilding) {
       return this._rebuilding;
     }
     this._rebuilding = (async () => {
-      let nextCloth = null;
+      let nextCloth: GPUClothSystem = null;
       try {
         nextCloth = await GPUClothSystem.createFromMesh(simulationMesh, {
-          enabled: config.enabled !== false,
+          enabled: this.enabled !== false,
           gravity: new Vector3(
-            readNumber(Array.isArray(config.gravity) ? config.gravity[0] : undefined, 0),
-            readNumber(Array.isArray(config.gravity) ? config.gravity[1] : undefined, -9.8),
-            readNumber(Array.isArray(config.gravity) ? config.gravity[2] : undefined, 0)
+            readNumber(Array.isArray(this.gravity) ? this.gravity[0] : undefined, 0),
+            readNumber(Array.isArray(this.gravity) ? this.gravity[1] : undefined, -9.8),
+            readNumber(Array.isArray(this.gravity) ? this.gravity[2] : undefined, 0)
           ),
-          damping: readNumber(config.damping, 0.02),
-          dynamicFriction: readNumber(config.dynamicFriction, 0.15),
-          staticFriction: readNumber(config.staticFriction, 0.3),
-          stiffness: readNumber(config.stiffness, 0.3),
-          poseFollow: readNumber(config.poseFollow, 0),
-          substeps: Math.max(1, Math.min(8, Number(config.substeps) || 2)),
-          solverIterations: Math.max(1, Number(config.solverIterations) || 5),
-          maxNeighbors: Math.max(1, Number(config.maxNeighbors) || 8),
-          workgroupSize: Math.max(1, Number(config.workgroupSize) || 64),
-          maxTrianglesPerVertex: Math.max(1, Number(config.maxTrianglesPerVertex) || 16),
-          rebuildNormals: config.rebuildNormals !== false,
-          pinnedVertexWeights: parsePinnedVertexWeights(config, simulationMesh),
-          colliders: buildClothColliders(host, config),
-          autoUpdate: config.autoUpdate !== false
+          damping: readNumber(this.damping, 0.02),
+          dynamicFriction: readNumber(this.dynamicFriction, 0.15),
+          staticFriction: readNumber(this.staticFriction, 0.3),
+          stiffness: readNumber(this.stiffness, 0.3),
+          poseFollow: readNumber(this.poseFollow, 0),
+          substeps: Math.max(1, Math.min(8, Number(this.substeps) || 2)),
+          solverIterations: Math.max(1, Number(this.solverIterations) || 5),
+          maxNeighbors: Math.max(1, Number(this.maxNeighbors) || 8),
+          workgroupSize: Math.max(1, Number(this.workgroupSize) || 64),
+          maxTrianglesPerVertex: Math.max(1, Number(this.maxTrianglesPerVertex) || 16),
+          rebuildNormals: this.rebuildNormals !== false,
+          pinnedVertexWeights: parsePinnedVertexWeights(this, simulationMesh),
+          colliders: buildClothColliders(host, this),
+          autoUpdate: this.autoUpdate !== false
         });
         if (wrapTargets.length > 0) {
           nextCloth.setWrapTargetsFromBindingData(wrapTargets);
@@ -620,7 +673,7 @@ export default class extends RuntimeScript {
       this._cloth = nextCloth;
       this._structureSignature = structureSignature;
       this._runtimeSignature = '';
-      this.applyRuntimeConfig(host, simulationMesh, config);
+      this.applyRuntimeConfig(host, simulationMesh);
       if (!nextCloth.supported && nextCloth.disabledReason) {
         console.warn('GPU cloth disabled:', nextCloth.disabledReason);
       }
@@ -632,26 +685,26 @@ export default class extends RuntimeScript {
 
   // 这里更新的是“已存在 cloth 实例上的可热更新参数”。
   // 如果结构签名没有变化，就尽量走这条轻量路径而不是整套重建。
-  applyRuntimeConfig(host, simulationMesh, config) {
+  applyRuntimeConfig(host: SceneNode, simulationMesh: Mesh) {
     if (!this._cloth) {
       return;
     }
-    this._cloth.enabled = config.enabled !== false;
+    this._cloth.enabled = this.enabled !== false;
     this._cloth.gravity = new Vector3(
-      readNumber(Array.isArray(config.gravity) ? config.gravity[0] : undefined, 0),
-      readNumber(Array.isArray(config.gravity) ? config.gravity[1] : undefined, -9.8),
-      readNumber(Array.isArray(config.gravity) ? config.gravity[2] : undefined, 0)
+      readNumber(Array.isArray(this.gravity) ? this.gravity[0] : undefined, 0),
+      readNumber(Array.isArray(this.gravity) ? this.gravity[1] : undefined, -9.8),
+      readNumber(Array.isArray(this.gravity) ? this.gravity[2] : undefined, 0)
     );
-    this._cloth.damping = readNumber(config.damping, 0.02);
-    this._cloth.dynamicFriction = readNumber(config.dynamicFriction, 0.15);
-    this._cloth.staticFriction = readNumber(config.staticFriction, 0.3);
-    this._cloth.stiffness = readNumber(config.stiffness, 0.3);
-    this._cloth.poseFollow = readNumber(config.poseFollow, 0);
-    this._cloth.substeps = Math.max(1, Math.min(8, Number(config.substeps) || 2));
-    this._cloth.solverIterations = Math.max(1, Number(config.solverIterations) || 5);
-    this._cloth.colliders = buildClothColliders(host, config);
-    this._cloth.bindToScene(config.autoUpdate === false ? null : simulationMesh.scene || host.scene || null);
-    this._runtimeSignature = buildRuntimeSignature(host, simulationMesh, config);
+    this._cloth.damping = readNumber(this.damping, 0.02);
+    this._cloth.dynamicFriction = readNumber(this.dynamicFriction, 0.15);
+    this._cloth.staticFriction = readNumber(this.staticFriction, 0.3);
+    this._cloth.stiffness = readNumber(this.stiffness, 0.3);
+    this._cloth.poseFollow = readNumber(this.poseFollow, 0);
+    this._cloth.substeps = Math.max(1, Math.min(8, Number(this.substeps) || 2));
+    this._cloth.solverIterations = Math.max(1, Number(this.solverIterations) || 5);
+    this._cloth.colliders = buildClothColliders(host, this);
+    this._cloth.bindToScene(this.autoUpdate === false ? null : simulationMesh.scene || host.scene || null);
+    this._runtimeSignature = buildRuntimeSignature(host, simulationMesh, this);
   }
 
   disposeCloth() {
@@ -663,4 +716,3 @@ export default class extends RuntimeScript {
     this._runtimeSignature = '';
   }
 }
-`;
