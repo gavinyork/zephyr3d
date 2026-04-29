@@ -2528,7 +2528,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
   }
   private handleNodeAttached(node: SceneNode) {
-    this.syncNodeProxyTree(node);
+    queueMicrotask(() => {
+      this.syncNodeProxyTree(node);
+    });
   }
   private syncNodeProxyTree(root: Nullable<SceneNode>) {
     if (!root || !this._proxy) {

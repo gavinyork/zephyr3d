@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add rendergraph based renderer",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

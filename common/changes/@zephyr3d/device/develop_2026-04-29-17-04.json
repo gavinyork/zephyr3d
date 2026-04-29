@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Update tsconfig compiler options",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

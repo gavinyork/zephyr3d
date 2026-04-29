@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add animation retarget support for humanoid skeleton",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

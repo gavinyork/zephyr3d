@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Add plugin system",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}

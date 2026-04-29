@@ -1,9 +1,8 @@
 {
   "name": "@zephyr3d/editor",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "zephyr3d studio",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
-  "private": "true",
   "files": [
     "dist"
   ],

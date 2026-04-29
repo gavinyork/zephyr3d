@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgpu",
+      "comment": "",
+      "type": "none"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgpu"
+}
