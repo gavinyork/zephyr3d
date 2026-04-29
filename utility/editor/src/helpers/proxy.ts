@@ -10,9 +10,13 @@ import {
   UnlitMaterial,
   PerspectiveCamera
 } from '@zephyr3d/scene';
+import type { EditorPluginManager } from '../core/plugin';
 
 const PROXY_NAME = '$__PROXY__$';
 const PLANE_NORMAL_PROXY_NAME = '$__PLANE_NORMAL_PROXY__$';
+const PROXY_FACTORY_ID_KEY = '$__PROXY_FACTORY_ID__$';
+
+type NodeProxyPluginRegistry = Pick<EditorPluginManager, 'tryCreateNodeProxy' | 'updateNodeProxy'>;
 
 export class NodeProxy extends Disposable {
   private readonly _diamondPrimitive: DRef<Primitive>;
@@ -25,10 +29,12 @@ export class NodeProxy extends Disposable {
   private readonly _lightProxyMaterial: DRef<UnlitMaterial>;
   private readonly _colliderProxyMaterial: DRef<UnlitMaterial>;
   private _scene: Scene;
-  private _proxyList: DWeakRef<Mesh>[];
-  constructor(scene: Scene) {
+  private readonly _plugins: NodeProxyPluginRegistry | null;
+  private _proxyList: DWeakRef<SceneNode>[];
+  constructor(scene: Scene, plugins?: NodeProxyPluginRegistry | null) {
     super();
     this._scene = scene;
+    this._plugins = plugins ?? null;
     this._diamondPrimitive = new DRef();
     this._spotLightPrimitive = new DRef();
     this._directionalLightPrimitive = new DRef();
@@ -59,26 +65,26 @@ export class NodeProxy extends Disposable {
     if (index >= 0) {
       return;
     }
-    let proxy: Mesh;
-    if (this.getSpringColliderMeta(src)) {
-      proxy = this.getSpringColliderProxyMesh(src);
-    } else if (src.isPunctualLight() && src.isDirectionLight()) {
-      proxy = this.getDirectionalLightProxyMesh();
-    } else if (src.isPunctualLight() && src.isSpotLight()) {
-      proxy = this.getSpotLightProxyMesh();
-    } else if (src.isPunctualLight() && src.isPointLight()) {
-      proxy = this.getPointLightProxyMesh();
-    } else if (src.isPunctualLight() && src.isRectLight()) {
-      proxy = this.getRectLightProxyMesh();
-    } else if (src instanceof PerspectiveCamera) {
-      proxy = this.getPerspectiveCameraProxyMesh();
+    let proxy: SceneNode = this.createBuiltinProxy(src);
+    let proxyFactoryId: string | null = null;
+    if (!proxy) {
+      const created = this._plugins?.tryCreateNodeProxy(src);
+      proxy = created?.proxy ?? null;
+      proxyFactoryId = created?.factoryId ?? null;
     }
     if (proxy) {
       proxy.sealed = true;
       proxy.parent = src;
       proxy.showState = 'inherit';
-      proxy.castShadow = false;
+      if ('castShadow' in proxy) {
+        (proxy as any).castShadow = false;
+      }
       proxy.name = PROXY_NAME;
+      if (proxyFactoryId) {
+        (proxy as any)[PROXY_FACTORY_ID_KEY] = proxyFactoryId;
+      } else {
+        delete (proxy as any)[PROXY_FACTORY_ID_KEY];
+      }
       this.updateProxy(src);
       this._proxyList.push(new DWeakRef(proxy));
     }
@@ -89,7 +95,18 @@ export class NodeProxy extends Disposable {
       const children = src.children;
       const index = children.findIndex((val) => this.isProxy(val));
       if (index >= 0) {
-        const proxy = children[index] as Mesh;
+        const proxy = children[index];
+        const proxyFactoryId = this.getProxyFactoryId(proxy);
+        if (proxyFactoryId) {
+          if (!this._plugins?.updateNodeProxy(proxyFactoryId, src, proxy)) {
+            proxy.remove();
+            this.createProxy(src);
+          }
+          return;
+        }
+        if (!(proxy instanceof Mesh)) {
+          return;
+        }
         const material = proxy.material;
         const primitive = proxy.primitive;
         const springMeta = this.getSpringColliderMeta(src);
@@ -131,7 +148,7 @@ export class NodeProxy extends Disposable {
       const children = src.children;
       const index = children.findIndex((val) => this.isProxy(val));
       if (index >= 0) {
-        const proxy = children[index] as Mesh;
+        const proxy = children[index];
         proxy.showState = 'hidden';
       }
     }
@@ -141,7 +158,7 @@ export class NodeProxy extends Disposable {
       const children = src.children;
       const index = children.findIndex((val) => this.isProxy(val));
       if (index >= 0) {
-        const proxy = children[index] as Mesh;
+        const proxy = children[index];
         proxy.showState = 'visible';
       }
     }
@@ -162,6 +179,31 @@ export class NodeProxy extends Disposable {
       ref.dispose();
     }
     this._proxyList = [];
+  }
+  private createBuiltinProxy(src: SceneNode) {
+    if (this.getSpringColliderMeta(src)) {
+      return this.getSpringColliderProxyMesh(src);
+    }
+    if (src.isPunctualLight() && src.isDirectionLight()) {
+      return this.getDirectionalLightProxyMesh();
+    }
+    if (src.isPunctualLight() && src.isSpotLight()) {
+      return this.getSpotLightProxyMesh();
+    }
+    if (src.isPunctualLight() && src.isPointLight()) {
+      return this.getPointLightProxyMesh();
+    }
+    if (src.isPunctualLight() && src.isRectLight()) {
+      return this.getRectLightProxyMesh();
+    }
+    if (src instanceof PerspectiveCamera) {
+      return this.getPerspectiveCameraProxyMesh();
+    }
+    return null;
+  }
+  private getProxyFactoryId(proxy: SceneNode) {
+    const factoryId = (proxy as any)?.[PROXY_FACTORY_ID_KEY];
+    return typeof factoryId === 'string' && factoryId.trim() ? factoryId : null;
   }
   private getSpringColliderMeta(src: SceneNode): any | null {
     const meta = src.metaData as any;
@@ -346,7 +388,7 @@ export class NodeProxy extends Disposable {
     }
     return direction;
   }
-  private static createLinePrimitive(vertices: number[], indices: number[], bbox: BoundingBox) {
+  public static createLinePrimitive(vertices: number[], indices: number[], bbox: BoundingBox) {
     const primitive = new Primitive();
     primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(vertices));
     primitive.createAndSetIndexBuffer(new Uint16Array(indices));

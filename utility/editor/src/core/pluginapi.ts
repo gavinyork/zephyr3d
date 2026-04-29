@@ -1,5 +1,5 @@
 import type { FileMetadata, IDisposable, Vector3, VFS } from '@zephyr3d/base';
-import type { Mesh, PropertyAccessor, Scene, SceneNode } from '@zephyr3d/scene';
+import type { BoundingBox, Mesh, PropertyAccessor, Scene, SceneNode } from '@zephyr3d/scene';
 
 export type EditorDirectoryInfo = {
   path: string;
@@ -66,9 +66,22 @@ export type EditorEditToolFactory = {
   priority?: number;
 };
 
+export type EditorNodeProxyFactory = {
+  id: string;
+  canCreateProxy: (node: SceneNode) => boolean;
+  createProxy: (node: SceneNode) => SceneNode | null;
+  updateProxy?: (node: SceneNode, proxy: SceneNode) => void;
+};
+
 export type EditorPropertyAccessorProvider = (
   object: unknown
 ) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>;
+
+export type EditorProxy = {
+  createProxy(node: SceneNode): SceneNode | undefined;
+  updateProxy(proxy: SceneNode): void;
+  createLinePrimitive(vertices: number[], indices: number[], bbox: BoundingBox);
+};
 
 export type EditorCommands = {
   addChildNode<T extends SceneNode = SceneNode>(
@@ -87,14 +100,15 @@ export type EditorCommands = {
   cloneNode(node: SceneNode): Promise<SceneNode>;
   executeCommand<T>(command: unknown): Promise<T>;
   executeUserCallback<T>(execute: () => T | Promise<T>, undo: () => void | Promise<void>): Promise<null | T>;
+  selectNode(node: SceneNode): void;
 };
 
 export type EditorSceneContext = {
   editor: EditorHost;
   scene: unknown | null;
   selectedNodes: readonly unknown[];
-  activeNode: unknown | null;
   commands: EditorCommands;
+  proxy: EditorProxy;
   notifySceneChanged(): void;
   refreshProperties(): void;
   getCamera(): unknown | null;
@@ -137,15 +151,9 @@ export type EditorEventMap = {
   sceneSaved: [scene: unknown, path: string];
   sceneDirty: [scene: unknown];
   selectionChanged: [selectedNodes: readonly unknown[], activeNode: unknown | null];
-  nodeAdded: [node: unknown];
-  nodeRemoved: [node: unknown];
-  nodeDeleted: [node: unknown];
-  nodeTransformed: [node: unknown];
-  propertyChanged: [target: object | null, prop: unknown];
-  propertyEditFinished: [target: object | null, prop: unknown, oldValue: unknown, newValue: unknown];
   editToolActivated: [tool: unknown, target: unknown];
   editToolDeactivated: [tool: unknown, target: unknown];
-  assetSelectionChanged: [ctx: EditorAssetContext];
+  pluginContributionsChanged: [];
 };
 
 export type EditorEventSource = {
@@ -235,11 +243,13 @@ export type EditorPluginContext = {
       height?: number
     ): Promise<EditorDirectoryInfo[]>;
   };
+  getSceneContext(): EditorSceneContext;
   refreshProperties(): void;
   notifySceneChanged(): void;
   registerMenuItems(contribution: EditorMenuContribution): () => void;
   registerToolbarItem(item: EditorToolbarContribution): () => void;
   registerEditTool(factory: EditorEditToolFactory): () => void;
+  registerNodeProxyFactory(factory: EditorNodeProxyFactory): () => void;
   registerPropertyAccessors(id: string, provider: EditorPropertyAccessorProvider): () => void;
   on<K extends keyof EditorEventMap>(
     type: K,

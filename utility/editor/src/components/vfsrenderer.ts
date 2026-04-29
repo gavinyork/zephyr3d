@@ -1537,7 +1537,6 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     this.dispatchEvent('selection_changed', this.selectedDir ?? null, this.selectedFiles, [
       ...this.selectedItems
     ]);
-    this._options.editor?.plugins.dispatchEvent('assetSelectionChanged', this.getAssetContext());
   }
 
   getAssetContext(): RuntimeEditorAssetContext {

@@ -9,7 +9,8 @@ import type {
   PickResult,
   PropertyAccessor,
   PropertyTrack,
-  MeshMaterial
+  MeshMaterial,
+  BoundingBox
 } from '@zephyr3d/scene';
 import {
   Mesh,
@@ -78,6 +79,7 @@ import { ResourceService } from '../core/services/resource';
 import { DlgMessage } from './dlg/messagedlg';
 import type { RuntimeEditorMenuContext, RuntimeEditorSceneContext } from '../core/plugin';
 import type { RuntimeEditorMenuItem } from '../core/plugin';
+import type { EditorCommands, EditorProxy } from '../core/pluginapi';
 
 type ColliderKind = 'sphere' | 'capsule' | 'plane';
 type MultiTransformItem = {
@@ -251,6 +253,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   get cmdManager() {
     return this._cmdManager;
+  }
+  get editToolContext() {
+    return this._editToolContext;
   }
   private createMenuOptions(): MenuBarOptions {
     const menuOptions: MenuBarOptions = {
@@ -761,12 +766,16 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._toolbar.registerShortcuts(this);
     }
     this._propGrid.refresh();
+    if (this.controller.model.scene) {
+      this.syncNodeProxyTree(this.controller.model.scene.rootNode);
+    }
   }
-  private handleRefreshProperties() {
+
+  public handleRefreshProperties() {
     this._propGrid.refresh();
   }
 
-  private createEditorCommands(): RuntimeEditorSceneContext['commands'] {
+  public createEditorCommands(): EditorCommands {
     return {
       addChildNode: async <T extends SceneNode = SceneNode>(
         parent: SceneNode,
@@ -778,7 +787,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           console.error('Failed to add child node');
           return null;
         }
-        this.editor.plugins.dispatchEvent('nodeAdded', node);
         eventBus.dispatchEvent('scene_changed');
         return node;
       },
@@ -794,7 +802,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           console.error(`Failed to add shape node: ${type}`);
           return null;
         }
-        this.editor.plugins.dispatchEvent('nodeAdded', node);
         eventBus.dispatchEvent('scene_changed');
         return node;
       },
@@ -806,7 +813,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           console.error(`Failed to instantiate prefab '${prefabPath}'`);
           return null;
         }
-        this.editor.plugins.dispatchEvent('nodeAdded', node);
         eventBus.dispatchEvent('scene_changed');
         return node;
       },
@@ -817,12 +823,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           return;
         }
         await this._cmdManager.execute(command);
-        this.editor.plugins.dispatchEvent('nodeDeleted', node);
         eventBus.dispatchEvent('scene_changed');
       },
       reparentNode: async (node: SceneNode, newParent: SceneNode) => {
         await this._cmdManager.execute(new NodeReparentCommand(node, newParent));
-        this.editor.plugins.dispatchEvent('nodeTransformed', node);
         eventBus.dispatchEvent('scene_changed');
       },
       cloneNode: async (node: SceneNode) => {
@@ -831,13 +835,22 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           console.error('Failed to clone node');
           return null;
         }
-        this.editor.plugins.dispatchEvent('nodeAdded', cloned);
         eventBus.dispatchEvent('scene_changed');
         return cloned;
       },
       executeCommand: <T>(command: unknown) => this._cmdManager.execute(command as Command<T>),
       executeUserCallback: <T>(execute: () => T | Promise<T>, undo: () => void | Promise<void>) =>
-        this._cmdManager.execute(new CustomCommand(execute, undo))
+        this._cmdManager.execute(new CustomCommand(execute, undo)),
+      selectNode: (node) => this._sceneHierarchy.selectNode(node)
+    };
+  }
+
+  public createEditorProxy(): EditorProxy {
+    return {
+      createProxy: (node) => this._proxy.createProxy(node),
+      updateProxy: (proxy) => this._proxy.updateProxy(proxy),
+      createLinePrimitive: (vertices: number[], indices: number[], bbox: BoundingBox) =>
+        NodeProxy.createLinePrimitive(vertices, indices, bbox)
     };
   }
 
@@ -848,6 +861,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       selectedNodes: this.getSelectedSceneNodes(),
       activeNode: this._sceneHierarchy?.selectedNode ?? null,
       commands: this.createEditorCommands(),
+      proxy: this.createEditorProxy(),
       commandManager: this._cmdManager,
       executeCommand: (command) => this._cmdManager.execute(command),
       notifySceneChanged: () => eventBus.dispatchEvent('scene_changed'),
@@ -1118,7 +1132,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                   .then((node) => {
                     this._sceneHierarchy!.selectNode(node);
                     placeNode.parent = null;
-                    this.editor.plugins.dispatchEvent('nodeAdded', node);
                     eventBus.dispatchEvent('scene_changed');
                   });
                 break;
@@ -1128,7 +1141,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                   .then((node) => {
                     this._sceneHierarchy!.selectNode(node);
                     placeNode.parent = null;
-                    this.editor.plugins.dispatchEvent('nodeAdded', node);
                     eventBus.dispatchEvent('scene_changed');
                   });
                 break;
@@ -1138,7 +1150,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                   .then((mesh) => {
                     this._sceneHierarchy!.selectNode(mesh);
                     placeNode.parent = null;
-                    this.editor.plugins.dispatchEvent('nodeAdded', mesh);
                     eventBus.dispatchEvent('scene_changed');
                   });
                 break;
@@ -1158,7 +1169,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                     this._sceneHierarchy!.selectNode(node);
                     placeNode.parent = null;
                     this._proxy!.createProxy(node!);
-                    this.editor.plugins.dispatchEvent('nodeAdded', node);
                     eventBus.dispatchEvent('scene_changed');
                   });
                 break;
@@ -1371,7 +1381,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   private sceneSetup() {
     if (this.controller.model.scene) {
-      this._proxy = new NodeProxy(this.controller.model.scene);
+      this._proxy = new NodeProxy(this.controller.model.scene, this.editor.plugins);
       this._postGizmoRenderer = new PostGizmoRenderer(this.controller.model.scene.mainCamera!, null);
       this._postGizmoRenderer.mode = 'select';
       this.updateGizmoTransformSpace();
@@ -1555,7 +1565,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         }
       }
     }
-    this.editor.plugins.dispatchEvent('propertyChanged', object, prop);
     eventBus.dispatchEvent('scene_changed');
   }
   private async handleObjectPropertyEditFinished(
@@ -1613,7 +1622,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     } else if (commands.length > 1) {
       await this._cmdManager.execute(new CompositeCommand(`Edit property ${prop.name}`, commands));
     }
-    this.editor.plugins.dispatchEvent('propertyEditFinished', object, prop, oldValue, newValue);
     eventBus.dispatchEvent('scene_changed');
   }
   private shouldRefreshSelectedColliderProxy(prop: PropertyAccessor) {
@@ -1814,9 +1822,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     if (clonedNodes.length > 0) {
       this._sceneHierarchy!.selectNodes(clonedNodes, lastCloned);
-      for (const node of clonedNodes) {
-        this.editor.plugins.dispatchEvent('nodeAdded', node);
-      }
       eventBus.dispatchEvent('scene_changed');
     }
   }
@@ -1848,7 +1853,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       }
     }
   }
-  private getSelectedSceneNodes() {
+  public getSelectedSceneNodes() {
     return this._sceneHierarchy ? [...this._sceneHierarchy.selectedNodes] : [];
   }
   private getTransformSelectionNodes(source?: SceneNode) {
@@ -2061,9 +2066,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     if (clonedNodes.length > 0) {
       this._sceneHierarchy!.selectNodes(clonedNodes, lastCloned);
-      for (const node of clonedNodes) {
-        this.editor.plugins.dispatchEvent('nodeAdded', node);
-      }
       eventBus.dispatchEvent('scene_changed');
     }
   }
@@ -2089,9 +2091,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     } else {
       await this._cmdManager.execute(new CompositeCommand('Delete nodes', commands));
     }
-    for (const node of selectedNodes) {
-      this.editor.plugins.dispatchEvent('nodeDeleted', node);
-    }
     eventBus.dispatchEvent('scene_changed');
   }
   private async handleDeleteNode(node: SceneNode) {
@@ -2100,7 +2099,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       return;
     }
     await this._cmdManager.execute(command);
-    this.editor.plugins.dispatchEvent('nodeDeleted', node);
     eventBus.dispatchEvent('scene_changed');
   }
   private prepareDeleteNodeCommand(node: SceneNode): Nullable<NodeDeleteCommand> {
@@ -2178,7 +2176,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           : new AddPrefabCommand(this.controller.model.scene, this._assetToBeAdded!, pos);
       this._cmdManager.execute(command).then((node) => {
         this._sceneHierarchy!.selectNode(node);
-        this.editor.plugins.dispatchEvent('nodeAdded', node);
         eventBus.dispatchEvent('scene_changed');
       });
     }
@@ -2371,7 +2368,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {
     if (src.parent !== dst && !src.isParentOf(dst)) {
       this._cmdManager.execute(new NodeReparentCommand(src, dst)).then(() => {
-        this.editor.plugins.dispatchEvent('nodeTransformed', src);
         eventBus.dispatchEvent('scene_changed');
       });
     }
@@ -2491,7 +2487,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private handleAddChild(parent: SceneNode, ctor: { new (scene: Scene): SceneNode }) {
     this._cmdManager.execute(new AddChildCommand(parent, ctor)).then((node) => {
       this._sceneHierarchy!.selectNode(node);
-      this.editor.plugins.dispatchEvent('nodeAdded', node);
       eventBus.dispatchEvent('scene_changed');
     });
   }
@@ -2573,7 +2568,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._proxy!.updateProxy(colliderNode);
       this._sceneHierarchy?.selectNode(colliderNode);
       this._propGrid.refresh();
-      this.editor.plugins.dispatchEvent('nodeAdded', colliderNode);
       eventBus.dispatchEvent('scene_changed');
     });
   }
@@ -2585,11 +2579,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (selectedNodes.some((selected) => node.isParentOf(selected))) {
       this._sceneHierarchy!.selectNode(null);
     }
-    this.editor.plugins.dispatchEvent('nodeRemoved', node);
   }
   private handleNodeAttached(node: SceneNode) {
     this.syncNodeProxyTree(node);
-    this.editor.plugins.dispatchEvent('nodeAdded', node);
   }
   private syncNodeProxyTree(root: Nullable<SceneNode>) {
     if (!root || !this._proxy) {
@@ -2679,12 +2671,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
           return false;
         });
       }
-      this.editor.plugins.dispatchEvent(
-        'nodeTransformed',
-        this._multiTransformItems.length > 0
-          ? [node, ...this._multiTransformItems.map((item) => item.node)]
-          : node
-      );
       this._multiTransformItems = [];
       this._multiTransformMasterStartWorld = null;
       this._transformNode.dispose();

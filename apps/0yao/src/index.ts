@@ -4,7 +4,7 @@ import type {
   EditorPluginDefinition,
   EditorDirectoryInfo
 } from '@zephyr3d/editor/editor-plugin';
-import { SceneNode } from '@zephyr3d/scene';
+import { PlaneShape, SceneNode, SphereShape } from '@zephyr3d/scene';
 import { initGPUClothPaintTool } from './gpu-cloth/paint-tool';
 import { initGPUClothPropertyProvider } from './gpu-cloth/property-provider';
 import { gpuClothRuntimeScriptSource } from './gpu-cloth/runtime-template';
@@ -12,6 +12,12 @@ import { isGPUClothHost } from './gpu-cloth/shared';
 import { initSpringPropertyProvider } from './spring/property-provider';
 import { springRuntimeScriptSource } from './spring/runtime-template';
 import { isSpringHost } from './spring/shared';
+import {
+  getSpringColliderMeta,
+  getSpringColliderProxyMesh,
+  handleAddCollider,
+  updateSpringColliderProxy
+} from './proxy/shared';
 
 const DEFAULT_GPU_CLOTH_SCRIPT_PATH = '/assets/scripts/gpucloth.ts';
 const DEFAULT_SPRING_SCRIPT_PATH = '/assets/scripts/springtest.ts';
@@ -193,6 +199,32 @@ const plugin: EditorPluginDefinition = {
     }
   },
   activate(ctx) {
+    // 添加Proxy处理
+    ctx.registerNodeProxyFactory({
+      id: 'com.0yao.proxy-factory',
+      canCreateProxy: (node) => getSpringColliderMeta(node),
+      createProxy: (node) => getSpringColliderProxyMesh(ctx, node),
+      updateProxy: (node, proxy) => {
+        if (!proxy.isMesh()) {
+          return;
+        }
+        const primitive = proxy.primitive;
+        const springMeta = getSpringColliderMeta(node);
+        if (springMeta) {
+          const type = springMeta.type;
+          const mismatch =
+            (type === 'sphere' && !(primitive instanceof SphereShape)) ||
+            (type === 'capsule' && (primitive instanceof SphereShape || primitive instanceof PlaneShape)) ||
+            (type === 'plane' && !(primitive instanceof PlaneShape));
+          if (mismatch) {
+            proxy.remove();
+            ctx.getSceneContext().proxy.createProxy(node);
+            return;
+          }
+          updateSpringColliderProxy(ctx, proxy, springMeta);
+        }
+      }
+    });
     // 主菜单入口，统一放在插件自己的顶级菜单下。
     ctx.registerMenuItems({
       location: 'main',
@@ -246,6 +278,32 @@ const plugin: EditorPluginDefinition = {
       items: (menuCtx) => {
         const node = menuCtx.target instanceof SceneNode ? menuCtx.target : null;
         return [
+          {
+            label: 'Add Collider',
+            subMenus: [
+              {
+                id: 'com.0yao.add-sphere-collider',
+                label: 'Sphere',
+                action: () => {
+                  handleAddCollider(menuCtx, node, 'sphere');
+                }
+              },
+              {
+                id: 'com.0yao.add-capsule-collider',
+                label: 'Capsule',
+                action: () => {
+                  handleAddCollider(menuCtx, node, 'capsule');
+                }
+              },
+              {
+                id: 'com.0yao.add-plane-collider',
+                label: 'Plane',
+                action: () => {
+                  handleAddCollider(menuCtx, node, 'plane');
+                }
+              }
+            ]
+          },
           {
             id: 'com.0yao.attach-gpu-cloth',
             label: node && isGPUClothHost(node) ? 'Open GPU Cloth Script' : 'Attach GPU Cloth',

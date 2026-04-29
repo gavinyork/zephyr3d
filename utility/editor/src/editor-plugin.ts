@@ -1,6 +1,8 @@
 export type {
   DisposableLike,
   EditorAssetContext,
+  EditorCommands,
+  EditorProxy,
   EditorDirectoryInfo,
   EditorEditToolFactory,
   EditorEditToolFactoryContext,
@@ -12,6 +14,7 @@ export type {
   EditorMenuContribution,
   EditorMenuItem,
   EditorMenuLocation,
+  EditorNodeProxyFactory,
   EditorPropertyAccessorProvider,
   EditorPluginDefinition,
   EditorPlugin,

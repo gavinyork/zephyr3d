@@ -174,6 +174,7 @@ export class SceneHierarchy extends TreeView<
     if (ImGui.MenuItem('Create Prefab...')) {
       this.dispatchEvent('request_save_prefab', node);
     }
+    /*
     ImGui.Separator();
     if (ImGui.BeginMenu('Add Collider')) {
       if (ImGui.MenuItem('Sphere')) {
@@ -187,6 +188,7 @@ export class SceneHierarchy extends TreeView<
       }
       ImGui.EndMenu();
     }
+    */
     const animationSet = node.animationSet;
     if (animationSet && animationSet.getAnimationNames().length > 0) {
       ImGui.Separator();

@@ -1,4 +1,4 @@
-import type { EventListener, FileMetadata, Nullable, VFS } from '@zephyr3d/base';
+import type { FileMetadata, Nullable, VFS } from '@zephyr3d/base';
 import { Disposable, Observable } from '@zephyr3d/base';
 import type { Scene, SceneNode, Camera, PropertyAccessor } from '@zephyr3d/scene';
 import { ClipmapTerrain } from '@zephyr3d/scene';
@@ -18,6 +18,7 @@ import type {
   EditorMenuContribution,
   EditorToolbarContribution,
   EditorEditToolFactory,
+  EditorNodeProxyFactory,
   EditorSceneContext,
   EditorAssetContext,
   EditorMenuContext,
@@ -30,6 +31,8 @@ import type {
   EditorPluginSettingsSchema
 } from './pluginapi';
 import { Dialog } from '../views/dlg/dlg';
+import { SceneController } from '../controllers/scenecontroller';
+import type { SceneView } from '../views/sceneview';
 
 class EditorPluginSubscription extends Disposable {
   private readonly _disposeCallback: () => void;
@@ -50,6 +53,7 @@ export type {
   EditorMenuContribution,
   EditorToolbarContribution,
   EditorEditToolFactory,
+  EditorNodeProxyFactory,
   EditorSceneContext,
   EditorAssetContext,
   EditorMenuContext,
@@ -124,6 +128,8 @@ export type RuntimeEditorEditToolFactory = {
   priority?: number;
 };
 
+export type RuntimeEditorNodeProxyFactory = EditorNodeProxyFactory;
+
 export type RuntimeEditorSceneContext = Override<
   EditorSceneContext,
   {
@@ -181,41 +187,12 @@ export type RuntimeEditorPropertyAccessorProvider = (
   object: unknown
 ) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>;
 
-export type RuntimeEditorEventMap = Override<
-  EditorEventMap,
-  {
-    sceneOpened: [scene: Scene, path: string];
-    sceneCreated: [scene: Scene, path: string];
-    sceneSaving: [scene: Scene, path: string];
-    sceneSaved: [scene: Scene, path: string];
-    sceneDirty: [scene: Scene];
-    selectionChanged: [selectedNodes: readonly SceneNode[], activeNode: Nullable<SceneNode>];
-    nodeAdded: [node: SceneNode];
-    nodeRemoved: [node: SceneNode];
-    nodeDeleted: [node: SceneNode];
-    nodeTransformed: [node: SceneNode | readonly SceneNode[]];
-    propertyChanged: [target: Nullable<object>, prop: PropertyAccessor];
-    propertyEditFinished: [
-      target: Nullable<object>,
-      prop: PropertyAccessor,
-      oldValue: unknown,
-      newValue: unknown
-    ];
-    assetSelectionChanged: [ctx: RuntimeEditorAssetContext];
-  }
-> & {
-  pluginContributionsChanged: [];
-  sceneOpening: [path: string];
-  editToolActivated: [tool: EditTool, target: unknown];
-  editToolDeactivated: [tool: EditTool, target: unknown];
-};
-
 type EditorPluginEntry = {
   plugin: EditorPlugin;
   context: Nullable<EditorPluginContext>;
 };
 
-export class EditorPluginManager extends Observable<RuntimeEditorEventMap> {
+export class EditorPluginManager extends Observable<EditorEventMap> {
   private readonly _editor: Editor;
   private readonly _plugins = new Map<string, EditorPluginEntry>();
   private readonly _activePlugins = new Set<string>();
@@ -223,6 +200,7 @@ export class EditorPluginManager extends Observable<RuntimeEditorEventMap> {
   private readonly _contextMenuItems: RuntimeEditorMenuContribution[] = [];
   private readonly _toolbarItems: RuntimeEditorToolbarContribution[] = [];
   private readonly _editToolFactories: RuntimeEditorEditToolFactory[] = [];
+  private readonly _nodeProxyFactories: RuntimeEditorNodeProxyFactory[] = [];
   private readonly _propertyAccessorProviders = new Map<string, RuntimeEditorPropertyAccessorProvider>();
 
   constructor(editor: Editor) {
@@ -335,6 +313,21 @@ export class EditorPluginManager extends Observable<RuntimeEditorEventMap> {
     };
   }
 
+  addNodeProxyFactory(factory: RuntimeEditorNodeProxyFactory) {
+    if (this._nodeProxyFactories.some((item) => item.id === factory.id)) {
+      throw new Error(`Editor node proxy factory '${factory.id}' already registered`);
+    }
+    this._nodeProxyFactories.push(factory);
+    this.dispatchContributionChanged();
+    return () => {
+      const index = this._nodeProxyFactories.indexOf(factory);
+      if (index >= 0) {
+        this._nodeProxyFactories.splice(index, 1);
+        this.dispatchContributionChanged();
+      }
+    };
+  }
+
   addPropertyAccessorProvider(id: string, provider: RuntimeEditorPropertyAccessorProvider) {
     if (this._propertyAccessorProviders.has(id)) {
       throw new Error(`Editor property accessor provider '${id}' already registered`);
@@ -374,6 +367,31 @@ export class EditorPluginManager extends Observable<RuntimeEditorEventMap> {
   createEditTool(obj: unknown, ctx: RuntimeEditorEditToolFactoryContext): Nullable<EditTool> {
     const factory = this._editToolFactories.find((item) => item.canEdit(obj, ctx));
     return factory?.create(obj, ctx) ?? null;
+  }
+
+  tryCreateNodeProxy(node: SceneNode) {
+    for (const factory of this._nodeProxyFactories) {
+      if (!factory.canCreateProxy(node)) {
+        continue;
+      }
+      const proxy = factory.createProxy(node);
+      if (proxy) {
+        return {
+          proxy,
+          factoryId: factory.id
+        };
+      }
+    }
+    return null;
+  }
+
+  updateNodeProxy(factoryId: string, node: SceneNode, proxy: SceneNode) {
+    const factory = this._nodeProxyFactories.find((item) => item.id === factoryId);
+    if (!factory || !factory.canCreateProxy(node)) {
+      return false;
+    }
+    factory.updateProxy?.(node, proxy);
+    return true;
   }
 
   applyMainMenuContributions(items: MenuItemOptions[], ctx: RuntimeEditorMenuContext) {
@@ -481,6 +499,26 @@ export class EditorPluginManager extends Observable<RuntimeEditorEventMap> {
         selectProjectFolders: async (title, rootDir, multi, width, height) =>
           await Dialog.openFolder(title, ProjectService.VFS, rootDir, multi, width, height)
       },
+      getSceneContext: () => {
+        const controller = this._editor.moduleManager.currentModule?.controller;
+        if (controller instanceof SceneController) {
+          const scene = controller.model.scene;
+          const view = controller.view as SceneView;
+          return {
+            editor: this._editor,
+            scene,
+            selectedNodes: view.getSelectedSceneNodes(),
+            commands: view.createEditorCommands(),
+            proxy: view.createEditorProxy(),
+            commandManager: view.cmdManager,
+            executeCommand: (command) => view.cmdManager.execute(command),
+            notifySceneChanged: () => eventBus.dispatchEvent('scene_changed'),
+            refreshProperties: () => view.handleRefreshProperties(),
+            getCamera: () => scene.mainCamera ?? null,
+            getViewportRect: () => view.editToolContext.getViewportRect()
+          };
+        }
+      },
       refreshProperties: () => eventBus.dispatchEvent('refresh_properties'),
       notifySceneChanged: () => eventBus.dispatchEvent('scene_changed'),
       registerMenuItems: (contribution: EditorMenuContribution) => {
@@ -498,6 +536,11 @@ export class EditorPluginManager extends Observable<RuntimeEditorEventMap> {
         context.subscriptions.push(new EditorPluginSubscription(dispose));
         return dispose;
       },
+      registerNodeProxyFactory: (factory: EditorNodeProxyFactory) => {
+        const dispose = this.addNodeProxyFactory(factory as RuntimeEditorNodeProxyFactory);
+        context.subscriptions.push(new EditorPluginSubscription(dispose));
+        return dispose;
+      },
       registerPropertyAccessors: (providerId: string, provider: EditorPropertyAccessorProvider) => {
         const dispose = this.addPropertyAccessorProvider(`${plugin.id}:${providerId}`, provider);
         context.subscriptions.push(new EditorPluginSubscription(dispose));
@@ -505,18 +548,8 @@ export class EditorPluginManager extends Observable<RuntimeEditorEventMap> {
       },
       on: (type, listener, listenerContext) => {
         const eventContext = listenerContext ?? context;
-        this.on(
-          type as keyof RuntimeEditorEventMap,
-          listener as EventListener<RuntimeEditorEventMap, keyof RuntimeEditorEventMap>,
-          eventContext
-        );
-        const subscription = new EditorPluginSubscription(() =>
-          this.off(
-            type as keyof RuntimeEditorEventMap,
-            listener as EventListener<RuntimeEditorEventMap, keyof RuntimeEditorEventMap>,
-            eventContext
-          )
-        );
+        this.on(type, listener, eventContext);
+        const subscription = new EditorPluginSubscription(() => this.off(type, listener, eventContext));
         context.subscriptions.push(subscription);
         return subscription;
       },
