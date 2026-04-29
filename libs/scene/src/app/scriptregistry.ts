@@ -394,16 +394,15 @@ export class ScriptRegistry {
     } else if (spec.startsWith('/')) {
       return spec.replace(/^\/+/, '/');
     } else if (getApp().editorMode !== 'none') {
+      const libRoot = '/';
       // naked module, checking if it is a installed module in editor mode
-      const depsLockPath = this._vfs.normalizePath(this._vfs.join(this._scriptsRoot, 'libs/deps.lock.json'));
-      const depsExists = await this._vfs.exists(depsLockPath);
+      let depsLockPath = this._vfs.normalizePath(this._vfs.join(libRoot, 'libs/deps.lock.json'));
+      let depsExists = await this._vfs.exists(depsLockPath);
       if (depsExists) {
         const content = (await this._vfs.readFile(depsLockPath, { encoding: 'utf8' })) as string;
         const depsInfo = JSON.parse(content) as { dependencies: Record<string, { entry: string }> };
         if (depsInfo?.dependencies[spec]) {
-          return this._vfs.normalizePath(
-            this._vfs.join(this._scriptsRoot, depsInfo.dependencies[spec].entry)
-          );
+          return this._vfs.normalizePath(this._vfs.join(libRoot, depsInfo.dependencies[spec].entry));
         }
       }
     }

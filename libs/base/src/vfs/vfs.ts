@@ -698,13 +698,12 @@ export abstract class VFS extends Observable<{
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
       mounted.vfs.makeDirectory(mounted.relativePath, recursive);
+    } else {
+      if (this._readOnly) {
+        throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
+      }
+      await this._makeDirectory(normalizedPath, recursive ?? false);
     }
-
-    if (this._readOnly) {
-      throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
-    }
-
-    await this._makeDirectory(normalizedPath, recursive ?? false);
     this.onChange('created', normalizedPath, 'directory');
   }
 
@@ -760,13 +759,12 @@ export abstract class VFS extends Observable<{
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
       mounted.vfs.deleteDirectory(mounted.relativePath, recursive);
+    } else {
+      if (this._readOnly) {
+        throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
+      }
+      await this._deleteDirectory(normalizedPath, recursive ?? false);
     }
-
-    if (this._readOnly) {
-      throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
-    }
-
-    await this._deleteDirectory(normalizedPath, recursive ?? false);
     this.onChange('deleted', normalizedPath, 'directory');
   }
 
@@ -824,23 +822,22 @@ export abstract class VFS extends Observable<{
     if (this.simpleMounts.has(normalizedPath)) {
       throw new VFSError('Is a directory', 'EISDIR', normalizedPath);
     }
+    const existed = await this.exists(normalizedPath);
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
       mounted.vfs.writeFile(mounted.relativePath, data, options);
-    }
-
-    if (this._readOnly) {
-      throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
-    }
-
-    const existed = await this._exists(normalizedPath);
-    if (existed) {
-      const stat = await this._stat(normalizedPath);
-      if (stat.isDirectory) {
-        throw new VFSError('Is a directory', 'EISDIR', normalizedPath);
+    } else {
+      if (this._readOnly) {
+        throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
       }
+      if (existed) {
+        const stat = await this._stat(normalizedPath);
+        if (stat.isDirectory) {
+          throw new VFSError('Is a directory', 'EISDIR', normalizedPath);
+        }
+      }
+      await this._writeFile(normalizedPath, data, options);
     }
-    await this._writeFile(normalizedPath, data, options);
     this.onChange(existed ? 'modified' : 'created', normalizedPath, 'file');
   }
 
@@ -856,13 +853,12 @@ export abstract class VFS extends Observable<{
     const mounted = this.getMountedVFS(normalizedPath);
     if (mounted) {
       mounted.vfs.deleteFile(mounted.relativePath);
+    } else {
+      if (this._readOnly) {
+        throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
+      }
+      await this._deleteFile(normalizedPath);
     }
-
-    if (this._readOnly) {
-      throw new VFSError('File system is read-only', 'EROFS', normalizedPath);
-    }
-
-    await this._deleteFile(normalizedPath);
     this.onChange('deleted', normalizedPath, 'file');
   }
 
