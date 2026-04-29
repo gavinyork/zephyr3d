@@ -1,6 +1,14 @@
 # Change Log - @zephyr3d/base
 
-This log was last generated on Fri, 27 Mar 2026 06:21:52 GMT and should not be manually modified.
+This log was last generated on Wed, 29 Apr 2026 18:55:40 GMT and should not be manually modified.
+
+## 0.2.3
+Wed, 29 Apr 2026 18:55:40 GMT
+
+### Patches
+
+- Update tsconfig compiler options
+- Fix VFS error when making/deleting directories at mounted path
 
 ## 0.2.2
 Fri, 27 Mar 2026 06:21:52 GMT

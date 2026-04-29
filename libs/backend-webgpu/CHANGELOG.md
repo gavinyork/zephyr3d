@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/backend-webgpu
 
-This log was last generated on Fri, 20 Mar 2026 11:37:32 GMT and should not be manually modified.
+This log was last generated on Wed, 29 Apr 2026 18:55:40 GMT and should not be manually modified.
+
+## 0.1.11
+Wed, 29 Apr 2026 18:55:40 GMT
+
+### Patches
+
+- Update tsconfig compiler options
 
 ## 0.1.10
 Fri, 20 Mar 2026 11:37:32 GMT

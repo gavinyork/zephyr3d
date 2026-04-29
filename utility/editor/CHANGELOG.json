@@ -1,6 +1,38 @@
 {
-  "name": "@zephyr3d/inspector",
+  "name": "@zephyr3d/editor",
   "entries": [
+    {
+      "version": "0.2.0",
+      "tag": "@zephyr3d/editor_v0.2.0",
+      "date": "Wed, 29 Apr 2026 18:55:40 GMT",
+      "comments": {
+        "minor": [
+          {
+            "comment": "Add plugin system"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.2` to `0.2.3`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.7` to `0.2.8`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/scene\" from `^0.8.2` to `0.9.0`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/imgui\" from `^0.2.1` to `0.2.2`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/backend-webgl\" from `^0.1.11` to `0.1.12`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/backend-webgpu\" from `^0.1.10` to `0.1.11`"
+          }
+        ]
+      }
+    },
     {
       "version": "0.1.1",
       "tag": "@zephyr3d/inspector_v0.1.1",

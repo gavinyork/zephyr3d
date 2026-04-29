@@ -2,6 +2,21 @@
   "name": "@zephyr3d/base",
   "entries": [
     {
+      "version": "0.2.3",
+      "tag": "@zephyr3d/base_v0.2.3",
+      "date": "Wed, 29 Apr 2026 18:55:40 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Update tsconfig compiler options"
+          },
+          {
+            "comment": "Fix VFS error when making/deleting directories at mounted path"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.2",
       "tag": "@zephyr3d/base_v0.2.2",
       "date": "Fri, 27 Mar 2026 06:21:52 GMT",

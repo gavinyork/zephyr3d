@@ -2,6 +2,26 @@
   "name": "@zephyr3d/backend-webgl",
   "entries": [
     {
+      "version": "0.1.12",
+      "tag": "@zephyr3d/backend-webgl_v0.1.12",
+      "date": "Wed, 29 Apr 2026 18:55:40 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Update tsconfig compiler options"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.2` to `0.2.3`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.7` to `0.2.8`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.11",
       "tag": "@zephyr3d/backend-webgl_v0.1.11",
       "date": "Fri, 20 Mar 2026 11:37:32 GMT",

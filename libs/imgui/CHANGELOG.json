@@ -2,6 +2,26 @@
   "name": "@zephyr3d/imgui",
   "entries": [
     {
+      "version": "0.2.2",
+      "tag": "@zephyr3d/imgui_v0.2.2",
+      "date": "Wed, 29 Apr 2026 18:55:40 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Update tsconfig compiler options"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.2` to `0.2.3`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.7` to `0.2.8`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.1",
       "tag": "@zephyr3d/imgui_v0.2.1",
       "date": "Tue, 10 Feb 2026 07:50:06 GMT",

@@ -2,6 +2,34 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.0",
+      "tag": "@zephyr3d/scene_v0.9.0",
+      "date": "Wed, 29 Apr 2026 18:55:40 GMT",
+      "comments": {
+        "minor": [
+          {
+            "comment": "Add animation retarget support for humanoid skeleton"
+          },
+          {
+            "comment": "Add rendergraph based renderer"
+          }
+        ],
+        "patch": [
+          {
+            "comment": "Fix logical module id bug for remote projects"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.2` to `0.2.3`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.7` to `0.2.8`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.8.2",
       "tag": "@zephyr3d/scene_v0.8.2",
       "date": "Sat, 28 Mar 2026 03:28:36 GMT",

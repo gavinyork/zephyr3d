@@ -1,6 +1,18 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Sat, 28 Mar 2026 03:28:36 GMT and should not be manually modified.
+This log was last generated on Wed, 29 Apr 2026 18:55:40 GMT and should not be manually modified.
+
+## 0.9.0
+Wed, 29 Apr 2026 18:55:40 GMT
+
+### Minor changes
+
+- Add animation retarget support for humanoid skeleton
+- Add rendergraph based renderer
+
+### Patches
+
+- Fix logical module id bug for remote projects
 
 ## 0.8.2
 Sat, 28 Mar 2026 03:28:36 GMT

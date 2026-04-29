@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/device
 
-This log was last generated on Fri, 20 Mar 2026 11:37:32 GMT and should not be manually modified.
+This log was last generated on Wed, 29 Apr 2026 18:55:40 GMT and should not be manually modified.
+
+## 0.2.8
+Wed, 29 Apr 2026 18:55:40 GMT
+
+### Patches
+
+- Update tsconfig compiler options
 
 ## 0.2.7
 Fri, 20 Mar 2026 11:37:32 GMT
