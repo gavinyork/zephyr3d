@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Fix logical module id bug for remote projects",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

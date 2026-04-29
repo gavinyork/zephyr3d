@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/base",
+      "comment": "Fix VFS error when making/deleting directories at mounted path",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/base"
+}
