@@ -1306,8 +1306,6 @@ export class SharedModel extends Disposable {
           meshNode.name = subMesh.name;
           meshNode.clipTestEnabled = true;
           meshNode.showState = 'inherit';
-          meshNode.skinAnimation = !!skeleton;
-          meshNode.morphAnimation = subMesh.numTargets > 0;
           meshNode.primitive = await this.createPrimitive(manager, subMesh.primitive);
           meshNode.material = await this.createMaterial(manager, subMesh.material);
           meshNode.parent = node;

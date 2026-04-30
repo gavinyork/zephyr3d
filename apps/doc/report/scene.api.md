@@ -13,6 +13,7 @@ import { Clonable } from '@zephyr3d/base';
 import { ColorState } from '@zephyr3d/device';
 import { CubeFace } from '@zephyr3d/base';
 import { DecoderModule } from 'draco3d';
+import { DeepPartial } from '@zephyr3d/base';
 import { DeepRequireOptionals } from '@zephyr3d/base';
 import { DeviceBackend } from '@zephyr3d/device';
 import { Disposable } from '@zephyr3d/base';
@@ -30,6 +31,7 @@ import { Immutable } from '@zephyr3d/base';
 import { IndexBuffer } from '@zephyr3d/device';
 import { InterpolationMode } from '@zephyr3d/base';
 import { Interpolator } from '@zephyr3d/base';
+import { InterpolatorScalar } from '@zephyr3d/base';
 import { Matrix4x4 } from '@zephyr3d/base';
 import { Metadata as Metadata_2 } from 'draco3d';
 import { Nullable } from '@zephyr3d/base';
@@ -142,8 +144,14 @@ export class AllConditionNode extends BaseGraphNode {
         name: string;
         getProps(): never[];
     };
-    protected getType(): "" | "bool";
+    protected getType(): "bool" | "";
     toString(): string;
+}
+
+// @public
+export interface AngleLimitConfig {
+    angleLimit: number;
+    limitFromRoot: boolean;
 }
 
 // @public
@@ -171,6 +179,8 @@ export class AnimationClip extends Disposable {
 // @public
 export class AnimationSet extends Disposable implements IDisposable {
     constructor(model: SceneNode);
+    copyAnimationFrom(sourceSet: AnimationSet, animationName: string, targetName?: string, excludeJoint?: (jointName: string) => boolean): AnimationClip | null;
+    copyHumanoidAnimationFrom(sourceSet: AnimationSet, animationName: string, targetName?: string): AnimationClip | null;
     createAnimation(name: string, embedded?: boolean): AnimationClip | null;
     deleteAnimation(name: string): void;
     get(name: string): AnimationClip | null;
@@ -215,7 +225,7 @@ export class AnyConditionNode extends BaseGraphNode {
         name: string;
         getProps(): never[];
     };
-    protected getType(): "" | "bool";
+    protected getType(): "bool" | "";
     toString(): string;
 }
 
@@ -249,7 +259,26 @@ export class Application extends Observable<appEventMap> {
 }
 
 // @public
+export function applyAngleLimits(pointsR: readonly PointR[], pointsRW: PointRW[], config: AngleLimitConfig): void;
+
+// @public
 export function applyMaterialMixins<M extends ((target: any) => any)[], T>(target: T, ...mixins: M): T & _zephyr3d_base.ExtractMixinType<M>;
+
+// @public
+export function applyResult(pointsR: readonly PointR[], pointsRW: PointRW[], positionsToTransform: readonly Vector3[], blendRatio: number, transformRotations: readonly Quaternion[], transformLocalRotations: readonly Quaternion[], preserveTwist: boolean): ApplyResultOutput[];
+
+// @public
+export interface ApplyResultOutput {
+    // (undocumented)
+    localRotation: Quaternion;
+    // (undocumented)
+    position: Vector3;
+    // (undocumented)
+    rotation: Quaternion;
+}
+
+// @public
+export function applyRuntimeScriptConfig<T extends RuntimeScript<any>>(instance: T, config?: Nullable<RuntimeScriptConfig>): void;
 
 // @public
 export interface AppOptions {
@@ -345,7 +374,7 @@ export interface AssetAnimationData {
     // (undocumented)
     skeletons: AssetSkeleton[];
     // (undocumented)
-    tracks: AssetAnimationTrack[];
+    tracks: (AssetAnimationTrack | AssetGeometryCacheAnimationTrack)[];
 }
 
 // @public
@@ -359,6 +388,25 @@ export interface AssetAnimationTrack {
     // (undocumented)
     type: 'translation' | 'scale' | 'rotation' | 'weights';
 }
+
+// @public
+export interface AssetFixedGeometryCacheAnimationTrack {
+    // (undocumented)
+    codec?: 'fixed';
+    // (undocumented)
+    frames: FixedGeometryCacheFrame[];
+    // (undocumented)
+    node: AssetHierarchyNode;
+    // (undocumented)
+    subMeshIndex: number;
+    // (undocumented)
+    times: Float32Array;
+    // (undocumented)
+    type: 'geometry-cache';
+}
+
+// @public
+export type AssetGeometryCacheAnimationTrack = AssetFixedGeometryCacheAnimationTrack | AssetPCAGeometryCacheAnimationTrack;
 
 // @public
 export class AssetHierarchyNode extends NamedObject {
@@ -587,6 +635,36 @@ export interface AssetPBRMaterialSG extends AssetPBRMaterialCommon {
 }
 
 // @public
+export interface AssetPCAGeometryCacheAnimationTrack {
+    // (undocumented)
+    bounds: [number, number, number, number, number, number][];
+    // (undocumented)
+    codec: 'pca';
+    // (undocumented)
+    node: AssetHierarchyNode;
+    // (undocumented)
+    normalBases?: Nullable<Float32Array[]>;
+    // (undocumented)
+    normalCoefficients?: Nullable<Float32Array[]>;
+    // (undocumented)
+    normalMean?: Nullable<Float32Array>;
+    // (undocumented)
+    positionBases: Float32Array[];
+    // (undocumented)
+    positionCoefficients: Float32Array[];
+    // (undocumented)
+    positionMean: Float32Array;
+    // (undocumented)
+    positionReference?: Nullable<Float32Array>;
+    // (undocumented)
+    subMeshIndex: number;
+    // (undocumented)
+    times: Float32Array;
+    // (undocumented)
+    type: 'geometry-cache';
+}
+
+// @public
 export interface AssetRotationTrack extends AssetAnimationTrack {
     // (undocumented)
     keyFrames: Record<number, Quaternion[]>;
@@ -685,6 +763,8 @@ export const ATMOSPHERIC_FOG_BIT: number;
 // @public
 export class BaseCameraController {
     constructor();
+    get enabled(): boolean;
+    set enabled(value: boolean);
     _getCamera(): Nullable<Camera>;
     lookAt(from: Vector3, to: Vector3, up: Vector3): void;
     onKeyDown(evt: IControllerKeydownEvent): boolean;
@@ -699,6 +779,7 @@ export class BaseCameraController {
     protected _onMouseUp(_evt: IControllerPointerUpEvent): boolean;
     onMouseWheel(evt: IControllerWheelEvent): boolean;
     protected _onMouseWheel(_evt: IControllerWheelEvent): boolean;
+    protected _onUpdate(): void;
     reset(): void;
     _setCamera(camera: Nullable<Camera>): void;
     update(): void;
@@ -732,12 +813,14 @@ export abstract class BaseLight extends GraphNode {
     constructor(scene: Scene, type: number);
     get diffuseAndIntensity(): Vector4;
     get directionAndCutoff(): Vector4;
+    get extraParams(): Vector4;
     get intensity(): number;
     set intensity(val: number);
     isDirectionLight(): this is DirectionalLight;
     isLight(): this is BaseLight;
     isPointLight(): this is PointLight;
     isPunctualLight(): this is PunctualLight;
+    isRectLight(): this is RectLight;
     isSpotLight(): this is SpotLight;
     get lightType(): number;
     get positionAndRange(): Immutable<Vector4>;
@@ -764,13 +847,7 @@ export class BaseSprite<M extends SpriteMaterial> extends BaseSprite_base implem
     computeWorldBoundingVolume(): BoundingBox | null;
     draw(ctx: DrawContext, renderQueue: Nullable<RenderQueue>, hash?: string): void;
     getBoneMatrices(): null;
-    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "getInstanceId"
-    //
-    // (undocumented)
     getInstanceId(_renderPass: RenderPass): string;
-    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "getInstanceUniforms"
-    //
-    // (undocumented)
     getInstanceUniforms(): Float32Array<ArrayBuffer>;
     getMaterial(): M;
     getMorphData(): null;
@@ -969,6 +1046,17 @@ export interface BluePrintUniformValue extends IRUniformValue {
 }
 
 // @public
+export interface BoneNode {
+    boneAxis?: Vector3;
+    children: BoneNode[];
+    depth: number;
+    index: number;
+    isFixed: boolean;
+    position: Vector3;
+    useForSurfaceCollision?: boolean;
+}
+
+// @public
 export class BoundingBox extends AABB implements BoundingVolume {
     constructor();
     constructor(box: AABB);
@@ -1039,6 +1127,8 @@ export class BoxFrameShape extends Shape<BoxCreationOptions> implements Clonable
         transform: null;
     };
     static generateData(options: DeepRequireOptionals<BoxCreationOptions>, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): "line-list";
+    // @override
+    raycast(ray: Ray): number | null;
     get type(): "BoxFrame";
 }
 
@@ -1059,9 +1149,20 @@ export class BoxShape extends Shape<BoxCreationOptions> implements Clonable<BoxS
     get depth(): number;
     static generateData(opt: BoxCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): "triangle-list";
     get height(): number;
+    // @override
+    raycast(ray: Ray): number | null;
     get type(): "Box";
     get width(): number;
 }
+
+// @public
+export function buildConstraints(rootPoints: BoneNode[], options: ConstraintBuildOptions): Constraint[];
+
+// @public
+export function buildForwardPlusGraph(graph: RenderGraph, ctx: DrawContext, renderQueue: RenderQueue, options: ForwardPlusOptions): RGHandle;
+
+// @public
+export function buildSurfaceFaces(rootPoints: BoneNode[], isLoop: boolean): number[];
 
 // @public
 export const BUILTIN_ASSET_TEST_CUBEMAP = "TEST_Cubemap";
@@ -1103,10 +1204,20 @@ export class Camera extends SceneNode {
     set clearStencil(v: number);
     get clipMask(): number;
     set clipMask(val: number);
+    get colorAdjust(): boolean;
+    set colorAdjust(val: boolean);
+    get colorAdjustContrast(): number;
+    set colorAdjustContrast(val: number);
+    get colorAdjustHue(): number;
+    set colorAdjustHue(val: number);
+    get colorAdjustSaturation(): number;
+    set colorAdjustSaturation(val: number);
+    get colorAdjustSharpen(): number;
+    set colorAdjustSharpen(val: number);
     get commandBufferReuse(): boolean;
     set commandBufferReuse(val: boolean);
     get compositor(): Compositor;
-    constructRay(x: number, y: number): Ray;
+    constructRay(x: number, y: number, viewportWidth?: number, viewportHeight?: number): Ray;
     get controller(): Nullable<BaseCameraController>;
     set controller(controller: Nullable<BaseCameraController>);
     get depthPrePass(): boolean;
@@ -1119,7 +1230,7 @@ export class Camera extends SceneNode {
     getAspect(): number;
     getFarPlane(): number;
     getFOV(): number;
-    getHistoryData(): CameraHistoryData;
+    getHistoryResourceManager(): Nullable<HistoryResourceManager>;
     getInvProjectionMatrix(): Immutable<Matrix4x4>;
     getNearPlane(): number;
     getProjectionMatrix(): Immutable<Matrix4x4>;
@@ -1145,6 +1256,10 @@ export class Camera extends SceneNode {
     set motionBlurStrength(val: number);
     get oit(): Nullable<OIT>;
     set oit(val: Nullable<OIT>);
+    get oitABufferLayers(): number;
+    set oitABufferLayers(val: number);
+    get oitMode(): CameraOITMode;
+    set oitMode(val: CameraOITMode);
     protected onDispose(): void;
     // (undocumented)
     pickAsync(posX: number, posY: number): Promise<Nullable<PickResult>>;
@@ -1214,12 +1329,6 @@ export class Camera extends SceneNode {
 }
 
 // @public
-export type CameraHistoryData = {
-    prevColorTex: Nullable<BaseTexture>;
-    prevMotionVectorTex: Nullable<BaseTexture>;
-};
-
-// @public
 export class CameraNearFarNode extends BaseGraphNode {
     constructor();
     static getSerializationCls(): {
@@ -1231,6 +1340,9 @@ export class CameraNearFarNode extends BaseGraphNode {
     toString(): string;
     protected validate(): string;
 }
+
+// @public
+export type CameraOITMode = 'none' | 'weighted' | 'abuffer';
 
 // @public
 export class CameraPositionNode extends BaseGraphNode {
@@ -1246,14 +1358,65 @@ export class CameraPositionNode extends BaseGraphNode {
 }
 
 // @public
+export class CameraVectorNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): {
+        ctor: typeof CameraVectorNode;
+        name: string;
+        getProps(): never[];
+    };
+    protected getType(id: number): "float" | "vec3";
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
 export interface CapsuleCollider extends SpringCollider {
     end: Vector3;
     localEndOffset?: Vector3;
+    localRadius?: number;
+    localRadiusScaleRef?: number;
     localStartOffset?: Vector3;
     radius: number;
     start: Vector3;
     // (undocumented)
     type: 'capsule';
+}
+
+// @public
+export interface CapsuleCreationOptions extends ShapeCreationOptions {
+    anchor?: number;
+    height?: number;
+    heightDetail?: number;
+    hemisphereDetail?: number;
+    radialDetail?: number;
+    radius?: number;
+}
+
+// @public
+export class CapsuleShape extends Shape<CapsuleCreationOptions> implements Clonable<CapsuleShape> {
+    constructor(options?: CapsuleCreationOptions);
+    // (undocumented)
+    clone(): this;
+    // (undocumented)
+    static _defaultOptions: {
+        radius: number;
+        height: number;
+        radialDetail: number;
+        hemisphereDetail: number;
+        heightDetail: number;
+        anchor: number;
+        needNormal: boolean;
+        needTangent: boolean;
+        needUV: boolean;
+        transform: null;
+    };
+    static generateData(opt: CapsuleCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): "triangle-list";
+    get height(): number;
+    get radius(): number;
+    raycast(ray: Ray): number | null;
+    get totalHeight(): number;
+    get type(): "Capsule";
 }
 
 // @public
@@ -1287,6 +1450,9 @@ export class CeilNode extends GenericMathNode {
 }
 
 // @public
+export function checkSurfaceCollision(ptA: Vector3, ptB: Vector3, ptC: Vector3, colliderPos: Vector3, colR: ColliderR, colRW: ColliderRW, out?: SurfaceCheckResult): SurfaceCheckResult;
+
+// @public
 export class ClampNode extends GenericMathNode {
     constructor();
     // (undocumented)
@@ -1316,13 +1482,9 @@ export class ClipmapTerrain extends ClipmapTerrain_base implements Drawable {
     getPickTarget(): PickTarget;
     getPrimitive(): null;
     getQueueType(): number;
-    // (undocumented)
-    set grassAssetId(val: string);
     get grassRenderer(): GrassRenderer;
     get heightMap(): Texture2D<unknown> | null;
     set heightMap(val: Texture2D<unknown> | null);
-    // (undocumented)
-    set heightMapAssetId(val: string);
     isClipmapTerrain(): this is ClipmapTerrain;
     isUnlit(): boolean;
     get material(): ClipmapTerrainMaterial | null;
@@ -1338,8 +1500,6 @@ export class ClipmapTerrain extends ClipmapTerrain_base implements Drawable {
     get sizeZ(): number;
     set sizeZ(val: number);
     get splatMap(): Texture2D<unknown> | _zephyr3d_device.Texture2DArray<unknown> | null;
-    // (undocumented)
-    set splatMapAssetId(val: string);
     updateBoundingBox(): void;
     updatePerCamera(camera: Camera, _elapsedInSeconds: number, _deltaInSeconds: number): void;
     updateRegion(): void;
@@ -1399,8 +1559,6 @@ export class ClipmapTerrainMaterial extends ClipmapTerrainMaterial_base {
     // (undocumented)
     protected onDispose(): void;
     // (undocumented)
-    set region(val: Vector4);
-    // (undocumented)
     sampleDetailNormalMap(scope: PBInsideFunctionScope, index: number, texCoord: PBShaderExp): PBShaderExp;
     // (undocumented)
     sampleHeightMap(scope: PBInsideFunctionScope, uv: PBShaderExp, pos: PBShaderExp, levelStart: PBShaderExp, levelDiff: PBShaderExp): any;
@@ -1421,9 +1579,75 @@ export class ClipmapTerrainMaterial extends ClipmapTerrainMaterial_base {
     // (undocumented)
     supportLighting(): boolean;
     // (undocumented)
-    set terrainScale(val: Vector3);
-    // (undocumented)
     vertexShader(scope: PBFunctionScope): void;
+}
+
+// @public
+export const enum ColliderForce {
+    Off = 0,
+    Pull = 2,
+    Push = 1
+}
+
+// @public
+export interface ColliderR {
+    forceType: ColliderForce;
+    friction: number;
+    height: number;
+    isInverseCollider: boolean;
+    radius: number;
+    radiusTailScale: number;
+}
+
+// @public
+export interface ColliderRW {
+    boundsCenter: Vector3;
+    boundsRadius: number;
+    directionCurrent: Vector3;
+    directionCurrentTransform: Quaternion;
+    directionPreviousTransform: Quaternion;
+    enabled: number;
+    localBoundsMax: Vector3;
+    localBoundsMin: Vector3;
+    positionCurrent: Vector3;
+    positionCurrentTransform: Vector3;
+    positionPreviousTransform: Vector3;
+    radius: number;
+    worldScale: Vector3;
+    worldToLocal: Matrix4x4;
+}
+
+// @public
+export function collisionDetection(colR: ColliderR, colRW: ColliderRW, point1: Vector3, point2: Vector3, out?: LineCollisionResult): LineCollisionResult;
+
+// @public
+export function collisionDetectionCapsule(colR: ColliderR, colRW: ColliderRW, point1: Vector3, point2: Vector3, out?: LineCollisionResult): LineCollisionResult;
+
+// @public
+export function collisionDetectionSphere(center: Vector3, radius: number, point1: Vector3, point2: Vector3, out?: LineCollisionResult): LineCollisionResult;
+
+// @public (undocumented)
+export interface CollisionResult {
+    // (undocumented)
+    hit: boolean;
+    // (undocumented)
+    point: Vector3;
+}
+
+// @public
+export class ColorAdjust extends AbstractPostEffect {
+    constructor();
+    apply(ctx: DrawContext, inputColorTexture: Texture2D, _sceneDepthTexture: Texture2D, srgbOutput: boolean): void;
+    get contrast(): number;
+    set contrast(val: number);
+    get hue(): number;
+    set hue(val: number);
+    requireDepthAttachment(): boolean;
+    requireLinearDepthTexture(): boolean;
+    get saturation(): number;
+    set saturation(val: number);
+    get sharpen(): number;
+    set sharpen(val: number);
 }
 
 // @public
@@ -1467,6 +1691,13 @@ export class CompDivNode extends GenericMathNode {
 }
 
 // @public
+export interface CompiledRenderGraph {
+    readonly lifetimes: ReadonlyMap<number, RGResourceLifetime>;
+    // Warning: (ae-forgotten-export) The symbol "RGPass" needs to be exported by the entry point index.d.ts
+    readonly orderedPasses: ReadonlyArray<RGPass>;
+}
+
+// @public
 export class CompMulNode extends GenericMathNode {
     constructor();
     // (undocumented)
@@ -1507,6 +1738,18 @@ export class CompSubNode extends GenericMathNode {
         getProps(): never[];
     };
 }
+
+// @public
+export function computeMaxDepth(rootPoints: BoneNode[]): number;
+
+// @public
+export function computeNearestPoints(posP: Vector3, dirP: Vector3, posQ: Vector3, dirQ: Vector3, out?: NearestPointsResult): {
+    tP: number;
+    tQ: number;
+    pointOnP: Vector3;
+    pointOnQ: Vector3;
+    sqrDistance: number;
+};
 
 // @public
 export class ConstantBooleanNode extends BaseGraphNode {
@@ -1690,6 +1933,60 @@ export class ConstantVec4Node extends BaseGraphNode {
 }
 
 // @public
+export interface Constraint {
+    indexA: number;
+    indexB: number;
+    isCollision: number;
+    length: number;
+    type: ConstraintType;
+}
+
+// @public
+export interface ConstraintBuildOptions {
+    bendingHorizontal: boolean;
+    bendingVertical: boolean;
+    collideShear: boolean;
+    collideStructuralHorizontal: boolean;
+    collideStructuralVertical: boolean;
+    enableSurfaceCollision: boolean;
+    isLoop: boolean;
+    shear: boolean;
+    structuralHorizontal: boolean;
+    structuralVertical: boolean;
+}
+
+// @public
+export const enum ConstraintType {
+    Bending_Horizontal = 4,
+    Bending_Vertical = 3,
+    Shear = 2,
+    Structural_Horizontal = 1,
+    Structural_Vertical = 0
+}
+
+// @public
+export interface ControllerConfig {
+    angleLimitConfig: AngleLimitConfig;
+    blendRatio: number;
+    constraintOptions: ConstraintBuildOptions;
+    constraintShrinkLimit: number;
+    curves: PhysicsCurves;
+    enableBroadPhase: boolean;
+    enableSurfaceCollision: boolean;
+    fakeWavePower: number;
+    fakeWaveSpeed: number;
+    gravity: Vector3;
+    isFakeWave: boolean;
+    preserveTwist: boolean;
+    relaxation: number;
+    rootRotateLimit: number;
+    rootSlideLimit: number;
+    stabilizationFrameRate: number;
+    subSteps: number;
+    windForce: Vector3;
+}
+
+// @public
 export class CopyBlitter extends Blitter {
     // @override
     protected calcHash(): string;
@@ -1723,6 +2020,12 @@ export class CosNode extends GenericMathNode {
 export function createCapsuleCollider(startOrOffset: Vector3, endOrOffset: Vector3, radius: number, node?: SceneNode): CapsuleCollider;
 
 // @public
+export function createGeometryCacheState(frame: Pick<GeometryCacheFrame, 'positions' | 'normals'>): GeometryCacheState;
+
+// @public
+export function createGPUClothWrapBindingData(source: any, target: any): Promise<GPUClothWrapBindingData>;
+
+// @public
 export function createPlaneCollider(pointOrOffset: Vector3, normal: Vector3, node?: SceneNode): PlaneCollider;
 
 // @public
@@ -1739,6 +2042,9 @@ export function createSpringParticle(position: Vector3, options?: {
     node?: SceneNode;
     originalRotation?: Quaternion;
 }): SpringParticle;
+
+// @public
+export function createTransformAccess(obj: SceneNode): TransformAccess;
 
 // @public
 export class CrossProductNode extends GenericMathNode {
@@ -2024,6 +2330,7 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
         transform: null;
     };
     static generateData(opt: CylinderCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): "triangle-list";
+    raycast(ray: Ray): number | null;
     get type(): "Cylinder";
 }
 
@@ -2061,7 +2368,7 @@ export function decodeNormalizedFloatFromRGBA(scope: PBInsideFunctionScope, valu
 // @public
 export function decodeRGBM(scope: PBInsideFunctionScope, rgbm: PBShaderExp, maxRange: PBShaderExp | number): PBShaderExp;
 
-// @public (undocumented)
+// @public
 export function defineProps(accessors: PropertyAccessor<any, 'DUMMY'>[]): PropertyAccessor[];
 
 // @public
@@ -2087,6 +2394,12 @@ export class DepthPass extends RenderPass {
     // (undocumented)
     get transmission(): boolean;
     set transmission(val: boolean);
+}
+
+// @public
+export class DevicePoolAllocator implements RGTextureAllocator<Texture2D> {
+    allocate(desc: RGTextureDesc, size: RGResolvedSize): Texture2D;
+    release(texture: Texture2D): void;
 }
 
 // @public
@@ -2155,6 +2468,7 @@ export interface Drawable {
     needSceneColor(): boolean;
     needSceneDepth(): boolean;
     pushRenderQueueRef(ref: RenderQueueRef): void;
+    updateState(): void;
 }
 
 // @public
@@ -2249,10 +2563,14 @@ export class Engine {
         renderable: DRef<IRenderable>;
         hook: Nullable<IRenderHook>;
     }[];
-    attachScript<T extends Host>(host: Nullable<T>, module: string): Promise<Nullable<RuntimeScript<T>>>;
+    attachScript<T extends Host>(host: Nullable<T>, module: string, config?: Nullable<RuntimeScriptConfig>): Promise<Nullable<RuntimeScript<T>>>;
     detachAllScripts(): void;
     detachScript<T extends Host>(host: T, idOrInstance: string | RuntimeScript<T>): void;
     getScriptObjects<T extends RuntimeScript<any>>(host: unknown): T[];
+    loadRuntimeScriptClass<T extends Host = Host>(module: string): Promise<Nullable<{
+        url: string;
+        cls: GenericConstructor<RuntimeScript<T>>;
+    }>>;
     // (undocumented)
     loadSceneFromFile(path: string): Promise<Nullable<Scene>>;
     // (undocumented)
@@ -2270,6 +2588,9 @@ export class Engine {
     get VFS(): VFS;
     set VFS(vfs: VFS);
 }
+
+// @public
+export function ensureGeometryCacheMeshBinding(meshBindings: WeakMap<Mesh, GeometryCacheMeshBinding>, mesh: Mesh, state: GeometryCacheState, errorPrefix: string): GeometryCacheMeshBinding;
 
 // @public
 export class EnvConstantAmbient extends EnvironmentLighting {
@@ -2389,6 +2710,9 @@ export class EnvShIBL extends EnvironmentLighting {
 }
 
 // @public
+export const EPSILON = 0.001;
+
+// @public
 export class EqualNode extends GenericMathNode {
     constructor();
     // (undocumented)
@@ -2398,6 +2722,9 @@ export class EqualNode extends GenericMathNode {
         getProps(): never[];
     };
 }
+
+// @public
+export function executeForwardPlusGraph(ctx: DrawContext): void;
 
 // @public
 export class Exp2Node extends GenericMathNode {
@@ -2527,6 +2854,45 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     set wind(val: Immutable<Vector2>);
 }
 
+// @public (undocumented)
+export type FixedGeometryCacheFrame = GeometryCacheFrame;
+
+// @public (undocumented)
+export type FixedGeometryCacheState = GeometryCacheState;
+
+// @public
+export class FixedGeometryCacheTrack extends AnimationTrack<FixedGeometryCacheState> {
+    constructor(times?: Float32Array, frames?: FixedGeometryCacheFrame[], embedded?: boolean);
+    // (undocumented)
+    applyState(target: object, state: FixedGeometryCacheState): void;
+    // (undocumented)
+    calculateState(_target: object, currentTime: number): GeometryCacheState;
+    // (undocumented)
+    get frames(): FixedGeometryCacheFrame[];
+    set frames(value: FixedGeometryCacheFrame[]);
+    // (undocumented)
+    getBlendId(): string;
+    // (undocumented)
+    getDuration(): number;
+    // (undocumented)
+    mixState(a: FixedGeometryCacheState, b: FixedGeometryCacheState, t: number): {
+        positions: Float32Array<ArrayBuffer>;
+        normals: Nullable<Float32Array<ArrayBufferLike>>;
+        boundingBox: BoundingBox;
+    };
+    // (undocumented)
+    reset(target: object): void;
+    // (undocumented)
+    get times(): Float32Array;
+    set times(value: Float32Array);
+}
+
+// @public
+export interface FlatPlane {
+    distance: number;
+    normal: Vector3;
+}
+
 // @public
 export class FloorNode extends GenericMathNode {
     constructor();
@@ -2553,6 +2919,17 @@ export class FmaNode extends GenericMathNode {
 export type FogType = 'height_fog' | 'none';
 
 // @public
+export interface ForwardPlusOptions {
+    depthPrepass: boolean;
+    gpuPicking: boolean;
+    hiZ: boolean;
+    motionVectors: boolean;
+    needSceneColor: boolean;
+    ssr: boolean;
+    ssrCalcThickness: boolean;
+}
+
+// @public
 export class FPSCameraController extends BaseCameraController {
     constructor(options?: FPSCameraControllerOptions);
     // @override
@@ -2566,10 +2943,10 @@ export class FPSCameraController extends BaseCameraController {
     // @override
     protected _onMouseUp(evt: IControllerPointerUpEvent): boolean;
     // @override
+    protected _onUpdate(): void;
+    // @override
     reset(): void;
     setOptions(opt?: FPSCameraControllerOptions): void;
-    // @override
-    update(): void;
 }
 
 // @public
@@ -2721,6 +3098,28 @@ export abstract class GenericMathNode extends BaseGraphNode {
 }
 
 // @public
+export type GeometryCacheFrame = {
+    positions: Float32Array;
+    normals?: Nullable<Float32Array>;
+    boundingBox: BoundingBox;
+};
+
+// @public
+export type GeometryCacheMeshBinding = {
+    originalPrimitive: Primitive;
+    primitive: Primitive;
+    positionBuffer: StructuredBuffer;
+    normalBuffer: Nullable<StructuredBuffer>;
+};
+
+// @public
+export type GeometryCacheState = {
+    positions: Float32Array;
+    normals?: Nullable<Float32Array>;
+    boundingBox: BoundingBox;
+};
+
+// @public
 export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
     constructor();
     applyWaterBindGroup(bindGroup: BindGroup): void;
@@ -2771,6 +3170,136 @@ export function getEngine(): Engine;
 export function getInput(): InputManager;
 
 // @public
+export function getRuntimeScriptProperties(ctor: GenericConstructor): RuntimeScriptPropertyInfo[];
+
+// @public
+export class GPUClothSystem {
+    constructor(options?: GPUClothSystemOptions);
+    // (undocumented)
+    addCollider(collider: SpringCollider): void;
+    // (undocumented)
+    bindToScene(scene: Nullable<Scene>): void;
+    // (undocumented)
+    clearColliders(): void;
+    // (undocumented)
+    clearWrapTargets(): void;
+    // (undocumented)
+    get colliders(): SpringCollider[];
+    set colliders(value: SpringCollider[]);
+    // (undocumented)
+    static createFromMesh(mesh: {
+        primitive: Nullable<Primitive>;
+        scene?: Nullable<Scene>;
+    }, options?: Omit<GPUClothSystemOptions, 'primitive' | 'positionData' | 'indexData' | 'scene'>): Promise<GPUClothSystem>;
+    // (undocumented)
+    static createFromPrimitive(primitive: Primitive, options?: Omit<GPUClothSystemOptions, 'primitive' | 'positionData' | 'indexData'>): Promise<GPUClothSystem>;
+    // (undocumented)
+    get damping(): number;
+    set damping(value: number);
+    // (undocumented)
+    get disabledReason(): Nullable<string>;
+    // (undocumented)
+    dispose(): void;
+    // (undocumented)
+    get dynamicFriction(): number;
+    set dynamicFriction(value: number);
+    // (undocumented)
+    get enabled(): boolean;
+    set enabled(value: boolean);
+    // (undocumented)
+    get gravity(): Vector3;
+    set gravity(value: Vector3);
+    // (undocumented)
+    get poseFollow(): number;
+    set poseFollow(value: number);
+    // (undocumented)
+    removeCollider(collider: SpringCollider): boolean;
+    // (undocumented)
+    setWrapTargets(targets: any[]): Promise<void>;
+    // (undocumented)
+    setWrapTargetsFromBindingData(targets: GPUClothWrapBindingTarget[]): void;
+    // (undocumented)
+    get solverIterations(): number;
+    set solverIterations(value: number);
+    // (undocumented)
+    get staticFriction(): number;
+    set staticFriction(value: number);
+    // (undocumented)
+    get stiffness(): number;
+    set stiffness(value: number);
+    // (undocumented)
+    get substeps(): number;
+    set substeps(value: number);
+    // (undocumented)
+    get supported(): boolean;
+    // (undocumented)
+    unbindFromScene(): void;
+    // (undocumented)
+    update(deltaTime: number): void;
+    // (undocumented)
+    get vertexCount(): number;
+}
+
+// @public
+export type GPUClothSystemOptions = {
+    enabled?: boolean;
+    device?: Nullable<AbstractDevice>;
+    primitive?: Nullable<Primitive>;
+    collisionSpaceNode?: any;
+    positionData?: Float32Array<ArrayBuffer>;
+    indexData?: Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>;
+    skinningBlendIndices?: Float32Array<ArrayBuffer>;
+    skinningBlendWeights?: Float32Array<ArrayBuffer>;
+    pinnedVertexWeights?: ArrayLike<number>;
+    pinnedVertexIndices?: number[];
+    gravity?: Vector3;
+    damping?: number;
+    dynamicFriction?: number;
+    staticFriction?: number;
+    stiffness?: number;
+    poseFollow?: number;
+    substeps?: number;
+    solverIterations?: number;
+    maxNeighbors?: number;
+    workgroupSize?: number;
+    colliders?: SpringCollider[];
+    maxTrianglesPerVertex?: number;
+    rebuildNormals?: boolean;
+    scene?: Nullable<Scene>;
+    autoUpdate?: boolean;
+};
+
+// @public
+export type GPUClothWrapBindingData = {
+    version: 4;
+    vertexCount: number;
+    sourceVertexCount: number;
+    influenceCount: number;
+    maxOffsetDistance: number;
+    sourceTriangleIndices: string;
+    sourceBarycentrics: string;
+    targetLocalOffsets: string;
+};
+
+// @public
+export type GPUClothWrapBindingTarget = {
+    target: any;
+    data: GPUClothWrapBindingData;
+};
+
+// @public
+export interface GrabberR {
+    force: number;
+    radius: number;
+}
+
+// @public
+export interface GrabberRW {
+    enabled: number;
+    position: Vector3;
+}
+
+// @public
 export function gradient(scope: PBInsideFunctionScope, p: PBShaderExp, t: PBShaderExp | number): PBShaderExp;
 
 // @public
@@ -2783,8 +3312,6 @@ export class GraphNode extends SceneNode {
     isBatchable(): this is BatchDrawable;
     // @override
     isGraphNode(): this is GraphNode;
-    // (undocumented)
-    set octreeNode(node: Nullable<OctreeNode>);
 }
 
 // @public
@@ -2948,7 +3475,115 @@ export class Hash3Node extends GenericMathNode {
 export const HEIGHT_FOG_BIT: number;
 
 // @public
+export class HistoryResourceManager<TTexture = Texture2D> {
+    constructor(allocator: RGTextureAllocator<TTexture>);
+    dispose(): void;
+    getCurrent(name: string): TTexture;
+    getPrevious(name: string): TTexture;
+    has(name: string): boolean;
+    register(name: string, desc: RGTextureDesc, size: RGResolvedSize): void;
+    registerWithTexture(name: string, desc: RGTextureDesc, size: RGResolvedSize, initialTexture: TTexture): void;
+    get size(): number;
+    swap(): void;
+    unregister(name: string): boolean;
+    updateCurrent(name: string, texture: TTexture): void;
+}
+
+// @public
 export type Host = IDisposable;
+
+// @public
+export enum HumanoidBodyRig {
+    // (undocumented)
+    Chest = "Chest",
+    // (undocumented)
+    Head = "Head",
+    // (undocumented)
+    Hips = "Hips",
+    // (undocumented)
+    LeftFoot = "LeftFoot",
+    // (undocumented)
+    LeftHand = "LeftHand",
+    // (undocumented)
+    LeftLowerArm = "LeftLowerArm",
+    // (undocumented)
+    LeftLowerLeg = "LeftLowerLeg",
+    // (undocumented)
+    LeftShoulder = "LeftShoulder",
+    // (undocumented)
+    LeftToes = "LeftToes",
+    // (undocumented)
+    LeftUpperArm = "LeftUpperArm",
+    // (undocumented)
+    LeftUpperLeg = "LeftUpperLeg",
+    // (undocumented)
+    Neck = "Neck",
+    // (undocumented)
+    RightFoot = "RightFoot",
+    // (undocumented)
+    RightHand = "RightHand",
+    // (undocumented)
+    RightLowerArm = "RightLowerArm",
+    // (undocumented)
+    RightLowerLeg = "RightLowerLeg",
+    // (undocumented)
+    RightShoulder = "RightShoulder",
+    // (undocumented)
+    RightToes = "RightToes",
+    // (undocumented)
+    RightUpperArm = "RightUpperArm",
+    // (undocumented)
+    RightUpperLeg = "RightUpperLeg",
+    // (undocumented)
+    Spine = "Spine",
+    // (undocumented)
+    UpperChest = "UpperChest"
+}
+
+// @public
+export enum HumanoidHandRig {
+    // (undocumented)
+    IndexDistal = "IndexDistal",
+    // (undocumented)
+    IndexIntermediate = "IndexIntermediate",
+    // (undocumented)
+    IndexProximal = "IndexProximal",
+    // (undocumented)
+    MiddleDistal = "MiddleDistal",
+    // (undocumented)
+    MiddleIntermediate = "MiddleIntermediate",
+    // (undocumented)
+    MiddleProximal = "MiddleProximal",
+    // (undocumented)
+    PinkyDistal = "PinkyDistal",
+    // (undocumented)
+    PinkyIntermediate = "PinkyIntermediate",
+    // (undocumented)
+    PinkyProximal = "PinkyProximal",
+    // (undocumented)
+    RingDistal = "RingDistal",
+    // (undocumented)
+    RingIntermediate = "RingIntermediate",
+    // (undocumented)
+    RingProximal = "RingProximal",
+    // (undocumented)
+    ThumbDistal = "ThumbDistal",
+    // (undocumented)
+    ThumbIntermediate = "ThumbIntermediate",
+    // (undocumented)
+    ThumbProximal = "ThumbProximal"
+}
+
+// @public
+export type HumanoidJointMapping<T extends {
+    name: string;
+    parent: Nullable<T>;
+    children: T[];
+}> = {
+    body: Record<HumanoidBodyRig, T>;
+    leftHand?: Record<HumanoidHandRig, T>;
+    rightHand?: Record<HumanoidHandRig, T>;
+};
 
 // @public
 export interface IAttachedScript {
@@ -3079,8 +3714,12 @@ export interface IKJoint {
 export class IKModifier<Solver extends IKSolver = IKSolver> extends SkeletonModifier {
     constructor(solver: Solver, target: Vector3, weight?: number);
     apply(_skeleton: Skeleton, _deltaTime: number): void;
+    // (undocumented)
+    protected _getWeight(): number;
     reset(): void;
     setTarget(target: Vector3): void;
+    // (undocumented)
+    protected _setWeight(value: number): void;
     get solver(): Solver;
     get target(): Vector3;
 }
@@ -3143,7 +3782,7 @@ export type IMixinLight = {
     calculateLightAttenuation(scope: PBInsideFunctionScope, type: PBShaderExp, worldPos: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp): PBShaderExp;
     calculateLightDirection(scope: PBInsideFunctionScope, type: PBShaderExp, worldPos: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp): PBShaderExp;
     calculateShadow(scope: PBInsideFunctionScope, worldPos: PBShaderExp, NoL: PBShaderExp): PBShaderExp;
-    forEachLight(scope: PBInsideFunctionScope, callback: (this: PBInsideFunctionScope, type: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp, colorIntensity: PBShaderExp, shadow: boolean) => void): void;
+    forEachLight(scope: PBInsideFunctionScope, callback: (this: PBInsideFunctionScope, type: PBShaderExp, posRange: PBShaderExp, dirCutoff: PBShaderExp, colorIntensity: PBShaderExp, extra: PBShaderExp, shadow: boolean) => void): void;
 } & TextureMixinInstanceTypes<['normal']> & IMixinAlbedoColor;
 
 // Warning: (ae-forgotten-export) The symbol "IMixinPBRBRDF" needs to be exported by the entry point index.d.ts
@@ -3154,7 +3793,7 @@ export type IMixinPBRBluePrint = {
     getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc;
     getCommonData(scope: PBInsideFunctionScope, data: PBShaderExp, viewVec: PBShaderExp, worldPos: PBShaderExp, worldNorm: PBShaderExp, worldTangent: PBShaderExp, worldBinormal: PBShaderExp, vertexColor: PBShaderExp, vertexUV: PBShaderExp, ir: MaterialBlueprintIR): void;
     calculateCommonData(scope: PBInsideFunctionScope, ir: MaterialBlueprintIR, viewVec: PBShaderExp, worldPos: PBShaderExp, worldNorm: PBShaderExp, worldTangent: PBShaderExp, worldBinormal: PBShaderExp, vertexColor: PBShaderExp, vertexUV: PBShaderExp, data: PBShaderExp): void;
-    directLighting(scope: PBInsideFunctionScope, lightDir: PBShaderExp, lightColor: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp): void;
+    directLighting(scope: PBInsideFunctionScope, lightDir: PBShaderExp, lightColor: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, diffuseScale: PBShaderExp, specularScale: PBShaderExp, sourceRadiusFactor: PBShaderExp, outColor: PBShaderExp): void;
     indirectLighting(scope: PBInsideFunctionScope, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp, outRoughness?: PBShaderExp): void;
 } & IMixinPBRBRDF & IMixinLight;
 
@@ -3185,7 +3824,8 @@ export type IMixinPBRCommon = {
     getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc;
     calculateEmissiveColor(scope: PBInsideFunctionScope): PBShaderExp;
     getF0(scope: PBInsideFunctionScope): PBShaderExp;
-    directLighting(scope: PBInsideFunctionScope, lightDir: PBShaderExp, lightColor: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp): void;
+    directLighting(scope: PBInsideFunctionScope, lightDir: PBShaderExp, lightColor: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, diffuseScale: PBShaderExp, specularScale: PBShaderExp, sourceRadiusFactor: PBShaderExp, outColor: PBShaderExp): void;
+    directRectLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, posRange: PBShaderExp, axisX: PBShaderExp, axisY: PBShaderExp, colorIntensity: PBShaderExp, outColor: PBShaderExp): void;
     indirectLighting(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp, outRoughness?: PBShaderExp): void;
 } & TextureMixinInstanceTypes<[
 'occlusion',
@@ -3206,12 +3846,22 @@ export type IMixinPBRMetallicRoughness = {
     metallic: number;
     roughness: number;
     specularFactor: Vector4;
+    reflectionMode: PBRReflectionMode;
+    anisotropy: number;
+    anisotropyDirection: number;
+    anisotropyDirectionScaleBias: Vector2;
     PBRLight(scope: PBInsideFunctionScope, worldPos: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, albedo: PBShaderExp, TBN: PBShaderExp, outRoughness?: PBShaderExp): PBShaderExp;
     calculateMetallic(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp;
     calculateRoughness(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp;
     calculateSpecularFactor(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp;
     calculateCommonData(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp, viewVec: PBShaderExp, TBN: PBShaderExp, data: PBShaderExp): void;
-} & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<['metallicRoughness', 'occlusion', 'specular', 'specularColor']>;
+} & IMixinPBRCommon & IMixinLight & TextureMixinInstanceTypes<[
+'metallicRoughness',
+'occlusion',
+'specular',
+'specularColor',
+'anisotropyDirection'
+]>;
 
 // @public
 export type IMixinPBRSpecularGlossiness = {
@@ -3373,6 +4023,145 @@ export interface IRUniformValue {
     value: number[];
 }
 
+// @public
+export function isGPUClothSupported(device?: Nullable<AbstractDevice>): boolean;
+
+// @public
+export type JointChainConfig = {
+    systemRoot: SceneNode;
+    chains: {
+        start: SceneNode;
+        end: SceneNode;
+    }[];
+};
+
+// @public (undocumented)
+export interface JointDynamicsColliderHandle {
+    // (undocumented)
+    readonly id: number;
+    // (undocumented)
+    readonly type: 'collider';
+}
+
+// @public (undocumented)
+export interface JointDynamicsFlatPlaneHandle {
+    // (undocumented)
+    readonly id: number;
+    // (undocumented)
+    readonly type: 'flatPlane';
+}
+
+// @public (undocumented)
+export interface JointDynamicsGrabberHandle {
+    // (undocumented)
+    readonly id: number;
+    // (undocumented)
+    readonly type: 'grabber';
+}
+
+// @public
+export class JointDynamicsModifier extends SkeletonModifier {
+    constructor(jointDynamicsSystem: JointDynamicsSystem);
+    apply(_skeleton: Skeleton, deltaTime: number): void;
+    // (undocumented)
+    protected _getWeight(): number;
+    get jointDynamicsSystem(): JointDynamicsSystem;
+    reset(): void;
+    // (undocumented)
+    protected _setWeight(value: number): void;
+    // (undocumented)
+    warp(): void;
+}
+
+// @public
+export class JointDynamicsSystem {
+    constructor(config: JointDynamicSystemConfig, colliders?: {
+        r: ColliderR;
+        transform: TransformAccess;
+    }[], grabbers?: {
+        r: GrabberR;
+        transform: TransformAccess;
+        enabled: boolean;
+    }[], flatPlanes?: {
+        up: Vector3;
+        position: Vector3;
+    }[]);
+    addCapsuleCollider(radius: number, height: number, transform?: SceneNode, radiusTailScale?: number, friction?: number, inversed?: boolean): JointDynamicsColliderHandle;
+    addCollider(r: ColliderR, transform?: SceneNode): JointDynamicsColliderHandle;
+    addFlatPlane(up: Vector3, position: Vector3): JointDynamicsFlatPlaneHandle;
+    addGrabber(r: GrabberR, transform?: SceneNode): JointDynamicsGrabberHandle;
+    addSphereCollider(radius: number, transform?: SceneNode, friction?: number, inversed?: boolean): JointDynamicsColliderHandle;
+    get controller(): JointDynamicsSystemController;
+    removeCollider(handle: JointDynamicsColliderHandle): boolean;
+    removeColliderAt(index: number): boolean;
+    removeFlatPlane(handle: JointDynamicsFlatPlaneHandle): boolean;
+    removeFlatPlaneAt(index: number): boolean;
+    removeGrabber(handle: JointDynamicsGrabberHandle): boolean;
+    removeGrabberAt(index: number): boolean;
+    setColliderEnabled(handle: JointDynamicsColliderHandle, enabled: boolean): boolean;
+    setFlatPlaneEnabled(handle: JointDynamicsFlatPlaneHandle, enabled: boolean): boolean;
+    setGrabberEnabled(handle: JointDynamicsGrabberHandle, enabled: boolean): boolean;
+    update(deltaTime: number): void;
+}
+
+// @public
+export class JointDynamicsSystemController {
+    constructor(config: ControllerConfig);
+    addCollider(r: ColliderR, transform: TransformAccess): JointDynamicsColliderHandle;
+    addFlatPlane(up: Vector3, position: Vector3): JointDynamicsFlatPlaneHandle;
+    addGrabber(r: GrabberR, transform: TransformAccess, enabled?: boolean): JointDynamicsGrabberHandle;
+    get blendRatio(): number;
+    set blendRatio(value: number);
+    get colliderCount(): number;
+    fadeIn(seconds: number): void;
+    fadeOut(seconds: number): void;
+    fixPoint(index: number): void;
+    get flatPlaneCount(): number;
+    getResults(): Array<{
+        position: Vector3;
+        rotation: Quaternion;
+    }>;
+    get grabberCount(): number;
+    initialize(rootTransform: TransformAccess, rootPoints: BoneNode[], pointTransforms: TransformAccess[], colliders: Array<{
+        r: ColliderR;
+        transform: TransformAccess;
+    }>, grabbers: Array<{
+        r: GrabberR;
+        transform: TransformAccess;
+        enabled: boolean;
+    }>, flatPlanes: Array<{
+        up: Vector3;
+        position: Vector3;
+    }>): void;
+    isPointFixed(index: number): boolean;
+    get pointCount(): number;
+    releasePoint(index: number): void;
+    removeCollider(handle: JointDynamicsColliderHandle): boolean;
+    removeColliderAt(index: number): boolean;
+    removeFlatPlane(handle: JointDynamicsFlatPlaneHandle): boolean;
+    removeFlatPlaneAt(index: number): boolean;
+    removeGrabber(handle: JointDynamicsGrabberHandle): boolean;
+    removeGrabberAt(index: number): boolean;
+    reset(): void;
+    setBroadPhaseEnabled(enabled: boolean): void;
+    setColliderEnabled(handle: JointDynamicsColliderHandle, enabled: boolean): boolean;
+    setColliderEnabledAt(index: number, enabled: boolean): boolean;
+    setFlatPlaneEnabled(handle: JointDynamicsFlatPlaneHandle, enabled: boolean): boolean;
+    setFlatPlaneEnabledAt(index: number, enabled: boolean): boolean;
+    setGrabberEnabled(handle: JointDynamicsGrabberHandle, enabled: boolean): boolean;
+    setGrabberEnabledAt(index: number, enabled: boolean): boolean;
+    setPaused(paused: boolean): void;
+    setWindForce(wind: Vector3): void;
+    step(deltaTime: number): void;
+    warp(): void;
+}
+
+// @public
+export type JointDynamicSystemConfig = {
+    chainConfig: JointChainConfig;
+    controllerConfig?: DeepPartial<ControllerConfig, 2>;
+};
+
 // Warning: (ae-forgotten-export) The symbol "LambertMaterial_base" needs to be exported by the entry point index.d.ts
 //
 // @public
@@ -3411,10 +4200,25 @@ export const LIGHT_TYPE_NONE = 0;
 export const LIGHT_TYPE_POINT = 2;
 
 // @public
+export const LIGHT_TYPE_RECT = 4;
+
+// @public
 export const LIGHT_TYPE_SPOT = 3;
 
 // @public
 export function linearToGamma(scope: PBInsideFunctionScope, color: PBShaderExp): PBShaderExp;
+
+// @public (undocumented)
+export interface LineCollisionResult {
+    // (undocumented)
+    hit: boolean;
+    // (undocumented)
+    pointOnCollider: Vector3;
+    // (undocumented)
+    pointOnLine: Vector3;
+    // (undocumented)
+    radius: number;
+}
 
 // @public
 export class Log2Node extends GenericMathNode {
@@ -3592,13 +4396,7 @@ export class Mesh extends Mesh_base implements BatchDrawable {
     draw(ctx: DrawContext, renderQueue: Nullable<RenderQueue>, hash?: string): void;
     getAnimatedBoundingBox(): BoundingBox | null;
     getBoneMatrices(): Nullable<Texture2D<unknown>>;
-    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "getInstanceId"
-    //
-    // (undocumented)
     getInstanceId(_renderPass: RenderPass): string;
-    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: No member was found with name "getInstanceUniforms"
-    //
-    // (undocumented)
     getInstanceUniforms(): Float32Array<ArrayBuffer>;
     getMaterial(): Nullable<MeshMaterial>;
     getMorphData(): Nullable<MorphData>;
@@ -3616,8 +4414,6 @@ export class Mesh extends Mesh_base implements BatchDrawable {
     isUnlit(): boolean;
     get material(): Nullable<MeshMaterial>;
     set material(m: Nullable<MeshMaterial>);
-    // (undocumented)
-    set morphAnimation(val: boolean);
     needSceneColor(): boolean;
     needSceneDepth(): boolean;
     protected onDispose(): void;
@@ -3634,8 +4430,6 @@ export class Mesh extends Mesh_base implements BatchDrawable {
     // (undocumented)
     get skeletonName(): string;
     set skeletonName(name: string);
-    // (undocumented)
-    set skinAnimation(val: boolean);
     update(frameId: number, elapsedInSeconds: number, deltaInSeconds: number): void;
     updateMorphWeights(weight: number[]): void;
 }
@@ -3645,6 +4439,8 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     constructor();
     get alphaCutoff(): number;
     set alphaCutoff(val: number);
+    get alphaDither(): boolean;
+    set alphaDither(val: boolean);
     get alphaToCoverage(): boolean;
     set alphaToCoverage(val: boolean);
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
@@ -3688,6 +4484,9 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
 }
 
 // @public
+export type MeshUpdateCallback = (frameId: number, elapsedInSeconds: number, deltaInSeconds: number) => void;
+
+// @public
 export interface Metadata {
     // (undocumented)
     [key: string]: string | number | boolean | null | Metadata | Array<string | number | boolean | null | undefined | Metadata>;
@@ -3703,6 +4502,9 @@ export class MinNode extends GenericMathNode {
         getProps(): never[];
     };
 }
+
+// @public
+export function mixGeometryCacheBoundingBox(a: BoundingBox, b: BoundingBox, t: number): BoundingBox;
 
 // @public
 export function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T): T & (new (...args: any[]) => IMixinAlbedoColor);
@@ -3849,7 +4651,7 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
     reset(node: SceneNode): void;
 }
 
-// @public
+// @public @deprecated
 export class MultiChainSpringSystem {
     constructor(options?: MultiChainSpringSystemOptions);
     addChain(chain: SpringChain): number;
@@ -3899,6 +4701,20 @@ export class NamedObject {
     constructor(name: string);
     // (undocumented)
     name: string;
+}
+
+// @public (undocumented)
+export interface NearestPointsResult {
+    // (undocumented)
+    pointOnP: Vector3;
+    // (undocumented)
+    pointOnQ: Vector3;
+    // (undocumented)
+    sqrDistance: number;
+    // (undocumented)
+    tP: number;
+    // (undocumented)
+    tQ: number;
 }
 
 // @public
@@ -3999,6 +4815,15 @@ export class NormalizeNode extends GenericMathNode {
         getProps(): never[];
     };
 }
+
+// @public
+export function normalizeRuntimeScriptConfig(ctor: GenericConstructor, config?: Nullable<RuntimeScriptConfig>): RuntimeScriptConfig;
+
+// @public
+export function normalizeScriptAttachmentConfig(value: unknown): ScriptAttachmentConfig;
+
+// @public
+export function normalizeScriptAttachments(value: unknown): ScriptAttachment[];
 
 // @public
 export class NotEqualNode extends GenericMathNode {
@@ -4133,10 +4958,10 @@ export class OrbitCameraController extends BaseCameraController {
     // @override
     protected _onMouseWheel(evt: IControllerWheelEvent): boolean;
     // @override
+    protected _onUpdate(): void;
+    // @override
     reset(): void;
     setOptions(opt?: OrbitCameraControllerOptions): void;
-    // @override
-    update(): void;
 }
 
 // @public
@@ -4196,6 +5021,20 @@ export class OrthoCamera extends Camera {
 }
 
 // @public
+class PannerNode_2 extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): SerializableClass;
+    protected getType(): string;
+    get speedX(): number;
+    set speedX(val: number);
+    get speedY(): number;
+    set speedY(val: number);
+    toString(): string;
+    protected validate(): string;
+}
+export { PannerNode_2 as PannerNode }
+
+// @public
 export function panoramaToCubemap(tex: Texture2D, outputCubeMap: TextureCube): void;
 
 // @public
@@ -4247,8 +5086,6 @@ export class ParticleSystem extends ParticleSystem_base implements Drawable {
     set emitterShapeSizeMax(value: Vector3);
     get emitterShapeSizeMin(): Vector3;
     set emitterShapeSizeMin(value: Vector3);
-    // (undocumented)
-    set flags(value: number);
     getMaterial(): Nullable<ParticleMaterial>;
     getMorphData(): null;
     getMorphInfo(): null;
@@ -4322,14 +5159,43 @@ export class PBRBlockNode extends BaseGraphNode {
 // @public
 export class PBRBluePrintMaterial extends PBRBluePrintMaterial_base implements Clonable<PBRBluePrintMaterial> {
     constructor(irFrag?: MaterialBlueprintIR, irVertex?: MaterialBlueprintIR, uniformValues?: BluePrintUniformValue[], uniformTextures?: BluePrintUniformTexture[]);
+    // (undocumented)
+    get anisotropy(): number;
+    set anisotropy(val: number);
+    // (undocumented)
+    get anisotropyDirection(): number;
+    set anisotropyDirection(val: number);
+    // (undocumented)
+    get anisotropyDirectionScaleBias(): Immutable<Vector2>;
+    set anisotropyDirectionScaleBias(val: Immutable<Vector2>);
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
     clone(): PBRBluePrintMaterial;
+    // (undocumented)
+    copyFrom(other: this): void;
     protected _createHash(): string;
     protected createProgram(ctx: DrawContext, pass: number): _zephyr3d_device.GPUProgram<unknown>;
     get fragmentIR(): MaterialBlueprintIR;
     set fragmentIR(ir: MaterialBlueprintIR);
     fragmentShader(scope: PBFunctionScope): void;
     protected onDispose(): void;
+    // (undocumented)
+    get reflectionMode(): PBRReflectionMode;
+    set reflectionMode(val: PBRReflectionMode);
+    // (undocumented)
+    get subsurfaceColor(): Immutable<Vector3>;
+    set subsurfaceColor(val: Immutable<Vector3>);
+    // (undocumented)
+    get subsurfaceIntensity(): number;
+    set subsurfaceIntensity(val: number);
+    // (undocumented)
+    get subsurfacePower(): number;
+    set subsurfacePower(val: number);
+    // (undocumented)
+    get subsurfaceScale(): number;
+    set subsurfaceScale(val: number);
+    // (undocumented)
+    get subsurfaceScattering(): boolean;
+    set subsurfaceScattering(val: boolean);
     get uniformTextures(): BluePrintUniformTexture[];
     set uniformTextures(val: BluePrintUniformTexture[]);
     get uniformValues(): BluePrintUniformValue[];
@@ -4345,11 +5211,23 @@ export class PBRBluePrintMaterial extends PBRBluePrintMaterial_base implements C
 export class PBRMetallicRoughnessMaterial extends PBRMetallicRoughnessMaterial_base implements Clonable<PBRMetallicRoughnessMaterial> {
     constructor();
     // (undocumented)
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
+    // (undocumented)
     clone(): PBRMetallicRoughnessMaterial;
     // (undocumented)
     copyFrom(other: this): void;
     // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
+    get subsurfaceColor(): Immutable<Vector3>;
+    set subsurfaceColor(val: Immutable<Vector3>);
+    get subsurfaceIntensity(): number;
+    set subsurfaceIntensity(val: number);
+    get subsurfacePower(): number;
+    set subsurfacePower(val: number);
+    get subsurfaceScale(): number;
+    set subsurfaceScale(val: number);
+    get subsurfaceScattering(): boolean;
+    set subsurfaceScattering(val: boolean);
     get vertexNormal(): boolean;
     set vertexNormal(val: boolean);
     // (undocumented)
@@ -4357,6 +5235,9 @@ export class PBRMetallicRoughnessMaterial extends PBRMetallicRoughnessMaterial_b
     get vertexTangent(): boolean;
     set vertexTangent(val: boolean);
 }
+
+// @public
+export type PBRReflectionMode = 'none' | 'ggx' | 'anisotropic' | 'glint';
 
 // Warning: (ae-forgotten-export) The symbol "PBRSpecularGlossinessMaterial_base" needs to be exported by the entry point index.d.ts
 //
@@ -4376,6 +5257,70 @@ export class PBRSpecularGlossinessMaterial extends PBRSpecularGlossinessMaterial
     get vertexTangent(): boolean;
     set vertexTangent(val: boolean);
 }
+
+// @public (undocumented)
+export type PCAGeometryCacheState = GeometryCacheState;
+
+// @public
+export class PCAGeometryCacheTrack extends AnimationTrack<PCAGeometryCacheState> {
+    constructor(data?: Partial<PCAGeometryCacheTrackData>, embedded?: boolean);
+    // (undocumented)
+    applyState(target: object, state: PCAGeometryCacheState): void;
+    // (undocumented)
+    get bounds(): [number, number, number, number, number, number][];
+    set bounds(value: [number, number, number, number, number, number][]);
+    // (undocumented)
+    calculateState(_target: object, currentTime: number): GeometryCacheState;
+    // (undocumented)
+    getBlendId(): string;
+    // (undocumented)
+    getDuration(): number;
+    // (undocumented)
+    mixState(a: PCAGeometryCacheState, b: PCAGeometryCacheState, t: number): {
+        positions: Float32Array<ArrayBuffer>;
+        normals: Nullable<Float32Array<ArrayBufferLike>>;
+        boundingBox: BoundingBox;
+    };
+    // (undocumented)
+    get normalBases(): Nullable<Float32Array[]>;
+    set normalBases(value: Nullable<Float32Array[]>);
+    // (undocumented)
+    get normalCoefficients(): Nullable<Float32Array[]>;
+    set normalCoefficients(value: Nullable<Float32Array[]>);
+    // (undocumented)
+    get normalMean(): Nullable<Float32Array>;
+    set normalMean(value: Nullable<Float32Array>);
+    // (undocumented)
+    get positionBases(): Float32Array[];
+    set positionBases(value: Float32Array[]);
+    // (undocumented)
+    get positionCoefficients(): Float32Array[];
+    set positionCoefficients(value: Float32Array[]);
+    // (undocumented)
+    get positionMean(): Float32Array;
+    set positionMean(value: Float32Array);
+    // (undocumented)
+    get positionReference(): Nullable<Float32Array>;
+    set positionReference(value: Nullable<Float32Array>);
+    // (undocumented)
+    reset(target: object): void;
+    // (undocumented)
+    get times(): Float32Array;
+    set times(value: Float32Array);
+}
+
+// @public
+export type PCAGeometryCacheTrackData = {
+    times: Float32Array;
+    bounds: [number, number, number, number, number, number][];
+    positionReference?: Nullable<Float32Array>;
+    positionMean: Float32Array;
+    positionBases: Float32Array[];
+    positionCoefficients: Float32Array[];
+    normalMean?: Nullable<Float32Array>;
+    normalBases?: Nullable<Float32Array[]>;
+    normalCoefficients?: Nullable<Float32Array[]>;
+};
 
 // @public
 export function perlinNoise2D(scope: PBInsideFunctionScope, p: PBShaderExp): PBShaderExp;
@@ -4417,6 +5362,32 @@ export class PerspectiveCamera extends Camera {
 }
 
 // @public
+export interface PhysicsCurves {
+    allShrinkScale: InterpolatorScalar;
+    allStretchScale: InterpolatorScalar;
+    bendingShrinkHorizontal: InterpolatorScalar;
+    bendingShrinkVertical: InterpolatorScalar;
+    bendingStretchHorizontal: InterpolatorScalar;
+    bendingStretchVertical: InterpolatorScalar;
+    fakeWaveFreq: InterpolatorScalar;
+    fakeWavePower: InterpolatorScalar;
+    friction: InterpolatorScalar;
+    gravityScale: InterpolatorScalar;
+    hardness: InterpolatorScalar;
+    massScale: InterpolatorScalar;
+    pointRadius: InterpolatorScalar;
+    resistance: InterpolatorScalar;
+    shearShrink: InterpolatorScalar;
+    shearStretch: InterpolatorScalar;
+    sliderJointLength: InterpolatorScalar;
+    structuralShrinkHorizontal: InterpolatorScalar;
+    structuralShrinkVertical: InterpolatorScalar;
+    structuralStretchHorizontal: InterpolatorScalar;
+    structuralStretchVertical: InterpolatorScalar;
+    windForceScale: InterpolatorScalar;
+}
+
+// @public
 export type PickResult = {
     distance: number;
     intersectedPoint: Vector3;
@@ -4429,6 +5400,32 @@ export type PickTarget = {
     node: SceneNode;
     label?: string;
 };
+
+// @public
+export class PixelNormalNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): {
+        ctor: typeof PixelNormalNode;
+        name: string;
+        getProps(): never[];
+    };
+    protected getType(id: number): "float" | "vec3";
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
+export class PixelWorldPositionNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): {
+        ctor: typeof PixelWorldPositionNode;
+        name: string;
+        getProps(): never[];
+    };
+    protected getType(id: number): "float" | "vec3";
+    toString(): string;
+    protected validate(): string;
+}
 
 // @public
 export interface PlaneCollider extends SpringCollider {
@@ -4471,6 +5468,7 @@ export class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<
         transform: null;
     };
     static generateData(opt: PlaneCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): "triangle-list";
+    raycast(ray: Ray): number | null;
     get type(): "Plane";
 }
 
@@ -4483,13 +5481,107 @@ export type PlayAnimationOptions = {
 };
 
 // @public
+export interface PointInit {
+    applyInvertCollision: number;
+    bendingShrinkHorizontal: number;
+    bendingShrinkVertical: number;
+    bendingStretchHorizontal: number;
+    bendingStretchVertical: number;
+    boneAxis: Vector3;
+    child: number;
+    direction: Vector3;
+    fakeWaveFreq: number;
+    fakeWavePower: number;
+    frictionScale: number;
+    gravity: Vector3;
+    hardness: number;
+    mass: number;
+    movableLimitIndex: number;
+    movableLimitRadius: number;
+    parent: number;
+    parentLength: number;
+    pointRadius: number;
+    position: Vector3;
+    resistance: number;
+    shearShrink: number;
+    shearStretch: number;
+    sliderJointLength: number;
+    structuralShrinkHorizontal: number;
+    structuralShrinkVertical: number;
+    structuralStretchHorizontal: number;
+    structuralStretchVertical: number;
+    weight: number;
+    windForceScale: number;
+}
+
+// @public
 export class PointLight extends PunctualLight {
     constructor(scene: Scene);
+    get diffuseScale(): number;
+    set diffuseScale(val: number);
     // @override
     isPointLight(): this is PointLight;
     get range(): number;
     set range(val: number);
+    setDiffuseScale(val: number): this;
     setRange(val: number): this;
+    setSourceRadius(val: number): this;
+    setSpecularScale(val: number): this;
+    get sourceRadius(): number;
+    set sourceRadius(val: number);
+    get specularScale(): number;
+    set specularScale(val: number);
+}
+
+// @public
+export interface PointR {
+    applyInvertCollision: number;
+    bendingShrinkHorizontal: number;
+    bendingShrinkVertical: number;
+    bendingStretchHorizontal: number;
+    bendingStretchVertical: number;
+    boneAxis: Vector3;
+    child: number;
+    fakeWaveFreq: number;
+    fakeWavePower: number;
+    forceFadeRatio: number;
+    frictionScale: number;
+    gravity: Vector3;
+    hardness: number;
+    initialLocalPosition: Vector3;
+    initialLocalRotation: Quaternion;
+    initialLocalScale: Vector3;
+    initialLocalTwist: Quaternion;
+    mass: number;
+    movableLimitIndex: number;
+    movableLimitRadius: number;
+    parent: number;
+    parentLength: number;
+    pointRadius: number;
+    resistance: number;
+    shearShrink: number;
+    shearStretch: number;
+    sliderJointLength: number;
+    structuralShrinkHorizontal: number;
+    structuralShrinkVertical: number;
+    structuralStretchHorizontal: number;
+    structuralStretchVertical: number;
+    weight: number;
+    windForceScale: number;
+}
+
+// @public
+export interface PointRW {
+    directionPrevious: Vector3;
+    fakeWindDirection: Vector3;
+    friction: number;
+    grabberDistance: number;
+    grabberIndex: number;
+    positionCurrent: Vector3;
+    positionCurrentTransform: Vector3;
+    positionPrevious: Vector3;
+    positionPreviousTransform: Vector3;
+    positionToTransform: Vector3;
 }
 
 // @public
@@ -4544,6 +5636,7 @@ export class Primitive extends Primitive_base implements Clonable<Primitive> {
     getNumVertices(): number;
     getVertexBuffer(semantic: VertexSemantic): StructuredBuffer<unknown> | null;
     getVertexBufferInfo(semantic: VertexSemantic): _zephyr3d_device.VertexBufferInfo | null;
+    get id(): number;
     get indexCount(): number;
     set indexCount(val: number);
     get indexStart(): number;
@@ -4605,6 +5698,8 @@ export type PropertyAccessorOptions = {
     speed?: number;
     animatable?: boolean;
     mimeTypes?: string[];
+    sceneNode?: PropertySceneNodeOptions;
+    inlineObjectArray?: boolean;
     objectTypes?: GenericConstructor[];
     enum?: {
         labels: string[];
@@ -4612,7 +5707,12 @@ export type PropertyAccessorOptions = {
     };
 };
 
-// @public (undocumented)
+// @public
+export type PropertySceneNodeOptions = {
+    kind?: 'node' | 'mesh';
+};
+
+// @public
 export type PropertyToType<T extends string> = T extends 'float' | 'vec2' | 'vec3' | 'vec4' | 'int' | 'int2' | 'int3' | 'int4' | 'rgb' | 'rgba' ? 'num' : T extends 'bool' ? 'bool' : T extends 'string' ? 'str' : T extends 'object' | 'object_array' ? 'object' : 'num' | 'bool' | 'str' | 'object';
 
 // @public
@@ -4656,6 +5756,27 @@ export class PunctualLight extends BaseLight {
 }
 
 // @public
+export function pushInCollisionDetection(colR: ColliderR, colRW: ColliderRW, point1: Vector3, point2: Vector3, out?: LineCollisionResult): LineCollisionResult;
+
+// @public
+export function pushInFromCapsule(colR: ColliderR, colRW: ColliderRW, point: Vector3, out?: CollisionResult): CollisionResult;
+
+// @public
+export function pushInFromCollider(colR: ColliderR, colRW: ColliderRW, point: Vector3, out?: CollisionResult): CollisionResult;
+
+// @public
+export function pushInFromSphere(center: Vector3, radius: number, point: Vector3, out?: CollisionResult): CollisionResult;
+
+// @public
+export function pushoutFromCapsule(colR: ColliderR, colRW: ColliderRW, point: Vector3, ptR: PointR, out?: CollisionResult): CollisionResult;
+
+// @public
+export function pushoutFromCollider(colR: ColliderR, colRW: ColliderRW, point: Vector3, ptR: PointR, out?: CollisionResult): CollisionResult;
+
+// @public
+export function pushoutFromSphere(center: Vector3, radius: number, pointRadius: number, point: Vector3, out?: CollisionResult): CollisionResult;
+
+// @public
 export const QUEUE_OPAQUE = 1;
 
 // @public
@@ -4670,6 +5791,47 @@ export class Radians2DegreesNode extends GenericMathNode {
         name: string;
         getProps(): never[];
     };
+}
+
+// @public
+export class RaycastVisitor implements Visitor<SceneNode | OctreeNode> {
+    constructor(ray?: Ray, length?: number);
+    // (undocumented)
+    get intersected(): Nullable<PickTarget>;
+    // (undocumented)
+    get intersectedDist(): number;
+    // (undocumented)
+    get intersectedPoint(): Vector3;
+    // (undocumented)
+    get ray(): Ray;
+    set ray(ray: Ray);
+    // (undocumented)
+    get rayLength(): number;
+    set rayLength(length: number);
+    // (undocumented)
+    visit(target: SceneNode | OctreeNode): boolean;
+    // (undocumented)
+    visitMesh(node: Mesh): boolean;
+    // (undocumented)
+    visitOctreeNode(node: OctreeNode): boolean;
+    // (undocumented)
+    visitWater(node: Water): boolean;
+}
+
+// @public
+export class RectLight extends PunctualLight {
+    constructor(scene: Scene);
+    get height(): number;
+    set height(val: number);
+    // @override
+    isRectLight(): this is RectLight;
+    get range(): number;
+    set range(val: number);
+    setHeight(val: number): this;
+    setRange(val: number): this;
+    setWidth(val: number): this;
+    get width(): number;
+    set width(val: number);
 }
 
 // @public
@@ -4706,7 +5868,7 @@ export const RENDER_PASS_TYPE_OBJECT_COLOR = 3;
 // @public
 export const RENDER_PASS_TYPE_SHADOWMAP = 1;
 
-// @public (undocumented)
+// @public
 export class RenderContext {
     constructor(_camera: Camera, w: number, h: number);
     // (undocumented)
@@ -4715,6 +5877,24 @@ export class RenderContext {
     renderHeight: number;
     // (undocumented)
     renderWidth: number;
+}
+
+// @public
+export class RenderGraph {
+    addPass<T = void>(name: string, setup: (builder: RGPassBuilder) => T): T;
+    compile(outputs: RGHandle[]): CompiledRenderGraph;
+    execute(compiled: CompiledRenderGraph): void;
+    importTexture(name: string): RGHandle;
+    reset(): void;
+}
+
+// @public
+export class RenderGraphExecutor<TTexture = unknown> {
+    constructor(allocator: RGTextureAllocator<TTexture>, backbufferWidth: number, backbufferHeight: number);
+    execute(compiled: CompiledRenderGraph): void;
+    reset(): void;
+    setBackbufferSize(width: number, height: number): void;
+    setImportedTexture(handle: RGHandle, texture: TTexture): void;
 }
 
 // @public
@@ -4824,7 +6004,7 @@ export interface RenderQueueRef {
     ref: RenderQueue;
 }
 
-// @public (undocumented)
+// @public
 export abstract class RenderTarget {
     // (undocumented)
     abstract calcOrthographicProjection(nearClip: number, farClip: number, outMatrix?: Matrix4x4): Matrix4x4;
@@ -4952,13 +6132,150 @@ export class ResourceManager {
 }
 
 // @public
+export function restoreGeometryCacheMeshBinding(mesh: Mesh): Promise<boolean>;
+
+// @public
+export interface RGExecuteContext {
+    getTexture<TTexture = unknown>(handle: RGHandle): TTexture;
+}
+
+// @public
+export type RGExecuteFn<T = void> = (ctx: RGExecuteContext, data: T) => void;
+
+// @public
+export class RGHandle {
+    get name(): string;
+}
+
+// @public
+export interface RGPassBuilder {
+    createTexture(desc: RGTextureDesc): RGHandle;
+    read(handle: RGHandle): void;
+    setExecute<D>(fn: RGExecuteFn<D>): void;
+    sideEffect(): void;
+    write(handle: RGHandle): void;
+}
+
+// @public
+export interface RGResolvedSize {
+    // (undocumented)
+    height: number;
+    // (undocumented)
+    width: number;
+}
+
+// @public
+export interface RGResourceLifetime {
+    readonly firstUse: number;
+    readonly lastUse: number;
+    // Warning: (ae-forgotten-export) The symbol "RGResource" needs to be exported by the entry point index.d.ts
+    readonly resource: RGResource;
+}
+
+// @public
+export type RGSizeMode = 'absolute' | 'backbuffer-relative';
+
+// @public
+export interface RGTextureAllocator<TTexture = unknown> {
+    allocate(desc: RGTextureDesc, size: RGResolvedSize): TTexture;
+    release(texture: TTexture): void;
+}
+
+// @public
+export interface RGTextureDesc {
+    format: TextureFormat;
+    height?: number;
+    label?: string;
+    mipLevels?: number;
+    sizeMode?: RGSizeMode;
+    width?: number;
+}
+
+// @public
+export class RotateAboutAxisNode extends BaseGraphNode {
+    constructor();
+    static getSerializationCls(): {
+        ctor: typeof RotateAboutAxisNode;
+        name: string;
+        getProps(): never[];
+    };
+    protected getType(): string;
+    toString(): string;
+    protected validate(): string;
+}
+
+// @public
 export class RuntimeScript<T extends IDisposable | null> {
+    static getScriptProperties(this: GenericConstructor): RuntimeScriptPropertyInfo[];
     onAttached(_host: Nullable<T>): void | Promise<void>;
     onCreated(): void | Promise<void>;
     onDestroy(): void;
     onDetached(_host: T): void;
     onUpdate(_deltaTime: number, _elapsedTime: number): void;
 }
+
+// @public
+export type RuntimeScriptArrayDeclaration = RuntimeScriptPropertyOptions & {
+    type: 'object_array';
+    element: RuntimeScriptArrayElementDeclaration;
+    default?: unknown[];
+};
+
+// @public
+export type RuntimeScriptArrayElementDeclaration = RuntimeScriptValueDeclaration | RuntimeScriptObjectDeclaration;
+
+// @public
+export type RuntimeScriptConfig = Record<string, unknown>;
+
+// @public
+export type RuntimeScriptObjectDeclaration = {
+    type: 'object';
+    fields: RuntimeScriptObjectFieldDeclaration[];
+    default?: Record<string, unknown>;
+};
+
+// @public
+export type RuntimeScriptObjectFieldDeclaration = RuntimeScriptValueDeclaration & {
+    name: string;
+};
+
+// @public
+export type RuntimeScriptPropertyDeclaration = RuntimeScriptValueDeclaration | RuntimeScriptArrayDeclaration;
+
+// @public
+export type RuntimeScriptPropertyInfo = RuntimeScriptPropertyDeclaration & {
+    name: string;
+};
+
+// @public
+export type RuntimeScriptPropertyOptions = {
+    label?: string;
+    group?: string;
+    hidden?: boolean;
+    minValue?: number;
+    maxValue?: number;
+    speed?: number;
+    mimeTypes?: string[];
+    sceneNode?: {
+        kind?: 'node' | 'mesh';
+    };
+    enum?: {
+        labels: string[];
+        values: unknown[];
+    };
+};
+
+// @public
+export type RuntimeScriptPropertyType = 'bool' | 'int' | 'float' | 'int2' | 'int3' | 'int4' | 'vec2' | 'vec3' | 'vec4' | 'rgb' | 'rgba' | 'string' | 'asset' | 'node' | 'object_array';
+
+// @public
+export type RuntimeScriptValueDeclaration = RuntimeScriptPropertyOptions & {
+    type: RuntimeScriptValueType;
+    default?: unknown;
+};
+
+// @public
+export type RuntimeScriptValueType = Exclude<RuntimeScriptPropertyType, 'object_array'>;
 
 // @public
 export type SamplerType = 'clamp_linear' | 'clamp_linear_nomip' | 'clamp_nearest' | 'clamp_nearest_nomip' | 'repeat_linear' | 'repeat_linear_nomip' | 'repeat_nearest' | 'repeat_nearest_nomip';
@@ -5020,6 +6337,7 @@ export class Scene extends Scene_base implements IRenderable {
     get octree(): Octree;
     protected onDispose(): void;
     queuePerCameraUpdateNode(node: SceneNode): void;
+    queueUpdateDrawable(drawable: Drawable): void;
     queueUpdateNode(node: SceneNode): void;
     raycast(ray: Ray, length?: number): {
         target: PickTarget;
@@ -5030,6 +6348,12 @@ export class Scene extends Scene_base implements IRenderable {
     get rootNode(): SceneNode;
     get script(): string;
     set script(fileName: string);
+    get scriptConfig(): Nullable<object | unknown[]>;
+    set scriptConfig(value: Nullable<object | unknown[]>);
+    get scriptConfigs(): unknown[];
+    set scriptConfigs(value: unknown[]);
+    get scripts(): ScriptAttachment[];
+    set scripts(value: ScriptAttachment[]);
     updateNodePlacement(octree: Octree, list: Set<GraphNode>): void;
 }
 
@@ -5048,7 +6372,7 @@ export class SceneNode extends SceneNode_base implements IDisposable {
     set boundingBoxDrawMode(mode: number);
     calculateLocalTransform(outMatrix: Matrix4x4): void;
     calculateWorldTransform(outMatrix: Matrix4x4): void;
-    get children(): DRef<SceneNode>[];
+    get children(): SceneNode[];
     get clipTestEnabled(): boolean;
     set clipTestEnabled(val: boolean);
     clone(): Promise<this>;
@@ -5067,6 +6391,8 @@ export class SceneNode extends SceneNode_base implements IDisposable {
     hasChild(child: SceneNode): boolean;
     get hidden(): boolean;
     invalidateBoundingVolume(): void;
+    // (undocumented)
+    invalidateTransform(invalidateLocal?: boolean): void;
     invalidateWorldBoundingVolume(transformChanged: boolean): void;
     get invWorldMatrix(): Immutable<Matrix4x4>;
     isBatchGroup(): this is BatchGroup;
@@ -5127,6 +6453,12 @@ export class SceneNode extends SceneNode_base implements IDisposable {
     get scene(): Nullable<Scene>;
     get script(): string;
     set script(fileName: string);
+    get scriptConfig(): Nullable<object | unknown[]>;
+    set scriptConfig(value: Nullable<object | unknown[]>);
+    get scriptConfigs(): unknown[];
+    set scriptConfigs(value: unknown[]);
+    get scripts(): ScriptAttachment[];
+    set scripts(value: ScriptAttachment[]);
     get sealed(): boolean;
     set sealed(val: boolean);
     setBoundingVolume(bv: BoundingVolume): void;
@@ -5200,7 +6532,7 @@ export type ScreenConfig = {
     scaleMode: ScreenScaleMode;
 };
 
-// @public (undocumented)
+// @public
 export class ScreenRenderTarget extends RenderTarget {
     constructor(screenAdapter?: ScreenAdapter);
     // (undocumented)
@@ -5219,12 +6551,34 @@ export class ScreenRenderTarget extends RenderTarget {
 export type ScreenScaleMode = 'fit' | 'fit-width' | 'fit-height' | 'cover' | 'stretch';
 
 // @public
+export class ScriptAttachment {
+    constructor(script?: string, config?: ScriptAttachmentConfig);
+    // (undocumented)
+    config: ScriptAttachmentConfig;
+    // (undocumented)
+    script: string;
+}
+
+// @public
+export type ScriptAttachmentConfig = Nullable<Record<string, unknown> | unknown[]>;
+
+// @public
 export class ScriptingSystem {
     constructor(opts?: ScriptingSystemOptions);
-    attachScript<T extends Host>(host: Nullable<T>, module: string): Promise<Nullable<RuntimeScript<T>>>;
+    attachScript<T extends Host>(host: Nullable<T>, module: string, config?: Nullable<RuntimeScriptConfig>): Promise<Nullable<RuntimeScript<T>>>;
+    attachScriptIndirect<T extends Host>(host: Nullable<T>, classInfo: {
+        url: string;
+        id: string;
+        cls: GenericConstructor<RuntimeScript<T>>;
+    }, config?: Nullable<RuntimeScriptConfig>): Promise<Nullable<RuntimeScript<T>>>;
     detachAllScripts(): void;
     detachScript<T extends Host>(host: T, idOrInstance?: string | RuntimeScript<T>): void;
     getScriptObjects<T extends RuntimeScript<any>>(host: unknown): T[];
+    loadRuntimeScriptClass<T extends Host = Host>(module: string): Promise<Nullable<{
+        url: string;
+        id: string;
+        cls: GenericConstructor<RuntimeScript<T>>;
+    }>>;
     get registry(): ScriptRegistry;
     update(deltaTime: number, elapsedTime: number): void;
 }
@@ -5236,6 +6590,9 @@ export type ScriptingSystemOptions = {
     importComment?: string;
     onLoadError?: (e: unknown, id: string) => void;
 };
+
+// @public
+export function scriptProp(options: RuntimeScriptPropertyDeclaration): PropertyDecorator;
 
 // @public
 export class ScriptRegistry {
@@ -5397,6 +6754,7 @@ export class ShadowMapPass extends RenderPass {
 // @public
 export class ShadowMapper {
     constructor(light: PunctualLight);
+    applyQualityPreset(preset: ShadowQualityPreset): void;
     // (undocumented)
     copyFrom(other: ShadowMapper): void;
     get depthBias(): number;
@@ -5444,6 +6802,9 @@ export class ShadowMapper {
 export type ShadowMode = 'hard' | 'vsm' | 'esm' | 'pcf-pd' | 'pcf-opt';
 
 // @public
+export type ShadowQualityPreset = 'character-small' | 'outdoor-large';
+
+// @public
 export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOptions> extends Primitive implements Clonable<Shape<T>> {
     constructor(options?: T);
     // (undocumented)
@@ -5477,7 +6838,7 @@ export interface ShapeCreationOptions {
 export type ShapeOptionType<ST extends ShapeType> = ST extends Shape<infer U> ? U : never;
 
 // @public
-export type ShapeType = BoxShape | BoxFrameShape | SphereShape | CylinderShape | PlaneShape | TorusShape | TetrahedronShape | TetrahedronFrameShape;
+export type ShapeType = BoxShape | BoxFrameShape | CapsuleShape | SphereShape | CylinderShape | PlaneShape | TorusShape | TetrahedronShape | TetrahedronFrameShape;
 
 // @public
 export class SharedModel extends Disposable {
@@ -5522,6 +6883,37 @@ export class SimplexNoise2DNode extends GenericMathNode {
 }
 
 // @public
+export function simulate(params: SimulationParams, pointsR: readonly PointR[], pointsRW: PointRW[], constraints: readonly Constraint[], collidersR: readonly ColliderR[], collidersRW: ColliderRW[], grabbersR: readonly GrabberR[], grabbersRW: readonly GrabberRW[], movableLimitTargets: readonly Vector3[], flatPlanes: readonly FlatPlane[]): {
+    positionsToTransform: Vector3[];
+    fakeWaveCounter: number;
+};
+
+// @public
+export interface SimulationParams {
+    blendRatio: number;
+    collisionScale: number;
+    constraintShrinkLimit: number;
+    enableBroadPhase: boolean;
+    enableSurfaceCollision: boolean;
+    fakeWaveCounter: number;
+    fakeWavePower: number;
+    fakeWaveSpeed: number;
+    isFakeWave: boolean;
+    isPaused: boolean;
+    previousRootPosition: Vector3;
+    previousRootRotation: Quaternion;
+    relaxation: number;
+    rootPosition: Vector3;
+    rootRotateLimit: number;
+    rootRotation: Quaternion;
+    rootSlideLimit: number;
+    stepTime: number;
+    subSteps: number;
+    surfaceConstraints: number[];
+    windForce: Vector3;
+}
+
+// @public
 export class SinHNode extends GenericMathNode {
     constructor();
     // (undocumented)
@@ -5557,26 +6949,61 @@ export class Skeleton extends Disposable {
     }): SkinnedBoundingBox;
     getJointIndex(joint: SceneNode): number;
     getJointIndexByName(jointName: string): number;
+    get humanoidJointMapping(): Nullable<HumanoidJointMapping<SceneNode>>;
+    get humanoidRootRotation(): Quaternion;
+    get joints(): SceneNode[];
     get jointTexture(): Texture2D<unknown>;
     get modifiers(): SkeletonModifier[];
     protected onDispose(): void;
     // (undocumented)
+    get persistentId(): string;
     set persistentId(val: string);
     // (undocumented)
+    get playing(): boolean;
     set playing(b: boolean);
+    static tryExtractHumanoidJoints<T extends {
+        name: string;
+        parent: Nullable<T>;
+        children: T[];
+    }>(root: T): HumanoidJointMapping<T> | null;
+    // (undocumented)
+    static tryExtractHumanoidJointsBiped<T extends {
+        name: string;
+        parent: Nullable<T>;
+        children: T[];
+    }>(root: T): HumanoidJointMapping<T> | null;
+    // (undocumented)
+    static tryExtractHumanoidJointsMixamo<T extends {
+        name: string;
+        parent: Nullable<T>;
+        children: T[];
+    }>(root: T): HumanoidJointMapping<T> | null;
+    // (undocumented)
+    static tryExtractHumanoidJointsUnityHumanoid<T extends {
+        name: string;
+        parent: Nullable<T>;
+        children: T[];
+    }>(root: T): HumanoidJointMapping<T> | null;
+    // (undocumented)
+    static tryExtractHumanoidJointsVRM<T extends {
+        name: string;
+        parent: Nullable<T>;
+        children: T[];
+    }>(root: T): HumanoidJointMapping<T> | null;
 }
 
 // @public
 export abstract class SkeletonModifier {
-    constructor(weight?: number);
+    constructor();
     abstract apply(skeleton: Skeleton, deltaTime: number): void;
     get enabled(): boolean;
     set enabled(value: boolean);
     protected _enabled: boolean;
+    protected abstract _getWeight(): number;
     abstract reset(): void;
+    protected abstract _setWeight(_value: number): void;
     get weight(): number;
     set weight(value: number);
-    protected _weight: number;
 }
 
 // @public
@@ -5603,8 +7030,6 @@ export class SkyEnvTextureNode extends BaseGraphNode {
 // @public
 export class SkyRenderer extends Disposable {
     constructor();
-    // (undocumented)
-    set aerialPerspectiveDebug(val: number);
     get aerialPerspectiveDistance(): number;
     set aerialPerspectiveDistance(val: number);
     get atmosphereExposure(): number;
@@ -5645,8 +7070,6 @@ export class SkyRenderer extends Disposable {
     get irradianceSH(): GPUDataBuffer<unknown>;
     get irradianceSHFB(): FrameBuffer<unknown>;
     protected onDispose(): void;
-    // (undocumented)
-    set panoramaTextureAsset(id: string);
     get radianceConvSamples(): number;
     set radianceConvSamples(val: number);
     get radianceMap(): TextureCube<unknown>;
@@ -5658,18 +7081,16 @@ export class SkyRenderer extends Disposable {
     renderUberFog(camera: Camera, depthTexture: Nullable<BaseTexture>): void;
     get shWindowWeights(): Immutable<Vector3>;
     set shWindowWeights(weights: Immutable<Vector3>);
+    get skyboxRotation(): Immutable<Vector3>;
+    set skyboxRotation(val: Immutable<Vector3>);
     get skyboxTexture(): Nullable<TextureCube<unknown>>;
     set skyboxTexture(tex: Nullable<TextureCube<unknown>>);
-    // (undocumented)
-    set skyboxTextureSize(size: number);
     get skyColor(): Immutable<Vector4>;
     set skyColor(val: Immutable<Vector4>);
     get skyImage(): Nullable<Texture2D<unknown>>;
     set skyImage(texture: Nullable<Texture2D<unknown>>);
     get skyType(): SkyType;
     set skyType(val: SkyType);
-    // (undocumented)
-    set skyWorldMatrix(val: Immutable<Matrix4x4>);
     // (undocumented)
     update(ctx: DrawContext): Vector4 | null;
     // (undocumented)
@@ -5696,9 +7117,14 @@ export class SmoothStepNode extends GenericMathNode {
 }
 
 // @public
+export function sortRootPointsByProximity(roots: BoneNode[], ignoreY: boolean, fixedBeginEnd: boolean): BoneNode[];
+
+// @public
 export interface SphereCollider extends SpringCollider {
     center: Vector3;
     localOffset?: Vector3;
+    localRadius?: number;
+    localRadiusScaleRef?: number;
     radius: number;
     // (undocumented)
     type: 'sphere';
@@ -5779,16 +7205,19 @@ export interface SpringConstraint {
     stiffness: number;
 }
 
-// @public
+// @public @deprecated
 export class SpringModifier extends SkeletonModifier {
     constructor(springSystem: SpringSystem, weight?: number);
     apply(_skeleton: Skeleton, deltaTime: number): void;
+    protected _getWeight(): number;
     reset(): void;
+    protected _setWeight(value: number): void;
     get springSystem(): SpringSystem;
 }
 
 // @public
 export interface SpringParticle {
+    animPosition: Vector3;
     damping: number;
     fixed: boolean;
     lastFramePosition: Vector3;
@@ -5819,6 +7248,20 @@ export class SpringSystem {
     set gravity(gravity: Vector3);
     get iterations(): number;
     set iterations(count: number);
+    get maxPoseOffset(): number;
+    set maxPoseOffset(value: number);
+    get maxPoseOffsetRoot(): number;
+    set maxPoseOffsetRoot(value: number);
+    get maxPoseOffsetTip(): number;
+    set maxPoseOffsetTip(value: number);
+    get poseFollow(): number;
+    set poseFollow(value: number);
+    get poseFollowExponent(): number;
+    set poseFollowExponent(value: number);
+    get poseFollowRoot(): number;
+    set poseFollowRoot(value: number);
+    get poseFollowTip(): number;
+    set poseFollowTip(value: number);
     removeCollider(collider: SpringCollider): boolean;
     reset(): void;
     get solver(): 'verlet' | 'xpbd';
@@ -5835,6 +7278,13 @@ export interface SpringSystemOptions {
     enableInertialForces?: boolean;
     gravity?: Vector3;
     iterations?: number;
+    maxPoseOffset?: number;
+    maxPoseOffsetRoot?: number;
+    maxPoseOffsetTip?: number;
+    poseFollow?: number;
+    poseFollowExponent?: number;
+    poseFollowRoot?: number;
+    poseFollowTip?: number;
     solver?: 'verlet' | 'xpbd';
     wind?: Vector3;
 }
@@ -5947,6 +7397,20 @@ export type StopAnimationOptions = {
     fadeOut?: number;
 };
 
+// @public (undocumented)
+export interface SurfaceCheckResult {
+    // (undocumented)
+    hit: boolean;
+    // (undocumented)
+    intersectionPoint: Vector3;
+    // (undocumented)
+    pointOnCollider: Vector3;
+    // (undocumented)
+    pushOut: Vector3;
+    // (undocumented)
+    radius: number;
+}
+
 // @public
 export class SwizzleNode extends BaseGraphNode {
     constructor();
@@ -6017,6 +7481,7 @@ export class TetrahedronFrameShape extends Shape<TetrahedronCreationOptions> imp
     };
     // (undocumented)
     static generateData(opt: TetrahedronCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): "line-list";
+    raycast(ray: Ray): number | null;
     // (undocumented)
     get type(): "TetrahedronFrame";
 }
@@ -6038,6 +7503,7 @@ export class TetrahedronShape extends Shape<TetrahedronCreationOptions> implemen
     };
     // (undocumented)
     static generateData(opt: TetrahedronCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): "triangle-list";
+    raycast(ray: Ray): number | null;
     // (undocumented)
     get type(): string;
 }
@@ -6083,9 +7549,19 @@ export class TextureSampleGrad extends BaseGraphNode {
 // @public
 export class TextureSampleNode extends BaseGraphNode {
     constructor();
+    addressU: TextureAddressMode;
+    addressV: TextureAddressMode;
+    filterMag: TextureFilterMode;
+    filterMin: TextureFilterMode;
+    filterMip: TextureFilterMode;
     static getSerializationCls(): SerializableClass;
-    protected getType(id: number): "" | "float" | "vec3" | "vec4";
+    protected getType(id: number): "float" | "vec3" | "vec4" | "";
+    get isUniform(): boolean;
+    get paramName(): string;
+    set paramName(val: string);
     samplerType: 'Color' | 'Normal';
+    sRGB: boolean;
+    textureId: string;
     toString(): string;
     protected validate(): string;
 }
@@ -6130,7 +7606,23 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
         transform: null;
     };
     static generateData(opt: TorusCreationOptions, vertices: number[], normals: number[], tangents: number[], uvs: number[], indices: number[], bbox?: AABB, indexOffset?: number, vertexCallback?: (index: number, x: number, y: number, z: number) => void): "triangle-list";
+    raycast(ray: Ray): number | null;
     get type(): "Torus";
+}
+
+// @public
+export interface TransformAccess {
+    getLocalPosition(): Vector3;
+    getLocalRotation(): Quaternion;
+    getLocalScale(): Vector3;
+    getWorldPosition(): Vector3;
+    getWorldRotation(): Quaternion;
+    getWorldScale(): Vector3;
+    setLocalPosition(p: Vector3): void;
+    setLocalRotation(q: Quaternion): void;
+    setLocalScale(s: Vector3): void;
+    setWorldPosition(p: Vector3): void;
+    setWorldRotation(q: Quaternion): void;
 }
 
 // @public
@@ -6141,7 +7633,7 @@ export class TransformNode extends BaseGraphNode {
         name: string;
         getProps(): never[];
     };
-    protected getType(): "" | "vec2" | "vec3" | "vec4" | "mat2" | "mat3" | "mat4";
+    protected getType(): "vec2" | "vec3" | "vec4" | "" | "mat2" | "mat3" | "mat4";
     toString(): string;
     protected validate(): string;
 }

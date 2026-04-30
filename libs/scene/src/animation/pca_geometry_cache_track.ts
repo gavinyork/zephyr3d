@@ -11,6 +11,11 @@ import {
   type GeometryCacheState
 } from './geometry_cache_utils';
 
+/**
+ * PCA-compressed geometry cache animation data.
+ *
+ * @public
+ */
 export type PCAGeometryCacheTrackData = {
   times: Float32Array;
   bounds: [number, number, number, number, number, number][];
@@ -23,8 +28,14 @@ export type PCAGeometryCacheTrackData = {
   normalCoefficients?: Nullable<Float32Array[]>;
 };
 
+/** @public */
 export type PCAGeometryCacheState = GeometryCacheState;
 
+/**
+ * Geometry cache track reconstructed from PCA bases and coefficients.
+ *
+ * @public
+ */
 export class PCAGeometryCacheTrack extends AnimationTrack<PCAGeometryCacheState> {
   private _times: Float32Array;
   private _bounds: [number, number, number, number, number, number][];

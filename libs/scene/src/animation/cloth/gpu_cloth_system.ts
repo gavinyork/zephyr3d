@@ -28,6 +28,11 @@ import type {
 } from '../spring/spring_collider';
 import { updateColliderFromNode } from '../spring/spring_collider';
 
+/**
+ * Options used to construct a GPU cloth simulation system.
+ *
+ * @public
+ */
 export type GPUClothSystemOptions = {
   enabled?: boolean;
   device?: Nullable<AbstractDevice>;
@@ -56,6 +61,11 @@ export type GPUClothSystemOptions = {
   autoUpdate?: boolean;
 };
 
+/**
+ * Serialized wrap-binding cache data for GPU cloth attachments.
+ *
+ * @public
+ */
 export type GPUClothWrapBindingData = {
   version: 4;
   vertexCount: number;
@@ -67,6 +77,11 @@ export type GPUClothWrapBindingData = {
   targetLocalOffsets: string;
 };
 
+/**
+ * Target object paired with GPU cloth wrap-binding data.
+ *
+ * @public
+ */
 export type GPUClothWrapBindingTarget = {
   target: any;
   data: GPUClothWrapBindingData;
@@ -125,6 +140,8 @@ function resolveDevice(explicitDevice?: Nullable<AbstractDevice>) {
  * Returns whether GPU cloth is supported on the given device.
  *
  * GPU cloth in this engine is WebGPU-only. WebGL backends are explicitly unsupported.
+ *
+ * @public
  */
 export function isGPUClothSupported(device?: Nullable<AbstractDevice>) {
   const resolved = resolveDevice(device);
@@ -1871,6 +1888,11 @@ class GPUClothWrapBinding {
   }
 }
 
+/**
+ * Creates wrap-binding cache data between a source cloth mesh and a target mesh.
+ *
+ * @public
+ */
 export async function createGPUClothWrapBindingData(
   source: any,
   target: any
@@ -1890,6 +1912,8 @@ export async function createGPUClothWrapBindingData(
  * WebGPU-only cloth simulation entry.
  *
  * On non-WebGPU backends (including WebGL), the system is always disabled.
+ *
+ * @public
  */
 export class GPUClothSystem {
   private _enabled: boolean;

@@ -36,7 +36,7 @@ export interface FileStat {
  * @public
  */
 export interface MoveOptions {
-  overwrite?: boolean; // 是否覆盖目标（如果存在）
+  overwrite?: boolean; // Whether to overwrite the target if it already exists
 }
 
 /**
@@ -1454,7 +1454,7 @@ export abstract class VFS extends Observable<{
   private extractPatternDirectory(pattern: string) {
     // Process absolute path
     if (pattern.startsWith('/')) {
-      const parts = pattern.substring(1).split('/'); // 移除开头的 /
+      const parts = pattern.substring(1).split('/'); // Remove the leading slash
       const dirParts: string[] = [];
 
       for (const part of parts) {

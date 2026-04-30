@@ -10,6 +10,11 @@ import type { GenericConstructor, Nullable, RequireOptionals } from '@zephyr3d/b
  */
 export type PropertyType = string;
 
+/**
+ * Maps a property type discriminator to the corresponding value lane key.
+ *
+ * @public
+ */
 export type PropertyToType<T extends string> = T extends
   | 'float'
   | 'vec2'
@@ -65,6 +70,11 @@ export type PropertyValue = {
  */
 export type PropEdit = 'aabb' | 'quaternion' | 'proptrack';
 
+/**
+ * Extra scene-node picker hints for a property.
+ *
+ * @public
+ */
 export type PropertySceneNodeOptions = {
   kind?: 'node' | 'mesh';
 };
@@ -107,6 +117,11 @@ export type PropertyAccessorOptions = {
   enum?: { labels: string[]; values: unknown[] };
 };
 
+/**
+ * Returns the property accessor list unchanged while preserving typing.
+ *
+ * @public
+ */
 export function defineProps(accessors: PropertyAccessor<any, 'DUMMY'>[]): PropertyAccessor[] {
   return accessors;
 }

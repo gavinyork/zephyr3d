@@ -23,6 +23,7 @@ function document() {
 
 function extract(projectName, projectPath) {
   process.chdir(projectPath);
+  const configPath = path.join(projectPath, 'api-extractor.json');
   const config = {
     $schema: 'https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json',
     projectFolder: '.',
@@ -49,9 +50,13 @@ function extract(projectName, projectPath) {
       enabled: false
     }
   };
-  fs.writeFileSync('api-extractor.json', JSON.stringify(config, null, 2));
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
   spawnSync(apiExtacter, ['run', '--local', '--verbose']);
-  fs.rmSync('api-extractor.json');
+  try {
+    fs.rmSync(configPath, { force: true });
+  } catch (err) {
+    console.warn(`failed to remove temporary api-extractor config for ${projectName}: ${err.message}`);
+  }
 }
 
 const projects = ['base', 'device', 'imgui', 'scene', 'backend-webgl', 'backend-webgpu'];

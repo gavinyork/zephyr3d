@@ -4,11 +4,13 @@ import { Vector3 } from '@zephyr3d/base';
 import type { ColliderR, ColliderRW, PointR } from './types';
 import { EPSILON, ColliderForce } from './types';
 
+/** @public */
 export interface CollisionResult {
   hit: boolean;
   point: Vector3;
 }
 
+/** @public */
 export interface LineCollisionResult {
   hit: boolean;
   pointOnLine: Vector3;
@@ -16,6 +18,7 @@ export interface LineCollisionResult {
   radius: number;
 }
 
+/** @public */
 export interface SurfaceCheckResult {
   hit: boolean;
   intersectionPoint: Vector3;
@@ -24,6 +27,7 @@ export interface SurfaceCheckResult {
   radius: number;
 }
 
+/** @public */
 export interface NearestPointsResult {
   tP: number;
   tQ: number;
@@ -223,6 +227,11 @@ function writeNearestPointsResult(
 
 // Pushout (keep point outside collider)
 
+/**
+ * Pushes a point out of a sphere collider.
+ *
+ * @public
+ */
 export function pushoutFromSphere(
   center: Vector3,
   radius: number,
@@ -243,6 +252,11 @@ export function pushoutFromSphere(
   return writeCollisionResult(out, false, point, !out);
 }
 
+/**
+ * Pushes a point out of a collider.
+ *
+ * @public
+ */
 export function pushoutFromCollider(
   colR: ColliderR,
   colRW: ColliderRW,
@@ -256,6 +270,11 @@ export function pushoutFromCollider(
   return pushoutFromCapsule(colR, colRW, point, ptR, out);
 }
 
+/**
+ * Pushes a point out of a capsule collider.
+ *
+ * @public
+ */
 export function pushoutFromCapsule(
   colR: ColliderR,
   colRW: ColliderRW,
@@ -295,6 +314,11 @@ export function pushoutFromCapsule(
 
 // PushIn (keep point inside collider - inverse mode)
 
+/**
+ * Pulls a point inside a sphere collider.
+ *
+ * @public
+ */
 export function pushInFromSphere(
   center: Vector3,
   radius: number,
@@ -313,6 +337,11 @@ export function pushInFromSphere(
   return writeCollisionResult(out, false, point, !out);
 }
 
+/**
+ * Pulls a point inside a collider.
+ *
+ * @public
+ */
 export function pushInFromCollider(
   colR: ColliderR,
   colRW: ColliderRW,
@@ -325,6 +354,11 @@ export function pushInFromCollider(
   return pushInFromCapsule(colR, colRW, point, out);
 }
 
+/**
+ * Pulls a point inside a capsule collider.
+ *
+ * @public
+ */
 export function pushInFromCapsule(
   colR: ColliderR,
   colRW: ColliderRW,
@@ -364,6 +398,11 @@ export function pushInFromCapsule(
 
 // Line segment vs collider detection
 
+/**
+ * Performs sphere collision detection.
+ *
+ * @public
+ */
 export function collisionDetectionSphere(
   center: Vector3,
   radius: number,
@@ -387,6 +426,11 @@ export function collisionDetectionSphere(
   return writeLineCollisionResult(out, hit, ptOnLine, center, radius, !out);
 }
 
+/**
+ * Performs capsule collision detection.
+ *
+ * @public
+ */
 export function collisionDetectionCapsule(
   colR: ColliderR,
   colRW: ColliderRW,
@@ -433,6 +477,11 @@ export function collisionDetectionCapsule(
   return writeLineCollisionResult(out, hit, ptOnLine, ptOnCol, r, !out);
 }
 
+/**
+ * Performs collision detection against the specified collider.
+ *
+ * @public
+ */
 export function collisionDetection(
   colR: ColliderR,
   colRW: ColliderRW,
@@ -446,6 +495,11 @@ export function collisionDetection(
   return collisionDetectionCapsule(colR, colRW, point1, point2, out);
 }
 
+/**
+ * Performs inward collision detection.
+ *
+ * @public
+ */
 export function pushInCollisionDetection(
   colR: ColliderR,
   colRW: ColliderRW,
@@ -463,6 +517,11 @@ export function pushInCollisionDetection(
 
 // Nearest points between two line segments
 
+/**
+ * Computes the nearest points between two segments.
+ *
+ * @public
+ */
 export function computeNearestPoints(
   posP: Vector3,
   dirP: Vector3,
@@ -495,6 +554,11 @@ export function computeNearestPoints(
 
 // Surface collision (triangle-based)
 
+/**
+ * Checks triangle-surface collision against a collider.
+ *
+ * @public
+ */
 export function checkSurfaceCollision(
   ptA: Vector3,
   ptB: Vector3,

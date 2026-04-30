@@ -23,9 +23,6 @@ export abstract class SkeletonModifier {
     return this._getWeight();
   }
 
-  /**
-   * Set the blend weight [0-1]
-   */
   set weight(value: number) {
     this._setWeight(value);
   }
@@ -37,9 +34,6 @@ export abstract class SkeletonModifier {
     return this._enabled;
   }
 
-  /**
-   * Set whether this processor is enabled
-   */
   set enabled(value: boolean) {
     this._enabled = value;
   }

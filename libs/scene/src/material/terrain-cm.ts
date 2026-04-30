@@ -108,6 +108,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   get region() {
     return this._region;
   }
+  /** @internal */
   set region(val: Vector4) {
     if (!val.equalsTo(this._region)) {
       this._region.set(val);
@@ -128,6 +129,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   get terrainScale() {
     return this._terrainScale;
   }
+  /** @internal */
   set terrainScale(val: Vector3) {
     if (!this._terrainScale.equalsTo(val)) {
       this._terrainScale.set(val);

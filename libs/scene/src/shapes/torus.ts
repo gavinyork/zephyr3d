@@ -65,9 +65,6 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
     return 'Torus' as const;
   }
   /**
-   * {@inheritDoc Primitive.raycast}
-   * @override
-   *
    * Analytically intersects a ray with a torus lying in the XZ plane.
    * The torus has major radius R (outerRadius) and minor radius r (innerRadius).
    *
@@ -86,10 +83,10 @@ export class TorusShape extends Shape<TorusCreationOptions> implements Clonable<
       dy = ray.direction.y,
       dz = ray.direction.z;
 
-    // Let  f = |O|² + R² - r²
-    //      g = O·D           (dot product)
-    //      h = |D|²  (should be 1 for a normalised direction, kept general)
-    // Quartic: (h*t² + 2g*t + f)² = 4R²*((dx*t+ox)² + (dz*t+oz)²)
+    // Let  f = |O|^2 + R^2 - r^2
+    //      g = dot(O, D)
+    //      h = |D|^2 (normally 1 for a normalized direction, kept general here)
+    // Quartic: (h*t^2 + 2g*t + f)^2 = 4R^2*((dx*t+ox)^2 + (dz*t+oz)^2)
     // Expand into  c4*t^4 + c3*t^3 + c2*t^2 + c1*t + c0 = 0
 
     const OO = ox * ox + oy * oy + oz * oz;

@@ -6,18 +6,33 @@ import type { Nullable } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { StructuredBuffer } from '@zephyr3d/device';
 
+/**
+ * Geometry cache frame data for a single sampled time.
+ *
+ * @public
+ */
 export type GeometryCacheFrame = {
   positions: Float32Array;
   normals?: Nullable<Float32Array>;
   boundingBox: BoundingBox;
 };
 
+/**
+ * Mutable working state used while evaluating geometry cache tracks.
+ *
+ * @public
+ */
 export type GeometryCacheState = {
   positions: Float32Array;
   normals?: Nullable<Float32Array>;
   boundingBox: BoundingBox;
 };
 
+/**
+ * GPU resources bound to a mesh while a geometry cache track is active.
+ *
+ * @public
+ */
 export type GeometryCacheMeshBinding = {
   originalPrimitive: Primitive;
   primitive: Primitive;
@@ -35,6 +50,11 @@ type GeometryCacheMeshState = {
 
 const geometryCacheMeshStates = new WeakMap<Mesh, GeometryCacheMeshState>();
 
+/**
+ * Creates a reusable geometry cache state buffer for a frame layout.
+ *
+ * @public
+ */
 export function createGeometryCacheState(
   frame: Pick<GeometryCacheFrame, 'positions' | 'normals'>
 ): GeometryCacheState {
@@ -45,6 +65,11 @@ export function createGeometryCacheState(
   };
 }
 
+/**
+ * Linearly interpolates two geometry-cache bounding boxes.
+ *
+ * @public
+ */
 export function mixGeometryCacheBoundingBox(a: BoundingBox, b: BoundingBox, t: number) {
   return new BoundingBox(
     new Vector3(
@@ -60,6 +85,11 @@ export function mixGeometryCacheBoundingBox(a: BoundingBox, b: BoundingBox, t: n
   );
 }
 
+/**
+ * Ensures the target mesh has GPU buffers compatible with the geometry cache state.
+ *
+ * @public
+ */
 export function ensureGeometryCacheMeshBinding(
   meshBindings: WeakMap<Mesh, GeometryCacheMeshBinding>,
   mesh: Mesh,
@@ -93,6 +123,11 @@ export function ensureGeometryCacheMeshBinding(
   return binding;
 }
 
+/**
+ * Restores a mesh primitive after geometry cache playback.
+ *
+ * @public
+ */
 export async function restoreGeometryCacheMeshBinding(mesh: Mesh) {
   const meshState = geometryCacheMeshStates.get(mesh);
   if (!meshState) {

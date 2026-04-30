@@ -358,7 +358,7 @@ export class ScriptRegistry {
         const depId = await this.resolveLogicalId(spec, String(fromId));
         replacement = await this.build(depId); // recursively build as dataURL
       }
-      out += replacement; // 不加引号
+      out += replacement; // Do not wrap in quotes
       last = im.e;
     }
     out += code.slice(last);

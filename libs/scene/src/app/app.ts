@@ -45,7 +45,11 @@ type appEventMap = {
   drop: [evt: DragEvent];
 };
 
-/** Editor Mode */
+/**
+ * Application editor/runtime mode.
+ *
+ * @public
+ */
 export type EditorMode = 'editor' | 'editor-preview' | 'none';
 
 /**
@@ -68,7 +72,7 @@ export interface AppOptions {
    */
   enableMSAA?: boolean;
   /**
-   * Device pixel ratio used when creating the device. Defaults to `window.devicePixelRatio` or 1.
+   * Device pixel ratio used when creating the device. Defaults to `window.devicePixelRatio` or `1`.
    */
   pixelRatio?: number;
 }

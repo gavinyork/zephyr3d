@@ -1,5 +1,10 @@
 import type { Nullable } from '@zephyr3d/base';
 
+/**
+ * Serializable script attachment configuration payload.
+ *
+ * @public
+ */
 export type ScriptAttachmentConfig = Nullable<Record<string, unknown> | unknown[]>;
 
 function cloneScriptAttachmentValue<T>(value: T): T {
@@ -16,6 +21,11 @@ function cloneScriptAttachmentValue<T>(value: T): T {
   return value;
 }
 
+/**
+ * Normalizes a script attachment config into a clone-safe serializable shape.
+ *
+ * @public
+ */
 export function normalizeScriptAttachmentConfig(value: unknown): ScriptAttachmentConfig {
   if (value == null) {
     return null;
@@ -29,6 +39,11 @@ export function normalizeScriptAttachmentConfig(value: unknown): ScriptAttachmen
   return null;
 }
 
+/**
+ * Describes a script attached to a scene node.
+ *
+ * @public
+ */
 export class ScriptAttachment {
   script: string;
   config: ScriptAttachmentConfig;
@@ -38,6 +53,11 @@ export class ScriptAttachment {
   }
 }
 
+/**
+ * Normalizes an arbitrary value into an array of script attachments.
+ *
+ * @public
+ */
 export function normalizeScriptAttachments(value: unknown): ScriptAttachment[] {
   if (!Array.isArray(value)) {
     return [];

@@ -14,9 +14,9 @@ import type { DrawContext } from '../render';
  * using UV information and an anchor point to control how the sprite
  * is positioned and textured.
  *
- * Derived classes can override {@link internalSetupUniforms},
- * {@link internalApplyUniforms} and
- * {@link calcFragmentColor} to provide custom
+ * Derived classes can override `internalSetupUniforms()`,
+ * `internalApplyUniforms()`, and
+ * `calcFragmentColor()` to provide custom
  * uniforms and shading logic (e.g. sampling a texture).
  *
  * @public
@@ -260,9 +260,9 @@ export class SpriteMaterial extends MeshMaterial implements Clonable<SpriteMater
    * @remarks
    * This method:
    * - Calls the base implementation.
-   * - Invokes {@link SpriteMaterial.internalSetupUniforms} for
+   * - Invokes `internalSetupUniforms()` for
    *   fragment-stage specific uniform declarations.
-   * - Computes fragment color by calling {@link SpriteMaterial.calcFragmentColor}
+   * - Computes fragment color by calling `calcFragmentColor()`
    *   if fragment color is needed.
    * - Outputs the final fragment color via {@link MeshMaterial.outputFragmentColor}.
    *
@@ -289,7 +289,7 @@ export class SpriteMaterial extends MeshMaterial implements Clonable<SpriteMater
    * for non-instanced rendering. For instanced rendering, these values
    * are expected to be provided as per-instance uniforms instead.
    *
-   * It also calls {@link SpriteMaterial.internalApplyUniforms} to allow
+   * It also calls `internalApplyUniforms()` to allow
    * derived classes to bind additional resources (e.g. textures).
    *
    * @param bindGroup - The bind group to which uniforms and resources are bound.

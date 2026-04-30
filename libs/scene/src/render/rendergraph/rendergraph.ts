@@ -118,7 +118,7 @@ export class RenderGraph {
    *
    * For automatic resource allocation/release, use {@link RenderGraphExecutor} instead.
    *
-   * @param compiled - The compiled graph from {@link compile}.
+   * @param compiled - The compiled graph from {@link RenderGraph.compile}.
    */
   execute(compiled: CompiledRenderGraph): void {
     const noopCtx: RGExecuteContext = {

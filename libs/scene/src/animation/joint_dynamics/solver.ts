@@ -1,4 +1,4 @@
-// Core physics simulation 閳?direct port of JobExecuteSimulation from SPCRJointDynamicsJob.cs
+// Core physics simulation - direct port of JobExecuteSimulation from SPCRJointDynamicsJob.cs
 
 import {
   Quaternion,
@@ -44,7 +44,11 @@ const _broadPhaseToCenter = new Vector3();
 const _broadPhaseClosestPoint = new Vector3();
 const _broadPhaseDelta = new Vector3();
 
-/** Parameters for a single simulation step */
+/**
+ * Parameters for a single simulation step.
+ *
+ * @public
+ */
 export interface SimulationParams {
   /** If true, skip force integration (only apply root motion and output positions) */
   isPaused: boolean;
@@ -68,7 +72,7 @@ export interface SimulationParams {
   windForce: Vector3;
   /** Enable triangle-based surface collision */
   enableSurfaceCollision: boolean;
-  /** Triangle indices for surface collision (6 per quad: 2 triangles 鑴?3 indices) */
+  /** Triangle indices for surface collision (6 per quad: 2 triangles, 3 indices each) */
   surfaceConstraints: number[];
   /** Number of constraint relaxation iterations per substep */
   relaxation: number;
@@ -91,8 +95,10 @@ export interface SimulationParams {
 }
 
 /**
- * Run the full simulation step. Mutates pointsRW and collidersRW in place.
- * Returns { positionsToTransform, fakeWaveCounter }.
+ * Run the full simulation step. Mutates `pointsRW` and `collidersRW` in place.
+ * Returns `{ positionsToTransform, fakeWaveCounter }`.
+ *
+ * @public
  */
 export function simulate(
   params: SimulationParams,
@@ -192,7 +198,7 @@ export function simulate(
       // Push fixed points out of colliders before constraint solving.
       // Fixed points follow animation and cannot be moved by the solver, but if
       // their animated position is inside a collider, the distance constraint will
-      // pull free children inward through the surface — causing the characteristic
+      // pull free children inward through the surface �?causing the characteristic
       // "hair flipping outward" artifact at the back of the head.
       // By temporarily clamping fixed-point positionCurrent to the collider surface
       // before each substep's constraint pass, we ensure constraints operate from
@@ -337,7 +343,7 @@ function segmentMayCollideBroadPhase(point1: Vector3, point2: Vector3, colRW: Co
   return delta.magnitudeSq <= colRW.boundsRadius * colRW.boundsRadius;
 }
 
-// Pass 1: Verlet integration + forces
+// Core physics simulation - direct port of JobExecuteSimulation from SPCRJointDynamicsJob.cs
 
 function pointUpdatePass1(
   pointsR: readonly PointR[],
@@ -531,7 +537,7 @@ function pointUpdatePass1(
   }
 }
 
-// Surface collision (triangle-based cloth collision)
+// Core physics simulation - direct port of JobExecuteSimulation from SPCRJointDynamicsJob.cs
 
 function surfaceCollision(
   pointsRW: PointRW[],
@@ -1042,12 +1048,22 @@ function pointUpdatePass2(
   }
 }
 
+/**
+ * Output of applying the simulated result back to transforms.
+ *
+ * @public
+ */
 export interface ApplyResultOutput {
   position: Vector3;
   rotation: Quaternion;
   localRotation: Quaternion;
 }
 
+/**
+ * Computes transform outputs from the simulated point positions.
+ *
+ * @public
+ */
 export function applyResult(
   pointsR: readonly PointR[],
   pointsRW: PointRW[],
@@ -1079,7 +1095,7 @@ export function applyResult(
       }
       const pos = ptRW.positionToTransform;
       // SetRotation with blendRatio=0 for dynamic points
-      // Step 1: Reset localRotation 閳?initialLocalRotation (blendRatio=0 閳?fully initial)
+      // Step 1: Reset localRotation to initialLocalRotation (blendRatio = 0 means fully initial)
       localRot = ptR.initialLocalRotation.clone();
 
       // Step 2: Recompute worldRot from the new localRot
@@ -1113,7 +1129,7 @@ export function applyResult(
         ptR.child !== -1 ? Math.max(pointsR[ptR.child].forceFadeRatio, blendRatio) : blendRatio;
 
       // Fixed joints are fully driven by the scene graph (animation + parent transforms).
-      // Use the engine's current world rotation directly as the baseline — do NOT
+      // Use the engine's current world rotation directly as the baseline �?do NOT
       // reconstruct it from localRot, because localRot was read from the transform that
       // was written back last frame (after aim correction), so it carries stale physics
       // noise that would accumulate each frame and cause periodic spin artifacts.
@@ -1138,7 +1154,7 @@ export function applyResult(
     }
   }
 
-  // Post-process: twist correction pass (parent → child order).
+  // Post-process: twist correction pass (parent �?child order).
   if (preserveTwist) {
     for (let index = 0; index < pointsR.length; index++) {
       const ptR = pointsR[index];
@@ -1159,6 +1175,11 @@ export function applyResult(
   return results;
 }
 
+/**
+ * Applies post-simulation angle limits to the point state.
+ *
+ * @public
+ */
 export function applyAngleLimits(
   pointsR: readonly PointR[],
   pointsRW: PointRW[],

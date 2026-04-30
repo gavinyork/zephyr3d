@@ -36,6 +36,11 @@ const tmpFrustum = new Frustum(Matrix4x4.identity());
  * @public
  */
 export type ShadowMode = 'hard' | 'vsm' | 'esm' | 'pcf-pd' | 'pcf-opt';
+/**
+ * Preset shadow quality profiles.
+ *
+ * @public
+ */
 export type ShadowQualityPreset = 'character-small' | 'outdoor-large';
 
 /** @internal */

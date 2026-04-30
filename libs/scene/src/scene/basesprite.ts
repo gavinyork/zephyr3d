@@ -64,13 +64,13 @@ export class BaseSprite<M extends SpriteMaterial>
     return this._name;
   }
   /**
-   * {@inheritDoc BatchDrawable.getInstanceId}
+   * Returns the batch instance ID for the current render pass.
    */
   getInstanceId(_renderPass: RenderPass) {
     return `${this._instanceHash}:${this.worldMatrixDet >= 0}`;
   }
   /**
-   * {@inheritDoc BatchDrawable.getInstanceUniforms}
+   * Returns the packed instance-uniform buffer used for batching.
    */
   getInstanceUniforms() {
     return this._material.get()!.$instanceUniforms;

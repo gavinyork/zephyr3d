@@ -317,6 +317,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     getGPUObjects(): GPUObjectList;
     // (undocumented)
+    getGPUObjectStack(obj: GPUObject): string;
+    // (undocumented)
     getPool(key: string | symbol): Pool;
     // (undocumented)
     abstract getProgram(): Nullable<GPUProgram>;
@@ -946,6 +948,7 @@ export interface GPUObjectList {
     framebuffers: FrameBuffer[];
     programs: GPUProgram[];
     samplers: TextureSampler[];
+    stacks: Map<GPUObject, string>;
     textures: BaseTexture[];
     vertexArrayObjects: VertexLayout[];
 }

@@ -46,7 +46,7 @@ export interface OrbitCameraControllerOptions {
       altKey: boolean;
       metaKey: boolean;
     };
-    zoomWheel?: boolean; // 是否启用滚轮缩放
+    zoomWheel?: boolean; // Whether mouse-wheel zoom is enabled
   };
 }
 

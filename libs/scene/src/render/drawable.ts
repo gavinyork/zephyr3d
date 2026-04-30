@@ -31,6 +31,11 @@ import { getDevice } from '../app/api';
  */
 export type PickTarget = { node: SceneNode; label?: string };
 
+/**
+ * Minimal render context carrying target size and device information.
+ *
+ * @public
+ */
 export class RenderContext {
   public device: AbstractDevice;
   public renderWidth: number;

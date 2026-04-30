@@ -34,6 +34,8 @@ export type ScreenConfig = {
  *
  *  outX = inX * scaleX + offsetX
  *  outY = inY * scaleY + offsetY
+ *
+ * @public
  */
 export type PointTransform = {
   scaleX: number;
@@ -45,6 +47,8 @@ export type PointTransform = {
 /**
  * Resolution transform information derived from a {@link ScreenConfig}
  * and a concrete viewport rectangle.
+ *
+ * @public
  */
 export type ResolutionTransform = {
   /**
@@ -99,7 +103,7 @@ export class ScreenAdapter {
    * Creates a new {@link ScreenAdapter}.
    *
    * @param config - Optional initial screen configuration. If omitted,
-   *   a default of 1280×720 with 'cover' mode is used.
+   *   a default of `1280 x 720` with `cover` mode is used.
    */
   constructor(config?: Immutable<ScreenConfig>) {
     this._viewport = null;
@@ -334,7 +338,7 @@ export class ScreenAdapter {
    *
    * @param canvasPos - Point in canvas coordinates (CSS pixels).
    * @param viewportPosOut - Optional output vector. If provided, it will be
-   *   written into and returned; otherwise a new {@link Vector2} is allocated.
+   *   written into and returned; otherwise a new `Vector2` is allocated.
    * @returns The point in viewport-local coordinates.
    */
   canvasPosToViewport(canvasPos: Vector2, viewportPosOut?: Vector2) {
@@ -350,7 +354,7 @@ export class ScreenAdapter {
    *
    * @param canvasPos - Point in canvas coordinates (CSS pixels).
    * @param logicPosOut - Optional output vector. If provided, it will be
-   *   written into and returned; otherwise a new {@link Vector2} is allocated.
+   *   written into and returned; otherwise a new `Vector2` is allocated.
    * @returns The point in logical (design resolution) coordinates.
    */
   canvasPosToLogic(canvasPos: Vector2, logicPosOut?: Vector2) {
@@ -367,7 +371,7 @@ export class ScreenAdapter {
    * @param transform - Transform parameters (scale and offset).
    * @param pointIn - Input point.
    * @param pointOut - Optional output vector. If provided, it will be
-   *   written into and returned; otherwise a new {@link Vector2} is allocated.
+   *   written into and returned; otherwise a new `Vector2` is allocated.
    * @returns The transformed point.
    */
   transformPoint(transform: PointTransform, pointIn: Vector2, pointOut?: Vector2) {

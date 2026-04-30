@@ -122,7 +122,7 @@ export class Ray {
     return other;
   }
   intersectionTestCircle(center: Vector3, normal: Vector3, radius: number, epsl: number) {
-    const deltaParallel = 1e-1; // 接近平行阈值
+    const deltaParallel = 1e-1; // Near-parallel threshold
     const deltaZero = 1e-12;
 
     const O = this.origin;
@@ -183,17 +183,17 @@ export class Ray {
    * @param plane - The plane to test against.
    * @returns The distance t from the ray origin to the intersection point
    *   (i.e. the hit point is `origin + t * direction`), or `null` when
-   *   there is no intersection in the forward direction (t < 0) or the ray
+   *   there is no intersection in the forward direction (`t < 0`) or the ray
    *   is parallel to the plane.
    */
   intersectionTestPlane(plane: Plane): number | null {
-    // denominator = N · D  (N = plane normal, D = ray direction)
+    // denominator = dot(N, D), where N is the plane normal and D is the ray direction
     const denom = plane[0] * this._direction.x + plane[1] * this._direction.y + plane[2] * this._direction.z;
-    // Ray is (nearly) parallel to the plane – no intersection
+    // Ray is (nearly) parallel to the plane, so there is no intersection
     if (Math.abs(denom) < 1e-10) {
       return null;
     }
-    // numerator = -(N · O + d)  (O = ray origin, d = plane[3])
+    // numerator = -(dot(N, O) + d), where O is the ray origin and d is plane[3]
     const numer = -(
       plane[0] * this._origin.x +
       plane[1] * this._origin.y +

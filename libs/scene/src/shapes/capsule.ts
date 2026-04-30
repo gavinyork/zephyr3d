@@ -72,9 +72,6 @@ export class CapsuleShape extends Shape<CapsuleCreationOptions> implements Clona
     return this.height + this.radius * 2;
   }
   /**
-   * {@inheritDoc Primitive.raycast}
-   * @override
-   *
    * Analytically intersects a ray with a capsule aligned along the Y axis.
    *
    * The capsule consists of:

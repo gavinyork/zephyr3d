@@ -40,9 +40,6 @@ export class TetrahedronShape
   }
 
   /**
-   * {@inheritDoc Primitive.raycast}
-   * @override
-   *
    * Tests each triangular face of the tetrahedron with the Möller–Trumbore
    * algorithm and returns the smallest non-negative t.
    */
@@ -165,9 +162,9 @@ export class TetrahedronShape
     const uv1 = [0, 1];
     const uv2 = [1, 1];
     // Add UV
-    uvs?.push(...uv0); // 顶点
-    uvs?.push(...uv1); // 左下
-    uvs?.push(...uv2); // 右下
+    uvs?.push(...uv0); // top vertex
+    uvs?.push(...uv1); // bottom-left
+    uvs?.push(...uv2); // bottom-right
 
     if (tangents) {
       const t = this.computeTangent(
@@ -354,9 +351,6 @@ export class TetrahedronFrameShape
   }
 
   /**
-   * {@inheritDoc Primitive.raycast}
-   * @override
-   *
    * Tests each triangular face of the tetrahedron with the Möller–Trumbore
    * algorithm and returns the smallest non-negative t.
    * The wireframe has the same overall geometry as the solid version.

@@ -247,8 +247,8 @@ export interface RGResolvedSize {
  * Interface for allocating and releasing transient textures.
  *
  * Implement this to bridge the render graph with your GPU device's resource pool.
- * The executor calls {@link allocate} before a resource's first use and
- * {@link release} after its last use.
+ * The executor calls `allocate()` before a resource's first use and
+ * `release()` after its last use.
  *
  * @typeParam TTexture - The concrete texture type (e.g. `Texture2D`).
  * @public

@@ -56,9 +56,6 @@ export class PlaneShape extends Shape<PlaneCreationOptions> implements Clonable<
     return 'Plane' as const;
   }
   /**
-   * {@inheritDoc Primitive.raycast}
-   * @override
-   *
    * Intersects the ray with the finite XZ plane (y = 0) whose bounds are
    * determined by size/anchor options.
    */

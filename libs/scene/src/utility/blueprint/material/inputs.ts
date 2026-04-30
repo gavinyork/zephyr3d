@@ -341,7 +341,7 @@ export class PixelWorldPositionNode extends BaseGraphNode {
    * Gets the output type for a specific output slot
    *
    * @param id - The output slot ID
-   * @returns 'float' for individual component outputs (id > 1), 'vec3' for full position
+   * @returns 'float' for individual component outputs (id \> 1), 'vec3' for full position
    */
   protected getType(id: number) {
     return id > 1 ? 'float' : 'vec3';
@@ -509,7 +509,7 @@ export class PixelNormalNode extends BaseGraphNode {
    * Gets the output type for a specific output slot
    *
    * @param id - The output slot ID
-   * @returns 'float' for individual component outputs (id > 1), 'vec3' for full normal
+   * @returns 'float' for individual component outputs (id \> 1), 'vec3' for full normal
    */
   protected getType(id: number) {
     return id > 1 ? 'float' : 'vec3';
@@ -1454,7 +1454,7 @@ export class CameraVectorNode extends BaseGraphNode {
    * Gets the output type for a specific output slot
    *
    * @param id - The output slot ID
-   * @returns 'float' for individual component outputs (id > 1), 'vec3' for full vector
+   * @returns 'float' for individual component outputs (id \> 1), 'vec3' for full vector
    */
   protected getType(id: number) {
     return id > 1 ? 'float' : 'vec3';

@@ -38,8 +38,8 @@ export class Input {
   public _dom_input: HTMLInputElement;
   constructor(cvs: HTMLCanvasElement) {
     this._dom_input = document.createElement('input');
-    // 该输入框仅用于 IME/文本输入中转，不应参与浏览器原生 Tab 焦点链。
-    // 否则按 Tab 时会在真实控件与隐藏输入框之间来回切换，出现“无限自动切换”现象。
+    // This input is only used as an IME/text-entry bridge and should not
+    // participate in the browser's native Tab focus order.
     this._dom_input.tabIndex = -1;
     this._dom_input.style.position = 'fixed';
     this._dom_input.style.top = -10000 + 'px';
@@ -47,8 +47,8 @@ export class Input {
     this._dom_input.addEventListener('keydown', (e) => {
       e.stopPropagation();
       this.onKeydown(e as KeyboardEvent);
-      // 只拦截 Tab，避免触发浏览器原生焦点跳转；其余按键保留默认行为，
-      // 否则会导致输入框内字符按键失效。
+      // Only intercept Tab so browser focus navigation does not trigger.
+      // Keep the default behavior for other keys so text entry still works.
       if ((e as KeyboardEvent).key === 'Tab') {
         e.preventDefault();
       }
@@ -56,7 +56,7 @@ export class Input {
     this._dom_input.addEventListener('keyup', (e) => {
       e.stopPropagation();
       this.onKeyup(e as KeyboardEvent);
-      // 同上：仅拦截 Tab，避免影响文本输入。
+      // Same as above: only intercept Tab to avoid interfering with text entry.
       if ((e as KeyboardEvent).key === 'Tab') {
         e.preventDefault();
       }
