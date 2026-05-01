@@ -10,6 +10,13 @@ import type {
 } from './types';
 import { RGHandle } from './types';
 
+interface RGPassAccessScope {
+  passName: string;
+  accessibleIds: Set<number>;
+  textureIds: Set<number>;
+  framebufferIds: Set<number>;
+}
+
 /**
  * Executes a compiled render graph with automatic resource lifecycle management.
  *
@@ -152,7 +159,8 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
         let passError: unknown = null;
         try {
           if (pass.executeFn) {
-            const ctx = this._createContext(pass);
+            const accessScope = this._createAccessScope(pass);
+            const ctx = this._createContext(accessScope);
             (pass.executeFn as RGExecuteFn<unknown>)(ctx, pass.data);
           }
         } catch (e) {
@@ -332,11 +340,11 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   }
 
   /** @internal */
-  private _resolveFramebufferDesc(desc: RGFramebufferDesc, pass?: RGPass): RGFramebufferDesc {
+  private _resolveFramebufferDesc(desc: RGFramebufferDesc, accessScope?: RGPassAccessScope): RGFramebufferDesc {
     const resolveAttachment = (attachment: unknown): unknown => {
       if (attachment instanceof RGHandle) {
-        if (pass) {
-          this._assertDeclaredAccess(pass, attachment, 'texture');
+        if (accessScope) {
+          this._assertDeclaredAccess(accessScope, attachment, 'texture');
         }
         return this._resolveResource(attachment);
       }
@@ -383,38 +391,70 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   }
 
   /** @internal */
-  private _assertDeclaredAccess(pass: RGPass, handle: RGHandle, access: 'texture' | 'framebuffer'): void {
-    const res = [...pass.reads, ...pass.writes].find((resource) => resource.id === handle._id);
-    if (!res) {
+  private _createAccessScope(pass: RGPass): RGPassAccessScope {
+    const accessibleIds = new Set<number>();
+    const textureIds = new Set<number>();
+    const framebufferIds = new Set<number>();
+    for (const resource of pass.reads) {
+      accessibleIds.add(resource.id);
+      if (resource.kind === 'transient' || resource.kind === 'imported') {
+        textureIds.add(resource.id);
+      } else if (resource.kind === 'framebuffer') {
+        framebufferIds.add(resource.id);
+      }
+    }
+    for (const resource of pass.writes) {
+      accessibleIds.add(resource.id);
+      if (resource.kind === 'transient' || resource.kind === 'imported') {
+        textureIds.add(resource.id);
+      } else if (resource.kind === 'framebuffer') {
+        framebufferIds.add(resource.id);
+      }
+    }
+    return {
+      passName: pass.name,
+      accessibleIds,
+      textureIds,
+      framebufferIds
+    };
+  }
+
+  /** @internal */
+  private _assertDeclaredAccess(
+    accessScope: RGPassAccessScope,
+    handle: RGHandle,
+    access: 'texture' | 'framebuffer'
+  ): void {
+    if (!accessScope.accessibleIds.has(handle._id)) {
       throw new Error(
-        `RenderGraphExecutor: pass "${pass.name}" tried to access ${access} "${handle.name}" ` +
+        `RenderGraphExecutor: pass "${accessScope.passName}" tried to access ${access} "${handle.name}" ` +
           `without declaring a read/write dependency.`
       );
     }
-    if (access === 'texture' && res.kind !== 'transient' && res.kind !== 'imported') {
+    if (access === 'texture' && !accessScope.textureIds.has(handle._id)) {
       throw new Error(
-        `RenderGraphExecutor: pass "${pass.name}" tried to access "${handle.name}" as a texture, ` +
-          `but it is a ${res.kind} resource.`
+        `RenderGraphExecutor: pass "${accessScope.passName}" tried to access "${handle.name}" as a texture, ` +
+          `but it is not a texture resource.`
       );
     }
-    if (access === 'framebuffer' && res.kind !== 'framebuffer') {
+    if (access === 'framebuffer' && !accessScope.framebufferIds.has(handle._id)) {
       throw new Error(
-        `RenderGraphExecutor: pass "${pass.name}" tried to access "${handle.name}" as a framebuffer, ` +
-          `but it is a ${res.kind} resource.`
+        `RenderGraphExecutor: pass "${accessScope.passName}" tried to access "${handle.name}" as a framebuffer, ` +
+          `but it is not a framebuffer resource.`
       );
     }
   }
 
   /** @internal */
-  private _createContext(pass: RGPass): RGExecuteContext {
+  private _createContext(accessScope: RGPassAccessScope): RGExecuteContext {
     const self = this;
     return {
       getTexture<T>(handle: RGHandle): T {
-        self._assertDeclaredAccess(pass, handle, 'texture');
+        self._assertDeclaredAccess(accessScope, handle, 'texture');
         return self._resolveResource(handle) as unknown as T;
       },
       getFramebuffer<TFramebuffer = unknown>(handle: RGHandle): TFramebuffer {
-        self._assertDeclaredAccess(pass, handle, 'framebuffer');
+        self._assertDeclaredAccess(accessScope, handle, 'framebuffer');
         const framebuffer = self._allocatedFramebuffers.get(handle._id);
         if (framebuffer !== undefined) {
           return framebuffer as unknown as TFramebuffer;
@@ -425,7 +465,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
         );
       },
       createFramebuffer<TFramebuffer = unknown>(desc: RGFramebufferDesc): TFramebuffer {
-        return self._createFramebuffer(self._resolveFramebufferDesc(desc, pass)) as unknown as TFramebuffer;
+        return self._createFramebuffer(self._resolveFramebufferDesc(desc, accessScope)) as unknown as TFramebuffer;
       },
       deferCleanup(callback: () => void): void {
         self._cleanupCallbacks.push(callback);
