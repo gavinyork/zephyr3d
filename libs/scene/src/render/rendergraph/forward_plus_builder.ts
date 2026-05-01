@@ -382,7 +382,22 @@ function buildForwardPlusGraphInternal(
 
   const sceneColorHandle = lightPassResult.sceneColorHandle;
 
-  // ── 8. Post Effects + Final Composite ─────────────────────────────
+  // 8. Transmission depth pass (optional)
+  let transmissionDepthToken: RGHandle | undefined;
+  if (options.needSceneColor) {
+    transmissionDepthToken = graph.addPass('TransmissionDepth', (builder) => {
+      builder.read(sceneColorHandle);
+      builder.read(depthPassResult.depthFramebufferHandle);
+      const done = builder.createToken('TransmissionDepthDone');
+      builder.sideEffect();
+      builder.setExecute((rgCtx) => {
+        renderTransmissionDepthPass(frame, rgCtx);
+      });
+      return done;
+    });
+  }
+
+  // 9. Post effects + final composite
   const presentedBackbuffer = graph.addPass('Composite', (builder) => {
     builder.read(sceneColorHandle);
     builder.read(depthHandle);
@@ -394,6 +409,9 @@ function buildForwardPlusGraphInternal(
     }
     if (lightPassResult.sceneColorFramebufferHandle) {
       builder.read(lightPassResult.sceneColorFramebufferHandle);
+    }
+    if (transmissionDepthToken) {
+      builder.read(transmissionDepthToken);
     }
     const outputBackbuffer = builder.write(backbuffer);
     builder.setExecute(() => {
@@ -771,10 +789,11 @@ function renderMainLightPass(
     _scenePass.clearStencil = null;
   }
   _scenePass.render(ctx, null, null, renderQueue);
+}
 
-  if (renderQueue.needSceneColor()) {
-    renderSceneDepth(frame, frame.depthFramebuffer, rgCtx);
-  }
+/** @internal */
+function renderTransmissionDepthPass(frame: FrameState, rgCtx: RGExecuteContext): void {
+  renderSceneDepth(frame, frame.depthFramebuffer, rgCtx);
 }
 
 /** @internal */
