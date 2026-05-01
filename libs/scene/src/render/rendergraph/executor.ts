@@ -120,6 +120,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     const ctx = this._createContext();
 
     let completed = false;
+    let executionError: unknown = null;
     try {
       for (let i = 0; i < compiled.orderedPasses.length; i++) {
         const pass = compiled.orderedPasses[i];
@@ -147,36 +148,57 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
           }
         }
 
-        // Execute the pass with exception safety for resource cleanup
+        // Execute the pass with exception safety for resource cleanup.
+        // Release errors must not hide the original pass execution error.
+        let passError: unknown = null;
         try {
           if (pass.executeFn) {
             (pass.executeFn as RGExecuteFn<unknown>)(ctx, pass.data);
           }
-        } finally {
-          const framebuffersToRelease = releaseFramebufferAt.get(i);
-          if (framebuffersToRelease) {
-            for (const resId of framebuffersToRelease) {
-              const framebuffer = this._allocatedFramebuffers.get(resId);
-              if (framebuffer !== undefined) {
+        } catch (e) {
+          passError = e;
+        }
+
+        let releaseError: unknown = null;
+        const framebuffersToRelease = releaseFramebufferAt.get(i);
+        if (framebuffersToRelease) {
+          for (const resId of framebuffersToRelease) {
+            const framebuffer = this._allocatedFramebuffers.get(resId);
+            if (framebuffer !== undefined) {
+              try {
                 this._releaseFramebuffer(framebuffer);
                 this._allocatedFramebuffers.delete(resId);
-              }
-            }
-          }
-          // Release resources that end at this pass (always runs even if pass throws)
-          const toRelease = releaseAt.get(i);
-          if (toRelease) {
-            for (const resId of toRelease) {
-              const texture = this._allocatedTextures.get(resId);
-              if (texture !== undefined) {
-                this._allocator.release(texture);
-                this._allocatedTextures.delete(resId);
+              } catch (e) {
+                releaseError ??= e;
               }
             }
           }
         }
+        // Release resources that end at this pass (always runs even if pass throws)
+        const toRelease = releaseAt.get(i);
+        if (toRelease) {
+          for (const resId of toRelease) {
+            const texture = this._allocatedTextures.get(resId);
+            if (texture !== undefined) {
+              try {
+                this._allocator.release(texture);
+                this._allocatedTextures.delete(resId);
+              } catch (e) {
+                releaseError ??= e;
+              }
+            }
+          }
+        }
+        if (passError) {
+          throw passError;
+        }
+        if (releaseError) {
+          throw releaseError;
+        }
       }
       completed = true;
+    } catch (e) {
+      executionError = e;
     } finally {
       let cleanupError: unknown = null;
       try {
@@ -185,8 +207,15 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
         cleanupError = e;
       } finally {
         if (!completed) {
-          this.reset();
+          try {
+            this.reset();
+          } catch (e) {
+            cleanupError ??= e;
+          }
         }
+      }
+      if (executionError) {
+        throw executionError;
       }
       if (cleanupError) {
         throw cleanupError;

@@ -94,11 +94,14 @@ export class RenderGraph {
    * Performs dead-pass culling, topological sorting, and resource lifetime analysis.
    *
    * @param outputs - Handles of resources that must be produced (graph sinks).
+   *   If a resource was passed to {@link RGPassBuilder.write}, use the returned
+   *   post-write handle here, not the original handle.
    *   Passes that do not contribute to these outputs (directly or transitively)
    *   are culled, unless marked as side-effect passes.
    * @returns The compiled graph ready for execution.
    */
   compile(outputs: RGHandle[]): CompiledRenderGraph {
+    this._validateOutputs(outputs);
     // 1. Mark alive passes via backward traversal from outputs + side-effect passes
     this._cullDeadPasses(outputs);
     // 2. Topological sort of alive passes
@@ -273,6 +276,31 @@ export class RenderGraph {
   }
 
   // ─── Private: Dead Pass Culling ─────────────────────────────────────
+
+  /** @internal */
+  private _validateOutputs(outputs: RGHandle[]): void {
+    const latestVersions = new Map<number, RGResource>();
+    for (const res of this._resources.values()) {
+      const current = latestVersions.get(res.physicalId);
+      if (!current || res.id > current.id) {
+        latestVersions.set(res.physicalId, res);
+      }
+    }
+
+    for (const handle of outputs) {
+      const res = this._resources.get(handle._id);
+      if (!res) {
+        throw new Error(`RenderGraph: unknown output resource "${handle.name}" (id=${handle._id})`);
+      }
+      const latest = latestVersions.get(res.physicalId);
+      if (latest && latest.id !== res.id) {
+        throw new Error(
+          `RenderGraph: output resource "${res.name}" (id=${res.id}) is not the latest version. ` +
+            `Use the handle returned by builder.write(); latest is "${latest.name}" (id=${latest.id}).`
+        );
+      }
+    }
+  }
 
   /** @internal */
   private _cullDeadPasses(outputs: RGHandle[]): void {

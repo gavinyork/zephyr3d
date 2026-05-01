@@ -148,7 +148,9 @@ export interface RGExecuteContext {
    *
    * Callbacks run in reverse registration order. Use this for temporary objects
    * created inside pass execution that are not graph resources, such as pooled
-   * framebuffers wrapping graph-managed textures.
+   * framebuffers wrapping graph-managed textures. If pass execution throws, the
+   * executor still runs cleanup callbacks and preserves the original pass error
+   * ahead of cleanup errors.
    *
    * @param callback - Cleanup function to invoke after execution.
    */
@@ -215,8 +217,11 @@ export interface RGPassBuilder {
    * Declare that this pass writes a new version of an existing resource.
    *
    * The returned handle represents the post-write version. Use it for subsequent
-   * reads or as a graph output. If the pass needs the previous contents, call
-   * {@link read} on the input handle explicitly before writing.
+   * reads and as the graph output passed to {@link RenderGraph.compile}. Passing
+   * an older version of the same resource to `compile()` is rejected because it
+   * usually means the caller ignored the handle returned by `write()`. If the pass
+   * needs the previous contents, call {@link read} on the input handle explicitly
+   * before writing.
    *
    * @param handle - Handle of the resource to write to.
    * @returns A handle referencing the newly written version.

@@ -110,6 +110,21 @@ describe('RenderGraph', () => {
       }).toThrow(/unknown output resource/);
     });
 
+    test('compile stale output version throws', () => {
+      const original = graph.importTexture('backbuffer');
+      let latest: RGHandle;
+
+      graph.addPass('Final', (builder) => {
+        latest = builder.write(original);
+        builder.setExecute(() => {});
+      });
+
+      expect(() => {
+        graph.compile([original]);
+      }).toThrow(/not the latest version/);
+      expect(graph.compile([latest!]).orderedPasses.map((p) => p.name)).toEqual(['Final']);
+    });
+
     test('framebuffer attachment must be a texture handle', () => {
       expect(() => {
         graph.addPass('BadFramebuffer', (builder) => {
@@ -716,6 +731,105 @@ describe('RenderGraphExecutor', () => {
 
     expect(events).toEqual(['create:released=0', 'use:released=0']);
     expect(releasedFramebuffers).toHaveLength(1);
+  });
+
+  test('releases graph and temporary resources when a pass throws', () => {
+    const { allocator, released, releasedFramebuffers } = createMockAllocator();
+    let backbuffer = graph.importTexture('backbuffer');
+
+    graph.addPass('ThrowingPass', (builder) => {
+      const color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      const framebuffer = builder.createFramebuffer({
+        colorAttachments: color,
+        depthAttachment: null
+      });
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute((ctx: RGExecuteContext) => {
+        ctx.getFramebuffer<MockFramebuffer>(framebuffer);
+        ctx.createFramebuffer<MockFramebuffer>({
+          colorAttachments: 'rgba8unorm',
+          depthAttachment: null
+        });
+        throw new Error('pass failed');
+      });
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080);
+    executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 1920, height: 1080 } });
+
+    expect(() => executor.execute(compiled)).toThrow(/pass failed/);
+    expect(released).toHaveLength(1);
+    expect(releasedFramebuffers).toHaveLength(2);
+
+    executor.reset();
+    expect(released).toHaveLength(1);
+    expect(releasedFramebuffers).toHaveLength(2);
+  });
+
+  test('runs deferred cleanup callbacks in reverse order after successful execution', () => {
+    const { allocator } = createMockAllocator();
+    let backbuffer = graph.importTexture('backbuffer');
+    const events: string[] = [];
+
+    graph.addPass('CleanupPass', (builder) => {
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute((ctx: RGExecuteContext) => {
+        events.push('execute');
+        ctx.deferCleanup(() => events.push('cleanup:first'));
+        ctx.deferCleanup(() => events.push('cleanup:second'));
+      });
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080);
+    executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 1920, height: 1080 } });
+    executor.execute(compiled);
+
+    expect(events).toEqual(['execute', 'cleanup:second', 'cleanup:first']);
+  });
+
+  test('preserves pass execution error when deferred cleanup also throws', () => {
+    const { allocator } = createMockAllocator();
+    let backbuffer = graph.importTexture('backbuffer');
+
+    graph.addPass('ThrowingPass', (builder) => {
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute((ctx: RGExecuteContext) => {
+        ctx.deferCleanup(() => {
+          throw new Error('cleanup failed');
+        });
+        throw new Error('pass failed');
+      });
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080);
+    executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 1920, height: 1080 } });
+
+    expect(() => executor.execute(compiled)).toThrow(/pass failed/);
+  });
+
+  test('preserves pass execution error when automatic resource release also throws', () => {
+    const { allocator } = createMockAllocator();
+    allocator.release = () => {
+      throw new Error('release failed');
+    };
+    let backbuffer = graph.importTexture('backbuffer');
+
+    graph.addPass('ThrowingPass', (builder) => {
+      builder.createTexture({ format: 'rgba8unorm', label: 'temporary' });
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute(() => {
+        throw new Error('pass failed');
+      });
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080);
+    executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 1920, height: 1080 } });
+
+    expect(() => executor.execute(compiled)).toThrow(/pass failed/);
   });
 
   test('backbuffer-relative sizing resolves correctly', () => {
