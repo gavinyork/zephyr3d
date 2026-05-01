@@ -28,30 +28,6 @@ export class PBRMetallicRoughnessMaterial
   private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
   /** @internal */
   private static readonly FEATURE_SUBSURFACE_SCATTERING = this.defineFeature();
-  /** @internal */
-  private static readonly SUBSURFACE_COLOR_UNIFORM = this.defineInstanceUniform(
-    'subsurfaceColor',
-    'rgb',
-    'SubsurfaceColor'
-  );
-  /** @internal */
-  private static readonly SUBSURFACE_SCALE_UNIFORM = this.defineInstanceUniform(
-    'subsurfaceScale',
-    'float',
-    'SubsurfaceScale'
-  );
-  /** @internal */
-  private static readonly SUBSURFACE_POWER_UNIFORM = this.defineInstanceUniform(
-    'subsurfacePower',
-    'float',
-    'SubsurfacePower'
-  );
-  /** @internal */
-  private static readonly SUBSURFACE_INTENSITY_UNIFORM = this.defineInstanceUniform(
-    'subsurfaceIntensity',
-    'float',
-    'SubsurfaceIntensity'
-  );
   private readonly _subsurfaceColor: Vector3;
   private _subsurfaceScale: number;
   private _subsurfacePower: number;
@@ -196,28 +172,6 @@ export class PBRMetallicRoughnessMaterial
         );
       }
     }
-    if (
-      this.subsurfaceScattering &&
-      this.needFragmentColor() &&
-      this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING
-    ) {
-      scope.$outputs.zSubsurfaceColor = this.getInstancedUniform(
-        scope,
-        PBRMetallicRoughnessMaterial.SUBSURFACE_COLOR_UNIFORM
-      );
-      scope.$outputs.zSubsurfaceScale = this.getInstancedUniform(
-        scope,
-        PBRMetallicRoughnessMaterial.SUBSURFACE_SCALE_UNIFORM
-      );
-      scope.$outputs.zSubsurfacePower = this.getInstancedUniform(
-        scope,
-        PBRMetallicRoughnessMaterial.SUBSURFACE_POWER_UNIFORM
-      );
-      scope.$outputs.zSubsurfaceIntensity = this.getInstancedUniform(
-        scope,
-        PBRMetallicRoughnessMaterial.SUBSURFACE_INTENSITY_UNIFORM
-      );
-    }
   }
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
@@ -225,8 +179,7 @@ export class PBRMetallicRoughnessMaterial
     if (
       this.subsurfaceScattering &&
       this.needFragmentColor() &&
-      this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT &&
-      !(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)
+      this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT
     ) {
       scope.zSubsurfaceColor = pb.vec3().uniform(2);
       scope.zSubsurfaceScale = pb.float().uniform(2);
