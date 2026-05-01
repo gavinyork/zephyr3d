@@ -25,6 +25,7 @@ import { RenderGraph } from './rendergraph';
 import { RenderGraphExecutor } from './executor';
 import { DevicePoolAllocator } from './device_pool_allocator';
 import { HistoryResourceManager } from './history_resource_manager';
+import { RGHistoryResources } from './history_resources';
 import type { RGExecuteContext, RGHandle } from './types';
 import { renderObjectColors } from '../gpu_picking';
 import type { Primitive } from '../primitive';
@@ -120,6 +121,11 @@ export interface FrameState {
 interface ForwardPlusGraphBuildResult {
   backbuffer: RGHandle;
   frame: FrameState;
+}
+
+interface HistoryReadBinding {
+  name: string;
+  handle: RGHandle;
 }
 
 // ─── Forward+ Graph Builder ─────────────────────────────────────────
@@ -380,6 +386,39 @@ function buildForwardPlusGraphInternal(
   });
 
   const sceneColorHandle = lightPassResult.sceneColorHandle;
+  const historyManager = ctx.camera?.getHistoryResourceManager?.() ?? null;
+  const historyReadBindings: HistoryReadBinding[] = [];
+  if (historyManager && ctx.camera?.TAA && options.motionVectors) {
+    const historySize = { width: ctx.renderWidth, height: ctx.renderHeight };
+    const colorHistoryHandle = historyManager.importPreviousIfCompatible(
+      graph,
+      RGHistoryResources.TAA_COLOR,
+      {
+        format: ctx.colorFormat!,
+        sizeMode: 'absolute',
+        width: ctx.renderWidth,
+        height: ctx.renderHeight
+      },
+      historySize
+    );
+    const motionVectorHistoryHandle = historyManager.importPreviousIfCompatible(
+      graph,
+      RGHistoryResources.TAA_MOTION_VECTOR,
+      {
+        format: 'rgba16f',
+        sizeMode: 'absolute',
+        width: ctx.renderWidth,
+        height: ctx.renderHeight
+      },
+      historySize
+    );
+    if (colorHistoryHandle && motionVectorHistoryHandle) {
+      historyReadBindings.push(
+        { name: RGHistoryResources.TAA_COLOR, handle: colorHistoryHandle },
+        { name: RGHistoryResources.TAA_MOTION_VECTOR, handle: motionVectorHistoryHandle }
+      );
+    }
+  }
 
   // 8. Transmission depth pass (optional)
   let transmissionDepthToken: RGHandle | undefined;
@@ -412,9 +451,26 @@ function buildForwardPlusGraphInternal(
     if (transmissionDepthToken) {
       builder.read(transmissionDepthToken);
     }
+    for (const binding of historyReadBindings) {
+      builder.read(binding.handle);
+    }
     const outputBackbuffer = builder.write(backbuffer);
-    builder.setExecute(() => {
-      renderComposite(frame);
+    builder.setExecute((rgCtx) => {
+      if (historyManager && historyReadBindings.length > 0) {
+        historyManager.beginReadScope(
+          historyReadBindings.map((binding) => ({
+            name: binding.name,
+            texture: rgCtx.getTexture<Texture2D>(binding.handle)
+          }))
+        );
+        try {
+          renderComposite(frame);
+        } finally {
+          historyManager.endReadScope();
+        }
+      } else {
+        renderComposite(frame);
+      }
     });
     return outputBackbuffer;
   });
@@ -836,6 +892,7 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
     historyManager = new HistoryResourceManager<Texture2D>(_devicePoolAllocator);
     ctx.camera.setHistoryResourceManager(historyManager);
   }
+  historyManager.beginFrame();
 
   const { backbuffer, frame } = buildForwardPlusGraphInternal(graph, ctx, renderQueue, options);
 
@@ -849,12 +906,13 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
     const backbufferTex = ctx.finalFramebuffer.getColorAttachments()[0] as Texture2D;
     executor.setImportedTexture(backbuffer, backbufferTex);
   }
+  historyManager.bindImportedTextures(executor);
 
   try {
     executor.execute(compiled);
-    // Swap history buffers at frame end (ping-pong)
-    historyManager.swap();
+    historyManager.commitFrame();
   } finally {
+    historyManager.discardFrame();
     cleanupFrame(frame);
     executor.reset();
   }

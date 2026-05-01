@@ -1,10 +1,15 @@
-import { RenderGraph } from '../../../libs/scene/src/render/rendergraph';
+import {
+  HistoryResourceManager,
+  RenderGraph,
+  RGHistoryResources,
+  type RGTextureAllocator
+} from '../../../libs/scene/src/render/rendergraph';
 import {
   buildForwardPlusGraph,
   type ForwardPlusOptions
 } from '../../../libs/scene/src/render/rendergraph/forward_plus_builder';
 
-function createMockDrawContext() {
+function createMockDrawContext(overrides: Record<string, unknown> = {}) {
   return {
     device: {
       type: 'webgpu'
@@ -14,7 +19,8 @@ function createMockDrawContext() {
     colorFormat: 'rgba8unorm',
     renderWidth: 1920,
     renderHeight: 1080,
-    finalFramebuffer: null
+    finalFramebuffer: null,
+    ...overrides
   } as any;
 }
 
@@ -45,12 +51,13 @@ function createOptions(overrides: Partial<ForwardPlusOptions> = {}): ForwardPlus
 
 function buildForwardPlusGraphForTest(
   options: ForwardPlusOptions,
-  renderQueueOptions: Partial<MockRenderQueueOptions> = {}
+  renderQueueOptions: Partial<MockRenderQueueOptions> = {},
+  drawContextOverrides: Record<string, unknown> = {}
 ): { graph: RenderGraph; backbuffer: ReturnType<typeof buildForwardPlusGraph> } {
   const graph = new RenderGraph();
   const backbuffer = buildForwardPlusGraph(
     graph,
-    createMockDrawContext(),
+    createMockDrawContext(drawContextOverrides),
     createMockRenderQueue({
       needSceneColor: options.needSceneColor,
       ...renderQueueOptions
@@ -150,5 +157,109 @@ describe('Forward+ render graph builder', () => {
     });
 
     expect(passNames).not.toContain('ShadowMaps');
+  });
+
+  test('declares compatible TAA history imports as Composite reads', () => {
+    const allocator: RGTextureAllocator<any> = {
+      allocate: (_desc, _size) => ({}),
+      release: () => {}
+    };
+    const historyManager = new HistoryResourceManager(allocator);
+    const size = { width: 1920, height: 1080 };
+    historyManager.beginFrame();
+    historyManager.queueCommit(
+      RGHistoryResources.TAA_COLOR,
+      {
+        format: 'rgba8unorm',
+        sizeMode: 'absolute',
+        width: 1920,
+        height: 1080
+      },
+      size,
+      { id: 'historyColor' }
+    );
+    historyManager.queueCommit(
+      RGHistoryResources.TAA_MOTION_VECTOR,
+      {
+        format: 'rgba16f',
+        sizeMode: 'absolute',
+        width: 1920,
+        height: 1080
+      },
+      size,
+      { id: 'historyMotionVector' }
+    );
+    historyManager.commitFrame();
+
+    const { graph } = buildForwardPlusGraphForTest(
+      createOptions({ motionVectors: true }),
+      {},
+      {
+        camera: {
+          TAA: true,
+          getHistoryResourceManager: () => historyManager
+        }
+      }
+    );
+
+    const composite = graph.passes.find((pass) => pass.name === 'Composite');
+    expect(composite?.reads.map((resource) => resource.name)).toEqual(
+      expect.arrayContaining([
+        `history:${RGHistoryResources.TAA_COLOR}:previous`,
+        `history:${RGHistoryResources.TAA_MOTION_VECTOR}:previous`
+      ])
+    );
+  });
+
+  test('does not declare stale TAA history reads when size is incompatible', () => {
+    const allocator: RGTextureAllocator<any> = {
+      allocate: (_desc, _size) => ({}),
+      release: () => {}
+    };
+    const historyManager = new HistoryResourceManager(allocator);
+    const size = { width: 1280, height: 720 };
+    historyManager.beginFrame();
+    historyManager.queueCommit(
+      RGHistoryResources.TAA_COLOR,
+      {
+        format: 'rgba8unorm',
+        sizeMode: 'absolute',
+        width: 1280,
+        height: 720
+      },
+      size,
+      { id: 'historyColor' }
+    );
+    historyManager.queueCommit(
+      RGHistoryResources.TAA_MOTION_VECTOR,
+      {
+        format: 'rgba16f',
+        sizeMode: 'absolute',
+        width: 1280,
+        height: 720
+      },
+      size,
+      { id: 'historyMotionVector' }
+    );
+    historyManager.commitFrame();
+
+    const { graph } = buildForwardPlusGraphForTest(
+      createOptions({ motionVectors: true }),
+      {},
+      {
+        camera: {
+          TAA: true,
+          getHistoryResourceManager: () => historyManager
+        }
+      }
+    );
+
+    const composite = graph.passes.find((pass) => pass.name === 'Composite');
+    expect(composite?.reads.map((resource) => resource.name)).not.toEqual(
+      expect.arrayContaining([
+        `history:${RGHistoryResources.TAA_COLOR}:previous`,
+        `history:${RGHistoryResources.TAA_MOTION_VECTOR}:previous`
+      ])
+    );
   });
 });

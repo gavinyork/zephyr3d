@@ -7,12 +7,7 @@ import { BoxShape } from '../shapes';
 import { temporalResolve } from '../shaders/temporal';
 import type { Nullable } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
-
-/** Resource names for TAA history buffers */
-const TAA_RESOURCES = {
-  COLOR: 'taaColor',
-  MOTION_VECTOR: 'taaMotionVector'
-} as const;
+import { RGHistoryResources } from '../render/rendergraph/history_resources';
 
 /** @internal */
 export class TAA extends AbstractPostEffect {
@@ -56,40 +51,42 @@ export class TAA extends AbstractPostEffect {
   }
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const historyMgr = ctx.camera.getHistoryResourceManager()!;
+    const colorDesc = {
+      format: inputColorTexture.format,
+      sizeMode: 'absolute' as const,
+      width: inputColorTexture.width,
+      height: inputColorTexture.height
+    };
+    const colorSize = { width: inputColorTexture.width, height: inputColorTexture.height };
+    const motionVectorDesc = {
+      format: ctx.motionVectorTexture!.format,
+      sizeMode: 'absolute' as const,
+      width: ctx.motionVectorTexture!.width,
+      height: ctx.motionVectorTexture!.height
+    };
+    const motionVectorSize = {
+      width: ctx.motionVectorTexture!.width,
+      height: ctx.motionVectorTexture!.height
+    };
 
-    // Check if this is the first frame (no history yet)
-    const isFirstFrame = !historyMgr.has(TAA_RESOURCES.COLOR);
+    const hasHistory =
+      historyMgr.isCompatible(RGHistoryResources.TAA_COLOR, colorDesc, colorSize) &&
+      historyMgr.isCompatible(RGHistoryResources.TAA_MOTION_VECTOR, motionVectorDesc, motionVectorSize);
 
-    if (isFirstFrame) {
+    if (!hasHistory) {
       // First frame: just pass through
       this.passThrough(ctx, inputColorTexture, srgbOutput);
 
-      // Register and update history resources (zero-copy)
+      // Queue history resources only after retaining references from the pool.
       const currentColorTex = ctx.device.getFramebuffer()!.getColorAttachments()[0] as Texture2D;
       ctx.device.pool.retainTexture(currentColorTex);
-
-      historyMgr.registerWithTexture(
-        TAA_RESOURCES.COLOR,
-        {
-          format: inputColorTexture.format,
-          sizeMode: 'absolute',
-          width: inputColorTexture.width,
-          height: inputColorTexture.height
-        },
-        { width: inputColorTexture.width, height: inputColorTexture.height },
-        currentColorTex
-      );
+      historyMgr.queueCommit(RGHistoryResources.TAA_COLOR, colorDesc, colorSize, currentColorTex);
 
       ctx.device.pool.retainTexture(ctx.motionVectorTexture!);
-      historyMgr.registerWithTexture(
-        TAA_RESOURCES.MOTION_VECTOR,
-        {
-          format: ctx.motionVectorTexture!.format,
-          sizeMode: 'absolute',
-          width: ctx.motionVectorTexture!.width,
-          height: ctx.motionVectorTexture!.height
-        },
-        { width: ctx.motionVectorTexture!.width, height: ctx.motionVectorTexture!.height },
+      historyMgr.queueCommit(
+        RGHistoryResources.TAA_MOTION_VECTOR,
+        motionVectorDesc,
+        motionVectorSize,
         ctx.motionVectorTexture!
       );
 
@@ -97,18 +94,8 @@ export class TAA extends AbstractPostEffect {
     }
 
     // Get history textures
-    const prevColorTex = historyMgr.getPrevious(TAA_RESOURCES.COLOR);
-
-    // Check if resolution changed
-    if (prevColorTex.width !== inputColorTexture.width || prevColorTex.height !== inputColorTexture.height) {
-      // Resolution changed, unregister old resources and restart
-      historyMgr.unregister(TAA_RESOURCES.COLOR);
-      historyMgr.unregister(TAA_RESOURCES.MOTION_VECTOR);
-      this.passThrough(ctx, inputColorTexture, srgbOutput);
-      return;
-    }
-
-    const prevMotionVectorTex = historyMgr.getPrevious(TAA_RESOURCES.MOTION_VECTOR);
+    const prevColorTex = historyMgr.getPrevious(RGHistoryResources.TAA_COLOR);
+    const prevMotionVectorTex = historyMgr.getPrevious(RGHistoryResources.TAA_MOTION_VECTOR);
 
     // Render TAA
     let program = TAA._resolveProgram[ctx.camera.TAADebug];
@@ -136,12 +123,17 @@ export class TAA extends AbstractPostEffect {
     // Update history with current framebuffer output (zero-copy)
     const currentColorTex = ctx.device.getFramebuffer()!.getColorAttachments()[0] as Texture2D;
     ctx.device.pool.retainTexture(currentColorTex);
-    historyMgr.updateCurrent(TAA_RESOURCES.COLOR, currentColorTex);
+    historyMgr.queueCommit(RGHistoryResources.TAA_COLOR, colorDesc, colorSize, currentColorTex);
 
     ctx.device.pool.retainTexture(ctx.motionVectorTexture!);
-    historyMgr.updateCurrent(TAA_RESOURCES.MOTION_VECTOR, ctx.motionVectorTexture!);
+    historyMgr.queueCommit(
+      RGHistoryResources.TAA_MOTION_VECTOR,
+      motionVectorDesc,
+      motionVectorSize,
+      ctx.motionVectorTexture!
+    );
 
-    // Note: History swap happens automatically in executeForwardPlusGraph
+    // History commits happen after the render graph completes successfully.
   }
   requireLinearDepthTexture(_ctx: DrawContext) {
     return true;

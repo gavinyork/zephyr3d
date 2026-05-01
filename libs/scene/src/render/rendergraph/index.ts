@@ -16,6 +16,7 @@ export { RenderGraph } from './rendergraph';
 export { RenderGraphExecutor } from './executor';
 export { DevicePoolAllocator } from './device_pool_allocator';
 export { HistoryResourceManager } from './history_resource_manager';
+export { RGHistoryResources } from './history_resources';
 export {
   buildForwardPlusGraph,
   executeForwardPlusGraph,
