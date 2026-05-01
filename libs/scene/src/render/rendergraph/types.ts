@@ -39,9 +39,9 @@ export interface RGTextureDesc {
 /**
  * Opaque handle referencing a resource within the render graph.
  *
- * Handles are obtained from {@link RGPassBuilder.createTexture}, {@link RenderGraph.importTexture},
- * or {@link RGPassBuilder.write}. They are lightweight identifiers used to declare
- * dependencies between passes.
+ * Handles are obtained from {@link RGPassBuilder.createTexture}, {@link RGPassBuilder.createFramebuffer},
+ * {@link RenderGraph.importTexture}, or {@link RGPassBuilder.write}. They are lightweight identifiers
+ * used to declare dependencies between passes.
  *
  * @public
  */
@@ -66,7 +66,7 @@ export class RGHandle {
 // ─── Internal Resource Tracking ─────────────────────────────────────────
 
 /** @public */
-export type RGResourceKind = 'transient' | 'imported' | 'token';
+export type RGResourceKind = 'transient' | 'imported' | 'token' | 'framebuffer';
 
 /**
  * Internal bookkeeping for a resource within the render graph.
@@ -76,7 +76,7 @@ export class RGResource {
   readonly id: number;
   readonly name: string;
   readonly kind: RGResourceKind;
-  readonly desc: RGTextureDesc | null;
+  readonly desc: RGTextureDesc | RGFramebufferDesc | null;
   /** Resource ID of the physical backing resource used by imported versions. */
   readonly physicalId: number;
   /** The pass that creates / writes this resource (null for imported until written). */
@@ -88,7 +88,7 @@ export class RGResource {
     id: number,
     name: string,
     kind: RGResourceKind,
-    desc: RGTextureDesc | null,
+    desc: RGTextureDesc | RGFramebufferDesc | null,
     physicalId = id
   ) {
     this.id = id;
@@ -122,6 +122,37 @@ export interface RGExecuteContext {
    * @returns The resolved texture object (type depends on the allocator).
    */
   getTexture<TTexture = unknown>(handle: RGHandle): TTexture;
+
+  /**
+   * Resolve a framebuffer handle to the actual backend framebuffer object.
+   *
+   * @param handle - Handle returned from {@link RGPassBuilder.createFramebuffer}.
+   * @returns The resolved framebuffer object (type depends on the allocator).
+   */
+  getFramebuffer<TFramebuffer = unknown>(handle: RGHandle): TFramebuffer;
+
+  /**
+   * Create a temporary framebuffer managed by the graph executor.
+   *
+   * The framebuffer is released automatically when graph execution finishes or
+   * aborts. Attachments may be actual backend resources or texture formats,
+   * depending on the allocator implementation.
+   *
+   * @param desc - Framebuffer descriptor.
+   * @returns The allocated framebuffer object (type depends on the allocator).
+   */
+  createFramebuffer<TFramebuffer = unknown>(desc: RGFramebufferDesc): TFramebuffer;
+
+  /**
+   * Register a cleanup callback to run when graph execution finishes or aborts.
+   *
+   * Callbacks run in reverse registration order. Use this for temporary objects
+   * created inside pass execution that are not graph resources, such as pooled
+   * framebuffers wrapping graph-managed textures.
+   *
+   * @param callback - Cleanup function to invoke after execution.
+   */
+  deferCleanup(callback: () => void): void;
 }
 
 /**
@@ -213,6 +244,17 @@ export interface RGPassBuilder {
   createToken(name?: string): RGHandle;
 
   /**
+   * Create a graph-managed framebuffer view.
+   *
+   * The graph compiler infers dependencies from any attachment handles in the
+   * descriptor. The executor creates and releases the framebuffer automatically.
+   *
+   * @param desc - Framebuffer descriptor.
+   * @returns A handle referencing the framebuffer view.
+   */
+  createFramebuffer(desc: RGFramebufferDesc): RGHandle;
+
+  /**
    * Mark this pass as having side effects.
    *
    * Side-effect passes are never culled by the graph compiler, regardless of
@@ -272,6 +314,40 @@ export interface RGResolvedSize {
 }
 
 /**
+ * Descriptor for a framebuffer view managed by the graph or created temporarily during pass execution.
+ *
+ * This is intentionally backend-agnostic: graph-managed descriptors may use
+ * {@link RGHandle} attachments, and executor-created descriptors use resolved
+ * resources or texture formats understood by the allocator.
+ *
+ * @public
+ */
+export interface RGFramebufferDesc {
+  /** Debug label for this framebuffer. */
+  label?: string;
+  /** Framebuffer width. Required when attachments are formats. */
+  width?: number;
+  /** Framebuffer height. Required when attachments are formats. */
+  height?: number;
+  /** Color attachments or formats. */
+  colorAttachments: unknown | unknown[] | null;
+  /** Depth/stencil attachment or format. */
+  depthAttachment?: unknown | null;
+  /** Whether color attachments created from formats should support mipmapping. */
+  mipmapping?: boolean;
+  /** Framebuffer sample count. */
+  sampleCount?: number;
+  /** Whether to ignore depth/stencil during MSAA resolve. */
+  ignoreDepthStencil?: boolean;
+  /** Attachment mip level. */
+  attachmentMipLevel?: number;
+  /** Attachment cubemap face. */
+  attachmentCubeface?: number;
+  /** Attachment array layer. */
+  attachmentLayer?: number;
+}
+
+/**
  * Interface for allocating and releasing transient textures.
  *
  * Implement this to bridge the render graph with your GPU device's resource pool.
@@ -281,7 +357,7 @@ export interface RGResolvedSize {
  * @typeParam TTexture - The concrete texture type (e.g. `Texture2D`).
  * @public
  */
-export interface RGTextureAllocator<TTexture = unknown> {
+export interface RGTextureAllocator<TTexture = unknown, TFramebuffer = unknown> {
   /**
    * Allocate a transient texture matching the given descriptor and resolved size.
    *
@@ -297,4 +373,22 @@ export interface RGTextureAllocator<TTexture = unknown> {
    * @param texture - The texture to release.
    */
   release(texture: TTexture): void;
+
+  /**
+   * Allocate a temporary framebuffer matching the given descriptor.
+   *
+   * Implementations should not auto-release this framebuffer; the graph executor
+   * calls {@link releaseFramebuffer} when execution completes or aborts.
+   *
+   * @param desc - Framebuffer descriptor.
+   * @returns The allocated framebuffer object.
+   */
+  allocateFramebuffer?(desc: RGFramebufferDesc): TFramebuffer;
+
+  /**
+   * Release a previously allocated temporary framebuffer.
+   *
+   * @param framebuffer - The framebuffer to release.
+   */
+  releaseFramebuffer?(framebuffer: TFramebuffer): void;
 }

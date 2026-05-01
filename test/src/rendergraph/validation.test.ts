@@ -11,7 +11,7 @@ describe('RenderGraph validation improvements', () => {
   describe('transient resource validation', () => {
     test('reading transient resource without producer throws', () => {
       // Manually create a transient resource without a producer (simulating edge case)
-      const backbuffer = graph.importTexture('backbuffer');
+      let backbuffer = graph.importTexture('backbuffer');
       let orphanHandle: RGHandle;
 
       graph.addPass('CreateOrphan', (builder) => {
@@ -28,7 +28,7 @@ describe('RenderGraph validation improvements', () => {
       expect(() => {
         graph.addPass('ReadOrphan', (builder) => {
           builder.read(orphanHandle!);
-          builder.write(backbuffer);
+          backbuffer = builder.write(backbuffer);
         });
       }).toThrow(/has no producer/);
     });
@@ -36,7 +36,7 @@ describe('RenderGraph validation improvements', () => {
 
   describe('circular dependency detection', () => {
     test('circular dependency reports involved passes', () => {
-      const backbuffer = graph.importTexture('backbuffer');
+      let backbuffer = graph.importTexture('backbuffer');
 
       // Create a circular dependency by having passes depend on each other's outputs
       let texA: RGHandle;
@@ -55,7 +55,7 @@ describe('RenderGraph validation improvements', () => {
 
       graph.addPass('Final', (builder) => {
         builder.read(texB!);
-        builder.write(backbuffer);
+        backbuffer = builder.write(backbuffer);
         builder.setExecute(() => {});
       });
 

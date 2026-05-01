@@ -1,5 +1,6 @@
 export {
   RGHandle,
+  type RGFramebufferDesc,
   type RGTextureDesc,
   type RGSizeMode,
   type RGPassBuilder,

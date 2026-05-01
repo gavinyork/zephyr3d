@@ -38,8 +38,8 @@ describe('RenderGraphExecutor Integration', () => {
     const graph = new RenderGraph();
 
     // Imported resources (managed externally)
-    const backbuffer = graph.importTexture('backbuffer');
-    const depthBuffer = graph.importTexture('depth');
+    let backbuffer = graph.importTexture('backbuffer');
+    let depthBuffer = graph.importTexture('depth');
 
     // Transient resource (managed by executor)
     let hiZHandle: any;
@@ -47,7 +47,7 @@ describe('RenderGraphExecutor Integration', () => {
     const events: string[] = [];
 
     graph.addPass('DepthPass', (builder) => {
-      builder.write(depthBuffer);
+      depthBuffer = builder.write(depthBuffer);
       builder.setExecute(() => {
         events.push('DepthPass');
       });
@@ -65,7 +65,7 @@ describe('RenderGraphExecutor Integration', () => {
     graph.addPass('LightPass', (builder) => {
       builder.read(depthBuffer);
       builder.read(hiZHandle);
-      builder.write(backbuffer);
+      backbuffer = builder.write(backbuffer);
       builder.setExecute(() => {
         events.push('LightPass');
       });

@@ -2,11 +2,12 @@ import type {
   CompiledRenderGraph,
   RGTextureAllocator,
   RGTextureDesc,
+  RGFramebufferDesc,
   RGResolvedSize,
   RGExecuteContext,
   RGExecuteFn
 } from './types';
-import type { RGHandle } from './types';
+import { RGHandle } from './types';
 
 /**
  * Executes a compiled render graph with automatic resource lifecycle management.
@@ -24,9 +25,9 @@ import type { RGHandle } from './types';
  * @typeParam TTexture - The concrete texture type (e.g. `Texture2D`).
  * @public
  */
-export class RenderGraphExecutor<TTexture = unknown> {
+export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   /** @internal */
-  private _allocator: RGTextureAllocator<TTexture>;
+  private _allocator: RGTextureAllocator<TTexture, TFramebuffer>;
   /** @internal */
   private _backbufferWidth: number;
   /** @internal */
@@ -36,11 +37,19 @@ export class RenderGraphExecutor<TTexture = unknown> {
   /** @internal */
   private _allocatedTextures: Map<number, TTexture> = new Map();
   /** @internal */
+  private _allocatedFramebuffers: Map<number, TFramebuffer> = new Map();
+  /** @internal */
   private _importedTextureAliases: Map<number, number> = new Map();
   /** @internal */
   private _resolvedImportedTextures: Map<number, TTexture> = new Map();
+  /** @internal */
+  private _cleanupCallbacks: Array<() => void> = [];
 
-  constructor(allocator: RGTextureAllocator<TTexture>, backbufferWidth: number, backbufferHeight: number) {
+  constructor(
+    allocator: RGTextureAllocator<TTexture, TFramebuffer>,
+    backbufferWidth: number,
+    backbufferHeight: number
+  ) {
     this._allocator = allocator;
     this._backbufferWidth = backbufferWidth;
     this._backbufferHeight = backbufferHeight;
@@ -75,11 +84,14 @@ export class RenderGraphExecutor<TTexture = unknown> {
    * @param compiled - The compiled graph from {@link RenderGraph.compile}.
    */
   execute(compiled: CompiledRenderGraph): void {
+    this._cleanupCallbacks.length = 0;
     this._resolveImportedTextureAliases(compiled);
 
     // Build per-pass allocation and release schedules
-    const allocateAt = new Map<number, number[]>(); // passIndex -> resourceIds to allocate
-    const releaseAt = new Map<number, number[]>(); // passIndex -> resourceIds to release
+    const allocateAt = new Map<number, number[]>(); // passIndex -> transient texture resourceIds to allocate
+    const releaseAt = new Map<number, number[]>(); // passIndex -> transient texture resourceIds to release
+    const allocateFramebufferAt = new Map<number, number[]>(); // passIndex -> framebuffer resourceIds to allocate
+    const releaseFramebufferAt = new Map<number, number[]>(); // passIndex -> framebuffer resourceIds to release
 
     for (const [resId, lifetime] of compiled.lifetimes) {
       if (lifetime.resource.kind === 'transient') {
@@ -92,6 +104,16 @@ export class RenderGraphExecutor<TTexture = unknown> {
           releaseAt.set(lifetime.lastUse, []);
         }
         releaseAt.get(lifetime.lastUse)!.push(resId);
+      } else if (lifetime.resource.kind === 'framebuffer') {
+        if (!allocateFramebufferAt.has(lifetime.firstUse)) {
+          allocateFramebufferAt.set(lifetime.firstUse, []);
+        }
+        allocateFramebufferAt.get(lifetime.firstUse)!.push(resId);
+
+        if (!releaseFramebufferAt.has(lifetime.lastUse)) {
+          releaseFramebufferAt.set(lifetime.lastUse, []);
+        }
+        releaseFramebufferAt.get(lifetime.lastUse)!.push(resId);
       }
     }
 
@@ -107,10 +129,21 @@ export class RenderGraphExecutor<TTexture = unknown> {
         if (toAllocate) {
           for (const resId of toAllocate) {
             const lifetime = compiled.lifetimes.get(resId)!;
-            const desc = lifetime.resource.desc!;
+            const desc = lifetime.resource.desc as RGTextureDesc;
             const size = this._resolveSize(desc);
             const texture = this._allocator.allocate(desc, size);
             this._allocatedTextures.set(resId, texture);
+          }
+        }
+
+        // Allocate framebuffer views after their texture attachments are available.
+        const framebuffersToAllocate = allocateFramebufferAt.get(i);
+        if (framebuffersToAllocate) {
+          for (const resId of framebuffersToAllocate) {
+            const lifetime = compiled.lifetimes.get(resId)!;
+            const desc = lifetime.resource.desc as RGFramebufferDesc;
+            const framebuffer = this._createFramebuffer(this._resolveFramebufferDesc(desc), false);
+            this._allocatedFramebuffers.set(resId, framebuffer);
           }
         }
 
@@ -120,6 +153,16 @@ export class RenderGraphExecutor<TTexture = unknown> {
             (pass.executeFn as RGExecuteFn<unknown>)(ctx, pass.data);
           }
         } finally {
+          const framebuffersToRelease = releaseFramebufferAt.get(i);
+          if (framebuffersToRelease) {
+            for (const resId of framebuffersToRelease) {
+              const framebuffer = this._allocatedFramebuffers.get(resId);
+              if (framebuffer !== undefined) {
+                this._releaseFramebuffer(framebuffer);
+                this._allocatedFramebuffers.delete(resId);
+              }
+            }
+          }
           // Release resources that end at this pass (always runs even if pass throws)
           const toRelease = releaseAt.get(i);
           if (toRelease) {
@@ -135,8 +178,18 @@ export class RenderGraphExecutor<TTexture = unknown> {
       }
       completed = true;
     } finally {
-      if (!completed) {
-        this.reset();
+      let cleanupError: unknown = null;
+      try {
+        this._runCleanupCallbacks();
+      } catch (e) {
+        cleanupError = e;
+      } finally {
+        if (!completed) {
+          this.reset();
+        }
+      }
+      if (cleanupError) {
+        throw cleanupError;
       }
     }
   }
@@ -146,7 +199,12 @@ export class RenderGraphExecutor<TTexture = unknown> {
    * Call this after execution or when resetting for a new frame.
    */
   reset(): void {
+    this._runCleanupCallbacks();
     // Release any textures that weren't released (shouldn't happen in normal flow)
+    for (const framebuffer of this._allocatedFramebuffers.values()) {
+      this._releaseFramebuffer(framebuffer);
+    }
+    this._allocatedFramebuffers.clear();
     for (const texture of this._allocatedTextures.values()) {
       this._allocator.release(texture);
     }
@@ -207,36 +265,110 @@ export class RenderGraphExecutor<TTexture = unknown> {
   }
 
   /** @internal */
+  private _runCleanupCallbacks(): void {
+    let error: unknown = null;
+    while (this._cleanupCallbacks.length > 0) {
+      const callback = this._cleanupCallbacks.pop()!;
+      try {
+        callback();
+      } catch (e) {
+        error ??= e;
+      }
+    }
+    if (error) {
+      throw error;
+    }
+  }
+
+  /** @internal */
+  private _createFramebuffer(desc: RGFramebufferDesc, autoCleanup = true): TFramebuffer {
+    if (!this._allocator.allocateFramebuffer || !this._allocator.releaseFramebuffer) {
+      throw new Error('RenderGraphExecutor: framebuffer allocation is not supported by this allocator.');
+    }
+    const framebuffer = this._allocator.allocateFramebuffer(desc);
+    if (autoCleanup) {
+      this._cleanupCallbacks.push(() => {
+        this._allocator.releaseFramebuffer!(framebuffer);
+      });
+    }
+    return framebuffer;
+  }
+
+  /** @internal */
+  private _releaseFramebuffer(framebuffer: TFramebuffer): void {
+    if (!this._allocator.releaseFramebuffer) {
+      throw new Error('RenderGraphExecutor: framebuffer release is not supported by this allocator.');
+    }
+    this._allocator.releaseFramebuffer(framebuffer);
+  }
+
+  /** @internal */
+  private _resolveFramebufferDesc(desc: RGFramebufferDesc): RGFramebufferDesc {
+    const resolveAttachment = (attachment: unknown): unknown => {
+      return attachment instanceof RGHandle ? this._resolveResource(attachment) : attachment;
+    };
+    const colors = Array.isArray(desc.colorAttachments)
+      ? desc.colorAttachments.map(resolveAttachment)
+      : desc.colorAttachments
+        ? resolveAttachment(desc.colorAttachments)
+        : null;
+    return {
+      ...desc,
+      colorAttachments: colors,
+      depthAttachment: resolveAttachment(desc.depthAttachment)
+    };
+  }
+
+  /** @internal */
+  private _resolveResource(handle: RGHandle): TTexture {
+    const imported = this._importedTextures.get(handle._id);
+    if (imported !== undefined) {
+      return imported;
+    }
+    const resolvedImported = this._resolvedImportedTextures.get(handle._id);
+    if (resolvedImported !== undefined) {
+      return resolvedImported;
+    }
+    const importedAlias = this._importedTextureAliases.get(handle._id);
+    if (importedAlias !== undefined) {
+      const aliased =
+        this._importedTextures.get(importedAlias) ?? this._resolvedImportedTextures.get(importedAlias);
+      if (aliased !== undefined) {
+        return aliased;
+      }
+    }
+    const allocated = this._allocatedTextures.get(handle._id);
+    if (allocated !== undefined) {
+      return allocated;
+    }
+    throw new Error(
+      `RenderGraphExecutor: cannot resolve resource "${handle.name}" (id=${handle._id}). ` +
+        `It may not have been allocated yet or was already released.`
+    );
+  }
+
+  /** @internal */
   private _createContext(): RGExecuteContext {
     const self = this;
     return {
       getTexture<T>(handle: RGHandle): T {
-        // Check imported first
-        const imported = self._importedTextures.get(handle._id);
-        if (imported !== undefined) {
-          return imported as unknown as T;
-        }
-        const resolvedImported = self._resolvedImportedTextures.get(handle._id);
-        if (resolvedImported !== undefined) {
-          return resolvedImported as unknown as T;
-        }
-        const importedAlias = self._importedTextureAliases.get(handle._id);
-        if (importedAlias !== undefined) {
-          const aliased =
-            self._importedTextures.get(importedAlias) ?? self._resolvedImportedTextures.get(importedAlias);
-          if (aliased !== undefined) {
-            return aliased as unknown as T;
-          }
-        }
-        // Check allocated transient
-        const allocated = self._allocatedTextures.get(handle._id);
-        if (allocated !== undefined) {
-          return allocated as unknown as T;
+        return self._resolveResource(handle) as unknown as T;
+      },
+      getFramebuffer<TFramebuffer = unknown>(handle: RGHandle): TFramebuffer {
+        const framebuffer = self._allocatedFramebuffers.get(handle._id);
+        if (framebuffer !== undefined) {
+          return framebuffer as unknown as TFramebuffer;
         }
         throw new Error(
-          `RenderGraphExecutor: cannot resolve resource "${handle.name}" (id=${handle._id}). ` +
+          `RenderGraphExecutor: cannot resolve framebuffer "${handle.name}" (id=${handle._id}). ` +
             `It may not have been allocated yet or was already released.`
         );
+      },
+      createFramebuffer<TFramebuffer = unknown>(desc: RGFramebufferDesc): TFramebuffer {
+        return self._createFramebuffer(self._resolveFramebufferDesc(desc)) as unknown as TFramebuffer;
+      },
+      deferCleanup(callback: () => void): void {
+        self._cleanupCallbacks.push(callback);
       }
     };
   }

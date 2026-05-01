@@ -25,7 +25,7 @@ import { RenderGraph } from './rendergraph';
 import { RenderGraphExecutor } from './executor';
 import { DevicePoolAllocator } from './device_pool_allocator';
 import { HistoryResourceManager } from './history_resource_manager';
-import type { RGHandle } from './types';
+import type { RGExecuteContext, RGHandle } from './types';
 import { renderObjectColors } from '../gpu_picking';
 import type { Primitive } from '../primitive';
 import { BoxShape } from '../../shapes';
@@ -111,8 +111,6 @@ export interface FrameState {
   depthFramebuffer: Nullable<FrameBuffer>;
   sunLightColor: Nullable<any>;
   options: ForwardPlusOptions;
-  depthFramebufferReleased: boolean;
-  intermediateFramebufferReleased: boolean;
   intermediateDeviceStatePushed: boolean;
   renderQueueDisposed: boolean;
   clusteredLightReleased: boolean;
@@ -165,8 +163,6 @@ function buildForwardPlusGraphInternal(
     depthFramebuffer: null,
     sunLightColor: null,
     options,
-    depthFramebufferReleased: false,
-    intermediateFramebufferReleased: false,
     intermediateDeviceStatePushed: false,
     renderQueueDisposed: false,
     clusteredLightReleased: false,
@@ -243,25 +239,69 @@ function buildForwardPlusGraphInternal(
     const motionVectorHandle = options.motionVectors
       ? builder.createTexture({ format: mvFormat, label: 'motionVector' })
       : undefined;
+    const finalDepthAttachment = ctx.finalFramebuffer?.getDepthAttachment();
+    const externalDepthAttachment = finalDepthAttachment?.isTexture2D() ? (finalDepthAttachment as Texture2D) : null;
+    const graphDepthAttachmentHandle = externalDepthAttachment
+      ? undefined
+      : builder.createTexture({ format: ctx.depthFormat, label: 'sceneDepth' });
+    const depthAttachmentOrFormat = externalDepthAttachment ?? graphDepthAttachmentHandle ?? ctx.depthFormat;
+    const depthFramebufferHandle = builder.createFramebuffer({
+      label: 'DepthPrepassFramebuffer',
+      width: ctx.renderWidth,
+      height: ctx.renderHeight,
+      colorAttachments: motionVectorHandle ? [depthHandle, motionVectorHandle] : depthHandle,
+      depthAttachment: depthAttachmentOrFormat,
+      ignoreDepthStencil: false
+    });
+    const skyMotionVectorFramebufferHandle = motionVectorHandle
+      ? builder.createFramebuffer({
+          label: 'SkyMotionVectorFramebuffer',
+          width: ctx.renderWidth,
+          height: ctx.renderHeight,
+          colorAttachments: motionVectorHandle,
+          depthAttachment: depthAttachmentOrFormat
+        })
+      : undefined;
 
     builder.setExecute((rgCtx) => {
-      const depthTex = rgCtx.getTexture<Texture2D>(depthHandle);
-      const mvTex = motionVectorHandle ? rgCtx.getTexture<Texture2D>(motionVectorHandle) : null;
-      frame.depthFramebuffer = renderSceneDepth(frame, null, depthTex, mvTex);
+      const depthFramebuffer = rgCtx.getFramebuffer<FrameBuffer>(depthFramebufferHandle);
+      frame.depthFramebuffer = renderSceneDepth(
+        frame,
+        depthFramebuffer,
+        undefined,
+        undefined,
+        rgCtx,
+        false,
+        skyMotionVectorFramebufferHandle
+      );
     });
 
-    return { depthHandle, motionVectorHandle };
+    return {
+      depthHandle,
+      motionVectorHandle,
+      graphDepthAttachmentHandle,
+      externalDepthAttachment,
+      depthFramebufferHandle
+    };
   });
 
   const depthHandle = depthPassResult.depthHandle;
   const motionVectorHandle = depthPassResult.motionVectorHandle;
+  const renderDepthAttachment =
+    depthPassResult.graphDepthAttachmentHandle ?? depthPassResult.externalDepthAttachment ?? null;
 
   // ── 6. Hi-Z (optional) ───────────────────────────────────────────
   let hiZHandle: RGHandle | undefined;
   if (options.hiZ) {
     graph.addPass('HiZ', (builder) => {
       builder.read(depthHandle!);
+      builder.read(depthPassResult.depthFramebufferHandle);
       hiZHandle = builder.createTexture({ format: 'r32f', label: 'hiZ', mipLevels: 10 });
+      const hiZFramebufferHandle = builder.createFramebuffer({
+        label: 'HiZFramebuffer',
+        colorAttachments: hiZHandle,
+        depthAttachment: null
+      });
       builder.setExecute((rgCtx) => {
         const ctx = frame.ctx;
         // Use the depth texture from the framebuffer (which contains the RenderGraph texture)
@@ -269,12 +309,9 @@ function buildForwardPlusGraphInternal(
         if (depthTex) {
           // Get the HiZ texture allocated by the executor
           const hiZTex = rgCtx.getTexture<Texture2D>(hiZHandle!);
-          const w = hiZTex.width;
-          const h = hiZTex.height;
-          const HiZFrameBuffer = ctx.device.pool.fetchTemporalFramebuffer(false, w, h, hiZTex, null, false);
+          const HiZFrameBuffer = rgCtx.getFramebuffer<FrameBuffer>(hiZFramebufferHandle);
           buildHiZ(depthTex, HiZFrameBuffer);
           ctx.HiZTexture = hiZTex;
-          ctx.device.pool.releaseFrameBuffer(HiZFrameBuffer);
         }
       });
     });
@@ -283,6 +320,7 @@ function buildForwardPlusGraphInternal(
   // ── 7. Main Light Pass ────────────────────────────────────────────
   const lightPassResult = graph.addPass('LightPass', (builder) => {
     builder.read(depthHandle);
+    builder.read(depthPassResult.depthFramebufferHandle);
     if (hiZHandle) {
       builder.read(hiZHandle);
     }
@@ -301,16 +339,45 @@ function buildForwardPlusGraphInternal(
         label: 'sceneColorCopy'
       });
     }
+    const useFinalFramebufferAsIntermediate =
+      !!depthPassResult.externalDepthAttachment &&
+      depthPassResult.externalDepthAttachment === ctx.finalFramebuffer?.getDepthAttachment();
+    const sceneColorFramebufferHandle = useFinalFramebufferAsIntermediate
+      ? undefined
+      : builder.createFramebuffer({
+          label: 'SceneColorFramebuffer',
+          width: ctx.renderWidth,
+          height: ctx.renderHeight,
+          colorAttachments: sceneColorHandle,
+          depthAttachment: renderDepthAttachment
+        });
+    const sceneColorCopyFramebufferHandle = sceneColorCopyHandle
+      ? builder.createFramebuffer({
+          label: 'SceneColorCopyFramebuffer',
+          width: ctx.renderWidth,
+          height: ctx.renderHeight,
+          colorAttachments: sceneColorCopyHandle,
+          depthAttachment: renderDepthAttachment,
+          ignoreDepthStencil: false
+        })
+      : undefined;
 
     builder.setExecute((rgCtx) => {
       const sceneColorTex = rgCtx.getTexture<Texture2D>(sceneColorHandle);
       const sceneColorCopyTex = sceneColorCopyHandle
         ? rgCtx.getTexture<Texture2D>(sceneColorCopyHandle)
         : null;
-      renderMainLightPass(frame, sceneColorTex, sceneColorCopyTex);
+      renderMainLightPass(
+        frame,
+        sceneColorTex,
+        sceneColorCopyTex,
+        rgCtx,
+        sceneColorFramebufferHandle,
+        sceneColorCopyFramebufferHandle
+      );
     });
 
-    return { sceneColorHandle, sceneColorCopyHandle };
+    return { sceneColorHandle, sceneColorCopyHandle, sceneColorFramebufferHandle };
   });
 
   const sceneColorHandle = lightPassResult.sceneColorHandle;
@@ -324,6 +391,9 @@ function buildForwardPlusGraphInternal(
     }
     if (motionVectorHandle) {
       builder.read(motionVectorHandle);
+    }
+    if (lightPassResult.sceneColorFramebufferHandle) {
+      builder.read(lightPassResult.sceneColorFramebufferHandle);
     }
     const outputBackbuffer = builder.write(backbuffer);
     builder.setExecute(() => {
@@ -359,26 +429,10 @@ function releaseIntermediateFramebuffer(frame: FrameState): void {
     ctx.device.popDeviceStates();
     frame.intermediateDeviceStatePushed = false;
   }
-  if (
-    ctx.intermediateFramebuffer &&
-    ctx.intermediateFramebuffer !== ctx.finalFramebuffer &&
-    !frame.intermediateFramebufferReleased
-  ) {
-    ctx.device.pool.releaseFrameBuffer(ctx.intermediateFramebuffer);
-    frame.intermediateFramebufferReleased = true;
-  }
   ctx.intermediateFramebuffer = null;
 }
 
 function releaseDepthFramebuffer(frame: FrameState): void {
-  if (
-    frame.depthFramebuffer &&
-    frame.depthFramebuffer !== frame.ctx.finalFramebuffer &&
-    !frame.depthFramebufferReleased
-  ) {
-    frame.ctx.device.pool.releaseFrameBuffer(frame.depthFramebuffer);
-    frame.depthFramebufferReleased = true;
-  }
   frame.depthFramebuffer = null;
 }
 
@@ -417,11 +471,14 @@ function renderSceneDepth(
   frame: FrameState,
   existingDepthFb: Nullable<FrameBuffer>,
   depthTex?: Texture2D,
-  motionVectorTex?: Nullable<Texture2D>
+  motionVectorTex?: Nullable<Texture2D>,
+  rgCtx?: RGExecuteContext,
+  transmissionOverride?: boolean,
+  skyMotionVectorFramebufferHandle?: RGHandle
 ): FrameBuffer {
   const ctx = frame.ctx;
   const renderQueue = frame.renderQueue;
-  const transmission = !!existingDepthFb;
+  const transmission = transmissionOverride ?? !!existingDepthFb;
   let depthFramebuffer = existingDepthFb;
 
   if (!depthFramebuffer) {
@@ -431,14 +488,22 @@ function renderSceneDepth(
       const depthAttachment = ctx.finalFramebuffer?.getDepthAttachment();
       const depthTexOrFormat = depthAttachment?.isTexture2D() ? depthAttachment : ctx.depthFormat;
 
-      depthFramebuffer = ctx.device.pool.fetchTemporalFramebuffer(
-        true,
-        depthTex.width,
-        depthTex.height,
-        colorAttachments,
-        depthTexOrFormat,
-        false
-      );
+      depthFramebuffer = rgCtx
+        ? rgCtx.createFramebuffer<FrameBuffer>({
+            width: depthTex.width,
+            height: depthTex.height,
+            colorAttachments,
+            depthAttachment: depthTexOrFormat,
+            ignoreDepthStencil: false
+          })
+        : ctx.device.pool.fetchTemporalFramebuffer(
+            true,
+            depthTex.width,
+            depthTex.height,
+            colorAttachments,
+            depthTexOrFormat,
+            false
+          );
     } else {
       // Fallback: allocate from pool (legacy path)
       const format: TextureFormat =
@@ -451,25 +516,14 @@ function renderSceneDepth(
             : 'r32f';
       const mvFormat: TextureFormat = 'rgba16f';
       if (!ctx.finalFramebuffer) {
-        depthFramebuffer = ctx.device.pool.fetchTemporalFramebuffer(
-          true,
-          ctx.renderWidth,
-          ctx.renderHeight,
-          ctx.motionVectors ? [format, mvFormat] : format,
-          ctx.depthFormat,
-          false
-        );
-      } else {
-        const originDepth = ctx.finalFramebuffer?.getDepthAttachment();
-        depthFramebuffer = originDepth?.isTexture2D()
-          ? ctx.device.pool.fetchTemporalFramebuffer(
-              true,
-              originDepth.width,
-              originDepth.height,
-              ctx.motionVectors ? [format, mvFormat] : format,
-              originDepth,
-              false
-            )
+        depthFramebuffer = rgCtx
+          ? rgCtx.createFramebuffer<FrameBuffer>({
+              width: ctx.renderWidth,
+              height: ctx.renderHeight,
+              colorAttachments: ctx.motionVectors ? [format, mvFormat] : format,
+              depthAttachment: ctx.depthFormat,
+              ignoreDepthStencil: false
+            })
           : ctx.device.pool.fetchTemporalFramebuffer(
               true,
               ctx.renderWidth,
@@ -478,13 +532,49 @@ function renderSceneDepth(
               ctx.depthFormat,
               false
             );
+      } else {
+        const originDepth = ctx.finalFramebuffer?.getDepthAttachment();
+        if (originDepth?.isTexture2D()) {
+          depthFramebuffer = rgCtx
+            ? rgCtx.createFramebuffer<FrameBuffer>({
+                width: originDepth.width,
+                height: originDepth.height,
+                colorAttachments: ctx.motionVectors ? [format, mvFormat] : format,
+                depthAttachment: originDepth,
+                ignoreDepthStencil: false
+              })
+            : ctx.device.pool.fetchTemporalFramebuffer(
+                true,
+                originDepth.width,
+                originDepth.height,
+                ctx.motionVectors ? [format, mvFormat] : format,
+                originDepth,
+                false
+              );
+        } else {
+          depthFramebuffer = rgCtx
+            ? rgCtx.createFramebuffer<FrameBuffer>({
+                width: ctx.renderWidth,
+                height: ctx.renderHeight,
+                colorAttachments: ctx.motionVectors ? [format, mvFormat] : format,
+                depthAttachment: ctx.depthFormat,
+                ignoreDepthStencil: false
+              })
+            : ctx.device.pool.fetchTemporalFramebuffer(
+                true,
+                ctx.renderWidth,
+                ctx.renderHeight,
+                ctx.motionVectors ? [format, mvFormat] : format,
+                ctx.depthFormat,
+                false
+              );
+        }
       }
     }
   }
 
   if (!transmission) {
     frame.depthFramebuffer = depthFramebuffer!;
-    frame.depthFramebufferReleased = false;
   }
 
   ctx.device.pushDeviceStates();
@@ -533,7 +623,7 @@ function renderSceneDepth(
     ctx.depthTexture = depthFramebuffer!.getDepthAttachment() as Texture2D;
     if (ctx.motionVectorTexture) {
       // Sky motion vectors rendering is handled inline
-      renderSkyMotionVectors(ctx);
+      renderSkyMotionVectors(ctx, rgCtx, skyMotionVectorFramebufferHandle);
     }
     // HiZ is now built in the dedicated HiZ pass
   }
@@ -547,13 +637,25 @@ let _skyMVBindGroup: Nullable<BindGroup> = null;
 let _skyMVBox: Nullable<Primitive> = null;
 
 /** @internal */
-function renderSkyMotionVectors(ctx: DrawContext): void {
+function renderSkyMotionVectors(
+  ctx: DrawContext,
+  rgCtx?: RGExecuteContext,
+  framebufferHandle?: RGHandle
+): void {
   if (!ctx.motionVectorTexture) {
     return;
   }
 
   const device = ctx.device;
-  const fb = device.pool.fetchTemporalFramebuffer(false, 0, 0, ctx.motionVectorTexture, ctx.depthTexture);
+  const fb =
+    rgCtx && framebufferHandle
+      ? rgCtx.getFramebuffer<FrameBuffer>(framebufferHandle)
+      : rgCtx
+        ? rgCtx.createFramebuffer<FrameBuffer>({
+            colorAttachments: ctx.motionVectorTexture,
+            depthAttachment: ctx.depthTexture
+          })
+        : device.pool.fetchTemporalFramebuffer(false, 0, 0, ctx.motionVectorTexture, ctx.depthTexture);
 
   if (!_skyMVProgram) {
     _skyMVProgram = device.buildRenderProgram({
@@ -611,14 +713,19 @@ function renderSkyMotionVectors(ctx: DrawContext): void {
   device.setFramebuffer(fb);
   _skyMVBox.draw();
   device.popDeviceStates();
-  device.pool.releaseFrameBuffer(fb);
+  if (!rgCtx) {
+    device.pool.releaseFrameBuffer(fb);
+  }
 }
 
 /** @internal */
 function renderMainLightPass(
   frame: FrameState,
   sceneColorTex: Texture2D,
-  sceneColorCopyTex: Nullable<Texture2D>
+  sceneColorCopyTex: Nullable<Texture2D>,
+  rgCtx: RGExecuteContext,
+  sceneColorFramebufferHandle?: RGHandle,
+  sceneColorCopyFramebufferHandle?: RGHandle
 ): void {
   const { ctx, renderQueue } = frame;
   const device = ctx.device;
@@ -628,20 +735,20 @@ function renderMainLightPass(
 
   if (depthTex === ctx.finalFramebuffer?.getDepthAttachment()) {
     ctx.intermediateFramebuffer = ctx.finalFramebuffer;
+  } else if (sceneColorFramebufferHandle) {
+    ctx.intermediateFramebuffer = rgCtx.getFramebuffer<FrameBuffer>(sceneColorFramebufferHandle);
   } else {
-    ctx.intermediateFramebuffer = device.pool.fetchTemporalFramebuffer(
-      false,
-      sceneColorTex.width,
-      sceneColorTex.height,
-      sceneColorTex,
-      depthTex
-    );
+    ctx.intermediateFramebuffer = rgCtx.createFramebuffer<FrameBuffer>({
+      width: sceneColorTex.width,
+      height: sceneColorTex.height,
+      colorAttachments: sceneColorTex,
+      depthAttachment: depthTex
+    });
   }
 
   if (ctx.intermediateFramebuffer && ctx.intermediateFramebuffer !== ctx.finalFramebuffer) {
     device.pushDeviceStates();
     frame.intermediateDeviceStatePushed = true;
-    frame.intermediateFramebufferReleased = false;
     device.setFramebuffer(ctx.intermediateFramebuffer);
   } else {
     device.setViewport(null);
@@ -663,20 +770,23 @@ function renderMainLightPass(
     ctx.compositor = null;
 
     // Use RenderGraph-allocated sceneColorCopy texture
-    const sceneColorFramebuffer = device.pool.fetchTemporalFramebuffer(
-      true,
-      sceneColorCopyTex.width,
-      sceneColorCopyTex.height,
-      ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS
-        ? [
-            sceneColorCopyTex,
-            device.getFramebuffer()!.getColorAttachments()[1]!,
-            device.getFramebuffer()!.getColorAttachments()[2]!
-          ]
-        : sceneColorCopyTex,
-      depthTex,
-      false
-    );
+    const sceneColorFramebuffer =
+      sceneColorCopyFramebufferHandle && !(ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS)
+        ? rgCtx.getFramebuffer<FrameBuffer>(sceneColorCopyFramebufferHandle)
+        : rgCtx.createFramebuffer<FrameBuffer>({
+            width: sceneColorCopyTex.width,
+            height: sceneColorCopyTex.height,
+            colorAttachments:
+              ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS
+                ? [
+                    sceneColorCopyTex,
+                    device.getFramebuffer()!.getColorAttachments()[1]!,
+                    device.getFramebuffer()!.getColorAttachments()[2]!
+                  ]
+                : sceneColorCopyTex,
+            depthAttachment: depthTex,
+            ignoreDepthStencil: false
+          });
     let sceneColorStatePushed = false;
     try {
       device.pushDeviceStates();
@@ -688,7 +798,6 @@ function renderMainLightPass(
       if (sceneColorStatePushed) {
         device.popDeviceStates();
       }
-      device.pool.releaseFrameBuffer(sceneColorFramebuffer);
       ctx.compositor = compositor;
     }
     ctx.sceneColorTexture = sceneColorCopyTex;

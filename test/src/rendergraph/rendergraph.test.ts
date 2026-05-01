@@ -3,7 +3,8 @@ import type {
   RGTextureAllocator,
   RGTextureDesc,
   RGResolvedSize,
-  RGExecuteContext
+  RGExecuteContext,
+  RGFramebufferDesc
 } from '../../../libs/scene/src/render/rendergraph';
 
 // ─── Mock Allocator ──────────────────────────────────────────────────
@@ -14,11 +15,19 @@ interface MockTexture {
   size: RGResolvedSize;
 }
 
+interface MockFramebuffer {
+  id: number;
+  desc: RGFramebufferDesc;
+}
+
 function createMockAllocator() {
   let nextId = 0;
+  let nextFramebufferId = 0;
   const allocated: MockTexture[] = [];
   const released: MockTexture[] = [];
-  const allocator: RGTextureAllocator<MockTexture> = {
+  const allocatedFramebuffers: MockFramebuffer[] = [];
+  const releasedFramebuffers: MockFramebuffer[] = [];
+  const allocator: RGTextureAllocator<MockTexture, MockFramebuffer> = {
     allocate(desc: RGTextureDesc, size: RGResolvedSize): MockTexture {
       const tex = { id: nextId++, desc, size };
       allocated.push(tex);
@@ -26,9 +35,17 @@ function createMockAllocator() {
     },
     release(texture: MockTexture): void {
       released.push(texture);
+    },
+    allocateFramebuffer(desc: RGFramebufferDesc): MockFramebuffer {
+      const fb = { id: nextFramebufferId++, desc };
+      allocatedFramebuffers.push(fb);
+      return fb;
+    },
+    releaseFramebuffer(framebuffer: MockFramebuffer): void {
+      releasedFramebuffers.push(framebuffer);
     }
   };
-  return { allocator, allocated, released };
+  return { allocator, allocated, released, allocatedFramebuffers, releasedFramebuffers };
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────
@@ -86,27 +103,71 @@ describe('RenderGraph', () => {
       }).toThrow(/unknown resource/);
     });
 
-    test('double write from different passes throws', () => {
+    test('compile unknown output throws', () => {
+      const fakeHandle = new RGHandle(999, 'fake');
+      expect(() => {
+        graph.compile([fakeHandle]);
+      }).toThrow(/unknown output resource/);
+    });
+
+    test('framebuffer attachment must be a texture handle', () => {
+      expect(() => {
+        graph.addPass('BadFramebuffer', (builder) => {
+          const token = builder.createToken('done');
+          builder.createFramebuffer({
+            colorAttachments: token,
+            depthAttachment: null
+          });
+        });
+      }).toThrow(/must be a texture resource/);
+    });
+
+    test('double write from different passes creates ordered versions', () => {
       const h = graph.importTexture('shared');
+      let h1: RGHandle;
+      let h2: RGHandle;
       graph.addPass('A', (builder) => {
-        builder.write(h);
+        h1 = builder.write(h);
         builder.setExecute(() => {});
       });
-      expect(() => {
-        graph.addPass('B', (builder) => {
-          builder.write(h);
-        });
-      }).toThrow(/already produced/);
+      graph.addPass('B', (builder) => {
+        h2 = builder.write(h1);
+        builder.setExecute(() => {});
+      });
+      const compiled = graph.compile([h2!]);
+      expect(compiled.orderedPasses.map((p) => p.name)).toEqual(['A', 'B']);
     });
   });
 
   // ─── Compilation: Dependency Resolution ─────────────────────────────
 
   describe('dependency resolution', () => {
+    test('framebuffer attachments infer texture dependencies', () => {
+      let color: RGHandle;
+      let backbuffer = graph.importTexture('backbuffer');
+
+      graph.addPass('ProduceColor', (builder) => {
+        color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+        builder.setExecute(() => {});
+      });
+      graph.addPass('UseFramebuffer', (builder) => {
+        builder.createFramebuffer({
+          colorAttachments: color!,
+          depthAttachment: null
+        });
+        backbuffer = builder.write(backbuffer);
+        builder.setExecute(() => {});
+      });
+
+      const compiled = graph.compile([backbuffer]);
+      expect(compiled.orderedPasses.map((p) => p.name)).toEqual(['ProduceColor', 'UseFramebuffer']);
+      expect(compiled.lifetimes.get(color!._id)!.lastUse).toBe(1);
+    });
+
     test('linear chain: A -> B -> C', () => {
       let t1: RGHandle;
       let t2: RGHandle;
-      const backbuffer = graph.importTexture('backbuffer');
+      let backbuffer = graph.importTexture('backbuffer');
 
       graph.addPass('A', (builder) => {
         t1 = builder.createTexture({ format: 'r32f', label: 't1' });
@@ -119,7 +180,7 @@ describe('RenderGraph', () => {
       });
       graph.addPass('C', (builder) => {
         builder.read(t2!);
-        builder.write(backbuffer);
+        backbuffer = builder.write(backbuffer);
         builder.setExecute(() => {});
       });
 
@@ -132,7 +193,7 @@ describe('RenderGraph', () => {
       let tA: RGHandle;
       let tB: RGHandle;
       let tC: RGHandle;
-      const backbuffer = graph.importTexture('backbuffer');
+      let backbuffer = graph.importTexture('backbuffer');
 
       graph.addPass('A', (builder) => {
         tA = builder.createTexture({ format: 'r32f', label: 'tA' });
@@ -150,7 +211,7 @@ describe('RenderGraph', () => {
       });
       graph.addPass('D', (builder) => {
         builder.read(tC!);
-        builder.write(backbuffer);
+        backbuffer = builder.write(backbuffer);
         builder.setExecute(() => {});
       });
 
@@ -161,13 +222,30 @@ describe('RenderGraph', () => {
       expect(names.indexOf('C')).toBeLessThan(names.indexOf('D'));
       expect(names).toHaveLength(4);
     });
+
+    test('compile honors different output handles on the same graph', () => {
+      let first: RGHandle;
+      let second: RGHandle;
+
+      graph.addPass('FirstOutput', (builder) => {
+        first = builder.createTexture({ format: 'r32f', label: 'first' });
+        builder.setExecute(() => {});
+      });
+      graph.addPass('SecondOutput', (builder) => {
+        second = builder.createTexture({ format: 'r32f', label: 'second' });
+        builder.setExecute(() => {});
+      });
+
+      expect(graph.compile([first!]).orderedPasses.map((p) => p.name)).toEqual(['FirstOutput']);
+      expect(graph.compile([second!]).orderedPasses.map((p) => p.name)).toEqual(['SecondOutput']);
+    });
   });
 
   // ─── Compilation: Dead Pass Culling ─────────────────────────────────
 
   describe('dead pass culling', () => {
     test('unused pass is culled', () => {
-      const backbuffer = graph.importTexture('backbuffer');
+      let backbuffer = graph.importTexture('backbuffer');
       let needed: RGHandle;
 
       graph.addPass('Needed', (builder) => {
@@ -180,7 +258,7 @@ describe('RenderGraph', () => {
       });
       graph.addPass('Final', (builder) => {
         builder.read(needed!);
-        builder.write(backbuffer);
+        backbuffer = builder.write(backbuffer);
         builder.setExecute(() => {});
       });
 
@@ -191,14 +269,14 @@ describe('RenderGraph', () => {
     });
 
     test('sideEffect pass is never culled', () => {
-      const backbuffer = graph.importTexture('backbuffer');
+      let backbuffer = graph.importTexture('backbuffer');
 
       graph.addPass('Picking', (builder) => {
         builder.sideEffect();
         builder.setExecute(() => {});
       });
       graph.addPass('Final', (builder) => {
-        builder.write(backbuffer);
+        backbuffer = builder.write(backbuffer);
         builder.setExecute(() => {});
       });
 
@@ -209,7 +287,7 @@ describe('RenderGraph', () => {
     });
 
     test('sideEffect pass keeps its dependencies alive', () => {
-      const backbuffer = graph.importTexture('backbuffer');
+      let backbuffer = graph.importTexture('backbuffer');
       let depth: RGHandle;
 
       graph.addPass('DepthPrepass', (builder) => {
@@ -222,7 +300,7 @@ describe('RenderGraph', () => {
         builder.setExecute(() => {});
       });
       graph.addPass('Final', (builder) => {
-        builder.write(backbuffer);
+        backbuffer = builder.write(backbuffer);
         builder.setExecute(() => {});
       });
 
@@ -233,7 +311,7 @@ describe('RenderGraph', () => {
     });
 
     test('disabling HiZ culls the HiZ pass and its unique dependencies', () => {
-      const backbuffer = graph.importTexture('backbuffer');
+      let backbuffer = graph.importTexture('backbuffer');
       let depth: RGHandle;
 
       graph.addPass('DepthPrepass', (builder) => {
@@ -247,7 +325,7 @@ describe('RenderGraph', () => {
       });
       graph.addPass('LightPass', (builder) => {
         builder.read(depth!);
-        builder.write(backbuffer);
+        backbuffer = builder.write(backbuffer);
         builder.setExecute(() => {});
       });
 
@@ -263,7 +341,7 @@ describe('RenderGraph', () => {
 
   describe('resource lifetime', () => {
     test('transient resource lifetime spans producer to last consumer', () => {
-      const backbuffer = graph.importTexture('backbuffer');
+      let backbuffer = graph.importTexture('backbuffer');
       let depth: RGHandle;
       let color: RGHandle;
 
@@ -279,7 +357,7 @@ describe('RenderGraph', () => {
       graph.addPass('PostProcess', (builder) => {
         builder.read(depth!);
         builder.read(color!);
-        builder.write(backbuffer);
+        backbuffer = builder.write(backbuffer);
         builder.setExecute(() => {});
       });
 
@@ -302,7 +380,7 @@ describe('RenderGraph', () => {
   describe('execution', () => {
     test('passes execute in topological order', () => {
       const log: string[] = [];
-      const backbuffer = graph.importTexture('backbuffer');
+      let backbuffer = graph.importTexture('backbuffer');
       let t: RGHandle;
 
       graph.addPass('A', (builder) => {
@@ -311,7 +389,7 @@ describe('RenderGraph', () => {
       });
       graph.addPass('B', (builder) => {
         builder.read(t!);
-        builder.write(backbuffer);
+        backbuffer = builder.write(backbuffer);
         builder.setExecute((_ctx) => log.push('B'));
       });
 
@@ -322,10 +400,10 @@ describe('RenderGraph', () => {
 
     test('culled passes do not execute', () => {
       const log: string[] = [];
-      const backbuffer = graph.importTexture('backbuffer');
+      let backbuffer = graph.importTexture('backbuffer');
 
       graph.addPass('Alive', (builder) => {
-        builder.write(backbuffer);
+        backbuffer = builder.write(backbuffer);
         builder.setExecute((_ctx) => log.push('Alive'));
       });
       graph.addPass('Dead', (builder) => {
@@ -360,7 +438,7 @@ describe('RenderGraph', () => {
   describe('forward+ pipeline simulation', () => {
     test('full pipeline with optional features', () => {
       const log: string[] = [];
-      const backbuffer = graph.importTexture('backbuffer');
+      let backbuffer = graph.importTexture('backbuffer');
 
       const enableHiZ = true;
       const enableTAA = true;
@@ -411,7 +489,7 @@ describe('RenderGraph', () => {
 
       graph.addPass('Composite', (builder) => {
         builder.read(taaOutput ?? sceneColor!);
-        builder.write(backbuffer);
+        backbuffer = builder.write(backbuffer);
         builder.setExecute((_ctx) => log.push('Composite'));
       });
 
@@ -435,7 +513,7 @@ describe('RenderGraph', () => {
 
     test('disabling TAA culls motionVector producer chain', () => {
       const log: string[] = [];
-      const backbuffer = graph.importTexture('backbuffer');
+      let backbuffer = graph.importTexture('backbuffer');
 
       let linearDepth: RGHandle;
       graph.addPass('DepthPrepass', (builder) => {
@@ -458,7 +536,7 @@ describe('RenderGraph', () => {
 
       graph.addPass('Composite', (builder) => {
         builder.read(sceneColor!);
-        builder.write(backbuffer);
+        backbuffer = builder.write(backbuffer);
         builder.setExecute((_ctx) => log.push('Composite'));
       });
 
@@ -482,7 +560,7 @@ describe('RenderGraphExecutor', () => {
 
   test('allocates transient textures before first use and releases after last use', () => {
     const { allocator, allocated, released } = createMockAllocator();
-    const backbuffer = graph.importTexture('backbuffer');
+    let backbuffer = graph.importTexture('backbuffer');
 
     let depth: RGHandle;
     let color: RGHandle;
@@ -504,7 +582,7 @@ describe('RenderGraphExecutor', () => {
     graph.addPass('PostProcess', (builder) => {
       builder.read(depth!);
       builder.read(color!);
-      builder.write(backbuffer);
+      backbuffer = builder.write(backbuffer);
       builder.setExecute((_ctx) => {
         events.push(`exec:PostProcess (allocated=${allocated.length}, released=${released.length})`);
       });
@@ -527,11 +605,11 @@ describe('RenderGraphExecutor', () => {
 
   test('resolves imported textures via getTexture', () => {
     const { allocator } = createMockAllocator();
-    const backbuffer = graph.importTexture('backbuffer');
+    let backbuffer = graph.importTexture('backbuffer');
 
     let resolved: MockTexture | null = null;
     graph.addPass('Final', (builder) => {
-      builder.write(backbuffer);
+      backbuffer = builder.write(backbuffer);
       builder.setExecute((ctx: RGExecuteContext) => {
         resolved = ctx.getTexture<MockTexture>(backbuffer);
       });
@@ -548,7 +626,7 @@ describe('RenderGraphExecutor', () => {
 
   test('resolves transient textures via getTexture', () => {
     const { allocator } = createMockAllocator();
-    const backbuffer = graph.importTexture('backbuffer');
+    let backbuffer = graph.importTexture('backbuffer');
 
     let depth: RGHandle;
     let resolvedDepth: MockTexture | null = null;
@@ -559,7 +637,7 @@ describe('RenderGraphExecutor', () => {
     });
     graph.addPass('LightPass', (builder) => {
       builder.read(depth!);
-      builder.write(backbuffer);
+      backbuffer = builder.write(backbuffer);
       builder.setExecute((ctx: RGExecuteContext) => {
         resolvedDepth = ctx.getTexture<MockTexture>(depth!);
       });
@@ -574,9 +652,75 @@ describe('RenderGraphExecutor', () => {
     expect(resolvedDepth!.desc.format).toBe('r32f');
   });
 
+  test('allocates graph framebuffers with resolved texture attachments', () => {
+    const { allocator, allocatedFramebuffers, releasedFramebuffers } = createMockAllocator();
+    let backbuffer = graph.importTexture('backbuffer');
+
+    let framebuffer: RGHandle;
+    let resolvedFramebuffer: MockFramebuffer | null = null;
+
+    graph.addPass('RenderToFramebuffer', (builder) => {
+      const color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      const depth = builder.createTexture({ format: 'd24s8' as any, label: 'depth' });
+      framebuffer = builder.createFramebuffer({
+        colorAttachments: color,
+        depthAttachment: depth
+      });
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute((ctx: RGExecuteContext) => {
+        resolvedFramebuffer = ctx.getFramebuffer<MockFramebuffer>(framebuffer);
+      });
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080);
+    executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 1920, height: 1080 } });
+    executor.execute(compiled);
+
+    expect(resolvedFramebuffer).toBe(allocatedFramebuffers[0]);
+    expect((allocatedFramebuffers[0].desc.colorAttachments as MockTexture).desc.label).toBe('color');
+    expect((allocatedFramebuffers[0].desc.depthAttachment as MockTexture).desc.label).toBe('depth');
+    expect(releasedFramebuffers).toHaveLength(1);
+  });
+
+  test('keeps graph framebuffers alive until their last reader', () => {
+    const { allocator, releasedFramebuffers } = createMockAllocator();
+    let backbuffer = graph.importTexture('backbuffer');
+
+    let framebuffer: RGHandle;
+    const events: string[] = [];
+
+    graph.addPass('CreateFramebuffer', (builder) => {
+      const color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      framebuffer = builder.createFramebuffer({
+        colorAttachments: color,
+        depthAttachment: null
+      });
+      builder.setExecute(() => {
+        events.push(`create:released=${releasedFramebuffers.length}`);
+      });
+    });
+    graph.addPass('UseFramebuffer', (builder) => {
+      builder.read(framebuffer!);
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute((ctx: RGExecuteContext) => {
+        ctx.getFramebuffer<MockFramebuffer>(framebuffer);
+        events.push(`use:released=${releasedFramebuffers.length}`);
+      });
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080);
+    executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 1920, height: 1080 } });
+    executor.execute(compiled);
+
+    expect(events).toEqual(['create:released=0', 'use:released=0']);
+    expect(releasedFramebuffers).toHaveLength(1);
+  });
+
   test('backbuffer-relative sizing resolves correctly', () => {
     const { allocator, allocated } = createMockAllocator();
-    const backbuffer = graph.importTexture('backbuffer');
+    let backbuffer = graph.importTexture('backbuffer');
 
     let tex: RGHandle;
     graph.addPass('Pass', (builder) => {
@@ -591,7 +735,7 @@ describe('RenderGraphExecutor', () => {
     });
     graph.addPass('Consumer', (builder) => {
       builder.read(tex!);
-      builder.write(backbuffer);
+      backbuffer = builder.write(backbuffer);
       builder.setExecute(() => {});
     });
 
@@ -607,7 +751,7 @@ describe('RenderGraphExecutor', () => {
 
   test('absolute sizing resolves correctly', () => {
     const { allocator, allocated } = createMockAllocator();
-    const backbuffer = graph.importTexture('backbuffer');
+    let backbuffer = graph.importTexture('backbuffer');
 
     let tex: RGHandle;
     graph.addPass('Pass', (builder) => {
@@ -622,7 +766,7 @@ describe('RenderGraphExecutor', () => {
     });
     graph.addPass('Consumer', (builder) => {
       builder.read(tex!);
-      builder.write(backbuffer);
+      backbuffer = builder.write(backbuffer);
       builder.setExecute(() => {});
     });
 
@@ -638,7 +782,7 @@ describe('RenderGraphExecutor', () => {
 
   test('early-released resource cannot be resolved by later passes', () => {
     const { allocator } = createMockAllocator();
-    const backbuffer = graph.importTexture('backbuffer');
+    let backbuffer = graph.importTexture('backbuffer');
 
     let earlyTex: RGHandle;
     let lateTex: RGHandle;
@@ -652,7 +796,7 @@ describe('RenderGraphExecutor', () => {
     graph.addPass('B', (builder) => {
       builder.read(earlyTex!);
       builder.read(lateTex!);
-      builder.write(backbuffer);
+      backbuffer = builder.write(backbuffer);
       builder.setExecute(() => {});
     });
 

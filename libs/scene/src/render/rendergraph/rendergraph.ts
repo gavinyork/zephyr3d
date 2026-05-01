@@ -99,9 +99,6 @@ export class RenderGraph {
    * @returns The compiled graph ready for execution.
    */
   compile(outputs: RGHandle[]): CompiledRenderGraph {
-    if (this._compiled) {
-      return this._compiled;
-    }
     // 1. Mark alive passes via backward traversal from outputs + side-effect passes
     this._cullDeadPasses(outputs);
     // 2. Topological sort of alive passes
@@ -126,6 +123,19 @@ export class RenderGraph {
         throw new Error(
           'RenderGraph.execute(): resource resolution not available. Use RenderGraphExecutor for managed execution.'
         );
+      },
+      getFramebuffer() {
+        throw new Error(
+          'RenderGraph.execute(): framebuffer resolution not available. Use RenderGraphExecutor for managed execution.'
+        );
+      },
+      createFramebuffer() {
+        throw new Error(
+          'RenderGraph.execute(): framebuffer allocation not available. Use RenderGraphExecutor for managed execution.'
+        );
+      },
+      deferCleanup() {
+        // No-op in unmanaged execution mode.
       }
     };
     for (const pass of compiled.orderedPasses) {
@@ -201,10 +211,19 @@ export class RenderGraph {
               `Use createToken() to produce ordering tokens.`
           );
         }
+        if (res.kind === 'framebuffer') {
+          throw new Error(
+            `RenderGraph: pass "${pass.name}" attempts to write framebuffer "${res.name}". ` +
+              `Create a new framebuffer view instead.`
+          );
+        }
         for (const consumer of res.consumers) {
           if (consumer !== pass && !pass.dependencies.includes(consumer)) {
             pass.dependencies.push(consumer);
           }
+        }
+        if (res.producer && res.producer !== pass && !pass.dependencies.includes(res.producer)) {
+          pass.dependencies.push(res.producer);
         }
         const id = graph._nextResourceId++;
         const versionName = `${res.name}@${pass.name}`;
@@ -234,6 +253,16 @@ export class RenderGraph {
         pass.writes.push(res);
         return new RGHandle(id, tokenName);
       },
+      createFramebuffer(desc): RGHandle {
+        const id = graph._nextResourceId++;
+        const name = desc.label ?? `_fb_${id}`;
+        const res = new RGResource(id, name, 'framebuffer', desc);
+        res.producer = pass;
+        graph._resources.set(id, res);
+        pass.writes.push(res);
+        graph._declareFramebufferAttachmentDeps(pass, desc);
+        return new RGHandle(id, name);
+      },
       sideEffect(): void {
         pass.hasSideEffect = true;
       },
@@ -255,25 +284,37 @@ export class RenderGraph {
     // Seed: resources that are requested outputs
     const neededResources = new Set<number>();
     const stack: RGResource[] = [];
-
-    for (const handle of outputs) {
-      const res = this._resources.get(handle._id);
-      if (res) {
+    const markResourceNeeded = (res: RGResource) => {
+      if (!neededResources.has(res.id)) {
         neededResources.add(res.id);
         stack.push(res);
       }
+    };
+    const markPassAlive = (pass: RGPass) => {
+      if (pass.alive) {
+        return;
+      }
+      pass.alive = true;
+      for (const dep of pass.reads) {
+        markResourceNeeded(dep);
+      }
+      for (const dependency of pass.dependencies) {
+        markPassAlive(dependency);
+      }
+    };
+
+    for (const handle of outputs) {
+      const res = this._resources.get(handle._id);
+      if (!res) {
+        throw new Error(`RenderGraph: unknown output resource "${handle.name}" (id=${handle._id})`);
+      }
+      markResourceNeeded(res);
     }
 
     // Seed: side-effect passes (always alive) — push their read dependencies
     for (const pass of this._passes) {
       if (pass.hasSideEffect) {
-        pass.alive = true;
-        for (const res of pass.reads) {
-          if (!neededResources.has(res.id)) {
-            neededResources.add(res.id);
-            stack.push(res);
-          }
-        }
+        markPassAlive(pass);
       }
     }
 
@@ -282,16 +323,44 @@ export class RenderGraph {
     while (stack.length > 0) {
       const res = stack.pop()!;
       const producer = res.producer;
-      if (producer && !producer.alive) {
-        producer.alive = true;
-        for (const dep of producer.reads) {
-          if (!neededResources.has(dep.id)) {
-            neededResources.add(dep.id);
-            stack.push(dep);
+      if (producer) {
+        markPassAlive(producer);
+      }
+    }
+  }
+
+  /** @internal */
+  private _declareFramebufferAttachmentDeps(pass: RGPass, desc: { colorAttachments: unknown | unknown[] | null; depthAttachment?: unknown | null }): void {
+    const declare = (attachment: unknown) => {
+      if (attachment instanceof RGHandle) {
+        const res = this._resources.get(attachment._id);
+        if (!res) {
+          throw new Error(`RenderGraph: unknown framebuffer attachment "${attachment.name}" (id=${attachment._id})`);
+        }
+        if (res.kind !== 'transient' && res.kind !== 'imported') {
+          throw new Error(
+            `RenderGraph: framebuffer attachment "${res.name}" must be a texture resource, got ${res.kind}.`
+          );
+        }
+        if (res.producer !== pass) {
+          if (!pass.reads.includes(res)) {
+            pass.reads.push(res);
+          }
+          if (!res.consumers.includes(pass)) {
+            res.consumers.push(pass);
           }
         }
       }
+    };
+    const colors = Array.isArray(desc.colorAttachments)
+      ? desc.colorAttachments
+      : desc.colorAttachments
+        ? [desc.colorAttachments]
+        : [];
+    for (const attachment of colors) {
+      declare(attachment);
     }
+    declare(desc.depthAttachment);
   }
 
   // ─── Private: Topological Sort (Kahn's Algorithm) ───────────────────
