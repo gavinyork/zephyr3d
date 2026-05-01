@@ -667,6 +667,32 @@ describe('RenderGraphExecutor', () => {
     expect(resolvedDepth!.desc.format).toBe('r32f');
   });
 
+  test('getTexture requires a declared read or write dependency', () => {
+    const { allocator } = createMockAllocator();
+    let texture: RGHandle;
+    let done: RGHandle;
+
+    graph.addPass('Producer', (builder) => {
+      texture = builder.createTexture({ format: 'r32f', label: 'hiddenTexture' });
+      done = builder.createToken('ProducerDone');
+      builder.setExecute(() => {});
+    });
+    graph.addPass('BadConsumer', (builder) => {
+      builder.read(done!);
+      builder.sideEffect();
+      builder.setExecute((ctx: RGExecuteContext) => {
+        ctx.getTexture<MockTexture>(texture!);
+      });
+    });
+
+    const compiled = graph.compile([]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080);
+
+    expect(() => executor.execute(compiled)).toThrow(
+      /pass "BadConsumer" tried to access texture "hiddenTexture" without declaring a read\/write dependency/
+    );
+  });
+
   test('allocates graph framebuffers with resolved texture attachments', () => {
     const { allocator, allocatedFramebuffers, releasedFramebuffers } = createMockAllocator();
     let backbuffer = graph.importTexture('backbuffer');
@@ -708,6 +734,7 @@ describe('RenderGraphExecutor', () => {
     graph.addPass('CreateFramebuffer', (builder) => {
       const color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
       framebuffer = builder.createFramebuffer({
+        label: 'hiddenFramebuffer',
         colorAttachments: color,
         depthAttachment: null
       });
@@ -731,6 +758,66 @@ describe('RenderGraphExecutor', () => {
 
     expect(events).toEqual(['create:released=0', 'use:released=0']);
     expect(releasedFramebuffers).toHaveLength(1);
+  });
+
+  test('getFramebuffer requires a declared read or write dependency', () => {
+    const { allocator } = createMockAllocator();
+    let framebuffer: RGHandle;
+    let done: RGHandle;
+
+    graph.addPass('CreateFramebuffer', (builder) => {
+      const color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      framebuffer = builder.createFramebuffer({
+        label: 'hiddenFramebuffer',
+        colorAttachments: color,
+        depthAttachment: null
+      });
+      done = builder.createToken('FramebufferDone');
+      builder.setExecute(() => {});
+    });
+    graph.addPass('BadConsumer', (builder) => {
+      builder.read(done!);
+      builder.sideEffect();
+      builder.setExecute((ctx: RGExecuteContext) => {
+        ctx.getFramebuffer<MockFramebuffer>(framebuffer!);
+      });
+    });
+
+    const compiled = graph.compile([]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080);
+
+    expect(() => executor.execute(compiled)).toThrow(
+      /pass "BadConsumer" tried to access framebuffer "hiddenFramebuffer" without declaring a read\/write dependency/
+    );
+  });
+
+  test('createFramebuffer requires declared dependencies for handle attachments', () => {
+    const { allocator } = createMockAllocator();
+    let texture: RGHandle;
+    let done: RGHandle;
+
+    graph.addPass('Producer', (builder) => {
+      texture = builder.createTexture({ format: 'rgba8unorm', label: 'hiddenAttachment' });
+      done = builder.createToken('ProducerDone');
+      builder.setExecute(() => {});
+    });
+    graph.addPass('BadConsumer', (builder) => {
+      builder.read(done!);
+      builder.sideEffect();
+      builder.setExecute((ctx: RGExecuteContext) => {
+        ctx.createFramebuffer<MockFramebuffer>({
+          colorAttachments: texture!,
+          depthAttachment: null
+        });
+      });
+    });
+
+    const compiled = graph.compile([]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080);
+
+    expect(() => executor.execute(compiled)).toThrow(
+      /pass "BadConsumer" tried to access texture "hiddenAttachment" without declaring a read\/write dependency/
+    );
   });
 
   test('releases graph and temporary resources when a pass throws', () => {

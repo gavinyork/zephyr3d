@@ -116,7 +116,8 @@ export interface RGExecuteContext {
    *
    * For transient resources, this returns the texture allocated by the executor.
    * For imported resources, this returns the texture registered via
-   * {@link RenderGraphExecutor.setImportedTexture}.
+   * {@link RenderGraphExecutor.setImportedTexture}. The handle must be declared
+   * by the current pass with {@link RGPassBuilder.read} or {@link RGPassBuilder.write}.
    *
    * @param handle - Handle of the resource to resolve.
    * @returns The resolved texture object (type depends on the allocator).
@@ -125,6 +126,9 @@ export interface RGExecuteContext {
 
   /**
    * Resolve a framebuffer handle to the actual backend framebuffer object.
+   *
+   * The handle must be declared by the current pass with {@link RGPassBuilder.read}
+   * or created by the same pass with {@link RGPassBuilder.createFramebuffer}.
    *
    * @param handle - Handle returned from {@link RGPassBuilder.createFramebuffer}.
    * @returns The resolved framebuffer object (type depends on the allocator).
@@ -136,7 +140,9 @@ export interface RGExecuteContext {
    *
    * The framebuffer is released automatically when graph execution finishes or
    * aborts. Attachments may be actual backend resources or texture formats,
-   * depending on the allocator implementation.
+   * depending on the allocator implementation. If an attachment is an
+   * {@link RGHandle}, the current pass must declare it with
+   * {@link RGPassBuilder.read} or {@link RGPassBuilder.write}.
    *
    * @param desc - Framebuffer descriptor.
    * @returns The allocated framebuffer object (type depends on the allocator).

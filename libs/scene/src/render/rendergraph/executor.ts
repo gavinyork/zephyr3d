@@ -5,7 +5,8 @@ import type {
   RGFramebufferDesc,
   RGResolvedSize,
   RGExecuteContext,
-  RGExecuteFn
+  RGExecuteFn,
+  RGPass
 } from './types';
 import { RGHandle } from './types';
 
@@ -117,8 +118,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
       }
     }
 
-    const ctx = this._createContext();
-
     let completed = false;
     let executionError: unknown = null;
     try {
@@ -153,6 +152,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
         let passError: unknown = null;
         try {
           if (pass.executeFn) {
+            const ctx = this._createContext(pass);
             (pass.executeFn as RGExecuteFn<unknown>)(ctx, pass.data);
           }
         } catch (e) {
@@ -332,9 +332,15 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   }
 
   /** @internal */
-  private _resolveFramebufferDesc(desc: RGFramebufferDesc): RGFramebufferDesc {
+  private _resolveFramebufferDesc(desc: RGFramebufferDesc, pass?: RGPass): RGFramebufferDesc {
     const resolveAttachment = (attachment: unknown): unknown => {
-      return attachment instanceof RGHandle ? this._resolveResource(attachment) : attachment;
+      if (attachment instanceof RGHandle) {
+        if (pass) {
+          this._assertDeclaredAccess(pass, attachment, 'texture');
+        }
+        return this._resolveResource(attachment);
+      }
+      return attachment;
     };
     const colors = Array.isArray(desc.colorAttachments)
       ? desc.colorAttachments.map(resolveAttachment)
@@ -377,13 +383,38 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   }
 
   /** @internal */
-  private _createContext(): RGExecuteContext {
+  private _assertDeclaredAccess(pass: RGPass, handle: RGHandle, access: 'texture' | 'framebuffer'): void {
+    const res = [...pass.reads, ...pass.writes].find((resource) => resource.id === handle._id);
+    if (!res) {
+      throw new Error(
+        `RenderGraphExecutor: pass "${pass.name}" tried to access ${access} "${handle.name}" ` +
+          `without declaring a read/write dependency.`
+      );
+    }
+    if (access === 'texture' && res.kind !== 'transient' && res.kind !== 'imported') {
+      throw new Error(
+        `RenderGraphExecutor: pass "${pass.name}" tried to access "${handle.name}" as a texture, ` +
+          `but it is a ${res.kind} resource.`
+      );
+    }
+    if (access === 'framebuffer' && res.kind !== 'framebuffer') {
+      throw new Error(
+        `RenderGraphExecutor: pass "${pass.name}" tried to access "${handle.name}" as a framebuffer, ` +
+          `but it is a ${res.kind} resource.`
+      );
+    }
+  }
+
+  /** @internal */
+  private _createContext(pass: RGPass): RGExecuteContext {
     const self = this;
     return {
       getTexture<T>(handle: RGHandle): T {
+        self._assertDeclaredAccess(pass, handle, 'texture');
         return self._resolveResource(handle) as unknown as T;
       },
       getFramebuffer<TFramebuffer = unknown>(handle: RGHandle): TFramebuffer {
+        self._assertDeclaredAccess(pass, handle, 'framebuffer');
         const framebuffer = self._allocatedFramebuffers.get(handle._id);
         if (framebuffer !== undefined) {
           return framebuffer as unknown as TFramebuffer;
@@ -394,7 +425,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
         );
       },
       createFramebuffer<TFramebuffer = unknown>(desc: RGFramebufferDesc): TFramebuffer {
-        return self._createFramebuffer(self._resolveFramebufferDesc(desc)) as unknown as TFramebuffer;
+        return self._createFramebuffer(self._resolveFramebufferDesc(desc, pass)) as unknown as TFramebuffer;
       },
       deferCleanup(callback: () => void): void {
         self._cleanupCallbacks.push(callback);
