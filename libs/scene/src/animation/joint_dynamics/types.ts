@@ -2,9 +2,19 @@
 
 import type { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 
+/**
+ * Numerical tolerance used by the joint dynamics solver.
+ *
+ * @public
+ */
 export const EPSILON = 0.001;
 
 /** Constraint topology type */
+/**
+ * Constraint topology type.
+ *
+ * @public
+ */
 export const enum ConstraintType {
   /** Parent-child bone pairs along vertical chains */
   Structural_Vertical = 0,
@@ -19,6 +29,11 @@ export const enum ConstraintType {
 }
 
 /** Collider surface force direction (used for surface/triangle collision) */
+/**
+ * Collider surface force direction used for surface and triangle collision.
+ *
+ * @public
+ */
 export const enum ColliderForce {
   /** No surface force */
   Off = 0,
@@ -32,6 +47,11 @@ export const enum ColliderForce {
  * Read-only per-point physics parameters.
  * Set once at initialization, immutable during simulation.
  * Constraint scale values are pre-multiplied by 0.5 (summed between two points in solver).
+ */
+/**
+ * Read-only per-point physics parameters.
+ *
+ * @public
  */
 export interface PointR {
   /** Index of parent point in the hierarchy (-1 = root, no parent) */
@@ -106,6 +126,11 @@ export interface PointR {
  * Mutable per-point simulation state.
  * Updated every substep during simulation.
  */
+/**
+ * Mutable per-point simulation state.
+ *
+ * @public
+ */
 export interface PointRW {
   /** Final output position to write back to the transform */
   positionToTransform: Vector3;
@@ -130,6 +155,11 @@ export interface PointRW {
 }
 
 /** Distance constraint between two points */
+/**
+ * Distance constraint between two points.
+ *
+ * @public
+ */
 export interface Constraint {
   /** Whether collision detection runs for this constraint's bone pair (0 or 1) */
   isCollision: number;
@@ -144,12 +174,17 @@ export interface Constraint {
 }
 
 /** Read-only collider shape parameters (set at init) */
+/**
+ * Read-only collider shape parameters.
+ *
+ * @public
+ */
 export interface ColliderR {
   /** Base radius of the collider sphere (or capsule head) */
   radius: number;
   /** Scale factor for capsule tail radius relative to head (1.0 = uniform) */
   radiusTailScale: number;
-  /** Capsule height. 0 = sphere collider, >0 = capsule collider */
+  /** Capsule height. `0` means a sphere collider; `\> 0` means a capsule collider. */
   height: number;
   /** Friction coefficient applied on collision contact */
   friction: number;
@@ -160,6 +195,11 @@ export interface ColliderR {
 }
 
 /** Mutable collider runtime state (updated each frame) */
+/**
+ * Mutable collider runtime state.
+ *
+ * @public
+ */
 export interface ColliderRW {
   /** Current interpolated head position (for this substep) */
   positionCurrent: Vector3;
@@ -192,6 +232,11 @@ export interface ColliderRW {
 }
 
 /** Read-only grabber parameters (set at init) */
+/**
+ * Read-only grabber parameters.
+ *
+ * @public
+ */
 export interface GrabberR {
   /** Grab activation radius — points within this distance can be grabbed */
   radius: number;
@@ -200,6 +245,11 @@ export interface GrabberR {
 }
 
 /** Mutable grabber runtime state (updated each frame) */
+/**
+ * Mutable grabber runtime state.
+ *
+ * @public
+ */
 export interface GrabberRW {
   /** Whether this grabber is active (0 = disabled, 1 = enabled) */
   enabled: number;
@@ -208,6 +258,11 @@ export interface GrabberRW {
 }
 
 /** Angle limiting configuration for post-simulation bone angle clamping */
+/**
+ * Angle limiting configuration for post-simulation bone angle clamping.
+ *
+ * @public
+ */
 export interface AngleLimitConfig {
   /** Max angle in degrees between parent and child bone. Negative = disabled */
   angleLimit: number;
@@ -216,6 +271,11 @@ export interface AngleLimitConfig {
 }
 
 /** Flat plane limiter — infinite plane that points cannot pass through */
+/**
+ * Infinite plane limiter that points cannot pass through.
+ *
+ * @public
+ */
 export interface FlatPlane {
   /** Plane normal (points toward the "allowed" side) */
   normal: Vector3;
@@ -226,6 +286,11 @@ export interface FlatPlane {
 /**
  * Input point data for low-level initialization (mirrors C# Point struct).
  * Used when bypassing the Controller and calling the solver directly.
+ */
+/**
+ * Input point data for low-level initialization.
+ *
+ * @public
  */
 export interface PointInit {
   /** Parent point index (-1 = no parent) */
@@ -294,6 +359,11 @@ export interface PointInit {
  * Engine-agnostic transform read/write interface.
  * Implement this to bridge the solver with any rendering engine (Three.js, Babylon, custom).
  */
+/**
+ * Transform adapter used by the solver to read and write bone state.
+ *
+ * @public
+ */
 export interface TransformAccess {
   /** Read world-space position */
   getWorldPosition(): Vector3;
@@ -322,6 +392,11 @@ export interface TransformAccess {
 /**
  * Bone hierarchy node for constraint building.
  * Represents a single bone in the tree structure passed to buildConstraints().
+ */
+/**
+ * Bone hierarchy node used to build constraints and simulation points.
+ *
+ * @public
  */
 export interface BoneNode {
   /** Unique index of this bone (must match the position in the pointTransforms array) */

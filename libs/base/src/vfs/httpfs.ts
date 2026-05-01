@@ -146,7 +146,7 @@ export class HttpFS extends VFS {
     const ctx: HttpDirectoryReaderContext = {
       fetch: (url, init) => this.fetchWithTimeout(url, init),
       toURL: (p) => this.toAbsoluteURL(p),
-      normalizePath: (p) => super.normalizePath(p), // 调用父类 normalize，保留 urlResolver 规则
+      normalizePath: (p) => super.normalizePath(p), // Reuse the base normalizer while preserving urlResolver rules
       joinPath: (...parts) => PathUtils.join(...parts),
       guessMimeType: (name) => this.guessMIMEType(name)
     };

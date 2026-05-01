@@ -1,4 +1,5 @@
 import { Vector3 } from '@zephyr3d/base';
+import type { SceneNode, Skeleton, SpringCollider } from '@zephyr3d/scene';
 import {
   RuntimeScript,
   scriptProp,
@@ -7,10 +8,7 @@ import {
   createPlaneCollider,
   SpringModifier,
   SpringSystem,
-  SpringChain,
-  SceneNode,
-  Skeleton,
-  SpringCollider
+  SpringChain
 } from '@zephyr3d/scene';
 
 // 这里保留对旧格式 capsule / plane 数据的兼容解析，

@@ -131,7 +131,7 @@ interface ForwardPlusGraphBuildResult {
  *
  * Each step in the existing `SceneRenderer._renderScene` becomes a graph pass.
  * Execute callbacks delegate to the existing rendering code, sharing a mutable
- * {@link FrameState}.
+ * `FrameState`.
  *
  * @param graph - The render graph to populate.
  * @param ctx - The draw context for this frame.

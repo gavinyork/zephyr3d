@@ -6,8 +6,8 @@ import { getDevice } from '../../app/api';
  * Bridges the render graph's {@link RGTextureAllocator} interface to the
  * engine's device resource pool (`device.pool`).
  *
- * Transient textures are fetched from the pool on {@link allocate} and
- * returned to the pool on {@link release}, enabling automatic reuse
+ * Transient textures are fetched from the pool on `allocate()` and
+ * returned to the pool on `release()`, enabling automatic reuse
  * across frames without manual lifecycle management.
  *
  * Usage:

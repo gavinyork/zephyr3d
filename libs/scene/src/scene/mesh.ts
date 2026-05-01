@@ -31,6 +31,11 @@ import type { SceneNode } from './scene_node';
 import { getDevice } from '../app/api';
 import type { SkinnedBoundingBox } from '../animation';
 
+/**
+ * Callback invoked after a mesh finishes its per-frame update.
+ *
+ * @public
+ */
 export type MeshUpdateCallback = (frameId: number, elapsedInSeconds: number, deltaInSeconds: number) => void;
 /**
  * Mesh node
@@ -64,11 +69,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /** @internal */
   protected _pickTarget: PickTarget;
   /** @internal */
-  protected _skinAnimation: boolean;
-  /** @internal */
   protected _suspendSkinning: boolean;
-  /** @internal */
-  protected _morphAnimation: boolean;
   /** @internal */
   protected _renderBundle: Nullable<Record<string, RenderBundle>>;
   /** @internal */
@@ -99,10 +100,8 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     this._batchable = getDevice().type !== 'webgl';
     this.primitive = primitive ?? null;
     this.material = material ?? Mesh._getDefaultMaterial();
-    this._skinAnimation = false;
     this._suspendSkinning = false;
     this._skeletonName = '';
-    this._morphAnimation = false;
     this._renderBundle = {};
     this._useRenderBundle = true;
     this._materialChangeTag = null;
@@ -116,13 +115,13 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     return this._name;
   }
   /**
-   * {@inheritDoc BatchDrawable.getInstanceId}
+   * Returns the batch instance ID for the current render pass.
    */
   getInstanceId(_renderPass: RenderPass) {
     return `${this._instanceHash}:${this.worldMatrixDet >= 0}`;
   }
   /**
-   * {@inheritDoc BatchDrawable.getInstanceUniforms}
+   * Returns the packed instance-uniform buffer used for batching.
    */
   getInstanceUniforms() {
     return this._material.get()!.$instanceUniforms;
@@ -150,25 +149,12 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
     return this._skinnedBoundingInfo;
   }
   /** @internal */
-  get skinAnimation() {
-    return this._skinAnimation;
-  }
-  set skinAnimation(val) {
-    this._skinAnimation = val;
-  }
-  /** @internal */
   get suspendSkinning() {
     return this._suspendSkinning;
   }
+  /** @internal */
   set suspendSkinning(val) {
     this._suspendSkinning = !!val;
-  }
-  /** @internal */
-  get morphAnimation() {
-    return this._morphAnimation;
-  }
-  set morphAnimation(val) {
-    this._morphAnimation = val;
   }
   /** Wether the mesh node casts shadows */
   get castShadow() {
@@ -408,7 +394,7 @@ export class Mesh extends applyMixins(GraphNode, mixinDrawable) implements Batch
   /**
    * Update morph target weight
    *
-   * @param weight - The weights of the morph targets, the length should be less than or equal to ${MAX_MORPH_TARGETS}
+   * @param weight - The morph target weights. The length must not exceed the mesh's morph target count.
    */
   updateMorphWeights(weight: number[]) {
     if (this._morphInfo && weight && weight.length <= this._morphInfo.data[3]) {

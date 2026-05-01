@@ -147,6 +147,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     }
     return this._heightMapAssetId;
   }
+  /** @internal */
   set heightMapAssetId(val: string) {
     this._heightMapAssetId = val;
   }
@@ -163,6 +164,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     }
     return this._splatMapAssetId;
   }
+  /** @internal */
   set splatMapAssetId(val: string) {
     this._splatMapAssetId = val;
   }
@@ -179,6 +181,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     }
     return this._grassAssetId;
   }
+  /** @internal */
   set grassAssetId(val: string) {
     this._grassAssetId = val;
   }

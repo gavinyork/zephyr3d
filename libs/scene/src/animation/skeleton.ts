@@ -278,14 +278,12 @@ export class Skeleton extends Disposable {
   get bindPose() {
     return this._bindPose;
   }
-  /** @internal */
   get playing() {
     return this._playing;
   }
   set playing(b: boolean) {
     this._playing = b;
   }
-  /** @internal */
   get persistentId() {
     return this._id;
   }

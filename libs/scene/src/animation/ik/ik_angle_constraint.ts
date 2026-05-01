@@ -44,9 +44,6 @@ export class IKAngleConstraint extends IKConstraint {
     return this._minAngle;
   }
 
-  /**
-   * Set the minimum angle in degrees.
-   */
   set minAngle(value: number) {
     this._minAngle = Math.max(0, Math.min(value, this._maxAngle));
   }
@@ -58,9 +55,6 @@ export class IKAngleConstraint extends IKConstraint {
     return this._maxAngle;
   }
 
-  /**
-   * Set the maximum angle in degrees.
-   */
   set maxAngle(value: number) {
     this._maxAngle = Math.min(180, Math.max(value, this._minAngle));
   }

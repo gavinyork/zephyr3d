@@ -130,7 +130,7 @@ function tryParsePythonSize(s: string) {
     };
     return Math.round(n * (map[unit] ?? 1));
   }
-  const m2 = s.match(/\b(\d{1,12})\b/); // 防止匹配年份时间等超长数字
+  const m2 = s.match(/\b(\d{1,12})\b/); // Avoid matching years, timestamps, or other overly long numbers
   if (m2) {
     const n = parseInt(m2[1], 10);
     if (Number.isFinite(n)) {
@@ -141,7 +141,7 @@ function tryParsePythonSize(s: string) {
 }
 
 function tryParsePythonDate(s: string) {
-  // Default date format of Python output "YYYY-MM-DD HH:MM" 或 "YYYY-MM-DD HH:MM:SS"
+  // Default Python output date format: "YYYY-MM-DD HH:MM" or "YYYY-MM-DD HH:MM:SS"
   const m = s.match(/\b(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?\b/);
   if (m) {
     const year = parseInt(m[1], 10);

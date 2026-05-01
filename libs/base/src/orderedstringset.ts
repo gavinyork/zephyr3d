@@ -27,7 +27,7 @@ export class OrderedStringSet {
   /**
    * Adds a new string to the set. If duplicates are not allowed and the string already exists, it is not added.
    *
-   * @param str The string to add to the set.
+   * @param str - The string to add to the set.
    */
   add(str: string) {
     const position = this.findInsertPosition(str);
@@ -41,7 +41,7 @@ export class OrderedStringSet {
    * Removes the first occurrence of a specified string from the set using binary search.
    * If the string does not exist, no action is taken.
    *
-   * @param str The string to remove from the set.
+   * @param str - The string to remove from the set.
    */
   remove(str: string) {
     const position = this.findStringPosition(str);
@@ -94,7 +94,7 @@ export class OrderedStringSet {
    * Uses binary search to find the index of a string in the set.
    * If the string exists, returns its index. Otherwise, returns -1.
    *
-   * @param str The string to find in the set.
+   * @param str - The string to find in the set.
    * @returns The index of the string, or -1 if not found.
    */
   private findStringPosition(str: string) {
@@ -123,7 +123,7 @@ export class OrderedStringSet {
    * Uses binary search to find the correct insertion position for a string.
    * If duplicates are not allowed, it returns null for existing strings.
    *
-   * @param str The string for which to find the insertion position.
+   * @param str - The string for which to find the insertion position.
    * @returns The position to insert the string, or null if the string exists and duplicates are not allowed.
    */
   private findInsertPosition(str: string) {

@@ -4,6 +4,11 @@ import type { ScreenAdapter } from '../app/screen';
 import { getEngine } from '../app/api';
 import { RenderTarget } from './rendertarget';
 
+/**
+ * Render target backed by the engine screen adapter.
+ *
+ * @public
+ */
 export class ScreenRenderTarget extends RenderTarget {
   private readonly screenAdapter: ScreenAdapter;
   constructor(screenAdapter?: ScreenAdapter) {

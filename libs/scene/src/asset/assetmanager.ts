@@ -860,7 +860,7 @@ export class AssetManager {
       const u = q.shift()!;
       const ins = gs.incoming[u] || [];
       for (const conn of ins) {
-        const v = conn.targetNodeId; // 前驱
+        const v = conn.targetNodeId; // predecessor
         if (!reachable.has(v)) {
           reachable.add(v);
           q.push(v);
@@ -898,7 +898,7 @@ export class AssetManager {
       for (const u of currentLevel) {
         const ins = gs.incoming[u] || [];
         for (const conn of ins) {
-          const v = conn.targetNodeId; // 前驱
+          const v = conn.targetNodeId; // predecessor
           if (!sub.has(v)) {
             continue;
           }

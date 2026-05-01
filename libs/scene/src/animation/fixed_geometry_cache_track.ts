@@ -10,9 +10,16 @@ import {
   type GeometryCacheState
 } from './geometry_cache_utils';
 
+/** @public */
 export type FixedGeometryCacheFrame = GeometryCacheFrame;
+/** @public */
 export type FixedGeometryCacheState = GeometryCacheState;
 
+/**
+ * Geometry cache track backed by explicit per-frame vertex data.
+ *
+ * @public
+ */
 export class FixedGeometryCacheTrack extends AnimationTrack<FixedGeometryCacheState> {
   private _times: Float32Array;
   private _frames: FixedGeometryCacheFrame[];

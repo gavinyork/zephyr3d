@@ -1263,7 +1263,7 @@ export class ZipFS extends VFS {
       filename: dirPath,
       directory: true,
       uncompressedSize: 0,
-      lastModDate: createdTime, // ZIP条目中保存创建时间
+      lastModDate: createdTime, // ZIP entries store the creation timestamp here
       comment: ''
     } as ZipJSEntry);
 

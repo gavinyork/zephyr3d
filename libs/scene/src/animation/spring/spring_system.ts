@@ -56,8 +56,8 @@ export interface SpringSystemOptions {
    */
   poseFollowTip?: number;
   /**
-   * Exponent used when interpolating root->tip follow.
-   * 1 = linear, >1 keeps root stiffer and tip looser.
+   * Exponent used when interpolating root-to-tip follow.
+   * `1` is linear; values `\> 1` keep the root stiffer and the tip looser.
    */
   poseFollowExponent?: number;
   /**
@@ -533,11 +533,11 @@ export class SpringSystem {
    * Reference: Müller et al., "Detailed Rigid Body Simulation with Extended Position Based Dynamics", 2020.
    *
    * The XPBD correction for a distance constraint C(x) = |x_b - x_a| - L is:
-   *   α̃ = compliance / dt²          (scaled compliance)
-   *   Δλ = (-C - α̃·λ) / (w_a + w_b + α̃)
-   *   λ  += Δλ
-   *   Δx_a = -w_a · Δλ · n̂
-   *   Δx_b = +w_b · Δλ · n̂
+   *   lphaTilde = compliance / dt^2`r
+   *   deltaLambda = (-C - alphaTilde * lambda) / (w_a + w_b + alphaTilde)`r
+   *   lambda += deltaLambda`r
+      // deltaX_a = -w_a * deltaLambda * n
+      // deltaX_b = +w_b * deltaLambda * n
    * where w = 1/mass (0 for fixed particles), n̂ = unit vector from a to b.
    */
   private solveConstraintXPBD(constraint: any, dt: number): void {
@@ -560,7 +560,7 @@ export class SpringSystem {
     // Constraint value C = currentLength - restLength
     const C = currentLength - constraint.restLength;
 
-    // Scaled compliance: α̃ = compliance / dt²
+    // Scaled compliance: alphaTilde = compliance / dt^2
     const alphaTilde = constraint.compliance / (dt * dt);
 
     // XPBD Lagrange multiplier update
@@ -571,11 +571,11 @@ export class SpringSystem {
     const n = Vector3.scale(delta, 1.0 / currentLength, new Vector3());
 
     if (!pA.fixed) {
-      // Δx_a = -w_a · Δλ · n̂
+      // deltaX_a = -w_a * deltaLambda * n
       Vector3.add(pA.position, Vector3.scale(n, -wA * deltaLambda, new Vector3()), pA.position);
     }
     if (!pB.fixed) {
-      // Δx_b = +w_b · Δλ · n̂
+      // deltaX_b = +w_b * deltaLambda * n
       Vector3.add(pB.position, Vector3.scale(n, wB * deltaLambda, new Vector3()), pB.position);
     }
   }
@@ -839,9 +839,6 @@ export class SpringSystem {
     return this._coriolisScale;
   }
 
-  /**
-   * Sets the Coriolis force scale
-   */
   set coriolisScale(scale: number) {
     this._coriolisScale = Math.max(0, scale);
   }
@@ -853,10 +850,6 @@ export class SpringSystem {
     return this._solver;
   }
 
-  /**
-   * Sets the constraint solver type.
-   * Switching to 'xpbd' resets all Lagrange multipliers.
-   */
   set solver(type: 'verlet' | 'xpbd') {
     if (this._solver !== type) {
       this._solver = type;
@@ -875,9 +868,6 @@ export class SpringSystem {
     return this._poseFollow;
   }
 
-  /**
-   * Sets pose preservation strength [0-1]
-   */
   set poseFollow(value: number) {
     const v = Math.max(0, Math.min(1, value));
     this._poseFollow = v;
@@ -892,9 +882,6 @@ export class SpringSystem {
     return this._maxPoseOffset;
   }
 
-  /**
-   * Sets max allowed deviation from animated pose. 0 disables clamping.
-   */
   set maxPoseOffset(value: number) {
     const v = Math.max(0, value);
     this._maxPoseOffset = v;
@@ -909,9 +896,6 @@ export class SpringSystem {
     return this._poseFollowRoot;
   }
 
-  /**
-   * Sets root pose follow strength [0-1]
-   */
   set poseFollowRoot(value: number) {
     this._poseFollowRoot = Math.max(0, Math.min(1, value));
   }
@@ -923,23 +907,17 @@ export class SpringSystem {
     return this._poseFollowTip;
   }
 
-  /**
-   * Sets tip pose follow strength [0-1]
-   */
   set poseFollowTip(value: number) {
     this._poseFollowTip = Math.max(0, Math.min(1, value));
   }
 
   /**
-   * Gets exponent for root->tip interpolation
+   * Gets exponent for root-to-tip interpolation
    */
   get poseFollowExponent(): number {
     return this._poseFollowExponent;
   }
 
-  /**
-   * Sets exponent for root->tip interpolation
-   */
   set poseFollowExponent(value: number) {
     this._poseFollowExponent = Math.max(0.1, value);
   }
@@ -951,9 +929,6 @@ export class SpringSystem {
     return this._maxPoseOffsetRoot;
   }
 
-  /**
-   * Sets root max allowed deviation from animated pose
-   */
   set maxPoseOffsetRoot(value: number) {
     this._maxPoseOffsetRoot = Math.max(0, value);
   }
@@ -965,9 +940,6 @@ export class SpringSystem {
     return this._maxPoseOffsetTip;
   }
 
-  /**
-   * Sets tip max allowed deviation from animated pose
-   */
   set maxPoseOffsetTip(value: number) {
     this._maxPoseOffsetTip = Math.max(0, value);
   }

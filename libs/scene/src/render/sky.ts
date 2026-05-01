@@ -216,6 +216,7 @@ export class SkyRenderer extends Disposable {
   get panoramaTextureAsset() {
     return this._panoramaAsset;
   }
+  /** @internal */
   set panoramaTextureAsset(id: string) {
     if (id !== this._panoramaAsset) {
       this._panoramaAsset = id ?? '';
@@ -230,6 +231,7 @@ export class SkyRenderer extends Disposable {
   get skyboxTextureSize() {
     return this._skyboxTextureSize;
   }
+  /** @internal */
   set skyboxTextureSize(size: number) {
     if (size !== this._skyboxTextureSize) {
       this._skyboxTextureSize = size;
@@ -556,6 +558,7 @@ export class SkyRenderer extends Disposable {
   get skyWorldMatrix(): Immutable<Matrix4x4> {
     return this._skyWorldMatrix;
   }
+  /** @internal */
   set skyWorldMatrix(val: Immutable<Matrix4x4>) {
     val = val ?? defaultSkyWorldMatrix;
     if (!val.equalsTo(this._skyWorldMatrix)) {
@@ -581,6 +584,7 @@ export class SkyRenderer extends Disposable {
   get aerialPerspectiveDebug() {
     return this._debugAerialPerspective;
   }
+  /** @internal */
   set aerialPerspectiveDebug(val) {
     this._debugAerialPerspective = val;
   }

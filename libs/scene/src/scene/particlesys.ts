@@ -372,6 +372,7 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   get flags() {
     return this._flags;
   }
+  /** @internal */
   set flags(value) {
     this._flags = value;
   }

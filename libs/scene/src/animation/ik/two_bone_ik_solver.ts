@@ -118,9 +118,6 @@ export class TwoBoneIKSolver extends IKSolver {
     return this._poleVector;
   }
 
-  /**
-   * Set the pole vector position.
-   */
   set poleVector(value: Vector3 | null) {
     if (value) {
       if (!this._poleVector) {
@@ -140,9 +137,6 @@ export class TwoBoneIKSolver extends IKSolver {
     return this._poleWeight;
   }
 
-  /**
-   * Set the pole vector weight (0-1).
-   */
   set poleWeight(value: number) {
     this._poleWeight = Math.max(0, Math.min(1, value));
   }

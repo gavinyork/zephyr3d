@@ -3,7 +3,11 @@
 import { Vector3 } from '@zephyr3d/base';
 import { ConstraintType, type Constraint, type BoneNode } from './types';
 
-/** Options for constraint generation from bone hierarchy */
+/**
+ * Options for constraint generation from a bone hierarchy.
+ *
+ * @public
+ */
 export interface ConstraintBuildOptions {
   /** Generate parent→child vertical constraints */
   structuralVertical: boolean;
@@ -197,6 +201,11 @@ function createSurfaceFaces(a: BoneNode | null, b: BoneNode | null, out: number[
 
 // ── Public API ──
 
+/**
+ * Builds solver constraints from the supplied root chains.
+ *
+ * @public
+ */
 export function buildConstraints(rootPoints: BoneNode[], options: ConstraintBuildOptions): Constraint[] {
   const n = rootPoints.length;
   const groups: Constraint[][] = [];
@@ -272,6 +281,11 @@ export function buildConstraints(rootPoints: BoneNode[], options: ConstraintBuil
   return groups.flat();
 }
 
+/**
+ * Builds triangle indices used for surface collision.
+ *
+ * @public
+ */
 export function buildSurfaceFaces(rootPoints: BoneNode[], isLoop: boolean): number[] {
   const out: number[] = [];
   const n = rootPoints.length;
@@ -284,6 +298,11 @@ export function buildSurfaceFaces(rootPoints: BoneNode[], isLoop: boolean): numb
   return out;
 }
 
+/**
+ * Computes the maximum chain depth among all root points.
+ *
+ * @public
+ */
 export function computeMaxDepth(rootPoints: BoneNode[]): number {
   let max = 0;
   function walk(node: BoneNode) {
@@ -300,6 +319,11 @@ export function computeMaxDepth(rootPoints: BoneNode[]): number {
   return max;
 }
 
+/**
+ * Sorts root points by proximity to the supplied reference position.
+ *
+ * @public
+ */
 export function sortRootPointsByProximity(
   roots: BoneNode[],
   ignoreY: boolean,

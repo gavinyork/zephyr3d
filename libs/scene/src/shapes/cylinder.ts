@@ -56,9 +56,6 @@ export class CylinderShape extends Shape<CylinderCreationOptions> implements Clo
     return 'Cylinder' as const;
   }
   /**
-   * {@inheritDoc Primitive.raycast}
-   * @override
-   *
    * Analytically intersects a ray with a cone frustum (or cylinder when
    * topRadius === bottomRadius) including the optional top and bottom caps.
    *

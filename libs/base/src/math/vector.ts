@@ -2083,7 +2083,7 @@ export class Quaternion extends VectorBase {
    */
   decomposeSwingTwist(axis: Vector3, outSwing?: Quaternion, outTwist?: Quaternion) {
     // Project quaternion's imaginary part (xyz) onto twist axis
-    // twist quaternion = (w, (xyz · axis) * axis)
+    // twist quaternion = (w, dot(xyz, axis) * axis)
     const dot = this.x * axis.x + this.y * axis.y + this.z * axis.z;
 
     let twistX = axis.x * dot;

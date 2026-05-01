@@ -384,7 +384,7 @@ export class IndexedDBFS extends VFS {
             isDirectory: record.type === 'directory',
             created: new Date(record.created),
             modified: new Date(record.modified),
-            accessed: new Date(record.modified) // IndexedDB 不跟踪访问时间，使用修改时间
+            accessed: new Date(record.modified) // IndexedDB does not track access time, so reuse modified time
           });
         };
         request.onerror = () => reject(new VFSError('Failed to get file stats', 'EIO', path));

@@ -158,6 +158,7 @@ export type ElementType<T> = T extends (infer U)[] ? U : never;
  * Object.entries with typed return value
  * @param obj - The object to extract entries from.
  * @returns An array of key-value pairs from the object.
+ * @public
  */
 export function objectEntries<T extends Record<PropertyKey, unknown>>(obj: T) {
   return Object.entries(obj) as { [K in keyof T]-?: [K, T[K]] }[keyof T][];
@@ -167,6 +168,7 @@ export function objectEntries<T extends Record<PropertyKey, unknown>>(obj: T) {
  * Object.keys with typed return value
  * @param obj - The object to extract keys from.
  * @returns An array of keys from the object.
+ * @public
  */
 export function objectKeys<T extends {}>(obj: T) {
   return Object.keys(obj) as (keyof T)[];
@@ -202,8 +204,8 @@ type HasFunctionProperty<T> = T extends object
 /**
  * Deep Partial
  *
- * @template T - 目标类型
- * @template Depth - 最大递归深度（默认 5）
+ * @typeParam T - The target type to make partially optional.
+ * @typeParam Depth - The maximum recursion depth. Defaults to `5`.
  *
  * @public
  */
@@ -269,6 +271,7 @@ export type DeepRequireOptionals<T> = T extends
 
 /**
  * Immutable type modifier
+ * @public
  */
 export type Immutable<T> = T extends (...args: any[]) => any
   ? T
@@ -723,15 +726,15 @@ interface FormatToken {
   explicitIndex?: number; // n$ style index (1-based)
 }
 
-// 说明：
-//  1: i$           -> 显式索引（整个转换的值索引）
+// Capture groups:
+//  1: i$           -> explicit value index for the whole conversion
 //  2: flagsStr
-//  3: starWidth    -> '*'（有星号宽度）
-//  4: widthIndex$  -> 星号宽度的显式索引，如 *3$ 里的 3
-//  5: widthNum     -> 数字宽度，如 10
-//  6: starPrec     -> '*'（有星号精度）
-//  7: precIndex$   -> 星号精度的显式索引，如 *4$ 里的 4
-//  8: precNum      -> 数字精度，如 .2
+//  3: starWidth    -> '*' width specifier
+//  4: widthIndex$  -> explicit width index, e.g. the 3 in `*3$`
+//  5: widthNum     -> numeric width, e.g. `10`
+//  6: starPrec     -> '*' precision specifier
+//  7: precIndex$   -> explicit precision index, e.g. the 4 in `*4$`
+//  8: precNum      -> numeric precision, e.g. `.2`
 //  9: type
 const formatRegex =
   /%(?:(\d+)\$)?([-+ 0#]*)(?:(\*)(?:(\d+)\$)?|(\d+))?(?:\.(?:(\*)(?:(\d+)\$)?|(\d+)))?([%sdifuoxXc])/g;

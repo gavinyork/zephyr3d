@@ -119,7 +119,7 @@ export class Engine {
     return this._resourceManager;
   }
   /**
-   * Exposes the instanceof {@link Screen}
+   * Exposes the active {@link ScreenAdapter}.
    */
   get screen() {
     return this._screen;

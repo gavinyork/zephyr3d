@@ -28,8 +28,8 @@ export class AABB {
     get extents(): Vector3;
     getClipState(viewProjMatrix: Matrix4x4): ClipState.NOT_CLIPPED | ClipState.A_INSIDE_B | ClipState.CLIPPED;
     getClipStateMask(viewProjMatrix: Matrix4x4, mask: number): ClipState.NOT_CLIPPED | ClipState.A_INSIDE_B | ClipState.CLIPPED;
-    getClipStateWithFrustum(frustum: Frustum): ClipState.NOT_CLIPPED | ClipState.A_INSIDE_B | ClipState.CLIPPED;
-    getClipStateWithFrustumMask(frustum: Frustum, mask: number): ClipState.NOT_CLIPPED | ClipState.A_INSIDE_B | ClipState.CLIPPED;
+    getClipStateWithFrustum(frustum: Pick<Frustum, 'planes'> | Immutable<Frustum>): ClipState.NOT_CLIPPED | ClipState.A_INSIDE_B | ClipState.CLIPPED;
+    getClipStateWithFrustumMask(frustum: Pick<Frustum, 'planes'> | Immutable<Frustum>, mask: number): ClipState.NOT_CLIPPED | ClipState.A_INSIDE_B | ClipState.CLIPPED;
     inplaceTransform(matrix: Matrix4x4): this;
     intersectedWithBox(other: AABB): boolean;
     isValid(): boolean;
@@ -66,6 +66,12 @@ export enum BoxSide {
     RIGHT = 1,
     TOP = 3
 }
+
+// @public
+export function clamp(v: number, min: number, max: number): number;
+
+// @public
+export function clamp01(v: number): number;
 
 // @public
 export enum ClipState {
@@ -136,6 +142,19 @@ export class DataTransferVFS extends VFS {
     protected _wipe(): Promise<void>;
     protected _writeFile(): Promise<void>;
 }
+
+// Warning: (ae-forgotten-export) The symbol "BuildTuple" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type Decrement<N extends number> = BuildTuple<N> extends [infer _, ...infer Rest] ? Rest['length'] : never;
+
+// Warning: (ae-forgotten-export) The symbol "Builtin" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "HasFunctionProperty" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type DeepPartial<T, Depth extends number = 5> = Depth extends 0 ? T : T extends Builtin ? T : T extends Array<infer U> ? Array<DeepPartial<U, Decrement<Depth>>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U, Decrement<Depth>>> : HasFunctionProperty<T> extends true ? T : T extends object ? {
+    [K in keyof T]?: T[K] extends (...args: any[]) => any ? T[K] : DeepPartial<T[K], Decrement<Depth>>;
+} : T;
 
 // @public
 export type DeepRequireOptionals<T> = T extends Function | Date | RegExp | symbol | bigint | string | number | boolean ? T : T extends readonly (infer U)[] ? readonly DeepRequireOptionals<U>[] : T extends object ? {
@@ -616,6 +635,17 @@ export class Interpolator {
     get stride(): number;
     get target(): Nullable<InterpolationTarget>;
     set target(val: Nullable<InterpolationTarget>);
+}
+
+// @public
+export class InterpolatorScalar extends Interpolator {
+    constructor(mode: InterpolationMode, inputs: InterpolateData, outputs: InterpolateData);
+    // (undocumented)
+    static constant(value: number): InterpolatorScalar;
+    // (undocumented)
+    evaluate(t: number): number;
+    // (undocumented)
+    static linear(value0: number, value1: number, t0?: number, t1?: number): InterpolatorScalar;
 }
 
 // @public
@@ -1160,6 +1190,7 @@ export class Quaternion extends VectorBase {
     static angleBetween(a: Quaternion, b: Quaternion): number;
     clone(): Quaternion;
     static conjugate(q: Quaternion, result?: Quaternion): Quaternion;
+    decomposeSwingTwist(axis: Vector3, outSwing?: Quaternion, outTwist?: Quaternion): void;
     static dot(a: Quaternion, b: Quaternion): number;
     fromAxisAngle(axis: Vector3, angle: number): this;
     static fromAxisAngle(axis: Vector3, angle: number, result?: Quaternion): Quaternion;
@@ -1171,10 +1202,13 @@ export class Quaternion extends VectorBase {
     getDirectionX(result?: Vector3): Vector3;
     getDirectionY(result?: Vector3): Vector3;
     getDirectionZ(result?: Vector3): Vector3;
+    getTwistAngle(axis: Vector3): number;
     identity(): this;
     static identity(q?: Quaternion): Quaternion;
     inplaceConjugate(): this;
+    inplaceInverse(): this;
     inplaceNormalize(): this;
+    static inverse(q: Quaternion, result?: Quaternion): Quaternion;
     get magnitude(): number;
     get magnitudeSq(): number;
     static multiply(a: Quaternion, b: Quaternion, result?: Quaternion): Quaternion;
@@ -1222,6 +1256,7 @@ export class Ray {
         dist: number;
         epsl: number;
     } | null;
+    intersectionTestPlane(plane: Plane): number | null;
     intersectionTestSphere(center: Vector3, radius: number): number[] | null;
     intersectionTestTriangle(v1: Vector3, v2: Vector3, v3: Vector3, cull: boolean): number | null;
     get origin(): Vector3;
@@ -1288,6 +1323,9 @@ export class SH {
     static readonly MAX_ORDER = 3;
     static readonly MIN_ORDER = 2;
 }
+
+// @public
+export function smoothStep(from: number, to: number, t: number): number;
 
 // @public
 export function textToBase64(text: string): string;
@@ -1379,6 +1417,7 @@ export class Vector2 extends VectorBase {
     inplaceMin(other: Vector2): this;
     inplaceNormalize(): this;
     static inverse(v: Vector2, result?: Vector2): Vector2;
+    static lerp(a: Vector2, b: Vector2, t: number, result?: Vector2): Vector2;
     get magnitude(): number;
     get magnitudeSq(): number;
     static max(a: Vector2, b: Vector2, result?: Vector2): Vector2;
@@ -1410,6 +1449,7 @@ export class Vector3 extends VectorBase {
     static abs(a: Vector3, result?: Vector3): Vector3;
     static add(a: Vector3, b: Vector3, result?: Vector3): Vector3;
     addBy(other: Vector3): this;
+    static angleBetween(a: Vector3, b: Vector3): number;
     static axisNX(): Vector3;
     static axisNY(): Vector3;
     static axisNZ(): Vector3;
@@ -1430,6 +1470,7 @@ export class Vector3 extends VectorBase {
     inplaceMin(other: Vector3): this;
     inplaceNormalize(): this;
     static inverse(v: Vector3, result?: Vector3): Vector3;
+    static lerp(a: Vector3, b: Vector3, t: number, result?: Vector3): Vector3;
     get magnitude(): number;
     get magnitudeSq(): number;
     static max(a: Vector3, b: Vector3, result?: Vector3): Vector3;
@@ -1483,6 +1524,7 @@ export class Vector4 extends VectorBase {
     inplaceMin(other: Vector4): this;
     inplaceNormalize(): this;
     static inverse(v: Vector4, result?: Vector4): Vector4;
+    static lerp(a: Vector4, b: Vector4, t: number, result?: Vector4): Vector4;
     get magnitude(): number;
     get magnitudeSq(): number;
     static max(a: Vector4, b: Vector4, result?: Vector4): Vector4;
@@ -1745,7 +1787,7 @@ export interface ZipJSWriterConstructor {
 
 // Warnings were encountered during analysis:
 //
-// dist/index.d.ts:577:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
+// dist/index.d.ts:616:9 - (ae-forgotten-export) The symbol "EventListenerMap" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

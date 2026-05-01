@@ -1,4 +1,4 @@
-// High-level orchestrator — SPCRJointDynamicsController API
+// High-level orchestrator - SPCRJointDynamicsController API
 
 import {
   EPSILON,
@@ -171,13 +171,13 @@ export class JointDynamicsSystemController {
   }
 
   /**
-   * 初始化物理系统
-   * @param rootTransform 根骨骼的 transform（用于检测根运动）
-   * @param rootPoints 骨骼层级的根节点数组（可以有多个根，如裙子的多条链）
-   * @param pointTransforms 所有物理点的 transform 数组（顺序必须与 BoneNode.index 对应）
-   * @param colliders 碰撞器数组（球体/胶囊体）
-   * @param grabbers 抓取器数组（用于鼠标交互等）
-   * @param flatPlanes 平面限制器数组（如地板，防止穿透）
+   * Initializes the physics system.
+   * @param rootTransform Root bone transform used to detect root motion.
+   * @param rootPoints Root nodes of the bone hierarchy. Multiple roots are allowed.
+   * @param pointTransforms Transform array for all physics points. Order must match `BoneNode.index`.
+   * @param colliders Collider array (spheres/capsules).
+   * @param grabbers Grabber array used for interactions such as mouse dragging.
+   * @param flatPlanes Plane limiters such as the floor to prevent penetration.
    */
   initialize(
     rootTransform: TransformAccess,
@@ -202,7 +202,7 @@ export class JointDynamicsSystemController {
 
     // Flatten bone hierarchy to point list, build parent map
     const allPoints: BoneNode[] = [];
-    const parentMap = new Map<number, number>(); // child index → parent index
+    const parentMap = new Map<number, number>(); // child index -> parent index
     function walk(node: BoneNode) {
       allPoints.push(node);
       for (const c of node.children) {
@@ -295,9 +295,10 @@ export class JointDynamicsSystemController {
   }
 
   /**
-   * 执行一帧物理模拟
-   * 内部流程：读取当前 transform → 运行 Verlet 积分和约束求解 → 写回 transform
-   * @param deltaTime 帧间隔时间（秒）。内部会被 subSteps 细分
+   * Advances the simulation by one frame.
+   * Internal flow: read current transforms, run Verlet integration and constraint solving,
+   * then write the result back to the transforms.
+   * @param deltaTime Frame delta time in seconds. Internally subdivided by `subSteps`.
    */
   step(deltaTime: number): void {
     if (!this._initialized || !this._rootTransform) {
@@ -412,9 +413,9 @@ export class JointDynamicsSystemController {
   }
 
   /**
-   * 获取所有点的模拟结果（世界坐标位置和旋转）
-   * 通常不需要手动调用——step() 已经自动写回 transform。
-   * 适用于需要在不写回 transform 的情况下读取物理结果的场景。
+   * Returns the simulated results for all points as world-space positions and rotations.
+   * Usually this does not need to be called manually because `step()` already writes the
+   * output back to the transforms.
    */
   getResults(): Array<{ position: Vector3; rotation: Quaternion }> {
     const transformRots = this._pointTransforms.map((t) => t.getWorldRotation());
@@ -432,9 +433,9 @@ export class JointDynamicsSystemController {
   }
 
   /**
-   * 瞬移补偿——在角色传送/瞬移后调用
-   * 将上一帧的根骨骼位置和旋转设为当前值，
-   * 使下一帧的根运动增量为零，避免物理点因巨大位移而弹射。
+   * Compensates for teleportation by resetting the previous root transform to the current one.
+   * Call this after a character warp or teleport to avoid a large root-motion impulse on the
+   * next simulation step.
    */
   warp(): void {
     if (!this._rootTransform) {
@@ -445,9 +446,9 @@ export class JointDynamicsSystemController {
   }
 
   /**
-   * 重置所有物理状态
-   * 将所有点的模拟位置重置为当前 transform 位置，清除速度和抓取状态。
-   * 适用于场景切换或需要消除所有物理运动的场景。
+   * Resets all physics state.
+   * Each simulated point is snapped back to the current transform position and grab state
+   * is cleared.
    */
   reset(): void {
     for (let i = 0; i < this._pointsRW.length; i++) {
@@ -460,9 +461,9 @@ export class JointDynamicsSystemController {
   }
 
   /**
-   * 释放固定点为动态点（如脱衣、布料脱落）
-   * 将 weight 从 0 改为 1，同时重置该点的模拟状态避免瞬间弹射。
-   * @param index 点的索引
+   * Releases a fixed point so it becomes dynamic, for example when cloth is detached.
+   * The point state is reset to avoid a sudden impulse.
+   * @param index Point index.
    */
   releasePoint(index: number): void {
     if (index < 0 || index >= this._pointsR.length) {
@@ -476,9 +477,9 @@ export class JointDynamicsSystemController {
   }
 
   /**
-   * 将动态点重新固定为跟随动画（如重新穿戴）
-   * 将 weight 从 1 改为 0，清除抓取状态。
-   * @param index 点的索引
+   * Fixes a dynamic point back to the animation pose, for example when an item is reattached.
+   * The point grab state is cleared.
+   * @param index Point index.
    */
   fixPoint(index: number): void {
     if (index < 0 || index >= this._pointsR.length) {
@@ -489,8 +490,8 @@ export class JointDynamicsSystemController {
   }
 
   /**
-   * 查询某个点是否为固定状态（weight=0，跟随动画）
-   * @param index 点的索引
+   * Returns whether a point is fixed to animation (`weight = 0`).
+   * @param index Point index.
    */
   isPointFixed(index: number): boolean {
     if (index < 0 || index >= this._pointsR.length) {
@@ -499,15 +500,15 @@ export class JointDynamicsSystemController {
     return this._pointsR[index].weight <= EPSILON;
   }
 
-  /** 获取物理点总数 */
+  /** Gets the total number of physics points. */
   get pointCount(): number {
     return this._pointsR.length;
   }
 
   /**
-   * 渐入物理——从动画姿态平滑过渡到物理模拟
-   * blendRatio 从 1（纯动画）渐变到 0（纯物理）
-   * @param seconds 过渡时长（秒）
+   * Fades physics in by blending from animation pose to simulation.
+   * `blendRatio` moves from `1` (animation only) to `0` (physics only).
+   * @param seconds Transition duration in seconds.
    */
   fadeIn(seconds: number): void {
     this._fadeState = 'in';
@@ -516,9 +517,9 @@ export class JointDynamicsSystemController {
   }
 
   /**
-   * 渐出物理——从物理模拟平滑过渡回动画姿态
-   * blendRatio 从 0（纯物理）渐变到 1（纯动画）
-   * @param seconds 过渡时长（秒）
+   * Fades physics out by blending from simulation back to animation pose.
+   * `blendRatio` moves from `0` (physics only) to `1` (animation only).
+   * @param seconds Transition duration in seconds.
    */
   fadeOut(seconds: number): void {
     this._fadeState = 'out';
@@ -527,9 +528,9 @@ export class JointDynamicsSystemController {
   }
 
   /**
-   * 设置全局风力向量
-   * 风力会按每个点的 windForceScale 和质量进行缩放
-   * @param wind 风力向量（世界坐标）
+   * Sets the global wind force vector.
+   * The final wind contribution is still scaled per point by `windForceScale` and mass.
+   * @param wind Wind vector in world space.
    */
   setWindForce(wind: Vector3): void {
     this._config.windForce = wind;
@@ -550,9 +551,10 @@ export class JointDynamicsSystemController {
   }
 
   /**
-   * 暂停/恢复物理模拟
-   * 暂停时仍会跟随根骨骼运动，但不进行力学积分和约束求解
-   * @param paused true=暂停, false=恢复
+   * Pauses or resumes the physics simulation.
+   * While paused, the system still follows root motion but skips force integration and
+   * constraint solving.
+   * @param paused `true` to pause, `false` to resume.
    */
   setPaused(paused: boolean): void {
     this._isPaused = paused;

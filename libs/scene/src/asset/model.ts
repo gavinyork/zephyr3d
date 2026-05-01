@@ -206,6 +206,11 @@ export interface AssetAnimationTrack {
   defaultMorphWeights?: number[];
 }
 
+/**
+ * Fixed-frame geometry cache animation track data.
+ *
+ * @public
+ */
 export interface AssetFixedGeometryCacheAnimationTrack {
   node: AssetHierarchyNode;
   type: 'geometry-cache';
@@ -215,6 +220,11 @@ export interface AssetFixedGeometryCacheAnimationTrack {
   frames: FixedGeometryCacheFrame[];
 }
 
+/**
+ * PCA-compressed geometry cache animation track data.
+ *
+ * @public
+ */
 export interface AssetPCAGeometryCacheAnimationTrack {
   node: AssetHierarchyNode;
   type: 'geometry-cache';
@@ -231,6 +241,11 @@ export interface AssetPCAGeometryCacheAnimationTrack {
   normalCoefficients?: Nullable<Float32Array[]>;
 }
 
+/**
+ * Geometry cache animation track data.
+ *
+ * @public
+ */
 export type AssetGeometryCacheAnimationTrack =
   | AssetFixedGeometryCacheAnimationTrack
   | AssetPCAGeometryCacheAnimationTrack;
@@ -956,17 +971,17 @@ export class SharedModel extends Disposable {
       for (const subMesh of meshData.subMeshes) {
         for (const instance of assetNode.instances!) {
           const meshNode = new Mesh(scene);
+          const skinAnimation = !!skeleton;
+          const morphAnimation = subMesh.numTargets > 0;
           meshNode.position = instance.t;
           meshNode.scale = instance.s;
           meshNode.rotation = instance.r;
           meshNode.name = subMesh.name;
           meshNode.clipTestEnabled = true;
           meshNode.showState = 'inherit';
-          meshNode.skinAnimation = !!skeleton;
-          meshNode.morphAnimation = subMesh.numTargets > 0;
           meshNode.primitive = subMesh.primitive.get()!;
           meshNode.material =
-            instancing && !meshNode.skinAnimation && !meshNode.morphAnimation
+            instancing && !skinAnimation && !morphAnimation
               ? subMesh.material.get()!.createInstance()
               : subMesh.material.get()!.clone();
           meshNode.parent = node;
