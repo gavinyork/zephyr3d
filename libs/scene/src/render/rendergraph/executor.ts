@@ -91,38 +91,46 @@ export class RenderGraphExecutor<TTexture = unknown> {
 
     const ctx = this._createContext();
 
-    for (let i = 0; i < compiled.orderedPasses.length; i++) {
-      const pass = compiled.orderedPasses[i];
+    let completed = false;
+    try {
+      for (let i = 0; i < compiled.orderedPasses.length; i++) {
+        const pass = compiled.orderedPasses[i];
 
-      // Allocate resources that start at this pass
-      const toAllocate = allocateAt.get(i);
-      if (toAllocate) {
-        for (const resId of toAllocate) {
-          const lifetime = compiled.lifetimes.get(resId)!;
-          const desc = lifetime.resource.desc!;
-          const size = this._resolveSize(desc);
-          const texture = this._allocator.allocate(desc, size);
-          this._allocatedTextures.set(resId, texture);
+        // Allocate resources that start at this pass
+        const toAllocate = allocateAt.get(i);
+        if (toAllocate) {
+          for (const resId of toAllocate) {
+            const lifetime = compiled.lifetimes.get(resId)!;
+            const desc = lifetime.resource.desc!;
+            const size = this._resolveSize(desc);
+            const texture = this._allocator.allocate(desc, size);
+            this._allocatedTextures.set(resId, texture);
+          }
         }
-      }
 
-      // Execute the pass with exception safety for resource cleanup
-      try {
-        if (pass.executeFn) {
-          (pass.executeFn as RGExecuteFn<unknown>)(ctx, pass.data);
-        }
-      } finally {
-        // Release resources that end at this pass (always runs even if pass throws)
-        const toRelease = releaseAt.get(i);
-        if (toRelease) {
-          for (const resId of toRelease) {
-            const texture = this._allocatedTextures.get(resId);
-            if (texture !== undefined) {
-              this._allocator.release(texture);
-              this._allocatedTextures.delete(resId);
+        // Execute the pass with exception safety for resource cleanup
+        try {
+          if (pass.executeFn) {
+            (pass.executeFn as RGExecuteFn<unknown>)(ctx, pass.data);
+          }
+        } finally {
+          // Release resources that end at this pass (always runs even if pass throws)
+          const toRelease = releaseAt.get(i);
+          if (toRelease) {
+            for (const resId of toRelease) {
+              const texture = this._allocatedTextures.get(resId);
+              if (texture !== undefined) {
+                this._allocator.release(texture);
+                this._allocatedTextures.delete(resId);
+              }
             }
           }
         }
+      }
+      completed = true;
+    } finally {
+      if (!completed) {
+        this.reset();
       }
     }
   }

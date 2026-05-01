@@ -111,6 +111,17 @@ export interface FrameState {
   depthFramebuffer: Nullable<FrameBuffer>;
   sunLightColor: Nullable<any>;
   options: ForwardPlusOptions;
+  depthFramebufferReleased: boolean;
+  intermediateFramebufferReleased: boolean;
+  intermediateDeviceStatePushed: boolean;
+  renderQueueDisposed: boolean;
+  clusteredLightReleased: boolean;
+  sunLightRestored: boolean;
+}
+
+interface ForwardPlusGraphBuildResult {
+  backbuffer: RGHandle;
+  frame: FrameState;
 }
 
 // ─── Forward+ Graph Builder ─────────────────────────────────────────
@@ -136,6 +147,15 @@ export function buildForwardPlusGraph(
   renderQueue: RenderQueue,
   options: ForwardPlusOptions
 ): RGHandle {
+  return buildForwardPlusGraphInternal(graph, ctx, renderQueue, options).backbuffer;
+}
+
+function buildForwardPlusGraphInternal(
+  graph: RenderGraph,
+  ctx: DrawContext,
+  renderQueue: RenderQueue,
+  options: ForwardPlusOptions
+): ForwardPlusGraphBuildResult {
   const backbuffer = graph.importTexture('backbuffer');
 
   // Shared mutable frame state
@@ -144,29 +164,42 @@ export function buildForwardPlusGraph(
     renderQueue,
     depthFramebuffer: null,
     sunLightColor: null,
-    options
+    options,
+    depthFramebufferReleased: false,
+    intermediateFramebufferReleased: false,
+    intermediateDeviceStatePushed: false,
+    renderQueueDisposed: false,
+    clusteredLightReleased: false,
+    sunLightRestored: false
   };
 
   // ── 1. Sky Update ─────────────────────────────────────────────────
-  graph.addPass('SkyUpdate', (builder) => {
+  let orderToken = graph.addPass('SkyUpdate', (builder) => {
+    const done = builder.createToken('SkyUpdateDone');
     builder.sideEffect();
     builder.setExecute(() => {
       frame.sunLightColor = ctx.scene.env.sky.update(ctx);
     });
+    return done;
   });
 
   // ── 2. Clustered Light Setup ──────────────────────────────────────
-  graph.addPass('ClusterLights', (builder) => {
+  orderToken = graph.addPass('ClusterLights', (builder) => {
+    builder.read(orderToken);
+    const done = builder.createToken('ClusterLightsDone');
     builder.sideEffect();
     builder.setExecute(() => {
       ctx.clusteredLight = getClusteredLight();
       ctx.clusteredLight.calculateLightIndex(ctx.camera, renderQueue);
     });
+    return done;
   });
 
   // ── 3. GPU Picking (optional, sideEffect) ─────────────────────────
   if (options.gpuPicking) {
-    graph.addPass('GPUPicking', (builder) => {
+    orderToken = graph.addPass('GPUPicking', (builder) => {
+      builder.read(orderToken);
+      const done = builder.createToken('GPUPickingDone');
       builder.sideEffect();
       builder.setExecute(() => {
         const pickResolveFunc = ctx.camera.getPickResultResolveFunc();
@@ -174,23 +207,28 @@ export function buildForwardPlusGraph(
           renderObjectColors(ctx, pickResolveFunc, renderQueue);
         }
       });
+      return done;
     });
   }
 
   // ── 4. Shadow Maps ────────────────────────────────────────────────
   // Shadow maps are managed internally by lights, mark as side effect
   if (renderQueue.shadowedLights.length > 0) {
-    graph.addPass('ShadowMaps', (builder) => {
+    orderToken = graph.addPass('ShadowMaps', (builder) => {
+      builder.read(orderToken);
+      const done = builder.createToken('ShadowMapsDone');
       builder.sideEffect();
       builder.setExecute(() => {
         renderShadowMaps(ctx, renderQueue.shadowedLights);
       });
+      return done;
     });
   }
 
   // ── 5. Depth Prepass ──────────────────────────────────────────────
   // Declare transient depth and motion vector textures
   const depthPassResult = graph.addPass('DepthPrepass', (builder) => {
+    builder.read(orderToken);
     const format: TextureFormat =
       ctx.device.type === 'webgl'
         ? ctx.SSRCalcThickness
@@ -280,6 +318,10 @@ export function buildForwardPlusGraph(
   // ── 8. Post Effects + Final Composite ─────────────────────────────
   graph.addPass('Composite', (builder) => {
     builder.read(sceneColorHandle);
+    builder.read(depthHandle);
+    if (hiZHandle) {
+      builder.read(hiZHandle);
+    }
     if (motionVectorHandle) {
       builder.read(motionVectorHandle);
     }
@@ -289,7 +331,7 @@ export function buildForwardPlusGraph(
     });
   });
 
-  return backbuffer;
+  return { backbuffer, frame };
 }
 
 // ─── Pass Implementation Helpers ────────────────────────────────────
@@ -301,10 +343,72 @@ export function buildForwardPlusGraph(
 function renderShadowMaps(ctx: DrawContext, lights: PunctualLight[]): void {
   ctx.renderPass = _shadowMapPass;
   ctx.device.pushDeviceStates();
-  for (const light of lights) {
-    light.shadow.render(ctx, _shadowMapPass);
+  try {
+    for (const light of lights) {
+      light.shadow.render(ctx, _shadowMapPass);
+    }
+  } finally {
+    ctx.device.popDeviceStates();
   }
-  ctx.device.popDeviceStates();
+}
+
+function releaseIntermediateFramebuffer(frame: FrameState): void {
+  const { ctx } = frame;
+  if (frame.intermediateDeviceStatePushed) {
+    ctx.device.popDeviceStates();
+    frame.intermediateDeviceStatePushed = false;
+  }
+  if (
+    ctx.intermediateFramebuffer &&
+    ctx.intermediateFramebuffer !== ctx.finalFramebuffer &&
+    !frame.intermediateFramebufferReleased
+  ) {
+    ctx.device.pool.releaseFrameBuffer(ctx.intermediateFramebuffer);
+    frame.intermediateFramebufferReleased = true;
+  }
+  ctx.intermediateFramebuffer = null;
+}
+
+function releaseDepthFramebuffer(frame: FrameState): void {
+  if (
+    frame.depthFramebuffer &&
+    frame.depthFramebuffer !== frame.ctx.finalFramebuffer &&
+    !frame.depthFramebufferReleased
+  ) {
+    frame.ctx.device.pool.releaseFrameBuffer(frame.depthFramebuffer);
+    frame.depthFramebufferReleased = true;
+  }
+  frame.depthFramebuffer = null;
+}
+
+function disposeRenderQueue(frame: FrameState): void {
+  if (!frame.renderQueueDisposed) {
+    frame.renderQueue.dispose();
+    frame.renderQueueDisposed = true;
+  }
+}
+
+function releaseClusteredLight(frame: FrameState): void {
+  if (!frame.clusteredLightReleased && frame.ctx.clusteredLight) {
+    freeClusteredLight(frame.ctx.clusteredLight);
+    frame.ctx.clusteredLight = undefined;
+    frame.clusteredLightReleased = true;
+  }
+}
+
+function restoreSunLight(frame: FrameState): void {
+  if (!frame.sunLightRestored && frame.sunLightColor && frame.ctx.sunLight) {
+    frame.ctx.sunLight.color = frame.sunLightColor;
+    frame.sunLightRestored = true;
+  }
+}
+
+function cleanupFrame(frame: FrameState): void {
+  releaseIntermediateFramebuffer(frame);
+  releaseDepthFramebuffer(frame);
+  releaseClusteredLight(frame);
+  disposeRenderQueue(frame);
+  restoreSunLight(frame);
 }
 
 /** @internal */
@@ -377,38 +481,48 @@ function renderSceneDepth(
     }
   }
 
-  ctx.device.pushDeviceStates();
-  ctx.device.setFramebuffer(depthFramebuffer!);
-  _depthPass.encodeDepth = depthFramebuffer!.getColorAttachments()[0].format === 'rgba8unorm';
-  _depthPass.clearColor = transmission
-    ? null
-    : _depthPass.encodeDepth
-      ? new Vector4(0, 0, 0, 1)
-      : new Vector4(1, 1, 1, 1);
-  _depthPass.clearDepth = transmission ? null : 1;
-  _depthPass.clearStencil = null;
-  _depthPass.transmission = transmission;
-
-  if (ctx.SSRCalcThickness && !transmission) {
-    if (!_backDepthColorState) {
-      _backDepthColorState = ctx.device.createColorState().setColorMask(false, true, false, false);
-    }
-    if (!_frontDepthColorState) {
-      _frontDepthColorState = ctx.device.createColorState().setColorMask(true, false, false, false);
-    }
-    ctx.forceColorState = _backDepthColorState;
-    ctx.forceCullMode = 'front';
-    _depthPass.renderBackface = true;
-    _depthPass.transmission = false;
-    _depthPass.render(ctx, null, null, renderQueue);
-    _depthPass.clearColor = null;
-    _depthPass.renderBackface = false;
-    ctx.forceColorState = _frontDepthColorState;
-    ctx.forceCullMode = null;
+  if (!transmission) {
+    frame.depthFramebuffer = depthFramebuffer!;
+    frame.depthFramebufferReleased = false;
   }
-  _depthPass.render(ctx, null, null, renderQueue);
-  ctx.forceColorState = null;
-  ctx.device.popDeviceStates();
+
+  ctx.device.pushDeviceStates();
+  try {
+    ctx.device.setFramebuffer(depthFramebuffer!);
+    _depthPass.encodeDepth = depthFramebuffer!.getColorAttachments()[0].format === 'rgba8unorm';
+    _depthPass.clearColor = transmission
+      ? null
+      : _depthPass.encodeDepth
+        ? new Vector4(0, 0, 0, 1)
+        : new Vector4(1, 1, 1, 1);
+    _depthPass.clearDepth = transmission ? null : 1;
+    _depthPass.clearStencil = null;
+    _depthPass.transmission = transmission;
+
+    if (ctx.SSRCalcThickness && !transmission) {
+      if (!_backDepthColorState) {
+        _backDepthColorState = ctx.device.createColorState().setColorMask(false, true, false, false);
+      }
+      if (!_frontDepthColorState) {
+        _frontDepthColorState = ctx.device.createColorState().setColorMask(true, false, false, false);
+      }
+      ctx.forceColorState = _backDepthColorState;
+      ctx.forceCullMode = 'front';
+      _depthPass.renderBackface = true;
+      _depthPass.transmission = false;
+      _depthPass.render(ctx, null, null, renderQueue);
+      _depthPass.clearColor = null;
+      _depthPass.renderBackface = false;
+      ctx.forceColorState = _frontDepthColorState;
+      ctx.forceCullMode = null;
+    }
+    _depthPass.render(ctx, null, null, renderQueue);
+  } finally {
+    ctx.forceColorState = null;
+    ctx.forceCullMode = null;
+    _depthPass.renderBackface = false;
+    ctx.device.popDeviceStates();
+  }
 
   if (!transmission) {
     ctx.motionVectorTexture = ctx.motionVectors
@@ -525,6 +639,8 @@ function renderMainLightPass(
 
   if (ctx.intermediateFramebuffer && ctx.intermediateFramebuffer !== ctx.finalFramebuffer) {
     device.pushDeviceStates();
+    frame.intermediateDeviceStatePushed = true;
+    frame.intermediateFramebufferReleased = false;
     device.setFramebuffer(ctx.intermediateFramebuffer);
   } else {
     device.setViewport(null);
@@ -560,11 +676,20 @@ function renderMainLightPass(
       depthTex,
       false
     );
-    device.pushDeviceStates();
-    device.setFramebuffer(sceneColorFramebuffer);
-    _scenePass.transmission = false;
-    _scenePass.render(ctx, null, null, renderQueue);
-    device.popDeviceStates();
+    let sceneColorStatePushed = false;
+    try {
+      device.pushDeviceStates();
+      sceneColorStatePushed = true;
+      device.setFramebuffer(sceneColorFramebuffer);
+      _scenePass.transmission = false;
+      _scenePass.render(ctx, null, null, renderQueue);
+    } finally {
+      if (sceneColorStatePushed) {
+        device.popDeviceStates();
+      }
+      device.pool.releaseFrameBuffer(sceneColorFramebuffer);
+      ctx.compositor = compositor;
+    }
     ctx.sceneColorTexture = sceneColorCopyTex;
     new CopyBlitter().blit(
       ctx.sceneColorTexture,
@@ -575,7 +700,6 @@ function renderMainLightPass(
     _scenePass.clearColor = null;
     _scenePass.clearDepth = null;
     _scenePass.clearStencil = null;
-    ctx.compositor = compositor;
   }
   _scenePass.render(ctx, null, null, renderQueue);
 
@@ -586,12 +710,11 @@ function renderMainLightPass(
 
 /** @internal */
 function renderComposite(frame: FrameState): void {
-  const { ctx, renderQueue } = frame;
-  const device = ctx.device;
+  const { ctx } = frame;
 
   ctx.compositor?.drawPostEffects(ctx, PostEffectLayer.end, ctx.linearDepthTexture!);
   ctx.compositor?.end(ctx);
-  renderQueue.dispose();
+  disposeRenderQueue(frame);
   ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
 
   if (ctx.intermediateFramebuffer && ctx.intermediateFramebuffer !== ctx.finalFramebuffer) {
@@ -599,15 +722,12 @@ function renderComposite(frame: FrameState): void {
     blitter.srgbOut = !ctx.finalFramebuffer;
     const srcTex = ctx.intermediateFramebuffer.getColorAttachments()[0] as Texture2D;
     blitter.blit(srcTex, ctx.finalFramebuffer ?? null, fetchSampler('clamp_nearest_nomip'));
-    device.popDeviceStates();
-    device.pool.releaseFrameBuffer(ctx.intermediateFramebuffer);
   }
 
-  freeClusteredLight(ctx.clusteredLight!);
-
-  if (frame.sunLightColor) {
-    ctx.sunLight!.color = frame.sunLightColor;
-  }
+  releaseIntermediateFramebuffer(frame);
+  releaseDepthFramebuffer(frame);
+  releaseClusteredLight(frame);
+  restoreSunLight(frame);
 }
 
 // ─── Convenience: Execute Full Pipeline ─────────────────────────────
@@ -636,7 +756,7 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
     ctx.camera.setHistoryResourceManager(historyManager);
   }
 
-  const backbuffer = buildForwardPlusGraph(graph, ctx, renderQueue, options);
+  const { backbuffer, frame } = buildForwardPlusGraphInternal(graph, ctx, renderQueue, options);
 
   const compiled = graph.compile([backbuffer]);
 
@@ -649,9 +769,12 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
     executor.setImportedTexture(backbuffer, backbufferTex);
   }
 
-  executor.execute(compiled);
-  executor.reset();
-
-  // Swap history buffers at frame end (ping-pong)
-  historyManager.swap();
+  try {
+    executor.execute(compiled);
+    // Swap history buffers at frame end (ping-pong)
+    historyManager.swap();
+  } finally {
+    cleanupFrame(frame);
+    executor.reset();
+  }
 }

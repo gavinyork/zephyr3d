@@ -66,7 +66,7 @@ export class RGHandle {
 // ─── Internal Resource Tracking ─────────────────────────────────────────
 
 /** @public */
-export type RGResourceKind = 'transient' | 'imported';
+export type RGResourceKind = 'transient' | 'imported' | 'token';
 
 /**
  * Internal bookkeeping for a resource within the render graph.
@@ -183,6 +183,18 @@ export interface RGPassBuilder {
    * @returns A handle referencing the newly created resource.
    */
   createTexture(desc: RGTextureDesc): RGHandle;
+
+  /**
+   * Create a logical dependency token produced by this pass.
+   *
+   * Tokens do not resolve to GPU resources and are not allocated by the executor.
+   * They are useful for ordering passes whose dependencies are side effects rather
+   * than texture reads/writes.
+   *
+   * @param name - Debug label for this token.
+   * @returns A handle referencing the newly created token.
+   */
+  createToken(name?: string): RGHandle;
 
   /**
    * Mark this pass as having side effects.

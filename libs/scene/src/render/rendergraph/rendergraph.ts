@@ -183,8 +183,12 @@ export class RenderGraph {
               `which has no producer. Ensure the resource is created before being read.`
           );
         }
-        pass.reads.push(res);
-        res.consumers.push(pass);
+        if (!pass.reads.includes(res)) {
+          pass.reads.push(res);
+        }
+        if (!res.consumers.includes(pass)) {
+          res.consumers.push(pass);
+        }
       },
       write(handle: RGHandle): void {
         const res = graph._resources.get(handle._id);
@@ -197,8 +201,16 @@ export class RenderGraph {
               `cannot be written by pass "${pass.name}"`
           );
         }
+        if (res.consumers.some((consumer) => consumer !== pass)) {
+          throw new Error(
+            `RenderGraph: pass "${pass.name}" attempts to write resource "${res.name}" after it ` +
+              `has already been read. Create a new resource/version for read-after-write workflows.`
+          );
+        }
         res.producer = pass;
-        pass.writes.push(res);
+        if (!pass.writes.includes(res)) {
+          pass.writes.push(res);
+        }
       },
       createTexture(desc: RGTextureDesc): RGHandle {
         const id = graph._nextResourceId++;
@@ -208,6 +220,15 @@ export class RenderGraph {
         graph._resources.set(id, res);
         pass.writes.push(res);
         return new RGHandle(id, name);
+      },
+      createToken(name?: string): RGHandle {
+        const id = graph._nextResourceId++;
+        const tokenName = name ?? `_token_${id}`;
+        const res = new RGResource(id, tokenName, 'token', null);
+        res.producer = pass;
+        graph._resources.set(id, res);
+        pass.writes.push(res);
+        return new RGHandle(id, tokenName);
       },
       sideEffect(): void {
         pass.hasSideEffect = true;

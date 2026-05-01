@@ -29,7 +29,15 @@ export class DevicePoolAllocator implements RGTextureAllocator<Texture2D> {
   allocate(desc: RGTextureDesc, size: RGResolvedSize): Texture2D {
     const device = getDevice();
     const mipmapping = (desc.mipLevels ?? 1) > 1;
-    return device.pool.fetchTemporalTexture2D(false, desc.format, size.width, size.height, mipmapping);
+    const texture = device.pool.fetchTemporalTexture2D(false, desc.format, size.width, size.height, mipmapping);
+    if (desc.mipLevels && texture.mipLevelCount < desc.mipLevels) {
+      device.pool.releaseTexture(texture);
+      throw new Error(
+        `DevicePoolAllocator: texture "${desc.label ?? '<unnamed>'}" requested ${desc.mipLevels} ` +
+          `mip levels, but only ${texture.mipLevelCount} were allocated.`
+      );
+    }
+    return texture;
   }
 
   /**
