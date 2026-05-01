@@ -35,6 +35,10 @@ export class RenderGraphExecutor<TTexture = unknown> {
   private _importedTextures: Map<number, TTexture> = new Map();
   /** @internal */
   private _allocatedTextures: Map<number, TTexture> = new Map();
+  /** @internal */
+  private _importedTextureAliases: Map<number, number> = new Map();
+  /** @internal */
+  private _resolvedImportedTextures: Map<number, TTexture> = new Map();
 
   constructor(allocator: RGTextureAllocator<TTexture>, backbufferWidth: number, backbufferHeight: number) {
     this._allocator = allocator;
@@ -71,6 +75,8 @@ export class RenderGraphExecutor<TTexture = unknown> {
    * @param compiled - The compiled graph from {@link RenderGraph.compile}.
    */
   execute(compiled: CompiledRenderGraph): void {
+    this._resolveImportedTextureAliases(compiled);
+
     // Build per-pass allocation and release schedules
     const allocateAt = new Map<number, number[]>(); // passIndex -> resourceIds to allocate
     const releaseAt = new Map<number, number[]>(); // passIndex -> resourceIds to release
@@ -146,6 +152,8 @@ export class RenderGraphExecutor<TTexture = unknown> {
     }
     this._allocatedTextures.clear();
     this._importedTextures.clear();
+    this._importedTextureAliases.clear();
+    this._resolvedImportedTextures.clear();
   }
 
   // ─── Private ────────────────────────────────────────────────────────
@@ -169,6 +177,36 @@ export class RenderGraphExecutor<TTexture = unknown> {
   }
 
   /** @internal */
+  private _resolveImportedTextureAliases(compiled: CompiledRenderGraph): void {
+    this._importedTextureAliases.clear();
+    this._resolvedImportedTextures.clear();
+    const physicalToTexture = new Map<number, TTexture>();
+    for (const lifetime of compiled.lifetimes.values()) {
+      const resource = lifetime.resource;
+      if (resource.kind !== 'imported') {
+        continue;
+      }
+      const texture =
+        this._importedTextures.get(resource.id) ?? this._importedTextures.get(resource.physicalId);
+      if (texture !== undefined) {
+        physicalToTexture.set(resource.physicalId, texture);
+      }
+    }
+    for (const lifetime of compiled.lifetimes.values()) {
+      const resource = lifetime.resource;
+      if (resource.kind !== 'imported') {
+        continue;
+      }
+      this._importedTextureAliases.set(resource.id, resource.physicalId);
+      const texture = physicalToTexture.get(resource.physicalId);
+      if (texture !== undefined) {
+        this._resolvedImportedTextures.set(resource.id, texture);
+        this._resolvedImportedTextures.set(resource.physicalId, texture);
+      }
+    }
+  }
+
+  /** @internal */
   private _createContext(): RGExecuteContext {
     const self = this;
     return {
@@ -177,6 +215,18 @@ export class RenderGraphExecutor<TTexture = unknown> {
         const imported = self._importedTextures.get(handle._id);
         if (imported !== undefined) {
           return imported as unknown as T;
+        }
+        const resolvedImported = self._resolvedImportedTextures.get(handle._id);
+        if (resolvedImported !== undefined) {
+          return resolvedImported as unknown as T;
+        }
+        const importedAlias = self._importedTextureAliases.get(handle._id);
+        if (importedAlias !== undefined) {
+          const aliased =
+            self._importedTextures.get(importedAlias) ?? self._resolvedImportedTextures.get(importedAlias);
+          if (aliased !== undefined) {
+            return aliased as unknown as T;
+          }
         }
         // Check allocated transient
         const allocated = self._allocatedTextures.get(handle._id);

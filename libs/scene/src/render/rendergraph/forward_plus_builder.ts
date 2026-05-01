@@ -316,7 +316,7 @@ function buildForwardPlusGraphInternal(
   const sceneColorHandle = lightPassResult.sceneColorHandle;
 
   // ── 8. Post Effects + Final Composite ─────────────────────────────
-  graph.addPass('Composite', (builder) => {
+  const presentedBackbuffer = graph.addPass('Composite', (builder) => {
     builder.read(sceneColorHandle);
     builder.read(depthHandle);
     if (hiZHandle) {
@@ -325,13 +325,14 @@ function buildForwardPlusGraphInternal(
     if (motionVectorHandle) {
       builder.read(motionVectorHandle);
     }
-    builder.write(backbuffer);
+    const outputBackbuffer = builder.write(backbuffer);
     builder.setExecute(() => {
       renderComposite(frame);
     });
+    return outputBackbuffer;
   });
 
-  return { backbuffer, frame };
+  return { backbuffer: presentedBackbuffer, frame };
 }
 
 // ─── Pass Implementation Helpers ────────────────────────────────────

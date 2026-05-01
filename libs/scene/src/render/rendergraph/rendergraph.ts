@@ -16,7 +16,7 @@ import {
  * Usage:
  * ```ts
  * const graph = new RenderGraph();
- * const backbuffer = graph.importTexture('backbuffer');
+ * let backbuffer = graph.importTexture('backbuffer');
  *
  * let linearDepth: RGHandle;
  * graph.addPass('DepthPrepass', (builder) => {
@@ -26,7 +26,7 @@ import {
  *
  * graph.addPass('LightPass', (builder) => {
  *   builder.read(linearDepth);
- *   builder.write(backbuffer);
+ *   backbuffer = builder.write(backbuffer);
  *   builder.setExecute(() => { ... });
  * });
  *
@@ -190,27 +190,31 @@ export class RenderGraph {
           res.consumers.push(pass);
         }
       },
-      write(handle: RGHandle): void {
+      write(handle: RGHandle): RGHandle {
         const res = graph._resources.get(handle._id);
         if (!res) {
           throw new Error(`RenderGraph: unknown resource "${handle.name}" (id=${handle._id})`);
         }
-        if (res.producer && res.producer !== pass) {
+        if (res.kind === 'token') {
           throw new Error(
-            `RenderGraph: resource "${res.name}" already produced by pass "${res.producer.name}", ` +
-              `cannot be written by pass "${pass.name}"`
+            `RenderGraph: pass "${pass.name}" attempts to write token "${res.name}". ` +
+              `Use createToken() to produce ordering tokens.`
           );
         }
-        if (res.consumers.some((consumer) => consumer !== pass)) {
-          throw new Error(
-            `RenderGraph: pass "${pass.name}" attempts to write resource "${res.name}" after it ` +
-              `has already been read. Create a new resource/version for read-after-write workflows.`
-          );
+        for (const consumer of res.consumers) {
+          if (consumer !== pass && !pass.dependencies.includes(consumer)) {
+            pass.dependencies.push(consumer);
+          }
         }
-        res.producer = pass;
-        if (!pass.writes.includes(res)) {
-          pass.writes.push(res);
+        const id = graph._nextResourceId++;
+        const versionName = `${res.name}@${pass.name}`;
+        const version = new RGResource(id, versionName, res.kind, res.desc, res.physicalId);
+        version.producer = pass;
+        graph._resources.set(id, version);
+        if (!pass.writes.includes(version)) {
+          pass.writes.push(version);
         }
+        return new RGHandle(id, versionName);
       },
       createTexture(desc: RGTextureDesc): RGHandle {
         const id = graph._nextResourceId++;
@@ -309,17 +313,30 @@ export class RenderGraph {
       adjacency.set(pass, []);
     }
 
+    const addEdge = (from: RGPass, to: RGPass) => {
+      if (from === to || !aliveSet.has(from) || !aliveSet.has(to)) {
+        return;
+      }
+      const neighbors = adjacency.get(from)!;
+      if (!neighbors.includes(to)) {
+        neighbors.push(to);
+        inDegree.set(to, inDegree.get(to)! + 1);
+      }
+    };
+
+    for (const pass of alivePasses) {
+      for (const dependency of pass.dependencies) {
+        addEdge(dependency, pass);
+      }
+    }
+
     // For each resource, its producer has an edge to each of its consumers
     for (const res of this._resources.values()) {
       if (!res.producer || !aliveSet.has(res.producer)) {
         continue;
       }
       for (const consumer of res.consumers) {
-        if (!aliveSet.has(consumer)) {
-          continue;
-        }
-        adjacency.get(res.producer)!.push(consumer);
-        inDegree.set(consumer, inDegree.get(consumer)! + 1);
+        addEdge(res.producer, consumer);
       }
     }
 

@@ -77,16 +77,25 @@ export class RGResource {
   readonly name: string;
   readonly kind: RGResourceKind;
   readonly desc: RGTextureDesc | null;
+  /** Resource ID of the physical backing resource used by imported versions. */
+  readonly physicalId: number;
   /** The pass that creates / writes this resource (null for imported until written). */
   producer: RGPass | null = null;
   /** Passes that read this resource. */
   readonly consumers: RGPass[] = [];
 
-  constructor(id: number, name: string, kind: RGResourceKind, desc: RGTextureDesc | null) {
+  constructor(
+    id: number,
+    name: string,
+    kind: RGResourceKind,
+    desc: RGTextureDesc | null,
+    physicalId = id
+  ) {
     this.id = id;
     this.name = name;
     this.kind = kind;
     this.desc = desc;
+    this.physicalId = physicalId;
   }
 }
 
@@ -136,6 +145,8 @@ export class RGPass<T = unknown> {
   readonly reads: RGResource[] = [];
   /** Resources this pass creates or writes. */
   readonly writes: RGResource[] = [];
+  /** Passes that must complete before this pass due to non-resource hazards. */
+  readonly dependencies: RGPass[] = [];
   /** Whether this pass has side effects and must not be culled. */
   hasSideEffect = false;
   /** User data returned from the setup function. */
@@ -170,11 +181,16 @@ export interface RGPassBuilder {
   read(handle: RGHandle): void;
 
   /**
-   * Declare that this pass writes to an existing resource (typically an imported resource).
+   * Declare that this pass writes a new version of an existing resource.
+   *
+   * The returned handle represents the post-write version. Use it for subsequent
+   * reads or as a graph output. If the pass needs the previous contents, call
+   * {@link read} on the input handle explicitly before writing.
    *
    * @param handle - Handle of the resource to write to.
+   * @returns A handle referencing the newly written version.
    */
-  write(handle: RGHandle): void;
+  write(handle: RGHandle): RGHandle;
 
   /**
    * Create a new transient texture resource that this pass will produce.
