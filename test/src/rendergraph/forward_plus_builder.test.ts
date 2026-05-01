@@ -18,10 +18,15 @@ function createMockDrawContext() {
   } as any;
 }
 
-function createMockRenderQueue(needSceneColor: boolean) {
+interface MockRenderQueueOptions {
+  needSceneColor: boolean;
+  shadowedLights?: unknown[];
+}
+
+function createMockRenderQueue(options: MockRenderQueueOptions) {
   return {
-    shadowedLights: [],
-    needSceneColor: () => needSceneColor
+    shadowedLights: options.shadowedLights ?? [],
+    needSceneColor: () => options.needSceneColor
   } as any;
 }
 
@@ -38,12 +43,18 @@ function createOptions(overrides: Partial<ForwardPlusOptions> = {}): ForwardPlus
   };
 }
 
-function compileForwardPlusPassNames(options: ForwardPlusOptions): string[] {
+function compileForwardPlusPassNames(
+  options: ForwardPlusOptions,
+  renderQueueOptions: Partial<MockRenderQueueOptions> = {}
+): string[] {
   const graph = new RenderGraph();
   const backbuffer = buildForwardPlusGraph(
     graph,
     createMockDrawContext(),
-    createMockRenderQueue(options.needSceneColor),
+    createMockRenderQueue({
+      needSceneColor: options.needSceneColor,
+      ...renderQueueOptions
+    }),
     options
   );
   return graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
@@ -81,5 +92,41 @@ describe('Forward+ render graph builder', () => {
     expect(passNames).toContain('HiZ');
     expect(passNames).toContain('LightPass');
     expect(passNames.indexOf('HiZ')).toBeLessThan(passNames.indexOf('LightPass'));
+  });
+
+  test('keeps GPUPicking side-effect pass before DepthPrepass when enabled', () => {
+    const passNames = compileForwardPlusPassNames(createOptions({ gpuPicking: true }));
+
+    expect(passNames).toContain('ClusterLights');
+    expect(passNames).toContain('GPUPicking');
+    expect(passNames).toContain('DepthPrepass');
+    expect(passNames.indexOf('ClusterLights')).toBeLessThan(passNames.indexOf('GPUPicking'));
+    expect(passNames.indexOf('GPUPicking')).toBeLessThan(passNames.indexOf('DepthPrepass'));
+  });
+
+  test('omits GPUPicking when disabled', () => {
+    const passNames = compileForwardPlusPassNames(createOptions({ gpuPicking: false }));
+
+    expect(passNames).not.toContain('GPUPicking');
+  });
+
+  test('inserts ShadowMaps before DepthPrepass when shadowed lights exist', () => {
+    const passNames = compileForwardPlusPassNames(createOptions(), {
+      shadowedLights: [{}]
+    });
+
+    expect(passNames).toContain('ClusterLights');
+    expect(passNames).toContain('ShadowMaps');
+    expect(passNames).toContain('DepthPrepass');
+    expect(passNames.indexOf('ClusterLights')).toBeLessThan(passNames.indexOf('ShadowMaps'));
+    expect(passNames.indexOf('ShadowMaps')).toBeLessThan(passNames.indexOf('DepthPrepass'));
+  });
+
+  test('omits ShadowMaps when there are no shadowed lights', () => {
+    const passNames = compileForwardPlusPassNames(createOptions(), {
+      shadowedLights: []
+    });
+
+    expect(passNames).not.toContain('ShadowMaps');
   });
 });
