@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Wed, 29 Apr 2026 18:55:40 GMT and should not be manually modified.
+This log was last generated on Fri, 01 May 2026 10:21:50 GMT and should not be manually modified.
+
+## 0.9.1
+Fri, 01 May 2026 10:21:50 GMT
+
+### Patches
+
+- Fix instancing rendering issue
 
 ## 0.9.0
 Wed, 29 Apr 2026 18:55:40 GMT
