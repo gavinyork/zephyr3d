@@ -121,12 +121,7 @@ describe('HistoryResourceManager', () => {
       )
     ).toBeNull();
     expect(
-      manager.importPreviousIfCompatible(
-        new RenderGraph(),
-        'color',
-        { ...desc, format: 'rgba16f' },
-        size
-      )
+      manager.importPreviousIfCompatible(new RenderGraph(), 'color', { ...desc, format: 'rgba16f' }, size)
     ).toBeNull();
   });
 
@@ -143,7 +138,9 @@ describe('HistoryResourceManager', () => {
     manager.beginReadScope([{ name: 'color', texture: resolved }]);
     expect(manager.getPrevious('color')).toBe(resolved);
     manager.endReadScope();
-    expect(() => manager.getPrevious('color')).toThrow(/not available in the current render graph read scope/);
+    expect(() => manager.getPrevious('color')).toThrow(
+      /not available in the current render graph read scope/
+    );
   });
 
   test('owned history textures are released when their slot is overwritten', () => {
