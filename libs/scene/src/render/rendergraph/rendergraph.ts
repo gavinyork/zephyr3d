@@ -2,6 +2,7 @@ import {
   RGHandle,
   RGResource,
   RGPass,
+  RGSubpass,
   type RGTextureDesc,
   type RGPassBuilder,
   type RGExecuteFn,
@@ -142,7 +143,11 @@ export class RenderGraph {
       }
     };
     for (const pass of compiled.orderedPasses) {
-      if (pass.executeFn) {
+      if (pass.subpasses.length > 0) {
+        for (const subpass of pass.subpasses) {
+          (subpass.executeFn as RGExecuteFn<unknown>)(noopCtx, pass.data);
+        }
+      } else if (pass.executeFn) {
         (pass.executeFn as RGExecuteFn<unknown>)(noopCtx, pass.data);
       }
     }
@@ -269,7 +274,22 @@ export class RenderGraph {
       sideEffect(): void {
         pass.hasSideEffect = true;
       },
+      addSubpass<D>(name: string, fn: RGExecuteFn<D>): void {
+        if (pass.executeFn) {
+          throw new Error(
+            `RenderGraph: pass "${pass.name}" cannot use addSubpass() after setExecute(). ` +
+              `Use either subpasses or a single execute callback.`
+          );
+        }
+        pass.subpasses.push(new RGSubpass(name, fn as RGExecuteFn<unknown>));
+      },
       setExecute<D>(fn: RGExecuteFn<D>): void {
+        if (pass.subpasses.length > 0) {
+          throw new Error(
+            `RenderGraph: pass "${pass.name}" cannot use setExecute() after addSubpass(). ` +
+              `Use either subpasses or a single execute callback.`
+          );
+        }
         pass.executeFn = fn as RGExecuteFn<unknown>;
       }
     };
@@ -358,12 +378,17 @@ export class RenderGraph {
   }
 
   /** @internal */
-  private _declareFramebufferAttachmentDeps(pass: RGPass, desc: { colorAttachments: unknown | unknown[] | null; depthAttachment?: unknown | null }): void {
+  private _declareFramebufferAttachmentDeps(
+    pass: RGPass,
+    desc: { colorAttachments: unknown | unknown[] | null; depthAttachment?: unknown | null }
+  ): void {
     const declare = (attachment: unknown) => {
       if (attachment instanceof RGHandle) {
         const res = this._resources.get(attachment._id);
         if (!res) {
-          throw new Error(`RenderGraph: unknown framebuffer attachment "${attachment.name}" (id=${attachment._id})`);
+          throw new Error(
+            `RenderGraph: unknown framebuffer attachment "${attachment.name}" (id=${attachment._id})`
+          );
         }
         if (res.kind !== 'transient' && res.kind !== 'imported') {
           throw new Error(

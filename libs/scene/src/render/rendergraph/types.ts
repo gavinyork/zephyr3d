@@ -174,6 +174,25 @@ export interface RGExecuteContext {
 export type RGExecuteFn<T = void> = (ctx: RGExecuteContext, data: T) => void;
 
 /**
+ * Ordered execution step inside a render graph pass.
+ *
+ * Subpasses share the parent pass's resource declarations, lifetime, culling,
+ * and access validation. They are intended to make multi-step pass bodies
+ * explicit without splitting graph-level resource dependencies.
+ *
+ * @public
+ */
+export class RGSubpass<T = unknown> {
+  readonly name: string;
+  readonly executeFn: RGExecuteFn<T>;
+
+  constructor(name: string, executeFn: RGExecuteFn<T>) {
+    this.name = name;
+    this.executeFn = executeFn;
+  }
+}
+
+/**
  * Internal bookkeeping for a pass within the render graph.
  * @public
  */
@@ -192,6 +211,8 @@ export class RGPass<T = unknown> {
   data: T | null = null;
   /** Execute callback. */
   executeFn: RGExecuteFn<T> | null = null;
+  /** Ordered subpasses for passes with multiple logical execution steps. */
+  readonly subpasses: RGSubpass<T>[] = [];
   /** Set during compilation: true if this pass is needed. */
   alive = true;
 
@@ -275,7 +296,21 @@ export interface RGPassBuilder {
   sideEffect(): void;
 
   /**
+   * Add an ordered logical subpass to this pass.
+   *
+   * Subpasses execute in registration order and share the parent pass's declared
+   * reads, writes, framebuffer views, and user data. A pass may use either
+   * subpasses or {@link setExecute}, but not both.
+   *
+   * @param name - Debug label for the subpass.
+   * @param fn - Callback invoked when this subpass executes.
+   */
+  addSubpass<D>(name: string, fn: RGExecuteFn<D>): void;
+
+  /**
    * Set the execution callback for this pass.
+   *
+   * A pass may use either this method or {@link addSubpass}, but not both.
    *
    * @param fn - Callback invoked during graph execution.
    */

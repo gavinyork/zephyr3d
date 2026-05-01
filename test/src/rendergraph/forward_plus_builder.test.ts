@@ -43,10 +43,10 @@ function createOptions(overrides: Partial<ForwardPlusOptions> = {}): ForwardPlus
   };
 }
 
-function compileForwardPlusPassNames(
+function buildForwardPlusGraphForTest(
   options: ForwardPlusOptions,
   renderQueueOptions: Partial<MockRenderQueueOptions> = {}
-): string[] {
+): { graph: RenderGraph; backbuffer: ReturnType<typeof buildForwardPlusGraph> } {
   const graph = new RenderGraph();
   const backbuffer = buildForwardPlusGraph(
     graph,
@@ -57,6 +57,14 @@ function compileForwardPlusPassNames(
     }),
     options
   );
+  return { graph, backbuffer };
+}
+
+function compileForwardPlusPassNames(
+  options: ForwardPlusOptions,
+  renderQueueOptions: Partial<MockRenderQueueOptions> = {}
+): string[] {
+  const { graph, backbuffer } = buildForwardPlusGraphForTest(options, renderQueueOptions);
   return graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
 }
 
@@ -92,6 +100,20 @@ describe('Forward+ render graph builder', () => {
     expect(passNames).toContain('HiZ');
     expect(passNames).toContain('LightPass');
     expect(passNames.indexOf('HiZ')).toBeLessThan(passNames.indexOf('LightPass'));
+  });
+
+  test('uses a single DepthPrepass subpass when motion vectors are disabled', () => {
+    const { graph } = buildForwardPlusGraphForTest(createOptions({ motionVectors: false }));
+    const depthPass = graph.passes.find((pass) => pass.name === 'DepthPrepass');
+
+    expect(depthPass?.subpasses.map((subpass) => subpass.name)).toEqual(['SceneDepth']);
+  });
+
+  test('uses ordered DepthPrepass subpasses when motion vectors are enabled', () => {
+    const { graph } = buildForwardPlusGraphForTest(createOptions({ motionVectors: true }));
+    const depthPass = graph.passes.find((pass) => pass.name === 'DepthPrepass');
+
+    expect(depthPass?.subpasses.map((subpass) => subpass.name)).toEqual(['SceneDepth', 'SkyMotionVectors']);
   });
 
   test('keeps GPUPicking side-effect pass before DepthPrepass when enabled', () => {

@@ -158,7 +158,17 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
         // Release errors must not hide the original pass execution error.
         let passError: unknown = null;
         try {
-          if (pass.executeFn) {
+          if (pass.subpasses.length > 0) {
+            const accessScope = this._createAccessScope(pass);
+            const ctx = this._createContext(accessScope);
+            for (const subpass of pass.subpasses) {
+              try {
+                (subpass.executeFn as RGExecuteFn<unknown>)(ctx, pass.data);
+              } catch (e) {
+                throw this._wrapSubpassError(pass.name, subpass.name, e);
+              }
+            }
+          } else if (pass.executeFn) {
             const accessScope = this._createAccessScope(pass);
             const ctx = this._createContext(accessScope);
             (pass.executeFn as RGExecuteFn<unknown>)(ctx, pass.data);
@@ -340,7 +350,10 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   }
 
   /** @internal */
-  private _resolveFramebufferDesc(desc: RGFramebufferDesc, accessScope?: RGPassAccessScope): RGFramebufferDesc {
+  private _resolveFramebufferDesc(
+    desc: RGFramebufferDesc,
+    accessScope?: RGPassAccessScope
+  ): RGFramebufferDesc {
     const resolveAttachment = (attachment: unknown): unknown => {
       if (attachment instanceof RGHandle) {
         if (accessScope) {
@@ -446,6 +459,16 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   }
 
   /** @internal */
+  private _wrapSubpassError(passName: string, subpassName: string, error: unknown): Error {
+    const message = error instanceof Error ? error.message : String(error);
+    const wrapped = new Error(
+      `RenderGraphExecutor: pass "${passName}" subpass "${subpassName}" failed: ${message}`
+    );
+    (wrapped as Error & { cause?: unknown }).cause = error;
+    return wrapped;
+  }
+
+  /** @internal */
   private _createContext(accessScope: RGPassAccessScope): RGExecuteContext {
     const self = this;
     return {
@@ -465,7 +488,9 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
         );
       },
       createFramebuffer<TFramebuffer = unknown>(desc: RGFramebufferDesc): TFramebuffer {
-        return self._createFramebuffer(self._resolveFramebufferDesc(desc, accessScope)) as unknown as TFramebuffer;
+        return self._createFramebuffer(
+          self._resolveFramebufferDesc(desc, accessScope)
+        ) as unknown as TFramebuffer;
       },
       deferCleanup(callback: () => void): void {
         self._cleanupCallbacks.push(callback);

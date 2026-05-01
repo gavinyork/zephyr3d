@@ -240,7 +240,9 @@ function buildForwardPlusGraphInternal(
       ? builder.createTexture({ format: mvFormat, label: 'motionVector' })
       : undefined;
     const finalDepthAttachment = ctx.finalFramebuffer?.getDepthAttachment();
-    const externalDepthAttachment = finalDepthAttachment?.isTexture2D() ? (finalDepthAttachment as Texture2D) : null;
+    const externalDepthAttachment = finalDepthAttachment?.isTexture2D()
+      ? (finalDepthAttachment as Texture2D)
+      : null;
     const graphDepthAttachmentHandle = externalDepthAttachment
       ? undefined
       : builder.createTexture({ format: ctx.depthFormat, label: 'sceneDepth' });
@@ -263,18 +265,15 @@ function buildForwardPlusGraphInternal(
         })
       : undefined;
 
-    builder.setExecute((rgCtx) => {
+    builder.addSubpass('SceneDepth', (rgCtx) => {
       const depthFramebuffer = rgCtx.getFramebuffer<FrameBuffer>(depthFramebufferHandle);
-      frame.depthFramebuffer = renderSceneDepth(
-        frame,
-        depthFramebuffer,
-        rgCtx,
-        undefined,
-        undefined,
-        false,
-        skyMotionVectorFramebufferHandle
-      );
+      frame.depthFramebuffer = renderSceneDepth(frame, depthFramebuffer, rgCtx, undefined, undefined, false);
     });
+    if (skyMotionVectorFramebufferHandle) {
+      builder.addSubpass('SkyMotionVectors', (rgCtx) => {
+        renderSkyMotionVectors(ctx, rgCtx, skyMotionVectorFramebufferHandle);
+      });
+    }
 
     return {
       depthHandle,
@@ -491,8 +490,7 @@ function renderSceneDepth(
   rgCtx: RGExecuteContext,
   depthTex?: Texture2D,
   motionVectorTex?: Nullable<Texture2D>,
-  transmissionOverride?: boolean,
-  skyMotionVectorFramebufferHandle?: RGHandle
+  transmissionOverride?: boolean
 ): FrameBuffer {
   const ctx = frame.ctx;
   const renderQueue = frame.renderQueue;
@@ -603,10 +601,6 @@ function renderSceneDepth(
       : null;
     ctx.linearDepthTexture = depthFramebuffer!.getColorAttachments()[0] as Texture2D;
     ctx.depthTexture = depthFramebuffer!.getDepthAttachment() as Texture2D;
-    if (ctx.motionVectorTexture) {
-      // Sky motion vectors rendering is handled inline
-      renderSkyMotionVectors(ctx, rgCtx, skyMotionVectorFramebufferHandle);
-    }
     // HiZ is now built in the dedicated HiZ pass
   }
   return depthFramebuffer!;
@@ -629,13 +623,12 @@ function renderSkyMotionVectors(
   }
 
   const device = ctx.device;
-  const fb =
-    framebufferHandle
-      ? rgCtx.getFramebuffer<FrameBuffer>(framebufferHandle)
-      : rgCtx.createFramebuffer<FrameBuffer>({
-          colorAttachments: ctx.motionVectorTexture,
-          depthAttachment: ctx.depthTexture
-        });
+  const fb = framebufferHandle
+    ? rgCtx.getFramebuffer<FrameBuffer>(framebufferHandle)
+    : rgCtx.createFramebuffer<FrameBuffer>({
+        colorAttachments: ctx.motionVectorTexture,
+        depthAttachment: ctx.depthTexture
+      });
 
   if (!_skyMVProgram) {
     _skyMVProgram = device.buildRenderProgram({

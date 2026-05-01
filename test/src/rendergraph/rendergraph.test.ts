@@ -125,6 +125,23 @@ describe('RenderGraph', () => {
       expect(graph.compile([latest!]).orderedPasses.map((p) => p.name)).toEqual(['Final']);
     });
 
+    test('setExecute and addSubpass are mutually exclusive', () => {
+      expect(() => {
+        graph.addPass('BadPass', (builder) => {
+          builder.addSubpass('A', () => {});
+          builder.setExecute(() => {});
+        });
+      }).toThrow(/cannot use setExecute\(\) after addSubpass\(\)/);
+
+      graph = new RenderGraph();
+      expect(() => {
+        graph.addPass('BadPass', (builder) => {
+          builder.setExecute(() => {});
+          builder.addSubpass('A', () => {});
+        });
+      }).toThrow(/cannot use addSubpass\(\) after setExecute\(\)/);
+    });
+
     test('framebuffer attachment must be a texture handle', () => {
       expect(() => {
         graph.addPass('BadFramebuffer', (builder) => {
@@ -430,6 +447,23 @@ describe('RenderGraph', () => {
       graph.execute(compiled);
       expect(log).toEqual(['Alive']);
     });
+
+    test('subpasses execute in registration order and receive pass data', () => {
+      const log: string[] = [];
+      let backbuffer = graph.importTexture('backbuffer');
+
+      graph.addPass('MultiStep', (builder) => {
+        backbuffer = builder.write(backbuffer);
+        builder.addSubpass<{ label: string }>('First', (_ctx, data) => log.push(`First:${data.label}`));
+        builder.addSubpass<{ label: string }>('Second', (_ctx, data) => log.push(`Second:${data.label}`));
+        return { label: 'payload' };
+      });
+
+      const compiled = graph.compile([backbuffer]);
+      graph.execute(compiled);
+
+      expect(log).toEqual(['First:payload', 'Second:payload']);
+    });
   });
 
   // ─── Reset ──────────────────────────────────────────────────────────
@@ -667,6 +701,36 @@ describe('RenderGraphExecutor', () => {
     expect(resolvedDepth!.desc.format).toBe('r32f');
   });
 
+  test('executor runs subpasses in order with shared declared resource access', () => {
+    const { allocator } = createMockAllocator();
+    let backbuffer = graph.importTexture('backbuffer');
+    const events: string[] = [];
+
+    graph.addPass('MultiStep', (builder) => {
+      const color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      const framebuffer = builder.createFramebuffer({
+        colorAttachments: color,
+        depthAttachment: null
+      });
+      backbuffer = builder.write(backbuffer);
+      builder.addSubpass('ResolveTexture', (ctx: RGExecuteContext) => {
+        const texture = ctx.getTexture<MockTexture>(color);
+        events.push(`texture:${texture.desc.label}`);
+      });
+      builder.addSubpass('ResolveFramebuffer', (ctx: RGExecuteContext) => {
+        ctx.getFramebuffer<MockFramebuffer>(framebuffer);
+        events.push('framebuffer');
+      });
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080);
+    executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 1920, height: 1080 } });
+    executor.execute(compiled);
+
+    expect(events).toEqual(['texture:color', 'framebuffer']);
+  });
+
   test('getTexture requires a declared read or write dependency', () => {
     const { allocator } = createMockAllocator();
     let texture: RGHandle;
@@ -690,6 +754,32 @@ describe('RenderGraphExecutor', () => {
 
     expect(() => executor.execute(compiled)).toThrow(
       /pass "BadConsumer" tried to access texture "hiddenTexture" without declaring a read\/write dependency/
+    );
+  });
+
+  test('subpass access validation reports pass and subpass names', () => {
+    const { allocator } = createMockAllocator();
+    let texture: RGHandle;
+    let done: RGHandle;
+
+    graph.addPass('Producer', (builder) => {
+      texture = builder.createTexture({ format: 'r32f', label: 'hiddenTexture' });
+      done = builder.createToken('ProducerDone');
+      builder.setExecute(() => {});
+    });
+    graph.addPass('BadConsumer', (builder) => {
+      builder.read(done!);
+      builder.sideEffect();
+      builder.addSubpass('Lookup', (ctx: RGExecuteContext) => {
+        ctx.getTexture<MockTexture>(texture!);
+      });
+    });
+
+    const compiled = graph.compile([]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080);
+
+    expect(() => executor.execute(compiled)).toThrow(
+      /pass "BadConsumer" subpass "Lookup" failed: .*hiddenTexture.*without declaring a read\/write dependency/
     );
   });
 
@@ -850,6 +940,36 @@ describe('RenderGraphExecutor', () => {
     expect(releasedFramebuffers).toHaveLength(2);
 
     executor.reset();
+    expect(released).toHaveLength(1);
+    expect(releasedFramebuffers).toHaveLength(2);
+  });
+
+  test('releases graph and temporary resources when a subpass throws', () => {
+    const { allocator, released, releasedFramebuffers } = createMockAllocator();
+    let backbuffer = graph.importTexture('backbuffer');
+
+    graph.addPass('ThrowingPass', (builder) => {
+      const color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      const framebuffer = builder.createFramebuffer({
+        colorAttachments: color,
+        depthAttachment: null
+      });
+      backbuffer = builder.write(backbuffer);
+      builder.addSubpass('ThrowingSubpass', (ctx: RGExecuteContext) => {
+        ctx.getFramebuffer<MockFramebuffer>(framebuffer);
+        ctx.createFramebuffer<MockFramebuffer>({
+          colorAttachments: 'rgba8unorm',
+          depthAttachment: null
+        });
+        throw new Error('subpass failed');
+      });
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080);
+    executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 1920, height: 1080 } });
+
+    expect(() => executor.execute(compiled)).toThrow(/subpass "ThrowingSubpass" failed: subpass failed/);
     expect(released).toHaveLength(1);
     expect(releasedFramebuffers).toHaveLength(2);
   });
