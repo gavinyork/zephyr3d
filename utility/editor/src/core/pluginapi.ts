@@ -92,7 +92,8 @@ export type EditorCommands = {
   addShapeNode<T extends 'box' | 'sphere' | 'plane' | 'cylinder' | 'torus' | 'tetrahedron'>(
     scene: Scene,
     type: T,
-    position?: Vector3
+    position?: Vector3,
+    parent?: SceneNode
   ): Promise<Mesh>;
   instantiatePrefab(scene: Scene, prefabPath: string, position?: Vector3): Promise<SceneNode>;
   deleteNode(node: SceneNode): Promise<void>;

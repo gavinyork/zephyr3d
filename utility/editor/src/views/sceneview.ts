@@ -58,6 +58,7 @@ import {
 } from '../commands/scenecommands';
 import { NodeProxy } from '../helpers/proxy';
 import { clearScriptPropertyAccessorCache } from '../helpers/scriptprops';
+import { shapePrimitivePaths, type ShapePrimitiveType } from '../helpers/shapeprimitives';
 import type { EditTool, EditToolContext } from './edittools/edittool';
 import { createEditTool, isObjectEditable } from './edittools/edittool';
 import { calcHierarchyBoundingBoxWorld } from '../helpers/misc';
@@ -96,15 +97,6 @@ type SyncedPropertyRecord = {
   oldValue: PropertySnapshot;
   newValue: PropertySnapshot;
 };
-
-const shapePrimitivePaths = {
-  box: '/assets/@builtins/primitives/box.zmsh',
-  sphere: '/assets/@builtins/primitives/sphere.zmsh',
-  plane: '/assets/@builtins/primitives/plane.zmsh',
-  cylinder: '/assets/@builtins/primitives/cylinder.zmsh',
-  torus: '/assets/@builtins/primitives/torus.zmsh',
-  tetrahedron: '/assets/@builtins/primitives/tetrahedron.zmsh'
-} as const;
 
 export class SceneView extends BaseView<SceneModel, SceneController> {
   private readonly _cmdManager: CommandManager;
@@ -789,13 +781,14 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         eventBus.dispatchEvent('scene_changed');
         return node;
       },
-      addShapeNode: async <T extends keyof typeof shapePrimitivePaths>(
+      addShapeNode: async <T extends ShapePrimitiveType>(
         scene: Scene,
         type: T,
-        position?: Vector3
+        position?: Vector3,
+        parent?: SceneNode
       ) => {
         const node = await this._cmdManager.execute(
-          new AddShapeCommand(scene, shapePrimitivePaths[type], position ?? new Vector3())
+          new AddShapeCommand(scene, shapePrimitivePaths[type], position ?? new Vector3(), parent)
         );
         if (!node) {
           console.error(`Failed to add shape node: ${type}`);

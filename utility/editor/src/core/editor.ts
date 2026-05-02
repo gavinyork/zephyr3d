@@ -12,7 +12,7 @@ import {
   formatGrowthAnalysis,
   getGPUObjectStatistics
 } from '../helpers/leakdetector';
-import type { FileMetadata, HttpDirectoryReader, HttpDirectoryReaderContext } from '@zephyr3d/base';
+import type { FileMetadata, HttpDirectoryReader, HttpDirectoryReaderContext, Nullable } from '@zephyr3d/base';
 import { DRef, HttpFS, MemoryFS, PathUtils } from '@zephyr3d/base';
 import type { ProjectInfo, ProjectSettings } from './services/project';
 import { ProjectService } from './services/project';
@@ -523,12 +523,15 @@ export class Editor {
       this._moduleManager.activate('');
       await ProjectService.closeCurrentProject();
       this._currentProject = null;
+      return null;
+    } else {
+      return 'No project opened';
     }
   }
 
   async exportProject() {
     if (!this._currentProject) {
-      return;
+      return 'No project opened';
     }
     const treeData: TreeData = {
       files: [],
@@ -599,6 +602,7 @@ export class Editor {
       new Blob([JSON.stringify(treeData, null, 2)]).stream()
     );
     await zipDownloader.finish();
+    return null;
   }
   async importProject() {
     const files = await FilePicker.chooseDirectory();
@@ -631,14 +635,16 @@ export class Editor {
       }
     }
   }
-  async newProject() {
-    const name = await Dialog.promptName('Create Project', 'Project Name', 'New Project', 400);
+  async newProject(name?: string) {
+    name = name || (await Dialog.promptName('Create Project', 'Project Name', 'New Project', 400));
     if (name) {
       const uuid = await ProjectService.createProject(name);
       const project = await ProjectService.openProject(uuid);
       this._currentProject = project;
       this._moduleManager.activate('Scene', '');
+      return this._currentProject.uuid;
     }
+    return null;
   }
   async openRemoteProject(url?: string) {
     url = url || (await Dialog.promptName('Open Remote Project', 'Project URL', '', 400));
@@ -666,39 +672,50 @@ export class Editor {
       loading.close('');
     }
   }
-  async openProject(id?: string) {
-    if (!id) {
-      const projects = await ProjectService.listProjects();
-      const names = projects.map((project) => project.name);
-      const ids = projects.map((project) => project.uuid);
-      id = await Dialog.openFromList('Open Project', names, ids, 400, 400);
-    }
-    if (id) {
-      this._isRemoteProject = false;
-      const project = await ProjectService.openProject(id);
-      const settings = await ProjectService.getCurrentProjectSettings();
-      this._currentProject = project;
-      this.loadDepTypes();
-      this._moduleManager.activate('Scene', settings.startupScene ?? project.lastEditScene ?? '');
-      for (const dep of Object.keys(settings.dependencies ?? {})) {
-        const depName = dep;
-        const depVersion = settings.dependencies[dep];
-        const packageName = `${depName}@${depVersion}`;
-        const installed = await ProjectService.VFS.exists(`/${libDir}/deps/${packageName}`);
-        if (!installed) {
-          const dlgMessageBoxEx = new DlgMessageBoxEx(
-            'Install package',
-            `Installing ${packageName}`,
-            [],
-            400,
-            0,
-            false
-          );
-          dlgMessageBoxEx.showModal();
-          await installDeps(id, ProjectService.VFS, '/', packageName, null, false);
-          dlgMessageBoxEx.close('');
+  async openProject(id?: string): Promise<{ id: Nullable<string>; err: Nullable<string> }> {
+    try {
+      if (!id) {
+        const projects = await ProjectService.listProjects();
+        const names = projects.map((project) => project.name);
+        const ids = projects.map((project) => project.uuid);
+        id = await Dialog.openFromList('Open Project', names, ids, 400, 400);
+      }
+      if (id) {
+        this._isRemoteProject = false;
+        const project = await ProjectService.openProject(id);
+        const settings = await ProjectService.getCurrentProjectSettings();
+        this._currentProject = project;
+        this.loadDepTypes();
+        this._moduleManager.activate('Scene', settings.startupScene ?? project.lastEditScene ?? '');
+        for (const dep of Object.keys(settings.dependencies ?? {})) {
+          const depName = dep;
+          const depVersion = settings.dependencies[dep];
+          const packageName = `${depName}@${depVersion}`;
+          const installed = await ProjectService.VFS.exists(`/${libDir}/deps/${packageName}`);
+          if (!installed) {
+            const dlgMessageBoxEx = new DlgMessageBoxEx(
+              'Install package',
+              `Installing ${packageName}`,
+              [],
+              400,
+              0,
+              false
+            );
+            dlgMessageBoxEx.showModal();
+            await installDeps(id, ProjectService.VFS, '/', packageName, null, false);
+            dlgMessageBoxEx.close('');
+          }
         }
       }
+      return {
+        id,
+        err: null
+      };
+    } catch (err) {
+      return {
+        id: null,
+        err: `${err}`
+      };
     }
   }
   async deleteProject(uuid: string) {

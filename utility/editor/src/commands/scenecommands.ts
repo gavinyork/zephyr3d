@@ -206,24 +206,56 @@ export class AddParticleSystemCommand extends Command<ParticleSystem> {
 }
 export class AddShapeCommand extends Command<Mesh> {
   private readonly _scene: Scene;
+  private readonly _parentId: string;
   private _nodeId: string;
   private readonly _shapeCls: string;
+  private readonly _name: string;
   private readonly _position: Vector3;
-  constructor(scene: Scene, shapeCls: string, pos: Vector3) {
+  private readonly _scale: Nullable<Vector3>;
+  private readonly _rotation: Nullable<Quaternion>;
+  constructor(
+    scene: Scene,
+    shapeCls: string,
+    pos: Vector3,
+    parentNode?: SceneNode,
+    name?: string,
+    scale?: Vector3,
+    rotation?: Quaternion
+  ) {
     super();
     this._nodeId = '';
     this._scene = scene;
+    this._parentId = parentNode && parentNode !== scene.rootNode ? getNodePath(parentNode) : '';
     this._position = pos.clone();
+    this._scale = scale?.clone() ?? null;
+    this._rotation = rotation?.clone() ?? null;
+    this._name = name ?? '';
     this._desc = 'Add shape';
     this._shapeCls = shapeCls;
   }
   async execute() {
+    const parent = findNodeByPath(this._scene.rootNode, this._parentId);
+    if (!parent) {
+      console.error('Add shape failed: parent node not found');
+      this._nodeId = '';
+      return null;
+    }
     const shape = (await getEngine().resourceManager.fetchPrimitive(this._shapeCls))!;
     const material = (await getEngine().resourceManager.fetchMaterial<MeshMaterial>(
       '/assets/@builtins/materials/pbr_metallic_roughness.zmtl'
     ))!;
     const mesh = new Mesh(this._scene, shape, material);
+    mesh.parent = parent;
+    if (this._name) {
+      mesh.name = this._name;
+    }
     mesh.position.set(this._position);
+    if (this._scale) {
+      mesh.scale.set(this._scale);
+    }
+    if (this._rotation) {
+      mesh.rotation.set(this._rotation);
+    }
     if (this._nodeId) {
       mesh.persistentId = this._nodeId.split('/').at(-1)!;
     } else {

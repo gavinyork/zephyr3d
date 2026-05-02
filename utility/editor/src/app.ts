@@ -4,6 +4,7 @@ import { imGuiInit } from '@zephyr3d/imgui';
 import { Editor } from './core/editor';
 import { initLeakDetector } from './helpers/leakdetector';
 import { initEmojiMapping } from './helpers/emoji';
+import { installEditorMCPBridge } from './helpers/mcpbridge';
 import type { ProjectSettings } from './core/services/project';
 import { ProjectService } from './core/services/project';
 import type { Nullable } from '@zephyr3d/base';
@@ -124,6 +125,7 @@ editorApp.ready().then(async () => {
     const editor = new Editor();
     await editor.init(fontSize);
     editor.registerModules();
+    installEditorMCPBridge(editor);
     getInput().use(editor.handleEvent.bind(editor));
 
     document.addEventListener('contextmenu', function (e) {

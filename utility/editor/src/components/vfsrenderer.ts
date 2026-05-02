@@ -264,7 +264,7 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
               if (!path.toLowerCase().endsWith('.zscn')) {
                 path = `${path}.zscn`;
               }
-              eventBus.dispatchEvent('action', 'NEW_DOC', path);
+              eventBus.dispatchEvent('action', 'NEW_DOC', { path });
             });
           }
           ImGui.Separator();
@@ -837,7 +837,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     if (this._options.allowDblClickOpen) {
       if (file.meta.path.toLowerCase().endsWith('.zscn')) {
         // open scene
-        eventBus.dispatchEvent('action', 'OPEN_DOC', file.meta.path);
+        eventBus.dispatchEvent('action', 'OPEN_DOC', { path: file.meta.path });
       } else if (file.meta.path.toLowerCase().endsWith('.zmtl')) {
         let name = this._vfs.basename(file.meta.path).slice(0, -5);
         if (this._vfs.isParentOf('/assets/@builtins', file.meta.path)) {
