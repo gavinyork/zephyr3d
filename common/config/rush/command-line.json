@@ -71,6 +71,12 @@
       "commandKind": "global",
       "summary": "Run editor",
       "shellCommand": "rush build -t editor && npm run serve --prefix ./utility/editor"
+    },
+    {
+      "name": "editor:mcp",
+      "commandKind": "global",
+      "summary": "Run editor with MCP bridge enabled",
+      "shellCommand": "rush build -t editor && npm run serve:mcp --prefix ./utility/editor"
     }
     // {
     //   /**

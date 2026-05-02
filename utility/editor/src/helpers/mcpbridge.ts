@@ -339,13 +339,32 @@ function parseNumberArray(
 
 export function installEditorMCPBridge(editor: Editor): void {
   const url = new URL(window.location.href);
-  const port = url.searchParams.get('mcp') || url.searchParams.get('mcpPort') || DEFAULT_MCP_PORT;
-  const token = url.searchParams.get('mcpToken') ?? '';
-  installConsoleCapture();
+  const mcpEnabled = url.searchParams.has('mcp') || url.searchParams.has('mcpPort');
 
   let ws: WebSocket | null = null;
   let reconnectTimer = 0;
   let closed = false;
+
+  (window as any).__zephyrEditor = editor;
+  (window as any).__zephyrEditorMCP = {
+    get editor() {
+      return editor;
+    },
+    get scene() {
+      return getScene(editor);
+    },
+    get controller() {
+      return getSceneController(editor);
+    }
+  };
+
+  if (!mcpEnabled) {
+    return;
+  }
+
+  const port = url.searchParams.get('mcp') || url.searchParams.get('mcpPort') || DEFAULT_MCP_PORT;
+  const token = url.searchParams.get('mcpToken') ?? '';
+  installConsoleCapture();
 
   const connect = () => {
     if (closed) {
@@ -376,19 +395,6 @@ export function installEditorMCPBridge(editor: Editor): void {
     closed = true;
     ws?.close();
   });
-
-  (window as any).__zephyrEditor = editor;
-  (window as any).__zephyrEditorMCP = {
-    get editor() {
-      return editor;
-    },
-    get scene() {
-      return getScene(editor);
-    },
-    get controller() {
-      return getSceneController(editor);
-    }
-  };
 
   connect();
 }
