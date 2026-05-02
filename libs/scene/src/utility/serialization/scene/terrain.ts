@@ -124,6 +124,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
       return defineProps([
         {
           name: 'Resolution',
+          description: 'Terrain resolution',
           type: 'int2',
           default: [256, 256],
           options: { minValue: 1, maxValue: 4096 },
@@ -137,6 +138,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'CastShadow',
+          description: 'If true, the terrain can cast shadows',
           type: 'bool',
           default: true,
           get(this: ClipmapTerrain, value) {
@@ -148,6 +150,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Wireframe',
+          description: 'If true, the terrain will be rendered as wireframe',
           type: 'bool',
           default: false,
           isPersistent() {

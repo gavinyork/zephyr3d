@@ -23,6 +23,7 @@ export function getMeshClass(): SerializableClass {
       return defineProps([
         {
           name: 'CastShadow',
+          description: 'If true, the mesh can cast shadows',
           type: 'bool',
           default: false,
           get(this: Mesh, value) {
@@ -213,6 +214,7 @@ export function getMeshClass(): SerializableClass {
         },
         {
           name: 'Primitive',
+          description: 'Primitive object of this mesh',
           type: 'object',
           options: {
             mimeTypes: ['application/vnd.zephyr3d.mesh+json']
@@ -235,6 +237,7 @@ export function getMeshClass(): SerializableClass {
         },
         {
           name: 'Material',
+          description: 'Material object of this mesh',
           type: 'object',
           options: {
             mimeTypes: ['application/vnd.zephyr3d.material+json']
@@ -256,6 +259,7 @@ export function getMeshClass(): SerializableClass {
         },
         {
           name: 'Geometry Instance',
+          description: 'If true, geometry instancing is enabled for this mesh',
           type: 'bool',
           get(this: Mesh, value) {
             value.bool[0] = !!this.material?.$isInstance;
@@ -268,6 +272,7 @@ export function getMeshClass(): SerializableClass {
         },
         {
           name: 'MaterialInstanceUniforms',
+          description: 'Per-instance material uniform properties',
           type: 'object',
           phase: 1,
           options: {

@@ -19,6 +19,7 @@ export function getParticleNodeClass(): SerializableClass {
       return defineProps([
         {
           name: 'WorldSpace',
+          description: 'If true, particle positions will be calculated in world space',
           type: 'bool',
           default: true,
           get(this: ParticleSystem, value) {
@@ -30,6 +31,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'MaxParticleCount',
+          description: 'Maximum particle count',
           type: 'int',
           default: 100,
           get(this: ParticleSystem, value) {
@@ -41,6 +43,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'EmitInterval',
+          description: 'Particle emit interval in millionseconds',
           type: 'int',
           default: 100,
           get(this: ParticleSystem, value) {
@@ -52,6 +55,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'EmitCount',
+          description: 'How many particles will be emitted at once',
           type: 'int',
           default: 1,
           get(this: ParticleSystem, value) {
@@ -97,6 +101,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Scalar',
+          description: 'Size scale for particles',
           type: 'float',
           default: 1,
           options: {
@@ -111,6 +116,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Aspect',
+          description: 'Particle aspect ratio',
           type: 'float',
           default: 1,
           options: {
@@ -209,6 +215,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Rotation',
+          description: 'Min/Max value of particle rotation',
           type: 'vec2',
           default: [0, 0],
           options: {
@@ -225,6 +232,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'ConeRadius',
+          description: 'min/max radius of particle emit cone',
           type: 'vec2',
           default: [0, 0.1],
           options: {
@@ -241,6 +249,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Velocity',
+          description: 'min/max value of initial speed of particles',
           type: 'vec2',
           default: [2, 3],
           options: {
@@ -257,6 +266,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Life',
+          description: 'min/max value of particle life in seconds',
           type: 'vec2',
           default: [1, 1.5],
           options: {
@@ -273,6 +283,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Size1',
+          description: 'min/max value of initial size of particles',
           type: 'vec2',
           default: [0.4, 0.5],
           options: {
@@ -289,6 +300,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Size2',
+          description: 'min/max value of end size of particles',
           type: 'vec2',
           default: [0, 0.1],
           options: {
@@ -305,6 +317,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Acceleration',
+          description: 'min/max value of particle speed acceleration',
           type: 'vec2',
           default: [-0.01, -0.02],
           options: {
@@ -321,6 +334,7 @@ export function getParticleNodeClass(): SerializableClass {
         },
         {
           name: 'Material',
+          description: 'Material object',
           type: 'object',
           default: null,
           options: {

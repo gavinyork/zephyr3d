@@ -530,6 +530,8 @@ export function getMeshMaterialClass(): SerializableClass[] {
         return defineProps([
           {
             name: 'AlphaCutoff',
+            description:
+              'If greater then 0, pixels which have alpha smaller than alpha cutoff will be discarded',
             type: 'float',
             default: 0,
             options: {
@@ -549,6 +551,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
           },
           {
             name: 'AlphaToCoverage',
+            description: 'If true, alpha-to-coverage will be enabled',
             type: 'bool',
             default: false,
             get(this: MeshMaterial, value) {
@@ -563,6 +566,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
           },
           {
             name: 'AlphaDither',
+            description: 'If true, alpha-dithering will be enabled',
             type: 'bool',
             default: false,
             get(this: MeshMaterial, value) {
@@ -577,6 +581,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
           },
           {
             name: 'BlendMode',
+            description: 'Blending mode for this material',
             type: 'string',
             options: {
               enum: { labels: ['None', 'Blend', 'Additive'], values: ['none', 'blend', 'additive'] }
@@ -594,6 +599,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
           },
           {
             name: 'CullMode',
+            description: 'Cull mode for this material',
             type: 'string',
             options: {
               enum: { labels: ['None', 'Front', 'Back'], values: ['none', 'front', 'back'] }
@@ -611,6 +617,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
           },
           {
             name: 'Opacity',
+            description: 'Opacity value for this material, no effect if blendingMode is `none`',
             type: 'float',
             options: {
               animatable: true,
@@ -630,6 +637,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
           },
           {
             name: 'TAAStrength',
+            description: 'TAA strength for this material',
             type: 'float',
             options: {
               minValue: 0,
@@ -679,6 +687,7 @@ export function getStandardSpriteMaterialClass(manager: ResourceManager): Serial
         return defineProps([
           {
             name: 'SpriteTexture',
+            description: 'Texture file path for the sprite',
             type: 'object',
             default: '',
             options: {
@@ -740,6 +749,7 @@ export function getParticleMaterialClass(manager: ResourceManager): Serializable
         return defineProps([
           {
             name: 'AlphaMap',
+            description: 'Alpha texture file path',
             type: 'object',
             default: '',
             options: {
@@ -779,6 +789,7 @@ export function getParticleMaterialClass(manager: ResourceManager): Serializable
           },
           {
             name: 'RampMap',
+            description: 'Ramp texture file path',
             type: 'object',
             default: '',
             options: {
@@ -834,6 +845,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
         return defineProps([
           {
             name: 'doubleSidedLighting',
+            description: 'If true, double-sided lighting will be enabled',
             type: 'bool',
             default: false,
             isValid(this: LitPropTypes) {
@@ -848,6 +860,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
           },
           {
             name: 'Reflection',
+            description: 'Reflection mode for the material',
             type: 'string',
             default: 'ggx',
             options: {
@@ -868,6 +881,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
           },
           {
             name: 'SubsurfaceScattering',
+            description: 'If true, subsurface-scattering will be enabled',
             type: 'bool',
             phase: 0,
             default: false,
@@ -883,6 +897,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
           },
           {
             name: 'SubsurfaceColor',
+            description: 'Subsurface-scattering color',
             type: 'rgb',
             phase: 1,
             default: [1, 0.3, 0.2],
@@ -906,6 +921,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
           },
           {
             name: 'SubsurfaceScale',
+            description: 'Scale value for subsurface-scattering',
             type: 'float',
             phase: 1,
             default: 0.5,
@@ -929,6 +945,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
           },
           {
             name: 'SubsurfacePower',
+            description: 'Power value for subsurface-scattering',
             type: 'float',
             phase: 1,
             default: 1.5,
@@ -952,6 +969,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
           },
           {
             name: 'SubsurfaceIntensity',
+            description: 'Intensity value for subsurface-scattering',
             type: 'float',
             phase: 1,
             default: 0.5,
@@ -975,6 +993,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
           },
           {
             name: 'Anisotropy',
+            description: 'Anistropy value',
             type: 'float',
             default: 0.75,
             options: {
@@ -997,6 +1016,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
           },
           {
             name: 'AnisotropyDirection',
+            description: 'Anisotropy direction',
             type: 'float',
             default: 0,
             options: {
@@ -1019,6 +1039,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
           },
           {
             name: 'AnisotropyDirectionScaleBias',
+            description: 'Anisotropy direction scale bias',
             type: 'vec2',
             default: [1, 0],
             options: {
@@ -1101,6 +1122,7 @@ export function getBlinnMaterialClass(manager: ResourceManager): SerializableCla
         return defineProps([
           {
             name: 'Shininess',
+            description: 'Shininess value',
             type: 'float',
             options: {
               animatable: true,
@@ -1119,6 +1141,7 @@ export function getBlinnMaterialClass(manager: ResourceManager): SerializableCla
           },
           {
             name: 'ScatterWrap',
+            description: 'Scatter wrap for light warping',
             type: 'float',
             options: {
               animatable: true,
@@ -1137,6 +1160,7 @@ export function getBlinnMaterialClass(manager: ResourceManager): SerializableCla
           },
           {
             name: 'ScatterWidth',
+            description: 'Scatter width for light wrapping',
             type: 'float',
             options: {
               animatable: true,
@@ -1155,6 +1179,7 @@ export function getBlinnMaterialClass(manager: ResourceManager): SerializableCla
           },
           {
             name: 'ScatterColor',
+            description: 'Scatter color for light warping',
             type: 'rgb',
             options: {
               animatable: true
@@ -1196,6 +1221,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
         return defineProps([
           {
             name: 'Metallic',
+            description: 'Metallic value',
             type: 'float',
             options: {
               animatable: true,
@@ -1214,6 +1240,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
           },
           {
             name: 'Roughness',
+            description: 'Roughness value',
             type: 'float',
             options: {
               animatable: true,
@@ -1251,6 +1278,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
           },
           {
             name: 'Reflection',
+            description: 'Reflection mode',
             type: 'string',
             default: 'ggx',
             options: {

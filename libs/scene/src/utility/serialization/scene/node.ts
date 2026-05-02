@@ -185,6 +185,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
       return defineProps([
         {
           name: 'Id',
+          description: 'Unique persistent id for the node',
           type: 'string',
           get(this: SceneNode, value) {
             value.str[0] = this.persistentId;
@@ -259,6 +260,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Rotation',
+          description: 'Euler rotation of this node in ZYX order',
           type: 'vec3',
           default: [0, 0, 0],
           options: {
@@ -287,6 +289,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'QuatRotation',
+          description: 'Node rotation quaternion',
           type: 'vec4',
           default: [0, 0, 0, 1],
           isHidden() {
@@ -307,6 +310,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Pickable',
+          description: 'If true, enable ray-cast for this object',
           type: 'bool',
           default: false,
           get(this: SceneNode, value) {
@@ -318,6 +322,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Visible',
+          description: 'Node visible state',
           type: 'string',
           default: 'inherit',
           options: {
@@ -335,6 +340,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Children',
+          description: 'Children nodes of this node',
           type: 'object_array',
           phase: 0,
           isHidden() {
@@ -442,6 +448,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Animations',
+          description: 'Animation clips which affect this object or children',
           type: 'object_array',
           phase: 2,
           readonly: true,
@@ -507,6 +514,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Script',
+          description: 'First script file path which is attached to this node',
           type: 'object',
           options: {
             mimeTypes: ['text/x-typescript']
@@ -526,6 +534,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Scripts',
+          description: 'All script file paths which are attached to this node',
           type: 'object_array',
           options: {
             objectTypes: [ScriptAttachment]
@@ -627,6 +636,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Metadata',
+          description: 'Meta data for this node',
           type: 'object',
           options: { objectTypes: [JSONData] },
           isNullable() {

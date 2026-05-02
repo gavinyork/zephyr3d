@@ -146,6 +146,8 @@ export type PropertyAccessor<T = object, U extends string = ''> = {
   type: PropertyType;
   /** Unique property name (stable identifier for tooling/serialization). */
   name: string;
+  /** Description of this property */
+  description?: string;
   /**
    * Optional evaluation phase/order hint (lower runs earlier).
    * Useful for staged initialization or batched updates in editors.

@@ -21,6 +21,7 @@ export function getBoxShapeClass(): SerializableClass {
       return defineProps([
         {
           name: 'Size',
+          description: 'Box size in (X, Y, Z) axis',
           type: 'vec3',
           default: [1, 1, 1],
           get(this: BoxShape, value) {
@@ -39,6 +40,7 @@ export function getBoxShapeClass(): SerializableClass {
         },
         {
           name: 'Anchor',
+          description: 'Anchor point of the box',
           type: 'vec3',
           default: [0.5, 0.5, 0.5],
           get(this: BoxShape, value) {
@@ -70,6 +72,7 @@ export function getCapsuleShapeClass(): SerializableClass {
       return defineProps([
         {
           name: 'Radius',
+          description: 'capsule radius',
           type: 'float',
           default: 1,
           get(this: CapsuleShape, value) {
@@ -84,6 +87,7 @@ export function getCapsuleShapeClass(): SerializableClass {
         },
         {
           name: 'Height',
+          description: 'capsule height',
           type: 'float',
           default: 1,
           get(this: CapsuleShape, value) {
@@ -167,6 +171,7 @@ export function getBoxFrameShapeClass(): SerializableClass {
       return defineProps([
         {
           name: 'Size',
+          description: 'Box size in (X, Y, Z) axis',
           type: 'vec3',
           default: [1, 1, 1],
           get(this: BoxShape, value) {
@@ -289,6 +294,7 @@ export function getPlaneShapeClass(): SerializableClass {
       return defineProps([
         {
           name: 'Size',
+          description: 'width and height of the plane in (X, Z) axis',
           type: 'vec2',
           default: [1, 1],
           get(this: PlaneShape, value) {

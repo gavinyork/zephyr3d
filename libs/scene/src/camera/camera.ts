@@ -800,7 +800,7 @@ export class Camera extends SceneNode {
   set commandBufferReuse(val) {
     this._commandBufferReuse = !!val;
   }
-  /** Whether this camera is adapted to screen settins */
+  /** Whether this camera is adapted to screen settings */
   get adapted() {
     return this._adapted;
   }

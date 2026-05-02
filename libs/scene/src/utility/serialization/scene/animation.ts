@@ -60,6 +60,8 @@ export function getInterpolatorClass(): SerializableClass {
       return defineProps([
         {
           name: 'Mode',
+          description:
+            'What kind of method does this interpolator use to interpolate data, possible value is `step` | `linear` | `cubicspline` | `cubicspline-natural`',
           type: 'string',
           get(this: Interpolator, value) {
             value.str[0] = this.mode;
@@ -67,6 +69,8 @@ export function getInterpolatorClass(): SerializableClass {
         },
         {
           name: 'Target',
+          description:
+            'What type of data this interpolator handles, possible value is `number` | `vec2` | `vec3` | `vec4 | `quat`',
           type: 'string',
           get(this: Interpolator, value) {
             value.str[0] = this.target ?? '';
@@ -86,6 +90,7 @@ export function getMorphTrackClass(): SerializableClass {
       return defineProps([
         {
           name: 'TrackName',
+          description: 'The track name',
           type: 'string',
           options: {
             label: 'Name'
@@ -99,6 +104,7 @@ export function getMorphTrackClass(): SerializableClass {
         },
         {
           name: 'Interpolator',
+          description: 'Interpolator object for this track',
           type: 'object',
           options: {
             objectTypes: [Interpolator]
@@ -115,6 +121,7 @@ export function getMorphTrackClass(): SerializableClass {
         },
         {
           name: 'DefaultWeights',
+          description: 'Default weights for this track',
           type: 'object',
           get(this: MorphTargetTrack, value) {
             value.object[0] = this.defaultWeights ?? null;
@@ -125,6 +132,7 @@ export function getMorphTrackClass(): SerializableClass {
         },
         {
           name: 'OriginBoundingBox',
+          description: 'Original bounding box',
           type: 'object',
           get(this: MorphTargetTrack, value) {
             if (!this.originBoundingBox) {
@@ -148,6 +156,7 @@ export function getMorphTrackClass(): SerializableClass {
         },
         {
           name: 'BoundingBox',
+          description: 'Bounding box when this track in action',
           type: 'object',
           get(this: MorphTargetTrack, value) {
             if (!this.boundingBox) {
@@ -181,6 +190,7 @@ export function getMorphTrackClass(): SerializableClass {
         },
         {
           name: 'TrackTarget',
+          description: 'Target object this track applys to',
           type: 'string',
           isHidden() {
             return true;
@@ -213,6 +223,7 @@ export function getFixedGeometryCacheTrackClass(): SerializableClass {
       return defineProps([
         {
           name: 'TrackName',
+          description: 'The track name',
           type: 'string',
           options: {
             label: 'Name'
@@ -226,6 +237,7 @@ export function getFixedGeometryCacheTrackClass(): SerializableClass {
         },
         {
           name: 'TrackTarget',
+          description: 'Target object this track applys to',
           type: 'string',
           isHidden() {
             return true;
@@ -461,6 +473,7 @@ export function getNodeRotationTrackClass(): SerializableClass {
       return defineProps([
         {
           name: 'TrackName',
+          description: 'The track name',
           type: 'string',
           options: {
             label: 'Name'
@@ -474,6 +487,7 @@ export function getNodeRotationTrackClass(): SerializableClass {
         },
         {
           name: 'Interpolator',
+          description: 'Interpolator object for this track',
           type: 'object',
           options: {
             objectTypes: [Interpolator]
@@ -490,6 +504,7 @@ export function getNodeRotationTrackClass(): SerializableClass {
         },
         {
           name: 'TrackTarget',
+          description: 'Target object this track applys to',
           type: 'string',
           isHidden() {
             return true;
@@ -515,6 +530,7 @@ export function getNodeEulerRotationTrackClass(): SerializableClass {
       return defineProps([
         {
           name: 'TrackName',
+          description: 'The track name',
           type: 'string',
           options: {
             label: 'Name'
@@ -528,6 +544,7 @@ export function getNodeEulerRotationTrackClass(): SerializableClass {
         },
         {
           name: 'Interpolator',
+          description: 'Interpolator object for this track',
           type: 'object',
           options: {
             objectTypes: [Interpolator]
@@ -544,6 +561,7 @@ export function getNodeEulerRotationTrackClass(): SerializableClass {
         },
         {
           name: 'TrackTarget',
+          description: 'Target object this track applys to',
           type: 'string',
           isHidden() {
             return true;
@@ -569,6 +587,7 @@ export function getNodeTranslationTrackClass(): SerializableClass {
       return defineProps([
         {
           name: 'TrackName',
+          description: 'The track name',
           type: 'string',
           options: {
             label: 'Name'
@@ -582,6 +601,7 @@ export function getNodeTranslationTrackClass(): SerializableClass {
         },
         {
           name: 'Interpolator',
+          description: 'Interpolator object for this track',
           type: 'object',
           options: {
             objectTypes: [Interpolator]
@@ -598,6 +618,7 @@ export function getNodeTranslationTrackClass(): SerializableClass {
         },
         {
           name: 'TrackTarget',
+          description: 'Target object this track applys to',
           type: 'string',
           isHidden() {
             return true;
@@ -623,6 +644,7 @@ export function getNodeScaleTrackClass(): SerializableClass {
       return defineProps([
         {
           name: 'TrackName',
+          description: 'The track name',
           type: 'string',
           options: {
             label: 'Name'
@@ -636,6 +658,7 @@ export function getNodeScaleTrackClass(): SerializableClass {
         },
         {
           name: 'Interpolator',
+          description: 'Interpolator object for this track',
           type: 'object',
           options: {
             objectTypes: [Interpolator]
@@ -652,6 +675,7 @@ export function getNodeScaleTrackClass(): SerializableClass {
         },
         {
           name: 'TrackTarget',
+          description: 'Target object this track applys to',
           type: 'string',
           isHidden() {
             return true;
@@ -683,6 +707,7 @@ export function getPropTrackClass(manager: ResourceManager): SerializableClass {
       return defineProps([
         {
           name: 'TrackName',
+          description: 'The track name',
           type: 'string',
           options: {
             label: 'Name'
@@ -696,6 +721,7 @@ export function getPropTrackClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'TrackTarget',
+          description: 'Target object this track applys to',
           type: 'string',
           options: {
             label: 'Target'
@@ -709,6 +735,7 @@ export function getPropTrackClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'TrackProp',
+          description: 'Which property of the target object does this track handle',
           type: 'string',
           get(this: PropertyTrack, value) {
             value.str[0] = manager.getPropertyName(this.getProp()) ?? '';
@@ -842,6 +869,7 @@ export function getAnimationClass(manager: ResourceManager): SerializableClass {
       return defineProps([
         {
           name: 'Name',
+          description: 'The animation name, unique in `AnimationSet`',
           type: 'string',
           get(this: AnimationClip, value) {
             value.str[0] = this.name;
@@ -849,6 +877,7 @@ export function getAnimationClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Duration',
+          description: 'Time duration of the animation in seconds',
           type: 'float',
           default: 1,
           get(this: AnimationClip, value) {
@@ -860,6 +889,7 @@ export function getAnimationClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Weight',
+          description: 'Weight of this animation, used in animation blending',
           type: 'float',
           default: 1,
           get(this: AnimationClip, value) {
@@ -871,6 +901,7 @@ export function getAnimationClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'AutoPlay',
+          description: 'Whether this animation should automatically start playing when model is loaded',
           type: 'bool',
           default: false,
           get(this: AnimationClip, value) {
@@ -900,6 +931,7 @@ export function getAnimationClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Tracks',
+          description: 'Animation tracks of this animation clip',
           type: 'object_array',
           options: {
             edit: 'proptrack',

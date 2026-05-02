@@ -15,6 +15,7 @@ export function getPunctualLightClass(): SerializableClass {
       return defineProps([
         {
           name: 'Color',
+          description: 'Light color',
           type: 'rgb',
           default: [1, 1, 1],
           options: {
@@ -31,6 +32,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'Intensity',
+          description: 'Light intensity',
           type: 'float',
           default: 1,
           options: {
@@ -47,6 +49,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'CastShadow',
+          description: 'if true, the light cast shadows',
           type: 'bool',
           phase: 0,
           default: false,
@@ -59,6 +62,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'ShadowType',
+          description: 'Which type of shadow this light product',
           type: 'string',
           phase: 1,
           default: 'hard',
@@ -80,6 +84,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'ShadowDistance',
+          description: 'Maximum shadow distance',
           type: 'float',
           phase: 1,
           default: 2000,
@@ -99,6 +104,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'ShadowMapSize',
+          description: 'Shadow map resolution',
           phase: 1,
           type: 'int',
           default: 1024,
@@ -120,6 +126,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'ShadowRegion',
+          description: 'World space AABB, objects inside this AABB can cast shadows',
           phase: 1,
           type: 'object',
           default: null,
@@ -160,6 +167,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'ShadowDepthBias',
+          description: 'Shadow depth bias',
           type: 'float',
           phase: 1,
           default: 0.5,
@@ -179,6 +187,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'ShadowNormalBias',
+          description: 'Shadow normal bias',
           type: 'float',
           phase: 1,
           default: 0.2,
@@ -198,6 +207,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'ShadowCascades',
+          description: 'Cascade count for CSM',
           type: 'int',
           phase: 1,
           default: 1,
@@ -217,6 +227,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'PCFKernelSize',
+          description: 'Kernel size for PCF shadow',
           phase: 2,
           type: 'int',
           default: 5,
@@ -238,6 +249,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'PCFSampleCount',
+          description: 'Sample count for PCF shadow',
           type: 'int',
           phase: 2,
           options: {
@@ -257,6 +269,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'PCFSampleRadius',
+          description: 'Sample radius for PCF shadow',
           type: 'float',
           phase: 2,
           options: {
@@ -276,6 +289,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'VSMBlurKernelSize',
+          description: 'Blur kernel size of VSM shadow',
           type: 'int',
           phase: 2,
           options: {
@@ -295,6 +309,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'VSMBlurRadius',
+          description: 'Blur radius for VSM shadow',
           type: 'float',
           phase: 2,
           options: {
@@ -314,6 +329,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'VSMDarkness',
+          description: 'Darkness for VSM shadow',
           type: 'float',
           phase: 2,
           options: {
@@ -333,6 +349,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'ESMDepthScale',
+          description: 'Depth scale value for ESM shadow',
           type: 'float',
           phase: 2,
           options: {
@@ -352,6 +369,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'ESMBlur',
+          description: 'If true, enable bluring for ESM shadow',
           type: 'bool',
           phase: 2,
           default: true,
@@ -367,6 +385,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'ESMBlurKernelSize',
+          description: 'Blur kernel size for ESM shadow',
           type: 'int',
           phase: 2,
           default: 5,
@@ -386,6 +405,7 @@ export function getPunctualLightClass(): SerializableClass {
         },
         {
           name: 'ESMBlurRadius',
+          description: 'Blur radius for ESM shadow',
           type: 'float',
           phase: 2,
           default: 4,
@@ -423,6 +443,7 @@ export function getDirectionalLightClass(): SerializableClass {
       return defineProps([
         {
           name: 'SunLight',
+          description: 'If true, this light will act as sun light and affect sky atmosphere rendering',
           type: 'bool',
           default: false,
           get(this: DirectionalLight, value) {
@@ -452,6 +473,7 @@ export function getPointLightClass(): SerializableClass {
       return defineProps([
         {
           name: 'Range',
+          description: 'Light range in world unit',
           type: 'float',
           default: 10,
           options: {
@@ -534,6 +556,7 @@ export function getSpotLightClass(): SerializableClass {
       return defineProps([
         {
           name: 'Range',
+          description: 'Light range in world unit',
           type: 'float',
           default: 10,
           options: {
@@ -550,6 +573,7 @@ export function getSpotLightClass(): SerializableClass {
         },
         {
           name: 'BeamAngle',
+          description: 'Beam angle of cone',
           type: 'float',
           default: 90,
           options: {
@@ -584,6 +608,7 @@ export function getRectLightClass(): SerializableClass {
       return defineProps([
         {
           name: 'Range',
+          description: 'Light range in world unit',
           type: 'float',
           default: 10,
           options: {
@@ -600,6 +625,7 @@ export function getRectLightClass(): SerializableClass {
         },
         {
           name: 'Width',
+          description: 'Width of the light',
           type: 'float',
           default: 1,
           options: {
@@ -616,6 +642,7 @@ export function getRectLightClass(): SerializableClass {
         },
         {
           name: 'Height',
+          description: 'Height of the light',
           type: 'float',
           default: 1,
           options: {

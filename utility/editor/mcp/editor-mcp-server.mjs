@@ -424,6 +424,29 @@ const tools = [
     inputSchema: { type: 'object', properties: {} }
   },
   {
+    name: 'getScenePropertyList',
+    description: 'Get the editable property metadata list for the current scene. Returns { propertyList, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'getNodePropertyList',
+    description:
+      'Get the editable property metadata list for a scene node by persistent node id. Returns { propertyList, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['id'],
+      properties: {
+        id: { type: 'string', description: 'Persistent id of the scene node.' },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
     name: 'createShapeNode',
     description:
       'Create a built-in primitive mesh node in the current scene. Supports optional parent, name, and local transform.',
@@ -719,6 +742,16 @@ const handlers = {
   },
   async getNodeClasses(args) {
     return bridge.send('getNodeClasses', {}, Number(args.timeoutMs ?? 10000));
+  },
+  async getScenePropertyList(args) {
+    return bridge.send('getScenePropertyList', {}, Number(args.timeoutMs ?? 10000));
+  },
+  async getNodePropertyList(args) {
+    const id = typeof args.id === 'string' ? args.id.trim() : '';
+    if (!id) {
+      return { propertyList: null, err: 'getNodePropertyList requires the node id' };
+    }
+    return bridge.send('getNodePropertyList', { id }, Number(args.timeoutMs ?? 10000));
   },
   async createShapeNode(args) {
     const shape = typeof args.shape === 'string' ? args.shape.trim() : '';

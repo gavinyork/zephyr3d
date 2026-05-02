@@ -1,5 +1,5 @@
 import type { Editor } from '../core/editor';
-import type { Scene } from '@zephyr3d/scene';
+import { Scene } from '@zephyr3d/scene';
 import { getDevice, getEngine, OrthoCamera, PerspectiveCamera } from '@zephyr3d/scene';
 import { BlobReader, BlobWriter, configure, ZipWriter } from '@zip.js/zip.js';
 import { PathUtils, Quaternion, Vector3 } from '@zephyr3d/base';
@@ -430,6 +430,49 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     case 'activateScene': {
       await editor.moduleManager.activate('Scene', params?.scenePath ?? '');
       return getStatus(editor);
+    }
+    case 'getScenePropertyList': {
+      const props = getEngine().resourceManager.getPropertiesByClass(
+        getEngine().resourceManager.getClassByConstructor(Scene)
+      );
+      return {
+        propertyList: JSON.parse(JSON.stringify(props)),
+        err: null
+      };
+    }
+    case 'getNodePropertyList': {
+      const id = params.id as string;
+      if (!id) {
+        return {
+          propertyList: null,
+          err: 'getNodePropertyList requires the node id'
+        };
+      }
+      const scene = getScene(editor);
+      if (!scene) {
+        return {
+          propertyList: null,
+          err: 'No scene is currently opened'
+        };
+      }
+      const node = scene.findNodeById(params.id);
+      if (!node) {
+        return {
+          propertyList: null,
+          err: `Node not found in scene node tree: ${params.id}`
+        };
+      }
+      const cls = getEngine().resourceManager.getClassByObject(node);
+      if (!cls) {
+        return {
+          propertyList: [],
+          err: null
+        };
+      }
+      return {
+        propertyList: JSON.parse(JSON.stringify(getEngine().resourceManager.getPropertiesByClass(cls))),
+        err: null
+      };
     }
     // project related tools
     case 'getProjectList': {

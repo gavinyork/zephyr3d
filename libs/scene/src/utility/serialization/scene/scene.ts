@@ -36,6 +36,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'EnvLightType',
+          description: 'Environment light type of scene',
           phase: 0,
           type: 'string',
           options: {
@@ -54,6 +55,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'AmbientColor',
+          description: 'RGB value for ambient color if environment light type sets to `Constant`',
           type: 'rgb',
           phase: 1,
           default: [0.2, 0.2, 0.2],
@@ -75,6 +77,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'AmbientUp',
+          description: 'RGB value for upper ambient color if environment light type sets to `Hemispheric`',
           type: 'rgb',
           phase: 1,
           default: [0.3, 0.5, 0.8],
@@ -96,6 +99,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'AmbientDown',
+          description: 'RGB value for lower ambient color if environment light type sets to `Hemispheric`',
           type: 'rgb',
           phase: 1,
           default: [0.2, 0.2, 0.2],
@@ -117,6 +121,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'EnvLightStrength',
+          description: 'Environment light strength',
           type: 'float',
           phase: 0,
           options: { animatable: true, minValue: 0, maxValue: 10 },
@@ -130,6 +135,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'SHWindowWeights',
+          description: 'Window weights for SH lighting',
           type: 'vec3',
           options: { minValue: 0, maxValue: 1 },
           default: [1, 1, 1],
@@ -145,6 +151,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'RadianceConvSamples',
+          description: 'Sample count for radiance convolution',
           type: 'int',
           options: { minValue: 1, maxValue: 2048 },
           default: 64,
@@ -157,6 +164,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'IrradianceConvSamples',
+          description: 'Sample count for irradiance convolution',
           type: 'int',
           options: { minValue: 1, maxValue: 2048 },
           default: 256,
@@ -187,6 +195,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'SkyColor',
+          description: 'RGB value for sky color if skyType sets to `Image`',
           type: 'rgb',
           phase: 1,
           default: [1, 1, 1],
@@ -209,6 +218,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'SkyImage',
+          description: 'Sky image file path if skyType sets to `Image`',
           type: 'object',
           default: null,
           options: {
@@ -560,6 +570,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'SkyBoxTextureSize',
+          description: 'Skybox cubemap resolution',
           type: 'int',
           default: 1024,
           get(this: Scene, value) {
@@ -574,6 +585,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'PanoramaTexture',
+          description: 'Panorama texture file path if skyType sets to `skybox`',
           type: 'object',
           phase: 1,
           options: {
@@ -591,6 +603,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'NodeHierarchy',
+          description: 'Node tree of this scene',
           type: 'object',
           isHidden() {
             return true;
@@ -610,6 +623,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'MainCamera',
+          description: 'Main camera node of this scene',
           type: 'string',
           isHidden() {
             return true;
@@ -623,6 +637,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Script',
+          description: 'The first script path which is attached to this scene',
           type: 'object',
           options: {
             mimeTypes: ['text/x-typescript']
@@ -642,6 +657,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Scripts',
+          description: 'All scripts paths which are attached to this scene',
           type: 'object_array',
           options: {
             objectTypes: [ScriptAttachment]
@@ -745,6 +761,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Metadata',
+          description: 'Meta data for this scene',
           type: 'object',
           default: null,
           options: { objectTypes: [JSONData, JSONArray] },
