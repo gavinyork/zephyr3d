@@ -505,6 +505,58 @@ const tools = [
     }
   },
   {
+    name: 'material_set_properties',
+    description:
+      'Set editable properties on a material asset and save it. Property names must match getMaterialPropertyList. Returns { err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['path', 'properties'],
+      properties: {
+        path: { type: 'string', description: 'Material asset VFS path.' },
+        properties: {
+          type: 'array',
+          description:
+            'Property updates. Values may be boolean, string, number, or number arrays for vec/rgb/rgba properties.',
+          items: {
+            type: 'object',
+            required: ['propertyName', 'value'],
+            properties: {
+              propertyName: { type: 'string', description: 'Editable material property name.' },
+              value: {
+                description: 'Property value.',
+                oneOf: [
+                  { type: 'boolean' },
+                  { type: 'string' },
+                  { type: 'number' },
+                  { type: 'array', items: { type: 'number' } }
+                ]
+              }
+            }
+          }
+        },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'material_get_properties',
+    description:
+      'Get property values from a material asset. Property names must match getMaterialPropertyList. Returns { values, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['path', 'properties'],
+      properties: {
+        path: { type: 'string', description: 'Material asset VFS path.' },
+        properties: {
+          type: 'array',
+          description: 'Material property names to read.',
+          items: { type: 'string' }
+        },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
     name: 'mesh_get_material',
     description: 'Get the material asset path assigned to a mesh node. Returns { material_path, err }.',
     inputSchema: {
@@ -730,7 +782,7 @@ const tools = [
       type: 'object',
       required: ['spec', 'destPath'],
       properties: {
-        spec: { type: 'object', description: 'Procedural model spec. Supported node types: box, cylinder, sphere, revolve, curve tube/ribbon including nurbs, mesh, and csg union/difference/intersection. Nodes may include uv options: mode(default/normalized/worldLength/planar/box/cylindrical/spherical), axes, axis, origin, size, tileSize, scale, offset, repeat, flipU, flipV, swapUV.' },
+        spec: { type: 'object', description: 'Procedural model spec. Supported node types: box, cylinder, sphere, revolve, surface bicubic Bezier patches, curve tube/ribbon including nurbs, mesh, and csg union/difference/intersection. Nodes may include coordinateSystem(editor/yUp/zUp), coordinateRemap(none/zUpToYUp/yUpToZUp or {axes:[x/y/z/-x/-y/-z]}), position, rotation quaternion, scale, preserveWinding, and uv options: mode(default/normalized/worldLength/planar/box/cylindrical/spherical), axes, axis, origin, size, tileSize, scale, offset, repeat, flipU, flipV, swapUV. Surface nodes may use normalOrientation patch/outward/inward, smoothSeams/seamTolerance, doubleSided, and optional backfaceOffset. Set generation.generateTangents=true to write tangent_f32x4 vertex tangents.' },
         destPath: { type: 'string', description: 'Destination .zmsh VFS path under /assets.' },
         name: { type: 'string', description: 'Optional mesh node name when createNode is true.' },
         createNode: { type: 'boolean', default: true },
@@ -962,6 +1014,44 @@ const handlers = {
       return { propertyList: null, err: 'getMaterialPropertyList requires the material file path' };
     }
     return bridge.send('getMaterialPropertyList', { path }, Number(args.timeoutMs ?? 10000));
+  },
+  async material_set_properties(args) {
+    const path = typeof args.path === 'string' ? args.path.trim() : '';
+    if (!path) {
+      return { err: 'material_set_properties requires the material file path' };
+    }
+    if (!Array.isArray(args.properties)) {
+      return { err: 'material_set_properties requires the property list' };
+    }
+    const properties = [];
+    for (const prop of args.properties) {
+      if (!prop || typeof prop !== 'object') {
+        return { err: 'material_set_properties property entries must be objects' };
+      }
+      const propertyName = typeof prop.propertyName === 'string' ? prop.propertyName.trim() : '';
+      if (!propertyName) {
+        return { err: 'material_set_properties requires the material property name' };
+      }
+      if (!Object.prototype.hasOwnProperty.call(prop, 'value')) {
+        return { err: `material_set_properties requires value for property ${propertyName}` };
+      }
+      properties.push({ propertyName, value: prop.value });
+    }
+    return bridge.send('material_set_properties', { path, properties }, Number(args.timeoutMs ?? 10000));
+  },
+  async material_get_properties(args) {
+    const path = typeof args.path === 'string' ? args.path.trim() : '';
+    if (!path) {
+      return { values: null, err: 'material_get_properties requires the material file path' };
+    }
+    if (!Array.isArray(args.properties) || args.properties.some((value) => typeof value !== 'string')) {
+      return { values: null, err: 'material_get_properties requires the property list as string array' };
+    }
+    const properties = args.properties.map((value) => value.trim()).filter((value) => value);
+    if (properties.length !== args.properties.length) {
+      return { values: null, err: 'material_get_properties property names must be non-empty strings' };
+    }
+    return bridge.send('material_get_properties', { path, properties }, Number(args.timeoutMs ?? 10000));
   },
   async mesh_get_material(args) {
     const meshId = typeof args.mesh_id === 'string' ? args.mesh_id.trim() : '';

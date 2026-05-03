@@ -1,9 +1,9 @@
 import type { Editor } from '../core/editor';
-import type { SceneNode } from '@zephyr3d/scene';
+import type { PropertyValue, SceneNode, Material } from '@zephyr3d/scene';
 import { Mesh, Scene } from '@zephyr3d/scene';
 import { getDevice, getEngine, OrthoCamera, PerspectiveCamera } from '@zephyr3d/scene';
 import { BlobReader, BlobWriter, configure, ZipWriter } from '@zip.js/zip.js';
-import { PathUtils, Quaternion, Vector3 } from '@zephyr3d/base';
+import { DRef, PathUtils, Quaternion, Vector3 } from '@zephyr3d/base';
 import { ProjectService } from '../core/services/project';
 import { fileListFileName, libDir } from '../core/build/templates';
 import { SceneController } from '../controllers/scenecontroller';
@@ -94,6 +94,7 @@ type GeneratedModelJob = {
     boxMax: number[];
     uvMin?: number[];
     uvMax?: number[];
+    hasTangents?: boolean;
   } | null;
 };
 
@@ -668,7 +669,8 @@ async function finishGeneratedModelJob(editor: Editor, job: GeneratedModelJob, m
       boxMin: Array.isArray(message.boxMin) ? message.boxMin : [],
       boxMax: Array.isArray(message.boxMax) ? message.boxMax : [],
       uvMin: Array.isArray(message.uvMin) ? message.uvMin : [],
-      uvMax: Array.isArray(message.uvMax) ? message.uvMax : []
+      uvMax: Array.isArray(message.uvMax) ? message.uvMax : [],
+      hasTangents: message.hasTangents === true
     });
   } catch (err) {
     failGeneratedModelJob(job, 'failed', err instanceof Error ? err.message : String(err));
@@ -984,6 +986,233 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         };
       }
     }
+    case 'material_get_properties': {
+      // Get property values from a material by vfs path
+      const materialRef = new DRef<Material>();
+      try {
+        let path = params.path as string;
+        if (typeof path !== 'string' || !path.trim()) {
+          return {
+            values: null,
+            err: 'material_get_properties requires the material file path'
+          };
+        }
+        path = path.trim();
+        const properties = params.properties as string[];
+        if (!Array.isArray(properties) || properties.some((val) => typeof val !== 'string')) {
+          return {
+            values: null,
+            err: 'material_get_properties requires the property list as string array'
+          };
+        }
+        const material = await getEngine().resourceManager.fetchMaterial(path);
+        if (!material) {
+          return {
+            values: null,
+            err: `Load material failed: path: ${path}`
+          };
+        }
+        materialRef.set(material);
+        const materialClass = getEngine().resourceManager.getClassByObject(material);
+        if (!materialClass) {
+          return {
+            values: null,
+            err: `Load material class failed: path: ${path}`
+          };
+        }
+        const values: (number[] | number | boolean | string)[] = [];
+        const props = materialClass.getProps();
+        for (const p of properties) {
+          let propertyName = p as string;
+          const prop = props.find((prop) => prop.name === propertyName);
+          if (!prop) {
+            return {
+              values: null,
+              err: `Invalid property: ${propertyName}`
+            };
+          }
+          if (!prop.get) {
+            return {
+              values: null,
+              err: `No getter for property ${prop.name}`
+            };
+          }
+          if (prop.type === 'object_array') {
+            return {
+              values: null,
+              err: `Gets property of type object_array is not supported`
+            };
+          }
+          const value: PropertyValue = {
+            num: [0, 0, 0, 0],
+            str: ['', '', '', ''],
+            bool: [false, false, false, false],
+            object: []
+          };
+          prop.get.call(material, value as any);
+          if (prop.type === 'bool') {
+            values.push(value.bool[0]);
+          } else if (prop.type === 'object' || prop.type === 'string') {
+            values.push(value.str[0]);
+          } else if (prop.type === 'float' || prop.type === 'int') {
+            values.push(value.num[0]);
+          } else if (prop.type === 'vec2' || prop.type === 'int2') {
+            values.push(value.num.slice(0, 2));
+          } else if (prop.type === 'vec3' || prop.type === 'int3' || prop.type === 'rgb') {
+            values.push(value.num.slice(0, 3));
+          } else if (prop.type === 'vec4' || prop.type === 'int4' || prop.type === 'rgba') {
+            values.push(value.num);
+          } else {
+            return {
+              values: null,
+              err: `Invalid property type: ${prop.type}`
+            };
+          }
+        }
+        return {
+          values,
+          err: null
+        };
+      } catch (err) {
+        return {
+          values: null,
+          err: `${err}`
+        };
+      } finally {
+        materialRef.dispose();
+      }
+    }
+    case 'material_set_properties': {
+      // Load material from file and modify properties and then save it
+      const materialRef = new DRef<Material>();
+      try {
+        let path = params.path as string;
+        if (typeof path !== 'string' || !path.trim()) {
+          return {
+            err: 'material_set_properties requires the material file path'
+          };
+        }
+        path = path.trim();
+        const properties = params.properties as { propertyName: string; value: unknown }[];
+        if (!Array.isArray(properties)) {
+          return {
+            err: 'material_set_properties requires the property list'
+          };
+        }
+        const material = await getEngine().resourceManager.fetchMaterial(path);
+        if (!material) {
+          return {
+            err: `Load material failed: path: ${path}`
+          };
+        }
+        materialRef.set(material);
+        const fileContent = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
+        const json = JSON.parse(fileContent);
+        const materialClass = getEngine().resourceManager.getClassByObject(material);
+        if (!materialClass) {
+          return {
+            err: `Load material class failed: path: ${path}`
+          };
+        }
+        const props = materialClass.getProps();
+        for (const p of properties) {
+          let propertyName = p.propertyName as string;
+          if (typeof propertyName !== 'string' || !propertyName.trim()) {
+            return {
+              err: 'material_set_properties requires the material property name'
+            };
+          }
+          propertyName = propertyName.trim();
+          const prop = props.find((prop) => prop.name === propertyName);
+          if (!prop) {
+            return {
+              err: `Invalid property: ${propertyName}`
+            };
+          }
+          if (!prop.set) {
+            return {
+              err: `Property ${prop.name} is readonly`
+            };
+          }
+          if (prop.type === 'object_array') {
+            return {
+              err: `Sets property of type object_array is not supported`
+            };
+          }
+          const value: PropertyValue = {
+            num: [0, 0, 0, 0],
+            str: ['', '', '', ''],
+            bool: [false, false, false, false],
+            object: []
+          };
+          if (typeof p.value === 'boolean') {
+            if (prop.type !== 'bool') {
+              return {
+                err: `Boolean value is not supported for property ${prop.name}`
+              };
+            } else {
+              value.bool[0] = p.value;
+            }
+          } else if (typeof p.value === 'string') {
+            if (prop.type !== 'string' && prop.type !== 'object') {
+              return {
+                err: `String value is not supported for property ${prop.name}`
+              };
+            } else {
+              value.str[0] = p.value;
+            }
+          } else if (typeof p.value === 'number') {
+            if (prop.type !== 'float' && prop.type !== 'int') {
+              return {
+                err: `Number value is not supported for property ${prop.name}`
+              };
+            } else {
+              value.num[0] = p.value;
+            }
+          } else if (Array.isArray(p.value)) {
+            let n = 0;
+            if (prop.type === 'vec2' || prop.type === 'int2') {
+              n = 2;
+            } else if (prop.type === 'vec3' || prop.type === 'int3' || prop.type === 'rgb') {
+              n = 3;
+            } else if (prop.type === 'vec4' || prop.type === 'int4' || prop.type === 'rgba') {
+              n = 4;
+            } else {
+              return {
+                err: `Unsupported property type: ${prop.type}`
+              };
+            }
+            if (p.value.length !== n || p.value.some((val) => typeof val !== 'number')) {
+              return {
+                err: `Array of ${n} numbers required for property ${prop.name}`
+              };
+            }
+            for (let i = 0; i < n; i++) {
+              value.num[i] = p.value[i];
+            }
+          } else {
+            return {
+              err: 'Invalid property value'
+            };
+          }
+          await prop.set.call(material, value as any);
+        }
+        json.data = await getEngine().resourceManager.serializeObject(material);
+        await ProjectService.VFS.writeFile(path, JSON.stringify(json, null, 2), {
+          encoding: 'utf8',
+          create: true
+        });
+        return {
+          err: null
+        };
+      } catch (err) {
+        return {
+          err: `${err}`
+        };
+      } finally {
+        materialRef.dispose();
+      }
+    }
     case 'getScenePropertyList': {
       const props = getEngine().resourceManager.getPropertiesByClass(
         getEngine().resourceManager.getClassByConstructor(Scene)
@@ -994,30 +1223,31 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       };
     }
     case 'getMaterialPropertyList': {
-      const path = params.path as string;
-      if (!path) {
+      let path = params.path as string;
+      if (typeof path !== 'string' || !path.trim()) {
         return {
           propertyList: null,
           err: 'getMaterialPropertyList requires the material file path'
         };
       }
+      path = path.trim();
       try {
-        if (!(await ProjectService.VFS.exists(params.path))) {
+        if (!(await ProjectService.VFS.exists(path))) {
           return {
             propertyList: null,
             err: `File not exists at ${path}`
           };
         }
-        const content = (await ProjectService.VFS.readFile(params.path, { encoding: 'utf8' })) as string;
+        const content = (await ProjectService.VFS.readFile(path, { encoding: 'utf8' })) as string;
         const json = JSON.parse(content);
-        const classname = json['ClassName'];
+        const classname = json.data?.['ClassName'];
         const cls = getEngine()
           .resourceManager.getClasses()
           .find((val) => val.name === classname);
         if (!cls) {
           return {
             propertyList: null,
-            err: 'Invalid material file'
+            err: `Invalid material file: class not found: ${classname}; root keys: ${Object.keys(json ?? {}).join(', ')}`
           };
         }
         return {

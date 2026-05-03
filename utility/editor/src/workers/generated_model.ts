@@ -1,23 +1,40 @@
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
+type Vec4 = [number, number, number, number];
 
 type GeneratedModelSpec = {
   version?: number;
   nodes?: ProceduralNode[];
   generation?: {
     maxVertices?: number;
+    generateTangents?: boolean;
+    tangents?: boolean;
   };
 };
 
-type ProceduralNode = BoxNode | CylinderNode | SphereNode | RevolveNode | CurveNode | MeshNode | CsgNode;
+type ProceduralNode =
+  | BoxNode
+  | CylinderNode
+  | SphereNode
+  | RevolveNode
+  | SurfaceNode
+  | CurveNode
+  | MeshNode
+  | CsgNode;
 
 type BaseNode = {
   id?: string;
   type: string;
+  coordinateSystem?: 'editor' | 'yUp' | 'zUp';
+  coordinateRemap?: CoordinateRemap;
   position?: Vec3;
+  rotation?: Vec4;
   scale?: Vec3;
+  preserveWinding?: boolean;
   uv?: UVSpec;
 };
+
+type CoordinateRemap = 'none' | 'zUpToYUp' | 'yUpToZUp' | { axes?: [UVAxis, UVAxis, UVAxis] };
 
 type UVSpec = {
   mode?: 'default' | 'normalized' | 'worldLength' | 'planar' | 'box' | 'cylindrical' | 'spherical';
@@ -64,6 +81,35 @@ type RevolveNode = BaseNode & {
   capBottom?: boolean;
 };
 
+type SurfaceNode = BaseNode & {
+  type: 'surface';
+  surfaceType?: 'bezierPatch';
+  controlPoints?: Vec3[];
+  patches: SurfacePatchSpec[];
+  segmentsU?: number;
+  segmentsV?: number;
+  flipWinding?: boolean;
+  flipNormals?: boolean;
+  normalOrientation?: 'patch' | 'outward' | 'inward';
+  smoothSeams?: boolean;
+  seamTolerance?: number;
+  doubleSided?: boolean;
+  backfaceOffset?: number;
+};
+
+type SurfacePatchSpec =
+  | number[]
+  | Vec3[]
+  | {
+      indices?: number[];
+      points?: Vec3[];
+      mirror?: Vec3;
+      reverseU?: boolean;
+      reverseV?: boolean;
+      flipWinding?: boolean;
+      flipNormals?: boolean;
+    };
+
 type CurveNode = BaseNode & {
   type: 'curve';
   curveType?: 'polyline' | 'bezier' | 'catmullRom' | 'nurbs';
@@ -106,6 +152,7 @@ type MeshData = {
   positions: number[];
   normals: number[];
   uvs: number[];
+  tangents: number[];
   indices: number[];
 };
 
@@ -145,6 +192,7 @@ type WorkerSuccess = {
   boxMax: Vec3;
   uvMin: Vec2;
   uvMax: Vec2;
+  hasTangents: boolean;
 };
 
 type WorkerError = {
@@ -194,31 +242,43 @@ function generatePrimitive(spec: GeneratedModelSpec, deadlineAt: number): Worker
   if (vertexCount > maxVertices) {
     throw new Error(`Generated model has ${vertexCount} vertices, exceeding maxVertices ${maxVertices}`);
   }
+  const generateTangents = spec.generation?.generateTangents === true || spec.generation?.tangents === true;
+  if (generateTangents) {
+    mesh.tangents = computeVertexTangents(mesh);
+  }
   const bbox = computeBounds(mesh.positions);
   const uvBounds = computeUVBounds(mesh.uvs);
   const positions = new Float32Array(mesh.positions);
   const normals = new Float32Array(mesh.normals);
   const uvs = new Float32Array(mesh.uvs);
+  const tangents = generateTangents ? new Float32Array(mesh.tangents) : null;
   const useU32 = vertexCount > 65535;
   const indices = useU32 ? new Uint32Array(mesh.indices) : new Uint16Array(mesh.indices);
+  const vertices: Record<string, { format: string; data: string }> = {
+    position: {
+      format: 'position_f32x3',
+      data: bytesToBase64(new Uint8Array(positions.buffer))
+    },
+    normal: {
+      format: 'normal_f32x3',
+      data: bytesToBase64(new Uint8Array(normals.buffer))
+    },
+    texCoord0: {
+      format: 'tex0_f32x2',
+      data: bytesToBase64(new Uint8Array(uvs.buffer))
+    }
+  };
+  if (tangents) {
+    vertices.tangent = {
+      format: 'tangent_f32x4',
+      data: bytesToBase64(new Uint8Array(tangents.buffer))
+    };
+  }
   const primitiveText = JSON.stringify(
     {
       type: 'Primitive',
       data: {
-        vertices: {
-          position: {
-            format: 'position_f32x3',
-            data: bytesToBase64(new Uint8Array(positions.buffer))
-          },
-          normal: {
-            format: 'normal_f32x3',
-            data: bytesToBase64(new Uint8Array(normals.buffer))
-          },
-          texCoord0: {
-            format: 'tex0_f32x2',
-            data: bytesToBase64(new Uint8Array(uvs.buffer))
-          }
-        },
+        vertices,
         indices: bytesToBase64(new Uint8Array(indices.buffer)),
         indexType: useU32 ? 'u32' : 'u16',
         indexCount: indices.length,
@@ -238,7 +298,8 @@ function generatePrimitive(spec: GeneratedModelSpec, deadlineAt: number): Worker
     boxMin: bbox.min,
     boxMax: bbox.max,
     uvMin: uvBounds.min,
-    uvMax: uvBounds.max
+    uvMax: uvBounds.max,
+    hasTangents: generateTangents
   };
 }
 
@@ -260,6 +321,9 @@ function tessellateNode(node: ProceduralNode, deadlineAt: number): MeshData {
     case 'revolve':
       mesh = tessellateRevolve(node, deadlineAt);
       break;
+    case 'surface':
+      mesh = tessellateSurface(node, deadlineAt);
+      break;
     case 'curve':
       mesh = tessellateCurve(node, deadlineAt);
       break;
@@ -272,8 +336,10 @@ function tessellateNode(node: ProceduralNode, deadlineAt: number): MeshData {
     default:
       throw new Error(`Unsupported procedural node type: ${(node as { type?: string }).type}`);
   }
-  applyTransform(mesh, node.position, node.scale);
-  enforceWindingMatchesNormals(mesh);
+  applyTransform(mesh, node);
+  if (!node.preserveWinding) {
+    enforceWindingMatchesNormals(mesh);
+  }
   return mesh;
 }
 
@@ -459,6 +525,213 @@ function tessellateRevolve(node: RevolveNode, deadlineAt: number): MeshData {
     capRevolve(mesh, node, profile[profile.length - 1], segments, true);
   }
   return mesh;
+}
+
+function tessellateSurface(node: SurfaceNode, deadlineAt: number): MeshData {
+  if (node.surfaceType && node.surfaceType !== 'bezierPatch') {
+    throw new Error(`Unsupported surface.surfaceType: ${node.surfaceType}`);
+  }
+  if (!Array.isArray(node.patches) || node.patches.length === 0) {
+    throw new Error('surface.patches requires at least one bicubic Bezier patch');
+  }
+  const controlPoints = node.controlPoints?.map((point) => {
+    if (!isVec3(point)) {
+      throw new Error('surface.controlPoints entries must be [x, y, z]');
+    }
+    return point;
+  });
+  const segmentsU = clampInteger(node.segmentsU ?? 16, 1, 256, 'surface.segmentsU');
+  const segmentsV = clampInteger(node.segmentsV ?? segmentsU, 1, 256, 'surface.segmentsV');
+  const mesh = emptyMesh();
+  for (const patch of node.patches) {
+    checkDeadline(deadlineAt);
+    const resolved = resolveBezierPatch(patch, controlPoints);
+    tessellateBezierPatch(
+      mesh,
+      node,
+      resolved.points,
+      segmentsU,
+      segmentsV,
+      node.flipWinding !== resolved.flipWinding,
+      node.flipNormals !== resolved.flipNormals,
+      deadlineAt
+    );
+  }
+  if (node.normalOrientation === 'outward' || node.normalOrientation === 'inward') {
+    orientMeshBySignedVolume(mesh, node.normalOrientation);
+  }
+  if (node.smoothSeams !== false) {
+    weldNormalsByPosition(mesh, positive(node.seamTolerance, 1e-5, 'surface.seamTolerance'));
+  }
+  if (node.doubleSided) {
+    duplicateMeshBackfaces(mesh, nonNegative(node.backfaceOffset, 0, 'surface.backfaceOffset'));
+  }
+  return mesh;
+}
+
+function resolveBezierPatch(
+  patch: SurfacePatchSpec,
+  controlPoints?: Vec3[]
+): { points: Vec3[]; flipWinding: boolean; flipNormals: boolean } {
+  if (Array.isArray(patch)) {
+    return {
+      points: resolveBezierPatchPoints(patch, controlPoints),
+      flipWinding: false,
+      flipNormals: false
+    };
+  }
+  if (!patch || typeof patch !== 'object') {
+    throw new Error('surface.patches entries must be arrays or patch objects');
+  }
+  const source = patch.indices ?? patch.points;
+  const points = resolveBezierPatchPoints(source as number[] | Vec3[], controlPoints);
+  const mirror = isVec3(patch.mirror) ? patch.mirror : ([1, 1, 1] as Vec3);
+  const transformed: Vec3[] = [];
+  for (let y = 0; y < 4; y++) {
+    for (let x = 0; x < 4; x++) {
+      const sx = patch.reverseU ? 3 - x : x;
+      const sy = patch.reverseV ? 3 - y : y;
+      const point = points[sy * 4 + sx];
+      transformed.push([point[0] * mirror[0], point[1] * mirror[1], point[2] * mirror[2]]);
+    }
+  }
+  return {
+    points: transformed,
+    flipWinding: patch.flipWinding === true,
+    flipNormals: patch.flipNormals === true
+  };
+}
+
+function resolveBezierPatchPoints(patch: number[] | Vec3[] | undefined, controlPoints?: Vec3[]): Vec3[] {
+  if (!Array.isArray(patch) || patch.length !== 16) {
+    throw new Error('surface.patches entries must contain 16 control point indices or 16 [x, y, z] points');
+  }
+  if (patch.every((value) => typeof value === 'number')) {
+    if (!controlPoints?.length) {
+      throw new Error('surface.controlPoints is required when patches use indices');
+    }
+    return (patch as number[]).map((index) => {
+      const controlPoint = controlPoints[clampIndex(index, controlPoints.length)];
+      return [controlPoint[0], controlPoint[1], controlPoint[2]] as Vec3;
+    });
+  }
+  return (patch as Vec3[]).map((point) => {
+    if (!isVec3(point)) {
+      throw new Error('surface patch point entries must be [x, y, z]');
+    }
+    return point;
+  });
+}
+
+function tessellateBezierPatch(
+  mesh: MeshData,
+  node: SurfaceNode,
+  points: Vec3[],
+  segmentsU: number,
+  segmentsV: number,
+  flipWinding: boolean,
+  flipNormals: boolean,
+  deadlineAt: number
+): void {
+  const base = mesh.positions.length / 3;
+  for (let vIndex = 0; vIndex <= segmentsV; vIndex++) {
+    checkDeadline(deadlineAt);
+    const v = vIndex / segmentsV;
+    for (let uIndex = 0; uIndex <= segmentsU; uIndex++) {
+      const u = uIndex / segmentsU;
+      const sample = evaluateBezierPatch(points, u, v);
+      const normal = flipNormals ? scaleVec3(sample.normal, -1) : sample.normal;
+      pushVec3(mesh.positions, sample.position);
+      pushVec3(mesh.normals, normal);
+      pushUV(mesh, node, u, v, 0, 1, sample.position, normal);
+    }
+  }
+  const row = segmentsU + 1;
+  for (let v = 0; v < segmentsV; v++) {
+    for (let u = 0; u < segmentsU; u++) {
+      const a = base + v * row + u;
+      const b = a + 1;
+      const c = a + row;
+      const d = c + 1;
+      if (flipWinding) {
+        mesh.indices.push(a, c, b, b, c, d);
+      } else {
+        mesh.indices.push(a, b, c, b, d, c);
+      }
+    }
+  }
+}
+
+function evaluateBezierPatch(points: Vec3[], u: number, v: number): { position: Vec3; normal: Vec3 } {
+  const position = evaluateBezierPatchPosition(points, u, v);
+  return {
+    position,
+    normal: evaluateBezierPatchNormal(points, u, v)
+  };
+}
+
+function evaluateBezierPatchPosition(points: Vec3[], u: number, v: number): Vec3 {
+  const bu = cubicBezierBasis(u);
+  const bv = cubicBezierBasis(v);
+  const position: Vec3 = [0, 0, 0];
+  for (let y = 0; y < 4; y++) {
+    for (let x = 0; x < 4; x++) {
+      const p = points[y * 4 + x];
+      const b = bu[x] * bv[y];
+      position[0] += p[0] * b;
+      position[1] += p[1] * b;
+      position[2] += p[2] * b;
+    }
+  }
+  return position;
+}
+
+function evaluateBezierPatchNormal(points: Vec3[], u: number, v: number): Vec3 {
+  const bu = cubicBezierBasis(u);
+  const bv = cubicBezierBasis(v);
+  const du = cubicBezierBasisDerivative(u);
+  const dv = cubicBezierBasisDerivative(v);
+  const tangentU: Vec3 = [0, 0, 0];
+  const tangentV: Vec3 = [0, 0, 0];
+  for (let y = 0; y < 4; y++) {
+    for (let x = 0; x < 4; x++) {
+      const p = points[y * 4 + x];
+      const ub = du[x] * bv[y];
+      const vb = bu[x] * dv[y];
+      tangentU[0] += p[0] * ub;
+      tangentU[1] += p[1] * ub;
+      tangentU[2] += p[2] * ub;
+      tangentV[0] += p[0] * vb;
+      tangentV[1] += p[1] * vb;
+      tangentV[2] += p[2] * vb;
+    }
+  }
+  const analytic = normalizeOptional(cross(tangentU, tangentV));
+  if (analytic) {
+    return analytic;
+  }
+  const eps = 1e-4;
+  const u0 = Math.max(0, u - eps);
+  const u1 = Math.min(1, u + eps);
+  const v0 = Math.max(0, v - eps);
+  const v1 = Math.min(1, v + eps);
+  const pu0 = evaluateBezierPatchPosition(points, u0, v);
+  const pu1 = evaluateBezierPatchPosition(points, u1, v);
+  const pv0 = evaluateBezierPatchPosition(points, u, v0);
+  const pv1 = evaluateBezierPatchPosition(points, u, v1);
+  const finiteU = subVec3(pu1, pu0);
+  const finiteV = subVec3(pv1, pv0);
+  return normalizeOptional(cross(finiteU, finiteV)) ?? [0, 1, 0];
+}
+
+function cubicBezierBasis(t: number): [number, number, number, number] {
+  const u = 1 - t;
+  return [u * u * u, 3 * t * u * u, 3 * t * t * u, t * t * t];
+}
+
+function cubicBezierBasisDerivative(t: number): [number, number, number, number] {
+  const u = 1 - t;
+  return [-3 * u * u, 3 * u * u - 6 * t * u, 6 * t * u - 3 * t * t, 3 * t * t];
 }
 
 function tessellateCurve(node: CurveNode, deadlineAt: number): MeshData {
@@ -1426,11 +1699,271 @@ function computeVertexNormals(positions: number[], indices: number[]): number[] 
   return normals;
 }
 
+function orientMeshBySignedVolume(mesh: MeshData, orientation: 'outward' | 'inward'): void {
+  const volume = computeSignedMeshVolume(mesh);
+  if (Math.abs(volume) < 1e-10) {
+    orientMeshNormalsByCenter(mesh, orientation);
+    return;
+  }
+  const shouldFlip = orientation === 'outward' ? volume < 0 : volume > 0;
+  if (shouldFlip) {
+    flipMeshOrientation(mesh);
+  }
+}
+
+function computeSignedMeshVolume(mesh: MeshData): number {
+  let volume = 0;
+  for (let i = 0; i + 2 < mesh.indices.length; i += 3) {
+    const a = vec3At(mesh.positions, mesh.indices[i]);
+    const b = vec3At(mesh.positions, mesh.indices[i + 1]);
+    const c = vec3At(mesh.positions, mesh.indices[i + 2]);
+    if (!a || !b || !c) {
+      continue;
+    }
+    volume += dot(a, cross(b, c)) / 6;
+  }
+  return volume;
+}
+
+function flipMeshOrientation(mesh: MeshData): void {
+  for (let i = 0; i < mesh.normals.length; i += 3) {
+    mesh.normals[i] = -mesh.normals[i];
+    mesh.normals[i + 1] = -mesh.normals[i + 1];
+    mesh.normals[i + 2] = -mesh.normals[i + 2];
+  }
+  for (let i = 0; i + 2 < mesh.indices.length; i += 3) {
+    const tmp = mesh.indices[i + 1];
+    mesh.indices[i + 1] = mesh.indices[i + 2];
+    mesh.indices[i + 2] = tmp;
+  }
+}
+
+function orientMeshNormalsByCenter(mesh: MeshData, orientation: 'outward' | 'inward'): void {
+  const center = computePositionCenter(mesh.positions);
+  const targetSign = orientation === 'outward' ? 1 : -1;
+  for (let i = 0; i < mesh.positions.length; i += 3) {
+    const direction: Vec3 = [
+      mesh.positions[i] - center[0],
+      mesh.positions[i + 1] - center[1],
+      mesh.positions[i + 2] - center[2]
+    ];
+    const normal: Vec3 = [mesh.normals[i], mesh.normals[i + 1], mesh.normals[i + 2]];
+    if (dot(direction, normal) * targetSign < 0) {
+      mesh.normals[i] = -mesh.normals[i];
+      mesh.normals[i + 1] = -mesh.normals[i + 1];
+      mesh.normals[i + 2] = -mesh.normals[i + 2];
+    }
+  }
+}
+
+function weldNormalsByPosition(mesh: MeshData, tolerance: number): void {
+  const buckets = new Map<string, number[]>();
+  const groups: number[][] = [];
+  const inv = 1 / tolerance;
+  for (let vertexIndex = 0; vertexIndex < mesh.positions.length / 3; vertexIndex++) {
+    const p = vertexIndex * 3;
+    const bx = Math.floor(mesh.positions[p] * inv);
+    const by = Math.floor(mesh.positions[p + 1] * inv);
+    const bz = Math.floor(mesh.positions[p + 2] * inv);
+    let group: number[] | null = null;
+    for (let z = bz - 1; z <= bz + 1 && !group; z++) {
+      for (let y = by - 1; y <= by + 1 && !group; y++) {
+        for (let x = bx - 1; x <= bx + 1 && !group; x++) {
+          const bucket = buckets.get(`${x},${y},${z}`);
+          if (!bucket) {
+            continue;
+          }
+          for (const otherIndex of bucket) {
+            if (distanceSqAt(mesh.positions, vertexIndex, otherIndex) <= tolerance * tolerance) {
+              group = groups.find((candidate) => candidate.includes(otherIndex)) ?? null;
+              break;
+            }
+          }
+        }
+      }
+    }
+    if (!group) {
+      group = [];
+      groups.push(group);
+    }
+    group.push(vertexIndex);
+    const key = `${bx},${by},${bz}`;
+    const bucket = buckets.get(key);
+    if (bucket) {
+      bucket.push(vertexIndex);
+    } else {
+      buckets.set(key, [vertexIndex]);
+    }
+  }
+  for (const indices of groups) {
+    weldCompatibleNormals(mesh, indices);
+  }
+}
+
+function distanceSqAt(positions: number[], a: number, b: number): number {
+  const ia = a * 3;
+  const ib = b * 3;
+  const dx = positions[ia] - positions[ib];
+  const dy = positions[ia + 1] - positions[ib + 1];
+  const dz = positions[ia + 2] - positions[ib + 2];
+  return dx * dx + dy * dy + dz * dz;
+}
+
+function weldCompatibleNormals(mesh: MeshData, indices: number[]): void {
+  if (indices.length < 2) {
+    return;
+  }
+  const sets: Array<{ indices: number[]; sum: Vec3 }> = [];
+  for (const index of indices) {
+    const normal = normalize(vec3At(mesh.normals, index) ?? [0, 1, 0]);
+    let best: { indices: number[]; sum: Vec3 } | null = null;
+    let bestDot = -Infinity;
+    for (const set of sets) {
+      const reference = normalizeOptional(set.sum);
+      if (!reference) {
+        continue;
+      }
+      const d = dot(reference, normal);
+      if (d > bestDot) {
+        bestDot = d;
+        best = set;
+      }
+    }
+    if (!best || bestDot < 0) {
+      best = { indices: [], sum: [0, 0, 0] };
+      sets.push(best);
+    }
+    best.indices.push(index);
+    best.sum[0] += normal[0];
+    best.sum[1] += normal[1];
+    best.sum[2] += normal[2];
+  }
+  for (const set of sets) {
+    if (set.indices.length < 2) {
+      continue;
+    }
+    const normal = normalizeOptional(set.sum);
+    if (!normal) {
+      continue;
+    }
+    for (const index of set.indices) {
+      const offset = index * 3;
+      mesh.normals[offset] = normal[0];
+      mesh.normals[offset + 1] = normal[1];
+      mesh.normals[offset + 2] = normal[2];
+    }
+  }
+}
+
+function duplicateMeshBackfaces(mesh: MeshData, offset: number): void {
+  const vertexCount = mesh.positions.length / 3;
+  const sourceIndices = mesh.indices.slice();
+  for (let i = 0; i < vertexCount; i++) {
+    const p = i * 3;
+    const t = i * 2;
+    const n: Vec3 = normalize([mesh.normals[p], mesh.normals[p + 1], mesh.normals[p + 2]]);
+    pushVec3(mesh.positions, [
+      mesh.positions[p] - n[0] * offset,
+      mesh.positions[p + 1] - n[1] * offset,
+      mesh.positions[p + 2] - n[2] * offset
+    ]);
+    pushVec3(mesh.normals, [-n[0], -n[1], -n[2]]);
+    pushRawUV(mesh, mesh.uvs[t] ?? 0, mesh.uvs[t + 1] ?? 0);
+  }
+  for (let i = 0; i + 2 < sourceIndices.length; i += 3) {
+    mesh.indices.push(
+      vertexCount + sourceIndices[i],
+      vertexCount + sourceIndices[i + 2],
+      vertexCount + sourceIndices[i + 1]
+    );
+  }
+}
+
+function computePositionCenter(positions: number[]): Vec3 {
+  const center: Vec3 = [0, 0, 0];
+  const vertexCount = positions.length / 3;
+  if (vertexCount === 0) {
+    return center;
+  }
+  for (let i = 0; i < positions.length; i += 3) {
+    center[0] += positions[i];
+    center[1] += positions[i + 1];
+    center[2] += positions[i + 2];
+  }
+  return [center[0] / vertexCount, center[1] / vertexCount, center[2] / vertexCount];
+}
+
+function computeVertexTangents(mesh: MeshData): number[] {
+  const vertexCount = mesh.positions.length / 3;
+  const tan1 = new Array<number>(vertexCount * 3).fill(0);
+  const tan2 = new Array<number>(vertexCount * 3).fill(0);
+  for (let i = 0; i + 2 < mesh.indices.length; i += 3) {
+    const i0 = mesh.indices[i];
+    const i1 = mesh.indices[i + 1];
+    const i2 = mesh.indices[i + 2];
+    const p0 = vec3At(mesh.positions, i0);
+    const p1 = vec3At(mesh.positions, i1);
+    const p2 = vec3At(mesh.positions, i2);
+    const uv0 = vec2At(mesh.uvs, i0);
+    const uv1 = vec2At(mesh.uvs, i1);
+    const uv2 = vec2At(mesh.uvs, i2);
+    if (!p0 || !p1 || !p2 || !uv0 || !uv1 || !uv2) {
+      continue;
+    }
+    const x1 = p1[0] - p0[0];
+    const x2 = p2[0] - p0[0];
+    const y1 = p1[1] - p0[1];
+    const y2 = p2[1] - p0[1];
+    const z1 = p1[2] - p0[2];
+    const z2 = p2[2] - p0[2];
+    const s1 = uv1[0] - uv0[0];
+    const s2 = uv2[0] - uv0[0];
+    const t1 = uv1[1] - uv0[1];
+    const t2 = uv2[1] - uv0[1];
+    const determinant = s1 * t2 - s2 * t1;
+    if (Math.abs(determinant) < 1e-12) {
+      continue;
+    }
+    const r = 1 / determinant;
+    const tangent: Vec3 = [(t2 * x1 - t1 * x2) * r, (t2 * y1 - t1 * y2) * r, (t2 * z1 - t1 * z2) * r];
+    const bitangent: Vec3 = [(s1 * x2 - s2 * x1) * r, (s1 * y2 - s2 * y1) * r, (s1 * z2 - s2 * z1) * r];
+    accumulateVec3(tan1, i0, tangent);
+    accumulateVec3(tan1, i1, tangent);
+    accumulateVec3(tan1, i2, tangent);
+    accumulateVec3(tan2, i0, bitangent);
+    accumulateVec3(tan2, i1, bitangent);
+    accumulateVec3(tan2, i2, bitangent);
+  }
+
+  const tangents = new Array<number>(vertexCount * 4);
+  for (let i = 0; i < vertexCount; i++) {
+    const normal = vec3At(mesh.normals, i) ?? [0, 1, 0];
+    const tangent = vec3At(tan1, i) ?? [0, 0, 0];
+    const bitangent = vec3At(tan2, i) ?? [0, 0, 0];
+    let t = subVec3(tangent, scaleVec3(normal, dot(normal, tangent)));
+    if (lengthSqVec3(t) < 1e-12) {
+      t = choosePerpendicular(normal);
+    } else {
+      t = normalize(t);
+    }
+    const w = dot(cross(normal, t), bitangent) < 0 ? -1 : 1;
+    const offset = i * 4;
+    tangents[offset] = t[0];
+    tangents[offset + 1] = t[1];
+    tangents[offset + 2] = t[2];
+    tangents[offset + 3] = w;
+  }
+  return tangents;
+}
+
 function mergeMesh(target: MeshData, source: MeshData): void {
   const base = target.positions.length / 3;
   appendNumbers(target.positions, source.positions);
   appendNumbers(target.normals, source.normals);
   appendNumbers(target.uvs, source.uvs);
+  if (source.tangents.length) {
+    appendNumbers(target.tangents, source.tangents);
+  }
   for (const index of source.indices) {
     target.indices.push(index + base);
   }
@@ -1683,20 +2216,70 @@ function vec3At(values: number[], index: number): Vec3 | undefined {
   return [values[offset], values[offset + 1], values[offset + 2]];
 }
 
-function applyTransform(mesh: MeshData, position?: Vec3, scale?: Vec3): void {
-  const p = isVec3(position) ? position : [0, 0, 0];
-  const s = isVec3(scale) ? scale : [1, 1, 1];
+function vec2At(values: number[], index: number): Vec2 | undefined {
+  const offset = index * 2;
+  if (offset + 1 >= values.length) {
+    return undefined;
+  }
+  return [values[offset], values[offset + 1]];
+}
+
+function applyTransform(mesh: MeshData, node: BaseNode): void {
+  const axes = getCoordinateRemapAxes(node);
+  const p = isVec3(node.position) ? node.position : [0, 0, 0];
+  const s = isVec3(node.scale) ? node.scale : [1, 1, 1];
+  const q = isVec4(node.rotation) ? normalizeQuat(node.rotation) : ([0, 0, 0, 1] as Vec4);
   for (let i = 0; i < mesh.positions.length; i += 3) {
-    mesh.positions[i] = mesh.positions[i] * s[0] + p[0];
-    mesh.positions[i + 1] = mesh.positions[i + 1] * s[1] + p[1];
-    mesh.positions[i + 2] = mesh.positions[i + 2] * s[2] + p[2];
+    const remapped = remapVec3([mesh.positions[i], mesh.positions[i + 1], mesh.positions[i + 2]], axes);
+    const rotated = rotateVec3ByQuat([remapped[0] * s[0], remapped[1] * s[1], remapped[2] * s[2]], q);
+    mesh.positions[i] = rotated[0] + p[0];
+    mesh.positions[i + 1] = rotated[1] + p[1];
+    mesh.positions[i + 2] = rotated[2] + p[2];
   }
   for (let i = 0; i < mesh.normals.length; i += 3) {
-    const n = normalize([mesh.normals[i] / s[0], mesh.normals[i + 1] / s[1], mesh.normals[i + 2] / s[2]]);
+    const remapped = remapVec3([mesh.normals[i], mesh.normals[i + 1], mesh.normals[i + 2]], axes);
+    const n = normalize(rotateVec3ByQuat([remapped[0] / s[0], remapped[1] / s[1], remapped[2] / s[2]], q));
     mesh.normals[i] = n[0];
     mesh.normals[i + 1] = n[1];
     mesh.normals[i + 2] = n[2];
   }
+}
+
+function getCoordinateRemapAxes(node: BaseNode): [UVAxis, UVAxis, UVAxis] {
+  const remap = node.coordinateRemap;
+  if (remap === 'none') {
+    return ['x', 'y', 'z'];
+  }
+  if (remap === 'zUpToYUp') {
+    return ['x', 'z', '-y'];
+  }
+  if (remap === 'yUpToZUp') {
+    return ['x', '-z', 'y'];
+  }
+  if (remap && typeof remap === 'object' && Array.isArray(remap.axes)) {
+    return getCoordinateAxes(remap.axes, ['x', 'y', 'z']);
+  }
+  if (node.coordinateSystem === 'zUp') {
+    return ['x', 'z', '-y'];
+  }
+  return ['x', 'y', 'z'];
+}
+
+function getCoordinateAxes(value: unknown, fallback: [UVAxis, UVAxis, UVAxis]): [UVAxis, UVAxis, UVAxis] {
+  if (
+    !Array.isArray(value) ||
+    value.length !== 3 ||
+    !isUVAxis(value[0]) ||
+    !isUVAxis(value[1]) ||
+    !isUVAxis(value[2])
+  ) {
+    return fallback;
+  }
+  return [value[0], value[1], value[2]];
+}
+
+function remapVec3(value: Vec3, axes: [UVAxis, UVAxis, UVAxis]): Vec3 {
+  return [axisValue(value, axes[0]), axisValue(value, axes[1]), axisValue(value, axes[2])];
 }
 
 function computeBounds(positions: number[]): { min: Vec3; max: Vec3 } {
@@ -1733,6 +2316,7 @@ function emptyMesh(): MeshData {
     positions: [],
     normals: [],
     uvs: [],
+    tangents: [],
     indices: []
   };
 }
@@ -1801,6 +2385,17 @@ function isVec3(value: unknown): value is Vec3 {
   );
 }
 
+function isVec4(value: unknown): value is Vec4 {
+  return (
+    Array.isArray(value) &&
+    value.length === 4 &&
+    isFiniteNumber(value[0]) &&
+    isFiniteNumber(value[1]) &&
+    isFiniteNumber(value[2]) &&
+    isFiniteNumber(value[3])
+  );
+}
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
@@ -1809,9 +2404,33 @@ function pushVec3(values: number[], v: Vec3): void {
   values.push(v[0], v[1], v[2]);
 }
 
+function accumulateVec3(values: number[], index: number, v: Vec3): void {
+  const offset = index * 3;
+  values[offset] += v[0];
+  values[offset + 1] += v[1];
+  values[offset + 2] += v[2];
+}
+
 function normalize(v: Vec3): Vec3 {
   const len = Math.hypot(v[0], v[1], v[2]);
   return len > 0 ? [v[0] / len, v[1] / len, v[2] / len] : [0, 1, 0];
+}
+
+function normalizeOptional(v: Vec3, epsilon = 1e-10): Vec3 | null {
+  const len = Math.hypot(v[0], v[1], v[2]);
+  return len > epsilon ? [v[0] / len, v[1] / len, v[2] / len] : null;
+}
+
+function normalizeQuat(q: Vec4): Vec4 {
+  const len = Math.hypot(q[0], q[1], q[2], q[3]);
+  return len > 0 ? [q[0] / len, q[1] / len, q[2] / len, q[3] / len] : [0, 0, 0, 1];
+}
+
+function rotateVec3ByQuat(v: Vec3, q: Vec4): Vec3 {
+  const u: Vec3 = [q[0], q[1], q[2]];
+  const uv = cross(u, v);
+  const uuv = cross(u, uv);
+  return addVec3(v, addVec3(scaleVec3(uv, 2 * q[3]), scaleVec3(uuv, 2)));
 }
 
 function cross(a: Vec3, b: Vec3): Vec3 {
@@ -1847,6 +2466,10 @@ function distanceSq(a: Vec3, b: Vec3): number {
   const y = a[1] - b[1];
   const z = a[2] - b[2];
   return x * x + y * y + z * z;
+}
+
+function lengthSqVec3(v: Vec3): number {
+  return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 }
 
 export {};
