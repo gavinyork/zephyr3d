@@ -1,4 +1,5 @@
 import type { Editor } from '../core/editor';
+import type { Mesh, SceneNode } from '@zephyr3d/scene';
 import { Scene } from '@zephyr3d/scene';
 import { getDevice, getEngine, OrthoCamera, PerspectiveCamera } from '@zephyr3d/scene';
 import { BlobReader, BlobWriter, configure, ZipWriter } from '@zip.js/zip.js';
@@ -27,6 +28,22 @@ type NodeClass =
   | 'RectLight'
   | 'ParticleSystem'
   | 'Sprite';
+type MaterialClass =
+  | 'UnlitMaterial'
+  | 'LambertMaterial'
+  | 'BlinnMaterial'
+  | 'PBRMetallicRoughnessMaterial'
+  | 'PBRSpecularGlossinessMaterial'
+  | 'StandardSpriteMaterial';
+
+const builtinMaterials: Record<MaterialClass, string> = {
+  UnlitMaterial: '/assets/@builtins/materials/unlit.zmtl',
+  LambertMaterial: '/assets/@builtins/materials/lambert.zmtl',
+  BlinnMaterial: '/assets/@builtins/materials/blinnphong.zmtl',
+  StandardSpriteMaterial: '/assets/@builtins/materials/sprite_std.zmtl',
+  PBRMetallicRoughnessMaterial: '/assets/@builtins/materials/pbr_metallic_roughness.zmtl',
+  PBRSpecularGlossinessMaterial: '/assets/@builtins/materials/pbr_specular_glossiness.zmtl'
+};
 
 interface BridgeRequest {
   id: number | string;
@@ -43,7 +60,7 @@ interface ConsoleEntry {
 const MAX_LOGS = 400;
 const MAX_SERIALIZE_DEPTH = 5;
 const DEFAULT_MCP_PORT = '47231';
-const SCREENSHOT_TIMEOUT_MS = 10000;
+const SCREENSHOT_TIMEOUT_MS = 5000;
 
 let consoleInstalled = false;
 const consoleEntries: ConsoleEntry[] = [];
@@ -164,6 +181,27 @@ function getSceneController(editor: Editor) {
     controller = null;
   }
   return controller as SceneController;
+}
+
+function getNode<T extends SceneNode>(editor: Editor, id: string): { node: T; err: string | null } {
+  const scene = getScene(editor);
+  if (!scene) {
+    return {
+      node: null,
+      err: 'No scene is currently opened'
+    };
+  }
+  const node = scene.findNodeById<T>(id);
+  if (!node) {
+    return {
+      node: null,
+      err: `Node not found in scene node tree: ${id}`
+    };
+  }
+  return {
+    node,
+    err: null
+  };
 }
 
 function getScene(editor: Editor): Scene {
@@ -427,9 +465,205 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
   switch (method) {
     case 'status':
       return getStatus(editor);
-    case 'activateScene': {
-      await editor.moduleManager.activate('Scene', params?.scenePath ?? '');
-      return getStatus(editor);
+    case 'mesh_get_material': {
+      try {
+        let meshId: string = params.mesh_id;
+        if (typeof meshId !== 'string' || !meshId.trim()) {
+          return {
+            material_path: null,
+            err: 'mesh_get_material requires mesh_id to be a non-empty string'
+          };
+        }
+        const node = getNode<Mesh>(editor, meshId.trim());
+        if (node.err) {
+          return {
+            material_path: null,
+            err: node.err
+          };
+        }
+        const materialPath = getEngine().resourceManager.getAssetId(node.node.material?.coreMaterial);
+        return {
+          material_path: materialPath,
+          err: null
+        };
+      } catch (err) {
+        return {
+          err: `${err}`
+        };
+      }
+    }
+    case 'mesh_set_material': {
+      try {
+        let meshId: string = params.mesh_id;
+        if (typeof meshId !== 'string' || !meshId.trim()) {
+          return {
+            err: 'mesh_set_material requires mesh_id to be a non-empty string'
+          };
+        }
+        const node = getNode<Mesh>(editor, meshId.trim());
+        if (node.err) {
+          return {
+            err: node.err
+          };
+        }
+        let materialPath: string = params.material_path;
+        if (typeof materialPath !== 'string' || !materialPath.trim()) {
+          return {
+            err: 'mesh_set_material requires material_path to be a non-empty string'
+          };
+        }
+        materialPath = ProjectService.VFS.normalizePath(materialPath);
+        const material = await getEngine().resourceManager.fetchMaterial(materialPath);
+        if (!material) {
+          return {
+            err: `Cannot load material at path: ${materialPath}`
+          };
+        }
+        node.node.material = material;
+        return {
+          err: null
+        };
+      } catch (err) {
+        return {
+          err: `${err}`
+        };
+      }
+    }
+    case 'asset_get_root': {
+      return {
+        root: '/assets',
+        err: null
+      };
+    }
+    case 'asset_create_material': {
+      try {
+        let path: string = params.directory;
+        if (typeof path !== 'string' || !path) {
+          return {
+            path: null,
+            err: 'asset_create_material requires path to be a non-empty string'
+          };
+        }
+        path = ProjectService.VFS.normalizePath(path);
+        if (path !== '/assets' && !path.startsWith('/assets/')) {
+          return {
+            path: null,
+            err: 'path is not in asset root directory'
+          };
+        }
+        if (path.startsWith('/assets/@builtins/')) {
+          return {
+            path: null,
+            err: 'Writing to `/assets/@builtins` directory is not allowed'
+          };
+        }
+        if (typeof params.class !== 'string' || !params.class) {
+          return {
+            path: null,
+            err: 'asset_create_material requires class to be a non-empty string'
+          };
+        }
+        if (!builtinMaterials[params.class]) {
+          return {
+            path: null,
+            err: 'Invalid material class'
+          };
+        }
+        if (typeof params.name !== 'string' || !params.name.trim()) {
+          return {
+            path: null,
+            err: 'asset_create_material requires name to be a non-empty string'
+          };
+        }
+        if (params.overwrite !== undefined && typeof params.overwrite !== 'boolean') {
+          return {
+            path: null,
+            err: 'overwrite parameter must be a boolean or be omitted'
+          };
+        }
+        let filename = params.name.trim() as string;
+        if (!filename.endsWith('.zmtl')) {
+          filename = filename.endsWith('.') ? `${filename}zmtl` : `${filename}.zmtl`;
+        }
+        const srcPath = builtinMaterials[params.class];
+        const dstPath = await ProjectService.VFS.join(path, filename);
+        if (!(await ProjectService.VFS.exists(path))) {
+          await ProjectService.VFS.makeDirectory(path, true);
+        }
+        const stat = (await ProjectService.VFS.exists(dstPath))
+          ? await ProjectService.VFS.stat(dstPath)
+          : null;
+        if (stat?.isDirectory) {
+          return {
+            path: null,
+            err: `${dstPath} is a directory and cannot be overwritten`
+          };
+        }
+        if (stat?.isFile && !params.overwrite) {
+          return {
+            path: null,
+            err: `${dstPath} already exists`
+          };
+        }
+        await ProjectService.VFS.copyFile(srcPath, dstPath, { overwrite: true });
+        return {
+          path: dstPath,
+          err: null
+        };
+      } catch (err) {
+        return {
+          path: null,
+          err: `${err}`
+        };
+      }
+    }
+    case 'asset_read_directory': {
+      try {
+        if (typeof params.path !== 'string' || !params.path) {
+          return {
+            result: null,
+            err: 'asset_read_directory require path to be a non-empty string'
+          };
+        }
+        if (params.recursive !== undefined && typeof params.recursive !== 'boolean') {
+          return {
+            result: null,
+            err: 'recursive parameter must be a boolean or be omitted'
+          };
+        }
+        if (params.pattern !== undefined && typeof params.pattern !== 'string') {
+          return {
+            result: null,
+            err: 'pattern parameter must be a string or be omitted'
+          };
+        }
+        const stat = await ProjectService.VFS.stat(params.path);
+        if (!stat) {
+          return {
+            result: null,
+            err: 'path not exists'
+          };
+        }
+        if (!stat.isDirectory) {
+          return {
+            result: null,
+            err: 'path is not directory'
+          };
+        }
+        const entries = await ProjectService.VFS.readDirectory(params.path, {
+          recursive: params.recursive,
+          pattern: params.pattern
+        });
+        return {
+          result: entries,
+          err: null
+        };
+      } catch (err) {
+        return {
+          result: null,
+          err: `${err}`
+        };
+      }
     }
     case 'getScenePropertyList': {
       const props = getEngine().resourceManager.getPropertiesByClass(
@@ -440,29 +674,60 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         err: null
       };
     }
+    case 'getMaterialPropertyList': {
+      const path = params.path as string;
+      if (!path) {
+        return {
+          propertyList: null,
+          err: 'getMaterialPropertyList requires the material file path'
+        };
+      }
+      try {
+        if (!(await ProjectService.VFS.exists(params.path))) {
+          return {
+            propertyList: null,
+            err: `File not exists at ${path}`
+          };
+        }
+        const content = (await ProjectService.VFS.readFile(params.path, { encoding: 'utf8' })) as string;
+        const json = JSON.parse(content);
+        const classname = json['ClassName'];
+        const cls = getEngine()
+          .resourceManager.getClasses()
+          .find((val) => val.name === classname);
+        if (!cls) {
+          return {
+            propertyList: null,
+            err: 'Invalid material file'
+          };
+        }
+        return {
+          propertyList: JSON.parse(JSON.stringify(getEngine().resourceManager.getPropertiesByClass(cls))),
+          err: null
+        };
+      } catch (err) {
+        return {
+          propertyList: null,
+          err: `${err}`
+        };
+      }
+    }
     case 'getNodePropertyList': {
       const id = params.id as string;
-      if (!id) {
+      if (typeof id !== 'string' || !id.trim()) {
         return {
           propertyList: null,
-          err: 'getNodePropertyList requires the node id'
+          err: 'getNodePropertyList requires the node id to be a non-empty string'
         };
       }
-      const scene = getScene(editor);
-      if (!scene) {
+      const node = getNode(editor, id.trim());
+      if (node.err) {
         return {
           propertyList: null,
-          err: 'No scene is currently opened'
+          err: node.err
         };
       }
-      const node = scene.findNodeById(params.id);
-      if (!node) {
-        return {
-          propertyList: null,
-          err: `Node not found in scene node tree: ${params.id}`
-        };
-      }
-      const cls = getEngine().resourceManager.getClassByObject(node);
+      const cls = getEngine().resourceManager.getClassByObject(node.node);
       if (!cls) {
         return {
           propertyList: [],
@@ -609,6 +874,17 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         };
       }
     }
+    case 'getMaterialClasses': {
+      const classes: MaterialClass[] = [
+        'UnlitMaterial',
+        'LambertMaterial',
+        'BlinnMaterial',
+        'StandardSpriteMaterial',
+        'PBRMetallicRoughnessMaterial',
+        'PBRSpecularGlossinessMaterial'
+      ];
+      return classes;
+    }
     case 'getNodeClasses': {
       const classes: NodeClass[] = [
         'SceneNode',
@@ -716,52 +992,44 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       };
     }
     case 'getNodeClass': {
-      const id = params.id as string;
-      if (!id) {
+      if (typeof params.id !== 'string' || !params.id.trim()) {
         return {
           nodeClass: null,
-          err: 'getNodeClass requires the node id'
+          err: 'getNodeClass requires the node id to be a non-empty string'
         };
       }
-      const scene = getScene(editor);
-      if (!scene) {
+      const node = getNode(editor, params.id.trim());
+      if (node.err) {
         return {
           nodeClass: null,
-          err: 'No scene is currently opened'
+          err: node.err
         };
       }
-      const node = scene.findNodeById(params.id);
-      if (!node) {
-        return {
-          nodeClass: null,
-          err: `Node not found in scene node tree: ${params.id}`
-        };
-      }
-      const cls: NodeClass = node.isMesh()
+      const cls: NodeClass = node.node.isMesh()
         ? 'Mesh'
-        : node.isBatchGroup()
+        : node.node.isBatchGroup()
           ? 'BatchGroup'
-          : node.isClipmapTerrain()
+          : node.node.isClipmapTerrain()
             ? 'ClipmapTerrain'
-            : node.isLight() && node.isDirectionLight()
+            : node.node.isLight() && node.node.isDirectionLight()
               ? 'DirectionalLight'
-              : node.isLight() && node.isPointLight()
+              : node.node.isLight() && node.node.isPointLight()
                 ? 'PointLight'
-                : node.isLight() && node.isSpotLight()
+                : node.node.isLight() && node.node.isSpotLight()
                   ? 'SpotLight'
-                  : node.isLight() && node.isRectLight()
+                  : node.node.isLight() && node.node.isRectLight()
                     ? 'RectLight'
-                    : node.isMesh()
+                    : node.node.isMesh()
                       ? 'Mesh'
-                      : node.isParticleSystem()
+                      : node.node.isParticleSystem()
                         ? 'ParticleSystem'
-                        : node.isWater()
+                        : node.node.isWater()
                           ? 'Water'
-                          : node instanceof PerspectiveCamera
+                          : node.node instanceof PerspectiveCamera
                             ? 'PerspectiveCamera'
-                            : node instanceof OrthoCamera
+                            : node.node instanceof OrthoCamera
                               ? 'OrthoCamera'
-                              : node.isCamera()
+                              : node.node.isCamera()
                                 ? 'Camera'
                                 : 'SceneNode';
       return {
@@ -771,24 +1039,17 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     }
     case 'setNodeLocalTransform': {
       const id = params.id as string;
-      if (!id) {
+      if (typeof id !== 'string' || !id.trim()) {
         return {
           transform: null,
-          err: 'setNodeLocalTransform requires the node id'
+          err: 'setNodeLocalTransform requires the node id to be a non-empty string'
         };
       }
-      const scene = getScene(editor);
-      if (!scene) {
+      const node = getNode(editor, id.trim());
+      if (node.err) {
         return {
           transform: null,
-          err: 'No scene is currently opened'
-        };
-      }
-      const node = scene.findNodeById(params.id);
-      if (!node) {
-        return {
-          transform: null,
-          err: `Node not found in scene node tree: ${params.id}`
+          err: node.err
         };
       }
       if (params.position) {
@@ -828,50 +1089,48 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         }
       }
       if (params.position) {
-        node.position.setXYZ(params.position[0], params.position[1], params.position[2]);
+        node.node.position.setXYZ(params.position[0], params.position[1], params.position[2]);
       }
       if (params.scale) {
-        node.scale.setXYZ(params.scale[0], params.scale[1], params.scale[2]);
+        node.node.scale.setXYZ(params.scale[0], params.scale[1], params.scale[2]);
       }
       if (params.rotation) {
-        node.rotation.setXYZW(params.rotation[0], params.rotation[1], params.rotation[2], params.rotation[3]);
+        node.node.rotation.setXYZW(
+          params.rotation[0],
+          params.rotation[1],
+          params.rotation[2],
+          params.rotation[3]
+        );
       }
       return {
         transform: {
-          position: [node.position.x, node.position.y, node.position.z],
-          scale: [node.scale.x, node.scale.y, node.scale.z],
-          rotation: [node.rotation.x, node.rotation.y, node.rotation.z, node.rotation.w]
+          position: [node.node.position.x, node.node.position.y, node.node.position.z],
+          scale: [node.node.scale.x, node.node.scale.y, node.node.scale.z],
+          rotation: [node.node.rotation.x, node.node.rotation.y, node.node.rotation.z, node.node.rotation.w]
         },
         err: null
       };
     }
     case 'getNodeLocalTransform': {
       const id = params.id as string;
-      if (!id) {
+      if (typeof id !== 'string' || !id.trim()) {
         return {
           transform: null,
-          err: 'getNodeLocalTransform requires the node id'
+          err: 'getNodeLocalTransform requires the node id to be non-empty string'
         };
       }
-      const scene = getScene(editor);
-      if (!scene) {
+      const node = getNode(editor, id.trim());
+      if (node.err) {
         return {
           transform: null,
-          err: 'No scene is currently opened'
-        };
-      }
-      const node = scene.findNodeById(params.id);
-      if (!node) {
-        return {
-          transform: null,
-          err: `Node not found in scene node tree: ${params.id}`
+          err: node.err
         };
       }
       return {
         transform: {
-          position: [node.position.x, node.position.y, node.position.z],
-          scale: [node.scale.x, node.scale.y, node.scale.z],
-          rotation: [node.rotation.x, node.rotation.y, node.rotation.z, node.rotation.w]
+          position: [node.node.position.x, node.node.position.y, node.node.position.z],
+          scale: [node.node.scale.x, node.node.scale.y, node.node.scale.z],
+          rotation: [node.node.rotation.x, node.node.rotation.y, node.node.rotation.z, node.node.rotation.w]
         },
         err: null
       };
@@ -901,120 +1160,94 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     }
     case 'getParentNode': {
       const id = params.id as string;
-      if (!id) {
+      if (typeof id !== 'string' || !id.trim()) {
         return {
           parentNode: null,
-          err: 'getParentNode requires the node id'
+          err: 'getParentNode requires the node id to be a non-empty string'
         };
       }
-      const scene = getScene(editor);
-      if (!scene) {
+      const node = getNode(editor, id.trim());
+      if (node.err) {
         return {
           parentNode: null,
-          err: 'No scene is currently opened'
-        };
-      }
-      const node = scene.findNodeById(params.id);
-      if (!node) {
-        return {
-          parentNode: null,
-          err: `Node not found in scene node tree: ${params.id}`
+          err: node.err
         };
       }
       return {
-        parentNode: node.parent?.persistentId ?? null,
+        parentNode: node.node.parent?.persistentId ?? null,
         err: null
       };
     }
     case 'removeNode': {
       const id = params.id as string;
-      if (!id) {
+      if (typeof id !== 'string' || !id.trim()) {
         return {
-          err: 'removeNode requires the node id'
+          err: 'removeNode requires the node id to be a non-empty string'
         };
       }
-      const scene = getScene(editor);
-      if (!scene) {
+      const node = getNode(editor, id.trim());
+      if (node.err) {
         return {
-          err: 'No scene is currently opened'
+          err: node.err
         };
       }
-      const node = scene.findNodeById(params.id);
-      if (!node) {
-        return {
-          err: `Node not found in scene node tree: ${params.id}`
-        };
-      }
-      node.remove();
+      node.node.remove();
       return {
         err: null
       };
     }
     case 'setParentNode': {
       const id = params.id as string;
-      if (!id) {
+      if (typeof id !== 'string' || !id.trim()) {
         return {
-          err: 'setParentNode requires the node id'
+          err: 'setParentNode requires the node id to be a non-empty string'
         };
       }
       const newParentId = params.parentId as string;
-      if (!newParentId) {
+      if (typeof newParentId !== 'string' || !newParentId.trim()) {
         return {
-          err: 'setParentNode requires the new parent id'
+          err: 'setParentNode requires the new parent id to be a non-empty string'
         };
       }
-      const scene = getScene(editor);
-      if (!scene) {
+      const node = getNode(editor, id.trim());
+      if (node.err) {
         return {
-          err: 'No scene is currently opened'
+          err: node.err
         };
       }
-      const node = scene.findNodeById(params.id);
-      if (!node) {
+      const newParentNode = getNode(editor, newParentId.trim());
+      if (newParentNode.err) {
         return {
-          err: `Node not found in scene node tree: ${params.id}`
+          err: newParentNode.err
         };
       }
-      const newParentNode = scene.findNodeById(params.parentId);
-      if (!newParentNode) {
-        return {
-          err: `New parent node not found in scene node tree: ${params.parentId}`
-        };
-      }
-      if (node.isParentOf(newParentNode)) {
+      if (node.node.isParentOf(newParentNode.node)) {
         return {
           err: `Cannot set this node as parent: ${params.parentId}`
         };
       }
-      node.parent = newParentNode;
+      node.node.parent = newParentNode.node;
       return {
         err: null
       };
     }
     case 'getSubNodes': {
       const parent = params.parent as string;
-      if (!parent) {
+      if (typeof parent !== 'string' || !parent.trim()) {
         return {
           subNodes: null,
           err: 'getSubNodes requires the parent node id'
         };
       }
-      const scene = getScene(editor);
-      if (!scene) {
+      const node = getNode(editor, parent.trim());
+      if (node.err) {
         return {
           subNodes: null,
-          err: 'No scene is currently opened'
-        };
-      }
-      const parentNode = scene.findNodeById(params.parent);
-      if (!parentNode) {
-        return {
-          subNodes: null,
-          err: `Parent node not found in scene node tree: ${params.parent}`
+          err: node.err
         };
       }
       return {
-        subNodes: parentNode.children.map((child) => ({ id: child.persistentId, name: child.name })),
+        subNodes: node.node.children.map((child) => ({ id: child.persistentId, name: child.name })),
         err: null
       };
     }

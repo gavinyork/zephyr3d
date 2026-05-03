@@ -277,6 +277,15 @@ const bridge = new EditorBridgeServer(DEFAULT_PORT, BRIDGE_TOKEN);
 await bridge.listen();
 log(`Editor MCP bridge listening on ws://127.0.0.1:${bridge.port}/editor-mcp`);
 
+const MATERIAL_CLASSES = [
+  'UnlitMaterial',
+  'LambertMaterial',
+  'BlinnMaterial',
+  'PBRMetallicRoughnessMaterial',
+  'PBRSpecularGlossinessMaterial',
+  'StandardSpriteMaterial'
+];
+
 const tools = [
   {
     name: 'editor_connect_info',
@@ -415,6 +424,108 @@ const tools = [
           description: 'Discard current dirty scene changes before deleting the project.'
         },
         timeoutMs: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'asset_get_root',
+    description: 'Get the project asset root directory. Returns { root, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'asset_read_directory',
+    description:
+      'Read entries from a project asset directory. Supports optional recursive traversal and glob pattern filtering.',
+    inputSchema: {
+      type: 'object',
+      required: ['path'],
+      properties: {
+        path: { type: 'string', description: 'VFS directory path, such as /assets or /assets/materials.' },
+        recursive: { type: 'boolean', description: 'Read directories recursively when true.' },
+        pattern: { type: 'string', description: 'Optional VFS glob pattern filter.' },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'asset_create_material',
+    description:
+      'Create a material asset in a project asset directory from a built-in material class. Returns { path, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['directory', 'class', 'name'],
+      properties: {
+        directory: {
+          type: 'string',
+          description: 'Destination VFS directory under /assets, excluding /assets/@builtins.'
+        },
+        class: {
+          type: 'string',
+          enum: MATERIAL_CLASSES,
+          description: 'Built-in material class to copy from.'
+        },
+        name: {
+          type: 'string',
+          description: 'Material file name. The .zmtl extension is appended when omitted.'
+        },
+        overwrite: {
+          type: 'boolean',
+          description: 'Overwrite an existing material file when true.'
+        },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'getMaterialClasses',
+    description: 'Get the list of material classes supported by asset_create_material.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'getMaterialPropertyList',
+    description:
+      'Get the editable property metadata list for a material asset path. Returns { propertyList, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['path'],
+      properties: {
+        path: { type: 'string', description: 'Material asset VFS path.' },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'mesh_get_material',
+    description: 'Get the material asset path assigned to a mesh node. Returns { material_path, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['mesh_id'],
+      properties: {
+        mesh_id: { type: 'string', description: 'Persistent id of the mesh node.' },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'mesh_set_material',
+    description: 'Assign a material asset to a mesh node. Returns { err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['mesh_id', 'material_path'],
+      properties: {
+        mesh_id: { type: 'string', description: 'Persistent id of the mesh node.' },
+        material_path: { type: 'string', description: 'Material asset VFS path.' },
+        timeoutMs: { type: 'number', default: 10000 }
       }
     }
   },
@@ -570,6 +681,31 @@ const tools = [
       required: ['id'],
       properties: {
         id: { type: 'string', description: 'Persistent id of the scene node.' },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'removeNode',
+    description: 'Remove a scene node by persistent node id. Returns { err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['id'],
+      properties: {
+        id: { type: 'string', description: 'Persistent id of the scene node.' },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'setParentNode',
+    description: 'Set a scene node parent by persistent node id. Returns { err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['id', 'parentId'],
+      properties: {
+        id: { type: 'string', description: 'Persistent id of the scene node.' },
+        parentId: { type: 'string', description: 'Persistent id of the new parent scene node.' },
         timeoutMs: { type: 'number', default: 10000 }
       }
     }
@@ -740,6 +876,74 @@ const handlers = {
       Number(args.timeoutMs ?? 30000)
     );
   },
+  async asset_get_root(args) {
+    return bridge.send('asset_get_root', {}, Number(args.timeoutMs ?? 10000));
+  },
+  async asset_read_directory(args) {
+    const path = typeof args.path === 'string' ? args.path.trim() : '';
+    if (!path) {
+      return { result: null, err: 'asset_read_directory requires the path' };
+    }
+    const params = { path };
+    if (Object.prototype.hasOwnProperty.call(args, 'recursive')) {
+      params.recursive = args.recursive;
+    }
+    if (Object.prototype.hasOwnProperty.call(args, 'pattern')) {
+      params.pattern = args.pattern;
+    }
+    return bridge.send('asset_read_directory', params, Number(args.timeoutMs ?? 10000));
+  },
+  async asset_create_material(args) {
+    const directory = typeof args.directory === 'string' ? args.directory.trim() : '';
+    if (!directory) {
+      return { path: null, err: 'asset_create_material requires the directory' };
+    }
+    const materialClass = typeof args.class === 'string' ? args.class.trim() : '';
+    if (!materialClass) {
+      return { path: null, err: 'asset_create_material requires the class' };
+    }
+    const name = typeof args.name === 'string' ? args.name.trim() : '';
+    if (!name) {
+      return { path: null, err: 'asset_create_material requires the name' };
+    }
+    const params = { directory, class: materialClass, name };
+    if (Object.prototype.hasOwnProperty.call(args, 'overwrite')) {
+      params.overwrite = args.overwrite;
+    }
+    return bridge.send('asset_create_material', params, Number(args.timeoutMs ?? 10000));
+  },
+  async getMaterialClasses(args) {
+    return bridge.send('getMaterialClasses', {}, Number(args.timeoutMs ?? 10000));
+  },
+  async getMaterialPropertyList(args) {
+    const path = typeof args.path === 'string' ? args.path.trim() : '';
+    if (!path) {
+      return { propertyList: null, err: 'getMaterialPropertyList requires the material file path' };
+    }
+    return bridge.send('getMaterialPropertyList', { path }, Number(args.timeoutMs ?? 10000));
+  },
+  async mesh_get_material(args) {
+    const meshId = typeof args.mesh_id === 'string' ? args.mesh_id.trim() : '';
+    if (!meshId) {
+      return { material_path: null, err: 'mesh_get_material requires the mesh_id' };
+    }
+    return bridge.send('mesh_get_material', { mesh_id: meshId }, Number(args.timeoutMs ?? 10000));
+  },
+  async mesh_set_material(args) {
+    const meshId = typeof args.mesh_id === 'string' ? args.mesh_id.trim() : '';
+    if (!meshId) {
+      return { err: 'mesh_set_material requires the mesh_id' };
+    }
+    const materialPath = typeof args.material_path === 'string' ? args.material_path.trim() : '';
+    if (!materialPath) {
+      return { err: 'mesh_set_material requires the material_path' };
+    }
+    return bridge.send(
+      'mesh_set_material',
+      { mesh_id: meshId, material_path: materialPath },
+      Number(args.timeoutMs ?? 10000)
+    );
+  },
   async getNodeClasses(args) {
     return bridge.send('getNodeClasses', {}, Number(args.timeoutMs ?? 10000));
   },
@@ -816,6 +1020,24 @@ const handlers = {
       return { parentNode: null, err: 'getParentNode requires the node id' };
     }
     return bridge.send('getParentNode', { id }, Number(args.timeoutMs ?? 10000));
+  },
+  async removeNode(args) {
+    const id = typeof args.id === 'string' ? args.id.trim() : '';
+    if (!id) {
+      return { err: 'removeNode requires the node id' };
+    }
+    return bridge.send('removeNode', { id }, Number(args.timeoutMs ?? 10000));
+  },
+  async setParentNode(args) {
+    const id = typeof args.id === 'string' ? args.id.trim() : '';
+    if (!id) {
+      return { err: 'setParentNode requires the node id' };
+    }
+    const parentId = typeof args.parentId === 'string' ? args.parentId.trim() : '';
+    if (!parentId) {
+      return { err: 'setParentNode requires the parentId' };
+    }
+    return bridge.send('setParentNode', { id, parentId }, Number(args.timeoutMs ?? 10000));
   },
   async getSubNodes(args) {
     const parent = typeof args.parent === 'string' ? args.parent.trim() : '';

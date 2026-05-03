@@ -259,7 +259,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * Returns the core material that owns GPU state.
    *
    * Instances may delegate to a shared core to reuse compiled programs and caches.
-   * @internal
+   * @public
    */
   get coreMaterial(): this {
     return this;
