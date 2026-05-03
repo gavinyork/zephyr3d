@@ -822,6 +822,34 @@ export class SharedModel extends Disposable {
       `Successfully created prefab with ${numSkeletons} skeletons and ${numAnimations} animations: ${path}`
     );
   }
+  static async writePrimitive(vfs: VFS, primitive: AssetPrimitiveInfo, path: string) {
+    const data = {
+      vertices: {} as Record<VertexSemantic, { format: VertexAttribFormat; data: string }>,
+      indices: primitive.indices
+        ? uint8ArrayToBase64(
+            new Uint8Array(
+              primitive.indices.buffer,
+              primitive.indices.byteOffset,
+              primitive.indices.byteLength
+            )
+          )
+        : null,
+      indexType: primitive.indices ? (primitive.indices instanceof Uint16Array ? 'u16' : 'u32') : '',
+      indexCount: primitive.indexCount,
+      type: primitive.type,
+      boxMin: [primitive.boxMin.x, primitive.boxMin.y, primitive.boxMin.z],
+      boxMax: [primitive.boxMax.x, primitive.boxMax.y, primitive.boxMax.z]
+    };
+    for (const k in primitive.vertices) {
+      const v = primitive.vertices[k as VertexSemantic];
+      data.vertices[k] = {
+        format: v.format,
+        data: uint8ArrayToBase64(new Uint8Array(v.data.buffer, v.data.byteOffset, v.data.byteLength))
+      };
+    }
+    const content = JSON.stringify({ type: 'Primitive', data }, null, 2);
+    await vfs.writeFile(path, content, { encoding: 'utf8', create: true });
+  }
   /** preprocess */
   async preprocess(manager: ResourceManager, destPath: string): Promise<void> {
     const srcVFS = this._vfs ?? manager.VFS;
@@ -882,28 +910,7 @@ export class SharedModel extends Disposable {
       for (let i = 0; i < this._primitiveList.length; i++) {
         const info = this._primitiveList[i];
         const path = manager.VFS.join(destPath, `${destName}_mesh_${i}.zmsh`);
-        const data = {
-          vertices: {} as Record<VertexSemantic, { format: VertexAttribFormat; data: string }>,
-          indices: info.indices
-            ? uint8ArrayToBase64(
-                new Uint8Array(info.indices.buffer, info.indices.byteOffset, info.indices.byteLength)
-              )
-            : null,
-          indexType: info.indices ? (info.indices instanceof Uint16Array ? 'u16' : 'u32') : '',
-          indexCount: info.indexCount,
-          type: info.type,
-          boxMin: [info.boxMin.x, info.boxMin.y, info.boxMin.z],
-          boxMax: [info.boxMax.x, info.boxMax.y, info.boxMax.z]
-        };
-        for (const k in info.vertices) {
-          const v = info.vertices[k as VertexSemantic];
-          data.vertices[k] = {
-            format: v.format,
-            data: uint8ArrayToBase64(new Uint8Array(v.data.buffer, v.data.byteOffset, v.data.byteLength))
-          };
-        }
-        const content = JSON.stringify({ type: 'Primitive', data }, null, 2);
-        await manager.VFS.writeFile(path, content, { encoding: 'utf8', create: true });
+        await SharedModel.writePrimitive(manager.VFS, info, path);
         info.path = path;
       }
     }

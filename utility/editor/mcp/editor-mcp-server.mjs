@@ -723,6 +723,47 @@ const tools = [
     }
   },
   {
+    name: 'model_generate_begin',
+    description:
+      'Start an editor-side worker job that tessellates an LLM generated procedural model spec, writes a .zmsh asset, and optionally creates a mesh node. Returns { jobId, status, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['spec', 'destPath'],
+      properties: {
+        spec: { type: 'object', description: 'Procedural model spec. Supported node types: box, cylinder, sphere, revolve, curve tube/ribbon including nurbs, mesh, and csg union/difference/intersection. Nodes may include uv options: mode(default/normalized/worldLength/planar/box/cylindrical/spherical), axes, axis, origin, size, tileSize, scale, offset, repeat, flipU, flipV, swapUV.' },
+        destPath: { type: 'string', description: 'Destination .zmsh VFS path under /assets.' },
+        name: { type: 'string', description: 'Optional mesh node name when createNode is true.' },
+        createNode: { type: 'boolean', default: true },
+        generationTimeoutMs: { type: 'number', default: 60000 },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'model_generate_status',
+    description: 'Get status for an editor-side procedural model generation job. Returns { job, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['jobId'],
+      properties: {
+        jobId: { type: 'string' },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'model_generate_cancel',
+    description: 'Cancel an editor-side procedural model generation job. Returns { jobId, status, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['jobId'],
+      properties: {
+        jobId: { type: 'string' },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
     name: 'editor_call',
     description: 'Call a built-in browser bridge method such as createScene, openScene, renderFrames, screenshot, consoleLogs.',
     inputSchema: {
@@ -1045,6 +1086,43 @@ const handlers = {
       return { subNodes: null, err: 'getSubNodes requires the parent node id' };
     }
     return bridge.send('getSubNodes', { parent }, Number(args.timeoutMs ?? 10000));
+  },
+  async model_generate_begin(args) {
+    if (!args.spec || typeof args.spec !== 'object') {
+      return { jobId: null, status: null, err: 'model_generate_begin requires spec' };
+    }
+    const destPath = typeof args.destPath === 'string' ? args.destPath.trim() : '';
+    if (!destPath) {
+      return { jobId: null, status: null, err: 'model_generate_begin requires destPath' };
+    }
+    const params = {
+      spec: args.spec,
+      destPath
+    };
+    if (typeof args.name === 'string') {
+      params.name = args.name;
+    }
+    if (Object.prototype.hasOwnProperty.call(args, 'createNode')) {
+      params.createNode = !!args.createNode;
+    }
+    if (Object.prototype.hasOwnProperty.call(args, 'generationTimeoutMs')) {
+      params.generationTimeoutMs = Number(args.generationTimeoutMs);
+    }
+    return bridge.send('model_generate_begin', params, Number(args.timeoutMs ?? 10000));
+  },
+  async model_generate_status(args) {
+    const jobId = typeof args.jobId === 'string' ? args.jobId.trim() : '';
+    if (!jobId) {
+      return { job: null, err: 'model_generate_status requires jobId' };
+    }
+    return bridge.send('model_generate_status', { jobId }, Number(args.timeoutMs ?? 10000));
+  },
+  async model_generate_cancel(args) {
+    const jobId = typeof args.jobId === 'string' ? args.jobId.trim() : '';
+    if (!jobId) {
+      return { jobId: null, status: null, err: 'model_generate_cancel requires jobId' };
+    }
+    return bridge.send('model_generate_cancel', { jobId }, Number(args.timeoutMs ?? 10000));
   },
   async editor_call(args) {
     return bridge.send(String(args.method), args.params ?? {}, Number(args.timeoutMs ?? 30000));

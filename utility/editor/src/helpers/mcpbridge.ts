@@ -1,6 +1,6 @@
 import type { Editor } from '../core/editor';
-import type { Mesh, SceneNode } from '@zephyr3d/scene';
-import { Scene } from '@zephyr3d/scene';
+import type { SceneNode } from '@zephyr3d/scene';
+import { Mesh, Scene } from '@zephyr3d/scene';
 import { getDevice, getEngine, OrthoCamera, PerspectiveCamera } from '@zephyr3d/scene';
 import { BlobReader, BlobWriter, configure, ZipWriter } from '@zip.js/zip.js';
 import { PathUtils, Quaternion, Vector3 } from '@zephyr3d/base';
@@ -61,9 +61,45 @@ const MAX_LOGS = 400;
 const MAX_SERIALIZE_DEPTH = 5;
 const DEFAULT_MCP_PORT = '47231';
 const SCREENSHOT_TIMEOUT_MS = 5000;
+const DEFAULT_GENERATED_MODEL_TIMEOUT_MS = 60000;
+
+type GeneratedModelJobStatus =
+  | 'running'
+  | 'writing'
+  | 'creating_node'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'timed_out';
+
+type GeneratedModelJob = {
+  id: string;
+  status: GeneratedModelJobStatus;
+  progress: number;
+  createdAt: number;
+  updatedAt: number;
+  timeoutMs: number;
+  destPath: string;
+  nodeName: string;
+  createNode: boolean;
+  worker: Worker | null;
+  timer: number;
+  error: string | null;
+  result: {
+    primitivePath: string;
+    node: { id: string; name: string; nodeClass: 'Mesh' } | null;
+    vertexCount: number;
+    indexCount: number;
+    boxMin: number[];
+    boxMax: number[];
+    uvMin?: number[];
+    uvMax?: number[];
+  } | null;
+};
 
 let consoleInstalled = false;
 const consoleEntries: ConsoleEntry[] = [];
+const generatedModelJobs = new Map<string, GeneratedModelJob>();
 
 function installConsoleCapture(): void {
   if (consoleInstalled) {
@@ -461,10 +497,293 @@ async function handleMessage(editor: Editor, ws: WebSocket, data: any): Promise<
   }
 }
 
+function startGeneratedModelJob(
+  editor: Editor,
+  params: any
+):
+  | { jobId: string; status: GeneratedModelJobStatus; err: null }
+  | { jobId: null; status: null; err: string } {
+  const controller = getSceneController(editor);
+  const scene = controller?.model?.scene ?? null;
+  if (!controller || !scene) {
+    return {
+      jobId: null,
+      status: null,
+      err: 'No scene is currently opened'
+    };
+  }
+  const spec = params.spec;
+  if (!spec || typeof spec !== 'object') {
+    return {
+      jobId: null,
+      status: null,
+      err: 'model_generate_begin requires `spec` to be an object'
+    };
+  }
+  let destPath = typeof params.destPath === 'string' ? params.destPath.trim() : '';
+  if (!destPath) {
+    return {
+      jobId: null,
+      status: null,
+      err: 'model_generate_begin requires `destPath`'
+    };
+  }
+  if (!destPath.endsWith('.zmsh')) {
+    destPath += '.zmsh';
+  }
+  destPath = ProjectService.VFS.normalizePath(destPath);
+  if (destPath !== '/assets' && !destPath.startsWith('/assets/')) {
+    return {
+      jobId: null,
+      status: null,
+      err: 'destPath must be under /assets'
+    };
+  }
+  if (destPath.startsWith('/assets/@builtins/')) {
+    return {
+      jobId: null,
+      status: null,
+      err: 'Writing to `/assets/@builtins` directory is not allowed'
+    };
+  }
+  const timeoutMs = Math.max(
+    1000,
+    Math.min(10 * 60 * 1000, Number(params.generationTimeoutMs ?? DEFAULT_GENERATED_MODEL_TIMEOUT_MS))
+  );
+  const jobId = `gm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const job: GeneratedModelJob = {
+    id: jobId,
+    status: 'running',
+    progress: 0,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    timeoutMs,
+    destPath,
+    nodeName:
+      typeof params.name === 'string' && params.name.trim()
+        ? params.name.trim()
+        : PathUtils.basename(destPath, '.zmsh'),
+    createNode: params.createNode !== false,
+    worker: null,
+    timer: 0,
+    error: null,
+    result: null
+  };
+  generatedModelJobs.set(jobId, job);
+  const worker = new Worker(new URL('../workers/generated_model.ts', import.meta.url), { type: 'module' });
+  job.worker = worker;
+  job.timer = window.setTimeout(() => {
+    failGeneratedModelJob(job, 'timed_out', `Generated model job timed out after ${timeoutMs}ms`);
+  }, timeoutMs);
+  worker.onmessage = (event: MessageEvent<any>) => {
+    const message = event.data;
+    if (!message || typeof message !== 'object') {
+      return;
+    }
+    if (message.type === 'progress') {
+      if (isGeneratedModelJobActive(job)) {
+        job.progress = Math.max(job.progress, Math.max(0, Math.min(0.95, Number(message.progress) || 0)));
+        job.updatedAt = Date.now();
+      }
+      return;
+    }
+    if (message.type === 'error') {
+      failGeneratedModelJob(job, 'failed', String(message.error || 'Generated model worker failed'));
+      return;
+    }
+    if (message.type === 'success') {
+      void finishGeneratedModelJob(editor, job, message);
+    }
+  };
+  worker.onerror = (event) => {
+    const location = event.filename ? ` (${event.filename}:${event.lineno}:${event.colno})` : '';
+    failGeneratedModelJob(job, 'failed', `${event.message || 'Generated model worker failed'}${location}`);
+  };
+  worker.onmessageerror = () => {
+    failGeneratedModelJob(job, 'failed', 'Generated model worker returned an unserializable message');
+  };
+  worker.postMessage({
+    type: 'generate',
+    spec,
+    deadlineAt: Date.now() + timeoutMs
+  });
+  return {
+    jobId,
+    status: job.status,
+    err: null
+  };
+}
+
+async function finishGeneratedModelJob(editor: Editor, job: GeneratedModelJob, message: any): Promise<void> {
+  if (!isGeneratedModelJobActive(job)) {
+    return;
+  }
+  try {
+    job.status = 'writing';
+    job.progress = 0.96;
+    job.updatedAt = Date.now();
+    const dir = ProjectService.VFS.dirname(job.destPath);
+    if (!(await ProjectService.VFS.exists(dir))) {
+      await ProjectService.VFS.makeDirectory(dir, true);
+    }
+    await ProjectService.VFS.writeFile(job.destPath, String(message.primitiveText), {
+      encoding: 'utf8',
+      create: true
+    });
+    let createdNode: GeneratedModelJob['result']['node'] = null;
+    if (job.createNode) {
+      job.status = 'creating_node';
+      job.progress = 0.98;
+      job.updatedAt = Date.now();
+      const controller = getSceneController(editor);
+      const scene = controller?.model?.scene ?? null;
+      if (!scene) {
+        throw new Error('No scene is currently opened');
+      }
+      const primitive = await getEngine().resourceManager.fetchPrimitive(job.destPath);
+      if (!primitive) {
+        throw new Error(`Cannot load generated primitive: ${job.destPath}`);
+      }
+      const material = await getEngine().resourceManager.fetchMaterial(
+        '/assets/@builtins/materials/pbr_metallic_roughness.zmtl'
+      );
+      if (!material) {
+        throw new Error('Cannot load default PBR material');
+      }
+      const mesh = new Mesh(scene, primitive, material);
+      mesh.name = job.nodeName;
+      mesh.parent = scene.rootNode;
+      createdNode = {
+        id: mesh.persistentId,
+        name: mesh.name,
+        nodeClass: 'Mesh'
+      };
+      eventBus.dispatchEvent('scene_changed');
+    }
+    completeGeneratedModelJob(job, {
+      primitivePath: job.destPath,
+      node: createdNode,
+      vertexCount: Number(message.vertexCount ?? 0),
+      indexCount: Number(message.indexCount ?? 0),
+      boxMin: Array.isArray(message.boxMin) ? message.boxMin : [],
+      boxMax: Array.isArray(message.boxMax) ? message.boxMax : [],
+      uvMin: Array.isArray(message.uvMin) ? message.uvMin : [],
+      uvMax: Array.isArray(message.uvMax) ? message.uvMax : []
+    });
+  } catch (err) {
+    failGeneratedModelJob(job, 'failed', err instanceof Error ? err.message : String(err));
+  }
+}
+
+function completeGeneratedModelJob(
+  job: GeneratedModelJob,
+  result: NonNullable<GeneratedModelJob['result']>
+): void {
+  cleanupGeneratedModelJob(job);
+  job.status = 'completed';
+  job.progress = 1;
+  job.updatedAt = Date.now();
+  job.result = result;
+  job.error = null;
+}
+
+function cancelGeneratedModelJob(jobId: string): {
+  jobId: string | null;
+  status: GeneratedModelJobStatus | null;
+  err: string | null;
+} {
+  const job = generatedModelJobs.get(jobId);
+  if (!job) {
+    return {
+      jobId: null,
+      status: null,
+      err: `Generated model job not found: ${jobId}`
+    };
+  }
+  if (
+    job.status === 'completed' ||
+    job.status === 'failed' ||
+    job.status === 'cancelled' ||
+    job.status === 'timed_out'
+  ) {
+    return {
+      jobId: job.id,
+      status: job.status,
+      err: null
+    };
+  }
+  failGeneratedModelJob(job, 'cancelled', 'Generated model job was cancelled');
+  return {
+    jobId: job.id,
+    status: job.status,
+    err: null
+  };
+}
+
+function failGeneratedModelJob(
+  job: GeneratedModelJob,
+  status: Exclude<GeneratedModelJobStatus, 'running' | 'writing' | 'creating_node' | 'completed'>,
+  error: string
+): void {
+  cleanupGeneratedModelJob(job);
+  job.status = status;
+  job.progress = status === 'cancelled' ? job.progress : Math.min(job.progress, 0.99);
+  job.updatedAt = Date.now();
+  job.error = error;
+}
+
+function cleanupGeneratedModelJob(job: GeneratedModelJob): void {
+  if (job.timer) {
+    window.clearTimeout(job.timer);
+    job.timer = 0;
+  }
+  if (job.worker) {
+    job.worker.terminate();
+    job.worker = null;
+  }
+}
+
+function isGeneratedModelJobActive(job: GeneratedModelJob): boolean {
+  return job.status === 'running' || job.status === 'writing' || job.status === 'creating_node';
+}
+
+function serializeGeneratedModelJob(job: GeneratedModelJob | undefined) {
+  if (!job) {
+    return {
+      job: null,
+      err: 'Generated model job not found'
+    };
+  }
+  return {
+    job: {
+      id: job.id,
+      status: job.status,
+      progress: job.progress,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      timeoutMs: job.timeoutMs,
+      destPath: job.destPath,
+      error: job.error,
+      result: job.result
+    },
+    err: null
+  };
+}
+
 async function dispatch(editor: Editor, method: string, params: any): Promise<any> {
   switch (method) {
     case 'status':
       return getStatus(editor);
+    case 'model_generate_begin':
+      return startGeneratedModelJob(editor, params);
+    case 'model_generate_status': {
+      const jobId = typeof params.jobId === 'string' ? params.jobId.trim() : '';
+      return serializeGeneratedModelJob(generatedModelJobs.get(jobId));
+    }
+    case 'model_generate_cancel': {
+      const jobId = typeof params.jobId === 'string' ? params.jobId.trim() : '';
+      return cancelGeneratedModelJob(jobId);
+    }
     case 'mesh_get_material': {
       try {
         let meshId: string = params.mesh_id;
