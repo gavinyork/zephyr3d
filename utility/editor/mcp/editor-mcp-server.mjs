@@ -293,7 +293,10 @@ const tools = [
     inputSchema: {
       type: 'object',
       properties: {
-        baseUrl: { type: 'string', description: 'Editor URL, defaulting to EDITOR_URL or local web-dev-server.' },
+        baseUrl: {
+          type: 'string',
+          description: 'Editor URL, defaulting to EDITOR_URL or local web-dev-server.'
+        },
         device: { type: 'string', description: 'Optional renderer query value such as webgl2 or webgpu.' },
         project: { type: 'string', description: 'Optional project id/path query value.' },
         remote: { type: 'boolean', description: 'Set the editor remote project flag.' },
@@ -339,7 +342,8 @@ const tools = [
         name: { type: 'string', description: 'Name for the new project.' },
         saveSceneChanges: {
           type: 'boolean',
-          description: 'Save the current dirty scene before creating the project. Fails if the scene has no path.'
+          description:
+            'Save the current dirty scene before creating the project. Fails if the scene has no path.'
         },
         discardSceneChanges: {
           type: 'boolean',
@@ -360,7 +364,8 @@ const tools = [
         id: { type: 'string', description: 'Project uuid to open.' },
         saveSceneChanges: {
           type: 'boolean',
-          description: 'Save the current dirty scene before opening the project. Fails if the scene has no path.'
+          description:
+            'Save the current dirty scene before opening the project. Fails if the scene has no path.'
         },
         discardSceneChanges: {
           type: 'boolean',
@@ -379,7 +384,8 @@ const tools = [
       properties: {
         saveSceneChanges: {
           type: 'boolean',
-          description: 'Save the current dirty scene before closing the project. Fails if the scene has no path.'
+          description:
+            'Save the current dirty scene before closing the project. Fails if the scene has no path.'
         },
         discardSceneChanges: {
           type: 'boolean',
@@ -398,7 +404,8 @@ const tools = [
       properties: {
         saveSceneChanges: {
           type: 'boolean',
-          description: 'Save the current dirty scene before exporting the project. Fails if the scene has no path.'
+          description:
+            'Save the current dirty scene before exporting the project. Fails if the scene has no path.'
         },
         discardSceneChanges: {
           type: 'boolean',
@@ -417,7 +424,8 @@ const tools = [
       properties: {
         saveSceneChanges: {
           type: 'boolean',
-          description: 'Save the current dirty scene before deleting the project. Fails if the scene has no path.'
+          description:
+            'Save the current dirty scene before deleting the project. Fails if the scene has no path.'
         },
         discardSceneChanges: {
           type: 'boolean',
@@ -428,7 +436,7 @@ const tools = [
     }
   },
   {
-    name: 'asset_get_root',
+    name: 'asset_get_root_directory',
     description: 'Get the project asset root directory. Returns { root, err }.',
     inputSchema: {
       type: 'object',
@@ -448,6 +456,43 @@ const tools = [
         path: { type: 'string', description: 'VFS directory path, such as /assets or /assets/materials.' },
         recursive: { type: 'boolean', description: 'Read directories recursively when true.' },
         pattern: { type: 'string', description: 'Optional VFS glob pattern filter.' },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'asset_read_file',
+    description:
+      'Read a project asset file as UTF-8 text or base64-encoded binary data. Returns { result, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['path'],
+      properties: {
+        path: { type: 'string', description: 'Asset file VFS path under /assets.' },
+        encoding: {
+          type: 'string',
+          enum: ['utf8', 'binary'],
+          description: 'Read mode. Defaults to utf8. binary returns base64 text.'
+        },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'asset_write_file',
+    description:
+      'Write a project asset file from UTF-8 text or base64-encoded binary data. Returns { err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['path', 'content'],
+      properties: {
+        path: { type: 'string', description: 'Asset file VFS path under /assets.' },
+        encoding: {
+          type: 'string',
+          enum: ['utf8', 'binary'],
+          description: 'Write mode. Defaults to utf8. binary content must be base64 text.'
+        },
+        content: { type: 'string', description: 'UTF-8 text or base64 binary content.' },
         timeoutMs: { type: 'number', default: 10000 }
       }
     }
@@ -574,6 +619,24 @@ const tools = [
     }
   },
   {
+    name: 'mesh_create',
+    description:
+      'Create a mesh node in the current scene from an existing primitive and material asset. Returns { mesh_id, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['primitive_path', 'material_path'],
+      properties: {
+        primitive_path: { type: 'string', description: 'Primitive asset VFS path, such as /assets/foo.zmsh.' },
+        material_path: { type: 'string', description: 'Material asset VFS path, such as /assets/foo.zmtl.' },
+        parent_id: {
+          type: 'string',
+          description: 'Optional persistent id of the parent scene node. Defaults to the scene root.'
+        },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
     name: 'mesh_get_material',
     description: 'Get the material asset path assigned to a mesh node. Returns { material_path, err }.',
     inputSchema: {
@@ -599,13 +662,39 @@ const tools = [
     }
   },
   {
+    name: 'mesh_get_primitive',
+    description: 'Get the primitive asset path assigned to a mesh node. Returns { primitive_path, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['mesh_id'],
+      properties: {
+        mesh_id: { type: 'string', description: 'Persistent id of the mesh node.' },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'mesh_set_primitive',
+    description: 'Assign a primitive asset to a mesh node. Returns { err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['mesh_id', 'primitive_path'],
+      properties: {
+        mesh_id: { type: 'string', description: 'Persistent id of the mesh node.' },
+        primitive_path: { type: 'string', description: 'Primitive asset VFS path.' },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
     name: 'getNodeClasses',
     description: 'Get the list of scene node classes that can be reported by the editor bridge.',
     inputSchema: { type: 'object', properties: {} }
   },
   {
     name: 'getScenePropertyList',
-    description: 'Get the editable property metadata list for the current scene. Returns { propertyList, err }.',
+    description:
+      'Get the editable property metadata list for the current scene. Returns { propertyList, err }.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -794,12 +883,16 @@ const tools = [
   {
     name: 'model_generate_begin',
     description:
-      'Start an editor-side worker job that tessellates an LLM generated procedural model spec, writes a .zmsh asset, and optionally creates a mesh node. Returns { jobId, status, err }.',
+      'Start an editor-side worker job that tessellates a compact procedural model spec into a .zmsh mesh asset and optionally creates a mesh node in the current scene. Use this for LLM-generated geometry instead of sending large raw vertex buffers through MCP. Returns { jobId, status, err }.',
     inputSchema: {
       type: 'object',
       required: ['spec', 'destPath'],
       properties: {
-        spec: { type: 'object', description: 'Procedural model spec. Supported node types: box, cylinder, sphere, revolve, surface bicubic Bezier patches, curve tube/ribbon including nurbs, mesh, and csg union/difference/intersection. Nodes may include coordinateSystem(editor/yUp/zUp), coordinateRemap(none/zUpToYUp/yUpToZUp or {axes:[x/y/z/-x/-y/-z]}), position, rotation quaternion, scale, preserveWinding, and uv options: mode(default/normalized/worldLength/planar/box/cylindrical/spherical), axes, axis, origin, size, tileSize, scale, offset, repeat, flipU, flipV, swapUV. Surface nodes may use normalOrientation patch/outward/inward, smoothSeams/seamTolerance, doubleSided, and optional backfaceOffset. Set generation.generateTangents=true to write tangent_f32x4 vertex tangents.' },
+        spec: {
+          type: 'object',
+          description:
+            'JSON object with { version?: 1, generation?: { maxVertices?: number, generateTangents?: boolean }, nodes: ProceduralNode[] }. Supported node.type values are box, cylinder, sphere, revolve, surface, curve, mesh, and csg. Use csg.op union/difference/intersection for booleans; use curve.shape tube or ribbon with optional nurbs curveType for roads, pipes, and strips; use surface patches for Bezier/NURBS-like patch modeling. Nodes support position, rotation quaternion [x,y,z,w], scale, coordinateRemap, preserveWinding, and uv options. Set generation.generateTangents=true to write tangent_f32x4.'
+        },
         destPath: { type: 'string', description: 'Destination .zmsh VFS path under /assets.' },
         name: { type: 'string', description: 'Optional mesh node name when createNode is true.' },
         createNode: { type: 'boolean', default: true },
@@ -833,8 +926,59 @@ const tools = [
     }
   },
   {
+    name: 'editor_create_scene',
+    description:
+      'Create a new scene in the current project. Optionally provide path, such as /assets/new_scene.zscn. Returns editor status plus err if failed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Optional destination scene VFS path ending in .zscn.' },
+        resetView: { type: 'boolean', default: true, description: 'Reset the scene view camera.' },
+        timeoutMs: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'editor_open_scene',
+    description:
+      'Open an existing scene asset in the current project. Returns editor status plus err if failed.',
+    inputSchema: {
+      type: 'object',
+      required: ['path'],
+      properties: {
+        path: { type: 'string', description: 'Scene VFS path, such as /assets/my_scene.zscn.' },
+        resetView: { type: 'boolean', default: true, description: 'Reset the scene view camera.' },
+        timeoutMs: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'editor_sample_pixels',
+    description:
+      'Sample RGBA pixels from the editor canvas after rendering. Useful for automated visual smoke tests. Returns an array of { x, y, rgba }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        points: {
+          type: 'array',
+          description: 'Up to 64 canvas pixel coordinates. Defaults to the canvas center.',
+          items: {
+            type: 'object',
+            required: ['x', 'y'],
+            properties: {
+              x: { type: 'number' },
+              y: { type: 'number' }
+            }
+          }
+        },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
     name: 'editor_call',
-    description: 'Call a built-in browser bridge method such as createScene, openScene, renderFrames, screenshot, consoleLogs.',
+    description:
+      'Advanced escape hatch: call a raw browser bridge method. Prefer the typed tools such as editor_create_scene, editor_open_scene, editor_render_frames, editor_screenshot, editor_console_logs, and editor_sample_pixels when available.',
     inputSchema: {
       type: 'object',
       required: ['method'],
@@ -847,7 +991,8 @@ const tools = [
   },
   {
     name: 'editor_eval',
-    description: 'Run JavaScript in the editor page. The script receives editor, controller, scene, getDevice, getEngine, and args bindings.',
+    description:
+      'Run JavaScript in the editor page. The script receives editor, controller, scene, getDevice, getEngine, and args bindings.',
     inputSchema: {
       type: 'object',
       required: ['script'],
@@ -889,6 +1034,97 @@ const tools = [
     }
   }
 ];
+
+const TOOL_ALIASES = [
+  {
+    name: 'asset_get_root',
+    target: 'asset_get_root_directory',
+    description: 'Preferred concise name for asset_get_root_directory. Get the project asset root directory. Returns { root, err }.'
+  },
+  {
+    name: 'material_get_classes',
+    target: 'getMaterialClasses',
+    description: 'Preferred snake_case name for getMaterialClasses. List built-in material classes accepted by asset_create_material.'
+  },
+  {
+    name: 'material_get_property_list',
+    target: 'getMaterialPropertyList',
+    description: 'Preferred snake_case name for getMaterialPropertyList. Inspect editable properties for a material asset before calling material_set_properties.'
+  },
+  {
+    name: 'node_get_classes',
+    target: 'getNodeClasses',
+    description: 'Preferred snake_case name for getNodeClasses. List scene node class names reported by node inspection tools.'
+  },
+  {
+    name: 'scene_get_property_list',
+    target: 'getScenePropertyList',
+    description: 'Preferred snake_case name for getScenePropertyList. Inspect editable scene properties.'
+  },
+  {
+    name: 'node_get_property_list',
+    target: 'getNodePropertyList',
+    description: 'Preferred snake_case name for getNodePropertyList. Inspect editable properties for a scene node by persistent id.'
+  },
+  {
+    name: 'shape_create_node',
+    target: 'createShapeNode',
+    description: 'Preferred snake_case name for createShapeNode. Create a built-in primitive mesh node such as box, sphere, plane, cylinder, torus, or tetrahedron.'
+  },
+  {
+    name: 'node_get_class',
+    target: 'getNodeClass',
+    description: 'Preferred snake_case name for getNodeClass. Get the class name for a scene node by persistent id.'
+  },
+  {
+    name: 'node_get_local_transform',
+    target: 'getNodeLocalTransform',
+    description: 'Preferred snake_case name for getNodeLocalTransform. Read a scene node local transform as position, scale, and rotation quaternion.'
+  },
+  {
+    name: 'node_set_local_transform',
+    target: 'setNodeLocalTransform',
+    description: 'Preferred snake_case name for setNodeLocalTransform. Set any subset of position, scale, and rotation quaternion on a scene node.'
+  },
+  {
+    name: 'scene_get_root_node',
+    target: 'getSceneRootNode',
+    description: 'Preferred snake_case name for getSceneRootNode. Get the current scene root node id and name.'
+  },
+  {
+    name: 'node_get_parent',
+    target: 'getParentNode',
+    description: 'Preferred snake_case name for getParentNode. Get the parent node id for a scene node.'
+  },
+  {
+    name: 'node_remove',
+    target: 'removeNode',
+    description: 'Preferred snake_case name for removeNode. Remove a scene node by persistent id.'
+  },
+  {
+    name: 'node_set_parent',
+    target: 'setParentNode',
+    description: 'Preferred snake_case name for setParentNode. Reparent a scene node by persistent id.'
+  },
+  {
+    name: 'node_get_children',
+    target: 'getSubNodes',
+    description: 'Preferred snake_case name for getSubNodes. List direct child nodes of a scene node.'
+  }
+];
+
+for (const alias of [...TOOL_ALIASES].reverse()) {
+  const target = tools.find((tool) => tool.name === alias.target);
+  if (!target || tools.some((tool) => tool.name === alias.name)) {
+    continue;
+  }
+  tools.unshift({
+    ...target,
+    name: alias.name,
+    description: alias.description
+  });
+  target.description = `Legacy camelCase/verbose alias. Prefer ${alias.name}. ${target.description}`;
+}
 
 const handlers = {
   async editor_connect_info(args) {
@@ -986,8 +1222,8 @@ const handlers = {
       Number(args.timeoutMs ?? 30000)
     );
   },
-  async asset_get_root(args) {
-    return bridge.send('asset_get_root', {}, Number(args.timeoutMs ?? 10000));
+  async asset_get_root_directory(args) {
+    return bridge.send('asset_get_root_directory', {}, Number(args.timeoutMs ?? 10000));
   },
   async asset_read_directory(args) {
     const path = typeof args.path === 'string' ? args.path.trim() : '';
@@ -1002,6 +1238,35 @@ const handlers = {
       params.pattern = args.pattern;
     }
     return bridge.send('asset_read_directory', params, Number(args.timeoutMs ?? 10000));
+  },
+  async asset_read_file(args) {
+    const path = typeof args.path === 'string' ? args.path.trim() : '';
+    if (!path) {
+      return { result: null, err: 'asset_read_file requires the path' };
+    }
+    const encoding = typeof args.encoding === 'string' ? args.encoding.trim() : 'utf8';
+    if (encoding !== 'utf8' && encoding !== 'binary') {
+      return { result: null, err: 'asset_read_file encoding must be `utf8` or `binary`' };
+    }
+    return bridge.send('asset_read_file', { path, encoding }, Number(args.timeoutMs ?? 10000));
+  },
+  async asset_write_file(args) {
+    const path = typeof args.path === 'string' ? args.path.trim() : '';
+    if (!path) {
+      return { err: 'asset_write_file requires the path' };
+    }
+    const encoding = typeof args.encoding === 'string' ? args.encoding.trim() : 'utf8';
+    if (encoding !== 'utf8' && encoding !== 'binary') {
+      return { err: 'asset_write_file encoding must be `utf8` or `binary`' };
+    }
+    if (typeof args.content !== 'string') {
+      return { err: 'asset_write_file requires string content' };
+    }
+    return bridge.send(
+      'asset_write_file',
+      { path, encoding, content: args.content },
+      Number(args.timeoutMs ?? 10000)
+    );
   },
   async asset_create_material(args) {
     const directory = typeof args.directory === 'string' ? args.directory.trim() : '';
@@ -1081,6 +1346,24 @@ const handlers = {
     }
     return bridge.send('primitive_export_glb', params, Number(args.timeoutMs ?? 30000));
   },
+  async mesh_create(args) {
+    const primitivePath = typeof args.primitive_path === 'string' ? args.primitive_path.trim() : '';
+    if (!primitivePath) {
+      return { mesh_id: null, err: 'mesh_create requires the primitive_path' };
+    }
+    const materialPath = typeof args.material_path === 'string' ? args.material_path.trim() : '';
+    if (!materialPath) {
+      return { mesh_id: null, err: 'mesh_create requires the material_path' };
+    }
+    const params = {
+      primitive_path: primitivePath,
+      material_path: materialPath
+    };
+    if (typeof args.parent_id === 'string' && args.parent_id.trim()) {
+      params.parent_id = args.parent_id.trim();
+    }
+    return bridge.send('mesh_create', params, Number(args.timeoutMs ?? 10000));
+  },
   async mesh_get_material(args) {
     const meshId = typeof args.mesh_id === 'string' ? args.mesh_id.trim() : '';
     if (!meshId) {
@@ -1100,6 +1383,28 @@ const handlers = {
     return bridge.send(
       'mesh_set_material',
       { mesh_id: meshId, material_path: materialPath },
+      Number(args.timeoutMs ?? 10000)
+    );
+  },
+  async mesh_get_primitive(args) {
+    const meshId = typeof args.mesh_id === 'string' ? args.mesh_id.trim() : '';
+    if (!meshId) {
+      return { primitive_path: null, err: 'mesh_get_primitive requires the mesh_id' };
+    }
+    return bridge.send('mesh_get_primitive', { mesh_id: meshId }, Number(args.timeoutMs ?? 10000));
+  },
+  async mesh_set_primitive(args) {
+    const meshId = typeof args.mesh_id === 'string' ? args.mesh_id.trim() : '';
+    if (!meshId) {
+      return { err: 'mesh_set_primitive requires the mesh_id' };
+    }
+    const primitivePath = typeof args.primitive_path === 'string' ? args.primitive_path.trim() : '';
+    if (!primitivePath) {
+      return { err: 'mesh_set_primitive requires the primitive_path' };
+    }
+    return bridge.send(
+      'mesh_set_primitive',
+      { mesh_id: meshId, primitive_path: primitivePath },
       Number(args.timeoutMs ?? 10000)
     );
   },
@@ -1242,6 +1547,34 @@ const handlers = {
     }
     return bridge.send('model_generate_cancel', { jobId }, Number(args.timeoutMs ?? 10000));
   },
+  async editor_create_scene(args) {
+    const params = {};
+    if (typeof args.path === 'string' && args.path.trim()) {
+      params.path = args.path.trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(args, 'resetView')) {
+      params.resetView = !!args.resetView;
+    }
+    return bridge.send('createScene', params, Number(args.timeoutMs ?? 30000));
+  },
+  async editor_open_scene(args) {
+    const path = typeof args.path === 'string' ? args.path.trim() : '';
+    if (!path) {
+      return { err: 'editor_open_scene requires path' };
+    }
+    const params = { path };
+    if (Object.prototype.hasOwnProperty.call(args, 'resetView')) {
+      params.resetView = !!args.resetView;
+    }
+    return bridge.send('openScene', params, Number(args.timeoutMs ?? 30000));
+  },
+  async editor_sample_pixels(args) {
+    const params = {};
+    if (Object.prototype.hasOwnProperty.call(args, 'points')) {
+      params.points = args.points;
+    }
+    return bridge.send('samplePixels', params, Number(args.timeoutMs ?? 10000));
+  },
   async editor_call(args) {
     return bridge.send(String(args.method), args.params ?? {}, Number(args.timeoutMs ?? 30000));
   },
@@ -1263,6 +1596,12 @@ const handlers = {
   }
 };
 
+for (const alias of TOOL_ALIASES) {
+  if (handlers[alias.target] && !handlers[alias.name]) {
+    handlers[alias.name] = handlers[alias.target];
+  }
+}
+
 let stdinBuffer = Buffer.alloc(0);
 let stdioResponseMode = 'jsonl';
 process.stdin.on('data', (chunk) => {
@@ -1274,7 +1613,10 @@ function parseMessages() {
   while (true) {
     while (
       stdinBuffer.length > 0 &&
-      (stdinBuffer[0] === 0x0d || stdinBuffer[0] === 0x0a || stdinBuffer[0] === 0x20 || stdinBuffer[0] === 0x09)
+      (stdinBuffer[0] === 0x0d ||
+        stdinBuffer[0] === 0x0a ||
+        stdinBuffer[0] === 0x20 ||
+        stdinBuffer[0] === 0x09)
     ) {
       stdinBuffer = stdinBuffer.slice(1);
     }
