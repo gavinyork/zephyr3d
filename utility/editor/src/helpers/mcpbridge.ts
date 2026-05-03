@@ -10,6 +10,7 @@ import { SceneController } from '../controllers/scenecontroller';
 import { AddShapeCommand } from '../commands/scenecommands';
 import { eventBus } from '../core/eventbus';
 import { shapePrimitivePaths, type ShapePrimitiveType } from './shapeprimitives';
+import { SharedModel, type AssetPrimitiveInfo } from '../loaders/model';
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
@@ -627,10 +628,11 @@ async function finishGeneratedModelJob(editor: Editor, job: GeneratedModelJob, m
     if (!(await ProjectService.VFS.exists(dir))) {
       await ProjectService.VFS.makeDirectory(dir, true);
     }
-    await ProjectService.VFS.writeFile(job.destPath, String(message.primitiveText), {
-      encoding: 'utf8',
-      create: true
-    });
+    await SharedModel.writePrimitive(
+      ProjectService.VFS,
+      createGeneratedAssetPrimitive(message),
+      job.destPath
+    );
     let createdNode: GeneratedModelJob['result']['node'] = null;
     if (job.createNode) {
       job.status = 'creating_node';
@@ -675,6 +677,49 @@ async function finishGeneratedModelJob(editor: Editor, job: GeneratedModelJob, m
   } catch (err) {
     failGeneratedModelJob(job, 'failed', err instanceof Error ? err.message : String(err));
   }
+}
+
+function createGeneratedAssetPrimitive(message: any): AssetPrimitiveInfo {
+  const primitive = message?.primitive;
+  if (!primitive || typeof primitive !== 'object') {
+    throw new Error('Generated model worker did not return primitive data');
+  }
+  const indices = primitive.indices;
+  if (!(indices instanceof Uint16Array) && !(indices instanceof Uint32Array)) {
+    throw new Error('Generated model worker returned invalid primitive indices');
+  }
+  const normalizedIndices =
+    indices instanceof Uint16Array ? new Uint16Array(indices) : new Uint32Array(indices);
+  const vertices: AssetPrimitiveInfo['vertices'] = {} as AssetPrimitiveInfo['vertices'];
+  if (!primitive.vertices || typeof primitive.vertices !== 'object') {
+    throw new Error('Generated model worker returned invalid primitive vertices');
+  }
+  for (const [semantic, vertex] of Object.entries(primitive.vertices as Record<string, any>)) {
+    if (!vertex || typeof vertex.format !== 'string' || !ArrayBuffer.isView(vertex.data)) {
+      throw new Error(`Generated model worker returned invalid vertex buffer: ${semantic}`);
+    }
+    vertices[semantic as keyof AssetPrimitiveInfo['vertices']] = {
+      format: vertex.format,
+      data: vertex.data
+    } as AssetPrimitiveInfo['vertices'][keyof AssetPrimitiveInfo['vertices']];
+  }
+  const boxMin = Array.isArray(primitive.boxMin) ? primitive.boxMin : message.boxMin;
+  const boxMax = Array.isArray(primitive.boxMax) ? primitive.boxMax : message.boxMax;
+  if (!isNumberArray(boxMin, 3) || !isNumberArray(boxMax, 3)) {
+    throw new Error('Generated model worker returned invalid primitive bounds');
+  }
+  return {
+    vertices,
+    indices: normalizedIndices,
+    indexCount: Number(primitive.indexCount ?? normalizedIndices.length),
+    type: primitive.type === 'triangle-list' ? 'triangle-list' : primitive.type,
+    boxMin: new Vector3(boxMin),
+    boxMax: new Vector3(boxMax)
+  };
+}
+
+function isNumberArray(value: unknown, length: number): value is number[] {
+  return Array.isArray(value) && value.length === length && value.every((item) => typeof item === 'number');
 }
 
 function completeGeneratedModelJob(

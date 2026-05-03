@@ -185,7 +185,7 @@ type WorkerProgress = {
 
 type WorkerSuccess = {
   type: 'success';
-  primitiveText: string;
+  primitive: WorkerPrimitivePayload;
   vertexCount: number;
   indexCount: number;
   boxMin: Vec3;
@@ -193,6 +193,16 @@ type WorkerSuccess = {
   uvMin: Vec2;
   uvMax: Vec2;
   hasTangents: boolean;
+};
+
+type WorkerPrimitivePayload = {
+  vertices: Record<string, { format: string; data: Float32Array }>;
+  indices: Uint16Array | Uint32Array;
+  indexCount: number;
+  indexType: 'u16' | 'u32';
+  type: 'triangle-list';
+  boxMin: Vec3;
+  boxMax: Vec3;
 };
 
 type WorkerError = {
@@ -254,45 +264,37 @@ function generatePrimitive(spec: GeneratedModelSpec, deadlineAt: number): Worker
   const tangents = generateTangents ? new Float32Array(mesh.tangents) : null;
   const useU32 = vertexCount > 65535;
   const indices = useU32 ? new Uint32Array(mesh.indices) : new Uint16Array(mesh.indices);
-  const vertices: Record<string, { format: string; data: string }> = {
+  const vertices: Record<string, { format: string; data: Float32Array }> = {
     position: {
       format: 'position_f32x3',
-      data: bytesToBase64(new Uint8Array(positions.buffer))
+      data: positions
     },
     normal: {
       format: 'normal_f32x3',
-      data: bytesToBase64(new Uint8Array(normals.buffer))
+      data: normals
     },
     texCoord0: {
       format: 'tex0_f32x2',
-      data: bytesToBase64(new Uint8Array(uvs.buffer))
+      data: uvs
     }
   };
   if (tangents) {
     vertices.tangent = {
       format: 'tangent_f32x4',
-      data: bytesToBase64(new Uint8Array(tangents.buffer))
+      data: tangents
     };
   }
-  const primitiveText = JSON.stringify(
-    {
-      type: 'Primitive',
-      data: {
-        vertices,
-        indices: bytesToBase64(new Uint8Array(indices.buffer)),
-        indexType: useU32 ? 'u32' : 'u16',
-        indexCount: indices.length,
-        type: 'triangle-list',
-        boxMin: bbox.min,
-        boxMax: bbox.max
-      }
-    },
-    null,
-    2
-  );
   return {
     type: 'success',
-    primitiveText,
+    primitive: {
+      vertices,
+      indices,
+      indexCount: indices.length,
+      indexType: useU32 ? 'u32' : 'u16',
+      type: 'triangle-list',
+      boxMin: bbox.min,
+      boxMax: bbox.max
+    },
     vertexCount,
     indexCount: indices.length,
     boxMin: bbox.min,
@@ -2319,16 +2321,6 @@ function emptyMesh(): MeshData {
     tangents: [],
     indices: []
   };
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
 }
 
 function postProgress(progress: number): void {
