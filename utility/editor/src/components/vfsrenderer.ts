@@ -25,6 +25,7 @@ import { getEngine, PBRBluePrintMaterial, SpriteBlueprintMaterial } from '@zephy
 import { exportFile, exportMultipleFilesAsZip } from '../helpers/downloader';
 import { matchesMimeType } from '../helpers/mimematch';
 import type { SharedModel } from '../loaders/model';
+import { buildPrimitiveGlbFromZmshContent } from '../helpers/primitiveglb';
 import { DlgImportOptions } from '../views/dlg/importoptionsdlg';
 import { DialogRenderer } from './modal';
 import type { Editor } from '../core/editor';
@@ -350,6 +351,12 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
                   this.renderer.copyFile(item.meta.path, name, 'prompt');
                 }
               });
+            }
+          }
+          if (item.meta.path.endsWith('.zmsh')) {
+            ImGui.Separator();
+            if (ImGui.MenuItem('Export as GLB')) {
+              this.renderer.exportPrimitiveAsGlb(item.meta.path);
             }
           }
           ImGui.Separator();
@@ -1058,6 +1065,17 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         (item: DirectoryInfo) => item.path
       );
       exportMultipleFilesAsZip(files, dirs, 'export.zip', this._vfs);
+    }
+  }
+
+  async exportPrimitiveAsGlb(path: string) {
+    try {
+      const content = (await this._vfs.readFile(path, { encoding: 'utf8' })) as string;
+      const filename = `${PathUtils.basename(path, '.zmsh')}.glb`;
+      const glb = buildPrimitiveGlbFromZmshContent(content, PathUtils.basename(path, '.zmsh'), path);
+      exportFile(glb, filename);
+    } catch (err) {
+      DlgMessage.messageBox('Error', `Export GLB failed: ${err}`);
     }
   }
 

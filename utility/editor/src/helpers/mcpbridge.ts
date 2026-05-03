@@ -11,6 +11,7 @@ import { AddShapeCommand } from '../commands/scenecommands';
 import { eventBus } from '../core/eventbus';
 import { shapePrimitivePaths, type ShapePrimitiveType } from './shapeprimitives';
 import { SharedModel, type AssetPrimitiveInfo } from '../loaders/model';
+import { buildPrimitiveGlbFromZmshContent } from './primitiveglb';
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
@@ -499,12 +500,20 @@ async function handleMessage(editor: Editor, ws: WebSocket, data: any): Promise<
   }
 }
 
-function startGeneratedModelJob(
+async function startGeneratedModelJob(
   editor: Editor,
   params: any
-):
-  | { jobId: string; status: GeneratedModelJobStatus; err: null }
-  | { jobId: null; status: null; err: string } {
+): Promise<
+  { jobId: string; status: GeneratedModelJobStatus; err: null } | { jobId: null; status: null; err: string }
+> {
+  const info = await ProjectService.getCurrentProjectInfo();
+  if (!info) {
+    return {
+      jobId: null,
+      status: null,
+      err: 'No project opened'
+    };
+  }
   const controller = getSceneController(editor);
   const scene = controller?.model?.scene ?? null;
   if (!controller || !scene) {
@@ -718,6 +727,98 @@ function createGeneratedAssetPrimitive(message: any): AssetPrimitiveInfo {
   };
 }
 
+async function exportPrimitiveGlb(
+  params: any
+): Promise<{ path: string | null; bytes: number; err: string | null }> {
+  try {
+    const info = await ProjectService.getCurrentProjectInfo();
+    if (!info) {
+      return {
+        path: null,
+        bytes: 0,
+        err: 'No project opened'
+      };
+    }
+    let srcPath = typeof params.srcPath === 'string' ? params.srcPath.trim() : '';
+    if (!srcPath && typeof params.path === 'string') {
+      srcPath = params.path.trim();
+    }
+    if (!srcPath) {
+      return {
+        path: null,
+        bytes: 0,
+        err: 'primitive_export_glb requires srcPath'
+      };
+    }
+    srcPath = ProjectService.VFS.normalizePath(srcPath);
+    if (srcPath !== '/assets' && !srcPath.startsWith('/assets/')) {
+      return {
+        path: null,
+        bytes: 0,
+        err: 'srcPath must be under /assets'
+      };
+    }
+    if (!srcPath.endsWith('.zmsh')) {
+      return {
+        path: null,
+        bytes: 0,
+        err: 'srcPath must point to a .zmsh primitive asset'
+      };
+    }
+    let destPath = typeof params.destPath === 'string' ? params.destPath.trim() : '';
+    if (!destPath) {
+      destPath = `${srcPath.slice(0, -'.zmsh'.length)}.glb`;
+    }
+    if (!destPath.endsWith('.glb')) {
+      destPath += '.glb';
+    }
+    destPath = ProjectService.VFS.normalizePath(destPath);
+    if (destPath !== '/assets' && !destPath.startsWith('/assets/')) {
+      return {
+        path: null,
+        bytes: 0,
+        err: 'destPath must be under /assets'
+      };
+    }
+    if (destPath.startsWith('/assets/@builtins/')) {
+      return {
+        path: null,
+        bytes: 0,
+        err: 'Writing to `/assets/@builtins` directory is not allowed'
+      };
+    }
+    const srcStat = await ProjectService.VFS.stat(srcPath);
+    if (!srcStat?.isFile) {
+      return {
+        path: null,
+        bytes: 0,
+        err: `Primitive asset not found: ${srcPath}`
+      };
+    }
+    const content = (await ProjectService.VFS.readFile(srcPath, { encoding: 'utf8' })) as string;
+    const glb = buildPrimitiveGlbFromZmshContent(content, PathUtils.basename(destPath, '.glb'), srcPath);
+    const dir = ProjectService.VFS.dirname(destPath);
+    if (!(await ProjectService.VFS.exists(dir))) {
+      await ProjectService.VFS.makeDirectory(dir, true);
+    }
+    await ProjectService.VFS.writeFile(destPath, glb, {
+      encoding: 'binary',
+      create: true
+    });
+    return {
+      path: destPath,
+      bytes: glb.byteLength,
+      err: null
+    };
+  } catch (err) {
+    return {
+      path: null,
+      bytes: 0,
+      err: err instanceof Error ? err.message : String(err)
+    };
+  }
+}
+
 function isNumberArray(value: unknown, length: number): value is number[] {
   return Array.isArray(value) && value.length === length && value.every((item) => typeof item === 'number');
 }
@@ -823,6 +924,8 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       return getStatus(editor);
     case 'model_generate_begin':
       return startGeneratedModelJob(editor, params);
+    case 'primitive_export_glb':
+      return exportPrimitiveGlb(params);
     case 'model_generate_status': {
       const jobId = typeof params.jobId === 'string' ? params.jobId.trim() : '';
       return serializeGeneratedModelJob(generatedModelJobs.get(jobId));
@@ -896,13 +999,34 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       }
     }
     case 'asset_get_root': {
-      return {
-        root: '/assets',
-        err: null
-      };
+      try {
+        const info = await ProjectService.getCurrentProjectInfo();
+        if (!info) {
+          return {
+            root: null,
+            err: 'No project opened'
+          };
+        }
+        return {
+          root: '/assets',
+          err: null
+        };
+      } catch (err) {
+        return {
+          root: null,
+          err: `${err}`
+        };
+      }
     }
     case 'asset_create_material': {
       try {
+        const info = await ProjectService.getCurrentProjectInfo();
+        if (!info) {
+          return {
+            path: null,
+            err: 'No project opened'
+          };
+        }
         let path: string = params.directory;
         if (typeof path !== 'string' || !path) {
           return {
@@ -985,6 +1109,13 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     }
     case 'asset_read_directory': {
       try {
+        const info = await ProjectService.getCurrentProjectInfo();
+        if (!info) {
+          return {
+            result: null,
+            err: 'No project opened'
+          };
+        }
         if (typeof params.path !== 'string' || !params.path) {
           return {
             result: null,
@@ -1033,6 +1164,13 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     }
     case 'material_get_properties': {
       // Get property values from a material by vfs path
+      const info = await ProjectService.getCurrentProjectInfo();
+      if (!info) {
+        return {
+          value: null,
+          err: 'No project opened'
+        };
+      }
       const materialRef = new DRef<Material>();
       try {
         let path = params.path as string;
@@ -1131,6 +1269,12 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       // Load material from file and modify properties and then save it
       const materialRef = new DRef<Material>();
       try {
+        const info = await ProjectService.getCurrentProjectInfo();
+        if (!info) {
+          return {
+            err: 'No project opened'
+          };
+        }
         let path = params.path as string;
         if (typeof path !== 'string' || !path.trim()) {
           return {
@@ -1259,13 +1403,20 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       }
     }
     case 'getScenePropertyList': {
-      const props = getEngine().resourceManager.getPropertiesByClass(
-        getEngine().resourceManager.getClassByConstructor(Scene)
-      );
-      return {
-        propertyList: JSON.parse(JSON.stringify(props)),
-        err: null
-      };
+      try {
+        const props = getEngine().resourceManager.getPropertiesByClass(
+          getEngine().resourceManager.getClassByConstructor(Scene)
+        );
+        return {
+          propertyList: JSON.parse(JSON.stringify(props)),
+          err: null
+        };
+      } catch (err) {
+        return {
+          propertyList: null,
+          err: `${err}`
+        };
+      }
     }
     case 'getMaterialPropertyList': {
       let path = params.path as string;
@@ -1277,6 +1428,13 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       }
       path = path.trim();
       try {
+        const info = await ProjectService.getCurrentProjectInfo();
+        if (!info) {
+          return {
+            propertyList: null,
+            err: 'No project opened'
+          };
+        }
         if (!(await ProjectService.VFS.exists(path))) {
           return {
             propertyList: null,

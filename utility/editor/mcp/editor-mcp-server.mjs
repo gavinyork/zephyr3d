@@ -557,6 +557,23 @@ const tools = [
     }
   },
   {
+    name: 'primitive_export_glb',
+    description:
+      'Export a .zmsh primitive asset to a binary .glb asset in the project VFS. Returns { path, bytes, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['srcPath'],
+      properties: {
+        srcPath: { type: 'string', description: 'Source .zmsh primitive VFS path under /assets.' },
+        destPath: {
+          type: 'string',
+          description: 'Destination .glb VFS path under /assets. Defaults to srcPath with .glb extension.'
+        },
+        timeoutMs: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
     name: 'mesh_get_material',
     description: 'Get the material asset path assigned to a mesh node. Returns { material_path, err }.',
     inputSchema: {
@@ -1052,6 +1069,17 @@ const handlers = {
       return { values: null, err: 'material_get_properties property names must be non-empty strings' };
     }
     return bridge.send('material_get_properties', { path, properties }, Number(args.timeoutMs ?? 10000));
+  },
+  async primitive_export_glb(args) {
+    const srcPath = typeof args.srcPath === 'string' ? args.srcPath.trim() : '';
+    if (!srcPath) {
+      return { path: null, bytes: 0, err: 'primitive_export_glb requires srcPath' };
+    }
+    const params = { srcPath };
+    if (typeof args.destPath === 'string' && args.destPath.trim()) {
+      params.destPath = args.destPath.trim();
+    }
+    return bridge.send('primitive_export_glb', params, Number(args.timeoutMs ?? 30000));
   },
   async mesh_get_material(args) {
     const meshId = typeof args.mesh_id === 'string' ? args.mesh_id.trim() : '';
