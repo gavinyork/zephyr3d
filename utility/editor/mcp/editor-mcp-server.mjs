@@ -46,6 +46,10 @@ class EditorBridgeServer {
     let handshake = Buffer.alloc(0);
     let websocketReady = false;
     let frameBuffer = Buffer.alloc(0);
+    const fragmentedMessage = {
+      opcode: 0,
+      chunks: []
+    };
 
     socket.on('data', (chunk) => {
       if (!websocketReady) {
@@ -61,7 +65,7 @@ class EditorBridgeServer {
           websocketReady = true;
           if (rest.length > 0) {
             frameBuffer = Buffer.concat([frameBuffer, rest]);
-            frameBuffer = this.processFrames(socket, frameBuffer);
+            frameBuffer = this.processFrames(socket, frameBuffer, fragmentedMessage);
           }
         } catch (err) {
           socket.destroy();
@@ -70,7 +74,7 @@ class EditorBridgeServer {
         return;
       }
       frameBuffer = Buffer.concat([frameBuffer, chunk]);
-      frameBuffer = this.processFrames(socket, frameBuffer);
+      frameBuffer = this.processFrames(socket, frameBuffer, fragmentedMessage);
     });
 
     socket.on('close', () => {
@@ -119,11 +123,12 @@ class EditorBridgeServer {
     );
   }
 
-  processFrames(socket, buffer) {
+  processFrames(socket, buffer, fragmentedMessage) {
     let offset = 0;
     while (buffer.length - offset >= 2) {
       const first = buffer[offset];
       const second = buffer[offset + 1];
+      const fin = (first & 0x80) !== 0;
       const opcode = first & 0x0f;
       const masked = (second & 0x80) !== 0;
       let length = second & 0x7f;
@@ -162,7 +167,29 @@ class EditorBridgeServer {
         socket.write(encodeWebSocketFrame(payload, 0x0a));
         continue;
       }
+      if (opcode === 0x0) {
+        if (!fragmentedMessage.opcode) {
+          log('Ignoring unexpected WebSocket continuation frame without an active fragmented message.');
+          continue;
+        }
+        fragmentedMessage.chunks.push(payload);
+        if (fin) {
+          const message = Buffer.concat(fragmentedMessage.chunks);
+          const messageOpcode = fragmentedMessage.opcode;
+          fragmentedMessage.opcode = 0;
+          fragmentedMessage.chunks = [];
+          if (messageOpcode === 0x1) {
+            this.handleMessage(socket, message.toString('utf8'));
+          }
+        }
+        continue;
+      }
       if (opcode === 0x1) {
+        if (!fin) {
+          fragmentedMessage.opcode = opcode;
+          fragmentedMessage.chunks = [payload];
+          continue;
+        }
         this.handleMessage(socket, payload.toString('utf8'));
       }
     }
@@ -446,6 +473,28 @@ const tools = [
     }
   },
   {
+    name: 'asset_get_builtin_primitives',
+    description:
+      'List built-in primitive assets. These built-in primitives are read-only references under /assets/@builtins/primitives and cannot be modified in place. Returns { primitive_list, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'asset_get_builtin_materials',
+    description:
+      'List built-in material assets. These built-in materials are read-only references under /assets/@builtins/materials and cannot be modified in place. If you need to change material properties, first clone the material with asset_clone_material, then edit the cloned asset. Returns { material_list, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
     name: 'asset_read_directory',
     description:
       'Read entries from a project asset directory. Supports optional recursive traversal and glob pattern filtering.',
@@ -480,8 +529,7 @@ const tools = [
   },
   {
     name: 'asset_write_file',
-    description:
-      'Write a project asset file from UTF-8 text or base64-encoded binary data. Returns { err }.',
+    description: 'Write a project asset file from UTF-8 text or base64-encoded binary data. Returns { err }.',
     inputSchema: {
       type: 'object',
       required: ['path', 'content'],
@@ -521,6 +569,27 @@ const tools = [
         overwrite: {
           type: 'boolean',
           description: 'Overwrite an existing material file when true.'
+        },
+        timeoutMs: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'asset_clone_material',
+    description:
+      'Clone a material asset to a writable project asset path. Use this before changing properties on a built-in material, because built-in materials are read-only and cannot be modified in place. Returns { err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['srcPath', 'dstPath'],
+      properties: {
+        srcPath: {
+          type: 'string',
+          description: 'Source material asset VFS path, such as /assets/@builtins/materials/unlit.zmtl.'
+        },
+        dstPath: {
+          type: 'string',
+          description:
+            'Destination writable material asset VFS path under /assets, such as /assets/materials/unlit_copy.zmtl.'
         },
         timeoutMs: { type: 'number', default: 10000 }
       }
@@ -626,7 +695,10 @@ const tools = [
       type: 'object',
       required: ['primitive_path', 'material_path'],
       properties: {
-        primitive_path: { type: 'string', description: 'Primitive asset VFS path, such as /assets/foo.zmsh.' },
+        primitive_path: {
+          type: 'string',
+          description: 'Primitive asset VFS path, such as /assets/foo.zmsh.'
+        },
         material_path: { type: 'string', description: 'Material asset VFS path, such as /assets/foo.zmtl.' },
         parent_id: {
           type: 'string',
@@ -953,29 +1025,6 @@ const tools = [
     }
   },
   {
-    name: 'editor_sample_pixels',
-    description:
-      'Sample RGBA pixels from the editor canvas after rendering. Useful for automated visual smoke tests. Returns an array of { x, y, rgba }.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        points: {
-          type: 'array',
-          description: 'Up to 64 canvas pixel coordinates. Defaults to the canvas center.',
-          items: {
-            type: 'object',
-            required: ['x', 'y'],
-            properties: {
-              x: { type: 'number' },
-              y: { type: 'number' }
-            }
-          }
-        },
-        timeoutMs: { type: 'number', default: 10000 }
-      }
-    }
-  },
-  {
     name: 'editor_call',
     description:
       'Advanced escape hatch: call a raw browser bridge method. Prefer the typed tools such as editor_create_scene, editor_open_scene, editor_render_frames, editor_screenshot, editor_console_logs, and editor_sample_pixels when available.',
@@ -1039,22 +1088,26 @@ const TOOL_ALIASES = [
   {
     name: 'asset_get_root',
     target: 'asset_get_root_directory',
-    description: 'Preferred concise name for asset_get_root_directory. Get the project asset root directory. Returns { root, err }.'
+    description:
+      'Preferred concise name for asset_get_root_directory. Get the project asset root directory. Returns { root, err }.'
   },
   {
     name: 'material_get_classes',
     target: 'getMaterialClasses',
-    description: 'Preferred snake_case name for getMaterialClasses. List built-in material classes accepted by asset_create_material.'
+    description:
+      'Preferred snake_case name for getMaterialClasses. List built-in material classes accepted by asset_create_material.'
   },
   {
     name: 'material_get_property_list',
     target: 'getMaterialPropertyList',
-    description: 'Preferred snake_case name for getMaterialPropertyList. Inspect editable properties for a material asset before calling material_set_properties.'
+    description:
+      'Preferred snake_case name for getMaterialPropertyList. Inspect editable properties for a material asset before calling material_set_properties.'
   },
   {
     name: 'node_get_classes',
     target: 'getNodeClasses',
-    description: 'Preferred snake_case name for getNodeClasses. List scene node class names reported by node inspection tools.'
+    description:
+      'Preferred snake_case name for getNodeClasses. List scene node class names reported by node inspection tools.'
   },
   {
     name: 'scene_get_property_list',
@@ -1064,32 +1117,38 @@ const TOOL_ALIASES = [
   {
     name: 'node_get_property_list',
     target: 'getNodePropertyList',
-    description: 'Preferred snake_case name for getNodePropertyList. Inspect editable properties for a scene node by persistent id.'
+    description:
+      'Preferred snake_case name for getNodePropertyList. Inspect editable properties for a scene node by persistent id.'
   },
   {
     name: 'shape_create_node',
     target: 'createShapeNode',
-    description: 'Preferred snake_case name for createShapeNode. Create a built-in primitive mesh node such as box, sphere, plane, cylinder, torus, or tetrahedron.'
+    description:
+      'Preferred snake_case name for createShapeNode. Create a built-in primitive mesh node such as box, sphere, plane, cylinder, torus, or tetrahedron.'
   },
   {
     name: 'node_get_class',
     target: 'getNodeClass',
-    description: 'Preferred snake_case name for getNodeClass. Get the class name for a scene node by persistent id.'
+    description:
+      'Preferred snake_case name for getNodeClass. Get the class name for a scene node by persistent id.'
   },
   {
     name: 'node_get_local_transform',
     target: 'getNodeLocalTransform',
-    description: 'Preferred snake_case name for getNodeLocalTransform. Read a scene node local transform as position, scale, and rotation quaternion.'
+    description:
+      'Preferred snake_case name for getNodeLocalTransform. Read a scene node local transform as position, scale, and rotation quaternion.'
   },
   {
     name: 'node_set_local_transform',
     target: 'setNodeLocalTransform',
-    description: 'Preferred snake_case name for setNodeLocalTransform. Set any subset of position, scale, and rotation quaternion on a scene node.'
+    description:
+      'Preferred snake_case name for setNodeLocalTransform. Set any subset of position, scale, and rotation quaternion on a scene node.'
   },
   {
     name: 'scene_get_root_node',
     target: 'getSceneRootNode',
-    description: 'Preferred snake_case name for getSceneRootNode. Get the current scene root node id and name.'
+    description:
+      'Preferred snake_case name for getSceneRootNode. Get the current scene root node id and name.'
   },
   {
     name: 'node_get_parent',
@@ -1225,6 +1284,12 @@ const handlers = {
   async asset_get_root_directory(args) {
     return bridge.send('asset_get_root_directory', {}, Number(args.timeoutMs ?? 10000));
   },
+  async asset_get_builtin_primitives(args) {
+    return bridge.send('asset_get_builtin_primitives', {}, Number(args.timeoutMs ?? 10000));
+  },
+  async asset_get_builtin_materials(args) {
+    return bridge.send('asset_get_builtin_materials', {}, Number(args.timeoutMs ?? 10000));
+  },
   async asset_read_directory(args) {
     const path = typeof args.path === 'string' ? args.path.trim() : '';
     if (!path) {
@@ -1286,6 +1351,17 @@ const handlers = {
       params.overwrite = args.overwrite;
     }
     return bridge.send('asset_create_material', params, Number(args.timeoutMs ?? 10000));
+  },
+  async asset_clone_material(args) {
+    const srcPath = typeof args.srcPath === 'string' ? args.srcPath.trim() : '';
+    if (!srcPath) {
+      return { err: 'asset_clone_material requires srcPath' };
+    }
+    const dstPath = typeof args.dstPath === 'string' ? args.dstPath.trim() : '';
+    if (!dstPath) {
+      return { err: 'asset_clone_material requires dstPath' };
+    }
+    return bridge.send('asset_clone_material', { srcPath, dstPath }, Number(args.timeoutMs ?? 10000));
   },
   async getMaterialClasses(args) {
     return bridge.send('getMaterialClasses', {}, Number(args.timeoutMs ?? 10000));
@@ -1567,13 +1643,6 @@ const handlers = {
       params.resetView = !!args.resetView;
     }
     return bridge.send('openScene', params, Number(args.timeoutMs ?? 30000));
-  },
-  async editor_sample_pixels(args) {
-    const params = {};
-    if (Object.prototype.hasOwnProperty.call(args, 'points')) {
-      params.points = args.points;
-    }
-    return bridge.send('samplePixels', params, Number(args.timeoutMs ?? 10000));
   },
   async editor_call(args) {
     return bridge.send(String(args.method), args.params ?? {}, Number(args.timeoutMs ?? 30000));

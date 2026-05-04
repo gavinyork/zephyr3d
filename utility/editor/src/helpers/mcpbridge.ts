@@ -1176,6 +1176,106 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         };
       }
     }
+    case 'asset_get_builtin_materials': {
+      try {
+        const info = await ProjectService.getCurrentProjectInfo();
+        if (!info) {
+          return {
+            material_list: null,
+            err: 'No project is currently opened; create or open a project first'
+          };
+        }
+        return {
+          material_list: [
+            {
+              path: '/assets/@builtins/materials/blinnphong.zmtl',
+              type: 'blinnphong',
+              immutable: true
+            },
+            {
+              path: '/assets/@builtins/materials/lambert.zmtl',
+              type: 'lambert',
+              immuable: true
+            },
+            {
+              path: '/assets/@builtins/materials/pbr_metallic_roughness',
+              type: 'pbr_metallic_roughness',
+              immutable: true
+            },
+            {
+              path: '/assets/@builtins/materials/pbr_specular_glossiness',
+              type: 'pbr_specular_glossiness',
+              immutable: true
+            },
+            {
+              path: '/assets/@builtins/materials/prite_std.zmtl',
+              type: 'sprite_standard',
+              immutable: true
+            },
+            {
+              path: '/assets/@builtins/materials/unlit.zmtl',
+              type: 'unlit',
+              immutable: true
+            }
+          ],
+          err: null
+        };
+      } catch (err) {
+        return {
+          material_list: null,
+          err: `${err}`
+        };
+      }
+    }
+    case 'asset_get_builtin_primitives': {
+      try {
+        const info = await ProjectService.getCurrentProjectInfo();
+        if (!info) {
+          return {
+            primitive_list: null,
+            err: 'No project is currently opened; create or open a project first'
+          };
+        }
+        return {
+          primitive_list: [
+            {
+              path: '/assets/@builtins/primitives/box.zmsh',
+              type: 'box'
+            },
+            {
+              path: '/assets/@builtins/primitives/sphere.zmsh',
+              type: 'sphere'
+            },
+            {
+              path: '/assets/@builtins/primitives/capsule.zmsh',
+              type: 'capsule'
+            },
+            {
+              path: '/assets/@builtins/primitives/cylinder.zmsh',
+              type: 'cylinder'
+            },
+            {
+              path: '/assets/@builtins/primitives/plane.zmsh',
+              type: 'plane'
+            },
+            {
+              path: '/assets/@builtins/primitives/tetrahedron.zmsh',
+              type: 'tetrahedron'
+            },
+            {
+              path: '/assets/@builtins/primitives/torus.zmsh',
+              type: 'torus'
+            }
+          ],
+          err: null
+        };
+      } catch (err) {
+        return {
+          primitive_list: null,
+          err: `${err}`
+        };
+      }
+    }
     case 'asset_create_material': {
       try {
         const info = await ProjectService.getCurrentProjectInfo();
@@ -1256,6 +1356,39 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         await ProjectService.VFS.copyFile(srcPath, dstPath, { overwrite: true });
         return {
           path: dstPath,
+          err: null
+        };
+      } catch (err) {
+        return {
+          path: null,
+          err: `${err}`
+        };
+      }
+    }
+    case 'asset_clone_material': {
+      // It is not possibly modifying a builtin material, unless you clone the material
+      try {
+        const info = await ProjectService.getCurrentProjectInfo();
+        if (!info) {
+          return {
+            err: 'No project is currently opened; create or open a project first'
+          };
+        }
+        let srcPath: string = params.srcPath;
+        if (typeof srcPath !== 'string' || !srcPath) {
+          return {
+            err: 'asset_clone_material requires `srcPath`, for example /assets/@builtins/unlit.zmtl'
+          };
+        }
+        srcPath = ProjectService.VFS.normalizePath(srcPath);
+        let dstPath: string = params.dstPath;
+        if (typeof dstPath !== 'string' || !dstPath) {
+          return {
+            err: 'asset_clone_material requires `dstPath`, for example /assets/new_material.zmtl'
+          };
+        }
+        await ProjectService.VFS.copyFile(srcPath, dstPath, { overwrite: true });
+        return {
           err: null
         };
       } catch (err) {
@@ -1528,7 +1661,12 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
             err: 'material_set_properties requires `path`, the material asset VFS path'
           };
         }
-        path = path.trim();
+        path = ProjectService.VFS.normalizePath(path.trim());
+        if (path.startsWith('/assets/@builtins')) {
+          return {
+            err: 'Builtin materials are not modifierable, use `asset_clone_material` first'
+          };
+        }
         const properties = params.properties as { propertyName: string; value: unknown }[];
         if (!Array.isArray(properties)) {
           return {
@@ -2304,14 +2442,16 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     }
     case 'screenshot': {
       const canvas = getCanvas();
+      // GPU-backed canvases, especially WebGPU, may not remain serializable once the
+      // render task has completed. Re-render immediately before capture so screenshot
+      // encoding happens in the same task as drawing.
+      editor.render();
       return {
         width: canvas.width,
         height: canvas.height,
         dataUrl: await canvasToDataUrl(canvas, params?.mimeType ?? 'image/png', params?.quality)
       };
     }
-    case 'samplePixels':
-      return samplePixels(params);
     case 'consoleLogs': {
       const limit = Math.max(1, Math.min(Number(params?.limit ?? 100), MAX_LOGS));
       return consoleEntries.slice(-limit);
@@ -2383,25 +2523,6 @@ function getStatus(editor: Editor) {
       frameCounter: device.frameInfo.frameCounter
     }
   };
-}
-
-function samplePixels(params: any): JsonValue {
-  const canvas = getCanvas();
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    throw new Error(
-      'Canvas 2D context is unavailable; pixel sampling cannot read the active WebGL/WebGPU canvas'
-    );
-  }
-  const points = Array.isArray(params?.points)
-    ? params.points
-    : [{ x: canvas.width >> 1, y: canvas.height >> 1 }];
-  return points.slice(0, 64).map((point: any) => {
-    const x = Math.max(0, Math.min(canvas.width - 1, Number(point.x) || 0));
-    const y = Math.max(0, Math.min(canvas.height - 1, Number(point.y) || 0));
-    const data = ctx.getImageData(x, y, 1, 1).data;
-    return { x, y, rgba: [data[0], data[1], data[2], data[3]] };
-  });
 }
 
 async function runEval(editor: Editor, source: string, expression: boolean): Promise<any> {
