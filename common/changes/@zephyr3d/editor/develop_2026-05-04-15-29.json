@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Add standalone version by electron",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}

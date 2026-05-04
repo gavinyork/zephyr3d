@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add serialization property descriptions",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
