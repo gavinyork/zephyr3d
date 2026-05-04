@@ -41,7 +41,13 @@
     "electron:dev": "npm run build && electron .",
     "electron:prepare": "node ./scripts/prepare-electron-app.cjs",
     "electron:pack": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir",
-    "electron:dist": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json"
+    "electron:dist": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json",
+    "electron:pack:win": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir --win",
+    "electron:pack:linux": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir --linux",
+    "electron:pack:mac": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir --mac",
+    "electron:dist:win": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --win",
+    "electron:dist:linux": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --linux",
+    "electron:dist:mac": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --mac"
   },
   "engines": {
     "node": ">=16.18.0"
