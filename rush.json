@@ -475,10 +475,6 @@
       "projectFolder": "apps/builder"
     },
     {
-      "packageName": "zephyr3d-plugin-0yao",
-      "projectFolder": "apps/0yao"
-    },
-    {
       "packageName": "@zephyr3d/spring-test",
       "projectFolder": "apps/spring"
     }

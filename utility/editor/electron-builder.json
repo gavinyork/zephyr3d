@@ -1,0 +1,41 @@
+{
+  "appId": "dev.zephyr3d.editor",
+  "productName": "Zephyr3D Editor",
+  "electronVersion": "41.5.0",
+  "directories": {
+    "output": "../release"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "package.json"
+  ],
+  "extraResources": [
+    {
+      "from": "dist/vendor/zephyr3d",
+      "to": "types/vendor/zephyr3d",
+      "filter": [
+        "**/*.d.ts"
+      ]
+    }
+  ],
+  "win": {
+    "icon": "electron/icon.ico",
+    "target": [
+      "nsis",
+      "zip"
+    ]
+  },
+  "mac": {
+    "target": [
+      "dmg",
+      "zip"
+    ]
+  },
+  "linux": {
+    "target": [
+      "AppImage",
+      "tar.gz"
+    ]
+  }
+}

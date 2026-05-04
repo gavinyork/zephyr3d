@@ -111,6 +111,10 @@ rush-logs/
 # rollup
 .rollup.cache
 
+# Electron editor packaging output
+utility/editor/.electron-app/
+utility/editor/release/
+
 # vscode
 .vscode
 

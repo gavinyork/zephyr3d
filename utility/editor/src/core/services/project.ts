@@ -1,9 +1,10 @@
 import type { HttpDirectoryReader, Immutable, VFS } from '@zephyr3d/base';
-import { HttpFS, IndexedDBFS, MemoryFS, PathUtils, randomUUID } from '@zephyr3d/base';
+import { HttpFS, MemoryFS, PathUtils, randomUUID } from '@zephyr3d/base';
 import { getEngine, tryGetApp } from '@zephyr3d/scene';
 import { fileListFileName, libDir, projectFileName } from '../build/templates';
 import { DlgMessage } from '../../views/dlg/messagedlg';
 import { installDeps } from '../build/dep';
+import { createEditorMetaVFS, createProjectVFS, deleteProjectVFS } from './storage';
 
 export type ProjectInfo = {
   name: string;
@@ -63,8 +64,7 @@ type EditorManifest = {
   history: Record<string, number>;
 };
 
-const META_DATABASE_NAME = 'zephyr3d-editor';
-const metaVFS = new IndexedDBFS(META_DATABASE_NAME, '$');
+const metaVFS = createEditorMetaVFS();
 let projectVFS: VFS = metaVFS;
 
 export class ProjectService {
@@ -119,7 +119,7 @@ export class ProjectService {
       uuid
     };
     await this.writeManifest(manifest);
-    const vfs = new IndexedDBFS(uuid, '$');
+    const vfs = createProjectVFS(uuid);
     try {
       for (const f of files) {
         const path = `/${PathUtils.relative(baseDir, f.webkitRelativePath)}`;
@@ -148,7 +148,7 @@ export class ProjectService {
       uuid
     };
     await this.writeManifest(manifest);
-    const vfs = new IndexedDBFS(uuid, '$');
+    const vfs = createProjectVFS(uuid);
     try {
       await vfs.makeDirectory('/assets');
       const settings = { ...defaultProjectSettings, title: name };
@@ -208,7 +208,7 @@ export class ProjectService {
     manifest.history[uuid] = Date.now();
     await this.writeManifest(manifest);
 
-    this.VFS = new IndexedDBFS(info.uuid, '$');
+    this.VFS = createProjectVFS(info.uuid);
 
     this._currentProject = uuid;
     console.info(`Project opened: ${uuid}`);
@@ -250,7 +250,7 @@ export class ProjectService {
       delete manifest.projectList[uuid];
       delete manifest.history[uuid];
       await this.writeManifest(manifest);
-      await IndexedDBFS.deleteDatabase(info.uuid);
+      await deleteProjectVFS(info.uuid);
     }
   }
   static async saveProject(project: ProjectInfo) {

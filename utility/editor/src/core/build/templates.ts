@@ -288,14 +288,19 @@ export const templateIndexHTML = `<!DOCTYPE html>
         height: 100vh;
       }
       canvas {
+        display: block;
         touch-action: none;
         overscroll-behavior: contain;
         overflow: hidden;
+        outline: none;
         position: absolute;
         left: 0;
         top: 0;
         width: 100%;
         height: 100%;
+      }
+      canvas:focus {
+        outline: none;
       }
     </style>
   </head>

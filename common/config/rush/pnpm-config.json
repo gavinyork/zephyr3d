@@ -106,7 +106,7 @@
    * https://pnpm.io/package_json#pnpmpeerdependencyrules
    */
   "globalPeerDependencyRules": {
-    // "ignoreMissing": ["@eslint/*"],
+    "ignoreMissing": ["electron-builder-squirrel-windows"]
     // "allowedVersions": { "react": "17" },
     // "allowAny": ["@babel/*"]
   },

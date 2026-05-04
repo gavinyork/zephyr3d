@@ -3,8 +3,10 @@
   "version": "0.2.0",
   "description": "zephyr3d studio",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
+  "main": "electron/main.cjs",
   "files": [
-    "dist"
+    "dist",
+    "electron"
   ],
   "exports": {
     "./editor-plugin": {
@@ -34,7 +36,12 @@
     "build:lib": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent",
     "serve": "web-dev-server --no-cache --open dist/index.html",
     "serve:mcp": "web-dev-server --no-cache --open dist/index.html?mcp=47231",
-    "mcp": "node ./mcp/editor-mcp-server.mjs"
+    "mcp": "node ./mcp/editor-mcp-server.mjs",
+    "electron:start": "electron .",
+    "electron:dev": "npm run build && electron .",
+    "electron:prepare": "node ./scripts/prepare-electron-app.cjs",
+    "electron:pack": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir",
+    "electron:dist": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json"
   },
   "engines": {
     "node": ">=16.18.0"
@@ -71,6 +78,8 @@
     "@typescript-eslint/parser": "~8.46.1",
     "@typescript-eslint/eslint-plugin": "~8.46.1",
     "prettier": "~3.6.2",
+    "electron": "^41.5.0",
+    "electron-builder": "^26.9.0",
     "eslint-plugin-prettier": "~5.5.4",
     "eslint-config-prettier": "~10.1.8",
     "eslint-plugin-import": "~2.32.0",

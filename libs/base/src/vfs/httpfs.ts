@@ -79,7 +79,7 @@ export class HttpFS extends VFS {
     if (this.basePath.endsWith('/')) {
       this.basePath = this.basePath.slice(0, -1);
     }
-    this.baseOrigin = url.origin;
+    this.baseOrigin = url.origin === 'null' ? `${url.protocol}//${url.host}` : url.origin;
     this.options = {
       timeout: 30000,
       ...options

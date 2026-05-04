@@ -1,7 +1,0 @@
-{
-  "id": "com.0yao.zephyr3d-plugin",
-  "name": "0yao",
-  "version": "0.1.0",
-  "description": "Zephyr3d editor plugin for 0yao projects.",
-  "entry": "index.js"
-}

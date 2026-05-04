@@ -12,14 +12,14 @@ const monacoLoaderHref = './vendor/monaco/vs/loader.js';
 const monacoBaseHref = './vendor/monaco/vs';
 
 const typeFiles = [
-  { path: './vendor/zephyr3d/base/dist/index.d.ts', name: '@zephyr3d/base' },
-  { path: './vendor/zephyr3d/device/dist/index.d.ts', name: '@zephyr3d/device' },
-  { path: './vendor/zephyr3d/scene/dist/index.d.ts', name: '@zephyr3d/scene' },
-  { path: './vendor/zephyr3d/imgui/dist/index.d.ts', name: '@zephyr3d/imgui' },
-  { path: './vendor/zephyr3d/backend-webgl/dist/index.d.ts', name: '@zephyr3d/backend-webgl' },
-  { path: './vendor/zephyr3d/backend-webgpu/dist/index.d.ts', name: '@zephyr3d/backend-webgpu' },
+  { path: 'vendor/zephyr3d/base/dist/index.d.ts', name: '@zephyr3d/base' },
+  { path: 'vendor/zephyr3d/device/dist/index.d.ts', name: '@zephyr3d/device' },
+  { path: 'vendor/zephyr3d/scene/dist/index.d.ts', name: '@zephyr3d/scene' },
+  { path: 'vendor/zephyr3d/imgui/dist/index.d.ts', name: '@zephyr3d/imgui' },
+  { path: 'vendor/zephyr3d/backend-webgl/dist/index.d.ts', name: '@zephyr3d/backend-webgl' },
+  { path: 'vendor/zephyr3d/backend-webgpu/dist/index.d.ts', name: '@zephyr3d/backend-webgpu' },
   {
-    path: './vendor/zephyr3d/editor/dist/pluginapi/core/pluginapi.d.ts',
+    path: 'vendor/zephyr3d/editor/dist/pluginapi/core/pluginapi.d.ts',
     name: '@zephyr3d/editor/editor-plugin'
   }
 ] as const;
@@ -34,6 +34,10 @@ const zephyrPackages = [
 ] as const;
 
 let monacoInitPromise: Promise<void> | null = null;
+
+function resolveEditorAssetUrl(path: string) {
+  return new URL(path.replace(/^\.?\//, ''), document.baseURI).href;
+}
 
 function ensureMonacoCss() {
   const existing = document.querySelector(`link[data-monaco-editor="true"]`);
@@ -98,19 +102,20 @@ function requireModules(modules: string[]) {
 
 async function loadTypeFiles(monaco: any) {
   const loadPromises = typeFiles.map(async (file) => {
+    const url = resolveEditorAssetUrl(file.path);
     try {
-      const response = await fetch(file.path);
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       const content = await response.text();
       const fileName = `file:///node_modules/${file.name}/index.d.ts`;
       monaco.languages.typescript.typescriptDefaults.addExtraLib(content, fileName);
-      return { success: true, file: file.path };
+      return { success: true, file: url };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`Failed to load ${file.path}:`, message);
-      return { success: false, file: file.path, error: message };
+      console.warn(`Failed to load ${url}:`, message);
+      return { success: false, file: url, error: message };
     }
   });
   return Promise.allSettled(loadPromises);

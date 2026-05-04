@@ -1,10 +1,10 @@
-import { IndexedDBFS, PathUtils } from '@zephyr3d/base';
+import { PathUtils } from '@zephyr3d/base';
 import { BlobReader, BlobWriter, ZipReader, type FileEntry } from '@zip.js/zip.js';
 import { libDir } from '../build/templates';
 import { installDeps } from '../build/dep';
+import { createSystemPluginVFS } from './storage';
 
-const META_DATABASE_NAME = 'zephyr3d-editor';
-const systemPluginVFS = new IndexedDBFS(META_DATABASE_NAME, '$');
+const systemPluginVFS = createSystemPluginVFS();
 
 const SYSTEM_PLUGIN_ROOT = '/system/plugins';
 const SYSTEM_PLUGIN_PACKAGES_DIR = `${SYSTEM_PLUGIN_ROOT}/packages`;
