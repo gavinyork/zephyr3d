@@ -20,6 +20,12 @@ export type DesktopFSListOptions = {
   recursive?: boolean;
 };
 
+export type DesktopDirectoryPickOptions = {
+  title?: string;
+  defaultPath?: string;
+  buttonLabel?: string;
+};
+
 export type DesktopFileMetadata = {
   name: string;
   path: string;
@@ -59,6 +65,7 @@ export type ZephyrEditorDesktopAPI = {
   };
   fs: {
     makeDirectory(scope: DesktopFSScope, path: string, recursive?: boolean): Promise<void>;
+    pickDirectory(options?: DesktopDirectoryPickOptions): Promise<string | null>;
     readDirectory(
       scope: DesktopFSScope,
       path: string,

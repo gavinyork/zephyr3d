@@ -6,7 +6,7 @@ import type {
   ReadOptions,
   WriteOptions
 } from '@zephyr3d/base';
-import { PathUtils, VFS, VFSError } from '@zephyr3d/base';
+import { VFS, VFSError } from '@zephyr3d/base';
 import {
   getDesktopAPI,
   type DesktopFileMetadata,
@@ -114,6 +114,6 @@ export class ElectronFS extends VFS {
   }
 }
 
-export function createElectronProjectFS(uuid: string) {
-  return new ElectronFS(`project:${PathUtils.sanitizeFilename(uuid)}`);
+export function createElectronProjectFS(id: string) {
+  return new ElectronFS(`project:${id}`);
 }

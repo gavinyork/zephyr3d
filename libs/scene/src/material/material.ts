@@ -416,6 +416,8 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
   clearCache() {
     for (const k in this._states) {
       this._states[k]?.bindGroup?.dispose();
+      Material._programCache[k]?.dispose();
+      delete Material._programCache[k];
     }
     this._states = {};
   }

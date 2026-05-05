@@ -1881,7 +1881,7 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       try {
         const list = await ProjectService.listProjects();
         return {
-          projects: list.map((val) => ({ name: val.name, id: val.uuid })),
+          projects: list.map((val) => ({ name: val.name, id: val.uuid, path: val.path ?? null })),
           err: null
         };
       } catch (err) {
@@ -1893,11 +1893,14 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     }
     case 'getCurrentProject': {
       return new Promise<{
-        projectInfo: {
-          name: string;
-          id: string;
-        };
-        err: string;
+        projectInfo:
+          | {
+              name: string;
+              id: string;
+              path?: string | null;
+            }
+          | null;
+        err: string | null;
       }>((resolve) => {
         ProjectService.getCurrentProjectInfo()
           .then((info) => {
@@ -1905,7 +1908,8 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
               resolve({
                 projectInfo: {
                   name: info.name,
-                  id: info.uuid
+                  id: info.uuid,
+                  path: info.path ?? null
                 },
                 err: null
               });
@@ -1927,6 +1931,7 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     case 'createProject': {
       try {
         const name = params?.name as string;
+        const path = params?.path as string;
         if (!name) {
           return {
             id: null,
@@ -1939,7 +1944,7 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
             return { id: null, err };
           }
         }
-        const id = await editor.newProject(name);
+        const id = await editor.newProject(name, path, { showErrorDialog: false });
         return id ? { id, err: null } : { id: null, err: 'Project was not created' };
       } catch (err) {
         return {
@@ -1954,7 +1959,7 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         if (!id) {
           return {
             id: null,
-            err: 'openProject requires `id`, the project uuid returned by project_list'
+            err: 'openProject requires `id`, the project id returned by project_list'
           };
         }
         if (editor.currentProject) {

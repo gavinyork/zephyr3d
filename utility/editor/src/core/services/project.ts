@@ -5,10 +5,12 @@ import { fileListFileName, libDir, projectFileName } from '../build/templates';
 import { DlgMessage } from '../../views/dlg/messagedlg';
 import { installDeps } from '../build/dep';
 import { createEditorMetaVFS, createProjectVFS, deleteProjectVFS } from './storage';
+import { getDesktopAPI } from './desktop';
 
 export type ProjectInfo = {
   name: string;
   uuid?: string;
+  path?: string;
   lastEditScene?: string;
 };
 
@@ -64,6 +66,27 @@ type EditorManifest = {
   history: Record<string, number>;
 };
 
+function isAbsoluteProjectId(value: string): boolean {
+  return typeof value === 'string' && (/^[a-zA-Z]:[\\/]/.test(value) || value.startsWith('\\\\') || value.startsWith('/'));
+}
+
+function normalizeProjectInfo(info: ProjectInfo | null | undefined): ProjectInfo | null {
+  if (!info) {
+    return null;
+  }
+  if (!info.path && isAbsoluteProjectId(info.uuid)) {
+    return {
+      ...info,
+      path: info.uuid
+    };
+  }
+  return { ...info };
+}
+
+function getProjectStorageId(project: ProjectInfo): string {
+  return project.path || project.uuid;
+}
+
 const metaVFS = createEditorMetaVFS();
 let projectVFS: VFS = metaVFS;
 
@@ -90,13 +113,14 @@ export class ProjectService {
   }
   static async listProjects(): Promise<ProjectInfo[]> {
     const manifest = await this.readManifest();
-    return Object.values(manifest.projectList);
+    return Object.values(manifest.projectList).map((project) => normalizeProjectInfo(project));
   }
   static async getRecentProjects(): Promise<ProjectInfo[]> {
     const manifest = await this.readManifest();
     return Object.keys(manifest.history)
       .sort((a, b) => manifest.history[b] - manifest.history[a])
       .map((v) => manifest.projectList[v])
+      .map((project) => normalizeProjectInfo(project))
       .filter((v) => !!v);
   }
   static async importProject(files: File[]) {
@@ -137,20 +161,34 @@ export class ProjectService {
     }
     return uuid;
   }
-  static async createProject(name: string) {
+  static async createProject(name: string, directory?: string) {
     if (!name) {
       throw new Error('Create project failed: Project name must not be empty');
     }
-    const uuid = randomUUID();
-    const manifest = await this.readManifest();
-    manifest.projectList[uuid] = {
+    const desktop = getDesktopAPI();
+    if (desktop && directory && !isAbsoluteProjectId(directory)) {
+      throw new Error(`Create project failed: Project directory must be an absolute path, got <${directory}>`);
+    }
+    const uuid = desktop
+      ? directory ||
+        (desktop.fs.pickDirectory
+          ? await desktop.fs.pickDirectory({
+              title: 'Select Project Directory',
+              buttonLabel: 'Select Folder'
+            })
+          : '')
+      : randomUUID();
+    if (!uuid) {
+      return '';
+    }
+    const project = normalizeProjectInfo({
       name,
       uuid
-    };
-    await this.writeManifest(manifest);
-    const vfs = createProjectVFS(uuid);
+    });
+    await this.ensureProjectLocationAvailable(project);
+    const vfs = createProjectVFS(getProjectStorageId(project));
     try {
-      await vfs.makeDirectory('/assets');
+      await vfs.makeDirectory('/assets', true);
       const settings = { ...defaultProjectSettings, title: name };
       await vfs.writeFile(`/${projectFileName}`, JSON.stringify(settings, null, 2), {
         encoding: 'utf8',
@@ -159,6 +197,9 @@ export class ProjectService {
     } finally {
       await vfs.close();
     }
+    const manifest = await this.readManifest();
+    manifest.projectList[uuid] = project;
+    await this.writeManifest(manifest);
     return uuid;
   }
   static async getCurrentProjectInfo() {
@@ -198,7 +239,7 @@ export class ProjectService {
   }
   static async openProject(uuid: string): Promise<ProjectInfo> {
     const manifest = await this.readManifest();
-    const info = manifest.projectList[uuid];
+    const info = normalizeProjectInfo(manifest.projectList[uuid]);
     if (!info) {
       throw new Error(`Cannot open project: Project <${uuid}> not found`);
     }
@@ -208,7 +249,7 @@ export class ProjectService {
     manifest.history[uuid] = Date.now();
     await this.writeManifest(manifest);
 
-    this.VFS = createProjectVFS(info.uuid);
+    this.VFS = createProjectVFS(getProjectStorageId(info));
 
     this._currentProject = uuid;
     console.info(`Project opened: ${uuid}`);
@@ -245,18 +286,19 @@ export class ProjectService {
       throw new Error('Project must be closed before delete it');
     }
     const manifest = await this.readManifest();
-    const info = manifest.projectList[uuid];
+    const info = normalizeProjectInfo(manifest.projectList[uuid]);
     if (info) {
       delete manifest.projectList[uuid];
       delete manifest.history[uuid];
       await this.writeManifest(manifest);
-      await deleteProjectVFS(info.uuid);
+      await deleteProjectVFS(getProjectStorageId(info));
     }
   }
   static async saveProject(project: ProjectInfo) {
     const manifest = await this.readManifest();
     project.uuid = project.uuid || randomUUID();
-    manifest.projectList[project.uuid] = project;
+    const normalizedProject = normalizeProjectInfo(project);
+    manifest.projectList[project.uuid] = normalizedProject;
     await this.writeManifest(manifest);
   }
   private static async readManifest() {
@@ -280,6 +322,28 @@ export class ProjectService {
   }
   private static async getProjectInfo(uuid: string) {
     const manifest = await this.readManifest();
-    return manifest.projectList[uuid] ?? null;
+    return normalizeProjectInfo(manifest.projectList[uuid]);
+  }
+  private static async ensureProjectLocationAvailable(project: ProjectInfo) {
+    const storageId = getProjectStorageId(project);
+    if (!storageId) {
+      throw new Error('Create project failed: Invalid project storage location');
+    }
+    const vfs = createProjectVFS(storageId);
+    try {
+      if (!(await vfs.exists('/'))) {
+        return;
+      }
+      const stat = await vfs.stat('/');
+      if (!stat.isDirectory) {
+        throw new Error(`Create project failed: <${storageId}> is not a directory`);
+      }
+      const entries = await vfs.readDirectory('/', { recursive: false });
+      if (entries.length > 0) {
+        throw new Error(`Create project failed: Project directory <${storageId}> already exists and is not empty`);
+      }
+    } finally {
+      await vfs.close();
+    }
   }
 }

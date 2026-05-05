@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('zephyrEditorDesktop', {
   },
   fs: {
     makeDirectory: (scope, path, recursive) => invokeFS('makeDirectory', { scope, path, recursive }),
+    pickDirectory: (options) => invokeFS('pickDirectory', { options }),
     readDirectory: (scope, path, options) => invokeFS('readDirectory', { scope, path, options }),
     deleteDirectory: (scope, path, recursive) => invokeFS('deleteDirectory', { scope, path, recursive }),
     readFile: (scope, path, options) => invokeFS('readFile', { scope, path, options }),

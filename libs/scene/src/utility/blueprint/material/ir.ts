@@ -1730,7 +1730,7 @@ export class MaterialBlueprintIR {
     return this.getOrCreateIRExpression(node, output, IRInput, (scope) =>
       scope.$builder.getDevice().type === 'vertex'
         ? (scope.$getVertexAttrib('normal') ?? ShaderHelper.resolveVertexNormal(scope))
-        : scope.zVertexNormal
+        : scope.$builder.normalize(scope.zVertexNormal)
     );
   }
   /** Converts a pixel normal input node to IR */
@@ -1738,7 +1738,7 @@ export class MaterialBlueprintIR {
     return this.getOrCreateIRExpression(node, output, IRInput, (scope) =>
       scope.$builder.getDevice().type === 'vertex'
         ? (scope.$getVertexAttrib('normal') ?? ShaderHelper.resolveVertexNormal(scope))
-        : scope.zVertexNormal
+        : scope.$builder.normalize(scope.zVertexNormal)
     );
   }
   /** Converts a vertex tangent input node to IR */
@@ -1746,12 +1746,14 @@ export class MaterialBlueprintIR {
     return this.getOrCreateIRExpression(node, output, IRInput, (scope) =>
       scope.$builder.getDevice().type === 'vertex'
         ? (scope.$getVertexAttrib('tangent') ?? ShaderHelper.resolveVertexTangent(scope))
-        : scope.zVertexTangent
+        : scope.$builder.normalize(scope.zVertexTangent)
     );
   }
   /** Converts a vertex binormal input node to IR */
   private vertexBinormal(node: VertexBinormalNode, output: number): IRExpression {
-    return this.getOrCreateIRExpression(node, output, IRInput, 'zVertexBinormal');
+    return this.getOrCreateIRExpression(node, output, IRInput, (scope) =>
+      scope.$builder.normalize(scope.zVertexBinormal)
+    );
   }
   /** Converts a vertex position input node to IR */
   private vertexPosition(node: VertexPositionNode, output: number): IRExpression {

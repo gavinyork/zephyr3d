@@ -37,6 +37,7 @@ import {
   type SystemPluginFileRecord,
   type SystemPluginRecord
 } from './services/systemplugin';
+import { isDesktopApp } from './services/desktop';
 
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
 
@@ -226,6 +227,9 @@ export class Editor {
   }
   get currentProject() {
     return this._currentProject;
+  }
+  private formatProjectLabel(project: ProjectInfo) {
+    return project.path ? `${project.name} (${project.path})` : project.name;
   }
   async saveProject() {
     if (this._currentProject && !this._isRemoteProject) {
@@ -643,14 +647,39 @@ export class Editor {
       }
     }
   }
-  async newProject(name?: string) {
-    name = name || (await Dialog.promptName('Create Project', 'Project Name', 'New Project', 400));
+  async newProject(
+    name?: string,
+    directory?: string,
+    options?: {
+      showErrorDialog?: boolean;
+    }
+  ) {
+    if (!name && isDesktopApp()) {
+      const result = await Dialog.createProject('Create Project', '', '', 560);
+      if (!result) {
+        return null;
+      }
+      name = result.name;
+      directory = result.directory;
+    } else {
+      name = name || (await Dialog.promptName('Create Project', 'Project Name', 'New Project', 400));
+    }
     if (name) {
-      const uuid = await ProjectService.createProject(name);
-      const project = await ProjectService.openProject(uuid);
-      this._currentProject = project;
-      this._moduleManager.activate('Scene', '');
-      return this._currentProject.uuid;
+      try {
+        const uuid = await ProjectService.createProject(name, directory);
+        if (!uuid) {
+          return null;
+        }
+        const project = await ProjectService.openProject(uuid);
+        this._currentProject = project;
+        this._moduleManager.activate('Scene', '');
+        return this._currentProject.uuid;
+      } catch (err) {
+        if (options?.showErrorDialog === false) {
+          throw err;
+        }
+        await DlgMessage.messageBox('Error', `${err}`);
+      }
     }
     return null;
   }
@@ -684,7 +713,7 @@ export class Editor {
     try {
       if (!id) {
         const projects = await ProjectService.listProjects();
-        const names = projects.map((project) => project.name);
+        const names = projects.map((project) => this.formatProjectLabel(project));
         const ids = projects.map((project) => project.uuid);
         id = await Dialog.openFromList('Open Project', names, ids, 400, 400);
       }

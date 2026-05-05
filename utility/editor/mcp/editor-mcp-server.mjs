@@ -392,12 +392,17 @@ const tools = [
   {
     name: 'project_create',
     description:
-      'Create a new editor project with the given name and open it. Returns id with the new project uuid on success, or null id and err on failure.',
+      'Create a new editor project with the given name and open it. Returns id with the new project id on success, or null id and err on failure.',
     inputSchema: {
       type: 'object',
       required: ['name'],
       properties: {
         name: { type: 'string', description: 'Name for the new project.' },
+        path: {
+          type: 'string',
+          description:
+            'Optional absolute directory path for the new project. In Electron this bypasses the native folder picker.'
+        },
         saveSceneChanges: {
           type: 'boolean',
           description:
@@ -414,12 +419,12 @@ const tools = [
   {
     name: 'project_open',
     description:
-      'Open an existing editor project by project id. Returns id with the opened project uuid on success, or null id and err on failure.',
+      'Open an existing editor project by project id. Returns id with the opened project id on success, or null id and err on failure.',
     inputSchema: {
       type: 'object',
       required: ['id'],
       properties: {
-        id: { type: 'string', description: 'Project uuid to open.' },
+        id: { type: 'string', description: 'Project id to open. In Electron this may be an absolute directory path.' },
         saveSceneChanges: {
           type: 'boolean',
           description:

@@ -1014,11 +1014,19 @@ async function getScopeRoot(scope) {
   } else if (scope === 'system') {
     root = path.join(storageBaseDir(), 'system');
   } else if (typeof scope === 'string' && scope.startsWith('project:')) {
-    root = path.join(storageBaseDir(), 'projects', sanitizeScopePart(scope.slice('project:'.length)));
+    const projectScope = scope.slice('project:'.length);
+    if (!projectScope || projectScope.includes('\0')) {
+      throw new Error('Invalid project filesystem scope');
+    }
+    root = path.isAbsolute(projectScope)
+      ? path.resolve(projectScope)
+      : path.join(storageBaseDir(), 'projects', sanitizeScopePart(projectScope));
   } else {
     throw new Error(`Invalid filesystem scope: ${scope}`);
   }
-  await fs.mkdir(root, { recursive: true });
+  if (scope === 'meta' || scope === 'system' || !path.isAbsolute(root)) {
+    await fs.mkdir(root, { recursive: true });
+  }
   return root;
 }
 
@@ -1042,6 +1050,11 @@ function toPhysicalPath(root, vfsPath) {
     throw new Error(`VFS path escapes storage root: ${vfsPath}`);
   }
   return { normalized, target };
+}
+
+function isFilesystemRoot(targetPath) {
+  const resolved = path.resolve(targetPath);
+  return resolved === path.parse(resolved).root;
 }
 
 function toFileMetadata(vfsPath, stat) {
@@ -1121,6 +1134,18 @@ function bufferToArrayBuffer(buffer) {
 }
 
 async function dispatchFS(operation, args) {
+  if (operation === 'pickDirectory') {
+    const result = await dialog.showOpenDialog(mainWindowRef ?? undefined, {
+      title: args.options?.title || 'Select Directory',
+      defaultPath: args.options?.defaultPath,
+      buttonLabel: args.options?.buttonLabel,
+      properties: ['openDirectory', 'createDirectory']
+    });
+    if (result.canceled || result.filePaths.length < 1) {
+      return null;
+    }
+    return path.resolve(result.filePaths[0]);
+  }
   const root = await getScopeRoot(args.scope);
   switch (operation) {
     case 'makeDirectory': {
@@ -1210,6 +1235,9 @@ async function dispatchFS(operation, args) {
       return null;
     }
     case 'deleteScope': {
+      if (path.isAbsolute(root) && isFilesystemRoot(root)) {
+        throw new Error(`Refusing to delete filesystem root: ${root}`);
+      }
       await fs.rm(root, { recursive: true, force: true });
       return null;
     }

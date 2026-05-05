@@ -20,6 +20,7 @@ import type { MeshMaterial } from '@zephyr3d/scene';
 import type { SharedModel } from '../../loaders/model';
 import { DlgImportOptions } from './importoptionsdlg';
 import { DlgOpenFolder } from './openfolderdlg';
+import { DlgCreateProject, type CreateProjectResult } from './createprojectdlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -128,6 +129,14 @@ export class Dialog {
     width?: number
   ): Promise<string> {
     return DlgPromptName.promptName(title, hint, defaultName, width);
+  }
+  public static async createProject(
+    title: string,
+    defaultName?: string,
+    defaultDirectory?: string,
+    width?: number
+  ): Promise<CreateProjectResult | null> {
+    return DlgCreateProject.createProject(title, defaultName, defaultDirectory, width);
   }
   public static async rename(title: string, name: string, width?: number): Promise<string> {
     return DlgRename.rename(title, name, width);

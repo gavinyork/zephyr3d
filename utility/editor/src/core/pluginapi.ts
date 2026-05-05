@@ -18,6 +18,7 @@ export type DisposableLike = IDisposable;
 
 export type EditorProjectInfo = {
   uuid?: string;
+  path?: string;
   name: string;
   lastEditScene?: string;
 };
