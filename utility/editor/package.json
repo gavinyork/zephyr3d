@@ -39,16 +39,16 @@
     "serve:mcp": "web-dev-server --no-cache --open dist/index.html?mcp=47231",
     "mcp": "node ./mcp/editor-mcp-server.mjs",
     "electron:start": "electron .",
-    "electron:dev": "npm run build && electron .",
+    "electron:dev": "rush build -t editor && electron .",
     "electron:prepare": "node ./scripts/prepare-electron-app.cjs",
-    "electron:pack": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir",
-    "electron:dist": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json",
-    "electron:pack:win": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir --win",
-    "electron:pack:linux": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir --linux",
-    "electron:pack:mac": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir --mac",
-    "electron:dist:win": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --win",
-    "electron:dist:linux": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --linux",
-    "electron:dist:mac": "npm run build && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --mac"
+    "electron:pack": "rush build -t editor && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir",
+    "electron:dist": "rush build -t editor && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json",
+    "electron:pack:win": "rush build -t editor && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir --win",
+    "electron:pack:linux": "rush build -t editor && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir --linux",
+    "electron:pack:mac": "rush build -t editor && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir --mac",
+    "electron:dist:win": "rush build -t editor && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --win",
+    "electron:dist:linux": "rush build -t editor && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --linux",
+    "electron:dist:mac": "rush build -t editor && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --mac"
   },
   "engines": {
     "node": ">=16.18.0"

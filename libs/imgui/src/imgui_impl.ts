@@ -36,14 +36,25 @@ async function readClipboardTextPreferSystem() {
 
 export class Input {
   public _dom_input: HTMLInputElement;
+  private _composing = false;
+  private _lastCommittedText = '';
+  private _lastCommittedAt = 0;
   constructor(cvs: HTMLCanvasElement) {
     this._dom_input = document.createElement('input');
+    this._dom_input.type = 'text';
+    this._dom_input.autocomplete = 'off';
+    this._dom_input.autocapitalize = 'off';
+    this._dom_input.spellcheck = false;
     // This input is only used as an IME/text-entry bridge and should not
     // participate in the browser's native Tab focus order.
     this._dom_input.tabIndex = -1;
     this._dom_input.style.position = 'fixed';
     this._dom_input.style.top = -10000 + 'px';
     this._dom_input.style.left = -10000 + 'px';
+    this._dom_input.style.width = '1px';
+    this._dom_input.style.height = '1px';
+    this._dom_input.style.opacity = '0';
+    this._dom_input.style.pointerEvents = 'none';
     this._dom_input.addEventListener('keydown', (e) => {
       e.stopPropagation();
       this.onKeydown(e as KeyboardEvent);
@@ -65,13 +76,23 @@ export class Input {
       e.stopPropagation();
       this.onKeypress(e as KeyboardEvent);
     });
+    this._dom_input.addEventListener('compositionstart', (e) => {
+      this.onCompositionStart(e as CompositionEvent);
+    });
+    this._dom_input.addEventListener('compositionupdate', (e) => {
+      this.onCompositionUpdate(e as CompositionEvent);
+    });
     this._dom_input.addEventListener('compositionend', (e) => {
       this.onCompositionEnd(e as CompositionEvent);
+    });
+    this._dom_input.addEventListener('input', (e) => {
+      this.onInput(e as InputEvent);
     });
     this._dom_input.addEventListener('paste', (e) => {
       this.onPaste(e as ClipboardEvent);
     });
-    cvs.appendChild(this._dom_input);
+    const parent = cvs.ownerDocument?.body ?? document.body ?? cvs.ownerDocument?.documentElement ?? cvs;
+    parent.appendChild(this._dom_input);
     this.blur();
   }
   onKeydown(e: KeyboardEvent) {
@@ -81,15 +102,41 @@ export class Input {
     canvas_on_keyup(e);
   }
   onKeypress(e: KeyboardEvent) {
-    e.preventDefault();
-    canvas_on_keypress(e);
+    void e;
   }
-  onCompositionEnd(e: CompositionEvent) {
-    e.preventDefault();
-    for (let i = 0; i < e.data.length; i++) {
-      const io = ImGui.GetIO();
-      io.AddInputCharacter(e.data.codePointAt(i)!);
+  onCompositionStart(_e: CompositionEvent) {
+    this._composing = true;
+  }
+  onCompositionUpdate(_e: CompositionEvent) {}
+  onCompositionEnd(_e: CompositionEvent) {
+    const text = typeof _e.data === 'string' ? _e.data : '';
+    this._composing = false;
+    if (text) {
+      this.commitText(text);
     }
+  }
+  onInput(e: InputEvent) {
+    e.stopPropagation();
+    const inputType = typeof e.inputType === 'string' ? e.inputType : '';
+    if (
+      this._composing ||
+      (typeof e.isComposing === 'boolean' && e.isComposing) ||
+      inputType === 'insertCompositionText'
+    ) {
+      return;
+    }
+    if (inputType.startsWith('delete')) {
+      this.clearText();
+      return;
+    }
+    const text = typeof e.data === 'string' && e.data.length > 0 ? e.data : this._dom_input.value;
+    if (text) {
+      const now = Date.now();
+      if (!(text === this._lastCommittedText && now - this._lastCommittedAt < 50)) {
+        this.commitText(text);
+      }
+    }
+    this.clearText();
   }
   onPaste(e: ClipboardEvent) {
     e.stopPropagation();
@@ -99,10 +146,27 @@ export class Input {
     }
   }
   blur() {
-    this._dom_input.blur();
+    if (document.activeElement === this._dom_input) {
+      this.clearText();
+      this._dom_input.blur();
+    }
   }
   focus() {
-    this._dom_input.focus();
+    if (document.activeElement !== this._dom_input) {
+      this._dom_input.focus();
+    }
+  }
+  private clearText() {
+    this._dom_input.value = '';
+  }
+  private commitText(text: string) {
+    const io = ImGui.GetIO();
+    for (const ch of text) {
+      io.AddInputCharacter(ch.codePointAt(0)!);
+    }
+    this._lastCommittedText = text;
+    this._lastCommittedAt = Date.now();
+    this.clearText();
   }
 }
 
@@ -234,8 +298,10 @@ export function canvas_on_keyup(event: KeyboardEvent) {
 }
 
 export function canvas_on_keypress(event: KeyboardEvent) {
+  void event;
   const io = ImGui.GetIO();
-  io.AddInputCharacter(event.charCode);
+  // Text is committed via the hidden DOM input's `input` event.
+  // Doing it here duplicates Latin characters and IME composition results.
   if (wantKeyboard || io.WantCaptureKeyboard || io.WantTextInput) {
     return true;
   }
