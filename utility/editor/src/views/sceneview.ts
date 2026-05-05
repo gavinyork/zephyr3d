@@ -38,6 +38,7 @@ import { DRef, HttpFS } from '@zephyr3d/base';
 import { ASSERT, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { Dialog } from './dlg/dlg';
+import { isDesktopApp } from '../core/services/desktop';
 import { renderTextureViewer } from '../components/textureviewer';
 import { MenubarView } from '../components/menubar';
 import type { MenuBarOptions } from '../components/menubar';
@@ -463,6 +464,29 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               action: () => (this._showDeviceInfo = !this._showDeviceInfo),
               checked: () => this._showDeviceInfo
             }
+          ]
+        },
+        {
+          label: 'Help',
+          id: 'help',
+          subMenus: [
+            {
+              label: 'About...',
+              action: () => eventBus.dispatchEvent('action', 'HELP_ABOUT')
+            },
+            ...(isDesktopApp()
+              ? [
+                  {
+                    label: 'Editor Settings...',
+                    action: () => eventBus.dispatchEvent('action', 'EDITOR_SETTINGS')
+                  },
+                  {
+                    label: 'Toggle DevTools',
+                    shortCut: 'F12',
+                    action: () => eventBus.dispatchEvent('action', 'TOGGLE_DEVTOOLS')
+                  }
+                ]
+              : [])
           ]
         }
       ]

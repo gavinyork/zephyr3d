@@ -6,7 +6,8 @@
   "main": "electron/main.cjs",
   "files": [
     "dist",
-    "electron"
+    "electron",
+    "mcp"
   ],
   "exports": {
     "./editor-plugin": {

@@ -1,11 +1,38 @@
-const { app, BrowserWindow, Menu, ipcMain, net, protocol, shell } = require('electron');
+const { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, net, protocol, shell } = require('electron');
+const http = require('http');
 const fs = require('fs/promises');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { Worker } = require('worker_threads');
 
 const FS_CHANNEL = 'zephyr-editor:fs';
 const LOG_CHANNEL = 'zephyr-editor:log';
+const SETTINGS_CHANNEL = 'zephyr-editor:settings';
 const EDITOR_PROTOCOL = 'zephyr-editor';
+const MCP_HTTP_PATH = '/mcp';
+const DEFAULT_MCP_SERVICE_PORT = Number(process.env.ZEPHYR_EDITOR_MCP_SERVER_PORT || 47231);
+const MAX_MCP_HTTP_BODY_BYTES = 16 * 1024 * 1024;
+const MCP_CONFIG_FILE = 'mcp-config.json';
+const EDITOR_GLOBAL_CONFIG_FILE = 'editor-config.json';
+const DEFAULT_EDITOR_RHI = 'webgpu';
+const SUPPORTED_EDITOR_RHIS = new Set(['webgpu', 'webgl2', 'webgl']);
+
+let mcpWorker = null;
+let mcpBridgeInfo = null;
+let mcpStartupPromise = null;
+let mcpWorkerStopping = false;
+let nextRpcRequestId = 1;
+let mainWindowRef = null;
+let mcpServiceServer = null;
+let mcpServiceStartPromise = null;
+const pendingRpcRequests = new Map();
+let mcpServiceConfig = {
+  enabled: true,
+  port: DEFAULT_MCP_SERVICE_PORT
+};
+let editorGlobalConfig = {
+  defaultRHI: DEFAULT_EDITOR_RHI
+};
 
 function editorWebPreferences() {
   return {
@@ -33,6 +60,743 @@ async function pathExists(filePath) {
     .catch(() => false);
 }
 
+function writeStderrLine(message) {
+  process.stderr.write(`${message}\n`);
+}
+
+function rejectPendingRpcRequests(error) {
+  for (const pending of pendingRpcRequests.values()) {
+    pending.reject(error);
+  }
+  pendingRpcRequests.clear();
+}
+
+function sendRpcToMcpWorker(message) {
+  if (!mcpWorker) {
+    return Promise.reject(new Error('Embedded MCP worker is not running'));
+  }
+  const requestId = nextRpcRequestId++;
+  return new Promise((resolve, reject) => {
+    pendingRpcRequests.set(requestId, { resolve, reject });
+    mcpWorker.postMessage({
+      type: 'rpc',
+      requestId,
+      message
+    });
+  });
+}
+
+async function sendRpcNotificationToMcpWorker(message) {
+  if (!mcpWorker) {
+    throw new Error('Embedded MCP worker is not running');
+  }
+  mcpWorker.postMessage({
+    type: 'rpcNotification',
+    message
+  });
+}
+
+function sanitizeMcpServicePort(value) {
+  const port = Number(value);
+  return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : DEFAULT_MCP_SERVICE_PORT;
+}
+
+function mcpConfigPath() {
+  return path.join(app.getPath('userData'), MCP_CONFIG_FILE);
+}
+
+async function loadMcpServiceConfig() {
+  const filePath = mcpConfigPath();
+  const loaded = await fs
+    .readFile(filePath, 'utf8')
+    .then((text) => JSON.parse(text))
+    .catch(() => null);
+  mcpServiceConfig = {
+    enabled: typeof loaded?.enabled === 'boolean' ? loaded.enabled : true,
+    port: sanitizeMcpServicePort(loaded?.port)
+  };
+}
+
+async function saveMcpServiceConfig() {
+  const filePath = mcpConfigPath();
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, `${JSON.stringify(mcpServiceConfig, null, 2)}\n`, 'utf8');
+}
+
+function sanitizeEditorRHI(value) {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return SUPPORTED_EDITOR_RHIS.has(normalized) ? normalized : DEFAULT_EDITOR_RHI;
+}
+
+function editorGlobalConfigPath() {
+  return path.join(app.getPath('userData'), EDITOR_GLOBAL_CONFIG_FILE);
+}
+
+async function loadEditorGlobalConfig() {
+  const filePath = editorGlobalConfigPath();
+  const loaded = await fs
+    .readFile(filePath, 'utf8')
+    .then((text) => JSON.parse(text))
+    .catch(() => null);
+  editorGlobalConfig = {
+    defaultRHI: sanitizeEditorRHI(loaded?.defaultRHI)
+  };
+}
+
+async function saveEditorGlobalConfig() {
+  const filePath = editorGlobalConfigPath();
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, `${JSON.stringify(editorGlobalConfig, null, 2)}\n`, 'utf8');
+}
+
+function getConfiguredMcpServiceUrl(port = mcpServiceConfig.port) {
+  return `http://127.0.0.1:${port}${MCP_HTTP_PATH}`;
+}
+
+function isMcpServiceRunning() {
+  return !!mcpServiceServer?.listening;
+}
+
+function getGlobalSettingsPayload() {
+  return {
+    mcp: {
+      enabled: !!mcpServiceConfig.enabled,
+      port: sanitizeMcpServicePort(mcpServiceConfig.port),
+      running: isMcpServiceRunning(),
+      url: getConfiguredMcpServiceUrl()
+    },
+    defaultRHI: sanitizeEditorRHI(editorGlobalConfig.defaultRHI)
+  };
+}
+
+async function applyMcpServiceConfig(nextConfig) {
+  const nextEnabled =
+    typeof nextConfig?.enabled === 'boolean' ? nextConfig.enabled : !!mcpServiceConfig.enabled;
+  const nextPort =
+    nextConfig?.port === undefined ? sanitizeMcpServicePort(mcpServiceConfig.port) : Number(nextConfig.port);
+  if (!Number.isInteger(nextPort) || nextPort < 1 || nextPort > 65535) {
+    throw new Error('Please enter an integer TCP port between 1 and 65535.');
+  }
+  const portChanged = nextPort !== mcpServiceConfig.port;
+  const enabledChanged = nextEnabled !== mcpServiceConfig.enabled;
+  mcpServiceConfig = {
+    enabled: nextEnabled,
+    port: nextPort
+  };
+  await saveMcpServiceConfig();
+  if (!nextEnabled) {
+    if (isMcpServiceRunning()) {
+      await stopLocalMcpService({ persistEnabled: false, interactive: false });
+    }
+    return;
+  }
+  if (portChanged && isMcpServiceRunning()) {
+    await restartLocalMcpService({ interactive: false });
+    return;
+  }
+  if (enabledChanged || !isMcpServiceRunning()) {
+    await startLocalMcpService({ persistEnabled: false, interactive: false });
+  }
+}
+
+async function applyGlobalSettings(nextSettings) {
+  if (nextSettings?.mcp) {
+    await applyMcpServiceConfig(nextSettings.mcp);
+  }
+  if (Object.prototype.hasOwnProperty.call(nextSettings ?? {}, 'defaultRHI')) {
+    editorGlobalConfig.defaultRHI = sanitizeEditorRHI(nextSettings.defaultRHI);
+    await saveEditorGlobalConfig();
+  }
+  return getGlobalSettingsPayload();
+}
+
+function getConfiguredEditorRHI() {
+  return sanitizeEditorRHI(process.env.ZEPHYR_EDITOR_DEVICE || editorGlobalConfig.defaultRHI);
+}
+
+function isLoopbackAddress(address) {
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+}
+
+function isAllowedMcpOrigin(origin) {
+  if (!origin || origin === 'null') {
+    return true;
+  }
+  try {
+    const url = new URL(origin);
+    if (url.protocol === 'file:') {
+      return true;
+    }
+    if (url.protocol === `${EDITOR_PROTOCOL}:` && url.host === 'app') {
+      return true;
+    }
+    if ((url.protocol === 'http:' || url.protocol === 'https:') && ['127.0.0.1', 'localhost', '::1'].includes(url.hostname)) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function buildMcpHttpHeaders(protocolVersion, origin, extraHeaders = {}) {
+  const headers = {
+    'Cache-Control': 'no-store',
+    ...extraHeaders
+  };
+  if (protocolVersion) {
+    headers['MCP-Protocol-Version'] = protocolVersion;
+  }
+  if (origin && isAllowedMcpOrigin(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers.Vary = 'Origin';
+  }
+  return headers;
+}
+
+function writeMcpJsonResponse(res, statusCode, body, protocolVersion, origin, extraHeaders = {}) {
+  res.writeHead(
+    statusCode,
+    buildMcpHttpHeaders(protocolVersion, origin, {
+      'Content-Type': 'application/json; charset=utf-8',
+      ...extraHeaders
+    })
+  );
+  res.end(JSON.stringify(body));
+}
+
+function writeMcpEmptyResponse(res, statusCode, protocolVersion, origin, extraHeaders = {}) {
+  res.writeHead(statusCode, buildMcpHttpHeaders(protocolVersion, origin, extraHeaders));
+  res.end();
+}
+
+function createJsonRpcError(id, code, message) {
+  return {
+    jsonrpc: '2.0',
+    id: id ?? null,
+    error: {
+      code,
+      message
+    }
+  };
+}
+
+function validateMcpHeaderMirrors(headers, message) {
+  if (!message || typeof message !== 'object' || Array.isArray(message) || typeof message.method !== 'string') {
+    return;
+  }
+  const methodHeader = headers['mcp-method'];
+  if (typeof methodHeader === 'string' && methodHeader.trim() && methodHeader !== message.method) {
+    throw Object.assign(new Error('Mcp-Method header does not match request body method'), {
+      statusCode: 400,
+      rpcCode: -32600
+    });
+  }
+  const nameHeader = headers['mcp-name'];
+  if (typeof nameHeader !== 'string' || !nameHeader.trim()) {
+    return;
+  }
+  let bodyName = null;
+  if (message.method === 'tools/call') {
+    bodyName = message.params?.name ?? null;
+  } else if (message.method === 'resources/read' || message.method === 'prompts/get') {
+    bodyName = message.params?.uri ?? null;
+  }
+  if (bodyName !== null && bodyName !== nameHeader) {
+    throw Object.assign(new Error('Mcp-Name header does not match request body'), {
+      statusCode: 400,
+      rpcCode: -32600
+    });
+  }
+}
+
+async function readMcpHttpBody(req) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > MAX_MCP_HTTP_BODY_BYTES) {
+      throw Object.assign(new Error(`MCP request body exceeds ${MAX_MCP_HTTP_BODY_BYTES} bytes`), {
+        statusCode: 413
+      });
+    }
+    chunks.push(chunk);
+  }
+  const text = Buffer.concat(chunks).toString('utf8').trim();
+  if (!text) {
+    throw Object.assign(new Error('MCP request body is empty'), {
+      statusCode: 400,
+      rpcCode: -32600
+    });
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw Object.assign(new Error('MCP request body is not valid JSON'), {
+      statusCode: 400,
+      rpcCode: -32700
+    });
+  }
+}
+
+function inferMcpProtocolVersion(req, body) {
+  const headerVersion = req.headers['mcp-protocol-version'];
+  if (typeof headerVersion === 'string' && headerVersion.trim()) {
+    return headerVersion.trim();
+  }
+  if (!Array.isArray(body) && body?.method === 'initialize' && typeof body?.params?.protocolVersion === 'string') {
+    return body.params.protocolVersion;
+  }
+  return '2024-11-05';
+}
+
+async function dispatchMcpHttpMessage(message, headers) {
+  if (!message || typeof message !== 'object' || Array.isArray(message)) {
+    return createJsonRpcError(null, -32600, 'Invalid JSON-RPC message');
+  }
+  validateMcpHeaderMirrors(headers, message);
+  if (typeof message.method !== 'string' || !message.method) {
+    return createJsonRpcError(message.id ?? null, -32600, 'JSON-RPC request is missing method');
+  }
+  if (!Object.prototype.hasOwnProperty.call(message, 'id')) {
+    await sendRpcNotificationToMcpWorker(message);
+    return null;
+  }
+  try {
+    return await sendRpcToMcpWorker(message);
+  } catch (err) {
+    return createJsonRpcError(message.id ?? null, -32000, err instanceof Error ? err.message : String(err));
+  }
+}
+
+async function handleMcpHttpRequest(req, res) {
+  const origin = typeof req.headers.origin === 'string' ? req.headers.origin : null;
+  const requestUrl = new URL(req.url || '/', 'http://127.0.0.1');
+  if (requestUrl.pathname !== MCP_HTTP_PATH) {
+    writeMcpEmptyResponse(res, 404, null, origin);
+    return;
+  }
+  if (!isLoopbackAddress(req.socket.remoteAddress)) {
+    writeMcpEmptyResponse(res, 403, null, origin);
+    return;
+  }
+  if (!isAllowedMcpOrigin(origin)) {
+    writeMcpEmptyResponse(res, 403, null, origin);
+    return;
+  }
+  if (req.method === 'OPTIONS') {
+    writeMcpEmptyResponse(res, 204, null, origin, {
+      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+      'Access-Control-Allow-Headers':
+        'Content-Type, Accept, MCP-Protocol-Version, Mcp-Method, Mcp-Name, Mcp-Session-Id, Authorization'
+    });
+    return;
+  }
+  if (req.method === 'GET') {
+    writeMcpEmptyResponse(res, 405, null, origin, {
+      Allow: 'POST, OPTIONS'
+    });
+    return;
+  }
+  if (req.method !== 'POST') {
+    writeMcpEmptyResponse(res, 405, null, origin, {
+      Allow: 'POST, GET, OPTIONS'
+    });
+    return;
+  }
+  const contentType = req.headers['content-type'];
+  if (typeof contentType !== 'string' || !contentType.toLowerCase().includes('application/json')) {
+    writeMcpEmptyResponse(res, 415, null, origin);
+    return;
+  }
+  try {
+    const body = await readMcpHttpBody(req);
+    const protocolVersion = inferMcpProtocolVersion(req, body);
+    const messages = Array.isArray(body) ? body : [body];
+    if (messages.length === 0) {
+      writeMcpJsonResponse(res, 400, createJsonRpcError(null, -32600, 'JSON-RPC batch must not be empty'), protocolVersion, origin);
+      return;
+    }
+    const responses = [];
+    for (const message of messages) {
+      const response = await dispatchMcpHttpMessage(message, req.headers);
+      if (response) {
+        responses.push(response);
+      }
+    }
+    if (responses.length === 0) {
+      writeMcpEmptyResponse(res, 202, protocolVersion, origin);
+      return;
+    }
+    writeMcpJsonResponse(res, 200, Array.isArray(body) ? responses : responses[0], protocolVersion, origin);
+  } catch (err) {
+    const protocolVersion = inferMcpProtocolVersion(req, null);
+    if (err?.rpcCode) {
+      writeMcpJsonResponse(
+        res,
+        err.statusCode ?? 400,
+        createJsonRpcError(null, err.rpcCode, err.message),
+        protocolVersion,
+        origin
+      );
+      return;
+    }
+    writeMcpJsonResponse(
+      res,
+      err?.statusCode ?? 400,
+      createJsonRpcError(null, -32700, err instanceof Error ? err.message : String(err)),
+      protocolVersion,
+      origin
+    );
+  }
+}
+
+function createApplicationMenu() {
+  const running = isMcpServiceRunning();
+  const statusText = running
+    ? `Running on ${getConfiguredMcpServiceUrl()}`
+    : `Stopped (configured port ${mcpServiceConfig.port})`;
+  return Menu.buildFromTemplate([
+    {
+      label: 'File',
+      submenu: [{ role: 'quit' }]
+    },
+    {
+      label: 'MCP',
+      submenu: [
+        {
+          label: `Status: ${statusText}`,
+          enabled: false
+        },
+        {
+          label: 'Start MCP Service',
+          enabled: !running,
+          click: () => {
+            void startLocalMcpService({ persistEnabled: true, interactive: true });
+          }
+        },
+        {
+          label: 'Stop MCP Service',
+          enabled: running,
+          click: () => {
+            void stopLocalMcpService({ persistEnabled: true, interactive: true });
+          }
+        },
+        {
+          label: 'Set MCP Port...',
+          click: () => {
+            void promptAndApplyMcpPort();
+          }
+        },
+        {
+          label: 'Copy MCP URL',
+          click: () => {
+            clipboard.writeText(getConfiguredMcpServiceUrl());
+          }
+        }
+      ]
+    },
+    {
+      label: 'Window',
+      submenu: [{ role: 'minimize' }, { role: 'close' }]
+    }
+  ]);
+}
+
+function rebuildApplicationMenu() {
+  Menu.setApplicationMenu(null);
+}
+
+async function promptForMcpPort(currentPort) {
+  const channel = `zephyr-editor:mcp-port:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+  return await new Promise((resolve) => {
+    let settled = false;
+    const promptWindow = new BrowserWindow({
+      width: 420,
+      height: 210,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      parent: mainWindowRef ?? undefined,
+      modal: !!mainWindowRef,
+      show: false,
+      title: 'Set MCP Port',
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    });
+    const finish = (value) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      ipcMain.removeAllListeners(channel);
+      if (!promptWindow.isDestroyed()) {
+        promptWindow.close();
+      }
+      resolve(value);
+    };
+    ipcMain.once(channel, (_event, value) => {
+      finish(value);
+    });
+    promptWindow.on('closed', () => {
+      if (!settled) {
+        settled = true;
+        ipcMain.removeAllListeners(channel);
+        resolve(null);
+      }
+    });
+    const html = `<!doctype html>
+<html>
+  <body style="margin:0;font-family:Segoe UI,Arial,sans-serif;background:#1f1f1f;color:#f2f2f2;">
+    <form id="form" style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+      <div style="font-size:20px;font-weight:600;">Set MCP Port</div>
+      <label for="port">Local TCP port</label>
+      <input id="port" type="number" min="1" max="65535" value="${String(currentPort)}"
+        style="padding:10px;border:1px solid #555;border-radius:6px;background:#111;color:#f2f2f2;font-size:14px;" />
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
+        <button type="button" id="cancel" style="padding:8px 14px;">Cancel</button>
+        <button type="submit" style="padding:8px 14px;">Save</button>
+      </div>
+    </form>
+    <script>
+      const { ipcRenderer } = require('electron');
+      const channel = ${JSON.stringify(channel)};
+      const input = document.getElementById('port');
+      document.getElementById('cancel').addEventListener('click', () => ipcRenderer.send(channel, null));
+      document.getElementById('form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        ipcRenderer.send(channel, input.value);
+      });
+      setTimeout(() => {
+        input.focus();
+        input.select();
+      }, 0);
+    </script>
+  </body>
+</html>`;
+    void promptWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    promptWindow.once('ready-to-show', () => promptWindow.show());
+  });
+}
+
+async function promptAndApplyMcpPort() {
+  const value = await promptForMcpPort(mcpServiceConfig.port);
+  if (value === null) {
+    return;
+  }
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    dialog.showErrorBox('Invalid MCP Port', 'Please enter an integer TCP port between 1 and 65535.');
+    return;
+  }
+  if (port === mcpServiceConfig.port) {
+    return;
+  }
+  mcpServiceConfig.port = port;
+  await saveMcpServiceConfig();
+  if (isMcpServiceRunning()) {
+    await restartLocalMcpService({ interactive: true });
+  }
+  rebuildApplicationMenu();
+}
+
+async function startLocalMcpService({ persistEnabled = false, interactive = false } = {}) {
+  if (isMcpServiceRunning()) {
+    if (persistEnabled && !mcpServiceConfig.enabled) {
+      mcpServiceConfig.enabled = true;
+      await saveMcpServiceConfig();
+      rebuildApplicationMenu();
+    }
+    return getConfiguredMcpServiceUrl();
+  }
+  if (mcpServiceStartPromise) {
+    return await mcpServiceStartPromise;
+  }
+  const port = sanitizeMcpServicePort(mcpServiceConfig.port);
+  mcpServiceConfig.port = port;
+  mcpServiceStartPromise = new Promise((resolve, reject) => {
+    const server = http.createServer((req, res) => {
+      void handleMcpHttpRequest(req, res);
+    });
+    const onError = (err) => {
+      server.removeAllListeners();
+      reject(err);
+    };
+    server.once('error', onError);
+    server.listen(port, '127.0.0.1', () => {
+      server.off('error', onError);
+      server.on('error', (err) => {
+        writeStderrLine(`[mcp:http-error] ${err?.stack || err}`);
+        void writeDiagnosticLog(`[mcp:http-error] ${err?.stack || err}`);
+      });
+      mcpServiceServer = server;
+      resolve(getConfiguredMcpServiceUrl());
+    });
+  });
+  try {
+    const url = await mcpServiceStartPromise;
+    if (persistEnabled) {
+      mcpServiceConfig.enabled = true;
+      await saveMcpServiceConfig();
+    }
+    writeStderrLine(`[mcp:http-started] ${url}`);
+    void writeDiagnosticLog(`[mcp:http-started] ${url}`);
+    return url;
+  } catch (err) {
+    if (persistEnabled) {
+      mcpServiceConfig.enabled = false;
+      await saveMcpServiceConfig();
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    writeStderrLine(`[mcp:http-start-failed] ${message}`);
+    void writeDiagnosticLog(`[mcp:http-start-failed] ${message}`);
+    if (interactive) {
+      dialog.showErrorBox('Failed to Start MCP Service', message);
+    }
+    throw err;
+  } finally {
+    mcpServiceStartPromise = null;
+    rebuildApplicationMenu();
+  }
+}
+
+async function stopLocalMcpService({ persistEnabled = false, interactive = false } = {}) {
+  if (mcpServiceStartPromise) {
+    await mcpServiceStartPromise.catch(() => undefined);
+  }
+  if (!mcpServiceServer) {
+    if (persistEnabled && mcpServiceConfig.enabled) {
+      mcpServiceConfig.enabled = false;
+      await saveMcpServiceConfig();
+      rebuildApplicationMenu();
+    }
+    return;
+  }
+  const server = mcpServiceServer;
+  mcpServiceServer = null;
+  try {
+    await new Promise((resolve, reject) => {
+      server.close((err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+    if (persistEnabled) {
+      mcpServiceConfig.enabled = false;
+      await saveMcpServiceConfig();
+    }
+    writeStderrLine('[mcp:http-stopped]');
+    void writeDiagnosticLog('[mcp:http-stopped]');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (interactive) {
+      dialog.showErrorBox('Failed to Stop MCP Service', message);
+    }
+    throw err;
+  } finally {
+    rebuildApplicationMenu();
+  }
+}
+
+async function restartLocalMcpService({ interactive = false } = {}) {
+  const shouldRemainEnabled = mcpServiceConfig.enabled;
+  await stopLocalMcpService({ persistEnabled: false, interactive });
+  if (shouldRemainEnabled) {
+    await startLocalMcpService({ persistEnabled: false, interactive });
+  }
+}
+
+function startEmbeddedMcpWorker() {
+  if (mcpStartupPromise) {
+    return mcpStartupPromise;
+  }
+  mcpStartupPromise = new Promise((resolve, reject) => {
+    mcpWorkerStopping = false;
+    let settled = false;
+    const worker = new Worker(path.join(__dirname, '..', 'mcp', 'editor-mcp-server.mjs'), {
+      workerData: {
+        transport: 'ipc',
+        editorUrl: process.env.ZEPHYR_EDITOR_ELECTRON_URL || process.env.EDITOR_URL || undefined
+      }
+    });
+    mcpWorker = worker;
+    worker.on('message', (message) => {
+      if (!message || typeof message !== 'object') {
+        return;
+      }
+      if (message.type === 'ready') {
+        mcpBridgeInfo = message.bridge ?? null;
+        settled = true;
+        resolve(mcpBridgeInfo);
+        return;
+      }
+      if (message.type === 'rpcResult') {
+        const pending = pendingRpcRequests.get(message.requestId);
+        if (pending) {
+          pendingRpcRequests.delete(message.requestId);
+          pending.resolve(message.response);
+        }
+      }
+    });
+    worker.once('error', (err) => {
+      rejectPendingRpcRequests(err);
+      mcpWorker = null;
+      mcpBridgeInfo = null;
+      mcpStartupPromise = null;
+      if (!settled) {
+        reject(err);
+      } else {
+        writeStderrLine(`[mcp:worker-error] ${err?.stack || err}`);
+        void writeDiagnosticLog(`[mcp:worker-error] ${err?.stack || err}`);
+      }
+    });
+    worker.once('exit', (code) => {
+      const err = new Error(`Embedded MCP worker exited with code ${code}`);
+      rejectPendingRpcRequests(err);
+      mcpWorker = null;
+      mcpBridgeInfo = null;
+      mcpStartupPromise = null;
+      if (!settled) {
+        reject(err);
+      } else if (code !== 0 && !mcpWorkerStopping) {
+        writeStderrLine(`[mcp:worker-exit] ${code}`);
+        void writeDiagnosticLog(`[mcp:worker-exit] ${code}`);
+      }
+    });
+  });
+  return mcpStartupPromise;
+}
+
+function buildEditorLaunchUrl(rawUrl, device) {
+  const url = new URL(rawUrl);
+  url.searchParams.set('desktop', 'electron');
+  url.searchParams.set('device', device);
+  if (mcpBridgeInfo?.port) {
+    url.searchParams.set('mcp', String(mcpBridgeInfo.port));
+  }
+  if (mcpBridgeInfo?.token) {
+    url.searchParams.set('mcpToken', String(mcpBridgeInfo.token));
+  }
+  return url.toString();
+}
+
+function stripMcpQueryParams(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    url.searchParams.delete('mcp');
+    url.searchParams.delete('mcpPort');
+    url.searchParams.delete('mcpToken');
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: EDITOR_PROTOCOL,
@@ -46,7 +810,6 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 function createWindow() {
-  Menu.setApplicationMenu(null);
   const mainWindow = new BrowserWindow({
     width: 1440,
     height: 960,
@@ -56,6 +819,13 @@ function createWindow() {
     icon: editorIconPath(),
     webPreferences: editorWebPreferences()
   });
+  mainWindowRef = mainWindow;
+  mainWindow.on('closed', () => {
+    if (mainWindowRef === mainWindow) {
+      mainWindowRef = null;
+    }
+  });
+  mainWindow.maximize();
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (isInternalEditorUrl(url)) {
@@ -70,22 +840,22 @@ function createWindow() {
 
   mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
     const lineText = `[renderer:${level}] ${message} (${sourceId}:${line})`;
-    console.log(lineText);
+    writeStderrLine(lineText);
     writeDiagnosticLog(lineText);
   });
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
     const lineText = `[renderer:load-failed] ${errorCode} ${errorDescription}: ${validatedURL}`;
-    console.error(lineText);
+    writeStderrLine(lineText);
     writeDiagnosticLog(lineText);
   });
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     const lineText = `[renderer:gone] ${details.reason} exitCode=${details.exitCode}`;
-    console.error(lineText);
+    writeStderrLine(lineText);
     writeDiagnosticLog(lineText);
   });
   mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
     const lineText = `[renderer:preload-error] ${preloadPath}: ${error?.stack || error}`;
-    console.error(lineText);
+    writeStderrLine(lineText);
     writeDiagnosticLog(lineText);
   });
   mainWindow.webContents.on('did-finish-load', () => {
@@ -116,19 +886,19 @@ function createWindow() {
         await fs.writeFile(`${screenshotPath}.json`, JSON.stringify(diagnostics, null, 2));
         const image = await mainWindow.webContents.capturePage();
         await fs.writeFile(screenshotPath, image.toPNG());
-        console.log(`[renderer:screenshot] ${screenshotPath}`);
+        writeStderrLine(`[renderer:screenshot] ${screenshotPath}`);
       } catch (err) {
-        console.error('[renderer:screenshot-failed]', err);
+        writeStderrLine(`[renderer:screenshot-failed] ${err?.stack || err}`);
       }
     }, 3000);
   });
 
   const devUrl = process.env.ZEPHYR_EDITOR_ELECTRON_URL;
+  const device = getConfiguredEditorRHI();
   if (devUrl) {
-    mainWindow.loadURL(devUrl);
+    mainWindow.loadURL(buildEditorLaunchUrl(devUrl, device));
   } else {
-    const device = process.env.ZEPHYR_EDITOR_DEVICE || 'webgl2';
-    mainWindow.loadURL(`${EDITOR_PROTOCOL}://app/index.html?desktop=electron&device=${encodeURIComponent(device)}`);
+    mainWindow.loadURL(buildEditorLaunchUrl(`${EDITOR_PROTOCOL}://app/index.html`, device));
   }
 
   if (process.env.ZEPHYR_EDITOR_DEVTOOLS === '1') {
@@ -153,7 +923,7 @@ function createPreviewWindow(url) {
     }
     return { action: 'deny' };
   });
-  previewWindow.loadURL(url);
+  previewWindow.loadURL(stripMcpQueryParams(url));
 }
 
 function isInternalEditorUrl(rawUrl) {
@@ -455,21 +1225,76 @@ ipcMain.handle(FS_CHANNEL, async (_event, payload) => {
   return await dispatchFS(payload.operation, payload.args);
 });
 
+ipcMain.handle(SETTINGS_CHANNEL, async (_event, payload) => {
+  if (!payload || typeof payload.operation !== 'string' || !payload.args) {
+    throw new Error('Invalid settings request');
+  }
+  switch (payload.operation) {
+    case 'getGlobalSettings':
+      return getGlobalSettingsPayload();
+    case 'saveGlobalSettings':
+      return await applyGlobalSettings(payload.args.settings ?? {});
+    case 'copyMcpServiceUrl': {
+      const url = getConfiguredMcpServiceUrl();
+      clipboard.writeText(url);
+      return url;
+    }
+    case 'toggleDevTools': {
+      if (!mainWindowRef || mainWindowRef.isDestroyed()) {
+        throw new Error('Main editor window is not available');
+      }
+      if (mainWindowRef.webContents.isDevToolsOpened()) {
+        mainWindowRef.webContents.closeDevTools();
+        return false;
+      }
+      mainWindowRef.webContents.openDevTools({ mode: 'detach' });
+      return true;
+    }
+    default:
+      throw new Error(`Unknown settings operation: ${payload.operation}`);
+  }
+});
+
 ipcMain.on(LOG_CHANNEL, (_event, payload) => {
   const lineText = `[renderer:${payload?.type || 'log'}] ${payload?.message || ''}`;
-  console.log(lineText);
+  writeStderrLine(lineText);
   writeDiagnosticLog(lineText);
 });
 
-app.whenReady().then(() => {
-  registerEditorProtocol();
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+app.whenReady()
+  .then(async () => {
+    await loadMcpServiceConfig();
+    await loadEditorGlobalConfig();
+    registerEditorProtocol();
+    await startEmbeddedMcpWorker();
+    rebuildApplicationMenu();
+    createWindow();
+    if (mcpServiceConfig.enabled) {
+      await startLocalMcpService({ persistEnabled: false, interactive: true }).catch(() => undefined);
     }
+
+    app.on('activate', async () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        await startEmbeddedMcpWorker();
+        rebuildApplicationMenu();
+        createWindow();
+      }
+    });
+  })
+  .catch((err) => {
+    writeStderrLine(`[app:startup-failed] ${err?.stack || err}`);
+    void writeDiagnosticLog(`[app:startup-failed] ${err?.stack || err}`);
+    app.exit(1);
   });
+
+app.on('before-quit', () => {
+  if (mcpServiceServer) {
+    void stopLocalMcpService({ persistEnabled: false, interactive: false }).catch(() => undefined);
+  }
+  if (mcpWorker) {
+    mcpWorkerStopping = true;
+    void mcpWorker.terminate().catch(() => undefined);
+  }
 });
 
 app.on('window-all-closed', () => {

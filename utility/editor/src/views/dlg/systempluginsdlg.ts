@@ -783,7 +783,7 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
   private async installPlugin() {
     this._busy = true;
     try {
-      const files = await FilePicker.chooseFiles(false, '.ts,.js,text/typescript,text/javascript');
+      const files = await FilePicker.chooseFiles(false, '.zip');
       if (files?.[0]) {
         await this._editor.installSystemPluginFromFile(files[0]);
         await this.reload();

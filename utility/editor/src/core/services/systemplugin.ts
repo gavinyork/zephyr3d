@@ -1,8 +1,10 @@
 import { PathUtils } from '@zephyr3d/base';
-import { BlobReader, BlobWriter, ZipReader, type FileEntry } from '@zip.js/zip.js';
+import { BlobReader, TextWriter, ZipReader, configure, type FileEntry } from '@zip.js/zip.js';
 import { libDir } from '../build/templates';
 import { installDeps } from '../build/dep';
 import { createSystemPluginVFS } from './storage';
+
+configure({ useWebWorkers: false });
 
 const systemPluginVFS = createSystemPluginVFS();
 
@@ -603,10 +605,9 @@ export class SystemPluginService {
         if (entry.directory) {
           continue;
         }
-        const blob = await (entry as FileEntry).getData(new BlobWriter());
         inputFiles.push({
           path: this.normalizePluginFilePath(entry.filename),
-          source: await blob.text()
+          source: await (entry as FileEntry).getData(new TextWriter())
         });
       }
       const packageFiles = this.normalizeImportedPluginFiles(inputFiles);

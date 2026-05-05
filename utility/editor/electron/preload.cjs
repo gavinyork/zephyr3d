@@ -2,9 +2,14 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const FS_CHANNEL = 'zephyr-editor:fs';
 const LOG_CHANNEL = 'zephyr-editor:log';
+const SETTINGS_CHANNEL = 'zephyr-editor:settings';
 
 function invokeFS(operation, args) {
   return ipcRenderer.invoke(FS_CHANNEL, { operation, args });
+}
+
+function invokeSettings(operation, args) {
+  return ipcRenderer.invoke(SETTINGS_CHANNEL, { operation, args });
 }
 
 contextBridge.exposeInMainWorld('zephyrEditorDesktop', {
@@ -26,6 +31,12 @@ contextBridge.exposeInMainWorld('zephyrEditorDesktop', {
     move: (scope, sourcePath, targetPath, options) =>
       invokeFS('move', { scope, sourcePath, targetPath, options }),
     deleteScope: (scope) => invokeFS('deleteScope', { scope })
+  },
+  settings: {
+    getGlobalSettings: () => invokeSettings('getGlobalSettings', {}),
+    saveGlobalSettings: (settings) => invokeSettings('saveGlobalSettings', { settings }),
+    copyMcpServiceUrl: () => invokeSettings('copyMcpServiceUrl', {}),
+    toggleDevTools: () => invokeSettings('toggleDevTools', {})
   }
 });
 

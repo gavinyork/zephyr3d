@@ -8,6 +8,7 @@
   "files": [
     "dist/**/*",
     "electron/**/*",
+    "mcp/**/*",
     "package.json"
   ],
   "extraResources": [

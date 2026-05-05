@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import fs from 'fs';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
+
+const packageJson = JSON.parse(fs.readFileSync(resolve(__dirname, 'package.json'), 'utf8'));
 
 export default defineConfig({
   root: '.',
@@ -92,7 +95,8 @@ export default defineConfig({
     extensions: ['.js', '.ts', '.jsx', '.tsx', '.json']
   },
   define: {
-    __DEV__: JSON.stringify(process.env.NODE_ENV === 'development')
+    __DEV__: JSON.stringify(process.env.NODE_ENV === 'development'),
+    __EDITOR_VERSION__: JSON.stringify(packageJson.version)
   },
   css: {
     preprocessorOptions: {

@@ -23,6 +23,7 @@ async function main() {
   await fs.mkdir(resolvedStaging, { recursive: true });
   await copyDirectory(path.join(projectRoot, 'dist'), path.join(resolvedStaging, 'dist'));
   await copyDirectory(path.join(projectRoot, 'electron'), path.join(resolvedStaging, 'electron'));
+  await copyDirectory(path.join(projectRoot, 'mcp'), path.join(resolvedStaging, 'mcp'));
 
   const appPackageJson = {
     name: packageJson.name,

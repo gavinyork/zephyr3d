@@ -406,10 +406,10 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
         if (parent) {
           parent.subMenus = [...(parent.subMenus ?? []), ...normalized];
         } else {
-          items.push(...normalized);
+          this.insertMainMenuItems(items, normalized);
         }
       } else {
-        items.push(...normalized);
+        this.insertMainMenuItems(items, normalized);
       }
     }
   }
@@ -455,6 +455,15 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
       enabled: item.enabled ? () => item.enabled(ctx) : undefined,
       subMenus: item.subMenus ? this.toMenuItemOptions(item.subMenus, ctx) : undefined
     }));
+  }
+
+  private insertMainMenuItems(target: MenuItemOptions[], items: MenuItemOptions[]) {
+    const helpIndex = target.findIndex((item) => item.id === 'help');
+    if (helpIndex >= 0) {
+      target.splice(helpIndex, 0, ...items);
+    } else {
+      target.push(...items);
+    }
   }
 
   private createPluginContext(plugin: EditorPlugin): EditorPluginContext {

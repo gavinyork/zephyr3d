@@ -38,6 +38,18 @@ export type DesktopFileStat = {
   accessed?: string;
 };
 
+export type DesktopMcpSettings = {
+  enabled: boolean;
+  port: number;
+  running: boolean;
+  url: string;
+};
+
+export type DesktopGlobalSettings = {
+  mcp: DesktopMcpSettings | null;
+  defaultRHI: 'webgpu' | 'webgl2' | 'webgl';
+};
+
 export type ZephyrEditorDesktopAPI = {
   platform: string;
   versions: {
@@ -74,6 +86,12 @@ export type ZephyrEditorDesktopAPI = {
       options?: DesktopFSMoveOptions
     ): Promise<void>;
     deleteScope(scope: DesktopFSScope): Promise<void>;
+  };
+  settings: {
+    getGlobalSettings(): Promise<DesktopGlobalSettings>;
+    saveGlobalSettings(settings: Partial<DesktopGlobalSettings>): Promise<DesktopGlobalSettings>;
+    copyMcpServiceUrl(): Promise<string>;
+    toggleDevTools(): Promise<boolean>;
   };
 };
 

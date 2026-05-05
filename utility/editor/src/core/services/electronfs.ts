@@ -1,6 +1,18 @@
-import type { FileMetadata, FileStat, ListOptions, MoveOptions, ReadOptions, WriteOptions } from '@zephyr3d/base';
+import type {
+  FileMetadata,
+  FileStat,
+  ListOptions,
+  MoveOptions,
+  ReadOptions,
+  WriteOptions
+} from '@zephyr3d/base';
 import { PathUtils, VFS, VFSError } from '@zephyr3d/base';
-import { getDesktopAPI, type DesktopFileMetadata, type DesktopFileStat, type DesktopFSScope } from './desktop';
+import {
+  getDesktopAPI,
+  type DesktopFileMetadata,
+  type DesktopFileStat,
+  type DesktopFSScope
+} from './desktop';
 
 export class ElectronFS extends VFS {
   private readonly scope: DesktopFSScope;
@@ -18,7 +30,9 @@ export class ElectronFS extends VFS {
     const entries = await this.api().readDirectory(this.scope, path, {
       recursive: !!options?.recursive
     });
-    return entries.map((entry) => this.toFileMetadata(entry)).filter((entry) => this.matchesFilter(entry, options));
+    return entries
+      .map((entry) => this.toFileMetadata(entry))
+      .filter((entry) => this.matchesFilter(entry, options));
   }
 
   protected async _deleteDirectory(path: string, recursive: boolean) {

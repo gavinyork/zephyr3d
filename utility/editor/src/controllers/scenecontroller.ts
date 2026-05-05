@@ -10,6 +10,9 @@ import { DlgProjectSettings } from '../views/dlg/projectsettingsdlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgSystemPlugins } from '../views/dlg/systempluginsdlg';
 import type { Nullable } from '@zephyr3d/base';
+import { DlgEditorSettings } from '../views/dlg/editorsettingsdlg';
+import { EditorSettingsService } from '../core/services/editorsettings';
+import { DlgAbout } from '../views/dlg/aboutdlg';
 
 export class SceneController extends BaseController<SceneModel, SceneView> {
   protected _editor: Editor;
@@ -138,6 +141,33 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
         if (newSettings) {
           await this._editor.saveProjectSettings(newSettings);
         }
+        arg?.cb?.();
+        break;
+      }
+      case 'EDITOR_SETTINGS': {
+        try {
+          const settings = await EditorSettingsService.getGlobalSettings();
+          const newSettings = await DlgEditorSettings.editEditorSettings('Editor Settings', settings, 520);
+          if (newSettings) {
+            await EditorSettingsService.saveGlobalSettings(newSettings);
+          }
+        } catch (err) {
+          await DlgMessage.messageBox('Error', `Failed to save editor settings: ${err}`);
+        }
+        arg?.cb?.();
+        break;
+      }
+      case 'TOGGLE_DEVTOOLS': {
+        try {
+          await EditorSettingsService.toggleDevTools();
+        } catch (err) {
+          await DlgMessage.messageBox('Error', `Failed to toggle DevTools: ${err}`);
+        }
+        arg?.cb?.();
+        break;
+      }
+      case 'HELP_ABOUT': {
+        await DlgAbout.about('About Zephyr3D Editor');
         arg?.cb?.();
         break;
       }

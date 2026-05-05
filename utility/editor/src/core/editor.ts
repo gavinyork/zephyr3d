@@ -94,6 +94,7 @@ class RemoteProjectDirectoryReader implements HttpDirectoryReader {
 }
 
 export class Editor {
+  private static _current: Editor = null;
   private readonly _moduleManager: ModuleManager;
   private readonly _assetImages: {
     brushes: { [key: string]: DRef<Texture2D> };
@@ -107,6 +108,7 @@ export class Editor {
   private readonly _plugins: EditorPluginManager;
   private readonly _systemPluginRegistrations: Map<string, SystemPluginRecord>;
   constructor() {
+    Editor._current = this;
     this._moduleManager = new ModuleManager();
     this._assetImages = { brushes: {}, app: {} };
     this._leakTestA = null;
@@ -116,6 +118,9 @@ export class Editor {
     this._extraLibs = {};
     this._plugins = new EditorPluginManager(this);
     this._systemPluginRegistrations = new Map();
+  }
+  static get current() {
+    return this._current;
   }
   get moduleManager() {
     return this._moduleManager;
@@ -215,6 +220,9 @@ export class Editor {
   }
   getBrushes() {
     return this._assetImages.brushes;
+  }
+  getAppImage(name: string) {
+    return this._assetImages.app[name]?.get() ?? null;
   }
   get currentProject() {
     return this._currentProject;

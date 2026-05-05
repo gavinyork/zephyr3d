@@ -2,10 +2,12 @@
 import crypto from 'node:crypto';
 import net from 'node:net';
 import process from 'node:process';
+import { isMainThread, parentPort, workerData } from 'node:worker_threads';
 
-const DEFAULT_PORT = Number(process.env.EDITOR_MCP_PORT || 47231);
-const BRIDGE_TOKEN = process.env.EDITOR_MCP_TOKEN || crypto.randomBytes(12).toString('hex');
-const DEFAULT_EDITOR_URL = process.env.EDITOR_URL || 'http://127.0.0.1:8000/dist/index.html';
+const DEFAULT_PORT = Number(process.env.EDITOR_MCP_PORT || workerData?.port || 47231);
+const BRIDGE_TOKEN = process.env.EDITOR_MCP_TOKEN || workerData?.token || crypto.randomBytes(12).toString('hex');
+const DEFAULT_EDITOR_URL = process.env.EDITOR_URL || workerData?.editorUrl || 'http://127.0.0.1:8000/dist/index.html';
+const IPC_TRANSPORT = !isMainThread && workerData?.transport === 'ipc';
 
 class EditorBridgeServer {
   constructor(port, token) {
@@ -278,6 +280,29 @@ class EditorBridgeServer {
       client: this.clientInfo
     };
   }
+
+  async close() {
+    const client = this.client;
+    this.client = null;
+    this.clientInfo = null;
+    if (client && !client.destroyed) {
+      client.destroy();
+    }
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error('Editor bridge server is shutting down'));
+    }
+    this.pending.clear();
+    for (const waiter of this.waiters.splice(0)) {
+      waiter();
+    }
+    if (!this.server.listening) {
+      return;
+    }
+    await new Promise((resolve) => {
+      this.server.close(() => resolve());
+    });
+  }
 }
 
 function encodeWebSocketFrame(payload, opcode) {
@@ -303,6 +328,12 @@ function encodeWebSocketFrame(payload, opcode) {
 const bridge = new EditorBridgeServer(DEFAULT_PORT, BRIDGE_TOKEN);
 await bridge.listen();
 log(`Editor MCP bridge listening on ws://127.0.0.1:${bridge.port}/editor-mcp`);
+if (IPC_TRANSPORT) {
+  parentPort?.postMessage({
+    type: 'ready',
+    bridge: bridge.getInfo()
+  });
+}
 
 const MATERIAL_CLASSES = [
   'UnlitMaterial',
@@ -1673,10 +1704,6 @@ for (const alias of TOOL_ALIASES) {
 
 let stdinBuffer = Buffer.alloc(0);
 let stdioResponseMode = 'jsonl';
-process.stdin.on('data', (chunk) => {
-  stdinBuffer = Buffer.concat([stdinBuffer, chunk]);
-  parseMessages();
-});
 
 function parseMessages() {
   while (true) {
@@ -1701,7 +1728,7 @@ function parseMessages() {
       stdinBuffer = stdinBuffer.slice(newline + 1);
       if (line.length > 0) {
         stdioResponseMode = 'jsonl';
-        void handleRpc(JSON.parse(line));
+        void handleIncomingRpc(JSON.parse(line), writeRpc);
       }
       continue;
     }
@@ -1734,11 +1761,11 @@ function parseMessages() {
     const body = stdinBuffer.slice(bodyStart, bodyEnd).toString('utf8');
     stdinBuffer = stdinBuffer.slice(bodyEnd);
     stdioResponseMode = 'content-length';
-    void handleRpc(JSON.parse(body));
+    void handleIncomingRpc(JSON.parse(body), writeRpc);
   }
 }
 
-async function handleRpc(message) {
+async function handleIncomingRpc(message, responder) {
   if (!message || typeof message !== 'object') {
     return;
   }
@@ -1749,9 +1776,9 @@ async function handleRpc(message) {
   log(`MCP <- ${message.method ?? '<notification>'} #${message.id}`);
   try {
     const result = await dispatchRpc(message.method, message.params ?? {});
-    writeRpc({ jsonrpc: '2.0', id: message.id, result });
+    responder({ jsonrpc: '2.0', id: message.id, result });
   } catch (err) {
-    writeRpc({
+    responder({
       jsonrpc: '2.0',
       id: message.id,
       error: {
@@ -1760,6 +1787,40 @@ async function handleRpc(message) {
       }
     });
   }
+}
+
+function installStdioTransport() {
+  process.stdin.on('data', (chunk) => {
+    stdinBuffer = Buffer.concat([stdinBuffer, chunk]);
+    parseMessages();
+  });
+}
+
+function installIpcTransport() {
+  parentPort?.on('message', (message) => {
+    if (!message || typeof message !== 'object') {
+      return;
+    }
+    if (message.type === 'rpc') {
+      void handleIncomingRpc(message.message, (response) => {
+        parentPort?.postMessage({
+          type: 'rpcResult',
+          requestId: message.requestId,
+          response
+        });
+      });
+      return;
+    }
+    if (message.type === 'rpcNotification') {
+      void handleIncomingRpc(message.message, () => {});
+      return;
+    }
+    if (message.type === 'shutdown') {
+      void bridge.close().finally(() => {
+        parentPort?.postMessage({ type: 'shutdown-complete' });
+      });
+    }
+  });
 }
 
 async function dispatchRpc(method, params) {
@@ -1829,4 +1890,10 @@ function writeRpc(message) {
 
 function log(message) {
   process.stderr.write(`${message}\n`);
+}
+
+if (IPC_TRANSPORT) {
+  installIpcTransport();
+} else {
+  installStdioTransport();
 }
