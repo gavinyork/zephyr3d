@@ -20,6 +20,7 @@ import { eventBus } from '../core/eventbus';
 import type { SceneHierarchyNodePickerPayload } from './scenehierarchy';
 import type { VFSRendererAssetPickerPayload } from './vfsrenderer';
 import { matchesMimeType } from '../helpers/mimematch';
+import { CustomInputTextFlags, customTextInput } from './textinput';
 
 interface Property<T extends {}> {
   objectPath: string;
@@ -753,12 +754,7 @@ export class PropertyEditor extends Observable<{
     } else {
       const clicked = this.renderClippedStringField('##value_display', val[0], fieldWidth, canInlineEdit);
       if (clicked && canInlineEdit) {
-        changed = ImGui.InputText(
-          '##value',
-          val,
-          undefined,
-          readonly ? ImGui.InputTextFlags.ReadOnly : undefined
-        );
+        changed = customTextInput('##value', val, '', readonly ? CustomInputTextFlags.ReadOnly : 0);
       }
     }
     if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
@@ -947,12 +943,7 @@ export class PropertyEditor extends Observable<{
           }
         } else {
           const val = tmpProperty.str as [string];
-          changed = ImGui.InputText(
-            '##value',
-            val,
-            undefined,
-            readonly ? ImGui.InputTextFlags.ReadOnly : undefined
-          );
+          changed = customTextInput('##value', val, '', readonly ? CustomInputTextFlags.ReadOnly : 0);
         }
         break;
       }
@@ -1218,12 +1209,7 @@ export class PropertyEditor extends Observable<{
                 ImGui.SetKeyboardFocusHere();
                 this._pendingStringEditorFocus = null;
               }
-              changed = ImGui.InputText(
-                '##value',
-                val,
-                undefined,
-                readonly ? ImGui.InputTextFlags.ReadOnly : undefined
-              );
+              changed = customTextInput('##value', val, '', readonly ? CustomInputTextFlags.ReadOnly : 0);
             } else {
               const clicked = this.renderClippedStringField(
                 '##value_display',

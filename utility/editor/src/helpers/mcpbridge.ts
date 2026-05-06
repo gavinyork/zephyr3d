@@ -1893,13 +1893,11 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     }
     case 'getCurrentProject': {
       return new Promise<{
-        projectInfo:
-          | {
-              name: string;
-              id: string;
-              path?: string | null;
-            }
-          | null;
+        projectInfo: {
+          name: string;
+          id: string;
+          path?: string | null;
+        } | null;
         err: string | null;
       }>((resolve) => {
         ProjectService.getCurrentProjectInfo()

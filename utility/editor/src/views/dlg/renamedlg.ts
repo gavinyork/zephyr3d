@@ -1,5 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
+import { CustomInputTextFlags, customTextInput } from '../../components/textinput';
 
 export class DlgRename extends DialogRenderer<string> {
   private _name: string;
@@ -19,7 +20,7 @@ export class DlgRename extends DialogRenderer<string> {
       this._firstOpen = false;
     }
     ImGui.PushItemWidth(ImGui.GetContentRegionAvail().x);
-    if (ImGui.InputText('###Rename', text, undefined, ImGui.InputTextFlags.AutoSelectAll)) {
+    if (customTextInput('###Rename', text, '', CustomInputTextFlags.AutoSelectAll)) {
       this._name = text[0];
     }
     ImGui.PopItemWidth();

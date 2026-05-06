@@ -20,6 +20,7 @@ import type {
 } from '@zephyr3d/base';
 import { PathUtils, VFSError, VFS } from '@zephyr3d/base';
 import { VFSRenderer } from '../../components/vfsrenderer';
+import { CustomInputTextFlags, customTextInput } from '../../components/textinput';
 
 function getPluginDependencyLines(plugin: SystemPluginRecord): string[] {
   const dependencies = Object.entries(plugin.dependencies ?? {}).sort(([a], [b]) => a.localeCompare(b));
@@ -670,12 +671,12 @@ class DlgPluginSettings extends DialogRenderer<Record<string, unknown> | null> {
     }
 
     const textValue = [String(this._values[key] ?? descriptor.default ?? '')] as [string];
-    const flags = descriptor.secret ? ImGui.InputTextFlags.Password : ImGui.InputTextFlags.None;
+    const flags = descriptor.secret ? CustomInputTextFlags.Password : 0;
     if (descriptor.multiline) {
-      if (ImGui.InputTextMultiline(`##${key}`, textValue, undefined, new ImGui.ImVec2(-1, 80), flags)) {
+      if (customTextInput(`##${key}`, textValue, '', CustomInputTextFlags.Multiline | flags, -1, 80)) {
         this._values[key] = textValue[0];
       }
-    } else if (ImGui.InputText(`##${key}`, textValue, undefined, flags)) {
+    } else if (customTextInput(`##${key}`, textValue, '', flags)) {
       this._values[key] = textValue[0];
     }
     this.renderSettingDescription(descriptor);

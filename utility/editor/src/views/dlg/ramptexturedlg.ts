@@ -2,6 +2,7 @@ import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 import { RampTextureCreator } from '../../components/ramptexture';
 import type { Interpolator } from '@zephyr3d/base';
+import { customTextInput } from '../../components/textinput';
 
 export class DlgRampTextureCreator extends DialogRenderer<{
   data: Uint8ClampedArray<ArrayBuffer>;
@@ -44,7 +45,7 @@ export class DlgRampTextureCreator extends DialogRenderer<{
   }
   doRender(): void {
     const name = [this._name] as [string];
-    if (ImGui.InputText('Asset Name', name)) {
+    if (customTextInput('Asset Name', name)) {
       this._name = name[0];
     }
     const height = ImGui.GetContentRegionAvail().y - ImGui.GetFrameHeightWithSpacing();

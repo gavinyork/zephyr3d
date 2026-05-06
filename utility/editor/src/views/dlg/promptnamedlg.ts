@@ -1,5 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
+import { CustomInputTextFlags, customTextInput } from '../../components/textinput';
 
 export class DlgPromptName extends DialogRenderer<string> {
   private _hint: string;
@@ -21,6 +22,13 @@ export class DlgPromptName extends DialogRenderer<string> {
   }
   doRender(): void {
     ImGui.SetKeyboardFocusHere();
+    const textEntered = customTextInput(
+      this._label,
+      this._name,
+      this._hint,
+      CustomInputTextFlags.AutoSelectAll | CustomInputTextFlags.EnterReturnsTrue
+    );
+    /*
     const textEntered = ImGui.InputTextWithHint(
       this._label,
       this._hint,
@@ -28,6 +36,7 @@ export class DlgPromptName extends DialogRenderer<string> {
       undefined,
       ImGui.InputTextFlags.AutoSelectAll | ImGui.InputTextFlags.EnterReturnsTrue
     );
+    */
     ImGui.Button('Ok');
     if (this._name[0] && (textEntered || (ImGui.IsItemHovered() && ImGui.IsMouseReleased(0)))) {
       this.close(this._name[0]);

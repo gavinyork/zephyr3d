@@ -1,6 +1,7 @@
 import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 import { renderEditableCombo } from '../../components/editablecombo';
+import { customTextInput } from '../../components/textinput';
 
 export class DlgSelectAnimation extends DialogRenderer<{ animationName: string; trackName: string }> {
   private readonly _animationNames: string[];
@@ -35,7 +36,7 @@ export class DlgSelectAnimation extends DialogRenderer<{ animationName: string; 
         false,
         'Enter the animation name or select one...'
       );
-      ImGui.InputText('TrackName:', this._trackName);
+      customTextInput('TrackName:', this._trackName);
     }
     ImGui.EndChild();
     if (ImGui.Button('Create')) {

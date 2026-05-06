@@ -6,6 +6,7 @@ import { DialogRenderer } from '../../components/modal';
 import { libDir } from '../../core/build/templates';
 import { type ProjectInfo, type ProjectSettings, ProjectService } from '../../core/services/project';
 import { DlgOpenFile } from './openfiledlg';
+import { customTextInput } from '../../components/textinput';
 
 class DepsContentData extends ListViewData<{ name: string; version: string }> {
   elements: { name: string; version: string }[];
@@ -120,12 +121,12 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
 
   doRender(): void {
     const title = [this._settings.title ?? this._info.name] as [string];
-    if (ImGui.InputText('Title', title, undefined, ImGui.InputTextFlags.None)) {
+    if (customTextInput('Title', title)) {
       this._settings.title = title[0];
     }
 
     const favicon = [this._settings.favicon ?? ''] as [string];
-    if (ImGui.InputText('Favicon', favicon, undefined, ImGui.InputTextFlags.None)) {
+    if (customTextInput('Favicon', favicon)) {
       this._settings.favicon = favicon[0];
     }
     if (ImGui.IsItemHovered()) {
@@ -148,7 +149,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     }
 
     const splashScreen = [this._settings.splashScreen ?? ''] as [string];
-    if (ImGui.InputText('Splash Screen', splashScreen, undefined, ImGui.InputTextFlags.None)) {
+    if (customTextInput('Splash Screen', splashScreen)) {
       this._settings.splashScreen = splashScreen[0];
     }
     if (ImGui.IsItemHovered()) {
@@ -171,7 +172,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     }
 
     const startupScene = [this._settings.startupScene ?? ''] as [string];
-    if (ImGui.InputText('Startup Scene', startupScene, undefined, ImGui.InputTextFlags.None)) {
+    if (customTextInput('Startup Scene', startupScene)) {
       this._settings.startupScene = startupScene[0];
     }
     if (ImGui.IsItemHovered()) {
@@ -194,7 +195,7 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     }
 
     const startupScript = [this._settings.startupScript ?? ''] as [string];
-    if (ImGui.InputText('Startup Script', startupScript, undefined, ImGui.InputTextFlags.None)) {
+    if (customTextInput('Startup Script', startupScript)) {
       this._settings.startupScript = startupScript[0];
     }
     if (ImGui.IsItemHovered()) {

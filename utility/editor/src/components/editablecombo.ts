@@ -1,4 +1,5 @@
 import { ImGui } from '@zephyr3d/imgui';
+import { CustomInputTextFlags, customTextInput } from './textinput';
 
 export function renderEditableCombo(
   label: string,
@@ -21,7 +22,7 @@ export function renderEditableCombo(
     if (!readonly) {
       ImGui.SetNextItemWidth(-1);
       ImGui.SetKeyboardFocusHere();
-      if (ImGui.InputText('##edit_input', value, undefined, ImGui.InputTextFlags.AutoSelectAll)) {
+      if (customTextInput('##edit_input', value, '', CustomInputTextFlags.AutoSelectAll)) {
         changed = true;
       }
       const inputFocused = ImGui.IsItemFocused();
