@@ -93,6 +93,67 @@ type VRMC1ExpressionInfo = {
   morphTargetBinds?: unknown;
 };
 
+type VRMCMToonTextureInfo = TextureInfo & {
+  scale?: number;
+};
+
+type VRMCMToonOutlineWidthMode = 'none' | 'worldCoordinates' | 'screenCoordinates';
+
+type VRMCMToonMaterialInfo = {
+  transparentWithZWrite?: boolean;
+  renderQueueOffsetNumber?: number;
+  shadeColorFactor?: number[];
+  shadeMultiplyTexture?: TextureInfo;
+  shadingShiftFactor?: number;
+  shadingShiftTexture?: VRMCMToonTextureInfo;
+  shadingToonyFactor?: number;
+  giEqualizationFactor?: number;
+  matcapFactor?: number[];
+  matcapTexture?: TextureInfo;
+  parametricRimColorFactor?: number[];
+  parametricRimFresnelPowerFactor?: number;
+  parametricRimLiftFactor?: number;
+  rimMultiplyTexture?: TextureInfo;
+  rimLightingMixFactor?: number;
+  outlineWidthMode?: VRMCMToonOutlineWidthMode;
+  outlineWidthFactor?: number;
+  outlineWidthMultiplyTexture?: TextureInfo;
+  outlineColorFactor?: number[];
+  outlineLightingMixFactor?: number;
+  uvAnimationMaskTexture?: TextureInfo;
+  uvAnimationScrollXSpeedFactor?: number;
+  uvAnimationScrollYSpeedFactor?: number;
+  uvAnimationRotationSpeedFactor?: number;
+};
+
+type GLTFMToonAssetMaterial = AssetUnlitMaterial & {
+  shadeColorFactor?: Vector3;
+  shadeMultiplyMap?: AssetTextureInfo;
+  shadingShiftFactor?: number;
+  shadingShiftMap?: AssetTextureInfo;
+  shadingShiftTextureScale?: number;
+  shadingToonyFactor?: number;
+  giEqualizationFactor?: number;
+  matcapFactor?: Vector3;
+  matcapMap?: AssetTextureInfo;
+  parametricRimColorFactor?: Vector3;
+  parametricRimFresnelPowerFactor?: number;
+  parametricRimLiftFactor?: number;
+  rimMultiplyMap?: AssetTextureInfo;
+  rimLightingMixFactor?: number;
+  outlineWidthMode?: VRMCMToonOutlineWidthMode;
+  outlineWidthFactor?: number;
+  outlineWidthMultiplyMap?: AssetTextureInfo;
+  outlineColorFactor?: Vector3;
+  outlineLightingMixFactor?: number;
+  uvAnimationMaskMap?: AssetTextureInfo;
+  uvAnimationScrollXSpeedFactor?: number;
+  uvAnimationScrollYSpeedFactor?: number;
+  uvAnimationRotationSpeedFactor?: number;
+  transparentWithZWrite?: boolean;
+  renderQueueOffsetNumber?: number;
+};
+
 const VRM_SPRING_BONE_SUBSTEPS = 3;
 const VRM_GRAVITY_ACCELERATION_SCALE = 3;
 const VRM_BASE_GRAVITY_ACCELERATION = 9.8 * VRM_GRAVITY_ACCELERATION_SCALE;
@@ -1400,7 +1461,14 @@ export class GLTFImporter extends AbstractModelImporter {
     if (materialInfo?.doubleSided) {
       pbrCommon.doubleSided = true;
     }
-    if (materialInfo?.pbrMetallicRoughness || materialInfo?.extensions?.KHR_materials_pbrSpecularGlossiness) {
+    const mtoonExtension = materialInfo?.extensions?.VRMC_materials_mtoon as
+      | VRMCMToonMaterialInfo
+      | undefined;
+    if (
+      materialInfo?.pbrMetallicRoughness ||
+      materialInfo?.extensions?.KHR_materials_pbrSpecularGlossiness ||
+      mtoonExtension
+    ) {
       pbrCommon.normalMap = materialInfo.normalTexture
         ? await this._loadTexture(model, gltf, materialInfo.normalTexture, false, vfs)
         : undefined;
@@ -1444,6 +1512,9 @@ export class GLTFImporter extends AbstractModelImporter {
         : undefined;
       pbrMetallicRoughness.metallicIndex = 2;
       pbrMetallicRoughness.roughnessIndex = 1;
+    }
+    if (mtoonExtension) {
+      return this._loadMToonMaterial(model, gltf, materialName, materialInfo, pbrCommon, mtoonExtension, vfs);
     }
     if (materialInfo?.extensions?.KHR_materials_pbrSpecularGlossiness) {
       const sg = materialInfo.extensions?.KHR_materials_pbrSpecularGlossiness;
@@ -1593,6 +1664,67 @@ export class GLTFImporter extends AbstractModelImporter {
       }
     }
     return assetMaterial;
+  }
+  /** @internal */
+  private async _loadMToonMaterial(
+    model: SharedModel,
+    gltf: GLTFContent,
+    materialName: string,
+    materialInfo: Material,
+    common: AssetMaterialCommon,
+    mtoon: VRMCMToonMaterialInfo,
+    vfs: VFS
+  ): Promise<GLTFMToonAssetMaterial> {
+    const pbr = materialInfo?.pbrMetallicRoughness;
+    const mtoonMaterial: GLTFMToonAssetMaterial = {
+      name: materialName,
+      type: 'mtoon',
+      common,
+      diffuse: new Vector4(pbr?.baseColorFactor ?? [1, 1, 1, 1]),
+      diffuseMap: pbr?.baseColorTexture
+        ? await this._loadTexture(model, gltf, pbr.baseColorTexture, true, vfs)
+        : undefined,
+      shadeColorFactor: mtoon.shadeColorFactor ? new Vector3(mtoon.shadeColorFactor) : undefined,
+      shadeMultiplyMap: mtoon.shadeMultiplyTexture
+        ? await this._loadTexture(model, gltf, mtoon.shadeMultiplyTexture, true, vfs)
+        : undefined,
+      shadingShiftFactor: mtoon.shadingShiftFactor,
+      shadingShiftMap: mtoon.shadingShiftTexture
+        ? await this._loadTexture(model, gltf, mtoon.shadingShiftTexture, false, vfs)
+        : undefined,
+      shadingShiftTextureScale: mtoon.shadingShiftTexture?.scale,
+      shadingToonyFactor: mtoon.shadingToonyFactor,
+      giEqualizationFactor: mtoon.giEqualizationFactor,
+      matcapFactor: mtoon.matcapFactor ? new Vector3(mtoon.matcapFactor) : undefined,
+      matcapMap: mtoon.matcapTexture
+        ? await this._loadTexture(model, gltf, mtoon.matcapTexture, true, vfs)
+        : undefined,
+      parametricRimColorFactor: mtoon.parametricRimColorFactor
+        ? new Vector3(mtoon.parametricRimColorFactor)
+        : undefined,
+      parametricRimFresnelPowerFactor: mtoon.parametricRimFresnelPowerFactor,
+      parametricRimLiftFactor: mtoon.parametricRimLiftFactor,
+      rimMultiplyMap: mtoon.rimMultiplyTexture
+        ? await this._loadTexture(model, gltf, mtoon.rimMultiplyTexture, true, vfs)
+        : undefined,
+      rimLightingMixFactor: mtoon.rimLightingMixFactor,
+      outlineWidthMode: mtoon.outlineWidthMode,
+      outlineWidthFactor: mtoon.outlineWidthFactor,
+      outlineWidthMultiplyMap: mtoon.outlineWidthMultiplyTexture
+        ? await this._loadTexture(model, gltf, mtoon.outlineWidthMultiplyTexture, false, vfs)
+        : undefined,
+      outlineColorFactor: mtoon.outlineColorFactor ? new Vector3(mtoon.outlineColorFactor) : undefined,
+      outlineLightingMixFactor: mtoon.outlineLightingMixFactor,
+      uvAnimationMaskMap: mtoon.uvAnimationMaskTexture
+        ? await this._loadTexture(model, gltf, mtoon.uvAnimationMaskTexture, false, vfs)
+        : undefined,
+      uvAnimationScrollXSpeedFactor: mtoon.uvAnimationScrollXSpeedFactor,
+      uvAnimationScrollYSpeedFactor: mtoon.uvAnimationScrollYSpeedFactor,
+      uvAnimationRotationSpeedFactor: mtoon.uvAnimationRotationSpeedFactor,
+      transparentWithZWrite: mtoon.transparentWithZWrite,
+      renderQueueOffsetNumber: mtoon.renderQueueOffsetNumber
+    };
+    return mtoonMaterial;
   }
   /** @internal */
   private async _loadTexture(

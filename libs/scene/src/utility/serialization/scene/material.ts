@@ -4,11 +4,13 @@ import {
   BlinnMaterial,
   LambertMaterial,
   MeshMaterial,
+  MToonMaterial,
   ParticleMaterial,
   PBRBluePrintMaterial,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
   SubsurfaceProfile,
+  type MToonOutlineWidthMode,
   type SubsurfaceProfilePreset,
   SpriteBlueprintMaterial,
   UnlitMaterial
@@ -811,6 +813,488 @@ function getUnlitMaterialProps(manager: ResourceManager): PropertyAccessor<Unlit
   ]);
 }
 
+function getMToonMaterialProps(manager: ResourceManager): PropertyAccessor<MToonMaterial>[] {
+  return defineProps([
+    {
+      name: 'AlbedoColor',
+      description: 'Base RGBA color of the MToon material',
+      type: 'rgba',
+      options: {
+        animatable: true
+      },
+      get(this: MToonMaterial, value) {
+        const color = this.albedoColor;
+        value.num[0] = color.x;
+        value.num[1] = color.y;
+        value.num[2] = color.z;
+        value.num[3] = color.w;
+      },
+      set(this: MToonMaterial, value) {
+        this.albedoColor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.albedoColor : [1, 1, 1, 1];
+      }
+    },
+    ...getTextureProps<MToonMaterial>(manager, 'albedoTexture', '2D', true, 0),
+    {
+      name: 'NormalScale',
+      description: 'Scalar applied to the MToon normal texture',
+      type: 'float',
+      phase: 1,
+      default: 1,
+      options: {
+        animatable: true,
+        minValue: 0,
+        maxValue: 2
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.normalScale;
+      },
+      set(this: MToonMaterial, value) {
+        this.normalScale = value.num[0];
+      },
+      isValid(this: MToonMaterial) {
+        return !this.$isInstance && !!this.normalTexture;
+      }
+    },
+    ...getTextureProps<MToonMaterial>(manager, 'normalTexture', '2D', false, 0),
+    {
+      name: 'DoubleSidedLighting',
+      description: 'If true, MToon lighting is evaluated on both sides of the surface',
+      type: 'bool',
+      default: true,
+      get(this: MToonMaterial, value) {
+        value.bool[0] = this.doubleSidedLighting;
+      },
+      set(this: MToonMaterial, value) {
+        this.doubleSidedLighting = value.bool[0];
+      }
+    },
+    {
+      name: 'EmissiveColor',
+      description: 'Base self-illumination color emitted by the MToon material',
+      type: 'rgb',
+      options: {
+        animatable: true
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.emissiveColor.x;
+        value.num[1] = this.emissiveColor.y;
+        value.num[2] = this.emissiveColor.z;
+      },
+      set(this: MToonMaterial, value) {
+        this.emissiveColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.emissiveColor : [0, 0, 0];
+      }
+    },
+    {
+      name: 'EmissiveStrength',
+      description: 'Intensity multiplier for the MToon emissive color and texture',
+      type: 'float',
+      default: 1,
+      options: {
+        animatable: true,
+        minValue: 0
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.emissiveStrength;
+      },
+      set(this: MToonMaterial, value) {
+        this.emissiveStrength = value.num[0];
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.emissiveStrength : 1;
+      }
+    },
+    ...getTextureProps<MToonMaterial>(manager, 'emissiveTexture', '2D', true, 0),
+    {
+      name: 'ShadeColorFactor',
+      description: 'MToon shadow-side color factor',
+      type: 'rgb',
+      default: [0, 0, 0],
+      options: {
+        animatable: true,
+        minValue: 0,
+        maxValue: 1
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.shadeColorFactor.x;
+        value.num[1] = this.shadeColorFactor.y;
+        value.num[2] = this.shadeColorFactor.z;
+      },
+      set(this: MToonMaterial, value) {
+        this.shadeColorFactor = new Vector3(value.num[0], value.num[1], value.num[2]);
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.shadeColorFactor : [0, 0, 0];
+      }
+    },
+    ...getTextureProps<MToonMaterial>(manager, 'shadeMultiplyTexture', '2D', true, 0),
+    {
+      name: 'ShadingShiftFactor',
+      description: 'MToon terminator shift factor',
+      type: 'float',
+      default: 0,
+      options: {
+        animatable: true,
+        minValue: -1,
+        maxValue: 1
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.shadingShiftFactor;
+      },
+      set(this: MToonMaterial, value) {
+        this.shadingShiftFactor = value.num[0];
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.shadingShiftFactor : 0;
+      }
+    },
+    {
+      name: 'ShadingShiftTextureScale',
+      description: 'Scale applied to the MToon shading shift texture',
+      type: 'float',
+      phase: 1,
+      default: 1,
+      options: {
+        animatable: true
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.shadingShiftTextureScale;
+      },
+      set(this: MToonMaterial, value) {
+        this.shadingShiftTextureScale = value.num[0];
+      },
+      isValid(this: MToonMaterial) {
+        return !this.$isInstance && !!this.shadingShiftTexture;
+      }
+    },
+    ...getTextureProps<MToonMaterial>(manager, 'shadingShiftTexture', '2D', false, 0),
+    {
+      name: 'ShadingToonyFactor',
+      description: 'MToon shadow edge sharpness factor',
+      type: 'float',
+      default: 0.9,
+      options: {
+        animatable: true,
+        minValue: 0,
+        maxValue: 0.99
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.shadingToonyFactor;
+      },
+      set(this: MToonMaterial, value) {
+        this.shadingToonyFactor = value.num[0];
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.shadingToonyFactor : 0.9;
+      }
+    },
+    {
+      name: 'GIEqualizationFactor',
+      description: 'MToon indirect lighting equalization factor',
+      type: 'float',
+      default: 0.9,
+      options: {
+        animatable: true,
+        minValue: 0,
+        maxValue: 1
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.giEqualizationFactor;
+      },
+      set(this: MToonMaterial, value) {
+        this.giEqualizationFactor = value.num[0];
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.giEqualizationFactor : 0.9;
+      }
+    },
+    {
+      name: 'MatcapFactor',
+      description: 'MToon matcap color factor',
+      type: 'rgb',
+      default: [1, 1, 1],
+      options: {
+        animatable: true,
+        minValue: 0,
+        maxValue: 1
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.matcapFactor.x;
+        value.num[1] = this.matcapFactor.y;
+        value.num[2] = this.matcapFactor.z;
+      },
+      set(this: MToonMaterial, value) {
+        this.matcapFactor = new Vector3(value.num[0], value.num[1], value.num[2]);
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.matcapFactor : [1, 1, 1];
+      }
+    },
+    ...getTextureProps<MToonMaterial>(manager, 'matcapTexture', '2D', true, 0),
+    {
+      name: 'ParametricRimColorFactor',
+      description: 'MToon parametric rim color factor',
+      type: 'rgb',
+      default: [0, 0, 0],
+      options: {
+        animatable: true,
+        minValue: 0,
+        maxValue: 1
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.parametricRimColorFactor.x;
+        value.num[1] = this.parametricRimColorFactor.y;
+        value.num[2] = this.parametricRimColorFactor.z;
+      },
+      set(this: MToonMaterial, value) {
+        this.parametricRimColorFactor = new Vector3(value.num[0], value.num[1], value.num[2]);
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.parametricRimColorFactor : [0, 0, 0];
+      }
+    },
+    {
+      name: 'ParametricRimFresnelPowerFactor',
+      description: 'MToon parametric rim Fresnel power factor',
+      type: 'float',
+      default: 5,
+      options: {
+        animatable: true,
+        minValue: 0
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.parametricRimFresnelPowerFactor;
+      },
+      set(this: MToonMaterial, value) {
+        this.parametricRimFresnelPowerFactor = value.num[0];
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.parametricRimFresnelPowerFactor : 5;
+      }
+    },
+    {
+      name: 'ParametricRimLiftFactor',
+      description: 'MToon parametric rim lift factor',
+      type: 'float',
+      default: 0,
+      options: {
+        animatable: true,
+        minValue: 0,
+        maxValue: 1
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.parametricRimLiftFactor;
+      },
+      set(this: MToonMaterial, value) {
+        this.parametricRimLiftFactor = value.num[0];
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.parametricRimLiftFactor : 0;
+      }
+    },
+    {
+      name: 'RimLightingMixFactor',
+      description: 'MToon rim lighting mix factor',
+      type: 'float',
+      default: 1,
+      options: {
+        animatable: true,
+        minValue: 0,
+        maxValue: 1
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.rimLightingMixFactor;
+      },
+      set(this: MToonMaterial, value) {
+        this.rimLightingMixFactor = value.num[0];
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.rimLightingMixFactor : 1;
+      }
+    },
+    ...getTextureProps<MToonMaterial>(manager, 'rimMultiplyTexture', '2D', true, 0),
+    {
+      name: 'OutlineWidthMode',
+      description: 'MToon outline width mode',
+      type: 'string',
+      default: 'none',
+      options: {
+        enum: {
+          labels: ['None', 'World Coordinates', 'Screen Coordinates'],
+          values: ['none', 'worldCoordinates', 'screenCoordinates']
+        }
+      },
+      get(this: MToonMaterial, value) {
+        value.str[0] = this.outlineWidthMode;
+      },
+      set(this: MToonMaterial, value) {
+        this.outlineWidthMode = value.str[0] as MToonOutlineWidthMode;
+      },
+      isValid(this: MToonMaterial) {
+        return !this.$isInstance;
+      }
+    },
+    {
+      name: 'OutlineWidthFactor',
+      description: 'MToon outline width factor',
+      type: 'float',
+      default: 0,
+      options: {
+        animatable: true,
+        minValue: 0
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.outlineWidthFactor;
+      },
+      set(this: MToonMaterial, value) {
+        this.outlineWidthFactor = value.num[0];
+      },
+      isValid(this: MToonMaterial) {
+        return !this.$isInstance && this.outlineWidthMode !== 'none';
+      }
+    },
+    ...getTextureProps<MToonMaterial>(manager, 'outlineWidthMultiplyTexture', '2D', false, 1, function () {
+      return this.outlineWidthMode !== 'none';
+    }),
+    {
+      name: 'OutlineColorFactor',
+      description: 'MToon outline color factor',
+      type: 'rgb',
+      default: [0, 0, 0],
+      options: {
+        animatable: true,
+        minValue: 0,
+        maxValue: 1
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.outlineColorFactor.x;
+        value.num[1] = this.outlineColorFactor.y;
+        value.num[2] = this.outlineColorFactor.z;
+      },
+      set(this: MToonMaterial, value) {
+        this.outlineColorFactor = new Vector3(value.num[0], value.num[1], value.num[2]);
+      },
+      isValid(this: MToonMaterial) {
+        return !this.$isInstance && this.outlineWidthMode !== 'none';
+      }
+    },
+    {
+      name: 'OutlineLightingMixFactor',
+      description: 'MToon outline lighting mix factor',
+      type: 'float',
+      default: 1,
+      options: {
+        animatable: true,
+        minValue: 0,
+        maxValue: 1
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.outlineLightingMixFactor;
+      },
+      set(this: MToonMaterial, value) {
+        this.outlineLightingMixFactor = value.num[0];
+      },
+      isValid(this: MToonMaterial) {
+        return !this.$isInstance && this.outlineWidthMode !== 'none';
+      }
+    },
+    ...getTextureProps<MToonMaterial>(manager, 'uvAnimationMaskTexture', '2D', false, 0),
+    {
+      name: 'UVAnimationScrollXSpeedFactor',
+      description: 'MToon UV animation scroll speed on the X axis',
+      type: 'float',
+      default: 0,
+      options: {
+        animatable: true
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.uvAnimationScrollXSpeedFactor;
+      },
+      set(this: MToonMaterial, value) {
+        this.uvAnimationScrollXSpeedFactor = value.num[0];
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.uvAnimationScrollXSpeedFactor : 0;
+      }
+    },
+    {
+      name: 'UVAnimationScrollYSpeedFactor',
+      description: 'MToon UV animation scroll speed on the Y axis',
+      type: 'float',
+      default: 0,
+      options: {
+        animatable: true
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.uvAnimationScrollYSpeedFactor;
+      },
+      set(this: MToonMaterial, value) {
+        this.uvAnimationScrollYSpeedFactor = value.num[0];
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.uvAnimationScrollYSpeedFactor : 0;
+      }
+    },
+    {
+      name: 'UVAnimationRotationSpeedFactor',
+      description: 'MToon UV animation rotation speed',
+      type: 'float',
+      default: 0,
+      options: {
+        animatable: true
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.uvAnimationRotationSpeedFactor;
+      },
+      set(this: MToonMaterial, value) {
+        this.uvAnimationRotationSpeedFactor = value.num[0];
+      },
+      getDefaultValue(this: MToonMaterial) {
+        return this.$isInstance ? this.coreMaterial.uvAnimationRotationSpeedFactor : 0;
+      }
+    },
+    {
+      name: 'TransparentWithZWrite',
+      description: 'If true, transparent MToon pixels also write depth',
+      type: 'bool',
+      default: false,
+      get(this: MToonMaterial, value) {
+        value.bool[0] = this.transparentWithZWrite;
+      },
+      set(this: MToonMaterial, value) {
+        this.transparentWithZWrite = value.bool[0];
+      },
+      isValid(this: MToonMaterial) {
+        return !this.$isInstance;
+      }
+    },
+    {
+      name: 'RenderQueueOffsetNumber',
+      description: 'MToon render queue offset number',
+      type: 'int',
+      default: 0,
+      options: {
+        minValue: -9,
+        maxValue: 9
+      },
+      get(this: MToonMaterial, value) {
+        value.num[0] = this.renderQueueOffsetNumber;
+      },
+      set(this: MToonMaterial, value) {
+        this.renderQueueOffsetNumber = value.num[0];
+      },
+      isValid(this: MToonMaterial) {
+        return !this.$isInstance;
+      }
+    }
+  ]);
+}
+
 /** @internal */
 export function getMeshMaterialClass(): SerializableClass[] {
   return [
@@ -1201,6 +1685,21 @@ export function getUnlitMaterialClass(manager: ResourceManager): SerializableCla
       }
     },
     getMeshMaterialInstanceUniformsClass(UnlitMaterial)
+  ];
+}
+
+/** @internal */
+export function getMToonMaterialClass(manager: ResourceManager): SerializableClass[] {
+  return [
+    {
+      ctor: MToonMaterial,
+      parent: MeshMaterial,
+      name: 'MToonMaterial',
+      getProps() {
+        return getMToonMaterialProps(manager);
+      }
+    },
+    getMeshMaterialInstanceUniformsClass(MToonMaterial)
   ];
 }
 

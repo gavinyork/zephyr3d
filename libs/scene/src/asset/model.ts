@@ -53,6 +53,7 @@ import type { MeshMaterial } from '../material/meshmaterial';
 import { UnlitMaterial } from '../material/unlit';
 import { PBRSpecularGlossinessMaterial } from '../material/pbrsg';
 import { PBRMetallicRoughnessMaterial } from '../material/pbrmr';
+import { MToonMaterial, type MToonOutlineWidthMode } from '../material/mtoon';
 
 type ReimportResourcePools = Map<string, Set<string>>;
 
@@ -181,6 +182,38 @@ export interface AssetMaterial {
 export interface AssetUnlitMaterial extends AssetMaterial {
   diffuseMap?: AssetTextureInfo;
   diffuse?: Vector4;
+}
+
+/**
+ * MToon related material properties for model loading
+ * @public
+ */
+export interface AssetMToonMaterial extends AssetUnlitMaterial {
+  shadeColorFactor?: Vector3;
+  shadeMultiplyMap?: AssetTextureInfo;
+  shadingShiftFactor?: number;
+  shadingShiftMap?: AssetTextureInfo;
+  shadingShiftTextureScale?: number;
+  shadingToonyFactor?: number;
+  giEqualizationFactor?: number;
+  matcapFactor?: Vector3;
+  matcapMap?: AssetTextureInfo;
+  parametricRimColorFactor?: Vector3;
+  parametricRimFresnelPowerFactor?: number;
+  parametricRimLiftFactor?: number;
+  rimMultiplyMap?: AssetTextureInfo;
+  rimLightingMixFactor?: number;
+  outlineWidthMode?: MToonOutlineWidthMode;
+  outlineWidthFactor?: number;
+  outlineWidthMultiplyMap?: AssetTextureInfo;
+  outlineColorFactor?: Vector3;
+  outlineLightingMixFactor?: number;
+  uvAnimationMaskMap?: AssetTextureInfo;
+  uvAnimationScrollXSpeedFactor?: number;
+  uvAnimationScrollYSpeedFactor?: number;
+  uvAnimationRotationSpeedFactor?: number;
+  transparentWithZWrite?: boolean;
+  renderQueueOffsetNumber?: number;
 }
 
 /**
@@ -2126,6 +2159,22 @@ export class SharedModel extends Disposable {
       }
       return t;
     }
+    async function setMaterialTexture(
+      material: Record<string, unknown>,
+      propertyPrefix: string,
+      textureInfo?: AssetTextureInfo
+    ): Promise<void> {
+      if (!textureInfo) {
+        return;
+      }
+      const info = await getTextureInfo(textureInfo);
+      if (info) {
+        material[`${propertyPrefix}Texture`] = info.texture;
+        material[`${propertyPrefix}TextureSampler`] = info.sampler;
+        material[`${propertyPrefix}TexCoordIndex`] = info.texCoord;
+        material[`${propertyPrefix}TexCoordMatrix`] = info.transform;
+      }
+    }
     if (assetMaterial.type === 'unlit') {
       const unlitAssetMaterial = assetMaterial as AssetUnlitMaterial;
       const unlitMaterial = new UnlitMaterial();
@@ -2149,6 +2198,93 @@ export class SharedModel extends Disposable {
         unlitMaterial.cullMode = 'none';
       }
       return unlitMaterial;
+    } else if (assetMaterial.type === 'mtoon') {
+      const mtoonAssetMaterial = assetMaterial as AssetMToonMaterial;
+      const mtoonMaterial = new MToonMaterial();
+      const mtoonTextureTarget = mtoonMaterial as unknown as Record<string, unknown>;
+      mtoonMaterial.albedoColor = mtoonAssetMaterial.diffuse ?? Vector4.one();
+      await setMaterialTexture(mtoonTextureTarget, 'albedo', mtoonAssetMaterial.diffuseMap);
+      await setMaterialTexture(mtoonTextureTarget, 'normal', mtoonAssetMaterial.common.normalMap);
+      mtoonMaterial.normalScale = mtoonAssetMaterial.common.bumpScale ?? 1;
+      await setMaterialTexture(mtoonTextureTarget, 'emissive', mtoonAssetMaterial.common.emissiveMap);
+      mtoonMaterial.emissiveColor = mtoonAssetMaterial.common.emissiveColor ?? Vector3.zero();
+      mtoonMaterial.emissiveStrength = mtoonAssetMaterial.common.emissiveStrength ?? 1;
+      if (mtoonAssetMaterial.shadeColorFactor) {
+        mtoonMaterial.shadeColorFactor = mtoonAssetMaterial.shadeColorFactor;
+      }
+      await setMaterialTexture(mtoonTextureTarget, 'shadeMultiply', mtoonAssetMaterial.shadeMultiplyMap);
+      if (mtoonAssetMaterial.shadingShiftFactor !== undefined) {
+        mtoonMaterial.shadingShiftFactor = mtoonAssetMaterial.shadingShiftFactor;
+      }
+      await setMaterialTexture(mtoonTextureTarget, 'shadingShift', mtoonAssetMaterial.shadingShiftMap);
+      if (mtoonAssetMaterial.shadingShiftTextureScale !== undefined) {
+        mtoonMaterial.shadingShiftTextureScale = mtoonAssetMaterial.shadingShiftTextureScale;
+      }
+      if (mtoonAssetMaterial.shadingToonyFactor !== undefined) {
+        mtoonMaterial.shadingToonyFactor = mtoonAssetMaterial.shadingToonyFactor;
+      }
+      if (mtoonAssetMaterial.giEqualizationFactor !== undefined) {
+        mtoonMaterial.giEqualizationFactor = mtoonAssetMaterial.giEqualizationFactor;
+      }
+      if (mtoonAssetMaterial.matcapFactor) {
+        mtoonMaterial.matcapFactor = mtoonAssetMaterial.matcapFactor;
+      }
+      await setMaterialTexture(mtoonTextureTarget, 'matcap', mtoonAssetMaterial.matcapMap);
+      if (mtoonAssetMaterial.parametricRimColorFactor) {
+        mtoonMaterial.parametricRimColorFactor = mtoonAssetMaterial.parametricRimColorFactor;
+      }
+      if (mtoonAssetMaterial.parametricRimFresnelPowerFactor !== undefined) {
+        mtoonMaterial.parametricRimFresnelPowerFactor = mtoonAssetMaterial.parametricRimFresnelPowerFactor;
+      }
+      if (mtoonAssetMaterial.parametricRimLiftFactor !== undefined) {
+        mtoonMaterial.parametricRimLiftFactor = mtoonAssetMaterial.parametricRimLiftFactor;
+      }
+      await setMaterialTexture(mtoonTextureTarget, 'rimMultiply', mtoonAssetMaterial.rimMultiplyMap);
+      if (mtoonAssetMaterial.rimLightingMixFactor !== undefined) {
+        mtoonMaterial.rimLightingMixFactor = mtoonAssetMaterial.rimLightingMixFactor;
+      }
+      if (mtoonAssetMaterial.outlineWidthMode !== undefined) {
+        mtoonMaterial.outlineWidthMode = mtoonAssetMaterial.outlineWidthMode;
+      }
+      if (mtoonAssetMaterial.outlineWidthFactor !== undefined) {
+        mtoonMaterial.outlineWidthFactor = mtoonAssetMaterial.outlineWidthFactor;
+      }
+      await setMaterialTexture(
+        mtoonTextureTarget,
+        'outlineWidthMultiply',
+        mtoonAssetMaterial.outlineWidthMultiplyMap
+      );
+      if (mtoonAssetMaterial.outlineColorFactor) {
+        mtoonMaterial.outlineColorFactor = mtoonAssetMaterial.outlineColorFactor;
+      }
+      if (mtoonAssetMaterial.outlineLightingMixFactor !== undefined) {
+        mtoonMaterial.outlineLightingMixFactor = mtoonAssetMaterial.outlineLightingMixFactor;
+      }
+      await setMaterialTexture(mtoonTextureTarget, 'uvAnimationMask', mtoonAssetMaterial.uvAnimationMaskMap);
+      if (mtoonAssetMaterial.uvAnimationScrollXSpeedFactor !== undefined) {
+        mtoonMaterial.uvAnimationScrollXSpeedFactor = mtoonAssetMaterial.uvAnimationScrollXSpeedFactor;
+      }
+      if (mtoonAssetMaterial.uvAnimationScrollYSpeedFactor !== undefined) {
+        mtoonMaterial.uvAnimationScrollYSpeedFactor = mtoonAssetMaterial.uvAnimationScrollYSpeedFactor;
+      }
+      if (mtoonAssetMaterial.uvAnimationRotationSpeedFactor !== undefined) {
+        mtoonMaterial.uvAnimationRotationSpeedFactor = mtoonAssetMaterial.uvAnimationRotationSpeedFactor;
+      }
+      if (mtoonAssetMaterial.transparentWithZWrite !== undefined) {
+        mtoonMaterial.transparentWithZWrite = mtoonAssetMaterial.transparentWithZWrite;
+      }
+      if (mtoonAssetMaterial.renderQueueOffsetNumber !== undefined) {
+        mtoonMaterial.renderQueueOffsetNumber = mtoonAssetMaterial.renderQueueOffsetNumber;
+      }
+      if (mtoonAssetMaterial.common.alphaMode === 'blend') {
+        mtoonMaterial.blendMode = 'blend';
+      } else if (mtoonAssetMaterial.common.alphaMode === 'mask') {
+        mtoonMaterial.alphaCutoff = mtoonAssetMaterial.common.alphaCutoff!;
+      }
+      if (mtoonAssetMaterial.common.doubleSided) {
+        mtoonMaterial.cullMode = 'none';
+      }
+      return mtoonMaterial;
     } else if (assetMaterial.type === 'pbrSpecularGlossiness') {
       const assetPBRMaterial = assetMaterial as AssetPBRMaterialSG;
       const pbrMaterial = new PBRSpecularGlossinessMaterial();

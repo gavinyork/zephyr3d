@@ -13,7 +13,7 @@ import { mixinAlbedoColor } from './mixins/albedocolor';
 import { mixinLambert } from './mixins/lightmodel/lambert';
 import { mixinTextureProps } from './mixins/texture';
 import { QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
-import { ShaderHelper } from '.';
+import { ShaderHelper } from './shader/helper';
 
 export type MToonOutlineWidthMode = 'none' | 'worldCoordinates' | 'screenCoordinates';
 
