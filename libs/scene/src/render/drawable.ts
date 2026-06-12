@@ -19,7 +19,6 @@ import type { ClusteredLight } from './cluster_light';
 import type { MeshMaterial } from '../material';
 import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import type { OIT } from './oit';
-import { getDevice } from '../app/api';
 
 /**
  * Picking result target container.
@@ -31,16 +30,6 @@ import { getDevice } from '../app/api';
  */
 export type PickTarget = { node: SceneNode; label?: string };
 
-export class RenderContext {
-  public device: AbstractDevice;
-  public renderWidth: number;
-  public renderHeight: number;
-  constructor(_camera: Camera, w: number, h: number) {
-    this.device = getDevice();
-    this.renderWidth = w;
-    this.renderHeight = h;
-  }
-}
 /**
  * Context object passed to draw calls and render helpers.
  *

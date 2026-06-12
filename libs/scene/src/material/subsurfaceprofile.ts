@@ -1,5 +1,14 @@
 import { Vector3, type Immutable } from '@zephyr3d/base';
 
+/**
+ * Built-in subsurface scattering profile preset names.
+ *
+ * @remarks
+ * The short aliases (`skin`, `wax`, and `jade`) resolve to their default
+ * canonical profiles.
+ *
+ * @public
+ */
 export type SubsurfaceProfilePreset =
   | 'skin'
   | 'skin_thin'
@@ -214,6 +223,11 @@ export class SubsurfaceProfile {
   private readonly _slot: number;
   private readonly _changeListeners: Set<() => void>;
 
+  /**
+   * Creates a subsurface scattering profile initialized with the default skin preset.
+   *
+   * @public
+   */
   constructor() {
     this._scatterRadius = new Vector3(0, 0, 0);
     this._falloffColor = new Vector3(0, 0, 0);
@@ -233,14 +247,38 @@ export class SubsurfaceProfile {
     this.applyPresetTemplate(this._preset, false);
   }
 
+  /**
+   * Gets the global profile data version.
+   *
+   * @remarks
+   * The value is incremented whenever a profile slot is allocated or profile
+   * data changes, allowing render systems to refresh cached profile textures.
+   *
+   * @public
+   */
   static get version() {
     return this._version;
   }
 
+  /**
+   * Gets the profile assigned to a packed profile slot.
+   *
+   * @param slot - The 1-based profile slot index.
+   * @returns The profile assigned to the slot, or `null` if the slot is invalid or unused.
+   *
+   * @public
+   */
   static getProfileBySlot(slot: number) {
     return slot > 0 && slot < this._profiles.length ? this._profiles[slot] : null;
   }
 
+  /**
+   * Gets the shared default skin subsurface profile.
+   *
+   * @returns The lazily-created default skin profile.
+   *
+   * @public
+   */
   static getDefaultSkinProfile() {
     if (!this._defaultSkinProfile) {
       this._defaultSkinProfile = new SubsurfaceProfile();
@@ -248,14 +286,37 @@ export class SubsurfaceProfile {
     return this._defaultSkinProfile;
   }
 
+  /**
+   * Gets the preset tint bias used by the screen-space transmission model.
+   *
+   * @param index - The packed canonical preset index.
+   * @returns The RGB tint bias for the preset, or white when the index is unknown.
+   *
+   * @public
+   */
   static getPresetTintBiasByIndex(index: number) {
     return SUBSURFACE_PROFILE_PRESET_TINT_BIAS[this.getPresetNameByIndex(index)] ?? [1, 1, 1];
   }
 
+  /**
+   * Gets the preset transmission response used by the screen-space SSS pass.
+   *
+   * @param index - The packed canonical preset index.
+   * @returns The four-component transmission response for the preset.
+   *
+   * @public
+   */
   static getPresetResponseByIndex(index: number) {
     return SUBSURFACE_PROFILE_PRESET_RESPONSE[this.getPresetNameByIndex(index)] ?? [0, 0, 0, 0];
   }
 
+  /**
+   * Computes the effective tint bias from the preset and current profile settings.
+   *
+   * @returns The derived RGB tint bias used for transmission tinting.
+   *
+   * @public
+   */
   getDerivedTintBias(): [number, number, number] {
     const base = SUBSURFACE_PROFILE_PRESET_TINT_BIAS[this._preset] ?? [1, 1, 1];
     const factors = this.getDerivedProfileFactors();
@@ -292,6 +353,13 @@ export class SubsurfaceProfile {
     ];
   }
 
+  /**
+   * Computes the effective transmission response from the preset and current profile settings.
+   *
+   * @returns The derived transmission response packed as four scalar channels.
+   *
+   * @public
+   */
   getDerivedTransmissionResponse(): [number, number, number, number] {
     const base = SUBSURFACE_PROFILE_PRESET_RESPONSE[this._preset] ?? [0, 0, 0, 0];
     const factors = this.getDerivedProfileFactors();
@@ -358,10 +426,23 @@ export class SubsurfaceProfile {
     ];
   }
 
+  /**
+   * Gets the 1-based profile slot used when encoding this profile into SSS buffers.
+   *
+   * @public
+   */
   get slot() {
     return this._slot;
   }
 
+  /**
+   * Gets or sets the RGB scatter radius.
+   *
+   * @remarks
+   * Assigning a radius also updates the mean-free-path authoring controls.
+   *
+   * @public
+   */
   get scatterRadius(): Immutable<Vector3> {
     return this._scatterRadius;
   }
@@ -373,6 +454,11 @@ export class SubsurfaceProfile {
     }
   }
 
+  /**
+   * Gets or sets the channel falloff color used by the diffusion kernel.
+   *
+   * @public
+   */
   get falloffColor(): Immutable<Vector3> {
     return this._falloffColor;
   }
@@ -390,6 +476,8 @@ export class SubsurfaceProfile {
    * @remarks
    * This is a more UE-like authoring control that keeps the existing radius-
    * based implementation, while letting tools expose a color + distance pair.
+   *
+   * @public
    */
   get meanFreePathColor(): Immutable<Vector3> {
     return this._meanFreePathColor;
@@ -403,7 +491,9 @@ export class SubsurfaceProfile {
   }
 
   /**
-   * Mean free path distance used to derive the absolute scatter radius.
+   * Gets or sets the mean free path distance used to derive the absolute scatter radius.
+   *
+   * @public
    */
   get meanFreePathDistance() {
     return this._meanFreePathDistance;
@@ -417,6 +507,15 @@ export class SubsurfaceProfile {
     }
   }
 
+  /**
+   * Gets or sets the active subsurface profile preset.
+   *
+   * @remarks
+   * Assigning a preset applies its template values to the profile. Alias preset
+   * names are resolved to their canonical preset.
+   *
+   * @public
+   */
   get preset() {
     return this._preset;
   }
@@ -429,10 +528,20 @@ export class SubsurfaceProfile {
     }
   }
 
+  /**
+   * Gets the packed canonical preset index.
+   *
+   * @public
+   */
   get presetIndex() {
     return SUBSURFACE_PROFILE_PRESET_INDEX[this._preset] ?? 0;
   }
 
+  /**
+   * Gets or sets the SSS strength multiplier.
+   *
+   * @public
+   */
   get strength() {
     return this._strength;
   }
@@ -444,6 +553,11 @@ export class SubsurfaceProfile {
     }
   }
 
+  /**
+   * Gets or sets the screen-space scatter width scale.
+   *
+   * @public
+   */
   get scale() {
     return this._scale;
   }
@@ -455,6 +569,11 @@ export class SubsurfaceProfile {
     }
   }
 
+  /**
+   * Gets or sets the world-unit scale used when converting profile radii.
+   *
+   * @public
+   */
   get worldUnitScale() {
     return this._worldUnitScale;
   }
@@ -467,6 +586,14 @@ export class SubsurfaceProfile {
     }
   }
 
+  /**
+   * Gets or sets the amount of color bleeding preserved near SSS boundaries.
+   *
+   * @remarks
+   * Values are clamped to the `[0, 1]` range.
+   *
+   * @public
+   */
   get boundaryColorBleed() {
     return this._boundaryColorBleed;
   }
@@ -479,6 +606,11 @@ export class SubsurfaceProfile {
     }
   }
 
+  /**
+   * Gets or sets the RGB tint applied to transmitted subsurface light.
+   *
+   * @public
+   */
   get transmissionTintColor(): Immutable<Vector3> {
     return this._transmissionTintColor;
   }
@@ -490,6 +622,14 @@ export class SubsurfaceProfile {
     }
   }
 
+  /**
+   * Gets or sets the extinction multiplier used by transmission attenuation.
+   *
+   * @remarks
+   * Values are clamped to zero or greater.
+   *
+   * @public
+   */
   get extinctionScale() {
     return this._extinctionScale;
   }
@@ -502,6 +642,14 @@ export class SubsurfaceProfile {
     }
   }
 
+  /**
+   * Gets or sets the normal sensitivity scale used by SSS filtering.
+   *
+   * @remarks
+   * Values are clamped to zero or greater.
+   *
+   * @public
+   */
   get normalScale() {
     return this._normalScale;
   }
@@ -514,6 +662,14 @@ export class SubsurfaceProfile {
     }
   }
 
+  /**
+   * Gets or sets the scattering distribution blend.
+   *
+   * @remarks
+   * Values are clamped to the `[0, 1]` range.
+   *
+   * @public
+   */
   get scatteringDistribution() {
     return this._scatteringDistribution;
   }
@@ -526,10 +682,24 @@ export class SubsurfaceProfile {
     }
   }
 
+  /**
+   * Adds a listener that is invoked whenever this profile changes.
+   *
+   * @param listener - The callback to invoke after profile data changes.
+   *
+   * @public
+   */
   addChangeListener(listener: () => void) {
     this._changeListeners.add(listener);
   }
 
+  /**
+   * Removes a previously registered profile change listener.
+   *
+   * @param listener - The callback to remove.
+   *
+   * @public
+   */
   removeChangeListener(listener: () => void) {
     this._changeListeners.delete(listener);
   }

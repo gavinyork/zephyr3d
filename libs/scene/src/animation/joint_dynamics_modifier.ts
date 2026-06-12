@@ -51,7 +51,7 @@ export class JointDynamicsModifier extends SkeletonModifier {
   }
 
   /**
-   * @deprecated Use {@link reset}. Kept as a compatibility alias for teleport handling.
+   * @deprecated Use {@link JointDynamicsModifier.reset}. Kept as a compatibility alias for teleport handling.
    */
   warp(): void {
     this._jointDynamicsSystem.controller.reset();

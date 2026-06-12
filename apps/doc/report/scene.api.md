@@ -1713,7 +1713,7 @@ export class CameraNearFarNode extends BaseGraphNode {
     protected validate(): string;
 }
 
-// @public (undocumented)
+// @public
 export type CameraOITMode = 'none' | 'weighted' | 'abuffer';
 
 // @public
@@ -5067,6 +5067,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     set alphaDither(val: boolean);
     get alphaToCoverage(): boolean;
     set alphaToCoverage(val: boolean);
+    apply(ctx: DrawContext): boolean;
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
     get blendMode(): BlendMode;
     set blendMode(val: BlendMode);
@@ -5973,44 +5974,57 @@ export class PBRBlockNode extends BaseGraphNode {
     protected validate(): string;
 }
 
-// Warning: (ae-forgotten-export) The symbol "PBRBluePrintMaterial_base" needs to be exported by the entry point index.d.ts
-//
 // @public
-export class PBRBluePrintMaterial extends PBRBluePrintMaterial_base implements Clonable<PBRBluePrintMaterial> {
+export class PBRBluePrintMaterial extends PBRMetallicRoughnessMaterial implements Clonable<PBRBluePrintMaterial> {
     constructor(irFrag?: MaterialBlueprintIR, irVertex?: MaterialBlueprintIR, uniformValues?: BluePrintUniformValue[], uniformTextures?: BluePrintUniformTexture[]);
     // (undocumented)
-    get anisotropy(): number;
-    set anisotropy(val: number);
-    // (undocumented)
-    get anisotropyDirection(): number;
-    set anisotropyDirection(val: number);
-    // (undocumented)
-    get anisotropyDirectionScaleBias(): Immutable<Vector2>;
-    set anisotropyDirectionScaleBias(val: Immutable<Vector2>);
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
+    // (undocumented)
+    calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp): PBShaderExp;
+    // (undocumented)
+    calculateEmissiveColor(scope: PBInsideFunctionScope): PBShaderExp;
+    // (undocumented)
+    calculateMetallic(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp;
+    // (undocumented)
+    calculateNormalAndTBN(scope: PBInsideFunctionScope, worldPos: PBShaderExp, worldNormal?: PBShaderExp, worldTangent?: PBShaderExp, worldBinormal?: PBShaderExp): PBShaderExp;
+    // (undocumented)
+    calculateRoughness(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp;
+    // (undocumented)
+    calculateSpecularFactor(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp): PBShaderExp;
+    // (undocumented)
     clone(): PBRBluePrintMaterial;
     // (undocumented)
     copyFrom(other: this): void;
+    // (undocumented)
     protected _createHash(): string;
+    // (undocumented)
     protected createProgram(ctx: DrawContext, pass: number): _zephyr3d_device.GPUProgram<unknown>;
+    // (undocumented)
     get fragmentIR(): MaterialBlueprintIR;
     set fragmentIR(ir: MaterialBlueprintIR);
+    // (undocumented)
     fragmentShader(scope: PBFunctionScope): void;
+    // (undocumented)
+    hasConnectedOutput(name: PBRBlueprintOutputName): boolean;
+    // (undocumented)
+    indirectLighting(scope: PBInsideFunctionScope, normal: PBShaderExp, viewVec: PBShaderExp, commonData: PBShaderExp, outColor: PBShaderExp, outRoughness?: PBShaderExp, outDiffuseColor?: PBShaderExp): void;
+    // (undocumented)
     protected onDispose(): void;
     // (undocumented)
-    get reflectionMode(): PBRReflectionMode;
-    set reflectionMode(val: PBRReflectionMode);
-    // (undocumented)
-    get subsurfaceProfile(): SubsurfaceProfile | null;
-    set subsurfaceProfile(val: SubsurfaceProfile | null);
     get uniformTextures(): BluePrintUniformTexture[];
     set uniformTextures(val: BluePrintUniformTexture[]);
+    // (undocumented)
     get uniformValues(): BluePrintUniformValue[];
     set uniformValues(val: BluePrintUniformValue[]);
+    // (undocumented)
     get vertexIR(): MaterialBlueprintIR;
     set vertexIR(ir: MaterialBlueprintIR);
+    // (undocumented)
     vertexShader(scope: PBFunctionScope): void;
 }
+
+// @public
+export type PBRBlueprintOutputName = 'BaseColor' | 'Metallic' | 'Roughness' | 'Specular' | 'Emissive' | 'Normal' | 'Tangent' | 'Opacity' | 'SpecularWeight' | 'AO';
 
 // Warning: (ae-forgotten-export) The symbol "PBRMetallicRoughnessMaterial_base" needs to be exported by the entry point index.d.ts
 //
@@ -6037,7 +6051,7 @@ export class PBRMetallicRoughnessMaterial extends PBRMetallicRoughnessMaterial_b
     set vertexTangent(val: boolean);
 }
 
-// @public (undocumented)
+// @public
 export type PBRReflectionMode = 'none' | 'ggx' | 'anisotropic' | 'glint';
 
 // Warning: (ae-forgotten-export) The symbol "PBRSpecularGlossinessMaterial_base" needs to be exported by the entry point index.d.ts
@@ -6674,18 +6688,7 @@ export const RENDER_PASS_TYPE_OBJECT_COLOR = 3;
 // @public
 export const RENDER_PASS_TYPE_SHADOWMAP = 1;
 
-// @public (undocumented)
-export class RenderContext {
-    constructor(_camera: Camera, w: number, h: number);
-    // (undocumented)
-    device: AbstractDevice;
-    // (undocumented)
-    renderHeight: number;
-    // (undocumented)
-    renderWidth: number;
-}
-
-// @public (undocumented)
+// @public
 export type RenderFunc = () => void;
 
 // @public
@@ -8317,13 +8320,13 @@ export class SqrtNode extends GenericMathNode {
     };
 }
 
-// @public (undocumented)
+// @public
 export type SSSDebugView = 'none' | 'scatter_mask' | 'scatter_softness' | 'scatter_radius' | 'scatter_falloff' | 'profile_energy' | 'profile_transmission' | 'profile_boundary' | 'diffuse' | 'blur' | 'screen_thinness' | 'thin_transmission_mask' | 'thin_lighting' | 'transmission_shadow';
 
-// @public (undocumented)
+// @public
 export type SSSQualityPreset = 'quality' | 'balanced' | 'performance';
 
-// @public (undocumented)
+// @public
 export type SSSResolvedSettings = {
     halfRes: boolean;
     blurKernelSize: number;
@@ -8368,68 +8371,46 @@ export type StopAnimationOptions = {
 // @public
 export class SubsurfaceProfile {
     constructor();
-    // (undocumented)
     addChangeListener(listener: () => void): void;
-    // (undocumented)
     get boundaryColorBleed(): number;
     set boundaryColorBleed(val: number);
-    // (undocumented)
     get extinctionScale(): number;
     set extinctionScale(val: number);
-    // (undocumented)
     get falloffColor(): Immutable<Vector3>;
     set falloffColor(val: Immutable<Vector3>);
-    // (undocumented)
     static getDefaultSkinProfile(): SubsurfaceProfile;
-    // (undocumented)
     getDerivedTintBias(): [number, number, number];
-    // (undocumented)
     getDerivedTransmissionResponse(): [number, number, number, number];
-    // (undocumented)
     static getPresetResponseByIndex(index: number): [number, number, number, number];
-    // (undocumented)
     static getPresetTintBiasByIndex(index: number): [number, number, number];
-    // (undocumented)
     static getProfileBySlot(slot: number): SubsurfaceProfile | null;
     get meanFreePathColor(): Immutable<Vector3>;
     set meanFreePathColor(val: Immutable<Vector3>);
     get meanFreePathDistance(): number;
     set meanFreePathDistance(val: number);
-    // (undocumented)
     get normalScale(): number;
     set normalScale(val: number);
-    // (undocumented)
     get preset(): SubsurfaceProfilePreset;
     set preset(val: SubsurfaceProfilePreset);
-    // (undocumented)
     get presetIndex(): number;
-    // (undocumented)
     removeChangeListener(listener: () => void): void;
-    // (undocumented)
     get scale(): number;
     set scale(val: number);
-    // (undocumented)
     get scatteringDistribution(): number;
     set scatteringDistribution(val: number);
-    // (undocumented)
     get scatterRadius(): Immutable<Vector3>;
     set scatterRadius(val: Immutable<Vector3>);
-    // (undocumented)
     get slot(): number;
-    // (undocumented)
     get strength(): number;
     set strength(val: number);
-    // (undocumented)
     get transmissionTintColor(): Immutable<Vector3>;
     set transmissionTintColor(val: Immutable<Vector3>);
-    // (undocumented)
     static get version(): number;
-    // (undocumented)
     get worldUnitScale(): number;
     set worldUnitScale(val: number);
 }
 
-// @public (undocumented)
+// @public
 export type SubsurfaceProfilePreset = 'skin' | 'skin_thin' | 'skin_default' | 'skin_heavy_makeup' | 'wax' | 'wax_backlit' | 'wax_soft' | 'jade' | 'jade_backlit' | 'jade_soft';
 
 // @public (undocumented)

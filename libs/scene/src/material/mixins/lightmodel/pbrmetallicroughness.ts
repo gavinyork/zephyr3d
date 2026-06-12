@@ -18,6 +18,10 @@ import {
   RENDER_PASS_TYPE_LIGHT
 } from '../../../values';
 
+/**
+ * Reflection modes for PBRMetallicRoughness material
+ * @public
+ */
 export type PBRReflectionMode = 'none' | 'ggx' | 'anisotropic' | 'glint';
 
 const PBR_REFLECTION_MODE: Record<PBRReflectionMode, number> = {

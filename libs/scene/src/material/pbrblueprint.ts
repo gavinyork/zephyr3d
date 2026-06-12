@@ -12,6 +12,10 @@ type BlueprintOutputMap = Partial<Record<PBRBlueprintOutputName, number | boolea
 type VertexBlueprintOutputName = 'Position' | 'Normal' | 'Tangent' | 'Color' | 'UV';
 type VertexBlueprintOutputMap = Partial<Record<VertexBlueprintOutputName, number | boolean | PBShaderExp>>;
 
+/**
+ * Physically-based rendering material driven by blueprint graphs, but shaded by the
+ * @public
+ */
 export type PBRBlueprintOutputName =
   | 'BaseColor'
   | 'Metallic'

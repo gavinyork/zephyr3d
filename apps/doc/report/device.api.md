@@ -1771,7 +1771,7 @@ export interface ProgramBuilder {
     };
     buildCompute(options: PBComputeOptions): readonly [string, BindGroupLayout[]];
     buildComputeProgram(options: PBComputeOptions): GPUProgram;
-    buildRender(options: PBRenderOptions): readonly [string, string, BindGroupLayout[], number[]];
+    buildRender(options: PBRenderOptions): readonly [string, string, BindGroupLayout[], number[], number];
     buildRenderProgram(options: PBRenderOptions): GPUProgram;
     bvec2: {
         (): PBShaderExp;
@@ -2181,6 +2181,7 @@ export type RenderBundle = unknown;
 // @public
 export interface RenderProgramConstructParams {
     bindGroupLayouts: BindGroupLayout[];
+    fragmentOutputCount?: number;
     fs: string;
     vertexAttributes: number[];
     vs: string;

@@ -10,6 +10,7 @@ export * from './grassmaterial';
 export * from './terrain-cm';
 export * from './pbrmr';
 export * from './pbrsg';
+export * from './mtoon';
 export * from './pbrblueprint';
 export * from './sprite';
 export * from './sprite_std';

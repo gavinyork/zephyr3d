@@ -67,7 +67,15 @@ export type CameraHistoryData = {
  * @public
  */
 export type RenderPath = 'forward';
+/**
+ * Camera Order-Independent Transparency mode.
+ * @public
+ */
 export type CameraOITMode = 'none' | 'weighted' | 'abuffer';
+/**
+ * Subsurface Scattering debug visualization modes (implementation-defined).
+ * @public
+ */
 export type SSSDebugView =
   | 'none'
   | 'scatter_mask'
@@ -83,7 +91,15 @@ export type SSSDebugView =
   | 'thin_transmission_mask'
   | 'thin_lighting'
   | 'transmission_shadow';
+/**
+ * Subsurface Scattering quality presets that resolve multiple internal settings for convenience.
+ * @public
+ */
 export type SSSQualityPreset = 'quality' | 'balanced' | 'performance';
+/**
+ * Resolved Subsurface Scattering settings after applying the quality preset. These are the actual settings used by the SSS post effect.
+ * @public
+ */
 export type SSSResolvedSettings = {
   halfRes: boolean;
   blurKernelSize: number;

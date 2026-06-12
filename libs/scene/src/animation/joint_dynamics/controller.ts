@@ -720,7 +720,7 @@ export class JointDynamicsSystemController {
 
   /**
    * Resets all physics state after teleportation.
-   * @deprecated Use {@link reset}. This method is kept as a compatibility alias.
+   * @deprecated Use {@link JointDynamicsSystemController.reset}. This method is kept as a compatibility alias.
    */
   warp(): void {
     this.reset();

@@ -36,6 +36,11 @@ export interface IRenderable extends IDisposable {
   render(): void;
 }
 
+/**
+ * Type for render functions that can be registered as renderables.
+ *
+ * @public
+ */
 export type RenderFunc = () => void;
 
 /**
@@ -109,14 +114,6 @@ export class Engine {
   get VFS() {
     return this._scriptingSystem.registry.VFS;
   }
-  /**
-   * Replaces the virtual file system used by the engine.
-   *
-   * The previous resource manager VFS is closed, the scripting registry is updated,
-   * and built-in assets are remounted on the new VFS.
-   *
-   * @param vfs - New virtual file system.
-   */
   set VFS(vfs: VFS) {
     if (vfs !== this._resourceManager.VFS) {
       this._resourceManager.VFS?.close();

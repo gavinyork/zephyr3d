@@ -7,18 +7,13 @@ import type {
   PBShaderExp,
   RenderStateSet
 } from '@zephyr3d/device';
-import type { DrawContext, Primitive } from '@zephyr3d/scene';
-import {
-  MeshMaterial,
-  QUEUE_OPAQUE,
-  QUEUE_TRANSPARENT,
-  RENDER_PASS_TYPE_LIGHT,
-  ShaderHelper,
-  applyMaterialMixins,
-  mixinAlbedoColor,
-  mixinLambert,
-  mixinTextureProps
-} from '@zephyr3d/scene';
+import type { DrawContext, Primitive } from '../render';
+import { applyMaterialMixins, MeshMaterial } from './meshmaterial';
+import { mixinAlbedoColor } from './mixins/albedocolor';
+import { mixinLambert } from './mixins/lightmodel/lambert';
+import { mixinTextureProps } from './mixins/texture';
+import { QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
+import { ShaderHelper } from '.';
 
 export type MToonOutlineWidthMode = 'none' | 'worldCoordinates' | 'screenCoordinates';
 
@@ -40,7 +35,7 @@ const ToonMaterialBase = applyMaterialMixins(
   mixinTextureProps('emissive')
 );
 
-export class ToonMaterial extends ToonMaterialBase {
+export class MToonMaterial extends ToonMaterialBase {
   private static readonly FEATURE_OUTLINE_WIDTH_MODE = this.defineFeature();
   private readonly _shadeColorFactor: Vector3;
   private readonly _matcapFactor: Vector3;
@@ -172,13 +167,13 @@ export class ToonMaterial extends ToonMaterialBase {
     }
   }
   get outlineWidthMode(): MToonOutlineWidthMode {
-    return this.featureUsed<MToonOutlineWidthMode>(ToonMaterial.FEATURE_OUTLINE_WIDTH_MODE);
+    return this.featureUsed<MToonOutlineWidthMode>(MToonMaterial.FEATURE_OUTLINE_WIDTH_MODE);
   }
   set outlineWidthMode(val: MToonOutlineWidthMode) {
     if (val !== 'none' && this.numPasses < 2) {
       this.numPasses = 2;
     }
-    this.useFeature(ToonMaterial.FEATURE_OUTLINE_WIDTH_MODE, val);
+    this.useFeature(MToonMaterial.FEATURE_OUTLINE_WIDTH_MODE, val);
     this.numPasses = val === 'none' ? 1 : 2;
   }
   get outlineWidthFactor(): number {
@@ -269,8 +264,8 @@ export class ToonMaterial extends ToonMaterialBase {
       this.uniformChanged();
     }
   }
-  clone(): ToonMaterial {
-    const other = new ToonMaterial();
+  clone(): MToonMaterial {
+    const other = new MToonMaterial();
     other.copyFrom(this);
     return other;
   }
