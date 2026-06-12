@@ -395,6 +395,7 @@ export class ScriptPanel {
     if (!host) {
       return;
     }
+    this.notifyScriptStructureChanged();
     this._options.onPropertyChanged?.(host, prop);
   }
 
