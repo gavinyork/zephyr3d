@@ -1203,6 +1203,21 @@ function getMToonMaterialProps(manager: ResourceManager): PropertyAccessor<MToon
         return !this.$isInstance && this.outlineWidthMode !== 'none';
       }
     },
+    {
+      name: 'OutlineUsesTangentNormals',
+      description: 'Use the tangent attribute xyz as smooth normals for MToon outline expansion',
+      type: 'boolean',
+      default: false,
+      get(this: MToonMaterial, value) {
+        value.bool[0] = this.outlineUsesTangentNormals;
+      },
+      set(this: MToonMaterial, value) {
+        this.outlineUsesTangentNormals = value.bool[0];
+      },
+      isValid(this: MToonMaterial) {
+        return !this.$isInstance && this.outlineWidthMode !== 'none';
+      }
+    },
     ...getTextureProps<MToonMaterial>(manager, 'uvAnimationMaskTexture', '2D', false, 0),
     {
       name: 'UVAnimationScrollXSpeedFactor',

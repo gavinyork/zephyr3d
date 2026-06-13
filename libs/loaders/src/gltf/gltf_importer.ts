@@ -58,7 +58,14 @@ import {
   getVertexAttribName,
   getVertexAttributeIndex
 } from '@zephyr3d/device';
-import type { AnimationChannel, AnimationSampler, GlTf, Material, TextureInfo } from './gltf_types';
+import type {
+  AnimationChannel,
+  AnimationSampler,
+  GlTf,
+  Material,
+  MeshPrimitive,
+  TextureInfo
+} from './gltf_types';
 import { AbstractModelImporter } from '../importer';
 
 type SpringBoneJointInfo = {
@@ -146,12 +153,21 @@ type GLTFMToonAssetMaterial = AssetUnlitMaterial & {
   outlineWidthMultiplyMap?: AssetTextureInfo;
   outlineColorFactor?: Vector3;
   outlineLightingMixFactor?: number;
+  outlineUsesTangentNormals?: boolean;
   uvAnimationMaskMap?: AssetTextureInfo;
   uvAnimationScrollXSpeedFactor?: number;
   uvAnimationScrollYSpeedFactor?: number;
   uvAnimationRotationSpeedFactor?: number;
   transparentWithZWrite?: boolean;
   renderQueueOffsetNumber?: number;
+};
+
+type GLTFLoadedMeshPrimitive = {
+  source: MeshPrimitive;
+  primitive: AssetPrimitiveInfo;
+  subMeshData: AssetSubMeshData;
+  materialInfo: Nullable<Material>;
+  outlineUsesTangentNormals: boolean;
 };
 
 const VRM_SPRING_BONE_SUBSTEPS = 3;
@@ -1268,6 +1284,7 @@ export class GLTFImporter extends AbstractModelImporter {
       const primitives = meshInfo.primitives;
       const meshName = meshInfo.name || null;
       if (primitives) {
+        const loadedPrimitives: GLTFLoadedMeshPrimitive[] = [];
         for (let i = 0; i < primitives.length; i++) {
           const p = primitives[i];
           const subMeshName = meshName
@@ -1390,20 +1407,37 @@ export class GLTFImporter extends AbstractModelImporter {
             primitiveType = 4;
           }
           primitive.type = this._primitiveType(primitiveType)!;
+          const materialInfo = p.material !== undefined ? gltf.materials![p.material] : null;
+          const outlineUsesTangentNormals = this._shouldGenerateMToonOutlineNormals(
+            materialInfo,
+            p,
+            primitive
+          );
+          loadedPrimitives.push({
+            source: p,
+            primitive,
+            subMeshData,
+            materialInfo,
+            outlineUsesTangentNormals
+          });
+        }
+        this._generateMToonOutlineNormals(loadedPrimitives);
+        for (const loaded of loadedPrimitives) {
+          const { source: p, primitive, subMeshData, materialInfo, outlineUsesTangentNormals } = loaded;
           const hasVertexNormal = !!primitive.vertices['normal'];
           const hasVertexColor = !!primitive.vertices['diffuse'];
           const hasVertexTangent = !!primitive.vertices['tangent'];
           const flagsHash = [
             hasVertexNormal ? 'N' : '',
             hasVertexColor ? 'C' : '',
-            hasVertexTangent ? 'T' : ''
+            hasVertexTangent ? 'T' : '',
+            outlineUsesTangentNormals ? 'OTN' : ''
           ]
             .filter((v) => !!v)
             .join('');
           const materialHash = [p.material ?? 'default', flagsHash].filter((v) => !!v).join('.');
           let material = model.getMaterial(materialHash);
           if (!material) {
-            const materialInfo = p.material !== undefined ? gltf.materials![p.material] : null;
             material = await this._loadMaterial(
               model,
               gltf,
@@ -1411,9 +1445,12 @@ export class GLTFImporter extends AbstractModelImporter {
               hasVertexColor,
               hasVertexNormal,
               hasVertexTangent,
+              outlineUsesTangentNormals,
               vfs
             );
             model.setMaterial(materialHash, material);
+          } else if (outlineUsesTangentNormals && material.type === 'mtoon') {
+            (material as GLTFMToonAssetMaterial).outlineUsesTangentNormals = true;
           }
           subMeshData.primitive = primitive;
           subMeshData.material = material;
@@ -1424,6 +1461,149 @@ export class GLTFImporter extends AbstractModelImporter {
     }
     return mesh;
   }
+  private _shouldGenerateMToonOutlineNormals(
+    materialInfo: Nullable<Material>,
+    primitiveInfo: MeshPrimitive,
+    primitive: AssetPrimitiveInfo
+  ) {
+    if (!materialInfo?.extensions?.VRMC_materials_mtoon) {
+      return false;
+    }
+    if (materialInfo.normalTexture) {
+      return false;
+    }
+    if (primitiveInfo.targets?.some((target) => target.TANGENT !== undefined)) {
+      return false;
+    }
+    return (
+      primitive.type === 'triangle-list' && !!primitive.vertices['position'] && !!primitive.vertices['normal']
+    );
+  }
+  private _generateMToonOutlineNormals(primitives: GLTFLoadedMeshPrimitive[]) {
+    const targets = primitives.filter((p) => p.outlineUsesTangentNormals);
+    if (targets.length === 0) {
+      return;
+    }
+    const sums = new Map<string, [number, number, number]>();
+    for (const { primitive } of targets) {
+      const positionInfo = primitive.vertices['position'];
+      if (!positionInfo) {
+        continue;
+      }
+      const positions = positionInfo.data as Float32Array;
+      const positionStride = getVertexFormatComponentCount(positionInfo.format);
+      const vertexCount = (positions.length / positionStride) >> 0;
+      const indices = this._getTriangleIndices(primitive, vertexCount);
+      if (!indices) {
+        continue;
+      }
+      for (let i = 0; i + 2 < indices.length; i += 3) {
+        const i0 = indices[i];
+        const i1 = indices[i + 1];
+        const i2 = indices[i + 2];
+        const p0 = i0 * positionStride;
+        const p1 = i1 * positionStride;
+        const p2 = i2 * positionStride;
+        const ax = positions[p1] - positions[p0];
+        const ay = positions[p1 + 1] - positions[p0 + 1];
+        const az = positions[p1 + 2] - positions[p0 + 2];
+        const bx = positions[p2] - positions[p0];
+        const by = positions[p2 + 1] - positions[p0 + 1];
+        const bz = positions[p2 + 2] - positions[p0 + 2];
+        const nx = ay * bz - az * by;
+        const ny = az * bx - ax * bz;
+        const nz = ax * by - ay * bx;
+        if (nx * nx + ny * ny + nz * nz <= 1e-20) {
+          continue;
+        }
+        this._accumulateOutlineNormal(sums, positions, positionStride, i0, nx, ny, nz);
+        this._accumulateOutlineNormal(sums, positions, positionStride, i1, nx, ny, nz);
+        this._accumulateOutlineNormal(sums, positions, positionStride, i2, nx, ny, nz);
+      }
+    }
+    for (const { primitive } of targets) {
+      const positionInfo = primitive.vertices['position'];
+      const normalInfo = primitive.vertices['normal'];
+      if (!positionInfo || !normalInfo) {
+        continue;
+      }
+      const positions = positionInfo.data as Float32Array;
+      const normals = normalInfo.data as Float32Array;
+      const positionStride = getVertexFormatComponentCount(positionInfo.format);
+      const normalStride = getVertexFormatComponentCount(normalInfo.format);
+      const vertexCount = (positions.length / positionStride) >> 0;
+      const tangents = new Float32Array(vertexCount * 4);
+      for (let i = 0; i < vertexCount; i++) {
+        const key = this._outlinePositionKey(
+          positions[i * positionStride],
+          positions[i * positionStride + 1],
+          positions[i * positionStride + 2]
+        );
+        const sum = sums.get(key);
+        let nx = sum?.[0] ?? normals[i * normalStride];
+        let ny = sum?.[1] ?? normals[i * normalStride + 1];
+        let nz = sum?.[2] ?? normals[i * normalStride + 2];
+        const len = Math.hypot(nx, ny, nz);
+        if (len > 1e-10) {
+          nx /= len;
+          ny /= len;
+          nz /= len;
+        } else {
+          nx = normals[i * normalStride];
+          ny = normals[i * normalStride + 1];
+          nz = normals[i * normalStride + 2];
+          const fallbackLen = Math.hypot(nx, ny, nz);
+          if (fallbackLen > 1e-10) {
+            nx /= fallbackLen;
+            ny /= fallbackLen;
+            nz /= fallbackLen;
+          } else {
+            nx = 0;
+            ny = 1;
+            nz = 0;
+          }
+        }
+        tangents[i * 4] = nx;
+        tangents[i * 4 + 1] = ny;
+        tangents[i * 4 + 2] = nz;
+        tangents[i * 4 + 3] = 1;
+      }
+      primitive.vertices['tangent'] = { format: 'tangent_f32x4', data: tangents };
+    }
+  }
+  private _accumulateOutlineNormal(
+    sums: Map<string, [number, number, number]>,
+    positions: Float32Array,
+    stride: number,
+    index: number,
+    x: number,
+    y: number,
+    z: number
+  ) {
+    const offset = index * stride;
+    const key = this._outlinePositionKey(positions[offset], positions[offset + 1], positions[offset + 2]);
+    const sum = sums.get(key);
+    if (sum) {
+      sum[0] += x;
+      sum[1] += y;
+      sum[2] += z;
+    } else {
+      sums.set(key, [x, y, z]);
+    }
+  }
+  private _getTriangleIndices(primitive: AssetPrimitiveInfo, vertexCount: number) {
+    if (primitive.indices) {
+      return primitive.indices;
+    }
+    const indices = new Uint32Array(vertexCount);
+    for (let i = 0; i < vertexCount; i++) {
+      indices[i] = i;
+    }
+    return indices;
+  }
+  private _outlinePositionKey(x: number, y: number, z: number) {
+    return `${Math.round(x * 100000)},${Math.round(y * 100000)},${Math.round(z * 100000)}`;
+  }
   /** @internal */
   private async _loadMaterial(
     model: SharedModel,
@@ -1432,6 +1612,7 @@ export class GLTFImporter extends AbstractModelImporter {
     vertexColor: boolean,
     vertexNormal: boolean,
     useTangent: boolean,
+    outlineUsesTangentNormals: boolean,
     vfs: VFS
   ): Promise<AssetMaterial> {
     const materialName = materialInfo?.name || 'material';
@@ -1514,7 +1695,16 @@ export class GLTFImporter extends AbstractModelImporter {
       pbrMetallicRoughness.roughnessIndex = 1;
     }
     if (mtoonExtension) {
-      return this._loadMToonMaterial(model, gltf, materialName, materialInfo, pbrCommon, mtoonExtension, vfs);
+      return this._loadMToonMaterial(
+        model,
+        gltf,
+        materialName,
+        materialInfo,
+        pbrCommon,
+        mtoonExtension,
+        outlineUsesTangentNormals,
+        vfs
+      );
     }
     if (materialInfo?.extensions?.KHR_materials_pbrSpecularGlossiness) {
       const sg = materialInfo.extensions?.KHR_materials_pbrSpecularGlossiness;
@@ -1673,6 +1863,7 @@ export class GLTFImporter extends AbstractModelImporter {
     materialInfo: Material,
     common: AssetMaterialCommon,
     mtoon: VRMCMToonMaterialInfo,
+    outlineUsesTangentNormals: boolean,
     vfs: VFS
   ): Promise<GLTFMToonAssetMaterial> {
     const pbr = materialInfo?.pbrMetallicRoughness;
@@ -1715,6 +1906,7 @@ export class GLTFImporter extends AbstractModelImporter {
         : undefined,
       outlineColorFactor: mtoon.outlineColorFactor ? new Vector3(mtoon.outlineColorFactor) : undefined,
       outlineLightingMixFactor: mtoon.outlineLightingMixFactor,
+      outlineUsesTangentNormals,
       uvAnimationMaskMap: mtoon.uvAnimationMaskTexture
         ? await this._loadTexture(model, gltf, mtoon.uvAnimationMaskTexture, false, vfs)
         : undefined,

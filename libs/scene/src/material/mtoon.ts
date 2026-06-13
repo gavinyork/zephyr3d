@@ -37,6 +37,7 @@ const ToonMaterialBase = applyMaterialMixins(
 
 export class MToonMaterial extends ToonMaterialBase {
   private static readonly FEATURE_OUTLINE_WIDTH_MODE = this.defineFeature();
+  private static readonly FEATURE_OUTLINE_TANGENT_NORMALS = this.defineFeature();
   private readonly _shadeColorFactor: Vector3;
   private readonly _matcapFactor: Vector3;
   private readonly _parametricRimColorFactor: Vector3;
@@ -78,6 +79,7 @@ export class MToonMaterial extends ToonMaterialBase {
     this._transparentWithZWrite = false;
     this._renderQueueOffsetNumber = 0;
     this.outlineWidthMode = 'none';
+    this.outlineUsesTangentNormals = false;
   }
   get shadeColorFactor(): Immutable<Vector3> {
     return this._shadeColorFactor;
@@ -202,6 +204,12 @@ export class MToonMaterial extends ToonMaterialBase {
       this.uniformChanged();
     }
   }
+  get outlineUsesTangentNormals(): boolean {
+    return !!this.featureUsed<boolean>(MToonMaterial.FEATURE_OUTLINE_TANGENT_NORMALS);
+  }
+  set outlineUsesTangentNormals(val: boolean) {
+    this.useFeature(MToonMaterial.FEATURE_OUTLINE_TANGENT_NORMALS, !!val);
+  }
   get transparentWithZWrite(): boolean {
     return this._transparentWithZWrite;
   }
@@ -285,6 +293,7 @@ export class MToonMaterial extends ToonMaterialBase {
     this.outlineWidthFactor = other.outlineWidthFactor;
     this.outlineColorFactor = other.outlineColorFactor;
     this.outlineLightingMixFactor = other.outlineLightingMixFactor;
+    this.outlineUsesTangentNormals = other.outlineUsesTangentNormals;
     this.transparentWithZWrite = other.transparentWithZWrite;
     this.renderQueueOffsetNumber = other.renderQueueOffsetNumber;
     this.uvAnimationScrollXSpeedFactor = other.uvAnimationScrollXSpeedFactor;
@@ -580,9 +589,16 @@ export class MToonMaterial extends ToonMaterialBase {
     const pb = scope.$builder;
     scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
     scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
+    if (this.pass > 0 && this.outlineUsesTangentNormals) {
+      scope.$l.oOutlineNorm = ShaderHelper.resolveVertexTangent(scope).xyz;
+    }
     scope.$l.worldNormal = pb.normalize(
       pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz
     );
+    scope.$l.worldOutlineNormal =
+      this.pass > 0 && this.outlineUsesTangentNormals
+        ? pb.normalize(pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oOutlineNorm, 0)).xyz)
+        : scope.worldNormal;
     scope.$l.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
     if (this.pass > 0) {
       scope.outlineWidthFactor = pb.float().uniform(2);
@@ -606,11 +622,11 @@ export class MToonMaterial extends ToonMaterialBase {
         scope.width = pb.mul(scope.width, pb.textureSampleLevel(scope.outlineWidthTex, scope.outlineUv, 0).g);
       }
       if (this.outlineWidthMode === 'worldCoordinates') {
-        scope.worldPos = pb.add(scope.worldPos, pb.mul(scope.worldNormal, scope.width));
+        scope.worldPos = pb.add(scope.worldPos, pb.mul(scope.worldOutlineNormal, scope.width));
       } else if (this.outlineWidthMode === 'screenCoordinates') {
         scope.$l.clipNormalPos = pb.mul(
           ShaderHelper.getViewProjectionMatrix(scope),
-          pb.vec4(pb.add(scope.worldPos, scope.worldNormal), 1)
+          pb.vec4(pb.add(scope.worldPos, scope.worldOutlineNormal), 1)
         );
         scope.$l.clipPos = pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.worldPos, 1));
         scope.$l.screenNormal = pb.sub(
@@ -630,13 +646,13 @@ export class MToonMaterial extends ToonMaterialBase {
           scope.clipPos.zw
         );
         scope.$outputs.worldPos = scope.worldPos;
-        scope.$outputs.wNorm = scope.worldNormal;
+        scope.$outputs.wNorm = scope.worldOutlineNormal;
         ShaderHelper.setClipSpacePosition(scope, scope.clipPos);
         return;
       }
     }
     scope.$outputs.worldPos = scope.worldPos;
-    scope.$outputs.wNorm = scope.worldNormal;
+    scope.$outputs.wNorm = this.pass > 0 ? scope.worldOutlineNormal : scope.worldNormal;
     ShaderHelper.setClipSpacePosition(
       scope,
       pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))

@@ -208,6 +208,7 @@ export interface AssetMToonMaterial extends AssetUnlitMaterial {
   outlineWidthMultiplyMap?: AssetTextureInfo;
   outlineColorFactor?: Vector3;
   outlineLightingMixFactor?: number;
+  outlineUsesTangentNormals?: boolean;
   uvAnimationMaskMap?: AssetTextureInfo;
   uvAnimationScrollXSpeedFactor?: number;
   uvAnimationScrollYSpeedFactor?: number;
@@ -2247,7 +2248,7 @@ export class SharedModel extends Disposable {
         mtoonMaterial.outlineWidthMode = mtoonAssetMaterial.outlineWidthMode;
       }
       if (mtoonAssetMaterial.outlineWidthFactor !== undefined) {
-        mtoonMaterial.outlineWidthFactor = mtoonAssetMaterial.outlineWidthFactor;
+        mtoonMaterial.outlineWidthFactor = Math.max(0.002, mtoonAssetMaterial.outlineWidthFactor);
       }
       await setMaterialTexture(
         mtoonTextureTarget,
@@ -2259,6 +2260,9 @@ export class SharedModel extends Disposable {
       }
       if (mtoonAssetMaterial.outlineLightingMixFactor !== undefined) {
         mtoonMaterial.outlineLightingMixFactor = mtoonAssetMaterial.outlineLightingMixFactor;
+      }
+      if (mtoonAssetMaterial.outlineUsesTangentNormals !== undefined) {
+        mtoonMaterial.outlineUsesTangentNormals = mtoonAssetMaterial.outlineUsesTangentNormals;
       }
       await setMaterialTexture(mtoonTextureTarget, 'uvAnimationMask', mtoonAssetMaterial.uvAnimationMaskMap);
       if (mtoonAssetMaterial.uvAnimationScrollXSpeedFactor !== undefined) {
