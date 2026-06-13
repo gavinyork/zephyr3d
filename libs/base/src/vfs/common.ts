@@ -27,6 +27,7 @@ const mimeTypes: Record<string, string> = {
   '.gltf': 'model/gltf+json',
   '.glb': 'model/gltf-binary',
   '.vrm': 'model/gltf-binary',
+  '.vrma': 'model/gltf-binary',
   '.ktx': 'image/ktx',
   '.ktx2': 'image/ktx2',
   '.ttf': 'font/ttf',
