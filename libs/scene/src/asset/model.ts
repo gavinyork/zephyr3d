@@ -2248,7 +2248,7 @@ export class SharedModel extends Disposable {
         mtoonMaterial.outlineWidthMode = mtoonAssetMaterial.outlineWidthMode;
       }
       if (mtoonAssetMaterial.outlineWidthFactor !== undefined) {
-        mtoonMaterial.outlineWidthFactor = Math.max(0.002, mtoonAssetMaterial.outlineWidthFactor);
+        mtoonMaterial.outlineWidthFactor = mtoonAssetMaterial.outlineWidthFactor;
       }
       await setMaterialTexture(
         mtoonTextureTarget,
