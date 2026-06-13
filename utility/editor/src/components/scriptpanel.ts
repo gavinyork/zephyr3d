@@ -4,6 +4,7 @@ import type { Scene, SceneNode } from '@zephyr3d/scene';
 import { ScriptAttachment, type PropertyAccessor } from '@zephyr3d/scene';
 import { FontGlyph } from '../core/fontglyph';
 import { ProjectService } from '../core/services/project';
+import { eventBus } from '../core/eventbus';
 import { PropertyEditor } from './grid';
 import { clearScriptPropertyAccessorCache, getSingleScriptPropertyAccessors } from '../helpers/scriptprops';
 
@@ -123,6 +124,7 @@ export class ScriptPanel {
         if (clicked) {
           this._selectedScriptIndex = i;
           this.syncScriptConfigEditor();
+          this.revealAsset(attachment.script);
         }
         ImGui.TableNextColumn();
         this.pushInlineActionButtonStyle();
@@ -343,6 +345,13 @@ export class ScriptPanel {
       ImGui.SetTooltip(text);
     }
     return clicked;
+  }
+
+  private revealAsset(path: string) {
+    if (!path || !path.startsWith('/')) {
+      return;
+    }
+    eventBus.dispatchEvent('reveal_asset', ProjectService.VFS.normalizePath(path));
   }
 
   private renderScriptDropTarget(host: Scene | SceneNode) {

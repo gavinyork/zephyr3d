@@ -1571,6 +1571,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this.registerShortcut('Ctrl+D', () => {
       return this.handleDuplicateShortcut();
     });
+    this.registerShortcut('F2', () => {
+      return this.handleAssetRenameShortcut();
+    });
     this._toolbar.on('action', this.handleSceneAction, this);
     this.editor.plugins.on('pluginContributionsChanged', this.refreshPluginContributions, this);
     eventBus.on('refresh_properties', this.handleRefreshProperties, this);
@@ -2760,6 +2763,17 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       return true;
     }
     return false;
+  }
+  private handleAssetRenameShortcut(): boolean {
+    if (ImGui.GetIO().WantTextInput) {
+      return false;
+    }
+    const assetRenderer = this._assetView?.renderer;
+    if (!assetRenderer || assetRenderer.selectedItems.size !== 1) {
+      return false;
+    }
+    assetRenderer.renameSelectedItem();
+    return true;
   }
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {
     const dragNodes = this.getHierarchyDragSelection(src, dst);

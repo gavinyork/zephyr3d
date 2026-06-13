@@ -124,6 +124,15 @@ type PathRewriteRule = {
   isDirectory: boolean;
 };
 
+type AssetMovePlanItem = {
+  sourcePath: string;
+  targetPath: string;
+  isDirectory: boolean;
+  affectsReferences: boolean;
+};
+
+const referenceRewriteExtensions = new Set(['.zscn', '.prefab', '.zprefab', '.zmtl', '.zbpt', '.zmf']);
+
 class VFSDirData extends TreeViewData<DirectoryInfo> {
   private _renderer: VFSRenderer;
   private _rootLabel: string;
@@ -596,6 +605,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   private _vfsBatchDepth = 0;
   private _vfsBatchReloadPending = false;
   private _selectedDirPath: string | null = null;
+  private _selectionRestorePaths: string[] | null = null;
+  private _referenceCandidatePaths: Set<string> | null = null;
+  private _referenceCandidateCacheDirty = true;
   private readonly _options: VFSRendererOptions = null;
 
   constructor(vfs: VFS, fileFilter: string[] = [], treePanelWidth = 200, options?: VFSRendererOptions) {
@@ -2101,17 +2113,38 @@ export class VFSRenderer extends makeObservable(Disposable)<{
               ? item.path.slice(0, item.path.lastIndexOf('/'))
               : (item as FileInfo).meta.path.slice(0, (item as FileInfo).meta.path.lastIndexOf('/'));
             const newPath = this._vfs.join(parentPath, newName);
-            await this._vfs.move(oldPath, newPath);
+            const movedRules: PathRewriteRule[] = [
+              {
+                oldPath,
+                newPath,
+                isDirectory: isDir
+              }
+            ];
+            const affectsReferences = !isDir || (await this.directoryMayAffectReferences(oldPath));
+            const dlg = new DlgProgress('RenameAsset##RenameProgress', 320, true);
+            dlg.showModal();
+            dlg.setMessage(
+              affectsReferences ? 'Renaming asset and updating references...' : 'Renaming asset...'
+            );
+            dlg.setProgress(0, affectsReferences ? 2 : 1);
+            dlg.setSubProgress(0, 1);
             try {
-              await this.rewriteAssetReferencesAfterMove([
-                {
-                  oldPath,
-                  newPath,
-                  isDirectory: isDir
+              await this.runWithVFSBatchUpdate(async () => {
+                await this._vfs.move(oldPath, newPath);
+                dlg.setProgress(1, affectsReferences ? 2 : 1);
+                this.applyPathRewriteRules(movedRules);
+                this.applyReferenceCandidatePathRewriteRules(movedRules);
+                if (affectsReferences) {
+                  try {
+                    await this.rewriteAssetReferencesAfterMove(movedRules, dlg);
+                  } catch (err) {
+                    console.warn(`Rewrite references after rename failed: ${err}`);
+                  }
+                  dlg.setProgress(2, 2);
                 }
-              ]);
-            } catch (err) {
-              console.warn(`Rewrite references after rename failed: ${err}`);
+              });
+            } finally {
+              dlg.close();
             }
           } catch (err) {
             DlgMessage.messageBox('Error', `Rename failed: ${err}`);
@@ -2331,7 +2364,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         const preserveSelection = this._reloadQueuedPreserveSelection;
         this._reloadQueued = false;
         this._reloadQueuedPreserveSelection = false;
-        const selectedItemPaths = preserveSelection ? this.getSelectedItemPaths() : [];
+        const selectedItemPaths = preserveSelection ? this.consumeSelectionRestorePaths() : [];
         await this.loadFileSystem();
         this.refreshFileView(preserveSelection, selectedItemPaths);
       }
@@ -2868,6 +2901,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     ) {
       return;
     }
+    this.updateReferenceCandidateCacheOnVFSChange(type, changedPath, itemType);
     if (this._vfsBatchDepth > 0) {
       this._reloadQueuedPreserveSelection = true;
       this._vfsBatchReloadPending = true;
@@ -2983,107 +3017,179 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   }
   async handleFileMoveOrCopy(targetDir: string, payload: { isDir: boolean; path: string }[]) {
     const copy = ImGui.GetIO().KeyCtrl;
-    const dlg = copy ? new DlgProgress('CopyFile##CopyProgress', 300, true) : null;
+    const dlg = new DlgProgress(copy ? 'CopyFile##CopyProgress' : 'MoveFile##MoveProgress', 320, true);
     const movedRules: PathRewriteRule[] = [];
-    if (dlg) {
-      dlg.showModal();
-      dlg.setProgress(0, payload.length);
+    let plan: AssetMovePlanItem[];
+    try {
+      plan = await this.createAssetMovePlan(targetDir, payload);
+      if (plan.length === 0) {
+        return;
+      }
+      const proceed = await this.confirmAssetMovePlan(plan, copy);
+      if (!proceed) {
+        return;
+      }
+    } catch (err) {
+      DlgMessage.messageBox('Error', `${copy ? 'Copy asset failed' : 'Move asset failed'}: ${err}`);
+      return;
     }
-    for (let i = 0; i < payload.length; i++) {
-      const asset = payload[i];
-      const vfs = this.VFS;
-      const sourceDir = asset.path;
-      const parentDir = vfs.dirname(sourceDir);
-      if (vfs.isParentOf(parentDir, targetDir) && vfs.isParentOf(targetDir, parentDir)) {
-        // no-op
-      } else if (!asset.isDir) {
-        const targetPath = vfs.join(targetDir, vfs.basename(sourceDir));
-        if (copy) {
-          await vfs.copyFile(sourceDir, targetPath, {
-            overwrite: true
-          });
-        } else {
-          await vfs.move(sourceDir, targetPath, {
-            overwrite: true
-          });
-          movedRules.push({
-            oldPath: sourceDir,
-            newPath: targetPath,
-            isDirectory: false
-          });
-        }
-      } else {
-        if (vfs.isParentOf(sourceDir, targetDir)) {
-          console.error(`Cannot ${copy ? 'copy' : 'move'} parent directory to child directory`);
-        } else {
-          const dest = vfs.join(targetDir, vfs.basename(sourceDir));
+    const affectsReferences = !copy && plan.some((item) => item.affectsReferences);
+    dlg.showModal();
+    dlg.setMessage(
+      copy ? 'Copying assets...' : affectsReferences ? 'Moving assets and updating references...' : 'Moving assets...'
+    );
+    dlg.setProgress(0, Math.max(plan.length, 1));
+    dlg.setSubProgress(0, 1);
+    try {
+      const execute = async () => {
+        for (let i = 0; i < plan.length; i++) {
+          const asset = plan[i];
+          const vfs = this.VFS;
           if (copy) {
-            await vfs.copyFileEx(vfs.join(sourceDir, '/**/*'), dest, {
-              overwrite: true,
-              onProgress: (current, total) => {
-                if (dlg) {
+            if (asset.isDirectory) {
+              await vfs.copyFileEx(vfs.join(asset.sourcePath, '/**/*'), asset.targetPath, {
+                overwrite: false,
+                onProgress: (current, total) => {
                   dlg.setSubProgress(current, total);
                 }
-              }
-            });
-          } else {
-            await vfs.move(sourceDir, dest);
+              });
+            } else {
+              await vfs.copyFile(asset.sourcePath, asset.targetPath, {
+                overwrite: false
+              });
+            }
+          } else if (asset.isDirectory) {
+            await vfs.move(asset.sourcePath, asset.targetPath);
             movedRules.push({
-              oldPath: sourceDir,
-              newPath: dest,
+              oldPath: asset.sourcePath,
+              newPath: asset.targetPath,
               isDirectory: true
             });
+          } else {
+            await vfs.move(asset.sourcePath, asset.targetPath, {
+              overwrite: false
+            });
+            movedRules.push({
+              oldPath: asset.sourcePath,
+              newPath: asset.targetPath,
+              isDirectory: false
+            });
           }
+          dlg.setProgress(i + 1, Math.max(plan.length, 1));
         }
-      }
-      if (dlg) {
-        dlg.setProgress(i + 1, payload.length);
-      }
-    }
-    if (!copy && movedRules.length > 0) {
-      try {
-        await this.rewriteAssetReferencesAfterMove(movedRules);
-      } catch (err) {
-        console.warn(`Rewrite references after move failed: ${err}`);
-      }
-    }
-    if (dlg) {
+        if (!copy && movedRules.length > 0 && affectsReferences) {
+          this.applyPathRewriteRules(movedRules);
+          this.applyReferenceCandidatePathRewriteRules(movedRules);
+          await this.rewriteAssetReferencesAfterMove(movedRules, dlg);
+        }
+      };
+      await this.runWithVFSBatchUpdate(execute);
+    } catch (err) {
+      DlgMessage.messageBox(
+        'Error',
+        `${copy ? 'Copy asset failed' : 'Move asset failed'}: ${err}\n\nThe operation was stopped before completing all remaining items.`
+      );
+    } finally {
       dlg.close();
     }
   }
 
-  private async rewriteAssetReferencesAfterMove(rules: PathRewriteRule[]) {
+  private async createAssetMovePlan(targetDir: string, payload: { isDir: boolean; path: string }[]) {
+    const vfs = this.VFS;
+    const normalizedTargetDir = vfs.normalizePath(targetDir);
+    const plan: AssetMovePlanItem[] = [];
+    const seenTargets = new Set<string>();
+    for (const asset of payload) {
+      const sourcePath = vfs.normalizePath(asset.path);
+      const targetPath = vfs.join(normalizedTargetDir, vfs.basename(sourcePath));
+      if (sourcePath === targetPath) {
+        continue;
+      }
+      if (asset.isDir && vfs.isParentOf(sourcePath, targetPath)) {
+        throw new Error(`Cannot move parent directory to child directory: ${sourcePath} -> ${targetPath}`);
+      }
+      const targetKey = vfs.normalizePath(targetPath);
+      if (seenTargets.has(targetKey)) {
+        throw new Error(`Multiple selected assets would move to the same destination: ${targetPath}`);
+      }
+      seenTargets.add(targetKey);
+      const affectsReferences = !asset.isDir || (await this.directoryMayAffectReferences(sourcePath));
+      plan.push({
+        sourcePath,
+        targetPath,
+        isDirectory: asset.isDir,
+        affectsReferences
+      });
+    }
+    return plan;
+  }
+
+  private async confirmAssetMovePlan(plan: AssetMovePlanItem[], copy: boolean) {
+    const conflicts: string[] = [];
+    for (const item of plan) {
+      if (await this.VFS.exists(item.targetPath)) {
+        conflicts.push(item.targetPath);
+      }
+    }
+    if (conflicts.length === 0) {
+      return true;
+    }
+    const preview = conflicts.slice(0, 5).join('\n');
+    const extra = conflicts.length > 5 ? `\n...and ${conflicts.length - 5} more` : '';
+    await DlgMessageBoxEx.messageBoxEx(
+      copy ? 'Copy assets' : 'Move assets',
+      `The following destination path(s) already exist:\n\n${preview}${extra}\n\nThe operation has been cancelled. Resolve the conflicts first and try again.`,
+      ['Ok'],
+      460,
+      0,
+      true
+    );
+    return false;
+  }
+
+  private async rewriteAssetReferencesAfterMove(rules: PathRewriteRule[], progress?: DlgProgress) {
     const deduplicated = this.prepareRewriteRules(rules);
     if (deduplicated.length === 0) {
       return;
     }
-    const rootDir = this._options.rootDir || '/assets';
-    const entries = await this._vfs.readDirectory(rootDir, {
-      includeHidden: true,
-      recursive: true
-    });
-    const targetFiles = entries.filter(
-      (entry) =>
-        entry.type === 'file' &&
-        (entry.path.toLowerCase().endsWith('.zscn') ||
-          entry.path.toLowerCase().endsWith('.prefab') ||
-          entry.path.toLowerCase().endsWith('.zprefab') ||
-          entry.path.toLowerCase().endsWith('.zmtl'))
-    );
-    for (const file of targetFiles) {
+    const targetFiles = await this.getReferenceCandidatePaths();
+    if (progress) {
+      progress.setMessage('Updating asset references...');
+      progress.setSubProgress(0, Math.max(targetFiles.length, 1));
+    }
+    for (let index = 0; index < targetFiles.length; index++) {
+      const file = targetFiles[index];
       try {
-        const text = (await this._vfs.readFile(file.path, { encoding: 'utf8' })) as string;
+        const text = (await this._vfs.readFile(file, { encoding: 'utf8' })) as string;
+        if (!this.mayContainRewriteTarget(text, deduplicated)) {
+          if (progress) {
+            progress.setSubProgress(index + 1, Math.max(targetFiles.length, 1));
+          }
+          continue;
+        }
         const json = JSON.parse(text);
         if (this.rewriteJsonPathValues(json, deduplicated)) {
-          await this._vfs.writeFile(file.path, JSON.stringify(json, null, 2), {
+          await this._vfs.writeFile(file, JSON.stringify(json, null, 2), {
             encoding: 'utf8',
             create: true
           });
         }
       } catch (err) {
-        console.warn(`Skip reference rewrite for ${file.path}: ${err}`);
+        console.warn(`Skip reference rewrite for ${file}: ${err}`);
+      } finally {
+        if (progress) {
+          progress.setSubProgress(index + 1, Math.max(targetFiles.length, 1));
+        }
       }
     }
+  }
+
+  private async directoryMayAffectReferences(path: string) {
+    const entries = await this._vfs.readDirectory(path, {
+      includeHidden: true,
+      recursive: true
+    });
+    return entries.some((entry) => entry.type === 'file' && this.isReferenceCandidatePath(entry.path));
   }
 
   private prepareRewriteRules(rules: PathRewriteRule[]): PathRewriteRule[] {
@@ -3151,5 +3257,143 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       }
     }
     return value;
+  }
+
+  private mayContainRewriteTarget(text: string, rules: PathRewriteRule[]): boolean {
+    for (const rule of rules) {
+      if (text.includes(rule.oldPath)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private getReferenceRootPath() {
+    return this._vfs.normalizePath(this._options.rootDir || '/assets');
+  }
+
+  private isReferenceCandidatePath(path: string) {
+    const normalizedPath = this._vfs.normalizePath(path);
+    const lowerPath = normalizedPath.toLowerCase();
+    for (const ext of referenceRewriteExtensions) {
+      if (lowerPath.endsWith(ext)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private async getReferenceCandidatePaths() {
+    if (!this._referenceCandidatePaths || this._referenceCandidateCacheDirty) {
+      await this.rebuildReferenceCandidatePathsCache();
+    }
+    return [...(this._referenceCandidatePaths ?? [])];
+  }
+
+  private async rebuildReferenceCandidatePathsCache() {
+    const entries = await this._vfs.readDirectory(this.getReferenceRootPath(), {
+      includeHidden: true,
+      recursive: true
+    });
+    const paths = new Set<string>();
+    for (const entry of entries) {
+      if (entry.type === 'file' && this.isReferenceCandidatePath(entry.path)) {
+        paths.add(this._vfs.normalizePath(entry.path));
+      }
+    }
+    this._referenceCandidatePaths = paths;
+    this._referenceCandidateCacheDirty = false;
+  }
+
+  private updateReferenceCandidateCacheOnVFSChange(
+    type: 'created' | 'deleted' | 'moved' | 'modified',
+    path: string,
+    itemType: 'file' | 'directory'
+  ) {
+    if (!this._referenceCandidatePaths || this._referenceCandidateCacheDirty) {
+      return;
+    }
+    if (type === 'moved') {
+      if (this._vfsBatchDepth <= 0) {
+        this._referenceCandidateCacheDirty = true;
+      }
+      return;
+    }
+    if (itemType === 'directory') {
+      if (type === 'deleted') {
+        this.removeReferenceCandidatePathsUnder(path);
+      } else if (this._vfsBatchDepth <= 0) {
+        this._referenceCandidateCacheDirty = true;
+      }
+      return;
+    }
+    const normalizedPath = this._vfs.normalizePath(path);
+    if (type === 'deleted') {
+      this._referenceCandidatePaths.delete(normalizedPath);
+      return;
+    }
+    if (this.isReferenceCandidatePath(normalizedPath)) {
+      this._referenceCandidatePaths.add(normalizedPath);
+    } else {
+      this._referenceCandidatePaths.delete(normalizedPath);
+    }
+  }
+
+  private removeReferenceCandidatePathsUnder(path: string) {
+    if (!this._referenceCandidatePaths || this._referenceCandidatePaths.size === 0) {
+      return;
+    }
+    const normalizedPath = this._vfs.normalizePath(path);
+    for (const candidatePath of [...this._referenceCandidatePaths]) {
+      if (candidatePath === normalizedPath || candidatePath.startsWith(`${normalizedPath}/`)) {
+        this._referenceCandidatePaths.delete(candidatePath);
+      }
+    }
+  }
+
+  private applyReferenceCandidatePathRewriteRules(rules: PathRewriteRule[]) {
+    if (!this._referenceCandidatePaths || this._referenceCandidateCacheDirty) {
+      return;
+    }
+    const preparedRules = this.prepareRewriteRules(rules);
+    if (preparedRules.length === 0) {
+      return;
+    }
+    const nextPaths = new Set<string>();
+    for (const path of this._referenceCandidatePaths) {
+      const rewrittenPath = this.rewritePathString(path, preparedRules);
+      if (this.isReferenceCandidatePath(rewrittenPath)) {
+        nextPaths.add(this._vfs.normalizePath(rewrittenPath));
+      }
+    }
+    for (const rule of preparedRules) {
+      if (!rule.isDirectory && this.isReferenceCandidatePath(rule.newPath)) {
+        nextPaths.add(this._vfs.normalizePath(rule.newPath));
+      }
+    }
+    this._referenceCandidatePaths = nextPaths;
+  }
+
+  private consumeSelectionRestorePaths(): string[] {
+    const paths = this._selectionRestorePaths?.slice() ?? this.getSelectedItemPaths();
+    this._selectionRestorePaths = null;
+    return paths;
+  }
+
+  private applyPathRewriteRules(rules: PathRewriteRule[]) {
+    const preparedRules = this.prepareRewriteRules(rules);
+    if (preparedRules.length === 0) {
+      return;
+    }
+    if (this._selectedDirPath) {
+      this._selectedDirPath = this.rewritePathString(this._selectedDirPath, preparedRules);
+    }
+    if (this._pendingRevealAssetPath) {
+      this._pendingRevealAssetPath = this.rewritePathString(this._pendingRevealAssetPath, preparedRules);
+    }
+    const selectionPaths =
+      this._selectionRestorePaths?.slice() ??
+      [...new Set(this.getSelectedItemPaths().map((path) => this._vfs.normalizePath(path)))];
+    this._selectionRestorePaths = selectionPaths.map((path) => this.rewritePathString(path, preparedRules));
   }
 }
