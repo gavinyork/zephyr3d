@@ -366,6 +366,72 @@ export class NodeDeleteCommand extends Command {
     }
   }
 }
+
+export class BatchNodeDeleteCommand extends Command {
+  private readonly _scene: Scene;
+  private readonly _entries: {
+    nodeId: string;
+    parentId: string;
+    archive: any;
+  }[];
+
+  constructor(nodes: SceneNode[]) {
+    super('Delete nodes');
+    this._scene = nodes[0]?.scene!;
+    this._entries = nodes.map((node) => ({
+      nodeId: getNodePath(node),
+      parentId: getNodePath(node.parent!),
+      archive: null
+    }));
+  }
+
+  async execute(): Promise<void> {
+    const nodes = this._entries.map((entry) => findNodeByPath(this._scene.rootNode, entry.nodeId));
+    if (this._entries.every((entry) => entry.archive)) {
+      for (const node of nodes) {
+        node.remove();
+      }
+      return;
+    }
+    const refs = nodes.map((node) => new DRef(node));
+    const parents = nodes.map((node) => node.parent);
+    for (const node of nodes) {
+      node.remove();
+    }
+    try {
+      await waitForNextFrame();
+      const archives = await Promise.all(
+        nodes.map((node) => getEngine().resourceManager.serializeObject(node, null, null))
+      );
+      for (let i = 0; i < this._entries.length; i++) {
+        this._entries[i].archive = archives[i];
+      }
+    } catch (err) {
+      for (let i = 0; i < nodes.length; i++) {
+        if (!nodes[i].parent && parents[i]) {
+          nodes[i].parent = parents[i];
+        }
+      }
+      throw err;
+    } finally {
+      refs.forEach((ref) => ref.dispose());
+    }
+  }
+
+  async undo() {
+    for (const entry of this._entries) {
+      if (!entry.archive) {
+        continue;
+      }
+      const parent = findNodeByPath(this._scene.rootNode, entry.parentId);
+      const node = await getEngine().resourceManager.deserializeObject<SceneNode>(parent, entry.archive);
+      if (node) {
+        node.persistentId = entry.nodeId.split('/').at(-1)!;
+        node.parent = parent;
+      }
+    }
+  }
+}
 export class NodeReparentCommand extends Command {
   private readonly _nodeId: string;
   private readonly _newParentId: string;

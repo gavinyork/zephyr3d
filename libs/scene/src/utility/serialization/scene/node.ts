@@ -168,11 +168,14 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
       let patch: DiffPatch | undefined = undefined;
       if (prefabId && guessMimeType(prefabId) === mimeTypeOf('.zprefab')) {
         try {
-          obj.prefabId = '';
           const prefabData = (await manager.loadPrefabContent(prefabId))!.data as DiffValue;
+          obj.prefabId = '';
           const nodeData = await manager.serializeObject(obj);
-          patch = diff(prefabData, nodeData);
-          ASSERT(diff(applyPatch(prefabData, patch), nodeData).length === 0, 'Patch test failed');
+          const nextPatch = diff(prefabData, nodeData);
+          if (nextPatch.length > 0) {
+            ASSERT(diff(applyPatch(prefabData, nextPatch), nodeData).length === 0, 'Patch test failed');
+            patch = nextPatch;
+          }
         } finally {
           obj.prefabId = prefabId;
         }
@@ -190,8 +193,11 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
             manager.setAssetId(baseNode, null);
             const baseNodeData = await manager.serializeObject(baseNode);
             const nodeData = await manager.serializeObject(obj);
-            patch = diff(baseNodeData, nodeData);
-            ASSERT(diff(applyPatch(baseNodeData, patch), nodeData).length === 0, 'Patch test failed');
+            const nextPatch = diff(baseNodeData, nodeData);
+            if (nextPatch.length > 0) {
+              ASSERT(diff(applyPatch(baseNodeData, nextPatch), nodeData).length === 0, 'Patch test failed');
+              patch = nextPatch;
+            }
           } finally {
             manager.setAssetId(obj, originalObjectAssetId);
             manager.setAssetId(baseNode, originalBaseAssetId);

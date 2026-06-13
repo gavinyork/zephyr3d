@@ -58,6 +58,7 @@ import {
   AddChildCommand,
   AddPrefabCommand,
   AddShapeCommand,
+  BatchNodeDeleteCommand,
   PropertyEditCommand,
   NodeCloneCommand,
   NodeDeleteCommand,
@@ -170,6 +171,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _springBone: JointDynamicsModifier;
   private _propGridScrollTopFrames: number;
   private _assetPlacementLoadingCount: number;
+  private _busyTaskCount: number;
+  private _busyStatusText: string;
   constructor(controller: SceneController) {
     super(controller);
     this._cmdManager = new CommandManager();
@@ -197,6 +200,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._springBone = null;
     this._propGridScrollTopFrames = 0;
     this._assetPlacementLoadingCount = 0;
+    this._busyTaskCount = 0;
+    this._busyStatusText = '';
     this._currentEditTool = new DRef();
     this._cameraAnimationEyeFrom = new Vector3();
     this._cameraAnimationTargetFrom = new Vector3();
@@ -278,7 +283,21 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     return this._cmdManager;
   }
   get busy() {
-    return this._cmdManager.busy || this._assetPlacementLoadingCount > 0;
+    return this._cmdManager.busy || this._assetPlacementLoadingCount > 0 || this._busyTaskCount > 0;
+  }
+  beginBusyTask(statusText: string) {
+    this._busyTaskCount++;
+    this._busyStatusText = statusText?.trim() ?? '';
+    this._statusbar.setStatus(this._busyStatusText);
+  }
+  endBusyTask(statusText?: string) {
+    this._busyTaskCount = Math.max(0, this._busyTaskCount - 1);
+    if (this._busyTaskCount === 0) {
+      this._busyStatusText = '';
+    } else if (statusText !== undefined) {
+      this._busyStatusText = statusText?.trim() ?? this._busyStatusText;
+    }
+    this._statusbar.setStatus(this._busyStatusText);
   }
   get editToolContext() {
     return this._editToolContext;
@@ -2430,11 +2449,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       return;
     }
     const commands: NodeDeleteCommand[] = [];
+    const preparedNodes: SceneNode[] = [];
     for (const node of selectedNodes) {
       if (node?.parent) {
         const command = this.prepareDeleteNodeCommand(node);
         if (command) {
           commands.push(command);
+          preparedNodes.push(node);
         }
       }
     }
@@ -2444,7 +2465,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (commands.length === 1) {
       await this._cmdManager.execute(commands[0]);
     } else {
-      await this._cmdManager.execute(new CompositeCommand('Delete nodes', commands));
+      await this._cmdManager.execute(new BatchNodeDeleteCommand(preparedNodes));
     }
     eventBus.dispatchEvent('scene_changed');
   }

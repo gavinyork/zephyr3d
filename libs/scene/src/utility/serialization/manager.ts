@@ -244,6 +244,7 @@ export class ResourceManager {
   private readonly _assetManager: AssetManager;
   private readonly _editorMode: boolean;
   private _allocated: WeakMap<any, string>;
+  private _prefabContentCache: Map<string, Promise<Nullable<{ type: string; data: object }>>> | null;
   /**
    * Create a ResourceManager bound to a virtual file system.
    *
@@ -253,6 +254,7 @@ export class ResourceManager {
     this._vfs = vfs;
     this._editorMode = editorMode;
     this._allocated = new WeakMap();
+    this._prefabContentCache = null;
     this._assetManager = new AssetManager(this);
     this._propMap = {};
     this._propNameMap = new Map();
@@ -921,14 +923,23 @@ export class ResourceManager {
    * @returns A Promise resolving to the prefab json object, or `null` on failure.
    */
   async loadPrefabContent(path: string): Promise<Nullable<{ type: string; data: object }>> {
-    try {
-      const content = (await this._vfs.readFile(path, { encoding: 'utf8' })) as string;
-      const json = JSON.parse(content) as { type: string; data: object };
-      return json;
-    } catch (err) {
-      console.error(`Failed to load prefab from ${path}:`, err);
-      return null;
+    const normalizedPath = this._vfs.normalizePath(path);
+    const cached = this._prefabContentCache?.get(normalizedPath);
+    if (cached) {
+      return cached;
     }
+    const loadTask = (async () => {
+      try {
+        const content = (await this._vfs.readFile(normalizedPath, { encoding: 'utf8' })) as string;
+        const json = JSON.parse(content) as { type: string; data: object };
+        return json;
+      } catch (err) {
+        console.error(`Failed to load prefab from ${normalizedPath}:`, err);
+        return null;
+      }
+    })();
+    this._prefabContentCache?.set(normalizedPath, loadTask);
+    return loadTask;
   }
   /**
    * Instantiate a prefab from a JSON file via VFS.
@@ -985,12 +996,20 @@ export class ResourceManager {
    */
   async saveScene(scene: Scene, filename: string): Promise<void> {
     const asyncTasks: Promise<unknown>[] = [];
-    const content = await this.serializeObject(scene, null, asyncTasks);
-    await Promise.all(asyncTasks);
-    await this._vfs.writeFile(filename, JSON.stringify(content, null, 2), {
-      encoding: 'utf8',
-      create: true
-    });
+    const previousPrefabContentCache = this._prefabContentCache;
+    if (!previousPrefabContentCache) {
+      this._prefabContentCache = new Map();
+    }
+    try {
+      const content = await this.serializeObject(scene, null, asyncTasks);
+      await Promise.all(asyncTasks);
+      await this._vfs.writeFile(filename, JSON.stringify(content, null, 2), {
+        encoding: 'utf8',
+        create: true
+      });
+    } finally {
+      this._prefabContentCache = previousPrefabContentCache;
+    }
   }
   private rebuildGraphStructure(
     nodes: Record<number, IGraphNode>,
