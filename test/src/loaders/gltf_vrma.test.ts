@@ -150,8 +150,6 @@ describe('GLTFImporter VRMA support', () => {
     const copied = targetRoot.animationSet.copyHumanoidAnimationFrom(sourceRoot.animationSet, 'walk');
     expect(copied).not.toBeNull();
     expect(copied!.skeletons.has(targetRig.persistentId)).toBe(true);
-    expect(copied!.tracks.get(targetHips)?.some((track) => track instanceof NodeTranslationTrack)).toBe(
-      true
-    );
+    expect(copied!.tracks.get(targetHips)?.some((track) => track instanceof NodeTranslationTrack)).toBe(true);
   });
 });

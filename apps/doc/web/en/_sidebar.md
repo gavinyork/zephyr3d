@@ -19,11 +19,17 @@
     - [Basic Framework](en/scene-basic.md)
     - [Meshes and Materials](en/mesh-material.md)
     - [Scene Graph And Nodes](en/scene-graph.md)
+    - [Asset Loading](en/asset-loading.md)
     - [Text Rendering](en/text-rendering.md)
+    - [Particles and Sprites](en/particles-sprites.md)
   - Lighting
     - [Overview](en/lighting-intro.md)
     - [Direct lighting](en/lighting-direct.md)
     - [Indirect lighting](en/lighting-indirect.md)
+  - Environment
+    - [Sky](en/sky.md)
+    - [Water](en/water.md)
+    - [Runtime Terrain](en/terrain-runtime.md)
   - Shadows
     - [Overview](en/shadow-intro.md)
     - [Anti-aliasing](en/shadow-aa.md)
@@ -44,6 +50,7 @@
     - [FXAA](en/posteffect-fxaa.md)
     - [TAA](en/posteffect-taa.md)
     - [SSR](en/posteffect-ssr.md)
+    - [Motion Blur](en/posteffect-motionblur.md)
   - Scene Picking
     - [Overview](en/picking.md)
   - Geometry Instancing
@@ -53,6 +60,7 @@
   - Multi-view Rendering
     - [Overview](en/multi-views.md)
   - Advanced Topics
+    - [Serialization and Prefabs](en/serialization.md)
     - [Memory Management](en/lifetime.md)
     - [Virtual File System](en/vfs.md)
 
@@ -61,6 +69,7 @@
   - Getting Started
     - [Overview](en/editor/overview.md)
     - [Quick Start](en/editor/getting-started.md)
+    - [Desktop Editor](en/editor/desktop.md)
 
   - Editor Interface
     - [Layout](en/editor/ui-layout.md)

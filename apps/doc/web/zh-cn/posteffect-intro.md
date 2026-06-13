@@ -1,28 +1,42 @@
+# 摄像机后处理（Camera Post-Processing）
 
-# 摄像机后处理（Camera Post‑Processing）
-
-在 Zephyr3D 引擎中，`Camera` 类集成了一个灵活的 **后处理（Post‑Processing）系统**，  
-用于在场景渲染完成后对结果图像执行各种视觉增强与合成效果。  
-所有后处理效果由内部的 **Compositor** 管理，并可通过 `Camera` 实例直接访问与控制。  
-
----
+`Camera` 类集成了一条在主场景渲染之后执行的后处理链。后处理效果由摄像机内部的 `Compositor` 管理，常用效果可以直接通过摄像机属性启用。
 
 ## 概述
 
-后处理效果在渲染主场景之后执行，依次通过一系列特效管线过滤 framebuffer。  
-开发者可根据需要启用或禁用各个特性，通过对应属性调整参数。
+后处理效果会读取已经渲染好的 framebuffer，并输出新的图像。大多数应用代码应使用内置摄像机属性，例如 `camera.bloom = true` 或 `camera.bloomIntensity = 1.2`。
 
-`Camera` 内置支持以下后处理效果：
+内置效果：
 
-| 后处理效果 | 类名 | 用途 |
-|-------------|-------|------|
-| **色调映射（Tonemap）** | `Tonemap` | 将 HDR 结果转换为标准显示颜色空间。 |
-| **快速抗锯齿（FXAA）** | `FXAA` | 改善边缘平滑度，减少走样锯齿。 |
-| **时间抗锯齿（TAA）** | `TAA` | 使用帧间采样抖动与累积缓冲消除高频噪声。 |
-| **泛光（Bloom）** | `Bloom` | 模拟高亮区域溢出光晕。 |
-| **屏幕空间反射（SSR）** | `SSR` | 计算基于屏幕空间的镜面反射。 |
-| **屏幕空间环境光遮蔽（SSAO/SAO）** | `SAO` | 增强物体接缝处阴影与空间深度感。 |
-| **运动模糊（MotionBlur）** | `MotionBlur` | 模拟相机或物体运动造成的模糊效果。 |
+| 效果 | 类名 | 用途 |
+| --- | --- | --- |
+| 色调映射 | `Tonemap` | 将 HDR 场景颜色转换为显示颜色 |
+| FXAA | `FXAA` | 快速边缘平滑 |
+| TAA | `TAA` | 基于 jitter 和累积缓冲的时间抗锯齿 |
+| Bloom | `Bloom` | 高亮区域光晕 |
+| SSR | `SSR` | 屏幕空间反射 |
+| SSAO/SAO | `SAO` | 屏幕空间环境光遮蔽 |
+| Motion Blur | `MotionBlur` | 相机或物体运动造成的模糊 |
+| Color Adjust | `ColorAdjust` | 饱和度、对比度、色相和锐化调整 |
+| Grayscale | `Grayscale` | 用于自定义 compositor 链的灰度转换 |
 
-> 后处理效果的启用开关和参数可通过 `Camera` 属性直接控制，  
-> 例如 `camera.bloom = true` 或调整 `camera.bloomIntensity`。
+## 摄像机属性
+
+摄像机会持有常用后处理实例，并自动加入内部 compositor。典型用法：
+
+```ts
+camera.HDR = true;
+camera.toneMap = true;
+camera.toneMapExposure = 1.1;
+
+camera.bloom = true;
+camera.bloomThreshold = 0.85;
+camera.bloomIntensity = 1.2;
+
+camera.FXAA = true;
+camera.TAA = true;
+camera.motionBlur = true;
+camera.motionBlurStrength = 0.5;
+```
+
+如果需要自定义后处理链，可以使用 `camera.compositor` 并追加自己的 `AbstractPostEffect` 实例。

@@ -15,6 +15,11 @@ import { mixinTextureProps } from './mixins/texture';
 import { QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
 import { ShaderHelper } from './shader/helper';
 
+/**
+ * MToonMaterial outline width mode.
+ *
+ * @public
+ */
 export type MToonOutlineWidthMode = 'none' | 'worldCoordinates' | 'screenCoordinates';
 
 type RuntimeMaterialPassMethods = {
@@ -35,6 +40,11 @@ const ToonMaterialBase = applyMaterialMixins(
   mixinTextureProps('emissive')
 );
 
+/**
+ * MToonMaterial is a material that implements the MToon shader, which is a stylized shader commonly used for rendering anime-style characters. It supports features such as rim lighting, matcap, and outline rendering.
+ *
+ * @public
+ */
 export class MToonMaterial extends ToonMaterialBase {
   private static readonly FEATURE_OUTLINE_WIDTH_MODE = this.defineFeature();
   private static readonly FEATURE_OUTLINE_TANGENT_NORMALS = this.defineFeature();

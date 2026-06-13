@@ -698,6 +698,62 @@ export interface AssetMorphTargetGroup {
 }
 
 // @public
+export interface AssetMToonMaterial extends AssetUnlitMaterial {
+    // (undocumented)
+    giEqualizationFactor?: number;
+    // (undocumented)
+    matcapFactor?: Vector3;
+    // (undocumented)
+    matcapMap?: AssetTextureInfo;
+    // (undocumented)
+    outlineColorFactor?: Vector3;
+    // (undocumented)
+    outlineLightingMixFactor?: number;
+    // (undocumented)
+    outlineUsesTangentNormals?: boolean;
+    // (undocumented)
+    outlineWidthFactor?: number;
+    // (undocumented)
+    outlineWidthMode?: MToonOutlineWidthMode;
+    // (undocumented)
+    outlineWidthMultiplyMap?: AssetTextureInfo;
+    // (undocumented)
+    parametricRimColorFactor?: Vector3;
+    // (undocumented)
+    parametricRimFresnelPowerFactor?: number;
+    // (undocumented)
+    parametricRimLiftFactor?: number;
+    // (undocumented)
+    renderQueueOffsetNumber?: number;
+    // (undocumented)
+    rimLightingMixFactor?: number;
+    // (undocumented)
+    rimMultiplyMap?: AssetTextureInfo;
+    // (undocumented)
+    shadeColorFactor?: Vector3;
+    // (undocumented)
+    shadeMultiplyMap?: AssetTextureInfo;
+    // (undocumented)
+    shadingShiftFactor?: number;
+    // (undocumented)
+    shadingShiftMap?: AssetTextureInfo;
+    // (undocumented)
+    shadingShiftTextureScale?: number;
+    // (undocumented)
+    shadingToonyFactor?: number;
+    // (undocumented)
+    transparentWithZWrite?: boolean;
+    // (undocumented)
+    uvAnimationMaskMap?: AssetTextureInfo;
+    // (undocumented)
+    uvAnimationRotationSpeedFactor?: number;
+    // (undocumented)
+    uvAnimationScrollXSpeedFactor?: number;
+    // (undocumented)
+    uvAnimationScrollYSpeedFactor?: number;
+}
+
+// @public
 export interface AssetPBRMaterialCommon extends AssetUnlitMaterial {
     // (undocumented)
     ior?: number;
@@ -851,6 +907,7 @@ export class AssetSkeleton extends NamedObject {
         rotation: Quaternion;
         scale: Vector3;
     }[];
+    humanoidJointMapping: Nullable<HumanoidJointMapping<AssetHierarchyNode>>;
     inverseBindMatrices: Matrix4x4[];
     joints: AssetHierarchyNode[];
     pivot: Nullable<AssetHierarchyNode>;
@@ -5451,6 +5508,104 @@ export class MSDFTextSprite extends GraphNode {
     update(): void;
 }
 
+// Warning: (ae-forgotten-export) The symbol "ToonMaterialBase" needs to be exported by the entry point index.d.ts
+//
+// @public
+export class MToonMaterial extends ToonMaterialBase {
+    constructor();
+    // (undocumented)
+    applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number): void;
+    // (undocumented)
+    clone(): MToonMaterial;
+    // (undocumented)
+    copyFrom(other: this): void;
+    // (undocumented)
+    draw(primitive: Primitive, ctx: DrawContext, numInstances?: number): void;
+    // (undocumented)
+    drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number): void;
+    // (undocumented)
+    get emissiveColor(): Immutable<Vector3>;
+    set emissiveColor(val: Immutable<Vector3>);
+    // (undocumented)
+    get emissiveStrength(): number;
+    set emissiveStrength(val: number);
+    // (undocumented)
+    fragmentShader(scope: PBFunctionScope): void;
+    // (undocumented)
+    getQueueType(): 1 | 2;
+    // (undocumented)
+    get giEqualizationFactor(): number;
+    set giEqualizationFactor(val: number);
+    // (undocumented)
+    isTransparentPass(pass: number, ctx?: DrawContext): boolean;
+    // (undocumented)
+    get matcapFactor(): Immutable<Vector3>;
+    set matcapFactor(val: Immutable<Vector3>);
+    // (undocumented)
+    get outlineColorFactor(): Immutable<Vector3>;
+    set outlineColorFactor(val: Immutable<Vector3>);
+    // (undocumented)
+    get outlineLightingMixFactor(): number;
+    set outlineLightingMixFactor(val: number);
+    // (undocumented)
+    get outlineUsesTangentNormals(): boolean;
+    set outlineUsesTangentNormals(val: boolean);
+    // (undocumented)
+    get outlineWidthFactor(): number;
+    set outlineWidthFactor(val: number);
+    // (undocumented)
+    get outlineWidthMode(): MToonOutlineWidthMode;
+    set outlineWidthMode(val: MToonOutlineWidthMode);
+    // (undocumented)
+    get parametricRimColorFactor(): Immutable<Vector3>;
+    set parametricRimColorFactor(val: Immutable<Vector3>);
+    // (undocumented)
+    get parametricRimFresnelPowerFactor(): number;
+    set parametricRimFresnelPowerFactor(val: number);
+    // (undocumented)
+    get parametricRimLiftFactor(): number;
+    set parametricRimLiftFactor(val: number);
+    // (undocumented)
+    passToHash(pass: number): string;
+    // (undocumented)
+    get renderQueueOffsetNumber(): number;
+    set renderQueueOffsetNumber(val: number);
+    // (undocumented)
+    get rimLightingMixFactor(): number;
+    set rimLightingMixFactor(val: number);
+    // (undocumented)
+    get shadeColorFactor(): Immutable<Vector3>;
+    set shadeColorFactor(val: Immutable<Vector3>);
+    // (undocumented)
+    get shadingShiftFactor(): number;
+    set shadingShiftFactor(val: number);
+    // (undocumented)
+    get shadingShiftTextureScale(): number;
+    set shadingShiftTextureScale(val: number);
+    // (undocumented)
+    get shadingToonyFactor(): number;
+    set shadingToonyFactor(val: number);
+    // (undocumented)
+    get transparentWithZWrite(): boolean;
+    set transparentWithZWrite(val: boolean);
+    // (undocumented)
+    protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void;
+    // (undocumented)
+    get uvAnimationRotationSpeedFactor(): number;
+    set uvAnimationRotationSpeedFactor(val: number);
+    // (undocumented)
+    get uvAnimationScrollXSpeedFactor(): number;
+    set uvAnimationScrollXSpeedFactor(val: number);
+    // (undocumented)
+    get uvAnimationScrollYSpeedFactor(): number;
+    set uvAnimationScrollYSpeedFactor(val: number);
+    // (undocumented)
+    vertexShader(scope: PBFunctionScope): void;
+}
+
+// @public
+export type MToonOutlineWidthMode = 'none' | 'worldCoordinates' | 'screenCoordinates';
+
 // @public @deprecated
 export class MultiChainSpringSystem {
     constructor(options?: MultiChainSpringSystemOptions);
@@ -7902,6 +8057,7 @@ export class SkeletonRig extends Disposable {
 export type SkeletonRigOptions = {
     rootJoint?: Nullable<SceneNode>;
     rootBindPose?: SkeletonBindPose;
+    humanoidJointMapping?: Nullable<HumanoidJointMapping<SceneNode>>;
 };
 
 // @public

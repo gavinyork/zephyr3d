@@ -19,11 +19,17 @@
     - [基本框架](zh-cn/scene-basic.md)
     - [网格及材质](zh-cn/mesh-material.md)
     - [场景图及节点](zh-cn/scene-graph.md)
+    - [资源加载](zh-cn/asset-loading.md)
     - [文本渲染](zh-cn/text-rendering.md)
+    - [粒子与 Sprite](zh-cn/particles-sprites.md)
   - 光照
     - [概述](zh-cn/lighting-intro.md)
     - [直接光照](zh-cn/lighting-direct.md)
     - [间接光照](zh-cn/lighting-indirect.md)
+  - 环境
+    - [天空](zh-cn/sky.md)
+    - [水面](zh-cn/water.md)
+    - [运行时地形](zh-cn/terrain-runtime.md)
   - 阴影
     - [概述](zh-cn/shadow-intro.md)
     - [反走样](zh-cn/shadow-aa.md)
@@ -44,6 +50,7 @@
     - [FXAA](zh-cn/posteffect-fxaa.md)
     - [TAA](zh-cn/posteffect-taa.md)
     - [SSR](zh-cn/posteffect-ssr.md)
+    - [Motion Blur](zh-cn/posteffect-motionblur.md)
   - 场景拾取
     - [概述](zh-cn/picking.md)
   - 几何体实例化
@@ -53,6 +60,7 @@
   - 多视口渲染
     - [概述](zh-cn/multi-views.md)
   - 进阶内容
+    - [序列化与预制体](zh-cn/serialization.md)
     - [内存管理](zh-cn/lifetime.md)
     - [虚拟文件系统](zh-cn/vfs.md)
 
@@ -61,6 +69,7 @@
   - 总体介绍
     - [概述](zh-cn/editor/overview.md)
     - [快速开始](zh-cn/editor/getting-started.md)
+    - [桌面编辑器](zh-cn/editor/desktop.md)
 
   - 编辑器界面
     - [总体布局](zh-cn/editor/ui-layout.md)
