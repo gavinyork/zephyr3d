@@ -36,17 +36,19 @@ export class DlgImport extends DialogRenderer<{
         this._msg = 'Searching for importable files...';
         this._paths = [];
         this._selected = [];
-        this._vfs.glob('/**/*.{gltf,glb,vrm,fbx}', { recursive: true, includeDirs: false }).then((files) => {
-          for (const f of files) {
-            this._paths.push(f.path);
-            this._selected.push([true]);
-          }
-          if (this._paths.length === 0) {
-            this._msg = 'No importable files found.';
-          } else {
-            this._msg = '';
-          }
-        });
+        this._vfs
+          .glob('/**/*.{gltf,glb,vrm,vrma,fbx}', { recursive: true, includeDirs: false })
+          .then((files) => {
+            for (const f of files) {
+              this._paths.push(f.path);
+              this._selected.push([true]);
+            }
+            if (this._paths.length === 0) {
+              this._msg = 'No importable files found.';
+            } else {
+              this._msg = '';
+            }
+          });
       }
       ImGui.Separator();
       if (this._msg) {

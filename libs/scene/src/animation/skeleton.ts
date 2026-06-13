@@ -119,6 +119,7 @@ export type SkeletonBindPose = { rotation: Quaternion; scale: Vector3; position:
 export type SkeletonRigOptions = {
   rootJoint?: Nullable<SceneNode>;
   rootBindPose?: SkeletonBindPose;
+  humanoidJointMapping?: Nullable<HumanoidJointMapping<SceneNode>>;
 };
 
 type HumanoidJointPattern = {
@@ -178,15 +179,16 @@ export class SkeletonRig extends Disposable {
     this._playing = false;
     this._modifiers = [];
     this.computeBindPose();
-    if (skeletonRoot) {
-      this._humanoidJointMapping = Skeleton.tryExtractHumanoidJoints(skeletonRoot);
-      this._humanoidRootRotation = Quaternion.identity();
-    } else {
-      this._humanoidJointMapping = null;
-      this._humanoidRootRotation = Quaternion.identity();
-    }
-    if (this._humanoidJointMapping) {
-      let p = this._humanoidJointMapping.body[HumanoidBodyRig.Hips];
+    this._humanoidJointMapping =
+      options?.humanoidJointMapping !== undefined
+        ? options.humanoidJointMapping
+        : skeletonRoot
+          ? Skeleton.tryExtractHumanoidJoints(skeletonRoot)
+          : null;
+    this._humanoidRootRotation = Quaternion.identity();
+    const hips = this._humanoidJointMapping?.body[HumanoidBodyRig.Hips];
+    if (hips) {
+      let p = hips;
       while (this._joints.includes(p.parent!)) {
         Quaternion.multiply(p.parent!.rotation, this._humanoidRootRotation, this._humanoidRootRotation);
         p = p.parent!;
@@ -438,7 +440,8 @@ export class SkinBinding extends Disposable {
       // pose visible by replacing the rig pose only when explicitly supplied.
       this._rig = new SkeletonRig(rig.joints, bindPose, {
         rootJoint: rig.rootJoint,
-        rootBindPose: rig.rootBindPose
+        rootBindPose: rig.rootBindPose,
+        humanoidJointMapping: rig.humanoidJointMapping
       });
     }
     this.updateJointMatrices();

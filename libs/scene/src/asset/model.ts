@@ -32,6 +32,7 @@ import {
   type SceneMorphTargetBinding,
   type SceneMorphTargetGroup
 } from '../scene/scene_node';
+import type { HumanoidJointMapping } from '../animation/skeleton';
 import { SkeletonRig, SkinBinding } from '../animation/skeleton';
 import type { FixedGeometryCacheFrame } from '../animation/fixed_geometry_cache_track';
 import type { PCAGeometryCacheTrackData } from '../animation';
@@ -638,6 +639,8 @@ export class AssetSkeleton extends NamedObject {
   inverseBindMatrices: Matrix4x4[];
   /** Binding pose matrices of the joints */
   bindPose: { position: Vector3; rotation: Quaternion; scale: Vector3 }[];
+  /** Explicit humanoid joint mapping, when supplied by the source asset. */
+  humanoidJointMapping: Nullable<HumanoidJointMapping<AssetHierarchyNode>>;
   /**
    * Creates an instance of AssetSkeleton
    * @param name - Name of the skeleton
@@ -649,6 +652,7 @@ export class AssetSkeleton extends NamedObject {
     this.joints = [];
     this.inverseBindMatrices = [];
     this.bindPose = [];
+    this.humanoidJointMapping = null;
   }
   /**
    * Adds a joint to the skeleton
@@ -1588,6 +1592,37 @@ export class SharedModel extends Disposable {
     }
     return null;
   }
+  private remapHumanoidJointMapping(
+    mapping: Nullable<HumanoidJointMapping<AssetHierarchyNode>>,
+    nodeMap: Map<AssetHierarchyNode, SceneNode>
+  ): Nullable<HumanoidJointMapping<SceneNode>> {
+    if (!mapping) {
+      return null;
+    }
+    const remap = <T extends string>(
+      source: Record<T, AssetHierarchyNode> | undefined
+    ): Record<T, SceneNode> | undefined => {
+      if (!source) {
+        return undefined;
+      }
+      const result = {} as Partial<Record<T, SceneNode>>;
+      for (const key of Object.keys(source) as T[]) {
+        const node = nodeMap.get(source[key]);
+        if (node) {
+          result[key] = node;
+        }
+      }
+      return Object.keys(result).length > 0 ? (result as Record<T, SceneNode>) : undefined;
+    };
+    const body = remap(mapping.body);
+    return body
+      ? {
+          body,
+          leftHand: remap(mapping.leftHand),
+          rightHand: remap(mapping.rightHand)
+        }
+      : null;
+  }
   async createSceneNode(
     manager: ResourceManager,
     scene: Scene,
@@ -1646,7 +1681,12 @@ export class SharedModel extends Disposable {
           const rigKey = SkeletonRig.getRigKey(joints, rootJoint);
           let rig = rigMap.get(rigKey);
           if (!rig) {
-            rig = new SkeletonRig(joints, sk.bindPose, { rootJoint });
+            const humanoidJointMapping = this.remapHumanoidJointMapping(sk.humanoidJointMapping, nodeMap);
+            rig = new SkeletonRig(
+              joints,
+              sk.bindPose,
+              humanoidJointMapping ? { rootJoint, humanoidJointMapping } : { rootJoint }
+            );
             rigMap.set(rigKey, rig);
             group.animationSet.rigs.push(new DRef(rig));
           }
