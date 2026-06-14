@@ -13,7 +13,7 @@ function getWebTarget() {
     input: path.join(__dirname, 'web', 'js', 'showcase.js'),
     preserveSymlinks: false,
     output: {
-      file: path.join(__dirname, 'dist', 'web', 'js', `showcase.js`),
+      file: path.join(__dirname, 'web', 'public', 'js', `showcase.js`),
       format: 'esm',
       sourcemap: true
     },

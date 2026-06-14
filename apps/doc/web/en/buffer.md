@@ -4,7 +4,7 @@ A buffer refers to a space allocated from GPU memory, commonly used to store ver
 
 ## Vertex Buffer
 
-Vertex Buffer is designed to store vertex data such as position, normals, texture coordinates, etc. You can create a vertex buffer using the [Device.createVertexBuffer()](/doc/markdown/./device.abstractdevice.createvertexbuffer) and [Device.createInterleavedVertexBuffer()](/doc/markdown/./ device.abstractdevice.createInterleavedVertexBuffer) methods.
+Vertex Buffer is designed to store vertex data such as position, normals, texture coordinates, etc. You can create a vertex buffer using the [Device.createVertexBuffer()](/doc/markdown/./device.abstractdevice.createvertexbuffer) and [Device.createInterleavedVertexBuffer()](/doc/markdown/./device.abstractdevice.createinterleavedvertexbuffer) methods.
 
 ```javascript
 

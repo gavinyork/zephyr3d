@@ -4,6 +4,7 @@ const path = require('path');
 
 const apiExtacter = path.join(__dirname, 'node_modules', '.bin', 'api-extractor');
 const apiDocumenter = path.join(__dirname, 'node_modules', '.bin', 'api-documenter');
+const apiOutputDir = path.join(__dirname, 'web', 'api');
 
 function spawnSync(cmd, args, cwd) {
   const child = crossSpawn.sync(cmd, args, {
@@ -17,7 +18,7 @@ function spawnSync(cmd, args, cwd) {
 }
 
 function document() {
-  process.chdir(path.resolve(__dirname, 'dist/web/doc'));
+  process.chdir(apiOutputDir);
   spawnSync(apiDocumenter, ['markdown']);
 }
 
@@ -40,8 +41,8 @@ function extract(projectName, projectPath) {
     },
     docModel: {
       enabled: true,
-      projectFolderUrl: 'http://localhost:3000/#/doc/markdown',
-      apiJsonFilePath: `<projectFolder>/../../apps/doc/dist/web/doc/input/${projectName}.api.json`
+      projectFolderUrl: 'https://zephyr3d.org/doc/api/markdown',
+      apiJsonFilePath: `<projectFolder>/../../apps/doc/web/api/input/${projectName}.api.json`
     },
     dtsRollup: {
       enabled: false
@@ -59,8 +60,10 @@ function extract(projectName, projectPath) {
   }
 }
 
-const projects = ['base', 'device', 'imgui', 'scene', 'backend-webgl', 'backend-webgpu'];
+const projects = ['base', 'device', 'loaders', 'imgui', 'scene', 'backend-webgl', 'backend-webgpu'];
 const cwd = process.cwd();
+fs.rmSync(apiOutputDir, { recursive: true, force: true });
+fs.mkdirSync(path.join(apiOutputDir, 'input'), { recursive: true });
 for (const name of projects) {
   const projectPath = path.resolve(__dirname, '..', '..', 'libs', name);
   if (fs.existsSync(projectPath)) {
@@ -71,14 +74,22 @@ for (const name of projects) {
 }
 document();
 
-const markdownDir = path.join(__dirname, 'dist', 'web', 'doc', 'markdown');
+const markdownDir = path.join(apiOutputDir, 'markdown');
 const r = /(\[[^\]]+\])\(([^\)]+\.md)\)/g;
 fs.readdirSync(markdownDir).forEach((file) => {
   const fullpath = path.join(markdownDir, file);
   if (fullpath.endsWith('.md') && fs.statSync(fullpath).isFile()) {
     const content = fs.readFileSync(fullpath, { encoding: 'utf-8' });
     try {
-      const newcontent = content.replaceAll(r, '$1(doc/markdown/$2)');
+      const newcontent = content
+        .replaceAll(r, (match, text, href) => {
+          const normalizedHref = href
+            .replace(/^doc\/markdown\/\.?\//, './')
+            .replace(/^\/doc\/markdown\/\.?\//, './')
+            .toLowerCase();
+          return `${text}(${normalizedHref})`;
+        })
+        .replace(/^\{[^\r\n]*\}$/gm, (line) => `\`${line}\``);
       if (newcontent !== content) {
         fs.writeFileSync(fullpath, newcontent, { encoding: 'utf-8' });
       }

@@ -12,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const srcdir = path.join(__dirname, 'src');
-const destdir = path.join(__dirname, 'dist', 'web', 'tut');
+const destdir = path.join(__dirname, 'web', 'public', 'tut');
 const srcfiles = [];
 const zephyr3d = path.join(__dirname, 'node_modules', '@zephyr3d');
 const cacheFile = path.join(__dirname, '.buildcache.json');
@@ -70,6 +70,13 @@ function traverseDirectory(dirPath, rootPath, dict) {
   return dict;
 }
 
+function hasTutOutput(output) {
+  return (
+    fs.existsSync(path.join(destdir, 'js', `${output}.js`)) &&
+    fs.existsSync(path.join(destdir, `${output}.html`))
+  );
+}
+
 let buildCache = {};
 try {
   if (fs.existsSync(destdir) && fs.statSync(cacheFile).isFile()) {
@@ -116,7 +123,7 @@ fs.readdirSync(srcdir).filter((dir) => {
     ) {
       const cache = buildCache[dir];
       const dict = traverseDirectory(fullpath, fullpath);
-      if (invalidAll || !deepEqual(cache, dict)) {
+      if (invalidAll || !deepEqual(cache, dict) || !hasTutOutput(dir)) {
         buildCache[dir] = dict;
         cacheChanged = true;
         srcfiles.push([main, dir]);
@@ -192,12 +199,12 @@ function getTutTarget(input, output) {
         targets: [
           {
             src: `src/${output}/index.html`,
-            dest: 'dist/web/tut',
+            dest: 'web/public/tut',
             rename: `${output}.html`
           },
           {
             src: `src/${output}/main.js`,
-            dest: 'dist/web/tut',
+            dest: 'web/public/tut',
             rename: `${output}.main.js`
           }
         ],
