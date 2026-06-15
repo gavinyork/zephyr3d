@@ -494,6 +494,9 @@ export class DirTreeView extends TreeView<{}, DirectoryInfo> {
       this._renderer.refreshFileView();
     });
   }
+  protected onSelectionChanged(): void {
+    this._renderer.emitSelectedChanged();
+  }
   protected onNodeOpenChanged(node: DirectoryInfo, open: boolean) {
     node.open = open;
     if (open) {
