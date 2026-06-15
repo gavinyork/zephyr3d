@@ -2443,6 +2443,8 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     for (const subDir of dir.subDir) {
       subDir.parent = dir;
     }
+    this._forceNavRefresh = true;
+    this._nav.refreshStructure();
     if (this.selectedDir === dir) {
       this.refreshFileView();
     }
