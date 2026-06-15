@@ -100,6 +100,7 @@ If the user changes the port in editor settings, the MCP client config must be u
 
 - `ZEPHYR_EDITOR_DEVICE=webgl2|webgpu`
 - `ZEPHYR_EDITOR_DEVTOOLS=1`
+- `ZEPHYR_PREVIEW_DEVTOOLS=1`
 - `ZEPHYR_EDITOR_LOG_PATH=<absolute path>`
 - `ZEPHYR_EDITOR_SCREENSHOT_PATH=<absolute path>`
 - `ZEPHYR_EDITOR_PORTABLE=1`
