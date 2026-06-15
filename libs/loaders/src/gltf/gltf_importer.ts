@@ -213,7 +213,7 @@ export class GLTFImporter extends AbstractModelImporter {
       const dracoDecoderModule = (window as any).DracoDecoderModule as draco3d.DracoDecoderModule;
       if (dracoDecoderModule) {
         dracoDecoderModule({
-          onModuleLoaded: (module) => {
+          onModuleLoaded: (module: any) => {
             gltf._dracoModule = module;
             resolve();
           }
