@@ -3,7 +3,7 @@ import type { TextureAddressMode, TextureFilterMode, TextureSampler } from '@zep
 import UPNG from 'upng-js';
 import { DataTransferVFS, Disposable, guessMimeType, makeObservable, PathUtils } from '@zephyr3d/base';
 import { DockPannel, ResizeDirection } from './dockpanel';
-import { ImGui, imGuiCalcTextSize } from '@zephyr3d/imgui';
+import { ImGui, getLastPointerInputType, imGuiCalcTextSize } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
 import { ProjectService } from '../core/services/project';
 import { eventBus } from '../core/eventbus';
@@ -291,6 +291,9 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
   get renderer() {
     return (this._data as VFSContentData).renderer;
   }
+  protected shouldAutoScrollWhileDragging(): boolean {
+    return getLastPointerInputType() === 'touch';
+  }
   protected renderGridContent(
     item: FileInfo | DirectoryInfo,
     _index: number,
@@ -476,6 +479,9 @@ export class DirTreeView extends TreeView<{}, DirectoryInfo> {
   constructor(renderer: VFSRenderer, projectName: string, multi?: boolean) {
     super(`###VFSNavigator${renderer.id}`, new VFSDirData(renderer, projectName), multi);
     this._renderer = renderer;
+  }
+  protected shouldAutoScrollWhileDragging(): boolean {
+    return getLastPointerInputType() === 'touch';
   }
   protected onGetContextMenuId(node: DirectoryInfo): string {
     return this._renderer.VFS.readOnly ? '' : `vfs_${node.path}`;

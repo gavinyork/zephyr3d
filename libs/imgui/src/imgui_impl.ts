@@ -323,6 +323,7 @@ export function canvas_on_keypress(event: KeyboardEvent) {
 }
 
 function canvas_on_pointermove(event: PointerEvent) {
+  lastPointerInputType = normalizePointerInputType(event.pointerType);
   const io = ImGui.GetIO();
   if (isPointerLocked()) {
     io.MousePos.x += event.movementX || 0;
@@ -361,6 +362,25 @@ const mouse_button_map: number[] = [
   3,
   4
 ];
+
+export type ImGuiPointerInputType = 'mouse' | 'touch' | 'pen' | 'unknown';
+
+let lastPointerInputType: ImGuiPointerInputType = 'unknown';
+
+function normalizePointerInputType(pointerType?: string): ImGuiPointerInputType {
+  switch (pointerType) {
+    case 'mouse':
+    case 'touch':
+    case 'pen':
+      return pointerType;
+    default:
+      return 'unknown';
+  }
+}
+
+export function getLastPointerInputType(): ImGuiPointerInputType {
+  return lastPointerInputType;
+}
 
 export function any_pointerdown() {
   const io = ImGui.GetIO();
@@ -435,6 +455,7 @@ function isPointerNearScreenEdge(event: PointerEvent) {
 }
 
 function canvas_on_pointerdown(event: PointerEvent) {
+  lastPointerInputType = normalizePointerInputType(event.pointerType);
   const io = ImGui.GetIO();
   io.MousePos.x = event.offsetX;
   io.MousePos.y = event.offsetY;
@@ -459,6 +480,7 @@ function canvas_on_contextmenu(_event: Event) {
 }
 
 function canvas_on_pointerup(event: PointerEvent) {
+  lastPointerInputType = normalizePointerInputType(event.pointerType);
   const io = ImGui.GetIO();
   io.MouseDown[mouse_button_map[event.button]] = false;
   if (event.button === 0) {
@@ -504,6 +526,7 @@ export class ITouch {
 export let multi_touch: { [key: number]: ITouch } = {};
 
 function canvas_on_touchstart(event: TouchEvent) {
+  lastPointerInputType = 'touch';
   for (let i = 0; i < event.changedTouches.length; i++) {
     const touch = event.changedTouches[i];
     touch_id = touch.identifier;
@@ -516,6 +539,7 @@ function canvas_on_touchstart(event: TouchEvent) {
   io.MouseDown[0] = true;
 }
 function canvas_on_touchmove(event: TouchEvent) {
+  lastPointerInputType = 'touch';
   for (let i = 0; i < event.changedTouches.length; i++) {
     const touch = event.changedTouches[i];
     multi_touch[touch.identifier] = { x: touch.clientX, y: touch.clientY };
@@ -526,6 +550,7 @@ function canvas_on_touchmove(event: TouchEvent) {
   io.MousePos.y = mtouch.y;
 }
 function canvas_on_touchend(event: TouchEvent) {
+  lastPointerInputType = 'touch';
   const io = ImGui.GetIO();
   for (let i = 0; i < event.changedTouches.length; i++) {
     const touch = event.changedTouches[i];
@@ -540,6 +565,7 @@ function canvas_on_touchend(event: TouchEvent) {
   }
 }
 function canvas_on_touchcancel(event: TouchEvent) {
+  lastPointerInputType = 'touch';
   canvas_on_touchend(event);
 }
 
@@ -976,9 +1002,11 @@ function scroll_update(io: ImGui.IO) {
       mouse_first_down = true;
     }
 
+    const allowDragScroll = lastPointerInputType === 'touch';
+
     if (hoveredWin.Flags & ImGui.ImGuiWindowFlags.NoMove) {
       let first_down = false;
-      if (io.MouseDown[0]) {
+      if (allowDragScroll && io.MouseDown[0]) {
         first_down = mouse_first_down;
         mouse_first_down = false;
       } else {
@@ -987,7 +1015,7 @@ function scroll_update(io: ImGui.IO) {
 
       const scroll = new ImGui.ImVec2(hoveredWin.Scroll.x, hoveredWin.Scroll.y);
       if (hoveredWin.ScrollbarY) {
-        if (io.MouseDown[0] && !first_down) {
+        if (allowDragScroll && io.MouseDown[0] && !first_down) {
           scroll.y -= io.MouseDelta.y;
           scroll_acc.y = io.MouseDelta.y;
         } else if (Math.abs(scroll_acc.y) > 1) {
@@ -1002,7 +1030,7 @@ function scroll_update(io: ImGui.IO) {
         hoveredWin.Scroll = scroll;
       }
       if (hoveredWin.ScrollbarX) {
-        if (io.MouseDown[0]) {
+        if (allowDragScroll && io.MouseDown[0]) {
           scroll.x -= io.MouseDelta.x;
           scroll_acc.x = io.MouseDelta.x;
         }

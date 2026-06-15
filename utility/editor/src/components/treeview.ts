@@ -246,8 +246,14 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
       ImGui.Unindent(row.depth * perDepth);
     }
   }
+  protected shouldAutoScrollWhileDragging(): boolean {
+    return true;
+  }
   private handleAutoScrollWhileDragging() {
     if (!this._draggingItem) {
+      return;
+    }
+    if (!this.shouldAutoScrollWhileDragging()) {
       return;
     }
 
