@@ -44,8 +44,25 @@ function getPluginModeSummary(plugin: SystemPluginRecord): string {
   return plugin.linked?.directory ? `Mode: linked (${plugin.linked.directory})` : 'Mode: installed package';
 }
 
+const LEGACY_0YAO_SCRIPT_PATHS = ['/assets/scripts/gpucloth.ts', '/assets/scripts/springtest.ts'];
+const PHYSICS_TOOLS_SCRIPT_PATHS = [
+  '/assets/plugins/0yao/gpucloth.ts',
+  '/assets/plugins/0yao/springtest.ts',
+  '/assets/plugins/0yao/externalanimations.ts'
+];
+const WARDROBE_SCRIPT_PATHS = [
+  '/assets/plugins/0yao/wardrobehost.ts',
+  '/assets/plugins/0yao/outfitpart.ts',
+  '/assets/plugins/0yao/shared.ts',
+  '/assets/plugins/0yao/mesh-io.ts',
+  '/assets/plugins/0yao/primitive-override.ts',
+  '/assets/plugins/0yao/calibration-runtime.ts'
+];
+
 const AUTO_SCRIPT_PATHS_BY_PLUGIN_ID: Record<string, string[]> = {
-  'com.0yao.zephyr3d-plugin': ['/assets/scripts/gpucloth.ts', '/assets/scripts/springtest.ts']
+  'com.0yao.zephyr3d-plugin': [...LEGACY_0YAO_SCRIPT_PATHS, ...PHYSICS_TOOLS_SCRIPT_PATHS, ...WARDROBE_SCRIPT_PATHS],
+  'com.0yao.zephyr3d-plugin.physics-tools': PHYSICS_TOOLS_SCRIPT_PATHS,
+  'com.0yao.zephyr3d-plugin.wardrobe': WARDROBE_SCRIPT_PATHS
 };
 
 function normalizePluginSettingsForSchema(
