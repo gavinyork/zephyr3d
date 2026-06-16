@@ -1261,6 +1261,11 @@ export class Editor {
   }
 
   async removeSystemPlugin(id: string) {
+    const plugin = this._plugins.hasPlugin(id) ? this._plugins.getPlugin(id) : null;
+    if (plugin) {
+      const context = this._plugins.createPluginContextForLifecycle(plugin);
+      await plugin.uninstall?.(context);
+    }
     if (this._plugins.hasPlugin(id) && this._plugins.isPluginActive(id)) {
       await this._plugins.deactivatePlugin(id);
     }

@@ -326,10 +326,12 @@ export type EditorPluginDefinition = Partial<EditorPluginMetadata> & {
   settings?: EditorPluginSettingsSchema;
   activate: (ctx: EditorPluginContext) => void | Promise<void>;
   deactivate?: (ctx: EditorPluginContext) => void | Promise<void>;
+  uninstall?: (ctx: EditorPluginContext) => void | Promise<void>;
 };
 
 export type EditorPlugin = EditorPluginMetadata & {
   settings?: EditorPluginSettingsSchema;
   activate: (ctx: EditorPluginContext) => void | Promise<void>;
   deactivate?: (ctx: EditorPluginContext) => void | Promise<void>;
+  uninstall?: (ctx: EditorPluginContext) => void | Promise<void>;
 };

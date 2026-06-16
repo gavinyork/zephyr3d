@@ -129,6 +129,58 @@ export type RuntimeEditorMenuContribution = {
   items: RuntimeEditorMenuItem[] | ((ctx: RuntimeEditorMenuContext) => RuntimeEditorMenuItem[]);
 };
 
+function cloneRuntimeMenuItem(item: RuntimeEditorMenuItem): RuntimeEditorMenuItem {
+  return {
+    ...item,
+    subMenus: item.subMenus?.map((subItem) => cloneRuntimeMenuItem(subItem))
+  };
+}
+
+function mergeRuntimeMenuItems(
+  target: RuntimeEditorMenuItem[],
+  items: readonly RuntimeEditorMenuItem[]
+): RuntimeEditorMenuItem[] {
+  for (const sourceItem of items) {
+    const item = cloneRuntimeMenuItem(sourceItem);
+    const existing =
+      item.id && item.subMenus?.length
+        ? target.find((candidate) => candidate.id === item.id)
+        : undefined;
+    if (existing) {
+      existing.subMenus = mergeRuntimeMenuItems(existing.subMenus ?? [], item.subMenus ?? []);
+      continue;
+    }
+    target.push(item);
+  }
+  return target;
+}
+
+function cloneMenuItemOptions(item: MenuItemOptions): MenuItemOptions {
+  return {
+    ...item,
+    subMenus: item.subMenus?.map((subItem) => cloneMenuItemOptions(subItem))
+  };
+}
+
+function mergeMenuItemOptions(
+  target: MenuItemOptions[],
+  items: readonly MenuItemOptions[]
+): MenuItemOptions[] {
+  for (const sourceItem of items) {
+    const item = cloneMenuItemOptions(sourceItem);
+    const existing =
+      item.id && item.subMenus?.length
+        ? target.find((candidate) => candidate.id === item.id)
+        : undefined;
+    if (existing) {
+      existing.subMenus = mergeMenuItemOptions(existing.subMenus ?? [], item.subMenus ?? []);
+      continue;
+    }
+    target.push(item);
+  }
+  return target;
+}
+
 export type RuntimeEditorToolbarContribution =
   | ToolBarItem
   | ((ctx: RuntimeEditorToolbarContext) => ToolBarItem);
@@ -285,6 +337,10 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
     return this._plugins.get(id)?.plugin ?? null;
   }
 
+  createPluginContextForLifecycle(plugin: EditorPlugin) {
+    return this.createPluginContext(plugin);
+  }
+
   unregisterPlugin(id: string) {
     if (this._activePlugins.has(id)) {
       throw new Error(`Editor plugin '${id}' is still active`);
@@ -413,7 +469,10 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
   getContextMenuItems(location: EditorMenuLocation, ctx: RuntimeEditorMenuContext) {
     return this._contextMenuItems
       .filter((contribution) => contribution.location === location)
-      .flatMap((contribution) => this.resolveMenuItems(contribution, ctx));
+      .reduce<RuntimeEditorMenuItem[]>(
+        (items, contribution) => mergeRuntimeMenuItems(items, this.resolveMenuItems(contribution, ctx)),
+        []
+      );
   }
 
   getToolbarItems(ctx: RuntimeEditorToolbarContext) {
@@ -463,22 +522,41 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
   }
 
   applyMainMenuContributions(items: MenuItemOptions[], ctx: RuntimeEditorMenuContext) {
+    const pending = new Map<string, MenuItemOptions[]>();
     for (const contribution of this._mainMenuItems) {
       const contributed = this.resolveMenuItems(contribution, ctx);
       if (contributed.length === 0) {
         continue;
       }
-      const normalized = this.toMenuItemOptions(contributed, ctx);
+      const normalized = mergeMenuItemOptions([], this.toMenuItemOptions(contributed, ctx));
       if (contribution.parentId) {
         const parent = this.findMenuItem(items, contribution.parentId);
         if (parent) {
-          parent.subMenus = [...(parent.subMenus ?? []), ...normalized];
+          parent.subMenus = mergeMenuItemOptions(parent.subMenus ?? [], normalized);
         } else {
-          this.insertMainMenuItems(items, normalized);
+          const queued = pending.get(contribution.parentId) ?? [];
+          mergeMenuItemOptions(queued, normalized);
+          pending.set(contribution.parentId, queued);
         }
       } else {
         this.insertMainMenuItems(items, normalized);
       }
+    }
+    let attached = true;
+    while (attached && pending.size > 0) {
+      attached = false;
+      for (const [parentId, queuedItems] of [...pending.entries()]) {
+        const parent = this.findMenuItem(items, parentId);
+        if (!parent) {
+          continue;
+        }
+        parent.subMenus = mergeMenuItemOptions(parent.subMenus ?? [], queuedItems);
+        pending.delete(parentId);
+        attached = true;
+      }
+    }
+    for (const queuedItems of pending.values()) {
+      this.insertMainMenuItems(items, mergeMenuItemOptions([], queuedItems));
     }
   }
 
@@ -526,11 +604,22 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
   }
 
   private insertMainMenuItems(target: MenuItemOptions[], items: MenuItemOptions[]) {
-    const helpIndex = target.findIndex((item) => item.id === 'help');
-    if (helpIndex >= 0) {
-      target.splice(helpIndex, 0, ...items);
-    } else {
-      target.push(...items);
+    for (const sourceItem of items) {
+      const item = cloneMenuItemOptions(sourceItem);
+      const existing =
+        item.id && item.subMenus?.length
+          ? target.find((candidate) => candidate.id === item.id)
+          : undefined;
+      if (existing) {
+        existing.subMenus = mergeMenuItemOptions(existing.subMenus ?? [], item.subMenus ?? []);
+        continue;
+      }
+      const helpIndex = target.findIndex((menuItem) => menuItem.id === 'help');
+      if (helpIndex >= 0) {
+        target.splice(helpIndex, 0, item);
+      } else {
+        target.push(item);
+      }
     }
   }
 
