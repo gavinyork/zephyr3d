@@ -282,6 +282,12 @@ export class PBRBluePrintMaterial
       scope.zVertexTangent = scope.$outputs.wTangent as PBShaderExp;
       scope.zVertexBinormal = scope.$outputs.wBinormal as PBShaderExp;
     }
+    for (const outputName of ['Output1', 'Output2', 'Output3', 'Output4']) {
+      const output = outputs.find((output) => output.name === outputName)?.exp;
+      if (output) {
+        scope.$outputs[outputName] = output;
+      }
+    }
   }
 
   fragmentShader(scope: PBFunctionScope) {

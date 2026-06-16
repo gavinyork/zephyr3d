@@ -167,6 +167,7 @@ import {
   CameraPositionNode,
   CameraVectorNode,
   ElapsedTimeNode,
+  InstanceIndexNode,
   InvProjMatrixNode,
   InvViewProjMatrixNode,
   PixelNormalNode,
@@ -178,7 +179,9 @@ import {
   SkyEnvTextureNode,
   VertexBinormalNode,
   VertexColorNode,
+  VertexIndexNode,
   VertexNormalNode,
+  VertexOutputNode,
   VertexPositionNode,
   VertexTangentNode,
   VertexUVNode,
@@ -434,7 +437,10 @@ export class ResourceManager {
         FunctionOutputNode.getSerializationCls(),
         FunctionCallNode.getSerializationCls(this),
         PannerNode.getSerializationCls(),
-        TextureSampleNode.getSerializationCls()
+        TextureSampleNode.getSerializationCls(),
+        VertexOutputNode.getSerializationCls(),
+        VertexIndexNode.getSerializationCls(),
+        InstanceIndexNode.getSerializationCls()
       ].map((val) => [val.ctor, val])
     );
     for (const k of this._classMap) {
