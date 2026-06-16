@@ -398,7 +398,6 @@ export class RenderQueue extends Disposable {
       this._needSceneColorWithDepth ||= transmission && needDepth;
       this._drawTransparent ||= trans;
       if (camera.getPickResultResolveFunc()) {
-        material!.objectColor = drawable.getObjectColor();
         this._objectColorMaps[0].set(drawable.getDrawableId(), drawable);
       }
       if (drawable.isBatchable()) {
