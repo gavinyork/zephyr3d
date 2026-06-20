@@ -21,7 +21,7 @@ import type { DepthPass } from '../render';
 import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { ShaderHelper } from './shader/helper';
-import type { Clonable, Nullable } from '@zephyr3d/base';
+import type { Clonable, Immutable, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4, applyMixins, DRef } from '@zephyr3d/base';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import { getDevice } from '../app/api';
@@ -168,6 +168,8 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * (here used inversely when mapping to motion vector output).
    */
   private _taaStrength: number;
+  /** @internal Per-object color for object picking pass. */
+  private _objectColor: Immutable<Vector4>;
   /** @internal Last draw context used for shader creation. */
   private _ctx: Nullable<DrawContext>;
   /** @internal Current material pass index during program building. */
@@ -193,6 +195,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     this._cullMode = 'back';
     this._opacity = 1;
     this._taaStrength = 1 - 1 / 16;
+    this._objectColor = Vector4.one();
     this._ctx = null;
     this._materialPass = -1;
     this.useFeature(FEATURE_ALPHABLEND, this._blendMode);
@@ -223,6 +226,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     this.shadowAlphaCutoff = other.shadowAlphaCutoff;
     this.cullMode = other.cullMode;
     this.opacity = other.opacity;
+    this.objectColor = other.objectColor;
   }
   /**
    * Capture the active draw context for both cached and freshly-built program paths.
@@ -645,6 +649,19 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     val = val < 0 ? 0 : val > 1 ? 1 : val;
     if (this._opacity !== val) {
       this._opacity = val;
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Per-object color used for GPU picking/object-ID pass.
+   * - Changing marks uniforms dirty only.
+   */
+  get objectColor(): Immutable<Vector4> {
+    return this._objectColor;
+  }
+  set objectColor(val: Immutable<Vector4>) {
+    if (val !== this._objectColor) {
+      this._objectColor = val;
       this.uniformChanged();
     }
   }
