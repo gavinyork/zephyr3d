@@ -1432,7 +1432,12 @@ export class ShaderHelper {
           this[UNIFORM_NAME_AERIALPERSPECTIVE_LUT],
           this[UNIFORM_NAME_SKYDISTANTLIGHT_LUT]
         );
-        this.color = pb.vec4(pb.add(pb.mul(this.color.rgb, this.fogging.a), this.fogging.rgb), this.color.a);
+        this.$l.foggingAlpha = pb.sub(1, pb.mul(pb.sub(1, this.fogging.a), this.color.a));
+        this.$l.foggingRGB = pb.mul(this.fogging.rgb, this.color.a);
+        this.color = pb.vec4(
+          pb.add(pb.mul(this.color.rgb, this.foggingAlpha), this.foggingRGB),
+          this.color.a
+        );
         //this.color = pb.vec4(pb.vec3(pb.mix(this.u0, this.u1, this.factor)), this.color.a);
       });
       scope[funcName](worldPos, color);

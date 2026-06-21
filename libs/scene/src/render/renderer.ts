@@ -38,88 +38,89 @@ export class SceneRenderer {
       const renderHeight = camera.viewport
         ? device.screenYToDevice(camera.viewport[3])
         : device.getDrawingBufferHeight();
-      if (renderWidth <= 0 || renderHeight <= 0) {
+      if (renderWidth > 0 && renderHeight > 0) {
+        const tmpFramebuffer = defaultViewport
+          ? null
+          : device.pool.fetchTemporalFramebuffer(false, renderWidth, renderHeight, colorFormat, depthFormat);
+        const originFramebuffer = device.getFramebuffer();
+        if (tmpFramebuffer) {
+          device.pushDeviceStates();
+          device.setFramebuffer(tmpFramebuffer);
+        }
+        device.clearFrameBuffer(camera.clearColor, camera.clearDepth, camera.clearStencil);
+        const SSR = camera.SSR && scene.env.light.envLight && scene.env.light.envLight.hasRadiance();
+        const SSS = camera.SSS;
+        const glossySurfaceFormat: TextureFormat = halfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
+        const ctx: DrawContext = {
+          device,
+          scene,
+          renderWidth,
+          renderHeight,
+          oit: null,
+          motionVectors:
+            device.type !== 'webgl' && (camera.TAA || camera.motionBlur || (SSR && camera.ssrTemporal)),
+          HiZ: camera.HiZ && device.type !== 'webgl',
+          HiZTexture: null,
+          globalBindGroupAllocator,
+          camera,
+          compositor: camera.compositor,
+          queue: 0,
+          lightBlending: false,
+          renderPass: null,
+          renderPassHash: null,
+          flip: false,
+          depthFormat,
+          colorFormat,
+          drawEnvLight: false,
+          env: null,
+          sunLight: null,
+          primaryDirectionalLight: null,
+          primaryTransmissionLight: null,
+          materialFlags: 0,
+          SSR,
+          SSS,
+          SSRCalcThickness: SSR && camera.ssrCalcThickness,
+          SSRRoughnessTexture: SSR
+            ? device.pool.fetchTemporalTexture2D(true, glossySurfaceFormat, renderWidth, renderHeight)
+            : null,
+          SSRNormalTexture: SSR
+            ? device.pool.fetchTemporalTexture2D(true, glossySurfaceFormat, renderWidth, renderHeight)
+            : null,
+          SSSProfileTexture: null,
+          SSSParamTexture: null,
+          SSSDiffuseTexture: null,
+          SSSTransmissionTexture: null,
+          ssrSDFBoxBuffer: null,
+          ssrSDFBoxCount: 0,
+          finalFramebuffer: device.getFramebuffer(),
+          intermediateFramebuffer: null
+        };
+        this._renderScene(ctx);
+        if (tmpFramebuffer) {
+          device.popDeviceStates();
+          const oversizedViewport =
+            renderX < 0 ||
+            renderY < 0 ||
+            renderX + renderWidth > device.getDrawingBufferWidth() ||
+            renderY + renderHeight > device.getDrawingBufferHeight();
+          const blitter = new CopyBlitter();
+          if (oversizedViewport) {
+            blitter.destRect = [renderX, renderY, renderWidth, renderHeight];
+          } else {
+            blitter.viewport = camera.viewport ? camera.viewport.slice() : null;
+          }
+          blitter.scissor = camera.scissor ? camera.scissor.slice() : null;
+          blitter.srgbOut = !originFramebuffer;
+          blitter.blit(
+            tmpFramebuffer.getColorAttachments()[0],
+            originFramebuffer ?? null,
+            fetchSampler('clamp_nearest_nomip')
+          );
+          device.pool.releaseFrameBuffer(tmpFramebuffer);
+        }
+      } else {
         camera.getPickResultResolveFunc()?.(null);
         return;
-      }
-      const tmpFramebuffer = defaultViewport
-        ? null
-        : device.pool.fetchTemporalFramebuffer(false, renderWidth, renderHeight, colorFormat, depthFormat);
-      const originFramebuffer = device.getFramebuffer();
-      if (tmpFramebuffer) {
-        device.pushDeviceStates();
-        device.setFramebuffer(tmpFramebuffer);
-      }
-      device.clearFrameBuffer(camera.clearColor, camera.clearDepth, camera.clearStencil);
-      const SSR = camera.SSR && scene.env.light.envLight && scene.env.light.envLight.hasRadiance();
-      const SSS = camera.SSS;
-      const glossySurfaceFormat: TextureFormat = halfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
-      const ctx: DrawContext = {
-        device,
-        scene,
-        renderWidth,
-        renderHeight,
-        oit: null,
-        motionVectors:
-          device.type !== 'webgl' && (camera.TAA || camera.motionBlur || (SSR && camera.ssrTemporal)),
-        HiZ: camera.HiZ && device.type !== 'webgl',
-        HiZTexture: null,
-        globalBindGroupAllocator,
-        camera,
-        compositor: camera.compositor,
-        queue: 0,
-        lightBlending: false,
-        renderPass: null,
-        renderPassHash: null,
-        flip: false,
-        depthFormat,
-        colorFormat,
-        drawEnvLight: false,
-        env: null,
-        sunLight: null,
-        primaryDirectionalLight: null,
-        primaryTransmissionLight: null,
-        materialFlags: 0,
-        SSR,
-        SSS,
-        SSRCalcThickness: SSR && camera.ssrCalcThickness,
-        SSRRoughnessTexture: SSR
-          ? device.pool.fetchTemporalTexture2D(true, glossySurfaceFormat, renderWidth, renderHeight)
-          : null,
-        SSRNormalTexture: SSR
-          ? device.pool.fetchTemporalTexture2D(true, glossySurfaceFormat, renderWidth, renderHeight)
-          : null,
-        SSSProfileTexture: null,
-        SSSParamTexture: null,
-        SSSDiffuseTexture: null,
-        SSSTransmissionTexture: null,
-        ssrSDFBoxBuffer: null,
-        ssrSDFBoxCount: 0,
-        finalFramebuffer: device.getFramebuffer(),
-        intermediateFramebuffer: null
-      };
-      this._renderScene(ctx);
-      if (tmpFramebuffer) {
-        device.popDeviceStates();
-        const oversizedViewport =
-          renderX < 0 ||
-          renderY < 0 ||
-          renderX + renderWidth > device.getDrawingBufferWidth() ||
-          renderY + renderHeight > device.getDrawingBufferHeight();
-        const blitter = new CopyBlitter();
-        if (oversizedViewport) {
-          blitter.destRect = [renderX, renderY, renderWidth, renderHeight];
-        } else {
-          blitter.viewport = camera.viewport ? camera.viewport.slice() : null;
-        }
-        blitter.scissor = camera.scissor ? camera.scissor.slice() : null;
-        blitter.srgbOut = !originFramebuffer;
-        blitter.blit(
-          tmpFramebuffer.getColorAttachments()[0],
-          originFramebuffer ?? null,
-          fetchSampler('clamp_nearest_nomip')
-        );
-        device.pool.releaseFrameBuffer(tmpFramebuffer);
       }
     }
     GlobalBindGroupAllocator.release(globalBindGroupAllocator);

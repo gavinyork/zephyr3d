@@ -31,6 +31,8 @@ myApp.ready().then(async () => {
   dirLight.castShadow = true;
   // 4 cascade levels
   dirLight.shadow.numShadowCascades = 4;
+  // depth bias
+  dirLight.shadow.depthBias = 0.005;
   // PCF
   dirLight.shadow.mode = 'pcf-opt';
 

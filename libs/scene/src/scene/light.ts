@@ -231,7 +231,7 @@ export class PunctualLight extends BaseLight {
    * @param b - true if the light casts shadows
    * @returns self
    */
-  setCastShadow(b: boolean) {
+  setCastShadow(b: boolean): this {
     this.ensurePunctualState();
     if (this._castShadow !== !!b) {
       this._castShadow = !!b;

@@ -1,4 +1,4 @@
-import { AABB, Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Scene,
   Application,
@@ -30,8 +30,7 @@ myApp.ready().then(function () {
   // light direction
   dirLight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
   // Enable shadowing
-  dirLight.castShadow = true;
-  dirLight.shadow.shadowRegion = new AABB(new Vector3(-50, 0, -50), new Vector3(50, 30, 50));
+  dirLight.shadow.depthBias = 0.0005;
 
   // Create a torus
   const material = new LambertMaterial();
@@ -43,7 +42,11 @@ myApp.ready().then(function () {
   // Create floor
   const floorMaterial = new LambertMaterial();
   floorMaterial.albedoColor = new Vector4(0, 1, 1, 1);
-  new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
+  const floor = new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
+  floor.castShadow = false;
+
+  // Enable directional light to cast shadow
+  dirLight.castShadow = true;
 
   // Create camera
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type DefaultTheme } from 'vitepress';
 
@@ -7,6 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const docsRoot = path.resolve(__dirname, '..');
 const base = normalizeBase(process.env.DOC_BASE || '/');
+const lastUpdatedCache = new Map<string, number>();
 
 function normalizeBase(value: string): string {
   const normalized = value.trim() || '/';
@@ -97,15 +99,39 @@ function apiSidebar(): DefaultTheme.SidebarItem[] {
   ];
 }
 
+function getLastUpdated(relativePath: string): number | undefined {
+  if (relativePath.startsWith('api/markdown/')) {
+    return undefined;
+  }
+
+  const cached = lastUpdatedCache.get(relativePath);
+  if (cached !== undefined) {
+    return cached || undefined;
+  }
+
+  const result = spawnSync('git', ['log', '-1', '--pretty=%ct', '--', relativePath], {
+    cwd: docsRoot,
+    encoding: 'utf8'
+  });
+  const timestamp = result.status === 0 ? Number.parseInt(result.stdout.trim(), 10) * 1000 : 0;
+  lastUpdatedCache.set(relativePath, Number.isFinite(timestamp) ? timestamp : 0);
+  return timestamp || undefined;
+}
+
 export default defineConfig({
   title: 'Zephyr3d',
   description: 'Zephyr3d documentation',
   base,
   outDir: '../dist/web',
+  metaChunk: true,
   cleanUrls: false,
-  lastUpdated: true,
+  lastUpdated: false,
   ignoreDeadLinks: true,
   srcExclude: ['**/_*.md'],
+  transformPageData(pageData) {
+    const lastUpdated = getLastUpdated(pageData.filePath);
+    return lastUpdated ? { lastUpdated } : undefined;
+  },
   head: [['link', { rel: 'icon', href: 'https://cdn.zephyr3d.org/doc/assets/images/favicon.ico' }]],
   markdown: {
     config(md) {
@@ -143,6 +169,9 @@ export default defineConfig({
     search: {
       provider: 'local',
       options: {
+        _render(src, env, md) {
+          return env.relativePath.startsWith('api/markdown/') ? '' : md.render(src, env);
+        },
         locales: {
           'zh-cn': {
             translations: {
