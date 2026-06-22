@@ -16,7 +16,7 @@ import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
 import { getDevice } from '../app/api';
-import type { Nullable } from '@zephyr3d/base';
+import { Vector4, type Nullable } from '@zephyr3d/base';
 
 type VSMImplData = {
   blurFramebuffer: FrameBuffer;
@@ -72,7 +72,7 @@ class VSMBlitter extends Blitter {
             ? pb.vec2(1, 0)
             : pb.vec2(0, 1);
       scope.numBlurPixelsPerSide = pb.float((this._kernelSize + 1) / 2);
-      scope.weight = pb.float(1 / (this._kernelSize * this._kernelSize));
+      scope.blurStep = pb.float(2 / (this._kernelSize - 1));
     }
   }
   setUniforms(bindGroup: BindGroup) {
@@ -117,14 +117,21 @@ class VSMBlitter extends Blitter {
     const that = this;
     const pb = scope.$builder;
     scope.d0 = that.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
-    scope.mean = pb.float(0);
-    scope.squaredMean = pb.float(0);
+    if (that._packFloat) {
+      scope.moment1 = scope.d0.x;
+      scope.moment2 = that._phase === 'horizonal' ? pb.mul(scope.d0.x, scope.d0.x) : scope.d0.y;
+    } else {
+      scope.moment1 = that._phase === 'horizonal' ? pb.mul(scope.d0.x, scope.d0.z) : scope.d0.x;
+      scope.moment2 = that._phase === 'horizonal' ? pb.mul(scope.d0.y, scope.d0.z) : scope.d0.y;
+      scope.coverage = scope.d0.z;
+    }
     scope.$for(pb.float('i'), 1, scope.numBlurPixelsPerSide, function () {
+      this.$l.blurOffset = pb.mul(this.blurMultiplyVec, this.blurSize, this.blurStep, this.i);
       this.d1 = that.readTexel(
         this,
         type,
         srcTex,
-        pb.sub(srcUV, pb.mul(this.blurMultiplyVec, this.blurSize, this.i)),
+        pb.sub(srcUV, this.blurOffset),
         srcLayer,
         sampleType
       );
@@ -132,24 +139,49 @@ class VSMBlitter extends Blitter {
         this,
         type,
         srcTex,
-        pb.add(srcUV, pb.mul(this.blurMultiplyVec, this.blurSize, this.i)),
+        pb.add(srcUV, this.blurOffset),
         srcLayer,
         sampleType
       );
-      this.mean = pb.add(this.mean, this.d1.x);
-      this.mean = pb.add(this.mean, this.d2.x);
-      if (that._phase === 'horizonal') {
-        this.squaredMean = pb.add(this.squaredMean, pb.mul(this.d1.x, this.d1.x));
-        this.squaredMean = pb.add(this.squaredMean, pb.mul(this.d2.x, this.d2.x));
+      if (that._packFloat) {
+        this.moment1 = pb.add(this.moment1, this.d1.x);
+        this.moment1 = pb.add(this.moment1, this.d2.x);
+        if (that._phase === 'horizonal') {
+          this.moment2 = pb.add(this.moment2, pb.mul(this.d1.x, this.d1.x));
+          this.moment2 = pb.add(this.moment2, pb.mul(this.d2.x, this.d2.x));
+        } else {
+          this.moment2 = pb.add(this.moment2, this.d1.y);
+          this.moment2 = pb.add(this.moment2, this.d2.y);
+        }
       } else {
-        this.squaredMean = pb.add(this.squaredMean, pb.dot(this.d1.xy, this.d1.xy));
-        this.squaredMean = pb.add(this.squaredMean, pb.dot(this.d2.xy, this.d2.xy));
+        this.moment1 = pb.add(
+          this.moment1,
+          that._phase === 'horizonal' ? pb.mul(this.d1.x, this.d1.z) : this.d1.x
+        );
+        this.moment1 = pb.add(
+          this.moment1,
+          that._phase === 'horizonal' ? pb.mul(this.d2.x, this.d2.z) : this.d2.x
+        );
+        this.moment2 = pb.add(
+          this.moment2,
+          that._phase === 'horizonal' ? pb.mul(this.d1.y, this.d1.z) : this.d1.y
+        );
+        this.moment2 = pb.add(
+          this.moment2,
+          that._phase === 'horizonal' ? pb.mul(this.d2.y, this.d2.z) : this.d2.y
+        );
+        this.coverage = pb.add(this.coverage, this.d1.z);
+        this.coverage = pb.add(this.coverage, this.d2.z);
       }
     });
-    scope.mean = pb.div(scope.mean, that._kernelSize);
-    scope.squaredMean = pb.div(scope.squaredMean, that._kernelSize);
-    scope.stdDev = pb.sqrt(pb.max(0, pb.sub(scope.squaredMean, pb.mul(scope.mean, scope.mean))));
-    return pb.vec4(scope.mean, scope.stdDev, 0, 1);
+    scope.moment1 = pb.div(scope.moment1, that._kernelSize);
+    scope.moment2 = pb.div(scope.moment2, that._kernelSize);
+    if (that._packFloat) {
+      return pb.vec4(scope.moment1, scope.moment2, 0, 1);
+    } else {
+      scope.coverage = pb.div(scope.coverage, that._kernelSize);
+      return pb.vec4(scope.moment1, scope.moment2, scope.coverage, 1);
+    }
   }
   protected calcHash() {
     return `${this._phase}-${this._kernelSize}-${Number(this._packFloat)}`;
@@ -226,8 +258,11 @@ export class VSM extends ShadowImpl {
   getType() {
     return 'vsm' as const;
   }
+  getShadowMapClearColor(_shadowMapParams: ShadowMapParams) {
+    return new Vector4(0, 0, 0, 1);
+  }
   getShadowMapBorder(_shadowMapParams: ShadowMapParams) {
-    return this._blur ? Math.ceil(((this._kernelSize + 1) / 2) * this._blurSize) : 0;
+    return this._blur ? Math.ceil(this._blurSize) + 1 : 0;
   }
   getShadowMap(shadowMapParams: ShadowMapParams) {
     const implData = shadowMapParams.implData as VSMImplData;
@@ -340,14 +375,10 @@ export class VSM extends ShadowImpl {
     const device = getDevice();
     return device.getDeviceCaps().textureCaps.supportFloatColorBuffer &&
       device.getDeviceCaps().textureCaps.supportLinearFloatTexture
-      ? device.type === 'webgl'
-        ? 'rgba32f'
-        : 'rg32f'
+      ? 'rgba32f'
       : device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer &&
           device.getDeviceCaps().textureCaps.supportLinearHalfFloatTexture
-        ? device.type === 'webgl'
-          ? 'rgba16f'
-          : 'rg16f'
+        ? 'rgba16f'
         : 'rgba8unorm';
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams) {
@@ -358,7 +389,11 @@ export class VSM extends ShadowImpl {
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp
   ) {
-    return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap!.format);
+    const pb = scope.$builder;
+    const depth = computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap!.format);
+    return shadowMapParams.shadowMap!.format === 'rgba8unorm'
+      ? depth
+      : pb.vec4(depth.x, pb.mul(depth.x, depth.x), 1, 1);
   }
   computeShadowCSM(
     shadowMapParams: ShadowMapParams,

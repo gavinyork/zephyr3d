@@ -1082,6 +1082,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     pb.func(alphaClipFuncName, [pb.float('alpha'), pb.float('cutoff')], function () {
       const shadowMaskedCaster = that.useTransparentShadowCaster(that.drawContext, that.pass);
       const shadowAlphaClip =
+        pb.getDevice().type !== 'webgl' &&
         that.drawContext.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP &&
         (shadowMaskedCaster || !that.isTransparentPass(that.pass, that.drawContext));
       if (shadowAlphaClip) {

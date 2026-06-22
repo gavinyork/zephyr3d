@@ -1328,7 +1328,16 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         function () {
           this.$l.T1 = pb.normalize(pb.sub(this.V, pb.mul(this.N, pb.dot(this.V, this.N))));
           this.$l.T2 = pb.cross(this.N, this.T1);
-          this.$l.ltcMatrix = pb.mul(this.Minv, pb.transpose(pb.mat3(this.T1, this.T2, this.N)));
+          if (pb.getDevice().type === 'webgl') {
+            this.$l.ltcBasis = pb.mat3(
+              pb.vec3(this.T1.x, this.T2.x, this.N.x),
+              pb.vec3(this.T1.y, this.T2.y, this.N.y),
+              pb.vec3(this.T1.z, this.T2.z, this.N.z)
+            );
+            this.$l.ltcMatrix = pb.mul(this.Minv, this.ltcBasis);
+          } else {
+            this.$l.ltcMatrix = pb.mul(this.Minv, pb.transpose(pb.mat3(this.T1, this.T2, this.N)));
+          }
           this.$l.L = pb.vec3[5]();
           this.L[0] = pb.mul(this.ltcMatrix, pb.sub(this.p0, this.P));
           this.L[1] = pb.mul(this.ltcMatrix, pb.sub(this.p1, this.P));

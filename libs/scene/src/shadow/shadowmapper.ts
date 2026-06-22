@@ -967,11 +967,7 @@ export class ShadowMapper extends Disposable {
     const device = getDevice();
     const fb = shadowMapParams.shadowMapFramebuffer!;
     shadowMapParams.depthClampEnabled = false;
-    renderPass.clearColor = fb.getColorAttachments()[0]
-      ? fb.getColorAttachments()[0].isFloatFormat()
-        ? new Vector4(1, 1, 1, 1)
-        : new Vector4(0, 0, 0, 1)
-      : null;
+    renderPass.clearColor = this._impl!.getShadowMapClearColor(shadowMapParams);
     const depthScale = this._impl!.getDepthScale();
     const directionalShadowRegion = this._shadowRegion.region;
     const shadowRegion =

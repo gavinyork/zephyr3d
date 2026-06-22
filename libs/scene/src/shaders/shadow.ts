@@ -391,16 +391,23 @@ function sampleShadowMapPoissonTap(
 function chebyshevUpperBound(scope: PBInsideFunctionScope, distance: PBShaderExp, occluder: PBShaderExp) {
   const funcNameChebyshevUpperBound = 'lib_chebyshevUpperBound';
   const pb = scope.$builder;
-  pb.func(funcNameChebyshevUpperBound, [pb.float('distance'), pb.vec2('occluder')], function () {
+  pb.func(funcNameChebyshevUpperBound, [pb.float('distance'), pb.vec3('occluder')], function () {
     this.$l.shadow = pb.float(1);
-    this.$l.test = pb.step(this.distance, this.occluder.x);
+    this.$l.coverage = this.occluder.z;
+    this.$l.invCoverage = pb.div(1, pb.max(this.coverage, 0.00001));
+    this.$l.moments = pb.mul(this.occluder.xy, this.invCoverage);
+    this.$l.test = pb.step(this.distance, this.moments.x);
     this.$if(pb.notEqual(this.test, 1), function () {
-      this.$l.d = pb.sub(this.distance, this.occluder.x);
-      this.$l.variance = pb.max(pb.mul(this.occluder.y, this.occluder.y), 0);
+      this.$l.d = pb.sub(this.distance, this.moments.x);
+      this.$l.variance = pb.max(
+        pb.sub(this.moments.y, pb.mul(this.moments.x, this.moments.x)),
+        0.000002
+      );
       const darkness = ShaderHelper.getDepthBiasValues(this).z;
       this.shadow = pb.div(this.variance, pb.add(this.variance, pb.mul(this.d, this.d)));
       this.shadow = pb.clamp(pb.div(pb.sub(this.shadow, darkness), pb.sub(1, darkness)), 0, 1);
     });
+    this.shadow = pb.mix(1, this.shadow, pb.clamp(this.coverage, 0, 1));
     this.$return(this.shadow);
   });
   return pb.getGlobalScope()[funcNameChebyshevUpperBound](distance, occluder) as PBShaderExp;
@@ -426,7 +433,9 @@ export function filterShadowVSM(
           chebyshevUpperBound(
             this,
             this.texCoord.w,
-            shadowMapFormat === 'rgba8unorm' ? decode2HalfFromRGBA(this, this.shadowTex) : this.shadowTex.rg
+            shadowMapFormat === 'rgba8unorm'
+              ? pb.vec3(decode2HalfFromRGBA(this, this.shadowTex), 1)
+              : this.shadowTex.rgb
           )
         );
       } else {
@@ -444,7 +453,9 @@ export function filterShadowVSM(
           chebyshevUpperBound(
             this,
             this.texCoord.z,
-            shadowMapFormat === 'rgba8unorm' ? decode2HalfFromRGBA(this, this.shadowTex) : this.shadowTex.rg
+            shadowMapFormat === 'rgba8unorm'
+              ? pb.vec3(decode2HalfFromRGBA(this, this.shadowTex), 1)
+              : this.shadowTex.rgb
           )
         );
       }

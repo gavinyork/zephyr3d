@@ -1,6 +1,6 @@
 import type { PBInsideFunctionScope, PBShaderExp, TextureFormat } from '@zephyr3d/device';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
-import type { Nullable } from '@zephyr3d/base';
+import { Vector4, type Nullable } from '@zephyr3d/base';
 
 /** @internal */
 export abstract class ShadowImpl {
@@ -16,6 +16,14 @@ export abstract class ShadowImpl {
   }
   abstract getType(): ShadowMode;
   abstract getShadowMapBorder(shadowMapParams: ShadowMapParams): number;
+  getShadowMapClearColor(shadowMapParams: ShadowMapParams) {
+    const colorAttachment = shadowMapParams.shadowMapFramebuffer?.getColorAttachments()[0];
+    return colorAttachment
+      ? colorAttachment.isFloatFormat()
+        ? new Vector4(1, 1, 1, 1)
+        : new Vector4(0, 0, 0, 1)
+      : null;
+  }
   abstract getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType;
   abstract postRenderShadowMap(shadowMapParams: ShadowMapParams): void;
   abstract getDepthScale(): number;
