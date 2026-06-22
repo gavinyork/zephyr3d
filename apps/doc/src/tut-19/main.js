@@ -1,4 +1,4 @@
-import { AABB, Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Scene,
   Application,
@@ -31,7 +31,8 @@ myApp.ready().then(function () {
   dirLight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
   // Enable shadowing
   dirLight.castShadow = true;
-  dirLight.shadow.shadowRegion = new AABB(new Vector3(-50, 0, -50), new Vector3(50, 6, 50));
+  // Depth bias
+  dirLight.shadow.depthBias = 0.005;
 
   // Create several boxes
   const boxMaterial = new LambertMaterial();
@@ -40,6 +41,7 @@ myApp.ready().then(function () {
   for (let i = 0; i < 16; i++) {
     const box = new Mesh(scene, boxShape, boxMaterial);
     box.position.setXYZ(Math.random() * 50 - 25, 3, Math.random() * 50 - 25);
+    dirLight.shadow.shadowRegion.addStaticCaster(box);
   }
   // Create floor
   const floorMaterial = new LambertMaterial();

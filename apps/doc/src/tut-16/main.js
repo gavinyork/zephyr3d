@@ -1,4 +1,4 @@
-import { AABB, Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Scene,
   Application,
@@ -31,6 +31,8 @@ myApp.ready().then(function () {
   dirLight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
   // Enable shadowing
   dirLight.castShadow = true;
+  // Depth bias
+  dirLight.shadow.depthBias = 0.001;
 
   // Create several boxes
   const boxMaterial = new LambertMaterial();
@@ -40,6 +42,7 @@ myApp.ready().then(function () {
     const box = new Mesh(scene, boxShape, boxMaterial);
     box.position.setXYZ(Math.random() * 50 - 25, 3, Math.random() * 50 - 25);
     box.castShadow = true;
+    dirLight.shadow.shadowRegion.addStaticCaster(box);
   }
   // Create floor
   const floorMaterial = new LambertMaterial();
@@ -48,9 +51,6 @@ myApp.ready().then(function () {
 
   // Create camera
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);
-
-  dirLight.shadow.shadowRegion = new AABB(new Vector3(-50, 0, -50), new Vector3(50, 6, 50));
-
   scene.mainCamera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
   scene.mainCamera.controller = new OrbitCameraController();
 

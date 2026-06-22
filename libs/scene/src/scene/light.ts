@@ -259,6 +259,11 @@ export class PunctualLight extends BaseLight {
     this.invalidateUniforms();
     // this._transformCallback(true, false);
   }
+  /** Disposes the punctual light node */
+  protected onDispose() {
+    super.onDispose();
+    this._shadowMapper?.dispose();
+  }
   /** @internal */
   computeUniforms() {}
 }

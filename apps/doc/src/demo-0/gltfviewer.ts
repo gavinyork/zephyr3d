@@ -79,7 +79,7 @@ export class GLTFViewer {
     this._ui.update();
     this._bboxNoScale = this.getBoundingBox();
     this.lookAt();
-    this._light.shadow.shadowRegion = this.getBoundingBox();
+    this._light.shadow.shadowRegion.clear().addDynamicCaster(this._modelNode.get());
     this._camera.clearHistoryData();
   }
   async handleDrop(data: DataTransfer) {
@@ -160,11 +160,6 @@ export class GLTFViewer {
     this._camera.TAA = !!enable;
   }
   render() {
-    if (this._modelNode.get()) {
-      if (this._animationSet) {
-        this._light.shadow.shadowRegion = this.getBoundingBox();
-      }
-    }
     this._camera.render(this._scene);
   }
   lookAt() {

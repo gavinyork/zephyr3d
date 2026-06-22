@@ -1629,6 +1629,9 @@ export class PropertyEditor extends Observable<{
         case 'bool': {
           const val = tmpProperty.bool as [boolean];
           changed = ImGui.Checkbox(`##value`, val) && !readonly;
+          if (changed) {
+            this.refresh();
+          }
           break;
         }
         case 'int': {

@@ -1,5 +1,14 @@
 import type { RequireOptionals, Nullable } from '@zephyr3d/base';
-import { retainObject, Matrix4x4, Vector3, Vector4, AABB, CubeFace, Frustum } from '@zephyr3d/base';
+import {
+  retainObject,
+  Matrix4x4,
+  Vector3,
+  Vector4,
+  AABB,
+  CubeFace,
+  Frustum,
+  Disposable
+} from '@zephyr3d/base';
 import type {
   PBShaderExp,
   FrameBuffer,
@@ -27,6 +36,7 @@ import type { DrawContext } from '../render';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_NONE, LIGHT_TYPE_POINT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
 import { getDevice } from '../app/api';
+import { ShadowRegion } from './shadow_region';
 
 const tmpMatrix = new Matrix4x4();
 const tmpFrustum = new Frustum(Matrix4x4.identity());
@@ -79,7 +89,7 @@ export interface ShadowConfig {
  * The shadow map generator
  * @public
  */
-export class ShadowMapper {
+export class ShadowMapper extends Disposable {
   /** @internal */
   private static readonly _snapMatrix = new Matrix4x4();
   /** @internal */
@@ -131,14 +141,13 @@ export class ShadowMapper {
   /** @internal */
   protected _shadowStrength: number;
   /** @internal */
-  protected _shadowRegion: Nullable<AABB>;
-  /** @internal */
-  protected _autoShadowRegion: boolean;
+  protected _shadowRegion: ShadowRegion;
   /**
    * Creates an instance of ShadowMapper
    * @param light - The light that is used to generate shadow map
    */
   constructor(light: PunctualLight) {
+    super();
     this._light = light;
     this._config = {
       shadowMapSize: 1024,
@@ -163,31 +172,8 @@ export class ShadowMapper {
     this._esmBlurRadius = 4;
     this._esmDepthScale = 200;
     this._shadowStrength = 1;
-    this._shadowRegion = null;
-    this._autoShadowRegion = false;
+    this._shadowRegion = new ShadowRegion();
     this.applyMode(this._shadowMode);
-  }
-  copyFrom(other: ShadowMapper) {
-    this.shadowMapSize = other.shadowMapSize;
-    this.shadowRegion = other.shadowRegion ? new AABB(other.shadowRegion) : null;
-    this.shadowDistance = other.shadowDistance;
-    this.numShadowCascades = other.numShadowCascades;
-    this.splitLambda = other.splitLambda;
-    this.depthBias = other.depthBias;
-    this.normalBias = other.normalBias;
-    this.nearClip = other.nearClip;
-    this.mode = other.mode;
-    this.pdSampleCount = other.pdSampleCount;
-    this.pdSampleRadius = other.pdSampleRadius;
-    this.pcfKernelSize = other.pcfKernelSize;
-    this.vsmBlurKernelSize = other.vsmBlurKernelSize;
-    this.vsmBlurRadius = other.vsmBlurRadius;
-    this.vsmDarkness = other.vsmDarkness;
-    this.esmBlur = other.esmBlur;
-    this.esmBlurKernelSize = other.esmBlurKernelSize;
-    this.esmBlurRadius = other.esmBlurRadius;
-    this.esmDepthScale = other.esmDepthScale;
-    this.shadowStrength = other.shadowStrength;
   }
   /** The light that is used to generate shadow map */
   get light() {
@@ -211,22 +197,27 @@ export class ShadowMapper {
   get shadowRegion() {
     return this._shadowRegion;
   }
-  set shadowRegion(region) {
-    this._shadowRegion = region;
-    this._autoShadowRegion = false;
-  }
   /** @internal */
   updateDirectionalShadowRegion(force = false) {
     if (!this._light.isDirectionLight()) {
       return;
     }
-    if (!force && !this._autoShadowRegion) {
+    if (!force) {
       return;
     }
     const scene = this._light.scene;
     if (!scene) {
       return;
     }
+    this._shadowRegion.clear();
+    scene.rootNode.iterate((child) => {
+      if ((child.isMesh() || child.isClipmapTerrain()) && child.castShadow) {
+        this._shadowRegion.addDynamicCaster(child);
+      }
+    });
+  }
+  /** @internal */
+  computeDirectionalShadowRegion(scene: Scene) {
     const aabb = new AABB();
     aabb.beginExtend();
     scene.rootNode.iterate((child) => {
@@ -238,8 +229,7 @@ export class ShadowMapper {
         }
       }
     });
-    this._shadowRegion = aabb.isValid() ? aabb : null;
-    this._autoShadowRegion = true;
+    return aabb.isValid() ? aabb : null;
   }
   /** Maximum distance from the camera, shadow will not be rendered beyond this range */
   get shadowDistance() {
@@ -751,8 +741,9 @@ export class ShadowMapper {
       tmpFrustum.initWithMatrix(tmpMatrix);
       frustum = tmpFrustum;
     }
-    border = border || 0;
-    const expand = (this.shadowMapSize - 2 * border) / this.shadowMapSize;
+    const borderSize = Number.isFinite(border ?? 0) ? Math.max(0, border ?? 0) : 0;
+    const clampedBorderSize = Math.min(borderSize, (this.shadowMapSize - 1) * 0.5);
+    const paddingScale = this.shadowMapSize / (this.shadowMapSize - 2 * clampedBorderSize);
     //const frustum = sceneCamera.frustum;
     const frustumMin = ShadowMapper._frustumMin;
     const frustumMax = ShadowMapper._frustumMax;
@@ -766,13 +757,13 @@ export class ShadowMapper {
       frustumMin.inplaceMin(p);
       frustumMax.inplaceMax(p);
     });
-    let radius = Vector3.distance(frustumMin, frustumMax) * 0.5 * expand;
+    let radius = Vector3.distance(frustumMin, frustumMax) * 0.5 * paddingScale;
     const center = sceneCamera.thisToWorld(
       Vector3.add(frustumMin, frustumMax, frustumCenter).scaleBy(0.5),
       frustumCenter
     );
-    // Bounding sphere of the shadow camera should not be larger than bounding sphere of the scene.
-    const sceneRadius = sceneAABB.diagonalLength * 0.5 * expand;
+    // Clamp to the scene bounds first, then apply the filter border.
+    const sceneRadius = sceneAABB.diagonalLength * 0.5 * paddingScale;
     if (sceneRadius < radius) {
       radius = sceneRadius;
       Vector3.add(sceneAABB.minPoint, sceneAABB.maxPoint, center).scaleBy(0.5);
@@ -867,6 +858,10 @@ export class ShadowMapper {
       cropMatrix.m13 = offsetY;
     }
     */
+  }
+  /** {@inheritDoc Disposable.onDispose} */
+  protected onDispose(): void {
+    this._shadowRegion.dispose();
   }
   /** @internal */
   private static fetchShadowMapParams() {
@@ -978,12 +973,10 @@ export class ShadowMapper {
         : new Vector4(0, 0, 0, 1)
       : null;
     const depthScale = this._impl!.getDepthScale();
-    if (this._light.isDirectionLight() && this._autoShadowRegion) {
-      this.updateDirectionalShadowRegion();
-    }
+    const directionalShadowRegion = this._shadowRegion.region;
     const shadowRegion =
-      this._light.isDirectionLight() && this._shadowRegion && this._shadowRegion.isValid()
-        ? this._shadowRegion
+      this._light.isDirectionLight() && directionalShadowRegion?.isValid()
+        ? directionalShadowRegion
         : scene.boundingBox;
     if (this._light.isPointLight()) {
       const shadowMapRenderCamera = ShadowMapper.fetchCameraForScene(scene);

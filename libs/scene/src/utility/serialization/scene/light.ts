@@ -156,10 +156,10 @@ export function getPunctualLightClass(): SerializableClass {
             return aabb;
           },
           get(this: PunctualLight, value) {
-            value.object[0] = this.shadow.shadowRegion;
+            value.object[0] = this.shadow.shadowRegion.region;
           },
           set(this: PunctualLight, value) {
-            this.shadow.shadowRegion = value.object[0] as AABB;
+            this.shadow.shadowRegion.setRegion(value.object[0] as AABB);
           },
           isValid(this: PunctualLight) {
             return !!this.castShadow && this.isDirectionLight();
