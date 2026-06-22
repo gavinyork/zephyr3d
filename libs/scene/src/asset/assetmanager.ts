@@ -33,7 +33,12 @@ import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
 import { getDevice, getEngine } from '../app/api';
-import { Material, PBRBluePrintMaterial, SpriteBlueprintMaterial } from '../material';
+import {
+  Material,
+  PBRBluePrintMaterial,
+  PBRBluePrintMaterialInstance,
+  SpriteBlueprintMaterial
+} from '../material';
 import type {
   BluePrintEditorState,
   BluePrintUniformTexture,
@@ -333,6 +338,23 @@ export class AssetManager {
   releaseFontAsset(url: string) {
     if (url in this._fontAssets) {
       delete this._fontAssets[url];
+      return true;
+    }
+    return false;
+  }
+  /**
+   * Remove one material entry from cache.
+   *
+   * @param url - Material asset path.
+   * @returns `true` if an entry existed and was removed.
+   */
+  invalidateMaterial(url: string) {
+    if (url in this._materials) {
+      const cached = this._materials[url];
+      if (cached instanceof DWeakRef) {
+        cached.dispose();
+      }
+      delete this._materials[url];
       return true;
     }
     return false;
@@ -792,6 +814,9 @@ export class AssetManager {
           m.vertexIR = data.irVertex!;
           m.uniformValues = data.uniformValues;
           m.uniformTextures = data.uniformTextures;
+          if (m instanceof PBRBluePrintMaterialInstance) {
+            m.syncInheritedUniforms();
+          }
         }
       }
     }
@@ -813,14 +838,41 @@ export class AssetManager {
         const data = (await this.readFileFromVFS(url, { encoding: 'utf8' }, vfs)) as string;
         const content = JSON.parse(data) as { type: string; data: any };
         ASSERT(
-          content.type === 'PBRBluePrintMaterial' || content.type === 'SpriteBluePrintMaterial',
+          content.type === 'PBRBluePrintMaterial' ||
+            content.type === 'PBRBluePrintMaterialInstance' ||
+            content.type === 'SpriteBluePrintMaterial',
           `Unsupported material type: ${content.type}`
         );
-        irData = content.data as {
-          IR: string;
-          uniformValues: BluePrintUniformValue[];
-          uniformTextures: BluePrintUniformTexture[];
-        };
+        if (content.type === 'PBRBluePrintMaterialInstance') {
+          const parentPath = content.data.parent as string;
+          ASSERT(typeof parentPath === 'string' && !!parentPath, 'Blueprint material instance requires parent');
+          const parentContent = JSON.parse(
+            (await this.readFileFromVFS(parentPath, { encoding: 'utf8' }, vfs)) as string
+          ) as {
+            type: string;
+            data?: {
+              IR?: string;
+              uniformValues?: BluePrintUniformValue[];
+              uniformTextures?: BluePrintUniformTexture[];
+            };
+          };
+          ASSERT(
+            parentContent.type === 'PBRBluePrintMaterial',
+            `Invalid parent blueprint material: ${parentPath}`
+          );
+          irData = {
+            IR: parentContent.data?.IR ?? content.data.IR ?? '',
+            uniformValues: content.data.uniformValues ?? parentContent.data?.uniformValues ?? [],
+            uniformTextures: content.data.uniformTextures ?? parentContent.data?.uniformTextures ?? []
+          };
+          ASSERT(!!irData.IR, `Parent blueprint material missing IR path: ${parentPath}`);
+        } else {
+          irData = content.data as {
+            IR: string;
+            uniformValues: BluePrintUniformValue[];
+            uniformTextures: BluePrintUniformTexture[];
+          };
+        }
       } else {
         irData = url;
       }
@@ -882,6 +934,7 @@ export class AssetManager {
       const content = JSON.parse(data) as { type: string; props: any; data: any };
       ASSERT(
         content.type === 'PBRBluePrintMaterial' ||
+          content.type === 'PBRBluePrintMaterialInstance' ||
           content.type === 'SpriteBluePrintMaterial' ||
           content.type === 'Default',
         `Unsupported material type: ${content.type}`
@@ -903,6 +956,15 @@ export class AssetManager {
           data.uniformValues,
           data.uniformTextures
         ) as unknown as T;
+      } else if (content.type === 'PBRBluePrintMaterialInstance') {
+        const parentMaterial = await this.fetchMaterial<PBRBluePrintMaterial>(
+          content.data.parent,
+          vfs ? { overrideVFS: vfs } : undefined
+        );
+        ASSERT(parentMaterial instanceof PBRBluePrintMaterial, `Invalid parent blueprint material: ${content.data.parent}`);
+        const instance = new PBRBluePrintMaterialInstance(parentMaterial, content.data.parent);
+        instance.setOverrides(content.data.uniformValues ?? [], content.data.uniformTextures ?? []);
+        mat = instance as unknown as T;
       } else if (content.type === 'SpriteBluePrintMaterial') {
         const data = (await this.loadBluePrintMaterialData(
           content.data as {
@@ -930,6 +992,9 @@ export class AssetManager {
       }
       if (mat && content.props) {
         await this._resourceManager.deserializeObjectProps(mat, content.props);
+      }
+      if (mat instanceof PBRBluePrintMaterialInstance) {
+        mat.syncInheritedUniforms();
       }
       return mat;
     } catch (err) {

@@ -6,6 +6,7 @@ import {
   MeshMaterial,
   ParticleMaterial,
   PBRBluePrintMaterial,
+  PBRBluePrintMaterialInstance,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
   SubsurfaceProfile,
@@ -1171,6 +1172,21 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
       }
     },
     getMeshMaterialInstanceUniformsClass(PBRBluePrintMaterial)
+  ];
+}
+
+/** @internal */
+export function getPBRBluePrintMaterialInstanceClass(): SerializableClass[] {
+  return [
+    {
+      ctor: PBRBluePrintMaterialInstance,
+      parent: PBRBluePrintMaterial,
+      name: 'PBRBluePrintMaterialInstance',
+      getProps() {
+        return defineProps([]);
+      }
+    },
+    getMeshMaterialInstanceUniformsClass(PBRBluePrintMaterialInstance)
   ];
 }
 

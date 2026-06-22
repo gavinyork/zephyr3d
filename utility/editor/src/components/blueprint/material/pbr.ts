@@ -574,15 +574,25 @@ export class PBRMaterialEditor extends GraphEditor {
   protected renderRightPanel() {
     const mat = this._editMaterial.get();
     if (mat instanceof PBRBluePrintMaterial || mat instanceof SpriteBlueprintMaterial) {
-      const v = ImGui.GetContentRegionAvail();
-      v.y >>= 1;
-      if (ImGui.BeginChild('##BluePrintNodeProps', v, true)) {
+      const region = ImGui.GetContentRegionAvail();
+      const spacing = ImGui.GetStyle().ItemSpacing.y;
+      const previewPanelHeight = Math.max(180, Math.min(region.x, region.y));
+      const propsHeight = Math.max(120, region.y - previewPanelHeight - spacing);
+      if (ImGui.BeginChild('##BluePrintNodeProps', new ImGui.ImVec2(-1, propsHeight), true)) {
         super.renderRightPanel();
       }
       ImGui.EndChild();
-      if (ImGui.BeginChild('##BluePrintMaterialPreview', new ImGui.ImVec2(-1, -1), true)) {
-        ImGui.GetContentRegionAvail(v);
-        this.renderPreviewScene(v);
+      if (ImGui.BeginChild('##BluePrintMaterialPreview', new ImGui.ImVec2(-1, previewPanelHeight), true)) {
+        const previewAvail = ImGui.GetContentRegionAvail();
+        const previewSize = new ImGui.ImVec2(
+          Math.max(1, Math.min(previewAvail.x, previewAvail.y)),
+          Math.max(1, Math.min(previewAvail.x, previewAvail.y))
+        );
+        const cursorPos = ImGui.GetCursorPos();
+        const offsetX = Math.max(0, (previewAvail.x - previewSize.x) * 0.5);
+        const offsetY = Math.max(0, (previewAvail.y - previewSize.y) * 0.5);
+        ImGui.SetCursorPos(new ImGui.ImVec2(cursorPos.x + offsetX, cursorPos.y + offsetY));
+        this.renderPreviewScene(previewSize);
       }
       ImGui.EndChild();
     } else {

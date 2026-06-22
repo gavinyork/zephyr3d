@@ -22,6 +22,7 @@ import {
   getPBRSpecularGlossinessMaterialClass,
   getParticleMaterialClass,
   getPBRBluePrintMaterialClass,
+  getPBRBluePrintMaterialInstanceClass,
   getSpriteMaterialClass,
   getSpriteBlueprintMaterialClass,
   getStandardSpriteMaterialClass
@@ -308,6 +309,7 @@ export class ResourceManager {
         getSubsurfaceProfileClass(),
         ...getMeshMaterialClass(),
         ...getPBRBluePrintMaterialClass(),
+        ...getPBRBluePrintMaterialInstanceClass(),
         ...getSpriteBlueprintMaterialClass(),
         ...getUnlitMaterialClass(this),
         ...getLambertMaterialClass(this),
@@ -856,6 +858,14 @@ export class ResourceManager {
       this._allocated.set(material, id);
     }
     return material;
+  }
+  /**
+   * Remove one material from the asset cache.
+   *
+   * @param id - Material identifier or path.
+   */
+  invalidateMaterial(id: string) {
+    this._assetManager.invalidateMaterial(id);
   }
   /**
    * Reload specific blue print materials

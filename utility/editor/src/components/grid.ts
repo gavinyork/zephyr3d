@@ -362,6 +362,13 @@ export class PropertyEditor extends Observable<{
     (object: any) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>
   >;
   private _extraPropertiesVersion: number;
+  private static readonly HDR_COLOR_EDIT_FLAGS =
+    ImGui.ColorEditFlags.Float |
+    ImGui.ColorEditFlags.HDR |
+    ImGui.ColorEditFlags.DisplayRGB |
+    ImGui.ColorEditFlags.InputRGB |
+    ImGui.ColorEditFlags.AlphaPreviewHalf |
+    ImGui.ColorEditFlags.NoOptions;
   constructor(labelPercent: number) {
     super();
     this._rootGroup = new PropertyGroup('Root', this);
@@ -1471,12 +1478,16 @@ export class PropertyEditor extends Observable<{
       }
       case 'rgb': {
         const val = tmpProperty.num as [number, number, number];
-        changed = ImGui.ColorEdit3('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined);
+        const flags =
+          PropertyEditor.HDR_COLOR_EDIT_FLAGS | (readonly ? ImGui.ColorEditFlags.NoInputs : ImGui.ColorEditFlags.None);
+        changed = ImGui.ColorEdit3('##value', val, flags);
         break;
       }
       case 'rgba': {
         const val = tmpProperty.num as [number, number, number, number];
-        changed = ImGui.ColorEdit4('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined);
+        const flags =
+          PropertyEditor.HDR_COLOR_EDIT_FLAGS | (readonly ? ImGui.ColorEditFlags.NoInputs : ImGui.ColorEditFlags.None);
+        changed = ImGui.ColorEdit4('##value', val, flags);
         break;
       }
     }
@@ -1488,17 +1499,17 @@ export class PropertyEditor extends Observable<{
       this.dispatchEvent('object_property_changed', null, value);
     }
   }
-  private linearToSRGB(x: number): number {
+  public linearToSRGB(_x: number): number {
     // 线性 -> sRGB（2.2 近似）
-    const srgb = Math.pow(Math.max(0, Math.min(1, x)), 1 / 2.2);
+    const srgb = Math.pow(Math.max(0, Math.min(1, _x)), 1 / 2.2);
     // 量化到 0-255 再还原到 0-1，避免无限精度
     const q = Math.round(srgb * 255);
     return q / 255;
   }
 
-  private sRGBToLinear(x: number): number {
+  public sRGBToLinear(_x: number): number {
     // sRGB -> 线性
-    return Math.pow(Math.max(0, Math.min(1, x)), 2.2);
+    return Math.pow(Math.max(0, Math.min(1, _x)), 2.2);
   }
   private revealAsset(path: string) {
     if (!path || !path.startsWith('/')) {
@@ -1892,33 +1903,19 @@ export class PropertyEditor extends Observable<{
           break;
         }
         case 'rgb': {
-          const val = [
-            this.linearToSRGB(tmpProperty.num[0]),
-            this.linearToSRGB(tmpProperty.num[1]),
-            this.linearToSRGB(tmpProperty.num[2])
-          ] as [number, number, number];
-          if (ImGui.ColorEdit3('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined)) {
-            changed = true;
-            tmpProperty.num[0] = this.sRGBToLinear(val[0]);
-            tmpProperty.num[1] = this.sRGBToLinear(val[1]);
-            tmpProperty.num[2] = this.sRGBToLinear(val[2]);
-          }
+          const val = tmpProperty.num as [number, number, number];
+          const flags =
+            PropertyEditor.HDR_COLOR_EDIT_FLAGS |
+            (readonly ? ImGui.ColorEditFlags.NoInputs : ImGui.ColorEditFlags.None);
+          changed = ImGui.ColorEdit3('##value', val, flags);
           break;
         }
         case 'rgba': {
-          const val = [
-            this.linearToSRGB(tmpProperty.num[0]),
-            this.linearToSRGB(tmpProperty.num[1]),
-            this.linearToSRGB(tmpProperty.num[2]),
-            tmpProperty.num[3]
-          ] as [number, number, number, number];
-          if (ImGui.ColorEdit4('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined)) {
-            changed = true;
-            tmpProperty.num[0] = this.sRGBToLinear(val[0]);
-            tmpProperty.num[1] = this.sRGBToLinear(val[1]);
-            tmpProperty.num[2] = this.sRGBToLinear(val[2]);
-            tmpProperty.num[3] = val[3];
-          }
+          const val = tmpProperty.num as [number, number, number, number];
+          const flags =
+            PropertyEditor.HDR_COLOR_EDIT_FLAGS |
+            (readonly ? ImGui.ColorEditFlags.NoInputs : ImGui.ColorEditFlags.None);
+          changed = ImGui.ColorEdit4('##value', val, flags);
           break;
         }
         case 'command': {

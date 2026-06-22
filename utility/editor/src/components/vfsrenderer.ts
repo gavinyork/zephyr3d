@@ -416,7 +416,7 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
                   if (!name.endsWith('.zmtl')) {
                     name = `${name}.zmtl`;
                   }
-                  this.renderer.copyFile(item.meta.path, name, 'prompt');
+                  void this.renderer.createMaterialInstance(item.meta.path, name);
                 }
               });
             }
@@ -1885,6 +1885,42 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     getEngine().resourceManager.invalidateBluePrint(blueprintPath);
     const label = this._vfs.basename(finalMaterialPath, '.zmtl');
     eventBus.dispatchEvent('edit_material', label, label, null, finalMaterialPath);
+  }
+
+  async createMaterialInstance(sourcePath: string, targetPath: string) {
+    const material = await getEngine().resourceManager.fetchMaterial(sourcePath, { overrideVFS: this._vfs });
+    if (!(material instanceof PBRBluePrintMaterial)) {
+      DlgMessage.messageBox(
+        'Create Material Instance',
+        'Only blueprint PBR materials can create material instances right now.'
+      );
+      return;
+    }
+    if (await this._vfs.exists(targetPath)) {
+      const overwrite =
+        'Yes' ===
+        (await DlgMessageBoxEx.messageBoxEx(
+          'Create Material Instance',
+          `'${this._vfs.basename(targetPath)}' already exists, do you want to overwrite it?`,
+          ['Yes', 'No']
+        ));
+      if (!overwrite) {
+        return;
+      }
+    }
+    const content = {
+      type: 'PBRBluePrintMaterialInstance',
+      props: {},
+      data: {
+        parent: sourcePath
+      }
+    };
+    await this._vfs.writeFile(targetPath, JSON.stringify(content, null, 2), {
+      encoding: 'utf8',
+      create: true
+    });
+    const label = this._vfs.basename(targetPath, '.zmtl');
+    eventBus.dispatchEvent('edit_material', label, label, null, targetPath);
   }
 
   async exportSelectedItems() {
