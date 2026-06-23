@@ -1625,12 +1625,13 @@ export class PropertyEditor extends Observable<{
       };
       value.get.call(object, tmpProperty);
       const oldValue = this.clonePropertyValue(tmpProperty);
+      let needRefresh = false;
       switch (value.type) {
         case 'bool': {
           const val = tmpProperty.bool as [boolean];
           changed = ImGui.Checkbox(`##value`, val) && !readonly;
           if (changed) {
-            this.refresh();
+            needRefresh = true;
           }
           break;
         }
@@ -1680,6 +1681,7 @@ export class PropertyEditor extends Observable<{
             changed = ImGui.Combo('##value', val, value.options.enum.labels) && !readonly;
             if (changed) {
               tmpProperty.str[0] = value.options.enum.values[val[0]] as string;
+              needRefresh = true;
             }
           } else {
             const val = tmpProperty.str as [string];
@@ -2011,6 +2013,10 @@ export class PropertyEditor extends Observable<{
         value.set.call(object, tmpProperty);
         this.invalidateRows();
         this.dispatchEvent('object_property_changed', object, value);
+
+        if (needRefresh) {
+          this.refresh();
+        }
       }
       if (value.set && ImGui.IsItemActivated()) {
         this.inspectGroup(owner);
