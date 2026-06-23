@@ -213,6 +213,7 @@ export class SubsurfaceProfile {
   private _scatteringDistribution: number;
   private readonly _slot: number;
   private readonly _changeListeners: Set<() => void>;
+  private _disposed: boolean;
 
   constructor() {
     this._scatterRadius = new Vector3(0, 0, 0);
@@ -229,8 +230,39 @@ export class SubsurfaceProfile {
     this._normalScale = 1;
     this._scatteringDistribution = 0.65;
     this._changeListeners = new Set();
+    this._disposed = false;
     this._slot = SubsurfaceProfile.allocateSlot(this);
     this.applyPresetTemplate(this._preset, false);
+  }
+
+  clone() {
+    const other = new SubsurfaceProfile();
+    other.copyFrom(this);
+    return other;
+  }
+
+  copyFrom(other: SubsurfaceProfile) {
+    this.preset = other.preset;
+    this.meanFreePathColor = other.meanFreePathColor;
+    this.meanFreePathDistance = other.meanFreePathDistance;
+    this.strength = other.strength;
+    this.scale = other.scale;
+    this.worldUnitScale = other.worldUnitScale;
+    this.boundaryColorBleed = other.boundaryColorBleed;
+    this.transmissionTintColor = other.transmissionTintColor;
+    this.extinctionScale = other.extinctionScale;
+    this.normalScale = other.normalScale;
+    this.scatteringDistribution = other.scatteringDistribution;
+    this.falloffColor = other.falloffColor;
+  }
+
+  dispose() {
+    if (this._disposed) {
+      return;
+    }
+    this._disposed = true;
+    this._changeListeners.clear();
+    SubsurfaceProfile.releaseSlot(this._slot, this);
   }
 
   static get version() {
@@ -543,6 +575,13 @@ export class SubsurfaceProfile {
       }
     }
     throw new Error('SubsurfaceProfile limit exceeded');
+  }
+
+  private static releaseSlot(slot: number, profile: SubsurfaceProfile) {
+    if (slot > 0 && slot < this._profiles.length && this._profiles[slot] === profile) {
+      this._profiles[slot] = null;
+      this._version++;
+    }
   }
 
   private markDirty() {

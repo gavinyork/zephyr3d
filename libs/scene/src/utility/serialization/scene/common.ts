@@ -17,6 +17,13 @@ function shouldHideBlueprintTextureProperty(object: unknown, outputs?: readonly 
   return !!outputs && object instanceof PBRBluePrintMaterial;
 }
 
+function isBlueprintMaterialAssetInstance(object: unknown): object is Material & {
+  isBlueprintMaterialInstance: true;
+  markMaterialPropertyOverridden?: (propName: string) => void;
+} {
+  return !!(object as { isBlueprintMaterialInstance?: boolean })?.isBlueprintMaterialInstance;
+}
+
 function getTextureLabel(name: string): string {
   return name
     .replace(/Texture$/, '')
@@ -164,12 +171,15 @@ export function getTextureProps<T extends Material>(
             console.error('Invalid texture type');
           }
         }
+        if (isBlueprintMaterialAssetInstance(this)) {
+          this.markMaterialPropertyOverridden?.(name[0].toUpperCase() + name.slice(1));
+        }
       },
       isHidden(this: T) {
         return shouldHideBlueprintTextureProperty(this, blueprintOutputsToHide);
       },
       isValid() {
-        if (this.$isInstance) {
+        if (this.$isInstance && !isBlueprintMaterialAssetInstance(this)) {
           return false;
         }
         if (isValid) {
@@ -209,12 +219,17 @@ export function getTextureProps<T extends Material>(
             new Vector3(value.num[0], value.num[1], 1)
           );
         }
+        if (isBlueprintMaterialAssetInstance(this)) {
+          this.markMaterialPropertyOverridden?.(
+            name[0].toUpperCase() + name.slice(1, name.length - 7) + 'TexCoordScale'
+          );
+        }
       },
       isHidden(this: T) {
         return shouldHideBlueprintTextureProperty(this, blueprintOutputsToHide);
       },
       isValid() {
-        if (this.$isInstance) {
+        if (this.$isInstance && !isBlueprintMaterialAssetInstance(this)) {
           return false;
         }
         if (isValid) {
@@ -259,12 +274,17 @@ export function getTextureProps<T extends Material>(
             mipFilter: sampler.mipFilter,
             maxAnisotropy: sampler.maxAnisotropy
           }) as any;
+        if (isBlueprintMaterialAssetInstance(this)) {
+          this.markMaterialPropertyOverridden?.(
+            name[0].toUpperCase() + name.slice(1, name.length - 7) + 'TexCoordAddressU'
+          );
+        }
       },
       isHidden(this: T) {
         return shouldHideBlueprintTextureProperty(this, blueprintOutputsToHide);
       },
       isValid() {
-        if (this.$isInstance) {
+        if (this.$isInstance && !isBlueprintMaterialAssetInstance(this)) {
           return false;
         }
         if (isValid) {
@@ -307,12 +327,17 @@ export function getTextureProps<T extends Material>(
           mipFilter: sampler.mipFilter,
           maxAnisotropy: sampler.maxAnisotropy
         });
+        if (isBlueprintMaterialAssetInstance(this)) {
+          this.markMaterialPropertyOverridden?.(
+            name[0].toUpperCase() + name.slice(1, name.length - 7) + 'TexCoordAddressV'
+          );
+        }
       },
       isHidden(this: T) {
         return shouldHideBlueprintTextureProperty(this, blueprintOutputsToHide);
       },
       isValid() {
-        if (this.$isInstance) {
+        if (this.$isInstance && !isBlueprintMaterialAssetInstance(this)) {
           return false;
         }
         if (isValid) {
@@ -333,12 +358,17 @@ export function getTextureProps<T extends Material>(
       },
       set(value) {
         this[name.slice(0, name.length - 7) + 'TexCoordIndex'] = value.num[0];
+        if (isBlueprintMaterialAssetInstance(this)) {
+          this.markMaterialPropertyOverridden?.(
+            name[0].toUpperCase() + name.slice(1, name.length - 7) + 'TexCoordIndex'
+          );
+        }
       },
       isHidden(this: T) {
         return shouldHideBlueprintTextureProperty(this, blueprintOutputsToHide);
       },
       isValid() {
-        if (this.$isInstance) {
+        if (this.$isInstance && !isBlueprintMaterialAssetInstance(this)) {
           return false;
         }
         if (isValid) {

@@ -39,6 +39,48 @@ function canEditParentMaterialProperty(material: MeshMaterial) {
   return !material.$isInstance && !(material as MeshMaterial & { isBlueprintMaterialInstance?: boolean }).isBlueprintMaterialInstance;
 }
 
+function isBlueprintMaterialAssetInstance(
+  material: MeshMaterial
+): material is MeshMaterial & {
+  isBlueprintMaterialInstance: true;
+  markMaterialPropertyOverridden?: (propName: string) => void;
+} {
+  return !!(material as MeshMaterial & { isBlueprintMaterialInstance?: boolean }).isBlueprintMaterialInstance;
+}
+
+function allowBlueprintInstanceOverride(
+  material: MeshMaterial,
+  propName: string,
+  setter: () => void
+) {
+  setter();
+  if (isBlueprintMaterialAssetInstance(material)) {
+    material.markMaterialPropertyOverridden?.(propName);
+  }
+}
+
+type BlueprintInstanceSubsurfaceMaterial = PBRMetallicRoughnessMaterial & {
+  isBlueprintMaterialInstance?: boolean;
+  setBlueprintInstanceSubsurfacePreset?: (val: SubsurfaceProfilePreset) => void;
+  setBlueprintInstanceSubsurfaceStrength?: (val: number) => void;
+  setBlueprintInstanceSubsurfaceScale?: (val: number) => void;
+  setBlueprintInstanceSubsurfaceProfileValue?: <K extends keyof SubsurfaceProfile>(
+    propName: string,
+    key: K,
+    value: SubsurfaceProfile[K]
+  ) => void;
+};
+
+function canEditBlueprintInstanceSubsurfaceProfile(material: PBRMetallicRoughnessMaterial) {
+  return !!material.subsurfaceProfile && !!(material as BlueprintInstanceSubsurfaceMaterial).isBlueprintMaterialInstance;
+}
+
+function getBlueprintInstanceSubsurfaceMaterial(
+  material: PBRMetallicRoughnessMaterial
+): BlueprintInstanceSubsurfaceMaterial {
+  return material as BlueprintInstanceSubsurfaceMaterial;
+}
+
 export function getSubsurfaceProfileClass(): SerializableClass {
   return {
     ctor: SubsurfaceProfile,
@@ -261,7 +303,7 @@ export function getSubsurfaceProfileClass(): SerializableClass {
 function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMaterial>[] {
   const supportsSSSThicknessAuthoring = function (this: PBRMaterial) {
     return (
-      !this.$isInstance &&
+      (!this.$isInstance || isBlueprintMaterialAssetInstance(this as unknown as MeshMaterial)) &&
       !!(this.transmission || (this as PBRMaterial & { subsurfaceProfile?: unknown }).subsurfaceProfile)
     );
   };
@@ -380,10 +422,12 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
         value.bool[0] = this.transmission;
       },
       set(this: PBRMaterial, value) {
-        this.transmission = value.bool[0];
+        allowBlueprintInstanceOverride(this as unknown as MeshMaterial, 'Transmission', () => {
+          this.transmission = value.bool[0];
+        });
       },
       isValid() {
-        return !this.$isInstance;
+        return !this.$isInstance || isBlueprintMaterialAssetInstance(this as unknown as MeshMaterial);
       }
     },
     {
@@ -391,7 +435,7 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
       description: 'Amount of transmitted light, from fully opaque to fully transparent',
       type: 'float',
       phase: 1,
-      default: 0,
+      default: 0.2,
       options: {
         animatable: true,
         minValue: 0,
@@ -401,7 +445,12 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
         value.num[0] = this.transmissionFactor;
       },
       set(this: PBRMaterial, value) {
-        this.transmissionFactor = value.num[0];
+        allowBlueprintInstanceOverride(this as unknown as MeshMaterial, 'TransmissionFactor', () => {
+          this.transmissionFactor = value.num[0];
+        });
+      },
+      getDefaultValue(this: PBRMaterial) {
+        return this.$isInstance ? this.coreMaterial.transmissionFactor : 0.2;
       },
       isValid() {
         return supportsSSSThicknessAuthoring.call(this);
@@ -415,7 +464,7 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
       description: 'Physical thickness used by transmission and volume attenuation',
       type: 'float',
       phase: 1,
-      default: 0,
+      default: 0.35,
       options: {
         animatable: true,
         minValue: 0,
@@ -425,7 +474,12 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
         value.num[0] = this.thicknessFactor;
       },
       set(this: PBRMaterial, value) {
-        this.thicknessFactor = value.num[0];
+        allowBlueprintInstanceOverride(this as unknown as MeshMaterial, 'ThicknessFactor', () => {
+          this.thicknessFactor = value.num[0];
+        });
+      },
+      getDefaultValue(this: PBRMaterial) {
+        return this.$isInstance ? this.coreMaterial.thicknessFactor : 0.35;
       },
       isValid() {
         return supportsSSSThicknessAuthoring.call(this);
@@ -439,7 +493,7 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
       description: 'Color tint applied to transmitted light as it travels through the material',
       type: 'rgb',
       phase: 1,
-      default: [1, 1, 1],
+      default: [1, 0.5, 0.4],
       options: {
         animatable: true
       },
@@ -449,7 +503,12 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
         value.num[2] = this.attenuationColor.z;
       },
       set(this: PBRMaterial, value) {
-        this.attenuationColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+        allowBlueprintInstanceOverride(this as unknown as MeshMaterial, 'AttenuationColor', () => {
+          this.attenuationColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+        });
+      },
+      getDefaultValue(this: PBRMaterial) {
+        return this.$isInstance ? this.coreMaterial.attenuationColor : [1, 0.5, 0.4];
       },
       isValid() {
         return supportsSSSThicknessAuthoring.call(this);
@@ -460,7 +519,7 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
       description: 'Distance over which transmitted light is attenuated inside the material',
       type: 'float',
       phase: 1,
-      default: 99999,
+      default: 0.6,
       options: {
         animatable: true,
         minValue: 0,
@@ -470,7 +529,12 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
         value.num[0] = this.attenuationDistance;
       },
       set(this: PBRMaterial, value) {
-        this.attenuationDistance = value.num[0];
+        allowBlueprintInstanceOverride(this as unknown as MeshMaterial, 'AttenuationDistance', () => {
+          this.attenuationDistance = value.num[0];
+        });
+      },
+      getDefaultValue(this: PBRMaterial) {
+        return this.$isInstance ? this.coreMaterial.attenuationDistance : 0.6;
       },
       isValid() {
         return supportsSSSThicknessAuthoring.call(this);
@@ -1455,6 +1519,333 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
                 this.reflectionMode === 'anisotropic' &&
                 !!this.anisotropyDirectionTexture
               );
+            }
+          },
+          {
+            name: 'SubsurfaceLookPreset',
+            description: 'Per-instance preset override for the active subsurface profile',
+            type: 'string',
+            phase: 1,
+            default: 'skin_default',
+            options: {
+              label: 'LookPreset',
+              enum: {
+                labels: [
+                  'Skin Thin',
+                  'Skin Default',
+                  'Skin HeavyMakeup',
+                  'Wax Backlit',
+                  'Wax Soft',
+                  'Jade Backlit',
+                  'Jade Soft'
+                ],
+                values: [
+                  'skin_thin',
+                  'skin_default',
+                  'skin_heavy_makeup',
+                  'wax_backlit',
+                  'wax_soft',
+                  'jade_backlit',
+                  'jade_soft'
+                ]
+              },
+              group: 'Subsurface Profile'
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.str[0] = this.subsurfaceProfile?.preset ?? 'skin_default';
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              const profile = getBlueprintInstanceSubsurfaceMaterial(this);
+              if (profile.isBlueprintMaterialInstance && profile.setBlueprintInstanceSubsurfacePreset) {
+                profile.setBlueprintInstanceSubsurfacePreset(value.str[0] as SubsurfaceProfilePreset);
+              }
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return canEditBlueprintInstanceSubsurfaceProfile(this);
+            }
+          },
+          {
+            name: 'SubsurfaceMeanFreePathColor',
+            description: 'Per-instance mean free path color override for the active subsurface profile',
+            type: 'rgb',
+            phase: 1,
+            default: [1, 0.45, 0.17],
+            options: {
+              label: 'MeanFreePathColor',
+              animatable: true,
+              minValue: 0,
+              maxValue: 1,
+              group: 'Subsurface Profile'
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceProfile?.meanFreePathColor.x ?? 0;
+              value.num[1] = this.subsurfaceProfile?.meanFreePathColor.y ?? 0;
+              value.num[2] = this.subsurfaceProfile?.meanFreePathColor.z ?? 0;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              const profile = getBlueprintInstanceSubsurfaceMaterial(this);
+              profile.setBlueprintInstanceSubsurfaceProfileValue?.(
+                'SubsurfaceMeanFreePathColor',
+                'meanFreePathColor',
+                new Vector3(value.num[0], value.num[1], value.num[2])
+              );
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return canEditBlueprintInstanceSubsurfaceProfile(this);
+            }
+          },
+          {
+            name: 'SubsurfaceMeanFreePathDistance',
+            description:
+              'Per-instance mean free path distance override for the active subsurface profile',
+            type: 'float',
+            phase: 1,
+            default: 0.92,
+            options: {
+              label: 'MeanFreePathDistance',
+              animatable: true,
+              minValue: 0,
+              maxValue: 8,
+              group: 'Subsurface Profile'
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceProfile?.meanFreePathDistance ?? 0;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              const profile = getBlueprintInstanceSubsurfaceMaterial(this);
+              profile.setBlueprintInstanceSubsurfaceProfileValue?.(
+                'SubsurfaceMeanFreePathDistance',
+                'meanFreePathDistance',
+                value.num[0]
+              );
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return canEditBlueprintInstanceSubsurfaceProfile(this);
+            }
+          },
+          {
+            name: 'SubsurfaceScatterWeight',
+            description: 'Per-instance scatter weight override for the active subsurface profile',
+            type: 'float',
+            phase: 1,
+            default: 0.82,
+            options: {
+              label: 'ScatterWeight',
+              animatable: true,
+              minValue: 0,
+              maxValue: 8,
+              group: 'Subsurface Profile'
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceProfile?.strength ?? 0;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              const profile = getBlueprintInstanceSubsurfaceMaterial(this);
+              if (profile.isBlueprintMaterialInstance && profile.setBlueprintInstanceSubsurfaceStrength) {
+                profile.setBlueprintInstanceSubsurfaceStrength(value.num[0]);
+              }
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return canEditBlueprintInstanceSubsurfaceProfile(this);
+            }
+          },
+          {
+            name: 'SubsurfaceScatterScale',
+            description: 'Per-instance scatter scale override for the active subsurface profile',
+            type: 'float',
+            phase: 1,
+            default: 0.96,
+            options: {
+              label: 'ScatterScale',
+              animatable: true,
+              minValue: 0,
+              maxValue: 8,
+              group: 'Subsurface Profile'
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceProfile?.scale ?? 0;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              const profile = getBlueprintInstanceSubsurfaceMaterial(this);
+              if (profile.isBlueprintMaterialInstance && profile.setBlueprintInstanceSubsurfaceScale) {
+                profile.setBlueprintInstanceSubsurfaceScale(value.num[0]);
+              }
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return canEditBlueprintInstanceSubsurfaceProfile(this);
+            }
+          },
+          {
+            name: 'SubsurfaceWorldUnitScale',
+            description: 'Per-instance world unit scale override for the active subsurface profile',
+            type: 'float',
+            phase: 1,
+            default: 1,
+            options: {
+              label: 'WorldUnitScale',
+              animatable: true,
+              minValue: 0.05,
+              maxValue: 4,
+              group: 'Subsurface Profile'
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceProfile?.worldUnitScale ?? 1;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              const profile = getBlueprintInstanceSubsurfaceMaterial(this);
+              profile.setBlueprintInstanceSubsurfaceProfileValue?.(
+                'SubsurfaceWorldUnitScale',
+                'worldUnitScale',
+                value.num[0]
+              );
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return canEditBlueprintInstanceSubsurfaceProfile(this);
+            }
+          },
+          {
+            name: 'SubsurfaceBoundaryColorBleed',
+            description:
+              'Per-instance boundary color bleed override for the active subsurface profile',
+            type: 'float',
+            phase: 1,
+            default: 0.22,
+            options: {
+              label: 'BoundaryColorBleed',
+              animatable: true,
+              minValue: 0,
+              maxValue: 1,
+              group: 'Subsurface Profile'
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceProfile?.boundaryColorBleed ?? 0;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              const profile = getBlueprintInstanceSubsurfaceMaterial(this);
+              profile.setBlueprintInstanceSubsurfaceProfileValue?.(
+                'SubsurfaceBoundaryColorBleed',
+                'boundaryColorBleed',
+                value.num[0]
+              );
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return canEditBlueprintInstanceSubsurfaceProfile(this);
+            }
+          },
+          {
+            name: 'SubsurfaceTransmissionTintColor',
+            description:
+              'Per-instance transmission tint color override for the active subsurface profile',
+            type: 'rgb',
+            phase: 1,
+            default: [1, 0.46, 0.34],
+            options: {
+              label: 'TransmissionTintColor',
+              animatable: true,
+              minValue: 0,
+              maxValue: 1,
+              group: 'Subsurface Profile'
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceProfile?.transmissionTintColor.x ?? 0;
+              value.num[1] = this.subsurfaceProfile?.transmissionTintColor.y ?? 0;
+              value.num[2] = this.subsurfaceProfile?.transmissionTintColor.z ?? 0;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              const profile = getBlueprintInstanceSubsurfaceMaterial(this);
+              profile.setBlueprintInstanceSubsurfaceProfileValue?.(
+                'SubsurfaceTransmissionTintColor',
+                'transmissionTintColor',
+                new Vector3(value.num[0], value.num[1], value.num[2])
+              );
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return canEditBlueprintInstanceSubsurfaceProfile(this);
+            }
+          },
+          {
+            name: 'SubsurfaceExtinctionScale',
+            description: 'Per-instance extinction scale override for the active subsurface profile',
+            type: 'float',
+            phase: 1,
+            default: 1.06,
+            options: {
+              label: 'ExtinctionScale',
+              animatable: true,
+              minValue: 0,
+              maxValue: 4,
+              group: 'Subsurface Profile'
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceProfile?.extinctionScale ?? 0;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              const profile = getBlueprintInstanceSubsurfaceMaterial(this);
+              profile.setBlueprintInstanceSubsurfaceProfileValue?.(
+                'SubsurfaceExtinctionScale',
+                'extinctionScale',
+                value.num[0]
+              );
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return canEditBlueprintInstanceSubsurfaceProfile(this);
+            }
+          },
+          {
+            name: 'SubsurfaceNormalScale',
+            description: 'Per-instance normal scale override for the active subsurface profile',
+            type: 'float',
+            phase: 1,
+            default: 1,
+            options: {
+              label: 'NormalScale',
+              animatable: true,
+              minValue: 0,
+              maxValue: 2,
+              group: 'Subsurface Profile'
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceProfile?.normalScale ?? 0;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              const profile = getBlueprintInstanceSubsurfaceMaterial(this);
+              profile.setBlueprintInstanceSubsurfaceProfileValue?.(
+                'SubsurfaceNormalScale',
+                'normalScale',
+                value.num[0]
+              );
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return canEditBlueprintInstanceSubsurfaceProfile(this);
+            }
+          },
+          {
+            name: 'SubsurfaceScatteringDistribution',
+            description:
+              'Per-instance scattering distribution override for the active subsurface profile',
+            type: 'float',
+            phase: 1,
+            default: 0.6,
+            options: {
+              label: 'ScatteringDistribution',
+              animatable: true,
+              minValue: 0,
+              maxValue: 1,
+              group: 'Subsurface Profile'
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceProfile?.scatteringDistribution ?? 0;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              const profile = getBlueprintInstanceSubsurfaceMaterial(this);
+              profile.setBlueprintInstanceSubsurfaceProfileValue?.(
+                'SubsurfaceScatteringDistribution',
+                'scatteringDistribution',
+                value.num[0]
+              );
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return canEditBlueprintInstanceSubsurfaceProfile(this);
             }
           },
           {

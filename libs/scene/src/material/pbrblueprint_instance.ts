@@ -3,6 +3,7 @@ import { getEngine } from '../app/api';
 import type { BluePrintUniformTexture, BluePrintUniformValue } from '../utility/blueprint/material/ir';
 import { PBRBluePrintMaterial } from './pbrblueprint';
 import type { PBRReflectionMode } from './mixins/lightmodel/pbrmetallicroughness';
+import { SubsurfaceProfile, type SubsurfaceProfilePreset } from './subsurfaceprofile';
 
 function cloneUniformFinalValue(value: BluePrintUniformValue) {
   if (typeof value.finalValue === 'number') {
@@ -74,6 +75,23 @@ function uniformTextureEquals(a: BluePrintUniformTexture, b: BluePrintUniformTex
   );
 }
 
+function valuesEqual(a: unknown, b: unknown) {
+  if (a === b) {
+    return true;
+  }
+  if (
+    a &&
+    b &&
+    typeof a === 'object' &&
+    typeof b === 'object' &&
+    'equalsTo' in (a as Record<string, unknown>) &&
+    typeof (a as { equalsTo?: unknown }).equalsTo === 'function'
+  ) {
+    return !!(a as { equalsTo: (other: unknown) => boolean }).equalsTo(b);
+  }
+  return false;
+}
+
 function copyParentMaterialState(
   instance: PBRBluePrintMaterialInstance,
   parentMaterial: PBRBluePrintMaterial
@@ -88,7 +106,7 @@ function copyParentMaterialState(
   instance.opacity = parentMaterial.opacity;
   instance.objectColor = parentMaterial.objectColor;
   instance.TAAStrength = parentMaterial.TAAStrength;
-  instance.subsurfaceProfile = parentMaterial.subsurfaceProfile;
+  instance.syncInheritedSubsurfaceProfile(parentMaterial.subsurfaceProfile);
   if (!instance.hasReflectionModeOverride()) {
     instance.setBlueprintInstanceReflectionMode(parentMaterial.reflectionMode, true);
   }
@@ -108,6 +126,8 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
   private _overrideUniformValues: Map<string, BluePrintUniformValue>;
   private _overrideUniformTextures: Map<string, BluePrintUniformTexture>;
   private _reflectionModeOverridden: boolean;
+  private _overrideMaterialProps: Set<string>;
+  private _subsurfaceProfileOverride: SubsurfaceProfile | null;
 
   constructor(parentMaterial?: Nullable<PBRBluePrintMaterial>, parentMaterialId = '') {
     super();
@@ -116,6 +136,8 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
     this._overrideUniformValues = new Map();
     this._overrideUniformTextures = new Map();
     this._reflectionModeOverridden = false;
+    this._overrideMaterialProps = new Set();
+    this._subsurfaceProfileOverride = null;
     if (parentMaterial) {
       this.setParentMaterial(parentMaterial, parentMaterialId);
     }
@@ -131,6 +153,26 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
 
   get isBlueprintMaterialInstance() {
     return true;
+  }
+
+  get hasSubsurfaceProfileOverride() {
+    return !!this._subsurfaceProfileOverride;
+  }
+
+  setMaterialPropertyOverrides(propNames: Iterable<string>) {
+    this._overrideMaterialProps = new Set(propNames);
+  }
+
+  getMaterialPropertyOverrides() {
+    return [...this._overrideMaterialProps];
+  }
+
+  markMaterialPropertyOverridden(propName: string) {
+    this._overrideMaterialProps.add(propName);
+  }
+
+  isMaterialPropertyOverridden(propName: string) {
+    return this._overrideMaterialProps.has(propName);
   }
 
   set uniformValues(val: BluePrintUniformValue[]) {
@@ -201,6 +243,70 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
     super.reflectionMode = val;
   }
 
+  private copySubsurfaceProfile(source: Nullable<SubsurfaceProfile>) {
+    if (!source) {
+      return null;
+    }
+    const profile = new SubsurfaceProfile();
+    profile.copyFrom(source);
+    return profile;
+  }
+
+  private ensureSubsurfaceProfileOverride() {
+    if (this._subsurfaceProfileOverride) {
+      return this._subsurfaceProfileOverride;
+    }
+    const source = this.subsurfaceProfile ?? this._parentMaterial?.subsurfaceProfile ?? null;
+    const profile = this.copySubsurfaceProfile(source);
+    this._subsurfaceProfileOverride = profile;
+    super.subsurfaceProfile = profile;
+    return profile;
+  }
+
+  private getInheritedSubsurfaceProfile() {
+    return this._parentMaterial?.subsurfaceProfile ?? null;
+  }
+
+  syncInheritedSubsurfaceProfile(parentProfile: Nullable<SubsurfaceProfile>) {
+    if (this._subsurfaceProfileOverride) {
+      super.subsurfaceProfile = this._subsurfaceProfileOverride;
+    } else {
+      super.subsurfaceProfile = parentProfile ?? null;
+    }
+  }
+
+  setBlueprintInstanceSubsurfacePreset(val: SubsurfaceProfilePreset) {
+    this.setBlueprintInstanceSubsurfaceProfileValue('SubsurfaceLookPreset', 'preset', val);
+  }
+
+  setBlueprintInstanceSubsurfaceStrength(val: number) {
+    this.setBlueprintInstanceSubsurfaceProfileValue('SubsurfaceScatterWeight', 'strength', val);
+  }
+
+  setBlueprintInstanceSubsurfaceScale(val: number) {
+    this.setBlueprintInstanceSubsurfaceProfileValue('SubsurfaceScatterScale', 'scale', val);
+  }
+
+  setBlueprintInstanceSubsurfaceProfileValue<K extends keyof SubsurfaceProfile>(
+    propName: string,
+    key: K,
+    value: SubsurfaceProfile[K]
+  ) {
+    const inherited = this.getInheritedSubsurfaceProfile();
+    const inheritedValue = inherited ? inherited[key] : undefined;
+    if (!this._subsurfaceProfileOverride && inherited && valuesEqual(inheritedValue, value)) {
+      this._overrideMaterialProps.delete(propName);
+      super.subsurfaceProfile = inherited;
+      return;
+    }
+    const profile = this.ensureSubsurfaceProfileOverride();
+    if (profile) {
+      this._overrideMaterialProps.add(propName);
+      (profile as unknown as Record<string, unknown>)[key as string] = value;
+      super.subsurfaceProfile = profile;
+    }
+  }
+
   setParentMaterial(parentMaterial: Nullable<PBRBluePrintMaterial>, parentMaterialId?: string) {
     this._parentMaterial = parentMaterial;
     this._parentMaterialId =
@@ -221,11 +327,80 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
     this.fragmentIR = parentMaterial.fragmentIR;
     this.vertexIR = parentMaterial.vertexIR;
     copyParentMaterialState(this, parentMaterial);
+    if (!this.isMaterialPropertyOverridden('Transmission')) {
+      this.transmission = parentMaterial.transmission;
+    }
+    if (!this.isMaterialPropertyOverridden('IOR')) {
+      this.ior = parentMaterial.ior;
+    }
+    if (!this.isMaterialPropertyOverridden('TransmissionFactor')) {
+      this.transmissionFactor = parentMaterial.transmissionFactor;
+    }
+    if (!this.isMaterialPropertyOverridden('ThicknessFactor')) {
+      this.thicknessFactor = parentMaterial.thicknessFactor;
+    }
+    if (!this.isMaterialPropertyOverridden('AttenuationColor')) {
+      this.attenuationColor = parentMaterial.attenuationColor;
+    }
+    if (!this.isMaterialPropertyOverridden('AttenuationDistance')) {
+      this.attenuationDistance = parentMaterial.attenuationDistance;
+    }
+    if (!this.isMaterialPropertyOverridden('TransmissionTexture')) {
+      this.transmissionTexture = parentMaterial.transmissionTexture;
+    }
+    if (
+      !this.isMaterialPropertyOverridden('TransmissionTexCoordAddressU') &&
+      !this.isMaterialPropertyOverridden('TransmissionTexCoordAddressV')
+    ) {
+      this.transmissionTextureSampler = parentMaterial.transmissionTextureSampler;
+    }
+    if (!this.isMaterialPropertyOverridden('TransmissionTexCoordScale')) {
+      this.transmissionTexCoordMatrix = parentMaterial.transmissionTexCoordMatrix;
+    }
+    if (!this.isMaterialPropertyOverridden('TransmissionTexCoordIndex')) {
+      this.transmissionTexCoordIndex = parentMaterial.transmissionTexCoordIndex;
+    }
+    if (!this.isMaterialPropertyOverridden('ThicknessTexture')) {
+      this.thicknessTexture = parentMaterial.thicknessTexture;
+    }
+    if (
+      !this.isMaterialPropertyOverridden('ThicknessTexCoordAddressU') &&
+      !this.isMaterialPropertyOverridden('ThicknessTexCoordAddressV')
+    ) {
+      this.thicknessTextureSampler = parentMaterial.thicknessTextureSampler;
+    }
+    if (!this.isMaterialPropertyOverridden('ThicknessTexCoordScale')) {
+      this.thicknessTexCoordMatrix = parentMaterial.thicknessTexCoordMatrix;
+    }
+    if (!this.isMaterialPropertyOverridden('ThicknessTexCoordIndex')) {
+      this.thicknessTexCoordIndex = parentMaterial.thicknessTexCoordIndex;
+    }
+    if (!this.isMaterialPropertyOverridden('SubsurfaceTexture')) {
+      this.subsurfaceTexture = parentMaterial.subsurfaceTexture;
+    }
+    if (
+      !this.isMaterialPropertyOverridden('SubsurfaceTexCoordAddressU') &&
+      !this.isMaterialPropertyOverridden('SubsurfaceTexCoordAddressV')
+    ) {
+      this.subsurfaceTextureSampler = parentMaterial.subsurfaceTextureSampler;
+    }
+    if (!this.isMaterialPropertyOverridden('SubsurfaceTexCoordScale')) {
+      this.subsurfaceTexCoordMatrix = parentMaterial.subsurfaceTexCoordMatrix;
+    }
+    if (!this.isMaterialPropertyOverridden('SubsurfaceTexCoordIndex')) {
+      this.subsurfaceTexCoordIndex = parentMaterial.subsurfaceTexCoordIndex;
+    }
     this.uniformValues = cloneUniformValues(parentMaterial.uniformValues).map(
       (v) => this._overrideUniformValues.get(v.name) ?? v
     );
     this.uniformTextures = cloneUniformTextures(parentMaterial.uniformTextures).map(
       (v) => this._overrideUniformTextures.get(v.name) ?? v
     );
+  }
+
+  protected override onDispose() {
+    this._subsurfaceProfileOverride?.dispose();
+    this._subsurfaceProfileOverride = null;
+    super.onDispose();
   }
 }
