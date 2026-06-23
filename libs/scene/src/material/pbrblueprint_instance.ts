@@ -1,7 +1,25 @@
-import { DRef, type Nullable } from '@zephyr3d/base';
+import { DRef, Vector4, type Nullable } from '@zephyr3d/base';
 import { getEngine } from '../app/api';
 import type { BluePrintUniformTexture, BluePrintUniformValue } from '../utility/blueprint/material/ir';
 import { PBRBluePrintMaterial } from './pbrblueprint';
+
+function cloneTextureParams(params: BluePrintUniformTexture['params']) {
+  return params instanceof Vector4
+    ? params.clone()
+    : params &&
+        typeof params === 'object' &&
+        'x' in params &&
+        'y' in params &&
+        'z' in params &&
+        'w' in params
+      ? new Vector4(
+          Number((params as { x: number }).x) || 0,
+          Number((params as { y: number }).y) || 0,
+          Number((params as { z: number }).z) || 0,
+          Number((params as { w: number }).w) || 0
+        )
+      : Vector4.zero();
+}
 
 function cloneUniformValues(values: Nullable<BluePrintUniformValue[]>) {
   return (values ?? []).map((v) => ({
@@ -19,7 +37,7 @@ function cloneUniformValues(values: Nullable<BluePrintUniformValue[]>) {
 function cloneUniformTextures(values: Nullable<BluePrintUniformTexture[]>) {
   return (values ?? []).map((v) => ({
     ...v,
-    params: v.params?.clone(),
+    params: cloneTextureParams(v.params),
     finalTexture: v.finalTexture ? new DRef(v.finalTexture.get()) : undefined,
     finalSampler: v.finalSampler
   }));
@@ -139,7 +157,7 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
   getOverrideUniformTextures() {
     return [...this._overrideUniformTextures.values()].map((v) => ({
       ...v,
-      params: v.params?.clone(),
+      params: cloneTextureParams(v.params),
       finalTexture: undefined,
       finalSampler: undefined
     }));

@@ -883,26 +883,7 @@ export class AssetManager {
         ...v,
         finalValue: v.value.length === 1 ? v.value[0] : new Float32Array(v.value)
       }));
-      const uniformTextures: BluePrintUniformTexture[] = [];
-      const textures = irData.uniformTextures;
-      for (const v of textures) {
-        const tex = await this.fetchTexture(v.texture, {
-          linearColorSpace: !v.sRGB,
-          overrideVFS: vfs
-        });
-        uniformTextures.push({
-          ...v,
-          finalTexture: new DRef(tex),
-          finalSampler: getDevice().createSampler({
-            addressU: v.wrapS as TextureAddressMode,
-            addressV: v.wrapT as TextureAddressMode,
-            minFilter: v.minFilter as TextureFilterMode,
-            magFilter: v.magFilter as TextureFilterMode,
-            mipFilter: v.mipFilter as TextureFilterMode
-          }),
-          params: tex ? new Vector4(tex.width, tex.height, tex.depth, tex.mipLevelCount) : Vector4.zero()
-        });
-      }
+      const uniformTextures = await this.hydrateBluePrintUniformTextures(irData.uniformTextures, vfs);
       return {
         irFragment: ir?.['fragment'] ?? null,
         irVertex: ir?.['vertex'] ?? null,
@@ -963,7 +944,10 @@ export class AssetManager {
         );
         ASSERT(parentMaterial instanceof PBRBluePrintMaterial, `Invalid parent blueprint material: ${content.data.parent}`);
         const instance = new PBRBluePrintMaterialInstance(parentMaterial, content.data.parent);
-        instance.setOverrides(content.data.uniformValues ?? [], content.data.uniformTextures ?? []);
+        instance.setOverrides(
+          content.data.uniformValues ?? [],
+          await this.hydrateBluePrintUniformTextures(content.data.uniformTextures ?? [], vfs)
+        );
         mat = instance as unknown as T;
       } else if (content.type === 'SpriteBluePrintMaterial') {
         const data = (await this.loadBluePrintMaterialData(
@@ -1001,6 +985,34 @@ export class AssetManager {
       console.error(`Load material failed: ${err}`);
       return null;
     }
+  }
+
+  private async hydrateBluePrintUniformTextures(
+    textures: BluePrintUniformTexture[],
+    vfs?: VFS
+  ): Promise<BluePrintUniformTexture[]> {
+    const uniformTextures: BluePrintUniformTexture[] = [];
+    for (const v of textures ?? []) {
+      const tex = v.texture
+        ? await this.fetchTexture(v.texture, {
+            linearColorSpace: !v.sRGB,
+            overrideVFS: vfs
+          })
+        : null;
+      uniformTextures.push({
+        ...v,
+        finalTexture: new DRef(tex),
+        finalSampler: getDevice().createSampler({
+          addressU: v.wrapS as TextureAddressMode,
+          addressV: v.wrapT as TextureAddressMode,
+          minFilter: v.minFilter as TextureFilterMode,
+          magFilter: v.magFilter as TextureFilterMode,
+          mipFilter: v.mipFilter as TextureFilterMode
+        }),
+        params: tex ? new Vector4(tex.width, tex.height, tex.depth, tex.mipLevelCount) : Vector4.zero()
+      });
+    }
+    return uniformTextures;
   }
   private rebuildGraphStructure(
     nodes: Record<number, IGraphNode>,

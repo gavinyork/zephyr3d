@@ -1302,9 +1302,10 @@ export class PropertyEditor extends Observable<{
     }
     if (changed && value.set) {
       this.inspectGroup(group);
-      value.set.call(object, tmpProperty);
-      this.invalidateRows();
-      this.dispatchEvent('object_property_changed', object, value);
+      Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
+        this.invalidateRows();
+        this.dispatchEvent('object_property_changed', object, value);
+      });
     }
     return true;
   }
@@ -2002,9 +2003,10 @@ export class PropertyEditor extends Observable<{
       */
       if (changed && value.set) {
         this.inspectGroup(owner);
-        value.set.call(object, tmpProperty);
-        this.invalidateRows();
-        this.dispatchEvent('object_property_changed', object, value);
+        Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
+          this.invalidateRows();
+          this.dispatchEvent('object_property_changed', object, value);
+        });
       }
       if (value.set && ImGui.IsItemActivated()) {
         this.inspectGroup(owner);

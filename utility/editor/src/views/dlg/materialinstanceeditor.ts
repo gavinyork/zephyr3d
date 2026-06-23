@@ -28,6 +28,7 @@ import { DlgMessageBoxEx } from './messageexdlg';
 import { DlgMessage } from './messagedlg';
 import { ProjectService } from '../../core/services/project';
 import type { FrameBuffer, Texture2D, Texture2DArray, TextureCube } from '@zephyr3d/device';
+import { TextureAddressMode, TextureFilterMode } from '@zephyr3d/device';
 
 type InstanceFileContent = {
   type: 'PBRBluePrintMaterialInstance';
@@ -221,11 +222,22 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     return ['image/jpeg', 'image/png', 'image/tga', 'image/vnd.radiance', 'image/x-dds', 'image/webp'];
   }
 
+  private createTextureSampler(uniform: BluePrintUniformTexture) {
+    return getDevice().createSampler({
+      addressU: uniform.wrapS as TextureAddressMode,
+      addressV: uniform.wrapT as TextureAddressMode,
+      minFilter: uniform.minFilter as TextureFilterMode,
+      magFilter: uniform.magFilter as TextureFilterMode,
+      mipFilter: uniform.mipFilter as TextureFilterMode
+    });
+  }
+
   private getBlueprintParameterProps(): PropertyAccessor[] {
     const material = this._material.get();
     if (!material) {
       return [];
     }
+    const createTextureSampler = this.createTextureSampler.bind(this);
     const props: PropertyAccessor[] = [];
     for (const uniform of material.uniformValues) {
       const type = this.getUniformDisplayType(uniform);
@@ -280,6 +292,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
           if (!target.texture) {
             target.finalTexture?.dispose();
             target.finalTexture = new DRef(null);
+            target.finalSampler = createTextureSampler(target);
             target.params = Vector4.zero();
             return;
           }
@@ -292,6 +305,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
           );
           target.finalTexture?.dispose();
           target.finalTexture = new DRef(tex);
+          target.finalSampler = createTextureSampler(target);
           target.params = tex ? new Vector4(tex.width, tex.height, tex.depth, tex.mipLevelCount) : Vector4.zero();
         }
       });
