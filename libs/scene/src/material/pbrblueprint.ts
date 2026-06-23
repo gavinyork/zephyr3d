@@ -419,7 +419,7 @@ export class PBRBluePrintMaterial
     const metallic = this.calculateMetallic(scope, albedo, normal);
     const roughness = this.calculateRoughness(scope, albedo, normal);
     const specularFactor = this.calculateSpecularFactor(scope, albedo, normal);
-    const reflectionMode = this.calculateReflectionMode(scope) as PBShaderExp;
+    const reflectionMode = scope.zReflectionMode as PBShaderExp;
     if (this.hasMetallicRoughnessTexture()) {
       scope.$l.metallicRoughnessSample = this.sampleMetallicRoughnessTexture(scope);
       data.metallic = this._connectedOutputs.has('Metallic')

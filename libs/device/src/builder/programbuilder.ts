@@ -83,7 +83,7 @@ function getAutoSamplerName(texture: PBShaderExp, comparison: boolean) {
   const bindingClass = getSamplerBindingClass(texture.$sampleType, comparison);
   return AST.genSamplerName(
     sharingKey
-      ? `${sharingKey}_${bindingClass}_${texture.$sampleType}`
+      ? `${sharingKey}_g${texture.$group ?? 0}_${bindingClass}_${texture.$sampleType}`
       : `${texture.$str}${comparison ? '_comparison' : ''}`,
     false
   );
@@ -1232,19 +1232,20 @@ export class ProgramBuilder {
    */
   buildRenderProgram(options: PBRenderOptions): Nullable<GPUProgram> {
     const ret = this.buildRender(options);
-    return ret
-      ? this._device.createGPUProgram({
-          type: 'render',
-          label: options.label,
-          params: {
-            vs: ret[0],
-            fs: ret[1],
-            fragmentOutputCount: ret[4],
-            bindGroupLayouts: ret[2],
-            vertexAttributes: ret[3]
-          }
-        })
-      : null;
+    if (!ret) {
+      return null;
+    }
+    return this._device.createGPUProgram({
+      type: 'render',
+      label: options.label,
+      params: {
+        vs: ret[0],
+        fs: ret[1],
+        fragmentOutputCount: ret[4],
+        bindGroupLayouts: ret[2],
+        vertexAttributes: ret[3]
+      }
+    });
   }
   /**
    * Creates a shader program for compute
@@ -2033,25 +2034,23 @@ export class ProgramBuilder {
       this.mergeUniforms(vertexScope, fragScope);
       this.updateUniformBindings([vertexScope, fragScope], [ShaderType.Vertex, ShaderType.Fragment]);
 
-      return [
-        this.generateRenderSource(
-          ShaderType.Vertex,
-          vertexScope,
-          vertexBuiltinScope,
-          vertexInputs.map((val) => val[1]),
-          vertexOutputs.map((val) => val[1])
-        )!,
-        this.generateRenderSource(
-          ShaderType.Fragment,
-          fragScope,
-          fragBuiltinScope,
-          fragInputs.map((val) => val[1]),
-          fragOutputs.map((val) => val[1])
-        )!,
-        this.createBindGroupLayouts(options.label),
-        this._vertexAttributes,
-        fragOutputs.length
-      ] as const;
+      const vertexSource = this.generateRenderSource(
+        ShaderType.Vertex,
+        vertexScope,
+        vertexBuiltinScope,
+        vertexInputs.map((val) => val[1]),
+        vertexOutputs.map((val) => val[1])
+      )!;
+      const fragmentSource = this.generateRenderSource(
+        ShaderType.Fragment,
+        fragScope,
+        fragBuiltinScope,
+        fragInputs.map((val) => val[1]),
+        fragOutputs.map((val) => val[1])
+      )!;
+      const bindGroupLayouts = this.createBindGroupLayouts(options.label);
+      this.logBlueprintSamplerDebug(options.label, fragOutputs.length, fragmentSource, bindGroupLayouts);
+      return [vertexSource, fragmentSource, bindGroupLayouts, this._vertexAttributes, fragOutputs.length] as const;
     } catch (err) {
       if (err instanceof errors.PBError) {
         this._lastError = err.getMessage(this._device.type);
@@ -2067,6 +2066,69 @@ export class ProgramBuilder {
         return null;
       }
     }
+  }
+  /** @internal */
+  private logBlueprintSamplerDebug(
+    label: string | undefined,
+    fragmentOutputCount: number,
+    fragmentShaderSource: string,
+    bindGroupLayouts: BindGroupLayout[]
+  ) {
+    const textureUniforms = this._uniforms
+      .filter((u) => !!u.texture)
+      .map((u) => ({
+        name: u.texture!.exp.$str,
+        group: u.group,
+        binding: u.binding,
+        sampleType: u.texture!.exp.$sampleType,
+        autoSamplerKey: u.texture!.exp.$autoSamplerKey,
+        autoBindSampler: u.texture!.autoBindSampler,
+        autoSamplerName: u.texture!.autoBindSampler ? getAutoSamplerName(u.texture!.exp, false) : null,
+        autoSamplerComparisonName:
+          u.texture!.autoBindSampler === 'comparison' ||
+          (u.texture!.exp.$typeinfo.isTextureType() && u.texture!.exp.$typeinfo.isDepthTexture())
+            ? getAutoSamplerName(u.texture!.exp, true)
+            : null
+      }));
+    const isBlueprintLikeProgram = textureUniforms.some(
+      (u) =>
+        u.name.startsWith('u_') &&
+        (u.autoSamplerKey?.startsWith('blueprint_') ||
+          ['u_BaseColor', 'u_AlphaTex', 'u_RoughnessMetallic', 'u_EmissiveTex', 'u_Normal'].includes(u.name))
+    );
+    if (!isBlueprintLikeProgram) {
+      return;
+    }
+    const samplerUniforms = this._uniforms
+      .filter((u) => !!u.sampler)
+      .map((u) => ({
+        name: u.sampler!.$str,
+        group: u.group,
+        binding: u.binding,
+        sampleType: u.sampler!.$sampleType
+      }));
+    console.error('[BlueprintSamplerDebug] render program built', {
+      label,
+      fragmentOutputCount,
+      textureUniformCount: textureUniforms.length,
+      samplerUniformCount: samplerUniforms.length,
+      uniqueSamplerCount: new Set(samplerUniforms.map((u) => `${u.group}:${u.name}`)).size,
+      textureUniforms,
+      samplerUniforms,
+      bindGroupLayouts: bindGroupLayouts.map((layout, group) => ({
+        group,
+        label: layout?.label,
+        entries:
+          layout?.entries?.map((entry) => ({
+            binding: entry.binding,
+            name: entry.name,
+            samplerType: entry.sampler?.type ?? null,
+            textureAutoBindSampler: entry.texture?.autoBindSampler ?? null,
+            textureAutoBindSamplerComparison: entry.texture?.autoBindSamplerComparison ?? null
+          })) ?? []
+      })),
+      fragmentShaderPreview: fragmentShaderSource.slice(0, 1200)
+    });
   }
   /** @internal */
   private generate(body?: (this: PBGlobalScope, pb: ProgramBuilder) => void): void {
@@ -2904,19 +2966,23 @@ export class PBScope extends Proxiable<PBScope> {
       // webgpu requires explicit sampler bindings
       const isDepth = variable.$typeinfo.isTextureType() && variable.$typeinfo.isDepthTexture();
       const samplerName = getAutoSamplerName(variable, false);
-      const samplerExp = getCurrentProgramBuilder()!
-        .sampler(samplerName)
-        .uniform(uniformInfo.group)
-        .sampleType(variable.$sampleType);
-      samplerExp.$sampleType = variable.$sampleType;
-      this.$local(samplerExp);
-      if (isDepth) {
-        const samplerNameComp = getAutoSamplerName(variable, true);
-        const samplerExpComp = getCurrentProgramBuilder()!
-          .samplerComparison(samplerNameComp)
+      if (!this.$_variables[samplerName]) {
+        const samplerExp = getCurrentProgramBuilder()!
+          .sampler(samplerName)
           .uniform(uniformInfo.group)
           .sampleType(variable.$sampleType);
-        this.$local(samplerExpComp);
+        samplerExp.$sampleType = variable.$sampleType;
+        this.$local(samplerExp);
+      }
+      if (isDepth) {
+        const samplerNameComp = getAutoSamplerName(variable, true);
+        if (!this.$_variables[samplerNameComp]) {
+          const samplerExpComp = getCurrentProgramBuilder()!
+            .samplerComparison(samplerNameComp)
+            .uniform(uniformInfo.group)
+            .sampleType(variable.$sampleType);
+          this.$local(samplerExpComp);
+        }
       }
     }
     return variable;
@@ -3108,6 +3174,9 @@ export class PBLocalScope extends PBScope {
         exp.$attrib = value.$attrib;
         exp.$sampleType = value.$sampleType;
         exp.$precision = value.$precision;
+        if (value.$typeinfo.isTextureType()) {
+          exp.$autoSamplerKey = value.$autoSamplerKey;
+        }
         exp.tag(...value.$tags);
       }
       this.$_scope.$local(exp, value);

@@ -67,6 +67,52 @@ type WebGPURenderBundle = {
   renderBundle: Nullable<GPURenderBundle>;
 };
 
+const WEBGPU_LIMIT_NAMES = [
+  'maxTextureDimension1D',
+  'maxTextureDimension2D',
+  'maxTextureDimension3D',
+  'maxTextureArrayLayers',
+  'maxBindGroups',
+  'maxBindGroupsPlusVertexBuffers',
+  'maxBindingsPerBindGroup',
+  'maxDynamicUniformBuffersPerPipelineLayout',
+  'maxDynamicStorageBuffersPerPipelineLayout',
+  'maxSampledTexturesPerShaderStage',
+  'maxSamplersPerShaderStage',
+  'maxStorageBuffersPerShaderStage',
+  'maxStorageTexturesPerShaderStage',
+  'maxUniformBuffersPerShaderStage',
+  'maxUniformBufferBindingSize',
+  'maxStorageBufferBindingSize',
+  'minUniformBufferOffsetAlignment',
+  'minStorageBufferOffsetAlignment',
+  'maxVertexBuffers',
+  'maxBufferSize',
+  'maxVertexAttributes',
+  'maxVertexBufferArrayStride',
+  'maxInterStageShaderComponents',
+  'maxInterStageShaderVariables',
+  'maxColorAttachments',
+  'maxColorAttachmentBytesPerSample',
+  'maxComputeWorkgroupStorageSize',
+  'maxComputeInvocationsPerWorkgroup',
+  'maxComputeWorkgroupSizeX',
+  'maxComputeWorkgroupSizeY',
+  'maxComputeWorkgroupSizeZ',
+  'maxComputeWorkgroupsPerDimension'
+] as const;
+
+function collectRequiredLimits(limits: GPUSupportedLimits): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const name of WEBGPU_LIMIT_NAMES) {
+    const value = (limits as unknown as Record<string, unknown>)[name];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      result[name] = value;
+    }
+  }
+  return result;
+}
+
 export class WebGPUDevice extends BaseDevice {
   private _context!: GPUCanvasContext;
   private _device!: GPUDevice;
@@ -202,9 +248,18 @@ export class WebGPUDevice extends BaseDevice {
     }
     this._adapter = adapter;
     this._adapterInfo = this._adapter.info ?? {};
+    const requiredLimits = collectRequiredLimits(this._adapter.limits);
     this._device = await this._adapter.requestDevice({
       requiredFeatures: [...this._adapter.features] as GPUFeatureName[],
-      requiredLimits: { ...this._adapter.limits } as any
+      requiredLimits: requiredLimits as any
+    });
+    console.info('WebGPU requested limits:', {
+      maxSampledTexturesPerShaderStage: requiredLimits.maxSampledTexturesPerShaderStage,
+      maxSamplersPerShaderStage: requiredLimits.maxSamplersPerShaderStage
+    });
+    console.info('WebGPU device limits:', {
+      maxSampledTexturesPerShaderStage: this._device.limits.maxSampledTexturesPerShaderStage,
+      maxSamplersPerShaderStage: this._device.limits.maxSamplersPerShaderStage
     });
     console.info('WebGPU device features:');
     for (const feature of this._device.features) {
