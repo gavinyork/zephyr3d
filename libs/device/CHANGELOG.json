@@ -2,6 +2,23 @@
   "name": "@zephyr3d/device",
   "entries": [
     {
+      "version": "0.2.10",
+      "tag": "@zephyr3d/device_v0.2.10",
+      "date": "Tue, 23 Jun 2026 16:50:23 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Track fragment outputs when building shaders"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.6` to `0.2.7`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.9",
       "tag": "@zephyr3d/device_v0.2.9",
       "date": "Tue, 19 May 2026 07:41:46 GMT",

@@ -2,6 +2,26 @@
   "name": "@zephyr3d/backend-webgpu",
   "entries": [
     {
+      "version": "0.1.13",
+      "tag": "@zephyr3d/backend-webgpu_v0.1.13",
+      "date": "Tue, 23 Jun 2026 16:50:23 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add checking for render target output count mismatch"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.6` to `0.2.7`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.9` to `0.2.10`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.12",
       "tag": "@zephyr3d/backend-webgpu_v0.1.12",
       "date": "Tue, 12 May 2026 03:53:58 GMT",

@@ -2,6 +2,26 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.7",
+      "tag": "@zephyr3d/scene_v0.9.7",
+      "date": "Tue, 23 Jun 2026 16:50:23 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Improve joint dynamics"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.6` to `0.2.7`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.9` to `0.2.10`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.6",
       "tag": "@zephyr3d/scene_v0.9.6",
       "date": "Fri, 05 Jun 2026 10:56:10 GMT",
