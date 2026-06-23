@@ -133,6 +133,8 @@ export class ShadowMapper extends Disposable {
   /** @internal */
   protected _esmBlur: boolean;
   /** @internal */
+  protected _esmLogSpace: boolean;
+  /** @internal */
   protected _esmBlurKernelSize: number;
   /** @internal */
   protected _esmBlurRadius: number;
@@ -168,6 +170,7 @@ export class ShadowMapper extends Disposable {
     this._vsmBlurRadius = 4;
     this._vsmDarkness = 0.3;
     this._esmBlur = true;
+    this._esmLogSpace = true;
     this._esmBlurKernelSize = 5;
     this._esmBlurRadius = 4;
     this._esmDepthScale = 200;
@@ -431,6 +434,19 @@ export class ShadowMapper extends Disposable {
       const esm = this.asESM();
       if (esm) {
         esm.blur = this._esmBlur;
+      }
+    }
+  }
+  /** Whether to enable log space ESM blur */
+  get esmLogSpace() {
+    return this._esmLogSpace;
+  }
+  set esmLogSpace(val) {
+    if (!!val !== this.esmLogSpace) {
+      this._esmLogSpace = !!val;
+      const esm = this.asESM();
+      if (esm) {
+        esm.logSpace = this._esmLogSpace;
       }
     }
   }
@@ -1159,6 +1175,9 @@ export class ShadowMapper extends Disposable {
       this._impl = new VSM(this._vsmBlurKernelSize, this._vsmBlurRadius, this._vsmDarkness);
     } else if (mode === 'esm') {
       this._impl = new ESM(this._esmBlurKernelSize, this._esmBlurRadius, this._esmDepthScale);
+      const esm = this._impl as ESM;
+      esm.blur = this._esmBlur;
+      esm.logSpace = this._esmLogSpace;
     } else if (mode === 'pcf-pd') {
       this._impl = new PCFPD(this._pdSampleCount, this._pdSampleRadius);
     } else if (mode === 'pcf-opt') {

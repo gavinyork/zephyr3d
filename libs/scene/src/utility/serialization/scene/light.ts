@@ -404,6 +404,22 @@ export function getPunctualLightClass(): SerializableClass {
           }
         },
         {
+          name: 'ESMLogSpaceBlur',
+          description: 'If true, enable log space bluring for ESM shadow',
+          type: 'bool',
+          phase: 2,
+          default: true,
+          get(this: PunctualLight, value) {
+            value.bool[0] = this.shadow.esmLogSpace;
+          },
+          set(this: PunctualLight, value) {
+            this.shadow.esmLogSpace = value.bool[0];
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow && this.shadow.mode === 'esm';
+          }
+        },
+        {
           name: 'ESMBlurKernelSize',
           description: 'Blur kernel size for ESM shadow',
           type: 'int',

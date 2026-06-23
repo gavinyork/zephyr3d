@@ -8,7 +8,8 @@ import { LIGHT_TYPE_POINT } from '../values';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
 import { ShaderHelper } from '../material/shader/helper';
 import { getDevice } from '../app/api';
-import type { Nullable } from '@zephyr3d/base';
+import { Vector4, type Nullable } from '@zephyr3d/base';
+import { computeShadowBias, computeShadowBiasCSM } from './shader';
 
 type ESMImplData = {
   blurFramebuffer: Nullable<FrameBuffer>;
@@ -37,9 +38,158 @@ class BlurBlitter extends GaussianBlurBlitter {
     const pb = scope.$builder;
     const texel = super.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
     if (this.packFloat) {
-      return pb.vec4(decodeNormalizedFloatFromRGBA(scope, texel), 0, 0, 1);
+      return pb.vec4(decodeNormalizedFloatFromRGBA(scope, texel), 1, 0, 1);
     } else {
       return texel;
+    }
+  }
+  filter(
+    scope: PBInsideFunctionScope,
+    type: BlitType,
+    srcTex: PBShaderExp,
+    srcUV: PBShaderExp,
+    srcLayer: PBShaderExp,
+    sampleType: 'float' | 'int' | 'uint'
+  ) {
+    const that = this;
+    const pb = scope.$builder;
+    scope.incrementalGaussian = pb.vec3();
+    scope.incrementalGaussian.x = pb.div(1, pb.mul(scope.sigma, Math.sqrt(2 * Math.PI)));
+    scope.incrementalGaussian.y = pb.exp(pb.div(-0.5, pb.mul(scope.sigma, scope.sigma)));
+    scope.incrementalGaussian.z = pb.mul(scope.incrementalGaussian.y, scope.incrementalGaussian.y);
+    scope.coefficientSum = pb.float(0);
+    scope.coverageSum = pb.float(0);
+    scope.d0 = that.readTexel(scope, type, srcTex, srcUV, srcLayer, sampleType);
+    scope.coverage0 = pb.clamp(scope.d0.y, 0, 1);
+    scope.coefficientSum = pb.add(scope.coefficientSum, scope.incrementalGaussian.x);
+    scope.coverageSum = pb.add(scope.coverageSum, pb.mul(scope.incrementalGaussian.x, scope.coverage0));
+
+    if (that.logSpace) {
+      scope.maxLogValue = pb.float(-1e20);
+      scope.logValue0 = that._phase === 'horizonal' ? pb.mul(scope.d0.x, scope.multiplier) : scope.d0.x;
+      scope.$if(pb.greaterThan(scope.coverage0, 0.000001), function () {
+        this.maxLogValue = this.logValue0;
+      });
+    } else {
+      scope.depthSum = pb.mul(scope.incrementalGaussian.x, scope.coverage0, scope.d0.x);
+    }
+
+    scope.incrementalGaussian = pb.vec3(
+      pb.mul(scope.incrementalGaussian.xy, scope.incrementalGaussian.yz),
+      scope.incrementalGaussian.z
+    );
+    scope.$for(pb.float('i'), 1, scope.numBlurPixelsPerSide, function () {
+      this.$l.blurOffset = pb.mul(this.blurMultiplyVec, this.blurSize, this.i);
+      this.$l.d1 = that.readTexel(scope, type, srcTex, pb.sub(srcUV, this.blurOffset), srcLayer, sampleType);
+      this.$l.d2 = that.readTexel(scope, type, srcTex, pb.add(srcUV, this.blurOffset), srcLayer, sampleType);
+      this.$l.coverage1 = pb.clamp(this.d1.y, 0, 1);
+      this.$l.coverage2 = pb.clamp(this.d2.y, 0, 1);
+      this.coefficientSum = pb.add(this.coefficientSum, pb.mul(this.incrementalGaussian.x, 2));
+      this.coverageSum = pb.add(
+        this.coverageSum,
+        pb.mul(this.incrementalGaussian.x, pb.add(this.coverage1, this.coverage2))
+      );
+      if (that.logSpace) {
+        this.$l.logValue1 = that._phase === 'horizonal' ? pb.mul(this.d1.x, this.multiplier) : this.d1.x;
+        this.$l.logValue2 = that._phase === 'horizonal' ? pb.mul(this.d2.x, this.multiplier) : this.d2.x;
+        this.$if(pb.greaterThan(this.coverage1, 0.000001), function () {
+          this.maxLogValue = pb.max(this.maxLogValue, this.logValue1);
+        });
+        this.$if(pb.greaterThan(this.coverage2, 0.000001), function () {
+          this.maxLogValue = pb.max(this.maxLogValue, this.logValue2);
+        });
+      } else {
+        this.depthSum = pb.add(
+          this.depthSum,
+          pb.mul(
+            this.incrementalGaussian.x,
+            pb.add(pb.mul(this.coverage1, this.d1.x), pb.mul(this.coverage2, this.d2.x))
+          )
+        );
+      }
+      this.incrementalGaussian = pb.vec3(
+        pb.mul(this.incrementalGaussian.xy, this.incrementalGaussian.yz),
+        this.incrementalGaussian.z
+      );
+    });
+
+    if (that.logSpace) {
+      scope.incrementalGaussian.x = pb.div(1, pb.mul(scope.sigma, Math.sqrt(2 * Math.PI)));
+      scope.incrementalGaussian.y = pb.exp(pb.div(-0.5, pb.mul(scope.sigma, scope.sigma)));
+      scope.incrementalGaussian.z = pb.mul(scope.incrementalGaussian.y, scope.incrementalGaussian.y);
+      scope.momentSum = pb.float(0);
+      scope.$if(pb.greaterThan(scope.coverage0, 0.000001), function () {
+        this.momentSum = pb.add(
+          this.momentSum,
+          pb.mul(
+            this.incrementalGaussian.x,
+            this.coverage0,
+            pb.exp(pb.min(87, pb.sub(this.logValue0, this.maxLogValue)))
+          )
+        );
+      });
+      scope.incrementalGaussian = pb.vec3(
+        pb.mul(scope.incrementalGaussian.xy, scope.incrementalGaussian.yz),
+        scope.incrementalGaussian.z
+      );
+      scope.$for(pb.float('i'), 1, scope.numBlurPixelsPerSide, function () {
+        this.$l.blurOffset = pb.mul(this.blurMultiplyVec, this.blurSize, this.i);
+        this.$l.d1 = that.readTexel(
+          scope,
+          type,
+          srcTex,
+          pb.sub(srcUV, this.blurOffset),
+          srcLayer,
+          sampleType
+        );
+        this.$l.d2 = that.readTexel(
+          scope,
+          type,
+          srcTex,
+          pb.add(srcUV, this.blurOffset),
+          srcLayer,
+          sampleType
+        );
+        this.$l.coverage1 = pb.clamp(this.d1.y, 0, 1);
+        this.$l.coverage2 = pb.clamp(this.d2.y, 0, 1);
+        this.$l.logValue1 = that._phase === 'horizonal' ? pb.mul(this.d1.x, this.multiplier) : this.d1.x;
+        this.$l.logValue2 = that._phase === 'horizonal' ? pb.mul(this.d2.x, this.multiplier) : this.d2.x;
+        this.$if(pb.greaterThan(this.coverage1, 0.000001), function () {
+          this.momentSum = pb.add(
+            this.momentSum,
+            pb.mul(
+              this.incrementalGaussian.x,
+              this.coverage1,
+              pb.exp(pb.min(87, pb.sub(this.logValue1, this.maxLogValue)))
+            )
+          );
+        });
+        this.$if(pb.greaterThan(this.coverage2, 0.000001), function () {
+          this.momentSum = pb.add(
+            this.momentSum,
+            pb.mul(
+              this.incrementalGaussian.x,
+              this.coverage2,
+              pb.exp(pb.min(87, pb.sub(this.logValue2, this.maxLogValue)))
+            )
+          );
+        });
+        this.incrementalGaussian = pb.vec3(
+          pb.mul(this.incrementalGaussian.xy, this.incrementalGaussian.yz),
+          this.incrementalGaussian.z
+        );
+      });
+      scope.$l.moment = pb.float(0);
+      scope.$if(pb.greaterThan(scope.coverageSum, 0.000001), function () {
+        this.moment = pb.add(this.maxLogValue, pb.log(pb.div(this.momentSum, this.coverageSum)));
+      });
+      return pb.vec4(scope.moment, pb.div(scope.coverageSum, scope.coefficientSum), 0, 1);
+    } else {
+      scope.$l.depth = pb.float(1);
+      scope.$if(pb.greaterThan(scope.coverageSum, 0.000001), function () {
+        this.depth = pb.div(this.depthSum, this.coverageSum);
+      });
+      return pb.vec4(scope.depth, pb.div(scope.coverageSum, scope.coefficientSum), 0, 1);
     }
   }
   writeTexel(scope: PBInsideFunctionScope, type: BlitType, srcUV: PBShaderExp, texel: PBShaderExp) {
@@ -130,6 +280,14 @@ export class ESM extends ShadowImpl {
   }
   getShadowMapBorder(_shadowMapParams: ShadowMapParams) {
     return this._blur ? Math.ceil(((this._kernelSize + 1) / 2) * this._blurSize) : 0;
+  }
+  getShadowMapClearColor(shadowMapParams: ShadowMapParams) {
+    const colorAttachment = shadowMapParams.shadowMapFramebuffer?.getColorAttachments()[0];
+    return colorAttachment
+      ? colorAttachment.format === 'rgba8unorm'
+        ? new Vector4(0, 0, 0, 1)
+        : new Vector4(1, 0, 0, 1)
+      : null;
   }
   getShadowMap(shadowMapParams: ShadowMapParams) {
     const implData = shadowMapParams.implData as ESMImplData;
@@ -226,14 +384,18 @@ export class ESM extends ShadowImpl {
     if (shadowMapParams.implData) {
       const implData = shadowMapParams.implData as ESMImplData;
       const colorAttachment = shadowMapParams.shadowMapFramebuffer!.getColorAttachments()[0];
+      const packFloat = colorAttachment.format === 'rgba8unorm';
+      const logSpace = this._logSpace && !packFloat;
       this._blitterH.blurSize = this._blurSize / colorAttachment.width;
       this._blitterH.kernelSize = this._kernelSize;
-      this._blitterH.logSpace = this._logSpace;
-      this._blitterH.packFloat = colorAttachment.format === 'rgba8unorm';
+      this._blitterH.logSpace = logSpace;
+      this._blitterH.logSpaceMultiplier = this._depthScale;
+      this._blitterH.packFloat = packFloat;
       this._blitterV.blurSize = this._blurSize / colorAttachment.height;
       this._blitterV.kernelSize = this._kernelSize;
-      this._blitterV.logSpace = this._logSpace;
-      this._blitterV.packFloat = colorAttachment.format === 'rgba8unorm';
+      this._blitterV.logSpace = logSpace;
+      this._blitterV.logSpaceMultiplier = this._depthScale;
+      this._blitterV.packFloat = packFloat;
       this._blitterH.blit(colorAttachment as any, implData.blurFramebuffer!);
       this._blitterV.blit(
         implData.blurFramebuffer!.getColorAttachments()[0] as any,
@@ -248,18 +410,18 @@ export class ESM extends ShadowImpl {
     this._depthScale = val;
   }
   getShaderHash() {
-    return '';
+    return `${this._blur ? 1 : 0}${this._logSpace ? 1 : 0}`;
   }
   getShadowMapColorFormat(_shadowMapParams: ShadowMapParams) {
     const device = getDevice();
-    return device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
+    return device.getDeviceCaps().textureCaps.supportFloatColorBuffer
       ? device.type === 'webgl'
-        ? 'rgba16f'
-        : 'r16f'
-      : device.getDeviceCaps().textureCaps.supportFloatColorBuffer
+        ? 'rgba32f'
+        : 'rg32f'
+      : device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
         ? device.type === 'webgl'
-          ? 'rgba32f'
-          : 'r32f'
+          ? 'rgba16f'
+          : 'rg16f'
         : 'rgba8unorm';
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams) {
@@ -270,7 +432,9 @@ export class ESM extends ShadowImpl {
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp
   ) {
-    return computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap!.format);
+    const pb = scope.$builder;
+    const depth = computeShadowMapDepth(scope, worldPos, shadowMapParams.shadowMap!.format);
+    return shadowMapParams.shadowMap!.format === 'rgba8unorm' ? depth : pb.vec4(depth.x, 1, 0, 1);
   }
   computeShadowCSM(
     shadowMapParams: ShadowMapParams,
@@ -281,6 +445,7 @@ export class ESM extends ShadowImpl {
   ) {
     const funcNameComputeShadowCSM = 'lib_computeShadowCSM';
     const pb = scope.$builder;
+    const logSpace = this._blur && this._logSpace && shadowMapParams.shadowMap!.format !== 'rgba8unorm';
     pb.func(
       funcNameComputeShadowCSM,
       [pb.vec4('shadowVertex'), pb.float('NdotL'), pb.int('split')],
@@ -302,12 +467,15 @@ export class ESM extends ShadowImpl {
         );
         this.$l.shadow = pb.float(1);
         this.$if(this.inShadow, function () {
+          this.$l.shadowBias = computeShadowBiasCSM(this, this.NdotL, this.split);
           this.shadow = filterShadowESM(
             this,
             shadowMapParams.lightType,
             shadowMapParams.shadowMap!.format,
+            logSpace,
             this.shadowCoord,
-            this.split
+            this.split,
+            this.shadowBias
           );
         });
         this.$return(this.shadow);
@@ -323,10 +491,32 @@ export class ESM extends ShadowImpl {
   ) {
     const funcNameComputeShadow = 'lib_computeShadow';
     const pb = scope.$builder;
+    const logSpace = this._blur && this._logSpace && shadowMapParams.shadowMap!.format !== 'rgba8unorm';
     pb.func(funcNameComputeShadow, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
       if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
         this.$l.dir = pb.sub(this.shadowVertex.xyz, ShaderHelper.getLightPositionAndRangeForShadow(this).xyz);
-        this.$return(filterShadowESM(this, LIGHT_TYPE_POINT, shadowMapParams.shadowMap!.format, this.dir));
+        this.$l.distance = pb.div(
+          pb.length(this.dir),
+          ShaderHelper.getLightPositionAndRangeForShadow(this).w
+        );
+        this.$l.shadowBias = computeShadowBias(
+          shadowMapParams.lightType,
+          this,
+          this.distance,
+          this.NdotL,
+          true
+        );
+        this.$return(
+          filterShadowESM(
+            this,
+            LIGHT_TYPE_POINT,
+            shadowMapParams.shadowMap!.format,
+            logSpace,
+            this.dir,
+            undefined,
+            this.shadowBias
+          )
+        );
       } else {
         this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
         this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
@@ -345,11 +535,21 @@ export class ESM extends ShadowImpl {
         );
         this.$l.shadow = pb.float(1);
         this.$if(this.inShadow, function () {
+          this.$l.shadowBias = computeShadowBias(
+            shadowMapParams.lightType,
+            this,
+            this.shadowCoord.z,
+            this.NdotL,
+            false
+          );
           this.shadow = filterShadowESM(
             this,
             shadowMapParams.lightType,
             shadowMapParams.shadowMap!.format,
-            this.shadowCoord
+            logSpace,
+            this.shadowCoord,
+            undefined,
+            this.shadowBias
           );
         });
         this.$return(this.shadow);

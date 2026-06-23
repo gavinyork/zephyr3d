@@ -469,8 +469,10 @@ export function filterShadowESM(
   scope: PBInsideFunctionScope,
   lightType: number,
   shadowMapFormat: TextureFormat,
+  logSpace: boolean,
   shadowVertex: PBShaderExp,
-  cascade?: PBShaderExp
+  cascade?: PBShaderExp,
+  depthBias?: PBShaderExp
 ) {
   const funcNameFilterShadowESM = 'lib_filterShadowESM';
   const pb = scope.$builder;
@@ -478,7 +480,8 @@ export function filterShadowESM(
     funcNameFilterShadowESM,
     [
       lightType === LIGHT_TYPE_POINT ? pb.vec3('shadowVertex') : pb.vec4('shadowVertex'),
-      ...(cascade ? [pb.int('cascade')] : [])
+      ...(cascade ? [pb.int('cascade')] : []),
+      ...(depthBias ? [pb.float('depthBias')] : [])
     ],
     function () {
       if (lightType === LIGHT_TYPE_POINT) {
@@ -515,15 +518,27 @@ export function filterShadowESM(
           this.$l.depth = this.shadowVertex.z;
         }
       }
+      if (depthBias) {
+        this.depth = pb.max(0, pb.sub(this.depth, this.depthBias));
+      }
       const depthScale = ShaderHelper.getDepthBiasValues(this).z;
-      this.$return(
-        pb.clamp(pb.exp(pb.min(87, pb.mul(depthScale, pb.sub(this.shadowTex.x, this.depth)))), 0, 1)
-      );
+      this.$l.shadow =
+        logSpace
+          ? pb.clamp(pb.exp(pb.min(87, pb.sub(this.shadowTex.x, pb.mul(depthScale, this.depth)))), 0, 1)
+          : pb.clamp(pb.exp(pb.min(87, pb.mul(depthScale, pb.sub(this.shadowTex.x, this.depth)))), 0, 1);
+      if (shadowMapFormat !== 'rgba8unorm') {
+        this.shadow = pb.mix(1, this.shadow, pb.clamp(this.shadowTex.y, 0, 1));
+      }
+      this.$return(this.shadow);
     }
   );
   return pb
     .getGlobalScope()
-    [funcNameFilterShadowESM](shadowVertex, ...(cascade ? [cascade] : [])) as PBShaderExp;
+    [funcNameFilterShadowESM](
+      shadowVertex,
+      ...(cascade ? [cascade] : []),
+      ...(depthBias ? [depthBias] : [])
+    ) as PBShaderExp;
 }
 
 /** @internal */
