@@ -23,13 +23,7 @@ import { ListView, ListViewData } from './listview';
 import { ResourceService } from '../core/services/resource';
 import { DlgSaveFile } from '../views/dlg/savefiledlg';
 import { exportMultipleFilesToDirectory } from '../helpers/downloader';
-import type {
-  BluePrintUniformTexture,
-  BluePrintUniformValue,
-  MaterialBlueprintIR,
-  MeshMaterial,
-  SharedModel
-} from '@zephyr3d/scene';
+import type { BluePrintUniformTexture, BluePrintUniformValue, MaterialBlueprintIR, MeshMaterial, SharedModel } from '@zephyr3d/scene';
 import {
   CompAddNode,
   CompMulNode,
@@ -40,6 +34,7 @@ import {
   PBRBlockNode,
   PBRBluePrintMaterial,
   PBRMetallicRoughnessMaterial,
+  SceneNode,
   SpriteBlueprintMaterial,
   SwizzleNode,
   TextureSampleNode,
@@ -116,6 +111,11 @@ export type VFSRendererAssetPickerPayload = {
   type: 'asset-picker';
   object: object;
   prop: PropertyAccessor<any>;
+};
+
+export type VFSRendererSceneNodeDropPayload = {
+  type: 'scene-node';
+  node: SceneNode;
 };
 
 type PathRewriteRule = {
@@ -585,6 +585,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   ];
   file_dbl_clicked: [file: FileInfo];
   asset_picker_drop: [payload: VFSRendererAssetPickerPayload, path: string];
+  scene_node_drop: [payload: VFSRendererSceneNodeDropPayload, targetDir: string];
 }>() {
   private static VFSId = 1;
   private static readonly baseFlags =
@@ -1360,11 +1361,13 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       max: contentMax
     };
 
-    if (this._isDragOverContent) {
+    const internalDragOverContent = this.acceptAssetAreaDrop();
+    if (this._isDragOverContent || internalDragOverContent) {
       this.renderContentDropHighlight();
     }
 
     ImGui.BeginChild(`##VFSContentInnerContainer${this.id}`, new ImGui.ImVec2(-1, -1), false);
+    ImGui.SetCursorPos(new ImGui.ImVec2(0, 0));
     if (this.selectedDir) {
       this._contentView.render();
     } else {
@@ -1377,6 +1380,43 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     }
     ImGui.EndChild();
     ImGui.EndChild();
+  }
+  private acceptAssetAreaDrop() {
+    if (!this.selectedDir) {
+      return false;
+    }
+    const cursorPos = ImGui.GetCursorPos();
+    const size = ImGui.GetContentRegionAvail();
+    if (size.x <= 0 || size.y <= 0) {
+      return false;
+    }
+    ImGui.InvisibleButton(`##asset_drop_target_${this.id}`, size, 0);
+    let hovering = false;
+    if (!ImGui.BeginDragDropTarget()) {
+      ImGui.SetCursorPos(cursorPos);
+      return false;
+    }
+    const assetPeek = ImGui.AcceptDragDropPayload('ASSET', ImGui.DragDropFlags.AcceptBeforeDelivery)?.Data as
+      | unknown
+      | undefined;
+    const nodePeek = ImGui.AcceptDragDropPayload('NODE', ImGui.DragDropFlags.AcceptBeforeDelivery)?.Data as
+      | unknown
+      | undefined;
+    hovering = !!assetPeek || !!nodePeek;
+    const assetPayload = ImGui.AcceptDragDropPayload('ASSET')?.Data as unknown;
+    if (assetPayload) {
+      this.handleAssetDrop(this.selectedDir.path, assetPayload);
+      ImGui.EndDragDropTarget();
+      ImGui.SetCursorPos(cursorPos);
+      return true;
+    }
+    const nodePayload = ImGui.AcceptDragDropPayload('NODE')?.Data as unknown;
+    if (nodePayload) {
+      this.handleAssetDrop(this.selectedDir.path, nodePayload);
+    }
+    ImGui.EndDragDropTarget();
+    ImGui.SetCursorPos(cursorPos);
+    return hovering;
   }
 
   private renderNavigationDropHighlight() {
@@ -2974,15 +3014,24 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   }
   acceptFileMoveOrCopy(path: string) {
     if (ImGui.BeginDragDropTarget()) {
-      const payload = ImGui.AcceptDragDropPayload('ASSET')?.Data as unknown;
-      if (payload) {
-        this.handleAssetDrop(path, payload);
+      const assetPayload = ImGui.AcceptDragDropPayload('ASSET')?.Data as unknown;
+      if (assetPayload) {
+        this.handleAssetDrop(path, assetPayload);
+        ImGui.EndDragDropTarget();
+        return;
+      }
+      const nodePayload = ImGui.AcceptDragDropPayload('NODE')?.Data as unknown;
+      if (nodePayload) {
+        this.handleAssetDrop(path, nodePayload);
       }
       ImGui.EndDragDropTarget();
     }
   }
   handleAssetDrop(targetPath: string, payload: unknown) {
-    const data = payload as { isDir: boolean; path: string }[] | VFSRendererAssetPickerPayload;
+    const data = payload as
+      | { isDir: boolean; path: string }[]
+      | VFSRendererAssetPickerPayload
+      | SceneNode;
     if (Array.isArray(data)) {
       void this.handleFileMoveOrCopy(targetPath, data);
     } else if (
@@ -2994,7 +3043,27 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       if (path && this.isAssetPickerPathAccepted(data as VFSRendererAssetPickerPayload, path)) {
         this.dispatchEvent('asset_picker_drop', data as VFSRendererAssetPickerPayload, path);
       }
+    } else if (data instanceof SceneNode) {
+      const dir = this.normalizeDropTargetDirectory(targetPath);
+      if (dir) {
+        this.dispatchEvent('scene_node_drop', {
+          type: 'scene-node',
+          node: data
+        }, dir);
+      }
     }
+  }
+  private normalizeDropTargetDirectory(path: string) {
+    const normalized = this._vfs.normalizePath(path);
+    const dir = this.findDirectoryByPath(this._filesystem, normalized);
+    if (dir) {
+      return normalized;
+    }
+    const file = this.findFileByPath(this._filesystem, normalized);
+    if (file) {
+      return this._vfs.normalizePath(file.parent.path);
+    }
+    return null;
   }
   private isAssetPickerPathAccepted(payload: VFSRendererAssetPickerPayload, path: string) {
     const mimeTypes = payload.prop?.options?.mimeTypes;
