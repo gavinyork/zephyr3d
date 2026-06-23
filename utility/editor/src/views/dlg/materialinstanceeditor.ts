@@ -244,7 +244,9 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
         type,
         options: {
           group: 'Blueprint Parameters',
-          label: this.prettifyUniformName(uniform.name)
+          label: this.prettifyUniformName(uniform.name),
+          minValue: uniform.minValue,
+          maxValue: uniform.maxValue
         },
         get(value: any) {
           const target = material.uniformValues.find((v) => v.name === uniform.name) ?? uniform;

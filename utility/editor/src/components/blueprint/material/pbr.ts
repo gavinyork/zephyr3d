@@ -272,6 +272,8 @@ export class PBRMaterialEditor extends GraphEditor {
                 name: u.name,
                 type: u.type,
                 value: u.value?.slice() ?? null,
+                minValue: u.minValue,
+                maxValue: u.maxValue,
                 inFragmentShader: u.inFragmentShader,
                 inVertexShader: u.inVertexShader,
                 finalValue: typeof u.finalValue === 'number' ? u.finalValue : (u.finalValue?.slice() ?? null)
@@ -479,6 +481,8 @@ export class PBRMaterialEditor extends GraphEditor {
           name: u.name,
           type: u.type,
           value: typeof u.value === 'number' ? [u.value] : [...u.value],
+          minValue: u.minValue,
+          maxValue: u.maxValue,
           inVertexShader: ir === vertexIR,
           inFragmentShader: ir === fragmentIR
         });

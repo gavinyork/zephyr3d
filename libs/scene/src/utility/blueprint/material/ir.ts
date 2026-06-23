@@ -98,6 +98,8 @@ export interface IRUniformValue {
   name: string;
   type: string;
   value: number[];
+  minValue?: number;
+  maxValue?: number;
 }
 
 /**
@@ -276,16 +278,22 @@ class IRConstantf extends IRExpression {
   readonly value: number;
   /** The uniform parameter name, or empty string for literals */
   readonly name: string;
+  /** Optional lower bound for editor-facing scalar parameters */
+  readonly minValue?: number;
+  /** Optional upper bound for editor-facing scalar parameters */
+  readonly maxValue?: number;
   /**
    * Creates a constant float expression
    *
    * @param value - The float value
    * @param paramName - The uniform parameter name, or empty string for literals
    */
-  constructor(value: number, paramName: string) {
+  constructor(value: number, paramName: string, minValue?: number, maxValue?: number) {
     super();
     this.value = value;
     this.name = paramName;
+    this.minValue = minValue;
+    this.maxValue = maxValue;
   }
   /**
    * Generates shader code for this constant
@@ -317,7 +325,9 @@ class IRConstantf extends IRExpression {
       ? {
           name: this.name,
           value: [this.value],
-          type: 'float'
+          type: 'float',
+          ...(this.minValue !== undefined ? { minValue: this.minValue } : {}),
+          ...(this.maxValue !== undefined ? { maxValue: this.maxValue } : {})
         }
       : null;
   }
@@ -2171,7 +2181,15 @@ export class MaterialBlueprintIR {
   }
   /** Converts a scalar constant node to IR */
   private constantf(node: ConstantScalarNode, output: number): IRExpression {
-    return this.getOrCreateIRExpression(node, output, IRConstantf, node.x, node.paramName);
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRConstantf,
+      node.x,
+      node.paramName,
+      node.isUniform && node.useRange ? node.minValue : undefined,
+      node.isUniform && node.useRange ? node.maxValue : undefined
+    );
   }
   /** Converts a vector constant node to IR */
   private constantfv(

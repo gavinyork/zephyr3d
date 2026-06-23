@@ -218,7 +218,8 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
 
   getOverrideUniformValues() {
     return [...this._overrideUniformValues.values()].map((v) => ({
-      ...v,
+      name: v.name,
+      type: v.type,
       value: [...v.value],
       finalValue: undefined
     }));
@@ -391,7 +392,16 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
       this.subsurfaceTexCoordIndex = parentMaterial.subsurfaceTexCoordIndex;
     }
     this.uniformValues = cloneUniformValues(parentMaterial.uniformValues).map(
-      (v) => this._overrideUniformValues.get(v.name) ?? v
+      (v) => {
+        const override = this._overrideUniformValues.get(v.name);
+        return override
+          ? {
+              ...v,
+              value: [...override.value],
+              finalValue: cloneUniformFinalValue(override)
+            }
+          : v;
+      }
     );
     this.uniformTextures = cloneUniformTextures(parentMaterial.uniformTextures).map(
       (v) => this._overrideUniformTextures.get(v.name) ?? v
