@@ -2034,23 +2034,25 @@ export class ProgramBuilder {
       this.mergeUniforms(vertexScope, fragScope);
       this.updateUniformBindings([vertexScope, fragScope], [ShaderType.Vertex, ShaderType.Fragment]);
 
-      const vertexSource = this.generateRenderSource(
-        ShaderType.Vertex,
-        vertexScope,
-        vertexBuiltinScope,
-        vertexInputs.map((val) => val[1]),
-        vertexOutputs.map((val) => val[1])
-      )!;
-      const fragmentSource = this.generateRenderSource(
-        ShaderType.Fragment,
-        fragScope,
-        fragBuiltinScope,
-        fragInputs.map((val) => val[1]),
-        fragOutputs.map((val) => val[1])
-      )!;
-      const bindGroupLayouts = this.createBindGroupLayouts(options.label);
-      this.logBlueprintSamplerDebug(options.label, fragOutputs.length, fragmentSource, bindGroupLayouts);
-      return [vertexSource, fragmentSource, bindGroupLayouts, this._vertexAttributes, fragOutputs.length] as const;
+      return [
+        this.generateRenderSource(
+          ShaderType.Vertex,
+          vertexScope,
+          vertexBuiltinScope,
+          vertexInputs.map((val) => val[1]),
+          vertexOutputs.map((val) => val[1])
+        )!,
+        this.generateRenderSource(
+          ShaderType.Fragment,
+          fragScope,
+          fragBuiltinScope,
+          fragInputs.map((val) => val[1]),
+          fragOutputs.map((val) => val[1])
+        )!,
+        this.createBindGroupLayouts(options.label),
+        this._vertexAttributes,
+        fragOutputs.length
+      ] as const;
     } catch (err) {
       if (err instanceof errors.PBError) {
         this._lastError = err.getMessage(this._device.type);
@@ -2067,70 +2069,6 @@ export class ProgramBuilder {
       }
     }
   }
-  /** @internal */
-  private logBlueprintSamplerDebug(
-    label: string | undefined,
-    fragmentOutputCount: number,
-    fragmentShaderSource: string,
-    bindGroupLayouts: BindGroupLayout[]
-  ) {
-    const textureUniforms = this._uniforms
-      .filter((u) => !!u.texture)
-      .map((u) => ({
-        name: u.texture!.exp.$str,
-        group: u.group,
-        binding: u.binding,
-        sampleType: u.texture!.exp.$sampleType,
-        autoSamplerKey: u.texture!.exp.$autoSamplerKey,
-        autoBindSampler: u.texture!.autoBindSampler,
-        autoSamplerName: u.texture!.autoBindSampler ? getAutoSamplerName(u.texture!.exp, false) : null,
-        autoSamplerComparisonName:
-          u.texture!.autoBindSampler === 'comparison' ||
-          (u.texture!.exp.$typeinfo.isTextureType() && u.texture!.exp.$typeinfo.isDepthTexture())
-            ? getAutoSamplerName(u.texture!.exp, true)
-            : null
-      }));
-    const isBlueprintLikeProgram = textureUniforms.some(
-      (u) =>
-        u.name.startsWith('u_') &&
-        (u.autoSamplerKey?.startsWith('blueprint_') ||
-          ['u_BaseColor', 'u_AlphaTex', 'u_RoughnessMetallic', 'u_EmissiveTex', 'u_Normal'].includes(u.name))
-    );
-    if (!isBlueprintLikeProgram) {
-      return;
-    }
-    const samplerUniforms = this._uniforms
-      .filter((u) => !!u.sampler)
-      .map((u) => ({
-        name: u.sampler!.$str,
-        group: u.group,
-        binding: u.binding,
-        sampleType: u.sampler!.$sampleType
-      }));
-    console.error('[BlueprintSamplerDebug] render program built', {
-      label,
-      fragmentOutputCount,
-      textureUniformCount: textureUniforms.length,
-      samplerUniformCount: samplerUniforms.length,
-      uniqueSamplerCount: new Set(samplerUniforms.map((u) => `${u.group}:${u.name}`)).size,
-      textureUniforms,
-      samplerUniforms,
-      bindGroupLayouts: bindGroupLayouts.map((layout, group) => ({
-        group,
-        label: layout?.label,
-        entries:
-          layout?.entries?.map((entry) => ({
-            binding: entry.binding,
-            name: entry.name,
-            samplerType: entry.sampler?.type ?? null,
-            textureAutoBindSampler: entry.texture?.autoBindSampler ?? null,
-            textureAutoBindSamplerComparison: entry.texture?.autoBindSamplerComparison ?? null
-          })) ?? []
-      })),
-      fragmentShaderPreview: fragmentShaderSource.slice(0, 1200)
-    });
-  }
-  /** @internal */
   private generate(body?: (this: PBGlobalScope, pb: ProgramBuilder) => void): void {
     this.pushScope(this._globalScope!);
     if (this._emulateDepthClamp && this._shaderType === ShaderType.Vertex) {

@@ -1232,6 +1232,8 @@ export class MaterialBlueprintIR {
   private _uniformTextures!: IRUniformTexture[];
   /** Fallback texture uniforms generated for TextureSample nodes without texture input */
   private _textureSampleFallbackMap!: Map<TextureSampleNode, IRConstantTexture>;
+  /** Shared fallback texture uniforms keyed by texture identity and sampling config */
+  private _sharedTextureUniformMap!: Map<string, IRConstantTexture>;
   /** Flags indicating which shader features are used */
   private _behaviors!: MaterialBlueprintIRBehaviors;
   /** Array of named output expressions (e.g., baseColor, normal, metallic) */
@@ -1392,11 +1394,68 @@ export class MaterialBlueprintIR {
     this._uniformTextures = [];
     this._uniformValues = [];
     this._textureSampleFallbackMap = new Map();
+    this._sharedTextureUniformMap = new Map();
     this._outputs = null;
     this._behaviors = {
       useVertexColor: false,
       useVertexUV: false
     };
+  }
+  /** Builds a stable key for reusing identical blueprint texture uniforms */
+  private getSharedTextureUniformKey(
+    textureId: string,
+    type: string,
+    sRGB: boolean,
+    addressU: TextureAddressMode,
+    addressV: TextureAddressMode,
+    filterMin: TextureFilterMode,
+    filterMag: TextureFilterMode,
+    filterMip: TextureFilterMode
+  ) {
+    return [
+      type,
+      textureId || '__default__',
+      sRGB ? 'srgb' : 'linear',
+      addressU,
+      addressV,
+      filterMin,
+      filterMag,
+      filterMip
+    ].join('|');
+  }
+  /** Gets or creates a shared texture uniform for identical fallback texture sample nodes */
+  private getOrCreateSharedTextureUniform(
+    name: string,
+    textureId: string,
+    type: string,
+    sRGB: boolean,
+    addressU: TextureAddressMode,
+    addressV: TextureAddressMode,
+    filterMin: TextureFilterMode,
+    filterMag: TextureFilterMode,
+    filterMip: TextureFilterMode
+  ): IRConstantTexture {
+    const key = this.getSharedTextureUniformKey(
+      textureId,
+      type,
+      sRGB,
+      addressU,
+      addressV,
+      filterMin,
+      filterMag,
+      filterMip
+    );
+    let ir = this._sharedTextureUniformMap.get(key);
+    if (!ir) {
+      ir = new IRConstantTexture(name, textureId, type, sRGB, addressU, addressV, filterMin, filterMag, filterMip);
+      this._sharedTextureUniformMap.set(key, ir);
+      this._expressions.push(ir);
+      const uniformTexture = ir.asUniformTexture();
+      if (uniformTexture) {
+        this._uniformTextures.push(uniformTexture);
+      }
+    }
+    return ir;
   }
   /**
    * Converts a graph node to an IR expression
@@ -2156,17 +2215,31 @@ export class MaterialBlueprintIR {
     return this.getOrCreateIRExpression(
       node,
       output,
-      IRConstantTexture,
-      node.paramName,
-      node.textureId,
-      node.getOutputType(1),
-      node.sRGB,
-      node.addressU,
-      node.addressV,
-      node.filterMin,
-      node.filterMag,
-      node.filterMip
-    ) as IRConstantTexture;
+      class SharedIRConstantTextureProxy extends IRExpression {
+        private readonly _shared: IRConstantTexture;
+        constructor(shared: IRConstantTexture) {
+          super();
+          this._shared = shared;
+        }
+        create(pb: ProgramBuilder) {
+          return this._shared.create(pb);
+        }
+        asUniformTexture() {
+          return null;
+        }
+      },
+      this.getOrCreateSharedTextureUniform(
+        node.paramName,
+        node.textureId,
+        node.getOutputType(1),
+        node.sRGB,
+        node.addressU,
+        node.addressV,
+        node.filterMin,
+        node.filterMag,
+        node.filterMip
+      )
+    ) as unknown as IRConstantTexture;
   }
   /** Converts a texture sample node to IR */
   private textureSample(node: TextureSampleNode, output: number): IRExpression {
@@ -2183,7 +2256,7 @@ export class MaterialBlueprintIR {
   private textureSampleFallbackTexture(node: TextureSampleNode): IRConstantTexture {
     let ir = this._textureSampleFallbackMap.get(node);
     if (!ir) {
-      ir = new IRConstantTexture(
+      ir = this.getOrCreateSharedTextureUniform(
         node.paramName,
         node.textureId,
         'tex2D',
@@ -2194,12 +2267,7 @@ export class MaterialBlueprintIR {
         node.filterMag,
         node.filterMip
       );
-      this._expressions.push(ir);
       this._textureSampleFallbackMap.set(node, ir);
-      const uniformTexture = ir.asUniformTexture();
-      if (uniformTexture) {
-        this._uniformTextures.push(uniformTexture);
-      }
     }
     return ir;
   }
