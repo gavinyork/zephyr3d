@@ -3,6 +3,16 @@ import { getEngine } from '../app/api';
 import type { BluePrintUniformTexture, BluePrintUniformValue } from '../utility/blueprint/material/ir';
 import { PBRBluePrintMaterial } from './pbrblueprint';
 
+function cloneUniformFinalValue(value: BluePrintUniformValue) {
+  if (typeof value.finalValue === 'number') {
+    return value.finalValue;
+  }
+  if (value.finalValue instanceof Float32Array) {
+    return new Float32Array(value.finalValue);
+  }
+  return value.value.length === 1 ? value.value[0] : new Float32Array(value.value);
+}
+
 function cloneTextureParams(params: BluePrintUniformTexture['params']) {
   return params instanceof Vector4
     ? params.clone()
@@ -25,12 +35,7 @@ function cloneUniformValues(values: Nullable<BluePrintUniformValue[]>) {
   return (values ?? []).map((v) => ({
     ...v,
     value: [...v.value],
-    finalValue:
-      typeof v.finalValue === 'number'
-        ? v.finalValue
-        : v.finalValue instanceof Float32Array
-          ? new Float32Array(v.finalValue)
-          : undefined
+    finalValue: cloneUniformFinalValue(v)
   }));
 }
 

@@ -66,8 +66,6 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
   private readonly _previewBlitter: CopyBlitter;
   private _version: number;
   private _savedProps: Record<string, unknown>;
-  private _savedUniformValues: unknown[];
-  private _savedUniformTextures: unknown[];
   private readonly _propChangeHandler: (object: object | null, prop: PropertyAccessor) => void;
   private _previewDragging: boolean;
 
@@ -86,8 +84,6 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     this._previewBlitter.srgbOut = true;
     this._version = 0;
     this._savedProps = {};
-    this._savedUniformValues = [];
-    this._savedUniformTextures = [];
     this._previewDragging = false;
     this._propChangeHandler = this.handlePropChanged.bind(this);
     this._propEditor.on('object_property_changed', this._propChangeHandler, this);
@@ -127,8 +123,6 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     this._material.set(material);
     this._parent.set(parent);
     this._savedProps = (content.props as Record<string, unknown>) ?? {};
-    this._savedUniformValues = [...(content.data.uniformValues ?? [])];
-    this._savedUniformTextures = [...(content.data.uniformTextures ?? [])];
     this._propEditor.object = material;
     this.initPreview(material);
   }
@@ -360,24 +354,26 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
       material.uniformTextures = reloaded.uniformTextures;
     }
     this._savedProps = overrideProps;
-    this._savedUniformValues = [...(content.data.uniformValues ?? [])];
-    this._savedUniformTextures = [...(content.data.uniformTextures ?? [])];
     this._version = 0;
   }
 
   private async restoreState() {
     const material = this._material.get();
-    const parent = this._parent.get();
-    if (!material || !parent) {
+    if (!material) {
       return;
     }
-    material.setParentMaterial(parent, material.parentMaterialId);
+    (getEngine().resourceManager as any).invalidateMaterial(this._path);
+    const reloaded = (await getEngine().resourceManager.fetchMaterial(this._path, {
+      overrideVFS: ProjectService.VFS
+    })) as PBRBluePrintMaterialInstanceLike | null;
+    if (!reloaded) {
+      throw new Error(`Reload material instance failed: ${this._path}`);
+    }
+    this._parent.set(reloaded.parentMaterial);
+    material.setParentMaterial(reloaded.parentMaterial, reloaded.parentMaterialId);
+    material.uniformValues = reloaded.uniformValues;
+    material.uniformTextures = reloaded.uniformTextures;
     await getEngine().resourceManager.deserializeObjectProps(material, this._savedProps);
-    material.setOverrides(
-      this._savedUniformValues as BluePrintUniformValue[],
-      this._savedUniformTextures as BluePrintUniformTexture[]
-    );
-    material.syncInheritedUniforms(parent);
     this._propEditor.object = material;
     this._version = 0;
   }

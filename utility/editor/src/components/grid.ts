@@ -1302,10 +1302,16 @@ export class PropertyEditor extends Observable<{
     }
     if (changed && value.set) {
       this.inspectGroup(group);
-      Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
+      const result = value.set.call(object, tmpProperty);
+      const onChanged = () => {
         this.invalidateRows();
         this.dispatchEvent('object_property_changed', object, value);
-      });
+      };
+      if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
+        Promise.resolve(result).then(onChanged);
+      } else {
+        onChanged();
+      }
     }
     return true;
   }
@@ -2003,10 +2009,16 @@ export class PropertyEditor extends Observable<{
       */
       if (changed && value.set) {
         this.inspectGroup(owner);
-        Promise.resolve(value.set.call(object, tmpProperty)).then(() => {
+        const result = value.set.call(object, tmpProperty);
+        const onChanged = () => {
           this.invalidateRows();
           this.dispatchEvent('object_property_changed', object, value);
-        });
+        };
+        if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
+          Promise.resolve(result).then(onChanged);
+        } else {
+          onChanged();
+        }
       }
       if (value.set && ImGui.IsItemActivated()) {
         this.inspectGroup(owner);
