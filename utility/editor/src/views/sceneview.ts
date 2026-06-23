@@ -2742,6 +2742,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
   }
   private handleDuplicateShortcut(): boolean {
+    if (Dialog.duplicateFocusedBlueprintSelection()) {
+      return true;
+    }
     const selectedNodes = this.getSelectedSceneNodes();
     const assetRenderer = this._assetView?.renderer;
     if (this._lastDuplicateTarget === 'asset' && assetRenderer) {

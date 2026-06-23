@@ -91,6 +91,11 @@ export class Dialog {
   public static async editMaterialFunction(title: string, path: string, width?: number, height?: number) {
     return DlgMaterialFunctionEditor.editMaterialFunction(title, path, width, height);
   }
+  public static duplicateFocusedBlueprintSelection() {
+    return (
+      DlgPBRMaterialEditor.duplicateFocusedSelection() || DlgMaterialFunctionEditor.duplicateFocusedSelection()
+    );
+  }
   public static async editProjectSettings(
     title: string,
     vfs: VFS,

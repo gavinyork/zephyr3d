@@ -37,6 +37,9 @@ export class GraphEditor
   getNodeEditor(tab: string) {
     return this._nodeEditor[tab];
   }
+  get activeNodeEditor() {
+    return this.getNodeEditor(this._activeTab);
+  }
   get propEditor() {
     return this._propGrid;
   }
@@ -49,6 +52,9 @@ export class GraphEditor
   addTab(label: string) {
     this._nodeEditor[label] = new NodeEditor(this);
     return this._nodeEditor[label];
+  }
+  async duplicateActiveSelection() {
+    return this._nodeEditor[this._activeTab]?.duplicateSelectedNodes() ?? false;
   }
   render() {
     const editor = this.getNodeEditor(this._activeTab);

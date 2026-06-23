@@ -7,6 +7,7 @@ import type { GenericConstructor } from '@zephyr3d/base';
 import type { MeshMaterial } from '@zephyr3d/scene';
 
 export class DlgPBRMaterialEditor extends DialogRenderer<void> {
+  private static _focusedInstance: DlgPBRMaterialEditor | null = null;
   private readonly editor: PBRMaterialEditor;
   private path: string;
   private type: GenericConstructor<MeshMaterial>;
@@ -53,12 +54,23 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
     this.editor.open();
   }
   close(): void {
+    if (DlgPBRMaterialEditor._focusedInstance === this) {
+      DlgPBRMaterialEditor._focusedInstance = null;
+    }
     this.editor.close();
     super.close();
+  }
+  public static duplicateFocusedSelection() {
+    return this._focusedInstance?.editor.duplicateActiveSelection() ?? false;
   }
   public doRender(): void {
     const io = ImGui.GetIO();
     const focused = ImGui.IsWindowFocused(ImGui.FocusedFlags.RootAndChildWindows);
+    if (focused) {
+      DlgPBRMaterialEditor._focusedInstance = this;
+    } else if (DlgPBRMaterialEditor._focusedInstance === this) {
+      DlgPBRMaterialEditor._focusedInstance = null;
+    }
     const cmdDown = io.KeyCtrl || io.KeySuper;
     if (focused && cmdDown && ImGui.IsKeyPressed(ImGui.GetKeyIndex(ImGui.Key.Z)) && this.editor.canUndo()) {
       this.editor.undo();
