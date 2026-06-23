@@ -25,6 +25,7 @@ import {
 import { DialogRenderer } from '../../components/modal';
 import { PropertyEditor } from '../../components/grid';
 import { DlgMessageBoxEx } from './messageexdlg';
+import { DlgMessage } from './messagedlg';
 import { ProjectService } from '../../core/services/project';
 import type { FrameBuffer, Texture2D, Texture2DArray, TextureCube } from '@zephyr3d/device';
 
@@ -148,6 +149,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
       );
       material.uniformChanged();
     }
+    this._propEditor.refresh();
     this._version = -1;
   }
 
@@ -490,7 +492,9 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     }
     ImGui.EndChild();
     if (ImGui.Button('Save')) {
-      void this.save();
+      this.save().catch((err) => {
+        DlgMessage.messageBox('Error', `Save material instance failed: ${err}`);
+      });
     }
     ImGui.SameLine();
     if (ImGui.Button('Close')) {
@@ -501,7 +505,11 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
           'Cancel'
         ]).then((value) => {
           if (value === 'Yes') {
-            this.save().then(() => this.close());
+            this.save()
+              .then(() => this.close())
+              .catch((err) => {
+                DlgMessage.messageBox('Error', `Save material instance failed: ${err}`);
+              });
           } else if (value === 'No') {
             this.restoreState().then(() => this.close());
           }

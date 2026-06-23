@@ -131,14 +131,17 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
   getOverrideUniformValues() {
     return [...this._overrideUniformValues.values()].map((v) => ({
       ...v,
-      value: [...v.value]
+      value: [...v.value],
+      finalValue: undefined
     }));
   }
 
   getOverrideUniformTextures() {
     return [...this._overrideUniformTextures.values()].map((v) => ({
       ...v,
-      params: v.params?.clone()
+      params: v.params?.clone(),
+      finalTexture: undefined,
+      finalSampler: undefined
     }));
   }
 
