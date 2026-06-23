@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Track fragment outputs when building shaders",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

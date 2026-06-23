@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Improve editor workflow",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}

@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/loaders",
+      "comment": "Support loading of .vrma files",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/loaders"
+}

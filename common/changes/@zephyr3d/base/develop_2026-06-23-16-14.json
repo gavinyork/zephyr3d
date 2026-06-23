@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/base",
+      "comment": "Add MIME type of .vrma file",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/base"
+}

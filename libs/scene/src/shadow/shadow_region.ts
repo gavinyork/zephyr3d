@@ -31,6 +31,11 @@ export class ShadowRegion extends Disposable {
   /** @internal */
   private readonly _dynamicCasters: DynamicShadowCasterEntry[];
 
+  /**
+   * Creates a shadow region.
+   *
+   * @param region - Optional manual world-space AABB used to initialize the region.
+   */
   constructor(region?: Nullable<AABB>) {
     super();
     this._manualRegion = region ? new AABB(region) : null;
@@ -42,33 +47,58 @@ export class ShadowRegion extends Disposable {
     this.updateRegion();
   }
 
-  /** Final world-space shadow region. */
+  /**
+   * Final world-space shadow region.
+   *
+   * @returns The union of the manual, static caster, and dynamic caster regions, or `null` if no valid region exists.
+   */
   get region(): Nullable<AABB> {
     return this._region.isValid() ? this._region : null;
   }
 
-  /** Region contributed by manually assigned AABB. */
+  /**
+   * Region contributed by manually assigned AABB.
+   *
+   * @returns The manually assigned region, or `null` if no manual region is set.
+   */
   get manualRegion(): Nullable<AABB> {
     return this._manualRegion;
   }
 
-  /** Region contributed by static shadow casters. */
+  /**
+   * Region contributed by static shadow casters.
+   *
+   * @returns The combined static caster region, or `null` if no valid static caster region exists.
+   */
   get staticRegion(): Nullable<AABB> {
     return this._staticRegion.isValid() ? this._staticRegion : null;
   }
 
-  /** Region contributed by dynamic shadow casters. */
+  /**
+   * Region contributed by dynamic shadow casters.
+   *
+   * @returns The combined dynamic caster region, or `null` if no valid dynamic caster region exists.
+   */
   get dynamicRegion(): Nullable<AABB> {
     return this._dynamicRegion.isValid() ? this._dynamicRegion : null;
   }
 
-  /** Assigns a manual world-space AABB to the region. */
+  /**
+   * Assigns a manual world-space AABB to the region.
+   *
+   * @param region - The manual world-space AABB to use, or `null` to clear the manual region.
+   */
   setRegion(region: Nullable<AABB>) {
     this._manualRegion = region ? new AABB(region) : null;
     this.updateRegion();
   }
 
-  /** Adds a static shadow caster using a snapshot of its current world-space AABB. */
+  /**
+   * Adds a static shadow caster using a snapshot of its current world-space AABB.
+   *
+   * @param caster - The mesh or clipmap terrain node to include as a static caster.
+   * @returns `this` for chaining.
+   */
   addStaticCaster(caster: SceneNode): this {
     if (!this.isShadowCaster(caster) || this.hasCaster(caster)) {
       return this;
@@ -86,7 +116,12 @@ export class ShadowRegion extends Disposable {
     return this;
   }
 
-  /** Adds a dynamic shadow caster and tracks its bounding volume changes. */
+  /**
+   * Adds a dynamic shadow caster and tracks its bounding volume changes.
+   *
+   * @param caster - The mesh or clipmap terrain node to include as a dynamic caster.
+   * @returns `this` for chaining.
+   */
   addDynamicCaster(caster: SceneNode): this {
     if (!this.isShadowCaster(caster) || this.hasCaster(caster)) {
       return this;
@@ -107,7 +142,12 @@ export class ShadowRegion extends Disposable {
     return this;
   }
 
-  /** Removes a previously added shadow caster. */
+  /**
+   * Removes a previously added shadow caster.
+   *
+   * @param caster - The caster node to remove from the static or dynamic caster list.
+   * @returns `this` for chaining.
+   */
   removeCaster(caster: SceneNode): this {
     let removed = false;
     let changed = false;
@@ -139,7 +179,9 @@ export class ShadowRegion extends Disposable {
     return this;
   }
 
-  /** Removes all shadow casters while keeping the manual region. */
+  /**
+   * Removes all shadow casters while keeping the manual region.
+   */
   clearCasters() {
     for (const entry of this._dynamicCasters) {
       entry.ref.get()?.off('bvchanged', entry.callback);
@@ -155,7 +197,11 @@ export class ShadowRegion extends Disposable {
     this.updateRegion();
   }
 
-  /** Clears the manual region and all shadow casters. */
+  /**
+   * Clears the manual region and all shadow casters.
+   *
+   * @returns `this` for chaining.
+   */
   clear(): this {
     this._manualRegion = null;
     this.clearCasters();
