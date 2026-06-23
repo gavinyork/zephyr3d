@@ -399,10 +399,7 @@ function chebyshevUpperBound(scope: PBInsideFunctionScope, distance: PBShaderExp
     this.$l.test = pb.step(this.distance, this.moments.x);
     this.$if(pb.notEqual(this.test, 1), function () {
       this.$l.d = pb.sub(this.distance, this.moments.x);
-      this.$l.variance = pb.max(
-        pb.sub(this.moments.y, pb.mul(this.moments.x, this.moments.x)),
-        0.000002
-      );
+      this.$l.variance = pb.max(pb.sub(this.moments.y, pb.mul(this.moments.x, this.moments.x)), 0.000002);
       const darkness = ShaderHelper.getDepthBiasValues(this).z;
       this.shadow = pb.div(this.variance, pb.add(this.variance, pb.mul(this.d, this.d)));
       this.shadow = pb.clamp(pb.div(pb.sub(this.shadow, darkness), pb.sub(1, darkness)), 0, 1);
@@ -522,10 +519,9 @@ export function filterShadowESM(
         this.depth = pb.max(0, pb.sub(this.depth, this.depthBias));
       }
       const depthScale = ShaderHelper.getDepthBiasValues(this).z;
-      this.$l.shadow =
-        logSpace
-          ? pb.clamp(pb.exp(pb.min(87, pb.sub(this.shadowTex.x, pb.mul(depthScale, this.depth)))), 0, 1)
-          : pb.clamp(pb.exp(pb.min(87, pb.mul(depthScale, pb.sub(this.shadowTex.x, this.depth)))), 0, 1);
+      this.$l.shadow = logSpace
+        ? pb.clamp(pb.exp(pb.min(87, pb.sub(this.shadowTex.x, pb.mul(depthScale, this.depth)))), 0, 1)
+        : pb.clamp(pb.exp(pb.min(87, pb.mul(depthScale, pb.sub(this.shadowTex.x, this.depth)))), 0, 1);
       if (shadowMapFormat !== 'rgba8unorm') {
         this.shadow = pb.mix(1, this.shadow, pb.clamp(this.shadowTex.y, 0, 1));
       }
@@ -534,11 +530,9 @@ export function filterShadowESM(
   );
   return pb
     .getGlobalScope()
-    [funcNameFilterShadowESM](
-      shadowVertex,
-      ...(cascade ? [cascade] : []),
-      ...(depthBias ? [depthBias] : [])
-    ) as PBShaderExp;
+    [
+      funcNameFilterShadowESM
+    ](shadowVertex, ...(cascade ? [cascade] : []), ...(depthBias ? [depthBias] : [])) as PBShaderExp;
 }
 
 /** @internal */

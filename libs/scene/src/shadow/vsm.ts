@@ -127,22 +127,8 @@ class VSMBlitter extends Blitter {
     }
     scope.$for(pb.float('i'), 1, scope.numBlurPixelsPerSide, function () {
       this.$l.blurOffset = pb.mul(this.blurMultiplyVec, this.blurSize, this.blurStep, this.i);
-      this.d1 = that.readTexel(
-        this,
-        type,
-        srcTex,
-        pb.sub(srcUV, this.blurOffset),
-        srcLayer,
-        sampleType
-      );
-      this.d2 = that.readTexel(
-        this,
-        type,
-        srcTex,
-        pb.add(srcUV, this.blurOffset),
-        srcLayer,
-        sampleType
-      );
+      this.d1 = that.readTexel(this, type, srcTex, pb.sub(srcUV, this.blurOffset), srcLayer, sampleType);
+      this.d2 = that.readTexel(this, type, srcTex, pb.add(srcUV, this.blurOffset), srcLayer, sampleType);
       if (that._packFloat) {
         this.moment1 = pb.add(this.moment1, this.d1.x);
         this.moment1 = pb.add(this.moment1, this.d2.x);
