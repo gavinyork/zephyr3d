@@ -7,6 +7,14 @@ import type { IGraphNode } from '../utility/blueprint/node';
 import { PBRBlockNode, VertexBlockNode } from '../utility/blueprint/material/pbr';
 import { PBRMetallicRoughnessMaterial } from './pbrmr';
 import type { DrawContext } from '../render/drawable';
+import type { PBRReflectionMode } from './mixins/lightmodel/pbrmetallicroughness';
+
+const PBR_REFLECTION_MODE: Record<PBRReflectionMode, number> = {
+  none: 0,
+  ggx: 1,
+  anisotropic: 2,
+  glint: 3
+};
 
 type BlueprintOutputMap = Partial<Record<PBRBlueprintOutputName, number | boolean | PBShaderExp>>;
 type VertexBlueprintOutputName = 'Position' | 'Normal' | 'Tangent' | 'Color' | 'UV';
@@ -319,7 +327,7 @@ export class PBRBluePrintMaterial
   }
 
   protected _createHash() {
-    return `${super._createHash()}:${this._irFrag.hash}:${this._irVertex.hash}:${this._connectedOutputHash()}`;
+    return `${super._createHash()}:${this._irFrag.hash}:${this._irVertex.hash}:${this._connectedOutputHash()}:${this._suppressedBackendTextureHash()}`;
   }
 
   protected onDispose() {
@@ -372,6 +380,59 @@ export class PBRBluePrintMaterial
       );
     }
     return base;
+  }
+
+  calculateCommonData(
+    scope: PBInsideFunctionScope,
+    albedo: PBShaderExp,
+    normal: PBShaderExp,
+    viewVec: PBShaderExp,
+    TBN: PBShaderExp,
+    data: PBShaderExp
+  ) {
+    const pb = scope.$builder;
+    const metallic = this.calculateMetallic(scope, albedo, normal);
+    const roughness = this.calculateRoughness(scope, albedo, normal);
+    const specularFactor = this.calculateSpecularFactor(scope, albedo, normal);
+    const reflectionMode = this.calculateReflectionMode(scope) as PBShaderExp;
+    if (this.hasMetallicRoughnessTexture()) {
+      scope.$l.metallicRoughnessSample = this.sampleMetallicRoughnessTexture(scope);
+      data.metallic = this._connectedOutputs.has('Metallic')
+        ? metallic
+        : pb.mul(metallic, scope.metallicRoughnessSample.z);
+      data.roughness = this._connectedOutputs.has('Roughness')
+        ? roughness
+        : pb.mul(roughness, scope.metallicRoughnessSample.y);
+    } else {
+      data.metallic = metallic;
+      data.roughness = roughness;
+    }
+    data.roughness = pb.mul(data.roughness, ShaderHelper.getCameraRoughnessFactor(scope));
+    if (this.hasSpecularColorTexture()) {
+      scope.$l.specularColor = pb.mul(specularFactor.rgb, this.sampleSpecularColorTexture(scope).rgb);
+    } else {
+      scope.$l.specularColor = specularFactor.rgb;
+    }
+    if (this.hasSpecularTexture()) {
+      data.specularWeight = pb.mul(specularFactor.a, this.sampleSpecularTexture(scope).a);
+    } else {
+      data.specularWeight = specularFactor.a;
+    }
+    data.specularWeight = pb.mul(
+      data.specularWeight,
+      pb.float(pb.notEqual(reflectionMode, PBR_REFLECTION_MODE.none))
+    );
+    data.f0 = pb.vec4(
+      pb.mix(
+        pb.min(pb.mul(this.getF0(scope).rgb, scope.specularColor), pb.vec3(1)),
+        albedo.rgb,
+        data.metallic
+      ),
+      this.getF0(scope).a
+    );
+    data.f90 = pb.vec3(1);
+    data.diffuse = pb.vec4(pb.mix(albedo.rgb, pb.vec3(0), data.metallic), albedo.a);
+    super.calculateCommonData(scope, albedo, normal, viewVec, TBN, data);
   }
 
   calculateEmissiveColor(scope: PBInsideFunctionScope) {
@@ -539,10 +600,31 @@ export class PBRBluePrintMaterial
       scope.$inputs.zVertexUV = pb.vec2().attrib('texCoord0');
       return scope.$inputs.zVertexUV as PBShaderExp;
     }
-    if (this.albedoTexture) {
+    if (this.hasAlbedoTexture()) {
       return (this.getAlbedoTexCoord(scope as unknown as PBInsideFunctionScope) ?? pb.vec2(0)) as PBShaderExp;
     }
     return pb.vec2(0);
+  }
+
+  protected isMaterialTextureEnabled(name: string) {
+    switch (name) {
+      case 'albedo':
+        return !this._connectedOutputs.has('BaseColor');
+      case 'specularColor':
+        return !this._connectedOutputs.has('Specular');
+      case 'specular':
+        return !this._connectedOutputs.has('SpecularWeight');
+      case 'emissive':
+        return !this._connectedOutputs.has('Emissive');
+      case 'normal':
+        return !(this._connectedOutputs.has('Normal') || this._connectedOutputs.has('Tangent'));
+      case 'occlusion':
+        return !this._connectedOutputs.has('AO');
+      case 'metallicRoughness':
+        return !(this._connectedOutputs.has('Metallic') && this._connectedOutputs.has('Roughness'));
+      default:
+        return super.isMaterialTextureEnabled(name);
+    }
   }
 
   private getBlueprintOutput(
@@ -678,6 +760,18 @@ export class PBRBluePrintMaterial
   private getBlueprintFragmentVertexUV(scope: PBInsideFunctionScope): PBShaderExp {
     const pb = scope.$builder;
     return (scope.$inputs.zVertexUV ?? scope.zVertexUV ?? pb.vec2(0)) as PBShaderExp;
+  }
+
+  private _suppressedBackendTextureHash() {
+    return [
+      Number(!this.isMaterialTextureEnabled('albedo')),
+      Number(!this.isMaterialTextureEnabled('metallicRoughness')),
+      Number(!this.isMaterialTextureEnabled('specularColor')),
+      Number(!this.isMaterialTextureEnabled('specular')),
+      Number(!this.isMaterialTextureEnabled('emissive')),
+      Number(!this.isMaterialTextureEnabled('normal')),
+      Number(!this.isMaterialTextureEnabled('occlusion'))
+    ].join('');
   }
 
   private getBlueprintFragmentVertexNormal(scope: PBInsideFunctionScope): PBShaderExp {

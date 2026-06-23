@@ -73,6 +73,22 @@ function uniformTextureEquals(a: BluePrintUniformTexture, b: BluePrintUniformTex
   );
 }
 
+function copyParentMaterialState(
+  instance: PBRBluePrintMaterialInstance,
+  parentMaterial: PBRBluePrintMaterial
+) {
+  instance.alphaCutoff = parentMaterial.alphaCutoff;
+  instance.alphaDither = parentMaterial.alphaDither;
+  instance.alphaToCoverage = parentMaterial.alphaToCoverage;
+  instance.blendMode = parentMaterial.blendMode;
+  instance.transparentShadowCaster = parentMaterial.transparentShadowCaster;
+  instance.shadowAlphaCutoff = parentMaterial.shadowAlphaCutoff;
+  instance.cullMode = parentMaterial.cullMode;
+  instance.opacity = parentMaterial.opacity;
+  instance.objectColor = parentMaterial.objectColor;
+  instance.TAAStrength = parentMaterial.TAAStrength;
+}
+
 /**
  * Blueprint material instance asset.
  *
@@ -174,8 +190,6 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
       parentMaterialId ??
       (parentMaterial ? (getEngine().resourceManager.getAssetId(parentMaterial.coreMaterial) ?? '') : '');
     if (parentMaterial) {
-      this.fragmentIR = parentMaterial.fragmentIR;
-      this.vertexIR = parentMaterial.vertexIR;
       this.syncInheritedUniforms(parentMaterial);
       // Keep the asset id on the instance asset, not the parent.
       this.clearCache();
@@ -187,6 +201,9 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
     if (!parentMaterial) {
       return;
     }
+    this.fragmentIR = parentMaterial.fragmentIR;
+    this.vertexIR = parentMaterial.vertexIR;
+    copyParentMaterialState(this, parentMaterial);
     this.uniformValues = cloneUniformValues(parentMaterial.uniformValues).map(
       (v) => this._overrideUniformValues.get(v.name) ?? v
     );

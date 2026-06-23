@@ -35,6 +35,10 @@ function createBlueprintOutputHiddenPredicate(_outputs: readonly PBRBlueprintOut
   };
 }
 
+function canEditParentMaterialProperty(material: MeshMaterial) {
+  return !material.$isInstance && !(material as MeshMaterial & { isBlueprintMaterialInstance?: boolean }).isBlueprintMaterialInstance;
+}
+
 export function getSubsurfaceProfileClass(): SerializableClass {
   return {
     ctor: SubsurfaceProfile,
@@ -837,8 +841,8 @@ export function getMeshMaterialClass(): SerializableClass[] {
             set(this: MeshMaterial, value) {
               this.alphaCutoff = value.num[0];
             },
-            isValid() {
-              return !this.$isInstance;
+            isValid(this: MeshMaterial) {
+              return canEditParentMaterialProperty(this);
             }
           },
           {
@@ -852,8 +856,8 @@ export function getMeshMaterialClass(): SerializableClass[] {
             set(this: MeshMaterial, value) {
               this.alphaToCoverage = value.bool[0];
             },
-            isValid() {
-              return !this.$isInstance;
+            isValid(this: MeshMaterial) {
+              return canEditParentMaterialProperty(this);
             }
           },
           {
@@ -868,7 +872,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
               this.alphaDither = value.bool[0];
             },
             isValid(this: MeshMaterial) {
-              return !this.$isInstance && this.alphaCutoff > 0;
+              return canEditParentMaterialProperty(this) && this.alphaCutoff > 0;
             }
           },
           {
@@ -885,8 +889,8 @@ export function getMeshMaterialClass(): SerializableClass[] {
             set(this: MeshMaterial, value) {
               this.blendMode = value.str[0] as BlendMode;
             },
-            isValid() {
-              return !this.$isInstance;
+            isValid(this: MeshMaterial) {
+              return canEditParentMaterialProperty(this);
             }
           },
           {
@@ -900,7 +904,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
               this.transparentShadowCaster = value.bool[0];
             },
             isValid(this: MeshMaterial) {
-              return !this.$isInstance && this.blendMode !== 'none';
+              return canEditParentMaterialProperty(this) && this.blendMode !== 'none';
             }
           },
           {
@@ -919,7 +923,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
               this.shadowAlphaCutoff = value.num[0];
             },
             isValid(this: MeshMaterial) {
-              return !this.$isInstance && this.blendMode !== 'none' && this.transparentShadowCaster;
+              return canEditParentMaterialProperty(this) && this.blendMode !== 'none' && this.transparentShadowCaster;
             }
           },
           {
@@ -936,8 +940,8 @@ export function getMeshMaterialClass(): SerializableClass[] {
             set(this: MeshMaterial, value) {
               this.cullMode = value.str[0] as FaceMode;
             },
-            isValid() {
-              return !this.$isInstance;
+            isValid(this: MeshMaterial) {
+              return canEditParentMaterialProperty(this);
             }
           },
           {
@@ -977,7 +981,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
               this.TAAStrength = value.num[0];
             },
             isValid(this: MeshMaterial) {
-              return !this.$isInstance;
+              return canEditParentMaterialProperty(this);
             }
           }
         ]);

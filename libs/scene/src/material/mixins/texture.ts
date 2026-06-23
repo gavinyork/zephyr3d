@@ -60,6 +60,8 @@ export type TextureProp<U extends string> = {
  * @public
  */
 export type TexturePropUniforms<U extends string> = {
+  [P in 'Texture' as `has${Capitalize<U>}${P}`]: () => boolean;
+} & {
   [P in 'TextureUniform' | 'TexCoord' as `get${Capitalize<U>}${P}`]: (
     scope: PBInsideFunctionScope
   ) => PBShaderExp;
@@ -161,6 +163,13 @@ export function mixinTextureProps<U extends string>(name: U) {
         const coord = texCoord ?? this[`get${capName}TexCoord`](scope);
         return scope.$builder.textureSample(tex, coord);
       }
+      [`has${capName}Texture`]() {
+        const textureEnabled =
+          typeof (this as any).isMaterialTextureEnabled === 'function'
+            ? (this as any).isMaterialTextureEnabled(name) !== false
+            : true;
+        return this.featureUsed(feature) && !!(this as any)[`${name}Texture`] && textureEnabled;
+      }
       [`get${capName}TextureUniform`](scope: PBInsideFunctionScope) {
         return scope.$builder.shaderKind === 'fragment' ? scope[`z${capName}Tex`] : null;
       }
@@ -197,7 +206,7 @@ export function mixinTextureProps<U extends string>(name: U) {
         if (vertex || this.needFragmentColorInput()) {
           const pb = scope.$builder;
           const that = this as any;
-          if (this.featureUsed(feature)) {
+          if (that[`has${capName}Texture`]()) {
             const texCoordIndex: number = that[`${name}TexCoordIndex`];
             if (texCoordIndex >= 0) {
               const semantic = `texCoord${that[`${name}TexCoordIndex`]}` as any;
@@ -223,7 +232,8 @@ export function mixinTextureProps<U extends string>(name: U) {
         super.fragmentShader(scope);
         if (this.needFragmentColorInput()) {
           const pb = scope.$builder;
-          if (this.featureUsed(feature)) {
+          const that = this as any;
+          if (that[`has${capName}Texture`]()) {
             scope[`z${capName}Tex`] = pb.tex2D().uniform(2);
           }
         }
@@ -231,8 +241,8 @@ export function mixinTextureProps<U extends string>(name: U) {
       applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
         super.applyUniformValues(bindGroup, ctx, pass);
         if (this.needFragmentColorInput(ctx)) {
-          if (this.featureUsed(feature)) {
-            const that = this as any;
+          const that = this as any;
+          if (that[`has${capName}Texture`]()) {
             bindGroup.setTexture(`z${capName}Tex`, that[`${name}Texture`], that[`${name}TextureSampler`]);
             if (this.featureUsed(featureTexMatrix)) {
               bindGroup.setValue(`z${capName}TextureMatrix`, that[`${name}TexCoordMatrix`]);

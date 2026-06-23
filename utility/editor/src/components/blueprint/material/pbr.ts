@@ -301,6 +301,67 @@ export class PBRMaterialEditor extends GraphEditor {
           : null
     };
   }
+  private sanitizeBlueprintMaterialProps(
+    mat: PBRBluePrintMaterial | SpriteBlueprintMaterial,
+    props: Record<string, unknown>
+  ) {
+    if (!(mat instanceof PBRBluePrintMaterial)) {
+      return props;
+    }
+    const sanitized = { ...props };
+    for (const name of [
+      'vertexColor',
+      'AlbedoColor',
+      'AlbedoTexture',
+      'AlbedoTexCoordScale',
+      'AlbedoTexCoordAddressU',
+      'AlbedoTexCoordAddressV',
+      'AlbedoTexCoordIndex',
+      'Opacity',
+      'Metallic',
+      'Roughness',
+      'MetallicRoughnessTexture',
+      'MetallicRoughnessTexCoordScale',
+      'MetallicRoughnessTexCoordAddressU',
+      'MetallicRoughnessTexCoordAddressV',
+      'MetallicRoughnessTexCoordIndex',
+      'SpecularFactor',
+      'SpecularColorTexture',
+      'SpecularColorTexCoordScale',
+      'SpecularColorTexCoordAddressU',
+      'SpecularColorTexCoordAddressV',
+      'SpecularColorTexCoordIndex',
+      'SpecularTexture',
+      'SpecularTexCoordScale',
+      'SpecularTexCoordAddressU',
+      'SpecularTexCoordAddressV',
+      'SpecularTexCoordIndex',
+      'EmissiveColor',
+      'EmissiveStrength',
+      'EmissiveTexture',
+      'EmissiveTexCoordScale',
+      'EmissiveTexCoordAddressU',
+      'EmissiveTexCoordAddressV',
+      'EmissiveTexCoordIndex',
+      'vertexNormal',
+      'vertexTangent',
+      'NormalScale',
+      'NormalTexture',
+      'NormalTexCoordScale',
+      'NormalTexCoordAddressU',
+      'NormalTexCoordAddressV',
+      'NormalTexCoordIndex',
+      'OcclusionStrength',
+      'OcclusionTexture',
+      'OcclusionTexCoordScale',
+      'OcclusionTexCoordAddressU',
+      'OcclusionTexCoordAddressV',
+      'OcclusionTexCoordIndex'
+    ]) {
+      delete sanitized[name];
+    }
+    return sanitized;
+  }
   async save(path: string) {
     if (path) {
       const VFS = ProjectService.VFS;
@@ -354,7 +415,13 @@ export class PBRMaterialEditor extends GraphEditor {
           };
         } = {
           type: mat instanceof PBRBluePrintMaterial ? 'PBRBluePrintMaterial' : 'SpriteBluePrintMaterial',
-          props: await getEngine().resourceManager.serializeObjectProps(this._editMaterial.get()),
+          props: this.sanitizeBlueprintMaterialProps(
+            mat,
+            (await getEngine().resourceManager.serializeObjectProps(this._editMaterial.get())) as Record<
+              string,
+              unknown
+            >
+          ),
           data: {
             IR: bpPath,
             uniformValues: uniforms.uniformValues,

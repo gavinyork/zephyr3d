@@ -906,6 +906,9 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     this.applyUniformValues(bindGroup, ctx, pass);
   }
+  protected isMaterialTextureEnabled(_name: string) {
+    return true;
+  }
   /**
    * Whether the fragment shader needs to compute color.
    * Returns true for LIGHT pass, or when alpha test or alpha-to-coverage is enabled.

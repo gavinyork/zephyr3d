@@ -424,7 +424,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           scope.zEmissiveStrength = pb.float().uniform(2);
           scope.zRectSpecularScale = pb.float().uniform(2);
         }
-        if (this.occlusionTexture) {
+        if (this.hasOcclusionTexture()) {
           scope.zOcclusionStrength = pb.float().uniform(2);
         }
         if (this.sheen) {
@@ -462,7 +462,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           bindGroup.setValue('zEmissiveStrength', this._emissiveStrength);
           bindGroup.setValue('zRectSpecularScale', this._rectSpecularScale);
         }
-        if (this.occlusionTexture) {
+        if (this.hasOcclusionTexture()) {
           bindGroup.setValue('zOcclusionStrength', this._occlusionStrength);
         }
         if (this.sheen) {
@@ -655,7 +655,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     calculateEmissiveColor(scope: PBInsideFunctionScope) {
       const pb = scope.$builder;
-      if (this.emissiveTexture) {
+      if (this.hasEmissiveTexture()) {
         return pb.mul(
           this.sampleEmissiveTexture(scope).rgb,
           this.getEmissiveColor(scope),
@@ -1673,7 +1673,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           }
           const envLightStrength = ShaderHelper.getEnvLightStrength(this);
           const envLightSpecularStrength = ShaderHelper.getEnvLightSpecularStrength(this);
-          if (that.occlusionTexture) {
+          if (that.hasOcclusionTexture()) {
             const occlusionSample = that.sampleOcclusionTexture(this).r;
             this.$l.occlusion = pb.mul(
               pb.add(pb.mul(this.zOcclusionStrength, pb.sub(occlusionSample, 1)), 1),

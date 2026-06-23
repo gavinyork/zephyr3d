@@ -188,9 +188,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         }
       }
       pb.func(funcName, params, function () {
-        this.$l.uv = that.normalTexture
+        this.$l.uv = that.hasNormalTexture()
           ? (that.getNormalTexCoord(this) ?? pb.vec2(0))
-          : that.albedoTexture
+          : that.hasAlbedoTexture()
             ? (that.getAlbedoTexCoord(this) ?? pb.vec2(0))
             : pb.vec2(0);
         this.$l.TBN = that.calculateTBN(
@@ -200,7 +200,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.worldTangent,
           this.worldBinormal
         );
-        if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
+        if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && that.hasNormalTexture()) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
@@ -259,9 +259,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         }
       }
       pb.func(funcName, params, function () {
-        this.$l.uv = that.normalTexture
+        this.$l.uv = that.hasNormalTexture()
           ? (that.getNormalTexCoord(this) ?? pb.vec2(0))
-          : that.albedoTexture
+          : that.hasAlbedoTexture()
             ? (that.getAlbedoTexCoord(this) ?? pb.vec2(0))
             : pb.vec2(0);
         this.$l.TBN = that.calculateTBN(
@@ -271,7 +271,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.worldTangent,
           this.worldBinormal
         );
-        if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
+        if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && that.hasNormalTexture()) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
@@ -323,9 +323,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       }
       pb.func(funcName, params, function () {
         const posW = this.worldPos;
-        this.$l.uv = that.normalTexture
+        this.$l.uv = that.hasNormalTexture()
           ? (that.getNormalTexCoord(this) ?? pb.vec2(0))
-          : that.albedoTexture
+          : that.hasAlbedoTexture()
             ? (that.getAlbedoTexCoord(this) ?? pb.vec2(0))
             : pb.vec2(0);
         this.$l.TBN = pb.mat3();
@@ -403,7 +403,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
-        if (this.normalTexture) {
+        if (this.hasNormalTexture()) {
           bindGroup.setValue('zNormalScale', this._normalScale);
         }
       }
@@ -704,7 +704,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       super.fragmentShader(scope);
       const pb = scope.$builder;
       if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
-        if (this.normalTexture) {
+        if (this.hasNormalTexture()) {
           scope.zNormalScale = pb.float().uniform(2);
         }
       }
