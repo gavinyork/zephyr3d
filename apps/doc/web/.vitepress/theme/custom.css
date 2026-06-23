@@ -11,6 +11,10 @@
 }
 
 .VPDoc {
+  --vp-code-block-bg: #f6f8fa;
+}
+
+.dark .VPDoc {
   --vp-code-block-bg: #10151f;
 }
 

@@ -155,7 +155,7 @@ export class ShadowMapper extends Disposable {
       shadowMapSize: 1024,
       numCascades: 1,
       splitLambda: 0.5,
-      depthBias: 0.5,
+      depthBias: 0.003,
       normalBias: 0.2,
       nearClip: 1
     };
@@ -320,7 +320,7 @@ export class ShadowMapper extends Disposable {
       this.shadowMapSize = 2048;
       this.shadowDistance = 120;
       this.splitLambda = 0.75;
-      this.depthBias = 0.18;
+      this.depthBias = 0.005;
       this.normalBias = 0.3;
       this.nearClip = 0.2;
       this.pcfKernelSize = 5;
@@ -331,7 +331,7 @@ export class ShadowMapper extends Disposable {
     this.shadowMapSize = 2048;
     this.shadowDistance = 800;
     this.splitLambda = 0.6;
-    this.depthBias = 0.35;
+    this.depthBias = 0.0035;
     this.normalBias = 0.22;
     this.nearClip = 1;
     this.pcfKernelSize = 3;
