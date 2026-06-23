@@ -163,7 +163,8 @@ export function getTextureSampleType(type: PBTextureTypeInfo) {
 
 /** @internal */
 export function genSamplerName(textureName: string, comparison: boolean) {
-  return `ch_auto_sampler_${textureName}${comparison ? '_comparison' : ''}`;
+  const safeName = textureName.replace(/[^A-Za-z0-9_]/g, '_');
+  return `ch_auto_sampler_${safeName}${comparison ? '_comparison' : ''}`;
 }
 
 /** @internal */

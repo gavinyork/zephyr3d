@@ -61,6 +61,34 @@ interface UniformInfo {
   sampler?: PBShaderExp;
 }
 
+function getSamplerBindingClass(sampleType: PBShaderExp['$sampleType'], comparison: boolean) {
+  if (comparison) {
+    return 'comparison';
+  }
+  switch (sampleType) {
+    case 'float':
+      return 'filtering';
+    case 'depth':
+    case 'sint':
+    case 'uint':
+    case 'unfilterable-float':
+      return 'nonfiltering';
+    default:
+      return 'filtering';
+  }
+}
+
+function getAutoSamplerName(texture: PBShaderExp, comparison: boolean) {
+  const sharingKey = texture.$autoSamplerKey;
+  const bindingClass = getSamplerBindingClass(texture.$sampleType, comparison);
+  return AST.genSamplerName(
+    sharingKey
+      ? `${sharingKey}_${bindingClass}_${texture.$sampleType}`
+      : `${texture.$str}${comparison ? '_comparison' : ''}`,
+    false
+  );
+}
+
 /**
  * Non-array value type of shader expression
  * @public
@@ -1852,7 +1880,7 @@ export class ProgramBuilder {
     }
     this._uniforms[u].texture!.autoBindSampler = samplerType;
     if (this._device.type === 'webgpu') {
-      const samplerName = AST.genSamplerName(t.$str, comparison);
+      const samplerName = getAutoSamplerName(t, comparison);
       if (!this.getGlobalScope()[samplerName]) {
         throw new Error(`failed to find sampler name ${samplerName}`);
       }
@@ -2483,7 +2511,7 @@ export class ProgramBuilder {
         } else if (entry.type.isExternalTexture()) {
           entry.externalTexture = {
             autoBindSampler: uniformInfo.texture.autoBindSampler
-              ? AST.genSamplerName(uniformInfo.texture.exp.$str, false)
+              ? getAutoSamplerName(uniformInfo.texture.exp, false)
               : null
           };
         } else {
@@ -2513,13 +2541,13 @@ export class ProgramBuilder {
             autoBindSamplerComparison: null
           };
           if (this._device.type === 'webgpu' || uniformInfo.texture.autoBindSampler === 'sample') {
-            entry.texture.autoBindSampler = AST.genSamplerName(uniformInfo.texture.exp.$str, false);
+            entry.texture.autoBindSampler = getAutoSamplerName(uniformInfo.texture.exp, false);
           }
           if (
             (this._device.type === 'webgpu' && entry.type.isDepthTexture()) ||
             uniformInfo.texture.autoBindSampler === 'comparison'
           ) {
-            entry.texture.autoBindSamplerComparison = AST.genSamplerName(uniformInfo.texture.exp.$str, true);
+            entry.texture.autoBindSamplerComparison = getAutoSamplerName(uniformInfo.texture.exp, true);
           }
         }
         entry.name = uniformInfo.texture.exp.$str;
@@ -2875,7 +2903,7 @@ export class PBScope extends Proxiable<PBScope> {
     ) {
       // webgpu requires explicit sampler bindings
       const isDepth = variable.$typeinfo.isTextureType() && variable.$typeinfo.isDepthTexture();
-      const samplerName = AST.genSamplerName(variable.$str, false);
+      const samplerName = getAutoSamplerName(variable, false);
       const samplerExp = getCurrentProgramBuilder()!
         .sampler(samplerName)
         .uniform(uniformInfo.group)
@@ -2883,7 +2911,7 @@ export class PBScope extends Proxiable<PBScope> {
       samplerExp.$sampleType = variable.$sampleType;
       this.$local(samplerExp);
       if (isDepth) {
-        const samplerNameComp = AST.genSamplerName(variable.$str, true);
+        const samplerNameComp = getAutoSamplerName(variable, true);
         const samplerExpComp = getCurrentProgramBuilder()!
           .samplerComparison(samplerNameComp)
           .uniform(uniformInfo.group)

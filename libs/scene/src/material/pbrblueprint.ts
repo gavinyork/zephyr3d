@@ -45,6 +45,23 @@ const DEFAULT_OUTPUT_NAMES: readonly PBRBlueprintOutputName[] = [
   'AO'
 ] as const;
 
+function getBlueprintAutoSamplerKey(
+  uniform: Pick<
+    BluePrintUniformTexture,
+    'type' | 'wrapS' | 'wrapT' | 'minFilter' | 'magFilter' | 'mipFilter'
+  >
+) {
+  return [
+    'blueprint',
+    uniform.type,
+    uniform.wrapS,
+    uniform.wrapT,
+    uniform.minFilter,
+    uniform.magFilter,
+    uniform.mipFilter
+  ].join('_');
+}
+
 /**
  * Physically-based rendering material driven by blueprint graphs, but shaded by the
  * same PBR metallic/roughness backend used by {@link PBRMetallicRoughnessMaterial}.
@@ -231,7 +248,11 @@ export class PBRBluePrintMaterial
     for (const u of [...this._uniformValues, ...this._uniformTextures]) {
       if (u.inVertexShader) {
         // @ts-ignore dynamic shader type constructor
-        pb.getGlobalScope()[u.name] = pb[u.type]().uniform(2);
+        const exp = pb[u.type]().uniform(2);
+        if ('texture' in u) {
+          exp.$autoSamplerKey = getBlueprintAutoSamplerKey(u);
+        }
+        pb.getGlobalScope()[u.name] = exp;
       }
     }
 
@@ -294,7 +315,11 @@ export class PBRBluePrintMaterial
       for (const u of [...this._uniformValues, ...this._uniformTextures]) {
         if (u.inFragmentShader) {
           // @ts-ignore dynamic shader type constructor
-          pb.getGlobalScope()[u.name] = pb[u.type]().uniform(2);
+          const exp = pb[u.type]().uniform(2);
+          if ('texture' in u) {
+            exp.$autoSamplerKey = getBlueprintAutoSamplerKey(u);
+          }
+          pb.getGlobalScope()[u.name] = exp;
         }
       }
       scope.zVertexColor = scope.$inputs.zOutDiffuse ?? pb.vec4(1);

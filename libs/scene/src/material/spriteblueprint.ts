@@ -6,6 +6,23 @@ import { SpriteMaterial } from './sprite';
 import type { BindGroup, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 
+function getBlueprintAutoSamplerKey(
+  uniform: Pick<
+    BluePrintUniformTexture,
+    'type' | 'wrapS' | 'wrapT' | 'minFilter' | 'magFilter' | 'mipFilter'
+  >
+) {
+  return [
+    'blueprint',
+    uniform.type,
+    uniform.wrapS,
+    uniform.wrapT,
+    uniform.minFilter,
+    uniform.magFilter,
+    uniform.mipFilter
+  ].join('_');
+}
+
 /**
  * Sprite material driven by a blueprint graph.
  *
@@ -168,6 +185,14 @@ export class SpriteBlueprintMaterial extends SpriteMaterial {
    */
   protected calcFragmentColor(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
+    for (const u of this._uniformTextures) {
+      if (!pb.getGlobalScope()[u.name]) {
+        // @ts-ignore dynamic shader type constructor
+        const exp = pb[u.type]().uniform(2);
+        exp.$autoSamplerKey = getBlueprintAutoSamplerKey(u);
+        pb.getGlobalScope()[u.name] = exp;
+      }
+    }
     const that = this;
     pb.func('zCalcSpriteColor', [pb.vec3('zWorldPos'), pb.vec2('zVertexUV')], function () {
       const outputs = that._irFrag.create(pb)!;

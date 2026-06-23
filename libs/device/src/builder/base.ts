@@ -171,6 +171,8 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
   /** @internal */
   $tags: ShaderExpTagValue[];
   /** @internal */
+  $autoSamplerKey: Nullable<string>;
+  /** @internal */
   $_group: Nullable<number>;
   /** @internal */
   $declareType: DeclareType;
@@ -200,6 +202,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$memberCache = {};
     this.$attrib = null;
     this.$tags = [];
+    this.$autoSamplerKey = null;
     this.$_group = null;
     this.$declareType = DeclareType.DECLARE_TYPE_NONE;
     this.$isBuffer = false;
