@@ -1360,7 +1360,16 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
               value.str[0] = this.reflectionMode;
             },
             set(this: PBRMetallicRoughnessMaterial, value) {
-              this.reflectionMode = value.str[0] as PBRReflectionMode;
+              const reflectionMode = value.str[0] as PBRReflectionMode;
+              const blueprintInstance = this as PBRMetallicRoughnessMaterial & {
+                isBlueprintMaterialInstance?: boolean;
+                setBlueprintInstanceReflectionMode?: (val: PBRReflectionMode, inherited?: boolean) => void;
+              };
+              if (blueprintInstance.isBlueprintMaterialInstance && blueprintInstance.setBlueprintInstanceReflectionMode) {
+                blueprintInstance.setBlueprintInstanceReflectionMode(reflectionMode);
+              } else {
+                this.reflectionMode = reflectionMode;
+              }
             },
             getDefaultValue(this: PBRMetallicRoughnessMaterial) {
               return this.$isInstance ? this.coreMaterial.reflectionMode : 'ggx';
@@ -1467,7 +1476,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
               this.subsurfaceProfile = (value.object[0] as SubsurfaceProfile) ?? null;
             },
             isValid(this: PBRMetallicRoughnessMaterial) {
-              return !this.$isInstance;
+              return canEditParentMaterialProperty(this);
             }
           },
           ...getTextureProps<PBRMetallicRoughnessMaterial>(

@@ -2,6 +2,7 @@ import { DRef, Vector4, type Nullable } from '@zephyr3d/base';
 import { getEngine } from '../app/api';
 import type { BluePrintUniformTexture, BluePrintUniformValue } from '../utility/blueprint/material/ir';
 import { PBRBluePrintMaterial } from './pbrblueprint';
+import type { PBRReflectionMode } from './mixins/lightmodel/pbrmetallicroughness';
 
 function cloneUniformFinalValue(value: BluePrintUniformValue) {
   if (typeof value.finalValue === 'number') {
@@ -87,6 +88,10 @@ function copyParentMaterialState(
   instance.opacity = parentMaterial.opacity;
   instance.objectColor = parentMaterial.objectColor;
   instance.TAAStrength = parentMaterial.TAAStrength;
+  instance.subsurfaceProfile = parentMaterial.subsurfaceProfile;
+  if (!instance.hasReflectionModeOverride()) {
+    instance.setBlueprintInstanceReflectionMode(parentMaterial.reflectionMode, true);
+  }
 }
 
 /**
@@ -102,6 +107,7 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
   private _parentMaterial: Nullable<PBRBluePrintMaterial>;
   private _overrideUniformValues: Map<string, BluePrintUniformValue>;
   private _overrideUniformTextures: Map<string, BluePrintUniformTexture>;
+  private _reflectionModeOverridden: boolean;
 
   constructor(parentMaterial?: Nullable<PBRBluePrintMaterial>, parentMaterialId = '') {
     super();
@@ -109,6 +115,7 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
     this._parentMaterial = null;
     this._overrideUniformValues = new Map();
     this._overrideUniformTextures = new Map();
+    this._reflectionModeOverridden = false;
     if (parentMaterial) {
       this.setParentMaterial(parentMaterial, parentMaterialId);
     }
@@ -182,6 +189,16 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
       finalTexture: undefined,
       finalSampler: undefined
     }));
+  }
+
+  hasReflectionModeOverride() {
+    return this._reflectionModeOverridden;
+  }
+
+  setBlueprintInstanceReflectionMode(val: PBRReflectionMode, inherited = false) {
+    this._reflectionModeOverridden =
+      !inherited && !!this._parentMaterial && val !== this._parentMaterial.reflectionMode;
+    super.reflectionMode = val;
   }
 
   setParentMaterial(parentMaterial: Nullable<PBRBluePrintMaterial>, parentMaterialId?: string) {
