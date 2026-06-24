@@ -150,7 +150,7 @@ export default defineConfig({
     }
   },
   themeConfig: {
-    logo: 'https://cdn.zephyr3d.org/doc/assets/images/logo_i.svg',
+    logo: 'https://cdn.zephyr3d.org/doc/assets/images/icon.png',
     nav: [
       {
         text: 'Guide',

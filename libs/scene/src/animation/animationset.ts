@@ -917,7 +917,7 @@ export class AnimationSet extends Disposable implements IDisposable {
    * Start (or update) playback of an animation clip.
    *
    * Behavior:
-   * - If the clip is already playing, updates its fade-in (resets fade-out).
+   * - If the clip is already playing, stops it first.
    * - Otherwise initializes playback state (repeat counter, speed, weight, initial time).
    * - Registers clip tracks and skeletons into the active sets for blending and application.
    *
@@ -930,62 +930,59 @@ export class AnimationSet extends Disposable implements IDisposable {
       console.error(`Animation ${name} not exists`);
       return;
     }
-    const fadeIn = Math.max(options?.fadeIn ?? 0, 0);
-    const info = this._activeAnimations.get(ani);
-    if (info) {
-      info.fadeOut = 0;
-      info.fadeIn = fadeIn;
-    } else {
-      const repeat = options?.repeat ?? 0;
-      const speedRatio = options?.speedRatio ?? 1;
-      const weight = options?.weight ?? ani.weight ?? 1;
-      this._activeAnimations.set(ani, {
-        repeat,
-        weight,
-        speedRatio,
-        fadeIn,
-        fadeOut: 0,
-        repeatCounter: 0,
-        currentTime: speedRatio < 0 ? ani.timeDuration : 0,
-        animateTime: 0,
-        fadeOutStart: 0,
-        firstFrame: true
-      });
-      ani.tracks?.forEach((v, k) => {
-        let nodeTracks = this._activeTracks.get(k);
-        if (!nodeTracks) {
-          nodeTracks = new Map();
-          this._activeTracks.set(k, nodeTracks);
-        }
-        for (const track of v) {
-          const blendId = track.getBlendId();
-          let blendedTracks = nodeTracks.get(blendId);
-          if (!blendedTracks) {
-            blendedTracks = [];
-            nodeTracks.set(blendId, blendedTracks);
-          }
-          blendedTracks.push(track);
-        }
-      });
-      ani.skeletons?.forEach((v, k) => {
-        const rig = this.model.findSkeletonRigById(k);
-        if (rig) {
-          const refcount = this._activeRigs.get(rig);
-          this._activeRigs.set(rig, refcount ? refcount + 1 : 1);
-          rig.playing = true;
-          return;
-        }
-        const binding = this.model.findSkinBindingById(k);
-        if (binding) {
-          const refcount = this._activeSkinBindings.get(binding);
-          this._activeSkinBindings.set(binding, refcount ? refcount + 1 : 1);
-          binding.playing = true;
-          const rigRefcount = this._activeRigs.get(binding.rig);
-          this._activeRigs.set(binding.rig, rigRefcount ? rigRefcount + 1 : 1);
-          binding.rig.playing = true;
-        }
-      });
+    if (this.isPlayingAnimation(name)) {
+      this.stopAnimation(name);
     }
+    const fadeIn = Math.max(options?.fadeIn ?? 0, 0);
+    const repeat = options?.repeat ?? 0;
+    const speedRatio = options?.speedRatio ?? 1;
+    const weight = options?.weight ?? ani.weight ?? 1;
+    this._activeAnimations.set(ani, {
+      repeat,
+      weight,
+      speedRatio,
+      fadeIn,
+      fadeOut: 0,
+      repeatCounter: 0,
+      currentTime: speedRatio < 0 ? ani.timeDuration : 0,
+      animateTime: 0,
+      fadeOutStart: 0,
+      firstFrame: true
+    });
+    ani.tracks?.forEach((v, k) => {
+      let nodeTracks = this._activeTracks.get(k);
+      if (!nodeTracks) {
+        nodeTracks = new Map();
+        this._activeTracks.set(k, nodeTracks);
+      }
+      for (const track of v) {
+        const blendId = track.getBlendId();
+        let blendedTracks = nodeTracks.get(blendId);
+        if (!blendedTracks) {
+          blendedTracks = [];
+          nodeTracks.set(blendId, blendedTracks);
+        }
+        blendedTracks.push(track);
+      }
+    });
+    ani.skeletons?.forEach((v, k) => {
+      const rig = this.model.findSkeletonRigById(k);
+      if (rig) {
+        const refcount = this._activeRigs.get(rig);
+        this._activeRigs.set(rig, refcount ? refcount + 1 : 1);
+        rig.playing = true;
+        return;
+      }
+      const binding = this.model.findSkinBindingById(k);
+      if (binding) {
+        const refcount = this._activeSkinBindings.get(binding);
+        this._activeSkinBindings.set(binding, refcount ? refcount + 1 : 1);
+        binding.playing = true;
+        const rigRefcount = this._activeRigs.get(binding.rig);
+        this._activeRigs.set(binding.rig, rigRefcount ? rigRefcount + 1 : 1);
+        binding.rig.playing = true;
+      }
+    });
   }
   /**
    * Stop playback of an animation clip.
