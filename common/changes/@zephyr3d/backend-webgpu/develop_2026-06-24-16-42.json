@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgpu",
+      "comment": "Add support of float32-filterable feature",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgpu"
+}
