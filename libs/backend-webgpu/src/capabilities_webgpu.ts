@@ -124,6 +124,7 @@ export class WebGPUTextureCaps implements TextureCaps {
     this.maxCubeTextureSize = device.device.limits.maxTextureDimension2D;
     this.npo2Mipmapping = true;
     this.npo2Repeating = true;
+    const float32Filterable = device.device.features.has('float32-filterable');
     this._textureFormatInfos = {
       ['rgba8unorm']: {
         gpuSampleType: 'float',
@@ -375,8 +376,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       size: 2
     };
     this._textureFormatInfos['r32f'] = {
-      gpuSampleType: 'unfilterable-float',
-      filterable: false,
+      gpuSampleType: float32Filterable ? 'float' : 'unfilterable-float',
+      filterable: float32Filterable,
       renderable: true,
       compressed: false,
       writable: true,
@@ -475,8 +476,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       size: 4
     };
     this._textureFormatInfos['rg32f'] = {
-      gpuSampleType: 'unfilterable-float',
-      filterable: false,
+      gpuSampleType: float32Filterable ? 'float' : 'unfilterable-float',
+      filterable: float32Filterable,
       renderable: true,
       compressed: false,
       writable: true,
@@ -575,8 +576,8 @@ export class WebGPUTextureCaps implements TextureCaps {
       size: 8
     };
     this._textureFormatInfos['rgba32f'] = {
-      gpuSampleType: 'unfilterable-float',
-      filterable: false,
+      gpuSampleType: float32Filterable ? 'float' : 'unfilterable-float',
+      filterable: float32Filterable,
       renderable: true,
       compressed: false,
       writable: true,
