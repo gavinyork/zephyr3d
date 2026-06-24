@@ -64,7 +64,7 @@
     "@zephyr3d/device": "workspace:^0.2.10",
     "@zephyr3d/imgui": "workspace:^0.2.4",
     "@zephyr3d/backend-webgl": "workspace:^0.1.12",
-    "@zephyr3d/backend-webgpu": "workspace:^0.1.13",
+    "@zephyr3d/backend-webgpu": "workspace:^0.1.14",
     "@rollup/plugin-commonjs": "~28.0.2",
     "rollup-plugin-import-css": "~3.5.8"
   }

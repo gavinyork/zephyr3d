@@ -2,6 +2,18 @@
   "name": "@zephyr3d/backend-webgpu",
   "entries": [
     {
+      "version": "0.1.14",
+      "tag": "@zephyr3d/backend-webgpu_v0.1.14",
+      "date": "Wed, 24 Jun 2026 16:45:43 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add support of float32-filterable feature"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.13",
       "tag": "@zephyr3d/backend-webgpu_v0.1.13",
       "date": "Tue, 23 Jun 2026 16:50:23 GMT",

@@ -2,6 +2,18 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.8",
+      "tag": "@zephyr3d/scene_v0.9.8",
+      "date": "Wed, 24 Jun 2026 16:45:43 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Fix ESM shadowing issue"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.7",
       "tag": "@zephyr3d/scene_v0.9.7",
       "date": "Tue, 23 Jun 2026 16:50:23 GMT",
