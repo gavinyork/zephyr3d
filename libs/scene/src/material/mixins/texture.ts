@@ -1,5 +1,6 @@
 import type {
   BindGroup,
+  BaseTexture,
   PBFunctionScope,
   PBInsideFunctionScope,
   PBShaderExp,
@@ -10,6 +11,41 @@ import type { MeshMaterial, applyMaterialMixins } from '../meshmaterial';
 import type { Matrix4x4, Nullable } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
+
+function getMaterialAutoSamplerKey(
+  sampler: Pick<
+    TextureSampler,
+    | 'addressModeU'
+    | 'addressModeV'
+    | 'addressModeW'
+    | 'magFilter'
+    | 'minFilter'
+    | 'mipFilter'
+    | 'lodMin'
+    | 'lodMax'
+    | 'compare'
+    | 'maxAnisotropy'
+  >
+) {
+  return [
+    'material',
+    sampler.addressModeU,
+    sampler.addressModeV,
+    sampler.addressModeW,
+    sampler.magFilter,
+    sampler.minFilter,
+    sampler.mipFilter,
+    sampler.lodMin,
+    sampler.lodMax,
+    sampler.compare ?? 'none',
+    sampler.maxAnisotropy
+  ].join('_');
+}
+
+function getTextureAutoSamplerKey(texture: BaseTexture | null, sampler: TextureSampler | null) {
+  const resolvedSampler = sampler ?? texture?.getDefaultSampler(false);
+  return resolvedSampler ? getMaterialAutoSamplerKey(resolvedSampler) : null;
+}
 
 /**
  * ToMixedTextureType
@@ -104,12 +140,18 @@ export function mixinTextureProps<U extends string>(name: U) {
           },
           set: function (newValue: Texture2D) {
             if (texture.get() !== newValue) {
+              const oldAutoSamplerKey = getTextureAutoSamplerKey(texture.get(), sampler);
               texture.set(newValue);
               this.useFeature(feature, !!newValue);
               if (newValue) {
                 this.useFeature(featureTexIndex, texCoord);
                 this.useFeature(featureTexMatrix, !!matrix);
-                this.uniformChanged();
+                const newAutoSamplerKey = getTextureAutoSamplerKey(newValue, sampler);
+                if (oldAutoSamplerKey !== newAutoSamplerKey) {
+                  this.optionChanged(true);
+                } else {
+                  this.uniformChanged();
+                }
               }
             }
           },
@@ -122,8 +164,14 @@ export function mixinTextureProps<U extends string>(name: U) {
           },
           set: function (newValue: TextureSampler) {
             if (sampler !== newValue) {
+              const oldAutoSamplerKey = getTextureAutoSamplerKey(texture.get(), sampler);
               sampler = newValue;
-              this.uniformChanged();
+              const newAutoSamplerKey = getTextureAutoSamplerKey(texture.get(), sampler);
+              if (oldAutoSamplerKey !== newAutoSamplerKey) {
+                this.optionChanged(true);
+              } else {
+                this.uniformChanged();
+              }
             }
           },
           enumerable: true,
@@ -234,7 +282,9 @@ export function mixinTextureProps<U extends string>(name: U) {
           const pb = scope.$builder;
           const that = this as any;
           if (that[`has${capName}Texture`]()) {
-            scope[`z${capName}Tex`] = pb.tex2D().uniform(2);
+            const exp = pb.tex2D().uniform(2);
+            exp.$autoSamplerKey = getTextureAutoSamplerKey(that[`${name}Texture`], that[`${name}TextureSampler`]);
+            scope[`z${capName}Tex`] = exp;
           }
         }
       }

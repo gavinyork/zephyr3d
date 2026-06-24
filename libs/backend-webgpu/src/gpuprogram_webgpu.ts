@@ -7,6 +7,7 @@ import type {
   PBStructTypeInfo,
   ShaderKind
 } from '@zephyr3d/device';
+import { ShaderType } from '@zephyr3d/device';
 import { WebGPUObject } from './gpuobject_webgpu';
 import type { WebGPUDevice } from './device';
 import type { Immutable, Nullable } from '@zephyr3d/base';
@@ -139,8 +140,32 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   }
   private createPipelineLayout(bindGroupLayouts: BindGroupLayout[]) {
     const layouts: GPUBindGroupLayout[] = [];
+    const stats = {
+      fragmentTextures: 0,
+      fragmentSamplers: 0,
+      fragmentSamplerNames: [] as string[]
+    };
+    bindGroupLayouts.forEach((layout) => {
+      layout.entries.forEach((entry) => {
+        if (entry.visibility & ShaderType.Fragment) {
+          if (entry.texture || entry.externalTexture) {
+            stats.fragmentTextures++;
+          }
+          if (entry.sampler) {
+            stats.fragmentSamplers++;
+            stats.fragmentSamplerNames.push(entry.name);
+          }
+        }
+      });
+    });
     bindGroupLayouts.forEach((val) => {
       layouts.push(this._device.fetchBindGroupLayout(val)[1]);
+    });
+    console.info('WebGPU pipeline layout fragment bindings:', {
+      label: this._label,
+      fragmentTextures: stats.fragmentTextures,
+      fragmentSamplers: stats.fragmentSamplers,
+      fragmentSamplerNames: stats.fragmentSamplerNames
     });
     return this._device.device.createPipelineLayout({
       bindGroupLayouts: layouts

@@ -113,6 +113,25 @@ export interface BluePrintUniformValue extends IRUniformValue {
   finalValue?: Nullable<number | Float32Array<ArrayBuffer>>;
 }
 
+function getBlueprintAutoSamplerKey(texture: {
+  type: string;
+  wrapS: TextureAddressMode;
+  wrapT: TextureAddressMode;
+  minFilter: TextureFilterMode;
+  magFilter: TextureFilterMode;
+  mipFilter: TextureFilterMode;
+}) {
+  return [
+    'blueprint',
+    texture.type,
+    texture.wrapS,
+    texture.wrapT,
+    texture.minFilter,
+    texture.magFilter,
+    texture.mipFilter
+  ].join('_');
+}
+
 /**
  * Represents a uniform texture and its sampler in the intermediate representation
  *
@@ -1164,7 +1183,16 @@ class IRConstantTexture extends IRExpression {
   create(pb: ProgramBuilder): PBShaderExp {
     if (!pb.getGlobalScope()[this.name]) {
       // @ts-ignore
-      pb.getGlobalScope()[this.name] = pb[this.type]().uniform(2);
+      const exp = pb[this.type]().uniform(2);
+      exp.$autoSamplerKey = getBlueprintAutoSamplerKey({
+        type: this.type,
+        wrapS: this.addressU,
+        wrapT: this.addressV,
+        minFilter: this.filterMin,
+        magFilter: this.filterMag,
+        mipFilter: this.filterMip
+      });
+      pb.getGlobalScope()[this.name] = exp;
     }
     return pb.getGlobalScope()[this.name];
   }
