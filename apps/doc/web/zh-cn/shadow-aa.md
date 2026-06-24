@@ -148,30 +148,56 @@ light.shadow.shadowDistance = 500;
 
 ## 指定阴影范围（Shadow Region）
 
-Zephyr3D 允许显式指定一个立方体区域（AABB），  
-仅在该区域内计算阴影。  
-这样可以进一步集中阴影贴图资源，用最低成本获得最佳质量。
+`ShadowRegion` 用于收紧方向光阴影贴图的世界空间覆盖范围。  
+渲染时使用的最终范围是 `shadowRegion.region`，它由以下几部分取并集：
+
+- `manualRegion`：通过 `setRegion(aabb)` 手动指定的 AABB；
+- `staticRegion`：通过 `addStaticCaster(node)` 添加的静态投影体包围盒快照；
+- `dynamicRegion`：通过 `addDynamicCaster(node)` 添加并随 `bvchanged` 事件更新的动态投影体包围盒。
+
+如果最终范围为空，方向光阴影会退回使用整个场景包围盒。  
+合理限制该区域可以让同样尺寸的 ShadowMap 覆盖更小的世界空间，从而提升阴影边缘精度。
 
 ```javascript
-// 计算场景中所有可投射阴影网格的总体包围盒
+// 计算场景中所有可投射阴影节点的总体包围盒
 const aabb = new AABB();
 aabb.beginExtend();
 
 scene.rootNode.iterate((node) => {
-  if (node.isMesh() && node.castShadow) {
-    const bbox = node.getWorldBoundingVolume().toAABB();
-    aabb.extend(bbox.minPoint);
-    aabb.extend(bbox.maxPoint);
+  if ((node.isMesh() || node.isClipmapTerrain()) && node.castShadow) {
+    const bbox = node.getWorldBoundingVolume()?.toAABB();
+    if (bbox) {
+      aabb.extend(bbox.minPoint);
+      aabb.extend(bbox.maxPoint);
+    }
   }
 });
 
 // 将阴影范围限制在此区域内
-light.shadow.shadowRegion = aabb;
+light.shadow.shadowRegion.setRegion(aabb);
+```
+
+对于不会移动的物体，可以把当前世界包围盒作为静态快照加入；对于会移动或包围盒会变化的物体，应使用动态投影体：
+
+`addStaticCaster()` 和 `addDynamicCaster()` 只接受 Mesh 或 ClipmapTerrain 节点；实际渲染阴影时，节点仍需要启用 `castShadow`。
+
+```javascript
+const shadowRegion = light.shadow.shadowRegion;
+
+// 静态投影体：只记录添加时的世界包围盒
+shadowRegion.addStaticCaster(building);
+
+// 动态投影体：包围盒变化时自动更新 ShadowRegion
+shadowRegion.addDynamicCaster(character);
+
+// 移除单个投影体，或清空投影体列表
+shadowRegion.removeCaster(character);
+shadowRegion.clearCasters();
 ```
 
 > **编辑器提示：**  
-> 在 Zephyr3D 编辑器中可以通过可视化操作界面直接调整 ShadowRegion，  
-> 以精确包围投射阴影的物体，从而避免不必要的阴影计算。
+> 在 Zephyr3D 编辑器中可以通过可视化操作界面调整 ShadowRegion 的手动 AABB，  
+> 以精确包围需要方向光阴影的区域，从而避免不必要的阴影贴图浪费。
 
 ---
 

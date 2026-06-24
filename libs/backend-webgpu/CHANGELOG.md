@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/backend-webgpu
 
-This log was last generated on Tue, 12 May 2026 03:53:58 GMT and should not be manually modified.
+This log was last generated on Tue, 23 Jun 2026 16:50:23 GMT and should not be manually modified.
+
+## 0.1.13
+Tue, 23 Jun 2026 16:50:23 GMT
+
+### Patches
+
+- Add checking for render target output count mismatch
 
 ## 0.1.12
 Tue, 12 May 2026 03:53:58 GMT

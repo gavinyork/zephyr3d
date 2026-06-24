@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/device
 
-This log was last generated on Tue, 19 May 2026 07:41:46 GMT and should not be manually modified.
+This log was last generated on Tue, 23 Jun 2026 16:50:23 GMT and should not be manually modified.
+
+## 0.2.10
+Tue, 23 Jun 2026 16:50:23 GMT
+
+### Patches
+
+- Track fragment outputs when building shaders
 
 ## 0.2.9
 Tue, 19 May 2026 07:41:46 GMT

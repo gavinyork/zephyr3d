@@ -6725,6 +6725,7 @@ export class PunctualLight extends BaseLight {
     set color(color: Vector4);
     // @override
     isPunctualLight(): this is PunctualLight;
+    protected onDispose(): void;
     setCastShadow(b: boolean): this;
     setColor(color: Vector4 | Vector3): this;
     get shadow(): ShadowMapper;
@@ -7728,11 +7729,9 @@ export class ShadowMapPass extends RenderPass {
 }
 
 // @public
-export class ShadowMapper {
+export class ShadowMapper extends Disposable {
     constructor(light: PunctualLight);
     applyQualityPreset(preset: ShadowQualityPreset): void;
-    // (undocumented)
-    copyFrom(other: ShadowMapper): void;
     get depthBias(): number;
     set depthBias(val: number);
     get esmBlur(): boolean;
@@ -7743,6 +7742,8 @@ export class ShadowMapper {
     set esmBlurRadius(val: number);
     get esmDepthScale(): number;
     set esmDepthScale(val: number);
+    get esmLogSpace(): boolean;
+    set esmLogSpace(val: boolean);
     get light(): PunctualLight;
     get mode(): ShadowMode;
     set mode(mode: ShadowMode);
@@ -7752,6 +7753,10 @@ export class ShadowMapper {
     set normalBias(val: number);
     get numShadowCascades(): number;
     set numShadowCascades(num: number);
+    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: The package "@zephyr3d/scene" does not have an export "Disposable"
+    //
+    // (undocumented)
+    protected onDispose(): void;
     get pcfKernelSize(): number;
     set pcfKernelSize(val: number);
     get pdSampleCount(): number;
@@ -7762,8 +7767,7 @@ export class ShadowMapper {
     set shadowDistance(val: number);
     get shadowMapSize(): number;
     set shadowMapSize(num: number);
-    get shadowRegion(): Nullable<AABB>;
-    set shadowRegion(region: Nullable<AABB>);
+    get shadowRegion(): ShadowRegion;
     get shadowStrength(): number;
     set shadowStrength(val: number);
     get splitLambda(): number;
@@ -7781,6 +7785,25 @@ export type ShadowMode = 'hard' | 'vsm' | 'esm' | 'pcf-pd' | 'pcf-opt';
 
 // @public
 export type ShadowQualityPreset = 'character-small' | 'outdoor-large';
+
+// @public
+export class ShadowRegion extends Disposable {
+    constructor(region?: Nullable<AABB>);
+    addDynamicCaster(caster: SceneNode): this;
+    addStaticCaster(caster: SceneNode): this;
+    clear(): this;
+    clearCasters(): void;
+    get dynamicRegion(): Nullable<AABB>;
+    get manualRegion(): Nullable<AABB>;
+    // Warning: (ae-unresolved-inheritdoc-reference) The @inheritDoc reference could not be resolved: The package "@zephyr3d/scene" does not have an export "Disposable"
+    //
+    // (undocumented)
+    protected onDispose(): void;
+    get region(): Nullable<AABB>;
+    removeCaster(caster: SceneNode): this;
+    setRegion(region: Nullable<AABB>): void;
+    get staticRegion(): Nullable<AABB>;
+}
 
 // @public
 export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOptions> extends Primitive implements Clonable<Shape<T>> {

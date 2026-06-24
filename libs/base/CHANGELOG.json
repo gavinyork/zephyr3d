@@ -2,6 +2,18 @@
   "name": "@zephyr3d/base",
   "entries": [
     {
+      "version": "0.2.7",
+      "tag": "@zephyr3d/base_v0.2.7",
+      "date": "Tue, 23 Jun 2026 16:50:23 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add MIME type of .vrma file"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.6",
       "tag": "@zephyr3d/base_v0.2.6",
       "date": "Thu, 04 Jun 2026 07:58:17 GMT",

@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/base
 
-This log was last generated on Thu, 04 Jun 2026 07:58:17 GMT and should not be manually modified.
+This log was last generated on Tue, 23 Jun 2026 16:50:23 GMT and should not be manually modified.
+
+## 0.2.7
+Tue, 23 Jun 2026 16:50:23 GMT
+
+### Patches
+
+- Add MIME type of .vrma file
 
 ## 0.2.6
 Thu, 04 Jun 2026 07:58:17 GMT

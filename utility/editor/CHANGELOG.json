@@ -2,6 +2,35 @@
   "name": "@zephyr3d/editor",
   "entries": [
     {
+      "version": "0.3.4",
+      "tag": "@zephyr3d/editor_v0.3.4",
+      "date": "Tue, 23 Jun 2026 16:50:23 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Improve editor workflow"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.6` to `0.2.7`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.9` to `0.2.10`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/scene\" from `^0.9.6` to `0.9.7`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/loaders\" from `^0.1.1` to `0.1.2`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/backend-webgpu\" from `^0.1.12` to `0.1.13`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.3.3",
       "tag": "@zephyr3d/editor_v0.3.3",
       "date": "Thu, 04 Jun 2026 07:58:17 GMT",

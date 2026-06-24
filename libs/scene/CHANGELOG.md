@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Fri, 05 Jun 2026 10:56:10 GMT and should not be manually modified.
+This log was last generated on Tue, 23 Jun 2026 16:50:23 GMT and should not be manually modified.
+
+## 0.9.7
+Tue, 23 Jun 2026 16:50:23 GMT
+
+### Patches
+
+- Improve joint dynamics
 
 ## 0.9.6
 Fri, 05 Jun 2026 10:56:10 GMT

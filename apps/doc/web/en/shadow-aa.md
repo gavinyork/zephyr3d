@@ -149,31 +149,57 @@ Recommended for:
 
 ## Defining Shadow Region
 
-Zephyr3D also allows you to explicitly define a **bounding volume (AABB)**  
-within which shadows are computed.  
-This concentrates shadow resources in critical areas and maximizes efficiency.
+`ShadowRegion` is used to tighten the world‑space coverage of directional light shadow maps.  
+The final region used for rendering is `shadowRegion.region`, which is the union of:
+
+- `manualRegion`: the AABB assigned with `setRegion(aabb)`;
+- `staticRegion`: snapshots captured from static casters added with `addStaticCaster(node)`;
+- `dynamicRegion`: tracked bounds from dynamic casters added with `addDynamicCaster(node)`, rebuilt when their `bvchanged` event fires.
+
+If the final region is empty, directional shadows fall back to the whole scene bounding box.  
+Keeping this region tight lets the same shadow map resolution cover less world space, improving edge precision.
 
 ```javascript
-// Compute the bounding box of all shadow‑casting meshes
+// Compute the bounding box of all shadow‑casting nodes
 const aabb = new AABB();
 aabb.beginExtend();
 
 scene.rootNode.iterate((node) => {
-  if (node.isMesh() && node.castShadow) {
-    const bbox = node.getWorldBoundingVolume().toAABB();
-    aabb.extend(bbox.minPoint);
-    aabb.extend(bbox.maxPoint);
+  if ((node.isMesh() || node.isClipmapTerrain()) && node.castShadow) {
+    const bbox = node.getWorldBoundingVolume()?.toAABB();
+    if (bbox) {
+      aabb.extend(bbox.minPoint);
+      aabb.extend(bbox.maxPoint);
+    }
   }
 });
 
 // Restrict the shadow map usage to this region
-light.shadow.shadowRegion = aabb;
+light.shadow.shadowRegion.setRegion(aabb);
+```
+
+For objects that do not move, you can add their current world bounds as static snapshots.  
+For moving objects, or objects whose bounds can change, use dynamic casters:
+
+`addStaticCaster()` and `addDynamicCaster()` only accept Mesh or ClipmapTerrain nodes; the node still needs `castShadow` enabled to render into shadow maps.
+
+```javascript
+const shadowRegion = light.shadow.shadowRegion;
+
+// Static caster: captures the current world-space AABB once
+shadowRegion.addStaticCaster(building);
+
+// Dynamic caster: updates ShadowRegion when the node bounds change
+shadowRegion.addDynamicCaster(character);
+
+// Remove a single caster, or clear all tracked casters
+shadowRegion.removeCaster(character);
+shadowRegion.clearCasters();
 ```
 
 > **Editor Tip:**  
-> In the Zephyr3D Editor, this region can be edited visually,  
-> allowing precise control to include only the necessary shadow‑casting objects  
-> and avoid redundant computation.
+> In the Zephyr3D Editor, the manual AABB of ShadowRegion can be edited visually,  
+> allowing precise control over the area that needs directional shadows and reducing wasted shadow map coverage.
 
 ---
 
