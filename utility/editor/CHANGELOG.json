@@ -2,6 +2,23 @@
   "name": "@zephyr3d/editor",
   "entries": [
     {
+      "version": "0.3.5",
+      "tag": "@zephyr3d/editor_v0.3.5",
+      "date": "Thu, 25 Jun 2026 08:26:57 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Fix external library not working"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/scene\" from `^0.9.8` to `0.9.9`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.3.4",
       "tag": "@zephyr3d/editor_v0.3.4",
       "date": "Tue, 23 Jun 2026 16:50:23 GMT",

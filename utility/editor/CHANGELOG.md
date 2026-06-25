@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/editor
 
-This log was last generated on Tue, 23 Jun 2026 16:50:23 GMT and should not be manually modified.
+This log was last generated on Thu, 25 Jun 2026 08:26:57 GMT and should not be manually modified.
+
+## 0.3.5
+Thu, 25 Jun 2026 08:26:57 GMT
+
+### Patches
+
+- Fix external library not working
 
 ## 0.3.4
 Tue, 23 Jun 2026 16:50:23 GMT

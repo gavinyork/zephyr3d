@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Wed, 24 Jun 2026 16:45:43 GMT and should not be manually modified.
+This log was last generated on Thu, 25 Jun 2026 08:26:57 GMT and should not be manually modified.
+
+## 0.9.9
+Thu, 25 Jun 2026 08:26:57 GMT
+
+### Patches
+
+- Fix external library not working
 
 ## 0.9.8
 Wed, 24 Jun 2026 16:45:43 GMT
