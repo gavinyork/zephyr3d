@@ -3,6 +3,45 @@ import type { AnimationSet } from './animationset';
 import type { AnimationTrack } from './animationtrack';
 
 /**
+ * A serializable reference to a point on an animation clip timeline.
+ * @public
+ */
+export type AnimationTimeRef =
+  | number
+  | {
+      time: number;
+    }
+  | {
+      frame: number;
+      fps?: number;
+    }
+  | {
+      marker: string;
+    };
+
+/**
+ * Timeline marker metadata stored on an animation clip.
+ *
+ * Markers are data, not callbacks. Runtime systems may dispatch events when a
+ * playback cursor crosses the marker.
+ * @public
+ */
+export type AnimationMarker = {
+  /** Stable marker id for editor and blueprint references. */
+  id?: string;
+  /** Display/event name. */
+  name: string;
+  /** Marker time in seconds. */
+  time?: number;
+  /** Marker frame. Converted with `fps` or the owning clip's `frameRate`. */
+  frame?: number;
+  /** Optional frame rate used for `frame` conversion. */
+  fps?: number;
+  /** Serializable user payload. */
+  payload?: unknown;
+};
+
+/**
  * Animation clip
  *
  * Represents a named animation composed of multiple tracks targeting various objects/properties,
@@ -34,6 +73,10 @@ export class AnimationClip extends Disposable {
   protected _weight: number;
   /** @internal */
   protected _skeletons: Set<string>;
+  /** @internal */
+  protected _frameRate: number;
+  /** @internal */
+  protected _markers: AnimationMarker[];
   /**
    * Creates an animation instance
    * @param name - Name of the animation
@@ -49,6 +92,8 @@ export class AnimationClip extends Disposable {
     this._weight = 1;
     this._autoPlay = false;
     this._skeletons = new Set();
+    this._frameRate = 30;
+    this._markers = [];
   }
   /**
    * Whether this clip is embedded (owned inline by its container/resource).
@@ -106,6 +151,23 @@ export class AnimationClip extends Disposable {
     this._skeletons = val;
   }
   /**
+   * Default frame rate used to convert frame-based marker references.
+   */
+  get frameRate() {
+    return this._frameRate;
+  }
+  set frameRate(val: number) {
+    if (Number.isFinite(val) && val > 0) {
+      this._frameRate = val;
+    }
+  }
+  /**
+   * Timeline markers stored on this clip.
+   */
+  get markers() {
+    return this._markers;
+  }
+  /**
    * Total time span of the clip in seconds.
    *
    * Automatically extended when adding tracks with longer duration.
@@ -115,6 +177,79 @@ export class AnimationClip extends Disposable {
   }
   set timeDuration(val) {
     this._duration = val;
+  }
+  /**
+   * Add a serializable marker to this clip.
+   *
+   * @param marker - Marker metadata. If `id` is omitted, `name` is used as the id.
+   * @returns The normalized marker.
+   */
+  addMarker(marker: AnimationMarker): AnimationMarker | null {
+    if (!marker?.name) {
+      console.error('Animation marker must have a name');
+      return null;
+    }
+    const normalized: AnimationMarker = {
+      ...marker,
+      id: marker.id || marker.name
+    };
+    if (this.resolveMarkerTime(normalized) === null) {
+      console.error('Animation marker must have either time or frame');
+      return null;
+    }
+    this._markers.push(normalized);
+    this._markers.sort((a, b) => (this.resolveMarkerTime(a) ?? 0) - (this.resolveMarkerTime(b) ?? 0));
+    return normalized;
+  }
+  /**
+   * Remove markers matching the marker id or name.
+   */
+  removeMarker(idOrName: string) {
+    const oldLength = this._markers.length;
+    this._markers = this._markers.filter((marker) => marker.id !== idOrName && marker.name !== idOrName);
+    return this._markers.length !== oldLength;
+  }
+  /**
+   * Get the first marker matching the marker id or name.
+   */
+  getMarker(idOrName: string) {
+    return this._markers.find((marker) => marker.id === idOrName || marker.name === idOrName) ?? null;
+  }
+  /**
+   * Resolve a marker to seconds on this clip's timeline.
+   */
+  resolveMarkerTime(marker: AnimationMarker): number | null {
+    if (typeof marker.time === 'number' && Number.isFinite(marker.time)) {
+      return marker.time;
+    }
+    if (typeof marker.frame === 'number' && Number.isFinite(marker.frame)) {
+      const fps = marker.fps ?? this._frameRate;
+      return fps > 0 ? marker.frame / fps : null;
+    }
+    return null;
+  }
+  /**
+   * Resolve a time reference to seconds on this clip's timeline.
+   */
+  resolveTimeRef(ref: AnimationTimeRef | null | undefined): number | null {
+    if (ref === null || ref === undefined) {
+      return null;
+    }
+    if (typeof ref === 'number') {
+      return Number.isFinite(ref) ? ref : null;
+    }
+    if ('time' in ref) {
+      return Number.isFinite(ref.time) ? ref.time : null;
+    }
+    if ('frame' in ref) {
+      const fps = ref.fps ?? this._frameRate;
+      return Number.isFinite(ref.frame) && fps > 0 ? ref.frame / fps : null;
+    }
+    if ('marker' in ref) {
+      const marker = this.getMarker(ref.marker);
+      return marker ? this.resolveMarkerTime(marker) : null;
+    }
+    return null;
   }
   /**
    * Add a skeleton used by this clip.

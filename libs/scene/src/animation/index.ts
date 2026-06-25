@@ -10,6 +10,8 @@ export type {
   SkeletalAnimationMaskUnsupportedTrackMode
 } from './animationmask';
 export * from './animationset';
+export * from './animationtimeline';
+export * from './animationcontroller';
 export * from './animationtrack';
 export * from './translationtrack';
 export * from './rotationtrack';

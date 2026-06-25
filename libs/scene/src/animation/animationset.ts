@@ -1,8 +1,16 @@
-import { weightedAverage, Disposable, Interpolator, Vector3 } from '@zephyr3d/base';
+import {
+  weightedAverage,
+  Disposable,
+  Interpolator,
+  Vector3,
+  Observable,
+  makeObservable
+} from '@zephyr3d/base';
 import type { DRef, IDisposable, Nullable } from '@zephyr3d/base';
 import { Quaternion } from '@zephyr3d/base';
 import type { SceneNode } from '../scene';
 import { AnimationClip } from './animation';
+import type { AnimationMarker, AnimationTimeRef } from './animation';
 import type { AnimationTrack } from './animationtrack';
 import { NodeRotationTrack } from './rotationtrack';
 import { NodeEulerRotationTrack } from './eulerrotationtrack';
@@ -50,6 +58,29 @@ export type PlayAnimationOptions = {
    * Default is the clip's configured weight.
    */
   weight?: number;
+  /**
+   * Optional stable playback id. Useful for blueprint/editor references.
+   */
+  id?: string;
+  /**
+   * Logical layer/channel name used by higher-level controllers.
+   */
+  layer?: string;
+  /**
+   * Priority used by higher-level interrupt policies.
+   */
+  priority?: number;
+  /**
+   * Whether higher-level controllers may interrupt this playback.
+   */
+  interruptible?: boolean;
+  /**
+   * Optional sub-range to play.
+   */
+  range?: {
+    start?: AnimationTimeRef;
+    end?: AnimationTimeRef;
+  };
 };
 
 /**
@@ -66,7 +97,313 @@ export type StopAnimationOptions = {
    * Default is 0 (immediate stop).
    */
   fadeOut?: number;
+  /**
+   * Stop reason reported by playback events.
+   */
+  reason?: AnimationStopReason;
 };
+
+/** @public */
+export type AnimationPlaybackState =
+  | 'scheduled'
+  | 'playing'
+  | 'paused'
+  | 'stopping'
+  | 'stopped'
+  | 'completed';
+
+/** @public */
+export type AnimationStopReason = 'manual' | 'interrupted' | 'completed' | 'deleted' | 'replaced';
+
+/** @public */
+export type AnimationPlaybackEvent = {
+  playback: AnimationPlayback;
+  animationSet: AnimationSet;
+  clip: AnimationClip;
+  time: number;
+  normalizedTime: number;
+};
+
+/** @public */
+export type AnimationMarkerEvent = AnimationPlaybackEvent & {
+  marker: AnimationMarker;
+  direction: 1 | -1;
+};
+
+/** @public */
+export type AnimationFrameEvent = AnimationPlaybackEvent & {
+  frame: number;
+};
+
+/** @public */
+export type AnimationPlaybackStopEvent = AnimationPlaybackEvent & {
+  reason: AnimationStopReason;
+};
+
+/** @public */
+export type AnimationPlaybackEventMap = {
+  start: [event: AnimationPlaybackEvent];
+  loop: [event: AnimationPlaybackEvent];
+  marker: [event: AnimationMarkerEvent];
+  frame: [event: AnimationFrameEvent];
+  complete: [event: AnimationPlaybackEvent];
+  stop: [event: AnimationPlaybackStopEvent];
+  pause: [event: AnimationPlaybackEvent];
+  resume: [event: AnimationPlaybackEvent];
+};
+
+/** @public */
+export type AnimationSetEventMap = {
+  playbackstart: [event: AnimationPlaybackEvent];
+  playbackloop: [event: AnimationPlaybackEvent];
+  marker: [event: AnimationMarkerEvent];
+  frame: [event: AnimationFrameEvent];
+  playbackcomplete: [event: AnimationPlaybackEvent];
+  playbackstop: [event: AnimationPlaybackStopEvent];
+  playbackpause: [event: AnimationPlaybackEvent];
+  playbackresume: [event: AnimationPlaybackEvent];
+};
+
+let nextAnimationPlaybackId = 1;
+
+/**
+ * Runtime handle for one playback of an AnimationClip.
+ * @public
+ */
+export class AnimationPlayback extends Observable<AnimationPlaybackEventMap> {
+  /** @internal */
+  private readonly _animationSet: AnimationSet;
+  /** @internal */
+  private readonly _clip: AnimationClip;
+  /** @internal */
+  private readonly _options: PlayAnimationOptions;
+  /** @internal */
+  private readonly _id: string;
+  /** @internal */
+  private readonly _frameWaiters: Map<number, ((event: AnimationFrameEvent | undefined) => void)[]>;
+  /** @internal */
+  private _state: AnimationPlaybackState;
+  /** @internal */
+  private _time: number;
+  /** @internal */
+  private _weight: number;
+  /** @internal */
+  private _speedRatio: number;
+  /** @internal */
+  private _layer: string;
+  /** @internal */
+  private _priority: number;
+  /** @internal */
+  private _interruptible: boolean;
+
+  constructor(animationSet: AnimationSet, clip: AnimationClip, options?: PlayAnimationOptions) {
+    super();
+    this._animationSet = animationSet;
+    this._clip = clip;
+    this._options = { ...(options ?? {}) };
+    this._id = this._options.id ?? `animation-playback-${nextAnimationPlaybackId++}`;
+    this._state = 'scheduled';
+    this._speedRatio = this._options.speedRatio ?? 1;
+    this._weight = this._options.weight ?? clip.weight ?? 1;
+    this._time = this._speedRatio < 0 ? clip.timeDuration : 0;
+    this._layer = this._options.layer ?? 'default';
+    this._priority = this._options.priority ?? 0;
+    this._interruptible = this._options.interruptible ?? true;
+    this._frameWaiters = new Map();
+  }
+  get id() {
+    return this._id;
+  }
+  get animationSet() {
+    return this._animationSet;
+  }
+  get clip() {
+    return this._clip;
+  }
+  get state() {
+    return this._state;
+  }
+  get time() {
+    return this._time;
+  }
+  set time(value: number) {
+    this.seek(value);
+  }
+  get normalizedTime() {
+    return this._clip.timeDuration > 0 ? this._time / this._clip.timeDuration : 0;
+  }
+  set normalizedTime(value: number) {
+    this.seek(value * this._clip.timeDuration);
+  }
+  get weight() {
+    return this._weight;
+  }
+  set weight(value: number) {
+    this._animationSet.setPlaybackWeight(this, value);
+  }
+  get speedRatio() {
+    return this._speedRatio;
+  }
+  set speedRatio(value: number) {
+    this._animationSet.setPlaybackSpeedRatio(this, value);
+  }
+  get layer() {
+    return this._layer;
+  }
+  get priority() {
+    return this._priority;
+  }
+  get interruptible() {
+    return this._interruptible;
+  }
+  play() {
+    this._animationSet.startPlayback(this);
+    return this;
+  }
+  pause() {
+    this._animationSet.pausePlayback(this);
+    return this;
+  }
+  resume() {
+    this._animationSet.resumePlayback(this);
+    return this;
+  }
+  stop(options?: StopAnimationOptions) {
+    this._animationSet.stopPlayback(this, options);
+    return this;
+  }
+  seek(time: number, options?: { emitEvents?: boolean; apply?: boolean }) {
+    this._animationSet.seekPlayback(this, time, options);
+    return this;
+  }
+  fadeTo(weight: number, duration: number) {
+    this._animationSet.fadePlaybackTo(this, weight, duration);
+    return this;
+  }
+  crossFadeTo(name: string, options?: PlayAnimationOptions & { duration?: number }) {
+    const duration = Math.max(options?.duration ?? 0, 0);
+    this.stop({ fadeOut: duration, reason: 'interrupted' });
+    return this._animationSet.play(name, { ...options, fadeIn: duration });
+  }
+  waitForComplete() {
+    return new Promise<this>((resolve) => {
+      this.once('complete', () => resolve(this));
+    });
+  }
+  waitForMarker(idOrName: string) {
+    if (this._state === 'stopped' || this._state === 'completed') {
+      return Promise.resolve(undefined);
+    }
+    return new Promise<AnimationMarkerEvent | undefined>((resolve) => {
+      const handler = (event: AnimationMarkerEvent) => {
+        if (event.marker.id === idOrName || event.marker.name === idOrName) {
+          this.off('marker', handler);
+          this.off('stop', stop);
+          resolve(event);
+        }
+      };
+      const stop = () => {
+        this.off('marker', handler);
+        this.off('stop', stop);
+        resolve(undefined);
+      };
+      this.on('marker', handler);
+      this.on('stop', stop);
+    });
+  }
+  waitForFrame(frame: number) {
+    if (this._state === 'stopped' || this._state === 'completed') {
+      return Promise.resolve(undefined);
+    }
+    return new Promise<AnimationFrameEvent | undefined>((resolve) => {
+      const waiters = this._frameWaiters.get(frame) ?? [];
+      let settled = false;
+      let stop: () => void;
+      const wrappedResolve = (event: AnimationFrameEvent | undefined) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        this.off('stop', stop);
+        resolve(event);
+      };
+      stop = () => {
+        const current = this._frameWaiters.get(frame);
+        if (current) {
+          this._frameWaiters.set(
+            frame,
+            current.filter((item) => item !== wrappedResolve)
+          );
+        }
+        wrappedResolve(undefined);
+      };
+      waiters.push(wrappedResolve);
+      this._frameWaiters.set(frame, waiters);
+      this.on('stop', stop);
+    });
+  }
+  /** @internal */
+  _getOptions() {
+    return this._options;
+  }
+  /** @internal */
+  _setState(state: AnimationPlaybackState) {
+    this._state = state;
+  }
+  /** @internal */
+  _setTime(time: number) {
+    this._time = time;
+  }
+  /** @internal */
+  _setWeight(weight: number) {
+    this._weight = weight;
+  }
+  /** @internal */
+  _setSpeedRatio(speedRatio: number) {
+    this._speedRatio = speedRatio;
+  }
+  /** @internal */
+  _getWatchedFrames() {
+    return [...this._frameWaiters.keys()];
+  }
+  /** @internal */
+  _emitStart(event: AnimationPlaybackEvent) {
+    this.dispatchEvent('start', event);
+  }
+  /** @internal */
+  _emitLoop(event: AnimationPlaybackEvent) {
+    this.dispatchEvent('loop', event);
+  }
+  /** @internal */
+  _emitMarker(event: AnimationMarkerEvent) {
+    this.dispatchEvent('marker', event);
+  }
+  /** @internal */
+  _emitFrame(event: AnimationFrameEvent) {
+    this.dispatchEvent('frame', event);
+    const waiters = this._frameWaiters.get(event.frame);
+    if (waiters) {
+      this._frameWaiters.delete(event.frame);
+      waiters.forEach((resolve) => resolve(event));
+    }
+  }
+  /** @internal */
+  _emitComplete(event: AnimationPlaybackEvent) {
+    this.dispatchEvent('complete', event);
+  }
+  /** @internal */
+  _emitStop(event: AnimationPlaybackStopEvent) {
+    this.dispatchEvent('stop', event);
+  }
+  /** @internal */
+  _emitPause(event: AnimationPlaybackEvent) {
+    this.dispatchEvent('pause', event);
+  }
+  /** @internal */
+  _emitResume(event: AnimationPlaybackEvent) {
+    this.dispatchEvent('resume', event);
+  }
+}
 
 /** @public */
 export type HumanoidRootMotionMode = 'scaled' | 'copy' | 'locked' | 'none';
@@ -645,7 +982,31 @@ function bakeHumanoidRotationTracks(
  *
  * @public
  */
-export class AnimationSet extends Disposable implements IDisposable {
+type ActiveAnimationInfo = {
+  playback: AnimationPlayback;
+  currentTime: number;
+  repeat: number;
+  repeatCounter: number;
+  weight: number;
+  targetWeight: number;
+  speedRatio: number;
+  firstFrame: boolean;
+  started: boolean;
+  paused: boolean;
+  fadeIn: number;
+  fadeOut: number;
+  fadeOutStart: number;
+  fadeToStart: number;
+  fadeToDuration: number;
+  fadeFromWeight: number;
+  fadeTargetWeight: number;
+  animateTime: number;
+  stopReason: AnimationStopReason;
+  rangeStart: number | null;
+  rangeEnd: number | null;
+};
+
+export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMap>() implements IDisposable {
   /** @internal */
   private _model: SceneNode;
   /** @internal */
@@ -661,21 +1022,7 @@ export class AnimationSet extends Disposable implements IDisposable {
   /** @internal */
   private readonly _activeRigs: Map<SkeletonRig, number>;
   /** @internal */
-  private readonly _activeAnimations: Map<
-    AnimationClip,
-    {
-      currentTime: number;
-      repeat: number;
-      repeatCounter: number;
-      weight: number;
-      speedRatio: number;
-      firstFrame: boolean;
-      fadeIn: number;
-      fadeOut: number;
-      fadeOutStart: number;
-      animateTime: number;
-    }
-  >;
+  private readonly _activeAnimations: Map<AnimationClip, ActiveAnimationInfo>;
   /**
    * Create an AnimationSet controlling the provided model.
    *
@@ -804,6 +1151,15 @@ export class AnimationSet extends Disposable implements IDisposable {
    */
   update(deltaInSeconds: number) {
     this._activeAnimations.forEach((v, k) => {
+      if (!v.started) {
+        v.started = true;
+        const event = this.createPlaybackEvent(v, k);
+        v.playback._emitStart(event);
+        this.dispatchEvent('playbackstart', event);
+      }
+      if (v.paused) {
+        return;
+      }
       if (v.fadeOut > 0 && v.fadeOutStart < 0) {
         v.fadeOutStart = v.animateTime;
       }
@@ -811,23 +1167,72 @@ export class AnimationSet extends Disposable implements IDisposable {
       if (v.firstFrame) {
         v.firstFrame = false;
       } else {
+        const previousTime = v.currentTime;
         const timeAdvance = deltaInSeconds * v.speedRatio;
         v.currentTime += timeAdvance;
         v.animateTime += timeAdvance;
+        const direction: 1 | -1 = timeAdvance >= 0 ? 1 : -1;
         if (k.timeDuration > 0) {
-          if (v.currentTime > k.timeDuration) {
-            v.repeatCounter += Math.max(1, Math.floor(v.currentTime / k.timeDuration));
+          if (v.rangeEnd !== null && v.speedRatio >= 0 && v.currentTime >= v.rangeEnd) {
+            v.currentTime = v.rangeEnd;
+            v.playback._setTime(v.currentTime);
+            this.completePlayback(k, v);
+            return;
+          } else if (v.rangeStart !== null && v.speedRatio < 0 && v.currentTime <= v.rangeStart) {
+            v.currentTime = v.rangeStart;
+            v.playback._setTime(v.currentTime);
+            this.completePlayback(k, v);
+            return;
+          } else if (v.currentTime > k.timeDuration) {
+            const loops = Math.max(1, Math.floor(v.currentTime / k.timeDuration));
+            if (v.repeat !== 0 && v.repeatCounter + loops >= v.repeat) {
+              v.repeatCounter += loops;
+              v.currentTime = k.timeDuration;
+              v.playback._setTime(v.currentTime);
+              this.emitCrossedMarkers(v, k, previousTime, v.currentTime, direction);
+              this.emitCrossedFrames(v, k, previousTime, v.currentTime, direction);
+              this.completePlayback(k, v);
+              return;
+            }
+            v.repeatCounter += loops;
             v.currentTime %= k.timeDuration;
+            const event = this.createPlaybackEvent(v, k);
+            v.playback._emitLoop(event);
+            this.dispatchEvent('playbackloop', event);
           } else if (v.currentTime < 0) {
-            v.repeatCounter += Math.max(1, Math.ceil(-v.currentTime / k.timeDuration));
+            const loops = Math.max(1, Math.ceil(-v.currentTime / k.timeDuration));
+            if (v.repeat !== 0 && v.repeatCounter + loops >= v.repeat) {
+              v.repeatCounter += loops;
+              v.currentTime = 0;
+              v.playback._setTime(v.currentTime);
+              this.emitCrossedMarkers(v, k, previousTime, v.currentTime, direction);
+              this.emitCrossedFrames(v, k, previousTime, v.currentTime, direction);
+              this.completePlayback(k, v);
+              return;
+            }
+            v.repeatCounter += loops;
             v.currentTime = ((v.currentTime % k.timeDuration) + k.timeDuration) % k.timeDuration;
+            const event = this.createPlaybackEvent(v, k);
+            v.playback._emitLoop(event);
+            this.dispatchEvent('playbackloop', event);
           }
         }
+        v.playback._setTime(v.currentTime);
+        this.emitCrossedMarkers(v, k, previousTime, v.currentTime, direction);
+        this.emitCrossedFrames(v, k, previousTime, v.currentTime, direction);
         if (v.repeat !== 0 && v.repeatCounter >= v.repeat) {
-          this.stopAnimation(k.name);
+          this.completePlayback(k, v);
         } else if (v.fadeOut > 0) {
           if (v.animateTime - v.fadeOutStart >= v.fadeOut) {
-            this.stopAnimation(k.name);
+            this.stopAnimation(k.name, { reason: v.stopReason });
+          }
+        }
+        if (v.fadeToDuration > 0) {
+          const t = Math.min(1, (v.animateTime - v.fadeToStart) / v.fadeToDuration);
+          v.weight = v.fadeFromWeight + (v.fadeTargetWeight - v.fadeFromWeight) * t;
+          v.playback._setWeight(v.weight);
+          if (t >= 1) {
+            v.fadeToDuration = 0;
           }
         }
       }
@@ -911,7 +1316,47 @@ export class AnimationSet extends Disposable implements IDisposable {
     const info = this._activeAnimations.get(ani);
     if (info) {
       info.weight = weight;
+      info.targetWeight = weight;
+      info.playback._setWeight(weight);
     }
+  }
+  /**
+   * Create a playback handle without starting it.
+   */
+  createPlayback(name: string, options?: PlayAnimationOptions) {
+    const ani = this._animations[name];
+    if (!ani) {
+      console.error(`Animation ${name} not exists`);
+      return null;
+    }
+    return new AnimationPlayback(this, ani, options);
+  }
+  /**
+   * Start an animation and return its playback handle.
+   */
+  play(name: string, options?: PlayAnimationOptions) {
+    const playback = this.createPlayback(name, options);
+    playback?.play();
+    return playback;
+  }
+  /**
+   * Get currently active playbacks.
+   */
+  getPlaybacks(name?: string) {
+    const playbacks: AnimationPlayback[] = [];
+    this._activeAnimations.forEach((info, clip) => {
+      if (!name || clip.name === name) {
+        playbacks.push(info.playback);
+      }
+    });
+    return playbacks;
+  }
+  /**
+   * Get the currently active playback for a clip.
+   */
+  getPlayback(name: string) {
+    const clip = this._animations[name];
+    return clip ? (this._activeAnimations.get(clip)?.playback ?? null) : null;
   }
   /**
    * Start (or update) playback of an animation clip.
@@ -925,29 +1370,53 @@ export class AnimationSet extends Disposable implements IDisposable {
    * @param options - Playback options (repeat, speedRatio, fadeIn).
    */
   playAnimation(name: string, options?: PlayAnimationOptions) {
-    const ani = this._animations[name];
+    this.play(name, options);
+  }
+  /**
+   * Start a previously created playback.
+   * @internal
+   */
+  startPlayback(playback: AnimationPlayback) {
+    const ani = playback.clip;
     if (!ani) {
-      console.error(`Animation ${name} not exists`);
       return;
     }
-    if (this.isPlayingAnimation(name)) {
-      this.stopAnimation(name);
+    if (this.isPlayingAnimation(ani.name)) {
+      this.stopAnimation(ani.name, { reason: 'replaced' });
     }
+    const options = playback._getOptions();
     const fadeIn = Math.max(options?.fadeIn ?? 0, 0);
     const repeat = options?.repeat ?? 0;
-    const speedRatio = options?.speedRatio ?? 1;
-    const weight = options?.weight ?? ani.weight ?? 1;
+    const speedRatio = playback.speedRatio;
+    const weight = playback.weight;
+    const rangeStart = ani.resolveTimeRef(options?.range?.start);
+    const rangeEnd = ani.resolveTimeRef(options?.range?.end);
+    const initialTime =
+      speedRatio < 0 ? (rangeEnd ?? rangeStart ?? ani.timeDuration) : (rangeStart ?? 0);
+    playback._setState('playing');
+    playback._setTime(initialTime);
     this._activeAnimations.set(ani, {
+      playback,
       repeat,
       weight,
+      targetWeight: weight,
       speedRatio,
       fadeIn,
       fadeOut: 0,
       repeatCounter: 0,
-      currentTime: speedRatio < 0 ? ani.timeDuration : 0,
+      currentTime: initialTime,
       animateTime: 0,
       fadeOutStart: 0,
-      firstFrame: true
+      fadeToStart: 0,
+      fadeToDuration: 0,
+      fadeFromWeight: weight,
+      fadeTargetWeight: weight,
+      firstFrame: true,
+      started: false,
+      paused: false,
+      stopReason: 'manual',
+      rangeStart,
+      rangeEnd
     });
     ani.tracks?.forEach((v, k) => {
       let nodeTracks = this._activeTracks.get(k);
@@ -985,6 +1454,195 @@ export class AnimationSet extends Disposable implements IDisposable {
     });
   }
   /**
+   * Stop a playback handle.
+   * @internal
+   */
+  stopPlayback(playback: AnimationPlayback, options?: StopAnimationOptions) {
+    if (this._activeAnimations.get(playback.clip)?.playback === playback) {
+      this.stopAnimation(playback.clip.name, options);
+    }
+  }
+  /**
+   * Pause a playback handle.
+   * @internal
+   */
+  pausePlayback(playback: AnimationPlayback) {
+    const info = this._activeAnimations.get(playback.clip);
+    if (info?.playback === playback && !info.paused) {
+      info.paused = true;
+      playback._setState('paused');
+      const event = this.createPlaybackEvent(info, playback.clip);
+      playback._emitPause(event);
+      this.dispatchEvent('playbackpause', event);
+    }
+  }
+  /**
+   * Resume a playback handle.
+   * @internal
+   */
+  resumePlayback(playback: AnimationPlayback) {
+    const info = this._activeAnimations.get(playback.clip);
+    if (info?.playback === playback && info.paused) {
+      info.paused = false;
+      playback._setState('playing');
+      const event = this.createPlaybackEvent(info, playback.clip);
+      playback._emitResume(event);
+      this.dispatchEvent('playbackresume', event);
+    }
+  }
+  /**
+   * Seek a playback handle.
+   * @internal
+   */
+  seekPlayback(
+    playback: AnimationPlayback,
+    time: number,
+    options?: { emitEvents?: boolean; apply?: boolean }
+  ) {
+    const clip = playback.clip;
+    const info = this._activeAnimations.get(clip);
+    const duration = clip.timeDuration;
+    const clampedTime = duration > 0 ? Math.max(0, Math.min(duration, time)) : Math.max(0, time);
+    const previousTime = info?.currentTime ?? playback.time;
+    playback._setTime(clampedTime);
+    if (info?.playback === playback) {
+      info.currentTime = clampedTime;
+      if (options?.emitEvents) {
+        const direction: 1 | -1 = clampedTime >= previousTime ? 1 : -1;
+        this.emitCrossedMarkers(info, clip, previousTime, clampedTime, direction);
+        this.emitCrossedFrames(info, clip, previousTime, clampedTime, direction);
+      }
+      if (options?.apply) {
+        this.update(0);
+      }
+    }
+  }
+  /**
+   * Set playback weight.
+   * @internal
+   */
+  setPlaybackWeight(playback: AnimationPlayback, weight: number) {
+    playback._setWeight(weight);
+    const info = this._activeAnimations.get(playback.clip);
+    if (info?.playback === playback) {
+      info.weight = weight;
+      info.targetWeight = weight;
+    }
+  }
+  /**
+   * Set playback speed ratio.
+   * @internal
+   */
+  setPlaybackSpeedRatio(playback: AnimationPlayback, speedRatio: number) {
+    playback._setSpeedRatio(speedRatio);
+    const info = this._activeAnimations.get(playback.clip);
+    if (info?.playback === playback) {
+      info.speedRatio = speedRatio;
+    }
+  }
+  /**
+   * Fade playback weight to a target value.
+   * @internal
+   */
+  fadePlaybackTo(playback: AnimationPlayback, weight: number, duration: number) {
+    const info = this._activeAnimations.get(playback.clip);
+    if (info?.playback === playback) {
+      info.fadeFromWeight = info.weight;
+      info.fadeTargetWeight = weight;
+      info.targetWeight = weight;
+      info.fadeToStart = info.animateTime;
+      info.fadeToDuration = Math.max(duration, 0);
+      if (info.fadeToDuration === 0) {
+        info.weight = weight;
+        playback._setWeight(weight);
+      }
+    } else {
+      playback._setWeight(weight);
+    }
+  }
+  private createPlaybackEvent(info: ActiveAnimationInfo, clip: AnimationClip): AnimationPlaybackEvent {
+    return {
+      playback: info.playback,
+      animationSet: this,
+      clip,
+      time: info.currentTime,
+      normalizedTime: clip.timeDuration > 0 ? info.currentTime / clip.timeDuration : 0
+    };
+  }
+  private completePlayback(clip: AnimationClip, info: ActiveAnimationInfo) {
+    const event = this.createPlaybackEvent(info, clip);
+    info.playback._setState('completed');
+    info.playback._emitComplete(event);
+    this.dispatchEvent('playbackcomplete', event);
+    this.stopAnimation(clip.name, { reason: 'completed' });
+  }
+  private emitCrossedMarkers(
+    info: ActiveAnimationInfo,
+    clip: AnimationClip,
+    fromTime: number,
+    toTime: number,
+    direction: 1 | -1
+  ) {
+    for (const marker of this.getCrossedMarkers(clip, fromTime, toTime, direction)) {
+      const event: AnimationMarkerEvent = {
+        ...this.createPlaybackEvent(info, clip),
+        marker,
+        direction
+      };
+      info.playback._emitMarker(event);
+      this.dispatchEvent('marker', event);
+    }
+  }
+  private emitCrossedFrames(
+    info: ActiveAnimationInfo,
+    clip: AnimationClip,
+    fromTime: number,
+    toTime: number,
+    direction: 1 | -1
+  ) {
+    for (const frame of info.playback._getWatchedFrames()) {
+      const frameTime = frame / clip.frameRate;
+      const crossed =
+        direction >= 0
+          ? this.crossedForward(fromTime, toTime, frameTime, clip.timeDuration)
+          : this.crossedBackward(fromTime, toTime, frameTime, clip.timeDuration);
+      if (crossed) {
+        const event: AnimationFrameEvent = {
+          ...this.createPlaybackEvent(info, clip),
+          frame
+        };
+        info.playback._emitFrame(event);
+        this.dispatchEvent('frame', event);
+      }
+    }
+  }
+  private getCrossedMarkers(
+    clip: AnimationClip,
+    fromTime: number,
+    toTime: number,
+    direction: 1 | -1
+  ): AnimationMarker[] {
+    return clip.markers.filter((marker) => {
+      const markerTime = clip.resolveMarkerTime(marker);
+      if (markerTime === null) {
+        return false;
+      }
+      return direction >= 0
+        ? this.crossedForward(fromTime, toTime, markerTime, clip.timeDuration)
+        : this.crossedBackward(fromTime, toTime, markerTime, clip.timeDuration);
+    });
+  }
+  private crossedForward(fromTime: number, toTime: number, targetTime: number, duration: number) {
+    return toTime >= fromTime
+      ? targetTime > fromTime && targetTime <= toTime
+      : (duration > 0 && targetTime > fromTime && targetTime <= duration) || targetTime <= toTime;
+  }
+  private crossedBackward(fromTime: number, toTime: number, targetTime: number, duration: number) {
+    return toTime <= fromTime
+      ? targetTime < fromTime && targetTime >= toTime
+      : (duration > 0 && targetTime < fromTime && targetTime >= 0) || targetTime >= toTime;
+  }
+  /**
    * Stop playback of an animation clip.
    *
    * Behavior:
@@ -1006,9 +1664,12 @@ export class AnimationSet extends Disposable implements IDisposable {
     const info = this._activeAnimations.get(ani);
     if (info) {
       const fadeOut = Math.max(options?.fadeOut ?? 0, 0);
+      const reason = options?.reason ?? 'manual';
       if (fadeOut !== 0) {
         info.fadeOut = fadeOut;
         info.fadeOutStart = -1;
+        info.stopReason = reason;
+        info.playback._setState('stopping');
       } else {
         this._activeAnimations.delete(ani);
         this._activeTracks.forEach((v) => {
@@ -1049,6 +1710,15 @@ export class AnimationSet extends Disposable implements IDisposable {
             }
           }
         });
+        const event: AnimationPlaybackStopEvent = {
+          ...this.createPlaybackEvent(info, ani),
+          reason
+        };
+        if (reason !== 'completed') {
+          info.playback._setState('stopped');
+        }
+        info.playback._emitStop(event);
+        this.dispatchEvent('playbackstop', event);
       }
     }
   }
