@@ -21,7 +21,7 @@ class DepsContentData extends ListViewData<{ name: string; version: string }> {
   }
 
   getItemIcon(): string {
-    return '馃摝';
+    return '📦';
   }
 
   getItemName(item: { name: string; version: string }): string {

@@ -639,7 +639,7 @@ async function __z3dLoad(spec, parentId = '') {
     } else if (baseSpec.startsWith('/')) {
       return `${baseSpec.replace(/^\/+/, '/')}${suffix}`;
     } else if (getApp().editorMode !== 'none') {
-      const libRoot = this._vfs.normalizePath(this._scriptsRoot || '/');
+      const libRoot = '/'; //this._vfs.normalizePath(this._scriptsRoot || '/');
       // naked module, checking if it is a installed module in editor mode
       let depsLockPath = this._vfs.normalizePath(this._vfs.join(libRoot, 'libs/deps.lock.json'));
       let depsExists = await this._vfs.exists(depsLockPath);
