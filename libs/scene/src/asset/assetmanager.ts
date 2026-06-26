@@ -1001,6 +1001,7 @@ export class AssetManager {
         : null;
       uniformTextures.push({
         ...v,
+        exposed: v.exposed ?? true,
         finalTexture: new DRef(tex),
         finalSampler: getDevice().createSampler({
           addressU: v.wrapS as TextureAddressMode,

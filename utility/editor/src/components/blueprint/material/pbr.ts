@@ -284,6 +284,7 @@ export class PBRMaterialEditor extends GraphEditor {
         mat instanceof PBRBluePrintMaterial || mat instanceof SpriteBlueprintMaterial
           ? (mat.uniformTextures?.map((u) => {
               return {
+                exposed: u.exposed ?? true,
                 name: u.name,
                 params: u.params?.clone() ?? null,
                 sRGB: u.sRGB,
@@ -493,6 +494,7 @@ export class PBRMaterialEditor extends GraphEditor {
           ASSERT(
             exists.type === u.type &&
               exists.texture === u.texture &&
+              exists.exposed === (u.exposed ?? true) &&
               exists.wrapS === u.wrapS &&
               exists.wrapT === u.wrapT &&
               exists.minFilter === u.minFilter &&
@@ -508,6 +510,7 @@ export class PBRMaterialEditor extends GraphEditor {
           continue;
         }
         uniformTextures.push({
+          exposed: u.exposed ?? true,
           name: u.name,
           type: u.type,
           texture: u.texture,

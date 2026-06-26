@@ -145,6 +145,7 @@ export interface IRUniformTexture {
   name: string;
   type: string;
   texture: string;
+  exposed: boolean;
   sRGB: boolean;
   wrapS: string;
   wrapT: string;
@@ -1133,6 +1134,8 @@ class IRConstantTexture extends IRExpression {
   readonly filterMag: TextureFilterMode;
   /** Mipmap filter mode */
   readonly filterMip: TextureFilterMode;
+  /** Whether this texture parameter should be exposed to material instances */
+  readonly exposed: boolean;
   /** Whether texture params is used */
   useParams: boolean;
   /**
@@ -1157,7 +1160,8 @@ class IRConstantTexture extends IRExpression {
     addressV: TextureAddressMode,
     minFilter: TextureFilterMode,
     magFilter: TextureFilterMode,
-    mipFilter: TextureFilterMode
+    mipFilter: TextureFilterMode,
+    exposed = true
   ) {
     super();
     this.name = name;
@@ -1169,6 +1173,7 @@ class IRConstantTexture extends IRExpression {
     this.filterMin = minFilter;
     this.filterMag = magFilter;
     this.filterMip = mipFilter;
+    this.exposed = exposed;
     this.useParams = false;
   }
   /**
@@ -1206,6 +1211,7 @@ class IRConstantTexture extends IRExpression {
     return {
       name: this.name,
       texture: this.id,
+      exposed: this.exposed,
       wrapS: this.addressU,
       wrapT: this.addressV,
       minFilter: this.filterMin,
@@ -1441,8 +1447,10 @@ export class MaterialBlueprintIR {
   }
   /** Builds a stable key for reusing identical blueprint texture uniforms */
   private getSharedTextureUniformKey(
+    name: string,
     textureId: string,
     type: string,
+    exposed: boolean,
     sRGB: boolean,
     addressU: TextureAddressMode,
     addressV: TextureAddressMode,
@@ -1451,8 +1459,10 @@ export class MaterialBlueprintIR {
     filterMip: TextureFilterMode
   ) {
     return [
+      name,
       type,
       textureId || '__default__',
+      exposed ? 'exposed' : 'hidden',
       sRGB ? 'srgb' : 'linear',
       addressU,
       addressV,
@@ -1466,6 +1476,7 @@ export class MaterialBlueprintIR {
     name: string,
     textureId: string,
     type: string,
+    exposed: boolean,
     sRGB: boolean,
     addressU: TextureAddressMode,
     addressV: TextureAddressMode,
@@ -1474,8 +1485,10 @@ export class MaterialBlueprintIR {
     filterMip: TextureFilterMode
   ): IRConstantTexture {
     const key = this.getSharedTextureUniformKey(
+      name,
       textureId,
       type,
+      exposed,
       sRGB,
       addressU,
       addressV,
@@ -1485,7 +1498,18 @@ export class MaterialBlueprintIR {
     );
     let ir = this._sharedTextureUniformMap.get(key);
     if (!ir) {
-      ir = new IRConstantTexture(name, textureId, type, sRGB, addressU, addressV, filterMin, filterMag, filterMip);
+      ir = new IRConstantTexture(
+        name,
+        textureId,
+        type,
+        sRGB,
+        addressU,
+        addressV,
+        filterMin,
+        filterMag,
+        filterMip,
+        exposed
+      );
       this._sharedTextureUniformMap.set(key, ir);
       this._expressions.push(ir);
       const uniformTexture = ir.asUniformTexture();
@@ -2278,6 +2302,7 @@ export class MaterialBlueprintIR {
         node.paramName,
         node.textureId,
         node.getOutputType(1),
+        node.expose,
         node.sRGB,
         node.addressU,
         node.addressV,
@@ -2306,6 +2331,7 @@ export class MaterialBlueprintIR {
         node.paramName,
         node.textureId,
         'tex2D',
+        node.expose,
         node.sRGB,
         node.addressU,
         node.addressV,

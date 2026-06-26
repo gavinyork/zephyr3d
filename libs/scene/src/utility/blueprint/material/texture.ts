@@ -132,6 +132,23 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
       }
     },
     {
+      name: 'Expose',
+      type: 'bool',
+      default: true,
+      options: {
+        label: 'Expose'
+      },
+      get(this: BaseTextureNode, value) {
+        value.bool[0] = this.expose;
+      },
+      set(this: BaseTextureNode, value) {
+        this.expose = value.bool[0];
+      },
+      isHidden(this: BaseTextureNode) {
+        return this instanceof TextureSampleNode && !!this.inputs[0]?.inputNode;
+      }
+    },
+    {
       name: 'sRGB',
       type: 'bool',
       default: true,
@@ -278,6 +295,8 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
 export abstract class BaseTextureNode extends BaseGraphNode {
   /** The shader parameter name for this texture uniform */
   private _paramName: string;
+  /** Whether this texture uniform should be exposed to material instances */
+  private _expose: boolean;
   /** Whether this texture should be loaded in sRGB color space */
   sRGB: boolean;
   /** Horizontal texture coordinate wrapping mode */
@@ -306,6 +325,7 @@ export abstract class BaseTextureNode extends BaseGraphNode {
   constructor() {
     super();
     this._paramName = getParamName();
+    this._expose = true;
     this.sRGB = true;
     this.addressU = 'clamp';
     this.addressV = 'clamp';
@@ -325,6 +345,18 @@ export abstract class BaseTextureNode extends BaseGraphNode {
   set paramName(val: string) {
     if (this._paramName !== val) {
       this._paramName = val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Whether this texture parameter should be exposed to material instances.
+   */
+  get expose() {
+    return this._expose;
+  }
+  set expose(val: boolean) {
+    if (this._expose !== val) {
+      this._expose = val;
       this.dispatchEvent('changed');
     }
   }
@@ -965,6 +997,8 @@ export class TextureSampleNode extends BaseGraphNode {
   samplerType: 'Color' | 'Normal';
   /** The shader parameter name for fallback texture uniform */
   private _paramName: string;
+  /** Whether fallback texture parameter should be exposed to material instances */
+  private _expose: boolean;
   /** Asset ID for fallback texture (used when texture input is not connected) */
   textureId: string;
   /** Whether fallback texture should be loaded in sRGB color space */
@@ -992,6 +1026,7 @@ export class TextureSampleNode extends BaseGraphNode {
     super();
     this.samplerType = 'Color';
     this._paramName = getParamName();
+    this._expose = true;
     this.textureId = '';
     this.sRGB = true;
     this.addressU = 'clamp';
@@ -1064,6 +1099,21 @@ export class TextureSampleNode extends BaseGraphNode {
     }
   }
   /**
+   * Whether fallback texture parameter should be exposed to material instances.
+   *
+   * @remarks
+   * Only meaningful when the texture input is not connected.
+   */
+  get expose() {
+    return this._expose;
+  }
+  set expose(val: boolean) {
+    if (this._expose !== val) {
+      this._expose = val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
    * Gets the serialization descriptor for this node type
    *
    * @returns Serialization class descriptor
@@ -1118,7 +1168,7 @@ export class TextureSampleNode extends BaseGraphNode {
               const path = value?.str?.[0];
               this.textureId = typeof path === 'string' ? path : '';
             }
-          }
+          },
         ]);
       }
     };

@@ -265,7 +265,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
         }
       });
     }
-    for (const uniform of material.uniformTextures) {
+    for (const uniform of material.uniformTextures.filter((u) => u.exposed !== false)) {
       props.push({
         name: uniform.name,
         description: `Override blueprint texture parameter ${uniform.name}`,

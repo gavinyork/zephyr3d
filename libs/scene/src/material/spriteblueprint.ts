@@ -106,6 +106,7 @@ export class SpriteBlueprintMaterial extends SpriteMaterial {
     val = val ?? [];
     if (val !== this._uniformTextures) {
       const newUniforms = val.map((v) => ({
+        exposed: v.exposed ?? true,
         finalTexture: new DRef(v.finalTexture!.get()),
         finalSampler: v.finalSampler,
         name: v.name,

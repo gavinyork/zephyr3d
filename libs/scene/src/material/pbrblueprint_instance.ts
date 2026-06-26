@@ -44,6 +44,7 @@ function cloneUniformValues(values: Nullable<BluePrintUniformValue[]>) {
 function cloneUniformTextures(values: Nullable<BluePrintUniformTexture[]>) {
   return (values ?? []).map((v) => ({
     ...v,
+    exposed: v.exposed ?? true,
     params: cloneTextureParams(v.params),
     finalTexture: v.finalTexture ? new DRef(v.finalTexture.get()) : undefined,
     finalSampler: v.finalSampler
@@ -66,6 +67,7 @@ function uniformTextureEquals(a: BluePrintUniformTexture, b: BluePrintUniformTex
   return (
     a.type === b.type &&
     a.texture === b.texture &&
+    (a.exposed ?? true) === (b.exposed ?? true) &&
     a.sRGB === b.sRGB &&
     a.wrapS === b.wrapS &&
     a.wrapT === b.wrapT &&

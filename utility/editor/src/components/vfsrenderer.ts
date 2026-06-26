@@ -1219,6 +1219,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           continue;
         }
         uniformTextures.push({
+          exposed: u.exposed ?? true,
           name: u.name,
           type: u.type,
           texture: u.texture,

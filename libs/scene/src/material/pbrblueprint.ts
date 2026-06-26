@@ -180,6 +180,7 @@ export class PBRBluePrintMaterial
   set uniformTextures(val: BluePrintUniformTexture[]) {
     if (val !== this._uniformTextures) {
       const newUniforms = (val ?? []).map((v) => ({
+        exposed: v.exposed ?? true,
         finalTexture: new DRef(v.finalTexture?.get() ?? null),
         finalSampler: v.finalSampler,
         inFragmentShader: v.inFragmentShader,
