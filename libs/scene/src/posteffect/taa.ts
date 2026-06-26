@@ -1,8 +1,8 @@
-import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, GPUProgram, Texture2D, TextureFormat } from '@zephyr3d/device';
 import type { DrawContext, Primitive } from '../render';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
-import { fetchSampler } from '../utility/misc';
+import { copyTexture, fetchSampler } from '../utility/misc';
 import { BoxShape } from '../shapes';
 import { temporalResolve } from '../shaders/temporal';
 import type { Nullable } from '@zephyr3d/base';
@@ -22,6 +22,23 @@ export class TAA extends AbstractPostEffect {
     this._bindGroup = null;
     this._layer = PostEffectLayer.end;
     this._skyMotionVectorBindGroup = null;
+  }
+  private isPoolTexture(ctx: DrawContext, texture: Texture2D) {
+    const pool = ctx.device.pool as typeof ctx.device.pool & {
+      hasTexture?: (texture: Texture2D) => boolean;
+    };
+    return !!pool.hasTexture?.(texture);
+  }
+  private copyHistoryColorTexture(ctx: DrawContext, texture: Texture2D, format: TextureFormat) {
+    const copy = ctx.device.pool.fetchTemporalTexture2D(
+      false,
+      format,
+      texture.width,
+      texture.height,
+      texture.mipLevelCount > 1
+    );
+    copyTexture(texture, copy, fetchSampler('clamp_nearest_nomip'));
+    return copy;
   }
   renderSkyMotionVectors(ctx: DrawContext) {
     const fb = ctx.device.pool.fetchTemporalFramebuffer(
@@ -99,17 +116,32 @@ export class TAA extends AbstractPostEffect {
     const currentColorTex = ctx.device.getFramebuffer()!.getColorAttachments()[0] as Texture2D;
     if (useGraphHistory) {
       const colorSize = { width: currentColorTex.width, height: currentColorTex.height };
-      historyManager.queueRetainedCommit(
-        RGHistoryResources.TAA_COLOR,
-        {
-          format: currentColorTex.format,
-          sizeMode: 'absolute',
-          width: currentColorTex.width,
-          height: currentColorTex.height
-        },
-        colorSize,
-        currentColorTex
-      );
+      if (this.isPoolTexture(ctx, currentColorTex)) {
+        historyManager.queueRetainedCommit(
+          RGHistoryResources.TAA_COLOR,
+          {
+            format: ctx.colorFormat,
+            sizeMode: 'absolute',
+            width: currentColorTex.width,
+            height: currentColorTex.height
+          },
+          colorSize,
+          currentColorTex
+        );
+      } else {
+        historyManager.queueCommit(
+          RGHistoryResources.TAA_COLOR,
+          {
+            format: ctx.colorFormat,
+            sizeMode: 'absolute',
+            width: currentColorTex.width,
+            height: currentColorTex.height
+          },
+          colorSize,
+          this.copyHistoryColorTexture(ctx, currentColorTex, ctx.colorFormat),
+          true
+        );
+      }
       if (ctx.motionVectorTexture) {
         const motionVectorSize = {
           width: ctx.motionVectorTexture.width,
@@ -131,8 +163,12 @@ export class TAA extends AbstractPostEffect {
       if (data!.prevColorTex) {
         ctx.device.pool.releaseTexture(data!.prevColorTex);
       }
-      ctx.device.pool.retainTexture(currentColorTex);
-      data!.prevColorTex = currentColorTex;
+      if (this.isPoolTexture(ctx, currentColorTex)) {
+        ctx.device.pool.retainTexture(currentColorTex);
+        data!.prevColorTex = currentColorTex;
+      } else {
+        data!.prevColorTex = this.copyHistoryColorTexture(ctx, currentColorTex, currentColorTex.format);
+      }
       if (data!.prevMotionVectorTex) {
         ctx.device.pool.releaseTexture(data!.prevMotionVectorTex);
       }

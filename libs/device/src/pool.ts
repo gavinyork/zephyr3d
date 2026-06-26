@@ -338,6 +338,14 @@ export class Pool {
     }
   }
   /**
+   * Check whether a texture is currently tracked by this pool.
+   * @param texture - The texture to check.
+   * @returns True if the texture was allocated from this pool and has not been fully released.
+   */
+  hasTexture(texture: BaseTexture) {
+    return !!this._allocatedTextures.get(texture);
+  }
+  /**
    * Dispose a framebuffer that is allocated from the object pool.
    * @param fb - The framebuffer to dispose.
    */
