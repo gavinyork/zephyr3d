@@ -1,5 +1,12 @@
 import { DRef } from '@zephyr3d/base';
-import { ConstantScalarNode, PBRBluePrintMaterial, PBRBluePrintMaterialInstance } from '@zephyr3d/scene';
+import { MemoryFS } from '@zephyr3d/base';
+import {
+  ConstantScalarNode,
+  PBRBluePrintMaterial,
+  PBRBluePrintMaterialInstance,
+  ResourceManager,
+  SubsurfaceProfile
+} from '@zephyr3d/scene';
 
 describe('Blueprint scalar parameter range', () => {
   test('ConstantScalarNode should clamp default value when range is enabled', () => {
@@ -174,5 +181,92 @@ describe('Blueprint scalar parameter range', () => {
 
     expect(instance.uniformTextures[0].finalTexture?.get()).toBe(hiddenParentTexture);
     expect(instance.uniformTextures[1].finalTexture?.get()).toBe(visibleParentTexture);
+  });
+
+  test('reloadBluePrintMaterials should refresh parent props before syncing blueprint instances', async () => {
+    const vfs = new MemoryFS();
+    const manager = new ResourceManager(vfs);
+    const parentPath = '/materials/parent.zmtl';
+    const bpPath = '/materials/parent.zbpt';
+    const instancePath = '/materials/instance.zmtl';
+
+    const parentBlueprint = {
+      type: 'PBRMaterial',
+      state: {
+        fragment: {
+          nodes: [{ id: 1, title: '', locked: true, node: { ClassName: 'PBRBlockNode', Object: {} } }],
+          links: [],
+          canvasOffset: [0, 0],
+          canvasScale: 1
+        },
+        vertex: {
+          nodes: [{ id: 1, title: '', locked: true, node: { ClassName: 'VertexBlockNode', Object: {} } }],
+          links: [],
+          canvasOffset: [0, 0],
+          canvasScale: 1
+        }
+      }
+    };
+    await vfs.writeFile(bpPath, JSON.stringify(parentBlueprint, null, 2), { encoding: 'utf8', create: true });
+
+    const parentMaterialFile: any = {
+      type: 'PBRBluePrintMaterial',
+      props: {
+        ClearCoat: false,
+        AttenuationColor: [1, 0.5, 0.4]
+      },
+      data: {
+        IR: bpPath,
+        uniformValues: [],
+        uniformTextures: []
+      }
+    };
+    await vfs.writeFile(parentPath, JSON.stringify(parentMaterialFile, null, 2), {
+      encoding: 'utf8',
+      create: true
+    });
+
+    const instanceMaterialFile: any = {
+      type: 'PBRBluePrintMaterialInstance',
+      props: {},
+      data: {
+        parent: parentPath,
+        uniformValues: [],
+        uniformTextures: []
+      }
+    };
+    await vfs.writeFile(instancePath, JSON.stringify(instanceMaterialFile, null, 2), {
+      encoding: 'utf8',
+      create: true
+    });
+
+    const parent = await manager.fetchMaterial<PBRBluePrintMaterial>(parentPath, { overrideVFS: vfs });
+    const instance = await manager.fetchMaterial<PBRBluePrintMaterialInstance>(instancePath, { overrideVFS: vfs });
+
+    expect(parent).toBeInstanceOf(PBRBluePrintMaterial);
+    expect(instance).toBeInstanceOf(PBRBluePrintMaterialInstance);
+    expect(parent!.clearcoat).toBe(false);
+    expect(instance!.clearcoat).toBe(false);
+
+    parentMaterialFile.props = {
+      ClearCoat: true,
+      SubsurfaceProfile: {
+        ClassName: 'SubsurfaceProfile',
+        Object: {
+          ScatterColor: [0.8, 0.6, 0.4]
+        }
+      }
+    };
+    await vfs.writeFile(parentPath, JSON.stringify(parentMaterialFile, null, 2), {
+      encoding: 'utf8',
+      create: true
+    });
+
+    await manager.reloadBluePrintMaterials();
+
+    expect(parent!.clearcoat).toBe(true);
+    expect(parent!.subsurfaceProfile).toBeInstanceOf(SubsurfaceProfile);
+    expect(instance!.clearcoat).toBe(true);
+    expect(instance!.subsurfaceProfile).toBeInstanceOf(SubsurfaceProfile);
   });
 });

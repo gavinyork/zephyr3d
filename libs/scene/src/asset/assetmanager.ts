@@ -810,12 +810,21 @@ export class AssetManager {
     for (let i = 0; i < materials.length; i++) {
       const m = materials[i];
       if (m instanceof PBRBluePrintMaterial && !(m instanceof PBRBluePrintMaterialInstance) && (!filter || filter(m))) {
+        const content = JSON.parse(
+          (await this.readFileFromVFS(paths[i], { encoding: 'utf8' })) as string
+        ) as {
+          type: string;
+          props?: Record<string, unknown>;
+        };
         const data = await this.loadBluePrintMaterialData(paths[i], true);
         if (data) {
           m.fragmentIR = data.irFragment!;
           m.vertexIR = data.irVertex!;
           m.uniformValues = data.uniformValues;
           m.uniformTextures = data.uniformTextures;
+          if (content.type === 'PBRBluePrintMaterial' && content.props) {
+            await this._resourceManager.deserializeObjectProps(m, content.props);
+          }
         }
       }
     }
@@ -846,6 +855,15 @@ export class AssetManager {
           content.data.uniformValues ?? [],
           await this.hydrateBluePrintUniformTextures(content.data.uniformTextures ?? [])
         );
+        const instanceContent = JSON.parse(
+          (await this.readFileFromVFS(paths[i], { encoding: 'utf8' })) as string
+        ) as {
+          type: string;
+          props?: Record<string, unknown>;
+        };
+        if (instanceContent.type === 'PBRBluePrintMaterialInstance' && instanceContent.props) {
+          await this._resourceManager.deserializeObjectProps(m, instanceContent.props);
+        }
       }
     }
   }
