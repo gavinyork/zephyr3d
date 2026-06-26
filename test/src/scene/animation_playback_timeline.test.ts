@@ -114,6 +114,47 @@ describe('Animation playback events', () => {
     expect(playback.time).toBeCloseTo(0.75);
   });
 
+  test('playback sync can start a clip at the same normalized phase as another playback', () => {
+    const animationSet = createAnimationSet();
+    const lower = animationSet.createAnimation('lower');
+    const upper = animationSet.createAnimation('upper');
+    lower!.timeDuration = 2;
+    upper!.timeDuration = 1;
+
+    const lowerPlayback = animationSet.play('lower', { repeat: 0 })!;
+    animationSet.update(0);
+    animationSet.update(0.75);
+
+    const upperPlayback = animationSet.play('upper', {
+      repeat: 0,
+      sync: { target: 'lower' }
+    })!;
+
+    expect(lowerPlayback.time).toBeCloseTo(0.75);
+    expect(upperPlayback.time).toBeCloseTo(0.375);
+    expect(upperPlayback.normalizedTime).toBeCloseTo(lowerPlayback.normalizedTime);
+  });
+
+  test('playback sync can copy absolute time from a playback id', () => {
+    const animationSet = createAnimationSet();
+    const source = animationSet.createAnimation('source');
+    const target = animationSet.createAnimation('target');
+    source!.timeDuration = 2;
+    target!.timeDuration = 3;
+
+    const sourcePlayback = animationSet.play('source', { id: 'locomotion', repeat: 0 })!;
+    animationSet.update(0);
+    animationSet.update(1.25);
+
+    const targetPlayback = animationSet.play('target', {
+      repeat: 0,
+      sync: { target: 'locomotion', mode: 'time', offset: 0.25, wrap: false }
+    })!;
+
+    expect(sourcePlayback.time).toBeCloseTo(1.25);
+    expect(targetPlayback.time).toBeCloseTo(1.5);
+  });
+
   test('marker and frame waiters resolve when playback stops', async () => {
     const scene = new Scene();
     const node = new SceneNode(scene);
@@ -128,6 +169,35 @@ describe('Animation playback events', () => {
 
     await expect(markerPromise).resolves.toBeUndefined();
     await expect(framePromise).resolves.toBeUndefined();
+  });
+
+  test('timeline play sync resolves local playback ids', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'lower', 2);
+    createClip(node, 'upper', 1);
+
+    const timeline = new AnimationTimeline({
+      steps: [
+        { type: 'play', clip: 'lower', id: 'lowerBody', options: { repeat: 0 } },
+        { type: 'wait', seconds: 0.5 },
+        {
+          type: 'play',
+          clip: 'upper',
+          options: { repeat: 0, sync: { target: 'lowerBody' } }
+        }
+      ]
+    });
+    const runner = timeline.createRunner(node.animationSet);
+
+    runner.start();
+    node.animationSet.update(0);
+    node.animationSet.update(0.5);
+
+    const lower = node.animationSet.getPlayback('lower');
+    const upper = node.animationSet.getPlayback('upper');
+    expect(lower?.time).toBeCloseTo(0.5);
+    expect(upper?.time).toBeCloseTo(0.25);
   });
 });
 
@@ -191,6 +261,56 @@ describe('Animation timeline controller', () => {
     expect(controller.currentState).toBe('fall');
     expect(node.animationSet.isPlayingAnimation('attack')).toBe(false);
     expect(node.animationSet.isPlayingAnimation('fall')).toBe(true);
+  });
+
+  test('a transition response can return to the previous state when the target state completes', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'run', 1);
+    createClip(node, 'attack', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    controller
+      .addState('run', {
+        timeline: {
+          steps: [{ type: 'play', clip: 'run', options: { repeat: 0 }, wait: false }]
+        },
+        responses: [
+          {
+            event: 'attack',
+            target: { targetState: 'attack', returnTo: true }
+          }
+        ]
+      })
+      .addState('attack', {
+        timeline: {
+          steps: [{ type: 'play', clip: 'attack', options: { repeat: 1 }, wait: 'complete' }]
+        }
+      });
+
+    const stateChanges: Array<string | null> = [];
+    controller.on('statechange', (state) => {
+      stateChanges.push(state);
+    });
+
+    controller.setState('run');
+    expect(controller.currentState).toBe('run');
+    expect(node.animationSet.isPlayingAnimation('run')).toBe(true);
+
+    const result = controller.dispatch('attack');
+    expect(result.handled).toBe(true);
+    expect(result.policy).toBe('transition');
+    expect(controller.currentState).toBe('attack');
+    expect(node.animationSet.isPlayingAnimation('run')).toBe(false);
+    expect(node.animationSet.isPlayingAnimation('attack')).toBe(true);
+
+    node.animationSet.update(0);
+    node.animationSet.update(1.1);
+
+    expect(controller.currentState).toBe('run');
+    expect(node.animationSet.isPlayingAnimation('attack')).toBe(false);
+    expect(node.animationSet.isPlayingAnimation('run')).toBe(true);
+    expect(stateChanges).toEqual(['run', 'attack', 'run']);
   });
 
   test('enqueue responses on the controller run after the current steps drain', () => {

@@ -22,6 +22,52 @@ import type { SkeletalAnimationMaskOptions } from './animationmask';
 import { createSkeletalMaskedAnimationClip } from './animationmask';
 
 /**
+ * How a new playback copies phase from an existing active playback.
+ *
+ * - `'normalized'`: copy the source playback's normalized phase and map it into the new clip.
+ * - `'time'`: copy the source playback's time in seconds.
+ *
+ * @public
+ */
+export type AnimationPlaybackSyncMode = 'normalized' | 'time';
+
+/**
+ * Options for starting a playback at the same phase as another active playback.
+ *
+ * Use this when switching between matching locomotion clips, upper/lower body clips, or a
+ * layered setup and a full-body clip that must stay phase-aligned.
+ *
+ * @public
+ */
+export type AnimationPlaybackSyncOptions = {
+  /**
+   * Active playback to synchronize with.
+   *
+   * The value is resolved as an active clip name first, then as an active playback id. Timeline
+   * `play` steps also resolve local `id` references before forwarding the options to
+   * `AnimationSet`.
+   */
+  target: string;
+  /**
+   * Synchronization mode. Defaults to `'normalized'`.
+   */
+  mode?: AnimationPlaybackSyncMode;
+  /**
+   * Optional phase offset.
+   *
+   * In `'normalized'` mode this is a normalized phase offset where 1 is one full cycle. In
+   * `'time'` mode this is an offset in seconds.
+   */
+  offset?: number;
+  /**
+   * Whether the synchronized time wraps into the destination clip or range. Defaults to true.
+   *
+   * Set to false to clamp the initial time to the destination clip or range.
+   */
+  wrap?: boolean;
+};
+
+/**
  * Options for playing an animation.
  *
  * Controls looping, playback speed (including reverse), and fade-in blending.
@@ -81,6 +127,14 @@ export type PlayAnimationOptions = {
     start?: AnimationTimeRef;
     end?: AnimationTimeRef;
   };
+  /**
+   * Optional phase synchronization source used to choose the initial playback time.
+   *
+   * When omitted, playback starts at the range start (or clip start), and reverse playback starts
+   * at the range end (or clip end). When set, the new playback starts at the phase copied from the
+   * referenced active playback.
+   */
+  sync?: AnimationPlaybackSyncOptions;
 };
 
 /**
@@ -1410,9 +1464,6 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
     if (!ani) {
       return;
     }
-    if (this.isPlayingAnimation(ani.name)) {
-      this.stopAnimation(ani.name, { reason: 'replaced' });
-    }
     const options = playback._getOptions();
     const fadeIn = Math.max(options?.fadeIn ?? 0, 0);
     const repeat = options?.repeat ?? 0;
@@ -1420,7 +1471,18 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
     const weight = playback.weight;
     const rangeStart = ani.resolveTimeRef(options?.range?.start);
     const rangeEnd = ani.resolveTimeRef(options?.range?.end);
-    const initialTime = speedRatio < 0 ? (rangeEnd ?? rangeStart ?? ani.timeDuration) : (rangeStart ?? 0);
+    const syncSource = this.resolvePlaybackSyncSource(options?.sync);
+    const initialTime = this.computePlaybackInitialTime(
+      ani,
+      speedRatio,
+      rangeStart,
+      rangeEnd,
+      options?.sync,
+      syncSource
+    );
+    if (this.isPlayingAnimation(ani.name)) {
+      this.stopAnimation(ani.name, { reason: 'replaced' });
+    }
     playback._setState('playing');
     playback._setTime(initialTime);
     this._activeAnimations.set(ani, {
@@ -1480,6 +1542,90 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
         binding.rig.playing = true;
       }
     });
+  }
+
+  private resolvePlaybackSyncSource(sync: AnimationPlaybackSyncOptions | undefined) {
+    if (!sync?.target) {
+      return null;
+    }
+    const playback = this.resolveActivePlayback(sync.target);
+    if (!playback) {
+      return null;
+    }
+    const info = this._activeAnimations.get(playback.clip);
+    return info?.playback === playback ? { playback, info, clip: playback.clip } : null;
+  }
+
+  private resolveActivePlayback(target: string): AnimationPlayback | null {
+    const named = this.getPlayback(target);
+    if (named) {
+      return named;
+    }
+    for (const info of this._activeAnimations.values()) {
+      if (info.playback.id === target) {
+        return info.playback;
+      }
+    }
+    return null;
+  }
+
+  private computePlaybackInitialTime(
+    clip: AnimationClip,
+    speedRatio: number,
+    rangeStart: number | null,
+    rangeEnd: number | null,
+    sync: AnimationPlaybackSyncOptions | undefined,
+    syncSource: { info: ActiveAnimationInfo; clip: AnimationClip } | null
+  ) {
+    const fallback = speedRatio < 0 ? (rangeEnd ?? rangeStart ?? clip.timeDuration) : (rangeStart ?? 0);
+    if (!sync || !syncSource) {
+      return fallback;
+    }
+    const destination = this.getPlaybackEffectiveRange(clip, rangeStart, rangeEnd);
+    if (destination.duration <= 0) {
+      return fallback;
+    }
+    const offset = Number.isFinite(sync.offset) ? (sync.offset ?? 0) : 0;
+    const wrap = sync.wrap ?? true;
+    if ((sync.mode ?? 'normalized') === 'time') {
+      return this.constrainPlaybackTime(syncSource.info.currentTime + offset, destination, wrap);
+    }
+    const source = this.getPlaybackEffectiveRange(
+      syncSource.clip,
+      syncSource.info.rangeStart,
+      syncSource.info.rangeEnd
+    );
+    if (source.duration <= 0) {
+      return fallback;
+    }
+    const phase = (syncSource.info.currentTime - source.start) / source.duration + offset;
+    return this.constrainPlaybackTime(destination.start + phase * destination.duration, destination, wrap);
+  }
+
+  private getPlaybackEffectiveRange(clip: AnimationClip, rangeStart: number | null, rangeEnd: number | null) {
+    const start = rangeStart ?? 0;
+    const end = rangeEnd ?? clip.timeDuration;
+    return start <= end
+      ? { start, end, duration: end - start }
+      : { start: end, end: start, duration: start - end };
+  }
+
+  private constrainPlaybackTime(
+    time: number,
+    range: { start: number; end: number; duration: number },
+    wrap: boolean
+  ) {
+    if (!Number.isFinite(time)) {
+      return range.start;
+    }
+    if (!wrap) {
+      return Math.max(range.start, Math.min(range.end, time));
+    }
+    if (time >= range.start && time <= range.end) {
+      return time;
+    }
+    const offset = (((time - range.start) % range.duration) + range.duration) % range.duration;
+    return range.start + offset;
   }
   /**
    * Stop a playback handle.

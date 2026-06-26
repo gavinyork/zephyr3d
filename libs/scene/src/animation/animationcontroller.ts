@@ -4,13 +4,29 @@ import type {
   AnimationTimelineEventResponse,
   AnimationTimelineEventResult,
   AnimationTimelineRunner,
+  AnimationTimelineStateReturnTarget,
   AnimationTimelineStep
 } from './animationtimeline';
 import { AnimationTimeline, type AnimationTimelineDefinition } from './animationtimeline';
 
-/** @public */
+type AnimationControllerReturnTarget = {
+  state: string;
+  transition?: number;
+};
+
+/**
+ * Definition of a named animation controller state.
+ * @public
+ */
 export type AnimationControllerStateDefinition = {
+  /**
+   * Timeline executed when the controller enters this state.
+   */
   timeline: AnimationTimelineDefinition;
+  /**
+   * Optional state-local responses evaluated after the active timeline does not handle a
+   * dispatched event.
+   */
   responses?: AnimationTimelineEventResponse[];
   /**
    * Default cross-fade duration (seconds) applied when transitioning *into* this state.
@@ -19,7 +35,10 @@ export type AnimationControllerStateDefinition = {
   transition?: number;
 };
 
-/** @public */
+/**
+ * Options used when switching the controller to another state.
+ * @public
+ */
 export type AnimationControllerSetStateOptions = {
   /** Cross-fade duration (seconds). Overrides the target state's own `transition`. */
   transition?: number;
@@ -27,14 +46,42 @@ export type AnimationControllerSetStateOptions = {
   force?: boolean;
   /** Stop options for the outgoing state when no cross-fade is used. */
   stop?: StopAnimationOptions;
+  /**
+   * Optional state to enter when the target state completes.
+   *
+   * Use `true` to return to the state active before this transition, or a string to return to a
+   * specific named state.
+   */
+  returnTo?: AnimationTimelineStateReturnTarget;
+  /**
+   * Optional transition duration used when returning from the target state.
+   *
+   * If omitted, the return state's own transition setting is used.
+   */
+  returnTransition?: number;
 };
 
-/** @public */
+/**
+ * Event map emitted by {@link AnimationController}.
+ * @public
+ */
 export type AnimationControllerEventMap = {
+  /**
+   * Emitted after the current state changes.
+   *
+   * The first argument is the new state name, or null when stopped. The second argument is the
+   * previous state name, or null when there was no previous state.
+   */
   statechange: [state: string | null, previousState: string | null];
+  /**
+   * Emitted when the active state's timeline runner drains all main, concurrent, and queued work.
+   */
   statecomplete: [state: string];
   /** Forwarded from the active state's timeline runner, so listeners need not rebind per state. */
   emit: [event: string, payload: unknown];
+  /**
+   * Emitted for every call to {@link AnimationController.dispatch} with the resolved event result.
+   */
   event: [event: string, payload: unknown, result: AnimationTimelineEventResult];
 };
 
@@ -47,6 +94,9 @@ export type AnimationControllerEventMap = {
  * @public
  */
 export class AnimationController extends Observable<AnimationControllerEventMap> {
+  /**
+   * Animation set used to create playbacks for all state timelines.
+   */
   readonly animationSet: AnimationSet;
   private readonly _states: Map<string, AnimationControllerStateDefinition>;
   private _currentState: string | null;
@@ -54,6 +104,11 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
   private _onRunnerComplete: (() => void) | null;
   private _onRunnerEmit: ((event: string, payload: unknown) => void) | null;
 
+  /**
+   * Create a controller for an animation set.
+   *
+   * @param animationSet - Animation set that owns the clips and active playbacks.
+   */
   constructor(animationSet: AnimationSet) {
     super();
     this.animationSet = animationSet;
@@ -64,14 +119,31 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     this._onRunnerEmit = null;
   }
 
+  /**
+   * Current state name.
+   *
+   * @returns The active state name, or null when the controller is stopped or has not entered a state.
+   */
   get currentState() {
     return this._currentState;
   }
 
+  /**
+   * Current timeline runner.
+   *
+   * @returns The active timeline runner, or null when no state is running.
+   */
   get runner() {
     return this._runner;
   }
 
+  /**
+   * Register or replace a named state definition.
+   *
+   * @param name - Unique state name.
+   * @param definition - Timeline and event response configuration for the state.
+   * @returns This controller for chaining.
+   */
   addState(name: string, definition: AnimationControllerStateDefinition) {
     if (this._states.has(name)) {
       console.warn(`AnimationController state ${name} already exists; overwriting`);
@@ -80,10 +152,27 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     return this;
   }
 
+  /**
+   * Test whether a state has been registered.
+   *
+   * @param name - State name to look up.
+   * @returns True if the controller contains a state with the given name; otherwise false.
+   */
   hasState(name: string) {
     return this._states.has(name);
   }
 
+  /**
+   * Enter a registered state.
+   *
+   * If the requested state is already current and `options.force` is not set, this returns the
+   * existing runner without restarting the timeline. When a transition duration is provided, the
+   * previous runner fades out while the entry plays of the new state fade in.
+   *
+   * @param name - State name to enter.
+   * @param options - Optional transition, re-entry, and stop behavior.
+   * @returns The active runner for the entered state, or null if the state does not exist.
+   */
   setState(name: string, options?: AnimationControllerSetStateOptions) {
     const definition = this._states.get(name);
     if (!definition) {
@@ -95,6 +184,11 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     }
     const previousState = this._currentState;
     const transition = Math.max(options?.transition ?? definition.transition ?? 0, 0);
+    const returnTarget = this.resolveReturnTarget(
+      options?.returnTo,
+      previousState,
+      options?.returnTransition
+    );
     this.detachRunner();
     if (transition > 0) {
       this._runner?.stop({ fadeOut: transition, reason: 'interrupted' });
@@ -106,7 +200,7 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     );
     this._runner = timeline.createRunner(this.animationSet);
     const runner = this._runner;
-    this.attachRunner(runner, name);
+    this.attachRunner(runner, name, returnTarget);
     // Enter the new state *before* starting the runner: start() flushes synchronously, so any
     // initial `emit`/`statecomplete` must observe the controller already in `name`. Otherwise a
     // listener calling dispatch() would route against the previous state.
@@ -122,6 +216,16 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     return this._runner;
   }
 
+  /**
+   * Dispatch a gameplay event to the active state.
+   *
+   * The active timeline receives the event first. If it does not handle the event, the current
+   * state's response table may consume it, enqueue or run steps, or transition to another state.
+   *
+   * @param event - Event name to dispatch.
+   * @param payload - Optional event payload passed through result notifications.
+   * @returns The resolved handling result for the event.
+   */
   dispatch(event: string, payload?: unknown): AnimationTimelineEventResult {
     if (!this._currentState || !this._runner) {
       return this.emitResult({ handled: false, policy: 'none', event, payload });
@@ -139,7 +243,11 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     }
     if (response.target.targetState !== undefined) {
       const transition = typeof response.onActive === 'object' ? response.onActive.fadeOut : undefined;
-      const runner = this.setState(response.target.targetState, { transition });
+      const runner = this.setState(response.target.targetState, {
+        transition,
+        returnTo: response.target.returnTo,
+        returnTransition: response.target.returnTransition
+      });
       // setState returns null when the target state is not registered: a config error must not be
       // reported as a successfully handled transition.
       if (!runner) {
@@ -170,6 +278,12 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     return this.emitResult({ handled: true, policy: 'steps', event, payload });
   }
 
+  /**
+   * Stop the active state and clear the current state.
+   *
+   * @param options - Optional stop behavior applied to playbacks owned by the active runner.
+   * @returns void
+   */
   stop(options?: StopAnimationOptions) {
     const previousState = this._currentState;
     this.detachRunner();
@@ -181,6 +295,11 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     }
   }
 
+  /**
+   * Stop playback and remove all registered states.
+   *
+   * @returns void
+   */
   dispose() {
     this.stop();
     this._states.clear();
@@ -191,9 +310,35 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     return result;
   }
 
-  private attachRunner(runner: AnimationTimelineRunner, state: string) {
+  private resolveReturnTarget(
+    returnTo: AnimationTimelineStateReturnTarget | undefined,
+    previousState: string | null,
+    returnTransition: number | undefined
+  ): AnimationControllerReturnTarget | null {
+    if (returnTo === undefined) {
+      return null;
+    }
+    const state = returnTo === true ? previousState : returnTo;
+    if (!state) {
+      return null;
+    }
+    if (!this._states.has(state)) {
+      console.error(`AnimationController return state ${state} not exists`);
+      return null;
+    }
+    return { state, transition: returnTransition };
+  }
+
+  private attachRunner(
+    runner: AnimationTimelineRunner,
+    state: string,
+    returnTarget?: AnimationControllerReturnTarget | null
+  ) {
     this._onRunnerComplete = () => {
       this.dispatchEvent('statecomplete', state);
+      if (returnTarget && this._runner === runner && this._currentState === state) {
+        this.setState(returnTarget.state, { transition: returnTarget.transition });
+      }
     };
     this._onRunnerEmit = (event, payload) => {
       this.dispatchEvent('emit', event, payload);

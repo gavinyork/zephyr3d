@@ -41,6 +41,7 @@
     - [Morph Target / BlendShape](zh-cn/animation-morph-target.md)
     - [关键帧动画](zh-cn/animation-keyframe.md)
     - [动画融合](zh-cn/animation-blending.md)
+    - [动作编排](zh-cn/animation-controller.md)
     - [自定义动画](zh-cn/animation-custom.md)
   - 后处理
     - [概述](zh-cn/posteffect-intro.md)

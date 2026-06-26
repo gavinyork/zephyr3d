@@ -18,14 +18,87 @@ import type {
 export type AnimationTimelineActiveDisposition = 'stop' | 'keep' | { fadeOut: number };
 
 /**
+ * Return target for controller state-transition responses.
+ *
+ * - `true`: return to the state that was active before the transition.
+ * - `string`: return to the named state.
+ *
+ * Only {@link AnimationController} state responses can perform the return; bare timeline runners
+ * report state-transition targets as unhandled so the controller can act on them.
+ * @public
+ */
+export type AnimationTimelineStateReturnTarget = true | string;
+
+/**
  * What a response does when its event fires. Exactly one variant applies.
  * @public
  */
 export type AnimationTimelineEventTarget =
-  | { steps: AnimationTimelineStep[]; targetState?: undefined; consume?: undefined; ignore?: undefined }
-  | { targetState: string; steps?: undefined; consume?: undefined; ignore?: undefined }
-  | { consume: true; steps?: undefined; targetState?: undefined; ignore?: undefined }
-  | { ignore: true; steps?: undefined; targetState?: undefined; consume?: undefined };
+  | {
+      /** Steps to run when the event is handled. */
+      steps: AnimationTimelineStep[];
+      /** Not used for step targets; keeps this union variant mutually exclusive. */
+      targetState?: undefined;
+      /** Not used for step targets; keeps this union variant mutually exclusive. */
+      returnTo?: undefined;
+      /** Not used for step targets; keeps this union variant mutually exclusive. */
+      returnTransition?: undefined;
+      /** Not used for step targets; keeps this union variant mutually exclusive. */
+      consume?: undefined;
+      /** Not used for step targets; keeps this union variant mutually exclusive. */
+      ignore?: undefined;
+    }
+  | {
+      /** Controller state name to transition to. */
+      targetState: string;
+      /**
+       * Optional state to enter when `targetState` completes.
+       *
+       * Use `true` to return to the state active before the transition, or a string to return to
+       * a specific named state. This is only applied by {@link AnimationController}.
+       */
+      returnTo?: AnimationTimelineStateReturnTarget;
+      /**
+       * Optional transition duration used when returning from `targetState`.
+       *
+       * If omitted, the return state's own transition setting is used.
+       */
+      returnTransition?: number;
+      /** Not used for state-transition targets; keeps this union variant mutually exclusive. */
+      steps?: undefined;
+      /** Not used for state-transition targets; keeps this union variant mutually exclusive. */
+      consume?: undefined;
+      /** Not used for state-transition targets; keeps this union variant mutually exclusive. */
+      ignore?: undefined;
+    }
+  | {
+      /** Consume the event without starting steps or changing state. */
+      consume: true;
+      /** Not used for consume targets; keeps this union variant mutually exclusive. */
+      steps?: undefined;
+      /** Not used for consume targets; keeps this union variant mutually exclusive. */
+      targetState?: undefined;
+      /** Not used for consume targets; keeps this union variant mutually exclusive. */
+      returnTo?: undefined;
+      /** Not used for consume targets; keeps this union variant mutually exclusive. */
+      returnTransition?: undefined;
+      /** Not used for consume targets; keeps this union variant mutually exclusive. */
+      ignore?: undefined;
+    }
+  | {
+      /** Explicitly ignore the event. */
+      ignore: true;
+      /** Not used for ignore targets; keeps this union variant mutually exclusive. */
+      steps?: undefined;
+      /** Not used for ignore targets; keeps this union variant mutually exclusive. */
+      targetState?: undefined;
+      /** Not used for ignore targets; keeps this union variant mutually exclusive. */
+      returnTo?: undefined;
+      /** Not used for ignore targets; keeps this union variant mutually exclusive. */
+      returnTransition?: undefined;
+      /** Not used for ignore targets; keeps this union variant mutually exclusive. */
+      consume?: undefined;
+    };
 
 /**
  * Resolved kind of action a dispatched event produced.
@@ -33,11 +106,26 @@ export type AnimationTimelineEventTarget =
  */
 export type AnimationTimelineEventPolicy = 'none' | 'ignore' | 'consume' | 'steps' | 'enqueue' | 'transition';
 
-/** @public */
+/**
+ * Result returned when a timeline or controller dispatches an event.
+ * @public
+ */
 export type AnimationTimelineEventResult = {
+  /**
+   * Whether the event was consumed, converted into steps, enqueued, or accepted as a transition.
+   */
   handled: boolean;
+  /**
+   * The action selected for the event.
+   */
   policy: AnimationTimelineEventPolicy;
+  /**
+   * Dispatched event name.
+   */
   event: string;
+  /**
+   * Optional payload supplied by the caller.
+   */
   payload?: unknown;
 };
 
@@ -49,6 +137,9 @@ export type AnimationTimelineEventResult = {
  * @public
  */
 export type AnimationTimelineEventResponse = {
+  /**
+   * Event name this response handles.
+   */
   event: string;
   /** What the event does. */
   target: AnimationTimelineEventTarget;
@@ -65,12 +156,19 @@ export type AnimationTimelineEventResponse = {
   enqueue?: boolean;
 };
 
-/** @public */
+/**
+ * One executable instruction in an animation timeline.
+ * @public
+ */
 export type AnimationTimelineStep =
   | {
+      /** Start an animation clip playback. */
       type: 'play';
+      /** Name of the animation clip to play from the owning AnimationSet. */
       clip: string;
+      /** Optional local reference id used by later `target` fields in the same scope. */
       id?: string;
+      /** Playback options passed to `AnimationSet.play`. */
       options?: PlayAnimationOptions;
       /**
        * Whether to block the timeline on this playback before advancing to the next step.
@@ -83,52 +181,97 @@ export type AnimationTimelineStep =
       wait?: 'complete' | false;
     }
   | {
+      /** Stop a playback owned by this runner. */
       type: 'stop';
+      /**
+       * Optional playback target id.
+       *
+       * When omitted, all playbacks owned by the current runner are stopped.
+       */
       target?: string;
+      /** Stop behavior passed to the matching playback or playbacks. */
       options?: StopAnimationOptions;
     }
   | {
+      /** Wait for a fixed duration. */
       type: 'wait';
+      /** Number of seconds to wait before continuing. */
       seconds: number;
     }
   | {
+      /** Wait until a matching event is dispatched to the runner. */
       type: 'waitEvent';
+      /** Event name that releases the wait. */
       event: string;
     }
   | {
+      /** Wait until a playback crosses a marker. */
       type: 'waitMarker';
+      /** Marker id or name to wait for. */
       marker: string;
+      /** Optional playback target id; defaults to the current playback in scope. */
       target?: string;
     }
   | {
+      /** Wait until a playback crosses a frame number. */
       type: 'waitFrame';
+      /** Frame number to wait for. */
       frame: number;
+      /** Optional playback target id; defaults to the current playback in scope. */
       target?: string;
     }
   | {
+      /** Emit a timeline event through the runner. */
       type: 'emit';
+      /** Event name emitted to runner listeners. */
       event: string;
+      /** Optional payload emitted with the event. */
       payload?: unknown;
     }
   | {
+      /** Execute child steps sequentially. */
       type: 'sequence';
+      /** Child steps run in order. */
       steps: AnimationTimelineStep[];
     }
   | {
+      /** Execute child steps as parallel branches. */
       type: 'parallel';
+      /** Child steps that become isolated parallel branches. */
       steps: AnimationTimelineStep[];
     };
 
-/** @public */
+/**
+ * Serializable timeline definition.
+ * @public
+ */
 export type AnimationTimelineDefinition = {
+  /**
+   * Root sequence of timeline steps.
+   */
   steps: AnimationTimelineStep[];
+  /**
+   * Optional responses evaluated when dispatched events are not consumed by waiters.
+   */
   responses?: AnimationTimelineEventResponse[];
 };
 
-/** @public */
+/**
+ * Event map emitted by {@link AnimationTimelineRunner}.
+ * @public
+ */
 export type AnimationTimelineRunnerEventMap = {
+  /**
+   * Emitted when the runner drains all main, concurrent, and queued work.
+   */
   complete: [runner: AnimationTimelineRunner];
+  /**
+   * Emitted when an active runner is explicitly stopped.
+   */
   stop: [runner: AnimationTimelineRunner];
+  /**
+   * Emitted by an `emit` timeline step.
+   */
   emit: [event: string, payload: unknown];
 };
 
@@ -140,11 +283,23 @@ export type AnimationTimelineRunnerEventMap = {
  * @public
  */
 export type AnimationTimelineRunnerState = {
+  /**
+   * Serialized main control-flow stack.
+   */
   stack: SerializedFrame[];
+  /**
+   * Serialized concurrent branches started with `keep` responses.
+   */
   concurrent: SerializedFrame[];
+  /**
+   * Queued step batches waiting for the main stack to drain.
+   */
   queued: AnimationTimelineStep[][];
   /** Ids of playbacks owned by concurrent (keep-active) branches that have already drained. */
   concurrentPlaybackIds: string[];
+  /**
+   * Whether the runner was stopped when the state was captured.
+   */
   stopped: boolean;
 };
 
@@ -205,9 +360,20 @@ type TickResult = { status: 'block' | 'advanced'; leftover?: number } | { status
  * @public
  */
 export class AnimationTimeline {
+  /**
+   * Root step sequence executed by runners created from this timeline.
+   */
   readonly steps: AnimationTimelineStep[];
+  /**
+   * Event responses declared on this timeline.
+   */
   readonly responses: AnimationTimelineEventResponse[];
 
+  /**
+   * Create a timeline from a definition object or a root step array.
+   *
+   * @param definition - Timeline definition, or a shorthand array used as the root steps.
+   */
   constructor(definition: AnimationTimelineDefinition | AnimationTimelineStep[]) {
     if (Array.isArray(definition)) {
       this.steps = definition;
@@ -218,6 +384,12 @@ export class AnimationTimeline {
     }
   }
 
+  /**
+   * Create a runtime runner for this timeline.
+   *
+   * @param animationSet - Animation set used to create and update playbacks.
+   * @returns A new stopped runner bound to this timeline and animation set.
+   */
   createRunner(animationSet: AnimationSet) {
     return new AnimationTimelineRunner(animationSet, this);
   }
@@ -232,7 +404,13 @@ export class AnimationTimeline {
  * @public
  */
 export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerEventMap> {
+  /**
+   * Animation set used to start, stop, and query animation playbacks.
+   */
   readonly animationSet: AnimationSet;
+  /**
+   * Timeline definition interpreted by this runner.
+   */
   readonly timeline: AnimationTimeline;
   private _stack: TimelineFrame[];
   private _concurrent: TimelineFrame[];
@@ -249,6 +427,12 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
   private readonly _crossedMarkers: Map<string, Set<string>>;
   private readonly _crossedFrames: Map<string, Set<number>>;
 
+  /**
+   * Create a stopped runner for a timeline.
+   *
+   * @param animationSet - Animation set that owns clips and playbacks referenced by the timeline.
+   * @param timeline - Timeline definition to interpret.
+   */
   constructor(animationSet: AnimationSet, timeline: AnimationTimeline) {
     super();
     this.animationSet = animationSet;
@@ -266,6 +450,11 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     this._crossedFrames = new Map();
   }
 
+  /**
+   * Playback currently referenced by the active main-flow scope.
+   *
+   * @returns The current playback, or null when the main flow has no active playback reference.
+   */
   get currentPlayback() {
     const scope = this.activeScope();
     if (!scope?.currentPlaybackId) {
@@ -274,10 +463,20 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     return this._ownedPlaybacks.get(scope.currentPlaybackId) ?? null;
   }
 
+  /**
+   * Whether this runner is stopped.
+   *
+   * @returns True when the runner is stopped; otherwise false.
+   */
   get stopped() {
     return this._stopped;
   }
 
+  /**
+   * Start or restart the runner from the beginning of the timeline.
+   *
+   * @returns This runner for chaining.
+   */
   start() {
     this._stopped = false;
     this._stack = [this.makeSeqFrame(this.timeline.steps)];
@@ -290,6 +489,12 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     return this;
   }
 
+  /**
+   * Stop the runner and all playbacks it owns.
+   *
+   * @param options - Optional stop behavior applied to owned playbacks.
+   * @returns This runner for chaining.
+   */
   stop(options?: StopAnimationOptions) {
     const wasStopped = this._stopped;
     this._stopped = true;
@@ -315,6 +520,14 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     return this;
   }
 
+  /**
+   * Append a batch of steps to run after the main stack drains.
+   *
+   * If the runner has already completed, enqueueing steps revives it and registers it for ticking.
+   *
+   * @param steps - Steps to run as the next queued batch.
+   * @returns void
+   */
   enqueue(steps: AnimationTimelineStep[]) {
     if (steps.length === 0) {
       return;
@@ -332,6 +545,9 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
   /**
    * Run `steps` concurrently with the current control flow (a true parallel branch). Unlike
    * {@link enqueue}, these do not wait for the main stack to drain.
+   *
+   * @param steps - Steps to run immediately in an independent concurrent branch.
+   * @returns void
    * @public
    */
   runConcurrent(steps: AnimationTimelineStep[]) {
@@ -348,6 +564,16 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     this.flush();
   }
 
+  /**
+   * Dispatch an event to this runner.
+   *
+   * Waiting `waitEvent` frames consume matching events first. If no waiter consumes the event,
+   * the timeline response table is evaluated.
+   *
+   * @param event - Event name to dispatch.
+   * @param payload - Optional payload returned in the result.
+   * @returns The resolved handling result for the event.
+   */
   dispatch(event: string, payload?: unknown): AnimationTimelineEventResult {
     // A waiting `waitEvent` frame consumes the event; flush advances past it synchronously.
     if (this.hasWaiterFor(event)) {
@@ -394,6 +620,8 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
    * Run pending non-blocking work synchronously (a zero-delta tick), without advancing any
    * time-based waits. Lets `start()`/`dispatch()` take effect immediately while keeping all
    * runtime state in the serializable frame stack.
+   *
+   * @returns This runner for chaining.
    * @public
    */
   flush() {
@@ -406,6 +634,9 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
 
   /**
    * Advance the timeline by `deltaInSeconds`. Called by `AnimationSet.update`.
+   *
+   * @param deltaInSeconds - Elapsed time in seconds for this tick.
+   * @returns void
    * @public
    */
   tick(deltaInSeconds: number) {
@@ -454,6 +685,8 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
 
   /**
    * Export the runtime state as plain data.
+   *
+   * @returns A serializable snapshot of the runner state.
    * @public
    */
   serialize(): AnimationTimelineRunnerState {
@@ -471,6 +704,11 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
    *
    * Re-create the relevant active playbacks on the AnimationSet before calling this so that
    * playback-bound frames (play-wait, waitMarker, waitFrame) can re-attach by id.
+   *
+   * @param animationSet - Animation set containing any live playbacks referenced by the state.
+   * @param timeline - Timeline definition to bind to the restored runner.
+   * @param state - Serialized state previously returned by {@link serialize}.
+   * @returns A runner restored to the supplied runtime state.
    * @public
    */
   static deserialize(
@@ -669,7 +907,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
         return { kind: 'parallel', branches };
       }
       case 'play': {
-        const playback = this.animationSet.play(step.clip, step.options);
+        const playback = this.animationSet.play(step.clip, this.resolvePlayOptions(step.options, scope));
         if (!playback) {
           return null;
         }
@@ -721,6 +959,24 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
         this.dispatchEvent('emit', step.event, step.payload);
         return null;
     }
+  }
+
+  private resolvePlayOptions(options: PlayAnimationOptions | undefined, scope: FrameScope) {
+    const target = options?.sync?.target;
+    if (!target) {
+      return options;
+    }
+    const mapped = scope.refs[target];
+    if (!mapped) {
+      return options;
+    }
+    return {
+      ...options,
+      sync: {
+        ...options.sync,
+        target: mapped
+      }
+    };
   }
 
   private tickWaitMarker(frame: WaitMarkerFrame): TickResult {

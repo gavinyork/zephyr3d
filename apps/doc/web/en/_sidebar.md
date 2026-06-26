@@ -41,6 +41,7 @@
     - [Morph Target / BlendShape](en/animation-morph-target.md)
     - [Keyframe Animation](en/animation-keyframe.md)
     - [Animation Blending](en/animation-blending.md)
+    - [Action Orchestration](en/animation-controller.md)
     - [Custom Animation](en/animation-custom.md)
   - PostProcessing
     - [Overview](en/posteffect-intro.md)
