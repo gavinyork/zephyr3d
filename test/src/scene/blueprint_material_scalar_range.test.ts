@@ -1,3 +1,4 @@
+import { DRef } from '@zephyr3d/base';
 import { ConstantScalarNode, PBRBluePrintMaterial, PBRBluePrintMaterialInstance } from '@zephyr3d/scene';
 
 describe('Blueprint scalar parameter range', () => {
@@ -64,5 +65,57 @@ describe('Blueprint scalar parameter range', () => {
     expect(instance.uniformValues[0].value).toEqual([0.75]);
     expect(instance.uniformValues[0].minValue).toBe(-2);
     expect(instance.uniformValues[0].maxValue).toBe(2);
+  });
+
+  test('Blueprint material instance should keep hydrated texture overrides after rebuilding override maps', () => {
+    const parent = new PBRBluePrintMaterial();
+    parent.uniformTextures = [
+      {
+        name: 'u_BaseColor',
+        type: 'tex2D',
+        texture: '/materials/base.png',
+        sRGB: true,
+        wrapS: 'clamp',
+        wrapT: 'clamp',
+        minFilter: 'linear',
+        magFilter: 'linear',
+        mipFilter: 'nearest',
+        inVertexShader: false,
+        inFragmentShader: true,
+        finalTexture: new DRef(null),
+        finalSampler: {} as any,
+        params: { clone: () => ({}) } as any
+      } as any
+    ];
+
+    const hydratedTextureRef = { id: 'hydrated-texture' } as any;
+    const instance = new PBRBluePrintMaterialInstance(parent, '/materials/parent.zmat');
+    instance.setOverrides([], [
+      {
+        name: 'u_BaseColor',
+        type: 'tex2D',
+        texture: '/materials/override.png',
+        sRGB: true,
+        wrapS: 'clamp',
+        wrapT: 'clamp',
+        minFilter: 'linear',
+        magFilter: 'linear',
+        mipFilter: 'nearest',
+        inVertexShader: false,
+        inFragmentShader: true,
+        finalTexture: new DRef(hydratedTextureRef),
+        finalSampler: { id: 'sampler' } as any,
+        params: { clone: () => ({}) } as any
+      } as any
+    ]);
+
+    expect(instance.uniformTextures[0].finalTexture?.get()).toBe(hydratedTextureRef);
+
+    instance.setParentMaterial(parent, instance.parentMaterialId);
+    instance.setOverrides(instance.uniformValues, instance.uniformTextures);
+
+    expect(instance.uniformTextures[0].texture).toBe('/materials/override.png');
+    expect(instance.uniformTextures[0].finalTexture?.get()).toBe(hydratedTextureRef);
+    expect(instance.getOverrideUniformTextures()[0].texture).toBe('/materials/override.png');
   });
 });

@@ -333,7 +333,9 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
       create: true
     });
     material.setParentMaterial(parent, material.parentMaterialId);
-    material.setOverrides(material.getOverrideUniformValues(), material.getOverrideUniformTextures());
+    // Rebuild override maps from the live runtime state so hydrated blueprint textures
+    // keep their GPU bindings after saving.
+    material.setOverrides(material.uniformValues, material.uniformTextures);
     await getEngine().resourceManager.deserializeObjectProps(material, overrideProps);
     this._savedProps = overrideProps;
     this._version = 0;
