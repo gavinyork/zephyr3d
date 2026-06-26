@@ -332,15 +332,9 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
       encoding: 'utf8',
       create: true
     });
-    (getEngine().resourceManager as any).invalidateMaterial(this._path);
-    const reloaded = (await getEngine().resourceManager.fetchMaterial(this._path, {
-      overrideVFS: ProjectService.VFS
-    })) as PBRBluePrintMaterialInstanceLike | null;
-    if (reloaded) {
-      material.setParentMaterial(reloaded.parentMaterial, reloaded.parentMaterialId);
-      material.uniformValues = reloaded.uniformValues;
-      material.uniformTextures = reloaded.uniformTextures;
-    }
+    material.setParentMaterial(parent, material.parentMaterialId);
+    material.setOverrides(material.getOverrideUniformValues(), material.getOverrideUniformTextures());
+    await getEngine().resourceManager.deserializeObjectProps(material, overrideProps);
     this._savedProps = overrideProps;
     this._version = 0;
   }

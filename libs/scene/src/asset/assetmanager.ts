@@ -805,19 +805,47 @@ export class AssetManager {
       }
     }
     const materials = await Promise.all(promises);
+
+    // Reload blueprint parents first so dependent instances always resync against the latest parent state.
     for (let i = 0; i < materials.length; i++) {
       const m = materials[i];
-      if (m instanceof PBRBluePrintMaterial && (!filter || filter(m))) {
+      if (m instanceof PBRBluePrintMaterial && !(m instanceof PBRBluePrintMaterialInstance) && (!filter || filter(m))) {
         const data = await this.loadBluePrintMaterialData(paths[i], true);
         if (data) {
           m.fragmentIR = data.irFragment!;
           m.vertexIR = data.irVertex!;
           m.uniformValues = data.uniformValues;
           m.uniformTextures = data.uniformTextures;
-          if (m instanceof PBRBluePrintMaterialInstance) {
-            m.syncInheritedUniforms();
-          }
         }
+      }
+    }
+
+    // Then reload instances from disk so override maps stay in sync with the refreshed parent materials.
+    for (let i = 0; i < materials.length; i++) {
+      const m = materials[i];
+      if (m instanceof PBRBluePrintMaterialInstance && (!filter || filter(m))) {
+        const content = JSON.parse(
+          (await this.readFileFromVFS(paths[i], { encoding: 'utf8' })) as string
+        ) as {
+          type: string;
+          data?: {
+            parent?: string;
+            uniformValues?: BluePrintUniformValue[];
+            uniformTextures?: BluePrintUniformTexture[];
+          };
+        };
+        if (content.type !== 'PBRBluePrintMaterialInstance' || !content.data?.parent) {
+          continue;
+        }
+        const parent = await this.fetchMaterial<PBRBluePrintMaterial>(content.data.parent);
+        if (!(parent instanceof PBRBluePrintMaterial)) {
+          continue;
+        }
+        m.setParentMaterial(parent, content.data.parent);
+        m.setOverrides(
+          content.data.uniformValues ?? [],
+          await this.hydrateBluePrintUniformTextures(content.data.uniformTextures ?? [])
+        );
       }
     }
   }
