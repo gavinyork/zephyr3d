@@ -39,6 +39,10 @@ function canEditParentMaterialProperty(material: MeshMaterial) {
   return !material.$isInstance && !(material as MeshMaterial & { isBlueprintMaterialInstance?: boolean }).isBlueprintMaterialInstance;
 }
 
+function isBlueprintMaterialAssetInstanceWithInheritedParentProps(material: MeshMaterial) {
+  return !!(material as MeshMaterial & { isBlueprintMaterialInstance?: boolean }).isBlueprintMaterialInstance;
+}
+
 function isBlueprintMaterialAssetInstance(
   material: MeshMaterial
 ): material is MeshMaterial & {
@@ -657,7 +661,7 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
         this.clearcoat = value.bool[0];
       },
       isValid() {
-        return !this.$isInstance;
+        return !this.$isInstance && !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial);
       }
     },
     {
@@ -678,11 +682,15 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
         this.clearcoatIntensity = value.num[0];
       },
       isValid() {
-        return !this.$isInstance && !!this.clearcoat;
+        return (
+          !this.$isInstance &&
+          !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial) &&
+          !!this.clearcoat
+        );
       }
     },
     ...getTextureProps<PBRMaterial>(manager, 'clearcoatIntensityTexture', '2D', false, 1, function () {
-      return this.clearcoat;
+      return !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial) && this.clearcoat;
     }),
     {
       name: 'ClearCoatRoughnessFactor',
@@ -702,14 +710,18 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
         this.clearcoatRoughnessFactor = value.num[0];
       },
       isValid() {
-        return !this.$isInstance && !!this.clearcoat;
+        return (
+          !this.$isInstance &&
+          !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial) &&
+          !!this.clearcoat
+        );
       }
     },
     ...getTextureProps<PBRMaterial>(manager, 'clearcoatRoughnessTexture', '2D', false, 1, function () {
-      return this.clearcoat;
+      return !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial) && this.clearcoat;
     }),
     ...getTextureProps<PBRMaterial>(manager, 'clearcoatNormalTexture', '2D', false, 1, function () {
-      return this.clearcoat;
+      return !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial) && this.clearcoat;
     }),
     {
       name: 'Sheen',

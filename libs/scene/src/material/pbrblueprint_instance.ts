@@ -108,6 +108,21 @@ function copyParentMaterialState(
   instance.opacity = parentMaterial.opacity;
   instance.objectColor = parentMaterial.objectColor;
   instance.TAAStrength = parentMaterial.TAAStrength;
+  instance.clearcoat = parentMaterial.clearcoat;
+  instance.clearcoatIntensity = parentMaterial.clearcoatIntensity;
+  instance.clearcoatRoughnessFactor = parentMaterial.clearcoatRoughnessFactor;
+  instance.clearcoatIntensityTexture = parentMaterial.clearcoatIntensityTexture;
+  instance.clearcoatIntensityTextureSampler = parentMaterial.clearcoatIntensityTextureSampler;
+  instance.clearcoatIntensityTexCoordMatrix = parentMaterial.clearcoatIntensityTexCoordMatrix;
+  instance.clearcoatIntensityTexCoordIndex = parentMaterial.clearcoatIntensityTexCoordIndex;
+  instance.clearcoatRoughnessTexture = parentMaterial.clearcoatRoughnessTexture;
+  instance.clearcoatRoughnessTextureSampler = parentMaterial.clearcoatRoughnessTextureSampler;
+  instance.clearcoatRoughnessTexCoordMatrix = parentMaterial.clearcoatRoughnessTexCoordMatrix;
+  instance.clearcoatRoughnessTexCoordIndex = parentMaterial.clearcoatRoughnessTexCoordIndex;
+  instance.clearcoatNormalTexture = parentMaterial.clearcoatNormalTexture;
+  instance.clearcoatNormalTextureSampler = parentMaterial.clearcoatNormalTextureSampler;
+  instance.clearcoatNormalTexCoordMatrix = parentMaterial.clearcoatNormalTexCoordMatrix;
+  instance.clearcoatNormalTexCoordIndex = parentMaterial.clearcoatNormalTexCoordIndex;
   instance.syncInheritedSubsurfaceProfile(parentMaterial.subsurfaceProfile);
   if (!instance.hasReflectionModeOverride()) {
     instance.setBlueprintInstanceReflectionMode(parentMaterial.reflectionMode, true);
