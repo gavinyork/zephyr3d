@@ -365,6 +365,64 @@ describe('Animation timeline controller', () => {
     expect(result.handled).toBe(false);
     expect(controller.currentState).toBe('idle');
   });
+
+  test('the controller forwards runner emit events and the binding survives state changes', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'a', 1);
+    createClip(node, 'b', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    controller
+      .addState('a', { timeline: { steps: [{ type: 'emit', event: 'a-enter' }] } })
+      .addState('b', { timeline: { steps: [{ type: 'emit', event: 'b-enter' }] } });
+
+    const emits: string[] = [];
+    // Bound once on the controller, not per-runner: must keep working across the state change.
+    controller.on('emit', (event) => {
+      emits.push(event);
+    });
+
+    controller.setState('a');
+    controller.setState('b');
+
+    expect(emits).toEqual(['a-enter', 'b-enter']);
+  });
+
+  test('a cross-fade transition fades in every entry play, including parallel branches', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'upper', 1);
+    createClip(node, 'lower', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    controller.addState('move', {
+      timeline: {
+        steps: [
+          {
+            type: 'parallel',
+            steps: [
+              { type: 'play', clip: 'upper', options: { repeat: 0 } },
+              { type: 'play', clip: 'lower', options: { repeat: 0 } }
+            ]
+          }
+        ]
+      }
+    });
+
+    controller.setState('move', { transition: 0.5 });
+
+    const upper = node.animationSet.getPlayback('upper');
+    const lower = node.animationSet.getPlayback('lower');
+    expect(upper).not.toBeNull();
+    expect(lower).not.toBeNull();
+    // Both branches start simultaneously, so both must receive the cross-fade fade-in, not just the
+    // first one in document order. `fadeIn` is only reachable via the internal options accessor.
+    const fadeInOf = (playback: typeof upper) =>
+      (playback as unknown as { _getOptions(): { fadeIn?: number } })._getOptions().fadeIn;
+    expect(fadeInOf(upper)).toBe(0.5);
+    expect(fadeInOf(lower)).toBe(0.5);
+  });
 });
 
 describe('Animation timeline runtime', () => {

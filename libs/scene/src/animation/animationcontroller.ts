@@ -33,6 +33,8 @@ export type AnimationControllerSetStateOptions = {
 export type AnimationControllerEventMap = {
   statechange: [state: string | null, previousState: string | null];
   statecomplete: [state: string];
+  /** Forwarded from the active state's timeline runner, so listeners need not rebind per state. */
+  emit: [event: string, payload: unknown];
   event: [event: string, payload: unknown, result: AnimationTimelineEventResult];
 };
 
@@ -50,6 +52,7 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
   private _currentState: string | null;
   private _runner: AnimationTimelineRunner | null;
   private _onRunnerComplete: (() => void) | null;
+  private _onRunnerEmit: ((event: string, payload: unknown) => void) | null;
 
   constructor(animationSet: AnimationSet) {
     super();
@@ -58,6 +61,7 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     this._currentState = null;
     this._runner = null;
     this._onRunnerComplete = null;
+    this._onRunnerEmit = null;
   }
 
   get currentState() {
@@ -184,40 +188,84 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     this._onRunnerComplete = () => {
       this.dispatchEvent('statecomplete', state);
     };
+    this._onRunnerEmit = (event, payload) => {
+      this.dispatchEvent('emit', event, payload);
+    };
     runner.on('complete', this._onRunnerComplete);
+    runner.on('emit', this._onRunnerEmit);
   }
 
   private detachRunner() {
-    if (this._runner && this._onRunnerComplete) {
-      this._runner.off('complete', this._onRunnerComplete);
+    if (this._runner) {
+      if (this._onRunnerComplete) {
+        this._runner.off('complete', this._onRunnerComplete);
+      }
+      if (this._onRunnerEmit) {
+        this._runner.off('emit', this._onRunnerEmit);
+      }
     }
     this._onRunnerComplete = null;
+    this._onRunnerEmit = null;
   }
 }
 
 /**
- * Return a copy of the timeline definition whose first `play` step fades in over `duration`,
- * so a state transition cross-fades against the previous state's fade-out.
+ * Return a copy of the timeline definition whose entry plays fade in over `duration`, so a state
+ * transition cross-fades against the previous state's fade-out.
+ *
+ * "Entry plays" are every `play` that starts before the control flow first blocks: plays before a
+ * `wait`/`waitEvent`/`waitMarker`/`waitFrame`, before a blocking `play` (`wait: 'complete'`), and
+ * every branch of a leading `parallel` (all branches start simultaneously). This covers parallel
+ * states whose branches would otherwise snap in at full weight while only the first faded.
  */
 function withFadeIn(
   definition: AnimationTimelineDefinition | AnimationTimelineStep[],
   duration: number
 ): AnimationTimelineDefinition {
   const def: AnimationTimelineDefinition = Array.isArray(definition) ? { steps: definition } : definition;
-  let injected = false;
-  const inject = (steps: AnimationTimelineStep[]): AnimationTimelineStep[] =>
-    steps.map((step) => {
-      if (injected) {
-        return step;
-      }
-      if (step.type === 'play') {
-        injected = true;
-        return { ...step, options: { ...step.options, fadeIn: duration } };
-      }
-      if (step.type === 'sequence' || step.type === 'parallel') {
-        return { ...step, steps: inject(step.steps) };
-      }
+  return { steps: injectEntryFadeIn(def.steps, duration).steps, responses: def.responses };
+}
+
+/**
+ * Inject `fadeIn` into every entry play in `steps`. Returns the rewritten steps and whether the
+ * flow blocks before reaching the end (so callers stop injecting into later, non-entry steps).
+ */
+function injectEntryFadeIn(
+  steps: AnimationTimelineStep[],
+  duration: number
+): { steps: AnimationTimelineStep[]; blocked: boolean } {
+  let blocked = false;
+  const out = steps.map((step) => {
+    if (blocked) {
       return step;
-    });
-  return { steps: inject(def.steps), responses: def.responses };
+    }
+    switch (step.type) {
+      case 'play':
+        if (step.wait === 'complete') {
+          blocked = true;
+        }
+        return { ...step, options: { ...step.options, fadeIn: duration } };
+      case 'sequence': {
+        const result = injectEntryFadeIn(step.steps, duration);
+        blocked = result.blocked;
+        return { ...step, steps: result.steps };
+      }
+      case 'parallel': {
+        // Every branch starts simultaneously, so inject into all of them; the parallel itself
+        // then blocks the steps that follow it.
+        const branches = step.steps.map((branch) => injectEntryFadeIn([branch], duration).steps[0]);
+        blocked = true;
+        return { ...step, steps: branches };
+      }
+      case 'wait':
+      case 'waitEvent':
+      case 'waitMarker':
+      case 'waitFrame':
+        blocked = true;
+        return step;
+      default:
+        return step;
+    }
+  });
+  return { steps: out, blocked };
 }
