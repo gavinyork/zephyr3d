@@ -185,25 +185,11 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     return base.replace(/_/g, ' ');
   }
 
-  private isColorUniformName(name: string) {
-    const normalized = name.toLowerCase();
-    return (
-      normalized.includes('color') ||
-      normalized.includes('colour') ||
-      normalized.includes('albedo') ||
-      normalized.includes('basecolor') ||
-      normalized.includes('diffuse') ||
-      normalized.includes('emissive') ||
-      normalized.includes('specular') ||
-      normalized.includes('tint')
-    );
-  }
-
   private getUniformDisplayType(uniform: BluePrintUniformValue) {
-    if (uniform.type === 'vec3' && this.isColorUniformName(uniform.name)) {
+    if (uniform.type === 'vec3') {
       return 'rgb';
     }
-    if (uniform.type === 'vec4' && this.isColorUniformName(uniform.name)) {
+    if (uniform.type === 'vec4') {
       return 'rgba';
     }
     return uniform.type === 'float' ? 'float' : uniform.type;
