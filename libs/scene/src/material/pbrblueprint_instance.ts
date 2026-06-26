@@ -51,6 +51,21 @@ function cloneUniformTextures(values: Nullable<BluePrintUniformTexture[]>) {
   }));
 }
 
+function mergeHydratedUniformTexture(
+  base: BluePrintUniformTexture,
+  runtime: Nullable<BluePrintUniformTexture>
+) {
+  if (!runtime) {
+    return base;
+  }
+  return {
+    ...base,
+    finalTexture: runtime.finalTexture ?? base.finalTexture,
+    finalSampler: runtime.finalSampler ?? base.finalSampler,
+    params: runtime.params ?? base.params
+  };
+}
+
 function uniformValueEquals(a: BluePrintUniformValue, b: BluePrintUniformValue) {
   if (a.type !== b.type || a.value.length !== b.value.length) {
     return false;
@@ -342,6 +357,7 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
     if (!parentMaterial) {
       return;
     }
+    const runtimeTextureMap = new Map((this.uniformTextures ?? []).map((v) => [v.name, v]));
     this.fragmentIR = parentMaterial.fragmentIR;
     this.vertexIR = parentMaterial.vertexIR;
     copyParentMaterialState(this, parentMaterial);
@@ -421,7 +437,11 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
       }
     );
     this.uniformTextures = cloneUniformTextures(parentMaterial.uniformTextures).map(
-      (v) => this._overrideUniformTextures.get(v.name) ?? v
+      (v) =>
+        mergeHydratedUniformTexture(
+          this._overrideUniformTextures.get(v.name) ?? v,
+          this._overrideUniformTextures.get(v.name) ?? runtimeTextureMap.get(v.name)
+        )
     );
   }
 

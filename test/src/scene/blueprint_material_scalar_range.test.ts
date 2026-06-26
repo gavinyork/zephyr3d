@@ -118,4 +118,61 @@ describe('Blueprint scalar parameter range', () => {
     expect(instance.uniformTextures[0].finalTexture?.get()).toBe(hydratedTextureRef);
     expect(instance.getOverrideUniformTextures()[0].texture).toBe('/materials/override.png');
   });
+
+  test('Blueprint material instance should preserve hydrated inherited textures after parent sync', () => {
+    const hiddenParentTexture = { id: 'hidden-parent-texture' } as any;
+    const visibleParentTexture = { id: 'visible-parent-texture' } as any;
+    const thicknessTexture = {
+      id: 'thickness-texture',
+      getDefaultSampler: () => ({ id: 'default-thickness-sampler' })
+    } as any;
+    const parent = new PBRBluePrintMaterial();
+    parent.uniformTextures = [
+      {
+        name: 'u_makeup02',
+        type: 'tex2D',
+        texture: '/materials/makeup02.png',
+        exposed: false,
+        sRGB: false,
+        wrapS: 'clamp',
+        wrapT: 'clamp',
+        minFilter: 'linear',
+        magFilter: 'linear',
+        mipFilter: 'nearest',
+        inVertexShader: false,
+        inFragmentShader: true,
+        finalTexture: new DRef(hiddenParentTexture),
+        finalSampler: { id: 'hidden-sampler' } as any,
+        params: { clone: () => ({}) } as any
+      } as any,
+      {
+        name: 'u_EmissiveTex',
+        type: 'tex2D',
+        texture: '/materials/emissive.png',
+        exposed: true,
+        sRGB: true,
+        wrapS: 'clamp',
+        wrapT: 'clamp',
+        minFilter: 'linear',
+        magFilter: 'linear',
+        mipFilter: 'nearest',
+        inVertexShader: false,
+        inFragmentShader: true,
+        finalTexture: new DRef(visibleParentTexture),
+        finalSampler: { id: 'visible-sampler' } as any,
+        params: { clone: () => ({}) } as any
+      } as any
+    ];
+
+    const instance = new PBRBluePrintMaterialInstance(parent, '/materials/parent.zmat');
+
+    expect(instance.uniformTextures[0].finalTexture?.get()).toBe(hiddenParentTexture);
+    expect(instance.uniformTextures[1].finalTexture?.get()).toBe(visibleParentTexture);
+
+    instance.thicknessTexture = thicknessTexture;
+    instance.syncInheritedUniforms(parent);
+
+    expect(instance.uniformTextures[0].finalTexture?.get()).toBe(hiddenParentTexture);
+    expect(instance.uniformTextures[1].finalTexture?.get()).toBe(visibleParentTexture);
+  });
 });

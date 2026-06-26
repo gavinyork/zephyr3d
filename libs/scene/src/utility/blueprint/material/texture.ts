@@ -145,7 +145,7 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
         this.expose = value.bool[0];
       },
       isHidden(this: BaseTextureNode) {
-        return this instanceof TextureSampleNode && !!this.inputs[0]?.inputNode;
+        return this instanceof TextureSampleNode && !!(this as TextureSampleNode).inputs[0]?.inputNode;
       }
     },
     {
