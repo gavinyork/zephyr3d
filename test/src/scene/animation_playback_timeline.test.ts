@@ -1,4 +1,4 @@
-import { AnimationController, AnimationTimeline, Scene, SceneNode } from '@zephyr3d/scene';
+import { AnimationController, AnimationTimeline, AnimationTimelineRunner, Scene, SceneNode } from '@zephyr3d/scene';
 
 function createAnimationSet() {
   const scene = new Scene();
@@ -32,6 +32,8 @@ describe('Animation playback events', () => {
 
     node.animationSet.update(0);
     runner.currentPlayback?.stop({ reason: 'interrupted' });
+    // The frame-stack runner advances on update(); one tick observes the external stop.
+    node.animationSet.update(0);
 
     await completed;
     expect(runner.stopped).toBe(true);
@@ -124,7 +126,7 @@ describe('Animation playback events', () => {
 });
 
 describe('Animation timeline controller', () => {
-  test('queued timeline batches are drained until empty', async () => {
+  test('queued timeline batches are drained until empty', () => {
     const scene = new Scene();
     const node = new SceneNode(scene);
     createClip(node, 'idle', 1);
@@ -132,16 +134,8 @@ describe('Animation timeline controller', () => {
     const timeline = new AnimationTimeline({
       steps: [{ type: 'waitEvent', event: 'go' }],
       responses: [
-        {
-          event: 'queue1',
-          policy: 'queue',
-          steps: [{ type: 'emit', event: 'first' }]
-        },
-        {
-          event: 'queue2',
-          policy: 'queue',
-          steps: [{ type: 'emit', event: 'second' }]
-        }
+        { event: 'queue1', target: { steps: [{ type: 'emit', event: 'first' }] }, enqueue: true },
+        { event: 'queue2', target: { steps: [{ type: 'emit', event: 'second' }] }, enqueue: true }
       ]
     });
     const runner = timeline.createRunner(node.animationSet);
@@ -149,14 +143,13 @@ describe('Animation timeline controller', () => {
     runner.on('emit', (event) => {
       emits.push(event);
     });
-    const completed = new Promise<void>((resolve) => runner.once('complete', () => resolve()));
 
     runner.start();
     runner.dispatch('queue1');
     runner.dispatch('queue2');
     runner.dispatch('go');
 
-    await completed;
+    expect(runner.stopped).toBe(true);
     expect(emits).toEqual(['first', 'second']);
   });
 
@@ -172,7 +165,7 @@ describe('Animation timeline controller', () => {
         timeline: {
           steps: [{ type: 'play', clip: 'attack', id: 'attack', options: { repeat: 0 }, wait: false }]
         },
-        responses: [{ event: 'hit', policy: 'transition', targetState: 'fall' }]
+        responses: [{ event: 'hit', target: { targetState: 'fall' } }]
       })
       .addState('fall', {
         timeline: {
@@ -194,23 +187,15 @@ describe('Animation timeline controller', () => {
     expect(node.animationSet.isPlayingAnimation('fall')).toBe(true);
   });
 
-  test('queue responses on the controller enqueue and run later', async () => {
+  test('enqueue responses on the controller run after the current steps drain', () => {
     const scene = new Scene();
     const node = new SceneNode(scene);
     createClip(node, 'idle', 1);
 
     const controller = new AnimationController(node.animationSet);
     controller.addState('idle', {
-      timeline: {
-        steps: [{ type: 'waitEvent', event: 'go' }]
-      },
-      responses: [
-        {
-          event: 'queue',
-          policy: 'queue',
-          steps: [{ type: 'emit', event: 'queued' }]
-        }
-      ]
+      timeline: { steps: [{ type: 'waitEvent', event: 'go' }] },
+      responses: [{ event: 'queue', target: { steps: [{ type: 'emit', event: 'queued' }] }, enqueue: true }]
     });
 
     controller.setState('idle');
@@ -218,15 +203,12 @@ describe('Animation timeline controller', () => {
     controller.runner!.on('emit', (event) => {
       emits.push(event);
     });
-    const completed = new Promise<void>((resolve) => controller.runner!.once('complete', () => resolve()));
 
     const result = controller.dispatch('queue');
     expect(result.handled).toBe(true);
-    expect(result.policy).toBe('queue');
+    expect(result.policy).toBe('enqueue');
 
     controller.dispatch('go');
-
-    await completed;
     expect(emits).toEqual(['queued']);
   });
 
@@ -238,7 +220,7 @@ describe('Animation timeline controller', () => {
     const controller = new AnimationController(node.animationSet);
     controller.addState('idle', {
       timeline: { steps: [{ type: 'waitEvent', event: 'never' }] },
-      responses: [{ event: 'swallow', policy: 'consume' }]
+      responses: [{ event: 'swallow', target: { consume: true } }]
     });
     controller.setState('idle');
 
@@ -256,14 +238,13 @@ describe('Animation timeline controller', () => {
     const controller = new AnimationController(node.animationSet);
     controller
       .addState('idle', {
-        // The timeline declares a 'transition' response, but a timeline runner cannot switch
-        // controller states. Previously it returned handled:true and masked the state-level
-        // transition below; now it returns handled:false so the controller acts on it.
+        // The timeline declares a transition target, but a timeline runner cannot switch
+        // controller states; it returns handled:false so the controller's table acts on it.
         timeline: {
           steps: [{ type: 'waitEvent', event: 'never' }],
-          responses: [{ event: 'drop', policy: 'transition', targetState: 'fall' }]
+          responses: [{ event: 'drop', target: { targetState: 'fall' } }]
         },
-        responses: [{ event: 'drop', policy: 'transition', targetState: 'fall' }]
+        responses: [{ event: 'drop', target: { targetState: 'fall' } }]
       })
       .addState('fall', {
         timeline: { steps: [{ type: 'play', clip: 'fall', options: { repeat: 0 } }] }
@@ -276,10 +257,65 @@ describe('Animation timeline controller', () => {
     expect(controller.currentState).toBe('fall');
     expect(node.animationSet.isPlayingAnimation('fall')).toBe(true);
   });
+
+  test('setState is a no-op on the same state unless forced', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'idle', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    controller.addState('idle', {
+      timeline: { steps: [{ type: 'play', clip: 'idle', options: { repeat: 0 }, wait: false }] }
+    });
+
+    const first = controller.setState('idle');
+    const same = controller.setState('idle');
+    expect(same).toBe(first);
+
+    const forced = controller.setState('idle', { force: true });
+    expect(forced).not.toBe(first);
+  });
+
+  test('statecomplete fires when a state timeline drains', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'idle', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    controller.addState('idle', {
+      timeline: { steps: [{ type: 'emit', event: 'done' }] }
+    });
+
+    const completed: string[] = [];
+    controller.on('statecomplete', (state) => {
+      completed.push(state);
+    });
+    controller.setState('idle');
+
+    expect(completed).toEqual(['idle']);
+  });
+
+  test('dispose stops the active state and clears it', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'idle', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    controller.addState('idle', {
+      timeline: { steps: [{ type: 'play', clip: 'idle', options: { repeat: 0 }, wait: false }] }
+    });
+    controller.setState('idle');
+    expect(node.animationSet.isPlayingAnimation('idle')).toBe(true);
+
+    controller.dispose();
+    expect(controller.currentState).toBeNull();
+    expect(node.animationSet.isPlayingAnimation('idle')).toBe(false);
+    expect(controller.hasState('idle')).toBe(false);
+  });
 });
 
 describe('Animation timeline runtime', () => {
-  test('a play step without an explicit wait does not block the timeline', async () => {
+  test('a play step without an explicit wait does not block the timeline', () => {
     const scene = new Scene();
     const node = new SceneNode(scene);
     createClip(node, 'walk', 1);
@@ -297,16 +333,15 @@ describe('Animation timeline runtime', () => {
     runner.on('emit', (event) => {
       emits.push(event);
     });
-    const completed = new Promise<void>((resolve) => runner.once('complete', () => resolve()));
 
     runner.start();
-    await completed;
 
     expect(emits).toEqual(['after-play']);
+    expect(runner.stopped).toBe(true);
     expect(node.animationSet.isPlayingAnimation('walk')).toBe(true);
   });
 
-  test('a wait step is driven by the animation logical clock, not wall-clock time', async () => {
+  test('a wait step is driven by the animation logical clock, not wall-clock time', () => {
     const scene = new Scene();
     const node = new SceneNode(scene);
     createClip(node, 'idle', 1);
@@ -324,26 +359,21 @@ describe('Animation timeline runtime', () => {
     });
 
     runner.start();
-    // No update() calls => no logical time advances => wait must not resolve.
-    await Promise.resolve();
     expect(emits).toEqual([]);
 
     node.animationSet.update(0.4);
-    await Promise.resolve();
     expect(emits).toEqual([]);
 
     node.animationSet.update(0.6);
-    await Promise.resolve();
-    await Promise.resolve();
     expect(emits).toEqual(['elapsed']);
   });
 
-  test('enqueueing into a drained runner revives it and runs the steps', async () => {
+  test('enqueueing into a drained runner revives it and runs the steps', () => {
     const scene = new Scene();
     const node = new SceneNode(scene);
     createClip(node, 'idle', 1);
 
-    // A timeline with no blocking steps drains immediately and reports complete.
+    // A timeline with no blocking steps drains immediately on start().
     const timeline = new AnimationTimeline({ steps: [{ type: 'emit', event: 'first' }] });
     const runner = timeline.createRunner(node.animationSet);
     const emits: string[] = [];
@@ -352,15 +382,125 @@ describe('Animation timeline runtime', () => {
     });
 
     runner.start();
-    await new Promise<void>((resolve) => runner.once('complete', () => resolve()));
     expect(runner.stopped).toBe(true);
     expect(emits).toEqual(['first']);
 
     // Enqueueing after the drain must revive the runner rather than silently dropping the steps.
-    const revived = new Promise<void>((resolve) => runner.once('complete', () => resolve()));
     runner.enqueue([{ type: 'emit', event: 'late' }]);
-    await revived;
     expect(emits).toEqual(['first', 'late']);
+  });
+
+  test('parallel branches resolve their own current playback for waitMarker (no cross-talk)', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    const upper = createClip(node, 'upper', 1);
+    const lower = createClip(node, 'lower', 1);
+    upper.addMarker({ id: 'u', name: 'u', time: 0.5 });
+    lower.addMarker({ id: 'l', name: 'l', time: 0.5 });
+
+    const timeline = new AnimationTimeline({
+      steps: [
+        {
+          type: 'parallel',
+          steps: [
+            {
+              type: 'sequence',
+              steps: [
+                { type: 'play', clip: 'upper', options: { repeat: 1 } },
+                { type: 'waitMarker', marker: 'u' },
+                { type: 'emit', event: 'upper-hit' }
+              ]
+            },
+            {
+              type: 'sequence',
+              steps: [
+                { type: 'play', clip: 'lower', options: { repeat: 1 } },
+                { type: 'waitMarker', marker: 'l' },
+                { type: 'emit', event: 'lower-hit' }
+              ]
+            }
+          ]
+        }
+      ]
+    });
+    const runner = timeline.createRunner(node.animationSet);
+    const emits: string[] = [];
+    runner.on('emit', (event) => {
+      emits.push(event);
+    });
+
+    runner.start();
+    // Cross the 0.5 markers of both clips; each branch's waitMarker must resolve on its own clip.
+    node.animationSet.update(0);
+    node.animationSet.update(0.6);
+
+    expect(emits.sort()).toEqual(['lower-hit', 'upper-hit']);
+  });
+
+  test('a keep-active branch runs concurrently with the existing timeline', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'base', 1);
+    createClip(node, 'overlay', 1);
+
+    const timeline = new AnimationTimeline({
+      steps: [
+        { type: 'play', clip: 'base', options: { repeat: 0 } },
+        { type: 'waitEvent', event: 'never' }
+      ],
+      responses: [
+        {
+          event: 'overlay',
+          target: { steps: [{ type: 'play', clip: 'overlay', options: { repeat: 0 } }] },
+          onActive: 'keep'
+        }
+      ]
+    });
+    const runner = timeline.createRunner(node.animationSet);
+
+    runner.start();
+    expect(node.animationSet.isPlayingAnimation('base')).toBe(true);
+
+    runner.dispatch('overlay');
+    // Both play simultaneously: the base timeline is still blocked on its waitEvent.
+    expect(node.animationSet.isPlayingAnimation('base')).toBe(true);
+    expect(node.animationSet.isPlayingAnimation('overlay')).toBe(true);
+  });
+
+  test('serialize/deserialize preserves a blocked wait and resumes deterministically', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'idle', 1);
+
+    const definition = {
+      steps: [
+        { type: 'wait' as const, seconds: 1 },
+        { type: 'emit' as const, event: 'elapsed' }
+      ]
+    };
+    const timeline = new AnimationTimeline(definition);
+    const runner = timeline.createRunner(node.animationSet);
+    runner.start();
+    node.animationSet.update(0.4);
+
+    const state = runner.serialize();
+    runner.stop();
+
+    // Restore into a fresh runner and continue ticking; the remaining 0.6s must still apply.
+    const restored = AnimationTimelineRunner.deserialize(
+      node.animationSet,
+      new AnimationTimeline(definition),
+      state
+    );
+    const emits: string[] = [];
+    restored.on('emit', (event) => {
+      emits.push(event);
+    });
+
+    node.animationSet.update(0.5);
+    expect(emits).toEqual([]);
+    node.animationSet.update(0.2);
+    expect(emits).toEqual(['elapsed']);
   });
 });
 

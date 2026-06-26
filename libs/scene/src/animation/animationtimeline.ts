@@ -1,36 +1,68 @@
 import { Observable } from '@zephyr3d/base';
 import type {
+  AnimationFrameEvent,
+  AnimationMarkerEvent,
   AnimationPlayback,
-  AnimationPlaybackStopEvent,
   AnimationSet,
   PlayAnimationOptions,
   StopAnimationOptions
 } from './animationset';
 
-/** @public */
-export type AnimationTimelineEventPolicy =
-  | 'ignore'
-  | 'consume'
-  | 'interrupt'
-  | 'transition'
-  | 'branch'
-  | 'queue';
+/**
+ * How a response disposes of the timeline's currently active playbacks/steps.
+ * - `'stop'` (default): stop the active steps before running the response.
+ * - `'keep'`: leave the active steps running; the response runs concurrently.
+ * - `{ fadeOut }`: stop the active steps with a fade-out.
+ * @public
+ */
+export type AnimationTimelineActiveDisposition = 'stop' | 'keep' | { fadeOut: number };
+
+/**
+ * What a response does when its event fires. Exactly one variant applies.
+ * @public
+ */
+export type AnimationTimelineEventTarget =
+  | { steps: AnimationTimelineStep[]; targetState?: undefined; consume?: undefined; ignore?: undefined }
+  | { targetState: string; steps?: undefined; consume?: undefined; ignore?: undefined }
+  | { consume: true; steps?: undefined; targetState?: undefined; ignore?: undefined }
+  | { ignore: true; steps?: undefined; targetState?: undefined; consume?: undefined };
+
+/**
+ * Resolved kind of action a dispatched event produced.
+ * @public
+ */
+export type AnimationTimelineEventPolicy = 'none' | 'ignore' | 'consume' | 'steps' | 'enqueue' | 'transition';
 
 /** @public */
 export type AnimationTimelineEventResult = {
   handled: boolean;
-  policy: AnimationTimelineEventPolicy | 'none';
+  policy: AnimationTimelineEventPolicy;
   event: string;
   payload?: unknown;
 };
 
-/** @public */
+/**
+ * A reaction to a gameplay event, declared on a timeline or a controller state.
+ *
+ * The model is orthogonal: `target` says *what* to do, `onActive` says what happens to the
+ * currently running steps, and `enqueue` defers `steps` instead of running them immediately.
+ * @public
+ */
 export type AnimationTimelineEventResponse = {
   event: string;
-  policy: AnimationTimelineEventPolicy;
-  steps?: AnimationTimelineStep[];
-  targetState?: string;
-  stopActive?: boolean | StopAnimationOptions;
+  /** What the event does. */
+  target: AnimationTimelineEventTarget;
+  /**
+   * Disposition of the currently active steps. Defaults to `'stop'`.
+   * Use `'keep'` with `target.steps` to run the new steps concurrently (true parallel branch).
+   * Ignored for `consume`/`ignore` targets.
+   */
+  onActive?: AnimationTimelineActiveDisposition;
+  /**
+   * When `true` and `target.steps` is set, the steps are appended to the queue and run after the
+   * current steps drain, instead of replacing/joining them. `onActive` is ignored.
+   */
+  enqueue?: boolean;
 };
 
 /** @public */
@@ -45,9 +77,8 @@ export type AnimationTimelineStep =
        * - `'complete'`: wait until the playback completes or is stopped.
        * - `false` or omitted (default): start the playback and immediately continue.
        *
-       * Note: omitting this no longer blocks. A clip that loops forever (`repeat: 0`) only
-       * completes when stopped, so combine `wait: 'complete'` with a finite `repeat`/`range`
-       * or an external stop to avoid blocking the timeline indefinitely.
+       * A clip that loops forever (`repeat: 0`) only completes when stopped, so combine
+       * `wait: 'complete'` with a finite `repeat`/`range` or an external stop.
        */
       wait?: 'complete' | false;
     }
@@ -101,15 +132,59 @@ export type AnimationTimelineRunnerEventMap = {
   emit: [event: string, payload: unknown];
 };
 
-type TimelineRuntimeContext = {
-  animationSet: AnimationSet;
-  refs: Map<string, AnimationPlayback>;
-  getCurrentPlayback(): AnimationPlayback | null;
-  setCurrentPlayback(playback: AnimationPlayback | null): void;
-  emit(event: string, payload: unknown): void;
-  waitForEvent(event: string): Promise<unknown>;
-  isStopped(): boolean;
+/**
+ * Serializable snapshot of a runner's runtime state.
+ *
+ * References to playbacks are by id; restoring playbacks themselves is the caller's
+ * responsibility (replay should re-create the active playbacks before deserializing).
+ * @public
+ */
+export type AnimationTimelineRunnerState = {
+  stack: SerializedFrame[];
+  concurrent: SerializedFrame[];
+  queued: AnimationTimelineStep[][];
+  stopped: boolean;
 };
+
+/**
+ * A scope tracks the "current playback" and named refs for a sequence of steps. Parallel branches
+ * each own an isolated scope so their `waitMarker`/`waitFrame` resolve deterministically.
+ */
+type FrameScope = {
+  currentPlaybackId: string | null;
+  refs: Record<string, string>;
+};
+
+type SeqFrame = {
+  kind: 'seq';
+  steps: AnimationTimelineStep[];
+  index: number;
+  scope: FrameScope;
+  child: TimelineFrame | null;
+};
+
+type ParallelFrame = {
+  kind: 'parallel';
+  branches: TimelineFrame[];
+};
+
+type WaitFrame = { kind: 'wait'; remaining: number };
+type WaitEventFrame = { kind: 'waitEvent'; event: string };
+type WaitMarkerFrame = { kind: 'waitMarker'; marker: string; playbackId: string | null; satisfied: boolean };
+type WaitFrameFrame = { kind: 'waitFrame'; frame: number; playbackId: string | null; satisfied: boolean };
+type PlayWaitFrame = { kind: 'playWait'; playbackId: string };
+
+type TimelineFrame =
+  | SeqFrame
+  | ParallelFrame
+  | WaitFrame
+  | WaitEventFrame
+  | WaitMarkerFrame
+  | WaitFrameFrame
+  | PlayWaitFrame;
+
+/** Plain-data form of a frame (no live playback references), used by serialize/deserialize. */
+type SerializedFrame = TimelineFrame;
 
 /**
  * Serializable animation timeline definition.
@@ -136,36 +211,50 @@ export class AnimationTimeline {
 
 /**
  * Runtime interpreter for an AnimationTimeline.
+ *
+ * The interpreter is a synchronous frame-stack state machine advanced by {@link tick}, which is
+ * driven by `AnimationSet.update(dt)` on the same logical clock as the animations. There is no
+ * `async`/`await` in the control flow, so the runtime state can be serialized and replayed.
  * @public
  */
 export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerEventMap> {
   readonly animationSet: AnimationSet;
   readonly timeline: AnimationTimeline;
-  readonly refs: Map<string, AnimationPlayback>;
-  private _currentPlayback: AnimationPlayback | null;
+  private _stack: TimelineFrame[];
+  private _concurrent: TimelineFrame[];
+  private readonly _queued: AnimationTimelineStep[][];
+  private _pendingEvents: string[];
   private _stopped: boolean;
-  private _runToken: number;
-  private readonly _eventWaiters: Map<string, ((payload: unknown) => void)[]>;
-  private readonly _queuedSteps: AnimationTimelineStep[][];
-  private _waitTimers: { remaining: number; resolve: () => void }[];
+  private _ticking: boolean;
   private readonly _onTick: (deltaInSeconds: number) => void;
+  /** Tracks playbacks created by this runner so `stop()` can tear them down. */
+  private readonly _ownedPlaybacks: Map<string, AnimationPlayback>;
+  /** Marker/frame crossings observed since the last tick, keyed by playback id. */
+  private readonly _crossedMarkers: Map<string, Set<string>>;
+  private readonly _crossedFrames: Map<string, Set<number>>;
 
   constructor(animationSet: AnimationSet, timeline: AnimationTimeline) {
     super();
     this.animationSet = animationSet;
     this.timeline = timeline;
-    this.refs = new Map();
-    this._currentPlayback = null;
+    this._stack = [];
+    this._concurrent = [];
+    this._queued = [];
+    this._pendingEvents = [];
     this._stopped = true;
-    this._runToken = 0;
-    this._eventWaiters = new Map();
-    this._queuedSteps = [];
-    this._waitTimers = [];
-    this._onTick = (deltaInSeconds) => this.tickWaits(deltaInSeconds);
+    this._ticking = false;
+    this._onTick = (deltaInSeconds) => this.tick(deltaInSeconds);
+    this._ownedPlaybacks = new Map();
+    this._crossedMarkers = new Map();
+    this._crossedFrames = new Map();
   }
 
   get currentPlayback() {
-    return this._currentPlayback;
+    const scope = this.activeScope();
+    if (!scope?.currentPlaybackId) {
+      return null;
+    }
+    return this._ownedPlaybacks.get(scope.currentPlaybackId) ?? null;
   }
 
   get stopped() {
@@ -174,24 +263,37 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
 
   start() {
     this._stopped = false;
-    const token = ++this._runToken;
-    void this.runUntilDrained(this.timeline.steps, token);
+    this._stack = [this.makeSeqFrame(this.timeline.steps)];
+    this._concurrent = [];
+    this._queued.length = 0;
+    this._pendingEvents = [];
+    this.animationSet._registerTimelineTicker(this._onTick);
+    // Drain any leading non-blocking steps immediately so e.g. an initial `play` starts now.
+    this.flush();
     return this;
   }
 
   stop(options?: StopAnimationOptions) {
-    if (this._stopped) {
-      return this;
-    }
+    const wasStopped = this._stopped;
     this._stopped = true;
-    this._runToken++;
-    this.clearWaiters();
-    this.clearWaitTimers();
-    this._queuedSteps.length = 0;
-    this.refs.forEach((playback) => playback.stop(options ?? { reason: 'interrupted' }));
-    this.refs.clear();
-    this._currentPlayback = null;
-    this.dispatchEvent('stop', this);
+    this._stack = [];
+    this._concurrent = [];
+    this._queued.length = 0;
+    this._pendingEvents = [];
+    this._crossedMarkers.clear();
+    this._crossedFrames.clear();
+    const stopOptions = options ?? { reason: 'interrupted' };
+    // Always tear down owned playbacks, even if the control flow already drained: a state whose
+    // script finished may still have a looping clip playing that a transition must stop.
+    this._ownedPlaybacks.forEach((playback) => {
+      this.detachPlayback(playback);
+      playback.stop(stopOptions);
+    });
+    this._ownedPlaybacks.clear();
+    this.animationSet._unregisterTimelineTicker(this._onTick);
+    if (!wasStopped) {
+      this.dispatchEvent('stop', this);
+    }
     return this;
   }
 
@@ -199,236 +301,587 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     if (steps.length === 0) {
       return;
     }
-    this._queuedSteps.push(steps);
-    // If the runner already drained to completion (or was otherwise stopped) it has no active
-    // drain loop to pick the queue up. Revive it so queued steps are not silently dropped.
+    this._queued.push(steps);
+    // Revive a runner that already drained so queued steps are not silently dropped.
     if (this._stopped) {
       this._stopped = false;
-      const token = ++this._runToken;
-      void this.runUntilDrained([], token);
+      this._stack = [];
+      this.animationSet._registerTimelineTicker(this._onTick);
     }
+    this.flush();
+  }
+
+  /**
+   * Run `steps` concurrently with the current control flow (a true parallel branch). Unlike
+   * {@link enqueue}, these do not wait for the main stack to drain.
+   * @public
+   */
+  runConcurrent(steps: AnimationTimelineStep[]) {
+    if (steps.length === 0) {
+      return;
+    }
+    this._concurrent.push(this.makeSeqFrame(steps));
+    if (this._stopped) {
+      this._stopped = false;
+      this.animationSet._registerTimelineTicker(this._onTick);
+    } else {
+      this.ensureTicking();
+    }
+    this.flush();
   }
 
   dispatch(event: string, payload?: unknown): AnimationTimelineEventResult {
-    const waiters = this._eventWaiters.get(event);
-    if (waiters?.length) {
-      this._eventWaiters.delete(event);
-      waiters.forEach((resolve) => resolve(payload));
+    // A waiting `waitEvent` frame consumes the event; flush advances past it synchronously.
+    if (this.hasWaiterFor(event)) {
+      this._pendingEvents.push(event);
+      this.flush();
       return { handled: true, policy: 'consume', event, payload };
     }
     const response = this.timeline.responses.find((item) => item.event === event);
-    if (!response || response.policy === 'ignore') {
-      return { handled: false, policy: response?.policy ?? 'none', event, payload };
+    if (!response || response.target.ignore) {
+      return { handled: false, policy: response ? 'ignore' : 'none', event, payload };
     }
-    if (response.policy === 'consume') {
+    if (response.target.consume) {
       return { handled: true, policy: 'consume', event, payload };
     }
-    if (response.policy === 'queue') {
-      if (response.steps?.length) {
-        this.enqueue(response.steps);
-        return { handled: true, policy: 'queue', event, payload };
-      }
-      return { handled: false, policy: 'queue', event, payload };
+    if (response.target.targetState !== undefined) {
+      // Only the controller can switch states; bubble up so it can act on its own table.
+      return { handled: false, policy: 'transition', event, payload };
     }
-    if (response.policy === 'branch' || response.policy === 'interrupt') {
-      if (!response.steps?.length) {
-        return { handled: false, policy: response.policy, event, payload };
-      }
-      if (response.policy === 'interrupt' || response.stopActive !== false) {
-        const stopOptions =
-          typeof response.stopActive === 'object'
-            ? response.stopActive
-            : ({ reason: 'interrupted' } as const);
-        this.stop(stopOptions);
-      }
+    const steps = response.target.steps;
+    if (!steps?.length) {
+      return { handled: false, policy: 'none', event, payload };
+    }
+    if (response.enqueue) {
+      this.enqueue(steps);
+      return { handled: true, policy: 'enqueue', event, payload };
+    }
+    const disposition = response.onActive ?? 'stop';
+    if (disposition === 'keep') {
+      // Run the new steps concurrently with the existing control flow (true parallel branch).
+      this.runConcurrent(steps);
+    } else {
+      const stopOptions =
+        typeof disposition === 'object' ? { ...disposition, reason: 'interrupted' as const } : undefined;
+      this.stopMainFlow(stopOptions);
       this._stopped = false;
-      const token = ++this._runToken;
-      void this.runUntilDrained(response.steps, token);
-      return { handled: true, policy: response.policy, event, payload };
+      this._stack = [this.makeSeqFrame(steps)];
+      this.ensureTicking();
+      this.flush();
     }
-    // Policies the runner cannot act on (e.g. 'transition', which only the controller can perform)
-    // must report `handled: false` so the controller falls through to its own response table.
-    return { handled: false, policy: response.policy, event, payload };
+    return { handled: true, policy: 'steps', event, payload };
   }
 
-  private getContext(): TimelineRuntimeContext {
-    return {
-      animationSet: this.animationSet,
-      refs: this.refs,
-      getCurrentPlayback: () => this._currentPlayback,
-      setCurrentPlayback: (playback) => {
-        this._currentPlayback = playback;
-      },
-      emit: (event, payload) => this.dispatchEvent('emit', event, payload),
-      waitForEvent: (event) =>
-        new Promise<unknown>((resolve) => {
-          const waiters = this._eventWaiters.get(event) ?? [];
-          waiters.push(resolve);
-          this._eventWaiters.set(event, waiters);
-        }),
-      isStopped: () => this._stopped
-    };
+  /**
+   * Run pending non-blocking work synchronously (a zero-delta tick), without advancing any
+   * time-based waits. Lets `start()`/`dispatch()` take effect immediately while keeping all
+   * runtime state in the serializable frame stack.
+   * @public
+   */
+  flush() {
+    // Guard against re-entrancy: an `emit` listener firing during a tick may dispatch again.
+    if (!this._ticking) {
+      this.tick(0);
+    }
+    return this;
   }
 
-  private async runSteps(steps: AnimationTimelineStep[], token: number) {
-    const ctx = this.getContext();
-    for (const step of steps) {
-      if (this._stopped || token !== this._runToken) {
-        return;
-      }
-      await this.runStep(step, ctx);
+  /**
+   * Advance the timeline by `deltaInSeconds`. Called by `AnimationSet.update`.
+   * @public
+   */
+  tick(deltaInSeconds: number) {
+    if (this._stopped && this._queued.length === 0) {
+      return;
     }
-  }
-
-  private async runUntilDrained(steps: AnimationTimelineStep[], token: number) {
-    await this.runSteps(steps, token);
-    while (!this._stopped && token === this._runToken) {
-      const queued = this._queuedSteps.shift();
-      if (!queued) {
-        break;
-      }
-      await this.runSteps(queued, token);
+    this._ticking = true;
+    // Advance the main control-flow stack.
+    if (this._stack.length === 0 && this._queued.length > 0) {
+      const next = this._queued.shift()!;
+      this._stack = [this.makeSeqFrame(next)];
     }
-    if (!this._stopped && token === this._runToken) {
+    if (this._stack.length > 0) {
+      this.tickFrames(this._stack, deltaInSeconds);
+    }
+    // Advance any concurrent (keep-active) branches; drop the ones that finished.
+    if (this._concurrent.length > 0) {
+      this._concurrent = this._concurrent.filter((frame) => {
+        const stack = [frame];
+        this.tickFrames(stack, deltaInSeconds);
+        return stack.length > 0;
+      });
+    }
+    // Consumed this tick.
+    this._pendingEvents = [];
+    this._crossedMarkers.clear();
+    this._crossedFrames.clear();
+    this._ticking = false;
+    // Pull queued batches once the stack drains.
+    while (this._stack.length === 0 && this._queued.length > 0) {
+      const next = this._queued.shift()!;
+      this._stack = [this.makeSeqFrame(next)];
+      this.tickFrames(this._stack, 0);
+    }
+    if (
+      !this._stopped &&
+      this._stack.length === 0 &&
+      this._concurrent.length === 0 &&
+      this._queued.length === 0
+    ) {
       this._stopped = true;
+      this.animationSet._unregisterTimelineTicker(this._onTick);
       this.dispatchEvent('complete', this);
     }
   }
 
-  private clearWaiters() {
-    this._eventWaiters.forEach((list) => list.forEach((resolve) => resolve(undefined)));
-    this._eventWaiters.clear();
+  /**
+   * Export the runtime state as plain data.
+   * @public
+   */
+  serialize(): AnimationTimelineRunnerState {
+    return {
+      stack: this._stack.map((frame) => this.cloneFrame(frame)),
+      concurrent: this._concurrent.map((frame) => this.cloneFrame(frame)),
+      queued: this._queued.map((steps) => steps.slice()),
+      stopped: this._stopped
+    };
   }
 
-  private async runStep(step: AnimationTimelineStep, ctx: TimelineRuntimeContext): Promise<void> {
-    if (ctx.isStopped()) {
-      return;
+  /**
+   * Restore runtime state previously produced by {@link serialize}.
+   *
+   * Re-create the relevant active playbacks on the AnimationSet before calling this so that
+   * playback-bound frames (play-wait, waitMarker, waitFrame) can re-attach by id.
+   * @public
+   */
+  static deserialize(
+    animationSet: AnimationSet,
+    timeline: AnimationTimeline,
+    state: AnimationTimelineRunnerState
+  ): AnimationTimelineRunner {
+    const runner = new AnimationTimelineRunner(animationSet, timeline);
+    runner._stack = state.stack.map((frame) => runner.cloneFrame(frame));
+    runner._concurrent = state.concurrent.map((frame) => runner.cloneFrame(frame));
+    state.queued.forEach((steps) => runner._queued.push(steps.slice()));
+    runner._stopped = state.stopped;
+    // Re-attach to any live playbacks referenced by the restored frames.
+    runner.reattachPlaybacks(runner._stack);
+    runner._concurrent.forEach((frame) => runner.reattachPlaybacks([frame]));
+    if (!runner._stopped) {
+      animationSet._registerTimelineTicker(runner._onTick);
     }
-    switch (step.type) {
-      case 'sequence':
-        await this.runSteps(step.steps, this._runToken);
-        return;
-      case 'parallel':
-        await Promise.all(step.steps.map((child) => this.runStep(child, ctx)));
-        return;
-      case 'play': {
-        const playback = ctx.animationSet.play(step.clip, step.options);
-        if (!playback) {
-          return;
-        }
-        ctx.setCurrentPlayback(playback);
-        if (step.id) {
-          ctx.refs.set(step.id, playback);
-        }
-        ctx.refs.set(playback.id, playback);
-        if (step.wait === 'complete') {
-          await new Promise<void>((resolve) => {
-            let settled = false;
-            const done = () => {
-              if (settled) {
-                return;
-              }
-              settled = true;
-              playback.off('complete', done);
-              playback.off('stop', stop);
-              resolve();
-            };
-            const stop = (_event: AnimationPlaybackStopEvent) => {
-              if (settled) {
-                return;
-              }
-              settled = true;
-              playback.off('complete', done);
-              playback.off('stop', stop);
-              resolve();
-            };
-            playback.on('complete', done);
-            playback.on('stop', stop);
-          });
-        }
+    return runner;
+  }
+
+  // --- internals -------------------------------------------------------------
+
+  private ensureTicking() {
+    if (!this._ticking) {
+      this.animationSet._registerTimelineTicker(this._onTick);
+    }
+  }
+
+  private makeSeqFrame(steps: AnimationTimelineStep[]): SeqFrame {
+    return {
+      kind: 'seq',
+      steps,
+      index: 0,
+      scope: { currentPlaybackId: null, refs: {} },
+      child: null
+    };
+  }
+
+  /** The scope of the innermost active sequence on the main stack (for currentPlayback). */
+  private activeScope(): FrameScope | null {
+    for (let i = this._stack.length - 1; i >= 0; i--) {
+      const scope = this.deepestScope(this._stack[i]);
+      if (scope) {
+        return scope;
+      }
+    }
+    return null;
+  }
+
+  private deepestScope(frame: TimelineFrame): FrameScope | null {
+    if (frame.kind === 'seq') {
+      return frame.child ? (this.deepestScope(frame.child) ?? frame.scope) : frame.scope;
+    }
+    return null;
+  }
+
+  /**
+   * Advance a frame stack in place. The top frame runs until it blocks or completes; completed
+   * frames pop and the parent sequence advances. Returns when the stack blocks or empties.
+   */
+  private tickFrames(stack: TimelineFrame[], deltaInSeconds: number) {
+    let guard = 0;
+    while (stack.length > 0) {
+      if (++guard > 10000) {
+        // Defensive: a malformed timeline should not spin forever.
+        break;
+      }
+      const frame = stack[stack.length - 1];
+      const done = this.tickFrame(frame, stack, deltaInSeconds);
+      if (done === 'block') {
         return;
       }
+      if (done === 'pop') {
+        stack.pop();
+        continue;
+      }
+      // 'advanced': the frame pushed a child or moved its cursor; loop again with delta 0 so a
+      // single tick can drain consecutive non-blocking steps.
+      deltaInSeconds = 0;
+    }
+  }
+
+  private tickFrame(
+    frame: TimelineFrame,
+    stack: TimelineFrame[],
+    deltaInSeconds: number
+  ): 'block' | 'pop' | 'advanced' {
+    switch (frame.kind) {
+      case 'seq':
+        return this.tickSeq(frame, stack, deltaInSeconds);
+      case 'parallel':
+        return this.tickParallel(frame, deltaInSeconds);
+      case 'wait':
+        frame.remaining -= deltaInSeconds;
+        return frame.remaining <= 0 ? 'pop' : 'block';
+      case 'waitEvent':
+        return this._pendingEvents.includes(frame.event) ? 'pop' : 'block';
+      case 'waitMarker':
+        return this.tickWaitMarker(frame);
+      case 'waitFrame':
+        return this.tickWaitFrame(frame);
+      case 'playWait':
+        return this.tickPlayWait(frame);
+    }
+  }
+
+  private tickSeq(
+    frame: SeqFrame,
+    _stack: TimelineFrame[],
+    deltaInSeconds: number
+  ): 'block' | 'pop' | 'advanced' {
+    if (frame.child) {
+      const childStack = [frame.child];
+      this.tickFrames(childStack, deltaInSeconds);
+      if (childStack.length > 0) {
+        return 'block';
+      }
+      frame.child = null;
+      frame.index++;
+    }
+    if (frame.index >= frame.steps.length) {
+      return 'pop';
+    }
+    const step = frame.steps[frame.index];
+    const blocking = this.beginStep(step, frame);
+    if (blocking) {
+      frame.child = blocking;
+      return 'advanced';
+    }
+    frame.index++;
+    return 'advanced';
+  }
+
+  private tickParallel(frame: ParallelFrame, deltaInSeconds: number): 'block' | 'pop' | 'advanced' {
+    frame.branches = frame.branches.filter((branch) => {
+      const branchStack = [branch];
+      this.tickFrames(branchStack, deltaInSeconds);
+      return branchStack.length > 0;
+    });
+    return frame.branches.length > 0 ? 'block' : 'pop';
+  }
+
+  /**
+   * Execute a non-blocking step immediately and return null, or return a frame to block on.
+   */
+  private beginStep(step: AnimationTimelineStep, scopeFrame: SeqFrame): TimelineFrame | null {
+    const scope = scopeFrame.scope;
+    switch (step.type) {
+      case 'sequence': {
+        const child = this.makeSeqFrame(step.steps);
+        // Inherit the parent scope so refs/currentPlayback carry into the nested sequence.
+        child.scope = scope;
+        return child;
+      }
+      case 'parallel': {
+        // Each branch gets an isolated scope so currentPlayback/refs don't race (#7).
+        const branches = step.steps.map((child) => {
+          const branchScope: FrameScope = {
+            currentPlaybackId: scope.currentPlaybackId,
+            refs: { ...scope.refs }
+          };
+          const seq = this.makeSeqFrame([child]);
+          seq.scope = branchScope;
+          return seq as TimelineFrame;
+        });
+        return { kind: 'parallel', branches };
+      }
+      case 'play': {
+        const playback = this.animationSet.play(step.clip, step.options);
+        if (!playback) {
+          return null;
+        }
+        this.attachPlayback(playback);
+        scope.currentPlaybackId = playback.id;
+        if (step.id) {
+          scope.refs[step.id] = playback.id;
+        }
+        scope.refs[playback.id] = playback.id;
+        if (step.wait === 'complete') {
+          return { kind: 'playWait', playbackId: playback.id };
+        }
+        return null;
+      }
       case 'stop': {
-        const playback = this.resolvePlayback(step.target);
+        const playback = this.resolvePlayback(step.target, scope);
         if (playback) {
           playback.stop(step.options);
         } else if (!step.target) {
-          ctx.refs.forEach((item) => item.stop(step.options));
+          this._ownedPlaybacks.forEach((item) => item.stop(step.options));
         }
-        return;
+        return null;
       }
       case 'wait':
-        await this.delay(step.seconds);
-        return;
+        return step.seconds > 0 ? { kind: 'wait', remaining: step.seconds } : null;
       case 'waitEvent':
-        await ctx.waitForEvent(step.event);
-        return;
+        return { kind: 'waitEvent', event: step.event };
       case 'waitMarker': {
-        const playback = this.resolvePlayback(step.target) ?? ctx.getCurrentPlayback();
-        if (playback) {
-          await playback.waitForMarker(step.marker);
+        const playback = this.resolvePlayback(step.target, scope) ?? this.scopeCurrentPlayback(scope);
+        if (!playback) {
+          return null;
         }
-        return;
+        return { kind: 'waitMarker', marker: step.marker, playbackId: playback.id, satisfied: false };
       }
       case 'waitFrame': {
-        const playback = this.resolvePlayback(step.target) ?? ctx.getCurrentPlayback();
-        if (playback) {
-          await playback.waitForFrame(step.frame);
+        const playback = this.resolvePlayback(step.target, scope) ?? this.scopeCurrentPlayback(scope);
+        if (!playback) {
+          return null;
         }
-        return;
+        return { kind: 'waitFrame', frame: step.frame, playbackId: playback.id, satisfied: false };
       }
       case 'emit':
-        ctx.emit(step.event, step.payload);
-        return;
+        this.dispatchEvent('emit', step.event, step.payload);
+        return null;
     }
   }
 
-  private resolvePlayback(target?: string) {
+  private tickWaitMarker(frame: WaitMarkerFrame): 'block' | 'pop' {
+    if (frame.satisfied || !frame.playbackId) {
+      return 'pop';
+    }
+    const playback = this._ownedPlaybacks.get(frame.playbackId);
+    if (!playback || playback.state === 'stopped' || playback.state === 'completed') {
+      return 'pop';
+    }
+    const crossed = this._crossedMarkers.get(frame.playbackId);
+    if (crossed && crossed.has(frame.marker)) {
+      return 'pop';
+    }
+    return 'block';
+  }
+
+  private tickWaitFrame(frame: WaitFrameFrame): 'block' | 'pop' {
+    if (frame.satisfied || frame.playbackId === null) {
+      return 'pop';
+    }
+    const playback = this._ownedPlaybacks.get(frame.playbackId);
+    if (!playback || playback.state === 'stopped' || playback.state === 'completed') {
+      return 'pop';
+    }
+    const crossed = this._crossedFrames.get(frame.playbackId);
+    if (crossed && crossed.has(frame.frame)) {
+      return 'pop';
+    }
+    return 'block';
+  }
+
+  private tickPlayWait(frame: PlayWaitFrame): 'block' | 'pop' {
+    const playback = this._ownedPlaybacks.get(frame.playbackId);
+    if (!playback || playback.state === 'stopped' || playback.state === 'completed') {
+      return 'pop';
+    }
+    return 'block';
+  }
+
+  private attachPlayback(playback: AnimationPlayback) {
+    this._ownedPlaybacks.set(playback.id, playback);
+    playback.on('marker', this.onPlaybackMarker);
+    playback.on('frame', this.onPlaybackFrame);
+    playback.on('stop', this.onPlaybackEnd);
+    playback.on('complete', this.onPlaybackEnd);
+  }
+
+  private detachPlayback(playback: AnimationPlayback) {
+    playback.off('marker', this.onPlaybackMarker);
+    playback.off('frame', this.onPlaybackFrame);
+    playback.off('stop', this.onPlaybackEnd);
+    playback.off('complete', this.onPlaybackEnd);
+  }
+
+  /**
+   * Cleanup when an owned playback ends (externally or naturally). Only touches runner-local
+   * bookkeeping, so it is safe to run inside `AnimationSet.update`'s playback loop. Frames blocked
+   * on this playback observe its absence on the next tick and unblock.
+   */
+  private readonly onPlaybackEnd = (event: { playback: AnimationPlayback }) => {
+    const playback = this._ownedPlaybacks.get(event.playback.id);
+    if (playback) {
+      this.detachPlayback(playback);
+      this._ownedPlaybacks.delete(playback.id);
+    }
+  };
+
+  private readonly onPlaybackMarker = (event: AnimationMarkerEvent) => {
+    const id = event.playback.id;
+    let set = this._crossedMarkers.get(id);
+    if (!set) {
+      set = new Set();
+      this._crossedMarkers.set(id, set);
+    }
+    if (event.marker.id !== undefined) {
+      set.add(event.marker.id);
+    }
+    set.add(event.marker.name);
+  };
+
+  private readonly onPlaybackFrame = (event: AnimationFrameEvent) => {
+    const id = event.playback.id;
+    let set = this._crossedFrames.get(id);
+    if (!set) {
+      set = new Set();
+      this._crossedFrames.set(id, set);
+    }
+    set.add(event.frame);
+  };
+
+  private resolvePlayback(target: string | undefined, scope: FrameScope): AnimationPlayback | null {
     if (!target) {
       return null;
     }
-    return this.refs.get(target) ?? this.animationSet.getPlayback(target);
+    const mapped = scope.refs[target];
+    if (mapped) {
+      const owned = this._ownedPlaybacks.get(mapped);
+      if (owned) {
+        return owned;
+      }
+    }
+    return this._ownedPlaybacks.get(target) ?? this.animationSet.getPlayback(target);
   }
 
-  private delay(seconds: number) {
-    return new Promise<void>((resolve) => {
-      if (seconds <= 0) {
-        resolve();
+  private scopeCurrentPlayback(scope: FrameScope): AnimationPlayback | null {
+    return scope.currentPlaybackId ? (this._ownedPlaybacks.get(scope.currentPlaybackId) ?? null) : null;
+  }
+
+  private hasWaiterFor(event: string): boolean {
+    const inFrame = (frame: TimelineFrame): boolean => {
+      switch (frame.kind) {
+        case 'waitEvent':
+          return frame.event === event;
+        case 'seq':
+          return frame.child ? inFrame(frame.child) : false;
+        case 'parallel':
+          return frame.branches.some(inFrame);
+        default:
+          return false;
+      }
+    };
+    return this._stack.some(inFrame) || this._concurrent.some(inFrame);
+  }
+
+  /** Stop only the main control flow (used when a response replaces it). */
+  private stopMainFlow(options?: StopAnimationOptions) {
+    const stopOptions = options ?? { reason: 'interrupted' };
+    const ids = this.collectScopePlaybackIds(this._stack);
+    ids.forEach((id) => {
+      const playback = this._ownedPlaybacks.get(id);
+      if (playback) {
+        this.detachPlayback(playback);
+        playback.stop(stopOptions);
+        this._ownedPlaybacks.delete(id);
+      }
+    });
+    this._stack = [];
+  }
+
+  private collectScopePlaybackIds(frames: TimelineFrame[]): Set<string> {
+    const ids = new Set<string>();
+    const visit = (frame: TimelineFrame) => {
+      if (frame.kind === 'seq') {
+        Object.values(frame.scope.refs).forEach((id) => ids.add(id));
+        if (frame.scope.currentPlaybackId) {
+          ids.add(frame.scope.currentPlaybackId);
+        }
+        if (frame.child) {
+          visit(frame.child);
+        }
+      } else if (frame.kind === 'parallel') {
+        frame.branches.forEach(visit);
+      }
+    };
+    frames.forEach(visit);
+    return ids;
+  }
+
+  private cloneFrame(frame: TimelineFrame): TimelineFrame {
+    switch (frame.kind) {
+      case 'seq':
+        return {
+          kind: 'seq',
+          steps: frame.steps,
+          index: frame.index,
+          scope: { currentPlaybackId: frame.scope.currentPlaybackId, refs: { ...frame.scope.refs } },
+          child: frame.child ? this.cloneFrame(frame.child) : null
+        };
+      case 'parallel':
+        return { kind: 'parallel', branches: frame.branches.map((b) => this.cloneFrame(b)) };
+      case 'wait':
+        return { kind: 'wait', remaining: frame.remaining };
+      case 'waitEvent':
+        return { kind: 'waitEvent', event: frame.event };
+      case 'waitMarker':
+        return { ...frame };
+      case 'waitFrame':
+        return { ...frame };
+      case 'playWait':
+        return { ...frame };
+    }
+  }
+
+  private reattachPlaybacks(frames: TimelineFrame[]) {
+    const ids = this.collectAllPlaybackIds(frames);
+    ids.forEach((id) => {
+      if (this._ownedPlaybacks.has(id)) {
         return;
       }
-      // Drive the wait off the animation logical clock (AnimationSet.update) rather than
-      // wall-clock time, so it pauses and scales together with the rest of the animations.
-      this._waitTimers.push({ remaining: seconds, resolve });
-      this.animationSet._registerTimelineTicker(this._onTick);
-    });
-  }
-
-  private tickWaits(deltaInSeconds: number) {
-    if (this._waitTimers.length === 0) {
-      return;
-    }
-    const ready: (() => void)[] = [];
-    this._waitTimers = this._waitTimers.filter((timer) => {
-      timer.remaining -= deltaInSeconds;
-      if (timer.remaining <= 0) {
-        ready.push(timer.resolve);
-        return false;
+      const playback = this.findLivePlayback(id);
+      if (playback) {
+        this.attachPlayback(playback);
       }
-      return true;
     });
-    if (this._waitTimers.length === 0) {
-      this.animationSet._unregisterTimelineTicker(this._onTick);
-    }
-    ready.forEach((resolve) => resolve());
   }
 
-  private clearWaitTimers() {
-    if (this._waitTimers.length === 0) {
-      return;
-    }
-    const timers = this._waitTimers;
-    this._waitTimers = [];
-    this.animationSet._unregisterTimelineTicker(this._onTick);
-    timers.forEach((timer) => timer.resolve());
+  private collectAllPlaybackIds(frames: TimelineFrame[]): Set<string> {
+    const ids = this.collectScopePlaybackIds(frames);
+    const visit = (frame: TimelineFrame) => {
+      if (frame.kind === 'playWait') {
+        ids.add(frame.playbackId);
+      } else if ((frame.kind === 'waitMarker' || frame.kind === 'waitFrame') && frame.playbackId) {
+        ids.add(frame.playbackId);
+      } else if (frame.kind === 'seq' && frame.child) {
+        visit(frame.child);
+      } else if (frame.kind === 'parallel') {
+        frame.branches.forEach(visit);
+      }
+    };
+    frames.forEach(visit);
+    return ids;
+  }
+
+  private findLivePlayback(id: string): AnimationPlayback | null {
+    return this.animationSet.getPlaybacks().find((playback) => playback.id === id) ?? null;
   }
 }
