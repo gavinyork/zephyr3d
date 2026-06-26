@@ -24,7 +24,7 @@ import { ShaderHelper } from './shader/helper';
 import type { Clonable, Immutable, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4, applyMixins, DRef } from '@zephyr3d/base';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
-import { getDevice } from '../app/api';
+import { getDevice, getEngine } from '../app/api';
 
 /**
  * Blending mode for mesh materials.
@@ -498,6 +498,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       }
     }
     Object.setPrototypeOf(instance, that);
+    getEngine().resourceManager.trackMaterialReference(
+      instance as this,
+      getEngine().resourceManager.getAssetId(that.coreMaterial)
+    );
     return instance as this;
   }
   /**

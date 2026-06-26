@@ -1,5 +1,13 @@
 import type { Nullable, RequireOptionals } from '@zephyr3d/base';
-import { ASSERT, DRef, randomUUID, type GenericConstructor, type TypedArray, type VFS } from '@zephyr3d/base';
+import {
+  ASSERT,
+  DRef,
+  DWeakRef,
+  randomUUID,
+  type GenericConstructor,
+  type TypedArray,
+  type VFS
+} from '@zephyr3d/base';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
 import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
@@ -187,7 +195,8 @@ import {
 } from '../blueprint/material/inputs';
 import { PBRBlockNode, SpriteBlockNode, VertexBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
-import type { Material, MeshMaterial, PBRBluePrintMaterial } from '../../material';
+import { Material } from '../../material';
+import type { MeshMaterial, PBRBluePrintMaterial } from '../../material';
 import type { Primitive } from '../../render';
 import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
 import { getSpriteClass } from './scene/sprite';
@@ -245,6 +254,7 @@ export class ResourceManager {
   private readonly _assetManager: AssetManager;
   private readonly _editorMode: boolean;
   private _allocated: WeakMap<any, string>;
+  private _materialsByAssetId: Map<string, Set<DWeakRef<Material>>>;
   private _prefabContentCache: Map<string, Promise<Nullable<{ type: string; data: object }>>> | null;
   /**
    * Create a ResourceManager bound to a virtual file system.
@@ -255,6 +265,7 @@ export class ResourceManager {
     this._vfs = vfs;
     this._editorMode = editorMode;
     this._allocated = new WeakMap();
+    this._materialsByAssetId = new Map();
     this._prefabContentCache = null;
     this._assetManager = new AssetManager(this);
     this._propMap = {};
@@ -628,11 +639,61 @@ export class ResourceManager {
    */
   setAssetId(asset: unknown, id?: Nullable<string>) {
     if (asset) {
+      const material = asset instanceof Material ? asset : null;
+      const prevId = material ? this.getAssetId(material) : null;
+      if (material && prevId && prevId !== id) {
+        this.unregisterMaterialReference(prevId, material);
+      }
       if (id) {
         this._allocated.set(asset, id);
+        if (material) {
+          this.registerMaterialReference(id, material);
+        }
       } else {
         this._allocated.delete(asset);
       }
+    }
+  }
+  getMaterialRefsByAssetId(id: string) {
+    return this._materialsByAssetId.get(id) ?? null;
+  }
+  trackMaterialReference(material: Nullable<Material>, id?: Nullable<string>) {
+    if (!material || !id) {
+      return;
+    }
+    this.setAssetId(material, id);
+  }
+  private registerMaterialReference(id: string, material: Material) {
+    let refs = this._materialsByAssetId.get(id);
+    if (!refs) {
+      refs = new Set();
+      this._materialsByAssetId.set(id, refs);
+    }
+    for (const ref of [...refs]) {
+      const obj = ref.get();
+      if (!obj) {
+        ref.dispose();
+        refs.delete(ref);
+      } else if (obj === material) {
+        return;
+      }
+    }
+    refs.add(new DWeakRef(material));
+  }
+  private unregisterMaterialReference(id: string, material: Material) {
+    const refs = this._materialsByAssetId.get(id);
+    if (!refs) {
+      return;
+    }
+    for (const ref of [...refs]) {
+      const obj = ref.get();
+      if (!obj || obj === material) {
+        ref.dispose();
+        refs.delete(ref);
+      }
+    }
+    if (refs.size === 0) {
+      this._materialsByAssetId.delete(id);
     }
   }
   /**

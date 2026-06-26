@@ -810,6 +810,7 @@ export class AssetManager {
     for (let i = 0; i < materials.length; i++) {
       const m = materials[i];
       if (m instanceof PBRBluePrintMaterial && !(m instanceof PBRBluePrintMaterialInstance) && (!filter || filter(m))) {
+        const assetId = this._resourceManager.getAssetId(m);
         const content = JSON.parse(
           (await this.readFileFromVFS(paths[i], { encoding: 'utf8' })) as string
         ) as {
@@ -825,6 +826,7 @@ export class AssetManager {
           if (content.type === 'PBRBluePrintMaterial' && content.props) {
             await this._resourceManager.deserializeObjectProps(m, content.props);
           }
+          this.syncTrackedBlueprintMaterialRefs(assetId, m);
         }
       }
     }
@@ -833,6 +835,7 @@ export class AssetManager {
     for (let i = 0; i < materials.length; i++) {
       const m = materials[i];
       if (m instanceof PBRBluePrintMaterialInstance && (!filter || filter(m))) {
+        const assetId = this._resourceManager.getAssetId(m);
         const content = JSON.parse(
           (await this.readFileFromVFS(paths[i], { encoding: 'utf8' })) as string
         ) as {
@@ -864,7 +867,29 @@ export class AssetManager {
         if (instanceContent.type === 'PBRBluePrintMaterialInstance' && instanceContent.props) {
           await this._resourceManager.deserializeObjectProps(m, instanceContent.props);
         }
+        this.syncTrackedBlueprintMaterialRefs(assetId, m);
       }
+    }
+  }
+  private syncTrackedBlueprintMaterialRefs(assetId: Nullable<string>, source: PBRBluePrintMaterial) {
+    if (!assetId) {
+      return;
+    }
+    const refs = this._resourceManager.getMaterialRefsByAssetId(assetId);
+    if (!refs) {
+      return;
+    }
+    for (const ref of [...refs]) {
+      const material = ref.get();
+      if (!material) {
+        ref.dispose();
+        refs.delete(ref);
+        continue;
+      }
+      if (material === source || !(material instanceof PBRBluePrintMaterial)) {
+        continue;
+      }
+      material.copyFrom(source as typeof material);
     }
   }
   private async loadBluePrintMaterialData(
