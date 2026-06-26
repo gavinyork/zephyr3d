@@ -423,6 +423,91 @@ describe('Animation timeline controller', () => {
     expect(fadeInOf(upper)).toBe(0.5);
     expect(fadeInOf(lower)).toBe(0.5);
   });
+
+  test('a cross-fade also fades in entry plays that follow a non-blocking parallel', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'u', 1);
+    createClip(node, 'l', 1);
+    createClip(node, 'tail', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    controller.addState('move', {
+      timeline: {
+        steps: [
+          {
+            type: 'parallel',
+            steps: [
+              { type: 'play', clip: 'u', options: { repeat: 0 } },
+              { type: 'play', clip: 'l', options: { repeat: 0 } }
+            ]
+          },
+          // The parallel above is all non-blocking, so it drains in the same flush and `tail` also
+          // starts at entry: it must be faded in too.
+          { type: 'play', clip: 'tail', options: { repeat: 0 } }
+        ]
+      }
+    });
+
+    controller.setState('move', { transition: 0.5 });
+
+    const tail = node.animationSet.getPlayback('tail');
+    expect(tail).not.toBeNull();
+    const fadeInOf = (playback: typeof tail) =>
+      (playback as unknown as { _getOptions(): { fadeIn?: number } })._getOptions().fadeIn;
+    expect(fadeInOf(tail)).toBe(0.5);
+  });
+
+  test('a statechange listener that stops the controller does not crash setState', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'a', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    controller.addState('a', {
+      timeline: { steps: [{ type: 'play', clip: 'a', options: { repeat: 0 } }] }
+    });
+    controller.on('statechange', (state) => {
+      if (state === 'a') {
+        controller.stop();
+      }
+    });
+
+    // The listener clears `_runner` mid-setState; start() must not run against a null runner.
+    expect(() => controller.setState('a')).not.toThrow();
+    expect(controller.currentState).toBeNull();
+    expect(node.animationSet.isPlayingAnimation('a')).toBe(false);
+  });
+
+  test('a statechange listener that re-enters setState starts the final state exactly once', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'a', 1);
+    createClip(node, 'b', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    controller
+      .addState('a', { timeline: { steps: [{ type: 'emit', event: 'a-enter' }] } })
+      .addState('b', { timeline: { steps: [{ type: 'emit', event: 'b-enter' }] } });
+
+    const emits: string[] = [];
+    controller.on('emit', (event) => {
+      emits.push(event);
+    });
+    let redirected = false;
+    controller.on('statechange', (state) => {
+      if (state === 'a' && !redirected) {
+        redirected = true;
+        controller.setState('b');
+      }
+    });
+
+    controller.setState('a');
+
+    expect(controller.currentState).toBe('b');
+    // The outer setState('a') resumes after the redirect; it must not restart 'b' a second time.
+    expect(emits.filter((event) => event === 'b-enter')).toHaveLength(1);
+  });
 });
 
 describe('Animation timeline runtime', () => {
@@ -575,6 +660,43 @@ describe('Animation timeline runtime', () => {
     runner.dispatch('overlay');
     // Both play simultaneously: the base timeline is still blocked on its waitEvent.
     expect(node.animationSet.isPlayingAnimation('base')).toBe(true);
+    expect(node.animationSet.isPlayingAnimation('overlay')).toBe(true);
+  });
+
+  test('a drained keep-active overlay survives a later main-flow stop response', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'base', 1);
+    createClip(node, 'overlay', 1);
+    createClip(node, 'attack', 1);
+
+    const timeline = new AnimationTimeline({
+      steps: [
+        { type: 'play', clip: 'base', options: { repeat: 0 } },
+        { type: 'waitEvent', event: 'never' }
+      ],
+      responses: [
+        {
+          event: 'overlay',
+          target: { steps: [{ type: 'play', clip: 'overlay', options: { repeat: 0 } }] },
+          onActive: 'keep'
+        },
+        // Default onActive ('stop') replaces the main flow.
+        { event: 'attack', target: { steps: [{ type: 'play', clip: 'attack', options: { repeat: 0 } }] } }
+      ]
+    });
+    const runner = timeline.createRunner(node.animationSet);
+
+    runner.start();
+    runner.dispatch('overlay');
+    expect(node.animationSet.isPlayingAnimation('overlay')).toBe(true);
+
+    // The overlay's keep-active branch is a non-blocking play, so its frame has already drained out
+    // of `_concurrent`. A default (stop) response replacing the main flow must still stop the main
+    // orphan ('base') yet preserve the concurrent overlay (tracked by id, not by a live frame).
+    runner.dispatch('attack');
+    expect(node.animationSet.isPlayingAnimation('attack')).toBe(true);
+    expect(node.animationSet.isPlayingAnimation('base')).toBe(false);
     expect(node.animationSet.isPlayingAnimation('overlay')).toBe(true);
   });
 

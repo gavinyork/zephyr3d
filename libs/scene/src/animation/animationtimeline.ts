@@ -143,16 +143,22 @@ export type AnimationTimelineRunnerState = {
   stack: SerializedFrame[];
   concurrent: SerializedFrame[];
   queued: AnimationTimelineStep[][];
+  /** Ids of playbacks owned by concurrent (keep-active) branches that have already drained. */
+  concurrentPlaybackIds: string[];
   stopped: boolean;
 };
 
 /**
  * A scope tracks the "current playback" and named refs for a sequence of steps. Parallel branches
  * each own an isolated scope so their `waitMarker`/`waitFrame` resolve deterministically.
+ *
+ * `owner` records whether the scope belongs to the main control flow or a concurrent (keep-active)
+ * branch, so a main-flow replacement does not stop the independent concurrent tracks.
  */
 type FrameScope = {
   currentPlaybackId: string | null;
   refs: Record<string, string>;
+  owner: 'main' | 'concurrent';
 };
 
 type SeqFrame = {
@@ -237,6 +243,8 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
   private readonly _onTick: (deltaInSeconds: number) => void;
   /** Tracks playbacks created by this runner so `stop()` can tear them down. */
   private readonly _ownedPlaybacks: Map<string, AnimationPlayback>;
+  /** Ids of playbacks owned by concurrent (keep-active) branches; preserved across main-flow stops. */
+  private readonly _concurrentPlaybackIds: Set<string>;
   /** Marker/frame crossings observed since the last tick, keyed by playback id. */
   private readonly _crossedMarkers: Map<string, Set<string>>;
   private readonly _crossedFrames: Map<string, Set<number>>;
@@ -253,6 +261,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     this._ticking = false;
     this._onTick = (deltaInSeconds) => this.tick(deltaInSeconds);
     this._ownedPlaybacks = new Map();
+    this._concurrentPlaybackIds = new Set();
     this._crossedMarkers = new Map();
     this._crossedFrames = new Map();
   }
@@ -298,6 +307,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
       playback.stop(stopOptions);
     });
     this._ownedPlaybacks.clear();
+    this._concurrentPlaybackIds.clear();
     this.animationSet._unregisterTimelineTicker(this._onTick);
     if (!wasStopped) {
       this.dispatchEvent('stop', this);
@@ -328,7 +338,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     if (steps.length === 0) {
       return;
     }
-    this._concurrent.push(this.makeSeqFrame(steps));
+    this._concurrent.push(this.makeSeqFrame(steps, 'concurrent'));
     if (this._stopped) {
       this._stopped = false;
       this.animationSet._registerTimelineTicker(this._onTick);
@@ -451,6 +461,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
       stack: this._stack.map((frame) => this.cloneFrame(frame)),
       concurrent: this._concurrent.map((frame) => this.cloneFrame(frame)),
       queued: this._queued.map((steps) => steps.slice()),
+      concurrentPlaybackIds: [...this._concurrentPlaybackIds],
       stopped: this._stopped
     };
   }
@@ -471,10 +482,20 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     runner._stack = state.stack.map((frame) => runner.cloneFrame(frame));
     runner._concurrent = state.concurrent.map((frame) => runner.cloneFrame(frame));
     state.queued.forEach((steps) => runner._queued.push(steps.slice()));
+    state.concurrentPlaybackIds?.forEach((id) => runner._concurrentPlaybackIds.add(id));
     runner._stopped = state.stopped;
     // Re-attach to any live playbacks referenced by the restored frames.
     runner.reattachPlaybacks(runner._stack);
     runner._concurrent.forEach((frame) => runner.reattachPlaybacks([frame]));
+    // Re-attach drained concurrent playbacks tracked only by id, so they survive future stops.
+    runner._concurrentPlaybackIds.forEach((id) => {
+      if (!runner._ownedPlaybacks.has(id)) {
+        const playback = runner.findLivePlayback(id);
+        if (playback) {
+          runner.attachPlayback(playback);
+        }
+      }
+    });
     if (!runner._stopped) {
       animationSet._registerTimelineTicker(runner._onTick);
     }
@@ -489,12 +510,12 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     }
   }
 
-  private makeSeqFrame(steps: AnimationTimelineStep[]): SeqFrame {
+  private makeSeqFrame(steps: AnimationTimelineStep[], owner: 'main' | 'concurrent' = 'main'): SeqFrame {
     return {
       kind: 'seq',
       steps,
       index: 0,
-      scope: { currentPlaybackId: null, refs: {} },
+      scope: { currentPlaybackId: null, refs: {}, owner },
       child: null
     };
   }
@@ -633,11 +654,13 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
         return child;
       }
       case 'parallel': {
-        // Each branch gets an isolated scope so currentPlayback/refs don't race (#7).
+        // Each branch gets an isolated scope so currentPlayback/refs don't race (#7), but inherits
+        // the parent's owner so concurrent branches stay concurrent through nested parallels.
         const branches = step.steps.map((child) => {
           const branchScope: FrameScope = {
             currentPlaybackId: scope.currentPlaybackId,
-            refs: { ...scope.refs }
+            refs: { ...scope.refs },
+            owner: scope.owner
           };
           const seq = this.makeSeqFrame([child]);
           seq.scope = branchScope;
@@ -651,6 +674,12 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
           return null;
         }
         this.attachPlayback(playback);
+        if (scope.owner === 'concurrent') {
+          // Remember concurrent ownership independently of the frames: a non-blocking keep-active
+          // play drains out of `_concurrent` immediately, but its playback must still survive a
+          // later main-flow replacement (#2).
+          this._concurrentPlaybackIds.add(playback.id);
+        }
         scope.currentPlaybackId = playback.id;
         if (step.id) {
           scope.refs[step.id] = playback.id;
@@ -757,6 +786,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     if (playback) {
       this.detachPlayback(playback);
       this._ownedPlaybacks.delete(playback.id);
+      this._concurrentPlaybackIds.delete(playback.id);
     }
   };
 
@@ -823,10 +853,10 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     // Stop every playback owned by the main flow, not just those still referenced by `_stack`:
     // a sequence that already drained may have left a looping clip playing (e.g. `play idle` with
     // `repeat: 0`), and replacing the main flow must stop it. Playbacks owned by concurrent
-    // (keep-active) branches are independent parallel tracks and must be preserved.
-    const concurrentIds = this.collectScopePlaybackIds(this._concurrent);
+    // (keep-active) branches are independent parallel tracks and are preserved — tracked by id so
+    // they survive even after their branch frames drained.
     this._ownedPlaybacks.forEach((playback, id) => {
-      if (concurrentIds.has(id)) {
+      if (this._concurrentPlaybackIds.has(id)) {
         return;
       }
       this.detachPlayback(playback);
@@ -862,7 +892,11 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
           kind: 'seq',
           steps: frame.steps,
           index: frame.index,
-          scope: { currentPlaybackId: frame.scope.currentPlaybackId, refs: { ...frame.scope.refs } },
+          scope: {
+            currentPlaybackId: frame.scope.currentPlaybackId,
+            refs: { ...frame.scope.refs },
+            owner: frame.scope.owner
+          },
           child: frame.child ? this.cloneFrame(frame.child) : null
         };
       case 'parallel':

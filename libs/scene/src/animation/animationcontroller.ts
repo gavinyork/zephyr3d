@@ -105,13 +105,20 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
       transition > 0 ? withFadeIn(definition.timeline, transition) : definition.timeline
     );
     this._runner = timeline.createRunner(this.animationSet);
-    this.attachRunner(this._runner, name);
+    const runner = this._runner;
+    this.attachRunner(runner, name);
     // Enter the new state *before* starting the runner: start() flushes synchronously, so any
     // initial `emit`/`statecomplete` must observe the controller already in `name`. Otherwise a
     // listener calling dispatch() would route against the previous state.
     this._currentState = name;
     this.dispatchEvent('statechange', name, previousState);
-    this._runner.start();
+    // The statechange listener may have re-entered (stop() or another setState()), swapping out or
+    // clearing `_runner`. Only start the runner we created if it is still the active one.
+    if (this._runner === runner && this._currentState === name) {
+      runner.start();
+    }
+    // If a reentrant listener superseded us, `_runner` is the now-active runner (or null after a
+    // reentrant stop()); return that rather than a runner we never started.
     return this._runner;
   }
 
@@ -251,10 +258,16 @@ function injectEntryFadeIn(
         return { ...step, steps: result.steps };
       }
       case 'parallel': {
-        // Every branch starts simultaneously, so inject into all of them; the parallel itself
-        // then blocks the steps that follow it.
-        const branches = step.steps.map((branch) => injectEntryFadeIn([branch], duration).steps[0]);
-        blocked = true;
+        // Every branch starts simultaneously, so inject into all of them. The parallel join only
+        // blocks the steps that follow it if at least one branch blocks; if all branches are
+        // non-blocking they drain in the same flush, so the following steps are still entry plays.
+        let anyBranchBlocked = false;
+        const branches = step.steps.map((branch) => {
+          const result = injectEntryFadeIn([branch], duration);
+          anyBranchBlocked = anyBranchBlocked || result.blocked;
+          return result.steps[0];
+        });
+        blocked = anyBranchBlocked;
         return { ...step, steps: branches };
       }
       case 'wait':
