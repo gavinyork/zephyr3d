@@ -229,4 +229,138 @@ describe('Animation timeline controller', () => {
     await completed;
     expect(emits).toEqual(['queued']);
   });
+
+  test('a controller-level consume response marks the event handled', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'idle', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    controller.addState('idle', {
+      timeline: { steps: [{ type: 'waitEvent', event: 'never' }] },
+      responses: [{ event: 'swallow', policy: 'consume' }]
+    });
+    controller.setState('idle');
+
+    const result = controller.dispatch('swallow');
+    expect(result.handled).toBe(true);
+    expect(result.policy).toBe('consume');
+  });
+
+  test('a timeline that cannot handle transition lets the controller state respond', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'idle', 1);
+    createClip(node, 'fall', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    controller
+      .addState('idle', {
+        // The timeline declares a 'transition' response, but a timeline runner cannot switch
+        // controller states. Previously it returned handled:true and masked the state-level
+        // transition below; now it returns handled:false so the controller acts on it.
+        timeline: {
+          steps: [{ type: 'waitEvent', event: 'never' }],
+          responses: [{ event: 'drop', policy: 'transition', targetState: 'fall' }]
+        },
+        responses: [{ event: 'drop', policy: 'transition', targetState: 'fall' }]
+      })
+      .addState('fall', {
+        timeline: { steps: [{ type: 'play', clip: 'fall', options: { repeat: 0 } }] }
+      });
+    controller.setState('idle');
+
+    const result = controller.dispatch('drop');
+    expect(result.handled).toBe(true);
+    expect(result.policy).toBe('transition');
+    expect(controller.currentState).toBe('fall');
+    expect(node.animationSet.isPlayingAnimation('fall')).toBe(true);
+  });
 });
+
+describe('Animation timeline runtime', () => {
+  test('a play step without an explicit wait does not block the timeline', async () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'walk', 1);
+
+    // walk loops forever (repeat: 0). With the old default this would block the timeline
+    // forever; the default is now non-blocking so `emit` runs immediately.
+    const timeline = new AnimationTimeline({
+      steps: [
+        { type: 'play', clip: 'walk', options: { repeat: 0 } },
+        { type: 'emit', event: 'after-play' }
+      ]
+    });
+    const runner = timeline.createRunner(node.animationSet);
+    const emits: string[] = [];
+    runner.on('emit', (event) => {
+      emits.push(event);
+    });
+    const completed = new Promise<void>((resolve) => runner.once('complete', () => resolve()));
+
+    runner.start();
+    await completed;
+
+    expect(emits).toEqual(['after-play']);
+    expect(node.animationSet.isPlayingAnimation('walk')).toBe(true);
+  });
+
+  test('a wait step is driven by the animation logical clock, not wall-clock time', async () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'idle', 1);
+
+    const timeline = new AnimationTimeline({
+      steps: [
+        { type: 'wait', seconds: 1 },
+        { type: 'emit', event: 'elapsed' }
+      ]
+    });
+    const runner = timeline.createRunner(node.animationSet);
+    const emits: string[] = [];
+    runner.on('emit', (event) => {
+      emits.push(event);
+    });
+
+    runner.start();
+    // No update() calls => no logical time advances => wait must not resolve.
+    await Promise.resolve();
+    expect(emits).toEqual([]);
+
+    node.animationSet.update(0.4);
+    await Promise.resolve();
+    expect(emits).toEqual([]);
+
+    node.animationSet.update(0.6);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(emits).toEqual(['elapsed']);
+  });
+
+  test('enqueueing into a drained runner revives it and runs the steps', async () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'idle', 1);
+
+    // A timeline with no blocking steps drains immediately and reports complete.
+    const timeline = new AnimationTimeline({ steps: [{ type: 'emit', event: 'first' }] });
+    const runner = timeline.createRunner(node.animationSet);
+    const emits: string[] = [];
+    runner.on('emit', (event) => {
+      emits.push(event);
+    });
+
+    runner.start();
+    await new Promise<void>((resolve) => runner.once('complete', () => resolve()));
+    expect(runner.stopped).toBe(true);
+    expect(emits).toEqual(['first']);
+
+    // Enqueueing after the drain must revive the runner rather than silently dropping the steps.
+    const revived = new Promise<void>((resolve) => runner.once('complete', () => resolve()));
+    runner.enqueue([{ type: 'emit', event: 'late' }]);
+    await revived;
+    expect(emits).toEqual(['first', 'late']);
+  });
+});
+

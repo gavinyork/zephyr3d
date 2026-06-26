@@ -1024,6 +1024,15 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
   /** @internal */
   private readonly _activeAnimations: Map<AnimationClip, ActiveAnimationInfo>;
   /**
+   * Callbacks driven by the same logical clock as the animations (see {@link update}).
+   *
+   * Used by higher-level constructs (e.g. timeline runners) that need to advance
+   * wall-clock-independent timers in sync with playback, so they pause/scale with the
+   * game clock instead of running on real time.
+   * @internal
+   */
+  private readonly _timelineTickers: Set<(deltaInSeconds: number) => void>;
+  /**
    * Create an AnimationSet controlling the provided model.
    *
    * @param model - The SceneNode (model root) controlled by this animation set.
@@ -1038,6 +1047,21 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
     this._activeAnimations = new Map();
     this._skeletons = [];
     this._rigs = [];
+    this._timelineTickers = new Set();
+  }
+  /**
+   * Register a callback advanced by {@link update} using the same delta time as the animations.
+   * @internal
+   */
+  _registerTimelineTicker(ticker: (deltaInSeconds: number) => void) {
+    this._timelineTickers.add(ticker);
+  }
+  /**
+   * Unregister a callback previously registered with {@link _registerTimelineTicker}.
+   * @internal
+   */
+  _unregisterTimelineTicker(ticker: (deltaInSeconds: number) => void) {
+    this._timelineTickers.delete(ticker);
   }
   /**
    * The model (SceneNode) controlled by this animation set.
@@ -1274,6 +1298,11 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
     this._skeletons.forEach((v) => {
       v.get()?.apply();
     });
+    // Advance logical-clock timers (e.g. timeline `wait` steps) with the same delta time,
+    // so they stay in sync with playback and pause/scale with the game clock.
+    if (this._timelineTickers.size > 0) {
+      this._timelineTickers.forEach((ticker) => ticker(deltaInSeconds));
+    }
   }
   /**
    * Check whether an animation is currently playing.
@@ -1391,8 +1420,7 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
     const weight = playback.weight;
     const rangeStart = ani.resolveTimeRef(options?.range?.start);
     const rangeEnd = ani.resolveTimeRef(options?.range?.end);
-    const initialTime =
-      speedRatio < 0 ? (rangeEnd ?? rangeStart ?? ani.timeDuration) : (rangeStart ?? 0);
+    const initialTime = speedRatio < 0 ? (rangeEnd ?? rangeStart ?? ani.timeDuration) : (rangeStart ?? 0);
     playback._setState('playing');
     playback._setTime(initialTime);
     this._activeAnimations.set(ani, {

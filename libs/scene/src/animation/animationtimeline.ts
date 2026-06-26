@@ -40,6 +40,15 @@ export type AnimationTimelineStep =
       clip: string;
       id?: string;
       options?: PlayAnimationOptions;
+      /**
+       * Whether to block the timeline on this playback before advancing to the next step.
+       * - `'complete'`: wait until the playback completes or is stopped.
+       * - `false` or omitted (default): start the playback and immediately continue.
+       *
+       * Note: omitting this no longer blocks. A clip that loops forever (`repeat: 0`) only
+       * completes when stopped, so combine `wait: 'complete'` with a finite `repeat`/`range`
+       * or an external stop to avoid blocking the timeline indefinitely.
+       */
       wait?: 'complete' | false;
     }
   | {
@@ -138,6 +147,8 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
   private _runToken: number;
   private readonly _eventWaiters: Map<string, ((payload: unknown) => void)[]>;
   private readonly _queuedSteps: AnimationTimelineStep[][];
+  private _waitTimers: { remaining: number; resolve: () => void }[];
+  private readonly _onTick: (deltaInSeconds: number) => void;
 
   constructor(animationSet: AnimationSet, timeline: AnimationTimeline) {
     super();
@@ -149,6 +160,8 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     this._runToken = 0;
     this._eventWaiters = new Map();
     this._queuedSteps = [];
+    this._waitTimers = [];
+    this._onTick = (deltaInSeconds) => this.tickWaits(deltaInSeconds);
   }
 
   get currentPlayback() {
@@ -173,6 +186,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     this._stopped = true;
     this._runToken++;
     this.clearWaiters();
+    this.clearWaitTimers();
     this._queuedSteps.length = 0;
     this.refs.forEach((playback) => playback.stop(options ?? { reason: 'interrupted' }));
     this.refs.clear();
@@ -182,8 +196,16 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
   }
 
   enqueue(steps: AnimationTimelineStep[]) {
-    if (steps.length > 0) {
-      this._queuedSteps.push(steps);
+    if (steps.length === 0) {
+      return;
+    }
+    this._queuedSteps.push(steps);
+    // If the runner already drained to completion (or was otherwise stopped) it has no active
+    // drain loop to pick the queue up. Revive it so queued steps are not silently dropped.
+    if (this._stopped) {
+      this._stopped = false;
+      const token = ++this._runToken;
+      void this.runUntilDrained([], token);
     }
   }
 
@@ -224,7 +246,9 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
       void this.runUntilDrained(response.steps, token);
       return { handled: true, policy: response.policy, event, payload };
     }
-    return { handled: true, policy: response.policy, event, payload };
+    // Policies the runner cannot act on (e.g. 'transition', which only the controller can perform)
+    // must report `handled: false` so the controller falls through to its own response table.
+    return { handled: false, policy: response.policy, event, payload };
   }
 
   private getContext(): TimelineRuntimeContext {
@@ -297,7 +321,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
           ctx.refs.set(step.id, playback);
         }
         ctx.refs.set(playback.id, playback);
-        if (step.wait !== false) {
+        if (step.wait === 'complete') {
           await new Promise<void>((resolve) => {
             let settled = false;
             const done = () => {
@@ -372,7 +396,39 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
         resolve();
         return;
       }
-      setTimeout(resolve, seconds * 1000);
+      // Drive the wait off the animation logical clock (AnimationSet.update) rather than
+      // wall-clock time, so it pauses and scales together with the rest of the animations.
+      this._waitTimers.push({ remaining: seconds, resolve });
+      this.animationSet._registerTimelineTicker(this._onTick);
     });
+  }
+
+  private tickWaits(deltaInSeconds: number) {
+    if (this._waitTimers.length === 0) {
+      return;
+    }
+    const ready: (() => void)[] = [];
+    this._waitTimers = this._waitTimers.filter((timer) => {
+      timer.remaining -= deltaInSeconds;
+      if (timer.remaining <= 0) {
+        ready.push(timer.resolve);
+        return false;
+      }
+      return true;
+    });
+    if (this._waitTimers.length === 0) {
+      this.animationSet._unregisterTimelineTicker(this._onTick);
+    }
+    ready.forEach((resolve) => resolve());
+  }
+
+  private clearWaitTimers() {
+    if (this._waitTimers.length === 0) {
+      return;
+    }
+    const timers = this._waitTimers;
+    this._waitTimers = [];
+    this.animationSet._unregisterTimelineTicker(this._onTick);
+    timers.forEach((timer) => timer.resolve());
   }
 }

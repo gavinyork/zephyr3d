@@ -93,6 +93,11 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
       this.dispatchEvent('event', event, payload, result);
       return result;
     }
+    if (response.policy === 'consume') {
+      const result: AnimationTimelineEventResult = { handled: true, policy: 'consume', event, payload };
+      this.dispatchEvent('event', event, payload, result);
+      return result;
+    }
     if (response.policy === 'transition' || response.policy === 'interrupt') {
       if (!response.targetState && !response.steps?.length) {
         const result: AnimationTimelineEventResult = {
