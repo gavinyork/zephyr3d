@@ -1,4 +1,10 @@
-import { AnimationController, AnimationTimeline, AnimationTimelineRunner, Scene, SceneNode } from '@zephyr3d/scene';
+import {
+  AnimationController,
+  AnimationTimeline,
+  AnimationTimelineRunner,
+  Scene,
+  SceneNode
+} from '@zephyr3d/scene';
 
 function createAnimationSet() {
   const scene = new Scene();
@@ -312,6 +318,53 @@ describe('Animation timeline controller', () => {
     expect(node.animationSet.isPlayingAnimation('idle')).toBe(false);
     expect(controller.hasState('idle')).toBe(false);
   });
+
+  test('the controller is already in the new state when start() flushes (state order)', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'idle', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    // This state's timeline drains synchronously inside start()'s flush, firing statecomplete.
+    // Fix #1 guarantees the controller entered 'ready' (statechange) *before* start(), so the
+    // ordering is statechange then statecomplete, and currentState is observable from either.
+    controller.addState('ready', {
+      timeline: { steps: [{ type: 'emit', event: 'ping' }] }
+    });
+
+    const order: string[] = [];
+    let stateAtComplete: string | null = 'unset';
+    controller.on('statechange', (state) => {
+      order.push(`statechange:${state}`);
+    });
+    controller.on('statecomplete', (state) => {
+      stateAtComplete = controller.currentState;
+      order.push(`statecomplete:${state}`);
+    });
+    controller.setState('ready');
+
+    expect(stateAtComplete).toBe('ready');
+    expect(order).toEqual(['statechange:ready', 'statecomplete:ready']);
+  });
+
+  test('a state response to a missing target state reports handled:false', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'idle', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    controller.addState('idle', {
+      timeline: { steps: [{ type: 'waitEvent', event: 'never' }] },
+      responses: [{ event: 'go', target: { targetState: 'does-not-exist' } }]
+    });
+    controller.setState('idle');
+
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const result = controller.dispatch('go');
+    errorSpy.mockRestore();
+    expect(result.handled).toBe(false);
+    expect(controller.currentState).toBe('idle');
+  });
 });
 
 describe('Animation timeline runtime', () => {
@@ -502,5 +555,54 @@ describe('Animation timeline runtime', () => {
     node.animationSet.update(0.2);
     expect(emits).toEqual(['elapsed']);
   });
-});
 
+  test('a stop-disposition response stops a looping clip left playing by a drained sequence', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'idle', 1);
+    createClip(node, 'attack', 1);
+
+    // `idle` loops forever and the timeline has nothing after it, so the main control flow drains
+    // while the idle playback keeps running. A default (stop) steps-response replacing the flow
+    // must still stop that orphaned loop.
+    const timeline = new AnimationTimeline({
+      steps: [{ type: 'play', clip: 'idle', options: { repeat: 0 } }],
+      responses: [
+        { event: 'attack', target: { steps: [{ type: 'play', clip: 'attack', options: { repeat: 0 } }] } }
+      ]
+    });
+    const runner = timeline.createRunner(node.animationSet);
+
+    runner.start();
+    expect(node.animationSet.isPlayingAnimation('idle')).toBe(true);
+
+    runner.dispatch('attack');
+    expect(node.animationSet.isPlayingAnimation('idle')).toBe(false);
+    expect(node.animationSet.isPlayingAnimation('attack')).toBe(true);
+  });
+
+  test('a wait carries leftover time to the next step within a single oversized tick', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'idle', 1);
+
+    // Two back-to-back 0.1s waits = 0.2s total. A single 0.5s tick must clear both (0.3s leftover),
+    // rather than consuming only the first wait and dropping the overshoot.
+    const timeline = new AnimationTimeline({
+      steps: [
+        { type: 'wait', seconds: 0.1 },
+        { type: 'wait', seconds: 0.1 },
+        { type: 'emit', event: 'elapsed' }
+      ]
+    });
+    const runner = timeline.createRunner(node.animationSet);
+    const emits: string[] = [];
+    runner.on('emit', (event) => {
+      emits.push(event);
+    });
+
+    runner.start();
+    node.animationSet.update(0.5);
+    expect(emits).toEqual(['elapsed']);
+  });
+});

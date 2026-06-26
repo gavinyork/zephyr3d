@@ -102,9 +102,12 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     );
     this._runner = timeline.createRunner(this.animationSet);
     this.attachRunner(this._runner, name);
-    this._runner.start();
+    // Enter the new state *before* starting the runner: start() flushes synchronously, so any
+    // initial `emit`/`statecomplete` must observe the controller already in `name`. Otherwise a
+    // listener calling dispatch() would route against the previous state.
     this._currentState = name;
     this.dispatchEvent('statechange', name, previousState);
+    this._runner.start();
     return this._runner;
   }
 
@@ -125,7 +128,12 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     }
     if (response.target.targetState !== undefined) {
       const transition = typeof response.onActive === 'object' ? response.onActive.fadeOut : undefined;
-      this.setState(response.target.targetState, { transition });
+      const runner = this.setState(response.target.targetState, { transition });
+      // setState returns null when the target state is not registered: a config error must not be
+      // reported as a successfully handled transition.
+      if (!runner) {
+        return this.emitResult({ handled: false, policy: 'transition', event, payload });
+      }
       return this.emitResult({ handled: true, policy: 'transition', event, payload });
     }
     const steps = response.target.steps;

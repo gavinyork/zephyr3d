@@ -187,6 +187,14 @@ type TimelineFrame =
 type SerializedFrame = TimelineFrame;
 
 /**
+ * Outcome of ticking a single frame.
+ * - `block`: the frame is still waiting; stop advancing this stack.
+ * - `pop`: the frame finished; `leftover` (if any) is unconsumed time to carry to the next step.
+ * - `advanced`: the frame moved its cursor or pushed a child; re-tick with zero delta.
+ */
+type TickResult = { status: 'block' | 'advanced'; leftover?: number } | { status: 'pop'; leftover?: number };
+
+/**
  * Serializable animation timeline definition.
  * @public
  */
@@ -514,6 +522,14 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
    * frames pop and the parent sequence advances. Returns when the stack blocks or empties.
    */
   private tickFrames(stack: TimelineFrame[], deltaInSeconds: number) {
+    this.tickFramesWithLeftover(stack, deltaInSeconds);
+  }
+
+  /**
+   * Same as {@link tickFrames} but returns the time left unconsumed when the stack drains
+   * completely (so a parent sequence can hand it to its next step).
+   */
+  private tickFramesWithLeftover(stack: TimelineFrame[], deltaInSeconds: number): number {
     let guard = 0;
     while (stack.length > 0) {
       if (++guard > 10000) {
@@ -521,25 +537,25 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
         break;
       }
       const frame = stack[stack.length - 1];
-      const done = this.tickFrame(frame, stack, deltaInSeconds);
-      if (done === 'block') {
-        return;
+      const result = this.tickFrame(frame, stack, deltaInSeconds);
+      if (result.status === 'block') {
+        return 0;
       }
-      if (done === 'pop') {
+      if (result.status === 'pop') {
         stack.pop();
+        // Carry any unused time (e.g. a `wait` that overshot its duration this tick) to the next
+        // step so a sequence of waits/actions tracks logical time regardless of frame rate.
+        deltaInSeconds = result.leftover ?? 0;
         continue;
       }
       // 'advanced': the frame pushed a child or moved its cursor; loop again with delta 0 so a
       // single tick can drain consecutive non-blocking steps.
       deltaInSeconds = 0;
     }
+    return deltaInSeconds;
   }
 
-  private tickFrame(
-    frame: TimelineFrame,
-    stack: TimelineFrame[],
-    deltaInSeconds: number
-  ): 'block' | 'pop' | 'advanced' {
+  private tickFrame(frame: TimelineFrame, stack: TimelineFrame[], deltaInSeconds: number): TickResult {
     switch (frame.kind) {
       case 'seq':
         return this.tickSeq(frame, stack, deltaInSeconds);
@@ -547,9 +563,10 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
         return this.tickParallel(frame, deltaInSeconds);
       case 'wait':
         frame.remaining -= deltaInSeconds;
-        return frame.remaining <= 0 ? 'pop' : 'block';
+        // On completion, hand back the overshoot (negative remaining) as leftover time.
+        return frame.remaining <= 0 ? { status: 'pop', leftover: -frame.remaining } : { status: 'block' };
       case 'waitEvent':
-        return this._pendingEvents.includes(frame.event) ? 'pop' : 'block';
+        return this._pendingEvents.includes(frame.event) ? { status: 'pop' } : { status: 'block' };
       case 'waitMarker':
         return this.tickWaitMarker(frame);
       case 'waitFrame':
@@ -559,40 +576,48 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     }
   }
 
-  private tickSeq(
-    frame: SeqFrame,
-    _stack: TimelineFrame[],
-    deltaInSeconds: number
-  ): 'block' | 'pop' | 'advanced' {
-    if (frame.child) {
-      const childStack = [frame.child];
-      this.tickFrames(childStack, deltaInSeconds);
-      if (childStack.length > 0) {
-        return 'block';
+  private tickSeq(frame: SeqFrame, _stack: TimelineFrame[], deltaInSeconds: number): TickResult {
+    // Drain steps in a loop so unconsumed time (e.g. a `wait` that overshot) flows into the next
+    // step within the same tick instead of being dropped.
+    let guard = 0;
+    for (;;) {
+      if (++guard > 10000) {
+        return { status: 'block' };
       }
-      frame.child = null;
+      if (frame.child) {
+        const childStack = [frame.child];
+        const leftover = this.tickFramesWithLeftover(childStack, deltaInSeconds);
+        if (childStack.length > 0) {
+          return { status: 'block' };
+        }
+        frame.child = null;
+        frame.index++;
+        deltaInSeconds = leftover;
+      }
+      if (frame.index >= frame.steps.length) {
+        return { status: 'pop', leftover: deltaInSeconds };
+      }
+      const step = frame.steps[frame.index];
+      const blocking = this.beginStep(step, frame);
+      if (blocking) {
+        // Tick the freshly-pushed child immediately with the carried time on the next loop turn.
+        frame.child = blocking;
+        continue;
+      }
       frame.index++;
+      // A non-blocking step consumes no time; keep the remaining delta for the following step.
     }
-    if (frame.index >= frame.steps.length) {
-      return 'pop';
-    }
-    const step = frame.steps[frame.index];
-    const blocking = this.beginStep(step, frame);
-    if (blocking) {
-      frame.child = blocking;
-      return 'advanced';
-    }
-    frame.index++;
-    return 'advanced';
   }
 
-  private tickParallel(frame: ParallelFrame, deltaInSeconds: number): 'block' | 'pop' | 'advanced' {
+  private tickParallel(frame: ParallelFrame, deltaInSeconds: number): TickResult {
     frame.branches = frame.branches.filter((branch) => {
       const branchStack = [branch];
       this.tickFrames(branchStack, deltaInSeconds);
       return branchStack.length > 0;
     });
-    return frame.branches.length > 0 ? 'block' : 'pop';
+    // Parallel branches may finish at different times; we do not attempt to reconcile a single
+    // leftover across them, so the join simply consumes the whole tick.
+    return frame.branches.length > 0 ? { status: 'block' } : { status: 'pop' };
   }
 
   /**
@@ -669,42 +694,42 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     }
   }
 
-  private tickWaitMarker(frame: WaitMarkerFrame): 'block' | 'pop' {
+  private tickWaitMarker(frame: WaitMarkerFrame): TickResult {
     if (frame.satisfied || !frame.playbackId) {
-      return 'pop';
+      return { status: 'pop' };
     }
     const playback = this._ownedPlaybacks.get(frame.playbackId);
     if (!playback || playback.state === 'stopped' || playback.state === 'completed') {
-      return 'pop';
+      return { status: 'pop' };
     }
     const crossed = this._crossedMarkers.get(frame.playbackId);
     if (crossed && crossed.has(frame.marker)) {
-      return 'pop';
+      return { status: 'pop' };
     }
-    return 'block';
+    return { status: 'block' };
   }
 
-  private tickWaitFrame(frame: WaitFrameFrame): 'block' | 'pop' {
+  private tickWaitFrame(frame: WaitFrameFrame): TickResult {
     if (frame.satisfied || frame.playbackId === null) {
-      return 'pop';
+      return { status: 'pop' };
     }
     const playback = this._ownedPlaybacks.get(frame.playbackId);
     if (!playback || playback.state === 'stopped' || playback.state === 'completed') {
-      return 'pop';
+      return { status: 'pop' };
     }
     const crossed = this._crossedFrames.get(frame.playbackId);
     if (crossed && crossed.has(frame.frame)) {
-      return 'pop';
+      return { status: 'pop' };
     }
-    return 'block';
+    return { status: 'block' };
   }
 
-  private tickPlayWait(frame: PlayWaitFrame): 'block' | 'pop' {
+  private tickPlayWait(frame: PlayWaitFrame): TickResult {
     const playback = this._ownedPlaybacks.get(frame.playbackId);
     if (!playback || playback.state === 'stopped' || playback.state === 'completed') {
-      return 'pop';
+      return { status: 'pop' };
     }
-    return 'block';
+    return { status: 'block' };
   }
 
   private attachPlayback(playback: AnimationPlayback) {
@@ -795,14 +820,18 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
   /** Stop only the main control flow (used when a response replaces it). */
   private stopMainFlow(options?: StopAnimationOptions) {
     const stopOptions = options ?? { reason: 'interrupted' };
-    const ids = this.collectScopePlaybackIds(this._stack);
-    ids.forEach((id) => {
-      const playback = this._ownedPlaybacks.get(id);
-      if (playback) {
-        this.detachPlayback(playback);
-        playback.stop(stopOptions);
-        this._ownedPlaybacks.delete(id);
+    // Stop every playback owned by the main flow, not just those still referenced by `_stack`:
+    // a sequence that already drained may have left a looping clip playing (e.g. `play idle` with
+    // `repeat: 0`), and replacing the main flow must stop it. Playbacks owned by concurrent
+    // (keep-active) branches are independent parallel tracks and must be preserved.
+    const concurrentIds = this.collectScopePlaybackIds(this._concurrent);
+    this._ownedPlaybacks.forEach((playback, id) => {
+      if (concurrentIds.has(id)) {
+        return;
       }
+      this.detachPlayback(playback);
+      playback.stop(stopOptions);
+      this._ownedPlaybacks.delete(id);
     });
     this._stack = [];
   }
