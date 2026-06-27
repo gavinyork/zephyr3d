@@ -2507,7 +2507,7 @@ const builtinFunctionsAll = {
       ])
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
-      if (args.length !== 2) {
+      if (args.length !== 2 && args.length !== 3) {
         throw new PBParamLengthError('textureSample');
       }
       const tex = args[0];
@@ -2522,8 +2522,17 @@ const builtinFunctionsAll = {
         if (texType.isStorageTexture()) {
           throw new PBParamTypeError('textureSample', 'texture');
         }
-        const sampler = pb.getDefaultSampler(tex, false)!;
-        const coords = args[1];
+        const sampler =
+          args.length === 3
+            ? (() => {
+                const exp = args[1];
+                if (!(exp instanceof PBShaderExp) || !exp.$ast.getType().isSamplerType()) {
+                  throw new PBParamTypeError('textureSample', 'sampler');
+                }
+                return exp;
+              })()
+            : pb.getDefaultSampler(tex, false)!;
+        const coords = args.length === 3 ? args[2] : args[1];
         const ret = callBuiltin(pb, name, tex, sampler, coords);
         if (ret.$ast.getType().isCompatibleType(typeinfo.typeF32)) {
           return pb.vec4(ret);

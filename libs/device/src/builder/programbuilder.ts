@@ -949,6 +949,8 @@ export interface ProgramBuilder {
   textureNumSamples(tex: PBShaderExp): PBShaderExp;
   /** Same as textureSample builtin function in WebGPU and texture/texture2D/textureCube builtin function in GLSL */
   textureSample(tex: PBShaderExp, coords: number | PBShaderExp): PBShaderExp;
+  /** Same as textureSample builtin function in WebGPU with explicit sampler */
+  textureSample(tex: PBShaderExp, sampler: PBShaderExp, coords: number | PBShaderExp): PBShaderExp;
   /** Same as textureSample builtin function in WebGPU and texture builtin function in GLSL, only valid for WebGL2 and WebGPU device */
   textureArraySample(tex: PBShaderExp, coords: PBShaderExp, arrayIndex: number | PBShaderExp): PBShaderExp;
   /** Same as textureSampleBias builtin function in WebGPU and texture/texture2D/textureCube builtin function in GLSL */
