@@ -262,6 +262,8 @@ responses: [
 ]
 ```
 
+当 `returnTransition` 大于 0 时，目标状态中已经完成的播放实例会继续保留这段时间并执行 completion fade-out，同时返回状态淡入。这样 `Attack` 这类自然完成的一次性动作不会在返回状态启动前被立即移除，而是会真正交叉淡回移动或待机状态。
+
 响应也可以不切换状态，只临时执行一段动作步骤。下面的片段让受击反应与当前状态并行播放，而换弹动作会排队到当前主流程结束后再执行：
 
 ```typescript
@@ -309,39 +311,98 @@ responses: [
 
 ---
 
-## 保持相位一致的分层切换
+## 常见动作编排场景
 
-当某个循环动作已经驱动角色的一部分身体时，新切入的动作通常需要从相同的运动相位开始。例如，下半身正在奔跑、上半身正在射击；射击结束后，无论是恢复上半身奔跑，还是切换回全身奔跑，都应该和下半身奔跑的步态周期对齐。可以在 `play` 步骤的 `options.sync` 中指定一个正在播放的同步源。
+下面的示例覆盖角色动作图中最常见的几类编排方式。每段代码都刻意保持较小范围，便于直接看出该场景的关键 API 用法。
 
-下面的示例会让 `RunLower` 一直循环播放，同时让 `ShootUpper` 播放一次。射击结束后，`RunUpper` 会从 `RunLower` 的同一归一化相位开始，因此上半身恢复奔跑时不会从第 0 帧重新开始。
+### 单一动作循环播放
+
+这个状态会一直循环播放一个待机 clip。这是最简单的 controller 状态：显式进入一次，然后保持循环播放，直到其它状态或 `stop()` 替换它。
 
 ```typescript
-controller.addState('runAndShoot', {
+controller.addState('idleLoop', {
   timeline: {
     steps: [
       {
-        // 下半身奔跑持续循环，并作为后续动作的相位参考。
+        // repeat: 0 表示 Idle clip 会无限循环。
+        type: 'play',
+        clip: 'Idle',
+        options: { repeat: 0 }
+      }
+    ]
+  }
+});
+
+// 需要显式进入循环状态；addState 只注册状态，不会自动激活。
+controller.setState('idleLoop');
+```
+
+### 单一循环中插播一次性动作
+
+这个控制器会保持 `Run` 循环播放。当收到 `attack` 事件时，插播一次 `Attack`。`returnTo: true` 会记录被打断的状态，因此一次性攻击完成后会自动回到 `runLoop`。
+
+```typescript
+controller
+  .addState('runLoop', {
+    transition: 0.15,
+    timeline: {
+      steps: [
+        {
+          // 没有临时动作时，持续播放移动循环。
+          type: 'play',
+          clip: 'Run',
+          options: { repeat: 0 }
+        }
+      ]
+    },
+    responses: [
+      {
+        // 插播一次 Attack，结束后回到被打断的状态。
+        event: 'attack',
+        target: { targetState: 'attackOnce', returnTo: true, returnTransition: 0.12 },
+        // Run 淡出，同时 Attack 淡入。
+        onActive: { fadeOut: 0.12 }
+      }
+    ]
+  })
+  .addState('attackOnce', {
+    transition: 0.12,
+    timeline: {
+      steps: [
+        {
+          // Attack 播放一次，并阻塞该状态直到播放完成。
+          type: 'play',
+          clip: 'Attack',
+          options: { repeat: 1 },
+          wait: 'complete'
+        }
+      ]
+    }
+  });
+```
+
+### 上下半身动作并行循环
+
+这个状态会同时启动下半身和上半身循环。`RunUpper` 会同步到 `lowerRun`，因此即使上半身 clip 时长不同，也会从与下半身相同的归一化移动相位开始。
+
+```typescript
+controller.addState('layeredRun', {
+  timeline: {
+    steps: [
+      {
+        // 下半身奔跑是这个分层状态的相位参考。
         type: 'play',
         clip: 'RunLower',
         id: 'lowerRun',
         options: { repeat: 0 }
       },
       {
-        // 上半身射击播放一次，并等待该动作结束。
-        type: 'play',
-        clip: 'ShootUpper',
-        id: 'shootUpper',
-        options: { repeat: 1 },
-        wait: 'complete'
-      },
-      {
-        // 上半身恢复奔跑，并同步到 lowerRun 当前的归一化相位。
+        // 上半身奔跑从 lowerRun 的同一归一化相位开始。
         type: 'play',
         clip: 'RunUpper',
         id: 'upperRun',
         options: {
           repeat: 0,
-          fadeIn: 0.15,
           sync: { target: 'lowerRun', mode: 'normalized' }
         }
       }
@@ -350,48 +411,99 @@ controller.addState('runAndShoot', {
 });
 ```
 
-下面的片段会把“下半身奔跑 + 上半身瞄准”的分层状态切换回全身奔跑。响应中使用淡出过渡，是为了让 `RunLower` 在 `RunFull` 启动时仍然存在，从而能读取它的相位。
+### 上下半身循环中插播半身动作
+
+这个响应会在 `RunLower` 持续循环时插播一次上半身射击。它先停止上半身循环，播放一次 `ShootUpper`，然后把 `RunUpper` 恢复到 `RunLower` 当前的相位。
+
+```typescript
+responses: [
+  {
+    event: 'shoot',
+    target: {
+      steps: [
+        {
+          // 只停止上半身循环；下半身奔跑继续作为相位源。
+          type: 'stop',
+          target: 'upperRun',
+          options: { fadeOut: 0.08 }
+        },
+        {
+          // 上半身射击播放一次。
+          type: 'play',
+          clip: 'ShootUpper',
+          options: { repeat: 1, fadeIn: 0.08 },
+          wait: 'complete'
+        },
+        {
+          // 恢复上半身奔跑，但不从步态周期的 0 相位重新开始。
+          // 复用 upperRun，后续 shoot 事件才能继续停止这次恢复后的播放。
+          type: 'play',
+          clip: 'RunUpper',
+          id: 'upperRun',
+          options: {
+            repeat: 0,
+            fadeIn: 0.12,
+            sync: { target: 'lowerRun', mode: 'normalized' }
+          }
+        }
+      ]
+    },
+    // 保持下半身分支运行，让上半身插播动作并行执行。
+    onActive: 'keep'
+  }
+]
+```
+
+### 上下半身循环中插播全身动作
+
+这个设置会在角色处于分层奔跑状态时插播一次全身闪避。状态切换使用淡出窗口保留 `RunLower`，因此 `DodgeFull` 启动时可以读取下半身的相位。`DodgeFull` 完成后，`returnTo: true` 会恢复之前被打断的分层状态。
 
 ```typescript
 controller
-  .addState('runLayered', {
-    responses: [
-      {
-        // 收起武器时，从分层动画回到全身移动动画。
-        event: 'holster',
-        target: { targetState: 'runFull' },
-        // 旧的下半身播放会在交叉淡出期间保留，供新状态同步相位。
-        onActive: { fadeOut: 0.2 }
-      }
-    ],
+  .addState('layeredRun', {
+    transition: 0.15,
     timeline: {
       steps: [
-        // RunLower 是 runFull 进入时要同步的播放源。
-        { type: 'play', clip: 'RunLower', options: { repeat: 0 } },
-        // AimUpper 是持武器时的上半身叠加动作。
-        { type: 'play', clip: 'AimUpper', options: { repeat: 0 } }
+        // 下半身奔跑是全身插播动作进入时的相位参考。
+        { type: 'play', clip: 'RunLower', id: 'lowerRun', options: { repeat: 0 } },
+        // 上半身奔跑叠加在下半身循环之上。
+        {
+          type: 'play',
+          clip: 'RunUpper',
+          options: { repeat: 0, sync: { target: 'lowerRun' } }
+        }
       ]
-    }
+    },
+    responses: [
+      {
+        // 插播一次全身闪避，然后回到 layeredRun。
+        event: 'dodge',
+        target: { targetState: 'dodgeFull', returnTo: true, returnTransition: 0.15 },
+        // 保留 RunLower 到 DodgeFull 启动时，供它读取相位。
+        onActive: { fadeOut: 0.12 }
+      }
+    ]
   })
-  .addState('runFull', {
-    transition: 0.2,
+  .addState('dodgeFull', {
+    transition: 0.12,
     timeline: {
       steps: [
         {
-          // 全身奔跑从 RunLower 当前的移动相位开始。
+          // 全身动作从旧下半身奔跑的同一移动相位开始。
           type: 'play',
-          clip: 'RunFull',
+          clip: 'DodgeFull',
           options: {
-            repeat: 0,
+            repeat: 1,
             sync: { target: 'RunLower', mode: 'normalized' }
-          }
+          },
+          wait: 'complete'
         }
       ]
     }
   });
 ```
 
-`sync.target` 会按正在播放的 clip 名称或 playback id 查找同步源。在 timeline 内部，也可以像上面的 `lowerRun` 一样引用本地 `id`。对应但时长不同的动作通常使用 `mode: 'normalized'`；如果多个 clip 的作者时间轴完全一致，可以使用 `mode: 'time'` 按秒复制时间。`offset` 可以偏移复制到的相位，`wrap: false` 则会把初始时间夹到目标 clip 或 range 内，而不是循环折返。
+`stop.target` 和 `sync.target` 都可以引用同一个 runner 中之前 `play` 步骤创建的本地 `id`，即使创建它的 frame 已经执行完毕。它们也可以按正在播放的 clip 名称或 playback id 查找目标。当某个响应停止了带名字的播放，并在稍后恢复同一条逻辑轨道时，需要在恢复用的 `play` 步骤上复用同一个 `id`，这样后续响应才会继续指向新的 playback。对应但时长不同的动作通常使用 `mode: 'normalized'`；如果多个 clip 的作者时间轴完全一致，可以使用 `mode: 'time'` 按秒复制时间。`offset` 可以偏移复制到的相位，`wrap: false` 则会把初始时间夹到目标 clip 或 range 内，而不是循环折返。
 
 ---
 
@@ -432,7 +544,7 @@ controller.on('event', (event, payload, result) => {
 - 用 `AnimationController` 管理动作层逻辑，用 `AnimationSet` 做底层直接播放。
 - timeline 中引用的 clip 名称必须和导入模型或手工创建的动画片段名称一致。
 - 一次性动作使用 `repeat: 1`，例如攻击、翻滚、开门；循环状态使用 `repeat: 0`，例如待机、奔跑。
-- 临时状态切换可使用 `returnTo: true`，让一次性动作结束后自动回到被打断的循环状态。
+- 临时状态切换可使用 `returnTo: true`，让一次性动作结束后自动回到被打断的循环状态；需要完成动作淡出并淡入返回状态时，设置 `returnTransition`。
 - 恢复上/下半身循环动作，或把分层移动切换为全身 clip 时使用 `options.sync`；如果新状态需要读取旧播放的相位，应使用短过渡让同步源保留到新状态启动。
 - 常规过渡时间写在状态的 `transition` 上；特殊切换可用 `setState(name, { transition })` 或响应里的 `{ fadeOut }` 覆盖。
 - 如果动画资源中有 marker，优先用 `waitMarker` 做命中、脚步、音效等时机；依赖固定帧号的流程可用 `waitFrame`。

@@ -98,6 +98,14 @@ export type PlayAnimationOptions = {
    */
   fadeIn?: number;
   /**
+   * Fade-out duration in seconds used after the playback completes naturally.
+   *
+   * When greater than 0, the playback emits `complete` at the authored end time but remains active
+   * for this duration while its weight fades to 0. This lets a following playback cross-fade from
+   * the completed pose instead of snapping after the completed clip is removed.
+   */
+  completionFadeOut?: number;
+  /**
    * Weight of the animation clip.
    *
    * Used during blending when multiple animations affect the same property.
@@ -1056,6 +1064,7 @@ type ActiveAnimationInfo = {
   fadeTargetWeight: number;
   animateTime: number;
   stopReason: AnimationStopReason;
+  completed: boolean;
   rangeStart: number | null;
   rangeEnd: number | null;
 };
@@ -1240,6 +1249,13 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
       }
       if (v.fadeOut > 0 && v.fadeOutStart < 0) {
         v.fadeOutStart = v.animateTime;
+      }
+      if (v.completed) {
+        v.animateTime += Math.abs(deltaInSeconds * v.speedRatio);
+        if (v.fadeOut > 0 && v.animateTime - v.fadeOutStart >= v.fadeOut) {
+          this.stopAnimation(k.name, { reason: v.stopReason });
+        }
+        return;
       }
       // Update animation time
       if (v.firstFrame) {
@@ -1505,6 +1521,7 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
       started: false,
       paused: false,
       stopReason: 'manual',
+      completed: false,
       rangeStart,
       rangeEnd
     });
@@ -1621,7 +1638,7 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
     if (!wrap) {
       return Math.max(range.start, Math.min(range.end, time));
     }
-    if (time >= range.start && time <= range.end) {
+    if (time >= range.start && time < range.end) {
       return time;
     }
     const offset = (((time - range.start) % range.duration) + range.duration) % range.duration;
@@ -1744,10 +1761,21 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
     };
   }
   private completePlayback(clip: AnimationClip, info: ActiveAnimationInfo) {
+    if (info.completed) {
+      return;
+    }
     const event = this.createPlaybackEvent(info, clip);
+    const completionFadeOut = Math.max(info.playback._getOptions().completionFadeOut ?? 0, 0);
     info.playback._setState('completed');
     info.playback._emitComplete(event);
     this.dispatchEvent('playbackcomplete', event);
+    if (completionFadeOut > 0) {
+      info.completed = true;
+      info.fadeOut = completionFadeOut;
+      info.fadeOutStart = info.animateTime;
+      info.stopReason = 'completed';
+      return;
+    }
     this.stopAnimation(clip.name, { reason: 'completed' });
   }
   private emitCrossedMarkers(

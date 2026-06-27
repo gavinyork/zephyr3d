@@ -1,5 +1,5 @@
 import { Observable } from '@zephyr3d/base';
-import type { AnimationSet, StopAnimationOptions } from './animationset';
+import type { AnimationPlaybackSyncOptions, AnimationSet, StopAnimationOptions } from './animationset';
 import type {
   AnimationTimelineEventResponse,
   AnimationTimelineEventResult,
@@ -42,6 +42,11 @@ export type AnimationControllerStateDefinition = {
 export type AnimationControllerSetStateOptions = {
   /** Cross-fade duration (seconds). Overrides the target state's own `transition`. */
   transition?: number;
+  /**
+   * Optional phase synchronization source applied to entry play steps that do not already define
+   * their own `options.sync`.
+   */
+  sync?: AnimationPlaybackSyncOptions;
   /** Re-enter the state even if it is already current. Defaults to false (no-op on same state). */
   force?: boolean;
   /** Stop options for the outgoing state when no cross-fade is used. */
@@ -196,7 +201,7 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
       this._runner?.stop(options?.stop ?? { reason: 'interrupted' });
     }
     const timeline = new AnimationTimeline(
-      transition > 0 ? withFadeIn(definition.timeline, transition) : definition.timeline
+      prepareTimelineForTransition(definition.timeline, transition, returnTarget?.transition, options?.sync)
     );
     this._runner = timeline.createRunner(this.animationSet);
     const runner = this._runner;
@@ -322,11 +327,12 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     if (!state) {
       return null;
     }
-    if (!this._states.has(state)) {
+    const definition = this._states.get(state);
+    if (!definition) {
       console.error(`AnimationController return state ${state} not exists`);
       return null;
     }
-    return { state, transition: returnTransition };
+    return { state, transition: returnTransition ?? definition.transition };
   }
 
   private attachRunner(
@@ -337,7 +343,11 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     this._onRunnerComplete = () => {
       this.dispatchEvent('statecomplete', state);
       if (returnTarget && this._runner === runner && this._currentState === state) {
-        this.setState(returnTarget.state, { transition: returnTarget.transition });
+        const sync =
+          returnTarget.transition && runner.lastCompletedPlaybackId
+            ? { target: runner.lastCompletedPlaybackId, mode: 'normalized' as const }
+            : undefined;
+        this.setState(returnTarget.state, { transition: returnTarget.transition, sync });
       }
     };
     this._onRunnerEmit = (event, payload) => {
@@ -359,6 +369,78 @@ export class AnimationController extends Observable<AnimationControllerEventMap>
     this._onRunnerComplete = null;
     this._onRunnerEmit = null;
   }
+}
+
+function prepareTimelineForTransition(
+  definition: AnimationTimelineDefinition | AnimationTimelineStep[],
+  entryTransition: number,
+  returnTransition: number | undefined,
+  entrySync: AnimationPlaybackSyncOptions | undefined
+): AnimationTimelineDefinition | AnimationTimelineStep[] {
+  let timeline: AnimationTimelineDefinition | AnimationTimelineStep[] = definition;
+  if (entrySync) {
+    timeline = withEntrySync(timeline, entrySync);
+  }
+  const completionFadeOut = Math.max(returnTransition ?? 0, 0);
+  if (completionFadeOut > 0) {
+    timeline = withCompletionFadeOut(timeline, completionFadeOut);
+  }
+  return entryTransition > 0 ? withFadeIn(timeline, entryTransition) : timeline;
+}
+
+/**
+ * Return a copy of the timeline definition whose entry plays use `sync` unless they already
+ * declare a more specific synchronization source.
+ */
+function withEntrySync(
+  definition: AnimationTimelineDefinition | AnimationTimelineStep[],
+  sync: AnimationPlaybackSyncOptions
+): AnimationTimelineDefinition {
+  const def: AnimationTimelineDefinition = Array.isArray(definition) ? { steps: definition } : definition;
+  return { steps: injectEntrySync(def.steps, sync).steps, responses: def.responses };
+}
+
+function injectEntrySync(
+  steps: AnimationTimelineStep[],
+  sync: AnimationPlaybackSyncOptions
+): { steps: AnimationTimelineStep[]; blocked: boolean } {
+  let blocked = false;
+  const out = steps.map((step) => {
+    if (blocked) {
+      return step;
+    }
+    switch (step.type) {
+      case 'play':
+        if (step.wait === 'complete') {
+          blocked = true;
+        }
+        return { ...step, options: { ...step.options, sync: step.options?.sync ?? sync } };
+      case 'sequence': {
+        const result = injectEntrySync(step.steps, sync);
+        blocked = result.blocked;
+        return { ...step, steps: result.steps };
+      }
+      case 'parallel': {
+        let anyBranchBlocked = false;
+        const branches = step.steps.map((branch) => {
+          const result = injectEntrySync([branch], sync);
+          anyBranchBlocked = anyBranchBlocked || result.blocked;
+          return result.steps[0];
+        });
+        blocked = anyBranchBlocked;
+        return { ...step, steps: branches };
+      }
+      case 'wait':
+      case 'waitEvent':
+      case 'waitMarker':
+      case 'waitFrame':
+        blocked = true;
+        return step;
+      default:
+        return step;
+    }
+  });
+  return { steps: out, blocked };
 }
 
 /**
@@ -426,4 +508,37 @@ function injectEntryFadeIn(
     }
   });
   return { steps: out, blocked };
+}
+
+/**
+ * Return a copy of the timeline definition whose play steps keep completed playbacks alive long
+ * enough to cross-fade into the automatic return state.
+ */
+function withCompletionFadeOut(
+  definition: AnimationTimelineDefinition | AnimationTimelineStep[],
+  duration: number
+): AnimationTimelineDefinition {
+  const def: AnimationTimelineDefinition = Array.isArray(definition) ? { steps: definition } : definition;
+  return { steps: injectCompletionFadeOut(def.steps, duration), responses: def.responses };
+}
+
+function injectCompletionFadeOut(steps: AnimationTimelineStep[], duration: number): AnimationTimelineStep[] {
+  return steps.map((step) => {
+    switch (step.type) {
+      case 'play':
+        return {
+          ...step,
+          options: {
+            ...step.options,
+            completionFadeOut: step.options?.completionFadeOut ?? duration
+          }
+        };
+      case 'sequence':
+        return { ...step, steps: injectCompletionFadeOut(step.steps, duration) };
+      case 'parallel':
+        return { ...step, steps: step.steps.map((branch) => injectCompletionFadeOut([branch], duration)[0]) };
+      default:
+        return step;
+    }
+  });
 }

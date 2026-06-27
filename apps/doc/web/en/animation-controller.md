@@ -262,6 +262,11 @@ responses: [
 ]
 ```
 
+When `returnTransition` is greater than 0, the target state's completed playbacks are kept alive
+for that duration as a completion fade-out while the return state fades in. This turns a natural
+one-shot completion, such as `Attack`, into a real cross-fade back to locomotion instead of removing
+the completed clip before the return state starts.
+
 Responses can also run short action snippets without changing state. This fragment keeps a flinch reaction concurrent with the current state, while reload is queued until the active main flow drains:
 
 ```typescript
@@ -309,39 +314,98 @@ responses: [
 
 ---
 
-## Phase-Consistent Layer Switching
+## Common Action Orchestration Scenarios
 
-When a loop is already driving part of a character, the next clip often needs to enter at the same locomotion phase. For example, after a lower-body run plus upper-body shooting action, the restored upper-body run or replacement full-body run should match the lower-body run cycle. Use `options.sync` on a `play` step to copy phase from an active playback.
+The following examples cover common character action graphs. They are intentionally small, so each snippet focuses on one orchestration pattern.
 
-The example below keeps `RunLower` looping while `ShootUpper` plays once. When shooting finishes, `RunUpper` starts at the same normalized phase as `RunLower`, so the restored upper body matches the legs instead of restarting from frame 0.
+### Single Loop
+
+This state plays one idle clip forever. It is the simplest form of a controller state: enter once, keep the looping playback alive until another state or `stop()` replaces it.
 
 ```typescript
-controller.addState('runAndShoot', {
+controller.addState('idleLoop', {
   timeline: {
     steps: [
       {
-        // Keep the lower-body run loop active as the phase reference.
+        // repeat: 0 means the Idle clip loops forever.
+        type: 'play',
+        clip: 'Idle',
+        options: { repeat: 0 }
+      }
+    ]
+  }
+});
+
+// Enter the looping state explicitly; adding a state does not make it active.
+controller.setState('idleLoop');
+```
+
+### Loop With One-Shot Insert
+
+This controller keeps `Run` looping, then inserts `Attack` once when the `attack` event arrives. `returnTo: true` records the interrupted state, so the controller automatically returns to `runLoop` after the one-shot attack completes.
+
+```typescript
+controller
+  .addState('runLoop', {
+    transition: 0.15,
+    timeline: {
+      steps: [
+        {
+          // Keep the locomotion loop alive while no temporary action is active.
+          type: 'play',
+          clip: 'Run',
+          options: { repeat: 0 }
+        }
+      ]
+    },
+    responses: [
+      {
+        // Insert Attack once, then return to whichever state was interrupted.
+        event: 'attack',
+        target: { targetState: 'attackOnce', returnTo: true, returnTransition: 0.12 },
+        // Fade Run out while Attack fades in.
+        onActive: { fadeOut: 0.12 }
+      }
+    ]
+  })
+  .addState('attackOnce', {
+    transition: 0.12,
+    timeline: {
+      steps: [
+        {
+          // Attack plays once and blocks this state until the playback completes.
+          type: 'play',
+          clip: 'Attack',
+          options: { repeat: 1 },
+          wait: 'complete'
+        }
+      ]
+    }
+  });
+```
+
+### Parallel Upper/Lower Loops
+
+This state starts lower-body and upper-body loops together. `RunUpper` synchronizes to `lowerRun`, so even if the upper clip has a different duration, it starts at the same normalized locomotion phase as the lower body.
+
+```typescript
+controller.addState('layeredRun', {
+  timeline: {
+    steps: [
+      {
+        // Lower-body running is the phase reference for this layered state.
         type: 'play',
         clip: 'RunLower',
         id: 'lowerRun',
         options: { repeat: 0 }
       },
       {
-        // Play the upper-body shooting action once and wait for it to finish.
-        type: 'play',
-        clip: 'ShootUpper',
-        id: 'shootUpper',
-        options: { repeat: 1 },
-        wait: 'complete'
-      },
-      {
-        // Restore upper-body running at the same normalized phase as lowerRun.
+        // Upper-body running starts at the same normalized phase as lowerRun.
         type: 'play',
         clip: 'RunUpper',
         id: 'upperRun',
         options: {
           repeat: 0,
-          fadeIn: 0.15,
           sync: { target: 'lowerRun', mode: 'normalized' }
         }
       }
@@ -350,48 +414,99 @@ controller.addState('runAndShoot', {
 });
 ```
 
-The next fragment replaces a layered lower/upper setup with a full-body run. The response uses a fade-out transition so `RunLower` remains active long enough for the entering `RunFull` playback to read its phase.
+### Parallel Loops With Half-Body Insert
+
+This response inserts a finite upper-body shooting action while `RunLower` keeps looping. It stops the upper loop, plays `ShootUpper` once, then restores `RunUpper` at the current phase of `RunLower`.
+
+```typescript
+responses: [
+  {
+    event: 'shoot',
+    target: {
+      steps: [
+        {
+          // Stop only the upper-body loop; the lower-body run continues as the phase source.
+          type: 'stop',
+          target: 'upperRun',
+          options: { fadeOut: 0.08 }
+        },
+        {
+          // Play the upper-body shooting action once.
+          type: 'play',
+          clip: 'ShootUpper',
+          options: { repeat: 1, fadeIn: 0.08 },
+          wait: 'complete'
+        },
+        {
+          // Restore upper-body running without restarting the gait cycle from phase 0.
+          // Reuse upperRun so later shoot events can stop this replacement playback too.
+          type: 'play',
+          clip: 'RunUpper',
+          id: 'upperRun',
+          options: {
+            repeat: 0,
+            fadeIn: 0.12,
+            sync: { target: 'lowerRun', mode: 'normalized' }
+          }
+        }
+      ]
+    },
+    // Keep the lower-body branch running while the upper-body insert executes.
+    onActive: 'keep'
+  }
+]
+```
+
+### Parallel Loops With Full-Body Insert
+
+This setup inserts a finite full-body dodge while the character is in the layered running state. The state transition keeps `RunLower` alive for the fade-out window, so `DodgeFull` can copy its phase before the layered playbacks are replaced. When `DodgeFull` completes, `returnTo: true` restores the previously interrupted layered state.
 
 ```typescript
 controller
-  .addState('runLayered', {
-    responses: [
-      {
-        // Holstering the weapon returns from layered animation to full-body locomotion.
-        event: 'holster',
-        target: { targetState: 'runFull' },
-        // Keep the old lower-body playback alive during the cross-fade for phase sync.
-        onActive: { fadeOut: 0.2 }
-      }
-    ],
+  .addState('layeredRun', {
+    transition: 0.15,
     timeline: {
       steps: [
-        // RunLower is the active playback that runFull will synchronize with.
-        { type: 'play', clip: 'RunLower', options: { repeat: 0 } },
-        // AimUpper is an upper-body overlay while the character is armed.
-        { type: 'play', clip: 'AimUpper', options: { repeat: 0 } }
+        // Lower-body running is the phase reference for full-body inserts.
+        { type: 'play', clip: 'RunLower', id: 'lowerRun', options: { repeat: 0 } },
+        // Upper-body running is layered on top of the lower-body loop.
+        {
+          type: 'play',
+          clip: 'RunUpper',
+          options: { repeat: 0, sync: { target: 'lowerRun' } }
+        }
       ]
-    }
+    },
+    responses: [
+      {
+        // Insert a finite full-body dodge and then return to layeredRun.
+        event: 'dodge',
+        target: { targetState: 'dodgeFull', returnTo: true, returnTransition: 0.15 },
+        // Keep RunLower alive long enough for DodgeFull to read its phase.
+        onActive: { fadeOut: 0.12 }
+      }
+    ]
   })
-  .addState('runFull', {
-    transition: 0.2,
+  .addState('dodgeFull', {
+    transition: 0.12,
     timeline: {
       steps: [
         {
-          // Start the full-body run at the same locomotion phase as RunLower.
+          // Start the full-body action at the same locomotion phase as the outgoing lower body.
           type: 'play',
-          clip: 'RunFull',
+          clip: 'DodgeFull',
           options: {
-            repeat: 0,
+            repeat: 1,
             sync: { target: 'RunLower', mode: 'normalized' }
-          }
+          },
+          wait: 'complete'
         }
       ]
     }
   });
 ```
 
-`sync.target` is resolved as an active clip name or playback id. Inside timeline steps it may also refer to a local `id`, as shown with `lowerRun`. Use `mode: 'normalized'` for corresponding clips with different durations, and `mode: 'time'` when clips share the same authored timing in seconds. `offset` shifts the copied phase, and `wrap: false` clamps instead of wrapping into the destination clip or range.
+`stop.target` and `sync.target` can refer to a local `id` created by a previous `play` step in the same runner, even if that step's frame has already drained. They can also resolve an active clip name or playback id. When a response stops a named playback and later restores the same logical track, assign the same `id` on the restoring `play` step so future responses keep targeting the new playback. Use `mode: 'normalized'` for corresponding clips with different durations, and `mode: 'time'` when clips share the same authored timing in seconds. `offset` shifts the copied phase, and `wrap: false` clamps instead of wrapping into the destination clip or range.
 
 ---
 
@@ -432,7 +547,7 @@ When `returnTo` is configured, `statecomplete` is emitted before the automatic r
 - Use `AnimationController` for action-level orchestration and `AnimationSet` for direct low-level playback.
 - Use stable clip names and verify imported models contain the clips referenced by timelines.
 - Use `repeat: 1` for one-shot actions that should complete, and `repeat: 0` for looping states such as idle or run.
-- Use `returnTo: true` on temporary state transitions when a one-shot action should return to the interrupted looping state.
+- Use `returnTo: true` on temporary state transitions when a one-shot action should return to the interrupted looping state. Set `returnTransition` when the completed action should fade out while the return state fades in.
 - Use `options.sync` when restoring an upper/lower-body loop or replacing layered locomotion with a full-body clip; keep the source playback alive with a short transition when the new state must read its phase.
 - Put default cross-fade durations on state definitions with `transition`; override individual transitions with `setState(name, { transition })` or a response's `{ fadeOut }`.
 - Use `waitMarker` for gameplay timing when authored animation markers are available; use `waitFrame` when your pipeline relies on frame numbers.

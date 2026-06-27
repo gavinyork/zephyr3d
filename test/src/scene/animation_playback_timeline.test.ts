@@ -313,6 +313,123 @@ describe('Animation timeline controller', () => {
     expect(stateChanges).toEqual(['run', 'attack', 'run']);
   });
 
+  test('returnTransition keeps the completed target fading while the return state fades in', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'run', 1);
+    createClip(node, 'attack', 1);
+
+    const controller = new AnimationController(node.animationSet);
+    controller
+      .addState('run', {
+        timeline: {
+          steps: [{ type: 'play', clip: 'run', options: { repeat: 0 }, wait: false }]
+        },
+        responses: [
+          {
+            event: 'attack',
+            target: { targetState: 'attack', returnTo: true, returnTransition: 0.25 }
+          }
+        ]
+      })
+      .addState('attack', {
+        timeline: {
+          steps: [{ type: 'play', clip: 'attack', options: { repeat: 1 }, wait: 'complete' }]
+        }
+      });
+
+    controller.setState('run');
+    controller.dispatch('attack');
+    node.animationSet.update(0);
+    node.animationSet.update(1.1);
+
+    const fadingAttack = node.animationSet.getPlayback('attack');
+    const returnedRun = node.animationSet.getPlayback('run');
+    expect(controller.currentState).toBe('run');
+    expect(fadingAttack).not.toBeNull();
+    expect(fadingAttack!.state).toBe('completed');
+    expect(returnedRun).not.toBeNull();
+
+    const optionsOf = (playback: typeof returnedRun) =>
+      (
+        playback as unknown as {
+          _getOptions(): { fadeIn?: number; completionFadeOut?: number; sync?: { target: string } };
+        }
+      )._getOptions();
+    expect(optionsOf(fadingAttack).completionFadeOut).toBe(0.25);
+    expect(optionsOf(returnedRun).fadeIn).toBe(0.25);
+    expect(optionsOf(returnedRun).sync?.target).toBe(fadingAttack!.id);
+
+    node.animationSet.update(0.1);
+    expect(node.animationSet.getPlayback('attack')).not.toBeNull();
+    node.animationSet.update(0.2);
+    expect(node.animationSet.getPlayback('attack')).toBeNull();
+  });
+
+  test('a controller keep response can target local playback ids from a drained state timeline', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'lower', 2);
+    createClip(node, 'upper', 1);
+    createClip(node, 'shoot', 0.2);
+
+    const controller = new AnimationController(node.animationSet);
+    controller.addState('layeredRun', {
+      timeline: {
+        steps: [
+          { type: 'play', clip: 'lower', id: 'lowerRun', options: { repeat: 0 } },
+          {
+            type: 'play',
+            clip: 'upper',
+            id: 'upperRun',
+            options: { repeat: 0, sync: { target: 'lowerRun', mode: 'normalized' } }
+          }
+        ]
+      },
+      responses: [
+        {
+          event: 'shoot',
+          target: {
+            steps: [
+              { type: 'stop', target: 'upperRun', options: { fadeOut: 0.08 } },
+              { type: 'play', clip: 'shoot', options: { repeat: 1 }, wait: 'complete' },
+              {
+                type: 'play',
+                clip: 'upper',
+                id: 'upperRun',
+                options: {
+                  repeat: 0,
+                  sync: { target: 'lowerRun', mode: 'normalized' }
+                }
+              }
+            ]
+          },
+          onActive: 'keep'
+        }
+      ]
+    });
+
+    controller.setState('layeredRun');
+    expect(controller.runner?.stopped).toBe(true);
+    expect(node.animationSet.getPlayback('upper')?.state).toBe('playing');
+
+    controller.dispatch('shoot');
+    expect(node.animationSet.getPlayback('upper')?.state).toBe('stopping');
+
+    node.animationSet.update(0);
+    node.animationSet.update(0.3);
+
+    const lower = node.animationSet.getPlayback('lower');
+    const restoredUpper = node.animationSet.getPlayback('upper');
+    expect(lower?.time).toBeCloseTo(0.3);
+    expect(restoredUpper).not.toBeNull();
+    expect(restoredUpper?.state).toBe('playing');
+    expect(restoredUpper?.time).toBeCloseTo(0.15);
+
+    controller.dispatch('shoot');
+    expect(node.animationSet.getPlayback('upper')?.state).toBe('stopping');
+  });
+
   test('enqueue responses on the controller run after the current steps drain', () => {
     const scene = new Scene();
     const node = new SceneNode(scene);
@@ -818,6 +935,68 @@ describe('Animation timeline runtime', () => {
     expect(node.animationSet.isPlayingAnimation('attack')).toBe(true);
     expect(node.animationSet.isPlayingAnimation('base')).toBe(false);
     expect(node.animationSet.isPlayingAnimation('overlay')).toBe(true);
+  });
+
+  test('a keep response can target local playback ids from a drained main flow', () => {
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    createClip(node, 'lower', 2);
+    createClip(node, 'upper', 1);
+    createClip(node, 'shoot', 0.2);
+
+    const timeline = new AnimationTimeline({
+      steps: [
+        { type: 'play', clip: 'lower', id: 'lowerRun', options: { repeat: 0 } },
+        {
+          type: 'play',
+          clip: 'upper',
+          id: 'upperRun',
+          options: { repeat: 0, sync: { target: 'lowerRun', mode: 'normalized' } }
+        }
+      ],
+      responses: [
+        {
+          event: 'shoot',
+          target: {
+            steps: [
+              { type: 'stop', target: 'upperRun', options: { fadeOut: 0.08 } },
+              { type: 'play', clip: 'shoot', options: { repeat: 1 }, wait: 'complete' },
+              {
+                type: 'play',
+                clip: 'upper',
+                id: 'upperRun',
+                options: {
+                  repeat: 0,
+                  sync: { target: 'lowerRun', mode: 'normalized' }
+                }
+              }
+            ]
+          },
+          onActive: 'keep'
+        }
+      ]
+    });
+    const runner = timeline.createRunner(node.animationSet);
+
+    runner.start();
+    expect(runner.stopped).toBe(true);
+    expect(node.animationSet.getPlayback('upper')?.state).toBe('playing');
+
+    runner.dispatch('shoot');
+    expect(node.animationSet.getPlayback('upper')?.state).toBe('stopping');
+
+    node.animationSet.update(0);
+    node.animationSet.update(0.3);
+
+    const lower = node.animationSet.getPlayback('lower');
+    const restoredUpper = node.animationSet.getPlayback('upper');
+    expect(lower?.time).toBeCloseTo(0.3);
+    expect(restoredUpper).not.toBeNull();
+    expect(restoredUpper?.state).toBe('playing');
+    expect(restoredUpper?.time).toBeCloseTo(0.15);
+
+    runner.dispatch('shoot');
+    expect(node.animationSet.getPlayback('upper')?.state).toBe('stopping');
   });
 
   test('serialize/deserialize preserves a blocked wait and resumes deterministically', () => {

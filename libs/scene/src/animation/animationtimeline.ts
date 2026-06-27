@@ -166,7 +166,12 @@ export type AnimationTimelineStep =
       type: 'play';
       /** Name of the animation clip to play from the owning AnimationSet. */
       clip: string;
-      /** Optional local reference id used by later `target` fields in the same scope. */
+      /**
+       * Optional local reference id used by later `target` fields in this runner.
+       *
+       * If a later step replaces the same logical playback and future responses should keep using
+       * this name, assign the same id again on the replacement `play` step.
+       */
       id?: string;
       /** Playback options passed to `AnimationSet.play`. */
       options?: PlayAnimationOptions;
@@ -298,6 +303,10 @@ export type AnimationTimelineRunnerState = {
   /** Ids of playbacks owned by concurrent (keep-active) branches that have already drained. */
   concurrentPlaybackIds: string[];
   /**
+   * Runner-level playback references preserved after the frame that created them has drained.
+   */
+  playbackRefs?: Record<string, string>;
+  /**
    * Whether the runner was stopped when the state was captured.
    */
   stopped: boolean;
@@ -418,9 +427,12 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
   private _pendingEvents: string[];
   private _stopped: boolean;
   private _ticking: boolean;
+  private _lastCompletedPlaybackId: string | null;
   private readonly _onTick: (deltaInSeconds: number) => void;
   /** Tracks playbacks created by this runner so `stop()` can tear them down. */
   private readonly _ownedPlaybacks: Map<string, AnimationPlayback>;
+  /** Local playback refs that survive after the sequence frame that declared them drains. */
+  private readonly _playbackRefs: Map<string, string>;
   /** Ids of playbacks owned by concurrent (keep-active) branches; preserved across main-flow stops. */
   private readonly _concurrentPlaybackIds: Set<string>;
   /** Marker/frame crossings observed since the last tick, keyed by playback id. */
@@ -443,8 +455,10 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     this._pendingEvents = [];
     this._stopped = true;
     this._ticking = false;
+    this._lastCompletedPlaybackId = null;
     this._onTick = (deltaInSeconds) => this.tick(deltaInSeconds);
     this._ownedPlaybacks = new Map();
+    this._playbackRefs = new Map();
     this._concurrentPlaybackIds = new Set();
     this._crossedMarkers = new Map();
     this._crossedFrames = new Map();
@@ -473,6 +487,15 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
   }
 
   /**
+   * Playback id for the most recent playback that completed naturally.
+   *
+   * @returns The playback id, or null when no owned playback has completed.
+   */
+  get lastCompletedPlaybackId() {
+    return this._lastCompletedPlaybackId;
+  }
+
+  /**
    * Start or restart the runner from the beginning of the timeline.
    *
    * @returns This runner for chaining.
@@ -483,6 +506,8 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     this._concurrent = [];
     this._queued.length = 0;
     this._pendingEvents = [];
+    this._lastCompletedPlaybackId = null;
+    this._playbackRefs.clear();
     this.animationSet._registerTimelineTicker(this._onTick);
     // Drain any leading non-blocking steps immediately so e.g. an initial `play` starts now.
     this.flush();
@@ -504,6 +529,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     this._pendingEvents = [];
     this._crossedMarkers.clear();
     this._crossedFrames.clear();
+    this._lastCompletedPlaybackId = null;
     const stopOptions = options ?? { reason: 'interrupted' };
     // Always tear down owned playbacks, even if the control flow already drained: a state whose
     // script finished may still have a looping clip playing that a transition must stop.
@@ -512,6 +538,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
       playback.stop(stopOptions);
     });
     this._ownedPlaybacks.clear();
+    this._playbackRefs.clear();
     this._concurrentPlaybackIds.clear();
     this.animationSet._unregisterTimelineTicker(this._onTick);
     if (!wasStopped) {
@@ -695,6 +722,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
       concurrent: this._concurrent.map((frame) => this.cloneFrame(frame)),
       queued: this._queued.map((steps) => steps.slice()),
       concurrentPlaybackIds: [...this._concurrentPlaybackIds],
+      playbackRefs: Object.fromEntries(this._playbackRefs),
       stopped: this._stopped
     };
   }
@@ -721,12 +749,21 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     runner._concurrent = state.concurrent.map((frame) => runner.cloneFrame(frame));
     state.queued.forEach((steps) => runner._queued.push(steps.slice()));
     state.concurrentPlaybackIds?.forEach((id) => runner._concurrentPlaybackIds.add(id));
+    Object.entries(state.playbackRefs ?? {}).forEach(([ref, id]) => runner._playbackRefs.set(ref, id));
     runner._stopped = state.stopped;
     // Re-attach to any live playbacks referenced by the restored frames.
     runner.reattachPlaybacks(runner._stack);
     runner._concurrent.forEach((frame) => runner.reattachPlaybacks([frame]));
     // Re-attach drained concurrent playbacks tracked only by id, so they survive future stops.
     runner._concurrentPlaybackIds.forEach((id) => {
+      if (!runner._ownedPlaybacks.has(id)) {
+        const playback = runner.findLivePlayback(id);
+        if (playback) {
+          runner.attachPlayback(playback);
+        }
+      }
+    });
+    runner._playbackRefs.forEach((id) => {
       if (!runner._ownedPlaybacks.has(id)) {
         const playback = runner.findLivePlayback(id);
         if (playback) {
@@ -921,8 +958,10 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
         scope.currentPlaybackId = playback.id;
         if (step.id) {
           scope.refs[step.id] = playback.id;
+          this._playbackRefs.set(step.id, playback.id);
         }
         scope.refs[playback.id] = playback.id;
+        this._playbackRefs.set(playback.id, playback.id);
         if (step.wait === 'complete') {
           return { kind: 'playWait', playbackId: playback.id };
         }
@@ -966,7 +1005,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     if (!target) {
       return options;
     }
-    const mapped = scope.refs[target];
+    const mapped = this.resolvePlaybackRef(target, scope);
     if (!mapped) {
       return options;
     }
@@ -977,6 +1016,10 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
         target: mapped
       }
     };
+  }
+
+  private resolvePlaybackRef(target: string, scope: FrameScope): string | null {
+    return scope.refs[target] ?? this._playbackRefs.get(target) ?? null;
   }
 
   private tickWaitMarker(frame: WaitMarkerFrame): TickResult {
@@ -1022,14 +1065,21 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     playback.on('marker', this.onPlaybackMarker);
     playback.on('frame', this.onPlaybackFrame);
     playback.on('stop', this.onPlaybackEnd);
-    playback.on('complete', this.onPlaybackEnd);
+    playback.on('complete', this.onPlaybackComplete);
   }
 
   private detachPlayback(playback: AnimationPlayback) {
     playback.off('marker', this.onPlaybackMarker);
     playback.off('frame', this.onPlaybackFrame);
     playback.off('stop', this.onPlaybackEnd);
-    playback.off('complete', this.onPlaybackEnd);
+    playback.off('complete', this.onPlaybackComplete);
+  }
+
+  private forgetPlayback(playback: AnimationPlayback) {
+    this.detachPlayback(playback);
+    this._ownedPlaybacks.delete(playback.id);
+    this._concurrentPlaybackIds.delete(playback.id);
+    this.forgetPlaybackRefs(playback.id);
   }
 
   /**
@@ -1040,9 +1090,15 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
   private readonly onPlaybackEnd = (event: { playback: AnimationPlayback }) => {
     const playback = this._ownedPlaybacks.get(event.playback.id);
     if (playback) {
-      this.detachPlayback(playback);
-      this._ownedPlaybacks.delete(playback.id);
-      this._concurrentPlaybackIds.delete(playback.id);
+      this.forgetPlayback(playback);
+    }
+  };
+
+  private readonly onPlaybackComplete = (event: { playback: AnimationPlayback }) => {
+    this._lastCompletedPlaybackId = event.playback.id;
+    const playback = this._ownedPlaybacks.get(event.playback.id);
+    if (playback) {
+      this.forgetPlayback(playback);
     }
   };
 
@@ -1073,7 +1129,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
     if (!target) {
       return null;
     }
-    const mapped = scope.refs[target];
+    const mapped = this.resolvePlaybackRef(target, scope);
     if (mapped) {
       const owned = this._ownedPlaybacks.get(mapped);
       if (owned) {
@@ -1081,6 +1137,14 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
       }
     }
     return this._ownedPlaybacks.get(target) ?? this.animationSet.getPlayback(target);
+  }
+
+  private forgetPlaybackRefs(playbackId: string) {
+    [...this._playbackRefs.entries()].forEach(([ref, id]) => {
+      if (id === playbackId) {
+        this._playbackRefs.delete(ref);
+      }
+    });
   }
 
   private scopeCurrentPlayback(scope: FrameScope): AnimationPlayback | null {
@@ -1118,6 +1182,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
       this.detachPlayback(playback);
       playback.stop(stopOptions);
       this._ownedPlaybacks.delete(id);
+      this.forgetPlaybackRefs(id);
     });
     this._stack = [];
   }
