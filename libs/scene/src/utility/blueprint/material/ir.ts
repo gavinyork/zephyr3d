@@ -699,6 +699,12 @@ class IRCallFunc extends IRExpression {
   reset() {
     this.tmpName = '';
   }
+  private isSingleTextureOutput() {
+    return this.node.outs.length === 1 && this.node.outs[0].type === 'tex2D';
+  }
+  private hasTextureOutput() {
+    return this.node.outs.some((output) => output.type === 'tex2D');
+  }
   /**
    * Generates shader code for the function definition and call
    *
@@ -714,25 +720,34 @@ class IRCallFunc extends IRExpression {
     if (this.tmpName) {
       return pb.getCurrentScope()[this.tmpName];
     }
+    if (this.hasTextureOutput() && !this.isSingleTextureOutput()) {
+      throw new Error(
+        `Material function '${this.node.name}' only supports tex2D as a single standalone output`
+      );
+    }
     const that = this;
     const ir = this.node.IR;
     // @ts-ignore
     const params = this.node.args.map((v) => pb[v.type](v.name));
     pb.func(this.node.name, params, function () {
       const outputs = ir.create(pb)!;
-      const rettype = pb.defineStruct(
-        that.node.outputs.map((output, index) => {
-          // @ts-ignore
-          return pb[that.node.outs[index].type](output.swizzle);
-        })
-      );
-      this.$return(
-        rettype(
-          ...outputs.map((output) => {
-            return output.exp;
+      if (that.isSingleTextureOutput()) {
+        this.$return(outputs[0].exp);
+      } else {
+        const rettype = pb.defineStruct(
+          that.node.outputs.map((output, index) => {
+            // @ts-ignore
+            return pb[that.node.outs[index].type](output.swizzle);
           })
-        )
-      );
+        );
+        this.$return(
+          rettype(
+            ...outputs.map((output) => {
+              return output.exp;
+            })
+          )
+        );
+      }
     });
     const args = this.args.map((arg) => arg.create(pb));
     const exp = pb.getGlobalScope()[this.node.name](...args);

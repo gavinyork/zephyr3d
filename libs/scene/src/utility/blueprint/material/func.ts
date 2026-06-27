@@ -4,6 +4,9 @@ import { defineProps } from '../../serialization/types';
 import { BaseGraphNode } from '../node';
 import type { MaterialBlueprintIR } from './ir';
 
+const materialFunctionValueTypes = ['float', 'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4'] as const;
+const materialFunctionInputTypes = [...materialFunctionValueTypes, 'tex2D'] as const;
+
 /**
  * Function call node for material blueprint functions
  *
@@ -101,10 +104,14 @@ export class FunctionCallNode extends BaseGraphNode {
         });
         this._outputs.push({
           id: this._outputs.length + 1,
-          name,
-          swizzle: name
+          name
         });
       }
+    }
+    if (!(this._outs.length === 1 && this._outs[0].type === 'tex2D')) {
+      this._outputs.forEach((output, index) => {
+        output.swizzle = this._outs[index].name;
+      });
     }
   }
   /**
@@ -232,7 +239,7 @@ export class FunctionCallNode extends BaseGraphNode {
  *
  * Each FunctionInputNode:
  * - Has a name (parameter name)
- * - Has a type (float, vec2, vec3, vec4, mat2, mat3, or mat4)
+ * - Has a type (float, vec2, vec3, vec4, mat2, mat3, mat4, or tex2D)
  * - Produces one output that provides the parameter value within the function
  * - Has no inputs (it receives its value from the calling context)
  *
@@ -277,7 +284,7 @@ export class FunctionInputNode extends BaseGraphNode {
   /**
    * Gets the parameter type
    *
-   * @returns The data type (float, vec2, vec3, vec4, mat2, mat3, or mat4)
+   * @returns The data type (float, vec2, vec3, vec4, mat2, mat3, mat4, or tex2D)
    */
   get type() {
     return this._type;
@@ -315,8 +322,8 @@ export class FunctionInputNode extends BaseGraphNode {
             type: 'string',
             options: {
               enum: {
-                labels: ['float', 'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4'],
-                values: ['float', 'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4']
+                labels: [...materialFunctionInputTypes],
+                values: [...materialFunctionInputTypes]
               }
             },
             get(this: FunctionInputNode, value) {
@@ -417,7 +424,7 @@ export class FunctionOutputNode extends BaseGraphNode {
    * @remarks
    * Initializes with:
    * - Auto-generated name: out_N (where N is an incrementing counter)
-   * - One input slot that accepts any standard shader type
+   * - One input slot that accepts numeric/matrix values and tex2D
    * - Type is inferred from the connected input node
    */
   constructor() {
@@ -426,7 +433,7 @@ export class FunctionOutputNode extends BaseGraphNode {
       {
         id: 1,
         name: `out_${FunctionOutputNode.outId++}`,
-        type: ['float', 'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4']
+        type: [...materialFunctionInputTypes]
       }
     ];
   }
