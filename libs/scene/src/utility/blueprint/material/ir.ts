@@ -683,6 +683,7 @@ class IRCallFunc extends IRExpression {
   readonly args: IRExpression[];
   /** Cached temporary variable name if result is referenced multiple times */
   tmpName: string;
+  private readonly textureArgSamplerNames: Map<string, string>;
   /**
    * Creates a function call expression
    *
@@ -694,10 +695,57 @@ class IRCallFunc extends IRExpression {
     this.node = node;
     this.args = args;
     this.tmpName = '';
+    this.textureArgSamplerNames = new Map();
   }
   /** Reset for next creation */
   reset() {
     this.tmpName = '';
+    this.textureArgSamplerNames.clear();
+  }
+  private getTextureSamplerVarName(argName: string) {
+    let name = this.textureArgSamplerNames.get(argName);
+    if (!name) {
+      name = `${argName}__sampler`;
+      this.textureArgSamplerNames.set(argName, name);
+    }
+    return name;
+  }
+  private buildTextureFunctionParams(pb: ProgramBuilder) {
+    const params: PBShaderExp[] = [];
+    for (const arg of this.node.args) {
+      // @ts-ignore
+      params.push(pb[arg.type](arg.name));
+      if (arg.type === 'tex2D' && pb.getDevice().type === 'webgpu') {
+        params.push(pb.sampler(this.getTextureSamplerVarName(arg.name)));
+      }
+    }
+    return params;
+  }
+  private buildTextureFunctionCallArgs(pb: ProgramBuilder) {
+    const args: (number | boolean | PBShaderExp)[] = [];
+    for (let i = 0; i < this.node.args.length; i++) {
+      const argDef = this.node.args[i];
+      const argExp = this.args[i].create(pb);
+      args.push(argExp);
+      if (argDef.type === 'tex2D' && pb.getDevice().type === 'webgpu') {
+        if (!(argExp instanceof PBShaderExp)) {
+          throw new Error(`Material function '${this.node.name}' expects texture argument '${argDef.name}'`);
+        }
+        let sampler = (pb as any).getDefaultSampler(argExp, false) as PBShaderExp | null;
+        if (!sampler && argExp.$str) {
+          sampler = (pb.getCurrentScope() as PBInsideFunctionScope)[
+            this.getTextureSamplerVarName(argExp.$str)
+          ] as PBShaderExp;
+        }
+        if (!sampler) {
+          throw new Error(
+            `Material function '${this.node.name}' cannot resolve sampler for texture argument '${argDef.name}'`
+          );
+        }
+        args.push(sampler);
+      }
+    }
+    return args;
   }
   private isSingleTextureOutput() {
     return this.node.outs.length === 1 && this.node.outs[0].type === 'tex2D';
@@ -727,8 +775,7 @@ class IRCallFunc extends IRExpression {
     }
     const that = this;
     const ir = this.node.IR;
-    // @ts-ignore
-    const params = this.node.args.map((v) => pb[v.type](v.name));
+    const params = this.buildTextureFunctionParams(pb);
     pb.func(this.node.name, params, function () {
       const outputs = ir.create(pb)!;
       if (that.isSingleTextureOutput()) {
@@ -749,7 +796,7 @@ class IRCallFunc extends IRExpression {
         );
       }
     });
-    const args = this.args.map((arg) => arg.create(pb));
+    const args = this.buildTextureFunctionCallArgs(pb);
     const exp = pb.getGlobalScope()[this.node.name](...args);
     if (this._ref === 1) {
       return exp;
@@ -1094,7 +1141,21 @@ class IRSampleTexture extends IRExpression {
     } else {
       throw new Error('Invalid texture coordinate');
     }
-    let exp = pb.textureSample(texExp, coordExp);
+    let exp: PBShaderExp;
+    if (pb.getDevice().type === 'webgpu') {
+      let sampler = (pb as any).getDefaultSampler(texExp, false) as PBShaderExp | null;
+      if (!sampler && texExp.$str) {
+        sampler = (pb.getCurrentScope() as PBInsideFunctionScope)[`${texExp.$str}__sampler`] as PBShaderExp;
+      }
+      if (sampler) {
+        // @ts-ignore ProgramBuilder runtime supports the explicit WebGPU sampler overload.
+        exp = pb.textureSample(texExp, sampler, coordExp);
+      } else {
+        exp = pb.textureSample(texExp, coordExp);
+      }
+    } else {
+      exp = pb.textureSample(texExp, coordExp);
+    }
     if (this.samplerType === 'Normal') {
       exp = pb.sub(pb.mul(exp, pb.vec4(2, 2, 2, 1)), pb.vec4(1, 1, 1, 0));
     }
