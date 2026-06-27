@@ -440,7 +440,7 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
       (v) =>
         mergeHydratedUniformTexture(
           this._overrideUniformTextures.get(v.name) ?? v,
-          this._overrideUniformTextures.get(v.name) ?? runtimeTextureMap.get(v.name)
+          this._overrideUniformTextures.get(v.name) ?? runtimeTextureMap.get(v.name) ?? null
         )
     );
   }
