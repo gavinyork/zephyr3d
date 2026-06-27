@@ -1,333 +1,40 @@
 # AnimationController and Action Orchestration
 
-`AnimationSet` is the low-level playback container for clips. `AnimationController` builds a higher-level action layer on top of it: named states, scripted timelines, state transitions, event responses, and cross-fades.
+`AnimationSet` handles low-level clip playback. `AnimationController` organizes those clips into input-driven action flows: idle, locomotion, attacks, interrupts, inserts, layered playback, cutscenes, and animation timing events.
 
-Use it when a character, camera, prop, or UI object needs action orchestration instead of isolated clip playback. Typical examples include idle/run/attack state machines, cutscene timelines, marker-driven effects, and interruptible actions.
-
----
-
-## Core Concepts
-
-| Concept | Description |
-|---------|-------------|
-| `AnimationController` | Owns named states and dispatches gameplay events to the active state. |
-| State | A named entry containing one timeline, optional event responses, and a default transition duration. |
-| `AnimationTimeline` | Serializable list of steps such as play, stop, wait, emit, sequence, and parallel. |
-| `AnimationTimelineRunner` | Runtime interpreter for one timeline. It is advanced by the owning `AnimationSet` update loop. |
-| Event response | Declares what to do when a dispatched event is not consumed by a waiting step. |
-
-The controller does not replace `AnimationSet`. It uses the same `AnimationSet` to create playbacks, so all existing blending, fade-in, fade-out, markers, and frame events still apply.
+This guide builds from simple to complex examples. Start with the first few sections to create a basic state machine, then add one-shot actions, marker events, parallel branches, layered animation, and phase synchronization.
 
 ---
 
-## Basic State Controller
+## Three Concepts First
 
-The most common pattern is to register several states and transition between them with events. The example below creates a simple idle/run/attack controller: movement events switch between idle and run, the attack event plays a one-shot attack, and `returnTo: true` returns to the state that was interrupted when the attack completes.
+| Concept | Purpose |
+|---------|---------|
+| State | A named action mode such as `idle`, `run`, or `attack`. Entering a state runs its timeline. |
+| Timeline | The state's step array: play clips, wait, emit events, and run sequential or parallel branches. |
+| Response | How the current state reacts to an external event: transition, insert steps, enqueue, consume, or ignore. |
+
+The controller does not replace `AnimationSet`. Every playback is still created by the same `AnimationSet`, so fade-in, fade-out, markers, frames, masks, weights, and phase synchronization all use the lower-level animation system.
 
 ```typescript
 import { AnimationController } from '@zephyr3d/scene';
 
-// Bind the controller to the model's AnimationSet so states can play the model's clips.
+// Bind the controller to the model's AnimationSet; states play clips by name from this set.
 const controller = new AnimationController(model.animationSet);
-
-controller
-  // Idle is the default looping state. It can transition to run or attack.
-  .addState('idle', {
-    // Cross-fade into idle over 0.2 seconds.
-    transition: 0.2,
-    timeline: {
-      steps: [
-        {
-          // Play the Idle clip forever while this state is active.
-          type: 'play',
-          clip: 'Idle',
-          options: { repeat: 0 }
-        }
-      ]
-    },
-    responses: [
-      // Gameplay "move" input enters the run state.
-      { event: 'move', target: { targetState: 'run' } },
-      // Attack interrupts idle, then returns to idle because idle was the previous state.
-      { event: 'attack', target: { targetState: 'attack', returnTo: true }, onActive: { fadeOut: 0.12 } }
-    ]
-  })
-  // Run is another looping state. It can return to idle or be interrupted by attack.
-  .addState('run', {
-    transition: 0.2,
-    timeline: {
-      steps: [
-        {
-          // Play the Run clip forever until another state replaces it.
-          type: 'play',
-          clip: 'Run',
-          options: { repeat: 0 }
-        }
-      ]
-    },
-    responses: [
-      // Stop movement and return to idle.
-      { event: 'stopMove', target: { targetState: 'idle' } },
-      // Attack interrupts run, then returns to run because run was the previous state.
-      { event: 'attack', target: { targetState: 'attack', returnTo: true }, onActive: { fadeOut: 0.12 } }
-    ]
-  })
-  // Attack is a one-shot state. Its timeline completes after the Attack clip finishes.
-  .addState('attack', {
-    transition: 0.12,
-    timeline: {
-      steps: [
-        {
-          // Play Attack once and block this timeline until it completes.
-          type: 'play',
-          clip: 'Attack',
-          options: { repeat: 1 },
-          wait: 'complete'
-        }
-      ]
-    },
-    responses: [
-      // Optional cancel input can cut the attack short and return to idle.
-      { event: 'cancel', target: { targetState: 'idle' }, onActive: { fadeOut: 0.1 } }
-    ]
-  });
-
-// Start the state machine from idle.
-controller.setState('idle');
-
-// Later, from input or gameplay code, these events drive state transitions.
-controller.dispatch('move');
-controller.dispatch('attack');
 ```
-
-`transition` is measured in seconds. When entering a state with a positive transition duration, the outgoing runner fades out and the entry play steps of the new timeline fade in.
 
 ---
 
-## Timeline Steps
+## 1. Play One Loop
 
-A timeline is a serializable action script. It runs synchronously on the animation update clock and does not use `async` or timers.
-
-| Step | Purpose |
-|------|---------|
-| `play` | Starts an animation clip. Set `wait: 'complete'` to block until that playback completes or stops. |
-| `stop` | Stops one playback by id, or all playbacks owned by the runner when `target` is omitted. |
-| `wait` | Blocks for a fixed number of seconds. |
-| `waitEvent` | Blocks until `controller.dispatch(event)` sends a matching event to the active runner. |
-| `waitMarker` | Blocks until a playback crosses a marker id or name. |
-| `waitFrame` | Blocks until a playback crosses a frame number. |
-| `emit` | Emits a named event from the runner or controller. |
-| `sequence` | Runs child steps in order. |
-| `parallel` | Runs child steps as isolated parallel branches and joins when all branches finish. |
-
-For example, a cutscene-like action can combine camera movement, character animation, waits, and emitted cues. The example below plays a camera intro and, after a short delay, a character wave in parallel. Once both branches finish, it emits `intro-finished` and returns to idle.
+The smallest useful state only needs one `play` step. `repeat: 0` means infinite looping. `addState()` only registers the state; call `setState()` to enter it.
 
 ```typescript
-// Register a timeline state for a short intro sequence.
-controller.addState('intro', {
+controller.addState('idle', {
   timeline: {
     steps: [
       {
-        // Run the camera branch and character branch at the same time.
-        type: 'parallel',
-        steps: [
-          {
-            // CameraIntro runs once and keeps its branch alive until the clip completes.
-            type: 'play',
-            clip: 'CameraIntro',
-            options: { repeat: 1 },
-            wait: 'complete'
-          },
-          {
-            // The character branch waits 0.4 seconds, then plays a Wave clip once.
-            type: 'sequence',
-            steps: [
-              { type: 'wait', seconds: 0.4 },
-              { type: 'play', clip: 'Wave', options: { repeat: 1 }, wait: 'complete' }
-            ]
-          }
-        ]
-      },
-      // Notify game code that the intro sequence has fully drained.
-      { type: 'emit', event: 'intro-finished' }
-    ]
-  }
-});
-
-// Convert the emitted timeline cue into the next controller state.
-controller.on('emit', (event) => {
-  if (event === 'intro-finished') {
-    controller.setState('idle');
-  }
-});
-```
-
----
-
-## Marker and Frame Driven Actions
-
-Use `id` on a `play` step when later steps need to refer to that playback. This is useful for hit frames, footstep effects, sound cues, or gameplay windows. The example below starts an attack clip, emits `attack-hit` when the authored marker is reached, then emits `attack-recover` at frame 36.
-
-```typescript
-// Register an attack variant whose timeline exposes animation timing to gameplay code.
-controller.addState('attackWithHitEvent', {
-  transition: 0.1,
-  timeline: {
-    steps: [
-      {
-        // Start Attack once and assign it a local id for waitMarker/waitFrame.
-        type: 'play',
-        clip: 'Attack',
-        id: 'attack',
-        options: { repeat: 1 },
-        // Continue immediately so the following wait steps can observe this playback.
-        wait: false
-      },
-      // Block until the Attack playback crosses the "hit" marker.
-      { type: 'waitMarker', marker: 'hit', target: 'attack' },
-      // Let gameplay code spawn damage/effects exactly on the hit marker.
-      { type: 'emit', event: 'attack-hit' },
-      // Block again until the authored recovery frame.
-      { type: 'waitFrame', frame: 36, target: 'attack' },
-      // Let gameplay code know the attack can transition out.
-      { type: 'emit', event: 'attack-recover' }
-    ]
-  }
-});
-
-// Handle timing cues produced by the attack timeline.
-controller.on('emit', (event) => {
-  if (event === 'attack-hit') {
-    spawnHitEffect();
-  } else if (event === 'attack-recover') {
-    controller.setState('idle');
-  }
-});
-```
-
-`waitMarker` accepts either the marker id or marker name. `waitFrame` uses frame numbers reported by the playback.
-
----
-
-## Event Responses
-
-Events sent with `controller.dispatch(name, payload)` are handled in this order:
-
-1. A matching `waitEvent` in the active runner consumes the event and advances the timeline.
-2. The active timeline's own `responses` are evaluated.
-3. The current controller state's `responses` are evaluated.
-4. If nothing handles the event, the result has `handled: false`.
-
-State transitions should be declared on the controller state's `responses`. This fragment turns movement input into state changes:
-
-```typescript
-responses: [
-  // Enter the running locomotion state when movement begins.
-  { event: 'move', target: { targetState: 'run' } },
-  // Return to the idle locomotion state when movement stops.
-  { event: 'stopMove', target: { targetState: 'idle' } }
-]
-```
-
-For temporary one-shot states, set `returnTo: true` on the state-transition target. This records the state active before the transition and returns to it after the target state's timeline completes:
-
-```typescript
-responses: [
-  {
-    event: 'attack',
-    target: {
-      // Enter Attack now, then return to whichever state was interrupted.
-      targetState: 'attack',
-      returnTo: true
-    },
-    // Fade out the interrupted state while Attack fades in.
-    onActive: { fadeOut: 0.12 }
-  }
-]
-```
-
-Use a string when the action should always return to a specific state:
-
-```typescript
-responses: [
-  {
-    event: 'intro',
-    target: {
-      // Play Intro, then always return to Idle regardless of the previous state.
-      targetState: 'intro',
-      returnTo: 'idle',
-      returnTransition: 0.25
-    }
-  }
-]
-```
-
-When `returnTransition` is greater than 0, the target state's completed playbacks are kept alive
-for that duration as a completion fade-out while the return state fades in. This turns a natural
-one-shot completion, such as `Attack`, into a real cross-fade back to locomotion instead of removing
-the completed clip before the return state starts.
-
-Responses can also run short action snippets without changing state. This fragment keeps a flinch reaction concurrent with the current state, while reload is queued until the active main flow drains:
-
-```typescript
-responses: [
-  {
-    event: 'flinch',
-    target: {
-      steps: [
-        {
-          // Play a short Flinch overlay once without replacing locomotion.
-          type: 'play',
-          clip: 'Flinch',
-          options: { repeat: 1 },
-          wait: false
-        }
-      ]
-    },
-    // Keep the active state running and play Flinch as a concurrent branch.
-    onActive: 'keep'
-  },
-  {
-    event: 'reload',
-    target: {
-      steps: [
-        // Play Reload once and wait for it to finish before emitting the completion cue.
-        { type: 'play', clip: 'Reload', options: { repeat: 1 }, wait: 'complete' },
-        { type: 'emit', event: 'reload-finished' }
-      ]
-    },
-    // Queue Reload so it starts after the current main-flow action finishes.
-    enqueue: true
-  }
-]
-```
-
-`onActive` controls the currently running steps:
-
-| Value | Behavior |
-|-------|----------|
-| `'stop'` | Stops the active main flow before running the response. This is the default. |
-| `'keep'` | Runs the response concurrently with the current flow. |
-| `{ fadeOut }` | Stops the active main flow with a fade-out before running the response. |
-
-`enqueue: true` appends the response steps and runs them after the current main flow drains.
-
----
-
-## Common Action Orchestration Scenarios
-
-The following examples cover common character action graphs. They are intentionally small, so each snippet focuses on one orchestration pattern.
-
-### Single Loop
-
-This state plays one idle clip forever. It is the simplest form of a controller state: enter once, keep the looping playback alive until another state or `stop()` replaces it.
-
-```typescript
-controller.addState('idleLoop', {
-  timeline: {
-    steps: [
-      {
-        // repeat: 0 means the Idle clip loops forever.
+        // Idle loops until the controller enters another state or stop() is called.
         type: 'play',
         clip: 'Idle',
         options: { repeat: 0 }
@@ -336,22 +43,46 @@ controller.addState('idleLoop', {
   }
 });
 
-// Enter the looping state explicitly; adding a state does not make it active.
-controller.setState('idleLoop');
+// Explicitly enter idle so the Idle clip starts playing.
+controller.setState('idle');
 ```
 
-### Loop With One-Shot Insert
+Result: the character enters `idle` and keeps playing `Idle`. This is the foundation for idle, run, and other looping modes.
 
-This controller keeps `Run` looping, then inserts `Attack` once when the `attack` event arrives. `returnTo: true` records the interrupted state, so the controller automatically returns to `runLoop` after the one-shot attack completes.
+---
+
+## 2. Switch States With Events
+
+States can define `responses`. When external code calls `controller.dispatch('move')`, the current state looks for a matching response and executes it.
 
 ```typescript
 controller
-  .addState('runLoop', {
-    transition: 0.15,
+  .addState('idle', {
+    transition: 0.2,
     timeline: {
       steps: [
         {
-          // Keep the locomotion loop alive while no temporary action is active.
+          // Keep playing Idle while this state is active.
+          type: 'play',
+          clip: 'Idle',
+          options: { repeat: 0 }
+        }
+      ]
+    },
+    responses: [
+      {
+        // Movement input enters run.
+        event: 'move',
+        target: { targetState: 'run' }
+      }
+    ]
+  })
+  .addState('run', {
+    transition: 0.2,
+    timeline: {
+      steps: [
+        {
+          // Keep playing Run while this state is active.
           type: 'play',
           clip: 'Run',
           options: { repeat: 0 }
@@ -360,20 +91,59 @@ controller
     },
     responses: [
       {
-        // Insert Attack once, then return to whichever state was interrupted.
+        // Stopping movement returns to idle.
+        event: 'stopMove',
+        target: { targetState: 'idle' }
+      }
+    ]
+  });
+
+controller.setState('idle');
+
+// Input or gameplay code drives the state machine with events.
+controller.dispatch('move');
+controller.dispatch('stopMove');
+```
+
+Result: `idle` and `run` transition between each other. `transition` is measured in seconds; entering the target state fades the old state out and fades the target state's entry playbacks in.
+
+---
+
+## 3. Insert a One-Shot and Return
+
+Attacks, rolls, doors, and similar actions usually play once, then return to the loop they interrupted. `returnTo: true` records the current state and returns to it after the target state's timeline completes.
+
+```typescript
+controller
+  .addState('run', {
+    transition: 0.2,
+    timeline: {
+      steps: [
+        {
+          // Run is the normal locomotion loop.
+          type: 'play',
+          clip: 'Run',
+          options: { repeat: 0 }
+        }
+      ]
+    },
+    responses: [
+      {
+        // Attack completes, then automatically returns to run.
         event: 'attack',
-        target: { targetState: 'attackOnce', returnTo: true, returnTransition: 0.12 },
-        // Fade Run out while Attack fades in.
+        target: { targetState: 'attack', returnTo: true, returnTransition: 0.15 },
+        // Fade Run out over 0.12 seconds while Attack fades in using the attack state's transition.
         onActive: { fadeOut: 0.12 }
       }
     ]
   })
-  .addState('attackOnce', {
+  .addState('attack', {
     transition: 0.12,
     timeline: {
       steps: [
         {
-          // Attack plays once and blocks this state until the playback completes.
+          // repeat: 1 plays once.
+          // wait: 'complete' keeps the attack state alive until Attack finishes.
           type: 'play',
           clip: 'Attack',
           options: { repeat: 1 },
@@ -384,16 +154,231 @@ controller
   });
 ```
 
-### Parallel Upper/Lower Loops
+Result: while running, `attack` switches to the `attack` state. When `Attack` finishes naturally, the controller returns to `run`. `returnTransition` keeps the completed attack playback alive for a short completion fade-out while the return state fades in, avoiding a hard removal at the end pose.
 
-This state starts lower-body and upper-body loops together. `RunUpper` synchronizes to `lowerRun`, so even if the upper clip has a different duration, it starts at the same normalized locomotion phase as the lower body.
+---
+
+## 4. Serial, Overlapping, and Explicit Parallel Steps
+
+`steps` run in order, but `play` is non-blocking by default. Two consecutive `play` steps start almost immediately, so their playbacks overlap.
+
+```typescript
+steps: [
+  {
+    // A starts and does not wait for completion.
+    type: 'play',
+    clip: 'A'
+  },
+  {
+    // B starts in the same flush, so A and B overlap.
+    type: 'play',
+    clip: 'B'
+  }
+]
+```
+
+When `play` has `wait: 'complete'`, following steps wait until that playback completes or stops.
+
+```typescript
+steps: [
+  {
+    // B will not start until A completes.
+    type: 'play',
+    clip: 'A',
+    options: { repeat: 1 },
+    wait: 'complete'
+  },
+  {
+    // This starts after A finishes.
+    type: 'play',
+    clip: 'B'
+  }
+]
+```
+
+Use `parallel` when you need to say "start these branches together and continue only after all branches finish." If a branch needs multiple steps, wrap it in `sequence`.
+
+```typescript
+controller.addState('intro', {
+  timeline: {
+    steps: [
+      {
+        // The camera branch and character branch run in parallel.
+        type: 'parallel',
+        steps: [
+          {
+            // The camera intro plays once and keeps its branch alive until completion.
+            type: 'play',
+            clip: 'CameraIntro',
+            options: { repeat: 1 },
+            wait: 'complete'
+          },
+          {
+            // The character branch waits 0.4 seconds, then plays Wave once.
+            type: 'sequence',
+            steps: [
+              { type: 'wait', seconds: 0.4 },
+              { type: 'play', clip: 'Wave', options: { repeat: 1 }, wait: 'complete' }
+            ]
+          }
+        ]
+      },
+      // Notify game code after both branches finish.
+      { type: 'emit', event: 'intro-finished' }
+    ]
+  }
+});
+```
+
+Result: `CameraIntro` and `Wave` are orchestrated in one cutscene state. `intro-finished` is emitted only after both branches finish.
+
+---
+
+## 5. Emit Events Inside an Action
+
+Hits, muzzle flashes, footsteps, sounds, and cancel windows usually happen inside an animation. Use markers to represent authored animation timing, then wait for them with `waitMarker`.
+
+```typescript
+// If the imported asset does not contain this marker, add one at 0.3 seconds.
+// Runtime animation uses a continuous timeline; prefer time over frame when authored FPS is not stable.
+controller.animationSet.getAnimationClip('Attack')?.addMarker({
+  id: 'hit',
+  name: 'hit',
+  time: 0.3
+});
+
+controller.addState('attackWithHit', {
+  timeline: {
+    steps: [
+      {
+        // Give the Attack playback a local id so waitMarker can target it.
+        type: 'play',
+        clip: 'Attack',
+        id: 'attack',
+        options: { repeat: 1 },
+        // Do not block; the following waitMarker observes this playback.
+        wait: false
+      },
+      {
+        // Wait until this Attack playback crosses the hit marker.
+        type: 'waitMarker',
+        marker: 'hit',
+        target: 'attack'
+      },
+      {
+        // Convert animation timing into a gameplay event.
+        type: 'emit',
+        event: 'attack-hit'
+      }
+    ]
+  }
+});
+
+controller.on('emit', (event) => {
+  if (event === 'attack-hit') {
+    spawnHitEffect();
+  }
+});
+```
+
+This minimal example only demonstrates "wait for marker, then emit." Its timeline ends after `attack-hit`. If the state must also wait for the full attack playback before restoring another state, use the `parallel` pattern below.
+
+If the action must still wait for the full playback before restoring, use `parallel`: one branch owns the playback lifetime, and another branch emits a mid-action cue after 0.5 seconds or a marker.
+
+```typescript
+steps: [
+  {
+    // Both branches start together: one owns lifetime, the other emits the cue.
+    type: 'parallel',
+    steps: [
+      {
+        // This branch keeps the parallel step alive until ShootUpper completes.
+        type: 'play',
+        clip: 'ShootUpper',
+        id: 'shootUpper',
+        options: { repeat: 1, fadeIn: 0.08 },
+        wait: 'complete'
+      },
+      {
+        // This branch emits a muzzle event 0.5 seconds after the action starts.
+        type: 'sequence',
+        steps: [
+          { type: 'wait', seconds: 0.5 },
+          { type: 'emit', event: 'shoot-fire' }
+        ]
+      }
+    ]
+  },
+  {
+    // This runs only after ShootUpper completes.
+    type: 'play',
+    clip: 'RunUpper',
+    options: { repeat: 0 }
+  }
+]
+```
+
+Result: `shoot-fire` is emitted mid-action, while the timeline still waits for `ShootUpper` to finish before restoring `RunUpper`.
+
+---
+
+## 6. Three Response Dispositions
+
+`onActive` controls what happens to the current flow when a response fires.
+
+| Value | Behavior | Common Use |
+|-------|----------|------------|
+| omitted or `'stop'` | Stop the active main flow, then run the response steps. | Normal interrupts and action changes. |
+| `'keep'` | Keep the active flow and run response steps as a parallel branch. | Flinch overlays, upper-body shooting, footstep effects. |
+| `{ fadeOut }` | Fade the active flow out over the given duration, then run the response. | State transitions and full-body inserts. |
+
+```typescript
+responses: [
+  {
+    event: 'flinch',
+    target: {
+      steps: [
+        {
+          // Flinch plays once as an overlay and does not replace locomotion.
+          type: 'play',
+          clip: 'Flinch',
+          options: { repeat: 1 },
+          wait: false
+        }
+      ]
+    },
+    // Keep the current state and play Flinch concurrently.
+    onActive: 'keep'
+  },
+  {
+    event: 'reload',
+    target: {
+      steps: [
+        // Reload runs after the current main flow drains.
+        { type: 'play', clip: 'Reload', options: { repeat: 1 }, wait: 'complete' },
+        { type: 'emit', event: 'reload-finished' }
+      ]
+    },
+    // Queue Reload instead of interrupting immediately.
+    enqueue: true
+  }
+]
+```
+
+Result: `flinch` is immediate and concurrent; `reload` is queued. `enqueue` is useful for ordered action queues.
+
+---
+
+## 7. Parallel Upper/Lower Body Loops
+
+Layered animation often lets the lower body drive locomotion while the upper body aims, holds a weapon, or performs another action. Play two masked clips together and synchronize the upper body to the lower-body phase.
 
 ```typescript
 controller.addState('layeredRun', {
   timeline: {
     steps: [
       {
-        // Lower-body running is the phase reference for this layered state.
+        // Lower-body running is the phase reference.
         type: 'play',
         clip: 'RunLower',
         id: 'lowerRun',
@@ -414,52 +399,86 @@ controller.addState('layeredRun', {
 });
 ```
 
-### Parallel Loops With Half-Body Insert
+Result: `RunLower` and `RunUpper` loop together. `sync.target` can refer to a local `id` created by a previous `play`. Use `mode: 'normalized'` when matching clips have different durations; use `mode: 'time'` when their authored timelines match in seconds.
 
-This response inserts a finite upper-body shooting action while `RunLower` keeps looping. It stops the upper loop, plays `ShootUpper` once, then restores `RunUpper` at the current phase of `RunLower`.
+---
+
+## 8. Insert a Half-Body Action While Layered
+
+A common character pattern: keep the lower body running, temporarily replace the upper body with one shooting action, then restore upper-body running at the current lower-body phase.
 
 ```typescript
-responses: [
-  {
-    event: 'shoot',
-    target: {
-      steps: [
-        {
-          // Stop only the upper-body loop; the lower-body run continues as the phase source.
-          type: 'stop',
-          target: 'upperRun',
-          options: { fadeOut: 0.08 }
-        },
-        {
-          // Play the upper-body shooting action once.
-          type: 'play',
-          clip: 'ShootUpper',
-          options: { repeat: 1, fadeIn: 0.08 },
-          wait: 'complete'
-        },
-        {
-          // Restore upper-body running without restarting the gait cycle from phase 0.
-          // Reuse upperRun so later shoot events can stop this replacement playback too.
-          type: 'play',
-          clip: 'RunUpper',
-          id: 'upperRun',
-          options: {
-            repeat: 0,
-            fadeIn: 0.12,
-            sync: { target: 'lowerRun', mode: 'normalized' }
+controller.addState('layeredRun', {
+  timeline: {
+    steps: [
+      { type: 'play', clip: 'RunLower', id: 'lowerRun', options: { repeat: 0 } },
+      {
+        type: 'play',
+        clip: 'RunUpper',
+        id: 'upperRun',
+        options: { repeat: 0, sync: { target: 'lowerRun', mode: 'normalized' } }
+      }
+    ]
+  },
+  responses: [
+    {
+      event: 'shoot',
+      target: {
+        steps: [
+          {
+            // Stop only the upper-body loop; lowerRun continues as the phase source.
+            type: 'stop',
+            target: 'upperRun',
+            options: { fadeOut: 0.08 }
+          },
+          {
+            // Play the shooting action once. parallel lets us emit shoot-fire mid-action and still wait for completion.
+            type: 'parallel',
+            steps: [
+              {
+                type: 'play',
+                clip: 'ShootUpper',
+                id: 'shootUpper',
+                options: { repeat: 1, fadeIn: 0.08 },
+                wait: 'complete'
+              },
+              {
+                type: 'sequence',
+                steps: [
+                  { type: 'wait', seconds: 0.5 },
+                  { type: 'emit', event: 'shoot-fire' }
+                ]
+              }
+            ]
+          },
+          {
+            // Restore upper-body running and synchronize it to the lower-body phase.
+            // Reuse upperRun so later shoot events can stop this new upper-body loop.
+            type: 'play',
+            clip: 'RunUpper',
+            id: 'upperRun',
+            options: {
+              repeat: 0,
+              fadeIn: 0.12,
+              sync: { target: 'lowerRun', mode: 'normalized' }
+            }
           }
-        }
-      ]
-    },
-    // Keep the lower-body branch running while the upper-body insert executes.
-    onActive: 'keep'
-  }
-]
+        ]
+      },
+      // Keep the lower-body branch alive; the response replaces only the upper body.
+      onActive: 'keep'
+    }
+  ]
+});
 ```
 
-### Parallel Loops With Full-Body Insert
+Result: `shoot` does not restart or stop `RunLower`. It emits `shoot-fire` mid-action, then restores `RunUpper` at the current `RunLower` phase. The easy detail to miss is `id: 'upperRun'` on the restoring play step: without reusing that id, the next `shoot` cannot find the new upper-body loop with `target: 'upperRun'`.
 
-This setup inserts a finite full-body dodge while the character is in the layered running state. The state transition keeps `RunLower` alive for the fade-out window, so `DodgeFull` can copy its phase before the layered playbacks are replaced. When `DodgeFull` completes, `returnTo: true` restores the previously interrupted layered state.
+---
+
+## 9. Insert a Full-Body Action and Return to Layering
+
+Full-body rolls, dodges, or knockdowns usually replace both upper and lower layers. Keep the old lower body alive briefly so the full-body action can read its phase, then use `returnTo` to restore the layered state.
 
 ```typescript
 controller
@@ -467,22 +486,32 @@ controller
     transition: 0.15,
     timeline: {
       steps: [
-        // Lower-body running is the phase reference for full-body inserts.
-        { type: 'play', clip: 'RunLower', id: 'lowerRun', options: { repeat: 0 } },
-        // Upper-body running is layered on top of the lower-body loop.
         {
+          // RunLower is the phase reference used when entering the full-body action.
+          type: 'play',
+          clip: 'RunLower',
+          id: 'lowerRun',
+          options: { repeat: 0 }
+        },
+        {
+          // RunUpper is synchronized to the lower body.
           type: 'play',
           clip: 'RunUpper',
-          options: { repeat: 0, sync: { target: 'lowerRun' } }
+          id: 'upperRun',
+          options: { repeat: 0, sync: { target: 'lowerRun', mode: 'normalized' } }
         }
       ]
     },
     responses: [
       {
-        // Insert a finite full-body dodge and then return to layeredRun.
         event: 'dodge',
-        target: { targetState: 'dodgeFull', returnTo: true, returnTransition: 0.15 },
-        // Keep RunLower alive long enough for DodgeFull to read its phase.
+        target: {
+          // dodgeFull completes, then returns to the current layeredRun state.
+          targetState: 'dodgeFull',
+          returnTo: true,
+          returnTransition: 0.15
+        },
+        // Keep the old state for 0.12 seconds so dodgeFull can read RunLower's phase.
         onActive: { fadeOut: 0.12 }
       }
     ]
@@ -492,7 +521,8 @@ controller
     timeline: {
       steps: [
         {
-          // Start the full-body action at the same locomotion phase as the outgoing lower body.
+          // Start DodgeFull at the same phase as the outgoing lower-body RunLower.
+          // This uses the clip name because the source belongs to the old fading state.
           type: 'play',
           clip: 'DodgeFull',
           options: {
@@ -506,13 +536,37 @@ controller
   });
 ```
 
-`stop.target` and `sync.target` can refer to a local `id` created by a previous `play` step in the same runner, even if that step's frame has already drained. They can also resolve an active clip name or playback id. When a response stops a named playback and later restores the same logical track, assign the same `id` on the restoring `play` step so future responses keep targeting the new playback. Use `mode: 'normalized'` for corresponding clips with different durations, and `mode: 'time'` when clips share the same authored timing in seconds. `offset` shifts the copied phase, and `wrap: false` clamps instead of wrapping into the destination clip or range.
+Result: `dodge` temporarily replaces layered locomotion with a full-body action. `DodgeFull` starts phase-aligned to the old `RunLower`; when it completes, the controller returns to `layeredRun`, fades the return state in, and keeps locomotion phase continuous.
 
 ---
 
-## Events Exposed by the Controller
+## 10. Common Rules
 
-The following listeners are useful when debugging an action graph. They log state changes, completed one-shot timelines, emitted timeline cues, and the resolved handling policy for each dispatched event.
+| Scenario | Recommended Pattern |
+|----------|---------------------|
+| Loop a clip | `play` + `options: { repeat: 0 }` |
+| Play a one-shot | `play` + `options: { repeat: 1 }` + `wait: 'complete'` |
+| Wait for external input | `waitEvent` plus external `controller.dispatch(event)` |
+| Stop a playback | `stop` + `target`, usually targeting a previous `play` id |
+| Put several steps in one parallel branch | Wrap those steps in `sequence` |
+| Fade into a state | Put `transition` on the state |
+| Fade out the interrupted state | Put `onActive: { fadeOut }` on the response |
+| Return after a one-shot state | `target: { targetState, returnTo: true }` |
+| Cross-fade while returning | Add `returnTransition` |
+| Overlay without replacing current flow | Use `onActive: 'keep'` |
+| Run after the current flow drains | Use `enqueue: true` |
+| Reference a playback later | Put `id` on `play`, then use `target` |
+| Keep controlling a replacement by the same name | Reuse the same `id` on the new `play` |
+| Restore upper/lower-body phase | `sync: { target: 'lowerRun', mode: 'normalized' }` |
+| Trigger animation-internal timing | Prefer `addMarker({ time })` + `waitMarker` |
+
+`waitFrame` converts frame numbers through `clip.frameRate` onto the continuous timeline. If your asset pipeline does not have a stable authored FPS, prefer marker `time`.
+
+---
+
+## Debug Events
+
+These events help you understand what the action graph is doing:
 
 ```typescript
 // Fires whenever setState() changes the active state or stop() clears it.
@@ -520,12 +574,12 @@ controller.on('statechange', (state, previousState) => {
   console.log('state changed', previousState, '->', state);
 });
 
-// Fires when the active state's runner drains all timeline work.
+// Fires when the active state's main flow, concurrent branches, and queued work all finish.
 controller.on('statecomplete', (state) => {
   console.log('state complete', state);
 });
 
-// Fires when a timeline step emits a gameplay cue.
+// Timeline emit steps are forwarded through the controller.
 controller.on('emit', (event, payload) => {
   console.log('timeline emitted', event, payload);
 });
@@ -536,19 +590,4 @@ controller.on('event', (event, payload, result) => {
 });
 ```
 
-The `event` notification is useful for debugging action graphs because it reports whether an input was consumed, ignored, enqueued, converted to steps, or used as a transition.
-
-When `returnTo` is configured, `statecomplete` is emitted before the automatic return. If a listener changes state during `statecomplete`, the automatic return is skipped and the listener's state change wins.
-
----
-
-## Practical Notes
-
-- Use `AnimationController` for action-level orchestration and `AnimationSet` for direct low-level playback.
-- Use stable clip names and verify imported models contain the clips referenced by timelines.
-- Use `repeat: 1` for one-shot actions that should complete, and `repeat: 0` for looping states such as idle or run.
-- Use `returnTo: true` on temporary state transitions when a one-shot action should return to the interrupted looping state. Set `returnTransition` when the completed action should fade out while the return state fades in.
-- Use `options.sync` when restoring an upper/lower-body loop or replacing layered locomotion with a full-body clip; keep the source playback alive with a short transition when the new state must read its phase.
-- Put default cross-fade durations on state definitions with `transition`; override individual transitions with `setState(name, { transition })` or a response's `{ fadeOut }`.
-- Use `waitMarker` for gameplay timing when authored animation markers are available; use `waitFrame` when your pipeline relies on frame numbers.
-- Looping states normally do not emit `statecomplete`, because their playbacks never finish unless they are stopped or interrupted.
+Looping states usually do not emit `statecomplete`, because `repeat: 0` playbacks do not finish naturally. One-shot states that use `wait: 'complete'` emit `statecomplete` after playback completion; if `returnTo` is configured, the automatic return happens after `statecomplete`.
