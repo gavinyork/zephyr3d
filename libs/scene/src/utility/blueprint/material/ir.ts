@@ -22,7 +22,15 @@ import {
 import type { GenericConstructor, DRef, Nullable } from '@zephyr3d/base';
 import type { Vector4 } from '@zephyr3d/base';
 import { ASSERT } from '@zephyr3d/base';
-import { BaseTextureNode, PannerNode, TextureSampleNode } from './texture';
+import {
+  BaseTextureNode,
+  GaussianBlurNode,
+  ChannelMorphNode,
+  ChannelSDFMaskNode,
+  PannerNode,
+  TexturePropertyNode,
+  TextureSampleNode
+} from './texture';
 import type { ComparisonMode } from '../common/math';
 import {
   GenericMathNode,
@@ -1169,6 +1177,411 @@ class IRSampleTexture extends IRExpression {
   }
 }
 
+class IRGaussianBlur extends IRExpression {
+  readonly tex: IRExpression;
+  readonly coord: IRExpression;
+  readonly blurRadius: IRExpression | number;
+  readonly channelMask: IRExpression | number[];
+  tmpName: string;
+  constructor(
+    tex: IRExpression,
+    coord: IRExpression,
+    blurRadius: IRExpression | number,
+    channelMask: IRExpression | number[]
+  ) {
+    super();
+    this.tex = tex.addRef();
+    this.coord = coord.addRef();
+    this.blurRadius = blurRadius instanceof IRExpression ? blurRadius.addRef() : blurRadius;
+    this.channelMask = channelMask instanceof IRExpression ? channelMask.addRef() : channelMask.slice() as number[];
+    this.tmpName = '';
+  }
+  reset() {
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const texExp = this.tex.create(pb);
+    const coordExp = this.coord.create(pb);
+    const radiusExp = this.blurRadius instanceof IRExpression ? this.blurRadius.create(pb) : this.blurRadius;
+    const maskExpRaw =
+      this.channelMask instanceof IRExpression
+        ? this.channelMask.create(pb)
+        : pb.vec4(
+            this.channelMask[0] ?? 0,
+            this.channelMask[1] ?? 0,
+            this.channelMask[2] ?? 0,
+            this.channelMask[3] ?? 0
+          );
+    if (!(texExp instanceof PBShaderExp) || !(coordExp instanceof PBShaderExp) || !(maskExpRaw instanceof PBShaderExp)) {
+      throw new Error('Invalid texture sampling input');
+    }
+    const maskExp = maskExpRaw;
+    const texVarName = texExp.$str || 'Texture';
+    const funcName = `Z_ChannelBlur_${texVarName.replace(/[^A-Za-z0-9_]/g, '_')}`;
+    const sampleMaskedName = `${funcName}_sampleMasked`;
+    const texelSize = pb.div(pb.vec2(1), pb.vec2(pb.textureDimensions(texExp, 0)));
+    pb.func(
+      sampleMaskedName,
+      [
+        pb.tex2D('texture'),
+        ...(pb.getDevice().type === 'webgpu' ? [pb.sampler('texture__sampler')] : []),
+        pb.vec2('uv'),
+        pb.vec4('channelMask')
+      ],
+      function () {
+        this.$l.sampled = pb.getDevice().type === 'webgpu'
+          ? pb.textureSample(this.texture, this.texture__sampler, this.uv)
+          : pb.textureSample(this.texture, this.uv);
+        this.$return(pb.dot(this.sampled, this.channelMask));
+      }
+    );
+    pb.func(
+      funcName,
+      [
+        pb.tex2D('texture'),
+        ...(pb.getDevice().type === 'webgpu' ? [pb.sampler('texture__sampler')] : []),
+        pb.vec2('uv'),
+        pb.vec2('texelSize'),
+        pb.float('blurRadius'),
+        pb.vec4('channelMask')
+      ],
+      function () {
+        this.$l.radius = pb.max(this.blurRadius, 0);
+        this.$l.sigma = pb.max(pb.mul(this.radius, 0.6), 0.85);
+        this.$l.invSigma2 = pb.div(0.5, pb.mul(this.sigma, this.sigma));
+        this.$l.kernelRadius = pb.int(2);
+        this.$if(pb.greaterThan(this.radius, 1.5), function () {
+          this.kernelRadius = pb.int(3);
+        });
+        this.$if(pb.greaterThan(this.radius, 3), function () {
+          this.kernelRadius = pb.int(4);
+        });
+        this.$if(pb.greaterThan(this.radius, 5), function () {
+          this.kernelRadius = pb.int(5);
+        });
+        this.$if(pb.greaterThan(this.radius, 7.5), function () {
+          this.kernelRadius = pb.int(6);
+        });
+        this.$if(pb.greaterThan(this.radius, 9), function () {
+          this.kernelRadius = pb.int(7);
+        });
+        this.$if(pb.greaterThan(this.radius, 10.5), function () {
+          this.kernelRadius = pb.int(8);
+        });
+        this.$if(pb.greaterThan(this.radius, 12), function () {
+          this.kernelRadius = pb.int(9);
+        });
+        this.$if(pb.greaterThan(this.radius, 13.5), function () {
+          this.kernelRadius = pb.int(10);
+        });
+        this.$if(pb.greaterThan(this.radius, 15), function () {
+          this.kernelRadius = pb.int(11);
+        });
+        this.$if(pb.greaterThan(this.radius, 16.5), function () {
+          this.kernelRadius = pb.int(12);
+        });
+        this.$if(pb.lessThanEqual(this.radius, 1e-4), function () {
+          this.$return(
+            pb.getDevice().type === 'webgpu'
+              ? this[sampleMaskedName](this.texture, this.texture__sampler, this.uv, this.channelMask)
+              : this[sampleMaskedName](this.texture, this.uv, this.channelMask)
+          );
+        });
+        this.$l.kernelRadiusF = pb.max(pb.float(this.kernelRadius), 1);
+        this.$l.sampleStep = pb.max(pb.div(this.radius, this.kernelRadiusF), 1);
+        this.$l.supportRadius = pb.max(this.radius, 1);
+        this.$l.supportRadius2 = pb.mul(this.supportRadius, this.supportRadius);
+        this.$l.sum = pb.float(0);
+        this.$l.weightSum = pb.float(0);
+        this.$for(pb.int('blurY'), 0, 25, function () {
+          this.$l.offsetY = pb.sub(this.blurY, 12);
+          this.$if(pb.lessThanEqual(pb.abs(this.offsetY), this.kernelRadius), function () {
+            this.$for(pb.int('blurX'), 0, 25, function () {
+              this.$l.offsetX = pb.sub(this.blurX, 12);
+              this.$if(pb.lessThanEqual(pb.abs(this.offsetX), this.kernelRadius), function () {
+                this.$l.sampleOffset = pb.mul(
+                  pb.vec2(pb.float(this.offsetX), pb.float(this.offsetY)),
+                  this.sampleStep
+                );
+                this.$l.sampleRadius2 = pb.dot(this.sampleOffset, this.sampleOffset);
+                this.$if(pb.lessThanEqual(this.sampleRadius2, this.supportRadius2), function () {
+                  this.$l.weight = pb.exp(pb.neg(pb.mul(this.sampleRadius2, this.invSigma2)));
+                  this.$l.sampleUV = pb.add(this.uv, pb.mul(this.sampleOffset, this.texelSize));
+                  this.$l.sampleValue = pb.getDevice().type === 'webgpu'
+                    ? this[sampleMaskedName](
+                        this.texture,
+                        this.texture__sampler,
+                        this.sampleUV,
+                        this.channelMask
+                      )
+                    : this[sampleMaskedName](
+                        this.texture,
+                        this.sampleUV,
+                        this.channelMask
+                      );
+                  this.sum = pb.add(this.sum, pb.mul(this.sampleValue, this.weight));
+                  this.weightSum = pb.add(this.weightSum, this.weight);
+                });
+              });
+            });
+          });
+        });
+        this.$return(pb.div(this.sum, pb.max(this.weightSum, 1e-5)));
+      }
+    );
+    const callArgs: (number | boolean | PBShaderExp)[] = [
+      texExp,
+      ...(pb.getDevice().type === 'webgpu'
+        ? [((pb as any).getDefaultSampler(texExp, false) as PBShaderExp | null) ??
+          ((pb.getCurrentScope() as PBInsideFunctionScope)[`${texExp.$str}__sampler`] as PBShaderExp)]
+        : []),
+      coordExp,
+      texelSize,
+      radiusExp as number | PBShaderExp,
+      maskExp
+    ];
+    if (pb.getDevice().type === 'webgpu' && !(callArgs[1] instanceof PBShaderExp)) {
+      throw new Error('Cannot resolve sampler for GaussianBlur node');
+    }
+    const exp = pb.getGlobalScope()[funcName](...callArgs);
+    if (this._ref === 1) {
+      return exp;
+    }
+    this.tmpName = this.getTmpName(pb.getCurrentScope());
+    pb.getCurrentScope()[this.tmpName] = exp;
+    return pb.getCurrentScope()[this.tmpName];
+  }
+}
+
+class IRChannelSDFMask extends IRExpression {
+  readonly tex: IRExpression;
+  readonly coord: IRExpression;
+  readonly sizeOffset: IRExpression | number;
+  readonly feather: IRExpression | number;
+  readonly spread: IRExpression | number;
+  readonly edgeCurve: IRExpression | number;
+  readonly channelMask: IRExpression | number[];
+  tmpName: string;
+  constructor(
+    tex: IRExpression,
+    coord: IRExpression,
+    sizeOffset: IRExpression | number,
+    feather: IRExpression | number,
+    spread: IRExpression | number,
+    edgeCurve: IRExpression | number,
+    channelMask: IRExpression | number[]
+  ) {
+    super();
+    this.tex = tex.addRef();
+    this.coord = coord.addRef();
+    this.sizeOffset = sizeOffset instanceof IRExpression ? sizeOffset.addRef() : sizeOffset;
+    this.feather = feather instanceof IRExpression ? feather.addRef() : feather;
+    this.spread = spread instanceof IRExpression ? spread.addRef() : spread;
+    this.edgeCurve = edgeCurve instanceof IRExpression ? edgeCurve.addRef() : edgeCurve;
+    this.channelMask = channelMask instanceof IRExpression ? channelMask.addRef() : channelMask.slice() as number[];
+    this.tmpName = '';
+  }
+  reset() {
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const texExp = this.tex.create(pb);
+    const coordExp = this.coord.create(pb);
+    const sizeExp = this.sizeOffset instanceof IRExpression ? this.sizeOffset.create(pb) : this.sizeOffset;
+    const featherExp = this.feather instanceof IRExpression ? this.feather.create(pb) : this.feather;
+    const spreadExp = this.spread instanceof IRExpression ? this.spread.create(pb) : this.spread;
+    const edgeCurveExp = this.edgeCurve instanceof IRExpression ? this.edgeCurve.create(pb) : this.edgeCurve;
+    const maskExpRaw =
+      this.channelMask instanceof IRExpression
+        ? this.channelMask.create(pb)
+        : pb.vec4(
+            this.channelMask[0] ?? 0,
+            this.channelMask[1] ?? 0,
+            this.channelMask[2] ?? 0,
+            this.channelMask[3] ?? 0
+          );
+    if (!(texExp instanceof PBShaderExp) || !(coordExp instanceof PBShaderExp) || !(maskExpRaw instanceof PBShaderExp)) {
+      throw new Error('Invalid texture sampling input');
+    }
+    const maskExp = maskExpRaw;
+    const sampled = pb.dot(pb.textureSample(texExp, coordExp), maskExp);
+    const spreadSafe = pb.max(pb.abs(spreadExp as number | PBShaderExp), 1e-5);
+    const featherSafe = pb.max(pb.abs(featherExp as number | PBShaderExp), 1e-5);
+    const edgeCurveSafe = pb.max(edgeCurveExp as number | PBShaderExp, 1e-5);
+    const signedDistance = pb.mul(pb.sub(sampled, 0.5), pb.mul(spreadSafe, 2));
+    const linearMask = pb.clamp(
+      pb.add(
+        pb.div(pb.add(signedDistance, sizeExp as number | PBShaderExp), pb.mul(featherSafe, 2)),
+        0.5
+      ),
+      0,
+      1
+    );
+    const linearMask2 = pb.mul(linearMask, linearMask);
+    const linearMask3 = pb.mul(linearMask2, linearMask);
+    const smootherMask = pb.mul(linearMask3, pb.add(pb.mul(linearMask, pb.sub(pb.mul(linearMask, 6), 15)), 10));
+    const softAmount = pb.clamp(pb.sub(1, pb.div(1, edgeCurveSafe)), 0, 1);
+    const softenedMask = pb.mix(linearMask, smootherMask, softAmount);
+    const sharpPower = pb.div(1, edgeCurveSafe);
+    const belowSharp = pb.mul(0.5, pb.pow(pb.mul(linearMask, 2), sharpPower));
+    const aboveSharp = pb.sub(1, pb.mul(0.5, pb.pow(pb.mul(pb.sub(1, linearMask), 2), sharpPower)));
+    const sharpMask = pb.select(aboveSharp, belowSharp, pb.lessThan(linearMask, 0.5));
+    const sharpAmount = pb.clamp(pb.sub(1, edgeCurveSafe), 0, 1);
+    const exp = pb.mix(softenedMask, sharpMask, sharpAmount);
+    if (this._ref === 1) {
+      return exp;
+    }
+    this.tmpName = this.getTmpName(pb.getCurrentScope());
+    pb.getCurrentScope()[this.tmpName] = exp;
+    return pb.getCurrentScope()[this.tmpName];
+  }
+}
+
+class IRChannelMorph extends IRExpression {
+  readonly tex: IRExpression;
+  readonly coord: IRExpression;
+  readonly morphRadius: IRExpression | number;
+  readonly channelMask: IRExpression | number[];
+  tmpName: string;
+  constructor(
+    tex: IRExpression,
+    coord: IRExpression,
+    morphRadius: IRExpression | number,
+    channelMask: IRExpression | number[]
+  ) {
+    super();
+    this.tex = tex.addRef();
+    this.coord = coord.addRef();
+    this.morphRadius = morphRadius instanceof IRExpression ? morphRadius.addRef() : morphRadius;
+    this.channelMask = channelMask instanceof IRExpression ? channelMask.addRef() : channelMask.slice() as number[];
+    this.tmpName = '';
+  }
+  reset() {
+    this.tmpName = '';
+  }
+  create(pb: ProgramBuilder): PBShaderExp {
+    if (this.tmpName) {
+      return pb.getCurrentScope()[this.tmpName];
+    }
+    const texExp = this.tex.create(pb);
+    const coordExp = this.coord.create(pb);
+    const morphExp = this.morphRadius instanceof IRExpression ? this.morphRadius.create(pb) : this.morphRadius;
+    const maskExp =
+      this.channelMask instanceof IRExpression
+        ? this.channelMask.create(pb)
+        : pb.vec4(
+            this.channelMask[0] ?? 0,
+            this.channelMask[1] ?? 0,
+            this.channelMask[2] ?? 0,
+            this.channelMask[3] ?? 0
+          );
+    if (!(texExp instanceof PBShaderExp) || !(coordExp instanceof PBShaderExp)) {
+      throw new Error('Invalid texture sampling input');
+    }
+    const texVarName = texExp.$str || 'Texture';
+    const funcName = `Z_ChannelMorph_${texVarName.replace(/[^A-Za-z0-9_]/g, '_')}`;
+    const sampleMaskedName = `${funcName}_sampleMasked`;
+    const texelSize = pb.div(pb.vec2(1), pb.vec2(pb.textureDimensions(texExp, 0)));
+    pb.func(
+      sampleMaskedName,
+      [
+        pb.tex2D('texture'),
+        ...(pb.getDevice().type === 'webgpu' ? [pb.sampler('texture__sampler')] : []),
+        pb.vec2('uv'),
+        pb.vec4('channelMask')
+      ],
+      function () {
+        this.$l.sampled = pb.getDevice().type === 'webgpu'
+          ? pb.textureSample(this.texture, this.texture__sampler, this.uv)
+          : pb.textureSample(this.texture, this.uv);
+        this.$return(pb.dot(this.sampled, this.channelMask));
+      }
+    );
+    pb.func(
+      funcName,
+      [
+        pb.tex2D('texture'),
+        ...(pb.getDevice().type === 'webgpu' ? [pb.sampler('texture__sampler')] : []),
+        pb.vec2('uv'),
+        pb.vec2('texelSize'),
+        pb.float('morphRadius'),
+        pb.vec4('channelMask')
+      ],
+      function () {
+        this.$l.morphStep = pb.abs(this.morphRadius);
+        this.$l.morphOffsets = pb.vec2[5]();
+        this.morphOffsets.setAt(0, pb.vec2(0, 0));
+        this.morphOffsets.setAt(1, pb.vec2(this.morphStep, 0));
+        this.morphOffsets.setAt(2, pb.vec2(pb.neg(this.morphStep), 0));
+        this.morphOffsets.setAt(3, pb.vec2(0, this.morphStep));
+        this.morphOffsets.setAt(4, pb.vec2(0, pb.neg(this.morphStep)));
+        this.$if(pb.greaterThan(this.morphRadius, 0), function () {
+          this.$l.dilateValue = pb.float(0);
+          this.$for(pb.int('morphIndex'), 0, 5, function () {
+            this.$l.sampleUV = pb.add(this.uv, pb.mul(this.morphOffsets.at(this.morphIndex), this.texelSize));
+            this.$l.sampleValue = pb.getDevice().type === 'webgpu'
+              ? this[sampleMaskedName](this.texture, this.texture__sampler, this.sampleUV, this.channelMask)
+              : this[sampleMaskedName](this.texture, this.sampleUV, this.channelMask);
+            this.$if(pb.equal(this.morphIndex, 0), function () {
+              this.dilateValue = this.sampleValue;
+            }).$else(function () {
+              this.dilateValue = pb.max(this.dilateValue, this.sampleValue);
+            });
+          });
+          this.$return(this.dilateValue);
+        }).$elseif(pb.lessThan(this.morphRadius, 0), function () {
+          this.$l.erodeValue = pb.float(0);
+          this.$for(pb.int('morphIndex'), 0, 5, function () {
+            this.$l.sampleUV = pb.add(this.uv, pb.mul(this.morphOffsets.at(this.morphIndex), this.texelSize));
+            this.$l.sampleValue = pb.getDevice().type === 'webgpu'
+              ? this[sampleMaskedName](this.texture, this.texture__sampler, this.sampleUV, this.channelMask)
+              : this[sampleMaskedName](this.texture, this.sampleUV, this.channelMask);
+            this.$if(pb.equal(this.morphIndex, 0), function () {
+              this.erodeValue = this.sampleValue;
+            }).$else(function () {
+              this.erodeValue = pb.min(this.erodeValue, this.sampleValue);
+            });
+          });
+          this.$return(this.erodeValue);
+        }).$else(function () {
+          this.$return(
+            pb.getDevice().type === 'webgpu'
+              ? this[sampleMaskedName](this.texture, this.texture__sampler, this.uv, this.channelMask)
+              : this[sampleMaskedName](this.texture, this.uv, this.channelMask)
+          );
+        });
+      }
+    );
+    const callArgs: (number | boolean | PBShaderExp)[] = [
+      texExp,
+      ...(pb.getDevice().type === 'webgpu'
+        ? [((pb as any).getDefaultSampler(texExp, false) as PBShaderExp | null) ??
+          ((pb.getCurrentScope() as PBInsideFunctionScope)[`${texExp.$str}__sampler`] as PBShaderExp)]
+        : []),
+      coordExp,
+      texelSize,
+      morphExp as number | PBShaderExp,
+      maskExp
+    ];
+    if (pb.getDevice().type === 'webgpu' && !(callArgs[1] instanceof PBShaderExp)) {
+      throw new Error('Cannot resolve sampler for ChannelMorph node');
+    }
+    const exp = pb.getGlobalScope()[funcName](...callArgs);
+    if (this._ref === 1) {
+      return exp;
+    }
+    this.tmpName = this.getTmpName(pb.getCurrentScope());
+    pb.getCurrentScope()[this.tmpName] = exp;
+    return pb.getCurrentScope()[this.tmpName];
+  }
+}
+
 /**
  * IR expression for texture uniform constants
  *
@@ -1635,6 +2048,12 @@ export class MaterialBlueprintIR {
       expr = this.constantTexture(node, output);
     } else if (node instanceof TextureSampleNode) {
       expr = this.textureSample(node, output);
+    } else if (node instanceof ChannelSDFMaskNode) {
+      expr = this.channelSDFMask(node, output);
+    } else if (node instanceof ChannelMorphNode) {
+      expr = this.channelMorph(node, output);
+    } else if (node instanceof GaussianBlurNode) {
+      expr = this.gaussianBlur(node, output);
     } else if (node instanceof PannerNode) {
       expr = this.panner(node, output);
     } else if (node instanceof MakeVectorNode) {
@@ -1721,6 +2140,8 @@ export class MaterialBlueprintIR {
       expr = this.functionInput(node, output);
     } else if (node instanceof FunctionOutputNode) {
       expr = this.functionOutput(node, output);
+    } else if (node instanceof TexturePropertyNode) {
+      expr = this.textureProperty(node, output);
     }
     if (expr && originType) {
       const outputType = node.getOutputType(output);
@@ -2398,6 +2819,71 @@ export class MaterialBlueprintIR {
           return new IRInput((scope) => scope.zVertexUV);
         })();
     return this.getOrCreateIRExpression(node, output, IRSampleTexture, tex, coord, node.samplerType);
+  }
+  /** Converts a texture property node to IR */
+  private textureProperty(node: TexturePropertyNode, output: number): IRExpression {
+    const tex = this.ir(node.inputs[0])!;
+    const func: (pb: ProgramBuilder, ...params: (number | boolean | PBShaderExp)[]) => PBShaderExp =
+      node.property === 'TextureSize'
+        ? (pb, ...params) => {
+            const texture = params[0] as PBShaderExp;
+            return pb.vec2(pb.textureDimensions(texture, 0));
+          }
+        : (pb, ...params) => {
+            const texture = params[0] as PBShaderExp;
+            return pb.div(pb.vec2(1), pb.vec2(pb.textureDimensions(texture, 0)));
+          };
+    return this.getOrCreateIRExpression(node, output, IRFunc, [tex], func);
+  }
+  private channelSDFMask(node: ChannelSDFMaskNode, output: number): IRExpression {
+    const tex = this.ir(node.inputs[0])!;
+    const coord = node.inputs[1].inputNode
+      ? this.ir(node.inputs[1])!
+      : (() => {
+          this._behaviors.useVertexUV = true;
+          return new IRInput((scope) => scope.zVertexUV);
+        })();
+    const sizeOffset = node.inputs[2].inputNode ? this.ir(node.inputs[2])! : (node.inputs[2].defaultValue?.[0] ?? 0);
+    const feather = node.inputs[3].inputNode ? this.ir(node.inputs[3])! : (node.inputs[3].defaultValue?.[0] ?? 0);
+    const spread = node.inputs[4].inputNode ? this.ir(node.inputs[4])! : (node.inputs[4].defaultValue?.[0] ?? 16);
+    const edgeCurve = node.inputs[5].inputNode ? this.ir(node.inputs[5])! : (node.inputs[5].defaultValue?.[0] ?? 1);
+    const channelMask = node.inputs[6].inputNode ? this.ir(node.inputs[6])! : (node.inputs[6].defaultValue ?? [1, 0, 0, 0]);
+    return this.getOrCreateIRExpression(
+      node,
+      output,
+      IRChannelSDFMask,
+      tex,
+      coord,
+      sizeOffset,
+      feather,
+      spread,
+      edgeCurve,
+      channelMask
+    );
+  }
+  private channelMorph(node: ChannelMorphNode, output: number): IRExpression {
+    const tex = this.ir(node.inputs[0])!;
+    const coord = node.inputs[1].inputNode
+      ? this.ir(node.inputs[1])!
+      : (() => {
+          this._behaviors.useVertexUV = true;
+          return new IRInput((scope) => scope.zVertexUV);
+        })();
+    const morphRadius = node.inputs[2].inputNode ? this.ir(node.inputs[2])! : (node.inputs[2].defaultValue?.[0] ?? 0);
+    const channelMask = node.inputs[3].inputNode ? this.ir(node.inputs[3])! : (node.inputs[3].defaultValue ?? [1, 0, 0, 0]);
+    return this.getOrCreateIRExpression(node, output, IRChannelMorph, tex, coord, morphRadius, channelMask);
+  }
+  private gaussianBlur(node: GaussianBlurNode, output: number): IRExpression {
+    const tex = this.ir(node.inputs[0])!;
+    const coord = node.inputs[1].inputNode
+      ? this.ir(node.inputs[1])!
+      : (() => {
+          this._behaviors.useVertexUV = true;
+          return new IRInput((scope) => scope.zVertexUV);
+        })();
+    const blurRadius = node.inputs[2].inputNode ? this.ir(node.inputs[2])! : (node.inputs[2].defaultValue?.[0] ?? 0);
+    const channelMask = node.inputs[3].inputNode ? this.ir(node.inputs[3])! : (node.inputs[3].defaultValue ?? [1, 0, 0, 0]);
+    return this.getOrCreateIRExpression(node, output, IRGaussianBlur, tex, coord, blurRadius, channelMask);
   }
   /** Gets or creates fallback texture uniform expression for texture sample nodes */
   private textureSampleFallbackTexture(node: TextureSampleNode): IRConstantTexture {

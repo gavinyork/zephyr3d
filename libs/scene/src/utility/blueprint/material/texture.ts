@@ -1244,6 +1244,464 @@ export class TextureSampleNode extends BaseGraphNode {
 }
 
 /**
+ * Texture property query node
+ *
+ * @remarks
+ * Queries metadata derived from a texture object, similar to Unreal Engine's
+ * `TextureProperty` material expression.
+ *
+ * Supported properties:
+ * - `TextureSize`: returns the texture dimensions as a vec2
+ * - `TexelSize`: returns `1 / textureDimensions` as a vec2
+ *
+ * Inputs:
+ * - Input 1: Texture sampler (tex2D, tex2DArray, or texCube)
+ *
+ * Outputs:
+ * - Output 1: Full property value (vec2)
+ * - Output 2: X component (float)
+ * - Output 3: Y component (float)
+ *
+ * @public
+ */
+export class TexturePropertyNode extends BaseGraphNode {
+  /** The queried texture property */
+  property: 'TextureSize' | 'TexelSize';
+  /**
+   * Creates a new texture property node
+   *
+   * @remarks
+   * Initializes with:
+   * - One required texture input
+   * - One vec2 output and two scalar swizzled outputs
+   * - `TexelSize` as default property
+   */
+  constructor() {
+    super();
+    this.property = 'TexelSize';
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      },
+      {
+        id: 2,
+        name: 'x',
+        swizzle: 'x'
+      },
+      {
+        id: 3,
+        name: 'y',
+        swizzle: 'y'
+      }
+    ];
+    this._inputs = [
+      {
+        id: 1,
+        name: 'texture',
+        type: ['tex2D', 'tex2DArray', 'texCube'],
+        required: true
+      }
+    ];
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: TexturePropertyNode,
+      name: 'TexturePropertyNode',
+      getProps(): PropertyAccessor<TexturePropertyNode>[] {
+        return defineProps([
+          {
+            name: 'Property',
+            type: 'string',
+            options: {
+              enum: {
+                labels: ['TextureSize', 'TexelSize'],
+                values: ['TextureSize', 'TexelSize']
+              }
+            },
+            get(this: TexturePropertyNode, value) {
+              value.str[0] = this.property;
+            },
+            set(this: TexturePropertyNode, value) {
+              this.property = value.str[0] as TexturePropertyNode['property'];
+            }
+          }
+        ]);
+      }
+    };
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns `textureProperty`
+   */
+  toString(): string {
+    return 'textureProperty';
+  }
+  /**
+   * Validates the node state and input type compatibility
+   *
+   * @returns Error message if invalid, empty string if valid
+   */
+  protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    const textureInput = this._inputs[0];
+    const textureType = textureInput.inputNode?.getOutputType(textureInput.inputId!);
+    if (!textureType) {
+      return `Cannot determine type of argument \`${textureInput.name}\``;
+    }
+    if (!textureInput.type.includes(textureType)) {
+      return `Invalid input type of argument \`${textureInput.name}\`: ${textureType}`;
+    }
+    return '';
+  }
+  /**
+   * Gets the output type
+   */
+  protected getType(id: number): string {
+    const err = this.validate();
+    if (err) {
+      return '';
+    }
+    return id === 1 ? 'vec2' : 'float';
+  }
+}
+
+/**
+ * Channel SDF mask evaluation node
+ *
+ * @remarks
+ * Samples a channel-packed SDF texture and reconstructs a feathered mask
+ * by decoding the stored value back into signed distance space.
+ *
+ * Inputs:
+ * - `texture`: source SDF texture
+ * - `coord`: UV coordinates, defaults to vertex UV when disconnected
+ * - `sizeOffset`: positive expands, negative shrinks, in SDF distance units
+ * - `feather`: transition width around the boundary, in SDF distance units
+ * - `spread`: encode range used when baking the SDF texture
+ * - `edgeCurve`: edge response curve, `1` keeps linear behavior, `>1` softens, `<1` hardens
+ * - `channelMask`: channel selector mask, defaults to R
+ *
+ * Output:
+ * - `Result`: scalar mask in `[0, 1]`
+ *
+ * @public
+ */
+export class ChannelSDFMaskNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._inputs = [
+      {
+        id: 1,
+        name: 'texture',
+        type: ['tex2D'],
+        required: true
+      },
+      {
+        id: 2,
+        name: 'coord',
+        type: ['vec2'],
+        required: false
+      },
+      {
+        id: 3,
+        name: 'sizeOffset',
+        type: ['float'],
+        required: false,
+        defaultValue: [0]
+      },
+      {
+        id: 4,
+        name: 'feather',
+        type: ['float'],
+        required: false,
+        defaultValue: [0]
+      },
+      {
+        id: 5,
+        name: 'spread',
+        type: ['float'],
+        required: false,
+        defaultValue: [16]
+      },
+      {
+        id: 6,
+        name: 'edgeCurve',
+        type: ['float'],
+        required: false,
+        defaultValue: [1]
+      },
+      {
+        id: 7,
+        name: 'channelMask',
+        type: ['vec4'],
+        required: false,
+        defaultValue: [1, 0, 0, 0]
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: 'Result'
+      }
+    ];
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: ChannelSDFMaskNode,
+      name: 'ChannelSDFMaskNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  toString(): string {
+    return 'ChannelSDFMask';
+  }
+  protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    const textureType = this._inputs[0].inputNode?.getOutputType(this._inputs[0].inputId!);
+    if (textureType !== 'tex2D') {
+      return 'Texture input must be tex2D';
+    }
+    const coordType = this._inputs[1].inputNode?.getOutputType(this._inputs[1].inputId!);
+    if (coordType && coordType !== 'vec2') {
+      return 'Texture coordinate type should be vec2';
+    }
+    const sizeType = this._inputs[2].inputNode?.getOutputType(this._inputs[2].inputId!);
+    if (sizeType && sizeType !== 'float') {
+      return 'Size offset type should be float';
+    }
+    const featherType = this._inputs[3].inputNode?.getOutputType(this._inputs[3].inputId!);
+    if (featherType && featherType !== 'float') {
+      return 'Feather type should be float';
+    }
+    const spreadType = this._inputs[4].inputNode?.getOutputType(this._inputs[4].inputId!);
+    if (spreadType && spreadType !== 'float') {
+      return 'Spread type should be float';
+    }
+    const edgeCurveType = this._inputs[5].inputNode?.getOutputType(this._inputs[5].inputId!);
+    if (edgeCurveType && edgeCurveType !== 'float') {
+      return 'Edge curve type should be float';
+    }
+    const maskType = this._inputs[6].inputNode?.getOutputType(this._inputs[6].inputId!);
+    if (maskType && maskType !== 'vec4') {
+      return 'Channel mask type should be vec4';
+    }
+    return '';
+  }
+  protected getType(): string {
+    return this.validate() ? '' : 'float';
+  }
+}
+
+/**
+ * Channel morphology node
+ *
+ * @remarks
+ * Applies a 5-tap cross-shaped dilate/erode to a selected channel of a
+ * texture mask. Positive radius dilates, negative radius erodes.
+ *
+ * Inputs:
+ * - `texture`: source mask texture
+ * - `coord`: UV coordinates, defaults to vertex UV when disconnected
+ * - `morphRadius`: positive expands, negative shrinks, zero keeps center
+ * - `channelMask`: channel selector mask, defaults to R
+ *
+ * Output:
+ * - `Result`: scalar filtered value
+ *
+ * @public
+ */
+export class ChannelMorphNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._inputs = [
+      {
+        id: 1,
+        name: 'texture',
+        type: ['tex2D'],
+        required: true
+      },
+      {
+        id: 2,
+        name: 'coord',
+        type: ['vec2'],
+        required: false
+      },
+      {
+        id: 3,
+        name: 'morphRadius',
+        type: ['float'],
+        required: false,
+        defaultValue: [0]
+      },
+      {
+        id: 4,
+        name: 'channelMask',
+        type: ['vec4'],
+        required: false,
+        defaultValue: [1, 0, 0, 0]
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: 'Result'
+      }
+    ];
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: ChannelMorphNode,
+      name: 'ChannelMorphNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  toString(): string {
+    return 'ChannelMorph';
+  }
+  protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    const textureType = this._inputs[0].inputNode?.getOutputType(this._inputs[0].inputId!);
+    if (textureType !== 'tex2D') {
+      return 'Texture input must be tex2D';
+    }
+    const coordType = this._inputs[1].inputNode?.getOutputType(this._inputs[1].inputId!);
+    if (coordType && coordType !== 'vec2') {
+      return 'Texture coordinate type should be vec2';
+    }
+    const morphType = this._inputs[2].inputNode?.getOutputType(this._inputs[2].inputId!);
+    if (morphType && morphType !== 'float') {
+      return 'Morph radius type should be float';
+    }
+    const maskType = this._inputs[3].inputNode?.getOutputType(this._inputs[3].inputId!);
+    if (maskType && maskType !== 'vec4') {
+      return 'Channel mask type should be vec4';
+    }
+    return '';
+  }
+  protected getType(): string {
+    return this.validate() ? '' : 'float';
+  }
+}
+
+/**
+ * Channel blur node
+ *
+ * @remarks
+ * Applies an adaptive Gaussian blur to a selected channel of a mask texture.
+ * The node expands its 2D kernel as blur radius grows, keeping small radii
+ * relatively cheap while producing a smoother, less layered falloff for
+ * larger radii.
+ *
+ * Inputs:
+ * - `texture`: source mask texture
+ * - `coord`: UV coordinates, defaults to vertex UV when disconnected
+ * - `blurRadius`: blur radius in texel units
+ * - `channelMask`: channel selector mask, defaults to R
+ *
+ * Output:
+ * - `Result`: scalar sampled value
+ *
+ * @public
+ */
+export class GaussianBlurNode extends BaseGraphNode {
+  constructor() {
+    super();
+    this._inputs = [
+      {
+        id: 1,
+        name: 'texture',
+        type: ['tex2D'],
+        required: true
+      },
+      {
+        id: 2,
+        name: 'coord',
+        type: ['vec2'],
+        required: false
+      },
+      {
+        id: 3,
+        name: 'blurRadius',
+        type: ['float'],
+        required: false,
+        defaultValue: [0]
+      },
+      {
+        id: 4,
+        name: 'channelMask',
+        type: ['vec4'],
+        required: false,
+        defaultValue: [1, 0, 0, 0]
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: 'Result'
+      }
+    ];
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: GaussianBlurNode,
+      name: 'GaussianBlurNode',
+      getProps() {
+        return [];
+      }
+    };
+  }
+  toString(): string {
+    return 'GaussianBlur';
+  }
+  protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    const textureType = this._inputs[0].inputNode?.getOutputType(this._inputs[0].inputId!);
+    if (textureType !== 'tex2D') {
+      return 'Texture input must be tex2D';
+    }
+    const coordType = this._inputs[1].inputNode?.getOutputType(this._inputs[1].inputId!);
+    if (coordType && coordType !== 'vec2') {
+      return 'Texture coordinate type should be vec2';
+    }
+    const radiusType = this._inputs[2].inputNode?.getOutputType(this._inputs[2].inputId!);
+    if (radiusType && radiusType !== 'float') {
+      return 'Blur radius type should be float';
+    }
+    const maskType = this._inputs[3].inputNode?.getOutputType(this._inputs[3].inputId!);
+    if (maskType && maskType !== 'vec4') {
+      return 'Channel mask type should be vec4';
+    }
+    return '';
+  }
+  protected getType(): string {
+    return this.validate() ? '' : 'float';
+  }
+}
+
+/**
  * Texture sampling with explicit gradients node
  *
  * @remarks

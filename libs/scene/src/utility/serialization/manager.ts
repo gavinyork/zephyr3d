@@ -93,10 +93,14 @@ import {
   ConstantVec4Node
 } from '../blueprint/common/constants';
 import {
+  GaussianBlurNode,
+  ChannelMorphNode,
+  ChannelSDFMaskNode,
   ConstantTexture2DArrayNode,
   ConstantTexture2DNode,
   ConstantTextureCubeNode,
   PannerNode,
+  TexturePropertyNode,
   TextureSampleNode
 } from '../blueprint/material/texture';
 import {
@@ -446,7 +450,11 @@ export class ResourceManager {
         FunctionInputNode.getSerializationCls(),
         FunctionOutputNode.getSerializationCls(),
         FunctionCallNode.getSerializationCls(this),
+        ChannelSDFMaskNode.getSerializationCls(),
+        ChannelMorphNode.getSerializationCls(),
+        GaussianBlurNode.getSerializationCls(),
         PannerNode.getSerializationCls(),
+        TexturePropertyNode.getSerializationCls(),
         TextureSampleNode.getSerializationCls()
       ].map((val) => [val.ctor, val])
     );

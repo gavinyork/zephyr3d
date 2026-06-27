@@ -1,8 +1,12 @@
 import {
+  GaussianBlurNode,
+  ChannelMorphNode,
+  ChannelSDFMaskNode,
   ConstantTexture2DArrayNode,
   ConstantTexture2DNode,
   ConstantTextureCubeNode,
   PannerNode,
+  TexturePropertyNode,
   TextureSampleNode
 } from '@zephyr3d/scene';
 import type { NodeCategory } from '../api';
@@ -31,6 +35,22 @@ export function getTextureNodeCategories(): NodeCategory[] {
         {
           name: 'TextureSample',
           create: () => new TextureSampleNode()
+        },
+        {
+          name: 'ChannelSDFMask',
+          create: () => new ChannelSDFMaskNode()
+        },
+        {
+          name: 'ChannelMorph',
+          create: () => new ChannelMorphNode()
+        },
+        {
+          name: 'GaussianBlur',
+          create: () => new GaussianBlurNode()
+        },
+        {
+          name: 'TextureProperty',
+          create: () => new TexturePropertyNode()
         }
       ]
     }
