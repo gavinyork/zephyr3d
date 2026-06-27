@@ -49,6 +49,8 @@ controller.setState('idle');
 
 效果：角色进入 `idle` 状态后持续播放 `Idle`，适合作为待机、奔跑这类基础循环。
 
+<div class="showcase" case="tut-56"></div>
+
 ---
 
 ## 2. 用事件切换状态
@@ -107,6 +109,8 @@ controller.dispatch('stopMove');
 
 效果：`idle` 和 `run` 互相切换。`transition` 单位是秒，进入目标状态时会让旧状态淡出、目标状态入口播放淡入。
 
+<div class="showcase" case="tut-57"></div>
+
 ---
 
 ## 3. 插播一次性动作并自动返回
@@ -155,6 +159,8 @@ controller
 ```
 
 效果：奔跑中收到 `attack` 后切到 `attack` 状态。`Attack` 自然完成后，控制器自动回到 `run`。`returnTransition` 会让完成的攻击动作保留一小段 completion fade-out，同时返回状态淡入，避免动作结束瞬间被硬切掉。
+
+<div class="showcase" case="tut-58"></div>
 
 ---
 

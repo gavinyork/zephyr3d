@@ -49,6 +49,8 @@ controller.setState('idle');
 
 Result: the character enters `idle` and keeps playing `Idle`. This is the foundation for idle, run, and other looping modes.
 
+<div class="showcase" case="tut-56"></div>
+
 ---
 
 ## 2. Switch States With Events
@@ -107,6 +109,8 @@ controller.dispatch('stopMove');
 
 Result: `idle` and `run` transition between each other. `transition` is measured in seconds; entering the target state fades the old state out and fades the target state's entry playbacks in.
 
+<div class="showcase" case="tut-57"></div>
+
 ---
 
 ## 3. Insert a One-Shot and Return
@@ -155,6 +159,8 @@ controller
 ```
 
 Result: while running, `attack` switches to the `attack` state. When `Attack` finishes naturally, the controller returns to `run`. `returnTransition` keeps the completed attack playback alive for a short completion fade-out while the return state fades in, avoiding a hard removal at the end pose.
+
+<div class="showcase" case="tut-58"></div>
 
 ---
 
