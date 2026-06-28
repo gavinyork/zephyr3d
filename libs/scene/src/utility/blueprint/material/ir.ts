@@ -2748,7 +2748,7 @@ export class MaterialBlueprintIR {
       output,
       IRConstantf,
       node.x,
-      node.paramName,
+      node.isUniform ? node.paramName : '',
       node.isUniform && node.useRange ? node.minValue : undefined,
       node.isUniform && node.useRange ? node.maxValue : undefined
     );
@@ -2769,7 +2769,7 @@ export class MaterialBlueprintIR {
       output,
       IRConstantfv,
       value,
-      node.paramName,
+      node.isUniform ? node.paramName : '',
       `vec${value.length}`
     );
   }
