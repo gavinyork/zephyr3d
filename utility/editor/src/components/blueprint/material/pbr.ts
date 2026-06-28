@@ -14,6 +14,7 @@ import type {
 } from '@zephyr3d/scene';
 import {
   CopyBlitter,
+  getDefaultTexture2D,
   MaterialBlueprintIR,
   Sprite,
   SpriteBlueprintMaterial,
@@ -810,9 +811,12 @@ export class PBRMaterialEditor extends GraphEditor {
           u.finalValue = u.value.length === 1 ? u.value[0] : new Float32Array(u.value);
         }
         for (const u of uniforms.uniformTextures) {
-          const tex = await getEngine().resourceManager.fetchTexture(u.texture, {
-            linearColorSpace: !u.sRGB
-          });
+          const tex =
+            (u.texture
+              ? await getEngine().resourceManager.fetchTexture(u.texture, {
+                  linearColorSpace: !u.sRGB
+                })
+              : null) ?? getDefaultTexture2D();
           u.finalTexture?.dispose();
           u.finalTexture = new DRef(tex);
           u.finalSampler = getDevice().createSampler({

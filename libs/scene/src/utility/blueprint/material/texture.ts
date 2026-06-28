@@ -1397,14 +1397,32 @@ export class TexturePropertyNode extends BaseGraphNode {
  * @public
  */
 export class ChannelSDFMaskNode extends BaseGraphNode {
+  private _paramName: string;
+  private _expose: boolean;
+  textureId: string;
+  sRGB: boolean;
+  addressU: TextureAddressMode;
+  addressV: TextureAddressMode;
+  filterMin: TextureFilterMode;
+  filterMag: TextureFilterMode;
+  filterMip: TextureFilterMode;
   constructor() {
     super();
+    this._paramName = getParamName();
+    this._expose = true;
+    this.textureId = '';
+    this.sRGB = true;
+    this.addressU = 'clamp';
+    this.addressV = 'clamp';
+    this.filterMin = 'linear';
+    this.filterMag = 'linear';
+    this.filterMip = 'nearest';
     this._inputs = [
       {
         id: 1,
         name: 'texture',
         type: ['tex2D'],
-        required: true
+        required: false
       },
       {
         id: 2,
@@ -1455,12 +1473,203 @@ export class ChannelSDFMaskNode extends BaseGraphNode {
       }
     ];
   }
+  get isUniform() {
+    return !this._inputs[0].inputNode;
+  }
+  get paramName() {
+    return this._paramName;
+  }
+  set paramName(val: string) {
+    if (this._paramName !== val) {
+      this._paramName = val;
+      this.dispatchEvent('changed');
+    }
+  }
+  get expose() {
+    return this._expose;
+  }
+  set expose(val: boolean) {
+    if (this._expose !== val) {
+      this._expose = val;
+      this.dispatchEvent('changed');
+    }
+  }
+  get sizeOffset() {
+    return this._inputs[2].defaultValue?.[0] ?? 0;
+  }
+  set sizeOffset(val: number) {
+    if (this.sizeOffset !== val) {
+      this._inputs[2].defaultValue = [val];
+      this.dispatchEvent('changed');
+    }
+  }
+  get feather() {
+    return this._inputs[3].defaultValue?.[0] ?? 0;
+  }
+  set feather(val: number) {
+    if (this.feather !== val) {
+      this._inputs[3].defaultValue = [val];
+      this.dispatchEvent('changed');
+    }
+  }
+  get spread() {
+    return this._inputs[4].defaultValue?.[0] ?? 16;
+  }
+  set spread(val: number) {
+    if (this.spread !== val) {
+      this._inputs[4].defaultValue = [val];
+      this.dispatchEvent('changed');
+    }
+  }
+  get edgeCurve() {
+    return this._inputs[5].defaultValue?.[0] ?? 1;
+  }
+  set edgeCurve(val: number) {
+    if (this.edgeCurve !== val) {
+      this._inputs[5].defaultValue = [val];
+      this.dispatchEvent('changed');
+    }
+  }
+  get channelMask() {
+    return [...(this._inputs[6].defaultValue ?? [1, 0, 0, 0])];
+  }
+  set channelMask(val: number[]) {
+    const next = [val[0] ?? 0, val[1] ?? 0, val[2] ?? 0, val[3] ?? 0];
+    const prev = this.channelMask;
+    if (prev.some((v, i) => v !== next[i])) {
+      this._inputs[6].defaultValue = next;
+      this.dispatchEvent('changed');
+    }
+  }
   static getSerializationCls(): SerializableClass {
     return {
       ctor: ChannelSDFMaskNode,
       name: 'ChannelSDFMaskNode',
-      getProps() {
-        return [];
+      getProps(): PropertyAccessor<ChannelSDFMaskNode>[] {
+        return defineProps([
+          ...(textureNodeProps as unknown as PropertyAccessor<ChannelSDFMaskNode>[]),
+          {
+            name: 'Texture',
+            type: 'object',
+            default: null,
+            options: {
+              mimeTypes: [
+                'image/jpeg',
+                'image/png',
+                'image/tga',
+                'image/vnd.radiance',
+                'image/x-dds',
+                'image/webp'
+              ]
+            },
+            isNullable() {
+              return true;
+            },
+            get(this: ChannelSDFMaskNode, value) {
+              value.str[0] = this.textureId;
+            },
+            async set(this: ChannelSDFMaskNode, value) {
+              const path = value?.str?.[0];
+              this.textureId = typeof path === 'string' ? path : '';
+            }
+          },
+          {
+            name: 'SizeOffset',
+            type: 'float',
+            description: 'Used when the sizeOffset pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.sizeOffset;
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              this.sizeOffset = value.num[0];
+            }
+          },
+          {
+            name: 'Feather',
+            type: 'float',
+            description: 'Used when the feather pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.feather;
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              this.feather = value.num[0];
+            }
+          },
+          {
+            name: 'Spread',
+            type: 'float',
+            description: 'Used when the spread pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.spread;
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              this.spread = value.num[0];
+            }
+          },
+          {
+            name: 'EdgeCurve',
+            type: 'float',
+            description: 'Used when the edgeCurve pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.edgeCurve;
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              this.edgeCurve = value.num[0];
+            }
+          },
+          {
+            name: 'ChannelMaskR',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.channelMask[0];
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              const next = this.channelMask;
+              next[0] = value.num[0];
+              this.channelMask = next;
+            }
+          },
+          {
+            name: 'ChannelMaskG',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.channelMask[1];
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              const next = this.channelMask;
+              next[1] = value.num[0];
+              this.channelMask = next;
+            }
+          },
+          {
+            name: 'ChannelMaskB',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.channelMask[2];
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              const next = this.channelMask;
+              next[2] = value.num[0];
+              this.channelMask = next;
+            }
+          },
+          {
+            name: 'ChannelMaskA',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.channelMask[3];
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              const next = this.channelMask;
+              next[3] = value.num[0];
+              this.channelMask = next;
+            }
+          }
+        ]);
       }
     };
   }
@@ -1472,9 +1681,17 @@ export class ChannelSDFMaskNode extends BaseGraphNode {
     if (err) {
       return err;
     }
-    const textureType = this._inputs[0].inputNode?.getOutputType(this._inputs[0].inputId!);
-    if (textureType !== 'tex2D') {
-      return 'Texture input must be tex2D';
+    const textureInput = this._inputs[0];
+    const textureType = textureInput.inputNode ? textureInput.inputNode.getOutputType(textureInput.inputId!) : 'tex2D';
+    if (textureInput.inputNode) {
+      if (!textureType) {
+        return `Cannot determine type of argument \`${textureInput.name}\``;
+      }
+      if (textureType !== 'tex2D') {
+        return 'Texture input must be tex2D';
+      }
+    } else if (!this.textureId) {
+      return 'Texture not specified';
     }
     const coordType = this._inputs[1].inputNode?.getOutputType(this._inputs[1].inputId!);
     if (coordType && coordType !== 'vec2') {
@@ -1529,14 +1746,32 @@ export class ChannelSDFMaskNode extends BaseGraphNode {
  * @public
  */
 export class MorphBlurNode extends BaseGraphNode {
+  private _paramName: string;
+  private _expose: boolean;
+  textureId: string;
+  sRGB: boolean;
+  addressU: TextureAddressMode;
+  addressV: TextureAddressMode;
+  filterMin: TextureFilterMode;
+  filterMag: TextureFilterMode;
+  filterMip: TextureFilterMode;
   constructor() {
     super();
+    this._paramName = getParamName();
+    this._expose = true;
+    this.textureId = '';
+    this.sRGB = true;
+    this.addressU = 'clamp';
+    this.addressV = 'clamp';
+    this.filterMin = 'linear';
+    this.filterMag = 'linear';
+    this.filterMip = 'nearest';
     this._inputs = [
       {
         id: 1,
         name: 'texture',
         type: ['tex2D'],
-        required: true
+        required: false
       },
       {
         id: 2,
@@ -1573,12 +1808,163 @@ export class MorphBlurNode extends BaseGraphNode {
       }
     ];
   }
+  get isUniform() {
+    return !this._inputs[0].inputNode;
+  }
+  get paramName() {
+    return this._paramName;
+  }
+  set paramName(val: string) {
+    if (this._paramName !== val) {
+      this._paramName = val;
+      this.dispatchEvent('changed');
+    }
+  }
+  get expose() {
+    return this._expose;
+  }
+  set expose(val: boolean) {
+    if (this._expose !== val) {
+      this._expose = val;
+      this.dispatchEvent('changed');
+    }
+  }
+  get morphRadius() {
+    return this._inputs[2].defaultValue?.[0] ?? 0;
+  }
+  set morphRadius(val: number) {
+    if (this.morphRadius !== val) {
+      this._inputs[2].defaultValue = [val];
+      this.dispatchEvent('changed');
+    }
+  }
+  get blurRadius() {
+    return this._inputs[3].defaultValue?.[0] ?? 0;
+  }
+  set blurRadius(val: number) {
+    if (this.blurRadius !== val) {
+      this._inputs[3].defaultValue = [val];
+      this.dispatchEvent('changed');
+    }
+  }
+  get channelMask() {
+    return [...(this._inputs[4].defaultValue ?? [1, 0, 0, 0])];
+  }
+  set channelMask(val: number[]) {
+    const next = [val[0] ?? 0, val[1] ?? 0, val[2] ?? 0, val[3] ?? 0];
+    const prev = this.channelMask;
+    if (prev.some((v, i) => v !== next[i])) {
+      this._inputs[4].defaultValue = next;
+      this.dispatchEvent('changed');
+    }
+  }
   static getSerializationCls(): SerializableClass {
     return {
       ctor: MorphBlurNode,
       name: 'MorphBlurNode',
-      getProps() {
-        return [];
+      getProps(): PropertyAccessor<MorphBlurNode>[] {
+        return defineProps([
+          ...(textureNodeProps as unknown as PropertyAccessor<MorphBlurNode>[]),
+          {
+            name: 'Texture',
+            type: 'object',
+            default: null,
+            options: {
+              mimeTypes: [
+                'image/jpeg',
+                'image/png',
+                'image/tga',
+                'image/vnd.radiance',
+                'image/x-dds',
+                'image/webp'
+              ]
+            },
+            isNullable() {
+              return true;
+            },
+            get(this: MorphBlurNode, value) {
+              value.str[0] = this.textureId;
+            },
+            async set(this: MorphBlurNode, value) {
+              const path = value?.str?.[0];
+              this.textureId = typeof path === 'string' ? path : '';
+            }
+          },
+          {
+            name: 'MorphRadius',
+            type: 'float',
+            description: 'Used when the morphRadius pin is not connected.',
+            get(this: MorphBlurNode, value) {
+              value.num[0] = this.morphRadius;
+            },
+            set(this: MorphBlurNode, value) {
+              this.morphRadius = value.num[0];
+            }
+          },
+          {
+            name: 'BlurRadius',
+            type: 'float',
+            description: 'Used when the blurRadius pin is not connected.',
+            get(this: MorphBlurNode, value) {
+              value.num[0] = this.blurRadius;
+            },
+            set(this: MorphBlurNode, value) {
+              this.blurRadius = value.num[0];
+            }
+          },
+          {
+            name: 'ChannelMaskR',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: MorphBlurNode, value) {
+              value.num[0] = this.channelMask[0];
+            },
+            set(this: MorphBlurNode, value) {
+              const next = this.channelMask;
+              next[0] = value.num[0];
+              this.channelMask = next;
+            }
+          },
+          {
+            name: 'ChannelMaskG',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: MorphBlurNode, value) {
+              value.num[0] = this.channelMask[1];
+            },
+            set(this: MorphBlurNode, value) {
+              const next = this.channelMask;
+              next[1] = value.num[0];
+              this.channelMask = next;
+            }
+          },
+          {
+            name: 'ChannelMaskB',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: MorphBlurNode, value) {
+              value.num[0] = this.channelMask[2];
+            },
+            set(this: MorphBlurNode, value) {
+              const next = this.channelMask;
+              next[2] = value.num[0];
+              this.channelMask = next;
+            }
+          },
+          {
+            name: 'ChannelMaskA',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: MorphBlurNode, value) {
+              value.num[0] = this.channelMask[3];
+            },
+            set(this: MorphBlurNode, value) {
+              const next = this.channelMask;
+              next[3] = value.num[0];
+              this.channelMask = next;
+            }
+          }
+        ]);
       }
     };
   }
@@ -1590,9 +1976,17 @@ export class MorphBlurNode extends BaseGraphNode {
     if (err) {
       return err;
     }
-    const textureType = this._inputs[0].inputNode?.getOutputType(this._inputs[0].inputId!);
-    if (textureType !== 'tex2D') {
-      return 'Texture input must be tex2D';
+    const textureInput = this._inputs[0];
+    const textureType = textureInput.inputNode ? textureInput.inputNode.getOutputType(textureInput.inputId!) : 'tex2D';
+    if (textureInput.inputNode) {
+      if (!textureType) {
+        return `Cannot determine type of argument \`${textureInput.name}\``;
+      }
+      if (textureType !== 'tex2D') {
+        return 'Texture input must be tex2D';
+      }
+    } else if (!this.textureId) {
+      return 'Texture not specified';
     }
     const coordType = this._inputs[1].inputNode?.getOutputType(this._inputs[1].inputId!);
     if (coordType && coordType !== 'vec2') {

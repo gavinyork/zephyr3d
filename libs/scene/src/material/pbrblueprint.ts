@@ -3,6 +3,7 @@ import { DRef, Vector4, type Clonable } from '@zephyr3d/base';
 import { ShaderHelper } from './shader/helper';
 import type { BluePrintUniformTexture, BluePrintUniformValue } from '../utility/blueprint/material/ir';
 import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
+import { getDefaultTexture2D } from '../utility/blueprint/material/texture';
 import type { IGraphNode } from '../utility/blueprint/node';
 import { PBRBlockNode, VertexBlockNode } from '../utility/blueprint/material/pbr';
 import { PBRMetallicRoughnessMaterial } from './pbrmr';
@@ -340,10 +341,8 @@ export class PBRBluePrintMaterial
         bindGroup.setValue(u.name, u.finalValue!);
       }
       for (const u of this._uniformTextures) {
-        const texture = u.finalTexture?.get();
-        if (texture) {
-          bindGroup.setTexture(u.name, texture, u.finalSampler);
-        }
+        const texture = u.finalTexture?.get() ?? getDefaultTexture2D();
+        bindGroup.setTexture(u.name, texture, u.finalSampler);
       }
     }
   }

@@ -2849,7 +2849,20 @@ export class MaterialBlueprintIR {
     return this.getOrCreateIRExpression(node, output, IRFunc, [tex], func);
   }
   private channelSDFMask(node: ChannelSDFMaskNode, output: number): IRExpression {
-    const tex = this.ir(node.inputs[0])!;
+    const tex = node.inputs[0].inputNode
+      ? this.ir(node.inputs[0])!
+      : this.getOrCreateSharedTextureUniform(
+          node.paramName,
+          node.textureId,
+          'tex2D',
+          node.expose,
+          node.sRGB,
+          node.addressU,
+          node.addressV,
+          node.filterMin,
+          node.filterMag,
+          node.filterMip
+        );
     const coord = node.inputs[1].inputNode
       ? this.ir(node.inputs[1])!
       : (() => {
@@ -2875,7 +2888,20 @@ export class MaterialBlueprintIR {
     );
   }
   private morphBlur(node: MorphBlurNode, output: number): IRExpression {
-    const tex = this.ir(node.inputs[0])!;
+    const tex = node.inputs[0].inputNode
+      ? this.ir(node.inputs[0])!
+      : this.getOrCreateSharedTextureUniform(
+          node.paramName,
+          node.textureId,
+          'tex2D',
+          node.expose,
+          node.sRGB,
+          node.addressU,
+          node.addressV,
+          node.filterMin,
+          node.filterMag,
+          node.filterMip
+        );
     const coord = node.inputs[1].inputNode
       ? this.ir(node.inputs[1])!
       : (() => {

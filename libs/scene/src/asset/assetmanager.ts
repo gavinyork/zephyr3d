@@ -50,6 +50,7 @@ import type {
 } from '../utility';
 import { BoundingBox } from '../utility/bounding_volume';
 import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
+import { getDefaultTexture2D } from '../utility/blueprint/material/texture';
 import type { Skeleton } from '../animation';
 import { Primitive } from '../render';
 import { FontAsset } from '../text';
@@ -1064,12 +1065,13 @@ export class AssetManager {
   ): Promise<BluePrintUniformTexture[]> {
     const uniformTextures: BluePrintUniformTexture[] = [];
     for (const v of textures ?? []) {
-      const tex = v.texture
-        ? await this.fetchTexture(v.texture, {
-            linearColorSpace: !v.sRGB,
-            overrideVFS: vfs
-          })
-        : null;
+      const tex =
+        (v.texture
+          ? await this.fetchTexture(v.texture, {
+              linearColorSpace: !v.sRGB,
+              overrideVFS: vfs
+            })
+          : null) ?? getDefaultTexture2D();
       uniformTextures.push({
         ...v,
         exposed: v.exposed ?? true,

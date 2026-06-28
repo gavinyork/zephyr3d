@@ -2,6 +2,7 @@ import { DRef, Vector4 } from '@zephyr3d/base';
 import { type BluePrintUniformTexture, type BluePrintUniformValue } from '../utility/blueprint/material/ir';
 import { SpriteBlockNode } from '../utility/blueprint/material/pbr';
 import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
+import { getDefaultTexture2D } from '../utility/blueprint/material/texture';
 import { SpriteMaterial } from './sprite';
 import type { BindGroup, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
@@ -165,7 +166,7 @@ export class SpriteBlueprintMaterial extends SpriteMaterial {
         bindGroup.setValue(u.name, u.finalValue!);
       }
       for (const u of this._uniformTextures) {
-        bindGroup.setTexture(u.name, u.finalTexture!.get()!, u.finalSampler);
+        bindGroup.setTexture(u.name, u.finalTexture?.get() ?? getDefaultTexture2D(), u.finalSampler);
       }
     }
   }
