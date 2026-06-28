@@ -407,7 +407,7 @@ export class AnimationTimeline {
 /**
  * Runtime interpreter for an AnimationTimeline.
  *
- * The interpreter is a synchronous frame-stack state machine advanced by {@link tick}, which is
+ * The interpreter is a synchronous frame-stack state machine advanced by {@link AnimationTimelineRunner.tick}, which is
  * driven by `AnimationSet.update(dt)` on the same logical clock as the animations. There is no
  * `async`/`await` in the control flow, so the runtime state can be serialized and replayed.
  * @public
@@ -571,7 +571,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
 
   /**
    * Run `steps` concurrently with the current control flow (a true parallel branch). Unlike
-   * {@link enqueue}, these do not wait for the main stack to drain.
+   * {@link AnimationTimelineRunner.enqueue}, these do not wait for the main stack to drain.
    *
    * @param steps - Steps to run immediately in an independent concurrent branch.
    * @returns void
@@ -728,14 +728,14 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
   }
 
   /**
-   * Restore runtime state previously produced by {@link serialize}.
+   * Restore runtime state previously produced by {@link AnimationTimelineRunner.serialize}.
    *
    * Re-create the relevant active playbacks on the AnimationSet before calling this so that
    * playback-bound frames (play-wait, waitMarker, waitFrame) can re-attach by id.
    *
    * @param animationSet - Animation set containing any live playbacks referenced by the state.
    * @param timeline - Timeline definition to bind to the restored runner.
-   * @param state - Serialized state previously returned by {@link serialize}.
+   * @param state - Serialized state previously returned by {@link AnimationTimelineRunner.serialize}.
    * @returns A runner restored to the supplied runtime state.
    * @public
    */
@@ -822,7 +822,7 @@ export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerE
   }
 
   /**
-   * Same as {@link tickFrames} but returns the time left unconsumed when the stack drains
+   * Same as {@link AnimationTimelineRunner.tickFrames} but returns the time left unconsumed when the stack drains
    * completely (so a parent sequence can hand it to its next step).
    */
   private tickFramesWithLeftover(stack: TimelineFrame[], deltaInSeconds: number): number {

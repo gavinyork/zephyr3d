@@ -156,6 +156,7 @@ export interface AngleLimitConfig {
 // @public
 export class AnimationClip extends Disposable {
     constructor(name: string, animationSet: AnimationSet, embedded?: boolean);
+    addMarker(marker: AnimationMarker): AnimationMarker | null;
     addSkeleton(skeletonId: string): void;
     addTrack(target: object, track: AnimationTrack): this;
     get animationSet(): AnimationSet;
@@ -163,7 +164,14 @@ export class AnimationClip extends Disposable {
     set autoPlay(val: boolean);
     deleteTrack(track: AnimationTrack): this;
     get embedded(): boolean;
+    get frameRate(): number;
+    set frameRate(val: number);
+    getMarker(idOrName: string): AnimationMarker | null;
+    get markers(): AnimationMarker[];
     get name(): string;
+    removeMarker(idOrName: string): boolean;
+    resolveMarkerTime(marker: AnimationMarker): number | null;
+    resolveTimeRef(ref: AnimationTimeRef | null | undefined): number | null;
     get skeletons(): Set<string>;
     set skeletons(val: Set<string>);
     get timeDuration(): number;
@@ -176,7 +184,166 @@ export class AnimationClip extends Disposable {
 }
 
 // @public
-export class AnimationSet extends Disposable implements IDisposable {
+export class AnimationController extends Observable<AnimationControllerEventMap> {
+    constructor(animationSet: AnimationSet);
+    addState(name: string, definition: AnimationControllerStateDefinition): this;
+    readonly animationSet: AnimationSet;
+    get currentState(): string | null;
+    dispatch(event: string, payload?: unknown): AnimationTimelineEventResult;
+    dispose(): void;
+    hasState(name: string): boolean;
+    get runner(): AnimationTimelineRunner | null;
+    setState(name: string, options?: AnimationControllerSetStateOptions): AnimationTimelineRunner | null;
+    stop(options?: StopAnimationOptions): void;
+}
+
+// @public
+export type AnimationControllerEventMap = {
+    statechange: [state: string | null, previousState: string | null];
+    statecomplete: [state: string];
+    emit: [event: string, payload: unknown];
+    event: [event: string, payload: unknown, result: AnimationTimelineEventResult];
+};
+
+// @public
+export type AnimationControllerSetStateOptions = {
+    transition?: number;
+    sync?: AnimationPlaybackSyncOptions;
+    force?: boolean;
+    stop?: StopAnimationOptions;
+    returnTo?: AnimationTimelineStateReturnTarget;
+    returnTransition?: number;
+};
+
+// @public
+export type AnimationControllerStateDefinition = {
+    timeline: AnimationTimelineDefinition;
+    responses?: AnimationTimelineEventResponse[];
+    transition?: number;
+};
+
+// @public (undocumented)
+export type AnimationFrameEvent = AnimationPlaybackEvent_2 & {
+    frame: number;
+};
+
+// @public
+export type AnimationMarker = {
+    id?: string;
+    name: string;
+    time?: number;
+    frame?: number;
+    fps?: number;
+    payload?: unknown;
+};
+
+// @public (undocumented)
+export type AnimationMarkerEvent = AnimationPlaybackEvent_2 & {
+    marker: AnimationMarker;
+    direction: 1 | -1;
+};
+
+// @public
+export class AnimationPlayback extends Observable<AnimationPlaybackEventMap> {
+    constructor(animationSet: AnimationSet, clip: AnimationClip, options?: PlayAnimationOptions);
+    // (undocumented)
+    get animationSet(): AnimationSet;
+    // (undocumented)
+    get clip(): AnimationClip;
+    // (undocumented)
+    crossFadeTo(name: string, options?: PlayAnimationOptions & {
+        duration?: number;
+    }): AnimationPlayback | null;
+    // (undocumented)
+    fadeTo(weight: number, duration: number): this;
+    // (undocumented)
+    get id(): string;
+    // (undocumented)
+    get interruptible(): boolean;
+    // (undocumented)
+    get layer(): string;
+    // (undocumented)
+    get normalizedTime(): number;
+    set normalizedTime(value: number);
+    // (undocumented)
+    pause(): this;
+    // (undocumented)
+    play(): this;
+    // (undocumented)
+    get priority(): number;
+    // (undocumented)
+    resume(): this;
+    // (undocumented)
+    seek(time: number, options?: {
+        emitEvents?: boolean;
+        apply?: boolean;
+    }): this;
+    // (undocumented)
+    get speedRatio(): number;
+    set speedRatio(value: number);
+    // (undocumented)
+    get state(): AnimationPlaybackState;
+    // (undocumented)
+    stop(options?: StopAnimationOptions): this;
+    // (undocumented)
+    get time(): number;
+    set time(value: number);
+    // (undocumented)
+    waitForComplete(): Promise<this>;
+    // (undocumented)
+    waitForFrame(frame: number): Promise<AnimationFrameEvent | undefined>;
+    // (undocumented)
+    waitForMarker(idOrName: string): Promise<AnimationMarkerEvent | undefined>;
+    // (undocumented)
+    get weight(): number;
+    set weight(value: number);
+}
+
+// @public (undocumented)
+type AnimationPlaybackEvent_2 = {
+    playback: AnimationPlayback;
+    animationSet: AnimationSet;
+    clip: AnimationClip;
+    time: number;
+    normalizedTime: number;
+};
+export { AnimationPlaybackEvent_2 as AnimationPlaybackEvent }
+
+// @public (undocumented)
+export type AnimationPlaybackEventMap = {
+    start: [event: AnimationPlaybackEvent_2];
+    loop: [event: AnimationPlaybackEvent_2];
+    marker: [event: AnimationMarkerEvent];
+    frame: [event: AnimationFrameEvent];
+    complete: [event: AnimationPlaybackEvent_2];
+    stop: [event: AnimationPlaybackStopEvent];
+    pause: [event: AnimationPlaybackEvent_2];
+    resume: [event: AnimationPlaybackEvent_2];
+};
+
+// @public (undocumented)
+export type AnimationPlaybackState = 'scheduled' | 'playing' | 'paused' | 'stopping' | 'stopped' | 'completed';
+
+// @public (undocumented)
+export type AnimationPlaybackStopEvent = AnimationPlaybackEvent_2 & {
+    reason: AnimationStopReason;
+};
+
+// @public
+export type AnimationPlaybackSyncMode = 'normalized' | 'time';
+
+// @public
+export type AnimationPlaybackSyncOptions = {
+    target: string;
+    mode?: AnimationPlaybackSyncMode;
+    offset?: number;
+    wrap?: boolean;
+};
+
+// Warning: (ae-forgotten-export) The symbol "AnimationSet_base" needs to be exported by the entry point index.d.ts
+//
+// @public
+export class AnimationSet extends AnimationSet_base implements IDisposable {
     constructor(model: SceneNode);
     // @deprecated
     copyAnimationFrom(sourceSet: AnimationSet, animationName: string, targetName?: string, excludeJoint?: (jointName: string) => boolean): AnimationClip | null;
@@ -184,15 +351,19 @@ export class AnimationSet extends Disposable implements IDisposable {
     // (undocumented)
     copyHumanoidAnimationFrom(sourceSet: AnimationSet, animationName: string, targetName?: string, options?: CopyHumanoidAnimationOptions): AnimationClip | null;
     createAnimation(name: string, embedded?: boolean): AnimationClip | null;
+    createPlayback(name: string, options?: PlayAnimationOptions): AnimationPlayback | null;
     createSkeletalMaskedAnimation(sourceName: string, targetName: string, options: SkeletalAnimationMaskOptions): AnimationClip | null;
     deleteAnimation(name: string): void;
     get(name: string): AnimationClip | null;
     getAnimationClip(name: string): AnimationClip | null;
     getAnimationNames(): string[];
+    getPlayback(name: string): AnimationPlayback | null;
+    getPlaybacks(name?: string): AnimationPlayback[];
     isPlayingAnimation(name?: string): boolean;
     get model(): SceneNode;
     get numAnimations(): number;
     protected onDispose(): void;
+    play(name: string, options?: PlayAnimationOptions): AnimationPlayback | null;
     playAnimation(name: string, options?: PlayAnimationOptions): void;
     resetSkeletonModifiers(): void;
     get rigs(): DRef<SkeletonRig>[];
@@ -202,6 +373,177 @@ export class AnimationSet extends Disposable implements IDisposable {
     stopAnimation(name: string, options?: StopAnimationOptions): void;
     update(deltaInSeconds: number): void;
 }
+
+// @public (undocumented)
+export type AnimationSetEventMap = {
+    playbackstart: [event: AnimationPlaybackEvent_2];
+    playbackloop: [event: AnimationPlaybackEvent_2];
+    marker: [event: AnimationMarkerEvent];
+    frame: [event: AnimationFrameEvent];
+    playbackcomplete: [event: AnimationPlaybackEvent_2];
+    playbackstop: [event: AnimationPlaybackStopEvent];
+    playbackpause: [event: AnimationPlaybackEvent_2];
+    playbackresume: [event: AnimationPlaybackEvent_2];
+};
+
+// @public (undocumented)
+export type AnimationStopReason = 'manual' | 'interrupted' | 'completed' | 'deleted' | 'replaced';
+
+// @public
+class AnimationTimeline_2 {
+    constructor(definition: AnimationTimelineDefinition | AnimationTimelineStep[]);
+    createRunner(animationSet: AnimationSet): AnimationTimelineRunner;
+    readonly responses: AnimationTimelineEventResponse[];
+    readonly steps: AnimationTimelineStep[];
+}
+export { AnimationTimeline_2 as AnimationTimeline }
+
+// @public
+export type AnimationTimelineActiveDisposition = 'stop' | 'keep' | {
+    fadeOut: number;
+};
+
+// @public
+export type AnimationTimelineDefinition = {
+    steps: AnimationTimelineStep[];
+    responses?: AnimationTimelineEventResponse[];
+};
+
+// @public
+export type AnimationTimelineEventPolicy = 'none' | 'ignore' | 'consume' | 'steps' | 'enqueue' | 'transition';
+
+// @public
+export type AnimationTimelineEventResponse = {
+    event: string;
+    target: AnimationTimelineEventTarget;
+    onActive?: AnimationTimelineActiveDisposition;
+    enqueue?: boolean;
+};
+
+// @public
+export type AnimationTimelineEventResult = {
+    handled: boolean;
+    policy: AnimationTimelineEventPolicy;
+    event: string;
+    payload?: unknown;
+};
+
+// @public
+export type AnimationTimelineEventTarget = {
+    steps: AnimationTimelineStep[];
+    targetState?: undefined;
+    returnTo?: undefined;
+    returnTransition?: undefined;
+    consume?: undefined;
+    ignore?: undefined;
+} | {
+    targetState: string;
+    returnTo?: AnimationTimelineStateReturnTarget;
+    returnTransition?: number;
+    steps?: undefined;
+    consume?: undefined;
+    ignore?: undefined;
+} | {
+    consume: true;
+    steps?: undefined;
+    targetState?: undefined;
+    returnTo?: undefined;
+    returnTransition?: undefined;
+    ignore?: undefined;
+} | {
+    ignore: true;
+    steps?: undefined;
+    targetState?: undefined;
+    returnTo?: undefined;
+    returnTransition?: undefined;
+    consume?: undefined;
+};
+
+// @public
+export class AnimationTimelineRunner extends Observable<AnimationTimelineRunnerEventMap> {
+    constructor(animationSet: AnimationSet, timeline: AnimationTimeline_2);
+    readonly animationSet: AnimationSet;
+    get currentPlayback(): AnimationPlayback | null;
+    static deserialize(animationSet: AnimationSet, timeline: AnimationTimeline_2, state: AnimationTimelineRunnerState): AnimationTimelineRunner;
+    dispatch(event: string, payload?: unknown): AnimationTimelineEventResult;
+    enqueue(steps: AnimationTimelineStep[]): void;
+    flush(): this;
+    get lastCompletedPlaybackId(): string | null;
+    runConcurrent(steps: AnimationTimelineStep[]): void;
+    serialize(): AnimationTimelineRunnerState;
+    start(): this;
+    stop(options?: StopAnimationOptions): this;
+    get stopped(): boolean;
+    tick(deltaInSeconds: number): void;
+    readonly timeline: AnimationTimeline_2;
+}
+
+// @public
+export type AnimationTimelineRunnerEventMap = {
+    complete: [runner: AnimationTimelineRunner];
+    stop: [runner: AnimationTimelineRunner];
+    emit: [event: string, payload: unknown];
+};
+
+// @public
+export type AnimationTimelineRunnerState = {
+    stack: SerializedFrame[];
+    concurrent: SerializedFrame[];
+    queued: AnimationTimelineStep[][];
+    concurrentPlaybackIds: string[];
+    playbackRefs?: Record<string, string>;
+    stopped: boolean;
+};
+
+// @public
+export type AnimationTimelineStateReturnTarget = true | string;
+
+// @public
+export type AnimationTimelineStep = {
+    type: 'play';
+    clip: string;
+    id?: string;
+    options?: PlayAnimationOptions;
+    wait?: 'complete' | false;
+} | {
+    type: 'stop';
+    target?: string;
+    options?: StopAnimationOptions;
+} | {
+    type: 'wait';
+    seconds: number;
+} | {
+    type: 'waitEvent';
+    event: string;
+} | {
+    type: 'waitMarker';
+    marker: string;
+    target?: string;
+} | {
+    type: 'waitFrame';
+    frame: number;
+    target?: string;
+} | {
+    type: 'emit';
+    event: string;
+    payload?: unknown;
+} | {
+    type: 'sequence';
+    steps: AnimationTimelineStep[];
+} | {
+    type: 'parallel';
+    steps: AnimationTimelineStep[];
+};
+
+// @public
+export type AnimationTimeRef = number | {
+    time: number;
+} | {
+    frame: number;
+    fps?: number;
+} | {
+    marker: string;
+};
 
 // @public
 export abstract class AnimationTrack<StateType = unknown> {
@@ -6449,7 +6791,17 @@ export type PlayAnimationOptions = {
     repeat?: number;
     speedRatio?: number;
     fadeIn?: number;
+    completionFadeOut?: number;
     weight?: number;
+    id?: string;
+    layer?: string;
+    priority?: number;
+    interruptible?: boolean;
+    range?: {
+        start?: AnimationTimeRef;
+        end?: AnimationTimeRef;
+    };
+    sync?: AnimationPlaybackSyncOptions;
 };
 
 // @public
@@ -8545,6 +8897,7 @@ export class StepNode extends GenericMathNode {
 // @public
 export type StopAnimationOptions = {
     fadeOut?: number;
+    reason?: AnimationStopReason;
 };
 
 // @public
@@ -9134,6 +9487,10 @@ export function worleyFBM(scope: PBInsideFunctionScope, p: PBShaderExp, freq: PB
 
 // @public
 export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq: PBShaderExp | number): PBShaderExp;
+
+// Warnings were encountered during analysis:
+//
+// dist/index.d.ts:11029:5 - (ae-forgotten-export) The symbol "SerializedFrame" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

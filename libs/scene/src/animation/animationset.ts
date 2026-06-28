@@ -1024,26 +1024,6 @@ function bakeHumanoidRotationTracks(
   }
 }
 
-/**
- * Animation set
- *
- * Manages a collection of named animation clips for a model and orchestrates:
- * - Playback state (time, loops, speed, weights, fade-in/out).
- * - Blending across multiple tracks targeting the same property via weighted averages.
- * - Skeleton usage and application for clips that drive skeletal animation.
- * - Active track registration and cleanup as clips start/stop.
- *
- * Usage:
- * - Create or retrieve `AnimationClip`s by name.
- * - Start playback with `playAnimation(name, options)`.
- * - Advance animation with `update(deltaSeconds)`.
- * - Optionally adjust weight while playing with `setAnimationWeight(name, weight)`.
- *
- * Lifetime:
- * - Disposing the set releases references to the model, clips, and clears active state.
- *
- * @public
- */
 type ActiveAnimationInfo = {
   playback: AnimationPlayback;
   currentTime: number;
@@ -1069,6 +1049,26 @@ type ActiveAnimationInfo = {
   rangeEnd: number | null;
 };
 
+/**
+ * Animation set
+ *
+ * Manages a collection of named animation clips for a model and orchestrates:
+ * - Playback state (time, loops, speed, weights, fade-in/out).
+ * - Blending across multiple tracks targeting the same property via weighted averages.
+ * - Skeleton usage and application for clips that drive skeletal animation.
+ * - Active track registration and cleanup as clips start/stop.
+ *
+ * Usage:
+ * - Create or retrieve `AnimationClip`s by name.
+ * - Start playback with `playAnimation(name, options)`.
+ * - Advance animation with `update(deltaSeconds)`.
+ * - Optionally adjust weight while playing with `setAnimationWeight(name, weight)`.
+ *
+ * Lifetime:
+ * - Disposing the set releases references to the model, clips, and clears active state.
+ *
+ * @public
+ */
 export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMap>() implements IDisposable {
   /** @internal */
   private _model: SceneNode;
