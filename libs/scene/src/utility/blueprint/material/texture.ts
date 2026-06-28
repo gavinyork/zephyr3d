@@ -1508,24 +1508,27 @@ export class ChannelSDFMaskNode extends BaseGraphNode {
 }
 
 /**
- * Channel morphology node
+ * Morph + blur node
  *
  * @remarks
- * Applies a 5-tap cross-shaped dilate/erode to a selected channel of a
- * texture mask. Positive radius dilates, negative radius erodes.
+ * Applies channel morphology and Gaussian blur in a single node. The node
+ * short-circuits internally so that when one radius is zero it falls back to
+ * the corresponding single-stage path instead of always paying for the full
+ * combined cost.
  *
  * Inputs:
  * - `texture`: source mask texture
  * - `coord`: UV coordinates, defaults to vertex UV when disconnected
- * - `morphRadius`: positive expands, negative shrinks, zero keeps center
+ * - `morphRadius`: positive expands, negative shrinks, zero disables morph
+ * - `blurRadius`: blur radius in texel units, zero disables blur
  * - `channelMask`: channel selector mask, defaults to R
  *
  * Output:
- * - `Result`: scalar filtered value
+ * - `Result`: scalar sampled value
  *
  * @public
  */
-export class ChannelMorphNode extends BaseGraphNode {
+export class MorphBlurNode extends BaseGraphNode {
   constructor() {
     super();
     this._inputs = [
@@ -1550,6 +1553,13 @@ export class ChannelMorphNode extends BaseGraphNode {
       },
       {
         id: 4,
+        name: 'blurRadius',
+        type: ['float'],
+        required: false,
+        defaultValue: [0]
+      },
+      {
+        id: 5,
         name: 'channelMask',
         type: ['vec4'],
         required: false,
@@ -1565,15 +1575,15 @@ export class ChannelMorphNode extends BaseGraphNode {
   }
   static getSerializationCls(): SerializableClass {
     return {
-      ctor: ChannelMorphNode,
-      name: 'ChannelMorphNode',
+      ctor: MorphBlurNode,
+      name: 'MorphBlurNode',
       getProps() {
         return [];
       }
     };
   }
   toString(): string {
-    return 'ChannelMorph';
+    return 'MorphBlur';
   }
   protected validate(): string {
     const err = super.validate();
@@ -1592,105 +1602,11 @@ export class ChannelMorphNode extends BaseGraphNode {
     if (morphType && morphType !== 'float') {
       return 'Morph radius type should be float';
     }
-    const maskType = this._inputs[3].inputNode?.getOutputType(this._inputs[3].inputId!);
-    if (maskType && maskType !== 'vec4') {
-      return 'Channel mask type should be vec4';
-    }
-    return '';
-  }
-  protected getType(): string {
-    return this.validate() ? '' : 'float';
-  }
-}
-
-/**
- * Channel blur node
- *
- * @remarks
- * Applies an adaptive Gaussian blur to a selected channel of a mask texture.
- * The node expands its 2D kernel as blur radius grows, keeping small radii
- * relatively cheap while producing a smoother, less layered falloff for
- * larger radii.
- *
- * Inputs:
- * - `texture`: source mask texture
- * - `coord`: UV coordinates, defaults to vertex UV when disconnected
- * - `blurRadius`: blur radius in texel units
- * - `channelMask`: channel selector mask, defaults to R
- *
- * Output:
- * - `Result`: scalar sampled value
- *
- * @public
- */
-export class GaussianBlurNode extends BaseGraphNode {
-  constructor() {
-    super();
-    this._inputs = [
-      {
-        id: 1,
-        name: 'texture',
-        type: ['tex2D'],
-        required: true
-      },
-      {
-        id: 2,
-        name: 'coord',
-        type: ['vec2'],
-        required: false
-      },
-      {
-        id: 3,
-        name: 'blurRadius',
-        type: ['float'],
-        required: false,
-        defaultValue: [0]
-      },
-      {
-        id: 4,
-        name: 'channelMask',
-        type: ['vec4'],
-        required: false,
-        defaultValue: [1, 0, 0, 0]
-      }
-    ];
-    this._outputs = [
-      {
-        id: 1,
-        name: 'Result'
-      }
-    ];
-  }
-  static getSerializationCls(): SerializableClass {
-    return {
-      ctor: GaussianBlurNode,
-      name: 'GaussianBlurNode',
-      getProps() {
-        return [];
-      }
-    };
-  }
-  toString(): string {
-    return 'GaussianBlur';
-  }
-  protected validate(): string {
-    const err = super.validate();
-    if (err) {
-      return err;
-    }
-    const textureType = this._inputs[0].inputNode?.getOutputType(this._inputs[0].inputId!);
-    if (textureType !== 'tex2D') {
-      return 'Texture input must be tex2D';
-    }
-    const coordType = this._inputs[1].inputNode?.getOutputType(this._inputs[1].inputId!);
-    if (coordType && coordType !== 'vec2') {
-      return 'Texture coordinate type should be vec2';
-    }
-    const radiusType = this._inputs[2].inputNode?.getOutputType(this._inputs[2].inputId!);
-    if (radiusType && radiusType !== 'float') {
+    const blurType = this._inputs[3].inputNode?.getOutputType(this._inputs[3].inputId!);
+    if (blurType && blurType !== 'float') {
       return 'Blur radius type should be float';
     }
-    const maskType = this._inputs[3].inputNode?.getOutputType(this._inputs[3].inputId!);
+    const maskType = this._inputs[4].inputNode?.getOutputType(this._inputs[4].inputId!);
     if (maskType && maskType !== 'vec4') {
       return 'Channel mask type should be vec4';
     }

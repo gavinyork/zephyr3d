@@ -1,7 +1,6 @@
 import {
-  GaussianBlurNode,
-  ChannelMorphNode,
   ChannelSDFMaskNode,
+  MorphBlurNode,
   ConstantTexture2DArrayNode,
   ConstantTexture2DNode,
   ConstantTextureCubeNode,
@@ -41,12 +40,8 @@ export function getTextureNodeCategories(): NodeCategory[] {
           create: () => new ChannelSDFMaskNode()
         },
         {
-          name: 'ChannelMorph',
-          create: () => new ChannelMorphNode()
-        },
-        {
-          name: 'GaussianBlur',
-          create: () => new GaussianBlurNode()
+          name: 'MorphBlur',
+          create: () => new MorphBlurNode()
         },
         {
           name: 'TextureProperty',
