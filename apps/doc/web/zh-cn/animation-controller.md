@@ -14,7 +14,7 @@
 | timeline | 状态内执行的步骤数组，例如播放 clip、等待、发事件、并行执行分支。 |
 | response | 当前状态收到外部事件时的反应，例如切换状态、插播动作、入队或忽略。 |
 
-控制器不会替代 `AnimationSet`。所有播放实例仍由同一个 `AnimationSet` 创建，因此淡入淡出、marker、frame、mask、权重和相位同步都沿用底层动画系统。
+控制器不会替代 `AnimationSet`，也不会跨 `AnimationSet` 调度。一个 `AnimationController` 在构造时绑定一个 `AnimationSet`；后续所有 state、response、`parallel` 分支和 `play` 步骤都只能播放这个 set 里的 clip。也就是说，它适合组织同一节点的动作流程。摄像机和角色这类不同节点、不同 `AnimationSet` 的过场，应分别创建 controller，再由外层逻辑同步启动或等待完成事件。所有播放实例仍由绑定的 `AnimationSet` 创建，因此淡入淡出、marker、frame、mask、权重和相位同步都沿用底层动画系统。
 
 ```typescript
 import { AnimationController } from '@zephyr3d/scene';
@@ -205,38 +205,78 @@ steps: [
 当你需要表达“多个分支同时开始，并等所有分支结束后再继续”时，用 `parallel`。分支里需要多个步骤时，用 `sequence` 包起来。
 
 ```typescript
-controller.addState('intro', {
-  timeline: {
-    steps: [
-      {
-        // 摄像机分支和角色分支并行运行。
-        type: 'parallel',
-        steps: [
-          {
-            // 摄像机开场动画播放一次，完成后该分支结束。
-            type: 'play',
-            clip: 'CameraIntro',
-            options: { repeat: 1 },
-            wait: 'complete'
-          },
-          {
-            // 角色分支先等 0.4 秒，再挥手一次。
-            type: 'sequence',
-            steps: [
-              { type: 'wait', seconds: 0.4 },
-              { type: 'play', clip: 'Wave', options: { repeat: 1 }, wait: 'complete' }
-            ]
-          }
-        ]
-      },
-      // 两个分支都结束后通知外部逻辑。
-      { type: 'emit', event: 'intro-finished' }
-    ]
+import { Vector3 } from '@zephyr3d/base';
+import { NodeEulerRotationTrack } from '@zephyr3d/scene';
+
+// 先把节点自转注册成当前 AnimationSet 里的一个 clip。
+const rotate = model.animationSet.createAnimation('rotate');
+rotate.timeDuration = 2;
+rotate.addTrack(
+  model,
+  new NodeEulerRotationTrack('linear', [
+    { time: 0, value: new Vector3(0, 0, 0) },
+    { time: 2, value: new Vector3(0, Math.PI * 2, 0) }
+  ])
+);
+
+controller
+  .addState('intro', {
+    timeline: {
+      steps: [
+        {
+          // 两个 intro 分支并行运行，并等待两个分支都结束。
+          type: 'parallel',
+          steps: [
+            {
+              // 分支 1：节点绕 Y 轴旋转 360 度，完成后该分支结束。
+              type: 'play',
+              clip: 'rotate',
+              options: { repeat: 1 },
+              wait: 'complete'
+            },
+            {
+              // 分支 2：先等 0.4 秒，再播放挥手动作。
+              type: 'sequence',
+              steps: [
+                { type: 'wait', seconds: 0.4 },
+                { type: 'play', clip: 'wave', options: { repeat: 1 }, wait: 'complete' }
+              ]
+            }
+          ]
+        },
+        { type: 'emit', event: 'intro-finished' }
+      ]
+    }
+  })
+  .addState('idle', {
+    transition: 0.2,
+    timeline: {
+      steps: [
+        {
+          type: 'play',
+          clip: 'idle',
+          options: { repeat: 0 }
+        }
+      ]
+    }
+  });
+
+controller.on('statecomplete', (state) => {
+  if (state === 'intro') {
+    controller.setState('idle');
   }
 });
+
+controller.setState('intro');
+
+function resetIntro() {
+  controller.setState('intro', { force: true });
+}
 ```
 
-效果：`CameraIntro` 和角色 `Wave` 编排在同一个过场状态中。`intro-finished` 只会在两个分支都结束后发出。
+效果：进入 `intro` 后，节点开始用 `rotate` 自转；0.4 秒后 `wave` 同时开始播放。两个分支都结束后会发出 `intro-finished`，随后 `statecomplete` 监听器把 controller 切到循环播放的 `idle` 状态。Reset 按钮只需要调用 `resetIntro()`，就会强制重新从 `intro` 开始演示。
+
+<div class="showcase" case="tut-59"></div>
 
 ---
 
@@ -247,84 +287,76 @@ controller.addState('intro', {
 ```typescript
 // 如果导入资源里没有 marker，可以手动把 0.3 秒处注册为 hit。
 // 动画使用连续时间轴；没有稳定作者帧率时，优先用 time 而不是 frame。
-controller.animationSet.getAnimationClip('Attack')?.addMarker({
+controller.animationSet.getAnimationClip('attack').addMarker({
   id: 'hit',
   name: 'hit',
   time: 0.3
 });
+controller.animationSet.getAnimationClip('attack').addMarker({
+  id: 'end',
+  name: 'end',
+  time: controller.animationSet.getAnimationClip('attack').timeDuration
+});
 
-controller.addState('attackWithHit', {
+controller.addState('idle', {
+  transition: 0.2,
   timeline: {
     steps: [
       {
-        // 给 Attack 播放实例设置本地 id，后续 waitMarker 才能指定目标。
         type: 'play',
-        clip: 'Attack',
-        id: 'attack',
-        options: { repeat: 1 },
-        // 不阻塞，让后续 waitMarker 可以观察同一个播放实例。
-        wait: false
-      },
-      {
-        // 等 Attack 播放实例经过 hit marker。
-        type: 'waitMarker',
-        marker: 'hit',
-        target: 'attack'
-      },
-      {
-        // 把动画时机转换成玩法事件。
-        type: 'emit',
-        event: 'attack-hit'
-      }
-    ]
-  }
-});
-
-controller.on('emit', (event) => {
-  if (event === 'attack-hit') {
-    spawnHitEffect();
-  }
-});
-```
-
-这个最小示例只演示“等 marker 后发事件”，timeline 会在 `attack-hit` 后结束。如果这个状态还需要等完整攻击动作结束，再恢复其它状态，请使用下一段 `parallel` 写法。
-
-如果还要等动作完整结束，再恢复状态，可以用 `parallel`：一个分支播放动作并等待完成，另一个分支等待 0.5 秒或 marker 后发事件。
-
-```typescript
-steps: [
-  {
-    // 两个分支同时开始：一个负责动作生命周期，一个负责中途事件。
-    type: 'parallel',
-    steps: [
-      {
-        // 这个分支让 parallel 一直等到 ShootUpper 播放完成。
-        type: 'play',
-        clip: 'ShootUpper',
-        id: 'shootUpper',
-        options: { repeat: 1, fadeIn: 0.08 },
-        wait: 'complete'
-      },
-      {
-        // 这个分支在动作开始 0.5 秒后发出开火事件。
-        type: 'sequence',
-        steps: [
-          { type: 'wait', seconds: 0.5 },
-          { type: 'emit', event: 'shoot-fire' }
-        ]
+        clip: 'idle',
+        options: { repeat: 0 }
       }
     ]
   },
-  {
-    // ShootUpper 完成后才会执行这里。
-    type: 'play',
-    clip: 'RunUpper',
-    options: { repeat: 0 }
-  }
-]
+  responses: [
+    {
+      event: 'attack',
+      target: {
+        steps: [
+          {
+            // 让 attack 播放实例有一个本地 id，后续 waitMarker 才能指定目标。
+            type: 'play',
+            clip: 'attack',
+            id: 'attackPlayback',
+            options: { repeat: 1, fadeIn: 0.08 },
+            wait: false
+          },
+          {
+            // 等 attack 播放实例经过 hit marker。
+            type: 'waitMarker',
+            marker: 'hit',
+            target: 'attackPlayback'
+          },
+          {
+            // 把动画时机转换成玩法事件。
+            type: 'emit',
+            event: 'attack-hit'
+          },
+          {
+            // 等 attack 播放实例结束
+            type: 'waitMarker',
+            marker: 'end',
+            target: 'attackPlayback'
+          },
+          {
+            // 恢复 idle 动作
+            type: 'play',
+            clip: 'idle',
+            options: { repeat: 0 }
+          }
+        ]
+      },
+      // 停止 idle，切换到 attack 分支。
+      onActive: 'stop'
+    }
+  ]
+});
 ```
 
-效果：`shoot-fire` 在动作中途发出，而 timeline 仍会等 `ShootUpper` 完成后再恢复 `RunUpper`。
+这个最小示例只演示“等 marker 后发事件”。`tut-60` 用同一套写法把命中闪光也一起演出来。
+
+<div class="showcase" case="tut-60"></div>
 
 ---
 
@@ -339,39 +371,55 @@ response 的 `onActive` 决定事件发生时当前流程如何处理。
 | `{ fadeOut }` | 先用指定秒数淡出当前流程，再执行 response。 | 状态切换、全身动作插播。 |
 
 ```typescript
-responses: [
-  {
-    event: 'flinch',
-    target: {
+controller
+  .addState('introWalk', {
+    transition: 0.18,
+    timeline: {
       steps: [
         {
-          // Flinch 叠加播放一次，不替换当前移动循环。
           type: 'play',
-          clip: 'Flinch',
+          clip: 'walk',
           options: { repeat: 1 },
-          wait: false
+          wait: 'complete'
         }
       ]
     },
-    // 保留当前状态，让 Flinch 并行播放。
-    onActive: 'keep'
-  },
-  {
-    event: 'reload',
-    target: {
-      steps: [
-        // Reload 会等当前主流程结束后再执行。
-        { type: 'play', clip: 'Reload', options: { repeat: 1 }, wait: 'complete' },
-        { type: 'emit', event: 'reload-finished' }
-      ]
-    },
-    // 把 Reload 排到队列里，而不是立刻打断当前流程。
-    enqueue: true
-  }
-]
+    responses: [
+      {
+        event: 'flinch',
+        target: {
+          steps: [
+            {
+              // flinch 叠加播放一次，不替换当前移动循环。
+              type: 'play',
+              clip: 'flinch',
+              options: { repeat: 1, fadeIn: 0.05 },
+              wait: 'complete'
+            }
+          ]
+        },
+        // 保留当前状态，让 Flinch 并行播放。
+        onActive: 'keep'
+      },
+      {
+        event: 'queueAttack',
+        target: {
+          steps: [
+            // 这一段会等当前主流程结束后再执行。
+            { type: 'play', clip: 'attack', options: { repeat: 1 }, wait: 'complete' },
+            { type: 'emit', event: 'queued-attack-finished' }
+          ]
+        },
+        // 把 attack 排到队列里，而不是立刻打断当前流程。
+        enqueue: true
+      }
+    ]
+  });
 ```
 
-效果：`flinch` 是即时叠加，`reload` 是排队执行。`enqueue` 适合需要按顺序播放的动作队列。
+效果：`flinch` 是即时叠加，`queueAttack` 是排队执行。`tut-61` 用这两个按钮把差异直接跑出来。
+
+<div class="showcase" case="tut-61"></div>
 
 ---
 
@@ -386,18 +434,18 @@ controller.addState('layeredRun', {
       {
         // 下半身奔跑是相位参考。
         type: 'play',
-        clip: 'RunLower',
-        id: 'lowerRun',
+        clip: 'run_lower',
+        id: 'lowerLoop',
         options: { repeat: 0 }
       },
       {
-        // 上半身奔跑从 lowerRun 的同一归一化相位开始。
+        // 上半身奔跑从 lowerLoop 的同一归一化相位开始。
         type: 'play',
-        clip: 'RunUpper',
-        id: 'upperRun',
+        clip: 'pistol_upper',
+        id: 'upperLoop',
         options: {
           repeat: 0,
-          sync: { target: 'lowerRun', mode: 'normalized' }
+          sync: { target: 'lowerLoop', mode: 'normalized' }
         }
       }
     ]
@@ -405,7 +453,9 @@ controller.addState('layeredRun', {
 });
 ```
 
-效果：`RunLower` 和 `RunUpper` 一起循环。`sync.target` 可以引用前面 `play` 的本地 `id`。如果两个 clip 时长不同，用 `mode: 'normalized'`；如果作者时间轴完全一致，用 `mode: 'time'`。
+效果：`run_lower` 和 `pistol_upper` 一起循环。`sync.target` 可以引用前面 `play` 的本地 `id`。如果两个 clip 时长不同，用 `mode: 'normalized'`；如果作者时间轴完全一致，用 `mode: 'time'`。
+
+<div class="showcase" case="tut-62"></div>
 
 ---
 
@@ -417,12 +467,19 @@ controller.addState('layeredRun', {
 controller.addState('layeredRun', {
   timeline: {
     steps: [
-      { type: 'play', clip: 'RunLower', id: 'lowerRun', options: { repeat: 0 } },
+      { 
+        type: 'play',
+        clip: 'run_lower',
+        id: 'lowerLoop',
+        options: {
+          repeat: 0
+        }
+      },
       {
         type: 'play',
-        clip: 'RunUpper',
-        id: 'upperRun',
-        options: { repeat: 0, sync: { target: 'lowerRun', mode: 'normalized' } }
+        clip: 'run_upper',
+        id: 'upperLoop',
+        options: { repeat: 0, sync: { target: 'lowerLoop', mode: 'time' } }
       }
     ]
   },
@@ -432,9 +489,9 @@ controller.addState('layeredRun', {
       target: {
         steps: [
           {
-            // 只停止上半身循环，下半身 lowerRun 继续作为相位源。
+            // 只停止上半身循环，下半身 lowerLoop 继续作为相位源。
             type: 'stop',
-            target: 'upperRun',
+            target: 'upperLoop',
             options: { fadeOut: 0.08 }
           },
           {
@@ -443,7 +500,7 @@ controller.addState('layeredRun', {
             steps: [
               {
                 type: 'play',
-                clip: 'ShootUpper',
+                clip: 'shoot_upper',
                 id: 'shootUpper',
                 options: { repeat: 1, fadeIn: 0.08 },
                 wait: 'complete'
@@ -451,7 +508,7 @@ controller.addState('layeredRun', {
               {
                 type: 'sequence',
                 steps: [
-                  { type: 'wait', seconds: 0.5 },
+                  { type: 'wait', seconds: 0.35 },
                   { type: 'emit', event: 'shoot-fire' }
                 ]
               }
@@ -459,14 +516,14 @@ controller.addState('layeredRun', {
           },
           {
             // 恢复上半身奔跑，并同步到下半身当前相位。
-            // 复用 upperRun，后续 shoot 事件才能继续停止新的上半身循环。
+            // 复用 upperLoop，后续 shoot 事件才能继续停止新的上半身循环。
             type: 'play',
-            clip: 'RunUpper',
-            id: 'upperRun',
+            clip: 'run_upper',
+            id: 'upperLoop',
             options: {
               repeat: 0,
               fadeIn: 0.12,
-              sync: { target: 'lowerRun', mode: 'normalized' }
+              sync: { target: 'lowerLoop', mode: 'time' }
             }
           }
         ]
@@ -478,75 +535,13 @@ controller.addState('layeredRun', {
 });
 ```
 
-效果：`shoot` 不会重启或停止 `RunLower`。射击中途发出 `shoot-fire`，射击完成后 `RunUpper` 按 `RunLower` 当前相位恢复。这里最容易漏掉的是恢复步骤上的 `id: 'upperRun'`：如果不复用这个 id，下一次 `shoot` 就无法再用 `target: 'upperRun'` 找到新的上半身循环。
+效果：`shoot` 不会重启或停止 `run_lower`。射击中途发出 `shoot-fire`，射击完成后 `pistol_upper` 按 `run_lower` 当前相位恢复。这里最容易漏掉的是恢复步骤上的 `id: 'upperLoop'`：如果不复用这个 id，下一次 `shoot` 就无法再用 `target: 'upperLoop'` 找到新的上半身循环。
+
+<div class="showcase" case="tut-63"></div>
 
 ---
 
-## 9. 插播全身动作并返回分层循环
-
-全身翻滚、闪避、受击倒地通常会替换上下半身分层播放。进入全身动作时保留旧下半身一小段时间，用来读取相位；全身动作完成后 `returnTo` 回到分层状态。
-
-```typescript
-controller
-  .addState('layeredRun', {
-    transition: 0.15,
-    timeline: {
-      steps: [
-        {
-          // RunLower 是进入全身动作时的相位参考。
-          type: 'play',
-          clip: 'RunLower',
-          id: 'lowerRun',
-          options: { repeat: 0 }
-        },
-        {
-          // RunUpper 与下半身同步。
-          type: 'play',
-          clip: 'RunUpper',
-          id: 'upperRun',
-          options: { repeat: 0, sync: { target: 'lowerRun', mode: 'normalized' } }
-        }
-      ]
-    },
-    responses: [
-      {
-        event: 'dodge',
-        target: {
-          // dodgeFull 播放完成后自动回到当前 layeredRun。
-          targetState: 'dodgeFull',
-          returnTo: true,
-          returnTransition: 0.15
-        },
-        // 保留旧状态 0.12 秒，让 dodgeFull 启动时能读取 RunLower 的相位。
-        onActive: { fadeOut: 0.12 }
-      }
-    ]
-  })
-  .addState('dodgeFull', {
-    transition: 0.12,
-    timeline: {
-      steps: [
-        {
-          // 使用旧下半身 RunLower 的相位启动全身 DodgeFull。
-          // 这里引用 clip 名称，因为它来自即将淡出的旧状态。
-          type: 'play',
-          clip: 'DodgeFull',
-          options: {
-            repeat: 1,
-            sync: { target: 'RunLower', mode: 'normalized' }
-          },
-          wait: 'complete'
-        }
-      ]
-    }
-  });
-```
-
-效果：`dodge` 用全身动作临时替换分层移动。`DodgeFull` 启动时和旧 `RunLower` 相位一致；完成后回到 `layeredRun`，返回状态入口播放会淡入，并保持相位连续。
-
----
-
-## 10. 常用规则速查
+## 9. 常用规则速查
 
 | 场景 | 推荐写法 |
 |------|----------|
@@ -597,3 +592,4 @@ controller.on('event', (event, payload, result) => {
 ```
 
 循环状态通常不会触发 `statecomplete`，因为 `repeat: 0` 的播放不会自然结束。一次性状态如果使用了 `wait: 'complete'`，会在播放完成后触发 `statecomplete`；如果配置了 `returnTo`，自动返回发生在 `statecomplete` 之后。
+
