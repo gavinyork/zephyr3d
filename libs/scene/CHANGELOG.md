@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Thu, 25 Jun 2026 08:26:57 GMT and should not be manually modified.
+This log was last generated on Sun, 28 Jun 2026 18:17:14 GMT and should not be manually modified.
+
+## 0.9.10
+Sun, 28 Jun 2026 18:17:14 GMT
+
+### Patches
+
+- Add animation controller
 
 ## 0.9.9
 Thu, 25 Jun 2026 08:26:57 GMT

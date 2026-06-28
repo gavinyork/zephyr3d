@@ -2,6 +2,18 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.10",
+      "tag": "@zephyr3d/scene_v0.9.10",
+      "date": "Sun, 28 Jun 2026 18:17:14 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add animation controller"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.9",
       "tag": "@zephyr3d/scene_v0.9.9",
       "date": "Thu, 25 Jun 2026 08:26:57 GMT",
