@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Switch API reference from api-documenter to TypeDoc",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
