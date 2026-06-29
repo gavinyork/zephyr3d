@@ -216,6 +216,7 @@ export class JointDynamicsSystemController {
   private _parentMap = new Map<number, number>();
   private _maxPointDepth = 0;
   private _pointTransforms: TransformAccess[] = [];
+  private _pointInputTransforms: TransformAccess[] = [];
   private _colliderTransforms: TransformAccess[] = [];
   private _grabberTransforms: TransformAccess[] = [];
   private _colliderHandleIds: number[] = [];
@@ -255,6 +256,7 @@ export class JointDynamicsSystemController {
     rootTransform: TransformAccess,
     rootPoints: BoneNode[],
     pointTransforms: TransformAccess[],
+    pointInputTransforms: TransformAccess[],
     colliders: Array<{ r: ColliderR; transform: TransformAccess }>,
     grabbers: Array<{
       r: GrabberR;
@@ -268,6 +270,7 @@ export class JointDynamicsSystemController {
     this._currentSystemScale = this._baseSystemScale;
     this._rootPoints = [...rootPoints];
     this._pointTransforms = pointTransforms;
+    this._pointInputTransforms = pointInputTransforms.length > 0 ? pointInputTransforms : pointTransforms;
     this._colliderTransforms = colliders.map((c) => c.transform);
     this._grabberTransforms = grabbers.map((g) => g.transform);
 
@@ -302,11 +305,11 @@ export class JointDynamicsSystemController {
     // This is critical for correct bone rotation in skinned meshes
     for (const p of allPoints) {
       if (!p.boneAxis && p.children.length > 0) {
-        const childPos = pointTransforms[p.children[0].index].getWorldPosition();
-        const parentPos = pointTransforms[p.index].getWorldPosition();
+        const childPos = this._pointTransforms[p.children[0].index].getWorldPosition();
+        const parentPos = this._pointTransforms[p.index].getWorldPosition();
         // InverseTransformPoint: convert child world pos to parent local space
-        const parentRot = pointTransforms[p.index].getWorldRotation();
-        const parentScale = pointTransforms[p.index].getLocalScale();
+        const parentRot = this._pointTransforms[p.index].getWorldRotation();
+        const parentScale = this._pointTransforms[p.index].getLocalScale();
         const diff = Vector3.sub(childPos, parentPos);
         const invRot = Quaternion.inverse(parentRot);
         const localDir = invRot.transform(diff);
@@ -357,7 +360,7 @@ export class JointDynamicsSystemController {
     this._previousRootRotation = rootTransform.getWorldRotation();
 
     for (let i = 0; i < this._pointsRW.length; i++) {
-      const pos = pointTransforms[i].getWorldPosition();
+      const pos = this._pointInputTransforms[i].getWorldPosition();
       this._pointsRW[i].positionCurrent = pos.clone();
       this._pointsRW[i].positionPrevious = pos.clone();
       this._pointsRW[i].positionCurrentTransform = pos.clone();
@@ -405,7 +408,7 @@ export class JointDynamicsSystemController {
     const inputLocalRotations = this._getInputLocalRotations();
     for (let i = 0; i < this._pointsRW.length; i++) {
       this._pointsRW[i].positionPreviousTransform = this._pointsRW[i].positionCurrentTransform.clone();
-      this._pointsRW[i].positionCurrentTransform = this._pointTransforms[i].getWorldPosition();
+      this._pointsRW[i].positionCurrentTransform = this._pointInputTransforms[i].getWorldPosition();
     }
 
     for (let i = 0; i < this._collidersRW.length; i++) {
@@ -734,7 +737,7 @@ export class JointDynamicsSystemController {
    */
   reset(): void {
     for (let i = 0; i < this._pointsRW.length; i++) {
-      const pos = this._pointTransforms[i].getWorldPosition();
+      const pos = this._pointInputTransforms[i].getWorldPosition();
       const ptRW = this._pointsRW[i];
       ptRW.positionCurrent = pos.clone();
       ptRW.positionPrevious = pos.clone();
@@ -793,7 +796,7 @@ export class JointDynamicsSystemController {
       return;
     }
     (this._pointsR[index] as any).weight = 1;
-    const pos = this._pointTransforms[index].getWorldPosition();
+    const pos = this._pointInputTransforms[index].getWorldPosition();
     this._pointsRW[index].positionCurrent = pos.clone();
     this._pointsRW[index].positionPrevious = pos.clone();
     this._pointsRW[index].grabberIndex = -1;

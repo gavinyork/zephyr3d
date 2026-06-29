@@ -58,7 +58,14 @@ type SerializedJointDynamicsGrabber = {
 type SerializedJointDynamicsModifier = {
   skeleton: string;
   systemRoot: string;
-  chains: { start: string; end: string }[];
+  chains: {
+    start: string;
+    end: string;
+    startAnchor?: string;
+    endAnchor?: string;
+    startAnchorOffset?: number[];
+    endAnchorOffset?: number[];
+  }[];
   controllerConfig?: SerializedControllerConfig;
   colliders?: SerializedJointDynamicsCollider[];
   flatPlanes?: SerializedJointDynamicsFlatPlane[];
@@ -460,9 +467,27 @@ export function getJointDynamicsModifierClass(): SerializableClass {
         .map((chain) => {
           const start = findSerializedNode(ctx, chain.start);
           const end = findSerializedNode(ctx, chain.end);
-          return start && end ? { start, end } : null;
+          const startAnchor = findSerializedNode(ctx, chain.startAnchor);
+          const endAnchor = findSerializedNode(ctx, chain.endAnchor);
+          return start && end
+            ? {
+                start,
+                end,
+                startAnchor: startAnchor ?? undefined,
+                endAnchor: endAnchor ?? undefined,
+                startAnchorOffset: chain.startAnchorOffset
+                  ? vectorFromArray(chain.startAnchorOffset)
+                  : undefined,
+                endAnchorOffset: chain.endAnchorOffset ? vectorFromArray(chain.endAnchorOffset) : undefined
+              }
+            : null;
         })
-        .filter((chain): chain is { start: SceneNode; end: SceneNode } => {
+        .filter((chain): chain is {
+          start: SceneNode;
+          end: SceneNode;
+          startAnchor?: SceneNode;
+          endAnchor?: SceneNode;
+        } => {
           return !!chain && chain.start.isParentOf(chain.end);
         });
       if (chains.length === 0) {
@@ -537,7 +562,11 @@ export function getJointDynamicsModifierClass(): SerializableClass {
         systemRoot: chainConfig.systemRoot.persistentId,
         chains: chainConfig.chains.map((chain) => ({
           start: chain.start.persistentId,
-          end: chain.end.persistentId
+          end: chain.end.persistentId,
+          startAnchor: chain.startAnchor?.persistentId,
+          endAnchor: chain.endAnchor?.persistentId,
+          startAnchorOffset: chain.startAnchorOffset ? vectorToArray(chain.startAnchorOffset) : undefined,
+          endAnchorOffset: chain.endAnchorOffset ? vectorToArray(chain.endAnchorOffset) : undefined
         })),
         controllerConfig: serializeControllerConfig(controllerConfig),
         colliders: obj.jointDynamicsSystem.getColliderSnapshots().map((item) => ({

@@ -47,11 +47,15 @@ describe('JointDynamics serialization', () => {
     const root = appendNode(model, 'root');
     const mid = appendNode(root, 'mid');
     const tip = appendNode(mid, 'tip');
+    const anchorStart = appendNode(model, 'anchorStart');
+    const anchorEnd = appendNode(model, 'anchorEnd');
     const colliderNode = appendNode(model, 'collider');
     const grabberNode = appendNode(model, 'grabber');
 
     mid.position.setXYZ(0, 1, 0);
     tip.position.setXYZ(0, 2, 0);
+    anchorStart.position.setXYZ(-0.3, 0.2, 0);
+    anchorEnd.position.setXYZ(0.3, 0.2, 0);
     colliderNode.position.setXYZ(1, 0, 0);
     grabberNode.position.setXYZ(0, 1, 1);
 
@@ -70,7 +74,7 @@ describe('JointDynamics serialization', () => {
       {
         chainConfig: {
           systemRoot: model,
-          chains: [{ start: root, end: tip }]
+          chains: [{ start: root, end: tip, startAnchor: anchorStart, endAnchor: anchorEnd }]
         },
         controllerConfig: {
           subSteps: 5,
@@ -148,6 +152,8 @@ describe('JointDynamics serialization', () => {
     expect(restoredSystemSnapshot.chainConfig.chains).toHaveLength(1);
     expect(restoredSystemSnapshot.chainConfig.chains[0].start.name).toBe('root');
     expect(restoredSystemSnapshot.chainConfig.chains[0].end.name).toBe('tip');
+    expect(restoredSystemSnapshot.chainConfig.chains[0].startAnchor.name).toBe('anchorStart');
+    expect(restoredSystemSnapshot.chainConfig.chains[0].endAnchor.name).toBe('anchorEnd');
     expect(restoredSystem.controller.getConfig().subSteps).toBe(7);
     expect(restoredSystem.controller.getConfig().blendRatio).toBeCloseTo(0.25);
     expect(restoredSystem.controller.getConfig().rootSlideLimit).toBeCloseTo(10);
