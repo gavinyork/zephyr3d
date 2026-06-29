@@ -1,0 +1,29 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme"],
+  "entryPoints": [
+    "../../libs/base/src/index.ts",
+    "../../libs/device/src/index.ts",
+    "../../libs/loaders/src/index.ts",
+    "../../libs/imgui/src/index.ts",
+    "../../libs/scene/src/index.ts",
+    "../../libs/backend-webgl/src/index.ts",
+    "../../libs/backend-webgpu/src/index.ts"
+  ],
+  "entryPointStrategy": "resolve",
+  "tsconfig": "./tsconfig.typedoc.json",
+  "out": "web/api",
+  "docsRoot": "web",
+  "readme": "none",
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "excludeExternals": true,
+  "githubPages": false,
+  "hideGenerator": true,
+  "skipErrorChecking": true,
+  "sort": ["source-order"],
+  "sidebar": {
+    "autoConfiguration": true,
+    "pretty": true
+  }
+}

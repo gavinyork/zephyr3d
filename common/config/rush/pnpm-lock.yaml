@@ -22,13 +22,13 @@ importers:
         specifier: workspace:^0.1.12
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
-        specifier: workspace:^0.1.12
+        specifier: workspace:^0.1.14
         version: link:../../libs/backend-webgpu
       '@zephyr3d/base':
-        specifier: workspace:^0.2.6
+        specifier: workspace:^0.2.7
         version: link:../../libs/base
       '@zephyr3d/device':
-        specifier: workspace:^0.2.9
+        specifier: workspace:^0.2.10
         version: link:../../libs/device
     devDependencies:
       '@babel/core':
@@ -146,22 +146,22 @@ importers:
         specifier: workspace:^0.1.12
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
-        specifier: workspace:^0.1.12
+        specifier: workspace:^0.1.14
         version: link:../../libs/backend-webgpu
       '@zephyr3d/base':
-        specifier: workspace:^0.2.6
+        specifier: workspace:^0.2.7
         version: link:../../libs/base
       '@zephyr3d/device':
-        specifier: workspace:^0.2.9
+        specifier: workspace:^0.2.10
         version: link:../../libs/device
       '@zephyr3d/imgui':
         specifier: workspace:^0.2.4
         version: link:../../libs/imgui
       '@zephyr3d/loaders':
-        specifier: workspace:^0.1.1
+        specifier: workspace:^0.1.2
         version: link:../../libs/loaders
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.6
+        specifier: workspace:^0.9.10
         version: link:../../libs/scene
       '@zip.js/zip.js':
         specifier: ^2.7.54
@@ -293,6 +293,15 @@ importers:
       tslib:
         specifier: ^2.8.1
         version: 2.8.1
+      typedoc:
+        specifier: ~0.28.19
+        version: 0.28.19(typescript@5.9.3)
+      typedoc-plugin-markdown:
+        specifier: ~4.12.0
+        version: 4.12.0(typedoc@0.28.19(typescript@5.9.3))
+      typedoc-vitepress-theme:
+        specifier: ~1.1.3
+        version: 1.1.3(typedoc-plugin-markdown@4.12.0(typedoc@0.28.19(typescript@5.9.3)))
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -318,16 +327,16 @@ importers:
         specifier: workspace:^0.1.12
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
-        specifier: workspace:^0.1.12
+        specifier: workspace:^0.1.14
         version: link:../../libs/backend-webgpu
       '@zephyr3d/base':
-        specifier: workspace:^0.2.6
+        specifier: workspace:^0.2.7
         version: link:../../libs/base
       '@zephyr3d/device':
-        specifier: workspace:^0.2.9
+        specifier: workspace:^0.2.10
         version: link:../../libs/device
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.6
+        specifier: workspace:^0.9.10
         version: link:../../libs/scene
     devDependencies:
       '@babel/core':
@@ -439,16 +448,16 @@ importers:
         specifier: workspace:^0.1.12
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
-        specifier: workspace:^0.1.12
+        specifier: workspace:^0.1.14
         version: link:../../libs/backend-webgpu
       '@zephyr3d/base':
-        specifier: workspace:^0.2.6
+        specifier: workspace:^0.2.7
         version: link:../../libs/base
       '@zephyr3d/device':
-        specifier: workspace:^0.2.9
+        specifier: workspace:^0.2.10
         version: link:../../libs/device
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.6
+        specifier: workspace:^0.9.10
         version: link:../../libs/scene
     devDependencies:
       '@babel/core':
@@ -563,13 +572,13 @@ importers:
         specifier: workspace:^0.1.12
         version: link:../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
-        specifier: workspace:^0.1.12
+        specifier: workspace:^0.1.14
         version: link:../libs/backend-webgpu
       '@zephyr3d/base':
-        specifier: workspace:^0.2.6
+        specifier: workspace:^0.2.7
         version: link:../libs/base
       '@zephyr3d/device':
-        specifier: workspace:^0.2.9
+        specifier: workspace:^0.2.10
         version: link:../libs/device
       '@zephyr3d/imgui':
         specifier: workspace:^0.2.4
@@ -687,10 +696,10 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/base':
-        specifier: workspace:^0.2.6
+        specifier: workspace:^0.2.7
         version: link:../base
       '@zephyr3d/device':
-        specifier: workspace:^0.2.9
+        specifier: workspace:^0.2.10
         version: link:../device
       rollup-plugin-import-css:
         specifier: ~3.5.8
@@ -790,10 +799,10 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/base':
-        specifier: workspace:^0.2.6
+        specifier: workspace:^0.2.7
         version: link:../base
       '@zephyr3d/device':
-        specifier: workspace:^0.2.9
+        specifier: workspace:^0.2.10
         version: link:../device
       rollup-plugin-import-css:
         specifier: ~3.5.8
@@ -987,7 +996,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/base':
-        specifier: workspace:^0.2.6
+        specifier: workspace:^0.2.7
         version: link:../base
       rollup-plugin-import-css:
         specifier: ~3.5.8
@@ -1087,10 +1096,10 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/base':
-        specifier: workspace:^0.2.6
+        specifier: workspace:^0.2.7
         version: link:../base
       '@zephyr3d/device':
-        specifier: workspace:^0.2.9
+        specifier: workspace:^0.2.10
         version: link:../device
       rollup-plugin-import-css:
         specifier: ~3.5.8
@@ -1190,13 +1199,13 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/base':
-        specifier: workspace:^0.2.6
+        specifier: workspace:^0.2.7
         version: link:../base
       '@zephyr3d/device':
-        specifier: workspace:^0.2.9
+        specifier: workspace:^0.2.10
         version: link:../device
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.6
+        specifier: workspace:^0.9.10
         version: link:../scene
     devDependencies:
       '@babel/core':
@@ -1290,10 +1299,10 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/base':
-        specifier: workspace:^0.2.6
+        specifier: workspace:^0.2.7
         version: link:../base
       '@zephyr3d/device':
-        specifier: workspace:^0.2.9
+        specifier: workspace:^0.2.10
         version: link:../device
       es-module-lexer:
         specifier: ^1.7.0
@@ -1399,19 +1408,19 @@ importers:
         specifier: workspace:^0.1.12
         version: link:../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
-        specifier: workspace:^0.1.12
+        specifier: workspace:^0.1.14
         version: link:../libs/backend-webgpu
       '@zephyr3d/base':
-        specifier: workspace:^0.2.6
+        specifier: workspace:^0.2.7
         version: link:../libs/base
       '@zephyr3d/device':
-        specifier: workspace:^0.2.9
+        specifier: workspace:^0.2.10
         version: link:../libs/device
       '@zephyr3d/imgui':
         specifier: workspace:^0.2.4
         version: link:../libs/imgui
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.6
+        specifier: workspace:^0.9.10
         version: link:../libs/scene
       '@zip.js/zip.js':
         specifier: ^2.7.54
@@ -1553,22 +1562,22 @@ importers:
         specifier: workspace:^0.1.12
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
-        specifier: workspace:^0.1.12
+        specifier: workspace:^0.1.14
         version: link:../../libs/backend-webgpu
       '@zephyr3d/base':
-        specifier: workspace:^0.2.6
+        specifier: workspace:^0.2.7
         version: link:../../libs/base
       '@zephyr3d/device':
-        specifier: workspace:^0.2.9
+        specifier: workspace:^0.2.10
         version: link:../../libs/device
       '@zephyr3d/imgui':
         specifier: workspace:^0.2.4
         version: link:../../libs/imgui
       '@zephyr3d/loaders':
-        specifier: workspace:^0.1.1
+        specifier: workspace:^0.1.2
         version: link:../../libs/loaders
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.6
+        specifier: workspace:^0.9.10
         version: link:../../libs/scene
       '@zip.js/zip.js':
         specifier: ^2.7.54
@@ -1705,13 +1714,13 @@ importers:
         version: 2.8.1
       vite:
         specifier: ^7.1.1
-        version: 7.3.2(@types/node@22.19.17)(jiti@2.6.1)(terser@5.46.2)
+        version: 7.3.2(@types/node@22.19.17)(jiti@2.6.1)(terser@5.46.2)(yaml@2.9.0)
       vite-plugin-monaco-editor-esm:
         specifier: ^2.0.2
         version: 2.0.2(monaco-editor@0.52.2)
       vite-plugin-static-copy:
         specifier: ^3.1.1
-        version: 3.4.0(vite@7.3.2(@types/node@22.19.17)(jiti@2.6.1)(terser@5.46.2))
+        version: 3.4.0(vite@7.3.2(@types/node@22.19.17)(jiti@2.6.1)(terser@5.46.2)(yaml@2.9.0))
 
 packages:
 
@@ -2809,6 +2818,9 @@ packages:
   '@fastify/deepmerge@2.0.2':
     resolution: {integrity: sha512-3wuLdX5iiiYeZWP6bQrjqhrcvBIf0NHbQH1Ur1WbHvoiuTYUEItgygea3zs8aHpiitn0lOB8gX20u1qO+FDm7Q==}
 
+  '@gerrit0/mini-shiki@3.23.0':
+    resolution: {integrity: sha512-bEMORlG0cqdjVyCEuU0cDQbORWX+kYCeo0kV1lbxF5bt4r7SID2l9bqsxJEM0zndaxpOUT7riCyIVEuqq/Ynxg==}
+
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
     engines: {node: '>=18.18.0'}
@@ -3356,17 +3368,29 @@ packages:
   '@shikijs/engine-oniguruma@2.5.0':
     resolution: {integrity: sha512-pGd1wRATzbo/uatrCIILlAdFVKdxImWJGQ5rFiB5VZi2ve5xj3Ax9jny8QvkaV93btQEwR/rSz5ERFpC5mKNIw==}
 
+  '@shikijs/engine-oniguruma@3.23.0':
+    resolution: {integrity: sha512-1nWINwKXxKKLqPibT5f4pAFLej9oZzQTsby8942OTlsJzOBZ0MWKiwzMsd+jhzu8YPCHAswGnnN1YtQfirL35g==}
+
   '@shikijs/langs@2.5.0':
     resolution: {integrity: sha512-Qfrrt5OsNH5R+5tJ/3uYBBZv3SuGmnRPejV9IlIbFH3HTGLDlkqgHymAlzklVmKBjAaVmkPkyikAV/sQ1wSL+w==}
 
+  '@shikijs/langs@3.23.0':
+    resolution: {integrity: sha512-2Ep4W3Re5aB1/62RSYQInK9mM3HsLeB91cHqznAJMuylqjzNVAVCMnNWRHFtcNHXsoNRayP9z1qj4Sq3nMqYXg==}
+
   '@shikijs/themes@2.5.0':
     resolution: {integrity: sha512-wGrk+R8tJnO0VMzmUExHR+QdSaPUl/NKs+a4cQQRWyoc3YFbUzuLEi/KWK1hj+8BfHRKm2jNhhJck1dfstJpiw==}
+
+  '@shikijs/themes@3.23.0':
+    resolution: {integrity: sha512-5qySYa1ZgAT18HR/ypENL9cUSGOeI2x+4IvYJu4JgVJdizn6kG4ia5Q1jDEOi7gTbN4RbuYtmHh0W3eccOrjMA==}
 
   '@shikijs/transformers@2.5.0':
     resolution: {integrity: sha512-SI494W5X60CaUwgi8u4q4m4s3YAFSxln3tzNjOSYqq54wlVgz0/NbbXEb3mdLbqMBztcmS7bVTaEd2w0qMmfeg==}
 
   '@shikijs/types@2.5.0':
     resolution: {integrity: sha512-ygl5yhxki9ZLNuNpPitBWvcy9fsSKKaRuO4BAlMyagszQidxcpLAr0qiW/q43DtSIDxO6hEbtYLiFZNXO/hdGw==}
+
+  '@shikijs/types@3.23.0':
+    resolution: {integrity: sha512-3JZ5HXOZfYjsYSk0yPwBrkupyYSLpAE26Qc0HLghhZNGTZg/SKxXIIgoxOpmmeQP0RRSDJTk1/vPfw9tbw+jSQ==}
 
   '@shikijs/vscode-textmate@10.0.2':
     resolution: {integrity: sha512-83yeghZ2xxin3Nj8z1NMd/NCuca+gsYXswywDy5bHvwlWL8tpTQmzGeUuHd9FC3E/SBEMvzJRwWEOz5gGes9Qg==}
@@ -4640,6 +4664,10 @@ packages:
   end-of-stream@1.4.5:
     resolution: {integrity: sha512-ooEGc6HP26xXq/N+GCGOT0JKCLDGrq2bQUZrQ7gyrJiZANJ/8YDTxTpQBXGMn+WbIQXNVpyWymm7KYVICQnyOg==}
 
+  entities@4.5.0:
+    resolution: {integrity: sha512-V0hjH4dGPh9Ao5p0MoRY6BVqtwCjhz6vI5LT8AJ55H+4g9/4vbHx1I54fS0XuclLhDHArPQCiMjDxjaL8fPxhw==}
+    engines: {node: '>=0.12'}
+
   entities@7.0.1:
     resolution: {integrity: sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA==}
     engines: {node: '>=0.12'}
@@ -5663,6 +5691,9 @@ packages:
   lines-and-columns@1.2.4:
     resolution: {integrity: sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==}
 
+  linkify-it@5.0.1:
+    resolution: {integrity: sha512-wVoTjP4Q6R0NW5hiZkVJaFZPWgtXfoGF+6LucL3/FtiNjmcHhYjEr5f1Kqjirc1nBW07J/ZuRFumqr2oqccEWg==}
+
   locate-path@5.0.0:
     resolution: {integrity: sha512-t7hw9pI+WvuwNJXwk5zVHpyhIqzg2qTlklJOf0mVxGSbe3Fp2VieZcduNYjaLDoy6p9uGpQEGWG87WpMKlNq8g==}
     engines: {node: '>=8'}
@@ -5700,6 +5731,9 @@ packages:
     resolution: {integrity: sha512-Jo6dJ04CmSjuznwJSS3pUeWmd/H0ffTlkXXgwZi+eq1UCmqQwCh+eLsYOYCwY991i2Fah4h1BEMCx4qThGbsiA==}
     engines: {node: '>=10'}
 
+  lunr@2.3.9:
+    resolution: {integrity: sha512-zTU3DaZaF3Rt9rhN3uBMGQD3dD2/vFQqnvZCDv4dl5iOzq2IZQqTxu90r4E5J+nP70J3ilqVCrbho2eWaeW8Ow==}
+
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
@@ -5720,6 +5754,10 @@ packages:
   mark.js@8.11.1:
     resolution: {integrity: sha512-1I+1qpDt4idfgLQG+BNWmrqku+7/2bi5nLf4YwF8y8zXvmfiTBY3PV3ZibfrjBueCByROpuBjLLFCajqkgYoLQ==}
 
+  markdown-it@14.2.0:
+    resolution: {integrity: sha512-1TGiQiJVRQ3NPmZH6sx5Cfnmg6GQm9jvC1ch4TK511NjSJvjzKLzn5pPfZRNZkRPZP0HqCioSndqH8v2nRaWVQ==}
+    hasBin: true
+
   matcher@3.0.0:
     resolution: {integrity: sha512-OkeDaAZ/bQCxeFAozM55PKcKU0yJMPGifLwV4Qgjitu+5MoAfSQN4lsLJeXZ1b8w0x+/Emda6MZgXS1jvsapng==}
     engines: {node: '>=10'}
@@ -5730,6 +5768,9 @@ packages:
 
   mdast-util-to-hast@13.2.1:
     resolution: {integrity: sha512-cctsq2wp5vTsLIcaymblUriiTcZd0CwWtCbLvrOzYCDZoWyMNV8sZ7krj09FSnsiJi3WVsHLM4k6Dq/yaPyCXA==}
+
+  mdurl@2.0.0:
+    resolution: {integrity: sha512-Lf+9+2r+Tdp5wXDXC4PcIBjTDtq4UKjCPMQhKIuzpJNW0b96kVqSwW0bT7FhRSfmAiFYgP+SCRvdrDozfh0U5w==}
 
   media-typer@0.3.0:
     resolution: {integrity: sha512-dq+qelQ9akHpcOl/gUVRTxVIOkAJ1wR3QAvb4RsVjS8oVoFjDGTc679wJYmUmknUF5HwMLOgb5O+a3KxfWapPQ==}
@@ -6118,6 +6159,10 @@ packages:
 
   pump@3.0.4:
     resolution: {integrity: sha512-VS7sjc6KR7e1ukRFhQSY5LM2uBWAUPiOPa/A3mkKmiMwSmRFUITt0xuj+/lesgnCv+dPIEYlkzrcyXgquIHMcA==}
+
+  punycode.js@2.3.1:
+    resolution: {integrity: sha512-uxFIHU0YlHYhDQtV4R9J6a52SLx28BCjT+4ieh7IGbgwVJWO+km431c4yRlREUAsAmt/uMjQUyQHNEPf0M39CA==}
+    engines: {node: '>=6'}
 
   punycode@2.3.1:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
@@ -6742,6 +6787,24 @@ packages:
     resolution: {integrity: sha512-3KS2b+kL7fsuk/eJZ7EQdnEmQoaho/r6KUef7hxvltNA5DR8NAUM+8wJMbJyZ4G9/7i3v5zPBIMN5aybAh2/Jg==}
     engines: {node: '>= 0.4'}
 
+  typedoc-plugin-markdown@4.12.0:
+    resolution: {integrity: sha512-eJDEMAfxCmede22c/Jw7d0FA13ggAQv+KkwQYKYCdqI02cin6Rc9QRwbG/7XvvHWinuFejySnZVUWDtvGk3Vbg==}
+    engines: {node: '>= 18'}
+    peerDependencies:
+      typedoc: 0.28.x
+
+  typedoc-vitepress-theme@1.1.3:
+    resolution: {integrity: sha512-EK9iV7e3+R8lFNigdc0rIPWMxqfmDku0uGac3qYUu9tS4Qf1rhWZnyZJ4zu4G3iXrP5mqNPkv2wpODzRlA7jLw==}
+    peerDependencies:
+      typedoc-plugin-markdown: '>=4.11.0'
+
+  typedoc@0.28.19:
+    resolution: {integrity: sha512-wKh+lhdmMFivMlc6vRRcMGXeGEHGU2g8a2CkPTJjJlwRf1iXbimWIPcFolCqe4E0d/FRtGszpIrsp3WLpDB8Pw==}
+    engines: {node: '>= 18', pnpm: '>= 10'}
+    hasBin: true
+    peerDependencies:
+      typescript: 5.0.x || 5.1.x || 5.2.x || 5.3.x || 5.4.x || 5.5.x || 5.6.x || 5.7.x || 5.8.x || 5.9.x || 6.0.x
+
   typescript@5.9.3:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
     engines: {node: '>=14.17'}
@@ -6754,6 +6817,9 @@ packages:
   typical@7.3.0:
     resolution: {integrity: sha512-ya4mg/30vm+DOWfBg4YK3j2WD6TWtRkCbasOJr40CseYENzCUby/7rIvXA99JGsQHeNxLbnXdyLLxKSv3tauFw==}
     engines: {node: '>=12.17'}
+
+  uc.micro@2.1.0:
+    resolution: {integrity: sha512-ARDJmphmdvUk6Glw7y9DQ2bFkKBHwQHLi2lsaH6PPmz/Ka9sFOBsBluozhDltWmnv9u/cF6Rt87znRTPV+yp/A==}
 
   uglify-js@3.19.3:
     resolution: {integrity: sha512-v3Xu+yuwBXisp6QYTcH4UbH+xYJXqnq2m/LtQVWKWzYc1iehYnLixoQDN9FH6/j9/oybfd6W9Ghwkl8+UMKTKQ==}
@@ -7058,6 +7124,11 @@ packages:
   yallist@5.0.0:
     resolution: {integrity: sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==}
     engines: {node: '>=18'}
+
+  yaml@2.9.0:
+    resolution: {integrity: sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
 
   yargs-parser@18.1.3:
     resolution: {integrity: sha512-o50j0JeToy/4K6OZcaQmW6lyXXKhq7csREXcDwk2omFPJEwUNOVtJKvmDr9EI1fAJZUyZcRF7kxGBWmRXudrCQ==}
@@ -8289,6 +8360,14 @@ snapshots:
 
   '@fastify/deepmerge@2.0.2': {}
 
+  '@gerrit0/mini-shiki@3.23.0':
+    dependencies:
+      '@shikijs/engine-oniguruma': 3.23.0
+      '@shikijs/langs': 3.23.0
+      '@shikijs/themes': 3.23.0
+      '@shikijs/types': 3.23.0
+      '@shikijs/vscode-textmate': 10.0.2
+
   '@humanfs/core@0.19.2':
     dependencies:
       '@humanfs/types': 0.15.0
@@ -8913,13 +8992,26 @@ snapshots:
       '@shikijs/types': 2.5.0
       '@shikijs/vscode-textmate': 10.0.2
 
+  '@shikijs/engine-oniguruma@3.23.0':
+    dependencies:
+      '@shikijs/types': 3.23.0
+      '@shikijs/vscode-textmate': 10.0.2
+
   '@shikijs/langs@2.5.0':
     dependencies:
       '@shikijs/types': 2.5.0
 
+  '@shikijs/langs@3.23.0':
+    dependencies:
+      '@shikijs/types': 3.23.0
+
   '@shikijs/themes@2.5.0':
     dependencies:
       '@shikijs/types': 2.5.0
+
+  '@shikijs/themes@3.23.0':
+    dependencies:
+      '@shikijs/types': 3.23.0
 
   '@shikijs/transformers@2.5.0':
     dependencies:
@@ -8927,6 +9019,11 @@ snapshots:
       '@shikijs/types': 2.5.0
 
   '@shikijs/types@2.5.0':
+    dependencies:
+      '@shikijs/vscode-textmate': 10.0.2
+      '@types/hast': 3.0.4
+
+  '@shikijs/types@3.23.0':
     dependencies:
       '@shikijs/vscode-textmate': 10.0.2
       '@types/hast': 3.0.4
@@ -10363,6 +10460,8 @@ snapshots:
     dependencies:
       once: 1.4.0
 
+  entities@4.5.0: {}
+
   entities@7.0.1: {}
 
   env-paths@2.2.1: {}
@@ -11763,6 +11862,10 @@ snapshots:
 
   lines-and-columns@1.2.4: {}
 
+  linkify-it@5.0.1:
+    dependencies:
+      uc.micro: 2.1.0
+
   locate-path@5.0.0:
     dependencies:
       p-locate: 4.1.0
@@ -11793,6 +11896,8 @@ snapshots:
     dependencies:
       yallist: 4.0.0
 
+  lunr@2.3.9: {}
+
   magic-string@0.30.21:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
@@ -11813,6 +11918,15 @@ snapshots:
 
   mark.js@8.11.1: {}
 
+  markdown-it@14.2.0:
+    dependencies:
+      argparse: 2.0.1
+      entities: 4.5.0
+      linkify-it: 5.0.1
+      mdurl: 2.0.0
+      punycode.js: 2.3.1
+      uc.micro: 2.1.0
+
   matcher@3.0.0:
     dependencies:
       escape-string-regexp: 4.0.0
@@ -11831,6 +11945,8 @@ snapshots:
       unist-util-position: 5.0.0
       unist-util-visit: 5.1.0
       vfile: 6.0.3
+
+  mdurl@2.0.0: {}
 
   media-typer@0.3.0: {}
 
@@ -12199,6 +12315,8 @@ snapshots:
     dependencies:
       end-of-stream: 1.4.5
       once: 1.4.0
+
+  punycode.js@2.3.1: {}
 
   punycode@2.3.1: {}
 
@@ -12912,11 +13030,30 @@ snapshots:
       possible-typed-array-names: 1.1.0
       reflect.getprototypeof: 1.0.10
 
+  typedoc-plugin-markdown@4.12.0(typedoc@0.28.19(typescript@5.9.3)):
+    dependencies:
+      typedoc: 0.28.19(typescript@5.9.3)
+
+  typedoc-vitepress-theme@1.1.3(typedoc-plugin-markdown@4.12.0(typedoc@0.28.19(typescript@5.9.3))):
+    dependencies:
+      typedoc-plugin-markdown: 4.12.0(typedoc@0.28.19(typescript@5.9.3))
+
+  typedoc@0.28.19(typescript@5.9.3):
+    dependencies:
+      '@gerrit0/mini-shiki': 3.23.0
+      lunr: 2.3.9
+      markdown-it: 14.2.0
+      minimatch: 10.2.5
+      typescript: 5.9.3
+      yaml: 2.9.0
+
   typescript@5.9.3: {}
 
   typical@4.0.0: {}
 
   typical@7.3.0: {}
+
+  uc.micro@2.1.0: {}
 
   uglify-js@3.19.3:
     optional: true
@@ -13041,13 +13178,13 @@ snapshots:
     dependencies:
       monaco-editor: 0.52.2
 
-  vite-plugin-static-copy@3.4.0(vite@7.3.2(@types/node@22.19.17)(jiti@2.6.1)(terser@5.46.2)):
+  vite-plugin-static-copy@3.4.0(vite@7.3.2(@types/node@22.19.17)(jiti@2.6.1)(terser@5.46.2)(yaml@2.9.0)):
     dependencies:
       chokidar: 3.6.0
       p-map: 7.0.4
       picocolors: 1.1.1
       tinyglobby: 0.2.16
-      vite: 7.3.2(@types/node@22.19.17)(jiti@2.6.1)(terser@5.46.2)
+      vite: 7.3.2(@types/node@22.19.17)(jiti@2.6.1)(terser@5.46.2)(yaml@2.9.0)
 
   vite@5.4.21(@types/node@24.12.2)(terser@5.46.2):
     dependencies:
@@ -13059,7 +13196,7 @@ snapshots:
       fsevents: 2.3.3
       terser: 5.46.2
 
-  vite@7.3.2(@types/node@22.19.17)(jiti@2.6.1)(terser@5.46.2):
+  vite@7.3.2(@types/node@22.19.17)(jiti@2.6.1)(terser@5.46.2)(yaml@2.9.0):
     dependencies:
       esbuild: 0.27.7
       fdir: 6.5.0(picomatch@4.0.4)
@@ -13072,6 +13209,7 @@ snapshots:
       fsevents: 2.3.3
       jiti: 2.6.1
       terser: 5.46.2
+      yaml: 2.9.0
 
   vitepress@1.6.4(@algolia/client-search@5.54.0)(@types/node@24.12.2)(postcss@8.5.15)(search-insights@2.17.3)(terser@5.46.2)(typescript@5.9.3):
     dependencies:
@@ -13242,6 +13380,8 @@ snapshots:
   yallist@4.0.0: {}
 
   yallist@5.0.0: {}
+
+  yaml@2.9.0: {}
 
   yargs-parser@18.1.3:
     dependencies:

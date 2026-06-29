@@ -1,3 +1,9 @@
+/**
+ * Dear ImGui bindings for zephyr3d project
+ *
+ * @module imgui
+ * @packageDocumentation
+ */
 import type { AbstractDevice, Font } from '@zephyr3d/device';
 import * as ImGui from './imgui';
 import * as ImGui_Impl from './imgui_impl';

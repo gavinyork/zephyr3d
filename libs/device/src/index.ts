@@ -7,6 +7,7 @@
  * a unified way to write shaders and automatically generate shader code
  * for the current platform.
  *
+ * @module device
  * @packageDocumentation
  */
 

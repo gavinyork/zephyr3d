@@ -1,6 +1,7 @@
 /**
  * The base library for zephyr3d project
  *
+ * @module base
  * @packageDocumentation
  */
 export * from './utils';
