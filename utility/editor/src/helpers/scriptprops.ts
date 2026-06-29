@@ -28,6 +28,7 @@ type RuntimeScriptValueDeclaration = {
   type: RuntimeScriptValueType;
   default?: unknown;
   label?: string;
+  description?: string;
   group?: string;
   hidden?: boolean;
   minValue?: number;
@@ -59,6 +60,7 @@ type RuntimeScriptPropertyInfo =
       element: RuntimeScriptArrayElementDeclaration;
       default?: unknown[];
       label?: string;
+      description?: string;
       group?: string;
       hidden?: boolean;
       minValue?: number;
@@ -533,6 +535,7 @@ function getArrayElementSerializationClass(
           {
             name: 'Value',
             type: getScalarPropertyType(scalarElement.type),
+            description: scalarElement.description,
             options: getPropertyOptions(scalarElement, undefined, false),
             isHidden() {
               return !!scalarElement.hidden;
@@ -555,6 +558,7 @@ function getArrayElementSerializationClass(
           ({
             name: field.name,
             type: getScalarPropertyType(field.type),
+            description: field.description,
             options: getPropertyOptions(field, undefined, false),
             isHidden() {
               return !!field.hidden;
@@ -596,6 +600,7 @@ function createScalarAccessor(
   return {
     name: info.name,
     type: getScalarPropertyType(info.type),
+    description: info.description,
     default: cloneValue(info.default),
     options: getPropertyOptions(info, scriptGroup),
     isHidden(this: ScriptHost) {
@@ -629,6 +634,7 @@ function createObjectArrayAccessor(
   return {
     name: info.name,
     type: 'object_array',
+    description: info.description,
     default: cloneValue(info.default),
     options: {
       ...getPropertyOptions(info, scriptGroup),
