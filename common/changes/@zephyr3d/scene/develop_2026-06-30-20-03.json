@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "fix .mjs runtime bundling",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
