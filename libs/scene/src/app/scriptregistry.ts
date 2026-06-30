@@ -96,7 +96,7 @@ type ScriptModuleInfo = {
  *
  * Modes:
  * - Editor mode (`editorMode === true`): local script graphs are bundled to data URLs.
- * - Runtime mode (`editorMode === false`): returns .js URLs directly (with .ts -\> .js mapping).
+ * - Runtime mode (`editorMode === false`): returns .js/.mjs URLs directly (with .ts -\> .js mapping).
  *
  * Caching:
  * - Built bundles are memoized in `_built` map keyed by canonical source path.
@@ -196,8 +196,8 @@ export class ScriptRegistry {
    * Fetches raw source for a logical module id by probing known extensions.
    *
    * Search order:
-   * - If `id` already ends with `.ts` or `.js` and is a file -\> return it.
-   * - Else try `.id.ts`, then `.id.js`.
+   * - If `id` already ends with `.ts`, `.js`, or `.mjs` and is a file -\> return it.
+   * - Else try `.id.ts`, then `.id.js`, then `.id.mjs`.
    *
    * @param id - Logical module identifier (absolute or logical path-like).
    * @returns Source code, resolved path, and type (`'js' | 'ts'`), or `undefined` if not found.
@@ -208,7 +208,7 @@ export class ScriptRegistry {
     if (id.endsWith('.ts')) {
       pathWithExt = id;
       type = 'ts';
-    } else if (id.endsWith('.js')) {
+    } else if (id.endsWith('.js') || id.endsWith('.mjs')) {
       pathWithExt = id;
       type = 'js';
     }
@@ -224,13 +224,13 @@ export class ScriptRegistry {
     }
     const types = ['ts', 'js'] as const;
     if (!type) {
-      for (const t of types) {
+      for (const t of [...types, 'mjs'] as const) {
         pathWithExt = `${id}.${t}`;
         const exists = await this._vfs.exists(pathWithExt);
         if (exists) {
           const stats = await this._vfs.stat(pathWithExt);
           if (stats.isFile) {
-            type = t;
+            type = t === 'ts' ? 'ts' : 'js';
             break;
           }
         }
@@ -247,8 +247,9 @@ export class ScriptRegistry {
    *
    * Behavior:
    * - In editor mode, builds the module to a data URL.
-   * - Otherwise, returns `.js` URL directly:
+   * - Otherwise, returns `.js` or `.mjs` URL directly:
    *   - If `id` ends with `.js`: return as-is.
+   *   - If `id` ends with `.mjs`: return as-is.
    *   - If `id` ends with `.ts`: map to `.js` (assumes pre-built file exists).
    *   - Else: append `.js`.
    *
@@ -262,7 +263,7 @@ export class ScriptRegistry {
     }
     return getApp().editorMode !== 'none'
       ? await this.build(String(id))
-      : id.endsWith('.js')
+      : id.endsWith('.js') || id.endsWith('.mjs')
         ? id
         : id.endsWith('.ts')
           ? `${id.slice(0, -3)}.js`
@@ -436,7 +437,7 @@ export class ScriptRegistry {
 
     const res = ts.transpileModule(code, {
       compilerOptions: {
-        target: ts.ScriptTarget.ES2015,
+        target: ts.ScriptTarget.ES2020,
         module: ts.ModuleKind.ESNext,
         experimentalDecorators: true,
         useDefineForClassFields: false
@@ -453,11 +454,12 @@ export class ScriptRegistry {
     const res = ts.transpileModule(code, {
       compilerOptions: {
         allowJs: true,
-        target: ts.ScriptTarget.ES2015,
+        // Keep modern syntax such as async generators, class fields, and private fields intact.
+        target: ts.ScriptTarget.ES2022,
         module: ts.ModuleKind.System,
         esModuleInterop: true,
         experimentalDecorators: true,
-        useDefineForClassFields: false
+        useDefineForClassFields: true
       },
       fileName: logicalId
     });
