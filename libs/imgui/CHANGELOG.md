@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/imgui
 
-This log was last generated on Tue, 19 May 2026 07:41:46 GMT and should not be manually modified.
+This log was last generated on Tue, 30 Jun 2026 20:07:17 GMT and should not be manually modified.
+
+## 0.2.5
+Tue, 30 Jun 2026 20:07:17 GMT
+
+### Patches
+
+- Switch API reference from api-documenter to TypeDoc
 
 ## 0.2.4
 Tue, 19 May 2026 07:41:46 GMT

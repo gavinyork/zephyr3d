@@ -2,6 +2,18 @@
   "name": "@zephyr3d/base",
   "entries": [
     {
+      "version": "0.2.8",
+      "tag": "@zephyr3d/base_v0.2.8",
+      "date": "Tue, 30 Jun 2026 20:07:17 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Switch API reference from api-documenter to TypeDoc"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.7",
       "tag": "@zephyr3d/base_v0.2.7",
       "date": "Tue, 23 Jun 2026 16:50:23 GMT",

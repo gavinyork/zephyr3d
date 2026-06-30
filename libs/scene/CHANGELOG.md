@@ -1,6 +1,14 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Sun, 28 Jun 2026 18:17:14 GMT and should not be manually modified.
+This log was last generated on Tue, 30 Jun 2026 20:07:17 GMT and should not be manually modified.
+
+## 0.9.11
+Tue, 30 Jun 2026 20:07:17 GMT
+
+### Patches
+
+- Switch API reference from api-documenter to TypeDoc
+- fix .mjs runtime bundling
 
 ## 0.9.10
 Sun, 28 Jun 2026 18:17:14 GMT

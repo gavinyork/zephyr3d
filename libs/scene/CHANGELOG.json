@@ -2,6 +2,29 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.11",
+      "tag": "@zephyr3d/scene_v0.9.11",
+      "date": "Tue, 30 Jun 2026 20:07:17 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Switch API reference from api-documenter to TypeDoc"
+          },
+          {
+            "comment": "fix .mjs runtime bundling"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.7` to `0.2.8`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.10` to `0.2.11`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.10",
       "tag": "@zephyr3d/scene_v0.9.10",
       "date": "Sun, 28 Jun 2026 18:17:14 GMT",

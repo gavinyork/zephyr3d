@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/backend-webgl
 
-This log was last generated on Wed, 29 Apr 2026 18:55:40 GMT and should not be manually modified.
+This log was last generated on Tue, 30 Jun 2026 20:07:17 GMT and should not be manually modified.
+
+## 0.1.13
+Tue, 30 Jun 2026 20:07:17 GMT
+
+### Patches
+
+- Switch API reference from api-documenter to TypeDoc
 
 ## 0.1.12
 Wed, 29 Apr 2026 18:55:40 GMT

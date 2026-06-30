@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/device
 
-This log was last generated on Tue, 23 Jun 2026 16:50:23 GMT and should not be manually modified.
+This log was last generated on Tue, 30 Jun 2026 20:07:17 GMT and should not be manually modified.
+
+## 0.2.11
+Tue, 30 Jun 2026 20:07:17 GMT
+
+### Patches
+
+- Switch API reference from api-documenter to TypeDoc
 
 ## 0.2.10
 Tue, 23 Jun 2026 16:50:23 GMT

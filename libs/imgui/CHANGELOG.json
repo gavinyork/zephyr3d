@@ -2,6 +2,26 @@
   "name": "@zephyr3d/imgui",
   "entries": [
     {
+      "version": "0.2.5",
+      "tag": "@zephyr3d/imgui_v0.2.5",
+      "date": "Tue, 30 Jun 2026 20:07:17 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Switch API reference from api-documenter to TypeDoc"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.7` to `0.2.8`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.10` to `0.2.11`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.4",
       "tag": "@zephyr3d/imgui_v0.2.4",
       "date": "Tue, 19 May 2026 07:41:46 GMT",

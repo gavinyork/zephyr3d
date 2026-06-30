@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/backend-webgpu
 
-This log was last generated on Wed, 24 Jun 2026 16:45:43 GMT and should not be manually modified.
+This log was last generated on Tue, 30 Jun 2026 20:07:17 GMT and should not be manually modified.
+
+## 0.1.15
+Tue, 30 Jun 2026 20:07:17 GMT
+
+### Patches
+
+- Switch API reference from api-documenter to TypeDoc
 
 ## 0.1.14
 Wed, 24 Jun 2026 16:45:43 GMT
