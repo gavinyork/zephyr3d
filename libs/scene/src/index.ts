@@ -7,6 +7,7 @@
  * style lighting passes, shadow mapping, post-processing, GPU picking, animation, and a robust app/runtime
  * layer to orchestrate rendering and resource lifecycles.
  *
+ * @module scene
  * @packageDocumentation
  */
 

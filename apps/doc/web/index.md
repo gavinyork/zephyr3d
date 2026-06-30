@@ -17,7 +17,7 @@ hero:
       link: /en/
     - theme: alt
       text: API Reference
-      link: /api/markdown/
+      link: /api/
 
 features:
   - title: Device API

@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noEmit": true
+  },
+  "include": [
+    "../../libs/base/src/**/*.ts",
+    "../../libs/device/src/**/*.ts",
+    "../../libs/loaders/src/**/*.ts",
+    "../../libs/imgui/src/**/*.ts",
+    "../../libs/scene/src/**/*.ts",
+    "../../libs/backend-webgl/src/**/*.ts",
+    "../../libs/backend-webgpu/src/**/*.ts"
+  ],
+  "exclude": ["**/node_modules", "**/*.spec.ts", "**/*.d.ts"]
+}

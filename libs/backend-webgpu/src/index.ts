@@ -1,3 +1,9 @@
+/**
+ * The WebGPU device backend for zephyr3d project
+ *
+ * @module backend-webgpu
+ * @packageDocumentation
+ */
 import { WebGPUDevice } from './device';
 import type { DeviceBackend, DeviceEventMap } from '@zephyr3d/device';
 import type { Nullable } from '@zephyr3d/base';

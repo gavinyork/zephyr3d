@@ -62,8 +62,6 @@ For help, feedback, or contributions, please use the following channels:
   <https://github.com/gavinyork/zephyr3d>
 
 - **Issues** – report bugs or suggest improvements  
-- **Wiki / Documentation** – detailed guides, API references, and practical examples  
-- **Community Channels** – e.g. Discord / QQ / forum (recommended to be added later)
 
 ---
 

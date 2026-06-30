@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Switch API reference from api-documenter to TypeDoc",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

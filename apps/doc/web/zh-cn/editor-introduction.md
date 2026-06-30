@@ -64,8 +64,6 @@ Zephyr3d Editor 既可作为 **Zephyr3d 引擎的配套工具**，也可独�
   [https://github.com/gavinyork/zephyr3d](https://github.com/gavinyork/zephyr3d)
 
 - **Issues 页面**：报告 Bug 或提出改进建议  
-- **Wiki 文档**：查看详细开发指南、API 参考与实践示例  
-- **社区讨论**（建议后续添加 Discord/QQ 或论坛链接）
 
 ---
 
