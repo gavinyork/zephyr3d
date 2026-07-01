@@ -154,6 +154,17 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
     const v = this._openState.get(id);
     return v !== undefined ? v : defaultOpen;
   }
+  private setNodeOpenRecursive(node: T, open: boolean) {
+    const id = this._data.getId(node);
+    this._openState.set(id, open);
+    this.onNodeOpenChanged(node, open);
+    if (!open && !this._data.hasChildren(node)) {
+      return;
+    }
+    for (const child of this._data.getChildren(node)) {
+      this.setNodeOpenRecursive(child, open);
+    }
+  }
 
   private renderRow(row: VisibleRow<T>, rowIndex: number, forceUpdate: boolean, _rowH: number) {
     const node = row.node;
@@ -184,8 +195,9 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
     if (textColor) {
       ImGui.PopStyleColor();
     }
+    const toggledOpen = !row.leaf && ImGui.IsItemToggledOpen();
 
-    if (ImGui.IsItemClicked(ImGui.MouseButton.Left)) {
+    if (ImGui.IsItemClicked(ImGui.MouseButton.Left) && !toggledOpen) {
       if (this._data.getDragSourcePayloadType(node)) {
         this.queuePendingClick(node, rowIndex);
       } else {
@@ -230,11 +242,15 @@ export class TreeView<P extends EventMap, T = unknown> extends Observable<P> {
     }
 
     if (!row.leaf) {
-      if (ImGui.IsItemToggledOpen()) {
+      if (toggledOpen) {
         const nowOpen = clickedOpen;
-        this._openState.set(id, nowOpen);
+        if (ImGui.GetIO().KeyShift) {
+          this.setNodeOpenRecursive(node, nowOpen);
+        } else {
+          this._openState.set(id, nowOpen);
+          this.onNodeOpenChanged(node, nowOpen);
+        }
         this._visibleDirty = true;
-        this.onNodeOpenChanged(node, nowOpen);
       }
     }
 

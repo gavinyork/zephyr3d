@@ -501,6 +501,23 @@ export class PropertyEditor extends Observable<{
   private inspectGroup(group: PropertyGroup) {
     this._inspectedGroup = this.getNearestObjectGroup(group);
   }
+  private setGroupOpenStateRecursive(group: PropertyGroup, opened: boolean) {
+    let changed = false;
+    if (group !== this._rootGroup) {
+      changed = group.opened !== opened || this._groupOpenStates.get(group.statePath) !== opened || changed;
+      group.opened = opened;
+      this._groupOpenStates.set(group.statePath, opened);
+    }
+    for (const property of group.properties) {
+      if (property instanceof PropertyGroup) {
+        changed = this.setGroupOpenStateRecursive(property, opened) || changed;
+      }
+    }
+    for (const subgroup of group.subgroups) {
+      changed = this.setGroupOpenStateRecursive(subgroup, opened) || changed;
+    }
+    return changed;
+  }
   private getNearestObjectGroup(group: PropertyGroup) {
     let current: Nullable<PropertyGroup> = group;
     while (current && current !== this._rootGroup) {
@@ -835,9 +852,16 @@ export class PropertyEditor extends Observable<{
         ImGui.TextDisabled(this.getGroupLabel(group));
       }
     } else {
-      opened = ImGui.TreeNodeEx(this.getGroupLabel(group), 0);
+      let recursiveChanged = false;
+      opened = ImGui.TreeNodeEx(this.getGroupLabel(group), ImGui.TreeNodeFlags.OpenOnArrow);
       if (ImGui.IsItemClicked(ImGui.MouseButton.Left) || ImGui.IsItemActivated()) {
         this.inspectGroup(group);
+      }
+      if (ImGui.IsItemToggledOpen() && ImGui.GetIO().KeyShift) {
+        recursiveChanged = this.setGroupOpenStateRecursive(group, opened);
+      }
+      if (recursiveChanged) {
+        this.invalidateRows();
       }
     }
     if (group.opened !== opened) {
