@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Update point light attenuation calculation",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

@@ -512,9 +512,13 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       const funcName = 'Z_calculatePointLightAttenuation';
       pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('posRange')], function () {
-        this.$l.dist = pb.distance(this.posRange.xyz, this.worldPos);
-        this.$l.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.posRange.w)));
-        this.$return(pb.mul(this.falloff, this.falloff));
+        this.$l.d = pb.sub(this.worldPos, this.posRange.xyz);
+        this.$l.dist2 = pb.dot(this.d, this.d);
+        this.$l.lightAtten = pb.div(1, pb.max(this.dist2, 0.0001));
+        this.$l.range2 = pb.mul(this.posRange.w, this.posRange.w);
+        this.$l.f = pb.div(this.dist2, pb.max(this.range2, 0.0001));
+        this.$l.f2 = pb.clamp(pb.sub(1, pb.mul(this.f, this.f)), 0, 1);
+        this.$return(pb.mul(this.lightAtten, pb.mul(this.f2, this.f2)));
       });
       return pb.getGlobalScope()[funcName](worldPos, posRange);
     }
