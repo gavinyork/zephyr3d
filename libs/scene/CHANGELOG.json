@@ -2,6 +2,18 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.12",
+      "tag": "@zephyr3d/scene_v0.9.12",
+      "date": "Wed, 01 Jul 2026 16:19:34 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Update point light attenuation calculation"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.11",
       "tag": "@zephyr3d/scene_v0.9.11",
       "date": "Tue, 30 Jun 2026 20:07:17 GMT",

@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Tue, 30 Jun 2026 20:07:17 GMT and should not be manually modified.
+This log was last generated on Wed, 01 Jul 2026 16:19:34 GMT and should not be manually modified.
+
+## 0.9.12
+Wed, 01 Jul 2026 16:19:34 GMT
+
+### Patches
+
+- Update point light attenuation calculation
 
 ## 0.9.11
 Tue, 30 Jun 2026 20:07:17 GMT
