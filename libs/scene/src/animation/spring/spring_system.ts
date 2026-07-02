@@ -249,11 +249,13 @@ export class SpringSystem {
   private updateFixedParticles(deltaTime: number): void {
     const blend = this.getTemporalBlendFactor(deltaTime, DEFAULT_PARTICLE_TARGET_SMOOTHING_TIME);
     for (const particle of this._chain.particles) {
-      if (!particle.node) {
+      const sourceNode = particle.anchorNode ?? particle.node;
+      if (!sourceNode) {
         continue;
       }
-      const worldMatrix = particle.node.worldMatrix;
-      const worldPos = new Vector3(worldMatrix.m03, worldMatrix.m13, worldMatrix.m23);
+      const worldPos = particle.anchorOffset
+        ? sourceNode.worldMatrix.transformPointAffine(particle.anchorOffset)
+        : new Vector3(sourceNode.worldMatrix.m03, sourceNode.worldMatrix.m13, sourceNode.worldMatrix.m23);
       const smoothedTarget = this.getSmoothedParticleTarget(particle, worldPos, blend);
       particle.animPosition.set(smoothedTarget);
       if (particle.fixed) {
