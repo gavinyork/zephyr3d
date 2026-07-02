@@ -28,7 +28,7 @@ import { eventBus } from '../core/eventbus';
 import type { SceneHierarchyNodePickerPayload } from './scenehierarchy';
 import type { VFSRendererAssetPickerPayload } from './vfsrenderer';
 import { matchesMimeType } from '../helpers/mimematch';
-import { CustomInputTextFlags, customTextInput } from './textinput';
+import { CustomInputTextFlags, customTextInput, requestCustomTextInputFocus } from './textinput';
 
 interface Property<T extends {}> {
   objectPath: string;
@@ -1737,7 +1737,7 @@ export class PropertyEditor extends Observable<{
             if (stringEditorActive) {
               ImGui.SetNextItemWidth(fieldWidth);
               if (this._pendingStringEditorFocus === editSessionKey) {
-                ImGui.SetKeyboardFocusHere();
+                requestCustomTextInputFocus('##value');
                 this._pendingStringEditorFocus = null;
               }
               changed = value.options?.multiline
