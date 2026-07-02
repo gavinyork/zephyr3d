@@ -99,6 +99,7 @@ class PropertyGroup {
   property: Nullable<Property<any>>;
   currentType: number;
   opened: boolean;
+  defaultOpen: Nullable<boolean>;
   objectTypes: Nullable<Nullable<SerializableClass>[]>;
   prop: Nullable<PropertyAccessor<any>>;
   properties: (PropertyGroup | { name: string; property: Property<any> })[];
@@ -119,6 +120,7 @@ class PropertyGroup {
     this.prop = null;
     this.currentType = -1;
     this.opened = true;
+    this.defaultOpen = null;
     this.objectTypes = null;
     this.properties = [];
     this.rawProperties = [];
@@ -165,7 +167,7 @@ class PropertyGroup {
       return;
     }
     if (value.options?.group) {
-      group = this.findOrAddGroup(value.options.group);
+      group = this.findOrAddGroup(value.options.group, value.options.defaultOpen);
     }
     const tmpProperty = {
       num: [0, 0, 0, 0],
@@ -216,7 +218,7 @@ class PropertyGroup {
     this.subgroups.push(group);
     return group;
   }
-  findOrAddGroup(name: string) {
+  findOrAddGroup(name: string, defaultOpen?: boolean) {
     const parts = name.split('/');
     const firstPart = parts.shift()!;
     let parent = this.properties.find(
@@ -227,7 +229,10 @@ class PropertyGroup {
       parent.parent = this;
       parent.path = this.path;
       parent.statePath = `${this.statePath}/${firstPart}`;
+      parent.defaultOpen = defaultOpen ?? null;
       this.properties.push(parent);
+    } else if (defaultOpen !== undefined && parent.defaultOpen == null) {
+      parent.defaultOpen = defaultOpen;
     }
     let group = parent;
     while (parts.length > 0) {
@@ -747,6 +752,7 @@ export class PropertyEditor extends Observable<{
     const opened = this._groupOpenStates.get(group.statePath);
     group.opened =
       opened ??
+      group.defaultOpen ??
       (isScriptArrayElementObject(group.value.object?.[0])
         ? true
         : this.getNearestObjectGroup(group) === this._rootGroup);
