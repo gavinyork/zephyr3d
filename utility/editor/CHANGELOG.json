@@ -2,6 +2,18 @@
   "name": "@zephyr3d/editor",
   "entries": [
     {
+      "version": "0.3.7",
+      "tag": "@zephyr3d/editor_v0.3.7",
+      "date": "Thu, 02 Jul 2026 20:22:25 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add icon for macOS version of editor"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.3.6",
       "tag": "@zephyr3d/editor_v0.3.6",
       "date": "Thu, 02 Jul 2026 18:25:31 GMT",

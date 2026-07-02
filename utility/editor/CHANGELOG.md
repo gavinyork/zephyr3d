@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/editor
 
-This log was last generated on Thu, 02 Jul 2026 18:25:31 GMT and should not be manually modified.
+This log was last generated on Thu, 02 Jul 2026 20:22:25 GMT and should not be manually modified.
+
+## 0.3.7
+Thu, 02 Jul 2026 20:22:25 GMT
+
+### Patches
+
+- Add icon for macOS version of editor
 
 ## 0.3.6
 Thu, 02 Jul 2026 18:25:31 GMT
