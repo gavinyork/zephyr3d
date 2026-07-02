@@ -1,0 +1,219 @@
+name: Editor Electron Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: Create a draft GitHub release after the builds finish
+        type: boolean
+        default: false
+      tag_suffix:
+        description: Optional suffix for test releases, for example test-1
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: editor-electron-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main branch
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "This release workflow can only run from the main branch."
+            exit 1
+          fi
+
+  metadata:
+    needs: guard
+    runs-on: ubuntu-latest
+    outputs:
+      release_name: ${{ steps.meta.outputs.release_name }}
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read editor version
+        id: meta
+        env:
+          TAG_SUFFIX: ${{ inputs.tag_suffix }}
+        shell: bash
+        run: |
+          version="$(node -p "require('./utility/editor/package.json').version")"
+          suffix="${TAG_SUFFIX}"
+
+          if [ -n "${suffix}" ] && [[ ! "${suffix}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            echo "tag_suffix must match ^[A-Za-z0-9][A-Za-z0-9._-]*$"
+            exit 1
+          fi
+
+          tag="editor-v${version}"
+          release_name="Zephyr3D Editor ${version}"
+          if [ -n "${suffix}" ]; then
+            tag="${tag}-${suffix}"
+            release_name="${release_name} (${suffix})"
+          fi
+
+          echo "release_name=${release_name}" >> "${GITHUB_OUTPUT}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+      - name: Refuse duplicate release
+        if: inputs.create_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "${{ steps.meta.outputs.tag }}" >/dev/null 2>&1; then
+            echo "Release ${{ steps.meta.outputs.tag }} already exists."
+            exit 1
+          fi
+
+  build:
+    needs: metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win
+          - os: macos-latest
+            target: mac
+    runs-on: ${{ matrix.os }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
+
+      - name: Rush Update
+        run: node common/scripts/install-run-rush.js update
+
+      - name: Build editor
+        run: node common/scripts/install-run-rush.js build -t editor
+
+      - name: Prepare Electron app
+        run: npm run electron:prepare --prefix utility/editor
+
+      - name: Build Electron package
+        working-directory: utility/editor
+        run: pnpm exec electron-builder --projectDir .electron-app --config ../electron-builder.json --${{ matrix.target }} --publish=never
+
+      - name: Generate SHA256 checksums
+        shell: bash
+        run: |
+          node <<'EOF'
+          const crypto = require('crypto');
+          const fs = require('fs');
+          const path = require('path');
+
+          const target = process.env.RELEASE_TARGET;
+          const releaseDir = path.resolve('utility/editor/release');
+          const checksumFile = path.join(releaseDir, `SHA256SUMS-${target}.txt`);
+          const assetExtensions = new Set(['.dmg', '.exe', '.zip']);
+
+          const assets = fs.readdirSync(releaseDir)
+            .filter((name) => assetExtensions.has(path.extname(name).toLowerCase()))
+            .sort((a, b) => a.localeCompare(b));
+
+          if (assets.length === 0) {
+            throw new Error(`No release assets found in ${releaseDir}`);
+          }
+
+          const lines = assets.map((name) => {
+            const file = path.join(releaseDir, name);
+            const hash = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+            return `${hash}  ${name}`;
+          });
+
+          fs.writeFileSync(checksumFile, `${lines.join('\n')}\n`);
+          EOF
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: editor-electron-${{ matrix.target }}
+          path: |
+            utility/editor/release/*.dmg
+            utility/editor/release/*.exe
+            utility/editor/release/*.zip
+            utility/editor/release/SHA256SUMS-${{ matrix.target }}.txt
+          if-no-files-found: error
+
+  release:
+    if: inputs.create_release
+    needs:
+      - metadata
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Merge checksums
+        shell: bash
+        run: |
+          cat release-assets/SHA256SUMS-*.txt > release-assets/SHA256SUMS.txt
+          rm release-assets/SHA256SUMS-*.txt
+
+      - name: Generate release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.metadata.outputs.tag }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+        shell: bash
+        run: |
+          gh api repos/${{ github.repository }}/releases/generate-notes \
+            -f tag_name="${TAG_NAME}" \
+            -f target_commitish="${GITHUB_SHA}" \
+            --jq .body > generated-notes.md
+
+          {
+            echo "## Unsigned builds"
+            echo
+            echo "These desktop builds are not code signed. Verify downloaded files with the attached SHA256SUMS.txt."
+            echo
+            echo "## Generated notes"
+            echo
+            cat generated-notes.md
+          } > release-notes.md
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "${{ needs.metadata.outputs.tag }}" release-assets/* \
+            --target "${GITHUB_SHA}" \
+            --title "${{ needs.metadata.outputs.release_name }}" \
+            --notes-file release-notes.md \
+            --draft

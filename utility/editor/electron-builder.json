@@ -1,6 +1,7 @@
 {
   "appId": "dev.zephyr3d.editor",
   "productName": "Zephyr3D Editor",
+  "artifactName": "Zephyr3D-Editor-${version}-${os}-${arch}.${ext}",
   "electronVersion": "41.5.0",
   "directories": {
     "output": "../release"
