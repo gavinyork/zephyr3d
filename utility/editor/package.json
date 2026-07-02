@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/editor",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "zephyr3d studio",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "main": "electron/main.cjs",
@@ -111,7 +111,7 @@
     "@jridgewell/trace-mapping": "^0.3.25",
     "@zephyr3d/base": "workspace:^0.2.8",
     "@zephyr3d/device": "workspace:^0.2.11",
-    "@zephyr3d/scene": "workspace:^0.9.12",
+    "@zephyr3d/scene": "workspace:^0.9.13",
     "@zephyr3d/loaders": "workspace:^0.1.3",
     "@zephyr3d/imgui": "workspace:^0.2.5",
     "@zephyr3d/backend-webgl": "workspace:^0.1.13",

@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/editor
 
-This log was last generated on Thu, 25 Jun 2026 08:26:57 GMT and should not be manually modified.
+This log was last generated on Thu, 02 Jul 2026 18:25:31 GMT and should not be manually modified.
+
+## 0.3.6
+Thu, 02 Jul 2026 18:25:31 GMT
+
+### Patches
+
+- Update electron builder configurations.
 
 ## 0.3.5
 Thu, 25 Jun 2026 08:26:57 GMT

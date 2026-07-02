@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Wed, 01 Jul 2026 16:19:34 GMT and should not be manually modified.
+This log was last generated on Thu, 02 Jul 2026 18:25:31 GMT and should not be manually modified.
+
+## 0.9.13
+Thu, 02 Jul 2026 18:25:31 GMT
+
+### Patches
+
+- Change serialization default values for camera
 
 ## 0.9.12
 Wed, 01 Jul 2026 16:19:34 GMT
