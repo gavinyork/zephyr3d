@@ -383,7 +383,7 @@ export function getCameraClass(): SerializableClass {
           name: 'FXAAEnabled',
           type: 'bool',
           phase: 0,
-          default: true,
+          default: false,
           options: {
             label: 'Enabled',
             group: 'PostProcessing/FXAA'
