@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Change serialization default values for camera",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

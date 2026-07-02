@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Update electron builder configurations.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}
