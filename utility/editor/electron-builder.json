@@ -28,7 +28,11 @@
       "zip"
     ]
   },
+  "nsis": {
+    "artifactName": "Zephyr3D-Editor-${version}-${os}-${arch}-Setup.${ext}"
+  },
   "mac": {
+    "icon": ".electron-app/electron/icon.icns",
     "target": [
       "dmg",
       "zip"
