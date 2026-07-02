@@ -119,6 +119,13 @@ jobs:
       - name: Prepare Electron app
         run: npm run electron:prepare --prefix utility/editor
 
+      - name: Verify macOS icon
+        if: matrix.target == 'mac'
+        shell: bash
+        run: |
+          test -s utility/editor/.electron-app/electron/icon.icns
+          ls -l utility/editor/.electron-app/electron/icon.icns
+
       - name: Build Electron package
         working-directory: utility/editor
         run: pnpm exec electron-builder --projectDir .electron-app --config ../electron-builder.json --${{ matrix.target }} --publish=never
