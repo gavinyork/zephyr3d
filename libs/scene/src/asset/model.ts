@@ -42,6 +42,7 @@ import {
   JointDynamicsModifier,
   JointDynamicsSystem,
   MorphTargetTrack,
+  MorphTargetGroupTrack,
   NodeRotationTrack,
   NodeScaleTrack,
   NodeTranslationTrack,
@@ -364,9 +365,10 @@ export interface AssetMorphTargetGroup {
  */
 export interface AssetAnimationTrack {
   node: AssetHierarchyNode;
-  type: 'translation' | 'scale' | 'rotation' | 'weights';
+  type: 'translation' | 'scale' | 'rotation' | 'weights' | 'morph-target-group';
   interpolator: Interpolator;
   defaultMorphWeights?: number[];
+  morphTargetGroupName?: string;
 }
 
 /**
@@ -1760,6 +1762,14 @@ export class SharedModel extends Disposable {
                   );
                   animation.addTrack(mesh, morphTrack);
                 }
+              }
+            } else if (track.type === 'morph-target-group') {
+              const groupName = track.morphTargetGroupName;
+              if (groupName) {
+                const morphTargetGroupTrack = new MorphTargetGroupTrack(groupName, track.interpolator, true);
+                morphTargetGroupTrack.name = groupName;
+                morphTargetGroupTrack.target = group.persistentId;
+                animation.addTrack(group, morphTargetGroupTrack);
               }
             } else if (track.type === 'geometry-cache') {
               const subMesh = track.node.mesh?.subMeshes[track.subMeshIndex];

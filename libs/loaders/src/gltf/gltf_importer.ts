@@ -91,6 +91,11 @@ type VRMC0BlendShapeGroupInfo = {
   binds?: unknown;
 };
 
+type VRMC0HumanBoneInfo = {
+  bone?: unknown;
+  node?: unknown;
+};
+
 type VRMC1MorphTargetBindInfo = {
   node?: unknown;
   index?: unknown;
@@ -180,9 +185,19 @@ type VRMAHumanoidInfo = {
   humanBones?: Record<string, VRMAHumanoidBoneInfo>;
 };
 
+type VRMAExpressionInfo = {
+  node?: unknown;
+};
+
+type VRMAExpressionsInfo = {
+  preset?: Record<string, VRMAExpressionInfo>;
+  custom?: Record<string, VRMAExpressionInfo>;
+};
+
 type VRMCVRMAnimationInfo = {
   specVersion?: unknown;
   humanoid?: VRMAHumanoidInfo;
+  expressions?: VRMAExpressionsInfo;
 };
 
 const VRM_SPRING_BONE_SUBSTEPS = 3;
@@ -191,6 +206,7 @@ const VRM_BASE_GRAVITY_ACCELERATION = 9.8 * VRM_GRAVITY_ACCELERATION_SCALE;
 const VRM_GRAVITY_POWER_TO_ACCELERATION = 9.8 * VRM_GRAVITY_ACCELERATION_SCALE;
 const VRM_STIFFNESS_TO_FRAME_HARDNESS = 0.05;
 const VRM_DRAGFORCE_SCALE = 0.5;
+const VRMA_LOOK_AT_EXPRESSION_NAMES = new Set(['lookUp', 'lookDown', 'lookLeft', 'lookRight']);
 
 /** @internal */
 export interface GLTFContent extends GlTf {
@@ -1043,7 +1059,47 @@ export class GLTFImporter extends AbstractModelImporter {
         model.addSkeleton(skeleton);
       }
     }
+    this._loadVRMHumanoidSkeletonMappings(gltf, model);
     this._loadVRMAHumanoidSkeleton(gltf, model);
+  }
+
+  private _loadVRMHumanoidSkeletonMappings(gltf: GLTFContent, model: SharedModel) {
+    const mapping = this._getVRMC1HumanoidMapping(gltf) ?? this._getVRMC0HumanoidMapping(gltf);
+    if (!mapping) {
+      return;
+    }
+    for (const skeleton of model.skeletons) {
+      const skeletonMapping = this._filterHumanoidMappingToSkeleton(mapping, skeleton);
+      if (skeletonMapping) {
+        this._setAssetSkeletonHumanoidMapping(skeleton, skeletonMapping);
+      }
+    }
+  }
+
+  private _getVRMC1HumanoidMapping(gltf: GLTFContent): Nullable<HumanoidJointMapping<AssetHierarchyNode>> {
+    const humanBones = gltf.extensions?.VRMC_vrm?.humanoid?.humanBones;
+    if (!humanBones || typeof humanBones !== 'object') {
+      return null;
+    }
+    return this._getVRMAHumanoidMapping(gltf, humanBones as Record<string, VRMAHumanoidBoneInfo>);
+  }
+
+  private _getVRMC0HumanoidMapping(gltf: GLTFContent): Nullable<HumanoidJointMapping<AssetHierarchyNode>> {
+    const humanBones = gltf.extensions?.VRM?.humanoid?.humanBones;
+    if (!Array.isArray(humanBones)) {
+      return null;
+    }
+    const byName: Record<string, VRMAHumanoidBoneInfo> = {};
+    for (const value of humanBones) {
+      if (!value || typeof value !== 'object') {
+        continue;
+      }
+      const boneInfo = value as VRMC0HumanBoneInfo;
+      if (typeof boneInfo.bone === 'string') {
+        byName[boneInfo.bone] = { node: boneInfo.node };
+      }
+    }
+    return this._getVRMC0HumanoidMappingFromBones(gltf, byName);
   }
   /** @internal */
   private _loadVRMAHumanoidSkeleton(gltf: GLTFContent, model: SharedModel) {
@@ -1188,6 +1244,125 @@ export class GLTFImporter extends AbstractModelImporter {
     return result;
   }
 
+  private _getVRMC0HumanoidMappingFromBones(
+    gltf: GLTFContent,
+    humanBones: Record<string, VRMAHumanoidBoneInfo>
+  ): Nullable<HumanoidJointMapping<AssetHierarchyNode>> {
+    const body = {} as Partial<Record<HumanoidBodyRig, AssetHierarchyNode>>;
+    const leftHand = {} as Partial<Record<HumanoidHandRig, AssetHierarchyNode>>;
+    const rightHand = {} as Partial<Record<HumanoidHandRig, AssetHierarchyNode>>;
+    const setBody = (vrmName: string, rig: HumanoidBodyRig) => {
+      const node = this._getVRMAHumanBoneNode(gltf, humanBones, vrmName);
+      if (node) {
+        body[rig] = node;
+      }
+    };
+    const setHand = (side: 'left' | 'right', vrmName: string, rig: HumanoidHandRig) => {
+      const node = this._getVRMAHumanBoneNode(gltf, humanBones, vrmName);
+      if (node) {
+        (side === 'left' ? leftHand : rightHand)[rig] = node;
+      }
+    };
+    setBody('hips', HumanoidBodyRig.Hips);
+    setBody('spine', HumanoidBodyRig.Spine);
+    setBody('chest', HumanoidBodyRig.Chest);
+    setBody('upperChest', HumanoidBodyRig.UpperChest);
+    setBody('neck', HumanoidBodyRig.Neck);
+    setBody('head', HumanoidBodyRig.Head);
+    setBody('leftShoulder', HumanoidBodyRig.LeftShoulder);
+    setBody('leftUpperArm', HumanoidBodyRig.LeftUpperArm);
+    setBody('leftLowerArm', HumanoidBodyRig.LeftLowerArm);
+    setBody('leftHand', HumanoidBodyRig.LeftHand);
+    setBody('rightShoulder', HumanoidBodyRig.RightShoulder);
+    setBody('rightUpperArm', HumanoidBodyRig.RightUpperArm);
+    setBody('rightLowerArm', HumanoidBodyRig.RightLowerArm);
+    setBody('rightHand', HumanoidBodyRig.RightHand);
+    setBody('leftUpperLeg', HumanoidBodyRig.LeftUpperLeg);
+    setBody('leftLowerLeg', HumanoidBodyRig.LeftLowerLeg);
+    setBody('leftFoot', HumanoidBodyRig.LeftFoot);
+    setBody('leftToes', HumanoidBodyRig.LeftToes);
+    setBody('rightUpperLeg', HumanoidBodyRig.RightUpperLeg);
+    setBody('rightLowerLeg', HumanoidBodyRig.RightLowerLeg);
+    setBody('rightFoot', HumanoidBodyRig.RightFoot);
+    setBody('rightToes', HumanoidBodyRig.RightToes);
+    setHand('left', 'leftThumbProximal', HumanoidHandRig.ThumbProximal);
+    setHand('left', 'leftThumbIntermediate', HumanoidHandRig.ThumbIntermediate);
+    setHand('left', 'leftThumbDistal', HumanoidHandRig.ThumbDistal);
+    setHand('left', 'leftIndexProximal', HumanoidHandRig.IndexProximal);
+    setHand('left', 'leftIndexIntermediate', HumanoidHandRig.IndexIntermediate);
+    setHand('left', 'leftIndexDistal', HumanoidHandRig.IndexDistal);
+    setHand('left', 'leftMiddleProximal', HumanoidHandRig.MiddleProximal);
+    setHand('left', 'leftMiddleIntermediate', HumanoidHandRig.MiddleIntermediate);
+    setHand('left', 'leftMiddleDistal', HumanoidHandRig.MiddleDistal);
+    setHand('left', 'leftRingProximal', HumanoidHandRig.RingProximal);
+    setHand('left', 'leftRingIntermediate', HumanoidHandRig.RingIntermediate);
+    setHand('left', 'leftRingDistal', HumanoidHandRig.RingDistal);
+    setHand('left', 'leftLittleProximal', HumanoidHandRig.PinkyProximal);
+    setHand('left', 'leftLittleIntermediate', HumanoidHandRig.PinkyIntermediate);
+    setHand('left', 'leftLittleDistal', HumanoidHandRig.PinkyDistal);
+    setHand('right', 'rightThumbProximal', HumanoidHandRig.ThumbProximal);
+    setHand('right', 'rightThumbIntermediate', HumanoidHandRig.ThumbIntermediate);
+    setHand('right', 'rightThumbDistal', HumanoidHandRig.ThumbDistal);
+    setHand('right', 'rightIndexProximal', HumanoidHandRig.IndexProximal);
+    setHand('right', 'rightIndexIntermediate', HumanoidHandRig.IndexIntermediate);
+    setHand('right', 'rightIndexDistal', HumanoidHandRig.IndexDistal);
+    setHand('right', 'rightMiddleProximal', HumanoidHandRig.MiddleProximal);
+    setHand('right', 'rightMiddleIntermediate', HumanoidHandRig.MiddleIntermediate);
+    setHand('right', 'rightMiddleDistal', HumanoidHandRig.MiddleDistal);
+    setHand('right', 'rightRingProximal', HumanoidHandRig.RingProximal);
+    setHand('right', 'rightRingIntermediate', HumanoidHandRig.RingIntermediate);
+    setHand('right', 'rightRingDistal', HumanoidHandRig.RingDistal);
+    setHand('right', 'rightLittleProximal', HumanoidHandRig.PinkyProximal);
+    setHand('right', 'rightLittleIntermediate', HumanoidHandRig.PinkyIntermediate);
+    setHand('right', 'rightLittleDistal', HumanoidHandRig.PinkyDistal);
+    if (!body[HumanoidBodyRig.Hips]) {
+      return null;
+    }
+    const result: HumanoidJointMapping<AssetHierarchyNode> = {
+      body: body as Record<HumanoidBodyRig, AssetHierarchyNode>
+    };
+    if (Object.keys(leftHand).length > 0) {
+      result.leftHand = leftHand as Record<HumanoidHandRig, AssetHierarchyNode>;
+    }
+    if (Object.keys(rightHand).length > 0) {
+      result.rightHand = rightHand as Record<HumanoidHandRig, AssetHierarchyNode>;
+    }
+    return result;
+  }
+
+  private _filterHumanoidMappingToSkeleton(
+    mapping: HumanoidJointMapping<AssetHierarchyNode>,
+    skeleton: AssetSkeleton
+  ): Nullable<HumanoidJointMapping<AssetHierarchyNode>> {
+    const joints = new Set(skeleton.joints);
+    const filter = <T extends string>(
+      source: Record<T, AssetHierarchyNode> | undefined
+    ): Record<T, AssetHierarchyNode> | undefined => {
+      if (!source) {
+        return undefined;
+      }
+      const result = {} as Partial<Record<T, AssetHierarchyNode>>;
+      for (const key of Object.keys(source) as T[]) {
+        const node = source[key];
+        if (node && joints.has(node)) {
+          result[key] = node;
+        }
+      }
+      return Object.keys(result).length > 0 ? (result as Record<T, AssetHierarchyNode>) : undefined;
+    };
+    const body = filter(mapping.body);
+    const leftHand = filter(mapping.leftHand);
+    const rightHand = filter(mapping.rightHand);
+    if (!body && !leftHand && !rightHand) {
+      return null;
+    }
+    return {
+      body: (body ?? {}) as Record<HumanoidBodyRig, AssetHierarchyNode>,
+      leftHand,
+      rightHand
+    };
+  }
+
   private _getVRMAHumanBoneNode(
     gltf: GLTFContent,
     humanBones: Record<string, VRMAHumanoidBoneInfo>,
@@ -1213,6 +1388,59 @@ export class GLTFImporter extends AbstractModelImporter {
     addMappedNodes(mapping.leftHand);
     addMappedNodes(mapping.rightHand);
     return nodes;
+  }
+
+  private _getVRMAExpressionMapping(gltf: GLTFContent): Map<number, string> {
+    const mapping = new Map<number, string>();
+    const ext = gltf.extensions?.VRMC_vrm_animation as VRMCVRMAnimationInfo | undefined;
+    const expressions = ext?.expressions;
+    if (!expressions || typeof expressions !== 'object') {
+      return mapping;
+    }
+    this._addVRMAExpressionMapping(gltf, mapping, expressions.preset);
+    this._addVRMAExpressionMapping(gltf, mapping, expressions.custom);
+    return mapping;
+  }
+
+  private _addVRMAExpressionMapping(
+    gltf: GLTFContent,
+    mapping: Map<number, string>,
+    expressionMap: unknown
+  ): void {
+    if (!expressionMap || typeof expressionMap !== 'object') {
+      return;
+    }
+    for (const [name, value] of Object.entries(expressionMap)) {
+      if (VRMA_LOOK_AT_EXPRESSION_NAMES.has(name) || !value || typeof value !== 'object') {
+        continue;
+      }
+      const nodeIndex = (value as VRMAExpressionInfo).node;
+      if (typeof nodeIndex !== 'number' || !gltf._nodes[nodeIndex] || mapping.has(nodeIndex)) {
+        continue;
+      }
+      mapping.set(nodeIndex, name);
+    }
+  }
+
+  private _createVRMAExpressionInterpolator(interpolator: Interpolator): InterpolatorScalar {
+    const inputs = new Float32Array(interpolator.inputs);
+    const sourceOutputs = interpolator.outputs;
+    if (interpolator.mode === 'cubicspline') {
+      const outputs = new Float32Array(inputs.length * 3);
+      for (let i = 0; i < inputs.length; i++) {
+        const sourceOffset = i * 9;
+        const targetOffset = i * 3;
+        outputs[targetOffset + 0] = sourceOutputs[sourceOffset + 0];
+        outputs[targetOffset + 1] = sourceOutputs[sourceOffset + 3];
+        outputs[targetOffset + 2] = sourceOutputs[sourceOffset + 6];
+      }
+      return new InterpolatorScalar(interpolator.mode, inputs, outputs);
+    }
+    const outputs = new Float32Array(inputs.length);
+    for (let i = 0; i < inputs.length; i++) {
+      outputs[i] = sourceOutputs[i * 3];
+    }
+    return new InterpolatorScalar(interpolator.mode, inputs, outputs);
   }
 
   private _findCommonRoot(nodes: AssetHierarchyNode[]): Nullable<AssetHierarchyNode> {
@@ -1353,6 +1581,7 @@ export class GLTFImporter extends AbstractModelImporter {
   /** @internal */
   private _loadAnimation(gltf: GLTFContent, index: number): AssetAnimationData {
     const animationInfo = this.getAnimationInfo(gltf, index);
+    const vrmaExpressionMapping = this._getVRMAExpressionMapping(gltf);
     const animationData: AssetAnimationData = {
       name: animationInfo.name,
       tracks: [],
@@ -1370,11 +1599,20 @@ export class GLTFImporter extends AbstractModelImporter {
       if (!targetNode) {
         continue;
       }
-      const track: AssetAnimationTrack = {
-        node: targetNode,
-        type: interpolatorType,
-        interpolator
-      };
+      const expressionName =
+        interpolatorType === 'translation' ? vrmaExpressionMapping.get(targetNodeIndex) : undefined;
+      const track: AssetAnimationTrack = expressionName
+        ? {
+            node: targetNode,
+            type: 'morph-target-group',
+            interpolator: this._createVRMAExpressionInterpolator(interpolator),
+            morphTargetGroupName: expressionName
+          }
+        : {
+            node: targetNode,
+            type: interpolatorType,
+            interpolator
+          };
       if (track.type === 'weights') {
         track.defaultMorphWeights = targetNode.weights!;
       }

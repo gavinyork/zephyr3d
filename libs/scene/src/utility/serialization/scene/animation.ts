@@ -12,6 +12,7 @@ import {
   createTransformAccess,
   PCAGeometryCacheTrack,
   MorphTargetTrack,
+  MorphTargetGroupTrack,
   NodeEulerRotationTrack,
   NodeRotationTrack,
   NodeScaleTrack,
@@ -1082,6 +1083,74 @@ export function getMorphTrackClass(): SerializableClass {
             value.str[0] = this.target;
           },
           set(this: NodeRotationTrack, value) {
+            this.target = value.str[0];
+          }
+        }
+      ]);
+    }
+  };
+}
+
+/** @internal */
+export function getMorphTargetGroupTrackClass(): SerializableClass {
+  return {
+    ctor: MorphTargetGroupTrack,
+    name: 'MorphTargetGroupTrack',
+    getProps() {
+      return defineProps([
+        {
+          name: 'TrackName',
+          description: 'The track name',
+          type: 'string',
+          options: {
+            label: 'Name'
+          },
+          get(this: MorphTargetGroupTrack, value) {
+            value.str[0] = this.name;
+          },
+          set(this: MorphTargetGroupTrack, value) {
+            this.name = value.str[0];
+          }
+        },
+        {
+          name: 'GroupName',
+          description: 'Morph target group controlled by this track',
+          type: 'string',
+          get(this: MorphTargetGroupTrack, value) {
+            value.str[0] = this.groupName;
+          },
+          set(this: MorphTargetGroupTrack, value) {
+            this.groupName = value.str[0];
+          }
+        },
+        {
+          name: 'Interpolator',
+          description: 'Scalar interpolator object for this track',
+          type: 'object',
+          options: {
+            objectTypes: [Interpolator]
+          },
+          isHidden() {
+            return true;
+          },
+          get(this: MorphTargetGroupTrack, value) {
+            value.object[0] = this.interpolator;
+          },
+          set(this: MorphTargetGroupTrack, value) {
+            this.interpolator = value.object[0] as Interpolator;
+          }
+        },
+        {
+          name: 'TrackTarget',
+          description: 'Target object this track applys to',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: MorphTargetGroupTrack, value) {
+            value.str[0] = this.target;
+          },
+          set(this: MorphTargetGroupTrack, value) {
             this.target = value.str[0];
           }
         }

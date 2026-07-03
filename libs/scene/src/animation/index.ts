@@ -19,6 +19,7 @@ export * from './eulerrotationtrack';
 export * from './scaletrack';
 export * from './proptrack';
 export * from './morphtrack';
+export * from './morphtargetgrouptrack';
 export * from './fixed_geometry_cache_track';
 export * from './geometry_cache_utils';
 export * from './pca_geometry_cache_track';
