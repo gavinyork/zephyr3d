@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Resolve VRMA retargeting for split rigs",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
