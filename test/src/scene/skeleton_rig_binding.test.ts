@@ -9,7 +9,8 @@ import {
   SkeletonModifier,
   SkeletonRig,
   SkinBinding,
-  HumanoidBodyRig
+  HumanoidBodyRig,
+  HumanoidHandRig
 } from '@zephyr3d/scene';
 
 jest.mock('@zephyr3d/scene/app/api', () => ({
@@ -124,6 +125,33 @@ function buildHumanoid(parent: SceneNode, prefix: string) {
   ];
 }
 
+function humanoidBodyMapping(joints: SceneNode[]) {
+  return {
+    [HumanoidBodyRig.Hips]: joints[0],
+    [HumanoidBodyRig.Spine]: joints[1],
+    [HumanoidBodyRig.Chest]: joints[2],
+    [HumanoidBodyRig.UpperChest]: joints[3],
+    [HumanoidBodyRig.Neck]: joints[4],
+    [HumanoidBodyRig.Head]: joints[5],
+    [HumanoidBodyRig.LeftShoulder]: joints[6],
+    [HumanoidBodyRig.LeftUpperArm]: joints[7],
+    [HumanoidBodyRig.LeftLowerArm]: joints[8],
+    [HumanoidBodyRig.LeftHand]: joints[9],
+    [HumanoidBodyRig.RightShoulder]: joints[10],
+    [HumanoidBodyRig.RightUpperArm]: joints[11],
+    [HumanoidBodyRig.RightLowerArm]: joints[12],
+    [HumanoidBodyRig.RightHand]: joints[13],
+    [HumanoidBodyRig.LeftUpperLeg]: joints[14],
+    [HumanoidBodyRig.LeftLowerLeg]: joints[15],
+    [HumanoidBodyRig.LeftFoot]: joints[16],
+    [HumanoidBodyRig.LeftToes]: joints[17],
+    [HumanoidBodyRig.RightUpperLeg]: joints[18],
+    [HumanoidBodyRig.RightLowerLeg]: joints[19],
+    [HumanoidBodyRig.RightFoot]: joints[20],
+    [HumanoidBodyRig.RightToes]: joints[21]
+  } as Record<HumanoidBodyRig, SceneNode>;
+}
+
 function scaleHumanoidLegs(joints: SceneNode[], scale: number) {
   for (const joint of [
     joints[14],
@@ -137,6 +165,33 @@ function scaleHumanoidLegs(joints: SceneNode[], scale: number) {
   ]) {
     joint.position.scaleBy(scale);
   }
+}
+
+function setHumanoidLateralBindPose(joints: SceneNode[], mirrored = false, forwardMirrored = false) {
+  const left = mirrored ? -1 : 1;
+  const right = -left;
+  const forward = forwardMirrored ? -1 : 1;
+  joints[1].position.setXYZ(0, 0.35, 0);
+  joints[2].position.setXYZ(0, 0.3, 0);
+  joints[3].position.setXYZ(0, 0.25, 0);
+  joints[4].position.setXYZ(0, 0.2, 0);
+  joints[5].position.setXYZ(0, 0.2, 0);
+  joints[6].position.setXYZ(0.15 * left, 0.05, 0);
+  joints[7].position.setXYZ(0.25 * left, 0, 0);
+  joints[8].position.setXYZ(0.25 * left, 0, 0);
+  joints[9].position.setXYZ(0.15 * left, 0, 0);
+  joints[10].position.setXYZ(0.15 * right, 0.05, 0);
+  joints[11].position.setXYZ(0.25 * right, 0, 0);
+  joints[12].position.setXYZ(0.25 * right, 0, 0);
+  joints[13].position.setXYZ(0.15 * right, 0, 0);
+  joints[14].position.setXYZ(0.12 * left, -0.1, 0);
+  joints[15].position.setXYZ(0, -0.45, 0);
+  joints[16].position.setXYZ(0, -0.45, 0);
+  joints[17].position.setXYZ(0, -0.05, 0.15 * forward);
+  joints[18].position.setXYZ(0.12 * right, -0.1, 0);
+  joints[19].position.setXYZ(0, -0.45, 0);
+  joints[20].position.setXYZ(0, -0.45, 0);
+  joints[21].position.setXYZ(0, -0.05, 0.15 * forward);
 }
 
 describe('SkeletonRig and SkinBinding', () => {
@@ -228,6 +283,317 @@ describe('SkeletonRig and SkinBinding', () => {
 
     expect(copied).toBeTruthy();
     expect(copied!.skeletons.has(dstRig.persistentId)).toBe(true);
+  });
+
+  test('retarget skips humanoid rigs whose mapped joints are not part of the rig', () => {
+    const scene = new Scene();
+    const srcModel = appendNode(scene.rootNode, 'srcModel');
+    const dstModel = appendNode(scene.rootNode, 'dstModel');
+    const srcRoot = appendNode(srcModel, 'SrcRoot');
+    const dstRoot = appendNode(dstModel, 'DstRoot');
+    const srcJoints = buildHumanoid(srcRoot, 'Src');
+    const dstJoints = buildHumanoid(dstRoot, 'Dst');
+    const srcRig = new SkeletonRig(srcJoints, bindPose(srcJoints));
+    const fullDstRig = new SkeletonRig(dstJoints, bindPose(dstJoints));
+    const partialDstRig = new SkeletonRig([dstJoints[5]], bindPose([dstJoints[5]]), {
+      humanoidJointMapping: fullDstRig.humanoidJointMapping
+    });
+    srcModel.animationSet.rigs.push(new DRef(srcRig));
+    dstModel.animationSet.rigs.push(new DRef(partialDstRig), new DRef(fullDstRig));
+
+    const srcClip = srcModel.animationSet.createAnimation('idle')!;
+    srcClip.addSkeleton(srcRig.persistentId);
+    srcClip.addTrack(
+      srcJoints[0],
+      new NodeRotationTrack('linear', [
+        { time: 0, value: Quaternion.identity() },
+        { time: 1, value: Quaternion.fromAxisAngle(Vector3.axisPY(), Math.PI / 4) }
+      ])
+    );
+
+    const copied = dstModel.animationSet.copyHumanoidAnimationFrom(
+      srcModel.animationSet as AnimationSet,
+      'idle',
+      'idle_copy'
+    );
+
+    expect(copied).toBeTruthy();
+    expect(copied!.skeletons.has(fullDstRig.persistentId)).toBe(true);
+    expect(copied!.skeletons.has(partialDstRig.persistentId)).toBe(false);
+  });
+
+  test('retarget corrects humanoid rotations and root motion when destination axes are inverted', () => {
+    const scene = new Scene();
+    const srcModel = appendNode(scene.rootNode, 'srcModel');
+    const dstModel = appendNode(scene.rootNode, 'dstModel');
+    const srcMotionRoot = appendNode(srcModel, 'SrcMotionRoot');
+    const srcRoot = appendNode(srcMotionRoot, 'SrcRoot');
+    const dstRoot = appendNode(dstModel, 'DstRoot');
+    const srcJoints = buildHumanoid(srcRoot, 'Src');
+    const dstJoints = buildHumanoid(dstRoot, 'Dst');
+    setHumanoidLateralBindPose(srcJoints);
+    setHumanoidLateralBindPose(dstJoints, true, true);
+    const srcRig = new SkeletonRig(srcJoints, bindPose(srcJoints));
+    const dstMainJoints = dstJoints.filter((_, index) => index !== 17 && index !== 21);
+    const dstToeJoints = [dstJoints[16], dstJoints[17], dstJoints[20], dstJoints[21]];
+    const dstRig = new SkeletonRig(dstMainJoints, bindPose(dstMainJoints));
+    const dstToeRig = new SkeletonRig(dstToeJoints, bindPose(dstToeJoints), {
+      humanoidJointMapping: {
+        body: {
+          [HumanoidBodyRig.LeftFoot]: dstJoints[16],
+          [HumanoidBodyRig.LeftToes]: dstJoints[17],
+          [HumanoidBodyRig.RightFoot]: dstJoints[20],
+          [HumanoidBodyRig.RightToes]: dstJoints[21]
+        } as any
+      }
+    });
+    srcModel.animationSet.rigs.push(new DRef(srcRig));
+    dstModel.animationSet.rigs.push(new DRef(dstRig), new DRef(dstToeRig));
+
+    const srcClip = srcModel.animationSet.createAnimation('wide')!;
+    srcClip.timeDuration = 1;
+    srcClip.addSkeleton(srcRig.persistentId);
+    srcClip.addTrack(
+      srcMotionRoot,
+      new NodeTranslationTrack('linear', [
+        { time: 0, value: srcMotionRoot.position.clone() },
+        { time: 1, value: srcMotionRoot.position.clone().addBy(new Vector3(0, 0, 1)) }
+      ])
+    );
+    srcClip.addTrack(
+      srcJoints[14],
+      new NodeRotationTrack('linear', [
+        { time: 0, value: Quaternion.identity() },
+        { time: 1, value: Quaternion.fromAxisAngle(Vector3.axisPZ(), Math.PI / 4) }
+      ])
+    );
+    srcClip.addTrack(
+      srcJoints[18],
+      new NodeRotationTrack('linear', [
+        { time: 0, value: Quaternion.identity() },
+        { time: 1, value: Quaternion.fromAxisAngle(Vector3.axisPZ(), -Math.PI / 4) }
+      ])
+    );
+    srcClip.addTrack(
+      srcJoints[5],
+      new NodeRotationTrack('linear', [
+        { time: 0, value: Quaternion.identity() },
+        { time: 1, value: Quaternion.fromAxisAngle(Vector3.axisPY(), Math.PI / 4) }
+      ])
+    );
+
+    const copied = dstModel.animationSet.copyHumanoidAnimationFrom(
+      srcModel.animationSet as AnimationSet,
+      'wide',
+      'wide_copy'
+    );
+
+    expect(copied).toBeTruthy();
+    const getLastRotationZ = (joint: SceneNode) => {
+      const track = copied!.tracks.get(joint)!.find((item) => item instanceof NodeRotationTrack);
+      expect(track).toBeInstanceOf(NodeRotationTrack);
+      const outputs = (track as NodeRotationTrack).interpolator.outputs as Float32Array;
+      return outputs[outputs.length - 2];
+    };
+    expect(getLastRotationZ(dstJoints[14])).toBeLessThan(-0.1);
+    expect(getLastRotationZ(dstJoints[18])).toBeGreaterThan(0.1);
+    const headTrack = copied!.tracks.get(dstJoints[5])!.find((item) => item instanceof NodeRotationTrack);
+    expect(headTrack).toBeInstanceOf(NodeRotationTrack);
+    const headOutputs = (headTrack as NodeRotationTrack).interpolator.outputs as Float32Array;
+    expect(headOutputs[headOutputs.length - 3]).toBeGreaterThan(0.1);
+    const rootTrack = copied!.tracks.get(dstJoints[0])!.find((item) => item instanceof NodeTranslationTrack);
+    expect(rootTrack).toBeInstanceOf(NodeTranslationTrack);
+    const rootOutputs = (rootTrack as NodeTranslationTrack).interpolator.outputs as Float32Array;
+    expect(rootOutputs[rootOutputs.length - 1] - rootOutputs[2]).toBeLessThan(-0.8);
+  });
+
+  test('retarget copies finger rotations from split humanoid rigs without hips', () => {
+    const scene = new Scene();
+    const srcModel = appendNode(scene.rootNode, 'srcModel');
+    const dstModel = appendNode(scene.rootNode, 'dstModel');
+    const srcRoot = appendNode(srcModel, 'SrcRoot');
+    const dstRoot = appendNode(dstModel, 'DstRoot');
+    const srcJoints = buildHumanoid(srcRoot, 'Src');
+    const dstJoints = buildHumanoid(dstRoot, 'Dst');
+    const srcIndexProximal = appendNode(srcJoints[9], 'SrcLeftIndexProximal');
+    const srcIndexIntermediate = appendNode(srcIndexProximal, 'SrcLeftIndexIntermediate');
+    const srcIndexDistal = appendNode(srcIndexIntermediate, 'SrcLeftIndexDistal');
+    const dstIndexProximal = appendNode(dstJoints[9], 'DstLeftIndexProximal');
+    const dstIndexIntermediate = appendNode(dstIndexProximal, 'DstLeftIndexIntermediate');
+    const dstIndexDistal = appendNode(dstIndexIntermediate, 'DstLeftIndexDistal');
+    const srcFingerMapping = {
+      [HumanoidHandRig.IndexProximal]: srcIndexProximal,
+      [HumanoidHandRig.IndexIntermediate]: srcIndexIntermediate,
+      [HumanoidHandRig.IndexDistal]: srcIndexDistal
+    } as Record<HumanoidHandRig, SceneNode>;
+    const dstFingerMapping = {
+      [HumanoidHandRig.IndexProximal]: dstIndexProximal,
+      [HumanoidHandRig.IndexIntermediate]: dstIndexIntermediate,
+      [HumanoidHandRig.IndexDistal]: dstIndexDistal
+    } as Record<HumanoidHandRig, SceneNode>;
+    const srcRigJoints = [...srcJoints, srcIndexProximal, srcIndexIntermediate, srcIndexDistal];
+    const dstHand = appendNode(dstJoints[9], 'DstLeftHandMirror');
+    const dstFingerJoints = [dstHand, dstIndexProximal, dstIndexIntermediate, dstIndexDistal];
+    const srcRig = new SkeletonRig(srcRigJoints, bindPose(srcRigJoints), {
+      humanoidJointMapping: {
+        body: humanoidBodyMapping(srcJoints),
+        leftHand: srcFingerMapping
+      }
+    });
+    const dstBodyRig = new SkeletonRig(dstJoints, bindPose(dstJoints), {
+      humanoidJointMapping: {
+        body: humanoidBodyMapping(dstJoints)
+      }
+    });
+    const dstFingerRig = new SkeletonRig(dstFingerJoints, bindPose(dstFingerJoints), {
+      humanoidJointMapping: {
+        body: {} as any,
+        leftHand: dstFingerMapping
+      }
+    });
+    srcModel.animationSet.rigs.push(new DRef(srcRig));
+    dstModel.animationSet.rigs.push(new DRef(dstBodyRig), new DRef(dstFingerRig));
+
+    const srcClip = srcModel.animationSet.createAnimation('finger')!;
+    srcClip.timeDuration = 1;
+    srcClip.addSkeleton(srcRig.persistentId);
+    srcClip.addTrack(
+      srcJoints[9],
+      new NodeRotationTrack('linear', [
+        { time: 0, value: Quaternion.identity() },
+        { time: 1, value: Quaternion.fromAxisAngle(Vector3.axisPY(), Math.PI / 4) }
+      ])
+    );
+    srcClip.addTrack(
+      srcIndexProximal,
+      new NodeRotationTrack('linear', [
+        { time: 0, value: Quaternion.identity() },
+        { time: 1, value: Quaternion.fromAxisAngle(Vector3.axisPY(), Math.PI / 4) }
+      ])
+    );
+
+    const copied = dstModel.animationSet.copyHumanoidAnimationFrom(
+      srcModel.animationSet as AnimationSet,
+      'finger',
+      'finger_copy'
+    );
+
+    expect(copied).toBeTruthy();
+    expect(copied!.skeletons.has(dstBodyRig.persistentId)).toBe(true);
+    expect(copied!.skeletons.has(dstFingerRig.persistentId)).toBe(true);
+    const fingerTrack = copied!.tracks
+      .get(dstIndexProximal)!
+      .find((item) => item instanceof NodeRotationTrack);
+    expect(fingerTrack).toBeInstanceOf(NodeRotationTrack);
+    const fingerOutputs = (fingerTrack as NodeRotationTrack).interpolator.outputs as Float32Array;
+    expect(fingerOutputs[fingerOutputs.length - 3]).toBeGreaterThan(0);
+    expect(Math.abs(fingerOutputs[fingerOutputs.length - 4])).toBeLessThan(0.05);
+    expect(Math.abs(fingerOutputs[fingerOutputs.length - 2])).toBeLessThan(0.05);
+  });
+
+  test('retarget duplicates shared humanoid joint tracks across split rigs', () => {
+    const scene = new Scene();
+    const srcModel = appendNode(scene.rootNode, 'srcModel');
+    const dstModel = appendNode(scene.rootNode, 'dstModel');
+    const srcRoot = appendNode(srcModel, 'SrcRoot');
+    const dstBodyRoot = appendNode(dstModel, 'DstBodyRoot');
+    const dstPartialRoot = appendNode(dstModel, 'DstPartialRoot');
+    const srcJoints = buildHumanoid(srcRoot, 'Src');
+    const dstBodyJoints = buildHumanoid(dstBodyRoot, 'DstBody');
+    const dstPartialJoints = buildHumanoid(dstPartialRoot, 'DstPartial');
+    setHumanoidLateralBindPose(dstPartialJoints, true, true);
+    dstPartialJoints[9].rotation.fromAxisAngle(Vector3.axisPY(), Math.PI);
+
+    const srcIndexProximal = appendNode(srcJoints[9], 'SrcLeftIndexProximal');
+    const srcIndexIntermediate = appendNode(srcIndexProximal, 'SrcLeftIndexIntermediate');
+    const srcIndexDistal = appendNode(srcIndexIntermediate, 'SrcLeftIndexDistal');
+    const dstPartialIndexProximal = appendNode(dstPartialJoints[9], 'DstPartialLeftIndexProximal');
+    const dstPartialIndexIntermediate = appendNode(dstPartialIndexProximal, 'DstPartialLeftIndexIntermediate');
+    const dstPartialIndexDistal = appendNode(dstPartialIndexIntermediate, 'DstPartialLeftIndexDistal');
+    const srcFingerMapping = {
+      [HumanoidHandRig.IndexProximal]: srcIndexProximal,
+      [HumanoidHandRig.IndexIntermediate]: srcIndexIntermediate,
+      [HumanoidHandRig.IndexDistal]: srcIndexDistal
+    } as Record<HumanoidHandRig, SceneNode>;
+    const dstFingerMapping = {
+      [HumanoidHandRig.IndexProximal]: dstPartialIndexProximal,
+      [HumanoidHandRig.IndexIntermediate]: dstPartialIndexIntermediate,
+      [HumanoidHandRig.IndexDistal]: dstPartialIndexDistal
+    } as Record<HumanoidHandRig, SceneNode>;
+    const srcRigJoints = [...srcJoints, srcIndexProximal, srcIndexIntermediate, srcIndexDistal];
+    const dstPartialRigJoints = [...dstPartialJoints, dstPartialIndexProximal, dstPartialIndexIntermediate, dstPartialIndexDistal];
+    const srcRig = new SkeletonRig(srcRigJoints, bindPose(srcRigJoints), {
+      humanoidJointMapping: {
+        body: humanoidBodyMapping(srcJoints),
+        leftHand: srcFingerMapping
+      }
+    });
+    const dstBodyRig = new SkeletonRig(dstBodyJoints, bindPose(dstBodyJoints), {
+      humanoidJointMapping: {
+        body: humanoidBodyMapping(dstBodyJoints)
+      }
+    });
+    const dstPartialRig = new SkeletonRig(dstPartialRigJoints, bindPose(dstPartialRigJoints), {
+      humanoidJointMapping: {
+        body: humanoidBodyMapping(dstPartialJoints),
+        leftHand: dstFingerMapping
+      }
+    });
+    srcModel.animationSet.rigs.push(new DRef(srcRig));
+    dstModel.animationSet.rigs.push(new DRef(dstBodyRig), new DRef(dstPartialRig));
+
+    const srcClip = srcModel.animationSet.createAnimation('shared')!;
+    srcClip.timeDuration = 1;
+    srcClip.addSkeleton(srcRig.persistentId);
+    srcClip.addTrack(
+      srcJoints[8],
+      new NodeRotationTrack('linear', [
+        { time: 0, value: Quaternion.identity() },
+        { time: 1, value: Quaternion.fromAxisAngle(Vector3.axisPY(), Math.PI / 4) }
+      ])
+    );
+    srcClip.addTrack(
+      srcJoints[9],
+      new NodeRotationTrack('linear', [
+        { time: 0, value: Quaternion.identity() },
+        { time: 1, value: Quaternion.fromAxisAngle(Vector3.axisPY(), Math.PI / 4) }
+      ])
+    );
+    srcClip.addTrack(
+      srcIndexProximal,
+      new NodeRotationTrack('linear', [
+        { time: 0, value: Quaternion.identity() },
+        { time: 1, value: Quaternion.fromAxisAngle(Vector3.axisPY(), Math.PI / 4) }
+      ])
+    );
+
+    const copied = dstModel.animationSet.copyHumanoidAnimationFrom(
+      srcModel.animationSet as AnimationSet,
+      'shared',
+      'shared_copy'
+    );
+
+    expect(copied).toBeTruthy();
+    expect(copied!.skeletons.has(dstBodyRig.persistentId)).toBe(true);
+    expect(copied!.skeletons.has(dstPartialRig.persistentId)).toBe(true);
+
+    expect(copied!.tracks.get(dstBodyJoints[8])?.some((track) => track instanceof NodeRotationTrack)).toBe(true);
+    expect(copied!.tracks.get(dstPartialJoints[8])?.some((track) => track instanceof NodeRotationTrack)).toBe(
+      true
+    );
+    expect(copied!.tracks.get(dstBodyJoints[9])?.some((track) => track instanceof NodeRotationTrack)).toBe(true);
+    expect(copied!.tracks.get(dstPartialJoints[9])?.some((track) => track instanceof NodeRotationTrack)).toBe(
+      true
+    );
+
+    const partialFingerTrack = copied!.tracks
+      .get(dstPartialIndexProximal)!
+      .find((item) => item instanceof NodeRotationTrack);
+    expect(partialFingerTrack).toBeInstanceOf(NodeRotationTrack);
+    const partialFingerOutputs = (partialFingerTrack as NodeRotationTrack).interpolator.outputs as Float32Array;
+    expect(partialFingerOutputs[partialFingerOutputs.length - 3]).toBeGreaterThan(0);
+    expect(Math.abs(partialFingerOutputs[partialFingerOutputs.length - 4])).toBeLessThan(0.05);
+    expect(Math.abs(partialFingerOutputs[partialFingerOutputs.length - 2])).toBeLessThan(0.05);
   });
 
   test('retarget scales humanoid hips translation by leg length', () => {
