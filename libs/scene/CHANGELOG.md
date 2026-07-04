@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Thu, 02 Jul 2026 18:25:31 GMT and should not be manually modified.
+This log was last generated on Sat, 04 Jul 2026 17:00:36 GMT and should not be manually modified.
+
+## 0.9.14
+Sat, 04 Jul 2026 17:00:36 GMT
+
+### Patches
+
+- Resolve VRMA retargeting for split rigs
 
 ## 0.9.13
 Thu, 02 Jul 2026 18:25:31 GMT

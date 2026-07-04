@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/loaders
 
-This log was last generated on Tue, 30 Jun 2026 20:07:17 GMT and should not be manually modified.
+This log was last generated on Sat, 04 Jul 2026 17:00:36 GMT and should not be manually modified.
+
+## 0.1.4
+Sat, 04 Jul 2026 17:00:36 GMT
+
+### Patches
+
+- Fix humanoid mapping for VRM0.0
 
 ## 0.1.3
 Tue, 30 Jun 2026 20:07:17 GMT

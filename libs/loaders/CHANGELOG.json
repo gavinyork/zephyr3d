@@ -2,6 +2,23 @@
   "name": "@zephyr3d/loaders",
   "entries": [
     {
+      "version": "0.1.4",
+      "tag": "@zephyr3d/loaders_v0.1.4",
+      "date": "Sat, 04 Jul 2026 17:00:36 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Fix humanoid mapping for VRM0.0"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/scene\" from `^0.9.13` to `0.9.14`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.3",
       "tag": "@zephyr3d/loaders_v0.1.3",
       "date": "Tue, 30 Jun 2026 20:07:17 GMT",
