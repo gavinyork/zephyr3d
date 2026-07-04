@@ -6,7 +6,7 @@
 
 > A modern TypeScript-based WebGL & WebGPU rendering engine  
 
-[User Manual](https://zephyr3d.org/doc/) &nbsp;|&nbsp; [Demos](https://zephyr3d.org/en/demos.html) &nbsp;|&nbsp; [Online Editor](https://zephyr3d.org/editor/)
+[User Manual](https://zephyr3d.org/doc/) &nbsp;|&nbsp; [Demos](https://zephyr3d.org/en/demos.html) &nbsp;|&nbsp; [Online Editor](https://zephyr3d.org/editor/) &nbsp;|&nbsp; [Desktop Editor Releases](https://github.com/gavinyork/zephyr3d/releases)
 
 [![CI](https://github.com/gavinyork/zephyr3d/actions/workflows/ci.yml/badge.svg)](https://github.com/gavinyork/zephyr3d/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@zephyr3d/scene?color=%235865f2)](https://www.npmjs.com/package/@zephyr3d/scene)
@@ -22,9 +22,38 @@
 
  - unified WebGL/WebGPU backends
  - a code‑generated shader system (JS/TS → GLSL/WGSL)
- - and a full web-based visual editor.  
+ - and a browser-first visual editor, with an optional desktop Electron app that adds MCP and LLM assistant support.  
 
 > Lightweight · Modular · Developer-friendly · Visual creation empowered by code.
+
+---
+
+## Zephyr3D Editor
+
+The Online Editor runs directly in the browser with no download required. The optional Desktop Editor adds AI support through MCP and the built-in LLM assistant, plus local project storage and persistent data.
+
+<div align="center">
+
+**Open the Online Editor -> [Zephyr3D Editor](https://zephyr3d.org/editor/)**  
+**Download the Desktop Editor -> [GitHub Releases](https://github.com/gavinyork/zephyr3d/releases)**
+
+<br/>
+
+<img src="https://cdn.zephyr3d.org/doc/assets/images/editor-sm.jpg" width="80%" alt="Zephyr3D Editor">
+
+</div>
+
+**Online Editor**
+- No download required
+- Scene, Material, Terrain editors
+- TypeScript scripting & animation tools
+- Instant preview & 1-click export
+
+**Desktop Editor**
+- Electron desktop runtime for local projects and persistent storage
+- Adds AI support through MCP and the built-in LLM assistant
+- API keys are stored locally and encrypted at rest
+- Download the latest desktop release -> [GitHub Releases](https://github.com/gavinyork/zephyr3d/releases)
 
 ---
 
