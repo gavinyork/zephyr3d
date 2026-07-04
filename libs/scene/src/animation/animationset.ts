@@ -517,6 +517,7 @@ type JointRetargetRemap = {
   srcNode: SceneNode;
   srcBindRotInv: Quaternion;
   dstBindRot: Quaternion;
+  rotationCorrection?: HumanoidRotationCorrection;
   srcBindPos: Vector3;
   dstBindPos: Vector3;
   translationScale: number;
@@ -553,7 +554,8 @@ function createJointRetargetRemap(
   translationRotation?: Quaternion,
   translationScale?: number,
   translationCorrection?: HumanoidRotationCorrection,
-  translationAxisLocks?: HumanoidRetargetAxisLocks
+  translationAxisLocks?: HumanoidRetargetAxisLocks,
+  rotationCorrection?: HumanoidRotationCorrection
 ): JointRetargetRemap {
   const si = srcSkeleton.joints.indexOf(srcJoint);
   const di = dstSkeleton.joints.indexOf(dstJoint);
@@ -567,6 +569,7 @@ function createJointRetargetRemap(
     srcNode: srcJoint,
     srcBindRotInv: Quaternion.inverse(srcBindPose.rotation),
     dstBindRot: dstBindPose.rotation.clone(),
+    rotationCorrection,
     srcBindPos: srcBindPose.position.clone(),
     dstBindPos: dstBindPose.position.clone(),
     translationScale: translationScale ?? (srcLen > 1e-6 ? dstLen / srcLen : 1),
@@ -585,7 +588,8 @@ function createTranslationRetargetRemap(
   translationScale: number,
   translationRotation?: Quaternion,
   translationCorrection?: HumanoidRotationCorrection,
-  translationAxisLocks?: HumanoidRetargetAxisLocks
+  translationAxisLocks?: HumanoidRetargetAxisLocks,
+  rotationCorrection?: HumanoidRotationCorrection
 ): JointRetargetRemap {
   return {
     dstNode,
@@ -593,6 +597,7 @@ function createTranslationRetargetRemap(
     srcNode,
     srcBindRotInv: Quaternion.identity(),
     dstBindRot: Quaternion.identity(),
+    rotationCorrection,
     srcBindPos: srcBindPos.clone(),
     dstBindPos: dstBindPos.clone(),
     translationScale,
@@ -867,6 +872,9 @@ function applyTranslationTangentAxisLocks(value: Vector3, locks: HumanoidRetarge
 function retargetRotation(qSrcAnim: Quaternion, remap: JointRetargetRemap, out: Quaternion): Quaternion {
   Quaternion.multiply(remap.srcBindRotInv, qSrcAnim, out);
   Quaternion.multiply(remap.dstBindRot, out, out);
+  if (remap.rotationCorrection) {
+    applyHumanoidRotationCorrection(out, remap.rotationCorrection, out);
+  }
   return out.inplaceNormalize();
 }
 
@@ -877,6 +885,9 @@ function retargetRotationTangent(
 ): Quaternion {
   Quaternion.multiply(remap.srcBindRotInv, qSrcTangent, out);
   Quaternion.multiply(remap.dstBindRot, out, out);
+  if (remap.rotationCorrection) {
+    applyHumanoidRotationCorrection(out, remap.rotationCorrection, out);
+  }
   return out;
 }
 
@@ -1243,33 +1254,6 @@ function bakeHumanoidRotationTracks(
     track.target = remap.dstNode.persistentId;
     track.jointIndex = remap.dstJointIndex;
     dstClip.addTrack(remap.dstNode, track);
-  }
-}
-
-function copyLocalHumanoidRotationTracks(
-  sourceClip: AnimationClip,
-  dstClip: AnimationClip,
-  remaps: JointRetargetRemap[]
-) {
-  for (const remap of remaps) {
-    const srcTracks = sourceClip.tracks.get(remap.srcNode);
-    if (!srcTracks) {
-      continue;
-    }
-    for (const srcTrack of srcTracks) {
-      let dstTrack: AnimationTrack | null = null;
-      if (srcTrack instanceof NodeRotationTrack) {
-        dstTrack = retargetRotationTrack(srcTrack, remap);
-      } else if (srcTrack instanceof NodeEulerRotationTrack) {
-        dstTrack = retargetEulerToRotationTrack(srcTrack, remap);
-      }
-      if (dstTrack) {
-        dstTrack.name = srcTrack.name;
-        dstTrack.target = remap.dstNode.persistentId;
-        dstTrack.jointIndex = remap.dstJointIndex;
-        dstClip.addTrack(remap.dstNode, dstTrack);
-      }
-    }
   }
 }
 
@@ -2264,8 +2248,7 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
       return null;
     }
 
-    const nodeMap = new Map<object, SceneNode>();
-    const jointRemapBySrcNode = new Map<object, JointRetargetRemap>();
+    const jointRemapsBySrcNode = new Map<SceneNode, JointRetargetRemap[]>();
 
     // Find a destination skeleton that has a humanoid mapping and share at least the body rig keys
     let srcJointsFiltered: SceneNode[] = [];
@@ -2403,8 +2386,6 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
     const jointRemapsByDstSkeleton = new Map<SkeletonRig, JointRetargetRemap[]>([
       [dstSkeleton, jointRemaps]
     ]);
-    const mappedSrcNodes = new Set<SceneNode>();
-    const mappedDstNodes = new Set<SceneNode>();
     const srcSignSkeletons = sourceSet._rigs
       .map((ref) => ref.get())
       .filter((sk): sk is SkeletonRig => !!sk);
@@ -2418,21 +2399,17 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
     const addJointRemap = (
       targetSkeleton: SkeletonRig,
       srcJoint: SceneNode | undefined,
-      dstJoint: SceneNode | undefined
+      dstJoint: SceneNode | undefined,
+      applyRotationCorrection = true
     ) => {
       if (
         !srcJoint ||
         !dstJoint ||
-        mappedSrcNodes.has(srcJoint) ||
-        mappedDstNodes.has(dstJoint) ||
         !srcSkeleton.joints.includes(srcJoint) ||
         !targetSkeleton.joints.includes(dstJoint)
       ) {
         return;
       }
-      mappedSrcNodes.add(srcJoint);
-      mappedDstNodes.add(dstJoint);
-      nodeMap.set(srcJoint, dstJoint);
       const remap = createJointRetargetRemap(
         srcSkeleton,
         targetSkeleton,
@@ -2440,7 +2417,9 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
         dstJoint,
         undefined,
         undefined,
-        humanoidRotationCorrection ?? undefined
+        humanoidRotationCorrection ?? undefined,
+        undefined,
+        applyRotationCorrection ? humanoidRotationCorrection ?? undefined : undefined
       );
       let targetRemaps = jointRemapsByDstSkeleton.get(targetSkeleton);
       if (!targetRemaps) {
@@ -2448,34 +2427,55 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
         jointRemapsByDstSkeleton.set(targetSkeleton, targetRemaps);
       }
       targetRemaps.push(remap);
-      jointRemapBySrcNode.set(srcJoint, remap);
+      let srcRemaps = jointRemapsBySrcNode.get(srcJoint);
+      if (!srcRemaps) {
+        srcRemaps = [];
+        jointRemapsBySrcNode.set(srcJoint, srcRemaps);
+      }
+      srcRemaps.push(remap);
     };
     const addHumanoidMappingRemaps = (targetSkeleton: SkeletonRig) => {
       const targetMapping = targetSkeleton.humanoidJointMapping;
       if (!targetMapping) {
         return;
       }
+      const applyRotationCorrection = targetSkeleton === dstSkeleton;
       for (const key of Object.keys(srcHumanoidMapping.body) as (keyof typeof srcHumanoidMapping.body)[]) {
-        addJointRemap(targetSkeleton, srcHumanoidMapping.body[key], targetMapping.body[key]);
+        addJointRemap(
+          targetSkeleton,
+          srcHumanoidMapping.body[key],
+          targetMapping.body[key],
+          applyRotationCorrection
+        );
       }
       if (srcHumanoidMapping.leftHand && targetMapping.leftHand) {
         for (const key of Object.keys(
           srcHumanoidMapping.leftHand
         ) as (keyof typeof srcHumanoidMapping.leftHand)[]) {
-          addJointRemap(targetSkeleton, srcHumanoidMapping.leftHand[key], targetMapping.leftHand[key]);
+          addJointRemap(
+            targetSkeleton,
+            srcHumanoidMapping.leftHand[key],
+            targetMapping.leftHand[key],
+            applyRotationCorrection
+          );
         }
       }
       if (srcHumanoidMapping.rightHand && targetMapping.rightHand) {
         for (const key of Object.keys(
           srcHumanoidMapping.rightHand
         ) as (keyof typeof srcHumanoidMapping.rightHand)[]) {
-          addJointRemap(targetSkeleton, srcHumanoidMapping.rightHand[key], targetMapping.rightHand[key]);
+          addJointRemap(
+            targetSkeleton,
+            srcHumanoidMapping.rightHand[key],
+            targetMapping.rightHand[key],
+            applyRotationCorrection
+          );
         }
       }
     };
     // Build remap for matched joint pairs
     for (let fi = 0; fi < srcJointsFiltered.length; fi++) {
-      addJointRemap(dstSkeleton, srcJointsFiltered[fi], dstJointsFiltered[fi]);
+      addJointRemap(dstSkeleton, srcJointsFiltered[fi], dstJointsFiltered[fi], true);
     }
     for (const targetSkeleton of dstSignSkeletons) {
       if (targetSkeleton !== dstSkeleton) {
@@ -2497,11 +2497,35 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
       if (targetRemaps.length === 0) {
         continue;
       }
-      dstClip.addSkeleton(targetSkeleton.persistentId);
-      if (targetSkeleton !== dstSkeleton) {
-        copyLocalHumanoidRotationTracks(sourceClip, dstClip, targetRemaps);
+      const hasCopyableTrack =
+        targetSkeleton === dstSkeleton ||
+        targetRemaps.some((remap) => {
+          const srcTracks = sourceClip.tracks.get(remap.srcNode);
+          if (!srcTracks) {
+            return false;
+          }
+          for (const srcTrack of srcTracks) {
+            if (srcTrack instanceof NodeRotationTrack || srcTrack instanceof NodeEulerRotationTrack) {
+              return true;
+            }
+            if (
+              srcTrack instanceof NodeTranslationTrack &&
+              remap.srcNode !== srcRootNode &&
+              srcTrack !== srcMotionTrack &&
+              jointTranslations === 'preserve'
+            ) {
+              return true;
+            }
+            if (srcTrack instanceof NodeScaleTrack) {
+              return true;
+            }
+          }
+          return false;
+        });
+      if (!hasCopyableTrack) {
         continue;
       }
+      dstClip.addSkeleton(targetSkeleton.persistentId);
       const targetRootNode =
         targetSkeleton.rootJoint ??
         targetSkeleton.humanoidJointMapping?.body[HumanoidBodyRig.Hips] ??
@@ -2538,7 +2562,8 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
           rootTranslationScale,
           rootTranslationRotation,
           humanoidRotationCorrection ?? undefined,
-          options.lockRootMotionAxes
+          options.lockRootMotionAxes,
+          humanoidRotationCorrection ?? undefined
         );
         dstRootTrack = retargetTranslationTrack(srcMotionTrack, rootRemap);
       }
@@ -2550,39 +2575,37 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
       }
     }
 
-    for (const srcNode of srcJointsFiltered) {
+    for (const [srcNode, srcRemaps] of jointRemapsBySrcNode) {
       const srcTracks = sourceClip.tracks.get(srcNode);
       if (!srcTracks) {
         // Not every humanoid joint must have a track; skip silently
         continue;
       }
-      const dstNode = nodeMap.get(srcNode)!;
-      const remap = jointRemapBySrcNode.get(srcNode)!;
-
-      for (const srcTrack of srcTracks) {
-        let dstTrack: AnimationTrack;
-        if (srcTrack instanceof NodeRotationTrack) {
-          continue;
-        } else if (srcTrack instanceof NodeEulerRotationTrack) {
-          continue;
-        } else if (srcTrack instanceof NodeTranslationTrack) {
-          if (srcNode === srcRootNode || srcTrack === srcMotionTrack || jointTranslations !== 'preserve') {
+      for (const remap of srcRemaps) {
+        const dstNode = remap.dstNode;
+        for (const srcTrack of srcTracks) {
+          let dstTrack: AnimationTrack;
+          if (srcTrack instanceof NodeRotationTrack || srcTrack instanceof NodeEulerRotationTrack) {
+            continue;
+          } else if (srcTrack instanceof NodeTranslationTrack) {
+            if (srcNode === srcRootNode || srcTrack === srcMotionTrack || jointTranslations !== 'preserve') {
+              continue;
+            }
+            dstTrack = retargetTranslationTrack(srcTrack, remap);
+          } else if (srcTrack instanceof NodeScaleTrack) {
+            dstTrack = new NodeScaleTrack(cloneInterpolator(srcTrack.interpolator));
+          } else {
+            console.warn(
+              `copyHumanoidAnimationFrom: unsupported track type '${srcTrack.constructor.name}', skipping`
+            );
             continue;
           }
-          dstTrack = retargetTranslationTrack(srcTrack, remap);
-        } else if (srcTrack instanceof NodeScaleTrack) {
-          dstTrack = new NodeScaleTrack(cloneInterpolator(srcTrack.interpolator));
-        } else {
-          console.warn(
-            `copyHumanoidAnimationFrom: unsupported track type '${srcTrack.constructor.name}', skipping`
-          );
-          continue;
-        }
 
-        dstTrack.name = srcTrack.name;
-        dstTrack.target = dstNode.persistentId;
-        dstTrack.jointIndex = remap.dstJointIndex;
-        dstClip.addTrack(dstNode, dstTrack);
+          dstTrack.name = srcTrack.name;
+          dstTrack.target = dstNode.persistentId;
+          dstTrack.jointIndex = remap.dstJointIndex;
+          dstClip.addTrack(dstNode, dstTrack);
+        }
       }
     }
 
