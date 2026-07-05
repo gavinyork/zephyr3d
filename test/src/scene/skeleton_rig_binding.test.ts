@@ -508,7 +508,10 @@ describe('SkeletonRig and SkinBinding', () => {
     const srcIndexIntermediate = appendNode(srcIndexProximal, 'SrcLeftIndexIntermediate');
     const srcIndexDistal = appendNode(srcIndexIntermediate, 'SrcLeftIndexDistal');
     const dstPartialIndexProximal = appendNode(dstPartialJoints[9], 'DstPartialLeftIndexProximal');
-    const dstPartialIndexIntermediate = appendNode(dstPartialIndexProximal, 'DstPartialLeftIndexIntermediate');
+    const dstPartialIndexIntermediate = appendNode(
+      dstPartialIndexProximal,
+      'DstPartialLeftIndexIntermediate'
+    );
     const dstPartialIndexDistal = appendNode(dstPartialIndexIntermediate, 'DstPartialLeftIndexDistal');
     const srcFingerMapping = {
       [HumanoidHandRig.IndexProximal]: srcIndexProximal,
@@ -521,7 +524,12 @@ describe('SkeletonRig and SkinBinding', () => {
       [HumanoidHandRig.IndexDistal]: dstPartialIndexDistal
     } as Record<HumanoidHandRig, SceneNode>;
     const srcRigJoints = [...srcJoints, srcIndexProximal, srcIndexIntermediate, srcIndexDistal];
-    const dstPartialRigJoints = [...dstPartialJoints, dstPartialIndexProximal, dstPartialIndexIntermediate, dstPartialIndexDistal];
+    const dstPartialRigJoints = [
+      ...dstPartialJoints,
+      dstPartialIndexProximal,
+      dstPartialIndexIntermediate,
+      dstPartialIndexDistal
+    ];
     const srcRig = new SkeletonRig(srcRigJoints, bindPose(srcRigJoints), {
       humanoidJointMapping: {
         body: humanoidBodyMapping(srcJoints),
@@ -577,11 +585,15 @@ describe('SkeletonRig and SkinBinding', () => {
     expect(copied!.skeletons.has(dstBodyRig.persistentId)).toBe(true);
     expect(copied!.skeletons.has(dstPartialRig.persistentId)).toBe(true);
 
-    expect(copied!.tracks.get(dstBodyJoints[8])?.some((track) => track instanceof NodeRotationTrack)).toBe(true);
+    expect(copied!.tracks.get(dstBodyJoints[8])?.some((track) => track instanceof NodeRotationTrack)).toBe(
+      true
+    );
     expect(copied!.tracks.get(dstPartialJoints[8])?.some((track) => track instanceof NodeRotationTrack)).toBe(
       true
     );
-    expect(copied!.tracks.get(dstBodyJoints[9])?.some((track) => track instanceof NodeRotationTrack)).toBe(true);
+    expect(copied!.tracks.get(dstBodyJoints[9])?.some((track) => track instanceof NodeRotationTrack)).toBe(
+      true
+    );
     expect(copied!.tracks.get(dstPartialJoints[9])?.some((track) => track instanceof NodeRotationTrack)).toBe(
       true
     );
@@ -590,7 +602,8 @@ describe('SkeletonRig and SkinBinding', () => {
       .get(dstPartialIndexProximal)!
       .find((item) => item instanceof NodeRotationTrack);
     expect(partialFingerTrack).toBeInstanceOf(NodeRotationTrack);
-    const partialFingerOutputs = (partialFingerTrack as NodeRotationTrack).interpolator.outputs as Float32Array;
+    const partialFingerOutputs = (partialFingerTrack as NodeRotationTrack).interpolator
+      .outputs as Float32Array;
     expect(partialFingerOutputs[partialFingerOutputs.length - 3]).toBeGreaterThan(0);
     expect(Math.abs(partialFingerOutputs[partialFingerOutputs.length - 4])).toBeLessThan(0.05);
     expect(Math.abs(partialFingerOutputs[partialFingerOutputs.length - 2])).toBeLessThan(0.05);

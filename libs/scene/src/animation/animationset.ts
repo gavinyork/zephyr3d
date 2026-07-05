@@ -737,10 +737,8 @@ function getHumanoidRotationCorrection(
   const dstForwardZSign =
     getHumanoidForwardZSign(dstSkeleton) ||
     getHumanoidSignFromSkeletons(dstSignSkeletons, getHumanoidForwardZSign);
-  const axisXSign =
-    srcLateralXSign && dstLateralXSign && srcLateralXSign !== dstLateralXSign ? -1 : 1;
-  const axisZSign =
-    srcForwardZSign && dstForwardZSign && srcForwardZSign !== dstForwardZSign ? -1 : 1;
+  const axisXSign = srcLateralXSign && dstLateralXSign && srcLateralXSign !== dstLateralXSign ? -1 : 1;
+  const axisZSign = srcForwardZSign && dstForwardZSign && srcForwardZSign !== dstForwardZSign ? -1 : 1;
   if (axisXSign === 1 && axisZSign === 1) {
     return null;
   }
@@ -2275,12 +2273,7 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
         const srcMatched: SceneNode[] = [];
         const dstMatched: SceneNode[] = [];
         const addMatch = (srcJoint: SceneNode | undefined, dstJoint: SceneNode | undefined) => {
-          if (
-            srcJoint &&
-            dstJoint &&
-            srcSkeleton.joints.includes(srcJoint) &&
-            sk.joints.includes(dstJoint)
-          ) {
+          if (srcJoint && dstJoint && srcSkeleton.joints.includes(srcJoint) && sk.joints.includes(dstJoint)) {
             srcMatched.push(srcJoint);
             dstMatched.push(dstJoint);
           }
@@ -2383,12 +2376,8 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
             : getHumanoidRootMotionScale(srcSkeleton, dstSkeleton)
         : 1;
     const jointRemaps: JointRetargetRemap[] = [];
-    const jointRemapsByDstSkeleton = new Map<SkeletonRig, JointRetargetRemap[]>([
-      [dstSkeleton, jointRemaps]
-    ]);
-    const srcSignSkeletons = sourceSet._rigs
-      .map((ref) => ref.get())
-      .filter((sk): sk is SkeletonRig => !!sk);
+    const jointRemapsByDstSkeleton = new Map<SkeletonRig, JointRetargetRemap[]>([[dstSkeleton, jointRemaps]]);
+    const srcSignSkeletons = sourceSet._rigs.map((ref) => ref.get()).filter((sk): sk is SkeletonRig => !!sk);
     const dstSignSkeletons = this._rigs.map((ref) => ref.get()).filter((sk): sk is SkeletonRig => !!sk);
     const humanoidRotationCorrection = getHumanoidRotationCorrection(
       srcSkeleton,
@@ -2419,7 +2408,7 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
         undefined,
         humanoidRotationCorrection ?? undefined,
         undefined,
-        applyRotationCorrection ? humanoidRotationCorrection ?? undefined : undefined
+        applyRotationCorrection ? (humanoidRotationCorrection ?? undefined) : undefined
       );
       let targetRemaps = jointRemapsByDstSkeleton.get(targetSkeleton);
       if (!targetRemaps) {

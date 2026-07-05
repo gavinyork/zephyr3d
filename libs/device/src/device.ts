@@ -59,7 +59,11 @@ import type {
   DeviceOptions,
   DeviceEventMap,
   DeviceViewport,
-  DrawTextLayoutOptions
+  DrawTextLayoutOptions,
+  TimestampQueryFilter,
+  TimestampQueryHandle,
+  TimestampQueryOptions,
+  TimestampQueryResult
 } from './base_types';
 import { DrawText } from './helpers';
 import { Pool } from './pool';
@@ -588,6 +592,21 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._gpuTimer = null;
     }
   }
+  beginTimestampQuery(_label?: string, _options?: TimestampQueryOptions): number {
+    return 0;
+  }
+  endTimestampQuery(_id: number): void {
+    return;
+  }
+  pollTimestampQuery(query: TimestampQueryHandle): Nullable<TimestampQueryResult> {
+    return this.createUnsupportedTimestampQueryResult(query);
+  }
+  resolveTimestampQuery(query: TimestampQueryHandle): Promise<TimestampQueryResult> {
+    return Promise.resolve(this.createUnsupportedTimestampQueryResult(query));
+  }
+  collectTimestampQueries(_filter?: TimestampQueryFilter): TimestampQueryResult[] {
+    return [];
+  }
   beginFrame() {
     if (this._beginFrameCounter === 0) {
       for (const obj of this._disposeObjectList) {
@@ -933,6 +952,18 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       list = this._gpuObjectList.bindGroups;
     }
     return list;
+  }
+  private createUnsupportedTimestampQueryResult(query: TimestampQueryHandle): TimestampQueryResult {
+    return {
+      id: typeof query === 'number' ? query : 0,
+      label: typeof query === 'string' ? query : '',
+      frameId: this._frameInfo.frameCounter,
+      durationMs: 0,
+      start: 0n,
+      end: 0n,
+      status: 'unsupported',
+      message: 'GPU timestamp queries are not supported by this device'
+    };
   }
   protected invalidateAll() {
     for (const list of [

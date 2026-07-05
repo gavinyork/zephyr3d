@@ -2124,6 +2124,70 @@ export interface FrameInfo {
 }
 
 /**
+ * Timestamp query result status.
+ * @public
+ */
+export type TimestampQueryStatus =
+  | 'pending'
+  | 'resolved'
+  | 'unsupported'
+  | 'invalid'
+  | 'auto-closed'
+  | 'exhausted'
+  | 'failed';
+
+/**
+ * Options for a GPU timestamp query scope.
+ * @public
+ */
+export interface TimestampQueryOptions {
+  /** Include pending GPU upload/copy commands at the timestamp boundary. Default true. */
+  includePendingUploads?: boolean;
+  /** Allow the query scope to remain open across frame boundaries. Default false. */
+  allowCrossFrame?: boolean;
+  /** Throw on invalid begin/end usage instead of warning. Default false. */
+  strict?: boolean;
+}
+
+/**
+ * GPU timestamp query scope result.
+ * @public
+ */
+export type TimestampQueryHandle = number | string;
+
+export interface TimestampQueryResult {
+  /** Unique query scope id. */
+  id: number;
+  /** Debug label. Labels are not unique. */
+  label: string;
+  /** Frame in which the scope began. */
+  frameId: number;
+  /** Duration in milliseconds. */
+  durationMs: number;
+  /** Raw GPU start timestamp. */
+  start: bigint;
+  /** Raw GPU end timestamp. */
+  end: bigint;
+  /** Query result status. */
+  status: TimestampQueryStatus;
+  /** True if the scope was closed automatically at frame end. */
+  autoClosed?: boolean;
+  /** Optional diagnostic message. */
+  message?: string;
+}
+
+/**
+ * Filter used to collect timestamp query results.
+ * @public
+ */
+export interface TimestampQueryFilter {
+  /** Result label to match. */
+  label?: string;
+  /** Frame id to match. */
+  frameId?: number;
+}
+
+/**
  * List of all gpu objects
  * @public
  */
@@ -2197,6 +2261,8 @@ export interface MiscCaps {
   maxBindGroups: number;
   /** The maximum number of texture coordinate index */
   maxTexCoordIndex: number;
+  /** True if the device supports GPU timestamp query scopes */
+  supportTimestampQuery: boolean;
 }
 
 /**
@@ -2480,6 +2546,26 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   ): void;
   /** Creates a GPU timer */
   createGPUTimer(): Nullable<ITimer>;
+  /**
+   * Begin a GPU timestamp query scope.
+   *
+   * @remarks
+   * The returned id is the only unique handle. Labels are only for grouping/debugging.
+   */
+  beginTimestampQuery(label?: string, options?: TimestampQueryOptions): number;
+  /** End a GPU timestamp query scope. */
+  endTimestampQuery(id: number): void;
+  /**
+   * Poll a timestamp query result. Returns null when the query is still pending.
+   *
+   * @remarks
+   * Passing a numeric id is unambiguous. Passing a label resolves the latest matching scope.
+   */
+  pollTimestampQuery(query: TimestampQueryHandle): Nullable<TimestampQueryResult>;
+  /** Resolve a timestamp query result asynchronously. */
+  resolveTimestampQuery(query: TimestampQueryHandle): Promise<TimestampQueryResult>;
+  /** Collect resolved timestamp query results. */
+  collectTimestampQueries(filter?: TimestampQueryFilter): TimestampQueryResult[];
   /** Creates a render state set object */
   createRenderStateSet(): RenderStateSet;
   /** Creates a blending state object */

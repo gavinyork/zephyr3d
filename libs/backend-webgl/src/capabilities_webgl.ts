@@ -215,6 +215,7 @@ export class WebGLMiscCaps implements MiscCaps {
   supportDepthClamp: boolean;
   maxBindGroups: number;
   maxTexCoordIndex: number;
+  supportTimestampQuery: boolean;
   constructor(gl: WebGLContext) {
     this._isWebGL2 = isWebGL2(gl);
     this._extBlendMinMax = null;
@@ -231,6 +232,7 @@ export class WebGLMiscCaps implements MiscCaps {
     this.supportDepthClamp = false;
     this.maxBindGroups = 4;
     this.maxTexCoordIndex = 8;
+    this.supportTimestampQuery = false;
   }
 }
 export class WebGLShaderCaps implements ShaderCaps {

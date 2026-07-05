@@ -54,6 +54,7 @@ export class WebGPUMiscCaps implements MiscCaps {
   supportDepthClamp: boolean;
   maxBindGroups: number;
   maxTexCoordIndex: number;
+  supportTimestampQuery: boolean;
   constructor(device: WebGPUDevice) {
     this.supportOversizedViewport = false;
     this.supportBlendMinMax = true;
@@ -61,6 +62,7 @@ export class WebGPUMiscCaps implements MiscCaps {
     this.supportDepthClamp = device.device.features.has('depth-clip-control');
     this.maxBindGroups = 4;
     this.maxTexCoordIndex = 8;
+    this.supportTimestampQuery = device.device.features.has('timestamp-query');
   }
 }
 export class WebGPUShaderCaps implements ShaderCaps {

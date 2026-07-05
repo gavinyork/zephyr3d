@@ -29,6 +29,10 @@ export class WebGPUComputePass {
     if (validation & VALIDATION_FAILED) {
       return;
     }
+    if (this._device.commandQueue.hasDeferredMipmapsForBindGroups(bindGroups)) {
+      this.end();
+      this._device.commandQueue.flushDeferredMipmapsForBindGroups(bindGroups);
+    }
     if (!this.active) {
       this.begin();
     }

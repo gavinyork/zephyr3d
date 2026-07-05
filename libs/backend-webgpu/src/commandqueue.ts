@@ -58,10 +58,7 @@ export class CommandQueueImmediate {
   getEncoder() {
     const segment = this.getOrCreateCurrentSegment();
     segment.hasBodyCommands = true;
-    if (!segment.bodyEncoder) {
-      segment.bodyEncoder = this._device.device.createCommandEncoder();
-    }
-    return segment.bodyEncoder;
+    return this.getOrCreateBodyEncoder(segment);
   }
   flushUploads() {
     this.finalizeCurrentSegmentUploads();
@@ -244,6 +241,26 @@ export class CommandQueueImmediate {
     this.submit();
     return this._device.device.queue.onSubmittedWorkDone();
   }
+  insertTimestampMarker(querySet: GPUQuerySet, queryIndex: number, includePendingUploads: boolean): void {
+    this.endAllBodyPasses(false);
+    if (includePendingUploads) {
+      this.finalizeCurrentSegmentUploads();
+      const encoder = this.getEncoder();
+      this.encodeTimestampMarker(encoder, querySet, queryIndex);
+    } else {
+      const segment = this.getOrCreateCurrentSegment();
+      const pendingBuffers = segment.buffersWithPendingUploads.splice(0);
+      const pendingTextures = segment.texturesWithPendingUploads.splice(0);
+      segment.hasBodyCommands = true;
+      const encoder = this.getOrCreateBodyEncoder(segment);
+      this.encodeTimestampMarker(encoder, querySet, queryIndex);
+      if (pendingBuffers.length > 0 || pendingTextures.length > 0) {
+        const nextSegment = this.createSegment();
+        nextSegment.buffersWithPendingUploads.push(...pendingBuffers);
+        nextSegment.texturesWithPendingUploads.push(...pendingTextures);
+      }
+    }
+  }
   private createSegment(): LogicalSegment {
     const segment: LogicalSegment = {
       uploadEncoder: null,
@@ -268,6 +285,12 @@ export class CommandQueueImmediate {
     }
     return segment.uploadEncoder;
   }
+  private getOrCreateBodyEncoder(segment: LogicalSegment) {
+    if (!segment.bodyEncoder) {
+      segment.bodyEncoder = this._device.device.createCommandEncoder();
+    }
+    return segment.bodyEncoder;
+  }
   private ensureRenderBodyReady() {
     if (this._computePass.active) {
       this._computePass.end();
@@ -278,9 +301,15 @@ export class CommandQueueImmediate {
       this._renderPass.end();
     }
   }
-  private endAllBodyPasses() {
+  flushDeferredMipmapsForBindGroups(bindGroups: WebGPUBindGroup[]): void {
+    this._renderPass.flushDeferredMipmapsForBindGroups(bindGroups);
+  }
+  hasDeferredMipmapsForBindGroups(bindGroups: WebGPUBindGroup[]): boolean {
+    return this._renderPass.hasDeferredMipmapsForBindGroups(bindGroups);
+  }
+  private endAllBodyPasses(generateMipmaps = true) {
     if (this._renderPass.active) {
-      this._renderPass.end();
+      this._renderPass.end(generateMipmaps);
     }
     if (this._computePass.active) {
       this._computePass.end();
@@ -288,9 +317,10 @@ export class CommandQueueImmediate {
   }
   private submit() {
     this.endAllBodyPasses();
+    this._renderPass.flushDeferredMipmaps();
     this.finalizeCurrentSegmentUploads();
+    const commandBuffers: GPUCommandBuffer[] = [];
     if (this._segments.length > 0) {
-      const commandBuffers: GPUCommandBuffer[] = [];
       for (const segment of this._segments) {
         if (segment.uploadEncoder && segment.hasUploadCommands) {
           commandBuffers.push(segment.uploadEncoder.finish());
@@ -299,9 +329,14 @@ export class CommandQueueImmediate {
           commandBuffers.push(segment.bodyEncoder.finish());
         }
       }
-      if (commandBuffers.length > 0) {
-        this._device.device.queue.submit(commandBuffers);
-      }
+    }
+    const timestampResolveCommandBuffer = this._device.createTimestampResolveCommandBuffer();
+    if (timestampResolveCommandBuffer) {
+      commandBuffers.push(timestampResolveCommandBuffer);
+    }
+    if (commandBuffers.length > 0) {
+      this._device.device.queue.submit(commandBuffers);
+      this._device.onTimestampCommandBuffersSubmitted();
     }
     for (const buffer of this._buffersAwaitingSyncEnd) {
       buffer.endSyncChanges();
@@ -313,6 +348,16 @@ export class CommandQueueImmediate {
     this._texturesAwaitingSyncEnd.length = 0;
     this._segments.length = 0;
     this._drawcallCounter = 0;
+  }
+  private encodeTimestampMarker(encoder: GPUCommandEncoder, querySet: GPUQuerySet, queryIndex: number): void {
+    const pass = encoder.beginComputePass({
+      label: `timestamp-marker:${queryIndex}`,
+      timestampWrites: {
+        querySet,
+        beginningOfPassWriteIndex: queryIndex
+      }
+    } as GPUComputePassDescriptor);
+    pass.end();
   }
   private markBufferAwaitingSyncEnd(buffer: WebGPUBuffer) {
     if (this._buffersAwaitingSyncEnd.indexOf(buffer) < 0) {

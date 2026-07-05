@@ -60,6 +60,13 @@ import { CommandQueueImmediate } from './commandqueue';
 import { WebGPUStructuredBuffer } from './structuredbuffer_webgpu';
 import { textureFormatInvMap } from './constants_webgpu';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
+import { WebGPUTimestampQueryManager } from './timestamp_query';
+import type {
+  TimestampQueryFilter,
+  TimestampQueryHandle,
+  TimestampQueryOptions,
+  TimestampQueryResult
+} from './timestamp_query';
 
 type WebGPURenderBundle = {
   dc: number;
@@ -97,6 +104,7 @@ export class WebGPUDevice extends BaseDevice {
   private _emptyBindGroup!: GPUBindGroup;
   private _captureRenderBundle: Nullable<WebGPURenderBundle>;
   private _adapterInfo: any;
+  private _timestampQueries!: WebGPUTimestampQueryManager;
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend, options?.dpr);
     this._reverseWindingOrder = false;
@@ -238,6 +246,7 @@ export class WebGPUDevice extends BaseDevice {
     this._bindGroupCache = new BindGroupCache(this);
     this._vertexLayoutCache = new VertexLayoutCache();
     this._commandQueue = new CommandQueueImmediate(this);
+    this._timestampQueries = new WebGPUTimestampQueryManager(this);
     this._canRender = true;
     this.setViewport(null);
     this.setScissor(null);
@@ -286,6 +295,21 @@ export class WebGPUDevice extends BaseDevice {
   createGPUTimer() {
     // throw new Error('not implemented');
     return null;
+  }
+  beginTimestampQuery(label?: string, options?: TimestampQueryOptions): number {
+    return this._timestampQueries.begin(label, options);
+  }
+  endTimestampQuery(id: number): void {
+    this._timestampQueries.end(id);
+  }
+  pollTimestampQuery(query: TimestampQueryHandle): Nullable<TimestampQueryResult> {
+    return this._timestampQueries.poll(query);
+  }
+  resolveTimestampQuery(query: TimestampQueryHandle): Promise<TimestampQueryResult> {
+    return this._timestampQueries.resolve(query);
+  }
+  collectTimestampQueries(filter?: TimestampQueryFilter): TimestampQueryResult[] {
+    return this._timestampQueries.collect(filter);
   }
   createRenderStateSet() {
     return new WebGPURenderStateSet(this);
@@ -793,6 +817,14 @@ export class WebGPUDevice extends BaseDevice {
     this._commandQueue.flushUploads();
   }
   /** @internal */
+  createTimestampResolveCommandBuffer() {
+    return this._timestampQueries.createResolveCommandBuffer();
+  }
+  /** @internal */
+  onTimestampCommandBuffersSubmitted() {
+    this._timestampQueries.onSubmitted();
+  }
+  /** @internal */
   protected _setFramebuffer(rt: FrameBuffer) {
     this._commandQueue.setFramebuffer(rt as WebGPUFrameBuffer);
   }
@@ -807,6 +839,7 @@ export class WebGPUDevice extends BaseDevice {
   }
   /** @internal */
   protected onEndFrame() {
+    this._timestampQueries.autoCloseOpenScopes();
     this._commandQueue.endFrame();
   }
   /** @internal */

@@ -32,6 +32,7 @@ export class WebGPURenderPass {
   private _currentViewport: Nullable<DeviceViewport>;
   private _currentScissor: Nullable<DeviceViewport>;
   private _frameBufferInfo: FrameBufferInfo;
+  private _deferredMipmapTextures: WebGPUBaseTexture[];
   constructor(device: WebGPUDevice) {
     this._device = device;
     this._renderCommandEncoder = null;
@@ -40,6 +41,7 @@ export class WebGPURenderPass {
     this._currentViewport = null;
     this._currentScissor = null;
     this._frameBufferInfo = this.createFrameBufferInfo(null);
+    this._deferredMipmapTextures = [];
   }
   get active() {
     return !!this._renderPassEncoder;
@@ -207,6 +209,10 @@ export class WebGPURenderPass {
     if (validation & VALIDATION_FAILED) {
       return;
     }
+    if (this.hasDeferredMipmapsForBindGroups(bindGroups)) {
+      this.end();
+      this.flushDeferredMipmapsForBindGroups(bindGroups);
+    }
     if (validation & VALIDATION_NEED_NEW_PASS) {
       this.end();
     }
@@ -363,7 +369,7 @@ export class WebGPURenderPass {
     this.setViewport(this._currentViewport);
     this.setScissor(this._currentScissor);
   }
-  end() {
+  end(generateMipmaps = true) {
     if (!this.active) {
       return;
     }
@@ -378,13 +384,36 @@ export class WebGPURenderPass {
       const options = this._frameBufferInfo.frameBuffer.getOptions();
       if (options.colorAttachments) {
         for (const attachment of options.colorAttachments) {
-          (attachment.texture as WebGPUBaseTexture)._markAsCurrentFB(false);
-          if (attachment.generateMipmaps && attachment.texture.mipLevelCount > 1) {
-            attachment.texture.generateMipmaps();
-          }
+          const texture = attachment.texture as WebGPUBaseTexture;
+          texture._markAsCurrentFB(false);
+          this.handleColorAttachmentMipmap(texture, !!attachment.generateMipmaps, generateMipmaps);
         }
       }
       (options.depthAttachment?.texture as WebGPUBaseTexture)?._markAsCurrentFB(false);
+    }
+  }
+  hasDeferredMipmapsForBindGroups(bindGroups: WebGPUBindGroup[]) {
+    return bindGroups?.some((bindGroup) => {
+      return bindGroup?.textureList.some((texture) => this._deferredMipmapTextures.indexOf(texture) >= 0);
+    });
+  }
+  flushDeferredMipmapsForBindGroups(bindGroups?: WebGPUBindGroup[]): void {
+    if (!bindGroups) {
+      this.flushDeferredMipmaps();
+      return;
+    }
+    for (const bindGroup of bindGroups) {
+      for (const texture of bindGroup?.textureList ?? []) {
+        this.flushDeferredMipmap(texture);
+      }
+    }
+  }
+  flushDeferredMipmaps(): void {
+    const textures = this._deferredMipmapTextures.splice(0);
+    for (const texture of textures) {
+      if (!texture.disposed) {
+        texture.generateMipmaps();
+      }
     }
   }
   capture(
@@ -569,6 +598,34 @@ export class WebGPURenderPass {
       validation |= VALIDATION_NEED_NEW_PASS;
     }
     return validation;
+  }
+  private handleColorAttachmentMipmap(
+    texture: WebGPUBaseTexture,
+    attachmentGenerateMipmaps: boolean,
+    generateMipmaps: boolean
+  ): void {
+    if (!attachmentGenerateMipmaps || texture.mipLevelCount <= 1) {
+      return;
+    }
+    if (generateMipmaps) {
+      this.removeDeferredMipmap(texture);
+      texture.generateMipmaps();
+    } else if (this._deferredMipmapTextures.indexOf(texture) < 0) {
+      this._deferredMipmapTextures.push(texture);
+    }
+  }
+  private flushDeferredMipmap(texture: WebGPUBaseTexture): void {
+    if (this.removeDeferredMipmap(texture) && !texture.disposed) {
+      texture.generateMipmaps();
+    }
+  }
+  private removeDeferredMipmap(texture: WebGPUBaseTexture): boolean {
+    const index = this._deferredMipmapTextures.indexOf(texture);
+    if (index >= 0) {
+      this._deferredMipmapTextures.splice(index, 1);
+      return true;
+    }
+    return false;
   }
   private setBindGroupsForRender(
     renderPassEncoder: GPURenderPassEncoder,
