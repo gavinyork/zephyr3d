@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Add api for timestamp query",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

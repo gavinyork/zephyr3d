@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgl",
+      "comment": "Add supportTimestampQuery device capability",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgl"
+}
