@@ -1,5 +1,10 @@
 import type {
   CompiledRenderGraph,
+  RenderGraphExecutorOptions,
+  RGProfileResult,
+  RGProfileScopeResult,
+  RGProfileScopeType,
+  RGProfilingOptions,
   RGTextureAllocator,
   RGTextureDesc,
   RGFramebufferDesc,
@@ -9,6 +14,8 @@ import type {
   RGPass
 } from './types';
 import { RGHandle } from './types';
+import type { AbstractDevice, TimestampQueryResult, TimestampQueryStatus } from '@zephyr3d/device';
+import { getDevice } from '../../app/api';
 
 interface RGPassAccessScope {
   passName: string;
@@ -16,6 +23,37 @@ interface RGPassAccessScope {
   textureIds: Set<number>;
   framebufferIds: Set<number>;
 }
+
+type RGResolvedProfilingOptions = Required<Omit<RGProfilingOptions, 'device'>> & {
+  device?: AbstractDevice;
+};
+
+interface RGProfileScopeInternal {
+  result: RGProfileScopeResult;
+  queryId: number;
+  ended: boolean;
+}
+
+interface RGProfileFrameInternal {
+  serial: number;
+  device: AbstractDevice | null;
+  supported: boolean;
+  result: RGProfileResult;
+  root: RGProfileScopeInternal;
+  scopes: RGProfileScopeInternal[];
+  resolvePromise: Promise<RGProfileResult>;
+}
+
+const DEFAULT_PROFILING_OPTIONS: RGResolvedProfilingOptions = {
+  enabled: false,
+  graph: true,
+  pass: true,
+  subpass: true,
+  includePendingUploads: true,
+  allowCrossFrame: false,
+  maxPendingFrames: 3,
+  label: 'RenderGraph'
+};
 
 /**
  * Executes a compiled render graph with automatic resource lifecycle management.
@@ -34,6 +72,12 @@ interface RGPassAccessScope {
  * @public
  */
 export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
+  private static _defaultProfilingOptions: boolean | RGProfilingOptions = false;
+  private static _latestProfileResult: RGProfileResult | null = null;
+  private static _latestPendingProfileFrame: RGProfileFrameInternal | null = null;
+  private static _latestResolvedProfileSerial = 0;
+  private static _nextProfileSerial = 0;
+
   /** @internal */
   private _allocator: RGTextureAllocator<TTexture, TFramebuffer>;
   /** @internal */
@@ -52,15 +96,76 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   private _resolvedImportedTextures: Map<number, TTexture> = new Map();
   /** @internal */
   private _cleanupCallbacks: Array<() => void> = [];
+  /** @internal */
+  private _profilingOptions: RGResolvedProfilingOptions;
+  /** @internal */
+  private _pendingProfileFrames: RGProfileFrameInternal[] = [];
+  /** @internal */
+  private _latestProfileResult: RGProfileResult | null = null;
+  /** @internal */
+  private _latestResolvedProfileSerial = 0;
 
   constructor(
     allocator: RGTextureAllocator<TTexture, TFramebuffer>,
     backbufferWidth: number,
-    backbufferHeight: number
+    backbufferHeight: number,
+    options?: RenderGraphExecutorOptions
   ) {
     this._allocator = allocator;
     this._backbufferWidth = backbufferWidth;
     this._backbufferHeight = backbufferHeight;
+    this._profilingOptions = this._normalizeProfilingOptions(
+      options?.profiling ?? RenderGraphExecutor._defaultProfilingOptions,
+      options?.device
+    );
+  }
+
+  /**
+   * Set the default profiling options used by newly constructed render graph executors.
+   */
+  static setDefaultProfilingOptions(options: boolean | RGProfilingOptions): void {
+    RenderGraphExecutor._defaultProfilingOptions = options;
+  }
+
+  /**
+   * Get the latest resolved profile result from any render graph executor.
+   */
+  static getLatestProfileResult(): RGProfileResult | null {
+    return RenderGraphExecutor._latestProfileResult;
+  }
+
+  /**
+   * Resolve the latest pending render graph profile result from any executor.
+   */
+  static resolveProfileResult(): Promise<RGProfileResult | null> {
+    return (
+      RenderGraphExecutor._latestPendingProfileFrame?.resolvePromise ??
+      Promise.resolve(RenderGraphExecutor._latestProfileResult)
+    );
+  }
+
+  /**
+   * Enable, disable, or update timestamp profiling for this executor.
+   */
+  setProfilingOptions(options: boolean | RGProfilingOptions): void {
+    this._profilingOptions = this._normalizeProfilingOptions(options, this._profilingOptions.device);
+  }
+
+  /**
+   * Get the latest resolved profile result produced by this executor.
+   */
+  getLatestProfileResult(): RGProfileResult | null {
+    return this._latestProfileResult;
+  }
+
+  /**
+   * Resolve the latest pending profile result produced by this executor.
+   */
+  resolveProfileResult(): Promise<RGProfileResult | null> {
+    return (
+      this._pendingProfileFrames[this._pendingProfileFrames.length - 1]?.resolvePromise ??
+      Promise.resolve(this._latestProfileResult)
+    );
   }
 
   /**
@@ -94,6 +199,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   execute(compiled: CompiledRenderGraph): void {
     this._cleanupCallbacks.length = 0;
     this._resolveImportedTextureAliases(compiled);
+    const profileFrame = this._beginProfileFrame();
 
     // Build per-pass allocation and release schedules
     const allocateAt = new Map<number, number[]>(); // passIndex -> transient texture resourceIds to allocate
@@ -157,15 +263,24 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
         // Execute the pass with exception safety for resource cleanup.
         // Release errors must not hide the original pass execution error.
         let passError: unknown = null;
+        const passProfile = this._beginPassProfileScope(profileFrame, pass);
         try {
           if (pass.subpasses.length > 0) {
             const accessScope = this._createAccessScope(pass);
             const ctx = this._createContext(accessScope);
             for (const subpass of pass.subpasses) {
+              const subpassProfile = this._beginSubpassProfileScope(
+                profileFrame,
+                passProfile,
+                pass,
+                subpass.name
+              );
               try {
                 (subpass.executeFn as RGExecuteFn<unknown>)(ctx, pass.data);
               } catch (e) {
                 throw this._wrapSubpassError(pass.name, subpass.name, e);
+              } finally {
+                this._endProfileScope(profileFrame, subpassProfile);
               }
             }
           } else if (pass.executeFn) {
@@ -175,6 +290,8 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
           }
         } catch (e) {
           passError = e;
+        } finally {
+          this._endProfileScope(profileFrame, passProfile);
         }
 
         let releaseError: unknown = null;
@@ -218,6 +335,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     } catch (e) {
       executionError = e;
     } finally {
+      this._finishProfileFrame(profileFrame);
       let cleanupError: unknown = null;
       try {
         this._runCleanupCallbacks();
@@ -262,6 +380,270 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   }
 
   // ─── Private ────────────────────────────────────────────────────────
+
+  /** @internal */
+  private _normalizeProfilingOptions(
+    options: boolean | RGProfilingOptions | undefined,
+    fallbackDevice?: AbstractDevice
+  ): RGResolvedProfilingOptions {
+    const source = typeof options === 'object' ? options : {};
+    const enabled = typeof options === 'boolean' ? options : (source.enabled ?? true);
+    return {
+      enabled,
+      graph: source.graph ?? DEFAULT_PROFILING_OPTIONS.graph,
+      pass: source.pass ?? DEFAULT_PROFILING_OPTIONS.pass,
+      subpass: source.subpass ?? DEFAULT_PROFILING_OPTIONS.subpass,
+      includePendingUploads: source.includePendingUploads ?? DEFAULT_PROFILING_OPTIONS.includePendingUploads,
+      allowCrossFrame: source.allowCrossFrame ?? DEFAULT_PROFILING_OPTIONS.allowCrossFrame,
+      maxPendingFrames: Math.max(1, source.maxPendingFrames ?? DEFAULT_PROFILING_OPTIONS.maxPendingFrames),
+      label: source.label ?? DEFAULT_PROFILING_OPTIONS.label,
+      device: source.device ?? fallbackDevice
+    };
+  }
+
+  /** @internal */
+  private _getProfilingDevice(): AbstractDevice | null {
+    if (this._profilingOptions.device) {
+      return this._profilingOptions.device;
+    }
+    try {
+      return getDevice();
+    } catch {
+      return null;
+    }
+  }
+
+  /** @internal */
+  private _beginProfileFrame(): RGProfileFrameInternal | null {
+    if (!this._profilingOptions.enabled) {
+      return null;
+    }
+    const device = this._getProfilingDevice();
+    const supported = !!device?.getDeviceCaps().miscCaps.supportTimestampQuery;
+    const rootResult: RGProfileScopeResult = {
+      name: this._profilingOptions.label,
+      type: 'graph',
+      queryId: 0,
+      durationMs: 0,
+      status: supported ? 'resolved' : 'unsupported',
+      children: [],
+      message: supported ? undefined : 'GPU timestamp queries are not supported'
+    };
+    const result: RGProfileResult = {
+      frameId: device?.frameInfo.frameCounter ?? -1,
+      status: rootResult.status,
+      graph: rootResult,
+      passes: rootResult.children
+    };
+    const root: RGProfileScopeInternal = {
+      result: rootResult,
+      queryId: 0,
+      ended: false
+    };
+    const frame: RGProfileFrameInternal = {
+      serial: ++RenderGraphExecutor._nextProfileSerial,
+      device,
+      supported,
+      result,
+      root,
+      scopes: [],
+      resolvePromise: Promise.resolve(result)
+    };
+    if (this._profilingOptions.graph) {
+      this._beginTimestampScope(frame, root, this._profilingOptions.label);
+    }
+    return frame;
+  }
+
+  /** @internal */
+  private _beginPassProfileScope(
+    frame: RGProfileFrameInternal | null,
+    pass: RGPass
+  ): RGProfileScopeInternal | null {
+    if (!frame || (!this._profilingOptions.pass && !this._profilingOptions.subpass)) {
+      return null;
+    }
+    return this._beginProfileScope(frame, frame.root, 'pass', pass.name, this._profilingOptions.pass);
+  }
+
+  /** @internal */
+  private _beginSubpassProfileScope(
+    frame: RGProfileFrameInternal | null,
+    passScope: RGProfileScopeInternal | null,
+    pass: RGPass,
+    subpassName: string
+  ): RGProfileScopeInternal | null {
+    if (!frame || !this._profilingOptions.subpass) {
+      return null;
+    }
+    const parent = passScope ?? frame.root;
+    return this._beginProfileScope(
+      frame,
+      parent,
+      'subpass',
+      subpassName,
+      true,
+      `${pass.name}/${subpassName}`
+    );
+  }
+
+  /** @internal */
+  private _beginProfileScope(
+    frame: RGProfileFrameInternal,
+    parent: RGProfileScopeInternal,
+    type: RGProfileScopeType,
+    name: string,
+    queryEnabled: boolean,
+    queryLabel?: string
+  ): RGProfileScopeInternal {
+    const status =
+      frame.supported && !queryEnabled ? 'resolved' : frame.supported ? 'pending' : 'unsupported';
+    const result: RGProfileScopeResult = {
+      name,
+      type,
+      queryId: 0,
+      durationMs: 0,
+      status,
+      children: [],
+      message: frame.supported ? undefined : 'GPU timestamp queries are not supported'
+    };
+    parent.result.children.push(result);
+    const scope: RGProfileScopeInternal = {
+      result,
+      queryId: 0,
+      ended: false
+    };
+    if (queryEnabled) {
+      this._beginTimestampScope(frame, scope, queryLabel ?? name);
+    }
+    return scope;
+  }
+
+  /** @internal */
+  private _beginTimestampScope(
+    frame: RGProfileFrameInternal,
+    scope: RGProfileScopeInternal,
+    label: string
+  ): void {
+    if (!frame.supported || !frame.device) {
+      scope.result.status = 'unsupported';
+      scope.result.message = 'GPU timestamp queries are not supported';
+      return;
+    }
+    const queryId = frame.device.beginTimestampQuery(label, {
+      includePendingUploads: this._profilingOptions.includePendingUploads,
+      allowCrossFrame: this._profilingOptions.allowCrossFrame
+    });
+    scope.queryId = queryId;
+    scope.result.queryId = queryId;
+    if (queryId > 0) {
+      scope.result.status = 'pending';
+      frame.scopes.push(scope);
+    } else {
+      scope.result.status = 'unsupported';
+      scope.result.message = 'GPU timestamp query was not started';
+    }
+  }
+
+  /** @internal */
+  private _endProfileScope(frame: RGProfileFrameInternal | null, scope: RGProfileScopeInternal | null): void {
+    if (!frame || !frame.device || !scope || scope.ended) {
+      return;
+    }
+    scope.ended = true;
+    if (scope.queryId > 0) {
+      frame.device.endTimestampQuery(scope.queryId);
+    }
+  }
+
+  /** @internal */
+  private _finishProfileFrame(frame: RGProfileFrameInternal | null): void {
+    if (!frame) {
+      return;
+    }
+    this._endProfileScope(frame, frame.root);
+    if (frame.scopes.length === 0 || !frame.device) {
+      frame.result.status = this._aggregateProfileStatus(frame.result.graph);
+      this._publishProfileResult(frame);
+      return;
+    }
+    frame.resolvePromise = Promise.all(
+      frame.scopes.map((scope) => frame.device!.resolveTimestampQuery(scope.queryId))
+    )
+      .then((results) => {
+        for (let i = 0; i < results.length; i++) {
+          this._applyTimestampResult(frame.scopes[i], results[i]);
+        }
+        frame.result.status = this._aggregateProfileStatus(frame.result.graph);
+        this._publishProfileResult(frame);
+        return frame.result;
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        for (const scope of frame.scopes) {
+          scope.result.status = 'failed';
+          scope.result.message = message;
+        }
+        frame.result.status = 'failed';
+        this._publishProfileResult(frame);
+        return frame.result;
+      });
+    this._trackPendingProfileFrame(frame);
+  }
+
+  /** @internal */
+  private _trackPendingProfileFrame(frame: RGProfileFrameInternal): void {
+    this._pendingProfileFrames.push(frame);
+    while (this._pendingProfileFrames.length > this._profilingOptions.maxPendingFrames) {
+      this._pendingProfileFrames.shift();
+    }
+    RenderGraphExecutor._latestPendingProfileFrame = frame;
+  }
+
+  /** @internal */
+  private _publishProfileResult(frame: RGProfileFrameInternal): void {
+    this._pendingProfileFrames = this._pendingProfileFrames.filter((pending) => pending !== frame);
+    if (frame.serial >= this._latestResolvedProfileSerial) {
+      this._latestResolvedProfileSerial = frame.serial;
+      this._latestProfileResult = frame.result;
+    }
+    if (frame.serial >= RenderGraphExecutor._latestResolvedProfileSerial) {
+      RenderGraphExecutor._latestResolvedProfileSerial = frame.serial;
+      RenderGraphExecutor._latestProfileResult = frame.result;
+    }
+    if (RenderGraphExecutor._latestPendingProfileFrame === frame) {
+      RenderGraphExecutor._latestPendingProfileFrame = null;
+    }
+  }
+
+  /** @internal */
+  private _applyTimestampResult(scope: RGProfileScopeInternal, result: TimestampQueryResult): void {
+    scope.result.queryId = result.id;
+    scope.result.durationMs = result.durationMs;
+    scope.result.status = result.status;
+    scope.result.message = result.message;
+  }
+
+  /** @internal */
+  private _aggregateProfileStatus(scope: RGProfileScopeResult): TimestampQueryStatus {
+    const statuses: TimestampQueryStatus[] = [];
+    const collect = (node: RGProfileScopeResult) => {
+      statuses.push(node.status);
+      for (const child of node.children) {
+        collect(child);
+      }
+    };
+    collect(scope);
+    for (const status of ['failed', 'invalid', 'exhausted', 'pending', 'auto-closed'] as const) {
+      if (statuses.includes(status)) {
+        return status;
+      }
+    }
+    if (statuses.includes('unsupported')) {
+      return 'unsupported';
+    }
+    return 'resolved';
+  }
 
   /** @internal */
   private _resolveSize(desc: RGTextureDesc): RGResolvedSize {

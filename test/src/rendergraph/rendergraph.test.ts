@@ -6,6 +6,7 @@ import type {
   RGExecuteContext,
   RGFramebufferDesc
 } from '../../../libs/scene/src/render/rendergraph';
+import type { AbstractDevice, TimestampQueryOptions, TimestampQueryResult } from '@zephyr3d/device';
 
 // ─── Mock Allocator ──────────────────────────────────────────────────
 
@@ -46,6 +47,49 @@ function createMockAllocator() {
     }
   };
   return { allocator, allocated, released, allocatedFramebuffers, releasedFramebuffers };
+}
+
+function createMockTimestampDevice(supportTimestampQuery = true) {
+  let nextQueryId = 0;
+  const labels = new Map<number, string>();
+  const begun: number[] = [];
+  const ended: number[] = [];
+  const device = {
+    frameInfo: {
+      frameCounter: 42
+    },
+    getDeviceCaps() {
+      return {
+        miscCaps: {
+          supportTimestampQuery
+        }
+      };
+    },
+    beginTimestampQuery(label?: string, _options?: TimestampQueryOptions): number {
+      if (!supportTimestampQuery) {
+        return 0;
+      }
+      const id = ++nextQueryId;
+      labels.set(id, label ?? '');
+      begun.push(id);
+      return id;
+    },
+    endTimestampQuery(id: number): void {
+      ended.push(id);
+    },
+    resolveTimestampQuery(id: number): Promise<TimestampQueryResult> {
+      return Promise.resolve({
+        id,
+        label: labels.get(id) ?? '',
+        frameId: 42,
+        durationMs: id,
+        start: BigInt(id * 1000),
+        end: BigInt(id * 1000 + id * 1000000),
+        status: 'resolved'
+      } as TimestampQueryResult);
+    }
+  } as unknown as AbstractDevice;
+  return { device, begun, ended, labels };
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────
@@ -1137,5 +1181,163 @@ describe('RenderGraphExecutor', () => {
     (executor as any)._allocatedTextures.set(999, { id: 999, desc: {}, size: { width: 1, height: 1 } });
     executor.reset();
     expect(released).toHaveLength(1);
+  });
+
+  test('render graph profiling is disabled by default', () => {
+    const { allocator } = createMockAllocator();
+    const { device, begun } = createMockTimestampDevice();
+    let backbuffer = graph.importTexture('backbuffer');
+
+    graph.addPass('Pass', (builder) => {
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute(() => {});
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080, { device });
+    executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 1920, height: 1080 } });
+    executor.execute(compiled);
+
+    expect(begun).toHaveLength(0);
+    expect(executor.getLatestProfileResult()).toBeNull();
+  });
+
+  test('render graph profiling resolves graph pass and subpass tree', async () => {
+    const { allocator } = createMockAllocator();
+    const { device, begun, ended, labels } = createMockTimestampDevice();
+    let backbuffer = graph.importTexture('backbuffer');
+    const events: string[] = [];
+
+    graph.addPass('MainPass', (builder) => {
+      backbuffer = builder.write(backbuffer);
+      builder.addSubpass('Opaque', () => {
+        events.push('Opaque');
+      });
+      builder.addSubpass('Overlay', () => {
+        events.push('Overlay');
+      });
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080, {
+      device,
+      profiling: true
+    });
+    executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 1920, height: 1080 } });
+    executor.execute(compiled);
+    const profile = await executor.resolveProfileResult();
+
+    expect(events).toEqual(['Opaque', 'Overlay']);
+    expect(begun).toHaveLength(4);
+    expect(ended).toEqual([3, 4, 2, 1]);
+    expect(labels.get(1)).toBe('RenderGraph');
+    expect(profile?.status).toBe('resolved');
+    expect(profile?.frameId).toBe(42);
+    expect(profile?.graph.name).toBe('RenderGraph');
+    expect(profile?.graph.durationMs).toBe(1);
+    expect(profile?.passes.map((pass) => pass.name)).toEqual(['MainPass']);
+    expect(profile?.passes[0].children.map((child) => child.name)).toEqual(['Opaque', 'Overlay']);
+    expect(profile?.passes[0].children.map((child) => child.durationMs)).toEqual([3, 4]);
+  });
+
+  test('render graph profiling exposes unsupported results without timestamp queries', async () => {
+    const { allocator } = createMockAllocator();
+    const { device, begun, ended } = createMockTimestampDevice(false);
+    let backbuffer = graph.importTexture('backbuffer');
+
+    graph.addPass('Pass', (builder) => {
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute(() => {});
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const executor = new RenderGraphExecutor(allocator, 1920, 1080, {
+      device,
+      profiling: true
+    });
+    executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 1920, height: 1080 } });
+    executor.execute(compiled);
+    const profile = await executor.resolveProfileResult();
+
+    expect(begun).toHaveLength(0);
+    expect(ended).toHaveLength(0);
+    expect(profile?.status).toBe('unsupported');
+    expect(profile?.passes[0].status).toBe('unsupported');
+  });
+
+  test('render graph profiling can be enabled globally for new executors', async () => {
+    const { allocator } = createMockAllocator();
+    const { device, begun } = createMockTimestampDevice();
+    let backbuffer = graph.importTexture('backbuffer');
+
+    graph.addPass('Pass', (builder) => {
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute(() => {});
+    });
+
+    try {
+      RenderGraphExecutor.setDefaultProfilingOptions({ enabled: true, device });
+      const compiled = graph.compile([backbuffer]);
+      const executor = new RenderGraphExecutor(allocator, 1920, 1080);
+      executor.setImportedTexture(backbuffer, {
+        id: -1,
+        desc: {} as any,
+        size: { width: 1920, height: 1080 }
+      });
+      executor.execute(compiled);
+      const profile = await RenderGraphExecutor.resolveProfileResult();
+
+      expect(begun).toHaveLength(2);
+      expect(profile?.passes.map((pass) => pass.name)).toEqual(['Pass']);
+    } finally {
+      RenderGraphExecutor.setDefaultProfilingOptions(false);
+    }
+  });
+
+  test('render graph global profile result uses the newest executor frame', async () => {
+    const first = createMockAllocator();
+    const second = createMockAllocator();
+    const { device } = createMockTimestampDevice();
+    let backbuffer = graph.importTexture('backbuffer');
+
+    graph.addPass('Pass', (builder) => {
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute(() => {});
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const firstExecutor = new RenderGraphExecutor(first.allocator, 1920, 1080, {
+      device,
+      profiling: { enabled: true, label: 'FirstGraph' }
+    });
+    firstExecutor.setImportedTexture(backbuffer, {
+      id: -1,
+      desc: {} as any,
+      size: { width: 1920, height: 1080 }
+    });
+    firstExecutor.execute(compiled);
+    await firstExecutor.resolveProfileResult();
+    firstExecutor.setImportedTexture(backbuffer, {
+      id: -1,
+      desc: {} as any,
+      size: { width: 1920, height: 1080 }
+    });
+    firstExecutor.execute(compiled);
+    await firstExecutor.resolveProfileResult();
+
+    const secondExecutor = new RenderGraphExecutor(second.allocator, 1920, 1080, {
+      device,
+      profiling: { enabled: true, label: 'SecondGraph' }
+    });
+    secondExecutor.setImportedTexture(backbuffer, {
+      id: -1,
+      desc: {} as any,
+      size: { width: 1920, height: 1080 }
+    });
+    secondExecutor.execute(compiled);
+    const profile = await RenderGraphExecutor.resolveProfileResult();
+
+    expect(profile?.graph.name).toBe('SecondGraph');
+    expect(RenderGraphExecutor.getLatestProfileResult()?.graph.name).toBe('SecondGraph');
   });
 });

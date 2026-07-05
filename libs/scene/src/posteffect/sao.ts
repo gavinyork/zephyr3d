@@ -192,7 +192,7 @@ export class SAO extends AbstractPostEffect {
     device.clearFrameBuffer(packed ? new Vector4(0, 0, 0, 1) : new Vector4(1, 0, 0, 1), null, null);
     const bindgroup = packed ? SAO._bindgroupPacked! : SAO._bindgroup!;
     bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
-    bindgroup.setTexture('depthTex', sceneDepthTexture);
+    bindgroup.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
     bindgroup.setValue('scale', this._saoScale);
     bindgroup.setValue('invProj', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
     bindgroup.setValue('bias', this._saoBias);

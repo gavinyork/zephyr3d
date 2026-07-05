@@ -32,7 +32,8 @@ import {
   MSDFText,
   JointDynamicsModifier,
   SphereShape,
-  CapsuleShape
+  CapsuleShape,
+  RenderGraphExecutor
 } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { DirectionalLight } from '@zephyr3d/scene';
@@ -142,6 +143,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
+  private _showProfiler: boolean;
   private readonly _clipBoardData: DRef<SceneNode>;
   private _clipBoardNodes: SceneNode[];
   private _proxy: Nullable<NodeProxy>;
@@ -190,6 +192,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
+    this._showProfiler = false;
     this._clipBoardNodes = [];
     this._proxy = null;
     this._springBoneGizmo = null;
@@ -617,6 +620,27 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 return true;
               },
               checked: () => this._showDeviceInfo
+            },
+            {
+              label: 'Profiler',
+              id: 'SHOW_PROFILER',
+              action: () => {
+                this._showProfiler = !this._showProfiler;
+                if (this._showProfiler) {
+                  RenderGraphExecutor.setDefaultProfilingOptions({
+                    enabled: true,
+                    graph: true,
+                    pass: true,
+                    subpass: true,
+                    includePendingUploads: true,
+                    maxPendingFrames: 3,
+                    label: 'RenderGraph'
+                  });
+                } else {
+                  RenderGraphExecutor.setDefaultProfilingOptions(false);
+                }
+                return true;
+              }
             }
           ]
         },
@@ -1100,6 +1124,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
+    this._showProfiler = false;
+    RenderGraphExecutor.setDefaultProfilingOptions(false);
     this._animatedCamera = null;
     this._currentEditTool?.dispose();
     this.sceneSetup();
@@ -1926,6 +1952,21 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this.updateSpringBone(inspectedObj);
     } else {
       this.selectSpringBone(null);
+    }
+    if (this._showProfiler) {
+      RenderGraphExecutor.resolveProfileResult().then((profile) => {
+        if (profile) {
+          console.log(profile.status, profile.graph.durationMs);
+          console.table(
+            profile.passes.map((p) => ({
+              pass: p.name,
+              status: p.status,
+              ms: p.durationMs,
+              children: p.children.length
+            }))
+          );
+        }
+      });
     }
   }
   private updateSpringBone(obj: JointDynamicsModifier) {

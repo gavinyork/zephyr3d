@@ -4,13 +4,18 @@ export {
   type RGFramebufferDesc,
   type RGTextureDesc,
   type RGSizeMode,
+  type RGProfilingOptions,
+  type RGProfileResult,
+  type RGProfileScopeResult,
+  type RGProfileScopeType,
   type RGPassBuilder,
   type CompiledRenderGraph,
   type RGResourceLifetime,
   type RGExecuteFn,
   type RGExecuteContext,
   type RGTextureAllocator,
-  type RGResolvedSize
+  type RGResolvedSize,
+  type RenderGraphExecutorOptions
 } from './types';
 export { RenderGraph } from './rendergraph';
 export { RenderGraphExecutor } from './executor';

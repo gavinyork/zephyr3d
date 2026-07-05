@@ -212,7 +212,27 @@ export class WebGPUDevice extends BaseDevice {
     this._adapterInfo = this._adapter.info ?? {};
     this._device = await this._adapter.requestDevice({
       requiredFeatures: [...this._adapter.features] as GPUFeatureName[],
-      requiredLimits: { ...this._adapter.limits } as any
+      requiredLimits: {
+        maxBufferSize: this._adapter.limits.maxBufferSize,
+        maxBindingsPerBindGroup: this._adapter.limits.maxBindingsPerBindGroup,
+        maxTextureDimension2D: this._adapter.limits.maxTextureDimension2D,
+        maxComputeWorkgroupSizeX: this._adapter.limits.maxComputeWorkgroupSizeX,
+        maxComputeWorkgroupSizeY: this._adapter.limits.maxComputeWorkgroupSizeY,
+        maxComputeWorkgroupSizeZ: this._adapter.limits.maxComputeWorkgroupSizeZ,
+        maxSampledTexturesPerShaderStage: this._adapter.limits.maxSampledTexturesPerShaderStage,
+        maxSamplersPerShaderStage: this._adapter.limits.maxSamplersPerShaderStage,
+        maxStorageBuffersPerShaderStage: this._adapter.limits.maxStorageBuffersPerShaderStage,
+        maxStorageTexturesPerShaderStage: this._adapter.limits.maxStorageTexturesPerShaderStage,
+        maxUniformBuffersPerShaderStage: this._adapter.limits.maxUniformBuffersPerShaderStage,
+        maxUniformBufferBindingSize: this._adapter.limits.maxUniformBufferBindingSize,
+        maxStorageBufferBindingSize: this._adapter.limits.maxStorageBufferBindingSize,
+        maxInterStageShaderVariables: this._adapter.limits.maxInterStageShaderVariables,
+        maxColorAttachments: this._adapter.limits.maxColorAttachments,
+        maxColorAttachmentBytesPerSample: this._adapter.limits.maxColorAttachmentBytesPerSample,
+        maxComputeWorkgroupStorageSize: this._adapter.limits.maxComputeWorkgroupStorageSize,
+        maxComputeInvocationsPerWorkgroup: this._adapter.limits.maxComputeInvocationsPerWorkgroup,
+        maxComputeWorkgroupsPerDimension: this._adapter.limits.maxComputeWorkgroupsPerDimension
+      }
     });
     console.info('WebGPU device features:');
     for (const feature of this._device.features) {

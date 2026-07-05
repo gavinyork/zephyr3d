@@ -1,4 +1,4 @@
-import type { TextureFormat } from '@zephyr3d/device';
+import type { AbstractDevice, TextureFormat, TimestampQueryStatus } from '@zephyr3d/device';
 
 // ─── Resource Descriptors ───────────────────────────────────────────────
 
@@ -346,6 +346,84 @@ export interface CompiledRenderGraph {
   readonly orderedPasses: ReadonlyArray<RGPass>;
   /** Resource lifetime information keyed by resource ID. */
   readonly lifetimes: ReadonlyMap<number, RGResourceLifetime>;
+}
+
+/**
+ * Profiling scope type in a render graph timing tree.
+ * @public
+ */
+export type RGProfileScopeType = 'graph' | 'pass' | 'subpass';
+
+/**
+ * Render graph GPU timestamp profiling options.
+ * @public
+ */
+export interface RGProfilingOptions {
+  /** Enable render graph timestamp profiling. Default true when an options object is provided. */
+  enabled?: boolean;
+  /** Measure the whole graph execution. Default true. */
+  graph?: boolean;
+  /** Measure every render graph pass. Default true. */
+  pass?: boolean;
+  /** Measure every subpass and expose it as a child scope. Default true. */
+  subpass?: boolean;
+  /** Include pending upload/copy commands at timestamp boundaries. Default true. */
+  includePendingUploads?: boolean;
+  /** Allow graph profile scopes to remain open across frame boundaries. Default false. */
+  allowCrossFrame?: boolean;
+  /** Maximum unresolved profile frames kept by the executor. Default 3. */
+  maxPendingFrames?: number;
+  /** Root graph profile label. Default 'RenderGraph'. */
+  label?: string;
+  /** Device used for timestamp queries. If omitted, the scene global getDevice() is used. */
+  device?: AbstractDevice;
+}
+
+/**
+ * Render graph executor construction options.
+ * @public
+ */
+export interface RenderGraphExecutorOptions {
+  /** Device used for timestamp queries. If omitted, the scene global getDevice() is used. */
+  device?: AbstractDevice;
+  /** Render graph timestamp profiling options. Default false. */
+  profiling?: boolean | RGProfilingOptions;
+}
+
+/**
+ * Resolved GPU timing for one graph/pass/subpass scope.
+ * @public
+ */
+export interface RGProfileScopeResult {
+  /** Scope label. */
+  name: string;
+  /** Scope type. */
+  type: RGProfileScopeType;
+  /** Timestamp query id used by the device, or 0 for synthetic/unsupported scopes. */
+  queryId: number;
+  /** GPU duration in milliseconds. */
+  durationMs: number;
+  /** Timestamp result status. */
+  status: TimestampQueryStatus;
+  /** Child scopes. */
+  children: RGProfileScopeResult[];
+  /** Optional diagnostic message. */
+  message?: string;
+}
+
+/**
+ * Resolved GPU timing tree for one render graph execution.
+ * @public
+ */
+export interface RGProfileResult {
+  /** Render frame id when profiling began. */
+  frameId: number;
+  /** Aggregate profile status. */
+  status: TimestampQueryStatus;
+  /** Root graph scope. */
+  graph: RGProfileScopeResult;
+  /** Top-level pass scopes. Same objects as graph.children. */
+  passes: RGProfileScopeResult[];
 }
 
 // ─── Texture Allocator ──────────────────────────────────────────────
