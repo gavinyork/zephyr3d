@@ -22,6 +22,15 @@ jest.mock('../../../libs/scene/src/app/api', () => ({
       elapsedFrame: 16.6667,
       elapsedOverall: 16.6667
     },
+    getDeviceCaps: jest.fn(() => ({
+      textureCaps: {
+        maxTextureSize: 4096
+      }
+    })),
+    createTexture2D: jest.fn(() => ({
+      update: jest.fn(),
+      dispose: jest.fn()
+    })),
     createStructuredBuffer: jest.fn(() => ({
       bufferSubData: jest.fn(),
       dispose: jest.fn()
@@ -264,6 +273,80 @@ describe('morph target groups', () => {
 
     restoredMesh.setMorphWeight('smile', 1);
     expectBoundingBox(restoredMesh.getAnimatedBoundingBox(), [-1, -2, -3], [3, 4, 5]);
+  });
+
+  test('restores morph data from source GLB reference without inlining MorphData', async () => {
+    const manager = new ResourceManager(new MemoryFS());
+    mockResourceManager = manager;
+
+    const sourceModel = new SharedModel();
+    const sourceNode = new AssetHierarchyNode('face', sourceModel);
+    sourceNode.mesh = {
+      morphNames: ['smile'],
+      subMeshes: [
+        {
+          name: 'face-0',
+          primitive: {
+            name: 'face-0',
+            vertices: {
+              position: {
+                format: 'position_f32x3',
+                data: new Float32Array([0, 0, 0])
+              }
+            } as any,
+            indices: null,
+            indexCount: 1,
+            type: 'point-list',
+            boxMin: new Vector3(0, 0, 0),
+            boxMax: new Vector3(0, 0, 0)
+          },
+          material: null,
+          rawPositions: null,
+          rawBlendIndices: null,
+          rawJointWeights: null,
+          numTargets: 1,
+          targets: {
+            0: {
+              numComponents: 3,
+              data: [new Float32Array([1, 2, 3])]
+            }
+          }
+        }
+      ]
+    };
+    const fetchModelDataSpy = jest.spyOn(manager.assetManager, 'fetchModelData').mockResolvedValue(sourceModel);
+
+    const scene = new Scene();
+    const mesh = new Mesh(scene);
+    setMorphInfo(mesh, ['smile'], [0.5]);
+    mesh.setMorphBoundingInfo({
+      originBox: new BoundingBox(new Vector3(0, 0, 0), new Vector3(1, 1, 1)),
+      targetBoxes: [new BoundingBox(new Vector3(-1, -1, -1), new Vector3(2, 2, 2))]
+    });
+    mesh.setMorphSource({
+      sourcePath: '/assets/test/head.glb',
+      nodeIndex: 0,
+      subMeshIndex: 0
+    });
+
+    const serialized = await manager.serializeObject(mesh);
+    expect((serialized.Object as Record<string, unknown>).MorphData).toBe('');
+    expect((serialized.Object as Record<string, unknown>).MorphSource).toBe(
+      '{"sourcePath":"/assets/test/head.glb","nodeIndex":0,"subMeshIndex":0}'
+    );
+
+    const restored = new Mesh(scene);
+    await manager.deserializeObjectProps(restored, serialized.Object as Record<string, unknown>);
+
+    expect(fetchModelDataSpy).toHaveBeenCalledWith('/assets/test/head.glb');
+    expect(restored.getMorphSource()).toEqual({
+      sourcePath: '/assets/test/head.glb',
+      nodeIndex: 0,
+      subMeshIndex: 0
+    });
+    expect(restored.getMorphData()).not.toBeNull();
+    expect(restored.getMorphData()!.width).toBe(1);
+    expect(Array.from(restored.getMorphData()!.data)).toEqual([1, 2, 3, 1]);
   });
 
   test('keeps combined animated bounds stable when skinning and morphing are both active', () => {

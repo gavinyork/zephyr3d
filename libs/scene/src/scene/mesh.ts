@@ -48,6 +48,17 @@ export interface MorphBoundingInfo {
   originBox: BoundingBox;
 }
 
+/**
+ * External source descriptor used to rebuild morph target data on demand.
+ *
+ * @public
+ */
+export interface MorphSourceDescriptor {
+  sourcePath: string;
+  nodeIndex: number;
+  subMeshIndex: number;
+}
+
 const MeshBase = castObservable(applyMixins(GraphNode, mixinDrawable))<{
   primitive_changed: [primitive: Nullable<Primitive>];
   material_changed: [material: Nullable<MeshMaterial>];
@@ -78,6 +89,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
   protected _morphInfo: Nullable<MorphInfo>;
   /** @internal */
   protected _morphBoundingInfo: Nullable<MorphBoundingInfo>;
+  /** @internal */
+  protected _morphSource: Nullable<MorphSourceDescriptor>;
   /** @internal */
   protected _morphDirty: boolean;
   /** @internal */
@@ -113,6 +126,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._morphData = null;
     this._morphInfo = null;
     this._morphBoundingInfo = null;
+    this._morphSource = null;
     this._morphDirty = false;
     this._instanceHash = null;
     this._pickTarget = { node: this };
@@ -332,6 +346,19 @@ export class Mesh extends MeshBase implements BatchDrawable {
    */
   getMorphData() {
     return this._morphData;
+  }
+  /**
+   * Gets the external morph source descriptor.
+   */
+  getMorphSource() {
+    return this._morphSource;
+  }
+  /**
+   * Sets the external morph source descriptor.
+   * @param source - The morph source descriptor
+   */
+  setMorphSource(source: Nullable<MorphSourceDescriptor>) {
+    this._morphSource = source ? { ...source } : null;
   }
   /**
    * Sets the buffer that contains the morph target information

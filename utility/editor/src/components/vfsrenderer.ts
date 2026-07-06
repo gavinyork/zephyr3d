@@ -2750,7 +2750,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
                       {
                         ...saveOptions[i],
                         rebuildPrefab: !!result.rebuildPrefab,
-                        rebuildMaterial: !!result.rebuildMaterial
+                        rebuildMaterial: !!result.rebuildMaterial,
+                        sourceGlbReference: !!result.sourceGlbReference,
+                        sourceModelPath: result.paths[i]
                       }
                     );
                   } catch (err) {

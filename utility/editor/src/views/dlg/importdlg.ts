@@ -7,6 +7,7 @@ export class DlgImport extends DialogRenderer<{
   paths?: string[];
   rebuildPrefab?: boolean;
   rebuildMaterial?: boolean;
+  sourceGlbReference?: boolean;
 }> {
   protected _vfs: VFS;
   protected _op: [number];
@@ -14,6 +15,7 @@ export class DlgImport extends DialogRenderer<{
   protected _selected: [boolean][];
   protected _rebuildPrefab: [boolean];
   protected _rebuildMaterial: [boolean];
+  protected _sourceGlbReference: [boolean];
   protected _msg: string;
   public static promptImport(title: string, vfs: VFS, width?: number, height?: number) {
     return new DlgImport(`${title}##Dialog`, vfs, width, height).showModal();
@@ -26,6 +28,7 @@ export class DlgImport extends DialogRenderer<{
     this._selected = null;
     this._rebuildPrefab = [false];
     this._rebuildMaterial = [false];
+    this._sourceGlbReference = [false];
   }
   doRender(): void {
     ImGui.RadioButton('Copy to project', this._op, 0);
@@ -63,6 +66,7 @@ export class DlgImport extends DialogRenderer<{
       ImGui.Separator();
       ImGui.Checkbox('Rebuild prefab', this._rebuildPrefab);
       ImGui.Checkbox('Rebuild material', this._rebuildMaterial);
+      ImGui.Checkbox('Source GLB Reference', this._sourceGlbReference);
     }
     ImGui.Separator();
     if (ImGui.Button('OK')) {
@@ -70,7 +74,8 @@ export class DlgImport extends DialogRenderer<{
         op: this._op[0] === 0 ? 'copy' : 'import',
         paths: this._op[0] === 1 ? this._paths.filter((v, i) => this._selected[i][0]) : null,
         rebuildPrefab: this._op[0] === 1 ? this._rebuildPrefab[0] : false,
-        rebuildMaterial: this._op[0] === 1 ? this._rebuildMaterial[0] : false
+        rebuildMaterial: this._op[0] === 1 ? this._rebuildMaterial[0] : false,
+        sourceGlbReference: this._op[0] === 1 ? this._sourceGlbReference[0] : false
       });
     }
     ImGui.SameLine();

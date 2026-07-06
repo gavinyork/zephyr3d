@@ -1,7 +1,9 @@
 import { base64ToUint8Array, uint8ArrayToBase64, Vector3, mimeTypeOf } from '@zephyr3d/base';
 import { getEngine } from '../../../app/api';
+import { applyMeshMorphData, applyMeshMorphMetadata } from '../../../asset/model';
 import type { MeshMaterial } from '../../../material/meshmaterial';
-import { GraphNode, Mesh, type SceneNode } from '../../../scene';
+import { GraphNode, Mesh, type MorphSourceDescriptor, type SceneNode } from '../../../scene';
+import type { ResourceManager } from '../manager';
 import { defineProps, type SerializableClass } from '../types';
 import { BoundingBox } from '../../bounding_volume';
 import { meshInstanceClsMap } from './common';
@@ -19,7 +21,7 @@ function deserializeBoundingBox(data: unknown): BoundingBox | null {
 }
 
 /** @internal */
-export function getMeshClass(): SerializableClass {
+export function getMeshClass(manager: ResourceManager): SerializableClass {
   return {
     ctor: Mesh,
     name: 'Mesh',
@@ -123,7 +125,7 @@ export function getMeshClass(): SerializableClass {
           },
           async get(this: Mesh, value) {
             const morphData = this.getMorphData();
-            if (morphData) {
+            if (morphData && !this.getMorphSource()) {
               const buffer = new ArrayBuffer(4 + 4 + 4 * 4 * morphData.width * morphData.height);
               const dataView = new DataView(buffer);
               dataView.setUint32(0, morphData.width, true);
@@ -137,14 +139,65 @@ export function getMeshClass(): SerializableClass {
           set(this: Mesh, value) {
             if (value.str[0]) {
               const data = base64ToUint8Array(value.str[0]);
-              const dataView = new DataView(data.buffer);
+              const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
               const width = dataView.getUint32(0, true);
               const height = dataView.getUint32(4, true);
-              const pixels = new Float32Array(data.buffer, 8, 4 * width * height);
+              const pixels = new Float32Array(data.buffer, data.byteOffset + 8, 4 * width * height);
               this.setMorphData({ width, height, data: pixels });
             } else {
               this.setMorphData(null);
             }
+          }
+        },
+        {
+          name: 'MorphSource',
+          description: 'External morph-target source reference',
+          type: 'string',
+          phase: 1,
+          isHidden() {
+            return true;
+          },
+          get(this: Mesh, value) {
+            value.str[0] = this.getMorphSource() ? JSON.stringify(this.getMorphSource()) : '';
+          },
+          async set(this: Mesh, value) {
+            if (!value.str[0]) {
+              this.setMorphSource(null);
+              return;
+            }
+            const source = JSON.parse(value.str[0]) as MorphSourceDescriptor;
+            this.setMorphSource(source);
+            const sourceModel = await manager.assetManager.fetchModelData(source.sourcePath);
+            const sourceNode = sourceModel.nodes[source.nodeIndex];
+            const sourceMesh = sourceNode?.mesh;
+            const sourceSubMesh = sourceMesh?.subMeshes[source.subMeshIndex];
+            if (!sourceNode || !sourceMesh || !sourceSubMesh) {
+              throw new Error(
+                `Morph source not found: ${source.sourcePath}#${source.nodeIndex}/${source.subMeshIndex}`
+              );
+            }
+            if (!this.getMorphInfo() || !this.getMorphBoundingInfo()) {
+              applyMeshMorphMetadata(
+                sourceSubMesh,
+                this,
+                sourceNode.weights ?? sourceMesh.morphWeights,
+                sourceMesh.morphNames
+              );
+            }
+            const expectedVertexCount = sourceSubMesh.primitive
+              ? ((sourceSubMesh.primitive.vertices['position'].data.length / 3) >> 0)
+              : 0;
+            if (
+              this.primitive &&
+              expectedVertexCount > 0 &&
+              this.primitive.getNumVertices() > 0 &&
+              this.primitive.getNumVertices() !== expectedVertexCount
+            ) {
+              throw new Error(
+                `Morph source vertex count mismatch: expected ${expectedVertexCount}, got ${this.primitive.getNumVertices()}`
+              );
+            }
+            applyMeshMorphData(sourceSubMesh, this);
           }
         },
         {
@@ -200,11 +253,13 @@ export function getMeshClass(): SerializableClass {
             if (value.str[0]) {
               try {
                 const info = JSON.parse(value.str[0]);
-                const data = new Float32Array(base64ToUint8Array(info.data).buffer);
+                const bytes = base64ToUint8Array(info.data);
+                const data = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
                 const names = info.names;
                 this.setMorphInfo({ data, names });
               } catch {
-                const data = new Float32Array(base64ToUint8Array(value.str[0]).buffer);
+                const bytes = base64ToUint8Array(value.str[0]);
+                const data = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
                 const names: Record<string, number> = {};
                 for (let i = 0; i < data[3]; i++) {
                   names[`Target${i}`] = i;
@@ -235,7 +290,8 @@ export function getMeshClass(): SerializableClass {
           },
           set(this: Mesh, value) {
             if (value.str[0]) {
-              const data = new Float32Array(base64ToUint8Array(value.str[0]).buffer);
+              const bytes = base64ToUint8Array(value.str[0]);
+              const data = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
               const bbox = new BoundingBox();
               bbox.minPoint.setXYZ(data[0], data[1], data[2]);
               bbox.maxPoint.setXYZ(data[3], data[4], data[5]);
