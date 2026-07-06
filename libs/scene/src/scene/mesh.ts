@@ -59,6 +59,26 @@ export interface MorphSourceDescriptor {
   subMeshIndex: number;
 }
 
+const MORPH_WEIGHT_CAPACITY = MORPH_WEIGHTS_VECTOR_COUNT * 4;
+const MORPH_ATTRIBUTE_CAPACITY = MORPH_ATTRIBUTE_VECTOR_COUNT * 4;
+const MORPH_INFO_DATA_LENGTH = 4 + MORPH_WEIGHT_CAPACITY + MORPH_ATTRIBUTE_CAPACITY;
+
+function normalizeMorphInfoData(data: MorphInfo['data']) {
+  const normalized = new Float32Array(MORPH_INFO_DATA_LENGTH);
+  for (let i = 0; i < MORPH_ATTRIBUTE_CAPACITY; i++) {
+    normalized[4 + MORPH_WEIGHT_CAPACITY + i] = -1;
+  }
+  normalized.set(data.subarray(0, Math.min(data.length, normalized.length)));
+  const declaredCount = Math.max(0, Math.floor(Number(normalized[3]) || 0));
+  const supportedCount = Math.min(declaredCount, MORPH_WEIGHT_CAPACITY, Math.max(0, data.length - 4));
+  normalized[3] = supportedCount;
+  return {
+    data: normalized,
+    declaredCount,
+    supportedCount
+  };
+}
+
 const MeshBase = castObservable(applyMixins(GraphNode, mixinDrawable))<{
   primitive_changed: [primitive: Nullable<Primitive>];
   material_changed: [material: Nullable<MeshMaterial>];
@@ -378,9 +398,21 @@ export class Mesh extends MeshBase implements BatchDrawable {
           buffer: new DRef()
         } as MorphInfo;
       }
-      this._morphInfo.data = info.data.slice();
-      this._morphInfo.names = { ...info.names };
-      if (info.buffer?.get()) {
+      const { data, declaredCount, supportedCount } = normalizeMorphInfoData(info.data);
+      if (declaredCount !== supportedCount) {
+        console.warn(
+          `Morph target count truncated from ${declaredCount} to ${supportedCount} to fit the runtime buffer layout`
+        );
+      }
+      const names: Record<string, number> = {};
+      for (const [name, index] of Object.entries(info.names ?? {})) {
+        if (Number.isInteger(index) && index >= 0 && index < supportedCount) {
+          names[name] = index;
+        }
+      }
+      this._morphInfo.data = data;
+      this._morphInfo.names = names;
+      if (info.buffer?.get() && declaredCount === supportedCount && info.data.length >= MORPH_INFO_DATA_LENGTH) {
         this._morphInfo.buffer!.set(info.buffer.get());
       } else {
         const bufferType = new PBStructTypeInfo('dummy', 'std140', [
@@ -397,7 +429,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
           {
             usage: 'uniform'
           },
-          info.data
+          data
         );
         this._morphInfo.buffer!.set(morphUniformBuffer);
       }
@@ -430,7 +462,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
    * @returns The number of morph targets
    */
   getNumMorphTargets(): number {
-    return this._morphInfo?.data[3] ?? 0;
+    return this._morphInfo ? Math.min(this._morphInfo.data[3], MORPH_WEIGHT_CAPACITY) : 0;
   }
   /**
    * Get the name of the morph target by index
@@ -439,7 +471,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
    * @returns The name of the morph target, or null if not found
    */
   getMorphTargetName(index: number): Nullable<string> {
-    if (this._morphInfo && index >= 0 && index < this._morphInfo.data[3]) {
+    if (this._morphInfo && index >= 0 && index < this.getNumMorphTargets()) {
       const name = Object.keys(this._morphInfo.names).find((key) => this._morphInfo!.names![key] === index);
       return name ?? null;
     }
@@ -472,7 +504,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
    * @param weight - The weight of the morph target
    */
   setMorphWeightByIndex(index: number, weight: number) {
-    if (index >= 0 && index < this._morphInfo!.data[3]) {
+    if (index >= 0 && index < this.getNumMorphTargets()) {
       if (this._morphInfo!.data[4 + index] !== weight) {
         this._morphInfo!.data[4 + index] = weight;
         this._morphDirty = true;
@@ -491,7 +523,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
    */
   getMorphWeight(name: string): number {
     const index = this._morphInfo?.names?.[name];
-    if (index !== undefined && index >= 0 && index < this._morphInfo!.data[3]) {
+    if (index !== undefined && index >= 0 && index < this.getNumMorphTargets()) {
       return this._morphInfo!.data[4 + index];
     }
     return 0;
@@ -502,7 +534,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
    * @param weight - The morph target weights. The length must not exceed the mesh's morph target count.
    */
   updateMorphWeights(weight: number[]) {
-    if (this._morphInfo && weight && weight.length <= this._morphInfo.data[3]) {
+    if (this._morphInfo && weight && weight.length <= this.getNumMorphTargets()) {
       this._morphInfo.data.set(weight, 4);
       this._morphDirty = true;
       this.refreshAnimatedBoundingBox();
@@ -572,7 +604,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
     if (!this._morphInfo || !this._morphBoundingInfo) {
       return null;
     }
-    const numTargets = Math.min(this._morphInfo.data[3], this._morphBoundingInfo.targetBoxes.length);
+    const numTargets = Math.min(this.getNumMorphTargets(), this._morphBoundingInfo.targetBoxes.length);
     if (numTargets <= 0) {
       return null;
     }
@@ -593,7 +625,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
   /** @internal */
   private updateMorphState() {
     if (this._morphInfo && this._morphDirty) {
-      this._morphInfo.buffer!.get()!.bufferSubData(4 * 4, this._morphInfo.data, 4, this._morphInfo.data[3]);
+      this._morphInfo.buffer!.get()!.bufferSubData(4 * 4, this._morphInfo.data, 4, this.getNumMorphTargets());
       this.refreshAnimatedBoundingBox();
       this._morphDirty = false;
     }

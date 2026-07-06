@@ -1,4 +1,4 @@
-import { MemoryFS, Vector3 } from '@zephyr3d/base';
+import { MemoryFS, Vector3, uint8ArrayToBase64 } from '@zephyr3d/base';
 import {
   AssetHierarchyNode,
   BoundingBox,
@@ -11,6 +11,7 @@ import {
   type AssetMeshData,
   type AssetSubMeshData
 } from '../../../libs/scene/src';
+import { MAX_MORPH_ATTRIBUTES, MAX_MORPH_TARGETS } from '../../../libs/scene/src/values';
 
 let mockResourceManager: ResourceManager | null = null;
 
@@ -32,7 +33,13 @@ jest.mock('../../../libs/scene/src/app/api', () => ({
       dispose: jest.fn()
     })),
     createStructuredBuffer: jest.fn(() => ({
-      bufferSubData: jest.fn(),
+      bufferSubData: jest.fn((_dstOffset, data, srcOffset, srcLength) => {
+        const offset = Number(srcOffset) || 0;
+        const length = Number(srcLength) || data.length - offset;
+        if (offset + length > data.length) {
+          throw new Error('bufferSubData() failed: source buffer is too small');
+        }
+      }),
       dispose: jest.fn()
     }))
   })),
@@ -62,7 +69,7 @@ function createAssetMesh(name: string, morphNames: string[]): AssetMeshData {
 }
 
 function setMorphInfo(mesh: Mesh, names: string[], weights: number[] = []) {
-  const data = new Float32Array(4 + names.length);
+  const data = new Float32Array(4 + MAX_MORPH_TARGETS + MAX_MORPH_ATTRIBUTES);
   data[3] = names.length;
   weights.forEach((weight, index) => {
     data[4 + index] = weight;
@@ -96,6 +103,21 @@ describe('morph target groups', () => {
 
     expect(model.morphTargetGroups.map((group) => group.name)).toEqual(['smile', 'blink', 'aa']);
     expect(model.getMorphTargetGroup('smile')?.bindings).toHaveLength(2);
+  });
+
+  test('limits generated morph target groups to the runtime morph target capacity', () => {
+    const model = new SharedModel();
+    const assetNode = new AssetHierarchyNode('face', model);
+    assetNode.mesh = createAssetMesh(
+      'face-0',
+      Array.from({ length: MAX_MORPH_TARGETS + 4 }, (_, index) => `Target${index}`)
+    );
+
+    model.buildMorphTargetGroupsByName();
+
+    expect(model.morphTargetGroups).toHaveLength(MAX_MORPH_TARGETS);
+    expect(model.getMorphTargetGroup(`Target${MAX_MORPH_TARGETS - 1}`)).not.toBeNull();
+    expect(model.getMorphTargetGroup(`Target${MAX_MORPH_TARGETS}`)).toBeNull();
   });
 
   test('initializes runtime group weight from mesh morph weights', () => {
@@ -347,6 +369,90 @@ describe('morph target groups', () => {
     expect(restored.getMorphData()).not.toBeNull();
     expect(restored.getMorphData()!.width).toBe(1);
     expect(Array.from(restored.getMorphData()!.data)).toEqual([1, 2, 3, 1]);
+  });
+
+  test('clamps oversized serialized morph info when restoring source GLB references', async () => {
+    const manager = new ResourceManager(new MemoryFS());
+    mockResourceManager = manager;
+
+    const totalTargets = MAX_MORPH_TARGETS + 2;
+    const morphNames = Array.from({ length: totalTargets }, (_, index) => `Target${index}`);
+    const targetData = morphNames.map((_, index) => new Float32Array([index + 1, 0, 0]));
+    const sourceModel = new SharedModel();
+    const sourceNode = new AssetHierarchyNode('face', sourceModel);
+    sourceNode.mesh = {
+      morphNames,
+      subMeshes: [
+        {
+          name: 'face-0',
+          primitive: {
+            name: 'face-0',
+            vertices: {
+              position: {
+                format: 'position_f32x3',
+                data: new Float32Array([0, 0, 0])
+              }
+            } as any,
+            indices: null,
+            indexCount: 1,
+            type: 'point-list',
+            boxMin: new Vector3(0, 0, 0),
+            boxMax: new Vector3(0, 0, 0)
+          },
+          material: null,
+          rawPositions: null,
+          rawBlendIndices: null,
+          rawJointWeights: null,
+          numTargets: totalTargets,
+          targets: {
+            0: {
+              numComponents: 3,
+              data: targetData
+            }
+          },
+          targetBox: [new BoundingBox(new Vector3(-1, -1, -1), new Vector3(1, 1, 1))]
+        }
+      ]
+    };
+    const fetchModelDataSpy = jest.spyOn(manager.assetManager, 'fetchModelData').mockResolvedValue(sourceModel);
+
+    const oversizedMorphInfo = new Float32Array(4 + MAX_MORPH_TARGETS + MAX_MORPH_ATTRIBUTES);
+    oversizedMorphInfo[0] = 1;
+    oversizedMorphInfo[1] = 1;
+    oversizedMorphInfo[2] = 1;
+    oversizedMorphInfo[3] = totalTargets;
+    oversizedMorphInfo[4 + MAX_MORPH_TARGETS] = 0;
+    for (let i = 1; i < MAX_MORPH_ATTRIBUTES; i++) {
+      oversizedMorphInfo[4 + MAX_MORPH_TARGETS + i] = -1;
+    }
+    const nameMap: Record<string, number> = {};
+    morphNames.forEach((name, index) => {
+      nameMap[name] = index;
+    });
+
+    const scene = new Scene();
+    const restored = new Mesh(scene);
+    await manager.deserializeObjectProps(restored, {
+      MorphData: '',
+      MorphSource: '{"sourcePath":"/assets/test/head.glb","nodeIndex":0,"subMeshIndex":0}',
+      MorphInfo: JSON.stringify({
+        data: uint8ArrayToBase64(new Uint8Array(oversizedMorphInfo.buffer)),
+        names: nameMap
+      }),
+      MorphBoundingInfo: JSON.stringify({
+        originBox: [0, 0, 0, 1, 1, 1],
+        targetBoxes: [[-1, -1, -1, 1, 1, 1]]
+      })
+    });
+
+    expect(fetchModelDataSpy).toHaveBeenCalledWith('/assets/test/head.glb');
+    expect(restored.getMorphData()).not.toBeNull();
+    expect(restored.getNumMorphTargets()).toBe(MAX_MORPH_TARGETS);
+    expect(restored.getMorphTargetName(MAX_MORPH_TARGETS - 1)).toBe(`Target${MAX_MORPH_TARGETS - 1}`);
+    expect(restored.getMorphTargetIndexByName(`Target${MAX_MORPH_TARGETS}`)).toBe(-1);
+
+    restored.setMorphWeightByIndex(MAX_MORPH_TARGETS - 1, 0.5);
+    expect(() => restored.update(1, 0, 0)).not.toThrow();
   });
 
   test('keeps combined animated bounds stable when skinning and morphing are both active', () => {

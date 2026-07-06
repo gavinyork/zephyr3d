@@ -2444,20 +2444,26 @@ export function applyMeshMorphMetadata(
   if (numTargets === 0 || !subMesh.targets || !subMesh.targetBox) {
     return;
   }
+  const supportedNumTargets = Math.min(numTargets, MAX_MORPH_TARGETS);
+  if (supportedNumTargets !== numTargets) {
+    console.warn(
+      `Morph target count truncated from ${numTargets} to ${supportedNumTargets} for mesh "${subMesh.name ?? mesh.name ?? ''}"`
+    );
+  }
   const attributes = Object.getOwnPropertyNames(subMesh.targets);
   const positionInfo = subMesh.primitive!.vertices['position'];
   const numVertices = positionInfo
     ? (positionInfo.data.length / getVertexFormatComponentCount(positionInfo.format)) >> 0
     : 0;
   const weightsAndOffsets = new Float32Array(4 + MAX_MORPH_TARGETS + MAX_MORPH_ATTRIBUTES);
-  for (let i = 0; i < numTargets; i++) {
+  for (let i = 0; i < supportedNumTargets; i++) {
     weightsAndOffsets[4 + i] = morphWeights?.[i] ?? 0;
   }
   const textureSize = Math.ceil(Math.sqrt(numVertices * attributes.length * numTargets));
   weightsAndOffsets[0] = textureSize;
   weightsAndOffsets[1] = textureSize;
   weightsAndOffsets[2] = numVertices;
-  weightsAndOffsets[3] = numTargets;
+  weightsAndOffsets[3] = supportedNumTargets;
   let offset = 0;
   for (let attrib = 0; attrib < MAX_MORPH_ATTRIBUTES; attrib++) {
     const index = attributes.indexOf(String(attrib));
@@ -2475,13 +2481,13 @@ export function applyMeshMorphMetadata(
   }
 
   const names: Record<string, number> = {};
-  for (let i = 0; i < numTargets; i++) {
+  for (let i = 0; i < supportedNumTargets; i++) {
     const name = morphNames?.[i] ?? `Target${i}`;
     names[name] = i;
   }
   mesh.setMorphInfo({ data: weightsAndOffsets, names });
   mesh.setMorphBoundingInfo({
-    targetBoxes: subMesh.targetBox!,
+    targetBoxes: subMesh.targetBox!.slice(0, supportedNumTargets),
     originBox: new BoundingBox(mesh.getBoundingVolume()!.toAABB())
   });
 }
@@ -2550,7 +2556,7 @@ function getAssetMeshMorphTargetCount(mesh: AssetMeshData): number {
   for (const subMesh of mesh.subMeshes) {
     count = Math.max(count, subMesh.numTargets);
   }
-  return count;
+  return Math.min(count, MAX_MORPH_TARGETS);
 }
 
 /** @internal */
