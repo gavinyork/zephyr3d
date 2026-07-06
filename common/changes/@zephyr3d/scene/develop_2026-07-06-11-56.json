@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add PCSS shadow implementation",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
