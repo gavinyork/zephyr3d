@@ -28,6 +28,7 @@ import { ESM } from './esm';
 import { VSM } from './vsm';
 import { PCFPD } from './pcf_pd';
 import { PCFOPT } from './pcf_opt';
+import { PCSS } from './pcss';
 import type { PointLight, PunctualLight, RectLight, SpotLight } from '../scene/light';
 import type { ShadowMapPass } from '../render/shadowmap_pass';
 import type { Scene } from '../scene/scene';
@@ -45,7 +46,7 @@ const tmpFrustum = new Frustum(Matrix4x4.identity());
  * Shadow mapping mode
  * @public
  */
-export type ShadowMode = 'hard' | 'vsm' | 'esm' | 'pcf-pd' | 'pcf-opt';
+export type ShadowMode = 'hard' | 'vsm' | 'esm' | 'pcf-pd' | 'pcf-opt' | 'pcss';
 /**
  * Preset shadow quality profiles.
  *
@@ -125,6 +126,16 @@ export class ShadowMapper extends Disposable {
   /** @internal */
   protected _pcfKernelSize: number;
   /** @internal */
+  protected _pcssLightRadius: number;
+  /** @internal */
+  protected _pcssBlockerSampleCount: number;
+  /** @internal */
+  protected _pcssFilterSampleCount: number;
+  /** @internal */
+  protected _pcssMaxFilterRadius: number;
+  /** @internal */
+  protected _pcssTemporalJitter: boolean;
+  /** @internal */
   protected _vsmBlurKernelSize: number;
   /** @internal */
   protected _vsmBlurRadius: number;
@@ -166,6 +177,11 @@ export class ShadowMapper extends Disposable {
     this._pdSampleCount = 24;
     this._pdSampleRadius = 3;
     this._pcfKernelSize = 7;
+    this._pcssLightRadius = 8;
+    this._pcssBlockerSampleCount = 24;
+    this._pcssFilterSampleCount = 32;
+    this._pcssMaxFilterRadius = 32;
+    this._pcssTemporalJitter = true;
     this._vsmBlurKernelSize = 5;
     this._vsmBlurRadius = 4;
     this._vsmDarkness = 0.3;
@@ -382,6 +398,76 @@ export class ShadowMapper extends Disposable {
       const pcfopt = this.asPCFOPT();
       if (pcfopt) {
         pcfopt.kernelSize = this._pcfKernelSize;
+      }
+    }
+  }
+  /** Light radius for PCSS shadow, measured in shadow-map texels */
+  get pcssLightRadius() {
+    return this._pcssLightRadius;
+  }
+  set pcssLightRadius(val) {
+    val = Math.max(0, Number(val) || 0);
+    if (val !== this._pcssLightRadius) {
+      this._pcssLightRadius = val;
+      const pcss = this.asPCSS();
+      if (pcss) {
+        pcss.lightRadius = this._pcssLightRadius;
+      }
+    }
+  }
+  /** Blocker search sample count for PCSS shadow */
+  get pcssBlockerSampleCount() {
+    return this._pcssBlockerSampleCount;
+  }
+  set pcssBlockerSampleCount(val) {
+    val = Math.min(Math.max(1, Number(val) >> 0), 64);
+    if (val !== this._pcssBlockerSampleCount) {
+      this._pcssBlockerSampleCount = val;
+      const pcss = this.asPCSS();
+      if (pcss) {
+        pcss.blockerSampleCount = this._pcssBlockerSampleCount;
+      }
+    }
+  }
+  /** Filter sample count for PCSS shadow */
+  get pcssFilterSampleCount() {
+    return this._pcssFilterSampleCount;
+  }
+  set pcssFilterSampleCount(val) {
+    val = Math.min(Math.max(1, Number(val) >> 0), 64);
+    if (val !== this._pcssFilterSampleCount) {
+      this._pcssFilterSampleCount = val;
+      const pcss = this.asPCSS();
+      if (pcss) {
+        pcss.filterSampleCount = this._pcssFilterSampleCount;
+      }
+    }
+  }
+  /** Maximum PCSS filter radius, measured in shadow-map texels */
+  get pcssMaxFilterRadius() {
+    return this._pcssMaxFilterRadius;
+  }
+  set pcssMaxFilterRadius(val) {
+    val = Math.max(1, Number(val) || 1);
+    if (val !== this._pcssMaxFilterRadius) {
+      this._pcssMaxFilterRadius = val;
+      const pcss = this.asPCSS();
+      if (pcss) {
+        pcss.maxFilterRadius = this._pcssMaxFilterRadius;
+      }
+    }
+  }
+  /** If true, rotates PCSS sampling pattern over frames for TAA accumulation */
+  get pcssTemporalJitter() {
+    return this._pcssTemporalJitter;
+  }
+  set pcssTemporalJitter(val) {
+    val = !!val;
+    if (val !== this._pcssTemporalJitter) {
+      this._pcssTemporalJitter = val;
+      const pcss = this.asPCSS();
+      if (pcss) {
+        pcss.temporalJitter = this._pcssTemporalJitter;
       }
     }
   }
@@ -1164,7 +1250,14 @@ export class ShadowMapper extends Disposable {
   }
   /** @internal */
   private applyMode(mode: ShadowMode) {
-    if (mode !== 'hard' && mode !== 'vsm' && mode !== 'esm' && mode !== 'pcf-pd' && mode !== 'pcf-opt') {
+    if (
+      mode !== 'hard' &&
+      mode !== 'vsm' &&
+      mode !== 'esm' &&
+      mode !== 'pcf-pd' &&
+      mode !== 'pcf-opt' &&
+      mode !== 'pcss'
+    ) {
       console.error(`ShadowMapper.setShadowMode() failed: invalid mode: ${mode}`);
       return;
     }
@@ -1182,6 +1275,14 @@ export class ShadowMapper extends Disposable {
       this._impl = new PCFPD(this._pdSampleCount, this._pdSampleRadius);
     } else if (mode === 'pcf-opt') {
       this._impl = new PCFOPT(this._pcfKernelSize);
+    } else if (mode === 'pcss') {
+      this._impl = new PCSS(
+        this._pcssLightRadius,
+        this._pcssBlockerSampleCount,
+        this._pcssFilterSampleCount,
+        this._pcssMaxFilterRadius,
+        this._pcssTemporalJitter
+      );
     }
   }
   /** @internal */
@@ -1199,5 +1300,9 @@ export class ShadowMapper extends Disposable {
   /** @internal */
   private asPCFOPT() {
     return this._impl?.getType() === 'pcf-opt' ? (this._impl as PCFOPT) : null;
+  }
+  /** @internal */
+  private asPCSS() {
+    return this._impl?.getType() === 'pcss' ? (this._impl as PCSS) : null;
   }
 }
