@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Sat, 04 Jul 2026 17:00:36 GMT and should not be manually modified.
+This log was last generated on Mon, 06 Jul 2026 06:18:13 GMT and should not be manually modified.
+
+## 0.9.15
+Mon, 06 Jul 2026 06:18:13 GMT
+
+### Patches
+
+- Add rendergraph profiler support
 
 ## 0.9.14
 Sat, 04 Jul 2026 17:00:36 GMT

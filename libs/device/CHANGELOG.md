@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/device
 
-This log was last generated on Tue, 30 Jun 2026 20:07:17 GMT and should not be manually modified.
+This log was last generated on Mon, 06 Jul 2026 06:18:13 GMT and should not be manually modified.
+
+## 0.2.12
+Mon, 06 Jul 2026 06:18:13 GMT
+
+### Patches
+
+- Add api for timestamp query
 
 ## 0.2.11
 Tue, 30 Jun 2026 20:07:17 GMT
