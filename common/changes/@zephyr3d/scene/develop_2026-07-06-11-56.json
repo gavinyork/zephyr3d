@@ -2,7 +2,7 @@
   "changes": [
     {
       "packageName": "@zephyr3d/scene",
-      "comment": "Add rendergraph profiler support",
+      "comment": "Add PCSS shadow implementation",
       "type": "patch"
     }
   ],

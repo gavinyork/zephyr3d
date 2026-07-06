@@ -1,6 +1,7 @@
-import type { FrameBuffer, Texture2D, TextureFormat } from '@zephyr3d/device';
+import type { FrameBuffer, Texture2D, TextureFormat, AbstractDevice } from '@zephyr3d/device';
 import type { RGFramebufferDesc, RGTextureAllocator, RGTextureDesc, RGResolvedSize } from './types';
 import { getDevice } from '../../app/api';
+import type { Nullable } from '@zephyr3d/base';
 
 /**
  * Bridges the render graph's {@link RGTextureAllocator} interface to the
@@ -19,6 +20,14 @@ import { getDevice } from '../../app/api';
  * @public
  */
 export class DevicePoolAllocator implements RGTextureAllocator<Texture2D, FrameBuffer> {
+  private _device: Nullable<AbstractDevice>;
+  /**
+   * Creates a new instance of the DevicePoolAllocator.
+   * @param device - Optional device instance to use for resource allocation. If not provided, the global device will be used.
+   */
+  constructor(device?: AbstractDevice) {
+    this._device = device ?? null;
+  }
   /**
    * Allocate a transient texture from the device pool.
    *
@@ -27,7 +36,7 @@ export class DevicePoolAllocator implements RGTextureAllocator<Texture2D, FrameB
    * @returns A pooled Texture2D instance.
    */
   allocate(desc: RGTextureDesc, size: RGResolvedSize): Texture2D {
-    const device = getDevice();
+    const device = this._device ?? getDevice();
     const mipmapping = (desc.mipLevels ?? 1) > 1;
     const texture = device.pool.fetchTemporalTexture2D(
       false,
@@ -52,7 +61,7 @@ export class DevicePoolAllocator implements RGTextureAllocator<Texture2D, FrameB
    * @param texture - The texture to release.
    */
   release(texture: Texture2D): void {
-    const device = getDevice();
+    const device = this._device ?? getDevice();
     device.pool.releaseTexture(texture);
   }
 
@@ -62,7 +71,7 @@ export class DevicePoolAllocator implements RGTextureAllocator<Texture2D, FrameB
    * @param texture - The texture to retain.
    */
   retain(texture: Texture2D): void {
-    const device = getDevice();
+    const device = this._device ?? getDevice();
     device.pool.retainTexture(texture);
   }
 
@@ -73,7 +82,7 @@ export class DevicePoolAllocator implements RGTextureAllocator<Texture2D, FrameB
    * @returns A pooled FrameBuffer instance.
    */
   allocateFramebuffer(desc: RGFramebufferDesc): FrameBuffer {
-    const device = getDevice();
+    const device = this._device ?? getDevice();
     const colors = Array.isArray(desc.colorAttachments)
       ? (desc.colorAttachments as Array<Texture2D | TextureFormat>)
       : desc.colorAttachments
@@ -101,7 +110,7 @@ export class DevicePoolAllocator implements RGTextureAllocator<Texture2D, FrameB
    * @param framebuffer - The framebuffer to release.
    */
   releaseFramebuffer(framebuffer: FrameBuffer): void {
-    const device = getDevice();
+    const device = this._device ?? getDevice();
     device.pool.releaseFrameBuffer(framebuffer);
   }
 }

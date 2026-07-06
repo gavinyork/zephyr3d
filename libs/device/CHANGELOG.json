@@ -2,6 +2,18 @@
   "name": "@zephyr3d/device",
   "entries": [
     {
+      "version": "0.2.12",
+      "tag": "@zephyr3d/device_v0.2.12",
+      "date": "Mon, 06 Jul 2026 06:18:13 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add api for timestamp query"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.11",
       "tag": "@zephyr3d/device_v0.2.11",
       "date": "Tue, 30 Jun 2026 20:07:17 GMT",

@@ -68,8 +68,8 @@ export function getPunctualLightClass(): SerializableClass {
           default: 'hard',
           options: {
             enum: {
-              labels: ['Hard', 'PCF', 'PCF-PD', 'VSM', 'ESM'],
-              values: ['hard', 'pcf-opt', 'pcf-pd', 'vsm', 'esm']
+              labels: ['Hard', 'PCF', 'PCF-PD', 'PCSS', 'VSM', 'ESM'],
+              values: ['hard', 'pcf-opt', 'pcf-pd', 'pcss', 'vsm', 'esm']
             }
           },
           get(this: PunctualLight, value) {
@@ -305,6 +305,102 @@ export function getPunctualLightClass(): SerializableClass {
           },
           isValid(this: PunctualLight) {
             return !!this.castShadow && this.shadow.mode === 'pcf-pd';
+          }
+        },
+        {
+          name: 'PCSSLightRadius',
+          description: 'Light radius for PCSS shadow',
+          type: 'float',
+          phase: 2,
+          options: {
+            minValue: 0,
+            maxValue: 64
+          },
+          default: 8,
+          get(this: PunctualLight, value) {
+            value.num[0] = this.shadow.pcssLightRadius;
+          },
+          set(this: PunctualLight, value) {
+            this.shadow.pcssLightRadius = value.num[0];
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow && this.shadow.mode === 'pcss';
+          }
+        },
+        {
+          name: 'PCSSBlockerSampleCount',
+          description: 'Blocker search sample count for PCSS shadow',
+          type: 'int',
+          phase: 2,
+          options: {
+            minValue: 1,
+            maxValue: 64
+          },
+          default: 24,
+          get(this: PunctualLight, value) {
+            value.num[0] = this.shadow.pcssBlockerSampleCount;
+          },
+          set(this: PunctualLight, value) {
+            this.shadow.pcssBlockerSampleCount = value.num[0];
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow && this.shadow.mode === 'pcss';
+          }
+        },
+        {
+          name: 'PCSSFilterSampleCount',
+          description: 'Filter sample count for PCSS shadow',
+          type: 'int',
+          phase: 2,
+          options: {
+            minValue: 1,
+            maxValue: 64
+          },
+          default: 32,
+          get(this: PunctualLight, value) {
+            value.num[0] = this.shadow.pcssFilterSampleCount;
+          },
+          set(this: PunctualLight, value) {
+            this.shadow.pcssFilterSampleCount = value.num[0];
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow && this.shadow.mode === 'pcss';
+          }
+        },
+        {
+          name: 'PCSSMaxFilterRadius',
+          description: 'Maximum filter radius for PCSS shadow',
+          type: 'float',
+          phase: 2,
+          options: {
+            minValue: 1,
+            maxValue: 128
+          },
+          default: 32,
+          get(this: PunctualLight, value) {
+            value.num[0] = this.shadow.pcssMaxFilterRadius;
+          },
+          set(this: PunctualLight, value) {
+            this.shadow.pcssMaxFilterRadius = value.num[0];
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow && this.shadow.mode === 'pcss';
+          }
+        },
+        {
+          name: 'PCSSTemporalJitter',
+          description: 'If true, rotate PCSS sampling pattern over frames for TAA accumulation',
+          type: 'bool',
+          phase: 2,
+          default: true,
+          get(this: PunctualLight, value) {
+            value.bool[0] = this.shadow.pcssTemporalJitter;
+          },
+          set(this: PunctualLight, value) {
+            this.shadow.pcssTemporalJitter = value.bool[0];
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow && this.shadow.mode === 'pcss';
           }
         },
         {

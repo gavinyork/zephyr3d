@@ -2,6 +2,23 @@
   "name": "@zephyr3d/backend-webgpu",
   "entries": [
     {
+      "version": "0.1.16",
+      "tag": "@zephyr3d/backend-webgpu_v0.1.16",
+      "date": "Mon, 06 Jul 2026 06:18:13 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add timestamp query"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.11` to `0.2.12`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.15",
       "tag": "@zephyr3d/backend-webgpu_v0.1.15",
       "date": "Tue, 30 Jun 2026 20:07:17 GMT",

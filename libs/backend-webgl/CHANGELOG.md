@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/backend-webgl
 
-This log was last generated on Tue, 30 Jun 2026 20:07:17 GMT and should not be manually modified.
+This log was last generated on Mon, 06 Jul 2026 06:18:13 GMT and should not be manually modified.
+
+## 0.1.14
+Mon, 06 Jul 2026 06:18:13 GMT
+
+### Patches
+
+- Add supportTimestampQuery device capability
 
 ## 0.1.13
 Tue, 30 Jun 2026 20:07:17 GMT
