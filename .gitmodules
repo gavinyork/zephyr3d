@@ -1,3 +1,6 @@
 [submodule "apps/homepage"]
 	path = apps/homepage
 	url = git@github.com:gavinyork/zephyr3d-homepage.git
+[submodule "apps/examples"]
+	path = apps/examples
+	url = git@github.com:gavinyork/zephyr3d-examples.git
