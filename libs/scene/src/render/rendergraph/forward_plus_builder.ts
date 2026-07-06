@@ -50,7 +50,8 @@ const SURFACE_MRT_FLAGS =
   MaterialVaryingFlags.SSS_STORE_PROFILE |
   MaterialVaryingFlags.SSS_STORE_DIFFUSE |
   MaterialVaryingFlags.SSS_STORE_NORMAL |
-  MaterialVaryingFlags.SSS_STORE_TRANSMISSION;
+  MaterialVaryingFlags.SSS_STORE_TRANSMISSION |
+  MaterialVaryingFlags.SKIN_SSS_STORE;
 
 function getClusteredLight(): ClusteredLight {
   return _clusters.length > 0 ? _clusters.pop()! : new ClusteredLight();
@@ -67,6 +68,10 @@ function hasSSSMaterialCore(material: unknown): boolean {
   return !!(getCoreMaterial(material) as { subsurfaceProfile?: unknown } | null)?.subsurfaceProfile;
 }
 
+function hasSkinSSSMaterialCore(material: unknown): boolean {
+  return !!(getCoreMaterial(material) as { skinSSS?: unknown } | null)?.skinSSS;
+}
+
 function renderQueueHasActiveSSS(renderQueue: RenderQueue): boolean {
   const itemList = renderQueue.itemList;
   if (!itemList) {
@@ -76,6 +81,22 @@ function renderQueueHasActiveSSS(renderQueue: RenderQueue): boolean {
   for (const list of lists) {
     for (const material of list.materialList) {
       if (hasSSSMaterialCore(material)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function renderQueueHasActiveSkinSSS(renderQueue: RenderQueue): boolean {
+  const itemList = renderQueue.itemList;
+  if (!itemList) {
+    return false;
+  }
+  const lists = [...itemList.opaque.lit, ...itemList.opaque.unlit];
+  for (const list of lists) {
+    for (const material of list.materialList) {
+      if (hasSkinSSSMaterialCore(material)) {
         return true;
       }
     }
@@ -240,6 +261,9 @@ function getLightPassColorAttachments(
   if (ctx.materialFlags & MaterialVaryingFlags.SSS_STORE_TRANSMISSION) {
     attachments.push(ctx.SSSTransmissionTexture!);
   }
+  if (ctx.materialFlags & MaterialVaryingFlags.SKIN_SSS_STORE) {
+    attachments.push(ctx.SkinSSSTexture!);
+  }
   return attachments.length === 1 ? attachments[0] : attachments;
 }
 
@@ -273,6 +297,8 @@ export interface ForwardPlusOptions {
   needsTransmissionDepthForSSR: boolean;
   /** Enable screen-space subsurface scattering. */
   sss: boolean;
+  /** Enable the stylized skin-specific SSS pass. */
+  skinSSS: boolean;
 }
 
 /**
@@ -287,6 +313,7 @@ export function deriveForwardPlusOptions(
 ): ForwardPlusOptions {
   const ssr = camera.SSR && scene.env.light.envLight && scene.env.light.envLight.hasRadiance();
   const sss = camera.SSS && renderQueueHasActiveSSS(renderQueue);
+  const skinSSS = camera.skinSSS && renderQueueHasActiveSkinSSS(renderQueue);
   const needSceneColor = renderQueue.needSceneColor();
   const needSceneColorWithDepth = renderQueue.needSceneColorWithDepth();
   return {
@@ -300,7 +327,8 @@ export function deriveForwardPlusOptions(
     needSceneColor,
     needSceneColorWithDepth,
     needsTransmissionDepthForSSR: !!ssr && needSceneColor && !needSceneColorWithDepth,
-    sss: !!sss
+    sss: !!sss,
+    skinSSS: !!skinSSS
   };
 }
 
@@ -377,6 +405,7 @@ function buildForwardPlusGraphInternal(
 ): ForwardPlusGraphBuildResult {
   const backbuffer = graph.importTexture('backbuffer');
   ctx.SSS = !!options.sss;
+  ctx.SkinSSSTexture = null;
 
   // Shared mutable frame state
   const frame: FrameState = {
@@ -713,7 +742,9 @@ function buildForwardPlusGraphInternal(
     ) {
       writeSSSTransmission = false;
     }
-    const sssLightingAttachmentCount = (writeSSSDiffuse ? 1 : 0) + (writeSSSTransmission ? 1 : 0);
+    const writeSkinSSS = options.skinSSS;
+    const sssLightingAttachmentCount =
+      (writeSSSDiffuse ? 1 : 0) + (writeSSSTransmission ? 1 : 0) + (writeSkinSSS ? 1 : 0);
     const sssLightingFormat = getSSSLightingTextureFormat(
       ctx,
       sssLightingAttachmentCount,
@@ -724,6 +755,9 @@ function buildForwardPlusGraphInternal(
       : undefined;
     const sssTransmissionHandle = writeSSSTransmission
       ? builder.createTexture({ format: sssLightingFormat, label: 'sssTransmission' })
+      : undefined;
+    const skinSSSHandle = writeSkinSSS
+      ? builder.createTexture({ format: sssLightingFormat, label: 'skinSSS' })
       : undefined;
     const useFinalFramebufferAsIntermediate =
       !!depthPassResult.externalDepthAttachment &&
@@ -768,6 +802,7 @@ function buildForwardPlusGraphInternal(
       ctx.SSSTransmissionTexture = sssTransmissionHandle
         ? rgCtx.getTexture<Texture2D>(sssTransmissionHandle)
         : null;
+      ctx.SkinSSSTexture = skinSSSHandle ? rgCtx.getTexture<Texture2D>(skinSSSHandle) : null;
       const renderLightPass = () =>
         renderMainLightPass(
           frame,
@@ -925,7 +960,8 @@ function renderForwardSSSProfile(
           MaterialVaryingFlags.SSS_STORE_PROFILE |
           MaterialVaryingFlags.SSS_STORE_NORMAL |
           MaterialVaryingFlags.SSS_STORE_DIFFUSE |
-          MaterialVaryingFlags.SSS_STORE_TRANSMISSION
+          MaterialVaryingFlags.SSS_STORE_TRANSMISSION |
+          MaterialVaryingFlags.SKIN_SSS_STORE
         )) |
       profileFlags;
     _scenePass.transmission = false;
@@ -1228,7 +1264,8 @@ function renderMainLightPass(
     MaterialVaryingFlags.SSS_STORE_PROFILE |
     MaterialVaryingFlags.SSS_STORE_DIFFUSE |
     MaterialVaryingFlags.SSS_STORE_NORMAL |
-    MaterialVaryingFlags.SSS_STORE_TRANSMISSION
+    MaterialVaryingFlags.SSS_STORE_TRANSMISSION |
+    MaterialVaryingFlags.SKIN_SSS_STORE
   );
 
   if (ctx.SSR) {
@@ -1241,6 +1278,9 @@ function renderMainLightPass(
     if (ctx.SSSTransmissionTexture) {
       ctx.materialFlags |= MaterialVaryingFlags.SSS_STORE_TRANSMISSION;
     }
+  }
+  if (ctx.SkinSSSTexture) {
+    ctx.materialFlags |= MaterialVaryingFlags.SKIN_SSS_STORE;
   }
 
   if (depthTex === ctx.finalFramebuffer?.getDepthAttachment()) {
@@ -1343,6 +1383,7 @@ function renderComposite(frame: FrameState): void {
   ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_DIFFUSE;
   ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_NORMAL;
   ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_TRANSMISSION;
+  ctx.materialFlags &= ~MaterialVaryingFlags.SKIN_SSS_STORE;
 
   if (ctx.intermediateFramebuffer && ctx.intermediateFramebuffer !== ctx.finalFramebuffer) {
     const blitter = new CopyBlitter();

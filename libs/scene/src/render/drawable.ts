@@ -131,6 +131,8 @@ export interface DrawContext {
   SSSDiffuseTexture: Nullable<Texture2D>;
   /** SSS transmission-lighting texture used for thin-shell/backscatter contributions. */
   SSSTransmissionTexture: Nullable<Texture2D>;
+  /** Skin-specific screen-space scattering source texture. */
+  SkinSSSTexture: Nullable<Texture2D>;
   /** SSR SDF proxy uniform buffer (pair of vec4: min.xyz / max.xyz for each box). */
   ssrSDFBoxBuffer: Nullable<GPUDataBuffer>;
   /** Number of valid SDF proxy boxes in `ssrSDFBoxBuffer`. */

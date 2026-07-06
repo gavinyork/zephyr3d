@@ -24,6 +24,7 @@ import {
   UnlitMaterial
 } from '../material';
 import { StandardSpriteMaterial } from '../material/sprite_std';
+import { SkinMaterial } from '../material/skin';
 import { ScreenAdapter } from './screen';
 import { MSDFTextAtlasManager } from '../text/runtime';
 
@@ -423,7 +424,8 @@ export class Engine {
       '/materials/blinnphong.zmtl': BlinnMaterial,
       '/materials/pbr_metallic_roughness.zmtl': PBRMetallicRoughnessMaterial,
       '/materials/pbr_specular_glossiness.zmtl': PBRSpecularGlossinessMaterial,
-      '/materials/sprite_std.zmtl': StandardSpriteMaterial
+      '/materials/sprite_std.zmtl': StandardSpriteMaterial,
+      '/materials/skin.zmtl': SkinMaterial
     } as const;
     for (const [key] of objectEntries(shapeClsMap)) {
       const obj = new shapeClsMap[key]();

@@ -973,6 +973,127 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'SkinSSSEnabled',
+          type: 'bool',
+          phase: 0,
+          default: false,
+          options: {
+            label: 'Enabled',
+            group: 'PostProcessing/SkinSSS'
+          },
+          get(this: Camera, value) {
+            value.bool[0] = this.skinSSS;
+          },
+          set(this: Camera, value) {
+            this.skinSSS = value.bool[0];
+          }
+        },
+        {
+          name: 'SkinSSSStrength',
+          type: 'float',
+          phase: 0,
+          default: 1,
+          options: {
+            label: 'Strength',
+            group: 'PostProcessing/SkinSSS',
+            minValue: 0,
+            maxValue: 4
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.skinSSSStrength;
+          },
+          set(this: Camera, value) {
+            this.skinSSSStrength = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.skinSSS;
+          }
+        },
+        {
+          name: 'SkinSSSOpacity',
+          type: 'float',
+          phase: 0,
+          default: 0.18,
+          options: {
+            label: 'Opacity',
+            group: 'PostProcessing/SkinSSS',
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.skinSSSOpacity;
+          },
+          set(this: Camera, value) {
+            this.skinSSSOpacity = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.skinSSS;
+          }
+        },
+        {
+          name: 'SkinSSSSampleStep',
+          type: 'float',
+          phase: 0,
+          default: 2,
+          options: {
+            label: 'SampleStep',
+            group: 'PostProcessing/SkinSSS',
+            minValue: 0.25,
+            maxValue: 8
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.skinSSSSampleStep;
+          },
+          set(this: Camera, value) {
+            this.skinSSSSampleStep = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.skinSSS;
+          }
+        },
+        {
+          name: 'SkinSSSDepthScale',
+          type: 'float',
+          phase: 0,
+          default: 80,
+          options: {
+            label: 'DepthScale',
+            group: 'PostProcessing/SkinSSS',
+            minValue: 0,
+            maxValue: 256
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.skinSSSDepthScale;
+          },
+          set(this: Camera, value) {
+            this.skinSSSDepthScale = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.skinSSS;
+          }
+        },
+        {
+          name: 'SkinSSSColorBoost',
+          type: 'float',
+          phase: 0,
+          default: 1,
+          options: {
+            label: 'ColorBoost',
+            group: 'PostProcessing/SkinSSS',
+            minValue: 0,
+            maxValue: 4
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.skinSSSColorBoost;
+          },
+          set(this: Camera, value) {
+            this.skinSSSColorBoost = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.skinSSS;
+          }
+        },
+        {
           name: 'SSAOEnabled',
           type: 'bool',
           phase: 0,

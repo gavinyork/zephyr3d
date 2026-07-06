@@ -9,6 +9,7 @@ import {
   PBRBluePrintMaterial,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
+  SkinMaterial,
   SubsurfaceProfile,
   type MToonOutlineWidthMode,
   type SubsurfaceProfilePreset,
@@ -27,7 +28,7 @@ import { StandardSpriteMaterial } from '../../../material/sprite_std';
 import type { PBRReflectionMode } from '../../../material/mixins/lightmodel/pbrmetallicroughness';
 
 type PBRMaterial = PBRMetallicRoughnessMaterial | PBRSpecularGlossinessMaterial;
-type LitPropTypes = LambertMaterial | BlinnMaterial | PBRMaterial;
+type LitPropTypes = LambertMaterial | BlinnMaterial | SkinMaterial | PBRMaterial;
 type UnlitPropTypes = UnlitMaterial | LitPropTypes;
 
 function createBlueprintOutputHiddenPredicate(_outputs: readonly PBRBlueprintOutputName[]) {
@@ -719,15 +720,36 @@ function getLitMaterialProps(manager: ResourceManager): PropertyAccessor<LitProp
       name: 'doubleSidedLighting',
       description: 'If true, lighting is evaluated on both sides of the surface',
       type: 'bool',
-      default: false,
+      default: true,
       isValid(this: LitPropTypes) {
-        return !this.$isInstance && this.cullMode !== 'back';
+        return !this.$isInstance;
       },
       get(this: LitPropTypes, value) {
         value.bool[0] = this.doubleSidedLighting;
       },
       set(this: LitPropTypes, value) {
         this.doubleSidedLighting = value.bool[0];
+      }
+    },
+    {
+      name: 'NormalScale',
+      description: 'Scalar applied to the normal texture',
+      type: 'float',
+      phase: 1,
+      default: 1,
+      options: {
+        animatable: true,
+        minValue: 0,
+        maxValue: 2
+      },
+      get(this: LitPropTypes, value) {
+        value.num[0] = this.normalScale;
+      },
+      set(this: LitPropTypes, value) {
+        this.normalScale = value.num[0];
+      },
+      isValid(this: LitPropTypes) {
+        return !this.$isInstance && !!this.normalTexture;
       }
     },
     {
@@ -1766,6 +1788,168 @@ export function getBlinnMaterialClass(manager: ResourceManager): SerializableCla
       }
     },
     getMeshMaterialInstanceUniformsClass(BlinnMaterial)
+  ];
+}
+
+/** @internal */
+export function getSkinMaterialClass(manager: ResourceManager): SerializableClass[] {
+  return [
+    {
+      ctor: SkinMaterial,
+      parent: MeshMaterial,
+      name: 'SkinMaterial',
+      getProps() {
+        return defineProps([
+          {
+            name: 'Shininess',
+            description: 'Blinn specular exponent for skin highlights',
+            type: 'float',
+            default: 72,
+            options: {
+              animatable: true,
+              minValue: 1,
+              maxValue: 2048
+            },
+            get(this: SkinMaterial, value) {
+              value.num[0] = this.shininess;
+            },
+            set(this: SkinMaterial, value) {
+              this.shininess = value.num[0];
+            },
+            getDefaultValue(this: SkinMaterial) {
+              return this.$isInstance ? this.coreMaterial.shininess : 72;
+            }
+          },
+          {
+            name: 'SpecularStrength',
+            description: 'Direct specular strength for restrained skin highlights',
+            type: 'float',
+            default: 0.22,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 4
+            },
+            get(this: SkinMaterial, value) {
+              value.num[0] = this.specularStrength;
+            },
+            set(this: SkinMaterial, value) {
+              this.specularStrength = value.num[0];
+            },
+            getDefaultValue(this: SkinMaterial) {
+              return this.$isInstance ? this.coreMaterial.specularStrength : 0.22;
+            }
+          },
+          {
+            name: 'DiffuseWrap',
+            description: 'Wrap amount for visible diffuse lighting',
+            type: 'float',
+            default: 0.28,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 2
+            },
+            get(this: SkinMaterial, value) {
+              value.num[0] = this.diffuseWrap;
+            },
+            set(this: SkinMaterial, value) {
+              this.diffuseWrap = value.num[0];
+            },
+            getDefaultValue(this: SkinMaterial) {
+              return this.$isInstance ? this.coreMaterial.diffuseWrap : 0.28;
+            }
+          },
+          {
+            name: 'DiffuseSoftness',
+            description: 'Blend from hard Lambert lighting to wrapped diffuse lighting',
+            type: 'float',
+            default: 0.45,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 1
+            },
+            get(this: SkinMaterial, value) {
+              value.num[0] = this.diffuseSoftness;
+            },
+            set(this: SkinMaterial, value) {
+              this.diffuseSoftness = value.num[0];
+            },
+            getDefaultValue(this: SkinMaterial) {
+              return this.$isInstance ? this.coreMaterial.diffuseSoftness : 0.45;
+            }
+          },
+          {
+            name: 'ScatterWrap',
+            description: 'Wide wrap amount written to the Skin SSS scattering source',
+            type: 'float',
+            default: 0.65,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 2
+            },
+            get(this: SkinMaterial, value) {
+              value.num[0] = this.scatterWrap;
+            },
+            set(this: SkinMaterial, value) {
+              this.scatterWrap = value.num[0];
+            },
+            getDefaultValue(this: SkinMaterial) {
+              return this.$isInstance ? this.coreMaterial.scatterWrap : 0.65;
+            }
+          },
+          {
+            name: 'ScatterStrength',
+            description: 'Strength of the lighting multiplier written to the Skin SSS side buffer',
+            type: 'float',
+            default: 0.7,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 4
+            },
+            get(this: SkinMaterial, value) {
+              value.num[0] = this.scatterStrength;
+            },
+            set(this: SkinMaterial, value) {
+              this.scatterStrength = value.num[0];
+            },
+            getDefaultValue(this: SkinMaterial) {
+              return this.$isInstance ? this.coreMaterial.scatterStrength : 0.7;
+            }
+          },
+          {
+            name: 'ScatterColor',
+            description: 'Warm tint for the blurred skin scattering contribution',
+            type: 'rgba',
+            default: [1, 0.42, 0.28, 1],
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 1
+            },
+            get(this: SkinMaterial, value) {
+              value.num[0] = this.scatterColor.x;
+              value.num[1] = this.scatterColor.y;
+              value.num[2] = this.scatterColor.z;
+              value.num[3] = this.scatterColor.w;
+            },
+            set(this: SkinMaterial, value) {
+              this.scatterColor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+            },
+            getDefaultValue(this: SkinMaterial) {
+              const color = this.$isInstance ? this.coreMaterial.scatterColor : new Vector4(1, 0.42, 0.28, 1);
+              return [color.x, color.y, color.z, color.w];
+            }
+          },
+          ...getTextureProps<SkinMaterial>(manager, 'subsurfaceTexture', '2D', false, 1),
+          ...getLitMaterialProps(manager)
+        ]);
+      }
+    },
+    getMeshMaterialInstanceUniformsClass(SkinMaterial)
   ];
 }
 

@@ -19,6 +19,7 @@ import type { OIT } from '../render/oit';
 import { TAA } from '../posteffect/taa';
 import { SSR } from '../posteffect/ssr';
 import { SSS } from '../posteffect/sss';
+import { SkinSSS } from '../posteffect/skinsss';
 import { Tonemap } from '../posteffect/tonemap';
 import { FXAA } from '../posteffect/fxaa';
 import { Bloom } from '../posteffect/bloom';
@@ -331,6 +332,20 @@ export class Camera extends SceneNode {
   protected _sssResolvedSettings: SSSResolvedSettings;
   /** @internal SSS debug visualization mode. */
   protected _sssDebugView: SSSDebugView;
+  /** @internal Skin SSS enable flag (via post effect). */
+  protected _skinSSS: boolean;
+  /** @internal Skin SSS post effect reference. */
+  protected _postEffectSkinSSS: DRef<SkinSSS>;
+  /** @internal Skin SSS final blend strength. */
+  protected _skinSSSStrength: number;
+  /** @internal Skin SSS mask opacity bias. */
+  protected _skinSSSOpacity: number;
+  /** @internal Skin SSS blur tap spacing in pixels. */
+  protected _skinSSSSampleStep: number;
+  /** @internal Skin SSS depth rejection scale. */
+  protected _skinSSSDepthScale: number;
+  /** @internal Skin SSS blurred multiplier boost. */
+  protected _skinSSSColorBoost: number;
   /** @internal SSAO enable flag (via post effect). */
   protected _SSAO: boolean;
   /** @internal SSAO post effect reference. */
@@ -472,6 +487,13 @@ export class Camera extends SceneNode {
     };
     this.updateSSSResolvedSettings();
     this._sssDebugView = 'none';
+    this._skinSSS = false;
+    this._postEffectSkinSSS = new DRef();
+    this._skinSSSStrength = 1;
+    this._skinSSSOpacity = 0.18;
+    this._skinSSSSampleStep = 2;
+    this._skinSSSDepthScale = 80;
+    this._skinSSSColorBoost = 1;
     this._SSAO = false;
     this._postEffectSSAO = new DRef();
     this._SSAOScale = 10;
@@ -974,6 +996,63 @@ export class Camera extends SceneNode {
   set sssDebugView(val: SSSDebugView) {
     this._sssDebugView = val ?? 'none';
   }
+  /** Gets whether the dedicated Skin SSS post effect is enabled. */
+  get skinSSS() {
+    return this._postEffectSkinSSS.get()!.enabled;
+  }
+  set skinSSS(val) {
+    this._postEffectSkinSSS.get()!.enabled = !!val;
+  }
+  /** Final blend strength for the dedicated Skin SSS post effect. */
+  get skinSSSStrength() {
+    return this._skinSSSStrength;
+  }
+  set skinSSSStrength(val) {
+    this._skinSSSStrength = Math.max(0, val ?? 0);
+    if (this._postEffectSkinSSS.get()) {
+      this._postEffectSkinSSS.get()!.strength = this._skinSSSStrength;
+    }
+  }
+  /** Bias subtracted from the blurred skin mask before compositing. */
+  get skinSSSOpacity() {
+    return this._skinSSSOpacity;
+  }
+  set skinSSSOpacity(val) {
+    this._skinSSSOpacity = Math.max(0, Math.min(1, val ?? 0));
+    if (this._postEffectSkinSSS.get()) {
+      this._postEffectSkinSSS.get()!.opacity = this._skinSSSOpacity;
+    }
+  }
+  /** Pixel spacing between blur taps. The reference shader uses 2. */
+  get skinSSSSampleStep() {
+    return this._skinSSSSampleStep;
+  }
+  set skinSSSSampleStep(val) {
+    this._skinSSSSampleStep = Math.max(0.25, val ?? 0.25);
+    if (this._postEffectSkinSSS.get()) {
+      this._postEffectSkinSSS.get()!.sampleStep = this._skinSSSSampleStep;
+    }
+  }
+  /** Depth rejection scale. The reference shader uses 80. */
+  get skinSSSDepthScale() {
+    return this._skinSSSDepthScale;
+  }
+  set skinSSSDepthScale(val) {
+    this._skinSSSDepthScale = Math.max(0, val ?? 0);
+    if (this._postEffectSkinSSS.get()) {
+      this._postEffectSkinSSS.get()!.depthScale = this._skinSSSDepthScale;
+    }
+  }
+  /** Multiplier applied to the blurred skin lighting multiplier before compositing. */
+  get skinSSSColorBoost() {
+    return this._skinSSSColorBoost;
+  }
+  set skinSSSColorBoost(val) {
+    this._skinSSSColorBoost = Math.max(0, val ?? 0);
+    if (this._postEffectSkinSSS.get()) {
+      this._postEffectSkinSSS.get()!.colorBoost = this._skinSSSColorBoost;
+    }
+  }
   /** @internal */
   get ssrParams(): Immutable<Vector4> {
     return this._ssrParams;
@@ -1451,6 +1530,17 @@ export class Camera extends SceneNode {
       this._postEffectSSS.set(sss);
       this._compositor.appendPostEffect(sss);
     }
+    if (!this._postEffectSkinSSS.get()) {
+      const skinSSS = new SkinSSS();
+      skinSSS.enabled = false;
+      skinSSS.strength = this._skinSSSStrength;
+      skinSSS.opacity = this._skinSSSOpacity;
+      skinSSS.sampleStep = this._skinSSSSampleStep;
+      skinSSS.depthScale = this._skinSSSDepthScale;
+      skinSSS.colorBoost = this._skinSSSColorBoost;
+      this._postEffectSkinSSS.set(skinSSS);
+      this._compositor.appendPostEffect(skinSSS);
+    }
     if (!this._postEffectSSAO.get()) {
       const ssao = new SAO();
       ssao.enabled = false;
@@ -1716,6 +1806,7 @@ export class Camera extends SceneNode {
     this._postEffectMotionBlur.dispose();
     this._postEffectSSAO.dispose();
     this._postEffectSSS.dispose();
+    this._postEffectSkinSSS.dispose();
     this._postEffectSSR.dispose();
     this._postEffectTAA.dispose();
     this._postEffectTonemap.dispose();

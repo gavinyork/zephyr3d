@@ -1025,6 +1025,9 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           if (ctx.materialFlags & MaterialVaryingFlags.SSS_STORE_TRANSMISSION) {
             this.$outputs.zSSSTransmission = pb.vec4();
           }
+          if (ctx.materialFlags & MaterialVaryingFlags.SKIN_SSS_STORE) {
+            this.$outputs.zSkinSSS = pb.vec4();
+          }
           if (ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.motionVectors) {
             this.$outputs.zMotionVector = pb.vec4();
             this.zTAAStrength = pb.float().uniform(2);
@@ -1073,7 +1076,8 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     sssParams?: PBShaderExp,
     sssDiffuse?: PBShaderExp,
     sssTransmission?: PBShaderExp,
-    sssProfileEnabled = false
+    sssProfileEnabled = false,
+    skinSSS?: PBShaderExp
   ) {
     const pb = scope.$builder;
     const that = this;
@@ -1314,6 +1318,13 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         (that.isTransparentPass(that.pass, that.drawContext) && !that.alphaToCoverage) ||
         that.needSceneColor();
       scope.$outputs.zSSSTransmission = disableSSS ? pb.vec4(0) : (sssTransmission ?? pb.vec4(0));
+    }
+    if (that.drawContext.materialFlags & MaterialVaryingFlags.SKIN_SSS_STORE) {
+      const disableSkinSSS =
+        that.drawContext.renderPass!.type !== RENDER_PASS_TYPE_LIGHT ||
+        (that.isTransparentPass(that.pass, that.drawContext) && !that.alphaToCoverage) ||
+        that.needSceneColor();
+      scope.$outputs.zSkinSSS = disableSkinSSS ? pb.vec4(0) : (skinSSS ?? pb.vec4(0));
     }
   }
 }

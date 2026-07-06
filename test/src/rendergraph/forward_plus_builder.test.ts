@@ -80,6 +80,7 @@ function createOptions(overrides: Partial<ForwardPlusOptions> = {}): ForwardPlus
     needSceneColorWithDepth: false,
     needsTransmissionDepthForSSR: false,
     sss: false,
+    skinSSS: false,
     ...overrides
   };
 }
@@ -207,6 +208,7 @@ describe('Forward+ render graph builder', () => {
     const camera = {
       SSR: true,
       SSS: false,
+      skinSSS: false,
       TAA: false,
       motionBlur: false,
       ssrTemporal: false,
@@ -248,6 +250,7 @@ describe('Forward+ render graph builder', () => {
     const camera = {
       SSR: false,
       SSS: true,
+      skinSSS: false,
       TAA: false,
       motionBlur: false,
       ssrTemporal: false,
@@ -271,6 +274,57 @@ describe('Forward+ render graph builder', () => {
     expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).sss).toBe(
       false
     );
+  });
+
+  test('derives SkinSSS only from opaque skin materials', () => {
+    const scene = {
+      env: {
+        light: {
+          envLight: {
+            hasRadiance: () => false
+          }
+        }
+      }
+    };
+    const camera = {
+      SSR: false,
+      SSS: false,
+      skinSSS: true,
+      TAA: false,
+      motionBlur: false,
+      ssrTemporal: false,
+      ssrCalcThickness: false,
+      HiZ: false,
+      getPickResultResolveFunc: () => null
+    };
+    const emptyBundle = { lit: [], unlit: [] };
+    const renderQueue = {
+      needSceneColor: () => false,
+      needSceneColorWithDepth: () => false,
+      itemList: {
+        opaque: {
+          lit: [{ materialList: new Set([{ skinSSS: true }]) }],
+          unlit: []
+        },
+        transmission: emptyBundle,
+        transparent: emptyBundle,
+        transmission_trans: emptyBundle
+      }
+    };
+
+    expect(
+      deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).skinSSS
+    ).toBe(true);
+
+    renderQueue.itemList.opaque = emptyBundle;
+    renderQueue.itemList.transmission = {
+      lit: [{ materialList: new Set([{ skinSSS: true }]) }],
+      unlit: []
+    };
+
+    expect(
+      deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).skinSSS
+    ).toBe(false);
   });
 
   test('omits HiZ when disabled', () => {
@@ -312,6 +366,18 @@ describe('Forward+ render graph builder', () => {
     expect(lightPass?.writes.map((resource) => resource.name)).toEqual(
       expect.arrayContaining(['sssDiffuse', 'sssTransmission'])
     );
+  });
+
+  test('declares SkinSSS MRT resource when enabled', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions({ skinSSS: true }));
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+    const lightPassWrites = graph.passes
+      .find((pass) => pass.name === 'LightPass')
+      ?.writes.map((resource) => resource.name);
+
+    expect(passNames).toContain('LightPass');
+    expect(passNames).not.toContain('SSSProfile');
+    expect(lightPassWrites).toContain('skinSSS');
   });
 
   test('keeps SSR surface MRT with scene-color materials and omits SSS transmission to reduce MRT count', () => {

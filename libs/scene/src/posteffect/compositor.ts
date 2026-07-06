@@ -145,6 +145,9 @@ export class Compositor {
     if (ctx.materialFlags & MaterialVaryingFlags.SSS_STORE_TRANSMISSION) {
       attachments.push(ctx.SSSTransmissionTexture!);
     }
+    if (ctx.materialFlags & MaterialVaryingFlags.SKIN_SSS_STORE) {
+      attachments.push(ctx.SkinSSSTexture!);
+    }
     const tmpFramebuffer = device.pool.fetchTemporalFramebuffer(
       true,
       w,

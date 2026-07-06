@@ -14,7 +14,8 @@ const SURFACE_MRT_FLAGS =
   MaterialVaryingFlags.SSS_STORE_PROFILE |
   MaterialVaryingFlags.SSS_STORE_DIFFUSE |
   MaterialVaryingFlags.SSS_STORE_NORMAL |
-  MaterialVaryingFlags.SSS_STORE_TRANSMISSION;
+  MaterialVaryingFlags.SSS_STORE_TRANSMISSION |
+  MaterialVaryingFlags.SKIN_SSS_STORE;
 const ADDITIVE_LIGHT_PASS_OMIT_MRT_FLAGS =
   MaterialVaryingFlags.SSR_STORE_ROUGHNESS |
   MaterialVaryingFlags.SSS_STORE_PROFILE |
@@ -77,6 +78,9 @@ export class LightPass extends RenderPass {
     }
     if (materialFlags & MaterialVaryingFlags.SSS_STORE_TRANSMISSION) {
       attachments.push(ctx.SSSTransmissionTexture!);
+    }
+    if (materialFlags & MaterialVaryingFlags.SKIN_SSS_STORE) {
+      attachments.push(ctx.SkinSSSTexture!);
     }
     return attachments.length === 1 ? attachments[0] : attachments;
   }
