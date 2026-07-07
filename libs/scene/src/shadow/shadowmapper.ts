@@ -26,7 +26,7 @@ import { Camera } from '../camera/camera';
 import { SSM } from './ssm';
 import { ESM } from './esm';
 import { VSM } from './vsm';
-import { PCFPD } from './pcf_pd';
+import type { PCFPD } from './pcf_pd';
 import { PCFOPT } from './pcf_opt';
 import { PCSS } from './pcss';
 import type { PointLight, PunctualLight, RectLight, SpotLight } from '../scene/light';
@@ -46,7 +46,16 @@ const tmpFrustum = new Frustum(Matrix4x4.identity());
  * Shadow mapping mode
  * @public
  */
-export type ShadowMode = 'hard' | 'vsm' | 'esm' | 'pcf-pd' | 'pcf-opt' | 'pcss';
+export type ShadowMode =
+  | 'hard'
+  | 'vsm'
+  | 'esm'
+  | 'pcf'
+  | 'pcss'
+  /** @deprecated Use `pcf` instead. */
+  | 'pcf-pd'
+  /** @deprecated Use `pcf` instead. */
+  | 'pcf-opt';
 /**
  * Preset shadow quality profiles.
  *
@@ -171,7 +180,7 @@ export class ShadowMapper extends Disposable {
       nearClip: 1
     };
     this._resourceDirty = true;
-    this._shadowMode = 'pcf-pd';
+    this._shadowMode = 'pcf';
     this._shadowDistance = 2000;
     this._impl = null;
     this._pdSampleCount = 24;
@@ -332,7 +341,7 @@ export class ShadowMapper extends Disposable {
    */
   applyQualityPreset(preset: ShadowQualityPreset) {
     if (preset === 'character-small') {
-      this.mode = 'pcf-opt';
+      this.mode = 'pcf';
       this.shadowMapSize = 2048;
       this.shadowDistance = 120;
       this.splitLambda = 0.75;
@@ -343,7 +352,7 @@ export class ShadowMapper extends Disposable {
       this.numShadowCascades = this._light.isDirectionLight() ? 3 : 1;
       return;
     }
-    this.mode = 'pcf-opt';
+    this.mode = 'pcf';
     this.shadowMapSize = 2048;
     this.shadowDistance = 800;
     this.splitLambda = 0.6;
@@ -1254,6 +1263,7 @@ export class ShadowMapper extends Disposable {
       mode !== 'hard' &&
       mode !== 'vsm' &&
       mode !== 'esm' &&
+      mode !== 'pcf' &&
       mode !== 'pcf-pd' &&
       mode !== 'pcf-opt' &&
       mode !== 'pcss'
@@ -1271,9 +1281,7 @@ export class ShadowMapper extends Disposable {
       const esm = this._impl as ESM;
       esm.blur = this._esmBlur;
       esm.logSpace = this._esmLogSpace;
-    } else if (mode === 'pcf-pd') {
-      this._impl = new PCFPD(this._pdSampleCount, this._pdSampleRadius);
-    } else if (mode === 'pcf-opt') {
+    } else if (mode === 'pcf' || mode === 'pcf-opt' || mode === 'pcf-pd') {
       this._impl = new PCFOPT(this._pcfKernelSize);
     } else if (mode === 'pcss') {
       this._impl = new PCSS(

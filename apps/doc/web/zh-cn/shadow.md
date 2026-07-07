@@ -46,9 +46,10 @@ PCF是通过对阴影图多次采样的一种反走样技术
 ```javascript
 
 // 采用optimized PCF
-light.shadow.mode = 'pcf-opt';
+light.shadow.mode = 'pcf';
 // 采用PoissonDisc采样的PCF
-light.shadow.mode = 'pcf-pd';
+// Deprecated: use 'pcf' instead of 'pcf-pd'.
+// light.shadow.mode = 'pcf-pd';
 
 ```
 

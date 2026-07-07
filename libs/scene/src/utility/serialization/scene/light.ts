@@ -68,8 +68,8 @@ export function getPunctualLightClass(): SerializableClass {
           default: 'hard',
           options: {
             enum: {
-              labels: ['Hard', 'PCF', 'PCF-PD', 'PCSS', 'VSM', 'ESM'],
-              values: ['hard', 'pcf-opt', 'pcf-pd', 'pcss', 'vsm', 'esm']
+              labels: ['Hard', 'PCF', 'PCSS', 'VSM', 'ESM', 'PCF-OPT (deprecated)', 'PCF-PD (deprecated)'],
+              values: ['hard', 'pcf', 'pcss', 'vsm', 'esm', 'pcf-opt', 'pcf-pd']
             }
           },
           get(this: PunctualLight, value) {
@@ -264,47 +264,7 @@ export function getPunctualLightClass(): SerializableClass {
             this.shadow.pcfKernelSize = value.num[0];
           },
           isValid(this: PunctualLight) {
-            return !!this.castShadow && this.shadow.mode === 'pcf-opt';
-          }
-        },
-        {
-          name: 'PCFSampleCount',
-          description: 'Sample count for PCF shadow',
-          type: 'int',
-          phase: 2,
-          options: {
-            minValue: 1,
-            maxValue: 128
-          },
-          default: 12,
-          get(this: PunctualLight, value) {
-            value.num[0] = this.shadow.pdSampleCount;
-          },
-          set(this: PunctualLight, value) {
-            this.shadow.pdSampleCount = value.num[0];
-          },
-          isValid(this: PunctualLight) {
-            return !!this.castShadow && this.shadow.mode === 'pcf-pd';
-          }
-        },
-        {
-          name: 'PCFSampleRadius',
-          description: 'Sample radius for PCF shadow',
-          type: 'float',
-          phase: 2,
-          options: {
-            minValue: 0,
-            maxValue: 64
-          },
-          default: 4,
-          get(this: PunctualLight, value) {
-            value.num[0] = this.shadow.pdSampleRadius;
-          },
-          set(this: PunctualLight, value) {
-            this.shadow.pdSampleRadius = value.num[0];
-          },
-          isValid(this: PunctualLight) {
-            return !!this.castShadow && this.shadow.mode === 'pcf-pd';
+            return !!this.castShadow && (this.shadow.mode === 'pcf' || this.shadow.mode === 'pcf-opt');
           }
         },
         {

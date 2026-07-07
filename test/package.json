@@ -14,7 +14,6 @@
   "scripts": {
     "clean": "shx rm -rf dist .tsbuildinfo",
     "build:check": "tsc -p . --noEmit",
-    "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent",
     "lint": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint \"src/**/*.ts\" -f compact",
     "lint-fix": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint --fix \"src/**/*.ts\" -f compact",
     "test": "npm run build && jest"

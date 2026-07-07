@@ -50,7 +50,7 @@ light.shadow.shadowMapSize = 1024;
 ```javascript
 
 // 使用PCF
-light.shadow.mode = 'pcf-opt';
+light.shadow.mode = 'pcf';
 
 ```
 

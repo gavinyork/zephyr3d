@@ -49,7 +49,7 @@ and averaging their visibility results — essentially a **filtered softening**.
 
 ```javascript
 // Enable PCF (optimized)
-light.shadow.mode = 'pcf-opt';
+light.shadow.mode = 'pcf';
 ```
 
 Example:  
