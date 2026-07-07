@@ -23,7 +23,12 @@ import {
 } from '@zephyr3d/device';
 import type { Scene } from './scene';
 import { BoundingBox, type BoundingVolume } from '../utility/bounding_volume';
-import { MORPH_ATTRIBUTE_VECTOR_COUNT, MORPH_WEIGHTS_VECTOR_COUNT, QUEUE_OPAQUE } from '../values';
+import {
+  getMorphTargetLimit,
+  MORPH_ATTRIBUTE_VECTOR_COUNT,
+  MORPH_WEIGHTS_VECTOR_COUNT,
+  QUEUE_OPAQUE
+} from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import type { SceneNode } from './scene_node';
@@ -70,7 +75,12 @@ function normalizeMorphInfoData(data: MorphInfo['data']) {
   }
   normalized.set(data.subarray(0, Math.min(data.length, normalized.length)));
   const declaredCount = Math.max(0, Math.floor(Number(normalized[3]) || 0));
-  const supportedCount = Math.min(declaredCount, MORPH_WEIGHT_CAPACITY, Math.max(0, data.length - 4));
+  const supportedCount = Math.min(
+    declaredCount,
+    getMorphTargetLimit(),
+    MORPH_WEIGHT_CAPACITY,
+    Math.max(0, data.length - 4)
+  );
   normalized[3] = supportedCount;
   return {
     data: normalized,

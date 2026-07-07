@@ -1,6 +1,6 @@
 import type { HttpDirectoryReader, Immutable, VFS } from '@zephyr3d/base';
 import { HttpFS, MemoryFS, PathUtils, randomUUID } from '@zephyr3d/base';
-import { getEngine, tryGetApp } from '@zephyr3d/scene';
+import { DEFAULT_MORPH_TARGET_LIMIT, getEngine, normalizeMorphTargetLimit, setMorphTargetLimit, tryGetApp } from '@zephyr3d/scene';
 import { fileListFileName, libDir, projectFileName } from '../build/templates';
 import { DlgMessage } from '../../views/dlg/messagedlg';
 import { installDeps } from '../build/dep';
@@ -23,13 +23,15 @@ export type ProjectSettings = {
   preferredRHI?: string[];
   enableMSAA?: boolean;
   renderScale?: number;
+  morphTargetLimit?: number;
   dependencies?: { [name: string]: string };
 };
 
 const defaultProjectSettings: Immutable<ProjectSettings> = {
   preferredRHI: ['WebGL', 'WebGL2', 'WebGPU'],
   enableMSAA: false,
-  renderScale: 0
+  renderScale: 0,
+  morphTargetLimit: DEFAULT_MORPH_TARGET_LIMIT
 };
 
 function normalizeRenderScale(scale: number): number {
@@ -52,7 +54,8 @@ function normalizeProjectSettings(settings: ProjectSettings): ProjectSettings {
     ...settings,
     preferredRHI: preferredRHI ? [...preferredRHI] : undefined,
     enableMSAA: !!settings?.enableMSAA,
-    renderScale: normalizeRenderScale(settings?.renderScale)
+    renderScale: normalizeRenderScale(settings?.renderScale),
+    morphTargetLimit: normalizeMorphTargetLimit(settings?.morphTargetLimit)
   };
 }
 
@@ -132,6 +135,9 @@ export class ProjectService {
   }
   static get currentProjectStorageId() {
     return this._currentProjectInfo ? getProjectStorageId(this._currentProjectInfo) : '';
+  }
+  static applyRuntimeSettings(settings?: ProjectSettings | null) {
+    setMorphTargetLimit(settings?.morphTargetLimit);
   }
   static async listProjects(): Promise<ProjectInfo[]> {
     const manifest = await this.readManifest(true);

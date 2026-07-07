@@ -314,6 +314,7 @@ export class Editor {
   async saveProjectSettings(settings: ProjectSettings) {
     if (this._currentProject) {
       await ProjectService.saveCurrentProjectSettings(settings);
+      ProjectService.applyRuntimeSettings(settings);
     }
   }
   isProjectReadOnly() {
@@ -838,6 +839,7 @@ export class Editor {
         this._isRemoteProject = true;
         updateProgress(3, 5, 'Loading project settings...');
         const settings = await ProjectService.getCurrentProjectSettings();
+        ProjectService.applyRuntimeSettings(settings);
         this._plugins.dispatchEvent('projectOpened', project);
         updateProgress(4, 5, 'Loading script type hints...');
         await this.loadDepTypes();
@@ -877,6 +879,7 @@ export class Editor {
           this._currentProject = project;
           updateProgress(2, 5, 'Loading project settings...');
           const settings = await ProjectService.getCurrentProjectSettings();
+          ProjectService.applyRuntimeSettings(settings);
           this._plugins.dispatchEvent('projectOpened', project);
           updateProgress(3, 5, 'Checking project dependencies...');
           await this.ensureProjectDependenciesInstalled(id as string, settings, (message) => {

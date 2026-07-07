@@ -1,7 +1,6 @@
 import { AnimationTrack } from './animationtrack';
 import type { Mesh, SceneNode } from '../scene';
 import { BoundingBox } from '../utility/bounding_volume';
-import { MAX_MORPH_TARGETS } from '../values';
 import { calculateMorphBoundingBox } from './morphtarget';
 import type { AABB, Interpolator, Nullable } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
@@ -63,7 +62,7 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
       this._state = {
         numTargets: interpolator.stride,
         boundingBox: new BoundingBox(),
-        weights: new Float32Array(MAX_MORPH_TARGETS)
+        weights: new Float32Array(interpolator.stride)
       };
       this._boundingBox = targetBox ?? null;
       this._originBox = originBox ?? null;
@@ -89,7 +88,7 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
       ? {
           numTargets: this._interpolator.stride,
           boundingBox: new BoundingBox(),
-          weights: new Float32Array(MAX_MORPH_TARGETS)
+          weights: new Float32Array(this._interpolator.stride)
         }
       : null;
   }

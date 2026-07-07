@@ -1,5 +1,6 @@
 import type { VFS } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
+import { DEFAULT_MORPH_TARGET_LIMIT, MAX_MORPH_TARGETS, normalizeMorphTargetLimit } from '@zephyr3d/scene';
 import { ListView, ListViewData } from '../../components/listview';
 import { renderMultiSelectedCombo } from '../../components/multicombo';
 import { DialogRenderer } from '../../components/modal';
@@ -257,6 +258,12 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     if (ImGui.Combo('Render Scale', selectedRenderScaleIndex, DlgProjectSettings.RENDER_SCALE_LABELS)) {
       this._settings.renderScale = DlgProjectSettings.RENDER_SCALE_ITEMS[selectedRenderScaleIndex[0]];
     }
+
+    const morphTargetLimit = [this._settings.morphTargetLimit ?? DEFAULT_MORPH_TARGET_LIMIT] as [number];
+    if (ImGui.InputInt('Morph Target Limit', morphTargetLimit, 32, 128)) {
+      this._settings.morphTargetLimit = normalizeMorphTargetLimit(morphTargetLimit[0]);
+    }
+    ImGui.TextDisabled(`Default ${DEFAULT_MORPH_TARGET_LIMIT}, range 1-${MAX_MORPH_TARGETS}. Reimport models after raising this limit.`);
 
     if (ImGui.BeginChild('ListBox', new ImGui.ImVec2(0, 100), true)) {
       ImGui.TextDisabled('Additional packages');

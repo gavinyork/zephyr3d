@@ -173,7 +173,7 @@ export default plugin;
 
 export function generateIndexTS(settings: ProjectSettings) {
   const rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
-  return `import { Application, getEngine } from '@zephyr3d/scene';
+  return `import { Application, getEngine, setMorphTargetLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
 let backend: DeviceBackend = null;
@@ -208,6 +208,8 @@ if (!backend) {
   throw new Error('No supported rendering device found');
 }
 
+setMorphTargetLimit(${settings.morphTargetLimit ?? 'undefined'});
+
 const application = new Application({
   backend,
   canvas: document.querySelector('#canvas'),
@@ -224,7 +226,7 @@ application.ready().then(async () => {
 `;
 }
 
-export const templateIndex = `import { Application, getEngine } from '@zephyr3d/scene';
+export const templateIndex = `import { Application, getEngine, setMorphTargetLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
 const VFS = new HttpFS('./');
@@ -254,6 +256,8 @@ if (!backend && rhiList.includes('webgl')) {
 if (!backend) {
   throw new Error('No supported rendering device found');
 }
+
+setMorphTargetLimit(settings.morphTargetLimit);
 
 const application = new Application({
   backend,

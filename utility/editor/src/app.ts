@@ -52,6 +52,7 @@ if (project && !open) {
   if (!settings) {
     throw new Error('Get project settings failed');
   }
+  ProjectService.applyRuntimeSettings(settings);
   rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
   document.title = settings.title ?? info.name;
   if (settings.favicon) {
@@ -64,6 +65,7 @@ if (project && !open) {
   }
 } else {
   editorMode = 'editor';
+  ProjectService.applyRuntimeSettings(null);
   const deviceType = searchParams.get('device');
   if (deviceType) {
     rhiList = [deviceType];

@@ -46,7 +46,7 @@ import {
   NodeTranslationTrack,
   PCAGeometryCacheTrack
 } from '../animation';
-import { MAX_MORPH_ATTRIBUTES, MAX_MORPH_TARGETS } from '../values';
+import { getMorphTargetLimit, MAX_MORPH_ATTRIBUTES, MAX_MORPH_TARGETS } from '../values';
 import { getDevice } from '../app/api';
 import { Primitive } from '../render/primitive';
 import type { MeshMaterial } from '../material/meshmaterial';
@@ -55,6 +55,7 @@ import { PBRSpecularGlossinessMaterial } from '../material/pbrsg';
 import { PBRMetallicRoughnessMaterial } from '../material/pbrmr';
 
 type ReimportResourcePools = Map<string, Set<string>>;
+const MAX_MORPH_TEXTURE_DATA_BYTES = 256 * 1024 * 1024;
 
 /**
  * Named object interface for model loading
@@ -1673,9 +1674,10 @@ export class SharedModel extends Disposable {
             } else if (track.type === 'weights') {
               for (const m of track.node.mesh!.subMeshes) {
                 const mesh = meshMap.get(m)!;
-                if (track.interpolator.stride > MAX_MORPH_TARGETS) {
+                const morphTargetLimit = getMorphTargetLimit();
+                if (track.interpolator.stride > morphTargetLimit) {
                   console.error(
-                    `Morph target too large: ${track.interpolator.stride}, the maximum is ${MAX_MORPH_TARGETS}`
+                    `Morph target too large: ${track.interpolator.stride}, the project limit is ${morphTargetLimit}`
                   );
                 } else {
                   const morphTrack = new MorphTargetTrack(
@@ -2444,7 +2446,7 @@ export function applyMeshMorphMetadata(
   if (numTargets === 0 || !subMesh.targets || !subMesh.targetBox) {
     return;
   }
-  const supportedNumTargets = Math.min(numTargets, MAX_MORPH_TARGETS);
+  const supportedNumTargets = Math.min(numTargets, getMorphTargetLimit());
   if (supportedNumTargets !== numTargets) {
     console.warn(
       `Morph target count truncated from ${numTargets} to ${supportedNumTargets} for mesh "${subMesh.name ?? mesh.name ?? ''}"`
@@ -2505,9 +2507,40 @@ export function applyMeshMorphData(subMesh: AssetSubMeshData, mesh: Mesh) {
     : 0;
   const textureSize = Math.ceil(Math.sqrt(numVertices * attributes.length * numTargets));
   if (textureSize > getDevice().getDeviceCaps().textureCaps.maxTextureSize) {
-    throw new Error(`Morph target data too large`);
+    console.warn(
+      `Morph target data skipped for mesh "${subMesh.name ?? mesh.name ?? ''}": texture size ${textureSize} exceeds device limit`
+    );
+    mesh.setMorphData(null);
+    return;
   }
-  const textureData = new Float32Array(textureSize * textureSize * 4);
+  const textureDataLength = textureSize * textureSize * 4;
+  const textureDataBytes = textureDataLength * 4;
+  if (textureDataBytes > MAX_MORPH_TEXTURE_DATA_BYTES) {
+    console.warn(
+      `Morph target data skipped for mesh "${subMesh.name ?? mesh.name ?? ''}": estimated allocation ${(
+        textureDataBytes /
+        1024 /
+        1024
+      ).toFixed(2)} MB exceeds safe limit ${(MAX_MORPH_TEXTURE_DATA_BYTES / 1024 / 1024).toFixed(0)} MB`
+    );
+    mesh.setMorphData(null);
+    return;
+  }
+  let textureData: Float32Array<ArrayBuffer>;
+  try {
+    textureData = new Float32Array(textureDataLength);
+  } catch (err) {
+    console.warn(
+      `Morph target data skipped for mesh "${subMesh.name ?? mesh.name ?? ''}": failed to allocate ${(
+        textureDataBytes /
+        1024 /
+        1024
+      ).toFixed(2)} MB`,
+      err
+    );
+    mesh.setMorphData(null);
+    return;
+  }
   let offset = 0;
   for (let attrib = 0; attrib < MAX_MORPH_ATTRIBUTES; attrib++) {
     const index = attributes.indexOf(String(attrib));
@@ -2556,7 +2589,7 @@ function getAssetMeshMorphTargetCount(mesh: AssetMeshData): number {
   for (const subMesh of mesh.subMeshes) {
     count = Math.max(count, subMesh.numTargets);
   }
-  return Math.min(count, MAX_MORPH_TARGETS);
+  return Math.min(count, getMorphTargetLimit());
 }
 
 /** @internal */
