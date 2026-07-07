@@ -41,6 +41,7 @@ export interface FbxDocument {
 }
 
 export interface FbxLayerElementData<T extends Float32Array | Int32Array | Uint32Array> {
+  name?: string;
   mapping: string;
   reference: string;
   data: T;

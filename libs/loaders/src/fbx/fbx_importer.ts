@@ -386,6 +386,7 @@ function readLayerElementFloat(node: Nullable<FbxNode>) {
   if (!node) {
     return null;
   }
+  const name = asString(getChild(node, 'Name')?.properties[0], '');
   const mapping = asString(getChild(node, 'MappingInformationType')?.properties[0], '');
   const reference = asString(getChild(node, 'ReferenceInformationType')?.properties[0], '');
   const dataNode =
@@ -406,6 +407,7 @@ function readLayerElementFloat(node: Nullable<FbxNode>) {
   }
   const indices = indexNode?.properties[0];
   return {
+    name,
     mapping,
     reference,
     data,
@@ -495,6 +497,29 @@ function createSamplerInfo(texture: FbxTextureData) {
   };
 }
 
+function normalizeUVSetName(name: string) {
+  return name.trim().toLowerCase();
+}
+
+function toEngineUVY(value: number) {
+  return 1 - value;
+}
+
+function resolveTextureTexCoord(texture: FbxTextureData, uvLayers: FbxLayerElementData<Float32Array>[]) {
+  if (!texture.uvSet) {
+    return 0;
+  }
+  const target = normalizeUVSetName(texture.uvSet);
+  const exactIndex = uvLayers.findIndex((layer) => !!layer.name && normalizeUVSetName(layer.name) === target);
+  if (exactIndex >= 0) {
+    return exactIndex;
+  }
+  if (uvLayers.length === 1) {
+    return 0;
+  }
+  return 0;
+}
+
 function resolveTextureImage(basePath: string, texture: FbxTextureData, vfs: VFS): AssetImageInfo | null {
   const video = texture.video;
   if (video?.content?.byteLength) {
@@ -519,7 +544,13 @@ function resolveTextureImage(basePath: string, texture: FbxTextureData, vfs: VFS
   return { uri };
 }
 
-function createTextureInfo(basePath: string, texture: Nullable<FbxTextureData>, vfs: VFS, sRGB: boolean) {
+function createTextureInfo(
+  basePath: string,
+  texture: Nullable<FbxTextureData>,
+  vfs: VFS,
+  sRGB: boolean,
+  uvLayers: FbxLayerElementData<Float32Array>[]
+) {
   if (!texture) {
     return null;
   }
@@ -530,13 +561,14 @@ function createTextureInfo(basePath: string, texture: Nullable<FbxTextureData>, 
   const transform = new Matrix4x4().identity();
   const uvScale = texture.scale ?? [1, 1];
   const uvOffset = texture.translation ?? [0, 0];
+  const engineUvOffsetY = 1 - uvScale[1] - uvOffset[1];
   transform.scaleLeft(new Vector3(uvScale[0], uvScale[1], 1));
-  transform.translateLeft(new Vector3(uvOffset[0], uvOffset[1], 0));
+  transform.translateLeft(new Vector3(uvOffset[0], engineUvOffsetY, 0));
   return {
     image,
     sRGB,
     sampler: createSamplerInfo(texture),
-    texCoord: 0,
+    texCoord: resolveTextureTexCoord(texture, uvLayers),
     transform
   } as AssetTextureInfo;
 }
@@ -571,6 +603,7 @@ function registerMaterialImages(model: SharedModel, ctx: FbxImportContext, mater
 function createMaterialAsset(
   material: Nullable<FbxMaterialData>,
   ctx: FbxImportContext,
+  uvLayers: FbxLayerElementData<Float32Array>[],
   vertexColor: boolean,
   useTangent: boolean
 ): AssetMaterial {
@@ -596,19 +629,32 @@ function createMaterialAsset(
       emissiveStrength: 1,
       occlusionStrength: 1,
       normalMap:
-        createTextureInfo(ctx.basePath, material?.textures.normal ?? null, ctx.vfs, false) ?? undefined,
+        createTextureInfo(ctx.basePath, material?.textures.normal ?? null, ctx.vfs, false, uvLayers) ?? undefined,
       emissiveMap:
-        createTextureInfo(ctx.basePath, material?.textures.emissive ?? null, ctx.vfs, true) ?? undefined
+        createTextureInfo(ctx.basePath, material?.textures.emissive ?? null, ctx.vfs, true, uvLayers) ?? undefined
     },
     ior: 1.5,
     diffuse: new Vector4(diffuse[0], diffuse[1], diffuse[2], alpha),
     metallic: 0,
     roughness: material?.shininess ? Math.max(0.04, 1 - Math.min(material.shininess / 100, 1)) : 1,
     diffuseMap:
-      createTextureInfo(ctx.basePath, material?.textures.diffuse ?? null, ctx.vfs, true) ?? undefined,
+      createTextureInfo(ctx.basePath, material?.textures.diffuse ?? null, ctx.vfs, true, uvLayers) ?? undefined,
     specularFactor: Vector4.one()
   };
   return assetMaterial;
+}
+
+function getMaterialUvBindingKey(
+  material: Nullable<FbxMaterialData>,
+  uvLayers: FbxLayerElementData<Float32Array>[]
+) {
+  if (!material) {
+    return 'no_uv_binding';
+  }
+  const entries = Object.entries(material.textures)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([slot, texture]) => `${slot}:${resolveTextureTexCoord(texture, uvLayers)}`);
+  return entries.join('|') || 'no_uv_binding';
 }
 
 function getElementIndex(
@@ -826,7 +872,7 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
           2,
           uvScratch[uvIndex]
         );
-        bucket.texCoords[uvIndex].push(uvScratch[uvIndex][0], uvScratch[uvIndex][1]);
+        bucket.texCoords[uvIndex].push(uvScratch[uvIndex][0], toEngineUVY(uvScratch[uvIndex][1]));
       }
 
       if (skinData) {
@@ -1180,17 +1226,19 @@ function createMeshData(
     const hasVertexTangent = !!primitive.vertices.tangent;
     let material: AssetMaterial;
     if (materialSource) {
-      const materialHash = `fbx_${materialSource.id}_${hasVertexColor ? 'C' : 'N'}_${hasVertexTangent ? 'T' : 'NT'}`;
-      material =
-        model.getMaterial(materialHash) ??
-        createMaterialAsset(materialSource, ctx, hasVertexColor, hasVertexTangent);
-      if (!model.getMaterial(materialHash)) {
-        registerMaterialImages(model, ctx, material);
-        model.setMaterial(materialHash, material);
+        const materialHash = `fbx_${materialSource.id}_${hasVertexColor ? 'C' : 'N'}_${hasVertexTangent ? 'T' : 'NT'}`;
+        const materialUvBindingKey = getMaterialUvBindingKey(materialSource, geometry.uvLayers);
+        const scopedMaterialHash = `${materialHash}_${materialUvBindingKey}`;
+        material =
+          model.getMaterial(scopedMaterialHash) ??
+          createMaterialAsset(materialSource, ctx, geometry.uvLayers, hasVertexColor, hasVertexTangent);
+        if (!model.getMaterial(scopedMaterialHash)) {
+          registerMaterialImages(model, ctx, material);
+          model.setMaterial(scopedMaterialHash, material);
+        }
+      } else {
+        material = createMaterialAsset(null, ctx, geometry.uvLayers, hasVertexColor, hasVertexTangent);
       }
-    } else {
-      material = createMaterialAsset(null, ctx, hasVertexColor, hasVertexTangent);
-    }
     const subMesh: AssetSubMeshData = {
       primitive,
       material,
