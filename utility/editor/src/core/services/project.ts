@@ -1,6 +1,15 @@
 import type { HttpDirectoryReader, Immutable, VFS } from '@zephyr3d/base';
 import { HttpFS, MemoryFS, PathUtils, randomUUID } from '@zephyr3d/base';
-import { DEFAULT_MORPH_TARGET_LIMIT, getEngine, normalizeMorphTargetLimit, setMorphTargetLimit, tryGetApp } from '@zephyr3d/scene';
+import {
+  DEFAULT_ACTIVE_MORPH_TARGET_LIMIT,
+  DEFAULT_MORPH_TARGET_LIMIT,
+  getEngine,
+  normalizeActiveMorphTargetLimit,
+  normalizeMorphTargetLimit,
+  setActiveMorphTargetLimit,
+  setMorphTargetLimit,
+  tryGetApp
+} from '@zephyr3d/scene';
 import { fileListFileName, libDir, projectFileName } from '../build/templates';
 import { DlgMessage } from '../../views/dlg/messagedlg';
 import { installDeps } from '../build/dep';
@@ -24,6 +33,7 @@ export type ProjectSettings = {
   enableMSAA?: boolean;
   renderScale?: number;
   morphTargetLimit?: number;
+  activeMorphTargetLimit?: number;
   dependencies?: { [name: string]: string };
 };
 
@@ -31,7 +41,8 @@ const defaultProjectSettings: Immutable<ProjectSettings> = {
   preferredRHI: ['WebGL', 'WebGL2', 'WebGPU'],
   enableMSAA: false,
   renderScale: 0,
-  morphTargetLimit: DEFAULT_MORPH_TARGET_LIMIT
+  morphTargetLimit: DEFAULT_MORPH_TARGET_LIMIT,
+  activeMorphTargetLimit: DEFAULT_ACTIVE_MORPH_TARGET_LIMIT
 };
 
 function normalizeRenderScale(scale: number): number {
@@ -49,13 +60,19 @@ function normalizeRenderScale(scale: number): number {
 
 function normalizeProjectSettings(settings: ProjectSettings): ProjectSettings {
   const preferredRHI = settings?.preferredRHI ?? defaultProjectSettings.preferredRHI;
+  const morphTargetLimit = normalizeMorphTargetLimit(settings?.morphTargetLimit);
+  const activeMorphTargetLimit = Math.min(
+    normalizeActiveMorphTargetLimit(settings?.activeMorphTargetLimit),
+    morphTargetLimit
+  );
   return {
     ...defaultProjectSettings,
     ...settings,
     preferredRHI: preferredRHI ? [...preferredRHI] : undefined,
     enableMSAA: !!settings?.enableMSAA,
     renderScale: normalizeRenderScale(settings?.renderScale),
-    morphTargetLimit: normalizeMorphTargetLimit(settings?.morphTargetLimit)
+    morphTargetLimit,
+    activeMorphTargetLimit
   };
 }
 
@@ -137,7 +154,8 @@ export class ProjectService {
     return this._currentProjectInfo ? getProjectStorageId(this._currentProjectInfo) : '';
   }
   static applyRuntimeSettings(settings?: ProjectSettings | null) {
-    setMorphTargetLimit(settings?.morphTargetLimit);
+    const morphTargetLimit = setMorphTargetLimit(settings?.morphTargetLimit);
+    setActiveMorphTargetLimit(Math.min(settings?.activeMorphTargetLimit ?? DEFAULT_ACTIVE_MORPH_TARGET_LIMIT, morphTargetLimit));
   }
   static async listProjects(): Promise<ProjectInfo[]> {
     const manifest = await this.readManifest(true);

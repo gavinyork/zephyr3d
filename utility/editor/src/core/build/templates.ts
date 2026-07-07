@@ -173,7 +173,7 @@ export default plugin;
 
 export function generateIndexTS(settings: ProjectSettings) {
   const rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
-  return `import { Application, getEngine, setMorphTargetLimit } from '@zephyr3d/scene';
+  return `import { Application, getEngine, setActiveMorphTargetLimit, setMorphTargetLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
 let backend: DeviceBackend = null;
@@ -208,7 +208,14 @@ if (!backend) {
   throw new Error('No supported rendering device found');
 }
 
-setMorphTargetLimit(${settings.morphTargetLimit ?? 'undefined'});
+const morphTargetLimit = ${settings.morphTargetLimit ?? 'undefined'};
+const activeMorphTargetLimit =
+  typeof ${settings.activeMorphTargetLimit ?? 'undefined'} === 'number'
+    ? Math.min(${settings.activeMorphTargetLimit ?? 'undefined'}, morphTargetLimit ?? ${settings.activeMorphTargetLimit ?? 'undefined'})
+    : undefined;
+
+setMorphTargetLimit(morphTargetLimit);
+setActiveMorphTargetLimit(activeMorphTargetLimit);
 
 const application = new Application({
   backend,
@@ -226,7 +233,7 @@ application.ready().then(async () => {
 `;
 }
 
-export const templateIndex = `import { Application, getEngine, setMorphTargetLimit } from '@zephyr3d/scene';
+export const templateIndex = `import { Application, getEngine, setActiveMorphTargetLimit, setMorphTargetLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
 const VFS = new HttpFS('./');
@@ -257,7 +264,14 @@ if (!backend) {
   throw new Error('No supported rendering device found');
 }
 
-setMorphTargetLimit(settings.morphTargetLimit);
+const morphTargetLimit = typeof settings.morphTargetLimit === 'number' ? settings.morphTargetLimit : undefined;
+const activeMorphTargetLimit =
+  typeof settings.activeMorphTargetLimit === 'number'
+    ? Math.min(settings.activeMorphTargetLimit, morphTargetLimit ?? settings.activeMorphTargetLimit)
+    : undefined;
+
+setMorphTargetLimit(morphTargetLimit);
+setActiveMorphTargetLimit(activeMorphTargetLimit);
 
 const application = new Application({
   backend,

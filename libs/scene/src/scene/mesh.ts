@@ -24,6 +24,7 @@ import {
 import type { Scene } from './scene';
 import { BoundingBox, type BoundingVolume } from '../utility/bounding_volume';
 import {
+  getActiveMorphTargetLimit,
   getMorphTargetLimit,
   MORPH_ATTRIBUTE_VECTOR_COUNT,
   MORPH_WEIGHTS_VECTOR_COUNT,
@@ -78,7 +79,6 @@ export interface MorphTargetSourceData {
 const MORPH_WEIGHT_CAPACITY = MORPH_WEIGHTS_VECTOR_COUNT * 4;
 const MORPH_ATTRIBUTE_CAPACITY = MORPH_ATTRIBUTE_VECTOR_COUNT * 4;
 const MORPH_INFO_DATA_LENGTH = 4 + MORPH_WEIGHT_CAPACITY + MORPH_ATTRIBUTE_CAPACITY;
-const MAX_ACTIVE_MORPH_TARGETS = 64;
 const ACTIVE_MORPH_WEIGHT_EPSILON = 1e-5;
 
 function normalizeMorphInfoData(data: MorphInfo['data']) {
@@ -537,6 +537,10 @@ export class Mesh extends MeshBase implements BatchDrawable {
       return new Uint32Array(0);
     }
     const count = this.getNumMorphTargets();
+    const activeLimit = Math.min(getActiveMorphTargetLimit(), count);
+    if (activeLimit <= 0) {
+      return new Uint32Array(0);
+    }
     const weighted: { index: number; weight: number }[] = [];
     for (let i = 0; i < count; i++) {
       const weight = this._morphInfo.data[4 + i];
@@ -544,9 +548,9 @@ export class Mesh extends MeshBase implements BatchDrawable {
         weighted.push({ index: i, weight: Math.abs(weight) });
       }
     }
-    if (weighted.length > MAX_ACTIVE_MORPH_TARGETS) {
+    if (weighted.length > activeLimit) {
       weighted.sort((a, b) => b.weight - a.weight);
-      weighted.length = MAX_ACTIVE_MORPH_TARGETS;
+      weighted.length = activeLimit;
     }
     weighted.sort((a, b) => a.index - b.index);
     return new Uint32Array(weighted.map((item) => item.index));
