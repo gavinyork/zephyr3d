@@ -452,7 +452,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
         ? this._skinnedBoundingInfo.boundingBox
         : null;
     if (skinnedBoundingBox && morphBoundingBox) {
-      return skinnedBoundingBox.clone().union(morphBoundingBox) as BoundingBox;
+      return skinnedBoundingBox.clone();
     }
     return skinnedBoundingBox?.clone() ?? morphBoundingBox ?? null;
   }
