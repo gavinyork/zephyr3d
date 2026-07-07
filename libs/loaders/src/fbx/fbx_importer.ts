@@ -171,7 +171,26 @@ function getObjectName(node: FbxNode) {
     return '';
   }
   const parts = raw.split('\0');
-  return parts[0] || raw;
+  const sanitized = (parts[0] || raw).replace(/[\u0000-\u001f]+/g, '').trim();
+  return sanitized || '';
+}
+
+function getPreferredName(...values: Array<Nullable<string>>) {
+  for (const value of values) {
+    const sanitized = (value ?? '').replace(/[\u0000-\u001f]+/g, '').trim();
+    if (sanitized) {
+      return sanitized;
+    }
+  }
+  return '';
+}
+
+function getFilenameStem(path: string) {
+  if (!path) {
+    return '';
+  }
+  const normalized = path.replace(/\\/g, '/');
+  return PathUtils.basename(normalized, PathUtils.extname(normalized));
 }
 
 function toRadiansTuple(value: [number, number, number]): [number, number, number] {
@@ -524,17 +543,23 @@ function resolveTextureTexCoord(texture: FbxTextureData, uvLayers: FbxLayerEleme
 
 function resolveTextureImage(basePath: string, texture: FbxTextureData, vfs: VFS): AssetImageInfo | null {
   const video = texture.video;
+  const rawPath =
+    texture.relativeFilename || texture.fileName || video?.relativeFilename || video?.filename || '';
+  const imageName = getPreferredName(
+    getFilenameStem(rawPath),
+    video?.name ?? '',
+    texture.name
+  );
   if (video?.content?.byteLength) {
     const filename =
       video.relativeFilename || video.filename || texture.relativeFilename || texture.fileName || '';
     const mimeType = filename ? vfs.guessMIMEType(filename) : '';
     return {
+      name: imageName || undefined,
       data: toUint8Array(video.content),
       mimeType
     };
   }
-  const rawPath =
-    texture.relativeFilename || texture.fileName || video?.relativeFilename || video?.filename || '';
   if (!rawPath) {
     return null;
   }
@@ -543,7 +568,10 @@ function resolveTextureImage(basePath: string, texture: FbxTextureData, vfs: VFS
     vfs.parseDataURI(normalized) || vfs.isAbsoluteURL(normalized)
       ? normalized
       : vfs.normalizePath(vfs.join(basePath, normalized));
-  return { uri };
+  return {
+    name: imageName || undefined,
+    uri
+  };
 }
 
 function createTextureInfo(
@@ -567,6 +595,9 @@ function createTextureInfo(
   transform.scaleLeft(new Vector3(uvScale[0], uvScale[1], 1));
   transform.translateLeft(new Vector3(uvOffset[0], engineUvOffsetY, 0));
   return {
+    name:
+      getPreferredName(texture.name, image.name ?? null, getFilenameStem(texture.fileName || texture.relativeFilename || '')) ||
+      undefined,
     image,
     sRGB,
     sampler: createSamplerInfo(texture),
@@ -619,6 +650,7 @@ function createMaterialAsset(
   );
   const alpha = Math.max(0, Math.min(1, opacity * (1 - transparencyFactor * transparentStrength)));
   const assetMaterial: AssetPBRMaterialMR = {
+    name: material?.name || undefined,
     type: 'pbrMetallicRoughness',
     common: {
       vertexColor,
@@ -908,6 +940,7 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
   }
 
   const result: FbxPrimitiveBuildData[] = [];
+  const meshBaseName = getPreferredName(model.name, geometry.name, `mesh_${model.id}`);
   for (const [materialIndex, bucket] of materialBuckets) {
     const vertices: Partial<FbxPrimitiveBuildData['vertices']> = {
       position: { format: 'position_f32x3', data: new Float32Array(bucket.positions) },
@@ -948,7 +981,7 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
       rawJointWeights:
         bucket.rawJointWeights.length > 0 ? toFloat32Array(new Float32Array(bucket.rawJointWeights)) : null,
       materialIndex,
-      name: materialBuckets.size > 1 ? `${geometry.name}_${materialIndex}` : geometry.name
+      name: materialBuckets.size > 1 ? `${meshBaseName}_${materialIndex}` : meshBaseName
     });
   }
   return result;
@@ -1241,6 +1274,7 @@ function createMeshData(
   for (const primitiveData of primitives) {
     const bounds = getBounds(primitiveData.rawPositions);
     const primitive: AssetPrimitiveInfo = {
+      name: primitiveData.name || getPreferredName(modelData.name, geometry.name, `mesh_${modelData.id}`),
       vertices: toVertexRecord(primitiveData.vertices) as AssetPrimitiveInfo['vertices'],
       indices: toUint32Array(primitiveData.indices),
       indexCount: primitiveData.indices.length,
