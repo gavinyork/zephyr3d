@@ -357,6 +357,7 @@ export class VSM extends ShadowImpl {
   getShaderHash() {
     return '';
   }
+  getParams() {}
   getShadowMapColorFormat(_shadowMapParams: ShadowMapParams) {
     const device = getDevice();
     return device.getDeviceCaps().textureCaps.supportFloatColorBuffer &&

@@ -45,6 +45,7 @@ export class PCFPD extends ShadowImpl {
     }
     return 3;
   }
+  getParams() {}
   getShadowMapBorder(_shadowMapParams: ShadowMapParams) {
     return Math.max(this._sampleRadius + 1, this.getPCFKernelSize());
   }

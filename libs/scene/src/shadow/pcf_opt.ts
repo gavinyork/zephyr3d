@@ -37,6 +37,7 @@ export class PCFOPT extends ShadowImpl {
   getShadowMapBorder(_shadowMapParams: ShadowMapParams) {
     return this._kernelSize;
   }
+  getParams() {}
   getShadowMap(shadowMapParams: ShadowMapParams) {
     return (
       this.useNativeShadowMap(shadowMapParams)

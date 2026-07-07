@@ -86,6 +86,7 @@ export class ShaderHelper {
     depthBiasValues: new Vector4(),
     shadowCameraParams: new Vector4(),
     depthBiasScales: new Vector4(),
+    implParams: new Vector4(),
     shadowMatrices: new Float32Array(16 * 4),
     shadowStrength: 1,
     envLightStrength: 1,
@@ -249,6 +250,7 @@ export class ShaderHelper {
             pb.vec4('depthBiasValues'),
             pb.vec4('shadowCameraParams'),
             pb.vec4('depthBiasScales'),
+            pb.vec4('implParams'),
             pb.vec4[16]('shadowMatrices'),
             pb.float('shadowStrength'),
             pb.float('envLightStrength'),
@@ -910,6 +912,7 @@ export class ShaderHelper {
     this._lightUniformShadow.depthBiasValues.set(shadowMapParams.depthBiasValues[0]);
     this._lightUniformShadow.shadowCameraParams.set(shadowMapParams.cameraParams);
     this._lightUniformShadow.depthBiasScales.set(shadowMapParams.depthBiasScales);
+    shadowMapParams.impl!.getParams(this._lightUniformShadow.implParams);
     this._lightUniformShadow.shadowMatrices.set(shadowMapParams.shadowMatrices);
     this._lightUniformShadow.shadowStrength = light.shadow.shadowStrength;
     this._lightUniformShadow.envLightStrength = ctx.env?.light.strength ?? 0;
@@ -1196,6 +1199,10 @@ export class ShaderHelper {
   /** @internal */
   static getCascadeDistances(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.light.cascadeDistances;
+  }
+  /** @internal */
+  static getShadowImplParams(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope.light.implParams;
   }
   /** @internal */
   static getDepthBiasValues(scope: PBInsideFunctionScope): PBShaderExp {

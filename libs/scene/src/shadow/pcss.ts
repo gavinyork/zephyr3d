@@ -12,7 +12,6 @@ import { getDevice } from '../app/api';
 
 /** @internal */
 export class PCSS extends ShadowImpl {
-  private static readonly SHADER_VERSION = 6;
   protected _lightRadius: number;
   protected _blockerSampleCount: number;
   protected _filterSampleCount: number;
@@ -88,7 +87,7 @@ export class PCSS extends ShadowImpl {
   }
   setDepthScale(_val: number) {}
   getShaderHash() {
-    return `${PCSS.SHADER_VERSION}-${this._lightRadius}-${this._blockerSampleCount}-${this._filterSampleCount}-${this._maxFilterRadius}-${Number(this._temporalJitter)}`;
+    return `${Number(this._temporalJitter)}`;
   }
   getShadowMapColorFormat(_shadowMapParams: ShadowMapParams): Nullable<TextureFormat> {
     const device = getDevice();
@@ -104,6 +103,9 @@ export class PCSS extends ShadowImpl {
       : device.getDeviceCaps().textureCaps.supportFloatColorBuffer
         ? 'r32f'
         : 'rgba8unorm';
+  }
+  getParams(out: Vector4) {
+    out.setXYZW(this._lightRadius, this._blockerSampleCount, this._filterSampleCount, this._maxFilterRadius);
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
     return getDevice().type === 'webgl' ? 'd24s8' : 'd32f';
@@ -153,10 +155,6 @@ export class PCSS extends ShadowImpl {
             this,
             shadowMapParams.lightType,
             shadowMapParams.shadowMap!.format,
-            that._blockerSampleCount,
-            that._filterSampleCount,
-            that._lightRadius,
-            that._maxFilterRadius,
             this.shadowCoord,
             this.receiverPlaneDepthBias,
             this.split,
@@ -244,10 +242,6 @@ export class PCSS extends ShadowImpl {
           this,
           shadowMapParams.lightType,
           shadowMapParams.shadowMap!.format,
-          that._blockerSampleCount,
-          that._filterSampleCount,
-          that._lightRadius,
-          that._maxFilterRadius,
           this.shadowCoord,
           this.receiverPlaneDepthBias,
           undefined,

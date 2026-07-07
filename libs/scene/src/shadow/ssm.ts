@@ -23,6 +23,7 @@ export class SSM extends ShadowImpl {
   getShadowMapBorder(_shadowMapParams: ShadowMapParams) {
     return 0;
   }
+  getParams() {}
   getShadowMap(shadowMapParams: ShadowMapParams) {
     return (
       this.useNativeShadowMap(shadowMapParams)

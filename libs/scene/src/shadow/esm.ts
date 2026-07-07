@@ -412,6 +412,7 @@ export class ESM extends ShadowImpl {
   getShaderHash() {
     return `${this._blur ? 1 : 0}${this._logSpace ? 1 : 0}`;
   }
+  getParams() {}
   getShadowMapColorFormat(_shadowMapParams: ShadowMapParams) {
     const device = getDevice();
     return device.getDeviceCaps().textureCaps.supportFloatColorBuffer &&
