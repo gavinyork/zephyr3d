@@ -89,7 +89,10 @@ export class WebGPURenderPass {
       this._currentViewport = {
         x: 0,
         y: 0,
-        width: this._device.deviceXToScreen(this._device.drawingBufferWidth),
+        width:
+          this._device.drawingBufferWidth > 0
+            ? this._device.deviceXToScreen(this._device.drawingBufferWidth)
+            : 1,
         height: this._device.deviceYToScreen(this._device.drawingBufferHeight),
         default: true
       };

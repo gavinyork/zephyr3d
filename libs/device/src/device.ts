@@ -307,10 +307,10 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     );
   }
   getScaleX() {
-    return this._canvas.clientWidth === 0 ? 0 : this._canvas.width / this._canvas.clientWidth;
+    return this._canvas.clientWidth === 0 ? 1 : this._canvas.width / this._canvas.clientWidth;
   }
   getScaleY() {
-    return this._canvas.clientHeight === 0 ? 0 : this._canvas.height / this._canvas.clientHeight;
+    return this._canvas.clientHeight === 0 ? 1 : this._canvas.height / this._canvas.clientHeight;
   }
   abstract getAdapterInfo(): any;
   abstract getFrameBufferSampleCount(): number;

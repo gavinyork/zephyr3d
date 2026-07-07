@@ -8,7 +8,7 @@ especially in large scenes or when using low‑resolution maps.
 To achieve smooth and natural shadow edges, several techniques can be used to reduce or eliminate aliasing:
 
 1. **Increase the shadow map resolution**  
-2. **Apply filtering methods (PCF, VSM, ESM)**  
+2. **Apply filtering methods (PCF, PCSS, VSM, ESM)**
 3. **Use Cascaded Shadow Maps (CSM)**  
 4. **Optimize shadow distance and bounding region**
 
@@ -48,14 +48,47 @@ It smooths edges by **sampling multiple nearby texels** in the shadow map
 and averaging their visibility results — essentially a **filtered softening**.
 
 ```javascript
-// Enable PCF (optimized)
+// Enable PCF
 light.shadow.mode = 'pcf';
 ```
+
+Parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `pcfKernelSize` | PCF sampling kernel size. Supported values are `3`, `5`, and `7`. Larger kernels produce softer edges, but cost more samples and make shadows blurrier. |
 
 Example:  
 The upper half of the screen uses PCF, while the lower half uses standard hard‑edge shadows.
 
 <div class="showcase" case="tut-20" style="width:600px;height:800px"></div>
+
+---
+
+## PCSS (Percentage-Closer Soft Shadows)
+
+**PCSS** is a soft-shadow extension of PCF.
+It first searches the shadow map for blockers, estimates the penumbra size from the depth difference between the receiver and those blockers,
+then applies variable-radius filtering. This keeps contact shadows sharper while making shadows softer as the receiver moves farther from the blocker.
+
+```javascript
+// Enable PCSS shadow mode
+light.shadow.mode = 'pcss';
+```
+
+Parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `pcssLightRadius` | Apparent light radius, measured in shadow-map texels. Larger values create wider penumbrae and softer shadows; `0` mostly collapses the result toward hard filtering. |
+| `pcssBlockerSampleCount` | Number of samples used for blocker search, clamped to `1`–`64`. Higher values make blocker estimation more stable, but increase search cost. |
+| `pcssFilterSampleCount` | Number of samples used for the final soft-shadow filter, clamped to `1`–`64`. Higher values reduce noise and smooth the edge, but increase fragment shading cost. |
+| `pcssMaxFilterRadius` | Maximum filter radius in shadow-map texels. Caps penumbra growth to avoid overly wide shadows and excessive sample coverage. |
+| `pcssTemporalJitter` | Rotates the PCSS sampling pattern over frames for TAA accumulation. This can make soft shadows smoother with TAA enabled, but may add slight temporal noise without TAA. |
+
+Example: upper half uses PCSS, lower half uses hard shadows.
+
+<div class="showcase" case="tut-65" style="width:600px;height:800px"></div>
 
 ---
 
@@ -75,6 +108,14 @@ light.shadow.mode = 'vsm';
 - Works well with glossy and reflective surfaces;  
 - Supports adjustable blur radius;  
 - May suffer from **light bleeding**, which can be mitigated by tuning bias or thresholds.
+
+Parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `vsmBlurKernelSize` | Kernel size of the VSM post blur. Larger kernels produce smoother edges, but increase the blur pass sampling cost. |
+| `vsmBlurRadius` | Blur radius for VSM. Larger values widen the transition band; values that are too large can remove contact-shadow detail. |
+| `vsmDarkness` | Shadow darkness and light-bleeding suppression for VSM. Higher values make shadows darker and reduce bleeding, but can compress soft transitions. |
 
 Example: upper half uses VSM, lower half uses standard shadow mapping.
 
@@ -101,6 +142,16 @@ light.shadow.mode = 'esm';
 **Note:**  
 The exponential factor should be tuned per scene  
 to avoid overly wide or faint shadow falloff.
+
+Parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `esmDepthScale` | Exponential depth scale. Higher values make falloff steeper, producing sharper and stronger shadows; lower values create wider transitions that can look faint. |
+| `esmBlur` | Enables the ESM post blur. When enabled, edges can be softened further; when disabled, the renderer uses the direct exponential shadow result. |
+| `esmLogSpace` | Runs ESM blur in log space. This is usually more stable and helps avoid numerical issues from very large or very small exponential values. |
+| `esmBlurKernelSize` | ESM blur kernel size, used only when `esmBlur` is `true`. Larger kernels are smoother, but cost more samples. |
+| `esmBlurRadius` | ESM blur radius, used only when `esmBlur` is `true`. Larger values create wider, softer shadow edges. |
 
 Example: upper half uses ESM, lower half uses hard shadows.
 
@@ -209,6 +260,7 @@ shadowRegion.clearCasters();
 |------------|----------------|-------------|------------|------------------|
 | **Higher Resolution** | Increase sampling density | Simple and direct | High memory usage | 🟠 Medium |
 | **PCF** | Multi‑sample averaging | Easy to use, no extra storage | Slightly blurry edges | 🟡 Medium‑High |
+| **PCSS** | Blocker search + variable-radius PCF | Sharp contact shadows with softer distant penumbrae | Many samples, may need TAA for stability | 🔵 High |
 | **VSM** | Statistical variance smoothing | Stable, noise‑free, supports blur | Possible light bleeding | 🟡 Medium |
 | **ESM** | Exponential depth attenuation | Smooth, noise‑free, efficient | Sensitive to tuning | 🟢 High efficiency |
 | **CSM** | Multi‑layer shadow maps by distance | High detail near camera | Complex to manage | 🔵 High |
@@ -216,6 +268,6 @@ shadowRegion.clearCasters();
 ---
 
 By combining these methods appropriately—  
-for instance, **PCF/VSM/ESM filtering**, **CSM segmentation**, or **distance limiting**—  
+for instance, **PCF/PCSS/VSM/ESM filtering**, **CSM segmentation**, or **distance limiting**—
 you can achieve a balanced compromise between **shadow quality**, **scene scale**, and **rendering performance**  
 in Zephyr3D‑based real‑time rendering.
