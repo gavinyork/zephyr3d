@@ -11,7 +11,10 @@ import {
   AssetHierarchyNode,
   AssetScene,
   AssetSkeleton,
+  BoundingBox,
   getEngine,
+  MORPH_TARGET_NORMAL,
+  MORPH_TARGET_POSITION,
   SharedModel,
   type AssetImageInfo,
   type AssetMaterial,
@@ -24,6 +27,7 @@ import {
 import { AbstractModelImporter } from '../importer';
 import { parseFbx } from './parser';
 import type {
+  FbxBlendShapeChannelData,
   FbxClusterData,
   FbxConnection,
   FbxDocument,
@@ -34,6 +38,7 @@ import type {
   FbxNode,
   FbxObjectMap,
   FbxPrimitiveBuildData,
+  FbxShapeData,
   FbxSkinData,
   FbxTextureData,
   FbxTransformData,
@@ -403,6 +408,61 @@ function readSkinData(node: FbxNode, ctx: FbxImportContext) {
   return { id, clusters } as FbxSkinData;
 }
 
+function getMorphTargetName(channelName: string, shapeName: string) {
+  const channelLeaf = channelName.includes('.') ? channelName.slice(channelName.lastIndexOf('.') + 1) : channelName;
+  return getPreferredName(shapeName, channelLeaf, channelName);
+}
+
+function readShapeData(node: FbxNode) {
+  return {
+    id: getNodeId(node),
+    name: getObjectName(node),
+    indices: (getChild(node, 'Indexes')?.properties[0] as Int32Array) ?? new Int32Array(),
+    vertices: (getChild(node, 'Vertices')?.properties[0] as Float64Array) ?? new Float64Array(),
+    normals: (getChild(node, 'Normals')?.properties[0] as Float64Array) ?? null
+  } as FbxShapeData;
+}
+
+function readBlendShapeChannelData(node: FbxNode, ctx: FbxImportContext) {
+  const id = getNodeId(node);
+  const shapeNode = ctx.connectionChildren
+    .get(id)
+    ?.map((connection) => ctx.objects.Geometry?.get(connection.from) ?? null)
+    .find((geometryNode) => geometryNode?.properties[2] === 'Shape');
+  const shape = shapeNode ? readShapeData(shapeNode) : null;
+  const fullWeights = Array.from((getChild(node, 'FullWeights')?.properties[0] as Float64Array) ?? []).map((value) =>
+    Number(value)
+  );
+  return {
+    id,
+    name: getMorphTargetName(getObjectName(node), shape?.name ?? ''),
+    fullWeights,
+    deformPercent: asNumber(getChild(node, 'DeformPercent')?.properties[0], 0),
+    shape
+  } as FbxBlendShapeChannelData;
+}
+
+function readMorphTargetData(geometryId: number, ctx: FbxImportContext) {
+  const morphTargets: FbxBlendShapeChannelData[] = [];
+  for (const connection of ctx.connectionChildren.get(geometryId) ?? []) {
+    const blendShapeNode = ctx.objects.Deformer?.get(connection.from);
+    if (blendShapeNode?.properties[2] !== 'BlendShape') {
+      continue;
+    }
+    for (const channelConnection of ctx.connectionChildren.get(connection.from) ?? []) {
+      const channelNode = ctx.objects.Deformer?.get(channelConnection.from);
+      if (channelNode?.properties[2] !== 'BlendShapeChannel') {
+        continue;
+      }
+      const channel = readBlendShapeChannelData(channelNode, ctx);
+      if (channel.shape && channel.shape.indices.length * 3 <= channel.shape.vertices.length) {
+        morphTargets.push(channel);
+      }
+    }
+  }
+  return morphTargets;
+}
+
 function readLayerElementFloat(node: Nullable<FbxNode>) {
   if (!node) {
     return null;
@@ -483,7 +543,8 @@ function readGeometryData(node: FbxNode, ctx: FbxImportContext) {
       .map((layer) => readLayerElementFloat(layer))
       .filter((layer): layer is FbxLayerElementData<Float32Array> => !!layer),
     materialLayer: readLayerElementInt(getChild(node, 'LayerElementMaterial')),
-    skin
+    skin,
+    morphTargets: readMorphTargetData(id, ctx)
   } as FbxGeometryData;
 }
 
@@ -787,6 +848,7 @@ function buildSkinData(geometry: FbxGeometryData) {
 }
 
 function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPrimitiveBuildData[] {
+  const morphTargets = geometry.morphTargets ?? [];
   const materialBuckets = new Map<
     number,
     {
@@ -801,6 +863,7 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
       rawPositions: number[];
       rawBlendIndices: number[];
       rawJointWeights: number[];
+      controlPointToVertices: Map<number, number[]>;
     }
   >();
   const geometryTransform = getGeometryTransform(model);
@@ -829,7 +892,8 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
         indices: [],
         rawPositions: [],
         rawBlendIndices: [],
-        rawJointWeights: []
+        rawJointWeights: [],
+        controlPointToVertices: new Map()
       };
       materialBuckets.set(materialIndex, bucket);
     }
@@ -856,6 +920,13 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
       geometryTransform.transformPointAffine(TMP_VEC3, TMP_VEC3_B);
       bucket.positions.push(TMP_VEC3_B.x, TMP_VEC3_B.y, TMP_VEC3_B.z);
       bucket.rawPositions.push(TMP_VEC3_B.x, TMP_VEC3_B.y, TMP_VEC3_B.z);
+      const vertexIndex = bucket.positions.length / 3 - 1;
+      const vertexRefs = bucket.controlPointToVertices.get(cpIndex);
+      if (vertexRefs) {
+        vertexRefs.push(vertexIndex);
+      } else {
+        bucket.controlPointToVertices.set(cpIndex, [vertexIndex]);
+      }
 
       resolveLayerElement(
         geometry.normals ?? null,
@@ -961,6 +1032,88 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
       const format = `tex${uvIndex}_f32x2` as VertexAttribFormat;
       vertices[semantic] = { format, data: new Float32Array(uv) };
     }
+    let numTargets = 0;
+    let targets: Partial<Record<number, { numComponents: number; data: Float32Array[] }>> | undefined;
+    let targetBox:
+      | {
+          min: [number, number, number];
+          max: [number, number, number];
+        }[]
+      | undefined;
+    let morphAttribCount = 0;
+    if (morphTargets.length > 0) {
+      const numVertices = bucket.positions.length / 3;
+      const positionTargets: Float32Array[] = [];
+      const normalTargets: Float32Array[] = [];
+      let hasNormalMorph = false;
+      targetBox = [];
+      for (const morphTarget of morphTargets) {
+        const positionData = new Float32Array(numVertices * 3);
+        const normalData = new Float32Array(numVertices * 3);
+        let minX = 0;
+        let minY = 0;
+        let minZ = 0;
+        let maxX = 0;
+        let maxY = 0;
+        let maxZ = 0;
+        const shape = morphTarget.shape;
+        if (shape) {
+          const count = Math.min(shape.indices.length, Math.floor(shape.vertices.length / 3));
+          const normalCount = shape.normals ? Math.min(shape.indices.length, Math.floor(shape.normals.length / 3)) : 0;
+          for (let i = 0; i < count; i++) {
+            const cpIndex = shape.indices[i];
+            const mappedVertices = bucket.controlPointToVertices.get(cpIndex);
+            if (!mappedVertices || mappedVertices.length === 0) {
+              continue;
+            }
+            TMP_VEC3.setXYZ(shape.vertices[i * 3] ?? 0, shape.vertices[i * 3 + 1] ?? 0, shape.vertices[i * 3 + 2] ?? 0);
+            geometryTransform.transformVectorAffine(TMP_VEC3, TMP_VEC3_B);
+            minX = Math.min(minX, TMP_VEC3_B.x);
+            minY = Math.min(minY, TMP_VEC3_B.y);
+            minZ = Math.min(minZ, TMP_VEC3_B.z);
+            maxX = Math.max(maxX, TMP_VEC3_B.x);
+            maxY = Math.max(maxY, TMP_VEC3_B.y);
+            maxZ = Math.max(maxZ, TMP_VEC3_B.z);
+            for (const vertexRef of mappedVertices) {
+              positionData[vertexRef * 3] = TMP_VEC3_B.x;
+              positionData[vertexRef * 3 + 1] = TMP_VEC3_B.y;
+              positionData[vertexRef * 3 + 2] = TMP_VEC3_B.z;
+            }
+            if (shape.normals && i < normalCount) {
+              TMP_VEC3.setXYZ(shape.normals[i * 3] ?? 0, shape.normals[i * 3 + 1] ?? 0, shape.normals[i * 3 + 2] ?? 0);
+              normalTransform.transformVector(TMP_VEC3, TMP_VEC4);
+              hasNormalMorph = true;
+              for (const vertexRef of mappedVertices) {
+                normalData[vertexRef * 3] = TMP_VEC4.x;
+                normalData[vertexRef * 3 + 1] = TMP_VEC4.y;
+                normalData[vertexRef * 3 + 2] = TMP_VEC4.z;
+              }
+            }
+          }
+        }
+        positionTargets.push(positionData);
+        normalTargets.push(normalData);
+        targetBox.push({
+          min: [minX, minY, minZ],
+          max: [maxX, maxY, maxZ]
+        });
+      }
+      numTargets = morphTargets.length;
+      targets = {
+        [MORPH_TARGET_POSITION]: {
+          numComponents: 3,
+          data: positionTargets
+        }
+      };
+      morphAttribCount = 1;
+      if (hasNormalMorph) {
+        targets[MORPH_TARGET_NORMAL] = {
+          numComponents: 3,
+          data: normalTargets
+        };
+        morphAttribCount++;
+      }
+    }
     if (bucket.blendIndices.length > 0) {
       vertices.blendIndices = {
         format: 'blendindices_f32x4' as VertexAttribFormat,
@@ -981,7 +1134,11 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
       rawJointWeights:
         bucket.rawJointWeights.length > 0 ? toFloat32Array(new Float32Array(bucket.rawJointWeights)) : null,
       materialIndex,
-      name: materialBuckets.size > 1 ? `${meshBaseName}_${materialIndex}` : meshBaseName
+      name: materialBuckets.size > 1 ? `${meshBaseName}_${materialIndex}` : meshBaseName,
+      numTargets,
+      targets,
+      targetBox,
+      morphAttribCount
     });
   }
   return result;
@@ -1266,6 +1423,7 @@ function createMeshData(
   ctx: FbxImportContext
 ) {
   const primitives = buildPrimitives(geometry, modelData);
+  const morphTargets = geometry.morphTargets ?? [];
   const materials = (ctx.connectionChildren.get(modelData.id) ?? [])
     .filter((connection) => ctx.materialMap.has(connection.from))
     .map((connection) => ctx.materialMap.get(connection.from)!)
@@ -1308,13 +1466,25 @@ function createMeshData(
       rawBlendIndices: primitiveData.rawBlendIndices ? toUint16Array(primitiveData.rawBlendIndices) : null,
       rawJointWeights: primitiveData.rawJointWeights ? toFloat32Array(primitiveData.rawJointWeights) : null,
       name: primitiveData.name || geometry.name,
-      numTargets: 0
+      numTargets: primitiveData.numTargets ?? 0,
+      targets: primitiveData.targets,
+      targetBox: primitiveData.targetBox?.map(
+        (box) =>
+          new BoundingBox(
+            new Vector3(box.min[0], box.min[1], box.min[2]),
+            new Vector3(box.max[0], box.max[1], box.max[2])
+          )
+      ),
+      morphAttribCount: primitiveData.morphAttribCount ?? 0
     };
     subMeshes.push(subMesh);
   }
   return {
-    morphWeights: [],
-    morphNames: [],
+    morphWeights: morphTargets.map((target) => {
+      const fullWeight = target.fullWeights[0] ?? 100;
+      return fullWeight !== 0 ? target.deformPercent / fullWeight : 0;
+    }),
+    morphNames: morphTargets.map((target) => target.name),
     subMeshes
   } as AssetMeshData;
 }
@@ -1465,6 +1635,7 @@ export class FBXImporter extends AbstractModelImporter {
       }
     }
     buildSkeletonsFromLimbRoots(model, ctx);
+    model.buildMorphTargetGroupsByName();
     model.scenes.push(scene);
     model.activeScene = 0;
   }

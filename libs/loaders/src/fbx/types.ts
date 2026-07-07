@@ -115,6 +115,22 @@ export interface FbxSkinData {
   clusters: FbxClusterData[];
 }
 
+export interface FbxShapeData {
+  id: number;
+  name: string;
+  indices: Int32Array;
+  vertices: Float64Array;
+  normals?: Float64Array | null;
+}
+
+export interface FbxBlendShapeChannelData {
+  id: number;
+  name: string;
+  fullWeights: number[];
+  deformPercent: number;
+  shape: FbxShapeData | null;
+}
+
 export interface FbxModelData {
   id: number;
   name: string;
@@ -135,6 +151,7 @@ export interface FbxGeometryData {
   uvLayers: FbxLayerElementData<Float32Array>[];
   materialLayer?: FbxLayerElementData<Int32Array> | null;
   skin?: FbxSkinData | null;
+  morphTargets?: FbxBlendShapeChannelData[] | null;
 }
 
 export interface FbxPrimitiveBuildData {
@@ -148,4 +165,8 @@ export interface FbxPrimitiveBuildData {
   rawJointWeights?: Float32Array | null;
   materialIndex: number;
   name: string;
+  numTargets?: number;
+  targets?: Partial<Record<number, { numComponents: number; data: Float32Array[] }>>;
+  targetBox?: { min: [number, number, number]; max: [number, number, number] }[];
+  morphAttribCount?: number;
 }
