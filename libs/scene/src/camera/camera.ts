@@ -1510,6 +1510,11 @@ export class Camera extends SceneNode {
       }
       Camera._historyData.delete(this);
     }
+    const historyResourceManager = Camera._historyResourceManager.get(this);
+    if (historyResourceManager) {
+      historyResourceManager.dispose();
+      Camera._historyResourceManager.delete(this);
+    }
     this._prevVPMatrix = null;
     this._prevPosition = null;
     this._prevJitteredVPMatrix = null;
@@ -1754,6 +1759,10 @@ export class Camera extends SceneNode {
    * @internal
    */
   setHistoryResourceManager(manager: HistoryResourceManager): void {
+    const current = Camera._historyResourceManager.get(this);
+    if (current && current !== manager) {
+      current.dispose();
+    }
     Camera._historyResourceManager.set(this, manager);
   }
   /** @internal */

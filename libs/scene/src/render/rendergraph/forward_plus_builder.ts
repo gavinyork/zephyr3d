@@ -539,6 +539,9 @@ function buildForwardPlusGraphInternal(
   const motionVectorHandle = depthPassResult.motionVectorHandle;
   const renderDepthAttachment =
     depthPassResult.graphDepthAttachmentHandle ?? depthPassResult.externalDepthAttachment ?? null;
+  const useFinalFramebufferAsIntermediate =
+    !!depthPassResult.externalDepthAttachment &&
+    depthPassResult.externalDepthAttachment === ctx.finalFramebuffer?.getDepthAttachment();
 
   let preLightTransmissionDepthToken: RGHandle | undefined;
   if (options.needsTransmissionDepthForSSR) {
@@ -759,9 +762,6 @@ function buildForwardPlusGraphInternal(
     const skinSSSHandle = writeSkinSSS
       ? builder.createTexture({ format: sssLightingFormat, label: 'skinSSS' })
       : undefined;
-    const useFinalFramebufferAsIntermediate =
-      !!depthPassResult.externalDepthAttachment &&
-      depthPassResult.externalDepthAttachment === ctx.finalFramebuffer?.getDepthAttachment();
     const sceneColorFramebufferHandle = useFinalFramebufferAsIntermediate
       ? undefined
       : builder.createFramebuffer({
@@ -869,7 +869,12 @@ function buildForwardPlusGraphInternal(
       builder.read(binding.handle);
     }
     const outputBackbuffer = builder.write(backbuffer);
+    const taaHistoryColorHandle = useFinalFramebufferAsIntermediate ? outputBackbuffer : sceneColorHandle;
     builder.setExecute((rgCtx) => {
+      const renderAndCommitComposite = () => {
+        renderComposite(frame);
+        queueTAAHistoryCommit(frame, rgCtx, historyManager, taaHistoryColorHandle, motionVectorHandle);
+      };
       if (historyManager && compositeHistoryReadBindings.length > 0) {
         historyManager.beginReadScope(
           compositeHistoryReadBindings.map((binding) => ({
@@ -878,12 +883,12 @@ function buildForwardPlusGraphInternal(
           }))
         );
         try {
-          renderComposite(frame);
+          renderAndCommitComposite();
         } finally {
           historyManager.endReadScope();
         }
       } else {
-        renderComposite(frame);
+        renderAndCommitComposite();
       }
     });
     return outputBackbuffer;
@@ -1369,6 +1374,49 @@ function renderMainLightPass(
 /** @internal */
 function renderTransmissionDepthPass(frame: FrameState, rgCtx: RGExecuteContext): void {
   renderSceneDepth(frame, frame.depthFramebuffer, rgCtx);
+}
+
+function queueTAAHistoryCommit(
+  frame: FrameState,
+  rgCtx: RGExecuteContext,
+  historyManager: Nullable<HistoryResourceManager<Texture2D>>,
+  colorHandle: RGHandle,
+  motionVectorHandle?: RGHandle
+): void {
+  const { ctx } = frame;
+  if (!historyManager?.frameActive || !ctx.camera.TAA || !frame.options.motionVectors || !motionVectorHandle) {
+    return;
+  }
+  const colorTexture = rgCtx.getTexture<Texture2D>(colorHandle);
+  const colorSize = { width: colorTexture.width, height: colorTexture.height };
+  historyManager.queueRetainedCommit(
+    RGHistoryResources.TAA_COLOR,
+    {
+      format: colorTexture.format,
+      sizeMode: 'absolute',
+      width: colorTexture.width,
+      height: colorTexture.height
+    },
+    colorSize,
+    colorTexture
+  );
+
+  const motionVectorTexture = rgCtx.getTexture<Texture2D>(motionVectorHandle);
+  const motionVectorSize = {
+    width: motionVectorTexture.width,
+    height: motionVectorTexture.height
+  };
+  historyManager.queueRetainedCommit(
+    RGHistoryResources.TAA_MOTION_VECTOR,
+    {
+      format: motionVectorTexture.format,
+      sizeMode: 'absolute',
+      width: motionVectorTexture.width,
+      height: motionVectorTexture.height
+    },
+    motionVectorSize,
+    motionVectorTexture
+  );
 }
 
 /** @internal */

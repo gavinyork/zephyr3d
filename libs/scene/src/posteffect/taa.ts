@@ -96,49 +96,20 @@ export class TAA extends AbstractPostEffect {
       ctx.device.setBindGroup(0, this._bindGroup);
       this.drawFullscreenQuad();
     }
-    const currentColorTex = ctx.device.getFramebuffer()!.getColorAttachments()[0] as Texture2D;
     if (useGraphHistory) {
-      const colorSize = { width: currentColorTex.width, height: currentColorTex.height };
-      historyManager.queueRetainedCommit(
-        RGHistoryResources.TAA_COLOR,
-        {
-          format: currentColorTex.format,
-          sizeMode: 'absolute',
-          width: currentColorTex.width,
-          height: currentColorTex.height
-        },
-        colorSize,
-        currentColorTex
-      );
-      if (ctx.motionVectorTexture) {
-        const motionVectorSize = {
-          width: ctx.motionVectorTexture.width,
-          height: ctx.motionVectorTexture.height
-        };
-        historyManager.queueRetainedCommit(
-          RGHistoryResources.TAA_MOTION_VECTOR,
-          {
-            format: ctx.motionVectorTexture.format,
-            sizeMode: 'absolute',
-            width: ctx.motionVectorTexture.width,
-            height: ctx.motionVectorTexture.height
-          },
-          motionVectorSize,
-          ctx.motionVectorTexture
-        );
-      }
-    } else {
-      if (data!.prevColorTex) {
-        ctx.device.pool.releaseTexture(data!.prevColorTex);
-      }
-      ctx.device.pool.retainTexture(currentColorTex);
-      data!.prevColorTex = currentColorTex;
-      if (data!.prevMotionVectorTex) {
-        ctx.device.pool.releaseTexture(data!.prevMotionVectorTex);
-      }
-      ctx.device.pool.retainTexture(ctx.motionVectorTexture!);
-      data!.prevMotionVectorTex = ctx.motionVectorTexture!;
+      return;
     }
+    const currentColorTex = ctx.device.getFramebuffer()!.getColorAttachments()[0] as Texture2D;
+    if (data!.prevColorTex) {
+      ctx.device.pool.releaseTexture(data!.prevColorTex);
+    }
+    ctx.device.pool.retainTexture(currentColorTex);
+    data!.prevColorTex = currentColorTex;
+    if (data!.prevMotionVectorTex) {
+      ctx.device.pool.releaseTexture(data!.prevMotionVectorTex);
+    }
+    ctx.device.pool.retainTexture(ctx.motionVectorTexture!);
+    data!.prevMotionVectorTex = ctx.motionVectorTexture!;
   }
   requireLinearDepthTexture(_ctx: DrawContext) {
     return true;
