@@ -166,7 +166,7 @@ export interface FbxPrimitiveBuildData {
   materialIndex: number;
   name: string;
   numTargets?: number;
-  targets?: Partial<Record<number, { numComponents: number; data: Float32Array[] }>>;
+  targets?: Partial<Record<number, { numComponents: number; data: Float32Array[]; indices?: Uint32Array[] }>>;
   targetBox?: { min: [number, number, number]; max: [number, number, number] }[];
   morphAttribCount?: number;
 }

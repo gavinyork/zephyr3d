@@ -1033,7 +1033,9 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
       vertices[semantic] = { format, data: new Float32Array(uv) };
     }
     let numTargets = 0;
-    let targets: Partial<Record<number, { numComponents: number; data: Float32Array[] }>> | undefined;
+    let targets:
+      | Partial<Record<number, { numComponents: number; data: Float32Array[]; indices?: Uint32Array[] }>>
+      | undefined;
     let targetBox:
       | {
           min: [number, number, number];
@@ -1042,14 +1044,17 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
       | undefined;
     let morphAttribCount = 0;
     if (morphTargets.length > 0) {
-      const numVertices = bucket.positions.length / 3;
       const positionTargets: Float32Array[] = [];
+      const positionTargetIndices: Uint32Array[] = [];
       const normalTargets: Float32Array[] = [];
+      const normalTargetIndices: Uint32Array[] = [];
       let hasNormalMorph = false;
       targetBox = [];
       for (const morphTarget of morphTargets) {
-        const positionData = new Float32Array(numVertices * 3);
-        const normalData = new Float32Array(numVertices * 3);
+        const positionIndexData: number[] = [];
+        const positionValueData: number[] = [];
+        const normalIndexData: number[] = [];
+        const normalValueData: number[] = [];
         let minX = 0;
         let minY = 0;
         let minZ = 0;
@@ -1075,24 +1080,24 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
             maxY = Math.max(maxY, TMP_VEC3_B.y);
             maxZ = Math.max(maxZ, TMP_VEC3_B.z);
             for (const vertexRef of mappedVertices) {
-              positionData[vertexRef * 3] = TMP_VEC3_B.x;
-              positionData[vertexRef * 3 + 1] = TMP_VEC3_B.y;
-              positionData[vertexRef * 3 + 2] = TMP_VEC3_B.z;
+              positionIndexData.push(vertexRef);
+              positionValueData.push(TMP_VEC3_B.x, TMP_VEC3_B.y, TMP_VEC3_B.z);
             }
             if (shape.normals && i < normalCount) {
               TMP_VEC3.setXYZ(shape.normals[i * 3] ?? 0, shape.normals[i * 3 + 1] ?? 0, shape.normals[i * 3 + 2] ?? 0);
               normalTransform.transformVector(TMP_VEC3, TMP_VEC4);
               hasNormalMorph = true;
               for (const vertexRef of mappedVertices) {
-                normalData[vertexRef * 3] = TMP_VEC4.x;
-                normalData[vertexRef * 3 + 1] = TMP_VEC4.y;
-                normalData[vertexRef * 3 + 2] = TMP_VEC4.z;
+                normalIndexData.push(vertexRef);
+                normalValueData.push(TMP_VEC4.x, TMP_VEC4.y, TMP_VEC4.z);
               }
             }
           }
         }
-        positionTargets.push(positionData);
-        normalTargets.push(normalData);
+        positionTargets.push(new Float32Array(positionValueData));
+        positionTargetIndices.push(new Uint32Array(positionIndexData));
+        normalTargets.push(new Float32Array(normalValueData));
+        normalTargetIndices.push(new Uint32Array(normalIndexData));
         targetBox.push({
           min: [minX, minY, minZ],
           max: [maxX, maxY, maxZ]
@@ -1102,14 +1107,16 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
       targets = {
         [MORPH_TARGET_POSITION]: {
           numComponents: 3,
-          data: positionTargets
+          data: positionTargets,
+          indices: positionTargetIndices
         }
       };
       morphAttribCount = 1;
       if (hasNormalMorph) {
-        targets[MORPH_TARGET_NORMAL] = {
+        targets![MORPH_TARGET_NORMAL] = {
           numComponents: 3,
-          data: normalTargets
+          data: normalTargets,
+          indices: normalTargetIndices
         };
         morphAttribCount++;
       }

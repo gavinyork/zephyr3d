@@ -124,10 +124,7 @@ export class MorphTargetTrack extends AnimationTrack<MorphState> {
   }
   /** {@inheritDoc AnimationTrack.applyState} */
   applyState(node: SceneNode, state: MorphState) {
-    (node as Mesh)
-      .getMorphInfo()!
-      .buffer!.get()!
-      .bufferSubData(4 * 4, state.weights);
+    (node as Mesh).updateMorphWeights(state.weights.subarray(0, state.numTargets));
     state.boundingBox.minPoint.addBy(this._originBox!.minPoint);
     state.boundingBox.maxPoint.addBy(this._originBox!.maxPoint);
     (node as Mesh).setAnimatedBoundingBox(state.boundingBox);

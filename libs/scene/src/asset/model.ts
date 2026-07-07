@@ -20,7 +20,7 @@ import type {
   VertexSemantic
 } from '@zephyr3d/device';
 import { getVertexFormatComponentCount } from '@zephyr3d/device';
-import { Mesh, type MorphSourceDescriptor } from '../scene/mesh';
+import { Mesh, type MorphSourceDescriptor, type MorphTargetSourceData } from '../scene/mesh';
 import { BoundingBox } from '../utility/bounding_volume';
 import type { ColliderR } from '../animation/joint_dynamics/types';
 import type { ControllerConfig } from '../animation/joint_dynamics/controller';
@@ -55,7 +55,6 @@ import { PBRSpecularGlossinessMaterial } from '../material/pbrsg';
 import { PBRMetallicRoughnessMaterial } from '../material/pbrmr';
 
 type ReimportResourcePools = Map<string, Set<string>>;
-const MAX_MORPH_TEXTURE_DATA_BYTES = 256 * 1024 * 1024;
 
 /**
  * Named object interface for model loading
@@ -282,7 +281,7 @@ export interface AssetSubMeshData {
   rawJointWeights: Nullable<TypedArray>;
   name: string;
   numTargets: number;
-  targets?: Partial<Record<number, { numComponents: number; data: Float32Array[] }>>;
+  targets?: Partial<Record<number, { numComponents: number; data: Float32Array[]; indices?: Uint32Array[] }>>;
   targetBox?: BoundingBox[];
   morphAttribCount?: number;
 }
@@ -2494,73 +2493,46 @@ export function applyMeshMorphMetadata(
   });
 }
 
-export function applyMeshMorphData(subMesh: AssetSubMeshData, mesh: Mesh) {
-  const numTargets = subMesh.numTargets;
+export function createMorphSourceDataFromSubMesh(subMesh: AssetSubMeshData): Nullable<MorphTargetSourceData> {
+  const numTargets = Math.min(subMesh.numTargets, getMorphTargetLimit());
   if (numTargets === 0 || !subMesh.targets) {
-    mesh.setMorphData(null);
-    return;
+    return null;
   }
-  const attributes = Object.getOwnPropertyNames(subMesh.targets);
   const positionInfo = subMesh.primitive!.vertices['position'];
   const numVertices = positionInfo
     ? (positionInfo.data.length / getVertexFormatComponentCount(positionInfo.format)) >> 0
     : 0;
-  const textureSize = Math.ceil(Math.sqrt(numVertices * attributes.length * numTargets));
-  if (textureSize > getDevice().getDeviceCaps().textureCaps.maxTextureSize) {
-    console.warn(
-      `Morph target data skipped for mesh "${subMesh.name ?? mesh.name ?? ''}": texture size ${textureSize} exceeds device limit`
-    );
-    mesh.setMorphData(null);
-    return;
-  }
-  const textureDataLength = textureSize * textureSize * 4;
-  const textureDataBytes = textureDataLength * 4;
-  if (textureDataBytes > MAX_MORPH_TEXTURE_DATA_BYTES) {
-    console.warn(
-      `Morph target data skipped for mesh "${subMesh.name ?? mesh.name ?? ''}": estimated allocation ${(
-        textureDataBytes /
-        1024 /
-        1024
-      ).toFixed(2)} MB exceeds safe limit ${(MAX_MORPH_TEXTURE_DATA_BYTES / 1024 / 1024).toFixed(0)} MB`
-    );
-    mesh.setMorphData(null);
-    return;
-  }
-  let textureData: Float32Array<ArrayBuffer>;
-  try {
-    textureData = new Float32Array(textureDataLength);
-  } catch (err) {
-    console.warn(
-      `Morph target data skipped for mesh "${subMesh.name ?? mesh.name ?? ''}": failed to allocate ${(
-        textureDataBytes /
-        1024 /
-        1024
-      ).toFixed(2)} MB`,
-      err
-    );
-    mesh.setMorphData(null);
-    return;
-  }
-  let offset = 0;
-  for (let attrib = 0; attrib < MAX_MORPH_ATTRIBUTES; attrib++) {
-    const index = attributes.indexOf(String(attrib));
-    if (index < 0) {
+  const targets: MorphTargetSourceData['targets'] = {};
+  for (const [attribKey, info] of Object.entries(subMesh.targets)) {
+    const attrib = Number(attribKey);
+    if (!info || !Number.isInteger(attrib) || attrib < 0) {
       continue;
     }
-    const info = subMesh.targets![attrib]!;
-    if (info.data.length !== numTargets) {
-      throw new Error('Invalid morph target data');
+    if (info.data.length < numTargets) {
+      console.error(`Invalid morph target data`);
+      return null;
     }
-    for (let t = 0; t < numTargets; t++) {
-      const data = info.data[t];
-      for (let i = 0; i < numVertices; i++) {
-        for (let j = 0; j < 4; j++) {
-          textureData[offset++] = j < info.numComponents ? data[i * info.numComponents + j] : 1;
-        }
-      }
-    }
+    targets[attrib] = {
+      numComponents: info.numComponents,
+      data: info.data.slice(0, numTargets),
+      indices: info.indices?.slice(0, numTargets)
+    };
   }
-  mesh.setMorphData({ width: textureSize, height: textureSize, data: textureData });
+  return {
+    numTargets,
+    numVertices,
+    targets
+  };
+}
+
+export function applyMeshMorphData(subMesh: AssetSubMeshData, mesh: Mesh) {
+  const sourceData = createMorphSourceDataFromSubMesh(subMesh);
+  if (!sourceData) {
+    mesh.setMorphData(null);
+    mesh.setMorphSourceData(null);
+    return;
+  }
+  mesh.setMorphSourceData(sourceData);
 }
 
 /** @internal */
@@ -2577,6 +2549,7 @@ function processMorphData(
   applyMeshMorphMetadata(subMesh, mesh, morphWeights, morphNames);
   mesh.setMorphSource(morphSource ?? null);
   if (morphSource) {
+    mesh.setMorphSourceData(null);
     mesh.setMorphData(null);
   } else {
     applyMeshMorphData(subMesh, mesh);
