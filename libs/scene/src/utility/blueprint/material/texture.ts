@@ -38,7 +38,7 @@ const defaultTexture2DArray: DRef<Texture2DArray> = new DRef();
  *
  * @returns A 1x1 white Texture2D instance
  *
- * @internal
+ * @public
  */
 export function getDefaultTexture2D(): Texture2D {
   if (!defaultTexture2D.get()) {
@@ -60,7 +60,7 @@ export function getDefaultTexture2D(): Texture2D {
  *
  * @returns A 1x1x1 white Texture2DArray instance
  *
- * @internal
+ * @public
  */
 export function getDefaultTexture2DArray(): Texture2DArray {
   if (!defaultTexture2DArray.get()) {
@@ -82,7 +82,7 @@ export function getDefaultTexture2DArray(): Texture2DArray {
  *
  * @returns A 1x1 white TextureCube instance
  *
- * @internal
+ * @public
  */
 export function getDefaultTextureCube(): TextureCube {
   if (!defaultTextureCube.get()) {
