@@ -1584,16 +1584,24 @@ function populateNodeTransforms(modelNode: AssetHierarchyNode, source: FbxModelD
   }
 }
 
-function createAssetNode(modelId: number, model: SharedModel, ctx: FbxImportContext) {
+function createAssetNode(modelId: number, model: SharedModel, ctx: FbxImportContext, recurseChildren = true) {
   const source = ctx.modelMap.get(modelId);
   if (!source) {
     return null;
   }
   const existing = ctx.nodeMap.get(modelId);
   if (existing) {
+    if (recurseChildren) {
+      for (const childId of source.children) {
+        createAssetNode(childId, model, ctx, true);
+      }
+    }
     return existing;
   }
-  const parent = source.parentId != null ? createAssetNode(source.parentId, model, ctx) : null;
+  // When creating a node on-demand from a skin cluster, build only the direct parent chain first.
+  // Otherwise an ancestor may eagerly recurse its full subtree before this node is registered,
+  // which can instantiate the same source path twice.
+  const parent = source.parentId != null ? createAssetNode(source.parentId, model, ctx, false) : null;
   const node: AssetHierarchyNode = new AssetHierarchyNode(
     source.name || `${source.type}_${modelId}`,
     model,
@@ -1609,8 +1617,10 @@ function createAssetNode(modelId: number, model: SharedModel, ctx: FbxImportCont
     node.mesh = createMeshData(geometry, source, model, ctx);
     node.skeleton = buildSkeleton(geometry, model, ctx);
   }
-  for (const childId of source.children) {
-    createAssetNode(childId, model, ctx);
+  if (recurseChildren) {
+    for (const childId of source.children) {
+      createAssetNode(childId, model, ctx, true);
+    }
   }
   return node;
 }
