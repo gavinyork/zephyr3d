@@ -75,6 +75,19 @@ function normalizeAssetNodePath(path: string) {
   return path.replace(/\\/g, '/').split('/').filter(Boolean).join('/');
 }
 
+function getSkinBindingKey(rig: SkeletonRig, joints: SceneNode[], inverseBindMatrices: Matrix4x4[]) {
+  const matrixKey = inverseBindMatrices
+    .map((matrix) => {
+      const elements: number[] = [];
+      for (let i = 0; i < 16; i++) {
+        elements.push(matrix[i]);
+      }
+      return elements.join(',');
+    })
+    .join('|');
+  return `${rig.persistentId}|${joints.map((joint) => joint.persistentId).join('|')}|${matrixKey}`;
+}
+
 function getAssetNodePath(node: Nullable<AssetHierarchyNode>) {
   const segments: string[] = [];
   let current = node;
@@ -1616,6 +1629,7 @@ export class SharedModel extends Disposable {
           }
         }
         const rigMap = new Map<string, SkeletonRig>();
+        const bindingMap = new Map<string, SkinBinding>();
         for (const v of skeletonMeshMap) {
           const sk = v[0];
           const joints = sk.joints.map((val) => {
@@ -1633,7 +1647,13 @@ export class SharedModel extends Disposable {
             rigMap.set(rigKey, rig);
             group.animationSet.rigs.push(new DRef(rig));
           }
-          const binding = new SkinBinding(rig, sk.inverseBindMatrices, joints);
+          const bindingKey = getSkinBindingKey(rig, joints, sk.inverseBindMatrices);
+          let binding = bindingMap.get(bindingKey);
+          if (!binding) {
+            binding = new SkinBinding(rig, sk.inverseBindMatrices, joints);
+            bindingMap.set(bindingKey, binding);
+            group.animationSet.skeletons.push(new DRef(binding));
+          }
           const nodes = skeletonMeshMap.get(sk);
           if (nodes) {
             if (!nodes.binding) {
@@ -1650,7 +1670,6 @@ export class SharedModel extends Disposable {
               }
             }
           }
-          group.animationSet.skeletons.push(new DRef(nodes!.binding));
         }
       }
       if (saveAnimations) {
