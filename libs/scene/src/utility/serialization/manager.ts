@@ -1357,82 +1357,92 @@ export class ResourceManager {
         continue;
       }
       const k = prop.name;
-      const v = json[k] ?? this.getDefaultValue(obj, prop);
-      const tmpVal: RequireOptionals<PropertyValue> = {
-        num: [0, 0, 0, 0],
-        str: [''],
-        bool: [false],
-        object: [null]
-      };
-      switch (prop.type) {
-        case 'object':
-          if (typeof v === 'string' && v) {
-            tmpVal.str[0] = v;
-          } else {
-            tmpVal.object[0] = v
-              ? Array.isArray(v)
-                ? v
-                : this.isSerializedObjectEnvelope(v)
-                  ? ((await this.deserializeObject<any>(obj, v)) ?? null)
-                  : v
-              : null;
-          }
-          break;
-        case 'object_array':
-          tmpVal.object = [];
-          if (Array.isArray(v)) {
-            for (const p of v) {
-              if (typeof p === 'string' && p) {
-                tmpVal.str[0] = p;
-              } else {
-                tmpVal.object.push(
-                  p
-                    ? this.isSerializedObjectEnvelope(p)
-                      ? ((await this.deserializeObject<any>(obj, p)) ?? null)
-                      : p
-                    : null
-                );
-              }
+      promises.push(
+        (async () => {
+          try {
+            const v = json[k] ?? this.getDefaultValue(obj, prop);
+            const tmpVal: RequireOptionals<PropertyValue> = {
+              num: [0, 0, 0, 0],
+              str: [''],
+              bool: [false],
+              object: [null]
+            };
+            switch (prop.type) {
+              case 'object':
+                if (typeof v === 'string' && v) {
+                  tmpVal.str[0] = v;
+                } else {
+                  tmpVal.object[0] = v
+                    ? Array.isArray(v)
+                      ? v
+                      : this.isSerializedObjectEnvelope(v)
+                        ? ((await this.deserializeObject<any>(obj, v)) ?? null)
+                        : v
+                    : null;
+                }
+                break;
+              case 'object_array':
+                tmpVal.object = [];
+                if (Array.isArray(v)) {
+                  for (const p of v) {
+                    if (typeof p === 'string' && p) {
+                      tmpVal.str[0] = p;
+                    } else {
+                      tmpVal.object.push(
+                        p
+                          ? this.isSerializedObjectEnvelope(p)
+                            ? ((await this.deserializeObject<any>(obj, p)) ?? null)
+                            : p
+                          : null
+                      );
+                    }
+                  }
+                }
+                break;
+              case 'embedded':
+                if (typeof v === 'string' && v) {
+                  tmpVal.str[0] = v;
+                }
+                break;
+              case 'float':
+              case 'int':
+                tmpVal.num[0] = v;
+                break;
+              case 'string':
+                tmpVal.str[0] = v;
+                break;
+              case 'bool':
+                tmpVal.bool[0] = v;
+                break;
+              case 'vec2':
+              case 'int2':
+                tmpVal.num[0] = v[0];
+                tmpVal.num[1] = v[1];
+                break;
+              case 'vec3':
+              case 'int3':
+              case 'rgb':
+                tmpVal.num[0] = v[0];
+                tmpVal.num[1] = v[1];
+                tmpVal.num[2] = v[2];
+                break;
+              case 'vec4':
+              case 'int4':
+              case 'rgba':
+                tmpVal.num[0] = v[0];
+                tmpVal.num[1] = v[1];
+                tmpVal.num[2] = v[2];
+                tmpVal.num[3] = v[3];
+                break;
             }
+            await Promise.resolve(prop.set.call(obj, tmpVal, -1));
+          } catch (err) {
+            console.warn(
+              `Deserialize property failed: ${cls.name}.${k} on ${obj?.constructor?.name ?? 'UnknownObject'}: ${String(err)}`
+            );
           }
-          break;
-        case 'embedded':
-          if (typeof v === 'string' && v) {
-            tmpVal.str[0] = v;
-          }
-          break;
-        case 'float':
-        case 'int':
-          tmpVal.num[0] = v;
-          break;
-        case 'string':
-          tmpVal.str[0] = v;
-          break;
-        case 'bool':
-          tmpVal.bool[0] = v;
-          break;
-        case 'vec2':
-        case 'int2':
-          tmpVal.num[0] = v[0];
-          tmpVal.num[1] = v[1];
-          break;
-        case 'vec3':
-        case 'int3':
-        case 'rgb':
-          tmpVal.num[0] = v[0];
-          tmpVal.num[1] = v[1];
-          tmpVal.num[2] = v[2];
-          break;
-        case 'vec4':
-        case 'int4':
-        case 'rgba':
-          tmpVal.num[0] = v[0];
-          tmpVal.num[1] = v[1];
-          tmpVal.num[2] = v[2];
-          tmpVal.num[3] = v[3];
-          break;
-      }
-      promises.push(Promise.resolve(prop.set.call(obj, tmpVal, -1)));
+        })()
+      );
     }
     if (promises.length > 0) {
       await Promise.all(promises);

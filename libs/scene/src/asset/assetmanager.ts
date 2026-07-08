@@ -1065,13 +1065,18 @@ export class AssetManager {
   ): Promise<BluePrintUniformTexture[]> {
     const uniformTextures: BluePrintUniformTexture[] = [];
     for (const v of textures ?? []) {
-      const tex =
-        (v.texture
-          ? await this.fetchTexture(v.texture, {
-              linearColorSpace: !v.sRGB,
-              overrideVFS: vfs
-            })
-          : null) ?? getDefaultTexture2D();
+      let tex: Nullable<BaseTexture> = null;
+      if (v.texture) {
+        try {
+          tex = await this.fetchTexture(v.texture, {
+            linearColorSpace: !v.sRGB,
+            overrideVFS: vfs
+          });
+        } catch (err) {
+          console.warn(`Load blueprint texture failed: ${v.texture}: ${String(err)}`);
+        }
+      }
+      tex = tex ?? getDefaultTexture2D();
       uniformTextures.push({
         ...v,
         exposed: v.exposed ?? true,
