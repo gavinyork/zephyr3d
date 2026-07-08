@@ -61,8 +61,8 @@ export interface MorphBoundingInfo {
  */
 export interface MorphSourceDescriptor {
   sourcePath: string;
-  nodeIndex: number;
-  subMeshIndex: number;
+  nodePath: string;
+  subMeshName: string;
 }
 
 /**

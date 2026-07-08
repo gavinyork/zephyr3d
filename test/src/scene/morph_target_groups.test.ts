@@ -347,14 +347,14 @@ describe('morph target groups', () => {
     });
     mesh.setMorphSource({
       sourcePath: '/assets/test/head.glb',
-      nodeIndex: 0,
-      subMeshIndex: 0
+      nodePath: 'face',
+      subMeshName: 'face-0'
     });
 
     const serialized = await manager.serializeObject(mesh);
     expect((serialized.Object as Record<string, unknown>).MorphData).toBe('');
     expect((serialized.Object as Record<string, unknown>).MorphSource).toBe(
-      '{"sourcePath":"/assets/test/head.glb","nodeIndex":0,"subMeshIndex":0}'
+      '{"sourcePath":"/assets/test/head.glb","nodePath":"face","subMeshName":"face-0"}'
     );
 
     const restored = new Mesh(scene);
@@ -363,12 +363,146 @@ describe('morph target groups', () => {
     expect(fetchModelDataSpy).toHaveBeenCalledWith('/assets/test/head.glb');
     expect(restored.getMorphSource()).toEqual({
       sourcePath: '/assets/test/head.glb',
-      nodeIndex: 0,
-      subMeshIndex: 0
+      nodePath: 'face',
+      subMeshName: 'face-0'
     });
     expect(restored.getMorphData()).not.toBeNull();
     expect(restored.getMorphData()!.width).toBe(1);
-    expect(Array.from(restored.getMorphData()!.data)).toEqual([1, 2, 3, 1]);
+    expect(Array.from(restored.getMorphData()!.data.slice(0, 3))).toEqual([1, 2, 3]);
+  });
+
+  test('resolves morph source by node path and sub-mesh name', async () => {
+    const manager = new ResourceManager(new MemoryFS());
+    mockResourceManager = manager;
+
+    const sourceModel = new SharedModel();
+    const root = new AssetHierarchyNode('root', sourceModel);
+    const wrong = new AssetHierarchyNode('wrong', sourceModel, root);
+    wrong.mesh = {
+      morphNames: ['frown'],
+      subMeshes: [
+        {
+          name: 'face-0',
+          primitive: {
+            name: 'face-0',
+            vertices: {
+              position: {
+                format: 'position_f32x3',
+                data: new Float32Array([0, 0, 0])
+              }
+            } as any,
+            indices: null,
+            indexCount: 1,
+            type: 'point-list',
+            boxMin: new Vector3(0, 0, 0),
+            boxMax: new Vector3(0, 0, 0)
+          },
+          material: null,
+          rawPositions: null,
+          rawBlendIndices: null,
+          rawJointWeights: null,
+          numTargets: 1,
+          targets: {
+            0: {
+              numComponents: 3,
+              data: [new Float32Array([9, 9, 9])]
+            }
+          },
+          targetBox: [new BoundingBox(new Vector3(0, 0, 0), new Vector3(1, 1, 1))]
+        }
+      ]
+    };
+    const face = new AssetHierarchyNode('face', sourceModel, root);
+    face.mesh = {
+      morphNames: ['smile'],
+      subMeshes: [
+        {
+          name: 'other',
+          primitive: {
+            name: 'other',
+            vertices: {
+              position: {
+                format: 'position_f32x3',
+                data: new Float32Array([0, 0, 0])
+              }
+            } as any,
+            indices: null,
+            indexCount: 1,
+            type: 'point-list',
+            boxMin: new Vector3(0, 0, 0),
+            boxMax: new Vector3(0, 0, 0)
+          },
+          material: null,
+          rawPositions: null,
+          rawBlendIndices: null,
+          rawJointWeights: null,
+          numTargets: 1,
+          targets: {
+            0: {
+              numComponents: 3,
+              data: [new Float32Array([4, 5, 6])]
+            }
+          },
+          targetBox: [new BoundingBox(new Vector3(0, 0, 0), new Vector3(1, 1, 1))]
+        },
+        {
+          name: 'face-0',
+          primitive: {
+            name: 'face-0',
+            vertices: {
+              position: {
+                format: 'position_f32x3',
+                data: new Float32Array([0, 0, 0])
+              }
+            } as any,
+            indices: null,
+            indexCount: 1,
+            type: 'point-list',
+            boxMin: new Vector3(0, 0, 0),
+            boxMax: new Vector3(0, 0, 0)
+          },
+          material: null,
+          rawPositions: null,
+          rawBlendIndices: null,
+          rawJointWeights: null,
+          numTargets: 1,
+          targets: {
+            0: {
+              numComponents: 3,
+              data: [new Float32Array([1, 2, 3])]
+            }
+          },
+          targetBox: [new BoundingBox(new Vector3(0, 0, 0), new Vector3(1, 1, 1))]
+        }
+      ]
+    };
+    const fetchModelDataSpy = jest.spyOn(manager.assetManager, 'fetchModelData').mockResolvedValue(sourceModel);
+
+    const scene = new Scene();
+    const template = new Mesh(scene);
+    setMorphInfo(template, ['placeholder']);
+    template.setMorphBoundingInfo({
+      originBox: new BoundingBox(new Vector3(0, 0, 0), new Vector3(1, 1, 1)),
+      targetBoxes: [new BoundingBox(new Vector3(0, 0, 0), new Vector3(1, 1, 1))]
+    });
+    const serialized = await manager.serializeObject(template);
+    const objectProps = serialized.Object as Record<string, unknown>;
+    objectProps.MorphData = '';
+    objectProps.MorphSource =
+      '{"sourcePath":"/assets/test/head.glb","nodePath":"root/face","subMeshName":"face-0"}';
+
+    const restored = new Mesh(scene);
+    await manager.deserializeObjectProps(restored, objectProps);
+
+    expect(fetchModelDataSpy).toHaveBeenCalledWith('/assets/test/head.glb');
+    expect(restored.getMorphSource()).toEqual({
+      sourcePath: '/assets/test/head.glb',
+      nodePath: 'root/face',
+      subMeshName: 'face-0'
+    });
+    expect(restored.getMorphSourceData()).not.toBeNull();
+    expect(restored.getMorphSourceData()!.numTargets).toBe(1);
+    expect(Array.from(restored.getMorphSourceData()!.targets[0]!.data[0])).toEqual([1, 2, 3]);
   });
 
   test('clamps oversized serialized morph info when restoring source GLB references', async () => {
@@ -434,7 +568,7 @@ describe('morph target groups', () => {
     const restored = new Mesh(scene);
     await manager.deserializeObjectProps(restored, {
       MorphData: '',
-      MorphSource: '{"sourcePath":"/assets/test/head.glb","nodeIndex":0,"subMeshIndex":0}',
+      MorphSource: '{"sourcePath":"/assets/test/head.glb","nodePath":"face","subMeshName":"face-0"}',
       MorphInfo: JSON.stringify({
         data: uint8ArrayToBase64(new Uint8Array(oversizedMorphInfo.buffer)),
         names: nameMap

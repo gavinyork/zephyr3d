@@ -1,6 +1,11 @@
 import { base64ToUint8Array, uint8ArrayToBase64, Vector3, mimeTypeOf } from '@zephyr3d/base';
 import { getEngine } from '../../../app/api';
-import { applyMeshMorphData, applyMeshMorphMetadata } from '../../../asset/model';
+import {
+  applyMeshMorphData,
+  applyMeshMorphMetadata,
+  type AssetHierarchyNode,
+  type AssetSubMeshData
+} from '../../../asset/model';
 import type { MeshMaterial } from '../../../material/meshmaterial';
 import { GraphNode, Mesh, type MorphSourceDescriptor, type MorphTargetSourceData, type SceneNode } from '../../../scene';
 import type { ResourceManager } from '../manager';
@@ -36,6 +41,66 @@ function encodeUint32Array(data: Uint32Array): string {
 function decodeUint32Array(data: string): Uint32Array {
   const bytes = base64ToUint8Array(data);
   return new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
+}
+
+function normalizeNodePath(path: string) {
+  return path.replace(/\\/g, '/').split('/').filter(Boolean).join('/');
+}
+
+function getNodePathCandidates(path: string) {
+  const normalized = normalizeNodePath(path);
+  const candidates = [normalized];
+  if (normalized.endsWith('Shape')) {
+    candidates.push(normalized.slice(0, -'Shape'.length));
+  }
+  const parts = normalized.split('/');
+  const last = parts.length > 0 ? parts[parts.length - 1] : '';
+  if (last.endsWith('Shape') && parts.length > 1) {
+    parts[parts.length - 1] = last.slice(0, -'Shape'.length);
+    candidates.push(parts.join('/'));
+    parts.pop();
+    candidates.push(parts.join('/'));
+  }
+  return candidates.filter((value, index, array) => !!value && array.indexOf(value) === index);
+}
+
+function getAssetNodePath(node: Pick<AssetHierarchyNode, 'name' | 'parent'>) {
+  const segments: string[] = [];
+  let current: Pick<AssetHierarchyNode, 'name' | 'parent'> | null | undefined = node;
+  while (current) {
+    if (current.name) {
+      segments.push(current.name);
+    }
+    current = current.parent;
+  }
+  return normalizeNodePath(segments.reverse().join('/'));
+}
+
+function resolveMorphSourceSubMesh(subMeshes: AssetSubMeshData[], subMeshName: string) {
+  return subMeshes.find((subMesh) => (subMesh?.name ?? '') === subMeshName) ?? null;
+}
+
+function resolveMorphSource(nodes: AssetHierarchyNode[], source: MorphSourceDescriptor) {
+  if (!source.nodePath || !source.subMeshName) {
+    return null;
+  }
+  for (const candidatePath of getNodePathCandidates(source.nodePath)) {
+    for (const node of nodes) {
+      const mesh = node?.mesh;
+      if (!mesh || getAssetNodePath(node) !== candidatePath) {
+        continue;
+      }
+      const subMesh = resolveMorphSourceSubMesh(mesh.subMeshes, source.subMeshName);
+      if (subMesh) {
+        return {
+          node,
+          mesh,
+          subMesh
+        };
+      }
+    }
+  }
+  return null;
 }
 
 function serializeMorphSourceData(data: MorphTargetSourceData) {
@@ -228,13 +293,12 @@ export function getMeshClass(manager: ResourceManager): SerializableClass {
             const source = JSON.parse(value.str[0]) as MorphSourceDescriptor;
             this.setMorphSource(source);
             const sourceModel = await manager.assetManager.fetchModelData(source.sourcePath);
-            const sourceNode = sourceModel.nodes[source.nodeIndex];
-            const sourceMesh = sourceNode?.mesh;
-            const sourceSubMesh = sourceMesh?.subMeshes[source.subMeshIndex];
+            const resolvedSource = resolveMorphSource(sourceModel.nodes, source);
+            const sourceNode = resolvedSource?.node;
+            const sourceMesh = resolvedSource?.mesh;
+            const sourceSubMesh = resolvedSource?.subMesh;
             if (!sourceNode || !sourceMesh || !sourceSubMesh) {
-              throw new Error(
-                `Morph source not found: ${source.sourcePath}#${source.nodeIndex}/${source.subMeshIndex}`
-              );
+              throw new Error(`Morph source not found: ${source.sourcePath}#${source.nodePath}/${source.subMeshName}`);
             }
             if (!this.getMorphInfo() || !this.getMorphBoundingInfo()) {
               applyMeshMorphMetadata(

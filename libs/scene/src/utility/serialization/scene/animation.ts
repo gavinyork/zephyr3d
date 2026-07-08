@@ -464,7 +464,7 @@ export function getJointDynamicsModifierClass(): SerializableClass {
         return { obj: null, loadProps: false };
       }
       const chains = (init.chains ?? [])
-        .map((chain) => {
+        .map((chain): JointDynamicSystemConfig['chainConfig']['chains'][number] | null => {
           const start = findSerializedNode(ctx, chain.start);
           const end = findSerializedNode(ctx, chain.end);
           const startAnchor = findSerializedNode(ctx, chain.startAnchor);
@@ -482,12 +482,7 @@ export function getJointDynamicsModifierClass(): SerializableClass {
               }
             : null;
         })
-        .filter((chain): chain is {
-          start: SceneNode;
-          end: SceneNode;
-          startAnchor?: SceneNode;
-          endAnchor?: SceneNode;
-        } => {
+        .filter((chain): chain is JointDynamicSystemConfig['chainConfig']['chains'][number] => {
           return !!chain && chain.start.isParentOf(chain.end);
         });
       if (chains.length === 0) {

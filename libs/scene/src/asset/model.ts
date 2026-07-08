@@ -71,6 +71,22 @@ export class NamedObject {
   }
 }
 
+function normalizeAssetNodePath(path: string) {
+  return path.replace(/\\/g, '/').split('/').filter(Boolean).join('/');
+}
+
+function getAssetNodePath(node: Nullable<AssetHierarchyNode>) {
+  const segments: string[] = [];
+  let current = node;
+  while (current) {
+    if (current.name) {
+      segments.push(current.name);
+    }
+    current = current.parent;
+  }
+  return normalizeAssetNodePath(segments.reverse().join('/'));
+}
+
 /**
  * Texture sampler settings for model loading.
  * @public
@@ -1970,7 +1986,7 @@ export class SharedModel extends Disposable {
         (this as SharedModelWithPreprocessOptions)._preprocessOptions?.sourceMorphReferenceAssetPath ?? null;
       const meshData = assetNode.mesh;
       const skeleton = saveSkeletons ? assetNode.skeleton : null;
-      for (const [subMeshIndex, subMesh] of meshData.subMeshes.entries()) {
+      for (const subMesh of meshData.subMeshes) {
         if (assetNode.instances.length === 0) {
           assetNode.instances.push({ t: Vector3.zero(), s: Vector3.one(), r: Quaternion.identity() });
         }
@@ -2003,11 +2019,18 @@ export class SharedModel extends Disposable {
           setSceneMeshAssetBinding(meshNode, { node: assetNode, mesh: meshData, subMesh });
           const morphSource: MorphSourceDescriptor | null =
             sourceMorphReferenceAssetPath && subMesh.numTargets > 0
-              ? {
-                  sourcePath: sourceMorphReferenceAssetPath,
-                  nodeIndex: this._nodes.indexOf(assetNode),
-                  subMeshIndex
-                }
+              ? (() => {
+                  const nodePath = getAssetNodePath(assetNode);
+                  const subMeshName = subMesh.name;
+                  if (!nodePath || !subMeshName) {
+                    return null;
+                  }
+                  return {
+                    sourcePath: sourceMorphReferenceAssetPath,
+                    nodePath,
+                    subMeshName
+                  };
+                })()
               : null;
           processMorphData(
             subMesh,
