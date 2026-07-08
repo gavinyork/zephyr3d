@@ -1,4 +1,11 @@
-import type { FbxConnection, FbxDocument, FbxNode, FbxObjectMap, FbxPropertyValue } from './types';
+import type {
+  FbxConnection,
+  FbxDocument,
+  FbxGlobalSettings,
+  FbxNode,
+  FbxObjectMap,
+  FbxPropertyValue
+} from './types';
 
 const FBX_BINARY_MAGIC = 'Kaydara FBX Binary  \0';
 
@@ -369,6 +376,35 @@ function getVersion(root: FbxNode) {
   return Number.isFinite(version) ? version : 0;
 }
 
+function getProperty70Scalar(node: FbxNode | null, propertyName: string) {
+  const props70 = node ? getChild(node, 'Properties70') : null;
+  if (!props70) {
+    return null;
+  }
+  for (const prop of getChildren(props70, 'P')) {
+    if (String(prop.properties[0] ?? '') !== propertyName) {
+      continue;
+    }
+    const value = prop.properties[4];
+    if (typeof value === 'bigint') {
+      return Number(value);
+    }
+    if (typeof value === 'number') {
+      return value;
+    }
+    return null;
+  }
+  return null;
+}
+
+function getGlobalSettings(root: FbxNode): FbxGlobalSettings {
+  const globalSettings = getChild(root, 'GlobalSettings');
+  const unitScaleFactor = getProperty70Scalar(globalSettings, 'UnitScaleFactor');
+  return {
+    unitScaleFactor: Number.isFinite(unitScaleFactor) ? unitScaleFactor ?? undefined : undefined
+  };
+}
+
 export async function parseFbx(buffer: ArrayBuffer): Promise<FbxDocument> {
   let root: FbxNode;
   if (isBinaryFbx(buffer)) {
@@ -396,6 +432,7 @@ export async function parseFbx(buffer: ArrayBuffer): Promise<FbxDocument> {
     version: getVersion(root),
     root,
     objects: buildObjectMap(root),
-    connections: buildConnections(root)
+    connections: buildConnections(root),
+    globalSettings: getGlobalSettings(root)
   };
 }

@@ -33,11 +33,16 @@ export interface FbxObjectMap {
   [type: string]: Map<number, FbxNode>;
 }
 
+export interface FbxGlobalSettings {
+  unitScaleFactor?: number;
+}
+
 export interface FbxDocument {
   version: number;
   root: FbxNode;
   objects: FbxObjectMap;
   connections: FbxConnection[];
+  globalSettings: FbxGlobalSettings;
 }
 
 export interface FbxLayerElementData<T extends Float32Array | Int32Array | Uint32Array> {

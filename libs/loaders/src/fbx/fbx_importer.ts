@@ -47,6 +47,7 @@ import type {
 
 type FbxImportContext = {
   document: FbxDocument;
+  unitScale: number;
   objects: FbxObjectMap;
   connectionChildren: Map<number, FbxConnection[]>;
   connectionParents: Map<number, FbxConnection[]>;
@@ -202,6 +203,18 @@ function toRadiansTuple(value: [number, number, number]): [number, number, numbe
   return [(value[0] * Math.PI) / 180, (value[1] * Math.PI) / 180, (value[2] * Math.PI) / 180];
 }
 
+function scaleTuple3(value: [number, number, number], unitScale: number): [number, number, number] {
+  if (unitScale === 1) {
+    return value;
+  }
+  return [value[0] * unitScale, value[1] * unitScale, value[2] * unitScale];
+}
+
+function getDocumentUnitScale(document: FbxDocument) {
+  const unitScaleFactor = document.globalSettings.unitScaleFactor;
+  return Number.isFinite(unitScaleFactor) && unitScaleFactor! > 0 ? unitScaleFactor! * 0.01 : 1;
+}
+
 function getEulerOrder(order: number): EulerAngleOrder {
   // FBX stores extrinsic Euler orders; Quaternion.fromEulerAngle expects the equivalent
   // intrinsic order, matching the conversion used by three.js FBXLoader.
@@ -246,26 +259,37 @@ function matrixFromTRS(
   );
 }
 
-function readTransformData(node: FbxNode): FbxTransformData {
+function readTransformData(node: FbxNode, unitScale: number): FbxTransformData {
   const lclTranslation = getProperty70Value(node, 'Lcl Translation', [0, 0, 0]) as [number, number, number];
   const lclRotation = getProperty70Value(node, 'Lcl Rotation', [0, 0, 0]) as [number, number, number];
   const lclScaling = getProperty70Value(node, 'Lcl Scaling', [1, 1, 1]) as [number, number, number];
   return {
-    translation: lclTranslation,
+    translation: scaleTuple3(lclTranslation, unitScale),
     rotation: lclRotation,
     scale: lclScaling,
     preRotation: getProperty70Value(node, 'PreRotation', [0, 0, 0]) as [number, number, number],
     postRotation: getProperty70Value(node, 'PostRotation', [0, 0, 0]) as [number, number, number],
-    rotationOffset: getProperty70Value(node, 'RotationOffset', [0, 0, 0]) as [number, number, number],
-    rotationPivot: getProperty70Value(node, 'RotationPivot', [0, 0, 0]) as [number, number, number],
-    scalingOffset: getProperty70Value(node, 'ScalingOffset', [0, 0, 0]) as [number, number, number],
-    scalingPivot: getProperty70Value(node, 'ScalingPivot', [0, 0, 0]) as [number, number, number],
+    rotationOffset: scaleTuple3(
+      getProperty70Value(node, 'RotationOffset', [0, 0, 0]) as [number, number, number],
+      unitScale
+    ),
+    rotationPivot: scaleTuple3(
+      getProperty70Value(node, 'RotationPivot', [0, 0, 0]) as [number, number, number],
+      unitScale
+    ),
+    scalingOffset: scaleTuple3(
+      getProperty70Value(node, 'ScalingOffset', [0, 0, 0]) as [number, number, number],
+      unitScale
+    ),
+    scalingPivot: scaleTuple3(
+      getProperty70Value(node, 'ScalingPivot', [0, 0, 0]) as [number, number, number],
+      unitScale
+    ),
     rotationOrder: asNumber(getProperty70Value(node, 'RotationOrder', 0), 0),
-    geometricTranslation: getProperty70Value(node, 'GeometricTranslation', [0, 0, 0]) as [
-      number,
-      number,
-      number
-    ],
+    geometricTranslation: scaleTuple3(
+      getProperty70Value(node, 'GeometricTranslation', [0, 0, 0]) as [number, number, number],
+      unitScale
+    ),
     geometricRotation: getProperty70Value(node, 'GeometricRotation', [0, 0, 0]) as [number, number, number],
     geometricScaling: getProperty70Value(node, 'GeometricScaling', [1, 1, 1]) as [number, number, number],
     inheritType: asNumber(getProperty70Value(node, 'InheritType', 0), 0)
@@ -561,7 +585,7 @@ function readModelData(node: FbxNode, ctx: FbxImportContext) {
     type: asString(node.properties[2], ''),
     parentId: parentConnection?.to ?? null,
     children: childConnections.map((connection) => connection.from),
-    transform: readTransformData(node)
+    transform: readTransformData(node, ctx.unitScale)
   } as FbxModelData;
 }
 
@@ -847,7 +871,7 @@ function buildSkinData(geometry: FbxGeometryData) {
   return { clusterList, influences };
 }
 
-function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPrimitiveBuildData[] {
+function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData, unitScale: number): FbxPrimitiveBuildData[] {
   const morphTargets = geometry.morphTargets ?? [];
   const materialBuckets = new Map<
     number,
@@ -913,9 +937,9 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
     const baseIndex = bucket.positions.length / 3;
     for (let localIndex = 0; localIndex < polygon.length; localIndex++) {
       const cpIndex = polygon[localIndex];
-      positionScratch[0] = controlPoints[cpIndex * 3] ?? 0;
-      positionScratch[1] = controlPoints[cpIndex * 3 + 1] ?? 0;
-      positionScratch[2] = controlPoints[cpIndex * 3 + 2] ?? 0;
+      positionScratch[0] = (controlPoints[cpIndex * 3] ?? 0) * unitScale;
+      positionScratch[1] = (controlPoints[cpIndex * 3 + 1] ?? 0) * unitScale;
+      positionScratch[2] = (controlPoints[cpIndex * 3 + 2] ?? 0) * unitScale;
       TMP_VEC3.setXYZ(positionScratch[0], positionScratch[1], positionScratch[2]);
       geometryTransform.transformPointAffine(TMP_VEC3, TMP_VEC3_B);
       bucket.positions.push(TMP_VEC3_B.x, TMP_VEC3_B.y, TMP_VEC3_B.z);
@@ -1071,7 +1095,11 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData): FbxPri
             if (!mappedVertices || mappedVertices.length === 0) {
               continue;
             }
-            TMP_VEC3.setXYZ(shape.vertices[i * 3] ?? 0, shape.vertices[i * 3 + 1] ?? 0, shape.vertices[i * 3 + 2] ?? 0);
+            TMP_VEC3.setXYZ(
+              (shape.vertices[i * 3] ?? 0) * unitScale,
+              (shape.vertices[i * 3 + 1] ?? 0) * unitScale,
+              (shape.vertices[i * 3 + 2] ?? 0) * unitScale
+            );
             geometryTransform.transformVectorAffine(TMP_VEC3, TMP_VEC3_B);
             minX = Math.min(minX, TMP_VEC3_B.x);
             minY = Math.min(minY, TMP_VEC3_B.y);
@@ -1201,11 +1229,25 @@ function matrixFromFloat64Array(array: Nullable<Float64Array | Float32Array>) {
   return matrix;
 }
 
-function resolveClusterInverseBind(cluster: FbxClusterData, jointNode: Nullable<AssetHierarchyNode>) {
+function matrixFromFloat64ArrayScaled(array: Nullable<Float64Array | Float32Array>, unitScale: number) {
+  const matrix = matrixFromFloat64Array(array);
+  if (unitScale !== 1) {
+    matrix[12] *= unitScale;
+    matrix[13] *= unitScale;
+    matrix[14] *= unitScale;
+  }
+  return matrix;
+}
+
+function resolveClusterInverseBind(
+  cluster: FbxClusterData,
+  jointNode: Nullable<AssetHierarchyNode>,
+  unitScale: number
+) {
   // FBX cluster Transform is the geometry node bind matrix. We already bake the geometry
   // transform into mesh vertices, so inverse bind should come from the link node only.
   if (cluster.transformLink) {
-    return matrixFromFloat64Array(cluster.transformLink).inplaceInvertAffine();
+    return matrixFromFloat64ArrayScaled(cluster.transformLink, unitScale).inplaceInvertAffine();
   }
   if (jointNode?.worldMatrix) {
     return new Matrix4x4(jointNode.worldMatrix).inplaceInvertAffine();
@@ -1252,7 +1294,7 @@ function applyClusterBindPose(
   if (!bindWorldOverride && !cluster.transformLink) {
     return;
   }
-  const bindWorld = bindWorldOverride ?? matrixFromFloat64Array(cluster.transformLink ?? null);
+  const bindWorld = bindWorldOverride ?? matrixFromFloat64ArrayScaled(cluster.transformLink ?? null, ctx.unitScale);
   const source = ctx.modelMap.get(cluster.boneModelId);
   const parentWorld =
     source?.parentId != null ? computeModelWorldMatrix(source.parentId, ctx, ctx.bindWorldCache) : null;
@@ -1273,7 +1315,7 @@ function buildBindWorldMap(ctx: FbxImportContext) {
       return;
     }
     if (overwrite || !ctx.bindWorldMap.has(modelId)) {
-      ctx.bindWorldMap.set(modelId, matrixFromFloat64Array(matrix));
+      ctx.bindWorldMap.set(modelId, matrixFromFloat64ArrayScaled(matrix, ctx.unitScale));
     }
   };
 
@@ -1356,7 +1398,8 @@ function buildSkeleton(geometry: FbxGeometryData, model: SharedModel, ctx: FbxIm
     }
     applyClusterBindPose(cluster, jointNode, ctx);
     const cacheKey = `${geometry.id}:${cluster.boneModelId}`;
-    const inverseBind = ctx.jointBindMatrices.get(cacheKey) ?? resolveClusterInverseBind(cluster, jointNode);
+    const inverseBind =
+      ctx.jointBindMatrices.get(cacheKey) ?? resolveClusterInverseBind(cluster, jointNode, ctx.unitScale);
     ctx.skeletonJointIds.add(cluster.boneModelId);
     ctx.jointBindMatrices.set(cacheKey, inverseBind);
     skeleton.addJoint(jointNode, inverseBind);
@@ -1429,7 +1472,7 @@ function createMeshData(
   model: SharedModel,
   ctx: FbxImportContext
 ) {
-  const primitives = buildPrimitives(geometry, modelData);
+  const primitives = buildPrimitives(geometry, modelData, ctx.unitScale);
   const morphTargets = geometry.morphTargets ?? [];
   const materials = (ctx.connectionChildren.get(modelData.id) ?? [])
     .filter((connection) => ctx.materialMap.has(connection.from))
@@ -1576,6 +1619,7 @@ function createImportContext(document: FbxDocument, basePath: string, vfs: VFS):
   const connectionMaps = readConnections(document.connections);
   return {
     document,
+    unitScale: getDocumentUnitScale(document),
     objects: document.objects,
     connectionChildren: connectionMaps.children,
     connectionParents: connectionMaps.parents,
