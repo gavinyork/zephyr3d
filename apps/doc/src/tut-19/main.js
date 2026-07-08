@@ -45,7 +45,7 @@ myApp.ready().then(function () {
   }
   // Create floor
   const floorMaterial = new LambertMaterial();
-  floorMaterial.albedoColor = new Vector4(0, 1, 1, 1);
+  floorMaterial.albedoColor = new Vector4(1, 1, 1, 1);
   new Mesh(scene, new PlaneShape({ size: 100 }), floorMaterial);
 
   // Create camera
@@ -55,21 +55,28 @@ myApp.ready().then(function () {
 
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
+  let useShadowAA = true;
+  const btnNoAA = document.querySelector('#btn-no-aa');
+  const btnAA = document.querySelector('#btn-aa');
+
+  function setShadowAA(enabled) {
+    useShadowAA = enabled;
+    btnNoAA.classList.toggle('active', !enabled);
+    btnAA.classList.toggle('active', enabled);
+    btnNoAA.setAttribute('aria-pressed', String(!enabled));
+    btnAA.setAttribute('aria-pressed', String(enabled));
+  }
+
+  btnNoAA.addEventListener('click', () => setShadowAA(false));
+  btnAA.addEventListener('click', () => setShadowAA(true));
+  setShadowAA(true);
+
   getEngine().setRenderable(scene, 0, {
     beforeRender(scene) {
       const width = myApp.device.deviceXToScreen(myApp.device.canvas.width);
       const height = myApp.device.deviceYToScreen(myApp.device.canvas.height);
-      scene.mainCamera.viewport = [0, 0, width, height >> 1];
-      dirLight.shadow.shadowMapSize = 1024;
-    }
-  });
-
-  getEngine().setRenderable(scene, 1, {
-    beforeRender(scene) {
-      const width = myApp.device.deviceXToScreen(myApp.device.canvas.width);
-      const height = myApp.device.deviceYToScreen(myApp.device.canvas.height);
-      scene.mainCamera.viewport = [0, height >> 1, width, height - (height >> 1)];
-      dirLight.shadow.shadowMapSize = 256;
+      scene.mainCamera.viewport = [0, 0, width, height];
+      dirLight.shadow.shadowMapSize = useShadowAA ? 1024 : 256;
     }
   });
 

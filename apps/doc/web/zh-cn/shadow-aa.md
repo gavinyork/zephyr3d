@@ -29,11 +29,9 @@ ShadowMap 的分辨率越高，采样密度越大，阴影边缘越平滑；
 light.shadow.shadowMapSize = 1024;
 ```
 
-在下面的示例中：
-- 上半部分的阴影贴图大小为 **256 像素**；
-- 下半部分的阴影贴图大小为 **1024 像素**。
+下面的示例可以通过按钮在 **256 像素** 和 **1024 像素** 阴影贴图之间切换。
 
-<div class="showcase" case="tut-19" style="width:600px;height:800px"></div>
+<div class="showcase" case="tut-19" style="width:600px;height:500px"></div>
 
 > 提示：
 > - 提高分辨率虽能改善边缘质量，但会显著增加 GPU 负载。
@@ -58,9 +56,9 @@ light.shadow.mode = 'pcf';
 |------|------|
 | `pcfKernelSize` | PCF 采样核尺寸，支持 `3`、`5`、`7`。数值越大，边缘越柔和，但采样开销更高，阴影也会更模糊。 |
 
-示例：上半屏使用 PCF 模糊阴影，下半屏为常规硬边阴影。
+示例：点击按钮可在 PCF 过滤阴影与常规硬边阴影之间切换。
 
-<div class="showcase" case="tut-20" style="width:600px;height:800px"></div>
+<div class="showcase" case="tut-20" style="width:600px;height:500px"></div>
 
 ---
 
@@ -85,9 +83,9 @@ light.shadow.mode = 'pcss';
 | `pcssMaxFilterRadius` | 最大滤波半径，以 ShadowMap texel 为单位。用于限制半影扩张，避免阴影过度变宽或采样范围过大。 |
 | `pcssTemporalJitter` | 是否随帧旋转 PCSS 采样图案，便于配合 TAA 累积出更平滑的软阴影；未使用 TAA 时可能带来轻微时间噪声。 |
 
-示例：上半屏启用 PCSS，下半屏为标准硬阴影。
+示例：点击按钮可在 PCSS 软阴影和标准硬阴影之间切换。
 
-<div class="showcase" case="tut-65" style="width:600px;height:800px"></div>
+<div class="showcase" case="tut-65" style="width:600px;height:500px"></div>
 
 ---
 
@@ -116,9 +114,9 @@ light.shadow.mode = 'vsm';
 | `vsmBlurRadius` | VSM 模糊半径。数值越大，阴影过渡带越宽；过大会削弱接触阴影细节。 |
 | `vsmDarkness` | VSM 阴影暗度和光漏抑制强度。数值越高，阴影越深并能减少光漏；过高会压缩柔和过渡。 |
 
-示例：上半屏启用 VSM，下半屏为传统 ShadowMap。
+示例：点击按钮可在 VSM 阴影和传统硬边 ShadowMap 之间切换。
 
-<div class="showcase" case="tut-21" style="width:600px;height:800px;"></div>
+<div class="showcase" case="tut-21" style="width:600px;height:500px;"></div>
 
 ---
 
@@ -150,9 +148,9 @@ light.shadow.mode = 'esm';
 | `esmBlurKernelSize` | ESM 模糊核尺寸，仅在 `esmBlur` 为 `true` 时生效。较大的核更平滑，但采样成本更高。 |
 | `esmBlurRadius` | ESM 模糊半径，仅在 `esmBlur` 为 `true` 时生效。数值越大，阴影边缘越宽、越柔和。 |
 
-示例：上半屏使用 ESM，下半屏为标准硬阴影。
+示例：点击按钮可在 ESM 阴影和标准硬阴影之间切换。
 
-<div class="showcase" case="tut-22" style="width:600px;height:800px;"></div>
+<div class="showcase" case="tut-22" style="width:600px;height:500px;"></div>
 
 ---
 
@@ -170,9 +168,9 @@ CSM 适用于：
 - 大型地形、户外场景；
 - 摄像机运动幅度较大的应用，如第三人称视角游戏。
 
-示例：
+示例：点击按钮可在 4 级 CSM 和单级硬阴影之间切换。
 
-<div class="showcase" case="tut-23" style="width:600px;height:800px;"></div>
+<div class="showcase" case="tut-23" style="width:600px;height:500px;"></div>
 
 ---
 

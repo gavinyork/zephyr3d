@@ -1384,7 +1384,12 @@ function queueTAAHistoryCommit(
   motionVectorHandle?: RGHandle
 ): void {
   const { ctx } = frame;
-  if (!historyManager?.frameActive || !ctx.camera.TAA || !frame.options.motionVectors || !motionVectorHandle) {
+  if (
+    !historyManager?.frameActive ||
+    !ctx.camera.TAA ||
+    !frame.options.motionVectors ||
+    !motionVectorHandle
+  ) {
     return;
   }
   const colorTexture = rgCtx.getTexture<Texture2D>(colorHandle);

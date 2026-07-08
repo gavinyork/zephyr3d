@@ -29,11 +29,9 @@ You can control the shadow map size through **`light.shadow.shadowMapSize`**:
 light.shadow.shadowMapSize = 1024;
 ```
 
-In the example below:
-- The upper half uses a **256‑pixel** shadow map.  
-- The lower half uses a **1024‑pixel** shadow map.
+The example below lets you switch between **256 px** and **1024 px** shadow maps.
 
-<div class="showcase" case="tut-19" style="width:600px;height:800px"></div>
+<div class="showcase" case="tut-19" style="width:600px;height:500px"></div>
 
 > **Tips:**
 > - Higher resolution improves quality but adds GPU overhead.  
@@ -58,10 +56,9 @@ Parameters:
 |-----------|-------------|
 | `pcfKernelSize` | PCF sampling kernel size. Supported values are `3`, `5`, and `7`. Larger kernels produce softer edges, but cost more samples and make shadows blurrier. |
 
-Example:  
-The upper half of the screen uses PCF, while the lower half uses standard hard‑edge shadows.
+Example: use the buttons to switch between PCF-filtered shadows and standard hard-edge shadows.
 
-<div class="showcase" case="tut-20" style="width:600px;height:800px"></div>
+<div class="showcase" case="tut-20" style="width:600px;height:500px"></div>
 
 ---
 
@@ -86,9 +83,9 @@ Parameters:
 | `pcssMaxFilterRadius` | Maximum filter radius in shadow-map texels. Caps penumbra growth to avoid overly wide shadows and excessive sample coverage. |
 | `pcssTemporalJitter` | Rotates the PCSS sampling pattern over frames for TAA accumulation. This can make soft shadows smoother with TAA enabled, but may add slight temporal noise without TAA. |
 
-Example: upper half uses PCSS, lower half uses hard shadows.
+Example: use the buttons to switch between PCSS soft shadows and hard shadows.
 
-<div class="showcase" case="tut-65" style="width:600px;height:800px"></div>
+<div class="showcase" case="tut-65" style="width:600px;height:500px"></div>
 
 ---
 
@@ -117,9 +114,9 @@ Parameters:
 | `vsmBlurRadius` | Blur radius for VSM. Larger values widen the transition band; values that are too large can remove contact-shadow detail. |
 | `vsmDarkness` | Shadow darkness and light-bleeding suppression for VSM. Higher values make shadows darker and reduce bleeding, but can compress soft transitions. |
 
-Example: upper half uses VSM, lower half uses standard shadow mapping.
+Example: use the buttons to switch between VSM shadows and traditional hard-edge shadow mapping.
 
-<div class="showcase" case="tut-21" style="width:600px;height:800px;"></div>
+<div class="showcase" case="tut-21" style="width:600px;height:500px;"></div>
 
 ---
 
@@ -153,9 +150,9 @@ Parameters:
 | `esmBlurKernelSize` | ESM blur kernel size, used only when `esmBlur` is `true`. Larger kernels are smoother, but cost more samples. |
 | `esmBlurRadius` | ESM blur radius, used only when `esmBlur` is `true`. Larger values create wider, softer shadow edges. |
 
-Example: upper half uses ESM, lower half uses hard shadows.
+Example: use the buttons to switch between ESM shadows and hard shadows.
 
-<div class="showcase" case="tut-22" style="width:600px;height:800px;"></div>
+<div class="showcase" case="tut-22" style="width:600px;height:500px;"></div>
 
 ---
 
@@ -173,9 +170,9 @@ How it works:
 - Large outdoor scenes and terrains;  
 - Third‑person or free‑camera systems requiring stable shadows over distance.
 
-Example:
+Example: use the buttons to switch between 4-cascade CSM and single-cascade hard shadows.
 
-<div class="showcase" case="tut-23" style="width:600px;height:800px;"></div>
+<div class="showcase" case="tut-23" style="width:600px;height:500px;"></div>
 
 ---
 
