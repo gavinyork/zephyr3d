@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add specific SSS implementation for skin rendering",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
