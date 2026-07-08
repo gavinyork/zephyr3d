@@ -51,14 +51,8 @@ export class TAA extends AbstractPostEffect {
   }
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const historyManager = ctx.camera.getHistoryResourceManager();
-    const useGraphHistory = !!historyManager?.frameActive;
-    const data = useGraphHistory ? null : ctx.camera.getHistoryData();
-    const prevColorTex = useGraphHistory
-      ? historyManager.tryGetPrevious(RGHistoryResources.TAA_COLOR)
-      : data!.prevColorTex;
-    const prevMotionVectorTex = useGraphHistory
-      ? historyManager.tryGetPrevious(RGHistoryResources.TAA_MOTION_VECTOR)
-      : data!.prevMotionVectorTex;
+    const prevColorTex = historyManager!.tryGetPrevious(RGHistoryResources.TAA_COLOR);
+    const prevMotionVectorTex = historyManager!.tryGetPrevious(RGHistoryResources.TAA_MOTION_VECTOR);
     if (
       !prevColorTex ||
       !prevMotionVectorTex ||
@@ -96,20 +90,6 @@ export class TAA extends AbstractPostEffect {
       ctx.device.setBindGroup(0, this._bindGroup);
       this.drawFullscreenQuad();
     }
-    if (useGraphHistory) {
-      return;
-    }
-    const currentColorTex = ctx.device.getFramebuffer()!.getColorAttachments()[0] as Texture2D;
-    if (data!.prevColorTex) {
-      ctx.device.pool.releaseTexture(data!.prevColorTex);
-    }
-    ctx.device.pool.retainTexture(currentColorTex);
-    data!.prevColorTex = currentColorTex;
-    if (data!.prevMotionVectorTex) {
-      ctx.device.pool.releaseTexture(data!.prevMotionVectorTex);
-    }
-    ctx.device.pool.retainTexture(ctx.motionVectorTexture!);
-    data!.prevMotionVectorTex = ctx.motionVectorTexture!;
   }
   requireLinearDepthTexture(_ctx: DrawContext) {
     return true;

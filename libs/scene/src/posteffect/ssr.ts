@@ -391,15 +391,9 @@ export class SSR extends AbstractPostEffect {
       );
     }
     const historyManager = ctx.camera.getHistoryResourceManager();
-    const useGraphHistory = !!historyManager?.frameActive;
-    const history = useGraphHistory ? null : ctx.camera.getHistoryData();
     let reflectanceTex = pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D;
-    const prevSSRReflectTex = useGraphHistory
-      ? historyManager!.tryGetPrevious(RGHistoryResources.SSR_REFLECT)
-      : history!.prevSSRReflectTex;
-    const prevSSRMotionVectorTex = useGraphHistory
-      ? historyManager!.tryGetPrevious(RGHistoryResources.SSR_MOTION_VECTOR)
-      : history!.prevSSRMotionVectorTex;
+    const prevSSRReflectTex = historyManager!.tryGetPrevious(RGHistoryResources.SSR_REFLECT);
+    const prevSSRMotionVectorTex = historyManager!.tryGetPrevious(RGHistoryResources.SSR_MOTION_VECTOR);
     const canTemporal =
       ctx.camera.ssrTemporal &&
       !!ctx.motionVectorTexture &&
@@ -420,58 +414,36 @@ export class SSR extends AbstractPostEffect {
     }
     device.popDeviceStates();
     this.combine(ctx, inputColorTexture, reflectanceTex, srgbOutput);
-    if (useGraphHistory) {
-      if (ctx.camera.ssrTemporal) {
-        const reflectanceSize = { width: reflectanceTex.width, height: reflectanceTex.height };
-        historyManager!.queueRetainedCommit(
-          RGHistoryResources.SSR_REFLECT,
-          {
-            format: reflectanceTex.format,
-            sizeMode: 'absolute',
-            width: reflectanceTex.width,
-            height: reflectanceTex.height
-          },
-          reflectanceSize,
-          reflectanceTex
-        );
-      }
-      if (ctx.camera.ssrTemporal && ctx.motionVectorTexture) {
-        const motionVectorSize = {
+    if (ctx.camera.ssrTemporal) {
+      const reflectanceSize = { width: reflectanceTex.width, height: reflectanceTex.height };
+      historyManager!.queueRetainedCommit(
+        RGHistoryResources.SSR_REFLECT,
+        {
+          format: reflectanceTex.format,
+          sizeMode: 'absolute',
+          width: reflectanceTex.width,
+          height: reflectanceTex.height
+        },
+        reflectanceSize,
+        reflectanceTex
+      );
+    }
+    if (ctx.camera.ssrTemporal && ctx.motionVectorTexture) {
+      const motionVectorSize = {
+        width: ctx.motionVectorTexture.width,
+        height: ctx.motionVectorTexture.height
+      };
+      historyManager!.queueRetainedCommit(
+        RGHistoryResources.SSR_MOTION_VECTOR,
+        {
+          format: ctx.motionVectorTexture.format,
+          sizeMode: 'absolute',
           width: ctx.motionVectorTexture.width,
           height: ctx.motionVectorTexture.height
-        };
-        historyManager!.queueRetainedCommit(
-          RGHistoryResources.SSR_MOTION_VECTOR,
-          {
-            format: ctx.motionVectorTexture.format,
-            sizeMode: 'absolute',
-            width: ctx.motionVectorTexture.width,
-            height: ctx.motionVectorTexture.height
-          },
-          motionVectorSize,
-          ctx.motionVectorTexture
-        );
-      }
-    } else {
-      if (history!.prevSSRReflectTex) {
-        device.pool.releaseTexture(history!.prevSSRReflectTex);
-        history!.prevSSRReflectTex = null;
-      }
-      if (history!.prevSSRMotionVectorTex) {
-        device.pool.releaseTexture(history!.prevSSRMotionVectorTex);
-        history!.prevSSRMotionVectorTex = null;
-      }
-      if (ctx.camera.ssrTemporal) {
-        device.pool.retainTexture(reflectanceTex);
-        history!.prevSSRReflectTex = reflectanceTex;
-      }
-      if (ctx.camera.ssrTemporal && ctx.motionVectorTexture) {
-        if (history!.prevSSRMotionVectorTex) {
-          device.pool.releaseTexture(history!.prevSSRMotionVectorTex);
-        }
-        device.pool.retainTexture(ctx.motionVectorTexture);
-        history!.prevSSRMotionVectorTex = ctx.motionVectorTexture;
-      }
+        },
+        motionVectorSize,
+        ctx.motionVectorTexture
+      );
     }
     device.pool.releaseFrameBuffer(intersectFramebuffer);
     device.pool.releaseFrameBuffer(pingpongFramebuffer[0]);
