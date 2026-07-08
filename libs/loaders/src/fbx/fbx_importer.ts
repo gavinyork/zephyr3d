@@ -1390,6 +1390,34 @@ function matrixFromFloat64ArrayScaled(array: Nullable<Float64Array | Float32Arra
   return matrix;
 }
 
+function isUnitTuple3(value: [number, number, number], epsilon = 1e-4) {
+  return (
+    Math.abs(value[0] - 1) <= epsilon && Math.abs(value[1] - 1) <= epsilon && Math.abs(value[2] - 1) <= epsilon
+  );
+}
+
+function shouldPreferSourceLocalTransform(source: Nullable<FbxModelData>) {
+  if (!source) {
+    return false;
+  }
+  // Some FBX joints (for example HairRoot) carry authored local scale/offset that should
+  // remain in the scene graph. Reconstructing them only from bind-world matrices can
+  // collapse that authored local TRS and later break child chains during animation.
+  return !isUnitTuple3(source.transform.scale) || !isUnitTuple3(source.transform.geometricScaling);
+}
+
+function resolveImportedLocalMatrix(modelData: FbxModelData, ctx: FbxImportContext) {
+  const bindWorld = ctx.bindWorldMap.get(modelData.id);
+  if (!bindWorld || shouldPreferSourceLocalTransform(modelData)) {
+    return composeFbxLocalMatrix(modelData.transform, modelData.parentId != null);
+  }
+  const parentWorld =
+    modelData.parentId != null ? computeModelWorldMatrix(modelData.parentId, ctx, ctx.bindWorldCache) : null;
+  return parentWorld
+    ? Matrix4x4.multiply(new Matrix4x4(parentWorld).inplaceInvertAffine(), bindWorld)
+    : new Matrix4x4(bindWorld);
+}
+
 function resolveClusterInverseBind(
   cluster: FbxClusterData,
   jointNode: Nullable<AssetHierarchyNode>,
@@ -1453,7 +1481,11 @@ function applyClusterBindPose(
     return;
   }
   const bindWorld = bindWorldOverride ?? matrixFromFloat64ArrayScaled(cluster.transformLink ?? null, ctx.unitScale);
-  const source = ctx.modelMap.get(cluster.boneModelId);
+  const source = ctx.modelMap.get(cluster.boneModelId) ?? null;
+  if (shouldPreferSourceLocalTransform(source)) {
+    ctx.bindWorldCache.set(cluster.boneModelId, bindWorld);
+    return;
+  }
   const parentWorld =
     source?.parentId != null ? computeModelWorldMatrix(source.parentId, ctx, ctx.bindWorldCache) : null;
   const local = parentWorld
@@ -1957,14 +1989,7 @@ function sampleAnimCurve(curve: Nullable<FbxAnimCurveData>, time: number, fallba
 }
 
 function getImportedLocalMatrix(modelData: FbxModelData, ctx: FbxImportContext) {
-  const bindWorld = ctx.bindWorldMap.get(modelData.id);
-  const parentWorld =
-    bindWorld && modelData.parentId != null ? computeModelWorldMatrix(modelData.parentId, ctx, ctx.bindWorldCache) : null;
-  return bindWorld
-    ? parentWorld
-      ? Matrix4x4.multiply(new Matrix4x4(parentWorld).inplaceInvertAffine(), bindWorld)
-      : new Matrix4x4(bindWorld)
-    : composeFbxLocalMatrix(modelData.transform, modelData.parentId != null);
+  return resolveImportedLocalMatrix(modelData, ctx);
 }
 
 function buildAnimatedLocalSample(
@@ -2156,13 +2181,7 @@ function loadAnimations(model: SharedModel, ctx: FbxImportContext) {
 
 function populateNodeTransforms(modelNode: AssetHierarchyNode, source: FbxModelData, ctx: FbxImportContext) {
   const bindWorld = ctx.bindWorldMap.get(source.id);
-  const parentWorld =
-    bindWorld && source.parentId != null ? computeModelWorldMatrix(source.parentId, ctx, ctx.bindWorldCache) : null;
-  const local = bindWorld
-    ? parentWorld
-      ? Matrix4x4.multiply(new Matrix4x4(parentWorld).inplaceInvertAffine(), bindWorld)
-      : new Matrix4x4(bindWorld)
-    : composeFbxLocalMatrix(source.transform, source.parentId != null);
+  const local = resolveImportedLocalMatrix(source, ctx);
   local.decompose(modelNode.scaling, modelNode.rotation, modelNode.position);
   if (!bindWorld && source.parentId != null && source.transform.inheritType === 2) {
     modelNode.scaling.setXYZ(1, 1, 1);
