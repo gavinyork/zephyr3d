@@ -69,6 +69,7 @@ type FbxImportContext = {
   animCurveNodeMap: Map<number, FbxAnimCurveNodeData>;
   bindWorldMap: Map<number, Matrix4x4>;
   bindWorldCache: Map<number, Matrix4x4>;
+  clusterJointIds: Set<number>;
   skeletonMap: Map<number, AssetSkeleton>;
   sharedSkeletonMap: Map<number, FbxSharedSkeletonData>;
   geometrySkeletonRoots: Map<number, number>;
@@ -1396,19 +1397,22 @@ function isUnitTuple3(value: [number, number, number], epsilon = 1e-4) {
   );
 }
 
-function shouldPreferSourceLocalTransform(source: Nullable<FbxModelData>) {
+function shouldPreferSourceLocalTransform(source: Nullable<FbxModelData>, ctx: FbxImportContext) {
   if (!source) {
     return false;
   }
-  // Some FBX joints (for example HairRoot) carry authored local scale/offset that should
-  // remain in the scene graph. Reconstructing them only from bind-world matrices can
-  // collapse that authored local TRS and later break child chains during animation.
+  if (ctx.clusterJointIds.has(source.id)) {
+    return false;
+  }
+  // Some helper joints (for example HairRoot) are stored only in bind pose nodes, while
+  // their authored local scale/offset should remain in the scene graph. Real skinned joints
+  // still need bind-world reconstruction so they can compensate parent scaling correctly.
   return !isUnitTuple3(source.transform.scale) || !isUnitTuple3(source.transform.geometricScaling);
 }
 
 function resolveImportedLocalMatrix(modelData: FbxModelData, ctx: FbxImportContext) {
   const bindWorld = ctx.bindWorldMap.get(modelData.id);
-  if (!bindWorld || shouldPreferSourceLocalTransform(modelData)) {
+  if (!bindWorld || shouldPreferSourceLocalTransform(modelData, ctx)) {
     return composeFbxLocalMatrix(modelData.transform, modelData.parentId != null);
   }
   const parentWorld =
@@ -1482,7 +1486,7 @@ function applyClusterBindPose(
   }
   const bindWorld = bindWorldOverride ?? matrixFromFloat64ArrayScaled(cluster.transformLink ?? null, ctx.unitScale);
   const source = ctx.modelMap.get(cluster.boneModelId) ?? null;
-  if (shouldPreferSourceLocalTransform(source)) {
+  if (shouldPreferSourceLocalTransform(source, ctx)) {
     ctx.bindWorldCache.set(cluster.boneModelId, bindWorld);
     return;
   }
@@ -1512,6 +1516,7 @@ function buildBindWorldMap(ctx: FbxImportContext) {
   for (const skin of ctx.skinMap.values()) {
     for (const cluster of skin.clusters) {
       if (cluster.boneModelId != null) {
+        ctx.clusterJointIds.add(cluster.boneModelId);
         setBindWorld(cluster.boneModelId, cluster.transformLink ?? null, true);
       }
     }
@@ -2249,6 +2254,7 @@ function createImportContext(document: FbxDocument, basePath: string, vfs: VFS):
     animCurveNodeMap: new Map(),
     bindWorldMap: new Map(),
     bindWorldCache: new Map(),
+    clusterJointIds: new Set(),
     skeletonMap: new Map(),
     sharedSkeletonMap: new Map(),
     geometrySkeletonRoots: new Map(),
