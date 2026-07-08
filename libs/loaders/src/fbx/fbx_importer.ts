@@ -70,6 +70,8 @@ type FbxImportContext = {
   bindWorldMap: Map<number, Matrix4x4>;
   bindWorldCache: Map<number, Matrix4x4>;
   skeletonMap: Map<number, AssetSkeleton>;
+  sharedSkeletonMap: Map<number, FbxSharedSkeletonData>;
+  geometrySkeletonRoots: Map<number, number>;
   jointBindMatrices: Map<string, Matrix4x4>;
   skeletonJointIds: Set<number>;
   imageSet: Set<AssetImageInfo>;
@@ -77,6 +79,12 @@ type FbxImportContext = {
   nodeMap: Map<number, AssetHierarchyNode>;
   basePath: string;
   vfs: VFS;
+};
+
+type FbxSharedSkeletonData = {
+  rootId: number;
+  jointModelIds: number[];
+  jointIndexByModelId: Map<number, number>;
 };
 
 function toUint8Array(data: Uint8Array<ArrayBufferLike>) {
@@ -985,6 +993,35 @@ function buildSkinData(geometry: FbxGeometryData) {
   return { clusterList, influences };
 }
 
+function remapMeshSkinIndices(
+  meshData: AssetMeshData,
+  geometry: FbxGeometryData,
+  sharedSkeleton: Nullable<FbxSharedSkeletonData>
+) {
+  if (!sharedSkeleton) {
+    return;
+  }
+  const remap = (geometry.skin?.clusters ?? []).map(
+    (cluster) => (cluster.boneModelId != null ? sharedSkeleton.jointIndexByModelId.get(cluster.boneModelId) : undefined) ?? 0
+  );
+  if (remap.length === 0) {
+    return;
+  }
+  for (const subMesh of meshData.subMeshes) {
+    if (subMesh.rawBlendIndices) {
+      for (let i = 0; i < subMesh.rawBlendIndices.length; i++) {
+        subMesh.rawBlendIndices[i] = remap[subMesh.rawBlendIndices[i]] ?? 0;
+      }
+    }
+    const blendIndices = subMesh.primitive?.vertices.blendIndices?.data;
+    if (blendIndices) {
+      for (let i = 0; i < blendIndices.length; i++) {
+        blendIndices[i] = remap[Math.trunc(blendIndices[i])] ?? 0;
+      }
+    }
+  }
+}
+
 function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData, unitScale: number): FbxPrimitiveBuildData[] {
   const morphTargets = geometry.morphTargets ?? [];
   const materialBuckets = new Map<
@@ -1498,6 +1535,158 @@ function collectDescendantIds(model: FbxModelData, ctx: FbxImportContext, out: n
   }
 }
 
+function findTopmostSkinJoint(modelId: number, ctx: FbxImportContext) {
+  let current = ctx.modelMap.get(modelId) ?? null;
+  while (current && current.type !== 'LimbNode' && current.parentId != null) {
+    current = ctx.modelMap.get(current.parentId) ?? null;
+  }
+  if (!current) {
+    return null;
+  }
+  while (current.parentId != null) {
+    const parent = ctx.modelMap.get(current.parentId);
+    if (!parent || parent.type !== 'LimbNode') {
+      break;
+    }
+    current = parent;
+  }
+  return current;
+}
+
+function resolveSharedSkeletonRootForJoint(modelId: number, ctx: FbxImportContext) {
+  const topJoint = findTopmostSkinJoint(modelId, ctx);
+  if (!topJoint) {
+    return null;
+  }
+  const parent = topJoint.parentId != null ? ctx.modelMap.get(topJoint.parentId) ?? null : null;
+  return parent && hasDescendantOfType(parent, ctx, 'LimbNode') ? parent : topJoint;
+}
+
+function findCommonAncestor(modelIds: number[], ctx: FbxImportContext) {
+  if (modelIds.length === 0) {
+    return null;
+  }
+  const ancestorChains = modelIds
+    .map((modelId) => {
+      const chain: FbxModelData[] = [];
+      let current = ctx.modelMap.get(modelId) ?? null;
+      while (current) {
+        chain.push(current);
+        current = current.parentId != null ? ctx.modelMap.get(current.parentId) ?? null : null;
+      }
+      return chain;
+    })
+    .filter((chain) => chain.length > 0);
+  if (ancestorChains.length === 0) {
+    return null;
+  }
+  for (const candidate of ancestorChains[0]) {
+    if (ancestorChains.every((chain) => chain.some((node) => node.id === candidate.id))) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function resolveSharedSkeletonRootForGeometry(geometry: FbxGeometryData, ctx: FbxImportContext) {
+  const cachedRootId = ctx.geometrySkeletonRoots.get(geometry.id);
+  if (cachedRootId != null) {
+    return ctx.modelMap.get(cachedRootId) ?? null;
+  }
+  const jointIds = Array.from(
+    new Set((geometry.skin?.clusters ?? []).map((cluster) => cluster.boneModelId).filter((id): id is number => id != null))
+  );
+  if (jointIds.length === 0) {
+    return null;
+  }
+  const rootCandidates = jointIds
+    .map((jointId) => resolveSharedSkeletonRootForJoint(jointId, ctx))
+    .filter((node): node is FbxModelData => !!node);
+  let root =
+    rootCandidates.length > 0 && rootCandidates.every((node) => node.id === rootCandidates[0].id)
+      ? rootCandidates[0]
+      : null;
+  if (!root) {
+    const commonRoot = findCommonAncestor(
+      rootCandidates.length > 0 ? rootCandidates.map((node) => node.id) : jointIds,
+      ctx
+    );
+    if (commonRoot && hasDescendantOfType(commonRoot, ctx, 'LimbNode')) {
+      root = commonRoot;
+    }
+  }
+  root = root ?? resolveSharedSkeletonRootForJoint(jointIds[0], ctx);
+  if (root) {
+    ctx.geometrySkeletonRoots.set(geometry.id, root.id);
+  }
+  return root;
+}
+
+function getSharedSkeletonData(geometry: FbxGeometryData, model: SharedModel, ctx: FbxImportContext) {
+  const root = resolveSharedSkeletonRootForGeometry(geometry, ctx);
+  if (!root) {
+    return null;
+  }
+  const cached = ctx.sharedSkeletonMap.get(root.id);
+  if (cached) {
+    return cached;
+  }
+  const requiredJointIds = new Set<number>();
+  for (const geometryData of ctx.geometryMap.values()) {
+    if (resolveSharedSkeletonRootForGeometry(geometryData, ctx)?.id !== root.id) {
+      continue;
+    }
+    for (const cluster of geometryData.skin?.clusters ?? []) {
+      if (cluster.boneModelId != null) {
+        requiredJointIds.add(cluster.boneModelId);
+      }
+    }
+  }
+  const jointModelIds: number[] = [];
+  const visit = (source: FbxModelData) => {
+    if (source.type === 'LimbNode' || requiredJointIds.has(source.id)) {
+      jointModelIds.push(source.id);
+      if (!ctx.nodeMap.has(source.id)) {
+        createAssetNode(source.id, model, ctx, false);
+      }
+    }
+    for (const childId of source.children) {
+      const child = ctx.modelMap.get(childId);
+      if (child) {
+        visit(child);
+      }
+    }
+  };
+  visit(root);
+  if (jointModelIds.length === 0) {
+    return null;
+  }
+  const jointIndexByModelId = new Map<number, number>();
+  jointModelIds.forEach((jointModelId, index) => {
+    jointIndexByModelId.set(jointModelId, index);
+  });
+  const sharedSkeleton = {
+    rootId: root.id,
+    jointModelIds,
+    jointIndexByModelId
+  } as FbxSharedSkeletonData;
+  ctx.sharedSkeletonMap.set(root.id, sharedSkeleton);
+  return sharedSkeleton;
+}
+
+function resolveJointBindWorld(
+  modelId: number,
+  jointNode: Nullable<AssetHierarchyNode>,
+  ctx: FbxImportContext
+) {
+  return (
+    ctx.bindWorldMap.get(modelId) ??
+    computeModelWorldMatrix(modelId, ctx, ctx.bindWorldCache) ??
+    jointNode?.worldMatrix ??
+    Matrix4x4.identity()
+  );
+}
+
 function buildSkeleton(geometry: FbxGeometryData, modelData: FbxModelData, model: SharedModel, ctx: FbxImportContext) {
   const cached = ctx.skeletonMap.get(geometry.id);
   if (cached) {
@@ -1507,21 +1696,37 @@ function buildSkeleton(geometry: FbxGeometryData, modelData: FbxModelData, model
   if (!skin || skin.clusters.length === 0) {
     return null;
   }
+  const sharedSkeleton = getSharedSkeletonData(geometry, model, ctx);
+  if (!sharedSkeleton) {
+    return null;
+  }
   const skeleton = new AssetSkeleton(`${geometry.name}_skeleton`);
+  const meshBindWorld = computeModelWorldMatrix(modelData.id, ctx, new Map());
+  const clustersByJointId = new Map<number, FbxClusterData>();
   for (const cluster of skin.clusters) {
-    if (cluster.boneModelId == null) {
-      continue;
+    if (cluster.boneModelId != null && !clustersByJointId.has(cluster.boneModelId)) {
+      clustersByJointId.set(cluster.boneModelId, cluster);
     }
-    const jointNode =
-      ctx.nodeMap.get(cluster.boneModelId) ?? createAssetNode(cluster.boneModelId, model, ctx);
+  }
+  for (const jointModelId of sharedSkeleton.jointModelIds) {
+    const jointNode = ctx.nodeMap.get(jointModelId) ?? createAssetNode(jointModelId, model, ctx, false);
     if (!jointNode) {
       continue;
     }
-    applyClusterBindPose(cluster, jointNode, ctx);
-    const cacheKey = `${geometry.id}:${cluster.boneModelId}`;
+    const cluster = clustersByJointId.get(jointModelId) ?? null;
+    if (cluster) {
+      applyClusterBindPose(cluster, jointNode, ctx);
+    }
+    const cacheKey = `${geometry.id}:${jointModelId}`;
     const inverseBind =
-      ctx.jointBindMatrices.get(cacheKey) ?? resolveClusterInverseBind(cluster, jointNode, modelData, ctx);
-    ctx.skeletonJointIds.add(cluster.boneModelId);
+      ctx.jointBindMatrices.get(cacheKey) ??
+      (cluster
+        ? resolveClusterInverseBind(cluster, jointNode, modelData, ctx)
+        : Matrix4x4.multiply(
+            new Matrix4x4(resolveJointBindWorld(jointModelId, jointNode, ctx)).inplaceInvertAffine(),
+            meshBindWorld
+          ));
+    ctx.skeletonJointIds.add(jointModelId);
     ctx.jointBindMatrices.set(cacheKey, inverseBind);
     skeleton.addJoint(jointNode, inverseBind);
   }
@@ -1546,7 +1751,7 @@ function buildSkeletonFromLimbRoot(root: FbxModelData, model: SharedModel, ctx: 
   const skeleton = new AssetSkeleton(`${root.name || `${root.type}_${root.id}`}_skeleton`);
   const visit = (source: FbxModelData) => {
     if (source.type === 'LimbNode') {
-      const jointNode = ctx.nodeMap.get(source.id) ?? createAssetNode(source.id, model, ctx);
+      const jointNode = ctx.nodeMap.get(source.id) ?? createAssetNode(source.id, model, ctx, false);
       if (jointNode) {
         const cacheKey = `${root.id}:${source.id}`;
         const inverseBind =
@@ -1650,7 +1855,7 @@ function createMeshData(
     };
     subMeshes.push(subMesh);
   }
-  return {
+  const meshData = {
     morphWeights: morphTargets.map((target) => {
       const fullWeight = target.fullWeights[0] ?? 100;
       return fullWeight !== 0 ? target.deformPercent / fullWeight : 0;
@@ -1658,6 +1863,8 @@ function createMeshData(
     morphNames: morphTargets.map((target) => target.name),
     subMeshes
   } as AssetMeshData;
+  remapMeshSkinIndices(meshData, geometry, getSharedSkeletonData(geometry, model, ctx));
+  return meshData;
 }
 
 function buildModelMaps(ctx: FbxImportContext) {
@@ -1992,8 +2199,8 @@ function createAssetNode(modelId: number, model: SharedModel, ctx: FbxImportCont
   );
   if (geometryConnection) {
     const geometry = ctx.geometryMap.get(geometryConnection.from)!;
-    node.mesh = createMeshData(geometry, source, model, ctx);
     node.skeleton = buildSkeleton(geometry, source, model, ctx);
+    node.mesh = createMeshData(geometry, source, model, ctx);
   }
   if (recurseChildren) {
     for (const childId of source.children) {
@@ -2024,6 +2231,8 @@ function createImportContext(document: FbxDocument, basePath: string, vfs: VFS):
     bindWorldMap: new Map(),
     bindWorldCache: new Map(),
     skeletonMap: new Map(),
+    sharedSkeletonMap: new Map(),
+    geometrySkeletonRoots: new Map(),
     jointBindMatrices: new Map(),
     skeletonJointIds: new Set(),
     imageSet: new Set(),
