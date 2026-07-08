@@ -538,7 +538,7 @@ export class PointLight extends PunctualLight {
    */
   constructor(scene: Scene) {
     super(scene, LIGHT_TYPE_POINT);
-    this._range = 10;
+    this._range = -1;
     this._diffuseScale = 1;
     this._specularScale = 1;
     this._sourceRadius = 0;
@@ -643,7 +643,11 @@ export class PointLight extends PunctualLight {
   computeUniforms() {
     const a = this.worldMatrix.getRow(3);
     const b = this.worldMatrix.getRow(2);
-    this._positionRange = new Vector4(a.x, a.y, a.z, this.range);
+    const range =
+      this.range < 0
+        ? 32 * Math.sqrt(Math.max(0.0001, this.intensity * Math.max(this._diffuseScale, this._specularScale)))
+        : this.range;
+    this._positionRange = new Vector4(a.x, a.y, a.z, range);
     this._directionCutoff = new Vector4(b.x, b.y, b.z, -1);
     this._diffuseIntensity = new Vector4(this.color.x, this.color.y, this.color.z, this.intensity);
     this._extraParams = new Vector4(
@@ -670,7 +674,7 @@ export class SpotLight extends PunctualLight {
    */
   constructor(scene: Scene) {
     super(scene, LIGHT_TYPE_SPOT);
-    this._range = 10;
+    this._range = -1;
     this._cutoff = Math.cos(Math.PI / 4);
     this.invalidateBoundingVolume();
   }
@@ -736,7 +740,8 @@ export class SpotLight extends PunctualLight {
   computeUniforms() {
     const a = this.worldMatrix.getRow(3);
     const b = this.worldMatrix.getRow(2).scaleBy(-1);
-    this._positionRange = new Vector4(a.x, a.y, a.z, this.range);
+    const range = this.range < 0 ? 32 * Math.sqrt(Math.max(0.0001, this.intensity)) : this.range;
+    this._positionRange = new Vector4(a.x, a.y, a.z, range);
     this._directionCutoff = new Vector4(b.x, b.y, b.z, this.cutoff);
     this._diffuseIntensity = new Vector4(this.color.x, this.color.y, this.color.z, this.intensity);
     this._extraParams = new Vector4(0, 0, 0, this.lightType);

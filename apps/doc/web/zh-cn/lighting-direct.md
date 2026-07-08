@@ -16,6 +16,8 @@ const light = new DirectionalLight(scene);
 light.rotation.fromEulerAngle(Math.PI/4, Math.PI/4, 0);
 // 平行光颜色
 light.color = new Vector4(1, 1, 0, 1);
+// 平行光亮度
+light.intensity = 8;
 
 ```
 
@@ -29,10 +31,10 @@ light.color = new Vector4(1, 1, 0, 1);
 
 // 创建点光对象
 const light = new PointLight(scene);
-// 点光的照射范围
-light.range = 30;
 // 点光颜色
 light.color = new Vector4(1, 1, 1, 1);
+// 点光的亮度
+light.intensity = 20;
 
 ```
 
@@ -50,10 +52,10 @@ const light = new SpotLight(scene);
 light.rotation.fromEulerAngle(-Math.PI/4, Math.PI/4, 0);
 // 锥形光颜色
 light.color = new Vector4(1, 1, 1, 1);
+// 锥形光亮度
+light.intensity = 20;
 // 光锥角度余弦
 light.cutoff = Math.cos(Math.PI * 0.25);
-// 锥形光范围
-light.range = 30;
 // 锥形光位置
 light.position.setXYZ(0, 15, 0);
 

@@ -16,6 +16,8 @@ const light = new DirectionalLight(scene);
 light.rotation.fromEulerAngle(Math.PI/4, Math.PI/4, 0);
 // light color
 light.color = new Vector4(1, 1, 0, 1);
+// light intensity
+light.intensity = 8;
 
 ```
 
@@ -29,10 +31,10 @@ The code below demonstrates how to use a point light.
 
 // Create a point light object
 const light = new PointLight(scene);
-// light range
-light.range = 30;
 // light color
 light.color = new Vector4(1, 1, 1, 1);
+// light intensity
+light.intensity = 20;
 // light position
 light.position.setXYZ(0, 1, 0);
 
@@ -52,10 +54,10 @@ const light = new SpotLight(scene);
 light.rotation.fromEulerAngle(-Math.PI/4, Math.PI/4, 0);
 // light color
 light.color = new Vector4(1, 1, 1, 1);
+// light intensity
+light.intensity = 20;
 // light cutoff
 light.cutoff = Math.cos(Math.PI * 0.25);
-// light range
-light.range = 30;
 // light position
 light.position.setXYZ(0, 15, 0);
 

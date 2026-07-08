@@ -26,10 +26,9 @@ myApp.ready().then(function () {
 
   // Create point light
   const light = new PointLight(scene);
-  // point light range
-  light.range = 30;
   // light color
   light.color = new Vector4(1, 1, 1, 1);
+  light.intensity = 30;
 
   // Create several boxes
   const boxMaterial = new LambertMaterial();
@@ -55,7 +54,7 @@ myApp.ready().then(function () {
   getEngine().setRenderable(scene, 0);
 
   myApp.on('tick', function () {
-    light.position.setXYZ(20 * Math.cos(Date.now() * 0.001) - 10, 15, 20 * Math.sin(Date.now() * 0.001) - 10);
+    light.position.setXYZ(20 * Math.cos(Date.now() * 0.001) - 10, 10, 20 * Math.sin(Date.now() * 0.001) - 10);
   });
 
   myApp.run();
