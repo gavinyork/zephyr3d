@@ -1242,17 +1242,24 @@ function matrixFromFloat64ArrayScaled(array: Nullable<Float64Array | Float32Arra
 function resolveClusterInverseBind(
   cluster: FbxClusterData,
   jointNode: Nullable<AssetHierarchyNode>,
-  unitScale: number
+  modelData: FbxModelData,
+  ctx: FbxImportContext
 ) {
-  // FBX cluster Transform is the geometry node bind matrix. We already bake the geometry
-  // transform into mesh vertices, so inverse bind should come from the link node only.
+  // For object-space skinning the inverse bind should be:
+  // inverse(jointBindWorld) * meshBindWorld
+  // so that mesh-local vertices remain unchanged in bind pose after:
+  // inverse(meshWorld) * jointWorld * inverseBind * vertex
+  const meshBindWorld = computeModelWorldMatrix(modelData.id, ctx, new Map());
   if (cluster.transformLink) {
-    return matrixFromFloat64ArrayScaled(cluster.transformLink, unitScale).inplaceInvertAffine();
+    return Matrix4x4.multiply(
+      matrixFromFloat64ArrayScaled(cluster.transformLink, ctx.unitScale).inplaceInvertAffine(),
+      meshBindWorld
+    );
   }
   if (jointNode?.worldMatrix) {
-    return new Matrix4x4(jointNode.worldMatrix).inplaceInvertAffine();
+    return Matrix4x4.multiply(new Matrix4x4(jointNode.worldMatrix).inplaceInvertAffine(), meshBindWorld);
   }
-  return Matrix4x4.identity();
+  return meshBindWorld;
 }
 
 function computeModelWorldMatrix(
@@ -1377,7 +1384,7 @@ function collectDescendantIds(model: FbxModelData, ctx: FbxImportContext, out: n
   }
 }
 
-function buildSkeleton(geometry: FbxGeometryData, model: SharedModel, ctx: FbxImportContext) {
+function buildSkeleton(geometry: FbxGeometryData, modelData: FbxModelData, model: SharedModel, ctx: FbxImportContext) {
   const cached = ctx.skeletonMap.get(geometry.id);
   if (cached) {
     return cached;
@@ -1399,7 +1406,7 @@ function buildSkeleton(geometry: FbxGeometryData, model: SharedModel, ctx: FbxIm
     applyClusterBindPose(cluster, jointNode, ctx);
     const cacheKey = `${geometry.id}:${cluster.boneModelId}`;
     const inverseBind =
-      ctx.jointBindMatrices.get(cacheKey) ?? resolveClusterInverseBind(cluster, jointNode, ctx.unitScale);
+      ctx.jointBindMatrices.get(cacheKey) ?? resolveClusterInverseBind(cluster, jointNode, modelData, ctx);
     ctx.skeletonJointIds.add(cluster.boneModelId);
     ctx.jointBindMatrices.set(cacheKey, inverseBind);
     skeleton.addJoint(jointNode, inverseBind);
@@ -1615,7 +1622,7 @@ function createAssetNode(modelId: number, model: SharedModel, ctx: FbxImportCont
   if (geometryConnection) {
     const geometry = ctx.geometryMap.get(geometryConnection.from)!;
     node.mesh = createMeshData(geometry, source, model, ctx);
-    node.skeleton = buildSkeleton(geometry, model, ctx);
+    node.skeleton = buildSkeleton(geometry, source, model, ctx);
   }
   if (recurseChildren) {
     for (const childId of source.children) {
