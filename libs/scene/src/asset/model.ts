@@ -1348,17 +1348,26 @@ export class SharedModel extends Disposable {
             usedPaths,
             `${destName}_texture_${i}`
           ));
-        if (img.uri) {
-          img.data = new Uint8Array((await srcVFS.readFile(img.uri, { encoding: 'binary' })) as ArrayBuffer);
+        try {
+          if (img.uri) {
+            img.data = new Uint8Array((await srcVFS.readFile(img.uri, { encoding: 'binary' })) as ArrayBuffer);
+          }
+          await dstVFS.writeFile(
+            path,
+            img.data!.buffer.slice(img.data!.byteOffset, img.data!.byteOffset + img.data!.byteLength),
+            { encoding: 'binary', create: true }
+          );
+          img.uri = path;
+          img.data = undefined;
+          img.mimeType = '';
+        } catch (err) {
+          console.warn(
+            `Skip missing or unreadable texture during import: ${img.uri || img.name || `${destName}_texture_${i}`}: ${String(err)}`
+          );
+          img.uri = undefined;
+          img.data = undefined;
+          img.mimeType = '';
         }
-        await dstVFS.writeFile(
-          path,
-          img.data!.buffer.slice(img.data!.byteOffset, img.data!.byteOffset + img.data!.byteLength),
-          { encoding: 'binary', create: true }
-        );
-        img.uri = path;
-        img.data = undefined;
-        img.mimeType = '';
       }
     }
     const materialKeys = Object.keys(this._materialList);
