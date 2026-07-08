@@ -145,6 +145,31 @@ export interface FbxModelData {
   transform: FbxTransformData;
 }
 
+export interface FbxAnimStackData {
+  id: number;
+  name: string;
+}
+
+export interface FbxAnimLayerData {
+  id: number;
+  name: string;
+}
+
+export interface FbxAnimCurveData {
+  id: number;
+  name: string;
+  keyTimes: number[];
+  keyValues: number[];
+}
+
+export interface FbxAnimCurveNodeData {
+  id: number;
+  name: string;
+  targetModelId: number | null;
+  targetProperty: string;
+  curveIds: [number | null, number | null, number | null];
+}
+
 export interface FbxGeometryData {
   id: number;
   name: string;

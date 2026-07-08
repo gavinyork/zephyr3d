@@ -1,5 +1,5 @@
-import type { EulerAngleOrder, Nullable, VFS } from '@zephyr3d/base';
-import { ASSERT, Matrix4x4, PathUtils, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
+import type { EulerAngleOrder, InterpolationMode, Nullable, VFS } from '@zephyr3d/base';
+import { ASSERT, Interpolator, Matrix4x4, PathUtils, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import type {
   PrimitiveType,
   TextureAddressMode,
@@ -16,6 +16,8 @@ import {
   MORPH_TARGET_NORMAL,
   MORPH_TARGET_POSITION,
   SharedModel,
+  type AssetAnimationData,
+  type AssetAnimationTrack,
   type AssetImageInfo,
   type AssetMaterial,
   type AssetMeshData,
@@ -27,6 +29,10 @@ import {
 import { AbstractModelImporter } from '../importer';
 import { parseFbx } from './parser';
 import type {
+  FbxAnimCurveData,
+  FbxAnimCurveNodeData,
+  FbxAnimLayerData,
+  FbxAnimStackData,
   FbxBlendShapeChannelData,
   FbxClusterData,
   FbxConnection,
@@ -57,6 +63,10 @@ type FbxImportContext = {
   textureMap: Map<number, FbxTextureData>;
   videoMap: Map<number, FbxVideoData>;
   skinMap: Map<number, FbxSkinData>;
+  animStackMap: Map<number, FbxAnimStackData>;
+  animLayerMap: Map<number, FbxAnimLayerData>;
+  animCurveMap: Map<number, FbxAnimCurveData>;
+  animCurveNodeMap: Map<number, FbxAnimCurveNodeData>;
   bindWorldMap: Map<number, Matrix4x4>;
   bindWorldCache: Map<number, Matrix4x4>;
   skeletonMap: Map<number, AssetSkeleton>;
@@ -109,6 +119,7 @@ function toVertexRecord(
 const TMP_VEC3 = new Vector3();
 const TMP_VEC3_B = new Vector3();
 const TMP_VEC4 = new Vector4();
+const FBX_TIME_TO_SECONDS = 1 / 46186158000;
 
 function asNumber(value: unknown, fallback = 0) {
   if (typeof value === 'bigint') {
@@ -189,6 +200,16 @@ function getPreferredName(...values: Array<Nullable<string>>) {
     }
   }
   return '';
+}
+
+function getObjectEntriesByNames<T extends FbxNode>(objects: FbxObjectMap, names: string[]) {
+  const entries: [number, T][] = [];
+  for (const name of names) {
+    for (const entry of objects[name]?.entries() ?? []) {
+      entries.push(entry as [number, T]);
+    }
+  }
+  return entries;
 }
 
 function getFilenameStem(path: string) {
@@ -587,6 +608,99 @@ function readModelData(node: FbxNode, ctx: FbxImportContext) {
     children: childConnections.map((connection) => connection.from),
     transform: readTransformData(node, ctx.unitScale)
   } as FbxModelData;
+}
+
+function toNumericArray(value: unknown) {
+  if (
+    value instanceof Float64Array ||
+    value instanceof Float32Array ||
+    value instanceof Int32Array ||
+    value instanceof Uint32Array
+  ) {
+    return Array.from(value, (item) => Number(item));
+  }
+  if (value instanceof BigInt64Array) {
+    return Array.from(value, (item) => Number(item));
+  }
+  return [];
+}
+
+function readAnimStackData(node: FbxNode) {
+  return {
+    id: getNodeId(node),
+    name: getPreferredName(getObjectName(node), `AnimStack_${getNodeId(node)}`)
+  } as FbxAnimStackData;
+}
+
+function readAnimLayerData(node: FbxNode) {
+  return {
+    id: getNodeId(node),
+    name: getPreferredName(getObjectName(node), `AnimLayer_${getNodeId(node)}`)
+  } as FbxAnimLayerData;
+}
+
+function readAnimationTrackType(property: string): AssetAnimationTrack['type'] | null {
+  switch ((property ?? '').trim()) {
+    case 'Lcl Translation':
+      return 'translation';
+    case 'Lcl Rotation':
+      return 'rotation';
+    case 'Lcl Scaling':
+      return 'scale';
+    default:
+      return null;
+  }
+}
+
+function readAnimationAxis(property: string) {
+  const normalized = (property ?? '').trim();
+  if (normalized.endsWith('X')) {
+    return 0;
+  }
+  if (normalized.endsWith('Y')) {
+    return 1;
+  }
+  if (normalized.endsWith('Z')) {
+    return 2;
+  }
+  return -1;
+}
+
+function readAnimCurveData(node: FbxNode) {
+  return {
+    id: getNodeId(node),
+    name: getPreferredName(getObjectName(node), `AnimCurve_${getNodeId(node)}`),
+    keyTimes: toNumericArray(getChild(node, 'KeyTime')?.properties[0]).map((value) => value * FBX_TIME_TO_SECONDS),
+    keyValues: toNumericArray(
+      getChild(node, 'KeyValueFloat')?.properties[0] ??
+        getChild(node, 'KeyValueDouble')?.properties[0] ??
+        getChild(node, 'KeyValue')?.properties[0]
+    )
+  } as FbxAnimCurveData;
+}
+
+function readAnimCurveNodeData(node: FbxNode, ctx: FbxImportContext) {
+  const id = getNodeId(node);
+  const targetConnection = ctx.connectionParents
+    .get(id)
+    ?.find((connection) => !!ctx.modelMap.get(connection.to) && !!readAnimationTrackType(connection.property ?? ''));
+  const curveIds: [number | null, number | null, number | null] = [null, null, null];
+  for (const connection of ctx.connectionChildren.get(id) ?? []) {
+    if (!ctx.animCurveMap.has(connection.from)) {
+      continue;
+    }
+    const axis = readAnimationAxis(connection.property ?? '');
+    if (axis === 0 || axis === 1 || axis === 2) {
+      curveIds[axis] = connection.from;
+    }
+  }
+  return {
+    id,
+    name: getPreferredName(getObjectName(node), `AnimCurveNode_${id}`),
+    targetModelId: targetConnection?.to ?? null,
+    targetProperty: targetConnection?.property ?? '',
+    curveIds
+  } as FbxAnimCurveNodeData;
 }
 
 function wrapModeFromFbx(value: number): TextureAddressMode {
@@ -1573,7 +1687,264 @@ function buildModelMaps(ctx: FbxImportContext) {
     const data = readModelData(node, ctx);
     ctx.modelMap.set(data.id, data);
   }
+  for (const [, node] of getObjectEntriesByNames(ctx.objects, ['AnimCurve', 'AnimationCurve'])) {
+    const data = readAnimCurveData(node);
+    ctx.animCurveMap.set(data.id, data);
+  }
+  for (const [, node] of getObjectEntriesByNames(ctx.objects, ['AnimLayer', 'AnimationLayer'])) {
+    const data = readAnimLayerData(node);
+    ctx.animLayerMap.set(data.id, data);
+  }
+  for (const [, node] of getObjectEntriesByNames(ctx.objects, ['AnimStack', 'AnimationStack'])) {
+    const data = readAnimStackData(node);
+    ctx.animStackMap.set(data.id, data);
+  }
+  for (const [, node] of getObjectEntriesByNames(ctx.objects, ['AnimCurveNode', 'AnimationCurveNode'])) {
+    const data = readAnimCurveNodeData(node, ctx);
+    if (data.targetModelId != null && readAnimationTrackType(data.targetProperty)) {
+      ctx.animCurveNodeMap.set(data.id, data);
+    }
+  }
   buildBindWorldMap(ctx);
+}
+
+function collectTrackTimes(curves: Array<Nullable<FbxAnimCurveData>>) {
+  const times = new Set<number>();
+  for (const curve of curves) {
+    for (const time of curve?.keyTimes ?? []) {
+      times.add(time);
+    }
+  }
+  return Array.from(times).sort((a, b) => a - b);
+}
+
+function sampleAnimCurve(curve: Nullable<FbxAnimCurveData>, time: number, fallback: number) {
+  if (!curve || curve.keyTimes.length === 0 || curve.keyValues.length === 0) {
+    return fallback;
+  }
+  const count = Math.min(curve.keyTimes.length, curve.keyValues.length);
+  if (count <= 0) {
+    return fallback;
+  }
+  if (time <= curve.keyTimes[0]) {
+    return curve.keyValues[0];
+  }
+  if (time >= curve.keyTimes[count - 1]) {
+    return curve.keyValues[count - 1];
+  }
+  for (let i = 0; i < count - 1; i++) {
+    const t0 = curve.keyTimes[i];
+    const t1 = curve.keyTimes[i + 1];
+    if (time < t0 || time > t1) {
+      continue;
+    }
+    const v0 = curve.keyValues[i];
+    const v1 = curve.keyValues[i + 1];
+    if (t1 <= t0) {
+      return v1;
+    }
+    const factor = (time - t0) / (t1 - t0);
+    return v0 + (v1 - v0) * factor;
+  }
+  return fallback;
+}
+
+function getImportedLocalMatrix(modelData: FbxModelData, ctx: FbxImportContext) {
+  const bindWorld = ctx.bindWorldMap.get(modelData.id);
+  const parentWorld =
+    bindWorld && modelData.parentId != null ? computeModelWorldMatrix(modelData.parentId, ctx, ctx.bindWorldCache) : null;
+  return bindWorld
+    ? parentWorld
+      ? Matrix4x4.multiply(new Matrix4x4(parentWorld).inplaceInvertAffine(), bindWorld)
+      : new Matrix4x4(bindWorld)
+    : composeFbxLocalMatrix(modelData.transform, modelData.parentId != null);
+}
+
+function buildAnimatedLocalSample(
+  modelData: FbxModelData,
+  ctx: FbxImportContext,
+  translation: [number, number, number],
+  rotation: [number, number, number],
+  scale: [number, number, number]
+) {
+  const transform: FbxTransformData = {
+    ...modelData.transform,
+    translation,
+    rotation,
+    scale
+  };
+  const restLocal = composeFbxLocalMatrix(modelData.transform, modelData.parentId != null);
+  const animatedLocal = composeFbxLocalMatrix(transform, modelData.parentId != null);
+  const importedLocal = getImportedLocalMatrix(modelData, ctx);
+  const deltaLocal = Matrix4x4.multiply(animatedLocal, new Matrix4x4(restLocal).inplaceInvertAffine());
+  const local = Matrix4x4.multiply(deltaLocal, importedLocal);
+  const sampleScale = Vector3.one();
+  const sampleRotation = Quaternion.identity();
+  const sampleTranslation = Vector3.zero();
+  local.decompose(sampleScale, sampleRotation, sampleTranslation);
+  return {
+    translation: sampleTranslation,
+    rotation: sampleRotation,
+    scale: sampleScale
+  };
+}
+
+function getCurveNodeCurves(curveNode: FbxAnimCurveNodeData, ctx: FbxImportContext) {
+  return curveNode.curveIds.map((id) => (id != null ? ctx.animCurveMap.get(id) ?? null : null)) as [
+    Nullable<FbxAnimCurveData>,
+    Nullable<FbxAnimCurveData>,
+    Nullable<FbxAnimCurveData>
+  ];
+}
+
+function createAnimationTracksForModel(
+  modelId: number,
+  curveNodes: Partial<Record<AssetAnimationTrack['type'], FbxAnimCurveNodeData>>,
+  ctx: FbxImportContext
+): { tracks: AssetAnimationTrack[]; skeletons: AssetSkeleton[] } | null {
+  const modelData = ctx.modelMap.get(modelId);
+  const targetNode = ctx.nodeMap.get(modelId);
+  if (!modelData || !targetNode) {
+    return null;
+  }
+  const translationCurves = curveNodes.translation ? getCurveNodeCurves(curveNodes.translation, ctx) : null;
+  const rotationCurves = curveNodes.rotation ? getCurveNodeCurves(curveNodes.rotation, ctx) : null;
+  const scaleCurves = curveNodes.scale ? getCurveNodeCurves(curveNodes.scale, ctx) : null;
+  const times = collectTrackTimes([
+    ...(translationCurves ?? []),
+    ...(rotationCurves ?? []),
+    ...(scaleCurves ?? [])
+  ]);
+  if (times.length === 0) {
+    return null;
+  }
+  const defaultTranslation = [...modelData.transform.translation] as [number, number, number];
+  const defaultRotation = [...modelData.transform.rotation] as [number, number, number];
+  const defaultScale = [...modelData.transform.scale] as [number, number, number];
+  const translationOutputs = translationCurves ? new Float32Array(times.length * 3) : null;
+  const rotationOutputs = rotationCurves ? new Float32Array(times.length * 4) : null;
+  const scaleOutputs = scaleCurves ? new Float32Array(times.length * 3) : null;
+  for (let i = 0; i < times.length; i++) {
+    const translation = [...defaultTranslation] as [number, number, number];
+    const rotation = [...defaultRotation] as [number, number, number];
+    const scale = [...defaultScale] as [number, number, number];
+    for (const [curves, target, scaleTranslation] of [
+      [translationCurves, translation, true],
+      [rotationCurves, rotation, false],
+      [scaleCurves, scale, false]
+    ] as const) {
+      if (!curves) {
+        continue;
+      }
+      for (let axis = 0; axis < 3; axis++) {
+        const sampled = sampleAnimCurve(curves[axis], times[i], target[axis]);
+        target[axis] = scaleTranslation ? sampled * ctx.unitScale : sampled;
+      }
+    }
+    const sample = buildAnimatedLocalSample(modelData, ctx, translation, rotation, scale);
+    if (translationOutputs) {
+      translationOutputs[i * 3] = sample.translation.x;
+      translationOutputs[i * 3 + 1] = sample.translation.y;
+      translationOutputs[i * 3 + 2] = sample.translation.z;
+    }
+    if (rotationOutputs) {
+      rotationOutputs[i * 4] = sample.rotation.x;
+      rotationOutputs[i * 4 + 1] = sample.rotation.y;
+      rotationOutputs[i * 4 + 2] = sample.rotation.z;
+      rotationOutputs[i * 4 + 3] = sample.rotation.w;
+    }
+    if (scaleOutputs) {
+      scaleOutputs[i * 3] = sample.scale.x;
+      scaleOutputs[i * 3 + 1] = sample.scale.y;
+      scaleOutputs[i * 3 + 2] = sample.scale.z;
+    }
+  }
+  const tracks: AssetAnimationTrack[] = [];
+  if (translationOutputs) {
+    tracks.push({
+      node: targetNode,
+      type: 'translation',
+      interpolator: new Interpolator('linear' as InterpolationMode, 'vec3', Float32Array.from(times), translationOutputs)
+    });
+  }
+  if (rotationOutputs) {
+    tracks.push({
+      node: targetNode,
+      type: 'rotation',
+      interpolator: new Interpolator('linear' as InterpolationMode, 'quat', Float32Array.from(times), rotationOutputs)
+    });
+  }
+  if (scaleOutputs) {
+    tracks.push({
+      node: targetNode,
+      type: 'scale',
+      interpolator: new Interpolator('linear' as InterpolationMode, 'vec3', Float32Array.from(times), scaleOutputs)
+    });
+  }
+  return {
+    tracks,
+    skeletons: targetNode.skeletonAttached ? Array.from(targetNode.skeletonAttached) : []
+  };
+}
+
+function loadAnimations(model: SharedModel, ctx: FbxImportContext) {
+  for (const stack of ctx.animStackMap.values()) {
+    const animation: AssetAnimationData = {
+      name: stack.name,
+      tracks: [],
+      skeletons: [],
+      nodes: []
+    };
+    const usedTrackKeys = new Set<string>();
+    for (const layerConnection of ctx.connectionChildren.get(stack.id) ?? []) {
+      const layer = ctx.animLayerMap.get(layerConnection.from);
+      if (!layer) {
+        continue;
+      }
+      const modelCurves = new Map<number, Partial<Record<AssetAnimationTrack['type'], FbxAnimCurveNodeData>>>();
+      for (const curveNodeConnection of ctx.connectionChildren.get(layer.id) ?? []) {
+        const curveNode = ctx.animCurveNodeMap.get(curveNodeConnection.from);
+        if (!curveNode) {
+          continue;
+        }
+        const type = readAnimationTrackType(curveNode.targetProperty);
+        const modelId = curveNode.targetModelId;
+        if (!type || modelId == null) {
+          continue;
+        }
+        const curveSet = modelCurves.get(modelId) ?? {};
+        curveSet[type] = curveSet[type] ?? curveNode;
+        modelCurves.set(modelId, curveSet);
+      }
+      for (const [modelId, curveSet] of modelCurves) {
+        const trackKey = `${modelId}:${
+          ['translation', 'rotation', 'scale'].filter((type) => !!curveSet[type as AssetAnimationTrack['type']]).join(',')
+        }`;
+        if (usedTrackKeys.has(trackKey)) {
+          continue;
+        }
+        const trackData = createAnimationTracksForModel(modelId, curveSet, ctx);
+        if (!trackData) {
+          continue;
+        }
+        usedTrackKeys.add(trackKey);
+        for (const track of trackData.tracks) {
+          animation.tracks.push(track);
+          if (animation.nodes.indexOf(track.node) < 0) {
+            animation.nodes.push(track.node);
+          }
+        }
+        for (const skeleton of trackData.skeletons) {
+          if (animation.skeletons.indexOf(skeleton) < 0) {
+            animation.skeletons.push(skeleton);
+          }
+        }
+      }
+    }
+    if (animation.tracks.length > 0) {
+      model.addAnimation(animation);
+    }
+  }
 }
 
 function populateNodeTransforms(modelNode: AssetHierarchyNode, source: FbxModelData, ctx: FbxImportContext) {
@@ -1646,6 +2017,10 @@ function createImportContext(document: FbxDocument, basePath: string, vfs: VFS):
     textureMap: new Map(),
     videoMap: new Map(),
     skinMap: new Map(),
+    animStackMap: new Map(),
+    animLayerMap: new Map(),
+    animCurveMap: new Map(),
+    animCurveNodeMap: new Map(),
     bindWorldMap: new Map(),
     bindWorldCache: new Map(),
     skeletonMap: new Map(),
@@ -1662,7 +2037,7 @@ function createImportContext(document: FbxDocument, basePath: string, vfs: VFS):
 /**
  * FBX importer that converts common FBX 7.x scene data into SharedModel.
  * Current scope targets hierarchy, mesh, material, embedded/external textures,
- * and basic skinning data. Animation is intentionally not mapped yet.
+ * basic skinning data, and common TRS animation tracks.
  * @public
  */
 export class FBXImporter extends AbstractModelImporter {
@@ -1704,6 +2079,7 @@ export class FBXImporter extends AbstractModelImporter {
     }
     buildSkeletonsFromLimbRoots(model, ctx);
     model.buildMorphTargetGroupsByName();
+    loadAnimations(model, ctx);
     model.scenes.push(scene);
     model.activeScene = 0;
   }
