@@ -10,7 +10,7 @@ export type SaveOptions = {
   importJointDynamics: boolean;
   rebuildPrefab?: boolean;
   rebuildMaterial?: boolean;
-  sourceGlbReference?: boolean;
+  sourceReference?: boolean;
   sourceModelPath?: string;
 };
 
@@ -33,7 +33,7 @@ export class ResourceService {
     saveOptions?: SaveOptions
   ) {
     if (
-      !saveOptions?.sourceGlbReference ||
+      !saveOptions?.sourceReference ||
       !saveOptions.sourceModelPath ||
       !ResourceService.modelHasMorphTargets(model)
     ) {
@@ -41,8 +41,10 @@ export class ResourceService {
     }
     const sourceModelPath = saveOptions.sourceModelPath;
     const mimeType = srcVFS.guessMIMEType(sourceModelPath);
-    if (mimeType !== 'model/gltf-binary') {
-      console.info(`Skip source GLB morph reference for ${sourceModelPath}: only GLB/VRM sources are supported`);
+    if (mimeType !== 'model/gltf-binary' && mimeType !== 'model/fbx') {
+      console.info(
+        `Skip source morph reference for ${sourceModelPath}: only single-file GLB/VRM/FBX sources are supported`
+      );
       return null;
     }
     const targetSourcePath = manager.VFS.join(path, PathUtils.basename(sourceModelPath));

@@ -2751,7 +2751,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
                         ...saveOptions[i],
                         rebuildPrefab: !!result.rebuildPrefab,
                         rebuildMaterial: !!result.rebuildMaterial,
-                        sourceGlbReference: !!result.sourceGlbReference,
+                        sourceReference: !!result.sourceReference,
                         sourceModelPath: result.paths[i]
                       }
                     );
