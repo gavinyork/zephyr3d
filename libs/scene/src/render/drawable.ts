@@ -164,6 +164,18 @@ export type MorphData = {
 };
 
 /**
+ * Additional skinning influence data beyond the base 4 vertex attributes.
+ * @public
+ */
+export type SkinInfluenceData = {
+  width: number;
+  height: number;
+  influenceCount: number;
+  data: Float32Array<ArrayBuffer>;
+  texture?: DRef<Texture2D>;
+};
+
+/**
  * Morph information
  * @public
  */
@@ -192,6 +204,8 @@ export interface Drawable {
   getPickTarget(): PickTarget;
   /** Returns the texture containing bone matrices for skinned meshes. */
   getBoneMatrices(): Nullable<Texture2D>;
+  /** Returns additional per-vertex skinning influences packed in a texture, if needed. */
+  getSkinInfluenceData(): Nullable<SkinInfluenceData>;
   /** Returns the unique color used for GPU picking (object ID in color). */
   getObjectColor(): Vector4;
   /** Returns the morph target data texture (if morphing is used). */

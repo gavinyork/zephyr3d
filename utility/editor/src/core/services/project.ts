@@ -3,11 +3,14 @@ import { HttpFS, MemoryFS, PathUtils, randomUUID } from '@zephyr3d/base';
 import {
   DEFAULT_ACTIVE_MORPH_TARGET_LIMIT,
   DEFAULT_MORPH_TARGET_LIMIT,
+  DEFAULT_SKIN_INFLUENCE_LIMIT,
   getEngine,
   normalizeActiveMorphTargetLimit,
   normalizeMorphTargetLimit,
+  normalizeSkinInfluenceLimit,
   setActiveMorphTargetLimit,
   setMorphTargetLimit,
+  setSkinInfluenceLimit,
   tryGetApp
 } from '@zephyr3d/scene';
 import { fileListFileName, libDir, projectFileName } from '../build/templates';
@@ -34,6 +37,7 @@ export type ProjectSettings = {
   renderScale?: number;
   morphTargetLimit?: number;
   activeMorphTargetLimit?: number;
+  skinInfluenceLimit?: number;
   dependencies?: { [name: string]: string };
 };
 
@@ -42,7 +46,8 @@ const defaultProjectSettings: Immutable<ProjectSettings> = {
   enableMSAA: false,
   renderScale: 0,
   morphTargetLimit: DEFAULT_MORPH_TARGET_LIMIT,
-  activeMorphTargetLimit: DEFAULT_ACTIVE_MORPH_TARGET_LIMIT
+  activeMorphTargetLimit: DEFAULT_ACTIVE_MORPH_TARGET_LIMIT,
+  skinInfluenceLimit: DEFAULT_SKIN_INFLUENCE_LIMIT
 };
 
 function normalizeRenderScale(scale: number): number {
@@ -65,6 +70,7 @@ function normalizeProjectSettings(settings: ProjectSettings): ProjectSettings {
     normalizeActiveMorphTargetLimit(settings?.activeMorphTargetLimit),
     morphTargetLimit
   );
+  const skinInfluenceLimit = normalizeSkinInfluenceLimit(settings?.skinInfluenceLimit);
   return {
     ...defaultProjectSettings,
     ...settings,
@@ -72,7 +78,8 @@ function normalizeProjectSettings(settings: ProjectSettings): ProjectSettings {
     enableMSAA: !!settings?.enableMSAA,
     renderScale: normalizeRenderScale(settings?.renderScale),
     morphTargetLimit,
-    activeMorphTargetLimit
+    activeMorphTargetLimit,
+    skinInfluenceLimit
   };
 }
 
@@ -156,6 +163,7 @@ export class ProjectService {
   static applyRuntimeSettings(settings?: ProjectSettings | null) {
     const morphTargetLimit = setMorphTargetLimit(settings?.morphTargetLimit);
     setActiveMorphTargetLimit(Math.min(settings?.activeMorphTargetLimit ?? DEFAULT_ACTIVE_MORPH_TARGET_LIMIT, morphTargetLimit));
+    setSkinInfluenceLimit(settings?.skinInfluenceLimit);
   }
   static async listProjects(): Promise<ProjectInfo[]> {
     const manifest = await this.readManifest(true);

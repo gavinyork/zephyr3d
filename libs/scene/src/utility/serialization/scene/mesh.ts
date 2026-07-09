@@ -3,6 +3,7 @@ import { getEngine } from '../../../app/api';
 import {
   applyMeshMorphData,
   applyMeshMorphMetadata,
+  applyMeshSkinInfluenceData,
   type AssetHierarchyNode,
   type AssetSubMeshData
 } from '../../../asset/model';
@@ -180,11 +181,14 @@ export function getMeshClass(manager: ResourceManager): SerializableClass {
           },
           get(this: Mesh, value) {
             if (this.skinnedBoundingInfo) {
-              const arr = new Float32Array(24 + 24 + 6 * 3);
-              arr.set(this.skinnedBoundingInfo.boundingVertexBlendIndices, 0);
-              arr.set(this.skinnedBoundingInfo.boundingVertexJointWeights, 24);
+              const influenceCount = this.skinnedBoundingInfo.influenceCount ?? 4;
+              const attribLength = 6 * influenceCount;
+              const arr = new Float32Array(1 + attribLength + attribLength + 6 * 3);
+              arr[0] = influenceCount;
+              arr.set(this.skinnedBoundingInfo.boundingVertexBlendIndices, 1);
+              arr.set(this.skinnedBoundingInfo.boundingVertexJointWeights, 1 + attribLength);
               for (let i = 0; i < 6; i++) {
-                arr.set(this.skinnedBoundingInfo.boundingVertices[i], 24 + 24 + i * 3);
+                arr.set(this.skinnedBoundingInfo.boundingVertices[i], 1 + attribLength + attribLength + i * 3);
               }
               value.str[0] = uint8ArrayToBase64(new Uint8Array(arr.buffer));
             } else {
@@ -194,13 +198,20 @@ export function getMeshClass(manager: ResourceManager): SerializableClass {
           set(this: Mesh, value) {
             if (value.str[0]) {
               const buf = new Float32Array(base64ToUint8Array(value.str[0]).buffer);
-              const boundingVertexBlendIndices = buf.subarray(0, 24);
-              const boundingVertexJointWeights = buf.subarray(24, 48);
+              const legacy = buf.length === 24 + 24 + 6 * 3;
+              const influenceCount = legacy ? 4 : Math.max(1, Math.floor(Number(buf[0]) || 4));
+              const attribLength = 6 * influenceCount;
+              const offset = legacy ? 0 : 1;
+              const boundingVertexBlendIndices = buf.subarray(offset, offset + attribLength);
+              const boundingVertexJointWeights = buf.subarray(offset + attribLength, offset + attribLength * 2);
               const boundingVertices: Vector3[] = [];
               for (let i = 0; i < 6; i++) {
-                boundingVertices.push(new Vector3(buf.subarray(48 + i * 3, 48 + (i + 1) * 3)));
+                boundingVertices.push(
+                  new Vector3(buf.subarray(offset + attribLength * 2 + i * 3, offset + attribLength * 2 + (i + 1) * 3))
+                );
               }
               this.setSkinnedBoundingInfo({
+                influenceCount,
                 boundingVertexBlendIndices,
                 boundingVertexJointWeights,
                 boundingVertices,
@@ -239,6 +250,41 @@ export function getMeshClass(manager: ResourceManager): SerializableClass {
             if (value.str[0]) {
               this.skeletonName = value.str[0];
             }
+          }
+        },
+        {
+          name: 'SkinInfluenceData',
+          description: 'Serialized extra skinning influences stored outside the base 4 vertex attributes',
+          type: 'string',
+          isHidden() {
+            return true;
+          },
+          get(this: Mesh, value) {
+            const skinData = this.getSkinInfluenceData();
+            if (!skinData) {
+              value.str[0] = '';
+              return;
+            }
+            const buffer = new ArrayBuffer(4 + 4 + 4 + 4 * 4 * skinData.width * skinData.height);
+            const dataView = new DataView(buffer);
+            dataView.setUint32(0, skinData.width, true);
+            dataView.setUint32(4, skinData.height, true);
+            dataView.setUint32(8, skinData.influenceCount, true);
+            new Float32Array(buffer, 12, 4 * skinData.width * skinData.height).set(skinData.data);
+            value.str[0] = uint8ArrayToBase64(new Uint8Array(buffer));
+          },
+          set(this: Mesh, value) {
+            if (!value.str[0]) {
+              this.setSkinInfluenceData(null);
+              return;
+            }
+            const data = base64ToUint8Array(value.str[0]);
+            const dataView = new DataView(data.buffer, data.byteOffset, data.byteLength);
+            const width = dataView.getUint32(0, true);
+            const height = dataView.getUint32(4, true);
+            const influenceCount = dataView.getUint32(8, true);
+            const pixels = new Float32Array(data.buffer, data.byteOffset + 12, 4 * width * height);
+            this.setSkinInfluenceData({ width, height, influenceCount, data: pixels });
           }
         },
         {
@@ -322,6 +368,7 @@ export function getMeshClass(manager: ResourceManager): SerializableClass {
               );
             }
             applyMeshMorphData(sourceSubMesh, this);
+            applyMeshSkinInfluenceData(sourceSubMesh, this);
           }
         },
         {

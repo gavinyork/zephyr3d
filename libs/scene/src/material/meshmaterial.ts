@@ -947,8 +947,8 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       ShaderHelper.prepareSkinAnimation(scope);
     }
     if (
-      this.drawContext.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION &&
-      this.drawContext.device.type === 'webgl'
+      this.drawContext.device.type === 'webgl' &&
+      (this.drawContext.materialFlags & (MaterialVaryingFlags.SKIN_ANIMATION | MaterialVaryingFlags.MORPH_ANIMATION))
     ) {
       scope.$inputs.zFakeVertexID = pb.float().attrib('texCoord7');
     }

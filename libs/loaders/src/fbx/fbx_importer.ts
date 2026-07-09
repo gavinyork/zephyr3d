@@ -13,6 +13,7 @@ import {
   AssetSkeleton,
   BoundingBox,
   getEngine,
+  getSkinInfluenceLimit,
   MORPH_TARGET_NORMAL,
   MORPH_TARGET_POSITION,
   SharedModel,
@@ -1025,6 +1026,7 @@ function remapMeshSkinIndices(
 
 function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData, unitScale: number): FbxPrimitiveBuildData[] {
   const morphTargets = geometry.morphTargets ?? [];
+  const skinInfluenceLimit = Math.max(1, getSkinInfluenceLimit());
   const materialBuckets = new Map<
     number,
     {
@@ -1039,6 +1041,7 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData, unitSca
       rawPositions: number[];
       rawBlendIndices: number[];
       rawJointWeights: number[];
+      rawSkinInfluenceCount: number;
       controlPointToVertices: Map<number, number[]>;
     }
   >();
@@ -1069,6 +1072,7 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData, unitSca
         rawPositions: [],
         rawBlendIndices: [],
         rawJointWeights: [],
+        rawSkinInfluenceCount: 0,
         controlPointToVertices: new Map()
       };
       materialBuckets.set(materialIndex, bucket);
@@ -1160,8 +1164,8 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData, unitSca
         const vertexInfluences = skinData.influences[cpIndex]
           .slice()
           .sort((a, b) => b.weight - a.weight)
-          .slice(0, 4);
-        while (vertexInfluences.length < 4) {
+          .slice(0, skinInfluenceLimit);
+        while (vertexInfluences.length < skinInfluenceLimit) {
           vertexInfluences.push({ joint: 0, weight: 0 });
         }
         let total = 0;
@@ -1169,12 +1173,16 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData, unitSca
           total += influence.weight;
         }
         const denom = total > 0 ? total : 1;
-        for (const influence of vertexInfluences) {
+        for (let influenceIndex = 0; influenceIndex < 4; influenceIndex++) {
+          const influence = vertexInfluences[influenceIndex] ?? { joint: 0, weight: 0 };
           bucket.blendIndices.push(influence.joint);
           bucket.blendWeights.push(influence.weight / denom);
+        }
+        for (const influence of vertexInfluences) {
           bucket.rawBlendIndices.push(influence.joint);
           bucket.rawJointWeights.push(influence.weight / denom);
         }
+        bucket.rawSkinInfluenceCount = skinInfluenceLimit;
       }
     }
     const polygonSize = polygon.length;
@@ -1320,6 +1328,7 @@ function buildPrimitives(geometry: FbxGeometryData, model: FbxModelData, unitSca
         bucket.rawBlendIndices.length > 0 ? toUint16Array(new Uint16Array(bucket.rawBlendIndices)) : null,
       rawJointWeights:
         bucket.rawJointWeights.length > 0 ? toFloat32Array(new Float32Array(bucket.rawJointWeights)) : null,
+      rawSkinInfluenceCount: bucket.rawSkinInfluenceCount || undefined,
       materialIndex,
       name: materialBuckets.size > 1 ? `${meshBaseName}_${materialIndex}` : meshBaseName,
       numTargets,
@@ -1878,6 +1887,7 @@ function createMeshData(
       rawPositions: toFloat32Array(primitiveData.rawPositions),
       rawBlendIndices: primitiveData.rawBlendIndices ? toUint16Array(primitiveData.rawBlendIndices) : null,
       rawJointWeights: primitiveData.rawJointWeights ? toFloat32Array(primitiveData.rawJointWeights) : null,
+      rawSkinInfluenceCount: primitiveData.rawSkinInfluenceCount,
       name: primitiveData.name || geometry.name,
       numTargets: primitiveData.numTargets ?? 0,
       targets: primitiveData.targets,

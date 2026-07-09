@@ -1435,7 +1435,9 @@ export class ResourceManager {
                 tmpVal.num[3] = v[3];
                 break;
             }
-            await Promise.resolve(prop.set.call(obj, tmpVal, -1));
+            if (prop.set) {
+              await Promise.resolve(prop.set.call(obj, tmpVal, -1));
+            }
           } catch (err) {
             console.warn(
               `Deserialize property failed: ${cls.name}.${k} on ${obj?.constructor?.name ?? 'UnknownObject'}: ${String(err)}`

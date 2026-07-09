@@ -11,6 +11,7 @@ import type {
   Primitive,
   RenderQueue
 } from '../render';
+import type { SkinInfluenceData } from '../render';
 import type { SceneNode } from '.';
 import { mixinDrawable } from '../render/drawable_mixin';
 import type { Texture2D } from '@zephyr3d/device';
@@ -64,6 +65,9 @@ export class MeshDrawable<M extends MeshMaterial>
     return { node: this.getNode() };
   }
   getBoneMatrices(): Nullable<Texture2D> {
+    return null;
+  }
+  getSkinInfluenceData(): Nullable<SkinInfluenceData> {
     return null;
   }
   getMorphData(): Nullable<MorphData> {

@@ -686,6 +686,9 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
   getMorphData() {
     return null;
   }
+  getSkinInfluenceData() {
+    return null;
+  }
   /**
    * {@inheritDoc Drawable.getMorphInfo}
    */

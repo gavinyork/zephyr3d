@@ -193,6 +193,7 @@ export interface FbxPrimitiveBuildData {
   rawPositions: Float32Array;
   rawBlendIndices?: Uint16Array | null;
   rawJointWeights?: Float32Array | null;
+  rawSkinInfluenceCount?: number;
   materialIndex: number;
   name: string;
   numTargets?: number;

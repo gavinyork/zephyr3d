@@ -3,9 +3,12 @@ import { ImGui } from '@zephyr3d/imgui';
 import {
   DEFAULT_ACTIVE_MORPH_TARGET_LIMIT,
   DEFAULT_MORPH_TARGET_LIMIT,
+  DEFAULT_SKIN_INFLUENCE_LIMIT,
   MAX_MORPH_TARGETS,
+  MAX_SKIN_INFLUENCES,
   normalizeActiveMorphTargetLimit,
-  normalizeMorphTargetLimit
+  normalizeMorphTargetLimit,
+  normalizeSkinInfluenceLimit
 } from '@zephyr3d/scene';
 import { ListView, ListViewData } from '../../components/listview';
 import { renderMultiSelectedCombo } from '../../components/multicombo';
@@ -290,6 +293,21 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
         'This limit only affects per-frame active morph uploads.\n' +
           'It does not change the total morph count preserved by Morph Target Limit.\n' +
           'MetaHuman-style facial rigs usually benefit from 64-128.'
+      );
+    }
+
+    const skinInfluenceLimit = [this._settings.skinInfluenceLimit ?? DEFAULT_SKIN_INFLUENCE_LIMIT] as [number];
+    if (ImGui.InputInt('Max Skin Influences', skinInfluenceLimit, 2, 4)) {
+      this._settings.skinInfluenceLimit = normalizeSkinInfluenceLimit(skinInfluenceLimit[0]);
+    }
+    ImGui.TextDisabled(
+      `Default ${DEFAULT_SKIN_INFLUENCE_LIMIT}, range 1-${MAX_SKIN_INFLUENCES}. Reimport skinned models after raising this limit.`
+    );
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip(
+        'Controls how many skinning influences are preserved per vertex during import.\n' +
+          'Values above 4 require the runtime extra-influence texture path.\n' +
+          'MetaHuman head rigs typically need 8-12 to avoid facial binding loss.'
       );
     }
 

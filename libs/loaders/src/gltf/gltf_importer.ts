@@ -37,6 +37,7 @@ import {
   BoundingBox,
   DracoMeshDecoder,
   getEngine,
+  getSkinInfluenceLimit,
   MORPH_TARGET_COLOR,
   MORPH_TARGET_NORMAL,
   MORPH_TARGET_POSITION,
@@ -69,6 +70,8 @@ type SpringBoneJointInfo = {
   gravityDir?: unknown;
   dragForce?: number;
 };
+
+const SKIN_WEIGHT_EPSILON = 1e-6;
 
 type VRMC0BlendShapeBindInfo = {
   mesh?: unknown;
@@ -1260,6 +1263,7 @@ export class GLTFImporter extends AbstractModelImporter {
               dracoMeshDecoder!
             );
           }
+          this._finalizeSkinData(gltf, attributes, primitive, subMeshData);
           if (p.targets) {
             if (getDevice().type === 'webgl') {
               // Emulate vertexID for WebGL1 device
@@ -1897,6 +1901,99 @@ export class GLTFImporter extends AbstractModelImporter {
     }
 
     this._setBuffer(gltf, accessorIndex, primitive, semantic, subMeshData);
+  }
+  /** @internal */
+  private _finalizeSkinData(
+    gltf: GLTFContent,
+    attributes: Record<string, number>,
+    primitive: AssetPrimitiveInfo,
+    subMeshData: AssetSubMeshData
+  ) {
+    const setIndices = Array.from(
+      new Set(
+        Object.keys(attributes)
+          .map((name) => {
+            const match = /^(?:JOINTS|WEIGHTS)_(\d+)$/.exec(name);
+            return match ? Number(match[1]) : -1;
+          })
+          .filter((index) => index >= 0)
+      )
+    )
+      .filter(
+        (setIndex) =>
+          attributes[`JOINTS_${setIndex}`] !== undefined && attributes[`WEIGHTS_${setIndex}`] !== undefined
+      )
+      .sort((a, b) => a - b);
+    if (setIndices.length === 0) {
+      return;
+    }
+    const limit = Math.max(1, getSkinInfluenceLimit());
+    const sets = setIndices.map((setIndex) => {
+      const jointAccessor = gltf._accessors[attributes[`JOINTS_${setIndex}`]];
+      const weightAccessor = gltf._accessors[attributes[`WEIGHTS_${setIndex}`]];
+      return {
+        jointComponentCount: jointAccessor.getComponentCount(jointAccessor.type),
+        weightComponentCount: weightAccessor.getComponentCount(weightAccessor.type),
+        joints: jointAccessor.getNormalizedDeinterlacedView(gltf),
+        weights: weightAccessor.getNormalizedDeinterlacedView(gltf),
+        count: weightAccessor.count
+      };
+    });
+    const numVertices = sets[0]?.count ?? 0;
+    if (numVertices <= 0) {
+      return;
+    }
+    const rawBlendIndices = new Uint16Array(numVertices * limit);
+    const rawJointWeights = new Float32Array(numVertices * limit);
+    const vertexBlendIndices = new Float32Array(numVertices * 4);
+    const vertexBlendWeights = new Float32Array(numVertices * 4);
+    for (let vertexIndex = 0; vertexIndex < numVertices; vertexIndex++) {
+      const influences: { joint: number; weight: number }[] = [];
+      for (const set of sets) {
+        const componentCount = Math.min(set.jointComponentCount, set.weightComponentCount);
+        const jointBase = vertexIndex * set.jointComponentCount;
+        const weightBase = vertexIndex * set.weightComponentCount;
+        for (let componentIndex = 0; componentIndex < componentCount; componentIndex++) {
+          const weight = Number(set.weights[weightBase + componentIndex]) || 0;
+          if (Math.abs(weight) <= SKIN_WEIGHT_EPSILON) {
+            continue;
+          }
+          influences.push({
+            joint: Math.max(0, Math.trunc(Number(set.joints[jointBase + componentIndex]) || 0)),
+            weight
+          });
+        }
+      }
+      influences.sort((a, b) => b.weight - a.weight);
+      const selected = influences.slice(0, limit);
+      let totalWeight = 0;
+      for (const influence of selected) {
+        totalWeight += influence.weight;
+      }
+      const denom = totalWeight > SKIN_WEIGHT_EPSILON ? totalWeight : 1;
+      const rawBase = vertexIndex * limit;
+      for (let influenceIndex = 0; influenceIndex < limit; influenceIndex++) {
+        const influence = selected[influenceIndex];
+        rawBlendIndices[rawBase + influenceIndex] = influence?.joint ?? 0;
+        rawJointWeights[rawBase + influenceIndex] = influence ? influence.weight / denom : 0;
+      }
+      const vertexBase = vertexIndex * 4;
+      for (let influenceIndex = 0; influenceIndex < 4; influenceIndex++) {
+        vertexBlendIndices[vertexBase + influenceIndex] = rawBlendIndices[rawBase + influenceIndex] ?? 0;
+        vertexBlendWeights[vertexBase + influenceIndex] = rawJointWeights[rawBase + influenceIndex] ?? 0;
+      }
+    }
+    primitive.vertices['blendIndices'] = {
+      format: 'blendindices_f32x4' as VertexAttribFormat,
+      data: vertexBlendIndices
+    };
+    primitive.vertices['blendWeights'] = {
+      format: 'blendweights_f32x4' as VertexAttribFormat,
+      data: vertexBlendWeights
+    };
+    subMeshData.rawBlendIndices = rawBlendIndices;
+    subMeshData.rawJointWeights = rawJointWeights;
+    subMeshData.rawSkinInfluenceCount = limit;
   }
   /** @internal */
   private _setBuffer(

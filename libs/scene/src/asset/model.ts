@@ -46,7 +46,7 @@ import {
   NodeTranslationTrack,
   PCAGeometryCacheTrack
 } from '../animation';
-import { getMorphTargetLimit, MAX_MORPH_ATTRIBUTES, MAX_MORPH_TARGETS } from '../values';
+import { getMorphTargetLimit, getSkinInfluenceLimit, MAX_MORPH_ATTRIBUTES, MAX_MORPH_TARGETS } from '../values';
 import { getDevice } from '../app/api';
 import { Primitive } from '../render/primitive';
 import type { MeshMaterial } from '../material/meshmaterial';
@@ -308,6 +308,7 @@ export interface AssetSubMeshData {
   rawPositions: Nullable<Float32Array>;
   rawBlendIndices: Nullable<TypedArray>;
   rawJointWeights: Nullable<TypedArray>;
+  rawSkinInfluenceCount?: number;
   name: string;
   numTargets: number;
   targets?: Partial<Record<number, { numComponents: number; data: Float32Array[]; indices?: Uint32Array[] }>>;
@@ -1672,7 +1673,8 @@ export class SharedModel extends Disposable {
                 const v = {
                   positions: nodes.bounding[i].rawPositions!,
                   blendIndices: nodes.bounding[i].rawBlendIndices!,
-                  weights: nodes.bounding[i].rawJointWeights!
+                  weights: nodes.bounding[i].rawJointWeights!,
+                  influenceCount: nodes.bounding[i].rawSkinInfluenceCount ?? 4
                 };
                 mesh.setSkinnedBoundingInfo(nodes.binding.getBoundingInfo(v));
                 mesh.skeletonName = nodes.binding.persistentId;
@@ -2067,6 +2069,7 @@ export class SharedModel extends Disposable {
             meshData.morphNames,
             morphSource
           );
+          applyMeshSkinInfluenceData(subMesh, meshNode);
           if (skeleton) {
             if (!skeletonMeshMap.has(skeleton)) {
               skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });
@@ -2584,6 +2587,55 @@ export function applyMeshMorphData(subMesh: AssetSubMeshData, mesh: Mesh) {
     return;
   }
   mesh.setMorphSourceData(sourceData);
+}
+
+function createSkinInfluenceDataFromSubMesh(subMesh: AssetSubMeshData) {
+  const influenceCount = Math.max(
+    0,
+    Math.min(
+      subMesh.rawSkinInfluenceCount ?? 4,
+      getSkinInfluenceLimit(),
+      Math.floor((subMesh.rawJointWeights?.length ?? 0) / Math.max(1, (subMesh.rawPositions?.length ?? 0) / 3))
+    )
+  );
+  if (
+    influenceCount <= 4 ||
+    !subMesh.rawPositions ||
+    !subMesh.rawBlendIndices ||
+    !subMesh.rawJointWeights ||
+    subMesh.rawPositions.length < 3
+  ) {
+    return null;
+  }
+  const numVertices = Math.floor(subMesh.rawPositions.length / 3);
+  if (numVertices <= 0) {
+    return null;
+  }
+  const extraInfluenceCount = influenceCount - 4;
+  const pairCount = Math.ceil(extraInfluenceCount / 2);
+  const textureSize = Math.ceil(Math.sqrt(numVertices * pairCount));
+  const textureData = new Float32Array(textureSize * textureSize * 4);
+  for (let vertexIndex = 0; vertexIndex < numVertices; vertexIndex++) {
+    const baseOffset = vertexIndex * influenceCount + 4;
+    for (let pairIndex = 0; pairIndex < pairCount; pairIndex++) {
+      const sourceIndex = baseOffset + pairIndex * 2;
+      const texelOffset = (vertexIndex * pairCount + pairIndex) * 4;
+      textureData[texelOffset] = Number(subMesh.rawBlendIndices[sourceIndex] ?? 0);
+      textureData[texelOffset + 1] = Number(subMesh.rawJointWeights[sourceIndex] ?? 0);
+      textureData[texelOffset + 2] = Number(subMesh.rawBlendIndices[sourceIndex + 1] ?? 0);
+      textureData[texelOffset + 3] = Number(subMesh.rawJointWeights[sourceIndex + 1] ?? 0);
+    }
+  }
+  return {
+    width: textureSize,
+    height: textureSize,
+    influenceCount,
+    data: textureData
+  };
+}
+
+export function applyMeshSkinInfluenceData(subMesh: AssetSubMeshData, mesh: Mesh) {
+  mesh.setSkinInfluenceData(createSkinInfluenceDataFromSubMesh(subMesh));
 }
 
 /** @internal */
