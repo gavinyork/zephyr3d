@@ -1,6 +1,14 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Mon, 06 Jul 2026 06:18:13 GMT and should not be manually modified.
+This log was last generated on Thu, 09 Jul 2026 06:50:05 GMT and should not be manually modified.
+
+## 0.9.16
+Thu, 09 Jul 2026 06:50:05 GMT
+
+### Patches
+
+- Add PCSS shadow implementation
+- Add specific SSS implementation for skin rendering
 
 ## 0.9.15
 Mon, 06 Jul 2026 06:18:13 GMT

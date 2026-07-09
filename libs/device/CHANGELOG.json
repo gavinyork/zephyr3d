@@ -2,6 +2,18 @@
   "name": "@zephyr3d/device",
   "entries": [
     {
+      "version": "0.2.13",
+      "tag": "@zephyr3d/device_v0.2.13",
+      "date": "Thu, 09 Jul 2026 06:50:05 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Fix possible NaN error when setting viewport or scissor rectangle"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.12",
       "tag": "@zephyr3d/device_v0.2.12",
       "date": "Mon, 06 Jul 2026 06:18:13 GMT",

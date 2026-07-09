@@ -2,6 +2,23 @@
   "name": "@zephyr3d/backend-webgpu",
   "entries": [
     {
+      "version": "0.1.17",
+      "tag": "@zephyr3d/backend-webgpu_v0.1.17",
+      "date": "Thu, 09 Jul 2026 06:50:05 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Fix possible NaN error when setting viewport or scissor rectangle"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.12` to `0.2.13`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.16",
       "tag": "@zephyr3d/backend-webgpu_v0.1.16",
       "date": "Mon, 06 Jul 2026 06:18:13 GMT",

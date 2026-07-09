@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/backend-webgpu
 
-This log was last generated on Mon, 06 Jul 2026 06:18:13 GMT and should not be manually modified.
+This log was last generated on Thu, 09 Jul 2026 06:50:05 GMT and should not be manually modified.
+
+## 0.1.17
+Thu, 09 Jul 2026 06:50:05 GMT
+
+### Patches
+
+- Fix possible NaN error when setting viewport or scissor rectangle
 
 ## 0.1.16
 Mon, 06 Jul 2026 06:18:13 GMT

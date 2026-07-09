@@ -2,6 +2,26 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.16",
+      "tag": "@zephyr3d/scene_v0.9.16",
+      "date": "Thu, 09 Jul 2026 06:50:05 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add PCSS shadow implementation"
+          },
+          {
+            "comment": "Add specific SSS implementation for skin rendering"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.12` to `0.2.13`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.15",
       "tag": "@zephyr3d/scene_v0.9.15",
       "date": "Mon, 06 Jul 2026 06:18:13 GMT",
