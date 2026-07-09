@@ -553,6 +553,32 @@ function decryptSecret(payload) {
   }
 }
 
+function findInvalidHttpHeaderValueChar(value) {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code > 255 || code === 0x00 || code === 0x0a || code === 0x0d) {
+      return { index: i, code };
+    }
+  }
+  return null;
+}
+
+function normalizeLlmApiKey(apiKey) {
+  let normalized = typeof apiKey === 'string' ? apiKey.trim() : '';
+  normalized = normalized.replace(/^Bearer\s+/i, '').trim();
+  if (!normalized) {
+    throw new Error('API key must not be empty');
+  }
+  const invalidChar = findInvalidHttpHeaderValueChar(normalized);
+  if (invalidChar) {
+    throw new Error(
+      `API key contains an unsupported character at index ${invalidChar.index} (code ${invalidChar.code}). ` +
+        'API keys used in HTTP headers must contain only header-safe characters; please paste the raw key only.'
+    );
+  }
+  return normalized;
+}
+
 async function loadLlmSecrets() {
   const filePath = llmSecretsPath();
   const loaded = await fs
@@ -577,10 +603,7 @@ function hasLlmApiKeyConfigured(provider) {
 
 async function setLlmApiKey(provider, apiKey) {
   const normalizedProvider = sanitizeLlmProvider(provider);
-  const normalizedKey = typeof apiKey === 'string' ? apiKey.trim() : '';
-  if (!normalizedKey) {
-    throw new Error('API key must not be empty');
-  }
+  const normalizedKey = normalizeLlmApiKey(apiKey);
   llmSecrets.providers[normalizedProvider] = {
     apiKey: encryptSecret(normalizedKey),
     updatedAt: new Date().toISOString()
@@ -1125,10 +1148,11 @@ async function readOpenAiCompatibleChatStream(response, callbacks) {
 }
 
 async function invokeOpenAiCompatibleChat(settings, messages, tools, signal, callbacks) {
-  const apiKey = getLlmApiKey(settings.provider);
-  if (!apiKey) {
+  const rawApiKey = getLlmApiKey(settings.provider);
+  if (!rawApiKey) {
     throw new Error(`No API key configured for provider ${settings.provider}`);
   }
+  const apiKey = normalizeLlmApiKey(rawApiKey);
   const response = await fetch(getOpenAiCompatibleChatUrl(settings.provider, settings.baseUrl), {
     method: 'POST',
     headers: {
