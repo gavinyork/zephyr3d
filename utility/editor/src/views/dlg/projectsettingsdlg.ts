@@ -301,12 +301,13 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
       this._settings.skinInfluenceLimit = normalizeSkinInfluenceLimit(skinInfluenceLimit[0]);
     }
     ImGui.TextDisabled(
-      `Default ${DEFAULT_SKIN_INFLUENCE_LIMIT}, range 1-${MAX_SKIN_INFLUENCES}. Reimport skinned models after raising this limit.`
+      `Default ${DEFAULT_SKIN_INFLUENCE_LIMIT}, range 1-${MAX_SKIN_INFLUENCES}. Reimport skinned models after raising this limit to preserve more weights.`
     );
     if (ImGui.IsItemHovered()) {
       ImGui.SetTooltip(
         'Controls how many skinning influences are preserved per vertex during import.\n' +
-          'Values above 4 require the runtime extra-influence texture path.\n' +
+        'Values above 4 require the runtime extra-influence texture path.\n' +
+          'Lowering this setting does not strip influences that were already imported.\n' +
           'MetaHuman head rigs typically need 8-12 to avoid facial binding loss.'
       );
     }

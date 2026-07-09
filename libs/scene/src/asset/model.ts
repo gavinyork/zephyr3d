@@ -46,7 +46,7 @@ import {
   NodeTranslationTrack,
   PCAGeometryCacheTrack
 } from '../animation';
-import { getMorphTargetLimit, getSkinInfluenceLimit, MAX_MORPH_ATTRIBUTES, MAX_MORPH_TARGETS } from '../values';
+import { getMorphTargetLimit, MAX_MORPH_ATTRIBUTES, MAX_MORPH_TARGETS, MAX_SKIN_INFLUENCES } from '../values';
 import { getDevice } from '../app/api';
 import { Primitive } from '../render/primitive';
 import type { MeshMaterial } from '../material/meshmaterial';
@@ -2590,11 +2590,13 @@ export function applyMeshMorphData(subMesh: AssetSubMeshData, mesh: Mesh) {
 }
 
 function createSkinInfluenceDataFromSubMesh(subMesh: AssetSubMeshData) {
+  // Preserve the influence count captured at import time so runtime settings do not silently
+  // degrade already-imported assets when a project lowers the import limit later on.
   const influenceCount = Math.max(
     0,
     Math.min(
       subMesh.rawSkinInfluenceCount ?? 4,
-      getSkinInfluenceLimit(),
+      MAX_SKIN_INFLUENCES,
       Math.floor((subMesh.rawJointWeights?.length ?? 0) / Math.max(1, (subMesh.rawPositions?.length ?? 0) / 3))
     )
   );
