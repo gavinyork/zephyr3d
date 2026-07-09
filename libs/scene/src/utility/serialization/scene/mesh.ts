@@ -380,7 +380,7 @@ export function getMeshClass(manager: ResourceManager): SerializableClass {
           },
           get(this: Mesh, value) {
             const sourceData = this.getMorphSourceData();
-            value.str[0] = sourceData ? serializeMorphSourceData(sourceData) : '';
+            value.str[0] = sourceData && !this.getMorphSource() ? serializeMorphSourceData(sourceData) : '';
           },
           set(this: Mesh, value) {
             if (!value.str[0]) {
