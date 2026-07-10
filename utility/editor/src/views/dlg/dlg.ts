@@ -20,6 +20,7 @@ import { DlgMaterialFunctionEditor } from './materialfunceditor';
 import { DlgImportOptions } from './importoptionsdlg';
 import { DlgOpenFolder } from './openfolderdlg';
 import { DlgCreateProject, type CreateProjectResult } from './createprojectdlg';
+import { DlgShapeEditor } from './shapeeditordlg';
 
 export class Dialog {
   public static messageBox(title: string, message: string, width?: number, height?: number) {
@@ -58,6 +59,9 @@ export class Dialog {
   }
   public static async promptImport(title: string, vfs: VFS, width?: number, height?: number) {
     return DlgImport.promptImport(`${title}##Dialog`, vfs, width, height);
+  }
+  public static async editShape(title: string, path: string, width?: number, height?: number) {
+    return DlgShapeEditor.editPrimitive(title, path, width, height);
   }
   public static async editMaterial(
     title: string,

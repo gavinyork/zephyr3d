@@ -25,6 +25,7 @@ type EventBusEventMap = {
   action: [action: string, ...args: any];
   edit_material: [label: string, outputName: string, type: GenericConstructor<MeshMaterial>, path: string];
   edit_material_function: [path: string];
+  edit_primitive: [label: string, path: string];
   reveal_asset: [path: string];
   assets_deleting: [paths: string[]];
 };

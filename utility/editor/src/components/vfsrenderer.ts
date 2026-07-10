@@ -1518,6 +1518,12 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         eventBus.dispatchEvent('edit_material', name, name, null, file.meta.path);
       } else if (file.meta.path.toLowerCase().endsWith('.zmf')) {
         eventBus.dispatchEvent('edit_material_function', file.meta.path);
+      } else if (file.meta.path.toLowerCase().endsWith('.zmsh')) {
+        let name = this._vfs.basename(file.meta.path).slice(0, -5);
+        if (this._vfs.isParentOf('/assets/@builtins', file.meta.path)) {
+          name = `${name} (read-only)`;
+        }
+        eventBus.dispatchEvent('edit_primitive', name, file.meta.path);
       } else {
         const mimeType = this._vfs.guessMIMEType(file.meta.path);
         this.openFile(file.meta.path, mimeType);
