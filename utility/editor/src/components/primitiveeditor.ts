@@ -29,13 +29,13 @@ import { GraphEditor } from './blueprint/grapheditor';
 
 let wasDragging = false;
 
-export class ShapeEditor extends GraphEditor {
+export class PrimitiveEditor extends GraphEditor {
   private _previewScene: DRef<Scene>;
   private _previewMesh: DRef<SceneNode>;
   private _defaultMaterial: DRef<MeshMaterial>;
   private _framebuffer: DRef<FrameBuffer>;
   private _previewTex: DRef<Texture2D>;
-  private _shape: DRef<Primitive>;
+  private _primitive: DRef<Primitive>;
   private _blitter: CopyBlitter;
   private _version: number;
   private _options: any;
@@ -44,7 +44,7 @@ export class ShapeEditor extends GraphEditor {
     this._version = 0;
     this._previewScene = new DRef();
     this._previewMesh = new DRef();
-    this._shape = new DRef();
+    this._primitive = new DRef();
     this._defaultMaterial = new DRef();
     this._framebuffer = new DRef();
     this._previewTex = new DRef();
@@ -57,8 +57,6 @@ export class ShapeEditor extends GraphEditor {
     scene.env.light.type = 'ibl';
     const camera = new PerspectiveCamera(scene);
     camera.fovY = Math.PI / 3;
-    camera.lookAt(new Vector3(0, 5, 10), Vector3.zero(), Vector3.axisPY());
-    camera.controller = new OrbitCameraController();
     const light = new DirectionalLight(scene);
     light.intensity = 10;
     light.sunLight = true;
@@ -70,6 +68,26 @@ export class ShapeEditor extends GraphEditor {
     this._defaultMaterial.set(defaultMat);
     const previewMesh = new Mesh(this._previewScene.get()!, primitive, this._defaultMaterial.get());
     this._previewMesh.set(previewMesh);
+    const bbox = previewMesh.getBoundingVolume().toAABB();
+    const minSize = 10;
+    const maxSize = 100;
+    if (bbox) {
+      const center = bbox.center;
+      const extents = bbox.extents;
+      let size = Math.max(extents.x, extents.y);
+      if (size < minSize || size > maxSize) {
+        const scale = size < minSize ? minSize / size : maxSize / size;
+        previewMesh.scaleBy(new Vector3(scale, scale, scale));
+        center.scaleBy(scale);
+        extents.scaleBy(scale);
+        size *= scale;
+      }
+      const dist = size / Math.tan(camera.fovY * 0.5) + extents.z + camera.near;
+      camera.lookAt(Vector3.add(center, Vector3.scale(Vector3.axisPZ(), dist)), center, Vector3.axisPY());
+      camera.near = Math.min(1, camera.near);
+      camera.far = Math.max(1000, dist + extents.z + 100);
+      camera.controller = new OrbitCameraController({ center });
+    }
   }
   open() {
     //getApp().inputManager.useFirst(this.handleEvent, this);
@@ -101,7 +119,7 @@ export class ShapeEditor extends GraphEditor {
   async save(path: string) {
     if (path) {
       const VFS = ProjectService.VFS;
-      const primitive = this._shape.get();
+      const primitive = this._primitive.get();
       if (!primitive) {
         return;
       }
@@ -124,7 +142,7 @@ export class ShapeEditor extends GraphEditor {
     if (!shape) {
       throw new Error(`Load shape failed: ${path}`);
     }
-    this._shape.set(shape);
+    this._primitive.set(shape);
     this._options = shape instanceof Shape ? JSON.parse(JSON.stringify(shape.options)) : null;
     this.readonly = !this._options || getEngine().VFS.isParentOf('/assets/@builtins', path);
     this.initPreview(shape);
@@ -136,7 +154,7 @@ export class ShapeEditor extends GraphEditor {
   }
   restoreState() {
     if (!this.readonly) {
-      const shape = this._shape.get();
+      const shape = this._primitive.get();
       if (!shape) {
         return;
       }

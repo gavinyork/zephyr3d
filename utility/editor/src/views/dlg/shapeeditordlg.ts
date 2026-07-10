@@ -2,15 +2,15 @@ import { ImGui } from '@zephyr3d/imgui';
 import { DialogRenderer } from '../../components/modal';
 import { DlgMessageBoxEx } from './messageexdlg';
 import { ProjectService } from '../../core/services/project';
-import { ShapeEditor } from '../../components/primitiveeditor';
+import { PrimitiveEditor } from '../../components/primitiveeditor';
 
 export class DlgShapeEditor extends DialogRenderer<void> {
-  private readonly editor: ShapeEditor;
+  private readonly editor: PrimitiveEditor;
   private path: string;
   constructor(id: string, width: number, height: number, path: string) {
     super(id, width, height, false, false, false, false);
     this.path = path;
-    this.editor = new ShapeEditor(id);
+    this.editor = new PrimitiveEditor(id);
   }
   public static async editPrimitive(
     title: string,
