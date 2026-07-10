@@ -1864,7 +1864,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
             name: 'SubsurfaceProfile',
             description: 'If true, enables subsurface scattering for translucent materials',
             type: 'object',
-            phase: 1,
+            phase: 0,
             default: null,
             options: {
               objectTypes: [SubsurfaceProfile]
