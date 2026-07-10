@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Adjust camera when editing primitive",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}
