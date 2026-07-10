@@ -2,6 +2,18 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.17",
+      "tag": "@zephyr3d/scene_v0.9.17",
+      "date": "Fri, 10 Jul 2026 09:44:15 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Fix PCSS for point light"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.16",
       "tag": "@zephyr3d/scene_v0.9.16",
       "date": "Thu, 09 Jul 2026 06:50:05 GMT",

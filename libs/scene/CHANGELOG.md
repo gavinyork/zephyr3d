@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Thu, 09 Jul 2026 06:50:05 GMT and should not be manually modified.
+This log was last generated on Fri, 10 Jul 2026 09:44:15 GMT and should not be manually modified.
+
+## 0.9.17
+Fri, 10 Jul 2026 09:44:15 GMT
+
+### Patches
+
+- Fix PCSS for point light
 
 ## 0.9.16
 Thu, 09 Jul 2026 06:50:05 GMT

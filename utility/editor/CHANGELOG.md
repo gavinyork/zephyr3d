@@ -1,6 +1,14 @@
 # Change Log - @zephyr3d/editor
 
-This log was last generated on Mon, 06 Jul 2026 06:18:13 GMT and should not be manually modified.
+This log was last generated on Fri, 10 Jul 2026 09:44:15 GMT and should not be manually modified.
+
+## 0.3.9
+Fri, 10 Jul 2026 09:44:15 GMT
+
+### Patches
+
+- Add primitive editor
+- Fix PCSS for point light
 
 ## 0.3.8
 Mon, 06 Jul 2026 06:18:13 GMT
