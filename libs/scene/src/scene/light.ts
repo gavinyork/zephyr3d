@@ -538,7 +538,7 @@ export class PointLight extends PunctualLight {
    */
   constructor(scene: Scene) {
     super(scene, LIGHT_TYPE_POINT);
-    this._range = -1;
+    this._range = 0;
     this._diffuseScale = 1;
     this._specularScale = 1;
     this._sourceRadius = 0;
@@ -634,9 +634,10 @@ export class PointLight extends PunctualLight {
   }
   /** @internal */
   computeBoundingVolume() {
+    const range = this.positionAndRange.w;
     const bbox = new BoundingBox();
-    bbox.minPoint = new Vector3(-this._range, -this._range, -this._range);
-    bbox.maxPoint = new Vector3(this._range, this._range, this._range);
+    bbox.minPoint = new Vector3(-range, -range, -range);
+    bbox.maxPoint = new Vector3(range, range, range);
     return bbox;
   }
   /** @internal */
@@ -644,7 +645,7 @@ export class PointLight extends PunctualLight {
     const a = this.worldMatrix.getRow(3);
     const b = this.worldMatrix.getRow(2);
     const range =
-      this.range < 0
+      this.range <= 0
         ? 32 * Math.sqrt(Math.max(0.0001, this.intensity * Math.max(this._diffuseScale, this._specularScale)))
         : this.range;
     this._positionRange = new Vector4(a.x, a.y, a.z, range);
@@ -674,7 +675,7 @@ export class SpotLight extends PunctualLight {
    */
   constructor(scene: Scene) {
     super(scene, LIGHT_TYPE_SPOT);
-    this._range = -1;
+    this._range = 0;
     this._cutoff = Math.cos(Math.PI / 4);
     this.invalidateBoundingVolume();
   }
@@ -731,16 +732,17 @@ export class SpotLight extends PunctualLight {
   computeBoundingVolume() {
     const bbox = new BoundingBox();
     const cosCutoff = Math.cos(this._cutoff);
-    const r = (this._range / cosCutoff) * Math.sqrt(1 - cosCutoff * cosCutoff);
+    const range = this.positionAndRange.w;
+    const r = (range / cosCutoff) * Math.sqrt(1 - cosCutoff * cosCutoff);
     bbox.minPoint = new Vector3(-r, -r, 0);
-    bbox.maxPoint = new Vector3(r, r, this._range);
+    bbox.maxPoint = new Vector3(r, r, range);
     return bbox;
   }
   /** @internal */
   computeUniforms() {
     const a = this.worldMatrix.getRow(3);
     const b = this.worldMatrix.getRow(2).scaleBy(-1);
-    const range = this.range < 0 ? 32 * Math.sqrt(Math.max(0.0001, this.intensity)) : this.range;
+    const range = this.range <= 0 ? 32 * Math.sqrt(Math.max(0.0001, this.intensity)) : this.range;
     this._positionRange = new Vector4(a.x, a.y, a.z, range);
     this._directionCutoff = new Vector4(b.x, b.y, b.z, this.cutoff);
     this._diffuseIntensity = new Vector4(this.color.x, this.color.y, this.color.z, this.intensity);

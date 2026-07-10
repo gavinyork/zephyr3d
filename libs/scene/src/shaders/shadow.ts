@@ -461,6 +461,24 @@ function sampleShadowDepthPCSS(
   return pb.getGlobalScope()[funcName](pos, bounds, ...(cascade ? [cascade] : [])) as PBShaderExp;
 }
 
+function samplePointShadowDepthPCSS(
+  scope: PBInsideFunctionScope,
+  shadowMapFormat: TextureFormat,
+  dir: PBShaderExp
+) {
+  const funcName = `lib_samplePointShadowDepthPCSS_${shadowMapFormat}`;
+  const pb = scope.$builder;
+  pb.func(funcName, [pb.vec3('dir')], function () {
+    this.$l.shadowTex = pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.dir, 0);
+    this.$return(
+      shadowMapFormat === 'rgba8unorm'
+        ? decodeNormalizedFloatFromRGBA(this, this.shadowTex)
+        : this.shadowTex.x
+    );
+  });
+  return pb.getGlobalScope()[funcName](dir) as PBShaderExp;
+}
+
 function compareShadowDepthPCSS(
   scope: PBInsideFunctionScope,
   sampleDepth: PBShaderExp,
@@ -545,6 +563,55 @@ function sampleShadowPCFPCSS(
     ](pos, bounds, compareDepth, texelSize, ...(receiverPlaneDepthBias ? [receiverPlaneDepthBias] : []), ...(cascade ? [cascade] : [])) as PBShaderExp;
 }
 
+function samplePointShadowPCFPCSS(
+  scope: PBInsideFunctionScope,
+  shadowMapFormat: TextureFormat,
+  dir: PBShaderExp,
+  compareDepth: PBShaderExp,
+  texelSize: PBShaderExp,
+  tangent: PBShaderExp,
+  bitangent: PBShaderExp
+) {
+  const funcName = `lib_samplePointShadowPCFPCSS_${shadowMapFormat}`;
+  const pb = scope.$builder;
+  pb.func(
+    funcName,
+    [
+      pb.vec3('dir'),
+      pb.float('compareDepth'),
+      pb.float('texelSize'),
+      pb.vec3('tangent'),
+      pb.vec3('bitangent')
+    ],
+    function () {
+      this.$l.shadow = pb.float(0);
+      this.$l.transitionWidth = pb.float(1 / 65535);
+      this.$l.offset = pb.vec2();
+      this.$l.sampleDir = pb.vec3();
+      this.$l.sampleDepth = pb.float();
+      const offsets = [
+        [-0.35, -0.35],
+        [0.35, -0.35],
+        [-0.35, 0.35],
+        [0.35, 0.35]
+      ];
+      for (const [ox, oy] of offsets) {
+        this.offset = pb.mul(pb.vec2(ox, oy), this.texelSize);
+        this.sampleDir = pb.normalize(
+          pb.add(this.dir, pb.add(pb.mul(this.tangent, this.offset.x), pb.mul(this.bitangent, this.offset.y)))
+        );
+        this.sampleDepth = samplePointShadowDepthPCSS(this, shadowMapFormat, this.sampleDir);
+        this.shadow = pb.add(
+          this.shadow,
+          compareShadowDepthPCSS(this, this.sampleDepth, this.compareDepth, this.transitionWidth)
+        );
+      }
+      this.$return(pb.mul(this.shadow, 0.25));
+    }
+  );
+  return pb.getGlobalScope()[funcName](dir, compareDepth, texelSize, tangent, bitangent) as PBShaderExp;
+}
+
 function findBlockerPCSS(
   scope: PBInsideFunctionScope,
   shadowMapFormat: TextureFormat,
@@ -620,6 +687,81 @@ function findBlockerPCSS(
     [
       funcName
     ](texCoord, bounds, searchRadius, tapCount, transitionWidth, matrix, ...(cascade ? [cascade] : [])) as PBShaderExp;
+}
+
+function findPointBlockerPCSS(
+  scope: PBInsideFunctionScope,
+  shadowMapFormat: TextureFormat,
+  tapCount: PBShaderExp,
+  dir: PBShaderExp,
+  compareDepth: PBShaderExp,
+  searchRadius: PBShaderExp,
+  transitionWidth: PBShaderExp,
+  matrix: PBShaderExp,
+  tangent: PBShaderExp,
+  bitangent: PBShaderExp
+) {
+  const funcName = `lib_findPointBlockerPCSS_${shadowMapFormat}`;
+  const pb = scope.$builder;
+  pb.func(
+    funcName,
+    [
+      pb.vec3('dir'),
+      pb.float('compareDepth'),
+      pb.float('searchRadius'),
+      pb.float('tapCount'),
+      pb.float('transitionWidth'),
+      pb.mat2('matrix'),
+      pb.vec3('tangent'),
+      pb.vec3('bitangent')
+    ],
+    function () {
+      this.$l.blockerDepthSum = pb.float(0);
+      this.$l.blockerCount = pb.float(0);
+      this.$l.duv = pb.vec2();
+      this.$l.sampleDir = pb.vec3();
+      this.$l.sampleDepth = pb.float();
+      this.$l.blockerWeight = pb.float();
+      this.$for(pb.float('i'), 0, this.tapCount, function () {
+        this.duv = pb.mul(
+          pb.mul(
+            this.matrix,
+            this.PCSSpdSamples.at(pb.mod(pb.mul(pb.int(this.i), 19), PCF_POISSON_DISC.length))
+          ),
+          this.searchRadius
+        );
+        this.sampleDir = pb.normalize(
+          pb.add(this.dir, pb.add(pb.mul(this.tangent, this.duv.x), pb.mul(this.bitangent, this.duv.y)))
+        );
+        this.sampleDepth = samplePointShadowDepthPCSS(this, shadowMapFormat, this.sampleDir);
+        this.blockerWeight = pb.sub(
+          1,
+          pb.smoothStep(
+            pb.neg(this.transitionWidth),
+            this.transitionWidth,
+            pb.sub(this.sampleDepth, this.compareDepth)
+          )
+        );
+        this.blockerDepthSum = pb.add(this.blockerDepthSum, pb.mul(this.sampleDepth, this.blockerWeight));
+        this.blockerCount = pb.add(this.blockerCount, this.blockerWeight);
+      });
+      this.$return(
+        pb.vec2(
+          this.$choice(
+            pb.greaterThan(this.blockerCount, 0),
+            pb.div(this.blockerDepthSum, pb.max(this.blockerCount, 0.0001)),
+            -1
+          ),
+          this.blockerCount
+        )
+      );
+    }
+  );
+  return pb
+    .getGlobalScope()
+    [
+      funcName
+    ](dir, compareDepth, searchRadius, tapCount, transitionWidth, matrix, tangent, bitangent) as PBShaderExp;
 }
 
 function chebyshevUpperBound(scope: PBInsideFunctionScope, distance: PBShaderExp, occluder: PBShaderExp) {
@@ -1333,6 +1475,89 @@ export function filterShadowPCSS(
         0
       );
 
+      if (!pb.getGlobalScope().PCSSpdSamples) {
+        pb.getGlobalScope().PCSSpdSamples = PCF_POISSON_DISC.map((s) => pb.vec2(s[0], s[1]));
+      }
+
+      if (lightType === LIGHT_TYPE_POINT) {
+        this.$l.lightDepth = this.texCoord.w;
+        this.$l.sampleDir = pb.normalize(this.texCoord.xyz);
+        this.$l.shadowMapTexelSize = pb.mul(getShadowMapTexelSize(this), 2);
+        this.$l.matrix = getPCSSRotationMatrix(
+          this,
+          pb.mul(this.sampleDir.xy, pb.vec2(getShadowMapSize(this))),
+          temporalJitter
+        );
+        this.$l.searchRadius = pb.mul(
+          pb.clamp(this.PCSSsearchRadius, 0, pb.max(0, this.PCSSmaxFilterRadius)),
+          this.shadowMapTexelSize
+        );
+        this.$l.blockerTransitionWidth = pb.float(1 / 65535);
+        this.$l.up = this.$choice(
+          pb.lessThan(pb.abs(this.sampleDir.y), 0.999),
+          pb.vec3(0, 1, 0),
+          pb.vec3(1, 0, 0)
+        );
+        this.$l.tangent = pb.normalize(pb.cross(this.up, this.sampleDir));
+        this.$l.bitangent = pb.cross(this.sampleDir, this.tangent);
+        this.$l.blocker = findPointBlockerPCSS(
+          this,
+          shadowMapFormat,
+          this.PCSSblockerSampleCount,
+          this.sampleDir,
+          this.lightDepth,
+          this.searchRadius,
+          this.blockerTransitionWidth,
+          this.matrix,
+          this.tangent,
+          this.bitangent
+        );
+        this.$if(pb.lessThanEqual(this.blocker.y, 0), function () {
+          this.$return(pb.float(1));
+        });
+        this.$l.penumbra = pb.div(
+          pb.max(pb.sub(this.lightDepth, this.blocker.x), 0),
+          pb.max(this.blocker.x, 0.0001)
+        );
+        this.$l.filterRadius = pb.mul(
+          pb.clamp(pb.mul(this.penumbra, this.PCSSlightRadius), 0, pb.max(0, this.PCSSmaxFilterRadius)),
+          this.shadowMapTexelSize
+        );
+        this.$l.shadow = pb.float(0);
+        this.$l.duv = pb.vec2();
+        this.$l.samplePointDir = pb.vec3();
+        this.$for(pb.float('i'), 0, this.PCSSfilterSampleCount, function () {
+          this.duv = pb.mul(
+            pb.mul(
+              this.matrix,
+              this.PCSSpdSamples.at(pb.mod(pb.mul(pb.int(this.i), 19), PCF_POISSON_DISC.length))
+            ),
+            this.filterRadius
+          );
+          this.samplePointDir = pb.normalize(
+            pb.add(
+              this.sampleDir,
+              pb.add(pb.mul(this.tangent, this.duv.x), pb.mul(this.bitangent, this.duv.y))
+            )
+          );
+          this.shadow = pb.add(
+            this.shadow,
+            samplePointShadowPCFPCSS(
+              this,
+              shadowMapFormat,
+              this.samplePointDir,
+              this.lightDepth,
+              this.shadowMapTexelSize,
+              this.tangent,
+              this.bitangent
+            )
+          );
+        });
+        this.shadow = pb.div(this.shadow, this.PCSSfilterSampleCount);
+        this.$return(this.shadow);
+        return;
+      }
+
       this.$l.lightDepth = this.texCoord.z;
       if (receiverPlaneDepthBias) {
         this.lightDepth = pb.sub(this.lightDepth, this.receiverPlaneDepthBias.z);
@@ -1367,10 +1592,6 @@ export function filterShadowPCSS(
       this.$l.blockerTransitionWidth = receiverPlaneDepthBias
         ? pb.max(pb.dot(pb.abs(this.receiverPlaneDepthBias.xy), this.searchRadius), 1 / 65535)
         : pb.float(1 / 65535);
-
-      if (!pb.getGlobalScope().PCSSpdSamples) {
-        pb.getGlobalScope().PCSSpdSamples = PCF_POISSON_DISC.map((s) => pb.vec2(s[0], s[1]));
-      }
 
       this.$l.blocker = findBlockerPCSS(
         this,

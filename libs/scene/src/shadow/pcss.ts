@@ -190,8 +190,17 @@ export class PCSS extends ShadowImpl {
           this.NdotL,
           true
         );
+        this.$l.shadowCoord = pb.vec4(this.dir, pb.sub(this.distance, this.shadowBias));
         this.$return(
-          that.samplePointShadowMap(shadowMapParams, this, this.dir, this.distance, this.shadowBias)
+          filterShadowPCSS(
+            this,
+            shadowMapParams.lightType,
+            shadowMapParams.shadowMap!.format,
+            this.shadowCoord,
+            undefined,
+            undefined,
+            that._temporalJitter
+          )
         );
       }
       this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);

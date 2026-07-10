@@ -206,6 +206,26 @@ export function getPunctualLightClass(): SerializableClass {
           }
         },
         {
+          name: 'ShadowNearClip',
+          description: 'Near clip distance for shadow camera',
+          type: 'float',
+          phase: 1,
+          default: 1,
+          options: {
+            minValue: 0.01,
+            maxValue: 10
+          },
+          get(this: PunctualLight, value) {
+            value.num[0] = this.shadow.nearClip;
+          },
+          set(this: PunctualLight, value) {
+            this.shadow.nearClip = value.num[0];
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow && !this.isDirectionLight();
+          }
+        },
+        {
           name: 'ShadowStrength',
           description: 'Shadow strength, 0 means disabled and 1 means full effect',
           type: 'float',

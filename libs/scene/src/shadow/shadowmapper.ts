@@ -802,7 +802,7 @@ export class ShadowMapper extends Disposable {
       Math.PI / 2,
       1,
       this._config.nearClip!,
-      Math.min(this._shadowDistance, (this._light as PointLight).range)
+      Math.min(this._shadowDistance, (this._light as PointLight).positionAndRange.w)
     );
     lightCamera.position.set(this._light.positionAndRange.xyz());
   }
@@ -815,7 +815,7 @@ export class ShadowMapper extends Disposable {
       2 * Math.acos((this._light as SpotLight).cutoff),
       1,
       this._config.nearClip,
-      Math.min(this._shadowDistance, (this._light as SpotLight).range)
+      Math.min(this._shadowDistance, (this._light as SpotLight).positionAndRange.w)
     );
   }
   /** @internal */
