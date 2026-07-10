@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Fix PCSS for point light",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}

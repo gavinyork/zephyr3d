@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Add primitive editor",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}
