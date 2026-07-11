@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/device
 
-This log was last generated on Thu, 09 Jul 2026 06:50:05 GMT and should not be manually modified.
+This log was last generated on Sat, 11 Jul 2026 13:49:41 GMT and should not be manually modified.
+
+## 0.2.14
+Sat, 11 Jul 2026 13:49:41 GMT
+
+### Patches
+
+- Fix constant type detection for program builder
 
 ## 0.2.13
 Thu, 09 Jul 2026 06:50:05 GMT

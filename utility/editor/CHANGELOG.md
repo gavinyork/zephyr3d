@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/editor
 
-This log was last generated on Fri, 10 Jul 2026 09:44:15 GMT and should not be manually modified.
+This log was last generated on Sat, 11 Jul 2026 13:49:41 GMT and should not be manually modified.
+
+## 0.3.10
+Sat, 11 Jul 2026 13:49:41 GMT
+
+### Patches
+
+- Adjust camera when editing primitive
 
 ## 0.3.9
 Fri, 10 Jul 2026 09:44:15 GMT
