@@ -2,6 +2,7 @@
 **/.temp
 **/.vitepress/cache
 .claude
+.agents
 # Logs
 logs
 *.log
