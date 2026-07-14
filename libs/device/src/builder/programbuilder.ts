@@ -1883,7 +1883,7 @@ export class ProgramBuilder {
       } else if (val >= 0 && val <= 0xffffffff) {
         return typeU32;
       } else {
-        throw new errors.PBValueOutOfRange(val);
+        return typeF32;
       }
     } else {
       return val.$ast?.getType() || val.$typeinfo;
