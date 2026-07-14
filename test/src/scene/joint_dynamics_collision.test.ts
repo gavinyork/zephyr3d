@@ -8,6 +8,7 @@ import {
   type PointR,
   type PointRW,
   pushoutFromCapsule,
+  pushoutFromSphere,
   simulate
 } from '../../../libs/scene/src/animation/joint_dynamics';
 
@@ -330,5 +331,25 @@ describe('JointDynamics capsule collision', () => {
     expect(result.hit).toBe(true);
     expect(result.point.x).toBeCloseTo(1);
     expect(result.point.y).toBeCloseTo(1.25);
+  });
+
+  it('keeps sphere pushout bounded when the point is near its own radius from the center', () => {
+    const center = Vector3.zero();
+    const result = pushoutFromSphere(center, 0.5, 0.1, new Vector3(0.100001, 0, 0));
+
+    expect(result.hit).toBe(true);
+    expect(result.point.x).toBeCloseTo(0.6);
+    expect(result.point.magnitude).toBeLessThan(1);
+  });
+
+  it('keeps capsule side pushout bounded when the point is near its own radius from the axis', () => {
+    const { colR, colRW } = makeCapsule(1, 2);
+    const pointR = { pointRadius: 0.1 } as PointR;
+    const result = pushoutFromCapsule(colR, colRW, new Vector3(0.100001, 1.25, 0), pointR);
+
+    expect(result.hit).toBe(true);
+    expect(result.point.x).toBeCloseTo(1.1);
+    expect(result.point.y).toBeCloseTo(1.25);
+    expect(result.point.magnitude).toBeLessThan(2);
   });
 });

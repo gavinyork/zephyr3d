@@ -192,8 +192,9 @@ export class MToonMaterial extends ToonMaterialBase {
     return this._outlineWidthFactor;
   }
   set outlineWidthFactor(val: number) {
-    if (val !== this._outlineWidthFactor) {
-      this._outlineWidthFactor = val;
+    const width = Math.max(val, 0);
+    if (width !== this._outlineWidthFactor) {
+      this._outlineWidthFactor = width;
       this.uniformChanged();
     }
   }
@@ -631,8 +632,32 @@ export class MToonMaterial extends ToonMaterialBase {
         }
         scope.width = pb.mul(scope.width, pb.textureSampleLevel(scope.outlineWidthTex, scope.outlineUv, 0).g);
       }
+      scope.width = pb.max(scope.width, 0);
+      scope.$l.hasOutlineWidth = pb.float(pb.greaterThan(scope.width, 0));
       if (this.outlineWidthMode === 'worldCoordinates') {
+        scope.$l.baseClipPos = pb.mul(
+          ShaderHelper.getViewProjectionMatrix(scope),
+          pb.vec4(scope.worldPos, 1)
+        );
         scope.worldPos = pb.add(scope.worldPos, pb.mul(scope.worldOutlineNormal, scope.width));
+        scope.$l.clipPos = pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.worldPos, 1));
+        scope.$l.baseNdc = pb.div(scope.baseClipPos.xy, pb.max(scope.baseClipPos.w, 0.00001));
+        scope.$l.inflatedNdc = pb.div(scope.clipPos.xy, pb.max(scope.clipPos.w, 0.00001));
+        scope.$l.outlineNdcDelta = pb.sub(scope.inflatedNdc, scope.baseNdc);
+        scope.$l.outlinePixelWidth = pb.length(
+          pb.mul(scope.outlineNdcDelta, ShaderHelper.getRenderSize(scope), 0.5)
+        );
+        scope.$l.outlinePixelScale = pb.mix(
+          1,
+          pb.div(pb.max(scope.outlinePixelWidth, 1), pb.max(scope.outlinePixelWidth, 0.00001)),
+          scope.hasOutlineWidth
+        );
+        scope.$l.adjustedNdc = pb.add(scope.baseNdc, pb.mul(scope.outlineNdcDelta, scope.outlinePixelScale));
+        scope.clipPos = pb.vec4(pb.mul(scope.adjustedNdc, scope.clipPos.w), scope.clipPos.zw);
+        scope.$outputs.worldPos = scope.worldPos;
+        scope.$outputs.wNorm = scope.worldOutlineNormal;
+        ShaderHelper.setClipSpacePosition(scope, scope.clipPos);
+        return;
       } else if (this.outlineWidthMode === 'screenCoordinates') {
         scope.$l.clipNormalPos = pb.mul(
           ShaderHelper.getViewProjectionMatrix(scope),
@@ -648,6 +673,13 @@ export class MToonMaterial extends ToonMaterialBase {
             scope.screenNormal,
             pb.vec2(1, pb.div(ShaderHelper.getRenderSize(scope).x, ShaderHelper.getRenderSize(scope).y))
           )
+        );
+        scope.$l.screenUnitPixels = pb.length(
+          pb.mul(scope.screenNormal, ShaderHelper.getRenderSize(scope), 0.5)
+        );
+        scope.width = pb.mul(
+          pb.max(scope.width, pb.div(1, pb.max(scope.screenUnitPixels, 0.00001))),
+          scope.hasOutlineWidth
         );
 
         //scope.clipPos.xy = pb.add(scope.clipPos.xy, pb.mul(scope.screenNormal, scope.width, scope.clipPos.w));

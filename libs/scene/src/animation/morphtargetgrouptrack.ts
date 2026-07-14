@@ -1,5 +1,4 @@
-import { InterpolatorScalar } from '@zephyr3d/base';
-import type { Interpolator } from '@zephyr3d/base';
+import { Interpolator } from '@zephyr3d/base';
 import { AnimationTrack } from './animationtrack';
 import type { SceneNode } from '../scene';
 
@@ -24,7 +23,8 @@ export class MorphTargetGroupTrack extends AnimationTrack<number> {
   constructor(groupName?: string, interpolator?: Interpolator, embedded?: boolean) {
     super(embedded ?? false);
     this._groupName = groupName ?? '';
-    this._interpolator = interpolator ?? InterpolatorScalar.constant(0);
+    this._interpolator =
+      interpolator ?? new Interpolator('step', 'number', new Float32Array([0]), new Float32Array([0]));
     this._state = [0];
   }
   /** Morph target group name controlled by this track. */
@@ -42,7 +42,8 @@ export class MorphTargetGroupTrack extends AnimationTrack<number> {
     if (value && value.target !== 'number') {
       throw new Error(`MorphTargetGroupTrack(): interpolator target must be 'number'`);
     }
-    this._interpolator = value ?? InterpolatorScalar.constant(0);
+    this._interpolator =
+      value ?? new Interpolator('step', 'number', new Float32Array([0]), new Float32Array([0]));
   }
   /** {@inheritDoc AnimationTrack.clone} */
   clone(): this {

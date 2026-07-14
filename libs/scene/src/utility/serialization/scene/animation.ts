@@ -966,6 +966,55 @@ export function getInterpolatorClass(): SerializableClass {
 }
 
 /** @internal */
+export function getInterpolatorScalarClass(): SerializableClass {
+  return {
+    ctor: InterpolatorScalar,
+    name: 'InterpolatorScalar',
+    createFunc(ctx, init: { mode: InterpolationMode; inputs: string; outputs: string }) {
+      const inputs = init.inputs
+        ? new Float32Array(base64ToUint8Array(init.inputs).buffer)
+        : new Float32Array();
+      const outputs = init.outputs
+        ? new Float32Array(base64ToUint8Array(init.outputs).buffer)
+        : new Float32Array();
+      return { obj: new Interpolator(init.mode, 'number', inputs, outputs) };
+    },
+    getInitParams(obj: InterpolatorScalar) {
+      const inputs: Float32Array<ArrayBuffer> =
+        obj.inputs instanceof Float32Array
+          ? obj.inputs
+          : obj.inputs
+            ? new Float32Array(obj.inputs)
+            : new Float32Array();
+      const outputs: Float32Array<ArrayBuffer> =
+        obj.outputs instanceof Float32Array
+          ? obj.outputs
+          : obj.outputs
+            ? new Float32Array(obj.outputs)
+            : new Float32Array();
+      return {
+        mode: obj.mode,
+        inputs: uint8ArrayToBase64(new Uint8Array(inputs.buffer, inputs.byteOffset, inputs.byteLength)),
+        outputs: uint8ArrayToBase64(new Uint8Array(outputs.buffer, outputs.byteOffset, outputs.byteLength))
+      };
+    },
+    getProps() {
+      return defineProps([
+        {
+          name: 'Mode',
+          description:
+            'What kind of method does this interpolator use to interpolate data, possible value is `step` | `linear` | `cubicspline` | `cubicspline-natural`',
+          type: 'string',
+          get(this: Interpolator, value) {
+            value.str[0] = this.mode;
+          }
+        }
+      ]);
+    }
+  };
+}
+
+/** @internal */
 export function getMorphTrackClass(): SerializableClass {
   return {
     ctor: MorphTargetTrack,

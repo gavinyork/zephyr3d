@@ -242,9 +242,10 @@ export function pushoutFromSphere(
   const direction = Vector3.sub(point, center, _pushoutSphereDirection);
   const sqrLen = direction.magnitudeSq;
   if (sqrLen > EPSILON) {
-    const dirLen = Math.sqrt(sqrLen) - pointRadius;
-    if (dirLen < radius) {
-      const scaled = Vector3.scale(direction, radius / dirLen, _pushoutSphereScaled);
+    const dist = Math.sqrt(sqrLen);
+    const targetDist = radius + pointRadius;
+    if (dist < targetDist) {
+      const scaled = Vector3.scale(direction, targetDist / dist, _pushoutSphereScaled);
       Vector3.add(center, scaled, scaled);
       return writeCollisionResult(out, true, scaled, !out);
     }
@@ -302,10 +303,11 @@ export function pushoutFromCapsule(
   const pushVec = Vector3.sub(point, posOnVec, _pushoutCapsulePushVec);
   const sqrPushDist = pushVec.magnitudeSq;
   if (sqrPushDist > EPSILON) {
-    const pushDist = Math.sqrt(sqrPushDist) - ptR.pointRadius;
+    const pushDist = Math.sqrt(sqrPushDist);
     const r = colRW.radius * lerp(1.0, colR.radiusTailScale, distOnVec / capsuleHeight);
-    if (pushDist < r) {
-      const scaled = Vector3.scale(pushVec, r / pushDist, _pushoutCapsuleScaled);
+    const targetDist = r + ptR.pointRadius;
+    if (pushDist < targetDist) {
+      const scaled = Vector3.scale(pushVec, targetDist / pushDist, _pushoutCapsuleScaled);
       Vector3.add(posOnVec, scaled, scaled);
       return writeCollisionResult(out, true, scaled, !out);
     }
