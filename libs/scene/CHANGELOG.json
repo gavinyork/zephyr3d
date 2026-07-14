@@ -2,6 +2,24 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.18",
+      "tag": "@zephyr3d/scene_v0.9.18",
+      "date": "Tue, 14 Jul 2026 09:09:52 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Fix: Serialization not working for MorphTargetGroupTrack"
+          },
+          {
+            "comment": "Fix joint dynamics collision pushout instability"
+          },
+          {
+            "comment": "Improve outline rendering for mtoon material"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.17",
       "tag": "@zephyr3d/scene_v0.9.17",
       "date": "Fri, 10 Jul 2026 09:44:15 GMT",

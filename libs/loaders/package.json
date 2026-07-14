@@ -75,7 +75,7 @@
     "@types/draco3d": "^1.4.9",
     "@webgpu/types": "^0.1.65",
     "@zephyr3d/base": "workspace:^0.2.8",
-    "@zephyr3d/scene": "workspace:^0.9.17",
+    "@zephyr3d/scene": "workspace:^0.9.18",
     "@zephyr3d/device": "workspace:^0.2.14"
   }
 }

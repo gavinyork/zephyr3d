@@ -1,6 +1,15 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Fri, 10 Jul 2026 09:44:15 GMT and should not be manually modified.
+This log was last generated on Tue, 14 Jul 2026 09:09:52 GMT and should not be manually modified.
+
+## 0.9.18
+Tue, 14 Jul 2026 09:09:52 GMT
+
+### Patches
+
+- Fix: Serialization not working for MorphTargetGroupTrack
+- Fix joint dynamics collision pushout instability
+- Improve outline rendering for mtoon material
 
 ## 0.9.17
 Fri, 10 Jul 2026 09:44:15 GMT
