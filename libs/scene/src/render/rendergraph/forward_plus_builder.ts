@@ -607,7 +607,6 @@ function buildForwardPlusGraphInternal(
   // ── 7. Main Light Pass ────────────────────────────────────────────
   const historyManager = ctx.camera?.getHistoryResourceManager?.() ?? null;
   const lightHistoryReadBindings: HistoryReadBinding[] = [];
-  const compositeHistoryReadBindings: HistoryReadBinding[] = [];
   const historySize = { width: ctx.renderWidth, height: ctx.renderHeight };
   if (historyManager && options.ssr && ctx.camera?.ssrTemporal && options.motionVectors) {
     const reflectHistoryHandle = historyManager.importPreviousIfCompatible(
@@ -639,36 +638,7 @@ function buildForwardPlusGraphInternal(
       );
     }
   }
-  if (historyManager && ctx.camera?.TAA && options.motionVectors) {
-    const colorHistoryHandle = historyManager.importPreviousIfCompatible(
-      graph,
-      RGHistoryResources.TAA_COLOR,
-      {
-        format: ctx.colorFormat!,
-        sizeMode: 'absolute',
-        width: ctx.renderWidth,
-        height: ctx.renderHeight
-      },
-      historySize
-    );
-    const motionVectorHistoryHandle = historyManager.importPreviousIfCompatible(
-      graph,
-      RGHistoryResources.TAA_MOTION_VECTOR,
-      {
-        format: 'rgba16f',
-        sizeMode: 'absolute',
-        width: ctx.renderWidth,
-        height: ctx.renderHeight
-      },
-      historySize
-    );
-    if (colorHistoryHandle && motionVectorHistoryHandle) {
-      compositeHistoryReadBindings.push(
-        { name: RGHistoryResources.TAA_COLOR, handle: colorHistoryHandle },
-        { name: RGHistoryResources.TAA_MOTION_VECTOR, handle: motionVectorHistoryHandle }
-      );
-    }
-  }
+  // Note: TAA history import/commit is handled by TAA.setup() (self-describing).
 
   let sssProfileResult: SSSProfilePassResult | undefined;
   if (options.sss) {
@@ -877,11 +847,7 @@ function buildForwardPlusGraphInternal(
   if (hiZHandle) {
     chainDependencies.push(hiZHandle);
   }
-  // TAA history commits capture the final post-processed color, so the chain
-  // must end in a readable graph texture; disable the direct-write fast path
-  // while a commit is pending.
-  const taaCommitActive = !!(historyManager && ctx.camera.TAA && options.motionVectors && motionVectorHandle);
-  const finalOutput = taaCommitActive ? null : { handle: backbuffer, isScreen: !ctx.finalFramebuffer };
+  const finalOutput = { handle: backbuffer, isScreen: !ctx.finalFramebuffer };
   const endLayerHasEffects = !!ctx.compositor?.layerHasEnabledEffect(PostEffectLayer.end);
 
   // 8a. Transparent-layer effects (bloom, tonemap, FXAA, ...). They run right
@@ -937,7 +903,6 @@ function buildForwardPlusGraphInternal(
         finalOutput,
         sceneDepthAttachment: renderDepthAttachment,
         dependencies: endChainDependencies,
-        historyReads: compositeHistoryReadBindings,
         history: historyManager
       })
     : { color: transparentChainResult.color, wroteFinal: false };
@@ -961,23 +926,14 @@ function buildForwardPlusGraphInternal(
   } else {
     presentedBackbuffer = graph.addPass('Present', (builder) => {
       builder.read(chainResult.color);
-      if (motionVectorHandle) {
-        builder.read(motionVectorHandle);
-      }
       for (const dep of endChainDependencies) {
         builder.read(dep);
-      }
-      // Read declaration parity with the former monolithic Composite pass: keep
-      // imported history textures alive even when no end-layer effect consumed them.
-      for (const binding of compositeHistoryReadBindings) {
-        builder.read(binding.handle);
       }
       const outputBackbuffer = builder.write(backbuffer);
       // Skip the blit when the chain output already lives in the final target
       // (final framebuffer used as intermediate and no end-layer effect ran).
       const needsBlit = chainResult.color !== backbuffer;
       builder.setExecute((rgCtx) => {
-        queueTAAHistoryCommit(frame, rgCtx, historyManager, chainResult.color, motionVectorHandle);
         const sourceTex = needsBlit ? rgCtx.getTexture<Texture2D>(chainResult.color) : null;
         if (sourceTex) {
           const blitter = new CopyBlitter();
@@ -1474,54 +1430,6 @@ function renderMainLightPass(
 /** @internal */
 function renderTransmissionDepthPass(frame: FrameState, rgCtx: RGExecuteContext): void {
   renderSceneDepth(frame, frame.depthFramebuffer, rgCtx);
-}
-
-function queueTAAHistoryCommit(
-  frame: FrameState,
-  rgCtx: RGExecuteContext,
-  historyManager: Nullable<HistoryResourceManager<Texture2D>>,
-  colorHandle: RGHandle,
-  motionVectorHandle?: RGHandle
-): void {
-  const { ctx } = frame;
-  if (
-    !historyManager?.frameActive ||
-    !ctx.camera.TAA ||
-    !frame.options.motionVectors ||
-    !motionVectorHandle
-  ) {
-    return;
-  }
-  const colorTexture = rgCtx.getTexture<Texture2D>(colorHandle);
-  const colorSize = { width: colorTexture.width, height: colorTexture.height };
-  historyManager.queueRetainedCommit(
-    RGHistoryResources.TAA_COLOR,
-    {
-      format: colorTexture.format,
-      sizeMode: 'absolute',
-      width: colorTexture.width,
-      height: colorTexture.height
-    },
-    colorSize,
-    colorTexture
-  );
-
-  const motionVectorTexture = rgCtx.getTexture<Texture2D>(motionVectorHandle);
-  const motionVectorSize = {
-    width: motionVectorTexture.width,
-    height: motionVectorTexture.height
-  };
-  historyManager.queueRetainedCommit(
-    RGHistoryResources.TAA_MOTION_VECTOR,
-    {
-      format: motionVectorTexture.format,
-      sizeMode: 'absolute',
-      width: motionVectorTexture.width,
-      height: motionVectorTexture.height
-    },
-    motionVectorSize,
-    motionVectorTexture
-  );
 }
 
 /**

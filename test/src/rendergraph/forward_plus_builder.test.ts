@@ -508,7 +508,7 @@ describe('Forward+ render graph builder', () => {
     );
   });
 
-  test('declares compatible TAA history imports as Present reads', () => {
+  test('declares compatible TAA history imports as TAA pass reads', () => {
     const allocator: RGTextureAllocator<any> = {
       allocate: (_desc, _size) => ({}),
       release: () => {}
@@ -540,10 +540,14 @@ describe('Forward+ render graph builder', () => {
     );
     historyManager.commitFrame();
 
+    const { TAA } = require('../../../libs/scene/src/posteffect/taa');
+    const compositor = new Compositor();
+    compositor.appendPostEffect(new TAA());
     const { graph } = buildForwardPlusGraphForTest(
       createOptions({ motionVectors: true }),
       {},
       {
+        compositor,
         camera: {
           TAA: true,
           getHistoryResourceManager: () => historyManager
@@ -551,13 +555,19 @@ describe('Forward+ render graph builder', () => {
       }
     );
 
-    const composite = graph.passes.find((pass) => pass.name === 'Present');
-    expect(composite?.reads.map((resource) => resource.name)).toEqual(
+    const taaPass = graph.passes.find((pass) => pass.name === 'PostEffect:TAA');
+    expect(taaPass).toBeDefined();
+    expect(taaPass?.reads.map((resource) => resource.name)).toEqual(
       expect.arrayContaining([
         `history:${RGHistoryResources.TAA_COLOR}:previous`,
         `history:${RGHistoryResources.TAA_MOTION_VECTOR}:previous`
       ])
     );
+    // TAA requires the scene depth attachment, so it never writes the final
+    // target directly — its output must stay a readable graph texture for the
+    // history commit.
+    expect(taaPass?.writes.some((resource) => resource.name.startsWith('backbuffer@'))).toBe(false);
+    expect(graph.passes.some((pass) => pass.name === 'Present')).toBe(true);
   });
 
   test('does not declare stale TAA history reads when size is incompatible', () => {
@@ -592,10 +602,14 @@ describe('Forward+ render graph builder', () => {
     );
     historyManager.commitFrame();
 
+    const { TAA } = require('../../../libs/scene/src/posteffect/taa');
+    const compositor = new Compositor();
+    compositor.appendPostEffect(new TAA());
     const { graph } = buildForwardPlusGraphForTest(
       createOptions({ motionVectors: true }),
       {},
       {
+        compositor,
         camera: {
           TAA: true,
           getHistoryResourceManager: () => historyManager
@@ -603,8 +617,9 @@ describe('Forward+ render graph builder', () => {
       }
     );
 
-    const composite = graph.passes.find((pass) => pass.name === 'Present');
-    expect(composite?.reads.map((resource) => resource.name)).not.toEqual(
+    const taaPass = graph.passes.find((pass) => pass.name === 'PostEffect:TAA');
+    expect(taaPass).toBeDefined();
+    expect(taaPass?.reads.map((resource) => resource.name)).not.toEqual(
       expect.arrayContaining([
         `history:${RGHistoryResources.TAA_COLOR}:previous`,
         `history:${RGHistoryResources.TAA_MOTION_VECTOR}:previous`
@@ -657,7 +672,10 @@ describe('Forward+ end-layer post effect chain', () => {
     expect(passNames).toContain('PostEffect:EffectB');
   });
 
-  test('ends the chain in an intermediate texture when a TAA history commit is pending', () => {
+  test('lets a plain end-layer effect direct-write even when camera TAA is enabled', () => {
+    // TAA history commits are owned by the TAA effect itself (committing its
+    // own resolve output), so other chain-tail effects keep the direct-write
+    // fast path regardless of camera.TAA.
     const allocator: RGTextureAllocator<any> = {
       allocate: () => ({}),
       release: () => {}
@@ -674,10 +692,10 @@ describe('Forward+ end-layer post effect chain', () => {
     const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
 
     expect(passNames).toContain('PostEffect:EffectA');
-    expect(passNames).toContain('Present');
+    expect(passNames).not.toContain('Present');
+    expect(passNames).toContain('FrameCleanup');
     const effectPass = graph.passes.find((pass) => pass.name === 'PostEffect:EffectA');
-    expect(effectPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(false);
-    expect(passNames.indexOf('PostEffect:EffectA')).toBeLessThan(passNames.indexOf('Present'));
+    expect(effectPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(true);
   });
 
   test('keeps the Present pass when no end-layer effect is enabled', () => {
