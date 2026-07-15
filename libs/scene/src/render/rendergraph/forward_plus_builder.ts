@@ -349,7 +349,6 @@ export interface FrameState {
   depthFramebuffer: Nullable<FrameBuffer>;
   sunLightColor: Nullable<any>;
   options: ForwardPlusOptions;
-  intermediateDeviceStatePushed: boolean;
   renderQueueDisposed: boolean;
   clusteredLightReleased: boolean;
   sunLightRestored: boolean;
@@ -418,7 +417,6 @@ function buildForwardPlusGraphInternal(
     depthFramebuffer: null,
     sunLightColor: null,
     options,
-    intermediateDeviceStatePushed: false,
     renderQueueDisposed: false,
     clusteredLightReleased: false,
     sunLightRestored: false
@@ -911,7 +909,12 @@ function buildForwardPlusGraphInternal(
     builder.read(opaqueChainResult.color);
     const out = builder.write(opaqueChainResult.color);
     builder.setExecute((rgCtx) => {
-      renderTransparentScenePass(frame, rgCtx, opaqueChainRan ? opaqueChainResult.color : null);
+      renderTransparentScenePass(
+        frame,
+        rgCtx,
+        opaqueChainRan ? opaqueChainResult.color : null,
+        lightPassResult.sceneColorFramebufferHandle
+      );
     });
     return out;
   });
@@ -938,8 +941,9 @@ function buildForwardPlusGraphInternal(
   // - sceneColorHandle: keeps LightPass alive even when the chain input is the
   //   backbuffer (final framebuffer used as intermediate); the former Composite
   //   pass always declared this read.
-  // - sceneColorFramebufferHandle: ctx.intermediateFramebuffer must stay allocated
-  //   until FrameCleanup pops the device state referencing it.
+  // - sceneColorFramebufferHandle: lifetime parity with the previous monolithic
+  //   Composite pass (device state is contained per pass now; scheduled for
+  //   removal together with the keep-alive reads).
   // - hiZHandle: lifetime parity with the previous monolithic Composite pass.
   const chainDependencies: RGHandle[] = [sceneColorHandle];
   if (lightPassResult.sceneColorFramebufferHandle) {
@@ -1151,12 +1155,9 @@ function renderForwardSSSProfile(
 }
 
 function releaseIntermediateFramebuffer(frame: FrameState): void {
-  const { ctx } = frame;
-  if (frame.intermediateDeviceStatePushed) {
-    ctx.device.popDeviceStates();
-    frame.intermediateDeviceStatePushed = false;
-  }
-  ctx.intermediateFramebuffer = null;
+  // Device state is contained within each pass now (LightPass/TransparentPass
+  // push/pop their own framebuffer bindings); only the context field remains.
+  frame.ctx.intermediateFramebuffer = null;
 }
 
 function releaseDepthFramebuffer(frame: FrameState): void {
@@ -1474,7 +1475,6 @@ function renderOpaqueScenePass(
   sceneColorFramebufferHandle?: RGHandle
 ): void {
   const { ctx, renderQueue } = frame;
-  const device = ctx.device;
 
   // Use RenderGraph-allocated scene color texture
   const depthTex = frame.depthFramebuffer?.getDepthAttachment() as Texture2D;
@@ -1521,78 +1521,101 @@ function renderOpaqueScenePass(
     });
   }
 
-  if (ctx.intermediateFramebuffer && ctx.intermediateFramebuffer !== ctx.finalFramebuffer) {
-    device.pushDeviceStates();
-    frame.intermediateDeviceStatePushed = true;
-    device.setFramebuffer(ctx.intermediateFramebuffer);
-  } else {
-    device.setViewport(null);
-    device.setScissor(null);
+  // The scene target is bound explicitly and the device state is restored at
+  // the end of this pass: graph passes never communicate through leftover
+  // device state. TransparentPass re-binds the same target (or the opaque
+  // chain output) explicitly.
+  ctx.device.pushDeviceStates();
+  try {
+    // setFramebuffer() no-ops when the target is unchanged, so reset the
+    // viewport/scissor explicitly to cover that case.
+    ctx.device.setFramebuffer(ctx.intermediateFramebuffer);
+    ctx.device.setViewport(null);
+    ctx.device.setScissor(null);
+
+    _scenePass.transmission = false;
+    _scenePass.clearDepth = depthTex ? null : 1;
+    _scenePass.clearStencil = depthTex ? null : 0;
+
+    if (renderQueue.needSceneColor() && sceneColorCopyTex) {
+      // Background copy was produced by the SceneColorGrab pass; seed the main
+      // color attachment with it and render only transmission/transparent on top.
+      ctx.sceneColorTexture = sceneColorCopyTex;
+      blitToCurrentColorAttachment(ctx, ctx.sceneColorTexture);
+      _scenePass.transmission = true;
+      _scenePass.clearColor = null;
+      _scenePass.clearDepth = null;
+      _scenePass.clearStencil = null;
+    }
+    _scenePass.renderOpaque = true;
+    _scenePass.renderTransparent = false;
+    _scenePass.render(ctx, null, null, renderQueue);
+    _scenePass.renderTransparent = true;
+  } finally {
+    ctx.device.popDeviceStates();
   }
-
-  _scenePass.transmission = false;
-  _scenePass.clearDepth = depthTex ? null : 1;
-  _scenePass.clearStencil = depthTex ? null : 0;
-
-  // Note: the compositor's legacy begin/end scene redirection is retired; all
-  // post effect layers are render graph passes now.
-
-  if (renderQueue.needSceneColor() && sceneColorCopyTex) {
-    // Background copy was produced by the SceneColorGrab pass; seed the main
-    // color attachment with it and render only transmission/transparent on top.
-    ctx.sceneColorTexture = sceneColorCopyTex;
-    blitToCurrentColorAttachment(ctx, ctx.sceneColorTexture);
-    _scenePass.transmission = true;
-    _scenePass.clearColor = null;
-    _scenePass.clearDepth = null;
-    _scenePass.clearStencil = null;
-  }
-  _scenePass.renderOpaque = true;
-  _scenePass.renderTransparent = false;
-  _scenePass.render(ctx, null, null, renderQueue);
-  _scenePass.renderTransparent = true;
 }
 
 /**
  * Renders the transmission/transparent geometry lists (including OIT) on top
- * of the opaque result, continuing in the device state left by the opaque
- * pass, then flushes the compositor's scene ping-pong chain back into the
- * intermediate framebuffer.
+ * of the opaque result. The target framebuffer is always bound explicitly:
+ * the opaque chain output when opaque-layer effects ran, otherwise the same
+ * scene target the light pass rendered into. OIT implementations composite
+ * into the currently bound framebuffer, which this pass guarantees.
  * @internal
  */
 function renderTransparentScenePass(
   frame: FrameState,
   rgCtx: RGExecuteContext,
-  opaqueChainOutput: Nullable<RGHandle>
+  opaqueChainOutput: Nullable<RGHandle>,
+  sceneColorFramebufferHandle?: RGHandle
 ): void {
   const { ctx, renderQueue } = frame;
+  const device = ctx.device;
+  let framebuffer: Nullable<FrameBuffer>;
   if (opaqueChainOutput) {
     // Opaque-layer effects redirected the scene color into their chain output;
     // transparent geometry renders on top of it with the scene depth attached.
     const chainTex = rgCtx.getTexture<Texture2D>(opaqueChainOutput);
     const depthTex = frame.depthFramebuffer?.getDepthAttachment() as Texture2D;
-    const framebuffer = rgCtx.createFramebuffer<FrameBuffer>({
+    framebuffer = rgCtx.createFramebuffer<FrameBuffer>({
       width: chainTex.width,
       height: chainTex.height,
       colorAttachments: chainTex,
       depthAttachment: depthTex
     });
-    ctx.device.setFramebuffer(framebuffer);
     // The chain output is single-color: surface MRT stores no longer apply.
     ctx.materialFlags &= ~SURFACE_MRT_FLAGS;
+  } else if (sceneColorFramebufferHandle) {
+    // No opaque-layer effect ran (thus no surface MRT either): continue in the
+    // graph scene color framebuffer the light pass rendered into.
+    framebuffer = rgCtx.getFramebuffer<FrameBuffer>(sceneColorFramebufferHandle);
+  } else {
+    // Final framebuffer used as scene intermediate.
+    framebuffer = ctx.finalFramebuffer;
   }
-  // _scenePass.transmission carries over from the opaque phase (true when the
-  // scene color copy seeded the background, false otherwise). Never clear:
-  // the opaque result is already in the target.
-  _scenePass.clearColor = null;
-  _scenePass.clearDepth = null;
-  _scenePass.clearStencil = null;
-  _scenePass.renderOpaque = false;
-  _scenePass.renderTransparent = true;
+  device.pushDeviceStates();
   try {
-    _scenePass.render(ctx, null, null, renderQueue);
+    // setFramebuffer() no-ops when the target is unchanged, so reset the
+    // viewport/scissor explicitly to cover that case.
+    device.setFramebuffer(framebuffer);
+    device.setViewport(null);
+    device.setScissor(null);
+    // _scenePass.transmission carries over from the opaque phase (true when the
+    // scene color copy seeded the background, false otherwise). Never clear:
+    // the opaque result is already in the target.
+    _scenePass.clearColor = null;
+    _scenePass.clearDepth = null;
+    _scenePass.clearStencil = null;
+    _scenePass.renderOpaque = false;
+    _scenePass.renderTransparent = true;
+    try {
+      _scenePass.render(ctx, null, null, renderQueue);
+    } finally {
+      _scenePass.renderOpaque = true;
+    }
   } finally {
-    _scenePass.renderOpaque = true;
+    device.popDeviceStates();
   }
 }
 

@@ -1852,6 +1852,11 @@ export class ProgramBuilder {
     }
     this._uniforms[u].texture!.autoBindSampler = samplerType;
     if (this._device.type === 'webgpu') {
+      if (!comparison && t.$noSampler) {
+        throw new Error(
+          `texture '${t.$str}' was declared with noSampler() but is sampled with a regular sampler`
+        );
+      }
       const samplerName = AST.genSamplerName(t.$str, comparison);
       if (!this.getGlobalScope()[samplerName]) {
         throw new Error(`failed to find sampler name ${samplerName}`);
@@ -1931,13 +1936,11 @@ export class ProgramBuilder {
       this._outputScope = new PBOutputScope();
       this._reflection.clear();
       this.generate(options.compute);
-      // this.removeUnusedSamplerBindings(this._globalScope);
       this.mergeUniformsCompute(this._globalScope);
       this.updateUniformBindings([this._globalScope], [ShaderType.Compute]);
-      return [
-        this.generateComputeSource(this._globalScope, this._builtinScope),
-        this.createBindGroupLayouts(options.label)
-      ] as const;
+      const bindGroupLayouts = this.createBindGroupLayouts(options.label);
+      this.reportSamplerUsage(bindGroupLayouts, options.label);
+      return [this.generateComputeSource(this._globalScope, this._builtinScope), bindGroupLayouts] as const;
     } catch (err) {
       if (err instanceof errors.PBError) {
         this._lastError = err.getMessage(this._device.type);
@@ -1973,9 +1976,6 @@ export class ProgramBuilder {
       const vertexBuiltinScope = this._builtinScope;
       const vertexInputs = this._inputs;
       const vertexOutputs = this._outputs;
-      if (this._device.type === 'webgpu') {
-        // this.removeUnusedSamplerBindings(vertexScope);
-      }
 
       this._shaderType = ShaderType.Fragment;
       this._scopeStack = [];
@@ -1998,12 +1998,11 @@ export class ProgramBuilder {
       const fragBuiltinScope = this._builtinScope;
       const fragInputs = this._inputs;
       const fragOutputs = this._outputs;
-      if (this._device.type === 'webgpu') {
-        // this.removeUnusedSamplerBindings(fragScope);
-      }
 
       this.mergeUniforms(vertexScope, fragScope);
       this.updateUniformBindings([vertexScope, fragScope], [ShaderType.Vertex, ShaderType.Fragment]);
+      const bindGroupLayouts = this.createBindGroupLayouts(options.label);
+      this.reportSamplerUsage(bindGroupLayouts, options.label);
 
       return [
         this.generateRenderSource(
@@ -2020,7 +2019,7 @@ export class ProgramBuilder {
           fragInputs.map((val) => val[1]),
           fragOutputs.map((val) => val[1])
         )!,
-        this.createBindGroupLayouts(options.label),
+        bindGroupLayouts,
         this._vertexAttributes,
         fragOutputs.length
       ] as const;
@@ -2401,6 +2400,44 @@ export class ProgramBuilder {
     });
   }
   /** @internal */
+  private reportSamplerUsage(layouts: BindGroupLayout[], label: string | undefined) {
+    if (this._device.type !== 'webgpu') {
+      return;
+    }
+    // WebGPU baseline per-stage sampler limit
+    const SAMPLER_LIMIT = 16;
+    const vertexSamplers: string[] = [];
+    const fragmentSamplers: string[] = [];
+    const computeSamplers: string[] = [];
+    for (const layout of layouts) {
+      for (const entry of layout?.entries ?? []) {
+        if (entry.sampler) {
+          if (entry.visibility & ShaderType.Vertex) {
+            vertexSamplers.push(entry.name);
+          }
+          if (entry.visibility & ShaderType.Fragment) {
+            fragmentSamplers.push(entry.name);
+          }
+          if (entry.visibility & ShaderType.Compute) {
+            computeSamplers.push(entry.name);
+          }
+        }
+      }
+    }
+    for (const [stage, samplers] of [
+      ['vertex', vertexSamplers],
+      ['fragment', fragmentSamplers],
+      ['compute', computeSamplers]
+    ] as const) {
+      if (samplers.length > SAMPLER_LIMIT) {
+        console.warn(
+          `Program '${label ?? 'unlabeled'}' uses ${samplers.length} samplers in the ${stage} stage ` +
+            `(WebGPU baseline per-stage limit is ${SAMPLER_LIMIT}): ${samplers.join(', ')}`
+        );
+      }
+    }
+  }
+  /** @internal */
   private updateUniformBindings(scopes: PBGlobalScope[], shaderTypes: ShaderType[]) {
     this._uniforms = this._uniforms.filter((val) => !!val.mask);
     const bindings: number[] = Array.from<number>({ length: MAX_BINDING_GROUPS }).fill(0);
@@ -2512,7 +2549,12 @@ export class ProgramBuilder {
             autoBindSampler: null,
             autoBindSamplerComparison: null
           };
-          if (this._device.type === 'webgpu' || uniformInfo.texture.autoBindSampler === 'sample') {
+          // Textures declared with noSampler() carry no regular auto-bound
+          // sampler (load-only or comparison-only access).
+          if (
+            (this._device.type === 'webgpu' && !uniformInfo.texture.exp.$noSampler) ||
+            uniformInfo.texture.autoBindSampler === 'sample'
+          ) {
             entry.texture.autoBindSampler = AST.genSamplerName(uniformInfo.texture.exp.$str, false);
           }
           if (
@@ -2875,13 +2917,15 @@ export class PBScope extends Proxiable<PBScope> {
     ) {
       // webgpu requires explicit sampler bindings
       const isDepth = variable.$typeinfo.isTextureType() && variable.$typeinfo.isDepthTexture();
-      const samplerName = AST.genSamplerName(variable.$str, false);
-      const samplerExp = getCurrentProgramBuilder()!
-        .sampler(samplerName)
-        .uniform(uniformInfo.group)
-        .sampleType(variable.$sampleType);
-      samplerExp.$sampleType = variable.$sampleType;
-      this.$local(samplerExp);
+      if (!variable.$noSampler) {
+        const samplerName = AST.genSamplerName(variable.$str, false);
+        const samplerExp = getCurrentProgramBuilder()!
+          .sampler(samplerName)
+          .uniform(uniformInfo.group)
+          .sampleType(variable.$sampleType);
+        samplerExp.$sampleType = variable.$sampleType;
+        this.$local(samplerExp);
+      }
       if (isDepth) {
         const samplerNameComp = AST.genSamplerName(variable.$str, true);
         const samplerExpComp = getCurrentProgramBuilder()!

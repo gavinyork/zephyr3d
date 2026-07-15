@@ -43,6 +43,13 @@ export interface OIT extends IDisposable {
   /**
    * Begins rendering the transparent objects.
    *
+   * @remarks
+   * Contract: the caller (the transparent scene pass) must have explicitly
+   * bound the transparent scene target framebuffer before calling begin(),
+   * beginPass() or endPass(). Implementations may redirect rendering to
+   * internal buffers, but must composite into that bound target and restore
+   * it before returning.
+   *
    * @param ctx - The draw context.
    * @returns The number of passes required for rendering.
    */

@@ -268,8 +268,9 @@ export class ShaderHelper {
       scope.light = lightStruct().uniform(0);
       if (useClusteredLighting) {
         scope[UNIFORM_NAME_LIGHT_BUFFER] = pb.vec4[(MAX_CLUSTERED_LIGHTS + 1) * 4]().uniformBuffer(0);
+        // Non-WebGL1 devices fetch the light index texture with textureLoad
         scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE] = (
-          pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D()
+          pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D().noSampler()
         ).uniform(0);
       }
       scope[UNIFORM_NAME_BAKED_SKY_MAP] = pb.texCube().uniform(0);
@@ -293,6 +294,12 @@ export class ShaderHelper {
             .filterable
         ) {
           tex.sampleType('unfilterable-float');
+        }
+        if (shadowMapParams.shadowMap!.isDepth()) {
+          // Depth-format shadow maps are sampled exclusively through the
+          // comparison sampler (textureSampleCompareLevel); skip the regular
+          // auto-bound sampler.
+          tex.noSampler();
         }
         scope[UNIFORM_NAME_SHADOW_MAP] = tex.uniform(0);
       }

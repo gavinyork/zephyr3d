@@ -154,7 +154,8 @@ export class ABufferOIT extends Disposable implements OIT {
     scope.Z_AB_nodeBuffer = pb.uvec4[0]().storageBuffer(2);
     scope.Z_AB_headImage = pb.atomic_uint[0]().storageBuffer(2);
     scope.Z_AB_screenSize = pb.uint().uniform(2);
-    scope.Z_AB_depthTexture = pb.tex2D().uniform(2);
+    // Read with textureLoad only
+    scope.Z_AB_depthTexture = pb.tex2D().uniform(2).noSampler();
     scope.$outputs.outColor = pb.vec4();
   }
   /**

@@ -159,6 +159,8 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
   /** @internal */
   $sampleType: 'depth' | 'sint' | 'uint' | 'float' | 'unfilterable-float';
   /** @internal */
+  $noSampler: boolean;
+  /** @internal */
   $precision: ShaderPrecisionType;
   /** @internal */
   $ast: ASTExpression;
@@ -195,6 +197,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$qualifier = null;
     this.$precision = ShaderPrecisionType.NONE;
     this.$sampleType = 'float';
+    this.$noSampler = false;
     this.$ast = new ASTPrimitive(this);
     this.$inout = null;
     this.$memberCache = {};
@@ -377,6 +380,24 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     if (type) {
       this.$sampleType = type;
     }
+    return this;
+  }
+  /**
+   * Declares that this texture uniform is never sampled with a regular
+   * (non-comparison) sampler — it is only accessed with textureLoad, or, for
+   * depth textures, only with comparison sampling.
+   *
+   * @remarks
+   * On WebGPU every texture uniform gets an automatically bound sampler that
+   * counts against the per-stage sampler limit; use this on load-only textures
+   * (and comparison-only depth textures) to suppress it. The declaration-level
+   * hint keeps bind group layouts consistent between programs that share bind
+   * groups, which usage analysis could not guarantee.
+   *
+   * @returns self
+   */
+  noSampler() {
+    this.$noSampler = true;
     return this;
   }
   /**
