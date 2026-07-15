@@ -875,3 +875,16 @@ describe('SceneColorGrab pass (P2)', () => {
     expect(lightPass?.reads.map((res) => res.name)).toContain('sceneColorCopy');
   });
 });
+
+describe('TransparentPass split (P2-S2)', () => {
+  test('splits transparent geometry into its own pass writing a scene color version', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions({ needSceneColor: true }));
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).toContain('TransparentPass');
+    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('TransparentPass'));
+    expect(passNames.indexOf('TransparentPass')).toBeLessThan(passNames.indexOf('TransmissionDepth'));
+    const transparentPass = graph.passes.find((pass) => pass.name === 'TransparentPass');
+    expect(transparentPass?.writes.some((res) => res.name.startsWith('sceneColor@'))).toBe(true);
+  });
+});

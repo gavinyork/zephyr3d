@@ -806,7 +806,7 @@ function buildForwardPlusGraphInternal(
         : null;
       ctx.SkinSSSTexture = skinSSSHandle ? rgCtx.getTexture<Texture2D>(skinSSSHandle) : null;
       const renderLightPass = () =>
-        renderMainLightPass(frame, sceneColorTex, sceneColorCopyTex, rgCtx, sceneColorFramebufferHandle);
+        renderOpaqueScenePass(frame, sceneColorTex, sceneColorCopyTex, rgCtx, sceneColorFramebufferHandle);
       if (historyManager && lightHistoryReadBindings.length > 0) {
         historyManager.beginReadScope(
           lightHistoryReadBindings.map((binding) => ({
@@ -827,7 +827,26 @@ function buildForwardPlusGraphInternal(
     return { sceneColorHandle, sceneColorCopyHandle, sceneColorFramebufferHandle };
   });
 
-  const sceneColorHandle = lightPassResult.sceneColorHandle;
+  // 7d. Transparent scene geometry (transmission/transparent lists + OIT).
+  // Continues rendering into the same intermediate framebuffer/device state
+  // left by the opaque pass; graph-wise this produces a new version of the
+  // scene color.
+  const sceneColorHandle = graph.addPass('TransparentPass', (builder) => {
+    builder.read(depthHandle);
+    builder.read(depthPassResult.depthFramebufferHandle);
+    if (lightPassResult.sceneColorFramebufferHandle) {
+      builder.read(lightPassResult.sceneColorFramebufferHandle);
+    }
+    if (lightPassResult.sceneColorCopyHandle) {
+      builder.read(lightPassResult.sceneColorCopyHandle);
+    }
+    builder.read(lightPassResult.sceneColorHandle);
+    const out = builder.write(lightPassResult.sceneColorHandle);
+    builder.setExecute(() => {
+      renderTransparentScenePass(frame);
+    });
+    return out;
+  });
   blackboard.set(FrameResources.SceneColor, sceneColorHandle);
   if (lightPassResult.sceneColorCopyHandle) {
     blackboard.set(FrameResources.SceneColorCopy, lightPassResult.sceneColorCopyHandle);
@@ -1373,7 +1392,7 @@ function renderSceneColorGrab(
 }
 
 /** @internal */
-function renderMainLightPass(
+function renderOpaqueScenePass(
   frame: FrameState,
   sceneColorTex: Texture2D,
   sceneColorCopyTex: Nullable<Texture2D>,
@@ -1448,10 +1467,37 @@ function renderMainLightPass(
     _scenePass.clearDepth = null;
     _scenePass.clearStencil = null;
   }
+  _scenePass.renderOpaque = true;
+  _scenePass.renderTransparent = false;
   _scenePass.render(ctx, null, null, renderQueue);
-  // Flush the compositor's scene ping-pong chain (opaque/transparent layer
-  // effects) back into the intermediate framebuffer so the graph's scene color
-  // texture holds the settled result before the end-layer effect passes read it.
+  _scenePass.renderTransparent = true;
+}
+
+/**
+ * Renders the transmission/transparent geometry lists (including OIT) on top
+ * of the opaque result, continuing in the device state left by the opaque
+ * pass, then flushes the compositor's scene ping-pong chain back into the
+ * intermediate framebuffer.
+ * @internal
+ */
+function renderTransparentScenePass(frame: FrameState): void {
+  const { ctx, renderQueue } = frame;
+  // _scenePass.transmission carries over from the opaque phase (true when the
+  // scene color copy seeded the background, false otherwise). Never clear:
+  // the opaque result is already in the target.
+  _scenePass.clearColor = null;
+  _scenePass.clearDepth = null;
+  _scenePass.clearStencil = null;
+  _scenePass.renderOpaque = false;
+  _scenePass.renderTransparent = true;
+  try {
+    _scenePass.render(ctx, null, null, renderQueue);
+  } finally {
+    _scenePass.renderOpaque = true;
+  }
+  // Flush the compositor's scene ping-pong chain (opaque-layer effects) back
+  // into the intermediate framebuffer so the graph's scene color texture holds
+  // the settled result before the effect chains read it.
   ctx.compositor?.end(ctx);
 }
 
