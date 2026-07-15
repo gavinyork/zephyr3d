@@ -982,6 +982,54 @@ describe('Final framebuffer as intermediate (editor render-to-texture mode)', ()
     expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('PostEffect:GizmoLikeEffect'));
   });
 
+  test('sole effect never direct-writes the final target it samples (feedback loop)', () => {
+    // Regression: in render-to-texture mode the scene physically lives in the
+    // final framebuffer. A single end-layer effect (e.g. Tonemap in the editor
+    // material preview) sampled that texture while direct-writing it — a
+    // WebGPU synchronization-scope error / WebGL feedback loop.
+    class TonemapLikeEffect extends AbstractPostEffect {}
+    const compositor = new Compositor();
+    compositor.appendPostEffect(new TonemapLikeEffect());
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions(),
+      {},
+      {
+        compositor,
+        ...createExternalDepthContext()
+      }
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    // The effect must write an intermediate texture, then Present blits back.
+    const effectPass = graph.passes.find((pass) => pass.name === 'PostEffect:TonemapLikeEffect');
+    expect(effectPass?.writes.some((res) => res.name.startsWith('backbuffer'))).toBe(false);
+    expect(effectPass?.writes.some((res) => res.name === 'PostEffect:TonemapLikeEffect:out')).toBe(true);
+    expect(passNames).toContain('Present');
+    expect(passNames.indexOf('PostEffect:TonemapLikeEffect')).toBeLessThan(passNames.indexOf('Present'));
+  });
+
+  test('second chained effect may still direct-write the final target', () => {
+    // With two effects the first moves the image into an intermediate texture,
+    // so the last effect's direct final write is safe again.
+    class EffectA extends AbstractPostEffect {}
+    class EffectB extends AbstractPostEffect {}
+    const compositor = new Compositor();
+    compositor.appendPostEffect(new EffectA());
+    compositor.appendPostEffect(new EffectB());
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions(),
+      {},
+      {
+        compositor,
+        ...createExternalDepthContext()
+      }
+    );
+    graph.compile([backbuffer]);
+
+    const effectB = graph.passes.find((pass) => pass.name === 'PostEffect:EffectB');
+    expect(effectB?.writes.some((res) => res.name.startsWith('backbuffer'))).toBe(true);
+  });
+
   test('opaque-layer effects disable final-framebuffer-as-intermediate mode', () => {
     // Regression: with an opaque-layer effect (e.g. SkinSSS) in render-to-texture
     // mode, the scene was still rendered directly into the single-color final

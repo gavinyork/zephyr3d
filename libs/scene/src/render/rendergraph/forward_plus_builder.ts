@@ -963,6 +963,7 @@ function buildForwardPlusGraphInternal(
         blackboard,
         input: chainInput,
         finalOutput: endLayerHasEffects ? null : finalOutput,
+        inputResidesInFinalTarget: !!backbufferResidentHandle,
         sceneDepthAttachment: renderDepthAttachment,
         dependencies: chainDependencies,
         history: historyManager
@@ -1002,6 +1003,8 @@ function buildForwardPlusGraphInternal(
         blackboard,
         input: transparentChainResult.color,
         finalOutput,
+        // Still backbuffer-resident if the transparent-layer chain ran no effect
+        inputResidesInFinalTarget: !!backbufferResidentHandle && transparentChainResult.color === chainInput,
         sceneDepthAttachment: renderDepthAttachment,
         dependencies: endChainDependencies,
         history: historyManager
