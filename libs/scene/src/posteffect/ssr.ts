@@ -50,6 +50,10 @@ export class SSR extends AbstractPostEffect {
   requireDepthAttachment() {
     return true;
   }
+  /** {@inheritDoc AbstractPostEffect.requireMotionVectorTexture} */
+  requireMotionVectorTexture(ctx: DrawContext) {
+    return !!ctx.camera.ssrTemporal;
+  }
   /** @internal */
   blurPass(
     ctx: DrawContext,

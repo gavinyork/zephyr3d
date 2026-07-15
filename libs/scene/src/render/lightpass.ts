@@ -6,7 +6,6 @@ import type { RenderItemListBundle, RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
-import { PostEffectLayer } from '../posteffect/posteffect';
 import type { Camera } from '../camera';
 
 const SURFACE_MRT_FLAGS =
@@ -306,17 +305,8 @@ export class LightPass extends RenderPass {
           ctx.device.popDeviceStates();
         }
       }
-      if (!renderQueue.needSceneColor() || ctx.sceneColorTexture) {
-        // Only opaque-layer effects still run inside the light pass (transparent
-        // geometry must render on top of them). The transparent and end layers
-        // are built as render graph passes after the light pass.
-        if (i === 0) {
-          ctx.compositor?.drawPostEffects(ctx, PostEffectLayer.opaque, ctx.linearDepthTexture!);
-          if (surfaceMRT && (ctx.device.getFramebuffer()?.getColorAttachments().length ?? 0) <= 1) {
-            ctx.materialFlags &= ~surfaceMRT;
-          }
-        }
-      }
+      // Post effects of all layers are built as render graph passes; the
+      // opaque-layer chain runs between the opaque and transparent passes.
     }
     if (tmpFramebuffer) {
       ctx.device.pool.releaseFrameBuffer(tmpFramebuffer);

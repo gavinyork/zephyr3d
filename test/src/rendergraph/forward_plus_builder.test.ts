@@ -888,3 +888,93 @@ describe('TransparentPass split (P2-S2)', () => {
     expect(transparentPass?.writes.some((res) => res.name.startsWith('sceneColor@'))).toBe(true);
   });
 });
+
+describe('Opaque-layer effect chain (P2-S3)', () => {
+  class OpaqueEffect extends AbstractPostEffect {
+    constructor() {
+      super();
+      this._layer = PostEffectLayer.opaque;
+    }
+    requireDepthAttachment() {
+      return true;
+    }
+  }
+
+  test('builds opaque-layer effects between LightPass and TransparentPass', () => {
+    const compositor = new Compositor();
+    compositor.appendPostEffect(new OpaqueEffect());
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions(), {}, { compositor });
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).toContain('PostEffect:OpaqueEffect');
+    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('PostEffect:OpaqueEffect'));
+    expect(passNames.indexOf('PostEffect:OpaqueEffect')).toBeLessThan(passNames.indexOf('TransparentPass'));
+    // Transparent geometry writes a new version of the chain output
+    const transparentPass = graph.passes.find((pass) => pass.name === 'TransparentPass');
+    expect(
+      transparentPass?.writes.some((res) => res.name.startsWith('PostEffect:OpaqueEffect:out@'))
+    ).toBe(true);
+    // Depth-requiring opaque effects never take the direct final write
+    const effectPass = graph.passes.find((pass) => pass.name === 'PostEffect:OpaqueEffect');
+    expect(effectPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(false);
+  });
+
+  test('TransparentPass writes the scene color version directly when no opaque effect runs', () => {
+    const compositor = new Compositor();
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions(), {}, { compositor });
+    graph.compile([backbuffer]);
+    const transparentPass = graph.passes.find((pass) => pass.name === 'TransparentPass');
+
+    expect(transparentPass?.writes.some((res) => res.name.startsWith('sceneColor@'))).toBe(true);
+  });
+});
+
+describe('Final framebuffer as intermediate (editor render-to-texture mode)', () => {
+  function createExternalDepthContext() {
+    const depthTex = {
+      isTexture2D: () => true,
+      width: 1920,
+      height: 1080,
+      format: 'd24s8'
+    };
+    return {
+      finalFramebuffer: {
+        getDepthAttachment: () => depthTex,
+        getColorAttachments: () => [{ format: 'rgba8unorm', width: 1920, height: 1080 }]
+      }
+    };
+  }
+
+  test('keeps LightPass alive when the scene renders directly into the final framebuffer', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions(),
+      {},
+      createExternalDepthContext()
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    // Regression: with the backbuffer as chain input, nothing read the scene
+    // color handle and dead-pass culling removed the light pass (black frame).
+    expect(passNames).toContain('LightPass');
+    expect(passNames).toContain('TransparentPass');
+  });
+
+  test('keeps LightPass alive with an end-layer effect in render-to-texture mode', () => {
+    class GizmoLikeEffect extends AbstractPostEffect {
+      requireDepthAttachment() {
+        return true;
+      }
+    }
+    const compositor = new Compositor();
+    compositor.appendPostEffect(new GizmoLikeEffect());
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions(), {}, {
+      compositor,
+      ...createExternalDepthContext()
+    });
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).toContain('LightPass');
+    expect(passNames).toContain('PostEffect:GizmoLikeEffect');
+    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('PostEffect:GizmoLikeEffect'));
+  });
+});

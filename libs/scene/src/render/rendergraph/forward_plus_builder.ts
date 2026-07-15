@@ -824,13 +824,69 @@ function buildForwardPlusGraphInternal(
       }
     });
 
-    return { sceneColorHandle, sceneColorCopyHandle, sceneColorFramebufferHandle };
+    return {
+      sceneColorHandle,
+      sceneColorCopyHandle,
+      sceneColorFramebufferHandle,
+      sssDiffuseHandle,
+      sssTransmissionHandle,
+      skinSSSHandle
+    };
   });
 
-  // 7d. Transparent scene geometry (transmission/transparent lists + OIT).
-  // Continues rendering into the same intermediate framebuffer/device state
-  // left by the opaque pass; graph-wise this produces a new version of the
-  // scene color.
+  // 7d. Opaque-layer post effects (SAO/SSR/SSS/SkinSSS). They read the opaque
+  // scene color and must complete before transparent geometry renders on top
+  // of their output. Never direct-write: the chain output becomes the
+  // transparent pass's render target.
+  const opaqueChainInput = useFinalFramebufferAsIntermediate ? backbuffer : lightPassResult.sceneColorHandle;
+  // Keep LightPass alive even when the chain input is the backbuffer (final
+  // framebuffer used as intermediate): the graph cannot see that the scene was
+  // physically rendered into the final framebuffer, so the scene color handle
+  // must be read explicitly or dead-pass culling removes the light pass.
+  const opaqueChainDeps: RGHandle[] = [depthHandle, lightPassResult.sceneColorHandle];
+  if (hiZHandle) {
+    opaqueChainDeps.push(hiZHandle);
+  }
+  if (lightPassResult.sceneColorFramebufferHandle) {
+    opaqueChainDeps.push(lightPassResult.sceneColorFramebufferHandle);
+  }
+  if (grabResult) {
+    opaqueChainDeps.push(grabResult.copyHandle);
+  }
+  if (sssProfileResult) {
+    opaqueChainDeps.push(sssProfileResult.profileHandle, sssProfileResult.paramHandle);
+    if (sssProfileResult.normalHandle) {
+      opaqueChainDeps.push(sssProfileResult.normalHandle);
+    }
+  }
+  for (const handle of [
+    lightPassResult.sssDiffuseHandle,
+    lightPassResult.sssTransmissionHandle,
+    lightPassResult.skinSSSHandle
+  ]) {
+    if (handle) {
+      opaqueChainDeps.push(handle);
+    }
+  }
+  const opaqueChainResult = ctx.compositor
+    ? ctx.compositor.buildLayer({
+        graph,
+        ctx,
+        layer: PostEffectLayer.opaque,
+        blackboard,
+        input: opaqueChainInput,
+        finalOutput: null,
+        sceneDepthAttachment: renderDepthAttachment,
+        dependencies: opaqueChainDeps,
+        historyReads: lightHistoryReadBindings,
+        history: historyManager
+      })
+    : { color: opaqueChainInput, wroteFinal: false };
+  const opaqueChainRan = opaqueChainResult.color !== opaqueChainInput;
+
+  // 7e. Transparent scene geometry (transmission/transparent lists + OIT).
+  // Renders on top of the opaque-chain output; graph-wise an in-place write
+  // producing a new version of the current scene color.
   const sceneColorHandle = graph.addPass('TransparentPass', (builder) => {
     builder.read(depthHandle);
     builder.read(depthPassResult.depthFramebufferHandle);
@@ -840,10 +896,13 @@ function buildForwardPlusGraphInternal(
     if (lightPassResult.sceneColorCopyHandle) {
       builder.read(lightPassResult.sceneColorCopyHandle);
     }
+    // Keep-alive for the light pass when rendering directly into the final
+    // framebuffer (see opaqueChainDeps note above).
     builder.read(lightPassResult.sceneColorHandle);
-    const out = builder.write(lightPassResult.sceneColorHandle);
-    builder.setExecute(() => {
-      renderTransparentScenePass(frame);
+    builder.read(opaqueChainResult.color);
+    const out = builder.write(opaqueChainResult.color);
+    builder.setExecute((rgCtx) => {
+      renderTransparentScenePass(frame, rgCtx, opaqueChainRan ? opaqueChainResult.color : null);
     });
     return out;
   });
@@ -858,11 +917,14 @@ function buildForwardPlusGraphInternal(
 
   // 8. Post effect chains + transmission depth.
   //
-  // Chain input: the settled scene color after the light pass (including
-  // opaque-layer effects, flushed back by compositor.end() at the tail of the
-  // light pass). When the final framebuffer doubles as the intermediate
-  // target, the scene color lives in the backbuffer instead.
-  const chainInput = useFinalFramebufferAsIntermediate ? backbuffer : sceneColorHandle;
+  // Chain input: the TransparentPass output version — the authoritative scene
+  // color regardless of whether it physically lives in a texture or in the
+  // backbuffer (final framebuffer used as intermediate, no opaque effects).
+  const chainInput = sceneColorHandle;
+  // When the scene color still physically resides in the final framebuffer,
+  // the Present blit must be skipped if no effect moved it to a texture.
+  const backbufferResidentHandle =
+    useFinalFramebufferAsIntermediate && !opaqueChainRan ? sceneColorHandle : null;
   // Ordering/lifetime dependencies each effect pass must declare:
   // - sceneColorHandle: keeps LightPass alive even when the chain input is the
   //   backbuffer (final framebuffer used as intermediate); the former Composite
@@ -962,7 +1024,7 @@ function buildForwardPlusGraphInternal(
       const outputBackbuffer = builder.write(backbuffer);
       // Skip the blit when the chain output already lives in the final target
       // (final framebuffer used as intermediate and no end-layer effect ran).
-      const needsBlit = chainResult.color !== backbuffer;
+      const needsBlit = chainResult.color !== backbufferResidentHandle;
       builder.setExecute((rgCtx) => {
         const sourceTex = needsBlit ? rgCtx.getTexture<Texture2D>(chainResult.color) : null;
         if (sourceTex) {
@@ -1455,7 +1517,8 @@ function renderOpaqueScenePass(
   _scenePass.clearDepth = depthTex ? null : 1;
   _scenePass.clearStencil = depthTex ? null : 0;
 
-  ctx.compositor?.begin(ctx);
+  // Note: the compositor's legacy begin/end scene redirection is retired; all
+  // post effect layers are render graph passes now.
 
   if (renderQueue.needSceneColor() && sceneColorCopyTex) {
     // Background copy was produced by the SceneColorGrab pass; seed the main
@@ -1480,8 +1543,27 @@ function renderOpaqueScenePass(
  * intermediate framebuffer.
  * @internal
  */
-function renderTransparentScenePass(frame: FrameState): void {
+function renderTransparentScenePass(
+  frame: FrameState,
+  rgCtx: RGExecuteContext,
+  opaqueChainOutput: Nullable<RGHandle>
+): void {
   const { ctx, renderQueue } = frame;
+  if (opaqueChainOutput) {
+    // Opaque-layer effects redirected the scene color into their chain output;
+    // transparent geometry renders on top of it with the scene depth attached.
+    const chainTex = rgCtx.getTexture<Texture2D>(opaqueChainOutput);
+    const depthTex = frame.depthFramebuffer?.getDepthAttachment() as Texture2D;
+    const framebuffer = rgCtx.createFramebuffer<FrameBuffer>({
+      width: chainTex.width,
+      height: chainTex.height,
+      colorAttachments: chainTex,
+      depthAttachment: depthTex
+    });
+    ctx.device.setFramebuffer(framebuffer);
+    // The chain output is single-color: surface MRT stores no longer apply.
+    ctx.materialFlags &= ~SURFACE_MRT_FLAGS;
+  }
   // _scenePass.transmission carries over from the opaque phase (true when the
   // scene color copy seeded the background, false otherwise). Never clear:
   // the opaque result is already in the target.
@@ -1495,10 +1577,6 @@ function renderTransparentScenePass(frame: FrameState): void {
   } finally {
     _scenePass.renderOpaque = true;
   }
-  // Flush the compositor's scene ping-pong chain (opaque-layer effects) back
-  // into the intermediate framebuffer so the graph's scene color texture holds
-  // the settled result before the effect chains read it.
-  ctx.compositor?.end(ctx);
 }
 
 /** @internal */
