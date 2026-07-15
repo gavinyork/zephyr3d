@@ -851,3 +851,27 @@ describe('Bloom native multi-pass setup', () => {
     expect(level3?.desc).toMatchObject({ sizeMode: 'absolute', width: 60, height: 33 });
   });
 });
+
+describe('SceneColorGrab pass (P2)', () => {
+  test('extracts the refraction background grab as its own pass before LightPass', () => {
+    const passNames = compileForwardPlusPassNames(createOptions({ needSceneColor: true }));
+
+    expect(passNames).toContain('SceneColorGrab');
+    expect(passNames.indexOf('DepthPrepass')).toBeLessThan(passNames.indexOf('SceneColorGrab'));
+    expect(passNames.indexOf('SceneColorGrab')).toBeLessThan(passNames.indexOf('LightPass'));
+  });
+
+  test('omits the grab pass when scene color is not needed', () => {
+    const passNames = compileForwardPlusPassNames(createOptions({ needSceneColor: false }));
+
+    expect(passNames).not.toContain('SceneColorGrab');
+  });
+
+  test('LightPass reads the grab output', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions({ needSceneColor: true }));
+    graph.compile([backbuffer]);
+    const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');
+
+    expect(lightPass?.reads.map((res) => res.name)).toContain('sceneColorCopy');
+  });
+});

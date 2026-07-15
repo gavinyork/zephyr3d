@@ -684,6 +684,41 @@ function buildForwardPlusGraphInternal(
     });
   }
 
+  // 7b. Scene color grab: renders the full scene (no transmission) into a copy
+  // texture that transmission/refraction materials sample as background.
+  // Extracted from the former monolithic light pass.
+  let grabResult: { copyHandle: RGHandle; copyFramebufferHandle?: RGHandle } | undefined;
+  if (options.needSceneColor) {
+    grabResult = graph.addPass('SceneColorGrab', (builder) => {
+      builder.read(depthHandle);
+      builder.read(depthPassResult.depthFramebufferHandle);
+      if (preLightTransmissionDepthToken) {
+        builder.read(preLightTransmissionDepthToken);
+      }
+      const copyHandle = builder.createTexture({
+        format: ctx.colorFormat!,
+        label: 'sceneColorCopy'
+      });
+      // SSR may pre-insert transmission depth before LightPass for Hi-Z. In that
+      // case the refraction scene-color copy needs an isolated depth buffer so
+      // transmission surfaces do not occlude the background they sample.
+      const copyFramebufferHandle = !options.needsTransmissionDepthForSSR
+        ? builder.createFramebuffer({
+            label: 'SceneColorCopyFramebuffer',
+            width: ctx.renderWidth,
+            height: ctx.renderHeight,
+            colorAttachments: copyHandle,
+            depthAttachment: renderDepthAttachment,
+            ignoreDepthStencil: false
+          })
+        : undefined;
+      builder.setExecute((rgCtx) => {
+        renderSceneColorGrab(frame, rgCtx, copyHandle, copyFramebufferHandle);
+      });
+      return { copyHandle, copyFramebufferHandle };
+    });
+  }
+
   const lightPassResult = graph.addPass('LightPass', (builder) => {
     builder.read(depthHandle);
     builder.read(depthPassResult.depthFramebufferHandle);
@@ -703,13 +738,10 @@ function buildForwardPlusGraphInternal(
       label: 'sceneColor'
     });
 
-    // Create optional sceneColorCopy for transmission/refraction materials
-    let sceneColorCopyHandle: RGHandle | undefined;
-    if (options.needSceneColor) {
-      sceneColorCopyHandle = builder.createTexture({
-        format: ctx.colorFormat!,
-        label: 'sceneColorCopy'
-      });
+    // Transmission/refraction background produced by the SceneColorGrab pass
+    const sceneColorCopyHandle = grabResult?.copyHandle;
+    if (sceneColorCopyHandle) {
+      builder.read(sceneColorCopyHandle);
     }
     if (sssProfileResult) {
       builder.read(sssProfileResult.profileHandle);
@@ -755,20 +787,6 @@ function buildForwardPlusGraphInternal(
           colorAttachments: sceneColorHandle,
           depthAttachment: renderDepthAttachment
         });
-    // SSR may pre-insert transmission depth before LightPass for Hi-Z. In that case the
-    // refraction scene-color copy needs an isolated depth buffer so transmission surfaces
-    // do not occlude the background color they are about to sample.
-    const sceneColorCopyFramebufferHandle =
-      sceneColorCopyHandle && !options.needsTransmissionDepthForSSR
-        ? builder.createFramebuffer({
-            label: 'SceneColorCopyFramebuffer',
-            width: ctx.renderWidth,
-            height: ctx.renderHeight,
-            colorAttachments: sceneColorCopyHandle,
-            depthAttachment: renderDepthAttachment,
-            ignoreDepthStencil: false
-          })
-        : undefined;
 
     builder.setExecute((rgCtx) => {
       const sceneColorTex = rgCtx.getTexture<Texture2D>(sceneColorHandle);
@@ -788,14 +806,7 @@ function buildForwardPlusGraphInternal(
         : null;
       ctx.SkinSSSTexture = skinSSSHandle ? rgCtx.getTexture<Texture2D>(skinSSSHandle) : null;
       const renderLightPass = () =>
-        renderMainLightPass(
-          frame,
-          sceneColorTex,
-          sceneColorCopyTex,
-          rgCtx,
-          sceneColorFramebufferHandle,
-          sceneColorCopyFramebufferHandle
-        );
+        renderMainLightPass(frame, sceneColorTex, sceneColorCopyTex, rgCtx, sceneColorFramebufferHandle);
       if (historyManager && lightHistoryReadBindings.length > 0) {
         historyManager.beginReadScope(
           lightHistoryReadBindings.map((binding) => ({
@@ -1301,14 +1312,73 @@ function blitToCurrentColorAttachment(ctx: DrawContext, source: Texture2D): void
   new CopyBlitter().blit(source, destination, fetchSampler('clamp_nearest_nomip'));
 }
 
+/**
+ * Renders the full scene (no transmission) into the scene-color copy texture
+ * used as refraction background. Runs as its own graph pass before LightPass.
+ * @internal
+ */
+function renderSceneColorGrab(
+  frame: FrameState,
+  rgCtx: RGExecuteContext,
+  copyHandle: RGHandle,
+  copyFramebufferHandle?: RGHandle
+): void {
+  const { ctx, renderQueue } = frame;
+  const device = ctx.device;
+  const depthTex = frame.depthFramebuffer?.getDepthAttachment() as Texture2D;
+  const copyTex = rgCtx.getTexture<Texture2D>(copyHandle);
+  const compositor = ctx.compositor;
+  ctx.compositor = null;
+  const isolateSceneColorDepth = frame.options.needsTransmissionDepthForSSR;
+  const savedDepthPrepassAttachment = ctx.depthPrepassAttachment;
+  const savedMaterialFlags = ctx.materialFlags;
+
+  // MRT store flags never apply to the background copy
+  const sceneColorMaterialFlags = ctx.materialFlags & ~SURFACE_MRT_FLAGS;
+  const sceneColorFramebuffer = copyFramebufferHandle
+    ? rgCtx.getFramebuffer<FrameBuffer>(copyFramebufferHandle)
+    : rgCtx.createFramebuffer<FrameBuffer>({
+        width: copyTex.width,
+        height: copyTex.height,
+        colorAttachments: copyTex,
+        depthAttachment: isolateSceneColorDepth ? ctx.depthFormat : depthTex,
+        ignoreDepthStencil: false
+      });
+  let sceneColorStatePushed = false;
+  try {
+    device.pushDeviceStates();
+    sceneColorStatePushed = true;
+    device.setFramebuffer(sceneColorFramebuffer);
+    _scenePass.transmission = false;
+    if (isolateSceneColorDepth) {
+      ctx.depthPrepassAttachment = undefined;
+      _scenePass.clearDepth = 1;
+      _scenePass.clearStencil = 0;
+    } else {
+      _scenePass.clearDepth = depthTex ? null : 1;
+      _scenePass.clearStencil = depthTex ? null : 0;
+    }
+    ctx.materialFlags = sceneColorMaterialFlags;
+    _scenePass.render(ctx, null, null, renderQueue);
+  } finally {
+    ctx.materialFlags = savedMaterialFlags;
+    if (isolateSceneColorDepth) {
+      ctx.depthPrepassAttachment = savedDepthPrepassAttachment;
+    }
+    if (sceneColorStatePushed) {
+      device.popDeviceStates();
+    }
+    ctx.compositor = compositor;
+  }
+}
+
 /** @internal */
 function renderMainLightPass(
   frame: FrameState,
   sceneColorTex: Texture2D,
   sceneColorCopyTex: Nullable<Texture2D>,
   rgCtx: RGExecuteContext,
-  sceneColorFramebufferHandle?: RGHandle,
-  sceneColorCopyFramebufferHandle?: RGHandle
+  sceneColorFramebufferHandle?: RGHandle
 ): void {
   const { ctx, renderQueue } = frame;
   const device = ctx.device;
@@ -1369,50 +1439,8 @@ function renderMainLightPass(
   ctx.compositor?.begin(ctx);
 
   if (renderQueue.needSceneColor() && sceneColorCopyTex) {
-    const compositor = ctx.compositor;
-    ctx.compositor = null;
-    const isolateSceneColorDepth = frame.options.needsTransmissionDepthForSSR;
-    const savedDepthPrepassAttachment = ctx.depthPrepassAttachment;
-    const savedClearDepth = _scenePass.clearDepth;
-    const savedClearStencil = _scenePass.clearStencil;
-    const savedMaterialFlags = ctx.materialFlags;
-
-    // Use RenderGraph-allocated sceneColorCopy texture
-    const sceneColorMaterialFlags = ctx.materialFlags & ~SURFACE_MRT_FLAGS;
-    const sceneColorFramebuffer = sceneColorCopyFramebufferHandle
-      ? rgCtx.getFramebuffer<FrameBuffer>(sceneColorCopyFramebufferHandle)
-      : rgCtx.createFramebuffer<FrameBuffer>({
-          width: sceneColorCopyTex.width,
-          height: sceneColorCopyTex.height,
-          colorAttachments: sceneColorCopyTex,
-          depthAttachment: isolateSceneColorDepth ? ctx.depthFormat : depthTex,
-          ignoreDepthStencil: false
-        });
-    let sceneColorStatePushed = false;
-    try {
-      device.pushDeviceStates();
-      sceneColorStatePushed = true;
-      device.setFramebuffer(sceneColorFramebuffer);
-      _scenePass.transmission = false;
-      if (isolateSceneColorDepth) {
-        ctx.depthPrepassAttachment = undefined;
-        _scenePass.clearDepth = 1;
-        _scenePass.clearStencil = 0;
-      }
-      ctx.materialFlags = sceneColorMaterialFlags;
-      _scenePass.render(ctx, null, null, renderQueue);
-    } finally {
-      ctx.materialFlags = savedMaterialFlags;
-      if (isolateSceneColorDepth) {
-        ctx.depthPrepassAttachment = savedDepthPrepassAttachment;
-        _scenePass.clearDepth = savedClearDepth;
-        _scenePass.clearStencil = savedClearStencil;
-      }
-      if (sceneColorStatePushed) {
-        device.popDeviceStates();
-      }
-      ctx.compositor = compositor;
-    }
+    // Background copy was produced by the SceneColorGrab pass; seed the main
+    // color attachment with it and render only transmission/transparent on top.
     ctx.sceneColorTexture = sceneColorCopyTex;
     blitToCurrentColorAttachment(ctx, ctx.sceneColorTexture);
     _scenePass.transmission = true;
