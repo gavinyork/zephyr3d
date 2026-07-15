@@ -447,6 +447,7 @@ export function screenSpaceRayTracing_HiZ(
   cameraNearFar: PBShaderExp,
   maxMipLevel: PBShaderExp | number,
   maxIterations: PBShaderExp | number,
+  maxDistance: PBShaderExp | number,
   thickness: PBShaderExp | number,
   textureSize: PBShaderExp,
   HiZTexture: PBShaderExp,
@@ -511,23 +512,48 @@ export function screenSpaceRayTracing_HiZ(
       pb.vec2('floorOffset'),
       pb.vec2('uvOffset'),
       pb.float('surfaceZ'),
+      pb.float('surfaceZMax'),
+      pb.int('currentMip'),
       pb.vec3('position').inout(),
       pb.float('currentT').inout()
     ],
     function () {
       this.$l.xyPlane = pb.add(pb.floor(this.currentMipPosition), this.floorOffset);
       this.xyPlane = pb.add(pb.mul(this.xyPlane, this.invCurrentMipResolution), this.uvOffset);
-      this.$l.boundaryPlanes = pb.vec3(this.xyPlane, this.surfaceZ);
-      this.$l.t = pb.mul(pb.sub(this.boundaryPlanes, this.origin), this.invDirection);
-      this.t.z = this.$choice(pb.greaterThan(this.direction.z, 0), this.t.z, MAX_FLOAT_VALUE);
-      this.$l.tMin = pb.min(pb.min(this.t.x, this.t.y), this.t.z);
-      this.$l.aboveSurface = pb.greaterThan(this.surfaceZ, this.position.z);
-      this.$l.skippedTile = pb.and(
-        pb.notEqual(pb.floatBitsToUint(this.tMin), pb.floatBitsToUint(this.t.z)),
-        this.aboveSurface
-      );
-      this.currentT = this.$choice(this.aboveSurface, this.tMin, this.currentT);
-      this.position = pb.add(this.origin, pb.mul(this.direction, this.currentT));
+      this.$l.skippedTile = pb.bool();
+      this.$if(pb.greaterThan(this.direction.z, 0), function () {
+        // Preserve the proven min-depth traversal for rays moving away from the camera.
+        this.$l.boundaryPlanes = pb.vec3(this.xyPlane, this.surfaceZ);
+        this.$l.forwardT = pb.mul(pb.sub(this.boundaryPlanes, this.origin), this.invDirection);
+        this.$l.tMin = pb.min(pb.min(this.forwardT.x, this.forwardT.y), this.forwardT.z);
+        this.$l.aboveSurface = pb.greaterThan(this.surfaceZ, this.position.z);
+        this.skippedTile = pb.and(
+          pb.notEqual(pb.floatBitsToUint(this.tMin), pb.floatBitsToUint(this.forwardT.z)),
+          this.aboveSurface
+        );
+        this.currentT = this.$choice(this.aboveSurface, this.tMin, this.currentT);
+        this.position = pb.add(this.origin, pb.mul(this.direction, this.currentT));
+      }).$else(function () {
+        this.$l.reverseT = pb.mul(pb.sub(this.xyPlane, this.origin.xy), this.invDirection.xy);
+        this.$l.tExit = pb.min(this.reverseT.x, this.reverseT.y);
+        this.$l.exitZ = pb.add(this.origin.z, pb.mul(this.direction.z, this.tExit));
+        this.$l.rayMinZ = pb.min(this.position.z, this.exitZ);
+        this.$l.rayMaxZ = pb.max(this.position.z, this.exitZ);
+        this.$l.overlapsDepth = pb.and(
+          pb.greaterThanEqual(this.rayMaxZ, this.surfaceZ),
+          pb.lessThanEqual(this.rayMinZ, this.surfaceZMax)
+        );
+        this.skippedTile = pb.not(this.overlapsDepth);
+        this.$if(this.skippedTile, function () {
+          this.currentT = this.tExit;
+          this.position = pb.add(this.origin, pb.mul(this.direction, this.currentT));
+        }).$elseif(pb.equal(this.currentMip, 0), function () {
+          this.$if(pb.greaterThan(pb.abs(this.direction.z), 1e-6), function () {
+            this.currentT = pb.div(pb.sub(this.surfaceZMax, this.origin.z), this.direction.z);
+            this.position = pb.add(this.origin, pb.mul(this.direction, this.currentT));
+          });
+        });
+      });
       this.$return(this.skippedTile);
     }
   );
@@ -541,13 +567,26 @@ export function screenSpaceRayTracing_HiZ(
       pb.int('mostDetailMip'),
       pb.int('maxMipLevel'),
       pb.float('maxIterations'),
+      pb.float('maxT'),
       pb.float('numIterations').out()
     ],
     function () {
-      this.$l.invDirection = this.$choice(
-        pb.all(pb.compNotEqual(this.screenSpaceDirection, pb.vec3(0))),
-        pb.div(pb.vec3(1), this.screenSpaceDirection),
-        pb.vec3(MAX_FLOAT_VALUE)
+      this.$l.invDirection = pb.vec3(
+        this.$choice(
+          pb.greaterThan(pb.abs(this.screenSpaceDirection.x), 1e-8),
+          pb.div(1, this.screenSpaceDirection.x),
+          MAX_FLOAT_VALUE
+        ),
+        this.$choice(
+          pb.greaterThan(pb.abs(this.screenSpaceDirection.y), 1e-8),
+          pb.div(1, this.screenSpaceDirection.y),
+          MAX_FLOAT_VALUE
+        ),
+        this.$choice(
+          pb.greaterThan(pb.abs(this.screenSpaceDirection.z), 1e-8),
+          pb.div(1, this.screenSpaceDirection.z),
+          MAX_FLOAT_VALUE
+        )
       );
       this.$l.currentMip = this.mostDetailMip;
       this.$l.currentMipResolution = this.getMipResolution(this.currentMip);
@@ -577,12 +616,23 @@ export function screenSpaceRayTracing_HiZ(
       this.numIterations = pb.float(0);
       this.$while(
         pb.and(
-          pb.lessThan(this.numIterations, this.maxIterations),
-          pb.greaterThanEqual(this.currentMip, this.mostDetailMip)
+          pb.and(
+            pb.lessThan(this.numIterations, this.maxIterations),
+            pb.greaterThanEqual(this.currentMip, this.mostDetailMip)
+          ),
+          pb.and(
+            pb.lessThanEqual(this.currentT, this.maxT),
+            pb.all(pb.greaterThanEqual(this.position.xy, pb.vec2(0))),
+            pb.all(pb.lessThanEqual(this.position.xy, pb.vec2(1)))
+          )
         ),
         function () {
           this.$l.currentMipPosition = pb.mul(this.currentMipResolution, this.position.xy);
-          this.$l.surfaceZ = pb.textureLoad(HiZTexture, pb.ivec2(this.currentMipPosition), this.currentMip).r;
+          this.$l.depthRange = pb.textureLoad(
+            HiZTexture,
+            pb.ivec2(this.currentMipPosition),
+            this.currentMip
+          ).rg;
           this.$l.skippedTile = this.SSR_advanceRay(
             this.screenSpacePos,
             this.screenSpaceDirection,
@@ -591,7 +641,9 @@ export function screenSpaceRayTracing_HiZ(
             this.invCurrentMipResolution,
             this.floorOffset,
             this.uvOffset,
-            this.surfaceZ,
+            this.depthRange.x,
+            this.depthRange.y,
+            this.currentMip,
             this.position,
             this.currentT
           );
@@ -614,7 +666,10 @@ export function screenSpaceRayTracing_HiZ(
         }
       );
       this.$l.validHit = this.$choice(
-        pb.lessThanEqual(this.numIterations, this.maxIterations),
+        pb.and(
+          pb.lessThan(this.currentMip, this.mostDetailMip),
+          pb.and(pb.greaterThanEqual(this.currentT, 0), pb.lessThanEqual(this.currentT, this.maxT))
+        ),
         pb.float(1),
         pb.float(0)
       );
@@ -630,24 +685,38 @@ export function screenSpaceRayTracing_HiZ(
       pb.mat4('projMatrix'),
       pb.mat4('invProjMatrix'),
       pb.vec2('cameraNearFar'),
+      pb.float('maxDistance'),
       pb.float('thickness'),
       pb.vec4('textureSize'),
       pb.int('maxMipLevel'),
       pb.float('maxIterations')
     ],
     function () {
-      this.$if(pb.greaterThan(this.traceRay.z, 0), function () {
+      this.$l.rayDirection = pb.normalize(this.traceRay);
+      this.$l.reverseRay = pb.greaterThan(this.rayDirection.z, 1e-6);
+      this.$l.rayLength = this.maxDistance;
+      this.$if(this.reverseRay, function () {
+        this.rayLength = pb.min(
+          this.rayLength,
+          pb.div(pb.sub(pb.neg(this.cameraNearFar.x), this.viewPos.z), this.rayDirection.z)
+        );
+      });
+      this.$if(pb.lessThanEqual(this.rayLength, 0), function () {
         this.$return(pb.vec4(0));
       });
       this.$l.originH = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
       this.$l.originCS = pb.div(this.originH.xyz, this.originH.w);
       this.$l.originTS = pb.add(pb.mul(this.originCS, 0.5), pb.vec3(0.5));
-      this.$l.directionTS = this.projectDirection(
-        this.viewPos,
-        this.traceRay,
-        this.originTS,
+      this.$l.endTS = this.projectPosition(
+        pb.add(this.viewPos, pb.mul(this.rayDirection, this.rayLength)),
         this.projMatrix
       );
+      this.$l.directionTS = this.$choice(
+        this.reverseRay,
+        pb.sub(this.endTS, this.originTS),
+        this.projectDirection(this.viewPos, this.rayDirection, this.originTS, this.projMatrix)
+      );
+      this.$l.maxT = this.$choice(this.reverseRay, pb.float(1), pb.float(MAX_FLOAT_VALUE));
       this.$l.mostDetailMip = pb.int(0);
       this.$l.numIterations = pb.float();
       this.$l.hit = this.SSR_RaymarchHiZ(
@@ -658,6 +727,7 @@ export function screenSpaceRayTracing_HiZ(
         this.mostDetailMip,
         this.maxMipLevel,
         this.maxIterations,
+        this.maxT,
         this.numIterations
       );
       this.$l.confidence = pb.float(0);
@@ -674,7 +744,7 @@ export function screenSpaceRayTracing_HiZ(
           this.surfaceZ,
           this.thickness,
           this.originTS.xy,
-          this.traceRay,
+          this.rayDirection,
           this.viewMatrix,
           this.invProjMatrix,
           this.textureSize,
@@ -682,9 +752,8 @@ export function screenSpaceRayTracing_HiZ(
         );
       });
       this.$l.iterationAttenuation = pb.sub(1, pb.smoothStep(0, this.maxIterations, this.numIterations));
-      this.$l.viewAttenuation = pb.sub(1, pb.smoothStep(-0.5, 0, this.traceRay.z));
       //this.$l.iterationAttenuation = pb.smoothStep(this.maxIterations, 1, this.numIterations);
-      this.confidence = pb.mul(this.confidence, this.iterationAttenuation, this.viewAttenuation);
+      this.confidence = pb.mul(this.confidence, this.iterationAttenuation);
       this.$l.hitPixel = pb.mul(this.hit.xy, this.textureSize.zw);
       this.$l.startPixel = pb.mul(this.originTS.xy, this.textureSize.zw);
       this.$l.hitDistance = pb.length(pb.sub(this.hitPixel, this.startPixel));
@@ -698,6 +767,7 @@ export function screenSpaceRayTracing_HiZ(
     projMatrix,
     invProjMatrix,
     cameraNearFar,
+    maxDistance,
     thickness,
     textureSize,
     pb.sub(maxMipLevel, 1),
