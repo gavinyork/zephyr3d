@@ -1,8 +1,10 @@
 import type { AbstractDevice, BindGroup, GPUProgram, RenderStateSet, Texture2D } from '@zephyr3d/device';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
+import type { PostEffectSetupContext } from './posteffect';
 import type { DrawContext } from '../render';
 import type { Nullable } from '@zephyr3d/base';
 import { Vector2, Vector4 } from '@zephyr3d/base';
+import type { RGHandle } from '../render/rendergraph/types';
 
 /**
  * The bloom post effect
@@ -85,6 +87,149 @@ export class Bloom extends AbstractPostEffect {
   requireDepthAttachment() {
     return false;
   }
+  /** {@inheritDoc AbstractPostEffect.setup}
+   *
+   * Native multi-pass implementation: prefilter, one pass per pyramid level
+   * (separable blur), one additive upsample pass per level, and a final
+   * compose pass. Pyramid sizes are computed at build time with the same math
+   * as {@link Bloom.apply}, so both paths produce identical results.
+   */
+  setup(s: PostEffectSetupContext): RGHandle {
+    const { graph, ctx } = s;
+    const format = s.colorFormat;
+    // Mirror apply()'s runtime sizing math at build time.
+    const prefilterWidth = Math.max(s.width >> 1, 1);
+    const prefilterHeight = Math.max(s.height >> 1, 1);
+    const t = Math.max(2, this._downsampleLimit);
+    const levels: Array<{ width: number; height: number }> = [];
+    {
+      let w = Math.max(t, prefilterWidth >> 1);
+      let h = Math.max(t, prefilterHeight >> 1);
+      let maxLevels = Math.max(this._maxDownsampleLevels, 1);
+      while ((w >= t || h >= t) && maxLevels > 0) {
+        levels.push({ width: w, height: h });
+        maxLevels--;
+        w = Math.max(1, w >> 1);
+        h = Math.max(1, h >> 1);
+      }
+    }
+    if (levels.length === 0) {
+      // Degenerate viewport: no pyramid possible, bloom contributes nothing.
+      return s.input;
+    }
+
+    // 1. Prefilter (threshold/knee) at half resolution.
+    const prefilterHandle = graph.addPass('Bloom:Prefilter', (builder) => {
+      builder.read(s.input);
+      for (const dep of s.dependencies) {
+        builder.read(dep);
+      }
+      const out = builder.createTexture({
+        format,
+        sizeMode: 'absolute',
+        width: prefilterWidth,
+        height: prefilterHeight,
+        label: 'Bloom:prefilter'
+      });
+      builder.setExecute((rg) => {
+        const device = ctx.device;
+        const inputTexture = rg.getTexture<Texture2D>(s.input);
+        this._prepare(device, inputTexture);
+        device.pushDeviceStates();
+        try {
+          this.prefilter(device, inputTexture, rg.getTexture<Texture2D>(out));
+        } finally {
+          device.popDeviceStates();
+        }
+      });
+      return out;
+    });
+
+    // 2. Downsample pyramid: one pass per level (separable blur through a
+    // pass-local intermediate texture).
+    const levelHandles: RGHandle[] = [];
+    let sourceHandle = prefilterHandle;
+    for (let i = 0; i < levels.length; i++) {
+      const level = levels[i];
+      const src = sourceHandle;
+      const levelHandle = graph.addPass(`Bloom:Downsample${i}`, (builder) => {
+        builder.read(src);
+        const middle = builder.createTexture({
+          format,
+          sizeMode: 'absolute',
+          width: level.width,
+          height: level.height,
+          label: `Bloom:downsample${i}:middle`
+        });
+        const out = builder.createTexture({
+          format,
+          sizeMode: 'absolute',
+          width: level.width,
+          height: level.height,
+          label: `Bloom:downsample${i}`
+        });
+        builder.setExecute((rg) => {
+          const device = ctx.device;
+          device.pushDeviceStates();
+          try {
+            const middleTexture = rg.getTexture<Texture2D>(middle);
+            this.blurH(device, rg.getTexture<Texture2D>(src), middleTexture);
+            this.blurV(device, middleTexture, rg.getTexture<Texture2D>(out));
+          } finally {
+            device.popDeviceStates();
+          }
+        });
+        return out;
+      });
+      levelHandles.push(levelHandle);
+      sourceHandle = levelHandle;
+    }
+
+    // 3. Upsample: additively blend each level into the level above (in-place
+    // write, so each pass produces a new version of the target texture).
+    for (let i = levels.length - 2; i >= 0; i--) {
+      const src = levelHandles[i + 1];
+      const dst = levelHandles[i];
+      levelHandles[i] = graph.addPass(`Bloom:Upsample${i}`, (builder) => {
+        builder.read(src);
+        builder.read(dst);
+        const out = builder.write(dst);
+        builder.setExecute((rg) => {
+          const device = ctx.device;
+          device.pushDeviceStates();
+          try {
+            this._prepare(device, rg.getTexture<Texture2D>(src));
+            this.upsampleInto(device, rg.getTexture<Texture2D>(src), rg.getTexture<Texture2D>(out));
+          } finally {
+            device.popDeviceStates();
+          }
+        });
+        return out;
+      });
+    }
+
+    // 4. Compose: scene color + bloom * intensity.
+    const bloomHandle = levelHandles[0];
+    return graph.addPass('Bloom:Compose', (builder) => {
+      builder.read(s.input);
+      builder.read(bloomHandle);
+      for (const dep of s.dependencies) {
+        builder.read(dep);
+      }
+      const output = s.createOutput(builder);
+      builder.setExecute((rg) => {
+        const device = ctx.device;
+        device.pushDeviceStates();
+        try {
+          device.setFramebuffer(output.framebuffer ? rg.getFramebuffer(output.framebuffer) : null);
+          this.finalCompose(device, rg.getTexture<Texture2D>(s.input), rg.getTexture<Texture2D>(bloomHandle));
+        } finally {
+          device.popDeviceStates();
+        }
+      });
+      return output.color;
+    });
+  }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, _sceneDepthTexture: Texture2D, _srgbOutput: boolean) {
     const device = ctx.device;
@@ -134,14 +279,40 @@ export class Bloom extends AbstractPostEffect {
   }
   /** @internal */
   upsample(device: AbstractDevice, textures: Texture2D[]) {
+    for (let i = textures.length - 2; i >= 0; i--) {
+      this.upsampleInto(device, textures[i + 1], textures[i]);
+    }
+  }
+  /** @internal */
+  private upsampleInto(device: AbstractDevice, srcTexture: Texture2D, dstTexture: Texture2D) {
     device.setProgram(Bloom._programUpsample);
     device.setBindGroup(0, Bloom._bindgroupUpsample!);
     Bloom._bindgroupUpsample!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    for (let i = textures.length - 2; i >= 0; i--) {
-      Bloom._bindgroupUpsample!.setTexture('tex', textures[i + 1]);
-      device.setFramebuffer([textures[i]]);
-      this.drawFullscreenQuad(Bloom._renderStateAdditive!);
-    }
+    Bloom._bindgroupUpsample!.setTexture('tex', srcTexture);
+    device.setFramebuffer([dstTexture]);
+    this.drawFullscreenQuad(Bloom._renderStateAdditive!);
+  }
+  /** @internal */
+  private blurH(device: AbstractDevice, srcTexture: Texture2D, dstTexture: Texture2D) {
+    this._invTexSize.setXY(1 / srcTexture.width, 1 / srcTexture.height);
+    device.setFramebuffer([dstTexture]);
+    device.setProgram(Bloom._programDownsampleH);
+    device.setBindGroup(0, Bloom._bindgroupDownsampleH!);
+    Bloom._bindgroupDownsampleH!.setTexture('tex', srcTexture);
+    Bloom._bindgroupDownsampleH!.setValue('invTexSize', this._invTexSize);
+    Bloom._bindgroupDownsampleH!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
+    this.drawFullscreenQuad();
+  }
+  /** @internal */
+  private blurV(device: AbstractDevice, srcTexture: Texture2D, dstTexture: Texture2D) {
+    this._invTexSize.setXY(1 / srcTexture.width, 1 / srcTexture.height);
+    device.setFramebuffer([dstTexture]);
+    device.setProgram(Bloom._programDownsampleV);
+    device.setBindGroup(0, Bloom._bindgroupDownsampleV!);
+    Bloom._bindgroupDownsampleV!.setTexture('tex', srcTexture);
+    Bloom._bindgroupDownsampleV!.setValue('invTexSize', this._invTexSize);
+    Bloom._bindgroupDownsampleV!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
+    this.drawFullscreenQuad();
   }
   /** @internal */
   downsample(device: AbstractDevice, inputColorTexture: Texture2D, textures: Texture2D[]) {
@@ -150,31 +321,14 @@ export class Bloom extends AbstractPostEffect {
     let h = Math.max(t, inputColorTexture.height >> 1);
     let maxLevels = Math.max(this._maxDownsampleLevels, 1);
     let sourceTex = inputColorTexture;
-    Bloom._bindgroupDownsampleH!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    Bloom._bindgroupDownsampleV!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     while ((w >= t || h >= t) && maxLevels > 0) {
       const tex = device.pool.fetchTemporalTexture2D(false, inputColorTexture.format, w, h, false);
       textures.push(tex);
 
       const texMiddle = device.pool.fetchTemporalTexture2D(false, inputColorTexture.format, w, h, false);
 
-      // horizonal blur
-      this._invTexSize.setXY(1 / sourceTex.width, 1 / sourceTex.height);
-      device.setFramebuffer([texMiddle]);
-      device.setProgram(Bloom._programDownsampleH);
-      device.setBindGroup(0, Bloom._bindgroupDownsampleH!);
-      Bloom._bindgroupDownsampleH!.setTexture('tex', sourceTex);
-      Bloom._bindgroupDownsampleH!.setValue('invTexSize', this._invTexSize);
-      this.drawFullscreenQuad();
-
-      // vertical blur
-      this._invTexSize.setXY(1 / texMiddle.width, 1 / texMiddle.height);
-      device.setFramebuffer([tex]);
-      device.setProgram(Bloom._programDownsampleV);
-      device.setBindGroup(0, Bloom._bindgroupDownsampleV!);
-      Bloom._bindgroupDownsampleV!.setTexture('tex', texMiddle);
-      Bloom._bindgroupDownsampleV!.setValue('invTexSize', this._invTexSize);
-      this.drawFullscreenQuad();
+      this.blurH(device, sourceTex, texMiddle);
+      this.blurV(device, texMiddle, tex);
 
       maxLevels--;
       w = Math.max(1, w >> 1);

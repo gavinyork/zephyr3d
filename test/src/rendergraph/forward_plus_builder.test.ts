@@ -787,3 +787,49 @@ describe('Forward+ transparent-layer post effect chain', () => {
     expect(endPass?.reads).toContain(transparentOutput);
   });
 });
+
+describe('Bloom native multi-pass setup', () => {
+  test('expands bloom into prefilter/downsample/upsample/compose passes', () => {
+    const { Bloom } = require('../../../libs/scene/src/posteffect/bloom');
+    const bloom = new Bloom();
+    const compositor = new Compositor();
+    compositor.appendPostEffect(bloom);
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions(), {}, { compositor });
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    // 1920x1080 -> prefilter 960x540 -> pyramid 480x270, 240x135, 120x67, 60x33 (4 levels)
+    expect(passNames).toContain('Bloom:Prefilter');
+    expect(passNames).toContain('Bloom:Downsample0');
+    expect(passNames).toContain('Bloom:Downsample3');
+    expect(passNames).toContain('Bloom:Upsample2');
+    expect(passNames).toContain('Bloom:Upsample0');
+    expect(passNames).toContain('Bloom:Compose');
+    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('Bloom:Prefilter'));
+    expect(passNames.indexOf('Bloom:Prefilter')).toBeLessThan(passNames.indexOf('Bloom:Downsample0'));
+    expect(passNames.indexOf('Bloom:Downsample3')).toBeLessThan(passNames.indexOf('Bloom:Upsample2'));
+    expect(passNames.indexOf('Bloom:Upsample0')).toBeLessThan(passNames.indexOf('Bloom:Compose'));
+
+    // Compose takes the direct final write (bloom is the last enabled effect)
+    const composePass = graph.passes.find((pass) => pass.name === 'Bloom:Compose');
+    expect(composePass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(true);
+
+    // Upsample passes write new versions of the downsample level textures
+    const upsamplePass = graph.passes.find((pass) => pass.name === 'Bloom:Upsample0');
+    expect(upsamplePass?.writes.some((res) => res.name.startsWith('Bloom:downsample0@'))).toBe(true);
+  });
+
+  test('declares absolute pyramid sizes matching the legacy runtime math', () => {
+    const { Bloom } = require('../../../libs/scene/src/posteffect/bloom');
+    const bloom = new Bloom();
+    const compositor = new Compositor();
+    compositor.appendPostEffect(bloom);
+    const { graph } = buildForwardPlusGraphForTest(createOptions(), {}, { compositor });
+
+    const prefilter = [...graph.resources.values()].find((res) => res.name === 'Bloom:prefilter');
+    expect(prefilter?.desc).toMatchObject({ sizeMode: 'absolute', width: 960, height: 540 });
+    const level0 = [...graph.resources.values()].find((res) => res.name === 'Bloom:downsample0');
+    expect(level0?.desc).toMatchObject({ sizeMode: 'absolute', width: 480, height: 270 });
+    const level3 = [...graph.resources.values()].find((res) => res.name === 'Bloom:downsample3');
+    expect(level3?.desc).toMatchObject({ sizeMode: 'absolute', width: 60, height: 33 });
+  });
+});

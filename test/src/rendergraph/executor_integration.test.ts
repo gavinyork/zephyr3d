@@ -93,3 +93,102 @@ describe('RenderGraphExecutor Integration', () => {
     executor.reset();
   });
 });
+
+describe('Transient write-version aliasing', () => {
+  test('write-versions of a transient resolve to the same physical texture', () => {
+    const { allocator, allocated, released } = createMockAllocator();
+    const graph = new RenderGraph();
+
+    let texHandle: any;
+    const seen: number[] = [];
+
+    graph.addPass('Produce', (builder) => {
+      texHandle = builder.createTexture({ format: 'rgba8unorm', label: 'accum' });
+      builder.setExecute((rgCtx) => {
+        seen.push(rgCtx.getTexture<MockTexture>(texHandle).id);
+      });
+    });
+
+    let version1: any;
+    graph.addPass('AccumulateA', (builder) => {
+      builder.read(texHandle);
+      version1 = builder.write(texHandle);
+      builder.setExecute((rgCtx) => {
+        seen.push(rgCtx.getTexture<MockTexture>(version1).id);
+      });
+    });
+
+    let version2: any;
+    graph.addPass('AccumulateB', (builder) => {
+      builder.read(version1);
+      version2 = builder.write(version1);
+      builder.setExecute((rgCtx) => {
+        seen.push(rgCtx.getTexture<MockTexture>(version2).id);
+      });
+    });
+
+    let backbuffer = graph.importTexture('backbuffer');
+    graph.addPass('Consume', (builder) => {
+      builder.read(version2);
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute((rgCtx) => {
+        seen.push(rgCtx.getTexture<MockTexture>(version2).id);
+      });
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const executor = new RenderGraphExecutor(allocator, 256, 256);
+    executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 256, height: 256 } });
+    executor.execute(compiled);
+
+    // One allocation shared by every version, all passes see the same texture
+    expect(allocated.length).toBe(1);
+    expect(seen).toEqual([allocated[0].id, allocated[0].id, allocated[0].id, allocated[0].id]);
+    // Released exactly once, after the last consumer
+    expect(released.length).toBe(1);
+    expect(released[0]).toBe(allocated[0]);
+  });
+
+  test('release is deferred until the last use of any version', () => {
+    const { allocator, allocated, released } = createMockAllocator();
+    const graph = new RenderGraph();
+
+    let texHandle: any;
+    let version1: any;
+    const releasedAt: string[] = [];
+
+    graph.addPass('Produce', (builder) => {
+      texHandle = builder.createTexture({ format: 'rgba8unorm', label: 'accum' });
+      builder.setExecute(() => {
+        releasedAt.push(`Produce:${released.length}`);
+      });
+    });
+
+    graph.addPass('Write', (builder) => {
+      builder.read(texHandle);
+      version1 = builder.write(texHandle);
+      builder.setExecute(() => {
+        releasedAt.push(`Write:${released.length}`);
+      });
+    });
+
+    let backbuffer = graph.importTexture('backbuffer');
+    graph.addPass('Consume', (builder) => {
+      builder.read(version1);
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute(() => {
+        releasedAt.push(`Consume:${released.length}`);
+      });
+    });
+
+    const compiled = graph.compile([backbuffer]);
+    const executor = new RenderGraphExecutor(allocator, 256, 256);
+    executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 256, height: 256 } });
+    executor.execute(compiled);
+
+    expect(allocated.length).toBe(1);
+    // Nothing released while any version still has pending uses
+    expect(releasedAt).toEqual(['Produce:0', 'Write:0', 'Consume:0']);
+    expect(released.length).toBe(1);
+  });
+});

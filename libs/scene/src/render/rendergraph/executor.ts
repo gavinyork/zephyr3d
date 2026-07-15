@@ -93,6 +93,8 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   /** @internal */
   private _importedTextureAliases: Map<number, number> = new Map();
   /** @internal */
+  private _transientTextureAliases: Map<number, number> = new Map();
+  /** @internal */
   private _resolvedImportedTextures: Map<number, TTexture> = new Map();
   /** @internal */
   private _cleanupCallbacks: Array<() => void> = [];
@@ -207,17 +209,27 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     const allocateFramebufferAt = new Map<number, number[]>(); // passIndex -> framebuffer resourceIds to allocate
     const releaseFramebufferAt = new Map<number, number[]>(); // passIndex -> framebuffer resourceIds to release
 
+    // Transient write-versions (builder.write on a transient) alias the same
+    // physical texture as the original resource: merge their lifetimes by
+    // physicalId so one texture is allocated at the first use of any version
+    // and released after the last use of any version.
+    this._transientTextureAliases.clear();
+    const transientSchedules = new Map<number, { firstUse: number; lastUse: number; desc: RGTextureDesc }>();
     for (const [resId, lifetime] of compiled.lifetimes) {
       if (lifetime.resource.kind === 'transient') {
-        if (!allocateAt.has(lifetime.firstUse)) {
-          allocateAt.set(lifetime.firstUse, []);
+        const physicalId = lifetime.resource.physicalId;
+        this._transientTextureAliases.set(resId, physicalId);
+        const merged = transientSchedules.get(physicalId);
+        if (merged) {
+          merged.firstUse = Math.min(merged.firstUse, lifetime.firstUse);
+          merged.lastUse = Math.max(merged.lastUse, lifetime.lastUse);
+        } else {
+          transientSchedules.set(physicalId, {
+            firstUse: lifetime.firstUse,
+            lastUse: lifetime.lastUse,
+            desc: lifetime.resource.desc as RGTextureDesc
+          });
         }
-        allocateAt.get(lifetime.firstUse)!.push(resId);
-
-        if (!releaseAt.has(lifetime.lastUse)) {
-          releaseAt.set(lifetime.lastUse, []);
-        }
-        releaseAt.get(lifetime.lastUse)!.push(resId);
       } else if (lifetime.resource.kind === 'framebuffer') {
         if (!allocateFramebufferAt.has(lifetime.firstUse)) {
           allocateFramebufferAt.set(lifetime.firstUse, []);
@@ -230,6 +242,17 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
         releaseFramebufferAt.get(lifetime.lastUse)!.push(resId);
       }
     }
+    for (const [physicalId, schedule] of transientSchedules) {
+      if (!allocateAt.has(schedule.firstUse)) {
+        allocateAt.set(schedule.firstUse, []);
+      }
+      allocateAt.get(schedule.firstUse)!.push(physicalId);
+
+      if (!releaseAt.has(schedule.lastUse)) {
+        releaseAt.set(schedule.lastUse, []);
+      }
+      releaseAt.get(schedule.lastUse)!.push(physicalId);
+    }
 
     let completed = false;
     let executionError: unknown = null;
@@ -241,10 +264,9 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
         const toAllocate = allocateAt.get(i);
         if (toAllocate) {
           for (const resId of toAllocate) {
-            const lifetime = compiled.lifetimes.get(resId)!;
-            const desc = lifetime.resource.desc as RGTextureDesc;
-            const size = this._resolveSize(desc);
-            const texture = this._allocator.allocate(desc, size);
+            const schedule = transientSchedules.get(resId)!;
+            const size = this._resolveSize(schedule.desc);
+            const texture = this._allocator.allocate(schedule.desc, size);
             this._allocatedTextures.set(resId, texture);
           }
         }
@@ -376,6 +398,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     this._allocatedTextures.clear();
     this._importedTextures.clear();
     this._importedTextureAliases.clear();
+    this._transientTextureAliases.clear();
     this._resolvedImportedTextures.clear();
   }
 
@@ -778,6 +801,14 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     const allocated = this._allocatedTextures.get(handle._id);
     if (allocated !== undefined) {
       return allocated;
+    }
+    // Transient write-versions resolve to the physical texture of the original.
+    const transientAlias = this._transientTextureAliases.get(handle._id);
+    if (transientAlias !== undefined) {
+      const aliased = this._allocatedTextures.get(transientAlias);
+      if (aliased !== undefined) {
+        return aliased;
+      }
     }
     throw new Error(
       `RenderGraphExecutor: cannot resolve resource "${handle.name}" (id=${handle._id}). ` +
