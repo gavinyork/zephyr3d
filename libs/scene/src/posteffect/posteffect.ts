@@ -152,6 +152,13 @@ export class AbstractPostEffect extends Disposable {
     return false;
   }
   /**
+   * Checks whether this post effect requires the motion vector texture
+   * @returns true if the motion vector texture is required.
+   */
+  requireMotionVectorTexture(_ctx: DrawContext) {
+    return false;
+  }
+  /**
    * Apply the post effect
    * @param camera - Camera used the render the scene
    * @param inputColorTexture - The previous scene color texture
@@ -193,14 +200,19 @@ export class AbstractPostEffect extends Disposable {
       for (const binding of s.historyReads) {
         builder.read(binding.handle);
       }
-      // The legacy apply() contract always receives the linear depth texture, and
-      // effects may reach other frame textures through DrawContext fields. Declare
-      // reads for them so the executor keeps them alive until this pass ran.
-      const linearDepthHandle = s.blackboard.get(FrameResources.LinearDepth);
+      // Declare reads according to the effect's declared requirements so the
+      // executor keeps exactly the textures this effect samples alive. Effects
+      // reaching frame textures through DrawContext fields must declare them
+      // via requireLinearDepthTexture / requireMotionVectorTexture.
+      const linearDepthHandle = this.requireLinearDepthTexture(s.ctx)
+        ? s.blackboard.get(FrameResources.LinearDepth)
+        : null;
       if (linearDepthHandle) {
         builder.read(linearDepthHandle);
       }
-      const motionVectorHandle = s.blackboard.get(FrameResources.MotionVector);
+      const motionVectorHandle = this.requireMotionVectorTexture(s.ctx)
+        ? s.blackboard.get(FrameResources.MotionVector)
+        : null;
       if (motionVectorHandle) {
         builder.read(motionVectorHandle);
       }

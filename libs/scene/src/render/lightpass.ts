@@ -216,7 +216,6 @@ export class LightPass extends RenderPass {
     const lists = this._transmission
       ? [items?.transmission, items?.transmission_trans, items?.transparent]
       : [items?.opaque, items?.transparent];
-    const transparentPass = lists.length - 1;
     for (let i = 0; i < lists.length; i++) {
       const isOpaquePass = i === 0;
       if ((isOpaquePass && !this._renderOpaque) || (!isOpaquePass && !this._renderTransparent)) {
@@ -308,17 +307,12 @@ export class LightPass extends RenderPass {
         }
       }
       if (!renderQueue.needSceneColor() || ctx.sceneColorTexture) {
-        if (i === 0 || i === transparentPass) {
-          ctx.compositor?.drawPostEffects(
-            ctx,
-            i === 0 ? PostEffectLayer.opaque : PostEffectLayer.transparent,
-            ctx.linearDepthTexture!
-          );
-          if (
-            i === 0 &&
-            surfaceMRT &&
-            (ctx.device.getFramebuffer()?.getColorAttachments().length ?? 0) <= 1
-          ) {
+        // Only opaque-layer effects still run inside the light pass (transparent
+        // geometry must render on top of them). The transparent and end layers
+        // are built as render graph passes after the light pass.
+        if (i === 0) {
+          ctx.compositor?.drawPostEffects(ctx, PostEffectLayer.opaque, ctx.linearDepthTexture!);
+          if (surfaceMRT && (ctx.device.getFramebuffer()?.getColorAttachments().length ?? 0) <= 1) {
             ctx.materialFlags &= ~surfaceMRT;
           }
         }

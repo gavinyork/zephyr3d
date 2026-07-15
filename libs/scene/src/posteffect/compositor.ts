@@ -265,13 +265,12 @@ export class Compositor {
     const device = ctx.device;
     this._textureFormat = this.getIntermediateFormat(ctx);
     this._finalFramebuffer = device.getFramebuffer();
-    // Only the opaque/transparent layers still render through the legacy
-    // ping-pong path inside the light pass. The end layer is built as render
-    // graph passes (see buildLayer), so scene rendering only needs to be
-    // redirected when a mid-scene effect will actually run.
-    const needScenePingPong =
-      this.layerHasEnabledEffect(PostEffectLayer.opaque) ||
-      this.layerHasEnabledEffect(PostEffectLayer.transparent);
+    // Only the opaque layer still renders through the legacy ping-pong path
+    // inside the light pass (transparent geometry must render on top of its
+    // output). The transparent and end layers are built as render graph passes
+    // (see buildLayer), so scene rendering only needs to be redirected when an
+    // opaque-layer effect will actually run.
+    const needScenePingPong = this.layerHasEnabledEffect(PostEffectLayer.opaque);
     if (!needScenePingPong) {
       return;
     }

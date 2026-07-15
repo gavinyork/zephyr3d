@@ -856,41 +856,21 @@ function buildForwardPlusGraphInternal(
     blackboard.set(FrameResources.SSSParam, sssProfileResult.paramHandle);
   }
 
-  // 8. Transmission depth pass (optional)
-  let transmissionDepthToken: RGHandle | undefined;
-  if (options.needSceneColor && !options.needsTransmissionDepthForSSR) {
-    transmissionDepthToken = graph.addPass('TransmissionDepth', (builder) => {
-      builder.read(sceneColorHandle);
-      builder.read(depthPassResult.depthFramebufferHandle);
-      const done = builder.createToken('TransmissionDepthDone');
-      builder.sideEffect();
-      builder.setExecute((rgCtx) => {
-        renderTransmissionDepthPass(frame, rgCtx);
-      });
-      return done;
-    });
-  }
-
-  // 9. End-layer post effects — each enabled effect becomes one or more graph passes.
+  // 8. Post effect chains + transmission depth.
   //
   // Chain input: the settled scene color after the light pass (including
-  // opaque/transparent-layer effects, flushed back by compositor.end() at the
-  // tail of the light pass). When the final framebuffer doubles as the
-  // intermediate target, the scene color lives in the backbuffer instead.
+  // opaque-layer effects, flushed back by compositor.end() at the tail of the
+  // light pass). When the final framebuffer doubles as the intermediate
+  // target, the scene color lives in the backbuffer instead.
   const chainInput = useFinalFramebufferAsIntermediate ? backbuffer : sceneColorHandle;
   // Ordering/lifetime dependencies each effect pass must declare:
   // - sceneColorHandle: keeps LightPass alive even when the chain input is the
   //   backbuffer (final framebuffer used as intermediate); the former Composite
   //   pass always declared this read.
-  // - transmissionDepthToken: TransmissionDepth mutates the linear depth texture
-  //   that end-layer effects sample; they must run after it.
   // - sceneColorFramebufferHandle: ctx.intermediateFramebuffer must stay allocated
   //   until FrameCleanup pops the device state referencing it.
   // - hiZHandle: lifetime parity with the previous monolithic Composite pass.
   const chainDependencies: RGHandle[] = [sceneColorHandle];
-  if (transmissionDepthToken) {
-    chainDependencies.push(transmissionDepthToken);
-  }
   if (lightPassResult.sceneColorFramebufferHandle) {
     chainDependencies.push(lightPassResult.sceneColorFramebufferHandle);
   }
@@ -901,29 +881,76 @@ function buildForwardPlusGraphInternal(
   // must end in a readable graph texture; disable the direct-write fast path
   // while a commit is pending.
   const taaCommitActive = !!(historyManager && ctx.camera.TAA && options.motionVectors && motionVectorHandle);
+  const finalOutput = taaCommitActive ? null : { handle: backbuffer, isScreen: !ctx.finalFramebuffer };
+  const endLayerHasEffects = !!ctx.compositor?.layerHasEnabledEffect(PostEffectLayer.end);
+
+  // 8a. Transparent-layer effects (bloom, tonemap, FXAA, ...). They run right
+  // after the light pass and must sample the pre-transmission linear depth, so
+  // they carry no transmissionDepthToken dependency; TransmissionDepth is
+  // instead ordered after this chain (see 8b).
+  const transparentChainResult = ctx.compositor
+    ? ctx.compositor.buildLayer({
+        graph,
+        ctx,
+        layer: PostEffectLayer.transparent,
+        blackboard,
+        input: chainInput,
+        finalOutput: endLayerHasEffects ? null : finalOutput,
+        sceneDepthAttachment: renderDepthAttachment,
+        dependencies: chainDependencies,
+        history: historyManager
+      })
+    : { color: chainInput, wroteFinal: false };
+
+  // 8b. Transmission depth pass (optional). Mutates the linear depth texture,
+  // so it must run after the transparent-layer chain (which samples the
+  // pre-transmission depth) and before the end-layer chain (which legacy
+  // behavior orders after it).
+  let transmissionDepthToken: RGHandle | undefined;
+  if (options.needSceneColor && !options.needsTransmissionDepthForSSR) {
+    transmissionDepthToken = graph.addPass('TransmissionDepth', (builder) => {
+      builder.read(sceneColorHandle);
+      if (transparentChainResult.color !== sceneColorHandle) {
+        builder.read(transparentChainResult.color);
+      }
+      builder.read(depthPassResult.depthFramebufferHandle);
+      const done = builder.createToken('TransmissionDepthDone');
+      builder.sideEffect();
+      builder.setExecute((rgCtx) => {
+        renderTransmissionDepthPass(frame, rgCtx);
+      });
+      return done;
+    });
+  }
+
+  // 9. End-layer effects (TAA). Ordered after TransmissionDepth.
+  const endChainDependencies = transmissionDepthToken
+    ? [...chainDependencies, transmissionDepthToken]
+    : chainDependencies;
   const chainResult = ctx.compositor
     ? ctx.compositor.buildLayer({
         graph,
         ctx,
         layer: PostEffectLayer.end,
         blackboard,
-        input: chainInput,
-        finalOutput: taaCommitActive ? null : { handle: backbuffer, isScreen: !ctx.finalFramebuffer },
+        input: transparentChainResult.color,
+        finalOutput,
         sceneDepthAttachment: renderDepthAttachment,
-        dependencies: chainDependencies,
+        dependencies: endChainDependencies,
         historyReads: compositeHistoryReadBindings,
         history: historyManager
       })
-    : { color: chainInput, wroteFinal: false };
+    : { color: transparentChainResult.color, wroteFinal: false };
+  const finalWroteFinal = chainResult.wroteFinal || transparentChainResult.wroteFinal;
 
   // 10. Present + frame cleanup.
   let presentedBackbuffer: RGHandle;
-  if (chainResult.wroteFinal) {
+  if (finalWroteFinal) {
     // The last effect wrote the final target directly; only cleanup remains.
     presentedBackbuffer = chainResult.color;
     graph.addPass('FrameCleanup', (builder) => {
       builder.read(presentedBackbuffer);
-      for (const dep of chainDependencies) {
+      for (const dep of endChainDependencies) {
         builder.read(dep);
       }
       builder.sideEffect();
@@ -937,7 +964,7 @@ function buildForwardPlusGraphInternal(
       if (motionVectorHandle) {
         builder.read(motionVectorHandle);
       }
-      for (const dep of chainDependencies) {
+      for (const dep of endChainDependencies) {
         builder.read(dep);
       }
       // Read declaration parity with the former monolithic Composite pass: keep

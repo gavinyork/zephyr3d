@@ -97,6 +97,9 @@ export class TAA extends AbstractPostEffect {
   requireDepthAttachment(_ctx: DrawContext) {
     return true;
   }
+  requireMotionVectorTexture(_ctx: DrawContext) {
+    return true;
+  }
   private static _getSkyMotionVectorProgram(ctx: DrawContext) {
     if (!this._skyMotionVectorProgram) {
       this._skyMotionVectorProgram = ctx.device.buildRenderProgram({

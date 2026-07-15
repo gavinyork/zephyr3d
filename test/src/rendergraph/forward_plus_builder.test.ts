@@ -9,7 +9,7 @@ import {
   buildForwardPlusGraph,
   type ForwardPlusOptions
 } from '../../../libs/scene/src/render/rendergraph/forward_plus_builder';
-import { AbstractPostEffect } from '../../../libs/scene/src/posteffect/posteffect';
+import { AbstractPostEffect, PostEffectLayer } from '../../../libs/scene/src/posteffect/posteffect';
 import { Compositor } from '../../../libs/scene/src/posteffect/compositor';
 
 function getMockTextureFormatSize(format: string): number {
@@ -704,5 +704,86 @@ describe('Forward+ end-layer post effect chain', () => {
 
     expect(passNames).toContain('TransmissionDepth');
     expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('PostEffect:EffectA'));
+  });
+});
+
+describe('Forward+ transparent-layer post effect chain', () => {
+  class TransparentEffect extends AbstractPostEffect {
+    constructor() {
+      super();
+      this._layer = PostEffectLayer.transparent;
+    }
+  }
+  class EndEffect extends AbstractPostEffect {}
+
+  function createCompositor(effects: AbstractPostEffect[]): Compositor {
+    const compositor = new Compositor();
+    for (const effect of effects) {
+      compositor.appendPostEffect(effect);
+    }
+    return compositor;
+  }
+
+  test('builds transparent-layer effects between LightPass and TransmissionDepth', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions({ needSceneColor: true }),
+      {},
+      { compositor: createCompositor([new TransparentEffect(), new EndEffect()]) }
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).toContain('PostEffect:TransparentEffect');
+    expect(passNames).toContain('TransmissionDepth');
+    expect(passNames).toContain('PostEffect:EndEffect');
+    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('PostEffect:TransparentEffect'));
+    expect(passNames.indexOf('PostEffect:TransparentEffect')).toBeLessThan(
+      passNames.indexOf('TransmissionDepth')
+    );
+    expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('PostEffect:EndEffect'));
+  });
+
+  test('gives the direct final write to the end layer when both layers have effects', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions(),
+      {},
+      { compositor: createCompositor([new TransparentEffect(), new EndEffect()]) }
+    );
+    graph.compile([backbuffer]);
+    const transparentPass = graph.passes.find((pass) => pass.name === 'PostEffect:TransparentEffect');
+    const endPass = graph.passes.find((pass) => pass.name === 'PostEffect:EndEffect');
+
+    expect(transparentPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(false);
+    expect(endPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(true);
+  });
+
+  test('gives the direct final write to the transparent layer when the end layer is empty', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions(),
+      {},
+      { compositor: createCompositor([new TransparentEffect()]) }
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+    const transparentPass = graph.passes.find((pass) => pass.name === 'PostEffect:TransparentEffect');
+
+    expect(transparentPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(true);
+    expect(passNames).toContain('FrameCleanup');
+    expect(passNames).not.toContain('Present');
+  });
+
+  test('chains transparent output into the end layer input', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions(),
+      {},
+      { compositor: createCompositor([new TransparentEffect(), new EndEffect()]) }
+    );
+    graph.compile([backbuffer]);
+    const transparentPass = graph.passes.find((pass) => pass.name === 'PostEffect:TransparentEffect');
+    const endPass = graph.passes.find((pass) => pass.name === 'PostEffect:EndEffect');
+    const transparentOutput = transparentPass?.writes.find((res) =>
+      res.name.startsWith('PostEffect:TransparentEffect:out')
+    );
+
+    expect(transparentOutput).toBeDefined();
+    expect(endPass?.reads).toContain(transparentOutput);
   });
 });

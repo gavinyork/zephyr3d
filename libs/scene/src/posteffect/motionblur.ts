@@ -41,6 +41,10 @@ export class MotionBlur extends AbstractPostEffect {
   requireDepthAttachment() {
     return false;
   }
+  /** {@inheritDoc AbstractPostEffect.requireMotionVectorTexture} */
+  requireMotionVectorTexture() {
+    return true;
+  }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
