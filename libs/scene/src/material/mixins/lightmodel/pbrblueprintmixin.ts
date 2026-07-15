@@ -204,6 +204,16 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
               this.lightNormal = pb.neg(this.lightNormal);
               this.$if(pb.greaterThan(this.area, 0), function () {
                 this.$l.baseColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.area, 0.25);
+                // calculateShadow() samples with implicit derivatives (dpdx);
+                // WGSL requires uniform control flow, so sample once per light
+                // toward the rect center instead of inside the per-sample
+                // NoL_light branch.
+                this.$l.rectShadow = pb.float(1);
+                if (shadow) {
+                  this.$l.rectL = pb.normalize(pb.sub(this.center, this.worldPos));
+                  this.$l.rectNoL = pb.clamp(pb.dot(this.pbrData.normal, this.rectL), 0, 1);
+                  this.rectShadow = that.calculateShadow(this, this.worldPos, pb.max(this.rectNoL, 1e-5));
+                }
                 this.$l.samplePos = pb.vec3();
                 this.$l.Lvec = pb.vec3();
                 this.$l.L = pb.vec3();
@@ -227,17 +237,13 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
                   this.NoL = pb.clamp(pb.dot(this.pbrData.normal, this.L), 0, 1);
                   this.NoL_light = pb.clamp(pb.dot(this.lightNormal, pb.neg(this.L)), 0, 1);
                   this.$if(pb.greaterThan(this.NoL_light, 0), function () {
-                    this.$l.sampleShadow = pb.float(1);
                     this.falloff = pb.float(1);
                     this.$if(pb.greaterThan(this.range, 0), function () {
                       this.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.range)));
                       this.falloff = pb.mul(this.falloff, this.falloff);
                     });
-                    if (shadow) {
-                      this.sampleShadow = that.calculateShadow(this, this.worldPos, pb.max(this.NoL, 1e-5));
-                    }
                     this.atten = pb.mul(this.invDist2, this.NoL_light, this.falloff);
-                    this.lightColor = pb.mul(this.baseColor, this.atten, this.NoL, this.sampleShadow);
+                    this.lightColor = pb.mul(this.baseColor, this.atten, this.NoL, this.rectShadow);
                     if (outSSSDiffuse) {
                       that.directLighting(
                         this,

@@ -290,12 +290,12 @@ export class SkinMaterial
             0,
             1
           );
-          this.$l.shadowTerm = pb.float(1);
-          if (shadow) {
-            this.$if(pb.greaterThan(this.NoLWrap, 0), function () {
-              this.shadowTerm = that.calculateShadow(this, this.$inputs.worldPos, pb.max(this.NoL, 1e-5));
-            });
-          }
+          // calculateShadow() samples with implicit derivatives (dpdx); WGSL
+          // requires the call to stay in uniform control flow, so never wrap
+          // it in a dynamic branch such as NoLWrap > 0.
+          this.$l.shadowTerm = shadow
+            ? that.calculateShadow(this, this.$inputs.worldPos, pb.max(this.NoL, 1e-5))
+            : pb.float(1);
           this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.shadowTerm);
           this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
           this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
