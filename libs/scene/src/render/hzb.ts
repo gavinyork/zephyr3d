@@ -1,14 +1,37 @@
-import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
+import type {
+  AbstractDevice,
+  BindGroup,
+  FrameBuffer,
+  GPUProgram,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  Texture2D
+} from '@zephyr3d/device';
 import { drawFullscreenQuad } from './fullscreenquad';
-import { CopyBlitter } from '../blitter';
+import { CopyBlitter, type BlitType } from '../blitter';
 import { fetchSampler } from '../utility/misc';
 import { getDevice } from '../app/api';
 import type { Nullable } from '@zephyr3d/base';
 
 let hzbProgram: Nullable<GPUProgram> = null;
 let hzbBindGroup: Nullable<BindGroup> = null;
-let blitter: Nullable<CopyBlitter> = null;
+let blitter: Nullable<HiZInitBlitter> = null;
 const srcSize = new Int32Array(2);
+
+class HiZInitBlitter extends CopyBlitter {
+  /** @override */
+  filter(
+    scope: PBInsideFunctionScope,
+    type: BlitType,
+    srcTex: PBShaderExp,
+    srcUV: PBShaderExp,
+    srcLayer: PBShaderExp,
+    sampleType: 'float' | 'int' | 'uint'
+  ) {
+    const depth = super.filter(scope, type, srcTex, srcUV, srcLayer, sampleType);
+    return scope.$builder.vec4(depth.xx, 0, 1);
+  }
+}
 
 /*
 vec3 trace_ray(vec3 ray_start, vec3 ray_dir)
@@ -219,10 +242,11 @@ function buildHZBProgram(device: AbstractDevice) {
             this.srcTex,
             pb.clamp(pb.add(this.coord, pb.ivec2(i >> 1, i & 1)), this.minCoord, this.maxCoord),
             device.type === 'webgpu' ? 0 : this.srcMipLevel
-          ).r;
+          );
         }
-        this.$l.d = pb.min(pb.min(this.d0, this.d1), pb.min(this.d2, this.d3));
-        this.$outputs.color = pb.vec4(this.d, 0, 0, 1);
+        this.$l.minDepth = pb.min(pb.min(this.d0.r, this.d1.r), pb.min(this.d2.r, this.d3.r));
+        this.$l.maxDepth = pb.max(pb.max(this.d0.g, this.d1.g), pb.max(this.d2.g, this.d3.g));
+        this.$outputs.color = pb.vec4(this.minDepth, this.maxDepth, 0, 1);
       });
     }
   })!;
@@ -273,7 +297,7 @@ export function buildHiZ(sourceTex: Texture2D, HiZFrameBuffer: FrameBuffer) {
   if (!hzbProgram) {
     hzbProgram = buildHZBProgram(device);
     hzbBindGroup = device.createBindGroup(hzbProgram.bindGroupLayouts[0]);
-    blitter = new CopyBlitter();
+    blitter = new HiZInitBlitter();
   }
   blitter!.blit(sourceTex, HiZFrameBuffer, fetchSampler('clamp_nearest'));
   device.pushDeviceStates();

@@ -566,7 +566,7 @@ function buildForwardPlusGraphInternal(
         builder.read(preLightTransmissionDepthToken);
       }
       hiZHandle = builder.createTexture({
-        format: 'r32f',
+        format: 'rg32f',
         label: 'hiZ',
         mipLevels: getFullMipLevelCount(ctx.renderWidth, ctx.renderHeight)
       });

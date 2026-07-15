@@ -363,6 +363,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
                 ShaderHelper.getCameraParams(this).xy,
                 pb.int(ShaderHelper.getHiZDepthTextureMipLevelCount(this)),
                 this.ssrParams.y,
+                this.ssrParams.x,
                 this.ssrParams.z,
                 pb.vec4(ShaderHelper.getRenderSize(this), ShaderHelper.getHiZDepthTextureSize(this)),
                 ShaderHelper.getHiZDepthTexture(this)
