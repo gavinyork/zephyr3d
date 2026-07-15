@@ -550,9 +550,18 @@ function buildForwardPlusGraphInternal(
   }
   const renderDepthAttachment =
     depthPassResult.graphDepthAttachmentHandle ?? depthPassResult.externalDepthAttachment ?? null;
+  // Rendering the scene directly into the final framebuffer is only possible
+  // when no opaque-layer effect is enabled: those effects must sample the
+  // opaque scene color as a texture and may require surface MRT attachments
+  // (SSR roughness / SSS / SkinSSS), which the single-color final framebuffer
+  // cannot carry. The legacy compositor.begin() used to redirect rendering to
+  // a temporal MRT framebuffer in that case; the graph path uses the regular
+  // scene color texture pipeline instead.
+  const opaqueLayerHasEffects = !!ctx.compositor?.layerHasEnabledEffect(PostEffectLayer.opaque);
   const useFinalFramebufferAsIntermediate =
     !!depthPassResult.externalDepthAttachment &&
-    depthPassResult.externalDepthAttachment === ctx.finalFramebuffer?.getDepthAttachment();
+    depthPassResult.externalDepthAttachment === ctx.finalFramebuffer?.getDepthAttachment() &&
+    !opaqueLayerHasEffects;
 
   let preLightTransmissionDepthToken: RGHandle | undefined;
   if (options.needsTransmissionDepthForSSR) {
@@ -1491,10 +1500,15 @@ function renderOpaqueScenePass(
     ctx.materialFlags |= MaterialVaryingFlags.SKIN_SSS_STORE;
   }
 
-  if (depthTex === ctx.finalFramebuffer?.getDepthAttachment()) {
-    ctx.intermediateFramebuffer = ctx.finalFramebuffer;
-  } else if (sceneColorFramebufferHandle && !hasSurfaceMRT(ctx)) {
+  // The graph scene color framebuffer takes priority: it is absent only when
+  // the graph was built in final-framebuffer-as-intermediate mode (external
+  // depth shared with the final framebuffer AND no opaque-layer effects).
+  // Checking the shared depth first would wrongly route the MRT/opaque-effect
+  // case into the single-color final framebuffer.
+  if (sceneColorFramebufferHandle && !hasSurfaceMRT(ctx)) {
     ctx.intermediateFramebuffer = rgCtx.getFramebuffer<FrameBuffer>(sceneColorFramebufferHandle);
+  } else if (!sceneColorFramebufferHandle && depthTex === ctx.finalFramebuffer?.getDepthAttachment()) {
+    ctx.intermediateFramebuffer = ctx.finalFramebuffer;
   } else {
     ctx.intermediateFramebuffer = rgCtx.createFramebuffer<FrameBuffer>({
       width: sceneColorTex.width,

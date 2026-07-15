@@ -314,9 +314,9 @@ describe('Forward+ render graph builder', () => {
       }
     };
 
-    expect(
-      deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).skinSSS
-    ).toBe(true);
+    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).skinSSS).toBe(
+      true
+    );
 
     renderQueue.itemList.opaque = emptyBundle;
     renderQueue.itemList.transmission = {
@@ -324,9 +324,9 @@ describe('Forward+ render graph builder', () => {
       unlit: []
     };
 
-    expect(
-      deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).skinSSS
-    ).toBe(false);
+    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).skinSSS).toBe(
+      false
+    );
   });
 
   test('omits HiZ when disabled', () => {
@@ -911,9 +911,9 @@ describe('Opaque-layer effect chain (P2-S3)', () => {
     expect(passNames.indexOf('PostEffect:OpaqueEffect')).toBeLessThan(passNames.indexOf('TransparentPass'));
     // Transparent geometry writes a new version of the chain output
     const transparentPass = graph.passes.find((pass) => pass.name === 'TransparentPass');
-    expect(
-      transparentPass?.writes.some((res) => res.name.startsWith('PostEffect:OpaqueEffect:out@'))
-    ).toBe(true);
+    expect(transparentPass?.writes.some((res) => res.name.startsWith('PostEffect:OpaqueEffect:out@'))).toBe(
+      true
+    );
     // Depth-requiring opaque effects never take the direct final write
     const effectPass = graph.passes.find((pass) => pass.name === 'PostEffect:OpaqueEffect');
     expect(effectPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(false);
@@ -967,14 +967,61 @@ describe('Final framebuffer as intermediate (editor render-to-texture mode)', ()
     }
     const compositor = new Compositor();
     compositor.appendPostEffect(new GizmoLikeEffect());
-    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions(), {}, {
-      compositor,
-      ...createExternalDepthContext()
-    });
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions(),
+      {},
+      {
+        compositor,
+        ...createExternalDepthContext()
+      }
+    );
     const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
 
     expect(passNames).toContain('LightPass');
     expect(passNames).toContain('PostEffect:GizmoLikeEffect');
     expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('PostEffect:GizmoLikeEffect'));
+  });
+
+  test('opaque-layer effects disable final-framebuffer-as-intermediate mode', () => {
+    // Regression: with an opaque-layer effect (e.g. SkinSSS) in render-to-texture
+    // mode, the scene was still rendered directly into the single-color final
+    // framebuffer (breaking surface MRT stores) while the effect chain read the
+    // backbuffer handle. The scene must go through the scene color texture.
+    class OpaqueEffect extends AbstractPostEffect {
+      constructor() {
+        super();
+        this._layer = PostEffectLayer.opaque;
+      }
+      requireDepthAttachment() {
+        return true;
+      }
+    }
+    const compositor = new Compositor();
+    compositor.appendPostEffect(new OpaqueEffect());
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions({ skinSSS: true }),
+      {},
+      {
+        compositor,
+        ...createExternalDepthContext()
+      }
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).toContain('LightPass');
+    expect(passNames).toContain('PostEffect:OpaqueEffect');
+    expect(passNames).toContain('TransparentPass');
+    // The chain input must be the scene color texture, not the backbuffer
+    const effectPass = graph.passes.find((pass) => pass.name === 'PostEffect:OpaqueEffect');
+    expect(effectPass?.reads.some((res) => res.name === 'sceneColor')).toBe(true);
+    expect(effectPass?.reads.some((res) => res.name === 'backbuffer')).toBe(false);
+    // LightPass renders into the graph scene color framebuffer, not the final one
+    const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');
+    expect(lightPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(false);
+    // Transparent geometry renders on top of the chain output
+    const transparentPass = graph.passes.find((pass) => pass.name === 'TransparentPass');
+    expect(transparentPass?.writes.some((res) => res.name.startsWith('PostEffect:OpaqueEffect:out@'))).toBe(
+      true
+    );
   });
 });
