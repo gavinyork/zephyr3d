@@ -1,35 +1,13 @@
-import { linearToGamma } from '../shaders/misc';
 import type { DrawContext } from '../render';
-import type {
-  AbstractDevice,
-  BindGroup,
-  FrameBuffer,
-  GPUProgram,
-  RenderStateSet,
-  Texture2D,
-  TextureFormat,
-  VertexLayout
-} from '@zephyr3d/device';
+import type { Texture2D, TextureFormat } from '@zephyr3d/device';
 import type { AbstractPostEffect, PostEffectHistoryRead, PostEffectSetupContext } from './posteffect';
 import { PostEffectLayer } from './posteffect';
-import { MaterialVaryingFlags } from '../values';
-import { fetchSampler } from '../utility/misc';
 import type { Nullable } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import type { RenderGraph } from '../render/rendergraph/rendergraph';
 import type { RGHandle } from '../render/rendergraph/types';
 import type { RGBlackboard } from '../render/rendergraph/blackboard';
 import type { HistoryResourceManager } from '../render/rendergraph/history_resource_manager';
-
-/**
- * Posteffect rendering context
- * @public
- */
-export interface CompositorContext {
-  pingpongFramebuffers: FrameBuffer[];
-  finalFramebuffer: FrameBuffer;
-  writeIndex: number;
-}
 
 /**
  * Options for building a post effect layer as render graph passes.
@@ -53,6 +31,13 @@ export interface CompositorBuildLayerOptions {
    * or isScreen=true when the final target is the device default framebuffer.
    */
   finalOutput?: Nullable<{ handle: RGHandle; isScreen: boolean }>;
+  /**
+   * True when the chain input physically resides in the final target (final
+   * framebuffer used as scene intermediate). An effect whose input is the
+   * final target must never direct-write it — sampling and rendering the same
+   * texture in one pass is a feedback loop.
+   */
+  inputResidesInFinalTarget?: boolean;
   /**
    * Depth attachment for intermediate effect outputs that request one:
    * either a graph texture handle or a backend depth texture.
@@ -84,22 +69,6 @@ export interface CompositorBuildLayerResult {
 export class Compositor {
   /** @internal */
   protected _postEffects: DRef<AbstractPostEffect>[][];
-  /** @internal */
-  private _finalFramebuffer: Nullable<FrameBuffer>;
-  /** @internal */
-  private _prevInputTexture: Nullable<Texture2D>;
-  /** @internal */
-  private _prevFrameBuffer: Nullable<FrameBuffer>;
-  /** @internal */
-  private _textureFormat: TextureFormat;
-  /** @internal */
-  private static _blitProgram: Nullable<GPUProgram> = null;
-  /** @internal */
-  private static _blitBindgroup: Nullable<BindGroup> = null;
-  /** @internal */
-  private static _blitRenderStates: Nullable<RenderStateSet> = null;
-  /** @internal */
-  private static _blitVertexLayout: Nullable<VertexLayout> = null;
   /**
    * Creates an instance of Compositor
    */
@@ -108,21 +77,6 @@ export class Compositor {
     this._postEffects[PostEffectLayer.opaque] = [];
     this._postEffects[PostEffectLayer.transparent] = [];
     this._postEffects[PostEffectLayer.end] = [];
-    this._finalFramebuffer = null;
-    this._prevInputTexture = null;
-    this._prevFrameBuffer = null;
-    this._textureFormat = 'rgba16f';
-  }
-  /** @internal */
-  requireLinearDepth(ctx: DrawContext) {
-    for (const list of this._postEffects) {
-      for (const postEffect of list) {
-        if (postEffect.get()!.requireLinearDepthTexture(ctx)) {
-          return true;
-        }
-      }
-    }
-    return false;
   }
   /** @internal */
   layerHasEnabledEffect(layer: PostEffectLayer): boolean {
@@ -160,6 +114,7 @@ export class Compositor {
     const dependencies = options.dependencies ?? [];
     const historyReads = options.historyReads ?? [];
     const sceneDepthAttachment = options.sceneDepthAttachment ?? null;
+    const inputResidesInFinalTarget = !!options.inputResidesInFinalTarget;
     const width = ctx.renderWidth;
     const height = ctx.renderHeight;
     let chain = input;
@@ -167,6 +122,9 @@ export class Compositor {
     for (let i = 0; i < effects.length; i++) {
       const effect = effects[i];
       const isLast = i === effects.length - 1;
+      // An effect that samples the final target's texture must not render into
+      // it in the same pass (feedback loop); force an intermediate output.
+      const inputIsFinalTarget = inputResidesInFinalTarget && chain === input;
       const label = `PostEffect:${effect.constructor.name}`;
       const setupContext: PostEffectSetupContext = {
         graph,
@@ -182,9 +140,11 @@ export class Compositor {
         createOutput(builder, opts) {
           const needDepthAttachment = !!opts?.needDepthAttachment;
           // Direct write to the final target is only allowed for the last effect
-          // of the chain, and only when the effect does not depth-test against
-          // scene depth (the final target does not carry the scene depth buffer).
-          if (isLast && finalOutput && !needDepthAttachment) {
+          // of the chain, only when the effect does not depth-test against
+          // scene depth (the final target does not carry the scene depth
+          // buffer), and only when the effect does not sample the final
+          // target's own texture as its input.
+          if (isLast && finalOutput && !needDepthAttachment && !inputIsFinalTarget) {
             wroteFinal = true;
             const color = builder.write(finalOutput.handle);
             if (finalOutput.isScreen) {
@@ -259,218 +219,5 @@ export class Compositor {
       }
       list.splice(0, list.length);
     }
-  }
-  /** @internal */
-  begin(ctx: DrawContext) {
-    const device = ctx.device;
-    this._textureFormat = this.getIntermediateFormat(ctx);
-    this._finalFramebuffer = device.getFramebuffer();
-    // Only the opaque layer still renders through the legacy ping-pong path
-    // inside the light pass (transparent geometry must render on top of its
-    // output). The transparent and end layers are built as render graph passes
-    // (see buildLayer), so scene rendering only needs to be redirected when an
-    // opaque-layer effect will actually run.
-    const needScenePingPong = this.layerHasEnabledEffect(PostEffectLayer.opaque);
-    if (!needScenePingPong) {
-      return;
-    }
-    const depth = this._finalFramebuffer?.getDepthAttachment() as Texture2D;
-    const w = depth ? depth.width : device.getDrawingBufferWidth();
-    const h = depth ? depth.height : device.getDrawingBufferHeight();
-    const attachments: any[] = [this._textureFormat];
-    if (ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
-      attachments.push(ctx.SSRRoughnessTexture!, ctx.SSRNormalTexture!);
-    } else if (ctx.materialFlags & MaterialVaryingFlags.SSS_STORE_NORMAL) {
-      attachments.push(ctx.SSRNormalTexture!);
-    }
-    if (ctx.materialFlags & MaterialVaryingFlags.SSS_STORE_PROFILE) {
-      attachments.push(ctx.SSSProfileTexture!, ctx.SSSParamTexture!);
-    }
-    if (ctx.materialFlags & MaterialVaryingFlags.SSS_STORE_DIFFUSE) {
-      attachments.push(ctx.SSSDiffuseTexture!);
-    }
-    if (ctx.materialFlags & MaterialVaryingFlags.SSS_STORE_TRANSMISSION) {
-      attachments.push(ctx.SSSTransmissionTexture!);
-    }
-    if (ctx.materialFlags & MaterialVaryingFlags.SKIN_SSS_STORE) {
-      attachments.push(ctx.SkinSSSTexture!);
-    }
-    const tmpFramebuffer = device.pool.fetchTemporalFramebuffer(
-      true,
-      w,
-      h,
-      attachments.length === 1 ? attachments[0] : attachments,
-      depth ?? ctx.depthFormat
-    );
-    device.setFramebuffer(tmpFramebuffer);
-  }
-  /** @internal */
-  drawPostEffects(ctx: DrawContext, layer: PostEffectLayer, sceneDepthTexture: Texture2D) {
-    const postEffects = this._postEffects[layer];
-    if (postEffects.length > 0) {
-      const device = ctx.device;
-      const inputFramebuffer = device.getFramebuffer()!;
-      const inputTexture = inputFramebuffer!.getColorAttachments()[0] as Texture2D;
-      let tmpTexture: Nullable<Texture2D> = null;
-      for (let i = 0; i < postEffects.length; i++) {
-        const postEffect = postEffects[i].get()!;
-        if (!postEffect.enabled) {
-          continue;
-        }
-        if (this._prevFrameBuffer) {
-          device.pool.releaseFrameBuffer(this._prevFrameBuffer);
-          this._prevFrameBuffer = null;
-        }
-        const isLast = this.isLastPostEffect(layer, i);
-        const finalEffect = isLast && (!postEffect.requireDepthAttachment(ctx) || !!this._finalFramebuffer);
-        let singleColorFramebuffer: Nullable<FrameBuffer> = null;
-        if (finalEffect) {
-          singleColorFramebuffer = this.createSingleColorFramebuffer(
-            device,
-            this._finalFramebuffer,
-            postEffect.requireDepthAttachment(ctx)
-          );
-          device.setFramebuffer(singleColorFramebuffer ?? this._finalFramebuffer);
-        } else {
-          this._prevFrameBuffer = device.pool.fetchTemporalFramebuffer(
-            false,
-            inputFramebuffer.getWidth(),
-            inputFramebuffer.getHeight(),
-            this._textureFormat,
-            inputFramebuffer.getDepthAttachment() ?? null
-          );
-          device.setFramebuffer(this._prevFrameBuffer);
-        }
-        const inputColorTexture = tmpTexture ?? inputTexture;
-        try {
-          postEffect.apply(ctx, inputColorTexture, sceneDepthTexture, !device.getFramebuffer());
-        } finally {
-          if (singleColorFramebuffer) {
-            device.setFramebuffer(this._finalFramebuffer);
-            device.pool.releaseFrameBuffer(singleColorFramebuffer);
-          }
-        }
-        if (this._prevInputTexture) {
-          device.pool.releaseTexture(this._prevInputTexture);
-          this._prevInputTexture = null;
-        }
-        if (this._prevFrameBuffer) {
-          tmpTexture = this._prevFrameBuffer.getColorAttachments()[0] as Texture2D;
-          device.pool.retainTexture(tmpTexture);
-          this._prevInputTexture = tmpTexture;
-        }
-      }
-    }
-  }
-  /** @internal */
-  end(ctx: DrawContext) {
-    const device = ctx.device;
-    if (device.getFramebuffer() !== this._finalFramebuffer) {
-      const srcTex = device.getFramebuffer()!.getColorAttachments()[0] as Texture2D;
-      const singleColorFramebuffer = this.createSingleColorFramebuffer(device, this._finalFramebuffer, false);
-      device.setFramebuffer(singleColorFramebuffer ?? this._finalFramebuffer);
-      device.setViewport(null);
-      device.setScissor(null);
-      try {
-        Compositor._blit(device, srcTex, !this._finalFramebuffer);
-      } finally {
-        if (singleColorFramebuffer) {
-          device.setFramebuffer(this._finalFramebuffer);
-          device.pool.releaseFrameBuffer(singleColorFramebuffer);
-        }
-      }
-    }
-    if (this._prevInputTexture) {
-      device.pool.releaseTexture(this._prevInputTexture);
-      this._prevInputTexture = null;
-    }
-    if (this._prevFrameBuffer) {
-      device.pool.releaseFrameBuffer(this._prevFrameBuffer);
-      this._prevFrameBuffer = null;
-    }
-  }
-  /** @internal */
-  private isLastPostEffect(layer: PostEffectLayer, index: number) {
-    for (let i = layer; i < this._postEffects.length; i++) {
-      const start = i === layer ? index + 1 : 0;
-      for (let j = start; j < this._postEffects[i].length; j++) {
-        if (this._postEffects[i][j].get()!.enabled) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-  /** @internal */
-  private createSingleColorFramebuffer(
-    device: AbstractDevice,
-    framebuffer: Nullable<FrameBuffer>,
-    withDepth: boolean
-  ) {
-    const colorAttachment = framebuffer?.getColorAttachments()[0] ?? null;
-    if (!framebuffer || framebuffer.getColorAttachments().length <= 1 || !colorAttachment) {
-      return null;
-    }
-    return device.pool.fetchTemporalFramebuffer(
-      false,
-      0,
-      0,
-      colorAttachment,
-      withDepth ? framebuffer.getDepthAttachment() : null,
-      false
-    );
-  }
-  /** @internal */
-  static _blit(device: AbstractDevice, srcTex: Texture2D, srgbOutput: boolean) {
-    if (!this._blitProgram) {
-      this._blitProgram = device.buildRenderProgram({
-        vertex(pb) {
-          this.$inputs.pos = pb.vec2().attrib('position');
-          this.$outputs.uv = pb.vec2();
-          this.flip = pb.int().uniform(0);
-          pb.main(function () {
-            this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
-            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
-            this.$if(pb.notEqual(this.flip, 0), function () {
-              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
-            });
-          });
-        },
-        fragment(pb) {
-          this.srcTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-          this.srgbOutput = pb.int().uniform(0);
-          this.$outputs.outColor = pb.vec4();
-          pb.main(function () {
-            this.$outputs.outColor = pb.textureSample(this.srcTex, this.$inputs.uv);
-            this.$if(pb.notEqual(this.srgbOutput, 0), function () {
-              this.$outputs.outColor = pb.vec4(linearToGamma(this, this.$outputs.outColor.rgb), 1);
-            });
-          });
-        }
-      })!;
-      this._blitProgram.name = '@Compositor_blit';
-      this._blitBindgroup = device.createBindGroup(this._blitProgram.bindGroupLayouts[0]);
-      this._blitVertexLayout = device.createVertexLayout({
-        vertexBuffers: [
-          {
-            buffer: device.createVertexBuffer(
-              'position_f32x2',
-              new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])
-            )!
-          }
-        ]
-      });
-      this._blitRenderStates = device.createRenderStateSet();
-      this._blitRenderStates.useRasterizerState().setCullMode('none');
-      this._blitRenderStates.useDepthState().enableTest(false).enableWrite(false);
-    }
-    this._blitBindgroup!.setTexture('srcTex', srcTex, fetchSampler('clamp_nearest_nomip'));
-    this._blitBindgroup!.setValue('srgbOutput', srgbOutput ? 1 : 0);
-    this._blitBindgroup!.setValue('flip', device.type === 'webgpu' && !!device.getFramebuffer() ? 1 : 0);
-    device.setRenderStates(this._blitRenderStates);
-    device.setProgram(this._blitProgram);
-    device.setBindGroup(0, this._blitBindgroup!);
-    device.setVertexLayout(this._blitVertexLayout);
-    device.draw('triangle-strip', 0, 4);
   }
 }
