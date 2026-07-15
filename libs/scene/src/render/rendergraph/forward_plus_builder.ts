@@ -31,6 +31,7 @@ import { RenderGraphExecutor } from './executor';
 import { DevicePoolAllocator } from './device_pool_allocator';
 import { HistoryResourceManager } from './history_resource_manager';
 import { RGHistoryResources } from './history_resources';
+import { RGBlackboard, FrameResources } from './blackboard';
 import type { RGExecuteContext, RGHandle } from './types';
 import { renderObjectColors } from '../gpu_picking';
 import type { Primitive } from '../primitive';
@@ -407,6 +408,9 @@ function buildForwardPlusGraphInternal(
   ctx.SSS = !!options.sss;
   ctx.SkinSSSTexture = null;
 
+  // Named registry of shared frame resources (consumed by post effect setup)
+  const blackboard = new RGBlackboard();
+
   // Shared mutable frame state
   const frame: FrameState = {
     ctx,
@@ -537,6 +541,13 @@ function buildForwardPlusGraphInternal(
 
   const depthHandle = depthPassResult.depthHandle;
   const motionVectorHandle = depthPassResult.motionVectorHandle;
+  blackboard.set(FrameResources.LinearDepth, depthHandle);
+  if (motionVectorHandle) {
+    blackboard.set(FrameResources.MotionVector, motionVectorHandle);
+  }
+  if (depthPassResult.graphDepthAttachmentHandle) {
+    blackboard.set(FrameResources.SceneDepthAttachment, depthPassResult.graphDepthAttachmentHandle);
+  }
   const renderDepthAttachment =
     depthPassResult.graphDepthAttachmentHandle ?? depthPassResult.externalDepthAttachment ?? null;
   const useFinalFramebufferAsIntermediate =
@@ -588,6 +599,9 @@ function buildForwardPlusGraphInternal(
         }
       });
     });
+    if (hiZHandle) {
+      blackboard.set(FrameResources.HiZ, hiZHandle);
+    }
   }
 
   // ── 7. Main Light Pass ────────────────────────────────────────────
@@ -833,6 +847,14 @@ function buildForwardPlusGraphInternal(
   });
 
   const sceneColorHandle = lightPassResult.sceneColorHandle;
+  blackboard.set(FrameResources.SceneColor, sceneColorHandle);
+  if (lightPassResult.sceneColorCopyHandle) {
+    blackboard.set(FrameResources.SceneColorCopy, lightPassResult.sceneColorCopyHandle);
+  }
+  if (sssProfileResult) {
+    blackboard.set(FrameResources.SSSProfile, sssProfileResult.profileHandle);
+    blackboard.set(FrameResources.SSSParam, sssProfileResult.paramHandle);
+  }
 
   // 8. Transmission depth pass (optional)
   let transmissionDepthToken: RGHandle | undefined;
@@ -849,50 +871,97 @@ function buildForwardPlusGraphInternal(
     });
   }
 
-  // 9. Post effects + final composite
-  const presentedBackbuffer = graph.addPass('Composite', (builder) => {
-    builder.read(sceneColorHandle);
-    builder.read(depthHandle);
-    if (hiZHandle) {
-      builder.read(hiZHandle);
-    }
-    if (motionVectorHandle) {
-      builder.read(motionVectorHandle);
-    }
-    if (lightPassResult.sceneColorFramebufferHandle) {
-      builder.read(lightPassResult.sceneColorFramebufferHandle);
-    }
-    if (transmissionDepthToken) {
-      builder.read(transmissionDepthToken);
-    }
-    for (const binding of compositeHistoryReadBindings) {
-      builder.read(binding.handle);
-    }
-    const outputBackbuffer = builder.write(backbuffer);
-    const taaHistoryColorHandle = useFinalFramebufferAsIntermediate ? outputBackbuffer : sceneColorHandle;
-    builder.setExecute((rgCtx) => {
-      const renderAndCommitComposite = () => {
-        renderComposite(frame);
-        queueTAAHistoryCommit(frame, rgCtx, historyManager, taaHistoryColorHandle, motionVectorHandle);
-      };
-      if (historyManager && compositeHistoryReadBindings.length > 0) {
-        historyManager.beginReadScope(
-          compositeHistoryReadBindings.map((binding) => ({
-            name: binding.name,
-            texture: rgCtx.getTexture<Texture2D>(binding.handle)
-          }))
-        );
-        try {
-          renderAndCommitComposite();
-        } finally {
-          historyManager.endReadScope();
-        }
-      } else {
-        renderAndCommitComposite();
+  // 9. End-layer post effects — each enabled effect becomes one or more graph passes.
+  //
+  // Chain input: the settled scene color after the light pass (including
+  // opaque/transparent-layer effects, flushed back by compositor.end() at the
+  // tail of the light pass). When the final framebuffer doubles as the
+  // intermediate target, the scene color lives in the backbuffer instead.
+  const chainInput = useFinalFramebufferAsIntermediate ? backbuffer : sceneColorHandle;
+  // Ordering/lifetime dependencies each effect pass must declare:
+  // - sceneColorHandle: keeps LightPass alive even when the chain input is the
+  //   backbuffer (final framebuffer used as intermediate); the former Composite
+  //   pass always declared this read.
+  // - transmissionDepthToken: TransmissionDepth mutates the linear depth texture
+  //   that end-layer effects sample; they must run after it.
+  // - sceneColorFramebufferHandle: ctx.intermediateFramebuffer must stay allocated
+  //   until FrameCleanup pops the device state referencing it.
+  // - hiZHandle: lifetime parity with the previous monolithic Composite pass.
+  const chainDependencies: RGHandle[] = [sceneColorHandle];
+  if (transmissionDepthToken) {
+    chainDependencies.push(transmissionDepthToken);
+  }
+  if (lightPassResult.sceneColorFramebufferHandle) {
+    chainDependencies.push(lightPassResult.sceneColorFramebufferHandle);
+  }
+  if (hiZHandle) {
+    chainDependencies.push(hiZHandle);
+  }
+  // TAA history commits capture the final post-processed color, so the chain
+  // must end in a readable graph texture; disable the direct-write fast path
+  // while a commit is pending.
+  const taaCommitActive = !!(historyManager && ctx.camera.TAA && options.motionVectors && motionVectorHandle);
+  const chainResult = ctx.compositor
+    ? ctx.compositor.buildLayer({
+        graph,
+        ctx,
+        layer: PostEffectLayer.end,
+        blackboard,
+        input: chainInput,
+        finalOutput: taaCommitActive ? null : { handle: backbuffer, isScreen: !ctx.finalFramebuffer },
+        sceneDepthAttachment: renderDepthAttachment,
+        dependencies: chainDependencies,
+        historyReads: compositeHistoryReadBindings,
+        history: historyManager
+      })
+    : { color: chainInput, wroteFinal: false };
+
+  // 10. Present + frame cleanup.
+  let presentedBackbuffer: RGHandle;
+  if (chainResult.wroteFinal) {
+    // The last effect wrote the final target directly; only cleanup remains.
+    presentedBackbuffer = chainResult.color;
+    graph.addPass('FrameCleanup', (builder) => {
+      builder.read(presentedBackbuffer);
+      for (const dep of chainDependencies) {
+        builder.read(dep);
       }
+      builder.sideEffect();
+      builder.setExecute(() => {
+        finishFrame(frame);
+      });
     });
-    return outputBackbuffer;
-  });
+  } else {
+    presentedBackbuffer = graph.addPass('Present', (builder) => {
+      builder.read(chainResult.color);
+      if (motionVectorHandle) {
+        builder.read(motionVectorHandle);
+      }
+      for (const dep of chainDependencies) {
+        builder.read(dep);
+      }
+      // Read declaration parity with the former monolithic Composite pass: keep
+      // imported history textures alive even when no end-layer effect consumed them.
+      for (const binding of compositeHistoryReadBindings) {
+        builder.read(binding.handle);
+      }
+      const outputBackbuffer = builder.write(backbuffer);
+      // Skip the blit when the chain output already lives in the final target
+      // (final framebuffer used as intermediate and no end-layer effect ran).
+      const needsBlit = chainResult.color !== backbuffer;
+      builder.setExecute((rgCtx) => {
+        queueTAAHistoryCommit(frame, rgCtx, historyManager, chainResult.color, motionVectorHandle);
+        const sourceTex = needsBlit ? rgCtx.getTexture<Texture2D>(chainResult.color) : null;
+        if (sourceTex) {
+          const blitter = new CopyBlitter();
+          blitter.srgbOut = !ctx.finalFramebuffer;
+          blitter.blit(sourceTex, ctx.finalFramebuffer ?? null, fetchSampler('clamp_nearest_nomip'));
+        }
+        finishFrame(frame);
+      });
+      return outputBackbuffer;
+    });
+  }
 
   return { backbuffer: presentedBackbuffer, frame };
 }
@@ -1369,6 +1438,10 @@ function renderMainLightPass(
     _scenePass.clearStencil = null;
   }
   _scenePass.render(ctx, null, null, renderQueue);
+  // Flush the compositor's scene ping-pong chain (opaque/transparent layer
+  // effects) back into the intermediate framebuffer so the graph's scene color
+  // texture holds the settled result before the end-layer effect passes read it.
+  ctx.compositor?.end(ctx);
 }
 
 /** @internal */
@@ -1424,12 +1497,19 @@ function queueTAAHistoryCommit(
   );
 }
 
-/** @internal */
-function renderComposite(frame: FrameState): void {
+/**
+ * Frame-tail housekeeping shared by the Present and FrameCleanup passes.
+ *
+ * The end-layer post effect chain and the final blit are graph passes now
+ * (see buildForwardPlusGraphInternal step 9/10); this only releases per-frame
+ * state. The compositor's scene ping-pong is flushed back to the intermediate
+ * framebuffer by compositor.end() at the tail of the light pass.
+ *
+ * @internal
+ */
+function finishFrame(frame: FrameState): void {
   const { ctx } = frame;
 
-  ctx.compositor?.drawPostEffects(ctx, PostEffectLayer.end, ctx.linearDepthTexture!);
-  ctx.compositor?.end(ctx);
   disposeRenderQueue(frame);
   ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
   ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_PROFILE;
@@ -1437,13 +1517,6 @@ function renderComposite(frame: FrameState): void {
   ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_NORMAL;
   ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_TRANSMISSION;
   ctx.materialFlags &= ~MaterialVaryingFlags.SKIN_SSS_STORE;
-
-  if (ctx.intermediateFramebuffer && ctx.intermediateFramebuffer !== ctx.finalFramebuffer) {
-    const blitter = new CopyBlitter();
-    blitter.srgbOut = !ctx.finalFramebuffer;
-    const srcTex = ctx.intermediateFramebuffer.getColorAttachments()[0] as Texture2D;
-    blitter.blit(srcTex, ctx.finalFramebuffer ?? null, fetchSampler('clamp_nearest_nomip'));
-  }
 
   releaseIntermediateFramebuffer(frame);
   releaseDepthFramebuffer(frame);

@@ -9,6 +9,8 @@ import {
   buildForwardPlusGraph,
   type ForwardPlusOptions
 } from '../../../libs/scene/src/render/rendergraph/forward_plus_builder';
+import { AbstractPostEffect } from '../../../libs/scene/src/posteffect/posteffect';
+import { Compositor } from '../../../libs/scene/src/posteffect/compositor';
 
 function getMockTextureFormatSize(format: string): number {
   switch (format) {
@@ -116,19 +118,19 @@ describe('Forward+ render graph builder', () => {
     const passNames = compileForwardPlusPassNames(createOptions({ needSceneColor: false }));
 
     expect(passNames).toContain('LightPass');
-    expect(passNames).toContain('Composite');
+    expect(passNames).toContain('Present');
     expect(passNames).not.toContain('TransmissionDepth');
-    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('Composite'));
+    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('Present'));
   });
 
-  test('inserts TransmissionDepth between LightPass and Composite when scene color copy is needed without SSR prepass', () => {
+  test('inserts TransmissionDepth between LightPass and Present when scene color copy is needed without SSR prepass', () => {
     const passNames = compileForwardPlusPassNames(createOptions({ needSceneColor: true }));
 
     expect(passNames).toContain('LightPass');
     expect(passNames).toContain('TransmissionDepth');
-    expect(passNames).toContain('Composite');
+    expect(passNames).toContain('Present');
     expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('TransmissionDepth'));
-    expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('Composite'));
+    expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('Present'));
   });
 
   test('inserts SSR transmission depth before LightPass and omits late TransmissionDepth', () => {
@@ -192,7 +194,7 @@ describe('Forward+ render graph builder', () => {
     expect(passNames).not.toContain('TransmissionDepthForSSR');
     expect(passNames).toContain('TransmissionDepth');
     expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('TransmissionDepth'));
-    expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('Composite'));
+    expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('Present'));
   });
 
   test('derives SSR transmission depth prepass only when scene-color materials do not need depth', () => {
@@ -506,7 +508,7 @@ describe('Forward+ render graph builder', () => {
     );
   });
 
-  test('declares compatible TAA history imports as Composite reads', () => {
+  test('declares compatible TAA history imports as Present reads', () => {
     const allocator: RGTextureAllocator<any> = {
       allocate: (_desc, _size) => ({}),
       release: () => {}
@@ -549,7 +551,7 @@ describe('Forward+ render graph builder', () => {
       }
     );
 
-    const composite = graph.passes.find((pass) => pass.name === 'Composite');
+    const composite = graph.passes.find((pass) => pass.name === 'Present');
     expect(composite?.reads.map((resource) => resource.name)).toEqual(
       expect.arrayContaining([
         `history:${RGHistoryResources.TAA_COLOR}:previous`,
@@ -601,12 +603,106 @@ describe('Forward+ render graph builder', () => {
       }
     );
 
-    const composite = graph.passes.find((pass) => pass.name === 'Composite');
+    const composite = graph.passes.find((pass) => pass.name === 'Present');
     expect(composite?.reads.map((resource) => resource.name)).not.toEqual(
       expect.arrayContaining([
         `history:${RGHistoryResources.TAA_COLOR}:previous`,
         `history:${RGHistoryResources.TAA_MOTION_VECTOR}:previous`
       ])
     );
+  });
+});
+
+describe('Forward+ end-layer post effect chain', () => {
+  class EffectA extends AbstractPostEffect {}
+  class EffectB extends AbstractPostEffect {}
+
+  function createCompositor(effects: AbstractPostEffect[]): Compositor {
+    const compositor = new Compositor();
+    for (const effect of effects) {
+      compositor.appendPostEffect(effect);
+    }
+    return compositor;
+  }
+
+  test('builds one pass per enabled end-layer effect, last one writing the backbuffer directly', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions(),
+      {},
+      { compositor: createCompositor([new EffectA(), new EffectB()]) }
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).toContain('PostEffect:EffectA');
+    expect(passNames).toContain('PostEffect:EffectB');
+    expect(passNames).toContain('FrameCleanup');
+    expect(passNames).not.toContain('Present');
+    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('PostEffect:EffectA'));
+    expect(passNames.indexOf('PostEffect:EffectA')).toBeLessThan(passNames.indexOf('PostEffect:EffectB'));
+    const lastEffectPass = graph.passes.find((pass) => pass.name === 'PostEffect:EffectB');
+    expect(lastEffectPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(true);
+  });
+
+  test('skips disabled end-layer effects', () => {
+    const effectA = new EffectA();
+    effectA.enabled = false;
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions(),
+      {},
+      { compositor: createCompositor([effectA, new EffectB()]) }
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).not.toContain('PostEffect:EffectA');
+    expect(passNames).toContain('PostEffect:EffectB');
+  });
+
+  test('ends the chain in an intermediate texture when a TAA history commit is pending', () => {
+    const allocator: RGTextureAllocator<any> = {
+      allocate: () => ({}),
+      release: () => {}
+    };
+    const historyManager = new HistoryResourceManager(allocator);
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions({ motionVectors: true }),
+      {},
+      {
+        compositor: createCompositor([new EffectA()]),
+        camera: { TAA: true, getHistoryResourceManager: () => historyManager }
+      }
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).toContain('PostEffect:EffectA');
+    expect(passNames).toContain('Present');
+    const effectPass = graph.passes.find((pass) => pass.name === 'PostEffect:EffectA');
+    expect(effectPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(false);
+    expect(passNames.indexOf('PostEffect:EffectA')).toBeLessThan(passNames.indexOf('Present'));
+  });
+
+  test('keeps the Present pass when no end-layer effect is enabled', () => {
+    const effect = new EffectA();
+    effect.enabled = false;
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions(),
+      {},
+      { compositor: createCompositor([effect]) }
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).toContain('Present');
+    expect(passNames).not.toContain('PostEffect:EffectA');
+  });
+
+  test('orders end-layer effect passes after TransmissionDepth', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions({ needSceneColor: true }),
+      {},
+      { compositor: createCompositor([new EffectA()]) }
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).toContain('TransmissionDepth');
+    expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('PostEffect:EffectA'));
   });
 });

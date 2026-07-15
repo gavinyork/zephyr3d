@@ -1,8 +1,14 @@
-import type { AbstractDevice, CompareFunc, RenderStateSet, Texture2D } from '@zephyr3d/device';
+import type { AbstractDevice, CompareFunc, RenderStateSet, Texture2D, TextureFormat } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { copyTexture, fetchSampler } from '../utility/misc';
 import { Disposable } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
+import type { RenderGraph } from '../render/rendergraph/rendergraph';
+import type { RGHandle, RGPassBuilder } from '../render/rendergraph/types';
+import type { RGBlackboard } from '../render/rendergraph/blackboard';
+import { FrameResources } from '../render/rendergraph/blackboard';
+import type { HistoryResourceManager } from '../render/rendergraph/history_resource_manager';
 
 /**
  * Rendering layer of post processing effects
@@ -13,6 +19,86 @@ export enum PostEffectLayer {
   opaque = 0,
   transparent = 1,
   end = 2
+}
+
+/**
+ * History texture binding required while a post effect executes.
+ * @public
+ */
+export interface PostEffectHistoryRead {
+  /** History resource name (see {@link RGHistoryResources}). */
+  name: string;
+  /** Graph handle of the imported previous-frame texture. */
+  handle: RGHandle;
+}
+
+/**
+ * Output target of a post effect, created through {@link PostEffectSetupContext.createOutput}.
+ * @public
+ */
+export interface PostEffectOutput {
+  /** Color handle produced by this effect. Return it from {@link AbstractPostEffect.setup}. */
+  color: RGHandle;
+  /**
+   * Graph framebuffer to render into, or null when the effect must render to the
+   * device default framebuffer (screen).
+   */
+  framebuffer: Nullable<RGHandle>;
+  /** Whether the effect must gamma-correct its final write. */
+  srgbOutput: boolean;
+}
+
+/**
+ * Build-time context handed to {@link AbstractPostEffect.setup}.
+ *
+ * The context carries everything an effect needs to declare its passes on the
+ * render graph. Where the effect output physically lands (intermediate texture,
+ * backbuffer or screen) is decided by {@link PostEffectSetupContext.createOutput};
+ * effect implementations never deal with final-target selection themselves.
+ *
+ * @public
+ */
+export interface PostEffectSetupContext {
+  /** The render graph being built for this frame. */
+  readonly graph: RenderGraph;
+  /** Frame draw context. Read configuration from it, never textures. */
+  readonly ctx: DrawContext;
+  /** Named frame resources (linear depth, motion vectors, GBuffer, ...). */
+  readonly blackboard: RGBlackboard;
+  /** Chain input: color output of the previous effect (or the scene color). */
+  readonly input: RGHandle;
+  /** Intermediate color format of the post effect chain. */
+  readonly colorFormat: TextureFormat;
+  /** Render width in pixels. */
+  readonly width: number;
+  /** Render height in pixels. */
+  readonly height: number;
+  /** Cross-frame history resources, or null when unavailable. */
+  readonly history: Nullable<HistoryResourceManager<Texture2D>>;
+  /**
+   * Ordering/lifetime dependencies that every pass created by this effect must
+   * declare with {@link RGPassBuilder.read}.
+   * @internal
+   */
+  readonly dependencies: readonly RGHandle[];
+  /**
+   * History texture bindings that must be in a read scope while this effect
+   * executes (legacy apply path).
+   * @internal
+   */
+  readonly historyReads: readonly PostEffectHistoryRead[];
+  /**
+   * Create the output target for the effect's final pass.
+   *
+   * Must be called exactly once, inside the setup callback of the pass that
+   * produces the effect's final color. The compositor decides whether this
+   * resolves to an intermediate texture or a direct write to the final target.
+   *
+   * @param builder - The pass builder of the effect's final pass.
+   * @param opts - Set needDepthAttachment when the pass depth-tests against scene depth.
+   * @returns The resolved output target.
+   */
+  createOutput(builder: RGPassBuilder, opts?: { needDepthAttachment?: boolean }): PostEffectOutput;
 }
 
 /**
@@ -77,6 +163,83 @@ export class AbstractPostEffect extends Disposable {
    */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     this.passThrough(ctx, inputColorTexture, srgbOutput);
+  }
+  /**
+   * Declare this effect's passes on the render graph.
+   *
+   * The default implementation wraps {@link AbstractPostEffect.apply} into a
+   * single graph pass, so effects only overriding apply() work unchanged.
+   * Multi-pass effects override this method to declare each internal step as
+   * its own pass, calling {@link PostEffectSetupContext.createOutput} inside
+   * the final pass.
+   *
+   * @param s - Build-time setup context.
+   * @returns The effect's output color handle.
+   */
+  setup(s: PostEffectSetupContext): RGHandle {
+    return this._setupFromApply(s);
+  }
+  /**
+   * Wraps the legacy apply() entry into a single graph pass.
+   * @internal
+   */
+  protected _setupFromApply(s: PostEffectSetupContext): RGHandle {
+    const passName = `PostEffect:${this.constructor.name}`;
+    return s.graph.addPass(passName, (builder) => {
+      builder.read(s.input);
+      for (const dep of s.dependencies) {
+        builder.read(dep);
+      }
+      for (const binding of s.historyReads) {
+        builder.read(binding.handle);
+      }
+      // The legacy apply() contract always receives the linear depth texture, and
+      // effects may reach other frame textures through DrawContext fields. Declare
+      // reads for them so the executor keeps them alive until this pass ran.
+      const linearDepthHandle = s.blackboard.get(FrameResources.LinearDepth);
+      if (linearDepthHandle) {
+        builder.read(linearDepthHandle);
+      }
+      const motionVectorHandle = s.blackboard.get(FrameResources.MotionVector);
+      if (motionVectorHandle) {
+        builder.read(motionVectorHandle);
+      }
+      const output = s.createOutput(builder, {
+        needDepthAttachment: this.requireDepthAttachment(s.ctx)
+      });
+      builder.setExecute((rg) => {
+        const device = s.ctx.device;
+        const inputTexture = rg.getTexture<Texture2D>(s.input);
+        const linearDepthTexture = linearDepthHandle
+          ? rg.getTexture<Texture2D>(linearDepthHandle)
+          : s.ctx.linearDepthTexture!;
+        const applyEffect = () => {
+          device.pushDeviceStates();
+          try {
+            device.setFramebuffer(output.framebuffer ? rg.getFramebuffer(output.framebuffer) : null);
+            this.apply(s.ctx, inputTexture, linearDepthTexture, output.srgbOutput);
+          } finally {
+            device.popDeviceStates();
+          }
+        };
+        if (s.history && s.historyReads.length > 0) {
+          s.history.beginReadScope(
+            s.historyReads.map((binding) => ({
+              name: binding.name,
+              texture: rg.getTexture<Texture2D>(binding.handle)
+            }))
+          );
+          try {
+            applyEffect();
+          } finally {
+            s.history.endReadScope();
+          }
+        } else {
+          applyEffect();
+        }
+      });
+      return output.color;
+    });
   }
   /**
    *
