@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Optimize sampler usage for program builder",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}
