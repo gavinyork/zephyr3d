@@ -25,7 +25,7 @@ import type {
 import { ProgramBuilder } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../../shaders/misc';
-import { fetchSampler } from '../../utility/misc';
+import { fetchSampler, getSamplerOptions } from '../../utility/misc';
 import type { AtmosphereParams } from '../../shaders';
 import { getAtmosphereParamsStruct, getDefaultAtmosphereParams } from '../../shaders';
 import type { HeightFogParams } from '../../shaders/fog';
@@ -235,8 +235,15 @@ export class ShaderHelper {
         ];
         const fogStruct = pb.defineStruct(fogStructMembers);
         scope.fog = fogStruct().uniform(0);
-        scope[UNIFORM_NAME_AERIALPERSPECTIVE_LUT] = pb.tex2D().uniform(0);
-        scope[UNIFORM_NAME_SKYDISTANTLIGHT_LUT] = pb.tex2D().uniform(0);
+        // Static samplers: LUTs are rgba16f without mipmaps
+        scope[UNIFORM_NAME_AERIALPERSPECTIVE_LUT] = pb
+          .tex2D()
+          .uniform(0)
+          .withSampler(getSamplerOptions('clamp_linear_nomip'));
+        scope[UNIFORM_NAME_SKYDISTANTLIGHT_LUT] = pb
+          .tex2D()
+          .uniform(0)
+          .withSampler(getSamplerOptions('clamp_linear_nomip'));
       }
       const lightStruct = ctx.currentShadowLight
         ? pb.defineStruct([
@@ -273,7 +280,11 @@ export class ShaderHelper {
           pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D().noSampler()
         ).uniform(0);
       }
-      scope[UNIFORM_NAME_BAKED_SKY_MAP] = pb.texCube().uniform(0);
+      // Baked sky cube: rgba16f without mipmaps
+      scope[UNIFORM_NAME_BAKED_SKY_MAP] = pb
+        .texCube()
+        .uniform(0)
+        .withSampler(getSamplerOptions('clamp_linear_nomip'));
       if (ctx.currentShadowLight) {
         const scope = pb.getGlobalScope();
         const shadowMapParams = ctx.shadowMapInfo!.get(ctx.currentShadowLight)!;
@@ -307,15 +318,28 @@ export class ShaderHelper {
         ctx.env!.light.envLight.initShaderBindings(pb);
       }
       if (ctx.linearDepthTexture) {
-        scope[UNIFORM_NAME_LINEAR_DEPTH_MAP] = pb.tex2D().uniform(0);
+        // Depth values must never be filtered across geometry edges; nearest
+        // matches the default sampler for unfilterable float formats.
+        scope[UNIFORM_NAME_LINEAR_DEPTH_MAP] = pb
+          .tex2D()
+          .uniform(0)
+          .withSampler(getSamplerOptions('clamp_nearest_nomip'));
         scope[UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE] = pb.vec2().uniform(0);
       }
       if (ctx.sceneColorTexture) {
-        scope[UNIFORM_NAME_SCENE_COLOR_MAP] = pb.tex2D().uniform(0);
+        // Scene color copy: single mip level
+        scope[UNIFORM_NAME_SCENE_COLOR_MAP] = pb
+          .tex2D()
+          .uniform(0)
+          .withSampler(getSamplerOptions('clamp_linear_nomip'));
         scope[UNIFORM_NAME_SCENE_COLOR_MAP_SIZE] = pb.vec2().uniform(0);
       }
       if (ctx.HiZTexture) {
-        scope[UNIFORM_NAME_HIZ_DEPTH_MAP] = pb.tex2D().uniform(0);
+        // Matches the fetchSampler('clamp_nearest') previously passed at runtime
+        scope[UNIFORM_NAME_HIZ_DEPTH_MAP] = pb
+          .tex2D()
+          .uniform(0)
+          .withSampler(getSamplerOptions('clamp_nearest'));
         scope[UNIFORM_NAME_HIZ_DEPTH_MAP_INFO] = pb.vec4().uniform(0);
       }
     }

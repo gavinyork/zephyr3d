@@ -24,7 +24,7 @@ import {
   typeI32
 } from './types';
 import { PBASTError } from './errors';
-import type { VertexSemantic } from '../gpuobject';
+import type { VertexSemantic, SamplerOptions } from '../gpuobject';
 import type { ProgramBuilder } from './programbuilder';
 import { getCurrentProgramBuilder } from './misc';
 import type { Nullable } from '@zephyr3d/base';
@@ -161,6 +161,8 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
   /** @internal */
   $noSampler: boolean;
   /** @internal */
+  $staticSampler: SamplerOptions | null;
+  /** @internal */
   $precision: ShaderPrecisionType;
   /** @internal */
   $ast: ASTExpression;
@@ -198,6 +200,7 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
     this.$precision = ShaderPrecisionType.NONE;
     this.$sampleType = 'float';
     this.$noSampler = false;
+    this.$staticSampler = null;
     this.$ast = new ASTPrimitive(this);
     this.$inout = null;
     this.$memberCache = {};
@@ -398,6 +401,30 @@ export class PBShaderExp extends Proxiable<PBShaderExp> {
    */
   noSampler() {
     this.$noSampler = true;
+    return this;
+  }
+  /**
+   * Declares that this texture uniform is always sampled with the given static
+   * sampler configuration.
+   *
+   * @remarks
+   * On WebGPU, textures declared with the same static configuration within the
+   * same bind group share a single auto-bound sampler binding instead of each
+   * taking one, keeping heavy shaders below the per-stage sampler limit. The
+   * shared sampler is created from the given options when the bind group is
+   * built; any sampler passed to setTexture() at runtime is ignored for this
+   * texture on WebGPU. On WebGL/WebGL2 behavior is unchanged — keep passing
+   * the matching sampler to setTexture(). Comparison samplers are not
+   * supported here; depth textures keep their auto-bound comparison sampler.
+   *
+   * @param options - The static sampler configuration
+   * @returns self
+   */
+  withSampler(options: SamplerOptions) {
+    if (options.compare) {
+      throw new Error('withSampler(): comparison samplers cannot be declared static');
+    }
+    this.$staticSampler = options;
     return this;
   }
   /**

@@ -483,7 +483,13 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
         ge.resource = t.object!;
         resourceOk = resourceOk && !!t.object;
       } else if (entry.sampler) {
-        const sampler = this._resources[entry.name] as GPUSampler;
+        let sampler = this._resources[entry.name] as GPUSampler;
+        if (!sampler && entry.sampler.staticOptions) {
+          // Shared static sampler (withSampler declaration): created from the
+          // declared configuration, never set through setTexture/setSampler.
+          sampler = (this._device.createSampler(entry.sampler.staticOptions) as WebGPUTextureSampler).object!;
+          this._resources[entry.name] = sampler;
+        }
         ge.resource = sampler;
         resourceOk = resourceOk && !!sampler;
       }

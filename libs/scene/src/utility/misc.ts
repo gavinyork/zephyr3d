@@ -119,6 +119,17 @@ export function fetchSampler(type: SamplerType) {
 }
 
 /**
+ * Get the sampler options of a sampler preset, e.g. for use with the
+ * withSampler() shader declaration modifier.
+ * @param type - The sampler type
+ * @returns The sampler options for the given type
+ * @public
+ */
+export function getSamplerOptions(type: SamplerType): SamplerOptions {
+  return samplerOptions[type];
+}
+
+/**
  * Utility function to copy a texture
  * @param src - Source texture to copy from
  * @param dest - Destination texture to copy to

@@ -1141,6 +1141,12 @@ export interface BufferBindingLayout {
 export interface SamplerBindingLayout {
   /** The bind type */
   type: 'filtering' | 'non-filtering' | 'comparison';
+  /**
+   * Static sampler configuration for shared auto-bound samplers declared with
+   * withSampler(); when present, the bind group creates and binds the sampler
+   * automatically instead of deriving it from a texture.
+   */
+  staticOptions?: SamplerOptions;
 }
 
 /**

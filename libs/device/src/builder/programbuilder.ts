@@ -1,6 +1,12 @@
 import type { AbstractDevice, ShaderKind } from '../base_types';
 import { ShaderType } from '../base_types';
-import type { GPUProgram, BindGroupLayout, BindGroupLayoutEntry, VertexSemantic } from '../gpuobject';
+import type {
+  GPUProgram,
+  BindGroupLayout,
+  BindGroupLayoutEntry,
+  VertexSemantic,
+  SamplerOptions
+} from '../gpuobject';
 import { MAX_BINDING_GROUPS, getVertexAttribByName } from '../gpuobject';
 import type { PBReflectionTagGetter } from './reflection';
 import { PBReflection } from './reflection';
@@ -45,6 +51,31 @@ const SHARED_UNIFORM_NAME = 'zUBA';
 const VERTEX_STORAGE_NAME = 'zSBV';
 const FRAGMENT_STORAGE_NAME = 'zSBF';
 const SHARED_STORAGE_NAME = 'zSBA';
+
+/**
+ * Deterministic name for a shared static sampler binding (withSampler).
+ * Textures with the same configuration, sample type and bind group share one
+ * binding; the group is part of the name so that shared reference layouts
+ * built per group stay independent of declaration order in other groups.
+ * @internal
+ */
+function staticSamplerName(group: number, sampleType: string, options: SamplerOptions): string {
+  const key = [
+    options.addressU ?? 'clamp',
+    options.addressV ?? 'clamp',
+    options.addressW ?? 'clamp',
+    options.magFilter ?? 'nearest',
+    options.minFilter ?? 'nearest',
+    options.mipFilter ?? 'none',
+    options.lodMin ?? 0,
+    options.lodMax ?? 32,
+    options.maxAnisotropy ?? 1,
+    sampleType
+  ]
+    .join('_')
+    .replace(/[^a-zA-Z0-9_]/g, 'p');
+  return `ch_shared_sampler_g${group}_${key}`;
+}
 interface UniformInfo {
   group: number;
   binding: number;
@@ -1857,7 +1888,10 @@ export class ProgramBuilder {
           `texture '${t.$str}' was declared with noSampler() but is sampled with a regular sampler`
         );
       }
-      const samplerName = AST.genSamplerName(t.$str, comparison);
+      const samplerName =
+        !comparison && t.$staticSampler
+          ? staticSamplerName(this._uniforms[u].group, t.$sampleType, t.$staticSampler)
+          : AST.genSamplerName(t.$str, comparison);
       if (!this.getGlobalScope()[samplerName]) {
         throw new Error(`failed to find sampler name ${samplerName}`);
       }
@@ -2550,10 +2584,14 @@ export class ProgramBuilder {
             autoBindSamplerComparison: null
           };
           // Textures declared with noSampler() carry no regular auto-bound
-          // sampler (load-only or comparison-only access).
+          // sampler (load-only or comparison-only access); textures declared
+          // with withSampler() reference a shared static sampler binding that
+          // the runtime must not overwrite from setTexture().
           if (
-            (this._device.type === 'webgpu' && !uniformInfo.texture.exp.$noSampler) ||
-            uniformInfo.texture.autoBindSampler === 'sample'
+            (this._device.type === 'webgpu' &&
+              !uniformInfo.texture.exp.$noSampler &&
+              !uniformInfo.texture.exp.$staticSampler) ||
+            (this._device.type !== 'webgpu' && uniformInfo.texture.autoBindSampler === 'sample')
           ) {
             entry.texture.autoBindSampler = AST.genSamplerName(uniformInfo.texture.exp.$str, false);
           }
@@ -2578,6 +2616,9 @@ export class ProgramBuilder {
                 : 'non-filtering'
               : 'comparison'
         };
+        if (uniformInfo.sampler.$staticSampler) {
+          entry.sampler.staticOptions = uniformInfo.sampler.$staticSampler;
+        }
         entry.name = uniformInfo.sampler.$str;
       } else {
         throw new errors.PBInternalError('invalid uniform entry type');
@@ -2917,7 +2958,25 @@ export class PBScope extends Proxiable<PBScope> {
     ) {
       // webgpu requires explicit sampler bindings
       const isDepth = variable.$typeinfo.isTextureType() && variable.$typeinfo.isDepthTexture();
-      if (!variable.$noSampler) {
+      if (variable.$staticSampler) {
+        // Static sampler configuration (withSampler): textures with the same
+        // configuration in the same group share a single sampler binding. The
+        // shared sampler is declared once per group and per sample type.
+        const samplerName = staticSamplerName(
+          uniformInfo.group,
+          variable.$sampleType,
+          variable.$staticSampler
+        );
+        if (!getCurrentProgramBuilder()!.getGlobalScope()[samplerName]) {
+          const samplerExp = getCurrentProgramBuilder()!
+            .sampler(samplerName)
+            .uniform(uniformInfo.group)
+            .sampleType(variable.$sampleType);
+          samplerExp.$sampleType = variable.$sampleType;
+          samplerExp.$staticSampler = variable.$staticSampler;
+          this.$local(samplerExp);
+        }
+      } else if (!variable.$noSampler) {
         const samplerName = AST.genSamplerName(variable.$str, false);
         const samplerExp = getCurrentProgramBuilder()!
           .sampler(samplerName)
@@ -3123,6 +3182,8 @@ export class PBLocalScope extends PBScope {
         exp.$group = value.$group!;
         exp.$attrib = value.$attrib;
         exp.$sampleType = value.$sampleType;
+        exp.$noSampler = value.$noSampler;
+        exp.$staticSampler = value.$staticSampler;
         exp.$precision = value.$precision;
         exp.tag(...value.$tags);
       }

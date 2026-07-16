@@ -10,7 +10,7 @@ import type {
   ProgramBuilder,
   TextureCube
 } from '@zephyr3d/device';
-import { fetchSampler } from '../utility/misc';
+import { fetchSampler, getSamplerOptions } from '../utility/misc';
 import { getDevice } from '../app/api';
 
 /**
@@ -181,11 +181,18 @@ export class EnvShIBL extends EnvironmentLighting {
   initShaderBindings(pb: ProgramBuilder) {
     if (pb.shaderKind === 'fragment') {
       if (this.radianceMap) {
-        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP] = pb.texCube().uniform(0);
+        // Prefiltered radiance cube: mipmap chain indexed by roughness
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP] = pb
+          .texCube()
+          .uniform(0)
+          .withSampler(getSamplerOptions('clamp_linear'));
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD] = pb.float().uniform(0);
       }
       if (this.sheenRadianceMap) {
-        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_SHEEN_RADIANCE_MAP] = pb.texCube().uniform(0);
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_SHEEN_RADIANCE_MAP] = pb
+          .texCube()
+          .uniform(0)
+          .withSampler(getSamplerOptions('clamp_linear'));
       }
       if (this.irradianceSHFB) {
         const tex = pb.tex2D();
@@ -195,6 +202,8 @@ export class EnvShIBL extends EnvironmentLighting {
         if (formatInfo && !formatInfo.filterable) {
           tex.sampleType('unfilterable-float');
         }
+        // SH coefficients are read at texel centers; nearest sampling is exact
+        tex.withSampler(getSamplerOptions('clamp_nearest_nomip'));
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = tex.uniform(0);
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
       } else if (this.irradianceSH) {

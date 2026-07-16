@@ -371,7 +371,13 @@ export class Renderer extends Disposable {
       fragment(pb) {
         this.$outputs.outColor = pb.vec4();
         if (diffuseMap) {
-          this.tex = pb.tex2D().uniform(0);
+          this.tex = pb.tex2D().uniform(0).withSampler({
+            minFilter: 'linear',
+            magFilter: 'linear',
+            mipFilter: 'none',
+            addressU: 'clamp',
+            addressV: 'clamp'
+          });
         }
         pb.main(function () {
           if (diffuseMap) {
