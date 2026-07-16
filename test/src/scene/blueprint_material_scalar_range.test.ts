@@ -74,6 +74,150 @@ describe('Blueprint scalar parameter range', () => {
     expect(instance.uniformValues[0].maxValue).toBe(2);
   });
 
+  test('Blueprint material instance should migrate only compatible overrides when changing parent', () => {
+    const texture = (
+      name: string,
+      type: string,
+      path: string,
+      exposed: boolean,
+      inVertexShader: boolean,
+      inFragmentShader: boolean,
+      finalTexture: unknown = null
+    ) =>
+      ({
+        name,
+        type,
+        texture: path,
+        exposed,
+        sRGB: true,
+        wrapS: 'clamp',
+        wrapT: 'clamp',
+        minFilter: 'linear',
+        magFilter: 'linear',
+        mipFilter: 'nearest',
+        inVertexShader,
+        inFragmentShader,
+        finalTexture: new DRef(finalTexture as any),
+        finalSampler: {} as any,
+        params: { clone: () => ({}) } as any
+      }) as any;
+    const parentA = new PBRBluePrintMaterial();
+    parentA.uniformValues = [
+      {
+        name: 'u_shared',
+        type: 'float',
+        value: [0.2],
+        minValue: 0,
+        maxValue: 1,
+        inVertexShader: false,
+        inFragmentShader: true,
+        finalValue: 0.2
+      },
+      {
+        name: 'u_type_changed',
+        type: 'vec3',
+        value: [0, 0, 0],
+        inVertexShader: false,
+        inFragmentShader: true,
+        finalValue: new Float32Array([0, 0, 0])
+      },
+      {
+        name: 'u_removed',
+        type: 'float',
+        value: [0],
+        inVertexShader: false,
+        inFragmentShader: true,
+        finalValue: 0
+      }
+    ];
+    parentA.uniformTextures = [
+      texture('t_shared', 'tex2D', '/old/shared.png', true, false, true),
+      texture('t_type_changed', 'texCube', '/old/cube.dds', true, false, true),
+      texture('t_hidden', 'tex2D', '/old/hidden.png', true, false, true)
+    ];
+
+    const sharedTexture = { id: 'shared-override' };
+    const discardedTexture = { id: 'discarded-override' };
+    const instance = new PBRBluePrintMaterialInstance(parentA, '/materials/parent-a.zmtl');
+    const reparentable = instance as PBRBluePrintMaterialInstance & {
+      getDiscardedOverridesForParent: (parent: PBRBluePrintMaterial) => {
+        uniformValues: string[];
+        uniformTextures: string[];
+      };
+      changeParentMaterial: (
+        parent: PBRBluePrintMaterial,
+        parentId: string
+      ) => { uniformValues: string[]; uniformTextures: string[] };
+    };
+    instance.setOverrides(
+      [
+        { ...parentA.uniformValues[0], value: [0.75], finalValue: 0.75 },
+        { ...parentA.uniformValues[1], value: [1, 2, 3], finalValue: new Float32Array([1, 2, 3]) },
+        { ...parentA.uniformValues[2], value: [0.5], finalValue: 0.5 }
+      ],
+      [
+        texture('t_shared', 'tex2D', '/override/shared.png', true, false, true, sharedTexture),
+        texture('t_type_changed', 'texCube', '/override/cube.dds', true, false, true),
+        texture('t_hidden', 'tex2D', '/override/hidden.png', true, false, true, discardedTexture)
+      ]
+    );
+
+    const parentB = new PBRBluePrintMaterial();
+    parentB.uniformValues = [
+      {
+        name: 'u_shared',
+        type: 'float',
+        value: [0.4],
+        minValue: -2,
+        maxValue: 2,
+        inVertexShader: true,
+        inFragmentShader: false,
+        finalValue: 0.4
+      },
+      {
+        name: 'u_type_changed',
+        type: 'float',
+        value: [1],
+        inVertexShader: false,
+        inFragmentShader: true,
+        finalValue: 1
+      }
+    ];
+    parentB.uniformTextures = [
+      texture('t_shared', 'tex2D', '/new/shared.png', true, true, false),
+      texture('t_type_changed', 'tex2D', '/new/texture.png', true, false, true),
+      texture('t_hidden', 'tex2D', '/new/hidden.png', false, true, false)
+    ];
+
+    expect(reparentable.getDiscardedOverridesForParent(parentB)).toEqual({
+      uniformValues: ['u_type_changed', 'u_removed'],
+      uniformTextures: ['t_type_changed', 't_hidden']
+    });
+    const discarded = reparentable.changeParentMaterial(parentB, '/materials/parent-b.zmtl');
+
+    expect(discarded).toEqual({
+      uniformValues: ['u_type_changed', 'u_removed'],
+      uniformTextures: ['t_type_changed', 't_hidden']
+    });
+    expect(instance.parentMaterial).toBe(parentB);
+    expect(instance.parentMaterialId).toBe('/materials/parent-b.zmtl');
+    expect(instance.uniformValues.map((v) => v.name)).toEqual(['u_shared', 'u_type_changed']);
+    expect(instance.uniformValues[0].value).toEqual([0.75]);
+    expect(instance.uniformValues[0].minValue).toBe(-2);
+    expect(instance.uniformValues[0].maxValue).toBe(2);
+    expect(instance.uniformValues[0].inVertexShader).toBe(true);
+    expect(instance.getOverrideUniformValues().map((v) => v.name)).toEqual(['u_shared']);
+
+    const migratedTexture = instance.uniformTextures.find((v) => v.name === 't_shared')!;
+    expect(migratedTexture.texture).toBe('/override/shared.png');
+    expect(migratedTexture.inVertexShader).toBe(true);
+    expect(migratedTexture.inFragmentShader).toBe(false);
+    expect(migratedTexture.finalTexture?.get()).toBe(sharedTexture);
+    expect(instance.uniformTextures.find((v) => v.name === 't_hidden')!.texture).toBe('/new/hidden.png');
+    expect(instance.uniformTextures.find((v) => v.name === 't_hidden')!.finalTexture?.get()).toBeNull();
+    expect(instance.getOverrideUniformTextures().map((v) => v.name)).toEqual(['t_shared']);
+  });
+
   test('Blueprint material instance should keep hydrated texture overrides after rebuilding override maps', () => {
     const parent = new PBRBluePrintMaterial();
     parent.uniformTextures = [

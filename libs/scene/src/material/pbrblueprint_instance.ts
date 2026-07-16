@@ -109,6 +109,12 @@ function valuesEqual(a: unknown, b: unknown) {
   return false;
 }
 
+/** Parameter overrides that cannot be migrated to a new blueprint material parent. */
+export interface PBRBluePrintMaterialInstanceDiscardedOverrides {
+  uniformValues: string[];
+  uniformTextures: string[];
+}
+
 function copyParentMaterialState(
   instance: PBRBluePrintMaterialInstance,
   parentMaterial: PBRBluePrintMaterial
@@ -264,6 +270,60 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
       finalTexture: undefined,
       finalSampler: undefined
     }));
+  }
+
+  getDiscardedOverridesForParent(
+    parentMaterial: PBRBluePrintMaterial
+  ): PBRBluePrintMaterialInstanceDiscardedOverrides {
+    const parentValueMap = new Map(parentMaterial.uniformValues.map((v) => [v.name, v]));
+    const parentTextureMap = new Map(parentMaterial.uniformTextures.map((v) => [v.name, v]));
+    return {
+      uniformValues: [...this._overrideUniformValues.values()]
+        .filter((v) => {
+          const parent = parentValueMap.get(v.name);
+          return !parent || parent.type !== v.type || parent.value.length !== v.value.length;
+        })
+        .map((v) => v.name),
+      uniformTextures: [...this._overrideUniformTextures.values()]
+        .filter((v) => {
+          const parent = parentTextureMap.get(v.name);
+          return !parent || parent.type !== v.type || parent.exposed === false;
+        })
+        .map((v) => v.name)
+    };
+  }
+
+  changeParentMaterial(
+    parentMaterial: PBRBluePrintMaterial,
+    parentMaterialId?: string
+  ): PBRBluePrintMaterialInstanceDiscardedOverrides {
+    const discarded = this.getDiscardedOverridesForParent(parentMaterial);
+    const discardedValues = new Set(discarded.uniformValues);
+    const discardedTextures = new Set(discarded.uniformTextures);
+    const parentTextureMap = new Map(parentMaterial.uniformTextures.map((v) => [v.name, v]));
+
+    this._overrideUniformValues = new Map(
+      [...this._overrideUniformValues.entries()].filter(([name]) => !discardedValues.has(name))
+    );
+    this._overrideUniformTextures = new Map(
+      [...this._overrideUniformTextures.entries()]
+        .filter(([name]) => !discardedTextures.has(name))
+        .map(([name, override]) => {
+          const parent = parentTextureMap.get(name)!;
+          return [
+            name,
+            {
+              ...override,
+              exposed: parent.exposed,
+              inVertexShader: parent.inVertexShader,
+              inFragmentShader: parent.inFragmentShader
+            }
+          ];
+        })
+    );
+    this.uniformTextures = this.uniformTextures.filter((v) => !discardedTextures.has(v.name));
+    this.setParentMaterial(parentMaterial, parentMaterialId);
+    return discarded;
   }
 
   hasReflectionModeOverride() {

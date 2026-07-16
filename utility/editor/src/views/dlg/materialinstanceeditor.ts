@@ -27,6 +27,7 @@ import { PropertyEditor } from '../../components/grid';
 import { DockPannel, ResizeDirection } from '../../components/dockpanel';
 import { DlgMessageBoxEx } from './messageexdlg';
 import { DlgMessage } from './messagedlg';
+import { DlgOpenFile } from './openfiledlg';
 import { ProjectService } from '../../core/services/project';
 import type { FrameBuffer, Texture2D, Texture2DArray, TextureCube } from '@zephyr3d/device';
 import { TextureAddressMode, TextureFilterMode } from '@zephyr3d/device';
@@ -41,6 +42,11 @@ type InstanceFileContent = {
   };
 };
 
+type DiscardedOverrides = {
+  uniformValues: string[];
+  uniformTextures: string[];
+};
+
 type PBRBluePrintMaterialInstanceLike = PBRBluePrintMaterial & {
   parentMaterialId: string;
   parentMaterial: PBRBluePrintMaterial | null;
@@ -51,6 +57,12 @@ type PBRBluePrintMaterialInstanceLike = PBRBluePrintMaterial & {
   getOverrideUniformValues: () => BluePrintUniformValue[];
   getOverrideUniformTextures: () => BluePrintUniformTexture[];
   setParentMaterial: (parentMaterial: PBRBluePrintMaterial | null, parentMaterialId?: string) => void;
+  changeParentMaterial: (
+    parentMaterial: PBRBluePrintMaterial,
+    parentMaterialId?: string
+  ) => DiscardedOverrides;
+  getDiscardedOverridesForParent: (parentMaterial: PBRBluePrintMaterial) => DiscardedOverrides;
+  setMaterialPropertyOverrides: (propNames: Iterable<string>) => void;
   syncInheritedUniforms: (parentMaterial?: PBRBluePrintMaterial | null) => void;
 };
 
@@ -71,6 +83,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
   private readonly _propChangeHandler: (object: object | null, prop: PropertyAccessor) => void;
   private _previewDragging: boolean;
   private _showPreview: boolean;
+  private _changingParent: boolean;
 
   constructor(id: string, width: number, height: number, path: string) {
     super(id, width, height, false, false, false, false);
@@ -90,6 +103,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     this._savedProps = {};
     this._previewDragging = false;
     this._showPreview = true;
+    this._changingParent = false;
     this._propChangeHandler = this.handlePropChanged.bind(this);
     this._propEditor.on('object_property_changed', this._propChangeHandler, this);
     this._propEditor.setExtraPropertiesProvider('blueprint-params', (object) =>
@@ -304,12 +318,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     return this._version === 0;
   }
 
-  private async save() {
-    const material = this._material.get();
-    const parent = this._parent.get();
-    if (!material || !parent) {
-      return;
-    }
+  private async getOverrideProps(material: PBRBluePrintMaterialInstanceLike, parent: PBRBluePrintMaterial) {
     const allProps = ((await getEngine().resourceManager.serializeObjectProps(material)) ?? {}) as Record<
       string,
       unknown
@@ -324,6 +333,100 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
         overrideProps[key] = allProps[key];
       }
     }
+    return overrideProps;
+  }
+
+  private formatDiscardedOverrides(discarded: DiscardedOverrides) {
+    const names = [...discarded.uniformValues, ...discarded.uniformTextures];
+    if (names.length === 0) {
+      return '';
+    }
+    const maxVisible = 10;
+    const visibleNames = names.slice(0, maxVisible).map((name) => `- ${name}`);
+    if (names.length > maxVisible) {
+      visibleNames.push(`- ...and ${names.length - maxVisible} more`);
+    }
+    return `\n\nThe following missing or incompatible overrides will be removed:\n${visibleNames.join('\n')}`;
+  }
+
+  private async changeParent() {
+    if (this._changingParent) {
+      return;
+    }
+    this._changingParent = true;
+    try {
+      const selected = await DlgOpenFile.openFile(
+        'Select Parent Material',
+        ProjectService.VFS,
+        '/assets',
+        'Material (*.zmtl)|*.zmtl',
+        false,
+        600,
+        450
+      );
+      if (selected.length === 0) {
+        return;
+      }
+      const parentPath = selected[0].meta.path;
+      const material = this._material.get();
+      const currentParent = this._parent.get();
+      if (!material || !currentParent || parentPath === material.parentMaterialId) {
+        return;
+      }
+      const content = JSON.parse(
+        (await ProjectService.VFS.readFile(parentPath, { encoding: 'utf8' })) as string
+      ) as { type?: string };
+      if (content.type !== 'PBRBluePrintMaterial') {
+        await DlgMessage.messageBox(
+          'Change Parent Material',
+          'Only blueprint PBR base materials can be selected.'
+        );
+        return;
+      }
+      const parent = await getEngine().resourceManager.fetchMaterial<PBRBluePrintMaterial>(parentPath, {
+        overrideVFS: ProjectService.VFS
+      });
+      if (!(parent instanceof PBRBluePrintMaterial)) {
+        await DlgMessage.messageBox('Change Parent Material', `Load parent material failed: ${parentPath}`);
+        return;
+      }
+
+      const discarded = material.getDiscardedOverridesForParent(parent);
+      const message =
+        `Change parent material from '${material.parentMaterialId}' to '${parentPath}'?` +
+        this.formatDiscardedOverrides(discarded);
+      const answer = await DlgMessageBoxEx.messageBoxEx(
+        'Change Parent Material',
+        message,
+        ['Change', 'Cancel'],
+        520
+      );
+      if (answer !== 'Change') {
+        return;
+      }
+
+      const overrideProps = await this.getOverrideProps(material, currentParent);
+      material.setMaterialPropertyOverrides(Object.keys(overrideProps));
+      material.changeParentMaterial(parent, parentPath);
+      await getEngine().resourceManager.deserializeObjectProps(material, overrideProps);
+      material.uniformChanged();
+      this._parent.set(parent);
+      this._propEditor.object = material;
+      this._version = -1;
+    } catch (err) {
+      await DlgMessage.messageBox('Change Parent Material', `Change parent material failed: ${err}`);
+    } finally {
+      this._changingParent = false;
+    }
+  }
+
+  private async save() {
+    const material = this._material.get();
+    const parent = this._parent.get();
+    if (!material || !parent) {
+      return;
+    }
+    const overrideProps = await this.getOverrideProps(material, parent);
     const content: InstanceFileContent = {
       type: 'PBRBluePrintMaterialInstance',
       props: overrideProps,
@@ -337,6 +440,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
       encoding: 'utf8',
       create: true
     });
+    material.setMaterialPropertyOverrides(Object.keys(overrideProps));
     material.setParentMaterial(parent, material.parentMaterialId);
     // Rebuild override maps from the live runtime state so hydrated blueprint textures
     // keep their GPU bindings after saving.
@@ -473,6 +577,9 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     const showPreview = [this._showPreview] as [boolean];
     if (ImGui.Checkbox('Show Preview', showPreview)) {
       this._showPreview = showPreview[0];
+    }
+    if (ImGui.Button('Change Parent...') && !this._changingParent) {
+      void this.changeParent();
     }
     ImGui.Text(`Parent: ${material.parentMaterialId}`);
     ImGui.Separator();
