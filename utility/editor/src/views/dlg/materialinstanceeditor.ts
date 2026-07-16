@@ -24,6 +24,7 @@ import {
 } from '@zephyr3d/scene';
 import { DialogRenderer } from '../../components/modal';
 import { PropertyEditor } from '../../components/grid';
+import { DockPannel, ResizeDirection } from '../../components/dockpanel';
 import { DlgMessageBoxEx } from './messageexdlg';
 import { DlgMessage } from './messagedlg';
 import { ProjectService } from '../../core/services/project';
@@ -55,6 +56,7 @@ type PBRBluePrintMaterialInstanceLike = PBRBluePrintMaterial & {
 
 export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
   private readonly _propEditor: PropertyEditor;
+  private readonly _inspectorPanel: DockPannel;
   private readonly _material: DRef<PBRBluePrintMaterialInstanceLike>;
   private readonly _parent: DRef<PBRBluePrintMaterial>;
   private readonly _path: string;
@@ -72,6 +74,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
   constructor(id: string, width: number, height: number, path: string) {
     super(id, width, height, false, false, false, false);
     this._propEditor = new PropertyEditor(0.4);
+    this._inspectorPanel = new DockPannel(0, 0, 300, 0, 8, 200, 600, ResizeDirection.Left);
     this._material = new DRef();
     this._parent = new DRef();
     this._path = path;
@@ -470,19 +473,24 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     const contentHeight = -ImGui.GetFrameHeightWithSpacing();
     if (ImGui.BeginChild('##MaterialInstanceBody', new ImGui.ImVec2(0, contentHeight), false)) {
       const region = ImGui.GetContentRegionAvail();
-      const spacing = ImGui.GetStyle().ItemSpacing.x;
-      const inspectorWidth = Math.min(400, Math.max(300, region.x * 0.32));
-      const previewWidth = Math.max(320, region.x - inspectorWidth - spacing);
-      if (ImGui.BeginChild('##MaterialInstancePreview', new ImGui.ImVec2(previewWidth, -1), true)) {
-        const previewSize = ImGui.GetContentRegionAvail();
-        this.renderPreviewScene(previewSize);
-      }
-      ImGui.EndChild();
-      ImGui.SameLine();
-      if (ImGui.BeginChild('##MaterialInstanceInspector', new ImGui.ImVec2(inspectorWidth, -1), true)) {
+      const cursorPos = ImGui.GetCursorPos();
+      this._inspectorPanel.left = region.x - this._inspectorPanel.width;
+      this._inspectorPanel.top = cursorPos.y;
+      this._inspectorPanel.height = region.y;
+      if (this._inspectorPanel.beginChild('##MaterialInstanceInspector')) {
         this._propEditor.render();
       }
-      ImGui.EndChild();
+      this._inspectorPanel.endChild();
+
+      ImGui.SetCursorPos(cursorPos);
+      const previewWidth = this._inspectorPanel.left - cursorPos.x;
+      if (previewWidth > 0) {
+        if (ImGui.BeginChild('##MaterialInstancePreview', new ImGui.ImVec2(previewWidth, region.y), true)) {
+          const previewSize = ImGui.GetContentRegionAvail();
+          this.renderPreviewScene(previewSize);
+        }
+        ImGui.EndChild();
+      }
     }
     ImGui.EndChild();
     if (ImGui.Button('Save')) {
