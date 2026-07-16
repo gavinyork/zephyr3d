@@ -6,7 +6,7 @@ import { FontGlyph } from '../../core/fontglyph';
 import { Editor } from '../../core/editor';
 
 export class DlgAbout extends DialogRenderer<void> {
-  private static readonly LABEL_COLUMN_WIDTH = 110;
+  private static readonly LABEL_COLUMN_WIDTH = 210;
 
   public static about(title: string) {
     return new DlgAbout(`${title}##Dialog`).showModal();
@@ -17,7 +17,12 @@ export class DlgAbout extends DialogRenderer<void> {
   doRender(): void {
     const desktop = getDesktopAPI();
     const details: [string, string][] = [
-      ['Version', EDITOR_VERSION],
+      ['@zephyr3d/scene', '0.9.19'],
+      ['@zephyr3d/device', '0.2.15'],
+      ['@zephyr3d/base', '0.2.8'],
+      ['@zephyr3d/imgui', '0.2.6'],
+      ['@zephyr3d/backend-webgl', '0.1.14'],
+      ['@zephyr3d/backend-webgpu', '0.1.18'],
       ['Runtime', isDesktopApp() ? 'Electron' : 'Web']
     ];
     if (desktop) {
