@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Upgrade engine version",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}
