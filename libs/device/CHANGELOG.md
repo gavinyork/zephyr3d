@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/device
 
-This log was last generated on Sat, 11 Jul 2026 13:49:41 GMT and should not be manually modified.
+This log was last generated on Thu, 16 Jul 2026 10:58:45 GMT and should not be manually modified.
+
+## 0.2.15
+Thu, 16 Jul 2026 10:58:45 GMT
+
+### Patches
+
+- Optimize sampler usage for program builder
 
 ## 0.2.14
 Sat, 11 Jul 2026 13:49:41 GMT

@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/imgui
 
-This log was last generated on Tue, 30 Jun 2026 20:07:17 GMT and should not be manually modified.
+This log was last generated on Thu, 16 Jul 2026 10:58:45 GMT and should not be manually modified.
+
+## 0.2.6
+Thu, 16 Jul 2026 10:58:45 GMT
+
+### Patches
+
+- Optimize sampler usage for program builder
 
 ## 0.2.5
 Tue, 30 Jun 2026 20:07:17 GMT

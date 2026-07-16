@@ -2,6 +2,26 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.19",
+      "tag": "@zephyr3d/scene_v0.9.19",
+      "date": "Thu, 16 Jul 2026 10:58:45 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Fix: Support bidirectional HiZ ray tracing"
+          },
+          {
+            "comment": "Fix render graph framebuffer attachment lifetimes and model transmission depth as versioned linear depth writes"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.14` to `0.2.15`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.18",
       "tag": "@zephyr3d/scene_v0.9.18",
       "date": "Tue, 14 Jul 2026 09:09:52 GMT",

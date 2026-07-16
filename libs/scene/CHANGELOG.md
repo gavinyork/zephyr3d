@@ -1,6 +1,14 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Tue, 14 Jul 2026 09:09:52 GMT and should not be manually modified.
+This log was last generated on Thu, 16 Jul 2026 10:58:45 GMT and should not be manually modified.
+
+## 0.9.19
+Thu, 16 Jul 2026 10:58:45 GMT
+
+### Patches
+
+- Fix: Support bidirectional HiZ ray tracing
+- Fix render graph framebuffer attachment lifetimes and model transmission depth as versioned linear depth writes
 
 ## 0.9.18
 Tue, 14 Jul 2026 09:09:52 GMT

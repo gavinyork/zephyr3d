@@ -2,6 +2,23 @@
   "name": "@zephyr3d/imgui",
   "entries": [
     {
+      "version": "0.2.6",
+      "tag": "@zephyr3d/imgui_v0.2.6",
+      "date": "Thu, 16 Jul 2026 10:58:45 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Optimize sampler usage for program builder"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.14` to `0.2.15`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.5",
       "tag": "@zephyr3d/imgui_v0.2.5",
       "date": "Tue, 30 Jun 2026 20:07:17 GMT",

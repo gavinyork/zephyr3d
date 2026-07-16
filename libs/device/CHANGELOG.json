@@ -2,6 +2,18 @@
   "name": "@zephyr3d/device",
   "entries": [
     {
+      "version": "0.2.15",
+      "tag": "@zephyr3d/device_v0.2.15",
+      "date": "Thu, 16 Jul 2026 10:58:45 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Optimize sampler usage for program builder"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.14",
       "tag": "@zephyr3d/device_v0.2.14",
       "date": "Sat, 11 Jul 2026 13:49:41 GMT",
