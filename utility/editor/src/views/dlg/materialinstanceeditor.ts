@@ -70,6 +70,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
   private _savedProps: Record<string, unknown>;
   private readonly _propChangeHandler: (object: object | null, prop: PropertyAccessor) => void;
   private _previewDragging: boolean;
+  private _showPreview: boolean;
 
   constructor(id: string, width: number, height: number, path: string) {
     super(id, width, height, false, false, false, false);
@@ -88,6 +89,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     this._version = 0;
     this._savedProps = {};
     this._previewDragging = false;
+    this._showPreview = true;
     this._propChangeHandler = this.handlePropChanged.bind(this);
     this._propEditor.on('object_property_changed', this._propChangeHandler, this);
     this._propEditor.setExtraPropertiesProvider('blueprint-params', (object) =>
@@ -468,26 +470,37 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
       ImGui.Text('Material instance not loaded.');
       return;
     }
+    const showPreview = [this._showPreview] as [boolean];
+    if (ImGui.Checkbox('Show Preview', showPreview)) {
+      this._showPreview = showPreview[0];
+    }
     ImGui.Text(`Parent: ${material.parentMaterialId}`);
     ImGui.Separator();
     const contentHeight = -ImGui.GetFrameHeightWithSpacing();
     if (ImGui.BeginChild('##MaterialInstanceBody', new ImGui.ImVec2(0, contentHeight), false)) {
       const region = ImGui.GetContentRegionAvail();
       const cursorPos = ImGui.GetCursorPos();
-      this._inspectorPanel.left = region.x - this._inspectorPanel.width;
-      this._inspectorPanel.top = cursorPos.y;
-      this._inspectorPanel.height = region.y;
-      if (this._inspectorPanel.beginChild('##MaterialInstanceInspector')) {
-        this._propEditor.render();
-      }
-      this._inspectorPanel.endChild();
+      if (this._showPreview) {
+        this._inspectorPanel.left = region.x - this._inspectorPanel.width;
+        this._inspectorPanel.top = cursorPos.y;
+        this._inspectorPanel.height = region.y;
+        if (this._inspectorPanel.beginChild('##MaterialInstanceInspector')) {
+          this._propEditor.render();
+        }
+        this._inspectorPanel.endChild();
 
-      ImGui.SetCursorPos(cursorPos);
-      const previewWidth = this._inspectorPanel.left - cursorPos.x;
-      if (previewWidth > 0) {
-        if (ImGui.BeginChild('##MaterialInstancePreview', new ImGui.ImVec2(previewWidth, region.y), true)) {
-          const previewSize = ImGui.GetContentRegionAvail();
-          this.renderPreviewScene(previewSize);
+        ImGui.SetCursorPos(cursorPos);
+        const previewWidth = this._inspectorPanel.left - cursorPos.x;
+        if (previewWidth > 0) {
+          if (ImGui.BeginChild('##MaterialInstancePreview', new ImGui.ImVec2(previewWidth, region.y), true)) {
+            const previewSize = ImGui.GetContentRegionAvail();
+            this.renderPreviewScene(previewSize);
+          }
+          ImGui.EndChild();
+        }
+      } else {
+        if (ImGui.BeginChild('##MaterialInstanceInspectorFull', new ImGui.ImVec2(0, region.y), true)) {
+          this._propEditor.render();
         }
         ImGui.EndChild();
       }

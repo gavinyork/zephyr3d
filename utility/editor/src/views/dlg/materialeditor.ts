@@ -11,6 +11,7 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
   private readonly editor: PBRMaterialEditor;
   private path: string;
   private type: GenericConstructor<MeshMaterial>;
+  private _showPreview: boolean;
   constructor(
     id: string,
     width: number,
@@ -23,6 +24,7 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
     this.path = path;
     this.type = type;
     this.editor = new PBRMaterialEditor(id, outputName);
+    this._showPreview = true;
   }
   public static async editPBRMaterial(
     title: string,
@@ -82,6 +84,10 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
     ) {
       this.editor.redo();
     }
+    const showPreview = [this._showPreview] as [boolean];
+    if (ImGui.Checkbox('Show Preview', showPreview)) {
+      this._showPreview = showPreview[0];
+    }
     if (
       ImGui.BeginChild(
         'NodeEditorContainer',
@@ -90,7 +96,7 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
         ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
       )
     ) {
-      this.editor.render();
+      this.editor.render(this._showPreview);
     }
     ImGui.EndChild();
     if (ImGui.Button('Save')) {
