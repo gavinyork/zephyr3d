@@ -135,6 +135,7 @@ export class Compositor {
         width,
         height,
         history,
+        sceneDepthAttachment,
         dependencies,
         historyReads,
         createOutput(builder, opts) {

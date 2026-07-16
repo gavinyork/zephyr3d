@@ -11,6 +11,7 @@ import {
 } from '../../../libs/scene/src/render/rendergraph/forward_plus_builder';
 import { AbstractPostEffect, PostEffectLayer } from '../../../libs/scene/src/posteffect/posteffect';
 import { Compositor } from '../../../libs/scene/src/posteffect/compositor';
+import { SSR } from '../../../libs/scene/src/posteffect/ssr';
 
 function getMockTextureFormatSize(format: string): number {
   switch (format) {
@@ -886,6 +887,52 @@ describe('TransparentPass split (P2-S2)', () => {
     expect(passNames.indexOf('TransparentPass')).toBeLessThan(passNames.indexOf('TransmissionDepth'));
     const transparentPass = graph.passes.find((pass) => pass.name === 'TransparentPass');
     expect(transparentPass?.writes.some((res) => res.name.startsWith('sceneColor@'))).toBe(true);
+  });
+});
+
+describe('SSR native multi-pass setup (P3-S3)', () => {
+  function buildWithSSR(cameraOverrides: Record<string, unknown>) {
+    const compositor = new Compositor();
+    compositor.appendPostEffect(new SSR());
+    return buildForwardPlusGraphForTest(
+      createOptions({ ssr: true }),
+      {},
+      {
+        compositor,
+        SSR: true,
+        camera: {
+          ssrTemporal: false,
+          ssrBlurScale: 0,
+          ssrBlurKernelSize: 0,
+          ...cameraOverrides
+        }
+      }
+    );
+  }
+
+  test('declares intersect/resolve/combine as individual graph passes', () => {
+    const { graph, backbuffer } = buildWithSSR({});
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    for (const name of ['SSR:Intersect', 'SSR:Resolve', 'PostEffect:SSR']) {
+      expect(passNames).toContain(name);
+    }
+    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('SSR:Intersect'));
+    expect(passNames.indexOf('SSR:Intersect')).toBeLessThan(passNames.indexOf('SSR:Resolve'));
+    expect(passNames.indexOf('SSR:Resolve')).toBeLessThan(passNames.indexOf('PostEffect:SSR'));
+    expect(passNames.indexOf('PostEffect:SSR')).toBeLessThan(passNames.indexOf('TransparentPass'));
+    // Blur disabled: no blur pass
+    expect(passNames).not.toContain('SSR:Blur');
+    expect(passNames).not.toContain('SSR:Temporal');
+  });
+
+  test('inserts the bilateral blur pass when enabled', () => {
+    const { graph, backbuffer } = buildWithSSR({ ssrBlurScale: 1, ssrBlurKernelSize: 5 });
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).toContain('SSR:Blur');
+    expect(passNames.indexOf('SSR:Resolve')).toBeLessThan(passNames.indexOf('SSR:Blur'));
+    expect(passNames.indexOf('SSR:Blur')).toBeLessThan(passNames.indexOf('PostEffect:SSR'));
   });
 });
 

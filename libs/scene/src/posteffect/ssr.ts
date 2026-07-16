@@ -1,4 +1,5 @@
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
+import type { PostEffectSetupContext } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
@@ -11,6 +12,8 @@ import { getGGXLUT } from '../utility/textures/ggxlut';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
 import { ShaderHelper } from '../material';
 import { RGHistoryResources } from '../render/rendergraph/history_resources';
+import { FrameResources } from '../render/rendergraph/blackboard';
+import type { RGExecuteContext, RGHandle, RGPassBuilder, RGTextureDesc } from '../render/rendergraph/types';
 
 /**
  * SSR post effect
@@ -54,6 +57,274 @@ export class SSR extends AbstractPostEffect {
   requireMotionVectorTexture(ctx: DrawContext) {
     return !!ctx.camera.ssrTemporal;
   }
+  /**
+   * Declares SSR's internal steps (intersect, resolve, optional bilateral
+   * blur, optional temporal resolve, combine) as individual render graph
+   * passes, mirroring the sequence of {@link SSR.apply}.
+   */
+  setup(s: PostEffectSetupContext): RGHandle {
+    const { graph, ctx, history } = s;
+    const linearDepthHandle = s.blackboard.get(FrameResources.LinearDepth);
+    const texDesc: RGTextureDesc = {
+      format: 'rgba16f',
+      sizeMode: 'absolute',
+      width: s.width,
+      height: s.height
+    };
+    const readCommon = (builder: RGPassBuilder) => {
+      if (linearDepthHandle) {
+        builder.read(linearDepthHandle);
+      }
+      // Roughness/normal MRT outputs, HiZ and the scene color copy are reached
+      // through DrawContext fields; the dependency list carries their handles.
+      for (const dep of s.dependencies) {
+        builder.read(dep);
+      }
+    };
+    const getLinearDepth = (rg: RGExecuteContext) =>
+      linearDepthHandle ? rg.getTexture<Texture2D>(linearDepthHandle) : ctx.linearDepthTexture!;
+
+    // 1. Ray march the scene (HiZ or linear 2D) into the intersect texture.
+    const intersectHandle = graph.addPass('SSR:Intersect', (builder) => {
+      builder.read(s.input);
+      readCommon(builder);
+      const out = builder.createTexture({ ...texDesc, label: 'SSR:intersect' });
+      const fb = builder.createFramebuffer({
+        label: 'SSR:intersectFB',
+        width: s.width,
+        height: s.height,
+        colorAttachments: out,
+        depthAttachment: s.sceneDepthAttachment,
+        ignoreDepthStencil: false
+      });
+      builder.setExecute((rg) => {
+        const device = ctx.device;
+        device.pushDeviceStates();
+        try {
+          device.setFramebuffer(rg.getFramebuffer(fb));
+          this.intersect(ctx, rg.getTexture<Texture2D>(s.input), getLinearDepth(rg), true, false);
+        } finally {
+          device.popDeviceStates();
+        }
+      });
+      return out;
+    });
+
+    // 2. Resolve reflection color from the intersect result.
+    const resolveHandle = graph.addPass('SSR:Resolve', (builder) => {
+      builder.read(s.input);
+      builder.read(intersectHandle);
+      readCommon(builder);
+      const out = builder.createTexture({ ...texDesc, label: 'SSR:resolve' });
+      const fb = builder.createFramebuffer({
+        label: 'SSR:resolveFB',
+        width: s.width,
+        height: s.height,
+        colorAttachments: out,
+        depthAttachment: s.sceneDepthAttachment,
+        ignoreDepthStencil: false
+      });
+      builder.setExecute((rg) => {
+        const device = ctx.device;
+        device.pushDeviceStates();
+        try {
+          device.setFramebuffer(rg.getFramebuffer(fb));
+          const inputTex = rg.getTexture<Texture2D>(s.input);
+          this.resolve(
+            ctx,
+            ctx.sceneColorTexture ?? inputTex,
+            getLinearDepth(rg),
+            rg.getTexture<Texture2D>(intersectHandle)
+          );
+        } finally {
+          device.popDeviceStates();
+        }
+      });
+      return out;
+    });
+
+    // 3. Optional bilateral blur (horizontal + vertical), guided by the
+    // per-pixel blur size stored in the intersect texture.
+    let reflectHandle = resolveHandle;
+    if (ctx.camera.ssrBlurScale > 0 && ctx.camera.ssrBlurKernelSize > 0) {
+      reflectHandle = graph.addPass('SSR:Blur', (builder) => {
+        builder.read(resolveHandle);
+        builder.read(intersectHandle);
+        readCommon(builder);
+        const middle = builder.createTexture({ ...texDesc, label: 'SSR:blurH' });
+        const out = builder.createTexture({ ...texDesc, label: 'SSR:blur' });
+        const middleFB = builder.createFramebuffer({
+          label: 'SSR:blurHFB',
+          width: s.width,
+          height: s.height,
+          colorAttachments: middle,
+          depthAttachment: s.sceneDepthAttachment,
+          ignoreDepthStencil: false
+        });
+        const outFB = builder.createFramebuffer({
+          label: 'SSR:blurFB',
+          width: s.width,
+          height: s.height,
+          colorAttachments: out,
+          depthAttachment: s.sceneDepthAttachment,
+          ignoreDepthStencil: false
+        });
+        builder.setExecute((rg) => {
+          const device = ctx.device;
+          device.pushDeviceStates();
+          try {
+            const intersectTex = rg.getTexture<Texture2D>(intersectHandle);
+            const blurSizeScale = 255 * ctx.camera.ssrBlurScale;
+            const kernelRadius = (Math.max(1, ctx.camera.ssrBlurKernelSize >> 0) - 1) >> 1;
+            const stdDev = ctx.camera.ssrBlurStdDev;
+            const depthCutoff = ctx.camera.ssrBlurDepthCutoff;
+            const blitterH = (SSR._blurBlitterH = SSR._blurBlitterH ?? new BilateralBlurBlitter(false));
+            blitterH.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, 'gt');
+            this.blurPass(
+              ctx,
+              blitterH,
+              intersectTex,
+              2,
+              blurSizeScale,
+              kernelRadius,
+              stdDev,
+              depthCutoff,
+              rg.getTexture<Texture2D>(resolveHandle),
+              rg.getFramebuffer<FrameBuffer>(middleFB)
+            );
+            const blitterV = (SSR._blurBlitterV = SSR._blurBlitterV ?? new BilateralBlurBlitter(true));
+            blitterV.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, 'gt');
+            this.blurPass(
+              ctx,
+              blitterV,
+              intersectTex,
+              2,
+              blurSizeScale,
+              kernelRadius,
+              stdDev,
+              depthCutoff,
+              rg.getTexture<Texture2D>(middle),
+              rg.getFramebuffer<FrameBuffer>(outFB)
+            );
+          } finally {
+            device.popDeviceStates();
+          }
+        });
+        return out;
+      });
+    }
+
+    // 4. Optional temporal resolve against last frame's reflection.
+    const wantTemporal = !!ctx.camera.ssrTemporal;
+    const motionVectorHandle = wantTemporal ? s.blackboard.get(FrameResources.MotionVector) : null;
+    const historySize = { width: s.width, height: s.height };
+    const prevReflectHandle =
+      wantTemporal && history && motionVectorHandle
+        ? history.importPreviousIfCompatible(graph, RGHistoryResources.SSR_REFLECT, texDesc, historySize)
+        : null;
+    const prevMotionVectorHandle =
+      wantTemporal && history && motionVectorHandle
+        ? history.importPreviousIfCompatible(
+            graph,
+            RGHistoryResources.SSR_MOTION_VECTOR,
+            texDesc,
+            historySize
+          )
+        : null;
+    if (motionVectorHandle && prevReflectHandle && prevMotionVectorHandle) {
+      const blurredHandle = reflectHandle;
+      reflectHandle = graph.addPass('SSR:Temporal', (builder) => {
+        builder.read(blurredHandle);
+        builder.read(prevReflectHandle);
+        builder.read(prevMotionVectorHandle);
+        builder.read(motionVectorHandle);
+        readCommon(builder);
+        const out = builder.createTexture({ ...texDesc, label: 'SSR:temporal' });
+        const fb = builder.createFramebuffer({
+          label: 'SSR:temporalFB',
+          width: s.width,
+          height: s.height,
+          colorAttachments: out,
+          depthAttachment: s.sceneDepthAttachment,
+          ignoreDepthStencil: false
+        });
+        builder.setExecute((rg) => {
+          const device = ctx.device;
+          device.pushDeviceStates();
+          try {
+            this.temporal(
+              ctx,
+              rg.getTexture<Texture2D>(blurredHandle),
+              getLinearDepth(rg),
+              rg.getTexture<Texture2D>(prevReflectHandle),
+              rg.getTexture<Texture2D>(prevMotionVectorHandle),
+              rg.getFramebuffer<FrameBuffer>(fb)
+            );
+          } finally {
+            device.popDeviceStates();
+          }
+        });
+        return out;
+      });
+    }
+
+    // 5. Combine reflections with the scene color and queue history commits.
+    const finalReflectHandle = reflectHandle;
+    return graph.addPass('PostEffect:SSR', (builder) => {
+      builder.read(s.input);
+      builder.read(finalReflectHandle);
+      if (motionVectorHandle) {
+        builder.read(motionVectorHandle);
+      }
+      readCommon(builder);
+      const output = s.createOutput(builder, { needDepthAttachment: true });
+      builder.setExecute((rg) => {
+        const device = ctx.device;
+        device.pushDeviceStates();
+        try {
+          device.setFramebuffer(output.framebuffer ? rg.getFramebuffer(output.framebuffer) : null);
+          const inputTex = rg.getTexture<Texture2D>(s.input);
+          const reflectanceTex = rg.getTexture<Texture2D>(finalReflectHandle);
+          copyTexture(
+            inputTex,
+            device.getFramebuffer()!,
+            fetchSampler('clamp_nearest_nomip'),
+            AbstractPostEffect.getDefaultRenderState(ctx, 'eq')
+          );
+          this.combine(ctx, inputTex, reflectanceTex, output.srgbOutput);
+          if (wantTemporal && history) {
+            history.queueRetainedCommit(
+              RGHistoryResources.SSR_REFLECT,
+              {
+                format: reflectanceTex.format,
+                sizeMode: 'absolute',
+                width: reflectanceTex.width,
+                height: reflectanceTex.height
+              },
+              { width: reflectanceTex.width, height: reflectanceTex.height },
+              reflectanceTex
+            );
+            if (ctx.motionVectorTexture) {
+              history.queueRetainedCommit(
+                RGHistoryResources.SSR_MOTION_VECTOR,
+                {
+                  format: ctx.motionVectorTexture.format,
+                  sizeMode: 'absolute',
+                  width: ctx.motionVectorTexture.width,
+                  height: ctx.motionVectorTexture.height
+                },
+                { width: ctx.motionVectorTexture.width, height: ctx.motionVectorTexture.height },
+                ctx.motionVectorTexture
+              );
+            }
+          }
+        } finally {
+          device.popDeviceStates();
+        }
+      });
+      return output.color;
+    });
+  }
   /** @internal */
   blurPass(
     ctx: DrawContext,
@@ -64,10 +335,10 @@ export class SSR extends AbstractPostEffect {
     kernelRadius: number,
     stdDev: number,
     depthCutoff: number,
-    fbFrom: FrameBuffer,
+    srcTex: Texture2D,
     fbTo: FrameBuffer
   ) {
-    const size = new Vector2(fbFrom.getWidth(), fbFrom.getHeight());
+    const size = new Vector2(srcTex.width, srcTex.height);
     blitter.kernelRadius = kernelRadius;
     blitter.stdDev = stdDev;
     blitter.size = size;
@@ -79,7 +350,7 @@ export class SSR extends AbstractPostEffect {
     blitter.sampler = fetchSampler('clamp_nearest_nomip');
     blitter.cameraNearFar.setXY(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
     blitter.srgbOut = false;
-    blitter.blit(fbFrom.getColorAttachments()[0] as Texture2D, fbTo, fetchSampler('clamp_linear_nomip'));
+    blitter.blit(srcTex, fbTo, fetchSampler('clamp_linear_nomip'));
   }
   /** @internal */
   combine(ctx: DrawContext, inputColorTexture: Texture2D, reflectanceTex: Texture2D, srgbOut: boolean) {
@@ -376,7 +647,7 @@ export class SSR extends AbstractPostEffect {
         kernelRadius,
         stdDev,
         depthCutoff,
-        pingpongFramebuffer[0],
+        pingpongFramebuffer[0].getColorAttachments()[0] as Texture2D,
         pingpongFramebuffer[1]
       );
       const blitterV = (SSR._blurBlitterV = SSR._blurBlitterV ?? new BilateralBlurBlitter(true));
@@ -390,7 +661,7 @@ export class SSR extends AbstractPostEffect {
         kernelRadius,
         stdDev,
         depthCutoff,
-        pingpongFramebuffer[1],
+        pingpongFramebuffer[1].getColorAttachments()[0] as Texture2D,
         pingpongFramebuffer[0]
       );
     }

@@ -76,6 +76,13 @@ export interface PostEffectSetupContext {
   /** Cross-frame history resources, or null when unavailable. */
   readonly history: Nullable<HistoryResourceManager<Texture2D>>;
   /**
+   * Scene depth attachment for intermediate passes that depth-test against
+   * scene depth: either a graph texture handle or a backend depth texture.
+   * Pass it as the depthAttachment of intermediate framebuffers; the final
+   * pass gets it through createOutput({needDepthAttachment: true}).
+   */
+  readonly sceneDepthAttachment: unknown;
+  /**
    * Ordering/lifetime dependencies that every pass created by this effect must
    * declare with {@link RGPassBuilder.read}.
    * @internal
