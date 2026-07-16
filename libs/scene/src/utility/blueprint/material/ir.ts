@@ -785,8 +785,15 @@ class IRCallFunc extends IRExpression {
     const params = this.buildTextureFunctionParams(pb);
     pb.func(this.node.name, params, function () {
       const outputs = ir.create(pb)!;
+      const orderedOutputs = that.node.outs.map((output) => {
+        const index = ir.DAG.roots.indexOf(output.index);
+        if (index < 0 || !outputs[index]) {
+          throw new Error(`Material function '${that.node.name}' cannot resolve output '${output.name}'`);
+        }
+        return outputs[index];
+      });
       if (that.isSingleTextureOutput()) {
-        this.$return(outputs[0].exp);
+        this.$return(orderedOutputs[0].exp);
       } else {
         const rettype = pb.defineStruct(
           that.node.outputs.map((output, index) => {
@@ -796,7 +803,7 @@ class IRCallFunc extends IRExpression {
         );
         this.$return(
           rettype(
-            ...outputs.map((output) => {
+            ...orderedOutputs.map((output) => {
               return output.exp;
             })
           )
