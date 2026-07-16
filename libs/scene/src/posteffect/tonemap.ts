@@ -111,7 +111,7 @@ export class Tonemap extends AbstractPostEffect {
             this.color = pb.mul(this.ACESOutputMat, this.color);
             this.color = pb.clamp(this.color, pb.vec3(0), pb.vec3(1));
             this.$if(pb.notEqual(this.srgbOut, 0), function () {
-              this.$l.color = linearToGamma(this, this.color);
+              this.color = linearToGamma(this, this.color);
             });
             this.$outputs.outColor = pb.vec4(this.color, 1);
           });

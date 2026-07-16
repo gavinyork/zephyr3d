@@ -98,10 +98,18 @@ export class SkinSSS extends AbstractPostEffect {
     this._bindGroup.setTexture('colorTex', inputColorTexture, fetchSampler('clamp_linear'));
     this._bindGroup.setTexture('skinTex', ctx.SkinSSSTexture, fetchSampler('clamp_linear'));
     this._bindGroup.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
-    this._bindGroup.setValue('cameraNearFar', new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane()));
+    this._bindGroup.setValue(
+      'cameraNearFar',
+      new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane())
+    );
     this._bindGroup.setValue(
       'targetSize',
-      new Vector4(inputColorTexture.width, inputColorTexture.height, inputColorTexture.width, inputColorTexture.height)
+      new Vector4(
+        inputColorTexture.width,
+        inputColorTexture.height,
+        inputColorTexture.width,
+        inputColorTexture.height
+      )
     );
     this._bindGroup.setValue('strength', this._strength);
     this._bindGroup.setValue('opacity', this._opacity);
