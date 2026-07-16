@@ -77,12 +77,52 @@ function hasRawQuery(spec: string) {
 
 type ScriptModuleType = 'js' | 'ts';
 
+/**
+ * Realm-global storage for shared script module registries, keyed by
+ * registry namespace. Bundles built by the same `ScriptRegistry` share one
+ * module registry so a module evaluates once and its exports (including
+ * module-level singletons) are identical across entry bundles.
+ * @internal
+ */
+const SCRIPT_MODULES_GLOBAL_KEY = '__z3dScriptModules';
+
+let scriptRegistryNamespaceCounter = 0;
+
+function nextScriptRegistryNamespace() {
+  return `z3d-scripts:${++scriptRegistryNamespaceCounter}`;
+}
+
+/**
+ * Monotonic serial stamped into each built bundle. The shared runtime uses it
+ * to ignore registrations coming from bundles older than the one that already
+ * registered a module, so late imports of stale bundles cannot downgrade a
+ * module record.
+ * @internal
+ */
+let scriptBuildSerialCounter = 0;
+
+/**
+ * FNV-1a hash of module code, used to version shared module records.
+ * Rebuilding an unchanged module keeps its already-evaluated instance;
+ * changed content replaces the record so the next load re-evaluates.
+ * @internal
+ */
+function hashModuleCode(text: string) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+}
+
 type ScriptModuleInfo = {
   id: string;
   path: string;
   type: ScriptModuleType;
   deps: string[];
   systemCode: string;
+  version: string;
 };
 
 /**
@@ -100,6 +140,13 @@ type ScriptModuleInfo = {
  *
  * Caching:
  * - Built bundles are memoized in `_built` map keyed by canonical source path.
+ * - At runtime, all bundles built by the same registry share one realm-global
+ *   module registry (keyed by a per-registry namespace): a local module is
+ *   evaluated once no matter how many entry bundles inline it, so module-level
+ *   singletons are identical across entries. Module records are versioned by a
+ *   content hash — rebuilding an unchanged module reuses its evaluated
+ *   instance, while changed content replaces the record so the next load
+ *   re-evaluates the new code.
  *
  * @public
  */
@@ -109,6 +156,7 @@ export class ScriptRegistry {
   private _built: Map<string, string>; // logicalId -> dataURL
   private _building: Map<string, Promise<string>>;
   private _builtDeps: Map<string, Set<string>>;
+  private _namespace: string;
 
   /**
    * @param vfs - The virtual file system for existence checks, reads, and path ops.
@@ -120,6 +168,7 @@ export class ScriptRegistry {
     this._built = new Map();
     this._building = new Map();
     this._builtDeps = new Map();
+    this._namespace = nextScriptRegistryNamespace();
   }
 
   /**
@@ -136,6 +185,13 @@ export class ScriptRegistry {
       this._built.clear();
       this._building.clear();
       this._builtDeps.clear();
+      // Rotate the shared module registry namespace: modules from the old VFS
+      // must not be reused as instances for same-named modules of the new VFS.
+      const root = (globalThis as Record<string, unknown>)[SCRIPT_MODULES_GLOBAL_KEY] as
+        | Map<string, unknown>
+        | undefined;
+      root?.delete(this._namespace);
+      this._namespace = nextScriptRegistryNamespace();
     }
   }
 
@@ -358,10 +414,19 @@ export class ScriptRegistry {
     if (!entry) {
       return '';
     }
+    // Replace content hashes with Merkle-style effective versions so that a
+    // module whose (transitive) dependencies changed is re-registered and
+    // re-evaluated even when its own source is unchanged.
+    this.applyEffectiveVersions(modules);
 
+    const serial = ++scriptBuildSerialCounter;
     const chunks = [this.getSystemBundleRuntime()];
     for (const module of modules.values()) {
-      chunks.push(`__z3dRegister(${JSON.stringify(module.id)}, () => {\n${module.systemCode}\n});`);
+      chunks.push(
+        `__z3dRegister(${JSON.stringify(module.id)}, ${JSON.stringify(
+          module.version
+        )}, ${serial}, () => {\n${module.systemCode}\n});`
+      );
     }
     chunks.push(
       `const __z3dEntry = await __z3dLoad(${JSON.stringify(entry.id)});\n` +
@@ -395,11 +460,49 @@ export class ScriptRegistry {
     const rewritten = await this.rewriteImportsToLogicalIds(esmCode, module.id);
     module.deps = rewritten.deps;
     module.systemCode = await this.transpileToSystemModule(rewritten.code, module.id);
+    module.version = hashModuleCode(module.systemCode);
 
     for (const dep of module.deps) {
       await this.collectModule(dep, modules);
     }
     return module;
+  }
+
+  /**
+   * Rewrites each collected module's version to a Merkle-style hash combining
+   * its own content hash with the effective versions of its local
+   * dependencies. Cycles fall back to the plain content hash, which is
+   * deterministic on both sides of the cycle.
+   */
+  private applyEffectiveVersions(modules: Map<string, ScriptModuleInfo>) {
+    const effective = new Map<string, string>();
+    const visiting = new Set<string>();
+    const visit = (id: string): string => {
+      const cached = effective.get(id);
+      if (cached !== undefined) {
+        return cached;
+      }
+      const module = modules.get(id);
+      if (!module) {
+        return '';
+      }
+      if (visiting.has(id)) {
+        return module.version;
+      }
+      visiting.add(id);
+      let acc = module.version;
+      for (const dep of module.deps) {
+        if (modules.has(dep)) {
+          acc = hashModuleCode(`${acc}:${dep}:${visit(dep)}`);
+        }
+      }
+      visiting.delete(id);
+      effective.set(id, acc);
+      return acc;
+    };
+    for (const module of modules.values()) {
+      module.version = visit(module.id);
+    }
   }
 
   private async resolveModuleInfo(id: string): Promise<Nullable<ScriptModuleInfo>> {
@@ -414,7 +517,8 @@ export class ScriptRegistry {
       path,
       type: srcPath.type,
       deps: [],
-      systemCode: ''
+      systemCode: '',
+      version: ''
     };
   }
 
@@ -522,8 +626,19 @@ export class ScriptRegistry {
 
   private getSystemBundleRuntime() {
     return `
-const __z3dRegistry = new Map();
+const __z3dRegistry = (() => {
+  const root = (globalThis.${SCRIPT_MODULES_GLOBAL_KEY} ??= new Map());
+  const ns = ${JSON.stringify(this._namespace)};
+  let registry = root.get(ns);
+  if (!registry) {
+    registry = new Map();
+    root.set(ns, registry);
+  }
+  return registry;
+})();
 let __z3dCurrentId = '';
+let __z3dCurrentVersion = '';
+let __z3dCurrentSerial = 0;
 const System = {
   register(deps, declare) {
     if (!__z3dCurrentId) {
@@ -531,6 +646,8 @@ const System = {
     }
     __z3dRegistry.set(__z3dCurrentId, {
       id: __z3dCurrentId,
+      version: __z3dCurrentVersion,
+      serial: __z3dCurrentSerial,
       deps,
       declare,
       exports: Object.create(null),
@@ -541,13 +658,31 @@ const System = {
     });
   }
 };
-function __z3dRegister(id, factory) {
-  const prev = __z3dCurrentId;
+function __z3dRegister(id, version, serial, factory) {
+  // The module registry is shared across bundles: a module already registered
+  // by another bundle with the same effective version is reused (so
+  // module-level singletons stay unique), while changed content replaces the
+  // record so the next load re-evaluates the new code. A record from a newer
+  // build or one that is currently executing is never replaced.
+  const existing = __z3dRegistry.get(id);
+  if (existing && (existing.version === version || existing.state === 1 || existing.serial > serial)) {
+    if (serial > existing.serial) {
+      existing.serial = serial;
+    }
+    return;
+  }
+  const prevId = __z3dCurrentId;
+  const prevVersion = __z3dCurrentVersion;
+  const prevSerial = __z3dCurrentSerial;
   __z3dCurrentId = id;
+  __z3dCurrentVersion = version;
+  __z3dCurrentSerial = serial;
   try {
     factory();
   } finally {
-    __z3dCurrentId = prev;
+    __z3dCurrentId = prevId;
+    __z3dCurrentVersion = prevVersion;
+    __z3dCurrentSerial = prevSerial;
   }
 }
 function __z3dResolve(spec, parentId) {
