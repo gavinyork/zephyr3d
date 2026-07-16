@@ -28,11 +28,9 @@ myApp.ready().then(function () {
   // Create a spot light
   const spotLight = new SpotLight(scene);
   spotLight.cutoff = Math.PI * 0.2;
-  spotLight.range = 200;
+  spotLight.intensity = 10;
   spotLight.position.setXYZ(0, 10, 0);
   spotLight.castShadow = true;
-  spotLight.shadow.depthBias = 0.7;
-  spotLight.shadow.normalBias = 5;
 
   // Create several boxes
   const boxMaterial = new LambertMaterial();

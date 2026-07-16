@@ -27,12 +27,12 @@ myApp.ready().then(function () {
 
   // Create a point light
   const pointLight = new PointLight(scene);
-  // point light range
-  pointLight.range = 60;
+  // point light intensity
+  pointLight.intensity = 60;
   // enable shadowing
   pointLight.castShadow = true;
-  pointLight.shadow.depthBias = 0.7;
-  pointLight.shadow.normalBias = 5;
+  pointLight.shadow.depthBias = 0.01;
+  pointLight.shadow.normalBias = 1.5;
 
   // Create several boxes
   const boxMaterial = new LambertMaterial();
@@ -60,7 +60,7 @@ myApp.ready().then(function () {
     // Light rotation
     pointLight.position.setXYZ(
       20 * Math.cos(Date.now() * 0.001) - 10,
-      20,
+      10,
       20 * Math.sin(Date.now() * 0.001) - 10
     );
   });
