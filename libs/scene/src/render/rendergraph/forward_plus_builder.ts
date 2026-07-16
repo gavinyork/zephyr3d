@@ -739,11 +739,16 @@ function buildForwardPlusGraphInternal(
       builder.read(binding.handle);
     }
 
-    // Create scene color texture (intermediate render target)
-    const sceneColorHandle = builder.createTexture({
-      format: ctx.colorFormat!,
-      label: 'sceneColor'
-    });
+    // Scene color: in final-framebuffer-as-intermediate mode the scene is
+    // physically rendered into the final framebuffer, so declare the
+    // backbuffer write — the graph sees the real data flow and no keep-alive
+    // reads are needed downstream. Otherwise render into a graph texture.
+    const sceneColorHandle = useFinalFramebufferAsIntermediate
+      ? builder.write(backbuffer)
+      : builder.createTexture({
+          format: ctx.colorFormat!,
+          label: 'sceneColor'
+        });
 
     // Transmission/refraction background produced by the SceneColorGrab pass
     const sceneColorCopyHandle = grabResult?.copyHandle;
@@ -844,13 +849,14 @@ function buildForwardPlusGraphInternal(
   // 7d. Opaque-layer post effects (SAO/SSR/SSS/SkinSSS). They read the opaque
   // scene color and must complete before transparent geometry renders on top
   // of their output. Never direct-write: the chain output becomes the
-  // transparent pass's render target.
-  const opaqueChainInput = useFinalFramebufferAsIntermediate ? backbuffer : lightPassResult.sceneColorHandle;
-  // Keep LightPass alive even when the chain input is the backbuffer (final
-  // framebuffer used as intermediate): the graph cannot see that the scene was
-  // physically rendered into the final framebuffer, so the scene color handle
-  // must be read explicitly or dead-pass culling removes the light pass.
-  const opaqueChainDeps: RGHandle[] = [depthHandle, lightPassResult.sceneColorHandle];
+  // transparent pass's render target. In final-framebuffer-as-intermediate
+  // mode the scene color handle is the LightPass's backbuffer write version,
+  // so the data flow is real either way — no keep-alive reads needed.
+  const opaqueChainInput = lightPassResult.sceneColorHandle;
+  // Data dependencies for every effect pass: frame textures the effects sample
+  // through DrawContext fields (linear depth, HiZ, scene color copy, SSS MRT
+  // outputs) rather than through declared require* hooks.
+  const opaqueChainDeps: RGHandle[] = [depthHandle];
   if (hiZHandle) {
     opaqueChainDeps.push(hiZHandle);
   }
@@ -897,15 +903,16 @@ function buildForwardPlusGraphInternal(
   const sceneColorHandle = graph.addPass('TransparentPass', (builder) => {
     builder.read(depthHandle);
     builder.read(depthPassResult.depthFramebufferHandle);
+    if (hiZHandle) {
+      // Transparent-phase materials may ray-march HiZ (e.g. water SSR)
+      builder.read(hiZHandle);
+    }
     if (lightPassResult.sceneColorFramebufferHandle) {
       builder.read(lightPassResult.sceneColorFramebufferHandle);
     }
     if (lightPassResult.sceneColorCopyHandle) {
       builder.read(lightPassResult.sceneColorCopyHandle);
     }
-    // Keep-alive for the light pass when rendering directly into the final
-    // framebuffer (see opaqueChainDeps note above).
-    builder.read(lightPassResult.sceneColorHandle);
     builder.read(opaqueChainResult.color);
     const out = builder.write(opaqueChainResult.color);
     builder.setExecute((rgCtx) => {
@@ -935,23 +942,13 @@ function buildForwardPlusGraphInternal(
   const chainInput = sceneColorHandle;
   // When the scene color still physically resides in the final framebuffer,
   // the Present blit must be skipped if no effect moved it to a texture.
-  const backbufferResidentHandle =
-    useFinalFramebufferAsIntermediate && !opaqueChainRan ? sceneColorHandle : null;
-  // Ordering/lifetime dependencies each effect pass must declare:
-  // - sceneColorHandle: keeps LightPass alive even when the chain input is the
-  //   backbuffer (final framebuffer used as intermediate); the former Composite
-  //   pass always declared this read.
-  // - sceneColorFramebufferHandle: lifetime parity with the previous monolithic
-  //   Composite pass (device state is contained per pass now; scheduled for
-  //   removal together with the keep-alive reads).
-  // - hiZHandle: lifetime parity with the previous monolithic Composite pass.
-  const chainDependencies: RGHandle[] = [sceneColorHandle];
-  if (lightPassResult.sceneColorFramebufferHandle) {
-    chainDependencies.push(lightPassResult.sceneColorFramebufferHandle);
-  }
-  if (hiZHandle) {
-    chainDependencies.push(hiZHandle);
-  }
+  // (Opaque-layer effects disable final-as-intermediate mode, so the scene
+  // color is backbuffer-resident whenever that mode is active.)
+  const backbufferResidentHandle = useFinalFramebufferAsIntermediate ? sceneColorHandle : null;
+  // No extra chain dependencies: the effect chains link to the scene color
+  // through their inputs, and per-effect texture needs are declared via the
+  // require* hooks in AbstractPostEffect.setup().
+  const chainDependencies: RGHandle[] = [];
   const finalOutput = { handle: backbuffer, isScreen: !ctx.finalFramebuffer };
   const endLayerHasEffects = !!ctx.compositor?.layerHasEnabledEffect(PostEffectLayer.end);
 

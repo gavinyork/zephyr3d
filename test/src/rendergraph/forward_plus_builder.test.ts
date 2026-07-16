@@ -957,6 +957,12 @@ describe('Final framebuffer as intermediate (editor render-to-texture mode)', ()
     // color handle and dead-pass culling removed the light pass (black frame).
     expect(passNames).toContain('LightPass');
     expect(passNames).toContain('TransparentPass');
+    // P3-S2: the physical backbuffer write is declared on the graph — the
+    // LightPass survives through the real version chain, not keep-alive reads.
+    const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');
+    expect(lightPass?.writes.some((res) => res.name.startsWith('backbuffer'))).toBe(true);
+    const transparentPass = graph.passes.find((pass) => pass.name === 'TransparentPass');
+    expect(transparentPass?.writes.some((res) => res.name.startsWith('backbuffer'))).toBe(true);
   });
 
   test('keeps LightPass alive with an end-layer effect in render-to-texture mode', () => {
