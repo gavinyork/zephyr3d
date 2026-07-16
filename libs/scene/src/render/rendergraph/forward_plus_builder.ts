@@ -1576,6 +1576,20 @@ function renderOpaqueScenePass(
       // color attachment with it and render only transmission/transparent on top.
       ctx.sceneColorTexture = sceneColorCopyTex;
       blitToCurrentColorAttachment(ctx, ctx.sceneColorTexture);
+      if (hasSurfaceMRT(ctx)) {
+        // The background copy carries no surface MRT attachments, so opaque
+        // geometry exists only there without roughness/normal (and SSS
+        // lighting) data. Re-render the opaque lists into the MRT scene
+        // target: early-z against the prepass depth keeps this cheap, and the
+        // color output matches the blitted copy on opaque pixels while the
+        // MRT attachments receive the surface data SSR/SSS require.
+        _scenePass.clearColor = null;
+        _scenePass.clearDepth = null;
+        _scenePass.clearStencil = null;
+        _scenePass.renderOpaque = true;
+        _scenePass.renderTransparent = false;
+        _scenePass.render(ctx, null, null, renderQueue);
+      }
       _scenePass.transmission = true;
       _scenePass.clearColor = null;
       _scenePass.clearDepth = null;
