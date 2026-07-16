@@ -926,6 +926,19 @@ describe('SSR native multi-pass setup (P3-S3)', () => {
     expect(passNames).not.toContain('SSR:Temporal');
   });
 
+  test('SSR roughness/normal MRT outputs are graph textures owned by LightPass (P3-S4)', () => {
+    const { graph, backbuffer } = buildWithSSR({});
+    graph.compile([backbuffer]);
+    const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');
+
+    expect(lightPass?.writes.some((res) => res.name === 'ssrRoughness')).toBe(true);
+    expect(lightPass?.writes.some((res) => res.name === 'ssrNormal')).toBe(true);
+    // Effect passes must read them so lifetimes cover the whole opaque chain
+    const intersectPass = graph.passes.find((pass) => pass.name === 'SSR:Intersect');
+    expect(intersectPass?.reads.some((res) => res.name === 'ssrRoughness')).toBe(true);
+    expect(intersectPass?.reads.some((res) => res.name === 'ssrNormal')).toBe(true);
+  });
+
   test('inserts the bilateral blur pass when enabled', () => {
     const { graph, backbuffer } = buildWithSSR({ ssrBlurScale: 1, ssrBlurKernelSize: 5 });
     const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);

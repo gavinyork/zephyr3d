@@ -222,12 +222,14 @@ function getSSSLightingTextureFormat(
     return colorFormat;
   }
   const caps = ctx.device.getDeviceCaps();
-  const roughnessFormat = ctx.SSRRoughnessTexture?.format ?? colorFormat;
-  const normalFormat = ctx.SSRNormalTexture?.format ?? colorFormat;
+  // The SSR roughness/normal MRT textures use the glossy surface format; they
+  // are graph textures now, so derive the format directly instead of reading
+  // the (not yet resolved) DrawContext fields.
+  const surfaceFormat = getSurfaceTextureFormat(ctx);
   const colorBytes =
     getTextureFormatBytes(ctx, colorFormat) +
-    getTextureFormatBytes(ctx, roughnessFormat) +
-    getTextureFormatBytes(ctx, normalFormat);
+    getTextureFormatBytes(ctx, surfaceFormat) +
+    getTextureFormatBytes(ctx, surfaceFormat);
   const fullPrecisionBytes = colorBytes + getTextureFormatBytes(ctx, colorFormat) * attachmentCount;
   if (fullPrecisionBytes <= caps.framebufferCaps.maxColorAttachmentBytesPerSample) {
     return colorFormat;
@@ -763,6 +765,15 @@ function buildForwardPlusGraphInternal(
       }
     }
     const includeSSRSurfaceMRT = !!options.ssr;
+    // SSR glossy-surface MRT outputs (roughness + world normal) are graph
+    // textures owned by this pass; effects reach them through the blackboard
+    // handles (or the ctx fields resolved below during execution).
+    const ssrRoughnessHandle = includeSSRSurfaceMRT
+      ? builder.createTexture({ format: getSurfaceTextureFormat(ctx), label: 'ssrRoughness' })
+      : undefined;
+    const ssrNormalHandle = includeSSRSurfaceMRT
+      ? builder.createTexture({ format: getSurfaceTextureFormat(ctx), label: 'ssrNormal' })
+      : undefined;
     const writeSSSDiffuse = options.sss && shouldStoreSSSDiffuse(ctx);
     let writeSSSTransmission = options.sss && shouldStoreSSSTransmission(ctx);
     if (
@@ -805,6 +816,10 @@ function buildForwardPlusGraphInternal(
       const sceneColorCopyTex = sceneColorCopyHandle
         ? rgCtx.getTexture<Texture2D>(sceneColorCopyHandle)
         : null;
+      // Resolve MRT products into the DrawContext bridge fields that scene
+      // rendering and apply()-based effects still read.
+      ctx.SSRRoughnessTexture = ssrRoughnessHandle ? rgCtx.getTexture<Texture2D>(ssrRoughnessHandle) : null;
+      ctx.SSRNormalTexture = ssrNormalHandle ? rgCtx.getTexture<Texture2D>(ssrNormalHandle) : null;
       if (sssProfileResult) {
         ctx.SSSProfileTexture = rgCtx.getTexture<Texture2D>(sssProfileResult.profileHandle);
         ctx.SSSParamTexture = rgCtx.getTexture<Texture2D>(sssProfileResult.paramHandle);
@@ -840,11 +855,31 @@ function buildForwardPlusGraphInternal(
       sceneColorHandle,
       sceneColorCopyHandle,
       sceneColorFramebufferHandle,
+      ssrRoughnessHandle,
+      ssrNormalHandle,
       sssDiffuseHandle,
       sssTransmissionHandle,
       skinSSSHandle
     };
   });
+  // Register the LightPass MRT products so effects can look them up by name.
+  if (lightPassResult.ssrRoughnessHandle) {
+    blackboard.set(FrameResources.SSRRoughness, lightPassResult.ssrRoughnessHandle);
+  }
+  if (lightPassResult.ssrNormalHandle) {
+    blackboard.set(FrameResources.SSRNormal, lightPassResult.ssrNormalHandle);
+  } else if (sssProfileResult?.normalHandle) {
+    blackboard.set(FrameResources.SSRNormal, sssProfileResult.normalHandle);
+  }
+  if (lightPassResult.sssDiffuseHandle) {
+    blackboard.set(FrameResources.SSSDiffuse, lightPassResult.sssDiffuseHandle);
+  }
+  if (lightPassResult.sssTransmissionHandle) {
+    blackboard.set(FrameResources.SSSTransmission, lightPassResult.sssTransmissionHandle);
+  }
+  if (lightPassResult.skinSSSHandle) {
+    blackboard.set(FrameResources.SkinSSS, lightPassResult.skinSSSHandle);
+  }
 
   // 7d. Opaque-layer post effects (SAO/SSR/SSS/SkinSSS). They read the opaque
   // scene color and must complete before transparent geometry renders on top
@@ -873,6 +908,8 @@ function buildForwardPlusGraphInternal(
     }
   }
   for (const handle of [
+    lightPassResult.ssrRoughnessHandle,
+    lightPassResult.ssrNormalHandle,
     lightPassResult.sssDiffuseHandle,
     lightPassResult.sssTransmissionHandle,
     lightPassResult.skinSSSHandle

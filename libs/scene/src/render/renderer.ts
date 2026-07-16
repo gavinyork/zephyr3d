@@ -1,4 +1,3 @@
-import type { TextureFormat } from '@zephyr3d/device';
 import { CopyBlitter } from '../blitter';
 import type { DrawContext } from './drawable';
 import type { Scene } from '../scene';
@@ -50,7 +49,6 @@ export class SceneRenderer {
         device.clearFrameBuffer(camera.clearColor, camera.clearDepth, camera.clearStencil);
         const SSR = camera.SSR && scene.env.light.envLight && scene.env.light.envLight.hasRadiance();
         const SSS = camera.SSS;
-        const glossySurfaceFormat: TextureFormat = halfFloatColorBuffer ? 'rgba16f' : 'rgba8unorm';
         const ctx: DrawContext = {
           device,
           scene,
@@ -80,12 +78,10 @@ export class SceneRenderer {
           SSR,
           SSS,
           SSRCalcThickness: SSR && camera.ssrCalcThickness,
-          SSRRoughnessTexture: SSR
-            ? device.pool.fetchTemporalTexture2D(true, glossySurfaceFormat, renderWidth, renderHeight)
-            : null,
-          SSRNormalTexture: SSR
-            ? device.pool.fetchTemporalTexture2D(true, glossySurfaceFormat, renderWidth, renderHeight)
-            : null,
+          // SSR roughness/normal MRT textures are render graph resources
+          // created by the LightPass; resolved into these fields at execution.
+          SSRRoughnessTexture: null,
+          SSRNormalTexture: null,
           SSSProfileTexture: null,
           SSSParamTexture: null,
           SSSDiffuseTexture: null,
