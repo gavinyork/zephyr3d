@@ -539,7 +539,7 @@ function buildForwardPlusGraphInternal(
     };
   });
 
-  const depthHandle = depthPassResult.depthHandle;
+  let depthHandle = depthPassResult.depthHandle;
   const motionVectorHandle = depthPassResult.motionVectorHandle;
   blackboard.set(FrameResources.LinearDepth, depthHandle);
   if (motionVectorHandle) {
@@ -565,15 +565,24 @@ function buildForwardPlusGraphInternal(
 
   let preLightTransmissionDepthToken: RGHandle | undefined;
   if (options.needsTransmissionDepthForSSR) {
-    preLightTransmissionDepthToken = graph.addPass('TransmissionDepthForSSR', (builder) => {
+    const transmissionDepthResult = graph.addPass('TransmissionDepthForSSR', (builder) => {
+      builder.read(depthHandle);
       builder.read(depthPassResult.depthFramebufferHandle);
+      // This pass renders transmission geometry into the prepass linear-depth
+      // texture: model the mutation as a write so later readers order against
+      // it through data flow instead of relying on the token alone.
+      const depthOut = builder.write(depthHandle);
       const done = builder.createToken('TransmissionDepthForSSRDone');
       builder.sideEffect();
       builder.setExecute((rgCtx) => {
         renderTransmissionDepthPass(frame, rgCtx);
       });
-      return done;
+      return { done, depthOut };
     });
+    preLightTransmissionDepthToken = transmissionDepthResult.done;
+    depthHandle = transmissionDepthResult.depthOut;
+    // Re-register so blackboard consumers read the post-transmission version.
+    blackboard.set(FrameResources.LinearDepth, depthHandle);
   }
 
   // ── 6. Hi-Z (optional) ───────────────────────────────────────────
@@ -1008,25 +1017,33 @@ function buildForwardPlusGraphInternal(
       })
     : { color: chainInput, wroteFinal: false };
 
-  // 8b. Transmission depth pass (optional). Mutates the linear depth texture,
-  // so it must run after the transparent-layer chain (which samples the
-  // pre-transmission depth) and before the end-layer chain (which legacy
-  // behavior orders after it).
+  // 8b. Transmission depth pass (optional). Mutates the linear depth texture;
+  // the mutation is modeled as a graph write: the WAR hazard orders this pass
+  // after every pre-transmission depth reader (the transparent-layer chain),
+  // and re-registering the post-write version in the blackboard gives
+  // end-layer effects (TAA) a real data dependency on the transmission depth.
   let transmissionDepthToken: RGHandle | undefined;
   if (options.needSceneColor && !options.needsTransmissionDepthForSSR) {
-    transmissionDepthToken = graph.addPass('TransmissionDepth', (builder) => {
+    const transmissionDepthResult = graph.addPass('TransmissionDepth', (builder) => {
       builder.read(sceneColorHandle);
       if (transparentChainResult.color !== sceneColorHandle) {
         builder.read(transparentChainResult.color);
       }
+      builder.read(depthHandle);
       builder.read(depthPassResult.depthFramebufferHandle);
+      const depthOut = builder.write(depthHandle);
       const done = builder.createToken('TransmissionDepthDone');
       builder.sideEffect();
       builder.setExecute((rgCtx) => {
         renderTransmissionDepthPass(frame, rgCtx);
       });
-      return done;
+      return { done, depthOut };
     });
+    transmissionDepthToken = transmissionDepthResult.done;
+    depthHandle = transmissionDepthResult.depthOut;
+    // The transparent-layer chain above read the pre-transmission version;
+    // everything built from here on (end-layer chain) reads this one.
+    blackboard.set(FrameResources.LinearDepth, depthHandle);
   }
 
   // 9. End-layer effects (TAA). Ordered after TransmissionDepth.

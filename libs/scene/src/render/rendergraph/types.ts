@@ -478,6 +478,13 @@ export interface RGFramebufferDesc {
  * The executor calls `allocate()` before a resource's first use and
  * `release()` after its last use.
  *
+ * Lifetime contract: the graph compiler extends a texture's lifetime to cover
+ * every graph-managed framebuffer it is attached to, and the executor releases
+ * framebuffers before textures at the same pass boundary. Allocators may
+ * therefore assume `releaseFramebuffer()` is called before `release()` of its
+ * attachments, and must keep a released framebuffer's attachments intact until
+ * their own `release()` call.
+ *
  * @typeParam TTexture - The concrete texture type (e.g. `Texture2D`).
  * @public
  */

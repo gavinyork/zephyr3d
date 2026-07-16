@@ -4,6 +4,7 @@ import {
   RGPass,
   RGSubpass,
   type RGTextureDesc,
+  type RGFramebufferDesc,
   type RGPassBuilder,
   type RGExecuteFn,
   type RGExecuteContext,
@@ -505,7 +506,7 @@ export class RenderGraph {
 
   /** @internal */
   private _analyzeLifetimes(orderedPasses: RGPass[]): Map<number, RGResourceLifetime> {
-    const lifetimes = new Map<number, RGResourceLifetime>();
+    const lifetimes = new Map<number, { resource: RGResource; firstUse: number; lastUse: number }>();
 
     // Build pass -> order index map
     const orderMap = new Map<RGPass, number>();
@@ -536,6 +537,38 @@ export class RenderGraph {
       if (first !== Infinity) {
         lifetimes.set(res.id, { resource: res, firstUse: first, lastUse: last });
       }
+    }
+
+    // A pass that reads a framebuffer implicitly reads its attachment textures:
+    // extend each RGHandle attachment's lifetime to cover the framebuffer's
+    // lifetime so the executor never releases a backing texture while a later
+    // pass can still render through the framebuffer. Framebuffers cannot be
+    // attachments of other framebuffers, so a single propagation pass suffices.
+    for (const lifetime of lifetimes.values()) {
+      const res = lifetime.resource;
+      if (res.kind !== 'framebuffer' || !res.desc) {
+        continue;
+      }
+      const desc = res.desc as RGFramebufferDesc;
+      const extend = (attachment: unknown) => {
+        if (!(attachment instanceof RGHandle)) {
+          return;
+        }
+        const attachmentLifetime = lifetimes.get(attachment._id);
+        if (attachmentLifetime) {
+          attachmentLifetime.firstUse = Math.min(attachmentLifetime.firstUse, lifetime.firstUse);
+          attachmentLifetime.lastUse = Math.max(attachmentLifetime.lastUse, lifetime.lastUse);
+        }
+      };
+      const colors = Array.isArray(desc.colorAttachments)
+        ? desc.colorAttachments
+        : desc.colorAttachments
+          ? [desc.colorAttachments]
+          : [];
+      for (const attachment of colors) {
+        extend(attachment);
+      }
+      extend(desc.depthAttachment);
     }
 
     return lifetimes;

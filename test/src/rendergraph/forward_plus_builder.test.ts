@@ -198,6 +198,51 @@ describe('Forward+ render graph builder', () => {
     expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('Present'));
   });
 
+  test('models TransmissionDepth as a versioned write of the linear depth texture', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions({
+        needSceneColor: true,
+        needsTransmissionDepthForSSR: false
+      })
+    );
+    graph.compile([backbuffer]);
+
+    const transmissionPass = graph.passes.find((pass) => pass.name === 'TransmissionDepth')!;
+    expect(transmissionPass).toBeDefined();
+    // The pass reads the prepass linear depth and writes a new version of it.
+    const depthRead = transmissionPass.reads.find((res) => res.name === 'linearDepth');
+    expect(depthRead).toBeDefined();
+    const depthWrite = transmissionPass.writes.find((res) => res.physicalId === depthRead!.physicalId);
+    expect(depthWrite).toBeDefined();
+    expect(depthWrite!.id).not.toBe(depthRead!.id);
+  });
+
+  test('models TransmissionDepthForSSR as a versioned write consumed by later depth readers', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions({
+        needSceneColor: true,
+        ssr: true,
+        hiZ: true,
+        needsTransmissionDepthForSSR: true
+      })
+    );
+    graph.compile([backbuffer]);
+
+    const transmissionPass = graph.passes.find((pass) => pass.name === 'TransmissionDepthForSSR')!;
+    expect(transmissionPass).toBeDefined();
+    const depthRead = transmissionPass.reads.find((res) => res.name === 'linearDepth');
+    expect(depthRead).toBeDefined();
+    const depthWrite = transmissionPass.writes.find((res) => res.physicalId === depthRead!.physicalId);
+    expect(depthWrite).toBeDefined();
+    // Later depth readers consume the post-transmission version, giving them a
+    // real data dependency instead of relying on the ordering token.
+    for (const passName of ['HiZ', 'LightPass']) {
+      const pass = graph.passes.find((p) => p.name === passName)!;
+      expect(pass.reads).toContain(depthWrite);
+      expect(pass.reads).not.toContain(depthRead);
+    }
+  });
+
   test('derives SSR transmission depth prepass only when scene-color materials do not need depth', () => {
     const scene = {
       env: {
