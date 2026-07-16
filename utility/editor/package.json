@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/editor",
-  "version": "0.3.10",
+  "version": "0.3.11",
   "description": "zephyr3d studio",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "main": "electron/main.cjs",

@@ -2,6 +2,18 @@
   "name": "@zephyr3d/editor",
   "entries": [
     {
+      "version": "0.3.11",
+      "tag": "@zephyr3d/editor_v0.3.11",
+      "date": "Thu, 16 Jul 2026 11:10:12 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Upgrade engine version"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.3.10",
       "tag": "@zephyr3d/editor_v0.3.10",
       "date": "Sat, 11 Jul 2026 13:49:41 GMT",

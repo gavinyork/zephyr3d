@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/editor
 
-This log was last generated on Sat, 11 Jul 2026 13:49:41 GMT and should not be manually modified.
+This log was last generated on Thu, 16 Jul 2026 11:10:12 GMT and should not be manually modified.
+
+## 0.3.11
+Thu, 16 Jul 2026 11:10:12 GMT
+
+### Patches
+
+- Upgrade engine version
 
 ## 0.3.10
 Sat, 11 Jul 2026 13:49:41 GMT
