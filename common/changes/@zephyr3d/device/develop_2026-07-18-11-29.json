@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Support per-target framebuffer clear colors",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}
