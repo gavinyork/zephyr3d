@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgl",
+      "comment": "Add RHI per-target blending support",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgl"
+}
