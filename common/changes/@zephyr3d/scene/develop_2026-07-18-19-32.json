@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Implemented dual-depth-peeling OIT",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
