@@ -63,6 +63,7 @@ type PBRBluePrintMaterialInstanceLike = PBRBluePrintMaterial & {
   ) => DiscardedOverrides;
   getDiscardedOverridesForParent: (parentMaterial: PBRBluePrintMaterial) => DiscardedOverrides;
   setMaterialPropertyOverrides: (propNames: Iterable<string>) => void;
+  markMaterialPropertyOverridden: (propName: string) => void;
   syncInheritedUniforms: (parentMaterial?: PBRBluePrintMaterial | null) => void;
 };
 
@@ -79,6 +80,8 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
   private readonly _previewTexture: DRef<Texture2D>;
   private readonly _previewBlitter: CopyBlitter;
   private _version: number;
+  private _editRevision: number;
+  private _saveChain: Promise<void>;
   private _savedProps: Record<string, unknown>;
   private readonly _propChangeHandler: (object: object | null, prop: PropertyAccessor) => void;
   private _previewDragging: boolean;
@@ -100,6 +103,8 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     this._previewBlitter = new CopyBlitter();
     this._previewBlitter.srgbOut = true;
     this._version = 0;
+    this._editRevision = 0;
+    this._saveChain = Promise.resolve();
     this._savedProps = {};
     this._previewDragging = false;
     this._showPreview = true;
@@ -154,9 +159,12 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     super.close();
   }
 
-  private handlePropChanged() {
+  private handlePropChanged(object: object | null, prop: PropertyAccessor) {
     const material = this._material.get();
     if (material) {
+      if (object === material && prop?.name) {
+        material.markMaterialPropertyOverridden(prop.name);
+      }
       material.setOverrides(
         material.uniformValues as BluePrintUniformValue[],
         material.uniformTextures as BluePrintUniformTexture[]
@@ -165,6 +173,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     }
     this._propEditor.refresh();
     this._version = -1;
+    this._editRevision++;
   }
 
   private initPreview(material: MeshMaterial) {
@@ -409,10 +418,12 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
       material.setMaterialPropertyOverrides(Object.keys(overrideProps));
       material.changeParentMaterial(parent, parentPath);
       await getEngine().resourceManager.deserializeObjectProps(material, overrideProps);
+      material.setMaterialPropertyOverrides(Object.keys(overrideProps));
       material.uniformChanged();
       this._parent.set(parent);
       this._propEditor.object = material;
       this._version = -1;
+      this._editRevision++;
     } catch (err) {
       await DlgMessage.messageBox('Change Parent Material', `Change parent material failed: ${err}`);
     } finally {
@@ -420,12 +431,18 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     }
   }
 
-  private async save() {
+  private save() {
+    const task = this._saveChain.then(() => this.saveInternal());
+    this._saveChain = task.catch(() => undefined);
+    return task;
+  }
+  private async saveInternal() {
     const material = this._material.get();
     const parent = this._parent.get();
     if (!material || !parent) {
       return;
     }
+    const saveRevision = this._editRevision;
     const overrideProps = await this.getOverrideProps(material, parent);
     const content: InstanceFileContent = {
       type: 'PBRBluePrintMaterialInstance',
@@ -446,8 +463,11 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     // keep their GPU bindings after saving.
     material.setOverrides(material.uniformValues, material.uniformTextures);
     await getEngine().resourceManager.deserializeObjectProps(material, overrideProps);
+    material.setMaterialPropertyOverrides(Object.keys(overrideProps));
     this._savedProps = overrideProps;
-    this._version = 0;
+    if (this._editRevision === saveRevision) {
+      this._version = 0;
+    }
   }
 
   private async restoreState() {
@@ -463,10 +483,12 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
       throw new Error(`Reload material instance failed: ${this._path}`);
     }
     this._parent.set(reloaded.parentMaterial);
+    material.setMaterialPropertyOverrides(Object.keys(this._savedProps));
     material.setParentMaterial(reloaded.parentMaterial, reloaded.parentMaterialId);
     material.uniformValues = reloaded.uniformValues;
     material.uniformTextures = reloaded.uniformTextures;
     await getEngine().resourceManager.deserializeObjectProps(material, this._savedProps);
+    material.setMaterialPropertyOverrides(Object.keys(this._savedProps));
     this._propEditor.object = material;
     this._version = 0;
   }

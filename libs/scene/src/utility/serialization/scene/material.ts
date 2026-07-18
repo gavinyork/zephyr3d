@@ -409,6 +409,9 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
         this.rectSpecularScale = value.num[0];
       },
       getDefaultValue(this: PBRMaterial) {
+        if (this instanceof PBRBluePrintMaterialInstance) {
+          return this.parentMaterial?.rectSpecularScale ?? 1;
+        }
         return this.$isInstance ? this.coreMaterial.rectSpecularScale : 1;
       }
     },

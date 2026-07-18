@@ -22,6 +22,27 @@ describe('Blueprint scalar parameter range', () => {
     expect(node.x).toBe(1);
   });
 
+  test('Blueprint material instance should preserve an explicit RectSpecularScale override', async () => {
+    const manager = new ResourceManager(new MemoryFS());
+    const parent = new PBRBluePrintMaterial();
+    parent.rectSpecularScale = 0;
+    const instance = new PBRBluePrintMaterialInstance(parent, '/materials/parent.zmtl');
+
+    expect(instance.rectSpecularScale).toBe(0);
+
+    instance.rectSpecularScale = 0.35;
+    instance.markMaterialPropertyOverridden('RectSpecularScale');
+    const props = await manager.serializeObjectProps(instance);
+    expect(props.RectSpecularScale).toBeCloseTo(0.35);
+
+    const restored = new PBRBluePrintMaterialInstance(parent, '/materials/parent.zmtl');
+    await manager.deserializeObjectProps(restored, props);
+    restored.setMaterialPropertyOverrides(Object.keys(props));
+    restored.syncInheritedUniforms();
+
+    expect(restored.rectSpecularScale).toBeCloseTo(0.35);
+  });
+
   test('Blueprint material instance should inherit latest scalar range from parent while keeping override value', () => {
     const parent = new PBRBluePrintMaterial();
     parent.uniformValues = [
@@ -357,6 +378,7 @@ describe('Blueprint scalar parameter range', () => {
       type: 'PBRBluePrintMaterial',
       props: {
         ClearCoat: false,
+        RectSpecularScale: 0,
         AttenuationColor: [1, 0.5, 0.4]
       },
       data: {
@@ -391,9 +413,12 @@ describe('Blueprint scalar parameter range', () => {
     expect(instance).toBeInstanceOf(PBRBluePrintMaterialInstance);
     expect(parent!.clearcoat).toBe(false);
     expect(instance!.clearcoat).toBe(false);
+    expect(parent!.rectSpecularScale).toBe(0);
+    expect(instance!.rectSpecularScale).toBe(0);
 
     parentMaterialFile.props = {
       ClearCoat: true,
+      RectSpecularScale: 0.25,
       SubsurfaceProfile: {
         ClassName: 'SubsurfaceProfile',
         Object: {
@@ -412,5 +437,7 @@ describe('Blueprint scalar parameter range', () => {
     expect(parent!.subsurfaceProfile).toBeInstanceOf(SubsurfaceProfile);
     expect(instance!.clearcoat).toBe(true);
     expect(instance!.subsurfaceProfile).toBeInstanceOf(SubsurfaceProfile);
+    expect(parent!.rectSpecularScale).toBe(0.25);
+    expect(instance!.rectSpecularScale).toBe(0.25);
   });
 });

@@ -138,6 +138,9 @@ export class PBRMaterialEditor extends GraphEditor {
   private _blitter: CopyBlitter;
   private _version: number;
   private _irChanged: boolean;
+  private _editRevision: number;
+  private _previewBuildGeneration: number;
+  private _saveChain: Promise<void>;
   private _outputName: string;
   private _blueprintPath: string;
   private readonly _cmdManager: CommandManager;
@@ -153,6 +156,9 @@ export class PBRMaterialEditor extends GraphEditor {
     this._outputName = outputName;
     this._version = 0;
     this._irChanged = false;
+    this._editRevision = 0;
+    this._previewBuildGeneration = 0;
+    this._saveChain = Promise.resolve();
     this._previewScene = new DRef();
     this._previewMesh = new DRef();
     this._defaultMaterial = new DRef();
@@ -205,6 +211,7 @@ export class PBRMaterialEditor extends GraphEditor {
     //getApp().inputManager.useFirst(this.handleEvent, this);
   }
   close() {
+    this._previewBuildGeneration++;
     getApp().inputManager.unuse(this.handleEvent, this);
     this._previewScene.dispose();
     this._previewMesh.dispose();
@@ -366,21 +373,35 @@ export class PBRMaterialEditor extends GraphEditor {
     }
     return sanitized;
   }
-  async save(path: string) {
+  save(path: string) {
+    const task = this._saveChain.then(() => this.saveInternal(path));
+    this._saveChain = task.catch(() => undefined);
+    return task;
+  }
+  private async saveInternal(path: string) {
     if (path) {
       const VFS = ProjectService.VFS;
       const mat = this._editMaterial.get();
       if (!mat) {
         return;
       }
+      const saveRevision = this._editRevision;
       if (mat instanceof PBRBluePrintMaterial || mat instanceof SpriteBlueprintMaterial) {
+        // Save from a freshly compiled graph snapshot, not a possibly stale preview IR.
+        ++this._previewBuildGeneration;
+        this._irChanged = false;
+        const irFrag = await this.createIR(this.fragmentEditor);
+        const irVert = mat instanceof PBRBluePrintMaterial ? await this.createIR(this.vertexEditor) : null;
+        if (!irFrag || (mat instanceof PBRBluePrintMaterial && !irVert)) {
+          Dialog.messageBox('Error', 'Save material failed: material graph contains errors');
+          return;
+        }
         const bpPath =
           this._blueprintPath ||
           VFS.normalizePath(VFS.join(VFS.dirname(path), `${VFS.basename(path, VFS.extname(path))}.zbpt`));
         // Save blueprint
-        const fragmentState = await this.fragmentEditor.saveState();
-        const vertexState =
-          mat instanceof PBRBluePrintMaterial ? await this.vertexEditor.saveState() : undefined;
+        const fragmentState = irFrag.editorState;
+        const vertexState = mat instanceof PBRBluePrintMaterial ? irVert!.editorState : undefined;
         try {
           await VFS.writeFile(
             bpPath,
@@ -405,10 +426,7 @@ export class PBRMaterialEditor extends GraphEditor {
           return;
         }
         // Save material
-        const uniforms = this.getUniforms(
-          mat.fragmentIR,
-          mat instanceof PBRBluePrintMaterial ? mat.vertexIR : null
-        );
+        const uniforms = this.getUniforms(irFrag, irVert);
         const content: {
           type: string;
           props: any;
@@ -441,6 +459,7 @@ export class PBRMaterialEditor extends GraphEditor {
           const msg = `Save material failed: ${err}`;
           console.error(msg);
           Dialog.messageBox('Error', msg);
+          return;
         }
         await getEngine().resourceManager.reloadBluePrintMaterials();
       } else if (mat) {
@@ -454,10 +473,13 @@ export class PBRMaterialEditor extends GraphEditor {
           const msg = `Save material failed: ${err}`;
           console.error(msg);
           Dialog.messageBox('Error', msg);
+          return;
         }
         await getEngine().resourceManager.reloadBluePrintMaterials();
       }
-      this._version = 0;
+      if (this._editRevision === saveRevision) {
+        this._version = 0;
+      }
       this._savedState = await this.getSavedState(mat);
     }
   }
@@ -625,7 +647,10 @@ export class PBRMaterialEditor extends GraphEditor {
   renderNodeEditor() {
     if (this._irChanged) {
       this._irChanged = false;
-      this.applyPreviewMaterial();
+      const generation = ++this._previewBuildGeneration;
+      void this.applyPreviewMaterial(generation).catch((err) => {
+        console.error(`Build material preview failed: ${err}`);
+      });
     }
     const mat = this._editMaterial.get();
     if (mat instanceof PBRBluePrintMaterial || mat instanceof SpriteBlueprintMaterial) {
@@ -776,11 +801,14 @@ export class PBRMaterialEditor extends GraphEditor {
     }
     camera.updateController();
   }
-  private async applyPreviewMaterial() {
+  private async applyPreviewMaterial(generation: number) {
     const mat = this._editMaterial.get();
     if (mat instanceof PBRBluePrintMaterial || mat instanceof SpriteBlueprintMaterial) {
       const irFrag = await this.createIR(this.fragmentEditor);
       const irVert = this.vertexEditor ? await this.createIR(this.vertexEditor) : null;
+      if (generation !== this._previewBuildGeneration) {
+        return;
+      }
       if (!irFrag || (mat instanceof PBRBluePrintMaterial && !irVert)) {
         (this._previewMesh.get() as Mesh | Sprite).material = this._defaultMaterial.get();
       } else {
@@ -826,6 +854,12 @@ export class PBRMaterialEditor extends GraphEditor {
             magFilter: u.magFilter as TextureFilterMode,
             mipFilter: u.mipFilter as TextureFilterMode
           });
+        }
+        if (generation !== this._previewBuildGeneration) {
+          for (const u of uniforms.uniformTextures) {
+            u.finalTexture?.dispose();
+          }
+          return;
         }
         mat.fragmentIR = irFrag;
         if (mat instanceof PBRBluePrintMaterial) {
@@ -893,6 +927,7 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   private markDirty() {
     this._version = -1;
+    this._editRevision++;
   }
   private shouldRefreshMaterialInspector(prop: Nullable<PropertyAccessor>) {
     const name = prop?.name ?? '';

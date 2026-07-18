@@ -868,6 +868,7 @@ export class AssetManager {
         if (instanceContent.type === 'PBRBluePrintMaterialInstance' && instanceContent.props) {
           await this._resourceManager.deserializeObjectProps(m, instanceContent.props);
         }
+        m.setMaterialPropertyOverrides(Object.keys(instanceContent.props ?? {}));
         this.syncTrackedBlueprintMaterialRefs(assetId, m);
       }
     }
@@ -1050,6 +1051,7 @@ export class AssetManager {
         await this._resourceManager.deserializeObjectProps(mat, content.props);
       }
       if (mat instanceof PBRBluePrintMaterialInstance) {
+        mat.setMaterialPropertyOverrides(Object.keys(content.props ?? {}));
         mat.syncInheritedUniforms();
       }
       return mat;

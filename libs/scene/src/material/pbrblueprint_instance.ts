@@ -129,6 +129,9 @@ function copyParentMaterialState(
   instance.opacity = parentMaterial.opacity;
   instance.objectColor = parentMaterial.objectColor;
   instance.TAAStrength = parentMaterial.TAAStrength;
+  if (!instance.isMaterialPropertyOverridden('RectSpecularScale')) {
+    instance.rectSpecularScale = parentMaterial.rectSpecularScale;
+  }
   instance.clearcoat = parentMaterial.clearcoat;
   instance.clearcoatIntensity = parentMaterial.clearcoatIntensity;
   instance.clearcoatRoughnessFactor = parentMaterial.clearcoatRoughnessFactor;
