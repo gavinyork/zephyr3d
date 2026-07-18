@@ -321,6 +321,23 @@ export interface RenderStateSet {
    */
   defaultColorState(): void;
   /**
+   * Gets the ColorState override for a color target or null if the global/default ColorState should be used
+   * @param index - The zero-based color target index
+   */
+  getTargetColorState(index: number): Nullable<ColorState>;
+  /**
+   * Allocates a ColorState override for a color target
+   * @param index - The zero-based color target index
+   * @param state - Optional existing ColorState to use as the override
+   * @returns The created ColorState
+   */
+  useTargetColorState(index: number, state?: ColorState): ColorState;
+  /**
+   * Deletes the ColorState override for a color target, so that the global/default ColorState will be used
+   * @param index - The zero-based color target index
+   */
+  defaultTargetColorState(index: number): void;
+  /**
    * Allocates a BlendingState
    * @returns The created BlendingState
    */
@@ -329,6 +346,23 @@ export interface RenderStateSet {
    * Deletes the BlendingState that was allocated by {@link RenderStateSet.useBlendingState}, so that the default value will be used
    */
   defaultBlendingState(): void;
+  /**
+   * Gets the BlendingState override for a color target or null if the global/default BlendingState should be used
+   * @param index - The zero-based color target index
+   */
+  getTargetBlendingState(index: number): Nullable<BlendingState>;
+  /**
+   * Allocates a BlendingState override for a color target
+   * @param index - The zero-based color target index
+   * @param state - Optional existing BlendingState to use as the override
+   * @returns The created BlendingState
+   */
+  useTargetBlendingState(index: number, state?: BlendingState): BlendingState;
+  /**
+   * Deletes the BlendingState override for a color target, so that the global/default BlendingState will be used
+   * @param index - The zero-based color target index
+   */
+  defaultTargetBlendingState(index: number): void;
   /**
    * Allocates a RasterizerState
    * @returns The created RasterizerState

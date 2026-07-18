@@ -9,6 +9,7 @@ import {
 } from '@zephyr3d/device';
 import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPURenderStateSet } from './renderstates_webgpu';
+import { WebGPUColorState } from './renderstates_webgpu';
 import type { WebGPUBindGroup } from './bindgroup_webgpu';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUDevice } from './device';
@@ -534,13 +535,19 @@ export class WebGPURenderPass {
     let validation = 0;
     const colorTargetCount = this._frameBufferInfo.colorFormats.length;
     if (colorTargetCount !== 0 && program.fragmentOutputCount !== colorTargetCount) {
-      if (
-        !stateSet?.colorState ||
-        stateSet.colorState.redMask ||
-        stateSet.colorState.greenMask ||
-        stateSet.colorState.blueMask ||
-        stateSet.colorState.alphaMask
-      ) {
+      let outputMismatch = program.fragmentOutputCount > colorTargetCount;
+      if (program.fragmentOutputCount < colorTargetCount) {
+        for (let i = program.fragmentOutputCount; i < colorTargetCount; i++) {
+          const writeMask =
+            stateSet?.getColorStateForTarget(i).internalState.internal ??
+            (WebGPUColorState.defaultState as WebGPUColorState).internalState.internal;
+          if (writeMask !== 0) {
+            outputMismatch = true;
+            break;
+          }
+        }
+      }
+      if (outputMismatch) {
         const framebuffer = this._frameBufferInfo.frameBuffer;
         const colorAttachments = framebuffer?.getColorAttachments().map((texture, index) => ({
           index,

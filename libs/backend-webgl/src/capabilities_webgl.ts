@@ -175,9 +175,11 @@ export interface TextureFormatInfoWebGL extends TextureFormatInfo {
 export class WebGLFramebufferCaps implements FramebufferCaps {
   private readonly _isWebGL2: boolean;
   private readonly _extDrawBuffers: Nullable<WEBGL_draw_buffers>;
+  private readonly _extDrawBuffersIndexed: Nullable<unknown>;
   private readonly _extFloatBlending: Nullable<EXT_float_blend>;
   private readonly _extRenderMipmap: Nullable<OES_fbo_render_mipmap>;
   maxDrawBuffers: number;
+  supportPerTargetBlending: boolean;
   maxColorAttachmentBytesPerSample: number;
   supportRenderMipmap: boolean;
   supportMultisampledFramebuffer: boolean;
@@ -187,6 +189,7 @@ export class WebGLFramebufferCaps implements FramebufferCaps {
   constructor(gl: WebGLContext) {
     this._isWebGL2 = isWebGL2(gl);
     this._extDrawBuffers = this._isWebGL2 ? null : gl.getExtension('WEBGL_draw_buffers');
+    this._extDrawBuffersIndexed = gl.getExtension('OES_draw_buffers_indexed');
     this._extFloatBlending = gl.getExtension('EXT_float_blend');
     this._extRenderMipmap = this._isWebGL2 ? null : gl.getExtension('OES_fbo_render_mipmap');
     this.maxDrawBuffers =
@@ -197,6 +200,7 @@ export class WebGLFramebufferCaps implements FramebufferCaps {
           )
         : 1;
     this.maxColorAttachmentBytesPerSample = this.maxDrawBuffers * 16;
+    this.supportPerTargetBlending = !!this._extDrawBuffersIndexed;
     this.supportRenderMipmap = isWebGL2(gl) || !!this._extRenderMipmap;
     this.supportMultisampledFramebuffer = isWebGL2(gl);
     this.supportFloatBlending = !!this._extFloatBlending;

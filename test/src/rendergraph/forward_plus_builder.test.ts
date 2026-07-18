@@ -33,7 +33,8 @@ function createMockDrawContext(overrides: Record<string, unknown> = {}) {
       type: 'webgpu',
       getDeviceCaps: () => ({
         framebufferCaps: {
-          maxColorAttachmentBytesPerSample: 32
+          maxColorAttachmentBytesPerSample: 32,
+          supportPerTargetBlending: true
         },
         textureCaps: {
           supportHalfFloatColorBuffer: true,

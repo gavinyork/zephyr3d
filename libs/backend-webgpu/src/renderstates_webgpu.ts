@@ -13,37 +13,58 @@ import type {
 } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
 import type { Nullable } from '@zephyr3d/base';
+import {
+  blendEquationMap,
+  blendFuncMap,
+  compareFuncMap,
+  faceModeMap,
+  stencilOpMap
+} from './constants_webgpu';
 
-export abstract class WebGPURenderState {
-  protected static _defaultState: WebGPURenderState;
-  protected _hash: Nullable<string>;
+const stateList: InternalState[] = [];
+const stateMap: Record<string, InternalState> = {};
+
+export type InternalState<InternalGPUState = any> = {
+  index: number;
+  internal: InternalGPUState;
+};
+
+export abstract class WebGPURenderState<U> {
+  protected static _defaultState: WebGPURenderState<any>;
+  protected _internalState: Nullable<InternalState<U>>;
   static get defaultState() {
     return this._defaultState;
   }
   constructor() {
-    this._hash = null;
+    this._internalState = null;
   }
-  get hash() {
-    return this._getHash(this.constructor);
+  get hash(): string {
+    return String(this.internalState.index);
+  }
+  get internalState(): InternalState<U> {
+    if (!this._internalState) {
+      const hash = `${this.constructor.name}:${this.computeHash()}`;
+      this._internalState = stateMap[hash];
+      if (!this._internalState) {
+        this._internalState = {
+          index: stateList.length,
+          internal: this.createInternalState()
+        };
+        stateList.push(this._internalState);
+        stateMap[hash] = this._internalState;
+      }
+    }
+    return this._internalState;
   }
   invalidateHash() {
-    this._hash = null;
+    this._internalState = null;
   }
-  protected _getHash(ctor: any) {
-    if (this === ctor.defaultState) {
-      return '';
-    } else {
-      if (this._hash === null) {
-        this._hash = this.computeHash();
-      }
-      return this._hash;
-    }
-  }
+  protected abstract createInternalState(): U;
   protected abstract computeHash(): string;
 }
 
-export class WebGPUColorState extends WebGPURenderState implements ColorState {
-  protected static _defaultState: WebGPURenderState = new WebGPUColorState();
+export class WebGPUColorState extends WebGPURenderState<number> implements ColorState {
+  protected static _defaultState: WebGPUColorState = new WebGPUColorState();
   private _redMask: boolean;
   private _greenMask: boolean;
   private _blueMask: boolean;
@@ -103,6 +124,13 @@ export class WebGPUColorState extends WebGPURenderState implements ColorState {
     this.alphaMask = a;
     return this;
   }
+  protected createInternalState(): number {
+    const r = this._redMask ? GPUColorWrite.RED : 0;
+    const g = this._greenMask ? GPUColorWrite.GREEN : 0;
+    const b = this._blueMask ? GPUColorWrite.BLUE : 0;
+    const a = this._alphaMask ? GPUColorWrite.ALPHA : 0;
+    return r | g | b | a;
+  }
   protected computeHash() {
     let val = 0;
     if (this.redMask) {
@@ -121,8 +149,11 @@ export class WebGPUColorState extends WebGPURenderState implements ColorState {
   }
 }
 
-export class WebGPUBlendingState extends WebGPURenderState implements BlendingState {
-  protected static _defaultState: WebGPURenderState = new WebGPUBlendingState();
+export class WebGPUBlendingState
+  extends WebGPURenderState<GPUBlendState | undefined>
+  implements BlendingState
+{
+  protected static _defaultState: WebGPUBlendingState = new WebGPUBlendingState();
   private _enabled: boolean;
   private _alphaToCoverageEnabled: boolean;
   private _srcBlendRGB: BlendFunc;
@@ -253,6 +284,15 @@ export class WebGPUBlendingState extends WebGPURenderState implements BlendingSt
     this.alphaEquation = alpha;
     return this;
   }
+  protected createInternalState(): GPUBlendState | undefined {
+    if (!this._enabled) {
+      return undefined;
+    }
+    return {
+      color: this.createBlendComponent(this._rgbEquation, this._srcBlendRGB, this._dstBlendRGB),
+      alpha: this.createBlendComponent(this._alphaEquation, this._srcBlendAlpha, this._dstBlendAlpha)
+    };
+  }
   protected computeHash() {
     return this._enabled
       ? `${this._srcBlendRGB}-${this._srcBlendAlpha}-${this._dstBlendRGB}-${this._dstBlendAlpha}-${
@@ -260,10 +300,35 @@ export class WebGPUBlendingState extends WebGPURenderState implements BlendingSt
         }-${this._alphaEquation}-${Number(!!this._alphaToCoverageEnabled)}`
       : `${Number(!!this._alphaToCoverageEnabled)}`;
   }
+  private createBlendComponent(op: BlendEquation, srcFunc: BlendFunc, dstFunc: BlendFunc) {
+    const operation = blendEquationMap[op];
+    if (!operation) {
+      throw new Error(`createBlendComponent() failed: invalid blend op: ${op}`);
+    }
+    const srcFactor = blendFuncMap[srcFunc];
+    if (!srcFactor) {
+      throw new Error(`createBlendComponent() failed: invalid source blend func ${srcFunc}`);
+    }
+    const dstFactor = blendFuncMap[dstFunc];
+    if (!dstFactor) {
+      throw new Error(`createBlendComponent() failed: invalid dest blend func ${dstFunc}`);
+    }
+    return {
+      operation,
+      srcFactor,
+      dstFactor
+    };
+  }
 }
 
-export class WebGPURasterizerState extends WebGPURenderState implements RasterizerState {
-  protected static _defaultState: WebGPURenderState = new WebGPURasterizerState();
+export class WebGPURasterizerState
+  extends WebGPURenderState<{
+    cullMode: GPUCullMode;
+    unclippedDepth: boolean;
+  }>
+  implements RasterizerState
+{
+  protected static _defaultState: WebGPURasterizerState = new WebGPURasterizerState();
   private _cullMode: FaceMode;
   private _depthClampEnabled: boolean;
   constructor() {
@@ -300,13 +365,22 @@ export class WebGPURasterizerState extends WebGPURenderState implements Rasteriz
     }
     return this;
   }
+  protected createInternalState(): {
+    cullMode: GPUCullMode;
+    unclippedDepth: boolean;
+  } {
+    return {
+      cullMode: faceModeMap[this._cullMode],
+      unclippedDepth: this._depthClampEnabled
+    };
+  }
   protected computeHash() {
     return `${this._cullMode}-${this._depthClampEnabled ? 1 : 0}`;
   }
 }
 
-export class WebGPUDepthState extends WebGPURenderState implements DepthState {
-  protected static _defaultState: WebGPURenderState = new WebGPUDepthState();
+export class WebGPUDepthState extends WebGPURenderState<Partial<GPUDepthStencilState>> implements DepthState {
+  protected static _defaultState: WebGPUDepthState = new WebGPUDepthState();
   private _testEnabled: boolean;
   private _writeEnabled: boolean;
   private _compareFunc: CompareFunc;
@@ -394,6 +468,14 @@ export class WebGPUDepthState extends WebGPURenderState implements DepthState {
     this.compareFunc = func;
     return this;
   }
+  protected createInternalState(): Partial<GPUDepthStencilState> {
+    return {
+      depthWriteEnabled: this._writeEnabled,
+      depthCompare: this._testEnabled ? compareFuncMap[this._compareFunc] : 'always',
+      depthBias: this._depthBias !== 0 ? this._depthBias : undefined,
+      depthBiasSlopeScale: this._depthBiasSlopeScale !== 0 ? this._depthBiasSlopeScale : undefined
+    };
+  }
   protected computeHash() {
     return `${Number(this._testEnabled)}-${Number(this._writeEnabled)}-${this._compareFunc}-${
       this._depthBias
@@ -401,8 +483,11 @@ export class WebGPUDepthState extends WebGPURenderState implements DepthState {
   }
 }
 
-export class WebGPUStencilState extends WebGPURenderState implements StencilState {
-  protected static _defaultState: WebGPURenderState = new WebGPUStencilState();
+export class WebGPUStencilState
+  extends WebGPURenderState<Partial<GPUDepthStencilState>>
+  implements StencilState
+{
+  protected static _defaultState: WebGPUStencilState = new WebGPUStencilState();
   private _enabled: boolean;
   private _writeMask: number;
   private _failOp: StencilOp;
@@ -582,12 +667,40 @@ export class WebGPUStencilState extends WebGPURenderState implements StencilStat
     this.readMask = mask;
     return this;
   }
+  protected createInternalState(): Partial<GPUDepthStencilState> {
+    return this._enabled
+      ? {
+          stencilFront: this.createStencilFaceState(this._func, this._failOp, this._zFailOp, this._passOp),
+          stencilBack: this.createStencilFaceState(
+            this._funcBack,
+            this._failOpBack,
+            this._zFailOpBack,
+            this._passOpBack
+          ),
+          stencilReadMask: this._readMask,
+          stencilWriteMask: this._writeMask
+        }
+      : {};
+  }
   protected computeHash() {
     return this._enabled
       ? `${this.sideHash(false)}-${this.sideHash(true)}-${this.readMask.toString(
           16
         )}-${this.writeMask.toString(16)}-${this.ref.toString(16)}`
       : '';
+  }
+  private createStencilFaceState(
+    func: CompareFunc,
+    failOp: StencilOp,
+    zFailOp: StencilOp,
+    passOp: StencilOp
+  ) {
+    return {
+      compare: compareFuncMap[func],
+      failOp: stencilOpMap[failOp],
+      depthFailOp: stencilOpMap[zFailOp],
+      passOp: stencilOpMap[passOp]
+    };
   }
   private sideHash(back: boolean): string {
     return back
@@ -598,6 +711,8 @@ export class WebGPUStencilState extends WebGPURenderState implements StencilStat
 
 export class WebGPURenderStateSet implements RenderStateSet {
   private readonly _device: WebGPUDevice;
+  private _targetColorStates: Nullable<WebGPUColorState>[];
+  private _targetBlendingStates: Nullable<WebGPUBlendingState>[];
   colorState: Nullable<WebGPUColorState>;
   blendingState: Nullable<WebGPUBlendingState>;
   rasterizerState: Nullable<WebGPURasterizerState>;
@@ -605,6 +720,8 @@ export class WebGPURenderStateSet implements RenderStateSet {
   stencilState: Nullable<WebGPUStencilState>;
   constructor(device: WebGPUDevice) {
     this._device = device;
+    this._targetColorStates = [];
+    this._targetBlendingStates = [];
     this.colorState = null;
     this.blendingState = null;
     this.rasterizerState = null;
@@ -615,6 +732,12 @@ export class WebGPURenderStateSet implements RenderStateSet {
     const newStateSet = new WebGPURenderStateSet(this._device);
     newStateSet.colorState = (this.colorState?.clone() as WebGPUColorState) ?? null;
     newStateSet.blendingState = (this.blendingState?.clone() as WebGPUBlendingState) ?? null;
+    newStateSet._targetColorStates = this._targetColorStates.map(
+      (state) => (state?.clone() as WebGPUColorState) ?? null
+    );
+    newStateSet._targetBlendingStates = this._targetBlendingStates.map(
+      (state) => (state?.clone() as WebGPUBlendingState) ?? null
+    );
     newStateSet.rasterizerState = (this.rasterizerState?.clone() as WebGPURasterizerState) ?? null;
     newStateSet.depthState = (this.depthState?.clone() as WebGPUDepthState) ?? null;
     newStateSet.stencilState = (this.stencilState?.clone() as WebGPUStencilState) ?? null;
@@ -623,12 +746,21 @@ export class WebGPURenderStateSet implements RenderStateSet {
   copyFrom(stateSet: RenderStateSet) {
     this.colorState = stateSet.colorState as WebGPUColorState;
     this.blendingState = stateSet.blendingState as WebGPUBlendingState;
+    if (stateSet instanceof WebGPURenderStateSet) {
+      this._targetColorStates = [...stateSet._targetColorStates];
+      this._targetBlendingStates = [...stateSet._targetBlendingStates];
+    } else {
+      this._targetColorStates = [];
+      this._targetBlendingStates = [];
+    }
     this.rasterizerState = stateSet.rasterizerState as WebGPURasterizerState;
     this.depthState = stateSet.depthState as WebGPUDepthState;
     this.stencilState = stateSet.stencilState as WebGPUStencilState;
   }
   get hash() {
-    return `${this.colorState?.hash || ''}:${this.blendingState?.hash || ''}:${
+    return `${this.colorState?.hash || ''}:${this.blendingState?.hash || ''}:${this.targetStateHash(
+      this._targetColorStates
+    )}:${this.targetStateHash(this._targetBlendingStates)}:${
       this.rasterizerState?.hash || ''
     }:${this.depthState?.hash || ''}:${this.stencilState?.hash || ''}`;
   }
@@ -638,12 +770,58 @@ export class WebGPURenderStateSet implements RenderStateSet {
   defaultColorState() {
     this.colorState = null;
   }
+  getTargetColorState(index: number) {
+    this.checkTargetIndex(index);
+    return this._targetColorStates[index] ?? null;
+  }
+  useTargetColorState(index: number, state?: ColorState) {
+    this.checkTargetIndex(index);
+    return (this._targetColorStates[index] =
+      (state as WebGPUColorState) ?? this._targetColorStates[index] ?? new WebGPUColorState());
+  }
+  defaultTargetColorState(index: number) {
+    this.checkTargetIndex(index);
+    this._targetColorStates[index] = null;
+    this.trimTargetStates(this._targetColorStates);
+  }
   useBlendingState(state?: BlendingState) {
     return (this.blendingState =
       (state as WebGPUBlendingState) ?? this.blendingState ?? new WebGPUBlendingState());
   }
   defaultBlendingState() {
     this.blendingState = null;
+  }
+  getTargetBlendingState(index: number) {
+    this.checkTargetIndex(index);
+    return this._targetBlendingStates[index] ?? null;
+  }
+  useTargetBlendingState(index: number, state?: BlendingState) {
+    this.checkTargetIndex(index);
+    return (this._targetBlendingStates[index] =
+      (state as WebGPUBlendingState) ?? this._targetBlendingStates[index] ?? new WebGPUBlendingState());
+  }
+  defaultTargetBlendingState(index: number) {
+    this.checkTargetIndex(index);
+    this._targetBlendingStates[index] = null;
+    this.trimTargetStates(this._targetBlendingStates);
+  }
+  getColorStateForTarget(index: number) {
+    return (
+      this._targetColorStates[index] ?? this.colorState ?? (WebGPUColorState.defaultState as WebGPUColorState)
+    );
+  }
+  getBlendingStateForTarget(index: number) {
+    return (
+      this._targetBlendingStates[index] ??
+      this.blendingState ??
+      (WebGPUBlendingState.defaultState as WebGPUBlendingState)
+    );
+  }
+  get alphaToCoverageEnabled() {
+    return (
+      !!this.blendingState?.alphaToCoverageEnabled ||
+      this._targetBlendingStates.some((state) => !!state?.alphaToCoverageEnabled)
+    );
   }
   useRasterizerState(state?: RasterizerState) {
     return (this.rasterizerState =
@@ -667,5 +845,21 @@ export class WebGPURenderStateSet implements RenderStateSet {
   }
   apply(_force?: boolean) {
     this._device.setRenderStates(this);
+  }
+  private targetStateHash(states: Nullable<{ hash: string }>[]) {
+    return states
+      .map((state, index) => (state ? `${index}:${state.hash}` : ''))
+      .filter((value) => !!value)
+      .join(',');
+  }
+  private trimTargetStates(states: Nullable<unknown>[]) {
+    while (states.length > 0 && !states[states.length - 1]) {
+      states.length--;
+    }
+  }
+  private checkTargetIndex(index: number) {
+    if (!Number.isInteger(index) || index < 0) {
+      throw new Error(`RenderStateSet target index must be a non-negative integer, got ${index}`);
+    }
   }
 }

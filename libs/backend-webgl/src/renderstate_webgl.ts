@@ -27,6 +27,14 @@ import {
 import { WebGLEnum } from './webgl_enum';
 import type { Nullable } from '@zephyr3d/base';
 
+export interface DrawBuffersIndexedEXT {
+  enablei(target: number, index: number): void;
+  disablei(target: number, index: number): void;
+  blendEquationSeparatei(index: number, modeRGB: number, modeAlpha: number): void;
+  blendFuncSeparatei(index: number, srcRGB: number, dstRGB: number, srcAlpha: number, dstAlpha: number): void;
+  colorMaski(index: number, r: boolean, g: boolean, b: boolean, a: boolean): void;
+}
+
 export abstract class WebGLRenderState {
   protected static _defaultState: WebGLRenderState;
   protected static _currentState: Nullable<WebGLRenderState>;
@@ -38,12 +46,15 @@ export abstract class WebGLRenderState {
     c._currentState = this;
   }
   static get defaultState() {
-    return WebGLRenderState._defaultState;
+    return this._defaultState;
   }
   static applyDefaults(gl: WebGLContext, force?: boolean) {
     if (force || this._currentState !== this._defaultState) {
       this._defaultState.apply(gl, force);
     }
+  }
+  static invalidateCurrentState() {
+    this._currentState = null;
   }
   protected abstract _apply(gl: WebGLContext): void;
 }
@@ -71,6 +82,9 @@ export class WebGLColorState extends WebGLRenderState implements ColorState {
   }
   protected _apply(gl: WebGLContext) {
     gl.colorMask(this.redMask, this.greenMask, this.blueMask, this.alphaMask);
+  }
+  applyTarget(ext: DrawBuffersIndexedEXT, targetIndex: number) {
+    ext.colorMaski(targetIndex, this.redMask, this.greenMask, this.blueMask, this.alphaMask);
   }
 }
 
@@ -184,6 +198,28 @@ export class WebGLBlendingState extends WebGLRenderState implements BlendingStat
       gl.disable(WebGLEnum.BLEND);
     }
     if (this.alphaToCoverageEnabled) {
+      gl.enable(WebGLEnum.SAMPLE_ALPHA_TO_COVERAGE);
+    } else {
+      gl.disable(WebGLEnum.SAMPLE_ALPHA_TO_COVERAGE);
+    }
+  }
+  applyTarget(ext: DrawBuffersIndexedEXT, targetIndex: number) {
+    if (this.enabled) {
+      ext.enablei(WebGLEnum.BLEND, targetIndex);
+      ext.blendEquationSeparatei(targetIndex, this._rgbEquation, this._alphaEquation);
+      ext.blendFuncSeparatei(
+        targetIndex,
+        this._srcBlendRGB,
+        this._dstBlendRGB,
+        this._srcBlendAlpha,
+        this._dstBlendAlpha
+      );
+    } else {
+      ext.disablei(WebGLEnum.BLEND, targetIndex);
+    }
+  }
+  static applyAlphaToCoverage(gl: WebGLContext, enabled: boolean) {
+    if (enabled) {
       gl.enable(WebGLEnum.SAMPLE_ALPHA_TO_COVERAGE);
     } else {
       gl.disable(WebGLEnum.SAMPLE_ALPHA_TO_COVERAGE);
@@ -441,6 +477,8 @@ export class WebGLStencilState extends WebGLRenderState implements StencilState 
 
 export class WebGLRenderStateSet implements RenderStateSet {
   private readonly _gl: WebGLContext;
+  private _targetColorStates: Nullable<WebGLColorState>[];
+  private _targetBlendingStates: Nullable<WebGLBlendingState>[];
   colorState: Nullable<WebGLColorState>;
   blendingState: Nullable<WebGLBlendingState>;
   rasterizerState: Nullable<WebGLRasterizerState>;
@@ -448,6 +486,8 @@ export class WebGLRenderStateSet implements RenderStateSet {
   stencilState: Nullable<WebGLStencilState>;
   constructor(gl: WebGLContext) {
     this._gl = gl;
+    this._targetColorStates = [];
+    this._targetBlendingStates = [];
     this.colorState = null;
     this.blendingState = null;
     this.rasterizerState = null;
@@ -458,6 +498,12 @@ export class WebGLRenderStateSet implements RenderStateSet {
     const newStateSet = new WebGLRenderStateSet(this._gl);
     newStateSet.colorState = (this.colorState?.clone() as WebGLColorState) ?? null;
     newStateSet.blendingState = (this.blendingState?.clone() as WebGLBlendingState) ?? null;
+    newStateSet._targetColorStates = this._targetColorStates.map(
+      (state) => (state?.clone() as WebGLColorState) ?? null
+    );
+    newStateSet._targetBlendingStates = this._targetBlendingStates.map(
+      (state) => (state?.clone() as WebGLBlendingState) ?? null
+    );
     newStateSet.rasterizerState = (this.rasterizerState?.clone() as WebGLRasterizerState) ?? null;
     newStateSet.depthState = (this.depthState?.clone() as WebGLDepthState) ?? null;
     newStateSet.stencilState = (this.stencilState?.clone() as WebGLStencilState) ?? null;
@@ -466,22 +512,21 @@ export class WebGLRenderStateSet implements RenderStateSet {
   copyFrom(stateSet: RenderStateSet) {
     this.colorState = stateSet.colorState as WebGLColorState;
     this.blendingState = stateSet.blendingState as WebGLBlendingState;
+    if (stateSet instanceof WebGLRenderStateSet) {
+      this._targetColorStates = [...stateSet._targetColorStates];
+      this._targetBlendingStates = [...stateSet._targetBlendingStates];
+    } else {
+      this._targetColorStates = [];
+      this._targetBlendingStates = [];
+    }
     this.rasterizerState = stateSet.rasterizerState as WebGLRasterizerState;
     this.depthState = stateSet.depthState as WebGLDepthState;
     this.stencilState = stateSet.stencilState as WebGLStencilState;
   }
   apply(force?: boolean) {
     const gl = this._gl;
-    if (this.colorState) {
-      this.colorState.apply(gl, force);
-    } else {
-      WebGLColorState.applyDefaults(gl, force);
-    }
-    if (this.blendingState) {
-      this.blendingState.apply(gl, force);
-    } else {
-      WebGLBlendingState.applyDefaults(gl, force);
-    }
+    this.applyColorStates(gl, force);
+    this.applyBlendingStates(gl, force);
     if (this.rasterizerState) {
       this.rasterizerState.apply(gl, force);
     } else {
@@ -504,12 +549,40 @@ export class WebGLRenderStateSet implements RenderStateSet {
   defaultColorState() {
     this.colorState = null;
   }
+  getTargetColorState(index: number) {
+    this.checkTargetIndex(index);
+    return this._targetColorStates[index] ?? null;
+  }
+  useTargetColorState(index: number, state?: ColorState) {
+    this.checkTargetIndex(index);
+    return (this._targetColorStates[index] =
+      (state as WebGLColorState) ?? this._targetColorStates[index] ?? new WebGLColorState());
+  }
+  defaultTargetColorState(index: number) {
+    this.checkTargetIndex(index);
+    this._targetColorStates[index] = null;
+    this.trimTargetStates(this._targetColorStates);
+  }
   useBlendingState(state?: BlendingState) {
     return (this.blendingState =
       (state as WebGLBlendingState) ?? this.blendingState ?? new WebGLBlendingState());
   }
   defaultBlendingState() {
     this.blendingState = null;
+  }
+  getTargetBlendingState(index: number) {
+    this.checkTargetIndex(index);
+    return this._targetBlendingStates[index] ?? null;
+  }
+  useTargetBlendingState(index: number, state?: BlendingState) {
+    this.checkTargetIndex(index);
+    return (this._targetBlendingStates[index] =
+      (state as WebGLBlendingState) ?? this._targetBlendingStates[index] ?? new WebGLBlendingState());
+  }
+  defaultTargetBlendingState(index: number) {
+    this.checkTargetIndex(index);
+    this._targetBlendingStates[index] = null;
+    this.trimTargetStates(this._targetBlendingStates);
   }
   useRasterizerState(state?: RasterizerState) {
     return (this.rasterizerState =
@@ -531,10 +604,150 @@ export class WebGLRenderStateSet implements RenderStateSet {
     this.stencilState = null;
   }
   static applyDefaults(gl: WebGLContext, force?: boolean) {
-    WebGLColorState.applyDefaults(gl, force);
-    WebGLBlendingState.applyDefaults(gl, force);
+    const targetCount = gl._currentFramebuffer?.getColorAttachments().length || 1;
+    const ext = (gl as WebGLContext & { _drawBuffersIndexedExt?: Nullable<DrawBuffersIndexedEXT> })
+      ._drawBuffersIndexedExt;
+    if (ext && targetCount > 1) {
+      const colorState = WebGLColorState.defaultState as WebGLColorState;
+      const blendingState = WebGLBlendingState.defaultState as WebGLBlendingState;
+      for (let i = 0; i < targetCount; i++) {
+        colorState.applyTarget(ext, i);
+        blendingState.applyTarget(ext, i);
+      }
+      WebGLColorState.invalidateCurrentState();
+      WebGLBlendingState.invalidateCurrentState();
+      WebGLBlendingState.applyAlphaToCoverage(gl, false);
+    } else {
+      WebGLColorState.applyDefaults(gl, force);
+      WebGLBlendingState.applyDefaults(gl, force);
+    }
     WebGLRasterizerState.applyDefaults(gl, force);
     WebGLDepthState.applyDefaults(gl, force);
     WebGLStencilState.applyDefaults(gl, force);
+  }
+  private applyColorStates(gl: WebGLContext, force?: boolean) {
+    const targetCount = this.getColorTargetCount(gl);
+    const ext = (gl as WebGLContext & { _drawBuffersIndexedExt?: Nullable<DrawBuffersIndexedEXT> })
+      ._drawBuffersIndexedExt;
+    const hasTargetStates = this.hasTargetStates(this._targetColorStates);
+    if (!hasTargetStates && targetCount === 1) {
+      if (this.colorState) {
+        this.colorState.apply(gl, force);
+      } else {
+        WebGLColorState.applyDefaults(gl, force);
+      }
+      return;
+    }
+    const firstState = this.getColorStateForTarget(0);
+    if (!ext) {
+      if (!this.canUseSingleColorState(firstState, targetCount)) {
+        this.reportMissingPerTargetBlending('color mask');
+      }
+      firstState.apply(gl, force);
+      return;
+    }
+    for (let i = 0; i < targetCount; i++) {
+      this.getColorStateForTarget(i).applyTarget(ext, i);
+    }
+    WebGLColorState.invalidateCurrentState();
+  }
+  private applyBlendingStates(gl: WebGLContext, force?: boolean) {
+    const targetCount = this.getColorTargetCount(gl);
+    const ext = (gl as WebGLContext & { _drawBuffersIndexedExt?: Nullable<DrawBuffersIndexedEXT> })
+      ._drawBuffersIndexedExt;
+    const hasTargetStates = this.hasTargetStates(this._targetBlendingStates);
+    if (!hasTargetStates && targetCount === 1) {
+      if (this.blendingState) {
+        this.blendingState.apply(gl, force);
+      } else {
+        WebGLBlendingState.applyDefaults(gl, force);
+      }
+      return;
+    }
+    const firstState = this.getBlendingStateForTarget(0);
+    if (!ext) {
+      if (!this.canUseSingleBlendingState(firstState, targetCount)) {
+        this.reportMissingPerTargetBlending('blending');
+      }
+      firstState.apply(gl, force);
+      return;
+    }
+    for (let i = 0; i < targetCount; i++) {
+      this.getBlendingStateForTarget(i).applyTarget(ext, i);
+    }
+    WebGLBlendingState.invalidateCurrentState();
+    WebGLBlendingState.applyAlphaToCoverage(gl, this.alphaToCoverageEnabled);
+  }
+  private getColorStateForTarget(index: number) {
+    return (
+      this._targetColorStates[index] ?? this.colorState ?? (WebGLColorState.defaultState as WebGLColorState)
+    );
+  }
+  private getBlendingStateForTarget(index: number) {
+    return (
+      this._targetBlendingStates[index] ??
+      this.blendingState ??
+      (WebGLBlendingState.defaultState as WebGLBlendingState)
+    );
+  }
+  private get alphaToCoverageEnabled() {
+    return (
+      !!this.blendingState?.alphaToCoverageEnabled ||
+      this._targetBlendingStates.some((state) => !!state?.alphaToCoverageEnabled)
+    );
+  }
+  private getColorTargetCount(gl: WebGLContext) {
+    return gl._currentFramebuffer?.getColorAttachments().length || 1;
+  }
+  private hasTargetStates<T>(states: Nullable<T>[]) {
+    return states.some((state) => !!state);
+  }
+  private canUseSingleColorState(firstState: WebGLColorState, targetCount: number) {
+    for (let i = 1; i < targetCount; i++) {
+      if (!this.sameColorState(firstState, this.getColorStateForTarget(i))) {
+        return false;
+      }
+    }
+    return true;
+  }
+  private canUseSingleBlendingState(firstState: WebGLBlendingState, targetCount: number) {
+    for (let i = 1; i < targetCount; i++) {
+      if (!this.sameBlendingState(firstState, this.getBlendingStateForTarget(i))) {
+        return false;
+      }
+    }
+    return true;
+  }
+  private sameColorState(a: WebGLColorState, b: WebGLColorState) {
+    return (
+      a.redMask === b.redMask &&
+      a.greenMask === b.greenMask &&
+      a.blueMask === b.blueMask &&
+      a.alphaMask === b.alphaMask
+    );
+  }
+  private sameBlendingState(a: WebGLBlendingState, b: WebGLBlendingState) {
+    return (
+      a.enabled === b.enabled &&
+      a.srcBlendRGB === b.srcBlendRGB &&
+      a.dstBlendRGB === b.dstBlendRGB &&
+      a.srcBlendAlpha === b.srcBlendAlpha &&
+      a.dstBlendAlpha === b.dstBlendAlpha &&
+      a.rgbEquation === b.rgbEquation &&
+      a.alphaEquation === b.alphaEquation
+    );
+  }
+  private reportMissingPerTargetBlending(stateName: string) {
+    console.error(`RenderStateSet.apply() failed: per-target ${stateName} requires OES_draw_buffers_indexed`);
+  }
+  private trimTargetStates(states: Nullable<unknown>[]) {
+    while (states.length > 0 && !states[states.length - 1]) {
+      states.length--;
+    }
+  }
+  private checkTargetIndex(index: number) {
+    if (!Number.isInteger(index) || index < 0) {
+      throw new Error(`RenderStateSet target index must be a non-negative integer, got ${index}`);
+    }
   }
 }

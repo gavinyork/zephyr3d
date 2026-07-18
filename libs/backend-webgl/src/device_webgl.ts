@@ -66,6 +66,7 @@ import {
   WebGLRenderStateSet,
   WebGLStencilState
 } from './renderstate_webgl';
+import type { DrawBuffersIndexedEXT } from './renderstate_webgl';
 import { GPUTimer } from './gpu_timer';
 import { WebGLTextureCaps, WebGLFramebufferCaps, WebGLMiscCaps, WebGLShaderCaps } from './capabilities_webgl';
 import { WebGLBindGroup } from './bindgroup_webgl';
@@ -86,10 +87,12 @@ declare global {
   interface WebGLRenderingContext {
     _currentFramebuffer?: Nullable<WebGLFrameBuffer>;
     _currentProgram?: Nullable<WebGLGPUProgram>;
+    _drawBuffersIndexedExt?: Nullable<DrawBuffersIndexedEXT>;
   }
   interface WebGL2RenderingContext {
     _currentFramebuffer?: Nullable<WebGLFrameBuffer>;
     _currentProgram?: Nullable<WebGLGPUProgram>;
+    _drawBuffersIndexedExt?: Nullable<DrawBuffersIndexedEXT>;
   }
 }
 
@@ -130,6 +133,20 @@ export interface DrawBuffersEXT {
   drawBuffers(buffers: number[]): void;
 }
 
+interface OESDrawBuffersIndexed {
+  enableiOES(target: number, index: number): void;
+  disableiOES(target: number, index: number): void;
+  blendEquationSeparateiOES(index: number, modeRGB: number, modeAlpha: number): void;
+  blendFuncSeparateiOES(
+    index: number,
+    srcRGB: number,
+    dstRGB: number,
+    srcAlpha: number,
+    dstAlpha: number
+  ): void;
+  colorMaskiOES(index: number, r: boolean, g: boolean, b: boolean, a: boolean): void;
+}
+
 const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);
 const tempInt32Array = new Int32Array(4);
 const tempUint32Array = new Uint32Array(4);
@@ -146,6 +163,7 @@ export class WebGLDevice extends BaseDevice {
   private _vaoExt: Nullable<VertexArrayObjectEXT>;
   private _instancedArraysExt: Nullable<InstancedArraysEXT>;
   private _drawBuffersExt: Nullable<DrawBuffersEXT>;
+  private _drawBuffersIndexedExt: Nullable<DrawBuffersIndexedEXT>;
   private _currentProgram: Nullable<WebGLGPUProgram>;
   private _currentVertexData: Nullable<WebGLVertexLayout>;
   private _currentStateSet: Nullable<WebGLRenderStateSet>;
@@ -192,6 +210,7 @@ export class WebGLDevice extends BaseDevice {
     this._vaoExt = null;
     this._instancedArraysExt = null;
     this._drawBuffersExt = null;
+    this._drawBuffersIndexedExt = null;
     this._reverseWindingOrder = false;
     this._context = context;
     this._currentProgram = null;
@@ -282,6 +301,9 @@ export class WebGLDevice extends BaseDevice {
   }
   get drawBuffersExt() {
     return this._drawBuffersExt;
+  }
+  get drawBuffersIndexedExt() {
+    return this._drawBuffersIndexedExt;
   }
   getDrawingBufferWidth() {
     return this._context._currentFramebuffer?.getWidth() || this._context.drawingBufferWidth;
@@ -1186,6 +1208,19 @@ export class WebGLDevice extends BaseDevice {
     }
   }
   /** @internal */
+  private createDrawBuffersIndexedEXT() {
+    const ext = this._context.getExtension('OES_draw_buffers_indexed') as Nullable<OESDrawBuffersIndexed>;
+    return ext
+      ? {
+          enablei: ext.enableiOES.bind(ext),
+          disablei: ext.disableiOES.bind(ext),
+          blendEquationSeparatei: ext.blendEquationSeparateiOES.bind(ext),
+          blendFuncSeparatei: ext.blendFuncSeparateiOES.bind(ext),
+          colorMaski: ext.colorMaskiOES.bind(ext)
+        }
+      : null;
+  }
+  /** @internal */
   private createVertexArrayObjectEXT() {
     const gl = this._context;
     if (isWebGL2(gl)) {
@@ -1256,6 +1291,8 @@ export class WebGLDevice extends BaseDevice {
     this._vaoExt = this.createVertexArrayObjectEXT();
     this._instancedArraysExt = this.createInstancedArraysEXT();
     this._drawBuffersExt = this.createDrawBuffersEXT();
+    this._drawBuffersIndexedExt = this.createDrawBuffersIndexedEXT();
+    this._context._drawBuffersIndexedExt = this._drawBuffersIndexedExt;
     this._context.pixelStorei(WebGLEnum.UNPACK_COLORSPACE_CONVERSION_WEBGL, WebGLEnum.NONE);
     this._context.pixelStorei(WebGLEnum.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     this.setViewport(null);

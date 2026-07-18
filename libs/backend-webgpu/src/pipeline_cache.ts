@@ -1,12 +1,5 @@
-import {
-  compareFuncMap,
-  stencilOpMap,
-  primitiveTypeMap,
-  faceModeMap,
-  blendEquationMap,
-  blendFuncMap
-} from './constants_webgpu';
-import type { StencilOp, PrimitiveType, CompareFunc, BlendEquation, BlendFunc } from '@zephyr3d/device';
+import { primitiveTypeMap } from './constants_webgpu';
+import type { PrimitiveType } from '@zephyr3d/device';
 import { PBPrimitiveTypeInfo, PBPrimitiveType } from '@zephyr3d/device';
 import * as rs from './renderstates_webgpu';
 import type { WebGPUVertexLayout } from './vertexlayout_webgpu';
@@ -98,8 +91,8 @@ export class PipelineCache {
       }
       const primitiveState = this.createPrimitiveState(vertexLayout, stateSet, primitiveType);
       const depthStencilState = this.createDepthStencilState(frameBufferInfo.depthFormat, stateSet);
-      const colorTargetStates = frameBufferInfo.colorFormats.map((val) =>
-        this.createColorTargetState(stateSet, val)
+      const colorTargetStates = frameBufferInfo.colorFormats.map((val, index) =>
+        this.createColorTargetState(stateSet, val, index)
       );
       const desc: GPURenderPipelineDescriptor = {
         label: hash,
@@ -128,20 +121,17 @@ export class PipelineCache {
     if (!topology) {
       throw new Error(`createPrimitiveState() failed: invalid primitive type: ${primitiveType}`);
     }
-    const rasterizerState =
-      stateSet?.rasterizerState || (rs.WebGPURasterizerState.defaultState as rs.WebGPURasterizerState);
-    const cullMode = faceModeMap[rasterizerState.cullMode];
-    if (!cullMode) {
-      throw new Error(`createPrimitiveState() failed: invalid cull mode: ${rasterizerState.cullMode}`);
-    }
+    const rasterizerState = (
+      stateSet?.rasterizerState || (rs.WebGPURasterizerState.defaultState as rs.WebGPURasterizerState)
+    ).internalState.internal;
     const frontFace = this._device.isWindingOrderReversed() ? 'cw' : 'ccw';
     const state: GPUPrimitiveState = {
       topology,
       frontFace,
-      cullMode
+      cullMode: rasterizerState.cullMode
     };
     if (this._device.device.features.has('depth-clip-control')) {
-      state.unclippedDepth = rasterizerState.depthClampEnabled;
+      state.unclippedDepth = rasterizerState.unclippedDepth;
     }
     if (topology === 'triangle-strip' || topology === 'line-strip') {
       state.stripIndexFormat = vertexData?.getIndexBuffer()?.indexType === typeU16 ? 'uint16' : 'uint32';
@@ -151,121 +141,56 @@ export class PipelineCache {
   private createMultisampleState(sampleCount: number, stateSet: WebGPURenderStateSet) {
     return {
       count: sampleCount,
-      alphaToCoverageEnabled:
-        sampleCount > 1 &&
-        (stateSet?.blendingState ?? (rs.WebGPUBlendingState.defaultState as rs.WebGPUBlendingState))
-          .alphaToCoverageEnabled
+      alphaToCoverageEnabled: sampleCount > 1 && !!stateSet?.alphaToCoverageEnabled
     };
   }
   private createDepthStencilState(depthFormat: GPUTextureFormat | undefined, stateSet: WebGPURenderStateSet) {
     if (!depthFormat) {
       return undefined;
     }
-    const depthState = stateSet?.depthState || (rs.WebGPUDepthState.defaultState as rs.WebGPUDepthState);
-    const stencilState =
-      stateSet?.stencilState || (rs.WebGPUStencilState.defaultState as rs.WebGPUStencilState);
+    const depthState = (stateSet?.depthState ?? (rs.WebGPUDepthState.defaultState as rs.WebGPUDepthState))
+      .internalState.internal;
+    const stencilState = (
+      stateSet?.stencilState ?? (rs.WebGPUStencilState.defaultState as rs.WebGPUStencilState)
+    ).internalState.internal;
     const hasStencil = stencilFormats.indexOf(depthFormat) >= 0;
     const hasDepth = depthFormats.indexOf(depthFormat) >= 0;
-    const depthWriteEnabled = hasDepth ? depthState.writeEnabled : false;
-    const depthCompare: GPUCompareFunction =
-      hasDepth && depthState.testEnabled ? compareFuncMap[depthState.compareFunc] : 'always';
+    const depthWriteEnabled = hasDepth ? depthState.depthWriteEnabled : false;
+    const depthCompare: GPUCompareFunction = hasDepth ? depthState.depthCompare! : 'always';
     const state: GPUDepthStencilState = {
       format: depthFormat,
       depthWriteEnabled,
-      depthCompare
+      depthCompare,
+      depthBias: depthState.depthBias,
+      depthBiasSlopeScale: depthState.depthBiasSlopeScale
     };
-    if (depthState.depthBias !== 0 || depthState.depthBiasSlopeScale !== 0) {
-      state.depthBias = depthState.depthBias;
-      state.depthBiasSlopeScale = depthState.depthBiasSlopeScale;
-    }
     if (hasStencil) {
-      const stencilFront = stencilState.enabled
-        ? this.createStencilFaceState(
-            stencilState.func,
-            stencilState.failOp,
-            stencilState.zFailOp,
-            stencilState.passOp
-          )
-        : undefined;
-      const stencilBack = stencilState.enabled
-        ? this.createStencilFaceState(
-            stencilState.funcBack,
-            stencilState.failOpBack,
-            stencilState.zFailOpBack,
-            stencilState.passOpBack
-          )
-        : undefined;
-      const stencilReadMask = stencilState.enabled ? stencilState.readMask : undefined;
-      const stencilWriteMask = stencilState.enabled ? stencilState.writeMask : undefined;
-      state.stencilFront = stencilFront;
-      state.stencilBack = stencilBack;
-      state.stencilReadMask = stencilReadMask;
-      state.stencilWriteMask = stencilWriteMask;
+      state.stencilFront = stencilState.stencilFront;
+      state.stencilBack = stencilState.stencilBack;
+      state.stencilReadMask = stencilState.stencilReadMask;
+      state.stencilWriteMask = stencilState.stencilWriteMask;
     }
     return state;
   }
-  private createStencilFaceState(
-    func: CompareFunc,
-    failOp: StencilOp,
-    zFailOp: StencilOp,
-    passOp: StencilOp
+  private createColorTargetState(
+    stateSet: WebGPURenderStateSet,
+    format: GPUTextureFormat,
+    targetIndex: number
   ) {
-    return {
-      compare: compareFuncMap[func],
-      failOp: stencilOpMap[failOp],
-      depthFailOp: stencilOpMap[zFailOp],
-      passOp: stencilOpMap[passOp]
-    };
-  }
-  private createColorTargetState(stateSet: WebGPURenderStateSet, format: GPUTextureFormat) {
-    const blendingState =
-      stateSet?.blendingState || (rs.WebGPUBlendingState.defaultState as rs.WebGPUBlendingState);
-    const colorState = stateSet?.colorState || (rs.WebGPUColorState.defaultState as rs.WebGPUColorState);
-    const r = colorState.redMask ? GPUColorWrite.RED : 0;
-    const g = colorState.greenMask ? GPUColorWrite.GREEN : 0;
-    const b = colorState.blueMask ? GPUColorWrite.BLUE : 0;
-    const a = colorState.alphaMask ? GPUColorWrite.ALPHA : 0;
+    const blendingState = (
+      stateSet?.getBlendingStateForTarget(targetIndex) ??
+      (rs.WebGPUBlendingState.defaultState as rs.WebGPUBlendingState)
+    ).internalState.internal;
+    const colorState = (
+      stateSet?.getColorStateForTarget(targetIndex) ??
+      (rs.WebGPUColorState.defaultState as rs.WebGPUColorState)
+    ).internalState.internal;
     const state: GPUColorTargetState = {
       format: format,
-      writeMask: r | g | b | a
+      writeMask: colorState,
+      blend: blendingState
     };
-    if (blendingState.enabled) {
-      state.blend = this.createBlendState(blendingState as rs.WebGPUBlendingState);
-    }
     return state;
-  }
-  private createBlendState(blendingState: rs.WebGPUBlendingState) {
-    return {
-      color: this.createBlendComponent(
-        blendingState.rgbEquation,
-        blendingState.srcBlendRGB,
-        blendingState.dstBlendRGB
-      ),
-      alpha: this.createBlendComponent(
-        blendingState.alphaEquation,
-        blendingState.srcBlendAlpha,
-        blendingState.dstBlendAlpha
-      )
-    };
-  }
-  private createBlendComponent(op: BlendEquation, srcFunc: BlendFunc, dstFunc: BlendFunc) {
-    const operation = blendEquationMap[op];
-    if (!operation) {
-      throw new Error(`createBlendComponent() failed: invalid blend op: ${op}`);
-    }
-    const srcFactor = blendFuncMap[srcFunc];
-    if (!srcFactor) {
-      throw new Error(`createBlendComponent() failed: invalid source blend func ${srcFunc}`);
-    }
-    const dstFactor = blendFuncMap[dstFunc];
-    if (!dstFactor) {
-      throw new Error(`createBlendComponent() failed: invalid dest blend func ${dstFunc}`);
-    }
-    return {
-      operation,
-      srcFactor,
-      dstFactor
-    };
   }
   private getRenderPipelineHash(
     fbHash: string,

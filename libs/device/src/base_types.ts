@@ -2232,6 +2232,8 @@ export interface DeviceCaps {
 export interface FramebufferCaps {
   /** The maximum number of framebuffer color attachment points */
   maxDrawBuffers: number;
+  /** True if device supports independent blending and color write masks for framebuffer color attachments */
+  supportPerTargetBlending: boolean;
   /** True if device supports rendering to mipmap */
   supportRenderMipmap: boolean;
   /** True if device supports multisampled frame buffer */
