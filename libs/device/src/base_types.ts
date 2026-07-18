@@ -47,6 +47,19 @@ import type { ITimer } from './timer';
 export type WebGLContext = WebGLRenderingContext | WebGL2RenderingContext;
 
 /**
+ * Color clear value or per-target color clear values for a frame buffer.
+ *
+ * A single Vector4 is a broadcast clear value: every current color target is
+ * cleared to that value. An array is a per-target clear list: element i applies
+ * only to color target i. A null or undefined array entry skips that target.
+ * Missing array entries also skip the corresponding targets, while entries past
+ * the current color target count are ignored after reporting an error.
+ *
+ * @public
+ */
+export type FrameBufferClearColors = Nullable<Vector4 | readonly Nullable<Vector4>[]>;
+
+/**
  * The texture type
  * @public
  */
@@ -2536,13 +2549,26 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     options?: DrawTextLayoutOptions
   ): void;
   /**
-   * Clears the current frame buffer
-   * @param clearColor - If not null, the color buffer will be cleared to this value.
+   * Clears the current frame buffer.
+   *
+   * @remarks
+   * Color, depth and stencil clears are independent. Passing null or undefined
+   * for one component leaves that component unchanged.
+   *
+   * For color clears, a single Vector4 clears every current color target to the
+   * same value. Passing an array switches to per-target behavior: array element
+   * i clears color target i, and a null, undefined or missing element skips that
+   * target. Therefore [color] is equivalent to color only when the current frame
+   * buffer has exactly one color target. If the array contains more entries than
+   * the current color target count, the extra entries are ignored after reporting
+   * an error.
+   *
+   * @param clearColor - Color clear value, per-target color clear values, or null to skip color clears.
    * @param clearDepth - If not null, the depth buffer will be cleared to this value.
    * @param clearStencil - If not null, the stencil buffer will be cleared to this value.
    */
   clearFrameBuffer(
-    clearColor: Nullable<Vector4>,
+    clearColor: FrameBufferClearColors,
     clearDepth: Nullable<number>,
     clearStencil: Nullable<number>
   ): void;

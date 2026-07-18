@@ -7,7 +7,7 @@ import type { Camera } from '../camera/camera';
 import type { DrawContext } from './drawable';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
 import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
-import type { BindGroup } from '@zephyr3d/device';
+import type { BindGroup, FrameBufferClearColors } from '@zephyr3d/device';
 import { getDevice } from '../app/api';
 
 /**
@@ -22,6 +22,8 @@ export abstract class RenderPass extends Disposable {
   /** @internal */
   protected _clearColor: Nullable<Vector4>;
   /** @internal */
+  protected _clearColors: Nullable<readonly Nullable<Vector4>[]>;
+  /** @internal */
   protected _clearDepth: Nullable<number>;
   /** @internal */
   protected _clearStencil: Nullable<number>;
@@ -33,6 +35,7 @@ export abstract class RenderPass extends Disposable {
     super();
     this._type = type;
     this._clearColor = new Vector4(0, 0, 0, 1);
+    this._clearColors = null;
     this._clearDepth = 1;
     this._clearStencil = 0;
     this._globalBindGroups = {};
@@ -43,6 +46,14 @@ export abstract class RenderPass extends Disposable {
   }
   set clearColor(color: Nullable<Immutable<Vector4>>) {
     this._clearColor = color;
+    this._clearColors = null;
+  }
+  /** Per-target color values that are used to clear the frame buffer */
+  get clearColors(): Nullable<readonly Nullable<Immutable<Vector4>>[]> {
+    return this._clearColors;
+  }
+  set clearColors(colors: Nullable<readonly Nullable<Immutable<Vector4>>[]>) {
+    this._clearColors = colors as Nullable<readonly Nullable<Vector4>[]>;
   }
   /** Depth value that is used to clear the frame buffer */
   get clearDepth() {
@@ -263,8 +274,9 @@ export abstract class RenderPass extends Disposable {
   }
   /** @internal */
   private clearFramebuffer() {
-    if (this._clearColor || this._clearDepth || this._clearStencil) {
-      getDevice().clearFrameBuffer(this._clearColor, this._clearDepth, this._clearStencil);
+    const clearColor = (this._clearColors ?? this._clearColor) as FrameBufferClearColors;
+    if (clearColor || this._clearDepth || this._clearStencil) {
+      getDevice().clearFrameBuffer(clearColor, this._clearDepth, this._clearStencil);
     }
   }
 }

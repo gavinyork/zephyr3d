@@ -1,7 +1,7 @@
-import type { Immutable, Nullable, Vector4 } from '@zephyr3d/base';
+import type { Immutable, Nullable } from '@zephyr3d/base';
 import { WebGPURenderPass } from './renderpass_webgpu';
 import { WebGPUComputePass } from './computepass_webgpu';
-import type { PrimitiveType, DeviceViewport } from '@zephyr3d/device';
+import type { PrimitiveType, DeviceViewport, FrameBufferClearColors } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
 import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPUVertexLayout } from './vertexlayout_webgpu';
@@ -231,7 +231,7 @@ export class CommandQueueImmediate {
   getScissor() {
     return this._renderPass.getScissor();
   }
-  clear(color: Nullable<Vector4>, depth: Nullable<number>, stencil: Nullable<number>) {
+  clear(color: FrameBufferClearColors, depth: Nullable<number>, stencil: Nullable<number>) {
     this.ensureRenderBodyReady();
     this._renderPass.clear(color, depth, stencil);
     const segment = this.getOrCreateCurrentSegment();

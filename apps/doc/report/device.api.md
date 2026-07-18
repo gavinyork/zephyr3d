@@ -25,7 +25,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
     buildRenderProgram(options: PBRenderOptions): Nullable<GPUProgram>;
     cancelNextFrame(handle: number): void;
     canvas: HTMLCanvasElement;
-    clearFrameBuffer(clearColor: Nullable<Vector4>, clearDepth: Nullable<number>, clearStencil: Nullable<number>): void;
+    clearFrameBuffer(clearColor: FrameBufferClearColors, clearDepth: Nullable<number>, clearStencil: Nullable<number>): void;
     compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number): void;
     copyBuffer(sourceBuffer: GPUDataBuffer, destBuffer: GPUDataBuffer, srcOffset: number, dstOffset: number, bytes: number): void;
     copyFramebufferToTexture2D(src: FrameBuffer, index: number, dst: Texture2D, level: number): void;
@@ -188,7 +188,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // (undocumented)
     protected _canvasClientWidth: number;
     // (undocumented)
-    abstract clearFrameBuffer(clearColor: Nullable<Vector4>, clearDepth: Nullable<number>, clearStencil: Nullable<number>): void;
+    abstract clearFrameBuffer(clearColor: FrameBufferClearColors, clearDepth: Nullable<number>, clearStencil: Nullable<number>): void;
     // (undocumented)
     compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number): void;
     // (undocumented)
@@ -747,6 +747,9 @@ export class Font {
     get top(): number;
     get topScaled(): number;
 }
+
+// @public
+export type FrameBufferClearColors = Nullable<Vector4 | readonly Nullable<Vector4>[]>;
 
 // @public
 export interface FrameBuffer<T = unknown> extends GPUObject<T> {

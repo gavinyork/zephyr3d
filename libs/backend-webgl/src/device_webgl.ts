@@ -30,6 +30,7 @@ import type {
   DeviceBackend,
   DeviceEventMap,
   AbstractDevice,
+  FrameBufferClearColors,
   RenderBundle
 } from '@zephyr3d/device';
 import {
@@ -150,6 +151,70 @@ interface OESDrawBuffersIndexed {
 const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);
 const tempInt32Array = new Int32Array(4);
 const tempUint32Array = new Uint32Array(4);
+
+function getFrameBufferClearColor(
+  clearColor: FrameBufferClearColors | undefined,
+  targetIndex: number
+): Nullable<Vector4> {
+  if (!clearColor) {
+    return null;
+  }
+  if (Array.isArray(clearColor)) {
+    return (clearColor as readonly Nullable<Vector4>[])[targetIndex] ?? null;
+  }
+  return clearColor as Vector4;
+}
+
+function hasFrameBufferClearColor(
+  clearColor: FrameBufferClearColors | undefined,
+  targetCount: number
+): boolean {
+  if (!clearColor || targetCount <= 0) {
+    return false;
+  }
+  if (Array.isArray(clearColor)) {
+    for (let i = 0; i < Math.min(clearColor.length, targetCount); i++) {
+      if (clearColor[i]) {
+        return true;
+      }
+    }
+    return false;
+  }
+  return true;
+}
+
+function validateFrameBufferClearColors(clearColor: FrameBufferClearColors | undefined, targetCount: number) {
+  if (Array.isArray(clearColor) && clearColor.length > targetCount) {
+    console.error(
+      `clearFrameBuffer(): clear color count (${clearColor.length}) exceeds framebuffer color attachment count (${targetCount})`
+    );
+  }
+}
+
+function clearWebGL2ColorAttachment(
+  gl: WebGL2RenderingContext,
+  index: number,
+  format: TextureFormat,
+  clearColor: Vector4
+) {
+  if (isIntegerTextureFormat(format)) {
+    if (isSignedTextureFormat(format)) {
+      tempInt32Array[0] = clearColor[0];
+      tempInt32Array[1] = clearColor[1];
+      tempInt32Array[2] = clearColor[2];
+      tempInt32Array[3] = clearColor[3];
+      gl.clearBufferiv(WebGLEnum.COLOR, index, tempInt32Array);
+    } else {
+      tempUint32Array[0] = clearColor[0];
+      tempUint32Array[1] = clearColor[1];
+      tempUint32Array[2] = clearColor[2];
+      tempUint32Array[3] = clearColor[3];
+      gl.clearBufferuiv(WebGLEnum.COLOR, index, tempUint32Array);
+    }
+  } else {
+    gl.clearBufferfv(WebGLEnum.COLOR, index, clearColor);
+  }
+}
 
 export class WebGLDevice extends BaseDevice {
   private readonly _context: WebGLContext;
@@ -420,12 +485,14 @@ export class WebGLDevice extends BaseDevice {
     this.setScissor(this._currentScissorRect);
   }
   clearFrameBuffer(
-    clearColor: Nullable<Vector4>,
+    clearColor: FrameBufferClearColors,
     clearDepth: Nullable<number>,
     clearStencil: Nullable<number>
   ) {
     const gl = this._context;
-    const colorFlag = clearColor ? gl.COLOR_BUFFER_BIT : 0;
+    const targetCount = gl._currentFramebuffer?.getColorAttachments().length ?? 1;
+    validateFrameBufferClearColors(clearColor, targetCount);
+    const colorFlag = hasFrameBufferClearColor(clearColor, targetCount) ? gl.COLOR_BUFFER_BIT : 0;
     const depthFlag = typeof clearDepth === 'number' ? gl.DEPTH_BUFFER_BIT : 0;
     const stencilFlag = typeof clearStencil === 'number' ? gl.STENCIL_BUFFER_BIT : 0;
     if (colorFlag || depthFlag || stencilFlag) {
@@ -437,31 +504,46 @@ export class WebGLDevice extends BaseDevice {
             gl.clearBufferfi(WebGLEnum.DEPTH_STENCIL, 0, clearDepth ?? 1, clearStencil ?? 0);
           }
         }
-        if (clearColor) {
+        if (colorFlag) {
           const attachments = gl._currentFramebuffer.getColorAttachments();
           for (let i = 0; i < attachments.length; i++) {
-            if (isIntegerTextureFormat(attachments[i].format)) {
-              if (isSignedTextureFormat(attachments[i].format)) {
-                tempInt32Array[0] = clearColor[0];
-                tempInt32Array[1] = clearColor[1];
-                tempInt32Array[2] = clearColor[2];
-                tempInt32Array[3] = clearColor[3];
-                gl.clearBufferiv(WebGLEnum.COLOR, i, tempInt32Array);
-              } else {
-                tempUint32Array[0] = clearColor[0];
-                tempUint32Array[1] = clearColor[1];
-                tempUint32Array[2] = clearColor[2];
-                tempUint32Array[3] = clearColor[3];
-                gl.clearBufferuiv(WebGLEnum.COLOR, i, tempUint32Array);
-              }
-            } else {
-              gl.clearBufferfv(WebGLEnum.COLOR, i, clearColor);
+            const color = getFrameBufferClearColor(clearColor, i);
+            if (color) {
+              clearWebGL2ColorAttachment(gl, i, attachments[i].format, color);
             }
           }
         }
       } else {
-        if (clearColor) {
-          gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+        let clearFlag = depthFlag | stencilFlag;
+        const clearPerTarget =
+          colorFlag && Array.isArray(clearColor) && !!gl._currentFramebuffer && targetCount > 1;
+        if (clearPerTarget) {
+          const drawBuffersExt = this.drawBuffersExt;
+          if (drawBuffersExt) {
+            const drawBuffers = new Array<number>(targetCount).fill(WebGLEnum.NONE);
+            for (let i = 0; i < targetCount; i++) {
+              const color = getFrameBufferClearColor(clearColor, i);
+              if (color) {
+                drawBuffers[i] = WebGLEnum.COLOR_ATTACHMENT0 + i;
+                drawBuffersExt.drawBuffers(drawBuffers);
+                gl.clearColor(color[0], color[1], color[2], color[3]);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+                drawBuffers[i] = WebGLEnum.NONE;
+              }
+            }
+            for (let i = 0; i < targetCount; i++) {
+              drawBuffers[i] = WebGLEnum.COLOR_ATTACHMENT0 + i;
+            }
+            drawBuffersExt.drawBuffers(drawBuffers);
+          } else {
+            console.error('clearFrameBuffer(): per-target color clear requires draw buffers support');
+          }
+        } else if (colorFlag) {
+          const color = getFrameBufferClearColor(clearColor, 0);
+          if (color) {
+            gl.clearColor(color[0], color[1], color[2], color[3]);
+            clearFlag |= gl.COLOR_BUFFER_BIT;
+          }
         }
         if (depthFlag) {
           gl.clearDepth(clearDepth as number);
@@ -469,7 +551,9 @@ export class WebGLDevice extends BaseDevice {
         if (stencilFlag) {
           gl.clearStencil(clearStencil as number);
         }
-        gl.clear(colorFlag | depthFlag | stencilFlag);
+        if (clearFlag) {
+          gl.clear(clearFlag);
+        }
       }
       (gl._currentFramebuffer as WebGLFrameBuffer)?.tagDraw();
       (gl._currentFramebuffer as WebGLFrameBuffer)?.invalidateMipmaps();

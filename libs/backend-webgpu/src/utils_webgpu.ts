@@ -1,5 +1,6 @@
 import type { Nullable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
+import type { FrameBufferClearColors } from '@zephyr3d/device';
 import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUBindGroup } from './bindgroup_webgpu';
@@ -7,6 +8,19 @@ import type { WebGPURenderStateSet } from './renderstates_webgpu';
 import type { WebGPUDevice } from './device';
 import type { FrameBufferInfo } from './pipeline_cache';
 import type { WebGPURenderPass } from './renderpass_webgpu';
+
+function getFrameBufferClearColor(
+  clearColor: FrameBufferClearColors | undefined,
+  targetIndex: number
+): Nullable<Vector4> {
+  if (!clearColor) {
+    return null;
+  }
+  if (Array.isArray(clearColor)) {
+    return (clearColor as readonly Nullable<Vector4>[])[targetIndex] ?? null;
+  }
+  return clearColor as Vector4;
+}
 
 export class WebGPUClearQuad {
   private static _clearPrograms: { [hash: string]: { program: WebGPUProgram; bindGroup: WebGPUBindGroup } } =
@@ -16,7 +30,7 @@ export class WebGPUClearQuad {
 
   static drawClearQuad(
     renderPass: WebGPURenderPass,
-    clearColor: Nullable<Float32Array<ArrayBuffer>>,
+    clearColor: FrameBufferClearColors,
     clearDepth: Nullable<number>,
     clearStencil: Nullable<number>
   ) {
@@ -24,14 +38,39 @@ export class WebGPUClearQuad {
       this.initClearQuad(renderPass);
     }
     const hash = renderPass.getFrameBufferInfo().clearHash;
+    const targetCount = renderPass.getFrameBufferInfo().colorFormats.length;
     const program = this.getClearProgram(renderPass.getDevice(), hash);
-    const bClearColor = !!clearColor;
     const bClearDepth = !(clearDepth === null || clearDepth === undefined);
     const bClearStencil = !(clearStencil === null || clearStencil === undefined);
     program.bindGroup.setValue('clearDepth', clearDepth ?? 1);
-    program.bindGroup.setValue('clearColor', clearColor ?? this._defaultClearColor);
+    if (targetCount === 0) {
+      program.bindGroup.setValue('clearColor', this._defaultClearColor);
+    } else {
+      for (let i = 0; i < targetCount; i++) {
+        program.bindGroup.setValue(
+          `clearColor${i}`,
+          getFrameBufferClearColor(clearColor, i) ?? this._defaultClearColor
+        );
+      }
+    }
     this._clearStateSet!.useDepthState().enableWrite(bClearDepth);
-    this._clearStateSet!.useColorState().setColorMask(bClearColor, bClearColor, bClearColor, bClearColor);
+    this._clearStateSet!.useColorState().setColorMask(true, true, true, true);
+    for (let i = 0; i < targetCount; i++) {
+      const bClearColor = !!getFrameBufferClearColor(clearColor, i);
+      this._clearStateSet!.useTargetColorState(i).setColorMask(
+        bClearColor,
+        bClearColor,
+        bClearColor,
+        bClearColor
+      );
+    }
+    for (
+      let i = targetCount;
+      i < renderPass.getDevice().getDeviceCaps().framebufferCaps.maxDrawBuffers;
+      i++
+    ) {
+      this._clearStateSet!.defaultTargetColorState(i);
+    }
     this._clearStateSet!.useStencilState()
       .enable(bClearStencil)
       .setReference(bClearStencil ? clearStencil : 0);
@@ -63,14 +102,15 @@ export class WebGPUClearQuad {
           });
         },
         fragment(pb) {
-          this.clearColor = pb.vec4().uniform(0);
           if (colorAttachments.length === 0) {
+            this.clearColor = pb.vec4().uniform(0);
             this.$outputs.outColor = pb.vec4();
             pb.main(function () {
               this.$outputs.outColor = this.clearColor;
             });
           } else {
             for (let i = 0; i < colorAttachments.length; i++) {
+              this[`clearColor${i}`] = pb.vec4().uniform(0);
               this.$outputs[`outColor${i}`] =
                 colorAttachments[i] === 'f'
                   ? pb.vec4()
@@ -82,10 +122,10 @@ export class WebGPUClearQuad {
               for (let i = 0; i < colorAttachments.length; i++) {
                 this.$outputs[`outColor${i}`] =
                   colorAttachments[i] === 'f'
-                    ? this.clearColor
+                    ? this[`clearColor${i}`]
                     : colorAttachments[i] === 'i'
-                      ? pb.ivec4(this.clearColor)
-                      : pb.uvec4(this.clearColor);
+                      ? pb.ivec4(this[`clearColor${i}`])
+                      : pb.uvec4(this[`clearColor${i}`]);
               }
             });
           }

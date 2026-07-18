@@ -60,6 +60,7 @@ import type {
   DeviceEventMap,
   DeviceViewport,
   DrawTextLayoutOptions,
+  FrameBufferClearColors,
   TimestampQueryFilter,
   TimestampQueryHandle,
   TimestampQueryOptions,
@@ -322,7 +323,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   abstract getDeviceCaps(): Immutable<DeviceCaps>;
   abstract initContext(): Promise<void>;
   abstract clearFrameBuffer(
-    clearColor: Nullable<Vector4>,
+    clearColor: FrameBufferClearColors,
     clearDepth: Nullable<number>,
     clearStencil: Nullable<number>
   ): void;

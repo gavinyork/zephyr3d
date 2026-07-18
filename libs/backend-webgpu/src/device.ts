@@ -1,4 +1,4 @@
-import type { Vector4, TypedArray, Immutable, Nullable } from '@zephyr3d/base';
+import type { TypedArray, Immutable, Nullable } from '@zephyr3d/base';
 import type {
   FrameBufferOptions,
   SamplerOptions,
@@ -24,6 +24,7 @@ import type {
   DeviceBackend,
   DeviceViewport,
   BaseTexture,
+  FrameBufferClearColors,
   RenderBundle
 } from '@zephyr3d/device';
 import { getTextureFormatBlockSize, BaseDevice } from '@zephyr3d/device';
@@ -305,7 +306,7 @@ export class WebGPUDevice extends BaseDevice {
     return;
   }
   clearFrameBuffer(
-    clearColor: Nullable<Vector4>,
+    clearColor: FrameBufferClearColors,
     clearDepth: Nullable<number>,
     clearStencil: Nullable<number>
   ) {

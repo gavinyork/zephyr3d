@@ -7256,6 +7256,8 @@ export abstract class RenderPass extends Disposable {
     constructor(type: number);
     get clearColor(): Nullable<Immutable<Vector4>>;
     set clearColor(color: Nullable<Immutable<Vector4>>);
+    get clearColors(): Nullable<readonly Nullable<Immutable<Vector4>>[]>;
+    set clearColors(colors: Nullable<readonly Nullable<Immutable<Vector4>>[]>);
     get clearDepth(): Nullable<number>;
     set clearDepth(depth: Nullable<number>);
     get clearStencil(): Nullable<number>;

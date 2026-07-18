@@ -1,5 +1,5 @@
-import type { Immutable, Nullable, TypedArray, Vector4 } from '@zephyr3d/base';
-import type { PrimitiveType, DeviceViewport } from '@zephyr3d/device';
+import type { Immutable, Nullable, Vector4 } from '@zephyr3d/base';
+import type { PrimitiveType, DeviceViewport, FrameBufferClearColors } from '@zephyr3d/device';
 import {
   hasStencilChannel,
   PBPrimitiveTypeInfo,
@@ -24,6 +24,45 @@ const VALIDATION_NEED_NEW_PASS = 1 << 0;
 const VALIDATION_FAILED = 1 << 1;
 
 const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);
+
+function getFrameBufferClearColor(
+  clearColor: FrameBufferClearColors | undefined,
+  targetIndex: number
+): Nullable<Vector4> {
+  if (!clearColor) {
+    return null;
+  }
+  if (Array.isArray(clearColor)) {
+    return (clearColor as readonly Nullable<Vector4>[])[targetIndex] ?? null;
+  }
+  return clearColor as Vector4;
+}
+
+function hasFrameBufferClearColor(
+  clearColor: FrameBufferClearColors | undefined,
+  targetCount: number
+): boolean {
+  if (!clearColor || targetCount <= 0) {
+    return false;
+  }
+  if (Array.isArray(clearColor)) {
+    for (let i = 0; i < Math.min(clearColor.length, targetCount); i++) {
+      if (clearColor[i]) {
+        return true;
+      }
+    }
+    return false;
+  }
+  return true;
+}
+
+function validateFrameBufferClearColors(clearColor: FrameBufferClearColors | undefined, targetCount: number) {
+  if (Array.isArray(clearColor) && clearColor.length > targetCount) {
+    console.error(
+      `clearFrameBuffer(): clear color count (${clearColor.length}) exceeds framebuffer color attachment count (${targetCount})`
+    );
+  }
+}
 
 export class WebGPURenderPass {
   private readonly _device: WebGPUDevice;
@@ -236,7 +275,15 @@ export class WebGPURenderPass {
       numInstances
     );
   }
-  clear(color: Nullable<Vector4>, depth: Nullable<number>, stencil: Nullable<number>) {
+  clear(color: FrameBufferClearColors, depth: Nullable<number>, stencil: Nullable<number>) {
+    validateFrameBufferClearColors(color, this._frameBufferInfo.colorFormats.length);
+    if (
+      !hasFrameBufferClearColor(color, this._frameBufferInfo.colorFormats.length) &&
+      typeof depth !== 'number' &&
+      typeof stencil !== 'number'
+    ) {
+      return;
+    }
     if (!this._currentScissor) {
       this.end();
       this.begin(color, depth, stencil);
@@ -255,7 +302,7 @@ export class WebGPURenderPass {
   getFrameBufferInfo() {
     return this._frameBufferInfo;
   }
-  begin(color?: Nullable<TypedArray>, depth?: Nullable<number>, stencil?: Nullable<number>) {
+  begin(color?: FrameBufferClearColors, depth?: Nullable<number>, stencil?: Nullable<number>) {
     if (this.active) {
       console.error('WebGPURenderPass.begin() failed: begin() has already been called');
       return;
@@ -272,9 +319,10 @@ export class WebGPURenderPass {
       } else {
         colorAttachmentDesc.view = this._device.context!.getCurrentTexture().createView();
       }
-      colorAttachmentDesc.loadOp = color ? 'clear' : 'load';
+      const attachmentClearColor = getFrameBufferClearColor(color, 0);
+      colorAttachmentDesc.loadOp = attachmentClearColor ? 'clear' : 'load';
       // TODO: GPUColor type in @webgpu/types conficts with lib.dom，use `any` type to make ts-server happy
-      colorAttachmentDesc.clearValue = (color as any) ?? undefined;
+      colorAttachmentDesc.clearValue = (attachmentClearColor as any) ?? undefined;
       const depthAttachmentDesc = this._device.defaultRenderPassDesc.depthStencilAttachment;
       depthAttachmentDesc!.depthLoadOp = typeof depth === 'number' ? 'clear' : 'load';
       depthAttachmentDesc!.depthClearValue = depth ?? undefined;
@@ -303,6 +351,7 @@ export class WebGPURenderPass {
           frameBuffer.getOptions().colorAttachments?.map((attachment, index) => {
             const tex = attachment.texture as WebGPUBaseTexture;
             if (tex) {
+              const attachmentClearColor = getFrameBufferClearColor(color, index);
               tex._markAsCurrentFB(true);
               const layer =
                 tex.isTexture2DArray() || tex.isTexture3D()
@@ -313,8 +362,8 @@ export class WebGPURenderPass {
               if (frameBuffer.getOptions().sampleCount === 1) {
                 return {
                   view: tex.getView(attachment.level ?? 0, layer ?? 0, 1),
-                  loadOp: color ? 'clear' : 'load',
-                  clearValue: color,
+                  loadOp: attachmentClearColor ? 'clear' : 'load',
+                  clearValue: (attachmentClearColor as any) ?? undefined,
                   storeOp: 'store'
                 } as GPURenderPassColorAttachment;
               } else {
@@ -329,8 +378,8 @@ export class WebGPURenderPass {
                 return {
                   view: msaaView,
                   resolveTarget: tex.getView(attachment.level ?? 0, layer ?? 0, 1),
-                  loadOp: color ? 'clear' : 'load',
-                  clearValue: color,
+                  loadOp: attachmentClearColor ? 'clear' : 'load',
+                  clearValue: (attachmentClearColor as any) ?? undefined,
                   storeOp: 'store'
                 } as GPURenderPassColorAttachment;
               }
