@@ -93,7 +93,7 @@ export interface OIT extends IDisposable {
    * @param scope - The global shader scope.
    * @param color - The calculated fragment color.
    */
-  outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp): boolean;
+  outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext): boolean;
   /**
    * Applies the uniforms for the given draw context and bind group.
    *
@@ -103,6 +103,14 @@ export interface OIT extends IDisposable {
    * @param bindGroup - The bind group.
    */
   applyUniforms(ctx: DrawContext, bindGroup: BindGroup): void;
+  /**
+   * Whether additive light passes should keep the material alpha before OIT output.
+   *
+   * @remarks
+   * Some OIT algorithms need the original material alpha to weight additive light color,
+   * but write zero alpha to their accumulation targets so transmittance is not counted twice.
+   */
+  wantsAdditiveLightPassAlpha?(): boolean;
   /**
    * Calculates the hash of the renderer.
    *

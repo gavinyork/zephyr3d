@@ -31,6 +31,7 @@ import type { ScreenConfig } from '../app/screen';
 import { ScreenAdapter } from '../app/screen';
 import { ABufferOIT } from '../render/abuffer_oit';
 import { WeightedBlendedOIT } from '../render/weightedblended_oit';
+import { DualDepthPeelingOIT } from '../render/dualdepthpeeling_oit';
 import type { HistoryResourceManager } from '../render';
 
 /**
@@ -72,7 +73,7 @@ export type RenderPath = 'forward';
  * Camera Order-Independent Transparency mode.
  * @public
  */
-export type CameraOITMode = 'none' | 'weighted' | 'abuffer';
+export type CameraOITMode = 'none' | 'weighted' | 'abuffer' | 'dual-depth';
 /**
  * Subsurface Scattering debug visualization modes (implementation-defined).
  * @public
@@ -223,6 +224,8 @@ export class Camera extends SceneNode {
   protected _oitMode: CameraOITMode;
   /** @internal ABuffer OIT layer budget. */
   protected _oitABufferLayers: number;
+  /** @internal Dual depth peeling OIT peel iteration count. */
+  protected _oitDualDepthPeels: number;
   /** @internal Whether to perform a depth pre-pass. */
   protected _depthPrePass: boolean;
   /** @internal Render path selection for scene renderer. */
@@ -425,6 +428,7 @@ export class Camera extends SceneNode {
     this._oit = new DRef();
     this._oitMode = 'none';
     this._oitABufferLayers = 20;
+    this._oitDualDepthPeels = 8;
     this._depthPrePass = false;
     this._renderPath = 'forward';
     this._screenAdapter = new ScreenAdapter();
@@ -1177,6 +1181,22 @@ export class Camera extends SceneNode {
       }
     }
   }
+  /** Dual depth peeling OIT peel iteration count. */
+  get oitDualDepthPeels() {
+    return this._oitDualDepthPeels;
+  }
+  set oitDualDepthPeels(val: number) {
+    const peels = Math.max(1, Math.floor(val || 0));
+    if (peels !== this._oitDualDepthPeels) {
+      this._oitDualDepthPeels = peels;
+      // Peel count only drives the per-frame pass loop, so update the live
+      // instance in place instead of rebuilding it.
+      const oit = this._oit.get();
+      if (oit instanceof DualDepthPeelingOIT) {
+        oit.numPeels = peels;
+      }
+    }
+  }
   /** Clip plane mask */
   get clipMask() {
     return this._clipMask;
@@ -1830,6 +1850,9 @@ export class Camera extends SceneNode {
     if (mode === 'weighted') {
       return new WeightedBlendedOIT();
     }
+    if (mode === 'dual-depth') {
+      return new DualDepthPeelingOIT(this._oitDualDepthPeels);
+    }
     return null;
   }
   /** @internal */
@@ -1843,6 +1866,9 @@ export class Camera extends SceneNode {
     }
     if (type === WeightedBlendedOIT.type) {
       return 'weighted';
+    }
+    if (type === DualDepthPeelingOIT.type) {
+      return 'dual-depth';
     }
     return null;
   }

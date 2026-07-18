@@ -117,8 +117,8 @@ export function getCameraClass(): SerializableClass {
             label: 'OIT',
             group: 'Rendering',
             enum: {
-              labels: ['None', 'Weighted', 'ABuffer'],
-              values: ['none', 'weighted', 'abuffer']
+              labels: ['None', 'Weighted', 'ABuffer', 'DualDepthPeeling'],
+              values: ['none', 'weighted', 'abuffer', 'dual-depth']
             }
           },
           get(this: Camera, value) {
@@ -145,6 +145,25 @@ export function getCameraClass(): SerializableClass {
           },
           isValid(this: Camera) {
             return this.oitMode === 'abuffer';
+          }
+        },
+        {
+          name: 'DualDepthPeels',
+          type: 'int',
+          default: 8,
+          options: {
+            label: 'Depth Peels',
+            group: 'Rendering',
+            minValue: 1
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.oitDualDepthPeels;
+          },
+          set(this: Camera, value) {
+            this.oitDualDepthPeels = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.oitMode === 'dual-depth';
           }
         },
         {

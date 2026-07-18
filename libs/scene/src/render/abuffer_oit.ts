@@ -88,6 +88,12 @@ export class ABufferOIT extends Disposable implements OIT {
     return ABufferOIT.usePremultipliedAlpha;
   }
   /**
+   * {@inheritDoc OIT.wantsAdditiveLightPassAlpha}
+   */
+  wantsAdditiveLightPassAlpha() {
+    return true;
+  }
+  /**
    * {@inheritDoc OIT.begin}
    */
   begin(ctx: DrawContext) {

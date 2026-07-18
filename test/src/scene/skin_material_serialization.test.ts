@@ -1,5 +1,5 @@
 import { MemoryFS, Vector4 } from '@zephyr3d/base';
-import { Camera, ResourceManager, Scene, SkinMaterial } from '../../../libs/scene/src';
+import { Camera, DualDepthPeelingOIT, ResourceManager, Scene, SkinMaterial } from '../../../libs/scene/src';
 
 describe('Skin material serialization', () => {
   test('round-trips SkinMaterial properties', async () => {
@@ -88,5 +88,23 @@ describe('Skin material serialization', () => {
     expect(restored.skinSSSSampleStep).toBeCloseTo(2.5);
     expect(restored.skinSSSDepthScale).toBeCloseTo(96);
     expect(restored.skinSSSColorBoost).toBeCloseTo(1.1);
+  });
+
+  test('round-trips camera dual depth peeling OIT mode', async () => {
+    const manager = new ResourceManager(new MemoryFS());
+    const scene = new Scene();
+    const camera = new Camera(scene);
+
+    camera.oitMode = 'dual-depth';
+
+    const serialized = await manager.serializeObject(camera);
+    const restored = (await manager.deserializeObject<Camera>(scene.rootNode, serialized))!;
+
+    expect(camera.oit).toBeInstanceOf(DualDepthPeelingOIT);
+    expect(serialized.Object).toMatchObject({
+      OITMode: 'dual-depth'
+    });
+    expect(restored.oitMode).toBe('dual-depth');
+    expect(restored.oit).toBeInstanceOf(DualDepthPeelingOIT);
   });
 });

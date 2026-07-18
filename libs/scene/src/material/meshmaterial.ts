@@ -1169,7 +1169,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           if (
             that.drawContext.oit &&
             that.drawContext.lightBlending &&
-            that.drawContext.oit.getType() !== 'ab'
+            !(that.drawContext.oit.wantsAdditiveLightPassAlpha?.() ?? false)
           ) {
             // For OIT with multi-light decomposition, keep additive light passes
             // color-only to avoid duplicating per-fragment transmittance.
@@ -1180,7 +1180,9 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
               that.featureUsed<BlendMode>(FEATURE_ALPHABLEND) === 'additive' ? 0 : this.outColor.a
             );
           }
-          output = !that.drawContext.oit || !that.drawContext.oit.outputFragmentColor(this, this.outColor);
+          output =
+            !that.drawContext.oit ||
+            !that.drawContext.oit.outputFragmentColor(this, this.outColor, that.drawContext);
         }
         if (output) {
           ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);

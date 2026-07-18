@@ -1,6 +1,6 @@
 import { GUI } from 'lil-gui';
 import type { Camera } from '@zephyr3d/scene';
-import { ABufferOIT, getDevice, WeightedBlendedOIT } from '@zephyr3d/scene';
+import { ABufferOIT, DualDepthPeelingOIT, getDevice, WeightedBlendedOIT } from '@zephyr3d/scene';
 
 interface GUIParams {
   deviceType: string;
@@ -19,8 +19,8 @@ export class Panel {
     this._camera = camera;
     this._deviceList = ['WebGL', 'WebGL2', 'WebGPU'];
     this._gui = new GUI({ container: document.body });
-    this._oitTypes = ['', WeightedBlendedOIT.type];
-    this._oitNames = ['Sort back to front', 'weighted-blended'];
+    this._oitTypes = ['', WeightedBlendedOIT.type, DualDepthPeelingOIT.type];
+    this._oitNames = ['Sort back to front', 'weighted-blended', 'dual-depth'];
     if (getDevice().type === 'webgpu') {
       this._oitTypes.push(ABufferOIT.type);
       this._oitNames.push('per-pixel linked list');
@@ -43,22 +43,23 @@ export class Panel {
         url.searchParams.set('dev', value.toLowerCase());
         window.location.href = url.href;
       });
-
+    //
     const oitSettings = this._gui.addFolder('OIT');
     oitSettings
       .add(this._params, 'oitType', this._oitNames)
       .name('Select OIT type')
       .onChange((value) => {
-        this._camera.oit?.dispose();
-        this._camera.oit = null;
+        this._camera.oitMode = 'none';
         const index = this._oitNames.indexOf(value);
         switch (this._oitTypes[index]) {
           case ABufferOIT.type:
-            this._camera.oit = new ABufferOIT();
+            this._camera.oitMode = 'abuffer';
             break;
           case WeightedBlendedOIT.type:
-            this._camera.oit = new WeightedBlendedOIT();
+            this._camera.oitMode = 'weighted';
             break;
+          case DualDepthPeelingOIT.type:
+            this._camera.oitMode = 'dual-depth';
         }
       });
     const perfSettings = this._gui.addFolder('Performance');

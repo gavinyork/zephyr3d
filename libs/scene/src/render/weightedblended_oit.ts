@@ -50,6 +50,12 @@ export class WeightedBlendedOIT extends Disposable implements OIT {
     return false;
   }
   /**
+   * {@inheritDoc OIT.wantsAdditiveLightPassAlpha}
+   */
+  wantsAdditiveLightPassAlpha() {
+    return false;
+  }
+  /**
    * {@inheritDoc OIT.begin}
    */
   begin(_ctx: DrawContext) {
