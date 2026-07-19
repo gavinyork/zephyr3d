@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "screen-space shadow mask for Forward+ clustered lighting",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

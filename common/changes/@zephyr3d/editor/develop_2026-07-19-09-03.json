@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Add profiler window for render graph GPU timings",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}
