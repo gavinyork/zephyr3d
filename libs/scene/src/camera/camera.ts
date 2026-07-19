@@ -436,7 +436,7 @@ export class Camera extends SceneNode {
     this._screenAdapter = new ScreenAdapter();
     this._adapted = false;
     this._HiZ = false;
-    this._screenSpaceShadowMask = false;
+    this._screenSpaceShadowMask = true;
     this._HDR = true;
     this._toneMap = true;
     this._postEffectTonemap = new DRef();

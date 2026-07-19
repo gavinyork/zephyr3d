@@ -112,7 +112,7 @@ export function getCameraClass(): SerializableClass {
         {
           name: 'ScreenSpaceShadow',
           type: 'bool',
-          default: false,
+          default: true,
           get(this: Camera, value) {
             value.bool[0] = this.screenSpaceShadowMask;
           },
