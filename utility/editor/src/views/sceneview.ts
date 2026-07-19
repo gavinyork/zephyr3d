@@ -35,6 +35,7 @@ import {
   CapsuleShape,
   RenderGraphExecutor
 } from '@zephyr3d/scene';
+import type { RGProfileResult, RGProfileScopeResult } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
 import { DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
@@ -144,6 +145,12 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _showTextureViewer: boolean;
   private _showDeviceInfo: boolean;
   private _showProfiler: boolean;
+  /** Latest resolved render graph GPU profile, shown in the Profiler window. */
+  private _profileResult: Nullable<RGProfileResult>;
+  /** Guards against issuing a new profile resolve while one is still pending. */
+  private _profilePending: boolean;
+  /** Timestamp (ms, device clock) of the last profile sample; throttled to ~1 Hz. */
+  private _profileLastSampleTime: number;
   private readonly _clipBoardData: DRef<SceneNode>;
   private _clipBoardNodes: SceneNode[];
   private _proxy: Nullable<NodeProxy>;
@@ -193,6 +200,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
     this._showProfiler = false;
+    this._profileResult = null;
+    this._profilePending = false;
+    this._profileLastSampleTime = 0;
     this._clipBoardNodes = [];
     this._proxy = null;
     this._springBoneGizmo = null;
@@ -1125,6 +1135,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._showTextureViewer = false;
     this._showDeviceInfo = false;
     this._showProfiler = false;
+    this._profileResult = null;
+    this._profilePending = false;
     RenderGraphExecutor.setDefaultProfilingOptions(false);
     this._animatedCamera = null;
     this._currentEditTool?.dispose();
@@ -1241,6 +1253,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     if (this._showDeviceInfo) {
       this.renderDeviceInfo();
+    }
+    if (this._showProfiler) {
+      this.renderProfiler();
     }
   }
   play() {
@@ -1773,6 +1788,74 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     ImGui.End();
   }
+  private renderProfiler() {
+    if (ImGui.Begin('Profiler')) {
+      const profile = this._profileResult;
+      if (!profile) {
+        ImGui.TextDisabled('Waiting for GPU timings…');
+      } else {
+        const totalMs = profile.graph.durationMs;
+        ImGui.Text(`Frame #${profile.frameId}`);
+        ImGui.SameLine();
+        this.renderProfileStatus(profile.status);
+        ImGui.Text(`Total: ${totalMs.toFixed(3)} ms`);
+        ImGui.Separator();
+        const tableFlags =
+          ImGui.TableFlags.Resizable |
+          ImGui.TableFlags.RowBg |
+          ImGui.TableFlags.BordersOuter |
+          ImGui.TableFlags.BordersInnerV;
+        if (ImGui.BeginTable('ProfilerTable', 3, tableFlags)) {
+          ImGui.TableSetupColumn('Scope', ImGui.TableColumnFlags.WidthStretch);
+          ImGui.TableSetupColumn('Time (ms)', ImGui.TableColumnFlags.WidthFixed, 90);
+          ImGui.TableSetupColumn('%', ImGui.TableColumnFlags.WidthFixed, 56);
+          ImGui.TableHeadersRow();
+          for (let i = 0; i < profile.passes.length; i++) {
+            this.renderProfileRow(profile.passes[i], totalMs, `p${i}`);
+          }
+          ImGui.EndTable();
+        }
+      }
+    }
+    ImGui.End();
+  }
+  private renderProfileStatus(status: RGProfileResult['status']) {
+    if (status === 'resolved') {
+      ImGui.TextColored(new ImGui.ImVec4(0.5, 0.9, 0.5, 1), `[${status}]`);
+    } else {
+      ImGui.TextColored(new ImGui.ImVec4(0.9, 0.7, 0.3, 1), `[${status}]`);
+    }
+  }
+  private renderProfileRow(node: RGProfileScopeResult, totalMs: number, id: string) {
+    const pct = totalMs > 0 ? (node.durationMs / totalMs) * 100 : 0;
+    const resolved = node.status === 'resolved';
+    const hasChildren = node.children.length > 0;
+    const name = resolved ? node.name : `${node.name} [${node.status}]`;
+    ImGui.TableNextRow();
+    ImGui.TableNextColumn();
+    let open = false;
+    if (hasChildren) {
+      open = ImGui.TreeNodeEx(
+        `${name}##${id}`,
+        ImGui.TreeNodeFlags.DefaultOpen | ImGui.TreeNodeFlags.SpanFullWidth
+      );
+    } else {
+      ImGui.TreeNodeEx(
+        `${name}##${id}`,
+        ImGui.TreeNodeFlags.Leaf | ImGui.TreeNodeFlags.NoTreePushOnOpen | ImGui.TreeNodeFlags.SpanFullWidth
+      );
+    }
+    ImGui.TableNextColumn();
+    ImGui.Text(node.durationMs.toFixed(3));
+    ImGui.TableNextColumn();
+    ImGui.Text(pct.toFixed(1));
+    if (hasChildren && open) {
+      for (let i = 0; i < node.children.length; i++) {
+        this.renderProfileRow(node.children[i], totalMs, `${id}.${i}`);
+      }
+      ImGui.TreePop();
+    }
+  }
   private closeAllTrackEditors() {
     for (const a of this._editingProps) {
       for (const b of a[1]) {
@@ -1956,19 +2039,25 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this.selectSpringBone(null);
     }
     if (this._showProfiler) {
-      RenderGraphExecutor.resolveProfileResult().then((profile) => {
-        if (profile) {
-          console.log(profile.status, profile.graph.durationMs);
-          console.table(
-            profile.passes.map((p) => ({
-              pass: p.name,
-              status: p.status,
-              ms: p.durationMs,
-              children: p.children.length
-            }))
-          );
-        }
-      });
+      // Resolve GPU timings at most once per second: per-frame updates make the
+      // numbers flicker and are unreadable. Cache the latest result for the window.
+      const now = getDevice().frameInfo.elapsedOverall;
+      if (!this._profilePending && now - this._profileLastSampleTime >= 1000) {
+        this._profileLastSampleTime = now;
+        this._profilePending = true;
+        RenderGraphExecutor.resolveProfileResult()
+          .then((profile) => {
+            this._profilePending = false;
+            if (profile) {
+              this._profileResult = profile;
+            }
+          })
+          .catch(() => {
+            this._profilePending = false;
+          });
+      }
+    } else if (this._profileResult) {
+      this._profileResult = null;
     }
   }
   private updateSpringBone(obj: JointDynamicsModifier) {
