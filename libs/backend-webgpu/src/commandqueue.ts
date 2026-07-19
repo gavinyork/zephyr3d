@@ -29,6 +29,8 @@ export class CommandQueueImmediate {
   private _texturesAwaitingSyncEnd: WebGPUBaseTexture[];
   private readonly _device: WebGPUDevice;
   private _drawcallCounter: number;
+  private _readbackTempBuffers: GPUBuffer[];
+  private _submitWaiters: Array<() => void>;
   constructor(device: WebGPUDevice) {
     this._device = device;
     this._segments = [];
@@ -37,6 +39,8 @@ export class CommandQueueImmediate {
     this._renderPass = new WebGPURenderPass(device);
     this._computePass = new WebGPUComputePass(device);
     this._drawcallCounter = 0;
+    this._readbackTempBuffers = [];
+    this._submitWaiters = [];
   }
   isBufferUploading(_buffer: WebGPUBuffer) {
     return false;
@@ -144,6 +148,30 @@ export class CommandQueueImmediate {
         depthOrArrayLayers
       }
     );
+  }
+  /**
+   * Encode a texture/buffer readback copy into the current command stream so it is
+   * submitted together with the rest of the frame instead of forcing an immediate,
+   * standalone `queue.submit()`. Temporary buffers are destroyed after the next submit.
+   */
+  encodeReadback(encode: (encoder: GPUCommandEncoder) => void, tempBuffers?: GPUBuffer[]): void {
+    this.endAllBodyPasses();
+    const encoder = this.getEncoder();
+    encode(encoder);
+    if (tempBuffers) {
+      for (const buffer of tempBuffers) {
+        this._readbackTempBuffers.push(buffer);
+      }
+    }
+  }
+  /**
+   * Resolve after the next `submit()`. Used by readbacks to guarantee the copy that
+   * fills a staging buffer has been submitted to the GPU before it is mapped.
+   */
+  onNextSubmit(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      this._submitWaiters.push(resolve);
+    });
   }
   compute(
     program: WebGPUProgram,
@@ -337,6 +365,21 @@ export class CommandQueueImmediate {
     if (commandBuffers.length > 0) {
       this._device.device.queue.submit(commandBuffers);
       this._device.onTimestampCommandBuffersSubmitted();
+    }
+    // Destroy readback staging buffers now that the copy commands referencing them have
+    // been submitted (WebGPU keeps them alive until the GPU work completes).
+    if (this._readbackTempBuffers.length > 0) {
+      for (const buffer of this._readbackTempBuffers) {
+        buffer.destroy();
+      }
+      this._readbackTempBuffers.length = 0;
+    }
+    // Notify readbacks waiting for their copy to be submitted before mapping.
+    if (this._submitWaiters.length > 0) {
+      const waiters = this._submitWaiters.splice(0);
+      for (const resolve of waiters) {
+        resolve();
+      }
     }
     for (const buffer of this._buffersAwaitingSyncEnd) {
       buffer.endSyncChanges();

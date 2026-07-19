@@ -125,6 +125,13 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       }
     } else {
       this.sync();
+      // The staging buffer is filled by a copy encoded into the current command stream
+      // (e.g. a texture readback) which has not been submitted yet. Ensure that submit
+      // happens before mapping, otherwise mapAsync could resolve against stale contents.
+      // Inside a render frame the copy rides the normal end-of-frame submit; for standalone
+      // readbacks (outside any frame) scheduleAutoFlush guarantees a submit still occurs.
+      this._device.scheduleAutoFlush();
+      await this._device.commandQueue.onNextSubmit();
     }
     const buffer = sourceBuffer.object as GPUBuffer;
     await buffer.mapAsync(GPUMapMode.READ);

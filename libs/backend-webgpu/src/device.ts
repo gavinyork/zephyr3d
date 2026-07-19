@@ -81,6 +81,7 @@ export class WebGPUDevice extends BaseDevice {
   private _adapter!: GPUAdapter;
   private _deviceCaps!: DeviceCaps;
   private _reverseWindingOrder: boolean;
+  private _autoFlushScheduled = false;
   private _canRender!: boolean;
   private _backBufferFormat!: GPUTextureFormat;
   private _depthFormat!: GPUTextureFormat;
@@ -741,6 +742,29 @@ export class WebGPUDevice extends BaseDevice {
   flush(): void {
     this._commandQueue.flush();
   }
+  /** @internal Submit pending GPU work only if there is any, without forcing an empty submit. */
+  flushIfPending(): void {
+    if (this._commandQueue.hasActiveWork()) {
+      this._commandQueue.flush();
+    }
+  }
+  /**
+   * @internal
+   * Schedule a microtask that submits any pending GPU work. Used by readbacks so a standalone
+   * copy (issued outside a render frame) still gets submitted, while inside a render frame the
+   * microtask runs after the normal end-of-frame submit and becomes a no-op — i.e. it never
+   * introduces a mid-frame submit.
+   */
+  scheduleAutoFlush(): void {
+    if (this._autoFlushScheduled) {
+      return;
+    }
+    this._autoFlushScheduled = true;
+    queueMicrotask(() => {
+      this._autoFlushScheduled = false;
+      this.flushIfPending();
+    });
+  }
   async readPixels(index: number, x: number, y: number, w: number, h: number, buffer: TypedArray) {
     const fb = this.getFramebuffer();
     const colorAttachment = fb
@@ -772,19 +796,7 @@ export class WebGPUDevice extends BaseDevice {
       ? fb.getColorAttachments()[index]?.format
       : textureFormatInvMap[this._backBufferFormat];
     if (colorAttachment && texFormat) {
-      this.flush();
-      WebGPUBaseTexture.copyTexturePixelsToBuffer(
-        this._device!,
-        colorAttachment,
-        texFormat,
-        x,
-        y,
-        w,
-        h,
-        0,
-        0,
-        buffer
-      );
+      WebGPUBaseTexture.copyTexturePixelsToBuffer(this, colorAttachment, texFormat, x, y, w, h, 0, 0, buffer);
     } else {
       console.error(
         'readPixelsToBuffer() failed: no color attachment0 or unrecoganized color attachment format'

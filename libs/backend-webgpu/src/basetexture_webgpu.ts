@@ -245,7 +245,7 @@ export abstract class WebGPUBaseTexture<
     }
     this.sync();
     WebGPUBaseTexture.copyTexturePixelsToBuffer(
-      this._device.device,
+      this._device,
       this.object as GPUTexture,
       this.format,
       x,
@@ -344,7 +344,10 @@ export abstract class WebGPUBaseTexture<
   abstract createView(level?: number, face?: number, mipCount?: number): Nullable<GPUTextureView>;
   /** @internal */
   private sync() {
-    this._device.flush();
+    // Texture readbacks no longer force an immediate `device.flush()` here: the copy is
+    // encoded into the frame's command stream (see copyTexturePixelsToBuffer) and submitted
+    // with the rest of the frame, so ordering after preceding renders is preserved without
+    // a mid-frame submit.
     /*
     if (this._pendingUploads) {
       if (this._device.isTextureUploading(this as WebGPUBaseTexture)) {
@@ -455,7 +458,7 @@ export abstract class WebGPUBaseTexture<
   }
   /** @internal */
   static copyTexturePixelsToBuffer(
-    device: GPUDevice,
+    device: WebGPUDevice,
     texture: GPUTexture,
     format: TextureFormat,
     x: number,
@@ -483,47 +486,53 @@ export abstract class WebGPUBaseTexture<
       );
       return;
     }
-    const tmpBuffer = device.createBuffer({
+    const tmpBuffer = device.device.createBuffer({
       size: sizeAligned,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC
     });
-    const encoder = device.createCommandEncoder();
-    encoder.copyTextureToBuffer(
-      {
-        texture: texture,
-        mipLevel: level ?? 0,
-        origin: {
-          x: x,
-          y: y,
-          z: layer ?? 0
+    // Encode the copy into the frame's command stream instead of submitting a standalone
+    // command buffer. This keeps the copy ordered after any preceding render (same stream)
+    // and avoids a mid-frame `queue.submit()` that would otherwise pollute GPU timings of
+    // whichever pass triggered the readback (e.g. GPU picking).
+    device.commandQueue.encodeReadback(
+      (encoder) => {
+        encoder.copyTextureToBuffer(
+          {
+            texture: texture,
+            mipLevel: level ?? 0,
+            origin: {
+              x: x,
+              y: y,
+              z: layer ?? 0
+            }
+          },
+          {
+            buffer: tmpBuffer,
+            offset: 0,
+            bytesPerRow: strideAligned
+          },
+          {
+            width: w,
+            height: h,
+            depthOrArrayLayers: 1
+          }
+        );
+        if (size !== sizeAligned) {
+          for (let i = 0; i < numRows; i++) {
+            encoder.copyBufferToBuffer(
+              tmpBuffer,
+              i * strideAligned,
+              buffer.object as GPUBuffer,
+              i * stride,
+              stride
+            );
+          }
+        } else {
+          encoder.copyBufferToBuffer(tmpBuffer, 0, buffer.object as GPUBuffer, 0, size);
         }
       },
-      {
-        buffer: tmpBuffer as GPUBuffer,
-        offset: 0,
-        bytesPerRow: strideAligned
-      },
-      {
-        width: w,
-        height: h,
-        depthOrArrayLayers: 1
-      }
+      [tmpBuffer]
     );
-    if (size !== sizeAligned) {
-      for (let i = 0; i < numRows; i++) {
-        encoder.copyBufferToBuffer(
-          tmpBuffer,
-          i * strideAligned,
-          buffer.object as GPUBuffer,
-          i * stride,
-          stride
-        );
-      }
-    } else {
-      encoder.copyBufferToBuffer(tmpBuffer, 0, buffer.object as GPUBuffer, 0, size);
-    }
-    device.queue.submit([encoder.finish()]);
-    tmpBuffer.destroy();
   }
   /** @internal */
   protected uploadRaw(
