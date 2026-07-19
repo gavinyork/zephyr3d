@@ -32,6 +32,14 @@ export interface RGTextureDesc {
   height?: number;
   /** Number of mip levels. Default 1. */
   mipLevels?: number;
+  /**
+   * Number of array layers. When omitted, a plain 2D texture is allocated. When
+   * defined (including 1), the allocator produces a 2D array texture — a
+   * single-layer array is a distinct texture type from a 2D texture and is not
+   * interchangeable when bound to a `tex2DArray` sampler. Individual layers can be
+   * targeted as framebuffer color attachments via {@link RGFramebufferDesc.attachmentLayer}.
+   */
+  arrayLayers?: number;
 }
 
 // ─── Handles ────────────────────────────────────────────────────────────

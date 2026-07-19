@@ -6,6 +6,7 @@ import type {
   FrameBuffer,
   GPUDataBuffer,
   Texture2D,
+  Texture2DArray,
   TextureFormat
 } from '@zephyr3d/device';
 import type { Camera } from '../camera/camera';
@@ -63,6 +64,28 @@ export interface DrawContext {
   readonly HiZ: boolean;
   /** Hi-Z (hierarchical Z) depth texture, when generated. */
   HiZTexture: Nullable<Texture2D>;
+  /**
+   * Whether the screen-space shadow mask path is active for this pass. When true,
+   * shadow-casting lights occupy the head of the clustered light buffer and are
+   * shaded through the clustered pass sampling a pre-rendered shadow mask, rather
+   * than via per-light additive passes.
+   */
+  readonly screenSpaceShadowMask: boolean;
+  /**
+   * Screen-space shadow mask array, produced by the ShadowMaskPass when
+   * {@link DrawContext.screenSpaceShadowMask} is active. Each RGBA8 layer packs
+   * four shadow lights (one per channel); a clustered light at buffer index `i`
+   * (1..N) samples `layer = (i-1) >> 2`, `channel = (i-1) & 3`.
+   */
+  shadowMaskTexture?: Nullable<Texture2DArray>;
+  /**
+   * Whether the current clustered light pass should sample the opaque shadow mask
+   * for shadow-casting lights. True for the opaque queue; false for transparent
+   * queues (e.g. OIT hair), where shadow lights are instead lit inline by the
+   * additive passes because the opaque-depth mask does not represent transparent
+   * surfaces. Only meaningful while {@link DrawContext.screenSpaceShadowMask} is on.
+   */
+  shadowMaskClusterSample?: boolean;
   /** The scene currently being drawn. */
   readonly scene: Scene;
   /** The render pass to which this drawing task belongs. */

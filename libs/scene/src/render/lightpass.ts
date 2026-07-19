@@ -110,7 +110,7 @@ export class LightPass extends RenderPass {
       ctx
     )}:${ctx.materialFlags}:${ctx.linearDepthTexture?.uid ?? 0}:${ctx.sceneColorTexture?.uid ?? 0}:${
       ctx.HiZTexture?.uid ?? 0
-    }`;
+    }:${ctx.screenSpaceShadowMask ? 1 : 0}`;
   }
   /** @internal */
   protected renderLightPass(
@@ -144,6 +144,12 @@ export class LightPass extends RenderPass {
           ctx.clusteredLight!.lightIndexTexture!
         );
         flags.lightSet[ctx.renderPassHash] = 1;
+      }
+      // Bind the per-queue cluster shadow-mask mode every call (not cached with
+      // lightSet): the same clustered program/bind group may serve both the opaque
+      // (sample mask) and transparent (skip shadow lights) queues.
+      if (ctx.screenSpaceShadowMask) {
+        ShaderHelper.setShadowMaskMode(bindGroup, !!ctx.shadowMaskClusterSample);
       }
     }
     if (ctx.materialFlags & MaterialVaryingFlags.APPLY_FOG && !flags.fogSet[ctx.renderPassHash]) {
@@ -222,6 +228,14 @@ export class LightPass extends RenderPass {
       }
       if (lists[i]) {
         ctx.queue = i === 0 ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
+        // The screen-space shadow mask is only valid for the opaque depth-prepass
+        // geometry: lists[0] in non-transmission mode. For that queue, shadow lights
+        // are lit via the clustered pass sampling the mask (additive passes skipped).
+        // Every other queue (transparent/OIT hair, transmission) keeps the inline
+        // additive shadow path, where shadows are sampled per-fragment at the real
+        // surface depth.
+        const useShadowMaskQueue = ctx.screenSpaceShadowMask && !this._transmission && i === 0;
+        ctx.shadowMaskClusterSample = useShadowMaskQueue;
         ctx.oit = i === 0 || !items ? null : oit;
         const isolateTransparentABufferLightPasses =
           !!ctx.oit && ctx.queue === QUEUE_TRANSPARENT && ctx.oit.getType() === 'ab';
@@ -268,7 +282,10 @@ export class LightPass extends RenderPass {
             }
           };
           let lightIndex = 0;
-          if (ctx.shadowMapInfo) {
+          // Run the per-shadowed-light additive passes unless this queue uses the
+          // screen-space shadow mask (opaque). Transparent/transmission queues keep
+          // the inline additive shadow path even when the mask is enabled.
+          if (!useShadowMaskQueue && ctx.shadowMapInfo) {
             for (const k of ctx.shadowMapInfo.keys()) {
               ctx.currentShadowLight = k;
               ctx.lightBlending = lightIndex > 0;

@@ -110,6 +110,17 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'ScreenSpaceShadow',
+          type: 'bool',
+          default: false,
+          get(this: Camera, value) {
+            value.bool[0] = this.screenSpaceShadowMask;
+          },
+          set(this: Camera, value) {
+            this.screenSpaceShadowMask = value.bool[0];
+          }
+        },
+        {
           name: 'OITMode',
           type: 'string',
           default: 'none',

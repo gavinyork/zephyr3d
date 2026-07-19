@@ -1,6 +1,6 @@
 import type { Nullable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
-import { MAX_CLUSTERED_LIGHTS } from '../values';
+import { MAX_CLUSTERED_LIGHTS, MAX_SHADOW_MASK_LIGHTS } from '../values';
 import type {
   AbstractDevice,
   BindGroup,
@@ -14,10 +14,13 @@ import type {
 } from '@zephyr3d/device';
 import type { Camera } from '../camera/camera';
 import type { RenderQueue } from './render_queue';
+import type { PunctualLight } from '../scene/light';
 import { ShaderHelper } from '../material/shader/helper';
 import { getDevice } from '../app/api';
 
 export class ClusteredLight {
+  /** Emit the shadow-mask overflow warning only once per session. */
+  private static _warnedShadowMaskOverflow = false;
   private readonly _tileCountX: number;
   private readonly _tileCountY: number;
   private readonly _tileCountZ: number;
@@ -32,6 +35,7 @@ export class ClusteredLight {
   private readonly _sizeParam: Vector4;
   private _countParam: Int32Array<ArrayBuffer>;
   private readonly _clusterParam: Vector4;
+  private _numShadowLights: number;
   constructor() {
     this._tileCountX = 16;
     this._tileCountY = 16;
@@ -47,9 +51,18 @@ export class ClusteredLight {
     this._sizeParam = new Vector4();
     this._countParam = new Int32Array(4);
     this._clusterParam = new Vector4();
+    this._numShadowLights = 0;
   }
   get lightBuffer() {
     return this._lightBuffer;
+  }
+  /**
+   * Number of shadow-casting lights placed at the head of the clustered light
+   * buffer (indices `1..N`), each backed by a screen-space shadow mask slot.
+   * Zero unless the screen-space shadow mask path is active.
+   */
+  get numShadowLights() {
+    return this._numShadowLights;
   }
   get clusterParam() {
     return this._clusterParam;
@@ -338,7 +351,7 @@ export class ClusteredLight {
     this._lightIndexFramebuffer = device.createFrameBuffer([this._lightIndexTexture], null);
   }
   calculateLightIndex(camera: Camera, renderQueue: RenderQueue) {
-    const numLights = this.getVisibleLights(renderQueue, this._lights);
+    const numLights = this.getVisibleLights(renderQueue, this._lights, camera.screenSpaceShadowMask);
     const device = getDevice();
     if (!this._lightIndexTexture) {
       this.createLightIndexTexture(device);
@@ -393,16 +406,54 @@ export class ClusteredLight {
     }
     device.popDeviceStates();
   }
-  private getVisibleLights(renderQueue: RenderQueue, lights: Float32Array) {
-    const numLights = Math.min(renderQueue.unshadowedLights.length, MAX_CLUSTERED_LIGHTS);
-    for (let i = 1; i <= numLights; i++) {
-      const light = renderQueue.unshadowedLights[i - 1];
-      const offset = i * 16;
+  private getVisibleLights(renderQueue: RenderQueue, lights: Float32Array, useShadowMask: boolean) {
+    const writeLight = (light: PunctualLight, slot: number) => {
+      const offset = slot * 16;
       lights.set(light.positionAndRange, offset);
       lights.set(light.directionAndCutoff, offset + 4);
       lights.set(light.diffuseAndIntensity, offset + 8);
       lights.set(light.extraParams, offset + 12);
+    };
+    // When the screen-space shadow mask is active, shadow-casting lights occupy
+    // the head of the buffer (slots 1..N) in the exact order of
+    // renderQueue.shadowedLights. The mask pass must assign layers/channels from
+    // the SAME list in the SAME order so that a light's buffer index maps to its
+    // mask slot without storing a per-light index. Keep these two in lockstep.
+    let numShadow = 0;
+    let slot = 0;
+    if (useShadowMask) {
+      numShadow = Math.min(renderQueue.shadowedLights.length, MAX_SHADOW_MASK_LIGHTS, MAX_CLUSTERED_LIGHTS);
+      for (let i = 1; i <= numShadow; i++) {
+        writeLight(renderQueue.shadowedLights[i - 1], i);
+      }
+      slot = numShadow;
     }
-    return numLights;
+    // Unshadowed lights fill the region after the mask-backed shadow lights.
+    const numUnshadowed = Math.min(renderQueue.unshadowedLights.length, MAX_CLUSTERED_LIGHTS - slot);
+    for (let j = 0; j < numUnshadowed; j++) {
+      writeLight(renderQueue.unshadowedLights[j], slot + j + 1);
+    }
+    slot += numUnshadowed;
+    // Shadow-casting lights beyond the mask capacity (MAX_SHADOW_MASK_LIGHTS) have
+    // no mask slot. Rather than dropping them silently, place them past index N so
+    // they are still lit — without a mask sample, i.e. degraded to no shadow.
+    if (useShadowMask && renderQueue.shadowedLights.length > numShadow) {
+      const overflow = renderQueue.shadowedLights.length - numShadow;
+      const numOverflow = Math.min(overflow, MAX_CLUSTERED_LIGHTS - slot);
+      for (let k = 0; k < numOverflow; k++) {
+        writeLight(renderQueue.shadowedLights[numShadow + k], slot + k + 1);
+      }
+      slot += numOverflow;
+      if (!ClusteredLight._warnedShadowMaskOverflow) {
+        ClusteredLight._warnedShadowMaskOverflow = true;
+        console.warn(
+          `ClusteredLight: ${renderQueue.shadowedLights.length} shadow-casting lights exceed the ` +
+            `screen-space shadow mask capacity (${MAX_SHADOW_MASK_LIGHTS}); ${overflow} light(s) are ` +
+            `lit without shadows${numOverflow < overflow ? `, and ${overflow - numOverflow} dropped` : ''}.`
+        );
+      }
+    }
+    this._numShadowLights = numShadow;
+    return slot;
   }
 }

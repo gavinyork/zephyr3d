@@ -59,6 +59,7 @@ export class SceneRenderer {
             device.type !== 'webgl' && (camera.TAA || camera.motionBlur || (SSR && camera.ssrTemporal)),
           HiZ: camera.HiZ && device.type !== 'webgl',
           HiZTexture: null,
+          screenSpaceShadowMask: camera.screenSpaceShadowMask,
           globalBindGroupAllocator,
           camera,
           compositor: camera.compositor,

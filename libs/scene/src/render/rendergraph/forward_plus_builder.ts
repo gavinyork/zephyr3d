@@ -6,6 +6,7 @@ import type {
   FrameBuffer,
   GPUProgram,
   Texture2D,
+  Texture2DArray,
   TextureFormat
 } from '@zephyr3d/device';
 import type { DrawContext } from '../drawable';
@@ -21,6 +22,7 @@ import { LightPass } from '../lightpass';
 import { ShadowMapPass } from '../shadowmap_pass';
 import { DepthPass } from '../depthpass';
 import { ClusteredLight } from '../cluster_light';
+import { ShadowMaskRenderer } from '../shadow_mask_pass';
 import { buildHiZ } from '../hzb';
 import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
@@ -43,6 +45,7 @@ const _scenePass = new LightPass();
 const _depthPass = new DepthPass();
 const _shadowMapPass = new ShadowMapPass();
 const _clusters: ClusteredLight[] = [];
+const _shadowMaskRenderer = new ShadowMaskRenderer();
 const _devicePoolAllocator = new DevicePoolAllocator();
 let _backDepthColorState: Nullable<ColorState> = null;
 let _frontDepthColorState: Nullable<ColorState> = null;
@@ -548,6 +551,58 @@ function buildForwardPlusGraphInternal(
   if (depthPassResult.graphDepthAttachmentHandle) {
     blackboard.set(FrameResources.SceneDepthAttachment, depthPassResult.graphDepthAttachmentHandle);
   }
+
+  // ── Screen-space shadow mask ────────────────────────────────────────────
+  // When active, render each shadow-casting light's visibility into an RGBA8
+  // texture array (4 lights per layer). The clustered LightPass samples this
+  // mask instead of each shadowed light running its own additive pass. The
+  // layer/channel order is locked to ClusteredLight.getVisibleLights: shadow
+  // lights fill clustered buffer indices 1..N in renderQueue.shadowedLights
+  // order, and ordinal s = index-1 maps to layer s>>2, channel s&3.
+  let shadowMaskHandle: RGHandle | null = null;
+  // Reset any mask carried over from a previous frame; the pass below re-sets it
+  // during execution only when the mask is actually produced.
+  ctx.shadowMaskTexture = null;
+  // Gate on build-time state only: renderQueue.shadowedLights is available now,
+  // whereas ctx.shadowMapInfo is populated later by the ShadowMaps pass execute
+  // (which runs before this pass thanks to the orderToken chain), so it must not
+  // be part of the pass-creation condition.
+  const useShadowMask = ctx.screenSpaceShadowMask && renderQueue.shadowedLights.length > 0;
+  if (useShadowMask) {
+    const numShadowLights = renderQueue.shadowedLights.length;
+    const numLayers = ShadowMaskRenderer.getLayerCount(numShadowLights);
+    const maskPassResult = graph.addPass('ShadowMaskPass', (builder) => {
+      builder.read(depthHandle);
+      builder.read(depthPassResult.depthFramebufferHandle);
+      // createTexture already registers this pass as the resource producer, so
+      // downstream passes read this handle directly (same pattern as HiZ). The
+      // per-layer framebuffers are created inside execute (rgCtx.createFramebuffer),
+      // which the graph cannot see; the createTexture producer edge is what keeps
+      // the resource alive and ordered before the LightPass reader.
+      const maskHandle = builder.createTexture({
+        format: 'rgba8unorm',
+        label: 'shadowMask',
+        arrayLayers: numLayers
+      });
+      builder.setExecute((rgCtx) => {
+        const depthTex = rgCtx.getTexture<Texture2D>(depthHandle);
+        const maskTex = rgCtx.getTexture<Texture2DArray>(maskHandle);
+        _shadowMaskRenderer.render(ctx, depthTex, renderQueue.shadowedLights, (layer) =>
+          rgCtx.createFramebuffer<FrameBuffer>({
+            width: maskTex.width,
+            height: maskTex.height,
+            colorAttachments: maskTex,
+            depthAttachment: null,
+            attachmentLayer: layer
+          })
+        );
+        ctx.shadowMaskTexture = maskTex;
+      });
+      return { maskHandle };
+    });
+    shadowMaskHandle = maskPassResult.maskHandle;
+    blackboard.set(FrameResources.ShadowMask, shadowMaskHandle);
+  }
   const renderDepthAttachment =
     depthPassResult.graphDepthAttachmentHandle ?? depthPassResult.externalDepthAttachment ?? null;
   // Rendering the scene directly into the final framebuffer is only possible
@@ -740,6 +795,9 @@ function buildForwardPlusGraphInternal(
   const lightPassResult = graph.addPass('LightPass', (builder) => {
     builder.read(depthHandle);
     builder.read(depthPassResult.depthFramebufferHandle);
+    if (shadowMaskHandle) {
+      builder.read(shadowMaskHandle);
+    }
     if (preLightTransmissionDepthToken) {
       builder.read(preLightTransmissionDepthToken);
     }

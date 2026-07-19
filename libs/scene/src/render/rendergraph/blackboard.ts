@@ -23,7 +23,8 @@ export const FrameResources = {
   SSSParam: 'sssParam',
   SSSDiffuse: 'sssDiffuse',
   SSSTransmission: 'sssTransmission',
-  SkinSSS: 'skinSSS'
+  SkinSSS: 'skinSSS',
+  ShadowMask: 'shadowMask'
 } as const;
 
 /**

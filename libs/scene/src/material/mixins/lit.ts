@@ -652,6 +652,13 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                       this.$l.directionCutoff = ShaderHelper.getLightDirectionAndCutoff(this, this.j);
                       this.$l.diffuseIntensity = ShaderHelper.getLightColorAndIntensity(this, this.j);
                       this.$l.extra = ShaderHelper.getLightExtra(this, this.j);
+                      if (that.drawContext.screenSpaceShadowMask) {
+                        this.$l.shadowMask = ShaderHelper.sampleShadowMask(this, this.j);
+                        this.diffuseIntensity = pb.vec4(
+                          pb.mul(this.diffuseIntensity.rgb, this.shadowMask),
+                          this.diffuseIntensity.w
+                        );
+                      }
                       this.$l.lightType = pb.int(this.extra.w);
                       this.$scope(function () {
                         callback.call(
@@ -679,6 +686,15 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                   this.$l.directionCutoff = ShaderHelper.getLightDirectionAndCutoff(this, this.c);
                   this.$l.diffuseIntensity = ShaderHelper.getLightColorAndIntensity(this, this.c);
                   this.$l.extra = ShaderHelper.getLightExtra(this, this.c);
+                  if (that.drawContext.screenSpaceShadowMask) {
+                    // Shadow-casting lights (buffer index <= numShadowLights) attenuate
+                    // by the pre-rendered screen-space shadow mask; others return 1.0.
+                    this.$l.shadowMask = ShaderHelper.sampleShadowMask(this, pb.int(this.c));
+                    this.diffuseIntensity = pb.vec4(
+                      pb.mul(this.diffuseIntensity.rgb, this.shadowMask),
+                      this.diffuseIntensity.w
+                    );
+                  }
                   this.$l.lightType = pb.int(this.extra.w);
                   this.$scope(function () {
                     callback.call(

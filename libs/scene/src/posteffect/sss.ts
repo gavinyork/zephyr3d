@@ -1084,27 +1084,31 @@ export class SSS extends AbstractPostEffect {
                 this.shadow = pb.mix(1, this.shadow, this.light.shadowStrength);
                 this.shadow = pb.clamp(this.shadow, 0, 1);
                 this.$return(this.shadow);
+              } else {
+                this.$l.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(
+                  this,
+                  pb.vec4(this.worldPos, 1)
+                );
+                this.$l.shadow = shadowMapParams!.impl!.computeShadow(
+                  shadowMapParams!,
+                  this,
+                  this.shadowVertex,
+                  this.NoL
+                );
+                this.$l.shadowDistance = this.light.shadowCameraParams.w;
+                this.shadow = pb.mix(
+                  this.shadow,
+                  1,
+                  pb.smoothStep(
+                    pb.mul(this.shadowDistance, 0.8),
+                    this.shadowDistance,
+                    pb.distance(this.camera.position.xyz, this.worldPos)
+                  )
+                );
+                this.shadow = pb.mix(1, this.shadow, this.light.shadowStrength);
+                this.shadow = pb.clamp(this.shadow, 0, 1);
+                this.$return(this.shadow);
               }
-              this.$l.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1));
-              this.$l.shadow = shadowMapParams!.impl!.computeShadow(
-                shadowMapParams!,
-                this,
-                this.shadowVertex,
-                this.NoL
-              );
-              this.$l.shadowDistance = this.light.shadowCameraParams.w;
-              this.shadow = pb.mix(
-                this.shadow,
-                1,
-                pb.smoothStep(
-                  pb.mul(this.shadowDistance, 0.8),
-                  this.shadowDistance,
-                  pb.distance(this.camera.position.xyz, this.worldPos)
-                )
-              );
-              this.shadow = pb.mix(1, this.shadow, this.light.shadowStrength);
-              this.shadow = pb.clamp(this.shadow, 0, 1);
-              this.$return(this.shadow);
             }
           );
         }

@@ -234,6 +234,8 @@ export class Camera extends SceneNode {
   protected _commandBufferReuse: boolean;
   /** @internal Hi-Z acceleration enable (primarily for SSR). */
   protected _HiZ: boolean;
+  /** @internal Screen-space shadow mask enable (Forward+ deferred shadows). */
+  protected _screenSpaceShadowMask: boolean;
   /** @internal If true, a float point backbuffer will be used. The default value is true */
   protected _HDR: boolean;
   /** @internal Tonemap enable flag (via post effect). */
@@ -434,6 +436,7 @@ export class Camera extends SceneNode {
     this._screenAdapter = new ScreenAdapter();
     this._adapted = false;
     this._HiZ = false;
+    this._screenSpaceShadowMask = false;
     this._HDR = true;
     this._toneMap = true;
     this._postEffectTonemap = new DRef();
@@ -578,6 +581,20 @@ export class Camera extends SceneNode {
   }
   set HiZ(val) {
     this._HiZ = !!val;
+  }
+  /**
+   * Whether the screen-space shadow mask is enabled.
+   *
+   * When enabled, shadow-casting lights are lit through the clustered pass and
+   * sample a pre-rendered screen-space shadow mask instead of each casting an
+   * additional full-scene additive light pass. Requires the depth prepass
+   * (always on in Forward+).
+   */
+  get screenSpaceShadowMask() {
+    return this._screenSpaceShadowMask;
+  }
+  set screenSpaceShadowMask(val) {
+    this._screenSpaceShadowMask = !!val;
   }
   /**
    * Render path used by the scene renderer.

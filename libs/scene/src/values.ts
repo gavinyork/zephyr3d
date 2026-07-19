@@ -69,6 +69,18 @@ export const LIGHT_TYPE_RECT = 4;
 export const MAX_CLUSTERED_LIGHTS = 255;
 
 /**
+ * Max number of shadow-casting lights backed by the screen-space shadow mask.
+ *
+ * Each mask layer packs 4 lights (one per RGBA8 channel), so this maps to
+ * `MAX_SHADOW_MASK_LIGHTS / 4` texture array layers. Shadow-casting lights are
+ * placed at the head of the clustered light buffer (indices `1..N`), so this
+ * value must not exceed {@link MAX_CLUSTERED_LIGHTS}. Shadow lights beyond this
+ * cap fall back to being lit without a mask-backed shadow.
+ * @public
+ */
+export const MAX_SHADOW_MASK_LIGHTS = 32;
+
+/**
  * Opaque render queue type
  * @public
  */

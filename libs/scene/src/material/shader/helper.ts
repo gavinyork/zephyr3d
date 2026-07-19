@@ -1,4 +1,5 @@
 import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
 import type { DrawContext } from '../../render/drawable';
 import {
   MaterialVaryingFlags,
@@ -14,11 +15,13 @@ import {
   RENDER_PASS_TYPE_SHADOWMAP
 } from '../../values';
 import type {
+  AbstractDevice,
   BindGroup,
   PBShaderExp,
   PBInsideFunctionScope,
   StructuredBuffer,
   Texture2D,
+  Texture2DArray,
   PBGlobalScope,
   BindGroupLayout
 } from '@zephyr3d/device';
@@ -39,6 +42,8 @@ const UNIFORM_NAME_BAKED_SKY_MAP = 'Z_UniformBakedSky';
 const UNIFORM_NAME_AERIALPERSPECTIVE_LUT = 'Z_UniformAerialPerspectiveLUT';
 const UNIFORM_NAME_SKYDISTANTLIGHT_LUT = 'Z_UniformSkyDistantLightLUT';
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
+const UNIFORM_NAME_SHADOW_MASK = 'Z_UniformShadowMask';
+const UNIFORM_NAME_SHADOW_MASK_MODE = 'Z_UniformShadowMaskMode';
 const UNIFORM_NAME_LINEAR_DEPTH_MAP = 'Z_UniformLinearDepth';
 const UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE = 'Z_UniformLinearDepthSize';
 const UNIFORM_NAME_SCENE_COLOR_MAP = 'Z_UniformSceneColor';
@@ -68,6 +73,8 @@ export class ShaderHelper {
   static readonly MATERIAL_INSTANCE_DATA_OFFSET = 9;
   /** @internal */
   static defaultSunDir = Vector3.one().inplaceNormalize();
+  /** @internal 1x1x1 fallback bound to the shadow-mask uniform when no mask exists this frame. */
+  private static _dummyShadowMask: Nullable<Texture2DArray> = null;
   /** @internal */
   private static readonly SKIN_MATRIX_NAME = 'Z_SkinMatrix';
   private static readonly SKIN_PREV_MATRIX_NAME = 'Z_PrevSkinMatrix';
@@ -269,7 +276,12 @@ export class ShaderHelper {
             pb.float('envLightSpecularStrength'),
             pb.vec4('clusterParams'),
             pb.ivec4('countParams'),
-            pb.ivec2('lightIndexTexSize')
+            pb.ivec2('lightIndexTexSize'),
+            // Number of shadow-casting lights at the head of the clustered light
+            // buffer (indices 1..N). Only present on the screen-space shadow mask
+            // path (part of the global bind group hash), so the declared and bound
+            // layouts always agree.
+            ...(ctx.screenSpaceShadowMask ? [pb.int('numShadowLights')] : [])
           ]);
       scope.camera = cameraStruct().uniform(0);
       scope.light = lightStruct().uniform(0);
@@ -279,6 +291,18 @@ export class ShaderHelper {
         scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE] = (
           pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D().noSampler()
         ).uniform(0);
+        // Screen-space shadow mask array (rgba8unorm, 4 shadow lights per layer).
+        // Sampled by clustered lights whose buffer index is <= numShadowLights.
+        // Presence is keyed into the global bind group hash, so declared and bound
+        // layouts always agree.
+        if (ctx.screenSpaceShadowMask) {
+          scope[UNIFORM_NAME_SHADOW_MASK] = pb.tex2DArray().uniform(0);
+          // Cluster shadow-light handling for the current queue: 1 = sample the
+          // opaque shadow mask (opaque queue); 0 = skip shadow lights, which are
+          // instead lit inline by the per-light additive passes (transparent queue,
+          // e.g. OIT hair, where the opaque-depth mask would be incorrect).
+          scope[UNIFORM_NAME_SHADOW_MASK_MODE] = pb.int().uniform(0);
+        }
       }
       // Baked sky cube: rgba16f without mipmaps
       scope[UNIFORM_NAME_BAKED_SKY_MAP] = pb
@@ -919,10 +943,22 @@ export class ShaderHelper {
       countParams: countParams,
       envLightStrength: ctx.env!.light.strength ?? 0,
       envLightSpecularStrength: ctx.env!.light.specularStrength ?? 1,
-      lightIndexTexSize: new Int32Array([lightIndexTexture.width, lightIndexTexture.height])
+      lightIndexTexSize: new Int32Array([lightIndexTexture.width, lightIndexTexture.height]),
+      ...(ctx.screenSpaceShadowMask ? { numShadowLights: ctx.clusteredLight?.numShadowLights ?? 0 } : {})
     });
     bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, lightBuffer);
     bindGroup.setTexture(UNIFORM_NAME_LIGHT_INDEX_TEXTURE, lightIndexTexture);
+    if (ctx.screenSpaceShadowMask) {
+      // The mask array is declared for the clustered light pass whenever the flag is
+      // on (keyed into the global bind group hash). When there are no shadow lights
+      // this frame the mask is never sampled, but a valid array texture must still
+      // be bound: fall back to a 1x1 dummy.
+      bindGroup.setTexture(
+        UNIFORM_NAME_SHADOW_MASK,
+        ctx.shadowMaskTexture ?? this.getDummyShadowMask(ctx.device),
+        fetchSampler('clamp_nearest')
+      );
+    }
     bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ctx.drawEnvLight) {
       ctx.env!.light.envLight.updateBindGroup(bindGroup);
@@ -1127,9 +1163,100 @@ export class ShaderHelper {
   static getCountParams(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.light.countParams;
   }
+  /**
+   * Number of shadow-casting lights at the head of the clustered light buffer.
+   * Only defined on the screen-space shadow mask path (ctx.screenSpaceShadowMask);
+   * a clustered light whose buffer index is `<= N` samples the shadow mask.
+   * @internal
+   */
+  static getNumShadowLights(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope.light.numShadowLights;
+  }
+  /**
+   * Cluster shadow-mask mode for the current queue: 1 = sample the opaque shadow
+   * mask for shadow lights; 0 = skip shadow lights (they are lit inline by the
+   * additive passes, used for the transparent queue). Only defined on the
+   * screen-space shadow mask path.
+   * @internal
+   */
+  static getShadowMaskMode(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_SHADOW_MASK_MODE];
+  }
+  /**
+   * Bind the per-queue cluster shadow-mask mode. Call in the clustered light pass
+   * only when the screen-space shadow mask path is active.
+   * @internal
+   */
+  static setShadowMaskMode(bindGroup: BindGroup, sampleMask: boolean) {
+    bindGroup.setValue(UNIFORM_NAME_SHADOW_MASK_MODE, sampleMask ? 1 : 0);
+  }
+  /**
+   * Lazily-created 1x1x1 rgba8unorm array texture used as the shadow-mask binding
+   * fallback when the screen-space shadow mask path is enabled but no mask was
+   * produced this frame (no shadow-casting lights). It is never sampled in that
+   * case, but the declared uniform still requires a valid binding.
+   * @internal
+   */
+  static getDummyShadowMask(device: AbstractDevice): Texture2DArray {
+    let tex = this._dummyShadowMask;
+    if (!tex || tex.disposed) {
+      tex = device.createTexture2DArray('rgba8unorm', 1, 1, 1, {
+        mipmapping: false
+      })!;
+      tex.name = 'DummyShadowMask';
+      this._dummyShadowMask = tex;
+    }
+    return tex;
+  }
   /** @internal */
   static getClusteredLightIndexTexture(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE];
+  }
+  /**
+   * Clustered shadow factor for a light, in `[0,1]` (1 = fully lit).
+   *
+   * - Lights whose clustered buffer index is greater than `numShadowLights` are not
+   *   shadow-casters and return 1.0.
+   * - Shadow-casting lights on the opaque queue (shadow mask mode 1) return the
+   *   screen-space mask value. Layer/channel are derived from the zero-based light
+   *   ordinal `s = index-1`: `layer = s >> 2`, `channel = s & 3`, matching the
+   *   ShadowMaskPass packing.
+   * - Shadow-casting lights on a transparent queue (mode 0) return 0: their clustered
+   *   contribution is suppressed because they are lit inline by the additive passes,
+   *   where shadows are sampled at the true (transparent) surface depth rather than
+   *   from the opaque-depth mask.
+   *
+   * Only valid on the screen-space shadow mask path (ctx.screenSpaceShadowMask).
+   * @internal
+   */
+  static sampleShadowMask(scope: PBInsideFunctionScope, lightIndex: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    const that = this;
+    const funcName = 'Z_sampleShadowMask';
+    pb.func(funcName, [pb.int('lightIndex')], function () {
+      this.$if(pb.greaterThan(this.lightIndex, that.getNumShadowLights(this)), function () {
+        this.$return(pb.float(1));
+      });
+      // Shadow light on a transparent queue: suppressed here, lit inline by additive.
+      this.$if(pb.equal(that.getShadowMaskMode(this), 0), function () {
+        this.$return(pb.float(0));
+      });
+      this.$l.ordinal = pb.sub(this.lightIndex, 1);
+      this.$l.layer = pb.div(this.ordinal, 4);
+      this.$l.channel = pb.sub(this.ordinal, pb.mul(this.layer, 4));
+      this.$l.uv = pb.div(pb.vec2(this.$builtins.fragCoord.xy), that.getRenderSize(this));
+      this.$l.texel = pb.textureArraySampleLevel(this[UNIFORM_NAME_SHADOW_MASK], this.uv, this.layer, 0);
+      // Select the light's channel via a dot with a one-hot mask (dynamic vector
+      // component indexing is not portable across GLSL ES / WGSL).
+      this.$l.selector = pb.vec4(
+        pb.float(pb.equal(this.channel, 0)),
+        pb.float(pb.equal(this.channel, 1)),
+        pb.float(pb.equal(this.channel, 2)),
+        pb.float(pb.equal(this.channel, 3))
+      );
+      this.$return(pb.dot(this.texel, this.selector));
+    });
+    return pb.getGlobalScope()[funcName](lightIndex);
   }
   /**
    * Gets the uniform variable that contains atmosphere parameters

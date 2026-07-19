@@ -38,13 +38,26 @@ export class DevicePoolAllocator implements RGTextureAllocator<Texture2D, FrameB
   allocate(desc: RGTextureDesc, size: RGResolvedSize): Texture2D {
     const device = this._device ?? getDevice();
     const mipmapping = (desc.mipLevels ?? 1) > 1;
-    const texture = device.pool.fetchTemporalTexture2D(
-      false,
-      desc.format,
-      size.width,
-      size.height,
-      mipmapping
-    );
+    const arrayLayers = desc.arrayLayers;
+    // A defined arrayLayers (even 1) requests a 2D array texture — a single-layer
+    // array is a distinct texture type from a plain 2D texture, and the two are
+    // not interchangeable when bound to a tex2DArray sampler. Array textures are
+    // fetched as Texture2DArray. The render graph's TTexture channel is nominally
+    // Texture2D (see forward_plus_builder's executor annotation); TS types are
+    // erased at runtime, every pool op below accepts BaseTexture, so the cast is
+    // safe. Passes resolve the real type via getTexture<Texture2DArray>().
+    // Individual layers are targeted through RGFramebufferDesc.attachmentLayer.
+    const texture =
+      arrayLayers !== undefined
+        ? (device.pool.fetchTemporalTexture2DArray(
+            false,
+            desc.format,
+            size.width,
+            size.height,
+            arrayLayers,
+            mipmapping
+          ) as unknown as Texture2D)
+        : device.pool.fetchTemporalTexture2D(false, desc.format, size.width, size.height, mipmapping);
     if (desc.mipLevels && texture.mipLevelCount < desc.mipLevels) {
       device.pool.releaseTexture(texture);
       throw new Error(
