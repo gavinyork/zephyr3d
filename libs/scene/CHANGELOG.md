@@ -1,6 +1,15 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Thu, 16 Jul 2026 10:58:45 GMT and should not be manually modified.
+This log was last generated on Sun, 19 Jul 2026 16:11:50 GMT and should not be manually modified.
+
+## 0.9.20
+Sun, 19 Jul 2026 16:11:50 GMT
+
+### Patches
+
+- Support per-target framebuffer clear colors
+- Implemented dual-depth-peeling OIT
+- screen-space shadow mask for Forward+ clustered lighting
 
 ## 0.9.19
 Thu, 16 Jul 2026 10:58:45 GMT

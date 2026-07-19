@@ -1,6 +1,14 @@
 # Change Log - @zephyr3d/device
 
-This log was last generated on Thu, 16 Jul 2026 10:58:45 GMT and should not be manually modified.
+This log was last generated on Sun, 19 Jul 2026 16:11:50 GMT and should not be manually modified.
+
+## 0.2.16
+Sun, 19 Jul 2026 16:11:50 GMT
+
+### Patches
+
+- Add RHI per-target blending support
+- Support per-target framebuffer clear colors
 
 ## 0.2.15
 Thu, 16 Jul 2026 10:58:45 GMT

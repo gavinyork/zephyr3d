@@ -2,6 +2,29 @@
   "name": "@zephyr3d/backend-webgpu",
   "entries": [
     {
+      "version": "0.1.19",
+      "tag": "@zephyr3d/backend-webgpu_v0.1.19",
+      "date": "Sun, 19 Jul 2026 16:11:50 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add RHI per-target blending support"
+          },
+          {
+            "comment": "Support per-target framebuffer clear colors"
+          },
+          {
+            "comment": "encode pixel readbacks into the frame command stream"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.15` to `0.2.16`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.18",
       "tag": "@zephyr3d/backend-webgpu_v0.1.18",
       "date": "Thu, 16 Jul 2026 10:58:45 GMT",

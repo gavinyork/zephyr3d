@@ -2,6 +2,29 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.20",
+      "tag": "@zephyr3d/scene_v0.9.20",
+      "date": "Sun, 19 Jul 2026 16:11:50 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Support per-target framebuffer clear colors"
+          },
+          {
+            "comment": "Implemented dual-depth-peeling OIT"
+          },
+          {
+            "comment": "screen-space shadow mask for Forward+ clustered lighting"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.15` to `0.2.16`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.19",
       "tag": "@zephyr3d/scene_v0.9.19",
       "date": "Thu, 16 Jul 2026 10:58:45 GMT",

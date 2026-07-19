@@ -2,6 +2,32 @@
   "name": "@zephyr3d/editor",
   "entries": [
     {
+      "version": "0.3.12",
+      "tag": "@zephyr3d/editor_v0.3.12",
+      "date": "Sun, 19 Jul 2026 16:11:50 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add profiler window for render graph GPU timings"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.15` to `0.2.16`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/scene\" from `^0.9.19` to `0.9.20`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/backend-webgl\" from `^0.1.14` to `0.1.15`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/backend-webgpu\" from `^0.1.18` to `0.1.19`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.3.11",
       "tag": "@zephyr3d/editor_v0.3.11",
       "date": "Thu, 16 Jul 2026 11:10:12 GMT",

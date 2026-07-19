@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/editor
 
-This log was last generated on Thu, 16 Jul 2026 11:10:12 GMT and should not be manually modified.
+This log was last generated on Sun, 19 Jul 2026 16:11:50 GMT and should not be manually modified.
+
+## 0.3.12
+Sun, 19 Jul 2026 16:11:50 GMT
+
+### Patches
+
+- Add profiler window for render graph GPU timings
 
 ## 0.3.11
 Thu, 16 Jul 2026 11:10:12 GMT

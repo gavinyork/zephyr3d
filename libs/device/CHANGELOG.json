@@ -2,6 +2,21 @@
   "name": "@zephyr3d/device",
   "entries": [
     {
+      "version": "0.2.16",
+      "tag": "@zephyr3d/device_v0.2.16",
+      "date": "Sun, 19 Jul 2026 16:11:50 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add RHI per-target blending support"
+          },
+          {
+            "comment": "Support per-target framebuffer clear colors"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.15",
       "tag": "@zephyr3d/device_v0.2.15",
       "date": "Thu, 16 Jul 2026 10:58:45 GMT",

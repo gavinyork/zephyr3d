@@ -1,6 +1,14 @@
 # Change Log - @zephyr3d/backend-webgl
 
-This log was last generated on Mon, 06 Jul 2026 06:18:13 GMT and should not be manually modified.
+This log was last generated on Sun, 19 Jul 2026 16:11:50 GMT and should not be manually modified.
+
+## 0.1.15
+Sun, 19 Jul 2026 16:11:50 GMT
+
+### Patches
+
+- Add RHI per-target blending support
+- Support per-target framebuffer clear colors
 
 ## 0.1.14
 Mon, 06 Jul 2026 06:18:13 GMT

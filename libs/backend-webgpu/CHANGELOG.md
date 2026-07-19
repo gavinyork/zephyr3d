@@ -1,6 +1,15 @@
 # Change Log - @zephyr3d/backend-webgpu
 
-This log was last generated on Thu, 16 Jul 2026 10:58:45 GMT and should not be manually modified.
+This log was last generated on Sun, 19 Jul 2026 16:11:50 GMT and should not be manually modified.
+
+## 0.1.19
+Sun, 19 Jul 2026 16:11:50 GMT
+
+### Patches
+
+- Add RHI per-target blending support
+- Support per-target framebuffer clear colors
+- encode pixel readbacks into the frame command stream
 
 ## 0.1.18
 Thu, 16 Jul 2026 10:58:45 GMT
