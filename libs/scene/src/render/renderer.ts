@@ -59,7 +59,9 @@ export class SceneRenderer {
             device.type !== 'webgl' && (camera.TAA || camera.motionBlur || (SSR && camera.ssrTemporal)),
           HiZ: camera.HiZ && device.type !== 'webgl',
           HiZTexture: null,
-          screenSpaceShadowMask: camera.screenSpaceShadowMask,
+          // WebGL1 has no 2D array textures; degrade gracefully to the legacy
+          // per-light additive shadow path (mirrors the HiZ gating above).
+          screenSpaceShadowMask: camera.screenSpaceShadowMask && device.type !== 'webgl',
           globalBindGroupAllocator,
           camera,
           compositor: camera.compositor,
