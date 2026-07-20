@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "fix: ShadowMaskPass reads undeclared linearDepth after TransmissionDepth",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
