@@ -572,7 +572,14 @@ function buildForwardPlusGraphInternal(
     const numShadowLights = renderQueue.shadowedLights.length;
     const numLayers = ShadowMaskRenderer.getLayerCount(numShadowLights);
     const maskPassResult = graph.addPass('ShadowMaskPass', (builder) => {
-      builder.read(depthHandle);
+      // Freeze the current linear-depth handle at build time. `depthHandle` is a
+      // mutable `let` that a later TransmissionDepth pass reassigns to a new
+      // version ('linearDepth@TransmissionDepth'); if the execute closure below
+      // captured it by reference it would read a handle this pass never declared,
+      // tripping RenderGraphExecutor's access assertion. The shadow mask is built
+      // from the opaque prepass depth, so the pre-transmission version is correct.
+      const maskDepthHandle = depthHandle;
+      builder.read(maskDepthHandle);
       builder.read(depthPassResult.depthFramebufferHandle);
       // createTexture already registers this pass as the resource producer, so
       // downstream passes read this handle directly (same pattern as HiZ). The
@@ -585,7 +592,7 @@ function buildForwardPlusGraphInternal(
         arrayLayers: numLayers
       });
       builder.setExecute((rgCtx) => {
-        const depthTex = rgCtx.getTexture<Texture2D>(depthHandle);
+        const depthTex = rgCtx.getTexture<Texture2D>(maskDepthHandle);
         const maskTex = rgCtx.getTexture<Texture2DArray>(maskHandle);
         _shadowMaskRenderer.render(ctx, depthTex, renderQueue.shadowedLights, (layer) =>
           rgCtx.createFramebuffer<FrameBuffer>({
