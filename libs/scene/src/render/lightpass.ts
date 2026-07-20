@@ -209,7 +209,11 @@ export class LightPass extends RenderPass {
       renderQueue.drawTransparent && camera.oit && camera.oit.supportDevice(ctx.device.type)
         ? camera.oit
         : null;
-    if (!oit && renderQueue.drawTransparent) {
+    // Sort only when this invocation actually draws the transparent queue.
+    // The opaque pass (and the SSS-profile pass) run with _renderTransparent
+    // === false; without this guard they would sort the transparent lists
+    // pointlessly, and the real transparent pass would then sort them again.
+    if (!oit && renderQueue.drawTransparent && this._renderTransparent) {
       renderQueue.sortTransparentItems(camera.getWorldPosition());
     }
     const flags: any = {
