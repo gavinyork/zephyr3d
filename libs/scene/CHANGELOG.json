@@ -2,6 +2,18 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.21",
+      "tag": "@zephyr3d/scene_v0.9.21",
+      "date": "Mon, 20 Jul 2026 17:14:56 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "fix: ShadowMaskPass reads undeclared linearDepth after TransmissionDepth"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.20",
       "tag": "@zephyr3d/scene_v0.9.20",
       "date": "Sun, 19 Jul 2026 16:11:50 GMT",

@@ -60,7 +60,7 @@
     "@webgpu/types": "^0.1.65",
     "@zephyr3d/base": "workspace:^0.2.8",
     "@zephyr3d/device": "workspace:^0.2.16",
-    "@zephyr3d/scene": "workspace:^0.9.20",
+    "@zephyr3d/scene": "workspace:^0.9.21",
     "@zephyr3d/backend-webgl": "workspace:^0.1.15",
     "@zephyr3d/backend-webgpu": "workspace:^0.1.19",
     "@rollup/plugin-commonjs": "~28.0.2"

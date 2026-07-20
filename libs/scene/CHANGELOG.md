@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Sun, 19 Jul 2026 16:11:50 GMT and should not be manually modified.
+This log was last generated on Mon, 20 Jul 2026 17:14:56 GMT and should not be manually modified.
+
+## 0.9.21
+Mon, 20 Jul 2026 17:14:56 GMT
+
+### Patches
+
+- fix: ShadowMaskPass reads undeclared linearDepth after TransmissionDepth
 
 ## 0.9.20
 Sun, 19 Jul 2026 16:11:50 GMT

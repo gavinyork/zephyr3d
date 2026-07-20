@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/scene",
-  "version": "0.9.20",
+  "version": "0.9.21",
   "description": "Scene API for zephyr3d",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
