@@ -1680,8 +1680,12 @@ function renderOpaqueScenePass(
     _scenePass.renderOpaque = true;
     _scenePass.renderTransparent = false;
     _scenePass.render(ctx, null, null, renderQueue);
-    _scenePass.renderTransparent = true;
   } finally {
+    // Restore the shared _scenePass flags so no state leaks to the next pass:
+    // the transparent pass sets transmission/renderOpaque/renderTransparent
+    // itself rather than inheriting whatever this pass happened to leave.
+    _scenePass.renderTransparent = true;
+    _scenePass.transmission = false;
     ctx.device.popDeviceStates();
   }
 }
@@ -1731,9 +1735,13 @@ function renderTransparentScenePass(
     device.setFramebuffer(framebuffer);
     device.setViewport(null);
     device.setScissor(null);
-    // _scenePass.transmission carries over from the opaque phase (true when the
-    // scene color copy seeded the background, false otherwise). Never clear:
-    // the opaque result is already in the target.
+    // Derive transmission mode from the same single source of truth the opaque
+    // pass used (renderQueue.needSceneColor()) instead of inheriting leftover
+    // _scenePass state. When scene color is needed the opaque pass seeded the
+    // refraction background and drew the transmission-opaque list, so here we
+    // draw transmission_trans + transparent; otherwise just the transparent
+    // list. Never clear: the opaque result is already in the target.
+    _scenePass.transmission = renderQueue.needSceneColor();
     _scenePass.clearColor = null;
     _scenePass.clearDepth = null;
     _scenePass.clearStencil = null;
