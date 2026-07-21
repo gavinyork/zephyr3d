@@ -6,7 +6,7 @@ import type { HistoryResourceManager } from './history_resource_manager';
 import type { DrawContext } from '../drawable';
 import type { RenderQueue } from '../render_queue';
 import type { Texture2D, FrameBuffer } from '@zephyr3d/device';
-import type { ForwardPlusOptions, FrameState } from './forward_plus_builder';
+import type { ForwardPlusOptions, FrameState, ForwardPlusBuildState } from './forward_plus_builder';
 
 /**
  * Ordering helper that encapsulates the side-effect "order token" chain.
@@ -90,6 +90,8 @@ export interface FrameGraphContext {
   readonly ordering: OrderingScope;
   /** The imported backbuffer handle (graph sink). */
   readonly backbuffer: RGHandle;
+  /** Mutable build-state shared between modules for non-resource intermediates. */
+  readonly state: ForwardPlusBuildState;
 }
 
 /** Backend framebuffer type used by the Forward+ allocator. */
