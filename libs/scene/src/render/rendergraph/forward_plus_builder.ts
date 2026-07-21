@@ -34,6 +34,9 @@ import { DevicePoolAllocator } from './device_pool_allocator';
 import { HistoryResourceManager } from './history_resource_manager';
 import { RGHistoryResources } from './history_resources';
 import { RGBlackboard, FrameResources } from './blackboard';
+import { OrderingScope } from './frame_graph_context';
+import type { FrameGraphContext } from './frame_graph_context';
+import type { RenderModule } from './render_module';
 import type { RGExecuteContext, RGHandle } from './types';
 import { renderObjectColors } from '../gpu_picking';
 import type { Primitive } from '../primitive';
@@ -376,6 +379,87 @@ interface SSSProfilePassResult {
   framebufferHandle: RGHandle;
 }
 
+// ─── Pre-scene side-effect modules ──────────────────────────────────
+// Sky update, clustered-light setup, GPU picking and shadow maps produce no
+// graph texture; they are sequenced through the ordering-token chain. Each is a
+// self-describing {@link RenderModule} so the pre-scene sequence is a plain list.
+
+/** @internal */
+const SkyUpdateModule: RenderModule = {
+  type: 'SkyUpdate',
+  enabled: () => true,
+  setup({ graph, ctx, frame, ordering }) {
+    graph.addPass('SkyUpdate', (builder) => {
+      ordering.emit(builder, 'SkyUpdateDone');
+      builder.sideEffect();
+      builder.setExecute(() => {
+        frame.sunLightColor = ctx.scene.env.sky.update(ctx);
+      });
+    });
+  }
+};
+
+/** @internal */
+const ClusterLightsModule: RenderModule = {
+  type: 'ClusterLights',
+  enabled: () => true,
+  setup({ graph, ctx, renderQueue, ordering }) {
+    graph.addPass('ClusterLights', (builder) => {
+      ordering.chainInto(builder);
+      ordering.emit(builder, 'ClusterLightsDone');
+      builder.sideEffect();
+      builder.setExecute(() => {
+        ctx.clusteredLight = getClusteredLight();
+        ctx.clusteredLight.calculateLightIndex(ctx.camera, renderQueue);
+      });
+    });
+  }
+};
+
+/** @internal */
+const GPUPickingModule: RenderModule = {
+  type: 'GPUPicking',
+  enabled: ({ options }) => options.gpuPicking,
+  setup({ graph, ctx, renderQueue, ordering }) {
+    graph.addPass('GPUPicking', (builder) => {
+      ordering.chainInto(builder);
+      ordering.emit(builder, 'GPUPickingDone');
+      builder.sideEffect();
+      builder.setExecute(() => {
+        const pickResolveFunc = ctx.camera.getPickResultResolveFunc();
+        if (pickResolveFunc) {
+          renderObjectColors(ctx, pickResolveFunc, renderQueue);
+        }
+      });
+    });
+  }
+};
+
+/** @internal */
+const ShadowMapsModule: RenderModule = {
+  type: 'ShadowMaps',
+  // Shadow maps are managed internally by lights; mark as side effect.
+  enabled: ({ renderQueue }) => renderQueue.shadowedLights.length > 0,
+  setup({ graph, ctx, renderQueue, ordering }) {
+    graph.addPass('ShadowMaps', (builder) => {
+      ordering.chainInto(builder);
+      ordering.emit(builder, 'ShadowMapsDone');
+      builder.sideEffect();
+      builder.setExecute(() => {
+        renderShadowMaps(ctx, renderQueue.shadowedLights);
+      });
+    });
+  }
+};
+
+/** @internal */
+const PRE_SCENE_MODULES: readonly RenderModule[] = [
+  SkyUpdateModule,
+  ClusterLightsModule,
+  GPUPickingModule,
+  ShadowMapsModule
+];
+
 // ─── Forward+ Graph Builder ─────────────────────────────────────────
 
 /**
@@ -427,62 +511,36 @@ function buildForwardPlusGraphInternal(
     sunLightRestored: false
   };
 
-  // ── 1. Sky Update ─────────────────────────────────────────────────
-  let orderToken = graph.addPass('SkyUpdate', (builder) => {
-    const done = builder.createToken('SkyUpdateDone');
-    builder.sideEffect();
-    builder.setExecute(() => {
-      frame.sunLightColor = ctx.scene.env.sky.update(ctx);
-    });
-    return done;
-  });
+  // Build-time context threaded through the pass-build blocks. Inter-block
+  // handles flow through `blackboard` (by FrameResources name) and ordering
+  // tokens through `ordering`, so no block reaches another's local variables.
+  const ordering = new OrderingScope();
+  const fg: FrameGraphContext = {
+    graph,
+    ctx,
+    renderQueue,
+    blackboard,
+    frame,
+    history: ctx.camera?.getHistoryResourceManager?.() ?? null,
+    options,
+    ordering,
+    backbuffer
+  };
 
-  // ── 2. Clustered Light Setup ──────────────────────────────────────
-  orderToken = graph.addPass('ClusterLights', (builder) => {
-    builder.read(orderToken);
-    const done = builder.createToken('ClusterLightsDone');
-    builder.sideEffect();
-    builder.setExecute(() => {
-      ctx.clusteredLight = getClusteredLight();
-      ctx.clusteredLight.calculateLightIndex(ctx.camera, renderQueue);
-    });
-    return done;
-  });
-
-  // ── 3. GPU Picking (optional, sideEffect) ─────────────────────────
-  if (options.gpuPicking) {
-    orderToken = graph.addPass('GPUPicking', (builder) => {
-      builder.read(orderToken);
-      const done = builder.createToken('GPUPickingDone');
-      builder.sideEffect();
-      builder.setExecute(() => {
-        const pickResolveFunc = ctx.camera.getPickResultResolveFunc();
-        if (pickResolveFunc) {
-          renderObjectColors(ctx, pickResolveFunc, renderQueue);
-        }
-      });
-      return done;
-    });
-  }
-
-  // ── 4. Shadow Maps ────────────────────────────────────────────────
-  // Shadow maps are managed internally by lights, mark as side effect
-  if (renderQueue.shadowedLights.length > 0) {
-    orderToken = graph.addPass('ShadowMaps', (builder) => {
-      builder.read(orderToken);
-      const done = builder.createToken('ShadowMapsDone');
-      builder.sideEffect();
-      builder.setExecute(() => {
-        renderShadowMaps(ctx, renderQueue.shadowedLights);
-      });
-      return done;
-    });
+  // ── 1-4. Pre-scene side-effect passes ─────────────────────────────
+  // These carry no data product; they are ordered relative to one another and
+  // to the depth prepass through the ordering-token chain. Each is a
+  // self-describing module reading only from the shared context.
+  for (const module of PRE_SCENE_MODULES) {
+    if (module.enabled(fg)) {
+      module.setup(fg);
+    }
   }
 
   // ── 5. Depth Prepass ──────────────────────────────────────────────
   // Declare transient depth and motion vector textures
   const depthPassResult = graph.addPass('DepthPrepass', (builder) => {
-    builder.read(orderToken);
+    ordering.chainInto(builder);
     const format: TextureFormat =
       ctx.device.type === 'webgl'
         ? ctx.SSRCalcThickness
@@ -542,9 +600,12 @@ function buildForwardPlusGraphInternal(
     };
   });
 
-  let depthHandle = depthPassResult.depthHandle;
   const motionVectorHandle = depthPassResult.motionVectorHandle;
-  blackboard.set(FrameResources.LinearDepth, depthHandle);
+  // Linear depth is threaded through the blackboard, not a mutable local: passes
+  // that mutate it in place (TransmissionDepth*) re-register the post-write
+  // version, so any block reading `blackboard.expect(LinearDepth)` at build time
+  // gets the version live at its position in the pipeline.
+  blackboard.set(FrameResources.LinearDepth, depthPassResult.depthHandle);
   if (motionVectorHandle) {
     blackboard.set(FrameResources.MotionVector, motionVectorHandle);
   }
@@ -565,20 +626,19 @@ function buildForwardPlusGraphInternal(
   ctx.shadowMaskTexture = null;
   // Gate on build-time state only: renderQueue.shadowedLights is available now,
   // whereas ctx.shadowMapInfo is populated later by the ShadowMaps pass execute
-  // (which runs before this pass thanks to the orderToken chain), so it must not
-  // be part of the pass-creation condition.
+  // (which runs before this pass thanks to the ordering-token chain), so it must
+  // not be part of the pass-creation condition.
   const useShadowMask = ctx.screenSpaceShadowMask && renderQueue.shadowedLights.length > 0;
   if (useShadowMask) {
     const numShadowLights = renderQueue.shadowedLights.length;
     const numLayers = ShadowMaskRenderer.getLayerCount(numShadowLights);
     const maskPassResult = graph.addPass('ShadowMaskPass', (builder) => {
-      // Freeze the current linear-depth handle at build time. `depthHandle` is a
-      // mutable `let` that a later TransmissionDepth pass reassigns to a new
-      // version ('linearDepth@TransmissionDepth'); if the execute closure below
-      // captured it by reference it would read a handle this pass never declared,
-      // tripping RenderGraphExecutor's access assertion. The shadow mask is built
-      // from the opaque prepass depth, so the pre-transmission version is correct.
-      const maskDepthHandle = depthHandle;
+      // Freeze the current linear-depth handle at build time. Reading the
+      // blackboard here returns the version live at this pipeline position (the
+      // opaque prepass depth, before any TransmissionDepth mutation), which is
+      // what the shadow mask is built from; capturing it by value avoids reading
+      // a later version this pass never declared.
+      const maskDepthHandle = blackboard.expect(FrameResources.LinearDepth);
       builder.read(maskDepthHandle);
       builder.read(depthPassResult.depthFramebufferHandle);
       // createTexture already registers this pass as the resource producer, so
@@ -628,12 +688,13 @@ function buildForwardPlusGraphInternal(
   let preLightTransmissionDepthToken: RGHandle | undefined;
   if (options.needsTransmissionDepthForSSR) {
     const transmissionDepthResult = graph.addPass('TransmissionDepthForSSR', (builder) => {
-      builder.read(depthHandle);
+      const currentDepth = blackboard.expect(FrameResources.LinearDepth);
+      builder.read(currentDepth);
       builder.read(depthPassResult.depthFramebufferHandle);
       // This pass renders transmission geometry into the prepass linear-depth
       // texture: model the mutation as a write so later readers order against
       // it through data flow instead of relying on the token alone.
-      const depthOut = builder.write(depthHandle);
+      const depthOut = builder.write(currentDepth);
       const done = builder.createToken('TransmissionDepthForSSRDone');
       builder.sideEffect();
       builder.setExecute((rgCtx) => {
@@ -642,16 +703,15 @@ function buildForwardPlusGraphInternal(
       return { done, depthOut };
     });
     preLightTransmissionDepthToken = transmissionDepthResult.done;
-    depthHandle = transmissionDepthResult.depthOut;
     // Re-register so blackboard consumers read the post-transmission version.
-    blackboard.set(FrameResources.LinearDepth, depthHandle);
+    blackboard.set(FrameResources.LinearDepth, transmissionDepthResult.depthOut);
   }
 
   // ── 6. Hi-Z (optional) ───────────────────────────────────────────
   let hiZHandle: RGHandle | undefined;
   if (options.hiZ) {
     graph.addPass('HiZ', (builder) => {
-      builder.read(depthHandle!);
+      builder.read(blackboard.expect(FrameResources.LinearDepth));
       builder.read(depthPassResult.depthFramebufferHandle);
       if (preLightTransmissionDepthToken) {
         builder.read(preLightTransmissionDepthToken);
@@ -685,7 +745,7 @@ function buildForwardPlusGraphInternal(
   }
 
   // ── 7. Main Light Pass ────────────────────────────────────────────
-  const historyManager = ctx.camera?.getHistoryResourceManager?.() ?? null;
+  const historyManager = fg.history;
   const lightHistoryReadBindings: HistoryReadBinding[] = [];
   const historySize = { width: ctx.renderWidth, height: ctx.renderHeight };
   if (historyManager && options.ssr && ctx.camera?.ssrTemporal && options.motionVectors) {
@@ -723,7 +783,7 @@ function buildForwardPlusGraphInternal(
   let sssProfileResult: SSSProfilePassResult | undefined;
   if (options.sss) {
     sssProfileResult = graph.addPass('SSSProfile', (builder) => {
-      builder.read(depthHandle);
+      builder.read(blackboard.expect(FrameResources.LinearDepth));
       builder.read(depthPassResult.depthFramebufferHandle);
       if (preLightTransmissionDepthToken) {
         builder.read(preLightTransmissionDepthToken);
@@ -770,7 +830,7 @@ function buildForwardPlusGraphInternal(
   let grabResult: { copyHandle: RGHandle; copyFramebufferHandle?: RGHandle } | undefined;
   if (options.needSceneColor) {
     grabResult = graph.addPass('SceneColorGrab', (builder) => {
-      builder.read(depthHandle);
+      builder.read(blackboard.expect(FrameResources.LinearDepth));
       builder.read(depthPassResult.depthFramebufferHandle);
       if (preLightTransmissionDepthToken) {
         builder.read(preLightTransmissionDepthToken);
@@ -800,7 +860,7 @@ function buildForwardPlusGraphInternal(
   }
 
   const lightPassResult = graph.addPass('LightPass', (builder) => {
-    builder.read(depthHandle);
+    builder.read(blackboard.expect(FrameResources.LinearDepth));
     builder.read(depthPassResult.depthFramebufferHandle);
     if (shadowMaskHandle) {
       builder.read(shadowMaskHandle);
@@ -965,7 +1025,7 @@ function buildForwardPlusGraphInternal(
   // Data dependencies for every effect pass: frame textures the effects sample
   // through DrawContext fields (linear depth, HiZ, scene color copy, SSS MRT
   // outputs) rather than through declared require* hooks.
-  const opaqueChainDeps: RGHandle[] = [depthHandle];
+  const opaqueChainDeps: RGHandle[] = [blackboard.expect(FrameResources.LinearDepth)];
   if (hiZHandle) {
     opaqueChainDeps.push(hiZHandle);
   }
@@ -1012,7 +1072,7 @@ function buildForwardPlusGraphInternal(
   // Renders on top of the opaque-chain output; graph-wise an in-place write
   // producing a new version of the current scene color.
   const sceneColorHandle = graph.addPass('TransparentPass', (builder) => {
-    builder.read(depthHandle);
+    builder.read(blackboard.expect(FrameResources.LinearDepth));
     builder.read(depthPassResult.depthFramebufferHandle);
     if (hiZHandle) {
       // Transparent-phase materials may ray-march HiZ (e.g. water SSR)
@@ -1090,13 +1150,14 @@ function buildForwardPlusGraphInternal(
   let transmissionDepthToken: RGHandle | undefined;
   if (options.needSceneColor && !options.needsTransmissionDepthForSSR) {
     const transmissionDepthResult = graph.addPass('TransmissionDepth', (builder) => {
+      const currentDepth = blackboard.expect(FrameResources.LinearDepth);
       builder.read(sceneColorHandle);
       if (transparentChainResult.color !== sceneColorHandle) {
         builder.read(transparentChainResult.color);
       }
-      builder.read(depthHandle);
+      builder.read(currentDepth);
       builder.read(depthPassResult.depthFramebufferHandle);
-      const depthOut = builder.write(depthHandle);
+      const depthOut = builder.write(currentDepth);
       const done = builder.createToken('TransmissionDepthDone');
       builder.sideEffect();
       builder.setExecute((rgCtx) => {
@@ -1105,10 +1166,9 @@ function buildForwardPlusGraphInternal(
       return { done, depthOut };
     });
     transmissionDepthToken = transmissionDepthResult.done;
-    depthHandle = transmissionDepthResult.depthOut;
     // The transparent-layer chain above read the pre-transmission version;
     // everything built from here on (end-layer chain) reads this one.
-    blackboard.set(FrameResources.LinearDepth, depthHandle);
+    blackboard.set(FrameResources.LinearDepth, transmissionDepthResult.depthOut);
   }
 
   // 9. End-layer effects (TAA). Ordered after TransmissionDepth.
