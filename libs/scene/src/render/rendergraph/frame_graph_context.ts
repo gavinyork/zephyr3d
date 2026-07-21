@@ -17,7 +17,7 @@ import type { ForwardPlusOptions, FrameState, ForwardPlusBuildState } from './fo
  * pass can chain after the previous one and (optionally) emit its own, without
  * the builder threading a mutable `orderToken` local between blocks.
  *
- * @internal
+ * @public
  */
 export class OrderingScope {
   /** @internal */
@@ -65,23 +65,21 @@ export class OrderingScope {
  * rather than from closure-captured variables.
  *
  * Handles for well-known frame resources (linear depth, scene color, ...) flow
- * through {@link FrameGraphContext.blackboard} keyed by
+ * through {@link RenderModuleContext.blackboard} keyed by
  * {@link ./blackboard#FrameResources}; the mutable execute-time state that is
  * not a render-graph resource stays on {@link FrameGraphContext.frame}.
  *
- * @internal
+ * @public
  */
-export interface FrameGraphContext {
+export interface RenderModuleContext {
   /** The render graph being populated for this frame. */
   readonly graph: RenderGraph;
   /** Frame draw context. */
   readonly ctx: DrawContext;
   /** The culled render queue for this frame. */
   readonly renderQueue: RenderQueue;
-  /** Named registry of shared frame-resource handles. */
+  /** Named registry of shared frame-resource handles (see {@link ./blackboard#FrameResources}). */
   readonly blackboard: RGBlackboard;
-  /** Mutable execute-time state shared between pass callbacks. */
-  readonly frame: FrameState;
   /** Cross-frame history resource manager, or null when unavailable. */
   readonly history: Nullable<HistoryResourceManager<Texture2D>>;
   /** Pipeline feature toggles derived from scene/camera state. */
@@ -90,6 +88,19 @@ export interface FrameGraphContext {
   readonly ordering: OrderingScope;
   /** The imported backbuffer handle (graph sink). */
   readonly backbuffer: RGHandle;
+}
+
+/**
+ * Full build-time context threaded through the Forward+ pipeline. Extends the
+ * public {@link RenderModuleContext} with the Forward+ pipeline's internal
+ * mutable state, which built-in modules read/write but custom modules should
+ * not depend on.
+ *
+ * @internal
+ */
+export interface FrameGraphContext extends RenderModuleContext {
+  /** Mutable execute-time state shared between pass callbacks. */
+  readonly frame: FrameState;
   /** Mutable build-state shared between modules for non-resource intermediates. */
   readonly state: ForwardPlusBuildState;
 }

@@ -2,11 +2,14 @@ import {
   HistoryResourceManager,
   RenderGraph,
   RGHistoryResources,
-  type RGTextureAllocator
+  FrameResources,
+  type RGTextureAllocator,
+  type RenderModule
 } from '../../../libs/scene/src/render/rendergraph';
 import {
   deriveForwardPlusOptions,
   buildForwardPlusGraph,
+  createForwardPlusPipeline,
   type ForwardPlusOptions
 } from '../../../libs/scene/src/render/rendergraph/forward_plus_builder';
 import { AbstractPostEffect, PostEffectLayer } from '../../../libs/scene/src/posteffect/posteffect';
@@ -1183,5 +1186,58 @@ describe('Final framebuffer as intermediate (editor render-to-texture mode)', ()
     expect(transparentPass?.writes.some((res) => res.name.startsWith('PostEffect:OpaqueEffect:out@'))).toBe(
       true
     );
+  });
+});
+
+describe('Forward+ pipeline customization', () => {
+  function compilePipelinePassNames(
+    pipeline: unknown,
+    options: ForwardPlusOptions = createOptions()
+  ): string[] {
+    const graph = new RenderGraph();
+    const backbuffer = buildForwardPlusGraph(
+      graph,
+      createMockDrawContext({ camera: { renderPipeline: pipeline } }),
+      createMockRenderQueue({ needSceneColor: options.needSceneColor }),
+      options
+    );
+    return graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+  }
+
+  test('default pipeline reproduces the built-in pass set (parity)', () => {
+    // No camera.renderPipeline → the shared default pipeline is used, which must
+    // match a direct build.
+    const direct = compileForwardPlusPassNames(createOptions());
+    const viaDefault = compilePipelinePassNames(createForwardPlusPipeline());
+    expect(viaDefault).toEqual(direct);
+    expect(viaDefault).toContain('LightPass');
+    expect(viaDefault).toContain('TransparentPass');
+    expect(viaDefault).toContain('Present');
+  });
+
+  test('a custom module inserted after LightPass adds its pass to the built graph', () => {
+    const customModule: RenderModule = {
+      type: 'MyCustom',
+      enabled: () => true,
+      setup(context) {
+        context.graph.addPass('MyCustomPass', (builder) => {
+          builder.read(context.blackboard.expect(FrameResources.LinearDepth));
+          builder.sideEffect();
+          builder.setExecute(() => {});
+        });
+      }
+    };
+    const pipeline = createForwardPlusPipeline().insertAfter('LightPass', customModule);
+    const names = compilePipelinePassNames(pipeline);
+    expect(names).toContain('MyCustomPass');
+    expect(names).toContain('LightPass');
+  });
+
+  test('removing a built-in module drops its pass, leaving the rest intact', () => {
+    const pipeline = createForwardPlusPipeline().remove('SkyUpdate');
+    const names = compilePipelinePassNames(pipeline);
+    expect(names).not.toContain('SkyUpdate');
+    expect(names).toContain('LightPass');
+    expect(names).toContain('Present');
   });
 });

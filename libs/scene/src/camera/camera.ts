@@ -33,6 +33,7 @@ import { ABufferOIT } from '../render/abuffer_oit';
 import { WeightedBlendedOIT } from '../render/weightedblended_oit';
 import { DualDepthPeelingOIT } from '../render/dualdepthpeeling_oit';
 import type { HistoryResourceManager } from '../render';
+import type { RenderPipeline } from '../render';
 
 /**
  * Result of a camera picking operation.
@@ -1801,6 +1802,20 @@ export class Camera extends SceneNode {
       current.dispose();
     }
     Camera._historyResourceManager.set(this, manager);
+  }
+  /** @internal */
+  private _renderPipeline: Nullable<RenderPipeline> = null;
+  /**
+   * The render pipeline that assembles this camera's frame graph. When null
+   * (the default), the shared default Forward+ pipeline is used. Assign a
+   * customized pipeline to override rendering for this camera only, e.g.
+   * `camera.renderPipeline = createForwardPlusPipeline().insertAfter('LightPass', myModule)`.
+   */
+  get renderPipeline(): Nullable<RenderPipeline> {
+    return this._renderPipeline;
+  }
+  set renderPipeline(pipeline: Nullable<RenderPipeline>) {
+    this._renderPipeline = pipeline;
   }
   /** @internal */
   private setController(controller: Nullable<BaseCameraController>) {

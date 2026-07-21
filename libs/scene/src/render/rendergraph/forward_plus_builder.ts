@@ -37,6 +37,7 @@ import { RGBlackboard, FrameResources } from './blackboard';
 import { OrderingScope } from './frame_graph_context';
 import type { FrameGraphContext } from './frame_graph_context';
 import type { RenderModule } from './render_module';
+import { RenderPipeline } from './render_pipeline';
 import type { RGExecuteContext, RGHandle } from './types';
 import { renderObjectColors } from '../gpu_picking';
 import type { Primitive } from '../primitive';
@@ -449,6 +450,8 @@ export interface ForwardPlusBuildState {
   grab?: SceneColorGrabResult;
   /** Main light pass outputs. */
   lightPass?: LightPassResult;
+  /** Graph output handle produced by the composite tail (Present/FrameCleanup). */
+  presentedBackbuffer?: RGHandle;
 }
 
 // ═══ Forward+ pipeline modules ══════════════════════════════════════
@@ -484,7 +487,7 @@ export interface ForwardPlusBuildState {
 const SkyUpdateModule: RenderModule = {
   type: 'SkyUpdate',
   enabled: () => true,
-  setup({ graph, ctx, frame, ordering }) {
+  setup({ graph, ctx, frame, ordering }: FrameGraphContext) {
     graph.addPass('SkyUpdate', (builder) => {
       ordering.emit(builder, 'SkyUpdateDone');
       builder.sideEffect();
@@ -499,7 +502,7 @@ const SkyUpdateModule: RenderModule = {
 const ClusterLightsModule: RenderModule = {
   type: 'ClusterLights',
   enabled: () => true,
-  setup({ graph, ctx, renderQueue, ordering }) {
+  setup({ graph, ctx, renderQueue, ordering }: FrameGraphContext) {
     graph.addPass('ClusterLights', (builder) => {
       ordering.chainInto(builder);
       ordering.emit(builder, 'ClusterLightsDone');
@@ -516,7 +519,7 @@ const ClusterLightsModule: RenderModule = {
 const GPUPickingModule: RenderModule = {
   type: 'GPUPicking',
   enabled: ({ options }) => options.gpuPicking,
-  setup({ graph, ctx, renderQueue, ordering }) {
+  setup({ graph, ctx, renderQueue, ordering }: FrameGraphContext) {
     graph.addPass('GPUPicking', (builder) => {
       ordering.chainInto(builder);
       ordering.emit(builder, 'GPUPickingDone');
@@ -536,7 +539,7 @@ const ShadowMapsModule: RenderModule = {
   type: 'ShadowMaps',
   // Shadow maps are managed internally by lights; mark as side effect.
   enabled: ({ renderQueue }) => renderQueue.shadowedLights.length > 0,
-  setup({ graph, ctx, renderQueue, ordering }) {
+  setup({ graph, ctx, renderQueue, ordering }: FrameGraphContext) {
     graph.addPass('ShadowMaps', (builder) => {
       ordering.chainInto(builder);
       ordering.emit(builder, 'ShadowMapsDone');
@@ -548,21 +551,13 @@ const ShadowMapsModule: RenderModule = {
   }
 };
 
-/** @internal */
-const PRE_SCENE_MODULES: readonly RenderModule[] = [
-  SkyUpdateModule,
-  ClusterLightsModule,
-  GPUPickingModule,
-  ShadowMapsModule
-];
-
 // ─── Depth prepass module ───────────────────────────────────────────
 
 /** @internal */
 const DepthPrepassModule: RenderModule = {
   type: 'DepthPrepass',
   enabled: () => true,
-  setup(fg) {
+  setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, ordering, blackboard, options } = fg;
     const result = graph.addPass('DepthPrepass', (builder) => {
       ordering.chainInto(builder);
@@ -671,7 +666,7 @@ const ShadowMaskModule: RenderModule = {
   // (which runs before this pass thanks to the ordering-token chain), so it must
   // not be part of the pass-creation condition.
   enabled: ({ ctx, renderQueue }) => ctx.screenSpaceShadowMask && renderQueue.shadowedLights.length > 0,
-  setup(fg) {
+  setup(fg: FrameGraphContext) {
     // When active, render each shadow-casting light's visibility into an RGBA8
     // texture array (4 lights per layer). The clustered LightPass samples this
     // mask instead of each shadowed light running its own additive pass. The
@@ -728,7 +723,7 @@ const ShadowMaskModule: RenderModule = {
 const TransmissionDepthForSSRModule: RenderModule = {
   type: 'TransmissionDepthForSSR',
   enabled: ({ options }) => options.needsTransmissionDepthForSSR,
-  setup(fg) {
+  setup(fg: FrameGraphContext) {
     const { graph, frame, blackboard } = fg;
     const depthPassResult = fg.state.depth!;
     const transmissionDepthResult = graph.addPass('TransmissionDepthForSSR', (builder) => {
@@ -758,7 +753,7 @@ const TransmissionDepthForSSRModule: RenderModule = {
 const HiZModule: RenderModule = {
   type: 'HiZ',
   enabled: ({ options }) => options.hiZ,
-  setup(fg) {
+  setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard } = fg;
     const depthPassResult = fg.state.depth!;
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
@@ -805,7 +800,7 @@ const HiZModule: RenderModule = {
 const SSSProfileModule: RenderModule = {
   type: 'SSSProfile',
   enabled: ({ options }) => options.sss,
-  setup(fg) {
+  setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard } = fg;
     const depthPassResult = fg.state.depth!;
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
@@ -859,7 +854,7 @@ const SSSProfileModule: RenderModule = {
 const SceneColorGrabModule: RenderModule = {
   type: 'SceneColorGrab',
   enabled: ({ options }) => options.needSceneColor,
-  setup(fg) {
+  setup(fg: FrameGraphContext) {
     // Renders the full scene (no transmission) into a copy texture that
     // transmission/refraction materials sample as background.
     const { graph, ctx, frame, blackboard, options } = fg;
@@ -903,7 +898,7 @@ const SceneColorGrabModule: RenderModule = {
 const LightPassModule: RenderModule = {
   type: 'LightPass',
   enabled: () => true,
-  setup(fg) {
+  setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard, options, backbuffer } = fg;
     const depthPassResult = fg.state.depth!;
     const shadowMaskHandle = fg.state.shadowMaskHandle;
@@ -1110,6 +1105,314 @@ const LightPassModule: RenderModule = {
   }
 };
 
+// ─── Composite tail module ──────────────────────────────────────────
+// The post-effect chains (opaque/transparent/end), the transparent scene pass,
+// the optional transmission-depth pass and Present/FrameCleanup form one
+// order-sensitive orchestration block. It is exposed as a single module so users
+// can insert passes before or after it, while post-effect-level customization
+// stays with the Compositor layers. All its inputs come from fg.state / fg.
+
+/** @internal */
+const CompositeTailModule: RenderModule = {
+  type: 'CompositeTail',
+  enabled: () => true,
+  setup(fg: FrameGraphContext) {
+    const { graph, ctx, frame, blackboard, options, backbuffer } = fg;
+    const depthPassResult = fg.state.depth!;
+    const hiZHandle = fg.state.hiZHandle;
+    const sssProfileResult = fg.state.sssProfile;
+    const grabResult = fg.state.grab;
+    const lightPassResult = fg.state.lightPass!;
+    const renderDepthAttachment = fg.state.renderDepthAttachment;
+    const useFinalFramebufferAsIntermediate = fg.state.useFinalFramebufferAsIntermediate;
+    const lightHistoryReadBindings = fg.state.lightHistoryReadBindings;
+    const historyManager = fg.history;
+
+    // 7d. Opaque-layer post effects (SAO/SSR/SSS/SkinSSS). They read the opaque
+    // scene color and must complete before transparent geometry renders on top
+    // of their output. Never direct-write: the chain output becomes the
+    // transparent pass's render target. In final-framebuffer-as-intermediate
+    // mode the scene color handle is the LightPass's backbuffer write version,
+    // so the data flow is real either way — no keep-alive reads needed.
+    const opaqueChainInput = lightPassResult.sceneColorHandle;
+    // Data dependencies for every effect pass: frame textures the effects sample
+    // through DrawContext fields (linear depth, HiZ, scene color copy, SSS MRT
+    // outputs) rather than through declared require* hooks.
+    const opaqueChainDeps: RGHandle[] = [blackboard.expect(FrameResources.LinearDepth)];
+    if (hiZHandle) {
+      opaqueChainDeps.push(hiZHandle);
+    }
+    if (lightPassResult.sceneColorFramebufferHandle) {
+      opaqueChainDeps.push(lightPassResult.sceneColorFramebufferHandle);
+    }
+    if (grabResult) {
+      opaqueChainDeps.push(grabResult.copyHandle);
+    }
+    if (sssProfileResult) {
+      opaqueChainDeps.push(sssProfileResult.profileHandle, sssProfileResult.paramHandle);
+      if (sssProfileResult.normalHandle) {
+        opaqueChainDeps.push(sssProfileResult.normalHandle);
+      }
+    }
+    for (const handle of [
+      lightPassResult.ssrRoughnessHandle,
+      lightPassResult.ssrNormalHandle,
+      lightPassResult.sssDiffuseHandle,
+      lightPassResult.sssTransmissionHandle,
+      lightPassResult.skinSSSHandle
+    ]) {
+      if (handle) {
+        opaqueChainDeps.push(handle);
+      }
+    }
+    const opaqueChainResult = ctx.compositor
+      ? ctx.compositor.buildLayer({
+          graph,
+          ctx,
+          layer: PostEffectLayer.opaque,
+          blackboard,
+          input: opaqueChainInput,
+          finalOutput: null,
+          sceneDepthAttachment: renderDepthAttachment,
+          dependencies: opaqueChainDeps,
+          historyReads: lightHistoryReadBindings,
+          history: historyManager
+        })
+      : { color: opaqueChainInput, wroteFinal: false };
+    const opaqueChainRan = opaqueChainResult.color !== opaqueChainInput;
+
+    // 7e. Transparent scene geometry (transmission/transparent lists + OIT).
+    // Renders on top of the opaque-chain output; graph-wise an in-place write
+    // producing a new version of the current scene color.
+    const sceneColorHandle = graph.addPass('TransparentPass', (builder) => {
+      builder.read(blackboard.expect(FrameResources.LinearDepth));
+      builder.read(depthPassResult.depthFramebufferHandle);
+      if (hiZHandle) {
+        // Transparent-phase materials may ray-march HiZ (e.g. water SSR)
+        builder.read(hiZHandle);
+      }
+      if (lightPassResult.sceneColorFramebufferHandle) {
+        builder.read(lightPassResult.sceneColorFramebufferHandle);
+      }
+      if (lightPassResult.sceneColorCopyHandle) {
+        builder.read(lightPassResult.sceneColorCopyHandle);
+      }
+      builder.read(opaqueChainResult.color);
+      const out = builder.write(opaqueChainResult.color);
+      builder.setExecute((rgCtx) => {
+        renderTransparentScenePass(
+          frame,
+          rgCtx,
+          opaqueChainRan ? opaqueChainResult.color : null,
+          lightPassResult.sceneColorFramebufferHandle
+        );
+      });
+      return out;
+    });
+    blackboard.set(FrameResources.SceneColor, sceneColorHandle);
+    if (lightPassResult.sceneColorCopyHandle) {
+      blackboard.set(FrameResources.SceneColorCopy, lightPassResult.sceneColorCopyHandle);
+    }
+    if (sssProfileResult) {
+      blackboard.set(FrameResources.SSSProfile, sssProfileResult.profileHandle);
+      blackboard.set(FrameResources.SSSParam, sssProfileResult.paramHandle);
+    }
+
+    // 8. Post effect chains + transmission depth.
+    //
+    // Chain input: the TransparentPass output version — the authoritative scene
+    // color regardless of whether it physically lives in a texture or in the
+    // backbuffer (final framebuffer used as intermediate, no opaque effects).
+    const chainInput = sceneColorHandle;
+    // When the scene color still physically resides in the final framebuffer,
+    // the Present blit must be skipped if no effect moved it to a texture.
+    // (Opaque-layer effects disable final-as-intermediate mode, so the scene
+    // color is backbuffer-resident whenever that mode is active.)
+    const backbufferResidentHandle = useFinalFramebufferAsIntermediate ? sceneColorHandle : null;
+    // No extra chain dependencies: the effect chains link to the scene color
+    // through their inputs, and per-effect texture needs are declared via the
+    // require* hooks in AbstractPostEffect.setup().
+    const chainDependencies: RGHandle[] = [];
+    const finalOutput = { handle: backbuffer, isScreen: !ctx.finalFramebuffer };
+    const endLayerHasEffects = !!ctx.compositor?.layerHasEnabledEffect(PostEffectLayer.end);
+
+    // 8a. Transparent-layer effects (bloom, tonemap, FXAA, ...). They run right
+    // after the light pass and must sample the pre-transmission linear depth, so
+    // they carry no transmissionDepthToken dependency; TransmissionDepth is
+    // instead ordered after this chain (see 8b).
+    const transparentChainResult = ctx.compositor
+      ? ctx.compositor.buildLayer({
+          graph,
+          ctx,
+          layer: PostEffectLayer.transparent,
+          blackboard,
+          input: chainInput,
+          finalOutput: endLayerHasEffects ? null : finalOutput,
+          inputResidesInFinalTarget: !!backbufferResidentHandle,
+          sceneDepthAttachment: renderDepthAttachment,
+          dependencies: chainDependencies,
+          history: historyManager
+        })
+      : { color: chainInput, wroteFinal: false };
+
+    // 8b. Transmission depth pass (optional). Mutates the linear depth texture;
+    // the mutation is modeled as a graph write: the WAR hazard orders this pass
+    // after every pre-transmission depth reader (the transparent-layer chain),
+    // and re-registering the post-write version in the blackboard gives
+    // end-layer effects (TAA) a real data dependency on the transmission depth.
+    let transmissionDepthToken: RGHandle | undefined;
+    if (options.needSceneColor && !options.needsTransmissionDepthForSSR) {
+      const transmissionDepthResult = graph.addPass('TransmissionDepth', (builder) => {
+        const currentDepth = blackboard.expect(FrameResources.LinearDepth);
+        builder.read(sceneColorHandle);
+        if (transparentChainResult.color !== sceneColorHandle) {
+          builder.read(transparentChainResult.color);
+        }
+        builder.read(currentDepth);
+        builder.read(depthPassResult.depthFramebufferHandle);
+        const depthOut = builder.write(currentDepth);
+        const done = builder.createToken('TransmissionDepthDone');
+        builder.sideEffect();
+        builder.setExecute((rgCtx) => {
+          renderTransmissionDepthPass(frame, rgCtx);
+        });
+        return { done, depthOut };
+      });
+      transmissionDepthToken = transmissionDepthResult.done;
+      // The transparent-layer chain above read the pre-transmission version;
+      // everything built from here on (end-layer chain) reads this one.
+      blackboard.set(FrameResources.LinearDepth, transmissionDepthResult.depthOut);
+    }
+
+    // 9. End-layer effects (TAA). Ordered after TransmissionDepth.
+    const endChainDependencies = transmissionDepthToken
+      ? [...chainDependencies, transmissionDepthToken]
+      : chainDependencies;
+    const chainResult = ctx.compositor
+      ? ctx.compositor.buildLayer({
+          graph,
+          ctx,
+          layer: PostEffectLayer.end,
+          blackboard,
+          input: transparentChainResult.color,
+          finalOutput,
+          // Still backbuffer-resident if the transparent-layer chain ran no effect
+          inputResidesInFinalTarget:
+            !!backbufferResidentHandle && transparentChainResult.color === chainInput,
+          sceneDepthAttachment: renderDepthAttachment,
+          dependencies: endChainDependencies,
+          history: historyManager
+        })
+      : { color: transparentChainResult.color, wroteFinal: false };
+    const finalWroteFinal = chainResult.wroteFinal || transparentChainResult.wroteFinal;
+
+    // 10. Present + frame cleanup.
+    let presentedBackbuffer: RGHandle;
+    if (finalWroteFinal) {
+      // The last effect wrote the final target directly; only cleanup remains.
+      presentedBackbuffer = chainResult.color;
+      graph.addPass('FrameCleanup', (builder) => {
+        builder.read(presentedBackbuffer);
+        for (const dep of endChainDependencies) {
+          builder.read(dep);
+        }
+        builder.sideEffect();
+        builder.setExecute(() => {
+          finishFrame(frame);
+        });
+      });
+    } else {
+      presentedBackbuffer = graph.addPass('Present', (builder) => {
+        builder.read(chainResult.color);
+        for (const dep of endChainDependencies) {
+          builder.read(dep);
+        }
+        const outputBackbuffer = builder.write(backbuffer);
+        // Skip the blit when the chain output already lives in the final target
+        // (final framebuffer used as intermediate and no end-layer effect ran).
+        const needsBlit = chainResult.color !== backbufferResidentHandle;
+        builder.setExecute((rgCtx) => {
+          const sourceTex = needsBlit ? rgCtx.getTexture<Texture2D>(chainResult.color) : null;
+          if (sourceTex) {
+            const blitter = new CopyBlitter();
+            blitter.srgbOut = !ctx.finalFramebuffer;
+            blitter.blit(sourceTex, ctx.finalFramebuffer ?? null, fetchSampler('clamp_nearest_nomip'));
+          }
+          finishFrame(frame);
+        });
+        return outputBackbuffer;
+      });
+    }
+    fg.state.presentedBackbuffer = presentedBackbuffer;
+  }
+};
+
+// ─── Default Forward+ pipeline ──────────────────────────────────────
+
+/**
+ * The built-in Forward+ modules in default order. Referenced by anchor `type`
+ * for pipeline insertion/replacement (e.g. `insertAfter('LightPass', ...)`).
+ *
+ * @public
+ */
+export const ForwardPlusModules = {
+  SkyUpdate: SkyUpdateModule,
+  ClusterLights: ClusterLightsModule,
+  GPUPicking: GPUPickingModule,
+  ShadowMaps: ShadowMapsModule,
+  DepthPrepass: DepthPrepassModule,
+  ShadowMask: ShadowMaskModule,
+  TransmissionDepthForSSR: TransmissionDepthForSSRModule,
+  HiZ: HiZModule,
+  SSSProfile: SSSProfileModule,
+  SceneColorGrab: SceneColorGrabModule,
+  LightPass: LightPassModule,
+  CompositeTail: CompositeTailModule
+} as const;
+
+/** The default module order assembled by {@link createForwardPlusPipeline}. */
+const DEFAULT_FORWARD_PLUS_MODULES: readonly RenderModule[] = [
+  SkyUpdateModule,
+  ClusterLightsModule,
+  GPUPickingModule,
+  ShadowMapsModule,
+  DepthPrepassModule,
+  ShadowMaskModule,
+  TransmissionDepthForSSRModule,
+  HiZModule,
+  SSSProfileModule,
+  SceneColorGrabModule,
+  LightPassModule,
+  CompositeTailModule
+];
+
+/** @internal Shared default pipeline, created lazily. */
+let _defaultForwardPlusPipeline: RenderPipeline | null = null;
+
+/**
+ * Create a fresh, independent Forward+ {@link RenderPipeline} preloaded with the
+ * built-in modules. Customize it and assign to `camera.renderPipeline`, or edit
+ * {@link getDefaultForwardPlusPipeline} to affect every camera.
+ *
+ * @public
+ */
+export function createForwardPlusPipeline(): RenderPipeline {
+  return new RenderPipeline(DEFAULT_FORWARD_PLUS_MODULES);
+}
+
+/**
+ * The shared default Forward+ pipeline used by cameras without an explicit
+ * `renderPipeline`. Mutating it affects all such cameras.
+ *
+ * @public
+ */
+export function getDefaultForwardPlusPipeline(): RenderPipeline {
+  if (!_defaultForwardPlusPipeline) {
+    _defaultForwardPlusPipeline = createForwardPlusPipeline();
+  }
+  return _defaultForwardPlusPipeline;
+}
+
 // ─── Forward+ Graph Builder ─────────────────────────────────────────
 
 /**
@@ -1186,275 +1489,16 @@ function buildForwardPlusGraphInternal(
     }
   };
 
-  // ── 1-4. Pre-scene side-effect passes ─────────────────────────────
-  // These carry no data product; they are ordered relative to one another and
-  // to the depth prepass through the ordering-token chain. Each is a
-  // self-describing module reading only from the shared context.
-  for (const module of PRE_SCENE_MODULES) {
-    if (module.enabled(fg)) {
-      module.setup(fg);
-    }
-  }
+  // Assemble the graph by running the camera's render pipeline (or the shared
+  // default). Each module reads its inputs from / publishes its outputs to `fg`;
+  // the composite tail module sets fg.state.presentedBackbuffer (graph sink).
+  const pipeline = ctx.camera?.renderPipeline ?? getDefaultForwardPlusPipeline();
+  pipeline.build(fg);
 
-  // ── 5. Depth Prepass ──────────────────────────────────────────────
-  DepthPrepassModule.setup(fg);
-  const depthPassResult = fg.state.depth!;
-  const renderDepthAttachment = fg.state.renderDepthAttachment;
-  const useFinalFramebufferAsIntermediate = fg.state.useFinalFramebufferAsIntermediate;
-
-  // ── Screen-space shadow mask ────────────────────────────────────────────
-  if (ShadowMaskModule.enabled(fg)) {
-    ShadowMaskModule.setup(fg);
-  }
-
-  // ── Pre-light transmission depth (SSR Hi-Z) ─────────────────────────────
-  if (TransmissionDepthForSSRModule.enabled(fg)) {
-    TransmissionDepthForSSRModule.setup(fg);
-  }
-
-  // ── 6. Hi-Z (optional) ───────────────────────────────────────────
-  if (HiZModule.enabled(fg)) {
-    HiZModule.setup(fg);
-  }
-  const hiZHandle = fg.state.hiZHandle;
-
-  // ── 7. Main light pass (SSS profile → scene-color grab → opaque lighting) ─
-
-  // ── 7a. Forward SSS profile (optional) ────────────────────────────
-  if (SSSProfileModule.enabled(fg)) {
-    SSSProfileModule.setup(fg);
-  }
-  const sssProfileResult = fg.state.sssProfile;
-
-  // ── 7b. Scene color grab (optional) ───────────────────────────────
-  if (SceneColorGrabModule.enabled(fg)) {
-    SceneColorGrabModule.setup(fg);
-  }
-  const grabResult = fg.state.grab;
-
-  // ── 7c. Main light pass (imports SSR history, resolves MRT bridge fields) ─
-  LightPassModule.setup(fg);
-  const lightPassResult = fg.state.lightPass!;
-  const lightHistoryReadBindings = fg.state.lightHistoryReadBindings;
-  const historyManager = fg.history;
-
-  // 7d. Opaque-layer post effects (SAO/SSR/SSS/SkinSSS). They read the opaque
-  // scene color and must complete before transparent geometry renders on top
-  // of their output. Never direct-write: the chain output becomes the
-  // transparent pass's render target. In final-framebuffer-as-intermediate
-  // mode the scene color handle is the LightPass's backbuffer write version,
-  // so the data flow is real either way — no keep-alive reads needed.
-  const opaqueChainInput = lightPassResult.sceneColorHandle;
-  // Data dependencies for every effect pass: frame textures the effects sample
-  // through DrawContext fields (linear depth, HiZ, scene color copy, SSS MRT
-  // outputs) rather than through declared require* hooks.
-  const opaqueChainDeps: RGHandle[] = [blackboard.expect(FrameResources.LinearDepth)];
-  if (hiZHandle) {
-    opaqueChainDeps.push(hiZHandle);
-  }
-  if (lightPassResult.sceneColorFramebufferHandle) {
-    opaqueChainDeps.push(lightPassResult.sceneColorFramebufferHandle);
-  }
-  if (grabResult) {
-    opaqueChainDeps.push(grabResult.copyHandle);
-  }
-  if (sssProfileResult) {
-    opaqueChainDeps.push(sssProfileResult.profileHandle, sssProfileResult.paramHandle);
-    if (sssProfileResult.normalHandle) {
-      opaqueChainDeps.push(sssProfileResult.normalHandle);
-    }
-  }
-  for (const handle of [
-    lightPassResult.ssrRoughnessHandle,
-    lightPassResult.ssrNormalHandle,
-    lightPassResult.sssDiffuseHandle,
-    lightPassResult.sssTransmissionHandle,
-    lightPassResult.skinSSSHandle
-  ]) {
-    if (handle) {
-      opaqueChainDeps.push(handle);
-    }
-  }
-  const opaqueChainResult = ctx.compositor
-    ? ctx.compositor.buildLayer({
-        graph,
-        ctx,
-        layer: PostEffectLayer.opaque,
-        blackboard,
-        input: opaqueChainInput,
-        finalOutput: null,
-        sceneDepthAttachment: renderDepthAttachment,
-        dependencies: opaqueChainDeps,
-        historyReads: lightHistoryReadBindings,
-        history: historyManager
-      })
-    : { color: opaqueChainInput, wroteFinal: false };
-  const opaqueChainRan = opaqueChainResult.color !== opaqueChainInput;
-
-  // 7e. Transparent scene geometry (transmission/transparent lists + OIT).
-  // Renders on top of the opaque-chain output; graph-wise an in-place write
-  // producing a new version of the current scene color.
-  const sceneColorHandle = graph.addPass('TransparentPass', (builder) => {
-    builder.read(blackboard.expect(FrameResources.LinearDepth));
-    builder.read(depthPassResult.depthFramebufferHandle);
-    if (hiZHandle) {
-      // Transparent-phase materials may ray-march HiZ (e.g. water SSR)
-      builder.read(hiZHandle);
-    }
-    if (lightPassResult.sceneColorFramebufferHandle) {
-      builder.read(lightPassResult.sceneColorFramebufferHandle);
-    }
-    if (lightPassResult.sceneColorCopyHandle) {
-      builder.read(lightPassResult.sceneColorCopyHandle);
-    }
-    builder.read(opaqueChainResult.color);
-    const out = builder.write(opaqueChainResult.color);
-    builder.setExecute((rgCtx) => {
-      renderTransparentScenePass(
-        frame,
-        rgCtx,
-        opaqueChainRan ? opaqueChainResult.color : null,
-        lightPassResult.sceneColorFramebufferHandle
-      );
-    });
-    return out;
-  });
-  blackboard.set(FrameResources.SceneColor, sceneColorHandle);
-  if (lightPassResult.sceneColorCopyHandle) {
-    blackboard.set(FrameResources.SceneColorCopy, lightPassResult.sceneColorCopyHandle);
-  }
-  if (sssProfileResult) {
-    blackboard.set(FrameResources.SSSProfile, sssProfileResult.profileHandle);
-    blackboard.set(FrameResources.SSSParam, sssProfileResult.paramHandle);
-  }
-
-  // 8. Post effect chains + transmission depth.
-  //
-  // Chain input: the TransparentPass output version — the authoritative scene
-  // color regardless of whether it physically lives in a texture or in the
-  // backbuffer (final framebuffer used as intermediate, no opaque effects).
-  const chainInput = sceneColorHandle;
-  // When the scene color still physically resides in the final framebuffer,
-  // the Present blit must be skipped if no effect moved it to a texture.
-  // (Opaque-layer effects disable final-as-intermediate mode, so the scene
-  // color is backbuffer-resident whenever that mode is active.)
-  const backbufferResidentHandle = useFinalFramebufferAsIntermediate ? sceneColorHandle : null;
-  // No extra chain dependencies: the effect chains link to the scene color
-  // through their inputs, and per-effect texture needs are declared via the
-  // require* hooks in AbstractPostEffect.setup().
-  const chainDependencies: RGHandle[] = [];
-  const finalOutput = { handle: backbuffer, isScreen: !ctx.finalFramebuffer };
-  const endLayerHasEffects = !!ctx.compositor?.layerHasEnabledEffect(PostEffectLayer.end);
-
-  // 8a. Transparent-layer effects (bloom, tonemap, FXAA, ...). They run right
-  // after the light pass and must sample the pre-transmission linear depth, so
-  // they carry no transmissionDepthToken dependency; TransmissionDepth is
-  // instead ordered after this chain (see 8b).
-  const transparentChainResult = ctx.compositor
-    ? ctx.compositor.buildLayer({
-        graph,
-        ctx,
-        layer: PostEffectLayer.transparent,
-        blackboard,
-        input: chainInput,
-        finalOutput: endLayerHasEffects ? null : finalOutput,
-        inputResidesInFinalTarget: !!backbufferResidentHandle,
-        sceneDepthAttachment: renderDepthAttachment,
-        dependencies: chainDependencies,
-        history: historyManager
-      })
-    : { color: chainInput, wroteFinal: false };
-
-  // 8b. Transmission depth pass (optional). Mutates the linear depth texture;
-  // the mutation is modeled as a graph write: the WAR hazard orders this pass
-  // after every pre-transmission depth reader (the transparent-layer chain),
-  // and re-registering the post-write version in the blackboard gives
-  // end-layer effects (TAA) a real data dependency on the transmission depth.
-  let transmissionDepthToken: RGHandle | undefined;
-  if (options.needSceneColor && !options.needsTransmissionDepthForSSR) {
-    const transmissionDepthResult = graph.addPass('TransmissionDepth', (builder) => {
-      const currentDepth = blackboard.expect(FrameResources.LinearDepth);
-      builder.read(sceneColorHandle);
-      if (transparentChainResult.color !== sceneColorHandle) {
-        builder.read(transparentChainResult.color);
-      }
-      builder.read(currentDepth);
-      builder.read(depthPassResult.depthFramebufferHandle);
-      const depthOut = builder.write(currentDepth);
-      const done = builder.createToken('TransmissionDepthDone');
-      builder.sideEffect();
-      builder.setExecute((rgCtx) => {
-        renderTransmissionDepthPass(frame, rgCtx);
-      });
-      return { done, depthOut };
-    });
-    transmissionDepthToken = transmissionDepthResult.done;
-    // The transparent-layer chain above read the pre-transmission version;
-    // everything built from here on (end-layer chain) reads this one.
-    blackboard.set(FrameResources.LinearDepth, transmissionDepthResult.depthOut);
-  }
-
-  // 9. End-layer effects (TAA). Ordered after TransmissionDepth.
-  const endChainDependencies = transmissionDepthToken
-    ? [...chainDependencies, transmissionDepthToken]
-    : chainDependencies;
-  const chainResult = ctx.compositor
-    ? ctx.compositor.buildLayer({
-        graph,
-        ctx,
-        layer: PostEffectLayer.end,
-        blackboard,
-        input: transparentChainResult.color,
-        finalOutput,
-        // Still backbuffer-resident if the transparent-layer chain ran no effect
-        inputResidesInFinalTarget: !!backbufferResidentHandle && transparentChainResult.color === chainInput,
-        sceneDepthAttachment: renderDepthAttachment,
-        dependencies: endChainDependencies,
-        history: historyManager
-      })
-    : { color: transparentChainResult.color, wroteFinal: false };
-  const finalWroteFinal = chainResult.wroteFinal || transparentChainResult.wroteFinal;
-
-  // 10. Present + frame cleanup.
-  let presentedBackbuffer: RGHandle;
-  if (finalWroteFinal) {
-    // The last effect wrote the final target directly; only cleanup remains.
-    presentedBackbuffer = chainResult.color;
-    graph.addPass('FrameCleanup', (builder) => {
-      builder.read(presentedBackbuffer);
-      for (const dep of endChainDependencies) {
-        builder.read(dep);
-      }
-      builder.sideEffect();
-      builder.setExecute(() => {
-        finishFrame(frame);
-      });
-    });
-  } else {
-    presentedBackbuffer = graph.addPass('Present', (builder) => {
-      builder.read(chainResult.color);
-      for (const dep of endChainDependencies) {
-        builder.read(dep);
-      }
-      const outputBackbuffer = builder.write(backbuffer);
-      // Skip the blit when the chain output already lives in the final target
-      // (final framebuffer used as intermediate and no end-layer effect ran).
-      const needsBlit = chainResult.color !== backbufferResidentHandle;
-      builder.setExecute((rgCtx) => {
-        const sourceTex = needsBlit ? rgCtx.getTexture<Texture2D>(chainResult.color) : null;
-        if (sourceTex) {
-          const blitter = new CopyBlitter();
-          blitter.srgbOut = !ctx.finalFramebuffer;
-          blitter.blit(sourceTex, ctx.finalFramebuffer ?? null, fetchSampler('clamp_nearest_nomip'));
-        }
-        finishFrame(frame);
-      });
-      return outputBackbuffer;
-    });
-  }
-
-  return { backbuffer: presentedBackbuffer, frame };
+  return { backbuffer: fg.state.presentedBackbuffer!, frame };
 }
+
+// ─── Pass Implementation Helpers ────────────────────────────────────
 
 // ─── Pass Implementation Helpers ────────────────────────────────────
 // These wrap the existing SceneRenderer static methods, adapted to work

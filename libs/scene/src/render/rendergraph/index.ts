@@ -23,8 +23,14 @@ export { DevicePoolAllocator } from './device_pool_allocator';
 export { HistoryResourceManager } from './history_resource_manager';
 export { RGHistoryResources } from './history_resources';
 export { RGBlackboard, FrameResources } from './blackboard';
+export { OrderingScope, type RenderModuleContext } from './frame_graph_context';
+export type { RenderModule } from './render_module';
+export { RenderPipeline } from './render_pipeline';
 export {
   buildForwardPlusGraph,
   executeForwardPlusGraph,
+  createForwardPlusPipeline,
+  getDefaultForwardPlusPipeline,
+  ForwardPlusModules,
   type ForwardPlusOptions
 } from './forward_plus_builder';
