@@ -72,9 +72,36 @@ export class SSS extends AbstractPostEffect {
     return null;
   }
 
+  /**
+   * Whether the combine pass should read the screen-space shadow mask for the
+   * combine light instead of recomputing its shadow. Enabled when the camera
+   * renders the mask and the combine light was actually written into it: the
+   * mask already holds the identical shadow — same shadow impl (PCSS/VSM/…),
+   * distance fade and shadowStrength — so this skips a full redundant per-pixel
+   * shadow evaluation. Shadow mode is irrelevant: the mask is rendered with the
+   * light's own impl. Falls back to the inline path when the light is not in the
+   * mask (e.g. it overflows {@link MAX_SHADOW_MASK_LIGHTS}).
+   *
+   * Only valid at execute time, after the ShadowMaps and ShadowMask passes have
+   * populated shadowMapInfo / maskOrdinal.
+   */
+  private useCombineShadowMask(ctx: DrawContext, shadowLight: Nullable<PunctualLight>): boolean {
+    if (!shadowLight || !ctx.screenSpaceShadowMask) {
+      return false;
+    }
+    const shadowMapParams = ctx.shadowMapInfo?.get(shadowLight);
+    return !!(shadowMapParams?.shadowMap && shadowMapParams.impl && shadowMapParams.maskOrdinal != null);
+  }
+
   private getCombineProgramKey(ctx: DrawContext, shadowLight: Nullable<PunctualLight>) {
     const shadowMapParams = shadowLight ? ctx.shadowMapInfo?.get(shadowLight) : null;
-    return shadowMapParams?.shaderHash ? `shadow:${shadowMapParams.shaderHash}` : 'default';
+    if (!shadowMapParams?.shaderHash) {
+      return 'default';
+    }
+    // The mask-sampling shader is independent of the PCSS impl hash.
+    return this.useCombineShadowMask(ctx, shadowLight)
+      ? 'shadowMask'
+      : `shadow:${shadowMapParams.shaderHash}`;
   }
 
   requireLinearDepthTexture() {
@@ -83,6 +110,15 @@ export class SSS extends AbstractPostEffect {
 
   requireDepthAttachment() {
     return true;
+  }
+
+  requireShadowMask(ctx: DrawContext) {
+    // Runs at graph-build time, before shadowMapInfo is populated (that happens
+    // during the ShadowMaps pass execute), so it cannot inspect the combine
+    // light. Keep the mask alive whenever the camera renders it; combine()
+    // decides at execute time whether to sample it, and _setupFromApply only
+    // reads the handle when the mask was actually produced this frame.
+    return !!ctx.screenSpaceShadowMask;
   }
 
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
@@ -328,35 +364,59 @@ export class SSS extends AbstractPostEffect {
     bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
     if (shadowLight) {
       const shadowMapParams = ctx.shadowMapInfo!.get(shadowLight)!;
-      const cameraPos = ctx.camera.getWorldPosition();
-      bindGroup.setValue('camera', {
-        position: new Vector4(cameraPos.x, cameraPos.y, cameraPos.z, 0),
-        params: new Vector4(ctx.camera.getNearPlane(), ctx.camera.getFarPlane(), 1, 1),
-        shadowDebugCascades: ctx.camera.shadowDebugCascades ? 1 : 0,
-        framestamp: ctx.device.frameInfo.frameCounter
-      });
-      bindGroup.setValue('light', {
-        sunDir: new Float32Array([sunDir.x, sunDir.y, sunDir.z]),
-        envLightStrength: ctx.env?.light.strength ?? 0,
-        envLightSpecularStrength: ctx.env?.light.specularStrength ?? 1,
-        shadowStrength: shadowLight.shadow.shadowStrength,
-        shadowCascades: shadowMapParams.numShadowCascades,
-        positionAndRange: shadowLight.positionAndRange,
-        directionAndCutoff: shadowLight.directionAndCutoff,
-        diffuseAndIntensity: shadowLight.diffuseAndIntensity,
-        extraParams: shadowLight.extraParams,
-        implParams: shadowMapParams.impl!.getParams(),
-        cascadeDistances: shadowMapParams.cascadeDistances,
-        depthBiasValues: shadowMapParams.depthBiasValues[0],
-        shadowCameraParams: shadowMapParams.cameraParams,
-        depthBiasScales: shadowMapParams.depthBiasScales,
-        shadowMatrices: new Float32Array(shadowMapParams.shadowMatrices)
-      });
-      bindGroup.setTexture(
-        'Z_UniformShadowMap',
-        shadowMapParams.shadowMap!,
-        shadowMapParams.shadowMapSampler
-      );
+      if (this.useCombineShadowMask(ctx, shadowLight)) {
+        // Screen-space shadow mask path: bind the mask array and select this
+        // light's layer/channel from its recorded ordinal (layer = s>>2,
+        // channel = s&3). A missing mask falls back to the fully-lit dummy.
+        const ordinal = shadowMapParams.maskOrdinal ?? 0;
+        const layer = ordinal >> 2;
+        const channel = ordinal & 3;
+        bindGroup.setValue('shadowMaskLayer', layer);
+        bindGroup.setValue(
+          'shadowMaskChannel',
+          new Float32Array([
+            channel === 0 ? 1 : 0,
+            channel === 1 ? 1 : 0,
+            channel === 2 ? 1 : 0,
+            channel === 3 ? 1 : 0
+          ])
+        );
+        bindGroup.setTexture(
+          'Z_UniformShadowMask',
+          ctx.shadowMaskTexture ?? ShaderHelper.getDummyShadowMask(device),
+          fetchSampler('clamp_nearest')
+        );
+      } else {
+        const cameraPos = ctx.camera.getWorldPosition();
+        bindGroup.setValue('camera', {
+          position: new Vector4(cameraPos.x, cameraPos.y, cameraPos.z, 0),
+          params: new Vector4(ctx.camera.getNearPlane(), ctx.camera.getFarPlane(), 1, 1),
+          shadowDebugCascades: ctx.camera.shadowDebugCascades ? 1 : 0,
+          framestamp: ctx.device.frameInfo.frameCounter
+        });
+        bindGroup.setValue('light', {
+          sunDir: new Float32Array([sunDir.x, sunDir.y, sunDir.z]),
+          envLightStrength: ctx.env?.light.strength ?? 0,
+          envLightSpecularStrength: ctx.env?.light.specularStrength ?? 1,
+          shadowStrength: shadowLight.shadow.shadowStrength,
+          shadowCascades: shadowMapParams.numShadowCascades,
+          positionAndRange: shadowLight.positionAndRange,
+          directionAndCutoff: shadowLight.directionAndCutoff,
+          diffuseAndIntensity: shadowLight.diffuseAndIntensity,
+          extraParams: shadowLight.extraParams,
+          implParams: shadowMapParams.impl!.getParams(),
+          cascadeDistances: shadowMapParams.cascadeDistances,
+          depthBiasValues: shadowMapParams.depthBiasValues[0],
+          shadowCameraParams: shadowMapParams.cameraParams,
+          depthBiasScales: shadowMapParams.depthBiasScales,
+          shadowMatrices: new Float32Array(shadowMapParams.shadowMatrices)
+        });
+        bindGroup.setTexture(
+          'Z_UniformShadowMap',
+          shadowMapParams.shadowMap!,
+          shadowMapParams.shadowMapSampler
+        );
+      }
     }
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
@@ -754,6 +814,11 @@ export class SSS extends AbstractPostEffect {
   private createCombineProgram(ctx: DrawContext, shadowLight: Nullable<PunctualLight>) {
     const shadowMapParams = shadowLight ? ctx.shadowMapInfo?.get(shadowLight) : null;
     const shadowEnabled = !!(shadowLight && shadowMapParams?.shadowMap && shadowMapParams.impl);
+    // When the screen-space shadow mask is available for the combine light,
+    // sample it instead of recomputing PCSS (which also avoids the dpdx-in-
+    // non-uniform-control-flow constraint entirely on this path).
+    const useShadowMask = this.useCombineShadowMask(ctx, shadowLight);
+    const pcssEnabled = shadowEnabled && !useShadowMask;
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         this.flip = pb.int().uniform(0);
@@ -768,7 +833,7 @@ export class SSS extends AbstractPostEffect {
         });
       },
       fragment(pb) {
-        if (shadowEnabled) {
+        if (pcssEnabled) {
           const cameraStruct = pb.defineStruct([
             pb.vec4('position'),
             pb.vec4('params'),
@@ -813,6 +878,14 @@ export class SSS extends AbstractPostEffect {
             shadowTex.sampleType('unfilterable-float');
           }
           this.Z_UniformShadowMap = shadowTex.uniform(0);
+        }
+        if (useShadowMask) {
+          // Screen-space shadow mask: one RGBA8 array layer per 4 lights. The
+          // combine light's visibility is one channel of one layer, selected via
+          // the layer index and a one-hot channel selector bound at draw time.
+          this.Z_UniformShadowMask = pb.tex2DArray().uniform(0);
+          this.shadowMaskLayer = pb.int().uniform(0);
+          this.shadowMaskChannel = pb.vec4().uniform(0);
         }
         this.colorTex = pb.tex2D().uniform(0);
         this.diffuseTex = pb.tex2D().uniform(0);
@@ -1033,7 +1106,7 @@ export class SSS extends AbstractPostEffect {
             this.$return(pb.mul(this.spotFactor, this.falloff, this.falloff));
           }
         );
-        if (shadowEnabled) {
+        if (pcssEnabled) {
           pb.func(
             'calculateTransmissionShadow',
             [pb.vec3('worldPos'), pb.float('depth01'), pb.float('NoL')],
@@ -1144,13 +1217,14 @@ export class SSS extends AbstractPostEffect {
           this.$l.profilePreset = this.readProfilePreset(this.param);
           this.$l.depth01 = this.readDepth01(this.uv);
           this.$l.result = this.baseColor.rgb;
-          // Shadow sampling uses implicit derivatives (dpdx) inside the PCSS
-          // impl; WGSL requires those to run in uniform control flow, so compute
-          // the transmission shadow here rather than inside the profile-active
-          // branch below (which is a per-pixel, non-uniform dynamic branch).
+          // Transmission shadow. On the PCSS path the shadow uses implicit
+          // derivatives (dpdx) inside the impl; WGSL requires those in uniform
+          // control flow, so it is computed here rather than inside the
+          // profile-active branch below (a per-pixel, non-uniform branch). On the
+          // shadow-mask path the value is a single texture fetch (no PCSS).
           this.$l.transmissionShadowRaw = pb.float(1);
           this.$l.transmissionShadow = pb.float(1);
-          if (shadowEnabled) {
+          if (pcssEnabled) {
             this.$l.shadowNormalWS = this.decodeNormal(this.uv);
             this.$l.shadowViewPos = this.reconstructViewPos(this.uv, this.depth01);
             this.$l.shadowWorldPos = pb.mul(this.invViewMatrix, pb.vec4(this.shadowViewPos, 1)).xyz;
@@ -1165,6 +1239,16 @@ export class SSS extends AbstractPostEffect {
               this.shadowWorldPos,
               this.depth01,
               pb.clamp(pb.abs(pb.dot(this.shadowNormalWS, this.shadowSunDirWS)), 0, 1)
+            );
+            this.transmissionShadow = this.transmissionShadowRaw;
+          } else if (useShadowMask) {
+            // The mask already holds the identical shadow (same PCSS + distance
+            // fade + shadowStrength) rendered by the ShadowMaskPass; read the
+            // combine light's channel. Sample by screen UV, matching how the
+            // other screen-space inputs (color/depth) are sampled above.
+            this.transmissionShadowRaw = pb.dot(
+              pb.textureArraySampleLevel(this.Z_UniformShadowMask, this.uv, this.shadowMaskLayer, 0),
+              this.shadowMaskChannel
             );
             this.transmissionShadow = this.transmissionShadowRaw;
           }

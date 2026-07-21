@@ -79,6 +79,14 @@ export type ShadowMapParams = {
   shadowMapSampler: Nullable<TextureSampler>;
   impl: Nullable<ShadowImpl>;
   implData: unknown;
+  /**
+   * Zero-based ordinal of this light within the screen-space shadow mask
+   * (`layer = ordinal >> 2`, `channel = ordinal & 3`). Set by
+   * {@link ShadowMaskRenderer.render} each frame the mask is built; undefined
+   * when the mask is not in use. Consumed by effects that sample the mask
+   * instead of recomputing shadows (e.g. the SSS combine pass).
+   */
+  maskOrdinal?: number;
 };
 
 /** @internal */
@@ -977,7 +985,11 @@ export class ShadowMapper extends Disposable {
   /** @internal */
   private static fetchShadowMapParams() {
     if (this._shadowMapParams.length > 0) {
-      return this._shadowMapParams.pop()!;
+      const params = this._shadowMapParams.pop()!;
+      // Pooled objects retain last frame's ordinal; clear it so it is only set
+      // again by ShadowMaskRenderer for lights actually written to the mask.
+      params.maskOrdinal = undefined;
+      return params;
     } else {
       return {
         lightType: LIGHT_TYPE_NONE,

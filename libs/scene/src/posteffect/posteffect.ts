@@ -166,6 +166,17 @@ export class AbstractPostEffect extends Disposable {
     return false;
   }
   /**
+   * Checks whether this post effect requires the screen-space shadow mask.
+   *
+   * When true and the mask was produced this frame, the effect can sample
+   * `DrawContext.shadowMaskTexture` in its apply() body; the graph keeps the
+   * mask alive for the effect's pass.
+   * @returns true if the shadow mask is required.
+   */
+  requireShadowMask(_ctx: DrawContext) {
+    return false;
+  }
+  /**
    * Apply the post effect
    * @param camera - Camera used the render the scene
    * @param inputColorTexture - The previous scene color texture
@@ -222,6 +233,14 @@ export class AbstractPostEffect extends Disposable {
         : null;
       if (motionVectorHandle) {
         builder.read(motionVectorHandle);
+      }
+      // Keep the screen-space shadow mask alive for effects that sample it
+      // (via DrawContext.shadowMaskTexture) instead of recomputing shadows.
+      const shadowMaskHandle = this.requireShadowMask(s.ctx)
+        ? s.blackboard.get(FrameResources.ShadowMask)
+        : null;
+      if (shadowMaskHandle) {
+        builder.read(shadowMaskHandle);
       }
       const output = s.createOutput(builder, {
         needDepthAttachment: this.requireDepthAttachment(s.ctx)
