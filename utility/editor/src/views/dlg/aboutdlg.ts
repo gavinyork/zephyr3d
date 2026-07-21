@@ -17,12 +17,12 @@ export class DlgAbout extends DialogRenderer<void> {
   doRender(): void {
     const desktop = getDesktopAPI();
     const details: [string, string][] = [
-      ['@zephyr3d/scene', '0.9.19'],
-      ['@zephyr3d/device', '0.2.15'],
+      ['@zephyr3d/scene', '0.9.22'],
+      ['@zephyr3d/device', '0.2.16'],
       ['@zephyr3d/base', '0.2.8'],
       ['@zephyr3d/imgui', '0.2.6'],
-      ['@zephyr3d/backend-webgl', '0.1.14'],
-      ['@zephyr3d/backend-webgpu', '0.1.18'],
+      ['@zephyr3d/backend-webgl', '0.1.15'],
+      ['@zephyr3d/backend-webgpu', '0.1.19'],
       ['Runtime', isDesktopApp() ? 'Electron' : 'Web']
     ];
     if (desktop) {
