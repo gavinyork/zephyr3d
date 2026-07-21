@@ -117,6 +117,9 @@ export class ShadowMaskRenderer {
         if (!shadowMapParams || !shadowMapParams.shadowMap) {
           continue;
         }
+        // Record where this light lives in the mask so downstream samplers (e.g.
+        // the SSS combine pass) can read its channel without recomputing shadows.
+        shadowMapParams.maskOrdinal = ordinal;
         ctx.currentShadowLight = light;
         this.renderLightChannel(ctx, depthTexture, light, shadowMapParams, channelStates[channel]);
       }
