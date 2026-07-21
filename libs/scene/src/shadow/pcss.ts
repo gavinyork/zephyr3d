@@ -105,7 +105,9 @@ export class PCSS extends ShadowImpl {
         : 'rgba8unorm';
   }
   getParams(out: Vector4) {
+    out = out ?? new Vector4();
     out.setXYZW(this._lightRadius, this._blockerSampleCount, this._filterSampleCount, this._maxFilterRadius);
+    return out;
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
     return getDevice().type === 'webgl' ? 'd24s8' : 'd32f';

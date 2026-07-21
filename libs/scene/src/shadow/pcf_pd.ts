@@ -8,6 +8,7 @@ import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
 import { getDevice } from '../app/api';
 import type { Nullable } from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
 
 /** @internal */
 export class PCFPD extends ShadowImpl {
@@ -45,7 +46,9 @@ export class PCFPD extends ShadowImpl {
     }
     return 3;
   }
-  getParams() {}
+  getParams(out?: Vector4) {
+    return out ?? Vector4.zero();
+  }
   getShadowMapBorder(_shadowMapParams: ShadowMapParams) {
     return Math.max(this._sampleRadius + 1, this.getPCFKernelSize());
   }
