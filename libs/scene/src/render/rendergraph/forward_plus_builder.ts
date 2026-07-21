@@ -50,6 +50,17 @@ const _shadowMapPass = new ShadowMapPass();
 const _clusters: ClusteredLight[] = [];
 const _shadowMaskRenderer = new ShadowMaskRenderer();
 const _devicePoolAllocator = new DevicePoolAllocator();
+
+/**
+ * Test-only accessor for the shared scene pass singleton. Lets execute-time
+ * state-contract tests intercept `render()` and snapshot the six render-control
+ * fields ({@link renderOpaqueScenePass}, {@link renderTransparentScenePass}).
+ * @internal
+ */
+export function _getScenePassForTest(): LightPass {
+  return _scenePass;
+}
+
 let _backDepthColorState: Nullable<ColorState> = null;
 let _frontDepthColorState: Nullable<ColorState> = null;
 const SURFACE_MRT_FLAGS =
@@ -439,6 +450,30 @@ export interface ForwardPlusBuildState {
   /** Main light pass outputs. */
   lightPass?: LightPassResult;
 }
+
+// ═══ Forward+ pipeline modules ══════════════════════════════════════
+//
+// The Forward+ graph is assembled from a fixed sequence of RenderModules, each
+// owning one logical stage. Contract every module below observes:
+//
+//   • Cross-module data flows only through the shared FrameGraphContext — graph
+//     resource handles via `fg.blackboard` (FrameResources names) and
+//     `fg.ordering` (side-effect tokens), non-resource intermediates (result
+//     bundles, derived flags) via `fg.state`. A module never reads another
+//     module's locals; this is what makes the pipeline recomposable later.
+//   • Linear depth is versioned: producers re-register FrameResources.LinearDepth
+//     after an in-place mutation, so a module reading it at setup time gets the
+//     version live at its pipeline position.
+//   • `enabled(fg)` derives the module's gating from scene/camera/renderQueue —
+//     there is no central options-to-passes switch.
+//
+// Execute-time behaviour is unchanged by modularization: pass callbacks still
+// share the process singletons (`_scenePass`, ...) and write the DrawContext
+// bridge fields (ctx.HiZTexture, ctx.SSR*/SSS* textures, ...) that material
+// shaders and legacy AbstractPostEffect.apply() effects read. The `_scenePass`
+// render-control state contract (each scene pass sets every field it needs
+// before render() and restores the shared flags after) is exercised by
+// test/src/rendergraph/forward_plus_scene_pass_state.test.ts.
 
 // ─── Pre-scene side-effect modules ──────────────────────────────────
 // Sky update, clustered-light setup, GPU picking and shadow maps produce no
@@ -1831,7 +1866,7 @@ function renderSceneColorGrab(
 }
 
 /** @internal */
-function renderOpaqueScenePass(
+export function renderOpaqueScenePass(
   frame: FrameState,
   sceneColorTex: Texture2D,
   sceneColorCopyTex: Nullable<Texture2D>,
@@ -1946,7 +1981,7 @@ function renderOpaqueScenePass(
  * into the currently bound framebuffer, which this pass guarantees.
  * @internal
  */
-function renderTransparentScenePass(
+export function renderTransparentScenePass(
   frame: FrameState,
   rgCtx: RGExecuteContext,
   opaqueChainOutput: Nullable<RGHandle>,
