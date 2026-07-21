@@ -2,6 +2,18 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.22",
+      "tag": "@zephyr3d/scene_v0.9.22",
+      "date": "Tue, 21 Jul 2026 11:48:52 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Optimize SSS shadow when shadowmask is enabled"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.21",
       "tag": "@zephyr3d/scene_v0.9.21",
       "date": "Mon, 20 Jul 2026 17:14:56 GMT",
