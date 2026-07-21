@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Optimize SSS shadow when shadowmask is enabled",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
