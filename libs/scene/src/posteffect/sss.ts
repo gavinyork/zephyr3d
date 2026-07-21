@@ -332,7 +332,8 @@ export class SSS extends AbstractPostEffect {
       bindGroup.setValue('camera', {
         position: new Vector4(cameraPos.x, cameraPos.y, cameraPos.z, 0),
         params: new Vector4(ctx.camera.getNearPlane(), ctx.camera.getFarPlane(), 1, 1),
-        shadowDebugCascades: ctx.camera.shadowDebugCascades ? 1 : 0
+        shadowDebugCascades: ctx.camera.shadowDebugCascades ? 1 : 0,
+        framestamp: ctx.device.frameInfo.frameCounter
       });
       bindGroup.setValue('light', {
         sunDir: new Float32Array([sunDir.x, sunDir.y, sunDir.z]),
@@ -344,6 +345,7 @@ export class SSS extends AbstractPostEffect {
         directionAndCutoff: shadowLight.directionAndCutoff,
         diffuseAndIntensity: shadowLight.diffuseAndIntensity,
         extraParams: shadowLight.extraParams,
+        implParams: shadowMapParams.impl!.getParams(),
         cascadeDistances: shadowMapParams.cascadeDistances,
         depthBiasValues: shadowMapParams.depthBiasValues[0],
         shadowCameraParams: shadowMapParams.cameraParams,
@@ -770,7 +772,8 @@ export class SSS extends AbstractPostEffect {
           const cameraStruct = pb.defineStruct([
             pb.vec4('position'),
             pb.vec4('params'),
-            pb.float('shadowDebugCascades')
+            pb.float('shadowDebugCascades'),
+            pb.int('framestamp')
           ]);
           const lightStruct = pb.defineStruct([
             pb.vec3('sunDir'),
@@ -784,6 +787,7 @@ export class SSS extends AbstractPostEffect {
             pb.vec4('extraParams'),
             pb.vec4('cascadeDistances'),
             pb.vec4('depthBiasValues'),
+            pb.vec4('implParams'),
             pb.vec4('shadowCameraParams'),
             pb.vec4('depthBiasScales'),
             pb.vec4[16]('shadowMatrices')
@@ -1140,6 +1144,30 @@ export class SSS extends AbstractPostEffect {
           this.$l.profilePreset = this.readProfilePreset(this.param);
           this.$l.depth01 = this.readDepth01(this.uv);
           this.$l.result = this.baseColor.rgb;
+          // Shadow sampling uses implicit derivatives (dpdx) inside the PCSS
+          // impl; WGSL requires those to run in uniform control flow, so compute
+          // the transmission shadow here rather than inside the profile-active
+          // branch below (which is a per-pixel, non-uniform dynamic branch).
+          this.$l.transmissionShadowRaw = pb.float(1);
+          this.$l.transmissionShadow = pb.float(1);
+          if (shadowEnabled) {
+            this.$l.shadowNormalWS = this.decodeNormal(this.uv);
+            this.$l.shadowViewPos = this.reconstructViewPos(this.uv, this.depth01);
+            this.$l.shadowWorldPos = pb.mul(this.invViewMatrix, pb.vec4(this.shadowViewPos, 1)).xyz;
+            this.$l.shadowSunDirWS = this.calculateMainLightDirection(
+              this.shadowWorldPos,
+              this.mainLightType,
+              this.mainLightPosRange,
+              this.mainLightDirCutoff,
+              this.sunDir
+            );
+            this.transmissionShadowRaw = this.calculateTransmissionShadow(
+              this.shadowWorldPos,
+              this.depth01,
+              pb.clamp(pb.abs(pb.dot(this.shadowNormalWS, this.shadowSunDirWS)), 0, 1)
+            );
+            this.transmissionShadow = this.transmissionShadowRaw;
+          }
           this.$if(
             pb.and(
               pb.and(
@@ -1304,15 +1332,9 @@ export class SSS extends AbstractPostEffect {
                 this.mainLightDirCutoff
               );
               this.$l.frontLit = pb.mul(pb.dot(this.normalWS, this.sunDirWS), this.mainLightAttenuation);
-              this.$l.transmissionShadowRaw = pb.float(1);
-              this.$l.transmissionShadow = pb.float(1);
-              if (shadowEnabled) {
-                this.transmissionShadowRaw = this.calculateTransmissionShadow(
-                  this.worldPos,
-                  this.depth01,
-                  pb.clamp(pb.abs(pb.dot(this.normalWS, this.sunDirWS)), 0, 1)
-                );
-              }
+              // transmissionShadowRaw/transmissionShadow were computed in uniform
+              // control flow at the top of main (PCSS sampling uses dpdx, which
+              // WGSL forbids inside this non-uniform branch); reuse them here.
               this.transmissionShadow = this.transmissionShadowRaw;
               this.$l.transmissionLightAttenuation = pb.mul(
                 this.mainLightAttenuation,

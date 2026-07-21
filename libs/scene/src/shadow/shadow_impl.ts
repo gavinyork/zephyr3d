@@ -24,7 +24,7 @@ export abstract class ShadowImpl {
         : new Vector4(0, 0, 0, 1)
       : null;
   }
-  abstract getParams(out: Vector4): void;
+  abstract getParams(out?: Vector4): Vector4;
   abstract getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType;
   abstract postRenderShadowMap(shadowMapParams: ShadowMapParams): void;
   abstract getDepthScale(): number;

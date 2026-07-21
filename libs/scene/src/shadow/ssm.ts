@@ -7,6 +7,7 @@ import { computeShadowMapDepth } from '../shaders/shadow';
 import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
 import { getDevice } from '../app/api';
+import { Vector4 } from '@zephyr3d/base';
 
 /** @internal */
 export class SSM extends ShadowImpl {
@@ -23,7 +24,9 @@ export class SSM extends ShadowImpl {
   getShadowMapBorder(_shadowMapParams: ShadowMapParams) {
     return 0;
   }
-  getParams() {}
+  getParams(out?: Vector4) {
+    return out ?? Vector4.zero();
+  }
   getShadowMap(shadowMapParams: ShadowMapParams) {
     return (
       this.useNativeShadowMap(shadowMapParams)
