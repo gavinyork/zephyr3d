@@ -556,6 +556,7 @@ const ShadowMapsModule: RenderModule<FrameGraphContext> = {
 /** @internal */
 const DepthPrepassModule: RenderModule<FrameGraphContext> = {
   type: 'DepthPrepass',
+  writes: [FrameResources.LinearDepth, FrameResources.MotionVector, FrameResources.SceneDepthAttachment],
   enabled: () => true,
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, ordering, blackboard, options } = fg;
@@ -661,6 +662,7 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
 /** @internal */
 const ShadowMaskModule: RenderModule<FrameGraphContext> = {
   type: 'ShadowMaskPass',
+  writes: [FrameResources.ShadowMask],
   // Gate on build-time state only: renderQueue.shadowedLights is available now,
   // whereas ctx.shadowMapInfo is populated later by the ShadowMaps pass execute
   // (which runs before this pass thanks to the ordering-token chain), so it must
@@ -722,6 +724,7 @@ const ShadowMaskModule: RenderModule<FrameGraphContext> = {
 /** @internal */
 const TransmissionDepthForSSRModule: RenderModule<FrameGraphContext> = {
   type: 'TransmissionDepthForSSR',
+  writes: [FrameResources.LinearDepth],
   enabled: ({ options }) => options.needsTransmissionDepthForSSR,
   setup(fg: FrameGraphContext) {
     const { graph, frame, blackboard } = fg;
@@ -752,6 +755,7 @@ const TransmissionDepthForSSRModule: RenderModule<FrameGraphContext> = {
 /** @internal */
 const HiZModule: RenderModule<FrameGraphContext> = {
   type: 'HiZ',
+  writes: [FrameResources.HiZ],
   enabled: ({ options }) => options.hiZ,
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard } = fg;
@@ -897,6 +901,13 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
 /** @internal */
 const LightPassModule: RenderModule<FrameGraphContext> = {
   type: 'LightPass',
+  writes: [
+    FrameResources.SSRRoughness,
+    FrameResources.SSRNormal,
+    FrameResources.SSSDiffuse,
+    FrameResources.SSSTransmission,
+    FrameResources.SkinSSS
+  ],
   enabled: () => true,
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard, options, backbuffer } = fg;
@@ -1115,6 +1126,13 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
 /** @internal */
 const CompositeTailModule: RenderModule<FrameGraphContext> = {
   type: 'CompositeTail',
+  writes: [
+    FrameResources.SceneColor,
+    FrameResources.SceneColorCopy,
+    FrameResources.SSSProfile,
+    FrameResources.SSSParam,
+    FrameResources.LinearDepth
+  ],
   enabled: () => true,
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard, options, backbuffer } = fg;

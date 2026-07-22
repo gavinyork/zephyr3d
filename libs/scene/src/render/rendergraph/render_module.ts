@@ -36,6 +36,29 @@ export interface RenderModule<TCtx extends RenderContext = RenderContext> {
   readonly type: string;
 
   /**
+   * Named frame resources (blackboard keys, see {@link ./blackboard#FrameResources})
+   * this module's `setup` depends on being published already.
+   *
+   * When set, the pipeline auto-orders this module's `setup` after every module
+   * that declares it {@link RenderModule.writes} one of these resources — so the
+   * module can be added at any position (e.g. plain `append`) and still see the
+   * inputs it needs, without the author picking an anchor. A read whose producer
+   * is absent this frame (gated off, or never declared) is skipped, not an
+   * error; guard on `blackboard.has(...)` in {@link RenderModule.enabled} if the
+   * module is meaningless without it.
+   *
+   * Omit for a module whose position is authored explicitly (append / insertAfter / ...).
+   */
+  readonly reads?: readonly string[];
+
+  /**
+   * Named frame resources (blackboard keys) this module's `setup` publishes.
+   * Used only to anchor other modules' {@link RenderModule.reads}; declaring a
+   * resource here does not by itself change this module's own position.
+   */
+  readonly writes?: readonly string[];
+
+  /**
    * Whether this module contributes to the current frame. Derived from
    * scene/camera/render-queue state and the pipeline options on the context.
    * A disabled module's {@link RenderModule.setup} is skipped entirely.

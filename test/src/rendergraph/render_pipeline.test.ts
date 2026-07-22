@@ -1,8 +1,19 @@
-import { RenderPipeline } from '../../../libs/scene/src/render/rendergraph/render_pipeline';
+import {
+  RenderPipeline,
+  resolveModuleOrder
+} from '../../../libs/scene/src/render/rendergraph/render_pipeline';
 import type { RenderModule } from '../../../libs/scene/src/render/rendergraph/render_module';
 
 function mod(type: string): RenderModule {
   return { type, enabled: () => true, setup: () => {} };
+}
+
+function dep(type: string, reads?: string[], writes?: string[]): RenderModule {
+  return { type, reads, writes, enabled: () => true, setup: () => {} };
+}
+
+function order(modules: RenderModule[]): string[] {
+  return resolveModuleOrder(modules).map((m) => m.type);
 }
 
 function types(p: RenderPipeline): string[] {
@@ -96,5 +107,62 @@ describe('RenderPipeline', () => {
     const p = new RenderPipeline([track('A', true), track('B', false), track('C', true)]);
     p.build({} as never);
     expect(calls).toEqual(['A', 'C']);
+  });
+});
+
+describe('resolveModuleOrder', () => {
+  test('preserves authored order when no dependencies are declared', () => {
+    expect(order([mod('A'), mod('B'), mod('C')])).toEqual(['A', 'B', 'C']);
+  });
+
+  test('places a consumer after its producer', () => {
+    expect(order([dep('Consumer', ['X']), dep('Producer', undefined, ['X'])])).toEqual([
+      'Producer',
+      'Consumer'
+    ]);
+  });
+
+  test('places a consumer after the last writer when a resource is written multiple times', () => {
+    const modules = [
+      dep('C', ['X']),
+      dep('W1', undefined, ['X']),
+      dep('W2', undefined, ['X'])
+    ];
+    expect(order(modules)).toEqual(['W1', 'W2', 'C']);
+  });
+
+  test('handles multiple reads on one consumer', () => {
+    const modules = [
+      dep('C', ['A', 'B']),
+      dep('PA', undefined, ['A']),
+      dep('PB', undefined, ['B'])
+    ];
+    // C must be after both PA and PB.
+    const result = order(modules);
+    expect(result.indexOf('C')).toBeGreaterThan(result.indexOf('PA'));
+    expect(result.indexOf('C')).toBeGreaterThan(result.indexOf('PB'));
+  });
+
+  test('skips a read whose producer is absent (lenient)', () => {
+    expect(order([dep('A'), dep('B', ['Missing']), dep('C')])).toEqual(['A', 'B', 'C']);
+  });
+
+  test('throws on cyclic dependencies', () => {
+    const modules = [
+      dep('A', ['B'], ['A']),
+      dep('B', ['A'], ['B'])
+    ];
+    expect(() => resolveModuleOrder(modules)).toThrow(/cyclic module dependency/i);
+  });
+
+  test('preserves authored order when reads are already satisfied', () => {
+    const modules = [dep('PA', undefined, ['A']), dep('PB', undefined, ['B']), dep('C', ['A', 'B'])];
+    expect(order(modules)).toEqual(['PA', 'PB', 'C']);
+  });
+
+  test('stable sort uses authored index as tiebreak', () => {
+    // Two consumers of the same resource — authored order wins.
+    const modules = [dep('P', undefined, ['X']), dep('C1', ['X']), dep('C2', ['X'])];
+    expect(order(modules)).toEqual(['P', 'C1', 'C2']);
   });
 });

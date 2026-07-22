@@ -2,6 +2,86 @@ import type { RenderModule } from './render_module';
 import type { RenderContext } from './render_context';
 
 /**
+ * Resolve the setup order of a module list, honouring declared
+ * {@link RenderModule.reads} / {@link RenderModule.writes} dependencies while
+ * keeping the authored array order as the stable default.
+ *
+ * A module that declares no `reads` has no incoming edge and never moves — its
+ * authored index is preserved exactly. A module that declares `reads` is ordered
+ * after every module (of lower-or-any authored index) that declares it `writes`
+ * one of those resources; when a resource is written by several modules, the
+ * last authored writer wins (matching the blackboard's last-write-wins lookup).
+ * A read whose resource no module writes is skipped (lenient): the consumer is
+ * expected to gate on it in {@link RenderModule.enabled} if it is required.
+ *
+ * @param modules - The pipeline's modules in authored order.
+ * @returns A new array in resolved setup order.
+ * @throws If the declared dependencies form a cycle.
+ * @public
+ */
+export function resolveModuleOrder<T extends RenderModule<any>>(modules: readonly T[]): T[] {
+  const n = modules.length;
+  // Producer map: resource name -> authored index of its last declared writer.
+  const lastWriter = new Map<string, number>();
+  for (let i = 0; i < n; i++) {
+    const w = modules[i].writes;
+    if (w) {
+      for (const res of w) {
+        lastWriter.set(res, i);
+      }
+    }
+  }
+  // Edges producer -> reader, keyed by reader index (its set of prerequisite indices).
+  const prereqs: Set<number>[] = modules.map(() => new Set<number>());
+  for (let reader = 0; reader < n; reader++) {
+    const r = modules[reader].reads;
+    if (!r) {
+      continue;
+    }
+    for (const res of r) {
+      const producer = lastWriter.get(res);
+      // Skip self-edges and absent producers (lenient semantics).
+      if (producer !== undefined && producer !== reader) {
+        prereqs[reader].add(producer);
+      }
+    }
+  }
+  // Stable topological sort: repeatedly emit the lowest authored index whose
+  // prerequisites are all already emitted.
+  const emitted: boolean[] = new Array(n).fill(false);
+  const order: T[] = [];
+  for (let placed = 0; placed < n; placed++) {
+    let next = -1;
+    for (let i = 0; i < n; i++) {
+      if (emitted[i]) {
+        continue;
+      }
+      let ready = true;
+      for (const p of prereqs[i]) {
+        if (!emitted[p]) {
+          ready = false;
+          break;
+        }
+      }
+      if (ready) {
+        next = i;
+        break;
+      }
+    }
+    if (next < 0) {
+      const stuck = modules
+        .filter((_, i) => !emitted[i])
+        .map((m) => m.type)
+        .join(' -> ');
+      throw new Error(`RenderPipeline: cyclic module dependency among [${stuck}]`);
+    }
+    emitted[next] = true;
+    order.push(modules[next]);
+  }
+  return order;
+}
+
+/**
  * An ordered, editable list of {@link RenderModule}s that assembles a render
  * graph for one frame.
  *
@@ -137,11 +217,13 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
   }
 
   /**
-   * Run every enabled module's setup, in order, against the build context.
+   * Run every enabled module's setup against the build context, in the order
+   * resolved by {@link resolveModuleOrder} (authored order, adjusted for any
+   * declared reads/writes dependencies).
    * @internal
    */
   build(context: TCtx): void {
-    for (const module of this._modules) {
+    for (const module of resolveModuleOrder(this._modules)) {
       if (module.enabled(context)) {
         module.setup(context);
       }

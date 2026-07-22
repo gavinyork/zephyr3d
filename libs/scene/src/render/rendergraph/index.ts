@@ -26,7 +26,7 @@ export { RGBlackboard, FrameResources } from './blackboard';
 export { OrderingScope, type RenderContext } from './render_context';
 export type { ForwardPlusModuleContext, RenderModuleContext } from './frame_graph_context';
 export type { RenderModule } from './render_module';
-export { RenderPipeline } from './render_pipeline';
+export { RenderPipeline, resolveModuleOrder } from './render_pipeline';
 export {
   buildForwardPlusGraph,
   executeForwardPlusGraph,
