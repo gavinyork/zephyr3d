@@ -24,7 +24,15 @@ export const FrameResources = {
   SSSDiffuse: 'sssDiffuse',
   SSSTransmission: 'sssTransmission',
   SkinSSS: 'skinSSS',
-  ShadowMask: 'shadowMask'
+  ShadowMask: 'shadowMask',
+  /**
+   * The final composited color version that will be presented to the screen /
+   * final framebuffer. Registered by the tail (Present) module and used as the
+   * render graph's output sink. A downstream module may take over the final
+   * output by writing a new version of the backbuffer and re-registering it
+   * under this key — the sink follows the last registration.
+   */
+  PresentedColor: 'presentedColor'
 } as const;
 
 /**

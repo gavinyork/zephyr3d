@@ -1131,7 +1131,8 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
     FrameResources.SceneColorCopy,
     FrameResources.SSSProfile,
     FrameResources.SSSParam,
-    FrameResources.LinearDepth
+    FrameResources.LinearDepth,
+    FrameResources.PresentedColor
   ],
   enabled: () => true,
   setup(fg: FrameGraphContext) {
@@ -1362,6 +1363,9 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
       });
     }
     fg.state.presentedBackbuffer = presentedBackbuffer;
+    // Register the presented version as the graph sink. A downstream module may
+    // re-register a newer backbuffer version here to take over the final output.
+    blackboard.set(FrameResources.PresentedColor, presentedBackbuffer);
   }
 };
 
@@ -1508,12 +1512,15 @@ function buildForwardPlusGraphInternal(
   };
 
   // Assemble the graph by running the camera's render pipeline (or the shared
-  // default). Each module reads its inputs from / publishes its outputs to `fg`;
-  // the composite tail module sets fg.state.presentedBackbuffer (graph sink).
+  // default). Each module reads its inputs from / publishes its outputs to `fg`.
+  // The tail module registers FrameResources.PresentedColor as the graph sink; a
+  // downstream module may re-register a newer backbuffer version to take over the
+  // final output, so the sink is read from the blackboard (last registration wins).
   const pipeline = ctx.camera?.renderPipeline ?? getDefaultForwardPlusPipeline();
   pipeline.build(fg);
 
-  return { backbuffer: fg.state.presentedBackbuffer!, frame };
+  const presented = blackboard.get(FrameResources.PresentedColor) ?? fg.state.presentedBackbuffer!;
+  return { backbuffer: presented, frame };
 }
 
 // ─── Pass Implementation Helpers ────────────────────────────────────
