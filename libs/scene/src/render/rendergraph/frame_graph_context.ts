@@ -1,104 +1,44 @@
-import type { Nullable } from '@zephyr3d/base';
-import type { RGHandle, RGPassBuilder } from './types';
-import type { RenderGraph } from './rendergraph';
-import type { RGBlackboard } from './blackboard';
-import type { HistoryResourceManager } from './history_resource_manager';
 import type { DrawContext } from '../drawable';
-import type { RenderQueue } from '../render_queue';
-import type { Texture2D, FrameBuffer } from '@zephyr3d/device';
+import type { FrameBuffer } from '@zephyr3d/device';
+import type { RenderContext } from './render_context';
 import type { ForwardPlusOptions, FrameState, ForwardPlusBuildState } from './forward_plus_builder';
 
 /**
- * Ordering helper that encapsulates the side-effect "order token" chain.
+ * Forward+ build-time context. Extends the pipeline-agnostic {@link RenderContext}
+ * with the state the Forward+ modules need but that is not part of the generic
+ * pipeline contract: the frame {@link ../drawable#DrawContext} and the Forward+
+ * feature toggles.
  *
- * Side-effect passes (SkyUpdate, ClusterLights, ...) carry no data product, so
- * they are ordered relative to one another through logical tokens rather than
- * texture reads/writes. This scope tracks the most recently emitted token so a
- * pass can chain after the previous one and (optionally) emit its own, without
- * the builder threading a mutable `orderToken` local between blocks.
+ * Handles for well-known frame resources (linear depth, scene color, ...) flow
+ * through {@link RenderContext.blackboard} keyed by {@link ./blackboard#FrameResources}.
  *
  * @public
  */
-export class OrderingScope {
-  /** @internal */
-  private _last: Nullable<RGHandle> = null;
-
-  /**
-   * Declare a read on the most recently emitted ordering token, if any, to
-   * order the current pass after the previous side-effect pass.
-   *
-   * @param builder - The pass builder of the current pass.
-   */
-  chainInto(builder: RGPassBuilder): void {
-    if (this._last) {
-      builder.read(this._last);
-    }
-  }
-
-  /**
-   * Emit a new ordering token from the current pass and record it as the latest
-   * link in the chain.
-   *
-   * @param builder - The pass builder of the current pass.
-   * @param name - Debug label for the token.
-   * @returns The newly created token handle.
-   */
-  emit(builder: RGPassBuilder, name: string): RGHandle {
-    const token = builder.createToken(name);
-    this._last = token;
-    return token;
-  }
-
-  /** The most recently emitted ordering token, or null. */
-  get last(): Nullable<RGHandle> {
-    return this._last;
-  }
+export interface ForwardPlusModuleContext extends RenderContext {
+  /** Frame draw context. */
+  readonly ctx: DrawContext;
+  /** Pipeline feature toggles derived from scene/camera state. */
+  readonly options: ForwardPlusOptions;
 }
 
 /**
- * Build-time context threaded through the Forward+ graph assembly.
- *
- * This aggregates everything the individual pass-build blocks previously reached
- * through enclosing function locals (`orderToken`, the mutable `depthHandle`,
- * result bundles, ...). Collecting them here is the seam that lets each pass be
- * expressed as an independent unit reading its inputs from a shared context
- * rather than from closure-captured variables.
- *
- * Handles for well-known frame resources (linear depth, scene color, ...) flow
- * through {@link RenderModuleContext.blackboard} keyed by
- * {@link ./blackboard#FrameResources}; the mutable execute-time state that is
- * not a render-graph resource stays on {@link FrameGraphContext.frame}.
+ * @deprecated Renamed to {@link ForwardPlusModuleContext}. The generic,
+ * pipeline-agnostic base contract is now {@link RenderContext}; this alias is
+ * kept for backward compatibility and will be removed in a future release.
  *
  * @public
  */
-export interface RenderModuleContext {
-  /** The render graph being populated for this frame. */
-  readonly graph: RenderGraph;
-  /** Frame draw context. */
-  readonly ctx: DrawContext;
-  /** The culled render queue for this frame. */
-  readonly renderQueue: RenderQueue;
-  /** Named registry of shared frame-resource handles (see {@link ./blackboard#FrameResources}). */
-  readonly blackboard: RGBlackboard;
-  /** Cross-frame history resource manager, or null when unavailable. */
-  readonly history: Nullable<HistoryResourceManager<Texture2D>>;
-  /** Pipeline feature toggles derived from scene/camera state. */
-  readonly options: ForwardPlusOptions;
-  /** Ordering-token chain for side-effect passes. */
-  readonly ordering: OrderingScope;
-  /** The imported backbuffer handle (graph sink). */
-  readonly backbuffer: RGHandle;
-}
+export type RenderModuleContext = ForwardPlusModuleContext;
 
 /**
  * Full build-time context threaded through the Forward+ pipeline. Extends the
- * public {@link RenderModuleContext} with the Forward+ pipeline's internal
+ * public {@link ForwardPlusModuleContext} with the Forward+ pipeline's internal
  * mutable state, which built-in modules read/write but custom modules should
  * not depend on.
  *
- * @internal
+ * @public
  */
-export interface FrameGraphContext extends RenderModuleContext {
+export interface FrameGraphContext extends ForwardPlusModuleContext {
   /** Mutable execute-time state shared between pass callbacks. */
   readonly frame: FrameState;
   /** Mutable build-state shared between modules for non-resource intermediates. */

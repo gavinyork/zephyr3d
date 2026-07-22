@@ -1,5 +1,5 @@
 import type { RenderModule } from './render_module';
-import type { FrameGraphContext } from './frame_graph_context';
+import type { RenderContext } from './render_context';
 
 /**
  * An ordered, editable list of {@link RenderModule}s that assembles a render
@@ -22,15 +22,15 @@ import type { FrameGraphContext } from './frame_graph_context';
  *
  * @public
  */
-export class RenderPipeline {
+export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
   /** @internal */
-  private _modules: RenderModule[];
+  private _modules: RenderModule<TCtx>[];
 
   /**
    * @param modules - Initial ordered modules. Copied into the pipeline; the
    *   array is not retained. Duplicate `type` values are rejected.
    */
-  constructor(modules?: readonly RenderModule[]) {
+  constructor(modules?: readonly RenderModule<TCtx>[]) {
     this._modules = [];
     if (modules) {
       for (const m of modules) {
@@ -40,7 +40,7 @@ export class RenderPipeline {
   }
 
   /** The pipeline's modules in execution order. */
-  get modules(): readonly RenderModule[] {
+  get modules(): readonly RenderModule<TCtx>[] {
     return this._modules;
   }
 
@@ -57,7 +57,7 @@ export class RenderPipeline {
    * @param type - The {@link RenderModule.type} to look up.
    * @returns The module, or undefined if absent.
    */
-  get(type: string): RenderModule | undefined {
+  get(type: string): RenderModule<TCtx> | undefined {
     const i = this._indexOf(type);
     return i >= 0 ? this._modules[i] : undefined;
   }
@@ -66,7 +66,7 @@ export class RenderPipeline {
    * Append a module to the end of the pipeline.
    * @param module - The module to add.
    */
-  append(module: RenderModule): this {
+  append(module: RenderModule<TCtx>): this {
     this._assertAbsent(module.type);
     this._modules.push(module);
     return this;
@@ -76,7 +76,7 @@ export class RenderPipeline {
    * Prepend a module to the front of the pipeline.
    * @param module - The module to add.
    */
-  prepend(module: RenderModule): this {
+  prepend(module: RenderModule<TCtx>): this {
     this._assertAbsent(module.type);
     this._modules.unshift(module);
     return this;
@@ -87,7 +87,7 @@ export class RenderPipeline {
    * @param type - The {@link RenderModule.type} of the existing anchor.
    * @param module - The module to insert.
    */
-  insertBefore(type: string, module: RenderModule): this {
+  insertBefore(type: string, module: RenderModule<TCtx>): this {
     this._assertAbsent(module.type);
     this._modules.splice(this._requireIndex(type), 0, module);
     return this;
@@ -98,7 +98,7 @@ export class RenderPipeline {
    * @param type - The {@link RenderModule.type} of the existing anchor.
    * @param module - The module to insert.
    */
-  insertAfter(type: string, module: RenderModule): this {
+  insertAfter(type: string, module: RenderModule<TCtx>): this {
     this._assertAbsent(module.type);
     this._modules.splice(this._requireIndex(type) + 1, 0, module);
     return this;
@@ -109,7 +109,7 @@ export class RenderPipeline {
    * @param type - The {@link RenderModule.type} of the module to replace.
    * @param module - The replacement module.
    */
-  replace(type: string, module: RenderModule): this {
+  replace(type: string, module: RenderModule<TCtx>): this {
     const i = this._requireIndex(type);
     if (module.type !== type) {
       this._assertAbsent(module.type);
@@ -132,15 +132,15 @@ export class RenderPipeline {
    * shared). Use to derive a per-camera pipeline from the default without
    * mutating the shared one.
    */
-  clone(): RenderPipeline {
-    return new RenderPipeline(this._modules);
+  clone(): RenderPipeline<TCtx> {
+    return new RenderPipeline<TCtx>(this._modules);
   }
 
   /**
    * Run every enabled module's setup, in order, against the build context.
    * @internal
    */
-  build(context: FrameGraphContext): void {
+  build(context: TCtx): void {
     for (const module of this._modules) {
       if (module.enabled(context)) {
         module.setup(context);

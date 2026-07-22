@@ -1804,17 +1804,22 @@ export class Camera extends SceneNode {
     Camera._historyResourceManager.set(this, manager);
   }
   /** @internal */
-  private _renderPipeline: Nullable<RenderPipeline> = null;
+  private _renderPipeline: Nullable<RenderPipeline<any>> = null;
   /**
    * The render pipeline that assembles this camera's frame graph. When null
    * (the default), the shared default Forward+ pipeline is used. Assign a
    * customized pipeline to override rendering for this camera only, e.g.
    * `camera.renderPipeline = createForwardPlusPipeline().insertAfter('LightPass', myModule)`.
+   *
+   * Typed as `RenderPipeline<any>` because a camera may hold any concrete
+   * pipeline (Forward+, and later Deferred or fully custom), each parameterized
+   * over its own context type; the concrete pipeline returned by
+   * `createForwardPlusPipeline()` remains strongly typed at its creation site.
    */
-  get renderPipeline(): Nullable<RenderPipeline> {
+  get renderPipeline(): Nullable<RenderPipeline<any>> {
     return this._renderPipeline;
   }
-  set renderPipeline(pipeline: Nullable<RenderPipeline>) {
+  set renderPipeline(pipeline: Nullable<RenderPipeline<any>>) {
     this._renderPipeline = pipeline;
   }
   /** @internal */

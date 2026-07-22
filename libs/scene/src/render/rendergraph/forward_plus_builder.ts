@@ -34,7 +34,7 @@ import { DevicePoolAllocator } from './device_pool_allocator';
 import { HistoryResourceManager } from './history_resource_manager';
 import { RGHistoryResources } from './history_resources';
 import { RGBlackboard, FrameResources } from './blackboard';
-import { OrderingScope } from './frame_graph_context';
+import { OrderingScope } from './render_context';
 import type { FrameGraphContext } from './frame_graph_context';
 import type { RenderModule } from './render_module';
 import { RenderPipeline } from './render_pipeline';
@@ -361,7 +361,7 @@ export function deriveForwardPlusOptions(
  * This replaces the monolithic DrawContext mutation pattern with an explicit
  * object that graph passes can read from and write to.
  *
- * @internal
+ * @public
  */
 export interface FrameState {
   ctx: DrawContext;
@@ -427,7 +427,7 @@ export interface LightPassResult {
  * Fields are populated as modules run in authored order; a field is only read
  * after the module that produces it has run.
  *
- * @internal
+ * @public
  */
 export interface ForwardPlusBuildState {
   /** Depth prepass outputs. */
@@ -484,7 +484,7 @@ export interface ForwardPlusBuildState {
 // self-describing {@link RenderModule} so the pre-scene sequence is a plain list.
 
 /** @internal */
-const SkyUpdateModule: RenderModule = {
+const SkyUpdateModule: RenderModule<FrameGraphContext> = {
   type: 'SkyUpdate',
   enabled: () => true,
   setup({ graph, ctx, frame, ordering }: FrameGraphContext) {
@@ -499,7 +499,7 @@ const SkyUpdateModule: RenderModule = {
 };
 
 /** @internal */
-const ClusterLightsModule: RenderModule = {
+const ClusterLightsModule: RenderModule<FrameGraphContext> = {
   type: 'ClusterLights',
   enabled: () => true,
   setup({ graph, ctx, renderQueue, ordering }: FrameGraphContext) {
@@ -516,7 +516,7 @@ const ClusterLightsModule: RenderModule = {
 };
 
 /** @internal */
-const GPUPickingModule: RenderModule = {
+const GPUPickingModule: RenderModule<FrameGraphContext> = {
   type: 'GPUPicking',
   enabled: ({ options }) => options.gpuPicking,
   setup({ graph, ctx, renderQueue, ordering }: FrameGraphContext) {
@@ -535,7 +535,7 @@ const GPUPickingModule: RenderModule = {
 };
 
 /** @internal */
-const ShadowMapsModule: RenderModule = {
+const ShadowMapsModule: RenderModule<FrameGraphContext> = {
   type: 'ShadowMaps',
   // Shadow maps are managed internally by lights; mark as side effect.
   enabled: ({ renderQueue }) => renderQueue.shadowedLights.length > 0,
@@ -554,7 +554,7 @@ const ShadowMapsModule: RenderModule = {
 // ─── Depth prepass module ───────────────────────────────────────────
 
 /** @internal */
-const DepthPrepassModule: RenderModule = {
+const DepthPrepassModule: RenderModule<FrameGraphContext> = {
   type: 'DepthPrepass',
   enabled: () => true,
   setup(fg: FrameGraphContext) {
@@ -659,7 +659,7 @@ const DepthPrepassModule: RenderModule = {
 // ─── Screen-space shadow mask module ────────────────────────────────
 
 /** @internal */
-const ShadowMaskModule: RenderModule = {
+const ShadowMaskModule: RenderModule<FrameGraphContext> = {
   type: 'ShadowMaskPass',
   // Gate on build-time state only: renderQueue.shadowedLights is available now,
   // whereas ctx.shadowMapInfo is populated later by the ShadowMaps pass execute
@@ -720,7 +720,7 @@ const ShadowMaskModule: RenderModule = {
 // ─── Pre-light transmission depth module (SSR Hi-Z) ─────────────────
 
 /** @internal */
-const TransmissionDepthForSSRModule: RenderModule = {
+const TransmissionDepthForSSRModule: RenderModule<FrameGraphContext> = {
   type: 'TransmissionDepthForSSR',
   enabled: ({ options }) => options.needsTransmissionDepthForSSR,
   setup(fg: FrameGraphContext) {
@@ -750,7 +750,7 @@ const TransmissionDepthForSSRModule: RenderModule = {
 // ─── Hi-Z pyramid module ────────────────────────────────────────────
 
 /** @internal */
-const HiZModule: RenderModule = {
+const HiZModule: RenderModule<FrameGraphContext> = {
   type: 'HiZ',
   enabled: ({ options }) => options.hiZ,
   setup(fg: FrameGraphContext) {
@@ -797,7 +797,7 @@ const HiZModule: RenderModule = {
 // ─── Forward SSS profile module ─────────────────────────────────────
 
 /** @internal */
-const SSSProfileModule: RenderModule = {
+const SSSProfileModule: RenderModule<FrameGraphContext> = {
   type: 'SSSProfile',
   enabled: ({ options }) => options.sss,
   setup(fg: FrameGraphContext) {
@@ -851,7 +851,7 @@ const SSSProfileModule: RenderModule = {
 // ─── Scene color grab module ────────────────────────────────────────
 
 /** @internal */
-const SceneColorGrabModule: RenderModule = {
+const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
   type: 'SceneColorGrab',
   enabled: ({ options }) => options.needSceneColor,
   setup(fg: FrameGraphContext) {
@@ -895,7 +895,7 @@ const SceneColorGrabModule: RenderModule = {
 // ─── Main light pass module ─────────────────────────────────────────
 
 /** @internal */
-const LightPassModule: RenderModule = {
+const LightPassModule: RenderModule<FrameGraphContext> = {
   type: 'LightPass',
   enabled: () => true,
   setup(fg: FrameGraphContext) {
@@ -1113,7 +1113,7 @@ const LightPassModule: RenderModule = {
 // stays with the Compositor layers. All its inputs come from fg.state / fg.
 
 /** @internal */
-const CompositeTailModule: RenderModule = {
+const CompositeTailModule: RenderModule<FrameGraphContext> = {
   type: 'CompositeTail',
   enabled: () => true,
   setup(fg: FrameGraphContext) {
@@ -1371,7 +1371,7 @@ export const ForwardPlusModules = {
 } as const;
 
 /** The default module order assembled by {@link createForwardPlusPipeline}. */
-const DEFAULT_FORWARD_PLUS_MODULES: readonly RenderModule[] = [
+const DEFAULT_FORWARD_PLUS_MODULES: readonly RenderModule<FrameGraphContext>[] = [
   SkyUpdateModule,
   ClusterLightsModule,
   GPUPickingModule,
@@ -1387,7 +1387,7 @@ const DEFAULT_FORWARD_PLUS_MODULES: readonly RenderModule[] = [
 ];
 
 /** @internal Shared default pipeline, created lazily. */
-let _defaultForwardPlusPipeline: RenderPipeline | null = null;
+let _defaultForwardPlusPipeline: RenderPipeline<FrameGraphContext> | null = null;
 
 /**
  * Create a fresh, independent Forward+ {@link RenderPipeline} preloaded with the
@@ -1396,8 +1396,8 @@ let _defaultForwardPlusPipeline: RenderPipeline | null = null;
  *
  * @public
  */
-export function createForwardPlusPipeline(): RenderPipeline {
-  return new RenderPipeline(DEFAULT_FORWARD_PLUS_MODULES);
+export function createForwardPlusPipeline(): RenderPipeline<FrameGraphContext> {
+  return new RenderPipeline<FrameGraphContext>(DEFAULT_FORWARD_PLUS_MODULES);
 }
 
 /**
@@ -1406,7 +1406,7 @@ export function createForwardPlusPipeline(): RenderPipeline {
  *
  * @public
  */
-export function getDefaultForwardPlusPipeline(): RenderPipeline {
+export function getDefaultForwardPlusPipeline(): RenderPipeline<FrameGraphContext> {
   if (!_defaultForwardPlusPipeline) {
     _defaultForwardPlusPipeline = createForwardPlusPipeline();
   }

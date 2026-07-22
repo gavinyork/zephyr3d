@@ -1,4 +1,4 @@
-import type { RenderModuleContext } from './frame_graph_context';
+import type { RenderContext } from './render_context';
 
 /**
  * A self-describing unit of a {@link ./render_pipeline#RenderPipeline}.
@@ -6,26 +6,28 @@ import type { RenderModuleContext } from './frame_graph_context';
  * Each module owns the setup of one logical stage (depth prepass, light pass,
  * the composite post-effect tail, ...): it declares its own gating condition and
  * adds its passes to the graph, reading inputs from and publishing outputs to
- * the shared {@link RenderModuleContext} — the blackboard for resource handles
- * (see {@link ./blackboard#FrameResources}) and the ordering scope for
- * side-effect tokens.
+ * the shared context — the blackboard for resource handles (see
+ * {@link ./blackboard#FrameResources}) and the ordering scope for side-effect
+ * tokens.
  *
  * Modules run in the pipeline's authored order. A module never reaches into
  * another module's local variables — all cross-module data flows through the
  * context — which is what lets a pipeline be recomposed (insert/replace/remove).
  *
- * A custom module inserted into the Forward+ pipeline typically only needs
- * `ctx.graph` (to add passes), `ctx.blackboard` (to read/publish named frame
- * resources), and `ctx.ctx` (the {@link ../drawable#DrawContext}). Replacing a
- * built-in producer additionally requires reproducing whatever that module
- * publishes for downstream modules.
+ * The module is parameterized over its context type `TCtx`. The default,
+ * pipeline-agnostic {@link RenderContext} gives access to `graph` (to add
+ * passes), `blackboard` (to read/publish named frame resources) and `ordering`.
+ * A module targeting a concrete pipeline narrows `TCtx` to that pipeline's
+ * context (e.g. {@link ./frame_graph_context#ForwardPlusModuleContext}) to reach
+ * the pipeline-specific state; such a module is only composable into a pipeline
+ * of the matching context type.
  *
  * Note: `setup` runs at graph-build time. Execute-time work stays in the pass
  * execute callbacks the module registers.
  *
  * @public
  */
-export interface RenderModule {
+export interface RenderModule<TCtx extends RenderContext = RenderContext> {
   /**
    * Stable identifier for this module (e.g. 'DepthPrepass', 'LightPass'). Used
    * as the anchor for pipeline insertion/replacement/removal. Where a module
@@ -41,7 +43,7 @@ export interface RenderModule {
    * @param context - The render module build context.
    * @returns true if the module should build its passes this frame.
    */
-  enabled(context: RenderModuleContext): boolean;
+  enabled(context: TCtx): boolean;
 
   /**
    * Add this module's passes to the graph.
@@ -52,5 +54,5 @@ export interface RenderModule {
    *
    * @param context - The render module build context.
    */
-  setup(context: RenderModuleContext): void;
+  setup(context: TCtx): void;
 }
