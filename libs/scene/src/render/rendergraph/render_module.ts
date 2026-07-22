@@ -44,8 +44,10 @@ export interface RenderModule<TCtx extends RenderContext = RenderContext> {
    * module can be added at any position (e.g. plain `append`) and still see the
    * inputs it needs, without the author picking an anchor. A read whose producer
    * is absent this frame (gated off, or never declared) is skipped, not an
-   * error; guard on `blackboard.has(...)` in {@link RenderModule.enabled} if the
-   * module is meaningless without it.
+   * error. If the module requires the resource, check `blackboard.has(...)` in
+   * {@link RenderModule.setup} before calling `expect()`. `enabled()` is evaluated
+   * for every module before any setup runs and must not depend on resources
+   * published by another module's setup.
    *
    * Omit for a module whose position is authored explicitly (append / insertAfter / ...).
    */
@@ -61,7 +63,9 @@ export interface RenderModule<TCtx extends RenderContext = RenderContext> {
   /**
    * Whether this module contributes to the current frame. Derived from
    * scene/camera/render-queue state and the pipeline options on the context.
-   * A disabled module's {@link RenderModule.setup} is skipped entirely.
+   * Disabled modules are removed before `reads`/`writes` dependency resolution,
+   * and their {@link RenderModule.setup} is skipped entirely. Consequently a
+   * disabled writer cannot become the producer that orders an enabled consumer.
    *
    * @param context - The render module build context.
    * @returns true if the module should build its passes this frame.

@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import type { Texture2D } from '@zephyr3d/device';
+import type { FrameBuffer, Texture2D } from '@zephyr3d/device';
 import type { RGHandle, RGPassBuilder } from './types';
 import type { RenderGraph } from './rendergraph';
 import type { RGBlackboard } from './blackboard';
@@ -71,6 +71,8 @@ export class OrderingScope {
  * @public
  */
 export interface RenderContext {
+  /** The external framebuffer presented by this frame, or null for the screen. */
+  readonly finalFramebuffer: FrameBuffer | null;
   /** The render graph being populated for this frame. */
   readonly graph: RenderGraph;
   /** The culled render queue for this frame. */

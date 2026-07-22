@@ -1,4 +1,4 @@
-import { FrameResources, getDevice } from '@zephyr3d/scene';
+import { FrameResources } from '@zephyr3d/scene';
 import type { RenderModule, RGExecuteContext, RGHandle } from '@zephyr3d/scene';
 import type { FrameBuffer, Texture2D } from '@zephyr3d/device';
 import { DepthGrayscaleBlitter } from './depth-grayscale-blitter';
@@ -38,14 +38,17 @@ export function createDepthVisualizationModule(): RenderModule {
     // Declarative ordering: place this module's setup after the linear-depth
     // producer. We do not care where in the authored list it sits.
     reads: [FrameResources.LinearDepth, FrameResources.PresentedColor],
-    // Only meaningful when linear depth was actually produced this frame.
-    enabled: ({ blackboard }) => blackboard.has(FrameResources.LinearDepth),
-    setup({ graph, blackboard }) {
+    // enabled() runs before every module's setup(), so gate on published resources in setup.
+    enabled: () => true,
+    setup({ graph, blackboard, finalFramebuffer }) {
+      if (!blackboard.has(FrameResources.LinearDepth)) {
+        return;
+      }
       const depthHandle = blackboard.expect(FrameResources.LinearDepth);
       const prevPresented = blackboard.expect(FrameResources.PresentedColor);
       // Capture the final target now, while graph build runs with the final
       // framebuffer still bound. null = screen, otherwise the offscreen FBO.
-      const finalTarget: FrameBuffer | null = getDevice().getFramebuffer();
+      const finalTarget: FrameBuffer | null = finalFramebuffer;
 
       const written = graph.addPass('DepthVisualization', (builder) => {
         builder.read(depthHandle);

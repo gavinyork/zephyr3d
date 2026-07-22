@@ -48,6 +48,7 @@ export class RenderGraph {
   private _passes: RGPass[] = [];
   /** @internal */
   private _compiled: CompiledRenderGraph | null = null;
+  private _lastWriterByPhysicalId = new Map<number, RGPass>();
 
   // ─── Graph Building ─────────────────────────────────────────────────
 
@@ -81,11 +82,34 @@ export class RenderGraph {
   addPass<T = void>(name: string, setup: (builder: RGPassBuilder) => T): T {
     const pass = new RGPass(this._passes.length, name);
     const builder = this._createBuilder(pass);
-    const data = setup(builder);
-    pass.data = data;
-    this._passes.push(pass);
-    this._compiled = null;
-    return data;
+    const initialResourceIds = new Set(this._resources.keys());
+    try {
+      const data = setup(builder);
+      pass.data = data;
+      this._passes.push(pass);
+      this._compiled = null;
+      return data;
+    } catch (error) {
+      for (const id of this._resources.keys()) {
+        if (!initialResourceIds.has(id)) {
+          this._resources.delete(id);
+        }
+      }
+      for (const resource of this._resources.values()) {
+        for (let i = resource.consumers.length - 1; i >= 0; i--) {
+          if (resource.consumers[i] === pass) {
+            resource.consumers.splice(i, 1);
+          }
+        }
+      }
+      this._lastWriterByPhysicalId.clear();
+      for (const resource of this._resources.values()) {
+        if (resource.producer) {
+          this._lastWriterByPhysicalId.set(resource.physicalId, resource.producer);
+        }
+      }
+      throw error;
+    }
   }
 
   // ─── Compilation ────────────────────────────────────────────────────
@@ -165,6 +189,7 @@ export class RenderGraph {
     this._resources.clear();
     this._nextResourceId = 0;
     this._compiled = null;
+    this._lastWriterByPhysicalId.clear();
   }
 
   // ─── Accessors (for testing / debugging) ────────────────────────────
@@ -226,6 +251,10 @@ export class RenderGraph {
               `Create a new framebuffer view instead.`
           );
         }
+        const previousWriter = graph._lastWriterByPhysicalId.get(res.physicalId);
+        if (previousWriter && previousWriter !== pass && !pass.dependencies.includes(previousWriter)) {
+          pass.dependencies.push(previousWriter);
+        }
         for (const consumer of res.consumers) {
           if (consumer !== pass && !pass.dependencies.includes(consumer)) {
             pass.dependencies.push(consumer);
@@ -239,6 +268,7 @@ export class RenderGraph {
         const version = new RGResource(id, versionName, res.kind, res.desc, res.physicalId);
         version.producer = pass;
         graph._resources.set(id, version);
+        graph._lastWriterByPhysicalId.set(res.physicalId, pass);
         if (!pass.writes.includes(version)) {
           pass.writes.push(version);
         }
@@ -250,6 +280,7 @@ export class RenderGraph {
         const res = new RGResource(id, name, 'transient', desc);
         res.producer = pass;
         graph._resources.set(id, res);
+        graph._lastWriterByPhysicalId.set(res.physicalId, pass);
         pass.writes.push(res);
         return new RGHandle(id, name);
       },
@@ -268,6 +299,7 @@ export class RenderGraph {
         const res = new RGResource(id, name, 'framebuffer', desc);
         res.producer = pass;
         graph._resources.set(id, res);
+        graph._lastWriterByPhysicalId.set(res.physicalId, pass);
         pass.writes.push(res);
         graph._declareFramebufferAttachmentDeps(pass, desc);
         return new RGHandle(id, name);

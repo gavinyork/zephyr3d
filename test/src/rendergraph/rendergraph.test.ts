@@ -642,6 +642,49 @@ describe('RenderGraph', () => {
   });
 });
 
+describe('RenderGraph mutation safety', () => {
+  test('setup failure rolls back resources and consumers', () => {
+    const graph = new RenderGraph();
+    const imported = graph.importTexture('backbuffer');
+    expect(() =>
+      graph.addPass('Broken', (builder) => {
+        builder.read(imported);
+        builder.createTexture({ format: 'rgba8unorm' });
+        throw new Error('setup failed');
+      })
+    ).toThrow('setup failed');
+    expect(graph.passes).toHaveLength(0);
+    expect(graph.resources.size).toBe(1);
+    expect(graph.getResource(imported)?.consumers).toHaveLength(0);
+  });
+
+  test('serializes forked writes even when topo order would otherwise diverge', () => {
+    const graph = new RenderGraph();
+    const backbuffer = graph.importTexture('backbuffer');
+
+    const gate = graph.addPass('Gate', (builder) => {
+      const token = builder.createToken('gate');
+      builder.setExecute(() => {});
+      return token;
+    });
+    graph.addPass('First', (builder) => {
+      builder.read(gate);
+      builder.write(backbuffer);
+      builder.sideEffect();
+      builder.setExecute(() => {});
+    });
+    const second = graph.addPass('Second', (builder) => {
+      const output = builder.write(backbuffer);
+      builder.setExecute(() => {});
+      return output;
+    });
+    // Without the WAW edge, Second is ready before First and the stable Kahn
+    // queue emits [Gate, Second, First].
+    const names = graph.compile([second]).orderedPasses.map((pass) => pass.name);
+    expect(names.indexOf('First')).toBeLessThan(names.indexOf('Second'));
+  });
+});
+
 // ─── RenderGraphExecutor Tests ────────────────────────────────────────
 
 describe('RenderGraphExecutor', () => {

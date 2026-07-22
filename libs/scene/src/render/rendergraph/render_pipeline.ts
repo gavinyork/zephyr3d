@@ -217,16 +217,16 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
   }
 
   /**
-   * Run every enabled module's setup against the build context, in the order
-   * resolved by {@link resolveModuleOrder} (authored order, adjusted for any
-   * declared reads/writes dependencies).
+   * Run every enabled module's setup against the build context. Enabled modules
+   * are filtered before dependency resolution, so disabled writers cannot affect
+   * the ordering or blackboard contract of the current frame.
    * @internal
    */
   build(context: TCtx): void {
-    for (const module of resolveModuleOrder(this._modules)) {
-      if (module.enabled(context)) {
-        module.setup(context);
-      }
+    // Resolve dependencies only among modules participating in this frame.
+    const enabled = this._modules.filter((module) => module.enabled(context));
+    for (const module of resolveModuleOrder(enabled)) {
+      module.setup(context);
     }
   }
 

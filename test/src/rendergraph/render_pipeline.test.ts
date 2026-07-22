@@ -108,6 +108,20 @@ describe('RenderPipeline', () => {
     p.build({} as never);
     expect(calls).toEqual(['A', 'C']);
   });
+
+  test('disabled writer authored last does not reorder enabled modules', () => {
+    const calls: string[] = [];
+    const consumer = dep('M1', ['R']);
+    consumer.setup = () => calls.push('M1');
+    const independent = dep('M2');
+    independent.setup = () => calls.push('M2');
+    const disabledWriter = dep('Wd', undefined, ['R']);
+    disabledWriter.enabled = () => false;
+    disabledWriter.setup = () => calls.push('Wd');
+
+    new RenderPipeline([consumer, independent, disabledWriter]).build({} as never);
+    expect(calls).toEqual(['M1', 'M2']);
+  });
 });
 
 describe('resolveModuleOrder', () => {
@@ -123,20 +137,12 @@ describe('resolveModuleOrder', () => {
   });
 
   test('places a consumer after the last writer when a resource is written multiple times', () => {
-    const modules = [
-      dep('C', ['X']),
-      dep('W1', undefined, ['X']),
-      dep('W2', undefined, ['X'])
-    ];
+    const modules = [dep('C', ['X']), dep('W1', undefined, ['X']), dep('W2', undefined, ['X'])];
     expect(order(modules)).toEqual(['W1', 'W2', 'C']);
   });
 
   test('handles multiple reads on one consumer', () => {
-    const modules = [
-      dep('C', ['A', 'B']),
-      dep('PA', undefined, ['A']),
-      dep('PB', undefined, ['B'])
-    ];
+    const modules = [dep('C', ['A', 'B']), dep('PA', undefined, ['A']), dep('PB', undefined, ['B'])];
     // C must be after both PA and PB.
     const result = order(modules);
     expect(result.indexOf('C')).toBeGreaterThan(result.indexOf('PA'));
@@ -148,10 +154,7 @@ describe('resolveModuleOrder', () => {
   });
 
   test('throws on cyclic dependencies', () => {
-    const modules = [
-      dep('A', ['B'], ['A']),
-      dep('B', ['A'], ['B'])
-    ];
+    const modules = [dep('A', ['B'], ['A']), dep('B', ['A'], ['B'])];
     expect(() => resolveModuleOrder(modules)).toThrow(/cyclic module dependency/i);
   });
 

@@ -1,12 +1,7 @@
 import { Blitter } from '@zephyr3d/scene';
 import type { BlitType } from '@zephyr3d/scene';
 import { Vector2 } from '@zephyr3d/base';
-import type {
-  BindGroup,
-  PBShaderExp,
-  PBInsideFunctionScope,
-  PBGlobalScope
-} from '@zephyr3d/device';
+import type { BindGroup, PBShaderExp, PBInsideFunctionScope, PBGlobalScope } from '@zephyr3d/device';
 
 /**
  * Visualizes the RAW, non-linear depth buffer as grayscale.

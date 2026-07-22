@@ -391,7 +391,7 @@ interface SSSProfilePassResult {
   framebufferHandle: RGHandle;
 }
 
-/** Result of the depth prepass module. @internal */
+/** Result of the depth prepass module. @public */
 export interface DepthPrepassResult {
   depthHandle: RGHandle;
   motionVectorHandle?: RGHandle;
@@ -400,13 +400,13 @@ export interface DepthPrepassResult {
   depthFramebufferHandle: RGHandle;
 }
 
-/** Result of the scene-color grab module. @internal */
+/** Result of the scene-color grab module. @public */
 export interface SceneColorGrabResult {
   copyHandle: RGHandle;
   copyFramebufferHandle?: RGHandle;
 }
 
-/** Result of the main light pass module. @internal */
+/** Result of the main light pass module. @public */
 export interface LightPassResult {
   sceneColorHandle: RGHandle;
   sceneColorCopyHandle?: RGHandle;
@@ -1496,6 +1496,7 @@ function buildForwardPlusGraphInternal(
   const fg: FrameGraphContext = {
     graph,
     ctx,
+    finalFramebuffer: ctx.finalFramebuffer,
     renderQueue,
     blackboard,
     frame,
@@ -2193,6 +2194,7 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
 
     executor.execute(compiled);
     historyManager.commitFrame();
+    historyFrameStarted = false;
   } finally {
     if (historyFrameStarted) {
       historyManager?.discardFrame();
