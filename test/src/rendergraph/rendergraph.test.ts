@@ -411,6 +411,38 @@ describe('RenderGraph', () => {
       expect(names).toContain('LightPass');
       expect(names).not.toContain('HiZ');
     });
+
+    test('reader of an overwritten version is still culled when its output is unused', () => {
+      let backbuffer = graph.importTexture('backbuffer');
+      let color: RGHandle;
+
+      graph.addPass('LightPass', (builder) => {
+        color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+        builder.setExecute(() => {});
+      });
+      // Reads the pre-write scene color but produces nothing anyone consumes:
+      // the WAR hazard with TransparentPass is ordering-only and must not keep
+      // this pass alive.
+      graph.addPass('DebugRead', (builder) => {
+        builder.read(color!);
+        builder.createTexture({ format: 'rgba8unorm', label: 'debug' });
+        builder.setExecute(() => {});
+      });
+      graph.addPass('TransparentPass', (builder) => {
+        builder.read(color!);
+        color = builder.write(color!);
+        builder.setExecute(() => {});
+      });
+      graph.addPass('Present', (builder) => {
+        builder.read(color!);
+        backbuffer = builder.write(backbuffer);
+        builder.setExecute(() => {});
+      });
+
+      const names = graph.compile([backbuffer]).orderedPasses.map((p) => p.name);
+      expect(names).toEqual(['LightPass', 'TransparentPass', 'Present']);
+      expect(names).not.toContain('DebugRead');
+    });
   });
 
   // ─── Resource Lifetime Analysis ─────────────────────────────────────
@@ -682,6 +714,154 @@ describe('RenderGraph mutation safety', () => {
     // queue emits [Gate, Second, First].
     const names = graph.compile([second]).orderedPasses.map((pass) => pass.name);
     expect(names.indexOf('First')).toBeLessThan(names.indexOf('Second'));
+  });
+
+  test('WAR: reader of the old version runs before the overwriting pass', () => {
+    const graph = new RenderGraph();
+    let backbuffer = graph.importTexture('backbuffer');
+    let color: RGHandle;
+    let debugOut: RGHandle;
+
+    graph.addPass('LightPass', (builder) => {
+      color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      builder.setExecute(() => {});
+    });
+    // Gate the reader behind a token so the stable Kahn queue would otherwise
+    // emit the writer first; the WAR edge must force the reader ahead.
+    const gate = graph.addPass('Gate', (builder) => {
+      const token = builder.createToken('gate');
+      builder.setExecute(() => {});
+      return token;
+    });
+    graph.addPass('DebugRead', (builder) => {
+      builder.read(gate);
+      builder.read(color!);
+      debugOut = builder.createTexture({ format: 'rgba8unorm', label: 'debug' });
+      builder.setExecute(() => {});
+    });
+    graph.addPass('TransparentPass', (builder) => {
+      builder.read(color!);
+      color = builder.write(color!);
+      builder.setExecute(() => {});
+    });
+    graph.addPass('Present', (builder) => {
+      builder.read(color!);
+      builder.read(debugOut!);
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute(() => {});
+    });
+
+    const names = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+    expect(names.indexOf('DebugRead')).toBeLessThan(names.indexOf('TransparentPass'));
+  });
+
+  test('read of a superseded version is ordered before the overwriting pass', () => {
+    const graph = new RenderGraph();
+    let backbuffer = graph.importTexture('backbuffer');
+    let colorV0: RGHandle;
+    let colorV1: RGHandle;
+    let lateOut: RGHandle;
+
+    graph.addPass('LightPass', (builder) => {
+      colorV0 = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      builder.setExecute(() => {});
+    });
+    graph.addPass('TransparentPass', (builder) => {
+      builder.read(colorV0!);
+      colorV1 = builder.write(colorV0!);
+      builder.setExecute(() => {});
+    });
+    // Declared AFTER the overwriting pass but reads the old version: it must be
+    // scheduled before TransparentPass clobbers the physical texture.
+    graph.addPass('LateReader', (builder) => {
+      builder.read(colorV0!);
+      lateOut = builder.createTexture({ format: 'rgba8unorm', label: 'late' });
+      builder.setExecute(() => {});
+    });
+    graph.addPass('Present', (builder) => {
+      builder.read(colorV1!);
+      builder.read(lateOut!);
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute(() => {});
+    });
+
+    const names = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+    expect(names.indexOf('LateReader')).toBeLessThan(names.indexOf('TransparentPass'));
+  });
+
+  test('stale read of a forked write is ordered before the FIRST overwriting pass', () => {
+    const graph = new RenderGraph();
+    let backbuffer = graph.importTexture('backbuffer');
+    let colorV0: RGHandle;
+    let lateOut: RGHandle;
+
+    graph.addPass('Producer', (builder) => {
+      colorV0 = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      builder.setExecute(() => {});
+    });
+    // Two forked writes of v0; the WAW edge serializes W1 before W2.
+    graph.addPass('W1', (builder) => {
+      builder.write(colorV0!);
+      builder.sideEffect();
+      builder.setExecute(() => {});
+    });
+    const v2 = graph.addPass('W2', (builder) => {
+      const out = builder.write(colorV0!);
+      builder.setExecute(() => {});
+      return out;
+    });
+    graph.addPass('LateReader', (builder) => {
+      builder.read(colorV0!);
+      lateOut = builder.createTexture({ format: 'rgba8unorm', label: 'late' });
+      builder.setExecute(() => {});
+    });
+    graph.addPass('Present', (builder) => {
+      builder.read(v2);
+      builder.read(lateOut!);
+      backbuffer = builder.write(backbuffer);
+      builder.setExecute(() => {});
+    });
+
+    const names = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+    expect(names.indexOf('LateReader')).toBeLessThan(names.indexOf('W1'));
+  });
+
+  test('setup failure rolls back retroactive WAR edges and nextWriter', () => {
+    const graph = new RenderGraph();
+    let color: RGHandle;
+
+    graph.addPass('Producer', (builder) => {
+      color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      builder.setExecute(() => {});
+    });
+    const v1 = graph.addPass('Writer', (builder) => {
+      builder.read(color!);
+      const out = builder.write(color!);
+      builder.setExecute(() => {});
+      return out;
+    });
+
+    // The stale read adds a WAR edge into Writer before the setup throws.
+    expect(() =>
+      graph.addPass('BrokenReader', (builder) => {
+        builder.read(color!);
+        throw new Error('setup failed');
+      })
+    ).toThrow('setup failed');
+    const writerPass = graph.passes.find((pass) => pass.name === 'Writer')!;
+    expect(writerPass.warDependencies).toHaveLength(0);
+
+    // A failed writer must not leave a nextWriter marker on the version it wrote.
+    expect(() =>
+      graph.addPass('BrokenWriter', (builder) => {
+        builder.write(v1);
+        throw new Error('setup failed');
+      })
+    ).toThrow('setup failed');
+    expect(graph.getResource(v1)?.nextWriter).toBeNull();
+
+    const names = graph.compile([v1]).orderedPasses.map((pass) => pass.name);
+    expect(names).toEqual(['Producer', 'Writer']);
   });
 });
 

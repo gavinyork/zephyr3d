@@ -101,6 +101,18 @@ export class RenderGraph {
             resource.consumers.splice(i, 1);
           }
         }
+        if (resource.nextWriter === pass) {
+          resource.nextWriter = null;
+        }
+      }
+      // Stale-version reads add ordering edges into OTHER passes'
+      // warDependencies; remove any that reference the discarded pass.
+      for (const existing of this._passes) {
+        for (let i = existing.warDependencies.length - 1; i >= 0; i--) {
+          if (existing.warDependencies[i] === pass) {
+            existing.warDependencies.splice(i, 1);
+          }
+        }
       }
       this._lastWriterByPhysicalId.clear();
       for (const resource of this._resources.values()) {
@@ -233,6 +245,13 @@ export class RenderGraph {
         if (!res.consumers.includes(pass)) {
           res.consumers.push(pass);
         }
+        // Reading a version that has already been superseded by a write is only
+        // satisfiable if this pass runs before the overwriting pass. Add the
+        // ordering-only WAR edge retroactively; later versions are transitively
+        // ordered through the WAW chain.
+        if (res.nextWriter && res.nextWriter !== pass && !res.nextWriter.warDependencies.includes(pass)) {
+          res.nextWriter.warDependencies.push(pass);
+        }
       },
       write(handle: RGHandle): RGHandle {
         const res = graph._resources.get(handle._id);
@@ -255,9 +274,11 @@ export class RenderGraph {
         if (previousWriter && previousWriter !== pass && !pass.dependencies.includes(previousWriter)) {
           pass.dependencies.push(previousWriter);
         }
+        // WAR hazard: readers of the overwritten version must run first, but
+        // this pass being alive does not force them to run — ordering-only edge.
         for (const consumer of res.consumers) {
-          if (consumer !== pass && !pass.dependencies.includes(consumer)) {
-            pass.dependencies.push(consumer);
+          if (consumer !== pass && !pass.warDependencies.includes(consumer)) {
+            pass.warDependencies.push(consumer);
           }
         }
         if (res.producer && res.producer !== pass && !pass.dependencies.includes(res.producer)) {
@@ -267,6 +288,12 @@ export class RenderGraph {
         const versionName = `${res.name}@${pass.name}`;
         const version = new RGResource(id, versionName, res.kind, res.desc, res.physicalId);
         version.producer = pass;
+        // Record the FIRST overwriting pass only: forked writes are serialized
+        // by the WAW edge above, so stale readers ordered before the first
+        // writer are transitively ordered before all later ones.
+        if (!res.nextWriter) {
+          res.nextWriter = pass;
+        }
         graph._resources.set(id, version);
         graph._lastWriterByPhysicalId.set(res.physicalId, pass);
         if (!pass.writes.includes(version)) {
@@ -379,6 +406,9 @@ export class RenderGraph {
       for (const dep of pass.reads) {
         markResourceNeeded(dep);
       }
+      // Only liveness-carrying (RAW/WAW) dependencies propagate aliveness.
+      // WAR edges (pass.warDependencies) are ordering-only: a reader of an
+      // overwritten version need not run just because the writer runs.
       for (const dependency of pass.dependencies) {
         markPassAlive(dependency);
       }
@@ -481,6 +511,11 @@ export class RenderGraph {
 
     for (const pass of alivePasses) {
       for (const dependency of pass.dependencies) {
+        addEdge(dependency, pass);
+      }
+      // WAR edges constrain ordering among alive passes only; they were
+      // deliberately excluded from liveness propagation in _cullDeadPasses.
+      for (const dependency of pass.warDependencies) {
         addEdge(dependency, pass);
       }
     }

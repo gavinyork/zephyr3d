@@ -281,4 +281,56 @@ describe('HistoryResourceManager', () => {
     expect(released).toHaveLength(1);
     expect(manager.importPrevious(new RenderGraph(), 'color')).toBeNull();
   });
+
+  test('overwriting a slot releases its reference even when both slots hold the same texture', () => {
+    const { allocator, refs } = createRefcountAllocator();
+    const manager = new HistoryResourceManager(allocator);
+    const shared = allocator.allocate(desc, size); // refcount 1 (external owner)
+
+    // Commit the same texture two frames running: both slots hold it, each
+    // holding its own retained reference (refcount 3).
+    manager.beginFrame();
+    manager.queueRetainedCommit('color', desc, size, shared);
+    manager.commitFrame();
+    manager.beginFrame();
+    manager.queueRetainedCommit('color', desc, size, shared);
+    manager.commitFrame();
+    expect(refs.get(shared)).toBe(3);
+
+    // Two more commits with fresh textures evict both slots; each eviction
+    // must release one retained reference of the shared texture.
+    manager.beginFrame();
+    manager.queueRetainedCommit('color', desc, size, allocator.allocate(desc, size));
+    manager.commitFrame();
+    manager.beginFrame();
+    manager.queueRetainedCommit('color', desc, size, allocator.allocate(desc, size));
+    manager.commitFrame();
+
+    // Only the external owner's initial reference remains.
+    expect(refs.get(shared)).toBe(1);
+  });
+
+  test('isCompatible distinguishes arrayLayers, including undefined vs 1', () => {
+    const { allocator } = createMockAllocator();
+    const manager = new HistoryResourceManager(allocator);
+    const arrayDesc: RGTextureDesc = { ...desc, arrayLayers: 1 };
+
+    manager.beginFrame();
+    manager.queueCommit('mask', arrayDesc, size, createTexture(1, arrayDesc, size));
+    manager.commitFrame();
+
+    expect(manager.isCompatible('mask', arrayDesc, size)).toBe(true);
+    // undefined (plain 2D) and 1 (single-layer array) are distinct texture types.
+    expect(manager.isCompatible('mask', desc, size)).toBe(false);
+    expect(manager.isCompatible('mask', { ...desc, arrayLayers: 4 }, size)).toBe(false);
+  });
+
+  test('queueCommit outside an active frame throws', () => {
+    const { allocator } = createMockAllocator();
+    const manager = new HistoryResourceManager(allocator);
+
+    expect(() => manager.queueCommit('color', desc, size, createTexture(1, desc, size))).toThrow(
+      /outside an active frame/
+    );
+  });
 });

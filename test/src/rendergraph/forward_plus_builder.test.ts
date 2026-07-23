@@ -119,6 +119,20 @@ function compileForwardPlusPassNames(
 }
 
 describe('Forward+ render graph builder', () => {
+  test('removing DepthPrepass from the pipeline fails with a clear error', () => {
+    const pipeline = createForwardPlusPipeline().remove('DepthPrepass');
+    const graph = new RenderGraph();
+
+    expect(() =>
+      buildForwardPlusGraph(
+        graph,
+        createMockDrawContext({ camera: { renderPipeline: pipeline } }),
+        createMockRenderQueue({ needSceneColor: false }),
+        createOptions()
+      )
+    ).toThrow(/requires module "DepthPrepass"/);
+  });
+
   test('omits TransmissionDepth when scene color copy is not needed', () => {
     const passNames = compileForwardPlusPassNames(createOptions({ needSceneColor: false }));
 

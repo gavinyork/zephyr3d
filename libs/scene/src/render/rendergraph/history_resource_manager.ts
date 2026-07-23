@@ -214,6 +214,12 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     texture: TTexture,
     ownsTexture = true
   ): void {
+    if (!this._frameActive) {
+      throw new Error(
+        `HistoryResourceManager: cannot queue history commit '${name}' outside an active frame. ` +
+          `Call beginFrame() first.`
+      );
+    }
     const existing = this._pendingCommits.get(name);
     if (existing?.ownsTexture) {
       this._allocator.release(existing.texture);
@@ -357,6 +363,9 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     return (
       resource.desc.format === desc.format &&
       (resource.desc.mipLevels ?? 1) === (desc.mipLevels ?? 1) &&
+      // Strict comparison on purpose: undefined (2D) and 1 (single-layer array)
+      // are distinct texture types and not interchangeable when sampled.
+      resource.desc.arrayLayers === desc.arrayLayers &&
       resource.size.width === size.width &&
       resource.size.height === size.height
     );
@@ -375,8 +384,10 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     if (!texture) {
       return;
     }
-    const otherIndex = 1 - index;
-    if (resource.ownsTexture[index] && resource.textures[otherIndex] !== texture) {
+    // Every owning slot holds one independent reference obligation: with a
+    // ref-counting allocator the same texture retained twice must be released
+    // twice, so release unconditionally when the slot owns its reference.
+    if (resource.ownsTexture[index]) {
       this._allocator.release(texture);
     }
     resource.textures[index] = null;

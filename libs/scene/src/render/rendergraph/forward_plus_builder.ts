@@ -454,8 +454,28 @@ export interface ForwardPlusBuildState {
   presentedBackbuffer?: RGHandle;
 }
 
-// ═══ Forward+ pipeline modules ══════════════════════════════════════
-//
+/**
+ * Fetch a build-state field produced by an earlier module, with a clear error
+ * when the producing module is absent (e.g. removed from the pipeline).
+ * @internal
+ */
+function requireBuildState<K extends keyof ForwardPlusBuildState>(
+  fg: FrameGraphContext,
+  key: K,
+  producerType: string,
+  consumerType: string
+): NonNullable<ForwardPlusBuildState[K]> {
+  const value = fg.state[key];
+  if (!value) {
+    throw new Error(
+      `Forward+ module "${consumerType}" requires module "${producerType}" ` +
+        `(build state "${String(key)}" was not produced). Did you remove it from the pipeline?`
+    );
+  }
+  return value;
+}
+
+// ═══ Forward+ pipeline modules ══════════════════════════════════════//
 // The Forward+ graph is assembled from a fixed sequence of RenderModules, each
 // owning one logical stage. Contract every module below observes:
 //
@@ -676,7 +696,7 @@ const ShadowMaskModule: RenderModule<FrameGraphContext> = {
     // lights fill clustered buffer indices 1..N in renderQueue.shadowedLights
     // order, and ordinal s = index-1 maps to layer s>>2, channel s&3.
     const { graph, ctx, renderQueue, blackboard } = fg;
-    const depthPassResult = fg.state.depth!;
+    const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'ShadowMaskPass');
     const numShadowLights = renderQueue.shadowedLights.length;
     const numLayers = ShadowMaskRenderer.getLayerCount(numShadowLights);
     const maskPassResult = graph.addPass('ShadowMaskPass', (builder) => {
@@ -728,7 +748,7 @@ const TransmissionDepthForSSRModule: RenderModule<FrameGraphContext> = {
   enabled: ({ options }) => options.needsTransmissionDepthForSSR,
   setup(fg: FrameGraphContext) {
     const { graph, frame, blackboard } = fg;
-    const depthPassResult = fg.state.depth!;
+    const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'TransmissionDepthForSSR');
     const transmissionDepthResult = graph.addPass('TransmissionDepthForSSR', (builder) => {
       const currentDepth = blackboard.expect(FrameResources.LinearDepth);
       builder.read(currentDepth);
@@ -759,7 +779,7 @@ const HiZModule: RenderModule<FrameGraphContext> = {
   enabled: ({ options }) => options.hiZ,
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard } = fg;
-    const depthPassResult = fg.state.depth!;
+    const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'HiZ');
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
     let hiZHandle: RGHandle | undefined;
     graph.addPass('HiZ', (builder) => {
@@ -806,7 +826,7 @@ const SSSProfileModule: RenderModule<FrameGraphContext> = {
   enabled: ({ options }) => options.sss,
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard } = fg;
-    const depthPassResult = fg.state.depth!;
+    const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'SSSProfile');
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     fg.state.sssProfile = graph.addPass('SSSProfile', (builder) => {
@@ -862,7 +882,7 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
     // Renders the full scene (no transmission) into a copy texture that
     // transmission/refraction materials sample as background.
     const { graph, ctx, frame, blackboard, options } = fg;
-    const depthPassResult = fg.state.depth!;
+    const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'SceneColorGrab');
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     fg.state.grab = graph.addPass('SceneColorGrab', (builder) => {
@@ -911,7 +931,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
   enabled: () => true,
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard, options, backbuffer } = fg;
-    const depthPassResult = fg.state.depth!;
+    const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'LightPass');
     const shadowMaskHandle = fg.state.shadowMaskHandle;
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
     const hiZHandle = fg.state.hiZHandle;
@@ -1137,11 +1157,11 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
   enabled: () => true,
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard, options, backbuffer } = fg;
-    const depthPassResult = fg.state.depth!;
+    const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'CompositeTail');
     const hiZHandle = fg.state.hiZHandle;
     const sssProfileResult = fg.state.sssProfile;
     const grabResult = fg.state.grab;
-    const lightPassResult = fg.state.lightPass!;
+    const lightPassResult = requireBuildState(fg, 'lightPass', 'LightPass', 'CompositeTail');
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     const useFinalFramebufferAsIntermediate = fg.state.useFinalFramebufferAsIntermediate;
     const lightHistoryReadBindings = fg.state.lightHistoryReadBindings;
@@ -1523,8 +1543,6 @@ function buildForwardPlusGraphInternal(
   const presented = blackboard.get(FrameResources.PresentedColor) ?? fg.state.presentedBackbuffer!;
   return { backbuffer: presented, frame };
 }
-
-// ─── Pass Implementation Helpers ────────────────────────────────────
 
 // ─── Pass Implementation Helpers ────────────────────────────────────
 // These wrap the existing SceneRenderer static methods, adapted to work

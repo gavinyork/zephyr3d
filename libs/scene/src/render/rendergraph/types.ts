@@ -89,6 +89,8 @@ export class RGResource {
   readonly physicalId: number;
   /** The pass that creates / writes this resource (null for imported until written). */
   producer: RGPass | null = null;
+  /** The pass that superseded this version via write(), or null while latest. */
+  nextWriter: RGPass | null = null;
   /** Passes that read this resource. */
   readonly consumers: RGPass[] = [];
 
@@ -211,8 +213,20 @@ export class RGPass<T = unknown> {
   readonly reads: RGResource[] = [];
   /** Resources this pass creates or writes. */
   readonly writes: RGResource[] = [];
-  /** Passes that must complete before this pass due to non-resource hazards. */
+  /**
+   * Liveness-carrying predecessors due to non-read hazards: the producer of a
+   * resource this pass overwrites (RAW on the previous version) and the previous
+   * writer of the same physical resource (WAW). If this pass runs, these passes
+   * must run too (a later write may only partially cover the resource), so dead
+   * pass culling propagates aliveness through them.
+   */
   readonly dependencies: RGPass[] = [];
+  /**
+   * Ordering-only (WAR) predecessors: readers of the version this pass
+   * overwrites. They must run before this pass IF both are alive, but this pass
+   * being alive does not require them to run — culling ignores these edges.
+   */
+  readonly warDependencies: RGPass[] = [];
   /** Whether this pass has side effects and must not be culled. */
   hasSideEffect = false;
   /** User data returned from the setup function. */
@@ -308,7 +322,7 @@ export interface RGPassBuilder {
    *
    * Subpasses execute in registration order and share the parent pass's declared
    * reads, writes, framebuffer views, and user data. A pass may use either
-   * subpasses or {@link RGPassBuilder.setExecute}, but not both.
+   * subpasses or {@link setExecute}, but not both.
    *
    * @param name - Debug label for the subpass.
    * @param fn - Callback invoked when this subpass executes.
@@ -318,7 +332,7 @@ export interface RGPassBuilder {
   /**
    * Set the execution callback for this pass.
    *
-   * A pass may use either this method or {@link RGPassBuilder.addSubpass}, but not both.
+   * A pass may use either this method or {@link addSubpass}, but not both.
    *
    * @param fn - Callback invoked during graph execution.
    */

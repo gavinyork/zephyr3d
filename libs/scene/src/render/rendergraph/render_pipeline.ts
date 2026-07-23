@@ -6,8 +6,9 @@ import type { RenderContext } from './render_context';
  * {@link RenderModule.reads} / {@link RenderModule.writes} dependencies while
  * keeping the authored array order as the stable default.
  *
- * A module that declares no `reads` has no incoming edge and never moves — its
- * authored index is preserved exactly. A module that declares `reads` is ordered
+ * A module that declares no `reads` has no incoming edge and is never reordered
+ * relative to other no-`reads` modules (its absolute index may still shift when
+ * a reader is moved behind its producer). A module that declares `reads` is ordered
  * after every module (of lower-or-any authored index) that declares it `writes`
  * one of those resources; when a resource is written by several modules, the
  * last authored writer wins (matching the blackboard's last-write-wins lookup).
