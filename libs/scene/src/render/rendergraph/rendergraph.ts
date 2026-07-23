@@ -49,6 +49,13 @@ export class RenderGraph {
   /** @internal */
   private _compiled: CompiledRenderGraph | null = null;
   private _lastWriterByPhysicalId = new Map<number, RGPass>();
+  /**
+   * Pass names already warned about in {@link RenderGraph._cullDeadPasses} for being
+   * culled while still referenced by WAR ordering edges. Static so the once-per-name
+   * dedup survives the per-frame graph rebuild.
+   * @internal
+   */
+  private static _warnedCulledPasses = new Set<string>();
 
   // ─── Graph Building ─────────────────────────────────────────────────
 
@@ -436,6 +443,27 @@ export class RenderGraph {
       const producer = res.producer;
       if (producer) {
         markPassAlive(producer);
+      }
+    }
+
+    // Diagnostic: a pass that is only ever referenced through WAR (ordering-only)
+    // edges and has no side effect is culled here, which is easy to hit by accident
+    // when a pass's work is meant to be observable but it forgot to call
+    // sideEffect() or contribute to an output. Warn once per pass name (the graph
+    // is rebuilt every frame, so per-instance state cannot dedup across frames).
+    for (const pass of this._passes) {
+      if (
+        !pass.alive &&
+        !pass.hasSideEffect &&
+        pass.warDependencies.length > 0 &&
+        !RenderGraph._warnedCulledPasses.has(pass.name)
+      ) {
+        RenderGraph._warnedCulledPasses.add(pass.name);
+        console.warn(
+          `RenderGraph: pass "${pass.name}" was culled but is referenced by WAR ` +
+            `ordering edges. If its work must run, call sideEffect() or route its ` +
+            `output into a compile() sink.`
+        );
       }
     }
   }

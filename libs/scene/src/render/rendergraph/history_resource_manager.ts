@@ -48,6 +48,11 @@ export class HistoryResourceManager<TTexture = Texture2D> {
   private _pendingCommits: Map<string, PendingHistoryCommit<TTexture>> = new Map();
   private _readScopeStack: Array<Map<string, TTexture>> = [];
   private _frameActive = false;
+  // Textures whose owning pending-commit slot was overwritten within the same
+  // frame. They are released only at frame end (commit/discard), never mid-frame:
+  // the caller may still hold a GPU-queued reference to a texture it just handed
+  // off, and releasing it back to the pool immediately risks reuse-before-consume.
+  private _deferredReleases: TTexture[] = [];
 
   /**
    * Create a new history resource manager.
@@ -221,8 +226,10 @@ export class HistoryResourceManager<TTexture = Texture2D> {
       );
     }
     const existing = this._pendingCommits.get(name);
-    if (existing?.ownsTexture) {
-      this._allocator.release(existing.texture);
+    if (existing?.ownsTexture && existing.texture !== texture) {
+      // Defer the release: see _deferredReleases. Skip when the same texture is
+      // re-queued (no ownership change, releasing would drop a live reference).
+      this._deferredReleases.push(existing.texture);
     }
     this._pendingCommits.set(name, {
       desc: { ...desc },
@@ -317,6 +324,7 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     this._pendingImports.clear();
     this._readScopeStack.length = 0;
     this._frameActive = false;
+    this._flushDeferredReleases();
   }
 
   /**
@@ -332,6 +340,15 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     this._pendingImports.clear();
     this._readScopeStack.length = 0;
     this._frameActive = false;
+    this._flushDeferredReleases();
+  }
+
+  /** @internal Release textures whose owning commit slot was overwritten mid-frame. */
+  private _flushDeferredReleases(): void {
+    for (const texture of this._deferredReleases) {
+      this._allocator.release(texture);
+    }
+    this._deferredReleases.length = 0;
   }
 
   /**

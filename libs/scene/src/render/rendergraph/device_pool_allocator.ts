@@ -37,7 +37,21 @@ export class DevicePoolAllocator implements RGTextureAllocator<Texture2D, FrameB
    */
   allocate(desc: RGTextureDesc, size: RGResolvedSize): Texture2D {
     const device = this._device ?? getDevice();
-    const mipmapping = (desc.mipLevels ?? 1) > 1;
+    const requestedMips = desc.mipLevels ?? 1;
+    // The device pool only exposes a boolean `mipmapping` flag (full chain or
+    // none), so a request for a specific mip count can only be satisfied when it
+    // does not exceed the physical maximum for this size. Reject over-requests up
+    // front with the offending dimensions rather than after a wasted allocation.
+    if (requestedMips > 1) {
+      const maxMips = Math.max(1, Math.floor(Math.log2(Math.max(1, size.width, size.height))) + 1);
+      if (requestedMips > maxMips) {
+        throw new Error(
+          `DevicePoolAllocator: texture "${desc.label ?? '<unnamed>'}" requested ${requestedMips} ` +
+            `mip levels, but a ${size.width}x${size.height} texture supports at most ${maxMips}.`
+        );
+      }
+    }
+    const mipmapping = requestedMips > 1;
     const arrayLayers = desc.arrayLayers;
     // A defined arrayLayers (even 1) requests a 2D array texture — a single-layer
     // array is a distinct texture type from a plain 2D texture, and the two are

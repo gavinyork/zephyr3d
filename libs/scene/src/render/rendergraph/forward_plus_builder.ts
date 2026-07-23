@@ -800,15 +800,19 @@ const HiZModule: RenderModule<FrameGraphContext> = {
       });
       builder.setExecute((rgCtx) => {
         const passCtx = frame.ctx;
-        // Use the depth texture from the framebuffer (which contains the RenderGraph texture)
-        const depthTex = frame.depthFramebuffer?.getDepthAttachment() as Texture2D;
-        if (depthTex) {
-          // Get the HiZ texture allocated by the executor
-          const hiZTex = rgCtx.getTexture<Texture2D>(hiZHandle!);
-          const HiZFrameBuffer = rgCtx.getFramebuffer<FrameBuffer>(hiZFramebufferHandle);
-          buildHiZ(depthTex, HiZFrameBuffer);
-          passCtx.HiZTexture = hiZTex;
+        // Resolve the depth texture through the graph handle declared as a read
+        // above, not through frame.depthFramebuffer: the handle is the executor's
+        // source of truth for this pass, and a missing attachment is a build-time
+        // contract violation that must surface loudly rather than silently skip.
+        const depthFb = rgCtx.getFramebuffer<FrameBuffer>(depthPassResult.depthFramebufferHandle);
+        const depthTex = depthFb.getDepthAttachment() as Texture2D;
+        if (!depthTex) {
+          throw new Error('HiZ pass: depth prepass framebuffer has no depth attachment.');
         }
+        const hiZTex = rgCtx.getTexture<Texture2D>(hiZHandle!);
+        const HiZFrameBuffer = rgCtx.getFramebuffer<FrameBuffer>(hiZFramebufferHandle);
+        buildHiZ(depthTex, HiZFrameBuffer);
+        passCtx.HiZTexture = hiZTex;
       });
     });
     if (hiZHandle) {
@@ -1119,6 +1123,16 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     if (lightPassResult.ssrRoughnessHandle) {
       blackboard.set(FrameResources.SSRRoughness, lightPassResult.ssrRoughnessHandle);
     }
+    // SSRNormal has exactly one producer, gated on options.ssr: the LightPass MRT
+    // normal when SSR is on, else the SSSProfile normal. They are created on
+    // mutually exclusive branches (see ssrNormalHandle / sssProfileResult.normalHandle
+    // above), so both being present would mean that invariant was broken upstream
+    // and one write would silently shadow the other.
+    console.assert(
+      !(lightPassResult.ssrNormalHandle && sssProfileResult?.normalHandle),
+      'RenderGraph: both LightPass and SSSProfile produced an SSRNormal handle; ' +
+        'these are meant to be mutually exclusive (gated on options.ssr).'
+    );
     if (lightPassResult.ssrNormalHandle) {
       blackboard.set(FrameResources.SSRNormal, lightPassResult.ssrNormalHandle);
     } else if (sssProfileResult?.normalHandle) {
@@ -1694,6 +1708,16 @@ function renderSceneDepth(
   const renderQueue = frame.renderQueue;
   const transmission = transmissionOverride ?? !!existingDepthFb;
   let depthFramebuffer = existingDepthFb;
+
+  // Contract check: every current caller in the forward+ pipeline runs after the
+  // DepthPrepass and passes a graph-managed depth framebuffer, so the self-creating
+  // branch below is currently unreachable. It is kept as scaffolding for standalone
+  // reuse; if that changes, this assert flags that the untested path is now live.
+  console.assert(
+    !!existingDepthFb,
+    'renderSceneDepth: called without an existing depth framebuffer; the ' +
+      'self-allocating fallback path is untested in the forward+ pipeline.'
+  );
 
   if (!depthFramebuffer) {
     // Use RenderGraph-allocated textures if provided
