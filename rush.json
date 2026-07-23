@@ -494,6 +494,10 @@
     {
       "packageName": "@zephyr3d/nonlinear-depth-demo",
       "projectFolder": "apps/nonlinear-depth-demo"
+    },
+    {
+      "packageName": "@zephyr3d/scene-render-demo",
+      "projectFolder": "apps/scene-render-demo"
     }
   ]
 }

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SceneRenderContext Demo</title>
+    <style>
+      html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #16181d; color: #e9edf2; font-family: ui-sans-serif, system-ui, sans-serif; }
+      canvas { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
+      #ui { position: absolute; top: 12px; left: 12px; z-index: 10; display: flex; gap: 8px; align-items: center; padding: 10px; background: rgba(24,28,34,0.82); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; backdrop-filter: blur(8px); }
+      button { min-height: 32px; padding: 0 12px; border: 1px solid rgba(255,255,255,0.16); border-radius: 4px; background: #2b3138; color: #eef2f7; cursor: pointer; font: inherit; }
+      button.active { background: #3d6f7f; border-color: #62a4b8; }
+    </style>
+  </head>
+  <body>
+    <div id="ui">
+      <button id="btn-transient" class="active">Red: Transient Queue</button>
+      <button id="btn-persistent">Red: Persistent Queue</button>
+    </div>
+    <canvas id="canvas"></canvas>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

@@ -1362,20 +1362,11 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
     // 10. Present + frame cleanup.
     let presentedBackbuffer: RGHandle;
     if (finalWroteFinal) {
-      // The last effect wrote the final target directly; only cleanup remains.
+      // The last effect wrote the final target directly; no extra pass needed.
+      // Cleanup is deferred to executeForwardPlusGraph's finally block (cleanupFrame).
       presentedBackbuffer = chainResult.color;
-      graph.addPass('FrameCleanup', (builder) => {
-        builder.read(presentedBackbuffer);
-        for (const dep of endChainDependencies) {
-          builder.read(dep);
-        }
-        builder.sideEffect();
-        builder.setExecute(() => {
-          finishFrame(frame);
-        });
-      });
     } else {
-      presentedBackbuffer = graph.addPass('Present', (builder) => {
+      presentedBackbuffer = graph.addPass('Blit', (builder) => {
         builder.read(chainResult.color);
         for (const dep of endChainDependencies) {
           builder.read(dep);
@@ -1391,7 +1382,7 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
             blitter.srgbOut = !ctx.finalFramebuffer;
             blitter.blit(sourceTex, ctx.finalFramebuffer ?? null, fetchSampler('clamp_nearest_nomip'));
           }
-          finishFrame(frame);
+          // cleanup deferred to executeForwardPlusGraph finally block (cleanupFrame)
         });
         return outputBackbuffer;
       });
@@ -1688,6 +1679,13 @@ function restoreSunLight(frame: FrameState): void {
 }
 
 function cleanupFrame(frame: FrameState): void {
+  const { ctx } = frame;
+  ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+  ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_PROFILE;
+  ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_DIFFUSE;
+  ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_NORMAL;
+  ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_TRANSMISSION;
+  ctx.materialFlags &= ~MaterialVaryingFlags.SKIN_SSS_STORE;
   releaseIntermediateFramebuffer(frame);
   releaseDepthFramebuffer(frame);
   releaseClusteredLight(frame);
@@ -2155,33 +2153,6 @@ export function renderTransparentScenePass(
 /** @internal */
 function renderTransmissionDepthPass(frame: FrameState, rgCtx: RGExecuteContext): void {
   renderSceneDepth(frame, frame.depthFramebuffer, rgCtx);
-}
-
-/**
- * Frame-tail housekeeping shared by the Present and FrameCleanup passes.
- *
- * The end-layer post effect chain and the final blit are graph passes now
- * (see buildForwardPlusGraphInternal step 9/10); this only releases per-frame
- * state. The compositor's scene ping-pong is flushed back to the intermediate
- * framebuffer by compositor.end() at the tail of the light pass.
- *
- * @internal
- */
-function finishFrame(frame: FrameState): void {
-  const { ctx } = frame;
-
-  disposeRenderQueue(frame);
-  ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
-  ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_PROFILE;
-  ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_DIFFUSE;
-  ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_NORMAL;
-  ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_TRANSMISSION;
-  ctx.materialFlags &= ~MaterialVaryingFlags.SKIN_SSS_STORE;
-
-  releaseIntermediateFramebuffer(frame);
-  releaseDepthFramebuffer(frame);
-  releaseClusteredLight(frame);
-  restoreSunLight(frame);
 }
 
 // ─── Convenience: Execute Full Pipeline ─────────────────────────────

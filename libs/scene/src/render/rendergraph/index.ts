@@ -35,3 +35,10 @@ export {
   ForwardPlusModules,
   type ForwardPlusOptions
 } from './forward_plus_builder';
+export {
+  createSceneRenderer,
+  type SceneRenderContext,
+  type SceneRenderQueueBuilder,
+  type SceneRenderOptions,
+  type PersistentSceneQueue
+} from './scene_render_context';
