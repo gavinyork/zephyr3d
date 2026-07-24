@@ -1,4 +1,11 @@
-import type { ForwardPlusModuleContext, RenderModule, PersistentSceneQueue } from '@zephyr3d/scene';
+import { Vector4 } from '@zephyr3d/base';
+import {
+  ForwardPlusModuleContext,
+  RenderModule,
+  PersistentSceneQueue,
+  UnlitMaterial,
+  ProxyDrawable
+} from '@zephyr3d/scene';
 import { createSceneRenderer, FrameResources, getDevice } from '@zephyr3d/scene';
 import type { Mesh } from '@zephyr3d/scene';
 
@@ -9,6 +16,7 @@ export function createRedBoxModule(
   getMode: () => RedBoxMode
 ): RenderModule<ForwardPlusModuleContext> {
   let persistentQueue: PersistentSceneQueue | null = null;
+  let redMaterial: UnlitMaterial;
 
   return {
     type: 'RedBoxPass',
@@ -43,8 +51,11 @@ export function createRedBoxModule(
           } else {
             if (!persistentQueue) {
               persistentQueue = sr.createPersistentQueue();
+              redMaterial = new UnlitMaterial();
+              redMaterial.albedoColor = new Vector4(1, 0, 0, 1);
               for (const mesh of redMeshes) {
-                persistentQueue.add(mesh, camera);
+                //persistentQueue.add(mesh, camera);
+                persistentQueue.add(new ProxyDrawable(mesh, mesh, redMaterial), camera);
               }
               persistentQueue.finalize(camera, true);
               console.log('[RedBoxPass] persistent queue built');

@@ -1,4 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
+import { DWeakRef } from '@zephyr3d/base';
 import { applyMixins, Disposable, DRef } from '@zephyr3d/base';
 import type { MeshMaterial } from '../material';
 import type {
@@ -11,11 +12,102 @@ import type {
   Primitive,
   RenderQueue
 } from '../render';
-import type { SceneNode } from '.';
+import type { Mesh, SceneNode } from '.';
 import { mixinDrawable } from '../render/drawable_mixin';
 import type { Texture2D } from '@zephyr3d/device';
 import type { Camera } from '../camera';
 import { QUEUE_OPAQUE } from '../values';
+
+export class ProxyDrawableBase<T extends Disposable & Drawable = Mesh> extends Disposable {
+  protected _host: DWeakRef<T>;
+  protected _node: DWeakRef<SceneNode>;
+  protected _material: DRef<MeshMaterial>;
+  /**
+   * Creates a proxy for a host drawable.
+   *
+   * @param host - Drawable that supplies the shared geometry, animation, and transform state.
+   * @param overrideMaterial - Optional material used instead of the host drawable's material.
+   */
+  constructor(host: T, node?: SceneNode, overrideMaterial?: MeshMaterial) {
+    super();
+    this._host = new DWeakRef(host);
+    this._node = new DWeakRef(node);
+    this._material = new DRef(overrideMaterial);
+  }
+  getName(): string {
+    return this._host.get()?.getName() ?? '';
+  }
+  getNode(): SceneNode {
+    return this._node.get()!;
+  }
+  getPickTarget(): PickTarget {
+    return this._host.get()!.getPickTarget();
+  }
+  getBoneMatrices(): Nullable<Texture2D> {
+    return this._host.get()?.getBoneMatrices() ?? null;
+  }
+  getMorphData(): Nullable<MorphData> {
+    return this._host.get()?.getMorphData() ?? null;
+  }
+  getMorphInfo(): Nullable<MorphInfo> {
+    return this._host.get()?.getMorphInfo() ?? null;
+  }
+  getSortDistance(camera: Camera): number {
+    return this._host.get()?.getSortDistance(camera) ?? 0;
+  }
+  getQueueType(): number {
+    return this.getMaterial()?.getQueueType() ?? QUEUE_OPAQUE;
+  }
+  needSceneColor(): boolean {
+    return this.getMaterial()?.needSceneColor() ?? false;
+  }
+  needSceneDepth(): boolean {
+    return this.getMaterial()?.needSceneDepth() ?? false;
+  }
+  isUnlit(): boolean {
+    return !this.getMaterial()?.supportLighting();
+  }
+  getMaterial(): Nullable<MeshMaterial> {
+    return this._material.get() ?? this._host.get()?.getMaterial() ?? null;
+  }
+  getPrimitive(): Nullable<Primitive> {
+    return this._host.get()?.getPrimitive() ?? null;
+  }
+  isBatchable(): this is BatchDrawable {
+    if (!this._host.get()?.isBatchable()) {
+      return false;
+    }
+    if (this._material.get() && !this._material.get()!.isBatchable()) {
+      return false;
+    }
+    return true;
+  }
+}
+
+/**
+ * Drawable proxy that renders an existing drawable with an optional material override.
+ *
+ * The proxy delegates geometry, picking, sorting, skinning, morph targets, and transform-related
+ * state to the host drawable, so it can be submitted as a separate drawable while sharing the
+ * host's animated and spatial state.
+ *
+ * If no override material is provided, the proxy uses the host drawable's material.
+ *
+ * @public
+ */
+export class ProxyDrawable extends applyMixins(ProxyDrawableBase<Disposable & Drawable>, mixinDrawable) {
+  constructor(host: Disposable & Drawable, node?: SceneNode, overrideMaterial?: MeshMaterial) {
+    super(host, node, overrideMaterial);
+  }
+  draw(ctx: DrawContext, renderQueue: Nullable<RenderQueue>): void {
+    const material = this.getMaterial();
+    const primitive = this.getPrimitive();
+    if (material && primitive) {
+      this.bind(ctx, renderQueue);
+      material.draw(primitive, ctx);
+    }
+  }
+}
 
 export class MeshDrawableBase extends Disposable {
   private _node: SceneNode;

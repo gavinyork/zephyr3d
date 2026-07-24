@@ -370,11 +370,14 @@ class SceneRenderContextImpl implements SceneRenderContext {
     const savedTransmission = _sceneLightPass.transmission;
     const savedRenderOpaque = _sceneLightPass.renderOpaque;
     const savedRenderTransparent = _sceneLightPass.renderTransparent;
+    const savedRenderSky = _sceneLightPass.renderSky;
     const savedClearColor = _sceneLightPass.clearColor;
     const savedClearDepth = _sceneLightPass.clearDepth;
     const savedClearStencil = _sceneLightPass.clearStencil;
     const savedMaterialFlags = ctx.materialFlags;
     const savedCompositor = ctx.compositor;
+    const savedPrepassDepth = ctx.depthPrepassAttachment;
+    ctx.depthPrepassAttachment = undefined;
     device.pushDeviceStates();
     try {
       device.setFramebuffer(target);
@@ -385,6 +388,7 @@ class SceneRenderContextImpl implements SceneRenderContext {
       ctx.materialFlags = savedMaterialFlags & ~SURFACE_MRT_FLAGS;
       ctx.compositor = null;
       _sceneLightPass.transmission = false;
+      _sceneLightPass.renderSky = false;
       _sceneLightPass.renderOpaque = renderOpaque;
       _sceneLightPass.renderTransparent = renderTransparent;
       _sceneLightPass.clearColor = opts && 'clearColor' in opts ? (opts.clearColor ?? null) : null;
@@ -395,11 +399,13 @@ class SceneRenderContextImpl implements SceneRenderContext {
       _sceneLightPass.transmission = savedTransmission;
       _sceneLightPass.renderOpaque = savedRenderOpaque;
       _sceneLightPass.renderTransparent = savedRenderTransparent;
+      _sceneLightPass.renderSky = savedRenderSky;
       _sceneLightPass.clearColor = savedClearColor ?? null;
       _sceneLightPass.clearDepth = savedClearDepth;
       _sceneLightPass.clearStencil = savedClearStencil;
       ctx.materialFlags = savedMaterialFlags;
       ctx.compositor = savedCompositor;
+      ctx.depthPrepassAttachment = savedPrepassDepth;
       device.popDeviceStates();
     }
   }

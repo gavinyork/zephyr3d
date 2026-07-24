@@ -33,6 +33,8 @@ export class LightPass extends RenderPass {
   protected _renderOpaque: boolean;
   /** @internal */
   protected _renderTransparent: boolean;
+  /** @internal */
+  protected _renderSky: boolean;
   /**
    * Creates an instance of ForwardRenderPass
    */
@@ -42,6 +44,7 @@ export class LightPass extends RenderPass {
     this._transmission = false;
     this._renderOpaque = true;
     this._renderTransparent = true;
+    this._renderSky = true;
     this._clearColor = Vector4.zero();
   }
   /** @internal */
@@ -64,6 +67,13 @@ export class LightPass extends RenderPass {
   }
   set renderTransparent(val: boolean) {
     this._renderTransparent = !!val;
+  }
+  /** @internal */
+  get renderSky() {
+    return this._renderSky;
+  }
+  set renderSky(val: boolean) {
+    this._renderSky = !!val;
   }
   /** @internal */
   protected getAdditiveLightPassColorAttachments(ctx: DrawContext, materialFlags: number) {
@@ -313,7 +323,7 @@ export class LightPass extends RenderPass {
         }
         ctx.materialFlags &= ~MaterialVaryingFlags.APPLY_FOG;
       }
-      if (i === 0 && !ctx.sceneColorTexture) {
+      if (i === 0 && !ctx.sceneColorTexture && this._renderSky) {
         if (tmpFramebuffer) {
           ctx.device.pushDeviceStates();
           ctx.device.setFramebuffer(tmpFramebuffer);

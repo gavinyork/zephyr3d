@@ -3,6 +3,7 @@ export * from './environment';
 export * from './graph_node';
 export * from './light';
 export * from './mesh';
+export * from './meshdrawable';
 export * from './basesprite';
 export * from './sprite';
 export * from './textsprite';

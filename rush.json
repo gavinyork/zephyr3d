@@ -498,6 +498,10 @@
     {
       "packageName": "@zephyr3d/scene-render-demo",
       "projectFolder": "apps/scene-render-demo"
+    },
+    {
+      "packageName": "@zephyr3d/outline-demo",
+      "projectFolder": "apps/outline-demo"
     }
   ]
 }
