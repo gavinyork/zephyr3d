@@ -137,19 +137,19 @@ describe('Forward+ render graph builder', () => {
     const passNames = compileForwardPlusPassNames(createOptions({ needSceneColor: false }));
 
     expect(passNames).toContain('LightPass');
-    expect(passNames).toContain('Present');
+    expect(passNames).toContain('Blit');
     expect(passNames).not.toContain('TransmissionDepth');
-    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('Present'));
+    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('Blit'));
   });
 
-  test('inserts TransmissionDepth between LightPass and Present when scene color copy is needed without SSR prepass', () => {
+  test('inserts TransmissionDepth between LightPass and Blit when scene color copy is needed without SSR prepass', () => {
     const passNames = compileForwardPlusPassNames(createOptions({ needSceneColor: true }));
 
     expect(passNames).toContain('LightPass');
     expect(passNames).toContain('TransmissionDepth');
-    expect(passNames).toContain('Present');
+    expect(passNames).toContain('Blit');
     expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('TransmissionDepth'));
-    expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('Present'));
+    expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('Blit'));
   });
 
   test('inserts SSR transmission depth before LightPass and omits late TransmissionDepth', () => {
@@ -213,7 +213,7 @@ describe('Forward+ render graph builder', () => {
     expect(passNames).not.toContain('TransmissionDepthForSSR');
     expect(passNames).toContain('TransmissionDepth');
     expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('TransmissionDepth'));
-    expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('Present'));
+    expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('Blit'));
   });
 
   test('models TransmissionDepth as a versioned write of the linear depth texture', () => {
@@ -631,7 +631,7 @@ describe('Forward+ render graph builder', () => {
     // target directly — its output must stay a readable graph texture for the
     // history commit.
     expect(taaPass?.writes.some((resource) => resource.name.startsWith('backbuffer@'))).toBe(false);
-    expect(graph.passes.some((pass) => pass.name === 'Present')).toBe(true);
+    expect(graph.passes.some((pass) => pass.name === 'Blit')).toBe(true);
   });
 
   test('does not declare stale TAA history reads when size is incompatible', () => {
@@ -714,8 +714,7 @@ describe('Forward+ end-layer post effect chain', () => {
 
     expect(passNames).toContain('PostEffect:EffectA');
     expect(passNames).toContain('PostEffect:EffectB');
-    expect(passNames).toContain('FrameCleanup');
-    expect(passNames).not.toContain('Present');
+    expect(passNames).not.toContain('Blit');
     expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('PostEffect:EffectA'));
     expect(passNames.indexOf('PostEffect:EffectA')).toBeLessThan(passNames.indexOf('PostEffect:EffectB'));
     const lastEffectPass = graph.passes.find((pass) => pass.name === 'PostEffect:EffectB');
@@ -756,13 +755,12 @@ describe('Forward+ end-layer post effect chain', () => {
     const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
 
     expect(passNames).toContain('PostEffect:EffectA');
-    expect(passNames).not.toContain('Present');
-    expect(passNames).toContain('FrameCleanup');
+    expect(passNames).not.toContain('Blit');
     const effectPass = graph.passes.find((pass) => pass.name === 'PostEffect:EffectA');
     expect(effectPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(true);
   });
 
-  test('keeps the Present pass when no end-layer effect is enabled', () => {
+  test('keeps the Blit pass when no end-layer effect is enabled', () => {
     const effect = new EffectA();
     effect.enabled = false;
     const { graph, backbuffer } = buildForwardPlusGraphForTest(
@@ -772,7 +770,7 @@ describe('Forward+ end-layer post effect chain', () => {
     );
     const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
 
-    expect(passNames).toContain('Present');
+    expect(passNames).toContain('Blit');
     expect(passNames).not.toContain('PostEffect:EffectA');
   });
 
@@ -848,8 +846,7 @@ describe('Forward+ transparent-layer post effect chain', () => {
     const transparentPass = graph.passes.find((pass) => pass.name === 'PostEffect:TransparentEffect');
 
     expect(transparentPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(true);
-    expect(passNames).toContain('FrameCleanup');
-    expect(passNames).not.toContain('Present');
+    expect(passNames).not.toContain('Blit');
   });
 
   test('chains transparent output into the end layer input', () => {
@@ -1129,12 +1126,12 @@ describe('Final framebuffer as intermediate (editor render-to-texture mode)', ()
     );
     const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
 
-    // The effect must write an intermediate texture, then Present blits back.
+    // The effect must write an intermediate texture, then Blit copies it back.
     const effectPass = graph.passes.find((pass) => pass.name === 'PostEffect:TonemapLikeEffect');
     expect(effectPass?.writes.some((res) => res.name.startsWith('backbuffer'))).toBe(false);
     expect(effectPass?.writes.some((res) => res.name === 'PostEffect:TonemapLikeEffect:out')).toBe(true);
-    expect(passNames).toContain('Present');
-    expect(passNames.indexOf('PostEffect:TonemapLikeEffect')).toBeLessThan(passNames.indexOf('Present'));
+    expect(passNames).toContain('Blit');
+    expect(passNames.indexOf('PostEffect:TonemapLikeEffect')).toBeLessThan(passNames.indexOf('Blit'));
   });
 
   test('second chained effect may still direct-write the final target', () => {
@@ -1226,7 +1223,7 @@ describe('Forward+ pipeline customization', () => {
     expect(viaDefault).toEqual(direct);
     expect(viaDefault).toContain('LightPass');
     expect(viaDefault).toContain('TransparentPass');
-    expect(viaDefault).toContain('Present');
+    expect(viaDefault).toContain('Blit');
   });
 
   test('a custom module inserted after LightPass adds its pass to the built graph', () => {
@@ -1247,11 +1244,32 @@ describe('Forward+ pipeline customization', () => {
     expect(names).toContain('LightPass');
   });
 
+  test('CompositeTail consumes a SceneColor version written after LightPass', () => {
+    const customModule: RenderModule = {
+      type: 'SceneColorOverride',
+      enabled: () => true,
+      setup(context) {
+        const input = context.blackboard.expect(FrameResources.SceneColor);
+        const output = context.graph.addPass('SceneColorOverridePass', (builder) => {
+          builder.read(input);
+          return builder.write(input);
+        });
+        context.blackboard.set(FrameResources.SceneColor, output);
+      }
+    };
+    const pipeline = createForwardPlusPipeline().insertAfter('LightPass', customModule);
+    const names = compilePipelinePassNames(pipeline);
+
+    expect(names).toContain('SceneColorOverridePass');
+    expect(names.indexOf('LightPass')).toBeLessThan(names.indexOf('SceneColorOverridePass'));
+    expect(names.indexOf('SceneColorOverridePass')).toBeLessThan(names.indexOf('TransparentPass'));
+  });
+
   test('removing a built-in module drops its pass, leaving the rest intact', () => {
     const pipeline = createForwardPlusPipeline().remove('SkyUpdate');
     const names = compilePipelinePassNames(pipeline);
     expect(names).not.toContain('SkyUpdate');
     expect(names).toContain('LightPass');
-    expect(names).toContain('Present');
+    expect(names).toContain('Blit');
   });
 });

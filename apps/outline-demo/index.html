@@ -20,7 +20,7 @@
     <canvas id="canvas"></canvas>
     <section id="panel">
       <h1>RenderGraph object outline</h1>
-      <p>The orange hull is a custom pipeline pass. It redraws a ProxyDrawable that shares the blue torus geometry, animation, and world transform.</p>
+      <p>The orange hull is a custom pipeline pass. It shares the scene depth, so the foreground sphere correctly occludes it.</p>
       <label><input id="outline-enabled" type="checkbox" checked /> Enable outline pass</label>
       <label>
         Width

@@ -4,20 +4,10 @@ import { ShaderHelper, UnlitMaterial } from '@zephyr3d/scene';
 import type { DrawContext } from '@zephyr3d/scene';
 
 /**
- * Writes only depth, leaving the color already presented by the main pipeline untouched.
- */
-export class OutlineDepthMaterial extends UnlitMaterial {
-  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
-    super.updateRenderStates(pass, stateSet, ctx);
-    stateSet.useColorState().setColorMask(false, false, false, false);
-  }
-}
-
-/**
  * Unlit inverted-hull material used by the outline pass.
  *
  * Vertices are displaced along their animated object-space normals. Front-face culling then keeps
- * only the expanded back faces, while the target object's depth hides the hull interior.
+ * only the expanded back faces, while the scene depth hides the hull interior and occluded parts.
  */
 export class OutlineMaterial extends UnlitMaterial {
   private _outlineWidth: number;
@@ -40,6 +30,11 @@ export class OutlineMaterial extends UnlitMaterial {
       this._outlineWidth = width;
       this.uniformChanged();
     }
+  }
+
+  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext): void {
+    super.updateRenderStates(pass, stateSet, ctx);
+    stateSet.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('le');
   }
 
   vertexShader(scope: PBFunctionScope): void {

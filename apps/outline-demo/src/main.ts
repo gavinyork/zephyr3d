@@ -55,8 +55,13 @@ for (const x of [-3.2, 3.2]) {
   sphere.position.setXYZ(x, 1, 0);
 }
 
+// This foreground sphere overlaps the torus so the shared-depth occlusion is easy to verify.
+const occluder = new Mesh(scene, new SphereShape({ radius: 0.9 }), neighborMaterial);
+occluder.position.setXYZ(0.9, 1.45, 1.3);
+
 const settings: OutlineSettings = { enabled: true, width: 0.1 };
-camera.renderPipeline = createForwardPlusPipeline().append(
+camera.renderPipeline = createForwardPlusPipeline().insertAfter(
+  'LightPass',
   createOutlineModule(outlinedTorus, settings)
 );
 getEngine().setRenderable(scene);

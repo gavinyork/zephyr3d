@@ -1,13 +1,7 @@
 import { Vector4 } from '@zephyr3d/base';
-import {
-  ForwardPlusModuleContext,
-  RenderModule,
-  PersistentSceneQueue,
-  UnlitMaterial,
-  ProxyDrawable
-} from '@zephyr3d/scene';
+import { UnlitMaterial, ProxyDrawable } from '@zephyr3d/scene';
 import { createSceneRenderer, FrameResources, getDevice } from '@zephyr3d/scene';
-import type { Mesh } from '@zephyr3d/scene';
+import type { Mesh, ForwardPlusModuleContext, RenderModule, PersistentSceneQueue } from '@zephyr3d/scene';
 
 export type RedBoxMode = 'transient' | 'persistent';
 

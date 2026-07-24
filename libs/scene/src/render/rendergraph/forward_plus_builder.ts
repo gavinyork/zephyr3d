@@ -450,7 +450,7 @@ export interface ForwardPlusBuildState {
   grab?: SceneColorGrabResult;
   /** Main light pass outputs. */
   lightPass?: LightPassResult;
-  /** Graph output handle produced by the composite tail (Present/FrameCleanup). */
+  /** Graph output handle produced by the composite tail. */
   presentedBackbuffer?: RGHandle;
 }
 
@@ -926,6 +926,7 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
 const LightPassModule: RenderModule<FrameGraphContext> = {
   type: 'LightPass',
   writes: [
+    FrameResources.SceneColor,
     FrameResources.SSRRoughness,
     FrameResources.SSRNormal,
     FrameResources.SSSDiffuse,
@@ -1119,6 +1120,9 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
       };
     });
     fg.state.lightPass = lightPassResult;
+    // Publish the opaque scene color immediately so modules inserted between
+    // LightPass and CompositeTail can update the version consumed by the tail.
+    blackboard.set(FrameResources.SceneColor, lightPassResult.sceneColorHandle);
     // Register the LightPass MRT products so effects can look them up by name.
     if (lightPassResult.ssrRoughnessHandle) {
       blackboard.set(FrameResources.SSRRoughness, lightPassResult.ssrRoughnessHandle);
@@ -1152,7 +1156,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
 
 // ─── Composite tail module ──────────────────────────────────────────
 // The post-effect chains (opaque/transparent/end), the transparent scene pass,
-// the optional transmission-depth pass and Present/FrameCleanup form one
+// the optional transmission-depth pass and final output form one
 // order-sensitive orchestration block. It is exposed as a single module so users
 // can insert passes before or after it, while post-effect-level customization
 // stays with the Compositor layers. All its inputs come from fg.state / fg.
@@ -1187,7 +1191,8 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
     // transparent pass's render target. In final-framebuffer-as-intermediate
     // mode the scene color handle is the LightPass's backbuffer write version,
     // so the data flow is real either way — no keep-alive reads needed.
-    const opaqueChainInput = lightPassResult.sceneColorHandle;
+    // An inserted module may have replaced the LightPass version in the blackboard.
+    const opaqueChainInput = blackboard.expect(FrameResources.SceneColor);
     // Data dependencies for every effect pass: frame textures the effects sample
     // through DrawContext fields (linear depth, HiZ, scene color copy, SSS MRT
     // outputs) rather than through declared require* hooks.
@@ -1278,7 +1283,7 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
     // backbuffer (final framebuffer used as intermediate, no opaque effects).
     const chainInput = sceneColorHandle;
     // When the scene color still physically resides in the final framebuffer,
-    // the Present blit must be skipped if no effect moved it to a texture.
+    // the final blit must be skipped if no effect moved it to a texture.
     // (Opaque-layer effects disable final-as-intermediate mode, so the scene
     // color is backbuffer-resident whenever that mode is active.)
     const backbufferResidentHandle = useFinalFramebufferAsIntermediate ? sceneColorHandle : null;
@@ -1359,7 +1364,7 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
       : { color: transparentChainResult.color, wroteFinal: false };
     const finalWroteFinal = chainResult.wroteFinal || transparentChainResult.wroteFinal;
 
-    // 10. Present + frame cleanup.
+    // 10. Final output. Frame cleanup runs from executeForwardPlusGraph's finally block.
     let presentedBackbuffer: RGHandle;
     if (finalWroteFinal) {
       // The last effect wrote the final target directly; no extra pass needed.
