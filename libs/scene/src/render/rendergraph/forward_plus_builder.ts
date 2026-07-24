@@ -72,7 +72,7 @@ function getTextureAffinityCache(camera: Camera, device: AbstractDevice): RGText
 
 /**
  * Test-only accessor for the shared scene pass singleton. Lets execute-time
- * state-contract tests intercept `render()` and snapshot the six render-control
+ * state-contract tests intercept `render()` and snapshot the render-control
  * fields ({@link renderOpaqueScenePass}, {@link renderTransparentScenePass}).
  * @internal
  */
@@ -1088,7 +1088,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     }
     // Note: TAA history import/commit is handled by TAA.setup() (self-describing).
 
-    const lightPassResult = graph.addPass('LightPass', (builder) => {
+    const opaquePassResult = graph.addPass('LightPass', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
       builder.read(depthPassResult.depthFramebufferHandle);
       if (shadowMaskHandle) {
@@ -1242,9 +1242,34 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
         skinSSSHandle
       };
     });
+    // Sky and opaque geometry share the same color/depth target, but are
+    // deliberately separate graph passes. The in-place scene-color write keeps
+    // the original opaque -> sky ordering while making the two GPU operations
+    // independently visible to graph diagnostics/profilers.
+    const skySceneColorHandle = graph.addPass('SkyPass', (builder) => {
+      builder.read(opaquePassResult.sceneColorHandle);
+      builder.read(depthPassResult.depthFramebufferHandle);
+      if (opaquePassResult.sceneColorFramebufferHandle) {
+        builder.read(opaquePassResult.sceneColorFramebufferHandle);
+      }
+      const out = builder.write(opaquePassResult.sceneColorHandle);
+      builder.setExecute((rgCtx) => {
+        // A refraction background grab already contains sky/fog and is blitted
+        // by LightPass. Reapplying fog here would fog the scene twice.
+        if (!sceneColorCopyHandle) {
+          renderSkyScenePass(frame, rgCtx, opaquePassResult.sceneColorFramebufferHandle);
+        }
+      });
+      return out;
+    });
+    const lightPassResult: LightPassResult = {
+      ...opaquePassResult,
+      sceneColorHandle: skySceneColorHandle
+    };
     fg.state.lightPass = lightPassResult;
-    // Publish the opaque scene color immediately so modules inserted between
-    // LightPass and CompositeTail can update the version consumed by the tail.
+    // Publish the complete opaque-layer color (opaque geometry followed by
+    // sky/fog) so modules inserted before CompositeTail consume the latest
+    // version.
     blackboard.set(FrameResources.SceneColor, lightPassResult.sceneColorHandle);
     // Register the LightPass MRT products so effects can look them up by name.
     if (lightPassResult.sceneRoughnessHandle) {
@@ -2147,6 +2172,7 @@ export function renderOpaqueScenePass(
     ctx.device.setScissor(null);
 
     _scenePass.transmission = false;
+    _scenePass.renderSky = false;
     _scenePass.clearDepth = depthTex ? null : 1;
     _scenePass.clearStencil = depthTex ? null : 0;
 
@@ -2182,8 +2208,38 @@ export function renderOpaqueScenePass(
     // the transparent pass sets transmission/renderOpaque/renderTransparent
     // itself rather than inheriting whatever this pass happened to leave.
     _scenePass.renderTransparent = true;
+    _scenePass.renderSky = true;
     _scenePass.transmission = false;
     ctx.device.popDeviceStates();
+  }
+}
+
+/**
+ * Renders sky and fog into the opaque scene target after opaque geometry.
+ *
+ * @internal
+ */
+export function renderSkyScenePass(
+  frame: FrameState,
+  rgCtx: RGExecuteContext,
+  sceneColorFramebufferHandle?: RGHandle
+): void {
+  const { ctx } = frame;
+  const framebuffer = sceneColorFramebufferHandle
+    ? rgCtx.getFramebuffer<FrameBuffer>(sceneColorFramebufferHandle)
+    : ctx.finalFramebuffer;
+  const device = ctx.device;
+  device.pushDeviceStates();
+  try {
+    device.setFramebuffer(framebuffer);
+    device.setViewport(null);
+    device.setScissor(null);
+    ctx.scene.env.sky.renderSky(ctx);
+    if (ctx.scene.env.sky.fogPresents) {
+      ctx.scene.env.sky.renderFog(ctx.camera);
+    }
+  } finally {
+    device.popDeviceStates();
   }
 }
 
@@ -2244,10 +2300,12 @@ export function renderTransparentScenePass(
     _scenePass.clearStencil = null;
     _scenePass.renderOpaque = false;
     _scenePass.renderTransparent = true;
+    _scenePass.renderSky = false;
     try {
       _scenePass.render(ctx, null, null, renderQueue);
     } finally {
       _scenePass.renderOpaque = true;
+      _scenePass.renderSky = true;
     }
   } finally {
     device.popDeviceStates();

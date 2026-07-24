@@ -964,6 +964,23 @@ describe('TransparentPass split (P2-S2)', () => {
   });
 });
 
+describe('SkyPass split', () => {
+  test('renders opaque geometry and sky as separate ordered graph passes', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions());
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).toContain('LightPass');
+    expect(passNames).toContain('SkyPass');
+    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('SkyPass'));
+    expect(passNames.indexOf('SkyPass')).toBeLessThan(passNames.indexOf('TransparentPass'));
+
+    const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');
+    const skyPass = graph.passes.find((pass) => pass.name === 'SkyPass');
+    expect(skyPass?.reads).toContain(lightPass?.writes.find((resource) => resource.name === 'sceneColor'));
+    expect(skyPass?.writes.some((resource) => resource.name.startsWith('sceneColor@SkyPass'))).toBe(true);
+  });
+});
+
 describe('SSR native multi-pass setup (P3-S3)', () => {
   function buildWithSSR(cameraOverrides: Record<string, unknown>) {
     const compositor = new Compositor();
@@ -1201,7 +1218,7 @@ describe('Final framebuffer as intermediate (editor render-to-texture mode)', ()
     expect(passNames).toContain('TransparentPass');
     // The chain input must be the scene color texture, not the backbuffer
     const effectPass = graph.passes.find((pass) => pass.name === 'PostEffect:OpaqueEffect');
-    expect(effectPass?.reads.some((res) => res.name === 'sceneColor')).toBe(true);
+    expect(effectPass?.reads.some((res) => res.name.startsWith('sceneColor'))).toBe(true);
     expect(effectPass?.reads.some((res) => res.name === 'backbuffer')).toBe(false);
     // LightPass renders into the graph scene color framebuffer, not the final one
     const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');

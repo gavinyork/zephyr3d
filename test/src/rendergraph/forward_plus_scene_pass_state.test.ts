@@ -1,6 +1,7 @@
 import {
   _getScenePassForTest,
   renderOpaqueScenePass,
+  renderSkyScenePass,
   renderTransparentScenePass
 } from '../../../libs/scene/src/render/rendergraph/forward_plus_builder';
 
@@ -8,8 +9,8 @@ import {
 //
 // The graph topology test (forward_plus_builder.test.ts) never runs the pass
 // execute callbacks, so it cannot see the shared `_scenePass` singleton's
-// render-control fields. Those six fields (transmission / clearColor /
-// clearDepth / clearStencil / renderOpaque / renderTransparent) are mutated in
+// render-control fields. Those seven fields (transmission / clearColor /
+// clearDepth / clearStencil / renderOpaque / renderTransparent / renderSky) are mutated in
 // place by the opaque and transparent scene passes and are only correct because
 // each pass sets every field it needs before `render()` (rather than inheriting
 // leftover state) and restores the shared flags afterwards. Module extraction
@@ -23,6 +24,7 @@ interface RenderSnapshot {
   clearStencil: unknown;
   renderOpaque: unknown;
   renderTransparent: unknown;
+  renderSky: unknown;
 }
 
 function snapshotScenePass(): RenderSnapshot {
@@ -33,7 +35,8 @@ function snapshotScenePass(): RenderSnapshot {
     clearDepth: p.clearDepth,
     clearStencil: p.clearStencil,
     renderOpaque: p.renderOpaque,
-    renderTransparent: p.renderTransparent
+    renderTransparent: p.renderTransparent,
+    renderSky: p.renderSky
   };
 }
 
@@ -101,6 +104,7 @@ describe('Forward+ _scenePass execute state contract', () => {
     scenePass.clearStencil = 'SEED';
     scenePass.renderOpaque = 'SEED' as unknown as boolean;
     scenePass.renderTransparent = 'SEED' as unknown as boolean;
+    scenePass.renderSky = 'SEED' as unknown as boolean;
   });
 
   afterEach(() => {
@@ -127,11 +131,13 @@ describe('Forward+ _scenePass execute state contract', () => {
       clearDepth: null,
       clearStencil: null,
       renderOpaque: true,
-      renderTransparent: false
+      renderTransparent: false,
+      renderSky: false
     });
     // The shared flags are restored so nothing leaks to the next pass.
     expect(scenePass.transmission).toBe(false);
     expect(scenePass.renderTransparent).toBe(true);
+    expect(scenePass.renderSky).toBe(true);
     // Device state is saved/restored around the pass.
     expect(device.pushDeviceStates).toHaveBeenCalledTimes(1);
     expect(device.popDeviceStates).toHaveBeenCalledTimes(1);
@@ -151,10 +157,12 @@ describe('Forward+ _scenePass execute state contract', () => {
       clearDepth: null,
       clearStencil: null,
       renderOpaque: false,
-      renderTransparent: true
+      renderTransparent: true,
+      renderSky: false
     });
     // renderOpaque restored to true after the transparent draw.
     expect(scenePass.renderOpaque).toBe(true);
+    expect(scenePass.renderSky).toBe(true);
     expect(device.pushDeviceStates).toHaveBeenCalledTimes(1);
     expect(device.popDeviceStates).toHaveBeenCalledTimes(1);
   });
@@ -170,7 +178,40 @@ describe('Forward+ _scenePass execute state contract', () => {
     expect(renderCalls[0]).toMatchObject({
       transmission: true, // needSceneColor() === true
       renderOpaque: false,
-      renderTransparent: true
+      renderTransparent: true,
+      renderSky: false
     });
+  });
+
+  test('sky pass renders sky and fog directly into the scene target', () => {
+    const device = createMockDevice();
+    const sky = {
+      fogPresents: true,
+      renderSky: jest.fn(),
+      renderFog: jest.fn()
+    };
+    const ctx = {
+      device,
+      camera: { id: 'camera' },
+      finalFramebuffer: null,
+      scene: { env: { sky } }
+    };
+    const frame = { ctx };
+    const framebuffer = { id: 'scene-color-fb' };
+    const rgCtx = {
+      ...createMockRgCtx(),
+      getFramebuffer: jest.fn(() => framebuffer)
+    };
+
+    renderSkyScenePass(frame as never, rgCtx as never, { name: 'sceneColorFb' } as never);
+
+    expect(device.setFramebuffer).toHaveBeenCalledWith(framebuffer);
+    expect(device.setViewport).toHaveBeenCalledWith(null);
+    expect(device.setScissor).toHaveBeenCalledWith(null);
+    expect(sky.renderSky).toHaveBeenCalledWith(ctx);
+    expect(sky.renderFog).toHaveBeenCalledWith(ctx.camera);
+    expect(renderCalls).toHaveLength(0);
+    expect(device.pushDeviceStates).toHaveBeenCalledTimes(1);
+    expect(device.popDeviceStates).toHaveBeenCalledTimes(1);
   });
 });
