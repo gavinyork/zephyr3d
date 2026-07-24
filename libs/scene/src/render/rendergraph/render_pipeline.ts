@@ -1,5 +1,7 @@
 import type { RenderModule } from './render_module';
 import type { RenderContext } from './render_context';
+import type { FrameResourceRequirements } from './frame_resource_requirements';
+import { mergeFrameResourceRequirements } from './frame_resource_requirements';
 
 /**
  * Resolve the setup order of a module list, honouring declared
@@ -215,6 +217,20 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
    */
   clone(): RenderPipeline<TCtx> {
     return new RenderPipeline<TCtx>(this._modules);
+  }
+
+  /**
+   * Collect requirements from every module in the authored pipeline.
+   * No module setup has run yet, so requirement providers cannot use blackboard
+   * resources produced by another module.
+   * @internal
+   */
+  collectRequirements(context: TCtx): FrameResourceRequirements {
+    const requirements: FrameResourceRequirements = {};
+    for (const module of this._modules) {
+      mergeFrameResourceRequirements(requirements, module.requirements?.(context));
+    }
+    return requirements;
   }
 
   /**

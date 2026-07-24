@@ -115,7 +115,10 @@ export class LambertMaterial
           this.color = pb.add(this.color, this.lightContrib);
         });
         scope.$l.litColor = pb.mul(scope.albedo, pb.vec4(scope.color, 1));
-        if (this.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
+        if (
+          this.drawContext.materialFlags &
+          (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
+        ) {
           this.outputFragmentColor(
             scope,
             scope.$inputs.worldPos,

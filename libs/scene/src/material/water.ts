@@ -250,7 +250,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.waterShading(scope, scope.$inputs.worldPos, scope.normal.xyz, scope.normal.w),
         1
       );
-      if (this.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
+      if (
+        this.drawContext.materialFlags &
+        (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
+      ) {
         scope.$l.outRoughness = pb.vec4(1, 1, 1, 0);
         this.outputFragmentColor(
           scope,

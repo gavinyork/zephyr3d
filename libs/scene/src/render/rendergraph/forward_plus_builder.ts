@@ -1,6 +1,7 @@
 import type { Nullable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
+  AbstractDevice,
   BindGroup,
   ColorState,
   FrameBuffer,
@@ -30,6 +31,7 @@ import { MaterialVaryingFlags } from '../../values';
 import { AbstractPostEffect, PostEffectLayer } from '../../posteffect/posteffect';
 import { RenderGraph } from './rendergraph';
 import { RenderGraphExecutor } from './executor';
+import { RGTextureAffinityCache } from './texture_affinity_cache';
 import { DevicePoolAllocator } from './device_pool_allocator';
 import { HistoryResourceManager } from './history_resource_manager';
 import { RGHistoryResources } from './history_resources';
@@ -38,6 +40,8 @@ import { OrderingScope } from './render_context';
 import type { FrameGraphContext } from './frame_graph_context';
 import type { RenderModule } from './render_module';
 import { RenderPipeline } from './render_pipeline';
+import type { FrameResourceRequirements } from './frame_resource_requirements';
+import { mergeFrameResourceRequirements } from './frame_resource_requirements';
 import type { RGExecuteContext, RGHandle } from './types';
 import { renderObjectColors } from '../gpu_picking';
 import type { Primitive } from '../primitive';
@@ -51,6 +55,20 @@ const _shadowMapPass = new ShadowMapPass();
 const _clusters: ClusteredLight[] = [];
 const _shadowMaskRenderer = new ShadowMaskRenderer();
 const _devicePoolAllocator = new DevicePoolAllocator();
+const _textureAffinityCaches = new WeakMap<
+  Camera,
+  { device: AbstractDevice; cache: RGTextureAffinityCache<Texture2D> }
+>();
+
+function getTextureAffinityCache(camera: Camera, device: AbstractDevice): RGTextureAffinityCache<Texture2D> {
+  const current = _textureAffinityCaches.get(camera);
+  if (current?.device === device) {
+    return current.cache;
+  }
+  const cache = new RGTextureAffinityCache<Texture2D>();
+  _textureAffinityCaches.set(camera, { device, cache });
+  return cache;
+}
 
 /**
  * Test-only accessor for the shared scene pass singleton. Lets execute-time
@@ -65,10 +83,10 @@ export function _getScenePassForTest(): LightPass {
 let _backDepthColorState: Nullable<ColorState> = null;
 let _frontDepthColorState: Nullable<ColorState> = null;
 const SURFACE_MRT_FLAGS =
-  MaterialVaryingFlags.SSR_STORE_ROUGHNESS |
+  MaterialVaryingFlags.SCENE_STORE_ROUGHNESS |
   MaterialVaryingFlags.SSS_STORE_PROFILE |
   MaterialVaryingFlags.SSS_STORE_DIFFUSE |
-  MaterialVaryingFlags.SSS_STORE_NORMAL |
+  MaterialVaryingFlags.SCENE_STORE_NORMAL |
   MaterialVaryingFlags.SSS_STORE_TRANSMISSION |
   MaterialVaryingFlags.SKIN_SSS_STORE;
 
@@ -233,10 +251,10 @@ function shouldStoreSSSTransmission(ctx: DrawContext): boolean {
 function getSSSLightingTextureFormat(
   ctx: DrawContext,
   attachmentCount: number,
-  includeSSRSurfaceMRT: boolean
+  surfaceAttachmentCount: number
 ): TextureFormat {
   const colorFormat = ctx.colorFormat!;
-  if (!includeSSRSurfaceMRT || attachmentCount === 0) {
+  if (surfaceAttachmentCount === 0 || attachmentCount === 0) {
     return colorFormat;
   }
   const caps = ctx.device.getDeviceCaps();
@@ -246,8 +264,7 @@ function getSSSLightingTextureFormat(
   const surfaceFormat = getSurfaceTextureFormat(ctx);
   const colorBytes =
     getTextureFormatBytes(ctx, colorFormat) +
-    getTextureFormatBytes(ctx, surfaceFormat) +
-    getTextureFormatBytes(ctx, surfaceFormat);
+    getTextureFormatBytes(ctx, surfaceFormat) * surfaceAttachmentCount;
   const fullPrecisionBytes = colorBytes + getTextureFormatBytes(ctx, colorFormat) * attachmentCount;
   if (fullPrecisionBytes <= caps.framebufferCaps.maxColorAttachmentBytesPerSample) {
     return colorFormat;
@@ -268,10 +285,11 @@ function getLightPassColorAttachments(
   colorAttachment: TextureFormat | Texture2D
 ): TextureFormat | Texture2D | Array<TextureFormat | Texture2D> {
   const attachments: Array<TextureFormat | Texture2D> = [colorAttachment];
-  if (ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
-    attachments.push(ctx.SSRRoughnessTexture!, ctx.SSRNormalTexture!);
-  } else if (ctx.materialFlags & MaterialVaryingFlags.SSS_STORE_NORMAL) {
-    attachments.push(ctx.SSRNormalTexture!);
+  if (ctx.materialFlags & MaterialVaryingFlags.SCENE_STORE_ROUGHNESS) {
+    attachments.push(ctx.SceneRoughnessTexture!);
+  }
+  if (ctx.materialFlags & MaterialVaryingFlags.SCENE_STORE_NORMAL) {
+    attachments.push(ctx.SceneNormalTexture!);
   }
   if (ctx.materialFlags & MaterialVaryingFlags.SSS_STORE_PROFILE) {
     attachments.push(ctx.SSSProfileTexture!, ctx.SSSParamTexture!);
@@ -304,6 +322,12 @@ export interface ForwardPlusOptions {
   motionVectors: boolean;
   /** Enable Hi-Z pyramid (for SSR ray tracing). */
   hiZ: boolean;
+  /** Produce opaque-scene world normals. */
+  sceneNormal: boolean;
+  /** Produce opaque-scene roughness data. */
+  sceneRoughness: boolean;
+  /** Produce and consume the clustered screen-space shadow mask. */
+  shadowMask: boolean;
   /** Enable screen-space reflections. */
   ssr: boolean;
   /** Whether to compute SSR thickness. */
@@ -339,9 +363,11 @@ export function deriveForwardPlusOptions(
   const needSceneColorWithDepth = renderQueue.needSceneColorWithDepth();
   return {
     depthPrepass: true,
-    motionVectors:
-      deviceType !== 'webgl' && (camera.TAA || camera.motionBlur || (!!ssr && camera.ssrTemporal)),
-    hiZ: camera.HiZ && deviceType !== 'webgl',
+    motionVectors: false,
+    hiZ: false,
+    sceneNormal: false,
+    sceneRoughness: false,
+    shadowMask: false,
     ssr: !!ssr,
     ssrCalcThickness: !!ssr && camera.ssrCalcThickness,
     gpuPicking: !!camera.getPickResultResolveFunc(),
@@ -351,6 +377,76 @@ export function deriveForwardPlusOptions(
     sss: !!sss,
     skinSSS: !!skinSSS
   };
+}
+
+function resolveFrameResourceRequirements(
+  ctx: DrawContext,
+  options: ForwardPlusOptions,
+  requirements: FrameResourceRequirements
+): void {
+  const deviceType = ctx.device.type;
+  options.motionVectors ||= !!requirements.motionVector;
+  options.hiZ ||= !!requirements.hiZ;
+  options.sceneNormal ||= !!requirements.sceneNormal;
+  options.sceneRoughness ||= !!requirements.sceneRoughness;
+  options.shadowMask ||= !!requirements.shadowMask;
+
+  if (options.motionVectors && deviceType === 'webgl') {
+    throw new Error('Forward+: MotionVector was requested but is not supported by the WebGL backend.');
+  }
+  if (options.hiZ && deviceType === 'webgl') {
+    throw new Error('Forward+: HiZ was requested but is not supported by the WebGL backend.');
+  }
+  if (options.shadowMask && deviceType === 'webgl') {
+    throw new Error('Forward+: ShadowMask was requested but is not supported by the WebGL backend.');
+  }
+
+  const surfaceAttachmentCount = Number(options.sceneNormal) + Number(options.sceneRoughness);
+  if (surfaceAttachmentCount > 0) {
+    const caps = ctx.device.getDeviceCaps();
+    const maxDrawBuffers = caps.framebufferCaps.maxDrawBuffers ?? Number.MAX_SAFE_INTEGER;
+    if (1 + surfaceAttachmentCount > maxDrawBuffers) {
+      throw new Error(
+        `Forward+: ${surfaceAttachmentCount} scene surface attachment(s) were requested, ` +
+          `but the device supports only ${maxDrawBuffers} color attachments.`
+      );
+    }
+    const bytesPerSample =
+      getTextureFormatBytes(ctx, ctx.colorFormat) +
+      getTextureFormatBytes(ctx, getSurfaceTextureFormat(ctx)) * surfaceAttachmentCount;
+    if (bytesPerSample > caps.framebufferCaps.maxColorAttachmentBytesPerSample) {
+      throw new Error(
+        `Forward+: requested scene surface attachments require ${bytesPerSample} bytes per sample, ` +
+          `but the device limit is ${caps.framebufferCaps.maxColorAttachmentBytesPerSample}.`
+      );
+    }
+  }
+
+  ctx.motionVectors = options.motionVectors;
+  ctx.HiZ = options.hiZ;
+  ctx.screenSpaceShadowMask = options.shadowMask;
+  ctx.SSS = options.sss;
+}
+
+function validateProducedFrameResources(
+  blackboard: RGBlackboard,
+  options: ForwardPlusOptions,
+  renderQueue: RenderQueue
+): void {
+  const required: Array<[boolean, string]> = [
+    [options.motionVectors, FrameResources.MotionVector],
+    [options.hiZ, FrameResources.HiZ],
+    [options.sceneNormal, FrameResources.SceneNormal],
+    [options.sceneRoughness, FrameResources.SceneRoughness],
+    [options.shadowMask && renderQueue.shadowedLights.length > 0, FrameResources.ShadowMask]
+  ];
+  for (const [needed, resource] of required) {
+    if (needed && !blackboard.has(resource)) {
+      throw new Error(
+        `Forward+: frame resource "${resource}" was requested but no enabled RenderModule produced it.`
+      );
+    }
+  }
 }
 
 // ─── Shared Frame State ─────────────────────────────────────────────
@@ -384,13 +480,6 @@ interface HistoryReadBinding {
   handle: RGHandle;
 }
 
-interface SSSProfilePassResult {
-  profileHandle: RGHandle;
-  paramHandle: RGHandle;
-  normalHandle?: RGHandle;
-  framebufferHandle: RGHandle;
-}
-
 /** Result of the depth prepass module. @public */
 export interface DepthPrepassResult {
   depthHandle: RGHandle;
@@ -400,19 +489,12 @@ export interface DepthPrepassResult {
   depthFramebufferHandle: RGHandle;
 }
 
-/** Result of the scene-color grab module. @public */
-export interface SceneColorGrabResult {
-  copyHandle: RGHandle;
-  copyFramebufferHandle?: RGHandle;
-}
-
 /** Result of the main light pass module. @public */
 export interface LightPassResult {
   sceneColorHandle: RGHandle;
-  sceneColorCopyHandle?: RGHandle;
   sceneColorFramebufferHandle?: RGHandle;
-  ssrRoughnessHandle?: RGHandle;
-  ssrNormalHandle?: RGHandle;
+  sceneRoughnessHandle?: RGHandle;
+  sceneNormalHandle?: RGHandle;
   sssDiffuseHandle?: RGHandle;
   sssTransmissionHandle?: RGHandle;
   skinSSSHandle?: RGHandle;
@@ -438,16 +520,8 @@ export interface ForwardPlusBuildState {
   useFinalFramebufferAsIntermediate: boolean;
   /** Ordering token from the pre-light transmission-depth pass, if any. */
   preLightTransmissionDepthToken?: RGHandle;
-  /** Screen-space shadow mask texture array handle, or null. */
-  shadowMaskHandle: RGHandle | null;
-  /** Hi-Z pyramid handle, if built. */
-  hiZHandle?: RGHandle;
   /** History textures kept in a read scope while the light pass executes. */
   lightHistoryReadBindings: HistoryReadBinding[];
-  /** Forward SSS profile pass outputs, if built. */
-  sssProfile?: SSSProfilePassResult;
-  /** Scene-color grab outputs, if built. */
-  grab?: SceneColorGrabResult;
   /** Main light pass outputs. */
   lightPass?: LightPassResult;
   /** Graph output handle produced by the composite tail. */
@@ -529,7 +603,7 @@ const ClusterLightsModule: RenderModule<FrameGraphContext> = {
       builder.sideEffect();
       builder.setExecute(() => {
         ctx.clusteredLight = getClusteredLight();
-        ctx.clusteredLight.calculateLightIndex(ctx.camera, renderQueue);
+        ctx.clusteredLight.calculateLightIndex(ctx.camera, renderQueue, ctx.screenSpaceShadowMask);
       });
     });
   }
@@ -592,9 +666,17 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
             : 'r32f';
       const mvFormat: TextureFormat = 'rgba16f';
 
-      const depthHandle = builder.createTexture({ format, label: 'linearDepth' });
+      const depthHandle = builder.createTexture({
+        format,
+        label: 'linearDepth',
+        allocationKey: 'ForwardPlus.LinearDepth'
+      });
       const motionVectorHandle = options.motionVectors
-        ? builder.createTexture({ format: mvFormat, label: 'motionVector' })
+        ? builder.createTexture({
+            format: mvFormat,
+            label: 'motionVector',
+            allocationKey: 'ForwardPlus.MotionVector'
+          })
         : undefined;
       const finalDepthAttachment = ctx.finalFramebuffer?.getDepthAttachment();
       const externalDepthAttachment = finalDepthAttachment?.isTexture2D()
@@ -602,7 +684,11 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
         : null;
       const graphDepthAttachmentHandle = externalDepthAttachment
         ? undefined
-        : builder.createTexture({ format: ctx.depthFormat, label: 'sceneDepth' });
+        : builder.createTexture({
+            format: ctx.depthFormat,
+            label: 'sceneDepth',
+            allocationKey: 'ForwardPlus.SceneDepth'
+          });
       const depthAttachmentOrFormat =
         externalDepthAttachment ?? graphDepthAttachmentHandle ?? ctx.depthFormat;
       const depthFramebufferHandle = builder.createFramebuffer({
@@ -683,11 +769,15 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
 const ShadowMaskModule: RenderModule<FrameGraphContext> = {
   type: 'ShadowMaskPass',
   writes: [FrameResources.ShadowMask],
+  requirements: ({ ctx, renderQueue }) => ({
+    shadowMask:
+      ctx.device.type !== 'webgl' && ctx.camera.screenSpaceShadowMask && renderQueue.shadowedLights.length > 0
+  }),
   // Gate on build-time state only: renderQueue.shadowedLights is available now,
   // whereas ctx.shadowMapInfo is populated later by the ShadowMaps pass execute
   // (which runs before this pass thanks to the ordering-token chain), so it must
   // not be part of the pass-creation condition.
-  enabled: ({ ctx, renderQueue }) => ctx.screenSpaceShadowMask && renderQueue.shadowedLights.length > 0,
+  enabled: ({ options, renderQueue }) => options.shadowMask && renderQueue.shadowedLights.length > 0,
   setup(fg: FrameGraphContext) {
     // When active, render each shadow-casting light's visibility into an RGBA8
     // texture array (4 lights per layer). The clustered LightPass samples this
@@ -716,7 +806,8 @@ const ShadowMaskModule: RenderModule<FrameGraphContext> = {
       const maskHandle = builder.createTexture({
         format: 'rgba8unorm',
         label: 'shadowMask',
-        arrayLayers: numLayers
+        arrayLayers: numLayers,
+        allocationKey: 'ForwardPlus.ShadowMask'
       });
       builder.setExecute((rgCtx) => {
         const depthTex = rgCtx.getTexture<Texture2D>(maskDepthHandle);
@@ -730,11 +821,9 @@ const ShadowMaskModule: RenderModule<FrameGraphContext> = {
             attachmentLayer: layer
           })
         );
-        ctx.shadowMaskTexture = maskTex;
       });
       return { maskHandle };
     });
-    fg.state.shadowMaskHandle = maskPassResult.maskHandle;
     blackboard.set(FrameResources.ShadowMask, maskPassResult.maskHandle);
   }
 };
@@ -791,7 +880,8 @@ const HiZModule: RenderModule<FrameGraphContext> = {
       hiZHandle = builder.createTexture({
         format: 'rg32f',
         label: 'hiZ',
-        mipLevels: getFullMipLevelCount(ctx.renderWidth, ctx.renderHeight)
+        mipLevels: getFullMipLevelCount(ctx.renderWidth, ctx.renderHeight),
+        allocationKey: 'ForwardPlus.HiZ'
       });
       const hiZFramebufferHandle = builder.createFramebuffer({
         label: 'HiZFramebuffer',
@@ -816,7 +906,6 @@ const HiZModule: RenderModule<FrameGraphContext> = {
       });
     });
     if (hiZHandle) {
-      fg.state.hiZHandle = hiZHandle;
       blackboard.set(FrameResources.HiZ, hiZHandle);
     }
   }
@@ -832,21 +921,28 @@ const SSSProfileModule: RenderModule<FrameGraphContext> = {
     const { graph, ctx, frame, blackboard } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'SSSProfile');
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
+    const shadowMaskHandle = blackboard.get(FrameResources.ShadowMask);
     const renderDepthAttachment = fg.state.renderDepthAttachment;
-    fg.state.sssProfile = graph.addPass('SSSProfile', (builder) => {
+    const sssProfileResult = graph.addPass('SSSProfile', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
       builder.read(depthPassResult.depthFramebufferHandle);
       if (preLightTransmissionDepthToken) {
         builder.read(preLightTransmissionDepthToken);
       }
-      const profileHandle = builder.createTexture({ format: 'rgba16f', label: 'sssProfile' });
-      const paramHandle = builder.createTexture({ format: 'rgba8unorm', label: 'sssParam' });
-      const normalHandle = fg.options.ssr
-        ? undefined
-        : builder.createTexture({ format: getSurfaceTextureFormat(ctx), label: 'sssNormal' });
-      const colorAttachments = normalHandle
-        ? [ctx.colorFormat!, normalHandle, profileHandle, paramHandle]
-        : [ctx.colorFormat!, profileHandle, paramHandle];
+      if (shadowMaskHandle) {
+        builder.read(shadowMaskHandle);
+      }
+      const profileHandle = builder.createTexture({
+        format: 'rgba16f',
+        label: 'sssProfile',
+        allocationKey: 'ForwardPlus.SSSProfile'
+      });
+      const paramHandle = builder.createTexture({
+        format: 'rgba8unorm',
+        label: 'sssParam',
+        allocationKey: 'ForwardPlus.SSSParam'
+      });
+      const colorAttachments = [ctx.colorFormat!, profileHandle, paramHandle];
       const framebufferHandle = builder.createFramebuffer({
         label: 'SSSProfileFramebuffer',
         width: ctx.renderWidth,
@@ -857,22 +953,24 @@ const SSSProfileModule: RenderModule<FrameGraphContext> = {
       });
 
       builder.setExecute((rgCtx) => {
+        ctx.shadowMaskTexture = shadowMaskHandle ? rgCtx.getTexture<Texture2DArray>(shadowMaskHandle) : null;
         renderForwardSSSProfile(
           frame,
           rgCtx.getFramebuffer<FrameBuffer>(framebufferHandle),
           rgCtx.getTexture<Texture2D>(profileHandle),
           rgCtx.getTexture<Texture2D>(paramHandle),
-          normalHandle ? rgCtx.getTexture<Texture2D>(normalHandle) : null
+          null
         );
       });
 
       return {
         profileHandle,
         paramHandle,
-        normalHandle,
         framebufferHandle
       };
     });
+    blackboard.set(FrameResources.SSSProfile, sssProfileResult.profileHandle);
+    blackboard.set(FrameResources.SSSParam, sssProfileResult.paramHandle);
   }
 };
 
@@ -888,16 +986,21 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
     const { graph, ctx, frame, blackboard, options } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'SceneColorGrab');
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
+    const shadowMaskHandle = blackboard.get(FrameResources.ShadowMask);
     const renderDepthAttachment = fg.state.renderDepthAttachment;
-    fg.state.grab = graph.addPass('SceneColorGrab', (builder) => {
+    const grabResult = graph.addPass('SceneColorGrab', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
       builder.read(depthPassResult.depthFramebufferHandle);
       if (preLightTransmissionDepthToken) {
         builder.read(preLightTransmissionDepthToken);
       }
+      if (shadowMaskHandle) {
+        builder.read(shadowMaskHandle);
+      }
       const copyHandle = builder.createTexture({
         format: ctx.colorFormat!,
-        label: 'sceneColorCopy'
+        label: 'sceneColorCopy',
+        allocationKey: 'ForwardPlus.SceneColorCopy'
       });
       // SSR may pre-insert transmission depth before LightPass for Hi-Z. In that
       // case the refraction scene-color copy needs an isolated depth buffer so
@@ -913,10 +1016,12 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
           })
         : undefined;
       builder.setExecute((rgCtx) => {
+        ctx.shadowMaskTexture = shadowMaskHandle ? rgCtx.getTexture<Texture2DArray>(shadowMaskHandle) : null;
         renderSceneColorGrab(frame, rgCtx, copyHandle, copyFramebufferHandle);
       });
       return { copyHandle, copyFramebufferHandle };
     });
+    blackboard.set(FrameResources.SceneColorCopy, grabResult.copyHandle);
   }
 };
 
@@ -927,8 +1032,8 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
   type: 'LightPass',
   writes: [
     FrameResources.SceneColor,
-    FrameResources.SSRRoughness,
-    FrameResources.SSRNormal,
+    FrameResources.SceneRoughness,
+    FrameResources.SceneNormal,
     FrameResources.SSSDiffuse,
     FrameResources.SSSTransmission,
     FrameResources.SkinSSS
@@ -937,11 +1042,12 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard, options, backbuffer } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'LightPass');
-    const shadowMaskHandle = fg.state.shadowMaskHandle;
+    const shadowMaskHandle = blackboard.get(FrameResources.ShadowMask);
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
-    const hiZHandle = fg.state.hiZHandle;
-    const sssProfileResult = fg.state.sssProfile;
-    const grabResult = fg.state.grab;
+    const hiZHandle = blackboard.get(FrameResources.HiZ);
+    const sssProfileHandle = blackboard.get(FrameResources.SSSProfile);
+    const sssParamHandle = blackboard.get(FrameResources.SSSParam);
+    const sceneColorCopyHandle = blackboard.get(FrameResources.SceneColorCopy);
     const useFinalFramebufferAsIntermediate = fg.state.useFinalFramebufferAsIntermediate;
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     const historyManager = fg.history;
@@ -1006,38 +1112,45 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
         ? builder.write(backbuffer)
         : builder.createTexture({
             format: ctx.colorFormat!,
-            label: 'sceneColor'
+            label: 'sceneColor',
+            allocationKey: 'ForwardPlus.SceneColor'
           });
 
       // Transmission/refraction background produced by the SceneColorGrab pass
-      const sceneColorCopyHandle = grabResult?.copyHandle;
       if (sceneColorCopyHandle) {
         builder.read(sceneColorCopyHandle);
       }
-      if (sssProfileResult) {
-        builder.read(sssProfileResult.profileHandle);
-        builder.read(sssProfileResult.paramHandle);
-        if (sssProfileResult.normalHandle) {
-          builder.read(sssProfileResult.normalHandle);
-        }
+      if (sssProfileHandle) {
+        builder.read(sssProfileHandle);
       }
-      const includeSSRSurfaceMRT = !!options.ssr;
-      // SSR glossy-surface MRT outputs (roughness + world normal) are graph
+      if (sssParamHandle) {
+        builder.read(sssParamHandle);
+      }
+      const surfaceAttachmentCount = Number(options.sceneRoughness) + Number(options.sceneNormal);
+      // Opaque-scene surface MRT outputs are graph
       // textures owned by this pass; effects reach them through the blackboard
       // handles (or the ctx fields resolved below during execution).
-      const ssrRoughnessHandle = includeSSRSurfaceMRT
-        ? builder.createTexture({ format: getSurfaceTextureFormat(ctx), label: 'ssrRoughness' })
+      const sceneRoughnessHandle = options.sceneRoughness
+        ? builder.createTexture({
+            format: getSurfaceTextureFormat(ctx),
+            label: 'sceneRoughness',
+            allocationKey: 'ForwardPlus.SceneRoughness'
+          })
         : undefined;
-      const ssrNormalHandle = includeSSRSurfaceMRT
-        ? builder.createTexture({ format: getSurfaceTextureFormat(ctx), label: 'ssrNormal' })
+      const sceneNormalHandle = options.sceneNormal
+        ? builder.createTexture({
+            format: getSurfaceTextureFormat(ctx),
+            label: 'sceneNormal',
+            allocationKey: 'ForwardPlus.SceneNormal'
+          })
         : undefined;
       const writeSSSDiffuse = options.sss && shouldStoreSSSDiffuse(ctx);
       let writeSSSTransmission = options.sss && shouldStoreSSSTransmission(ctx);
       if (
         writeSSSDiffuse &&
         writeSSSTransmission &&
-        includeSSRSurfaceMRT &&
-        getSSSLightingTextureFormat(ctx, 2, includeSSRSurfaceMRT) !== ctx.colorFormat
+        surfaceAttachmentCount > 0 &&
+        getSSSLightingTextureFormat(ctx, 2, surfaceAttachmentCount) !== ctx.colorFormat
       ) {
         writeSSSTransmission = false;
       }
@@ -1047,16 +1160,28 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
       const sssLightingFormat = getSSSLightingTextureFormat(
         ctx,
         sssLightingAttachmentCount,
-        includeSSRSurfaceMRT
+        surfaceAttachmentCount
       );
       const sssDiffuseHandle = writeSSSDiffuse
-        ? builder.createTexture({ format: sssLightingFormat, label: 'sssDiffuse' })
+        ? builder.createTexture({
+            format: sssLightingFormat,
+            label: 'sssDiffuse',
+            allocationKey: 'ForwardPlus.SSSDiffuse'
+          })
         : undefined;
       const sssTransmissionHandle = writeSSSTransmission
-        ? builder.createTexture({ format: sssLightingFormat, label: 'sssTransmission' })
+        ? builder.createTexture({
+            format: sssLightingFormat,
+            label: 'sssTransmission',
+            allocationKey: 'ForwardPlus.SSSTransmission'
+          })
         : undefined;
       const skinSSSHandle = writeSkinSSS
-        ? builder.createTexture({ format: sssLightingFormat, label: 'skinSSS' })
+        ? builder.createTexture({
+            format: sssLightingFormat,
+            label: 'skinSSS',
+            allocationKey: 'ForwardPlus.SkinSSS'
+          })
         : undefined;
       const sceneColorFramebufferHandle = useFinalFramebufferAsIntermediate
         ? undefined
@@ -1075,15 +1200,14 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
           : null;
         // Resolve MRT products into the DrawContext bridge fields that scene
         // rendering and apply()-based effects still read.
-        ctx.SSRRoughnessTexture = ssrRoughnessHandle ? rgCtx.getTexture<Texture2D>(ssrRoughnessHandle) : null;
-        ctx.SSRNormalTexture = ssrNormalHandle ? rgCtx.getTexture<Texture2D>(ssrNormalHandle) : null;
-        if (sssProfileResult) {
-          ctx.SSSProfileTexture = rgCtx.getTexture<Texture2D>(sssProfileResult.profileHandle);
-          ctx.SSSParamTexture = rgCtx.getTexture<Texture2D>(sssProfileResult.paramHandle);
-          if (sssProfileResult.normalHandle) {
-            ctx.SSRNormalTexture = rgCtx.getTexture<Texture2D>(sssProfileResult.normalHandle);
-          }
-        }
+        ctx.shadowMaskTexture = shadowMaskHandle ? rgCtx.getTexture<Texture2DArray>(shadowMaskHandle) : null;
+        ctx.HiZTexture = hiZHandle ? rgCtx.getTexture<Texture2D>(hiZHandle) : null;
+        ctx.SceneRoughnessTexture = sceneRoughnessHandle
+          ? rgCtx.getTexture<Texture2D>(sceneRoughnessHandle)
+          : null;
+        ctx.SceneNormalTexture = sceneNormalHandle ? rgCtx.getTexture<Texture2D>(sceneNormalHandle) : null;
+        ctx.SSSProfileTexture = sssProfileHandle ? rgCtx.getTexture<Texture2D>(sssProfileHandle) : null;
+        ctx.SSSParamTexture = sssParamHandle ? rgCtx.getTexture<Texture2D>(sssParamHandle) : null;
         ctx.SSSDiffuseTexture = sssDiffuseHandle ? rgCtx.getTexture<Texture2D>(sssDiffuseHandle) : null;
         ctx.SSSTransmissionTexture = sssTransmissionHandle
           ? rgCtx.getTexture<Texture2D>(sssTransmissionHandle)
@@ -1110,10 +1234,9 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
 
       return {
         sceneColorHandle,
-        sceneColorCopyHandle,
         sceneColorFramebufferHandle,
-        ssrRoughnessHandle,
-        ssrNormalHandle,
+        sceneRoughnessHandle,
+        sceneNormalHandle,
         sssDiffuseHandle,
         sssTransmissionHandle,
         skinSSSHandle
@@ -1124,23 +1247,11 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     // LightPass and CompositeTail can update the version consumed by the tail.
     blackboard.set(FrameResources.SceneColor, lightPassResult.sceneColorHandle);
     // Register the LightPass MRT products so effects can look them up by name.
-    if (lightPassResult.ssrRoughnessHandle) {
-      blackboard.set(FrameResources.SSRRoughness, lightPassResult.ssrRoughnessHandle);
+    if (lightPassResult.sceneRoughnessHandle) {
+      blackboard.set(FrameResources.SceneRoughness, lightPassResult.sceneRoughnessHandle);
     }
-    // SSRNormal has exactly one producer, gated on options.ssr: the LightPass MRT
-    // normal when SSR is on, else the SSSProfile normal. They are created on
-    // mutually exclusive branches (see ssrNormalHandle / sssProfileResult.normalHandle
-    // above), so both being present would mean that invariant was broken upstream
-    // and one write would silently shadow the other.
-    console.assert(
-      !(lightPassResult.ssrNormalHandle && sssProfileResult?.normalHandle),
-      'RenderGraph: both LightPass and SSSProfile produced an SSRNormal handle; ' +
-        'these are meant to be mutually exclusive (gated on options.ssr).'
-    );
-    if (lightPassResult.ssrNormalHandle) {
-      blackboard.set(FrameResources.SSRNormal, lightPassResult.ssrNormalHandle);
-    } else if (sssProfileResult?.normalHandle) {
-      blackboard.set(FrameResources.SSRNormal, sssProfileResult.normalHandle);
+    if (lightPassResult.sceneNormalHandle) {
+      blackboard.set(FrameResources.SceneNormal, lightPassResult.sceneNormalHandle);
     }
     if (lightPassResult.sssDiffuseHandle) {
       blackboard.set(FrameResources.SSSDiffuse, lightPassResult.sssDiffuseHandle);
@@ -1164,21 +1275,13 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
 /** @internal */
 const CompositeTailModule: RenderModule<FrameGraphContext> = {
   type: 'CompositeTail',
-  writes: [
-    FrameResources.SceneColor,
-    FrameResources.SceneColorCopy,
-    FrameResources.SSSProfile,
-    FrameResources.SSSParam,
-    FrameResources.LinearDepth,
-    FrameResources.PresentedColor
-  ],
+  writes: [FrameResources.SceneColor, FrameResources.LinearDepth, FrameResources.PresentedColor],
   enabled: () => true,
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard, options, backbuffer } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'CompositeTail');
-    const hiZHandle = fg.state.hiZHandle;
-    const sssProfileResult = fg.state.sssProfile;
-    const grabResult = fg.state.grab;
+    const hiZHandle = blackboard.get(FrameResources.HiZ);
+    const sceneColorCopyHandle = blackboard.get(FrameResources.SceneColorCopy);
     const lightPassResult = requireBuildState(fg, 'lightPass', 'LightPass', 'CompositeTail');
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     const useFinalFramebufferAsIntermediate = fg.state.useFinalFramebufferAsIntermediate;
@@ -1203,21 +1306,17 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
     if (lightPassResult.sceneColorFramebufferHandle) {
       opaqueChainDeps.push(lightPassResult.sceneColorFramebufferHandle);
     }
-    if (grabResult) {
-      opaqueChainDeps.push(grabResult.copyHandle);
-    }
-    if (sssProfileResult) {
-      opaqueChainDeps.push(sssProfileResult.profileHandle, sssProfileResult.paramHandle);
-      if (sssProfileResult.normalHandle) {
-        opaqueChainDeps.push(sssProfileResult.normalHandle);
-      }
+    if (sceneColorCopyHandle) {
+      opaqueChainDeps.push(sceneColorCopyHandle);
     }
     for (const handle of [
-      lightPassResult.ssrRoughnessHandle,
-      lightPassResult.ssrNormalHandle,
-      lightPassResult.sssDiffuseHandle,
-      lightPassResult.sssTransmissionHandle,
-      lightPassResult.skinSSSHandle
+      blackboard.get(FrameResources.SSSProfile),
+      blackboard.get(FrameResources.SSSParam),
+      blackboard.get(FrameResources.SceneRoughness),
+      blackboard.get(FrameResources.SceneNormal),
+      blackboard.get(FrameResources.SSSDiffuse),
+      blackboard.get(FrameResources.SSSTransmission),
+      blackboard.get(FrameResources.SkinSSS)
     ]) {
       if (handle) {
         opaqueChainDeps.push(handle);
@@ -1252,8 +1351,8 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
       if (lightPassResult.sceneColorFramebufferHandle) {
         builder.read(lightPassResult.sceneColorFramebufferHandle);
       }
-      if (lightPassResult.sceneColorCopyHandle) {
-        builder.read(lightPassResult.sceneColorCopyHandle);
+      if (sceneColorCopyHandle) {
+        builder.read(sceneColorCopyHandle);
       }
       builder.read(opaqueChainResult.color);
       const out = builder.write(opaqueChainResult.color);
@@ -1268,13 +1367,6 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
       return out;
     });
     blackboard.set(FrameResources.SceneColor, sceneColorHandle);
-    if (lightPassResult.sceneColorCopyHandle) {
-      blackboard.set(FrameResources.SceneColorCopy, lightPassResult.sceneColorCopyHandle);
-    }
-    if (sssProfileResult) {
-      blackboard.set(FrameResources.SSSProfile, sssProfileResult.profileHandle);
-      blackboard.set(FrameResources.SSSParam, sssProfileResult.paramHandle);
-    }
 
     // 8. Post effect chains + transmission depth.
     //
@@ -1537,18 +1629,22 @@ function buildForwardPlusGraphInternal(
     state: {
       renderDepthAttachment: null,
       useFinalFramebufferAsIntermediate: false,
-      shadowMaskHandle: null,
       lightHistoryReadBindings: []
     }
   };
+
+  const pipeline = ctx.camera?.renderPipeline ?? getDefaultForwardPlusPipeline();
+  const requirements = ctx.compositor?.collectRequirements(ctx) ?? {};
+  mergeFrameResourceRequirements(requirements, pipeline.collectRequirements(fg));
+  resolveFrameResourceRequirements(ctx, options, requirements);
 
   // Assemble the graph by running the camera's render pipeline (or the shared
   // default). Each module reads its inputs from / publishes its outputs to `fg`.
   // The tail module registers FrameResources.PresentedColor as the graph sink; a
   // downstream module may re-register a newer backbuffer version to take over the
   // final output, so the sink is read from the blackboard (last registration wins).
-  const pipeline = ctx.camera?.renderPipeline ?? getDefaultForwardPlusPipeline();
   pipeline.build(fg);
+  validateProducedFrameResources(blackboard, options, renderQueue);
 
   const presented = blackboard.get(FrameResources.PresentedColor) ?? fg.state.presentedBackbuffer!;
   return { backbuffer: presented, frame };
@@ -1600,11 +1696,11 @@ function renderForwardSSSProfile(
   const savedCommandBufferReuse = ctx.camera.commandBufferReuse;
   const savedProfileTexture = ctx.SSSProfileTexture;
   const savedParamTexture = ctx.SSSParamTexture;
-  const savedNormalTexture = ctx.SSRNormalTexture;
+  const savedNormalTexture = ctx.SceneNormalTexture;
 
   let profileFlags = MaterialVaryingFlags.SSS_STORE_PROFILE;
   if (normalTexture) {
-    profileFlags |= MaterialVaryingFlags.SSS_STORE_NORMAL;
+    profileFlags |= MaterialVaryingFlags.SCENE_STORE_NORMAL;
   }
 
   device.pushDeviceStates();
@@ -1612,15 +1708,15 @@ function renderForwardSSSProfile(
     device.setFramebuffer(profileFramebuffer);
     ctx.SSSProfileTexture = profileTexture;
     ctx.SSSParamTexture = paramTexture;
-    ctx.SSRNormalTexture = normalTexture;
+    ctx.SceneNormalTexture = normalTexture;
     ctx.compositor = null;
     ctx.camera.commandBufferReuse = false;
     ctx.materialFlags =
       (ctx.materialFlags &
         ~(
-          MaterialVaryingFlags.SSR_STORE_ROUGHNESS |
+          MaterialVaryingFlags.SCENE_STORE_ROUGHNESS |
           MaterialVaryingFlags.SSS_STORE_PROFILE |
-          MaterialVaryingFlags.SSS_STORE_NORMAL |
+          MaterialVaryingFlags.SCENE_STORE_NORMAL |
           MaterialVaryingFlags.SSS_STORE_DIFFUSE |
           MaterialVaryingFlags.SSS_STORE_TRANSMISSION |
           MaterialVaryingFlags.SKIN_SSS_STORE
@@ -1645,7 +1741,7 @@ function renderForwardSSSProfile(
     ctx.compositor = savedCompositor;
     ctx.SSSProfileTexture = savedProfileTexture;
     ctx.SSSParamTexture = savedParamTexture;
-    ctx.SSRNormalTexture = savedNormalTexture;
+    ctx.SceneNormalTexture = savedNormalTexture;
     device.popDeviceStates();
     sssRenderQueue.dispose();
   }
@@ -1685,10 +1781,10 @@ function restoreSunLight(frame: FrameState): void {
 
 function cleanupFrame(frame: FrameState): void {
   const { ctx } = frame;
-  ctx.materialFlags &= ~MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+  ctx.materialFlags &= ~MaterialVaryingFlags.SCENE_STORE_ROUGHNESS;
   ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_PROFILE;
   ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_DIFFUSE;
-  ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_NORMAL;
+  ctx.materialFlags &= ~MaterialVaryingFlags.SCENE_STORE_NORMAL;
   ctx.materialFlags &= ~MaterialVaryingFlags.SSS_STORE_TRANSMISSION;
   ctx.materialFlags &= ~MaterialVaryingFlags.SKIN_SSS_STORE;
   releaseIntermediateFramebuffer(frame);
@@ -1994,16 +2090,19 @@ export function renderOpaqueScenePass(
   const depthTex = frame.depthFramebuffer?.getDepthAttachment() as Texture2D;
 
   ctx.materialFlags &= ~(
-    MaterialVaryingFlags.SSR_STORE_ROUGHNESS |
+    MaterialVaryingFlags.SCENE_STORE_ROUGHNESS |
     MaterialVaryingFlags.SSS_STORE_PROFILE |
     MaterialVaryingFlags.SSS_STORE_DIFFUSE |
-    MaterialVaryingFlags.SSS_STORE_NORMAL |
+    MaterialVaryingFlags.SCENE_STORE_NORMAL |
     MaterialVaryingFlags.SSS_STORE_TRANSMISSION |
     MaterialVaryingFlags.SKIN_SSS_STORE
   );
 
-  if (ctx.SSR) {
-    ctx.materialFlags |= MaterialVaryingFlags.SSR_STORE_ROUGHNESS;
+  if (ctx.SceneRoughnessTexture) {
+    ctx.materialFlags |= MaterialVaryingFlags.SCENE_STORE_ROUGHNESS;
+  }
+  if (ctx.SceneNormalTexture) {
+    ctx.materialFlags |= MaterialVaryingFlags.SCENE_STORE_NORMAL;
   }
   if (ctx.SSS) {
     if (ctx.SSSDiffuseTexture) {
@@ -2178,6 +2277,8 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
   let executor: RenderGraphExecutor<Texture2D, FrameBuffer> | null = null;
   let historyManager: HistoryResourceManager<Texture2D> | null = null;
   let historyFrameStarted = false;
+  let motionVectorFramePrepared = false;
+  let motionVectorFrameCommitted = false;
 
   try {
     // Cull scene first (needed to derive options)
@@ -2198,10 +2299,19 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
     const buildResult = buildForwardPlusGraphInternal(graph, ctx, renderQueue, options);
     frame = buildResult.frame;
 
+    if (options.motionVectors) {
+      ctx.camera.prepareMotionVectorFrame(ctx.camera.TAA, ctx.renderWidth, ctx.renderHeight);
+      motionVectorFramePrepared = true;
+    } else {
+      ctx.camera.clearMotionVectorFrame();
+    }
+
     const compiled = graph.compile([buildResult.backbuffer]);
 
     // Use RenderGraphExecutor for automatic resource management
-    executor = new RenderGraphExecutor(_devicePoolAllocator, ctx.renderWidth, ctx.renderHeight);
+    executor = new RenderGraphExecutor(_devicePoolAllocator, ctx.renderWidth, ctx.renderHeight, {
+      textureAffinityCache: getTextureAffinityCache(ctx.camera, device)
+    });
 
     // Register imported backbuffer (if using finalFramebuffer)
     if (ctx.finalFramebuffer) {
@@ -2213,6 +2323,10 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
     executor.execute(compiled);
     historyManager.commitFrame();
     historyFrameStarted = false;
+    if (motionVectorFramePrepared) {
+      ctx.camera.commitMotionVectorFrame();
+      motionVectorFrameCommitted = true;
+    }
   } finally {
     if (historyFrameStarted) {
       historyManager?.discardFrame();
@@ -2223,5 +2337,8 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
       renderQueue?.dispose();
     }
     executor?.reset();
+    if (motionVectorFramePrepared && !motionVectorFrameCommitted) {
+      ctx.camera.clearMotionVectorFrame();
+    }
   }
 }

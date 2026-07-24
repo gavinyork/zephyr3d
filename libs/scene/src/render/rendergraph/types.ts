@@ -1,4 +1,5 @@
 import type { AbstractDevice, TextureFormat, TimestampQueryStatus } from '@zephyr3d/device';
+import type { RGTextureAffinityCache } from './texture_affinity_cache';
 
 // ─── Resource Descriptors ───────────────────────────────────────────────
 
@@ -22,6 +23,11 @@ export type RGSizeMode = 'absolute' | 'backbuffer-relative';
 export interface RGTextureDesc {
   /** Debug label for this resource. */
   label?: string;
+  /**
+   * Stable identity used to prefer the same pooled texture across graph executions.
+   * When omitted, the graph derives one from the declaring pass and resource label.
+   */
+  allocationKey?: string;
   /** Texture format (e.g. 'rgba8unorm', 'r32f', 'rgba16f'). */
   format: TextureFormat;
   /** Sizing mode. Default 'backbuffer-relative'. */
@@ -87,6 +93,8 @@ export class RGResource {
   readonly desc: RGTextureDesc | RGFramebufferDesc | null;
   /** Resource ID of the physical backing resource used by imported versions. */
   readonly physicalId: number;
+  /** Stable identity used for cross-frame transient texture allocation affinity. */
+  readonly allocationKey: string | null;
   /** The pass that creates / writes this resource (null for imported until written). */
   producer: RGPass | null = null;
   /** The pass that superseded this version via write(), or null while latest. */
@@ -99,13 +107,15 @@ export class RGResource {
     name: string,
     kind: RGResourceKind,
     desc: RGTextureDesc | RGFramebufferDesc | null,
-    physicalId = id
+    physicalId = id,
+    allocationKey: string | null = null
   ) {
     this.id = id;
     this.name = name;
     this.kind = kind;
     this.desc = desc;
     this.physicalId = physicalId;
+    this.allocationKey = allocationKey;
   }
 }
 
@@ -209,6 +219,8 @@ export class RGSubpass<T = unknown> {
 export class RGPass<T = unknown> {
   readonly index: number;
   readonly name: string;
+  /** Occurrence of this pass name within the graph, used for stable allocation keys. */
+  readonly nameOccurrence: number;
   /** Resources this pass reads (dependencies). */
   readonly reads: RGResource[] = [];
   /** Resources this pass creates or writes. */
@@ -238,9 +250,10 @@ export class RGPass<T = unknown> {
   /** Set during compilation: true if this pass is needed. */
   alive = true;
 
-  constructor(index: number, name: string) {
+  constructor(index: number, name: string, nameOccurrence = 0) {
     this.index = index;
     this.name = name;
+    this.nameOccurrence = nameOccurrence;
   }
 }
 
@@ -405,11 +418,13 @@ export interface RGProfilingOptions {
  * Render graph executor construction options.
  * @public
  */
-export interface RenderGraphExecutorOptions {
+export interface RenderGraphExecutorOptions<TTexture = unknown> {
   /** Device used for timestamp queries. If omitted, the scene global getDevice() is used. */
   device?: AbstractDevice;
   /** Render graph timestamp profiling options. Default false. */
   profiling?: boolean | RGProfilingOptions;
+  /** Cross-execution affinity state used to stabilize transient texture identities. */
+  textureAffinityCache?: RGTextureAffinityCache<TTexture>;
 }
 
 /**
@@ -516,9 +531,10 @@ export interface RGTextureAllocator<TTexture = unknown, TFramebuffer = unknown> 
    *
    * @param desc - The texture descriptor from the pass builder.
    * @param size - The resolved pixel dimensions.
+   * @param preferred - Previous compatible allocation to reacquire when available.
    * @returns The allocated texture object.
    */
-  allocate(desc: RGTextureDesc, size: RGResolvedSize): TTexture;
+  allocate(desc: RGTextureDesc, size: RGResolvedSize, preferred?: TTexture): TTexture;
 
   /**
    * Release a previously allocated transient texture back to the pool.

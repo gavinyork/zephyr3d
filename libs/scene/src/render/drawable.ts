@@ -57,11 +57,11 @@ export interface DrawContext {
   /** Order-Independent Transparency interface for transparent passes. */
   oit: Nullable<OIT>;
   /** Whether motion vectors are being written this pass (used by TAA/MotionBlur). */
-  readonly motionVectors: boolean;
+  motionVectors: boolean;
   /** Motion vector texture target when motion vectors are active. */
   motionVectorTexture?: Nullable<Texture2D>;
   /** Whether hierarchical depth (Hi-Z) is enabled for the current pass. */
-  readonly HiZ: boolean;
+  HiZ: boolean;
   /** Hi-Z (hierarchical Z) depth texture, when generated. */
   HiZTexture: Nullable<Texture2D>;
   /**
@@ -70,7 +70,7 @@ export interface DrawContext {
    * shaded through the clustered pass sampling a pre-rendered shadow mask, rather
    * than via per-light additive passes.
    */
-  readonly screenSpaceShadowMask: boolean;
+  screenSpaceShadowMask: boolean;
   /**
    * Screen-space shadow mask array, produced by the ShadowMaskPass when
    * {@link DrawContext.screenSpaceShadowMask} is active. Each RGBA8 layer packs
@@ -90,8 +90,10 @@ export interface DrawContext {
   readonly scene: Scene;
   /** The render pass to which this drawing task belongs. */
   renderPass: Nullable<RenderPass>;
-  /** Stable hash for the current pass/draw state, for render bundle or pipeline cache. */
+  /** Resource-aware hash for the current pass/draw state, including runtime texture identities. */
   renderPassHash: Nullable<string>;
+  /** Shader-only variant hash; excludes runtime resource identities when possible. */
+  shaderVariantHash: Nullable<string>;
   /** Whether the output orientation is flipped vertically (e.g., due to framebuffer conventions). */
   flip: boolean;
   /** Whether this is the base lighting pass that draws environment lighting. */
@@ -142,10 +144,10 @@ export interface DrawContext {
   SSS: boolean;
   /** Whether SSR thickness should be computed dynamically in this pass. */
   SSRCalcThickness: boolean;
-  /** SSR roughness input texture. */
-  SSRRoughnessTexture: Nullable<Texture2D>;
-  /** SSR normal input texture (usually view-space or world-space normals). */
-  SSRNormalTexture: Nullable<Texture2D>;
+  /** Per-pixel perceptual roughness and reflection data for opaque scene surfaces. */
+  SceneRoughnessTexture: Nullable<Texture2D>;
+  /** Encoded world-space normal for opaque scene surfaces. */
+  SceneNormalTexture: Nullable<Texture2D>;
   /** SSS profile texture (rgb = scatter strength, a = transmission mask). */
   SSSProfileTexture: Nullable<Texture2D>;
   /** SSS param texture (r = normalized profile slot, g = blur width). */

@@ -14,6 +14,7 @@ import type {
   RGPass
 } from './types';
 import { RGHandle } from './types';
+import type { RGTextureAffinityCache, RGTextureAffinityEntry } from './texture_affinity_cache';
 import type { AbstractDevice, TimestampQueryResult, TimestampQueryStatus } from '@zephyr3d/device';
 import { getDevice } from '../../app/api';
 
@@ -106,12 +107,14 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   private _latestProfileResult: RGProfileResult | null = null;
   /** @internal */
   private _latestResolvedProfileSerial = 0;
+  /** @internal */
+  private _textureAffinityCache: RGTextureAffinityCache<TTexture> | null;
 
   constructor(
     allocator: RGTextureAllocator<TTexture, TFramebuffer>,
     backbufferWidth: number,
     backbufferHeight: number,
-    options?: RenderGraphExecutorOptions
+    options?: RenderGraphExecutorOptions<TTexture>
   ) {
     this._allocator = allocator;
     this._backbufferWidth = backbufferWidth;
@@ -120,6 +123,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
       options?.profiling ?? RenderGraphExecutor._defaultProfilingOptions,
       options?.device
     );
+    this._textureAffinityCache = options?.textureAffinityCache ?? null;
   }
 
   /**
@@ -202,6 +206,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     this._cleanupCallbacks.length = 0;
     this._resolveImportedTextureAliases(compiled);
     const profileFrame = this._beginProfileFrame();
+    const affinityEntries = new Map<string, RGTextureAffinityEntry<TTexture>>();
 
     // Build per-pass allocation and release schedules
     const allocateAt = new Map<number, number[]>(); // passIndex -> transient texture resourceIds to allocate
@@ -214,7 +219,10 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     // physicalId so one texture is allocated at the first use of any version
     // and released after the last use of any version.
     this._transientTextureAliases.clear();
-    const transientSchedules = new Map<number, { firstUse: number; lastUse: number; desc: RGTextureDesc }>();
+    const transientSchedules = new Map<
+      number,
+      { firstUse: number; lastUse: number; desc: RGTextureDesc; allocationKey: string | null }
+    >();
     for (const [resId, lifetime] of compiled.lifetimes) {
       if (lifetime.resource.kind === 'transient') {
         const physicalId = lifetime.resource.physicalId;
@@ -227,7 +235,8 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
           transientSchedules.set(physicalId, {
             firstUse: lifetime.firstUse,
             lastUse: lifetime.lastUse,
-            desc: lifetime.resource.desc as RGTextureDesc
+            desc: lifetime.resource.desc as RGTextureDesc,
+            allocationKey: lifetime.resource.allocationKey
           });
         }
       } else if (lifetime.resource.kind === 'framebuffer') {
@@ -266,8 +275,15 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
           for (const resId of toAllocate) {
             const schedule = transientSchedules.get(resId)!;
             const size = this._resolveSize(schedule.desc);
-            const texture = this._allocator.allocate(schedule.desc, size);
+            const descriptorSignature = this._getTextureDescriptorSignature(schedule.desc, size);
+            const preferred = schedule.allocationKey
+              ? this._textureAffinityCache?.getPreferredTexture(schedule.allocationKey, descriptorSignature)
+              : undefined;
+            const texture = this._allocator.allocate(schedule.desc, size, preferred);
             this._allocatedTextures.set(resId, texture);
+            if (schedule.allocationKey) {
+              affinityEntries.set(schedule.allocationKey, { texture, descriptorSignature });
+            }
           }
         }
 
@@ -371,6 +387,9 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
             cleanupError ??= e;
           }
         }
+      }
+      if (completed && !executionError && !cleanupError) {
+        this._textureAffinityCache?.replace(affinityEntries);
       }
       if (executionError) {
         throw executionError;
@@ -684,6 +703,17 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
       width: Math.max(1, Math.floor(this._backbufferWidth * scaleX)),
       height: Math.max(1, Math.floor(this._backbufferHeight * scaleY))
     };
+  }
+
+  /** @internal */
+  private _getTextureDescriptorSignature(desc: RGTextureDesc, size: RGResolvedSize): string {
+    return JSON.stringify([
+      desc.format,
+      size.width,
+      size.height,
+      desc.mipLevels ?? 1,
+      desc.arrayLayers ?? null
+    ]);
   }
 
   /** @internal */

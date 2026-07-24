@@ -14,10 +14,10 @@ import type { RGExecuteContext } from './types';
 // off before rendering to avoid materials writing into attachments that do not
 // exist on the user-provided target.
 const SURFACE_MRT_FLAGS =
-  MaterialVaryingFlags.SSR_STORE_ROUGHNESS |
+  MaterialVaryingFlags.SCENE_STORE_ROUGHNESS |
   MaterialVaryingFlags.SSS_STORE_PROFILE |
   MaterialVaryingFlags.SSS_STORE_DIFFUSE |
-  MaterialVaryingFlags.SSS_STORE_NORMAL |
+  MaterialVaryingFlags.SCENE_STORE_NORMAL |
   MaterialVaryingFlags.SSS_STORE_TRANSMISSION |
   MaterialVaryingFlags.SKIN_SSS_STORE;
 

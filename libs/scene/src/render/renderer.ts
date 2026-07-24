@@ -69,6 +69,7 @@ export class SceneRenderer {
           lightBlending: false,
           renderPass: null,
           renderPassHash: null,
+          shaderVariantHash: null,
           flip: false,
           depthFormat,
           colorFormat,
@@ -81,10 +82,10 @@ export class SceneRenderer {
           SSR,
           SSS,
           SSRCalcThickness: SSR && camera.ssrCalcThickness,
-          // SSR roughness/normal MRT textures are render graph resources
+          // Surface roughness/normal MRT textures are render graph resources
           // created by the LightPass; resolved into these fields at execution.
-          SSRRoughnessTexture: null,
-          SSRNormalTexture: null,
+          SceneRoughnessTexture: null,
+          SceneNormalTexture: null,
           SSSProfileTexture: null,
           SSSParamTexture: null,
           SSSDiffuseTexture: null,

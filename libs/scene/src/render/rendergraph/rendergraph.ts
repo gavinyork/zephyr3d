@@ -87,7 +87,13 @@ export class RenderGraph {
    * @param setup - Setup callback that declares resources and sets the execute function.
    */
   addPass<T = void>(name: string, setup: (builder: RGPassBuilder) => T): T {
-    const pass = new RGPass(this._passes.length, name);
+    let nameOccurrence = 0;
+    for (const existing of this._passes) {
+      if (existing.name === name) {
+        nameOccurrence++;
+      }
+    }
+    const pass = new RGPass(this._passes.length, name, nameOccurrence);
     const builder = this._createBuilder(pass);
     const initialResourceIds = new Set(this._resources.keys());
     try {
@@ -153,6 +159,7 @@ export class RenderGraph {
     const ordered = this._topologicalSort();
     // 3. Resource lifetime analysis
     const lifetimes = this._analyzeLifetimes(ordered);
+    this._validateAllocationKeys(lifetimes);
 
     this._compiled = { orderedPasses: ordered, lifetimes };
     return this._compiled;
@@ -233,6 +240,7 @@ export class RenderGraph {
   /** @internal */
   private _createBuilder(pass: RGPass): RGPassBuilder {
     const graph = this;
+    const textureLabelOccurrences = new Map<string, number>();
     return {
       read(handle: RGHandle): void {
         const res = graph._resources.get(handle._id);
@@ -293,7 +301,14 @@ export class RenderGraph {
         }
         const id = graph._nextResourceId++;
         const versionName = `${res.name}@${pass.name}`;
-        const version = new RGResource(id, versionName, res.kind, res.desc, res.physicalId);
+        const version = new RGResource(
+          id,
+          versionName,
+          res.kind,
+          res.desc,
+          res.physicalId,
+          res.allocationKey
+        );
         version.producer = pass;
         // Record the FIRST overwriting pass only: forked writes are serialized
         // by the WAW edge above, so stale readers ordered before the first
@@ -309,9 +324,18 @@ export class RenderGraph {
         return new RGHandle(id, versionName);
       },
       createTexture(desc: RGTextureDesc): RGHandle {
+        if (desc.allocationKey !== undefined && desc.allocationKey.length === 0) {
+          throw new Error(`RenderGraph: pass "${pass.name}" specified an empty texture allocationKey.`);
+        }
         const id = graph._nextResourceId++;
         const name = desc.label ?? `_tex_${id}`;
-        const res = new RGResource(id, name, 'transient', desc);
+        const labelKey = desc.label ?? '<unnamed>';
+        const labelOccurrence = textureLabelOccurrences.get(labelKey) ?? 0;
+        textureLabelOccurrences.set(labelKey, labelOccurrence + 1);
+        const allocationKey =
+          desc.allocationKey ??
+          `rg:${JSON.stringify([pass.name, pass.nameOccurrence, desc.label ?? null, labelOccurrence])}`;
+        const res = new RGResource(id, name, 'transient', desc, id, allocationKey);
         res.producer = pass;
         graph._resources.set(id, res);
         graph._lastWriterByPhysicalId.set(res.physicalId, pass);
@@ -360,6 +384,25 @@ export class RenderGraph {
         pass.executeFn = fn as RGExecuteFn<unknown>;
       }
     };
+  }
+
+  /** @internal */
+  private _validateAllocationKeys(lifetimes: ReadonlyMap<number, RGResourceLifetime>): void {
+    const physicalByKey = new Map<string, number>();
+    for (const lifetime of lifetimes.values()) {
+      const resource = lifetime.resource;
+      if (resource.kind !== 'transient' || !resource.allocationKey) {
+        continue;
+      }
+      const existingPhysicalId = physicalByKey.get(resource.allocationKey);
+      if (existingPhysicalId !== undefined && existingPhysicalId !== resource.physicalId) {
+        throw new Error(
+          `RenderGraph: transient allocationKey "${resource.allocationKey}" is used by multiple resources. ` +
+            'Use a unique allocationKey for each logical texture.'
+        );
+      }
+      physicalByKey.set(resource.allocationKey, resource.physicalId);
+    }
   }
 
   // ─── Private: Dead Pass Culling ─────────────────────────────────────

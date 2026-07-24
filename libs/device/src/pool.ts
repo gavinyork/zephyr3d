@@ -76,6 +76,7 @@ export class Pool {
    * @param width - The width of the texture.
    * @param height - The height of the texture.
    * @param mipmapping - Whether this texture support mipmapping
+   * @param preferred - A previously released matching texture to reacquire when available.
    * @returns The fetched Texture2D object.
    */
   fetchTemporalTexture2D(
@@ -83,7 +84,8 @@ export class Pool {
     format: TextureFormat,
     width: number,
     height: number,
-    mipmapping = false
+    mipmapping = false,
+    preferred?: Texture2D
   ) {
     const hash = `2d:${format}:${width}:${height}:${mipmapping ? 1 : 0}`;
     let texture: Nullable<BaseTexture> = null;
@@ -95,7 +97,8 @@ export class Pool {
       }
       this._memCost += texture.memCost;
     } else {
-      texture = list.pop()!;
+      const preferredIndex = preferred ? list.indexOf(preferred) : -1;
+      texture = preferredIndex >= 0 ? list.splice(preferredIndex, 1)[0] : list.pop()!;
       if (list.length === 0) {
         delete this._freeTextures[hash];
       }
@@ -114,6 +117,7 @@ export class Pool {
    * @param height - Height of the texture.
    * @param numLayers - Layer count of the texture
    * @param mipmapping - Whether this texture support mipmapping
+   * @param preferred - A previously released matching texture to reacquire when available.
    * @returns The fetched Texture2DArray object.
    */
   fetchTemporalTexture2DArray(
@@ -122,7 +126,8 @@ export class Pool {
     width: number,
     height: number,
     numLayers: number,
-    mipmapping = false
+    mipmapping = false,
+    preferred?: Texture2DArray
   ) {
     const hash = `2darray:${format}:${width}:${height}:${numLayers}:${mipmapping ? 1 : 0}`;
     let texture: Nullable<BaseTexture> = null;
@@ -134,7 +139,8 @@ export class Pool {
       }
       this._memCost += texture.memCost;
     } else {
-      texture = list.pop()!;
+      const preferredIndex = preferred ? list.indexOf(preferred) : -1;
+      texture = preferredIndex >= 0 ? list.splice(preferredIndex, 1)[0] : list.pop()!;
       if (list.length === 0) {
         delete this._freeTextures[hash];
       }

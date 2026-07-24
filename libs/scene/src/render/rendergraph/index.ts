@@ -19,10 +19,15 @@ export {
 } from './types';
 export { RenderGraph } from './rendergraph';
 export { RenderGraphExecutor } from './executor';
+export { RGTextureAffinityCache } from './texture_affinity_cache';
 export { DevicePoolAllocator } from './device_pool_allocator';
 export { HistoryResourceManager } from './history_resource_manager';
 export { RGHistoryResources } from './history_resources';
 export { RGBlackboard, FrameResources } from './blackboard';
+export {
+  mergeFrameResourceRequirements,
+  type FrameResourceRequirements
+} from './frame_resource_requirements';
 export { OrderingScope, type RenderContext } from './render_context';
 export type { ForwardPlusModuleContext, RenderModuleContext } from './frame_graph_context';
 export type { RenderModule } from './render_module';

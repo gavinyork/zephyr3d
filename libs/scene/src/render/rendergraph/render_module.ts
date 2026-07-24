@@ -1,4 +1,5 @@
 import type { RenderContext } from './render_context';
+import type { FrameResourceRequirements } from './frame_resource_requirements';
 
 /**
  * A self-describing unit of a {@link ./render_pipeline#RenderPipeline}.
@@ -59,6 +60,15 @@ export interface RenderModule<TCtx extends RenderContext = RenderContext> {
    * resource here does not by itself change this module's own position.
    */
   readonly writes?: readonly string[];
+
+  /**
+   * Declare semantic frame resources this module needs the pipeline to produce.
+   * This preflight hook runs before any module setup and before the blackboard is
+   * populated. It must be pure and may only inspect frame/camera/queue state.
+   * The hook is called even when `enabled()` will later return false, so it must
+   * return an empty object when the module will not participate in this frame.
+   */
+  requirements?(context: TCtx): FrameResourceRequirements;
 
   /**
    * Whether this module contributes to the current frame. Derived from

@@ -112,6 +112,10 @@ export class SSS extends AbstractPostEffect {
     return true;
   }
 
+  requireSceneNormalTexture() {
+    return true;
+  }
+
   requireShadowMask(ctx: DrawContext) {
     // Runs at graph-build time, before shadowMapInfo is populated (that happens
     // during the ShadowMaps pass execute), so it cannot inspect the combine
@@ -219,8 +223,8 @@ export class SSS extends AbstractPostEffect {
     sssSettings: Readonly<SSSResolvedSettings>
   ) {
     const device = ctx.device;
-    const sssNormalTexture = ctx.SSRNormalTexture ?? ctx.SSSParamTexture!;
-    const hasNormalTexture = !!ctx.SSRNormalTexture;
+    const sssNormalTexture = ctx.SceneNormalTexture ?? ctx.SSSParamTexture!;
+    const hasNormalTexture = !!ctx.SceneNormalTexture;
     const key = `${horizontal ? 'h' : 'v'}:${kernelRadius}`;
     let program = SSS._blurPrograms[key];
     if (!program) {
@@ -261,10 +265,10 @@ export class SSS extends AbstractPostEffect {
     srgbOutput: boolean
   ) {
     const device = ctx.device;
-    const sssRoughnessTexture = ctx.SSRRoughnessTexture ?? ctx.SSSParamTexture!;
-    const sssNormalTexture = ctx.SSRNormalTexture ?? ctx.SSSParamTexture!;
-    const hasRoughnessTexture = !!ctx.SSRRoughnessTexture;
-    const hasNormalTexture = !!ctx.SSRNormalTexture;
+    const sssRoughnessTexture = ctx.SceneRoughnessTexture ?? ctx.SSSParamTexture!;
+    const sssNormalTexture = ctx.SceneNormalTexture ?? ctx.SSSParamTexture!;
+    const hasRoughnessTexture = !!ctx.SceneRoughnessTexture;
+    const hasNormalTexture = !!ctx.SceneNormalTexture;
     const shadowLight = this.getCombineShadowLight(ctx);
     const programKey = this.getCombineProgramKey(ctx, shadowLight);
     let program = SSS._combinePrograms[programKey];

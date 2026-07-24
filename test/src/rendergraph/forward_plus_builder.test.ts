@@ -28,14 +28,20 @@ function getMockTextureFormatSize(format: string): number {
 }
 
 function createMockDrawContext(overrides: Record<string, unknown> = {}) {
-  const { camera: cameraOverrides, ...restOverrides } = overrides as {
+  const {
+    camera: cameraOverrides,
+    device: deviceOverrides,
+    ...restOverrides
+  } = overrides as {
     camera?: Record<string, unknown>;
+    device?: Record<string, unknown>;
   } & Record<string, unknown>;
   return {
     device: {
       type: 'webgpu',
       getDeviceCaps: () => ({
         framebufferCaps: {
+          maxDrawBuffers: 8,
           maxColorAttachmentBytesPerSample: 32,
           supportPerTargetBlending: true
         },
@@ -45,7 +51,8 @@ function createMockDrawContext(overrides: Record<string, unknown> = {}) {
             size: getMockTextureFormatSize(format)
           })
         }
-      })
+      }),
+      ...deviceOverrides
     },
     SSRCalcThickness: false,
     depthFormat: 'd24s8',
@@ -80,6 +87,9 @@ function createOptions(overrides: Partial<ForwardPlusOptions> = {}): ForwardPlus
     depthPrepass: true,
     motionVectors: false,
     hiZ: false,
+    sceneNormal: false,
+    sceneRoughness: false,
+    shadowMask: false,
     ssr: false,
     ssrCalcThickness: false,
     gpuPicking: false,
@@ -419,7 +429,9 @@ describe('Forward+ render graph builder', () => {
   });
 
   test('inserts SSSProfile before LightPass and declares SSS MRT resources when enabled', () => {
-    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions({ sss: true }));
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions({ sss: true, sceneNormal: true })
+    );
     const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
     const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');
 
@@ -427,7 +439,7 @@ describe('Forward+ render graph builder', () => {
     expect(passNames).toContain('LightPass');
     expect(passNames.indexOf('SSSProfile')).toBeLessThan(passNames.indexOf('LightPass'));
     expect(lightPass?.reads.map((resource) => resource.name)).toEqual(
-      expect.arrayContaining(['sssProfile', 'sssParam', 'sssNormal'])
+      expect.arrayContaining(['sssProfile', 'sssParam'])
     );
     expect(lightPass?.writes.map((resource) => resource.name)).toEqual(
       expect.arrayContaining(['sssDiffuse', 'sssTransmission'])
@@ -451,14 +463,16 @@ describe('Forward+ render graph builder', () => {
       createOptions({
         sss: true,
         ssr: true,
+        sceneNormal: true,
+        sceneRoughness: true,
         needSceneColor: true,
         needSceneColorWithDepth: true
       }),
       {},
       {
         colorFormat: 'rgba16f',
-        SSRRoughnessTexture: { format: 'rgba16f' },
-        SSRNormalTexture: { format: 'rgba16f' }
+        SceneRoughnessTexture: { format: 'rgba16f' },
+        SceneNormalTexture: { format: 'rgba16f' }
       }
     );
     const lightPassWrites = graph.passes
@@ -955,7 +969,7 @@ describe('SSR native multi-pass setup (P3-S3)', () => {
     const compositor = new Compositor();
     compositor.appendPostEffect(new SSR());
     return buildForwardPlusGraphForTest(
-      createOptions({ ssr: true }),
+      createOptions({ ssr: true, sceneNormal: true, sceneRoughness: true }),
       {},
       {
         compositor,
@@ -986,17 +1000,17 @@ describe('SSR native multi-pass setup (P3-S3)', () => {
     expect(passNames).not.toContain('SSR:Temporal');
   });
 
-  test('SSR roughness/normal MRT outputs are graph textures owned by LightPass (P3-S4)', () => {
+  test('scene roughness/normal MRT outputs are graph textures owned by LightPass (P3-S4)', () => {
     const { graph, backbuffer } = buildWithSSR({});
     graph.compile([backbuffer]);
     const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');
 
-    expect(lightPass?.writes.some((res) => res.name === 'ssrRoughness')).toBe(true);
-    expect(lightPass?.writes.some((res) => res.name === 'ssrNormal')).toBe(true);
+    expect(lightPass?.writes.some((res) => res.name === 'sceneRoughness')).toBe(true);
+    expect(lightPass?.writes.some((res) => res.name === 'sceneNormal')).toBe(true);
     // Effect passes must read them so lifetimes cover the whole opaque chain
     const intersectPass = graph.passes.find((pass) => pass.name === 'SSR:Intersect');
-    expect(intersectPass?.reads.some((res) => res.name === 'ssrRoughness')).toBe(true);
-    expect(intersectPass?.reads.some((res) => res.name === 'ssrNormal')).toBe(true);
+    expect(intersectPass?.reads.some((res) => res.name === 'sceneRoughness')).toBe(true);
+    expect(intersectPass?.reads.some((res) => res.name === 'sceneNormal')).toBe(true);
   });
 
   test('inserts the bilateral blur pass when enabled', () => {
@@ -1244,6 +1258,78 @@ describe('Forward+ pipeline customization', () => {
     expect(names).toContain('LightPass');
   });
 
+  test('collects a module requirement before setup and produces only the requested surface MRT', () => {
+    const customModule: RenderModule = {
+      type: 'NormalConsumer',
+      requirements: () => ({ sceneNormal: true }),
+      enabled: () => true,
+      setup(context) {
+        context.graph.addPass('NormalConsumerPass', (builder) => {
+          builder.read(context.blackboard.expect(FrameResources.SceneNormal));
+          builder.sideEffect();
+        });
+      }
+    };
+    const pipeline = createForwardPlusPipeline().insertAfter('LightPass', customModule);
+    const graph = new RenderGraph();
+    buildForwardPlusGraph(
+      graph,
+      createMockDrawContext({ camera: { renderPipeline: pipeline } }),
+      createMockRenderQueue({ needSceneColor: false }),
+      createOptions()
+    );
+    const lightPassWrites = graph.passes
+      .find((pass) => pass.name === 'LightPass')
+      ?.writes.map((resource) => resource.name);
+
+    expect(lightPassWrites).toContain('sceneNormal');
+    expect(lightPassWrites).not.toContain('sceneRoughness');
+    expect(graph.passes.find((pass) => pass.name === 'NormalConsumerPass')?.reads[0]?.name).toBe(
+      'sceneNormal'
+    );
+  });
+
+  test('LightPass consumes the latest ShadowMask version published through the blackboard', () => {
+    const replacement: RenderModule = {
+      type: 'ShadowMaskReplacement',
+      enabled: () => true,
+      setup(context) {
+        const replacementMask = context.graph.addPass('ShadowMaskReplacementPass', (builder) =>
+          builder.createTexture({ format: 'rgba8unorm', label: 'replacementShadowMask', arrayLayers: 1 })
+        );
+        context.blackboard.set(FrameResources.ShadowMask, replacementMask);
+      }
+    };
+    const pipeline = createForwardPlusPipeline().insertBefore('LightPass', replacement);
+    const graph = new RenderGraph();
+    buildForwardPlusGraph(
+      graph,
+      createMockDrawContext({ camera: { renderPipeline: pipeline } }),
+      createMockRenderQueue({ needSceneColor: false, shadowedLights: [{}] }),
+      createOptions({ shadowMask: true })
+    );
+    const lightPassReads = graph.passes
+      .find((pass) => pass.name === 'LightPass')
+      ?.reads.map((resource) => resource.name);
+
+    expect(lightPassReads).toContain('replacementShadowMask');
+    expect(lightPassReads).not.toContain('shadowMask');
+  });
+
+  test('pre-light scene passes read ShadowMask before rendering shaded scene copies', () => {
+    const { graph } = buildForwardPlusGraphForTest(
+      createOptions({ shadowMask: true, needSceneColor: true, sss: true, sceneNormal: true }),
+      { needSceneColor: true, shadowedLights: [{}] }
+    );
+
+    for (const passName of ['SceneColorGrab', 'SSSProfile']) {
+      const reads = graph.passes
+        .find((pass) => pass.name === passName)
+        ?.reads.map((resource) => resource.name);
+      expect(reads).toContain('shadowMask');
+    }
+  });
+
   test('CompositeTail consumes a SceneColor version written after LightPass', () => {
     const customModule: RenderModule = {
       type: 'SceneColorOverride',
@@ -1271,5 +1357,115 @@ describe('Forward+ pipeline customization', () => {
     expect(names).not.toContain('SkyUpdate');
     expect(names).toContain('LightPass');
     expect(names).toContain('Blit');
+  });
+});
+
+describe('Forward+ frame-resource requirements', () => {
+  class ResourceConsumer extends AbstractPostEffect {
+    requireMotionVectorTexture() {
+      return true;
+    }
+    requireHiZTexture() {
+      return true;
+    }
+    requireSceneNormalTexture() {
+      return true;
+    }
+    requireSceneRoughnessTexture() {
+      return true;
+    }
+  }
+
+  function buildWithEffect(
+    effect: AbstractPostEffect,
+    options: ForwardPlusOptions = createOptions(),
+    drawContextOverrides: Record<string, unknown> = {}
+  ) {
+    const compositor = new Compositor();
+    compositor.appendPostEffect(effect);
+    return buildForwardPlusGraphForTest(options, {}, { compositor, ...drawContextOverrides });
+  }
+
+  test('enabled effects automatically produce their declared frame resources', () => {
+    const { graph, backbuffer } = buildWithEffect(new ResourceConsumer());
+    const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');
+    const depthPass = graph.passes.find((pass) => pass.name === 'DepthPrepass');
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(depthPass?.subpasses.map((subpass) => subpass.name)).toContain('SkyMotionVectors');
+    expect(passNames).toContain('HiZ');
+    expect(lightPass?.writes.map((resource) => resource.name)).toEqual(
+      expect.arrayContaining(['sceneNormal', 'sceneRoughness'])
+    );
+  });
+
+  test('reports an unavailable backend resource during graph build', () => {
+    expect(() =>
+      buildWithEffect(
+        new (class extends AbstractPostEffect {
+          requireHiZTexture() {
+            return true;
+          }
+        })(),
+        createOptions(),
+        { device: { type: 'webgl' } }
+      )
+    ).toThrow(/HiZ was requested/);
+  });
+
+  test('validates unsupported resources enabled directly through pipeline options', () => {
+    expect(() =>
+      buildForwardPlusGraphForTest(
+        createOptions({ motionVectors: true }),
+        {},
+        {
+          device: { type: 'webgl' }
+        }
+      )
+    ).toThrow(/MotionVector was requested/);
+  });
+
+  test('reports a missing producer when a required module is removed', () => {
+    const pipeline = createForwardPlusPipeline().remove('HiZ');
+    const effect = new (class extends AbstractPostEffect {
+      requireHiZTexture() {
+        return true;
+      }
+    })();
+    expect(() =>
+      buildForwardPlusGraph(
+        new RenderGraph(),
+        createMockDrawContext({
+          compositor: (() => {
+            const compositor = new Compositor();
+            compositor.appendPostEffect(effect);
+            return compositor;
+          })(),
+          camera: { renderPipeline: pipeline }
+        }),
+        createMockRenderQueue({ needSceneColor: false }),
+        createOptions()
+      )
+    ).toThrow(/frame resource "hiZ"/);
+  });
+
+  test('reports a missing shadow-mask producer when shadowed lights need it', () => {
+    const pipeline = createForwardPlusPipeline().remove('ShadowMaskPass');
+    const effect = new (class extends AbstractPostEffect {
+      requireShadowMask() {
+        return true;
+      }
+    })();
+    const compositor = new Compositor();
+    compositor.appendPostEffect(effect);
+
+    expect(() =>
+      buildForwardPlusGraph(
+        new RenderGraph(),
+        createMockDrawContext({ compositor, camera: { renderPipeline: pipeline } }),
+        createMockRenderQueue({ needSceneColor: false, shadowedLights: [{}] }),
+        createOptions()
+      )
+    ).toThrow(/frame resource "shadowMask"/);
   });
 });

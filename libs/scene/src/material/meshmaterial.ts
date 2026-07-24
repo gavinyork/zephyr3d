@@ -1006,13 +1006,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           that.drawContext.oit.setupFragmentOutput(this);
         } else {
           this.$outputs.zFragmentOutput = pb.vec4();
-          if (ctx.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
+          if (ctx.materialFlags & MaterialVaryingFlags.SCENE_STORE_ROUGHNESS) {
             this.$outputs.zSSRRoughness = pb.vec4();
           }
-          if (
-            ctx.materialFlags &
-            (MaterialVaryingFlags.SSR_STORE_ROUGHNESS | MaterialVaryingFlags.SSS_STORE_NORMAL)
-          ) {
+          if (ctx.materialFlags & MaterialVaryingFlags.SCENE_STORE_NORMAL) {
             this.$outputs.zSSRNormal = pb.vec4();
           }
           if (ctx.materialFlags & MaterialVaryingFlags.SSS_STORE_PROFILE) {
@@ -1266,7 +1263,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     } else {
       pb.getGlobalScope()[funcName](worldPos);
     }
-    if (that.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
+    const writeSceneRoughness = !!(
+      that.drawContext.materialFlags & MaterialVaryingFlags.SCENE_STORE_ROUGHNESS
+    );
+    const writeSceneNormal = !!(that.drawContext.materialFlags & MaterialVaryingFlags.SCENE_STORE_NORMAL);
+    if (writeSceneRoughness || writeSceneNormal) {
       // Transparent/blended passes (and materials that depend on scene color like transmission)
       // do not have a stable depth match for SSR, so force-disable SSR contribution on those pixels.
       const disableSSR =
@@ -1275,28 +1276,24 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       const disableSceneColorSSR =
         that.needSceneColor() && that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT;
       if (disableSSR || disableSceneColorSSR) {
-        scope.$outputs.zSSRRoughness = pb.vec4(0, 0, 0, 1);
-        scope.$outputs.zSSRNormal = pb.vec4(0);
+        if (writeSceneRoughness) {
+          scope.$outputs.zSSRRoughness = pb.vec4(0, 0, 0, 1);
+        }
+        if (writeSceneNormal) {
+          scope.$outputs.zSSRNormal = pb.vec4(0);
+        }
       } else {
-        scope.$outputs.zSSRRoughness = ssrRoughness ?? pb.vec4(1, 1, 0, 1);
-        scope.$outputs.zSSRNormal = ssrNormal
-          ? ssrNormal
-          : scope.$inputs.wNorm
-            ? pb.vec4(pb.add(pb.mul(pb.normalize(scope.$inputs.wNorm), 0.5), pb.vec3(0.5)), 1)
-            : pb.vec4(0.5, 0.5, 1, 1);
+        if (writeSceneRoughness) {
+          scope.$outputs.zSSRRoughness = ssrRoughness ?? pb.vec4(1, 1, 0, 1);
+        }
+        if (writeSceneNormal) {
+          scope.$outputs.zSSRNormal = ssrNormal
+            ? ssrNormal
+            : scope.$inputs.wNorm
+              ? pb.vec4(pb.add(pb.mul(pb.normalize(scope.$inputs.wNorm), 0.5), pb.vec3(0.5)), 1)
+              : pb.vec4(0.5, 0.5, 1, 1);
+        }
       }
-    } else if (that.drawContext.materialFlags & MaterialVaryingFlags.SSS_STORE_NORMAL) {
-      const disableNormal =
-        that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT &&
-        ((that.isTransparentPass(that.pass, that.drawContext) && !that.alphaToCoverage) ||
-          that.needSceneColor());
-      scope.$outputs.zSSRNormal = disableNormal
-        ? pb.vec4(0)
-        : ssrNormal
-          ? ssrNormal
-          : scope.$inputs.wNorm
-            ? pb.vec4(pb.add(pb.mul(pb.normalize(scope.$inputs.wNorm), 0.5), pb.vec3(0.5)), 1)
-            : pb.vec4(0.5, 0.5, 1, 1);
     }
     if (that.drawContext.materialFlags & MaterialVaryingFlags.SSS_STORE_PROFILE) {
       const disableSSS =

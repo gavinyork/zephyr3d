@@ -350,8 +350,12 @@ export class ClusteredLight {
     this._lightIndexFramebuffer?.dispose();
     this._lightIndexFramebuffer = device.createFrameBuffer([this._lightIndexTexture], null);
   }
-  calculateLightIndex(camera: Camera, renderQueue: RenderQueue) {
-    const numLights = this.getVisibleLights(renderQueue, this._lights, camera.screenSpaceShadowMask);
+  calculateLightIndex(
+    camera: Camera,
+    renderQueue: RenderQueue,
+    screenSpaceShadowMask = camera.screenSpaceShadowMask
+  ) {
+    const numLights = this.getVisibleLights(renderQueue, this._lights, screenSpaceShadowMask);
     const device = getDevice();
     if (!this._lightIndexTexture) {
       this.createLightIndexTexture(device);

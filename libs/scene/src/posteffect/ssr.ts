@@ -57,6 +57,18 @@ export class SSR extends AbstractPostEffect {
   requireMotionVectorTexture(ctx: DrawContext) {
     return !!ctx.camera.ssrTemporal;
   }
+  /** {@inheritDoc AbstractPostEffect.requireHiZTexture} */
+  requireHiZTexture(ctx: DrawContext) {
+    return !!ctx.camera.HiZ;
+  }
+  /** {@inheritDoc AbstractPostEffect.requireSceneNormalTexture} */
+  requireSceneNormalTexture() {
+    return true;
+  }
+  /** {@inheritDoc AbstractPostEffect.requireSceneRoughnessTexture} */
+  requireSceneRoughnessTexture() {
+    return true;
+  }
   /**
    * Declares SSR's internal steps (intersect, resolve, optional bilateral
    * blur, optional temporal resolve, combine) as individual render graph
@@ -360,7 +372,7 @@ export class SSR extends AbstractPostEffect {
       program = this._createCombineProgrm(ctx);
       SSR._combineProgram = program;
     }
-    const roughnessTexture = ctx.SSRRoughnessTexture!;
+    const roughnessTexture = ctx.SceneRoughnessTexture!;
     if (!this._combineBindGroup) {
       this._combineBindGroup = device.createBindGroup(program!.bindGroupLayouts[0]);
     }
@@ -371,7 +383,7 @@ export class SSR extends AbstractPostEffect {
     this._combineBindGroup.setTexture('roughnessTex', roughnessTexture, linearSampler);
     this._combineBindGroup.setTexture('albedoTex', inputColorTexture, linearSampler);
     this._combineBindGroup.setTexture('extraTex', inputColorTexture, nearestSampler);
-    this._combineBindGroup.setTexture('normalTex', ctx.SSRNormalTexture!, nearestSampler);
+    this._combineBindGroup.setTexture('normalTex', ctx.SceneNormalTexture!, nearestSampler);
     this._combineBindGroup.setTexture('depthTex', ctx.linearDepthTexture!, nearestSampler);
     this._combineBindGroup.setTexture('zGGXLut', getGGXLUT(1024), fetchSampler('clamp_nearest_nomip'));
     this._combineBindGroup.setValue('ssrMaxRoughness', ctx.camera.ssrMaxRoughness);
@@ -419,8 +431,8 @@ export class SSR extends AbstractPostEffect {
     }
     const nearestSampler = fetchSampler('clamp_nearest');
     const linearSampler = fetchSampler('clamp_linear');
-    const roughnessTexture = ctx.SSRRoughnessTexture!;
-    const normalTexture = ctx.SSRNormalTexture!;
+    const roughnessTexture = ctx.SceneRoughnessTexture!;
+    const normalTexture = ctx.SceneNormalTexture!;
     bindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
     bindGroup.setTexture('intersectTex', intersectTexture, nearestSampler);
     bindGroup.setTexture('roughnessTex', roughnessTexture, nearestSampler);
@@ -483,8 +495,8 @@ export class SSR extends AbstractPostEffect {
     }
     const nearestSampler = fetchSampler('clamp_nearest');
     const linearSampler = fetchSampler('clamp_linear');
-    const roughnessTexture = ctx.SSRRoughnessTexture!;
-    const normalTexture = ctx.SSRNormalTexture!;
+    const roughnessTexture = ctx.SceneRoughnessTexture!;
+    const normalTexture = ctx.SceneNormalTexture!;
     if (!blur) {
       bindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
       if (hasEnvRadiance) {

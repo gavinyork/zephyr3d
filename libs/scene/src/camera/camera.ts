@@ -1671,53 +1671,53 @@ export class Camera extends SceneNode {
   render(scene: Scene) {
     const device = getDevice();
     //this.updatePostProcessing(device);
-    const useMotionVector =
-      (this.TAA || this.motionBlur || (this.SSR && this.ssrTemporal)) && device.type !== 'webgl';
-    const useTAA = useMotionVector && this.TAA;
     scene.dispatchEvent('startrender', scene, this, this._compositor);
-    if (useMotionVector) {
-      const width = device.getDrawingBufferWidth();
-      const height = device.getDrawingBufferHeight();
-      if (useTAA) {
-        const halton = Camera._halton23[device.frameInfo.frameCounter % Camera._halton23.length];
-        this._jitterValue.setXY((halton[0] * 2) / width, (halton[1] * 2) / height);
-      } else {
-        this._jitterValue.setXY(0, 0);
-      }
-      this._jitteredVPMatrix.set(this.getProjectionMatrix());
-      this._jitteredVPMatrix[8] += this._jitterValue.x;
-      this._jitteredVPMatrix[9] += this._jitterValue.y;
-      this._jitteredVPMatrix.multiplyRight(this.viewMatrix);
-      Matrix4x4.invert(this._jitteredVPMatrix, this._jitteredInvVPMatrix);
-      if (!this._prevJitteredVPMatrix) {
-        this._prevJitteredVPMatrix = new Matrix4x4();
-        this._prevJitteredVPMatrix.set(this._jitteredVPMatrix);
-        this._prevJitterValue = new Vector2(this._jitterValue);
-      }
-      if (!this._prevVPMatrix) {
-        this._prevVPMatrix = new Matrix4x4();
-        this._prevVPMatrix.set(this.viewProjectionMatrix);
-        this._prevPosition = this.getWorldPosition();
-      }
-    } else {
-      this._jitterValue.setXY(0, 0);
-      this._prevVPMatrix = null;
-      this._prevPosition = null;
-      this._prevJitteredVPMatrix = null;
-      this._prevJitterValue = null;
-      this._jitteredInvVPMatrix.set(this.invViewProjectionMatrix);
-    }
     device.pushDeviceStates();
     device.reverseVertexWindingOrder(false);
     scene.getRenderer().renderScene(scene, this);
     device.popDeviceStates();
-    if (useMotionVector) {
-      this._prevJitteredVPMatrix!.set(this._jitteredVPMatrix);
-      this._prevJitterValue!.set(this._jitterValue);
-      this._prevVPMatrix!.set(this.viewProjectionMatrix);
+    scene.dispatchEvent('endrender', scene, this, this._compositor);
+  }
+  /** Prepare current/previous camera transforms used by a motion-vector pass. @internal */
+  prepareMotionVectorFrame(useTAA: boolean, width: number, height: number): void {
+    const device = getDevice();
+    if (useTAA) {
+      const halton = Camera._halton23[device.frameInfo.frameCounter % Camera._halton23.length];
+      this._jitterValue.setXY((halton[0] * 2) / width, (halton[1] * 2) / height);
+    } else {
+      this._jitterValue.setXY(0, 0);
+    }
+    this._jitteredVPMatrix.set(this.getProjectionMatrix());
+    this._jitteredVPMatrix[8] += this._jitterValue.x;
+    this._jitteredVPMatrix[9] += this._jitterValue.y;
+    this._jitteredVPMatrix.multiplyRight(this.viewMatrix);
+    Matrix4x4.invert(this._jitteredVPMatrix, this._jitteredInvVPMatrix);
+    if (!this._prevJitteredVPMatrix) {
+      this._prevJitteredVPMatrix = new Matrix4x4();
+      this._prevJitteredVPMatrix.set(this._jitteredVPMatrix);
+      this._prevJitterValue = new Vector2(this._jitterValue);
+    }
+    if (!this._prevVPMatrix) {
+      this._prevVPMatrix = new Matrix4x4();
+      this._prevVPMatrix.set(this.viewProjectionMatrix);
       this._prevPosition = this.getWorldPosition();
     }
-    scene.dispatchEvent('endrender', scene, this, this._compositor);
+  }
+  /** Commit camera transforms after a motion-vector frame completes. @internal */
+  commitMotionVectorFrame(): void {
+    this._prevJitteredVPMatrix!.set(this._jitteredVPMatrix);
+    this._prevJitterValue!.set(this._jitterValue);
+    this._prevVPMatrix!.set(this.viewProjectionMatrix);
+    this._prevPosition = this.getWorldPosition();
+  }
+  /** Clear temporal camera transforms when motion vectors are not in use. @internal */
+  clearMotionVectorFrame(): void {
+    this._jitterValue.setXY(0, 0);
+    this._prevVPMatrix = null;
+    this._prevPosition = null;
+    this._prevJitteredVPMatrix = null;
+    this._prevJitterValue = null;
+    this._jitteredInvVPMatrix.set(this.invViewProjectionMatrix);
   }
   async pickAsync(posX: number, posY: number) {
     this._pickPosX = posX;

@@ -345,7 +345,10 @@ export class SkinMaterial
           )
         );
         scope.$l.skinSSS = pb.vec4(scope.scatterMultiplier, scope.skinMask);
-        if (this.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
+        if (
+          this.drawContext.materialFlags &
+          (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
+        ) {
           scope.$l.outRoughness = pb.vec4(
             pb.mul(scope.albedo.rgb, pb.sub(1, scope.roughness), scope.zSkinSpecularStrength),
             pb.mul(scope.roughness, ShaderHelper.getCameraRoughnessFactor(scope))

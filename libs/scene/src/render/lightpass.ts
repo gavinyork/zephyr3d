@@ -1,6 +1,7 @@
 import { RenderPass } from './renderpass';
 import { MaterialVaryingFlags, QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Nullable } from '@zephyr3d/base';
+import type { Texture2D } from '@zephyr3d/device';
 import { Vector4 } from '@zephyr3d/base';
 import type { RenderItemListBundle, RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
@@ -9,16 +10,16 @@ import { ShaderHelper } from '../material/shader/helper';
 import type { Camera } from '../camera';
 
 const SURFACE_MRT_FLAGS =
-  MaterialVaryingFlags.SSR_STORE_ROUGHNESS |
+  MaterialVaryingFlags.SCENE_STORE_ROUGHNESS |
   MaterialVaryingFlags.SSS_STORE_PROFILE |
   MaterialVaryingFlags.SSS_STORE_DIFFUSE |
-  MaterialVaryingFlags.SSS_STORE_NORMAL |
+  MaterialVaryingFlags.SCENE_STORE_NORMAL |
   MaterialVaryingFlags.SSS_STORE_TRANSMISSION |
   MaterialVaryingFlags.SKIN_SSS_STORE;
 const ADDITIVE_LIGHT_PASS_OMIT_MRT_FLAGS =
-  MaterialVaryingFlags.SSR_STORE_ROUGHNESS |
+  MaterialVaryingFlags.SCENE_STORE_ROUGHNESS |
   MaterialVaryingFlags.SSS_STORE_PROFILE |
-  MaterialVaryingFlags.SSS_STORE_NORMAL;
+  MaterialVaryingFlags.SCENE_STORE_NORMAL;
 
 /**
  * Forward render pass
@@ -123,6 +124,17 @@ export class LightPass extends RenderPass {
     }:${ctx.screenSpaceShadowMask ? 1 : 0}`;
   }
   /** @internal */
+  protected _getShaderVariantHash(ctx: DrawContext, camera: Camera) {
+    const textureVariant = (texture: Texture2D | null | undefined) => (texture ? `1:${texture.format}` : '0');
+    return `LightPassShaderVariant:${this._shadowMapHash}:${ctx.currentShadowLight?.runtimeId ?? 0}:${
+      ctx.lightBlending ? 1 : 0
+    }:${camera.oit?.calculateHash() ?? ''}:${ctx.env!.getHash(
+      ctx
+    )}:${ctx.materialFlags}:${textureVariant(ctx.linearDepthTexture)}:${textureVariant(
+      ctx.sceneColorTexture
+    )}:${textureVariant(ctx.HiZTexture)}:${ctx.screenSpaceShadowMask ? 1 : 0}`;
+  }
+  /** @internal */
   protected renderLightPass(
     ctx: DrawContext,
     camera: Camera,
@@ -136,6 +148,7 @@ export class LightPass extends RenderPass {
       ctx.env!.light.type !== 'none' &&
       (ctx.env!.light.envLight.hasRadiance() || ctx.env!.light.envLight.hasIrradiance());
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx, camera);
+    ctx.shaderVariantHash = this._getShaderVariantHash(ctx, camera);
     const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
     if (!flags.cameraSet[ctx.renderPassHash]) {
       ShaderHelper.setCameraUniforms(bindGroup, ctx, camera, !!ctx.device.getFramebuffer());
@@ -189,6 +202,7 @@ export class LightPass extends RenderPass {
   /** @internal */
   protected renderItems(ctx: DrawContext, camera: Camera, renderQueue: RenderQueue) {
     ctx.renderPassHash = null;
+    ctx.shaderVariantHash = null;
     ctx.env = ctx.scene.env;
     ctx.drawEnvLight = false;
     ctx.flip = this.isAutoFlip(ctx);

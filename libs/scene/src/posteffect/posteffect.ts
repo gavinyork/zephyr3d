@@ -8,6 +8,7 @@ import type { RenderGraph } from '../render/rendergraph/rendergraph';
 import type { RGHandle, RGPassBuilder } from '../render/rendergraph/types';
 import type { RGBlackboard } from '../render/rendergraph/blackboard';
 import { FrameResources } from '../render/rendergraph/blackboard';
+import type { FrameResourceRequirements } from '../render/rendergraph/frame_resource_requirements';
 import type { HistoryResourceManager } from '../render/rendergraph/history_resource_manager';
 
 /**
@@ -165,6 +166,18 @@ export class AbstractPostEffect extends Disposable {
   requireMotionVectorTexture(_ctx: DrawContext) {
     return false;
   }
+  /** Checks whether this post effect requires the Hi-Z depth pyramid. */
+  requireHiZTexture(_ctx: DrawContext) {
+    return false;
+  }
+  /** Checks whether this post effect requires opaque-scene world normals. */
+  requireSceneNormalTexture(_ctx: DrawContext) {
+    return false;
+  }
+  /** Checks whether this post effect requires opaque-scene roughness data. */
+  requireSceneRoughnessTexture(_ctx: DrawContext) {
+    return false;
+  }
   /**
    * Checks whether this post effect requires the screen-space shadow mask.
    *
@@ -175,6 +188,16 @@ export class AbstractPostEffect extends Disposable {
    */
   requireShadowMask(_ctx: DrawContext) {
     return false;
+  }
+  /** Collect this effect's semantic frame-resource requirements. @internal */
+  getFrameResourceRequirements(ctx: DrawContext): FrameResourceRequirements {
+    return {
+      motionVector: this.requireMotionVectorTexture(ctx),
+      hiZ: this.requireHiZTexture(ctx),
+      sceneNormal: this.requireSceneNormalTexture(ctx),
+      sceneRoughness: this.requireSceneRoughnessTexture(ctx),
+      shadowMask: this.requireShadowMask(ctx)
+    };
   }
   /**
    * Apply the post effect
@@ -233,6 +256,22 @@ export class AbstractPostEffect extends Disposable {
         : null;
       if (motionVectorHandle) {
         builder.read(motionVectorHandle);
+      }
+      const hiZHandle = this.requireHiZTexture(s.ctx) ? s.blackboard.get(FrameResources.HiZ) : null;
+      if (hiZHandle) {
+        builder.read(hiZHandle);
+      }
+      const sceneNormalHandle = this.requireSceneNormalTexture(s.ctx)
+        ? s.blackboard.get(FrameResources.SceneNormal)
+        : null;
+      if (sceneNormalHandle) {
+        builder.read(sceneNormalHandle);
+      }
+      const sceneRoughnessHandle = this.requireSceneRoughnessTexture(s.ctx)
+        ? s.blackboard.get(FrameResources.SceneRoughness)
+        : null;
+      if (sceneRoughnessHandle) {
+        builder.read(sceneRoughnessHandle);
       }
       // Keep the screen-space shadow mask alive for effects that sample it
       // (via DrawContext.shadowMaskTexture) instead of recomputing shadows.

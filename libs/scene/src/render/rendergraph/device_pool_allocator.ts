@@ -1,4 +1,4 @@
-import type { FrameBuffer, Texture2D, TextureFormat, AbstractDevice } from '@zephyr3d/device';
+import type { FrameBuffer, Texture2D, Texture2DArray, TextureFormat, AbstractDevice } from '@zephyr3d/device';
 import type { RGFramebufferDesc, RGTextureAllocator, RGTextureDesc, RGResolvedSize } from './types';
 import { getDevice } from '../../app/api';
 import type { Nullable } from '@zephyr3d/base';
@@ -35,7 +35,7 @@ export class DevicePoolAllocator implements RGTextureAllocator<Texture2D, FrameB
    * @param size - Resolved pixel dimensions.
    * @returns A pooled Texture2D instance.
    */
-  allocate(desc: RGTextureDesc, size: RGResolvedSize): Texture2D {
+  allocate(desc: RGTextureDesc, size: RGResolvedSize, preferred?: Texture2D): Texture2D {
     const device = this._device ?? getDevice();
     const requestedMips = desc.mipLevels ?? 1;
     // The device pool only exposes a boolean `mipmapping` flag (full chain or
@@ -69,9 +69,17 @@ export class DevicePoolAllocator implements RGTextureAllocator<Texture2D, FrameB
             size.width,
             size.height,
             arrayLayers,
-            mipmapping
+            mipmapping,
+            preferred as unknown as Texture2DArray
           ) as unknown as Texture2D)
-        : device.pool.fetchTemporalTexture2D(false, desc.format, size.width, size.height, mipmapping);
+        : device.pool.fetchTemporalTexture2D(
+            false,
+            desc.format,
+            size.width,
+            size.height,
+            mipmapping,
+            preferred
+          );
     if (desc.mipLevels && texture.mipLevelCount < desc.mipLevels) {
       device.pool.releaseTexture(texture);
       throw new Error(

@@ -704,7 +704,10 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
           break;
       }
       //scope.$l.outColor = pb.vec4(scope.litColor, 1);
-      if (this.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
+      if (
+        this.drawContext.materialFlags &
+        (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
+      ) {
         scope.$l.outRoughness = pb.vec4(0, 0, 0, 0);
         this.outputFragmentColor(
           scope,

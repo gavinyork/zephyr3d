@@ -86,7 +86,10 @@ export class BlinnMaterial
           scope.$inputs.wBinormal
         );
         scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
-        if (this.drawContext.materialFlags & MaterialVaryingFlags.SSR_STORE_ROUGHNESS) {
+        if (
+          this.drawContext.materialFlags &
+          (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
+        ) {
           scope.$l.outRoughness = pb.vec4();
           scope.$l.litColor = this.blinnPhongLight(
             scope,

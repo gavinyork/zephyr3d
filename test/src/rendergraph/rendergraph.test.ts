@@ -1,4 +1,9 @@
-import { RenderGraph, RGHandle, RenderGraphExecutor } from '../../../libs/scene/src/render/rendergraph';
+import {
+  RenderGraph,
+  RGHandle,
+  RenderGraphExecutor,
+  RGTextureAffinityCache
+} from '../../../libs/scene/src/render/rendergraph';
 import type {
   RGTextureAllocator,
   RGTextureDesc,
@@ -7,6 +12,7 @@ import type {
   RGFramebufferDesc
 } from '../../../libs/scene/src/render/rendergraph';
 import type { AbstractDevice, TimestampQueryOptions, TimestampQueryResult } from '@zephyr3d/device';
+import { Pool } from '../../../libs/device/src/pool';
 
 // ─── Mock Allocator ──────────────────────────────────────────────────
 
@@ -874,6 +880,139 @@ describe('RenderGraphExecutor', () => {
     graph = new RenderGraph();
   });
 
+  test('reacquires the previous logical texture across newly-created executors', () => {
+    let nextId = 0;
+    const allocateCalls: Array<{ preferred?: MockTexture; result: MockTexture }> = [];
+    const allocator: RGTextureAllocator<MockTexture> = {
+      allocate(desc, size, preferred) {
+        const result = preferred ?? { id: nextId++, desc, size };
+        allocateCalls.push({ preferred, result });
+        return result;
+      },
+      release() {}
+    };
+    const affinityCache = new RGTextureAffinityCache<MockTexture>();
+
+    const executeFrame = (format: RGTextureDesc['format'] = 'rgba8unorm') => {
+      const frameGraph = new RenderGraph();
+      let backbuffer = frameGraph.importTexture('backbuffer');
+      let color!: RGHandle;
+      frameGraph.addPass('ColorPass', (builder) => {
+        color = builder.createTexture({
+          format,
+          label: 'color',
+          allocationKey: 'test.color'
+        });
+        builder.setExecute(() => {});
+      });
+      frameGraph.addPass('Present', (builder) => {
+        builder.read(color);
+        backbuffer = builder.write(backbuffer);
+        builder.setExecute(() => {});
+      });
+      const compiled = frameGraph.compile([backbuffer]);
+      const executor = new RenderGraphExecutor(allocator, 64, 64, {
+        textureAffinityCache: affinityCache
+      });
+      executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 64, height: 64 } });
+      executor.execute(compiled);
+    };
+
+    executeFrame();
+    executeFrame();
+
+    expect(allocateCalls).toHaveLength(2);
+    expect(allocateCalls[0].preferred).toBeUndefined();
+    expect(allocateCalls[1].preferred).toBe(allocateCalls[0].result);
+    expect(allocateCalls[1].result).toBe(allocateCalls[0].result);
+  });
+
+  test('falls back when the descriptor changes and updates the affinity snapshot', () => {
+    let nextId = 0;
+    const allocateCalls: Array<{ preferred?: MockTexture; result: MockTexture }> = [];
+    const allocator: RGTextureAllocator<MockTexture> = {
+      allocate(desc, size, preferred) {
+        const result = { id: nextId++, desc, size };
+        allocateCalls.push({ preferred, result });
+        return result;
+      },
+      release() {}
+    };
+    const affinityCache = new RGTextureAffinityCache<MockTexture>();
+
+    const executeFrame = (format: RGTextureDesc['format']) => {
+      const frameGraph = new RenderGraph();
+      let backbuffer = frameGraph.importTexture('backbuffer');
+      let color!: RGHandle;
+      frameGraph.addPass('ColorPass', (builder) => {
+        color = builder.createTexture({ format, allocationKey: 'test.color' });
+        builder.setExecute(() => {});
+      });
+      frameGraph.addPass('Present', (builder) => {
+        builder.read(color);
+        backbuffer = builder.write(backbuffer);
+        builder.setExecute(() => {});
+      });
+      const executor = new RenderGraphExecutor(allocator, 64, 64, { textureAffinityCache: affinityCache });
+      executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 64, height: 64 } });
+      executor.execute(frameGraph.compile([backbuffer]));
+    };
+
+    executeFrame('rgba8unorm');
+    executeFrame('rgba16f');
+    executeFrame('rgba16f');
+
+    expect(allocateCalls[0].preferred).toBeUndefined();
+    expect(allocateCalls[1].preferred).toBeUndefined();
+    expect(allocateCalls[2].preferred).toBe(allocateCalls[1].result);
+  });
+
+  test('does not commit fallback allocations when execution fails', () => {
+    let nextId = 0;
+    let rejectPreferred = false;
+    const allocateCalls: Array<{ preferred?: MockTexture; result: MockTexture }> = [];
+    const allocator: RGTextureAllocator<MockTexture> = {
+      allocate(desc, size, preferred) {
+        const result = !rejectPreferred && preferred ? preferred : { id: nextId++, desc, size };
+        allocateCalls.push({ preferred, result });
+        return result;
+      },
+      release() {}
+    };
+    const affinityCache = new RGTextureAffinityCache<MockTexture>();
+
+    const executeFrame = (shouldThrow: boolean) => {
+      const frameGraph = new RenderGraph();
+      let backbuffer = frameGraph.importTexture('backbuffer');
+      let color!: RGHandle;
+      frameGraph.addPass('ColorPass', (builder) => {
+        color = builder.createTexture({ format: 'rgba8unorm', allocationKey: 'test.color' });
+        builder.setExecute(() => {
+          if (shouldThrow) {
+            throw new Error('frame failed');
+          }
+        });
+      });
+      frameGraph.addPass('Present', (builder) => {
+        builder.read(color);
+        backbuffer = builder.write(backbuffer);
+        builder.setExecute(() => {});
+      });
+      const executor = new RenderGraphExecutor(allocator, 64, 64, { textureAffinityCache: affinityCache });
+      executor.setImportedTexture(backbuffer, { id: -1, desc: {} as any, size: { width: 64, height: 64 } });
+      executor.execute(frameGraph.compile([backbuffer]));
+    };
+
+    executeFrame(false);
+    rejectPreferred = true;
+    expect(() => executeFrame(true)).toThrow('frame failed');
+    rejectPreferred = false;
+    executeFrame(false);
+
+    expect(allocateCalls[1].preferred).toBe(allocateCalls[0].result);
+    expect(allocateCalls[2].preferred).toBe(allocateCalls[0].result);
+  });
+
   test('allocates transient textures before first use and releases after last use', () => {
     const { allocator, allocated, released } = createMockAllocator();
     let backbuffer = graph.importTexture('backbuffer');
@@ -1562,5 +1701,22 @@ describe('RenderGraphExecutor', () => {
 
     expect(profile?.graph.name).toBe('SecondGraph');
     expect(RenderGraphExecutor.getLatestProfileResult()?.graph.name).toBe('SecondGraph');
+  });
+});
+
+describe('Pool preferred transient allocation', () => {
+  test('takes the preferred matching texture instead of the stack top', () => {
+    let nextId = 0;
+    const device = {
+      createTexture2D: () => ({ id: nextId++, memCost: 1 }),
+      getGPUObjects: () => ({ stacks: new WeakMap() })
+    } as any;
+    const pool = new Pool(device, 'rendergraph-test');
+    const first = pool.fetchTemporalTexture2D(false, 'rgba8unorm', 16, 16);
+    const second = pool.fetchTemporalTexture2D(false, 'rgba8unorm', 16, 16);
+    pool.releaseTexture(first);
+    pool.releaseTexture(second);
+
+    expect(pool.fetchTemporalTexture2D(false, 'rgba8unorm', 16, 16, false, first)).toBe(first);
   });
 });

@@ -8,6 +8,8 @@ import type { RenderGraph } from '../render/rendergraph/rendergraph';
 import type { RGHandle } from '../render/rendergraph/types';
 import type { RGBlackboard } from '../render/rendergraph/blackboard';
 import type { HistoryResourceManager } from '../render/rendergraph/history_resource_manager';
+import type { FrameResourceRequirements } from '../render/rendergraph/frame_resource_requirements';
+import { mergeFrameResourceRequirements } from '../render/rendergraph/frame_resource_requirements';
 
 /**
  * Options for building a post effect layer as render graph passes.
@@ -81,6 +83,19 @@ export class Compositor {
   /** @internal */
   layerHasEnabledEffect(layer: PostEffectLayer): boolean {
     return this._postEffects[layer].some((ref) => !!ref.get()?.enabled);
+  }
+  /** Collect semantic frame resources requested by every enabled effect. @internal */
+  collectRequirements(ctx: DrawContext): FrameResourceRequirements {
+    const requirements: FrameResourceRequirements = {};
+    for (const layer of this._postEffects) {
+      for (const ref of layer) {
+        const effect = ref.get();
+        if (effect?.enabled) {
+          mergeFrameResourceRequirements(requirements, effect.getFrameResourceRequirements(ctx));
+        }
+      }
+    }
+    return requirements;
   }
   /** @internal */
   private getIntermediateFormat(ctx: DrawContext): TextureFormat {

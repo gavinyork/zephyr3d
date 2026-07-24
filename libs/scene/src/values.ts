@@ -133,11 +133,11 @@ export const enum MaterialVaryingFlags {
   MORPH_ANIMATION = 1 << 0,
   SKIN_ANIMATION = 1 << 1,
   INSTANCING = 1 << 2,
-  SSR_STORE_ROUGHNESS = 1 << 3,
+  SCENE_STORE_ROUGHNESS = 1 << 3,
   APPLY_FOG = 1 << 4,
   SSS_STORE_PROFILE = 1 << 5,
   SSS_STORE_DIFFUSE = 1 << 6,
-  SSS_STORE_NORMAL = 1 << 7,
+  SCENE_STORE_NORMAL = 1 << 7,
   SSS_STORE_TRANSMISSION = 1 << 8,
   SKIN_SSS_STORE = 1 << 9
 }

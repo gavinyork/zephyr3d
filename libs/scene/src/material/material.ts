@@ -30,7 +30,8 @@ type MaterialState = {
  * - `createHash(pass)` produces a stable hash representing shader variant options for a pass.
  *   Override `_createHash()` in subclasses to encode feature toggles (defines, keywords, macros).
  * - The global hash used to key `MaterialState` also includes `ctx.materialFlags` and
- *   `ctx.renderPassHash`, allowing context-sensitive variants (e.g., MSAA, MRT layout).
+ *   `ctx.shaderVariantHash` when provided, allowing context-sensitive variants without
+ *   coupling shader programs to runtime texture identities.
  * - GPU programs are additionally memoized in a global static `_programCache` across materials
  *   by `constructor.name` + hash, to avoid recompilation of identical variants.
  *
@@ -377,11 +378,13 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * Includes:
    * - Per-pass material hash from `getHash(pass)`.
    * - `ctx.materialFlags` for context-dependent toggles.
-   * - `ctx.renderPassHash` for framebuffer/attachment layout variants.
+   * - `ctx.shaderVariantHash` for shader layout/feature variants, falling back
+   *   to `ctx.renderPassHash` for passes without a shader-only hash.
    * @internal
    */
   private calcGlobalHash(ctx: DrawContext, pass: number) {
-    return `${this.getHash(pass)}:${ctx.materialFlags}:${ctx.renderPassHash}:${
+    const shaderVariantHash = ctx.shaderVariantHash ?? ctx.renderPassHash;
+    return `${this.getHash(pass)}:${ctx.materialFlags}:${shaderVariantHash}:${
       ctx.drawEnvLight ? 1 : 0
     }:${ctx.currentShadowLight ? 1 : 0}:${ctx.lightBlending ? 1 : 0}`;
   }
