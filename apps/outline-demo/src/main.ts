@@ -61,7 +61,7 @@ occluder.position.setXYZ(0.9, 1.45, 1.3);
 
 const settings: OutlineSettings = { enabled: true, width: 0.1 };
 camera.renderPipeline = createForwardPlusPipeline().insertAfter(
-  'LightPass',
+  'SkyPass',
   createOutlineModule(outlinedTorus, settings)
 );
 getEngine().setRenderable(scene);

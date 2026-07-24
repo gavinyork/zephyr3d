@@ -7,21 +7,18 @@ import { NonLinearDepthBlitter } from './nonlinear-depth-blitter';
  * A fully user-side {@link RenderModule} that replaces the final rendered image
  * with a grayscale visualization of the RAW, non-linear depth buffer.
  *
- * It mirrors the linear-depth demo's takeover mechanism (read the previous
- * `PresentedColor` to order after Present, write a new backbuffer version,
- * re-register it as the sink), but differs in what it samples:
+ * It mirrors the linear-depth demo's takeover mechanism (discard-write a new
+ * `PresentedColor` version and register it as the sink), but differs in what it
+ * samples:
  *
  * - It reads `FrameResources.SceneDepthAttachment` — the scene's actual
  *   depth-stencil texture — and displays its red channel (non-linear NDC depth)
  *   directly. No linearization and no re-derivation from the linear-depth
  *   texture.
  *
- * Availability caveat: the engine only registers `SceneDepthAttachment` when
- * the graph owns the depth attachment (i.e. the final framebuffer does not
- * supply its own depth texture — see forward_plus_builder.ts). When an external
- * depth attachment is used, the resource is absent; this module gates on that
- * via a setup-time blackboard check and simply does nothing, leaving the normal
- * frame on screen.
+ * Graph-owned and external final-framebuffer depth textures are both published
+ * as `SceneDepthAttachment`, so the module works in screen and render-to-texture
+ * paths as long as the attachment is sampleable.
  *
  * Backend note: sampling a depth texture's red channel as non-linear NDC depth
  * is the WebGL2 path this demo targets.
@@ -33,8 +30,13 @@ export function createNonLinearDepthModule(): RenderModule {
 
   return {
     type: 'NonLinearDepthVisualization',
+    clone: () => createNonLinearDepthModule(),
     // Order this module's setup after the depth attachment and current sink.
-    reads: [FrameResources.SceneDepthAttachment, FrameResources.PresentedColor],
+    reads: [
+      { resource: FrameResources.SceneDepthAttachment, version: 'final' },
+      { resource: FrameResources.PresentedColor, version: 'final' }
+    ],
+    writes: [FrameResources.PresentedColor],
     // enabled() runs before all module setup callbacks, so resource availability
     // must be checked in setup rather than by reading the blackboard here.
     enabled: () => true,
@@ -49,9 +51,7 @@ export function createNonLinearDepthModule(): RenderModule {
 
       const written = graph.addPass('NonLinearDepthVisualization', (builder) => {
         builder.read(depthHandle);
-        // Order after the built-in Present pass.
-        builder.read(prevPresented);
-        const out: RGHandle = builder.write(prevPresented);
+        const out: RGHandle = builder.write(prevPresented, { load: 'discard' });
         builder.setExecute((rgCtx: RGExecuteContext) => {
           const depthTex = rgCtx.getTexture<Texture2D>(depthHandle);
           // The hyperbolic z distribution crushes everything toward 1, so a

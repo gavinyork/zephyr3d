@@ -212,6 +212,17 @@ export class RGSubpass<T = unknown> {
   }
 }
 
+/** Controls whether a write needs the previous resource contents. @public */
+export interface RGWriteOptions {
+  /**
+   * `'load'` preserves the existing behavior and keeps previous writers alive.
+   * Use `'discard'` when the pass fully overwrites the resource; hazard ordering
+   * is preserved, but producers needed only for the old contents may be culled.
+   * Default `'load'`.
+   */
+  load?: 'load' | 'discard';
+}
+
 /**
  * Internal bookkeeping for a pass within the render graph.
  * @public
@@ -233,6 +244,11 @@ export class RGPass<T = unknown> {
    * pass culling propagates aliveness through them.
    */
   readonly dependencies: RGPass[] = [];
+  /**
+   * WAW/overwrite predecessors that constrain execution only when both passes
+   * are alive. Discard writes use these edges without retaining old contents.
+   */
+  readonly orderingDependencies: RGPass[] = [];
   /**
    * Ordering-only (WAR) predecessors: readers of the version this pass
    * overwrites. They must run before this pass IF both are alive, but this pass
@@ -281,14 +297,17 @@ export interface RGPassBuilder {
    * The returned handle represents the post-write version. Use it for subsequent
    * reads and as the graph output passed to {@link RenderGraph.compile}. Passing
    * an older version of the same resource to `compile()` is rejected because it
-   * usually means the caller ignored the handle returned by `write()`. If the pass
-   * needs the previous contents, call {@link RGPassBuilder.read} on the input handle explicitly
-   * before writing.
+   * usually means the caller ignored the handle returned by `write()`. A normal
+   * write preserves prior contents for compatibility. For a full
+   * overwrite, pass `{ load: 'discard' }`; this lets passes that only produced
+   * the discarded contents be culled. Calling {@link RGPassBuilder.read} always
+   * declares an actual content dependency regardless of this option.
    *
    * @param handle - Handle of the resource to write to.
+   * @param options - Previous-content load behavior. Default `{ load: 'load' }`.
    * @returns A handle referencing the newly written version.
    */
-  write(handle: RGHandle): RGHandle;
+  write(handle: RGHandle, options?: RGWriteOptions): RGHandle;
 
   /**
    * Create a new transient texture resource that this pass will produce.

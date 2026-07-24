@@ -97,6 +97,83 @@ describe('RenderPipeline', () => {
     expect(c.get('A')).toBe(p.get('A'));
   });
 
+  test('attaches modules and releases them on remove', () => {
+    const attach = jest.fn();
+    const detach = jest.fn();
+    const dispose = jest.fn();
+    const module: RenderModule = {
+      ...mod('Stateful'),
+      attach,
+      detach,
+      dispose,
+      clone: () => ({ ...mod('Stateful') })
+    };
+    const pipeline = new RenderPipeline([module]);
+
+    expect(attach).toHaveBeenCalledWith(pipeline);
+    pipeline.remove('Stateful');
+    expect(detach).toHaveBeenCalledWith(pipeline);
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(() => new RenderPipeline([module])).toThrow(/disposed module .* cannot be attached again/);
+  });
+
+  test('construction failure rolls back modules already attached', () => {
+    const detach = jest.fn();
+    const dispose = jest.fn();
+    const first: RenderModule = {
+      ...mod('Duplicate'),
+      detach,
+      dispose
+    };
+
+    expect(() => new RenderPipeline([first, mod('Duplicate')])).toThrow(/already exists/);
+    expect(detach).toHaveBeenCalledTimes(1);
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  test('dispose releases owned modules once and rejects further mutation', () => {
+    const calls: string[] = [];
+    const lifecycle = (type: string): RenderModule => ({
+      ...mod(type),
+      detach: () => calls.push(`detach:${type}`),
+      dispose: () => calls.push(`dispose:${type}`),
+      clone: () => lifecycle(type)
+    });
+    const pipeline = new RenderPipeline([lifecycle('A'), lifecycle('B')]);
+
+    pipeline.dispose();
+    pipeline.dispose();
+
+    expect(calls).toEqual(['detach:B', 'dispose:B', 'detach:A', 'dispose:A']);
+    expect(pipeline.disposed).toBe(true);
+    expect(() => pipeline.append(mod('C'))).toThrow(/has been disposed/);
+  });
+
+  test('clone uses module clone hooks and rejects unsafe stateful sharing', () => {
+    const clonedModule = mod('Stateful');
+    const stateful: RenderModule = {
+      ...mod('Stateful'),
+      dispose: () => {},
+      clone: () => clonedModule
+    };
+    const clonedPipeline = new RenderPipeline([stateful]).clone();
+    expect(clonedPipeline.get('Stateful')).toBe(clonedModule);
+
+    const unsafe: RenderModule = { ...mod('Unsafe'), dispose: () => {} };
+    expect(() => new RenderPipeline([unsafe]).clone()).toThrow(/must implement clone/);
+  });
+
+  test('same stateful module instance cannot be owned by two pipelines', () => {
+    const stateful: RenderModule = {
+      ...mod('Stateful'),
+      dispose: jest.fn(),
+      clone: () => ({ ...mod('Stateful') })
+    };
+    const first = new RenderPipeline([stateful]);
+    expect(() => new RenderPipeline([stateful])).toThrow(/already belongs to another pipeline/);
+    first.dispose();
+  });
+
   test('build runs enabled modules in order and skips disabled ones', () => {
     const calls: string[] = [];
     const track = (type: string, enabled: boolean): RenderModule => ({
@@ -167,5 +244,54 @@ describe('resolveModuleOrder', () => {
     // Two consumers of the same resource — authored order wins.
     const modules = [dep('P', undefined, ['X']), dep('C1', ['X']), dep('C2', ['X'])];
     expect(order(modules)).toEqual(['P', 'C1', 'C2']);
+  });
+
+  test('current read selects the nearest prior writer and preserves authored placement', () => {
+    const modules: RenderModule[] = [
+      dep('W1', undefined, ['X']),
+      {
+        ...dep('C'),
+        reads: [{ resource: 'X', version: 'current' }]
+      },
+      dep('W2', undefined, ['X'])
+    ];
+    expect(order(modules)).toEqual(['W1', 'C', 'W2']);
+  });
+
+  test('final read selects a later final writer and permits global reordering', () => {
+    const modules: RenderModule[] = [
+      dep('W1', undefined, ['X']),
+      {
+        ...dep('C'),
+        reads: [{ resource: 'X', version: 'final' }]
+      },
+      dep('W2', undefined, ['X'])
+    ];
+    expect(order(modules)).toEqual(['W1', 'W2', 'C']);
+  });
+
+  test('module can read and then write the current resource version', () => {
+    const modules: RenderModule[] = [
+      dep('Initial', undefined, ['X']),
+      {
+        ...dep('Transform', undefined, ['X']),
+        reads: [{ resource: 'X' }]
+      }
+    ];
+    expect(order(modules)).toEqual(['Initial', 'Transform']);
+  });
+
+  test('required read rejects a missing writer while optional read remains in place', () => {
+    const required: RenderModule = {
+      ...dep('Required'),
+      reads: [{ resource: 'Missing' }]
+    };
+    expect(() => order([required])).toThrow(/requires current resource "Missing"/);
+
+    const optional: RenderModule = {
+      ...dep('Optional'),
+      reads: [{ resource: 'Missing', optional: true }]
+    };
+    expect(order([optional, mod('Next')])).toEqual(['Optional', 'Next']);
   });
 });

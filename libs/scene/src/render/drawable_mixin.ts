@@ -122,12 +122,15 @@ export function mixinDrawable<
     }
     pushRenderQueueRef(ref: RenderQueueRef) {
       this.renderQueueRefPrune();
-      this._mdRenderQueueRef.push(ref);
+      if (!this._mdRenderQueueRef.includes(ref)) {
+        this._mdRenderQueueRef.push(ref);
+      }
     }
     renderQueueRefPrune(force = false) {
       for (let i = this._mdRenderQueueRef.length - 1; i >= 0; i--) {
-        const ref = this._mdRenderQueueRef[i].ref;
-        if (force || ref.disposed) {
+        const queueRef = this._mdRenderQueueRef[i];
+        const ref = queueRef.ref;
+        if (force || !queueRef.valid || ref.disposed) {
           this._mdRenderQueueRef.splice(i, 1);
           const bindGroup = this._mdDrawableBindGroupInstanced.get(ref);
           if (bindGroup) {
@@ -185,7 +188,7 @@ export function mixinDrawable<
     }
     applyMaterialUniformsAll() {
       for (const ref of this._mdRenderQueueRef) {
-        if (ref.ref) {
+        if (ref.valid && !ref.ref.disposed) {
           const instanceInfo = ref.ref.getInstanceInfo(this as unknown as Drawable);
           if (instanceInfo) {
             this.applyMaterialUniforms(instanceInfo);
@@ -217,7 +220,7 @@ export function mixinDrawable<
         }
         this._currentWorldMatrixBuffer.set(this.getNode().worldMatrix);
         for (const ref of this._mdRenderQueueRef) {
-          if (ref.ref) {
+          if (ref.valid && !ref.ref.disposed) {
             this.applyTransformUniforms(ref.ref);
           }
         }

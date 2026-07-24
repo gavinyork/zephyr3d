@@ -1096,6 +1096,33 @@ describe('Final framebuffer as intermediate (editor render-to-texture mode)', ()
     };
   }
 
+  test('publishes an external depth texture as an imported frame resource', () => {
+    const depthConsumer: RenderModule<any> = {
+      type: 'ExternalDepthConsumer',
+      reads: [{ resource: FrameResources.SceneDepthAttachment, version: 'current' }],
+      enabled: () => true,
+      setup(context) {
+        const depth = context.blackboard.expect(FrameResources.SceneDepthAttachment);
+        context.graph.addPass('ExternalDepthConsumer', (builder) => {
+          builder.read(depth);
+          builder.sideEffect();
+        });
+      }
+    };
+    const pipeline = createForwardPlusPipeline().insertAfter('DepthPrepass', depthConsumer);
+    const graph = new RenderGraph();
+    buildForwardPlusGraph(
+      graph,
+      createMockDrawContext({ camera: { renderPipeline: pipeline }, ...createExternalDepthContext() }),
+      createMockRenderQueue({ needSceneColor: false }),
+      createOptions()
+    );
+
+    const read = graph.passes.find((pass) => pass.name === 'ExternalDepthConsumer')?.reads[0];
+    expect(read?.name).toBe('externalSceneDepth');
+    expect(read?.kind).toBe('imported');
+  });
+
   test('keeps LightPass alive when the scene renders directly into the final framebuffer', () => {
     const { graph, backbuffer } = buildForwardPlusGraphForTest(
       createOptions(),

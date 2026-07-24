@@ -1,5 +1,27 @@
 import type { RenderContext } from './render_context';
 import type { FrameResourceRequirements } from './frame_resource_requirements';
+import type { RenderPipeline } from './render_pipeline';
+
+/** Selects which declared writer satisfies a module resource read. @public */
+export interface RenderModuleReadDescriptor {
+  /** Blackboard resource key. */
+  readonly resource: string;
+  /**
+   * `current` selects the nearest prior writer in authored order. `final`
+   * selects the last writer in the pipeline and may reorder this module.
+   * Default `current`.
+   */
+  readonly version?: 'current' | 'final';
+  /** Allow the read to have no enabled declared writer. Default false. */
+  readonly optional?: boolean;
+}
+
+/**
+ * Module resource read declaration. A string is the compatibility shorthand
+ * for `{ resource, version: 'final', optional: true }`.
+ * @public
+ */
+export type RenderModuleRead = string | RenderModuleReadDescriptor;
 
 /**
  * A self-describing unit of a {@link ./render_pipeline#RenderPipeline}.
@@ -40,19 +62,16 @@ export interface RenderModule<TCtx extends RenderContext = RenderContext> {
    * Named frame resources (blackboard keys, see {@link ./blackboard#FrameResources})
    * this module's `setup` depends on being published already.
    *
-   * When set, the pipeline auto-orders this module's `setup` after every module
-   * that declares it {@link RenderModule.writes} one of these resources — so the
-   * module can be added at any position (e.g. plain `append`) and still see the
-   * inputs it needs, without the author picking an anchor. A read whose producer
-   * is absent this frame (gated off, or never declared) is skipped, not an
-   * error. If the module requires the resource, check `blackboard.has(...)` in
-   * {@link RenderModule.setup} before calling `expect()`. `enabled()` is evaluated
-   * for every module before any setup runs and must not depend on resources
+   * Descriptor reads distinguish the resource visible at the authored position
+   * (`version: 'current'`) from the pipeline's last writer (`version: 'final'`).
+   * Required reads reject missing enabled writers; set `optional: true` when
+   * absence is supported. String reads retain legacy optional-final behavior.
+   * `enabled()` is evaluated before setup and must not depend on resources
    * published by another module's setup.
    *
    * Omit for a module whose position is authored explicitly (append / insertAfter / ...).
    */
-  readonly reads?: readonly string[];
+  readonly reads?: readonly RenderModuleRead[];
 
   /**
    * Named frame resources (blackboard keys) this module's `setup` publishes.
@@ -60,6 +79,21 @@ export interface RenderModule<TCtx extends RenderContext = RenderContext> {
    * resource here does not by itself change this module's own position.
    */
   readonly writes?: readonly string[];
+
+  /** Called when this module becomes owned by a pipeline. */
+  attach?(pipeline: RenderPipeline<TCtx>): void;
+
+  /** Called immediately before this module leaves its owning pipeline. */
+  detach?(pipeline: RenderPipeline<TCtx>): void;
+
+  /** Release resources owned by this module. Called at most once by its pipeline. */
+  dispose?(): void;
+
+  /**
+   * Create an independent module for {@link RenderPipeline.clone}. Modules with
+   * lifecycle hooks must provide this method; stateless modules may be shared.
+   */
+  clone?(): RenderModule<TCtx>;
 
   /**
    * Declare semantic frame resources this module needs the pipeline to produce.

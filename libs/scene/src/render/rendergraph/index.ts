@@ -9,6 +9,7 @@ export {
   type RGProfileScopeResult,
   type RGProfileScopeType,
   type RGPassBuilder,
+  type RGWriteOptions,
   type CompiledRenderGraph,
   type RGResourceLifetime,
   type RGExecuteFn,
@@ -29,8 +30,8 @@ export {
   type FrameResourceRequirements
 } from './frame_resource_requirements';
 export { OrderingScope, type RenderContext } from './render_context';
-export type { ForwardPlusModuleContext, RenderModuleContext } from './frame_graph_context';
-export type { RenderModule } from './render_module';
+export type { ForwardPlusModuleContext, RenderModuleContext, FrameGraphContext } from './frame_graph_context';
+export type { RenderModule, RenderModuleRead, RenderModuleReadDescriptor } from './render_module';
 export { RenderPipeline, resolveModuleOrder } from './render_pipeline';
 export {
   buildForwardPlusGraph,

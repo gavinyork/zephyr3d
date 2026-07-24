@@ -12,7 +12,7 @@ export interface OutlineSettings {
 /**
  * Creates a custom pipeline module that draws an inverted-hull outline around one mesh.
  *
- * The module runs between the opaque LightPass and CompositeTail. It draws an expanded,
+ * The module runs between SkyPass and CompositeTail. It draws an expanded,
  * front-face-culled proxy into the current scene color while reusing the scene depth attachment.
  */
 export function createOutlineModule(
@@ -24,6 +24,16 @@ export function createOutlineModule(
 
   return {
     type: 'ObjectOutline',
+    reads: [
+      { resource: FrameResources.SceneColor, version: 'current' },
+      { resource: FrameResources.SceneDepthAttachment, version: 'current' }
+    ],
+    writes: [FrameResources.SceneColor],
+    clone: () => createOutlineModule(target, settings),
+    dispose() {
+      outlineProxy.dispose();
+      outlineMaterial.dispose();
+    },
     enabled: () => settings.enabled,
     setup(fg) {
       const sceneColor = fg.blackboard.expect(FrameResources.SceneColor);

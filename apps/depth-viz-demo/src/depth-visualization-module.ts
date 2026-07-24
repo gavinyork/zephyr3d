@@ -11,16 +11,14 @@ import { DepthGrayscaleBlitter } from './depth-grayscale-blitter';
  * PUBLIC render-pipeline API only, yet it takes over the pipeline's final
  * output. It relies on two pieces of the architecture:
  *
- * 1. `reads: [FrameResources.LinearDepth]` — the pipeline auto-orders this
- *    module's setup after whatever produced the linear-depth resource, so the
- *    module can simply be `append`ed with no explicit anchor.
+ * 1. A final `LinearDepth` read orders setup after the last depth writer, so the
+ *    module can simply be appended with no explicit anchor.
  *
  * 2. `FrameResources.PresentedColor` — the tail (Present) module registers the
  *    backbuffer version it presents under this key, and the graph's output sink
- *    is resolved from it (last registration wins). By reading the previous
- *    presented version (which orders our pass AFTER Present), writing a new
- *    backbuffer version, and re-registering it, this module becomes the graph's
- *    final sink. The render graph keeps our pass alive and culls nothing.
+ *    is resolved from it (last registration wins). A discard write replaces
+ *    that version and becomes the new sink, allowing the unused shaded-color
+ *    and presentation passes to be culled.
  *
  * The blit target is the pipeline's final framebuffer, captured at build time
  * from `getDevice().getFramebuffer()` — this is exactly what the engine records
@@ -35,9 +33,14 @@ export function createDepthVisualizationModule(): RenderModule {
 
   return {
     type: 'DepthVisualization',
+    clone: () => createDepthVisualizationModule(),
     // Declarative ordering: place this module's setup after the linear-depth
     // producer. We do not care where in the authored list it sits.
-    reads: [FrameResources.LinearDepth, FrameResources.PresentedColor],
+    reads: [
+      { resource: FrameResources.LinearDepth, version: 'final' },
+      { resource: FrameResources.PresentedColor, version: 'final' }
+    ],
+    writes: [FrameResources.PresentedColor],
     // enabled() runs before every module's setup(), so gate on published resources in setup.
     enabled: () => true,
     setup({ graph, blackboard, finalFramebuffer }) {
@@ -52,14 +55,11 @@ export function createDepthVisualizationModule(): RenderModule {
 
       const written = graph.addPass('DepthVisualization', (builder) => {
         builder.read(depthHandle);
-        // Reading the previously-presented backbuffer version orders this pass
-        // after the built-in Present pass (it renders the normal frame first).
-        builder.read(prevPresented);
-        // Produce a new backbuffer version so we become the latest sink.
-        const out: RGHandle = builder.write(prevPresented);
+        // Fully replace the presented image; prior color contents are unused.
+        const out: RGHandle = builder.write(prevPresented, { load: 'discard' });
         builder.setExecute((rgCtx: RGExecuteContext) => {
           const depthTex = rgCtx.getTexture<Texture2D>(depthHandle);
-          // The stored depth is normalized (near/z); the window + gamma control
+          // The stored depth is normalized by camera far distance; window + gamma control
           // contrast (see DepthGrayscaleBlitter).
           blitter.windowNear = 0;
           blitter.windowFar = 1;

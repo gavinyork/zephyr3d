@@ -247,28 +247,9 @@ export class RenderGraph {
         if (!res) {
           throw new Error(`RenderGraph: unknown resource "${handle.name}" (id=${handle._id})`);
         }
-        // Validate that transient resources have a producer
-        if (res.kind === 'transient' && !res.producer) {
-          throw new Error(
-            `RenderGraph: pass "${pass.name}" attempts to read transient resource "${res.name}" ` +
-              `which has no producer. Ensure the resource is created before being read.`
-          );
-        }
-        if (!pass.reads.includes(res)) {
-          pass.reads.push(res);
-        }
-        if (!res.consumers.includes(pass)) {
-          res.consumers.push(pass);
-        }
-        // Reading a version that has already been superseded by a write is only
-        // satisfiable if this pass runs before the overwriting pass. Add the
-        // ordering-only WAR edge retroactively; later versions are transitively
-        // ordered through the WAW chain.
-        if (res.nextWriter && res.nextWriter !== pass && !res.nextWriter.warDependencies.includes(pass)) {
-          res.nextWriter.warDependencies.push(pass);
-        }
+        graph._declareRead(pass, res);
       },
-      write(handle: RGHandle): RGHandle {
+      write(handle: RGHandle, options): RGHandle {
         const res = graph._resources.get(handle._id);
         if (!res) {
           throw new Error(`RenderGraph: unknown resource "${handle.name}" (id=${handle._id})`);
@@ -285,9 +266,13 @@ export class RenderGraph {
               `Create a new framebuffer view instead.`
           );
         }
+        const discard = options?.load === 'discard';
         const previousWriter = graph._lastWriterByPhysicalId.get(res.physicalId);
-        if (previousWriter && previousWriter !== pass && !pass.dependencies.includes(previousWriter)) {
-          pass.dependencies.push(previousWriter);
+        if (previousWriter && previousWriter !== pass) {
+          const dependencies = discard ? pass.orderingDependencies : pass.dependencies;
+          if (!dependencies.includes(previousWriter)) {
+            dependencies.push(previousWriter);
+          }
         }
         // WAR hazard: readers of the overwritten version must run first, but
         // this pass being alive does not force them to run — ordering-only edge.
@@ -296,8 +281,11 @@ export class RenderGraph {
             pass.warDependencies.push(consumer);
           }
         }
-        if (res.producer && res.producer !== pass && !pass.dependencies.includes(res.producer)) {
-          pass.dependencies.push(res.producer);
+        if (res.producer && res.producer !== pass) {
+          const dependencies = discard ? pass.orderingDependencies : pass.dependencies;
+          if (!dependencies.includes(res.producer)) {
+            dependencies.push(res.producer);
+          }
         }
         const id = graph._nextResourceId++;
         const versionName = `${res.name}@${pass.name}`;
@@ -512,6 +500,30 @@ export class RenderGraph {
   }
 
   /** @internal */
+  private _declareRead(pass: RGPass, res: RGResource): void {
+    // Validate that transient resources have a producer.
+    if (res.kind === 'transient' && !res.producer) {
+      throw new Error(
+        `RenderGraph: pass "${pass.name}" attempts to read transient resource "${res.name}" ` +
+          `which has no producer. Ensure the resource is created before being read.`
+      );
+    }
+    if (!pass.reads.includes(res)) {
+      pass.reads.push(res);
+    }
+    if (!res.consumers.includes(pass)) {
+      res.consumers.push(pass);
+    }
+    // Reading a version that has already been superseded by a write is only
+    // satisfiable if this pass runs before the overwriting pass. Add the
+    // ordering-only WAR edge retroactively; later versions are transitively
+    // ordered through the WAW chain.
+    if (res.nextWriter && res.nextWriter !== pass && !res.nextWriter.warDependencies.includes(pass)) {
+      res.nextWriter.warDependencies.push(pass);
+    }
+  }
+
+  /** @internal */
   private _declareFramebufferAttachmentDeps(
     pass: RGPass,
     desc: { colorAttachments: unknown | unknown[] | null; depthAttachment?: unknown | null }
@@ -530,12 +542,7 @@ export class RenderGraph {
           );
         }
         if (res.producer !== pass) {
-          if (!pass.reads.includes(res)) {
-            pass.reads.push(res);
-          }
-          if (!res.consumers.includes(pass)) {
-            res.consumers.push(pass);
-          }
+          this._declareRead(pass, res);
         }
       }
     };
@@ -582,6 +589,9 @@ export class RenderGraph {
 
     for (const pass of alivePasses) {
       for (const dependency of pass.dependencies) {
+        addEdge(dependency, pass);
+      }
+      for (const dependency of pass.orderingDependencies) {
         addEdge(dependency, pass);
       }
       // WAR edges constrain ordering among alive passes only; they were

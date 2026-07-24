@@ -869,6 +869,139 @@ describe('RenderGraph mutation safety', () => {
     const names = graph.compile([v1]).orderedPasses.map((pass) => pass.name);
     expect(names).toEqual(['Producer', 'Writer']);
   });
+
+  test('stale color framebuffer attachment is ordered before its overwriting pass', () => {
+    const graph = new RenderGraph();
+    let colorV0: RGHandle;
+
+    graph.addPass('Producer', (builder) => {
+      colorV0 = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      builder.setExecute(() => {});
+    });
+    const colorV1 = graph.addPass('Overwrite', (builder) => {
+      const out = builder.write(colorV0!);
+      builder.setExecute(() => {});
+      return out;
+    });
+    const framebuffer = graph.addPass('LateFramebuffer', (builder) => {
+      const out = builder.createFramebuffer({ colorAttachments: colorV0! });
+      builder.setExecute(() => {});
+      return out;
+    });
+
+    const names = graph.compile([colorV1, framebuffer]).orderedPasses.map((pass) => pass.name);
+    expect(names.indexOf('LateFramebuffer')).toBeLessThan(names.indexOf('Overwrite'));
+  });
+
+  test('stale depth framebuffer attachment is ordered before its overwriting pass', () => {
+    const graph = new RenderGraph();
+    let depthV0: RGHandle;
+
+    graph.addPass('Producer', (builder) => {
+      depthV0 = builder.createTexture({ format: 'd24s8', label: 'depth' });
+      builder.setExecute(() => {});
+    });
+    const depthV1 = graph.addPass('Overwrite', (builder) => {
+      const out = builder.write(depthV0!);
+      builder.setExecute(() => {});
+      return out;
+    });
+    const framebuffer = graph.addPass('LateFramebuffer', (builder) => {
+      const out = builder.createFramebuffer({ colorAttachments: null, depthAttachment: depthV0! });
+      builder.setExecute(() => {});
+      return out;
+    });
+
+    const names = graph.compile([depthV1, framebuffer]).orderedPasses.map((pass) => pass.name);
+    expect(names.indexOf('LateFramebuffer')).toBeLessThan(names.indexOf('Overwrite'));
+  });
+
+  test('framebuffer setup failure rolls back retroactive attachment WAR edges', () => {
+    const graph = new RenderGraph();
+    let colorV0: RGHandle;
+
+    graph.addPass('Producer', (builder) => {
+      colorV0 = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      builder.setExecute(() => {});
+    });
+    const colorV1 = graph.addPass('Writer', (builder) => {
+      const out = builder.write(colorV0!);
+      builder.setExecute(() => {});
+      return out;
+    });
+    const token = graph.addPass('Token', (builder) => builder.createToken('invalid-attachment'));
+
+    expect(() =>
+      graph.addPass('BrokenFramebuffer', (builder) => {
+        builder.createFramebuffer({ colorAttachments: [colorV0!, token] });
+      })
+    ).toThrow('must be a texture resource');
+
+    const writerPass = graph.passes.find((pass) => pass.name === 'Writer')!;
+    expect(writerPass.warDependencies).toHaveLength(0);
+    expect(graph.getResource(colorV0!)?.consumers).not.toContainEqual(
+      expect.objectContaining({ name: 'BrokenFramebuffer' })
+    );
+    expect(graph.compile([colorV1]).orderedPasses.map((pass) => pass.name)).toEqual(['Producer', 'Writer']);
+  });
+
+  test('discard write culls passes needed only for previous contents', () => {
+    const graph = new RenderGraph();
+    let color: RGHandle;
+
+    graph.addPass('OldContents', (builder) => {
+      color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      builder.setExecute(() => {});
+    });
+    const replaced = graph.addPass('FullOverwrite', (builder) => {
+      const out = builder.write(color!, { load: 'discard' });
+      builder.setExecute(() => {});
+      return out;
+    });
+
+    expect(graph.compile([replaced]).orderedPasses.map((pass) => pass.name)).toEqual(['FullOverwrite']);
+  });
+
+  test('load write keeps the previous contents producer alive', () => {
+    const graph = new RenderGraph();
+    let color: RGHandle;
+
+    graph.addPass('OldContents', (builder) => {
+      color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
+      builder.setExecute(() => {});
+    });
+    const replaced = graph.addPass('PartialOverwrite', (builder) => {
+      const out = builder.write(color!);
+      builder.setExecute(() => {});
+      return out;
+    });
+
+    expect(graph.compile([replaced]).orderedPasses.map((pass) => pass.name)).toEqual([
+      'OldContents',
+      'PartialOverwrite'
+    ]);
+  });
+
+  test('discard write preserves WAW ordering among independently alive passes', () => {
+    const graph = new RenderGraph();
+    const target = graph.importTexture('target');
+    const first = graph.addPass('FirstWrite', (builder) => {
+      const out = builder.write(target);
+      builder.sideEffect();
+      builder.setExecute(() => {});
+      return out;
+    });
+    const second = graph.addPass('DiscardWrite', (builder) => {
+      const out = builder.write(first, { load: 'discard' });
+      builder.setExecute(() => {});
+      return out;
+    });
+
+    expect(graph.compile([second]).orderedPasses.map((pass) => pass.name)).toEqual([
+      'FirstWrite',
+      'DiscardWrite'
+    ]);
+  });
 });
 
 // ─── RenderGraphExecutor Tests ────────────────────────────────────────

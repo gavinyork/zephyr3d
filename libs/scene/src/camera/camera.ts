@@ -33,7 +33,7 @@ import { ABufferOIT } from '../render/abuffer_oit';
 import { WeightedBlendedOIT } from '../render/weightedblended_oit';
 import { DualDepthPeelingOIT } from '../render/dualdepthpeeling_oit';
 import type { HistoryResourceManager } from '../render';
-import type { RenderPipeline } from '../render';
+import type { FrameGraphContext, RenderPipeline } from '../render';
 
 /**
  * Result of a camera picking operation.
@@ -1804,22 +1804,17 @@ export class Camera extends SceneNode {
     Camera._historyResourceManager.set(this, manager);
   }
   /** @internal */
-  private _renderPipeline: Nullable<RenderPipeline<any>> = null;
+  private _renderPipeline: Nullable<RenderPipeline<FrameGraphContext>> = null;
   /**
    * The render pipeline that assembles this camera's frame graph. When null
    * (the default), the shared default Forward+ pipeline is used. Assign a
    * customized pipeline to override rendering for this camera only, e.g.
-   * `camera.renderPipeline = createForwardPlusPipeline().insertAfter('LightPass', myModule)`.
-   *
-   * Typed as `RenderPipeline<any>` because a camera may hold any concrete
-   * pipeline (Forward+, and later Deferred or fully custom), each parameterized
-   * over its own context type; the concrete pipeline returned by
-   * `createForwardPlusPipeline()` remains strongly typed at its creation site.
+   * `camera.renderPipeline = createForwardPlusPipeline().insertAfter('SkyPass', myModule)`.
    */
-  get renderPipeline(): Nullable<RenderPipeline<any>> {
+  get renderPipeline(): Nullable<RenderPipeline<FrameGraphContext>> {
     return this._renderPipeline;
   }
-  set renderPipeline(pipeline: Nullable<RenderPipeline<any>>) {
+  set renderPipeline(pipeline: Nullable<RenderPipeline<FrameGraphContext>>) {
     this._renderPipeline = pipeline;
   }
   /** @internal */

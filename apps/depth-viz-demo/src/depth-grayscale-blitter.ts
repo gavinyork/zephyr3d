@@ -8,7 +8,8 @@ import type { BindGroup, PBShaderExp, PBInsideFunctionScope, PBGlobalScope } fro
  * into a grayscale image.
  *
  * `FrameResources.LinearDepth` stores **normalized** linear depth in `[0, 1]`
- * (`near / z`), and on the WebGL backend it is RGBA8-packed rather than stored
+ * (view-space depth divided by the camera far distance), and on the WebGL backend it is
+ * RGBA8-packed rather than stored
  * in a single float channel. Reading `.r` directly is therefore wrong on WebGL
  * and unscaled everywhere. This blitter uses the engine's public
  * {@link ShaderHelper.sampleLinearDepth}, which decodes the value correctly per

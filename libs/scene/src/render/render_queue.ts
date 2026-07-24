@@ -26,11 +26,12 @@ const maxBufferSizeInFloats = 65536 / 4;
  * Instance bind group allocator
  * @public
  */
-export class InstanceBindGroupAllocator {
+export class InstanceBindGroupAllocator extends Disposable {
   private static _instanceBindGroupLayout: Nullable<BindGroupLayout> = null;
   _bindGroupList: CachedBindGroup[] = [];
   private _allocFrameStamp: number;
   constructor() {
+    super();
     this._allocFrameStamp = -1;
     this._bindGroupList = [];
   }
@@ -68,6 +69,22 @@ export class InstanceBindGroupAllocator {
     };
     this._bindGroupList.push(bindGroup);
     return bindGroup;
+  }
+  /** Reset all allocations so the owned bind groups can be reused. */
+  reset() {
+    this._allocFrameStamp = -1;
+    for (const allocation of this._bindGroupList) {
+      allocation.offset = 0;
+      allocation.dirty = true;
+    }
+  }
+  /** Release all bind groups owned by this allocator. */
+  protected onDispose() {
+    super.onDispose();
+    for (const allocation of this._bindGroupList) {
+      allocation.bindGroup.dispose();
+    }
+    this._bindGroupList.length = 0;
   }
 }
 
@@ -142,6 +159,8 @@ export interface RenderItemList {
  */
 export interface RenderQueueRef {
   ref: RenderQueue;
+  /** False after the queue is cleared and starts a new contents generation. */
+  valid: boolean;
 }
 
 /**
@@ -175,7 +194,7 @@ export class RenderQueue extends Disposable {
   /** @internal */
   private readonly _bindGroupAllocator: InstanceBindGroupAllocator;
   /** @internal */
-  private readonly _ref: RenderQueueRef;
+  private _ref: RenderQueueRef;
   /** @internal */
   private readonly _instanceInfo: Map<Drawable, DrawableInstanceInfo>;
   /** @internal */
@@ -200,7 +219,7 @@ export class RenderQueue extends Disposable {
     this._sunLight = null;
     this._primaryDirectionalLight = null;
     this._primaryTransmissionLight = null;
-    this._ref = { ref: this };
+    this._ref = { ref: this, valid: true };
     this._instanceInfo = new Map();
     this._needSceneColor = false;
     this._needSceneDepth = false;
@@ -508,6 +527,11 @@ export class RenderQueue extends Disposable {
       }
       this._itemList = null;
     }
+    this._ref.valid = false;
+    this._ref = { ref: this, valid: true };
+    this._instanceInfo.clear();
+    this._objectColorMaps.length = 1;
+    this._objectColorMaps[0].clear();
     this._shadowedLightList = [];
     this._unshadowedLightList = [];
     this._sunLight = null;
@@ -669,6 +693,7 @@ export class RenderQueue extends Disposable {
   protected onDispose() {
     super.onDispose();
     this.reset();
+    this._ref.valid = false;
   }
 
   private drawableDistanceToCamera(drawable: Drawable, cameraPos: Vector3) {

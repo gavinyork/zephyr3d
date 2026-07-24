@@ -473,6 +473,7 @@ export interface FrameState {
 interface ForwardPlusGraphBuildResult {
   backbuffer: RGHandle;
   frame: FrameState;
+  externalDepthImport?: { handle: RGHandle; texture: Texture2D };
 }
 
 interface HistoryReadBinding {
@@ -485,6 +486,7 @@ export interface DepthPrepassResult {
   depthHandle: RGHandle;
   motionVectorHandle?: RGHandle;
   graphDepthAttachmentHandle?: RGHandle;
+  externalDepthAttachmentHandle?: RGHandle;
   externalDepthAttachment: Nullable<Texture2D>;
   depthFramebufferHandle: RGHandle;
 }
@@ -682,6 +684,9 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
       const externalDepthAttachment = finalDepthAttachment?.isTexture2D()
         ? (finalDepthAttachment as Texture2D)
         : null;
+      const externalDepthAttachmentHandle = externalDepthAttachment
+        ? graph.importTexture('externalSceneDepth')
+        : undefined;
       const graphDepthAttachmentHandle = externalDepthAttachment
         ? undefined
         : builder.createTexture({
@@ -690,7 +695,7 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
             allocationKey: 'ForwardPlus.SceneDepth'
           });
       const depthAttachmentOrFormat =
-        externalDepthAttachment ?? graphDepthAttachmentHandle ?? ctx.depthFormat;
+        externalDepthAttachmentHandle ?? graphDepthAttachmentHandle ?? ctx.depthFormat;
       const depthFramebufferHandle = builder.createFramebuffer({
         label: 'DepthPrepassFramebuffer',
         width: ctx.renderWidth,
@@ -730,6 +735,7 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
         depthHandle,
         motionVectorHandle,
         graphDepthAttachmentHandle,
+        externalDepthAttachmentHandle,
         externalDepthAttachment,
         depthFramebufferHandle
       };
@@ -744,12 +750,13 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
     if (result.motionVectorHandle) {
       blackboard.set(FrameResources.MotionVector, result.motionVectorHandle);
     }
-    if (result.graphDepthAttachmentHandle) {
-      blackboard.set(FrameResources.SceneDepthAttachment, result.graphDepthAttachmentHandle);
-    }
+    blackboard.set(
+      FrameResources.SceneDepthAttachment,
+      result.graphDepthAttachmentHandle ?? result.externalDepthAttachmentHandle!
+    );
     // Derived attachment + final-framebuffer mode are consumed by later modules.
     fg.state.renderDepthAttachment =
-      result.graphDepthAttachmentHandle ?? result.externalDepthAttachment ?? null;
+      result.graphDepthAttachmentHandle ?? result.externalDepthAttachmentHandle ?? null;
     // Rendering the scene directly into the final framebuffer is only possible
     // when no opaque-layer effect is enabled: those effects must sample the
     // opaque scene color as a texture and may require surface MRT attachments
@@ -1242,34 +1249,9 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
         skinSSSHandle
       };
     });
-    // Sky and opaque geometry share the same color/depth target, but are
-    // deliberately separate graph passes. The in-place scene-color write keeps
-    // the original opaque -> sky ordering while making the two GPU operations
-    // independently visible to graph diagnostics/profilers.
-    const skySceneColorHandle = graph.addPass('SkyPass', (builder) => {
-      builder.read(opaquePassResult.sceneColorHandle);
-      builder.read(depthPassResult.depthFramebufferHandle);
-      if (opaquePassResult.sceneColorFramebufferHandle) {
-        builder.read(opaquePassResult.sceneColorFramebufferHandle);
-      }
-      const out = builder.write(opaquePassResult.sceneColorHandle);
-      builder.setExecute((rgCtx) => {
-        // A refraction background grab already contains sky/fog and is blitted
-        // by LightPass. Reapplying fog here would fog the scene twice.
-        if (!sceneColorCopyHandle) {
-          renderSkyScenePass(frame, rgCtx, opaquePassResult.sceneColorFramebufferHandle);
-        }
-      });
-      return out;
-    });
-    const lightPassResult: LightPassResult = {
-      ...opaquePassResult,
-      sceneColorHandle: skySceneColorHandle
-    };
+    const lightPassResult: LightPassResult = opaquePassResult;
     fg.state.lightPass = lightPassResult;
-    // Publish the complete opaque-layer color (opaque geometry followed by
-    // sky/fog) so modules inserted before CompositeTail consume the latest
-    // version.
+    // SkyPass advances this opaque-only color to the complete opaque layer.
     blackboard.set(FrameResources.SceneColor, lightPassResult.sceneColorHandle);
     // Register the LightPass MRT products so effects can look them up by name.
     if (lightPassResult.sceneRoughnessHandle) {
@@ -1287,6 +1269,43 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     if (lightPassResult.skinSSSHandle) {
       blackboard.set(FrameResources.SkinSSS, lightPassResult.skinSSSHandle);
     }
+  }
+};
+
+// ─── Sky pass module ────────────────────────────────────────────────
+
+/** @internal */
+const SkyPassModule: RenderModule<FrameGraphContext> = {
+  type: 'SkyPass',
+  reads: [{ resource: FrameResources.SceneColor, version: 'current' }],
+  writes: [FrameResources.SceneColor],
+  enabled: () => true,
+  setup(fg: FrameGraphContext) {
+    const { graph, frame, blackboard } = fg;
+    const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'SkyPass');
+    const lightPassResult = requireBuildState(fg, 'lightPass', 'LightPass', 'SkyPass');
+    const sceneColorCopyHandle = blackboard.get(FrameResources.SceneColorCopy);
+    const sceneColorHandle = blackboard.expect(FrameResources.SceneColor);
+
+    const skySceneColorHandle = graph.addPass('SkyPass', (builder) => {
+      builder.read(sceneColorHandle);
+      builder.read(depthPassResult.depthFramebufferHandle);
+      if (lightPassResult.sceneColorFramebufferHandle) {
+        builder.read(lightPassResult.sceneColorFramebufferHandle);
+      }
+      const out = builder.write(sceneColorHandle);
+      builder.setExecute((rgCtx) => {
+        // A refraction background grab already contains sky/fog and is blitted
+        // by LightPass. Reapplying fog here would fog the scene twice.
+        if (!sceneColorCopyHandle) {
+          renderSkyScenePass(frame, rgCtx, lightPassResult.sceneColorFramebufferHandle);
+        }
+      });
+      return out;
+    });
+
+    lightPassResult.sceneColorHandle = skySceneColorHandle;
+    blackboard.set(FrameResources.SceneColor, skySceneColorHandle);
   }
 };
 
@@ -1520,7 +1539,7 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
 
 /**
  * The built-in Forward+ modules in default order. Referenced by anchor `type`
- * for pipeline insertion/replacement (e.g. `insertAfter('LightPass', ...)`).
+ * for pipeline insertion/replacement (e.g. `insertAfter('SkyPass', ...)`).
  *
  * @public
  */
@@ -1536,6 +1555,7 @@ export const ForwardPlusModules = {
   SSSProfile: SSSProfileModule,
   SceneColorGrab: SceneColorGrabModule,
   LightPass: LightPassModule,
+  SkyPass: SkyPassModule,
   CompositeTail: CompositeTailModule
 } as const;
 
@@ -1552,6 +1572,7 @@ const DEFAULT_FORWARD_PLUS_MODULES: readonly RenderModule<FrameGraphContext>[] =
   SSSProfileModule,
   SceneColorGrabModule,
   LightPassModule,
+  SkyPassModule,
   CompositeTailModule
 ];
 
@@ -1672,7 +1693,12 @@ function buildForwardPlusGraphInternal(
   validateProducedFrameResources(blackboard, options, renderQueue);
 
   const presented = blackboard.get(FrameResources.PresentedColor) ?? fg.state.presentedBackbuffer!;
-  return { backbuffer: presented, frame };
+  const depth = fg.state.depth;
+  const externalDepthImport =
+    depth?.externalDepthAttachmentHandle && depth.externalDepthAttachment
+      ? { handle: depth.externalDepthAttachmentHandle, texture: depth.externalDepthAttachment }
+      : undefined;
+  return { backbuffer: presented, frame, externalDepthImport };
 }
 
 // ─── Pass Implementation Helpers ────────────────────────────────────
@@ -2375,6 +2401,12 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
     if (ctx.finalFramebuffer) {
       const backbufferTex = ctx.finalFramebuffer.getColorAttachments()[0] as Texture2D;
       executor.setImportedTexture(buildResult.backbuffer, backbufferTex);
+    }
+    if (buildResult.externalDepthImport) {
+      executor.setImportedTexture(
+        buildResult.externalDepthImport.handle,
+        buildResult.externalDepthImport.texture
+      );
     }
     historyManager.bindImportedTextures(executor);
 

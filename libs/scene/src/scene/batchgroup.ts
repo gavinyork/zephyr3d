@@ -113,6 +113,15 @@ export class BatchGroup extends GraphNode {
     // Reset the render queue when attached to a new scene.
     this.invalidate();
   }
+  /** Release cached queues and their private instance bind groups. */
+  protected onDispose() {
+    for (const { queue } of this._renderQueueMap.values()) {
+      queue.dispose();
+    }
+    this._renderQueueMap.clear();
+    this._bindGroupAllocator.dispose();
+    super.onDispose();
+  }
   /** @internal */
   computeBoundingVolume() {
     const bv = new BoundingBox();

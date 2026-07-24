@@ -28,6 +28,60 @@ const SURFACE_MRT_FLAGS =
 const _sceneLightPass = new LightPass();
 const _sceneDepthPass = new DepthPass();
 
+type DrawContextState = Pick<
+  DrawContext,
+  | 'renderPass'
+  | 'renderPassHash'
+  | 'shaderVariantHash'
+  | 'flip'
+  | 'drawEnvLight'
+  | 'env'
+  | 'queue'
+  | 'lightBlending'
+  | 'instanceData'
+  | 'oit'
+  | 'currentShadowLight'
+  | 'materialFlags'
+  | 'shadowMaskClusterSample'
+  | 'compositor'
+  | 'depthPrepassAttachment'
+  | 'sunLight'
+  | 'primaryDirectionalLight'
+  | 'primaryTransmissionLight'
+>;
+
+function snapshotDrawContext(ctx: DrawContext): DrawContextState {
+  return {
+    renderPass: ctx.renderPass,
+    renderPassHash: ctx.renderPassHash,
+    shaderVariantHash: ctx.shaderVariantHash,
+    flip: ctx.flip,
+    drawEnvLight: ctx.drawEnvLight,
+    env: ctx.env,
+    queue: ctx.queue,
+    lightBlending: ctx.lightBlending,
+    instanceData: ctx.instanceData,
+    oit: ctx.oit,
+    currentShadowLight: ctx.currentShadowLight,
+    materialFlags: ctx.materialFlags,
+    shadowMaskClusterSample: ctx.shadowMaskClusterSample,
+    compositor: ctx.compositor,
+    depthPrepassAttachment: ctx.depthPrepassAttachment,
+    sunLight: ctx.sunLight,
+    primaryDirectionalLight: ctx.primaryDirectionalLight,
+    primaryTransmissionLight: ctx.primaryTransmissionLight
+  };
+}
+
+function restoreDrawContext(ctx: DrawContext, state: DrawContextState): void {
+  Object.assign(ctx, state);
+}
+
+/** Test-only access to the facade-owned pass instances. @internal */
+export function _getSceneRenderPassesForTest() {
+  return { light: _sceneLightPass, depth: _sceneDepthPass };
+}
+
 /**
  * Options for a facade scene render call.
  *
@@ -248,7 +302,13 @@ class SceneRenderContextImpl implements SceneRenderContext {
 
   cull(camera?: Camera, filter?: (drawable: Drawable) => boolean): RenderQueue {
     const cullCamera = camera ?? this._ctx.camera;
-    const queue = _sceneLightPass.cullScene(this._ctx, cullCamera);
+    const savedContext = snapshotDrawContext(this._ctx);
+    let queue: RenderQueue;
+    try {
+      queue = _sceneLightPass.cullScene(this._ctx, cullCamera);
+    } finally {
+      restoreDrawContext(this._ctx, savedContext);
+    }
     if (!filter) {
       return this._own(queue);
     }
@@ -302,6 +362,7 @@ class SceneRenderContextImpl implements SceneRenderContext {
       },
       clear(): PersistentSceneQueue {
         queue.reset();
+        allocator.reset();
         return this;
       },
       add(drawable: Drawable, camera: Camera): PersistentSceneQueue {
@@ -314,6 +375,7 @@ class SceneRenderContextImpl implements SceneRenderContext {
       },
       dispose(): void {
         queue.dispose();
+        allocator.dispose();
       }
     };
   }
@@ -374,9 +436,7 @@ class SceneRenderContextImpl implements SceneRenderContext {
     const savedClearColor = _sceneLightPass.clearColor;
     const savedClearDepth = _sceneLightPass.clearDepth;
     const savedClearStencil = _sceneLightPass.clearStencil;
-    const savedMaterialFlags = ctx.materialFlags;
-    const savedCompositor = ctx.compositor;
-    const savedPrepassDepth = ctx.depthPrepassAttachment;
+    const savedContext = snapshotDrawContext(ctx);
     ctx.depthPrepassAttachment = undefined;
     device.pushDeviceStates();
     try {
@@ -385,8 +445,11 @@ class SceneRenderContextImpl implements SceneRenderContext {
       device.setScissor(null);
       // The facade renders into a single-color target with no post-processing,
       // so strip surface-MRT store flags and detach the compositor.
-      ctx.materialFlags = savedMaterialFlags & ~SURFACE_MRT_FLAGS;
+      ctx.materialFlags = savedContext.materialFlags & ~SURFACE_MRT_FLAGS;
       ctx.compositor = null;
+      ctx.sunLight = queue.sunLight;
+      ctx.primaryDirectionalLight = queue.primaryDirectionalLight;
+      ctx.primaryTransmissionLight = queue.primaryTransmissionLight;
       _sceneLightPass.transmission = false;
       _sceneLightPass.renderSky = false;
       _sceneLightPass.renderOpaque = renderOpaque;
@@ -403,9 +466,7 @@ class SceneRenderContextImpl implements SceneRenderContext {
       _sceneLightPass.clearColor = savedClearColor ?? null;
       _sceneLightPass.clearDepth = savedClearDepth;
       _sceneLightPass.clearStencil = savedClearStencil;
-      ctx.materialFlags = savedMaterialFlags;
-      ctx.compositor = savedCompositor;
-      ctx.depthPrepassAttachment = savedPrepassDepth;
+      restoreDrawContext(ctx, savedContext);
       device.popDeviceStates();
     }
   }
@@ -422,13 +483,16 @@ class SceneRenderContextImpl implements SceneRenderContext {
     const savedClearColor = _sceneDepthPass.clearColor;
     const savedClearDepth = _sceneDepthPass.clearDepth;
     const savedClearStencil = _sceneDepthPass.clearStencil;
-    const savedMaterialFlags = ctx.materialFlags;
+    const savedContext = snapshotDrawContext(ctx);
     device.pushDeviceStates();
     try {
       device.setFramebuffer(target);
       device.setViewport(null);
       device.setScissor(null);
-      ctx.materialFlags = savedMaterialFlags & ~SURFACE_MRT_FLAGS;
+      ctx.materialFlags = savedContext.materialFlags & ~SURFACE_MRT_FLAGS;
+      ctx.sunLight = queue.sunLight;
+      ctx.primaryDirectionalLight = queue.primaryDirectionalLight;
+      ctx.primaryTransmissionLight = queue.primaryTransmissionLight;
       _sceneDepthPass.transmission = false;
       _sceneDepthPass.renderBackface = false;
       _sceneDepthPass.encodeDepth = encodeDepth;
@@ -448,7 +512,7 @@ class SceneRenderContextImpl implements SceneRenderContext {
       _sceneDepthPass.clearColor = savedClearColor ?? null;
       _sceneDepthPass.clearDepth = savedClearDepth;
       _sceneDepthPass.clearStencil = savedClearStencil;
-      ctx.materialFlags = savedMaterialFlags;
+      restoreDrawContext(ctx, savedContext);
       device.popDeviceStates();
     }
   }

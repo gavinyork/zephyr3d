@@ -10,13 +10,26 @@ export function createRedBoxModule(
   getMode: () => RedBoxMode
 ): RenderModule<ForwardPlusModuleContext> {
   let persistentQueue: PersistentSceneQueue | null = null;
-  let redMaterial: UnlitMaterial;
+  let redMaterial: UnlitMaterial | null = null;
+  let persistentProxies: ProxyDrawable[] = [];
 
   return {
     type: 'RedBoxPass',
+    clone: () => createRedBoxModule(redMeshes, getMode),
+    dispose() {
+      persistentQueue?.dispose();
+      persistentQueue = null;
+      for (const proxy of persistentProxies) {
+        proxy.dispose();
+      }
+      persistentProxies = [];
+      redMaterial?.dispose();
+      redMaterial = null;
+    },
     // Order this module's setup after the Present module publishes PresentedColor,
     // so we render the red boxes on top of the finished frame.
-    reads: [FrameResources.PresentedColor],
+    reads: [{ resource: FrameResources.PresentedColor, version: 'final' }],
+    writes: [FrameResources.PresentedColor],
     enabled: () => true,
     setup(fg: ForwardPlusModuleContext) {
       if (!fg.blackboard.has(FrameResources.PresentedColor)) {
@@ -31,32 +44,37 @@ export function createRedBoxModule(
         builder.read(prevPresented);
         const out = builder.write(prevPresented);
         builder.setExecute((rgCtx) => {
-          getDevice().pushDeviceStates();
-          getDevice().setFramebuffer(finalTarget);
-          const sr = createSceneRenderer(fg.ctx, rgCtx);
-          const camera = fg.ctx.camera;
-          if (getMode() === 'transient') {
-            const qb = sr.createQueue();
-            for (const mesh of redMeshes) {
-              qb.add(mesh, camera);
-            }
-            // Do not clear: render on top of the presented frame, keep its depth.
-            sr.renderOpaque(finalTarget, qb.finalize(camera));
-          } else {
-            if (!persistentQueue) {
-              persistentQueue = sr.createPersistentQueue();
-              redMaterial = new UnlitMaterial();
-              redMaterial.albedoColor = new Vector4(1, 0, 0, 1);
+          const device = getDevice();
+          device.pushDeviceStates();
+          try {
+            device.setFramebuffer(finalTarget);
+            const sr = createSceneRenderer(fg.ctx, rgCtx);
+            const camera = fg.ctx.camera;
+            if (getMode() === 'transient') {
+              const qb = sr.createQueue();
               for (const mesh of redMeshes) {
-                //persistentQueue.add(mesh, camera);
-                persistentQueue.add(new ProxyDrawable(mesh, mesh, redMaterial), camera);
+                qb.add(mesh, camera);
               }
-              persistentQueue.finalize(camera, true);
-              console.log('[RedBoxPass] persistent queue built');
+              // Do not clear: render on top of the presented frame, keep its depth.
+              sr.renderOpaque(finalTarget, qb.finalize(camera));
+            } else {
+              if (!persistentQueue) {
+                persistentQueue = sr.createPersistentQueue();
+                redMaterial = new UnlitMaterial();
+                redMaterial.albedoColor = new Vector4(1, 0, 0, 1);
+                for (const mesh of redMeshes) {
+                  const proxy = new ProxyDrawable(mesh, mesh, redMaterial);
+                  persistentProxies.push(proxy);
+                  persistentQueue.add(proxy, camera);
+                }
+                persistentQueue.finalize(camera, true);
+                console.log('[RedBoxPass] persistent queue built');
+              }
+              sr.renderOpaque(finalTarget, persistentQueue.queue);
             }
-            sr.renderOpaque(finalTarget, persistentQueue.queue);
+          } finally {
+            device.popDeviceStates();
           }
-          getDevice().popDeviceStates();
         });
         return out;
       });
