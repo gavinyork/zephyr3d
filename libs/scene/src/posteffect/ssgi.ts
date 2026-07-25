@@ -17,7 +17,7 @@ const MOMENTS_FORMAT = 'rgba16f' as const;
 /**
  * Screen-space diffuse global illumination.
  *
- * The effect traces normalized diffuse irradiance, temporally accumulates it,
+ * The effect traces diffuse irradiance, temporally accumulates it,
  * performs variance-guided cross-bilateral a-trous filtering, and publishes
  * the result as history. The next opaque light pass consumes that irradiance
  * through the material BRDF; this pass deliberately does not add irradiance
@@ -716,7 +716,15 @@ export class SSGI extends AbstractPostEffect {
               pb.sub(pb.mul(pb.textureSampleLevel(this.normalTex, this.uv, 0).rgb, 2), pb.vec3(1))
             );
             this.$l.viewNormal = pb.normalize(pb.mul(this.viewMatrix, pb.vec4(this.worldNormal, 0)).xyz);
-            this.$l.radianceSum = pb.vec3(0);
+            // Use the SH-integrated diffuse IBL as an exact, noise-free
+            // baseline. Stochastic rays only estimate the screen-space
+            // replacement relative to the environment in the same direction.
+            this.$l.iblIrradiance = pb.mul(
+              ctx.env!.light.envLight.getIrradiance(this, this.worldNormal),
+              this.radianceParams.z,
+              Math.PI
+            );
+            this.$l.correctionSum = pb.vec3(0);
             this.$for(pb.float('rayIndex'), 0, raysPerPixel, function () {
               this.$l.xi = this.SSGI_hash22(
                 pb.add(pb.mul(this.uv, this.targetSize.xy), pb.vec2(this.rayIndex, pb.mul(this.rayIndex, 7))),
@@ -766,7 +774,6 @@ export class SSGI extends AbstractPostEffect {
                 ctx.env!.light.envLight.getRadiance(this, this.worldRay, pb.float(0))!,
                 this.radianceParams.z
               );
-              this.$l.hitRadiance = this.envRadiance;
               if (sampleHistory) {
                 this.$l.hitMotion = pb.textureSampleLevel(this.motionTex, this.hitUV, 0).xy;
                 this.$l.previousHitUV = pb.sub(this.hitUV, this.hitMotion);
@@ -806,32 +813,31 @@ export class SSGI extends AbstractPostEffect {
                     this.historyRejectParams.y
                   )
                 );
-                this.hitRadiance = pb.mix(
-                  this.envRadiance,
-                  this.historyRadiance,
-                  pb.mul(this.hitConfidence, pb.float(this.historyValid))
-                );
+                this.$l.screenRadiance = this.historyRadiance;
+                this.$l.correctionValidity = pb.mul(this.hitConfidence, pb.float(this.historyValid));
               } else {
-                this.$l.currentRadiance = pb.textureSampleLevel(this.sampleColorTex, this.hitUV, 0).rgb;
-                this.hitRadiance = pb.mix(this.envRadiance, this.currentRadiance, this.hitConfidence);
+                this.$l.screenRadiance = pb.textureSampleLevel(this.sampleColorTex, this.hitUV, 0).rgb;
+                this.$l.correctionValidity = this.hitConfidence;
               }
-              // Intensity scales only the screen-space replacement. A miss
-              // remains exact IBL instead of dimming the scene.
-              this.hitRadiance = pb.mix(this.envRadiance, this.hitRadiance, this.radianceParams.x);
               this.$l.maxComponent = pb.max(
-                pb.max(this.hitRadiance.r, this.hitRadiance.g),
-                this.hitRadiance.b
+                pb.max(this.screenRadiance.r, this.screenRadiance.g),
+                this.screenRadiance.b
               );
               this.$l.fireflyScale = this.$choice(
                 pb.greaterThan(this.maxComponent, this.radianceParams.y),
                 pb.div(this.radianceParams.y, pb.max(this.maxComponent, 1e-5)),
                 pb.float(1)
               );
-              this.radianceSum = pb.add(this.radianceSum, pb.mul(this.hitRadiance, this.fireflyScale));
+              this.$l.clampedScreenRadiance = pb.mul(this.screenRadiance, this.fireflyScale);
+              this.$l.correction = pb.mul(
+                pb.sub(this.clampedScreenRadiance, this.envRadiance),
+                this.correctionValidity,
+                this.radianceParams.x,
+                Math.PI
+              );
+              this.correctionSum = pb.add(this.correctionSum, this.correction);
             });
-            // With cosine-weighted sampling, irradiance is
-            // E = PI * average(L). The receiving material applies its BRDF.
-            this.$l.irradiance = pb.mul(pb.div(this.radianceSum, raysPerPixel), Math.PI);
+            this.$l.irradiance = pb.add(this.iblIrradiance, pb.div(this.correctionSum, raysPerPixel));
             this.$outputs.outColor = pb.vec4(pb.max(this.irradiance, pb.vec3(0)), 1);
           });
         });
@@ -938,7 +944,11 @@ export class SSGI extends AbstractPostEffect {
               pb.float(pb.and(this.validUV, this.surfaceValid)),
               pb.clamp(this.previous.a, 0, 1)
             );
-            this.$l.weight = pb.mul(this.temporalParams.x, this.validity);
+            // Start new histories as a running average, then cap their weight
+            // at the configured value once enough samples have accumulated.
+            this.$l.runningAverageWeight = pb.div(this.previousMoment.z, pb.add(this.previousMoment.z, 1));
+            this.$l.historyWeight = pb.min(this.temporalParams.x, this.runningAverageWeight);
+            this.$l.weight = pb.mul(this.historyWeight, this.validity);
             this.result = pb.mix(this.current.rgb, this.previousClamped, this.weight);
             this.$l.momentXY = pb.mix(this.moment.xy, this.previousMoment.xy, this.weight);
             this.$l.historyLength = pb.mix(

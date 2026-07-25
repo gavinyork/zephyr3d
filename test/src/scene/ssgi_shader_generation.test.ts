@@ -18,7 +18,8 @@ function createShaderContext(type: 'webgl' | 'webgpu') {
   };
   const envLight = {
     initShaderBindings: () => {},
-    getRadiance: (scope: any) => scope.$builder.vec3(0.25)
+    getRadiance: (scope: any) => scope.$builder.vec3(0.25),
+    getIrradiance: (scope: any) => scope.$builder.vec3(0.5)
   };
   return {
     device,
