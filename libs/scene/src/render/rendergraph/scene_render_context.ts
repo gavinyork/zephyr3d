@@ -9,10 +9,7 @@ import { LightPass } from '../lightpass';
 import { DepthPass } from '../depthpass';
 import type { RGExecuteContext } from './types';
 
-// Surface MRT store flags (SSR roughness/normal, SSS profile/diffuse/... , skin
-// SSS). The facade never binds those extra MRT attachments, so it masks these
-// off before rendering to avoid materials writing into attachments that do not
-// exist on the user-provided target.
+// The facade uses a single-color target, so disable surface MRT outputs.
 const SURFACE_MRT_FLAGS =
   MaterialVaryingFlags.SCENE_STORE_ROUGHNESS |
   MaterialVaryingFlags.SSS_STORE_PROFILE |
@@ -21,10 +18,7 @@ const SURFACE_MRT_FLAGS =
   MaterialVaryingFlags.SSS_STORE_TRANSMISSION |
   MaterialVaryingFlags.SKIN_SSS_STORE;
 
-// Dedicated pass singletons owned by the facade. Kept separate from the built-in
-// Forward+ `_scenePass`/`_depthPass` so a custom pass rendering through the
-// facade can never leak render-control state (transmission / renderOpaque / ...)
-// into the built-in pipeline passes, and vice versa.
+// Keep facade state isolated from the built-in Forward+ passes.
 const _sceneLightPass = new LightPass();
 const _sceneDepthPass = new DepthPass();
 
@@ -82,17 +76,7 @@ export function _getSceneRenderPassesForTest() {
   return { light: _sceneLightPass, depth: _sceneDepthPass };
 }
 
-/**
- * Options for a facade scene render call.
- *
- * Every clear field defaults to `undefined`, which means "do not clear that
- * buffer". Pass an explicit value to clear (e.g. `clearColor: Vector4.zero()`);
- * pass `null` to also skip the clear. This no-clear default lets successive
- * calls (e.g. {@link SceneRenderContext.renderOpaque} then
- * {@link SceneRenderContext.renderTransparent}) accumulate into one target.
- *
- * @public
- */
+/** Scene render options. Omitted or null clear values preserve the target. @public */
 export interface SceneRenderOptions {
   /** Camera whose uniforms drive the render. Defaults to the frame's `ctx.camera`. */
   camera?: Camera;
@@ -104,145 +88,45 @@ export interface SceneRenderOptions {
   clearStencil?: Nullable<number>;
 }
 
-/**
- * Builder for a user-authored render queue.
- *
- * Obtained from {@link SceneRenderContext.createQueue}. Add drawables with
- * {@link SceneRenderQueueBuilder.add}, then call
- * {@link SceneRenderQueueBuilder.finalize} to run the queue's batching /
- * bind-group allocation and get a renderable {@link RenderQueue}. A queue must
- * be finalized before it can be rendered; the split return type enforces this.
- *
- * The produced queue is owned by the {@link SceneRenderContext}: it is disposed
- * automatically when the graph pass finishes. Do not cache it across frames —
- * the instance bind groups it allocates are frame-scoped.
- *
- * @public
- */
+/** Builder for a pass-scoped render queue. Call `finalize` before rendering. @public */
 export interface SceneRenderQueueBuilder {
-  /**
-   * Add a drawable to the queue. The object is routed into the correct sub-list
-   * (opaque / transmission / transparent, lit / unlit) automatically.
-   *
-   * @param drawable - The object to draw.
-   * @param camera - Camera used for sort-distance/pick bookkeeping. Defaults to
-   *   the frame's `ctx.camera`.
-   */
+  /** Add a drawable, using the frame camera by default. */
   add(drawable: Drawable, camera?: Camera): this;
 
-  /**
-   * Finalize the queue (run instance batching and bind-group allocation) and
-   * return a renderable {@link RenderQueue}.
-   *
-   * @param camera - Camera used to finalize sort/instance data. Defaults to the
-   *   frame's `ctx.camera`.
-   */
+  /** Finalize batching and return the renderable queue. */
   finalize(camera?: Camera): RenderQueue;
 }
 
-/**
- * A render queue that persists across frames.
- *
- * Unlike the transient queues from {@link SceneRenderContext.createQueue} /
- * {@link SceneRenderContext.cull} (which are disposed when the pass finishes),
- * a persistent queue owns a private {@link ../render_queue#InstanceBindGroupAllocator}
- * and is caller-managed: build it once, reuse its {@link PersistentSceneQueue.queue}
- * every frame, and rebuild only when its contents change. This mirrors how
- * {@link ../../scene/batchgroup#BatchGroup} caches its queue.
- *
- * Because it holds a private allocator, its frame-scoped instance bind groups are
- * not clobbered by other queues between frames, so cross-frame reuse is safe as
- * long as the queue is finalized after the last content change.
- *
- * The caller owns the lifetime: call {@link PersistentSceneQueue.dispose} when
- * done (e.g. when the owning module/effect is torn down). Do not register it for
- * the pass-scoped cleanup.
- *
- * @public
- */
+/** Caller-owned render queue that can be reused across frames. @public */
 export interface PersistentSceneQueue {
-  /**
-   * The underlying renderable queue. Pass it to the facade's render methods.
-   * Only valid after at least one {@link PersistentSceneQueue.finalize}.
-   */
+  /** Renderable queue, valid after {@link PersistentSceneQueue.finalize}. */
   readonly queue: RenderQueue;
 
-  /**
-   * Clear the queue's contents for a rebuild. Call before re-adding drawables
-   * when the set of objects changed.
-   */
+  /** Clear the queue for rebuilding. */
   clear(): this;
 
-  /**
-   * Add a drawable. `camera` is used for sort-distance/pick bookkeeping.
-   */
+  /** Add a drawable. */
   add(drawable: Drawable, camera: Camera): this;
 
-  /**
-   * Finalize the queue (instance batching + bind-group allocation) so it can be
-   * rendered. Call after adding drawables, and re-call after any rebuild.
-   *
-   * @param camera - Camera used to finalize sort/instance data.
-   * @param createRenderBundles - Build render bundles for reuse (recommended for
-   *   static, cross-frame queues). Default false.
-   */
+  /** Finalize batching, optionally creating reusable render bundles. */
   finalize(camera: Camera, createRenderBundles?: boolean): this;
 
   /** Release the queue and its private allocator's GPU resources. */
   dispose(): void;
 }
 
-/**
- * Execute-time facade that lets a custom render-graph pass render scene objects
- * without touching the built-in pipeline's shared pass singletons or the manual
- * device-state save/restore dance.
- *
- * Obtain one inside a pass execute callback via
- * {@link ../frame_graph_context#FrameGraphContext} (`createSceneRenderer(fg, rgCtx)`),
- * then either render the frame's already-culled queue or build your own:
- *
- * ```ts
- * builder.setExecute((rgCtx) => {
- *   const target = rgCtx.getFramebuffer<FrameBuffer>(fbHandle);
- *   const sr = createSceneRenderer(fg, rgCtx);
- *   const queue = sr.createQueue().add(myMesh).finalize();
- *   sr.renderScene(target, queue, { clearColor: Vector4.zero(), clearDepth: 1 });
- * });
- * ```
- *
- * The render target framebuffer must still be declared to the graph (via
- * `builder.createFramebuffer` / `builder.write`) at setup time; the facade does
- * not create graph dependencies.
- *
- * @public
- */
+/** Scene rendering facade for custom render graph passes. @public */
 export interface SceneRenderContext {
   /** The frame draw context (camera, scene, env, device). */
   readonly ctx: DrawContext;
 
-  /**
-   * Cull the scene into a fresh queue, optionally with a different camera and/or
-   * a drawable filter. The returned queue is owned by the facade and disposed
-   * when the pass finishes.
-   *
-   * @param camera - Camera to cull with. Defaults to the frame's `ctx.camera`.
-   * @param filter - Optional predicate; only drawables for which it returns true
-   *   are kept.
-   */
+  /** Cull into a pass-scoped queue, optionally filtering drawables. */
   cull(camera?: Camera, filter?: (drawable: Drawable) => boolean): RenderQueue;
 
-  /**
-   * Start building a user-authored queue. Add drawables, then `finalize()`.
-   */
+  /** Start building a user-authored queue. */
   createQueue(): SceneRenderQueueBuilder;
 
-  /**
-   * Render the opaque and transparent geometry of a queue into `target`.
-   *
-   * @param target - Destination framebuffer (resolve from a graph handle).
-   * @param queue - A finalized render queue.
-   * @param opts - Clear / camera options.
-   */
+  /** Render opaque and transparent geometry into `target`. */
   renderScene(target: FrameBuffer, queue: RenderQueue, opts?: SceneRenderOptions): void;
 
   /** Render only the opaque geometry of a queue. See {@link SceneRenderContext.renderScene}. */
@@ -255,15 +139,7 @@ export interface SceneRenderContext {
   renderDepth(target: FrameBuffer, queue: RenderQueue, opts?: SceneRenderOptions): void;
 
   /**
-   * Create a persistent, caller-managed queue backed by a private
-   * {@link ../render_queue#InstanceBindGroupAllocator}.
-   *
-   * Unlike the transient queues from {@link SceneRenderContext.createQueue} /
-   * {@link SceneRenderContext.cull}, this queue is **not** disposed when the
-   * pass finishes. Build it once, reuse it every frame, and call
-   * {@link PersistentSceneQueue.clear} + re-add + {@link PersistentSceneQueue.finalize}
-   * only when its contents change. Call {@link PersistentSceneQueue.dispose}
-   * when the queue is no longer needed.
+   * Create a caller-managed queue. It is not disposed with the current pass.
    */
   createPersistentQueue(): PersistentSceneQueue;
 }
@@ -272,7 +148,6 @@ export interface SceneRenderContext {
 class SceneRenderContextImpl implements SceneRenderContext {
   private readonly _ctx: DrawContext;
   private readonly _rgCtx: RGExecuteContext;
-  /** Queues created by this facade, disposed together when the pass finishes. */
   private readonly _ownedQueues: RenderQueue[] = [];
   private _cleanupRegistered = false;
 
@@ -285,7 +160,6 @@ class SceneRenderContextImpl implements SceneRenderContext {
     return this._ctx;
   }
 
-  /** Track a facade-owned queue and register the one-time cleanup callback. */
   private _own(queue: RenderQueue): RenderQueue {
     this._ownedQueues.push(queue);
     if (!this._cleanupRegistered) {
@@ -312,8 +186,7 @@ class SceneRenderContextImpl implements SceneRenderContext {
     if (!filter) {
       return this._own(queue);
     }
-    // Rebuild a filtered queue: cullScene already finalized `queue`, so re-push
-    // the surviving drawables into a fresh queue and finalize that instead.
+    // Rebuild because cullScene returns an already-finalized queue.
     const filtered = new RenderQueue(_sceneLightPass);
     const itemList = queue.itemList;
     if (itemList) {
@@ -427,8 +300,7 @@ class SceneRenderContextImpl implements SceneRenderContext {
     const ctx = this._ctx;
     const device = ctx.device;
     const camera = opts?.camera ?? ctx.camera;
-    // Snapshot the shared pass flags and the mutable ctx.materialFlags so nothing
-    // leaks into the built-in pipeline passes that run after this one.
+    // Restore all shared pass and draw-context state after rendering.
     const savedTransmission = _sceneLightPass.transmission;
     const savedRenderOpaque = _sceneLightPass.renderOpaque;
     const savedRenderTransparent = _sceneLightPass.renderTransparent;
@@ -443,8 +315,7 @@ class SceneRenderContextImpl implements SceneRenderContext {
       device.setFramebuffer(target);
       device.setViewport(null);
       device.setScissor(null);
-      // The facade renders into a single-color target with no post-processing,
-      // so strip surface-MRT store flags and detach the compositor.
+      // The facade target has no surface MRT or compositor attachments.
       ctx.materialFlags = savedContext.materialFlags & ~SURFACE_MRT_FLAGS;
       ctx.compositor = null;
       ctx.sunLight = queue.sunLight;
@@ -518,12 +389,7 @@ class SceneRenderContextImpl implements SceneRenderContext {
   }
 }
 
-/**
- * Finalize a queue for rendering: runs the queue's instance batching and
- * bind-group allocation. Isolated here so both the builder and the filtered
- * `cull()` path share one call site into the queue's (internal) `end()`.
- * @internal
- */
+/** @internal */
 function finalizeQueue(queue: RenderQueue, camera: Camera, createRenderBundles?: boolean): void {
   (queue as unknown as { end(camera: Camera, createRenderBundles?: boolean): RenderQueue }).end(
     camera,
@@ -531,19 +397,7 @@ function finalizeQueue(queue: RenderQueue, camera: Camera, createRenderBundles?:
   );
 }
 
-/**
- * Create a {@link SceneRenderContext} for the current render-graph pass.
- *
- * Call this inside a pass execute callback, passing the frame draw context and
- * the pass's {@link RGExecuteContext}. Queues the facade creates are disposed
- * automatically when the pass finishes (via `rgCtx.deferCleanup`).
- *
- * @param ctx - The frame draw context (e.g. `fg.ctx`).
- * @param rgCtx - The execute context handed to the pass callback.
- * @returns A scene render facade bound to this pass.
- *
- * @public
- */
+/** Create a scene facade bound to the current graph pass. @public */
 export function createSceneRenderer(ctx: DrawContext, rgCtx: RGExecuteContext): SceneRenderContext {
   return new SceneRenderContextImpl(ctx, rgCtx);
 }

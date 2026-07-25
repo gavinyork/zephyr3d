@@ -4,16 +4,7 @@ interface RGTextureAffinityEntry<TTexture> {
   descriptorSignature: string;
 }
 
-/**
- * Stores the last successful transient texture allocation for each logical
- * render-graph resource. The cache does not own or retain the textures.
- *
- * Keep one cache per independently executed render view. Passing the same cache
- * to newly-created executors lets pooled physical texture identities remain
- * stable across frames.
- *
- * @public
- */
+/** Remembers transient texture identities across executions without owning them. @public */
 export class RGTextureAffinityCache<TTexture = unknown> {
   /** @internal */
   private _entries = new Map<string, RGTextureAffinityEntry<TTexture>>();

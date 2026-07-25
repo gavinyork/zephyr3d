@@ -47,8 +47,6 @@ import { renderObjectColors } from '../gpu_picking';
 import type { Primitive } from '../primitive';
 import { BoxShape } from '../../shapes';
 
-// ─── Shared Pass Instances ──────────────────────────────────────────
-
 const _scenePass = new LightPass();
 const _depthPass = new DepthPass();
 const _shadowMapPass = new ShadowMapPass();
@@ -70,12 +68,7 @@ function getTextureAffinityCache(camera: Camera, device: AbstractDevice): RGText
   return cache;
 }
 
-/**
- * Test-only accessor for the shared scene pass singleton. Lets execute-time
- * state-contract tests intercept `render()` and snapshot the render-control
- * fields ({@link renderOpaqueScenePass}, {@link renderTransparentScenePass}).
- * @internal
- */
+/** Test-only access to the shared scene pass. @internal */
 export function _getScenePassForTest(): LightPass {
   return _scenePass;
 }
@@ -258,9 +251,7 @@ function getSSSLightingTextureFormat(
     return colorFormat;
   }
   const caps = ctx.device.getDeviceCaps();
-  // The SSR roughness/normal MRT textures use the glossy surface format; they
-  // are graph textures now, so derive the format directly instead of reading
-  // the (not yet resolved) DrawContext fields.
+  // MRT graph textures are not resolved on DrawContext yet.
   const surfaceFormat = getSurfaceTextureFormat(ctx);
   const colorBytes =
     getTextureFormatBytes(ctx, colorFormat) +
@@ -306,15 +297,7 @@ function getLightPassColorAttachments(
   return attachments.length === 1 ? attachments[0] : attachments;
 }
 
-// ─── Pipeline Options ───────────────────────────────────────────────
-
-/**
- * Options controlling which features are enabled in the forward+ pipeline.
- *
- * Derived from camera settings and device capabilities each frame.
- *
- * @public
- */
+/** Per-frame Forward+ feature options. @public */
 export interface ForwardPlusOptions {
   /** Enable depth prepass (always true for now). */
   depthPrepass: boolean;
@@ -346,10 +329,7 @@ export interface ForwardPlusOptions {
   skinSSS: boolean;
 }
 
-/**
- * Derive pipeline options from the current scene/camera state.
- * @internal
- */
+/** Derive Forward+ options from scene and camera state. @internal */
 export function deriveForwardPlusOptions(
   scene: Scene,
   camera: Camera,
@@ -449,16 +429,7 @@ function validateProducedFrameResources(
   }
 }
 
-// ─── Shared Frame State ─────────────────────────────────────────────
-
-/**
- * Mutable state shared between pass execute callbacks within a single frame.
- *
- * This replaces the monolithic DrawContext mutation pattern with an explicit
- * object that graph passes can read from and write to.
- *
- * @public
- */
+/** Mutable state shared by pass callbacks for one frame. @public */
 export interface FrameState {
   ctx: DrawContext;
   renderQueue: RenderQueue;
@@ -502,17 +473,7 @@ export interface LightPassResult {
   skinSSSHandle?: RGHandle;
 }
 
-/**
- * Mutable build-state shared between Forward+ modules for intermediate results
- * that are not render-graph resources (result bundles, derived flags, ordering
- * tokens). Resource handles that downstream post-effects also consume flow
- * through the blackboard instead; this holds the build-internal wiring.
- *
- * Fields are populated as modules run in authored order; a field is only read
- * after the module that produces it has run.
- *
- * @public
- */
+/** Non-resource state shared while Forward+ modules build. @public */
 export interface ForwardPlusBuildState {
   /** Depth prepass outputs. */
   depth?: DepthPrepassResult;
@@ -530,11 +491,7 @@ export interface ForwardPlusBuildState {
   presentedBackbuffer?: RGHandle;
 }
 
-/**
- * Fetch a build-state field produced by an earlier module, with a clear error
- * when the producing module is absent (e.g. removed from the pipeline).
- * @internal
- */
+/** Require state produced by an earlier module. @internal */
 function requireBuildState<K extends keyof ForwardPlusBuildState>(
   fg: FrameGraphContext,
   key: K,
@@ -550,34 +507,6 @@ function requireBuildState<K extends keyof ForwardPlusBuildState>(
   }
   return value;
 }
-
-// ═══ Forward+ pipeline modules ══════════════════════════════════════//
-// The Forward+ graph is assembled from a fixed sequence of RenderModules, each
-// owning one logical stage. Contract every module below observes:
-//
-//   • Cross-module data flows only through the shared FrameGraphContext — graph
-//     resource handles via `fg.blackboard` (FrameResources names) and
-//     `fg.ordering` (side-effect tokens), non-resource intermediates (result
-//     bundles, derived flags) via `fg.state`. A module never reads another
-//     module's locals; this is what makes the pipeline recomposable later.
-//   • Linear depth is versioned: producers re-register FrameResources.LinearDepth
-//     after an in-place mutation, so a module reading it at setup time gets the
-//     version live at its pipeline position.
-//   • `enabled(fg)` derives the module's gating from scene/camera/renderQueue —
-//     there is no central options-to-passes switch.
-//
-// Execute-time behaviour is unchanged by modularization: pass callbacks still
-// share the process singletons (`_scenePass`, ...) and write the DrawContext
-// bridge fields (ctx.HiZTexture, ctx.SSR*/SSS* textures, ...) that material
-// shaders and legacy AbstractPostEffect.apply() effects read. The `_scenePass`
-// render-control state contract (each scene pass sets every field it needs
-// before render() and restores the shared flags after) is exercised by
-// test/src/rendergraph/forward_plus_scene_pass_state.test.ts.
-
-// ─── Pre-scene side-effect modules ──────────────────────────────────
-// Sky update, clustered-light setup, GPU picking and shadow maps produce no
-// graph texture; they are sequenced through the ordering-token chain. Each is a
-// self-describing {@link RenderModule} so the pre-scene sequence is a plain list.
 
 /** @internal */
 const SkyUpdateModule: RenderModule<FrameGraphContext> = {
@@ -633,7 +562,7 @@ const GPUPickingModule: RenderModule<FrameGraphContext> = {
 /** @internal */
 const ShadowMapsModule: RenderModule<FrameGraphContext> = {
   type: 'ShadowMaps',
-  // Shadow maps are managed internally by lights; mark as side effect.
+  // Light-owned shadow maps are observable side effects.
   enabled: ({ renderQueue }) => renderQueue.shadowedLights.length > 0,
   setup({ graph, ctx, renderQueue, ordering }: FrameGraphContext) {
     graph.addPass('ShadowMaps', (builder) => {
@@ -646,8 +575,6 @@ const ShadowMapsModule: RenderModule<FrameGraphContext> = {
     });
   }
 };
-
-// ─── Depth prepass module ───────────────────────────────────────────
 
 /** @internal */
 const DepthPrepassModule: RenderModule<FrameGraphContext> = {
@@ -742,10 +669,7 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
     });
 
     fg.state.depth = result;
-    // Linear depth is threaded through the blackboard, not a mutable local:
-    // passes that mutate it in place (TransmissionDepth*) re-register the
-    // post-write version, so any block reading `blackboard.expect(LinearDepth)`
-    // at build time gets the version live at its position in the pipeline.
+    // Depth mutations re-register their versions through the blackboard.
     blackboard.set(FrameResources.LinearDepth, result.depthHandle);
     if (result.motionVectorHandle) {
       blackboard.set(FrameResources.MotionVector, result.motionVectorHandle);
@@ -754,14 +678,10 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
       FrameResources.SceneDepthAttachment,
       result.graphDepthAttachmentHandle ?? result.externalDepthAttachmentHandle!
     );
-    // Derived attachment + final-framebuffer mode are consumed by later modules.
+    // Later modules share this attachment without owning it.
     fg.state.renderDepthAttachment =
       result.graphDepthAttachmentHandle ?? result.externalDepthAttachmentHandle ?? null;
-    // Rendering the scene directly into the final framebuffer is only possible
-    // when no opaque-layer effect is enabled: those effects must sample the
-    // opaque scene color as a texture and may require surface MRT attachments
-    // (SSR roughness / SSS / SkinSSS), which the single-color final framebuffer
-    // cannot carry.
+    // Opaque effects require a texture and may require surface MRT attachments.
     const opaqueLayerHasEffects = !!ctx.compositor?.layerHasEnabledEffect(PostEffectLayer.opaque);
     fg.state.useFinalFramebufferAsIntermediate =
       !!result.externalDepthAttachment &&
@@ -769,8 +689,6 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
       !opaqueLayerHasEffects;
   }
 };
-
-// ─── Screen-space shadow mask module ────────────────────────────────
 
 /** @internal */
 const ShadowMaskModule: RenderModule<FrameGraphContext> = {
@@ -780,36 +698,20 @@ const ShadowMaskModule: RenderModule<FrameGraphContext> = {
     shadowMask:
       ctx.device.type !== 'webgl' && ctx.camera.screenSpaceShadowMask && renderQueue.shadowedLights.length > 0
   }),
-  // Gate on build-time state only: renderQueue.shadowedLights is available now,
-  // whereas ctx.shadowMapInfo is populated later by the ShadowMaps pass execute
-  // (which runs before this pass thanks to the ordering-token chain), so it must
-  // not be part of the pass-creation condition.
+  // shadowMapInfo is populated at execute time and cannot gate graph building.
   enabled: ({ options, renderQueue }) => options.shadowMask && renderQueue.shadowedLights.length > 0,
   setup(fg: FrameGraphContext) {
-    // When active, render each shadow-casting light's visibility into an RGBA8
-    // texture array (4 lights per layer). The clustered LightPass samples this
-    // mask instead of each shadowed light running its own additive pass. The
-    // layer/channel order is locked to ClusteredLight.getVisibleLights: shadow
-    // lights fill clustered buffer indices 1..N in renderQueue.shadowedLights
-    // order, and ordinal s = index-1 maps to layer s>>2, channel s&3.
+    // Four shadow lights share each RGBA8 layer in clustered-light order.
     const { graph, ctx, renderQueue, blackboard } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'ShadowMaskPass');
     const numShadowLights = renderQueue.shadowedLights.length;
     const numLayers = ShadowMaskRenderer.getLayerCount(numShadowLights);
     const maskPassResult = graph.addPass('ShadowMaskPass', (builder) => {
-      // Freeze the current linear-depth handle at build time. Reading the
-      // blackboard here returns the version live at this pipeline position (the
-      // opaque prepass depth, before any TransmissionDepth mutation), which is
-      // what the shadow mask is built from; capturing it by value avoids reading
-      // a later version this pass never declared.
+      // Capture the depth version declared at this pipeline position.
       const maskDepthHandle = blackboard.expect(FrameResources.LinearDepth);
       builder.read(maskDepthHandle);
       builder.read(depthPassResult.depthFramebufferHandle);
-      // createTexture already registers this pass as the resource producer, so
-      // downstream passes read this handle directly (same pattern as HiZ). The
-      // per-layer framebuffers are created inside execute (rgCtx.createFramebuffer),
-      // which the graph cannot see; the createTexture producer edge is what keeps
-      // the resource alive and ordered before the LightPass reader.
+      // Per-layer framebuffers are temporary views of this graph texture.
       const maskHandle = builder.createTexture({
         format: 'rgba8unorm',
         label: 'shadowMask',
@@ -835,8 +737,6 @@ const ShadowMaskModule: RenderModule<FrameGraphContext> = {
   }
 };
 
-// ─── Pre-light transmission depth module (SSR Hi-Z) ─────────────────
-
 /** @internal */
 const TransmissionDepthForSSRModule: RenderModule<FrameGraphContext> = {
   type: 'TransmissionDepthForSSR',
@@ -849,9 +749,7 @@ const TransmissionDepthForSSRModule: RenderModule<FrameGraphContext> = {
       const currentDepth = blackboard.expect(FrameResources.LinearDepth);
       builder.read(currentDepth);
       builder.read(depthPassResult.depthFramebufferHandle);
-      // This pass renders transmission geometry into the prepass linear-depth
-      // texture: model the mutation as a write so later readers order against
-      // it through data flow instead of relying on the token alone.
+      // Version the in-place depth mutation for downstream dependencies.
       const depthOut = builder.write(currentDepth);
       const done = builder.createToken('TransmissionDepthForSSRDone');
       builder.sideEffect();
@@ -861,12 +759,10 @@ const TransmissionDepthForSSRModule: RenderModule<FrameGraphContext> = {
       return { done, depthOut };
     });
     fg.state.preLightTransmissionDepthToken = transmissionDepthResult.done;
-    // Re-register so blackboard consumers read the post-transmission version.
+    // Publish the post-transmission depth version.
     blackboard.set(FrameResources.LinearDepth, transmissionDepthResult.depthOut);
   }
 };
-
-// ─── Hi-Z pyramid module ────────────────────────────────────────────
 
 /** @internal */
 const HiZModule: RenderModule<FrameGraphContext> = {
@@ -897,10 +793,7 @@ const HiZModule: RenderModule<FrameGraphContext> = {
       });
       builder.setExecute((rgCtx) => {
         const passCtx = frame.ctx;
-        // Resolve the depth texture through the graph handle declared as a read
-        // above, not through frame.depthFramebuffer: the handle is the executor's
-        // source of truth for this pass, and a missing attachment is a build-time
-        // contract violation that must surface loudly rather than silently skip.
+        // Resolve the declared handle, not mutable framebuffer state.
         const depthFb = rgCtx.getFramebuffer<FrameBuffer>(depthPassResult.depthFramebufferHandle);
         const depthTex = depthFb.getDepthAttachment() as Texture2D;
         if (!depthTex) {
@@ -917,8 +810,6 @@ const HiZModule: RenderModule<FrameGraphContext> = {
     }
   }
 };
-
-// ─── Forward SSS profile module ─────────────────────────────────────
 
 /** @internal */
 const SSSProfileModule: RenderModule<FrameGraphContext> = {
@@ -981,15 +872,12 @@ const SSSProfileModule: RenderModule<FrameGraphContext> = {
   }
 };
 
-// ─── Scene color grab module ────────────────────────────────────────
-
 /** @internal */
 const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
   type: 'SceneColorGrab',
   enabled: ({ options }) => options.needSceneColor,
   setup(fg: FrameGraphContext) {
-    // Renders the full scene (no transmission) into a copy texture that
-    // transmission/refraction materials sample as background.
+    // Refraction samples this non-transmission scene copy.
     const { graph, ctx, frame, blackboard, options } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'SceneColorGrab');
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
@@ -1009,9 +897,7 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
         label: 'sceneColorCopy',
         allocationKey: 'ForwardPlus.SceneColorCopy'
       });
-      // SSR may pre-insert transmission depth before LightPass for Hi-Z. In that
-      // case the refraction scene-color copy needs an isolated depth buffer so
-      // transmission surfaces do not occlude the background they sample.
+      // Isolate depth when SSR inserts transmission depth before LightPass.
       const copyFramebufferHandle = !options.needsTransmissionDepthForSSR
         ? builder.createFramebuffer({
             label: 'SceneColorCopyFramebuffer',
@@ -1031,8 +917,6 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
     blackboard.set(FrameResources.SceneColorCopy, grabResult.copyHandle);
   }
 };
-
-// ─── Main light pass module ─────────────────────────────────────────
 
 /** @internal */
 const LightPassModule: RenderModule<FrameGraphContext> = {
@@ -1059,8 +943,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     const historyManager = fg.history;
 
-    // Import previous-frame SSR history textures the light pass samples through
-    // its temporal reflection path (kept in a read scope during execute).
+    // Keep SSR history scoped while the light pass executes.
     const lightHistoryReadBindings = fg.state.lightHistoryReadBindings;
     const historySize = { width: ctx.renderWidth, height: ctx.renderHeight };
     if (historyManager && options.ssr && ctx.camera?.ssrTemporal && options.motionVectors) {
@@ -1093,7 +976,6 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
         );
       }
     }
-    // Note: TAA history import/commit is handled by TAA.setup() (self-describing).
 
     const opaquePassResult = graph.addPass('LightPass', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
@@ -1111,10 +993,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
         builder.read(binding.handle);
       }
 
-      // Scene color: in final-framebuffer-as-intermediate mode the scene is
-      // physically rendered into the final framebuffer, so declare the
-      // backbuffer write — the graph sees the real data flow and no keep-alive
-      // reads are needed downstream. Otherwise render into a graph texture.
+      // Direct rendering writes the backbuffer; otherwise create a texture.
       const sceneColorHandle = useFinalFramebufferAsIntermediate
         ? builder.write(backbuffer)
         : builder.createTexture({
@@ -1123,7 +1002,6 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
             allocationKey: 'ForwardPlus.SceneColor'
           });
 
-      // Transmission/refraction background produced by the SceneColorGrab pass
       if (sceneColorCopyHandle) {
         builder.read(sceneColorCopyHandle);
       }
@@ -1134,9 +1012,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
         builder.read(sssParamHandle);
       }
       const surfaceAttachmentCount = Number(options.sceneRoughness) + Number(options.sceneNormal);
-      // Opaque-scene surface MRT outputs are graph
-      // textures owned by this pass; effects reach them through the blackboard
-      // handles (or the ctx fields resolved below during execution).
+      // Surface MRT products are exposed through blackboard handles.
       const sceneRoughnessHandle = options.sceneRoughness
         ? builder.createTexture({
             format: getSurfaceTextureFormat(ctx),
@@ -1205,8 +1081,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
         const sceneColorCopyTex = sceneColorCopyHandle
           ? rgCtx.getTexture<Texture2D>(sceneColorCopyHandle)
           : null;
-        // Resolve MRT products into the DrawContext bridge fields that scene
-        // rendering and apply()-based effects still read.
+        // Legacy effects still read resolved MRT textures from DrawContext.
         ctx.shadowMaskTexture = shadowMaskHandle ? rgCtx.getTexture<Texture2DArray>(shadowMaskHandle) : null;
         ctx.HiZTexture = hiZHandle ? rgCtx.getTexture<Texture2D>(hiZHandle) : null;
         ctx.SceneRoughnessTexture = sceneRoughnessHandle
@@ -1251,9 +1126,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     });
     const lightPassResult: LightPassResult = opaquePassResult;
     fg.state.lightPass = lightPassResult;
-    // SkyPass advances this opaque-only color to the complete opaque layer.
     blackboard.set(FrameResources.SceneColor, lightPassResult.sceneColorHandle);
-    // Register the LightPass MRT products so effects can look them up by name.
     if (lightPassResult.sceneRoughnessHandle) {
       blackboard.set(FrameResources.SceneRoughness, lightPassResult.sceneRoughnessHandle);
     }
@@ -1271,8 +1144,6 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     }
   }
 };
-
-// ─── Sky pass module ────────────────────────────────────────────────
 
 /** @internal */
 const SkyPassModule: RenderModule<FrameGraphContext> = {
@@ -1295,8 +1166,7 @@ const SkyPassModule: RenderModule<FrameGraphContext> = {
       }
       const out = builder.write(sceneColorHandle);
       builder.setExecute((rgCtx) => {
-        // A refraction background grab already contains sky/fog and is blitted
-        // by LightPass. Reapplying fog here would fog the scene twice.
+        // The refraction background already contains sky and fog.
         if (!sceneColorCopyHandle) {
           renderSkyScenePass(frame, rgCtx, lightPassResult.sceneColorFramebufferHandle);
         }
@@ -1308,13 +1178,6 @@ const SkyPassModule: RenderModule<FrameGraphContext> = {
     blackboard.set(FrameResources.SceneColor, skySceneColorHandle);
   }
 };
-
-// ─── Composite tail module ──────────────────────────────────────────
-// The post-effect chains (opaque/transparent/end), the transparent scene pass,
-// the optional transmission-depth pass and final output form one
-// order-sensitive orchestration block. It is exposed as a single module so users
-// can insert passes before or after it, while post-effect-level customization
-// stays with the Compositor layers. All its inputs come from fg.state / fg.
 
 /** @internal */
 const CompositeTailModule: RenderModule<FrameGraphContext> = {
@@ -1332,17 +1195,9 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
     const lightHistoryReadBindings = fg.state.lightHistoryReadBindings;
     const historyManager = fg.history;
 
-    // 7d. Opaque-layer post effects (SAO/SSR/SSS/SkinSSS). They read the opaque
-    // scene color and must complete before transparent geometry renders on top
-    // of their output. Never direct-write: the chain output becomes the
-    // transparent pass's render target. In final-framebuffer-as-intermediate
-    // mode the scene color handle is the LightPass's backbuffer write version,
-    // so the data flow is real either way — no keep-alive reads needed.
-    // An inserted module may have replaced the LightPass version in the blackboard.
+    // Opaque effects finish before transparent geometry uses their output.
     const opaqueChainInput = blackboard.expect(FrameResources.SceneColor);
-    // Data dependencies for every effect pass: frame textures the effects sample
-    // through DrawContext fields (linear depth, HiZ, scene color copy, SSS MRT
-    // outputs) rather than through declared require* hooks.
+    // Include textures sampled indirectly through DrawContext.
     const opaqueChainDeps: RGHandle[] = [blackboard.expect(FrameResources.LinearDepth)];
     if (hiZHandle) {
       opaqueChainDeps.push(hiZHandle);
@@ -1382,14 +1237,12 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
       : { color: opaqueChainInput, wroteFinal: false };
     const opaqueChainRan = opaqueChainResult.color !== opaqueChainInput;
 
-    // 7e. Transparent scene geometry (transmission/transparent lists + OIT).
-    // Renders on top of the opaque-chain output; graph-wise an in-place write
-    // producing a new version of the current scene color.
+    // Transparent geometry writes a new version of the opaque-chain output.
     const sceneColorHandle = graph.addPass('TransparentPass', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
       builder.read(depthPassResult.depthFramebufferHandle);
       if (hiZHandle) {
-        // Transparent-phase materials may ray-march HiZ (e.g. water SSR)
+        // Transparent materials may ray-march HiZ.
         builder.read(hiZHandle);
       }
       if (lightPassResult.sceneColorFramebufferHandle) {
@@ -1412,28 +1265,14 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
     });
     blackboard.set(FrameResources.SceneColor, sceneColorHandle);
 
-    // 8. Post effect chains + transmission depth.
-    //
-    // Chain input: the TransparentPass output version — the authoritative scene
-    // color regardless of whether it physically lives in a texture or in the
-    // backbuffer (final framebuffer used as intermediate, no opaque effects).
     const chainInput = sceneColorHandle;
-    // When the scene color still physically resides in the final framebuffer,
-    // the final blit must be skipped if no effect moved it to a texture.
-    // (Opaque-layer effects disable final-as-intermediate mode, so the scene
-    // color is backbuffer-resident whenever that mode is active.)
+    // Track whether the chain input still resides in the final target.
     const backbufferResidentHandle = useFinalFramebufferAsIntermediate ? sceneColorHandle : null;
-    // No extra chain dependencies: the effect chains link to the scene color
-    // through their inputs, and per-effect texture needs are declared via the
-    // require* hooks in AbstractPostEffect.setup().
     const chainDependencies: RGHandle[] = [];
     const finalOutput = { handle: backbuffer, isScreen: !ctx.finalFramebuffer };
     const endLayerHasEffects = !!ctx.compositor?.layerHasEnabledEffect(PostEffectLayer.end);
 
-    // 8a. Transparent-layer effects (bloom, tonemap, FXAA, ...). They run right
-    // after the light pass and must sample the pre-transmission linear depth, so
-    // they carry no transmissionDepthToken dependency; TransmissionDepth is
-    // instead ordered after this chain (see 8b).
+    // Transparent-layer effects read depth before its transmission mutation.
     const transparentChainResult = ctx.compositor
       ? ctx.compositor.buildLayer({
           graph,
@@ -1449,11 +1288,7 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
         })
       : { color: chainInput, wroteFinal: false };
 
-    // 8b. Transmission depth pass (optional). Mutates the linear depth texture;
-    // the mutation is modeled as a graph write: the WAR hazard orders this pass
-    // after every pre-transmission depth reader (the transparent-layer chain),
-    // and re-registering the post-write version in the blackboard gives
-    // end-layer effects (TAA) a real data dependency on the transmission depth.
+    // WAR orders this depth mutation after pre-transmission readers.
     let transmissionDepthToken: RGHandle | undefined;
     if (options.needSceneColor && !options.needsTransmissionDepthForSSR) {
       const transmissionDepthResult = graph.addPass('TransmissionDepth', (builder) => {
@@ -1473,12 +1308,9 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
         return { done, depthOut };
       });
       transmissionDepthToken = transmissionDepthResult.done;
-      // The transparent-layer chain above read the pre-transmission version;
-      // everything built from here on (end-layer chain) reads this one.
       blackboard.set(FrameResources.LinearDepth, transmissionDepthResult.depthOut);
     }
 
-    // 9. End-layer effects (TAA). Ordered after TransmissionDepth.
     const endChainDependencies = transmissionDepthToken
       ? [...chainDependencies, transmissionDepthToken]
       : chainDependencies;
@@ -1490,7 +1322,6 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
           blackboard,
           input: transparentChainResult.color,
           finalOutput,
-          // Still backbuffer-resident if the transparent-layer chain ran no effect
           inputResidesInFinalTarget:
             !!backbufferResidentHandle && transparentChainResult.color === chainInput,
           sceneDepthAttachment: renderDepthAttachment,
@@ -1500,11 +1331,8 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
       : { color: transparentChainResult.color, wroteFinal: false };
     const finalWroteFinal = chainResult.wroteFinal || transparentChainResult.wroteFinal;
 
-    // 10. Final output. Frame cleanup runs from executeForwardPlusGraph's finally block.
     let presentedBackbuffer: RGHandle;
     if (finalWroteFinal) {
-      // The last effect wrote the final target directly; no extra pass needed.
-      // Cleanup is deferred to executeForwardPlusGraph's finally block (cleanupFrame).
       presentedBackbuffer = chainResult.color;
     } else {
       presentedBackbuffer = graph.addPass('Blit', (builder) => {
@@ -1513,8 +1341,7 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
           builder.read(dep);
         }
         const outputBackbuffer = builder.write(backbuffer);
-        // Skip the blit when the chain output already lives in the final target
-        // (final framebuffer used as intermediate and no end-layer effect ran).
+        // Skip copies when the output already resides in the final target.
         const needsBlit = chainResult.color !== backbufferResidentHandle;
         builder.setExecute((rgCtx) => {
           const sourceTex = needsBlit ? rgCtx.getTexture<Texture2D>(chainResult.color) : null;
@@ -1523,26 +1350,17 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
             blitter.srgbOut = !ctx.finalFramebuffer;
             blitter.blit(sourceTex, ctx.finalFramebuffer ?? null, fetchSampler('clamp_nearest_nomip'));
           }
-          // cleanup deferred to executeForwardPlusGraph finally block (cleanupFrame)
         });
         return outputBackbuffer;
       });
     }
     fg.state.presentedBackbuffer = presentedBackbuffer;
-    // Register the presented version as the graph sink. A downstream module may
-    // re-register a newer backbuffer version here to take over the final output.
+    // Downstream modules may replace this sink registration.
     blackboard.set(FrameResources.PresentedColor, presentedBackbuffer);
   }
 };
 
-// ─── Default Forward+ pipeline ──────────────────────────────────────
-
-/**
- * The built-in Forward+ modules in default order. Referenced by anchor `type`
- * for pipeline insertion/replacement (e.g. `insertAfter('SkyPass', ...)`).
- *
- * @public
- */
+/** Built-in Forward+ modules addressable by pipeline anchors. @public */
 export const ForwardPlusModules = {
   SkyUpdate: SkyUpdateModule,
   ClusterLights: ClusterLightsModule,
@@ -1576,26 +1394,15 @@ const DEFAULT_FORWARD_PLUS_MODULES: readonly RenderModule<FrameGraphContext>[] =
   CompositeTailModule
 ];
 
-/** @internal Shared default pipeline, created lazily. */
+/** @internal */
 let _defaultForwardPlusPipeline: RenderPipeline<FrameGraphContext> | null = null;
 
-/**
- * Create a fresh, independent Forward+ {@link RenderPipeline} preloaded with the
- * built-in modules. Customize it and assign to `camera.renderPipeline`, or edit
- * {@link getDefaultForwardPlusPipeline} to affect every camera.
- *
- * @public
- */
+/** Create an independent pipeline with the built-in Forward+ modules. @public */
 export function createForwardPlusPipeline(): RenderPipeline<FrameGraphContext> {
   return new RenderPipeline<FrameGraphContext>(DEFAULT_FORWARD_PLUS_MODULES);
 }
 
-/**
- * The shared default Forward+ pipeline used by cameras without an explicit
- * `renderPipeline`. Mutating it affects all such cameras.
- *
- * @public
- */
+/** Return the shared default pipeline. Mutations affect cameras using it. @public */
 export function getDefaultForwardPlusPipeline(): RenderPipeline<FrameGraphContext> {
   if (!_defaultForwardPlusPipeline) {
     _defaultForwardPlusPipeline = createForwardPlusPipeline();
@@ -1603,23 +1410,7 @@ export function getDefaultForwardPlusPipeline(): RenderPipeline<FrameGraphContex
   return _defaultForwardPlusPipeline;
 }
 
-// ─── Forward+ Graph Builder ─────────────────────────────────────────
-
-/**
- * Constructs a render graph representing the forward+ pipeline.
- *
- * Each step in the existing `SceneRenderer._renderScene` becomes a graph pass.
- * Execute callbacks delegate to the existing rendering code, sharing a mutable
- * `FrameState`.
- *
- * @param graph - The render graph to populate.
- * @param ctx - The draw context for this frame.
- * @param renderQueue - The culled render queue.
- * @param options - Pipeline feature toggles.
- * @returns The backbuffer handle (graph output).
- *
- * @public
- */
+/** Build the Forward+ render graph and return its backbuffer output. @public */
 export function buildForwardPlusGraph(
   graph: RenderGraph,
   ctx: DrawContext,
@@ -1638,14 +1429,11 @@ function buildForwardPlusGraphInternal(
   const backbuffer = graph.importTexture('backbuffer');
   ctx.SSS = !!options.sss;
   ctx.SkinSSSTexture = null;
-  // Reset any shadow mask carried over from a previous frame; the ShadowMask
-  // module re-sets it during execution only when the mask is actually produced.
+  // ShadowMask sets this only when it produces a texture.
   ctx.shadowMaskTexture = null;
 
-  // Named registry of shared frame resources (consumed by post effect setup)
   const blackboard = new RGBlackboard();
 
-  // Shared mutable frame state
   const frame: FrameState = {
     ctx,
     renderQueue,
@@ -1657,9 +1445,6 @@ function buildForwardPlusGraphInternal(
     sunLightRestored: false
   };
 
-  // Build-time context threaded through the pass-build blocks. Inter-block
-  // handles flow through `blackboard` (by FrameResources name) and ordering
-  // tokens through `ordering`, so no block reaches another's local variables.
   const ordering = new OrderingScope();
   const fg: FrameGraphContext = {
     graph,
@@ -1684,11 +1469,6 @@ function buildForwardPlusGraphInternal(
   mergeFrameResourceRequirements(requirements, pipeline.collectRequirements(fg));
   resolveFrameResourceRequirements(ctx, options, requirements);
 
-  // Assemble the graph by running the camera's render pipeline (or the shared
-  // default). Each module reads its inputs from / publishes its outputs to `fg`.
-  // The tail module registers FrameResources.PresentedColor as the graph sink; a
-  // downstream module may re-register a newer backbuffer version to take over the
-  // final output, so the sink is read from the blackboard (last registration wins).
   pipeline.build(fg);
   validateProducedFrameResources(blackboard, options, renderQueue);
 
@@ -1700,11 +1480,6 @@ function buildForwardPlusGraphInternal(
       : undefined;
   return { backbuffer: presented, frame, externalDepthImport };
 }
-
-// ─── Pass Implementation Helpers ────────────────────────────────────
-// These wrap the existing SceneRenderer static methods, adapted to work
-// with the FrameState pattern. They contain the same logic as the
-// original methods but read/write through FrameState.
 
 /** @internal */
 function renderShadowMaps(ctx: DrawContext, lights: PunctualLight[]): void {
@@ -1799,8 +1574,7 @@ function renderForwardSSSProfile(
 }
 
 function releaseIntermediateFramebuffer(frame: FrameState): void {
-  // Device state is contained within each pass now (LightPass/TransparentPass
-  // push/pop their own framebuffer bindings); only the context field remains.
+  // Each pass owns device state; only clear the shared context field.
   frame.ctx.intermediateFramebuffer = null;
 }
 
@@ -1859,10 +1633,7 @@ function renderSceneDepth(
   const transmission = transmissionOverride ?? !!existingDepthFb;
   let depthFramebuffer = existingDepthFb;
 
-  // Contract check: every current caller in the forward+ pipeline runs after the
-  // DepthPrepass and passes a graph-managed depth framebuffer, so the self-creating
-  // branch below is currently unreachable. It is kept as scaffolding for standalone
-  // reuse; if that changes, this assert flags that the untested path is now live.
+  // Current callers must provide the graph-managed prepass framebuffer.
   console.assert(
     !!existingDepthFb,
     'renderSceneDepth: called without an existing depth framebuffer; the ' +
@@ -1870,7 +1641,6 @@ function renderSceneDepth(
   );
 
   if (!depthFramebuffer) {
-    // Use RenderGraph-allocated textures if provided
     if (depthTex) {
       const colorAttachments = motionVectorTex ? [depthTex, motionVectorTex] : depthTex;
       const depthAttachment = ctx.finalFramebuffer?.getDepthAttachment();
@@ -1884,7 +1654,6 @@ function renderSceneDepth(
         ignoreDepthStencil: false
       });
     } else {
-      // Allocate through RenderGraph so framebuffer lifetime is owned by the executor.
       const format: TextureFormat =
         ctx.device.type === 'webgl'
           ? ctx.SSRCalcThickness
@@ -1974,12 +1743,9 @@ function renderSceneDepth(
     ctx.linearDepthTexture = depthFramebuffer!.getColorAttachments()[0] as Texture2D;
     ctx.depthTexture = depthFramebuffer!.getDepthAttachment() as Texture2D;
     ctx.depthPrepassAttachment = ctx.depthTexture;
-    // HiZ is now built in the dedicated HiZ pass
   }
   return depthFramebuffer!;
 }
-
-// ─── Sky Motion Vector State ────────────────────────────────────────
 
 let _skyMVProgram: Nullable<GPUProgram> = null;
 let _skyMVBindGroup: Nullable<BindGroup> = null;
@@ -2067,11 +1833,7 @@ function blitToCurrentColorAttachment(ctx: DrawContext, source: Texture2D): void
   new CopyBlitter().blit(source, destination, fetchSampler('clamp_nearest_nomip'));
 }
 
-/**
- * Renders the full scene (no transmission) into the scene-color copy texture
- * used as refraction background. Runs as its own graph pass before LightPass.
- * @internal
- */
+/** Render the refraction background before LightPass. @internal */
 function renderSceneColorGrab(
   frame: FrameState,
   rgCtx: RGExecuteContext,
@@ -2088,7 +1850,7 @@ function renderSceneColorGrab(
   const savedDepthPrepassAttachment = ctx.depthPrepassAttachment;
   const savedMaterialFlags = ctx.materialFlags;
 
-  // MRT store flags never apply to the background copy
+  // The background copy has no surface MRT attachments.
   const sceneColorMaterialFlags = ctx.materialFlags & ~SURFACE_MRT_FLAGS;
   const sceneColorFramebuffer = copyFramebufferHandle
     ? rgCtx.getFramebuffer<FrameBuffer>(copyFramebufferHandle)
@@ -2137,7 +1899,6 @@ export function renderOpaqueScenePass(
 ): void {
   const { ctx, renderQueue } = frame;
 
-  // Use RenderGraph-allocated scene color texture
   const depthTex = frame.depthFramebuffer?.getDepthAttachment() as Texture2D;
 
   ctx.materialFlags &= ~(
@@ -2167,11 +1928,7 @@ export function renderOpaqueScenePass(
     ctx.materialFlags |= MaterialVaryingFlags.SKIN_SSS_STORE;
   }
 
-  // The graph scene color framebuffer takes priority: it is absent only when
-  // the graph was built in final-framebuffer-as-intermediate mode (external
-  // depth shared with the final framebuffer AND no opaque-layer effects).
-  // Checking the shared depth first would wrongly route the MRT/opaque-effect
-  // case into the single-color final framebuffer.
+  // Prefer the graph framebuffer; final-target mode has no graph framebuffer.
   if (sceneColorFramebufferHandle && !hasSurfaceMRT(ctx)) {
     ctx.intermediateFramebuffer = rgCtx.getFramebuffer<FrameBuffer>(sceneColorFramebufferHandle);
   } else if (!sceneColorFramebufferHandle && depthTex === ctx.finalFramebuffer?.getDepthAttachment()) {
@@ -2185,14 +1942,10 @@ export function renderOpaqueScenePass(
     });
   }
 
-  // The scene target is bound explicitly and the device state is restored at
-  // the end of this pass: graph passes never communicate through leftover
-  // device state. TransparentPass re-binds the same target (or the opaque
-  // chain output) explicitly.
+  // Graph passes do not communicate through leftover device state.
   ctx.device.pushDeviceStates();
   try {
-    // setFramebuffer() no-ops when the target is unchanged, so reset the
-    // viewport/scissor explicitly to cover that case.
+    // setFramebuffer may no-op, so reset viewport and scissor explicitly.
     ctx.device.setFramebuffer(ctx.intermediateFramebuffer);
     ctx.device.setViewport(null);
     ctx.device.setScissor(null);
@@ -2203,17 +1956,11 @@ export function renderOpaqueScenePass(
     _scenePass.clearStencil = depthTex ? null : 0;
 
     if (renderQueue.needSceneColor() && sceneColorCopyTex) {
-      // Background copy was produced by the SceneColorGrab pass; seed the main
-      // color attachment with it and render only transmission/transparent on top.
+      // Seed the main target with the refraction background.
       ctx.sceneColorTexture = sceneColorCopyTex;
       blitToCurrentColorAttachment(ctx, ctx.sceneColorTexture);
       if (hasSurfaceMRT(ctx)) {
-        // The background copy carries no surface MRT attachments, so opaque
-        // geometry exists only there without roughness/normal (and SSS
-        // lighting) data. Re-render the opaque lists into the MRT scene
-        // target: early-z against the prepass depth keeps this cheap, and the
-        // color output matches the blitted copy on opaque pixels while the
-        // MRT attachments receive the surface data SSR/SSS require.
+        // Re-render opaque lists to populate MRT data missing from the copy.
         _scenePass.clearColor = null;
         _scenePass.clearDepth = null;
         _scenePass.clearStencil = null;
@@ -2230,9 +1977,7 @@ export function renderOpaqueScenePass(
     _scenePass.renderTransparent = false;
     _scenePass.render(ctx, null, null, renderQueue);
   } finally {
-    // Restore the shared _scenePass flags so no state leaks to the next pass:
-    // the transparent pass sets transmission/renderOpaque/renderTransparent
-    // itself rather than inheriting whatever this pass happened to leave.
+    // Restore shared pass flags before the next graph pass.
     _scenePass.renderTransparent = true;
     _scenePass.renderSky = true;
     _scenePass.transmission = false;
@@ -2240,11 +1985,7 @@ export function renderOpaqueScenePass(
   }
 }
 
-/**
- * Renders sky and fog into the opaque scene target after opaque geometry.
- *
- * @internal
- */
+/** Render sky and fog after opaque geometry. @internal */
 export function renderSkyScenePass(
   frame: FrameState,
   rgCtx: RGExecuteContext,
@@ -2269,14 +2010,7 @@ export function renderSkyScenePass(
   }
 }
 
-/**
- * Renders the transmission/transparent geometry lists (including OIT) on top
- * of the opaque result. The target framebuffer is always bound explicitly:
- * the opaque chain output when opaque-layer effects ran, otherwise the same
- * scene target the light pass rendered into. OIT implementations composite
- * into the currently bound framebuffer, which this pass guarantees.
- * @internal
- */
+/** Render transmission, transparency, and OIT over the opaque result. @internal */
 export function renderTransparentScenePass(
   frame: FrameState,
   rgCtx: RGExecuteContext,
@@ -2287,8 +2021,7 @@ export function renderTransparentScenePass(
   const device = ctx.device;
   let framebuffer: Nullable<FrameBuffer>;
   if (opaqueChainOutput) {
-    // Opaque-layer effects redirected the scene color into their chain output;
-    // transparent geometry renders on top of it with the scene depth attached.
+    // Opaque effects redirect transparent rendering to their chain output.
     const chainTex = rgCtx.getTexture<Texture2D>(opaqueChainOutput);
     const depthTex = frame.depthFramebuffer?.getDepthAttachment() as Texture2D;
     framebuffer = rgCtx.createFramebuffer<FrameBuffer>({
@@ -2297,29 +2030,22 @@ export function renderTransparentScenePass(
       colorAttachments: chainTex,
       depthAttachment: depthTex
     });
-    // The chain output is single-color: surface MRT stores no longer apply.
+    // The chain output has no surface MRT attachments.
     ctx.materialFlags &= ~SURFACE_MRT_FLAGS;
   } else if (sceneColorFramebufferHandle) {
-    // No opaque-layer effect ran (thus no surface MRT either): continue in the
-    // graph scene color framebuffer the light pass rendered into.
+    // Continue in the light pass target when no opaque effect ran.
     framebuffer = rgCtx.getFramebuffer<FrameBuffer>(sceneColorFramebufferHandle);
   } else {
-    // Final framebuffer used as scene intermediate.
+    // Scene color already resides in the final framebuffer.
     framebuffer = ctx.finalFramebuffer;
   }
   device.pushDeviceStates();
   try {
-    // setFramebuffer() no-ops when the target is unchanged, so reset the
-    // viewport/scissor explicitly to cover that case.
+    // setFramebuffer may no-op, so reset viewport and scissor explicitly.
     device.setFramebuffer(framebuffer);
     device.setViewport(null);
     device.setScissor(null);
-    // Derive transmission mode from the same single source of truth the opaque
-    // pass used (renderQueue.needSceneColor()) instead of inheriting leftover
-    // _scenePass state. When scene color is needed the opaque pass seeded the
-    // refraction background and drew the transmission-opaque list, so here we
-    // draw transmission_trans + transparent; otherwise just the transparent
-    // list. Never clear: the opaque result is already in the target.
+    // Derive transmission mode instead of inheriting shared pass state.
     _scenePass.transmission = renderQueue.needSceneColor();
     _scenePass.clearColor = null;
     _scenePass.clearDepth = null;
@@ -2343,16 +2069,7 @@ function renderTransmissionDepthPass(frame: FrameState, rgCtx: RGExecuteContext)
   renderSceneDepth(frame, frame.depthFramebuffer, rgCtx);
 }
 
-// ─── Convenience: Execute Full Pipeline ─────────────────────────────
-
-/**
- * Build, compile, and execute the forward+ pipeline as a render graph.
- *
- * This is the drop-in replacement for `SceneRenderer._renderScene`.
- *
- * @param ctx - The draw context for this frame.
- * @public
- */
+/** Build and execute the Forward+ graph for one frame. @public */
 export function executeForwardPlusGraph(ctx: DrawContext): void {
   const device = ctx.device;
   const graph = new RenderGraph();
@@ -2365,13 +2082,11 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
   let motionVectorFrameCommitted = false;
 
   try {
-    // Cull scene first (needed to derive options)
     renderQueue = _scenePass.cullScene(ctx, ctx.camera);
 
     const options = deriveForwardPlusOptions(ctx.scene, ctx.camera, device.type, renderQueue);
     ctx.SSS = options.sss;
 
-    // Ensure the camera has a history resource manager for temporal effects (TAA, motion blur)
     historyManager = ctx.camera.getHistoryResourceManager();
     if (!historyManager) {
       historyManager = new HistoryResourceManager<Texture2D>(_devicePoolAllocator);
@@ -2392,12 +2107,10 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
 
     const compiled = graph.compile([buildResult.backbuffer]);
 
-    // Use RenderGraphExecutor for automatic resource management
     executor = new RenderGraphExecutor(_devicePoolAllocator, ctx.renderWidth, ctx.renderHeight, {
       textureAffinityCache: getTextureAffinityCache(ctx.camera, device)
     });
 
-    // Register imported backbuffer (if using finalFramebuffer)
     if (ctx.finalFramebuffer) {
       const backbufferTex = ctx.finalFramebuffer.getColorAttachments()[0] as Texture2D;
       executor.setImportedTexture(buildResult.backbuffer, backbufferTex);

@@ -1,7 +1,4 @@
-/**
- * Resource names for render graph history resources.
- * @public
- */
+/** Render graph history resource names. @public */
 export const RGHistoryResources = {
   TAA_COLOR: 'taaColor',
   TAA_MOTION_VECTOR: 'taaMotionVector',

@@ -1,25 +1,12 @@
 import type { AbstractDevice, TextureFormat, TimestampQueryStatus } from '@zephyr3d/device';
 import type { RGTextureAffinityCache } from './texture_affinity_cache';
 
-// ─── Resource Descriptors ───────────────────────────────────────────────
-
 /**
- * Sizing mode for render graph textures.
- *
- * - 'absolute': fixed pixel dimensions
- * - 'backbuffer-relative': scaled relative to the backbuffer size
- *
- * @public
+ * Texture size mode: fixed pixels or a backbuffer-relative scale. @public
  */
 export type RGSizeMode = 'absolute' | 'backbuffer-relative';
 
-/**
- * Descriptor for a transient texture resource within the render graph.
- *
- * Transient textures are allocated and released automatically by the graph compiler.
- *
- * @public
- */
+/** Descriptor for a graph-managed transient texture. @public */
 export interface RGTextureDesc {
   /** Debug label for this resource. */
   label?: string;
@@ -28,37 +15,21 @@ export interface RGTextureDesc {
    * When omitted, the graph derives one from the declaring pass and resource label.
    */
   allocationKey?: string;
-  /** Texture format (e.g. 'rgba8unorm', 'r32f', 'rgba16f'). */
+  /** Texture format. */
   format: TextureFormat;
   /** Sizing mode. Default 'backbuffer-relative'. */
   sizeMode?: RGSizeMode;
-  /** Width in pixels (absolute) or scale factor (backbuffer-relative, default 1.0). */
+  /** Pixel width or backbuffer scale. Default 1. */
   width?: number;
-  /** Height in pixels (absolute) or scale factor (backbuffer-relative, default 1.0). */
+  /** Pixel height or backbuffer scale. Default 1. */
   height?: number;
   /** Number of mip levels. Default 1. */
   mipLevels?: number;
-  /**
-   * Number of array layers. When omitted, a plain 2D texture is allocated. When
-   * defined (including 1), the allocator produces a 2D array texture — a
-   * single-layer array is a distinct texture type from a 2D texture and is not
-   * interchangeable when bound to a `tex2DArray` sampler. Individual layers can be
-   * targeted as framebuffer color attachments via {@link RGFramebufferDesc.attachmentLayer}.
-   */
+  /** Array layers. Any defined value, including 1, requests a 2D array texture. */
   arrayLayers?: number;
 }
 
-// ─── Handles ────────────────────────────────────────────────────────────
-
-/**
- * Opaque handle referencing a resource within the render graph.
- *
- * Handles are obtained from {@link RGPassBuilder.createTexture}, {@link RGPassBuilder.createFramebuffer},
- * {@link RenderGraph.importTexture}, or {@link RGPassBuilder.write}. They are lightweight identifiers
- * used to declare dependencies between passes.
- *
- * @public
- */
+/** Opaque render graph resource handle. @public */
 export class RGHandle {
   /** @internal */
   readonly _id: number;
@@ -77,15 +48,10 @@ export class RGHandle {
   }
 }
 
-// ─── Internal Resource Tracking ─────────────────────────────────────────
-
 /** @public */
 export type RGResourceKind = 'transient' | 'imported' | 'token' | 'framebuffer';
 
-/**
- * Internal bookkeeping for a resource within the render graph.
- * @public
- */
+/** Render graph resource metadata. @public */
 export class RGResource {
   readonly id: number;
   readonly name: string;
@@ -119,89 +85,33 @@ export class RGResource {
   }
 }
 
-// ─── Internal Pass Tracking ─────────────────────────────────────────────
-
-// ─── Execution Context ──────────────────────────────────────────────
-
-/**
- * Context passed to pass execute callbacks during graph execution.
- *
- * Provides access to resolved GPU resources by their handles.
- *
- * @public
- */
+/** Resolves resources during pass execution. @public */
 export interface RGExecuteContext {
   /**
-   * Resolve a handle to the actual GPU texture object.
-   *
-   * For transient resources, this returns the texture allocated by the executor.
-   * For imported resources, this returns the texture registered via
-   * {@link RenderGraphExecutor.setImportedTexture}. The handle must be declared
-   * by the current pass with {@link RGPassBuilder.read} or {@link RGPassBuilder.write}.
-   *
-   * @param handle - Handle of the resource to resolve.
-   * @returns The resolved texture object (type depends on the allocator).
+   * Resolve a declared texture handle. Imported textures must first be bound on
+   * the executor.
    */
   getTexture<TTexture = unknown>(handle: RGHandle): TTexture;
 
-  /**
-   * Resolve a framebuffer handle to the actual backend framebuffer object.
-   *
-   * The handle must be declared by the current pass with {@link RGPassBuilder.read}
-   * or created by the same pass with {@link RGPassBuilder.createFramebuffer}.
-   *
-   * @param handle - Handle returned from {@link RGPassBuilder.createFramebuffer}.
-   * @returns The resolved framebuffer object (type depends on the allocator).
-   */
+  /** Resolve a framebuffer declared or created by the current pass. */
   getFramebuffer<TFramebuffer = unknown>(handle: RGHandle): TFramebuffer;
 
   /**
-   * Create a temporary framebuffer managed by the graph executor.
-   *
-   * The framebuffer is released automatically when graph execution finishes or
-   * aborts. Attachments may be actual backend resources or texture formats,
-   * depending on the allocator implementation. If an attachment is an
-   * {@link RGHandle}, the current pass must declare it with
-   * {@link RGPassBuilder.read} or {@link RGPassBuilder.write}.
-   *
-   * @param desc - Framebuffer descriptor.
-   * @returns The allocated framebuffer object (type depends on the allocator).
+   * Create a temporary framebuffer released after execution. Handle attachments
+   * must be declared by the current pass.
    */
   createFramebuffer<TFramebuffer = unknown>(desc: RGFramebufferDesc): TFramebuffer;
 
   /**
-   * Register a cleanup callback to run when graph execution finishes or aborts.
-   *
-   * Callbacks run in reverse registration order. Use this for temporary objects
-   * created inside pass execution that are not graph resources, such as pooled
-   * framebuffers wrapping graph-managed textures. If pass execution throws, the
-   * executor still runs cleanup callbacks and preserves the original pass error
-   * ahead of cleanup errors.
-   *
-   * @param callback - Cleanup function to invoke after execution.
+   * Run cleanup after execution or abort. Callbacks run in reverse order.
    */
   deferCleanup(callback: () => void): void;
 }
 
-/**
- * Execute callback signature.
- *
- * The callback receives a context for resolving handles to GPU resources,
- * plus the user data returned from the setup function.
- *
- * @public
- */
+/** Render graph execute callback. @public */
 export type RGExecuteFn<T = void> = (ctx: RGExecuteContext, data: T) => void;
 
-/**
- * Ordered execution step inside a render graph pass.
- *
- * Subpasses share the parent pass's resource declarations, lifetime, culling,
- * and access validation. They are intended to make multi-step pass bodies
- * explicit without splitting graph-level resource dependencies.
- *
- * @public
- */
+/** Ordered step sharing its parent pass's resources and lifetime. @public */
 export class RGSubpass<T = unknown> {
   readonly name: string;
   readonly executeFn: RGExecuteFn<T>;
@@ -215,18 +125,13 @@ export class RGSubpass<T = unknown> {
 /** Controls whether a write needs the previous resource contents. @public */
 export interface RGWriteOptions {
   /**
-   * `'load'` preserves the existing behavior and keeps previous writers alive.
-   * Use `'discard'` when the pass fully overwrites the resource; hazard ordering
-   * is preserved, but producers needed only for the old contents may be culled.
-   * Default `'load'`.
+   * Use `discard` for a full overwrite so old-content producers may be culled.
+   * Default `load`.
    */
   load?: 'load' | 'discard';
 }
 
-/**
- * Internal bookkeeping for a pass within the render graph.
- * @public
- */
+/** Render graph pass metadata. @public */
 export class RGPass<T = unknown> {
   readonly index: number;
   readonly name: string;
@@ -237,23 +142,12 @@ export class RGPass<T = unknown> {
   /** Resources this pass creates or writes. */
   readonly writes: RGResource[] = [];
   /**
-   * Liveness-carrying predecessors due to non-read hazards: the producer of a
-   * resource this pass overwrites (RAW on the previous version) and the previous
-   * writer of the same physical resource (WAW). If this pass runs, these passes
-   * must run too (a later write may only partially cover the resource), so dead
-   * pass culling propagates aliveness through them.
+   * RAW/WAW predecessors that propagate liveness.
    */
   readonly dependencies: RGPass[] = [];
-  /**
-   * WAW/overwrite predecessors that constrain execution only when both passes
-   * are alive. Discard writes use these edges without retaining old contents.
-   */
+  /** WAW predecessors used only for ordering, including discard writes. */
   readonly orderingDependencies: RGPass[] = [];
-  /**
-   * Ordering-only (WAR) predecessors: readers of the version this pass
-   * overwrites. They must run before this pass IF both are alive, but this pass
-   * being alive does not require them to run — culling ignores these edges.
-   */
+  /** WAR predecessors used only when both passes are alive. */
   readonly warDependencies: RGPass[] = [];
   /** Whether this pass has side effects and must not be culled. */
   hasSideEffect = false;
@@ -273,111 +167,37 @@ export class RGPass<T = unknown> {
   }
 }
 
-// ─── Pass Builder ───────────────────────────────────────────────────────
-
-/**
- * Builder interface used within the setup callback of {@link RenderGraph.addPass}
- * to declare a pass's resource requirements.
- *
- * @public
- */
+/** Declares a pass's resource access and execution callback. @public */
 export interface RGPassBuilder {
-  /**
-   * Declare a read dependency on an existing resource.
-   *
-   * The resource must have been created by a prior pass or imported into the graph.
-   *
-   * @param handle - Handle of the resource to read.
-   */
+  /** Declare a read of an existing resource. */
   read(handle: RGHandle): void;
 
   /**
-   * Declare that this pass writes a new version of an existing resource.
-   *
-   * The returned handle represents the post-write version. Use it for subsequent
-   * reads and as the graph output passed to {@link RenderGraph.compile}. Passing
-   * an older version of the same resource to `compile()` is rejected because it
-   * usually means the caller ignored the handle returned by `write()`. A normal
-   * write preserves prior contents for compatibility. For a full
-   * overwrite, pass `{ load: 'discard' }`; this lets passes that only produced
-   * the discarded contents be culled. Calling {@link RGPassBuilder.read} always
-   * declares an actual content dependency regardless of this option.
-   *
-   * @param handle - Handle of the resource to write to.
-   * @param options - Previous-content load behavior. Default `{ load: 'load' }`.
-   * @returns A handle referencing the newly written version.
+   * Write a new resource version. Use the returned handle for later reads and
+   * graph outputs. `discard` permits old-content producers to be culled.
    */
   write(handle: RGHandle, options?: RGWriteOptions): RGHandle;
 
-  /**
-   * Create a new transient texture resource that this pass will produce.
-   *
-   * @param desc - Texture descriptor.
-   * @returns A handle referencing the newly created resource.
-   */
+  /** Create a transient texture produced by this pass. */
   createTexture(desc: RGTextureDesc): RGHandle;
 
-  /**
-   * Create a logical dependency token produced by this pass.
-   *
-   * Tokens do not resolve to GPU resources and are not allocated by the executor.
-   * They are useful for ordering passes whose dependencies are side effects rather
-   * than texture reads/writes.
-   *
-   * @param name - Debug label for this token.
-   * @returns A handle referencing the newly created token.
-   */
+  /** Create a logical token for ordering passes without resource dependencies. */
   createToken(name?: string): RGHandle;
 
-  /**
-   * Create a graph-managed framebuffer view.
-   *
-   * The graph compiler infers dependencies from any attachment handles in the
-   * descriptor. The executor creates and releases the framebuffer automatically.
-   *
-   * @param desc - Framebuffer descriptor.
-   * @returns A handle referencing the framebuffer view.
-   */
+  /** Create a graph-managed framebuffer and infer attachment dependencies. */
   createFramebuffer(desc: RGFramebufferDesc): RGHandle;
 
-  /**
-   * Mark this pass as having side effects.
-   *
-   * Side-effect passes are never culled by the graph compiler, regardless of
-   * whether their outputs are consumed. Use this for GPU readback, picking,
-   * debug overlays, etc.
-   */
+  /** Prevent this pass from being culled. */
   sideEffect(): void;
 
-  /**
-   * Add an ordered logical subpass to this pass.
-   *
-   * Subpasses execute in registration order and share the parent pass's declared
-   * reads, writes, framebuffer views, and user data. A pass may use either
-   * subpasses or {@link setExecute}, but not both.
-   *
-   * @param name - Debug label for the subpass.
-   * @param fn - Callback invoked when this subpass executes.
-   */
+  /** Add an ordered subpass. Cannot be combined with {@link setExecute}. */
   addSubpass<D>(name: string, fn: RGExecuteFn<D>): void;
 
-  /**
-   * Set the execution callback for this pass.
-   *
-   * A pass may use either this method or {@link addSubpass}, but not both.
-   *
-   * @param fn - Callback invoked during graph execution.
-   */
+  /** Set the pass callback. Cannot be combined with {@link addSubpass}. */
   setExecute<D>(fn: RGExecuteFn<D>): void;
 }
 
-// ─── Compiled Graph ─────────────────────────────────────────────────────
-
-/**
- * Lifetime information for a resource within the compiled graph.
- *
- * @public
- */
+/** Compiled resource lifetime. @public */
 export interface RGResourceLifetime {
   /** The resource. */
   readonly resource: RGResource;
@@ -387,14 +207,7 @@ export interface RGResourceLifetime {
   readonly lastUse: number;
 }
 
-/**
- * Result of compiling a render graph.
- *
- * Contains the ordered list of passes to execute and lifetime information
- * for automatic resource management.
- *
- * @public
- */
+/** Ordered passes and resource lifetimes from graph compilation. @public */
 export interface CompiledRenderGraph {
   /** Topologically sorted passes (only non-culled passes). */
   readonly orderedPasses: ReadonlyArray<RGPass>;
@@ -402,16 +215,10 @@ export interface CompiledRenderGraph {
   readonly lifetimes: ReadonlyMap<number, RGResourceLifetime>;
 }
 
-/**
- * Profiling scope type in a render graph timing tree.
- * @public
- */
+/** Profiling scope type. @public */
 export type RGProfileScopeType = 'graph' | 'pass' | 'subpass';
 
-/**
- * Render graph GPU timestamp profiling options.
- * @public
- */
+/** GPU timestamp profiling options. @public */
 export interface RGProfilingOptions {
   /** Enable render graph timestamp profiling. Default true when an options object is provided. */
   enabled?: boolean;
@@ -433,10 +240,7 @@ export interface RGProfilingOptions {
   device?: AbstractDevice;
 }
 
-/**
- * Render graph executor construction options.
- * @public
- */
+/** Render graph executor options. @public */
 export interface RenderGraphExecutorOptions<TTexture = unknown> {
   /** Device used for timestamp queries. If omitted, the scene global getDevice() is used. */
   device?: AbstractDevice;
@@ -446,10 +250,7 @@ export interface RenderGraphExecutorOptions<TTexture = unknown> {
   textureAffinityCache?: RGTextureAffinityCache<TTexture>;
 }
 
-/**
- * Resolved GPU timing for one graph/pass/subpass scope.
- * @public
- */
+/** Resolved GPU timing for one scope. @public */
 export interface RGProfileScopeResult {
   /** Scope label. */
   name: string;
@@ -467,10 +268,7 @@ export interface RGProfileScopeResult {
   message?: string;
 }
 
-/**
- * Resolved GPU timing tree for one render graph execution.
- * @public
- */
+/** GPU timing tree for one graph execution. @public */
 export interface RGProfileResult {
   /** Render frame id when profiling began. */
   frameId: number;
@@ -482,26 +280,13 @@ export interface RGProfileResult {
   passes: RGProfileScopeResult[];
 }
 
-// ─── Texture Allocator ──────────────────────────────────────────────
-
-/**
- * Resolved dimensions for a texture allocation.
- * @public
- */
+/** Resolved texture dimensions. @public */
 export interface RGResolvedSize {
   width: number;
   height: number;
 }
 
-/**
- * Descriptor for a framebuffer view managed by the graph or created temporarily during pass execution.
- *
- * This is intentionally backend-agnostic: graph-managed descriptors may use
- * {@link RGHandle} attachments, and executor-created descriptors use resolved
- * resources or texture formats understood by the allocator.
- *
- * @public
- */
+/** Backend-independent framebuffer descriptor. @public */
 export interface RGFramebufferDesc {
   /** Debug label for this framebuffer. */
   label?: string;
@@ -530,67 +315,27 @@ export interface RGFramebufferDesc {
 /**
  * Interface for allocating and releasing transient textures.
  *
- * Implement this to bridge the render graph with your GPU device's resource pool.
- * The executor calls `allocate()` before a resource's first use and
- * `release()` after its last use.
+ * Framebuffers are released before their attachments at the same pass boundary.
+ * A released framebuffer must retain its attachments until texture release.
  *
- * Lifetime contract: the graph compiler extends a texture's lifetime to cover
- * every graph-managed framebuffer it is attached to, and the executor releases
- * framebuffers before textures at the same pass boundary. Allocators may
- * therefore assume `releaseFramebuffer()` is called before `release()` of its
- * attachments, and must keep a released framebuffer's attachments intact until
- * their own `release()` call.
- *
- * @typeParam TTexture - The concrete texture type (e.g. `Texture2D`).
  * @public
  */
 export interface RGTextureAllocator<TTexture = unknown, TFramebuffer = unknown> {
-  /**
-   * Allocate a transient texture matching the given descriptor and resolved size.
-   *
-   * @param desc - The texture descriptor from the pass builder.
-   * @param size - The resolved pixel dimensions.
-   * @param preferred - Previous compatible allocation to reacquire when available.
-   * @returns The allocated texture object.
-   */
+  /** Allocate a transient texture, preferring a compatible prior allocation. */
   allocate(desc: RGTextureDesc, size: RGResolvedSize, preferred?: TTexture): TTexture;
 
-  /**
-   * Release a previously allocated transient texture back to the pool.
-   *
-   * @param texture - The texture to release.
-   */
+  /** Release a transient texture. */
   release(texture: TTexture): void;
 
   /**
-   * Retain a texture allocated by this allocator so it can outlive the graph pass
-   * that produced it.
-   *
-   * This is used when a graph-produced transient texture must be handed off to
-   * an external owner, such as a cross-frame history resource. Executors still
-   * release the graph's own reference at the resource's last use; the external
-   * owner must later call {@link RGTextureAllocator.release} for the retained
-   * reference.
-   *
-   * Allocators that cannot retain transient textures should leave this undefined.
+   * Retain a transient texture beyond graph execution. The external owner must
+   * later release it.
    */
   retain?(texture: TTexture): void;
 
-  /**
-   * Allocate a temporary framebuffer matching the given descriptor.
-   *
-   * Implementations should not auto-release this framebuffer; the graph executor
-   * calls {@link RGTextureAllocator.releaseFramebuffer} when execution completes or aborts.
-   *
-   * @param desc - Framebuffer descriptor.
-   * @returns The allocated framebuffer object.
-   */
+  /** Allocate a framebuffer released by the executor. */
   allocateFramebuffer?(desc: RGFramebufferDesc): TFramebuffer;
 
-  /**
-   * Release a previously allocated temporary framebuffer.
-   *
-   * @param framebuffer - The framebuffer to release.
-   */
+  /** Release a temporary framebuffer. */
   releaseFramebuffer?(framebuffer: TFramebuffer): void;
 }

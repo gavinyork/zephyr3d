@@ -1,8 +1,4 @@
-/**
- * Semantic frame resources that a render module or post effect needs from the
- * Forward+ pipeline. Requirements are collected before any module setup runs.
- * @public
- */
+/** Frame resources requested before Forward+ module setup. @public */
 export interface FrameResourceRequirements {
   motionVector?: boolean;
   hiZ?: boolean;

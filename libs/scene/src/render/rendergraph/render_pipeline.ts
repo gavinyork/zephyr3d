@@ -4,23 +4,12 @@ import type { FrameResourceRequirements } from './frame_resource_requirements';
 import { mergeFrameResourceRequirements } from './frame_resource_requirements';
 
 /**
- * Resolve the setup order of a module list, honouring declared
- * {@link RenderModule.reads} / {@link RenderModule.writes} dependencies while
- * keeping the authored array order as the stable default.
- *
- * Descriptor reads select either the nearest prior writer (`current`) or the
- * last writer in the full pipeline (`final`). Final reads may reorder a module
- * after a later writer; current reads preserve authored dataflow. Required reads
- * reject missing writers. String reads keep the legacy optional-final behavior.
- *
- * @param modules - The pipeline's modules in authored order.
- * @returns A new array in resolved setup order.
+ * Resolve module dependencies with authored order as the stable default.
  * @throws If the declared dependencies form a cycle.
  * @public
  */
 export function resolveModuleOrder<T extends RenderModule<any>>(modules: readonly T[]): T[] {
   const n = modules.length;
-  // Edges producer -> reader, keyed by reader index (its set of prerequisite indices).
   const prereqs: Set<number>[] = modules.map(() => new Set<number>());
   const findWriter = (resource: string, reader: number, version: 'current' | 'final') => {
     const start = version === 'current' ? reader - 1 : n - 1;
@@ -53,8 +42,7 @@ export function resolveModuleOrder<T extends RenderModule<any>>(modules: readonl
       }
     }
   }
-  // Stable topological sort: repeatedly emit the lowest authored index whose
-  // prerequisites are all already emitted.
+  // Prefer the earliest authored module among ready nodes.
   const emitted: boolean[] = new Array(n).fill(false);
   const order: T[] = [];
   for (let placed = 0; placed < n; placed++) {
@@ -88,31 +76,10 @@ export function resolveModuleOrder<T extends RenderModule<any>>(modules: readonl
   return order;
 }
 
-/**
- * An ordered, editable list of {@link RenderModule}s that assembles a render
- * graph for one frame.
- *
- * The Forward+ pipeline is exposed as a default `RenderPipeline` (see
- * `createForwardPlusPipeline` / `getDefaultForwardPlusPipeline`). Applications
- * customize rendering by inserting, replacing or removing modules — anchored by
- * a module's {@link RenderModule.type} — either on a per-camera pipeline
- * (`camera.renderPipeline`) or on the shared default.
- *
- * ```ts
- * camera.renderPipeline = createForwardPlusPipeline()
- *   .insertAfter('SkyPass', myOutlineModule)
- *   .remove('GPUPicking');
- * ```
- *
- * Modules must have unique `type` values within a pipeline. Editing methods are
- * chainable and locate their anchor by `type`, throwing if it is absent.
- *
- * @public
- */
+/** Ordered, editable collection of uniquely named render modules. @public */
 export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
   private static readonly _moduleOwners = new WeakMap<object, RenderPipeline<any>>();
   private static readonly _disposedModules = new WeakSet<object>();
-  /** @internal */
   private _modules: RenderModule<TCtx>[];
   private _disposed = false;
 
@@ -129,12 +96,10 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
         }
       }
     } catch (error) {
-      // A failed constructor has no caller-visible pipeline that could release
-      // modules already attached earlier in the list.
       try {
         this.dispose();
       } catch {
-        // Preserve the construction error after making a best-effort rollback.
+        // Preserve the construction error.
       }
       throw error;
     }
@@ -150,28 +115,18 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     return this._disposed;
   }
 
-  /**
-   * Whether a module with the given type is present.
-   * @param type - The {@link RenderModule.type} to look up.
-   */
+  /** Whether a module type is present. */
   has(type: string): boolean {
     return this._indexOf(type) >= 0;
   }
 
-  /**
-   * Look up a module by type.
-   * @param type - The {@link RenderModule.type} to look up.
-   * @returns The module, or undefined if absent.
-   */
+  /** Return a module by type, or undefined. */
   get(type: string): RenderModule<TCtx> | undefined {
     const i = this._indexOf(type);
     return i >= 0 ? this._modules[i] : undefined;
   }
 
-  /**
-   * Append a module to the end of the pipeline.
-   * @param module - The module to add.
-   */
+  /** Append a module. */
   append(module: RenderModule<TCtx>): this {
     this._assertMutable();
     this._assertAbsent(module.type);
@@ -185,10 +140,7 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     return this;
   }
 
-  /**
-   * Prepend a module to the front of the pipeline.
-   * @param module - The module to add.
-   */
+  /** Prepend a module. */
   prepend(module: RenderModule<TCtx>): this {
     this._assertMutable();
     this._assertAbsent(module.type);
@@ -202,11 +154,7 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     return this;
   }
 
-  /**
-   * Insert a module immediately before the anchor module.
-   * @param type - The {@link RenderModule.type} of the existing anchor.
-   * @param module - The module to insert.
-   */
+  /** Insert a module before the named anchor. */
   insertBefore(type: string, module: RenderModule<TCtx>): this {
     this._assertMutable();
     this._assertAbsent(module.type);
@@ -221,11 +169,7 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     return this;
   }
 
-  /**
-   * Insert a module immediately after the anchor module.
-   * @param type - The {@link RenderModule.type} of the existing anchor.
-   * @param module - The module to insert.
-   */
+  /** Insert a module after the named anchor. */
   insertAfter(type: string, module: RenderModule<TCtx>): this {
     this._assertMutable();
     this._assertAbsent(module.type);
@@ -240,11 +184,7 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     return this;
   }
 
-  /**
-   * Replace the module with the given type in place.
-   * @param type - The {@link RenderModule.type} of the module to replace.
-   * @param module - The replacement module.
-   */
+  /** Replace a module in place. */
   replace(type: string, module: RenderModule<TCtx>): this {
     this._assertMutable();
     const i = this._requireIndex(type);
@@ -266,10 +206,7 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     return this;
   }
 
-  /**
-   * Remove the module with the given type.
-   * @param type - The {@link RenderModule.type} of the module to remove.
-   */
+  /** Remove a module by type. */
   remove(type: string): this {
     this._assertMutable();
     const [module] = this._modules.splice(this._requireIndex(type), 1);
@@ -277,10 +214,7 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     return this;
   }
 
-  /**
-   * Create an independent copy of this pipeline. Stateless module objects may
-   * be shared; lifecycle-aware modules must provide {@link RenderModule.clone}.
-   */
+  /** Clone the pipeline; lifecycle-aware modules must implement `clone`. */
   clone(): RenderPipeline<TCtx> {
     this._assertMutable();
     const modules = this._modules.map((module) => {
@@ -327,12 +261,7 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     return resolveModuleOrder(this._modules.filter((module) => module.enabled(context)));
   }
 
-  /**
-   * Collect requirements from every module in the authored pipeline.
-   * No module setup has run yet, so requirement providers cannot use blackboard
-   * resources produced by another module.
-   * @internal
-   */
+  /** Collect requirements before module setup. @internal */
   collectRequirements(context: TCtx): FrameResourceRequirements {
     this._assertMutable();
     const requirements: FrameResourceRequirements = {};
@@ -342,12 +271,7 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     return requirements;
   }
 
-  /**
-   * Run every enabled module's setup against the build context. Enabled modules
-   * are filtered before dependency resolution, so disabled writers cannot affect
-   * the ordering or blackboard contract of the current frame.
-   * @internal
-   */
+  /** Build enabled modules in dependency order. @internal */
   build(context: TCtx): void {
     this._assertMutable();
     for (const module of this.resolveModules(context)) {
@@ -355,7 +279,6 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     }
   }
 
-  /** @internal */
   private _indexOf(type: string): number {
     for (let i = 0; i < this._modules.length; i++) {
       if (this._modules[i].type === type) {
@@ -365,7 +288,6 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     return -1;
   }
 
-  /** @internal */
   private _requireIndex(type: string): number {
     const i = this._indexOf(type);
     if (i < 0) {
@@ -374,14 +296,12 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     return i;
   }
 
-  /** @internal */
   private _assertAbsent(type: string): void {
     if (this._indexOf(type) >= 0) {
       throw new Error(`RenderPipeline: a module with type "${type}" already exists`);
     }
   }
 
-  /** @internal */
   private _releaseModule(module: RenderModule<TCtx>): void {
     if (RenderPipeline._moduleOwners.get(module) === this) {
       RenderPipeline._moduleOwners.delete(module);
@@ -414,7 +334,6 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     }
   }
 
-  /** @internal */
   private _attachModule(module: RenderModule<TCtx>): void {
     if (module.dispose && RenderPipeline._disposedModules.has(module)) {
       throw new Error(`RenderPipeline: disposed module "${module.type}" cannot be attached again`);
@@ -440,7 +359,6 @@ export class RenderPipeline<TCtx extends RenderContext = RenderContext> {
     }
   }
 
-  /** @internal */
   private _assertMutable(): void {
     if (this._disposed) {
       throw new Error('RenderPipeline: pipeline has been disposed');

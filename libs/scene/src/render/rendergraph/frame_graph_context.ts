@@ -3,17 +3,7 @@ import type { FrameBuffer } from '@zephyr3d/device';
 import type { RenderContext } from './render_context';
 import type { ForwardPlusOptions, FrameState, ForwardPlusBuildState } from './forward_plus_builder';
 
-/**
- * Forward+ build-time context. Extends the pipeline-agnostic {@link RenderContext}
- * with the state the Forward+ modules need but that is not part of the generic
- * pipeline contract: the frame {@link ../drawable#DrawContext} and the Forward+
- * feature toggles.
- *
- * Handles for well-known frame resources (linear depth, scene color, ...) flow
- * through {@link RenderContext.blackboard} keyed by {@link ./blackboard#FrameResources}.
- *
- * @public
- */
+/** Forward+ module build context. @public */
 export interface ForwardPlusModuleContext extends RenderContext {
   /** Frame draw context. */
   readonly ctx: DrawContext;
@@ -30,14 +20,7 @@ export interface ForwardPlusModuleContext extends RenderContext {
  */
 export type RenderModuleContext = ForwardPlusModuleContext;
 
-/**
- * Full build-time context threaded through the Forward+ pipeline. Extends the
- * public {@link ForwardPlusModuleContext} with the Forward+ pipeline's internal
- * mutable state, which built-in modules read/write but custom modules should
- * not depend on.
- *
- * @public
- */
+/** Forward+ build context including internal shared state. @public */
 export interface FrameGraphContext extends ForwardPlusModuleContext {
   /** Mutable execute-time state shared between pass callbacks. */
   readonly frame: FrameState;

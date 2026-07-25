@@ -56,22 +56,7 @@ const DEFAULT_PROFILING_OPTIONS: RGResolvedProfilingOptions = {
   label: 'RenderGraph'
 };
 
-/**
- * Executes a compiled render graph with automatic resource lifecycle management.
- *
- * The executor allocates transient textures before their first use and releases
- * them after their last use, using the provided {@link RGTextureAllocator}.
- *
- * Usage:
- * ```ts
- * const executor = new RenderGraphExecutor(myAllocator, backbufferWidth, backbufferHeight);
- * executor.setImportedTexture(backbufferHandle, actualBackbufferTexture);
- * executor.execute(compiledGraph);
- * ```
- *
- * @typeParam TTexture - The concrete texture type (e.g. `Texture2D`).
- * @public
- */
+/** Executes compiled graphs with automatic resource lifetimes. @public */
 export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   private static _defaultProfilingOptions: boolean | RGProfilingOptions = false;
   private static _latestProfileResult: RGProfileResult | null = null;
@@ -79,35 +64,20 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   private static _latestResolvedProfileSerial = 0;
   private static _nextProfileSerial = 0;
 
-  /** @internal */
   private _allocator: RGTextureAllocator<TTexture, TFramebuffer>;
-  /** @internal */
   private _backbufferWidth: number;
-  /** @internal */
   private _backbufferHeight: number;
-  /** @internal */
   private _importedTextures: Map<number, TTexture> = new Map();
-  /** @internal */
   private _allocatedTextures: Map<number, TTexture> = new Map();
-  /** @internal */
   private _allocatedFramebuffers: Map<number, TFramebuffer> = new Map();
-  /** @internal */
   private _importedTextureAliases: Map<number, number> = new Map();
-  /** @internal */
   private _transientTextureAliases: Map<number, number> = new Map();
-  /** @internal */
   private _resolvedImportedTextures: Map<number, TTexture> = new Map();
-  /** @internal */
   private _cleanupCallbacks: Array<() => void> = [];
-  /** @internal */
   private _profilingOptions: RGResolvedProfilingOptions;
-  /** @internal */
   private _pendingProfileFrames: RGProfileFrameInternal[] = [];
-  /** @internal */
   private _latestProfileResult: RGProfileResult | null = null;
-  /** @internal */
   private _latestResolvedProfileSerial = 0;
-  /** @internal */
   private _textureAffinityCache: RGTextureAffinityCache<TTexture> | null;
 
   constructor(
@@ -126,23 +96,17 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     this._textureAffinityCache = options?.textureAffinityCache ?? null;
   }
 
-  /**
-   * Set the default profiling options used by newly constructed render graph executors.
-   */
+  /** Set profiling defaults for new executors. */
   static setDefaultProfilingOptions(options: boolean | RGProfilingOptions): void {
     RenderGraphExecutor._defaultProfilingOptions = options;
   }
 
-  /**
-   * Get the latest resolved profile result from any render graph executor.
-   */
+  /** Return the latest resolved result from any executor. */
   static getLatestProfileResult(): RGProfileResult | null {
     return RenderGraphExecutor._latestProfileResult;
   }
 
-  /**
-   * Resolve the latest pending render graph profile result from any executor.
-   */
+  /** Resolve the latest pending result from any executor. */
   static resolveProfileResult(): Promise<RGProfileResult | null> {
     return (
       RenderGraphExecutor._latestPendingProfileFrame?.resolvePromise ??
@@ -150,23 +114,17 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     );
   }
 
-  /**
-   * Enable, disable, or update timestamp profiling for this executor.
-   */
+  /** Update timestamp profiling for this executor. */
   setProfilingOptions(options: boolean | RGProfilingOptions): void {
     this._profilingOptions = this._normalizeProfilingOptions(options, this._profilingOptions.device);
   }
 
-  /**
-   * Get the latest resolved profile result produced by this executor.
-   */
+  /** Return this executor's latest resolved profile. */
   getLatestProfileResult(): RGProfileResult | null {
     return this._latestProfileResult;
   }
 
-  /**
-   * Resolve the latest pending profile result produced by this executor.
-   */
+  /** Resolve this executor's latest pending profile. */
   resolveProfileResult(): Promise<RGProfileResult | null> {
     return (
       this._pendingProfileFrames[this._pendingProfileFrames.length - 1]?.resolvePromise ??
@@ -174,50 +132,30 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     );
   }
 
-  /**
-   * Update the backbuffer dimensions used for 'backbuffer-relative' sizing.
-   */
+  /** Update dimensions used for backbuffer-relative resources. */
   setBackbufferSize(width: number, height: number): void {
     this._backbufferWidth = width;
     this._backbufferHeight = height;
   }
 
-  /**
-   * Register an imported (external) texture so it can be resolved during execution.
-   *
-   * @param handle - The handle returned from {@link RenderGraph.importTexture}.
-   * @param texture - The actual GPU texture object.
-   */
+  /** Bind an imported texture for execution. */
   setImportedTexture(handle: RGHandle, texture: TTexture): void {
     this._importedTextures.set(handle._id, texture);
   }
 
-  /**
-   * Execute the compiled graph with full resource lifecycle management.
-   *
-   * For each pass in topological order:
-   * 1. Allocate any transient resources whose lifetime begins at this pass
-   * 2. Invoke the pass's execute callback with a context that resolves handles
-   * 3. Release any transient resources whose lifetime ends at this pass
-   *
-   * @param compiled - The compiled graph from {@link RenderGraph.compile}.
-   */
+  /** Execute a compiled graph and manage its transient resources. */
   execute(compiled: CompiledRenderGraph): void {
     this._cleanupCallbacks.length = 0;
     this._resolveImportedTextureAliases(compiled);
     const profileFrame = this._beginProfileFrame();
     const affinityEntries = new Map<string, RGTextureAffinityEntry<TTexture>>();
 
-    // Build per-pass allocation and release schedules
-    const allocateAt = new Map<number, number[]>(); // passIndex -> transient texture resourceIds to allocate
-    const releaseAt = new Map<number, number[]>(); // passIndex -> transient texture resourceIds to release
-    const allocateFramebufferAt = new Map<number, number[]>(); // passIndex -> framebuffer resourceIds to allocate
-    const releaseFramebufferAt = new Map<number, number[]>(); // passIndex -> framebuffer resourceIds to release
+    const allocateAt = new Map<number, number[]>();
+    const releaseAt = new Map<number, number[]>();
+    const allocateFramebufferAt = new Map<number, number[]>();
+    const releaseFramebufferAt = new Map<number, number[]>();
 
-    // Transient write-versions (builder.write on a transient) alias the same
-    // physical texture as the original resource: merge their lifetimes by
-    // physicalId so one texture is allocated at the first use of any version
-    // and released after the last use of any version.
+    // Merge lifetimes of versions sharing one physical texture.
     this._transientTextureAliases.clear();
     const transientSchedules = new Map<
       number,
@@ -269,7 +207,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
       for (let i = 0; i < compiled.orderedPasses.length; i++) {
         const pass = compiled.orderedPasses[i];
 
-        // Allocate resources that start at this pass
         const toAllocate = allocateAt.get(i);
         if (toAllocate) {
           for (const resId of toAllocate) {
@@ -287,7 +224,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
           }
         }
 
-        // Allocate framebuffer views after their texture attachments are available.
+        // Allocate framebuffers after their attachments.
         const framebuffersToAllocate = allocateFramebufferAt.get(i);
         if (framebuffersToAllocate) {
           for (const resId of framebuffersToAllocate) {
@@ -298,8 +235,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
           }
         }
 
-        // Execute the pass with exception safety for resource cleanup.
-        // Release errors must not hide the original pass execution error.
+        // Preserve pass errors ahead of release errors.
         let passError: unknown = null;
         const passProfile = this._beginPassProfileScope(profileFrame, pass);
         try {
@@ -347,7 +283,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
             }
           }
         }
-        // Release resources that end at this pass (always runs even if pass throws)
         const toRelease = releaseAt.get(i);
         if (toRelease) {
           for (const resId of toRelease) {
@@ -400,13 +335,10 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     }
   }
 
-  /**
-   * Clear imported texture registrations and any leftover allocated textures.
-   * Call this after execution or when resetting for a new frame.
-   */
+  /** Release remaining resources and clear imported bindings. */
   reset(): void {
     this._runCleanupCallbacks();
-    // Release any textures that weren't released (shouldn't happen in normal flow)
+    // Handles aborted execution and allocator failures.
     for (const framebuffer of this._allocatedFramebuffers.values()) {
       this._releaseFramebuffer(framebuffer);
     }
@@ -421,9 +353,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     this._resolvedImportedTextures.clear();
   }
 
-  // ─── Private ────────────────────────────────────────────────────────
-
-  /** @internal */
   private _normalizeProfilingOptions(
     options: boolean | RGProfilingOptions | undefined,
     fallbackDevice?: AbstractDevice
@@ -443,7 +372,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     };
   }
 
-  /** @internal */
   private _getProfilingDevice(): AbstractDevice | null {
     if (this._profilingOptions.device) {
       return this._profilingOptions.device;
@@ -455,7 +383,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     }
   }
 
-  /** @internal */
   private _beginProfileFrame(): RGProfileFrameInternal | null {
     if (!this._profilingOptions.enabled) {
       return null;
@@ -497,7 +424,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     return frame;
   }
 
-  /** @internal */
   private _beginPassProfileScope(
     frame: RGProfileFrameInternal | null,
     pass: RGPass
@@ -508,7 +434,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     return this._beginProfileScope(frame, frame.root, 'pass', pass.name, this._profilingOptions.pass);
   }
 
-  /** @internal */
   private _beginSubpassProfileScope(
     frame: RGProfileFrameInternal | null,
     passScope: RGProfileScopeInternal | null,
@@ -529,7 +454,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     );
   }
 
-  /** @internal */
   private _beginProfileScope(
     frame: RGProfileFrameInternal,
     parent: RGProfileScopeInternal,
@@ -561,7 +485,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     return scope;
   }
 
-  /** @internal */
   private _beginTimestampScope(
     frame: RGProfileFrameInternal,
     scope: RGProfileScopeInternal,
@@ -587,7 +510,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     }
   }
 
-  /** @internal */
   private _endProfileScope(frame: RGProfileFrameInternal | null, scope: RGProfileScopeInternal | null): void {
     if (!frame || !frame.device || !scope || scope.ended) {
       return;
@@ -598,7 +520,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     }
   }
 
-  /** @internal */
   private _finishProfileFrame(frame: RGProfileFrameInternal | null): void {
     if (!frame) {
       return;
@@ -633,7 +554,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     this._trackPendingProfileFrame(frame);
   }
 
-  /** @internal */
   private _trackPendingProfileFrame(frame: RGProfileFrameInternal): void {
     this._pendingProfileFrames.push(frame);
     while (this._pendingProfileFrames.length > this._profilingOptions.maxPendingFrames) {
@@ -642,7 +562,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     RenderGraphExecutor._latestPendingProfileFrame = frame;
   }
 
-  /** @internal */
   private _publishProfileResult(frame: RGProfileFrameInternal): void {
     this._pendingProfileFrames = this._pendingProfileFrames.filter((pending) => pending !== frame);
     if (frame.serial >= this._latestResolvedProfileSerial) {
@@ -658,7 +577,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     }
   }
 
-  /** @internal */
   private _applyTimestampResult(scope: RGProfileScopeInternal, result: TimestampQueryResult): void {
     scope.result.queryId = result.id;
     scope.result.durationMs = result.durationMs;
@@ -666,7 +584,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     scope.result.message = result.message;
   }
 
-  /** @internal */
   private _aggregateProfileStatus(scope: RGProfileScopeResult): TimestampQueryStatus {
     const statuses: TimestampQueryStatus[] = [];
     const collect = (node: RGProfileScopeResult) => {
@@ -687,7 +604,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     return 'resolved';
   }
 
-  /** @internal */
   private _resolveSize(desc: RGTextureDesc): RGResolvedSize {
     const mode = desc.sizeMode ?? 'backbuffer-relative';
     if (mode === 'absolute') {
@@ -696,7 +612,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
         height: desc.height ?? 1
       };
     }
-    // backbuffer-relative: width/height are scale factors (default 1.0)
     const scaleX = desc.width ?? 1.0;
     const scaleY = desc.height ?? 1.0;
     return {
@@ -705,7 +620,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     };
   }
 
-  /** @internal */
   private _getTextureDescriptorSignature(desc: RGTextureDesc, size: RGResolvedSize): string {
     return JSON.stringify([
       desc.format,
@@ -716,7 +630,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     ]);
   }
 
-  /** @internal */
   private _resolveImportedTextureAliases(compiled: CompiledRenderGraph): void {
     this._importedTextureAliases.clear();
     this._resolvedImportedTextures.clear();
@@ -746,7 +659,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     }
   }
 
-  /** @internal */
   private _runCleanupCallbacks(): void {
     let error: unknown = null;
     while (this._cleanupCallbacks.length > 0) {
@@ -762,7 +674,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     }
   }
 
-  /** @internal */
   private _createFramebuffer(desc: RGFramebufferDesc, autoCleanup = true): TFramebuffer {
     if (!this._allocator.allocateFramebuffer || !this._allocator.releaseFramebuffer) {
       throw new Error('RenderGraphExecutor: framebuffer allocation is not supported by this allocator.');
@@ -776,7 +687,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     return framebuffer;
   }
 
-  /** @internal */
   private _releaseFramebuffer(framebuffer: TFramebuffer): void {
     if (!this._allocator.releaseFramebuffer) {
       throw new Error('RenderGraphExecutor: framebuffer release is not supported by this allocator.');
@@ -784,7 +694,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     this._allocator.releaseFramebuffer(framebuffer);
   }
 
-  /** @internal */
   private _resolveFramebufferDesc(
     desc: RGFramebufferDesc,
     accessScope?: RGPassAccessScope
@@ -810,7 +719,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     };
   }
 
-  /** @internal */
   private _resolveResource(handle: RGHandle): TTexture {
     const imported = this._importedTextures.get(handle._id);
     if (imported !== undefined) {
@@ -832,7 +740,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     if (allocated !== undefined) {
       return allocated;
     }
-    // Transient write-versions resolve to the physical texture of the original.
+    // Written versions alias the original physical texture.
     const transientAlias = this._transientTextureAliases.get(handle._id);
     if (transientAlias !== undefined) {
       const aliased = this._allocatedTextures.get(transientAlias);
@@ -846,7 +754,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     );
   }
 
-  /** @internal */
   private _createAccessScope(pass: RGPass): RGPassAccessScope {
     const accessibleIds = new Set<number>();
     const textureIds = new Set<number>();
@@ -875,7 +782,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     };
   }
 
-  /** @internal */
   private _assertDeclaredAccess(
     accessScope: RGPassAccessScope,
     handle: RGHandle,
@@ -901,7 +807,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     }
   }
 
-  /** @internal */
   private _wrapSubpassError(passName: string, subpassName: string, error: unknown): Error {
     const message = error instanceof Error ? error.message : String(error);
     const wrapped = new Error(
@@ -911,7 +816,6 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     return wrapped;
   }
 
-  /** @internal */
   private _createContext(accessScope: RGPassAccessScope): RGExecuteContext {
     const self = this;
     return {

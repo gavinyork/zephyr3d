@@ -19,28 +19,7 @@ interface PendingHistoryCommit<TTexture> {
   ownsTexture: boolean;
 }
 
-/**
- * Manages cross-frame history resources that can be imported into a render graph.
- *
- * History resources are textures that persist across frames for temporal effects
- * like TAA, motion blur, or temporal upscaling. Previous-frame textures can be
- * imported into a {@link RenderGraph}, and current-frame textures are committed
- * only after graph execution succeeds.
- *
- * Usage:
- * ```ts
- * const historyMgr = new HistoryResourceManager(allocator);
- * historyMgr.beginFrame();
- * const prev = historyMgr.importPrevious(graph, 'taaColor');
- * // declare builder.read(prev) if non-null
- * historyMgr.bindImportedTextures(executor);
- * // after successful execution:
- * historyMgr.commitFrame();
- * ```
- *
- * @typeParam TTexture - The concrete texture type (e.g. `Texture2D`).
- * @public
- */
+/** Manages render graph textures retained across frames. @public */
 export class HistoryResourceManager<TTexture = Texture2D> {
   private _resources: Map<string, HistoryResource<TTexture>> = new Map();
   private _allocator: RGTextureAllocator<TTexture>;
@@ -48,31 +27,17 @@ export class HistoryResourceManager<TTexture = Texture2D> {
   private _pendingCommits: Map<string, PendingHistoryCommit<TTexture>> = new Map();
   private _readScopeStack: Array<Map<string, TTexture>> = [];
   private _frameActive = false;
-  // Textures whose owning pending-commit slot was overwritten within the same
-  // frame. They are released only at frame end (commit/discard), never mid-frame:
-  // the caller may still hold a GPU-queued reference to a texture it just handed
-  // off, and releasing it back to the pool immediately risks reuse-before-consume.
+  // Delay replaced commits until frame end to prevent pool reuse while queued.
   private _deferredReleases: TTexture[] = [];
 
-  /**
-   * Create a new history resource manager.
-   *
-   * @param allocator - Texture allocator for creating history textures.
-   */
+  /** Create a history manager using the given allocator. */
   constructor(allocator: RGTextureAllocator<TTexture>) {
     this._allocator = allocator;
   }
 
   /**
-   * Get the previous-frame texture resolved by the current render graph pass.
-   *
-   * The resource must have been imported with {@link HistoryResourceManager.importPrevious} or
-   * {@link HistoryResourceManager.importPreviousIfCompatible}, declared as a pass read, and bound with
-   * {@link HistoryResourceManager.beginReadScope} before this method is called.
-   *
-   * @param name - Name of the history resource.
-   * @returns The graph-resolved previous-frame texture.
-   * @throws If no read scope is active for the resource.
+   * Return a previous-frame texture from the active read scope.
+   * @throws When the resource is not available in that scope.
    */
   getPrevious(name: string): TTexture {
     const scoped = this._getScopedRead(name);
@@ -85,41 +50,23 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     );
   }
 
-  /**
-   * Try to get a previous-frame texture from the current render graph read scope.
-   *
-   * Returns null when the resource was not imported for the current pass.
-   *
-   * @param name - Name of the history resource.
-   * @returns The scoped previous-frame texture, or null.
-   */
+  /** Return a scoped previous-frame texture, or null. */
   tryGetPrevious(name: string): TTexture | null {
     return this._getScopedRead(name);
   }
 
-  /**
-   * Whether this manager is currently collecting imports/commits for a graph frame.
-   */
+  /** Whether a history frame is active. */
   get frameActive(): boolean {
     return this._frameActive;
   }
 
-  /**
-   * Check whether a valid history resource exists and matches the descriptor.
-   *
-   * @param name - Name of the history resource.
-   * @param desc - Expected texture descriptor.
-   * @param size - Expected resolved size.
-   * @returns True if the resource exists, is valid, and matches.
-   */
+  /** Check for valid history matching the descriptor and size. */
   isCompatible(name: string, desc: RGTextureDesc, size: RGResolvedSize): boolean {
     const resource = this._resources.get(name);
     return !!resource?.valid && this._matches(resource, desc, size);
   }
 
-  /**
-   * Start collecting graph imports and deferred commits for a new frame.
-   */
+  /** Begin collecting imports and commits for a frame. */
   beginFrame(): void {
     this.discardFrame();
     this._pendingImports.clear();
@@ -127,15 +74,7 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     this._frameActive = true;
   }
 
-  /**
-   * Import the latest committed texture for a history resource into the graph.
-   *
-   * Returns null when the resource has no valid previous frame.
-   *
-   * @param graph - Render graph to import into.
-   * @param name - History resource name.
-   * @returns Imported graph handle, or null when no valid previous texture exists.
-   */
+  /** Import the latest history texture, or return null when unavailable. */
   importPrevious(graph: RenderGraph, name: string): RGHandle | null {
     const resource = this._resources.get(name);
     const texture = resource?.valid ? resource.textures[resource.currentIndex] : null;
@@ -148,17 +87,7 @@ export class HistoryResourceManager<TTexture = Texture2D> {
   }
 
   /**
-   * Import the latest committed texture only when it matches the expected shape.
-   *
-   * This is the preferred API for effects that can declare their history reads
-   * while building the graph: incompatible history is treated as absent, so the
-   * pass does not declare stale reads after resize or format changes.
-   *
-   * @param graph - Render graph to import into.
-   * @param name - History resource name.
-   * @param desc - Expected texture descriptor.
-   * @param size - Expected resolved size.
-   * @returns Imported graph handle, or null when no compatible history exists.
+   * Import the latest history only when its descriptor and size match.
    */
   importPreviousIfCompatible(
     graph: RenderGraph,
@@ -169,22 +98,14 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     return this.isCompatible(name, desc, size) ? this.importPrevious(graph, name) : null;
   }
 
-  /**
-   * Bind all history imports created for this frame to the executor.
-   *
-   * @param executor - Render graph executor for the current frame.
-   */
+  /** Bind this frame's history imports to an executor. */
   bindImportedTextures(executor: Pick<RenderGraphExecutor<TTexture>, 'setImportedTexture'>): void {
     for (const [handle, texture] of this._pendingImports) {
       executor.setImportedTexture(handle, texture);
     }
   }
 
-  /**
-   * Make resolved history textures available to code executing inside a pass.
-   *
-   * @param bindings - History name to resolved texture bindings.
-   */
+  /** Push a history read scope for pass execution. */
   beginReadScope(bindings: Array<{ name: string; texture: TTexture }>): void {
     const scope = new Map<string, TTexture>();
     for (const binding of bindings) {
@@ -193,24 +114,14 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     this._readScopeStack.push(scope);
   }
 
-  /**
-   * End the most recent history read scope.
-   */
+  /** Pop the latest history read scope. */
   endReadScope(): void {
     this._readScopeStack.pop();
   }
 
   /**
-   * Queue a current-frame texture to become the next previous-frame history.
-   *
-   * The texture is committed only when {@link HistoryResourceManager.commitFrame} is called. If the
-   * frame fails, {@link HistoryResourceManager.discardFrame} releases owned pending textures instead.
-   *
-   * @param name - History resource name.
-   * @param desc - Texture descriptor.
-   * @param size - Resolved texture size.
-   * @param texture - Texture produced by the current frame.
-   * @param ownsTexture - Whether this manager should release the texture later.
+   * Queue the next history texture. It becomes visible on `commitFrame`; owned
+   * textures are released on `discardFrame`.
    */
   queueCommit(
     name: string,
@@ -227,8 +138,7 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     }
     const existing = this._pendingCommits.get(name);
     if (existing?.ownsTexture && existing.texture !== texture) {
-      // Defer the release: see _deferredReleases. Skip when the same texture is
-      // re-queued (no ownership change, releasing would drop a live reference).
+      // Re-queuing the same texture keeps its existing reference.
       this._deferredReleases.push(existing.texture);
     }
     this._pendingCommits.set(name, {
@@ -240,18 +150,7 @@ export class HistoryResourceManager<TTexture = Texture2D> {
   }
 
   /**
-   * Queue a graph-produced texture as a current-frame history write.
-   *
-   * The allocator must retain the texture before the graph executor releases its
-   * transient reference. Use this from inside the pass that declares access to
-   * the handle being committed.
-   *
-   * @param name - History resource name.
-   * @param desc - Texture descriptor.
-   * @param size - Resolved texture size.
-   * @param ctx - Current render graph execute context.
-   * @param handle - Graph texture handle to commit.
-   * @returns The retained texture.
+   * Retain and queue a graph texture from its declaring pass.
    */
   queueCommitFromGraph(
     name: string,
@@ -265,18 +164,7 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     return texture;
   }
 
-  /**
-   * Queue a texture after retaining it through the allocator.
-   *
-   * Use this for textures produced by the graph allocator. The manager owns the
-   * retained reference and releases it when the history slot is overwritten,
-   * discarded, or disposed.
-   *
-   * @param name - History resource name.
-   * @param desc - Texture descriptor.
-   * @param size - Resolved texture size.
-   * @param texture - Texture to retain and commit.
-   */
+  /** Retain a texture through the allocator and queue it as history. */
   queueRetainedCommit(name: string, desc: RGTextureDesc, size: RGResolvedSize, texture: TTexture): void {
     if (!this._allocator.retain) {
       throw new Error(
@@ -288,9 +176,7 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     this.queueCommit(name, desc, size, texture, true);
   }
 
-  /**
-   * Commit all current-frame history writes.
-   */
+  /** Commit all pending history writes. */
   commitFrame(): void {
     for (const [name, pending] of this._pendingCommits) {
       let resource = this._resources.get(name);
@@ -327,9 +213,7 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     this._flushDeferredReleases();
   }
 
-  /**
-   * Discard all uncommitted frame history writes.
-   */
+  /** Discard all pending history writes. */
   discardFrame(): void {
     for (const pending of this._pendingCommits.values()) {
       if (pending.ownsTexture) {
@@ -343,7 +227,7 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     this._flushDeferredReleases();
   }
 
-  /** @internal Release textures whose owning commit slot was overwritten mid-frame. */
+  /** @internal */
   private _flushDeferredReleases(): void {
     for (const texture of this._deferredReleases) {
       this._allocator.release(texture);
@@ -351,11 +235,7 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     this._deferredReleases.length = 0;
   }
 
-  /**
-   * Release all history resources and clear the manager.
-   *
-   * Call this when disposing the render context or when history is no longer needed.
-   */
+  /** Release all history resources. */
   dispose(): void {
     this.discardFrame();
     for (const resource of this._resources.values()) {
@@ -380,8 +260,7 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     return (
       resource.desc.format === desc.format &&
       (resource.desc.mipLevels ?? 1) === (desc.mipLevels ?? 1) &&
-      // Strict comparison on purpose: undefined (2D) and 1 (single-layer array)
-      // are distinct texture types and not interchangeable when sampled.
+      // A 2D texture and a one-layer array are distinct types.
       resource.desc.arrayLayers === desc.arrayLayers &&
       resource.size.width === size.width &&
       resource.size.height === size.height
@@ -401,9 +280,7 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     if (!texture) {
       return;
     }
-    // Every owning slot holds one independent reference obligation: with a
-    // ref-counting allocator the same texture retained twice must be released
-    // twice, so release unconditionally when the slot owns its reference.
+    // Each owning slot represents one retained reference.
     if (resource.ownsTexture[index]) {
       this._allocator.release(texture);
     }
