@@ -1,37 +1,39 @@
 import type { RenderContext } from './render_context';
 import type { FrameResourceRequirements } from './frame_resource_requirements';
 import type { RenderPipeline } from './render_pipeline';
+import type { FrameResourceKey } from './blackboard';
 
 /** Selects which declared writer satisfies a module resource read. @public */
 export interface RenderModuleReadDescriptor {
   /** Blackboard resource key. */
-  readonly resource: string;
+  readonly resource: FrameResourceKey;
   /** Writer selection. `final` may reorder the module. Default `current`. */
   readonly version?: 'current' | 'final';
   /** Allow the read to have no enabled declared writer. Default false. */
   readonly optional?: boolean;
 }
 
-/**
- * Module resource read declaration. A string is the compatibility shorthand
- * for `{ resource, version: 'final', optional: true }`.
- * @public
- */
-export type RenderModuleRead = string | RenderModuleReadDescriptor;
+/** Module resource read declaration. @public */
+export type RenderModuleRead = RenderModuleReadDescriptor;
+
+/** Result of the module's per-frame feature preparation. @public */
+export interface RenderModulePreparation {
+  /** Whether setup should contribute passes this frame. */
+  readonly enabled: boolean;
+  /** Frame resources required by enabled modules. */
+  readonly requirements?: FrameResourceRequirements;
+}
 
 /** A pipeline stage that declares dependencies and builds graph passes. @public */
 export interface RenderModule<TCtx extends RenderContext = RenderContext> {
   /** Stable identifier used by pipeline editing methods. */
   readonly type: string;
 
-  /**
-   * Blackboard resources required by `setup`. String entries retain the legacy
-   * optional-final behavior.
-   */
+  /** Blackboard resources required by `setup`, resolved before module ordering. */
   readonly reads?: readonly RenderModuleRead[];
 
   /** Blackboard resources published by `setup`, used for dependency ordering. */
-  readonly writes?: readonly string[];
+  readonly writes?: readonly FrameResourceKey[];
 
   /** Called when this module becomes owned by a pipeline. */
   attach?(pipeline: RenderPipeline<TCtx>): void;
@@ -45,14 +47,8 @@ export interface RenderModule<TCtx extends RenderContext = RenderContext> {
   /** Create an independent module for {@link RenderPipeline.clone}. */
   clone?(): RenderModule<TCtx>;
 
-  /**
-   * Declare frame resources before setup. This must be pure and return no
-   * requirements when the module will be disabled.
-   */
-  requirements?(context: TCtx): FrameResourceRequirements;
-
-  /** Whether this module contributes to the current frame. */
-  enabled(context: TCtx): boolean;
+  /** Prepare pure feature state and requirements for the current frame. */
+  prepare(context: TCtx): RenderModulePreparation;
 
   /** Add this module's passes and publish its outputs. */
   setup(context: TCtx): void;

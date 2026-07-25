@@ -30,7 +30,7 @@ export function createRedBoxModule(
     // so we render the red boxes on top of the finished frame.
     reads: [{ resource: FrameResources.PresentedColor, version: 'final' }],
     writes: [FrameResources.PresentedColor],
-    enabled: () => true,
+    prepare: () => ({ enabled: true }),
     setup(fg: ForwardPlusModuleContext) {
       if (!fg.blackboard.has(FrameResources.PresentedColor)) {
         return;

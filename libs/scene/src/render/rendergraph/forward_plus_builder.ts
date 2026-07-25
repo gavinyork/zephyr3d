@@ -35,7 +35,7 @@ import { RGTextureAffinityCache } from './texture_affinity_cache';
 import { DevicePoolAllocator } from './device_pool_allocator';
 import { HistoryResourceManager } from './history_resource_manager';
 import { RGHistoryResources } from './history_resources';
-import { RGBlackboard, FrameResources } from './blackboard';
+import { RGBlackboard, FrameResources, type FrameResourceKey } from './blackboard';
 import { OrderingScope } from './render_context';
 import type { FrameGraphContext } from './frame_graph_context';
 import type { RenderModule } from './render_module';
@@ -413,7 +413,7 @@ function validateProducedFrameResources(
   options: ForwardPlusOptions,
   renderQueue: RenderQueue
 ): void {
-  const required: Array<[boolean, string]> = [
+  const required: Array<[boolean, FrameResourceKey]> = [
     [options.motionVectors, FrameResources.MotionVector],
     [options.hiZ, FrameResources.HiZ],
     [options.sceneNormal, FrameResources.SceneNormal],
@@ -511,7 +511,7 @@ function requireBuildState<K extends keyof ForwardPlusBuildState>(
 /** @internal */
 const SkyUpdateModule: RenderModule<FrameGraphContext> = {
   type: 'SkyUpdate',
-  enabled: () => true,
+  prepare: () => ({ enabled: true }),
   setup({ graph, ctx, frame, ordering }: FrameGraphContext) {
     graph.addPass('SkyUpdate', (builder) => {
       ordering.emit(builder, 'SkyUpdateDone');
@@ -526,7 +526,7 @@ const SkyUpdateModule: RenderModule<FrameGraphContext> = {
 /** @internal */
 const ClusterLightsModule: RenderModule<FrameGraphContext> = {
   type: 'ClusterLights',
-  enabled: () => true,
+  prepare: () => ({ enabled: true }),
   setup({ graph, ctx, renderQueue, ordering }: FrameGraphContext) {
     graph.addPass('ClusterLights', (builder) => {
       ordering.chainInto(builder);
@@ -543,7 +543,7 @@ const ClusterLightsModule: RenderModule<FrameGraphContext> = {
 /** @internal */
 const GPUPickingModule: RenderModule<FrameGraphContext> = {
   type: 'GPUPicking',
-  enabled: ({ options }) => options.gpuPicking,
+  prepare: ({ options }) => ({ enabled: options.gpuPicking }),
   setup({ graph, ctx, renderQueue, ordering }: FrameGraphContext) {
     graph.addPass('GPUPicking', (builder) => {
       ordering.chainInto(builder);
@@ -563,7 +563,7 @@ const GPUPickingModule: RenderModule<FrameGraphContext> = {
 const ShadowMapsModule: RenderModule<FrameGraphContext> = {
   type: 'ShadowMaps',
   // Light-owned shadow maps are observable side effects.
-  enabled: ({ renderQueue }) => renderQueue.shadowedLights.length > 0,
+  prepare: ({ renderQueue }) => ({ enabled: renderQueue.shadowedLights.length > 0 }),
   setup({ graph, ctx, renderQueue, ordering }: FrameGraphContext) {
     graph.addPass('ShadowMaps', (builder) => {
       ordering.chainInto(builder);
@@ -580,7 +580,7 @@ const ShadowMapsModule: RenderModule<FrameGraphContext> = {
 const DepthPrepassModule: RenderModule<FrameGraphContext> = {
   type: 'DepthPrepass',
   writes: [FrameResources.LinearDepth, FrameResources.MotionVector, FrameResources.SceneDepthAttachment],
-  enabled: () => true,
+  prepare: () => ({ enabled: true }),
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, ordering, blackboard, options } = fg;
     const result = graph.addPass('DepthPrepass', (builder) => {
@@ -694,12 +694,16 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
 const ShadowMaskModule: RenderModule<FrameGraphContext> = {
   type: 'ShadowMaskPass',
   writes: [FrameResources.ShadowMask],
-  requirements: ({ ctx, renderQueue }) => ({
-    shadowMask:
-      ctx.device.type !== 'webgl' && ctx.camera.screenSpaceShadowMask && renderQueue.shadowedLights.length > 0
-  }),
   // shadowMapInfo is populated at execute time and cannot gate graph building.
-  enabled: ({ options, renderQueue }) => options.shadowMask && renderQueue.shadowedLights.length > 0,
+  prepare: ({ ctx, options, renderQueue }) => ({
+    enabled: options.shadowMask && renderQueue.shadowedLights.length > 0,
+    requirements: {
+      shadowMask:
+        ctx.device.type !== 'webgl' &&
+        ctx.camera.screenSpaceShadowMask &&
+        renderQueue.shadowedLights.length > 0
+    }
+  }),
   setup(fg: FrameGraphContext) {
     // Four shadow lights share each RGBA8 layer in clustered-light order.
     const { graph, ctx, renderQueue, blackboard } = fg;
@@ -741,7 +745,7 @@ const ShadowMaskModule: RenderModule<FrameGraphContext> = {
 const TransmissionDepthForSSRModule: RenderModule<FrameGraphContext> = {
   type: 'TransmissionDepthForSSR',
   writes: [FrameResources.LinearDepth],
-  enabled: ({ options }) => options.needsTransmissionDepthForSSR,
+  prepare: ({ options }) => ({ enabled: options.needsTransmissionDepthForSSR }),
   setup(fg: FrameGraphContext) {
     const { graph, frame, blackboard } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'TransmissionDepthForSSR');
@@ -768,7 +772,7 @@ const TransmissionDepthForSSRModule: RenderModule<FrameGraphContext> = {
 const HiZModule: RenderModule<FrameGraphContext> = {
   type: 'HiZ',
   writes: [FrameResources.HiZ],
-  enabled: ({ options }) => options.hiZ,
+  prepare: ({ options }) => ({ enabled: options.hiZ }),
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'HiZ');
@@ -814,7 +818,7 @@ const HiZModule: RenderModule<FrameGraphContext> = {
 /** @internal */
 const SSSProfileModule: RenderModule<FrameGraphContext> = {
   type: 'SSSProfile',
-  enabled: ({ options }) => options.sss,
+  prepare: ({ options }) => ({ enabled: options.sss }),
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'SSSProfile');
@@ -875,7 +879,7 @@ const SSSProfileModule: RenderModule<FrameGraphContext> = {
 /** @internal */
 const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
   type: 'SceneColorGrab',
-  enabled: ({ options }) => options.needSceneColor,
+  prepare: ({ options }) => ({ enabled: options.needSceneColor }),
   setup(fg: FrameGraphContext) {
     // Refraction samples this non-transmission scene copy.
     const { graph, ctx, frame, blackboard, options } = fg;
@@ -929,7 +933,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     FrameResources.SSSTransmission,
     FrameResources.SkinSSS
   ],
-  enabled: () => true,
+  prepare: () => ({ enabled: true }),
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard, options, backbuffer } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'LightPass');
@@ -1150,7 +1154,7 @@ const SkyPassModule: RenderModule<FrameGraphContext> = {
   type: 'SkyPass',
   reads: [{ resource: FrameResources.SceneColor, version: 'current' }],
   writes: [FrameResources.SceneColor],
-  enabled: () => true,
+  prepare: () => ({ enabled: true }),
   setup(fg: FrameGraphContext) {
     const { graph, frame, blackboard } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'SkyPass');
@@ -1183,7 +1187,7 @@ const SkyPassModule: RenderModule<FrameGraphContext> = {
 const CompositeTailModule: RenderModule<FrameGraphContext> = {
   type: 'CompositeTail',
   writes: [FrameResources.SceneColor, FrameResources.LinearDepth, FrameResources.PresentedColor],
-  enabled: () => true,
+  prepare: () => ({ enabled: true }),
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, blackboard, options, backbuffer } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'CompositeTail');

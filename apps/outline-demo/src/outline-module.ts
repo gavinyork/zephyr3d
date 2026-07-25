@@ -34,7 +34,7 @@ export function createOutlineModule(
       outlineProxy.dispose();
       outlineMaterial.dispose();
     },
-    enabled: () => settings.enabled,
+    prepare: () => ({ enabled: settings.enabled }),
     setup(fg) {
       const sceneColor = fg.blackboard.expect(FrameResources.SceneColor);
       const graphDepth = fg.blackboard.get(FrameResources.SceneDepthAttachment);
@@ -49,7 +49,7 @@ export function createOutlineModule(
           builder.read(graphDepth);
         }
         const output = builder.write(sceneColor);
-        const framebuffer = builder.createFramebuffer({
+        const framebuffer = builder.createFramebuffer<FrameBuffer>({
           label: 'ObjectOutlineFramebuffer',
           width: fg.ctx.renderWidth,
           height: fg.ctx.renderHeight,

@@ -41,8 +41,8 @@ export function createDepthVisualizationModule(): RenderModule {
       { resource: FrameResources.PresentedColor, version: 'final' }
     ],
     writes: [FrameResources.PresentedColor],
-    // enabled() runs before every module's setup(), so gate on published resources in setup.
-    enabled: () => true,
+    // Published-resource availability is checked in setup after ordering is resolved.
+    prepare: () => ({ enabled: true }),
     setup({ graph, blackboard, finalFramebuffer }) {
       if (!blackboard.has(FrameResources.LinearDepth)) {
         return;

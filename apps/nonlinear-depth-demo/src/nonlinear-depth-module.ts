@@ -37,9 +37,8 @@ export function createNonLinearDepthModule(): RenderModule {
       { resource: FrameResources.PresentedColor, version: 'final' }
     ],
     writes: [FrameResources.PresentedColor],
-    // enabled() runs before all module setup callbacks, so resource availability
-    // must be checked in setup rather than by reading the blackboard here.
-    enabled: () => true,
+    // Resource availability is checked in setup after ordering is resolved.
+    prepare: () => ({ enabled: true }),
     setup({ graph, blackboard, finalFramebuffer }) {
       if (!blackboard.has(FrameResources.SceneDepthAttachment)) {
         return;

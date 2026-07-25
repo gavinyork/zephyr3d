@@ -29,17 +29,25 @@ export interface RGTextureDesc {
   arrayLayers?: number;
 }
 
+/** Resource kinds that can be referenced by a graph handle. @public */
+export type RGHandleKind = 'texture' | 'framebuffer' | 'token';
+
 /** Opaque render graph resource handle. @public */
-export class RGHandle {
+export class RGHandle<K extends RGHandleKind = RGHandleKind, TValue = unknown> {
+  /** Compile-time backing resource type. */
+  declare readonly _value: TValue;
   /** @internal */
   readonly _id: number;
   /** @internal */
   readonly _name: string;
+  /** Resource kind used for compile-time and runtime validation. */
+  readonly kind: K;
 
   /** @internal */
-  constructor(id: number, name: string) {
+  constructor(id: number, name: string, kind: K = 'texture' as K) {
     this._id = id;
     this._name = name;
+    this.kind = kind;
   }
 
   /** Debug-friendly name of the referenced resource. */
@@ -47,6 +55,15 @@ export class RGHandle {
     return this._name;
   }
 }
+
+/** Texture resource handle. @public */
+export type RGTextureHandle<TTexture = unknown> = RGHandle<'texture', TTexture>;
+
+/** Framebuffer resource handle. @public */
+export type RGFramebufferHandle<TFramebuffer = unknown> = RGHandle<'framebuffer', TFramebuffer>;
+
+/** Ordering-only resource handle. @public */
+export type RGTokenHandle = RGHandle<'token', void>;
 
 /** @public */
 export type RGResourceKind = 'transient' | 'imported' | 'token' | 'framebuffer';
@@ -62,11 +79,11 @@ export class RGResource {
   /** Stable identity used for cross-frame transient texture allocation affinity. */
   readonly allocationKey: string | null;
   /** The pass that creates / writes this resource (null for imported until written). */
-  producer: RGPass | null = null;
+  producer: RGPass<any> | null = null;
   /** The pass that superseded this version via write(), or null while latest. */
-  nextWriter: RGPass | null = null;
+  nextWriter: RGPass<any> | null = null;
   /** Passes that read this resource. */
-  readonly consumers: RGPass[] = [];
+  readonly consumers: RGPass<any>[] = [];
 
   constructor(
     id: number,
@@ -91,10 +108,14 @@ export interface RGExecuteContext {
    * Resolve a declared texture handle. Imported textures must first be bound on
    * the executor.
    */
-  getTexture<TTexture = unknown>(handle: RGHandle): TTexture;
+  getTexture<TTexture>(handle: RGTextureHandle<TTexture>): TTexture;
+  /** Resolve a texture handle stored in a generic resource container. */
+  getTexture<TTexture = unknown>(handle: RGHandle<RGHandleKind, any>): TTexture;
 
   /** Resolve a framebuffer declared or created by the current pass. */
-  getFramebuffer<TFramebuffer = unknown>(handle: RGHandle): TFramebuffer;
+  getFramebuffer<TFramebuffer>(handle: RGFramebufferHandle<TFramebuffer>): TFramebuffer;
+  /** Resolve a framebuffer handle stored in a generic resource container. */
+  getFramebuffer<TFramebuffer = unknown>(handle: RGHandle<RGHandleKind, any>): TFramebuffer;
 
   /**
    * Create a temporary framebuffer released after execution. Handle attachments
@@ -132,7 +153,7 @@ export interface RGWriteOptions {
 }
 
 /** Render graph pass metadata. @public */
-export class RGPass<T = unknown> {
+export class RGPass<T = void> {
   readonly index: number;
   readonly name: string;
   /** Occurrence of this pass name within the graph, used for stable allocation keys. */
@@ -144,11 +165,11 @@ export class RGPass<T = unknown> {
   /**
    * RAW/WAW predecessors that propagate liveness.
    */
-  readonly dependencies: RGPass[] = [];
+  readonly dependencies: RGPass<any>[] = [];
   /** WAW predecessors used only for ordering, including discard writes. */
-  readonly orderingDependencies: RGPass[] = [];
+  readonly orderingDependencies: RGPass<any>[] = [];
   /** WAR predecessors used only when both passes are alive. */
-  readonly warDependencies: RGPass[] = [];
+  readonly warDependencies: RGPass<any>[] = [];
   /** Whether this pass has side effects and must not be culled. */
   hasSideEffect = false;
   /** User data returned from the setup function. */
@@ -168,7 +189,7 @@ export class RGPass<T = unknown> {
 }
 
 /** Declares a pass's resource access and execution callback. @public */
-export interface RGPassBuilder {
+export interface RGPassBuilder<TData = any> {
   /** Declare a read of an existing resource. */
   read(handle: RGHandle): void;
 
@@ -176,25 +197,28 @@ export interface RGPassBuilder {
    * Write a new resource version. Use the returned handle for later reads and
    * graph outputs. `discard` permits old-content producers to be culled.
    */
-  write(handle: RGHandle, options?: RGWriteOptions): RGHandle;
+  write<TTexture>(handle: RGTextureHandle<TTexture>, options?: RGWriteOptions): RGTextureHandle<TTexture>;
+
+  /** Generic-container fallback; runtime validation still applies. */
+  write(handle: RGHandle, options?: RGWriteOptions): RGTextureHandle;
 
   /** Create a transient texture produced by this pass. */
-  createTexture(desc: RGTextureDesc): RGHandle;
+  createTexture<TTexture = unknown>(desc: RGTextureDesc): RGTextureHandle<TTexture>;
 
   /** Create a logical token for ordering passes without resource dependencies. */
-  createToken(name?: string): RGHandle;
+  createToken(name?: string): RGTokenHandle;
 
   /** Create a graph-managed framebuffer and infer attachment dependencies. */
-  createFramebuffer(desc: RGFramebufferDesc): RGHandle;
+  createFramebuffer<TFramebuffer = unknown>(desc: RGFramebufferDesc): RGFramebufferHandle<TFramebuffer>;
 
   /** Prevent this pass from being culled. */
   sideEffect(): void;
 
   /** Add an ordered subpass. Cannot be combined with {@link setExecute}. */
-  addSubpass<D>(name: string, fn: RGExecuteFn<D>): void;
+  addSubpass<D = TData>(name: string, fn: RGExecuteFn<D>): void;
 
   /** Set the pass callback. Cannot be combined with {@link addSubpass}. */
-  setExecute<D>(fn: RGExecuteFn<D>): void;
+  setExecute<D = TData>(fn: RGExecuteFn<D>): void;
 }
 
 /** Compiled resource lifetime. @public */
@@ -210,7 +234,7 @@ export interface RGResourceLifetime {
 /** Ordered passes and resource lifetimes from graph compilation. @public */
 export interface CompiledRenderGraph {
   /** Topologically sorted passes (only non-culled passes). */
-  readonly orderedPasses: ReadonlyArray<RGPass>;
+  readonly orderedPasses: ReadonlyArray<RGPass<any>>;
   /** Resource lifetime information keyed by resource ID. */
   readonly lifetimes: ReadonlyMap<number, RGResourceLifetime>;
 }
@@ -250,6 +274,12 @@ export interface RenderGraphExecutorOptions<TTexture = unknown> {
   textureAffinityCache?: RGTextureAffinityCache<TTexture>;
 }
 
+/** External resources bound for one graph execution. @public */
+export interface RenderGraphExecutionBindings<TTexture = unknown> {
+  /** Imported graph texture handles and their physical textures. */
+  readonly importedTextures?: ReadonlyMap<RGTextureHandle<TTexture>, TTexture>;
+}
+
 /** Resolved GPU timing for one scope. @public */
 export interface RGProfileScopeResult {
   /** Scope label. */
@@ -286,8 +316,10 @@ export interface RGResolvedSize {
   height: number;
 }
 
+export type RGTextureAttachment<TTexture = unknown> = RGTextureHandle<TTexture> | TTexture | TextureFormat;
+
 /** Backend-independent framebuffer descriptor. @public */
-export interface RGFramebufferDesc {
+export interface RGFramebufferDesc<TTexture = unknown> {
   /** Debug label for this framebuffer. */
   label?: string;
   /** Framebuffer width. Required when attachments are formats. */
@@ -295,9 +327,9 @@ export interface RGFramebufferDesc {
   /** Framebuffer height. Required when attachments are formats. */
   height?: number;
   /** Color attachments or formats. */
-  colorAttachments: unknown | unknown[] | null;
+  colorAttachments: RGTextureAttachment<TTexture> | RGTextureAttachment<TTexture>[] | null;
   /** Depth/stencil attachment or format. */
-  depthAttachment?: unknown | null;
+  depthAttachment?: RGTextureAttachment<TTexture> | null;
   /** Whether color attachments created from formats should support mipmapping. */
   mipmapping?: boolean;
   /** Framebuffer sample count. */

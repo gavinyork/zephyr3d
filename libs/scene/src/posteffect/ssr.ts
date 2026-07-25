@@ -113,7 +113,7 @@ export class SSR extends AbstractPostEffect {
         const device = ctx.device;
         device.pushDeviceStates();
         try {
-          device.setFramebuffer(rg.getFramebuffer(fb));
+          device.setFramebuffer(rg.getFramebuffer<FrameBuffer>(fb));
           this.intersect(ctx, rg.getTexture<Texture2D>(s.input), getLinearDepth(rg), true, false);
         } finally {
           device.popDeviceStates();
@@ -140,7 +140,7 @@ export class SSR extends AbstractPostEffect {
         const device = ctx.device;
         device.pushDeviceStates();
         try {
-          device.setFramebuffer(rg.getFramebuffer(fb));
+          device.setFramebuffer(rg.getFramebuffer<FrameBuffer>(fb));
           const inputTex = rg.getTexture<Texture2D>(s.input);
           this.resolve(
             ctx,
@@ -294,7 +294,9 @@ export class SSR extends AbstractPostEffect {
         const device = ctx.device;
         device.pushDeviceStates();
         try {
-          device.setFramebuffer(output.framebuffer ? rg.getFramebuffer(output.framebuffer) : null);
+          device.setFramebuffer(
+            output.framebuffer ? rg.getFramebuffer<FrameBuffer>(output.framebuffer) : null
+          );
           const inputTex = rg.getTexture<Texture2D>(s.input);
           const reflectanceTex = rg.getTexture<Texture2D>(finalReflectHandle);
           copyTexture(

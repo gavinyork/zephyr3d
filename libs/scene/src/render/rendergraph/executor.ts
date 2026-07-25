@@ -11,7 +11,10 @@ import type {
   RGResolvedSize,
   RGExecuteContext,
   RGExecuteFn,
-  RGPass
+  RGPass,
+  RGTextureHandle,
+  RGFramebufferHandle,
+  RenderGraphExecutionBindings
 } from './types';
 import { RGHandle } from './types';
 import type { RGTextureAffinityCache, RGTextureAffinityEntry } from './texture_affinity_cache';
@@ -144,7 +147,12 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   }
 
   /** Execute a compiled graph and manage its transient resources. */
-  execute(compiled: CompiledRenderGraph): void {
+  execute(compiled: CompiledRenderGraph, bindings?: RenderGraphExecutionBindings<TTexture>): void {
+    if (bindings?.importedTextures) {
+      for (const [handle, texture] of bindings.importedTextures) {
+        this.setImportedTexture(handle, texture);
+      }
+    }
     this._cleanupCallbacks.length = 0;
     this._resolveImportedTextureAliases(compiled);
     const profileFrame = this._beginProfileFrame();
@@ -819,11 +827,11 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   private _createContext(accessScope: RGPassAccessScope): RGExecuteContext {
     const self = this;
     return {
-      getTexture<T>(handle: RGHandle): T {
+      getTexture<T>(handle: RGTextureHandle<T>): T {
         self._assertDeclaredAccess(accessScope, handle, 'texture');
         return self._resolveResource(handle) as unknown as T;
       },
-      getFramebuffer<TFramebuffer = unknown>(handle: RGHandle): TFramebuffer {
+      getFramebuffer<TFramebuffer>(handle: RGFramebufferHandle<TFramebuffer>): TFramebuffer {
         self._assertDeclaredAccess(accessScope, handle, 'framebuffer');
         const framebuffer = self._allocatedFramebuffers.get(handle._id);
         if (framebuffer !== undefined) {

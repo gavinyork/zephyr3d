@@ -1,4 +1,11 @@
-import type { AbstractDevice, CompareFunc, RenderStateSet, Texture2D, TextureFormat } from '@zephyr3d/device';
+import type {
+  AbstractDevice,
+  CompareFunc,
+  FrameBuffer,
+  RenderStateSet,
+  Texture2D,
+  TextureFormat
+} from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { copyTexture, fetchSampler } from '../utility/misc';
@@ -293,7 +300,9 @@ export class AbstractPostEffect extends Disposable {
         const applyEffect = () => {
           device.pushDeviceStates();
           try {
-            device.setFramebuffer(output.framebuffer ? rg.getFramebuffer(output.framebuffer) : null);
+            device.setFramebuffer(
+              output.framebuffer ? rg.getFramebuffer<FrameBuffer>(output.framebuffer) : null
+            );
             this.apply(s.ctx, inputTexture, linearDepthTexture, output.srgbOutput);
           } finally {
             device.popDeviceStates();

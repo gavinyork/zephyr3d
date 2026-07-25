@@ -1100,7 +1100,7 @@ describe('Final framebuffer as intermediate (editor render-to-texture mode)', ()
     const depthConsumer: RenderModule<any> = {
       type: 'ExternalDepthConsumer',
       reads: [{ resource: FrameResources.SceneDepthAttachment, version: 'current' }],
-      enabled: () => true,
+      prepare: () => ({ enabled: true }),
       setup(context) {
         const depth = context.blackboard.expect(FrameResources.SceneDepthAttachment);
         context.graph.addPass('ExternalDepthConsumer', (builder) => {
@@ -1287,7 +1287,7 @@ describe('Forward+ pipeline customization', () => {
   test('a custom module inserted after LightPass adds its pass to the built graph', () => {
     const customModule: RenderModule = {
       type: 'MyCustom',
-      enabled: () => true,
+      prepare: () => ({ enabled: true }),
       setup(context) {
         context.graph.addPass('MyCustomPass', (builder) => {
           builder.read(context.blackboard.expect(FrameResources.LinearDepth));
@@ -1305,8 +1305,7 @@ describe('Forward+ pipeline customization', () => {
   test('collects a module requirement before setup and produces only the requested surface MRT', () => {
     const customModule: RenderModule = {
       type: 'NormalConsumer',
-      requirements: () => ({ sceneNormal: true }),
-      enabled: () => true,
+      prepare: () => ({ enabled: true, requirements: { sceneNormal: true } }),
       setup(context) {
         context.graph.addPass('NormalConsumerPass', (builder) => {
           builder.read(context.blackboard.expect(FrameResources.SceneNormal));
@@ -1336,7 +1335,7 @@ describe('Forward+ pipeline customization', () => {
   test('LightPass consumes the latest ShadowMask version published through the blackboard', () => {
     const replacement: RenderModule = {
       type: 'ShadowMaskReplacement',
-      enabled: () => true,
+      prepare: () => ({ enabled: true }),
       setup(context) {
         const replacementMask = context.graph.addPass('ShadowMaskReplacementPass', (builder) =>
           builder.createTexture({ format: 'rgba8unorm', label: 'replacementShadowMask', arrayLayers: 1 })
@@ -1377,7 +1376,7 @@ describe('Forward+ pipeline customization', () => {
   test('CompositeTail consumes a SceneColor version written after LightPass', () => {
     const customModule: RenderModule = {
       type: 'SceneColorOverride',
-      enabled: () => true,
+      prepare: () => ({ enabled: true }),
       setup(context) {
         const input = context.blackboard.expect(FrameResources.SceneColor);
         const output = context.graph.addPass('SceneColorOverridePass', (builder) => {

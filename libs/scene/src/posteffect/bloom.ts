@@ -1,4 +1,11 @@
-import type { AbstractDevice, BindGroup, GPUProgram, RenderStateSet, Texture2D } from '@zephyr3d/device';
+import type {
+  AbstractDevice,
+  BindGroup,
+  FrameBuffer,
+  GPUProgram,
+  RenderStateSet,
+  Texture2D
+} from '@zephyr3d/device';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import type { PostEffectSetupContext } from './posteffect';
 import type { DrawContext } from '../render';
@@ -221,7 +228,9 @@ export class Bloom extends AbstractPostEffect {
         const device = ctx.device;
         device.pushDeviceStates();
         try {
-          device.setFramebuffer(output.framebuffer ? rg.getFramebuffer(output.framebuffer) : null);
+          device.setFramebuffer(
+            output.framebuffer ? rg.getFramebuffer<FrameBuffer>(output.framebuffer) : null
+          );
           this.finalCompose(device, rg.getTexture<Texture2D>(s.input), rg.getTexture<Texture2D>(bloomHandle));
         } finally {
           device.popDeviceStates();

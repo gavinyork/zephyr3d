@@ -1,5 +1,8 @@
 import {
   RGHandle,
+  type RGTextureHandle,
+  type RGFramebufferHandle,
+  type RGTokenHandle,
   RGResource,
   RGPass,
   RGSubpass,
@@ -9,26 +12,27 @@ import {
   type RGExecuteFn,
   type RGExecuteContext,
   type CompiledRenderGraph,
-  type RGResourceLifetime
+  type RGResourceLifetime,
+  type RGWriteOptions
 } from './types';
 
 /** Declarative render pass and resource dependency graph. @public */
 export class RenderGraph {
   private _nextResourceId = 0;
   private _resources: Map<number, RGResource> = new Map();
-  private _passes: RGPass[] = [];
+  private _passes: RGPass<any>[] = [];
   private _compiled: CompiledRenderGraph | null = null;
-  private _lastWriterByPhysicalId = new Map<number, RGPass>();
+  private _lastWriterByPhysicalId = new Map<number, RGPass<any>>();
   /** Deduplicates warnings across per-frame graph instances. */
   private static _warnedCulledPasses = new Set<string>();
 
   /** Import an external texture that the graph does not own. */
-  importTexture(name: string): RGHandle {
+  importTexture<TTexture = unknown>(name: string): RGTextureHandle<TTexture> {
     const id = this._nextResourceId++;
     const resource = new RGResource(id, name, 'imported', null);
     this._resources.set(id, resource);
     this._compiled = null;
-    return new RGHandle(id, name);
+    return new RGHandle(id, name, 'texture');
   }
 
   /**
@@ -41,7 +45,7 @@ export class RenderGraph {
         nameOccurrence++;
       }
     }
-    const pass = new RGPass(this._passes.length, name, nameOccurrence);
+    const pass = new RGPass<T>(this._passes.length, name, nameOccurrence);
     const builder = this._createBuilder(pass);
     const initialResourceIds = new Set(this._resources.keys());
     try {
@@ -99,7 +103,7 @@ export class RenderGraph {
     return this._compiled;
   }
 
-  /** Execute without resource management. Prefer {@link RenderGraphExecutor}. */
+  /** @internal Test-only callback runner; resource-managed code uses RenderGraphExecutor. */
   execute(compiled: CompiledRenderGraph): void {
     const noopCtx: RGExecuteContext = {
       getTexture() {
@@ -145,7 +149,7 @@ export class RenderGraph {
   }
 
   /** @internal */
-  get passes(): ReadonlyArray<RGPass> {
+  get passes(): ReadonlyArray<RGPass<any>> {
     return this._passes;
   }
 
@@ -154,7 +158,7 @@ export class RenderGraph {
     return this._resources;
   }
 
-  private _createBuilder(pass: RGPass): RGPassBuilder {
+  private _createBuilder<T>(pass: RGPass<T>): RGPassBuilder<T> {
     const graph = this;
     const textureLabelOccurrences = new Map<string, number>();
     return {
@@ -165,7 +169,10 @@ export class RenderGraph {
         }
         graph._declareRead(pass, res);
       },
-      write(handle: RGHandle, options): RGHandle {
+      write<TTexture>(
+        handle: RGTextureHandle<TTexture> | RGHandle,
+        options: RGWriteOptions | undefined
+      ): RGTextureHandle<TTexture> {
         const res = graph._resources.get(handle._id);
         if (!res) {
           throw new Error(`RenderGraph: unknown resource "${handle.name}" (id=${handle._id})`);
@@ -222,9 +229,9 @@ export class RenderGraph {
         if (!pass.writes.includes(version)) {
           pass.writes.push(version);
         }
-        return new RGHandle(id, versionName);
+        return new RGHandle(id, versionName, 'texture');
       },
-      createTexture(desc: RGTextureDesc): RGHandle {
+      createTexture<TTexture = unknown>(desc: RGTextureDesc): RGTextureHandle<TTexture> {
         if (desc.allocationKey !== undefined && desc.allocationKey.length === 0) {
           throw new Error(`RenderGraph: pass "${pass.name}" specified an empty texture allocationKey.`);
         }
@@ -241,18 +248,18 @@ export class RenderGraph {
         graph._resources.set(id, res);
         graph._lastWriterByPhysicalId.set(res.physicalId, pass);
         pass.writes.push(res);
-        return new RGHandle(id, name);
+        return new RGHandle(id, name, 'texture');
       },
-      createToken(name?: string): RGHandle {
+      createToken(name?: string): RGTokenHandle {
         const id = graph._nextResourceId++;
         const tokenName = name ?? `_token_${id}`;
         const res = new RGResource(id, tokenName, 'token', null);
         res.producer = pass;
         graph._resources.set(id, res);
         pass.writes.push(res);
-        return new RGHandle(id, tokenName);
+        return new RGHandle(id, tokenName, 'token');
       },
-      createFramebuffer(desc): RGHandle {
+      createFramebuffer<TFramebuffer = unknown>(desc: RGFramebufferDesc): RGFramebufferHandle<TFramebuffer> {
         const id = graph._nextResourceId++;
         const name = desc.label ?? `_fb_${id}`;
         const res = new RGResource(id, name, 'framebuffer', desc);
@@ -261,28 +268,28 @@ export class RenderGraph {
         graph._lastWriterByPhysicalId.set(res.physicalId, pass);
         pass.writes.push(res);
         graph._declareFramebufferAttachmentDeps(pass, desc);
-        return new RGHandle(id, name);
+        return new RGHandle(id, name, 'framebuffer');
       },
       sideEffect(): void {
         pass.hasSideEffect = true;
       },
-      addSubpass<D>(name: string, fn: RGExecuteFn<D>): void {
+      addSubpass<D = T>(name: string, fn: RGExecuteFn<D>): void {
         if (pass.executeFn) {
           throw new Error(
             `RenderGraph: pass "${pass.name}" cannot use addSubpass() after setExecute(). ` +
               `Use either subpasses or a single execute callback.`
           );
         }
-        pass.subpasses.push(new RGSubpass(name, fn as RGExecuteFn<unknown>));
+        pass.subpasses.push(new RGSubpass(name, fn as unknown as RGExecuteFn<T>));
       },
-      setExecute<D>(fn: RGExecuteFn<D>): void {
+      setExecute<D = T>(fn: RGExecuteFn<D>): void {
         if (pass.subpasses.length > 0) {
           throw new Error(
             `RenderGraph: pass "${pass.name}" cannot use setExecute() after addSubpass(). ` +
               `Use either subpasses or a single execute callback.`
           );
         }
-        pass.executeFn = fn as RGExecuteFn<unknown>;
+        pass.executeFn = fn as unknown as RGExecuteFn<T>;
       }
     };
   }
@@ -342,7 +349,7 @@ export class RenderGraph {
         stack.push(res);
       }
     };
-    const markPassAlive = (pass: RGPass) => {
+    const markPassAlive = (pass: RGPass<any>) => {
       if (pass.alive) {
         return;
       }
@@ -396,7 +403,7 @@ export class RenderGraph {
     }
   }
 
-  private _declareRead(pass: RGPass, res: RGResource): void {
+  private _declareRead(pass: RGPass<any>, res: RGResource): void {
     if (res.kind === 'transient' && !res.producer) {
       throw new Error(
         `RenderGraph: pass "${pass.name}" attempts to read transient resource "${res.name}" ` +
@@ -416,7 +423,7 @@ export class RenderGraph {
   }
 
   private _declareFramebufferAttachmentDeps(
-    pass: RGPass,
+    pass: RGPass<any>,
     desc: { colorAttachments: unknown | unknown[] | null; depthAttachment?: unknown | null }
   ): void {
     const declare = (attachment: unknown) => {
@@ -448,22 +455,22 @@ export class RenderGraph {
     declare(desc.depthAttachment);
   }
 
-  private _topologicalSort(): RGPass[] {
+  private _topologicalSort(): RGPass<any>[] {
     const alivePasses = this._passes.filter((p) => p.alive);
     if (alivePasses.length === 0) {
       return [];
     }
 
     const aliveSet = new Set(alivePasses);
-    const inDegree = new Map<RGPass, number>();
-    const adjacency = new Map<RGPass, RGPass[]>();
+    const inDegree = new Map<RGPass<any>, number>();
+    const adjacency = new Map<RGPass<any>, RGPass<any>[]>();
 
     for (const pass of alivePasses) {
       inDegree.set(pass, 0);
       adjacency.set(pass, []);
     }
 
-    const addEdge = (from: RGPass, to: RGPass) => {
+    const addEdge = (from: RGPass<any>, to: RGPass<any>) => {
       if (from === to || !aliveSet.has(from) || !aliveSet.has(to)) {
         return;
       }
@@ -495,14 +502,14 @@ export class RenderGraph {
       }
     }
 
-    const queue: RGPass[] = [];
+    const queue: RGPass<any>[] = [];
     for (const pass of alivePasses) {
       if (inDegree.get(pass) === 0) {
         queue.push(pass);
       }
     }
 
-    const result: RGPass[] = [];
+    const result: RGPass<any>[] = [];
     while (queue.length > 0) {
       const pass = queue.shift()!;
       result.push(pass);
@@ -532,10 +539,10 @@ export class RenderGraph {
     return result;
   }
 
-  private _analyzeLifetimes(orderedPasses: RGPass[]): Map<number, RGResourceLifetime> {
+  private _analyzeLifetimes(orderedPasses: RGPass<any>[]): Map<number, RGResourceLifetime> {
     const lifetimes = new Map<number, { resource: RGResource; firstUse: number; lastUse: number }>();
 
-    const orderMap = new Map<RGPass, number>();
+    const orderMap = new Map<RGPass<any>, number>();
     for (let i = 0; i < orderedPasses.length; i++) {
       orderMap.set(orderedPasses[i], i);
     }

@@ -1,4 +1,4 @@
-import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext, Primitive } from '../render';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import type { PostEffectSetupContext } from './posteffect';
@@ -168,7 +168,9 @@ export class TAA extends AbstractPostEffect {
         const device = ctx.device;
         device.pushDeviceStates();
         try {
-          device.setFramebuffer(output.framebuffer ? rg.getFramebuffer(output.framebuffer) : null);
+          device.setFramebuffer(
+            output.framebuffer ? rg.getFramebuffer<FrameBuffer>(output.framebuffer) : null
+          );
           const inputTexture = rg.getTexture<Texture2D>(s.input);
           const depthTexture = rg.getTexture<Texture2D>(linearDepthHandle);
           const motionVectorTexture = rg.getTexture<Texture2D>(motionVectorHandle);

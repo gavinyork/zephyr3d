@@ -3,13 +3,24 @@ import {
   resolveModuleOrder
 } from '../../../libs/scene/src/render/rendergraph/render_pipeline';
 import type { RenderModule } from '../../../libs/scene/src/render/rendergraph/render_module';
+import type { FrameResourceKey } from '../../../libs/scene/src/render/rendergraph/blackboard';
 
 function mod(type: string): RenderModule {
-  return { type, enabled: () => true, setup: () => {} };
+  return { type, prepare: () => ({ enabled: true }), setup: () => {} };
+}
+
+function key(name: string): FrameResourceKey {
+  return name as FrameResourceKey;
 }
 
 function dep(type: string, reads?: string[], writes?: string[]): RenderModule {
-  return { type, reads, writes, enabled: () => true, setup: () => {} };
+  return {
+    type,
+    reads: reads?.map((resource) => ({ resource: key(resource), version: 'final', optional: true })),
+    writes: writes?.map(key),
+    prepare: () => ({ enabled: true }),
+    setup: () => {}
+  };
 }
 
 function order(modules: RenderModule[]): string[] {
@@ -97,7 +108,7 @@ describe('RenderPipeline', () => {
     expect(c.get('A')).toBe(p.get('A'));
   });
 
-  test('attaches modules and releases them on remove', () => {
+  test('detaches modules without disposing them on remove', () => {
     const attach = jest.fn();
     const detach = jest.fn();
     const dispose = jest.fn();
@@ -113,8 +124,10 @@ describe('RenderPipeline', () => {
     expect(attach).toHaveBeenCalledWith(pipeline);
     pipeline.remove('Stateful');
     expect(detach).toHaveBeenCalledWith(pipeline);
+    expect(dispose).not.toHaveBeenCalled();
+    const replacement = new RenderPipeline([module]);
+    replacement.disposeModule(module);
     expect(dispose).toHaveBeenCalledTimes(1);
-    expect(() => new RenderPipeline([module])).toThrow(/disposed module .* cannot be attached again/);
   });
 
   test('construction failure rolls back modules already attached', () => {
@@ -178,7 +191,7 @@ describe('RenderPipeline', () => {
     const calls: string[] = [];
     const track = (type: string, enabled: boolean): RenderModule => ({
       type,
-      enabled: () => enabled,
+      prepare: () => ({ enabled }),
       setup: () => calls.push(type)
     });
     const p = new RenderPipeline([track('A', true), track('B', false), track('C', true)]);
@@ -193,7 +206,7 @@ describe('RenderPipeline', () => {
     const independent = dep('M2');
     independent.setup = () => calls.push('M2');
     const disabledWriter = dep('Wd', undefined, ['R']);
-    disabledWriter.enabled = () => false;
+    disabledWriter.prepare = () => ({ enabled: false });
     disabledWriter.setup = () => calls.push('Wd');
 
     new RenderPipeline([consumer, independent, disabledWriter]).build({} as never);
@@ -251,7 +264,7 @@ describe('resolveModuleOrder', () => {
       dep('W1', undefined, ['X']),
       {
         ...dep('C'),
-        reads: [{ resource: 'X', version: 'current' }]
+        reads: [{ resource: key('X'), version: 'current' }]
       },
       dep('W2', undefined, ['X'])
     ];
@@ -263,7 +276,7 @@ describe('resolveModuleOrder', () => {
       dep('W1', undefined, ['X']),
       {
         ...dep('C'),
-        reads: [{ resource: 'X', version: 'final' }]
+        reads: [{ resource: key('X'), version: 'final' }]
       },
       dep('W2', undefined, ['X'])
     ];
@@ -275,7 +288,7 @@ describe('resolveModuleOrder', () => {
       dep('Initial', undefined, ['X']),
       {
         ...dep('Transform', undefined, ['X']),
-        reads: [{ resource: 'X' }]
+        reads: [{ resource: key('X') }]
       }
     ];
     expect(order(modules)).toEqual(['Initial', 'Transform']);
@@ -284,13 +297,13 @@ describe('resolveModuleOrder', () => {
   test('required read rejects a missing writer while optional read remains in place', () => {
     const required: RenderModule = {
       ...dep('Required'),
-      reads: [{ resource: 'Missing' }]
+      reads: [{ resource: key('Missing') }]
     };
     expect(() => order([required])).toThrow(/requires current resource "Missing"/);
 
     const optional: RenderModule = {
       ...dep('Optional'),
-      reads: [{ resource: 'Missing', optional: true }]
+      reads: [{ resource: key('Missing'), optional: true }]
     };
     expect(order([optional, mod('Next')])).toEqual(['Optional', 'Next']);
   });
