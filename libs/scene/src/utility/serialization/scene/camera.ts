@@ -542,8 +542,8 @@ export function getCameraClass(): SerializableClass {
             label: 'Quality',
             group: 'PostProcessing/SSGI',
             enum: {
-              labels: ['Quality', 'Balanced', 'Performance'],
-              values: ['quality', 'balanced', 'performance']
+              labels: ['Quality', 'Balanced', 'Performance', 'Custom'],
+              values: ['quality', 'balanced', 'performance', 'custom']
             }
           },
           get(this: Camera, value) {
@@ -554,6 +554,88 @@ export function getCameraClass(): SerializableClass {
           },
           isValid(this: Camera) {
             return this.SSGI;
+          }
+        },
+        {
+          name: 'SSGIHalfResolution',
+          type: 'bool',
+          phase: 2,
+          default: false,
+          options: {
+            label: 'HalfResolution',
+            group: 'PostProcessing/SSGI'
+          },
+          get(this: Camera, value) {
+            value.bool[0] = this.ssgiHalfResolution;
+          },
+          set(this: Camera, value) {
+            this.ssgiHalfResolution = value.bool[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI && this.ssgiQualityPreset === 'custom';
+          }
+        },
+        {
+          name: 'SSGIRaysPerPixel',
+          type: 'int',
+          phase: 2,
+          default: 2,
+          options: {
+            label: 'RaysPerPixel',
+            group: 'PostProcessing/SSGI',
+            minValue: 1,
+            maxValue: 4
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiRaysPerPixel;
+          },
+          set(this: Camera, value) {
+            this.ssgiRaysPerPixel = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI && this.ssgiQualityPreset === 'custom';
+          }
+        },
+        {
+          name: 'SSGIMaxSteps',
+          type: 'int',
+          phase: 2,
+          default: 64,
+          options: {
+            label: 'MaxSteps',
+            group: 'PostProcessing/SSGI',
+            minValue: 1,
+            maxValue: 256
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiMaxSteps;
+          },
+          set(this: Camera, value) {
+            this.ssgiMaxSteps = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI && this.ssgiQualityPreset === 'custom';
+          }
+        },
+        {
+          name: 'SSGIDenoisePasses',
+          type: 'int',
+          phase: 2,
+          default: 3,
+          options: {
+            label: 'DenoisePasses',
+            group: 'PostProcessing/SSGI',
+            minValue: 0,
+            maxValue: 5
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiDenoisePasses;
+          },
+          set(this: Camera, value) {
+            this.ssgiDenoisePasses = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI && this.ssgiQualityPreset === 'custom';
           }
         },
         {

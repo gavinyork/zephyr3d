@@ -32,10 +32,23 @@ SSGI runs before SSR, transparency, tone mapping, TAA and FXAA. Its histories ar
 | `quality` | Full | 2 | 64 | 3 |
 | `balanced` | Half | 1 | 48 | 2 |
 | `performance` | Half | 1 | 24 | 1 |
+| `custom` | Configurable | 1–4 | 1–256 | 0–5 |
 
 ```ts
 camera.ssgiQualityPreset = 'quality';
 ```
+
+The `custom` preset exposes trace resolution, SPP, maximum steps and denoise passes independently:
+
+```ts
+camera.ssgiQualityPreset = 'custom';
+camera.ssgiHalfResolution = true;
+camera.ssgiRaysPerPixel = 2;
+camera.ssgiMaxSteps = 48;
+camera.ssgiDenoisePasses = 2;
+```
+
+Changing any custom setting through the API also switches the preset to `custom` automatically.
 
 ## Controls
 

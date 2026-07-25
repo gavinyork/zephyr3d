@@ -32,10 +32,23 @@ SSGI 位于 SSR、透明层、ToneMap、TAA 和 FXAA 之前，因此后续抗锯
 | `quality` | 全分辨率 | 2 | 64 | 3 |
 | `balanced` | 半分辨率 | 1 | 48 | 2 |
 | `performance` | 半分辨率 | 1 | 24 | 1 |
+| `custom` | 可配置 | 1–4 | 1–256 | 0–5 |
 
 ```ts
 camera.ssgiQualityPreset = 'quality';
 ```
+
+选择 `custom` 后可分别设置追踪分辨率、SPP、最大步数和去噪次数：
+
+```ts
+camera.ssgiQualityPreset = 'custom';
+camera.ssgiHalfResolution = true;
+camera.ssgiRaysPerPixel = 2;
+camera.ssgiMaxSteps = 48;
+camera.ssgiDenoisePasses = 2;
+```
+
+直接修改任意一项自定义参数也会自动将 preset 切换为 `custom`。
 
 ## 参数
 

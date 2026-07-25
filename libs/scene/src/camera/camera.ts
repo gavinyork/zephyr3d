@@ -114,7 +114,7 @@ export type SSSResolvedSettings = {
 };
 
 /** Screen Space Global Illumination quality preset. @public */
-export type SSGIQualityPreset = 'quality' | 'balanced' | 'performance';
+export type SSGIQualityPreset = 'quality' | 'balanced' | 'performance' | 'custom';
 
 /** Resolved trace and denoise settings used by the SSGI post effect. @public */
 export type SSGIResolvedSettings = {
@@ -124,7 +124,7 @@ export type SSGIResolvedSettings = {
   denoisePasses: number;
 };
 
-const SSGI_QUALITY_PRESET_SETTINGS: Record<SSGIQualityPreset, SSGIResolvedSettings> = {
+const SSGI_QUALITY_PRESET_SETTINGS: Record<Exclude<SSGIQualityPreset, 'custom'>, SSGIResolvedSettings> = {
   quality: { halfRes: false, raysPerPixel: 2, maxSteps: 64, denoisePasses: 3 },
   balanced: { halfRes: true, raysPerPixel: 1, maxSteps: 48, denoisePasses: 2 },
   performance: { halfRes: true, raysPerPixel: 1, maxSteps: 24, denoisePasses: 1 }
@@ -896,13 +896,49 @@ export class Camera extends SceneNode {
     const next = Camera.resolveSSGIQualityPreset(val);
     if (next !== this._ssgiQualityPreset) {
       this._ssgiQualityPreset = next;
-      this._ssgiResolvedSettings = { ...SSGI_QUALITY_PRESET_SETTINGS[next] };
+      if (next !== 'custom') {
+        this._ssgiResolvedSettings = { ...SSGI_QUALITY_PRESET_SETTINGS[next] };
+      }
       this.invalidateSSGIHistory();
     }
   }
   /** Resolved trace and denoise settings for the current SSGI preset. */
   get ssgiResolvedSettings(): Readonly<SSGIResolvedSettings> {
     return this._ssgiResolvedSettings;
+  }
+  /** Whether the custom SSGI trace runs at half resolution. */
+  get ssgiHalfResolution() {
+    return this._ssgiResolvedSettings.halfRes;
+  }
+  set ssgiHalfResolution(val) {
+    this.updateSSGICustomSettings({ halfRes: !!val });
+  }
+  /** Number of diffuse rays traced per pixel by the custom SSGI preset. */
+  get ssgiRaysPerPixel() {
+    return this._ssgiResolvedSettings.raysPerPixel;
+  }
+  set ssgiRaysPerPixel(val) {
+    this.updateSSGICustomSettings({
+      raysPerPixel: Math.max(1, Math.min(4, Math.round(val ?? 1)))
+    });
+  }
+  /** Maximum screen-space ray-march iterations used by the custom SSGI preset. */
+  get ssgiMaxSteps() {
+    return this._ssgiResolvedSettings.maxSteps;
+  }
+  set ssgiMaxSteps(val) {
+    this.updateSSGICustomSettings({
+      maxSteps: Math.max(1, Math.min(256, Math.round(val ?? 1)))
+    });
+  }
+  /** Number of cross-bilateral a-trous passes used by the custom SSGI preset. */
+  get ssgiDenoisePasses() {
+    return this._ssgiResolvedSettings.denoisePasses;
+  }
+  set ssgiDenoisePasses(val) {
+    this.updateSSGICustomSettings({
+      denoisePasses: Math.max(0, Math.min(5, Math.round(val ?? 0)))
+    });
   }
   /** SSGI diffuse irradiance multiplier. */
   get ssgiIntensity() {
@@ -1840,9 +1876,25 @@ export class Camera extends SceneNode {
       case 'quality':
       case 'balanced':
       case 'performance':
+      case 'custom':
         return val;
       default:
         return 'quality';
+    }
+  }
+
+  private updateSSGICustomSettings(settings: Partial<SSGIResolvedSettings>) {
+    const next = { ...this._ssgiResolvedSettings, ...settings };
+    if (
+      this._ssgiQualityPreset !== 'custom' ||
+      next.halfRes !== this._ssgiResolvedSettings.halfRes ||
+      next.raysPerPixel !== this._ssgiResolvedSettings.raysPerPixel ||
+      next.maxSteps !== this._ssgiResolvedSettings.maxSteps ||
+      next.denoisePasses !== this._ssgiResolvedSettings.denoisePasses
+    ) {
+      this._ssgiQualityPreset = 'custom';
+      this._ssgiResolvedSettings = next;
+      this.invalidateSSGIHistory();
     }
   }
 

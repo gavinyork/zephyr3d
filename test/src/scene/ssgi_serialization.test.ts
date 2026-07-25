@@ -23,6 +23,10 @@ describe('SSGI configuration and serialization', () => {
     expect(camera.ssgiTemporalWeight).toBeCloseTo(0.94);
     expect(camera.ssgiDepthReject).toBeCloseTo(0.5);
     expect(camera.ssgiNormalReject).toBeCloseTo(0.75);
+    expect(camera.ssgiHalfResolution).toBe(false);
+    expect(camera.ssgiRaysPerPixel).toBe(2);
+    expect(camera.ssgiMaxSteps).toBe(64);
+    expect(camera.ssgiDenoisePasses).toBe(3);
 
     camera.ssgiQualityPreset = 'balanced';
     expect(camera.ssgiResolvedSettings).toEqual({
@@ -37,6 +41,32 @@ describe('SSGI configuration and serialization', () => {
       raysPerPixel: 1,
       maxSteps: 24,
       denoisePasses: 1
+    });
+  });
+
+  test('switches to custom when an individual quality setting changes', () => {
+    const scene = new Scene();
+    const camera = new Camera(scene);
+    camera.ssgiQualityPreset = 'balanced';
+
+    camera.ssgiRaysPerPixel = 2;
+    camera.ssgiMaxSteps = 56;
+    camera.ssgiDenoisePasses = 4;
+
+    expect(camera.ssgiQualityPreset).toBe('custom');
+    expect(camera.ssgiResolvedSettings).toEqual({
+      halfRes: true,
+      raysPerPixel: 2,
+      maxSteps: 56,
+      denoisePasses: 4
+    });
+
+    camera.ssgiQualityPreset = 'quality';
+    expect(camera.ssgiResolvedSettings).toEqual({
+      halfRes: false,
+      raysPerPixel: 2,
+      maxSteps: 64,
+      denoisePasses: 3
     });
   });
 
@@ -99,6 +129,36 @@ describe('SSGI configuration and serialization', () => {
       SSGITemporalEnabled: false
     });
     expect(restored.ssgiTemporal).toBe(false);
+  });
+
+  test('round-trips custom trace and denoise settings', async () => {
+    const manager = new ResourceManager(new MemoryFS());
+    const scene = new Scene();
+    const camera = new Camera(scene);
+    camera.SSGI = true;
+    camera.ssgiQualityPreset = 'custom';
+    camera.ssgiHalfResolution = true;
+    camera.ssgiRaysPerPixel = 1;
+    camera.ssgiMaxSteps = 72;
+    camera.ssgiDenoisePasses = 2;
+
+    const serialized = await manager.serializeObject(camera);
+    const restored = (await manager.deserializeObject<Camera>(scene.rootNode, serialized))!;
+
+    expect(serialized.Object).toMatchObject({
+      SSGIQualityPreset: 'custom',
+      SSGIHalfResolution: true,
+      SSGIRaysPerPixel: 1,
+      SSGIMaxSteps: 72,
+      SSGIDenoisePasses: 2
+    });
+    expect(restored.ssgiQualityPreset).toBe('custom');
+    expect(restored.ssgiResolvedSettings).toEqual({
+      halfRes: true,
+      raysPerPixel: 1,
+      maxSteps: 72,
+      denoisePasses: 2
+    });
   });
 
   test('round-trips the IBL allowSSGI opt-in independently from the camera', async () => {
