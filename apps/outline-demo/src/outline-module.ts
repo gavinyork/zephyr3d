@@ -49,7 +49,7 @@ export function createOutlineModule(
           builder.read(graphDepth);
         }
         const output = builder.write(sceneColor);
-        const framebuffer = builder.createFramebuffer<FrameBuffer>({
+        const framebuffer = builder.createFramebuffer({
           label: 'ObjectOutlineFramebuffer',
           width: fg.ctx.renderWidth,
           height: fg.ctx.renderHeight,

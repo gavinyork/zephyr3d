@@ -76,7 +76,7 @@
 
   <body class="fullpage flex-col">
     <div class="flex-row maximized fit">
-      <nav class="flex-col nav" style="padding: 15px; width: 200px">
+      <nav class="flex-col nav" style="padding: 15px; width: 300px">
         <h1 class="title">Zephyr3d tests</h1>
         <label for="device-type" style="color: black">select device:</label>
         <select id="device-type" style="padding: 3px; margin: 0px 10px 0px 0px; outline: none">
@@ -84,47 +84,49 @@
           <option value="webgl2">WebGL2</option>
           <option value="webgpu">WebGPU</option>
         </select>
-        <ul class="maximized fit" style="text-align: left; overflow: auto; padding: 0">
-          <li id="clearframebuffer">Clear framebuffer</li>
-          <li id="computeboids">Compute boids</li>
-          <li id="cube">Simple cube</li>
-          <li id="imageblur">Image blur</li>
-          <li id="instancecube">Instancing cubes</li>
-          <li id="pertargetblending">Per-target blending</li>
-          <li id="rendertexture">Render to texture</li>
-          <li id="sea">Sea</li>
-          <li id="stenciloutline">Stencil outline</li>
-          <li id="texturedcube">Textured cube</li>
-          <li id="triangle">Triangle</li>
-        </ul>
+        <ul class="maximized fit" style="text-align: left; overflow: auto; padding: 0"></ul>
       </nav>
       <iframe class="maximized fit" style="border-width: 0" title="render window" scrolling="no"></iframe>
     </div>
-    <script type="text/javascript">
+    <script type="module">
+      import examples from './examples.js';
+
       const iframe = document.querySelector('iframe');
       const selectDevice = document.querySelector('select');
-      const linkCallback = function () {
-        const id = this.id;
-        iframe.src = id + '/index.html?dev=' + selectDevice.value;
-        const links = document.querySelectorAll('li');
+      const list = document.querySelector('ul');
+
+      const openExample = function (id) {
+        const query = new URLSearchParams({ dev: selectDevice.value, device: selectDevice.value });
+        iframe.src = `${id}/index.html?${query}`;
+        const links = document.querySelectorAll('a[data-example]');
         for (const link of links) {
-          if (link === this) {
-            link.classList.add('active');
-          } else {
-            link.classList.remove('active');
-          }
+          link.classList.toggle('active', link.dataset.example === id);
         }
       };
-      selectDevice.addEventListener('change', function () {
-        if (document.querySelector('.active')) {
-          const src = iframe.src.split('?')[0];
-          iframe.src = src + '?dev=' + this.value;
-        }
-      });
-      const links = document.querySelectorAll('li');
-      for (const link of links) {
-        link.addEventListener('click', linkCallback);
+
+      for (const example of examples) {
+        const item = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = `#${example.id}`;
+        link.dataset.example = example.id;
+        link.textContent = example.title;
+        item.append(link);
+        list.append(item);
       }
+
+      const openSelectedExample = function () {
+        const requested = decodeURIComponent(location.hash.slice(1));
+        const selected = examples.find((example) => example.id === requested) || examples[0];
+        if (selected) {
+          openExample(selected.id);
+        }
+      };
+
+      selectDevice.addEventListener('change', function () {
+        openSelectedExample();
+      });
+      window.addEventListener('hashchange', openSelectedExample);
+      openSelectedExample();
     </script>
   </body>
 </html>
