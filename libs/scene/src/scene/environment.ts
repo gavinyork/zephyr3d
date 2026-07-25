@@ -24,6 +24,7 @@ export class EnvLightWrapper extends Disposable {
   private readonly _irradianceWindow: Vector3;
   private _strength: number;
   private _specularStrength: number;
+  private _allowSSGI: boolean;
   /** @internal */
   constructor() {
     super();
@@ -51,6 +52,7 @@ export class EnvLightWrapper extends Disposable {
     this._irradianceWindow = new Vector3();
     this._strength = 1;
     this._specularStrength = 1;
+    this._allowSSGI = false;
   }
   /** @internal */
   getHash(ctx?: DrawContext) {
@@ -62,10 +64,15 @@ export class EnvLightWrapper extends Disposable {
             ? 'buf'
             : 'none'
         : 'na';
+    const ssgiHistory =
+      !!ctx?.SSGI &&
+      !!ctx.SSGIIrradianceHistoryTexture &&
+      !!ctx.SSGISurfaceHistoryTexture &&
+      (ctx.device.type !== 'webgpu' || !!ctx.motionVectorTexture);
     return !ctx || ctx.drawEnvLight
       ? `${this.type}:${this._envLight!.hasRadiance() ? '1' : '0'}:${
           this._envLight!.hasSheenRadiance() ? '1' : '0'
-        }:${this._envLight!.hasIrradiance() ? '1' : '0'}:${irradianceSource}`
+        }:${this._envLight!.hasIrradiance() ? '1' : '0'}:${irradianceSource}:ssgi${ssgiHistory ? '1' : '0'}`
       : 'none';
   }
   /** @internal */
@@ -85,6 +92,16 @@ export class EnvLightWrapper extends Disposable {
   }
   set specularStrength(val) {
     this._specularStrength = val;
+  }
+  /**
+   * Whether this IBL may be replaced by screen-space diffuse irradiance.
+   * This option has no effect for non-IBL environment light types.
+   */
+  get allowSSGI() {
+    return this._allowSSGI;
+  }
+  set allowSSGI(val) {
+    this._allowSSGI = !!val;
   }
   /** Ambient light color for environment light type constant */
   get ambientColor(): Vector4 {

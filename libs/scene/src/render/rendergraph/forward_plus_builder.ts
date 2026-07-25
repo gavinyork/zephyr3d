@@ -233,6 +233,16 @@ function getTextureFormatBytes(ctx: DrawContext, format: TextureFormat): number 
   return ctx.device.getDeviceCaps().textureCaps.getTextureFormatInfo(format).size;
 }
 
+function supportsSSGIRenderTargets(ctx: DrawContext): boolean {
+  const caps = ctx.device.getDeviceCaps();
+  const rgba16fBytes = caps.textureCaps.getTextureFormatInfo('rgba16f').size;
+  return !!(
+    caps.textureCaps.supportHalfFloatColorBuffer &&
+    caps.framebufferCaps.maxDrawBuffers >= 2 &&
+    caps.framebufferCaps.maxColorAttachmentBytesPerSample >= rgba16fBytes * 2
+  );
+}
+
 function shouldStoreSSSDiffuse(ctx: DrawContext): boolean {
   return ctx.camera.sssStrength > 0 && ctx.camera.sssBlurScale > 0;
 }
@@ -313,6 +323,8 @@ export interface ForwardPlusOptions {
   shadowMask: boolean;
   /** Enable screen-space reflections. */
   ssr: boolean;
+  /** Enable screen-space diffuse global illumination. */
+  ssgi: boolean;
   /** Whether to compute SSR thickness. */
   ssrCalcThickness: boolean;
   /** Whether GPU picking is requested this frame. */
@@ -337,6 +349,14 @@ export function deriveForwardPlusOptions(
   renderQueue: RenderQueue
 ): ForwardPlusOptions {
   const ssr = camera.SSR && scene.env.light.envLight && scene.env.light.envLight.hasRadiance();
+  const ssgi =
+    camera.SSGI &&
+    camera.HDR &&
+    camera.ssgiIntensity > 0 &&
+    scene.env.light.type === 'ibl' &&
+    scene.env.light.allowSSGI &&
+    !!scene.env.light.envLight?.hasRadiance() &&
+    !!scene.env.light.envLight?.hasIrradiance();
   const sss = camera.SSS && renderQueueHasActiveSSS(renderQueue);
   const skinSSS = camera.skinSSS && renderQueueHasActiveSkinSSS(renderQueue);
   const needSceneColor = renderQueue.needSceneColor();
@@ -349,6 +369,7 @@ export function deriveForwardPlusOptions(
     sceneRoughness: false,
     shadowMask: false,
     ssr: !!ssr,
+    ssgi: !!ssgi,
     ssrCalcThickness: !!ssr && camera.ssrCalcThickness,
     gpuPicking: !!camera.getPickResultResolveFunc(),
     needSceneColor,
@@ -404,6 +425,7 @@ function resolveFrameResourceRequirements(
 
   ctx.motionVectors = options.motionVectors;
   ctx.HiZ = options.hiZ;
+  ctx.SSGI = options.ssgi;
   ctx.screenSpaceShadowMask = options.shadowMask;
   ctx.SSS = options.sss;
 }
@@ -980,6 +1002,37 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
         );
       }
     }
+    if (historyManager && options.ssgi) {
+      const ssgiHistorySize = { width: ctx.renderWidth, height: ctx.renderHeight };
+      const irradianceHistoryHandle = historyManager.importPreviousIfCompatible(
+        graph,
+        RGHistoryResources.SSGI_IRRADIANCE,
+        {
+          format: 'rgba16f',
+          sizeMode: 'absolute',
+          width: ctx.renderWidth,
+          height: ctx.renderHeight
+        },
+        ssgiHistorySize
+      );
+      const surfaceHistoryHandle = historyManager.importPreviousIfCompatible(
+        graph,
+        RGHistoryResources.SSGI_SURFACE,
+        {
+          format: 'rgba16f',
+          sizeMode: 'absolute',
+          width: ctx.renderWidth,
+          height: ctx.renderHeight
+        },
+        ssgiHistorySize
+      );
+      if (irradianceHistoryHandle && surfaceHistoryHandle) {
+        lightHistoryReadBindings.push(
+          { name: RGHistoryResources.SSGI_IRRADIANCE, handle: irradianceHistoryHandle },
+          { name: RGHistoryResources.SSGI_SURFACE, handle: surfaceHistoryHandle }
+        );
+      }
+    }
 
     const opaquePassResult = graph.addPass('LightPass', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
@@ -1102,6 +1155,18 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
         const renderLightPass = () =>
           renderOpaqueScenePass(frame, sceneColorTex, sceneColorCopyTex, rgCtx, sceneColorFramebufferHandle);
         if (historyManager && lightHistoryReadBindings.length > 0) {
+          const ssgiIrradianceBinding = lightHistoryReadBindings.find(
+            (binding) => binding.name === RGHistoryResources.SSGI_IRRADIANCE
+          );
+          const ssgiSurfaceBinding = lightHistoryReadBindings.find(
+            (binding) => binding.name === RGHistoryResources.SSGI_SURFACE
+          );
+          ctx.SSGIIrradianceHistoryTexture = ssgiIrradianceBinding
+            ? rgCtx.getTexture<Texture2D>(ssgiIrradianceBinding.handle)
+            : null;
+          ctx.SSGISurfaceHistoryTexture = ssgiSurfaceBinding
+            ? rgCtx.getTexture<Texture2D>(ssgiSurfaceBinding.handle)
+            : null;
           historyManager.beginReadScope(
             lightHistoryReadBindings.map((binding) => ({
               name: binding.name,
@@ -1112,6 +1177,8 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
             renderLightPass();
           } finally {
             historyManager.endReadScope();
+            ctx.SSGIIrradianceHistoryTexture = null;
+            ctx.SSGISurfaceHistoryTexture = null;
           }
         } else {
           renderLightPass();
@@ -1431,7 +1498,13 @@ function buildForwardPlusGraphInternal(
   options: ForwardPlusOptions
 ): ForwardPlusGraphBuildResult {
   const backbuffer = graph.importTexture('backbuffer');
+  // Irradiance, moments and surface history require renderable half-float
+  // targets. Keep ordinary IBL active on devices that cannot provide them.
+  options.ssgi &&= supportsSSGIRenderTargets(ctx);
   ctx.SSS = !!options.sss;
+  ctx.SSGI = !!options.ssgi;
+  ctx.SSGIIrradianceHistoryTexture = null;
+  ctx.SSGISurfaceHistoryTexture = null;
   ctx.SkinSSSTexture = null;
   // ShadowMask sets this only when it produces a texture.
   ctx.shadowMaskTexture = null;
@@ -2089,12 +2162,19 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
     renderQueue = _scenePass.cullScene(ctx, ctx.camera);
 
     const options = deriveForwardPlusOptions(ctx.scene, ctx.camera, device.type, renderQueue);
+    options.ssgi &&= supportsSSGIRenderTargets(ctx);
     ctx.SSS = options.sss;
 
     historyManager = ctx.camera.getHistoryResourceManager();
     if (!historyManager) {
       historyManager = new HistoryResourceManager<Texture2D>(_devicePoolAllocator);
       ctx.camera.setHistoryResourceManager(historyManager);
+    }
+    if (!options.ssgi) {
+      historyManager.invalidate(RGHistoryResources.SSGI_SCENE_COLOR);
+      historyManager.invalidate(RGHistoryResources.SSGI_IRRADIANCE);
+      historyManager.invalidate(RGHistoryResources.SSGI_SURFACE);
+      historyManager.invalidate(RGHistoryResources.SSGI_MOMENTS);
     }
     historyManager.beginFrame();
     historyFrameStarted = true;

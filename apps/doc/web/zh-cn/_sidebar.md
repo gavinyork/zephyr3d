@@ -51,6 +51,7 @@
     - [FXAA](zh-cn/posteffect-fxaa.md)
     - [TAA](zh-cn/posteffect-taa.md)
     - [SSR](zh-cn/posteffect-ssr.md)
+    - [SSGI](zh-cn/posteffect-ssgi.md)
     - [Motion Blur](zh-cn/posteffect-motionblur.md)
   - 场景拾取
     - [概述](zh-cn/picking.md)

@@ -1,6 +1,6 @@
 import { defineProps, type SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
-import type { CameraOITMode, SSSDebugView, SSSQualityPreset } from '../../../camera';
+import type { CameraOITMode, SSGIQualityPreset, SSSDebugView, SSSQualityPreset } from '../../../camera';
 import { SceneNode } from '../../../scene';
 import {
   TAA_DEBUG_ALAPH,
@@ -518,6 +518,227 @@ export function getCameraClass(): SerializableClass {
           },
           isValid(this: Camera) {
             return this.motionBlur;
+          }
+        },
+        {
+          name: 'SSGIEnabled',
+          type: 'bool',
+          phase: 0,
+          default: false,
+          options: { label: 'Enabled', group: 'PostProcessing/SSGI' },
+          get(this: Camera, value) {
+            value.bool[0] = this.SSGI;
+          },
+          set(this: Camera, value) {
+            this.SSGI = value.bool[0];
+          }
+        },
+        {
+          name: 'SSGIQualityPreset',
+          type: 'string',
+          phase: 1,
+          default: 'quality',
+          options: {
+            label: 'Quality',
+            group: 'PostProcessing/SSGI',
+            enum: {
+              labels: ['Quality', 'Balanced', 'Performance'],
+              values: ['quality', 'balanced', 'performance']
+            }
+          },
+          get(this: Camera, value) {
+            value.str[0] = this.ssgiQualityPreset;
+          },
+          set(this: Camera, value) {
+            this.ssgiQualityPreset = value.str[0] as SSGIQualityPreset;
+          },
+          isValid(this: Camera) {
+            return this.SSGI;
+          }
+        },
+        {
+          name: 'SSGIIntensity',
+          type: 'float',
+          phase: 1,
+          default: 0.7,
+          options: {
+            label: 'Intensity',
+            group: 'PostProcessing/SSGI',
+            minValue: 0,
+            maxValue: 4,
+            animatable: true
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiIntensity;
+          },
+          set(this: Camera, value) {
+            this.ssgiIntensity = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI;
+          }
+        },
+        {
+          name: 'SSGIMaxDistance',
+          type: 'float',
+          phase: 1,
+          default: 32,
+          options: {
+            label: 'MaxDistance',
+            group: 'PostProcessing/SSGI',
+            minValue: 0.1,
+            maxValue: 512
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiMaxDistance;
+          },
+          set(this: Camera, value) {
+            this.ssgiMaxDistance = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI;
+          }
+        },
+        {
+          name: 'SSGIThickness',
+          type: 'float',
+          phase: 1,
+          default: 0.5,
+          options: {
+            label: 'Thickness',
+            group: 'PostProcessing/SSGI',
+            minValue: 0.001,
+            maxValue: 8
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiThickness;
+          },
+          set(this: Camera, value) {
+            this.ssgiThickness = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI;
+          }
+        },
+        {
+          name: 'SSGIStride',
+          type: 'int',
+          phase: 1,
+          default: 1,
+          options: {
+            label: 'Stride',
+            group: 'PostProcessing/SSGI',
+            minValue: 1,
+            maxValue: 16
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiStride;
+          },
+          set(this: Camera, value) {
+            this.ssgiStride = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI;
+          }
+        },
+        {
+          name: 'SSGIMaxRayIntensity',
+          type: 'float',
+          phase: 1,
+          default: 10,
+          options: {
+            label: 'MaxRayIntensity',
+            group: 'PostProcessing/SSGI',
+            minValue: 0,
+            maxValue: 64
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiMaxRayIntensity;
+          },
+          set(this: Camera, value) {
+            this.ssgiMaxRayIntensity = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI;
+          }
+        },
+        {
+          name: 'SSGITemporalEnabled',
+          type: 'bool',
+          phase: 1,
+          default: true,
+          options: { label: 'Temporal', group: 'PostProcessing/SSGI' },
+          get(this: Camera, value) {
+            value.bool[0] = this.ssgiTemporal;
+          },
+          set(this: Camera, value) {
+            this.ssgiTemporal = value.bool[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI;
+          }
+        },
+        {
+          name: 'SSGITemporalWeight',
+          type: 'float',
+          phase: 1,
+          default: 0.94,
+          options: {
+            label: 'TemporalWeight',
+            group: 'PostProcessing/SSGI',
+            minValue: 0,
+            maxValue: 0.99
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiTemporalWeight;
+          },
+          set(this: Camera, value) {
+            this.ssgiTemporalWeight = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI && this.ssgiTemporal;
+          }
+        },
+        {
+          name: 'SSGIDepthReject',
+          type: 'float',
+          phase: 1,
+          default: 0.5,
+          options: {
+            label: 'DepthReject',
+            group: 'PostProcessing/SSGI',
+            minValue: 0,
+            maxValue: 4
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiDepthReject;
+          },
+          set(this: Camera, value) {
+            this.ssgiDepthReject = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI;
+          }
+        },
+        {
+          name: 'SSGINormalReject',
+          type: 'float',
+          phase: 1,
+          default: 0.75,
+          options: {
+            label: 'NormalReject',
+            group: 'PostProcessing/SSGI',
+            minValue: -1,
+            maxValue: 1
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiNormalReject;
+          },
+          set(this: Camera, value) {
+            this.ssgiNormalReject = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI;
           }
         },
         {

@@ -430,10 +430,15 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         return scope.$builder.vec3(0);
       }
       return this.drawContext.env!.light.envLight.hasIrradiance()
-        ? (scope.$builder.mul(
-            this.drawContext.env!.light.envLight.getIrradiance(scope, normal).rgb,
-            ShaderHelper.getEnvLightStrength(scope)
-          ) as PBShaderExp)
+        ? ((this.drawContext.SSGI &&
+          this.drawContext.SSGIIrradianceHistoryTexture &&
+          this.drawContext.SSGISurfaceHistoryTexture &&
+          (this.drawContext.device.type !== 'webgpu' || this.drawContext.motionVectorTexture)
+            ? this.drawContext.env!.light.envLight.getIrradiance(scope, normal, this.drawContext).rgb
+            : scope.$builder.mul(
+                this.drawContext.env!.light.envLight.getIrradiance(scope, normal, this.drawContext).rgb,
+                ShaderHelper.getEnvLightStrength(scope)
+              )) as PBShaderExp)
         : scope.$builder.vec3(0);
     }
     /**

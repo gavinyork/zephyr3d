@@ -51,6 +51,7 @@
     - [FXAA](en/posteffect-fxaa.md)
     - [TAA](en/posteffect-taa.md)
     - [SSR](en/posteffect-ssr.md)
+    - [SSGI](en/posteffect-ssgi.md)
     - [Motion Blur](en/posteffect-motionblur.md)
   - Scene Picking
     - [Overview](en/picking.md)

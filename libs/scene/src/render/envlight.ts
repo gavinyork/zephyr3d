@@ -1,5 +1,5 @@
 import type { Immutable, Nullable } from '@zephyr3d/base';
-import { Disposable, DRef, Vector3 } from '@zephyr3d/base';
+import { Disposable, DRef, Vector2, Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
   BindGroup,
@@ -12,6 +12,8 @@ import type {
 } from '@zephyr3d/device';
 import { fetchSampler, getSamplerOptions } from '../utility/misc';
 import { getDevice } from '../app/api';
+import type { DrawContext } from './drawable';
+import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 
 /**
  * Environment light type
@@ -32,12 +34,12 @@ export abstract class EnvironmentLighting extends Disposable {
    * Initialize shader bindings
    * @param pb - The program builder
    */
-  abstract initShaderBindings(pb: ProgramBuilder): void;
+  abstract initShaderBindings(pb: ProgramBuilder, ctx?: DrawContext): void;
   /**
    * Updates the uniform values
    * @param bg - The bind group to be updated
    */
-  abstract updateBindGroup(bg: BindGroup): void;
+  abstract updateBindGroup(bg: BindGroup, ctx?: DrawContext): void;
   /**
    * Get radiance for a fragment
    *
@@ -74,7 +76,7 @@ export abstract class EnvironmentLighting extends Disposable {
    *
    * @returns The radiance for the fragment
    */
-  abstract getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
+  abstract getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp, ctx?: DrawContext): PBShaderExp;
   /**
    * Returns whether this environment lighting supports reflective light
    */
@@ -104,6 +106,18 @@ export class EnvShIBL extends EnvironmentLighting {
   public static readonly UNIFORM_NAME_IBL_IRRADIANCE_SH = 'zIBLIrradianceSH';
   /** @internal */
   public static readonly UNIFORM_NAME_IBL_IRRADIANCE_WINDOW = 'zIBLIrradianceWindow';
+  /** @internal */
+  public static readonly UNIFORM_NAME_SSGI_IRRADIANCE = 'zSSGIPreviousIrradiance';
+  /** @internal */
+  public static readonly UNIFORM_NAME_SSGI_SURFACE = 'zSSGIPreviousSurface';
+  /** @internal */
+  public static readonly UNIFORM_NAME_SSGI_CURRENT_DEPTH = 'zSSGICurrentDepth';
+  /** @internal */
+  public static readonly UNIFORM_NAME_SSGI_MOTION = 'zSSGICurrentMotion';
+  /** @internal */
+  public static readonly UNIFORM_NAME_SSGI_TARGET_SIZE = 'zSSGITargetSize';
+  /** @internal */
+  public static readonly UNIFORM_NAME_SSGI_REPROJECTION = 'zSSGIReprojection';
   /** @internal */
   private readonly _radianceMap: DRef<TextureCube>;
   /** @internal */
@@ -178,7 +192,7 @@ export class EnvShIBL extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.initShaderBindings}
    * @override
    */
-  initShaderBindings(pb: ProgramBuilder) {
+  initShaderBindings(pb: ProgramBuilder, ctx?: DrawContext) {
     if (pb.shaderKind === 'fragment') {
       if (this.radianceMap) {
         // Prefiltered radiance cube: mipmap chain indexed by roughness
@@ -210,13 +224,37 @@ export class EnvShIBL extends EnvironmentLighting {
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH] = pb.vec4[9]().uniformBuffer(0);
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
       }
+      if (EnvShIBL.hasSSGIHistory(ctx)) {
+        const irradianceSampler =
+          pb.getDevice().type === 'webgl' ? 'clamp_nearest_nomip' : 'clamp_linear_nomip';
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_IRRADIANCE] = pb
+          .tex2D()
+          .uniform(0)
+          .withSampler(getSamplerOptions(irradianceSampler));
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_SURFACE] = pb
+          .tex2D()
+          .uniform(0)
+          .withSampler(getSamplerOptions('clamp_nearest_nomip'));
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_CURRENT_DEPTH] = pb
+          .tex2D()
+          .uniform(0)
+          .withSampler(getSamplerOptions('clamp_nearest_nomip'));
+        if (ctx?.motionVectorTexture) {
+          pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_MOTION] = pb
+            .tex2D()
+            .uniform(0)
+            .withSampler(getSamplerOptions('clamp_nearest_nomip'));
+        }
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_TARGET_SIZE] = pb.vec2().uniform(0);
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_REPROJECTION] = pb.vec4().uniform(0);
+      }
     }
   }
   /**
    * {@inheritDoc EnvironmentLighting.updateBindGroup}
    * @override
    */
-  updateBindGroup(bg: BindGroup) {
+  updateBindGroup(bg: BindGroup, ctx?: DrawContext) {
     if (this.radianceMap) {
       bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP_MAX_LOD, this.radianceMap.mipLevelCount - 1);
       bg.setTexture(EnvShIBL.UNIFORM_NAME_IBL_RADIANCE_MAP, this.radianceMap);
@@ -234,6 +272,35 @@ export class EnvShIBL extends EnvironmentLighting {
     } else if (this.irradianceSH) {
       bg.setBuffer(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_SH, this.irradianceSH);
       bg.setValue(EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW, this.irradianceWindow);
+    }
+    if (EnvShIBL.hasSSGIHistory(ctx)) {
+      bg.setTexture(
+        EnvShIBL.UNIFORM_NAME_SSGI_IRRADIANCE,
+        ctx!.SSGIIrradianceHistoryTexture!,
+        fetchSampler(ctx!.device.type === 'webgl' ? 'clamp_nearest_nomip' : 'clamp_linear_nomip')
+      );
+      bg.setTexture(
+        EnvShIBL.UNIFORM_NAME_SSGI_SURFACE,
+        ctx!.SSGISurfaceHistoryTexture!,
+        fetchSampler('clamp_nearest_nomip')
+      );
+      bg.setTexture(
+        EnvShIBL.UNIFORM_NAME_SSGI_CURRENT_DEPTH,
+        ctx!.linearDepthTexture!,
+        fetchSampler('clamp_nearest_nomip')
+      );
+      if (ctx!.motionVectorTexture) {
+        bg.setTexture(
+          EnvShIBL.UNIFORM_NAME_SSGI_MOTION,
+          ctx!.motionVectorTexture,
+          fetchSampler('clamp_nearest_nomip')
+        );
+      }
+      bg.setValue(EnvShIBL.UNIFORM_NAME_SSGI_TARGET_SIZE, new Vector2(ctx!.renderWidth, ctx!.renderHeight));
+      bg.setValue(
+        EnvShIBL.UNIFORM_NAME_SSGI_REPROJECTION,
+        new Vector4(ctx!.camera.ssgiDepthReject, ctx!.camera.ssgiNormalReject, ctx!.camera.getFarPlane(), 0)
+      );
     }
   }
   /**
@@ -268,7 +335,7 @@ export class EnvShIBL extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.getIrradiance}
    * @override
    */
-  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp) {
+  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp, ctx?: DrawContext) {
     const pb = scope.$builder;
     const that = this;
     pb.func('Z_sh_Y0', [pb.vec3('v')], function () {
@@ -420,7 +487,81 @@ export class EnvShIBL extends EnvironmentLighting {
       }
       this.$return(this.c);
     });
-    return pb.getGlobalScope().Z_sh_eval(normal) as PBShaderExp;
+    const iblIrradiance = pb.getGlobalScope().Z_sh_eval(normal) as PBShaderExp;
+    if (!EnvShIBL.hasSSGIHistory(ctx)) {
+      return iblIrradiance;
+    }
+    const useMotionReprojection = !!ctx?.motionVectorTexture;
+    pb.func('Z_ssgi_reprojectIrradiance', [pb.vec3('currentNormal'), pb.vec3('ibl')], function () {
+      this.$l.uv = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this[EnvShIBL.UNIFORM_NAME_SSGI_TARGET_SIZE]);
+      if (useMotionReprojection) {
+        this.$l.motion = pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_SSGI_MOTION], this.uv, 0).xy;
+        this.$l.previousUV = pb.sub(this.uv, this.motion);
+      } else {
+        this.$l.previousUV = this.uv;
+      }
+      this.$l.params = this[EnvShIBL.UNIFORM_NAME_SSGI_REPROJECTION];
+      this.$l.fallback = pb.mul(this.ibl, this.light.envLightStrength);
+      this.$if(
+        pb.or(
+          pb.any(pb.lessThan(this.previousUV, pb.vec2(0))),
+          pb.any(pb.greaterThan(this.previousUV, pb.vec2(1))),
+          useMotionReprojection
+            ? pb.any(pb.greaterThanEqual(pb.abs(this.motion), pb.vec2(5e4)))
+            : pb.bool(false)
+        ),
+        function () {
+          this.$return(this.fallback);
+        }
+      );
+      this.$l.previousSurface = pb.textureSampleLevel(
+        this[EnvShIBL.UNIFORM_NAME_SSGI_SURFACE],
+        this.previousUV,
+        0
+      );
+      this.$l.previousNormal = pb.normalize(pb.sub(pb.mul(this.previousSurface.rgb, 2), pb.vec3(1)));
+      this.$l.currentDepthSample = pb.textureSampleLevel(
+        this[EnvShIBL.UNIFORM_NAME_SSGI_CURRENT_DEPTH],
+        this.uv,
+        0
+      );
+      this.$l.currentDepth = pb.mul(
+        pb.getDevice().type === 'webgl'
+          ? decodeNormalizedFloatFromRGBA(this, this.currentDepthSample)
+          : this.currentDepthSample.r,
+        this.params.z
+      );
+      this.$l.depthValid = pb.lessThanEqual(
+        pb.abs(pb.sub(this.previousSurface.a, this.currentDepth)),
+        this.params.x
+      );
+      this.$l.normalValid = pb.greaterThanEqual(
+        pb.dot(pb.normalize(this.currentNormal), this.previousNormal),
+        this.params.y
+      );
+      this.$l.previousIrradiance = pb.textureSampleLevel(
+        this[EnvShIBL.UNIFORM_NAME_SSGI_IRRADIANCE],
+        this.previousUV,
+        0
+      );
+      this.$l.validity = pb.mul(
+        pb.float(pb.and(this.depthValid, this.normalValid)),
+        pb.clamp(this.previousIrradiance.a, 0, 1)
+      );
+      this.$return(pb.mix(this.fallback, this.previousIrradiance.rgb, this.validity));
+    });
+    return scope.Z_ssgi_reprojectIrradiance(normal, iblIrradiance) as PBShaderExp;
+  }
+
+  /** Whether all textures required by the lighting reprojection are scoped. @internal */
+  static hasSSGIHistory(ctx?: DrawContext) {
+    return !!(
+      ctx?.SSGI &&
+      ctx.SSGIIrradianceHistoryTexture &&
+      ctx.SSGISurfaceHistoryTexture &&
+      (ctx.device.type !== 'webgpu' || ctx.motionVectorTexture) &&
+      ctx.linearDepthTexture
+    );
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasRadiance}

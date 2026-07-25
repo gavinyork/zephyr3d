@@ -48,6 +48,14 @@ export class SceneRenderer {
         }
         device.clearFrameBuffer(camera.clearColor, camera.clearDepth, camera.clearStencil);
         const SSR = camera.SSR && scene.env.light.envLight && scene.env.light.envLight.hasRadiance();
+        const SSGI =
+          camera.SSGI &&
+          camera.HDR &&
+          camera.ssgiIntensity > 0 &&
+          scene.env.light.type === 'ibl' &&
+          scene.env.light.allowSSGI &&
+          !!scene.env.light.envLight?.hasRadiance() &&
+          !!scene.env.light.envLight?.hasIrradiance();
         const SSS = camera.SSS;
         const ctx: DrawContext = {
           device,
@@ -80,6 +88,9 @@ export class SceneRenderer {
           primaryTransmissionLight: null,
           materialFlags: 0,
           SSR,
+          SSGI,
+          SSGIIrradianceHistoryTexture: null,
+          SSGISurfaceHistoryTexture: null,
           SSS,
           SSRCalcThickness: SSR && camera.ssrCalcThickness,
           // Surface roughness/normal MRT textures are render graph resources

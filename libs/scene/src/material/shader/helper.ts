@@ -339,7 +339,7 @@ export class ShaderHelper {
         scope[UNIFORM_NAME_SHADOW_MAP] = tex.uniform(0);
       }
       if (ctx.drawEnvLight) {
-        ctx.env!.light.envLight.initShaderBindings(pb);
+        ctx.env!.light.envLight.initShaderBindings(pb, ctx);
       }
       if (ctx.linearDepthTexture) {
         // Depth values must never be filtered across geometry edges; nearest
@@ -961,7 +961,7 @@ export class ShaderHelper {
     }
     bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ctx.drawEnvLight) {
-      ctx.env!.light.envLight.updateBindGroup(bindGroup);
+      ctx.env!.light.envLight.updateBindGroup(bindGroup, ctx);
     }
   }
   /** @internal */
@@ -992,7 +992,7 @@ export class ShaderHelper {
     );
     bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ctx.drawEnvLight) {
-      ctx.env!.light.envLight.updateBindGroup(bindGroup);
+      ctx.env!.light.envLight.updateBindGroup(bindGroup, ctx);
     }
   }
   /**

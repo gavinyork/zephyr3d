@@ -17,6 +17,7 @@ import type {
 } from './base';
 import type { OIT } from '../render/oit';
 import { TAA } from '../posteffect/taa';
+import { SSGI } from '../posteffect/ssgi';
 import { SSR } from '../posteffect/ssr';
 import { SSS } from '../posteffect/sss';
 import { SkinSSS } from '../posteffect/skinsss';
@@ -34,6 +35,7 @@ import { WeightedBlendedOIT } from '../render/weightedblended_oit';
 import { DualDepthPeelingOIT } from '../render/dualdepthpeeling_oit';
 import type { HistoryResourceManager } from '../render';
 import type { FrameGraphContext, RenderPipeline } from '../render';
+import { RGHistoryResources } from '../render/rendergraph/history_resources';
 
 /**
  * Result of a camera picking operation.
@@ -109,6 +111,23 @@ export type SSSResolvedSettings = {
   blurStdDev: number;
   blurDepthCutoff: number;
   normalCutoff: number;
+};
+
+/** Screen Space Global Illumination quality preset. @public */
+export type SSGIQualityPreset = 'quality' | 'balanced' | 'performance';
+
+/** Resolved trace and denoise settings used by the SSGI post effect. @public */
+export type SSGIResolvedSettings = {
+  halfRes: boolean;
+  raysPerPixel: number;
+  maxSteps: number;
+  denoisePasses: number;
+};
+
+const SSGI_QUALITY_PRESET_SETTINGS: Record<SSGIQualityPreset, SSGIResolvedSettings> = {
+  quality: { halfRes: false, raysPerPixel: 2, maxSteps: 64, denoisePasses: 3 },
+  balanced: { halfRes: true, raysPerPixel: 1, maxSteps: 48, denoisePasses: 2 },
+  performance: { halfRes: true, raysPerPixel: 1, maxSteps: 24, denoisePasses: 1 }
 };
 
 type SSSDefaultSettings = {
@@ -318,6 +337,32 @@ export class Camera extends SceneNode {
   protected _ssrTemporal: boolean;
   /** @internal SSR temporal blending weight in [0, 1]. */
   protected _ssrTemporalWeight: number;
+  /** @internal SSGI enable flag (via post effect). */
+  protected _SSGI: boolean;
+  /** @internal SSGI post effect reference. */
+  protected _postEffectSSGI: DRef<SSGI>;
+  /** @internal SSGI quality preset. */
+  protected _ssgiQualityPreset: SSGIQualityPreset;
+  /** @internal Resolved SSGI trace/denoise settings. */
+  protected _ssgiResolvedSettings: SSGIResolvedSettings;
+  /** @internal SSGI irradiance composite strength. */
+  protected _ssgiIntensity: number;
+  /** @internal Maximum view-space ray distance. */
+  protected _ssgiMaxDistance: number;
+  /** @internal Ray hit thickness. */
+  protected _ssgiThickness: number;
+  /** @internal Linear trace stride. */
+  protected _ssgiStride: number;
+  /** @internal Firefly clamp applied to sampled radiance. */
+  protected _ssgiMaxRayIntensity: number;
+  /** @internal Whether SSGI temporal accumulation is enabled. */
+  protected _ssgiTemporal: boolean;
+  /** @internal Weight of valid reprojected irradiance. */
+  protected _ssgiTemporalWeight: number;
+  /** @internal Maximum linear-depth delta in scene units accepted by reprojection. */
+  protected _ssgiDepthReject: number;
+  /** @internal Minimum normal dot product accepted by reprojection. */
+  protected _ssgiNormalReject: number;
   /** @internal SSS enable flag (via post effect). */
   protected _SSS: boolean;
   /** @internal SSS post effect reference. */
@@ -477,6 +522,20 @@ export class Camera extends SceneNode {
     this._ssrBlurStdDev = 4;
     this._ssrTemporal = true;
     this._ssrTemporalWeight = 0.85;
+    this._SSGI = false;
+    this._postEffectSSGI = new DRef();
+    this._ssgiQualityPreset = 'quality';
+    const defaultSSGIQualityPreset = SSGI_QUALITY_PRESET_SETTINGS.quality;
+    this._ssgiResolvedSettings = { ...defaultSSGIQualityPreset };
+    this._ssgiIntensity = 0.7;
+    this._ssgiMaxDistance = 32;
+    this._ssgiThickness = 0.5;
+    this._ssgiStride = 1;
+    this._ssgiMaxRayIntensity = 10;
+    this._ssgiTemporal = true;
+    this._ssgiTemporalWeight = 0.94;
+    this._ssgiDepthReject = 0.5;
+    this._ssgiNormalReject = 0.75;
     this._SSS = false;
     this._postEffectSSS = new DRef();
     this._sssBlurScale = SSS_DEFAULT_SETTINGS.blurScale;
@@ -817,6 +876,120 @@ export class Camera extends SceneNode {
   }
   set SSR(val) {
     this._postEffectSSR.get()!.enabled = !!val;
+  }
+  /** Gets whether Screen Space Global Illumination is enabled for this camera. */
+  get SSGI() {
+    return this._postEffectSSGI.get()!.enabled;
+  }
+  set SSGI(val) {
+    const next = !!val;
+    if (next !== this._postEffectSSGI.get()!.enabled) {
+      this._postEffectSSGI.get()!.enabled = next;
+      this.invalidateSSGIHistory();
+    }
+  }
+  /** High-level SSGI trace and denoise quality preset. */
+  get ssgiQualityPreset() {
+    return this._ssgiQualityPreset;
+  }
+  set ssgiQualityPreset(val: SSGIQualityPreset) {
+    const next = Camera.resolveSSGIQualityPreset(val);
+    if (next !== this._ssgiQualityPreset) {
+      this._ssgiQualityPreset = next;
+      this._ssgiResolvedSettings = { ...SSGI_QUALITY_PRESET_SETTINGS[next] };
+      this.invalidateSSGIHistory();
+    }
+  }
+  /** Resolved trace and denoise settings for the current SSGI preset. */
+  get ssgiResolvedSettings(): Readonly<SSGIResolvedSettings> {
+    return this._ssgiResolvedSettings;
+  }
+  /** SSGI diffuse irradiance multiplier. */
+  get ssgiIntensity() {
+    return this._ssgiIntensity;
+  }
+  set ssgiIntensity(val) {
+    const next = Math.max(0, val ?? 0);
+    if (next !== this._ssgiIntensity) {
+      this._ssgiIntensity = next;
+      this.invalidateSSGIHistory();
+    }
+  }
+  /** Maximum SSGI ray length in view-space units. */
+  get ssgiMaxDistance() {
+    return this._ssgiMaxDistance;
+  }
+  set ssgiMaxDistance(val) {
+    const next = Math.max(0, val ?? 0);
+    if (next !== this._ssgiMaxDistance) {
+      this._ssgiMaxDistance = next;
+      this.invalidateSSGIHistory();
+    }
+  }
+  /** Depth thickness used by screen-space ray intersection tests. */
+  get ssgiThickness() {
+    return this._ssgiThickness;
+  }
+  set ssgiThickness(val) {
+    const next = Math.max(0.0001, val ?? 0.0001);
+    if (next !== this._ssgiThickness) {
+      this._ssgiThickness = next;
+      this.invalidateSSGIHistory();
+    }
+  }
+  /** Pixel stride used by the WebGL linear ray marcher. */
+  get ssgiStride() {
+    return this._ssgiStride;
+  }
+  set ssgiStride(val) {
+    const next = Math.max(1, Math.round(val ?? 1));
+    if (next !== this._ssgiStride) {
+      this._ssgiStride = next;
+      this.invalidateSSGIHistory();
+    }
+  }
+  /** Maximum per-ray radiance before temporal accumulation (firefly clamp). */
+  get ssgiMaxRayIntensity() {
+    return this._ssgiMaxRayIntensity;
+  }
+  set ssgiMaxRayIntensity(val) {
+    const next = Math.max(0, val ?? 0);
+    if (next !== this._ssgiMaxRayIntensity) {
+      this._ssgiMaxRayIntensity = next;
+      this.invalidateSSGIHistory();
+    }
+  }
+  /** Whether WebGPU SSGI temporal accumulation is enabled. */
+  get ssgiTemporal() {
+    return this._ssgiTemporal;
+  }
+  set ssgiTemporal(val) {
+    const next = !!val;
+    if (next !== this._ssgiTemporal) {
+      this._ssgiTemporal = next;
+      this.invalidateSSGIHistory();
+    }
+  }
+  /** Weight assigned to valid reprojected SSGI history. */
+  get ssgiTemporalWeight() {
+    return this._ssgiTemporalWeight;
+  }
+  set ssgiTemporalWeight(val) {
+    this._ssgiTemporalWeight = Math.max(0, Math.min(1, val ?? 0));
+  }
+  /** Relative linear-depth rejection threshold for SSGI reprojection. */
+  get ssgiDepthReject() {
+    return this._ssgiDepthReject;
+  }
+  set ssgiDepthReject(val) {
+    this._ssgiDepthReject = Math.max(0, val ?? 0);
+  }
+  /** Minimum world-normal dot product accepted by SSGI reprojection. */
+  get ssgiNormalReject() {
+    return this._ssgiNormalReject;
+  }
+  set ssgiNormalReject(val) {
+    this._ssgiNormalReject = Math.max(-1, Math.min(1, val ?? 0));
   }
   /**
    * Gets the maximum roughness value for screen space reflections.
@@ -1561,6 +1734,13 @@ export class Camera extends SceneNode {
   /** @internal */
   private updatePostProcessing() {
     this._compositor.clear();
+    if (!this._postEffectSSGI.get()) {
+      const ssgi = new SSGI();
+      ssgi.enabled = false;
+      this._postEffectSSGI.set(ssgi);
+      // SSGI resolves opaque linear HDR before SSR, transparency and AA.
+      this._compositor.appendPostEffect(ssgi);
+    }
     if (!this._postEffectSSR.get()) {
       const ssr = new SSR();
       ssr.enabled = false;
@@ -1653,6 +1833,26 @@ export class Camera extends SceneNode {
       default:
         return 'balanced';
     }
+  }
+
+  private static resolveSSGIQualityPreset(val: SSGIQualityPreset) {
+    switch (val) {
+      case 'quality':
+      case 'balanced':
+      case 'performance':
+        return val;
+      default:
+        return 'quality';
+    }
+  }
+
+  /** @internal Invalidate only the histories owned by SSGI. */
+  private invalidateSSGIHistory() {
+    const history = Camera._historyResourceManager.get(this);
+    history?.invalidate(RGHistoryResources.SSGI_SCENE_COLOR);
+    history?.invalidate(RGHistoryResources.SSGI_IRRADIANCE);
+    history?.invalidate(RGHistoryResources.SSGI_SURFACE);
+    history?.invalidate(RGHistoryResources.SSGI_MOMENTS);
   }
 
   private updateSSSResolvedSettings() {
@@ -1868,6 +2068,7 @@ export class Camera extends SceneNode {
     this._postEffectSSAO.dispose();
     this._postEffectSSS.dispose();
     this._postEffectSkinSSS.dispose();
+    this._postEffectSSGI.dispose();
     this._postEffectSSR.dispose();
     this._postEffectTAA.dispose();
     this._postEffectTonemap.dispose();

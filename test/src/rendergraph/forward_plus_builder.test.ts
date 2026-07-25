@@ -15,6 +15,7 @@ import {
 import { AbstractPostEffect, PostEffectLayer } from '../../../libs/scene/src/posteffect/posteffect';
 import { Compositor } from '../../../libs/scene/src/posteffect/compositor';
 import { SSR } from '../../../libs/scene/src/posteffect/ssr';
+import { SSGI } from '../../../libs/scene/src/posteffect/ssgi';
 
 function getMockTextureFormatSize(format: string): number {
   switch (format) {
@@ -91,6 +92,7 @@ function createOptions(overrides: Partial<ForwardPlusOptions> = {}): ForwardPlus
     sceneRoughness: false,
     shadowMask: false,
     ssr: false,
+    ssgi: false,
     ssrCalcThickness: false,
     gpuPicking: false,
     needSceneColor: false,
@@ -584,6 +586,184 @@ describe('Forward+ render graph builder', () => {
         `history:${RGHistoryResources.SSR_MOTION_VECTOR}:previous`
       ])
     );
+  });
+
+  test('declares compatible SSGI irradiance and surface history as LightPass reads', () => {
+    const allocator: RGTextureAllocator<any> = {
+      allocate: (_desc, _size) => ({}),
+      release: () => {}
+    };
+    const historyManager = new HistoryResourceManager(allocator);
+    const size = { width: 1920, height: 1080 };
+    historyManager.beginFrame();
+    for (const name of [RGHistoryResources.SSGI_IRRADIANCE, RGHistoryResources.SSGI_SURFACE]) {
+      historyManager.queueCommit(
+        name,
+        {
+          format: 'rgba16f',
+          sizeMode: 'absolute',
+          width: size.width,
+          height: size.height
+        },
+        size,
+        { id: name }
+      );
+    }
+    historyManager.commitFrame();
+
+    const { graph } = buildForwardPlusGraphForTest(
+      createOptions({ ssgi: true }),
+      {},
+      {
+        camera: {
+          ssgiResolvedSettings: {
+            halfRes: false,
+            raysPerPixel: 2,
+            maxSteps: 64,
+            denoisePasses: 3
+          },
+          getHistoryResourceManager: () => historyManager
+        }
+      }
+    );
+
+    const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');
+    expect(lightPass?.reads.map((resource) => resource.name)).toEqual(
+      expect.arrayContaining([
+        `history:${RGHistoryResources.SSGI_IRRADIANCE}:previous`,
+        `history:${RGHistoryResources.SSGI_SURFACE}:previous`
+      ])
+    );
+  });
+
+  test('derives SSGI only when both camera and IBL opt in', () => {
+    const envLight = {
+      hasRadiance: () => true,
+      hasIrradiance: () => true
+    };
+    const scene = {
+      env: {
+        light: {
+          type: 'ibl',
+          allowSSGI: true,
+          envLight
+        }
+      }
+    };
+    const camera = {
+      SSGI: true,
+      HDR: true,
+      ssgiIntensity: 0.7,
+      SSR: false,
+      SSS: false,
+      skinSSS: false,
+      ssrCalcThickness: false,
+      getPickResultResolveFunc: () => null
+    };
+    const renderQueue = {
+      needSceneColor: () => false,
+      needSceneColorWithDepth: () => false,
+      itemList: { opaque: { lit: [], unlit: [] } }
+    };
+
+    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).ssgi).toBe(
+      true
+    );
+    scene.env.light.allowSSGI = false;
+    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).ssgi).toBe(
+      false
+    );
+    scene.env.light.allowSSGI = true;
+    camera.HDR = false;
+    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).ssgi).toBe(
+      false
+    );
+    camera.HDR = true;
+    camera.ssgiIntensity = 0;
+    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).ssgi).toBe(
+      false
+    );
+  });
+
+  test('builds SSGI trace, temporal, a-trous and commit before transparent rendering', () => {
+    const allocator: RGTextureAllocator<any> = {
+      allocate: (_desc, _size) => ({}),
+      release: () => {},
+      retain: () => {}
+    };
+    const historyManager = new HistoryResourceManager(allocator);
+    const compositor = new Compositor();
+    compositor.appendPostEffect(new SSGI());
+
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions({ ssgi: true, motionVectors: true, hiZ: true, sceneNormal: true }),
+      {},
+      {
+        compositor,
+        camera: {
+          HDR: true,
+          ssgiTemporal: true,
+          ssgiResolvedSettings: {
+            halfRes: false,
+            raysPerPixel: 2,
+            maxSteps: 64,
+            denoisePasses: 3
+          },
+          getHistoryResourceManager: () => historyManager
+        }
+      }
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    for (const name of [
+      'SSGI:Trace',
+      'SSGI:Surface',
+      'SSGI:Temporal',
+      'SSGI:ATrous:0',
+      'SSGI:ATrous:1',
+      'SSGI:ATrous:2',
+      'SSGI:Commit'
+    ]) {
+      expect(passNames).toContain(name);
+    }
+    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('SSGI:Trace'));
+    expect(passNames.indexOf('SSGI:Trace')).toBeLessThan(passNames.indexOf('SSGI:Temporal'));
+    expect(passNames.indexOf('SSGI:Temporal')).toBeLessThan(passNames.indexOf('SSGI:ATrous:0'));
+    expect(passNames.indexOf('SSGI:Commit')).toBeLessThan(passNames.indexOf('TransparentPass'));
+  });
+
+  test.each([
+    ['half-float render targets', false, 8, 32],
+    ['two draw buffers', true, 1, 32],
+    ['the MRT byte budget', true, 8, 8]
+  ])('falls back to IBL when SSGI lacks %s', (_reason, halfFloat, maxDrawBuffers, maxBytes) => {
+    const compositor = new Compositor();
+    compositor.appendPostEffect(new SSGI());
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions({ ssgi: true }),
+      {},
+      {
+        compositor,
+        device: {
+          getDeviceCaps: () => ({
+            framebufferCaps: {
+              maxDrawBuffers,
+              maxColorAttachmentBytesPerSample: maxBytes,
+              supportPerTargetBlending: true
+            },
+            textureCaps: {
+              supportHalfFloatColorBuffer: halfFloat,
+              getTextureFormatInfo: (format: string) => ({
+                size: getMockTextureFormatSize(format)
+              })
+            }
+          })
+        }
+      }
+    );
+
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+    expect(passNames).not.toContain('SSGI:Trace');
   });
 
   test('declares compatible TAA history imports as TAA pass reads', () => {

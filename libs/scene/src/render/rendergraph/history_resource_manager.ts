@@ -227,6 +227,43 @@ export class HistoryResourceManager<TTexture = Texture2D> {
     this._flushDeferredReleases();
   }
 
+  /**
+   * Invalidate one named history resource without disturbing unrelated
+   * temporal effects. If called during a frame, owned textures are released
+   * after that frame so already-imported graph reads remain valid.
+   */
+  invalidate(name: string): void {
+    const pending = this._pendingCommits.get(name);
+    if (pending) {
+      if (pending.ownsTexture) {
+        if (this._frameActive) {
+          this._deferredReleases.push(pending.texture);
+        } else {
+          this._allocator.release(pending.texture);
+        }
+      }
+      this._pendingCommits.delete(name);
+    }
+    const resource = this._resources.get(name);
+    if (!resource) {
+      return;
+    }
+    if (this._frameActive) {
+      for (let i = 0; i < resource.textures.length; i++) {
+        const texture = resource.textures[i];
+        if (texture && resource.ownsTexture[i]) {
+          this._deferredReleases.push(texture);
+        }
+        resource.textures[i] = null;
+        resource.ownsTexture[i] = false;
+      }
+      resource.valid = false;
+    } else {
+      this._releaseResource(resource);
+    }
+    this._resources.delete(name);
+  }
+
   /** @internal */
   private _flushDeferredReleases(): void {
     for (const texture of this._deferredReleases) {
