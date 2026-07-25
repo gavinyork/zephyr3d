@@ -2118,7 +2118,10 @@ export interface FrameInfo {
   frameTimestamp: number;
   /** time spent by the CPU from last frame, in milliseconds */
   elapsedTimeCPU: number;
-  /** time spent by the GPU from last frame, in milliseconds */
+  /**
+   * Time spent by the GPU for the latest resolved frame, in milliseconds.
+   * This value is available on WebGPU devices with timestamp-query support and is 0 on WebGL devices.
+   */
   elapsedTimeGPU: number;
   /** time spent from last frame, in milliseconds */
   elapsedFrame: number;

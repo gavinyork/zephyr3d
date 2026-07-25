@@ -51,6 +51,7 @@ type TimestampQueryRecord = {
   endIndex: number;
   status: TimestampQueryInternalStatus;
   autoClosed: boolean;
+  collectResult: boolean;
   result: TimestampQueryResult | null;
   waiters: Array<(result: TimestampQueryResult) => void>;
 };
@@ -83,6 +84,7 @@ export class WebGPUTimestampQueryManager {
   private readonly _pendingSubmitBatches: TimestampResolveBatch[];
   private readonly _resolvedResults: TimestampQueryResult[];
   private _nextId: number;
+  private _frameQueryId: number;
 
   constructor(device: WebGPUDevice) {
     this._device = device;
@@ -103,6 +105,7 @@ export class WebGPUTimestampQueryManager {
     this._pendingSubmitBatches = [];
     this._resolvedResults = [];
     this._nextId = 0;
+    this._frameQueryId = 0;
   }
 
   get supported() {
@@ -110,6 +113,34 @@ export class WebGPUTimestampQueryManager {
   }
 
   begin(label?: string, options?: TimestampQueryOptions): number {
+    return this.beginRecord(label, options, true);
+  }
+
+  beginFrame(): void {
+    if (this._frameQueryId === 0) {
+      this._frameQueryId = this.beginRecord('', undefined, false);
+    }
+  }
+
+  endFrame(): Promise<TimestampQueryResult> | null {
+    if (this._frameQueryId === 0) {
+      return null;
+    }
+    const id = this._frameQueryId;
+    this._frameQueryId = 0;
+    this.end(id);
+    const result = this.resolve(id);
+    if (this._records.get(id)?.result) {
+      this._records.delete(id);
+    }
+    return result;
+  }
+
+  private beginRecord(
+    label: string | undefined,
+    options: TimestampQueryOptions | undefined,
+    collectResult: boolean
+  ): number {
     if (!this._supported || !this._querySet) {
       return 0;
     }
@@ -136,10 +167,13 @@ export class WebGPUTimestampQueryManager {
         endIndex: -1,
         status: 'exhausted',
         autoClosed: false,
+        collectResult,
         result,
         waiters: []
       });
-      this.pushResolvedResult(result);
+      if (collectResult) {
+        this.pushResolvedResult(result);
+      }
       return id;
     }
     const record: TimestampQueryRecord = {
@@ -151,6 +185,7 @@ export class WebGPUTimestampQueryManager {
       endIndex: startIndex + 1,
       status: 'open',
       autoClosed: false,
+      collectResult,
       result: null,
       waiters: []
     };
@@ -322,7 +357,7 @@ export class WebGPUTimestampQueryManager {
       record.result = result;
       this.freeQueryPair(record.startIndex);
       this.resolveWaiters(record);
-      this.pushResolvedResult(result);
+      this.completeRecord(record, result);
     }
     batch.readbackBuffer.unmap();
     batch.readbackBuffer.destroy();
@@ -346,7 +381,7 @@ export class WebGPUTimestampQueryManager {
       record.result = result;
       this.freeQueryPair(record.startIndex);
       this.resolveWaiters(record);
-      this.pushResolvedResult(result);
+      this.completeRecord(record, result);
     }
     batch.readbackBuffer.destroy();
     batch.resolveBuffer.destroy();
@@ -361,6 +396,14 @@ export class WebGPUTimestampQueryManager {
   private resolveWaiters(record: TimestampQueryRecord): void {
     for (const resolve of record.waiters.splice(0)) {
       resolve(record.result!);
+    }
+  }
+
+  private completeRecord(record: TimestampQueryRecord, result: TimestampQueryResult): void {
+    if (record.collectResult) {
+      this.pushResolvedResult(result);
+    } else {
+      this._records.delete(record.id);
     }
   }
 

@@ -905,16 +905,11 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._frameInfo.FPS = 0;
       this._fpsCounter.time = now;
       this._fpsCounter.frame = this._frameInfo.frameCounter;
-      if (this._gpuTimer) {
-        this._gpuTimer.begin();
-      }
     } else {
       this._frameInfo.elapsedFrame = now - this._frameInfo.frameTimestamp;
       this._frameInfo.elapsedOverall += this._frameInfo.elapsedFrame;
-      let gpuTime = 0;
       let cpuTime = 0;
       if (this._endFrameTime !== 0) {
-        gpuTime = now - this._endFrameTime;
         cpuTime = this._endFrameTime - this._frameInfo.frameTimestamp;
       }
       this._frameInfo.frameTimestamp = now;
@@ -923,7 +918,6 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
           ((this._frameInfo.frameCounter - this._fpsCounter.frame) * 1000) / (now - this._fpsCounter.time);
         this._fpsCounter.time = now;
         this._fpsCounter.frame = this._frameInfo.frameCounter;
-        this._frameInfo.elapsedTimeGPU = gpuTime;
         this._frameInfo.elapsedTimeCPU = cpuTime;
       }
     }

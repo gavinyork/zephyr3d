@@ -1382,7 +1382,6 @@ export class WebGLDevice extends BaseDevice {
     this.setViewport(null);
     this.setScissor(null);
     this._context.enable(WebGLEnum.SCISSOR_TEST);
-    this.enableGPUTimeRecording(true);
     this._context._currentFramebuffer = undefined;
     this._context._currentProgram = undefined;
     this._deviceUniformBuffers = [];

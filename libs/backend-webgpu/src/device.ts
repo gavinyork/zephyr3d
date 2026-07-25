@@ -107,6 +107,7 @@ export class WebGPUDevice extends BaseDevice {
   private _captureRenderBundle: Nullable<WebGPURenderBundle>;
   private _adapterInfo: any;
   private _timestampQueries!: WebGPUTimestampQueryManager;
+  private _latestGPUFrameId: number;
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend, options?.dpr);
     this._reverseWindingOrder = false;
@@ -123,6 +124,7 @@ export class WebGPUDevice extends BaseDevice {
     this._captureRenderBundle = null;
     this._samplerCache = new SamplerCache(this);
     this._adapterInfo = {};
+    this._latestGPUFrameId = -1;
   }
   get context() {
     return this._context;
@@ -865,6 +867,9 @@ export class WebGPUDevice extends BaseDevice {
   protected onBeginFrame() {
     if (this._canRender) {
       this._commandQueue.beginFrame();
+      if (this._beginFrameCounter === 1) {
+        this._timestampQueries.beginFrame();
+      }
       return true;
     } else {
       return false;
@@ -872,8 +877,15 @@ export class WebGPUDevice extends BaseDevice {
   }
   /** @internal */
   protected onEndFrame() {
+    const frameTime = this._timestampQueries.endFrame();
     this._timestampQueries.autoCloseOpenScopes();
     this._commandQueue.endFrame();
+    void frameTime?.then((result) => {
+      if (result.frameId >= this._latestGPUFrameId) {
+        this._latestGPUFrameId = result.frameId;
+        this._frameInfo.elapsedTimeGPU = result.status === 'resolved' ? result.durationMs : 0;
+      }
+    });
   }
   /** @internal */
   protected _draw(primitiveType: PrimitiveType, first: number, count: number) {
