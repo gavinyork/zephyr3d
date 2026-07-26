@@ -7,6 +7,7 @@ export interface MappedBuffer {
   offset: number;
   used: boolean;
   mappedRange: Nullable<ArrayBuffer>;
+  destroyed: boolean;
 }
 
 export interface UploadBuffer {
@@ -47,11 +48,14 @@ export class UploadRingBuffer {
   private _bufferList: MappedBuffer[];
   private readonly _defaultSize: number;
   private _unmappedBufferList: MappedBuffer[];
+  /** Buffers waiting for mapAsync() after a submitted upload. */
+  private _pendingMapBuffers: Set<MappedBuffer>;
   constructor(device: WebGPUDevice, defaultSize = 64 * 1024) {
     this._device = device;
     this._bufferList = [];
     this._defaultSize = defaultSize;
     this._unmappedBufferList = [];
+    this._pendingMapBuffers = new Set();
   }
   uploadBuffer(
     src: Nullable<ArrayBuffer>,
@@ -90,12 +94,24 @@ export class UploadRingBuffer {
   }
   endUploads() {
     for (const buffer of this._unmappedBufferList) {
-      buffer.buffer.mapAsync(GPUMapMode.WRITE).then(() => {
-        buffer.offset = 0;
-        buffer.used = false;
-        buffer.mappedRange = buffer.buffer.getMappedRange();
-        this._bufferList.push(buffer);
-      });
+      this._pendingMapBuffers.add(buffer);
+      buffer.buffer
+        .mapAsync(GPUMapMode.WRITE)
+        .then(() => {
+          this._pendingMapBuffers.delete(buffer);
+          // The owner may have been disposed while mapAsync was pending.
+          if (buffer.destroyed) {
+            return;
+          }
+          buffer.offset = 0;
+          buffer.used = false;
+          buffer.mappedRange = buffer.buffer.getMappedRange();
+          this._bufferList.push(buffer);
+        })
+        .catch(() => {
+          this._pendingMapBuffers.delete(buffer);
+          this.destroyBuffer(buffer);
+        });
     }
     this._unmappedBufferList = [];
   }
@@ -104,14 +120,21 @@ export class UploadRingBuffer {
       const buffer = this._bufferList[i];
       if (buffer.mappedRange) {
         buffer.buffer.unmap();
-        buffer.buffer.destroy();
       }
+      this.destroyBuffer(buffer);
     }
     this._bufferList = [];
     for (const buffer of this._unmappedBufferList) {
-      buffer.buffer.destroy();
+      this.destroyBuffer(buffer);
     }
     this._unmappedBufferList = [];
+    // mapAsync() cannot be cancelled, but destroying these buffers makes the
+    // promise reject and prevents the completion callback from resurrecting
+    // them in _bufferList.
+    for (const buffer of this._pendingMapBuffers) {
+      this.destroyBuffer(buffer);
+    }
+    this._pendingMapBuffers.clear();
   }
   fetchBufferMapped(size: number) {
     for (const buffer of this._bufferList) {
@@ -121,19 +144,36 @@ export class UploadRingBuffer {
       }
     }
     const bufferSize = (Math.max(size, this._defaultSize) + 3) & ~3;
-    const buf = this._device.device.createBuffer({
+    const buf = this._device.gpuCreateBuffer({
       label: `StagingRingBuffer${this._bufferList.length}:${bufferSize}`,
       size: bufferSize,
       usage: GPUBufferUsage.MAP_WRITE | GPUBufferUsage.COPY_SRC,
       mappedAtCreation: true
     });
-    this._bufferList.push({
+    const buffer: MappedBuffer = {
       buffer: buf,
       size: bufferSize,
       offset: 0,
       used: true,
-      mappedRange: buf.getMappedRange()
-    });
+      mappedRange: null,
+      destroyed: false
+    };
+    try {
+      buffer.mappedRange = buf.getMappedRange();
+    } catch (err) {
+      this.destroyBuffer(buffer);
+      throw err;
+    }
+    this._bufferList.push(buffer);
     return this._bufferList[this._bufferList.length - 1];
+  }
+
+  private destroyBuffer(buffer: MappedBuffer): void {
+    if (buffer.destroyed) {
+      return;
+    }
+    buffer.destroyed = true;
+    buffer.mappedRange = null;
+    buffer.buffer.destroy();
   }
 }

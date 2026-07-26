@@ -152,7 +152,12 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     }
   }
   destroy() {
+    // Release staging buffers owned by this dynamic buffer as well. Without
+    // this, pending mapAsync() operations can retain orphaned GPUBuffer
+    // objects after the owner has been disposed.
+    this._ringBuffer.purge();
     if (this._object) {
+      this._device.gpuRemoveObjectHash(this._object);
       this._object.destroy();
       this._object = null;
       this._gpuUsage = 0;

@@ -156,6 +156,7 @@ export abstract class WebGPUBaseTexture<
   destroy() {
     if (this._object) {
       if (!this.isTextureVideo()) {
+        this._device.gpuRemoveObjectHash(this._object);
         (this._object as GPUTexture).destroy();
       }
       this._object = null;
@@ -216,19 +217,6 @@ export abstract class WebGPUBaseTexture<
     return this._views[face][level][mipCount];
   }
   getDefaultView() {
-    if (!this._defaultView && this._object && !this.isTextureVideo()) {
-      this._defaultView = this._device.gpuCreateTextureView(this._object as GPUTexture, {
-        dimension: this.isTextureCube()
-          ? 'cube'
-          : this.isTexture3D()
-            ? '3d'
-            : this.isTexture2DArray()
-              ? '2d-array'
-              : '2d',
-        arrayLayerCount: this.isTextureCube() ? 6 : this.isTexture2DArray() ? this._depth : 1,
-        aspect: hasDepthChannel(this.format) ? 'depth-only' : 'all'
-      });
-    }
     return this._defaultView;
   }
   copyPixelDataToBuffer(
@@ -435,6 +423,17 @@ export abstract class WebGPUBaseTexture<
             (this._renderable && !this.isTexture3D() ? GPUTextureUsage.RENDER_ATTACHMENT : 0) |
             (this._flags & GPUResourceUsageFlags.TF_WRITABLE ? GPUTextureUsage.STORAGE_BINDING : 0)
         }) as any;
+        this._defaultView = this._device.gpuCreateTextureView(this._object as GPUTexture, {
+          dimension: this.isTextureCube()
+            ? 'cube'
+            : this.isTexture3D()
+              ? '3d'
+              : this.isTexture2DArray()
+                ? '2d-array'
+                : '2d',
+          arrayLayerCount: this.isTextureCube() ? 6 : this.isTexture2DArray() ? this._depth : 1,
+          aspect: hasDepthChannel(this.format) ? 'depth-only' : 'all'
+        });
         const memCost = (this.getTextureCaps() as WebGPUTextureCaps).calcMemoryUsage(
           this._format,
           this._width * this._height * (this.isTextureCube() ? 6 : this._depth)
@@ -486,7 +485,7 @@ export abstract class WebGPUBaseTexture<
       );
       return;
     }
-    const tmpBuffer = device.device.createBuffer({
+    const tmpBuffer = device.gpuCreateBuffer({
       size: sizeAligned,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC
     });

@@ -346,6 +346,7 @@ export class ShaderHelper {
         // matches the default sampler for unfilterable float formats.
         scope[UNIFORM_NAME_LINEAR_DEPTH_MAP] = pb
           .tex2D()
+          .sampleType('unfilterable-float')
           .uniform(0)
           .withSampler(getSamplerOptions('clamp_nearest_nomip'));
         scope[UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE] = pb.vec2().uniform(0);
@@ -362,6 +363,7 @@ export class ShaderHelper {
         // Matches the fetchSampler('clamp_nearest') previously passed at runtime
         scope[UNIFORM_NAME_HIZ_DEPTH_MAP] = pb
           .tex2D()
+          .sampleType('unfilterable-float')
           .uniform(0)
           .withSampler(getSamplerOptions('clamp_nearest'));
         scope[UNIFORM_NAME_HIZ_DEPTH_MAP_INFO] = pb.vec4().uniform(0);

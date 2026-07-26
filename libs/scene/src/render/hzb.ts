@@ -1,5 +1,6 @@
 import type {
   AbstractDevice,
+  BaseTexture,
   BindGroup,
   FrameBuffer,
   GPUProgram,
@@ -14,7 +15,7 @@ import { getDevice } from '../app/api';
 import type { Nullable } from '@zephyr3d/base';
 
 let hzbProgram: Nullable<GPUProgram> = null;
-let hzbBindGroup: Nullable<BindGroup> = null;
+let hzbBindGroupCache: WeakMap<BaseTexture, BindGroup[]> = new WeakMap();
 let blitter: Nullable<HiZInitBlitter> = null;
 const srcSize = new Int32Array(2);
 
@@ -254,13 +255,33 @@ function buildHZBProgram(device: AbstractDevice) {
   return program;
 }
 
+function getHiZBindGroup(tex: BaseTexture, mip: number) {
+  let info = hzbBindGroupCache.get(tex);
+  if (!info) {
+    info = [];
+    hzbBindGroupCache.set(tex, info);
+  }
+  if (!info[mip]) {
+    info[mip] = tex.device.createBindGroup(hzbProgram!.bindGroupLayouts[0]);
+    srcSize[0] = Math.max(tex.width >> mip, 1);
+    srcSize[1] = Math.max(tex.height >> mip, 1);
+    info[mip].setValue('srcSize', srcSize);
+    if (tex.device.type === 'webgpu') {
+      info[mip].setTextureView('srcTex', tex, mip, 0, 1, fetchSampler('clamp_nearest'));
+    } else {
+      info[mip].setTexture('srcTex', tex, fetchSampler('clamp_nearest'));
+      info[mip].setValue('srcMipLevel', mip);
+    }
+  }
+  return info[mip];
+}
+
 function buildHiZLevel(
   device: AbstractDevice,
   miplevel: number,
   srcTexture: Texture2D,
   dstTexture: Texture2D
 ) {
-  const sampler = fetchSampler('clamp_nearest');
   const framebuffer = device.pool.fetchTemporalFramebuffer(
     false,
     0,
@@ -273,17 +294,8 @@ function buildHiZLevel(
     miplevel + 1
   );
   framebuffer.setColorAttachmentGenerateMipmaps(0, false);
-  srcSize[0] = Math.max(srcTexture.width >> miplevel, 1);
-  srcSize[1] = Math.max(srcTexture.height >> miplevel, 1);
-  hzbBindGroup!.setValue('srcSize', srcSize);
-  if (device.type === 'webgpu') {
-    hzbBindGroup!.setTextureView('srcTex', srcTexture, miplevel, 0, 1, sampler);
-  } else {
-    hzbBindGroup!.setTexture('srcTex', srcTexture, sampler);
-    hzbBindGroup!.setValue('srcMipLevel', miplevel);
-  }
   device.setProgram(hzbProgram);
-  device.setBindGroup(0, hzbBindGroup!);
+  device.setBindGroup(0, getHiZBindGroup(srcTexture, miplevel));
   device.setFramebuffer(framebuffer);
   drawFullscreenQuad();
   if (srcTexture !== dstTexture) {
@@ -296,7 +308,6 @@ export function buildHiZ(sourceTex: Texture2D, HiZFrameBuffer: FrameBuffer) {
   const device = getDevice();
   if (!hzbProgram) {
     hzbProgram = buildHZBProgram(device);
-    hzbBindGroup = device.createBindGroup(hzbProgram.bindGroupLayouts[0]);
     blitter = new HiZInitBlitter();
   }
   blitter!.blit(sourceTex, HiZFrameBuffer, fetchSampler('clamp_nearest'));

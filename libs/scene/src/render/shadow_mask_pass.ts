@@ -15,6 +15,7 @@ import type { ShadowMapParams } from '../shadow/shadowmapper';
 import { ShaderHelper } from '../material/shader/helper';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { MAX_SHADOW_MASK_LIGHTS } from '../values';
+import { fetchSampler } from '../utility/misc';
 
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
 
@@ -221,7 +222,7 @@ export class ShadowMaskRenderer {
     bindGroup.setValue('invViewProjMatrix', camera.invViewProjectionMatrix);
     bindGroup.setValue('cameraNearFar', this._nearFar);
     bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
-    bindGroup.setTexture('depthTex', depthTexture);
+    bindGroup.setTexture('depthTex', depthTexture, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setTexture(
       UNIFORM_NAME_SHADOW_MAP,
       shadowMapParams.shadowMap!,
@@ -305,7 +306,7 @@ export class ShadowMaskRenderer {
           shadowTex.sampleType('unfilterable-float');
         }
         this[UNIFORM_NAME_SHADOW_MAP] = shadowTex.uniform(0);
-        this.depthTex = pb.tex2D().uniform(0);
+        this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.invViewProjMatrix = pb.mat4().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         this.$outputs.color = pb.vec4();

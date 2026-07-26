@@ -760,7 +760,10 @@ export class SSR extends AbstractPostEffect {
         this.albedoTex = pb.tex2D().uniform(0);
         this.extraTex = pb.tex2D().uniform(0);
         this.normalTex = pb.tex2D().uniform(0);
-        this.depthTex = pb.tex2D().uniform(0);
+        // Linear depth is r32f/rg32f and is only sampled with nearest
+        // filtering, so it must use the non-filtering float sample type on
+        // adapters without float32-filterable.
+        this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.zGGXLut = pb.tex2D().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
@@ -911,7 +914,7 @@ export class SSR extends AbstractPostEffect {
         this.normalTex = pb.tex2D().uniform(0);
         this.albedoTex = pb.tex2D().uniform(0);
         this.extraTex = pb.tex2D().uniform(0);
-        this.depthTex = pb.tex2D().uniform(0);
+        this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.zGGXLut = pb.tex2D().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
@@ -1182,7 +1185,7 @@ export class SSR extends AbstractPostEffect {
         this.roughnessTex = pb.tex2D().uniform(0);
         this.normalTex = pb.tex2D().uniform(0);
         this.extraTex = pb.tex2D().uniform(0);
-        this.depthTex = pb.tex2D().uniform(0);
+        this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.zGGXLut = pb.tex2D().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         this.cameraPos = pb.vec3().uniform(0);
@@ -1195,7 +1198,9 @@ export class SSR extends AbstractPostEffect {
         this.ssrStrengthMode = pb.int().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
         if (ctx.HiZTexture) {
-          this.hizTex = pb.tex2D().uniform(0);
+          // Hi-Z is rg32f and is sampled with a nearest sampler. Do not
+          // require the optional float32-filterable feature just to bind it.
+          this.hizTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           this.depthMipLevels = pb.int().uniform(0);
         } else {
           this.ssrStride = pb.float().uniform(0);

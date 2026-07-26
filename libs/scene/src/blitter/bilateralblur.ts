@@ -155,7 +155,9 @@ export class BilateralBlurBlitter extends Blitter {
     super.setup(scope, type);
     const pb = scope.$builder;
     if (pb.shaderKind === 'fragment') {
-      scope.depthTex = pb.tex2D().uniform(0);
+      // The bilateral depth input is linear r32f/rg32f and always uses a
+      // nearest sampler, so it must not require float32-filterable.
+      scope.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
       if (this._blurSizeTex) {
         scope.blurSizeTex = pb.tex2D().uniform(0);
         scope.blurSizeScale = pb.float().uniform(0);

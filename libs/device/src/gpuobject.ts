@@ -1550,6 +1550,7 @@ export type StructuredValue = number | TypedArray | VectorBase | { [name: string
 export interface BindGroup extends GPUObject<unknown> {
   getLayout(): Immutable<BindGroupLayout>;
   getDynamicOffsets(): Nullable<Immutable<number[]>>;
+  getVersion(): string;
   getGPUId(): string;
   getBuffer(name: string, nocreate?: boolean): Nullable<GPUDataBuffer>;
   getTexture(name: string): Nullable<BaseTexture>;

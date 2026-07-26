@@ -34,9 +34,9 @@ export class SSGI extends AbstractPostEffect {
 
   private _traceBindGroups: Record<string, BindGroup> = {};
   private _temporalBindGroups: Record<string, BindGroup> = {};
-  private _atrousBindGroup: BindGroup | null = null;
-  private _surfaceBindGroup: BindGroup | null = null;
-  private _upsampleBindGroup: BindGroup | null = null;
+  private _atrousBindGroups: Record<string, BindGroup> = {};
+  private _surfaceBindGroups: Record<string, BindGroup> = {};
+  private _upsampleBindGroups: Record<string, BindGroup> = {};
 
   constructor() {
     super();
@@ -424,35 +424,40 @@ export class SSGI extends AbstractPostEffect {
     sampleHistory: boolean
   ) {
     const envHash = ctx.env!.light.getHash();
-    const hash = `${ctx.device.type}:${sampleHistory ? 1 : 0}:${hiZ ? 1 : 0}:${ctx.camera.ssgiResolvedSettings.raysPerPixel}:${envHash}`;
-    let program = SSGI._tracePrograms[hash];
+    const historyHash = sampleHistory ? `${motion!.uid}:${previousSurface!.uid}` : '';
+    const hizHash = hiZ ? `${hiZ.uid}` : '';
+    const programHash = `${sampleHistory ? '1' : '0'}:${hiZ ? '1' : '0'}:${ctx.camera.ssgiResolvedSettings.raysPerPixel}:${envHash}`;
+    const bindGroupHash = `${sampleColor.uid}:${depth.uid}:${normal.uid}:(${historyHash}):(${hizHash}):${ctx.camera.ssgiResolvedSettings.raysPerPixel}:${envHash}`;
+    let program = SSGI._tracePrograms[programHash];
     if (!program) {
       program = this.createTraceProgram(ctx, !!hiZ, sampleHistory);
-      SSGI._tracePrograms[hash] = program;
+      SSGI._tracePrograms[programHash] = program;
     }
-    let bindGroup = this._traceBindGroups[hash];
+    let bindGroup = this._traceBindGroups[bindGroupHash];
     if (!bindGroup) {
       bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
-      this._traceBindGroups[hash] = bindGroup;
+      bindGroup.setTexture(
+        'sampleColorTex',
+        sampleColor,
+        fetchSampler(ctx.device.type === 'webgl' ? 'clamp_nearest_nomip' : 'clamp_linear_nomip')
+      );
+      bindGroup.setTexture('depthTex', depth, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setTexture('normalTex', normal, fetchSampler('clamp_nearest_nomip'));
+      if (sampleHistory) {
+        bindGroup.setTexture('motionTex', motion!, fetchSampler('clamp_nearest_nomip'));
+        bindGroup.setTexture('previousSurfaceTex', previousSurface!, fetchSampler('clamp_nearest_nomip'));
+      }
+      if (hiZ) {
+        bindGroup.setTexture('hizTex', hiZ, fetchSampler('clamp_nearest'));
+        bindGroup.setValue('depthMipLevels', hiZ.mipLevelCount);
+      }
+      this._traceBindGroups[bindGroupHash] = bindGroup;
     }
-    bindGroup.setTexture(
-      'sampleColorTex',
-      sampleColor,
-      fetchSampler(ctx.device.type === 'webgl' ? 'clamp_nearest_nomip' : 'clamp_linear_nomip')
-    );
-    bindGroup.setTexture('depthTex', depth, fetchSampler('clamp_nearest_nomip'));
-    bindGroup.setTexture('normalTex', normal, fetchSampler('clamp_nearest_nomip'));
     if (sampleHistory) {
-      bindGroup.setTexture('motionTex', motion!, fetchSampler('clamp_nearest_nomip'));
-      bindGroup.setTexture('previousSurfaceTex', previousSurface!, fetchSampler('clamp_nearest_nomip'));
       bindGroup.setValue(
         'historyRejectParams',
         new Vector2(ctx.camera.ssgiDepthReject, ctx.camera.ssgiNormalReject)
       );
-    }
-    if (hiZ) {
-      bindGroup.setTexture('hizTex', hiZ, fetchSampler('clamp_nearest'));
-      bindGroup.setValue('depthMipLevels', hiZ.mipLevelCount);
     }
     bindGroup.setValue('cameraNearFar', new Vector2(ctx.camera.getNearPlane(), ctx.camera.getFarPlane()));
     bindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
@@ -499,7 +504,9 @@ export class SSGI extends AbstractPostEffect {
     height: number
   ) {
     const hasHistory = !!(motion && previousIrradiance && previousSurface && previousMoments);
-    const hash = hasHistory ? 'history' : 'initialize';
+    const hash = hasHistory
+      ? `history:${current.uid}:${depth.uid}:${normal.uid}:${motion!.uid}:${previousIrradiance!.uid}:${previousSurface.uid}:${previousMoments.uid}`
+      : `initialize:${current.uid}:${depth.uid}:${normal.uid}`;
     let program = SSGI._temporalPrograms[hash];
     if (!program) {
       program = this.createTemporalProgram(ctx, hasHistory);
@@ -508,16 +515,20 @@ export class SSGI extends AbstractPostEffect {
     let bindGroup = this._temporalBindGroups[hash];
     if (!bindGroup) {
       bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
+      bindGroup.setTexture('currentTex', current, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setTexture('depthTex', depth, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setTexture('normalTex', normal, fetchSampler('clamp_nearest_nomip'));
+      if (hasHistory) {
+        bindGroup.setTexture('motionTex', motion!, fetchSampler('clamp_nearest_nomip'));
+        bindGroup.setTexture(
+          'previousIrradianceTex',
+          previousIrradiance!,
+          fetchSampler('clamp_linear_nomip')
+        );
+        bindGroup.setTexture('previousSurfaceTex', previousSurface!, fetchSampler('clamp_nearest_nomip'));
+        bindGroup.setTexture('previousMomentsTex', previousMoments!, fetchSampler('clamp_linear_nomip'));
+      }
       this._temporalBindGroups[hash] = bindGroup;
-    }
-    bindGroup.setTexture('currentTex', current, fetchSampler('clamp_nearest_nomip'));
-    bindGroup.setTexture('depthTex', depth, fetchSampler('clamp_nearest_nomip'));
-    bindGroup.setTexture('normalTex', normal, fetchSampler('clamp_nearest_nomip'));
-    if (hasHistory) {
-      bindGroup.setTexture('motionTex', motion!, fetchSampler('clamp_nearest_nomip'));
-      bindGroup.setTexture('previousIrradianceTex', previousIrradiance!, fetchSampler('clamp_linear_nomip'));
-      bindGroup.setTexture('previousSurfaceTex', previousSurface!, fetchSampler('clamp_nearest_nomip'));
-      bindGroup.setTexture('previousMomentsTex', previousMoments!, fetchSampler('clamp_linear_nomip'));
     }
     bindGroup.setValue('targetSize', new Vector4(width, height, depth.width, depth.height));
     bindGroup.setValue(
@@ -551,14 +562,16 @@ export class SSGI extends AbstractPostEffect {
       program = this.createAtrousProgram(ctx);
       SSGI._atrousProgram = program;
     }
-    if (!this._atrousBindGroup) {
-      this._atrousBindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
+    const hash = `atrous:${source.uid}:${moments.uid}:${depth.uid}:${normal.uid}`;
+    let bindGroup = this._atrousBindGroups[hash];
+    if (!bindGroup) {
+      bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
+      bindGroup.setTexture('sourceTex', source, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setTexture('momentsTex', moments, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setTexture('depthTex', depth, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setTexture('normalTex', normal, fetchSampler('clamp_nearest_nomip'));
+      this._atrousBindGroups[hash] = bindGroup;
     }
-    const bindGroup = this._atrousBindGroup;
-    bindGroup.setTexture('sourceTex', source, fetchSampler('clamp_nearest_nomip'));
-    bindGroup.setTexture('momentsTex', moments, fetchSampler('clamp_nearest_nomip'));
-    bindGroup.setTexture('depthTex', depth, fetchSampler('clamp_nearest_nomip'));
-    bindGroup.setTexture('normalTex', normal, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setValue('targetSize', new Vector4(width, height, depth.width, depth.height));
     bindGroup.setValue(
       'filterParams',
@@ -583,16 +596,19 @@ export class SSGI extends AbstractPostEffect {
       program = this.createSurfaceProgram(ctx);
       SSGI._surfaceProgram = program;
     }
-    if (!this._surfaceBindGroup) {
-      this._surfaceBindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
+    const hash = `${depth.uid}:${normal.uid}`;
+    let bindGroup = this._surfaceBindGroups[hash];
+    if (!bindGroup) {
+      bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
+      bindGroup.setTexture('depthTex', depth, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setTexture('normalTex', normal, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setValue('targetSize', new Vector2(depth.width, depth.height));
+      this._surfaceBindGroups[hash] = bindGroup;
     }
-    this._surfaceBindGroup.setTexture('depthTex', depth, fetchSampler('clamp_nearest_nomip'));
-    this._surfaceBindGroup.setTexture('normalTex', normal, fetchSampler('clamp_nearest_nomip'));
-    this._surfaceBindGroup.setValue('targetSize', new Vector2(depth.width, depth.height));
-    this._surfaceBindGroup.setValue('cameraFar', ctx.camera.getFarPlane());
-    this._surfaceBindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
+    bindGroup.setValue('cameraFar', ctx.camera.getFarPlane());
+    bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
     ctx.device.setProgram(program);
-    ctx.device.setBindGroup(0, this._surfaceBindGroup);
+    ctx.device.setBindGroup(0, bindGroup);
     this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'always'));
   }
 
@@ -603,17 +619,17 @@ export class SSGI extends AbstractPostEffect {
       program = this.createUpsampleProgram(ctx);
       SSGI._upsampleProgram = program;
     }
-    if (!this._upsampleBindGroup) {
-      this._upsampleBindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
+    const hash = `${source.uid}:${depth.uid}:${normal.uid}`;
+    let bindGroup = this._upsampleBindGroups[hash];
+    if (!bindGroup) {
+      bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
+      bindGroup.setTexture('sourceTex', source, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setTexture('depthTex', depth, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setTexture('normalTex', normal, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setValue('targetSize', new Vector4(source.width, source.height, depth.width, depth.height));
+      this._upsampleBindGroups[hash] = bindGroup;
     }
-    this._upsampleBindGroup.setTexture('sourceTex', source, fetchSampler('clamp_nearest_nomip'));
-    this._upsampleBindGroup.setTexture('depthTex', depth, fetchSampler('clamp_nearest_nomip'));
-    this._upsampleBindGroup.setTexture('normalTex', normal, fetchSampler('clamp_nearest_nomip'));
-    this._upsampleBindGroup.setValue(
-      'targetSize',
-      new Vector4(source.width, source.height, depth.width, depth.height)
-    );
-    this._upsampleBindGroup.setValue(
+    bindGroup.setValue(
       'guideParams',
       new Vector4(
         Math.max(0.001, ctx.camera.ssgiDepthReject),
@@ -622,9 +638,9 @@ export class SSGI extends AbstractPostEffect {
         0
       )
     );
-    this._upsampleBindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
+    bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
     ctx.device.setProgram(program);
-    ctx.device.setBindGroup(0, this._upsampleBindGroup);
+    ctx.device.setBindGroup(0, bindGroup);
     this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'always'));
   }
 
@@ -646,7 +662,10 @@ export class SSGI extends AbstractPostEffect {
       },
       fragment(pb) {
         this.sampleColorTex = pb.tex2D().uniform(0);
-        this.depthTex = pb.tex2D().uniform(0);
+        // Linear depth is r32f (or rg32f when thickness is enabled). These
+        // formats are not filterable without the optional float32-filterable
+        // feature, and all SSGI depth reads use a nearest sampler.
+        this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.normalTex = pb.tex2D().uniform(0);
         if (sampleHistory) {
           this.motionTex = pb.tex2D().uniform(0);
@@ -654,7 +673,10 @@ export class SSGI extends AbstractPostEffect {
           this.historyRejectParams = pb.vec2().uniform(0);
         }
         if (useHiZ) {
-          this.hizTex = pb.tex2D().uniform(0);
+          // Hi-Z is stored as rg32f. It is only read with a nearest sampler,
+          // so use the unfilterable sample type for adapters without the
+          // optional float32-filterable feature (notably some AMD iGPUs).
+          this.hizTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           this.depthMipLevels = pb.int().uniform(0);
         }
         this.cameraNearFar = pb.vec2().uniform(0);
@@ -864,7 +886,7 @@ export class SSGI extends AbstractPostEffect {
       },
       fragment(pb) {
         this.currentTex = pb.tex2D().uniform(0);
-        this.depthTex = pb.tex2D().uniform(0);
+        this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.normalTex = pb.tex2D().uniform(0);
         if (hasHistory) {
           this.motionTex = pb.tex2D().uniform(0);
@@ -1012,7 +1034,7 @@ export class SSGI extends AbstractPostEffect {
       fragment(pb) {
         this.sourceTex = pb.tex2D().uniform(0);
         this.momentsTex = pb.tex2D().uniform(0);
-        this.depthTex = pb.tex2D().uniform(0);
+        this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.normalTex = pb.tex2D().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
         this.filterParams = pb.vec4().uniform(0);
@@ -1112,7 +1134,7 @@ export class SSGI extends AbstractPostEffect {
         });
       },
       fragment(pb) {
-        this.depthTex = pb.tex2D().uniform(0);
+        this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.normalTex = pb.tex2D().uniform(0);
         this.targetSize = pb.vec2().uniform(0);
         this.cameraFar = pb.float().uniform(0);
@@ -1149,7 +1171,7 @@ export class SSGI extends AbstractPostEffect {
       },
       fragment(pb) {
         this.sourceTex = pb.tex2D().uniform(0);
-        this.depthTex = pb.tex2D().uniform(0);
+        this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.normalTex = pb.tex2D().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
         this.guideParams = pb.vec4().uniform(0);

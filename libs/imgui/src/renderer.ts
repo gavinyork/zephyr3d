@@ -42,6 +42,8 @@ export class Renderer extends Disposable {
   /** @internal */
   private _deviceSize: Vector2;
   /** @internal */
+  private _viewSize: Vector2;
+  /** @internal */
   private readonly _program: GPUProgram;
   /** @internal */
   private readonly _textureSampler: TextureSampler;
@@ -50,9 +52,11 @@ export class Renderer extends Disposable {
   /** @internal */
   private readonly _bindGroup: BindGroup;
   /** @internal */
-  private readonly _bindGroupTexture: BindGroup;
+  private _bindGroupTextures: WeakMap<Texture2D, [BindGroup, number]>;
   /** @internal */
   private readonly _renderStateSet: RenderStateSet;
+  /** @internal */
+  private _tag: number;
   /** @internal */
   private _vertexCache: Uint8Array<ArrayBuffer>;
   /** @internal */
@@ -75,11 +79,13 @@ export class Renderer extends Disposable {
     this._projectionMatrix = new Matrix4x4();
     this._flipMatrix = new Matrix4x4();
     this._mvpMatrix = new Matrix4x4();
-    this._deviceSize = new Vector2();
+    this._deviceSize = new Vector2(-1, -1);
+    this._viewSize = new Vector2(-1, -1);
     this._program = this.createProgram(false);
     this._programTexture = this.createProgram(true);
+    this._tag = 0;
     this._bindGroup = this._device.createBindGroup(this._program.bindGroupLayouts[0]);
-    this._bindGroupTexture = this._device.createBindGroup(this._programTexture.bindGroupLayouts[0]);
+    this._bindGroupTextures = new WeakMap();
     this._textureSampler = this._device.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
@@ -275,9 +281,19 @@ export class Renderer extends Disposable {
     for (const drawCommand of this._pendingDrawCommands) {
       if (drawCommand.texture !== lastTexture) {
         if (drawCommand.texture) {
+          let info = this._bindGroupTextures.get(drawCommand.texture);
+          if (!info) {
+            info = [this._device.createBindGroup(this._programTexture.bindGroupLayouts[0]), -1];
+            info[0].setTexture('tex', drawCommand.texture, this._textureSampler);
+            this._bindGroupTextures.set(drawCommand.texture, info);
+          }
+          if (info[1] !== this._tag) {
+            info[0].setValue('mvpMatrix', this._mvpMatrix);
+            info[0].setValue('deviceSize', this._deviceSize);
+            info[1] = this._tag;
+          }
           this._device.setProgram(this._programTexture);
-          this._bindGroupTexture.setTexture('tex', drawCommand.texture, this._textureSampler);
-          this._device.setBindGroup(0, this._bindGroupTexture);
+          this._device.setBindGroup(0, info[0]);
         } else {
           this._device.setProgram(this._program);
           this._device.setBindGroup(0, this._bindGroup);
@@ -306,17 +322,27 @@ export class Renderer extends Disposable {
     ASSERT(this._pendingDrawCommands.length === 0);
     const width = this._device.getDrawingBufferWidth();
     const height = this._device.getDrawingBufferHeight();
+    const scaleX = this._device.getScaleX();
+    const scaleY = this._device.getScaleY();
+    if (
+      width !== this._viewSize.x ||
+      height !== this._viewSize.y ||
+      scaleX !== this._deviceSize.x ||
+      scaleY !== this._deviceSize.y
+    ) {
+      this._projectionMatrix.ortho(0, width, 0, height, -1, 1);
+      this._flipMatrix = Matrix4x4.translation(new Vector3(0, height, 0)).scaleRight(new Vector3(1, -1, 1));
+      Matrix4x4.multiply(this._projectionMatrix, this._flipMatrix, this._mvpMatrix);
+      this._viewSize.setXY(width, height);
+      this._deviceSize.setXY(scaleX, scaleY);
+      this._bindGroup.setValue('mvpMatrix', this._mvpMatrix);
+      this._bindGroup.setValue('deviceSize', this._deviceSize);
+      this._tag++;
+    }
     //this._device.setViewport();
     //this._device.setScissor();
-    this._projectionMatrix.ortho(0, width, 0, height, -1, 1);
-    this._flipMatrix = Matrix4x4.translation(new Vector3(0, height, 0)).scaleRight(new Vector3(1, -1, 1));
-    Matrix4x4.multiply(this._projectionMatrix, this._flipMatrix, this._mvpMatrix);
-    this._deviceSize.x = this._device.getScaleX();
-    this._deviceSize.y = this._device.getScaleY();
-    this._bindGroup.setValue('mvpMatrix', this._mvpMatrix);
-    this._bindGroup.setValue('deviceSize', this._deviceSize);
-    this._bindGroupTexture.setValue('mvpMatrix', this._mvpMatrix);
-    this._bindGroupTexture.setValue('deviceSize', this._deviceSize);
+    //this._bindGroupTexture.setValue('mvpMatrix', this._mvpMatrix);
+    //this._bindGroupTexture.setValue('deviceSize', this._deviceSize);
     if (this._clearBeforeRender) {
       this._device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
     }
@@ -329,7 +355,7 @@ export class Renderer extends Disposable {
   protected onDispose() {
     super.onDispose();
     this._bindGroup?.dispose();
-    this._bindGroupTexture?.dispose();
+    this._bindGroupTextures = new WeakMap();
     this._primitiveBuffer?.forEach((vertexLayout) => vertexLayout.dispose());
     this._program?.dispose();
     this._programTexture?.dispose();
