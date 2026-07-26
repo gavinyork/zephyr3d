@@ -497,26 +497,27 @@ export class EnvShIBL extends EnvironmentLighting {
       if (useMotionReprojection) {
         this.$l.motion = pb.textureSampleLevel(this[EnvShIBL.UNIFORM_NAME_SSGI_MOTION], this.uv, 0).xy;
         this.$l.previousUV = pb.sub(this.uv, this.motion);
+        this.$l.motionValid = pb.not(pb.any(pb.greaterThanEqual(pb.abs(this.motion), pb.vec2(5e4))));
       } else {
         this.$l.previousUV = this.uv;
+        this.$l.motionValid = pb.bool(true);
       }
       this.$l.params = this[EnvShIBL.UNIFORM_NAME_SSGI_REPROJECTION];
       this.$l.fallback = pb.mul(this.ibl, this.light.envLightStrength);
-      this.$if(
-        pb.or(
-          pb.any(pb.lessThan(this.previousUV, pb.vec2(0))),
-          pb.any(pb.greaterThan(this.previousUV, pb.vec2(1))),
-          useMotionReprojection
-            ? pb.any(pb.greaterThanEqual(pb.abs(this.motion), pb.vec2(5e4)))
-            : pb.bool(false)
-        ),
-        function () {
-          this.$return(this.fallback);
-        }
+      this.$l.normalizedCurrentNormal = pb.normalize(this.currentNormal);
+      this.$l.depthTolerance = pb.max(this.params.x, 1e-4);
+      this.$l.texelSize = pb.div(pb.vec2(1), this[EnvShIBL.UNIFORM_NAME_SSGI_TARGET_SIZE]);
+      this.$l.halfTexel = pb.mul(this.texelSize, 0.5);
+      this.$l.maxUV = pb.sub(pb.vec2(1), this.halfTexel);
+      this.$l.previousUVInBounds = pb.and(
+        this.motionValid,
+        pb.all(pb.greaterThanEqual(this.previousUV, pb.vec2(0))),
+        pb.all(pb.lessThanEqual(this.previousUV, pb.vec2(1)))
       );
+      this.$l.previousSampleUV = pb.clamp(this.previousUV, this.halfTexel, this.maxUV);
       this.$l.previousSurface = pb.textureSampleLevel(
         this[EnvShIBL.UNIFORM_NAME_SSGI_SURFACE],
-        this.previousUV,
+        this.previousSampleUV,
         0
       );
       this.$l.previousNormal = pb.normalize(pb.sub(pb.mul(this.previousSurface.rgb, 2), pb.vec3(1)));
@@ -536,19 +537,97 @@ export class EnvShIBL extends EnvironmentLighting {
         this.params.x
       );
       this.$l.normalValid = pb.greaterThanEqual(
-        pb.dot(pb.normalize(this.currentNormal), this.previousNormal),
+        pb.dot(this.normalizedCurrentNormal, this.previousNormal),
         this.params.y
       );
       this.$l.previousIrradiance = pb.textureSampleLevel(
         this[EnvShIBL.UNIFORM_NAME_SSGI_IRRADIANCE],
-        this.previousUV,
+        this.previousSampleUV,
         0
       );
-      this.$l.validity = pb.mul(
-        pb.float(pb.and(this.depthValid, this.normalValid)),
-        pb.clamp(this.previousIrradiance.a, 0, 1)
+      this.$l.previousAlpha = pb.clamp(this.previousIrradiance.a, 0, 1);
+      this.$l.exactHistoryValid = pb.and(
+        this.previousUVInBounds,
+        this.depthValid,
+        this.normalValid,
+        pb.greaterThan(this.previousAlpha, 1e-4)
       );
-      this.$return(pb.mix(this.fallback, this.previousIrradiance.rgb, this.validity));
+      this.$if(this.exactHistoryValid, function () {
+        this.$return(pb.mix(this.fallback, this.previousIrradiance.rgb, this.previousAlpha));
+      });
+
+      // Repair disoccluded and off-screen history from nearby samples before
+      // falling back to IBL. Sampling around the clamped reprojected position
+      // fills camera-edge holes, while current UV provides a conservative
+      // screen-stationary candidate for invalid motion vectors.
+      this.$l.repairCenter = this.$choice(
+        this.motionValid,
+        this.previousSampleUV,
+        pb.clamp(this.uv, this.halfTexel, this.maxUV)
+      );
+      this.$l.repairSum = pb.vec3(0);
+      this.$l.repairWeight = pb.float(0);
+      const repairSamples = [
+        { currentUV: false, x: 0, y: 0, kernel: 1 },
+        { currentUV: false, x: -1, y: 0, kernel: 0.7 },
+        { currentUV: false, x: 1, y: 0, kernel: 0.7 },
+        { currentUV: false, x: 0, y: -1, kernel: 0.7 },
+        { currentUV: false, x: 0, y: 1, kernel: 0.7 },
+        { currentUV: true, x: 0, y: 0, kernel: 0.5 }
+      ];
+      for (let i = 0; i < repairSamples.length; i++) {
+        const sample = repairSamples[i];
+        const baseUV = sample.currentUV ? this.uv : this.repairCenter;
+        this.$l[`repairUV${i}`] = pb.add(baseUV, pb.mul(this.texelSize, pb.vec2(sample.x, sample.y)));
+        this.$l[`repairUVValid${i}`] = pb.and(
+          pb.all(pb.greaterThanEqual(this[`repairUV${i}`], this.halfTexel)),
+          pb.all(pb.lessThanEqual(this[`repairUV${i}`], this.maxUV))
+        );
+        this.$l[`repairSurface${i}`] = pb.textureSampleLevel(
+          this[EnvShIBL.UNIFORM_NAME_SSGI_SURFACE],
+          pb.clamp(this[`repairUV${i}`], this.halfTexel, this.maxUV),
+          0
+        );
+        this.$l[`repairNormal${i}`] = pb.normalize(
+          pb.sub(pb.mul(this[`repairSurface${i}`].rgb, 2), pb.vec3(1))
+        );
+        this.$l[`repairDepthDelta${i}`] = pb.abs(pb.sub(this[`repairSurface${i}`].a, this.currentDepth));
+        this.$l[`repairNormalDot${i}`] = pb.dot(this.normalizedCurrentNormal, this[`repairNormal${i}`]);
+        this.$l[`repairSurfaceValid${i}`] = pb.and(
+          this[`repairUVValid${i}`],
+          pb.lessThanEqual(this[`repairDepthDelta${i}`], this.params.x),
+          pb.greaterThanEqual(this[`repairNormalDot${i}`], this.params.y)
+        );
+        this.$l[`repairIrradiance${i}`] = pb.textureSampleLevel(
+          this[EnvShIBL.UNIFORM_NAME_SSGI_IRRADIANCE],
+          pb.clamp(this[`repairUV${i}`], this.halfTexel, this.maxUV),
+          0
+        );
+        this.$l[`repairDepthWeight${i}`] = pb.exp(
+          pb.neg(pb.div(this[`repairDepthDelta${i}`], this.depthTolerance))
+        );
+        this.$l[`repairNormalWeight${i}`] = pb.pow(pb.max(0, this[`repairNormalDot${i}`]), 8);
+        this.$l[`repairSampleWeight${i}`] = pb.mul(
+          pb.float(this[`repairSurfaceValid${i}`]),
+          pb.clamp(this[`repairIrradiance${i}`].a, 0, 1),
+          this[`repairDepthWeight${i}`],
+          this[`repairNormalWeight${i}`],
+          sample.kernel
+        );
+        this.repairSum = pb.add(
+          this.repairSum,
+          pb.mul(this[`repairIrradiance${i}`].rgb, this[`repairSampleWeight${i}`])
+        );
+        this.repairWeight = pb.add(this.repairWeight, this[`repairSampleWeight${i}`]);
+      }
+      this.$if(pb.greaterThan(this.repairWeight, 1e-4), function () {
+        this.$l.repairedIrradiance = pb.div(this.repairSum, this.repairWeight);
+        // Repaired samples are intentionally capped below full confidence so
+        // newly traced irradiance replaces the extrapolation on following frames.
+        this.$l.repairConfidence = pb.mul(pb.clamp(this.repairWeight, 0, 1), 0.85);
+        this.$return(pb.mix(this.fallback, this.repairedIrradiance, this.repairConfidence));
+      });
+      this.$return(this.fallback);
     });
     return scope.Z_ssgi_reprojectIrradiance(normal, iblIrradiance) as PBShaderExp;
   }
