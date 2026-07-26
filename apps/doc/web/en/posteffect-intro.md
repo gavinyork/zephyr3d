@@ -15,6 +15,7 @@ Built-in effects:
 | TAA | `TAA` | Temporal antialiasing with jitter and accumulation |
 | Bloom | `Bloom` | Glow from bright areas |
 | SSR | `SSR` | Screen-space reflections |
+| SSGI | `SSGI` | Screen-space diffuse global illumination using opaque HDR history |
 | SSAO/SAO | `SAO` | Screen-space ambient occlusion |
 | Motion Blur | `MotionBlur` | Blur from camera or object motion |
 | Color Adjust | `ColorAdjust` | Saturation, contrast, hue, and sharpen adjustment |

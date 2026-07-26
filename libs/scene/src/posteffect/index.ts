@@ -8,4 +8,5 @@ export * from './sss';
 export * from './skinsss';
 export * from './fxaa';
 export * from './taa';
+export * from './ssgi';
 export * from './compositor';

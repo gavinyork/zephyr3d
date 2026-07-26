@@ -15,6 +15,7 @@
 | TAA | `TAA` | 基于 jitter 和累积缓冲的时间抗锯齿 |
 | Bloom | `Bloom` | 高亮区域光晕 |
 | SSR | `SSR` | 屏幕空间反射 |
+| SSGI | `SSGI` | 基于历史 HDR 场景颜色的屏幕空间漫反射全局光照 |
 | SSAO/SAO | `SAO` | 屏幕空间环境光遮蔽 |
 | Motion Blur | `MotionBlur` | 相机或物体运动造成的模糊 |
 | Color Adjust | `ColorAdjust` | 饱和度、对比度、色相和锐化调整 |

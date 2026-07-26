@@ -339,13 +339,14 @@ export class ShaderHelper {
         scope[UNIFORM_NAME_SHADOW_MAP] = tex.uniform(0);
       }
       if (ctx.drawEnvLight) {
-        ctx.env!.light.envLight.initShaderBindings(pb);
+        ctx.env!.light.envLight.initShaderBindings(pb, ctx);
       }
       if (ctx.linearDepthTexture) {
         // Depth values must never be filtered across geometry edges; nearest
         // matches the default sampler for unfilterable float formats.
         scope[UNIFORM_NAME_LINEAR_DEPTH_MAP] = pb
           .tex2D()
+          .sampleType('unfilterable-float')
           .uniform(0)
           .withSampler(getSamplerOptions('clamp_nearest_nomip'));
         scope[UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE] = pb.vec2().uniform(0);
@@ -362,6 +363,7 @@ export class ShaderHelper {
         // Matches the fetchSampler('clamp_nearest') previously passed at runtime
         scope[UNIFORM_NAME_HIZ_DEPTH_MAP] = pb
           .tex2D()
+          .sampleType('unfilterable-float')
           .uniform(0)
           .withSampler(getSamplerOptions('clamp_nearest'));
         scope[UNIFORM_NAME_HIZ_DEPTH_MAP_INFO] = pb.vec4().uniform(0);
@@ -961,7 +963,7 @@ export class ShaderHelper {
     }
     bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ctx.drawEnvLight) {
-      ctx.env!.light.envLight.updateBindGroup(bindGroup);
+      ctx.env!.light.envLight.updateBindGroup(bindGroup, ctx);
     }
   }
   /** @internal */
@@ -992,7 +994,7 @@ export class ShaderHelper {
     );
     bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ctx.drawEnvLight) {
-      ctx.env!.light.envLight.updateBindGroup(bindGroup);
+      ctx.env!.light.envLight.updateBindGroup(bindGroup, ctx);
     }
   }
   /**

@@ -238,12 +238,12 @@ export class WebGPUTimestampQueryManager {
       };
     });
     const byteLength = entries.length * TIMESTAMP_RESOLVE_STRIDE;
-    const resolveBuffer = this._device.device.createBuffer({
+    const resolveBuffer = this._device.gpuCreateBuffer({
       label: 'timestamp-query-resolve',
       size: byteLength,
       usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC
     });
-    const readbackBuffer = this._device.device.createBuffer({
+    const readbackBuffer = this._device.gpuCreateBuffer({
       label: 'timestamp-query-readback',
       size: byteLength,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ

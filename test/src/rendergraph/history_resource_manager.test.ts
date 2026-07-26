@@ -187,6 +187,43 @@ describe('HistoryResourceManager', () => {
     expect(manager.frameActive).toBe(false);
   });
 
+  test('invalidate releases only the named history resource', () => {
+    const { allocator, released } = createMockAllocator();
+    const manager = new HistoryResourceManager(allocator);
+    const color = createTexture(1, desc, size);
+    const irradiance = createTexture(2, desc, size);
+
+    manager.beginFrame();
+    manager.queueCommit('color', desc, size, color);
+    manager.queueCommit('irradiance', desc, size, irradiance);
+    manager.commitFrame();
+
+    manager.invalidate('irradiance');
+
+    expect(released).toEqual([irradiance]);
+    expect(manager.isCompatible('irradiance', desc, size)).toBe(false);
+    expect(manager.isCompatible('color', desc, size)).toBe(true);
+  });
+
+  test('invalidate during a frame defers release so imported reads remain alive', () => {
+    const { allocator, released } = createMockAllocator();
+    const manager = new HistoryResourceManager(allocator);
+    const texture = createTexture(1, desc, size);
+
+    manager.beginFrame();
+    manager.queueCommit('irradiance', desc, size, texture);
+    manager.commitFrame();
+    manager.beginFrame();
+    expect(manager.importPrevious(new RenderGraph(), 'irradiance')).not.toBeNull();
+
+    manager.invalidate('irradiance');
+    expect(released).toEqual([]);
+    manager.commitFrame();
+
+    expect(released).toEqual([texture]);
+    expect(manager.isCompatible('irradiance', desc, size)).toBe(false);
+  });
+
   test('owned history textures are released when their slot is overwritten', () => {
     const { allocator, released } = createMockAllocator();
     const manager = new HistoryResourceManager(allocator);

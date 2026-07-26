@@ -59,6 +59,7 @@ export class WebGPUTextureSampler extends WebGPUObject<GPUSampler> implements Te
     return this._options.maxAnisotropy;
   }
   destroy() {
+    this._device.gpuRemoveObjectHash(this._object!);
     this._object = null;
   }
   restore() {

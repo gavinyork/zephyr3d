@@ -140,7 +140,7 @@ export class SkinSSS extends AbstractPostEffect {
       fragment(pb) {
         this.colorTex = pb.tex2D().uniform(0);
         this.skinTex = pb.tex2D().uniform(0);
-        this.depthTex = pb.tex2D().uniform(0);
+        this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
         this.strength = pb.float().uniform(0);

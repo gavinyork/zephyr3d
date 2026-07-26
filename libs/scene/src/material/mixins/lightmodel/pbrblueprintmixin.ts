@@ -620,6 +620,13 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           const envLightStrength = ShaderHelper.getEnvLightStrength(this);
           const envLightSpecularStrength = ShaderHelper.getEnvLightSpecularStrength(this);
           this.$l.occlusion = envLightStrength;
+          this.$l.diffuseOcclusion =
+            ctx.SSGI &&
+            ctx.SSGIIrradianceHistoryTexture &&
+            ctx.SSGISurfaceHistoryTexture &&
+            (ctx.device.type !== 'webgpu' || ctx.motionVectorTexture)
+              ? pb.float(1)
+              : this.occlusion;
           this.$l.reflectionMode = this.zReflectionMode;
           this.$l.NoV = pb.clamp(pb.dot(this.data.normal, this.viewVec), 0.0001, 1);
           this.$l.ggxLutSample = pb.clamp(
@@ -659,7 +666,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
             }
           }
           if (ctx.env!.light.envLight.hasIrradiance()) {
-            this.$l.irradiance = ctx.env!.light.envLight.getIrradiance(this, this.data.normal);
+            this.$l.irradiance = ctx.env!.light.envLight.getIrradiance(this, this.data.normal, ctx);
             this.$l.mixedF0 = this.data.f0.rgb;
             this.$l.FssEss = pb.add(pb.mul(this.k_S, this.f_ab.x), pb.vec3(this.f_ab.y));
             this.$l.Ems = pb.sub(1, pb.add(this.f_ab.x, this.f_ab.y));
@@ -669,7 +676,11 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
               pb.sub(pb.vec3(1), pb.mul(this.F_avg, this.Ems))
             );
             this.$l.k_D = pb.mul(this.data.diffuse.rgb, pb.add(pb.sub(pb.vec3(1), this.FssEss), this.FmsEms));
-            this.$l.iblDiffuse = pb.mul(pb.add(this.FmsEms, this.k_D), this.irradiance, this.occlusion);
+            this.$l.iblDiffuse = pb.mul(
+              pb.add(this.FmsEms, this.k_D),
+              this.irradiance,
+              this.diffuseOcclusion
+            );
             this.outColor = pb.add(this.outColor, this.iblDiffuse);
             if (outDiffuseColor) {
               this.outDiffuseColor = pb.add(this.outDiffuseColor, this.iblDiffuse);

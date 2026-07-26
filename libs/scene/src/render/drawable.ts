@@ -140,6 +140,12 @@ export interface DrawContext {
   forceColorState?: Nullable<ColorState>;
   /** Screen-space reflections are active this frame/pass. */
   readonly SSR: boolean;
+  /** Screen-space diffuse global illumination is active for this frame. */
+  SSGI: boolean;
+  /** Previous denoised SSGI irradiance, scoped to the opaque light pass. */
+  SSGIIrradianceHistoryTexture: Nullable<Texture2D>;
+  /** Previous SSGI normal/depth surface data, scoped to the opaque light pass. */
+  SSGISurfaceHistoryTexture: Nullable<Texture2D>;
   /** Screen-space subsurface scattering is active this frame/pass. */
   SSS: boolean;
   /** Whether SSR thickness should be computed dynamically in this pass. */

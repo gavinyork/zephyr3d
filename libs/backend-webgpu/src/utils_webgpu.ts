@@ -177,7 +177,8 @@ export class WebGPUMipmapGenerator {
     tex.setMipmapDirty(false);
     for (let face = 0; face < numLayers; face++) {
       for (let level = 1; level < miplevels; level++) {
-        this.generateMiplevel(device, encoder, tex, tex.object!, tex.gpuFormat!, level, level, face);
+        const view = tex.getView(level, face, 1);
+        this.generateMiplevel(device, encoder, tex, view, tex.gpuFormat!, level, face);
       }
     }
     if (!cmdEncoder) {
@@ -199,13 +200,12 @@ export class WebGPUMipmapGenerator {
     device: WebGPUDevice,
     commandEncoder: GPUCommandEncoder,
     srcTex: WebGPUBaseTexture,
-    dstTex: GPUTexture,
+    dstTex: GPUTextureView,
     format: GPUTextureFormat,
-    dstLevel: number,
     srcLevel: number,
     face: number
   ) {
-    const renderPassEncoder = this.beginMipmapGenerationPass(commandEncoder, dstTex, format, dstLevel, face);
+    const renderPassEncoder = this.beginMipmapGenerationPass(commandEncoder, dstTex, format);
     renderPassEncoder.setBindGroup(0, srcTex.getMipmapGenerationBindGroup(srcLevel, face).bindGroup);
     const pipeline = device.pipelineCache.fetchRenderPipeline(
       this._mipmapGenerationProgram!,
@@ -222,21 +222,13 @@ export class WebGPUMipmapGenerator {
   }
   private static beginMipmapGenerationPass(
     encoder: GPUCommandEncoder,
-    texture: GPUTexture,
-    format: GPUTextureFormat,
-    level: number,
-    face: number
+    view: GPUTextureView,
+    format: GPUTextureFormat
   ) {
     const passDesc: GPURenderPassDescriptor = {
       colorAttachments: [
         {
-          view: texture.createView({
-            dimension: '2d',
-            baseMipLevel: level || 0,
-            mipLevelCount: 1,
-            baseArrayLayer: face || 0,
-            arrayLayerCount: 1
-          }),
+          view,
           loadOp: 'clear',
           clearValue: [0, 0, 0, 0],
           storeOp: 'store'

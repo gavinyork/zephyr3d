@@ -1662,6 +1662,12 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       const that = this;
       const ctx = that.drawContext;
+      const useReprojectedSSGI = !!(
+        ctx.SSGI &&
+        ctx.SSGIIrradianceHistoryTexture &&
+        ctx.SSGISurfaceHistoryTexture &&
+        (ctx.device.type !== 'webgpu' || ctx.motionVectorTexture)
+      );
       const funcName = 'Z_PBRIndirectLighting';
       pb.func(
         funcName,
@@ -1684,13 +1690,13 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           const envLightSpecularStrength = ShaderHelper.getEnvLightSpecularStrength(this);
           if (that.occlusionTexture) {
             const occlusionSample = that.sampleOcclusionTexture(this).r;
-            this.$l.occlusion = pb.mul(
-              pb.add(pb.mul(this.zOcclusionStrength, pb.sub(occlusionSample, 1)), 1),
-              envLightStrength
-            );
+            this.$l.ambientOcclusion = pb.add(pb.mul(this.zOcclusionStrength, pb.sub(occlusionSample, 1)), 1);
+            this.$l.occlusion = pb.mul(this.ambientOcclusion, envLightStrength);
           } else {
+            this.$l.ambientOcclusion = pb.float(1);
             this.$l.occlusion = envLightStrength;
           }
+          this.$l.diffuseOcclusion = useReprojectedSSGI ? this.ambientOcclusion : this.occlusion;
           this.$l.NoV = pb.clamp(pb.dot(this.normal, this.viewVec), 0.0001, 1);
           if (that.sheen) {
             this.$l.sheenLutSample = pb.clamp(
@@ -1762,7 +1768,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             }
           }
           if (ctx.env!.light.envLight.hasIrradiance()) {
-            this.$l.irradiance = ctx.env!.light.envLight.getIrradiance(this, this.normal);
+            this.$l.irradiance = ctx.env!.light.envLight.getIrradiance(this, this.normal, ctx);
             if (that.iridescence) {
               this.$l.iridescenceF0Max = pb.vec3(
                 pb.max(
@@ -1794,7 +1800,11 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               pb.sub(pb.vec3(1), pb.mul(this.F_avg, this.Ems))
             );
             this.$l.k_D = pb.mul(this.data.diffuse.rgb, pb.add(pb.sub(pb.vec3(1), this.FssEss), this.FmsEms));
-            this.$l.iblDiffuse = pb.mul(pb.add(this.FmsEms, this.k_D), this.irradiance, this.occlusion);
+            this.$l.iblDiffuse = pb.mul(
+              pb.add(this.FmsEms, this.k_D),
+              this.irradiance,
+              this.diffuseOcclusion
+            );
             if (that.clearcoat) {
               this.$if(pb.greaterThan(this.data.ccFactor.x, 0), function () {
                 this.iblDiffuse = pb.mul(

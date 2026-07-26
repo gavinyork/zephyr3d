@@ -666,10 +666,18 @@ export class WebGPUDevice extends BaseDevice {
     return this._gpuObjectHasher.get(obj) ?? null;
   }
   /** @internal */
+  gpuSetObjectHash(obj: GPUObjectBase, count: number) {
+    return this._gpuObjectHasher.set(obj, count);
+  }
+  /** @internal */
+  gpuRemoveObjectHash(obj: GPUObjectBase) {
+    this._gpuObjectHasher.delete(obj);
+  }
+  /** @internal */
   gpuCreateTexture(desc: GPUTextureDescriptor) {
     const tex = this._device!.createTexture(desc);
     if (tex) {
-      this._gpuObjectHasher.set(tex, ++this._gpuObjectHashCounter);
+      this.gpuSetObjectHash(tex, ++this._gpuObjectHashCounter);
     }
     return tex;
   }
@@ -677,7 +685,7 @@ export class WebGPUDevice extends BaseDevice {
   gpuImportExternalTexture(el: HTMLVideoElement) {
     const tex = this._device!.importExternalTexture({ source: el });
     if (tex) {
-      this._gpuObjectHasher.set(tex, ++this._gpuObjectHashCounter);
+      this.gpuSetObjectHash(tex, ++this._gpuObjectHashCounter);
     }
     return tex;
   }
@@ -685,7 +693,7 @@ export class WebGPUDevice extends BaseDevice {
   gpuCreateSampler(desc: GPUSamplerDescriptor) {
     const sampler = this._device!.createSampler(desc);
     if (sampler) {
-      this._gpuObjectHasher.set(sampler, ++this._gpuObjectHashCounter);
+      this.gpuSetObjectHash(sampler, ++this._gpuObjectHashCounter);
     }
     return sampler;
   }
@@ -693,7 +701,7 @@ export class WebGPUDevice extends BaseDevice {
   gpuCreateBindGroup(desc: GPUBindGroupDescriptor) {
     const bindGroup = this._device!.createBindGroup(desc);
     if (bindGroup) {
-      this._gpuObjectHasher.set(bindGroup, ++this._gpuObjectHashCounter);
+      this.gpuSetObjectHash(bindGroup, ++this._gpuObjectHashCounter);
     }
     return bindGroup;
   }
@@ -701,7 +709,7 @@ export class WebGPUDevice extends BaseDevice {
   gpuCreateBuffer(desc: GPUBufferDescriptor) {
     const buffer = this._device!.createBuffer(desc);
     if (buffer) {
-      this._gpuObjectHasher.set(buffer, ++this._gpuObjectHashCounter);
+      this.gpuSetObjectHash(buffer, ++this._gpuObjectHashCounter);
     }
     return buffer;
   }
@@ -709,7 +717,7 @@ export class WebGPUDevice extends BaseDevice {
   gpuCreateTextureView(texture: GPUTexture, desc?: GPUTextureViewDescriptor) {
     const view = texture?.createView(desc);
     if (view) {
-      this._gpuObjectHasher.set(view, ++this._gpuObjectHashCounter);
+      this.gpuSetObjectHash(view, ++this._gpuObjectHashCounter);
     }
     return view;
   }
@@ -717,7 +725,7 @@ export class WebGPUDevice extends BaseDevice {
   gpuCreateRenderPipeline(desc: GPURenderPipelineDescriptor) {
     const pipeline = this._device!.createRenderPipeline(desc);
     if (pipeline) {
-      this._gpuObjectHasher.set(pipeline, ++this._gpuObjectHashCounter);
+      this.gpuSetObjectHash(pipeline, ++this._gpuObjectHashCounter);
     }
     return pipeline;
   }
@@ -725,7 +733,7 @@ export class WebGPUDevice extends BaseDevice {
   gpuCreateComputePipeline(desc: GPUComputePipelineDescriptor) {
     const pipeline = this._device!.createComputePipeline(desc);
     if (pipeline) {
-      this._gpuObjectHasher.set(pipeline, ++this._gpuObjectHashCounter);
+      this.gpuSetObjectHash(pipeline, ++this._gpuObjectHashCounter);
     }
     return pipeline;
   }
@@ -880,6 +888,7 @@ export class WebGPUDevice extends BaseDevice {
     const frameTime = this._timestampQueries.endFrame();
     this._timestampQueries.autoCloseOpenScopes();
     this._commandQueue.endFrame();
+
     void frameTime?.then((result) => {
       if (result.frameId >= this._latestGPUFrameId) {
         this._latestGPUFrameId = result.frameId;
