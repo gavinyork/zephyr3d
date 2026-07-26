@@ -40,6 +40,9 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
       }
     }
   }
+  getVersion() {
+    return String(this._uid);
+  }
   getGPUId() {
     return String(this._uid);
   }

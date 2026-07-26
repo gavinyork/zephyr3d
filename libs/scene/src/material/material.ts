@@ -319,7 +319,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
         state = {
           program,
           bindGroup,
-          bindGroupTag: bindGroup?.getGPUId() ?? '',
+          bindGroupTag: bindGroup?.getVersion() ?? '',
           renderStateSet: ctx.device.createRenderStateSet(),
           materialTag: -1
         };
@@ -335,7 +335,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
       this.updateRenderStates(pass, state.renderStateSet, ctx);
       this._currentHash[pass] = hash;
       if (state.bindGroup) {
-        const id = state.bindGroup.getGPUId();
+        const id = state.bindGroup.getVersion();
         if (id !== state.bindGroupTag) {
           state.bindGroupTag = id;
           this._changeTag++;

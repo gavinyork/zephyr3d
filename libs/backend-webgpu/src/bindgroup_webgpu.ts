@@ -20,15 +20,13 @@ import type { Immutable, Nullable, TypedArray } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
 import type { WebGPUBuffer } from './buffer_webgpu';
 
-export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup {
+export class WebGPUBindGroup extends WebGPUObject<GPUObjectBase> implements BindGroup {
   private readonly _layout: Immutable<BindGroupLayout>;
-  private _layoutDesc: Nullable<GPUBindGroupLayoutDescriptor>;
   private _entries: Nullable<GPUBindGroupEntry[]>;
   private _bindGroup: Nullable<GPUBindGroup>;
   private _buffers: WebGPUBuffer[];
   private _textures: WebGPUBaseTexture[];
   private _createdBuffers: WebGPUBuffer[];
-  private _gpuId: number;
   private _videoTextures: Nullable<WebGPUTextureVideo[]>;
   private _dynamicOffsets: Nullable<number[]>;
   private _resources: {
@@ -38,20 +36,22 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
       | [WebGPUBaseTexture, Nullable<GPUTextureView>]
       | GPUSampler;
   };
+  private _version: number;
+  private _bindGroupCache: Record<string, GPUBindGroup>;
   constructor(device: WebGPUDevice, layout: Immutable<BindGroupLayout>) {
     super(device);
     this._device = device;
     this._layout = layout;
-    this._layoutDesc = null;
     this._entries = null;
     this._bindGroup = null;
     this._dynamicOffsets = null;
-    this._gpuId = 0;
     this._resources = {};
     this._buffers = [];
     this._textures = [];
     this._createdBuffers = [];
     this._videoTextures = null;
+    this._bindGroupCache = {};
+    this._version = 0;
     for (const entry of this._layout.entries) {
       if (entry.buffer && entry.buffer.hasDynamicOffset) {
         if (!this._dynamicOffsets) {
@@ -67,12 +67,6 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     }
     return this._bindGroup;
   }
-  get layoutDescriptor() {
-    if (!this._bindGroup) {
-      this._bindGroup = this._create();
-    }
-    return this._layoutDesc;
-  }
   get entries() {
     if (!this._bindGroup) {
       this._bindGroup = this._create();
@@ -80,7 +74,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     return this._entries;
   }
   getGPUId() {
-    return `${this._uid}:${this._gpuId}`;
+    return `${this._device.gpuGetObjectHash(this.bindGroup!) ?? ''}`;
   }
   get bufferList() {
     return this._buffers;
@@ -88,9 +82,12 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   get textureList() {
     return this._textures;
   }
+  getVersion() {
+    return `${this.uid}:${this._version}`;
+  }
   invalidate() {
     this._bindGroup = null;
-    this._gpuId++;
+    this._version++;
   }
   getLayout(): Immutable<BindGroupLayout> {
     return this._layout;
@@ -348,6 +345,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
     }
   }
   destroy() {
+    this._device.gpuRemoveObjectHash(this._object!);
     this.invalidate();
     this._resources = {};
     this._buffers = [];
@@ -361,7 +359,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   }
   restore() {
     this.invalidate();
-    this._object = {};
+    this._object = { label: '' };
   }
   isBindGroup(): this is BindGroup {
     return true;
@@ -436,14 +434,15 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
   /** @internal */
   private _create() {
     let bindGroup: Nullable<GPUBindGroup> = null;
-    this._layoutDesc = null;
     this._entries = null;
     this._textures = [];
     this._buffers = [];
     const entries = [] as GPUBindGroupEntry[];
+    const entryHashes = [] as string[];
     let resourceOk = true;
     for (const entry of this._layout.entries) {
       const ge = { binding: entry.binding } as GPUBindGroupEntry;
+      let hash = '';
       if (entry.buffer) {
         const buffer = this._getBufferInfo(
           entry.name,
@@ -465,6 +464,7 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           offset: buffer[1],
           size: buffer[2]
         };
+        hash = `(${buffer[0].uid}:${buffer[1]}:${buffer[2]})`;
         resourceOk = resourceOk && !!buffer[0].object;
       } else if (entry.texture || entry.storageTexture) {
         const t = this._resources[entry.name] as [WebGPUBaseTexture, GPUTextureView];
@@ -476,11 +476,13 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
             this._textures.push(t[0]);
           }
           ge.resource = t[1];
+          hash = `(${this._device.gpuGetObjectHash(t[1])})`;
           resourceOk = resourceOk && !!t[1];
         }
       } else if (entry.externalTexture) {
         const t = this._resources[entry.name] as WebGPUTextureVideo;
         ge.resource = t.object!;
+        hash = `(${t.uid})`;
         resourceOk = resourceOk && !!t.object;
       } else if (entry.sampler) {
         let sampler = this._resources[entry.name] as GPUSampler;
@@ -491,26 +493,32 @@ export class WebGPUBindGroup extends WebGPUObject<unknown> implements BindGroup 
           this._resources[entry.name] = sampler;
         }
         ge.resource = sampler;
+        hash = `(${this._device.gpuGetObjectHash(sampler)})`;
         resourceOk = resourceOk && !!sampler;
       }
       entries.push(ge);
+      entryHashes.push(hash);
     }
     if (!resourceOk) {
       return null;
     }
-    const [desc, layout] = this._device.fetchBindGroupLayout(this._layout);
-    const descriptor: GPUBindGroupDescriptor = {
-      layout: layout,
-      entries
-    };
-    if (layout.label) {
-      descriptor.label = `${layout.label}.bindgroup`;
+    const bindGroupHash = entryHashes.join(':');
+    bindGroup = this._bindGroupCache[bindGroupHash];
+    if (!bindGroup) {
+      const layout = this._device.fetchBindGroupLayout(this._layout)[1];
+      const descriptor: GPUBindGroupDescriptor = {
+        layout: layout,
+        entries
+      };
+      if (layout.label) {
+        descriptor.label = `${layout.label}.bindgroup`;
+      }
+      bindGroup = this._device.gpuCreateBindGroup(descriptor);
+      this._bindGroupCache[bindGroupHash] = bindGroup;
     }
-    bindGroup = this._device.gpuCreateBindGroup(descriptor);
     if (!bindGroup) {
       console.error('Create bindgroup failed');
     }
-    this._layoutDesc = desc;
     this._entries = entries;
     return bindGroup;
   }
