@@ -1551,6 +1551,7 @@ export interface BindGroup extends GPUObject<unknown> {
   getLayout(): Immutable<BindGroupLayout>;
   getDynamicOffsets(): Nullable<Immutable<number[]>>;
   getGPUId(): string;
+  getVersion(): string;
   getBuffer(name: string, nocreate?: boolean): Nullable<GPUDataBuffer>;
   getTexture(name: string): Nullable<BaseTexture>;
   setBuffer(
