@@ -90,6 +90,19 @@ export class SkyRenderer extends Disposable {
    * Sunny 16, whose camera exposure is 1 / 38,400) onto that model reference: 10 / (100000 / 38400).
    */
   static readonly PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE = 3.84;
+  /**
+   * @internal
+   *
+   * Height-fog base/directional colors are authored as display-referred 0..1 values. In physical
+   * mode the fog composites into the scene-linear (cd/m²) buffer alongside the distant-sky term,
+   * which is itself 38,400x its legacy value (the baked atmosphere is scaled by
+   * {@link PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE}, then sampled by the distant-light LUT). Scaling the
+   * authored colors by the same factor keeps them on equal footing with the sky term and makes the
+   * fog render identically to legacy at the Sunny-16 reference exposure (1 / 38,400), while scaling
+   * naturally with camera exposure like any other physical quantity. 38,400 = 1 / exposure(f/16,
+   * 1/125s, ISO 100).
+   */
+  static readonly FOG_PHYSICAL_LUMINANCE = 38400;
   private static readonly _skyCamera = (() => {
     return new PerspectiveCamera(null, Math.PI * 0.5, 1, 20, 1);
   })();
@@ -148,6 +161,8 @@ export class SkyRenderer extends Disposable {
   private readonly _bindgroupFog: Nullable<DRef<BindGroup>> = null;
   private readonly _bindgroupFogNoDepth: Nullable<DRef<BindGroup>> = null;
   private _format: Nullable<TextureFormat>;
+  /** @internal Height-fog color scale for the current frame (1 in legacy, FOG_PHYSICAL_LUMINANCE in physical). */
+  private _fogLuminanceScale: number;
   /**
    * Creates an instance of SkyRenderer
    */
@@ -191,6 +206,7 @@ export class SkyRenderer extends Disposable {
     this._bindgroupFog = new DRef();
     this._bindgroupFogNoDepth = new DRef();
     this._format = null;
+    this._fogLuminanceScale = 1;
   }
   /** @internal */
   getHash(_ctx: DrawContext) {
@@ -628,6 +644,10 @@ export class SkyRenderer extends Disposable {
     return this._skyDistantLightLut.get()!.getColorAttachments()[0] as Texture2D;
   }
   update(ctx: DrawContext) {
+    // Latch the fog color scale for this frame. The bake path (updateBakedSkyMap) uses the sky
+    // camera whose scene is null, so it cannot read lightingMode itself; both bake and main pass
+    // run after update(), so caching it here keeps them consistent.
+    this._fogLuminanceScale = ctx.scene.lightingMode === 'physical' ? SkyRenderer.FOG_PHYSICAL_LUMINANCE : 1;
     const useScatter = this._skyType === 'scatter';
     if (useScatter || !atmosphereLUTRendered()) {
       this.renderAtmosphereLUTs(ctx);
@@ -786,12 +806,32 @@ export class SkyRenderer extends Disposable {
     bindgroup.setValue('withAerialPerspective', this.skyType === 'scatter' ? 1 : 0);
     bindgroup.setValue('fogType', this.mappedFogType);
     bindgroup.setValue('atmosphereParams', this._atmosphereParams);
-    bindgroup.setValue('heightFogParams', this._heightFogParams);
+    bindgroup.setValue('heightFogParams', this._getUploadHeightFogParams());
     device.setProgram(fogProgram);
     device.setBindGroup(0, bindgroup);
     device.setVertexLayout(SkyRenderer._vertexLayout);
     device.setRenderStates(renderStates);
     device.draw('triangle-strip', 0, 4);
+  }
+  /**
+   * @internal
+   * Height-fog upload params with the authored base/directional colors lifted into scene-linear
+   * space when physical lighting is active. Legacy returns the stored params untouched so its
+   * upload stays byte-identical. Stored authored values are never mutated.
+   */
+  private _getUploadHeightFogParams() {
+    const scale = this._fogLuminanceScale;
+    const p = this._heightFogParams;
+    if (scale === 1) {
+      return p;
+    }
+    const p1 = p.parameter1;
+    const p4 = p.parameter4;
+    return {
+      ...p,
+      parameter1: new Vector4(p1.x * scale, p1.y * scale, p1.z * scale, p1.w),
+      parameter4: new Vector4(p4.x * scale, p4.y * scale, p4.z * scale, p4.w)
+    };
   }
   /** @internal */
   renderFog(camera: Camera) {

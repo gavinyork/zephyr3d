@@ -184,4 +184,33 @@ describe('Physical lighting and camera units', () => {
     expect(serializedSpot.Object.PhysicalOuterConeAngle).toBeCloseTo(30);
     expect(serializedRect.Object).toMatchObject({ Luminance: 750 });
   });
+
+  test('derives the physical fog luminance scale from the reference exposure', () => {
+    // FOG_PHYSICAL_LUMINANCE lifts authored 0..1 fog colors into the scene-linear space shared by
+    // the distant-sky term, which is 1/exposure(Sunny-16) larger than its legacy value. It must be
+    // the reciprocal of the reference exposure, not an arbitrary constant.
+    const referenceExposure = calculatePhysicalExposure(16, 1 / 125, 100);
+    expect(SkyRenderer.FOG_PHYSICAL_LUMINANCE).toBeCloseTo(1 / referenceExposure, 6);
+    // Same daylight anchor as the atmosphere normalization: fog scale = atmosphere scale x (10^5/10).
+    expect(SkyRenderer.FOG_PHYSICAL_LUMINANCE).toBeCloseTo(
+      SkyRenderer.PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE * (100000 / 10),
+      6
+    );
+  });
+
+  test('forces physical (manual) exposure for the SSGI firefly clamp regardless of exposure mode', () => {
+    const scene = new Scene();
+    scene.lightingMode = 'physical';
+    const camera = new PerspectiveCamera(scene);
+    camera.aperture = 16;
+    camera.shutterSpeed = 1 / 125;
+    camera.ISO = 100;
+    camera.ssgiMaxRayIntensity = 10;
+    const expected = 10 / camera.exposure;
+    // 'legacy' must be ignored while the scene is physical; the clamp still divides by exposure.
+    camera.exposureMode = 'legacy';
+    expect(camera.effectiveSSGIMaxRayIntensity).toBeCloseTo(expected, 6);
+    camera.exposureMode = 'manual';
+    expect(camera.effectiveSSGIMaxRayIntensity).toBeCloseTo(expected, 6);
+  });
 });

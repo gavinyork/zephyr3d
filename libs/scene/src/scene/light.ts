@@ -6,7 +6,11 @@ import { ShadowMapper } from '../shadow/shadowmapper';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT, LIGHT_TYPE_RECT } from '../values';
 import type { Scene } from './scene';
 
-const PHYSICAL_LIGHT_CUTOFF_LUX = 0.01;
+// Illuminance (lux) at which an auto-ranged physical light is considered to no longer contribute.
+// This bounds the light's influence radius for clustered culling. 0.25 lux (~civil-twilight /
+// full-moon level) keeps the radius practical: a 100 cd point light reaches ~20 units instead of
+// ~100 at 0.01 lux, cutting clustered-cull cost with no perceptible difference under normal exposure.
+const PHYSICAL_LIGHT_CUTOFF_LUX = 0.25;
 
 function makeColorIntensity(color: Vector4, intensity: number, physical: boolean): Vector4 {
   if (!physical) {
