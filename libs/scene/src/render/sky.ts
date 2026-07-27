@@ -743,7 +743,10 @@ export class SkyRenderer extends Disposable {
     for (const face of [CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ]) {
       camera.lookAtCubeFace(face);
       this._bakedSkyboxFrameBuffer.get()!.setColorAttachmentCubeFace(0, face);
-      this._renderSky(camera, false);
+      // Direct sunlight is represented by the scene's directional sun light. Keep the analytic
+      // sun disk out of both diffuse and specular IBL to avoid baking that direct contribution a
+      // second time. Atmospheric scattering and clouds remain in the cubemap.
+      this._renderSky(camera, false, false);
     }
     device.popDeviceStates();
 
@@ -863,7 +866,7 @@ export class SkyRenderer extends Disposable {
     }
     const framebuffer = this._beginSingleColorPass(true);
     try {
-      this._renderSky(skyCamera, true);
+      this._renderSky(skyCamera, true, true);
     } finally {
       this._endSingleColorPass(framebuffer);
     }
@@ -919,12 +922,12 @@ export class SkyRenderer extends Disposable {
     }
   }
   /** @internal */
-  private _renderSky(camera: Camera, depthTest: boolean) {
+  private _renderSky(camera: Camera, depthTest: boolean, includeSunDisk: boolean) {
     const device = getDevice();
     const savedRenderStates = device.getRenderStates();
     this._prepareSkyBox(device);
     if (this._skyType === 'scatter') {
-      this._drawScattering(camera, depthTest);
+      this._drawScattering(camera, depthTest, includeSunDisk);
     } else if (this._skyType === 'skybox' && this.skyboxTexture) {
       this._drawSkybox(camera, depthTest);
     } else {
@@ -1044,7 +1047,7 @@ export class SkyRenderer extends Disposable {
     return new Vector3(Math.exp(-sum.x), Math.exp(-sum.y), Math.exp(-sum.z));
   }
   /** @internal */
-  private _drawScattering(camera: Camera, depthTest: boolean) {
+  private _drawScattering(camera: Camera, depthTest: boolean, includeSunDisk: boolean) {
     const device = getDevice();
     const tLut = getTransmittanceLut();
     const skyLut = getSkyViewLut();
@@ -1060,6 +1063,7 @@ export class SkyRenderer extends Disposable {
     bindgroup.setValue('worldMatrix', this._skyWorldMatrix);
     bindgroup.setValue('cameraPos', camera.getWorldPosition());
     bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
+    bindgroup.setValue('includeSunDisk', includeSunDisk ? 1 : 0);
     bindgroup.setTexture('tLut', tLut, fetchSampler('clamp_linear_nomip'));
     bindgroup.setTexture('skyLut', skyLut, fetchSampler('clamp_linear_nomip'));
     bindgroup.setValue('cloudy', this._cloudy);
@@ -1405,6 +1409,7 @@ export class SkyRenderer extends Disposable {
         this.tLut = pb.tex2D().uniform(0);
         this.skyLut = pb.tex2D().uniform(0);
         this.params = getAtmosphereParamsStruct(pb)().uniform(0);
+        this.includeSunDisk = pb.int().uniform(0);
         if (cloud) {
           this.cloudy = pb.float().uniform(0);
           this.cloudIntensity = pb.float().uniform(0);
@@ -1438,6 +1443,7 @@ export class SkyRenderer extends Disposable {
             this.sunColor,
             this.$inputs.worldDirection,
             pb.float(0.01),
+            this.includeSunDisk,
             this.tLut,
             this.skyLut
           ).rgb;

@@ -13,6 +13,10 @@ import type { PostEffectSetupContext } from './posteffect';
 const IRRADIANCE_FORMAT = 'rgba16f' as const;
 const SURFACE_FORMAT = 'rgba16f' as const;
 const MOMENTS_FORMAT = 'rgba16f' as const;
+const HALF_FLOAT_MAX = 65504;
+// Moments are also rgba16f, so the squared luminance must remain below
+// HALF_FLOAT_MAX. 255^2 = 65025 leaves a small rounding margin.
+const MOMENT_LUMINANCE_MAX = 255;
 
 /**
  * Screen-space diffuse global illumination.
@@ -790,11 +794,25 @@ export class SSGI extends AbstractPostEffect {
                   this.normalTex
                 );
               }
-              this.$l.hitConfidence = pb.clamp(this.hit.w, 0, 1);
-              this.$l.hitUV = pb.clamp(this.hit.xy, pb.vec2(0), pb.vec2(1));
-              this.$l.envRadiance = pb.mul(
+              // Grazing/projectively degenerate rays can return Inf or NaN.
+              // A zero confidence is not sufficient because NaN * 0 remains
+              // NaN and the spatial passes then spread it into a dark block.
+              this.$l.hitFinite = pb.all(pb.lessThan(pb.abs(this.hit), pb.vec4(1e30)));
+              this.$l.hitValid = pb.and(this.hitFinite, pb.greaterThan(this.hit.w, 0));
+              this.$l.hitConfidence = this.$choice(this.hitValid, pb.clamp(this.hit.w, 0, 1), pb.float(0));
+              this.$l.hitUV = this.$choice(
+                this.hitValid,
+                pb.clamp(this.hit.xy, pb.vec2(0), pb.vec2(1)),
+                this.uv
+              );
+              this.$l.rawEnvRadiance = pb.mul(
                 ctx.env!.light.envLight.getRadiance(this, this.worldRay, pb.float(0))!,
                 this.radianceParams.z
+              );
+              this.$l.envRadiance = this.$choice(
+                pb.all(pb.lessThan(pb.abs(this.rawEnvRadiance), pb.vec3(1e30))),
+                this.rawEnvRadiance,
+                pb.vec3(0)
               );
               if (sampleHistory) {
                 this.$l.hitMotion = pb.textureSampleLevel(this.motionTex, this.hitUV, 0).xy;
@@ -841,6 +859,13 @@ export class SSGI extends AbstractPostEffect {
                 this.$l.screenRadiance = pb.textureSampleLevel(this.sampleColorTex, this.hitUV, 0).rgb;
                 this.$l.correctionValidity = this.hitConfidence;
               }
+              this.$l.screenRadianceFinite = pb.all(pb.lessThan(pb.abs(this.screenRadiance), pb.vec3(1e30)));
+              this.screenRadiance = this.$choice(
+                this.screenRadianceFinite,
+                this.screenRadiance,
+                this.envRadiance
+              );
+              this.correctionValidity = pb.mul(this.correctionValidity, pb.float(this.screenRadianceFinite));
               this.$l.maxComponent = pb.max(
                 pb.max(this.screenRadiance.r, this.screenRadiance.g),
                 this.screenRadiance.b
@@ -867,7 +892,17 @@ export class SSGI extends AbstractPostEffect {
               this.iblIrradiance,
               pb.max(0, pb.sub(1, this.radianceParams.x))
             );
-            this.$outputs.outColor = pb.vec4(pb.max(this.irradiance, this.minimumIrradiance), 1);
+            // Physical lighting operates in raw photometric units and the
+            // exposure-adjusted firefly limit can exceed rgba16f's range.
+            // Clamp before the render-target conversion; otherwise a finite
+            // value becomes Inf in the texture and every a-trous pass expands
+            // the contaminated region by its kernel radius.
+            this.$l.boundedIrradiance = pb.clamp(
+              pb.max(this.irradiance, this.minimumIrradiance),
+              pb.vec3(0),
+              pb.vec3(HALF_FLOAT_MAX)
+            );
+            this.$outputs.outColor = pb.vec4(this.boundedIrradiance, 1);
           });
         });
       }
@@ -906,7 +941,12 @@ export class SSGI extends AbstractPostEffect {
         this.$outputs.outIrradiance = pb.vec4();
         this.$outputs.outMoments = pb.vec4();
         pb.func('SSGI_luminance', [pb.vec3('c')], function () {
-          this.$return(pb.max(0, pb.dot(this.c, pb.vec3(0.2126, 0.7152, 0.0722))));
+          this.$l.boundedLuminance = pb.clamp(
+            pb.dot(this.c, pb.vec3(0.2126, 0.7152, 0.0722)),
+            0,
+            MOMENT_LUMINANCE_MAX
+          );
+          this.$return(this.boundedLuminance);
         });
         pb.main(function () {
           this.$l.uv = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);

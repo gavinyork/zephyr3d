@@ -13,7 +13,9 @@ function createShaderContext(type: 'webgl' | 'webgpu') {
       }
       return {
         bindGroupLayouts: result[2],
-        name: ''
+        name: '',
+        vertexSource: result[0],
+        fragmentSource: result[1]
       };
     }
   };
@@ -91,8 +93,14 @@ describe('SSGI shader generation', () => {
     const ctx = createShaderContext(type);
     const effect = new SSGI() as any;
 
-    expect(effect.createTraceProgram(ctx, type === 'webgpu', false)).toBeTruthy();
-    expect(effect.createTemporalProgram(ctx, false)).toBeTruthy();
+    const traceProgram = effect.createTraceProgram(ctx, type === 'webgpu', false);
+    expect(traceProgram).toBeTruthy();
+    expect(traceProgram.fragmentSource).toContain('hitFinite');
+    expect(traceProgram.fragmentSource).toContain('screenRadianceFinite');
+    expect(traceProgram.fragmentSource).toContain('boundedIrradiance');
+    const temporalProgram = effect.createTemporalProgram(ctx, false);
+    expect(temporalProgram).toBeTruthy();
+    expect(temporalProgram.fragmentSource).toContain('boundedLuminance');
     if (type === 'webgpu') {
       expect(effect.createTraceProgram(ctx, true, true)).toBeTruthy();
       expect(effect.createTemporalProgram(ctx, true)).toBeTruthy();

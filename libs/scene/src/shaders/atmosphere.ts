@@ -639,6 +639,7 @@ export function skyBox(
   f4SunColor: PBShaderExp,
   f3SkyBoxWorldPos: PBShaderExp,
   fSunSolidAngle: PBShaderExp,
+  fIncludeSunDisk: PBShaderExp,
   texTransmittanceLut: PBShaderExp,
   texSkyViewLut: PBShaderExp
 ) {
@@ -647,7 +648,13 @@ export function skyBox(
   const Params = getAtmosphereParamsStruct(pb);
   pb.func(
     funcName,
-    [Params('params'), pb.vec4('sunColor').out(), pb.vec3('worldPos'), pb.float('sunSolidAngle')],
+    [
+      Params('params'),
+      pb.vec4('sunColor').out(),
+      pb.vec3('worldPos'),
+      pb.float('sunSolidAngle'),
+      pb.int('includeSunDisk')
+    ],
     function () {
       this.$l.rgb = pb.vec3(0);
       this.$l.viewDir = pb.normalize(this.worldPos);
@@ -670,7 +677,7 @@ export function skyBox(
         texTransmittanceLut
       );
       this.sunColor = pb.mul(this.params.lightColor, pb.vec4(this.sunTransmittance, 1));
-      this.$if(pb.lessThan(this.groundDistance, 0), function () {
+      this.$if(pb.and(pb.notEqual(this.includeSunDisk, 0), pb.lessThan(this.groundDistance, 0)), function () {
         this.rgb = pb.add(
           this.rgb,
           sunBloom(this, this.viewDir, this.params.lightDir, this.sunColor, this.sunSolidAngle)
@@ -679,7 +686,13 @@ export function skyBox(
       this.$return(pb.vec4(this.rgb, 1));
     }
   );
-  return scope[funcName](stParams, f4SunColor, f3SkyBoxWorldPos, fSunSolidAngle) as PBShaderExp;
+  return scope[funcName](
+    stParams,
+    f4SunColor,
+    f3SkyBoxWorldPos,
+    fSunSolidAngle,
+    fIncludeSunDisk
+  ) as PBShaderExp;
 }
 
 /** @internal */
