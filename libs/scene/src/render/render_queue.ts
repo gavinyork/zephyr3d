@@ -484,15 +484,24 @@ export class RenderQueue extends Disposable {
     }
   }
   /** @internal */
-  getDrawableByColor(c: Uint8Array<ArrayBuffer>) {
+  getDrawableByColor(c: Uint8Array<ArrayBuffer>, map?: Map<number, Drawable>[]) {
     const id = (c[0] << 24) + (c[1] << 16) + (c[2] << 8) + c[3];
-    for (const m of this._objectColorMaps) {
+    map = map ?? this._objectColorMaps;
+    for (const m of map) {
       const drawable = m.get(id);
       if (drawable) {
         return drawable;
       }
     }
     return null;
+  }
+  /**
+   * Capture an object-color lookup that remains valid after this queue is reset or disposed.
+   * @internal
+   */
+  createObjectColorLookupSnapshot(): (c: Uint8Array<ArrayBuffer>) => Nullable<Drawable> {
+    const snapshot = this._objectColorMaps.slice();
+    return (c: Uint8Array<ArrayBuffer>) => this.getDrawableByColor(c, snapshot);
   }
   /**
    * Removes all items in the render queue
@@ -530,8 +539,8 @@ export class RenderQueue extends Disposable {
     this._ref.valid = false;
     this._ref = { ref: this, valid: true };
     this._instanceInfo.clear();
-    this._objectColorMaps.length = 1;
-    this._objectColorMaps[0].clear();
+    this._objectColorMaps.length = 0;
+    this._objectColorMaps.push(new Map());
     this._shadowedLightList = [];
     this._unshadowedLightList = [];
     this._sunLight = null;

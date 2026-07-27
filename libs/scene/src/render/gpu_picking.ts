@@ -76,6 +76,8 @@ export function renderObjectColors(
   const colorPixels = new Uint8Array(4);
   const distancePixels = isWebGL1 ? new Uint8Array(4) : new Float32Array(4);
   const device = ctx.device;
+  // RenderGraph releases the frame RenderQueue before the asynchronous GPU readback completes.
+  const getDrawableByColor = renderQueue.createObjectColorLookupSnapshot();
   let fence: Promise<void[]>;
   if (ctx.device.type === 'webgl') {
     fence = Promise.all([
@@ -90,7 +92,7 @@ export function renderObjectColors(
   }
   fence
     .then(() => {
-      const drawable = renderQueue.getDrawableByColor(colorPixels);
+      const drawable = getDrawableByColor(colorPixels);
       let d = isWebGL1
         ? decodeNormalizedFloat(distancePixels as Uint8Array<ArrayBuffer>) * far
         : distancePixels[0];
@@ -111,10 +113,11 @@ export function renderObjectColors(
             }
           : null
       );
-      device.pool.releaseFrameBuffer(fb);
     })
     .catch((_err) => {
-      camera.getPickResultResolveFunc()?.(null);
+      pickResolveFunc(null);
+    })
+    .finally(() => {
       device.pool.releaseFrameBuffer(fb);
     });
 }

@@ -22,6 +22,30 @@ describe('RenderQueue lifecycle', () => {
     expect(queue.ref.valid).toBe(false);
   });
 
+  test('object-color lookup snapshot survives queue disposal', async () => {
+    const queue = new RenderQueue({} as RenderPass);
+    const firstDrawable = {};
+    const mergedDrawable = {};
+    const duplicateDrawable = {};
+    const internals = queue as any;
+    internals._objectColorMaps[0].set(0x01020304, firstDrawable);
+    internals._objectColorMaps.push(
+      new Map([
+        [0x01020304, duplicateDrawable],
+        [0x05060708, mergedDrawable]
+      ])
+    );
+    const lookup = queue.createObjectColorLookupSnapshot();
+
+    queue.dispose();
+    await Promise.resolve();
+
+    expect(lookup(new Uint8Array([1, 2, 3, 4]))).toBe(firstDrawable);
+    expect(lookup(new Uint8Array([5, 6, 7, 8]))).toBe(mergedDrawable);
+    expect(lookup(new Uint8Array([9, 10, 11, 12]))).toBeNull();
+    expect(queue.getDrawableByColor(new Uint8Array([1, 2, 3, 4]))).toBeNull();
+  });
+
   test('allocator reset reuses allocations and dispose releases bind groups', () => {
     const allocator = new InstanceBindGroupAllocator();
     const dispose = jest.fn();
