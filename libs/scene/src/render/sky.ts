@@ -671,26 +671,11 @@ export class SkyRenderer extends Disposable {
     }
     if (this._bakedSkyboxDirty) {
       this._bakedSkyboxDirty = false;
+      // updateBakedSkyMap derives the IBL (specular prefilter + irradiance SH) from the fog-free
+      // cubemap internally, before compositing fog. The distant-light LUT is re-baked here against
+      // the fogged cubemap to preserve the pre-refactor fog shading appearance.
       this.updateBakedSkyMap(ctx);
       this.renderSkyDistantLut(ctx, this._bakedSkyboxTexture.get()!);
-      if (
-        ctx.scene.env.light.radianceMap &&
-        (ctx.scene.env.light.radianceMap === this.radianceMap ||
-          (this._irradianceSH.get() && ctx.scene.env.light.irradianceSH === this.irradianceSH) ||
-          (this._irradianceSHFB.get() && ctx.scene.env.light.irradianceSHFB === this.irradianceSHFB))
-      ) {
-        prefilterCubemap(
-          this._bakedSkyboxTexture.get()!,
-          'ggx',
-          this.radianceFramebuffer!,
-          this._radianceConvSamples
-        );
-        ctx.scene.env.light.sheenRadianceMap = this.radianceMap;
-        this._shProjector.projectCubemapToTexture(this._bakedSkyboxTexture.get()!, this.irradianceSHFB);
-        ctx.scene.env.light.irradianceSHFB = this.irradianceSHFB;
-        ctx.scene.env.light.irradianceSH = null;
-        ctx.scene.env.light.irradianceWindow = this._shWindowWeights;
-      }
     }
     const newSunLight = oldSunLight
       ? Vector3.mul(ctx.sunLight!.color.xyz(), this.sunTransmittance(ctx.sunLight!))
@@ -772,6 +757,19 @@ export class SkyRenderer extends Disposable {
 
     this.renderSkyDistantLut(ctx, tex);
 
+    // Publish the texture reference before deriving IBL so _updateIBLFromBakedSky reads the
+    // current cubemap.
+    this._bakedSkyboxTexture.set(tex);
+
+    // Derive the IBL from the fog-free cubemap. Height fog is a view/position-dependent participating
+    // medium applied per-pixel in screen space (see lightpass renderFog); baking it into the distant
+    // environment probe would both double-count it against that screen-space pass and wrongly lift the
+    // lower hemisphere (ground direction) from the atmosphere's dark value to a bright fog color. The
+    // same reasoning that keeps the sun disk out of the IBL applies to fog, for diffuse and specular alike.
+    this._updateIBLFromBakedSky(ctx, tex);
+
+    // Composite fog into the cubemap afterwards. This copy is only used as the visible skybox
+    // background (UNIFORM_NAME_BAKED_SKY_MAP), where the fogged distant sky is desired.
     device.pushDeviceStates();
     device.setFramebuffer(this._bakedSkyboxFrameBuffer.get());
     for (const face of [CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ]) {
@@ -782,7 +780,27 @@ export class SkyRenderer extends Disposable {
     device.popDeviceStates();
 
     device.setRenderStates(saveRenderStates);
-    this._bakedSkyboxTexture.set(tex);
+  }
+  /**
+   * @internal
+   * Updates the scene's IBL (GGX-prefiltered specular radiance map + irradiance SH) from the given
+   * cubemap, provided the scene environment light is still driven by this dynamic sky. Must be called
+   * with the fog-free cubemap so height fog does not leak into the environment lighting.
+   */
+  private _updateIBLFromBakedSky(ctx: DrawContext, skybox: TextureCube) {
+    if (
+      ctx.scene.env.light.radianceMap &&
+      (ctx.scene.env.light.radianceMap === this.radianceMap ||
+        (this._irradianceSH.get() && ctx.scene.env.light.irradianceSH === this.irradianceSH) ||
+        (this._irradianceSHFB.get() && ctx.scene.env.light.irradianceSHFB === this.irradianceSHFB))
+    ) {
+      prefilterCubemap(skybox, 'ggx', this.radianceFramebuffer!, this._radianceConvSamples);
+      ctx.scene.env.light.sheenRadianceMap = this.radianceMap;
+      this._shProjector.projectCubemapToTexture(skybox, this.irradianceSHFB);
+      ctx.scene.env.light.irradianceSHFB = this.irradianceSHFB;
+      ctx.scene.env.light.irradianceSH = null;
+      ctx.scene.env.light.irradianceWindow = this._shWindowWeights;
+    }
   }
   renderUberFog(camera: Camera, depthTexture: Nullable<BaseTexture>) {
     const device = getDevice();
