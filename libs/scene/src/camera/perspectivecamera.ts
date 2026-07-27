@@ -3,6 +3,8 @@ import type { Scene } from '../scene/scene';
 import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Matrix4x4 } from '@zephyr3d/base';
 import { getDevice, getEngine } from '../app/api';
+import { calculateVerticalFov } from '../utility/physical';
+import type { CameraProjectionMode, CameraSensorFit } from '../utility/physical';
 
 /**
  * Perspective camera class
@@ -16,6 +18,11 @@ export class PerspectiveCamera extends Camera {
   private _aspect: number;
   private _autoAspect: boolean;
   private _window: Nullable<number[]>;
+  private _projectionMode: CameraProjectionMode;
+  private _focalLengthMm: number;
+  private _sensorWidthMm: number;
+  private _sensorHeightMm: number;
+  private _sensorFit: CameraSensorFit;
   /**
    * Creates an instance of PerspectiveCamera
    * @param scene - The scene that the camera belongs to.
@@ -32,7 +39,79 @@ export class PerspectiveCamera extends Camera {
     this._far = far;
     this._autoAspect = true;
     this._window = null;
+    this._projectionMode = 'fov';
+    this._focalLengthMm = 50;
+    this._sensorWidthMm = 36;
+    this._sensorHeightMm = 24;
+    this._sensorFit = 'horizontal';
     this._invalidate(true);
+  }
+  /** Perspective projection parameterization. */
+  get projectionMode() {
+    return this._projectionMode;
+  }
+  set projectionMode(val: CameraProjectionMode) {
+    const mode = val === 'physical' ? 'physical' : 'fov';
+    if (mode !== this._projectionMode) {
+      this._projectionMode = mode;
+      this._invalidate(true);
+    }
+  }
+  /** Physical focal length in millimeters. */
+  get focalLengthMm() {
+    return this._focalLengthMm;
+  }
+  set focalLengthMm(val: number) {
+    const focalLength = Math.max(0.0001, val);
+    if (focalLength !== this._focalLengthMm) {
+      this._focalLengthMm = focalLength;
+      this._invalidate(true);
+    }
+  }
+  /** Physical sensor width in millimeters. */
+  get sensorWidthMm() {
+    return this._sensorWidthMm;
+  }
+  set sensorWidthMm(val: number) {
+    const width = Math.max(0.0001, val);
+    if (width !== this._sensorWidthMm) {
+      this._sensorWidthMm = width;
+      this._invalidate(true);
+    }
+  }
+  /** Physical sensor height in millimeters. */
+  get sensorHeightMm() {
+    return this._sensorHeightMm;
+  }
+  set sensorHeightMm(val: number) {
+    const height = Math.max(0.0001, val);
+    if (height !== this._sensorHeightMm) {
+      this._sensorHeightMm = height;
+      this._invalidate(true);
+    }
+  }
+  /** Sensor dimension kept fixed while fitting the viewport aspect ratio. */
+  get sensorFit() {
+    return this._sensorFit;
+  }
+  set sensorFit(val: CameraSensorFit) {
+    const fit = val === 'vertical' ? 'vertical' : 'horizontal';
+    if (fit !== this._sensorFit) {
+      this._sensorFit = fit;
+      this._invalidate(true);
+    }
+  }
+  /** Effective vertical field of view used by the projection matrix. */
+  get effectiveFovY() {
+    return this._projectionMode === 'physical'
+      ? calculateVerticalFov(
+          this._focalLengthMm,
+          this._sensorWidthMm,
+          this._sensorHeightMm,
+          this._aspect,
+          this._sensorFit
+        )
+      : this._fovY;
   }
   /** Sub-window of the frustum */
   get window(): Nullable<Immutable<number[]>> {
@@ -107,6 +186,7 @@ export class PerspectiveCamera extends Camera {
    * {@inheritDoc Camera.setPerspective}
    */
   setPerspective(fovY: number, aspect: number, zNear: number, zFar: number) {
+    this._projectionMode = 'fov';
     this._aspect = aspect;
     this._fovY = fovY;
     this._near = zNear;
@@ -133,6 +213,7 @@ export class PerspectiveCamera extends Camera {
         super.setProjectionMatrix(matrix);
         this._aspect = matrix.getAspect();
         this._fovY = matrix.getFov();
+        this._projectionMode = 'fov';
         this._near = matrix.getNearPlane();
         this._far = matrix.getFarPlane();
       } else {
@@ -151,10 +232,11 @@ export class PerspectiveCamera extends Camera {
   }
   /** @internal */
   protected _computeProj() {
+    const fovY = this.effectiveFovY;
     if (this.adapted) {
-      this.calcAdaptedPerspectiveProjection(this._fovY, this._near, this._far, this._projMatrix);
+      this.calcAdaptedPerspectiveProjection(fovY, this._near, this._far, this._projMatrix);
     } else {
-      const h = this._near * Math.tan(this._fovY * 0.5);
+      const h = this._near * Math.tan(fovY * 0.5);
       const w = h * this._aspect;
       let left = -w;
       let right = w;

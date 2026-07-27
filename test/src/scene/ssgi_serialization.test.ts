@@ -19,6 +19,7 @@ describe('SSGI configuration and serialization', () => {
     expect(camera.ssgiThickness).toBeCloseTo(0.5);
     expect(camera.ssgiStride).toBe(1);
     expect(camera.ssgiMaxRayIntensity).toBeCloseTo(10);
+    expect(camera.effectiveSSGIMaxRayIntensity).toBeCloseTo(10);
     expect(camera.ssgiTemporal).toBe(true);
     expect(camera.ssgiTemporalWeight).toBeCloseTo(0.94);
     expect(camera.ssgiDepthReject).toBeCloseTo(0.5);
@@ -27,6 +28,11 @@ describe('SSGI configuration and serialization', () => {
     expect(camera.ssgiRaysPerPixel).toBe(2);
     expect(camera.ssgiMaxSteps).toBe(64);
     expect(camera.ssgiDenoisePasses).toBe(3);
+
+    scene.lightingMode = 'physical';
+    expect(camera.effectiveSSGIMaxRayIntensity).toBeCloseTo(384000);
+    camera.exposureCompensation = 1;
+    expect(camera.effectiveSSGIMaxRayIntensity).toBeCloseTo(192000);
 
     camera.ssgiQualityPreset = 'balanced';
     expect(camera.ssgiResolvedSettings).toEqual({

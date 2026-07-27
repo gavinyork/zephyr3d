@@ -23,6 +23,7 @@ export class EnvLightWrapper extends Disposable {
   private readonly _irradianceSHFB: DRef<FrameBuffer>;
   private readonly _irradianceWindow: Vector3;
   private _strength: number;
+  private _radianceScale: number;
   private _specularStrength: number;
   private _allowSSGI: boolean;
   /** @internal */
@@ -51,6 +52,7 @@ export class EnvLightWrapper extends Disposable {
     this._irradianceSHFB = new DRef();
     this._irradianceWindow = new Vector3();
     this._strength = 1;
+    this._radianceScale = 1;
     this._specularStrength = 1;
     this._allowSSGI = false;
   }
@@ -85,6 +87,16 @@ export class EnvLightWrapper extends Disposable {
   }
   set strength(val) {
     this._strength = val;
+  }
+  /**
+   * Physical environment radiance scale in cd/m² per unit texture value.
+   * Used only when the owning scene enables physical lighting.
+   */
+  get radianceScale() {
+    return this._radianceScale;
+  }
+  set radianceScale(val) {
+    this._radianceScale = Math.max(0, val);
   }
   /** The strength of environment specular lighting */
   get specularStrength() {

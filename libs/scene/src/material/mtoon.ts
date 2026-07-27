@@ -504,7 +504,14 @@ export class MToonMaterial extends ToonMaterialBase {
       function () {
         this.$l.directColor = pb.vec3(0);
         that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
-          this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.worldPos, posRange, dirCutoff);
+          this.$l.lightAtten = that.calculateLightAttenuation(
+            this,
+            type,
+            this.worldPos,
+            posRange,
+            dirCutoff,
+            extra
+          );
           this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
           this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
           this.$l.NoL = pb.dot(this.normal, this.lightDir);

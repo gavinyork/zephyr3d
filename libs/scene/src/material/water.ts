@@ -428,8 +428,15 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.vec3(1),
           this.foamFactor
         );
-        that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, _extra, shadow) {
-          this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.worldPos, posRange, dirCutoff);
+        that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
+          this.$l.lightAtten = that.calculateLightAttenuation(
+            this,
+            type,
+            this.worldPos,
+            posRange,
+            dirCutoff,
+            extra
+          );
           this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
           this.$l.lightContrib = this.lightSpecular(

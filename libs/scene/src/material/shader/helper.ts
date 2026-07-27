@@ -939,11 +939,13 @@ export class ShaderHelper {
     lightBuffer: StructuredBuffer,
     lightIndexTexture: Texture2D
   ) {
+    const envLightStrength =
+      ctx.scene.lightingMode === 'physical' ? ctx.env!.light.radianceScale : (ctx.env!.light.strength ?? 0);
     bindGroup.setValue('light', {
       sunDir: ctx.sunLight ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1) : this.defaultSunDir,
       clusterParams: clusterParams,
       countParams: countParams,
-      envLightStrength: ctx.env!.light.strength ?? 0,
+      envLightStrength,
       envLightSpecularStrength: ctx.env!.light.specularStrength ?? 1,
       lightIndexTexSize: new Int32Array([lightIndexTexture.width, lightIndexTexture.height]),
       ...(ctx.screenSpaceShadowMask ? { numShadowLights: ctx.clusteredLight?.numShadowLights ?? 0 } : {})
@@ -984,7 +986,10 @@ export class ShaderHelper {
     shadowMapParams.impl!.getParams(this._lightUniformShadow.implParams);
     this._lightUniformShadow.shadowMatrices.set(shadowMapParams.shadowMatrices);
     this._lightUniformShadow.shadowStrength = light.shadow.shadowStrength;
-    this._lightUniformShadow.envLightStrength = ctx.env?.light.strength ?? 0;
+    this._lightUniformShadow.envLightStrength =
+      ctx.scene.lightingMode === 'physical'
+        ? (ctx.env?.light.radianceScale ?? 0)
+        : (ctx.env?.light.strength ?? 0);
     this._lightUniformShadow.envLightSpecularStrength = ctx.env?.light.specularStrength ?? 1;
     bindGroup.setValue('light', this._lightUniformShadow);
     bindGroup.setTexture(

@@ -6,6 +6,19 @@ import { ShadowMapper } from '../shadow/shadowmapper';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT, LIGHT_TYPE_RECT } from '../values';
 import type { Scene } from './scene';
 
+const PHYSICAL_LIGHT_CUTOFF_LUX = 0.01;
+
+function makeColorIntensity(color: Vector4, intensity: number, physical: boolean): Vector4 {
+  if (!physical) {
+    return new Vector4(color.x, color.y, color.z, intensity);
+  }
+  const luminance = color.x * 0.2126 + color.y * 0.7152 + color.z * 0.0722;
+  if (luminance <= 0.000001) {
+    return new Vector4(0, 0, 0, intensity);
+  }
+  return new Vector4(color.x / luminance, color.y / luminance, color.z / luminance, intensity);
+}
+
 /**
  * Base class for any kind of light node
  * @public
@@ -274,6 +287,7 @@ export class PunctualLight extends BaseLight {
  */
 export class DirectionalLight extends PunctualLight {
   private static readonly _currentSunLight: WeakMap<Scene, DWeakRef<DirectionalLight>> = new WeakMap();
+  private _illuminance: number;
   /**
    * Creates an instance of directional light
    * @param scene - The scene to which the light belongs
@@ -281,8 +295,20 @@ export class DirectionalLight extends PunctualLight {
   constructor(scene: Scene) {
     super(scene, LIGHT_TYPE_DIRECTIONAL);
     this.intensity = 10;
+    this._illuminance = 100000;
     if (!DirectionalLight.getSunLight(scene)) {
       DirectionalLight.setSunLight(scene, this);
+    }
+  }
+  /** Physical illuminance in lux. */
+  get illuminance() {
+    return this._illuminance;
+  }
+  set illuminance(val: number) {
+    const illuminance = Math.max(0, val);
+    if (illuminance !== this._illuminance) {
+      this._illuminance = illuminance;
+      this.invalidateUniforms();
     }
   }
   static getSunLight(scene: Scene) {
@@ -332,7 +358,12 @@ export class DirectionalLight extends PunctualLight {
     const b = this.worldMatrix.getRow(2).scaleBy(-1);
     this._positionRange = new Vector4(a.x, a.y, a.z, -1);
     this._directionCutoff = new Vector4(b.x, b.y, b.z, 0);
-    this._diffuseIntensity = new Vector4(this.color.x, this.color.y, this.color.z, this.intensity);
+    const physical = this.scene?.lightingMode === 'physical';
+    this._diffuseIntensity = makeColorIntensity(
+      this.color,
+      physical ? this.illuminance : this.intensity,
+      physical
+    );
     this._extraParams = new Vector4(0, 0, 0, this.lightType);
   }
   // adapt from DXSDK
@@ -532,6 +563,8 @@ export class PointLight extends PunctualLight {
   protected _specularScale: number;
   /** @internal */
   protected _sourceRadius: number;
+  /** @internal Physical luminous intensity in candela. */
+  protected _luminousIntensity: number;
   /**
    * Creates an instance of point light
    * @param scene - The scene to which the light belongs
@@ -542,6 +575,7 @@ export class PointLight extends PunctualLight {
     this._diffuseScale = 1;
     this._specularScale = 1;
     this._sourceRadius = 0;
+    this._luminousIntensity = 100;
     this.invalidateBoundingVolume();
   }
   /** The range of the light */
@@ -571,6 +605,20 @@ export class PointLight extends PunctualLight {
   }
   set sourceRadius(val: number) {
     this.setSourceRadius(val);
+  }
+  /** Physical luminous intensity in candela. */
+  get luminousIntensity() {
+    return this._luminousIntensity;
+  }
+  set luminousIntensity(val: number) {
+    const intensity = Math.max(0, val);
+    if (intensity !== this._luminousIntensity) {
+      this._luminousIntensity = intensity;
+      this.invalidateUniforms();
+      if (this._range <= 0) {
+        this.invalidateBoundingVolume();
+      }
+    }
   }
   /**
    * Sets the range of the light
@@ -644,13 +692,22 @@ export class PointLight extends PunctualLight {
   computeUniforms() {
     const a = this.worldMatrix.getRow(3);
     const b = this.worldMatrix.getRow(2);
+    const physical = this.scene?.lightingMode === 'physical';
+    const metersPerUnit = this.scene?.metersPerUnit ?? 1;
+    const physicalScale = Math.max(this._diffuseScale, this._specularScale);
     const range =
       this.range <= 0
-        ? 32 * Math.sqrt(Math.max(0.0001, this.intensity * Math.max(this._diffuseScale, this._specularScale)))
+        ? physical
+          ? Math.sqrt(Math.max(0, this.luminousIntensity * physicalScale) / PHYSICAL_LIGHT_CUTOFF_LUX) /
+            metersPerUnit
+          : 32 * Math.sqrt(Math.max(0.0001, this.intensity * physicalScale))
         : this.range;
+    const resolvedIntensity = physical
+      ? this.luminousIntensity / (metersPerUnit * metersPerUnit)
+      : this.intensity;
     this._positionRange = new Vector4(a.x, a.y, a.z, range);
     this._directionCutoff = new Vector4(b.x, b.y, b.z, -1);
-    this._diffuseIntensity = new Vector4(this.color.x, this.color.y, this.color.z, this.intensity);
+    this._diffuseIntensity = makeColorIntensity(this.color, resolvedIntensity, physical);
     this._extraParams = new Vector4(
       this._diffuseScale,
       this._specularScale,
@@ -669,6 +726,12 @@ export class SpotLight extends PunctualLight {
   protected _range: number;
   /** @internal */
   protected _cutoff: number;
+  /** @internal Physical luminous intensity in candela. */
+  protected _luminousIntensity: number;
+  /** @internal Physical inner cone half-angle in radians. */
+  protected _innerConeAngle: number;
+  /** @internal Physical outer cone half-angle in radians. */
+  protected _outerConeAngle: number;
   /**
    * Creates an instance of spot light
    * @param scene - The scene to which the light belongs
@@ -677,6 +740,9 @@ export class SpotLight extends PunctualLight {
     super(scene, LIGHT_TYPE_SPOT);
     this._range = 0;
     this._cutoff = Math.cos(Math.PI / 4);
+    this._luminousIntensity = 1000;
+    this._innerConeAngle = Math.PI / 8;
+    this._outerConeAngle = Math.PI / 4;
     this.invalidateBoundingVolume();
   }
   /** The range of the light */
@@ -707,6 +773,44 @@ export class SpotLight extends PunctualLight {
   set cutoff(val: number) {
     this.setCutoff(val);
   }
+  /** Physical luminous intensity in candela. */
+  get luminousIntensity() {
+    return this._luminousIntensity;
+  }
+  set luminousIntensity(val: number) {
+    const intensity = Math.max(0, val);
+    if (intensity !== this._luminousIntensity) {
+      this._luminousIntensity = intensity;
+      this.invalidateUniforms();
+      if (this._range <= 0) {
+        this.invalidateBoundingVolume();
+      }
+    }
+  }
+  /** Physical inner cone half-angle in radians. */
+  get innerConeAngle() {
+    return this._innerConeAngle;
+  }
+  set innerConeAngle(val: number) {
+    const angle = Math.max(0, Math.min(val, this._outerConeAngle));
+    if (angle !== this._innerConeAngle) {
+      this._innerConeAngle = angle;
+      this.invalidateUniforms();
+    }
+  }
+  /** Physical outer cone half-angle in radians. */
+  get outerConeAngle() {
+    return this._outerConeAngle;
+  }
+  set outerConeAngle(val: number) {
+    const angle = Math.max(0.0001, Math.min(val, Math.PI * 0.5));
+    if (angle !== this._outerConeAngle) {
+      this._outerConeAngle = angle;
+      this._innerConeAngle = Math.min(this._innerConeAngle, angle);
+      this.invalidateUniforms();
+      this.invalidateBoundingVolume();
+    }
+  }
   /**
    * Sets the cutoff of the light
    * @param val - The value to set
@@ -731,7 +835,8 @@ export class SpotLight extends PunctualLight {
   /** @internal */
   computeBoundingVolume() {
     const bbox = new BoundingBox();
-    const cosCutoff = Math.cos(this._cutoff);
+    const cosCutoff =
+      this.scene?.lightingMode === 'physical' ? Math.cos(this._outerConeAngle) : Math.cos(this._cutoff);
     const range = this.positionAndRange.w;
     const r = (range / cosCutoff) * Math.sqrt(1 - cosCutoff * cosCutoff);
     bbox.minPoint = new Vector3(-r, -r, 0);
@@ -742,11 +847,26 @@ export class SpotLight extends PunctualLight {
   computeUniforms() {
     const a = this.worldMatrix.getRow(3);
     const b = this.worldMatrix.getRow(2).scaleBy(-1);
-    const range = this.range <= 0 ? 32 * Math.sqrt(Math.max(0.0001, this.intensity)) : this.range;
+    const physical = this.scene?.lightingMode === 'physical';
+    const metersPerUnit = this.scene?.metersPerUnit ?? 1;
+    const range =
+      this.range <= 0
+        ? physical
+          ? Math.sqrt(Math.max(0, this.luminousIntensity) / PHYSICAL_LIGHT_CUTOFF_LUX) / metersPerUnit
+          : 32 * Math.sqrt(Math.max(0.0001, this.intensity))
+        : this.range;
+    const resolvedIntensity = physical
+      ? this.luminousIntensity / (metersPerUnit * metersPerUnit)
+      : this.intensity;
     this._positionRange = new Vector4(a.x, a.y, a.z, range);
-    this._directionCutoff = new Vector4(b.x, b.y, b.z, this.cutoff);
-    this._diffuseIntensity = new Vector4(this.color.x, this.color.y, this.color.z, this.intensity);
-    this._extraParams = new Vector4(0, 0, 0, this.lightType);
+    this._directionCutoff = new Vector4(
+      b.x,
+      b.y,
+      b.z,
+      physical ? Math.cos(this.outerConeAngle) : this.cutoff
+    );
+    this._diffuseIntensity = makeColorIntensity(this.color, resolvedIntensity, physical);
+    this._extraParams = new Vector4(physical ? Math.cos(this.innerConeAngle) : 0, 0, 0, this.lightType);
   }
 }
 
@@ -761,6 +881,8 @@ export class RectLight extends PunctualLight {
   protected _width: number;
   /** @internal */
   protected _height: number;
+  /** @internal Physical luminance in cd/m². */
+  protected _luminance: number;
   /**
    * Creates an instance of rect light
    * @param scene - The scene to which the light belongs
@@ -770,6 +892,7 @@ export class RectLight extends PunctualLight {
     this._range = 10;
     this._width = 1;
     this._height = 1;
+    this._luminance = 100;
     this.invalidateBoundingVolume();
   }
   /** The range of the light */
@@ -821,6 +944,27 @@ export class RectLight extends PunctualLight {
   set height(val: number) {
     this.setHeight(val);
   }
+  /** Physical luminance in cd/m² (nit). */
+  get luminance() {
+    return this._luminance;
+  }
+  set luminance(val: number) {
+    const luminance = Math.max(0, val);
+    if (luminance !== this._luminance) {
+      this._luminance = luminance;
+      this.invalidateUniforms();
+    }
+  }
+  /** One-sided Lambertian luminous flux in lumen. */
+  get luminousFlux() {
+    const metersPerUnit = this.scene?.metersPerUnit ?? 1;
+    return this.luminance * Math.PI * this.width * this.height * metersPerUnit * metersPerUnit;
+  }
+  set luminousFlux(val: number) {
+    const metersPerUnit = this.scene?.metersPerUnit ?? 1;
+    const area = this.width * this.height * metersPerUnit * metersPerUnit;
+    this.luminance = area > 0 ? Math.max(0, val) / (Math.PI * area) : 0;
+  }
   /**
    * Sets the height of the light
    * @param val - The value to set
@@ -866,7 +1010,12 @@ export class RectLight extends PunctualLight {
       .scaleBy(this._height * 0.5);
     this._positionRange = new Vector4(pos.x, pos.y, pos.z, this.range);
     this._directionCutoff = new Vector4(axisX.x, axisX.y, axisX.z, 0);
-    this._diffuseIntensity = new Vector4(this.color.x, this.color.y, this.color.z, this.intensity);
+    const physical = this.scene?.lightingMode === 'physical';
+    this._diffuseIntensity = makeColorIntensity(
+      this.color,
+      physical ? this.luminance : this.intensity,
+      physical
+    );
     this._extraParams = new Vector4(axisY.x, axisY.y, axisY.z, this.lightType);
   }
 }

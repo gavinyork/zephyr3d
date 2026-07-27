@@ -36,6 +36,8 @@ import { DualDepthPeelingOIT } from '../render/dualdepthpeeling_oit';
 import type { HistoryResourceManager } from '../render';
 import type { FrameGraphContext, RenderPipeline } from '../render';
 import { RGHistoryResources } from '../render/rendergraph/history_resources';
+import { calculateEV100, calculatePhysicalExposure } from '../utility/physical';
+import type { CameraExposureMode, LightingMode } from '../utility/physical';
 
 /**
  * Result of a camera picking operation.
@@ -264,6 +266,18 @@ export class Camera extends SceneNode {
   protected _postEffectTonemap: DRef<Tonemap>;
   /** @internal Tonemap exposure. */
   protected _tonemapExposure: number;
+  /** @internal Camera exposure parameterization. */
+  protected _exposureMode: CameraExposureMode;
+  /** @internal Lens aperture expressed as an f-number. */
+  protected _aperture: number;
+  /** @internal Shutter-open time in seconds. */
+  protected _shutterSpeed: number;
+  /** @internal Sensor sensitivity. */
+  protected _ISO: number;
+  /** @internal Exposure compensation in stops. */
+  protected _exposureCompensation: number;
+  /** @internal Lighting mode currently reflected by the post effect ordering. */
+  protected _postProcessingLightingMode: Nullable<LightingMode>;
   /** @internal Motion blur enable flag (via post effect). */
   protected _motionBlur: boolean;
   /** @internal Motion blur post effect reference. */
@@ -487,6 +501,12 @@ export class Camera extends SceneNode {
     this._toneMap = true;
     this._postEffectTonemap = new DRef();
     this._tonemapExposure = 1;
+    this._exposureMode = 'manual';
+    this._aperture = 16;
+    this._shutterSpeed = 1 / 125;
+    this._ISO = 100;
+    this._exposureCompensation = 0;
+    this._postProcessingLightingMode = null;
     this._motionBlur = false;
     this._postEffectMotionBlur = new DRef();
     this._motionBlurStrength = 1;
@@ -837,9 +857,57 @@ export class Camera extends SceneNode {
   }
   set toneMapExposure(val) {
     this._tonemapExposure = val;
-    if (this._postEffectTonemap.get()) {
+    if (this._postEffectTonemap.get()?.mode === 'legacy') {
       this._postEffectTonemap.get()!.exposure = val;
     }
+  }
+  /** Camera exposure parameterization used by physical lighting scenes. */
+  get exposureMode() {
+    return this._exposureMode;
+  }
+  set exposureMode(val: CameraExposureMode) {
+    this._exposureMode = val === 'legacy' ? 'legacy' : 'manual';
+  }
+  /** Lens aperture as an f-number. */
+  get aperture() {
+    return this._aperture;
+  }
+  set aperture(val: number) {
+    this._aperture = Math.max(0.0001, val);
+  }
+  /** Shutter-open time in seconds. */
+  get shutterSpeed() {
+    return this._shutterSpeed;
+  }
+  set shutterSpeed(val: number) {
+    this._shutterSpeed = Math.max(0.000001, val);
+  }
+  /** Sensor sensitivity in ISO units. */
+  get ISO() {
+    return this._ISO;
+  }
+  set ISO(val: number) {
+    this._ISO = Math.max(0.0001, val);
+  }
+  /** Exposure compensation in stops (EV). */
+  get exposureCompensation() {
+    return this._exposureCompensation;
+  }
+  set exposureCompensation(val: number) {
+    this._exposureCompensation = val;
+  }
+  /** Photographic EV100 calculated from aperture, shutter time and ISO. */
+  get EV100() {
+    return calculateEV100(this._aperture, this._shutterSpeed, this._ISO);
+  }
+  /** Scene-linear physical exposure multiplier, including exposure compensation. */
+  get exposure() {
+    return calculatePhysicalExposure(
+      this._aperture,
+      this._shutterSpeed,
+      this._ISO,
+      this._exposureCompensation
+    );
   }
   /**
    * Gets whether TAA is enabled.
@@ -994,6 +1062,18 @@ export class Camera extends SceneNode {
       this._ssgiMaxRayIntensity = next;
       this.invalidateSSGIHistory();
     }
+  }
+  /**
+   * Maximum per-ray radiance in the scene-linear lighting space.
+   *
+   * @internal
+   * Physical scenes interpret the public limit after camera exposure so its firefly rejection
+   * remains stable across the much larger cd/m² range. Legacy keeps the original scene-linear value.
+   */
+  get effectiveSSGIMaxRayIntensity() {
+    return this.scene?.lightingMode === 'physical' && this._exposureMode === 'manual'
+      ? this._ssgiMaxRayIntensity / Math.max(this.exposure, 1e-8)
+      : this._ssgiMaxRayIntensity;
   }
   /** Whether WebGPU SSGI temporal accumulation is enabled. */
   get ssgiTemporal() {
@@ -1860,6 +1940,31 @@ export class Camera extends SceneNode {
     }
   }
 
+  /** @internal */
+  private syncPostProcessingMode(scene: Scene) {
+    const tonemap = this._postEffectTonemap.get()!;
+    const usePhysicalExposure = scene.lightingMode === 'physical' && this._exposureMode === 'manual';
+    tonemap.mode = usePhysicalExposure ? 'physical' : 'legacy';
+    tonemap.exposure = usePhysicalExposure ? this.exposure : this._tonemapExposure;
+    const bloom = this._postEffectBloom.get()!;
+    bloom.preExposure =
+      scene.lightingMode === 'physical'
+        ? usePhysicalExposure
+          ? this.exposure * Tonemap.ACES_INPUT_SCALE
+          : this._tonemapExposure * Tonemap.ACES_INPUT_SCALE
+        : 1;
+    if (this._postProcessingLightingMode !== scene.lightingMode) {
+      // SSGI histories contain scene-linear radiance. Never reuse them across lighting unit models.
+      this.invalidateSSGIHistory();
+      if (scene.lightingMode === 'physical') {
+        this._compositor.movePostEffectBefore(bloom, tonemap);
+      } else {
+        this._compositor.movePostEffectAfter(bloom, this._postEffectFXAA.get()!);
+      }
+      this._postProcessingLightingMode = scene.lightingMode;
+    }
+  }
+
   private static resolveSSSQualityPreset(val: SSSQualityPreset) {
     switch (val) {
       case 'quality':
@@ -1922,7 +2027,7 @@ export class Camera extends SceneNode {
    */
   render(scene: Scene) {
     const device = getDevice();
-    //this.updatePostProcessing(device);
+    this.syncPostProcessingMode(scene);
     scene.dispatchEvent('startrender', scene, this, this._compositor);
     device.pushDeviceStates();
     device.reverseVertexWindingOrder(false);

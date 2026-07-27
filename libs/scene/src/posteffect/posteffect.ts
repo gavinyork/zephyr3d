@@ -303,6 +303,11 @@ export class AbstractPostEffect extends Disposable {
             device.setFramebuffer(
               output.framebuffer ? rg.getFramebuffer<FrameBuffer>(output.framebuffer) : null
             );
+            // A framebuffer bind may be a backend no-op when the requested target is already
+            // current. Never let a previous multi-resolution effect (for example Bloom) leak its
+            // smaller viewport/scissor into this fullscreen pass.
+            device.setViewport(null);
+            device.setScissor(null);
             this.apply(s.ctx, inputTexture, linearDepthTexture, output.srgbOutput);
           } finally {
             device.popDeviceStates();

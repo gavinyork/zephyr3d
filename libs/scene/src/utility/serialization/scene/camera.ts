@@ -2,6 +2,7 @@ import { defineProps, type SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import type { CameraOITMode, SSGIQualityPreset, SSSDebugView, SSSQualityPreset } from '../../../camera';
 import { SceneNode } from '../../../scene';
+import type { CameraExposureMode, CameraProjectionMode, CameraSensorFit } from '../../physical';
 import {
   TAA_DEBUG_ALAPH,
   TAA_DEBUG_CURRENT_COLOR,
@@ -204,6 +205,121 @@ export function getCameraClass(): SerializableClass {
           },
           set(this: Camera, value) {
             this.toneMapExposure = value.num[0];
+          },
+          isHidden(this: Camera) {
+            return this.scene?.lightingMode === 'physical' && this.exposureMode === 'manual';
+          }
+        },
+        {
+          name: 'ExposureMode',
+          type: 'string',
+          phase: 0,
+          default: 'manual',
+          options: {
+            label: 'Exposure Mode',
+            group: 'PostProcessing/ToneMap',
+            enum: {
+              labels: ['Legacy Multiplier', 'Manual Camera'],
+              values: ['legacy', 'manual']
+            }
+          },
+          get(this: Camera, value) {
+            value.str[0] = this.exposureMode;
+          },
+          set(this: Camera, value) {
+            this.exposureMode = value.str[0] as CameraExposureMode;
+          },
+          isHidden(this: Camera) {
+            return this.scene?.lightingMode !== 'physical';
+          }
+        },
+        {
+          name: 'Aperture',
+          type: 'float',
+          phase: 1,
+          default: 16,
+          options: {
+            label: 'Aperture (f-number)',
+            group: 'PostProcessing/ToneMap',
+            minValue: 0.1,
+            maxValue: 64,
+            animatable: true
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.aperture;
+          },
+          set(this: Camera, value) {
+            this.aperture = value.num[0];
+          },
+          isHidden(this: Camera) {
+            return this.scene?.lightingMode !== 'physical' || this.exposureMode !== 'manual';
+          }
+        },
+        {
+          name: 'ShutterSpeed',
+          description: 'Shutter-open time in seconds',
+          type: 'float',
+          phase: 1,
+          default: 1 / 125,
+          options: {
+            label: 'Shutter (seconds)',
+            group: 'PostProcessing/ToneMap',
+            minValue: 0.000001,
+            maxValue: 60,
+            animatable: true
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.shutterSpeed;
+          },
+          set(this: Camera, value) {
+            this.shutterSpeed = value.num[0];
+          },
+          isHidden(this: Camera) {
+            return this.scene?.lightingMode !== 'physical' || this.exposureMode !== 'manual';
+          }
+        },
+        {
+          name: 'ISO',
+          type: 'float',
+          phase: 1,
+          default: 100,
+          options: {
+            group: 'PostProcessing/ToneMap',
+            minValue: 1,
+            maxValue: 204800,
+            animatable: true
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ISO;
+          },
+          set(this: Camera, value) {
+            this.ISO = value.num[0];
+          },
+          isHidden(this: Camera) {
+            return this.scene?.lightingMode !== 'physical' || this.exposureMode !== 'manual';
+          }
+        },
+        {
+          name: 'ExposureCompensation',
+          description: 'Exposure compensation in stops',
+          type: 'float',
+          phase: 1,
+          default: 0,
+          options: {
+            label: 'Compensation (EV)',
+            group: 'PostProcessing/ToneMap',
+            minValue: -10,
+            maxValue: 10,
+            animatable: true
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.exposureCompensation;
+          },
+          set(this: Camera, value) {
+            this.exposureCompensation = value.num[0];
+          },
+          isHidden(this: Camera) {
+            return this.scene?.lightingMode !== 'physical' || this.exposureMode !== 'manual';
           }
         },
         {
@@ -725,6 +841,7 @@ export function getCameraClass(): SerializableClass {
         },
         {
           name: 'SSGIMaxRayIntensity',
+          description: 'Maximum ray radiance after camera exposure in physical lighting mode',
           type: 'float',
           phase: 1,
           default: 10,
@@ -1525,6 +1642,24 @@ export function getPerspectiveCameraClass(): SerializableClass {
     getProps() {
       return defineProps([
         {
+          name: 'ProjectionMode',
+          type: 'string',
+          phase: 0,
+          default: 'fov',
+          options: {
+            enum: {
+              labels: ['Field of View', 'Physical Lens'],
+              values: ['fov', 'physical']
+            }
+          },
+          get(this: PerspectiveCamera, value) {
+            value.str[0] = this.projectionMode;
+          },
+          set(this: PerspectiveCamera, value) {
+            this.projectionMode = value.str[0] as CameraProjectionMode;
+          }
+        },
+        {
           name: 'FovVertical',
           type: 'float',
           default: Math.PI / 3,
@@ -1537,6 +1672,89 @@ export function getPerspectiveCameraClass(): SerializableClass {
           },
           set(this: PerspectiveCamera, value) {
             this.fovY = value.num[0];
+          },
+          isHidden(this: PerspectiveCamera) {
+            return this.projectionMode === 'physical';
+          }
+        },
+        {
+          name: 'FocalLength',
+          description: 'Physical focal length in millimeters',
+          type: 'float',
+          default: 50,
+          options: {
+            minValue: 0.1,
+            maxValue: 2000,
+            animatable: true
+          },
+          get(this: PerspectiveCamera, value) {
+            value.num[0] = this.focalLengthMm;
+          },
+          set(this: PerspectiveCamera, value) {
+            this.focalLengthMm = value.num[0];
+          },
+          isHidden(this: PerspectiveCamera) {
+            return this.projectionMode !== 'physical';
+          }
+        },
+        {
+          name: 'SensorWidth',
+          description: 'Physical sensor width in millimeters',
+          type: 'float',
+          default: 36,
+          options: {
+            minValue: 0.1,
+            maxValue: 200,
+            animatable: true
+          },
+          get(this: PerspectiveCamera, value) {
+            value.num[0] = this.sensorWidthMm;
+          },
+          set(this: PerspectiveCamera, value) {
+            this.sensorWidthMm = value.num[0];
+          },
+          isHidden(this: PerspectiveCamera) {
+            return this.projectionMode !== 'physical';
+          }
+        },
+        {
+          name: 'SensorHeight',
+          description: 'Physical sensor height in millimeters',
+          type: 'float',
+          default: 24,
+          options: {
+            minValue: 0.1,
+            maxValue: 200,
+            animatable: true
+          },
+          get(this: PerspectiveCamera, value) {
+            value.num[0] = this.sensorHeightMm;
+          },
+          set(this: PerspectiveCamera, value) {
+            this.sensorHeightMm = value.num[0];
+          },
+          isHidden(this: PerspectiveCamera) {
+            return this.projectionMode !== 'physical';
+          }
+        },
+        {
+          name: 'SensorFit',
+          type: 'string',
+          default: 'horizontal',
+          options: {
+            enum: {
+              labels: ['Horizontal', 'Vertical'],
+              values: ['horizontal', 'vertical']
+            }
+          },
+          get(this: PerspectiveCamera, value) {
+            value.str[0] = this.sensorFit;
+          },
+          set(this: PerspectiveCamera, value) {
+            this.sensorFit = value.str[0] as CameraSensorFit;
+          },
+          isHidden(this: PerspectiveCamera) {
+            return this.projectionMode !== 'physical';
           }
         },
         {

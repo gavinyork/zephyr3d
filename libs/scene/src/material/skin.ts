@@ -269,7 +269,8 @@ export class SkinMaterial
             type,
             this.$inputs.worldPos,
             posRange,
-            dirCutoff
+            dirCutoff,
+            extra
           );
           this.$l.lightDir = that.calculateLightDirection(
             this,

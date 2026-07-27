@@ -4,15 +4,19 @@ import type { AbstractDevice, BindGroup, GPUProgram, Texture2D } from '@zephyr3d
 import type { DrawContext } from '../render';
 import { fetchSampler } from '../utility/misc';
 import type { Nullable } from '@zephyr3d/base';
+import type { LightingMode } from '../utility/physical';
 
 /**
  * The tonemap post effect
  * @public
  */
 export class Tonemap extends AbstractPostEffect {
+  /** @internal ACES input calibration, independent of camera exposure mode. */
+  static readonly ACES_INPUT_SCALE = 1 / 0.6;
   private static _programTonemap: Nullable<GPUProgram> = null;
   private static _bindgroupTonemap: Nullable<BindGroup> = null;
   private _exposure: number;
+  private _mode: LightingMode;
   /**
    * Creates an instance of tonemap post effect
    */
@@ -20,6 +24,14 @@ export class Tonemap extends AbstractPostEffect {
     super();
     this._layer = PostEffectLayer.transparent;
     this._exposure = 1;
+    this._mode = 'legacy';
+  }
+  /** Exposure interpretation and tonemap calibration mode. */
+  get mode() {
+    return this._mode;
+  }
+  set mode(val: LightingMode) {
+    this._mode = val === 'physical' ? 'physical' : 'legacy';
   }
   /** Exposure value */
   get exposure() {
@@ -45,7 +57,7 @@ export class Tonemap extends AbstractPostEffect {
   /** @internal */
   private _tonemap(device: AbstractDevice, inputColorTexture: Texture2D, sRGBOutput: boolean) {
     Tonemap._bindgroupTonemap!.setValue('srgbOut', sRGBOutput ? 1 : 0);
-    Tonemap._bindgroupTonemap!.setValue('exposure', this._exposure);
+    Tonemap._bindgroupTonemap!.setValue('exposure', this._exposure * Tonemap.ACES_INPUT_SCALE);
     Tonemap._bindgroupTonemap!.setValue('flip', this.needFlip(device) ? 1 : 0);
     Tonemap._bindgroupTonemap!.setTexture('tex', inputColorTexture, fetchSampler('clamp_nearest_nomip'));
     device.setProgram(Tonemap._programTonemap);
@@ -105,7 +117,7 @@ export class Tonemap extends AbstractPostEffect {
               -0.00605,
               1.07602
             );
-            this.$l.color = pb.mul(this.vSample.rgb, pb.div(this.exposure, 0.6));
+            this.$l.color = pb.mul(this.vSample.rgb, this.exposure);
             this.color = pb.mul(this.ACESInputMat, this.color);
             this.color = this.RRTAndODTFit(this.color);
             this.color = pb.mul(this.ACESOutputMat, this.color);

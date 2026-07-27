@@ -45,6 +45,9 @@ export function getPunctualLightClass(): SerializableClass {
           },
           set(this: BaseLight, value) {
             this.intensity = value.num[0];
+          },
+          isHidden(this: BaseLight) {
+            return this.scene?.lightingMode === 'physical';
           }
         },
         {
@@ -554,6 +557,26 @@ export function getDirectionalLightClass(): SerializableClass {
     getProps() {
       return defineProps([
         {
+          name: 'Illuminance',
+          description: 'Physical illuminance in lux',
+          type: 'float',
+          default: 100000,
+          options: {
+            animatable: true,
+            minValue: 0,
+            maxValue: 200000
+          },
+          get(this: DirectionalLight, value) {
+            value.num[0] = this.illuminance;
+          },
+          set(this: DirectionalLight, value) {
+            this.illuminance = value.num[0];
+          },
+          isHidden(this: DirectionalLight) {
+            return this.scene?.lightingMode !== 'physical';
+          }
+        },
+        {
           name: 'SunLight',
           description: 'If true, this light will act as sun light and affect sky atmosphere rendering',
           type: 'bool',
@@ -583,6 +606,26 @@ export function getPointLightClass(): SerializableClass {
     },
     getProps() {
       return defineProps([
+        {
+          name: 'LuminousIntensity',
+          description: 'Physical luminous intensity in candela',
+          type: 'float',
+          default: 100,
+          options: {
+            animatable: true,
+            minValue: 0,
+            maxValue: 1000000
+          },
+          get(this: PointLight, value) {
+            value.num[0] = this.luminousIntensity;
+          },
+          set(this: PointLight, value) {
+            this.luminousIntensity = value.num[0];
+          },
+          isHidden(this: PointLight) {
+            return this.scene?.lightingMode !== 'physical';
+          }
+        },
         {
           name: 'Range',
           description: 'Light range in world unit',
@@ -670,6 +713,26 @@ export function getSpotLightClass(): SerializableClass {
     getProps() {
       return defineProps([
         {
+          name: 'LuminousIntensity',
+          description: 'Physical luminous intensity in candela',
+          type: 'float',
+          default: 1000,
+          options: {
+            animatable: true,
+            minValue: 0,
+            maxValue: 1000000
+          },
+          get(this: SpotLight, value) {
+            value.num[0] = this.luminousIntensity;
+          },
+          set(this: SpotLight, value) {
+            this.luminousIntensity = value.num[0];
+          },
+          isHidden(this: SpotLight) {
+            return this.scene?.lightingMode !== 'physical';
+          }
+        },
+        {
           name: 'Range',
           description: 'Light range in world unit',
           type: 'float',
@@ -701,6 +764,49 @@ export function getSpotLightClass(): SerializableClass {
           },
           set(this: SpotLight, value) {
             this.cutoff = Math.cos(degree2radian(value.num[0]) * 0.5);
+          },
+          isHidden(this: SpotLight) {
+            return this.scene?.lightingMode === 'physical';
+          }
+        },
+        {
+          name: 'PhysicalInnerConeAngle',
+          description: 'Physical inner cone half-angle in degrees',
+          type: 'float',
+          default: 22.5,
+          options: {
+            animatable: true,
+            minValue: 0,
+            maxValue: 90
+          },
+          get(this: SpotLight, value) {
+            value.num[0] = radian2degree(this.innerConeAngle);
+          },
+          set(this: SpotLight, value) {
+            this.innerConeAngle = degree2radian(value.num[0]);
+          },
+          isHidden(this: SpotLight) {
+            return this.scene?.lightingMode !== 'physical';
+          }
+        },
+        {
+          name: 'PhysicalOuterConeAngle',
+          description: 'Physical outer cone half-angle in degrees',
+          type: 'float',
+          default: 45,
+          options: {
+            animatable: true,
+            minValue: 0.01,
+            maxValue: 90
+          },
+          get(this: SpotLight, value) {
+            value.num[0] = radian2degree(this.outerConeAngle);
+          },
+          set(this: SpotLight, value) {
+            this.outerConeAngle = degree2radian(value.num[0]);
+          },
+          isHidden(this: SpotLight) {
+            return this.scene?.lightingMode !== 'physical';
           }
         }
       ]);
@@ -721,6 +827,26 @@ export function getRectLightClass(): SerializableClass {
     },
     getProps() {
       return defineProps([
+        {
+          name: 'Luminance',
+          description: 'Physical luminance in candela per square meter (nit)',
+          type: 'float',
+          default: 100,
+          options: {
+            animatable: true,
+            minValue: 0,
+            maxValue: 1000000
+          },
+          get(this: RectLight, value) {
+            value.num[0] = this.luminance;
+          },
+          set(this: RectLight, value) {
+            this.luminance = value.num[0];
+          },
+          isHidden(this: RectLight) {
+            return this.scene?.lightingMode !== 'physical';
+          }
+        },
         {
           name: 'Range',
           description: 'Light range in world unit',

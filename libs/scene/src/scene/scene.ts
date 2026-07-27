@@ -17,6 +17,7 @@ import {
   normalizeScriptAttachments,
   ScriptAttachment
 } from './script_attachment';
+import type { LightingMode } from '../utility/physical';
 
 /**
  * Represents a renderable world that manages scene graph, spatial indexing, and environment.
@@ -75,6 +76,10 @@ export class Scene
   protected _mainCamera: DRef<Camera>;
   /** @internal Arbitrary metadata loaded with the scene (optional). */
   protected _metaData: Nullable<Metadata>;
+  /** @internal Lighting unit model used by this scene. */
+  protected _lightingMode: LightingMode;
+  /** @internal Number of physical meters represented by one scene unit. */
+  protected _metersPerUnit: number;
   /** @internal User-attached script entries (engine-defined). */
   private _scripts: ScriptAttachment[];
   /**
@@ -103,6 +108,8 @@ export class Scene
     this._rootNode.set(new SceneNode(this));
     this._rootNode.get()!.name = 'Root';
     this._metaData = null;
+    this._lightingMode = 'legacy';
+    this._metersPerUnit = 1;
     this._scripts = [];
     this._mainCamera = new DRef();
   }
@@ -161,6 +168,36 @@ export class Scene
    */
   get env() {
     return this._env;
+  }
+  /** Lighting unit model. Legacy remains the default for backward compatibility. */
+  get lightingMode() {
+    return this._lightingMode;
+  }
+  set lightingMode(val: LightingMode) {
+    const mode: LightingMode = val === 'physical' ? 'physical' : 'legacy';
+    if (mode !== this._lightingMode) {
+      this._lightingMode = mode;
+      this.invalidateLightUniforms();
+    }
+  }
+  /** Number of physical meters represented by one scene-space unit. */
+  get metersPerUnit() {
+    return this._metersPerUnit;
+  }
+  set metersPerUnit(val: number) {
+    const scale = Number.isFinite(val) ? Math.max(val, 0.000001) : 1;
+    if (scale !== this._metersPerUnit) {
+      this._metersPerUnit = scale;
+      this.invalidateLightUniforms();
+    }
+  }
+  /** @internal */
+  private invalidateLightUniforms() {
+    this._rootNode.get()?.iterate((node) => {
+      if (node.isLight()) {
+        node.invalidateUniforms();
+      }
+    });
   }
   /**
    * Arbitrary metadata associated with the scene (e.g., imported asset info).

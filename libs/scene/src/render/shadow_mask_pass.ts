@@ -216,7 +216,11 @@ export class ShadowMaskRenderer {
       implParams: implParams,
       shadowMatrices: new Float32Array(shadowMapParams.shadowMatrices),
       shadowStrength: light.shadow.shadowStrength,
-      envLightStrength: ctx.env?.light.strength ?? 0,
+      envLightStrength: ctx.env
+        ? ctx.scene.lightingMode === 'physical'
+          ? ctx.env.light.radianceScale
+          : ctx.env.light.strength
+        : 0,
       envLightSpecularStrength: ctx.env?.light.specularStrength ?? 1
     });
     bindGroup.setValue('invViewProjMatrix', camera.invViewProjectionMatrix);

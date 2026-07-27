@@ -400,7 +400,11 @@ export class SSS extends AbstractPostEffect {
         });
         bindGroup.setValue('light', {
           sunDir: new Float32Array([sunDir.x, sunDir.y, sunDir.z]),
-          envLightStrength: ctx.env?.light.strength ?? 0,
+          envLightStrength: ctx.env
+            ? ctx.scene.lightingMode === 'physical'
+              ? ctx.env.light.radianceScale
+              : ctx.env.light.strength
+            : 0,
           envLightSpecularStrength: ctx.env?.light.specularStrength ?? 1,
           shadowStrength: shadowLight.shadow.shadowStrength,
           shadowCascades: shadowMapParams.numShadowCascades,

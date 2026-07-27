@@ -478,8 +478,8 @@ export class SSGI extends AbstractPostEffect {
       'radianceParams',
       new Vector4(
         ctx.camera.ssgiIntensity,
-        ctx.camera.ssgiMaxRayIntensity,
-        ctx.env!.light.strength,
+        ctx.camera.effectiveSSGIMaxRayIntensity,
+        ctx.scene.lightingMode === 'physical' ? ctx.env!.light.radianceScale : ctx.env!.light.strength,
         ctx.device.frameInfo.frameCounter
       )
     );
@@ -860,7 +860,14 @@ export class SSGI extends AbstractPostEffect {
               this.correctionSum = pb.add(this.correctionSum, this.correction);
             });
             this.$l.irradiance = pb.add(this.iblIrradiance, pb.div(this.correctionSum, raysPerPixel));
-            this.$outputs.outColor = pb.vec4(pb.max(this.irradiance, pb.vec3(0)), 1);
+            // radianceParams.x blends the traced estimate over the IBL baseline. A finite-ray
+            // correction can have much higher variance than the integrated physical sky and must
+            // not remove more than that blend permits (at the default 0.7, at least 30% remains).
+            this.$l.minimumIrradiance = pb.mul(
+              this.iblIrradiance,
+              pb.max(0, pb.sub(1, this.radianceParams.x))
+            );
+            this.$outputs.outColor = pb.vec4(pb.max(this.irradiance, this.minimumIrradiance), 1);
           });
         });
       }

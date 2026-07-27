@@ -85,13 +85,14 @@ export class LambertMaterial
         if (this.needCalculateEnvLight()) {
           scope.color = pb.add(scope.color, this.getEnvLightIrradiance(scope, scope.normal));
         }
-        this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, _extra, shadow) {
+        this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
           this.$l.lightAtten = that.calculateLightAttenuation(
             this,
             type,
             scope.$inputs.worldPos,
             posRange,
-            dirCutoff
+            dirCutoff,
+            extra
           );
           this.$l.lightDir = that.calculateLightDirection(
             this,

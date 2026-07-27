@@ -9,6 +9,7 @@ import { JSONArray, JSONData } from '../json';
 import type { Camera } from '../../../camera';
 import type { SceneNode } from '../../../scene';
 import { ScriptAttachment, normalizeScriptAttachmentConfig } from '../../../scene/script_attachment';
+import type { LightingMode } from '../../physical';
 
 /** @internal */
 export function getSceneClass(manager: ResourceManager): SerializableClass {
@@ -20,6 +21,43 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
     },
     getProps() {
       return defineProps([
+        {
+          name: 'LightingMode',
+          description: 'Lighting unit model. Legacy preserves the historical unitless pipeline.',
+          type: 'string',
+          phase: 0,
+          default: 'legacy',
+          options: {
+            group: 'Rendering/Physical',
+            enum: {
+              labels: ['Legacy', 'Physical'],
+              values: ['legacy', 'physical']
+            }
+          },
+          get(this: Scene, value) {
+            value.str[0] = this.lightingMode;
+          },
+          set(this: Scene, value) {
+            this.lightingMode = value.str[0] as LightingMode;
+          }
+        },
+        {
+          name: 'MetersPerUnit',
+          description: 'Physical meters represented by one scene unit',
+          type: 'float',
+          phase: 0,
+          default: 1,
+          options: {
+            group: 'Rendering/Physical',
+            minValue: 0.000001
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.metersPerUnit;
+          },
+          set(this: Scene, value) {
+            this.metersPerUnit = value.num[0];
+          }
+        },
         {
           name: 'Name',
           description: 'Scene name',
@@ -135,6 +173,20 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'EnvLightRadianceScale',
+          description: 'Physical environment radiance in cd/m² per unit HDR texture value',
+          type: 'float',
+          phase: 0,
+          options: { animatable: true, minValue: 0, group: 'Environment/Physical' },
+          default: 1,
+          get(this: Scene, value) {
+            value.num[0] = this.env.light.radianceScale;
+          },
+          set(this: Scene, value) {
+            this.env.light.radianceScale = value.num[0];
+          }
+        },
+        {
           name: 'EnvLightSpecularStrength',
           description: 'Environment light specular strength',
           type: 'float',
@@ -163,9 +215,6 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Scene, value) {
             this.env.light.allowSSGI = value.bool[0];
-          },
-          isValid(this: Scene) {
-            return this.env.light.type === 'ibl';
           }
         },
         {

@@ -4,6 +4,7 @@ export * from './shprojector';
 export * from './aabbtree';
 export * from './bounding_volume';
 export * from './misc';
+export * from './physical';
 export * from './debug';
 export * from './serialization';
 export * from './draco/decoder';

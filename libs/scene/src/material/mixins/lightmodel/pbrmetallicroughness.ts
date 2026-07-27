@@ -606,7 +606,8 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
                 type,
                 this.worldPos,
                 posRange,
-                dirCutoff
+                dirCutoff,
+                extra
               );
               this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
               this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);

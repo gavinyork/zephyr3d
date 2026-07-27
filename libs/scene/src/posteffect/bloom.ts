@@ -19,6 +19,10 @@ import type { RGHandle } from '../render/rendergraph/types';
  */
 export class Bloom extends AbstractPostEffect {
   static readonly className = 'Bloom' as const;
+  /** Keep the pre-exposed pyramid finite even when its source contains photometric sun values. */
+  private static readonly EXPOSED_COLOR_CLAMP = 64;
+  /** Largest finite IEEE-754 half-float value used by the HDR post-effect chain. */
+  private static readonly HALF_FLOAT_MAX = 65504;
   private static _programDownsampleH: Nullable<GPUProgram> = null;
   private static _programDownsampleV: Nullable<GPUProgram> = null;
   private static _programUpsample: Nullable<GPUProgram> = null;
@@ -37,6 +41,7 @@ export class Bloom extends AbstractPostEffect {
   private _threshold: number;
   private _thresholdKnee: number;
   private _intensity: number;
+  private _preExposure: number;
   /**
    * Creates an instance of tonemap post effect
    */
@@ -50,6 +55,7 @@ export class Bloom extends AbstractPostEffect {
     this._threshold = 0.8;
     this._thresholdKnee = 0;
     this._intensity = 1;
+    this._preExposure = 1;
   }
   /** The maximum downsample levels */
   get maxDownsampleLevel() {
@@ -85,6 +91,13 @@ export class Bloom extends AbstractPostEffect {
   }
   set intensity(val) {
     this._intensity = val;
+  }
+  /** Exposure multiplier used only to evaluate the scene-linear bloom threshold. */
+  get preExposure() {
+    return this._preExposure;
+  }
+  set preExposure(val) {
+    this._preExposure = Math.max(0, val);
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture() {
@@ -231,6 +244,8 @@ export class Bloom extends AbstractPostEffect {
           device.setFramebuffer(
             output.framebuffer ? rg.getFramebuffer<FrameBuffer>(output.framebuffer) : null
           );
+          device.setViewport(null);
+          device.setScissor(null);
           this.finalCompose(device, rg.getTexture<Texture2D>(s.input), rg.getTexture<Texture2D>(bloomHandle));
         } finally {
           device.popDeviceStates();
@@ -266,11 +281,14 @@ export class Bloom extends AbstractPostEffect {
     this._thresholdValue.w = 0.25 / (this._thresholdValue.y + 0.00001);
     this._thresholdValue.y -= this._thresholdValue.x;
     device.setFramebuffer([rt]);
+    device.setViewport(null);
+    device.setScissor(null);
     device.setProgram(Bloom._programPrefilter);
     device.setBindGroup(0, Bloom._bindgroupPrefilter!);
     Bloom._bindgroupPrefilter!.setTexture('tex', srcTexture);
     Bloom._bindgroupPrefilter!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     Bloom._bindgroupPrefilter!.setValue('threshold', this._thresholdValue);
+    Bloom._bindgroupPrefilter!.setValue('preExposure', this._preExposure);
     this.drawFullscreenQuad();
   }
   /** @internal */
@@ -280,6 +298,10 @@ export class Bloom extends AbstractPostEffect {
     Bloom._bindgroupFinalCompose!.setTexture('srcTex', srcTexture);
     Bloom._bindgroupFinalCompose!.setTexture('bloomTex', bloomTexture);
     Bloom._bindgroupFinalCompose!.setValue('intensity', this._intensity);
+    Bloom._bindgroupFinalCompose!.setValue(
+      'inversePreExposure',
+      this._preExposure > 0 ? 1 / this._preExposure : 0
+    );
     Bloom._bindgroupFinalCompose!.setValue(
       'flip',
       device.type === 'webgpu' && device.getFramebuffer() ? 1 : 0
@@ -299,12 +321,16 @@ export class Bloom extends AbstractPostEffect {
     Bloom._bindgroupUpsample!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     Bloom._bindgroupUpsample!.setTexture('tex', srcTexture);
     device.setFramebuffer([dstTexture]);
+    device.setViewport(null);
+    device.setScissor(null);
     this.drawFullscreenQuad(Bloom._renderStateAdditive!);
   }
   /** @internal */
   private blurH(device: AbstractDevice, srcTexture: Texture2D, dstTexture: Texture2D) {
     this._invTexSize.setXY(1 / srcTexture.width, 1 / srcTexture.height);
     device.setFramebuffer([dstTexture]);
+    device.setViewport(null);
+    device.setScissor(null);
     device.setProgram(Bloom._programDownsampleH);
     device.setBindGroup(0, Bloom._bindgroupDownsampleH!);
     Bloom._bindgroupDownsampleH!.setTexture('tex', srcTexture);
@@ -316,6 +342,8 @@ export class Bloom extends AbstractPostEffect {
   private blurV(device: AbstractDevice, srcTexture: Texture2D, dstTexture: Texture2D) {
     this._invTexSize.setXY(1 / srcTexture.width, 1 / srcTexture.height);
     device.setFramebuffer([dstTexture]);
+    device.setViewport(null);
+    device.setScissor(null);
     device.setProgram(Bloom._programDownsampleV);
     device.setBindGroup(0, Bloom._bindgroupDownsampleV!);
     Bloom._bindgroupDownsampleV!.setTexture('tex', srcTexture);
@@ -367,14 +395,23 @@ export class Bloom extends AbstractPostEffect {
           this.srcTex = pb.tex2D().uniform(0);
           this.bloomTex = pb.tex2D().uniform(0);
           this.intensity = pb.float().uniform(0);
+          this.inversePreExposure = pb.float().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
             this.$l.srcSample = pb.textureSampleLevel(this.srcTex, this.$inputs.uv, 0);
             this.$l.bloomSample = pb.textureSampleLevel(this.bloomTex, this.$inputs.uv, 0);
-            this.$outputs.outColor = pb.vec4(
-              pb.add(this.srcSample.rgb, pb.mul(this.bloomSample.rgb, this.intensity)),
-              1
+            // The bloom pyramid is camera-pre-exposed to keep physical luminance inside the
+            // finite half-float range. Convert it back to scene-linear units for the following
+            // physical Tonemap pass, then clamp the half-float render-target write itself.
+            this.$l.composed = pb.clamp(
+              pb.add(
+                this.srcSample.rgb,
+                pb.mul(this.bloomSample.rgb, this.intensity, this.inversePreExposure)
+              ),
+              pb.vec3(0),
+              pb.vec3(Bloom.HALF_FLOAT_MAX)
             );
+            this.$outputs.outColor = pb.vec4(this.composed, 1);
           });
         }
       })!;
@@ -398,17 +435,30 @@ export class Bloom extends AbstractPostEffect {
         fragment(pb) {
           this.tex = pb.tex2D().uniform(0);
           this.threshold = pb.vec4().uniform(0);
+          this.preExposure = pb.float().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
             this.$l.p = pb.textureSampleLevel(this.tex, this.$inputs.uv, 0);
-            this.$l.brightness = pb.max(pb.max(this.p.r, this.p.g), this.p.b);
+            // Filtering raw cd/m² values in rgba16f can overflow during additive upsampling.
+            // Store a bounded, pre-exposed color instead; finalCompose converts it back before
+            // the physical Tonemap pass. With legacy preExposure=1 this remains equivalent for
+            // the display-referred 0..1 input.
+            this.$l.exposedColor = pb.clamp(
+              pb.mul(this.p.rgb, this.preExposure),
+              pb.vec3(0),
+              pb.vec3(Bloom.EXPOSED_COLOR_CLAMP)
+            );
+            this.$l.brightness = pb.max(
+              pb.max(this.exposedColor.r, this.exposedColor.g),
+              this.exposedColor.b
+            );
             this.$l.soft = pb.clamp(pb.add(this.brightness, this.threshold.y), 0, this.threshold.z);
             this.soft = pb.mul(this.soft, this.soft, this.threshold.w);
             this.$l.contrib = pb.div(
               pb.max(this.soft, pb.sub(this.brightness, this.threshold.x)),
               pb.max(this.brightness, 0.00001)
             );
-            this.$outputs.outColor = pb.vec4(pb.mul(this.p.rgb, this.contrib), 1);
+            this.$outputs.outColor = pb.vec4(pb.mul(this.exposedColor, this.contrib), 1);
           });
         }
       })!;

@@ -210,6 +210,36 @@ export class Compositor {
       this._postEffects[postEffect.layer].push(new DRef(postEffect));
     }
   }
+  /** Move an existing post effect immediately before another effect in the same layer. @internal */
+  movePostEffectBefore(postEffect: AbstractPostEffect, referenceEffect: AbstractPostEffect) {
+    const list = this._postEffects[postEffect.layer];
+    if (postEffect.layer !== referenceEffect.layer) {
+      return;
+    }
+    const sourceIndex = list.findIndex((val) => val.get() === postEffect);
+    const referenceIndex = list.findIndex((val) => val.get() === referenceEffect);
+    if (sourceIndex < 0 || referenceIndex < 0 || sourceIndex === referenceIndex - 1) {
+      return;
+    }
+    const [ref] = list.splice(sourceIndex, 1);
+    const targetIndex = list.findIndex((val) => val.get() === referenceEffect);
+    list.splice(targetIndex, 0, ref);
+  }
+  /** Move an existing post effect immediately after another effect in the same layer. @internal */
+  movePostEffectAfter(postEffect: AbstractPostEffect, referenceEffect: AbstractPostEffect) {
+    const list = this._postEffects[postEffect.layer];
+    if (postEffect.layer !== referenceEffect.layer) {
+      return;
+    }
+    const sourceIndex = list.findIndex((val) => val.get() === postEffect);
+    const referenceIndex = list.findIndex((val) => val.get() === referenceEffect);
+    if (sourceIndex < 0 || referenceIndex < 0 || sourceIndex === referenceIndex + 1) {
+      return;
+    }
+    const [ref] = list.splice(sourceIndex, 1);
+    const targetIndex = list.findIndex((val) => val.get() === referenceEffect);
+    list.splice(targetIndex + 1, 0, ref);
+  }
   /**
    * Removes a posteffect that was previously added
    *

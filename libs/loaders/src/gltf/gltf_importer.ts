@@ -2131,7 +2131,7 @@ export class GLTFImporter extends AbstractModelImporter {
         : undefined;
       pbrCommon.occlusionStrength = materialInfo.occlusionTexture?.strength ?? 1;
       pbrCommon.emissiveMap = materialInfo.emissiveTexture
-        ? await this._loadTexture(model, gltf, materialInfo.emissiveTexture, false, vfs)
+        ? await this._loadTexture(model, gltf, materialInfo.emissiveTexture, true, vfs)
         : undefined;
       pbrCommon.emissiveStrength =
         materialInfo?.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? 1;

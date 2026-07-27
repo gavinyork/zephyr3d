@@ -82,6 +82,14 @@ const defaultSkyWorldMatrix = Matrix4x4.identity();
  * @public
  */
 export class SkyRenderer extends Disposable {
+  /**
+   * @internal
+   *
+   * The atmospheric scattering model predates photometric lighting and was authored around a
+   * sun input of 10. This normalization maps the physical daylight reference (100,000 lux at
+   * Sunny 16, whose camera exposure is 1 / 38,400) onto that model reference: 10 / (100000 / 38400).
+   */
+  static readonly PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE = 3.84;
   private static readonly _skyCamera = (() => {
     return new PerspectiveCamera(null, Math.PI * 0.5, 1, 20, 1);
   })();
@@ -681,7 +689,14 @@ export class SkyRenderer extends Disposable {
         Math.min(126, -this._heightFogParams.parameter1.w * (cameraY - this._heightFogParams.parameter2.y))
       );
       this._heightFogParams.parameter3.z = this._heightFogParams.parameter2.x * Math.pow(2, p);
-      this._heightFogParams.lightColor.set(newSunLight);
+      // The legacy directional fog term expects a display-relative 0..1 light color. It cannot be
+      // mixed directly with photometric illuminance; physical fog instead receives its radiance
+      // from the distant-sky integration below.
+      if (ctx.scene.lightingMode === 'physical') {
+        this._heightFogParams.lightColor.setXYZ(0, 0, 0);
+      } else {
+        this._heightFogParams.lightColor.set(newSunLight);
+      }
       this._heightFogParams.lightDir.set(SkyRenderer._getSunDir(ctx.sunLight));
     }
     return oldSunLight;
@@ -689,7 +704,9 @@ export class SkyRenderer extends Disposable {
   renderAtmosphereLUTs(ctx: DrawContext) {
     this._atmosphereParams.lightDir.set(SkyRenderer._getSunDir(ctx.sunLight));
     this._atmosphereParams.lightColor.set(SkyRenderer._getSunColor(ctx.sunLight));
-    this._atmosphereParams.lightColor.w *= this._atmosphereExposure;
+    this._atmosphereParams.lightColor.w *=
+      this._atmosphereExposure *
+      (ctx.scene.lightingMode === 'physical' ? SkyRenderer.PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE : 1);
     this._atmosphereParams.cameraAspect = ctx.camera.getAspect();
     this._atmosphereParams.cameraWorldMatrix.set(ctx.camera.worldMatrix);
     renderAtmosphereLUTs(this._atmosphereParams);
@@ -702,6 +719,7 @@ export class SkyRenderer extends Disposable {
     ctx.device.setFramebuffer(this._skyDistantLightLut.get());
     ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 1), null, null);
     this._bindgroupDistantLight!.get()!.setTexture('skybox', skybox, fetchSampler('clamp_linear_nomip'));
+    this._bindgroupDistantLight!.get()!.setValue('physical', ctx.scene.lightingMode === 'physical' ? 1 : 0);
     ctx.device.setBindGroup(0, this._bindgroupDistantLight!.get()!);
     SkyRenderer._primitiveDistantLight!.draw();
     ctx.device.popDeviceStates();
@@ -1078,9 +1096,18 @@ export class SkyRenderer extends Disposable {
         fragment(pb) {
           this.$outputs.color = pb.vec4();
           this.skybox = pb.texCube().uniform(0);
+          this.physical = pb.int().uniform(0);
           pb.main(function () {
             this.$l.sunColor = pb.vec4();
-            this.$l.skyColor = pb.textureSampleLevel(this.skybox, this.$inputs.vector, 0).rgb;
+            // Height-fog in-scattering is lit by the sky hemisphere. The old full-sphere average
+            // is retained verbatim in legacy mode; in physical mode, mirror lower samples into the
+            // upper hemisphere so a dark ground/lower sky cannot turn the horizon into a black band.
+            this.$l.sampleDirection = this.$choice(
+              pb.notEqual(this.physical, 0),
+              pb.vec3(this.$inputs.vector.x, pb.abs(this.$inputs.vector.y), this.$inputs.vector.z),
+              this.$inputs.vector
+            );
+            this.$l.skyColor = pb.textureSampleLevel(this.skybox, this.sampleDirection, 0).rgb;
             this.$outputs.color = pb.vec4(pb.mul(this.skyColor, 1 / 64), 1);
           });
         }
