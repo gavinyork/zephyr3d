@@ -23,6 +23,12 @@ export type EditorProjectInfo = {
   lastEditScene?: string;
 };
 
+export type EditorProjectAssetChange = {
+  type: 'created' | 'deleted' | 'moved' | 'modified';
+  path: string;
+  itemType: 'file' | 'directory';
+};
+
 export type EditorHost = {
   currentProject: EditorProjectInfo | null;
 };
@@ -186,6 +192,7 @@ export type EditorEditToolFactoryContext = {
 
 export type EditorEventMap = {
   projectOpened: [project: EditorProjectInfo];
+  projectAssetChanged: [change: EditorProjectAssetChange];
   sceneOpening: [path: string];
   sceneOpened: [scene: unknown, path: string];
   sceneCreated: [scene: unknown, path: string];

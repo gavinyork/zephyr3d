@@ -459,6 +459,7 @@ export class ResourceManager {
     for (const k of this._classMap) {
       this.registerProps(k[1]);
     }
+    this._vfs.on('changed', this.handleVFSChanged, this);
   }
   /**
    * The virtual file system used by this manager.
@@ -470,7 +471,12 @@ export class ResourceManager {
     return this._vfs;
   }
   set VFS(vfs: VFS) {
-    this._vfs = vfs;
+    if (vfs !== this._vfs) {
+      this._vfs?.off('changed', this.handleVFSChanged, this);
+      this._vfs = vfs;
+      this.clearCache();
+      this._vfs?.on('changed', this.handleVFSChanged, this);
+    }
   }
   /**
    * Wethether editor mode is enabled
@@ -1230,7 +1236,34 @@ export class ResourceManager {
    */
   clearCache() {
     this._allocated = new WeakMap();
+    this._prefabContentCache?.clear();
     this._assetManager.clearCache();
+  }
+  private handleVFSChanged(
+    type: 'created' | 'deleted' | 'moved' | 'modified',
+    path: string,
+    itemType: 'file' | 'directory'
+  ) {
+    if (type === 'moved') {
+      // The current VFS event does not expose the old path, so both sides cannot be invalidated precisely.
+      this._prefabContentCache?.clear();
+      this._assetManager.clearCache();
+      return;
+    }
+    const normalizedPath = this._vfs.normalizePath(path);
+    this._assetManager.invalidateAsset(normalizedPath, itemType === 'directory');
+    if (this._prefabContentCache) {
+      if (itemType === 'directory') {
+        const prefix = normalizedPath.endsWith('/') ? normalizedPath : `${normalizedPath}/`;
+        for (const key of [...this._prefabContentCache.keys()]) {
+          if (key === normalizedPath || key.startsWith(prefix)) {
+            this._prefabContentCache.delete(key);
+          }
+        }
+      } else {
+        this._prefabContentCache.delete(normalizedPath);
+      }
+    }
   }
   private static readonly _pathPattern = /^([^\][]+)(?:\[(\d+)\])?$/;
   private static parsePropertyPath(str: string) {

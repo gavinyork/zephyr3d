@@ -12,7 +12,13 @@ import {
   formatGrowthAnalysis,
   getGPUObjectStatistics
 } from '../helpers/leakdetector';
-import type { FileMetadata, HttpDirectoryReader, HttpDirectoryReaderContext, Nullable } from '@zephyr3d/base';
+import type {
+  FileMetadata,
+  HttpDirectoryReader,
+  HttpDirectoryReaderContext,
+  Nullable,
+  VFS
+} from '@zephyr3d/base';
 import { DRef, HttpFS, MemoryFS, PathUtils } from '@zephyr3d/base';
 import type { ProjectInfo, ProjectSettings } from './services/project';
 import { ProjectService } from './services/project';
@@ -40,6 +46,7 @@ import {
 } from './services/systemplugin';
 import { isDesktopApp } from './services/desktop';
 import type { SceneView } from '../views/sceneview';
+import { clearScriptPropertyAccessorCache } from '../helpers/scriptprops';
 
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
 
@@ -119,6 +126,7 @@ export class Editor {
   private _extraLibs: Record<string, Monaco.IDisposable>;
   private readonly _plugins: EditorPluginManager;
   private readonly _systemPluginRegistrations: Map<string, SystemPluginRecord>;
+  private _projectVFS: VFS;
   constructor() {
     Editor._current = this;
     this._moduleManager = new ModuleManager();
@@ -130,6 +138,7 @@ export class Editor {
     this._extraLibs = {};
     this._plugins = new EditorPluginManager(this);
     this._systemPluginRegistrations = new Map();
+    this._projectVFS = null;
   }
   static get current() {
     return this._current;
@@ -139,6 +148,38 @@ export class Editor {
   }
   get plugins() {
     return this._plugins;
+  }
+  private notifyProjectOpened(project: ProjectInfo) {
+    this.bindProjectVFS(ProjectService.VFS);
+    this._plugins.dispatchEvent('projectOpened', project);
+  }
+  private bindProjectVFS(vfs: VFS) {
+    if (vfs === this._projectVFS) {
+      return;
+    }
+    this._projectVFS?.off('changed', this.handleProjectAssetChanged, this);
+    this._projectVFS = vfs;
+    clearScriptPropertyAccessorCache();
+    this._projectVFS?.on('changed', this.handleProjectAssetChanged, this);
+  }
+  private handleProjectAssetChanged(
+    type: 'created' | 'deleted' | 'moved' | 'modified',
+    path: string,
+    itemType: 'file' | 'directory'
+  ) {
+    const normalizedPath = this._projectVFS.normalizePath(path);
+    if (type === 'moved' || itemType === 'directory') {
+      getEngine().scriptingSystem.registry.invalidate();
+      clearScriptPropertyAccessorCache();
+    } else if (/\.(?:[cm]?[jt]s|[jt]sx)$/i.test(normalizedPath)) {
+      getEngine().scriptingSystem.registry.invalidate(normalizedPath);
+      clearScriptPropertyAccessorCache(normalizedPath);
+    }
+    this._plugins.dispatchEvent('projectAssetChanged', {
+      type,
+      path: normalizedPath,
+      itemType
+    });
   }
   registerPlugin(plugin: EditorPlugin) {
     this._plugins.registerPlugin(plugin);
@@ -626,6 +667,7 @@ export class Editor {
       this._currentProject.lastEditScene = lastScenePath ?? '';
       await this.saveProject();
       this._moduleManager.activate('');
+      this.bindProjectVFS(null);
       await ProjectService.closeCurrentProject();
       this._currentProject = null;
       return null;
@@ -739,7 +781,7 @@ export class Editor {
         const project = await ProjectService.openProject(uuid);
         const settings = await ProjectService.getCurrentProjectSettings();
         this._currentProject = project;
-        this._plugins.dispatchEvent('projectOpened', project);
+        this.notifyProjectOpened(project);
         let scene = settings.startupScene ?? project.lastEditScene ?? '';
         if (!scene) {
           const sceneFiles = await ProjectService.VFS.glob('/**/*.zscn', {
@@ -806,7 +848,7 @@ export class Editor {
         }
         const project = await ProjectService.openProject(uuid);
         this._currentProject = project;
-        this._plugins.dispatchEvent('projectOpened', project);
+        this.notifyProjectOpened(project);
         this._moduleManager.activate('Scene', '');
         return this._currentProject.uuid;
       } catch (err) {
@@ -840,7 +882,7 @@ export class Editor {
         updateProgress(3, 5, 'Loading project settings...');
         const settings = await ProjectService.getCurrentProjectSettings();
         ProjectService.applyRuntimeSettings(settings);
-        this._plugins.dispatchEvent('projectOpened', project);
+        this.notifyProjectOpened(project);
         updateProgress(4, 5, 'Loading script type hints...');
         await this.loadDepTypes();
         updateProgress(5, 5, 'Opening startup scene...');
@@ -880,7 +922,7 @@ export class Editor {
           updateProgress(2, 5, 'Loading project settings...');
           const settings = await ProjectService.getCurrentProjectSettings();
           ProjectService.applyRuntimeSettings(settings);
-          this._plugins.dispatchEvent('projectOpened', project);
+          this.notifyProjectOpened(project);
           updateProgress(3, 5, 'Checking project dependencies...');
           await this.ensureProjectDependenciesInstalled(id as string, settings, (message) => {
             updateProgress(3, 5, message);

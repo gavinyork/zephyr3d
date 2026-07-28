@@ -288,45 +288,80 @@ export class AssetManager {
    *   if no other owners are holding them.
    */
   clearCache() {
-    for (const k in Object.keys(this._textures)) {
-      const v = this._textures[k];
-      if (v instanceof DWeakRef) {
-        v.dispose();
-      }
-    }
+    this.clearCacheEntries(this._textures);
     this._textures = {};
-    for (const k in Object.keys(this._models)) {
-      const v = this._models[k];
-      if (v instanceof DWeakRef) {
-        v.dispose();
-      }
-    }
+    this.clearCacheEntries(this._models);
     this._models = {};
-    for (const k in Object.keys(this._materials)) {
-      const v = this._materials[k];
-      if (v instanceof DWeakRef) {
-        v.dispose();
-      }
-    }
+    this.clearCacheEntries(this._materials);
     this._materials = {};
-    for (const k in Object.keys(this._primitives)) {
-      const v = this._primitives[k];
-      if (v instanceof DWeakRef) {
-        v.dispose();
-      }
-    }
+    this.clearCacheEntries(this._primitives);
     this._primitives = {};
-    for (const k in Object.keys(this._skeletons)) {
-      const v = this._skeletons[k];
-      if (v instanceof DWeakRef) {
-        v.dispose();
-      }
-    }
+    this.clearCacheEntries(this._skeletons);
     this._skeletons = {};
+    this._bluePrints = {};
     this._fontAssets = {};
     this._binaryDatas = {};
     this._textDatas = {};
     this._jsonDatas = {};
+  }
+  /**
+   * Evicts cached data loaded from a VFS path.
+   *
+   * Existing scene objects keep their current resources. Subsequent loads read the asset again.
+   *
+   * @param path - Changed VFS file or directory path.
+   * @param recursive - Whether entries below a directory path should also be evicted.
+   * @returns Number of cache entries removed.
+   */
+  invalidateAsset(path: string, recursive = false) {
+    const normalizedPath = this.vfs.normalizePath(path);
+    const matches = (key: string) => this.cachePathMatches(key, normalizedPath, recursive);
+    const matchesTexture = (key: string) => {
+      const firstSeparator = key.indexOf(':');
+      const lastSeparator = key.lastIndexOf(':');
+      const sourcePath =
+        firstSeparator >= 0 && lastSeparator > firstSeparator
+          ? key.slice(firstSeparator + 1, lastSeparator)
+          : key;
+      return this.cachePathMatches(sourcePath, normalizedPath, recursive);
+    };
+    let removed = 0;
+    removed += this.clearCacheEntries(this._textures, matchesTexture);
+    removed += this.clearCacheEntries(this._models, matches);
+    removed += this.clearCacheEntries(this._materials, matches);
+    removed += this.clearCacheEntries(this._primitives, matches);
+    removed += this.clearCacheEntries(this._skeletons, matches);
+    removed += this.clearCacheEntries(this._bluePrints, matches);
+    removed += this.clearCacheEntries(this._fontAssets, matches);
+    removed += this.clearCacheEntries(this._binaryDatas, matches);
+    removed += this.clearCacheEntries(this._textDatas, matches);
+    removed += this.clearCacheEntries(this._jsonDatas, matches);
+    return removed;
+  }
+  private clearCacheEntries<T>(cache: Record<string, T>, matches: (key: string) => boolean = () => true) {
+    let removed = 0;
+    for (const key of Object.keys(cache)) {
+      if (!matches(key)) {
+        continue;
+      }
+      const cached = cache[key];
+      if (cached instanceof DWeakRef) {
+        cached.dispose();
+      }
+      delete cache[key];
+      removed++;
+    }
+    return removed;
+  }
+  private cachePathMatches(cachePath: string, normalizedPath: string, recursive: boolean) {
+    let normalizedCachePath = cachePath;
+    if (!/^(?:[a-z]+:)?\/\//i.test(cachePath) && !cachePath.startsWith('data:')) {
+      normalizedCachePath = this.vfs.normalizePath(cachePath);
+    }
+    return (
+      normalizedCachePath === normalizedPath ||
+      (recursive && normalizedCachePath.startsWith(normalizedPath.endsWith('/') ? normalizedPath : `${normalizedPath}/`))
+    );
   }
   /**
    * Removes a cached font asset entry by URL.
@@ -523,7 +558,7 @@ export class AssetManager {
       this._materials[hash] = P;
     }
     const material = await P;
-    if (this._materials[hash] instanceof Promise) {
+    if (this._materials[hash] === P) {
       this._materials[hash] = new DWeakRef<Material>(material);
     }
     return material;
@@ -548,7 +583,7 @@ export class AssetManager {
       this._primitives[hash] = P;
     }
     const primitive = await P;
-    if (this._primitives[hash] instanceof Promise) {
+    if (this._primitives[hash] === P) {
       this._primitives[hash] = new DWeakRef<Primitive>(primitive);
     }
     return primitive;
@@ -594,7 +629,7 @@ export class AssetManager {
         this._textures[hash] = P;
       }
       const tex: T = await P;
-      if (this._textures[hash] instanceof Promise) {
+      if (this._textures[hash] === P) {
         this._textures[hash] = new DWeakRef<T>(tex);
       }
       return tex;
@@ -621,7 +656,7 @@ export class AssetManager {
       this._models[hash] = P;
     }
     const sharedModel = await P;
-    if (this._models[hash] instanceof Promise) {
+    if (this._models[hash] === P) {
       this._models[hash] = new DWeakRef<SharedModel>(sharedModel);
     }
     return sharedModel;
