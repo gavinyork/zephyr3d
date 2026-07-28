@@ -594,13 +594,16 @@ export class MToonMaterial extends ToonMaterialBase {
   }
   private calculateMToonEmission(scope: PBInsideFunctionScope): PBShaderExp {
     const pb = scope.$builder;
-    return this.emissiveTexture
+    const emission = this.emissiveTexture
       ? pb.mul(
           scope.emissiveColor,
           scope.emissiveStrength,
           this.sampleEmissiveTexture(scope, this.applyUVAnimation(scope, this.getEmissiveTexCoord(scope))).rgb
         )
       : pb.mul(scope.emissiveColor, scope.emissiveStrength);
+    // Material-authored emitters are not covered by the CPU-side light pre-exposure, so a physical
+    // scene exposes them here. The factor is 1 in legacy.
+    return pb.mul(emission, ShaderHelper.getPreExposureUniform(scope)) as PBShaderExp;
   }
   vertexShader(scope: PBFunctionScope): void {
     super.vertexShader(scope);

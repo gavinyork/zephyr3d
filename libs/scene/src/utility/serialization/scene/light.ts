@@ -627,8 +627,28 @@ export function getPointLightClass(): SerializableClass {
           }
         },
         {
+          name: 'LuminousPower',
+          description: 'Physical luminous flux in lumen (4pi x candela)',
+          type: 'float',
+          options: {
+            animatable: true,
+            minValue: 0,
+            group: 'Physical'
+          },
+          get(this: PointLight, value) {
+            value.num[0] = this.luminousPower;
+          },
+          set(this: PointLight, value) {
+            this.luminousPower = value.num[0];
+          },
+          isHidden(this: PointLight) {
+            return this.scene?.lightingMode !== 'physical';
+          }
+        },
+        {
           name: 'Range',
-          description: 'Light range in world unit',
+          description:
+            'Light influence radius in world units. 0 auto-derives it from the physical intensity.',
           type: 'float',
           default: 10,
           options: {
@@ -733,8 +753,28 @@ export function getSpotLightClass(): SerializableClass {
           }
         },
         {
+          name: 'LuminousPower',
+          description: 'Physical luminous flux in lumen (2pi(1-cos(outer)) x candela)',
+          type: 'float',
+          options: {
+            animatable: true,
+            minValue: 0,
+            group: 'Physical'
+          },
+          get(this: SpotLight, value) {
+            value.num[0] = this.luminousPower;
+          },
+          set(this: SpotLight, value) {
+            this.luminousPower = value.num[0];
+          },
+          isHidden(this: SpotLight) {
+            return this.scene?.lightingMode !== 'physical';
+          }
+        },
+        {
           name: 'Range',
-          description: 'Light range in world unit',
+          description:
+            'Light influence radius in world units. 0 auto-derives it from the physical intensity.',
           type: 'float',
           default: 10,
           options: {

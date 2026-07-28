@@ -2,7 +2,7 @@ import { defineProps, type SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import type { CameraOITMode, SSGIQualityPreset, SSSDebugView, SSSQualityPreset } from '../../../camera';
 import { SceneNode } from '../../../scene';
-import type { CameraExposureMode, CameraProjectionMode, CameraSensorFit } from '../../physical';
+import type { CameraProjectionMode, CameraSensorFit } from '../../physical';
 import {
   TAA_DEBUG_ALAPH,
   TAA_DEBUG_CURRENT_COLOR,
@@ -207,30 +207,7 @@ export function getCameraClass(): SerializableClass {
             this.toneMapExposure = value.num[0];
           },
           isHidden(this: Camera) {
-            return this.scene?.lightingMode === 'physical' && this.exposureMode === 'manual';
-          }
-        },
-        {
-          name: 'ExposureMode',
-          type: 'string',
-          phase: 0,
-          default: 'manual',
-          options: {
-            label: 'Exposure Mode',
-            group: 'PostProcessing/ToneMap',
-            enum: {
-              labels: ['Legacy Multiplier', 'Manual Camera'],
-              values: ['legacy', 'manual']
-            }
-          },
-          get(this: Camera, value) {
-            value.str[0] = this.exposureMode;
-          },
-          set(this: Camera, value) {
-            this.exposureMode = value.str[0] as CameraExposureMode;
-          },
-          isHidden(this: Camera) {
-            return this.scene?.lightingMode !== 'physical';
+            return this.scene?.lightingMode === 'physical';
           }
         },
         {
@@ -252,7 +229,7 @@ export function getCameraClass(): SerializableClass {
             this.aperture = value.num[0];
           },
           isHidden(this: Camera) {
-            return this.scene?.lightingMode !== 'physical' || this.exposureMode !== 'manual';
+            return this.scene?.lightingMode !== 'physical';
           }
         },
         {
@@ -275,7 +252,7 @@ export function getCameraClass(): SerializableClass {
             this.shutterSpeed = value.num[0];
           },
           isHidden(this: Camera) {
-            return this.scene?.lightingMode !== 'physical' || this.exposureMode !== 'manual';
+            return this.scene?.lightingMode !== 'physical';
           }
         },
         {
@@ -296,7 +273,7 @@ export function getCameraClass(): SerializableClass {
             this.ISO = value.num[0];
           },
           isHidden(this: Camera) {
-            return this.scene?.lightingMode !== 'physical' || this.exposureMode !== 'manual';
+            return this.scene?.lightingMode !== 'physical';
           }
         },
         {
@@ -319,7 +296,7 @@ export function getCameraClass(): SerializableClass {
             this.exposureCompensation = value.num[0];
           },
           isHidden(this: Camera) {
-            return this.scene?.lightingMode !== 'physical' || this.exposureMode !== 'manual';
+            return this.scene?.lightingMode !== 'physical';
           }
         },
         {
@@ -470,11 +447,17 @@ export function getCameraClass(): SerializableClass {
         },
         {
           name: 'BloomThreshold',
+          description:
+            'Luminance above which a pixel blooms. Under physical lighting the buffer is camera ' +
+            'pre-exposed, where 0.8 is roughly a white surface in direct sunlight; lower it for a ' +
+            'more pronounced glow.',
           type: 'float',
           options: {
             animatable: true,
             minValue: 0,
-            maxValue: 1,
+            // Not capped at 1: physical scenes legitimately threshold above sunlit white to
+            // restrict blooming to genuine emitters.
+            maxValue: 8,
             label: 'Threshold',
             group: 'PostProcessing/Bloom'
           },

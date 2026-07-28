@@ -23,9 +23,11 @@ export class EnvLightWrapper extends Disposable {
   private readonly _irradianceSHFB: DRef<FrameBuffer>;
   private readonly _irradianceWindow: Vector3;
   private _strength: number;
-  private _radianceScale: number;
+  private _intensity: number;
   private _specularStrength: number;
   private _allowSSGI: boolean;
+  /** @internal Invalidates the owning Environment's cached sky bake. */
+  private _invalidateBake: Nullable<() => void>;
   /** @internal */
   constructor() {
     super();
@@ -52,9 +54,19 @@ export class EnvLightWrapper extends Disposable {
     this._irradianceSHFB = new DRef();
     this._irradianceWindow = new Vector3();
     this._strength = 1;
-    this._radianceScale = 1;
+    // Filament's IndirectLight default intensity, in lux.
+    this._intensity = 30000;
     this._specularStrength = 1;
     this._allowSSGI = false;
+    this._invalidateBake = null;
+  }
+  /**
+   * @internal
+   * Registers the owning {@link Environment}'s sky-bake invalidator, so photometric properties that
+   * are only applied at bake time can force a re-bake when they change.
+   */
+  setBakeInvalidator(invalidate: Nullable<() => void>) {
+    this._invalidateBake = invalidate;
   }
   /** @internal */
   getHash(ctx?: DrawContext) {
@@ -81,7 +93,15 @@ export class EnvLightWrapper extends Disposable {
   get envLight() {
     return this._envLight!;
   }
-  /** The strength of environment lighting */
+  /**
+   * Multiplier on environment lighting, in both lighting modes.
+   *
+   * @remarks
+   * In physical mode this is the per-frame dimmer for the IBL. The photometric {@link intensity}
+   * only reaches the image through the cached sky bake -- and a `scatter` sky ignores it entirely,
+   * taking its brightness from the sun -- so this is the control that always responds. 0 turns
+   * environment lighting off.
+   */
   get strength() {
     return this._strength;
   }
@@ -89,14 +109,40 @@ export class EnvLightWrapper extends Disposable {
     this._strength = val;
   }
   /**
-   * Physical environment radiance scale in cd/m² per unit texture value.
-   * Used only when the owning scene enables physical lighting.
+   * Physical environment light intensity, in lux.
+   *
+   * @remarks
+   * Mirrors Filament's `IndirectLight::Builder::intensity`: the illuminance a unit (0..1)
+   * environment texture value represents. Applied when the sky is baked, so changing it re-bakes.
+   *
+   * Only affects authored skies (`skybox`, `image`). A `scatter` sky derives its luminance from the
+   * sun's illuminance, so this value never enters its bake -- use {@link strength} to dim that.
+   *
+   * Used only when the owning scene enables physical lighting; legacy uses {@link strength}.
+   * Default 30,000 lux matches Filament's default (roughly an overcast-to-hazy sky).
+   */
+  get intensity() {
+    return this._intensity;
+  }
+  set intensity(val) {
+    const intensity = Math.max(0, val);
+    if (intensity !== this._intensity) {
+      this._intensity = intensity;
+      // Authored skies are lifted by this value when baked, so the cached cubemap is stale now.
+      // A scatter sky ignores it (its brightness comes from the sun), but re-baking is harmless.
+      this._invalidateBake?.();
+    }
+  }
+  /**
+   * Physical environment light intensity in lux.
+   *
+   * @deprecated Renamed to {@link intensity} to match the photometric unit it carries.
    */
   get radianceScale() {
-    return this._radianceScale;
+    return this._intensity;
   }
   set radianceScale(val) {
-    this._radianceScale = Math.max(0, val);
+    this.intensity = val;
   }
   /** The strength of environment specular lighting */
   get specularStrength() {
@@ -248,6 +294,9 @@ export class Environment extends Disposable {
     super();
     this._sky = new SkyRenderer();
     this._light = new EnvLightWrapper();
+    // The physical `intensity` only reaches the image through the cached sky bake, so changing it
+    // has to re-bake; otherwise the cubemap keeps the value it was baked with.
+    this._light.setBakeInvalidator(() => this._sky.invalidate());
   }
   /** The sky renderer */
   get sky() {

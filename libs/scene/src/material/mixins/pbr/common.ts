@@ -30,6 +30,7 @@ export type IMixinPBRCommon = {
   ior: number;
   emissiveColor: Vector3;
   emissiveStrength: number;
+  emissiveExposureWeight: number;
   occlusionStrength: number;
   rectSpecularScale: number;
   transmission: boolean;
@@ -162,6 +163,11 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
 
   const EMISSIVE_COLOR_UNIFORM = S.defineInstanceUniform('emissiveColor', 'rgb', 'EmissiveColor');
   const EMISSIVE_STRENGTH_UNIFORM = S.defineInstanceUniform('emissiveStrength', 'float', 'EmissiveStrength');
+  const EMISSIVE_EXPOSURE_WEIGHT_UNIFORM = S.defineInstanceUniform(
+    'emissiveExposureWeight',
+    'float',
+    'EmissiveExposureWeight'
+  );
   const RECT_SPECULAR_SCALE_UNIFORM = S.defineInstanceUniform(
     'rectSpecularScale',
     'float',
@@ -173,6 +179,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     private readonly _f0: Vector4;
     private readonly _emissiveColor: Vector3;
     private _emissiveStrength: number;
+    private _emissiveExposureWeight: number;
     private _occlusionStrength: number;
     private _rectSpecularScale: number;
     private readonly _sheenFactor: Vector4;
@@ -188,6 +195,8 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       this._occlusionStrength = 1;
       this._emissiveColor = new Vector3(0, 0, 0);
       this._emissiveStrength = 1;
+      // Default 1: emissive is a photometric luminance that follows camera exposure, like Filament.
+      this._emissiveExposureWeight = 1;
       this._rectSpecularScale = 1;
       this._sheenFactor = Vector4.zero();
       this._clearcoatFactor = new Vector4(0, 0, 1, 0);
@@ -212,6 +221,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       this.rectSpecularScale = other.rectSpecularScale;
       this.emissiveColor = other.emissiveColor;
       this.emissiveStrength = other.emissiveStrength;
+      this.emissiveExposureWeight = other.emissiveExposureWeight;
       this.transmission = other.transmission;
       this.iridescence = other.iridescence;
       this.clearcoat = other.clearcoat;
@@ -313,6 +323,14 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         this.uniformChanged();
       }
     }
+    /**
+     * Artistic multiplier on the rect-light specular term.
+     *
+     * @remarks
+     * 1 is neutral. Physical lighting normalizes the LTC integral by `1/(2*pi)`, which is the
+     * reference implementation's factor, so the default needs no calibration fudge there. Legacy
+     * keeps its historical weighting, where existing scenes may have tuned this value.
+     */
     get rectSpecularScale() {
       return this._rectSpecularScale;
     }
@@ -341,6 +359,30 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     set emissiveStrength(val) {
       if (this._emissiveStrength !== val) {
         this._emissiveStrength = val;
+        this.uniformChanged();
+      }
+    }
+    /**
+     * How strongly the emissive term follows the camera exposure, in [0, 1].
+     *
+     * @remarks
+     * Mirrors Filament's `emissive.w`: the emitter is attenuated by
+     * `mix(1, cameraExposure, emissiveExposureWeight)`.
+     *
+     * At 1 (default) the emissive value is a photometric luminance in cd/m², so a neon sign keeps a
+     * constant real-world brightness and darkens as the camera stops down, like every other lit
+     * surface. At 0 it bypasses exposure entirely and stays a display-referred value, which is what
+     * you want for a UI-like overlay that must not dim.
+     *
+     * Has no effect in legacy lighting, where the pre-exposure is always 1.
+     */
+    get emissiveExposureWeight() {
+      return this._emissiveExposureWeight;
+    }
+    set emissiveExposureWeight(val) {
+      const weight = Math.max(0, Math.min(1, val));
+      if (this._emissiveExposureWeight !== weight) {
+        this._emissiveExposureWeight = weight;
         this.uniformChanged();
       }
     }
@@ -411,6 +453,10 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       if (this.needFragmentColor() && this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
         scope.$outputs.zEmissiveColor = this.getInstancedUniform(scope, EMISSIVE_COLOR_UNIFORM);
         scope.$outputs.zEmissiveStrength = this.getInstancedUniform(scope, EMISSIVE_STRENGTH_UNIFORM);
+        scope.$outputs.zEmissiveExposureWeight = this.getInstancedUniform(
+          scope,
+          EMISSIVE_EXPOSURE_WEIGHT_UNIFORM
+        );
         scope.$outputs.zRectSpecularScale = this.getInstancedUniform(scope, RECT_SPECULAR_SCALE_UNIFORM);
       }
     }
@@ -422,6 +468,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         if (!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)) {
           scope.zEmissiveColor = pb.vec3().uniform(2);
           scope.zEmissiveStrength = pb.float().uniform(2);
+          scope.zEmissiveExposureWeight = pb.float().uniform(2);
           scope.zRectSpecularScale = pb.float().uniform(2);
         }
         if (this.occlusionTexture) {
@@ -460,6 +507,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         if (!(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
           bindGroup.setValue('zEmissiveColor', this._emissiveColor);
           bindGroup.setValue('zEmissiveStrength', this._emissiveStrength);
+          bindGroup.setValue('zEmissiveExposureWeight', this._emissiveExposureWeight);
           bindGroup.setValue('zRectSpecularScale', this._rectSpecularScale);
         }
         if (this.occlusionTexture) {
@@ -640,6 +688,12 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
       return (instancing ? scope.$inputs.zEmissiveStrength : scope.zEmissiveStrength) as PBShaderExp;
     }
+    getEmissiveExposureWeight(scope: PBInsideFunctionScope) {
+      const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
+      return (
+        instancing ? scope.$inputs.zEmissiveExposureWeight : scope.zEmissiveExposureWeight
+      ) as PBShaderExp;
+    }
     getRectSpecularScale(scope: PBInsideFunctionScope) {
       const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
       return (instancing ? scope.$inputs.zRectSpecularScale : scope.zRectSpecularScale) as PBShaderExp;
@@ -655,15 +709,22 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     calculateEmissiveColor(scope: PBInsideFunctionScope) {
       const pb = scope.$builder;
-      if (this.emissiveTexture) {
-        return pb.mul(
-          this.sampleEmissiveTexture(scope).rgb,
-          this.getEmissiveColor(scope),
-          this.getEmissiveStrength(scope)
-        ) as PBShaderExp;
-      } else {
-        return pb.mul(this.getEmissiveColor(scope), this.getEmissiveStrength(scope)) as PBShaderExp;
-      }
+      const base = this.emissiveTexture
+        ? pb.mul(
+            this.sampleEmissiveTexture(scope).rgb,
+            this.getEmissiveColor(scope),
+            this.getEmissiveStrength(scope)
+          )
+        : pb.mul(this.getEmissiveColor(scope), this.getEmissiveStrength(scope));
+      // Filament's emissive attenuation: mix(1, exposure, exposureWeight). Lights are pre-exposed on
+      // the CPU, but a material-authored emitter is not, so it is exposed here. In legacy the
+      // pre-exposure is 1, which leaves this a no-op regardless of the weight.
+      const attenuation = pb.mix(
+        pb.float(1),
+        ShaderHelper.getPreExposureUniform(scope),
+        this.getEmissiveExposureWeight(scope)
+      );
+      return pb.mul(base, attenuation) as PBShaderExp;
     }
     getSheenAlbedoScaling(
       scope: PBInsideFunctionScope,
@@ -1206,7 +1267,10 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     ) {
       const pb = scope.$builder;
       const that = this;
-      const funcName = 'Z_PBRRectLight';
+      const physical = this.drawContext.scene.lightingMode === 'physical';
+      // The two modes normalize the LTC integral differently, so they must not share a cached
+      // function body under one name.
+      const funcName = physical ? 'Z_PBRRectLightPhysical' : 'Z_PBRRectLight';
       const LUT_SIZE = 64;
       const LUT_SCALE = (LUT_SIZE - 1) / LUT_SIZE;
       const LUT_BIAS = 0.5 / LUT_SIZE;
@@ -1448,13 +1512,23 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               this.$l.lightColor = pb.mul(this.colorIntensity.rgb, this.colorIntensity.a, this.falloff);
               this.$l.baseF0 = this.data.f0.rgb;
               this.$l.rectSpecularScale = that.getRectSpecularScale(this);
+              // Z_LTCEvaluateRect returns the raw edge sum; the reference implementation normalizes
+              // it by 1/(2*pi). Physical applies that so the authored luminance (cd/m²) is
+              // reproduced and diffuse/specular keep their correct ratio -- previously diffuse was
+              // divided by pi and specular by nothing, leaving specular pi times too strong.
+              //
+              // Legacy deliberately keeps the historical (unnormalized) weighting: its rect
+              // intensity is unitless and existing scenes are calibrated against it.
+              const ltcNormalization = physical ? 1 / (2 * Math.PI) : 1;
+              const diffuseNormalization = physical ? 1 / (2 * Math.PI) : 1 / Math.PI;
               this.$l.specularLtc = pb.mul(
                 this.spec,
                 pb.add(pb.mul(this.baseF0, this.t2.x), pb.mul(pb.sub(pb.vec3(1), this.baseF0), this.t2.y)),
                 this.data.specularWeight,
-                this.rectSpecularScale
+                this.rectSpecularScale,
+                ltcNormalization
               );
-              this.$l.diffuseLtc = pb.mul(this.diff, pb.div(this.data.diffuse.rgb, Math.PI));
+              this.$l.diffuseLtc = pb.mul(this.diff, pb.mul(this.data.diffuse.rgb, diffuseNormalization));
               this.outColor = pb.add(
                 this.outColor,
                 pb.mul(this.lightColor, pb.add(this.diffuseLtc, this.specularLtc))

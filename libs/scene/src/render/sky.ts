@@ -36,6 +36,7 @@ import type {
 } from '@zephyr3d/device';
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
+import { PHYSICAL_BAKE_EXPOSURE } from '../utility/physical';
 import { fetchSampler } from '../utility/misc';
 import { CubemapSHProjector } from '../utility/shprojector';
 import { Fog, uniformSphereSamples } from '../values';
@@ -92,15 +93,17 @@ export class SkyRenderer extends Disposable {
   static readonly PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE = 3.84;
   /**
    * @internal
+   * Fixed exposure the physical sky bake is stored at. See {@link PHYSICAL_BAKE_EXPOSURE}.
+   */
+  static readonly PHYSICAL_BAKE_EXPOSURE = PHYSICAL_BAKE_EXPOSURE;
+  /**
+   * @internal
    *
-   * Height-fog base/directional colors are authored as display-referred 0..1 values. In physical
-   * mode the fog composites into the scene-linear (cd/m²) buffer alongside the distant-sky term,
-   * which is itself 38,400x its legacy value (the baked atmosphere is scaled by
-   * {@link PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE}, then sampled by the distant-light LUT). Scaling the
-   * authored colors by the same factor keeps them on equal footing with the sky term and makes the
-   * fog render identically to legacy at the Sunny-16 reference exposure (1 / 38,400), while scaling
-   * naturally with camera exposure like any other physical quantity. 38,400 = 1 / exposure(f/16,
-   * 1/125s, ISO 100).
+   * Reference-exposure anchor previously used to lift authored fog colors into photometric space.
+   *
+   * @deprecated Physical fog now derives its luminance from `EnvLightWrapper.intensity`, mirroring
+   * Filament, which scales fog color by `iblLuminance`. Retained only because it documents the
+   * Sunny-16 equivalence: 38,400 = 1 / exposure(f/16, 1/125s, ISO 100).
    */
   static readonly FOG_PHYSICAL_LUMINANCE = 38400;
   private static readonly _skyCamera = (() => {
@@ -161,8 +164,16 @@ export class SkyRenderer extends Disposable {
   private readonly _bindgroupFog: Nullable<DRef<BindGroup>> = null;
   private readonly _bindgroupFogNoDepth: Nullable<DRef<BindGroup>> = null;
   private _format: Nullable<TextureFormat>;
-  /** @internal Height-fog color scale for the current frame (1 in legacy, FOG_PHYSICAL_LUMINANCE in physical). */
+  /**
+   * @internal Scale lifting the authored 0..1 height-fog colors into the pre-exposed space for the
+   * current frame (1 in legacy, `EnvLightWrapper.intensity * cameraExposure` in physical).
+   */
   private _fogLuminanceScale: number;
+  /**
+   * @internal Ratio converting the fog shader's atmosphere-derived LUT samples from the fixed bake
+   * exposure to the live one (1 in legacy).
+   */
+  private _fogPreExposure: number;
   /**
    * Creates an instance of SkyRenderer
    */
@@ -207,6 +218,7 @@ export class SkyRenderer extends Disposable {
     this._bindgroupFogNoDepth = new DRef();
     this._format = null;
     this._fogLuminanceScale = 1;
+    this._fogPreExposure = 1;
   }
   /** @internal */
   getHash(_ctx: DrawContext) {
@@ -644,10 +656,21 @@ export class SkyRenderer extends Disposable {
     return this._skyDistantLightLut.get()!.getColorAttachments()[0] as Texture2D;
   }
   update(ctx: DrawContext) {
-    // Latch the fog color scale for this frame. The bake path (updateBakedSkyMap) uses the sky
-    // camera whose scene is null, so it cannot read lightingMode itself; both bake and main pass
-    // run after update(), so caching it here keeps them consistent.
-    this._fogLuminanceScale = ctx.scene.lightingMode === 'physical' ? SkyRenderer.FOG_PHYSICAL_LUMINANCE : 1;
+    // Latch the fog scales for this frame. The bake path (updateBakedSkyMap) uses the sky camera
+    // whose scene is null, so it cannot read lightingMode itself; both bake and main pass run after
+    // update(), so caching them here keeps them consistent.
+    // The fog shader mixes two differently-scaled sources, so it needs both factors:
+    //  - the atmosphere-derived LUTs (distant sky, aerial perspective) are stored at the fixed bake
+    //    exposure, so they convert with the bake-to-live ratio;
+    //  - the authored 0..1 fog colors are lifted by the environment intensity (lux) -- the same
+    //    anchor the sky and IBL use, mirroring Filament's `fogColor *= iblLuminance` -- and then
+    //    take the plain camera pre-exposure.
+    // Legacy leaves both at 1 so its authored colors are untouched.
+    this._fogPreExposure = SkyRenderer.getBakeToPreExposedScale(ctx);
+    this._fogLuminanceScale =
+      ctx.scene.lightingMode === 'physical'
+        ? ctx.scene.env.light.intensity * ShaderHelper.getPreExposure(ctx)
+        : 1;
     const useScatter = this._skyType === 'scatter';
     if (useScatter || !atmosphereLUTRendered()) {
       this.renderAtmosphereLUTs(ctx);
@@ -709,9 +732,16 @@ export class SkyRenderer extends Disposable {
   renderAtmosphereLUTs(ctx: DrawContext) {
     this._atmosphereParams.lightDir.set(SkyRenderer._getSunDir(ctx.sunLight));
     this._atmosphereParams.lightColor.set(SkyRenderer._getSunColor(ctx.sunLight));
+    // Physical: the sun input is photometric (lux), normalized onto the model's authored reference
+    // and stored at the fixed PHYSICAL_BAKE_EXPOSURE rather than the live camera exposure. That
+    // keeps the cached IBL bake exposure-independent while staying inside the environment cubemap's
+    // limited float range -- raw luminance would overflow it to Inf. Consumers rescale to the live
+    // exposure via getBakeToPreExposedScale().
     this._atmosphereParams.lightColor.w *=
       this._atmosphereExposure *
-      (ctx.scene.lightingMode === 'physical' ? SkyRenderer.PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE : 1);
+      (ctx.scene.lightingMode === 'physical'
+        ? SkyRenderer.PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE * SkyRenderer.PHYSICAL_BAKE_EXPOSURE
+        : 1);
     this._atmosphereParams.cameraAspect = ctx.camera.getAspect();
     this._atmosphereParams.cameraWorldMatrix.set(ctx.camera.worldMatrix);
     renderAtmosphereLUTs(this._atmosphereParams);
@@ -751,7 +781,7 @@ export class SkyRenderer extends Disposable {
       // Direct sunlight is represented by the scene's directional sun light. Keep the analytic
       // sun disk out of both diffuse and specular IBL to avoid baking that direct contribution a
       // second time. Atmospheric scattering and clouds remain in the cubemap.
-      this._renderSky(camera, false, false);
+      this._renderSky(camera, false, false, this._getSkyBakeLuminanceScale(ctx));
     }
     device.popDeviceStates();
 
@@ -833,14 +863,15 @@ export class SkyRenderer extends Disposable {
   }
   /**
    * @internal
-   * Height-fog upload params with the authored base/directional colors lifted into scene-linear
-   * space when physical lighting is active. Legacy returns the stored params untouched so its
-   * upload stays byte-identical. Stored authored values are never mutated.
+   * Height-fog upload params with the authored base/directional colors lifted into the pre-exposed
+   * physical space when physical lighting is active, plus the pre-exposure the shader applies to its
+   * atmosphere-derived LUT samples. Legacy returns the stored params untouched so its upload stays
+   * byte-identical. Stored authored values are never mutated.
    */
   private _getUploadHeightFogParams() {
     const scale = this._fogLuminanceScale;
     const p = this._heightFogParams;
-    if (scale === 1) {
+    if (scale === 1 && this._fogPreExposure === 1) {
       return p;
     }
     const p1 = p.parameter1;
@@ -848,7 +879,8 @@ export class SkyRenderer extends Disposable {
     return {
       ...p,
       parameter1: new Vector4(p1.x * scale, p1.y * scale, p1.z * scale, p1.w),
-      parameter4: new Vector4(p4.x * scale, p4.y * scale, p4.z * scale, p4.w)
+      parameter4: new Vector4(p4.x * scale, p4.y * scale, p4.z * scale, p4.w),
+      preExposure: this._fogPreExposure
     };
   }
   /** @internal */
@@ -924,7 +956,7 @@ export class SkyRenderer extends Disposable {
     }
     const framebuffer = this._beginSingleColorPass(true);
     try {
-      this._renderSky(skyCamera, true, true);
+      this._renderSky(skyCamera, true, true, this._getSkyScreenLuminanceScale(ctx));
     } finally {
       this._endSingleColorPass(framebuffer);
     }
@@ -980,24 +1012,75 @@ export class SkyRenderer extends Disposable {
     }
   }
   /** @internal */
-  private _renderSky(camera: Camera, depthTest: boolean, includeSunDisk: boolean) {
+  private _renderSky(camera: Camera, depthTest: boolean, includeSunDisk: boolean, luminanceScale = 1) {
     const device = getDevice();
     const savedRenderStates = device.getRenderStates();
     this._prepareSkyBox(device);
     if (this._skyType === 'scatter') {
-      this._drawScattering(camera, depthTest, includeSunDisk);
+      // The atmosphere LUTs already hold physical luminance, so only the caller's exposure applies.
+      this._drawScattering(camera, depthTest, includeSunDisk, luminanceScale);
     } else if (this._skyType === 'skybox' && this.skyboxTexture) {
-      this._drawSkybox(camera, depthTest);
+      this._drawSkybox(camera, depthTest, luminanceScale);
     } else {
-      this._drawSkyColor(camera, depthTest);
+      this._drawSkyColor(camera, depthTest, luminanceScale);
     }
     device.setRenderStates(savedRenderStates);
   }
+  /**
+   * @internal
+   *
+   * Converts a value stored at {@link PHYSICAL_BAKE_EXPOSURE} into the live pre-exposed space.
+   *
+   * @remarks
+   * Everything derived from the cached sky bake (the IBL, the distant-light LUT, the visible baked
+   * skybox) is stored at the fixed reference exposure. Multiplying by this ratio yields the same
+   * result as if the live camera exposure had been baked in, without invalidating the cache when
+   * the camera stops down. Returns 1 in legacy.
+   */
+  static getBakeToPreExposedScale(ctx: DrawContext) {
+    return ctx.scene.lightingMode === 'physical'
+      ? ShaderHelper.getPreExposure(ctx) / SkyRenderer.PHYSICAL_BAKE_EXPOSURE
+      : 1;
+  }
+  /**
+   * @internal
+   *
+   * Scale that normalizes a sky into the IBL bake's storage space.
+   *
+   * @remarks
+   * An authored 0..1 `skybox` / `image` is treated as an emitter of `EnvLightWrapper.intensity` lux.
+   * The scattering atmosphere needs no lift: its LUTs already carry photometric sun illuminance.
+   *
+   * Both are then scaled to {@link PHYSICAL_BAKE_EXPOSURE}. The bake is cached and only invalidated
+   * by sun changes, so it must be exposure-independent; storing it at raw photometric magnitude
+   * would overflow the environment cubemap's float range (see {@link PHYSICAL_BAKE_EXPOSURE}).
+   *
+   * Returns 1 in legacy so its bake stays byte-identical.
+   */
+  private _getSkyBakeLuminanceScale(ctx: DrawContext) {
+    if (ctx.scene.lightingMode !== 'physical') {
+      return 1;
+    }
+    // scatter already includes the bake exposure via renderAtmosphereLUTs().
+    return this._skyType === 'scatter'
+      ? 1
+      : ctx.scene.env.light.intensity * SkyRenderer.PHYSICAL_BAKE_EXPOSURE;
+  }
+  /**
+   * @internal
+   *
+   * On-screen sky scale: the bake-time normalization converted from the stored reference exposure
+   * to the live one, so the visible sky lands in the same pre-exposed space as every lit surface.
+   */
+  private _getSkyScreenLuminanceScale(ctx: DrawContext) {
+    return this._getSkyBakeLuminanceScale(ctx) * SkyRenderer.getBakeToPreExposedScale(ctx);
+  }
   /** @internal */
-  private _drawSkyColor(camera: Camera, depthTest: boolean) {
+  private _drawSkyColor(camera: Camera, depthTest: boolean, luminanceScale: number) {
     const device = getDevice();
     const bindgroup = this._bindgroupSky.image!.get()!;
     bindgroup.setValue('color', this._skyColor);
+    bindgroup.setValue('luminanceScale', luminanceScale);
     bindgroup.setTexture(
       'texture',
       this._skyImage.get() ?? SkyRenderer._defaultSkyImage.get()!,
@@ -1010,10 +1093,11 @@ export class SkyRenderer extends Disposable {
     drawFullscreenQuad(depthTest ? SkyRenderer._renderStatesSky! : SkyRenderer._renderStatesSkyNoDepthTest!);
   }
   /** @internal */
-  private _drawSkybox(camera: Camera, depthTest: boolean) {
+  private _drawSkybox(camera: Camera, depthTest: boolean, luminanceScale: number) {
     const device = getDevice();
     const bindgroup = this._bindgroupSky.skybox!.get()!;
     bindgroup.setTexture('skyCubeMap', this.skyboxTexture!, fetchSampler('clamp_linear_nomip'));
+    bindgroup.setValue('luminanceScale', luminanceScale);
     bindgroup.setValue(
       'flip',
       device.getFramebuffer() && device.type === 'webgpu' ? new Vector4(1, -1, 1, 1) : new Vector4(1, 1, 1, 1)
@@ -1105,7 +1189,12 @@ export class SkyRenderer extends Disposable {
     return new Vector3(Math.exp(-sum.x), Math.exp(-sum.y), Math.exp(-sum.z));
   }
   /** @internal */
-  private _drawScattering(camera: Camera, depthTest: boolean, includeSunDisk: boolean) {
+  private _drawScattering(
+    camera: Camera,
+    depthTest: boolean,
+    includeSunDisk: boolean,
+    luminanceScale: number
+  ) {
     const device = getDevice();
     const tLut = getTransmittanceLut();
     const skyLut = getSkyViewLut();
@@ -1122,6 +1211,7 @@ export class SkyRenderer extends Disposable {
     bindgroup.setValue('cameraPos', camera.getWorldPosition());
     bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
     bindgroup.setValue('includeSunDisk', includeSunDisk ? 1 : 0);
+    bindgroup.setValue('luminanceScale', luminanceScale);
     bindgroup.setTexture('tLut', tLut, fetchSampler('clamp_linear_nomip'));
     bindgroup.setTexture('skyLut', skyLut, fetchSampler('clamp_linear_nomip'));
     bindgroup.setValue('cloudy', this._cloudy);
@@ -1215,9 +1305,12 @@ export class SkyRenderer extends Disposable {
           this.color = pb.vec4().uniform(0);
           this.texture = pb.tex2D().uniform(0);
           this.srgbOut = pb.int().uniform(0);
+          this.luminanceScale = pb.float().uniform(0);
           pb.main(function () {
             this.$l.sampleColor = pb.textureSampleLevel(this.texture, this.$inputs.uv, 0);
-            this.$l.outColor = pb.mul(this.sampleColor, this.color);
+            // luminanceScale is 1 in legacy and for the IBL bake; on screen in physical mode it
+            // carries the environment intensity (lux) pre-multiplied by the camera exposure.
+            this.$l.outColor = pb.mul(this.sampleColor, this.color, this.luminanceScale);
             this.$if(pb.equal(this.srgbOut, 0), function () {
               this.$outputs.outColor = pb.vec4(this.outColor.rgb, 1);
             }).$else(function () {
@@ -1265,9 +1358,15 @@ export class SkyRenderer extends Disposable {
           this.$outputs.outColor = pb.vec4();
           this.skyCubeMap = pb.texCube().uniform(0);
           this.srgbOut = pb.int().uniform(0);
+          this.luminanceScale = pb.float().uniform(0);
           pb.main(function () {
             this.$l.texCoord = pb.normalize(this.$inputs.texCoord);
-            this.$l.color = pb.textureSampleLevel(this.skyCubeMap, this.texCoord, 0).rgb;
+            // luminanceScale is 1 in legacy and for the IBL bake; on screen in physical mode it
+            // carries the environment intensity (lux) pre-multiplied by the camera exposure.
+            this.$l.color = pb.mul(
+              pb.textureSampleLevel(this.skyCubeMap, this.texCoord, 0).rgb,
+              this.luminanceScale
+            );
             this.$if(pb.equal(this.srgbOut, 0), function () {
               this.$outputs.outColor = pb.vec4(this.color, 1);
             }).$else(function () {
@@ -1475,6 +1574,7 @@ export class SkyRenderer extends Disposable {
           this.velocity = pb.vec2().uniform(0);
         }
         this.srgbOut = pb.int().uniform(0);
+        this.luminanceScale = pb.float().uniform(0);
         pb.func('noise', [pb.vec3('p'), pb.float('t')], function () {
           this.p2 = pb.mul(this.p, 0.25);
           this.f = pb.mul(smoothNoise3D(this, this.p2), 0.5);
@@ -1551,6 +1651,8 @@ export class SkyRenderer extends Disposable {
           } else {
             this.$l.color = this.skyColor;
           }
+          // 1 for legacy and for the IBL bake; the camera pre-exposure when drawn on screen.
+          this.color = pb.mul(this.color, this.luminanceScale);
           this.$if(pb.equal(this.srgbOut, 0), function () {
             this.$outputs.outColor = pb.vec4(this.color, 1);
           }).$else(function () {

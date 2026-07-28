@@ -387,7 +387,12 @@ export class PBRBluePrintMaterial
   calculateEmissiveColor(scope: PBInsideFunctionScope) {
     const emissive = this.getBlueprintOutput(scope, 'Emissive');
     if (emissive !== undefined) {
-      return this.toVec3(scope, emissive);
+      // This bypasses the base implementation, so it has to apply the camera pre-exposure itself.
+      // A blueprint has no per-material exposure weight, so the emitter always follows exposure.
+      return scope.$builder.mul(
+        this.toVec3(scope, emissive),
+        ShaderHelper.getPreExposureUniform(scope)
+      ) as PBShaderExp;
     }
     return super.calculateEmissiveColor(scope);
   }

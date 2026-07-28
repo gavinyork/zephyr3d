@@ -37,7 +37,7 @@ import type { HistoryResourceManager } from '../render';
 import type { FrameGraphContext, RenderPipeline } from '../render';
 import { RGHistoryResources } from '../render/rendergraph/history_resources';
 import { calculateEV100, calculatePhysicalExposure } from '../utility/physical';
-import type { CameraExposureMode, LightingMode } from '../utility/physical';
+import type { LightingMode } from '../utility/physical';
 
 /**
  * Result of a camera picking operation.
@@ -266,8 +266,6 @@ export class Camera extends SceneNode {
   protected _postEffectTonemap: DRef<Tonemap>;
   /** @internal Tonemap exposure. */
   protected _tonemapExposure: number;
-  /** @internal Camera exposure parameterization. */
-  protected _exposureMode: CameraExposureMode;
   /** @internal Lens aperture expressed as an f-number. */
   protected _aperture: number;
   /** @internal Shutter-open time in seconds. */
@@ -501,7 +499,6 @@ export class Camera extends SceneNode {
     this._toneMap = true;
     this._postEffectTonemap = new DRef();
     this._tonemapExposure = 1;
-    this._exposureMode = 'manual';
     this._aperture = 16;
     this._shutterSpeed = 1 / 125;
     this._ISO = 100;
@@ -856,24 +853,9 @@ export class Camera extends SceneNode {
     return this._tonemapExposure;
   }
   set toneMapExposure(val) {
+    // syncPostProcessingMode() re-uploads the resolved exposure every frame, so this only needs to
+    // record the authored value. Legacy scenes read it back verbatim; physical scenes ignore it.
     this._tonemapExposure = val;
-    if (this._postEffectTonemap.get()?.mode === 'legacy') {
-      this._postEffectTonemap.get()!.exposure = val;
-    }
-  }
-  /**
-   * Camera exposure parameterization.
-   *
-   * @remarks
-   * Retained for API/serialization compatibility. It no longer affects rendering: physical lighting
-   * scenes always use physical (manual) exposure derived from aperture/shutter/ISO, and legacy
-   * scenes always use {@link toneMapExposure}. Setting `'legacy'` on a physical scene has no effect.
-   */
-  get exposureMode() {
-    return this._exposureMode;
-  }
-  set exposureMode(val: CameraExposureMode) {
-    this._exposureMode = val === 'legacy' ? 'legacy' : 'manual';
   }
   /** Lens aperture as an f-number. */
   get aperture() {
@@ -1069,20 +1051,6 @@ export class Camera extends SceneNode {
       this._ssgiMaxRayIntensity = next;
       this.invalidateSSGIHistory();
     }
-  }
-  /**
-   * Maximum per-ray radiance in the scene-linear lighting space.
-   *
-   * @internal
-   * Physical scenes interpret the public limit after camera exposure so its firefly rejection
-   * remains stable across the much larger cd/m² range. Legacy keeps the original scene-linear value.
-   */
-  get effectiveSSGIMaxRayIntensity() {
-    // Physical lighting always uses physical (manual) camera exposure; legacy exposure would leave
-    // raw cd/m² radiance unscaled and blow out the tonemap, so it is intentionally overridden.
-    return this.scene?.lightingMode === 'physical'
-      ? this._ssgiMaxRayIntensity / Math.max(this.exposure, 1e-8)
-      : this._ssgiMaxRayIntensity;
   }
   /** Whether WebGPU SSGI temporal accumulation is enabled. */
   get ssgiTemporal() {
@@ -1952,14 +1920,12 @@ export class Camera extends SceneNode {
   /** @internal */
   private syncPostProcessingMode(scene: Scene) {
     const tonemap = this._postEffectTonemap.get()!;
-    // Physical lighting always drives physical (manual) exposure. Legacy exposure on cd/m² radiance
-    // would saturate the tonemap and, via bloom preExposure, clamp nearly everything, so the
-    // _exposureMode setting is intentionally ignored while the scene is physical.
+    // Physical lighting pre-exposes every light quantity on the CPU (see ShaderHelper.getPreExposure),
+    // so the HDR buffer already sits near 1.0 and tonemapping only applies the ACES curve. Legacy
+    // keeps its plain exposure multiplier.
     const usePhysicalExposure = scene.lightingMode === 'physical';
-    tonemap.mode = usePhysicalExposure ? 'physical' : 'legacy';
-    tonemap.exposure = usePhysicalExposure ? this.exposure : this._tonemapExposure;
+    tonemap.exposure = usePhysicalExposure ? 1 : this._tonemapExposure;
     const bloom = this._postEffectBloom.get()!;
-    bloom.preExposure = usePhysicalExposure ? this.exposure * Tonemap.ACES_INPUT_SCALE : 1;
     if (this._postProcessingLightingMode !== scene.lightingMode) {
       // SSGI histories contain scene-linear radiance. Never reuse them across lighting unit models.
       this.invalidateSSGIHistory();

@@ -459,10 +459,7 @@ export class SSR extends AbstractPostEffect {
     bindGroup.setValue('viewMatrix', ctx.camera.viewMatrix);
     bindGroup.setValue('invViewMatrix', ctx.camera.worldMatrix);
     if (hasEnvRadiance) {
-      bindGroup.setValue(
-        'envLightStrength',
-        ctx.scene.lightingMode === 'physical' ? ctx.env!.light.radianceScale : ctx.env!.light.strength
-      );
+      bindGroup.setValue('envLightStrength', ShaderHelper.getEnvLightLuminance(ctx));
       bindGroup.setValue('envLightSpecularStrength', ctx.env!.light.specularStrength ?? 1);
       ctx.env!.light.envLight.updateBindGroup(bindGroup);
     }
@@ -505,10 +502,7 @@ export class SSR extends AbstractPostEffect {
     if (!blur) {
       bindGroup.setTexture('colorTex', inputColorTexture, linearSampler);
       if (hasEnvRadiance) {
-        bindGroup.setValue(
-          'envLightStrength',
-          ctx.scene.lightingMode === 'physical' ? ctx.env!.light.radianceScale : ctx.env!.light.strength
-        );
+        bindGroup.setValue('envLightStrength', ShaderHelper.getEnvLightLuminance(ctx));
         bindGroup.setValue('envLightSpecularStrength', ctx.env!.light.specularStrength ?? 1);
         ctx.env!.light.envLight.updateBindGroup(bindGroup);
       }

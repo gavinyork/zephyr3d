@@ -353,9 +353,10 @@ export class ClusteredLight {
   calculateLightIndex(
     camera: Camera,
     renderQueue: RenderQueue,
-    screenSpaceShadowMask = camera.screenSpaceShadowMask
+    screenSpaceShadowMask = camera.screenSpaceShadowMask,
+    preExposure = 1
   ) {
-    const numLights = this.getVisibleLights(renderQueue, this._lights, screenSpaceShadowMask);
+    const numLights = this.getVisibleLights(renderQueue, this._lights, screenSpaceShadowMask, preExposure);
     const device = getDevice();
     if (!this._lightIndexTexture) {
       this.createLightIndexTexture(device);
@@ -410,12 +411,23 @@ export class ClusteredLight {
     }
     device.popDeviceStates();
   }
-  private getVisibleLights(renderQueue: RenderQueue, lights: Float32Array, useShadowMask: boolean) {
+  private getVisibleLights(
+    renderQueue: RenderQueue,
+    lights: Float32Array,
+    useShadowMask: boolean,
+    preExposure: number
+  ) {
     const writeLight = (light: PunctualLight, slot: number) => {
       const offset = slot * 16;
+      const colorIntensity = light.diffuseAndIntensity;
       lights.set(light.positionAndRange, offset);
       lights.set(light.directionAndCutoff, offset + 4);
-      lights.set(light.diffuseAndIntensity, offset + 8);
+      // Only the intensity carries the camera pre-exposure; the color stays as authored. The
+      // light's own cached vector must not be mutated because it is shared across cameras.
+      lights[offset + 8] = colorIntensity.x;
+      lights[offset + 9] = colorIntensity.y;
+      lights[offset + 10] = colorIntensity.z;
+      lights[offset + 11] = colorIntensity.w * preExposure;
       lights.set(light.extraParams, offset + 12);
     };
     // When the screen-space shadow mask is active, shadow-casting lights occupy

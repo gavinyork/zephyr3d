@@ -207,7 +207,7 @@ export class ShadowMaskRenderer {
       shadowCascades: shadowMapParams.numShadowCascades,
       positionAndRange: light.positionAndRange,
       directionAndCutoff: light.directionAndCutoff,
-      diffuseAndIntensity: light.diffuseAndIntensity,
+      diffuseAndIntensity: ShaderHelper.getPreExposedColorIntensity(light, ctx),
       extraParams: light.extraParams,
       cascadeDistances: shadowMapParams.cascadeDistances,
       depthBiasValues: shadowMapParams.depthBiasValues[0],
@@ -216,11 +216,7 @@ export class ShadowMaskRenderer {
       implParams: implParams,
       shadowMatrices: new Float32Array(shadowMapParams.shadowMatrices),
       shadowStrength: light.shadow.shadowStrength,
-      envLightStrength: ctx.env
-        ? ctx.scene.lightingMode === 'physical'
-          ? ctx.env.light.radianceScale
-          : ctx.env.light.strength
-        : 0,
+      envLightStrength: ShaderHelper.getEnvLightLuminance(ctx),
       envLightSpecularStrength: ctx.env?.light.specularStrength ?? 1
     });
     bindGroup.setValue('invViewProjMatrix', camera.invViewProjectionMatrix);

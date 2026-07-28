@@ -327,12 +327,13 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
     },
     {
       name: 'EmissiveStrength',
-      description: 'Intensity multiplier for the emissive color and emissive texture',
+      description:
+        'Intensity multiplier for the emissive color and emissive texture. Under physical lighting ' +
+        'the product is a luminance in cd/m², so values far above 1 are expected.',
       type: 'float',
       options: {
         animatable: true,
-        minValue: 0,
-        maxValue: 1
+        minValue: 0
       },
       get(this: PBRMaterial, value) {
         value.num[0] = this.emissiveStrength;
@@ -343,6 +344,30 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
       isHidden: createBlueprintOutputHiddenPredicate(['Emissive']),
       getDefaultValue(this: PBRMaterial) {
         return this.$isInstance ? this.coreMaterial.emissiveStrength : 1;
+      }
+    },
+    {
+      name: 'EmissiveExposureWeight',
+      description:
+        'How strongly the emissive term follows camera exposure. 1 treats it as a photometric ' +
+        'luminance that dims as the camera stops down; 0 keeps it display-referred.',
+      type: 'float',
+      options: {
+        animatable: true,
+        minValue: 0,
+        maxValue: 1
+      },
+      get(this: PBRMaterial, value) {
+        value.num[0] = this.emissiveExposureWeight;
+      },
+      set(this: PBRMaterial, value) {
+        this.emissiveExposureWeight = value.num[0];
+      },
+      // Materials are not scene-bound, so this cannot be gated on lightingMode. It is inert in
+      // legacy anyway (pre-exposure is 1 there), so it stays visible like the other emissive props.
+      isHidden: createBlueprintOutputHiddenPredicate(['Emissive']),
+      getDefaultValue(this: PBRMaterial) {
+        return this.$isInstance ? this.coreMaterial.emissiveExposureWeight : 1;
       }
     },
     {

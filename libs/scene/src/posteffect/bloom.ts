@@ -19,8 +19,6 @@ import type { RGHandle } from '../render/rendergraph/types';
  */
 export class Bloom extends AbstractPostEffect {
   static readonly className = 'Bloom' as const;
-  /** Keep the pre-exposed pyramid finite even when its source contains photometric sun values. */
-  private static readonly EXPOSED_COLOR_CLAMP = 64;
   /** Largest finite IEEE-754 half-float value used by the HDR post-effect chain. */
   private static readonly HALF_FLOAT_MAX = 65504;
   private static _programDownsampleH: Nullable<GPUProgram> = null;
@@ -41,7 +39,6 @@ export class Bloom extends AbstractPostEffect {
   private _threshold: number;
   private _thresholdKnee: number;
   private _intensity: number;
-  private _preExposure: number;
   /**
    * Creates an instance of tonemap post effect
    */
@@ -55,7 +52,6 @@ export class Bloom extends AbstractPostEffect {
     this._threshold = 0.8;
     this._thresholdKnee = 0;
     this._intensity = 1;
-    this._preExposure = 1;
   }
   /** The maximum downsample levels */
   get maxDownsampleLevel() {
@@ -71,7 +67,24 @@ export class Bloom extends AbstractPostEffect {
   set downsampleLimit(val) {
     this._downsampleLimit = val;
   }
-  /** Bloom threshold */
+  /**
+   * Luminance above which a pixel starts to bloom.
+   *
+   * @remarks
+   * Compared against the value in the color buffer, whose meaning depends on the scene's lighting
+   * mode -- the same number is a different physical brightness in each:
+   *
+   * - `legacy`: the buffer is display-referred, so the default 0.8 means "near white".
+   * - `physical`: the buffer holds camera pre-exposed luminance. 0.8 then corresponds to
+   *   `0.8 / cameraExposure` cd/m², which at the Sunny-16 reference is ~30,700 cd/m² -- almost
+   *   exactly a white surface in direct sunlight (~31,800). Little in an ordinary daylight scene is
+   *   brighter than that, so only genuine emitters and specular highlights bloom.
+   *
+   * Physical scenes that want a more pronounced glow should lower this: ~0.3 makes a white surface
+   * bloom, ~0.15 catches everything above mid-gray. Because the buffer is pre-exposed, a fixed
+   * threshold tracks the camera -- stopping down dims the scene and reduces what blooms, as it
+   * would on a real sensor.
+   */
   get threshold() {
     return this._threshold;
   }
@@ -91,13 +104,6 @@ export class Bloom extends AbstractPostEffect {
   }
   set intensity(val) {
     this._intensity = val;
-  }
-  /** Exposure multiplier used only to evaluate the scene-linear bloom threshold. */
-  get preExposure() {
-    return this._preExposure;
-  }
-  set preExposure(val) {
-    this._preExposure = Math.max(0, val);
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture() {
@@ -288,7 +294,6 @@ export class Bloom extends AbstractPostEffect {
     Bloom._bindgroupPrefilter!.setTexture('tex', srcTexture);
     Bloom._bindgroupPrefilter!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     Bloom._bindgroupPrefilter!.setValue('threshold', this._thresholdValue);
-    Bloom._bindgroupPrefilter!.setValue('preExposure', this._preExposure);
     this.drawFullscreenQuad();
   }
   /** @internal */
@@ -298,10 +303,6 @@ export class Bloom extends AbstractPostEffect {
     Bloom._bindgroupFinalCompose!.setTexture('srcTex', srcTexture);
     Bloom._bindgroupFinalCompose!.setTexture('bloomTex', bloomTexture);
     Bloom._bindgroupFinalCompose!.setValue('intensity', this._intensity);
-    Bloom._bindgroupFinalCompose!.setValue(
-      'inversePreExposure',
-      this._preExposure > 0 ? 1 / this._preExposure : 0
-    );
     Bloom._bindgroupFinalCompose!.setValue(
       'flip',
       device.type === 'webgpu' && device.getFramebuffer() ? 1 : 0
@@ -395,19 +396,29 @@ export class Bloom extends AbstractPostEffect {
           this.srcTex = pb.tex2D().uniform(0);
           this.bloomTex = pb.tex2D().uniform(0);
           this.intensity = pb.float().uniform(0);
-          this.inversePreExposure = pb.float().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
             this.$l.srcSample = pb.textureSampleLevel(this.srcTex, this.$inputs.uv, 0);
             this.$l.bloomSample = pb.textureSampleLevel(this.bloomTex, this.$inputs.uv, 0);
-            // The bloom pyramid is camera-pre-exposed to keep physical luminance inside the
-            // finite half-float range. Convert it back to scene-linear units for the following
-            // physical Tonemap pass, then clamp the half-float render-target write itself.
+            // Both inputs are camera pre-exposed (~1.0), so no unit conversion is needed.
+            //
+            // Sanitize each input explicitly rather than relying on clamp() to absorb a NaN: for a
+            // NaN operand clamp only yields 0 because max(NaN, 0) happens to return its second
+            // argument on most hardware, which the spec does not require. The scene color reaches
+            // this pass without going through the prefilter, so this is its only guard.
+            this.$l.src = this.$choice(
+              pb.all(pb.lessThan(pb.abs(this.srcSample.rgb), pb.vec3(1e30))),
+              this.srcSample.rgb,
+              pb.vec3(0)
+            );
+            this.$l.bloom = this.$choice(
+              pb.all(pb.lessThan(pb.abs(this.bloomSample.rgb), pb.vec3(1e30))),
+              this.bloomSample.rgb,
+              pb.vec3(0)
+            );
+            // The clamp then only guards the half-float write against accumulated overshoot.
             this.$l.composed = pb.clamp(
-              pb.add(
-                this.srcSample.rgb,
-                pb.mul(this.bloomSample.rgb, this.intensity, this.inversePreExposure)
-              ),
+              pb.add(this.src, pb.mul(this.bloom, this.intensity)),
               pb.vec3(0),
               pb.vec3(Bloom.HALF_FLOAT_MAX)
             );
@@ -435,30 +446,33 @@ export class Bloom extends AbstractPostEffect {
         fragment(pb) {
           this.tex = pb.tex2D().uniform(0);
           this.threshold = pb.vec4().uniform(0);
-          this.preExposure = pb.float().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
-            this.$l.p = pb.textureSampleLevel(this.tex, this.$inputs.uv, 0);
-            // Filtering raw cd/m² values in rgba16f can overflow during additive upsampling.
-            // Store a bounded, pre-exposed color instead; finalCompose converts it back before
-            // the physical Tonemap pass. With legacy preExposure=1 this remains equivalent for
-            // the display-referred 0..1 input.
-            this.$l.exposedColor = pb.clamp(
-              pb.mul(this.p.rgb, this.preExposure),
-              pb.vec3(0),
-              pb.vec3(Bloom.EXPOSED_COLOR_CLAMP)
+            this.$l.raw = pb.textureSampleLevel(this.tex, this.$inputs.uv, 0);
+            // Reject non-finite input before any arithmetic. An Inf makes the contribution below
+            // evaluate Inf/Inf = NaN, and a NaN survives every subsequent operation: the separable
+            // blur smears it across the coarsest mip and the upsample chain expands that single
+            // texel into a 2^maxDownsampleLevels black block on screen.
+            //
+            // Non-finite samples are dropped rather than clamped. With CPU pre-exposure the HDR
+            // target sits near 1.0, so an Inf/NaN here means an upstream pass (SSR, SSGI, TAA
+            // reprojection) produced garbage; contributing nothing is the conservative choice and
+            // matches how SSGI sanitizes its own ray payloads. Finite values are still clamped so
+            // the additive upsample cannot overflow the half-float target either.
+            this.$l.finite = pb.all(pb.lessThan(pb.abs(this.raw.rgb), pb.vec3(1e30)));
+            this.$l.p = this.$choice(
+              this.finite,
+              pb.clamp(this.raw.rgb, pb.vec3(0), pb.vec3(Bloom.HALF_FLOAT_MAX)),
+              pb.vec3(0)
             );
-            this.$l.brightness = pb.max(
-              pb.max(this.exposedColor.r, this.exposedColor.g),
-              this.exposedColor.b
-            );
+            this.$l.brightness = pb.max(pb.max(this.p.r, this.p.g), this.p.b);
             this.$l.soft = pb.clamp(pb.add(this.brightness, this.threshold.y), 0, this.threshold.z);
             this.soft = pb.mul(this.soft, this.soft, this.threshold.w);
             this.$l.contrib = pb.div(
               pb.max(this.soft, pb.sub(this.brightness, this.threshold.x)),
               pb.max(this.brightness, 0.00001)
             );
-            this.$outputs.outColor = pb.vec4(pb.mul(this.exposedColor, this.contrib), 1);
+            this.$outputs.outColor = pb.vec4(pb.mul(this.p, this.contrib), 1);
           });
         }
       })!;

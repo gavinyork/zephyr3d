@@ -819,11 +819,16 @@ export class ShadowMapper extends Disposable {
     this._light.worldMatrix.decompose(null, lightCamera.rotation, lightCamera.position);
     lightCamera.parent = this._light.scene?.rootNode ?? null;
     lightCamera.scale.setXYZ(1, 1, 1);
+    const spot = this._light as SpotLight;
+    // The shadow frustum must match the lit cone. Physical mode defines it by the outer cone
+    // half-angle; legacy stores the cosine of its own cutoff angle.
+    const fov =
+      spot.scene?.lightingMode === 'physical' ? 2 * spot.outerConeAngle : 2 * Math.acos(spot.cutoff);
     lightCamera.setPerspective(
-      2 * Math.acos((this._light as SpotLight).cutoff),
+      fov,
       1,
       this._config.nearClip,
-      Math.min(this._shadowDistance, (this._light as SpotLight).positionAndRange.w)
+      Math.min(this._shadowDistance, spot.positionAndRange.w)
     );
   }
   /** @internal */

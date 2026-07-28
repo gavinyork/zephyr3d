@@ -173,17 +173,30 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
-          name: 'EnvLightRadianceScale',
-          description: 'Physical environment radiance in cd/m² per unit HDR texture value',
+          name: 'EnvLightIntensity',
+          description:
+            'Illuminance an authored (skybox / image) sky represents, in lux. Not used by the ' +
+            'scattering sky, whose brightness comes from the sun illuminance; dim that with ' +
+            'EnvLightStrength instead.',
           type: 'float',
           phase: 0,
-          options: { animatable: true, minValue: 0, group: 'Environment/Physical' },
-          default: 1,
+          options: {
+            animatable: true,
+            minValue: 0,
+            label: 'Intensity (lux)',
+            group: 'Environment/Physical'
+          },
+          default: 30000,
           get(this: Scene, value) {
-            value.num[0] = this.env.light.radianceScale;
+            value.num[0] = this.env.light.intensity;
           },
           set(this: Scene, value) {
-            this.env.light.radianceScale = value.num[0];
+            this.env.light.intensity = value.num[0];
+          },
+          isHidden(this: Scene) {
+            // A scattering sky derives its luminance from the sun, so this value never reaches the
+            // bake. Hiding it avoids presenting a control that cannot affect the image.
+            return this.lightingMode !== 'physical' || this.env.sky.skyType === 'scatter';
           }
         },
         {

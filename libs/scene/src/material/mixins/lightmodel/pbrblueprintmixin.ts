@@ -415,7 +415,13 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
             )
           : ShaderHelper.getCameraRoughnessFactor(scope);
         this.zCommonData.specular = that.getOutput(outputs, 'Specular') ?? pb.vec3(1);
-        this.zCommonData.emissive = that.getOutput(outputs, 'Emissive') ?? pb.vec3(0);
+        // A blueprint-authored emitter is a material quantity, so unlike lights it is not
+        // pre-exposed on the CPU. Physical scenes expose it here (blueprints have no per-material
+        // exposure weight, so it always follows exposure); in legacy the factor is 1.
+        this.zCommonData.emissive = pb.mul(
+          (that.getOutput(outputs, 'Emissive') ?? pb.vec3(0)) as PBShaderExp,
+          ShaderHelper.getPreExposureUniform(scope)
+        );
         this.zCommonData.f90 = pb.vec3(1);
         this.zCommonData.f0 = pb.vec4(
           pb.mix(

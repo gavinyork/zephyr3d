@@ -29,6 +29,7 @@ import { ProgramBuilder } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../../shaders/misc';
 import { fetchSampler, getSamplerOptions } from '../../utility/misc';
+import { PHYSICAL_BAKE_EXPOSURE } from '../../utility/physical';
 import type { AtmosphereParams } from '../../shaders';
 import { getAtmosphereParamsStruct, getDefaultAtmosphereParams } from '../../shaders';
 import type { HeightFogParams } from '../../shaders/fog';
@@ -213,6 +214,7 @@ export class ShaderHelper {
       pb.float('shadowDebugCascades'),
       pb.float('frameDeltaTime'),
       pb.float('elapsedTime'),
+      pb.float('preExposure'),
       pb.int('framestamp')
     ]);
     if (ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP) {
@@ -867,6 +869,7 @@ export class ShaderHelper {
       shadowDebugCascades: camera.shadowDebugCascades ? 1 : 0,
       frameDeltaTime: ctx.device.frameInfo.elapsedFrame * 0.001,
       elapsedTime: ctx.device.frameInfo.elapsedOverall * 0.001,
+      preExposure: this.getPreExposure(ctx),
       framestamp: ctx.device.frameInfo.frameCounter
     } as any;
     if (ctx.motionVectors && ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH) {
@@ -930,6 +933,70 @@ export class ShaderHelper {
     bindGroup.setTexture(UNIFORM_NAME_AERIALPERSPECTIVE_LUT, aerialPerspectiveLUT);
     bindGroup.setTexture(UNIFORM_NAME_SKYDISTANTLIGHT_LUT, skyDistantLightLUT);
   }
+  /**
+   * @internal
+   *
+   * Camera pre-exposure factor for scene-linear lighting quantities.
+   *
+   * @remarks
+   * Physical lighting authors light intensities in photometric units (lux, candela, cd/m²), whose
+   * magnitudes (~1e5 for daylight) neither fit an rgba16f render target nor leave usable headroom
+   * for specular highlights. Following Filament, the camera exposure is folded into every light
+   * quantity on the CPU so the HDR target stays near 1.0 and downstream passes need no unit
+   * awareness. Legacy returns 1 so its uploads stay byte-identical.
+   */
+  static getPreExposure(ctx: DrawContext) {
+    return ctx.scene.lightingMode === 'physical' ? ctx.camera.exposure : 1;
+  }
+  /**
+   * @internal
+   *
+   * Light color/intensity vector with the camera pre-exposure folded into the intensity component.
+   *
+   * @remarks
+   * Only the intensity (`w`) is scaled; the color stays untouched, matching Filament's
+   * `FScene::prepareDynamicLights`. The light's own cached vector is never mutated because it is
+   * shared across every camera rendering the scene.
+   */
+  static getPreExposedColorIntensity(light: PunctualLight, ctx: DrawContext, out?: Vector4) {
+    const src = light.diffuseAndIntensity;
+    const result = out ?? new Vector4();
+    result.setXYZW(src.x, src.y, src.z, src.w * this.getPreExposure(ctx));
+    return result;
+  }
+  /**
+   * @internal
+   *
+   * Environment lighting scale uploaded as `light.envLightStrength`.
+   *
+   * @remarks
+   * Legacy uses the unitless {@link EnvLightWrapper.strength}.
+   *
+   * Physical returns the ratio that converts the cached sky bake from its fixed storage exposure
+   * (`SkyRenderer.PHYSICAL_BAKE_EXPOSURE`) to the live camera exposure. Every environment source is
+   * normalized into that one space before it reaches the IBL -- the scattering atmosphere emits
+   * photometric luminance, authored 0..1 skyboxes/panoramas are lifted by
+   * {@link EnvLightWrapper.intensity} -- so no pass consuming `envLightStrength` has to know the
+   * sky type.
+   *
+   * The bake cannot simply hold raw cd/m²: the environment cubemap is `rg11b10uf`/`rgba16f` and a
+   * daylight sun overflows it to Inf, which `prefilterCubemap` then spreads across the whole IBL.
+   *
+   * {@link EnvLightWrapper.strength} multiplies the result in both modes. It is the only per-frame
+   * dimmer for environment lighting: the photometric `intensity` reaches the image solely through
+   * the cached bake, and a `scatter` sky does not even consult it (its brightness comes from the
+   * sun), so without this factor there would be no way to turn the IBL down without re-baking.
+   */
+  static getEnvLightLuminance(ctx: DrawContext) {
+    const env = ctx.env;
+    if (!env) {
+      return 0;
+    }
+    const strength = env.light.strength ?? 0;
+    return ctx.scene.lightingMode === 'physical'
+      ? (this.getPreExposure(ctx) / PHYSICAL_BAKE_EXPOSURE) * strength
+      : strength;
+  }
   /** @internal */
   static setLightUniforms(
     bindGroup: BindGroup,
@@ -939,8 +1006,7 @@ export class ShaderHelper {
     lightBuffer: StructuredBuffer,
     lightIndexTexture: Texture2D
   ) {
-    const envLightStrength =
-      ctx.scene.lightingMode === 'physical' ? ctx.env!.light.radianceScale : (ctx.env!.light.strength ?? 0);
+    const envLightStrength = this.getEnvLightLuminance(ctx);
     bindGroup.setValue('light', {
       sunDir: ctx.sunLight ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1) : this.defaultSunDir,
       clusterParams: clusterParams,
@@ -977,7 +1043,7 @@ export class ShaderHelper {
     this._lightUniformShadow.shadowCascades = shadowMapParams.numShadowCascades;
     this._lightUniformShadow.positionAndRange.set(light.positionAndRange);
     this._lightUniformShadow.directionAndCutoff.set(light.directionAndCutoff);
-    this._lightUniformShadow.diffuseAndIntensity.set(light.diffuseAndIntensity);
+    this.getPreExposedColorIntensity(light, ctx, this._lightUniformShadow.diffuseAndIntensity);
     this._lightUniformShadow.extraParams.set(light.extraParams);
     this._lightUniformShadow.cascadeDistances.set(shadowMapParams.cascadeDistances);
     this._lightUniformShadow.depthBiasValues.set(shadowMapParams.depthBiasValues[0]);
@@ -986,10 +1052,7 @@ export class ShaderHelper {
     shadowMapParams.impl!.getParams(this._lightUniformShadow.implParams);
     this._lightUniformShadow.shadowMatrices.set(shadowMapParams.shadowMatrices);
     this._lightUniformShadow.shadowStrength = light.shadow.shadowStrength;
-    this._lightUniformShadow.envLightStrength =
-      ctx.scene.lightingMode === 'physical'
-        ? (ctx.env?.light.radianceScale ?? 0)
-        : (ctx.env?.light.strength ?? 0);
+    this._lightUniformShadow.envLightStrength = this.getEnvLightLuminance(ctx);
     this._lightUniformShadow.envLightSpecularStrength = ctx.env?.light.specularStrength ?? 1;
     bindGroup.setValue('light', this._lightUniformShadow);
     bindGroup.setTexture(
@@ -1089,6 +1152,41 @@ export class ShaderHelper {
    */
   static getBakedSkyTexture(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_BAKED_SKY_MAP];
+  }
+  /**
+   * Samples the baked sky cubemap in the same pre-exposed space as the scene color buffer.
+   *
+   * @remarks
+   * The bake is cached and therefore exposure-independent, stored at the fixed
+   * `PHYSICAL_BAKE_EXPOSURE`. Anything that blends it against already-pre-exposed lit color (water
+   * reflection, blueprint sky lookups) must first convert it to the live exposure.
+   * `envLightStrength` carries exactly that ratio in physical mode, and the legacy environment
+   * strength (its established meaning) otherwise.
+   *
+   * @param scope - Current shader scope
+   * @param direction - Sampling direction
+   * @returns Pre-exposed sky radiance
+   */
+  static sampleBakedSkyPreExposed(scope: PBInsideFunctionScope, direction: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    return pb.mul(
+      pb.textureSampleLevel(this.getBakedSkyTexture(scope), direction, 0).rgb,
+      this.getEnvLightStrength(scope)
+    ) as PBShaderExp;
+  }
+  /**
+   * Gets the camera pre-exposure factor.
+   *
+   * @remarks
+   * The multiplier every photometric quantity is scaled by before it reaches the HDR target. 1 in
+   * legacy. Use it for material-authored emitters (emissive), which are not covered by the CPU-side
+   * light pre-exposure.
+   *
+   * @param scope - Current shader scope
+   * @returns The pre-exposure factor
+   */
+  static getPreExposureUniform(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope.camera.preExposure;
   }
   /**
    * Gets the elapsed time in seconds

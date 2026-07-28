@@ -14,6 +14,12 @@ export type HeightFogParams = {
   parameter4: Vector4; // [rgb=directionalInscatteringColor a=UNUSED]
   lightDir: Vector3;
   lightColor: Vector3;
+  /**
+   * Camera pre-exposure applied to the atmosphere-derived LUT samples (distant sky, aerial
+   * perspective). Those LUTs are baked exposure-independently, unlike the authored fog colors which
+   * are already pre-exposed on upload. 1 in legacy.
+   */
+  preExposure: number;
 };
 
 /** @internal */
@@ -24,7 +30,8 @@ export function getDefaultHeightFogParams() {
     parameter3: new Vector4(0.8, 1, 0, 4),
     parameter4: new Vector4(0, 0, 0, 0),
     lightDir: new Vector3(0, 1, 0),
-    lightColor: new Vector3(0, 0, 0)
+    lightColor: new Vector3(0, 0, 0),
+    preExposure: 1
   } as HeightFogParams;
 }
 
@@ -38,7 +45,8 @@ export function getHeightFogParamsStruct(pb: ProgramBuilder) {
     pb.float('dirInscatteringStartDistance'),
     pb.vec3('dirInscatteringColor'),
     pb.vec3('lightDir'),
-    pb.vec3('lightColor')
+    pb.vec3('lightColor'),
+    pb.float('preExposure')
   ]);
 }
 
@@ -94,6 +102,12 @@ export function calculateFog(
           this.worldPos,
           pb.vec3(32),
           apLut
+        );
+        // rgb is inscattered radiance from the exposure-independent AP LUT, so it takes the camera
+        // pre-exposure; alpha is transmittance and must stay unscaled.
+        this.atmosphericFogging = pb.vec4(
+          pb.mul(this.atmosphericFogging.rgb, this.heightFogParams.preExposure),
+          this.atmosphericFogging.a
         );
         this.$if(pb.notEqual(this.fogType, Fog.FOG_TYPE_NONE), function () {
           this.fogging = combineAerialPerspectiveFog(this, this.fogging, this.atmosphericFogging);
@@ -201,7 +215,12 @@ export function calculateHeightFog(
 
       this.$l.fogColor = this.params.parameter1.rgb;
       this.$if(pb.greaterThan(this.params.parameter3.y, 0), function () {
-        this.$l.skyContrib = pb.textureSampleLevel(skyDistantColorLut, pb.vec2(0.5), 0).rgb;
+        // The distant-sky LUT is baked exposure-independently (it feeds the cached IBL), so the
+        // camera pre-exposure is applied here. The authored fogColor above is already pre-exposed.
+        this.$l.skyContrib = pb.mul(
+          pb.textureSampleLevel(skyDistantColorLut, pb.vec2(0.5), 0).rgb,
+          this.params.preExposure
+        );
         this.fogColor = pb.add(this.fogColor, pb.mul(this.skyContrib, this.params.parameter3.y));
       });
       this.$l.fogFactor = pb.max(pb.min(this.fogFactor, this.params.parameter3.x), this.fading);

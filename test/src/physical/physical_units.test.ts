@@ -1,11 +1,14 @@
 import { MemoryFS, Vector4 } from '@zephyr3d/base';
+import type { DrawContext } from '../../../libs/scene/src';
 import {
   DirectionalLight,
+  PBRMetallicRoughnessMaterial,
   PerspectiveCamera,
   PointLight,
   RectLight,
   ResourceManager,
   Scene,
+  ShaderHelper,
   SkyRenderer,
   SpotLight,
   Tonemap,
@@ -15,7 +18,9 @@ import {
 } from '../../../libs/scene/src';
 
 describe('Physical lighting and camera units', () => {
-  test('keeps ACES input calibration independent of exposure mode', () => {
+  test('matches the ACESLegacy input calibration in both lighting modes', () => {
+    // Filament's ACESLegacy tone mapper pre-scales its input by 1/0.6 before the RRT+ODT fit.
+    // This is a property of the curve, not of the exposure, so it applies unconditionally.
     expect(Tonemap.ACES_INPUT_SCALE).toBeCloseTo(1 / 0.6, 12);
   });
 
@@ -73,7 +78,7 @@ describe('Physical lighting and camera units', () => {
     expect(rescaledIlluminance).toBeCloseTo(25, 10);
   });
 
-  test('normalizes physical light color by Rec.709 luminance without changing legacy output', () => {
+  test('keeps light color and intensity strictly separate in both lighting modes', () => {
     const scene = new Scene();
     const light = new PointLight(scene);
     light.color = new Vector4(1, 0, 0, 1);
@@ -84,12 +89,91 @@ describe('Physical lighting and camera units', () => {
     expect(light.diffuseAndIntensity.x).toBe(1);
     expect(light.diffuseAndIntensity.w).toBe(3);
 
+    // Physical stores the authored color verbatim, like Filament. Normalizing a saturated primary
+    // by its Rec.709 luminance would inflate the channel by ~4.7x here (1 / 0.2126) and up to
+    // ~13.8x for pure blue, overflowing the half-float lighting target.
     scene.lightingMode = 'physical';
     light.luminousIntensity = 100;
     const physicalColor = light.diffuseAndIntensity;
-    const luminance = physicalColor.x * 0.2126 + physicalColor.y * 0.7152 + physicalColor.z * 0.0722;
-    expect(luminance).toBeCloseTo(1, 6);
+    expect(physicalColor.x).toBe(1);
+    expect(physicalColor.y).toBe(0);
+    expect(physicalColor.z).toBe(0);
     expect(physicalColor.w).toBeCloseTo(100, 10);
+  });
+
+  test('preserves sun transmittance dimming in physical mode', () => {
+    // SkyRenderer.update() folds atmospheric transmittance into the sun's color. Normalizing that
+    // color by its luminance would cancel the magnitude and leave only the hue shift, so a sunset
+    // would stay at full brightness. Keeping the color verbatim preserves the dimming.
+    const scene = new Scene();
+    scene.lightingMode = 'physical';
+    const sun = new DirectionalLight(scene);
+    sun.illuminance = 100000;
+
+    sun.color = new Vector4(1, 1, 1, 1);
+    const noon = sun.diffuseAndIntensity;
+    const noonLuminance = noon.x * 0.2126 + noon.y * 0.7152 + noon.z * 0.0722;
+
+    // A low sun: heavy attenuation, reddened.
+    sun.color = new Vector4(0.6, 0.3, 0.1, 1);
+    const sunset = sun.diffuseAndIntensity;
+    const sunsetLuminance = sunset.x * 0.2126 + sunset.y * 0.7152 + sunset.z * 0.0722;
+
+    expect(sunsetLuminance).toBeLessThan(noonLuminance);
+    // The photometric intensity is untouched; only the color carries the transmittance.
+    expect(sunset.w).toBeCloseTo(noon.w, 6);
+  });
+
+  test('converts luminous power to intensity with Filament point and spot formulas', () => {
+    const scene = new Scene();
+    scene.lightingMode = 'physical';
+
+    // Point: I = phi / (4 pi)
+    const point = new PointLight(scene);
+    point.luminousPower = 4 * Math.PI * 25;
+    expect(point.luminousIntensity).toBeCloseTo(25, 10);
+    expect(point.luminousPower).toBeCloseTo(4 * Math.PI * 25, 10);
+
+    // Focused spot: I = phi / (2 pi (1 - cos(outer)))
+    const spot = new SpotLight(scene);
+    spot.outerConeAngle = Math.PI / 6;
+    const cone = 2 * Math.PI * (1 - Math.cos(Math.PI / 6));
+    spot.luminousPower = cone * 500;
+    expect(spot.luminousIntensity).toBeCloseTo(500, 10);
+    expect(spot.luminousPower).toBeCloseTo(cone * 500, 10);
+  });
+
+  test('packs the spot cone attenuation as Filament scale/offset and survives inner == outer', () => {
+    const scene = new Scene();
+    scene.lightingMode = 'physical';
+    const spot = new SpotLight(scene);
+    spot.outerConeAngle = Math.PI / 4;
+    spot.innerConeAngle = Math.PI / 8;
+
+    const cosOuter = Math.cos(Math.PI / 4);
+    const cosInner = Math.cos(Math.PI / 8);
+    const expectedScale = 1 / (cosInner - cosOuter);
+    expect(spot.extraParams.x).toBeCloseTo(expectedScale, 4);
+    expect(spot.extraParams.y).toBeCloseTo(-cosOuter * expectedScale, 4);
+    // saturate(cd * scale + offset) must reach 1 at the inner cone and 0 at the outer cone.
+    expect(cosInner * spot.extraParams.x + spot.extraParams.y).toBeCloseTo(1, 4);
+    expect(cosOuter * spot.extraParams.x + spot.extraParams.y).toBeCloseTo(0, 4);
+
+    // A degenerate cone must stay finite: Filament floors the denominator at 1/1024.
+    spot.innerConeAngle = spot.outerConeAngle;
+    expect(Number.isFinite(spot.extraParams.x)).toBe(true);
+    expect(spot.extraParams.x).toBeCloseTo(1024, 0);
+  });
+
+  test('clamps spot cone half-angles to Filament limits', () => {
+    const scene = new Scene();
+    const spot = new SpotLight(scene);
+    spot.outerConeAngle = 0;
+    expect(spot.outerConeAngle).toBeCloseTo((0.5 * Math.PI) / 180, 10);
+    spot.outerConeAngle = Math.PI;
+    expect(spot.outerConeAngle).toBeCloseTo(Math.PI * 0.5, 10);
+    spot.innerConeAngle = Math.PI;
+    expect(spot.innerConeAngle).toBeCloseTo(spot.outerConeAngle, 10);
   });
 
   test('loads scene data without physical fields in legacy mode', async () => {
@@ -111,21 +195,20 @@ describe('Physical lighting and camera units', () => {
     const scene = new Scene();
     scene.lightingMode = 'physical';
     scene.metersPerUnit = 0.01;
-    scene.env.light.radianceScale = 2.5;
+    scene.env.light.intensity = 25000;
 
     const serializedScene = await manager.serializeObject(scene);
     const restoredScene = (await manager.deserializeObject<Scene>(null, serializedScene))!;
     expect(serializedScene.Object).toMatchObject({
       LightingMode: 'physical',
       MetersPerUnit: 0.01,
-      EnvLightRadianceScale: 2.5
+      EnvLightIntensity: 25000
     });
     expect(restoredScene.lightingMode).toBe('physical');
     expect(restoredScene.metersPerUnit).toBeCloseTo(0.01);
-    expect(restoredScene.env.light.radianceScale).toBeCloseTo(2.5);
+    expect(restoredScene.env.light.intensity).toBeCloseTo(25000);
 
     const camera = new PerspectiveCamera(scene);
-    camera.exposureMode = 'manual';
     camera.aperture = 8;
     camera.shutterSpeed = 1 / 250;
     camera.ISO = 200;
@@ -153,7 +236,6 @@ describe('Physical lighting and camera units', () => {
       SensorFit: 'vertical'
     });
     expect(restoredCamera.aperture).toBeCloseTo(8);
-    expect(restoredCamera.exposureMode).toBe('manual');
     expect(restoredCamera.shutterSpeed).toBeCloseTo(1 / 250);
     expect(restoredCamera.ISO).toBeCloseTo(200);
     expect(restoredCamera.exposureCompensation).toBeCloseTo(1);
@@ -185,32 +267,91 @@ describe('Physical lighting and camera units', () => {
     expect(serializedRect.Object).toMatchObject({ Luminance: 750 });
   });
 
-  test('derives the physical fog luminance scale from the reference exposure', () => {
-    // FOG_PHYSICAL_LUMINANCE lifts authored 0..1 fog colors into the scene-linear space shared by
-    // the distant-sky term, which is 1/exposure(Sunny-16) larger than its legacy value. It must be
-    // the reciprocal of the reference exposure, not an arbitrary constant.
-    const referenceExposure = calculatePhysicalExposure(16, 1 / 125, 100);
-    expect(SkyRenderer.FOG_PHYSICAL_LUMINANCE).toBeCloseTo(1 / referenceExposure, 6);
-    // Same daylight anchor as the atmosphere normalization: fog scale = atmosphere scale x (10^5/10).
-    expect(SkyRenderer.FOG_PHYSICAL_LUMINANCE).toBeCloseTo(
-      SkyRenderer.PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE * (100000 / 10),
-      6
-    );
+  test('relates rect light luminance and luminous flux by the Lambertian area law', () => {
+    const scene = new Scene();
+    scene.lightingMode = 'physical';
+    const rect = new RectLight(scene);
+    rect.width = 2;
+    rect.height = 0.5;
+    rect.luminance = 750;
+
+    // phi = L * pi * area, one-sided Lambertian.
+    expect(rect.luminousFlux).toBeCloseTo(750 * Math.PI * 1, 6);
+    rect.luminousFlux = 1000 * Math.PI;
+    expect(rect.luminance).toBeCloseTo(1000, 6);
+
+    // Scene units must not change the photometric relation.
+    scene.metersPerUnit = 0.01;
+    const area = 2 * 0.5 * 0.01 * 0.01;
+    expect(rect.luminousFlux).toBeCloseTo(rect.luminance * Math.PI * area, 6);
   });
 
-  test('forces physical (manual) exposure for the SSGI firefly clamp regardless of exposure mode', () => {
+  test('exposes emissive as a photometric luminance with an exposure weight', async () => {
+    const manager = new ResourceManager(new MemoryFS());
+    const material = new PBRMetallicRoughnessMaterial();
+
+    // Default follows exposure, matching Filament's emissive.w default.
+    expect(material.emissiveExposureWeight).toBe(1);
+    // Physical emissive is a cd/m² luminance, so the strength must not be capped at 1.
+    material.emissiveStrength = 5000;
+    expect(material.emissiveStrength).toBeCloseTo(5000, 6);
+    material.emissiveExposureWeight = 0;
+    expect(material.emissiveExposureWeight).toBe(0);
+    material.emissiveExposureWeight = 5;
+    expect(material.emissiveExposureWeight).toBe(1);
+    material.emissiveExposureWeight = -1;
+    expect(material.emissiveExposureWeight).toBe(0);
+
+    material.emissiveExposureWeight = 0.25;
+    const serialized = await manager.serializeObject(material);
+    expect(serialized.Object).toMatchObject({
+      EmissiveStrength: 5000,
+      EmissiveExposureWeight: 0.25
+    });
+    const restored = (await manager.deserializeObject<PBRMetallicRoughnessMaterial>(null, serialized))!;
+    expect(restored.emissiveStrength).toBeCloseTo(5000, 6);
+    expect(restored.emissiveExposureWeight).toBeCloseTo(0.25, 6);
+  });
+
+  test('anchors the atmosphere normalization to the physical daylight reference', () => {
+    // PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE maps the photometric daylight reference (100,000 lux at
+    // Sunny 16) onto the atmosphere model's authored sun input of 10. The LUTs are baked
+    // exposure-independently, so at the reference exposure the sky lands on the legacy value.
+    const referenceExposure = calculatePhysicalExposure(16, 1 / 125, 100);
+    expect(100000 * SkyRenderer.PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE * referenceExposure).toBeCloseTo(10, 6);
+    // The retired fog anchor stays documented as the reciprocal of that reference exposure; fog now
+    // derives its luminance from EnvLightWrapper.intensity instead.
+    expect(SkyRenderer.FOG_PHYSICAL_LUMINANCE).toBeCloseTo(1 / referenceExposure, 6);
+  });
+
+  test('pre-exposes light intensity without touching the color, and leaves legacy unscaled', () => {
     const scene = new Scene();
     scene.lightingMode = 'physical';
     const camera = new PerspectiveCamera(scene);
     camera.aperture = 16;
     camera.shutterSpeed = 1 / 125;
     camera.ISO = 100;
-    camera.ssgiMaxRayIntensity = 10;
-    const expected = 10 / camera.exposure;
-    // 'legacy' must be ignored while the scene is physical; the clamp still divides by exposure.
-    camera.exposureMode = 'legacy';
-    expect(camera.effectiveSSGIMaxRayIntensity).toBeCloseTo(expected, 6);
-    camera.exposureMode = 'manual';
-    expect(camera.effectiveSSGIMaxRayIntensity).toBeCloseTo(expected, 6);
+    const light = new DirectionalLight(scene);
+    light.color = new Vector4(1, 0.5, 0.25, 1);
+    light.illuminance = 100000;
+
+    const ctx = { scene, camera } as unknown as DrawContext;
+    const preExposed = ShaderHelper.getPreExposedColorIntensity(light, ctx);
+    // Color is passed through verbatim (Filament's FScene::prepareDynamicLights).
+    expect(preExposed.x).toBeCloseTo(light.diffuseAndIntensity.x, 10);
+    expect(preExposed.y).toBeCloseTo(light.diffuseAndIntensity.y, 10);
+    expect(preExposed.z).toBeCloseTo(light.diffuseAndIntensity.z, 10);
+    // Only the intensity carries exposure, landing the HDR buffer near 1.0.
+    expect(preExposed.w).toBeCloseTo(light.diffuseAndIntensity.w * camera.exposure, 6);
+    expect(preExposed.w).toBeCloseTo(100000 / 38400, 6);
+    // The light's own cached vector must stay authored (it is shared across cameras).
+    expect(light.diffuseAndIntensity.w).toBeCloseTo(100000, 6);
+
+    scene.lightingMode = 'legacy';
+    expect(ShaderHelper.getPreExposure(ctx)).toBe(1);
+    expect(ShaderHelper.getPreExposedColorIntensity(light, ctx).w).toBeCloseTo(
+      light.diffuseAndIntensity.w,
+      10
+    );
   });
 });

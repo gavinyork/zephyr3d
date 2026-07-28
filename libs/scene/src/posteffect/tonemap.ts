@@ -4,19 +4,22 @@ import type { AbstractDevice, BindGroup, GPUProgram, Texture2D } from '@zephyr3d
 import type { DrawContext } from '../render';
 import { fetchSampler } from '../utility/misc';
 import type { Nullable } from '@zephyr3d/base';
-import type { LightingMode } from '../utility/physical';
 
 /**
  * The tonemap post effect
  * @public
  */
 export class Tonemap extends AbstractPostEffect {
-  /** @internal ACES input calibration, independent of camera exposure mode. */
+  /**
+   * @internal
+   *
+   * ACES input calibration. Matches Filament's `ACESLegacy` tone mapper, which pre-scales its input
+   * by `1 / 0.6` before the RRT+ODT fit. Applied in every lighting mode, independent of exposure.
+   */
   static readonly ACES_INPUT_SCALE = 1 / 0.6;
   private static _programTonemap: Nullable<GPUProgram> = null;
   private static _bindgroupTonemap: Nullable<BindGroup> = null;
   private _exposure: number;
-  private _mode: LightingMode;
   /**
    * Creates an instance of tonemap post effect
    */
@@ -24,16 +27,14 @@ export class Tonemap extends AbstractPostEffect {
     super();
     this._layer = PostEffectLayer.transparent;
     this._exposure = 1;
-    this._mode = 'legacy';
   }
-  /** Exposure interpretation and tonemap calibration mode. */
-  get mode() {
-    return this._mode;
-  }
-  set mode(val: LightingMode) {
-    this._mode = val === 'physical' ? 'physical' : 'legacy';
-  }
-  /** Exposure value */
+  /**
+   * Exposure multiplier applied before the ACES curve.
+   *
+   * @remarks
+   * Physical lighting pre-exposes every light quantity on the CPU, so this stays at 1 there and
+   * only legacy uses it as a brightness control.
+   */
   get exposure() {
     return this._exposure;
   }

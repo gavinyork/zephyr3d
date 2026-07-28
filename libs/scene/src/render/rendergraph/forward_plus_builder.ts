@@ -28,6 +28,7 @@ import { buildHiZ } from '../hzb';
 import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
 import { MaterialVaryingFlags } from '../../values';
+import { ShaderHelper } from '../../material/shader/helper';
 import { AbstractPostEffect, PostEffectLayer } from '../../posteffect/posteffect';
 import { RenderGraph } from './rendergraph';
 import { RenderGraphExecutor } from './executor';
@@ -556,7 +557,12 @@ const ClusterLightsModule: RenderModule<FrameGraphContext> = {
       builder.sideEffect();
       builder.setExecute(() => {
         ctx.clusteredLight = getClusteredLight();
-        ctx.clusteredLight.calculateLightIndex(ctx.camera, renderQueue, ctx.screenSpaceShadowMask);
+        ctx.clusteredLight.calculateLightIndex(
+          ctx.camera,
+          renderQueue,
+          ctx.screenSpaceShadowMask,
+          ShaderHelper.getPreExposure(ctx)
+        );
       });
     });
   }

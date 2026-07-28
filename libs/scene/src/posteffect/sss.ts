@@ -289,7 +289,7 @@ export class SSS extends AbstractPostEffect {
         ? mainTransmissionLight.directionAndCutoff.xyz()
         : { x: 0, y: 0, z: 1 };
     const sunColorIntensity = mainTransmissionLight
-      ? mainTransmissionLight.diffuseAndIntensity
+      ? ShaderHelper.getPreExposedColorIntensity(mainTransmissionLight, ctx)
       : { x: 1, y: 1, z: 1, w: 0 };
     const mainLightPosRange = mainTransmissionLight
       ? mainTransmissionLight.positionAndRange
@@ -400,17 +400,13 @@ export class SSS extends AbstractPostEffect {
         });
         bindGroup.setValue('light', {
           sunDir: new Float32Array([sunDir.x, sunDir.y, sunDir.z]),
-          envLightStrength: ctx.env
-            ? ctx.scene.lightingMode === 'physical'
-              ? ctx.env.light.radianceScale
-              : ctx.env.light.strength
-            : 0,
+          envLightStrength: ShaderHelper.getEnvLightLuminance(ctx),
           envLightSpecularStrength: ctx.env?.light.specularStrength ?? 1,
           shadowStrength: shadowLight.shadow.shadowStrength,
           shadowCascades: shadowMapParams.numShadowCascades,
           positionAndRange: shadowLight.positionAndRange,
           directionAndCutoff: shadowLight.directionAndCutoff,
-          diffuseAndIntensity: shadowLight.diffuseAndIntensity,
+          diffuseAndIntensity: ShaderHelper.getPreExposedColorIntensity(shadowLight, ctx),
           extraParams: shadowLight.extraParams,
           implParams: shadowMapParams.impl!.getParams(),
           cascadeDistances: shadowMapParams.cascadeDistances,

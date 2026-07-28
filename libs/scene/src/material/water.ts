@@ -393,7 +393,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         );
         this.refl.y = pb.max(this.refl.y, 0.1);
         this.reflectance = pb.mix(
-          pb.textureSampleLevel(ShaderHelper.getBakedSkyTexture(this), this.refl, 0).rgb,
+          // Blended against the pre-exposed scene color, so the exposure-independent sky bake has
+          // to be lifted into the same space.
+          ShaderHelper.sampleBakedSkyPreExposed(this, this.refl),
           pb.textureSampleLevel(ShaderHelper.getSceneColorTexture(this), this.hitInfo.xy, 0).rgb,
           this.hitInfo.w
         );

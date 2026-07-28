@@ -482,8 +482,8 @@ export class SSGI extends AbstractPostEffect {
       'radianceParams',
       new Vector4(
         ctx.camera.ssgiIntensity,
-        ctx.camera.effectiveSSGIMaxRayIntensity,
-        ctx.scene.lightingMode === 'physical' ? ctx.env!.light.radianceScale : ctx.env!.light.strength,
+        ctx.camera.ssgiMaxRayIntensity,
+        ShaderHelper.getEnvLightLuminance(ctx),
         ctx.device.frameInfo.frameCounter
       )
     );
@@ -892,11 +892,10 @@ export class SSGI extends AbstractPostEffect {
               this.iblIrradiance,
               pb.max(0, pb.sub(1, this.radianceParams.x))
             );
-            // Physical lighting operates in raw photometric units and the
-            // exposure-adjusted firefly limit can exceed rgba16f's range.
-            // Clamp before the render-target conversion; otherwise a finite
-            // value becomes Inf in the texture and every a-trous pass expands
-            // the contaminated region by its kernel radius.
+            // Clamp before the render-target conversion: a finite value that overflows becomes Inf
+            // in the texture, and every a-trous pass then expands the contaminated region by its
+            // kernel radius. Pre-exposed lighting makes this unlikely, but a bright emissive hit
+            // amplified by a low-probability ray can still reach it.
             this.$l.boundedIrradiance = pb.clamp(
               pb.max(this.irradiance, this.minimumIrradiance),
               pb.vec3(0),

@@ -533,14 +533,18 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       worldPos: PBShaderExp,
       posRange: PBShaderExp,
       dirCutoff: PBShaderExp,
-      innerCutoff?: PBShaderExp
+      angleScaleOffset?: PBShaderExp
     ) {
       const pb = scope.$builder;
-      const funcName = 'Z_calculateSpotLightAttenuation';
       const physical = this.drawContext.scene.lightingMode === 'physical';
+      // The two modes emit different falloff and cone-attenuation bodies, so they must not share a
+      // cached function under one name.
+      const funcName = physical
+        ? 'Z_calculateSpotLightAttenuationPhysical'
+        : 'Z_calculateSpotLightAttenuation';
       pb.func(
         funcName,
-        [pb.vec3('worldPos'), pb.vec4('posRange'), pb.vec4('dirCutoff'), pb.float('innerCutoff')],
+        [pb.vec3('worldPos'), pb.vec4('posRange'), pb.vec4('dirCutoff'), pb.vec2('angleScaleOffset')],
         function () {
           this.$l.dist = pb.distance(this.posRange.xyz, this.worldPos);
           if (physical) {
@@ -554,16 +558,24 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
             this.$l.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.posRange.w)));
             this.falloff = pb.mul(this.falloff, this.falloff);
           }
-          this.$l.spotFactor = pb.dot(
-            pb.normalize(pb.sub(this.worldPos, this.posRange.xyz)),
-            this.dirCutoff.xyz
-          );
-          this.spotFactor = pb.smoothStep(this.dirCutoff.w, this.innerCutoff, this.spotFactor);
+          this.$l.cd = pb.dot(pb.normalize(pb.sub(this.worldPos, this.posRange.xyz)), this.dirCutoff.xyz);
+          if (physical) {
+            // Filament's getAngleAttenuation: saturate(cd * scale + offset) squared. The scale/offset
+            // pair is derived CPU-side from the cone half-angles and already guards inner == outer.
+            this.$l.spotFactor = pb.clamp(
+              pb.add(pb.mul(this.cd, this.angleScaleOffset.x), this.angleScaleOffset.y),
+              0,
+              1
+            );
+            this.spotFactor = pb.mul(this.spotFactor, this.spotFactor);
+          } else {
+            this.$l.spotFactor = pb.smoothStep(this.dirCutoff.w, pb.mix(this.dirCutoff.w, 1, 0.5), this.cd);
+          }
           this.$return(pb.mul(this.spotFactor, this.falloff));
         }
       );
-      const resolvedInnerCutoff = physical && innerCutoff ? innerCutoff : pb.mix(dirCutoff.w, 1, 0.5);
-      return pb.getGlobalScope()[funcName](worldPos, posRange, dirCutoff, resolvedInnerCutoff);
+      const resolvedScaleOffset = physical && angleScaleOffset ? angleScaleOffset : pb.vec2(0);
+      return pb.getGlobalScope()[funcName](worldPos, posRange, dirCutoff, resolvedScaleOffset);
     }
     calculateLightAttenuation(
       scope: PBInsideFunctionScope,
@@ -583,7 +595,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           scope.$choice(
             pb.equal(type, LIGHT_TYPE_RECT),
             this.calculatePointLightAttenuation(scope, worldPos.xyz, posRange),
-            this.calculateSpotLightAttenuation(scope, worldPos.xyz, posRange, dirCutoff, extra?.x)
+            this.calculateSpotLightAttenuation(scope, worldPos.xyz, posRange, dirCutoff, extra?.xy)
           )
         )
       );

@@ -12,15 +12,18 @@ import type { Scene } from './scene';
 // ~100 at 0.01 lux, cutting clustered-cull cost with no perceptible difference under normal exposure.
 const PHYSICAL_LIGHT_CUTOFF_LUX = 0.25;
 
-function makeColorIntensity(color: Vector4, intensity: number, physical: boolean): Vector4 {
-  if (!physical) {
-    return new Vector4(color.x, color.y, color.z, intensity);
-  }
-  const luminance = color.x * 0.2126 + color.y * 0.7152 + color.z * 0.0722;
-  if (luminance <= 0.000001) {
-    return new Vector4(0, 0, 0, intensity);
-  }
-  return new Vector4(color.x / luminance, color.y / luminance, color.z / luminance, intensity);
+/**
+ * Pack a light's color and intensity into the shader's `diffuseAndIntensity` vector.
+ *
+ * @remarks
+ * The color is stored as authored in both lighting modes, matching Filament, which keeps color and
+ * intensity strictly separate. Normalizing the color by its luminance (so the photometric value
+ * describes total light output regardless of hue) was tried and rejected: a saturated primary has a
+ * low Rec.709 luminance, so the division inflates its channels by up to ~13.8x and pushes them out
+ * of the half-float range.
+ */
+function makeColorIntensity(color: Vector4, intensity: number): Vector4 {
+  return new Vector4(color.x, color.y, color.z, intensity);
 }
 
 /**
@@ -363,11 +366,7 @@ export class DirectionalLight extends PunctualLight {
     this._positionRange = new Vector4(a.x, a.y, a.z, -1);
     this._directionCutoff = new Vector4(b.x, b.y, b.z, 0);
     const physical = this.scene?.lightingMode === 'physical';
-    this._diffuseIntensity = makeColorIntensity(
-      this.color,
-      physical ? this.illuminance : this.intensity,
-      physical
-    );
+    this._diffuseIntensity = makeColorIntensity(this.color, physical ? this.illuminance : this.intensity);
     this._extraParams = new Vector4(0, 0, 0, this.lightType);
   }
   // adapt from DXSDK
@@ -625,6 +624,18 @@ export class PointLight extends PunctualLight {
     }
   }
   /**
+   * One-sided luminous flux in lumen.
+   *
+   * @remarks
+   * Derived from {@link luminousIntensity} with Filament's point-light conversion, `Φ = 4π·I`.
+   */
+  get luminousPower() {
+    return this._luminousIntensity * 4 * Math.PI;
+  }
+  set luminousPower(val: number) {
+    this.luminousIntensity = Math.max(0, val) / (4 * Math.PI);
+  }
+  /**
    * Sets the range of the light
    * @param val - The value to set
    * @returns self
@@ -698,6 +709,8 @@ export class PointLight extends PunctualLight {
     const b = this.worldMatrix.getRow(2);
     const physical = this.scene?.lightingMode === 'physical';
     const metersPerUnit = this.scene?.metersPerUnit ?? 1;
+    // diffuse/specular scales still multiply the shaded result, so the auto-derived influence
+    // radius has to account for them. SpotLight has no equivalent scales, hence no such factor.
     const physicalScale = Math.max(this._diffuseScale, this._specularScale);
     const range =
       this.range <= 0
@@ -711,7 +724,7 @@ export class PointLight extends PunctualLight {
       : this.intensity;
     this._positionRange = new Vector4(a.x, a.y, a.z, range);
     this._directionCutoff = new Vector4(b.x, b.y, b.z, -1);
-    this._diffuseIntensity = makeColorIntensity(this.color, resolvedIntensity, physical);
+    this._diffuseIntensity = makeColorIntensity(this.color, resolvedIntensity);
     this._extraParams = new Vector4(
       this._diffuseScale,
       this._specularScale,
@@ -726,6 +739,8 @@ export class PointLight extends PunctualLight {
  * @public
  */
 export class SpotLight extends PunctualLight {
+  /** @internal Smallest cone half-angle, matching Filament's 0.5 degree clamp. */
+  private static readonly MIN_CONE_ANGLE = (0.5 * Math.PI) / 180;
   /** @internal */
   protected _range: number;
   /** @internal */
@@ -791,12 +806,30 @@ export class SpotLight extends PunctualLight {
       }
     }
   }
+  /**
+   * One-sided luminous flux in lumen.
+   *
+   * @remarks
+   * Derived from {@link luminousIntensity} with Filament's focused-spot conversion,
+   * `Φ = I · 2π(1 - cos(θouter))`, so authoring in either unit stays consistent.
+   */
+  get luminousPower() {
+    return this._luminousIntensity * SpotLight.luminousPowerPerIntensity(this._outerConeAngle);
+  }
+  set luminousPower(val: number) {
+    this.luminousIntensity = Math.max(0, val) / SpotLight.luminousPowerPerIntensity(this._outerConeAngle);
+  }
+  /** @internal Filament focused-spot conversion factor: 2π(1 - cos(θouter)). */
+  private static luminousPowerPerIntensity(outerConeAngle: number) {
+    return Math.max(2 * Math.PI * (1 - Math.cos(outerConeAngle)), 1e-6);
+  }
   /** Physical inner cone half-angle in radians. */
   get innerConeAngle() {
     return this._innerConeAngle;
   }
   set innerConeAngle(val: number) {
-    const angle = Math.max(0, Math.min(val, this._outerConeAngle));
+    // Filament clamps to [0.5 degrees, outer]; the shader's scale/offset also guards inner == outer.
+    const angle = Math.max(SpotLight.MIN_CONE_ANGLE, Math.min(Math.abs(val), this._outerConeAngle));
     if (angle !== this._innerConeAngle) {
       this._innerConeAngle = angle;
       this.invalidateUniforms();
@@ -807,13 +840,27 @@ export class SpotLight extends PunctualLight {
     return this._outerConeAngle;
   }
   set outerConeAngle(val: number) {
-    const angle = Math.max(0.0001, Math.min(val, Math.PI * 0.5));
+    // Filament clamps both cone half-angles to [0.5 degrees, 90 degrees].
+    const angle = Math.max(SpotLight.MIN_CONE_ANGLE, Math.min(Math.abs(val), Math.PI * 0.5));
     if (angle !== this._outerConeAngle) {
       this._outerConeAngle = angle;
       this._innerConeAngle = Math.min(this._innerConeAngle, angle);
       this.invalidateUniforms();
       this.invalidateBoundingVolume();
     }
+  }
+  /**
+   * @internal
+   *
+   * Cone angle attenuation packed as `(scale, offset)` so the shader evaluates
+   * `saturate(cos(theta) * scale + offset)^2`, matching Filament's `getAngleAttenuation`.
+   * The `1/1024` floor keeps a degenerate `inner == outer` cone finite instead of dividing by zero.
+   */
+  private getAngleScaleOffset(): [number, number] {
+    const cosOuter = Math.cos(this._outerConeAngle);
+    const cosInner = Math.cos(Math.min(this._innerConeAngle, this._outerConeAngle));
+    const scale = 1 / Math.max(1 / 1024, cosInner - cosOuter);
+    return [scale, -cosOuter * scale];
   }
   /**
    * Sets the cutoff of the light
@@ -869,8 +916,9 @@ export class SpotLight extends PunctualLight {
       b.z,
       physical ? Math.cos(this.outerConeAngle) : this.cutoff
     );
-    this._diffuseIntensity = makeColorIntensity(this.color, resolvedIntensity, physical);
-    this._extraParams = new Vector4(physical ? Math.cos(this.innerConeAngle) : 0, 0, 0, this.lightType);
+    this._diffuseIntensity = makeColorIntensity(this.color, resolvedIntensity);
+    const [angleScale, angleOffset] = physical ? this.getAngleScaleOffset() : [0, 0];
+    this._extraParams = new Vector4(angleScale, angleOffset, 0, this.lightType);
   }
 }
 
@@ -959,7 +1007,14 @@ export class RectLight extends PunctualLight {
       this.invalidateUniforms();
     }
   }
-  /** One-sided Lambertian luminous flux in lumen. */
+  /**
+   * One-sided Lambertian luminous flux in lumen.
+   *
+   * @remarks
+   * Derived from {@link luminance}: `phi = L * pi * area`. Named `luminousFlux` rather than
+   * `luminousPower` because an area light is authored by its luminance, with flux as the derived
+   * convenience; point and spot lights are the other way round.
+   */
   get luminousFlux() {
     const metersPerUnit = this.scene?.metersPerUnit ?? 1;
     return this.luminance * Math.PI * this.width * this.height * metersPerUnit * metersPerUnit;
@@ -1015,11 +1070,7 @@ export class RectLight extends PunctualLight {
     this._positionRange = new Vector4(pos.x, pos.y, pos.z, this.range);
     this._directionCutoff = new Vector4(axisX.x, axisX.y, axisX.z, 0);
     const physical = this.scene?.lightingMode === 'physical';
-    this._diffuseIntensity = makeColorIntensity(
-      this.color,
-      physical ? this.luminance : this.intensity,
-      physical
-    );
+    this._diffuseIntensity = makeColorIntensity(this.color, physical ? this.luminance : this.intensity);
     this._extraParams = new Vector4(axisY.x, axisY.y, axisY.z, this.lightType);
   }
 }
