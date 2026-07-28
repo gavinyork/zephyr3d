@@ -47,6 +47,7 @@ import {
 import { isDesktopApp } from './services/desktop';
 import type { SceneView } from '../views/sceneview';
 import { clearScriptPropertyAccessorCache } from '../helpers/scriptprops';
+import type { EditorProjectAssetChange } from './pluginapi';
 
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
 
@@ -127,6 +128,8 @@ export class Editor {
   private readonly _plugins: EditorPluginManager;
   private readonly _systemPluginRegistrations: Map<string, SystemPluginRecord>;
   private _projectVFS: VFS;
+  private readonly _pendingScriptAssetChanges: Map<string, EditorProjectAssetChange>;
+  private _scriptAssetChangeTimer: ReturnType<typeof setTimeout>;
   constructor() {
     Editor._current = this;
     this._moduleManager = new ModuleManager();
@@ -139,6 +142,8 @@ export class Editor {
     this._plugins = new EditorPluginManager(this);
     this._systemPluginRegistrations = new Map();
     this._projectVFS = null;
+    this._pendingScriptAssetChanges = new Map();
+    this._scriptAssetChangeTimer = null;
   }
   static get current() {
     return this._current;
@@ -158,6 +163,11 @@ export class Editor {
       return;
     }
     this._projectVFS?.off('changed', this.handleProjectAssetChanged, this);
+    if (this._scriptAssetChangeTimer) {
+      clearTimeout(this._scriptAssetChangeTimer);
+      this._scriptAssetChangeTimer = null;
+    }
+    this._pendingScriptAssetChanges.clear();
     this._projectVFS = vfs;
     clearScriptPropertyAccessorCache();
     this._projectVFS?.on('changed', this.handleProjectAssetChanged, this);
@@ -165,21 +175,74 @@ export class Editor {
   private handleProjectAssetChanged(
     type: 'created' | 'deleted' | 'moved' | 'modified',
     path: string,
-    itemType: 'file' | 'directory'
+    itemType: 'file' | 'directory',
+    oldPath?: string
   ) {
     const normalizedPath = this._projectVFS.normalizePath(path);
-    if (type === 'moved' || itemType === 'directory') {
-      getEngine().scriptingSystem.registry.invalidate();
-      clearScriptPropertyAccessorCache();
-    } else if (/\.(?:[cm]?[jt]s|[jt]sx)$/i.test(normalizedPath)) {
-      getEngine().scriptingSystem.registry.invalidate(normalizedPath);
-      clearScriptPropertyAccessorCache(normalizedPath);
-    }
-    this._plugins.dispatchEvent('projectAssetChanged', {
+    const normalizedOldPath = oldPath ? this._projectVFS.normalizePath(oldPath) : undefined;
+    const change: EditorProjectAssetChange = {
       type,
       path: normalizedPath,
-      itemType
-    });
+      itemType,
+      oldPath: normalizedOldPath
+    };
+    this._plugins.dispatchEvent('projectAssetChanged', change);
+    this.queueScriptAssetChange(change);
+  }
+  private queueScriptAssetChange(change: EditorProjectAssetChange) {
+    const isSameOrChild = (path: string, parent: string) =>
+      path === parent || path.startsWith(parent.endsWith('/') ? parent : `${parent}/`);
+    const changePaths = (value: EditorProjectAssetChange) =>
+      value.oldPath ? [value.path, value.oldPath] : [value.path];
+    for (const [key, pending] of [...this._pendingScriptAssetChanges]) {
+      if (pending.itemType === 'directory') {
+        const pendingPaths = changePaths(pending);
+        if (changePaths(change).every((path) => pendingPaths.some((parent) => isSameOrChild(path, parent)))) {
+          return;
+        }
+      }
+      if (change.itemType === 'directory') {
+        const nextPaths = changePaths(change);
+        if (changePaths(pending).every((path) => nextPaths.some((parent) => isSameOrChild(path, parent)))) {
+          this._pendingScriptAssetChanges.delete(key);
+        }
+      }
+    }
+    const key =
+      change.type === 'moved'
+        ? `moved\0${change.oldPath ?? ''}\0${change.path}`
+        : `${change.itemType}\0${change.path}`;
+    this._pendingScriptAssetChanges.set(key, change);
+    if (!this._scriptAssetChangeTimer) {
+      this._scriptAssetChangeTimer = setTimeout(() => this.flushScriptAssetChanges(), 25);
+    }
+  }
+  private flushScriptAssetChanges() {
+    this._scriptAssetChangeTimer = null;
+    const changes = [...this._pendingScriptAssetChanges.values()];
+    this._pendingScriptAssetChanges.clear();
+    const scriptPaths = new Set<string>();
+    let invalidateAllScripts = false;
+    for (const change of changes) {
+      if (change.itemType === 'directory' || (change.type === 'moved' && !change.oldPath)) {
+        invalidateAllScripts = true;
+        break;
+      }
+      for (const path of change.oldPath ? [change.path, change.oldPath] : [change.path]) {
+        if (/\.(?:[cm]?[jt]s|[jt]sx)$/i.test(path)) {
+          scriptPaths.add(path);
+        }
+      }
+    }
+    if (invalidateAllScripts) {
+      getEngine().scriptingSystem.registry.invalidate();
+      clearScriptPropertyAccessorCache();
+    } else {
+      for (const path of scriptPaths) {
+        getEngine().scriptingSystem.registry.invalidate(path);
+        clearScriptPropertyAccessorCache(path);
+      }
+    }
   }
   registerPlugin(plugin: EditorPlugin) {
     this._plugins.registerPlugin(plugin);

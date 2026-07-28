@@ -312,7 +312,12 @@ export class GlobMatcher {
  *
  */
 export abstract class VFS extends Observable<{
-  changed: [type: 'created' | 'deleted' | 'moved' | 'modified', path: string, itemType: 'file' | 'directory'];
+  changed: [
+    type: 'created' | 'deleted' | 'moved' | 'modified',
+    path: string,
+    itemType: 'file' | 'directory',
+    oldPath?: string
+  ];
 }> {
   /** Whether this file system is read-only */
   protected _readOnly: boolean;
@@ -326,7 +331,12 @@ export abstract class VFS extends Observable<{
   private sortedMountPaths: string[];
   private mountChangeCallbacks: Map<
     string,
-    (type: 'created' | 'deleted' | 'moved' | 'modified', path: string, itemType: 'file' | 'directory') => void
+    (
+      type: 'created' | 'deleted' | 'moved' | 'modified',
+      path: string,
+      itemType: 'file' | 'directory',
+      oldPath?: string
+    ) => void
   >;
 
   /**
@@ -682,7 +692,7 @@ export abstract class VFS extends Observable<{
     // Do moving operation
     await this._move(normalizedSource, normalizedTarget, options);
 
-    this.onChange('moved', normalizedTarget, itemType);
+    this.onChange('moved', normalizedTarget, itemType, normalizedSource);
   }
 
   /**
@@ -1227,11 +1237,15 @@ export abstract class VFS extends Observable<{
     const callback = (
       type: 'created' | 'deleted' | 'moved' | 'modified',
       subPath: string,
-      itemType: 'file' | 'directory'
+      itemType: 'file' | 'directory',
+      oldSubPath?: string
     ) => {
       const rel = subPath === '/' ? '' : subPath;
       const hostPath = PathUtils.normalize(PathUtils.join(normalizedPath, rel));
-      this.onChange(type, hostPath, itemType);
+      const oldHostPath = oldSubPath
+        ? PathUtils.normalize(PathUtils.join(normalizedPath, oldSubPath === '/' ? '' : oldSubPath))
+        : undefined;
+      this.onChange(type, hostPath, itemType, oldHostPath);
     };
     this.mountChangeCallbacks.set(normalizedPath, callback);
     vfs.on('changed', callback, this);
@@ -1311,13 +1325,15 @@ export abstract class VFS extends Observable<{
    * @param type - Change type
    * @param path - File path that causes changing
    * @param itemType - File type
+   * @param oldPath - Previous path for move operations, when available
    */
   protected onChange(
     type: 'created' | 'deleted' | 'moved' | 'modified',
     path: string,
-    itemType: 'file' | 'directory'
+    itemType: 'file' | 'directory',
+    oldPath?: string
   ) {
-    this.dispatchEvent('changed', type, path, itemType);
+    this.dispatchEvent('changed', type, path, itemType, oldPath);
   }
   /**
    * Creates a directory in the file system.

@@ -1,4 +1,4 @@
-import { MemoryFS } from '@zephyr3d/base';
+import { MemoryFS, type HttpRequest } from '@zephyr3d/base';
 import { ResourceManager, SharedModel } from '@zephyr3d/scene';
 
 describe('asset cache invalidation', () => {
@@ -27,6 +27,43 @@ describe('asset cache invalidation', () => {
     expect(await manager.assetManager.fetchJsonData(path)).toEqual({ version: 2 });
   });
 
+  test('invalidates resolver-based cache keys through their source path index', async () => {
+    const vfs = new MemoryFS();
+    const manager = new ResourceManager(vfs);
+    const path = '/assets/resolved.txt';
+    const request = { urlResolver: () => 'resolved-cache-key' } as unknown as HttpRequest;
+
+    await vfs.writeFile(path, 'before', { encoding: 'utf8', create: true });
+    expect(await manager.assetManager.fetchTextData(path, undefined, request)).toBe('before');
+
+    await vfs.writeFile(path, 'after', { encoding: 'utf8' });
+    expect(await manager.assetManager.fetchTextData(path, undefined, request)).toBe('after');
+  });
+
+  test('recursively invalidates a directory without evicting sibling assets', async () => {
+    const vfs = new MemoryFS();
+    const manager = new ResourceManager(vfs);
+    const nestedPath = '/assets/group/nested.txt';
+    const siblingPath = '/assets/sibling.txt';
+    let siblingLoads = 0;
+
+    await vfs.writeFile(nestedPath, 'before', { encoding: 'utf8', create: true });
+    await vfs.writeFile(siblingPath, 'sibling', { encoding: 'utf8', create: true });
+    expect(await manager.assetManager.fetchTextData(nestedPath)).toBe('before');
+    expect(
+      await manager.assetManager.fetchTextData(siblingPath, (text) => {
+        siblingLoads++;
+        return text;
+      })
+    ).toBe('sibling');
+
+    await vfs.deleteDirectory('/assets/group', true);
+    await vfs.writeFile(nestedPath, 'after', { encoding: 'utf8', create: true });
+    expect(await manager.assetManager.fetchTextData(nestedPath)).toBe('after');
+    expect(await manager.assetManager.fetchTextData(siblingPath)).toBe('sibling');
+    expect(siblingLoads).toBe(1);
+  });
+
   test('clears path-based caches when switching VFS instances', async () => {
     const firstVFS = new MemoryFS();
     const secondVFS = new MemoryFS();
@@ -41,19 +78,49 @@ describe('asset cache invalidation', () => {
     expect(await manager.assetManager.fetchTextData(path)).toBe('second project');
   });
 
-  test('clears asset caches on move without dropping live asset ids', async () => {
+  test('invalidates both move paths without dropping unrelated caches or live asset ids', async () => {
     const vfs = new MemoryFS();
     const manager = new ResourceManager(vfs);
     const sourcePath = '/assets/source.txt';
     const targetPath = '/assets/target.txt';
     const liveAsset = {};
+    const unrelatedPath = '/assets/unrelated.txt';
+    let unrelatedLoads = 0;
 
     await vfs.writeFile(sourcePath, 'moved content', { encoding: 'utf8', create: true });
+    await vfs.writeFile(targetPath, 'stale target', { encoding: 'utf8', create: true });
+    await vfs.writeFile(unrelatedPath, 'unrelated', { encoding: 'utf8', create: true });
     expect(await manager.assetManager.fetchTextData(sourcePath)).toBe('moved content');
+    expect(await manager.assetManager.fetchTextData(targetPath)).toBe('stale target');
+    expect(
+      await manager.assetManager.fetchTextData(unrelatedPath, (text) => {
+        unrelatedLoads++;
+        return text;
+      })
+    ).toBe('unrelated');
     manager.setAssetId(liveAsset, sourcePath);
 
-    await vfs.move(sourcePath, targetPath);
+    await vfs.move(sourcePath, targetPath, { overwrite: true });
     expect(manager.getAssetId(liveAsset)).toBe(sourcePath);
+    expect(await manager.assetManager.fetchTextData(targetPath)).toBe('moved content');
+    expect(await manager.assetManager.fetchTextData(unrelatedPath)).toBe('unrelated');
+    expect(unrelatedLoads).toBe(1);
+  });
+
+  test('rewrites both move paths from a mounted VFS before invalidating caches', async () => {
+    const projectVFS = new MemoryFS();
+    const mountedVFS = new MemoryFS();
+    const manager = new ResourceManager(projectVFS);
+    const sourcePath = '/mounted/source.txt';
+    const targetPath = '/mounted/target.txt';
+
+    await mountedVFS.writeFile('/source.txt', 'moved content', { encoding: 'utf8', create: true });
+    await mountedVFS.writeFile('/target.txt', 'stale target', { encoding: 'utf8', create: true });
+    await projectVFS.mount('/mounted', mountedVFS);
+    expect(await manager.assetManager.fetchTextData(sourcePath)).toBe('moved content');
+    expect(await manager.assetManager.fetchTextData(targetPath)).toBe('stale target');
+
+    await mountedVFS.move('/source.txt', '/target.txt', { overwrite: true });
     expect(await manager.assetManager.fetchTextData(targetPath)).toBe('moved content');
   });
 

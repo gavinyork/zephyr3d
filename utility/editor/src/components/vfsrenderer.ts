@@ -2975,20 +2975,30 @@ export class VFSRenderer extends makeObservable(Disposable)<{
   onVFSChanged(
     type: 'created' | 'deleted' | 'moved' | 'modified',
     path: string,
-    itemType: 'file' | 'directory'
+    itemType: 'file' | 'directory',
+    oldPath?: string
   ) {
     const rootPath = this._vfs.normalizePath(this._options.rootDir || '/');
     const changedPath = this._vfs.normalizePath(path || '/');
-    if (type === 'moved' || changedPath === '/') {
+    const previousPath = oldPath ? this._vfs.normalizePath(oldPath) : null;
+    if ((type === 'moved' && !previousPath) || changedPath === '/') {
       this._thumbnailService.clear();
-    } else if (this._vfs.isParentOf(rootPath, changedPath)) {
-      this._thumbnailService.invalidate(changedPath, itemType === 'directory');
+    } else {
+      if (previousPath && this._vfs.isParentOf(rootPath, previousPath)) {
+        this._thumbnailService.invalidate(previousPath, itemType === 'directory');
+      }
+      if (this._vfs.isParentOf(rootPath, changedPath)) {
+        this._thumbnailService.invalidate(changedPath, itemType === 'directory');
+      }
     }
-    if (
-      changedPath !== '/' &&
-      !this._vfs.isParentOf(rootPath, changedPath) &&
-      !this._vfs.isParentOf(changedPath, rootPath)
-    ) {
+    const changedPathRelevant =
+      changedPath === '/' ||
+      this._vfs.isParentOf(rootPath, changedPath) ||
+      this._vfs.isParentOf(changedPath, rootPath);
+    const previousPathRelevant =
+      !!previousPath &&
+      (this._vfs.isParentOf(rootPath, previousPath) || this._vfs.isParentOf(previousPath, rootPath));
+    if (!changedPathRelevant && !previousPathRelevant) {
       return;
     }
     this.updateReferenceCandidateCacheOnVFSChange(type, changedPath, itemType);

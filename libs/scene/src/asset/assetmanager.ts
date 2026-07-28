@@ -180,6 +180,18 @@ export interface ModelLoader {
   loadModel(path: string, vfs?: VFS): Promise<SharedModel>;
 }
 
+type AssetCacheKind =
+  | 'texture'
+  | 'model'
+  | 'binary'
+  | 'font'
+  | 'text'
+  | 'blueprint'
+  | 'material'
+  | 'primitive'
+  | 'skeleton'
+  | 'json';
+
 /**
  * Centralized asset manager for loading and caching resources.
  *
@@ -256,6 +268,10 @@ export class AssetManager {
     [url: string]: Promise<any>;
   };
   /** @internal */
+  private readonly _cacheKeysByPath: Map<string, Set<string>>;
+  /** @internal */
+  private readonly _cachePathByKey: Map<string, string>;
+  /** @internal */
   private readonly _resourceManager: ResourceManager;
   /**
    * Creates an instance of AssetManager
@@ -272,6 +288,8 @@ export class AssetManager {
     this._fontAssets = {};
     this._textDatas = {};
     this._jsonDatas = {};
+    this._cacheKeysByPath = new Map();
+    this._cachePathByKey = new Map();
   }
   /**
    * VFS used to read resources (files, URLs, virtual mounts).
@@ -303,6 +321,8 @@ export class AssetManager {
     this._binaryDatas = {};
     this._textDatas = {};
     this._jsonDatas = {};
+    this._cacheKeysByPath.clear();
+    this._cachePathByKey.clear();
   }
   /**
    * Evicts cached data loaded from a VFS path.
@@ -315,27 +335,26 @@ export class AssetManager {
    */
   invalidateAsset(path: string, recursive = false) {
     const normalizedPath = this.vfs.normalizePath(path);
-    const matches = (key: string) => this.cachePathMatches(key, normalizedPath, recursive);
-    const matchesTexture = (key: string) => {
-      const firstSeparator = key.indexOf(':');
-      const lastSeparator = key.lastIndexOf(':');
-      const sourcePath =
-        firstSeparator >= 0 && lastSeparator > firstSeparator
-          ? key.slice(firstSeparator + 1, lastSeparator)
-          : key;
-      return this.cachePathMatches(sourcePath, normalizedPath, recursive);
-    };
     let removed = 0;
-    removed += this.clearCacheEntries(this._textures, matchesTexture);
-    removed += this.clearCacheEntries(this._models, matches);
-    removed += this.clearCacheEntries(this._materials, matches);
-    removed += this.clearCacheEntries(this._primitives, matches);
-    removed += this.clearCacheEntries(this._skeletons, matches);
-    removed += this.clearCacheEntries(this._bluePrints, matches);
-    removed += this.clearCacheEntries(this._fontAssets, matches);
-    removed += this.clearCacheEntries(this._binaryDatas, matches);
-    removed += this.clearCacheEntries(this._textDatas, matches);
-    removed += this.clearCacheEntries(this._jsonDatas, matches);
+    const indexedPaths = recursive
+      ? [...this._cacheKeysByPath.keys()].filter((sourcePath) =>
+          this.cachePathMatches(sourcePath, normalizedPath, true)
+        )
+      : [normalizedPath];
+    for (const sourcePath of indexedPaths) {
+      const tokens = this._cacheKeysByPath.get(sourcePath);
+      if (!tokens) {
+        continue;
+      }
+      for (const token of [...tokens]) {
+        const separator = token.indexOf('\0');
+        const kind = token.slice(0, separator) as AssetCacheKind;
+        const key = token.slice(separator + 1);
+        if (this.removeCacheEntry(kind, key)) {
+          removed++;
+        }
+      }
+    }
     return removed;
   }
   private clearCacheEntries<T>(cache: Record<string, T>, matches: (key: string) => boolean = () => true) {
@@ -354,14 +373,86 @@ export class AssetManager {
     return removed;
   }
   private cachePathMatches(cachePath: string, normalizedPath: string, recursive: boolean) {
-    let normalizedCachePath = cachePath;
-    if (!/^(?:[a-z]+:)?\/\//i.test(cachePath) && !cachePath.startsWith('data:')) {
-      normalizedCachePath = this.vfs.normalizePath(cachePath);
-    }
     return (
-      normalizedCachePath === normalizedPath ||
-      (recursive && normalizedCachePath.startsWith(normalizedPath.endsWith('/') ? normalizedPath : `${normalizedPath}/`))
+      cachePath === normalizedPath ||
+      (recursive && cachePath.startsWith(normalizedPath.endsWith('/') ? normalizedPath : `${normalizedPath}/`))
     );
+  }
+  private normalizeAssetSourcePath(path: string) {
+    return /^(?:[a-z]+:)?\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:')
+      ? path
+      : this.vfs.normalizePath(path);
+  }
+  private getCache(kind: AssetCacheKind): Record<string, unknown> {
+    switch (kind) {
+      case 'texture':
+        return this._textures;
+      case 'model':
+        return this._models;
+      case 'binary':
+        return this._binaryDatas;
+      case 'font':
+        return this._fontAssets;
+      case 'text':
+        return this._textDatas;
+      case 'blueprint':
+        return this._bluePrints;
+      case 'material':
+        return this._materials;
+      case 'primitive':
+        return this._primitives;
+      case 'skeleton':
+        return this._skeletons;
+      case 'json':
+        return this._jsonDatas;
+    }
+  }
+  private getCacheToken(kind: AssetCacheKind, key: string) {
+    return `${kind}\0${key}`;
+  }
+  private trackCacheEntry(kind: AssetCacheKind, key: string, sourcePath: string) {
+    const token = this.getCacheToken(kind, key);
+    const normalizedSourcePath = this.normalizeAssetSourcePath(sourcePath);
+    const previousPath = this._cachePathByKey.get(token);
+    if (previousPath === normalizedSourcePath) {
+      return;
+    }
+    if (previousPath) {
+      const previousKeys = this._cacheKeysByPath.get(previousPath);
+      previousKeys?.delete(token);
+      if (previousKeys?.size === 0) {
+        this._cacheKeysByPath.delete(previousPath);
+      }
+    }
+    let keys = this._cacheKeysByPath.get(normalizedSourcePath);
+    if (!keys) {
+      keys = new Set();
+      this._cacheKeysByPath.set(normalizedSourcePath, keys);
+    }
+    keys.add(token);
+    this._cachePathByKey.set(token, normalizedSourcePath);
+  }
+  private removeCacheEntry(kind: AssetCacheKind, key: string) {
+    const cache = this.getCache(kind);
+    const existed = key in cache;
+    if (existed) {
+      const cached = cache[key];
+      if (cached instanceof DWeakRef) {
+        cached.dispose();
+      }
+      delete cache[key];
+    }
+    const token = this.getCacheToken(kind, key);
+    const sourcePath = this._cachePathByKey.get(token);
+    if (sourcePath) {
+      const keys = this._cacheKeysByPath.get(sourcePath);
+      keys?.delete(token);
+      if (keys?.size === 0) {
+        this._cacheKeysByPath.delete(sourcePath);
+      }
+      this._cachePathByKey.delete(token);
+    }
+    return existed;
   }
   /**
    * Removes a cached font asset entry by URL.
@@ -372,11 +463,7 @@ export class AssetManager {
    * @returns `true` if a cache entry existed and was removed.
    */
   releaseFontAsset(url: string) {
-    if (url in this._fontAssets) {
-      delete this._fontAssets[url];
-      return true;
-    }
-    return false;
+    return this.removeCacheEntry('font', url);
   }
   /**
    * Remove one material entry from cache.
@@ -385,15 +472,7 @@ export class AssetManager {
    * @returns `true` if an entry existed and was removed.
    */
   invalidateMaterial(url: string) {
-    if (url in this._materials) {
-      const cached = this._materials[url];
-      if (cached instanceof DWeakRef) {
-        cached.dispose();
-      }
-      delete this._materials[url];
-      return true;
-    }
-    return false;
+    return this.removeCacheEntry('material', url);
   }
   /**
    * Register a texture loader (highest priority first).
@@ -438,6 +517,7 @@ export class AssetManager {
     if (!P) {
       P = this.loadTextData(url, postProcess, options?.overrideVFS);
       this._textDatas[hash] = P;
+      this.trackCacheEntry('text', hash, url);
     }
     return P;
   }
@@ -463,6 +543,7 @@ export class AssetManager {
     if (!P) {
       P = this.loadJsonData<T>(url, postProcess, options?.overrideVFS);
       this._jsonDatas[hash] = P;
+      this.trackCacheEntry('json', hash, url);
     }
     return P;
   }
@@ -487,6 +568,7 @@ export class AssetManager {
     if (!P) {
       P = this.loadBinaryData(url, postProcess, options?.overrideVFS);
       this._binaryDatas[hash] = P;
+      this.trackCacheEntry('binary', hash, url);
     }
     return P;
   }
@@ -517,6 +599,7 @@ export class AssetManager {
           });
       });
       this._fontAssets[hash] = P;
+      this.trackCacheEntry('font', hash, url);
     }
     return P;
   }
@@ -535,6 +618,7 @@ export class AssetManager {
     if (!P) {
       P = this.loadBluePrint(url, options?.overrideVFS);
       this._bluePrints[hash] = P;
+      this.trackCacheEntry('blueprint', hash, url);
     }
     return P;
   }
@@ -556,6 +640,7 @@ export class AssetManager {
     } else if (!P || P instanceof DWeakRef) {
       P = this.loadMaterial<T>(url, false, options?.overrideVFS);
       this._materials[hash] = P;
+      this.trackCacheEntry('material', hash, url);
     }
     const material = await P;
     if (this._materials[hash] === P) {
@@ -581,6 +666,7 @@ export class AssetManager {
     } else if (!P || P instanceof DWeakRef) {
       P = this.loadPrimitive<T>(url, options?.overrideVFS);
       this._primitives[hash] = P;
+      this.trackCacheEntry('primitive', hash, url);
     }
     const primitive = await P;
     if (this._primitives[hash] === P) {
@@ -627,6 +713,7 @@ export class AssetManager {
           options?.overrideVFS
         ) as Promise<T>;
         this._textures[hash] = P;
+        this.trackCacheEntry('texture', hash, url);
       }
       const tex: T = await P;
       if (this._textures[hash] === P) {
@@ -654,6 +741,7 @@ export class AssetManager {
     } else if (!P || P instanceof DWeakRef) {
       P = this.loadModel(url, options, options?.overrideVFS);
       this._models[hash] = P;
+      this.trackCacheEntry('model', hash, url);
     }
     const sharedModel = await P;
     if (this._models[hash] === P) {
@@ -1255,7 +1343,7 @@ export class AssetManager {
     };
   }
   invalidateBluePrint(path: string) {
-    delete this._bluePrints[path];
+    this.removeCacheEntry('blueprint', path);
   }
   async loadBluePrint(path: string, vfs?: VFS) {
     try {

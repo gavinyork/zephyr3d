@@ -1242,27 +1242,42 @@ export class ResourceManager {
   private handleVFSChanged(
     type: 'created' | 'deleted' | 'moved' | 'modified',
     path: string,
-    itemType: 'file' | 'directory'
+    itemType: 'file' | 'directory',
+    oldPath?: string
   ) {
     if (type === 'moved') {
-      // The current VFS event does not expose the old path, so both sides cannot be invalidated precisely.
-      this._prefabContentCache?.clear();
-      this._assetManager.clearCache();
+      if (!oldPath) {
+        this._prefabContentCache?.clear();
+        this._assetManager.clearCache();
+        return;
+      }
+      const normalizedOldPath = this._vfs.normalizePath(oldPath);
+      const normalizedPath = this._vfs.normalizePath(path);
+      const recursive = itemType === 'directory';
+      this._assetManager.invalidateAsset(normalizedOldPath, recursive);
+      this._assetManager.invalidateAsset(normalizedPath, recursive);
+      this.invalidatePrefabContent(normalizedOldPath, recursive);
+      this.invalidatePrefabContent(normalizedPath, recursive);
       return;
     }
     const normalizedPath = this._vfs.normalizePath(path);
-    this._assetManager.invalidateAsset(normalizedPath, itemType === 'directory');
-    if (this._prefabContentCache) {
-      if (itemType === 'directory') {
-        const prefix = normalizedPath.endsWith('/') ? normalizedPath : `${normalizedPath}/`;
-        for (const key of [...this._prefabContentCache.keys()]) {
-          if (key === normalizedPath || key.startsWith(prefix)) {
-            this._prefabContentCache.delete(key);
-          }
+    const recursive = itemType === 'directory';
+    this._assetManager.invalidateAsset(normalizedPath, recursive);
+    this.invalidatePrefabContent(normalizedPath, recursive);
+  }
+  private invalidatePrefabContent(path: string, recursive: boolean) {
+    if (!this._prefabContentCache) {
+      return;
+    }
+    if (recursive) {
+      const prefix = path.endsWith('/') ? path : `${path}/`;
+      for (const key of [...this._prefabContentCache.keys()]) {
+        if (key === path || key.startsWith(prefix)) {
+          this._prefabContentCache.delete(key);
         }
-      } else {
-        this._prefabContentCache.delete(normalizedPath);
       }
+    } else {
+      this._prefabContentCache.delete(path);
     }
   }
   private static readonly _pathPattern = /^([^\][]+)(?:\[(\d+)\])?$/;

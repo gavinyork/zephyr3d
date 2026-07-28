@@ -27,6 +27,7 @@ export type EditorProjectAssetChange = {
   type: 'created' | 'deleted' | 'moved' | 'modified';
   path: string;
   itemType: 'file' | 'directory';
+  oldPath?: string;
 };
 
 export type EditorHost = {
