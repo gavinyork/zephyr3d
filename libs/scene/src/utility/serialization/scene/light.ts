@@ -612,6 +612,7 @@ export function getPointLightClass(): SerializableClass {
           type: 'float',
           default: 100,
           options: {
+            label: 'Luminous (cd)',
             animatable: true,
             minValue: 0,
             maxValue: 1000000
@@ -621,25 +622,6 @@ export function getPointLightClass(): SerializableClass {
           },
           set(this: PointLight, value) {
             this.luminousIntensity = value.num[0];
-          },
-          isHidden(this: PointLight) {
-            return this.scene?.lightingMode !== 'physical';
-          }
-        },
-        {
-          name: 'LuminousPower',
-          description: 'Physical luminous flux in lumen (4pi x candela)',
-          type: 'float',
-          options: {
-            animatable: true,
-            minValue: 0,
-            group: 'Physical'
-          },
-          get(this: PointLight, value) {
-            value.num[0] = this.luminousPower;
-          },
-          set(this: PointLight, value) {
-            this.luminousPower = value.num[0];
           },
           isHidden(this: PointLight) {
             return this.scene?.lightingMode !== 'physical';
