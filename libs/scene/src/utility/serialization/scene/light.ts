@@ -562,9 +562,10 @@ export function getDirectionalLightClass(): SerializableClass {
           type: 'float',
           default: 100000,
           options: {
+            label: 'Illuminance (lux)',
             animatable: true,
             minValue: 0,
-            maxValue: 200000
+            group: 'Physical'
           },
           get(this: DirectionalLight, value) {
             value.num[0] = this.illuminance;
@@ -607,21 +608,41 @@ export function getPointLightClass(): SerializableClass {
     getProps() {
       return defineProps([
         {
+          // Storage only, never shown: candela is the unit the shader consumes and the only one
+          // safe to persist, but LuminousPower below is the single field authors edit.
           name: 'LuminousIntensity',
           description: 'Physical luminous intensity in candela',
           type: 'float',
           default: 100,
           options: {
-            label: 'Luminous (cd)',
-            animatable: true,
-            minValue: 0,
-            maxValue: 1000000
+            minValue: 0
           },
           get(this: PointLight, value) {
             value.num[0] = this.luminousIntensity;
           },
           set(this: PointLight, value) {
             this.luminousIntensity = value.num[0];
+          },
+          isHidden: () => true
+        },
+        {
+          // The authored field. Non-persistent because LuminousIntensity above is the value of
+          // record -- saving both would put the same quantity in the scene file twice.
+          name: 'LuminousPower',
+          description: 'Physical luminous flux in lumen (4pi x candela)',
+          type: 'float',
+          options: {
+            label: 'Luminous power (lm)',
+            animatable: true,
+            minValue: 0,
+            group: 'Physical'
+          },
+          isPersistent: () => false,
+          get(this: PointLight, value) {
+            value.num[0] = this.luminousPower;
+          },
+          set(this: PointLight, value) {
+            this.luminousPower = value.num[0];
           },
           isHidden(this: PointLight) {
             return this.scene?.lightingMode !== 'physical';
@@ -635,8 +656,7 @@ export function getPointLightClass(): SerializableClass {
           default: 10,
           options: {
             animatable: true,
-            minValue: 0,
-            maxValue: 1000
+            minValue: 0
           },
           get(this: PointLight, value) {
             value.num[0] = this.range;
@@ -715,14 +735,17 @@ export function getSpotLightClass(): SerializableClass {
     getProps() {
       return defineProps([
         {
+          // Storage only, never shown. Persisting candela is also required for correctness here:
+          // the lumen conversion depends on the outer cone angle, which is a separate property
+          // applied later in this list, so a persisted lumen value would be converted back against
+          // the constructor's default angle on load -- silently changing the brightness of every
+          // spot light whose cone is not 45 degrees.
           name: 'LuminousIntensity',
           description: 'Physical luminous intensity in candela',
           type: 'float',
           default: 1000,
           options: {
-            animatable: true,
-            minValue: 0,
-            maxValue: 1000000
+            minValue: 0
           },
           get(this: SpotLight, value) {
             value.num[0] = this.luminousIntensity;
@@ -730,19 +753,20 @@ export function getSpotLightClass(): SerializableClass {
           set(this: SpotLight, value) {
             this.luminousIntensity = value.num[0];
           },
-          isHidden(this: SpotLight) {
-            return this.scene?.lightingMode !== 'physical';
-          }
+          isHidden: () => true
         },
         {
+          // The authored field. See LuminousIntensity above for why it is not the persisted one.
           name: 'LuminousPower',
           description: 'Physical luminous flux in lumen (2pi(1-cos(outer)) x candela)',
           type: 'float',
           options: {
+            label: 'Luminous power (lm)',
             animatable: true,
             minValue: 0,
             group: 'Physical'
           },
+          isPersistent: () => false,
           get(this: SpotLight, value) {
             value.num[0] = this.luminousPower;
           },
@@ -761,8 +785,7 @@ export function getSpotLightClass(): SerializableClass {
           default: 10,
           options: {
             animatable: true,
-            minValue: 0,
-            maxValue: 1000
+            minValue: 0
           },
           get(this: SpotLight, value) {
             value.num[0] = this.range;
@@ -855,9 +878,10 @@ export function getRectLightClass(): SerializableClass {
           type: 'float',
           default: 100,
           options: {
+            label: 'Luminance (nit)',
             animatable: true,
             minValue: 0,
-            maxValue: 1000000
+            group: 'Physical'
           },
           get(this: RectLight, value) {
             value.num[0] = this.luminance;
@@ -876,8 +900,7 @@ export function getRectLightClass(): SerializableClass {
           default: 10,
           options: {
             animatable: true,
-            minValue: 0,
-            maxValue: 1000
+            minValue: 0
           },
           get(this: RectLight, value) {
             value.num[0] = this.range;
