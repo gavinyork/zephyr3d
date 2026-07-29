@@ -77,6 +77,11 @@ export class SSR extends AbstractPostEffect {
   setup(s: PostEffectSetupContext): RGHandle {
     const { graph, ctx, history } = s;
     const linearDepthHandle = s.blackboard.get(FrameResources.LinearDepth);
+    // Reflected geometry must contribute its own radiance, not the fog the camera
+    // ray picked up on the way to it, which would otherwise be applied twice:
+    // once inside the reflection and again over the final image. Only published
+    // when the scene has fog; without it SceneColor is already fog free.
+    const noFogHandle = s.blackboard.get(FrameResources.SceneColorNoFog);
     const texDesc: RGTextureDesc = {
       format: 'rgba16f',
       sizeMode: 'absolute',
@@ -125,6 +130,9 @@ export class SSR extends AbstractPostEffect {
     // 2. Resolve reflection color from the intersect result.
     const resolveHandle = graph.addPass('SSR:Resolve', (builder) => {
       builder.read(s.input);
+      if (noFogHandle) {
+        builder.read(noFogHandle);
+      }
       builder.read(intersectHandle);
       readCommon(builder);
       const out = builder.createTexture({ ...texDesc, label: 'SSR:resolve' });
@@ -144,7 +152,7 @@ export class SSR extends AbstractPostEffect {
           const inputTex = rg.getTexture<Texture2D>(s.input);
           this.resolve(
             ctx,
-            ctx.sceneColorTexture ?? inputTex,
+            noFogHandle ? rg.getTexture<Texture2D>(noFogHandle) : (ctx.sceneColorTexture ?? inputTex),
             getLinearDepth(rg),
             rg.getTexture<Texture2D>(intersectHandle)
           );

@@ -98,14 +98,31 @@ describe('SSGI shader generation', () => {
     expect(traceProgram.fragmentSource).toContain('hitFinite');
     expect(traceProgram.fragmentSource).toContain('screenRadianceFinite');
     expect(traceProgram.fragmentSource).toContain('boundedIrradiance');
+    // Visibility must stay separate from radiance validity, and the average must
+    // run over resolved rays so indeterminate ones do not read as unoccluded sky.
+    expect(traceProgram.fragmentSource).toContain('occluded');
+    expect(traceProgram.fragmentSource).toContain('determinateCount');
+    expect(traceProgram.fragmentSource).toContain('escapedSum');
+    // Measured bounce light must survive independently of the sky removal, so an
+    // occluding hit can never subtract the sky without adding its own radiance.
+    expect(traceProgram.fragmentSource).toContain('bounceGain');
+    expect(traceProgram.fragmentSource).toContain('skyLoss');
     const temporalProgram = effect.createTemporalProgram(ctx, false);
     expect(temporalProgram).toBeTruthy();
     expect(temporalProgram.fragmentSource).toContain('boundedLuminance');
     if (type === 'webgpu') {
-      expect(effect.createTraceProgram(ctx, true, true)).toBeTruthy();
+      const historyTraceProgram = effect.createTraceProgram(ctx, true, true);
+      expect(historyTraceProgram).toBeTruthy();
+      // Failed reprojection must fall back to this frame's colour, not to IBL.
+      expect(historyTraceProgram.fragmentSource).toContain('currentColorTex');
+      expect(historyTraceProgram.fragmentSource).toContain('previousColorTex');
       expect(effect.createTemporalProgram(ctx, true)).toBeTruthy();
     }
-    expect(effect.createAtrousProgram(ctx)).toBeTruthy();
+    const atrousProgram = effect.createAtrousProgram(ctx);
+    expect(atrousProgram).toBeTruthy();
+    // Short-history pixels have to widen the kernel instead of preserving noise.
+    expect(atrousProgram.fragmentSource).toContain('historyConfidence');
+    expect(atrousProgram.fragmentSource).toContain('effStep');
     expect(effect.createSurfaceProgram(ctx)).toBeTruthy();
     expect(effect.createUpsampleProgram(ctx)).toBeTruthy();
   });

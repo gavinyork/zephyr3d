@@ -15,6 +15,9 @@ describe('SSGI configuration and serialization', () => {
       denoisePasses: 3
     });
     expect(camera.ssgiIntensity).toBeCloseTo(0.7);
+    // Occluding hits remove the sky in full by default; 0 reproduces the
+    // pre-occlusion behaviour where only readable hits contributed.
+    expect(camera.ssgiSkyOcclusion).toBeCloseTo(1);
     expect(camera.ssgiMaxDistance).toBeCloseTo(32);
     expect(camera.ssgiThickness).toBeCloseTo(0.5);
     expect(camera.ssgiStride).toBe(1);
@@ -74,6 +77,18 @@ describe('SSGI configuration and serialization', () => {
     });
   });
 
+  test('clamps sky occlusion to a normalized fraction', () => {
+    const scene = new Scene();
+    const camera = new Camera(scene);
+
+    camera.ssgiSkyOcclusion = 0.4;
+    expect(camera.ssgiSkyOcclusion).toBeCloseTo(0.4);
+    camera.ssgiSkyOcclusion = 2;
+    expect(camera.ssgiSkyOcclusion).toBeCloseTo(1);
+    camera.ssgiSkyOcclusion = -1;
+    expect(camera.ssgiSkyOcclusion).toBe(0);
+  });
+
   test('round-trips every camera SSGI editor property', async () => {
     const manager = new ResourceManager(new MemoryFS());
     const scene = new Scene();
@@ -81,6 +96,7 @@ describe('SSGI configuration and serialization', () => {
     camera.SSGI = true;
     camera.ssgiQualityPreset = 'balanced';
     camera.ssgiIntensity = 1.15;
+    camera.ssgiSkyOcclusion = 0.65;
     camera.ssgiMaxDistance = 48;
     camera.ssgiThickness = 0.35;
     camera.ssgiStride = 2;
@@ -97,6 +113,7 @@ describe('SSGI configuration and serialization', () => {
       SSGIEnabled: true,
       SSGIQualityPreset: 'balanced',
       SSGIIntensity: 1.15,
+      SSGISkyOcclusion: 0.65,
       SSGIMaxDistance: 48,
       SSGIThickness: 0.35,
       SSGIStride: 2,
@@ -108,6 +125,7 @@ describe('SSGI configuration and serialization', () => {
     expect(restored.SSGI).toBe(true);
     expect(restored.ssgiQualityPreset).toBe('balanced');
     expect(restored.ssgiIntensity).toBeCloseTo(1.15);
+    expect(restored.ssgiSkyOcclusion).toBeCloseTo(0.65);
     expect(restored.ssgiMaxDistance).toBeCloseTo(48);
     expect(restored.ssgiThickness).toBeCloseTo(0.35);
     expect(restored.ssgiStride).toBe(2);

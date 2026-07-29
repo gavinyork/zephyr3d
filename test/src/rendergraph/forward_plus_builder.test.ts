@@ -100,6 +100,7 @@ function createOptions(overrides: Partial<ForwardPlusOptions> = {}): ForwardPlus
     needsTransmissionDepthForSSR: false,
     sss: false,
     skinSSS: false,
+    fogPresents: false,
     ...overrides
   };
 }
@@ -732,6 +733,54 @@ describe('Forward+ render graph builder', () => {
     expect(passNames.indexOf('SSGI:Commit')).toBeLessThan(passNames.indexOf('TransparentPass'));
   });
 
+  test('traces and commits history against the fog-free scene color when fog is present', () => {
+    const allocator: RGTextureAllocator<any> = {
+      allocate: (_desc, _size) => ({}),
+      release: () => {},
+      retain: () => {}
+    };
+    const historyManager = new HistoryResourceManager(allocator);
+    const compositor = new Compositor();
+    compositor.appendPostEffect(new SSGI());
+
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions({
+        ssgi: true,
+        motionVectors: true,
+        hiZ: true,
+        sceneNormal: true,
+        fogPresents: true
+      }),
+      {},
+      {
+        compositor,
+        camera: {
+          HDR: true,
+          ssgiTemporal: true,
+          ssgiResolvedSettings: {
+            halfRes: false,
+            raysPerPixel: 2,
+            maxSteps: 64,
+            denoisePasses: 3
+          },
+          getHistoryResourceManager: () => historyManager
+        }
+      }
+    );
+    graph.compile([backbuffer]);
+
+    // A traced hit reads this as surface radiance, and fog along the camera ray
+    // is not part of the path SSGI integrates.
+    const skyPass = graph.passes.find((pass) => pass.name === 'SkyPass');
+    expect(skyPass?.writes.some((res) => res.name === 'sceneColorNoFog')).toBe(true);
+    const tracePass = graph.passes.find((pass) => pass.name === 'SSGI:Trace');
+    expect(tracePass?.reads.some((res) => res.name === 'sceneColorNoFog')).toBe(true);
+    // The committed history must match what the trace sampled, or the current
+    // and previous frames disagree and the result flickers.
+    const commitPass = graph.passes.find((pass) => pass.name === 'SSGI:Commit');
+    expect(commitPass?.reads.some((res) => res.name === 'sceneColorNoFog')).toBe(true);
+  });
+
   test.each([
     ['half-float render targets', false, 8, 32],
     ['two draw buffers', true, 1, 32],
@@ -1217,6 +1266,36 @@ describe('SSR native multi-pass setup (P3-S3)', () => {
     expect(passNames).toContain('SSR:Blur');
     expect(passNames.indexOf('SSR:Resolve')).toBeLessThan(passNames.indexOf('SSR:Blur'));
     expect(passNames.indexOf('SSR:Blur')).toBeLessThan(passNames.indexOf('PostEffect:SSR'));
+  });
+
+  test('resolves reflections from the fog-free scene color when fog is present', () => {
+    const compositor = new Compositor();
+    compositor.appendPostEffect(new SSR());
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions({ ssr: true, sceneNormal: true, sceneRoughness: true, fogPresents: true }),
+      {},
+      {
+        compositor,
+        SSR: true,
+        camera: { ssrTemporal: false, ssrBlurScale: 0, ssrBlurKernelSize: 0 }
+      }
+    );
+    graph.compile([backbuffer]);
+
+    // Fog is composited after the snapshot, so reflections must not pick it up
+    // and apply it a second time over the final image.
+    const skyPass = graph.passes.find((pass) => pass.name === 'SkyPass');
+    expect(skyPass?.writes.some((res) => res.name === 'sceneColorNoFog')).toBe(true);
+    const resolvePass = graph.passes.find((pass) => pass.name === 'SSR:Resolve');
+    expect(resolvePass?.reads.some((res) => res.name === 'sceneColorNoFog')).toBe(true);
+  });
+
+  test('allocates no fog-free copy when the scene has no fog', () => {
+    const { graph, backbuffer } = buildWithSSR({});
+    graph.compile([backbuffer]);
+
+    const skyPass = graph.passes.find((pass) => pass.name === 'SkyPass');
+    expect(skyPass?.writes.some((res) => res.name === 'sceneColorNoFog')).toBe(false);
   });
 });
 

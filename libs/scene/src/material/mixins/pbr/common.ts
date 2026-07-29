@@ -1829,7 +1829,18 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             }
             if (outRoughness) {
               this.outRoughness = pb.vec4(this.specularFactor /*this.data.f0.rgb*/, this.data.roughness);
-            } else if (ctx.env!.light.envLight.hasRadiance()) {
+            }
+            // Skip specular IBL only when the roughness target exists, since SSR
+            // is its only requester and resolves the reflection from it; adding
+            // it here too would count it twice. `outRoughness` alone is not that
+            // signal: SSGI requests the scene normal target and materials raise
+            // the roughness and normal flags together, so an SSGI-only frame
+            // wrote outRoughness with nobody to resolve the reflection, which
+            // silently dropped specular highlights. Keyed on the flag rather
+            // than ctx.SSR because the flag is part of the light pass shader
+            // hash, so cached programs cannot outlive a change here.
+            const ssrResolvesSpecular = !!(ctx.materialFlags & MaterialVaryingFlags.SCENE_STORE_ROUGHNESS);
+            if (!ssrResolvesSpecular && ctx.env!.light.envLight.hasRadiance()) {
               this.$l.radiance = ctx.env!.light.envLight.getRadiance(
                 this,
                 pb.reflect(pb.neg(this.viewVec), this.normal),

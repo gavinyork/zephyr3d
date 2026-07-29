@@ -9,6 +9,7 @@ export type FrameResourceKey<THandle extends RGHandle = RGHandle> = string & {
 type FrameResourceMap = {
   readonly SceneColor: FrameResourceKey<RGTextureHandle>;
   readonly SceneColorCopy: FrameResourceKey<RGTextureHandle>;
+  readonly SceneColorNoFog: FrameResourceKey<RGTextureHandle>;
   readonly LinearDepth: FrameResourceKey<RGTextureHandle>;
   readonly SceneDepthAttachment: FrameResourceKey<RGTextureHandle>;
   readonly MotionVector: FrameResourceKey<RGTextureHandle>;
@@ -28,6 +29,16 @@ type FrameResourceMap = {
 export const FrameResources = {
   SceneColor: 'sceneColor',
   SceneColorCopy: 'sceneColorCopy',
+  /**
+   * Opaque scene color with sky but before height fog is composited.
+   *
+   * Screen-space passes read this as the outgoing radiance of a traced hit. Fog
+   * along the camera-to-hit ray is unrelated to the shading-point-to-hit path
+   * those passes integrate, and sampling it would both tint hits with the fog
+   * color and feed back into the next frame. Only published when fog is present
+   * and a consumer needs it.
+   */
+  SceneColorNoFog: 'sceneColorNoFog',
   LinearDepth: 'linearDepth',
   SceneDepthAttachment: 'sceneDepthAttachment',
   MotionVector: 'motionVector',

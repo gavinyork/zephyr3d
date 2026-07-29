@@ -359,6 +359,8 @@ export class Camera extends SceneNode {
   protected _ssgiResolvedSettings: SSGIResolvedSettings;
   /** @internal SSGI irradiance composite strength. */
   protected _ssgiIntensity: number;
+  /** @internal Fraction of environment irradiance removed by an occluding hit. */
+  protected _ssgiSkyOcclusion: number;
   /** @internal Maximum view-space ray distance. */
   protected _ssgiMaxDistance: number;
   /** @internal Ray hit thickness. */
@@ -545,6 +547,7 @@ export class Camera extends SceneNode {
     const defaultSSGIQualityPreset = SSGI_QUALITY_PRESET_SETTINGS.quality;
     this._ssgiResolvedSettings = { ...defaultSSGIQualityPreset };
     this._ssgiIntensity = 0.7;
+    this._ssgiSkyOcclusion = 1;
     this._ssgiMaxDistance = 32;
     this._ssgiThickness = 0.5;
     this._ssgiStride = 1;
@@ -1005,6 +1008,28 @@ export class Camera extends SceneNode {
     const next = Math.max(0, val ?? 0);
     if (next !== this._ssgiIntensity) {
       this._ssgiIntensity = next;
+      this.invalidateSSGIHistory();
+    }
+  }
+  /**
+   * How much environment irradiance an occluding hit removes, in [0, 1].
+   *
+   * A screen-space ray that hits geometry blocks the sky for that direction. At 1
+   * the environment contribution is removed in full, which is what produces sky
+   * occlusion in interiors and corners; lower values dim the sky less than the
+   * geometry implies, for art direction or to compensate for the hemisphere a
+   * screen-space trace cannot see. Only the removal is scaled — bounce light
+   * measured at the hit is always kept, so lowering this brightens without ever
+   * discarding indirect light. {@link Camera.ssgiIntensity} still bounds how dark
+   * the result can get, so full occlusion also needs an intensity of 1.
+   */
+  get ssgiSkyOcclusion() {
+    return this._ssgiSkyOcclusion;
+  }
+  set ssgiSkyOcclusion(val) {
+    const next = Math.max(0, Math.min(1, val ?? 0));
+    if (next !== this._ssgiSkyOcclusion) {
+      this._ssgiSkyOcclusion = next;
       this.invalidateSSGIHistory();
     }
   }

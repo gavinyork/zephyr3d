@@ -760,6 +760,28 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'SSGISkyOcclusion',
+          type: 'float',
+          phase: 1,
+          default: 1,
+          options: {
+            label: 'Sky occlusion',
+            group: 'PostProcessing/SSGI',
+            minValue: 0,
+            maxValue: 1,
+            animatable: true
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiSkyOcclusion;
+          },
+          set(this: Camera, value) {
+            this.ssgiSkyOcclusion = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI;
+          }
+        },
+        {
           name: 'SSGIMaxDistance',
           type: 'float',
           phase: 1,

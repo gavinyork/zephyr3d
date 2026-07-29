@@ -340,6 +340,8 @@ export interface ForwardPlusOptions {
   sss: boolean;
   /** Enable the stylized skin-specific SSS pass. */
   skinSSS: boolean;
+  /** Whether height fog is composited over the opaque scene this frame. */
+  fogPresents: boolean;
 }
 
 /** Derive Forward+ options from scene and camera state. @internal */
@@ -377,7 +379,8 @@ export function deriveForwardPlusOptions(
     needSceneColorWithDepth,
     needsTransmissionDepthForSSR: !!ssr && needSceneColor && !needSceneColorWithDepth,
     sss: !!sss,
-    skinSSS: !!skinSSS
+    skinSSS: !!skinSSS,
+    fogPresents: !!scene.env.sky?.fogPresents
   };
 }
 
@@ -1226,33 +1229,54 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
 const SkyPassModule: RenderModule<FrameGraphContext> = {
   type: 'SkyPass',
   reads: [{ resource: FrameResources.SceneColor, version: 'current' }],
-  writes: [FrameResources.SceneColor],
+  writes: [FrameResources.SceneColor, FrameResources.SceneColorNoFog],
   prepare: () => ({ enabled: true }),
   setup(fg: FrameGraphContext) {
-    const { graph, frame, blackboard } = fg;
+    const { graph, ctx, frame, blackboard, options } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'SkyPass');
     const lightPassResult = requireBuildState(fg, 'lightPass', 'LightPass', 'SkyPass');
     const sceneColorCopyHandle = blackboard.get(FrameResources.SceneColorCopy);
     const sceneColorHandle = blackboard.expect(FrameResources.SceneColor);
+    // Screen-space passes must not read fog as surface radiance. Snapshot the lit
+    // scene with sky but before fog, and only when fog is actually present and a
+    // consumer exists, so fog-free scenes allocate nothing extra. The refraction
+    // background path already baked sky and fog into the copy, so no fog-free
+    // version can be recovered there and consumers keep their existing input.
+    const captureNoFog = !sceneColorCopyHandle && (options.ssgi || options.ssr) && options.fogPresents;
 
-    const skySceneColorHandle = graph.addPass('SkyPass', (builder) => {
+    const skyPassResult = graph.addPass('SkyPass', (builder) => {
       builder.read(sceneColorHandle);
       builder.read(depthPassResult.depthFramebufferHandle);
       if (lightPassResult.sceneColorFramebufferHandle) {
         builder.read(lightPassResult.sceneColorFramebufferHandle);
       }
+      const noFog = captureNoFog
+        ? builder.createTexture({
+            format: ctx.colorFormat!,
+            label: 'sceneColorNoFog',
+            allocationKey: 'ForwardPlus.SceneColorNoFog'
+          })
+        : null;
       const out = builder.write(sceneColorHandle);
       builder.setExecute((rgCtx) => {
         // The refraction background already contains sky and fog.
         if (!sceneColorCopyHandle) {
-          renderSkyScenePass(frame, rgCtx, lightPassResult.sceneColorFramebufferHandle);
+          renderSkyScenePass(
+            frame,
+            rgCtx,
+            lightPassResult.sceneColorFramebufferHandle,
+            noFog ? rgCtx.getTexture<Texture2D>(noFog) : null
+          );
         }
       });
-      return out;
+      return { color: out, noFog };
     });
 
-    lightPassResult.sceneColorHandle = skySceneColorHandle;
-    blackboard.set(FrameResources.SceneColor, skySceneColorHandle);
+    lightPassResult.sceneColorHandle = skyPassResult.color;
+    blackboard.set(FrameResources.SceneColor, skyPassResult.color);
+    if (skyPassResult.noFog) {
+      blackboard.set(FrameResources.SceneColorNoFog, skyPassResult.noFog);
+    }
   }
 };
 
@@ -2072,7 +2096,8 @@ export function renderOpaqueScenePass(
 export function renderSkyScenePass(
   frame: FrameState,
   rgCtx: RGExecuteContext,
-  sceneColorFramebufferHandle?: RGHandle
+  sceneColorFramebufferHandle?: RGHandle,
+  sceneColorNoFog?: Nullable<Texture2D>
 ): void {
   const { ctx } = frame;
   const framebuffer = sceneColorFramebufferHandle
@@ -2086,6 +2111,19 @@ export function renderSkyScenePass(
     device.setScissor(null);
     ctx.scene.env.sky.renderSky(ctx);
     if (ctx.scene.env.sky.fogPresents) {
+      // Snapshot between sky and fog. Sky belongs in the copy - a ray that hits
+      // the sky should read the sky - while fog does not, because the fog a
+      // screen-space pass would sample lies along the camera ray rather than the
+      // path it integrates.
+      if (sceneColorNoFog) {
+        const source = framebuffer?.getColorAttachment<Texture2D>(0) ?? null;
+        if (source) {
+          new CopyBlitter().blit(source, sceneColorNoFog, fetchSampler('clamp_nearest_nomip'));
+          device.setFramebuffer(framebuffer);
+          device.setViewport(null);
+          device.setScissor(null);
+        }
+      }
       ctx.scene.env.sky.renderFog(ctx.camera);
     }
   } finally {

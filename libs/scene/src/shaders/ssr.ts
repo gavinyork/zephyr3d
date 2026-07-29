@@ -169,6 +169,28 @@ function validateHit(
     : scope[funcName](hit2D, surfaceZ, uv, traceRay, viewMatrix, invProjMatrix, textureSize);
 }
 
+/**
+ * Optional `giTraceOut` (both tracers): `vec3(occluded, escaped, rawConfidence)`.
+ *
+ * Reflections only care whether a hit is usable, so the returned confidence folds
+ * together "was the ray blocked" and "can its radiance be trusted". Diffuse GI
+ * needs those apart: a hit whose colour is unusable still occludes the sky.
+ * - `occluded`: the march intersected geometry (not a sky texel).
+ * - `escaped`: the march missed and the ray was provably unoccluded where it
+ *   stopped. Neither flag set means the outcome is indeterminate (ran out of
+ *   screen or iterations behind geometry) and callers should exclude the sample
+ *   rather than treat it as unoccluded.
+ * - `certainty`: how certain the intersection is *geometrically* — the hit's
+ *   distance from the sampled surface relative to the thickness, so a thin-object
+ *   false positive does not occlude. Deliberately excludes the screen-border,
+ *   near-self and backface vetoes {@link validateHit} applies: those bound
+ *   reflection artifacts, whereas for diffuse GI a border, adjacent or
+ *   back-facing hit is real geometry whose screen colour is still the best
+ *   available estimate of its outgoing radiance. The march-length attenuation is
+ *   excluded too, as it would make occlusion depend on camera distance.
+ *
+ * Callers that omit the parameter generate exactly the same shader as before.
+ */
 export function screenSpaceRayTracing_Linear2D(
   scope: PBInsideFunctionScope,
   viewPos: PBShaderExp,
@@ -184,7 +206,8 @@ export function screenSpaceRayTracing_Linear2D(
   textureSize: PBShaderExp,
   linearDepthTex: PBShaderExp,
   normalTexture?: PBShaderExp,
-  useBackfaceDepth?: boolean
+  useBackfaceDepth?: boolean,
+  giTraceOut?: PBShaderExp
 ) {
   const pb = scope.$builder;
   pb.func('distanceSquared', [pb.vec2('a'), pb.vec2('b')], function () {
@@ -354,7 +377,7 @@ export function screenSpaceRayTracing_Linear2D(
     }
   );
   pb.func(
-    'SSR_Linear2D',
+    giTraceOut ? 'SSR_Linear2D_GI' : 'SSR_Linear2D',
     [
       pb.vec3('rayOrigin'),
       pb.vec3('rayDirection'),
@@ -366,9 +389,13 @@ export function screenSpaceRayTracing_Linear2D(
       pb.float('maxIterations'),
       pb.float('thickness'),
       pb.vec2('cameraNearFar'),
-      pb.vec4('textureSize')
+      pb.vec4('textureSize'),
+      ...(giTraceOut ? [pb.vec3('giTrace').out()] : [])
     ],
     function () {
+      if (giTraceOut) {
+        this.giTrace = pb.vec3(0);
+      }
       this.$l.hit2D = pb.vec3();
       this.$l.hit3D = pb.vec3();
       this.$l.origin = pb.vec2();
@@ -388,11 +415,38 @@ export function screenSpaceRayTracing_Linear2D(
         this.origin,
         this.numIterations
       );
-      this.$if(pb.not(this.intersected), function () {
-        this.$return(pb.vec4(0));
-      });
-      this.$l.surfaceZ01 = ShaderHelper.sampleLinearDepth(this, linearDepthTex, this.hit2D.xy, 0);
+      if (giTraceOut) {
+        // Depth where the march stopped. A miss only counts as a free escape
+        // when the ray was still in front of the depth buffer there; a ray that
+        // left the screen from behind geometry is indeterminate, not unoccluded.
+        this.$l.exitSurfaceZ01 = ShaderHelper.sampleLinearDepth(this, linearDepthTex, this.hit2D.xy, 0);
+        this.$if(pb.not(this.intersected), function () {
+          this.$l.exitSceneZ = pb.neg(pb.mul(this.exitSurfaceZ01, this.cameraNearFar.y));
+          this.giTrace = pb.vec3(
+            0,
+            pb.float(
+              pb.or(
+                pb.greaterThanEqual(this.exitSurfaceZ01, 1),
+                pb.greaterThan(this.hit2D.z, this.exitSceneZ)
+              )
+            ),
+            0
+          );
+          this.$return(pb.vec4(0));
+        });
+      } else {
+        this.$if(pb.not(this.intersected), function () {
+          this.$return(pb.vec4(0));
+        });
+      }
+      this.$l.surfaceZ01 = giTraceOut
+        ? this.exitSurfaceZ01
+        : ShaderHelper.sampleLinearDepth(this, linearDepthTex, this.hit2D.xy, 0);
       this.$if(pb.equal(this.surfaceZ01, 1), function () {
+        if (giTraceOut) {
+          // The intersection resolved onto a sky texel, so the ray escaped.
+          this.giTrace = pb.vec3(0, 1, 0);
+        }
         this.$return(pb.vec4(0));
       });
       this.$l.surfaceZ = ShaderHelper.linearDepthToNonLinear(
@@ -413,6 +467,12 @@ export function screenSpaceRayTracing_Linear2D(
         this.textureSize,
         normalTexture
       );
+      if (giTraceOut) {
+        // rayIntersectDepth already enforced the thickness window, so an
+        // intersection here is geometrically certain regardless of the vetoes
+        // validateHit applies for reflections.
+        this.giTrace = pb.vec3(1, 0, 1);
+      }
       this.$l.iterationAttenuation = pb.sub(1, pb.smoothStep(0, this.maxIterations, this.numIterations));
       //this.$l.iterationAttenuation = pb.smoothStep(this.maxIterations, 1, this.numIterations);
       this.confidence = pb.mul(this.confidence, this.iterationAttenuation);
@@ -422,19 +482,34 @@ export function screenSpaceRayTracing_Linear2D(
       this.$return(pb.vec4(this.hit2D.xy, this.hitDistance, this.confidence));
     }
   );
-  return scope.SSR_Linear2D(
-    viewPos,
-    traceRay,
-    viewMatrix,
-    projMatrix,
-    invProjMatrix,
-    stride,
-    maxDistance,
-    maxIterations,
-    thickness,
-    cameraNearFar,
-    textureSize
-  );
+  return giTraceOut
+    ? scope.SSR_Linear2D_GI(
+        viewPos,
+        traceRay,
+        viewMatrix,
+        projMatrix,
+        invProjMatrix,
+        stride,
+        maxDistance,
+        maxIterations,
+        thickness,
+        cameraNearFar,
+        textureSize,
+        giTraceOut
+      )
+    : scope.SSR_Linear2D(
+        viewPos,
+        traceRay,
+        viewMatrix,
+        projMatrix,
+        invProjMatrix,
+        stride,
+        maxDistance,
+        maxIterations,
+        thickness,
+        cameraNearFar,
+        textureSize
+      );
 }
 
 export function screenSpaceRayTracing_HiZ(
@@ -451,7 +526,8 @@ export function screenSpaceRayTracing_HiZ(
   thickness: PBShaderExp | number,
   textureSize: PBShaderExp,
   HiZTexture: PBShaderExp,
-  normalTexture?: PBShaderExp
+  normalTexture?: PBShaderExp,
+  giTraceOut?: PBShaderExp
 ) {
   const pb = scope.$builder;
   pb.func('getMipResolution', [pb.int('mipLevel')], function () {
@@ -677,7 +753,7 @@ export function screenSpaceRayTracing_HiZ(
     }
   );
   pb.func(
-    'SSR_HiZ',
+    giTraceOut ? 'SSR_HiZ_GI' : 'SSR_HiZ',
     [
       pb.vec3('viewPos'),
       pb.vec3('traceRay'),
@@ -689,9 +765,13 @@ export function screenSpaceRayTracing_HiZ(
       pb.float('thickness'),
       pb.vec4('textureSize'),
       pb.int('maxMipLevel'),
-      pb.float('maxIterations')
+      pb.float('maxIterations'),
+      ...(giTraceOut ? [pb.vec3('giTrace').out()] : [])
     ],
     function () {
+      if (giTraceOut) {
+        this.giTrace = pb.vec3(0);
+      }
       this.$l.rayDirection = pb.normalize(this.traceRay);
       this.$l.reverseRay = pb.greaterThan(this.rayDirection.z, 1e-6);
       this.$l.rayLength = this.maxDistance;
@@ -731,9 +811,13 @@ export function screenSpaceRayTracing_HiZ(
         this.numIterations
       );
       this.$l.confidence = pb.float(0);
-      this.$if(pb.notEqual(this.hit.w, 0), function () {
+      const hitBranch = this.$if(pb.notEqual(this.hit.w, 0), function () {
         this.$l.surfaceZ = pb.textureSampleLevel(HiZTexture, this.hit.xy, 0).r;
         this.$if(pb.equal(this.surfaceZ, 1), function () {
+          if (giTraceOut) {
+            // The intersection resolved onto a sky texel, so the ray escaped.
+            this.giTrace = pb.vec3(0, 1, 0);
+          }
           this.$return(pb.vec4(0));
         });
         this.$l.hit3D = invProjectPosition(this, this.hit.xyz, this.invProjMatrix);
@@ -750,7 +834,42 @@ export function screenSpaceRayTracing_HiZ(
           this.textureSize,
           normalTexture
         );
+        if (giTraceOut) {
+          // Keep only the thickness term of validateHit: a hit far from the
+          // sampled surface may be a thin-object false positive, which is a
+          // genuine geometric doubt. The border, near-self and backface vetoes
+          // bound reflection artifacts and must not gate diffuse occlusion.
+          this.$l.giSurfaceVS = invProjectPosition(
+            this,
+            pb.vec3(this.hit.xy, this.surfaceZ),
+            this.invProjMatrix
+          );
+          this.$l.giThicknessFade = pb.sub(
+            1,
+            pb.smoothStep(0, this.thickness, pb.distance(this.giSurfaceVS, this.hit3D))
+          );
+          this.giTrace = pb.vec3(1, 0, pb.mul(this.giThicknessFade, this.giThicknessFade));
+        }
       });
+      if (giTraceOut) {
+        hitBranch.$else(function () {
+          // A miss only counts as a free escape when the ray was still in front
+          // of the depth buffer where the march stopped; a ray that left the
+          // screen from behind geometry is indeterminate, not unoccluded.
+          this.$l.exitUV = pb.clamp(this.hit.xy, pb.vec2(0), pb.vec2(1));
+          this.$l.exitSurfaceZ = this.SSR_loadDepth(this.exitUV, 0);
+          this.giTrace = pb.vec3(
+            0,
+            pb.float(
+              pb.or(
+                pb.greaterThanEqual(this.exitSurfaceZ, 1),
+                pb.lessThanEqual(this.hit.z, this.exitSurfaceZ)
+              )
+            ),
+            0
+          );
+        });
+      }
       this.$l.iterationAttenuation = pb.sub(1, pb.smoothStep(0, this.maxIterations, this.numIterations));
       //this.$l.iterationAttenuation = pb.smoothStep(this.maxIterations, 1, this.numIterations);
       this.confidence = pb.mul(this.confidence, this.iterationAttenuation);
@@ -760,18 +879,35 @@ export function screenSpaceRayTracing_HiZ(
       this.$return(pb.vec4(this.hit.xy, this.hitDistance, this.confidence));
     }
   );
-  return scope.SSR_HiZ(
-    viewPos,
-    traceRay,
-    viewMatrix,
-    projMatrix,
-    invProjMatrix,
-    cameraNearFar,
-    maxDistance,
-    thickness,
-    textureSize,
-    pb.sub(maxMipLevel, 1),
-    maxIterations
+  return (
+    giTraceOut
+      ? scope.SSR_HiZ_GI(
+          viewPos,
+          traceRay,
+          viewMatrix,
+          projMatrix,
+          invProjMatrix,
+          cameraNearFar,
+          maxDistance,
+          thickness,
+          textureSize,
+          pb.sub(maxMipLevel, 1),
+          maxIterations,
+          giTraceOut
+        )
+      : scope.SSR_HiZ(
+          viewPos,
+          traceRay,
+          viewMatrix,
+          projMatrix,
+          invProjMatrix,
+          cameraNearFar,
+          maxDistance,
+          thickness,
+          textureSize,
+          pb.sub(maxMipLevel, 1),
+          maxIterations
+        )
   ) as PBShaderExp;
 }
 
