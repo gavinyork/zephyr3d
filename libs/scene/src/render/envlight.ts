@@ -1,5 +1,5 @@
 import type { Immutable, Nullable } from '@zephyr3d/base';
-import { Disposable, DRef, Vector2, Vector3 } from '@zephyr3d/base';
+import { Disposable, DRef, Matrix4x4, Vector2, Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
   BindGroup,
@@ -14,6 +14,66 @@ import { fetchSampler, getSamplerOptions } from '../utility/misc';
 import { getDevice } from '../app/api';
 import type { DrawContext } from './drawable';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
+
+/**
+ * Depth-proportional term of the SSGI history rejection tolerance.
+ *
+ * The surface history stores `linearDepth * cameraFar` in an `rgba16f` alpha
+ * channel, so its quantization error grows with depth: fp16 carries ~11 bits of
+ * mantissa, giving a relative error near 4.9e-4 (~0.49 world units at a depth of
+ * 1000). A purely absolute tolerance is therefore unusable in the distance -- at
+ * `ssgiDepthReject`'s 0.5 default, storage quantization alone consumes the whole
+ * budget and the test degenerates into dithered noise. This factor keeps roughly
+ * 4x headroom over that error while staying far below the depth step of a real
+ * disocclusion.
+ *
+ * @internal
+ */
+const SSGI_DEPTH_TOLERANCE_RELATIVE = 2e-3;
+
+/**
+ * Multiple of the scaled tolerance at which history is dropped outright.
+ *
+ * Inside this gate the depth term contributes a smooth `exp(-d/tol)` weight
+ * rather than a boolean, so confidence decays continuously instead of flipping.
+ * At 3x the weight is already down to ~0.05, making the cutoff visually
+ * continuous -- which is what keeps a rejection boundary from reading as a
+ * staircase after nearest-neighbour sampling quantizes it to texel steps.
+ *
+ * @internal
+ */
+const SSGI_DEPTH_GATE_SCALE = 3;
+
+/**
+ * Clamp distance, in texels, at which history repair reaches its widest radius.
+ *
+ * The clamp distance says how far the reprojection had to travel to get back on
+ * screen, which is a direct measure of how unrelated to this pixel the surviving
+ * history is. It scales the repair radius rather than gating repair off: the
+ * lighting pass only ever sees the previous frame, so a pixel rotating in from
+ * off screen has no fresh data anywhere and both alternatives to spreading the
+ * taps look worse than the blur does.
+ *
+ * @internal
+ */
+const SSGI_REPAIR_WIDE_CLAMP_TEXELS = 8;
+
+/**
+ * Repair tap radius in texels, from an interior hole to a camera-edge one.
+ *
+ * The radius is what trades structure against smoothness. At one texel the taps
+ * of neighbouring pixels barely overlap, so detail survives -- correct for a hole
+ * in the middle of the screen, where the reprojection landed near its true
+ * position. Wide taps instead overlap heavily between neighbours, which turns the
+ * one strip of history that survives at a screen edge into a smooth low-frequency
+ * estimate of the surface's irradiance rather than a per-column copy of single
+ * texels, and copying single texels is what draws streaks along the direction of
+ * travel.
+ *
+ * @internal
+ */
+const SSGI_REPAIR_MIN_RADIUS_TEXELS = 1;
+const SSGI_REPAIR_MAX_RADIUS_TEXELS = 16;
 
 /**
  * Environment light type
@@ -118,6 +178,16 @@ export class EnvShIBL extends EnvironmentLighting {
   public static readonly UNIFORM_NAME_SSGI_TARGET_SIZE = 'zSSGITargetSize';
   /** @internal */
   public static readonly UNIFORM_NAME_SSGI_REPROJECTION = 'zSSGIReprojection';
+  /**
+   * Transforms a current-frame view-space position into previous-frame clip
+   * space, so the reprojected depth can be compared against the surface history
+   * in the frame that history was written in. @internal
+   */
+  public static readonly UNIFORM_NAME_SSGI_VIEW_TO_PREV_CLIP = 'zSSGIViewToPrevClip';
+  /** Unprojects a screen-space sample back into current view space. @internal */
+  public static readonly UNIFORM_NAME_SSGI_INV_PROJECTION = 'zSSGIInvProjection';
+  /** Scratch for the view -> previous clip composition. @internal */
+  private static readonly _viewToPrevClip = new Matrix4x4();
   /** @internal */
   private readonly _radianceMap: DRef<TextureCube>;
   /** @internal */
@@ -247,6 +317,8 @@ export class EnvShIBL extends EnvironmentLighting {
         }
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_TARGET_SIZE] = pb.vec2().uniform(0);
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_REPROJECTION] = pb.vec4().uniform(0);
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_VIEW_TO_PREV_CLIP] = pb.mat4().uniform(0);
+        pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_INV_PROJECTION] = pb.mat4().uniform(0);
       }
     }
   }
@@ -299,8 +371,21 @@ export class EnvShIBL extends EnvironmentLighting {
       bg.setValue(EnvShIBL.UNIFORM_NAME_SSGI_TARGET_SIZE, new Vector2(ctx!.renderWidth, ctx!.renderHeight));
       bg.setValue(
         EnvShIBL.UNIFORM_NAME_SSGI_REPROJECTION,
-        new Vector4(ctx!.camera.ssgiDepthReject, ctx!.camera.ssgiNormalReject, ctx!.camera.getFarPlane(), 0)
+        new Vector4(
+          ctx!.camera.ssgiDepthReject,
+          ctx!.camera.ssgiNormalReject,
+          ctx!.camera.getFarPlane(),
+          ctx!.camera.getNearPlane()
+        )
       );
+      // View -> world -> previous clip. `prevVPMatrix` is null on the first frame
+      // after a history reset; falling back to the current VP makes the expected
+      // previous depth equal the current one, so the depth term is a no-op until
+      // a real previous frame exists.
+      const prevVP = ctx!.camera.prevVPMatrix ?? ctx!.camera.viewProjectionMatrix;
+      Matrix4x4.multiply(prevVP as Matrix4x4, ctx!.camera.worldMatrix as Matrix4x4, EnvShIBL._viewToPrevClip);
+      bg.setValue(EnvShIBL.UNIFORM_NAME_SSGI_VIEW_TO_PREV_CLIP, EnvShIBL._viewToPrevClip);
+      bg.setValue(EnvShIBL.UNIFORM_NAME_SSGI_INV_PROJECTION, ctx!.camera.getInvProjectionMatrix());
     }
   }
   /**
@@ -532,9 +617,41 @@ export class EnvShIBL extends EnvironmentLighting {
           : this.currentDepthSample.r,
         this.params.z
       );
+      // The surface history holds a Z measured in the *previous* frame's view
+      // space, so the current Z cannot be compared against it directly: under
+      // camera rotation a static, correctly reprojected point has
+      // `dz ~ r * sin(theta) * dphi`, which crosses any fixed threshold at the
+      // screen edges and drops history in the exact staircase pattern that
+      // nearest-neighbour sampling of the reprojected UV produces. Rebuild the
+      // current view-space position and push it through `view -> previous clip`
+      // instead; `clip.w` is `-view.z`, i.e. the same positive view-space
+      // distance the history stores.
+      this.$l.ndc = pb.sub(pb.mul(this.uv, 2), pb.vec2(1));
+      this.$l.nearPlaneRay = pb.mul(
+        this[EnvShIBL.UNIFORM_NAME_SSGI_INV_PROJECTION],
+        pb.vec4(this.ndc, -1, 1)
+      );
+      // Perspective unprojection of NDC z = -1 lands on the near plane, where
+      // view z is exactly -near; scaling that ray by depth/near walks it out to
+      // the sample without a non-linear depth round trip.
+      this.$l.viewPos = pb.mul(
+        pb.div(this.nearPlaneRay.xyz, this.nearPlaneRay.w),
+        pb.div(this.currentDepth, pb.max(this.params.w, 1e-6))
+      );
+      this.$l.expectedPreviousDepth = pb.mul(
+        this[EnvShIBL.UNIFORM_NAME_SSGI_VIEW_TO_PREV_CLIP],
+        pb.vec4(this.viewPos, 1)
+      ).w;
+      this.$l.depthDelta = pb.abs(pb.sub(this.previousSurface.a, this.expectedPreviousDepth));
+      // fp16 storage error scales with depth, so the tolerance has to as well.
+      this.$l.scaledDepthTolerance = pb.add(
+        this.depthTolerance,
+        pb.mul(this.currentDepth, SSGI_DEPTH_TOLERANCE_RELATIVE)
+      );
+      this.$l.depthWeight = pb.exp(pb.neg(pb.div(this.depthDelta, this.scaledDepthTolerance)));
       this.$l.depthValid = pb.lessThanEqual(
-        pb.abs(pb.sub(this.previousSurface.a, this.currentDepth)),
-        this.params.x
+        this.depthDelta,
+        pb.mul(this.scaledDepthTolerance, SSGI_DEPTH_GATE_SCALE)
       );
       this.$l.normalValid = pb.greaterThanEqual(
         pb.dot(this.normalizedCurrentNormal, this.previousNormal),
@@ -553,7 +670,13 @@ export class EnvShIBL extends EnvironmentLighting {
         pb.greaterThan(this.previousAlpha, 1e-4)
       );
       this.$if(this.exactHistoryValid, function () {
-        this.$return(pb.mix(this.fallback, this.previousIrradiance.rgb, this.previousAlpha));
+        // Weighting confidence by the depth term keeps the gate boundary a ramp
+        // rather than a step, so residual reprojection error on moving geometry
+        // and grazing surfaces fades out instead of outlining itself.
+        this.$l.exactConfidence = pb.mul(this.previousAlpha, this.depthWeight);
+        this.$if(pb.greaterThan(this.exactConfidence, 1e-4), function () {
+          this.$return(pb.mix(this.fallback, this.previousIrradiance.rgb, this.exactConfidence));
+        });
       });
 
       // Repair disoccluded and off-screen history from nearby samples before
@@ -565,20 +688,65 @@ export class EnvShIBL extends EnvironmentLighting {
         this.previousSampleUV,
         pb.clamp(this.uv, this.halfTexel, this.maxUV)
       );
+      // How far the reprojection had to be clamped to land back on screen. For a
+      // hole in the interior this is zero and the taps really are neighbours of
+      // the reprojected point, but for geometry rotating in from off screen the
+      // clamp can travel hundreds of pixels -- and the depth and normal terms
+      // cannot catch that, because the edge texel it lands on is usually the same
+      // continuous surface (same normal, similar depth) merely sampled somewhere
+      // spatially unrelated. Its irradiance therefore belongs to a different part
+      // of the surface, so reading it as a point sample smears into streaks along
+      // the direction of travel. Drive the tap radius with it instead, trading
+      // that structure for a blur.
+      this.$l.repairClampTexels = pb.div(
+        pb.length(pb.sub(this.previousSampleUV, this.previousUV)),
+        pb.max(pb.min(this.texelSize.x, this.texelSize.y), 1e-8)
+      );
+      // Widen the taps as the clamp travel grows. Only meaningful while the motion
+      // vector is usable: without one the centre is already the current UV by
+      // construction, so there is no travel to react to.
+      this.$l.repairRadius = pb.mix(
+        pb.float(SSGI_REPAIR_MIN_RADIUS_TEXELS),
+        pb.float(SSGI_REPAIR_MAX_RADIUS_TEXELS),
+        this.$choice(
+          this.motionValid,
+          pb.smoothStep(0, SSGI_REPAIR_WIDE_CLAMP_TEXELS, this.repairClampTexels),
+          pb.float(0)
+        )
+      );
+      // Taps this far apart straddle real depth variation across the surface, so a
+      // gate tuned for immediate neighbours would reject most of them and bring
+      // the dark band back. Loosen it with the radius and lean on the normal term,
+      // which stays strict, to keep the average on one surface.
+      this.$l.repairDepthTolerance = pb.mul(
+        this.scaledDepthTolerance,
+        SSGI_DEPTH_GATE_SCALE,
+        pb.add(1, this.repairRadius)
+      );
       this.$l.repairSum = pb.vec3(0);
       this.$l.repairWeight = pb.float(0);
+      // A full ring rather than a cross: at the wide end four taps are not an
+      // average but four distant point copies, and their axis alignment paints
+      // directional artifacts of its own.
       const repairSamples = [
         { currentUV: false, x: 0, y: 0, kernel: 1 },
         { currentUV: false, x: -1, y: 0, kernel: 0.7 },
         { currentUV: false, x: 1, y: 0, kernel: 0.7 },
         { currentUV: false, x: 0, y: -1, kernel: 0.7 },
         { currentUV: false, x: 0, y: 1, kernel: 0.7 },
+        { currentUV: false, x: -0.7071, y: -0.7071, kernel: 0.5 },
+        { currentUV: false, x: 0.7071, y: -0.7071, kernel: 0.5 },
+        { currentUV: false, x: -0.7071, y: 0.7071, kernel: 0.5 },
+        { currentUV: false, x: 0.7071, y: 0.7071, kernel: 0.5 },
         { currentUV: true, x: 0, y: 0, kernel: 0.5 }
       ];
       for (let i = 0; i < repairSamples.length; i++) {
         const sample = repairSamples[i];
         const baseUV = sample.currentUV ? this.uv : this.repairCenter;
-        this.$l[`repairUV${i}`] = pb.add(baseUV, pb.mul(this.texelSize, pb.vec2(sample.x, sample.y)));
+        this.$l[`repairUV${i}`] = pb.add(
+          baseUV,
+          pb.mul(this.texelSize, pb.vec2(sample.x, sample.y), this.repairRadius)
+        );
         this.$l[`repairUVValid${i}`] = pb.and(
           pb.all(pb.greaterThanEqual(this[`repairUV${i}`], this.halfTexel)),
           pb.all(pb.lessThanEqual(this[`repairUV${i}`], this.maxUV))
@@ -591,11 +759,16 @@ export class EnvShIBL extends EnvironmentLighting {
         this.$l[`repairNormal${i}`] = pb.normalize(
           pb.sub(pb.mul(this[`repairSurface${i}`].rgb, 2), pb.vec3(1))
         );
-        this.$l[`repairDepthDelta${i}`] = pb.abs(pb.sub(this[`repairSurface${i}`].a, this.currentDepth));
+        // Compared against the reprojected depth, not the current one: the taps
+        // are samples of the previous frame's surface, so they live in the same
+        // space as `expectedPreviousDepth`.
+        this.$l[`repairDepthDelta${i}`] = pb.abs(
+          pb.sub(this[`repairSurface${i}`].a, this.expectedPreviousDepth)
+        );
         this.$l[`repairNormalDot${i}`] = pb.dot(this.normalizedCurrentNormal, this[`repairNormal${i}`]);
         this.$l[`repairSurfaceValid${i}`] = pb.and(
           this[`repairUVValid${i}`],
-          pb.lessThanEqual(this[`repairDepthDelta${i}`], this.params.x),
+          pb.lessThanEqual(this[`repairDepthDelta${i}`], this.repairDepthTolerance),
           pb.greaterThanEqual(this[`repairNormalDot${i}`], this.params.y)
         );
         this.$l[`repairIrradiance${i}`] = pb.textureSampleLevel(
@@ -603,8 +776,10 @@ export class EnvShIBL extends EnvironmentLighting {
           pb.clamp(this[`repairUV${i}`], this.halfTexel, this.maxUV),
           0
         );
+        // Same widening as the hard gate above: a falloff tuned for immediate
+        // neighbours decays to nothing across a wide tap and starves the average.
         this.$l[`repairDepthWeight${i}`] = pb.exp(
-          pb.neg(pb.div(this[`repairDepthDelta${i}`], this.depthTolerance))
+          pb.neg(pb.div(this[`repairDepthDelta${i}`], this.repairDepthTolerance))
         );
         this.$l[`repairNormalWeight${i}`] = pb.pow(pb.max(0, this[`repairNormalDot${i}`]), 8);
         this.$l[`repairSampleWeight${i}`] = pb.mul(
@@ -612,6 +787,11 @@ export class EnvShIBL extends EnvironmentLighting {
           pb.clamp(this[`repairIrradiance${i}`].a, 0, 1),
           this[`repairDepthWeight${i}`],
           this[`repairNormalWeight${i}`],
+          // The screen-stationary tap only exists to cover unusable motion
+          // vectors; while motion is valid it is a history read at the wrong world
+          // point, which survives the depth term on any flat surface and leaves a
+          // stationary ghost.
+          sample.currentUV ? pb.float(pb.not(this.motionValid)) : pb.float(1),
           sample.kernel
         );
         this.repairSum = pb.add(
