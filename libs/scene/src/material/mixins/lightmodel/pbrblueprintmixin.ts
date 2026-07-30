@@ -417,7 +417,9 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         this.zCommonData.specular = that.getOutput(outputs, 'Specular') ?? pb.vec3(1);
         // A blueprint-authored emitter is a material quantity, so unlike lights it is not
         // pre-exposed on the CPU. Physical scenes expose it here (blueprints have no per-material
-        // exposure weight, so it always follows exposure); in legacy the factor is 1.
+        // exposure weight, so it always follows exposure); in legacy the factor is 1. The graph
+        // output replaces the whole emissive term, so under physical lighting it is a cd/m²
+        // luminance: emit hundreds to thousands, not the [0,1] of a legacy scene.
         this.zCommonData.emissive = pb.mul(
           (that.getOutput(outputs, 'Emissive') ?? pb.vec3(0)) as PBShaderExp,
           ShaderHelper.getPreExposureUniform(scope)

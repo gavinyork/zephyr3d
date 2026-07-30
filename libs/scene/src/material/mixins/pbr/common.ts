@@ -30,6 +30,7 @@ export type IMixinPBRCommon = {
   ior: number;
   emissiveColor: Vector3;
   emissiveStrength: number;
+  emissiveLuminance: number;
   emissiveExposureWeight: number;
   occlusionStrength: number;
   rectSpecularScale: number;
@@ -163,6 +164,11 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
 
   const EMISSIVE_COLOR_UNIFORM = S.defineInstanceUniform('emissiveColor', 'rgb', 'EmissiveColor');
   const EMISSIVE_STRENGTH_UNIFORM = S.defineInstanceUniform('emissiveStrength', 'float', 'EmissiveStrength');
+  const EMISSIVE_LUMINANCE_UNIFORM = S.defineInstanceUniform(
+    'emissiveLuminance',
+    'float',
+    'EmissiveLuminance'
+  );
   const EMISSIVE_EXPOSURE_WEIGHT_UNIFORM = S.defineInstanceUniform(
     'emissiveExposureWeight',
     'float',
@@ -179,6 +185,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     private readonly _f0: Vector4;
     private readonly _emissiveColor: Vector3;
     private _emissiveStrength: number;
+    private _emissiveLuminance: number;
     private _emissiveExposureWeight: number;
     private _occlusionStrength: number;
     private _rectSpecularScale: number;
@@ -195,6 +202,9 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       this._occlusionStrength = 1;
       this._emissiveColor = new Vector3(0, 0, 0);
       this._emissiveStrength = 1;
+      // 1000 cd/m² is a lit-display-class emitter: clearly visible at interior exposures and still
+      // readable under the Sunny-16 default, unlike the 1 nit that `emissiveStrength` would mean.
+      this._emissiveLuminance = 1000;
       // Default 1: emissive is a photometric luminance that follows camera exposure, like Filament.
       this._emissiveExposureWeight = 1;
       this._rectSpecularScale = 1;
@@ -221,6 +231,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       this.rectSpecularScale = other.rectSpecularScale;
       this.emissiveColor = other.emissiveColor;
       this.emissiveStrength = other.emissiveStrength;
+      this.emissiveLuminance = other.emissiveLuminance;
       this.emissiveExposureWeight = other.emissiveExposureWeight;
       this.transmission = other.transmission;
       this.iridescence = other.iridescence;
@@ -353,6 +364,15 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         this.uniformChanged();
       }
     }
+    /**
+     * Display-referred multiplier on {@link emissiveColor}, used by legacy lighting.
+     *
+     * @remarks
+     * This is the glTF authoring quantity (`KHR_materials_emissive_strength`) and is unitless: the
+     * product with {@link emissiveColor} lands directly in the render target. Physical lighting
+     * ignores it and uses {@link emissiveLuminance} instead, exactly as a light's unitless
+     * `intensity` gives way to its photometric counterpart.
+     */
     get emissiveStrength() {
       return this._emissiveStrength;
     }
@@ -363,16 +383,55 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       }
     }
     /**
+     * Multiplier on {@link emissiveColor} used by physical lighting. Legacy ignores it and uses
+     * {@link emissiveStrength}.
+     *
+     * @remarks
+     * The physical counterpart of {@link emissiveStrength}, mirroring how
+     * {@link DirectionalLight.illuminance} and {@link RectLight.luminance} shadow a light's unitless
+     * `intensity`. Keeping the two separate means switching {@link Scene.lightingMode} never
+     * reinterprets one authored number as two different quantities.
+     *
+     * **Its unit depends on {@link emissiveExposureWeight}**, because the shaded value is
+     * `emissiveColor * emissiveLuminance * mix(1, cameraExposure, emissiveExposureWeight)`:
+     *
+     * - At weight 1 (the constructor default) this is a photometric luminance in cd/m² (nit).
+     *   Anchors: an office display is 200-1000, a lit interior wall a few hundred, an overcast sky
+     *   ~2000, a neon sign 5,000-20,000. The default is 1000. Values around 1 are genuinely
+     *   invisible, since a sunlit white surface is ~25,000 cd/m².
+     * - At weight 0 the camera exposure cancels out and this is a display-referred multiplier
+     *   landing straight in the render target, so the useful range is around [0, 1] and 1 is very
+     *   bright. **Materials imported from glTF/FBX are in this state**: the importer writes weight 0
+     *   to preserve glTF's display-referred emissive, matching Filament's gltfio. Raise the weight
+     *   to 1 (and rescale to nits) to author such a material photometrically.
+     */
+    get emissiveLuminance() {
+      return this._emissiveLuminance;
+    }
+    set emissiveLuminance(val) {
+      const luminance = Math.max(0, val);
+      if (this._emissiveLuminance !== luminance) {
+        this._emissiveLuminance = luminance;
+        this.uniformChanged();
+      }
+    }
+    /**
      * How strongly the emissive term follows the camera exposure, in [0, 1].
      *
      * @remarks
      * Mirrors Filament's `emissive.w`: the emitter is attenuated by
      * `mix(1, cameraExposure, emissiveExposureWeight)`.
      *
-     * At 1 (default) the emissive value is a photometric luminance in cd/m², so a neon sign keeps a
-     * constant real-world brightness and darkens as the camera stops down, like every other lit
-     * surface. At 0 it bypasses exposure entirely and stays a display-referred value, which is what
-     * you want for a UI-like overlay that must not dim.
+     * At 1, the constructor default, {@link emissiveLuminance} is read as the cd/m² value it claims
+     * to be: a neon sign keeps a constant real-world brightness and darkens as the camera stops
+     * down, like every other lit surface.
+     *
+     * At 0 the exposure cancels out of the product and {@link emissiveLuminance} becomes a
+     * display-referred multiplier instead — bright at 1, and completely unresponsive to aperture,
+     * shutter and ISO. That is what a UI-like overlay wants, and what glTF content expects, so
+     * {@link Model} writes 0 on every imported material (Filament's gltfio writes `emissive.w = 0`
+     * for the same reason). Keep this in mind when an imported emitter looks far brighter than an
+     * authored one at the same {@link emissiveLuminance}.
      *
      * Has no effect in legacy lighting, where the pre-exposure is always 1.
      */
@@ -453,6 +512,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       if (this.needFragmentColor() && this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
         scope.$outputs.zEmissiveColor = this.getInstancedUniform(scope, EMISSIVE_COLOR_UNIFORM);
         scope.$outputs.zEmissiveStrength = this.getInstancedUniform(scope, EMISSIVE_STRENGTH_UNIFORM);
+        scope.$outputs.zEmissiveLuminance = this.getInstancedUniform(scope, EMISSIVE_LUMINANCE_UNIFORM);
         scope.$outputs.zEmissiveExposureWeight = this.getInstancedUniform(
           scope,
           EMISSIVE_EXPOSURE_WEIGHT_UNIFORM
@@ -468,6 +528,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         if (!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING)) {
           scope.zEmissiveColor = pb.vec3().uniform(2);
           scope.zEmissiveStrength = pb.float().uniform(2);
+          scope.zEmissiveLuminance = pb.float().uniform(2);
           scope.zEmissiveExposureWeight = pb.float().uniform(2);
           scope.zRectSpecularScale = pb.float().uniform(2);
         }
@@ -507,6 +568,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         if (!(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)) {
           bindGroup.setValue('zEmissiveColor', this._emissiveColor);
           bindGroup.setValue('zEmissiveStrength', this._emissiveStrength);
+          bindGroup.setValue('zEmissiveLuminance', this._emissiveLuminance);
           bindGroup.setValue('zEmissiveExposureWeight', this._emissiveExposureWeight);
           bindGroup.setValue('zRectSpecularScale', this._rectSpecularScale);
         }
@@ -684,6 +746,10 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
       return (instancing ? scope.$inputs.zEmissiveColor : scope.zEmissiveColor) as PBShaderExp;
     }
+    getEmissiveLuminance(scope: PBInsideFunctionScope) {
+      const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
+      return (instancing ? scope.$inputs.zEmissiveLuminance : scope.zEmissiveLuminance) as PBShaderExp;
+    }
     getEmissiveStrength(scope: PBInsideFunctionScope) {
       const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
       return (instancing ? scope.$inputs.zEmissiveStrength : scope.zEmissiveStrength) as PBShaderExp;
@@ -709,13 +775,18 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     calculateEmissiveColor(scope: PBInsideFunctionScope) {
       const pb = scope.$builder;
+      // Legacy multiplies by the unitless emissiveStrength, physical by the cd/m² emissiveLuminance.
+      // Same split as a light's `intensity` vs `illuminance`/`luminance`, so switching lightingMode
+      // never reinterprets one authored number as two different quantities. Safe to branch here
+      // because emissive is only evaluated in the light pass, whose program hash includes
+      // lightingMode (see LightPass._getGlobalBindGroupHash).
+      const strength =
+        this.drawContext.scene.lightingMode === 'physical'
+          ? this.getEmissiveLuminance(scope)
+          : this.getEmissiveStrength(scope);
       const base = this.emissiveTexture
-        ? pb.mul(
-            this.sampleEmissiveTexture(scope).rgb,
-            this.getEmissiveColor(scope),
-            this.getEmissiveStrength(scope)
-          )
-        : pb.mul(this.getEmissiveColor(scope), this.getEmissiveStrength(scope));
+        ? pb.mul(this.sampleEmissiveTexture(scope).rgb, this.getEmissiveColor(scope), strength)
+        : pb.mul(this.getEmissiveColor(scope), strength);
       // Filament's emissive attenuation: mix(1, exposure, exposureWeight). Lights are pre-exposed on
       // the CPU, but a material-authored emitter is not, so it is exposed here. In legacy the
       // pre-exposure is 1, which leaves this a no-op regardless of the weight.
