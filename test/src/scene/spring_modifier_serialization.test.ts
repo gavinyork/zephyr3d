@@ -10,7 +10,8 @@ import {
   SpringSystem,
   createCapsuleCollider,
   createPlaneCollider,
-  createSphereCollider
+  createSphereCollider,
+  updateColliderFromNode
 } from '@zephyr3d/scene';
 
 jest.mock('@zephyr3d/scene/app/api', () => ({
@@ -44,6 +45,16 @@ function createSkeleton(model: SceneNode, joints: SceneNode[]) {
   );
   model.animationSet.skeletons.push(new DRef(skeleton));
   return skeleton;
+}
+
+function removeSerializedKey(value: unknown, key: string): void {
+  if (Array.isArray(value)) {
+    value.forEach((item) => removeSerializedKey(item, key));
+  } else if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    delete record[key];
+    Object.values(record).forEach((item) => removeSerializedKey(item, key));
+  }
 }
 
 describe('SpringModifier serialization', () => {
@@ -199,6 +210,51 @@ describe('SpringModifier serialization', () => {
     expect(restoredModifier.springSystem).toBeInstanceOf(SpringSystem);
     expect(restoredModifier.springSystem.iterations).toBe(3);
     expect(restoredModifier.weight).toBeCloseTo(0.4);
+  });
+
+  it('preserves collider radius scaling and recovers modifiers saved without its scale reference', async () => {
+    const scene = new Scene();
+    const model = appendNode(scene.rootNode, 'model');
+    const root = appendNode(model, 'root');
+    const tip = appendNode(root, 'tip', 1);
+    const colliderNode = appendNode(model, 'colliderNode');
+    colliderNode.scale.setXYZ(0.01, 0.01, 0.01);
+    const skeleton = createSkeleton(model, [root, tip]);
+    const system = new SpringSystem(SpringChain.fromBoneChain(root, tip));
+    const collider = createCapsuleCollider(new Vector3(10, 0, 0), new Vector3(-10, 0, 0), 13, colliderNode);
+    collider.localRadiusScaleRef = 1;
+    updateColliderFromNode(collider);
+    expect(collider.radius).toBeCloseTo(0.13);
+    system.addCollider(collider);
+    skeleton.modifiers.push(new SpringModifier(system));
+
+    const manager = new ResourceManager(new MemoryFS());
+    const serialized = await manager.serializeObject(model);
+    expect(JSON.stringify(serialized)).toContain('"localRadiusScaleRef":1');
+
+    const restoreCollider = async (data: Record<string, unknown>) => {
+      const restoreScene = new Scene();
+      const container = new SceneNode(restoreScene);
+      container.remove();
+      const restored = (await manager.deserializeObject<SceneNode>(container, data))!;
+      const restoredModifier = restored.animationSet.rigs[0].get()!.modifiers[0] as SpringModifier;
+      const restoredCollider = restoredModifier.springSystem.colliders[0];
+      updateColliderFromNode(restoredCollider);
+      return restoredCollider;
+    };
+
+    const restoredCollider = (await restoreCollider(serialized)) as ReturnType<typeof createCapsuleCollider>;
+    expect(restoredCollider.localRadius).toBeCloseTo(13);
+    expect(restoredCollider.localRadiusScaleRef).toBeCloseTo(1);
+    expect(restoredCollider.radius).toBeCloseTo(0.13);
+
+    const legacySerialized = JSON.parse(JSON.stringify(serialized));
+    removeSerializedKey(legacySerialized, 'localRadiusScaleRef');
+    const legacyCollider = (await restoreCollider(legacySerialized)) as ReturnType<
+      typeof createCapsuleCollider
+    >;
+    expect(legacyCollider.localRadiusScaleRef).toBeCloseTo(1);
+    expect(legacyCollider.radius).toBeCloseTo(0.13);
   });
 
   it('serializes a spring modifier added to a prefab instance', async () => {

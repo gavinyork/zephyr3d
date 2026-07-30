@@ -120,6 +120,7 @@ type SerializedSpringCollider =
       center: number[];
       radius: number;
       localRadius?: number;
+      localRadiusScaleRef?: number;
       localOffset?: number[];
     }
   | {
@@ -130,6 +131,7 @@ type SerializedSpringCollider =
       end: number[];
       radius: number;
       localRadius?: number;
+      localRadiusScaleRef?: number;
       localStartOffset?: number[];
       localEndOffset?: number[];
     }
@@ -277,6 +279,9 @@ function serializeSpringCollider(collider: SpringCollider): SerializedSpringColl
         center: vectorToArray(sphere.center),
         radius: sphere.radius,
         ...(sphere.localRadius !== undefined ? { localRadius: sphere.localRadius } : {}),
+        ...(sphere.localRadiusScaleRef !== undefined
+          ? { localRadiusScaleRef: sphere.localRadiusScaleRef }
+          : {}),
         ...(sphere.localOffset ? { localOffset: vectorToArray(sphere.localOffset) } : {})
       };
     }
@@ -290,6 +295,9 @@ function serializeSpringCollider(collider: SpringCollider): SerializedSpringColl
         end: vectorToArray(capsule.end),
         radius: capsule.radius,
         ...(capsule.localRadius !== undefined ? { localRadius: capsule.localRadius } : {}),
+        ...(capsule.localRadiusScaleRef !== undefined
+          ? { localRadiusScaleRef: capsule.localRadiusScaleRef }
+          : {}),
         ...(capsule.localStartOffset ? { localStartOffset: vectorToArray(capsule.localStartOffset) } : {}),
         ...(capsule.localEndOffset ? { localEndOffset: vectorToArray(capsule.localEndOffset) } : {})
       };
@@ -309,6 +317,30 @@ function serializeSpringCollider(collider: SpringCollider): SerializedSpringColl
   }
 }
 
+function restoreSpringColliderRadiusScale(
+  collider: SphereCollider | CapsuleCollider,
+  data: Extract<SerializedSpringCollider, { type: 'sphere' | 'capsule' }>
+): void {
+  const createdScaleRef = collider.localRadiusScaleRef;
+  if (data.localRadiusScaleRef !== undefined) {
+    collider.localRadiusScaleRef = data.localRadiusScaleRef;
+  } else if (
+    data.localRadius !== undefined &&
+    createdScaleRef !== undefined &&
+    Number.isFinite(data.localRadius) &&
+    Number.isFinite(data.radius) &&
+    Math.abs(data.radius) > 1e-6
+  ) {
+    // Older serialized modifiers omitted the authored scale reference. Recover it
+    // from the stored world radius and the node scale captured by the constructor.
+    const inferredScaleRef = (data.localRadius * createdScaleRef) / data.radius;
+    if (Number.isFinite(inferredScaleRef) && Math.abs(inferredScaleRef) > 1e-6) {
+      collider.localRadiusScaleRef = Math.abs(inferredScaleRef);
+    }
+  }
+  collider.radius = data.radius;
+}
+
 function deserializeSpringCollider(ctx: SceneNode, data: SerializedSpringCollider): SpringCollider | null {
   const node = findSerializedNode(ctx, data.node);
   if (data.node && !node) {
@@ -316,21 +348,27 @@ function deserializeSpringCollider(ctx: SceneNode, data: SerializedSpringCollide
   }
   let collider: SpringCollider;
   switch (data.type) {
-    case 'sphere':
-      collider = createSphereCollider(
+    case 'sphere': {
+      const sphere = createSphereCollider(
         node && data.localOffset ? vectorFromArray(data.localOffset) : vectorFromArray(data.center),
         node ? (data.localRadius ?? data.radius) : data.radius,
         node ?? undefined
       );
+      restoreSpringColliderRadiusScale(sphere, data);
+      collider = sphere;
       break;
-    case 'capsule':
-      collider = createCapsuleCollider(
+    }
+    case 'capsule': {
+      const capsule = createCapsuleCollider(
         node && data.localStartOffset ? vectorFromArray(data.localStartOffset) : vectorFromArray(data.start),
         node && data.localEndOffset ? vectorFromArray(data.localEndOffset) : vectorFromArray(data.end),
         node ? (data.localRadius ?? data.radius) : data.radius,
         node ?? undefined
       );
+      restoreSpringColliderRadiusScale(capsule, data);
+      collider = capsule;
       break;
+    }
     case 'plane':
       collider = createPlaneCollider(
         node && data.localPointOffset ? vectorFromArray(data.localPointOffset) : vectorFromArray(data.point),
