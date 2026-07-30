@@ -1,5 +1,7 @@
 import { Vector3, Quaternion } from '@zephyr3d/base';
+import type { SceneNode } from '../../scene/scene_node';
 import type { SpringChain } from './spring_chain';
+import type { SpringParticle } from './spring_particle';
 import type { SpringConstraint } from './spring_constraint';
 import { IKUtils } from '../ik/ik_utils';
 import type { SpringCollider } from './spring_collider';
@@ -41,6 +43,14 @@ export interface MultiChainSpringSystemOptions {
   maxPoseOffsetTip?: number;
 }
 
+/** Options used when rebuilding runtime spring state from the current node pose. */
+export interface SpringPoseReinitializeOptions {
+  /** Recompute maintained anchor offsets against runtime-remapped anchor nodes. */
+  recomputeAnchorOffsets?: boolean;
+  /** Recompute structural and inter-chain rest lengths from the current pose. */
+  recalculateRestLengths?: boolean;
+}
+
 const FIXED_SIMULATION_TIME_STEP = 1 / 60;
 const MAX_ACCUMULATED_SIMULATION_TIME = 1 / 20;
 const MAX_SIMULATION_STEPS_PER_UPDATE = Math.max(
@@ -73,6 +83,9 @@ export class MultiChainSpringSystem {
   private _smoothedSphereCenters: WeakMap<SphereCollider, Vector3>;
   private _smoothedCapsuleEndpoints: WeakMap<CapsuleCollider, { start: Vector3; end: Vector3 }>;
   private _smoothedPlaneData: WeakMap<PlaneCollider, { point: Vector3; normal: Vector3 }>;
+  private _runtimeNodeMap: ReadonlyMap<SceneNode, SceneNode> | null;
+  private _runtimeAnchorOffsets: WeakMap<SpringParticle, Vector3>;
+  private _runtimeRestLengths: WeakMap<object, number>;
 
   constructor(options?: MultiChainSpringSystemOptions) {
     this._chains = [];
@@ -97,6 +110,9 @@ export class MultiChainSpringSystem {
     this._smoothedSphereCenters = new WeakMap();
     this._smoothedCapsuleEndpoints = new WeakMap();
     this._smoothedPlaneData = new WeakMap();
+    this._runtimeNodeMap = null;
+    this._runtimeAnchorOffsets = new WeakMap();
+    this._runtimeRestLengths = new WeakMap();
   }
 
   addChain(chain: SpringChain): number {
@@ -377,6 +393,91 @@ export class MultiChainSpringSystem {
     return this._colliders;
   }
 
+  /**
+   * Sets a runtime-only node remapping used by particles, anchors and colliders.
+   * The authored node references remain unchanged and therefore serialize normally.
+   */
+  setRuntimeNodeMap(nodeMap: ReadonlyMap<SceneNode, SceneNode> | null): void {
+    this._runtimeNodeMap = nodeMap;
+    this._runtimeAnchorOffsets = new WeakMap();
+    this._runtimeRestLengths = new WeakMap();
+    this.clearRuntimeCaches();
+  }
+
+  /**
+   * Rebuilds particle history from the current runtime-remapped node pose.
+   * This must be called after a hierarchy graft or skeleton rebind.
+   */
+  reinitializeFromCurrentPose(options?: SpringPoseReinitializeOptions): void {
+    const recomputeAnchorOffsets = options?.recomputeAnchorOffsets ?? true;
+    const recalculateRestLengths = options?.recalculateRestLengths ?? true;
+    this._runtimeAnchorOffsets = new WeakMap();
+    this._runtimeRestLengths = new WeakMap();
+
+    for (const chain of this._chains) {
+      for (const particle of chain.particles) {
+        const particleNode = this.resolveRuntimeNode(particle.node);
+        let position = particleNode
+          ? new Vector3(
+              particleNode.worldMatrix.m03,
+              particleNode.worldMatrix.m13,
+              particleNode.worldMatrix.m23
+            )
+          : particle.position.clone();
+        const anchorNode = this.resolveRuntimeNode(particle.anchorNode);
+        if (particle.fixed && anchorNode) {
+          let anchorOffset = particle.anchorOffset;
+          if (recomputeAnchorOffsets && anchorOffset && particleNode) {
+            anchorOffset = anchorNode.worldToThis(position, new Vector3());
+            this._runtimeAnchorOffsets.set(particle, anchorOffset);
+          }
+          position = anchorOffset
+            ? anchorNode.worldMatrix.transformPointAffine(anchorOffset, new Vector3())
+            : new Vector3(anchorNode.worldMatrix.m03, anchorNode.worldMatrix.m13, anchorNode.worldMatrix.m23);
+        }
+        particle.position.set(position);
+        particle.prevPosition.set(position);
+        particle.animPosition.set(position);
+        particle.lastFramePosition.set(position);
+        if (particle.positionHistory) {
+          particle.positionHistory.length = 0;
+        }
+      }
+
+      for (const constraint of chain.constraints) {
+        constraint.lambda = 0;
+        if (recalculateRestLengths) {
+          this._runtimeRestLengths.set(
+            constraint,
+            Vector3.distance(
+              chain.particles[constraint.particleA].position,
+              chain.particles[constraint.particleB].position
+            )
+          );
+        }
+      }
+    }
+
+    for (const constraint of this._interChainConstraints) {
+      constraint.lambda = 0;
+      if (recalculateRestLengths) {
+        const particleA = this._chains[constraint.chainAIndex]?.particles[constraint.particleAIndex];
+        const particleB = this._chains[constraint.chainBIndex]?.particles[constraint.particleBIndex];
+        if (particleA && particleB) {
+          this._runtimeRestLengths.set(constraint, Vector3.distance(particleA.position, particleB.position));
+        }
+      }
+    }
+
+    for (const collider of this._colliders) {
+      const colliderNode = this.resolveRuntimeNode(collider.node);
+      if (colliderNode) {
+        updateColliderFromNode(collider, colliderNode);
+      }
+    }
+    this.clearRuntimeCaches();
+  }
+
   private simulateStep(dt: number, inputDeltaTime: number): void {
     if (this._enableInertialForces) {
       for (const chain of this._chains) {
@@ -459,12 +560,13 @@ export class MultiChainSpringSystem {
     const blend = this.getTemporalBlendFactor(deltaTime, DEFAULT_PARTICLE_TARGET_SMOOTHING_TIME);
     for (const chain of this._chains) {
       for (const particle of chain.particles) {
-        const sourceNode = particle.anchorNode ?? particle.node;
+        const sourceNode = this.resolveRuntimeNode(particle.anchorNode ?? particle.node);
         if (!sourceNode) {
           continue;
         }
-        const worldPos = particle.anchorOffset
-          ? sourceNode.worldMatrix.transformPointAffine(particle.anchorOffset)
+        const anchorOffset = this._runtimeAnchorOffsets.get(particle) ?? particle.anchorOffset;
+        const worldPos = anchorOffset
+          ? sourceNode.worldMatrix.transformPointAffine(anchorOffset)
           : new Vector3(sourceNode.worldMatrix.m03, sourceNode.worldMatrix.m13, sourceNode.worldMatrix.m23);
         const smoothedTarget = this.getSmoothedParticleTarget(particle, worldPos, blend);
         particle.animPosition.set(smoothedTarget);
@@ -528,8 +630,9 @@ export class MultiChainSpringSystem {
     const planes: PlaneCollider[] = [];
 
     for (const collider of this._colliders) {
-      if (collider.node) {
-        updateColliderFromNode(collider);
+      const colliderNode = this.resolveRuntimeNode(collider.node);
+      if (colliderNode) {
+        updateColliderFromNode(collider, colliderNode);
       }
       if (!collider.enabled) {
         continue;
@@ -571,14 +674,23 @@ export class MultiChainSpringSystem {
         if (particle.fixed) {
           continue;
         }
+        const positionBeforeCollision = particle.position.clone();
+        let collided = false;
         for (const collider of spheres) {
-          resolveSphereCollision(particle.position, collider);
+          collided = resolveSphereCollision(particle.position, collider) || collided;
         }
         for (const collider of capsules) {
-          resolveCapsuleCollision(particle.position, collider);
+          collided = resolveCapsuleCollision(particle.position, collider) || collided;
         }
         for (const collider of planes) {
-          resolvePlaneCollision(particle.position, collider);
+          collided = resolvePlaneCollision(particle.position, collider) || collided;
+        }
+        if (collided) {
+          Vector3.add(
+            particle.prevPosition,
+            Vector3.sub(particle.position, positionBeforeCollision, new Vector3()),
+            particle.prevPosition
+          );
         }
       }
     }
@@ -587,10 +699,20 @@ export class MultiChainSpringSystem {
   private calculateGlobalRotation(dt: number): { center: Vector3; omega: Vector3 } {
     const fixedParticles: any[] = [];
     const velocities: Vector3[] = [];
+    const drivenNodes = new Set<SceneNode>();
 
     for (const chain of this._chains) {
       for (const particle of chain.particles) {
-        if (!particle.fixed) {
+        const node = this.resolveRuntimeNode(particle.node);
+        if (node) {
+          drivenNodes.add(node);
+        }
+      }
+    }
+
+    for (const chain of this._chains) {
+      for (const particle of chain.particles) {
+        if (!particle.fixed || !this.isExternalInertialAnchor(particle, drivenNodes)) {
           continue;
         }
         const velocity = Vector3.sub(particle.position, particle.lastFramePosition, new Vector3());
@@ -725,7 +847,7 @@ export class MultiChainSpringSystem {
     if (currentLength < 0.0001) {
       return;
     }
-    const diff = (currentLength - constraint.restLength) / currentLength;
+    const diff = (currentLength - this.getRuntimeRestLength(constraint)) / currentLength;
     const correction = Vector3.scale(delta, diff * constraint.stiffness * 0.5, new Vector3());
     if (!pA.fixed) {
       Vector3.add(pA.position, correction, pA.position);
@@ -745,7 +867,7 @@ export class MultiChainSpringSystem {
     if (currentLength < 0.0001) {
       return;
     }
-    const diff = (currentLength - constraint.restLength) / currentLength;
+    const diff = (currentLength - this.getRuntimeRestLength(constraint)) / currentLength;
     const correction = Vector3.scale(delta, diff * constraint.stiffness * 0.5, new Vector3());
     if (!pA.fixed) {
       Vector3.add(pA.position, correction, pA.position);
@@ -769,7 +891,7 @@ export class MultiChainSpringSystem {
     if (currentLength < 0.0001) {
       return;
     }
-    const C = currentLength - constraint.restLength;
+    const C = currentLength - this.getRuntimeRestLength(constraint);
     const alphaTilde = constraint.compliance / (dt * dt);
     const deltaLambda = (-C - alphaTilde * constraint.lambda) / (wSum + alphaTilde);
     constraint.lambda += deltaLambda;
@@ -798,7 +920,7 @@ export class MultiChainSpringSystem {
     if (currentLength < 0.0001) {
       return;
     }
-    const C = currentLength - constraint.restLength;
+    const C = currentLength - this.getRuntimeRestLength(constraint);
     const alphaTilde = constraint.compliance / (dt * dt);
     const deltaLambda = (-C - alphaTilde * constraint.lambda) / (wSum + alphaTilde);
     constraint.lambda += deltaLambda;
@@ -820,12 +942,12 @@ export class MultiChainSpringSystem {
     for (let i = 0; i < chain.particles.length - 1; i++) {
       const particle = chain.particles[i];
       const nextParticle = chain.particles[i + 1];
-      const node = particle.node;
+      const node = this.resolveRuntimeNode(particle.node);
       if (!node) {
         continue;
       }
 
-      const nextNode = nextParticle.node;
+      const nextNode = this.resolveRuntimeNode(nextParticle.node);
       if (!nextNode) {
         continue;
       }
@@ -886,6 +1008,34 @@ export class MultiChainSpringSystem {
     for (const constraint of this._interChainConstraints) {
       constraint.lambda = 0;
     }
+  }
+
+  private resolveRuntimeNode(node: SceneNode | null | undefined): SceneNode | null {
+    return node ? (this._runtimeNodeMap?.get(node) ?? node) : null;
+  }
+
+  private isExternalInertialAnchor(particle: SpringParticle, drivenNodes: Set<SceneNode>): boolean {
+    const particleNode = this.resolveRuntimeNode(particle.node);
+    let current = this.resolveRuntimeNode(particle.anchorNode ?? particle.node);
+    while (current) {
+      if (current !== particleNode && drivenNodes.has(current)) {
+        return false;
+      }
+      current = current.parent;
+    }
+    return true;
+  }
+
+  private getRuntimeRestLength(constraint: SpringConstraint | InterChainConstraint): number {
+    return this._runtimeRestLengths.get(constraint) ?? constraint.restLength;
+  }
+
+  private clearRuntimeCaches(): void {
+    this._timeAccumulator = 0;
+    this._smoothedParticleTargets = new WeakMap();
+    this._smoothedSphereCenters = new WeakMap();
+    this._smoothedCapsuleEndpoints = new WeakMap();
+    this._smoothedPlaneData = new WeakMap();
   }
 
   private lerp(a: number, b: number, t: number): number {

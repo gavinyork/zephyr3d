@@ -314,12 +314,13 @@ export function resolvePlaneCollision(particlePos: Vector3, collider: PlaneColli
  *
  * @public
  */
-export function updateColliderFromNode(collider: SpringCollider): void {
-  if (!collider.node || !collider.enabled) {
+export function updateColliderFromNode(collider: SpringCollider, runtimeNode?: Nullable<SceneNode>): void {
+  const node = runtimeNode ?? collider.node;
+  if (!node || !collider.enabled) {
     return;
   }
 
-  const worldMatrix = collider.node.worldMatrix;
+  const worldMatrix = node.worldMatrix;
 
   switch (collider.type) {
     case 'sphere': {
