@@ -18,6 +18,7 @@ import type { ResourceManager } from '../manager';
 import {
   AnimationClip,
   JointDynamicsModifier,
+  SpringModifier,
   NodeRotationTrack,
   NodeScaleTrack,
   NodeTranslationTrack
@@ -26,7 +27,12 @@ import { JSONArray, JSONData } from '../json';
 import { ScriptAttachment, normalizeScriptAttachmentConfig } from '../../../scene/script_attachment';
 import { parseZABCBlob, attachZABCAnimationsToSceneNode } from '../../../asset/loaders/zabc/zabc_loader';
 import { restoreGeometryCacheMeshBinding } from '../../../animation/geometry_cache_utils';
-import { getJointDynamicsModifierSkeleton, setJointDynamicsModifierSkeleton } from './animation';
+import {
+  getJointDynamicsModifierSkeleton,
+  getSpringModifierSkeleton,
+  setJointDynamicsModifierSkeleton,
+  setSpringModifierSkeleton
+} from './animation';
 const geometryCacheBindings = new WeakMap<
   SceneNode,
   {
@@ -722,6 +728,117 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
                     return;
                   }
                   n++;
+                }
+              }
+            }
+          }
+        },
+        {
+          name: 'SpringModifiers',
+          description: 'Spring systems which affect this object or children',
+          type: 'object_array',
+          phase: 3,
+          readonly: true,
+          options: {
+            objectTypes: [SpringModifier]
+          },
+          isPersistent(this: SceneNode) {
+            return !this._prefabId || guessMimeType(this._prefabId) === mimeTypeOf('.zprefab');
+          },
+          getDefaultValue(this: SceneNode) {
+            const animationSet = this.animationSet;
+            const springModifiers: SpringModifier[] = [];
+            const rigs = new Set(animationSet.rigs.map((v) => v.get()));
+            for (const binding of animationSet.skeletons) {
+              const rig = binding.get()?.rig;
+              if (rig) {
+                rigs.add(rig);
+              }
+            }
+            for (const rig of rigs) {
+              for (const modifier of rig!.modifiers) {
+                if (modifier instanceof SpringModifier) {
+                  setSpringModifierSkeleton(modifier, rig!);
+                  springModifiers.push(modifier);
+                }
+              }
+            }
+            return springModifiers;
+          },
+          get(this: SceneNode, value) {
+            const animationSet = this.animationSet;
+            const springModifiers: SpringModifier[] = [];
+            const rigs = new Set(animationSet.rigs.map((v) => v.get()));
+            for (const binding of animationSet.skeletons) {
+              const rig = binding.get()?.rig;
+              if (rig) {
+                rigs.add(rig);
+              }
+            }
+            for (const rig of rigs) {
+              for (const modifier of rig!.modifiers) {
+                if (modifier instanceof SpringModifier) {
+                  setSpringModifierSkeleton(modifier, rig!);
+                  springModifiers.push(modifier);
+                }
+              }
+            }
+            value.object = springModifiers;
+          },
+          set(this: SceneNode, value) {
+            const animationSet = this.animationSet;
+            for (const rigRef of animationSet.rigs) {
+              const modifiers = rigRef.get()!.modifiers;
+              for (let i = modifiers.length - 1; i >= 0; i--) {
+                if (modifiers[i] instanceof SpringModifier) {
+                  modifiers.splice(i, 1);
+                }
+              }
+            }
+            for (const modifier of value.object) {
+              if (!(modifier instanceof SpringModifier)) {
+                continue;
+              }
+              const skeleton = getSpringModifierSkeleton(modifier);
+              if (skeleton && animationSet.rigs.some((rigRef) => rigRef.get() === skeleton)) {
+                skeleton.modifiers.push(modifier);
+                setSpringModifierSkeleton(modifier, skeleton);
+                continue;
+              }
+              const system = modifier.springSystem as any;
+              const chains = Array.isArray(system?.chains)
+                ? system.chains
+                : system?.chain
+                  ? [system.chain]
+                  : [];
+              const particleNodes = chains.flatMap((chain: any) =>
+                (chain?.particles ?? []).map((particle: any) => particle?.node).filter(Boolean)
+              );
+              for (const rigRef of animationSet.rigs) {
+                const rig = rigRef.get()!;
+                if (
+                  particleNodes.length > 0 &&
+                  particleNodes.every((node: SceneNode) => rig.joints.includes(node))
+                ) {
+                  rig.modifiers.push(modifier);
+                  setSpringModifierSkeleton(modifier, rig);
+                  break;
+                }
+              }
+            }
+          },
+          delete(this: SceneNode, index) {
+            const animationSet = this.animationSet;
+            let current = 0;
+            for (const rigRef of animationSet.rigs) {
+              const modifiers = rigRef.get()!.modifiers;
+              for (const modifier of modifiers) {
+                if (modifier instanceof SpringModifier) {
+                  if (current === index) {
+                    modifiers.splice(modifiers.indexOf(modifier), 1);
+                    return;
+                  }
+                  current++;
                 }
               }
             }
