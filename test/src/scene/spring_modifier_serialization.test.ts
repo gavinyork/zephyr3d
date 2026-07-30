@@ -121,6 +121,7 @@ describe('SpringModifier serialization', () => {
     system.addCollider(createPlaneCollider(new Vector3(0, -1, 0), new Vector3(0, 1, 0)));
 
     const modifier = new SpringModifier(system as any, 0.65);
+    modifier.sourceId = 'spring-config:test-outfit';
     modifier.enabled = false;
     skeleton.modifiers.push(modifier);
 
@@ -136,6 +137,7 @@ describe('SpringModifier serialization', () => {
     const restoredSystem = restoredModifier.springSystem as any as MultiChainSpringSystem;
 
     expect(restoredModifier).toBeInstanceOf(SpringModifier);
+    expect(restoredModifier.sourceId).toBe('spring-config:test-outfit');
     expect(restoredModifier.enabled).toBe(false);
     expect(restoredModifier.weight).toBeCloseTo(0.65);
     expect(restoredSystem).toBeInstanceOf(MultiChainSpringSystem);
@@ -197,5 +199,39 @@ describe('SpringModifier serialization', () => {
     expect(restoredModifier.springSystem).toBeInstanceOf(SpringSystem);
     expect(restoredModifier.springSystem.iterations).toBe(3);
     expect(restoredModifier.weight).toBeCloseTo(0.4);
+  });
+
+  it('serializes a spring modifier added to a prefab instance', async () => {
+    const scene = new Scene();
+    const model = appendNode(scene.rootNode, 'model');
+    const root = appendNode(model, 'root');
+    const tip = appendNode(root, 'tip', 1);
+    createSkeleton(model, [root, tip]);
+
+    const vfs = new MemoryFS();
+    const manager = new ResourceManager(vfs);
+    const prefabData = await manager.serializeObject(model);
+    await vfs.writeFile('/spring.zprefab', JSON.stringify({ type: 'SceneNode', data: prefabData }), {
+      encoding: 'utf8',
+      create: true
+    });
+
+    const instance = (await manager.instantiatePrefab(scene.rootNode, '/spring.zprefab'))!;
+    const instanceRoot = instance.findNodeByName('root')!;
+    const instanceTip = instance.findNodeByName('tip')!;
+    const skeleton = instance.animationSet.skeletons[0].get()!;
+    const system = new SpringSystem(SpringChain.fromBoneChain(instanceRoot, instanceTip));
+    system.addCollider(createPlaneCollider(new Vector3(0, -1, 0), new Vector3(0, 1, 0)));
+    const modifier = new SpringModifier(system, 1);
+    modifier.sourceId = 'spring-config:prefab-instance';
+    skeleton.modifiers.push(modifier);
+
+    // Runtime simulation data can temporarily contain values that JSON normalizes
+    // (for example, a non-finite transform component). Patch verification must use
+    // the same representation that is eventually persisted to the scene file.
+    instance.position.x = Number.NaN;
+    const serialized = await manager.serializeObject(instance);
+    expect(serialized).toBeTruthy();
+    expect(() => JSON.parse(JSON.stringify(serialized))).not.toThrow();
   });
 });

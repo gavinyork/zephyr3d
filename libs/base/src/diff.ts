@@ -171,14 +171,15 @@ function diffObject(baseObj: DiffObject, targetObj: DiffObject, path: DiffPath, 
   const keys = new Set([...Object.keys(baseObj), ...Object.keys(targetObj)]);
   for (const k of keys) {
     const p = [...path, k];
-    const hasB = Object.prototype.hasOwnProperty.call(baseObj, k);
-    const hasT = Object.prototype.hasOwnProperty.call(targetObj, k);
+    // Diff values are serialized as JSON, where undefined object properties are omitted.
+    const hasB = Object.prototype.hasOwnProperty.call(baseObj, k) && baseObj[k] !== undefined;
+    const hasT = Object.prototype.hasOwnProperty.call(targetObj, k) && targetObj[k] !== undefined;
 
     if (!hasB && hasT) {
       out.push({ kind: 'set', path: p, value: cloneDeep(targetObj[k]) });
     } else if (hasB && !hasT) {
       out.push({ kind: 'del', path: p });
-    } else {
+    } else if (hasB && hasT) {
       diffInto(baseObj[k], targetObj[k], p, out);
     }
   }

@@ -150,6 +150,7 @@ type SerializedSpringSystemOptions = Omit<SpringSystemOptions, 'gravity' | 'wind
 
 type SerializedSpringModifier = {
   skeleton: string;
+  sourceId?: string;
   systemType: 'single' | 'multi';
   options: SerializedSpringSystemOptions;
   chains: SerializedSpringChain[];
@@ -200,11 +201,13 @@ function quaternionFromArray(value: number[] | undefined): Quaternion | undefine
 function serializeSpringChain(chain: SpringChain): SerializedSpringChain {
   return {
     particles: chain.particles.map((particle) => ({
-      node: particle.node?.persistentId,
-      anchorNode: particle.anchorNode?.persistentId,
-      anchorOffset: particle.anchorOffset ? vectorToArray(particle.anchorOffset) : undefined,
+      ...(particle.node ? { node: particle.node.persistentId } : {}),
+      ...(particle.anchorNode ? { anchorNode: particle.anchorNode.persistentId } : {}),
+      ...(particle.anchorOffset ? { anchorOffset: vectorToArray(particle.anchorOffset) } : {}),
       originalPosition: vectorToArray(particle.originalPosition),
-      originalRotation: particle.originalRotation ? quaternionToArray(particle.originalRotation) : undefined,
+      ...(particle.originalRotation
+        ? { originalRotation: quaternionToArray(particle.originalRotation) }
+        : {}),
       mass: particle.mass,
       damping: particle.damping,
       fixed: particle.fixed
@@ -269,38 +272,38 @@ function serializeSpringCollider(collider: SpringCollider): SerializedSpringColl
       const sphere = collider as SphereCollider;
       return {
         type: 'sphere',
-        node: sphere.node?.persistentId,
+        ...(sphere.node ? { node: sphere.node.persistentId } : {}),
         enabled: sphere.enabled,
         center: vectorToArray(sphere.center),
         radius: sphere.radius,
-        localRadius: sphere.localRadius,
-        localOffset: sphere.localOffset ? vectorToArray(sphere.localOffset) : undefined
+        ...(sphere.localRadius !== undefined ? { localRadius: sphere.localRadius } : {}),
+        ...(sphere.localOffset ? { localOffset: vectorToArray(sphere.localOffset) } : {})
       };
     }
     case 'capsule': {
       const capsule = collider as CapsuleCollider;
       return {
         type: 'capsule',
-        node: capsule.node?.persistentId,
+        ...(capsule.node ? { node: capsule.node.persistentId } : {}),
         enabled: capsule.enabled,
         start: vectorToArray(capsule.start),
         end: vectorToArray(capsule.end),
         radius: capsule.radius,
-        localRadius: capsule.localRadius,
-        localStartOffset: capsule.localStartOffset ? vectorToArray(capsule.localStartOffset) : undefined,
-        localEndOffset: capsule.localEndOffset ? vectorToArray(capsule.localEndOffset) : undefined
+        ...(capsule.localRadius !== undefined ? { localRadius: capsule.localRadius } : {}),
+        ...(capsule.localStartOffset ? { localStartOffset: vectorToArray(capsule.localStartOffset) } : {}),
+        ...(capsule.localEndOffset ? { localEndOffset: vectorToArray(capsule.localEndOffset) } : {})
       };
     }
     case 'plane': {
       const plane = collider as PlaneCollider;
       return {
         type: 'plane',
-        node: plane.node?.persistentId,
+        ...(plane.node ? { node: plane.node.persistentId } : {}),
         enabled: plane.enabled,
         point: vectorToArray(plane.point),
         normal: vectorToArray(plane.normal),
-        localPointOffset: plane.localPointOffset ? vectorToArray(plane.localPointOffset) : undefined,
-        localNormal: plane.localNormal ? vectorToArray(plane.localNormal) : undefined
+        ...(plane.localPointOffset ? { localPointOffset: vectorToArray(plane.localPointOffset) } : {}),
+        ...(plane.localNormal ? { localNormal: vectorToArray(plane.localNormal) } : {})
       };
     }
   }
@@ -774,6 +777,7 @@ export function getSpringModifierClass(): SerializableClass {
         }
       }
       const modifier = new SpringModifier(system as unknown as SpringSystem, init.weight ?? 1);
+      modifier.sourceId = init.sourceId ?? '';
       modifier.enabled = init.enabled ?? true;
       setSpringModifierSkeleton(modifier, skeleton);
       return { obj: modifier, loadProps: false };
@@ -788,12 +792,17 @@ export function getSpringModifierClass(): SerializableClass {
       const chains = isMultiChain ? system.chains : [system.chain];
       const init: SerializedSpringModifier = {
         skeleton: skeleton?.persistentId ?? '',
+        sourceId: obj.sourceId,
         systemType: isMultiChain ? 'multi' : 'single',
         options: getSpringSystemOptions(system),
         chains: chains.map(serializeSpringChain),
-        interChainConstraints: isMultiChain
-          ? system.interChainConstraints.map(({ lambda: _lambda, ...constraint }) => constraint)
-          : undefined,
+        ...(isMultiChain
+          ? {
+              interChainConstraints: system.interChainConstraints.map(
+                ({ lambda: _lambda, ...constraint }) => constraint
+              )
+            }
+          : {}),
         colliders: system.colliders.map(serializeSpringCollider),
         enabled: obj.enabled,
         weight: obj.weight

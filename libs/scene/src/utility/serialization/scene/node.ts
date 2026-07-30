@@ -63,6 +63,30 @@ function normalizeSerializedSceneNodeData(data: DiffValue): Record<string, unkno
   };
 }
 
+function normalizePatchData(data: DiffValue): DiffValue {
+  const serialized = JSON.stringify(data);
+  ASSERT(serialized !== undefined, 'Prefab patch data is not JSON serializable');
+  return JSON.parse(serialized) as DiffValue;
+}
+
+function createVerifiedPatch(baseData: DiffValue, nodeData: DiffValue): DiffPatch | undefined {
+  const normalizedBaseData = normalizePatchData(baseData);
+  const normalizedNodeData = normalizePatchData(nodeData);
+  const patch = diff(normalizedBaseData, normalizedNodeData);
+  if (patch.length === 0) {
+    return undefined;
+  }
+  if (diff(applyPatch(normalizedBaseData, patch), normalizedNodeData).length === 0) {
+    return patch;
+  }
+  const fallbackPatch: DiffPatch = [{ kind: 'set', path: [], value: normalizedNodeData }];
+  ASSERT(
+    diff(applyPatch(normalizedBaseData, fallbackPatch), normalizedNodeData).length === 0,
+    'Fallback patch test failed'
+  );
+  return fallbackPatch;
+}
+
 function hasMeshDescendants(node: SceneNode) {
   let hasMesh = false;
   node.iterate((child) => {
@@ -177,11 +201,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           const prefabData = (await manager.loadPrefabContent(prefabId))!.data as DiffValue;
           obj.prefabId = '';
           const nodeData = await manager.serializeObject(obj);
-          const nextPatch = diff(prefabData, nodeData);
-          if (nextPatch.length > 0) {
-            ASSERT(diff(applyPatch(prefabData, nextPatch), nodeData).length === 0, 'Patch test failed');
-            patch = nextPatch;
-          }
+          patch = createVerifiedPatch(prefabData, nodeData);
         } finally {
           obj.prefabId = prefabId;
         }
@@ -199,11 +219,7 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
             manager.setAssetId(baseNode, null);
             const baseNodeData = await manager.serializeObject(baseNode);
             const nodeData = await manager.serializeObject(obj);
-            const nextPatch = diff(baseNodeData, nodeData);
-            if (nextPatch.length > 0) {
-              ASSERT(diff(applyPatch(baseNodeData, nextPatch), nodeData).length === 0, 'Patch test failed');
-              patch = nextPatch;
-            }
+            patch = createVerifiedPatch(baseNodeData, nodeData);
           } finally {
             manager.setAssetId(obj, originalObjectAssetId);
             manager.setAssetId(baseNode, originalBaseAssetId);
