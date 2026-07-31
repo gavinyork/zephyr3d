@@ -17,7 +17,7 @@ const PBR_REFLECTION_MODE: Record<PBRReflectionMode, number> = {
   glint: 3
 };
 
-type BlueprintOutputMap = Partial<Record<PBRBlueprintOutputName, number | boolean | PBShaderExp>>;
+type ConnectedBlueprintOutputMap = Partial<Record<PBRBlueprintOutputName, number | boolean | PBShaderExp>>;
 type VertexBlueprintOutputName = 'Position' | 'Normal' | 'Tangent' | 'Color' | 'UV';
 type VertexBlueprintOutputMap = Partial<Record<VertexBlueprintOutputName, number | boolean | PBShaderExp>>;
 
@@ -33,6 +33,19 @@ export type PBRBlueprintOutputName =
   | 'SpecularWeight'
   | 'AO';
 
+/** Inputs available while evaluating a PBR blueprint fragment graph. */
+export interface PBRBlueprintOutputInputs {
+  worldPosition?: PBShaderExp;
+  vertexColor?: PBShaderExp;
+  vertexUV?: PBShaderExp;
+  vertexNormal?: PBShaderExp;
+  vertexTangent?: PBShaderExp;
+  vertexBinormal?: PBShaderExp;
+}
+
+/** Fully resolved PBR surface outputs produced by a blueprint fragment graph. */
+export type PBRBlueprintOutputMap = Readonly<Record<PBRBlueprintOutputName, PBShaderExp>>;
+
 const DEFAULT_OUTPUT_NAMES: readonly PBRBlueprintOutputName[] = [
   'BaseColor',
   'Metallic',
@@ -47,10 +60,7 @@ const DEFAULT_OUTPUT_NAMES: readonly PBRBlueprintOutputName[] = [
 ] as const;
 
 function getBlueprintAutoSamplerKey(
-  uniform: Pick<
-    BluePrintUniformTexture,
-    'type' | 'wrapS' | 'wrapT' | 'minFilter' | 'magFilter' | 'mipFilter'
-  >
+  uniform: Pick<BluePrintUniformTexture, 'type' | 'wrapS' | 'wrapT' | 'minFilter' | 'magFilter' | 'mipFilter'>
 ) {
   return [
     'blueprint',
@@ -209,6 +219,15 @@ export class PBRBluePrintMaterial
     return this._connectedOutputs.has(name);
   }
 
+  /**
+   * Binds fragment-stage uniforms consumed while evaluating blueprint PBR outputs.
+   *
+   * @param bindGroup - Material bind group used by the output evaluation shader.
+   */
+  applyBlueprintOutputUniformValues(bindGroup: BindGroup) {
+    this.applyBlueprintUniformValues(bindGroup, true);
+  }
+
   clone() {
     const other = new PBRBluePrintMaterial(
       this._irFrag,
@@ -314,16 +333,7 @@ export class PBRBluePrintMaterial
   fragmentShader(scope: PBFunctionScope) {
     const pb = scope.$builder;
     if (this.needFragmentColorInput()) {
-      for (const u of [...this._uniformValues, ...this._uniformTextures]) {
-        if (u.inFragmentShader) {
-          // @ts-ignore dynamic shader type constructor
-          const exp = pb[u.type]().uniform(2);
-          if ('texture' in u) {
-            exp.$autoSamplerKey = getBlueprintAutoSamplerKey(u);
-          }
-          pb.getGlobalScope()[u.name] = exp;
-        }
-      }
+      this.declareBlueprintOutputUniforms(scope, true);
       scope.zVertexColor = scope.$inputs.zOutDiffuse ?? pb.vec4(1);
       scope.zVertexUV = scope.$inputs.zVertexUV ?? pb.vec2(0);
       scope.zVertexNormal = scope.$inputs.wNorm ?? pb.vec3(0, 0, 1);
@@ -337,13 +347,7 @@ export class PBRBluePrintMaterial
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColorInput(ctx)) {
-      for (const u of this._uniformValues) {
-        bindGroup.setValue(u.name, u.finalValue!);
-      }
-      for (const u of this._uniformTextures) {
-        const texture = u.finalTexture?.get() ?? getDefaultTexture2D();
-        bindGroup.setTexture(u.name, texture, u.finalSampler);
-      }
+      this.applyBlueprintUniformValues(bindGroup, false);
     }
   }
 
@@ -659,11 +663,22 @@ export class PBRBluePrintMaterial
     if (!this._connectedOutputs.has(name)) {
       return undefined;
     }
-    return this.getBlueprintOutputMap(scope)[name];
+    return this.evaluateBlueprintOutputs(scope)[name];
   }
 
-  private getBlueprintOutputMap(scope: PBInsideFunctionScope): BlueprintOutputMap {
+  /**
+   * Evaluates the fragment blueprint and returns all PBR surface outputs.
+   *
+   * @param scope - Shader function scope used to generate output expressions.
+   * @param inputs - Optional explicit surface inputs. Missing values use the active draw scope.
+   * @returns A complete output map with defaults for graph outputs that are not connected.
+   */
+  evaluateBlueprintOutputs(
+    scope: PBInsideFunctionScope,
+    inputs: PBRBlueprintOutputInputs = {}
+  ): PBRBlueprintOutputMap {
     const pb = scope.$builder;
+    this.declareBlueprintOutputUniforms(scope);
     const funcName = 'Z_GetPBRBlueprintOutputs';
     const that = this;
     const outputsStruct = pb.defineStruct(
@@ -764,12 +779,45 @@ export class PBRBluePrintMaterial
       .getGlobalScope()
       [
         funcName
-      ](this.getBlueprintWorldPos(scope), this.getBlueprintFragmentVertexColor(scope), this.getBlueprintFragmentVertexUV(scope), this.getBlueprintFragmentVertexNormal(scope), this.getBlueprintFragmentVertexTangent(scope), this.getBlueprintFragmentVertexBinormal(scope)) as PBShaderExp;
-    const map: BlueprintOutputMap = {};
+      ](inputs.worldPosition ?? this.getBlueprintWorldPos(scope), inputs.vertexColor ?? this.getBlueprintFragmentVertexColor(scope), inputs.vertexUV ?? this.getBlueprintFragmentVertexUV(scope), inputs.vertexNormal ?? this.getBlueprintFragmentVertexNormal(scope), inputs.vertexTangent ?? this.getBlueprintFragmentVertexTangent(scope), inputs.vertexBinormal ?? this.getBlueprintFragmentVertexBinormal(scope)) as PBShaderExp;
+    const map = {} as Record<PBRBlueprintOutputName, PBShaderExp>;
     for (const name of DEFAULT_OUTPUT_NAMES) {
       map[name] = result[name] as PBShaderExp;
     }
     return map;
+  }
+
+  private declareBlueprintOutputUniforms(
+    scope: PBFunctionScope | PBInsideFunctionScope,
+    replaceExisting = false
+  ) {
+    const pb = scope.$builder;
+    const globalScope = pb.getGlobalScope();
+    for (const uniform of [...this._uniformValues, ...this._uniformTextures]) {
+      if (!uniform.inFragmentShader || (!replaceExisting && globalScope[uniform.name])) {
+        continue;
+      }
+      // @ts-ignore dynamic shader type constructor
+      const exp = pb[uniform.type]().uniform(2);
+      if ('texture' in uniform) {
+        exp.$autoSamplerKey = getBlueprintAutoSamplerKey(uniform);
+      }
+      globalScope[uniform.name] = exp;
+    }
+  }
+
+  private applyBlueprintUniformValues(bindGroup: BindGroup, fragmentOnly: boolean) {
+    for (const uniform of this._uniformValues) {
+      if (!fragmentOnly || uniform.inFragmentShader) {
+        bindGroup.setValue(uniform.name, uniform.finalValue!);
+      }
+    }
+    for (const uniform of this._uniformTextures) {
+      if (!fragmentOnly || uniform.inFragmentShader) {
+        const texture = uniform.finalTexture?.get() ?? getDefaultTexture2D();
+        bindGroup.setTexture(uniform.name, texture, uniform.finalSampler);
+      }
+    }
   }
 
   private getBlueprintWorldPos(scope: PBInsideFunctionScope): PBShaderExp {
@@ -819,8 +867,8 @@ export class PBRBluePrintMaterial
       name: string;
       exp: number | boolean | PBShaderExp;
     }[]
-  ): BlueprintOutputMap {
-    const map: BlueprintOutputMap = {};
+  ): ConnectedBlueprintOutputMap {
+    const map: ConnectedBlueprintOutputMap = {};
     for (const output of outputs) {
       map[output.name as PBRBlueprintOutputName] = output.exp;
     }

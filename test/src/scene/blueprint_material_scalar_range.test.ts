@@ -22,6 +22,34 @@ describe('Blueprint scalar parameter range', () => {
     expect(node.x).toBe(1);
   });
 
+  test('Blueprint output uniform binding should include fragment inputs only', () => {
+    const material = new PBRBluePrintMaterial();
+    material.uniformValues = [
+      {
+        name: 'u_fragmentScalar',
+        type: 'float',
+        value: [0.25],
+        inVertexShader: false,
+        inFragmentShader: true,
+        finalValue: 0.25
+      },
+      {
+        name: 'u_vertexScalar',
+        type: 'float',
+        value: [0.75],
+        inVertexShader: true,
+        inFragmentShader: false,
+        finalValue: 0.75
+      }
+    ];
+    const setValue = jest.fn();
+
+    material.applyBlueprintOutputUniformValues({ setValue } as any);
+
+    expect(setValue).toHaveBeenCalledTimes(1);
+    expect(setValue).toHaveBeenCalledWith('u_fragmentScalar', 0.25);
+  });
+
   test('Blueprint material instance should preserve an explicit RectSpecularScale override', async () => {
     const manager = new ResourceManager(new MemoryFS());
     const parent = new PBRBluePrintMaterial();
