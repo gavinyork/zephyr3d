@@ -73,6 +73,8 @@ function buildSSGIHistoryRepairProgram(type: 'webgl' | 'webgpu') {
       }
       this[EnvShIBL.UNIFORM_NAME_SSGI_TARGET_SIZE] = pb.vec2().uniform(0);
       this[EnvShIBL.UNIFORM_NAME_SSGI_REPROJECTION] = pb.vec4().uniform(0);
+      this[EnvShIBL.UNIFORM_NAME_SSGI_VIEW_TO_PREV_CLIP] = pb.mat4().uniform(0);
+      this[EnvShIBL.UNIFORM_NAME_SSGI_INV_PROJECTION] = pb.mat4().uniform(0);
       const lightStruct = pb.defineStruct([pb.float('envLightStrength')]);
       this.light = lightStruct().uniform(0);
       this.$outputs.color = pb.vec4();
