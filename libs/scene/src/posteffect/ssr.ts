@@ -15,6 +15,8 @@ import { RGHistoryResources } from '../render/rendergraph/history_resources';
 import { FrameResources } from '../render/rendergraph/blackboard';
 import type { RGExecuteContext, RGHandle, RGPassBuilder, RGTextureDesc } from '../render/rendergraph/types';
 
+const DEBUG_HIZ_INTERSECT = false;
+
 /**
  * SSR post effect
  *
@@ -1301,6 +1303,9 @@ export class SSR extends AbstractPostEffect {
               );
               this.$l.hitInfo = pb.vec4(0);
               if (ctx.HiZTexture) {
+                if (DEBUG_HIZ_INTERSECT) {
+                  this.$l.hizDebug = pb.vec4(0);
+                }
                 this.hitInfo = screenSpaceRayTracing_HiZ(
                   this,
                   this.viewPos,
@@ -1315,7 +1320,9 @@ export class SSR extends AbstractPostEffect {
                   this.ssrParams.z,
                   this.targetSize,
                   this.hizTex,
-                  this.normalTex
+                  DEBUG_HIZ_INTERSECT ? this.normalTex : undefined,
+                  undefined,
+                  DEBUG_HIZ_INTERSECT ? this.hizDebug : undefined
                 );
               } else {
                 this.hitInfo = screenSpaceRayTracing_Linear2D(
@@ -1339,24 +1346,29 @@ export class SSR extends AbstractPostEffect {
               this.$l.hitAlpha = pb.clamp(this.hitInfo.w, 0, 1);
               this.$l.hitUV = pb.clamp(this.hitInfo.xy, pb.vec2(0), pb.vec2(1));
               if (blur) {
-                this.blurRadius = pb.float(0);
-                this.$if(pb.greaterThan(this.roughness, 0.001), function () {
-                  this.$l.coneAngle = pb.mul(pb.min(this.roughness, 0.999), Math.PI * 0.5);
-                  this.$l.coneLen = this.$choice(
-                    pb.greaterThan(this.hitAlpha, 0),
-                    this.hitInfo.z,
-                    pb.min(this.targetSize.z, this.targetSize.w)
-                  );
-                  this.$l.opLen = pb.mul(pb.tan(this.coneAngle), this.coneLen, 2);
-                  this.$l.a2 = pb.mul(this.opLen, this.opLen);
-                  this.$l.fh2 = pb.mul(this.coneLen, this.coneLen, 4);
-                  this.blurRadius = pb.div(
-                    pb.mul(this.opLen, pb.sub(pb.sqrt(pb.add(this.a2, this.fh2)), this.opLen)),
-                    pb.mul(this.coneLen, 4)
-                  );
-                });
-                this.a = this.hitAlpha;
-                this.color = pb.vec3(this.hitUV, pb.clamp(pb.div(this.blurRadius, 255), 0, 1));
+                if (ctx.HiZTexture && DEBUG_HIZ_INTERSECT) {
+                  this.a = this.hizDebug.a;
+                  this.color = this.hizDebug.rgb;
+                } else {
+                  this.blurRadius = pb.float(0);
+                  this.$if(pb.greaterThan(this.roughness, 0.001), function () {
+                    this.$l.coneAngle = pb.mul(pb.min(this.roughness, 0.999), Math.PI * 0.5);
+                    this.$l.coneLen = this.$choice(
+                      pb.greaterThan(this.hitAlpha, 0),
+                      this.hitInfo.z,
+                      pb.min(this.targetSize.x, this.targetSize.y)
+                    );
+                    this.$l.opLen = pb.mul(pb.tan(this.coneAngle), this.coneLen, 2);
+                    this.$l.a2 = pb.mul(this.opLen, this.opLen);
+                    this.$l.fh2 = pb.mul(this.coneLen, this.coneLen, 4);
+                    this.blurRadius = pb.div(
+                      pb.mul(this.opLen, pb.sub(pb.sqrt(pb.add(this.a2, this.fh2)), this.opLen)),
+                      pb.mul(this.coneLen, 4)
+                    );
+                  });
+                  this.a = this.hitAlpha;
+                  this.color = pb.vec3(this.hitUV, pb.clamp(pb.div(this.blurRadius, 255), 0, 1));
+                }
               } else {
                 if (ctx.env!.light.envLight?.hasRadiance()) {
                   this.$l.reflectVecW = pb.mul(this.invViewMatrix, pb.vec4(this.reflectVec, 0)).xyz;

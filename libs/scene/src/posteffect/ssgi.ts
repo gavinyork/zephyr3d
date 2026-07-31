@@ -495,7 +495,10 @@ export class SSGI extends AbstractPostEffect {
         ctx.camera.ssgiStride
       )
     );
-    bindGroup.setValue('targetSize', new Vector4(width, height, depth.width, depth.height));
+    bindGroup.setValue(
+      'targetSize',
+      new Vector4(width, height, hiZ?.width ?? depth.width, hiZ?.height ?? depth.height)
+    );
     bindGroup.setValue(
       'radianceParams',
       new Vector4(

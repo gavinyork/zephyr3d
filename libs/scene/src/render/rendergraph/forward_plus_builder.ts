@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { nextPowerOf2, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BindGroup,
@@ -808,6 +808,8 @@ const HiZModule: RenderModule<FrameGraphContext> = {
     const { graph, ctx, frame, blackboard } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'HiZ');
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
+    const hiZWidth = nextPowerOf2(ctx.renderWidth);
+    const hiZHeight = nextPowerOf2(ctx.renderHeight);
     let hiZHandle: RGHandle | undefined;
     graph.addPass('HiZ', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
@@ -818,7 +820,10 @@ const HiZModule: RenderModule<FrameGraphContext> = {
       hiZHandle = builder.createTexture({
         format: 'rg32f',
         label: 'hiZ',
-        mipLevels: getFullMipLevelCount(ctx.renderWidth, ctx.renderHeight),
+        sizeMode: 'absolute',
+        width: hiZWidth,
+        height: hiZHeight,
+        mipLevels: getFullMipLevelCount(hiZWidth, hiZHeight),
         allocationKey: 'ForwardPlus.HiZ'
       });
       const hiZFramebufferHandle = builder.createFramebuffer({

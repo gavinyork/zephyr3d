@@ -420,15 +420,21 @@ describe('Forward+ render graph builder', () => {
     expect(passNames.indexOf('HiZ')).toBeLessThan(passNames.indexOf('LightPass'));
   });
 
-  test('computes HiZ mip levels from render size', () => {
+  test('rounds HiZ dimensions up to powers of two', () => {
     const { graph } = buildForwardPlusGraphForTest(
       createOptions({ hiZ: true }),
       {},
-      { renderWidth: 256, renderHeight: 128 }
+      { renderWidth: 1193, renderHeight: 790 }
     );
     const hiZResource = [...graph.resources.values()].find((resource) => resource.name === 'hiZ');
 
-    expect(hiZResource?.desc).toMatchObject({ format: 'rg32f', mipLevels: 9 });
+    expect(hiZResource?.desc).toMatchObject({
+      format: 'rg32f',
+      sizeMode: 'absolute',
+      width: 2048,
+      height: 1024,
+      mipLevels: 12
+    });
   });
 
   test('inserts SSSProfile before LightPass and declares SSS MRT resources when enabled', () => {
