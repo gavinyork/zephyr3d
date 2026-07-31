@@ -760,6 +760,50 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'SSGIAOIntensity',
+          type: 'float',
+          phase: 1,
+          default: 0.8,
+          options: {
+            label: 'AO intensity',
+            group: 'PostProcessing/SSGI',
+            minValue: 0,
+            maxValue: 1,
+            animatable: true
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiAOIntensity;
+          },
+          set(this: Camera, value) {
+            this.ssgiAOIntensity = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI;
+          }
+        },
+        {
+          name: 'SSGIAOPower',
+          type: 'float',
+          phase: 1,
+          default: 1,
+          options: {
+            label: 'AO contrast',
+            group: 'PostProcessing/SSGI',
+            minValue: 0.01,
+            maxValue: 4,
+            animatable: true
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.ssgiAOPower;
+          },
+          set(this: Camera, value) {
+            this.ssgiAOPower = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.SSGI;
+          }
+        },
+        {
           name: 'SSGISkyOcclusion',
           type: 'float',
           phase: 1,

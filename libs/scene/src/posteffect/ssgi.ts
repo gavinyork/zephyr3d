@@ -6,6 +6,7 @@ import { RGHistoryResources } from '../render/rendergraph/history_resources';
 import type { RGHandle, RGPassBuilder, RGTextureDesc } from '../render/rendergraph/types';
 import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
 import { ShaderHelper } from '../material';
+import { linearToGamma } from '../shaders/misc';
 import { fetchSampler } from '../utility/misc';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import type { PostEffectSetupContext } from './posteffect';
@@ -13,6 +14,10 @@ import type { PostEffectSetupContext } from './posteffect';
 const IRRADIANCE_FORMAT = 'rgba16f' as const;
 const SURFACE_FORMAT = 'rgba16f' as const;
 const MOMENTS_FORMAT = 'rgba16f' as const;
+// Ambient occlusion is a single scalar. SSGI already requires a half float color
+// buffer for the irradiance targets, so this format is available wherever the
+// effect runs at all.
+const AO_FORMAT = 'r16f' as const;
 const HALF_FLOAT_MAX = 65504;
 // Moments are also rgba16f, so the squared luminance must remain below
 // HALF_FLOAT_MAX. 255^2 = 65025 leaves a small rounding margin.
@@ -35,12 +40,14 @@ export class SSGI extends AbstractPostEffect {
   private static _atrousProgram: GPUProgram | null = null;
   private static _surfaceProgram: GPUProgram | null = null;
   private static _upsampleProgram: GPUProgram | null = null;
+  private static _compositePrograms: Record<string, GPUProgram> = {};
 
   private _traceBindGroups: Record<string, BindGroup> = {};
   private _temporalBindGroups: Record<string, BindGroup> = {};
   private _atrousBindGroups: Record<string, BindGroup> = {};
   private _surfaceBindGroups: Record<string, BindGroup> = {};
   private _upsampleBindGroups: Record<string, BindGroup> = {};
+  private _compositeBindGroups: Record<string, BindGroup> = {};
 
   constructor() {
     super();
@@ -118,6 +125,18 @@ export class SSGI extends AbstractPostEffect {
       width: traceWidth,
       height: traceHeight
     };
+    const aoTraceDesc: RGTextureDesc = {
+      format: AO_FORMAT,
+      sizeMode: 'absolute',
+      width: traceWidth,
+      height: traceHeight
+    };
+    const fullAODesc: RGTextureDesc = {
+      format: AO_FORMAT,
+      sizeMode: 'absolute',
+      width: s.width,
+      height: s.height
+    };
 
     const findHistoryRead = (name: string) =>
       s.historyReads.find((binding) => binding.name === name)?.handle ?? null;
@@ -127,6 +146,15 @@ export class SSGI extends AbstractPostEffect {
       graph,
       RGHistoryResources.SSGI_MOMENTS,
       momentsDesc,
+      traceSize
+    );
+    // Only this effect's own temporal pass reads the AO history, so it is
+    // imported directly instead of being routed through the light pass history
+    // read bindings the way irradiance and surface are.
+    const previousAOHandle = history.importPreviousIfCompatible(
+      graph,
+      RGHistoryResources.SSGI_AO,
+      aoTraceDesc,
       traceSize
     );
     const previousSceneColorHandle =
@@ -162,7 +190,7 @@ export class SSGI extends AbstractPostEffect {
     // Trace one or two cosine-weighted diffuse rays. A hit prefers the previous
     // frame through previousHitUV = hitUV - motion(hitUV) for multi-bounce
     // feedback and falls back to the current frame when that reprojection fails.
-    const rawIrradianceHandle = graph.addPass('SSGI:Trace', (builder) => {
+    const traceResult = graph.addPass('SSGI:Trace', (builder) => {
       builder.read(sampleColorHandle);
       readFrameInputs(builder);
       if (canSampleSceneHistory) {
@@ -170,11 +198,12 @@ export class SSGI extends AbstractPostEffect {
         builder.read(previousSurfaceHandle!);
       }
       const out = builder.createTexture({ ...traceDesc, label: 'SSGI:rawIrradiance' });
+      const ao = builder.createTexture({ ...aoTraceDesc, label: 'SSGI:rawAO' });
       const fb = builder.createFramebuffer({
         label: 'SSGI:traceFB',
         width: traceWidth,
         height: traceHeight,
-        colorAttachments: out,
+        colorAttachments: [out, ao],
         depthAttachment: null,
         ignoreDepthStencil: true
       });
@@ -199,7 +228,7 @@ export class SSGI extends AbstractPostEffect {
           device.popDeviceStates();
         }
       });
-      return out;
+      return { irradiance: out, ao };
     });
 
     // Store the current full-resolution surface independently from irradiance;
@@ -239,27 +268,31 @@ export class SSGI extends AbstractPostEffect {
       motionHandle &&
       previousIrradianceHandle &&
       previousSurfaceHandle &&
-      previousMomentsHandle
+      previousMomentsHandle &&
+      previousAOHandle
     );
 
     // Temporal pass always creates moments. On the first frame it simply
     // initializes them; with valid history it rejects by depth and normal,
     // neighborhood-clamps radiance, and accumulates first/second moments.
     const temporalResult = graph.addPass('SSGI:Temporal', (builder) => {
-      builder.read(rawIrradianceHandle);
+      builder.read(traceResult.irradiance);
+      builder.read(traceResult.ao);
       readFrameInputs(builder);
       if (canTemporal) {
         builder.read(previousIrradianceHandle!);
         builder.read(previousSurfaceHandle!);
         builder.read(previousMomentsHandle!);
+        builder.read(previousAOHandle!);
       }
       const irradiance = builder.createTexture({ ...traceDesc, label: 'SSGI:temporalIrradiance' });
       const moments = builder.createTexture({ ...momentsDesc, label: 'SSGI:moments' });
+      const ao = builder.createTexture({ ...aoTraceDesc, label: 'SSGI:temporalAO' });
       const fb = builder.createFramebuffer({
         label: 'SSGI:temporalFB',
         width: traceWidth,
         height: traceHeight,
-        colorAttachments: [irradiance, moments],
+        colorAttachments: [irradiance, moments, ao],
         depthAttachment: null,
         ignoreDepthStencil: true
       });
@@ -270,13 +303,15 @@ export class SSGI extends AbstractPostEffect {
           device.setFramebuffer(rg.getFramebuffer<FrameBuffer>(fb));
           this.temporal(
             ctx,
-            rg.getTexture<Texture2D>(rawIrradianceHandle),
+            rg.getTexture<Texture2D>(traceResult.irradiance),
+            rg.getTexture<Texture2D>(traceResult.ao),
             rg.getTexture<Texture2D>(linearDepthHandle),
             rg.getTexture<Texture2D>(normalHandle),
             canTemporal ? rg.getTexture<Texture2D>(motionHandle!) : null,
             canTemporal ? rg.getTexture<Texture2D>(previousIrradianceHandle!) : null,
             canTemporal ? rg.getTexture<Texture2D>(previousSurfaceHandle!) : null,
             canTemporal ? rg.getTexture<Texture2D>(previousMomentsHandle!) : null,
+            canTemporal ? rg.getTexture<Texture2D>(previousAOHandle!) : null,
             traceWidth,
             traceHeight
           );
@@ -284,26 +319,30 @@ export class SSGI extends AbstractPostEffect {
           device.popDeviceStates();
         }
       });
-      return { irradiance, moments };
+      return { irradiance, moments, ao };
     });
 
     // Variance-guided, cross-bilateral a-trous filtering. The increasing
     // kernel step removes low-frequency Monte Carlo noise while depth/normal
     // weights preserve discontinuities.
     let filteredHandle = temporalResult.irradiance;
+    let filteredAOHandle = temporalResult.ao;
     for (let pass = 0; pass < settings.denoisePasses; pass++) {
       const source = filteredHandle;
-      filteredHandle = graph.addPass(`SSGI:ATrous:${pass}`, (builder) => {
+      const aoSource = filteredAOHandle;
+      const filtered = graph.addPass(`SSGI:ATrous:${pass}`, (builder) => {
         builder.read(source);
+        builder.read(aoSource);
         builder.read(temporalResult.moments);
         builder.read(linearDepthHandle);
         builder.read(normalHandle);
         const out = builder.createTexture({ ...traceDesc, label: `SSGI:atrous${pass}` });
+        const ao = builder.createTexture({ ...aoTraceDesc, label: `SSGI:atrousAO${pass}` });
         const fb = builder.createFramebuffer({
           label: `SSGI:atrousFB${pass}`,
           width: traceWidth,
           height: traceHeight,
-          colorAttachments: out,
+          colorAttachments: [out, ao],
           depthAttachment: null,
           ignoreDepthStencil: true
         });
@@ -315,6 +354,7 @@ export class SSGI extends AbstractPostEffect {
             this.atrous(
               ctx,
               rg.getTexture<Texture2D>(source),
+              rg.getTexture<Texture2D>(aoSource),
               rg.getTexture<Texture2D>(temporalResult.moments),
               rg.getTexture<Texture2D>(linearDepthHandle),
               rg.getTexture<Texture2D>(normalHandle),
@@ -327,25 +367,31 @@ export class SSGI extends AbstractPostEffect {
             device.popDeviceStates();
           }
         });
-        return out;
+        return { irradiance: out, ao };
       });
+      filteredHandle = filtered.irradiance;
+      filteredAOHandle = filtered.ao;
     }
 
     // Half-resolution presets use a joint bilateral upsample before history is
     // consumed by full-resolution materials on the next frame.
     let finalIrradianceHandle = filteredHandle;
+    let finalAOHandle = filteredAOHandle;
     if (settings.halfRes) {
       const source = filteredHandle;
-      finalIrradianceHandle = graph.addPass('SSGI:Upsample', (builder) => {
+      const aoSource = filteredAOHandle;
+      const upsampled = graph.addPass('SSGI:Upsample', (builder) => {
         builder.read(source);
+        builder.read(aoSource);
         builder.read(linearDepthHandle);
         builder.read(normalHandle);
         const out = builder.createTexture({ ...fullIrradianceDesc, label: 'SSGI:upsampledIrradiance' });
+        const ao = builder.createTexture({ ...fullAODesc, label: 'SSGI:upsampledAO' });
         const fb = builder.createFramebuffer({
           label: 'SSGI:upsampleFB',
           width: s.width,
           height: s.height,
-          colorAttachments: out,
+          colorAttachments: [out, ao],
           depthAttachment: null,
           ignoreDepthStencil: true
         });
@@ -357,6 +403,7 @@ export class SSGI extends AbstractPostEffect {
             this.upsample(
               ctx,
               rg.getTexture<Texture2D>(source),
+              rg.getTexture<Texture2D>(aoSource),
               rg.getTexture<Texture2D>(linearDepthHandle),
               rg.getTexture<Texture2D>(normalHandle)
             );
@@ -364,9 +411,16 @@ export class SSGI extends AbstractPostEffect {
             device.popDeviceStates();
           }
         });
-        return out;
+        return { irradiance: out, ao };
       });
+      finalIrradianceHandle = upsampled.irradiance;
+      finalAOHandle = upsampled.ao;
     }
+
+    // Pinned before the commit closure captures it: the a-trous loop above
+    // reassigns the handle, and the AO history has to be the trace-resolution
+    // one regardless of whether an upsample ran.
+    const traceResolutionAOHandle = filteredAOHandle;
 
     // SSGI history is independent from TAA/SSR history. Commit the opaque HDR
     // SceneColor input (before SSR/transparency/tone-map/AA), irradiance,
@@ -377,6 +431,10 @@ export class SSGI extends AbstractPostEffect {
         builder.read(noFogHandle);
       }
       builder.read(finalIrradianceHandle);
+      builder.read(finalAOHandle);
+      // The trace-resolution AO is what goes back into history, so it has to be
+      // read here too even when the upsampled one is what gets composited.
+      builder.read(traceResolutionAOHandle);
       builder.read(surfaceHandle);
       builder.read(temporalResult.moments);
       const output = s.createOutput(builder);
@@ -389,9 +447,15 @@ export class SSGI extends AbstractPostEffect {
           );
           const sceneColor = rg.getTexture<Texture2D>(s.input);
           const irradiance = rg.getTexture<Texture2D>(finalIrradianceHandle);
+          const ao = rg.getTexture<Texture2D>(finalAOHandle);
+          const filteredAO = rg.getTexture<Texture2D>(traceResolutionAOHandle);
           const surface = rg.getTexture<Texture2D>(surfaceHandle);
           const moments = rg.getTexture<Texture2D>(temporalResult.moments);
-          this.passThrough(ctx, sceneColor, output.srgbOutput);
+          if (ctx.camera.ssgiAOIntensity > 0) {
+            this.compositeAO(ctx, sceneColor, ao, output.srgbOutput);
+          } else {
+            this.passThrough(ctx, sceneColor, output.srgbOutput);
+          }
           if (ctx.device.type === 'webgpu') {
             // Commit the same fog-free color the trace sampled, so next frame's
             // reprojected history is on the same footing as this frame's fallback.
@@ -404,6 +468,10 @@ export class SSGI extends AbstractPostEffect {
           this.commitHistory(history, RGHistoryResources.SSGI_IRRADIANCE, irradiance);
           this.commitHistory(history, RGHistoryResources.SSGI_SURFACE, surface);
           this.commitHistory(history, RGHistoryResources.SSGI_MOMENTS, moments);
+          // Committed at trace resolution: the temporal pass that consumes it
+          // runs before the upsample, so a full-resolution AO would fail the
+          // descriptor compatibility check and silently disable accumulation.
+          this.commitHistory(history, RGHistoryResources.SSGI_AO, filteredAO);
         } finally {
           device.popDeviceStates();
         }
@@ -517,19 +585,21 @@ export class SSGI extends AbstractPostEffect {
   private temporal(
     ctx: DrawContext,
     current: Texture2D,
+    currentAO: Texture2D,
     depth: Texture2D,
     normal: Texture2D,
     motion: Texture2D | null,
     previousIrradiance: Texture2D | null,
     previousSurface: Texture2D | null,
     previousMoments: Texture2D | null,
+    previousAO: Texture2D | null,
     width: number,
     height: number
   ) {
-    const hasHistory = !!(motion && previousIrradiance && previousSurface && previousMoments);
+    const hasHistory = !!(motion && previousIrradiance && previousSurface && previousMoments && previousAO);
     const hash = hasHistory
-      ? `history:${current.uid}:${depth.uid}:${normal.uid}:${motion!.uid}:${previousIrradiance!.uid}:${previousSurface.uid}:${previousMoments.uid}`
-      : `initialize:${current.uid}:${depth.uid}:${normal.uid}`;
+      ? `history:${current.uid}:${currentAO.uid}:${depth.uid}:${normal.uid}:${motion!.uid}:${previousIrradiance!.uid}:${previousSurface.uid}:${previousMoments.uid}:${previousAO!.uid}`
+      : `initialize:${current.uid}:${currentAO.uid}:${depth.uid}:${normal.uid}`;
     let program = SSGI._temporalPrograms[hash];
     if (!program) {
       program = this.createTemporalProgram(ctx, hasHistory);
@@ -539,6 +609,7 @@ export class SSGI extends AbstractPostEffect {
     if (!bindGroup) {
       bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
       bindGroup.setTexture('currentTex', current, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setTexture('currentAOTex', currentAO, fetchSampler('clamp_nearest_nomip'));
       bindGroup.setTexture('depthTex', depth, fetchSampler('clamp_nearest_nomip'));
       bindGroup.setTexture('normalTex', normal, fetchSampler('clamp_nearest_nomip'));
       if (hasHistory) {
@@ -550,6 +621,9 @@ export class SSGI extends AbstractPostEffect {
         );
         bindGroup.setTexture('previousSurfaceTex', previousSurface!, fetchSampler('clamp_nearest_nomip'));
         bindGroup.setTexture('previousMomentsTex', previousMoments!, fetchSampler('clamp_linear_nomip'));
+        // Linear is safe here: this branch only runs on WebGPU, where r16f is
+        // unconditionally filterable, and the read is at a reprojected UV.
+        bindGroup.setTexture('previousAOTex', previousAO!, fetchSampler('clamp_linear_nomip'));
       }
       this._temporalBindGroups[hash] = bindGroup;
     }
@@ -573,6 +647,7 @@ export class SSGI extends AbstractPostEffect {
   private atrous(
     ctx: DrawContext,
     source: Texture2D,
+    aoSource: Texture2D,
     moments: Texture2D,
     depth: Texture2D,
     normal: Texture2D,
@@ -586,11 +661,12 @@ export class SSGI extends AbstractPostEffect {
       program = this.createAtrousProgram(ctx);
       SSGI._atrousProgram = program;
     }
-    const hash = `atrous:${source.uid}:${moments.uid}:${depth.uid}:${normal.uid}`;
+    const hash = `atrous:${source.uid}:${aoSource.uid}:${moments.uid}:${depth.uid}:${normal.uid}`;
     let bindGroup = this._atrousBindGroups[hash];
     if (!bindGroup) {
       bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
       bindGroup.setTexture('sourceTex', source, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setTexture('aoSourceTex', aoSource, fetchSampler('clamp_nearest_nomip'));
       bindGroup.setTexture('momentsTex', moments, fetchSampler('clamp_nearest_nomip'));
       bindGroup.setTexture('depthTex', depth, fetchSampler('clamp_nearest_nomip'));
       bindGroup.setTexture('normalTex', normal, fetchSampler('clamp_nearest_nomip'));
@@ -641,17 +717,24 @@ export class SSGI extends AbstractPostEffect {
   }
 
   /** @internal */
-  private upsample(ctx: DrawContext, source: Texture2D, depth: Texture2D, normal: Texture2D) {
+  private upsample(
+    ctx: DrawContext,
+    source: Texture2D,
+    aoSource: Texture2D,
+    depth: Texture2D,
+    normal: Texture2D
+  ) {
     let program = SSGI._upsampleProgram;
     if (!program) {
       program = this.createUpsampleProgram(ctx);
       SSGI._upsampleProgram = program;
     }
-    const hash = `${source.uid}:${depth.uid}:${normal.uid}`;
+    const hash = `${source.uid}:${aoSource.uid}:${depth.uid}:${normal.uid}`;
     let bindGroup = this._upsampleBindGroups[hash];
     if (!bindGroup) {
       bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
       bindGroup.setTexture('sourceTex', source, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setTexture('aoSourceTex', aoSource, fetchSampler('clamp_nearest_nomip'));
       bindGroup.setTexture('depthTex', depth, fetchSampler('clamp_nearest_nomip'));
       bindGroup.setTexture('normalTex', normal, fetchSampler('clamp_nearest_nomip'));
       bindGroup.setValue('targetSize', new Vector4(source.width, source.height, depth.width, depth.height));
@@ -719,6 +802,7 @@ export class SSGI extends AbstractPostEffect {
         this.skyOcclusion = pb.float().uniform(0);
         ctx.env!.light.envLight.initShaderBindings(pb);
         this.$outputs.outColor = pb.vec4();
+        this.$outputs.outAO = pb.vec4();
         pb.func('SSGI_getPosition', [pb.vec2('uv')], function () {
           this.$l.linearDepth = ShaderHelper.sampleLinearDepth(this, this.depthTex, this.uv, 0);
           this.$l.nonLinearDepth = pb.div(
@@ -763,6 +847,10 @@ export class SSGI extends AbstractPostEffect {
           this.$l.pos = this.SSGI_getPosition(this.uv);
           this.$if(pb.greaterThanEqual(this.pos.w, 1), function () {
             this.$outputs.outColor = pb.vec4(0);
+            // Sky is unoccluded. Its irradiance validity is zero, so this value
+            // is never read as a weight, but it must not be a dark texel: the
+            // a-trous and upsample kernels reach across the silhouette.
+            this.$outputs.outAO = pb.vec4(1);
           }).$else(function () {
             this.$l.worldNormal = pb.normalize(
               pb.sub(pb.mul(pb.textureSampleLevel(this.normalTex, this.uv, 0).rgb, 2), pb.vec3(1))
@@ -788,6 +876,10 @@ export class SSGI extends AbstractPostEffect {
             // the average instead of counted as unoccluded sky.
             this.$l.determinateSum = pb.float(0);
             this.$l.escapedSum = pb.float(0);
+            // Ambient occlusion reuses the very same visibility measurement the
+            // sky removal is built on, so the two can never disagree. No extra
+            // ray march: only this accumulator is new.
+            this.$l.occludedSum = pb.float(0);
             this.$for(pb.float('rayIndex'), 0, raysPerPixel, function () {
               this.$l.xi = this.SSGI_hash22(
                 pb.add(pb.mul(this.uv, this.targetSize.xy), pb.vec2(this.rayIndex, pb.mul(this.rayIndex, 7))),
@@ -956,6 +1048,7 @@ export class SSGI extends AbstractPostEffect {
               this.correctionSum = pb.add(this.correctionSum, this.correction);
               this.determinateSum = pb.add(this.determinateSum, pb.max(this.occluded, this.escaped));
               this.escapedSum = pb.add(this.escapedSum, this.escaped);
+              this.occludedSum = pb.add(this.occludedSum, this.occluded);
             });
             // Average over resolved rays only. Dividing by raysPerPixel would
             // implicitly treat every indeterminate ray as an unoccluded sky
@@ -985,6 +1078,14 @@ export class SSGI extends AbstractPostEffect {
               pb.vec3(HALF_FLOAT_MAX)
             );
             this.$outputs.outColor = pb.vec4(this.boundedIrradiance, 1);
+            // Cosine-weighted sampling makes the mean of `occluded` over the
+            // resolved rays an unbiased estimate of cosine-weighted visibility.
+            // Averaging over the determinate set - not raysPerPixel - is what
+            // keeps an indeterminate ray from reading as unoccluded, the same
+            // reasoning the irradiance average uses above.
+            this.$outputs.outAO = pb.vec4(
+              pb.clamp(pb.sub(1, pb.div(this.occludedSum, this.determinateCount)), 0, 1)
+            );
           });
         });
       }
@@ -1010,6 +1111,7 @@ export class SSGI extends AbstractPostEffect {
       },
       fragment(pb) {
         this.currentTex = pb.tex2D().uniform(0);
+        this.currentAOTex = pb.tex2D().uniform(0);
         this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.normalTex = pb.tex2D().uniform(0);
         if (hasHistory) {
@@ -1017,11 +1119,13 @@ export class SSGI extends AbstractPostEffect {
           this.previousIrradianceTex = pb.tex2D().uniform(0);
           this.previousSurfaceTex = pb.tex2D().uniform(0);
           this.previousMomentsTex = pb.tex2D().uniform(0);
+          this.previousAOTex = pb.tex2D().uniform(0);
         }
         this.targetSize = pb.vec4().uniform(0);
         this.temporalParams = pb.vec4().uniform(0);
         this.$outputs.outIrradiance = pb.vec4();
         this.$outputs.outMoments = pb.vec4();
+        this.$outputs.outAO = pb.vec4();
         pb.func('SSGI_luminance', [pb.vec3('c')], function () {
           this.$l.boundedLuminance = pb.clamp(
             pb.dot(this.c, pb.vec3(0.2126, 0.7152, 0.0722)),
@@ -1033,7 +1137,9 @@ export class SSGI extends AbstractPostEffect {
         pb.main(function () {
           this.$l.uv = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.xy);
           this.$l.current = pb.textureSampleLevel(this.currentTex, this.uv, 0);
+          this.$l.currentAO = pb.textureSampleLevel(this.currentAOTex, this.uv, 0).r;
           this.$l.result = this.current.rgb;
+          this.$l.resultAO = this.currentAO;
           this.$l.luminance = this.SSGI_luminance(this.current.rgb);
           this.$l.moment = pb.vec4(this.luminance, pb.mul(this.luminance, this.luminance), 1, 0);
           if (hasHistory) {
@@ -1066,18 +1172,20 @@ export class SSGI extends AbstractPostEffect {
             );
             this.$l.neighborhoodMin = this.current.rgb;
             this.$l.neighborhoodMax = this.current.rgb;
+            this.$l.aoNeighborhoodMin = this.currentAO;
+            this.$l.aoNeighborhoodMax = this.currentAO;
             for (let y = -1; y <= 1; y++) {
               for (let x = -1; x <= 1; x++) {
                 if (x === 0 && y === 0) {
                   continue;
                 }
-                this.$l.neighbor = pb.textureSampleLevel(
-                  this.currentTex,
-                  pb.add(this.uv, pb.div(pb.vec2(x, y), this.targetSize.xy)),
-                  0
-                ).rgb;
+                this.$l.neighborUV = pb.add(this.uv, pb.div(pb.vec2(x, y), this.targetSize.xy));
+                this.$l.neighbor = pb.textureSampleLevel(this.currentTex, this.neighborUV, 0).rgb;
                 this.neighborhoodMin = pb.min(this.neighborhoodMin, this.neighbor);
                 this.neighborhoodMax = pb.max(this.neighborhoodMax, this.neighbor);
+                this.$l.aoNeighbor = pb.textureSampleLevel(this.currentAOTex, this.neighborUV, 0).r;
+                this.aoNeighborhoodMin = pb.min(this.aoNeighborhoodMin, this.aoNeighbor);
+                this.aoNeighborhoodMax = pb.max(this.aoNeighborhoodMax, this.aoNeighbor);
               }
             }
             this.$l.previous = pb.textureSampleLevel(
@@ -1101,6 +1209,20 @@ export class SSGI extends AbstractPostEffect {
             this.$l.historyWeight = pb.min(this.temporalParams.x, this.runningAverageWeight);
             this.$l.weight = pb.mul(this.historyWeight, this.validity);
             this.result = pb.mix(this.current.rgb, this.previousClamped, this.weight);
+            // AO accumulates on exactly the same validity and weight as the
+            // irradiance: it was measured by the same rays against the same
+            // surface, so any disagreement between the two would be an artifact.
+            this.$l.previousAO = pb.textureSampleLevel(
+              this.previousAOTex,
+              pb.clamp(this.previousUV, pb.vec2(0), pb.vec2(1)),
+              0
+            ).r;
+            this.$l.previousAOClamped = pb.clamp(
+              this.previousAO,
+              this.aoNeighborhoodMin,
+              this.aoNeighborhoodMax
+            );
+            this.resultAO = pb.mix(this.currentAO, this.previousAOClamped, this.weight);
             this.$l.momentXY = pb.mix(this.moment.xy, this.previousMoment.xy, this.weight);
             this.$l.historyLength = pb.mix(
               pb.float(1),
@@ -1138,6 +1260,7 @@ export class SSGI extends AbstractPostEffect {
           }
           this.$outputs.outIrradiance = pb.vec4(this.result, this.current.a);
           this.$outputs.outMoments = this.moment;
+          this.$outputs.outAO = pb.vec4(pb.clamp(this.resultAO, 0, 1));
         });
       }
     })!;
@@ -1162,6 +1285,7 @@ export class SSGI extends AbstractPostEffect {
       },
       fragment(pb) {
         this.sourceTex = pb.tex2D().uniform(0);
+        this.aoSourceTex = pb.tex2D().uniform(0);
         this.momentsTex = pb.tex2D().uniform(0);
         this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.normalTex = pb.tex2D().uniform(0);
@@ -1170,6 +1294,7 @@ export class SSGI extends AbstractPostEffect {
         this.denoiseParams = pb.vec4().uniform(0);
         this.cameraFar = pb.float().uniform(0);
         this.$outputs.outColor = pb.vec4();
+        this.$outputs.outAO = pb.vec4();
         pb.func('SSGI_luminance', [pb.vec3('c')], function () {
           this.$return(pb.max(0, pb.dot(this.c, pb.vec3(0.2126, 0.7152, 0.0722))));
         });
@@ -1190,10 +1315,16 @@ export class SSGI extends AbstractPostEffect {
           // noise as if it were detail. Widen the kernel and relax the luminance
           // and normal tests until enough frames have converged, then hand back
           // to the sharp weights (standard SVGF history-driven ramp).
+          //
+          // A path that never accumulates history (no temporal resolve, so
+          // moments.z is pinned at 1) is permanently unconverged, not converged:
+          // it is the noisiest input this filter ever sees. Sending it to the
+          // relaxed end is the whole point of the ramp - the sharp end would give
+          // it the narrowest kernel and one eighth the luminance tolerance.
           this.$l.historyConfidence = this.$choice(
             pb.greaterThan(this.denoiseParams.x, 0),
             pb.clamp(pb.div(this.moments.z, this.denoiseParams.x), 0, 1),
-            pb.float(1)
+            pb.float(0)
           );
           this.$l.stepScale = pb.mix(pb.float(2), pb.float(1), this.historyConfidence);
           this.$l.effStep = pb.mul(this.filterParams.x, this.stepScale);
@@ -1204,8 +1335,11 @@ export class SSGI extends AbstractPostEffect {
           );
           this.$l.sigmaScale = pb.mix(pb.float(8), pb.float(1), this.historyConfidence);
           this.$l.sigma = pb.mul(pb.add(pb.sqrt(pb.max(this.moments.w, 0)), 0.02), this.sigmaScale);
+          this.$l.centerAO = pb.textureSampleLevel(this.aoSourceTex, this.uv, 0).r;
           this.$l.sum = pb.vec3(0);
           this.$l.weightSum = pb.float(0);
+          this.$l.aoSum = pb.float(0);
+          this.$l.aoWeightSum = pb.float(0);
           const kernel = [1, 2 / 3, 1 / 6];
           for (let y = -2; y <= 2; y++) {
             for (let x = -2; x <= 2; x++) {
@@ -1251,6 +1385,20 @@ export class SSGI extends AbstractPostEffect {
               );
               this.sum = pb.add(this.sum, pb.mul(this.sampleValue.rgb, this.weight));
               this.weightSum = pb.add(this.weightSum, this.weight);
+              // AO deliberately drops colorWeight: that term is driven by the
+              // moments' luminance variance, which describes the irradiance and
+              // says nothing about AO. Leaving it out is a stronger smoothing,
+              // which is what a per-ray binary quantity needs - with 1-2 rays per
+              // pixel, single-frame AO is close to binary.
+              this.$l.aoWeight = pb.mul(
+                kernelWeight,
+                this.depthWeight,
+                this.normalWeight,
+                this.sampleValue.a
+              );
+              this.$l.sampleAO = pb.textureSampleLevel(this.aoSourceTex, this.sampleUV, 0).r;
+              this.aoSum = pb.add(this.aoSum, pb.mul(this.sampleAO, this.aoWeight));
+              this.aoWeightSum = pb.add(this.aoWeightSum, this.aoWeight);
             }
           }
           this.$l.filtered = this.$choice(
@@ -1258,7 +1406,13 @@ export class SSGI extends AbstractPostEffect {
             pb.div(this.sum, this.weightSum),
             this.center.rgb
           );
+          this.$l.filteredAO = this.$choice(
+            pb.greaterThan(this.aoWeightSum, 1e-5),
+            pb.div(this.aoSum, this.aoWeightSum),
+            this.centerAO
+          );
           this.$outputs.outColor = pb.vec4(this.filtered, this.center.a);
+          this.$outputs.outAO = pb.vec4(pb.clamp(this.filteredAO, 0, 1));
         });
       }
     })!;
@@ -1302,6 +1456,82 @@ export class SSGI extends AbstractPostEffect {
     return program;
   }
 
+  /**
+   * Multiply the traced ambient occlusion into the scene color.
+   *
+   * This is the same multiply-into-final-color semantics the standalone SAO post
+   * effect applies, so enabling both double darkens.
+   *
+   * @internal
+   */
+  private compositeAO(ctx: DrawContext, sceneColor: Texture2D, ao: Texture2D, srgbOutput: boolean) {
+    const key = srgbOutput ? 'srgb' : 'linear';
+    let program = SSGI._compositePrograms[key];
+    if (!program) {
+      program = this.createCompositeProgram(ctx, srgbOutput);
+      SSGI._compositePrograms[key] = program;
+    }
+    const hash = `${key}:${sceneColor.uid}:${ao.uid}`;
+    let bindGroup = this._compositeBindGroups[hash];
+    if (!bindGroup) {
+      bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
+      bindGroup.setTexture('colorTex', sceneColor, fetchSampler('clamp_nearest_nomip'));
+      // Nearest, not linear: the AO handed to this pass is already at full
+      // resolution, so filtering would only add a dependency on the WebGL
+      // half-float linear filtering cap for no gain.
+      bindGroup.setTexture('aoTex', ao, fetchSampler('clamp_nearest_nomip'));
+      this._compositeBindGroups[hash] = bindGroup;
+    }
+    bindGroup.setValue(
+      'aoParams',
+      new Vector2(ctx.camera.ssgiAOIntensity, Math.max(1e-3, ctx.camera.ssgiAOPower))
+    );
+    bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
+    ctx.device.setProgram(program);
+    ctx.device.setBindGroup(0, bindGroup);
+    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'always'));
+  }
+
+  /** @internal */
+  private createCompositeProgram(ctx: DrawContext, srgbOutput: boolean) {
+    const program = ctx.device.buildRenderProgram({
+      vertex(pb) {
+        this.flip = pb.int().uniform(0);
+        this.$inputs.pos = pb.vec2().attrib('position');
+        this.$outputs.uv = pb.vec2();
+        pb.main(function () {
+          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
+          this.$if(pb.notEqual(this.flip, 0), function () {
+            this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+          });
+        });
+      },
+      fragment(pb) {
+        this.colorTex = pb.tex2D().uniform(0);
+        this.aoTex = pb.tex2D().uniform(0);
+        this.aoParams = pb.vec2().uniform(0);
+        this.$outputs.outColor = pb.vec4();
+        pb.main(function () {
+          this.$l.color = pb.textureSampleLevel(this.colorTex, this.$inputs.uv, 0);
+          this.$l.ao = pb.clamp(pb.textureSampleLevel(this.aoTex, this.$inputs.uv, 0).r, 0, 1);
+          // mix() toward 1 rather than a plain multiply: intensity then doubles as
+          // the fallback for noisy or unresolved texels, which matters most on the
+          // WebGL path where there is no temporal accumulation to converge them.
+          this.$l.shapedAO = pb.pow(this.ao, this.aoParams.y);
+          this.$l.finalAO = pb.mix(pb.float(1), this.shapedAO, this.aoParams.x);
+          this.$l.occludedColor = pb.mul(this.color.rgb, this.finalAO);
+          this.$outputs.outColor = pb.vec4(
+            srgbOutput ? linearToGamma(this, this.occludedColor) : this.occludedColor,
+            this.color.a
+          );
+        });
+      }
+    })!;
+    program.name = srgbOutput ? '@SSGI_CompositeAO_sRGB' : '@SSGI_CompositeAO';
+    return program;
+  }
+
   /** @internal */
   private createUpsampleProgram(ctx: DrawContext) {
     const program = ctx.device.buildRenderProgram({
@@ -1319,11 +1549,13 @@ export class SSGI extends AbstractPostEffect {
       },
       fragment(pb) {
         this.sourceTex = pb.tex2D().uniform(0);
+        this.aoSourceTex = pb.tex2D().uniform(0);
         this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.normalTex = pb.tex2D().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
         this.guideParams = pb.vec4().uniform(0);
         this.$outputs.outColor = pb.vec4();
+        this.$outputs.outAO = pb.vec4();
         pb.main(function () {
           this.$l.uv = pb.div(pb.vec2(this.$builtins.fragCoord.xy), this.targetSize.zw);
           this.$l.centerDepth = pb.mul(
@@ -1335,10 +1567,12 @@ export class SSGI extends AbstractPostEffect {
           );
           this.$l.sum = pb.vec3(0);
           this.$l.weightSum = pb.float(0);
+          this.$l.aoSum = pb.float(0);
           for (let y = -1; y <= 1; y++) {
             for (let x = -1; x <= 1; x++) {
               this.$l.sampleUV = pb.add(this.uv, pb.div(pb.vec2(x, y), this.targetSize.xy));
               this.$l.sampleValue = pb.textureSampleLevel(this.sourceTex, this.sampleUV, 0);
+              this.$l.sampleAO = pb.textureSampleLevel(this.aoSourceTex, this.sampleUV, 0).r;
               this.$l.sampleDepth = pb.mul(
                 ShaderHelper.sampleLinearDepth(this, this.depthTex, this.sampleUV, 0),
                 this.guideParams.z
@@ -1356,6 +1590,9 @@ export class SSGI extends AbstractPostEffect {
               this.$l.weight = pb.mul(this.depthWeight, this.normalWeight, this.sampleValue.a);
               this.sum = pb.add(this.sum, pb.mul(this.sampleValue.rgb, this.weight));
               this.weightSum = pb.add(this.weightSum, this.weight);
+              // Same joint bilateral weights as the irradiance, so the upsampled
+              // AO cannot cross a depth or normal edge the irradiance respects.
+              this.aoSum = pb.add(this.aoSum, pb.mul(this.sampleAO, this.weight));
             }
           }
           this.$l.result = this.$choice(
@@ -1363,7 +1600,13 @@ export class SSGI extends AbstractPostEffect {
             pb.div(this.sum, this.weightSum),
             pb.textureSampleLevel(this.sourceTex, this.uv, 0).rgb
           );
+          this.$l.resultAO = this.$choice(
+            pb.greaterThan(this.weightSum, 1e-5),
+            pb.div(this.aoSum, this.weightSum),
+            pb.textureSampleLevel(this.aoSourceTex, this.uv, 0).r
+          );
           this.$outputs.outColor = pb.vec4(this.result, pb.float(pb.greaterThan(this.weightSum, 1e-5)));
+          this.$outputs.outAO = pb.vec4(pb.clamp(this.resultAO, 0, 1));
         });
       }
     })!;

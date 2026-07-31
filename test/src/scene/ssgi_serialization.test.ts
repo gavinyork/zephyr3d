@@ -15,6 +15,10 @@ describe('SSGI configuration and serialization', () => {
       denoisePasses: 3
     });
     expect(camera.ssgiIntensity).toBeCloseTo(0.7);
+    // Below 1 on purpose: SSGI irradiance already has sky occlusion subtracted,
+    // so the AO multiply lands on a partly occluded diffuse term.
+    expect(camera.ssgiAOIntensity).toBeCloseTo(0.8);
+    expect(camera.ssgiAOPower).toBeCloseTo(1);
     // Occluding hits remove the sky in full by default; 0 reproduces the
     // pre-occlusion behaviour where only readable hits contributed.
     expect(camera.ssgiSkyOcclusion).toBeCloseTo(1);
@@ -89,6 +93,27 @@ describe('SSGI configuration and serialization', () => {
     expect(camera.ssgiSkyOcclusion).toBe(0);
   });
 
+  test('clamps the ambient occlusion controls', () => {
+    const scene = new Scene();
+    const camera = new Camera(scene);
+
+    camera.ssgiAOIntensity = 0.5;
+    expect(camera.ssgiAOIntensity).toBeCloseTo(0.5);
+    camera.ssgiAOIntensity = 3;
+    expect(camera.ssgiAOIntensity).toBeCloseTo(1);
+    // 0 is a supported value, not a clamped floor: it takes the composite out of
+    // the frame entirely and restores the plain pass-through.
+    camera.ssgiAOIntensity = -1;
+    expect(camera.ssgiAOIntensity).toBe(0);
+
+    camera.ssgiAOPower = 2.5;
+    expect(camera.ssgiAOPower).toBeCloseTo(2.5);
+    // A zero exponent would flatten AO to a constant 1, so the setter keeps it
+    // strictly positive.
+    camera.ssgiAOPower = 0;
+    expect(camera.ssgiAOPower).toBeCloseTo(0.01);
+  });
+
   test('round-trips every camera SSGI editor property', async () => {
     const manager = new ResourceManager(new MemoryFS());
     const scene = new Scene();
@@ -96,6 +121,8 @@ describe('SSGI configuration and serialization', () => {
     camera.SSGI = true;
     camera.ssgiQualityPreset = 'balanced';
     camera.ssgiIntensity = 1.15;
+    camera.ssgiAOIntensity = 0.45;
+    camera.ssgiAOPower = 1.6;
     camera.ssgiSkyOcclusion = 0.65;
     camera.ssgiMaxDistance = 48;
     camera.ssgiThickness = 0.35;
@@ -113,6 +140,8 @@ describe('SSGI configuration and serialization', () => {
       SSGIEnabled: true,
       SSGIQualityPreset: 'balanced',
       SSGIIntensity: 1.15,
+      SSGIAOIntensity: 0.45,
+      SSGIAOPower: 1.6,
       SSGISkyOcclusion: 0.65,
       SSGIMaxDistance: 48,
       SSGIThickness: 0.35,
@@ -125,6 +154,8 @@ describe('SSGI configuration and serialization', () => {
     expect(restored.SSGI).toBe(true);
     expect(restored.ssgiQualityPreset).toBe('balanced');
     expect(restored.ssgiIntensity).toBeCloseTo(1.15);
+    expect(restored.ssgiAOIntensity).toBeCloseTo(0.45);
+    expect(restored.ssgiAOPower).toBeCloseTo(1.6);
     expect(restored.ssgiSkyOcclusion).toBeCloseTo(0.65);
     expect(restored.ssgiMaxDistance).toBeCloseTo(48);
     expect(restored.ssgiThickness).toBeCloseTo(0.35);
