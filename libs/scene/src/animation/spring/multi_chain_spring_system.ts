@@ -14,6 +14,7 @@ import {
   type SphereCollider,
   updateColliderFromNode
 } from './spring_collider';
+import { SpringNodePoseTracker } from './spring_node_pose_tracker';
 
 export interface InterChainConstraint {
   chainAIndex: number;
@@ -86,6 +87,7 @@ export class MultiChainSpringSystem {
   private _runtimeNodeMap: ReadonlyMap<SceneNode, SceneNode> | null;
   private _runtimeAnchorOffsets: WeakMap<SpringParticle, Vector3>;
   private _runtimeRestLengths: WeakMap<object, number>;
+  private _nodePoseTracker: SpringNodePoseTracker;
 
   constructor(options?: MultiChainSpringSystemOptions) {
     this._chains = [];
@@ -113,6 +115,7 @@ export class MultiChainSpringSystem {
     this._runtimeNodeMap = null;
     this._runtimeAnchorOffsets = new WeakMap();
     this._runtimeRestLengths = new WeakMap();
+    this._nodePoseTracker = new SpringNodePoseTracker();
   }
 
   addChain(chain: SpringChain): number {
@@ -164,6 +167,7 @@ export class MultiChainSpringSystem {
   }
 
   update(deltaTime: number): void {
+    this._nodePoseTracker.restoreInputPose();
     const frameDt = Math.min(Math.max(Number(deltaTime) || 0, 0), MAX_ACCUMULATED_SIMULATION_TIME);
     if (frameDt <= 0) {
       return;
@@ -199,19 +203,23 @@ export class MultiChainSpringSystem {
         continue;
       }
       const parent = node.parent;
+      const inputRotation = node.rotation.clone();
       if (parent) {
         const parentWorldRotation = new Quaternion();
         parent.worldMatrix.decompose(null, parentWorldRotation, null);
         const parentInvRotation = Quaternion.conjugate(parentWorldRotation, new Quaternion());
         const localRotation = Quaternion.multiply(parentInvRotation, worldRotation, new Quaternion());
         node.rotation = localRotation;
+        this._nodePoseTracker.recordAppliedRotation(node, inputRotation, localRotation);
       } else {
         node.rotation = worldRotation;
+        this._nodePoseTracker.recordAppliedRotation(node, inputRotation, worldRotation);
       }
     }
   }
 
   reset(): void {
+    this._nodePoseTracker.clear(true);
     for (const chain of this._chains) {
       chain.reset();
       for (const particle of chain.particles) {
@@ -398,6 +406,7 @@ export class MultiChainSpringSystem {
    * The authored node references remain unchanged and therefore serialize normally.
    */
   setRuntimeNodeMap(nodeMap: ReadonlyMap<SceneNode, SceneNode> | null): void {
+    this._nodePoseTracker.clear(false);
     this._runtimeNodeMap = nodeMap;
     this._runtimeAnchorOffsets = new WeakMap();
     this._runtimeRestLengths = new WeakMap();
@@ -409,6 +418,7 @@ export class MultiChainSpringSystem {
    * This must be called after a hierarchy graft or skeleton rebind.
    */
   reinitializeFromCurrentPose(options?: SpringPoseReinitializeOptions): void {
+    this._nodePoseTracker.clear(false);
     const recomputeAnchorOffsets = options?.recomputeAnchorOffsets ?? true;
     const recalculateRestLengths = options?.recalculateRestLengths ?? true;
     this._runtimeAnchorOffsets = new WeakMap();
