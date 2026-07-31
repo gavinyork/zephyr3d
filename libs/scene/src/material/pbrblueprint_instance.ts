@@ -129,6 +129,12 @@ function copyParentMaterialState(
   instance.opacity = parentMaterial.opacity;
   instance.objectColor = parentMaterial.objectColor;
   instance.TAAStrength = parentMaterial.TAAStrength;
+  if (!instance.isMaterialPropertyOverridden('NormalScale')) {
+    instance.normalScale = parentMaterial.normalScale;
+  }
+  if (!instance.isMaterialPropertyOverridden('NormalFlipY')) {
+    instance.normalFlipY = parentMaterial.normalFlipY;
+  }
   if (!instance.isMaterialPropertyOverridden('RectSpecularScale')) {
     instance.rectSpecularScale = parentMaterial.rectSpecularScale;
   }

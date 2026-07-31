@@ -798,6 +798,59 @@ function getLitMaterialProps(manager: ResourceManager): PropertyAccessor<LitProp
   return defineProps([
     ...getUnlitMaterialProps(manager),
     {
+      name: 'NormalScale',
+      description: 'Strength multiplier for normal map X and Y components',
+      type: 'float',
+      default: 1,
+      options: {
+        animatable: true,
+        minValue: 0,
+        maxValue: 3
+      },
+      get(this: LitPropTypes, value) {
+        value.num[0] = this.normalScale;
+      },
+      set(this: LitPropTypes, value) {
+        allowBlueprintInstanceOverride(this as unknown as MeshMaterial, 'NormalScale', () => {
+          this.normalScale = value.num[0];
+        });
+      },
+      isHidden: createBlueprintOutputHiddenPredicate(['Normal']),
+      getDefaultValue(this: LitPropTypes) {
+        if (this instanceof PBRBluePrintMaterialInstance) {
+          return this.parentMaterial?.normalScale ?? 1;
+        }
+        return this.$isInstance ? this.coreMaterial.normalScale : 1;
+      },
+      isValid() {
+        return !this.$isInstance || isBlueprintMaterialAssetInstance(this as unknown as MeshMaterial);
+      }
+    },
+    {
+      name: 'NormalFlipY',
+      description: 'If true, flips the green (Y) component sampled from the normal map',
+      type: 'bool',
+      default: false,
+      get(this: LitPropTypes, value) {
+        value.bool[0] = this.normalFlipY;
+      },
+      set(this: LitPropTypes, value) {
+        allowBlueprintInstanceOverride(this as unknown as MeshMaterial, 'NormalFlipY', () => {
+          this.normalFlipY = value.bool[0];
+        });
+      },
+      isHidden: createBlueprintOutputHiddenPredicate(['Normal']),
+      getDefaultValue(this: LitPropTypes) {
+        if (this instanceof PBRBluePrintMaterialInstance) {
+          return this.parentMaterial?.normalFlipY ?? false;
+        }
+        return this.$isInstance ? this.coreMaterial.normalFlipY : false;
+      },
+      isValid() {
+        return !this.$isInstance || isBlueprintMaterialAssetInstance(this as unknown as MeshMaterial);
+      }
+    },
+    {
       name: 'doubleSidedLighting',
       description: 'If true, lighting is evaluated on both sides of the surface',
       type: 'bool',
