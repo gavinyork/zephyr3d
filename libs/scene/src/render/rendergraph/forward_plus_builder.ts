@@ -1898,7 +1898,7 @@ function renderSkyMotionVectors(
           this.$l.prevWorldPos = pb.add(this.$inputs.pos, this.prevCameraPos);
           this.$l.clipPos = pb.mul(this.VPMatrix, pb.vec4(this.worldPos, 1));
           this.$l.prevClipPos = pb.mul(this.prevVPMatrix, pb.vec4(this.prevWorldPos, 1));
-          this.clipPos.z = this.clipPos.w;
+          this.clipPos.z = ShaderHelper.farthestClipZ(this, this.clipPos.w);
           this.$builtins.position = this.clipPos;
           this.$outputs.currentPos = this.clipPos;
           this.$outputs.prevPos = this.prevClipPos;

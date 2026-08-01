@@ -9,7 +9,7 @@ import type {
 } from '@zephyr3d/device';
 import { fetchSampler } from './misc';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
-import { DRef } from '@zephyr3d/base';
+import { DEPTH_FARTHEST, DRef } from '@zephyr3d/base';
 import { getDevice } from '../app/api';
 
 export abstract class RenderMipmap {
@@ -95,7 +95,7 @@ export abstract class RenderMipmap {
           this.$outputs.uv = pb.vec2();
           that.setupUniforms(this);
           pb.main(function () {
-            this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+            this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
             this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
             if (device.type === 'webgpu') {
               this.$builtins.position.y = pb.neg(this.$builtins.position.y);

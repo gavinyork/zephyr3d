@@ -1,5 +1,5 @@
 import type { Vector2 } from '@zephyr3d/base';
-import { Vector3, Vector4, Quaternion, Matrix3x3, Matrix4x4 } from '@zephyr3d/base';
+import { Vector3, Vector4, Quaternion, Matrix3x3, Matrix4x4, REVERSE_Z } from '@zephyr3d/base';
 import { rand, randInt, randNonZero, numberEquals } from './common';
 import { Scene, SceneNode } from '@zephyr3d/scene';
 
@@ -537,8 +537,13 @@ export function testMatrixType(c: MatrixConstructor, rows: number, cols: number)
         expect(m1.getNearPlane()).toBeNear(near, 0.01);
         expect(m1.getFarPlane()).toBeNear(far, 0.01);
 
-        const vmin = new Vector4(-1, -1, -1, 1);
-        const vmax = new Vector4(1, 1, 1, 1);
+        // NDC depth of the near/far planes in the active clip-space
+        // convention (GL [-1,1] under standard-Z, reverse ZO under reverse-Z)
+        const ndcNear = REVERSE_Z ? 1 : -1;
+        const ndcFar = REVERSE_Z ? 0 : 1;
+
+        const vmin = new Vector4(-1, -1, ndcNear, 1);
+        const vmax = new Vector4(1, 1, ndcFar, 1);
 
         const vx1 = m2.transformPoint(new Vector3(left, bottom, -near));
         vx1.scaleBy(1 / vx1.w);
@@ -564,14 +569,14 @@ export function testMatrixType(c: MatrixConstructor, rows: number, cols: number)
           new Vector3(leftFar, topFar, -far)
         ];
         const v2 = [
-          new Vector4(-1, -1, -1, 1),
-          new Vector4(1, -1, -1, 1),
-          new Vector4(1, 1, -1, 1),
-          new Vector4(-1, 1, -1, 1),
-          new Vector4(-1, -1, 1, 1),
-          new Vector4(1, -1, 1, 1),
-          new Vector4(1, 1, 1, 1),
-          new Vector4(-1, 1, 1, 1)
+          new Vector4(-1, -1, ndcNear, 1),
+          new Vector4(1, -1, ndcNear, 1),
+          new Vector4(1, 1, ndcNear, 1),
+          new Vector4(-1, 1, ndcNear, 1),
+          new Vector4(-1, -1, ndcFar, 1),
+          new Vector4(1, -1, ndcFar, 1),
+          new Vector4(1, 1, ndcFar, 1),
+          new Vector4(-1, 1, ndcFar, 1)
         ];
         for (let i = 0; i < 8; i++) {
           const t = m1.transformPoint(v[i]);
@@ -601,14 +606,14 @@ export function testMatrixType(c: MatrixConstructor, rows: number, cols: number)
           new Vector3(left, top, -far)
         ];
         const v4 = [
-          new Vector4(-1, -1, -1, 1),
-          new Vector4(1, -1, -1, 1),
-          new Vector4(1, 1, -1, 1),
-          new Vector4(-1, 1, -1, 1),
-          new Vector4(-1, -1, 1, 1),
-          new Vector4(1, -1, 1, 1),
-          new Vector4(1, 1, 1, 1),
-          new Vector4(-1, 1, 1, 1)
+          new Vector4(-1, -1, ndcNear, 1),
+          new Vector4(1, -1, ndcNear, 1),
+          new Vector4(1, 1, ndcNear, 1),
+          new Vector4(-1, 1, ndcNear, 1),
+          new Vector4(-1, -1, ndcFar, 1),
+          new Vector4(1, -1, ndcFar, 1),
+          new Vector4(1, 1, ndcFar, 1),
+          new Vector4(-1, 1, ndcFar, 1)
         ];
         for (let i = 0; i < 8; i++) {
           const t = m3.transformPoint(v3[i]);

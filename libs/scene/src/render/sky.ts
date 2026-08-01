@@ -1351,7 +1351,7 @@ export class SkyRenderer extends Disposable {
               pb.mul(this.worldMatrix, pb.vec4(this.$inputs.pos, 0)).xyz
             );
             this.$builtins.position = pb.mul(this.viewProjMatrix, pb.vec4(this.worldPos, 1), this.flip);
-            this.$builtins.position.z = this.$builtins.position.w;
+            this.$builtins.position.z = ShaderHelper.farthestClipZ(this, this.$builtins.position.w);
           });
         },
         fragment(pb) {
@@ -1560,7 +1560,7 @@ export class SkyRenderer extends Disposable {
             pb.vec4(pb.add(this.$outputs.worldDirection, this.cameraPos), 1),
             this.flip
           );
-          this.$builtins.position.z = this.$builtins.position.w;
+          this.$builtins.position.z = ShaderHelper.farthestClipZ(this, this.$builtins.position.w);
         });
       },
       fragment(pb) {
