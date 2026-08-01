@@ -1,5 +1,5 @@
 import type { Vector4, TypedArray, Immutable, Nullable } from '@zephyr3d/base';
-import { makeObservable } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, makeObservable } from '@zephyr3d/base';
 import type {
   WebGLContext,
   FrameBufferOptions,
@@ -501,7 +501,7 @@ export class WebGLDevice extends BaseDevice {
         if (depthFlag || stencilFlag) {
           const depthAttachment = gl._currentFramebuffer.getDepthAttachment();
           if (depthAttachment) {
-            gl.clearBufferfi(WebGLEnum.DEPTH_STENCIL, 0, clearDepth ?? 1, clearStencil ?? 0);
+            gl.clearBufferfi(WebGLEnum.DEPTH_STENCIL, 0, clearDepth ?? DEPTH_CLEAR_VALUE, clearStencil ?? 0);
           }
         }
         if (colorFlag) {

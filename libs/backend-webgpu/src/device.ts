@@ -1,4 +1,5 @@
 import type { TypedArray, Immutable, Nullable } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE } from '@zephyr3d/base';
 import type {
   FrameBufferOptions,
   SamplerOptions,
@@ -1028,7 +1029,7 @@ export class WebGPUDevice extends BaseDevice {
       depthStencilAttachment: {
         view: this._defaultDepthTextureView,
         depthLoadOp: 'clear',
-        depthClearValue: 1,
+        depthClearValue: DEPTH_CLEAR_VALUE,
         depthStoreOp: 'store',
         stencilLoadOp: 'clear',
         stencilClearValue: 0,

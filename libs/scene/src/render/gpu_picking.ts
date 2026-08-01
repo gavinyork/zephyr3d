@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from './drawable';
 import type { RenderQueue } from './render_queue';
 import { type PickResult, Camera } from '../camera';
@@ -66,7 +66,7 @@ export function renderObjectColors(
   const ray = isWebGL1 ? camera.constructRay(camera.getPickPosX(), camera.getPickPosY()) : null;
   ctx.device.setFramebuffer(fb);
   _objectColorPass.clearColor = Vector4.zero();
-  _objectColorPass.clearDepth = 1;
+  _objectColorPass.clearDepth = DEPTH_CLEAR_VALUE;
   const rq = _objectColorPass.cullScene(ctx, pickCamera);
   _objectColorPass.render(ctx, pickCamera, null, rq);
   rq.dispose();

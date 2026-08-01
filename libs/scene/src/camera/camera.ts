@@ -1,5 +1,15 @@
 import type { CubeFace, Immutable, Nullable, Plane } from '@zephyr3d/base';
-import { DRef, Vector2, Matrix4x4, Frustum, Vector4, Vector3, Ray, halton23 } from '@zephyr3d/base';
+import {
+  DEPTH_CLEAR_VALUE,
+  DRef,
+  Vector2,
+  Matrix4x4,
+  Frustum,
+  Vector4,
+  Vector3,
+  Ray,
+  halton23
+} from '@zephyr3d/base';
 import { SceneNode } from '../scene/scene_node';
 import type { Drawable, PickTarget } from '../render/drawable';
 import type { BaseTexture } from '@zephyr3d/device';
@@ -479,7 +489,7 @@ export class Camera extends SceneNode {
     this._invViewProjMatrix = Matrix4x4.identity();
     this._clipPlane = null;
     this._clearColor = new Vector4(0, 0, 0, 1);
-    this._clearDepth = 1;
+    this._clearDepth = DEPTH_CLEAR_VALUE;
     this._clearStencil = 0;
     this._dirty = true;
     this._controller = null;

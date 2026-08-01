@@ -1,5 +1,5 @@
 import type { Immutable, Nullable } from '@zephyr3d/base';
-import { Disposable, Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Disposable, Vector4 } from '@zephyr3d/base';
 import { CullVisitor } from './cull_visitor';
 import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
@@ -36,7 +36,7 @@ export abstract class RenderPass extends Disposable {
     this._type = type;
     this._clearColor = new Vector4(0, 0, 0, 1);
     this._clearColors = null;
-    this._clearDepth = 1;
+    this._clearDepth = DEPTH_CLEAR_VALUE;
     this._clearStencil = 0;
     this._globalBindGroups = {};
   }
@@ -275,7 +275,7 @@ export abstract class RenderPass extends Disposable {
   /** @internal */
   private clearFramebuffer() {
     const clearColor = (this._clearColors ?? this._clearColor) as FrameBufferClearColors;
-    if (clearColor || this._clearDepth || this._clearStencil) {
+    if (clearColor || this._clearDepth != null || this._clearStencil != null) {
       getDevice().clearFrameBuffer(clearColor, this._clearDepth, this._clearStencil);
     }
   }

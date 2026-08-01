@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
 import type { FrameBuffer, Texture2D } from '@zephyr3d/device';
 import type { Camera } from '../../camera';
 import { MaterialVaryingFlags } from '../../values';
@@ -373,7 +373,8 @@ class SceneRenderContextImpl implements SceneRenderContext {
           : encodeDepth
             ? new Vector4(0, 0, 0, 1)
             : new Vector4(1, 1, 1, 1);
-      _sceneDepthPass.clearDepth = opts && 'clearDepth' in opts ? (opts.clearDepth ?? null) : 1;
+      _sceneDepthPass.clearDepth =
+        opts && 'clearDepth' in opts ? (opts.clearDepth ?? null) : DEPTH_CLEAR_VALUE;
       _sceneDepthPass.clearStencil = opts && 'clearStencil' in opts ? (opts.clearStencil ?? null) : null;
       _sceneDepthPass.render(ctx, camera, camera, queue);
     } finally {

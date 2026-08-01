@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { /*nextPowerOf2, */ Vector4 } from '@zephyr3d/base';
+import { /*nextPowerOf2, */ DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BindGroup,
@@ -1823,7 +1823,7 @@ function renderSceneDepth(
       : _depthPass.encodeDepth
         ? new Vector4(0, 0, 0, 1)
         : new Vector4(1, 1, 1, 1);
-    _depthPass.clearDepth = transmission ? null : 1;
+    _depthPass.clearDepth = transmission ? null : DEPTH_CLEAR_VALUE;
     _depthPass.clearStencil = null;
     _depthPass.transmission = transmission;
 
@@ -1985,10 +1985,10 @@ function renderSceneColorGrab(
     _scenePass.transmission = false;
     if (isolateSceneColorDepth) {
       ctx.depthPrepassAttachment = undefined;
-      _scenePass.clearDepth = 1;
+      _scenePass.clearDepth = DEPTH_CLEAR_VALUE;
       _scenePass.clearStencil = 0;
     } else {
-      _scenePass.clearDepth = depthTex ? null : 1;
+      _scenePass.clearDepth = depthTex ? null : DEPTH_CLEAR_VALUE;
       _scenePass.clearStencil = depthTex ? null : 0;
     }
     ctx.materialFlags = sceneColorMaterialFlags;
@@ -2068,7 +2068,7 @@ export function renderOpaqueScenePass(
 
     _scenePass.transmission = false;
     _scenePass.renderSky = false;
-    _scenePass.clearDepth = depthTex ? null : 1;
+    _scenePass.clearDepth = depthTex ? null : DEPTH_CLEAR_VALUE;
     _scenePass.clearStencil = depthTex ? null : 0;
 
     if (renderQueue.needSceneColor() && sceneColorCopyTex) {

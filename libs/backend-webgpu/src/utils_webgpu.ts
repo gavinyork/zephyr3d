@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
 import type { FrameBufferClearColors } from '@zephyr3d/device';
 import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';
@@ -42,7 +42,7 @@ export class WebGPUClearQuad {
     const program = this.getClearProgram(renderPass.getDevice(), hash);
     const bClearDepth = !(clearDepth === null || clearDepth === undefined);
     const bClearStencil = !(clearStencil === null || clearStencil === undefined);
-    program.bindGroup.setValue('clearDepth', clearDepth ?? 1);
+    program.bindGroup.setValue('clearDepth', clearDepth ?? DEPTH_CLEAR_VALUE);
     if (targetCount === 0) {
       program.bindGroup.setValue('clearColor', this._defaultClearColor);
     } else {

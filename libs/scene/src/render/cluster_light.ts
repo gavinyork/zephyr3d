@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
 import { MAX_CLUSTERED_LIGHTS, MAX_SHADOW_MASK_LIGHTS } from '../values';
 import type {
   AbstractDevice,
@@ -407,7 +407,7 @@ export class ClusteredLight {
       device.draw('point-list', 0, this._tileCountX * this._tileCountY * this._tileCountZ);
       device.setRenderStates(savedRS);
     } else {
-      device.clearFrameBuffer(new Vector4(0, 0, 0, 0), 1, 0);
+      device.clearFrameBuffer(new Vector4(0, 0, 0, 0), DEPTH_CLEAR_VALUE, 0);
     }
     device.popDeviceStates();
   }

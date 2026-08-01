@@ -3,7 +3,7 @@ import { GlyphManager, Font as DeviceFont } from '@zephyr3d/device';
 import { Renderer } from './renderer';
 import * as ImGui from './imgui';
 import type { Nullable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
 
 let clipboard_text = '';
 let renderer: Nullable<Renderer> = null;
@@ -1029,7 +1029,7 @@ function input_text_update(_io: ImGui.IO) {
 }
 
 export function ClearBuffer(color: ImGui.ImVec4) {
-  renderer!.device.clearFrameBuffer(new Vector4(color.x, color.y, color.z, color.w), 1, 0);
+  renderer!.device.clearFrameBuffer(new Vector4(color.x, color.y, color.z, color.w), DEPTH_CLEAR_VALUE, 0);
 }
 
 export function RenderDrawData(draw_data: ImGui.DrawData | null = ImGui.GetDrawData()) {

@@ -12,7 +12,7 @@ import type { DrawContext } from '../render';
 import { MaterialVaryingFlags, MAX_TERRAIN_MIPMAP_LEVELS } from '../values';
 import { ShaderHelper } from './shader/helper';
 import type { Nullable } from '@zephyr3d/base';
-import { DRef, Vector3, Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, DRef, Vector3, Vector4 } from '@zephyr3d/base';
 import { mixinLight } from './mixins/lit';
 import { fetchSampler } from '../utility/misc';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
@@ -787,14 +787,14 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       device.setFramebuffer(fbDetail);
       for (let i = 0; i < detailMap!.depth; i++) {
         fbDetail.setColorAttachmentLayer(0, i);
-        device.clearFrameBuffer(Vector4.zero(), 1, 0);
+        device.clearFrameBuffer(Vector4.zero(), DEPTH_CLEAR_VALUE, 0);
       }
       fbDetail.dispose();
       const fbNormal = device.createFrameBuffer([detailNormalMap!], null);
       device.setFramebuffer(fbNormal);
       for (let i = 0; i < detailNormalMap!.depth; i++) {
         fbNormal.setColorAttachmentLayer(0, i);
-        device.clearFrameBuffer(new Vector4(0.5, 0.5, 1, 1), 1, 0);
+        device.clearFrameBuffer(new Vector4(0.5, 0.5, 1, 1), DEPTH_CLEAR_VALUE, 0);
       }
       fbNormal.dispose();
     }
@@ -802,7 +802,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     device.setFramebuffer(fbSplat);
     for (let i = 0; i < splatMap!.depth; i++) {
       fbSplat.setColorAttachmentLayer(0, i);
-      device.clearFrameBuffer(i === 0 ? new Vector4(1, 0, 0, 0) : Vector4.zero(), 1, 0);
+      device.clearFrameBuffer(i === 0 ? new Vector4(1, 0, 0, 0) : Vector4.zero(), DEPTH_CLEAR_VALUE, 0);
     }
     device.popDeviceStates();
     fbSplat.dispose();

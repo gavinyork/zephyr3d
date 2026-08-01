@@ -1,6 +1,6 @@
 import type { ColorRGBA, Nullable } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
-import { ASSERT, Disposable, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
+import { ASSERT, DEPTH_CLEAR_VALUE, Disposable, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   type BindGroup,
   type RenderStateSet,
@@ -344,7 +344,7 @@ export class Renderer extends Disposable {
     //this._bindGroupTexture.setValue('mvpMatrix', this._mvpMatrix);
     //this._bindGroupTexture.setValue('deviceSize', this._deviceSize);
     if (this._clearBeforeRender) {
-      this._device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
+      this._device.clearFrameBuffer(new Vector4(0, 0, 0, 1), DEPTH_CLEAR_VALUE, 0);
     }
   }
   /** @internal */
