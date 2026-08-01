@@ -13,6 +13,7 @@ import { CopyBlitter, type BlitType } from '../blitter';
 import { fetchSampler } from '../utility/misc';
 import { getDevice } from '../app/api';
 import type { Nullable } from '@zephyr3d/base';
+import { DEPTH_FARTHEST, DEPTH_REDUCE_FARTHER } from '@zephyr3d/base';
 
 let hzbProgram: Nullable<GPUProgram> = null;
 let hzbBindGroupCache: WeakMap<BaseTexture, BindGroup[]> = new WeakMap();
@@ -220,7 +221,7 @@ function buildHZBProgram(device: AbstractDevice) {
       this.$inputs.pos = pb.vec2().attrib('position');
       this.$outputs.uv = pb.vec2();
       pb.main(function () {
-        this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+        this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
         this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
         if (device.type === 'webgpu') {
           this.$builtins.position.y = pb.neg(this.$builtins.position.y);
@@ -245,8 +246,11 @@ function buildHZBProgram(device: AbstractDevice) {
             device.type === 'webgpu' ? 0 : this.srcMipLevel
           );
         }
-        // Furthest-depth (max) reduction; standard Z, so max = farthest.
-        this.$l.maxDepth = pb.max(pb.max(this.d0.r, this.d1.r), pb.max(this.d2.r, this.d3.r));
+        // Furthest-depth reduction (max under standard Z, min under reverse Z).
+        this.$l.maxDepth = pb[DEPTH_REDUCE_FARTHER](
+          pb[DEPTH_REDUCE_FARTHER](this.d0.r, this.d1.r),
+          pb[DEPTH_REDUCE_FARTHER](this.d2.r, this.d3.r)
+        );
         this.$outputs.color = pb.vec4(this.maxDepth, 0, 0, 1);
       });
     }

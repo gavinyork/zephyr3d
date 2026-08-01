@@ -1,5 +1,6 @@
 /// <reference types="@webgpu/types" />
 
+import { DEPTH_COMPARE_CLOSER } from '@zephyr3d/base';
 import { WebGPUObject } from './gpuobject_webgpu';
 import type {
   SamplerOptions,
@@ -710,7 +711,7 @@ export abstract class WebGPUBaseTexture<
       lodMin: 0,
       lodMax: 32,
       maxAnisotropy: 1,
-      compare: comparison ? 'lt' : null
+      compare: comparison ? DEPTH_COMPARE_CLOSER : null
     } as const;
   }
   /** @internal */

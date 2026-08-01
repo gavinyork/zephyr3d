@@ -1,3 +1,4 @@
+import { DEPTH_COMPARE_DEFAULT } from '@zephyr3d/base';
 import type {
   ColorState,
   BlendingState,
@@ -282,7 +283,7 @@ export class WebGLDepthState extends WebGLRenderState implements DepthState {
     super();
     this.testEnabled = true;
     this.writeEnabled = true;
-    this.compareFunc = 'le';
+    this.compareFunc = DEPTH_COMPARE_DEFAULT;
     this.depthBias = 0;
     this.depthBiasSlopeScale = 0;
   }

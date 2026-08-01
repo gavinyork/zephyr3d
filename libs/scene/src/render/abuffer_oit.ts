@@ -15,7 +15,7 @@ import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { ShaderHelper } from '../material';
 import type { Nullable } from '@zephyr3d/base';
-import { Disposable } from '@zephyr3d/base';
+import { DEPTH_FARTHEST, Disposable } from '@zephyr3d/base';
 
 /**
  * per-pixel linked list OIT renderer using ABuffer.
@@ -366,7 +366,7 @@ export class ABufferOIT extends Disposable implements OIT {
           this.$inputs.pos = pb.vec2().attrib('position');
           this.$outputs.uv = pb.vec2();
           pb.main(function () {
-            this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+            this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
             this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
             if (device.type === 'webgpu') {
               this.$builtins.position.y = pb.neg(this.$builtins.position.y);

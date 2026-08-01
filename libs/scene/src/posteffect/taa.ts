@@ -7,7 +7,7 @@ import { fetchSampler } from '../utility/misc';
 import { BoxShape } from '../shapes';
 import { temporalResolve } from '../shaders/temporal';
 import type { Nullable } from '@zephyr3d/base';
-import { Vector2 } from '@zephyr3d/base';
+import { DEPTH_COMPARE_DEFAULT, DEPTH_FARTHEST, Vector2 } from '@zephyr3d/base';
 import { RGHistoryResources } from '../render/rendergraph/history_resources';
 import { FrameResources } from '../render/rendergraph/blackboard';
 import type { RGHandle, RGTextureDesc } from '../render/rendergraph/types';
@@ -46,7 +46,7 @@ export class TAA extends AbstractPostEffect {
     ctx.device.pushDeviceStates();
     ctx.device.setProgram(program);
     ctx.device.setBindGroup(0, this._skyMotionVectorBindGroup);
-    ctx.device.setRenderStates(AbstractPostEffect.getDefaultRenderState(ctx, 'le'));
+    ctx.device.setRenderStates(AbstractPostEffect.getDefaultRenderState(ctx, DEPTH_COMPARE_DEFAULT));
     ctx.device.setFramebuffer(fb);
     box.draw();
     ctx.device.popDeviceStates();
@@ -293,7 +293,7 @@ export class TAA extends AbstractPostEffect {
         this.$inputs.pos = pb.vec2().attrib('position');
         this.$outputs.uv = pb.vec2();
         pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
           this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
           this.$if(pb.notEqual(this.flip, 0), function () {
             this.$builtins.position.y = pb.neg(this.$builtins.position.y);

@@ -1,4 +1,4 @@
-import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
+import { DEPTH_FARTHEST, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { FrameResources } from '../render/rendergraph/blackboard';
@@ -767,7 +767,7 @@ export class SSGI extends AbstractPostEffect {
         this.$inputs.pos = pb.vec2().attrib('position');
         this.$outputs.uv = pb.vec2();
         pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
           this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
           this.$if(pb.notEqual(this.flip, 0), function () {
             this.$builtins.position.y = pb.neg(this.$builtins.position.y);
@@ -1117,7 +1117,7 @@ export class SSGI extends AbstractPostEffect {
         this.$inputs.pos = pb.vec2().attrib('position');
         this.$outputs.uv = pb.vec2();
         pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
           this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
           this.$if(pb.notEqual(this.flip, 0), function () {
             this.$builtins.position.y = pb.neg(this.$builtins.position.y);
@@ -1291,7 +1291,7 @@ export class SSGI extends AbstractPostEffect {
         this.$inputs.pos = pb.vec2().attrib('position');
         this.$outputs.uv = pb.vec2();
         pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
           this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
           this.$if(pb.notEqual(this.flip, 0), function () {
             this.$builtins.position.y = pb.neg(this.$builtins.position.y);
@@ -1443,7 +1443,7 @@ export class SSGI extends AbstractPostEffect {
         this.$inputs.pos = pb.vec2().attrib('position');
         this.$outputs.uv = pb.vec2();
         pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
           this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
           this.$if(pb.notEqual(this.flip, 0), function () {
             this.$builtins.position.y = pb.neg(this.$builtins.position.y);
@@ -1515,7 +1515,7 @@ export class SSGI extends AbstractPostEffect {
         this.$inputs.pos = pb.vec2().attrib('position');
         this.$outputs.uv = pb.vec2();
         pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
           this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
           this.$if(pb.notEqual(this.flip, 0), function () {
             this.$builtins.position.y = pb.neg(this.$builtins.position.y);
@@ -1555,7 +1555,7 @@ export class SSGI extends AbstractPostEffect {
         this.$inputs.pos = pb.vec2().attrib('position');
         this.$outputs.uv = pb.vec2();
         pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
           this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
           this.$if(pb.notEqual(this.flip, 0), function () {
             this.$builtins.position.y = pb.neg(this.$builtins.position.y);

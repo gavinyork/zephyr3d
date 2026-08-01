@@ -11,7 +11,7 @@ import {
 } from '../shaders/ssr';
 import { temporalResolve } from '../shaders/temporal';
 import type { Nullable } from '@zephyr3d/base';
-import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
+import { DEPTH_COMPARE_FARTHER, DEPTH_FARTHEST, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { copyTexture, fetchSampler } from '../utility/misc';
 import { getGGXLUT } from '../utility/textures/ggxlut';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
@@ -206,7 +206,7 @@ export class SSR extends AbstractPostEffect {
             const stdDev = ctx.camera.ssrBlurStdDev;
             const depthCutoff = ctx.camera.ssrBlurDepthCutoff;
             const blitterH = (SSR._blurBlitterH = SSR._blurBlitterH ?? new BilateralBlurBlitter(false));
-            blitterH.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, 'gt');
+            blitterH.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, DEPTH_COMPARE_FARTHER);
             this.blurPass(
               ctx,
               blitterH,
@@ -220,7 +220,7 @@ export class SSR extends AbstractPostEffect {
               rg.getFramebuffer<FrameBuffer>(middleFB)
             );
             const blitterV = (SSR._blurBlitterV = SSR._blurBlitterV ?? new BilateralBlurBlitter(true));
-            blitterV.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, 'gt');
+            blitterV.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, DEPTH_COMPARE_FARTHER);
             this.blurPass(
               ctx,
               blitterV,
@@ -424,7 +424,7 @@ export class SSR extends AbstractPostEffect {
     this._combineBindGroup.setValue('srgbOut', srgbOut ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, this._combineBindGroup);
-    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'gt'));
+    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, DEPTH_COMPARE_FARTHER));
   }
   /** @internal */
   resolve(
@@ -481,7 +481,7 @@ export class SSR extends AbstractPostEffect {
     bindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
-    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'gt'));
+    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, DEPTH_COMPARE_FARTHER));
   }
   /** @internal */
   intersect(
@@ -568,7 +568,7 @@ export class SSR extends AbstractPostEffect {
     bindGroup.setValue('srgbOut', srgbOut ? 1 : 0);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
-    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'gt'));
+    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, DEPTH_COMPARE_FARTHER));
   }
   /** @internal */
   temporal(
@@ -618,7 +618,7 @@ export class SSR extends AbstractPostEffect {
     device.setFramebuffer(outFramebuffer);
     device.setProgram(program);
     device.setBindGroup(0, this._temporalBindGroup);
-    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'gt'));
+    this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, DEPTH_COMPARE_FARTHER));
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
@@ -669,7 +669,7 @@ export class SSR extends AbstractPostEffect {
       const stdDev = ctx.camera.ssrBlurStdDev;
       const depthCutoff = ctx.camera.ssrBlurDepthCutoff;
       const blitterH = (SSR._blurBlitterH = SSR._blurBlitterH ?? new BilateralBlurBlitter(false));
-      blitterH.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, 'gt');
+      blitterH.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, DEPTH_COMPARE_FARTHER);
       this.blurPass(
         ctx,
         blitterH,
@@ -683,7 +683,7 @@ export class SSR extends AbstractPostEffect {
         pingpongFramebuffer[1]
       );
       const blitterV = (SSR._blurBlitterV = SSR._blurBlitterV ?? new BilateralBlurBlitter(true));
-      blitterV.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, 'gt');
+      blitterV.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, DEPTH_COMPARE_FARTHER);
       this.blurPass(
         ctx,
         blitterV,
@@ -764,7 +764,7 @@ export class SSR extends AbstractPostEffect {
         this.$inputs.pos = pb.vec2().attrib('position');
         this.$outputs.uv = pb.vec2();
         pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
           this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
           this.$if(pb.notEqual(this.flip, 0), function () {
             this.$builtins.position.y = pb.neg(this.$builtins.position.y);
@@ -918,7 +918,7 @@ export class SSR extends AbstractPostEffect {
           ctx.env!.light.envLight.initShaderBindings(pb);
         }
         pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
           this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
           this.$if(pb.notEqual(this.flip, 0), function () {
             this.$builtins.position.y = pb.neg(this.$builtins.position.y);
@@ -1134,7 +1134,7 @@ export class SSR extends AbstractPostEffect {
         this.$inputs.pos = pb.vec2().attrib('position');
         this.$outputs.uv = pb.vec2();
         pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
           this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
           this.$if(pb.notEqual(this.flip, 0), function () {
             this.$builtins.position.y = pb.neg(this.$builtins.position.y);
@@ -1183,7 +1183,7 @@ export class SSR extends AbstractPostEffect {
           ctx.env!.light.envLight.initShaderBindings(pb);
         }
         pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
           this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
           this.$if(pb.notEqual(this.flip, 0), function () {
             this.$builtins.position.y = pb.neg(this.$builtins.position.y);

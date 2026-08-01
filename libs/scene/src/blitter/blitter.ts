@@ -1,5 +1,5 @@
 import type { CubeFace, Nullable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { DEPTH_FARTHEST, Vector4 } from '@zephyr3d/base';
 import type {
   RenderStateSet,
   BaseTexture,
@@ -535,7 +535,7 @@ function createBlitProgram(
       }
       filter.setup(this, type);
       pb.main(function () {
-        this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+        this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
         this.$outputs.uv =
           type === 'cube'
             ? pb.mul(pb.vec2(1, -1), this.$inputs.pos.xy)
@@ -545,7 +545,7 @@ function createBlitProgram(
         }
         if (scaleBias) {
           this.$l.xy = pb.add(pb.mul(this.$builtins.position.xy, this.scaleBias.xy), this.scaleBias.zw);
-          this.$builtins.position = pb.vec4(this.xy, 1, 1);
+          this.$builtins.position = pb.vec4(this.xy, DEPTH_FARTHEST, 1);
         }
       });
     },

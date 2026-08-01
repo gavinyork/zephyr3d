@@ -1,5 +1,5 @@
 import type { Immutable } from '@zephyr3d/base';
-import { Vector2, Vector3 } from '@zephyr3d/base';
+import { DEPTH_COMPARE_CLOSER, Vector2, Vector3 } from '@zephyr3d/base';
 import type {
   BindGroup,
   PBFunctionScope,
@@ -327,7 +327,7 @@ export class MToonMaterial extends ToonMaterialBase {
     if (pass > 0) {
       stateSet.useRasterizerState().cullMode = 'front';
       stateSet.defaultBlendingState();
-      stateSet.useDepthState().enableTest(true).enableWrite(true).setCompareFunc('lt');
+      stateSet.useDepthState().enableTest(true).enableWrite(true).setCompareFunc(DEPTH_COMPARE_CLOSER);
     } else if (this._transparentWithZWrite && this.isTransparentPass(pass, ctx)) {
       stateSet.useDepthState().enableTest(true).enableWrite(true);
     }

@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { /*nextPowerOf2, */ DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
+import { /*nextPowerOf2, */ DEPTH_CLEAR_VALUE, DEPTH_COMPARE_DEFAULT, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BindGroup,
@@ -1937,7 +1937,7 @@ function renderSkyMotionVectors(
   device.pushDeviceStates();
   device.setProgram(_skyMVProgram);
   device.setBindGroup(0, _skyMVBindGroup);
-  device.setRenderStates(AbstractPostEffect.getDefaultRenderState(ctx, 'le'));
+  device.setRenderStates(AbstractPostEffect.getDefaultRenderState(ctx, DEPTH_COMPARE_DEFAULT));
   device.setFramebuffer(fb);
   _skyMVBox.draw();
   device.popDeviceStates();

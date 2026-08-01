@@ -1,5 +1,5 @@
 import type { Immutable, Nullable, RequireOptionals, TypedArray } from '@zephyr3d/base';
-import { isPowerOf2 } from '@zephyr3d/base';
+import { DEPTH_COMPARE_CLOSER, isPowerOf2 } from '@zephyr3d/base';
 import type {
   SamplerOptions,
   BaseTexture,
@@ -392,7 +392,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
       lodMin: 0,
       lodMax: 32,
       maxAnisotropy: 1,
-      compare: comparison ? 'lt' : null
+      compare: comparison ? DEPTH_COMPARE_CLOSER : null
     } as const;
   }
 }

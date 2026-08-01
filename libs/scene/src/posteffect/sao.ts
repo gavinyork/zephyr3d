@@ -11,7 +11,7 @@ import { isFloatTextureFormat } from '@zephyr3d/device';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import type { Nullable } from '@zephyr3d/base';
-import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
+import { DEPTH_COMPARE_FARTHER, DEPTH_FARTHEST, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
 import type { BlitType } from '../blitter';
 import type { DrawContext } from '../render';
@@ -244,10 +244,10 @@ export class SAO extends AbstractPostEffect {
     if (this._supported) {
       if (!SAO._renderState) {
         SAO._renderState = device.createRenderStateSet();
-        SAO._renderState.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('gt');
+        SAO._renderState.useDepthState().enableTest(true).enableWrite(false).setCompareFunc(DEPTH_COMPARE_FARTHER);
         SAO._renderState.useRasterizerState().setCullMode('none');
         SAO._renderStateBlend = device.createRenderStateSet();
-        SAO._renderStateBlend.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('gt');
+        SAO._renderStateBlend.useDepthState().enableTest(true).enableWrite(false).setCompareFunc(DEPTH_COMPARE_FARTHER);
         SAO._renderStateBlend.useRasterizerState().setCullMode('none');
         SAO._renderStateBlend
           .useBlendingState()
@@ -262,7 +262,7 @@ export class SAO extends AbstractPostEffect {
             this.$inputs.pos = pb.vec2().attrib('position');
             this.$outputs.uv = pb.vec2();
             pb.main(function () {
-              this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+              this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
               this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
               this.$if(pb.notEqual(this.flip, 0), function () {
                 this.$builtins.position.y = pb.neg(this.$builtins.position.y);

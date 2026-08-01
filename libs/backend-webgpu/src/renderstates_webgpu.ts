@@ -1,3 +1,4 @@
+import { DEPTH_COMPARE_DEFAULT } from '@zephyr3d/base';
 import type {
   CompareFunc,
   ColorState,
@@ -390,7 +391,7 @@ export class WebGPUDepthState extends WebGPURenderState<Partial<GPUDepthStencilS
     super();
     this._testEnabled = true;
     this._writeEnabled = true;
-    this._compareFunc = 'le';
+    this._compareFunc = DEPTH_COMPARE_DEFAULT;
     this._depthBias = 0;
     this._depthBiasSlopeScale = 0;
   }

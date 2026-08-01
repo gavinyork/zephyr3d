@@ -17,7 +17,7 @@ import {
 } from '../shaders';
 import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Disposable, DRef, objectKeys, Vector3 } from '@zephyr3d/base';
-import { CubeFace, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
+import { CubeFace, DEPTH_COMPARE_DEFAULT, DEPTH_COMPARE_FARTHER, DEPTH_FARTHEST, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { Primitive } from './primitive';
 import { BoxShape } from '../shapes';
 import type { Camera } from '../camera/camera';
@@ -1293,7 +1293,7 @@ export class SkyRenderer extends Disposable {
           this.$outputs.uv = pb.vec2();
           this.flip = pb.int().uniform(0);
           pb.main(function () {
-            this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+            this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
             this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
             if (device.type !== 'webgpu') {
               this.$builtins.position.y = pb.neg(this.$builtins.position.y);
@@ -1384,7 +1384,7 @@ export class SkyRenderer extends Disposable {
     }
     if (!SkyRenderer._renderStatesSky) {
       SkyRenderer._renderStatesSky = device.createRenderStateSet();
-      SkyRenderer._renderStatesSky.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('le');
+      SkyRenderer._renderStatesSky.useDepthState().enableTest(true).enableWrite(false).setCompareFunc(DEPTH_COMPARE_DEFAULT);
       SkyRenderer._renderStatesSky.useRasterizerState().setCullMode('none');
     }
     if (!SkyRenderer._renderStatesSkyNoDepthTest) {
@@ -1406,7 +1406,7 @@ export class SkyRenderer extends Disposable {
         .useDepthState()
         .enableTest(true)
         .enableWrite(false)
-        .setCompareFunc('gt');
+        .setCompareFunc(DEPTH_COMPARE_FARTHER);
     }
     if (!SkyRenderer._renderStatesDistantLight) {
       SkyRenderer._renderStatesDistantLight = device.createRenderStateSet();
@@ -1458,7 +1458,7 @@ export class SkyRenderer extends Disposable {
         this.$inputs.pos = pb.vec2().attrib('position');
         this.$outputs.uv = pb.vec2();
         pb.main(function () {
-          this.$builtins.position = pb.vec4(this.$inputs.pos, 1, 1);
+          this.$builtins.position = pb.vec4(this.$inputs.pos, DEPTH_FARTHEST, 1);
           this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos.xy, 0.5), pb.vec2(0.5));
           if (device.type === 'webgpu') {
             this.$if(pb.notEqual(this.rt, 0), function () {
