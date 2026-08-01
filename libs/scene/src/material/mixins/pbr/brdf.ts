@@ -1,5 +1,9 @@
-import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type { PBInsideFunctionScope, PBShaderExp, ProgramBuilder } from '@zephyr3d/device';
 import type { MeshMaterial } from '../../meshmaterial';
+
+function useShaderF16(pb: ProgramBuilder): boolean {
+  return pb.getDevice().getDeviceCaps().shaderCaps.supportShaderF16;
+}
 
 /**
  * Interface for common PBR mixin
@@ -125,18 +129,32 @@ export function mixinPBRBRDF<T extends typeof MeshMaterial>(BaseCls: T) {
     }
     fresnelSchlick(scope: PBInsideFunctionScope, cosTheta: PBShaderExp, F0: PBShaderExp, F90: PBShaderExp) {
       const pb = scope.$builder;
-      const funcName = 'Z_fresnelSchlick';
+      const f16 = useShaderF16(pb);
+      const funcName = f16 ? 'Z_fresnelSchlick_h' : 'Z_fresnelSchlick';
       pb.func(funcName, [pb.float('cosTheta'), pb.vec3('f0'), pb.vec3('f90')], function () {
-        this.$return(
-          pb.add(
-            this.f0,
-            pb.mul(pb.sub(this.f90, this.f0), pb.pow(pb.clamp(pb.sub(1, this.cosTheta), 0, 1), 5))
-          )
-        );
+        if (f16) {
+          this.$l.hf0 = pb.hvec3(this.f0);
+          this.$l.hf90 = pb.hvec3(this.f90);
+          this.$l.x = pb.clamp(pb.sub(1, pb.half(this.cosTheta)), 0, 1);
+          this.$return(
+            pb.vec3(pb.add(this.hf0, pb.mul(pb.sub(this.hf90, this.hf0), pb.pow(this.x, 5))))
+          );
+        } else {
+          this.$return(
+            pb.add(
+              this.f0,
+              pb.mul(pb.sub(this.f90, this.f0), pb.pow(pb.clamp(pb.sub(1, this.cosTheta), 0, 1), 5))
+            )
+          );
+        }
       });
       return scope.$g[funcName](cosTheta, F0, F90) as PBShaderExp;
     }
     distributionGGX(scope: PBInsideFunctionScope, NdotH: PBShaderExp, alphaRoughness: PBShaderExp) {
+      // Stays f32 even when shader-f16 is available: near the specular peak
+      // 1-NdotH^2 suffers catastrophic cancellation in f16, alpha^2 underflows
+      // for smooth surfaces (roughness < ~0.09) and the peak value overflows
+      // the f16 range (65504)
       const pb = scope.$builder;
       const funcName = 'Z_distributionGGX';
       pb.func(funcName, [pb.float('NdotH'), pb.float('roughness')], function () {
@@ -156,23 +174,40 @@ export function mixinPBRBRDF<T extends typeof MeshMaterial>(BaseCls: T) {
       alphaRoughness: PBShaderExp
     ) {
       const pb = scope.$builder;
-      const funcName = 'Z_visGGX';
+      const f16 = useShaderF16(pb);
+      const funcName = f16 ? 'Z_visGGX_h' : 'Z_visGGX';
       pb.func(funcName, [pb.float('NdotV'), pb.float('NdotL'), pb.float('roughness')], function () {
-        this.$l.a = this.roughness;
-        this.$l.ggxV = pb.mul(
-          this.NdotL,
-          pb.sqrt(pb.add(pb.mul(this.NdotV, this.NdotV, pb.sub(1, this.a)), this.a))
-        );
-        this.$l.ggxL = pb.mul(
-          this.NdotV,
-          pb.sqrt(pb.add(pb.mul(this.NdotL, this.NdotL, pb.sub(1, this.a)), this.a))
-        );
-        this.$l.ggx = pb.add(this.ggxV, this.ggxL, 1e-5);
-        this.$if(pb.greaterThan(this.ggx, 0), function () {
-          this.$return(pb.div(0.5, this.ggx));
-        }).$else(function () {
-          this.$return(pb.float(0));
-        });
+        if (f16) {
+          this.$l.a = pb.half(this.roughness);
+          this.$l.NoV = pb.half(this.NdotV);
+          this.$l.NoL = pb.half(this.NdotL);
+          this.$l.ggxV = pb.mul(this.NoL, pb.sqrt(pb.add(pb.mul(this.NoV, this.NoV, pb.sub(1, this.a)), this.a)));
+          this.$l.ggxL = pb.mul(this.NoV, pb.sqrt(pb.add(pb.mul(this.NoL, this.NoL, pb.sub(1, this.a)), this.a)));
+          // 1e-5 is below the smallest normal f16 (~6.1e-5) and would flush to
+          // zero; 1e-4 keeps 0.5/ggx within the f16 range (<= 5000)
+          this.$l.ggx = pb.add(this.ggxV, this.ggxL, pb.half(1e-4));
+          this.$if(pb.greaterThan(this.ggx, 0), function () {
+            this.$return(pb.float(pb.div(0.5, this.ggx)));
+          }).$else(function () {
+            this.$return(pb.float(0));
+          });
+        } else {
+          this.$l.a = this.roughness;
+          this.$l.ggxV = pb.mul(
+            this.NdotL,
+            pb.sqrt(pb.add(pb.mul(this.NdotV, this.NdotV, pb.sub(1, this.a)), this.a))
+          );
+          this.$l.ggxL = pb.mul(
+            this.NdotV,
+            pb.sqrt(pb.add(pb.mul(this.NdotL, this.NdotL, pb.sub(1, this.a)), this.a))
+          );
+          this.$l.ggx = pb.add(this.ggxV, this.ggxL, 1e-5);
+          this.$if(pb.greaterThan(this.ggx, 0), function () {
+            this.$return(pb.div(0.5, this.ggx));
+          }).$else(function () {
+            this.$return(pb.float(0));
+          });
+        }
       });
       return scope.$g[funcName](NdotV, NdotL, alphaRoughness) as PBShaderExp;
     }
