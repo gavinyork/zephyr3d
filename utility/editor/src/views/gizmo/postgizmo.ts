@@ -2558,9 +2558,15 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
             this.$l.sceneDepth = this.sceneDepthSample.r;
 
-            this.$if(pb.greaterThan(this.depth, this.sceneDepth), function () {
-              this.alpha = pb.mul(this.alpha, 0.5);
-            });
+            this.$if(
+              // occluded when the fragment is farther than the scene depth
+              REVERSE_Z
+                ? pb.lessThan(this.depth, this.sceneDepth)
+                : pb.greaterThan(this.depth, this.sceneDepth),
+              function () {
+                this.alpha = pb.mul(this.alpha, 0.5);
+              }
+            );
 
             this.$outputs.color = pb.vec4(
               pb.mul(this.lineColor.rgb, this.alpha),
@@ -2725,9 +2731,15 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             this.$l.depth = this.$builtins.fragCoord.z;
             this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
             this.$l.sceneDepth = this.sceneDepthSample.r;
-            this.$if(pb.greaterThan(this.depth, this.sceneDepth), function () {
-              this.alpha = pb.mul(this.alpha, 0.5);
-            });
+            this.$if(
+              // occluded when the fragment is farther than the scene depth
+              REVERSE_Z
+                ? pb.lessThan(this.depth, this.sceneDepth)
+                : pb.greaterThan(this.depth, this.sceneDepth),
+              function () {
+                this.alpha = pb.mul(this.alpha, 0.5);
+              }
+            );
             this.$outputs.color = pb.vec4(
               pb.mul(this.lineColor.rgb, this.alpha),
               pb.mul(this.lineColor.a, this.alpha)
