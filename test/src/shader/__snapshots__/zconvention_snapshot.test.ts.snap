@@ -1,0 +1,337 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`depth convention status-quo shader snapshots ShaderHelper depth linearization trio (webgl2): webgl2-linearize-fs 1`] = `
+"#version 300 es
+precision highp float;
+precision highp int;
+struct zStruct0 {
+  vec2 nearFar;
+};
+layout(std140) uniform ch_block_name_zUBF_0_0 { zStruct0 zUBF_0_0; };
+layout(location = 0) out vec4 zFSOutput_color;
+void main() {
+  const float d = 0.5;
+  float lin = (zUBF_0_0.nearFar.x * zUBF_0_0.nearFar.y) / mix(zUBF_0_0.nearFar.y,zUBF_0_0.nearFar.x,d);
+  float nonlin = (zUBF_0_0.nearFar.y - ((zUBF_0_0.nearFar.x * zUBF_0_0.nearFar.y) / lin)) / (zUBF_0_0.nearFar.y - zUBF_0_0.nearFar.x);
+  float norm = zUBF_0_0.nearFar.x / mix(zUBF_0_0.nearFar.y,zUBF_0_0.nearFar.x,d);
+  zFSOutput_color = vec4(lin,nonlin,norm,1.0);
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots ShaderHelper depth linearization trio (webgpu): webgpu-linearize-fs 1`] = `
+"struct zFSOutput {
+  @location(0) zFSOutput_color: vec4<f32>
+};
+struct zStruct0 {
+  nearFar: vec2<f32>
+};
+@group(0) @binding(0) var<uniform> zUBF_0_0: zStruct0;
+var<private> zFSOutputCpy: zFSOutput;
+@fragment fn main() -> zFSOutput {
+  let d: f32 = 0.5;
+  let lin: f32 = (zUBF_0_0.nearFar.x * zUBF_0_0.nearFar.y) / mix(zUBF_0_0.nearFar.y,zUBF_0_0.nearFar.x,d);
+  let nonlin: f32 = (zUBF_0_0.nearFar.y - ((zUBF_0_0.nearFar.x * zUBF_0_0.nearFar.y) / lin)) / (zUBF_0_0.nearFar.y - zUBF_0_0.nearFar.x);
+  let norm: f32 = zUBF_0_0.nearFar.x / mix(zUBF_0_0.nearFar.y,zUBF_0_0.nearFar.x,d);
+  zFSOutputCpy.zFSOutput_color = vec4<f32>(lin,nonlin,norm,1.0);
+  return zFSOutputCpy;
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots ShaderHelper.samplePositionFromDepth reconstruction (webgl2): webgl2-reconstruct-fs 1`] = `
+"#version 300 es
+precision highp float;
+precision highp int;
+struct zStruct0 {
+  mat4 invViewProj;
+  vec2 nearFar;
+};
+uniform highp sampler2D depthTex;
+layout(std140) uniform ch_block_name_zUBF_0_0 { zStruct0 zUBF_0_0; };
+layout(location = 0) out vec4 zFSOutput_color;
+vec4 zSamplePositionFromDepth(vec2 uv,vec2 cameraNearFar,mat4 mat) {
+  float linearDepth = textureLod(depthTex,uv,0.0).r;
+  float nonLinearDepth = ((cameraNearFar.x / linearDepth) - cameraNearFar.y) / (cameraNearFar.x - cameraNearFar.y);
+  vec4 clipSpacePos = vec4((uv * 2.0) - vec2(1.0),(clamp(nonLinearDepth,0.0,1.0) * 2.0) - 1.0,1.0);
+  vec4 wPos = mat * clipSpacePos;
+  return vec4(wPos.xyz / wPos.w,linearDepth);
+}
+void main() {
+  const vec2 uv = vec2(0.5);
+  zFSOutput_color = zSamplePositionFromDepth(uv,zUBF_0_0.nearFar,zUBF_0_0.invViewProj);
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots ShaderHelper.samplePositionFromDepth reconstruction (webgpu): webgpu-reconstruct-fs 1`] = `
+"struct zFSOutput {
+  @location(0) zFSOutput_color: vec4<f32>
+};
+struct zStruct0 {
+  invViewProj: mat4x4<f32>,
+  nearFar: vec2<f32>
+};
+@group(0) @binding(1) var ch_auto_sampler_depthTex: sampler;
+@group(0) @binding(0) var depthTex: texture_2d<f32>;
+@group(0) @binding(2) var<uniform> zUBF_0_0: zStruct0;
+var<private> zFSOutputCpy: zFSOutput;
+fn zSamplePositionFromDepth(uv: vec2<f32>,cameraNearFar: vec2<f32>,mat: mat4x4<f32>) -> vec4<f32> {
+  let linearDepth: f32 = textureSampleLevel(depthTex,ch_auto_sampler_depthTex,uv,0.0).r;
+  let nonLinearDepth: f32 = ((cameraNearFar.x / linearDepth) - cameraNearFar.y) / (cameraNearFar.x - cameraNearFar.y);
+  let clipSpacePos: vec4<f32> = vec4<f32>((uv * 2.0) - vec2<f32>(1.0),(clamp(nonLinearDepth,0.0,1.0) * 2.0) - 1.0,1.0);
+  let wPos: vec4<f32> = mat * clipSpacePos;
+  return vec4<f32>(wPos.xyz / wPos.w,linearDepth);
+}
+@fragment fn main() -> zFSOutput {
+  let uv: vec2<f32> = vec2<f32>(0.5);
+  zFSOutputCpy.zFSOutput_color = zSamplePositionFromDepth(uv,zUBF_0_0.nearFar,zUBF_0_0.invViewProj);
+  return zFSOutputCpy;
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots computeShadowMapDepth native depth path (webgl2): webgl2-shadowdepth-clamp_false-fs 1`] = `
+"#version 300 es
+precision highp float;
+precision highp int;
+in vec3 zVSOutput_worldPos;
+layout(location = 0) out vec4 zFSOutput_color;
+vec4 Z_computeShadowMapDepth(vec3 worldPos) {
+  return vec4(gl_FragCoord.z,0.0,0.0,1.0);
+}
+void main() {
+  zFSOutput_color = Z_computeShadowMapDepth(zVSOutput_worldPos);
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots computeShadowMapDepth native depth path (webgl2): webgl2-shadowdepth-clamp_true-fs 1`] = `
+"#version 300 es
+precision highp float;
+precision highp int;
+in float zVSOutput_clamppedDepth;
+in vec3 zVSOutput_worldPos;
+layout(location = 0) out vec4 zFSOutput_color;
+vec4 Z_computeShadowMapDepth(vec3 worldPos) {
+  return vec4(clamp(zVSOutput_clamppedDepth,0.0,1.0),0.0,0.0,1.0);
+}
+void main() {
+  gl_FragDepth = clamp(zVSOutput_clamppedDepth,0.0,1.0);
+  zFSOutput_color = Z_computeShadowMapDepth(zVSOutput_worldPos);
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots computeShadowMapDepth native depth path (webgpu): webgpu-shadowdepth-clamp_false-fs 1`] = `
+"struct zFSInput {
+  @builtin(position) zFragCoord: vec4<f32>,
+  @location(0) zVSOutput_worldPos: vec3<f32>
+};
+struct zFSOutput {
+  @location(0) zFSOutput_color: vec4<f32>
+};
+var<private> zFSOutputCpy: zFSOutput;
+fn Z_computeShadowMapDepth(worldPos: vec3<f32>,zVertexOutput: zFSInput) -> vec4<f32> {
+  return vec4<f32>(zVertexOutput.zFragCoord.z,0.0,0.0,1.0);
+}
+@fragment fn main(zVertexOutput: zFSInput) -> zFSOutput {
+  zFSOutputCpy.zFSOutput_color = Z_computeShadowMapDepth(zVertexOutput.zVSOutput_worldPos,zVertexOutput);
+  return zFSOutputCpy;
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots computeShadowMapDepth native depth path (webgpu): webgpu-shadowdepth-clamp_true-fs 1`] = `
+"struct zFSInput {
+  @location(0) zVSOutput_clamppedDepth: f32,
+  @location(1) zVSOutput_worldPos: vec3<f32>
+};
+struct zFSOutput {
+  @builtin(frag_depth) zFragDepth: f32,
+  @location(0) zFSOutput_color: vec4<f32>
+};
+var<private> zFSOutputCpy: zFSOutput;
+fn Z_computeShadowMapDepth(worldPos: vec3<f32>,zVertexOutput: zFSInput) -> vec4<f32> {
+  return vec4<f32>(clamp(zVertexOutput.zVSOutput_clamppedDepth,0.0,1.0),0.0,0.0,1.0);
+}
+@fragment fn main(zVertexOutput: zFSInput) -> zFSOutput {
+  zFSOutputCpy.zFragDepth = clamp(zVertexOutput.zVSOutput_clamppedDepth,0.0,1.0);
+  zFSOutputCpy.zFSOutput_color = Z_computeShadowMapDepth(zVertexOutput.zVSOutput_worldPos,zVertexOutput);
+  return zFSOutputCpy;
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots depth range correction: minimal vertex/fragment (webgl2): webgl2-minimal-fs 1`] = `
+"#version 300 es
+precision highp float;
+precision highp int;
+layout(location = 0) out vec4 zFSOutput_color;
+void main() {
+  zFSOutput_color = vec4(1.0);
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots depth range correction: minimal vertex/fragment (webgl2): webgl2-minimal-vs 1`] = `
+"#version 300 es
+precision highp float;
+precision highp int;
+#define zVSInput_pos a_position
+in vec3 zVSInput_pos;
+void main() {
+  gl_Position = vec4(zVSInput_pos,1.0);
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots depth range correction: minimal vertex/fragment (webgpu): webgpu-minimal-fs 1`] = `
+"struct zFSOutput {
+  @location(0) zFSOutput_color: vec4<f32>
+};
+var<private> zFSOutputCpy: zFSOutput;
+@fragment fn main() -> zFSOutput {
+  zFSOutputCpy.zFSOutput_color = vec4<f32>(1.0);
+  return zFSOutputCpy;
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots depth range correction: minimal vertex/fragment (webgpu): webgpu-minimal-vs 1`] = `
+"struct zVSInput {
+  @location(0) zVSInput_pos: vec3<f32>
+};
+struct zVSOutput {
+  @builtin(position) zPosition: vec4<f32>
+};
+var<private> zVSOutputCpy: zVSOutput;
+@vertex fn main(zVertexInput: zVSInput) -> zVSOutput {
+  zVSOutputCpy.zPosition = vec4<f32>(zVertexInput.zVSInput_pos,1.0);
+  zVSOutputCpy.zPosition.z = (zVSOutputCpy.zPosition.z + zVSOutputCpy.zPosition.w) * 0.5;
+  return zVSOutputCpy;
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots emulateDepthClamp vertex/fragment (webgl2): webgl2-depthclamp-fs 1`] = `
+"#version 300 es
+precision highp float;
+precision highp int;
+in float zVSOutput_clamppedDepth;
+layout(location = 0) out vec4 zFSOutput_color;
+void main() {
+  gl_FragDepth = clamp(zVSOutput_clamppedDepth,0.0,1.0);
+  zFSOutput_color = vec4(1.0);
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots emulateDepthClamp vertex/fragment (webgl2): webgl2-depthclamp-vs 1`] = `
+"#version 300 es
+precision highp float;
+precision highp int;
+#define zVSInput_pos a_position
+in vec3 zVSInput_pos;
+out float zVSOutput_clamppedDepth;
+void main() {
+  gl_Position = vec4(zVSInput_pos,1.0);
+  zVSOutput_clamppedDepth = ((gl_Position.z / gl_Position.w) + 1.0) / 2.0;
+  gl_Position.z = 0.0;
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots emulateDepthClamp vertex/fragment (webgpu): webgpu-depthclamp-fs 1`] = `
+"struct zFSInput {
+  @location(0) zVSOutput_clamppedDepth: f32
+};
+struct zFSOutput {
+  @builtin(frag_depth) zFragDepth: f32,
+  @location(0) zFSOutput_color: vec4<f32>
+};
+var<private> zFSOutputCpy: zFSOutput;
+@fragment fn main(zVertexOutput: zFSInput) -> zFSOutput {
+  zFSOutputCpy.zFragDepth = clamp(zVertexOutput.zVSOutput_clamppedDepth,0.0,1.0);
+  zFSOutputCpy.zFSOutput_color = vec4<f32>(1.0);
+  return zFSOutputCpy;
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots emulateDepthClamp vertex/fragment (webgpu): webgpu-depthclamp-vs 1`] = `
+"struct zVSInput {
+  @location(0) zVSInput_pos: vec3<f32>
+};
+struct zVSOutput {
+  @builtin(position) zPosition: vec4<f32>,
+  @location(0) zVSOutput_clamppedDepth: f32
+};
+var<private> zVSOutputCpy: zVSOutput;
+@vertex fn main(zVertexInput: zVSInput) -> zVSOutput {
+  zVSOutputCpy.zPosition = vec4<f32>(zVertexInput.zVSInput_pos,1.0);
+  zVSOutputCpy.zPosition.z = (zVSOutputCpy.zPosition.z + zVSOutputCpy.zPosition.w) * 0.5;
+  zVSOutputCpy.zVSOutput_clamppedDepth = zVSOutputCpy.zPosition.z / zVSOutputCpy.zPosition.w;
+  zVSOutputCpy.zPosition.z = 0.0;
+  return zVSOutputCpy;
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots fullscreen quad at far plane (z = 1) (webgl2): webgl2-fullscreen-vs 1`] = `
+"#version 300 es
+precision highp float;
+precision highp int;
+#define zVSInput_pos a_position
+in vec2 zVSInput_pos;
+void main() {
+  gl_Position = vec4(zVSInput_pos,1.0,1.0);
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots fullscreen quad at far plane (z = 1) (webgpu): webgpu-fullscreen-vs 1`] = `
+"struct zVSInput {
+  @location(0) zVSInput_pos: vec2<f32>
+};
+struct zVSOutput {
+  @builtin(position) zPosition: vec4<f32>
+};
+var<private> zVSOutputCpy: zVSOutput;
+@vertex fn main(zVertexInput: zVSInput) -> zVSOutput {
+  zVSOutputCpy.zPosition = vec4<f32>(zVertexInput.zVSInput_pos,1.0,1.0);
+  zVSOutputCpy.zPosition.z = (zVSOutputCpy.zPosition.z + zVSOutputCpy.zPosition.w) * 0.5;
+  return zVSOutputCpy;
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots sky-style far plane push (z = w) (webgl2): webgl2-sky-vs 1`] = `
+"#version 300 es
+precision highp float;
+precision highp int;
+#define zVSInput_pos a_position
+in vec3 zVSInput_pos;
+void main() {
+  gl_Position = vec4(zVSInput_pos,1.0);
+  gl_Position.z = gl_Position.w;
+}
+"
+`;
+
+exports[`depth convention status-quo shader snapshots sky-style far plane push (z = w) (webgpu): webgpu-sky-vs 1`] = `
+"struct zVSInput {
+  @location(0) zVSInput_pos: vec3<f32>
+};
+struct zVSOutput {
+  @builtin(position) zPosition: vec4<f32>
+};
+var<private> zVSOutputCpy: zVSOutput;
+@vertex fn main(zVertexInput: zVSInput) -> zVSOutput {
+  zVSOutputCpy.zPosition = vec4<f32>(zVertexInput.zVSInput_pos,1.0);
+  zVSOutputCpy.zPosition.z = zVSOutputCpy.zPosition.w;
+  zVSOutputCpy.zPosition.z = (zVSOutputCpy.zPosition.z + zVSOutputCpy.zPosition.w) * 0.5;
+  return zVSOutputCpy;
+}
+"
+`;
