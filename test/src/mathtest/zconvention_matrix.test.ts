@@ -5,14 +5,7 @@
  * `standardDepth + reverseDepth === 1` for the same eye-space position.
  */
 
-import {
-  REVERSE_Z,
-  DEPTH_NEAREST,
-  DEPTH_FARTHEST,
-  Matrix4x4,
-  Vector4,
-  Plane
-} from '@zephyr3d/base';
+import { REVERSE_Z, DEPTH_NEAREST, DEPTH_FARTHEST, Matrix4x4, Vector4, Plane } from '@zephyr3d/base';
 
 /** Device depth produced by the engine's canonical clip space for eye z. */
 function deviceDepth(proj: Matrix4x4, eyeZ: number): number {

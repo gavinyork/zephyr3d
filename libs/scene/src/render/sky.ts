@@ -17,7 +17,15 @@ import {
 } from '../shaders';
 import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Disposable, DRef, objectKeys, Vector3 } from '@zephyr3d/base';
-import { CubeFace, DEPTH_COMPARE_DEFAULT, DEPTH_COMPARE_FARTHER, DEPTH_FARTHEST, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
+import {
+  CubeFace,
+  DEPTH_COMPARE_DEFAULT,
+  DEPTH_COMPARE_FARTHER,
+  DEPTH_FARTHEST,
+  Matrix4x4,
+  Vector2,
+  Vector4
+} from '@zephyr3d/base';
 import { Primitive } from './primitive';
 import { BoxShape } from '../shapes';
 import type { Camera } from '../camera/camera';
@@ -1384,7 +1392,11 @@ export class SkyRenderer extends Disposable {
     }
     if (!SkyRenderer._renderStatesSky) {
       SkyRenderer._renderStatesSky = device.createRenderStateSet();
-      SkyRenderer._renderStatesSky.useDepthState().enableTest(true).enableWrite(false).setCompareFunc(DEPTH_COMPARE_DEFAULT);
+      SkyRenderer._renderStatesSky
+        .useDepthState()
+        .enableTest(true)
+        .enableWrite(false)
+        .setCompareFunc(DEPTH_COMPARE_DEFAULT);
       SkyRenderer._renderStatesSky.useRasterizerState().setCullMode('none');
     }
     if (!SkyRenderer._renderStatesSkyNoDepthTest) {

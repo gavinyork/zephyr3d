@@ -9,7 +9,13 @@ import type {
 import { ShadowImpl } from './shadow_impl';
 import type { BlitType } from '../blitter';
 import { Blitter } from '../blitter';
-import { applyShadowDepthBias, computeShadowMapDepth, filterShadowVSM, ndcToShadowCoord, shadowCoordDepthInRange } from '../shaders/shadow';
+import {
+  applyShadowDepthBias,
+  computeShadowMapDepth,
+  filterShadowVSM,
+  ndcToShadowCoord,
+  shadowCoordDepthInRange
+} from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
 import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encode2HalfToRGBA } from '../shaders/misc';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
@@ -496,7 +502,12 @@ export class VSM extends ShadowImpl {
               false
             );
           }
-          this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.shadowBias, shadowMapParams.lightType !== LIGHT_TYPE_SPOT);
+          this.shadowCoord.z = applyShadowDepthBias(
+            this,
+            this.shadowCoord.z,
+            this.shadowBias,
+            shadowMapParams.lightType !== LIGHT_TYPE_SPOT
+          );
           this.shadow = filterShadowVSM(
             this,
             shadowMapParams.lightType,

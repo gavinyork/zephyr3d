@@ -884,9 +884,7 @@ function chebyshevUpperBound(
     // than the mean occluder depth; variance and squared difference are
     // invariant under the reverse-Z d -> 1-d mirror, only the side test
     // flips.
-    this.$l.test = flip
-      ? pb.step(this.moments.x, this.distance)
-      : pb.step(this.distance, this.moments.x);
+    this.$l.test = flip ? pb.step(this.moments.x, this.distance) : pb.step(this.distance, this.moments.x);
     this.$if(pb.notEqual(this.test, 1), function () {
       this.$l.d = pb.sub(this.distance, this.moments.x);
       this.$l.variance = pb.max(pb.sub(this.moments.y, pb.mul(this.moments.x, this.moments.x)), 0.000002);

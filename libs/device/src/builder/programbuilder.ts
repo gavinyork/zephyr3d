@@ -3624,10 +3624,7 @@ export class PBGlobalScope extends PBScope {
               // Canonical clip space is zero-to-one: z/w of the uncorrected
               // position is exactly the device depth on every backend.
               if (pb.emulateDepthClamp) {
-                this.$outputs.clamppedDepth = pb.div(
-                  this.$builtins.position.z,
-                  this.$builtins.position.w
-                );
+                this.$outputs.clamppedDepth = pb.div(this.$builtins.position.z, this.$builtins.position.w);
               }
               if (pb.clipSpaceCorrection === 'zo2gl') {
                 this.$builtins.position.z = pb.sub(
@@ -3648,10 +3645,7 @@ export class PBGlobalScope extends PBScope {
               if (pb.emulateDepthClamp) {
                 //z = gl_Position.z / gl_Position.w;
                 //z = (gl_DepthRange.diff * z + gl_DepthRange.near + gl_DepthRange.far) * 0.5;
-                this.$outputs.clamppedDepth = pb.div(
-                  this.$builtins.position.z,
-                  this.$builtins.position.w
-                );
+                this.$outputs.clamppedDepth = pb.div(this.$builtins.position.z, this.$builtins.position.w);
                 this.$builtins.position.z = 0;
               }
             }
@@ -3673,10 +3667,7 @@ export class PBGlobalScope extends PBScope {
             // Canonical clip space is zero-to-one: z/w of the uncorrected
             // position is exactly the device depth on every backend.
             if (pb.emulateDepthClamp) {
-              this.$outputs.clamppedDepth = pb.div(
-                this.$builtins.position.z,
-                this.$builtins.position.w
-              );
+              this.$outputs.clamppedDepth = pb.div(this.$builtins.position.z, this.$builtins.position.w);
             }
             if (pb.clipSpaceCorrection === 'zo2gl') {
               this.$builtins.position.z = pb.sub(

@@ -1,5 +1,10 @@
 import type { Nullable } from '@zephyr3d/base';
-import { /*nextPowerOf2, */ DEPTH_CLEAR_VALUE, DEPTH_COMPARE_DEFAULT, REVERSE_Z, Vector4 } from '@zephyr3d/base';
+import {
+  /*nextPowerOf2, */ DEPTH_CLEAR_VALUE,
+  DEPTH_COMPARE_DEFAULT,
+  REVERSE_Z,
+  Vector4
+} from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BindGroup,

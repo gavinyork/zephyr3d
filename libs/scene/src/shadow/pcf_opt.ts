@@ -1,7 +1,14 @@
 import type { PBInsideFunctionScope, PBShaderExp, TextureFormat, TextureSampler } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
-import { applyShadowDepthBias, computeShadowMapDepth, computeReceiverPlaneDepthBias, filterShadowPCF, ndcToShadowCoord, shadowCoordDepthInRange } from '../shaders/shadow';
+import {
+  applyShadowDepthBias,
+  computeShadowMapDepth,
+  computeReceiverPlaneDepthBias,
+  filterShadowPCF,
+  ndcToShadowCoord,
+  shadowCoordDepthInRange
+} from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
 import { LIGHT_TYPE_POINT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
@@ -296,7 +303,9 @@ export class PCFOPT extends ShadowImpl {
           if (!floatDepthTexture) {
             this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
           }
-          this.$return(REVERSE_Z ? pb.step(this.shadowTex.x, this.distance) : pb.step(this.distance, this.shadowTex.x));
+          this.$return(
+            REVERSE_Z ? pb.step(this.shadowTex.x, this.distance) : pb.step(this.distance, this.shadowTex.x)
+          );
         }
       }
     );

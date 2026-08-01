@@ -706,9 +706,7 @@ export function screenSpaceRayTracing_HiZ(
       this.compareTolerance = pb.max(
         pb.abs(this.rayStepTS.z),
         pb.mul(
-          REVERSE_Z
-            ? pb.sub(this.rayStartTS.z, this.depthTSz)
-            : pb.sub(this.depthTSz, this.rayStartTS.z),
+          REVERSE_Z ? pb.sub(this.rayStartTS.z, this.depthTSz) : pb.sub(this.depthTSz, this.rayStartTS.z),
           this.slopeCompareToleranceScale
         )
       );

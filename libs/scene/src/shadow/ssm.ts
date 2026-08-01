@@ -3,7 +3,12 @@ import { ShadowImpl } from './shadow_impl';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
-import { applyShadowDepthBias, computeShadowMapDepth, ndcToShadowCoord3, shadowCoordDepthInRange } from '../shaders/shadow';
+import {
+  applyShadowDepthBias,
+  computeShadowMapDepth,
+  ndcToShadowCoord3,
+  shadowCoordDepthInRange
+} from '../shaders/shadow';
 import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
 import { getDevice } from '../app/api';
@@ -140,7 +145,9 @@ export class SSM extends ShadowImpl {
             if (!floatDepthTexture) {
               this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
             }
-            this.shadow = REVERSE_Z ? pb.step(this.shadowTex.x, this.shadowCoord.z) : pb.step(this.shadowCoord.z, this.shadowTex.x);
+            this.shadow = REVERSE_Z
+              ? pb.step(this.shadowTex.x, this.shadowCoord.z)
+              : pb.step(this.shadowCoord.z, this.shadowTex.x);
           }
         });
         this.$return(this.shadow);
@@ -254,7 +261,12 @@ export class SSM extends ShadowImpl {
                 false
               );
             }
-            this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.shadowBias, shadowMapParams.lightType !== LIGHT_TYPE_SPOT);
+            this.shadowCoord.z = applyShadowDepthBias(
+              this,
+              this.shadowCoord.z,
+              this.shadowBias,
+              shadowMapParams.lightType !== LIGHT_TYPE_SPOT
+            );
             this.$l.shadowTex = pb.textureSampleLevel(
               ShaderHelper.getShadowMap(this),
               this.shadowCoord.xy,
@@ -263,7 +275,10 @@ export class SSM extends ShadowImpl {
             if (!floatDepthTexture) {
               this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
             }
-            this.shadow = REVERSE_Z && shadowMapParams.lightType !== LIGHT_TYPE_SPOT ? pb.step(this.shadowTex.x, this.shadowCoord.z) : pb.step(this.shadowCoord.z, this.shadowTex.x);
+            this.shadow =
+              REVERSE_Z && shadowMapParams.lightType !== LIGHT_TYPE_SPOT
+                ? pb.step(this.shadowTex.x, this.shadowCoord.z)
+                : pb.step(this.shadowCoord.z, this.shadowTex.x);
           }
         });
         this.$return(this.shadow);

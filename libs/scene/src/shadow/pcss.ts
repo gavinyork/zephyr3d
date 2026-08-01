@@ -3,7 +3,15 @@ import { REVERSE_Z, Vector4 } from '@zephyr3d/base';
 import type { PBInsideFunctionScope, PBShaderExp, TextureFormat } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
-import { applyShadowDepthBias, computeReceiverPlaneDepthBias, computeShadowMapDepth, filterShadowPCSS, isDeviceDepthShadow, ndcToShadowCoord, shadowCoordDepthInRange } from '../shaders/shadow';
+import {
+  applyShadowDepthBias,
+  computeReceiverPlaneDepthBias,
+  computeShadowMapDepth,
+  filterShadowPCSS,
+  isDeviceDepthShadow,
+  ndcToShadowCoord,
+  shadowCoordDepthInRange
+} from '../shaders/shadow';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
@@ -252,7 +260,12 @@ export class PCSS extends ShadowImpl {
             false
           );
         }
-        this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.shadowBias, shadowMapParams.lightType !== LIGHT_TYPE_SPOT);
+        this.shadowCoord.z = applyShadowDepthBias(
+          this,
+          this.shadowCoord.z,
+          this.shadowBias,
+          shadowMapParams.lightType !== LIGHT_TYPE_SPOT
+        );
         this.shadow = filterShadowPCSS(
           this,
           shadowMapParams.lightType,

@@ -2,7 +2,16 @@ import type { ClipmapTerrain, GrassInstanceInfo } from '@zephyr3d/scene';
 import UPNG from 'upng-js';
 import { ClipmapTerrainMaterial, CopyBlitter, fetchSampler, getDevice, getEngine } from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
-import { DEPTH_CLEAR_VALUE, degree2radian, Disposable, DRef, HttpRequest, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
+import {
+  DEPTH_CLEAR_VALUE,
+  degree2radian,
+  Disposable,
+  DRef,
+  HttpRequest,
+  Vector2,
+  Vector4,
+  type Vector3
+} from '@zephyr3d/base';
 import type { MenuItemOptions } from '../../components/menubar';
 import type { ToolBarItem } from '../../components/toolbar';
 import { ImGui } from '@zephyr3d/imgui';

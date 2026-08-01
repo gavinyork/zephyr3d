@@ -1,4 +1,11 @@
-import { DEPTH_COMPARE_FARTHER, DEPTH_FARTHEST, Matrix4x4, Vector2, Vector4, type Nullable } from '@zephyr3d/base';
+import {
+  DEPTH_COMPARE_FARTHER,
+  DEPTH_FARTHEST,
+  Matrix4x4,
+  Vector2,
+  Vector4,
+  type Nullable
+} from '@zephyr3d/base';
 import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { SSSResolvedSettings } from '../camera';
 import type { DrawContext } from '../render';

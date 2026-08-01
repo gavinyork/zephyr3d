@@ -20,7 +20,6 @@ function loadWithGlobal(value: boolean | undefined): ZConventionModule {
   try {
     let mod: ZConventionModule;
     jest.isolateModules(() => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       mod = require(MODULE_PATH);
     });
     return mod!;

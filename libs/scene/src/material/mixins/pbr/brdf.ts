@@ -136,9 +136,7 @@ export function mixinPBRBRDF<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$l.hf0 = pb.hvec3(this.f0);
           this.$l.hf90 = pb.hvec3(this.f90);
           this.$l.x = pb.clamp(pb.sub(1, pb.half(this.cosTheta)), 0, 1);
-          this.$return(
-            pb.vec3(pb.add(this.hf0, pb.mul(pb.sub(this.hf90, this.hf0), pb.pow(this.x, 5))))
-          );
+          this.$return(pb.vec3(pb.add(this.hf0, pb.mul(pb.sub(this.hf90, this.hf0), pb.pow(this.x, 5)))));
         } else {
           this.$return(
             pb.add(
@@ -181,8 +179,14 @@ export function mixinPBRBRDF<T extends typeof MeshMaterial>(BaseCls: T) {
           this.$l.a = pb.half(this.roughness);
           this.$l.NoV = pb.half(this.NdotV);
           this.$l.NoL = pb.half(this.NdotL);
-          this.$l.ggxV = pb.mul(this.NoL, pb.sqrt(pb.add(pb.mul(this.NoV, this.NoV, pb.sub(1, this.a)), this.a)));
-          this.$l.ggxL = pb.mul(this.NoV, pb.sqrt(pb.add(pb.mul(this.NoL, this.NoL, pb.sub(1, this.a)), this.a)));
+          this.$l.ggxV = pb.mul(
+            this.NoL,
+            pb.sqrt(pb.add(pb.mul(this.NoV, this.NoV, pb.sub(1, this.a)), this.a))
+          );
+          this.$l.ggxL = pb.mul(
+            this.NoV,
+            pb.sqrt(pb.add(pb.mul(this.NoL, this.NoL, pb.sub(1, this.a)), this.a))
+          );
           // 1e-5 is below the smallest normal f16 (~6.1e-5) and would flush to
           // zero; 1e-4 keeps 0.5/ggx within the f16 range (<= 5000)
           this.$l.ggx = pb.add(this.ggxV, this.ggxL, pb.half(1e-4));

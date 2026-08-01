@@ -91,9 +91,7 @@ describe('depth convention status-quo shader snapshots', () => {
           }
         });
         expect(ret).not.toBeNull();
-        expect(ret![0]).toMatchSnapshot(
-          `${deviceType}-zo_${zeroToOne}-clamp_${emulateDepthClamp}-vs`
-        );
+        expect(ret![0]).toMatchSnapshot(`${deviceType}-zo_${zeroToOne}-clamp_${emulateDepthClamp}-vs`);
       }
     }
   );

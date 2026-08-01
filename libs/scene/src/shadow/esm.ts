@@ -3,7 +3,13 @@ import type { FrameBuffer, TextureFormat, PBShaderExp, PBInsideFunctionScope } f
 import { ShadowImpl } from './shadow_impl';
 import type { BlitType } from '../blitter';
 import { GaussianBlurBlitter } from '../blitter';
-import { computeShadowMapDepth, filterShadowESM, isDeviceDepthShadow, ndcToShadowCoord, shadowCoordDepthInRange } from '../shaders/shadow';
+import {
+  computeShadowMapDepth,
+  filterShadowESM,
+  isDeviceDepthShadow,
+  ndcToShadowCoord,
+  shadowCoordDepthInRange
+} from '../shaders/shadow';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { LIGHT_TYPE_POINT } from '../values';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';

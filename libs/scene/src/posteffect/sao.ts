@@ -245,10 +245,18 @@ export class SAO extends AbstractPostEffect {
     if (this._supported) {
       if (!SAO._renderState) {
         SAO._renderState = device.createRenderStateSet();
-        SAO._renderState.useDepthState().enableTest(true).enableWrite(false).setCompareFunc(DEPTH_COMPARE_FARTHER);
+        SAO._renderState
+          .useDepthState()
+          .enableTest(true)
+          .enableWrite(false)
+          .setCompareFunc(DEPTH_COMPARE_FARTHER);
         SAO._renderState.useRasterizerState().setCullMode('none');
         SAO._renderStateBlend = device.createRenderStateSet();
-        SAO._renderStateBlend.useDepthState().enableTest(true).enableWrite(false).setCompareFunc(DEPTH_COMPARE_FARTHER);
+        SAO._renderStateBlend
+          .useDepthState()
+          .enableTest(true)
+          .enableWrite(false)
+          .setCompareFunc(DEPTH_COMPARE_FARTHER);
         SAO._renderStateBlend.useRasterizerState().setCullMode('none');
         SAO._renderStateBlend
           .useBlendingState()
