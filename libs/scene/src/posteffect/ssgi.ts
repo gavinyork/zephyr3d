@@ -808,13 +808,14 @@ export class SSGI extends AbstractPostEffect {
         this.$outputs.outAO = pb.vec4();
         pb.func('SSGI_getPosition', [pb.vec2('uv')], function () {
           this.$l.linearDepth = ShaderHelper.sampleLinearDepth(this, this.depthTex, this.uv, 0);
-          this.$l.nonLinearDepth = pb.div(
-            pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
-            pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
+          this.$l.nonLinearDepth = ShaderHelper.linearNormalizedToNonLinearDepth(
+            this,
+            this.linearDepth,
+            this.cameraNearFar
           );
           this.$l.clipPos = pb.vec4(
             pb.sub(pb.mul(this.uv, 2), pb.vec2(1)),
-            pb.sub(pb.mul(pb.clamp(this.nonLinearDepth, 0, 1), 2), 1),
+            ShaderHelper.deviceDepthToClipZ(this, pb.clamp(this.nonLinearDepth, 0, 1)),
             1
           );
           this.$l.viewPos = pb.mul(this.invProjMatrix, this.clipPos);

@@ -13,6 +13,7 @@ import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../s
 import type { Nullable } from '@zephyr3d/base';
 import { DEPTH_COMPARE_FARTHER, DEPTH_FARTHEST, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
 import { BilateralBlurBlitter } from '../blitter/bilateralblur';
+import { ShaderHelper } from '../material/shader/helper';
 import type { BlitType } from '../blitter';
 import type { DrawContext } from '../render';
 import { fetchSampler } from '../utility/misc';
@@ -297,13 +298,14 @@ export class SAO extends AbstractPostEffect {
               } else {
                 this.$l.linearDepth = this.depthValue.r;
               }
-              this.$l.nonLinearDepth = pb.div(
-                pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
-                pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
+              this.$l.nonLinearDepth = ShaderHelper.linearNormalizedToNonLinearDepth(
+                this,
+                this.linearDepth,
+                this.cameraNearFar
               );
               this.$l.clipSpacePos = pb.vec4(
                 pb.sub(pb.mul(this.uv, 2), pb.vec2(1)),
-                pb.sub(pb.mul(this.nonLinearDepth, 2), 1),
+                ShaderHelper.deviceDepthToClipZ(this, pb.clamp(this.nonLinearDepth, 0, 1)),
                 1
               );
               // this.$l.clipSpacePos = pb.vec4(this.uv, this.nonLinearDepth, 1);

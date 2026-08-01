@@ -1,4 +1,12 @@
-import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import {
+  DEPTH_FARTHEST,
+  DEPTH_REDUCE_CLOSER,
+  DEPTH_REDUCE_FARTHER,
+  REVERSE_Z,
+  Vector2,
+  Vector3,
+  Vector4
+} from '@zephyr3d/base';
 import type { Nullable } from '@zephyr3d/base';
 import type { DrawContext } from '../../render/drawable';
 import {
@@ -1728,6 +1736,12 @@ export class ShaderHelper {
   ): PBShaderExp {
     const pb = scope.$builder;
     nearFar = nearFar ?? this.getCameraParams(scope);
+    if (REVERSE_Z) {
+      return pb.div(
+        pb.sub(pb.div(pb.mul(nearFar.x, nearFar.y), depth), nearFar.x),
+        pb.sub(nearFar.y, nearFar.x)
+      );
+    }
     return pb.div(
       pb.sub(nearFar.y, pb.div(pb.mul(nearFar.x, nearFar.y), depth)),
       pb.sub(nearFar.y, nearFar.x)
@@ -1748,6 +1762,9 @@ export class ShaderHelper {
   ): PBShaderExp {
     const pb = scope.$builder;
     nearFar = nearFar ?? this.getCameraParams(scope);
+    if (REVERSE_Z) {
+      return pb.div(pb.mul(nearFar.x, nearFar.y), pb.mix(nearFar.x, nearFar.y, depth));
+    }
     return pb.div(pb.mul(nearFar.x, nearFar.y), pb.mix(nearFar.y, nearFar.x, depth));
   }
   /**
@@ -1765,7 +1782,93 @@ export class ShaderHelper {
   ): PBShaderExp {
     const pb = scope.$builder;
     nearFar = nearFar ?? this.getCameraParams(scope);
+    if (REVERSE_Z) {
+      return pb.div(nearFar.x, pb.mix(nearFar.x, nearFar.y, depth));
+    }
     return pb.div(nearFar.x, pb.mix(nearFar.y, nearFar.x, depth));
+  }
+  /**
+   * Converts normalized linear depth back to device non-linear depth.
+   *
+   * @remarks
+   * The normalized linear depth convention (range [near/far, 1] with 1 at
+   * the far plane, as produced by {@link ShaderHelper.nonLinearDepthToLinearNormalized})
+   * is independent of the engine depth convention; only the mapping to
+   * device depth flips under reverse-Z.
+   *
+   * @param scope - Current shader scope
+   * @param depth - The normalized linear depth
+   * @param nearFar - A vector that contains the near clip plane in x component and the far clip plane in y component
+   * @returns The device non-linear depth
+   */
+  static linearNormalizedToNonLinearDepth(
+    scope: PBInsideFunctionScope,
+    depth: PBShaderExp,
+    nearFar?: PBShaderExp
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    nearFar = nearFar ?? this.getCameraParams(scope);
+    if (REVERSE_Z) {
+      return pb.div(pb.sub(pb.div(nearFar.x, depth), nearFar.x), pb.sub(nearFar.y, nearFar.x));
+    }
+    return pb.div(pb.sub(pb.div(nearFar.x, depth), nearFar.y), pb.sub(nearFar.x, nearFar.y));
+  }
+  /**
+   * Maps a device depth value to the canonical clip-space z coordinate
+   * (GL [-1,1] under standard-Z, zero-to-one under reverse-Z), suitable for
+   * unprojection with the engine's inverse projection matrices.
+   *
+   * @param scope - Current shader scope
+   * @param depth - The device depth value
+   * @returns The canonical clip-space z
+   */
+  static deviceDepthToClipZ(scope: PBInsideFunctionScope, depth: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    return REVERSE_Z ? depth : pb.sub(pb.mul(depth, 2), 1);
+  }
+  /**
+   * Clip-space z that places a vertex exactly on the far plane (sky domes,
+   * background geometry).
+   *
+   * @param scope - Current shader scope
+   * @param w - The clip-space w coordinate of the vertex
+   * @returns The clip-space z value for the far plane
+   */
+  static farthestClipZ(scope: PBInsideFunctionScope, w: PBShaderExp): PBShaderExp | number {
+    return REVERSE_Z ? 0 : w;
+  }
+  /**
+   * Tests whether a device depth value equals the cleared (farthest) depth,
+   * i.e. no geometry was rendered at this position.
+   *
+   * @param scope - Current shader scope
+   * @param depth - The device depth value
+   * @returns Boolean expression, true for background pixels
+   */
+  static isFarthestDepth(scope: PBInsideFunctionScope, depth: PBShaderExp): PBShaderExp {
+    return scope.$builder.equal(depth, DEPTH_FARTHEST);
+  }
+  /**
+   * Selects the closer of two device depth values.
+   *
+   * @param scope - Current shader scope
+   * @param a - First device depth value
+   * @param b - Second device depth value
+   * @returns The value closer to the camera
+   */
+  static closerDepth(scope: PBInsideFunctionScope, a: PBShaderExp, b: PBShaderExp): PBShaderExp {
+    return scope.$builder[DEPTH_REDUCE_CLOSER](a, b);
+  }
+  /**
+   * Selects the farther of two device depth values.
+   *
+   * @param scope - Current shader scope
+   * @param a - First device depth value
+   * @param b - Second device depth value
+   * @returns The value farther from the camera
+   */
+  static fartherDepth(scope: PBInsideFunctionScope, a: PBShaderExp, b: PBShaderExp): PBShaderExp {
+    return scope.$builder[DEPTH_REDUCE_FARTHER](a, b);
   }
   /**
    * Sample linear depth from linear depth texture
@@ -1799,13 +1902,14 @@ export class ShaderHelper {
       [pb.vec2('uv'), pb.vec2('cameraNearFar'), pb.mat4('mat')],
       function () {
         this.$l.linearDepth = that.sampleLinearDepth(this, depthTex, this.uv, 0);
-        this.$l.nonLinearDepth = pb.div(
-          pb.sub(pb.div(this.cameraNearFar.x, this.linearDepth), this.cameraNearFar.y),
-          pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
+        this.$l.nonLinearDepth = that.linearNormalizedToNonLinearDepth(
+          this,
+          this.linearDepth,
+          this.cameraNearFar
         );
         this.$l.clipSpacePos = pb.vec4(
           pb.sub(pb.mul(this.uv, 2), pb.vec2(1)),
-          pb.sub(pb.mul(pb.clamp(this.nonLinearDepth, 0, 1), 2), 1),
+          that.deviceDepthToClipZ(this, pb.clamp(this.nonLinearDepth, 0, 1)),
           1
         );
         this.$l.wPos = pb.mul(this.mat, this.clipSpacePos);

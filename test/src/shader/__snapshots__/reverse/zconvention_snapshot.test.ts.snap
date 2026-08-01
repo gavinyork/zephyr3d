@@ -11,9 +11,9 @@ layout(std140) uniform ch_block_name_zUBF_0_0 { zStruct0 zUBF_0_0; };
 layout(location = 0) out vec4 zFSOutput_color;
 void main() {
   const float d = 0.5;
-  float lin = (zUBF_0_0.nearFar.x * zUBF_0_0.nearFar.y) / mix(zUBF_0_0.nearFar.y,zUBF_0_0.nearFar.x,d);
-  float nonlin = (zUBF_0_0.nearFar.y - ((zUBF_0_0.nearFar.x * zUBF_0_0.nearFar.y) / lin)) / (zUBF_0_0.nearFar.y - zUBF_0_0.nearFar.x);
-  float norm = zUBF_0_0.nearFar.x / mix(zUBF_0_0.nearFar.y,zUBF_0_0.nearFar.x,d);
+  float lin = (zUBF_0_0.nearFar.x * zUBF_0_0.nearFar.y) / mix(zUBF_0_0.nearFar.x,zUBF_0_0.nearFar.y,d);
+  float nonlin = (((zUBF_0_0.nearFar.x * zUBF_0_0.nearFar.y) / lin) - zUBF_0_0.nearFar.x) / (zUBF_0_0.nearFar.y - zUBF_0_0.nearFar.x);
+  float norm = zUBF_0_0.nearFar.x / mix(zUBF_0_0.nearFar.x,zUBF_0_0.nearFar.y,d);
   zFSOutput_color = vec4(lin,nonlin,norm,1.0);
 }
 "
@@ -30,9 +30,9 @@ struct zStruct0 {
 var<private> zFSOutputCpy: zFSOutput;
 @fragment fn main() -> zFSOutput {
   let d: f32 = 0.5;
-  let lin: f32 = (zUBF_0_0.nearFar.x * zUBF_0_0.nearFar.y) / mix(zUBF_0_0.nearFar.y,zUBF_0_0.nearFar.x,d);
-  let nonlin: f32 = (zUBF_0_0.nearFar.y - ((zUBF_0_0.nearFar.x * zUBF_0_0.nearFar.y) / lin)) / (zUBF_0_0.nearFar.y - zUBF_0_0.nearFar.x);
-  let norm: f32 = zUBF_0_0.nearFar.x / mix(zUBF_0_0.nearFar.y,zUBF_0_0.nearFar.x,d);
+  let lin: f32 = (zUBF_0_0.nearFar.x * zUBF_0_0.nearFar.y) / mix(zUBF_0_0.nearFar.x,zUBF_0_0.nearFar.y,d);
+  let nonlin: f32 = (((zUBF_0_0.nearFar.x * zUBF_0_0.nearFar.y) / lin) - zUBF_0_0.nearFar.x) / (zUBF_0_0.nearFar.y - zUBF_0_0.nearFar.x);
+  let norm: f32 = zUBF_0_0.nearFar.x / mix(zUBF_0_0.nearFar.x,zUBF_0_0.nearFar.y,d);
   zFSOutputCpy.zFSOutput_color = vec4<f32>(lin,nonlin,norm,1.0);
   return zFSOutputCpy;
 }
@@ -52,8 +52,8 @@ layout(std140) uniform ch_block_name_zUBF_0_0 { zStruct0 zUBF_0_0; };
 layout(location = 0) out vec4 zFSOutput_color;
 vec4 zSamplePositionFromDepth(vec2 uv,vec2 cameraNearFar,mat4 mat) {
   float linearDepth = textureLod(depthTex,uv,0.0).r;
-  float nonLinearDepth = ((cameraNearFar.x / linearDepth) - cameraNearFar.y) / (cameraNearFar.x - cameraNearFar.y);
-  vec4 clipSpacePos = vec4((uv * 2.0) - vec2(1.0),(clamp(nonLinearDepth,0.0,1.0) * 2.0) - 1.0,1.0);
+  float nonLinearDepth = ((cameraNearFar.x / linearDepth) - cameraNearFar.x) / (cameraNearFar.y - cameraNearFar.x);
+  vec4 clipSpacePos = vec4((uv * 2.0) - vec2(1.0),clamp(nonLinearDepth,0.0,1.0),1.0);
   vec4 wPos = mat * clipSpacePos;
   return vec4(wPos.xyz / wPos.w,linearDepth);
 }
@@ -78,8 +78,8 @@ struct zStruct0 {
 var<private> zFSOutputCpy: zFSOutput;
 fn zSamplePositionFromDepth(uv: vec2<f32>,cameraNearFar: vec2<f32>,mat: mat4x4<f32>) -> vec4<f32> {
   let linearDepth: f32 = textureSampleLevel(depthTex,ch_auto_sampler_depthTex,uv,0.0).r;
-  let nonLinearDepth: f32 = ((cameraNearFar.x / linearDepth) - cameraNearFar.y) / (cameraNearFar.x - cameraNearFar.y);
-  let clipSpacePos: vec4<f32> = vec4<f32>((uv * 2.0) - vec2<f32>(1.0),(clamp(nonLinearDepth,0.0,1.0) * 2.0) - 1.0,1.0);
+  let nonLinearDepth: f32 = ((cameraNearFar.x / linearDepth) - cameraNearFar.x) / (cameraNearFar.y - cameraNearFar.x);
+  let clipSpacePos: vec4<f32> = vec4<f32>((uv * 2.0) - vec2<f32>(1.0),clamp(nonLinearDepth,0.0,1.0),1.0);
   let wPos: vec4<f32> = mat * clipSpacePos;
   return vec4<f32>(wPos.xyz / wPos.w,linearDepth);
 }

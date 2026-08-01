@@ -1049,16 +1049,14 @@ export class SSS extends AbstractPostEffect {
         );
         pb.func('reconstructViewPos', [pb.vec2('uv'), pb.float('linearDepth')], function () {
           this.$l.viewDepth = pb.max(pb.mul(this.linearDepth, this.cameraNearFar.y), 1e-5);
-          this.$l.nonLinearDepth = pb.div(
-            pb.sub(
-              pb.div(pb.mul(this.cameraNearFar.x, this.cameraNearFar.y), this.viewDepth),
-              this.cameraNearFar.y
-            ),
-            pb.sub(this.cameraNearFar.x, this.cameraNearFar.y)
+          this.$l.nonLinearDepth = ShaderHelper.linearDepthToNonLinear(
+            this,
+            this.viewDepth,
+            this.cameraNearFar
           );
           this.$l.clipPos = pb.vec4(
             pb.sub(pb.mul(this.uv, 2), pb.vec2(1)),
-            pb.sub(pb.mul(pb.clamp(this.nonLinearDepth, 0, 1), 2), 1),
+            ShaderHelper.deviceDepthToClipZ(this, pb.clamp(this.nonLinearDepth, 0, 1)),
             1
           );
           this.$l.viewPos = pb.mul(this.invProjMatrix, this.clipPos);

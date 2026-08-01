@@ -1485,15 +1485,17 @@ export class SkyRenderer extends Disposable {
         this.srgbOut = pb.int().uniform(0);
         this.$outputs.outColor = pb.vec4();
         pb.main(function () {
-          this.$l.depthValue = noDepth ? pb.float(1) : pb.textureSample(this.depthTex, this.$inputs.uv).r;
+          this.$l.depthValue = noDepth
+            ? pb.float(DEPTH_FARTHEST)
+            : pb.textureSample(this.depthTex, this.$inputs.uv).r;
           this.$l.clipSpacePos = pb.vec4(
             pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1)),
-            pb.sub(pb.mul(this.depthValue, 2), 1),
+            ShaderHelper.deviceDepthToClipZ(this, this.depthValue),
             1
           );
           this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
           this.$l.worldPos = pb.div(this.$l.hPos, this.$l.hPos.w).xyz;
-          this.$l.isSky = pb.equal(this.$l.depthValue, 1);
+          this.$l.isSky = ShaderHelper.isFarthestDepth(this, this.$l.depthValue);
           this.$l.color = calculateFog(
             this,
             this.withAerialPerspective,
