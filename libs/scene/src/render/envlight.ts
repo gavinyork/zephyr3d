@@ -1,5 +1,5 @@
 import type { Immutable, Nullable } from '@zephyr3d/base';
-import { Disposable, DRef, Matrix4x4, Vector2, Vector3 } from '@zephyr3d/base';
+import { Disposable, DRef, Matrix4x4, REVERSE_Z, Vector2, Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type {
   BindGroup,
@@ -629,11 +629,12 @@ export class EnvShIBL extends EnvironmentLighting {
       this.$l.ndc = pb.sub(pb.mul(this.uv, 2), pb.vec2(1));
       this.$l.nearPlaneRay = pb.mul(
         this[EnvShIBL.UNIFORM_NAME_SSGI_INV_PROJECTION],
-        pb.vec4(this.ndc, -1, 1)
+        pb.vec4(this.ndc, REVERSE_Z ? 1 : -1, 1)
       );
-      // Perspective unprojection of NDC z = -1 lands on the near plane, where
-      // view z is exactly -near; scaling that ray by depth/near walks it out to
-      // the sample without a non-linear depth round trip.
+      // Perspective unprojection of the near-plane NDC depth (GL -1, reverse
+      // ZO 1) lands on the near plane, where view z is exactly -near; scaling
+      // that ray by depth/near walks it out to the sample without a
+      // non-linear depth round trip.
       this.$l.viewPos = pb.mul(
         pb.div(this.nearPlaneRay.xyz, this.nearPlaneRay.w),
         pb.div(this.currentDepth, pb.max(this.params.w, 1e-6))
