@@ -2098,6 +2098,11 @@ function buildEditorLaunchUrl(rawUrl, device) {
   const url = new URL(rawUrl);
   url.searchParams.set('desktop', 'electron');
   url.searchParams.set('device', device);
+  // Run the editor with the reverse-Z depth convention (picked up by the
+  // pre-module bootstrap script in index.html).
+  if (process.env.ZEPHYR_EDITOR_REVERSE_Z || process.argv.includes('--reverse-z')) {
+    url.searchParams.set('reverseZ', '1');
+  }
   if (mcpBridgeInfo?.port) {
     url.searchParams.set('mcp', String(mcpBridgeInfo.port));
   }

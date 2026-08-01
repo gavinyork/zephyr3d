@@ -36,6 +36,11 @@ __ZEPHYR3D_IMPORT_MAP__
   </head>
   <body>
     <canvas id="canvas"></canvas>
+    <script>
+      // Select the engine depth convention before any engine module loads.
+      // Append ?reverseZ to the URL to run the editor with reverse-Z.
+      globalThis.__ZEPHYR3D_REVERSE_Z__ = new URLSearchParams(location.search).has('reverseZ');
+    </script>
     <script src="/vendor/typescript.js"></script>
     <script src="/vendor/draco_decoder.js"></script>
     <script type="module" src="/src/monaco-init.ts"></script>

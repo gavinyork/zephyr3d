@@ -2,7 +2,7 @@ import type { BaseTexture, FrameBuffer, Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
 import { getDevice } from '@zephyr3d/scene';
 import { TextureDrawer } from './texturedrawer';
-import { Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
 
 let frameBuffer: FrameBuffer = null;
 let currentTexture: BaseTexture = null;
@@ -141,7 +141,7 @@ export function renderTextureViewer() {
     }
     getDevice().pushDeviceStates();
     getDevice().setFramebuffer(frameBuffer);
-    getDevice().clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
+    getDevice().clearFrameBuffer(new Vector4(0, 0, 0, 1), DEPTH_CLEAR_VALUE, 0);
     textureDrawer.draw(
       currentTexture,
       textureRepeat,

@@ -2,7 +2,7 @@ import type { ClipmapTerrain, GrassInstanceInfo } from '@zephyr3d/scene';
 import UPNG from 'upng-js';
 import { ClipmapTerrainMaterial, CopyBlitter, fetchSampler, getDevice, getEngine } from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
-import { degree2radian, Disposable, DRef, HttpRequest, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, degree2radian, Disposable, DRef, HttpRequest, Vector2, Vector4, type Vector3 } from '@zephyr3d/base';
 import type { MenuItemOptions } from '../../components/menubar';
 import type { ToolBarItem } from '../../components/toolbar';
 import { ImGui } from '@zephyr3d/imgui';
@@ -699,7 +699,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
       const fb = device.pool.fetchTemporalFramebuffer(false, 0, 0, heightMap, null, false);
       device.pushDeviceStates();
       device.setFramebuffer(fb);
-      device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
+      device.clearFrameBuffer(new Vector4(0, 0, 0, 1), DEPTH_CLEAR_VALUE, 0);
       device.popDeviceStates();
       device.pool.releaseFrameBuffer(fb);
     }

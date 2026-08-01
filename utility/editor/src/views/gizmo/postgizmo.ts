@@ -21,7 +21,7 @@ import {
   createEditAABBGizmo
 } from './gizmo';
 import type { Nullable, Ray } from '@zephyr3d/base';
-import { CubeFace } from '@zephyr3d/base';
+import { CubeFace, DEPTH_COMPARE_DEFAULT, REVERSE_Z } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { AABB, makeObservable } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
@@ -892,7 +892,11 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
 
     const ndcX = (_x / this._camera.viewport![2]) * 2 - 1;
     const ndcY = 1 - (_y / this._camera.viewport![3]) * 2;
-    const worldPos = this._camera.invViewProjectionMatrix.transformPointP(new Vector3(ndcX, ndcY, 0));
+    // NDC depth of the same mid-frustum point in either convention
+    // (GL ndc 0 corresponds to reverse ZO device depth 0.5)
+    const worldPos = this._camera.invViewProjectionMatrix.transformPointP(
+      new Vector3(ndcX, ndcY, REVERSE_Z ? 0.5 : 0)
+    );
 
     if (this._rectInfo.coord === 4) {
       const lt = this.calcSpriteVertexPosition(sprite, 0, 0);
@@ -1326,7 +1330,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   }
   private _createGridRenderStates() {
     const rs = getDevice().createRenderStateSet();
-    rs.useDepthState().enableTest(true).enableWrite(false).setCompareFunc('le');
+    rs.useDepthState().enableTest(true).enableWrite(false).setCompareFunc(DEPTH_COMPARE_DEFAULT);
     return rs;
   }
   private _createBlendRenderStates() {
@@ -1444,7 +1448,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
             this.$outputs.worldPos = this.worldPos;
           }).$else(function () {
             this.$l.vertexId = this.$inputs.pos.x;
-            this.$l.origin = pb.mul(this.invViewProjMatrix, pb.vec4(0, 0, 1, 1));
+            // anchor at the far-plane center (NDC far depth: GL 1, reverse ZO 0)
+            this.$l.origin = pb.mul(this.invViewProjMatrix, pb.vec4(0, 0, REVERSE_Z ? 0 : 1, 1));
             this.$l.forward = pb.vec3(this.viewMatrix[0].z, this.viewMatrix[1].z, this.viewMatrix[2].z);
             this.$l.axis = this.$choice(
               pb.lessThan(pb.abs(this.forward.y), 0.999),
@@ -1720,7 +1725,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
           this.$l.sceneDepth = this.sceneDepthSample.r;
           this.$l.alpha = this.$choice(
-            pb.greaterThan(this.depth, this.sceneDepth),
+            // occluded when the fragment is farther than the scene depth
+            REVERSE_Z
+              ? pb.lessThan(this.depth, this.sceneDepth)
+              : pb.greaterThan(this.depth, this.sceneDepth),
             pb.float(0),
             this.color.a
           );
@@ -1751,7 +1759,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
           this.$l.sceneDepth = this.sceneDepthSample.r;
           this.$l.alpha = this.$choice(
-            pb.greaterThan(this.depth, this.sceneDepth),
+            // occluded when the fragment is farther than the scene depth
+            REVERSE_Z
+              ? pb.lessThan(this.depth, this.sceneDepth)
+              : pb.greaterThan(this.depth, this.sceneDepth),
             pb.float(0.5),
             pb.float(1)
           );
@@ -1803,7 +1814,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
           this.$l.sceneDepth = this.sceneDepthSample.r;
           this.$l.alpha = this.$choice(
-            pb.greaterThan(this.depth, this.sceneDepth),
+            // occluded when the fragment is farther than the scene depth
+            REVERSE_Z
+              ? pb.lessThan(this.depth, this.sceneDepth)
+              : pb.greaterThan(this.depth, this.sceneDepth),
             selectMode ? pb.float(0.3) : pb.float(0.5),
             pb.float(1)
           );
