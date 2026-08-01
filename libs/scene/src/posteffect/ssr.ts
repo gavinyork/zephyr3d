@@ -3,7 +3,12 @@ import type { PostEffectSetupContext } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D, SSR_calcJitter } from '../shaders/ssr';
+import {
+  screenSpaceRayTracing_HiZ,
+  screenSpaceRayTracing_Linear2D,
+  SSR_calcJitter,
+  SSR_interleavedGradientNoise
+} from '../shaders/ssr';
 import { temporalResolve } from '../shaders/temporal';
 import type { Nullable } from '@zephyr3d/base';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
@@ -533,6 +538,9 @@ export class SSR extends AbstractPostEffect {
     if (ctx.HiZTexture) {
       bindGroup.setTexture('hizTex', ctx.HiZTexture, nearestSampler);
       bindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
+      // Temporal jitter phase for the UE5-style fixed-step HZB march
+      // (UE View.StateFrameIndexMod8).
+      bindGroup.setValue('ssrFrameIndex', device.frameInfo.frameCounter % 8);
       bindGroup.setValue(
         'targetSize',
         new Vector4(
@@ -1210,6 +1218,7 @@ export class SSR extends AbstractPostEffect {
           // require the optional float32-filterable feature just to bind it.
           this.hizTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           this.depthMipLevels = pb.int().uniform(0);
+          this.ssrFrameIndex = pb.float().uniform(0);
         } else {
           this.ssrStride = pb.float().uniform(0);
         }
@@ -1301,6 +1310,12 @@ export class SSR extends AbstractPostEffect {
               );
               this.$l.hitInfo = pb.vec4(0);
               if (ctx.HiZTexture) {
+                // UE5-style temporal jitter of the fixed-step march; the
+                // temporal resolve pass converges the resulting noise.
+                this.$l.ssrStepOffset = pb.sub(
+                  SSR_interleavedGradientNoise(this, this.$builtins.fragCoord.xy, this.ssrFrameIndex),
+                  0.5
+                );
                 this.hitInfo = screenSpaceRayTracing_HiZ(
                   this,
                   this.viewPos,
@@ -1315,7 +1330,10 @@ export class SSR extends AbstractPostEffect {
                   this.ssrParams.z,
                   this.targetSize,
                   this.hizTex,
-                  this.normalTex
+                  this.normalTex,
+                  undefined,
+                  this.roughness,
+                  this.ssrStepOffset
                 );
               } else {
                 this.hitInfo = screenSpaceRayTracing_Linear2D(

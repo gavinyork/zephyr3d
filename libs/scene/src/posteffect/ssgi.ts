@@ -891,6 +891,16 @@ export class SSGI extends AbstractPostEffect {
               // vec3(occluded, escaped, rawConfidence) - see screenSpaceRayTracing_Linear2D.
               this.$l.giTrace = pb.vec3(0);
               if (useHiZ) {
+                // UE5 SSGI: diffuse rays march with RayRoughness = 1 (fast mip
+                // ramp) and StepOffset = noise - 0.9. A dedicated hash keeps
+                // the jitter decorrelated from the direction sample.
+                this.$l.stepOffset = pb.sub(
+                  this.SSGI_hash22(
+                    pb.add(pb.mul(this.uv, this.targetSize.xy), pb.vec2(pb.mul(this.rayIndex, 23), 11)),
+                    pb.add(this.radianceParams.w, pb.mul(this.rayIndex, 29))
+                  ).x,
+                  0.9
+                );
                 this.$l.hit = screenSpaceRayTracing_HiZ(
                   this,
                   this.rayOrigin,
@@ -906,7 +916,9 @@ export class SSGI extends AbstractPostEffect {
                   this.targetSize,
                   this.hizTex,
                   this.normalTex,
-                  this.giTrace
+                  this.giTrace,
+                  1,
+                  this.stepOffset
                 );
               } else {
                 this.$l.hit = screenSpaceRayTracing_Linear2D(
