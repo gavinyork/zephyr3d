@@ -475,7 +475,6 @@ export class PBRMaterialEditor extends GraphEditor {
           Dialog.messageBox('Error', msg);
           return;
         }
-        await getEngine().resourceManager.reloadBluePrintMaterials();
       }
       if (this._editRevision === saveRevision) {
         this._version = 0;
@@ -935,6 +934,17 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   private handleMaterialPropertyChanged(prop: Nullable<PropertyAccessor>) {
     this.markDirty();
+    const material = this._editMaterial.get();
+    if (
+      material &&
+      prop &&
+      !(material instanceof PBRBluePrintMaterial) &&
+      !(material instanceof SpriteBlueprintMaterial)
+    ) {
+      void getEngine()
+        .resourceManager.syncMaterialPropertyReferences(material, prop)
+        .catch((err) => console.error(`Sync material property failed: ${err}`));
+    }
     if (this.shouldRefreshMaterialInspector(prop)) {
       this.propEditor.refresh();
     }

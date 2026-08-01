@@ -705,11 +705,79 @@ export class ResourceManager {
         ref.dispose();
         refs.delete(ref);
       } else if (material !== source && material.constructor === source.constructor) {
-        material.copyFrom(source as typeof material);
+        const instance = material as Material & {
+          $isInstance?: boolean;
+          coreMaterial?: Material;
+          getInstancedUniforms?: () => Array<{ prop: string }>;
+        };
+        if (instance.$isInstance && instance.getInstancedUniforms) {
+          const coreMaterial = instance.coreMaterial;
+          if (
+            coreMaterial &&
+            coreMaterial !== source &&
+            coreMaterial.constructor === source.constructor
+          ) {
+            coreMaterial.copyFrom(source as typeof coreMaterial);
+          }
+          for (const { prop } of instance.getInstancedUniforms()) {
+            (instance as any)[prop] = (source as any)[prop];
+          }
+        } else {
+          material.copyFrom(source as typeof material);
+        }
       }
     }
     if (refs.size === 0) {
       this._materialsByAssetId.delete(id);
+    }
+  }
+  async syncMaterialPropertyReferences(source: Material, prop: PropertyAccessor) {
+    const id = this.getAssetId(source);
+    const refs = id ? this._materialsByAssetId.get(id) : null;
+    if (!refs || !prop.get || !prop.set) {
+      return;
+    }
+    const sourceValue: RequireOptionals<PropertyValue> = {
+      num: [0, 0, 0, 0],
+      str: [''],
+      bool: [false],
+      object: [null]
+    };
+    (prop as PropertyAccessor<any, 'DUMMY'>).get.call(source, sourceValue);
+    const tasks: Promise<void>[] = [];
+    for (const ref of [...refs]) {
+      const material = ref.get();
+      if (!material || material.disposed) {
+        ref.dispose();
+        refs.delete(ref);
+        continue;
+      }
+      if (material === source || material.constructor !== source.constructor) {
+        continue;
+      }
+      const instance = material as Material & {
+        $isInstance?: boolean;
+        coreMaterial?: Material;
+        getInstancedUniforms?: () => Array<{ name: string }>;
+      };
+      const isInstanceUniform =
+        !!instance.$isInstance &&
+        !!instance.getInstancedUniforms?.().some((uniform) => uniform.name === prop.name);
+      const target = instance.$isInstance && !isInstanceUniform ? instance.coreMaterial : material;
+      if (!target || target === source || target.constructor !== source.constructor) {
+        continue;
+      }
+      const value: RequireOptionals<PropertyValue> = {
+        num: [...sourceValue.num],
+        str: [...sourceValue.str],
+        bool: [...sourceValue.bool],
+        object: [...sourceValue.object]
+      };
+      tasks.push(Promise.resolve((prop as PropertyAccessor<any, 'DUMMY'>).set!.call(target, value)));
+    }
+    await Promise.all(tasks);
+    if (refs.size === 0) {
+      this._materialsByAssetId.delete(id!);
     }
   }
   trackMaterialReference(material: Nullable<Material>, id?: Nullable<string>) {
