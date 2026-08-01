@@ -1,6 +1,7 @@
 import type { Matrix4x4 } from './vector';
 import { Vector3, Vector4 } from './vector';
 import { BoxSide, ClipState } from './types';
+import { REVERSE_Z } from '../zconvention';
 import type { Plane } from './plane';
 import type { Frustum } from './frustum';
 import type { Immutable } from '../utils';
@@ -273,10 +274,20 @@ export class AABB {
       } else if (clipTop && v1.y > v1.w) {
         clip |= AABB.ClipTop;
       }
-      if (clipFar && v1.z < -v1.w) {
-        clip |= AABB.ClipBack;
-      } else if (clipNear && v1.z > v1.w) {
-        clip |= AABB.ClipFront;
+      if (REVERSE_Z) {
+        // Reverse ZO clip volume 0 <= z <= w: beyond-near is z > w,
+        // beyond-far is z < 0 (geometric mirror of the GL branches below).
+        if (clipFar && v1.z > v1.w) {
+          clip |= AABB.ClipBack;
+        } else if (clipNear && v1.z < 0) {
+          clip |= AABB.ClipFront;
+        }
+      } else {
+        if (clipFar && v1.z < -v1.w) {
+          clip |= AABB.ClipBack;
+        } else if (clipNear && v1.z > v1.w) {
+          clip |= AABB.ClipFront;
+        }
       }
       andFlags &= clip;
       orFlags |= clip;
@@ -319,10 +330,20 @@ export class AABB {
       } else if (v1.y > v1.w) {
         clip |= AABB.ClipTop;
       }
-      if (v1.z < -v1.w) {
-        clip |= AABB.ClipBack;
-      } else if (v1.z > v1.w) {
-        clip |= AABB.ClipFront;
+      if (REVERSE_Z) {
+        // Reverse ZO clip volume 0 <= z <= w (geometric mirror of the GL
+        // branches below).
+        if (v1.z > v1.w) {
+          clip |= AABB.ClipBack;
+        } else if (v1.z < 0) {
+          clip |= AABB.ClipFront;
+        }
+      } else {
+        if (v1.z < -v1.w) {
+          clip |= AABB.ClipBack;
+        } else if (v1.z > v1.w) {
+          clip |= AABB.ClipFront;
+        }
       }
       andFlags &= clip;
       orFlags |= clip;

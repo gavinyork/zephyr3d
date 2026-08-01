@@ -1,16 +1,23 @@
 import { Plane } from './plane';
 import { Matrix4x4, Vector3 } from './vector';
 import { BoxSide } from './types';
+import { REVERSE_Z } from '../zconvention';
 import type { Immutable } from '../utils';
 
-const nnn = [-1, -1, -1];
-const nnp = [-1, -1, 1];
-const npn = [-1, 1, -1];
-const npp = [-1, 1, 1];
-const pnn = [1, -1, -1];
-const pnp = [1, -1, 1];
-const ppn = [1, 1, -1];
-const ppp = [1, 1, 1];
+// NDC z of the near/far plane in the active clip space convention:
+// GL [-1,1] under standard-Z, reverse ZO [0,1] (near -> 1) under reverse-Z.
+const NDC_NEAR_Z = REVERSE_Z ? 1 : -1;
+const NDC_FAR_Z = REVERSE_Z ? 0 : 1;
+
+// Corner order matches the Frustum.CORNER_* bit layout: bit0 = near/far.
+const nnn = [-1, -1, NDC_NEAR_Z];
+const nnp = [-1, -1, NDC_FAR_Z];
+const npn = [-1, 1, NDC_NEAR_Z];
+const npp = [-1, 1, NDC_FAR_Z];
+const pnn = [1, -1, NDC_NEAR_Z];
+const pnp = [1, -1, NDC_FAR_Z];
+const ppn = [1, 1, NDC_NEAR_Z];
+const ppp = [1, 1, NDC_FAR_Z];
 
 const ndcVertices = [nnn, nnp, npn, npp, pnn, pnp, ppn, ppp];
 
@@ -138,22 +145,40 @@ export class Frustum {
         transform.m33 - transform.m13
       )
       .inplaceNormalize();
-    this._planes[BoxSide.FRONT]
-      .setEquation(
-        transform.m30 + transform.m20,
-        transform.m31 + transform.m21,
-        transform.m32 + transform.m22,
-        transform.m33 + transform.m23
-      )
-      .inplaceNormalize();
-    this._planes[BoxSide.BACK]
-      .setEquation(
-        transform.m30 - transform.m20,
-        transform.m31 - transform.m21,
-        transform.m32 - transform.m22,
-        transform.m33 - transform.m23
-      )
-      .inplaceNormalize();
+    if (REVERSE_Z) {
+      // Reverse ZO clip space: inside when 0 <= z_clip <= w_clip.
+      // Near plane: z <= w  <=>  row3 - row2 >= 0
+      this._planes[BoxSide.FRONT]
+        .setEquation(
+          transform.m30 - transform.m20,
+          transform.m31 - transform.m21,
+          transform.m32 - transform.m22,
+          transform.m33 - transform.m23
+        )
+        .inplaceNormalize();
+      // Far plane: z >= 0  <=>  row2 >= 0
+      this._planes[BoxSide.BACK]
+        .setEquation(transform.m20, transform.m21, transform.m22, transform.m23)
+        .inplaceNormalize();
+    } else {
+      // GL clip space: inside when -w_clip <= z_clip <= w_clip.
+      this._planes[BoxSide.FRONT]
+        .setEquation(
+          transform.m30 + transform.m20,
+          transform.m31 + transform.m21,
+          transform.m32 + transform.m22,
+          transform.m33 + transform.m23
+        )
+        .inplaceNormalize();
+      this._planes[BoxSide.BACK]
+        .setEquation(
+          transform.m30 - transform.m20,
+          transform.m31 - transform.m21,
+          transform.m32 - transform.m22,
+          transform.m33 - transform.m23
+        )
+        .inplaceNormalize();
+    }
     const invMatrix = Matrix4x4.invert(transform);
     const vertices: Vector3[] = ndcVertices.map((v) => new Vector3(v[0], v[1], v[2]));
     this._corners = this._corners || [];
