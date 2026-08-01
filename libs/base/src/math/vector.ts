@@ -3,6 +3,7 @@
  */
 
 import { toFloat } from './misc';
+import { REVERSE_Z } from '../zconvention';
 import { CubeFace } from './types';
 import type { Plane } from './plane';
 import type { Nullable } from '../utils';
@@ -3828,11 +3829,18 @@ export class Matrix4x4 extends VectorBase {
     result[7] = 0;
     result[8] = 0;
     result[9] = 0;
-    result[10] = 2 / (near - far);
+    if (REVERSE_Z) {
+      // Reverse ZO clip space: z_eye = -near -> 1, z_eye = -far -> 0
+      result[10] = 1 / (far - near);
+      result[14] = far / (far - near);
+    } else {
+      // GL clip space: z_eye = -near -> -1, z_eye = -far -> 1
+      result[10] = 2 / (near - far);
+      result[14] = (near + far) / (near - far);
+    }
     result[11] = 0;
     result[12] = (left + right) / (left - right);
     result[13] = (bottom + top) / (bottom - top);
-    result[14] = (near + far) / (near - far);
     result[15] = 1;
     return result;
   }
@@ -3880,6 +3888,11 @@ export class Matrix4x4 extends VectorBase {
     return this.frustum(-w, w, -h, h, znear, zfar, result);
   }
   static obliqueProjection(projectionMatrix: Matrix4x4, clipPlane: Plane) {
+    if (REVERSE_Z) {
+      // The oblique clipping derivation below hard-codes the GL [-1,1] far
+      // plane; the reverse-Z variant is tracked separately.
+      throw new Error('Matrix4x4.obliqueProjection: not yet supported with reverse-Z');
+    }
     const result = new Matrix4x4(projectionMatrix);
     const q = Matrix4x4.invert(projectionMatrix).transform(
       new Vector4(clipPlane.a > 0 ? 1 : -1, clipPlane.b > 0 ? 1 : -1, 1, 1)
@@ -3892,6 +3905,11 @@ export class Matrix4x4 extends VectorBase {
     return result;
   }
   static obliquePerspective(perspectiveMatrix: Matrix4x4, nearPlane: Vector4) {
+    if (REVERSE_Z) {
+      // Lengyel's derivation hard-codes the GL [-1,1] far plane; the
+      // reverse-Z variant is tracked separately.
+      throw new Error('Matrix4x4.obliquePerspective: not yet supported with reverse-Z');
+    }
     const result = new Matrix4x4(perspectiveMatrix);
     const q = new Vector4(
       ((nearPlane.x > 0 ? 1 : nearPlane.x < 0 ? -1 : 0) + perspectiveMatrix.m02) / perspectiveMatrix.m00,
@@ -3971,11 +3989,18 @@ export class Matrix4x4 extends VectorBase {
     result[7] = 0;
     result[8] = (left + right) / dx;
     result[9] = (top + bottom) / dy;
-    result[10] = (znear + zfar) / dz;
+    if (REVERSE_Z) {
+      // Reverse ZO clip space: z_eye = -znear -> 1, z_eye = -zfar -> 0
+      result[10] = znear / (zfar - znear);
+      result[14] = (znear * zfar) / (zfar - znear);
+    } else {
+      // GL clip space: z_eye = -znear -> -1, z_eye = -zfar -> 1
+      result[10] = (znear + zfar) / dz;
+      result[14] = (2 * znear * zfar) / dz;
+    }
     result[11] = -1;
     result[12] = 0;
     result[13] = 0;
-    result[14] = (2 * znear * zfar) / dz;
     result[15] = 0;
 
     return result;
@@ -5010,6 +5035,13 @@ export class Matrix4x4 extends VectorBase {
    * @returns The near clip plane
    */
   getNearPlane() {
+    if (REVERSE_Z) {
+      if (this.isPerspective()) {
+        return this[14] / (this[10] + 1);
+      } else {
+        return (this[14] - 1) / this[10];
+      }
+    }
     if (this.isPerspective()) {
       return this[14] / (this[10] - 1);
     } else {
@@ -5055,6 +5087,9 @@ export class Matrix4x4 extends VectorBase {
    * @returns The far clip plane
    */
   getFarPlane() {
+    if (REVERSE_Z) {
+      return this[14] / this[10];
+    }
     if (this.isPerspective()) {
       return this[14] / (this[10] + 1);
     } else {
@@ -5171,6 +5206,9 @@ export class Matrix4x4 extends VectorBase {
   setNearFar(znear: number, zfar: number) {
     if (this.isPerspective()) {
       this.perspective(this.getFov(), this.getAspect(), znear, zfar);
+    } else if (REVERSE_Z) {
+      this[10] = 1 / (zfar - znear);
+      this[14] = zfar / (zfar - znear);
     } else {
       this[10] = 2 / (znear - zfar);
       this[14] = (znear + zfar) / (znear - zfar);
