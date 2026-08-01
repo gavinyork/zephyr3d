@@ -5,6 +5,7 @@
  * @packageDocumentation
  */
 export * from './utils';
+export * from './zconvention';
 export * from './diff';
 export * from './event';
 export * from './linkedlist';
