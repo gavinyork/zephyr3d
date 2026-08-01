@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { /*nextPowerOf2, */ DEPTH_CLEAR_VALUE, DEPTH_COMPARE_DEFAULT, Vector4 } from '@zephyr3d/base';
+import { /*nextPowerOf2, */ DEPTH_CLEAR_VALUE, DEPTH_COMPARE_DEFAULT, REVERSE_Z, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BindGroup,
@@ -818,11 +818,13 @@ const HiZModule: RenderModule<FrameGraphContext> = {
         builder.read(preLightTransmissionDepthToken);
       }
       hiZHandle = builder.createTexture({
-        // Single-channel furthest-depth pyramid (max reduction); the UE5-style
-        // tracer no longer needs the closest depth. r16f would not be enough:
-        // standard-Z clusters far depth near 1.0 where half floats only
-        // resolve ~5e-4.
-        format: 'r32f',
+        // Single-channel furthest-depth pyramid; the UE5-style tracer no
+        // longer needs the closest depth. Under standard-Z r16f would not be
+        // enough: far depth clusters near 1.0 where half floats only resolve
+        // ~5e-4. Under reverse-Z far depth clusters near 0.0 where fp16
+        // precision is relative, so the half-width pyramid halves the
+        // bandwidth at no quality cost (matches UE's fp16 furthest HZB).
+        format: REVERSE_Z ? 'r16f' : 'r32f',
         label: 'hiZ',
         sizeMode: 'backbuffer-relative',
         //width: hiZWidth,

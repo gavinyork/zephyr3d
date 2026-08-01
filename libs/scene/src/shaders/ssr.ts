@@ -584,13 +584,12 @@ export function SSR_interleavedGradientNoise(
  *   difference is mirrored (`Diff = SampleDepth - SampleZ`).
  * - UE view space has +z forward; ours has -z forward.
  * - UE's HZB is a half-res pow2 pyramid and starts marching at its mip 1;
- *   ours is full-res at mip0 and marches from START_MIP = 0, because under
- *   standard-Z the coarse furthest-depth blocks quantize into a staircase
- *   that grazing rays periodically self-intersect, showing up as regular
- *   stripes TAA cannot converge. Marching at full resolution removes the
- *   staircase at the same sample count (the mip only affects texture cache
- *   efficiency); rough reflections still climb the pyramid via the
- *   roughness mip ramp.
+ *   ours is full-res at mip0. Under standard-Z the march starts at
+ *   START_MIP = 0, because the coarse furthest-depth blocks quantize into a
+ *   staircase that grazing rays periodically self-intersect, showing up as
+ *   regular stripes TAA cannot converge. Under reverse-Z depth precision is
+ *   nearly uniform, so the march starts at mip 1 like UE; rough reflections
+ *   still climb the pyramid via the roughness mip ramp in both cases.
  *
  * `maxIterations` is the number of linear samples along the ray (UE NumSteps,
  * typically 8..64), no longer the traversal iteration cap of the previous
@@ -718,10 +717,12 @@ export function screenSpaceRayTracing_HiZ(
   // Port of UE5 CastScreenSpaceRay: NumSteps uniform samples in batches of 4,
   // mip level ramped by roughness, tolerance-window hit test, uncertainty
   // tracking and line-segment hit refinement.
-  // 0 instead of UE's StartMipLevel=1: see the convention notes above --
-  // coarse-mip depth staircases cause grazing-angle stripe artifacts under
-  // standard Z.
-  const START_MIP = 0;
+  // Standard-Z keeps 0 instead of UE's StartMipLevel=1: coarse-mip depth
+  // staircases combined with the poor far-depth resolution near 1.0 cause
+  // grazing-angle stripe artifacts. Under reverse-Z depth precision is nearly
+  // uniform along the ray, so the march starts at mip 1 like UE for better
+  // texture cache behavior.
+  const START_MIP = REVERSE_Z ? 1 : 0;
   pb.func(
     'SSR_castScreenSpaceRay',
     [
