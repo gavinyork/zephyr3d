@@ -671,6 +671,47 @@ export class ResourceManager {
   getMaterialRefsByAssetId(id: string) {
     return this._materialsByAssetId.get(id) ?? null;
   }
+  /** @internal */
+  getTrackedMaterialAssetIds() {
+    const ids: string[] = [];
+    for (const [id, refs] of this._materialsByAssetId) {
+      for (const ref of [...refs]) {
+        const material = ref.get();
+        if (!material || material.disposed) {
+          ref.dispose();
+          refs.delete(ref);
+        }
+      }
+      if (refs.size === 0) {
+        this._materialsByAssetId.delete(id);
+      } else {
+        ids.push(id);
+      }
+    }
+    return ids;
+  }
+  syncMaterialReferences(source: Material) {
+    const id = this.getAssetId(source);
+    if (!id) {
+      return;
+    }
+    const refs = this._materialsByAssetId.get(id);
+    if (!refs) {
+      return;
+    }
+    for (const ref of [...refs]) {
+      const material = ref.get();
+      if (!material || material.disposed) {
+        ref.dispose();
+        refs.delete(ref);
+      } else if (material !== source && material.constructor === source.constructor) {
+        material.copyFrom(source as typeof material);
+      }
+    }
+    if (refs.size === 0) {
+      this._materialsByAssetId.delete(id);
+    }
+  }
   trackMaterialReference(material: Nullable<Material>, id?: Nullable<string>) {
     if (!material || !id) {
       return;
@@ -930,7 +971,7 @@ export class ResourceManager {
   async fetchMaterial<T extends Material = MeshMaterial>(id: string, options?: { overrideVFS?: VFS }) {
     const material = await this._assetManager.fetchMaterial<T>(id, options);
     if (material) {
-      this._allocated.set(material, id);
+      this.setAssetId(material, id);
     }
     return material;
   }

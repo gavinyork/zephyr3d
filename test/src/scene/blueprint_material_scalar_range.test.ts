@@ -2,6 +2,7 @@ import { DRef } from '@zephyr3d/base';
 import { MemoryFS } from '@zephyr3d/base';
 import {
   ConstantScalarNode,
+  Material,
   PBRBluePrintMaterial,
   PBRBluePrintMaterialInstance,
   ResourceManager,
@@ -121,6 +122,39 @@ describe('Blueprint scalar parameter range', () => {
     expect(instance.uniformValues[0].value).toEqual([0.75]);
     expect(instance.uniformValues[0].minValue).toBe(-2);
     expect(instance.uniformValues[0].maxValue).toBe(2);
+  });
+
+  test('Blueprint material instance parameter changes should sync to tracked scene materials immediately', () => {
+    const manager = new ResourceManager(new MemoryFS());
+    const instancePath = '/materials/instance.zmtl';
+    const parent = new PBRBluePrintMaterial();
+    parent.uniformValues = [
+      {
+        name: 'u_scalar',
+        type: 'float',
+        value: [0.25],
+        inVertexShader: false,
+        inFragmentShader: true,
+        finalValue: 0.25
+      }
+    ];
+    const source = new PBRBluePrintMaterialInstance(parent, '/materials/parent.zmtl');
+    const sceneMaterial = new PBRBluePrintMaterialInstance(parent, '/materials/parent.zmtl');
+    manager.setAssetId(source, instancePath);
+    manager.trackMaterialReference(sceneMaterial, instancePath);
+
+    source.uniformValues[0].value = [0.8];
+    source.uniformValues[0].finalValue = 0.8;
+    source.setOverrides(source.uniformValues, source.uniformTextures);
+    const baseCopyFrom = jest.spyOn(Material.prototype, 'copyFrom').mockImplementation(() => undefined);
+    try {
+      manager.syncMaterialReferences(source);
+    } finally {
+      baseCopyFrom.mockRestore();
+    }
+
+    expect(sceneMaterial.uniformValues[0].value).toEqual([0.8]);
+    expect(sceneMaterial.uniformValues[0].finalValue).toBe(0.8);
   });
 
   test('Blueprint material instance should migrate only compatible overrides when changing parent', () => {
@@ -454,10 +488,19 @@ describe('Blueprint scalar parameter range', () => {
         }
       }
     };
+    instanceMaterialFile.props = {
+      RectSpecularScale: 0.75
+    };
     await vfs.writeFile(parentPath, JSON.stringify(parentMaterialFile, null, 2), {
       encoding: 'utf8',
       create: true
     });
+    await vfs.writeFile(instancePath, JSON.stringify(instanceMaterialFile, null, 2), {
+      encoding: 'utf8',
+      create: true
+    });
+    manager.invalidateMaterial(parentPath);
+    manager.invalidateMaterial(instancePath);
 
     await manager.reloadBluePrintMaterials();
 
@@ -466,6 +509,6 @@ describe('Blueprint scalar parameter range', () => {
     expect(instance!.clearcoat).toBe(true);
     expect(instance!.subsurfaceProfile).toBeInstanceOf(SubsurfaceProfile);
     expect(parent!.rectSpecularScale).toBe(0.25);
-    expect(instance!.rectSpecularScale).toBe(0.25);
+    expect(instance!.rectSpecularScale).toBe(0.75);
   });
 });

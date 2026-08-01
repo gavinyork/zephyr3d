@@ -170,6 +170,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
         material.uniformTextures as BluePrintUniformTexture[]
       );
       material.uniformChanged();
+      getEngine().resourceManager.syncMaterialReferences(material);
     }
     this._propEditor.refresh();
     this._version = -1;
