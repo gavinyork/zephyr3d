@@ -2,6 +2,7 @@ import type { PBInsideFunctionScope, PBShaderExp, TextureFormat } from '@zephyr3
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
 import { REVERSE_Z, Vector4, type Nullable } from '@zephyr3d/base';
 import { isDeviceDepthShadow } from '../shaders/shadow';
+import { getDevice } from '../app/api';
 
 /** @internal */
 export abstract class ShadowImpl {
@@ -27,6 +28,23 @@ export abstract class ShadowImpl {
         ? new Vector4(farthest, farthest, farthest, 1)
         : new Vector4(0, 0, 0, 1)
       : null;
+  }
+  /**
+   * Depth format for shadow maps rendered into a native depth attachment.
+   *
+   * Float depth everywhere except WebGL, where d24s8 is kept under
+   * standard-Z (WebGL1 compatibility, no precision benefit anyway). Under
+   * reverse-Z the WebGL2 float depth format is used so shadow maps share
+   * the near-uniform precision distribution (full benefit with
+   * EXT_clip_control active).
+   * @internal
+   */
+  protected preferredShadowMapDepthFormat(): TextureFormat {
+    const device = getDevice();
+    return device.type !== 'webgl' ||
+      (REVERSE_Z && device.getDeviceCaps().framebufferCaps.supportDepth32float)
+      ? 'd32f'
+      : 'd24s8';
   }
   abstract getParams(out?: Vector4): Vector4;
   abstract getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType;

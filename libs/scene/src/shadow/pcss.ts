@@ -114,7 +114,7 @@ export class PCSS extends ShadowImpl {
     return out;
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
-    return getDevice().type === 'webgl' ? 'd24s8' : 'd32f';
+    return this.preferredShadowMapDepthFormat();
   }
   computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,

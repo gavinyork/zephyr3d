@@ -65,7 +65,7 @@ export class PCFOPT extends ShadowImpl {
     return this.useNativeShadowMap(shadowMapParams) ? null : 'rgba8unorm';
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
-    return getDevice().type === 'webgl' ? 'd24s8' : 'd32f';
+    return this.preferredShadowMapDepthFormat();
   }
   computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,

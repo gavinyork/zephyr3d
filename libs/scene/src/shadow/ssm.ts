@@ -64,7 +64,7 @@ export class SSM extends ShadowImpl {
     }
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams) {
-    return getDevice().type === 'webgl' ? 'd24s8' : 'd32f';
+    return this.preferredShadowMapDepthFormat();
   }
   computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,
