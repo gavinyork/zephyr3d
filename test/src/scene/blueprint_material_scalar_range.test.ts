@@ -10,6 +10,32 @@ import {
 } from '@zephyr3d/scene';
 
 describe('Blueprint scalar parameter range', () => {
+  test('Blueprint material instance should inherit double-sided lighting unless overridden', async () => {
+    const manager = new ResourceManager(new MemoryFS());
+    const parent = new PBRBluePrintMaterial();
+    parent.cullMode = 'none';
+    parent.doubleSidedLighting = true;
+    const instance = new PBRBluePrintMaterialInstance(parent);
+
+    expect(instance.doubleSidedLighting).toBe(true);
+
+    parent.doubleSidedLighting = false;
+    instance.syncInheritedUniforms();
+    expect(instance.doubleSidedLighting).toBe(false);
+
+    parent.doubleSidedLighting = true;
+    instance.syncInheritedUniforms();
+    expect(instance.doubleSidedLighting).toBe(true);
+
+    await manager.deserializeObjectProps(instance, { doubleSidedLighting: false });
+    expect(instance.isMaterialPropertyOverridden('doubleSidedLighting')).toBe(true);
+    instance.syncInheritedUniforms();
+    expect(instance.doubleSidedLighting).toBe(false);
+
+    const props = await manager.serializeObjectProps(instance);
+    expect(props.doubleSidedLighting).toBe(false);
+  });
+
   test('ConstantScalarNode should clamp default value when range is enabled', () => {
     const node = new ConstantScalarNode();
     node.useRange = true;

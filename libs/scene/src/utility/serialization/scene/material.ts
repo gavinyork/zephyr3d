@@ -908,7 +908,15 @@ function getLitMaterialProps(manager: ResourceManager): PropertyAccessor<LitProp
         value.bool[0] = this.doubleSidedLighting;
       },
       set(this: LitPropTypes, value) {
-        this.doubleSidedLighting = value.bool[0];
+        allowBlueprintInstanceOverride(this as unknown as MeshMaterial, 'doubleSidedLighting', () => {
+          this.doubleSidedLighting = value.bool[0];
+        });
+      },
+      getDefaultValue(this: LitPropTypes) {
+        if (this instanceof PBRBluePrintMaterialInstance) {
+          return this.parentMaterial?.doubleSidedLighting ?? false;
+        }
+        return this.$isInstance ? this.coreMaterial.doubleSidedLighting : false;
       }
     },
     {

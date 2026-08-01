@@ -135,6 +135,9 @@ function copyParentMaterialState(
   if (!instance.isMaterialPropertyOverridden('NormalFlipY')) {
     instance.normalFlipY = parentMaterial.normalFlipY;
   }
+  if (!instance.isMaterialPropertyOverridden('doubleSidedLighting')) {
+    instance.doubleSidedLighting = parentMaterial.doubleSidedLighting;
+  }
   if (!instance.isMaterialPropertyOverridden('RectSpecularScale')) {
     instance.rectSpecularScale = parentMaterial.rectSpecularScale;
   }
