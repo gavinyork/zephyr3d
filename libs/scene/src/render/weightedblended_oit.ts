@@ -11,7 +11,7 @@ import type {
 import type { OIT } from './oit';
 import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
-import { DEPTH_FARTHEST, Disposable, Vector4 } from '@zephyr3d/base';
+import { DEPTH_FARTHEST, Disposable, REVERSE_Z, Vector4 } from '@zephyr3d/base';
 
 /**
  * Weighted-blended OIT renderer.
@@ -127,7 +127,11 @@ export class WeightedBlendedOIT extends Disposable implements OIT {
       );
     });
     pb.func('Z_WBOIT_output', [pb.vec4('color')], function () {
-      this.$l.w = this.Z_WBOIT_depthWeight(this.$builtins.fragCoord.z, this.color.a);
+      // The weight ramp expects standard-oriented depth (0 = near)
+      this.$l.w = this.Z_WBOIT_depthWeight(
+        REVERSE_Z ? pb.sub(1, this.$builtins.fragCoord.z) : this.$builtins.fragCoord.z,
+        this.color.a
+      );
       this.$outputs[0] = pb.vec4(pb.mul(this.color.rgb, this.w), this.color.a);
       this.$outputs[1] =
         pb.getDevice().type === 'webgl'

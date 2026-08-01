@@ -1,6 +1,7 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { ShaderHelper } from '../material/shader/helper';
 import type { Nullable } from '@zephyr3d/base';
+import { REVERSE_Z } from '@zephyr3d/base';
 
 /** @internal */
 export function SSR_calcJitter(scope: PBInsideFunctionScope, viewPos: PBShaderExp, roughness: PBShaderExp) {
@@ -81,7 +82,10 @@ export function SSR_dither(scope: PBInsideFunctionScope, uv: PBShaderExp) {
 function invProjectPosition(scope: PBInsideFunctionScope, pos: PBShaderExp, mat: PBShaderExp) {
   const pb = scope.$builder;
   pb.func('invProjectPosition', [pb.vec3('p'), pb.mat4('mat')], function () {
-    this.$l.c = pb.sub(pb.mul(this.p, 2), pb.vec3(1));
+    this.$l.c = pb.vec3(
+      pb.sub(pb.mul(this.p.xy, 2), pb.vec2(1)),
+      ShaderHelper.deviceDepthToClipZ(this, this.p.z)
+    );
     this.$l.u = pb.mul(this.mat, pb.vec4(this.c, 1));
     this.u = pb.div(this.u, this.u.w);
     this.$return(this.u.xyz);
@@ -619,7 +623,10 @@ export function screenSpaceRayTracing_HiZ(
     this.$return(pb.textureSampleLevel(HiZTexture, this.uv, this.level).r);
   });
   pb.func('invProjectPosition', [pb.vec3('p'), pb.mat4('mat')], function () {
-    this.$l.c = pb.sub(pb.mul(this.p, 2), pb.vec3(1));
+    this.$l.c = pb.vec3(
+      pb.sub(pb.mul(this.p.xy, 2), pb.vec2(1)),
+      ShaderHelper.deviceDepthToClipZ(this, this.p.z)
+    );
     this.$l.u = pb.mul(this.mat, pb.vec4(this.c, 1));
     this.u = pb.div(this.u, this.u.w);
     this.$return(this.u.xyz);
@@ -677,20 +684,34 @@ export function screenSpaceRayTracing_HiZ(
       // Always extend/clip the ray to the screen border so NumSteps samples
       // cover the whole visible segment.
       this.stepNDC = pb.mul(this.stepNDC, this.SSR_clipRayToScreenEdge(this.startNDC.xy, this.stepNDC.xy));
-      this.rayStartTS = pb.add(pb.mul(this.startNDC, 0.5), pb.vec3(0.5));
-      this.rayStepTS = pb.mul(this.stepNDC, 0.5);
+      if (REVERSE_Z) {
+        // Reverse ZO canonical clip space: NDC z is already the device depth.
+        this.rayStartTS = pb.vec3(pb.add(pb.mul(this.startNDC.xy, 0.5), pb.vec2(0.5)), this.startNDC.z);
+        this.rayStepTS = pb.vec3(pb.mul(this.stepNDC.xy, 0.5), this.stepNDC.z);
+      } else {
+        this.rayStartTS = pb.add(pb.mul(this.startNDC, 0.5), pb.vec3(0.5));
+        this.rayStepTS = pb.mul(this.stepNDC, 0.5);
+      }
       // Depth-only step (UE RayDepthScreen): project the point at rayLength
       // straight along the view forward axis for the slope tolerance.
       this.$l.depthH = pb.mul(
         this.projMatrix,
         pb.vec4(this.viewPos.xy, pb.sub(this.viewPos.z, this.rayLength), 1)
       );
-      this.$l.depthTSz = pb.add(pb.mul(pb.div(this.depthH.z, this.depthH.w), 0.5), 0.5);
-      // Standard Z grows away from the camera, so the sign is mirrored vs
-      // UE's reversed-Z (RayStartScreen.z - RayDepthScreen.z).
+      this.$l.depthTSz = REVERSE_Z
+        ? pb.div(this.depthH.z, this.depthH.w)
+        : pb.add(pb.mul(pb.div(this.depthH.z, this.depthH.w), 0.5), 0.5);
+      // Under standard Z depth grows away from the camera, mirroring UE's
+      // reversed-Z expression (RayStartScreen.z - RayDepthScreen.z); under
+      // reverse-Z the UE orientation applies directly.
       this.compareTolerance = pb.max(
         pb.abs(this.rayStepTS.z),
-        pb.mul(pb.sub(this.depthTSz, this.rayStartTS.z), this.slopeCompareToleranceScale)
+        pb.mul(
+          REVERSE_Z
+            ? pb.sub(this.rayStartTS.z, this.depthTSz)
+            : pb.sub(this.depthTSz, this.rayStartTS.z),
+          this.slopeCompareToleranceScale
+        )
       );
     }
   );
@@ -753,12 +774,18 @@ export function screenSpaceRayTracing_HiZ(
           this.$l[`sampleT${j}`] = pb.add(this.marchBase, j + 1);
           this.$l[`sampleUV${j}`] = pb.add(this.rayUVz.xy, pb.mul(this.rayStepUVz.xy, this[`sampleT${j}`]));
           this.$l[`sampleZ${j}`] = pb.add(this.rayUVz.z, pb.mul(this.rayStepUVz.z, this[`sampleT${j}`]));
-          // Standard-Z mirror of UE's `SamplesZ - SampleDepth`: negative when
-          // the ray is behind the surface, hit window is (-2T, 0).
-          this[`diff${j}`] = pb.sub(
-            this.SSR_loadDepth(this[`sampleUV${j}`], j < 2 ? this.mip01 : this.mip23),
-            this[`sampleZ${j}`]
-          );
+          // Negative when the ray is behind the surface, hit window (-2T, 0).
+          // Under reverse-Z this is UE's original `SamplesZ - SampleDepth`;
+          // under standard Z the difference is mirrored.
+          this[`diff${j}`] = REVERSE_Z
+            ? pb.sub(
+                this[`sampleZ${j}`],
+                this.SSR_loadDepth(this[`sampleUV${j}`], j < 2 ? this.mip01 : this.mip23)
+              )
+            : pb.sub(
+                this.SSR_loadDepth(this[`sampleUV${j}`], j < 2 ? this.mip01 : this.mip23),
+                this[`sampleZ${j}`]
+              );
           this[`hit${j}`] = pb.lessThan(
             pb.abs(pb.add(this[`diff${j}`], this.compareTolerance)),
             this.compareTolerance
@@ -874,7 +901,7 @@ export function screenSpaceRayTracing_HiZ(
       this.$l.confidence = pb.float(0);
       const hitBranch = this.$if(this.foundHit, function () {
         this.$l.surfaceZ = this.SSR_loadDepth(this.hitUVz.xy, 0);
-        this.$if(pb.equal(this.surfaceZ, 1), function () {
+        this.$if(ShaderHelper.isFarthestDepth(this, this.surfaceZ), function () {
           if (giTraceOut) {
             // The intersection resolved onto a sky texel, so the ray escaped.
             this.giTrace = pb.vec3(0, 1, 0);

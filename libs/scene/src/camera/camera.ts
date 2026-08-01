@@ -1,6 +1,7 @@
 import type { CubeFace, Immutable, Nullable, Plane } from '@zephyr3d/base';
 import {
   DEPTH_CLEAR_VALUE,
+  REVERSE_Z,
   DRef,
   Vector2,
   Matrix4x4,
@@ -1662,8 +1663,8 @@ export class Camera extends SceneNode {
     const height = this.viewport ? this.viewport[3] : getDevice().getViewport().height;
     const ndcX = (2 * x) / width - 1;
     const ndcY = 1 - (2 * y) / height;
-    const nearClip = new Vector4(ndcX, ndcY, -1, 1);
-    const farClip = new Vector4(ndcX, ndcY, 1, 1);
+    const nearClip = new Vector4(ndcX, ndcY, REVERSE_Z ? 1 : -1, 1);
+    const farClip = new Vector4(ndcX, ndcY, REVERSE_Z ? 0 : 1, 1);
     const nearWorld = this.invViewProjectionMatrix.transform(nearClip);
     const farWorld = this.invViewProjectionMatrix.transform(farClip);
     if (this.isPerspective()) {

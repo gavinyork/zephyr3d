@@ -12,7 +12,7 @@ import type {
   TextureFormat
 } from '@zephyr3d/device';
 import type { Nullable } from '@zephyr3d/base';
-import { DEPTH_FARTHEST, Disposable, Vector4 } from '@zephyr3d/base';
+import { DEPTH_FARTHEST, Disposable, REVERSE_Z, Vector4 } from '@zephyr3d/base';
 import type { OIT } from './oit';
 import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
@@ -220,8 +220,15 @@ export class DualDepthPeelingOIT extends Disposable implements OIT {
     scope.$outputs.Z_DDP_depth = pb.vec2(-1, -1);
     scope.$outputs.Z_DDP_frontColor = pb.vec4(0, 0, 0, 0);
     scope.$outputs.Z_DDP_backColor = pb.vec4(0, 0, 0, 0);
+    // The peeling depth encoding is internal to this algorithm; normalize
+    // device depth to standard orientation (0 = near) so the (-front, back)
+    // encoding, the max/max blend extraction and the peel window logic stay
+    // convention independent.
+    scope.$l.Z_DDP_normDepth = REVERSE_Z
+      ? pb.sub(1, scope.$builtins.fragCoord.z)
+      : scope.$builtins.fragCoord.z;
     if (this._currentPass === 0) {
-      scope.$outputs.Z_DDP_depth = pb.vec2(pb.neg(scope.$builtins.fragCoord.z), scope.$builtins.fragCoord.z);
+      scope.$outputs.Z_DDP_depth = pb.vec2(pb.neg(scope.Z_DDP_normDepth), scope.Z_DDP_normDepth);
     } else {
       scope.$l.Z_DDP_prevDepth = pb.textureLoad(
         scope.Z_DDP_depthTexture,
@@ -230,7 +237,7 @@ export class DualDepthPeelingOIT extends Disposable implements OIT {
       ).xy;
       scope.$l.Z_DDP_frontDepth = pb.neg(scope.Z_DDP_prevDepth.x);
       scope.$l.Z_DDP_backDepth = scope.Z_DDP_prevDepth.y;
-      scope.$l.Z_DDP_curDepth = scope.$builtins.fragCoord.z;
+      scope.$l.Z_DDP_curDepth = scope.Z_DDP_normDepth;
       scope.$l.Z_DDP_outputColor = pb.vec4(color.rgb, ctx.lightBlending ? pb.float(0) : color.a);
       scope
         .$if(
@@ -248,10 +255,7 @@ export class DualDepthPeelingOIT extends Disposable implements OIT {
             pb.lessThan(pb.add(scope.Z_DDP_curDepth, 0.000001), scope.Z_DDP_backDepth)
           ),
           function () {
-            this.$outputs.Z_DDP_depth = pb.vec2(
-              pb.neg(this.$builtins.fragCoord.z),
-              this.$builtins.fragCoord.z
-            );
+            this.$outputs.Z_DDP_depth = pb.vec2(pb.neg(this.Z_DDP_normDepth), this.Z_DDP_normDepth);
           }
         )
         .$elseif(
