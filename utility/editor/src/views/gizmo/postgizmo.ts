@@ -21,7 +21,7 @@ import {
   createEditAABBGizmo
 } from './gizmo';
 import type { Nullable, Ray } from '@zephyr3d/base';
-import { CubeFace, DEPTH_COMPARE_DEFAULT, REVERSE_Z } from '@zephyr3d/base';
+import { CubeFace, DEPTH_CLEAR_VALUE, DEPTH_COMPARE_DEFAULT, REVERSE_Z } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { AABB, makeObservable } from '@zephyr3d/base';
 import { Matrix4x4, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
@@ -460,7 +460,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     PostGizmoRenderer._cameraNearFar.setXY(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
     ctx.device.pushDeviceStates();
     ctx.device.setFramebuffer(tmpFramebuffer);
-    ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 0), 1, 0);
+    ctx.device.clearFrameBuffer(new Vector4(0, 0, 0, 0), DEPTH_CLEAR_VALUE, 0);
     if (this._drawGrid) {
       this.renderGrid(ctx, destFramebuffer!.getDepthAttachment()!);
     }
