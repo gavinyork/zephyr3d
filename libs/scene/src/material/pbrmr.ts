@@ -338,39 +338,28 @@ export class PBRMetallicRoughnessMaterial
   }
   private buildSubsurfaceProfile(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
-    const hasExplicitTransmissionAuthoring = !!(this.transmissionTexture || this.thicknessTexture);
     scope.$l.sssMask = pb.float(1);
     scope.$l.sssScatterSoftness = pb.float(0);
     scope.$l.sssTransmissionMask = pb.float(0);
-    scope.$l.sssTransmissionAuthor = pb.float(1);
-    scope.$l.sssThicknessScale = pb.clamp(
-      pb.div(scope.zThicknessFactor ?? 0, pb.add(scope.zThicknessFactor ?? 0, 1)),
-      0,
-      1
-    );
-    scope.$l.sssThinAuthorMask = pb.sub(1, scope.sssThicknessScale);
     if (this.subsurfaceTexture) {
       scope.$l.sssTexel = this.sampleSubsurfaceTexture(scope);
       scope.sssMask = pb.clamp(scope.sssTexel.r, 0, 1);
       scope.sssScatterSoftness = pb.clamp(scope.sssTexel.g, 0, 1);
     }
+    // A profile always enables diffusion, but thin transmission requires an authored map.
+    scope.$l.sssTransmissionAuthor = pb.float(this.thicknessTexture ? 1 : 0);
     if (this.transmissionTexture) {
-      scope.sssTransmissionAuthor = pb.mul(
-        scope.sssTransmissionAuthor,
-        pb.clamp(this.sampleTransmissionTexture(scope).r, 0, 1)
-      );
-    }
-    if (this.thicknessTexture) {
-      scope.$l.sssThicknessSample = pb.clamp(this.sampleThicknessTexture(scope).g, 0, 1);
-      scope.sssThinAuthorMask = pb.clamp(
-        pb.mix(
-          pb.sub(1, scope.sssThicknessSample),
-          pb.sub(1, pb.mul(scope.sssThicknessSample, scope.sssThicknessScale)),
-          pb.add(0.35, pb.mul(scope.sssThicknessScale, 0.65))
-        ),
+      scope.sssTransmissionAuthor = pb.clamp(
+        pb.mul(this.sampleTransmissionTexture(scope).r, scope.zTransmissionFactor ?? 0),
         0,
         1
       );
+    }
+    scope.$l.sssThinAuthorMask = pb.float(this.transmissionTexture ? 1 : 0);
+    if (this.thicknessTexture) {
+      // KHR_materials_volume stores thickness in G: zero is thin and one is thick.
+      scope.$l.sssThicknessSample = pb.clamp(this.sampleThicknessTexture(scope).g, 0, 1);
+      scope.sssThinAuthorMask = pb.sub(1, scope.sssThicknessSample);
     }
     scope.$l.sssAuthoredTransmissionMask = pb.clamp(
       pb.mul(scope.sssTransmissionAuthor, scope.sssThinAuthorMask),
@@ -395,17 +384,6 @@ export class PBRMetallicRoughnessMaterial
     scope.$l.sssStrength = pb.mul(this.getSubsurfaceProfileStrength(scope), scope.sssScatterStrengthMask);
     scope.$l.sssWidthBase = pb.mul(this.getSubsurfaceProfileScale(scope), scope.sssScatterWidthMask);
     scope.$l.sssWidth = pb.clamp(pb.div(scope.sssWidthBase, pb.add(scope.sssWidthBase, 1)), 0, 0.999);
-    if (!hasExplicitTransmissionAuthoring) {
-      scope.$l.sssProfileFallbackMask = pb.clamp(
-        pb.add(
-          pb.mul(scope.sssMask, 0.12),
-          pb.add(pb.mul(scope.sssStrength, 0.18), pb.mul(scope.sssWidth, 0.24))
-        ),
-        0,
-        0.42
-      );
-      scope.sssTransmissionMask = pb.max(scope.sssTransmissionMask, scope.sssProfileFallbackMask);
-    }
     scope.$l.sssSlotEncoded = pb.div(this.getSubsurfaceProfileId(scope), 255);
     scope.$l.sssPresetEncoded = pb.div(this.getSubsurfaceProfilePreset(scope), 255);
     scope.$l.sssParams = pb.vec4(

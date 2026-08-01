@@ -21,11 +21,12 @@ import { AbstractPostEffect, PostEffectLayer } from './posteffect';
  */
 export class SSS extends AbstractPostEffect {
   private static readonly _profileLUTWidth = 256;
-  private static readonly _profileLUTHeight = 7;
+  private static readonly _profileLUTHeight = 8;
   private static readonly _profileRadiusEncodeMax = 8;
   private static readonly _profileWorldScaleEncodeMax = 4;
   private static readonly _profileNormalScaleEncodeMax = 2;
   private static readonly _profileExtinctionEncodeMax = 4;
+  private static readonly _profileSpecularRadiusEncodeMax = 4;
   private static readonly _debugViewMap: Record<string, number> = {
     none: 0,
     scatter_mask: 1,
@@ -206,6 +207,7 @@ export class SSS extends AbstractPostEffect {
     bindGroup.setValue('targetSize', new Vector4(targetWidth, targetHeight, targetWidth, targetHeight));
     bindGroup.setValue('sampleOffsets', this.createSampleOffsets(kernelRadius));
     bindGroup.setValue('blurScale', ctx.camera.sssBlurScale);
+    bindGroup.setValue('sssStrength', ctx.camera.sssStrength);
     bindGroup.setValue('blurStdDev', sssSettings.blurStdDev);
     bindGroup.setValue('depthCutoff', sssSettings.blurDepthCutoff);
     bindGroup.setValue('normalCutoff', sssSettings.normalCutoff);
@@ -387,6 +389,7 @@ export class SSS extends AbstractPostEffect {
         this.targetSize = pb.vec4().uniform(0);
         this.sampleOffsets = pb.vec4[sampleCount + 1]().uniform(0);
         this.blurScale = pb.float().uniform(0);
+        this.sssStrength = pb.float().uniform(0);
         this.blurStdDev = pb.float().uniform(0);
         this.depthCutoff = pb.float().uniform(0);
         this.normalCutoff = pb.float().uniform(0);
@@ -618,14 +621,24 @@ export class SSS extends AbstractPostEffect {
                 1e-4
               )
             );
+            this.$l.normalDetailSoftening = pb.mul(
+              pb.clamp(this.sssStrength, 0, 1),
+              pb.add(0.14, pb.mul(this.widthStrength, 0.1))
+            );
             this.$l.normalThreshold = pb.clamp(
               pb.add(
-                pb.max(pb.sub(this.normalCutoff, pb.mul(this.widthStrength, 0.12)), 0.58),
+                pb.max(
+                  pb.sub(
+                    this.normalCutoff,
+                    pb.add(this.normalDetailSoftening, pb.mul(this.widthStrength, 0.12))
+                  ),
+                  0.48
+                ),
                 pb.sub(pb.mul(this.profileNormalScale, 0.08), 0.08),
                 pb.neg(pb.mul(this.profileBoundaryBleed, 0.04))
               ),
-              0.52,
-              0.985
+              0.44,
+              0.92
             );
             this.$l.centerNormal = this.decodeNormal(this.uv);
             this.$l.profileRadius = pb.mul(
@@ -897,11 +910,13 @@ export class SSS extends AbstractPostEffect {
             )
           );
         });
+        pb.func('readProfileSpecularSettings', [pb.float('slot')], function () {
+          this.$l.uv = pb.vec2(pb.div(pb.add(this.slot, 0.5), SSS._profileLUTWidth), SSS.profileRowV(7));
+          this.$l.raw = pb.textureSampleLevel(this.profileLUTTex, this.uv, 0);
+          this.$return(pb.vec2(this.raw.x, pb.mul(this.raw.y, SSS._profileSpecularRadiusEncodeMax)));
+        });
         pb.func('readProfileSlot', [pb.vec4('param')], function () {
           this.$return(pb.floor(pb.add(pb.mul(this.param.r, 255), 0.5)));
-        });
-        pb.func('readProfilePreset', [pb.vec4('param')], function () {
-          this.$return(pb.floor(pb.add(pb.mul(this.param.b, 255), 0.5)));
         });
         pb.func('decodeNormal', [pb.vec2('uv')], function () {
           this.$if(pb.equal(this.hasNormalTex, 0), function () {
@@ -913,6 +928,38 @@ export class SSS extends AbstractPostEffect {
         pb.func('readDepth01', [pb.vec2('uv')], function () {
           this.$return(ShaderHelper.sampleLinearDepth(this, this.depthTex, this.uv, 0));
         });
+        pb.func(
+          'sampleCompatibleSpecular',
+          [pb.vec2('uv'), pb.float('profileSlot'), pb.float('centerLogDepth')],
+          function () {
+            this.$l.sampleUV = pb.clamp(this.uv, pb.vec2(0), pb.vec2(1));
+            this.$l.sampleParam = pb.textureSampleLevel(this.paramTex, this.sampleUV, 0);
+            this.$l.sampleSlot = this.readProfileSlot(this.sampleParam);
+            this.$l.sampleDepth01 = this.readDepth01(this.sampleUV);
+            this.$if(
+              pb.or(
+                pb.or(
+                  pb.lessThanEqual(this.sampleParam.a, 0.5),
+                  pb.notEqual(this.sampleSlot, this.profileSlot)
+                ),
+                pb.greaterThanEqual(this.sampleDepth01, 1)
+              ),
+              function () {
+                this.$return(pb.vec4(0));
+              }
+            );
+            this.$l.sampleLogDepth = pb.log(pb.add(pb.mul(this.sampleDepth01, this.cameraNearFar.y), 1));
+            this.$if(
+              pb.greaterThan(pb.abs(pb.sub(this.sampleLogDepth, this.centerLogDepth)), 0.022),
+              function () {
+                this.$return(pb.vec4(0));
+              }
+            );
+            this.$l.sampleScene = pb.textureSampleLevel(this.colorTex, this.sampleUV, 0).rgb;
+            this.$l.sampleDiffuse = pb.textureSampleLevel(this.diffuseTex, this.sampleUV, 0).rgb;
+            this.$return(pb.vec4(pb.max(pb.sub(this.sampleScene, this.sampleDiffuse), pb.vec3(0)), 1));
+          }
+        );
         pb.func(
           'estimateScreenThinnessComponents',
           [pb.vec2('uv'), pb.float('depth01'), pb.vec3('normalWS'), pb.float('radiusScale')],
@@ -1133,7 +1180,6 @@ export class SSS extends AbstractPostEffect {
           this.$l.materialTransmissionMask = pb.clamp(this.profile.a, 0, 1);
           this.debugTransmissionMask = this.materialTransmissionMask;
           this.$l.profileSlot = this.readProfileSlot(this.param);
-          this.$l.profilePreset = this.readProfilePreset(this.param);
           this.$l.depth01 = this.readDepth01(this.uv);
           this.$l.result = this.baseColor.rgb;
           this.$if(
@@ -1149,6 +1195,7 @@ export class SSS extends AbstractPostEffect {
               this.$l.profileSettingsA = this.readProfileSettingsA(this.profileSlot);
               this.$l.profileTransmissionTint = this.readProfileTransmissionTint(this.profileSlot);
               this.$l.profileSettingsB = this.readProfileSettingsB(this.profileSlot);
+              this.$l.profileSpecularSettings = this.readProfileSpecularSettings(this.profileSlot);
               this.$l.profileWorldScale = pb.clamp(
                 this.profileSettingsA.x,
                 0.05,
@@ -1172,6 +1219,12 @@ export class SSS extends AbstractPostEffect {
                 SSS._profileWorldScaleEncodeMax
               );
               this.$l.profileStrengthScale = pb.clamp(this.profileSettingsB.z, 0.05, 2);
+              this.$l.profileSpecularSoftness = pb.clamp(this.profileSpecularSettings.x, 0, 1);
+              this.$l.profileSpecularRadius = pb.clamp(
+                this.profileSpecularSettings.y,
+                0,
+                SSS._profileSpecularRadiusEncodeMax
+              );
               this.$l.profileWorldScaleNorm = pb.clamp(
                 pb.div(this.profileWorldScale, SSS._profileWorldScaleEncodeMax),
                 0,
@@ -1258,7 +1311,6 @@ export class SSS extends AbstractPostEffect {
               this.$l.presetResponse = this.readProfilePresetResponse(this.profileSlot);
               this.$l.presetFrontScatter = this.presetResponse.x;
               this.$l.presetSoftness = this.presetResponse.y;
-              this.$l.presetEnergyBoost = this.presetResponse.z;
               this.$l.presetTransmissionBoost = this.presetResponse.w;
               this.$l.presetTint = pb.mul(
                 this.profileTintBase,
@@ -1481,13 +1533,6 @@ export class SSS extends AbstractPostEffect {
                 ),
                 1
               );
-              this.$l.scatterMix = pb.add(
-                pb.add(0.54, pb.mul(this.radiusResponse, 0.94)),
-                pb.add(
-                  pb.add(pb.mul(this.avgFalloff, 0.22), pb.mul(this.profileSpread, 0.08)),
-                  pb.add(pb.mul(this.materialScatterBoost, 0.3), this.presetSoftness)
-                )
-              );
               this.$l.scatterStrength = pb.clamp(
                 pb.mul(
                   pb.max(
@@ -1610,98 +1655,74 @@ export class SSS extends AbstractPostEffect {
                 )
               );
               this.$l.baseSpecular = pb.max(pb.sub(this.baseColor.rgb, this.baseDiffuseColor), pb.vec3(0));
-              this.$l.scatterBlend = pb.clamp(
-                pb.mul(this.scatterStrength, pb.add(0.12, pb.mul(this.scatterMix, 0.24)), this.scatterMask),
+              this.$l.softenedSpecular = this.baseSpecular;
+              this.$if(pb.notEqual(this.hasDiffuseTex, 0), function () {
+                // The wide SSS pass contains diffuse lighting only. Preserve broad
+                // highlights, but diffuse the pixel-scale normal detail that would
+                // otherwise be added back unchanged with the specular component.
+                this.$l.specularRadius = pb.clamp(
+                  pb.mul(this.profileSpecularRadius, pb.mix(0.9, 1.1, this.radiusResponse)),
+                  0,
+                  pb.mul(SSS._profileSpecularRadiusEncodeMax, 1.1)
+                );
+                this.$l.specularTexel = pb.div(pb.vec2(this.specularRadius), this.targetSize.xy);
+                this.$l.centerLogDepth = pb.log(pb.add(pb.mul(this.depth01, this.cameraNearFar.y), 1));
+                this.$l.specularSum = this.baseSpecular;
+                this.$l.specularWeight = pb.float(1);
+                const sampleSpecularAt = (offsetX: number, offsetY: number) => {
+                  this.$l.specularNeighbor = this.sampleCompatibleSpecular(
+                    pb.add(this.uv, pb.mul(this.specularTexel, pb.vec2(offsetX, offsetY))),
+                    this.profileSlot,
+                    this.centerLogDepth
+                  );
+                  this.specularSum = pb.add(
+                    this.specularSum,
+                    pb.mul(this.specularNeighbor.rgb, this.specularNeighbor.a, 0.72)
+                  );
+                  this.specularWeight = pb.add(this.specularWeight, pb.mul(this.specularNeighbor.a, 0.72));
+                };
+                sampleSpecularAt(1, 0);
+                sampleSpecularAt(-1, 0);
+                sampleSpecularAt(0, 1);
+                sampleSpecularAt(0, -1);
+                this.$l.filteredSpecular = pb.div(this.specularSum, pb.max(this.specularWeight, 1));
+                this.$l.specularSoftnessBase = pb.clamp(
+                  pb.mul(this.profileSpecularSoftness, this.profileStrength, this.sssStrength),
+                  0,
+                  0.95
+                );
+                this.$l.specularSoftness = pb.sub(
+                  1,
+                  pb.mul(pb.sub(1, this.specularSoftnessBase), pb.sub(1, this.specularSoftnessBase))
+                );
+                this.softenedSpecular = pb.mix(
+                  this.baseSpecular,
+                  this.filteredSpecular,
+                  this.specularSoftness
+                );
+              });
+              this.$l.scatterBlendBase = pb.clamp(
+                pb.mul(
+                  this.profileStrength,
+                  this.sssStrength,
+                  pb.add(0.28, pb.add(pb.mul(this.radiusResponse, 0.42), pb.mul(this.widthStrength, 0.3))),
+                  pb.mix(0.72, 1, this.scatterMask)
+                ),
                 0,
-                pb.add(
-                  pb.add(0.7, pb.mul(this.materialScatterBoost, 0.22)),
-                  this.$choice(
-                    pb.equal(this.profilePreset, 1),
-                    0.12,
-                    this.$choice(pb.equal(this.profilePreset, 2), 0.08, 0)
-                  )
-                )
+                0.92
+              );
+              // Diffusion should visibly suppress high-frequency normal lighting.
+              // A squared complement keeps low strengths controllable while making
+              // a fully enabled skin profile approach the blurred diffuse result.
+              this.$l.scatterBlend = pb.clamp(
+                pb.sub(1, pb.mul(pb.sub(1, this.scatterBlendBase), pb.sub(1, this.scatterBlendBase))),
+                0,
+                0.97
               );
               this.$l.blurredLuma = pb.dot(this.blurred, pb.vec3(0.2126, 0.7152, 0.0722));
-              this.$l.profileBlurred = pb.mix(
-                this.blurred,
-                pb.mul(
-                  this.blurred,
-                  pb.mix(
-                    pb.vec3(1),
-                    this.skinTint,
-                    pb.clamp(
-                      pb.add(
-                        pb.add(0.2, pb.mul(this.avgFalloff, 0.26)),
-                        pb.add(pb.mul(this.materialScatterBoost, 0.16), pb.mul(this.presetSoftness, 0.18))
-                      ),
-                      0,
-                      0.72
-                    )
-                  )
-                ),
-                pb.clamp(
-                  pb.add(
-                    pb.add(0.14, pb.mul(this.radiusResponse, 0.18)),
-                    pb.add(
-                      pb.mul(this.avgFalloff, 0.08),
-                      pb.add(pb.mul(this.materialScatterBoost, 0.16), pb.mul(this.presetSoftness, 0.16))
-                    )
-                  ),
-                  0,
-                  0.58
-                )
-              );
-              this.$l.warmBlur = pb.mul(
-                pb.max(this.blurredLuma, pb.mul(this.baseDiffuseLuma, 0.82)),
-                this.deepTint
-              );
-              this.profileBlurred = pb.mix(
-                this.profileBlurred,
-                this.warmBlur,
-                pb.clamp(
-                  pb.add(
-                    pb.add(0.1, pb.mul(this.avgFalloff, 0.08)),
-                    pb.add(pb.mul(this.materialScatterBoost, 0.12), pb.mul(this.presetSoftness, 0.08))
-                  ),
-                  0.08,
-                  0.32
-                )
-              );
-              this.$l.blurredClamped = pb.min(
-                this.profileBlurred,
-                pb.add(
-                  this.baseDiffuseColor,
-                  pb.mul(
-                    this.deepTint,
-                    pb.mul(
-                      this.scatterMask,
-                      pb.add(
-                        pb.add(0.06, pb.mul(this.radiusResponse, 0.18)),
-                        pb.add(
-                          pb.mul(this.avgFalloff, 0.08),
-                          pb.add(pb.mul(this.materialScatterBoost, 0.2), pb.mul(this.presetEnergyBoost, 0.18))
-                        )
-                      )
-                    )
-                  )
-                )
-              );
+              this.$l.profileBlurred = this.blurred;
+              this.$l.blurredClamped = this.profileBlurred;
               this.$l.scattered = pb.mix(this.baseDiffuseColor, this.blurredClamped, this.scatterBlend);
-              this.$l.terminatorLift = pb.mul(
-                this.baseDiffuseColor,
-                this.deepTint,
-                this.scatterStrength,
-                this.terminatorWrap,
-                pb.add(
-                  pb.add(0.014, pb.mul(this.radiusResponse, 0.022)),
-                  pb.add(
-                    pb.mul(this.profileSpread, 0.012),
-                    pb.add(pb.mul(this.materialScatterBoost, 0.02), pb.mul(this.presetSoftness, 0.012))
-                  )
-                ),
-                pb.sub(1, pb.mul(this.specMask, 0.45))
-              );
               this.$l.multiScatterLift = pb.mul(
                 pb.max(pb.sub(this.blurredClamped, this.baseDiffuseColor), pb.vec3(0)),
                 this.scatterStrength,
@@ -1724,80 +1745,7 @@ export class SSS extends AbstractPostEffect {
                   )
                 )
               );
-              this.$l.subdermalFill = pb.mul(
-                this.deepTint,
-                this.scatterStrength,
-                pb.add(
-                  pb.mul(
-                    this.shadowMask,
-                    pb.add(
-                      pb.add(0.026, pb.mul(this.radiusResponse, 0.08)),
-                      pb.add(pb.mul(this.profileSpread, 0.045), pb.mul(this.materialScatterBoost, 0.05))
-                    )
-                  ),
-                  pb.add(
-                    pb.add(0.004, pb.mul(this.avgFalloff, 0.012)),
-                    pb.add(pb.mul(this.profileSpread, 0.004), pb.mul(this.materialScatterBoost, 0.008))
-                  )
-                ),
-                this.scatterMask,
-                pb.sub(1, pb.mul(this.specMask, 0.62))
-              );
-              this.$l.veilColor = pb.mix(
-                this.blurredClamped,
-                pb.mul(this.blurredClamped, this.skinTint),
-                0.16
-              );
-              this.$l.softVeil = pb.mul(
-                this.veilColor,
-                this.scatterStrength,
-                this.scatterMask,
-                pb.add(
-                  pb.add(
-                    pb.add(0.002, pb.mul(this.materialScatterBoost, 0.004)),
-                    pb.mul(this.presetSoftness, 0.004)
-                  ),
-                  pb.mul(
-                    this.radiusResponse,
-                    pb.add(
-                      pb.add(0.007, pb.mul(this.avgFalloff, 0.007)),
-                      pb.add(
-                        pb.mul(this.profileSpread, 0.003),
-                        pb.add(pb.mul(this.materialScatterBoost, 0.006), pb.mul(this.presetSoftness, 0.004))
-                      )
-                    )
-                  )
-                ),
-                pb.sub(1, pb.mul(this.specMask, 0.55))
-              );
-              this.$l.scatteredDiffuse = pb.add(
-                this.scattered,
-                pb.add(
-                  this.terminatorLift,
-                  pb.add(this.multiScatterLift, pb.add(this.subdermalFill, this.softVeil))
-                )
-              );
-              this.$l.energyLimit = pb.add(
-                this.baseDiffuseColor,
-                pb.mul(
-                  this.deepTint,
-                  this.scatterStrength,
-                  this.scatterMask,
-                  pb.add(
-                    pb.add(
-                      pb.add(0.1, pb.mul(this.radiusResponse, 0.18)),
-                      pb.add(pb.mul(this.avgFalloff, 0.08), pb.mul(this.profileSpread, 0.04))
-                    ),
-                    pb.add(pb.mul(this.materialScatterBoost, 0.28), this.presetEnergyBoost)
-                  )
-                )
-              );
-              this.$l.scatterBudget = pb.max(pb.sub(this.energyLimit, this.baseDiffuseColor), pb.vec3(0));
-              this.$l.scatterDelta = pb.max(pb.sub(this.scatteredDiffuse, this.baseDiffuseColor), pb.vec3(0));
-              this.$l.scatteredDiffuse = pb.add(
-                this.baseDiffuseColor,
-                pb.min(this.scatterDelta, this.scatterBudget)
-              );
+              this.$l.scatteredDiffuse = pb.add(this.scattered, this.multiScatterLift);
               this.$l.transmissionBudget = pb.mul(
                 this.deepTint,
                 this.scatterStrength,
@@ -1832,7 +1780,7 @@ export class SSS extends AbstractPostEffect {
                   )
                 )
               );
-              this.result = pb.add(this.baseSpecular, this.scatteredDiffuse);
+              this.result = pb.add(this.softenedSpecular, this.scatteredDiffuse);
               this.$if(pb.greaterThan(this.transmissionStrength, 0), function () {
                 this.$l.viewDirVS = pb.normalize(pb.neg(this.viewPos));
                 this.$l.viewDirWS = pb.normalize(pb.mul(this.invViewMatrix, pb.vec4(this.viewDirVS, 0)).xyz);
@@ -1900,15 +1848,12 @@ export class SSS extends AbstractPostEffect {
                   pb.vec3(0),
                   pb.vec3(1)
                 );
-                this.$l.backLit = pb.mul(
-                  pb.pow(pb.clamp(pb.dot(pb.neg(this.normalWS), this.sunDirWS), 0, 1), 1.5),
-                  this.transmissionLightAttenuation
-                );
+                this.$l.backLightFacing = pb.clamp(pb.dot(pb.neg(this.normalWS), this.sunDirWS), 0, 1);
+                this.$l.backLightGate = pb.pow(this.backLightFacing, pb.max(this.transmissionPower, 0.1));
+                // Keep warm thin-shell lighting on the back-facing side of the surface.
+                this.$l.backLit = pb.mul(this.backLightGate, this.transmissionLightAttenuation);
                 this.$l.thicknessBackScatter = pb.clamp(
-                  pb.add(
-                    pb.add(pb.mul(this.backLit, 0.82), pb.mul(this.rim, 0.24)),
-                    pb.mul(this.materialThicknessField, 0.08)
-                  ),
+                  pb.mul(this.backLit, pb.add(0.82, pb.mul(this.rim, 0.18))),
                   0,
                   1
                 );
@@ -2268,14 +2213,14 @@ export class SSS extends AbstractPostEffect {
                   pb.max(
                     pb.mix(
                       this.warmTransmissionTint,
-                      pb.mul(this.profileTransmissionTint, pb.vec3(1.0, 0.14, 0.08)),
+                      this.profileTransmissionTint,
                       pb.clamp(
                         pb.add(
-                          pb.add(0.5, pb.mul(this.visibleTransmissionMask, 0.22)),
-                          pb.mul(this.thicknessBackScatter, 0.18)
+                          pb.mul(this.visibleTransmissionMask, 0.24),
+                          pb.mul(this.thicknessBackScatter, 0.2)
                         ),
                         0,
-                        0.92
+                        0.6
                       )
                     ),
                     pb.vec3(1e-4)
@@ -2288,17 +2233,17 @@ export class SSS extends AbstractPostEffect {
                 );
                 this.$l.visibleTransmissionGain = pb.clamp(
                   pb.add(
-                    pb.add(2.35, pb.mul(this.visibleTransmissionMask, 1.85)),
+                    pb.add(0.78, pb.mul(this.visibleTransmissionMask, 0.72)),
                     pb.add(
-                      pb.mul(this.thicknessBackScatter, 1.3),
+                      pb.mul(this.thicknessBackScatter, 0.48),
                       pb.add(
-                        pb.mul(this.materialTransmissionSoftness, 0.42),
-                        pb.mul(this.profileTransmissionScale, 0.72)
+                        pb.mul(this.materialTransmissionSoftness, 0.18),
+                        pb.mul(this.profileTransmissionScale, 0.24)
                       )
                     )
                   ),
-                  2,
-                  6.4
+                  0.7,
+                  2.4
                 );
                 this.$l.visibleTransmissionHeadroom = pb.add(
                   pb.mul(
@@ -2319,25 +2264,13 @@ export class SSS extends AbstractPostEffect {
                   )
                 );
                 this.$l.visibleTransmission = pb.min(
-                  pb.mul(this.visibleTransmissionWarm, this.visibleTransmissionGain, this.transmissionShadow),
-                  this.visibleTransmissionHeadroom
-                );
-                this.$l.visibleTransmissionReveal = pb.clamp(
                   pb.mul(
-                    this.visibleTransmissionMask,
+                    this.visibleTransmissionWarm,
+                    this.visibleTransmissionGain,
                     this.transmissionShadow,
-                    pb.add(
-                      pb.add(0.1, pb.mul(this.thicknessBackScatter, 0.25)),
-                      pb.mul(this.materialThicknessField, 0.12)
-                    )
+                    this.backLightGate
                   ),
-                  0,
-                  0.38
-                );
-                this.result = pb.mix(
-                  this.result,
-                  pb.mul(this.result, pb.vec3(0.84, 0.68, 0.64)),
-                  this.visibleTransmissionReveal
+                  this.visibleTransmissionHeadroom
                 );
                 this.debugThinLighting = this.visibleTransmission;
                 this.result = pb.add(this.result, this.visibleTransmission);
@@ -2452,7 +2385,13 @@ export class SSS extends AbstractPostEffect {
 
   private ensureProfileLUT(ctx: DrawContext): Texture2D {
     const device = ctx.device;
-    if (!SSS._profileLUT || SSS._profileLUT.device !== device) {
+    if (
+      !SSS._profileLUT ||
+      SSS._profileLUT.device !== device ||
+      SSS._profileLUT.width !== SSS._profileLUTWidth ||
+      SSS._profileLUT.height !== SSS._profileLUTHeight
+    ) {
+      SSS._profileLUT?.dispose();
       SSS._profileLUT = device.createTexture2D('rgba8unorm', SSS._profileLUTWidth, SSS._profileLUTHeight, {
         mipmapping: false
       })!;
@@ -2505,6 +2444,14 @@ export class SSS extends AbstractPostEffect {
         data[settingsBOffset + 1] = encodeScaled(profile.scale, SSS._profileWorldScaleEncodeMax);
         data[settingsBOffset + 2] = encodeUnit(profile.strength / 2);
         data[settingsBOffset + 3] = 255;
+        const specularSettingsOffset = (SSS._profileLUTWidth * 7 + slot) * 4;
+        data[specularSettingsOffset + 0] = encodeUnit(profile.specularDetailSoftness);
+        data[specularSettingsOffset + 1] = encodeScaled(
+          profile.specularDetailRadius,
+          SSS._profileSpecularRadiusEncodeMax
+        );
+        data[specularSettingsOffset + 2] = 0;
+        data[specularSettingsOffset + 3] = 255;
       }
       SSS._profileLUT!.update(data, 0, 0, SSS._profileLUTWidth, SSS._profileLUTHeight);
       SSS._profileLUTVersion = SubsurfaceProfile.version;

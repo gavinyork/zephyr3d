@@ -36,27 +36,24 @@ function createBlueprintOutputHiddenPredicate(_outputs: readonly PBRBlueprintOut
 }
 
 function canEditParentMaterialProperty(material: MeshMaterial) {
-  return !material.$isInstance && !(material as MeshMaterial & { isBlueprintMaterialInstance?: boolean }).isBlueprintMaterialInstance;
+  return (
+    !material.$isInstance &&
+    !(material as MeshMaterial & { isBlueprintMaterialInstance?: boolean }).isBlueprintMaterialInstance
+  );
 }
 
 function isBlueprintMaterialAssetInstanceWithInheritedParentProps(material: MeshMaterial) {
   return !!(material as MeshMaterial & { isBlueprintMaterialInstance?: boolean }).isBlueprintMaterialInstance;
 }
 
-function isBlueprintMaterialAssetInstance(
-  material: MeshMaterial
-): material is MeshMaterial & {
+function isBlueprintMaterialAssetInstance(material: MeshMaterial): material is MeshMaterial & {
   isBlueprintMaterialInstance: true;
   markMaterialPropertyOverridden?: (propName: string) => void;
 } {
   return !!(material as MeshMaterial & { isBlueprintMaterialInstance?: boolean }).isBlueprintMaterialInstance;
 }
 
-function allowBlueprintInstanceOverride(
-  material: MeshMaterial,
-  propName: string,
-  setter: () => void
-) {
+function allowBlueprintInstanceOverride(material: MeshMaterial, propName: string, setter: () => void) {
   setter();
   if (isBlueprintMaterialAssetInstance(material)) {
     material.markMaterialPropertyOverridden?.(propName);
@@ -76,7 +73,10 @@ type BlueprintInstanceSubsurfaceMaterial = PBRMetallicRoughnessMaterial & {
 };
 
 function canEditBlueprintInstanceSubsurfaceProfile(material: PBRMetallicRoughnessMaterial) {
-  return !!material.subsurfaceProfile && !!(material as BlueprintInstanceSubsurfaceMaterial).isBlueprintMaterialInstance;
+  return (
+    !!material.subsurfaceProfile &&
+    !!(material as BlueprintInstanceSubsurfaceMaterial).isBlueprintMaterialInstance
+  );
 }
 
 function getBlueprintInstanceSubsurfaceMaterial(
@@ -297,6 +297,40 @@ export function getSubsurfaceProfileClass(): SerializableClass {
           },
           set(this: SubsurfaceProfile, value) {
             this.scatteringDistribution = value.num[0];
+          }
+        },
+        {
+          name: 'SpecularDetailSoftness',
+          type: 'float',
+          default: 0.78,
+          options: {
+            label: 'SpecularDetailSoftness',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: SubsurfaceProfile, value) {
+            value.num[0] = this.specularDetailSoftness;
+          },
+          set(this: SubsurfaceProfile, value) {
+            this.specularDetailSoftness = value.num[0];
+          }
+        },
+        {
+          name: 'SpecularDetailRadius',
+          type: 'float',
+          default: 1.8,
+          options: {
+            label: 'SpecularDetailRadius',
+            animatable: true,
+            minValue: 0,
+            maxValue: 4
+          },
+          get(this: SubsurfaceProfile, value) {
+            value.num[0] = this.specularDetailRadius;
+          },
+          set(this: SubsurfaceProfile, value) {
+            this.specularDetailRadius = value.num[0];
           }
         }
       ]);
@@ -664,7 +698,10 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
         this.clearcoat = value.bool[0];
       },
       isValid() {
-        return !this.$isInstance && !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial);
+        return (
+          !this.$isInstance &&
+          !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial)
+        );
       }
     },
     {
@@ -693,7 +730,10 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
       }
     },
     ...getTextureProps<PBRMaterial>(manager, 'clearcoatIntensityTexture', '2D', false, 1, function () {
-      return !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial) && this.clearcoat;
+      return (
+        !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial) &&
+        this.clearcoat
+      );
     }),
     {
       name: 'ClearCoatRoughnessFactor',
@@ -721,10 +761,16 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
       }
     },
     ...getTextureProps<PBRMaterial>(manager, 'clearcoatRoughnessTexture', '2D', false, 1, function () {
-      return !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial) && this.clearcoat;
+      return (
+        !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial) &&
+        this.clearcoat
+      );
     }),
     ...getTextureProps<PBRMaterial>(manager, 'clearcoatNormalTexture', '2D', false, 1, function () {
-      return !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial) && this.clearcoat;
+      return (
+        !isBlueprintMaterialAssetInstanceWithInheritedParentProps(this as unknown as MeshMaterial) &&
+        this.clearcoat
+      );
     }),
     {
       name: 'Sheen',
@@ -1055,7 +1101,11 @@ export function getMeshMaterialClass(): SerializableClass[] {
               this.shadowAlphaCutoff = value.num[0];
             },
             isValid(this: MeshMaterial) {
-              return canEditParentMaterialProperty(this) && this.blendMode !== 'none' && this.transparentShadowCaster;
+              return (
+                canEditParentMaterialProperty(this) &&
+                this.blendMode !== 'none' &&
+                this.transparentShadowCaster
+              );
             }
           },
           {
@@ -1497,7 +1547,10 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
                 isBlueprintMaterialInstance?: boolean;
                 setBlueprintInstanceReflectionMode?: (val: PBRReflectionMode, inherited?: boolean) => void;
               };
-              if (blueprintInstance.isBlueprintMaterialInstance && blueprintInstance.setBlueprintInstanceReflectionMode) {
+              if (
+                blueprintInstance.isBlueprintMaterialInstance &&
+                blueprintInstance.setBlueprintInstanceReflectionMode
+              ) {
                 blueprintInstance.setBlueprintInstanceReflectionMode(reflectionMode);
               } else {
                 this.reflectionMode = reflectionMode;
@@ -1664,8 +1717,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
           },
           {
             name: 'SubsurfaceMeanFreePathDistance',
-            description:
-              'Per-instance mean free path distance override for the active subsurface profile',
+            description: 'Per-instance mean free path distance override for the active subsurface profile',
             type: 'float',
             phase: 1,
             default: 0.92,
@@ -1773,8 +1825,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
           },
           {
             name: 'SubsurfaceBoundaryColorBleed',
-            description:
-              'Per-instance boundary color bleed override for the active subsurface profile',
+            description: 'Per-instance boundary color bleed override for the active subsurface profile',
             type: 'float',
             phase: 1,
             default: 0.22,
@@ -1802,8 +1853,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
           },
           {
             name: 'SubsurfaceTransmissionTintColor',
-            description:
-              'Per-instance transmission tint color override for the active subsurface profile',
+            description: 'Per-instance transmission tint color override for the active subsurface profile',
             type: 'rgb',
             phase: 1,
             default: [1, 0.46, 0.34],
@@ -1889,8 +1939,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
           },
           {
             name: 'SubsurfaceScatteringDistribution',
-            description:
-              'Per-instance scattering distribution override for the active subsurface profile',
+            description: 'Per-instance scattering distribution override for the active subsurface profile',
             type: 'float',
             phase: 1,
             default: 0.6,
@@ -1909,6 +1958,62 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
               profile.setBlueprintInstanceSubsurfaceProfileValue?.(
                 'SubsurfaceScatteringDistribution',
                 'scatteringDistribution',
+                value.num[0]
+              );
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return canEditBlueprintInstanceSubsurfaceProfile(this);
+            }
+          },
+          {
+            name: 'SubsurfaceSpecularDetailSoftness',
+            description: 'Per-instance specular detail softness override for the active subsurface profile',
+            type: 'float',
+            phase: 1,
+            default: 0.78,
+            options: {
+              label: 'SpecularDetailSoftness',
+              animatable: true,
+              minValue: 0,
+              maxValue: 1,
+              group: 'Subsurface Profile'
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceProfile?.specularDetailSoftness ?? 0;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              const profile = getBlueprintInstanceSubsurfaceMaterial(this);
+              profile.setBlueprintInstanceSubsurfaceProfileValue?.(
+                'SubsurfaceSpecularDetailSoftness',
+                'specularDetailSoftness',
+                value.num[0]
+              );
+            },
+            isValid(this: PBRMetallicRoughnessMaterial) {
+              return canEditBlueprintInstanceSubsurfaceProfile(this);
+            }
+          },
+          {
+            name: 'SubsurfaceSpecularDetailRadius',
+            description: 'Per-instance specular detail radius override for the active subsurface profile',
+            type: 'float',
+            phase: 1,
+            default: 1.8,
+            options: {
+              label: 'SpecularDetailRadius',
+              animatable: true,
+              minValue: 0,
+              maxValue: 4,
+              group: 'Subsurface Profile'
+            },
+            get(this: PBRMetallicRoughnessMaterial, value) {
+              value.num[0] = this.subsurfaceProfile?.specularDetailRadius ?? 0;
+            },
+            set(this: PBRMetallicRoughnessMaterial, value) {
+              const profile = getBlueprintInstanceSubsurfaceMaterial(this);
+              profile.setBlueprintInstanceSubsurfaceProfileValue?.(
+                'SubsurfaceSpecularDetailRadius',
+                'specularDetailRadius',
                 value.num[0]
               );
             },

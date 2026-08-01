@@ -33,6 +33,8 @@ type SubsurfaceProfilePresetTemplate = {
   extinctionScale: number;
   normalScale: number;
   scatteringDistribution: number;
+  specularDetailSoftness: number;
+  specularDetailRadius: number;
 };
 
 const SUBSURFACE_PROFILE_PRESET_ALIAS: Record<SubsurfaceProfilePreset, CanonicalSubsurfaceProfilePreset> = {
@@ -73,7 +75,9 @@ const SUBSURFACE_PROFILE_PRESET_TEMPLATE: Record<
     transmissionTintColor: [1, 0.37, 0.28],
     extinctionScale: 1.24,
     normalScale: 1.18,
-    scatteringDistribution: 0.56
+    scatteringDistribution: 0.56,
+    specularDetailSoftness: 0.66,
+    specularDetailRadius: 1.35
   },
   skin_default: {
     meanFreePathColor: [1.0, 0.45, 0.17],
@@ -86,7 +90,9 @@ const SUBSURFACE_PROFILE_PRESET_TEMPLATE: Record<
     transmissionTintColor: [1, 0.46, 0.34],
     extinctionScale: 1.06,
     normalScale: 1,
-    scatteringDistribution: 0.6
+    scatteringDistribution: 0.6,
+    specularDetailSoftness: 0.78,
+    specularDetailRadius: 1.8
   },
   skin_heavy_makeup: {
     meanFreePathColor: [1.0, 0.33, 0.11],
@@ -99,7 +105,9 @@ const SUBSURFACE_PROFILE_PRESET_TEMPLATE: Record<
     transmissionTintColor: [0.94, 0.31, 0.22],
     extinctionScale: 1.4,
     normalScale: 1.26,
-    scatteringDistribution: 0.5
+    scatteringDistribution: 0.5,
+    specularDetailSoftness: 0.86,
+    specularDetailRadius: 2.1
   },
   wax_backlit: {
     meanFreePathColor: [1.0, 0.68, 0.36],
@@ -112,7 +120,9 @@ const SUBSURFACE_PROFILE_PRESET_TEMPLATE: Record<
     transmissionTintColor: [1, 0.82, 0.7],
     extinctionScale: 0.78,
     normalScale: 0.92,
-    scatteringDistribution: 0.82
+    scatteringDistribution: 0.82,
+    specularDetailSoftness: 0.88,
+    specularDetailRadius: 2.35
   },
   wax_soft: {
     meanFreePathColor: [1.0, 0.72, 0.38],
@@ -125,7 +135,9 @@ const SUBSURFACE_PROFILE_PRESET_TEMPLATE: Record<
     transmissionTintColor: [1, 0.86, 0.74],
     extinctionScale: 0.86,
     normalScale: 0.98,
-    scatteringDistribution: 0.74
+    scatteringDistribution: 0.74,
+    specularDetailSoftness: 0.94,
+    specularDetailRadius: 2.65
   },
   jade_backlit: {
     meanFreePathColor: [0.74, 1.0, 0.88],
@@ -138,7 +150,9 @@ const SUBSURFACE_PROFILE_PRESET_TEMPLATE: Record<
     transmissionTintColor: [0.68, 0.92, 0.86],
     extinctionScale: 0.92,
     normalScale: 1.02,
-    scatteringDistribution: 0.7
+    scatteringDistribution: 0.7,
+    specularDetailSoftness: 0.42,
+    specularDetailRadius: 1.2
   },
   jade_soft: {
     meanFreePathColor: [0.68, 1.0, 0.84],
@@ -151,7 +165,9 @@ const SUBSURFACE_PROFILE_PRESET_TEMPLATE: Record<
     transmissionTintColor: [0.74, 0.96, 0.9],
     extinctionScale: 1,
     normalScale: 1.04,
-    scatteringDistribution: 0.66
+    scatteringDistribution: 0.66,
+    specularDetailSoftness: 0.5,
+    specularDetailRadius: 1.4
   }
 };
 
@@ -211,6 +227,8 @@ export class SubsurfaceProfile {
   private _extinctionScale: number;
   private _normalScale: number;
   private _scatteringDistribution: number;
+  private _specularDetailSoftness: number;
+  private _specularDetailRadius: number;
   private readonly _slot: number;
   private readonly _changeListeners: Set<() => void>;
   private _disposed: boolean;
@@ -229,6 +247,8 @@ export class SubsurfaceProfile {
     this._extinctionScale = 1;
     this._normalScale = 1;
     this._scatteringDistribution = 0.65;
+    this._specularDetailSoftness = 0.78;
+    this._specularDetailRadius = 1.8;
     this._changeListeners = new Set();
     this._disposed = false;
     this._slot = SubsurfaceProfile.allocateSlot(this);
@@ -253,6 +273,8 @@ export class SubsurfaceProfile {
     this.extinctionScale = other.extinctionScale;
     this.normalScale = other.normalScale;
     this.scatteringDistribution = other.scatteringDistribution;
+    this.specularDetailSoftness = other.specularDetailSoftness;
+    this.specularDetailRadius = other.specularDetailRadius;
     this.falloffColor = other.falloffColor;
   }
 
@@ -558,6 +580,32 @@ export class SubsurfaceProfile {
     }
   }
 
+  /** Strength of the screen-space filter applied to normal-driven specular detail. */
+  get specularDetailSoftness() {
+    return this._specularDetailSoftness;
+  }
+
+  set specularDetailSoftness(val: number) {
+    const next = this.clamp01(val ?? 0);
+    if (next !== this._specularDetailSoftness) {
+      this._specularDetailSoftness = next;
+      this.markDirty();
+    }
+  }
+
+  /** Radius in screen pixels used to soften normal-driven specular detail. */
+  get specularDetailRadius() {
+    return this._specularDetailRadius;
+  }
+
+  set specularDetailRadius(val: number) {
+    const next = this.clampRange(val ?? 0, 0, 4);
+    if (next !== this._specularDetailRadius) {
+      this._specularDetailRadius = next;
+      this.markDirty();
+    }
+  }
+
   addChangeListener(listener: () => void) {
     this._changeListeners.add(listener);
   }
@@ -625,6 +673,8 @@ export class SubsurfaceProfile {
     this._extinctionScale = template.extinctionScale;
     this._normalScale = template.normalScale;
     this._scatteringDistribution = template.scatteringDistribution;
+    this._specularDetailSoftness = template.specularDetailSoftness;
+    this._specularDetailRadius = template.specularDetailRadius;
     this.syncScatterRadiusFromMeanFreePath(false);
     if (markDirty) {
       this.markDirty();
