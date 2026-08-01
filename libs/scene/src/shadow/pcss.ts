@@ -1,9 +1,9 @@
 import type { Nullable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { REVERSE_Z, Vector4 } from '@zephyr3d/base';
 import type { PBInsideFunctionScope, PBShaderExp, TextureFormat } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
-import { applyShadowDepthBias, computeReceiverPlaneDepthBias, computeShadowMapDepth, filterShadowPCSS, ndcToShadowCoord, shadowCoordDepthInRange } from '../shaders/shadow';
+import { applyShadowDepthBias, computeReceiverPlaneDepthBias, computeShadowMapDepth, filterShadowPCSS, isDeviceDepthShadow, ndcToShadowCoord, shadowCoordDepthInRange } from '../shaders/shadow';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
@@ -71,8 +71,12 @@ export class PCSS extends ShadowImpl {
   getShadowMapBorder(_shadowMapParams: ShadowMapParams) {
     return this._lightRadius > 0 ? Math.ceil(Math.max(this._lightRadius, this._maxFilterRadius) + 2) : 0;
   }
-  getShadowMapClearColor(_shadowMapParams: ShadowMapParams) {
-    return new Vector4(1, 1, 1, 1);
+  getShadowMapClearColor(shadowMapParams: ShadowMapParams) {
+    // Empty texels must read as "farthest" (no blocker): under reverse-Z
+    // that is 0 for the device-encoded directional/rect maps, while the
+    // linear point/spot encodings keep 1 = far.
+    const farthest = REVERSE_Z && isDeviceDepthShadow(shadowMapParams.lightType) ? 0 : 1;
+    return new Vector4(farthest, farthest, farthest, 1);
   }
   getShadowMap(shadowMapParams: ShadowMapParams) {
     return shadowMapParams.shadowMapFramebuffer!.getColorAttachments()[0] as ShadowMapType;

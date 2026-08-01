@@ -489,18 +489,22 @@ function sampleShadowMapPoissonTap(
 function sampleShadowDepthPCSS(
   scope: PBInsideFunctionScope,
   shadowMapFormat: TextureFormat,
+  deviceEncoded: boolean,
   pos: PBShaderExp,
   bounds: PBShaderExp,
   cascade?: PBShaderExp
 ) {
-  const funcName = `lib_sampleShadowDepthPCSS_${shadowMapFormat}_${cascade ? 1 : 0}`;
+  const funcName = `lib_sampleShadowDepthPCSS_${shadowMapFormat}_${cascade ? 1 : 0}${
+    REVERSE_Z && deviceEncoded ? '_rev' : ''
+  }`;
   const pb = scope.$builder;
   pb.func(
     funcName,
     [pb.vec2('coords'), pb.vec4('bounds'), ...(cascade ? [pb.int('cascade')] : [])],
     function () {
-      // out-of-bounds samples read as "farthest" (no blocker)
-      this.$l.depth = pb.float(DEPTH_FARTHEST);
+      // out-of-bounds samples read as "farthest" (no blocker); farthest is
+      // DEPTH_FARTHEST for device-encoded depth, 1 for linear encodings
+      this.$l.depth = pb.float(deviceEncoded ? DEPTH_FARTHEST : 1);
       this.$l.sampleInside = pb.all(
         pb.bvec4(
           pb.greaterThanEqual(this.coords.x, this.bounds.x),
@@ -581,6 +585,7 @@ function compareShadowDepthPCSS(
 function sampleShadowPCFPCSS(
   scope: PBInsideFunctionScope,
   shadowMapFormat: TextureFormat,
+  deviceEncoded: boolean,
   pos: PBShaderExp,
   bounds: PBShaderExp,
   compareDepth: PBShaderExp,
@@ -588,7 +593,9 @@ function sampleShadowPCFPCSS(
   receiverPlaneDepthBias?: PBShaderExp,
   cascade?: PBShaderExp
 ) {
-  const funcName = `lib_sampleShadowPCFPCSS_${shadowMapFormat}_${receiverPlaneDepthBias ? 1 : 0}_${cascade ? 1 : 0}`;
+  const funcName = `lib_sampleShadowPCFPCSS_${shadowMapFormat}_${receiverPlaneDepthBias ? 1 : 0}_${
+    cascade ? 1 : 0
+  }${REVERSE_Z && deviceEncoded ? '_rev' : ''}`;
   const pb = scope.$builder;
   pb.func(
     funcName,
@@ -621,6 +628,7 @@ function sampleShadowPCFPCSS(
         this.sampleDepth = sampleShadowDepthPCSS(
           this,
           shadowMapFormat,
+          deviceEncoded,
           this.tapCoord,
           this.bounds,
           this.cascade
@@ -630,7 +638,13 @@ function sampleShadowPCFPCSS(
           : this.compareDepth;
         this.shadow = pb.add(
           this.shadow,
-          compareShadowDepthPCSS(this, this.sampleDepth, this.tapCompareDepth, this.transitionWidth, true)
+          compareShadowDepthPCSS(
+            this,
+            this.sampleDepth,
+            this.tapCompareDepth,
+            this.transitionWidth,
+            deviceEncoded
+          )
         );
       }
       this.$return(pb.mul(this.shadow, 0.25));
@@ -695,6 +709,7 @@ function samplePointShadowPCFPCSS(
 function findBlockerPCSS(
   scope: PBInsideFunctionScope,
   shadowMapFormat: TextureFormat,
+  deviceEncoded: boolean,
   tapCount: PBShaderExp,
   texCoord: PBShaderExp,
   bounds: PBShaderExp,
@@ -703,7 +718,9 @@ function findBlockerPCSS(
   matrix: PBShaderExp,
   cascade?: PBShaderExp
 ) {
-  const funcName = `lib_findBlockerPCSS_${shadowMapFormat}_${cascade ? 1 : 0}`;
+  const funcName = `lib_findBlockerPCSS_${shadowMapFormat}_${cascade ? 1 : 0}${
+    REVERSE_Z && deviceEncoded ? '_rev' : ''
+  }`;
   const pb = scope.$builder;
   pb.func(
     funcName,
@@ -735,6 +752,7 @@ function findBlockerPCSS(
         this.sampleDepth = sampleShadowDepthPCSS(
           this,
           shadowMapFormat,
+          deviceEncoded,
           this.sampleCoord,
           this.bounds,
           this.cascade
@@ -746,7 +764,7 @@ function findBlockerPCSS(
           pb.smoothStep(
             pb.neg(this.transitionWidth),
             this.transitionWidth,
-            REVERSE_Z
+            REVERSE_Z && deviceEncoded
               ? pb.sub(this.texCoord.z, this.sampleDepth)
               : pb.sub(this.sampleDepth, this.texCoord.z)
           )
@@ -1670,11 +1688,15 @@ export function filterShadowPCSS(
         return;
       }
 
+      // Directional/rect compare device depth (flips under reverse-Z);
+      // spot receivers and their stored depth use a linear encoding.
+      const deviceEncoded = isDeviceDepthShadow(lightType);
       this.$l.lightDepth = this.texCoord.z;
       if (receiverPlaneDepthBias) {
-        this.lightDepth = REVERSE_Z
-          ? pb.add(this.lightDepth, this.receiverPlaneDepthBias.z)
-          : pb.sub(this.lightDepth, this.receiverPlaneDepthBias.z);
+        this.lightDepth =
+          REVERSE_Z && deviceEncoded
+            ? pb.add(this.lightDepth, this.receiverPlaneDepthBias.z)
+            : pb.sub(this.lightDepth, this.receiverPlaneDepthBias.z);
       }
       this.$l.sampleBounds = pb.vec4(0, 0, 1, 1);
       if (cascade && getDevice().type === 'webgl' && numCascades > 1) {
@@ -1710,6 +1732,7 @@ export function filterShadowPCSS(
       this.$l.blocker = findBlockerPCSS(
         this,
         shadowMapFormat,
+        deviceEncoded,
         this.PCSSblockerSampleCount,
         pb.vec4(this.texCoord.xy, this.lightDepth, this.texCoord.w),
         this.sampleBounds,
@@ -1721,14 +1744,15 @@ export function filterShadowPCSS(
       this.$if(pb.lessThanEqual(this.blocker.y, 0), function () {
         this.$return(pb.float(1));
       });
-      // Penumbra estimation (receiver - blocker) / blocker in device depth;
-      // under reverse-Z apply the d -> 1-d mirror of the same expression.
-      this.$l.penumbra = REVERSE_Z
-        ? pb.div(
-            pb.max(pb.sub(this.blocker.x, this.lightDepth), 0),
-            pb.max(pb.sub(1, this.blocker.x), 0.0001)
-          )
-        : pb.div(pb.max(pb.sub(this.lightDepth, this.blocker.x), 0), pb.max(this.blocker.x, 0.0001));
+      // Penumbra estimation (receiver - blocker) / blocker; for device
+      // depth under reverse-Z apply the d -> 1-d mirror of the expression.
+      this.$l.penumbra =
+        REVERSE_Z && deviceEncoded
+          ? pb.div(
+              pb.max(pb.sub(this.blocker.x, this.lightDepth), 0),
+              pb.max(pb.sub(1, this.blocker.x), 0.0001)
+            )
+          : pb.div(pb.max(pb.sub(this.lightDepth, this.blocker.x), 0), pb.max(this.blocker.x, 0.0001));
       this.$l.filterRadius = pb.mul(
         pb.clamp(pb.mul(this.penumbra, this.PCSSlightRadius), 0, pb.max(0, this.PCSSmaxFilterRadius)),
         this.shadowMapTexelSize
@@ -1754,6 +1778,7 @@ export function filterShadowPCSS(
           sampleShadowPCFPCSS(
             this,
             shadowMapFormat,
+            deviceEncoded,
             this.sampleCoord,
             this.sampleBounds,
             this.compareDepth,

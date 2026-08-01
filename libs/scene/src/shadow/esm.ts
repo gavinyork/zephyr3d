@@ -1,8 +1,9 @@
+import { REVERSE_Z } from '@zephyr3d/base';
 import type { FrameBuffer, TextureFormat, PBShaderExp, PBInsideFunctionScope } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
 import type { BlitType } from '../blitter';
 import { GaussianBlurBlitter } from '../blitter';
-import { computeShadowMapDepth, filterShadowESM, ndcToShadowCoord, shadowCoordDepthInRange } from '../shaders/shadow';
+import { computeShadowMapDepth, filterShadowESM, isDeviceDepthShadow, ndcToShadowCoord, shadowCoordDepthInRange } from '../shaders/shadow';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { LIGHT_TYPE_POINT } from '../values';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
@@ -283,10 +284,13 @@ export class ESM extends ShadowImpl {
   }
   getShadowMapClearColor(shadowMapParams: ShadowMapParams) {
     const colorAttachment = shadowMapParams.shadowMapFramebuffer?.getColorAttachments()[0];
+    // Empty texels must read as "farthest": under reverse-Z that is 0 for
+    // device-encoded directional/rect maps, 1 for linear point/spot maps.
+    const farthest = REVERSE_Z && isDeviceDepthShadow(shadowMapParams.lightType) ? 0 : 1;
     return colorAttachment
       ? colorAttachment.format === 'rgba8unorm'
         ? new Vector4(0, 0, 0, 1)
-        : new Vector4(1, 0, 0, 1)
+        : new Vector4(farthest, 0, 0, 1)
       : null;
   }
   getShadowMap(shadowMapParams: ShadowMapParams) {

@@ -1,6 +1,7 @@
 import type { PBInsideFunctionScope, PBShaderExp, TextureFormat } from '@zephyr3d/device';
 import type { ShadowMapParams, ShadowMapType, ShadowMode } from './shadowmapper';
-import { Vector4, type Nullable } from '@zephyr3d/base';
+import { REVERSE_Z, Vector4, type Nullable } from '@zephyr3d/base';
+import { isDeviceDepthShadow } from '../shaders/shadow';
 
 /** @internal */
 export abstract class ShadowImpl {
@@ -18,9 +19,12 @@ export abstract class ShadowImpl {
   abstract getShadowMapBorder(shadowMapParams: ShadowMapParams): number;
   getShadowMapClearColor(shadowMapParams: ShadowMapParams) {
     const colorAttachment = shadowMapParams.shadowMapFramebuffer?.getColorAttachments()[0];
+    // Empty texels must read as "farthest": under reverse-Z that is 0 for
+    // device-encoded directional/rect maps, 1 for linear point/spot maps.
+    const farthest = REVERSE_Z && isDeviceDepthShadow(shadowMapParams.lightType) ? 0 : 1;
     return colorAttachment
       ? colorAttachment.isFloatFormat()
-        ? new Vector4(1, 1, 1, 1)
+        ? new Vector4(farthest, farthest, farthest, 1)
         : new Vector4(0, 0, 0, 1)
       : null;
   }
