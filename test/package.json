@@ -16,7 +16,8 @@
     "build:check": "tsc -p . --noEmit",
     "lint": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint \"src/**/*.ts\" -f compact",
     "lint-fix": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint --fix \"src/**/*.ts\" -f compact",
-    "test": "jest"
+    "test": "jest",
+    "test:reverse": "cross-env Z_CONVENTION=reverse jest"
   },
   "engines": {
     "node": ">=16.18.0"

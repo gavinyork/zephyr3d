@@ -16,7 +16,9 @@ module.exports = {
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.test.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+  setupFiles: ['<rootDir>/src/setupEnv.ts'],
   setupFilesAfterEnv: ['<rootDir>/src/setup.ts'],
+  snapshotResolver: '<rootDir>/snapshotResolver.js',
   moduleNameMapper: {
     '^@zephyr3d/base$': '<rootDir>/../libs/base/src',
     '^@zephyr3d/device$': '<rootDir>/../libs/device/src',
