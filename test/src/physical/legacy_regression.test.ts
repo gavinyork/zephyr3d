@@ -106,6 +106,9 @@ describe('Legacy lighting is unaffected by the physical alignment', () => {
     expect(material.emissiveStrength).toBeCloseTo(2, 10);
     material.emissiveExposureWeight = 0;
     expect(material.emissiveStrength).toBeCloseTo(2, 10);
+    // The physical cd/m² property must not disturb the legacy authoring value either.
+    material.emissiveLuminance = 8000;
+    expect(material.emissiveStrength).toBeCloseTo(2, 10);
   });
 
   test('rect light legacy authoring path still works', () => {

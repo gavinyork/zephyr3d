@@ -389,6 +389,8 @@ export class PBRBluePrintMaterial
     if (emissive !== undefined) {
       // This bypasses the base implementation, so it has to apply the camera pre-exposure itself.
       // A blueprint has no per-material exposure weight, so the emitter always follows exposure.
+      // The graph output replaces emissiveColor * emissiveLuminance outright, so under physical
+      // lighting it is a cd/m² luminance: emit hundreds to thousands, not the [0,1] of legacy.
       return scope.$builder.mul(
         this.toVec3(scope, emissive),
         ShaderHelper.getPreExposureUniform(scope)

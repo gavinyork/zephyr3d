@@ -15,12 +15,18 @@
  * | Spot light | lumen (authored) / candela (shaded) | `luminousPower` / `luminousIntensity` |
  * | Rect light | cd/m² (nit) | {@link RectLight.luminance} |
  * | Environment / IBL | cd/m² (nit) | `EnvLightWrapper.intensity` |
- * | Emissive material | cd/m² (nit) | `emissiveLuminance` |
+ * | Emissive material | cd/m² (nit) at `emissiveExposureWeight` 1 | `emissiveLuminance` (legacy: `emissiveStrength`) |
  * | Camera exposure | unitless multiplier | {@link Camera.exposure} |
  *
  * Lighting is pre-exposed on the CPU: every light quantity is multiplied by the camera exposure
  * before upload, so the HDR render target stays near 1.0 and downstream passes (bloom, SSR, SSGI,
  * fog) need no unit awareness. Tonemapping therefore applies the ACES curve only.
+ *
+ * Emissive is the one exception, because it is authored on a material rather than a light. It is
+ * exposed in the shader, and `emissiveExposureWeight` decides whether it is exposed at all: at 1 it
+ * is a true cd/m² luminance, at 0 the exposure cancels out and `emissiveLuminance` degrades to a
+ * display-referred multiplier. Imported glTF/FBX materials use 0 to preserve glTF's display-referred
+ * emissive, so their `emissiveLuminance` does not read in nits.
  *
  * @public
  */

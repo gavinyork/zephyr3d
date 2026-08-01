@@ -2380,6 +2380,17 @@ export class SharedModel extends Disposable {
       }
       pbrMaterial.emissiveColor = assetPBRMaterial.common.emissiveColor!;
       pbrMaterial.emissiveStrength = assetPBRMaterial.common.emissiveStrength!;
+      // glTF authors emissive as a display-referred value, not a photometric luminance, so it must
+      // not be attenuated by the camera exposure or every imported emitter goes black under physical
+      // lighting. Filament's gltfio does the same by writing `material.emissive.w = 0`. Mirroring the
+      // strength into the luminance slot then makes both lighting modes render the asset identically.
+      //
+      // Consequence worth knowing: weight 0 cancels the exposure out of the emissive product, so on
+      // an imported material `emissiveLuminance` is NOT in cd/m². It is a display-referred multiplier
+      // that is already bright at 1 and ignores aperture/shutter/ISO. Retuning such a material
+      // photometrically means raising the weight to 1 and rescaling into nits.
+      pbrMaterial.emissiveLuminance = assetPBRMaterial.common.emissiveStrength!;
+      pbrMaterial.emissiveExposureWeight = 0;
       if (assetPBRMaterial.common.occlusionMap) {
         const info = await getTextureInfo(assetPBRMaterial.common.occlusionMap);
         if (info) {
@@ -2448,6 +2459,17 @@ export class SharedModel extends Disposable {
       }
       pbrMaterial.emissiveColor = assetPBRMaterial.common.emissiveColor!;
       pbrMaterial.emissiveStrength = assetPBRMaterial.common.emissiveStrength!;
+      // glTF authors emissive as a display-referred value, not a photometric luminance, so it must
+      // not be attenuated by the camera exposure or every imported emitter goes black under physical
+      // lighting. Filament's gltfio does the same by writing `material.emissive.w = 0`. Mirroring the
+      // strength into the luminance slot then makes both lighting modes render the asset identically.
+      //
+      // Consequence worth knowing: weight 0 cancels the exposure out of the emissive product, so on
+      // an imported material `emissiveLuminance` is NOT in cd/m². It is a display-referred multiplier
+      // that is already bright at 1 and ignores aperture/shutter/ISO. Retuning such a material
+      // photometrically means raising the weight to 1 and rescaling into nits.
+      pbrMaterial.emissiveLuminance = assetPBRMaterial.common.emissiveStrength!;
+      pbrMaterial.emissiveExposureWeight = 0;
       if (assetPBRMaterial.common.occlusionMap) {
         const info = await getTextureInfo(assetPBRMaterial.common.occlusionMap);
         if (info) {

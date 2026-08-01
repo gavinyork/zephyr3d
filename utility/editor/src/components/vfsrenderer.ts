@@ -1078,6 +1078,10 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           sampler: material.emissiveTextureSampler
         })
       : null;
+    // A blueprint Emissive output replaces the whole emissive term, so it can only carry one of the
+    // material's two authoring quantities. This bakes the legacy display-referred emissiveStrength;
+    // the physical emissiveLuminance is copied onto the blueprint material by copyFrom but is not
+    // reachable from the graph. Retune the baked value if the target scene is in physical mode.
     const emissiveFactor =
       material.emissiveStrength !== 1
         ? {

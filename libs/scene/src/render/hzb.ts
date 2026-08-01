@@ -30,7 +30,7 @@ class HiZInitBlitter extends CopyBlitter {
     sampleType: 'float' | 'int' | 'uint'
   ) {
     const depth = super.filter(scope, type, srcTex, srcUV, srcLayer, sampleType);
-    return scope.$builder.vec4(depth.xx, 0, 1);
+    return scope.$builder.vec4(depth.x, 0, 0, 1);
   }
 }
 
@@ -245,9 +245,9 @@ function buildHZBProgram(device: AbstractDevice) {
             device.type === 'webgpu' ? 0 : this.srcMipLevel
           );
         }
-        this.$l.minDepth = pb.min(pb.min(this.d0.r, this.d1.r), pb.min(this.d2.r, this.d3.r));
-        this.$l.maxDepth = pb.max(pb.max(this.d0.g, this.d1.g), pb.max(this.d2.g, this.d3.g));
-        this.$outputs.color = pb.vec4(this.minDepth, this.maxDepth, 0, 1);
+        // Furthest-depth (max) reduction; standard Z, so max = farthest.
+        this.$l.maxDepth = pb.max(pb.max(this.d0.r, this.d1.r), pb.max(this.d2.r, this.d3.r));
+        this.$outputs.color = pb.vec4(this.maxDepth, 0, 0, 1);
       });
     }
   })!;

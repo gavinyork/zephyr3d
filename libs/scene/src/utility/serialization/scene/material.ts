@@ -328,8 +328,8 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
     {
       name: 'EmissiveStrength',
       description:
-        'Intensity multiplier for the emissive color and emissive texture. Under physical lighting ' +
-        'the product is a luminance in cd/m², so values far above 1 are expected.',
+        'Display-referred intensity multiplier for the emissive color and texture, used by legacy ' +
+        'lighting. Physical lighting uses EmissiveLuminance instead.',
       type: 'float',
       options: {
         animatable: true,
@@ -347,10 +347,35 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
       }
     },
     {
+      name: 'EmissiveLuminance',
+      description:
+        'Emissive multiplier used by physical lighting. With EmissiveExposureWeight at 1 it is a ' +
+        'luminance in cd/m²: a display is 200-1000, a neon sign 5,000-20,000, a sunlit white ' +
+        'surface ~25,000. With the weight at 0, as on imported glTF/FBX materials, the exposure ' +
+        'cancels out and it is a display-referred multiplier where the useful range is about [0, 1].',
+      type: 'float',
+      options: {
+        animatable: true,
+        minValue: 0
+      },
+      get(this: PBRMaterial, value) {
+        value.num[0] = this.emissiveLuminance;
+      },
+      set(this: PBRMaterial, value) {
+        this.emissiveLuminance = value.num[0];
+      },
+      isHidden: createBlueprintOutputHiddenPredicate(['Emissive']),
+      getDefaultValue(this: PBRMaterial) {
+        return this.$isInstance ? this.coreMaterial.emissiveLuminance : 1000;
+      }
+    },
+    {
       name: 'EmissiveExposureWeight',
       description:
-        'How strongly the emissive term follows camera exposure. 1 treats it as a photometric ' +
-        'luminance that dims as the camera stops down; 0 keeps it display-referred.',
+        'How strongly the emissive term follows camera exposure, and therefore what unit ' +
+        'EmissiveLuminance carries. 1 reads it as a cd/m² luminance that dims as the camera stops ' +
+        'down; 0 cancels the exposure out, making it a display-referred multiplier that ignores ' +
+        'aperture, shutter and ISO. Imported glTF/FBX materials are set to 0.',
       type: 'float',
       options: {
         animatable: true,

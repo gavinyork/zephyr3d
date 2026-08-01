@@ -127,6 +127,69 @@ describe('SSGI shader generation', () => {
     expect(atrousProgram.fragmentSource).toContain('effStep');
     expect(effect.createSurfaceProgram(ctx)).toBeTruthy();
     expect(effect.createUpsampleProgram(ctx)).toBeTruthy();
+    expect(effect.createCompositeProgram(ctx, false)).toBeTruthy();
+    expect(effect.createCompositeProgram(ctx, true)).toBeTruthy();
+  });
+
+  test.each(['webgpu', 'webgl'] as const)('traces ambient occlusion alongside %s irradiance', (type) => {
+    const ctx = createShaderContext(type);
+    const effect = new SSGI() as any;
+
+    // AO must be derived from the same visibility the sky removal uses, averaged
+    // over the resolved rays so an indeterminate one cannot read as unoccluded.
+    const traceProgram = effect.createTraceProgram(ctx, type === 'webgpu', false);
+    expect(traceProgram.fragmentSource).toContain('occludedSum');
+    expect(traceProgram.fragmentSource).toContain('determinateCount');
+
+    // Every stage between the trace and the composite has to carry the channel,
+    // otherwise the AO silently reverts to the unfiltered trace output.
+    const temporalProgram = effect.createTemporalProgram(ctx, false);
+    expect(temporalProgram.fragmentSource).toContain('currentAOTex');
+    if (type === 'webgpu') {
+      const temporalHistoryProgram = effect.createTemporalProgram(ctx, true);
+      expect(temporalHistoryProgram.fragmentSource).toContain('previousAOTex');
+      // AO accumulates on the irradiance's validity, and is neighborhood-clamped
+      // against its own extents rather than the radiance ones.
+      expect(temporalHistoryProgram.fragmentSource).toContain('aoNeighborhoodMin');
+    }
+    expect(effect.createAtrousProgram(ctx).fragmentSource).toContain('aoSourceTex');
+    expect(effect.createUpsampleProgram(ctx).fragmentSource).toContain('aoSourceTex');
+
+    // The composite is what replaces the standalone SAO pass.
+    const compositeProgram = effect.createCompositeProgram(ctx, false);
+    expect(compositeProgram.fragmentSource).toContain('finalAO');
+  });
+
+  // The a-trous edge-stopping weights ride an SVGF ramp: historyConfidence 0 is
+  // the relaxed end (wide kernel, loose normal and luminance tests), 1 is the
+  // sharp end. A path with no temporal resolve has moments.z pinned at 1 and can
+  // never converge, so it has to sit at the relaxed end - it is the noisiest
+  // input the filter ever receives. Sending it to the sharp end instead gives the
+  // worst input the narrowest kernel and an eighth of the luminance tolerance,
+  // which reads as heavy surviving Monte Carlo noise.
+  test.each(['webgpu', 'webgl'] as const)('ramps %s denoising toward relaxed without history', (type) => {
+    const ctx = createShaderContext(type);
+    const effect = new SSGI() as any;
+    const src: string = effect.createAtrousProgram(ctx).fragmentSource;
+    // WGSL declares `let historyConfidence: f32 = ...` and GLSL
+    // `float historyConfidence = ...`, so match on the guard instead of on `=`.
+    // denoiseParams.x is what the JS side sets to 0 on the paths that never
+    // accumulate history.
+    const rampLine = src
+      .split('\n')
+      .find((line) => line.includes('historyConfidence') && line.includes('denoiseParams.x > 0.0'));
+    expect(rampLine).toBeTruthy();
+    if (type === 'webgpu') {
+      // WGSL select() takes the false value first.
+      expect(rampLine).toContain('select(0.0,');
+    } else {
+      expect(rampLine!.trimEnd().endsWith(': 0.0;')).toBe(true);
+    }
+
+    // The ramp itself must stay oriented relaxed -> sharp, otherwise a
+    // confidence of 0 would no longer mean "widen and loosen".
+    expect(src).toContain('mix(2.0,1.0,historyConfidence)');
+    expect(src).toContain('mix(8.0,1.0,historyConfidence)');
   });
 
   test.each(['webgpu', 'webgl'] as const)('builds %s lighting history repair', (type) => {

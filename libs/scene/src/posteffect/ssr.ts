@@ -3,7 +3,12 @@ import type { PostEffectSetupContext } from './posteffect';
 import { linearToGamma } from '../shaders/misc';
 import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
-import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D, SSR_calcJitter } from '../shaders/ssr';
+import {
+  screenSpaceRayTracing_HiZ,
+  screenSpaceRayTracing_Linear2D,
+  SSR_calcJitter,
+  SSR_interleavedGradientNoise
+} from '../shaders/ssr';
 import { temporalResolve } from '../shaders/temporal';
 import type { Nullable } from '@zephyr3d/base';
 import { Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
@@ -535,6 +540,9 @@ export class SSR extends AbstractPostEffect {
     if (ctx.HiZTexture) {
       bindGroup.setTexture('hizTex', ctx.HiZTexture, nearestSampler);
       bindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
+      // Temporal jitter phase for the UE5-style fixed-step HZB march
+      // (UE View.StateFrameIndexMod8).
+      bindGroup.setValue('ssrFrameIndex', device.frameInfo.frameCounter % 8);
       bindGroup.setValue(
         'targetSize',
         new Vector4(
@@ -1208,10 +1216,11 @@ export class SSR extends AbstractPostEffect {
         this.ssrStrengthMode = pb.int().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
         if (ctx.HiZTexture) {
-          // Hi-Z is rg32f and is sampled with a nearest sampler. Do not
+          // Hi-Z is r32f and is sampled with a nearest sampler. Do not
           // require the optional float32-filterable feature just to bind it.
           this.hizTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           this.depthMipLevels = pb.int().uniform(0);
+          this.ssrFrameIndex = pb.float().uniform(0);
         } else {
           this.ssrStride = pb.float().uniform(0);
         }
@@ -1303,12 +1312,24 @@ export class SSR extends AbstractPostEffect {
               );
               this.$l.hitInfo = pb.vec4(0);
               if (ctx.HiZTexture) {
-                if (DEBUG_HIZ_INTERSECT) {
-                  this.$l.hizDebug = pb.vec4(0);
-                }
+                // UE5-style temporal jitter of the fixed-step march; the
+                // temporal resolve pass converges the resulting noise.
+                this.$l.ssrStepOffset = pb.sub(
+                  SSR_interleavedGradientNoise(this, this.$builtins.fragCoord.xy, this.ssrFrameIndex),
+                  0.5
+                );
+                // Nudge the ray origin off the surface along the normal so the
+                // grazing-angle march does not self-intersect the reflector's
+                // quantized depth staircase (regular stripe artifacts). Scales
+                // with view distance to track depth precision; same idea as the
+                // SSGI ray-origin bias.
+                this.$l.ssrRayOrigin = pb.add(
+                  this.viewPos,
+                  pb.mul(pb.normalize(this.viewNormal), pb.max(0.01, pb.mul(pb.neg(this.viewPos.z), 0.002)))
+                );
                 this.hitInfo = screenSpaceRayTracing_HiZ(
                   this,
-                  this.viewPos,
+                  this.ssrRayOrigin,
                   this.reflectVec,
                   this.viewMatrix,
                   this.projMatrix,
@@ -1320,9 +1341,10 @@ export class SSR extends AbstractPostEffect {
                   this.ssrParams.z,
                   this.targetSize,
                   this.hizTex,
-                  DEBUG_HIZ_INTERSECT ? this.normalTex : undefined,
+                  this.normalTex,
                   undefined,
-                  DEBUG_HIZ_INTERSECT ? this.hizDebug : undefined
+                  this.roughness,
+                  this.ssrStepOffset
                 );
               } else {
                 this.hitInfo = screenSpaceRayTracing_Linear2D(

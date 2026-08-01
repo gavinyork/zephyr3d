@@ -292,7 +292,18 @@ describe('Physical lighting and camera units', () => {
 
     // Default follows exposure, matching Filament's emissive.w default.
     expect(material.emissiveExposureWeight).toBe(1);
-    // Physical emissive is a cd/m² luminance, so the strength must not be capped at 1.
+    // The physical emitter is authored on its own cd/m² property, so switching lightingMode never
+    // reinterprets the legacy emissiveStrength as a luminance. 1 nit would be invisible.
+    expect(material.emissiveLuminance).toBe(1000);
+    expect(material.emissiveStrength).toBe(1);
+    // A luminance is unbounded above: a neon sign is 5,000-20,000 cd/m².
+    material.emissiveLuminance = 5000;
+    expect(material.emissiveLuminance).toBeCloseTo(5000, 6);
+    expect(material.emissiveStrength).toBe(1);
+    // Negative luminance is not physical.
+    material.emissiveLuminance = -1;
+    expect(material.emissiveLuminance).toBe(0);
+    material.emissiveLuminance = 5000;
     material.emissiveStrength = 5000;
     expect(material.emissiveStrength).toBeCloseTo(5000, 6);
     material.emissiveExposureWeight = 0;
@@ -306,11 +317,51 @@ describe('Physical lighting and camera units', () => {
     const serialized = await manager.serializeObject(material);
     expect(serialized.Object).toMatchObject({
       EmissiveStrength: 5000,
+      EmissiveLuminance: 5000,
       EmissiveExposureWeight: 0.25
     });
     const restored = (await manager.deserializeObject<PBRMetallicRoughnessMaterial>(null, serialized))!;
     expect(restored.emissiveStrength).toBeCloseTo(5000, 6);
+    expect(restored.emissiveLuminance).toBeCloseTo(5000, 6);
     expect(restored.emissiveExposureWeight).toBeCloseTo(0.25, 6);
+  });
+
+  test('emissive at the default exposure is comparable to a sunlit surface', () => {
+    // The bug this split fixes: with a single field, emissiveStrength = 1 meant 1 cd/m², which the
+    // Sunny-16 pre-exposure crushes to 2.6e-5 while a sunlit white surface lands at 0.66. Anchor the
+    // relation so the default luminance stays in a visible band.
+    const exposure = calculatePhysicalExposure(16, 1 / 125, 100);
+    const material = new PBRMetallicRoughnessMaterial();
+    const sunlitWhite = ((100000 * 0.8) / Math.PI) * exposure;
+    expect(sunlitWhite).toBeCloseTo(0.663, 3);
+    // What a bare emissiveStrength = 1 used to produce under physical lighting.
+    expect(1 * exposure).toBeLessThan(1e-4);
+    // What the dedicated luminance default produces instead: ~4 orders of magnitude brighter.
+    expect(material.emissiveLuminance * exposure).toBeCloseTo(0.026, 3);
+  });
+
+  test('a zero exposure weight turns emissiveLuminance display-referred', () => {
+    // The gotcha behind the "imported emitter is blinding at emissiveLuminance = 1" report. The
+    // shaded value is color * emissiveLuminance * mix(1, exposure, weight), so weight 0 removes the
+    // exposure from the product entirely: the same authored number is ~38,400x brighter than at
+    // weight 1, and no aperture/shutter/ISO change moves it. Importers write weight 0 to preserve
+    // glTF's display-referred emissive, so emissiveLuminance is only in cd/m² at weight 1.
+    const shaded = (luminance: number, weight: number, exposure: number) =>
+      luminance * (1 * (1 - weight) + exposure * weight);
+
+    const sunny16 = calculatePhysicalExposure(16, 1 / 125, 100);
+    const interior = calculatePhysicalExposure(2.8, 1 / 60, 400);
+    expect(interior).toBeGreaterThan(sunny16);
+
+    // Weight 1: a photometric luminance, so it dims as the camera stops down.
+    expect(shaded(1, 1, sunny16)).toBeLessThan(1e-4);
+    expect(shaded(1, 1, interior)).toBeGreaterThan(shaded(1, 1, sunny16));
+
+    // Weight 0: display-referred, already at full white in the HDR target and exposure-invariant.
+    expect(shaded(1, 0, sunny16)).toBe(1);
+    expect(shaded(1, 0, interior)).toBe(shaded(1, 0, sunny16));
+    // Brighter than a sunlit white surface, which is the "far too bright" the report describes.
+    expect(shaded(1, 0, sunny16)).toBeGreaterThan(((100000 * 0.8) / Math.PI) * sunny16);
   });
 
   test('anchors the atmosphere normalization to the physical daylight reference', () => {

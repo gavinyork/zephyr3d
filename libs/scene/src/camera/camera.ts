@@ -359,6 +359,10 @@ export class Camera extends SceneNode {
   protected _ssgiResolvedSettings: SSGIResolvedSettings;
   /** @internal SSGI irradiance composite strength. */
   protected _ssgiIntensity: number;
+  /** @internal Strength of the ambient occlusion traced alongside SSGI. */
+  protected _ssgiAOIntensity: number;
+  /** @internal Contrast curve of the SSGI ambient occlusion. */
+  protected _ssgiAOPower: number;
   /** @internal Fraction of environment irradiance removed by an occluding hit. */
   protected _ssgiSkyOcclusion: number;
   /** @internal Maximum view-space ray distance. */
@@ -547,6 +551,8 @@ export class Camera extends SceneNode {
     const defaultSSGIQualityPreset = SSGI_QUALITY_PRESET_SETTINGS.quality;
     this._ssgiResolvedSettings = { ...defaultSSGIQualityPreset };
     this._ssgiIntensity = 0.7;
+    this._ssgiAOIntensity = 0.8;
+    this._ssgiAOPower = 1;
     this._ssgiSkyOcclusion = 1;
     this._ssgiMaxDistance = 32;
     this._ssgiThickness = 0.5;
@@ -1032,6 +1038,38 @@ export class Camera extends SceneNode {
       this._ssgiSkyOcclusion = next;
       this.invalidateSSGIHistory();
     }
+  }
+  /**
+   * How strongly the ambient occlusion traced alongside SSGI darkens the scene,
+   * in [0, 1]. 0 disables the composite entirely.
+   *
+   * The occlusion comes from the same rays that produce the irradiance, at no
+   * extra trace cost, and is multiplied into the final opaque color — the same
+   * semantics the standalone {@link SAO} post effect applies. **Enabling both at
+   * once therefore darkens twice.** Its range is the SSGI trace range
+   * ({@link Camera.ssgiMaxDistance}), so this is long-range occlusion rather than
+   * the small-radius contact darkening a dedicated AO pass produces.
+   *
+   * Defaults to 0.8 rather than 1: SSGI irradiance already has sky occlusion
+   * subtracted, so diffuse is partly occluded before this multiply is applied.
+   */
+  get ssgiAOIntensity() {
+    return this._ssgiAOIntensity;
+  }
+  set ssgiAOIntensity(val) {
+    this._ssgiAOIntensity = Math.max(0, Math.min(1, val ?? 0));
+  }
+  /**
+   * Contrast curve applied to the SSGI ambient occlusion before it is composited.
+   *
+   * Values above 1 deepen the occluded regions, below 1 lift them. Purely an art
+   * direction control on an already-traced quantity.
+   */
+  get ssgiAOPower() {
+    return this._ssgiAOPower;
+  }
+  set ssgiAOPower(val) {
+    this._ssgiAOPower = Math.max(0.01, val ?? 1);
   }
   /** Maximum SSGI ray length in view-space units. */
   get ssgiMaxDistance() {
@@ -2008,6 +2046,7 @@ export class Camera extends SceneNode {
     history?.invalidate(RGHistoryResources.SSGI_IRRADIANCE);
     history?.invalidate(RGHistoryResources.SSGI_SURFACE);
     history?.invalidate(RGHistoryResources.SSGI_MOMENTS);
+    history?.invalidate(RGHistoryResources.SSGI_AO);
   }
 
   private updateSSSResolvedSettings() {

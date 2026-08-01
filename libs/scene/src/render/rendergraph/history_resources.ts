@@ -11,5 +11,7 @@ export const RGHistoryResources = {
   /** Depth/normal surface data used to validate SSGI reprojection. */
   SSGI_SURFACE: 'ssgiSurface',
   /** First and second luminance moments used by the SSGI temporal filter. */
-  SSGI_MOMENTS: 'ssgiMoments'
+  SSGI_MOMENTS: 'ssgiMoments',
+  /** Temporally accumulated screen space ambient occlusion traced alongside SSGI. */
+  SSGI_AO: 'ssgiAO'
 } as const;
