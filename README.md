@@ -151,6 +151,50 @@ Use with your preferred bundler (Vite / Webpack / Rollup).
 
 ---
 
+## Depth Convention (Reverse-Z)
+
+The engine supports two depth conventions, selected once at load time:
+
+- **Standard-Z** (default): device depth 0 at the near plane, 1 at the far plane.
+- **Reverse-Z**: device depth 1 at the near plane, 0 at the far plane. With a floating
+  point depth buffer (`d32f` / `d32fs8`, the default on WebGPU and WebGL2) this yields a
+  nearly uniform depth error distribution and greatly reduces far-distance z-fighting.
+
+Enable reverse-Z with a build-time define so your bundler can eliminate the unused code
+path:
+
+```js
+// vite.config.js / esbuild
+define: { __ZEPHYR3D_REVERSE_Z__: 'true' }
+
+// rollup (@rollup/plugin-replace)
+replace({ preventAssignment: true, values: { __ZEPHYR3D_REVERSE_Z__: 'true' } })
+```
+
+Without a bundler, set the global **before the first import of any `@zephyr3d/*` module**:
+
+```html
+<script>globalThis.__ZEPHYR3D_REVERSE_Z__ = true;</script>
+<script type="module" src="app.js"></script>
+```
+
+The convention is fixed for the lifetime of the page. Backend notes:
+
+- **WebGPU**: full benefit, no extra requirements.
+- **WebGL/WebGL2**: the engine activates `EXT_clip_control` when available
+  (Chromium 121+); without it a shader-side fallback keeps rendering correct but the
+  precision benefit is limited. WebGL1 has no float depth format, so reverse-Z is
+  functionally supported but yields no precision gain there.
+- Custom materials should use the exported constants (`REVERSE_Z`, `DEPTH_CLEAR_VALUE`,
+  `DEPTH_COMPARE_DEFAULT`, `DEPTH_FARTHEST`, ...) from `@zephyr3d/base` and the
+  `ShaderHelper` depth utilities instead of hard-coding depth values or compare
+  directions.
+- Known limitation: oblique-clipped projections
+  (`Matrix4x4.obliqueProjection/obliquePerspective`, used by planar water reflections)
+  are not yet supported under reverse-Z and throw an explicit error.
+
+---
+
 ## Example — Scene API
 
 ```ts

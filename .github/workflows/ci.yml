@@ -54,9 +54,6 @@ jobs:
         working-directory: test
         run: npx jest --ci
 
-      # Informational until the reverse-Z implementation lands (phase D flips
-      # this to a required check).
-      - name: Unit tests (reverse-Z, informational)
+      - name: Unit tests (reverse-Z)
         working-directory: test
         run: npx cross-env Z_CONVENTION=reverse jest --ci
-        continue-on-error: true

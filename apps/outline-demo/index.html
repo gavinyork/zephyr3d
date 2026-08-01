@@ -28,6 +28,11 @@
         <output id="outline-width-value">0.10</output>
       </label>
     </section>
+    <script>
+      // Select the engine depth convention before any engine module loads.
+      // Append ?reverseZ to the URL to run this demo with reverse-Z.
+      globalThis.__ZEPHYR3D_REVERSE_Z__ = new URLSearchParams(location.search).has("reverseZ");
+    </script>
     <script type="module" src="js/main.js"></script>
   </body>
 </html>
