@@ -42,6 +42,7 @@ import {
 import type { StorageTextureConstructor } from './constructors';
 import { getCurrentProgramBuilder, setCurrentProgramBuilder } from './misc';
 import type { Nullable } from '@zephyr3d/base';
+import { REVERSE_Z } from '@zephyr3d/base';
 
 const COMPUTE_UNIFORM_NAME = 'zUBC';
 const COMPUTE_STORAGE_NAME = 'zSBC';
@@ -1085,6 +1086,27 @@ export interface ProgramBuilder {
  * The program builder class
  * @public
  */
+/**
+ * Clip-space depth correction applied at the end of the vertex shader main
+ * function to map the engine's canonical clip space to the device clip space.
+ *
+ * - Standard-Z canonical clip space is GL style ([-1, 1] depth); WebGPU
+ *   needs `gl2zo` (z' = (z + w) / 2).
+ * - Reverse-Z canonical clip space is zero-to-one; devices whose clip space
+ *   is already zero-to-one (WebGPU, WebGL with EXT_clip_control activated)
+ *   need no correction, otherwise `zo2gl` (z' = 2z - w) maps back to GL
+ *   clip space so the fixed-function [0,1] window remap restores the
+ *   original zero-to-one depth.
+ */
+export type ClipSpaceCorrection = 'none' | 'gl2zo' | 'zo2gl';
+
+function resolveClipSpaceCorrection(device: AbstractDevice): ClipSpaceCorrection {
+  if (REVERSE_Z) {
+    return device.clipSpaceZeroToOne ? 'none' : 'zo2gl';
+  }
+  return device.type === 'webgpu' ? 'gl2zo' : 'none';
+}
+
 export class ProgramBuilder {
   /** @internal */
   _device: AbstractDevice;
@@ -1113,7 +1135,7 @@ export class ProgramBuilder {
   /** @internal */
   _vertexAttributes: number[];
   /** @internal */
-  _depthRangeCorrection: boolean;
+  _clipSpaceCorrection: ClipSpaceCorrection;
   /** @internal */
   _emulateDepthClamp: boolean;
   /** @internal */
@@ -1143,7 +1165,7 @@ export class ProgramBuilder {
     this._inputs = [];
     this._outputs = [];
     this._vertexAttributes = [];
-    this._depthRangeCorrection = device.type === 'webgpu';
+    this._clipSpaceCorrection = resolveClipSpaceCorrection(device);
     this._emulateDepthClamp = false;
     this._lastError = null;
     this._reflection = new PBReflection(this);
@@ -1195,7 +1217,14 @@ export class ProgramBuilder {
   }
   /** @internal */
   get depthRangeCorrection(): boolean {
-    return this._depthRangeCorrection;
+    return this._clipSpaceCorrection === 'gl2zo';
+  }
+  /**
+   * Clip-space depth correction applied at the end of the vertex shader.
+   * @internal
+   */
+  get clipSpaceCorrection(): ClipSpaceCorrection {
+    return this._clipSpaceCorrection;
   }
   get emulateDepthClamp(): boolean {
     return this._emulateDepthClamp;
@@ -1224,7 +1253,7 @@ export class ProgramBuilder {
     this._inputs = [];
     this._outputs = [];
     this._vertexAttributes = [];
-    this._depthRangeCorrection = this._device.type === 'webgpu';
+    this._clipSpaceCorrection = resolveClipSpaceCorrection(this._device);
     this._reflection = new PBReflection(this);
     this._autoStructureTypeIndex = 0;
     this._nameMap = [];
@@ -3591,17 +3620,40 @@ export class PBGlobalScope extends PBScope {
           body?.call(this);
           //this.chMainStub();
           if (pb.shaderType === ShaderType.Vertex) {
-            if (pb.depthRangeCorrection) {
-              this.$builtins.position.z = pb.mul(
-                pb.add(this.$builtins.position.z, this.$builtins.position.w),
-                0.5
-              );
-            }
-            if (pb.emulateDepthClamp) {
-              //z = gl_Position.z / gl_Position.w;
-              //z = (gl_DepthRange.diff * z + gl_DepthRange.near + gl_DepthRange.far) * 0.5;
-              this.$outputs.clamppedDepth = pb.div(this.$builtins.position.z, this.$builtins.position.w);
-              this.$builtins.position.z = 0;
+            if (REVERSE_Z) {
+              // Canonical clip space is zero-to-one: z/w of the uncorrected
+              // position is exactly the device depth on every backend.
+              if (pb.emulateDepthClamp) {
+                this.$outputs.clamppedDepth = pb.div(
+                  this.$builtins.position.z,
+                  this.$builtins.position.w
+                );
+              }
+              if (pb.clipSpaceCorrection === 'zo2gl') {
+                this.$builtins.position.z = pb.sub(
+                  pb.mul(this.$builtins.position.z, 2),
+                  this.$builtins.position.w
+                );
+              }
+              if (pb.emulateDepthClamp) {
+                this.$builtins.position.z = 0;
+              }
+            } else {
+              if (pb.depthRangeCorrection) {
+                this.$builtins.position.z = pb.mul(
+                  pb.add(this.$builtins.position.z, this.$builtins.position.w),
+                  0.5
+                );
+              }
+              if (pb.emulateDepthClamp) {
+                //z = gl_Position.z / gl_Position.w;
+                //z = (gl_DepthRange.diff * z + gl_DepthRange.near + gl_DepthRange.far) * 0.5;
+                this.$outputs.clamppedDepth = pb.div(
+                  this.$builtins.position.z,
+                  this.$builtins.position.w
+                );
+                this.$builtins.position.z = 0;
+              }
             }
           }
 
@@ -3616,12 +3668,32 @@ export class PBGlobalScope extends PBScope {
           this.$builtins.fragDepth = pb.clamp(this.$inputs.clamppedDepth, 0, 1);
         }
         body?.call(this);
-        if (pb.shaderType === ShaderType.Vertex && pb.emulateDepthClamp) {
-          this.$outputs.clamppedDepth = pb.div(
-            pb.add(pb.div(this.$builtins.position.z, this.$builtins.position.w), 1),
-            2
-          );
-          this.$builtins.position.z = 0;
+        if (pb.shaderType === ShaderType.Vertex) {
+          if (REVERSE_Z) {
+            // Canonical clip space is zero-to-one: z/w of the uncorrected
+            // position is exactly the device depth on every backend.
+            if (pb.emulateDepthClamp) {
+              this.$outputs.clamppedDepth = pb.div(
+                this.$builtins.position.z,
+                this.$builtins.position.w
+              );
+            }
+            if (pb.clipSpaceCorrection === 'zo2gl') {
+              this.$builtins.position.z = pb.sub(
+                pb.mul(this.$builtins.position.z, 2),
+                this.$builtins.position.w
+              );
+            }
+            if (pb.emulateDepthClamp) {
+              this.$builtins.position.z = 0;
+            }
+          } else if (pb.emulateDepthClamp) {
+            this.$outputs.clamppedDepth = pb.div(
+              pb.add(pb.div(this.$builtins.position.z, this.$builtins.position.w), 1),
+              2
+            );
+            this.$builtins.position.z = 0;
+          }
         }
       });
     }

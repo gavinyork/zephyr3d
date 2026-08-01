@@ -2281,6 +2281,8 @@ export interface MiscCaps {
   maxTexCoordIndex: number;
   /** True if the device supports GPU timestamp query scopes */
   supportTimestampQuery: boolean;
+  /** True if the device can switch the clip-space depth range to [0, 1] (EXT_clip_control on WebGL, always true on WebGPU) */
+  supportClipControl: boolean;
 }
 
 /**
@@ -2524,6 +2526,14 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   getBackBufferHeight(): number;
   /** Get the device capabilities */
   getDeviceCaps(): Immutable<DeviceCaps>;
+  /**
+   * True if the device clip space maps depth to [0, 1] (zero-to-one).
+   *
+   * Always true on WebGPU. On WebGL this becomes true when the engine runs
+   * with the reverse-Z convention and the EXT_clip_control extension has
+   * been activated; otherwise the clip space is GL style [-1, 1].
+   */
+  readonly clipSpaceZeroToOne: boolean;
   /** Schedule next frame */
   nextFrame(callback: () => void): number;
   /** Cancel schedule next frame */

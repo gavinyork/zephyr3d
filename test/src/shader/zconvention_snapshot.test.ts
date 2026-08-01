@@ -13,9 +13,10 @@ import { computeShadowMapDepth } from '../../../libs/scene/src/shaders/shadow';
  * keep these snapshots byte-identical.
  */
 
-function createMockDevice(type: 'webgpu' | 'webgl2'): AbstractDevice {
+function createMockDevice(type: 'webgpu' | 'webgl2', clipSpaceZeroToOne?: boolean): AbstractDevice {
   return {
     type,
+    clipSpaceZeroToOne: clipSpaceZeroToOne ?? type === 'webgpu',
     getDeviceCaps() {
       return {
         shaderCaps: {
@@ -61,6 +62,41 @@ describe('depth convention status-quo shader snapshots', () => {
     expect(ret![0]).toMatchSnapshot(`${deviceType}-depthclamp-vs`);
     expect(ret![1]).toMatchSnapshot(`${deviceType}-depthclamp-fs`);
   });
+
+  // Full clip-space correction matrix: device type x zero-to-one clip space
+  // x emulateDepthClamp. Covers 'gl2zo' (standard/webgpu), 'zo2gl'
+  // (reverse/webgl without EXT_clip_control) and 'none' paths.
+  test.each([
+    ['webgpu', true],
+    ['webgl2', true],
+    ['webgl2', false]
+  ] as ['webgpu' | 'webgl2', boolean][])(
+    'clip-space correction matrix (%s, zeroToOne=%s)',
+    (deviceType, zeroToOne) => {
+      for (const emulateDepthClamp of [false, true]) {
+        const pb = new ProgramBuilder(createMockDevice(deviceType, zeroToOne));
+        pb.emulateDepthClamp = emulateDepthClamp;
+        const ret = pb.buildRender({
+          vertex(pb) {
+            this.$inputs.pos = pb.vec3().attrib('position');
+            pb.main(function () {
+              this.$builtins.position = pb.vec4(this.$inputs.pos, 1);
+            });
+          },
+          fragment(pb) {
+            this.$outputs.color = pb.vec4();
+            pb.main(function () {
+              this.$outputs.color = pb.vec4(1);
+            });
+          }
+        });
+        expect(ret).not.toBeNull();
+        expect(ret![0]).toMatchSnapshot(
+          `${deviceType}-zo_${zeroToOne}-clamp_${emulateDepthClamp}-vs`
+        );
+      }
+    }
+  );
 
   test.each([...DEVICE_TYPES])('sky-style far plane push (z = w) (%s)', (deviceType) => {
     const pb = new ProgramBuilder(createMockDevice(deviceType));

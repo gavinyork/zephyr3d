@@ -209,14 +209,28 @@ export class WebGLFramebufferCaps implements FramebufferCaps {
   }
 }
 
+/**
+ * Minimal typing for the EXT_clip_control WebGL extension (community
+ * approved; not yet present in all TypeScript DOM libs).
+ */
+export interface EXTClipControl {
+  readonly LOWER_LEFT_EXT: number;
+  readonly UPPER_LEFT_EXT: number;
+  readonly NEGATIVE_ONE_TO_ONE_EXT: number;
+  readonly ZERO_TO_ONE_EXT: number;
+  clipControlEXT(origin: number, depth: number): void;
+}
+
 export class WebGLMiscCaps implements MiscCaps {
   private readonly _isWebGL2: boolean;
   private readonly _extIndexUint32: Nullable<OES_element_index_uint>;
   private readonly _extBlendMinMax: Nullable<EXT_blend_minmax>;
+  private readonly _extClipControl: Nullable<EXTClipControl>;
   supportOversizedViewport: boolean;
   supportBlendMinMax: boolean;
   support32BitIndex: boolean;
   supportDepthClamp: boolean;
+  supportClipControl: boolean;
   maxBindGroups: number;
   maxTexCoordIndex: number;
   supportTimestampQuery: boolean;
@@ -234,9 +248,17 @@ export class WebGLMiscCaps implements MiscCaps {
     }
     this.supportOversizedViewport = true;
     this.supportDepthClamp = false;
+    // Community approved extension, available on both WebGL1 and WebGL2
+    // contexts where implemented (Chromium 121+).
+    this._extClipControl = gl.getExtension('EXT_clip_control') as Nullable<EXTClipControl>;
+    this.supportClipControl = !!this._extClipControl;
     this.maxBindGroups = 4;
     this.maxTexCoordIndex = 8;
     this.supportTimestampQuery = false;
+  }
+  /** The EXT_clip_control extension object if available */
+  get extClipControl(): Nullable<EXTClipControl> {
+    return this._extClipControl;
   }
 }
 export class WebGLShaderCaps implements ShaderCaps {

@@ -193,6 +193,9 @@ export class WebGPUDevice extends BaseDevice {
   getDeviceCaps(): Immutable<DeviceCaps> {
     return this._deviceCaps;
   }
+  get clipSpaceZeroToOne(): boolean {
+    return true;
+  }
   getDrawingBufferWidth() {
     return this.getFramebuffer()?.getWidth() || this.canvas.width;
   }

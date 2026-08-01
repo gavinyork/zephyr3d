@@ -1,5 +1,5 @@
 import type { Vector4, TypedArray, Immutable, Nullable } from '@zephyr3d/base';
-import { DEPTH_CLEAR_VALUE, makeObservable } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, REVERSE_Z, makeObservable } from '@zephyr3d/base';
 import type {
   WebGLContext,
   FrameBufferOptions,
@@ -222,6 +222,7 @@ export class WebGLDevice extends BaseDevice {
   private readonly _msaaSampleCount: number;
   private readonly _loseContextExtension: Nullable<WEBGL_lose_context>;
   private _contextLost: boolean;
+  private _clipSpaceZeroToOne = false;
   private _isRendering: boolean;
   private _reverseWindingOrder: boolean;
   private _deviceCaps!: DeviceCaps;
@@ -357,6 +358,9 @@ export class WebGLDevice extends BaseDevice {
   }
   getDeviceCaps(): Immutable<DeviceCaps> {
     return this._deviceCaps;
+  }
+  get clipSpaceZeroToOne(): boolean {
+    return this._clipSpaceZeroToOne;
   }
   get vaoExt() {
     return this._vaoExt;
@@ -1372,6 +1376,19 @@ export class WebGLDevice extends BaseDevice {
       shaderCaps: new WebGLShaderCaps(this._context),
       textureCaps: new WebGLTextureCaps(this._context)
     };
+    // Under the reverse-Z convention switch the clip-space depth range to
+    // [0, 1] when EXT_clip_control is available, so vertex shaders need no
+    // depth remapping and the full float depth precision is preserved.
+    // Set globalThis.__ZEPHYR3D_NO_CLIP_CONTROL__ before device creation to
+    // force the shader-side fallback (debugging aid).
+    this._clipSpaceZeroToOne = false;
+    if (REVERSE_Z && !(globalThis as Record<string, unknown>).__ZEPHYR3D_NO_CLIP_CONTROL__) {
+      const extClipControl = (this._deviceCaps.miscCaps as WebGLMiscCaps).extClipControl;
+      if (extClipControl) {
+        extClipControl.clipControlEXT(extClipControl.LOWER_LEFT_EXT, extClipControl.ZERO_TO_ONE_EXT);
+        this._clipSpaceZeroToOne = true;
+      }
+    }
     this._vaoExt = this.createVertexArrayObjectEXT();
     this._instancedArraysExt = this.createInstancedArraysEXT();
     this._drawBuffersExt = this.createDrawBuffersEXT();

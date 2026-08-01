@@ -321,6 +321,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   abstract getBackBufferWidth(): number;
   abstract getBackBufferHeight(): number;
   abstract getDeviceCaps(): Immutable<DeviceCaps>;
+  abstract get clipSpaceZeroToOne(): boolean;
   abstract initContext(): Promise<void>;
   abstract clearFrameBuffer(
     clearColor: FrameBufferClearColors,

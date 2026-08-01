@@ -99,6 +99,7 @@ precision highp int;
 in vec3 zVSInput_pos;
 void main() {
   gl_Position = vec4(zVSInput_pos,1.0);
+  gl_Position.z = (gl_Position.z * 2.0) - gl_Position.w;
 }
 "
 `;
@@ -112,7 +113,8 @@ in vec3 zVSInput_pos;
 out float zVSOutput_clamppedDepth;
 void main() {
   gl_Position = vec4(zVSInput_pos,1.0);
-  zVSOutput_clamppedDepth = ((gl_Position.z / gl_Position.w) + 1.0) / 2.0;
+  zVSOutput_clamppedDepth = gl_Position.z / gl_Position.w;
+  gl_Position.z = (gl_Position.z * 2.0) - gl_Position.w;
   gl_Position.z = 0.0;
 }
 "
@@ -139,7 +141,7 @@ in vec3 zVSInput_pos;
 out float zVSOutput_clamppedDepth;
 void main() {
   gl_Position = vec4(zVSInput_pos,1.0);
-  zVSOutput_clamppedDepth = ((gl_Position.z / gl_Position.w) + 1.0) / 2.0;
+  zVSOutput_clamppedDepth = gl_Position.z / gl_Position.w;
   gl_Position.z = 0.0;
 }
 "
@@ -155,7 +157,6 @@ struct zVSOutput {
 var<private> zVSOutputCpy: zVSOutput;
 @vertex fn main(zVertexInput: zVSInput) -> zVSOutput {
   zVSOutputCpy.zPosition = vec4<f32>(zVertexInput.zVSInput_pos,1.0);
-  zVSOutputCpy.zPosition.z = (zVSOutputCpy.zPosition.z + zVSOutputCpy.zPosition.w) * 0.5;
   return zVSOutputCpy;
 }
 "
@@ -172,7 +173,6 @@ struct zVSOutput {
 var<private> zVSOutputCpy: zVSOutput;
 @vertex fn main(zVertexInput: zVSInput) -> zVSOutput {
   zVSOutputCpy.zPosition = vec4<f32>(zVertexInput.zVSInput_pos,1.0);
-  zVSOutputCpy.zPosition.z = (zVSOutputCpy.zPosition.z + zVSOutputCpy.zPosition.w) * 0.5;
   zVSOutputCpy.zVSOutput_clamppedDepth = zVSOutputCpy.zPosition.z / zVSOutputCpy.zPosition.w;
   zVSOutputCpy.zPosition.z = 0.0;
   return zVSOutputCpy;
@@ -271,6 +271,7 @@ precision highp int;
 in vec3 zVSInput_pos;
 void main() {
   gl_Position = vec4(zVSInput_pos,1.0);
+  gl_Position.z = (gl_Position.z * 2.0) - gl_Position.w;
 }
 "
 `;
@@ -297,7 +298,6 @@ struct zVSOutput {
 var<private> zVSOutputCpy: zVSOutput;
 @vertex fn main(zVertexInput: zVSInput) -> zVSOutput {
   zVSOutputCpy.zPosition = vec4<f32>(zVertexInput.zVSInput_pos,1.0);
-  zVSOutputCpy.zPosition.z = (zVSOutputCpy.zPosition.z + zVSOutputCpy.zPosition.w) * 0.5;
   return zVSOutputCpy;
 }
 "
@@ -325,7 +325,8 @@ in vec3 zVSInput_pos;
 out float zVSOutput_clamppedDepth;
 void main() {
   gl_Position = vec4(zVSInput_pos,1.0);
-  zVSOutput_clamppedDepth = ((gl_Position.z / gl_Position.w) + 1.0) / 2.0;
+  zVSOutput_clamppedDepth = gl_Position.z / gl_Position.w;
+  gl_Position.z = (gl_Position.z * 2.0) - gl_Position.w;
   gl_Position.z = 0.0;
 }
 "
@@ -359,7 +360,6 @@ struct zVSOutput {
 var<private> zVSOutputCpy: zVSOutput;
 @vertex fn main(zVertexInput: zVSInput) -> zVSOutput {
   zVSOutputCpy.zPosition = vec4<f32>(zVertexInput.zVSInput_pos,1.0);
-  zVSOutputCpy.zPosition.z = (zVSOutputCpy.zPosition.z + zVSOutputCpy.zPosition.w) * 0.5;
   zVSOutputCpy.zVSOutput_clamppedDepth = zVSOutputCpy.zPosition.z / zVSOutputCpy.zPosition.w;
   zVSOutputCpy.zPosition.z = 0.0;
   return zVSOutputCpy;
@@ -375,6 +375,7 @@ precision highp int;
 in vec2 zVSInput_pos;
 void main() {
   gl_Position = vec4(zVSInput_pos,1.0,1.0);
+  gl_Position.z = (gl_Position.z * 2.0) - gl_Position.w;
 }
 "
 `;
@@ -389,7 +390,6 @@ struct zVSOutput {
 var<private> zVSOutputCpy: zVSOutput;
 @vertex fn main(zVertexInput: zVSInput) -> zVSOutput {
   zVSOutputCpy.zPosition = vec4<f32>(zVertexInput.zVSInput_pos,1.0,1.0);
-  zVSOutputCpy.zPosition.z = (zVSOutputCpy.zPosition.z + zVSOutputCpy.zPosition.w) * 0.5;
   return zVSOutputCpy;
 }
 "
@@ -404,6 +404,7 @@ in vec3 zVSInput_pos;
 void main() {
   gl_Position = vec4(zVSInput_pos,1.0);
   gl_Position.z = gl_Position.w;
+  gl_Position.z = (gl_Position.z * 2.0) - gl_Position.w;
 }
 "
 `;
@@ -419,7 +420,6 @@ var<private> zVSOutputCpy: zVSOutput;
 @vertex fn main(zVertexInput: zVSInput) -> zVSOutput {
   zVSOutputCpy.zPosition = vec4<f32>(zVertexInput.zVSInput_pos,1.0);
   zVSOutputCpy.zPosition.z = zVSOutputCpy.zPosition.w;
-  zVSOutputCpy.zPosition.z = (zVSOutputCpy.zPosition.z + zVSOutputCpy.zPosition.w) * 0.5;
   return zVSOutputCpy;
 }
 "
