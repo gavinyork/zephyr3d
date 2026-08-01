@@ -338,39 +338,38 @@ export class PBRMetallicRoughnessMaterial
   }
   private buildSubsurfaceProfile(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
+    const hasExplicitTransmissionAuthoring = !!(this.transmissionTexture || this.thicknessTexture);
     scope.$l.sssMask = pb.float(1);
     scope.$l.sssScatterSoftness = pb.float(0);
-    scope.$l.sssTransmissionMask = pb.float(0);
+    // Negative alpha marks profiles that need conservative screen-space thin-region inference.
+    scope.$l.sssTransmissionMask = pb.float(hasExplicitTransmissionAuthoring ? 0 : -1);
     if (this.subsurfaceTexture) {
       scope.$l.sssTexel = this.sampleSubsurfaceTexture(scope);
       scope.sssMask = pb.clamp(scope.sssTexel.r, 0, 1);
       scope.sssScatterSoftness = pb.clamp(scope.sssTexel.g, 0, 1);
     }
-    // A profile always enables diffusion, but thin transmission requires an authored map.
-    scope.$l.sssTransmissionAuthor = pb.float(this.thicknessTexture ? 1 : 0);
-    if (this.transmissionTexture) {
-      scope.sssTransmissionAuthor = pb.clamp(
-        pb.mul(this.sampleTransmissionTexture(scope).r, scope.zTransmissionFactor ?? 0),
+    if (hasExplicitTransmissionAuthoring) {
+      scope.$l.sssTransmissionAuthor = pb.float(this.thicknessTexture ? 1 : 0);
+      if (this.transmissionTexture) {
+        scope.sssTransmissionAuthor = pb.clamp(
+          pb.mul(this.sampleTransmissionTexture(scope).r, scope.zTransmissionFactor ?? 0),
+          0,
+          1
+        );
+      }
+      scope.$l.sssThinAuthorMask = pb.float(this.transmissionTexture ? 1 : 0);
+      if (this.thicknessTexture) {
+        // KHR_materials_volume stores thickness in G: zero is thin and one is thick.
+        scope.$l.sssThicknessSample = pb.clamp(this.sampleThicknessTexture(scope).g, 0, 1);
+        scope.sssThinAuthorMask = pb.sub(1, scope.sssThicknessSample);
+      }
+      scope.$l.sssAuthoredTransmissionMask = pb.clamp(
+        pb.mul(scope.sssTransmissionAuthor, scope.sssThinAuthorMask),
         0,
         1
       );
+      scope.sssTransmissionMask = scope.sssAuthoredTransmissionMask;
     }
-    scope.$l.sssThinAuthorMask = pb.float(this.transmissionTexture ? 1 : 0);
-    if (this.thicknessTexture) {
-      // KHR_materials_volume stores thickness in G: zero is thin and one is thick.
-      scope.$l.sssThicknessSample = pb.clamp(this.sampleThicknessTexture(scope).g, 0, 1);
-      scope.sssThinAuthorMask = pb.sub(1, scope.sssThicknessSample);
-    }
-    scope.$l.sssAuthoredTransmissionMask = pb.clamp(
-      pb.mul(scope.sssTransmissionAuthor, scope.sssThinAuthorMask),
-      0,
-      1
-    );
-    scope.sssTransmissionMask = pb.clamp(
-      pb.max(scope.sssTransmissionMask, scope.sssAuthoredTransmissionMask),
-      0,
-      1
-    );
     scope.$l.sssScatterStrengthMask = pb.clamp(
       pb.add(pb.mul(scope.sssMask, 0.82), pb.mul(scope.sssScatterSoftness, 0.38)),
       0,

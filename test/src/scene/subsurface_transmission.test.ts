@@ -42,14 +42,14 @@ describe('Subsurface profile specular detail', () => {
 });
 
 describe('Subsurface transmission authoring', () => {
-  test('does not infer thin transmission from a subsurface profile alone', () => {
+  test('marks a profile without authored thickness for screen-space thin-region inference', () => {
     const material = new PBRMetallicRoughnessMaterial();
     const profile = buildSubsurfaceProfile(material);
 
     expect(profile[0]).toBeGreaterThan(0);
     expect(profile[1]).toBeGreaterThan(0);
     expect(profile[2]).toBeGreaterThan(0);
-    expect(profile[3]).toBe(0);
+    expect(profile[3]).toBe(-1);
   });
 
   test('treats the thickness texture G channel as thin-to-thick coverage', () => {

@@ -1177,8 +1177,8 @@ export class SSS extends AbstractPostEffect {
           this.$l.scatterSoftnessAuthor = pb.clamp(pb.mul(pb.sub(this.param.a, 0.75), 4), 0, 1);
           this.$l.roughnessInfo = pb.textureSampleLevel(this.roughnessTex, this.uv, 0);
           this.$l.profileStrength = this.max3(this.profile.rgb);
+          this.$l.automaticTransmission = pb.lessThan(this.profile.a, 0);
           this.$l.materialTransmissionMask = pb.clamp(this.profile.a, 0, 1);
-          this.debugTransmissionMask = this.materialTransmissionMask;
           this.$l.profileSlot = this.readProfileSlot(this.param);
           this.$l.depth01 = this.readDepth01(this.uv);
           this.$l.result = this.baseColor.rgb;
@@ -1375,6 +1375,18 @@ export class SSS extends AbstractPostEffect {
               this.$l.depthThinness = this.thinnessComponents.x;
               this.$l.curvatureThinness = this.thinnessComponents.y;
               this.$l.screenThinness = this.thinnessComponents.z;
+              this.$l.backLightFacing = pb.clamp(pb.dot(pb.neg(this.normalWS), this.sunDirWS), 0, 1);
+              this.$l.backLightGate = pb.pow(this.backLightFacing, pb.max(this.transmissionPower, 0.1));
+              this.$l.automaticThinMask = pb.mul(
+                pb.smoothStep(0.24, 0.72, this.screenThinness),
+                pb.mix(0.58, 1, this.backLightGate)
+              );
+              this.materialTransmissionMask = this.$choice(
+                this.automaticTransmission,
+                this.automaticThinMask,
+                this.materialTransmissionMask
+              );
+              this.debugTransmissionMask = this.materialTransmissionMask;
               this.debugThinness = this.screenThinness;
               this.debugThinnessLayers = pb.vec3(this.depthThinness, this.curvatureThinness, 0);
               this.$l.wrappedFront = pb.smoothStep(
@@ -1848,8 +1860,6 @@ export class SSS extends AbstractPostEffect {
                   pb.vec3(0),
                   pb.vec3(1)
                 );
-                this.$l.backLightFacing = pb.clamp(pb.dot(pb.neg(this.normalWS), this.sunDirWS), 0, 1);
-                this.$l.backLightGate = pb.pow(this.backLightFacing, pb.max(this.transmissionPower, 0.1));
                 // Keep warm thin-shell lighting on the back-facing side of the surface.
                 this.$l.backLit = pb.mul(this.backLightGate, this.transmissionLightAttenuation);
                 this.$l.thicknessBackScatter = pb.clamp(
