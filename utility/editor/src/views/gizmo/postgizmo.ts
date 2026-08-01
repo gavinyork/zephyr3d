@@ -2371,7 +2371,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
 
     // Clip to -w <= z <= w
-    function clipZToClipVolumeGL(
+    function clipZToClipVolume(
       ax: number,
       ay: number,
       az: number,
@@ -2424,13 +2424,26 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         return true;
       }
 
-      // near: z + w >= 0  => -(dz+dw) * t <= z0 + w0
-      if (!clipTest(-(dz + dw), z0 + w0)) {
-        return null;
-      }
-      // far:  w - z >= 0  => -(dw-dz) * t <= w0 - z0
-      if (!clipTest(-(dw - dz), w0 - z0)) {
-        return null;
+      if (REVERSE_Z) {
+        // Reverse ZO clip volume: 0 <= z <= w
+        // near: w - z >= 0  => (dz-dw) * t <= w0 - z0
+        if (!clipTest(dz - dw, w0 - z0)) {
+          return null;
+        }
+        // far:  z >= 0  => -dz * t <= z0
+        if (!clipTest(-dz, z0)) {
+          return null;
+        }
+      } else {
+        // GL clip volume: -w <= z <= w
+        // near: z + w >= 0  => -(dz+dw) * t <= z0 + w0
+        if (!clipTest(-(dz + dw), z0 + w0)) {
+          return null;
+        }
+        // far:  w - z >= 0  => -(dw-dz) * t <= w0 - z0
+        if (!clipTest(-(dw - dz), w0 - z0)) {
+          return null;
+        }
       }
 
       if (t1p < t0) {
@@ -2455,8 +2468,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
     [clipX1, clipY1, clipZ1, clipW1, clipX2, clipY2, clipZ2, clipW2] = wClipped;
 
-    // ---- clip z to GL clip volume ----
-    const zClipped = clipZToClipVolumeGL(clipX1, clipY1, clipZ1, clipW1, clipX2, clipY2, clipZ2, clipW2);
+    // ---- clip z to the clip volume of the active depth convention ----
+    const zClipped = clipZToClipVolume(clipX1, clipY1, clipZ1, clipW1, clipX2, clipY2, clipZ2, clipW2);
     if (!zClipped) {
       return;
     }
