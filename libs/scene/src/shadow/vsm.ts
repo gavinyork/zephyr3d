@@ -9,7 +9,7 @@ import type {
 import { ShadowImpl } from './shadow_impl';
 import type { BlitType } from '../blitter';
 import { Blitter } from '../blitter';
-import { computeShadowMapDepth, filterShadowVSM } from '../shaders/shadow';
+import { applyShadowDepthBias, computeShadowMapDepth, filterShadowVSM, ndcToShadowCoord, shadowCoordDepthInRange } from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
 import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encode2HalfToRGBA } from '../shaders/misc';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
@@ -398,7 +398,7 @@ export class VSM extends ShadowImpl {
       [pb.vec4('shadowVertex'), pb.float('NdotL'), pb.int('split')],
       function () {
         this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
-        this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
+        this.$l.shadowCoord = ndcToShadowCoord(this, this.shadowCoord);
         this.$l.inShadow = pb.all(
           pb.bvec2(
             pb.all(
@@ -409,13 +409,13 @@ export class VSM extends ShadowImpl {
                 pb.lessThanEqual(this.shadowCoord.y, 1)
               )
             ),
-            pb.lessThanEqual(this.shadowCoord.z, 1)
+            shadowCoordDepthInRange(this, this.shadowCoord.z)
           )
         );
         this.$l.shadow = pb.float(1);
         this.$if(this.inShadow, function () {
           this.$l.shadowBias = computeShadowBiasCSM(this, this.NdotL, this.split);
-          this.shadowCoord.z = pb.sub(this.shadowCoord.z, this.shadowBias);
+          this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.shadowBias, true);
           this.shadow = filterShadowVSM(
             this,
             shadowMapParams.lightType,
@@ -457,7 +457,7 @@ export class VSM extends ShadowImpl {
         );
       } else {
         this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
-        this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
+        this.$l.shadowCoord = ndcToShadowCoord(this, this.shadowCoord);
         this.$l.inShadow = pb.all(
           pb.bvec2(
             pb.all(
@@ -468,7 +468,7 @@ export class VSM extends ShadowImpl {
                 pb.lessThanEqual(this.shadowCoord.y, 1)
               )
             ),
-            pb.lessThanEqual(this.shadowCoord.z, 1)
+            shadowCoordDepthInRange(this, this.shadowCoord.z)
           )
         );
         this.$l.shadow = pb.float(1);
@@ -496,7 +496,7 @@ export class VSM extends ShadowImpl {
               false
             );
           }
-          this.shadowCoord.z = pb.sub(this.shadowCoord.z, this.shadowBias);
+          this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.shadowBias, shadowMapParams.lightType !== LIGHT_TYPE_SPOT);
           this.shadow = filterShadowVSM(
             this,
             shadowMapParams.lightType,

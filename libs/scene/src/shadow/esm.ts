@@ -2,7 +2,7 @@ import type { FrameBuffer, TextureFormat, PBShaderExp, PBInsideFunctionScope } f
 import { ShadowImpl } from './shadow_impl';
 import type { BlitType } from '../blitter';
 import { GaussianBlurBlitter } from '../blitter';
-import { computeShadowMapDepth, filterShadowESM } from '../shaders/shadow';
+import { computeShadowMapDepth, filterShadowESM, ndcToShadowCoord, shadowCoordDepthInRange } from '../shaders/shadow';
 import { decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { LIGHT_TYPE_POINT } from '../values';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
@@ -456,7 +456,7 @@ export class ESM extends ShadowImpl {
       [pb.vec4('shadowVertex'), pb.float('NdotL'), pb.int('split')],
       function () {
         this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
-        this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
+        this.$l.shadowCoord = ndcToShadowCoord(this, this.shadowCoord);
         this.$l.inShadow = pb.all(
           pb.bvec2(
             pb.all(
@@ -467,7 +467,7 @@ export class ESM extends ShadowImpl {
                 pb.lessThanEqual(this.shadowCoord.y, 1)
               )
             ),
-            pb.lessThanEqual(this.shadowCoord.z, 1)
+            shadowCoordDepthInRange(this, this.shadowCoord.z)
           )
         );
         this.$l.shadow = pb.float(1);
@@ -524,7 +524,7 @@ export class ESM extends ShadowImpl {
         );
       } else {
         this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
-        this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
+        this.$l.shadowCoord = ndcToShadowCoord(this, this.shadowCoord);
         this.$l.inShadow = pb.all(
           pb.bvec2(
             pb.all(
@@ -535,7 +535,7 @@ export class ESM extends ShadowImpl {
                 pb.lessThanEqual(this.shadowCoord.y, 1)
               )
             ),
-            pb.lessThanEqual(this.shadowCoord.z, 1)
+            shadowCoordDepthInRange(this, this.shadowCoord.z)
           )
         );
         this.$l.shadow = pb.float(1);

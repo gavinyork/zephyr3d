@@ -3,7 +3,7 @@ import { Vector4 } from '@zephyr3d/base';
 import type { PBInsideFunctionScope, PBShaderExp, TextureFormat } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
-import { computeReceiverPlaneDepthBias, computeShadowMapDepth, filterShadowPCSS } from '../shaders/shadow';
+import { applyShadowDepthBias, computeReceiverPlaneDepthBias, computeShadowMapDepth, filterShadowPCSS, ndcToShadowCoord, shadowCoordDepthInRange } from '../shaders/shadow';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
 import { ShaderHelper } from '../material/shader/helper';
@@ -134,7 +134,7 @@ export class PCSS extends ShadowImpl {
       [pb.vec4('shadowVertex'), pb.float('NdotL'), pb.int('split')],
       function () {
         this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
-        this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
+        this.$l.shadowCoord = ndcToShadowCoord(this, this.shadowCoord);
         this.$l.inShadow = pb.all(
           pb.bvec2(
             pb.all(
@@ -145,14 +145,14 @@ export class PCSS extends ShadowImpl {
                 pb.lessThanEqual(this.shadowCoord.y, 1)
               )
             ),
-            pb.lessThanEqual(this.shadowCoord.z, 1)
+            shadowCoordDepthInRange(this, this.shadowCoord.z)
           )
         );
         this.$l.shadow = pb.float(1);
         this.$l.receiverPlaneDepthBias = computeReceiverPlaneDepthBias(this, this.shadowCoord);
         this.$if(this.inShadow, function () {
           this.$l.shadowBias = computeShadowBiasCSM(this, this.NdotL, this.split);
-          this.shadowCoord.z = pb.sub(this.shadowCoord.z, this.shadowBias);
+          this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.shadowBias, true);
           this.shadow = filterShadowPCSS(
             this,
             shadowMapParams.lightType,
@@ -206,7 +206,7 @@ export class PCSS extends ShadowImpl {
         );
       }
       this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
-      this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
+      this.$l.shadowCoord = ndcToShadowCoord(this, this.shadowCoord);
       this.$l.inShadow = pb.all(
         pb.bvec2(
           pb.all(
@@ -217,7 +217,7 @@ export class PCSS extends ShadowImpl {
               pb.lessThanEqual(this.shadowCoord.y, 1)
             )
           ),
-          pb.lessThanEqual(this.shadowCoord.z, 1)
+          shadowCoordDepthInRange(this, this.shadowCoord.z)
         )
       );
       this.$l.shadow = pb.float(1);
@@ -248,7 +248,7 @@ export class PCSS extends ShadowImpl {
             false
           );
         }
-        this.shadowCoord.z = pb.sub(this.shadowCoord.z, this.shadowBias);
+        this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.shadowBias, shadowMapParams.lightType !== LIGHT_TYPE_SPOT);
         this.shadow = filterShadowPCSS(
           this,
           shadowMapParams.lightType,

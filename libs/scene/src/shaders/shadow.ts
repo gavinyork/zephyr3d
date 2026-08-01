@@ -1,10 +1,73 @@
 import type { TextureFormat, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { hasDepthChannel } from '@zephyr3d/device';
+import { DEPTH_FARTHEST, REVERSE_Z } from '@zephyr3d/base';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_RECT, LIGHT_TYPE_SPOT } from '../values';
 import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from './misc';
 import { ShaderHelper } from '../material/shader/helper';
 import { smoothNoise3D } from './noise';
 import { getDevice } from '../app/api';
+
+/**
+ * Whether the shadow-space depth compared by a filter is the device depth
+ * (direction flips under reverse-Z) or a linear distance encoding
+ * (direction independent). Directional/rect receivers use the light
+ * projection device depth; point uses distance/range and spot a linear
+ * view-depth encoding.
+ * @internal
+ */
+export function isDeviceDepthShadow(lightType: number): boolean {
+  return lightType !== LIGHT_TYPE_POINT && lightType !== LIGHT_TYPE_SPOT;
+}
+
+/**
+ * Maps the shadow-space NDC position to shadow map coordinates: xy to
+ * [0, 1] texture space, depth to the device depth range. Under standard-Z
+ * all components map from GL [-1, 1]; under reverse-Z the depth is already
+ * zero-to-one and passes through.
+ * @internal
+ */
+export function ndcToShadowCoord(scope: PBInsideFunctionScope, ndc: PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  return REVERSE_Z
+    ? pb.vec4(pb.add(pb.mul(ndc.xy, 0.5), pb.vec2(0.5)), ndc.z, ndc.w)
+    : pb.add(pb.mul(ndc, 0.5), 0.5);
+}
+
+/**
+ * vec3 variant of {@link ndcToShadowCoord}.
+ * @internal
+ */
+export function ndcToShadowCoord3(scope: PBInsideFunctionScope, ndc: PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  return REVERSE_Z
+    ? pb.vec3(pb.add(pb.mul(ndc.xy, 0.5), pb.vec2(0.5)), ndc.z)
+    : pb.add(pb.mul(ndc, 0.5), 0.5);
+}
+
+/**
+ * Whether a shadow map device depth lies within the far bound of the
+ * shadow projection ("not beyond the shadow far plane").
+ * @internal
+ */
+export function shadowCoordDepthInRange(scope: PBInsideFunctionScope, z: PBShaderExp): PBShaderExp {
+  const pb = scope.$builder;
+  return REVERSE_Z ? pb.greaterThanEqual(z, 0) : pb.lessThanEqual(z, 1);
+}
+
+/**
+ * Applies a depth bias that moves the receiver towards the light in the
+ * encoding of the compared shadow depth.
+ * @internal
+ */
+export function applyShadowDepthBias(
+  scope: PBInsideFunctionScope,
+  z: PBShaderExp,
+  bias: PBShaderExp,
+  deviceEncoded: boolean
+): PBShaderExp {
+  const pb = scope.$builder;
+  return REVERSE_Z && deviceEncoded ? pb.add(z, bias) : pb.sub(z, bias);
+}
 
 /*
   const PCF_KERNEL_3x3 = [
@@ -290,7 +353,11 @@ function sampleShadowMapPCF(
         if (shadowMapFormat === 'rgba8unorm') {
           this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
         }
-        this.$return(pb.step(sampleDepth, this.shadowTex.x));
+        // Receiver and stored depth are device-encoded here; under reverse-Z
+        // "lit" means receiver depth >= stored depth.
+        this.$return(
+          REVERSE_Z ? pb.step(this.shadowTex.x, sampleDepth) : pb.step(sampleDepth, this.shadowTex.x)
+        );
       }
     }
   );
@@ -348,7 +415,13 @@ function sampleShadowMap(
           if (shadowMapFormat === 'rgba8unorm') {
             this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
           }
-          this.$return(pb.step(this.z, this.shadowTex.x));
+          // directional/rect compare device depth (flips under reverse-Z);
+          // spot receivers convert to a linear encoding beforehand.
+          this.$return(
+            REVERSE_Z && isDeviceDepthShadow(lightType)
+              ? pb.step(this.shadowTex.x, this.z)
+              : pb.step(this.z, this.shadowTex.x)
+          );
         }
       }
     }
@@ -426,7 +499,8 @@ function sampleShadowDepthPCSS(
     funcName,
     [pb.vec2('coords'), pb.vec4('bounds'), ...(cascade ? [pb.int('cascade')] : [])],
     function () {
-      this.$l.depth = pb.float(1);
+      // out-of-bounds samples read as "farthest" (no blocker)
+      this.$l.depth = pb.float(DEPTH_FARTHEST);
       this.$l.sampleInside = pb.all(
         pb.bvec4(
           pb.greaterThanEqual(this.coords.x, this.bounds.x),
@@ -483,15 +557,21 @@ function compareShadowDepthPCSS(
   scope: PBInsideFunctionScope,
   sampleDepth: PBShaderExp,
   compareDepth: PBShaderExp,
-  transitionWidth: PBShaderExp
+  transitionWidth: PBShaderExp,
+  deviceEncoded: boolean
 ) {
-  const funcName = 'lib_compareShadowDepthPCSS';
+  // Lit when the stored depth is farther than the receiver; farther means a
+  // smaller value for device-encoded depth under reverse-Z.
+  const flip = REVERSE_Z && deviceEncoded;
+  const funcName = flip ? 'lib_compareShadowDepthPCSSRev' : 'lib_compareShadowDepthPCSS';
   const pb = scope.$builder;
   pb.func(
     funcName,
     [pb.float('sampleDepth'), pb.float('compareDepth'), pb.float('transitionWidth')],
     function () {
-      this.$l.depthDelta = pb.sub(this.sampleDepth, this.compareDepth);
+      this.$l.depthDelta = flip
+        ? pb.sub(this.compareDepth, this.sampleDepth)
+        : pb.sub(this.sampleDepth, this.compareDepth);
       this.$return(pb.smoothStep(pb.neg(this.transitionWidth), this.transitionWidth, this.depthDelta));
     }
   );
@@ -550,7 +630,7 @@ function sampleShadowPCFPCSS(
           : this.compareDepth;
         this.shadow = pb.add(
           this.shadow,
-          compareShadowDepthPCSS(this, this.sampleDepth, this.tapCompareDepth, this.transitionWidth)
+          compareShadowDepthPCSS(this, this.sampleDepth, this.tapCompareDepth, this.transitionWidth, true)
         );
       }
       this.$return(pb.mul(this.shadow, 0.25));
@@ -603,7 +683,7 @@ function samplePointShadowPCFPCSS(
         this.sampleDepth = samplePointShadowDepthPCSS(this, shadowMapFormat, this.sampleDir);
         this.shadow = pb.add(
           this.shadow,
-          compareShadowDepthPCSS(this, this.sampleDepth, this.compareDepth, this.transitionWidth)
+          compareShadowDepthPCSS(this, this.sampleDepth, this.compareDepth, this.transitionWidth, false)
         );
       }
       this.$return(pb.mul(this.shadow, 0.25));
@@ -659,12 +739,16 @@ function findBlockerPCSS(
           this.bounds,
           this.cascade
         );
+        // Blocker when the sample is closer to the light than the receiver;
+        // device-encoded depth mirrors the difference under reverse-Z.
         this.blockerWeight = pb.sub(
           1,
           pb.smoothStep(
             pb.neg(this.transitionWidth),
             this.transitionWidth,
-            pb.sub(this.sampleDepth, this.texCoord.z)
+            REVERSE_Z
+              ? pb.sub(this.texCoord.z, this.sampleDepth)
+              : pb.sub(this.sampleDepth, this.texCoord.z)
           )
         );
         this.blockerDepthSum = pb.add(this.blockerDepthSum, pb.mul(this.sampleDepth, this.blockerWeight));
@@ -764,15 +848,27 @@ function findPointBlockerPCSS(
     ](dir, compareDepth, searchRadius, tapCount, transitionWidth, matrix, tangent, bitangent) as PBShaderExp;
 }
 
-function chebyshevUpperBound(scope: PBInsideFunctionScope, distance: PBShaderExp, occluder: PBShaderExp) {
-  const funcNameChebyshevUpperBound = 'lib_chebyshevUpperBound';
+function chebyshevUpperBound(
+  scope: PBInsideFunctionScope,
+  distance: PBShaderExp,
+  occluder: PBShaderExp,
+  deviceEncoded: boolean
+) {
+  const flip = REVERSE_Z && deviceEncoded;
+  const funcNameChebyshevUpperBound = flip ? 'lib_chebyshevUpperBoundRev' : 'lib_chebyshevUpperBound';
   const pb = scope.$builder;
   pb.func(funcNameChebyshevUpperBound, [pb.float('distance'), pb.vec3('occluder')], function () {
     this.$l.shadow = pb.float(1);
     this.$l.coverage = this.occluder.z;
     this.$l.invCoverage = pb.div(1, pb.max(this.coverage, 0.00001));
     this.$l.moments = pb.mul(this.occluder.xy, this.invCoverage);
-    this.$l.test = pb.step(this.distance, this.moments.x);
+    // The one-sided Chebyshev bound applies when the receiver is farther
+    // than the mean occluder depth; variance and squared difference are
+    // invariant under the reverse-Z d -> 1-d mirror, only the side test
+    // flips.
+    this.$l.test = flip
+      ? pb.step(this.moments.x, this.distance)
+      : pb.step(this.distance, this.moments.x);
     this.$if(pb.notEqual(this.test, 1), function () {
       this.$l.d = pb.sub(this.distance, this.moments.x);
       this.$l.variance = pb.max(pb.sub(this.moments.y, pb.mul(this.moments.x, this.moments.x)), 0.000002);
@@ -808,7 +904,8 @@ export function filterShadowVSM(
             this.texCoord.w,
             shadowMapFormat === 'rgba8unorm'
               ? pb.vec3(decode2HalfFromRGBA(this, this.shadowTex), 1)
-              : this.shadowTex.rgb
+              : this.shadowTex.rgb,
+            false
           )
         );
       } else {
@@ -828,7 +925,8 @@ export function filterShadowVSM(
             this.texCoord.z,
             shadowMapFormat === 'rgba8unorm'
               ? pb.vec3(decode2HalfFromRGBA(this, this.shadowTex), 1)
-              : this.shadowTex.rgb
+              : this.shadowTex.rgb,
+            isDeviceDepthShadow(lightType)
           )
         );
       }
@@ -891,13 +989,25 @@ export function filterShadowESM(
           this.$l.depth = this.shadowVertex.z;
         }
       }
+      const deviceEncoded = isDeviceDepthShadow(lightType);
       if (depthBias) {
-        this.depth = pb.max(0, pb.sub(this.depth, this.depthBias));
+        this.depth =
+          REVERSE_Z && deviceEncoded
+            ? pb.min(1, pb.add(this.depth, this.depthBias))
+            : pb.max(0, pb.sub(this.depth, this.depthBias));
       }
       const depthScale = ShaderHelper.getDepthBiasValues(this).z;
-      this.$l.shadow = logSpace
-        ? pb.clamp(pb.exp(pb.min(87, pb.sub(this.shadowTex.x, pb.mul(depthScale, this.depth)))), 0, 1)
-        : pb.clamp(pb.exp(pb.min(87, pb.mul(depthScale, pb.sub(this.shadowTex.x, this.depth)))), 0, 1);
+      // ESM expects exp(k * (occluder - receiver)) with depth growing away
+      // from the light; device-encoded depth grows towards the light under
+      // reverse-Z, so the difference is mirrored.
+      this.$l.shadow =
+        REVERSE_Z && deviceEncoded
+          ? logSpace
+            ? pb.clamp(pb.exp(pb.min(87, pb.sub(pb.mul(depthScale, this.depth), this.shadowTex.x))), 0, 1)
+            : pb.clamp(pb.exp(pb.min(87, pb.mul(depthScale, pb.sub(this.depth, this.shadowTex.x)))), 0, 1)
+          : logSpace
+            ? pb.clamp(pb.exp(pb.min(87, pb.sub(this.shadowTex.x, pb.mul(depthScale, this.depth)))), 0, 1)
+            : pb.clamp(pb.exp(pb.min(87, pb.mul(depthScale, pb.sub(this.shadowTex.x, this.depth)))), 0, 1);
       if (shadowMapFormat !== 'rgba8unorm') {
         this.shadow = pb.mix(1, this.shadow, pb.clamp(this.shadowTex.y, 0, 1));
       }
@@ -933,7 +1043,9 @@ export function filterShadowPCF(
     function () {
       this.$l.lightDepth = this.texCoord.z;
       if (receiverPlaneDepthBias) {
-        this.lightDepth = pb.sub(this.lightDepth, this.receiverPlaneDepthBias.z);
+        this.lightDepth = REVERSE_Z
+          ? pb.add(this.lightDepth, this.receiverPlaneDepthBias.z)
+          : pb.sub(this.lightDepth, this.receiverPlaneDepthBias.z);
       }
       const shadowMapTexelSize = getShadowMapTexelSize(this);
       this.$l.uv = pb.add(pb.mul(this.texCoord.xy, pb.vec2(getShadowMapSize(this))), pb.vec2(0));
@@ -1560,7 +1672,9 @@ export function filterShadowPCSS(
 
       this.$l.lightDepth = this.texCoord.z;
       if (receiverPlaneDepthBias) {
-        this.lightDepth = pb.sub(this.lightDepth, this.receiverPlaneDepthBias.z);
+        this.lightDepth = REVERSE_Z
+          ? pb.add(this.lightDepth, this.receiverPlaneDepthBias.z)
+          : pb.sub(this.lightDepth, this.receiverPlaneDepthBias.z);
       }
       this.$l.sampleBounds = pb.vec4(0, 0, 1, 1);
       if (cascade && getDevice().type === 'webgl' && numCascades > 1) {
@@ -1607,10 +1721,14 @@ export function filterShadowPCSS(
       this.$if(pb.lessThanEqual(this.blocker.y, 0), function () {
         this.$return(pb.float(1));
       });
-      this.$l.penumbra = pb.div(
-        pb.max(pb.sub(this.lightDepth, this.blocker.x), 0),
-        pb.max(this.blocker.x, 0.0001)
-      );
+      // Penumbra estimation (receiver - blocker) / blocker in device depth;
+      // under reverse-Z apply the d -> 1-d mirror of the same expression.
+      this.$l.penumbra = REVERSE_Z
+        ? pb.div(
+            pb.max(pb.sub(this.blocker.x, this.lightDepth), 0),
+            pb.max(pb.sub(1, this.blocker.x), 0.0001)
+          )
+        : pb.div(pb.max(pb.sub(this.lightDepth, this.blocker.x), 0), pb.max(this.blocker.x, 0.0001));
       this.$l.filterRadius = pb.mul(
         pb.clamp(pb.mul(this.penumbra, this.PCSSlightRadius), 0, pb.max(0, this.PCSSmaxFilterRadius)),
         this.shadowMapTexelSize
@@ -1678,7 +1796,9 @@ export function filterShadowPoissonDisc(
     function () {
       this.$l.lightDepth = this.texCoord.z;
       if (receiverPlaneDepthBias) {
-        this.lightDepth = pb.sub(this.lightDepth, this.receiverPlaneDepthBias.z);
+        this.lightDepth = REVERSE_Z
+          ? pb.add(this.lightDepth, this.receiverPlaneDepthBias.z)
+          : pb.sub(this.lightDepth, this.receiverPlaneDepthBias.z);
       }
       this.$l.duv = pb.vec2();
       this.$l.sampleCoord = pb.vec2();

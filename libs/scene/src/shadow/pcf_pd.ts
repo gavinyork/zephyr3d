@@ -1,6 +1,6 @@
 import type { PBInsideFunctionScope, PBShaderExp, TextureSampler } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
-import { computeShadowMapDepth, filterShadowPCF } from '../shaders/shadow';
+import { applyShadowDepthBias, computeShadowMapDepth, filterShadowPCF, ndcToShadowCoord, shadowCoordDepthInRange } from '../shaders/shadow';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
 import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import { LIGHT_TYPE_POINT } from '../values';
@@ -8,7 +8,7 @@ import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
 import { getDevice } from '../app/api';
 import type { Nullable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { REVERSE_Z, Vector4 } from '@zephyr3d/base';
 
 /** @internal */
 export class PCFPD extends ShadowImpl {
@@ -115,7 +115,7 @@ export class PCFPD extends ShadowImpl {
       [pb.vec4('shadowVertex'), pb.float('NdotL'), pb.int('split')],
       function () {
         this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
-        this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
+        this.$l.shadowCoord = ndcToShadowCoord(this, this.shadowCoord);
         this.$l.inShadow = pb.all(
           pb.bvec2(
             pb.all(
@@ -126,13 +126,13 @@ export class PCFPD extends ShadowImpl {
                 pb.lessThanEqual(this.shadowCoord.y, 1)
               )
             ),
-            pb.lessThanEqual(this.shadowCoord.z, 1)
+            shadowCoordDepthInRange(this, this.shadowCoord.z)
           )
         );
         this.$l.shadow = pb.float(1);
         this.$if(this.inShadow, function () {
           this.$l.shadowBias = computeShadowBiasCSM(this, this.NdotL, this.split);
-          this.shadowCoord.z = pb.sub(this.shadowCoord.z, this.shadowBias);
+          this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.shadowBias, true);
           this.shadow = filterShadowPCF(
             this,
             shadowMapParams.lightType,
@@ -189,7 +189,7 @@ export class PCFPD extends ShadowImpl {
         }
       } else {
         this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
-        this.$l.shadowCoord = pb.add(pb.mul(this.shadowCoord, 0.5), 0.5);
+        this.$l.shadowCoord = ndcToShadowCoord(this, this.shadowCoord);
         this.$l.inShadow = pb.all(
           pb.bvec2(
             pb.all(
@@ -200,7 +200,7 @@ export class PCFPD extends ShadowImpl {
                 pb.lessThanEqual(this.shadowCoord.y, 1)
               )
             ),
-            pb.lessThanEqual(this.shadowCoord.z, 1)
+            shadowCoordDepthInRange(this, this.shadowCoord.z)
           )
         );
         this.$l.shadow = pb.float(1);
@@ -212,7 +212,7 @@ export class PCFPD extends ShadowImpl {
             this.NdotL,
             false
           );
-          this.shadowCoord.z = pb.sub(this.shadowCoord.z, this.shadowBias);
+          this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.shadowBias, true);
           this.shadow = filterShadowPCF(
             this,
             shadowMapParams.lightType,
@@ -248,7 +248,7 @@ export class PCFPD extends ShadowImpl {
             pb.textureSampleCompareLevel(
               ShaderHelper.getShadowMap(this),
               this.coords,
-              pb.sub(this.z, this.bias)
+              applyShadowDepthBias(this, this.z, this.bias, true)
             ),
             0,
             1
@@ -282,7 +282,7 @@ export class PCFPD extends ShadowImpl {
       [pb.vec4('coords'), pb.int('split'), pb.float('z'), pb.float('bias')],
       function () {
         const floatDepthTexture = shadowMapParams.shadowMap!.format !== 'rgba8unorm';
-        this.$l.distance = pb.sub(this.z, this.bias);
+        this.$l.distance = applyShadowDepthBias(this, this.z, this.bias, true);
         if (that.useNativeShadowMap(shadowMapParams)) {
           if (shadowMapParams.shadowMap!.isTexture2DArray()) {
             this.$return(
@@ -320,7 +320,7 @@ export class PCFPD extends ShadowImpl {
           if (!floatDepthTexture) {
             this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
           }
-          this.$return(pb.step(this.distance, this.shadowTex.x));
+          this.$return(REVERSE_Z ? pb.step(this.shadowTex.x, this.distance) : pb.step(this.distance, this.shadowTex.x));
         }
       }
     );
