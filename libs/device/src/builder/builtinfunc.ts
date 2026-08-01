@@ -16,7 +16,8 @@ const genTypeList = [
   [typeinfo.typeF32, typeinfo.typeF32Vec2, typeinfo.typeF32Vec3, typeinfo.typeF32Vec4],
   [typeinfo.typeI32, typeinfo.typeI32Vec2, typeinfo.typeI32Vec3, typeinfo.typeI32Vec4],
   [typeinfo.typeU32, typeinfo.typeU32Vec2, typeinfo.typeU32Vec3, typeinfo.typeU32Vec4],
-  [typeinfo.typeBool, typeinfo.typeBVec2, typeinfo.typeBVec3, typeinfo.typeBVec4]
+  [typeinfo.typeBool, typeinfo.typeBVec2, typeinfo.typeBVec3, typeinfo.typeBVec4],
+  [typeinfo.typeF16, typeinfo.typeF16Vec2, typeinfo.typeF16Vec3, typeinfo.typeF16Vec4]
 ];
 
 const genMatrixTypeList = [
@@ -144,6 +145,18 @@ const MASK_WEBGPU = 1 << 2;
 const MASK_WEBGL = MASK_WEBGL1 | MASK_WEBGL2;
 const MASK_ALL = MASK_WEBGL | MASK_WEBGPU;
 
+// scalar-vector mixed overloads of f16 type for binary operators (WebGPU only)
+function genTypeF16ScalarVec(name: string) {
+  return [
+    ...genType(name, MASK_WEBGPU, typeinfo.typeF16Vec2, [typeinfo.typeF16, typeinfo.typeF16Vec2]),
+    ...genType(name, MASK_WEBGPU, typeinfo.typeF16Vec2, [typeinfo.typeF16Vec2, typeinfo.typeF16]),
+    ...genType(name, MASK_WEBGPU, typeinfo.typeF16Vec3, [typeinfo.typeF16, typeinfo.typeF16Vec3]),
+    ...genType(name, MASK_WEBGPU, typeinfo.typeF16Vec3, [typeinfo.typeF16Vec3, typeinfo.typeF16]),
+    ...genType(name, MASK_WEBGPU, typeinfo.typeF16Vec4, [typeinfo.typeF16, typeinfo.typeF16Vec4]),
+    ...genType(name, MASK_WEBGPU, typeinfo.typeF16Vec4, [typeinfo.typeF16Vec4, typeinfo.typeF16])
+  ];
+}
+
 const builtinFunctionsAll = {
   add_2: {
     overloads: [
@@ -172,7 +185,10 @@ const builtinFunctionsAll = {
       ...genType('', MASK_ALL, typeinfo.typeU32Vec4, [typeinfo.typeU32, typeinfo.typeU32Vec4]),
       ...genType('', MASK_ALL, typeinfo.typeU32Vec4, [typeinfo.typeU32Vec4, typeinfo.typeU32]),
 
-      ...genMatrixType('', MASK_ALL, null, [null, null])
+      ...genMatrixType('', MASK_ALL, null, [null, null]),
+
+      ...genType('', MASK_WEBGPU, 4, [4, 4]),
+      ...genTypeF16ScalarVec('')
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       if (args.length === 2 && typeof args[0] === 'number' && typeof args[1] === 'number') {
@@ -222,7 +238,10 @@ const builtinFunctionsAll = {
       ...genType('', MASK_ALL, typeinfo.typeU32Vec4, [typeinfo.typeU32, typeinfo.typeU32Vec4]),
       ...genType('', MASK_ALL, typeinfo.typeU32Vec4, [typeinfo.typeU32Vec4, typeinfo.typeU32]),
 
-      ...genMatrixType('', MASK_ALL, null, [null, null])
+      ...genMatrixType('', MASK_ALL, null, [null, null]),
+
+      ...genType('', MASK_WEBGPU, 4, [4, 4]),
+      ...genTypeF16ScalarVec('')
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
@@ -254,7 +273,10 @@ const builtinFunctionsAll = {
       ...genType('', MASK_ALL, typeinfo.typeU32Vec3, [typeinfo.typeU32, typeinfo.typeU32Vec3]),
       ...genType('', MASK_ALL, typeinfo.typeU32Vec3, [typeinfo.typeU32Vec3, typeinfo.typeU32]),
       ...genType('', MASK_ALL, typeinfo.typeU32Vec4, [typeinfo.typeU32, typeinfo.typeU32Vec4]),
-      ...genType('', MASK_ALL, typeinfo.typeU32Vec4, [typeinfo.typeU32Vec4, typeinfo.typeU32])
+      ...genType('', MASK_ALL, typeinfo.typeU32Vec4, [typeinfo.typeU32Vec4, typeinfo.typeU32]),
+
+      ...genType('', MASK_WEBGPU, 4, [4, 4]),
+      ...genTypeF16ScalarVec('')
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
@@ -343,7 +365,10 @@ const builtinFunctionsAll = {
       ...genType('', MASK_ALL, typeinfo.typeMat3x4, [typeinfo.typeMat4, typeinfo.typeMat3x4]),
       ...genType('', MASK_ALL, typeinfo.typeMat4, [typeinfo.typeMat4, typeinfo.typeMat4]),
       ...genType('', MASK_ALL, typeinfo.typeF32Vec4, [typeinfo.typeMat4, typeinfo.typeF32Vec4]),
-      ...genType('', MASK_ALL, typeinfo.typeF32Vec4, [typeinfo.typeF32Vec4, typeinfo.typeMat4])
+      ...genType('', MASK_ALL, typeinfo.typeF32Vec4, [typeinfo.typeF32Vec4, typeinfo.typeMat4]),
+
+      ...genType('', MASK_WEBGPU, 4, [4, 4]),
+      ...genTypeF16ScalarVec('')
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
@@ -368,7 +393,8 @@ const builtinFunctionsAll = {
       ...genType('mod', MASK_ALL, 0, [0, 0]),
       ...genType('mod', MASK_ALL, 1, [1, 1]),
       ...genType('mod', MASK_ALL, 2, [2, 2]),
-      ...genType('mod', MASK_ALL, 3, [3, 3])
+      ...genType('mod', MASK_ALL, 3, [3, 3]),
+      ...genType('mod', MASK_WEBGPU, 4, [4, 4])
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
@@ -387,47 +413,79 @@ const builtinFunctionsAll = {
       }
     }
   },
-  radians: { overloads: genType('radians', MASK_ALL, 0, [0]) },
-  degrees: { overloads: genType('degrees', MASK_ALL, 0, [0]) },
-  sin: { overloads: genType('sin', MASK_ALL, 0, [0]) },
-  cos: { overloads: genType('cos', MASK_ALL, 0, [0]) },
-  tan: { overloads: genType('tan', MASK_ALL, 0, [0]) },
-  asin: { overloads: genType('asin', MASK_ALL, 0, [0]) },
-  acos: { overloads: genType('acos', MASK_ALL, 0, [0]) },
-  atan: { overloads: genType('atan', MASK_ALL, 0, [0]) },
-  atan2: {
-    overloads: [...genType('atan', MASK_WEBGL, 0, [0, 0]), ...genType('atan2', MASK_WEBGPU, 0, [0, 0])]
+  radians: {
+    overloads: [...genType('radians', MASK_ALL, 0, [0]), ...genType('radians', MASK_WEBGPU, 4, [4])]
   },
-  sinh: { overloads: genType('sinh', MASK_WEBGL2 | MASK_WEBGPU, 0, [0]) },
-  cosh: { overloads: genType('cosh', MASK_WEBGL2 | MASK_WEBGPU, 0, [0]) },
-  tanh: { overloads: genType('tanh', MASK_WEBGL2 | MASK_WEBGPU, 0, [0]) },
+  degrees: {
+    overloads: [...genType('degrees', MASK_ALL, 0, [0]), ...genType('degrees', MASK_WEBGPU, 4, [4])]
+  },
+  sin: { overloads: [...genType('sin', MASK_ALL, 0, [0]), ...genType('sin', MASK_WEBGPU, 4, [4])] },
+  cos: { overloads: [...genType('cos', MASK_ALL, 0, [0]), ...genType('cos', MASK_WEBGPU, 4, [4])] },
+  tan: { overloads: [...genType('tan', MASK_ALL, 0, [0]), ...genType('tan', MASK_WEBGPU, 4, [4])] },
+  asin: { overloads: [...genType('asin', MASK_ALL, 0, [0]), ...genType('asin', MASK_WEBGPU, 4, [4])] },
+  acos: { overloads: [...genType('acos', MASK_ALL, 0, [0]), ...genType('acos', MASK_WEBGPU, 4, [4])] },
+  atan: { overloads: [...genType('atan', MASK_ALL, 0, [0]), ...genType('atan', MASK_WEBGPU, 4, [4])] },
+  atan2: {
+    overloads: [
+      ...genType('atan', MASK_WEBGL, 0, [0, 0]),
+      ...genType('atan2', MASK_WEBGPU, 0, [0, 0]),
+      ...genType('atan2', MASK_WEBGPU, 4, [4, 4])
+    ]
+  },
+  sinh: {
+    overloads: [
+      ...genType('sinh', MASK_WEBGL2 | MASK_WEBGPU, 0, [0]),
+      ...genType('sinh', MASK_WEBGPU, 4, [4])
+    ]
+  },
+  cosh: {
+    overloads: [
+      ...genType('cosh', MASK_WEBGL2 | MASK_WEBGPU, 0, [0]),
+      ...genType('cosh', MASK_WEBGPU, 4, [4])
+    ]
+  },
+  tanh: {
+    overloads: [
+      ...genType('tanh', MASK_WEBGL2 | MASK_WEBGPU, 0, [0]),
+      ...genType('tanh', MASK_WEBGPU, 4, [4])
+    ]
+  },
   asinh: { overloads: genType('asinh', MASK_WEBGL2, 0, [0]) },
   acosh: { overloads: genType('acosh', MASK_WEBGL2, 0, [0]) },
   atanh: { overloads: genType('atanh', MASK_WEBGL2, 0, [0]) },
-  pow: { overloads: genType('pow', MASK_ALL, 0, [0, 0]) },
-  exp: { overloads: genType('exp', MASK_ALL, 0, [0]) },
-  exp2: { overloads: genType('exp2', MASK_ALL, 0, [0]) },
-  log: { overloads: genType('log', MASK_ALL, 0, [0]) },
-  log2: { overloads: genType('log2', MASK_ALL, 0, [0]) },
-  sqrt: { overloads: genType('sqrt', MASK_ALL, 0, [0]) },
+  pow: { overloads: [...genType('pow', MASK_ALL, 0, [0, 0]), ...genType('pow', MASK_WEBGPU, 4, [4, 4])] },
+  exp: { overloads: [...genType('exp', MASK_ALL, 0, [0]), ...genType('exp', MASK_WEBGPU, 4, [4])] },
+  exp2: { overloads: [...genType('exp2', MASK_ALL, 0, [0]), ...genType('exp2', MASK_WEBGPU, 4, [4])] },
+  log: { overloads: [...genType('log', MASK_ALL, 0, [0]), ...genType('log', MASK_WEBGPU, 4, [4])] },
+  log2: { overloads: [...genType('log2', MASK_ALL, 0, [0]), ...genType('log2', MASK_WEBGPU, 4, [4])] },
+  sqrt: { overloads: [...genType('sqrt', MASK_ALL, 0, [0]), ...genType('sqrt', MASK_WEBGPU, 4, [4])] },
   inverseSqrt: {
-    overloads: [...genType('inversesqrt', MASK_WEBGL, 0, [0]), ...genType('inverseSqrt', MASK_WEBGPU, 0, [0])]
+    overloads: [
+      ...genType('inversesqrt', MASK_WEBGL, 0, [0]),
+      ...genType('inverseSqrt', MASK_WEBGPU, 0, [0]),
+      ...genType('inverseSqrt', MASK_WEBGPU, 4, [4])
+    ]
   },
   abs: {
     overloads: [
       ...genType('abs', MASK_ALL, 0, [0]),
       ...genType('abs', MASK_WEBGL2 | MASK_WEBGPU, 1, [1]),
-      ...genType('abs', MASK_WEBGPU, 2, [2])
+      ...genType('abs', MASK_WEBGPU, 2, [2]),
+      ...genType('abs', MASK_WEBGPU, 4, [4])
     ]
   },
   sign: {
-    overloads: [...genType('sign', MASK_ALL, 0, [0]), ...genType('sign', MASK_WEBGL2, 1, [1])]
+    overloads: [
+      ...genType('sign', MASK_ALL, 0, [0]),
+      ...genType('sign', MASK_WEBGL2, 1, [1]),
+      ...genType('sign', MASK_WEBGPU, 4, [4])
+    ]
   },
-  floor: { overloads: genType('floor', MASK_ALL, 0, [0]) },
-  ceil: { overloads: genType('ceil', MASK_ALL, 0, [0]) },
-  fract: { overloads: genType('fract', MASK_ALL, 0, [0]) },
+  floor: { overloads: [...genType('floor', MASK_ALL, 0, [0]), ...genType('floor', MASK_WEBGPU, 4, [4])] },
+  ceil: { overloads: [...genType('ceil', MASK_ALL, 0, [0]), ...genType('ceil', MASK_WEBGPU, 4, [4])] },
+  fract: { overloads: [...genType('fract', MASK_ALL, 0, [0]), ...genType('fract', MASK_WEBGPU, 4, [4])] },
   fma: {
-    overloads: genType('fma', MASK_ALL, 0, [0, 0, 0]),
+    overloads: [...genType('fma', MASK_ALL, 0, [0, 0, 0]), ...genType('fma', MASK_WEBGPU, 4, [4, 4, 4])],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
       if (pb.getDevice().type === 'webgpu') {
@@ -437,28 +495,31 @@ const builtinFunctionsAll = {
       }
     }
   },
-  round: { overloads: genType('round', MASK_WEBGPU, 0, [0]) },
-  trunc: { overloads: genType('trunc', MASK_WEBGPU, 0, [0]) },
+  round: { overloads: [...genType('round', MASK_WEBGPU, 0, [0]), ...genType('round', MASK_WEBGPU, 4, [4])] },
+  trunc: { overloads: [...genType('trunc', MASK_WEBGPU, 0, [0]), ...genType('trunc', MASK_WEBGPU, 4, [4])] },
   // TODO: modf
   min: {
     overloads: [
       ...genType('min', MASK_ALL, 0, [0, 0]),
       ...genType('min', MASK_WEBGL2 | MASK_WEBGPU, 1, [1, 1]),
-      ...genType('min', MASK_WEBGL2 | MASK_WEBGPU, 2, [2, 2])
+      ...genType('min', MASK_WEBGL2 | MASK_WEBGPU, 2, [2, 2]),
+      ...genType('min', MASK_WEBGPU, 4, [4, 4])
     ]
   },
   max: {
     overloads: [
       ...genType('max', MASK_ALL, 0, [0, 0]),
       ...genType('max', MASK_WEBGL2 | MASK_WEBGPU, 1, [1, 1]),
-      ...genType('max', MASK_WEBGL2 | MASK_WEBGPU, 2, [2, 2])
+      ...genType('max', MASK_WEBGL2 | MASK_WEBGPU, 2, [2, 2]),
+      ...genType('max', MASK_WEBGPU, 4, [4, 4])
     ]
   },
   clamp: {
     overloads: [
       ...genType('clamp', MASK_ALL, 0, [0, 0, 0]),
       ...genType('clamp', MASK_WEBGL2 | MASK_WEBGPU, 1, [1, 1, 1]),
-      ...genType('clamp', MASK_WEBGL2 | MASK_WEBGPU, 2, [2, 2, 2])
+      ...genType('clamp', MASK_WEBGL2 | MASK_WEBGPU, 2, [2, 2, 2]),
+      ...genType('clamp', MASK_WEBGPU, 4, [4, 4, 4])
     ]
   },
   saturate: {
@@ -474,44 +535,82 @@ const builtinFunctionsAll = {
       if (!argType.isPrimitiveType() || (!argType.isScalarType() && !argType.isVectorType())) {
         throw new PBParamTypeError('saturate', 'x');
       }
+      const vecCtor = argType.isF16() ? 'hvec' : 'vec';
       // @ts-ignore 7053
-      const a = argType.isScalarType() ? 0 : pb[`vec${argType.cols}`](0);
+      const a = argType.isScalarType() ? 0 : pb[`${vecCtor}${argType.cols}`](0);
       // @ts-ignore 7053
-      const b = argType.isScalarType() ? 1 : pb[`vec${argType.cols}`](1);
+      const b = argType.isScalarType() ? 1 : pb[`${vecCtor}${argType.cols}`](1);
       return pb.clamp(args[0], a, b);
     }
   },
   mix: {
     overloads: [
       ...genType('mix', MASK_ALL, 0, [0, 0, 0]),
-      ...genType('mix', MASK_ALL, 0, [0, 0, typeinfo.typeF32])
+      ...genType('mix', MASK_ALL, 0, [0, 0, typeinfo.typeF32]),
+      ...genType('mix', MASK_WEBGPU, 4, [4, 4, 4]),
+      ...genType('mix', MASK_WEBGPU, 4, [4, 4, typeinfo.typeF16])
     ]
   },
-  step: { overloads: genType('step', MASK_ALL, 0, [0, 0]) },
-  smoothStep: { overloads: genType('smoothstep', MASK_ALL, 0, [0, 0, 0]) },
+  step: { overloads: [...genType('step', MASK_ALL, 0, [0, 0]), ...genType('step', MASK_WEBGPU, 4, [4, 4])] },
+  smoothStep: {
+    overloads: [
+      ...genType('smoothstep', MASK_ALL, 0, [0, 0, 0]),
+      ...genType('smoothstep', MASK_WEBGPU, 4, [4, 4, 4])
+    ]
+  },
   isnan: { overloads: genType('isnan', MASK_WEBGL2, 3, [0]) },
   isinf: { overloads: genType('isinf', MASK_WEBGL2, 3, [0]) },
-  length: { overloads: genType('length', MASK_ALL, typeinfo.typeF32, [0]) },
-  distance: { overloads: genType('distance', MASK_ALL, typeinfo.typeF32, [0, 0]) },
+  length: {
+    overloads: [
+      ...genType('length', MASK_ALL, typeinfo.typeF32, [0]),
+      ...genType('length', MASK_WEBGPU, typeinfo.typeF16, [4])
+    ]
+  },
+  distance: {
+    overloads: [
+      ...genType('distance', MASK_ALL, typeinfo.typeF32, [0, 0]),
+      ...genType('distance', MASK_WEBGPU, typeinfo.typeF16, [4, 4])
+    ]
+  },
   dot: {
     overloads: [
       ...genType('dot', MASK_ALL, typeinfo.typeF32, [0, 0], true),
       ...genType('dot', MASK_WEBGPU, typeinfo.typeI32, [1, 1], true),
-      ...genType('dot', MASK_WEBGPU, typeinfo.typeU32, [2, 2], true)
+      ...genType('dot', MASK_WEBGPU, typeinfo.typeU32, [2, 2], true),
+      ...genType('dot', MASK_WEBGPU, typeinfo.typeF16, [4, 4], true)
     ]
   },
   cross: {
-    overloads: genType('cross', MASK_ALL, typeinfo.typeF32Vec3, [typeinfo.typeF32Vec3, typeinfo.typeF32Vec3])
+    overloads: [
+      ...genType('cross', MASK_ALL, typeinfo.typeF32Vec3, [typeinfo.typeF32Vec3, typeinfo.typeF32Vec3]),
+      ...genType('cross', MASK_WEBGPU, typeinfo.typeF16Vec3, [typeinfo.typeF16Vec3, typeinfo.typeF16Vec3])
+    ]
   },
-  normalize: { overloads: genType('normalize', MASK_ALL, 0, [0], true) },
+  normalize: {
+    overloads: [
+      ...genType('normalize', MASK_ALL, 0, [0], true),
+      ...genType('normalize', MASK_WEBGPU, 4, [4], true)
+    ]
+  },
   faceForward: {
     overloads: [
       ...genType('faceforward', MASK_WEBGL, 0, [0, 0, 0], true),
-      ...genType('faceForward', MASK_WEBGPU, 0, [0, 0, 0], true)
+      ...genType('faceForward', MASK_WEBGPU, 0, [0, 0, 0], true),
+      ...genType('faceForward', MASK_WEBGPU, 4, [4, 4, 4], true)
     ]
   },
-  reflect: { overloads: genType('reflect', MASK_ALL, 0, [0, 0], true) },
-  refract: { overloads: genType('refract', MASK_ALL, 0, [0, 0, typeinfo.typeF32], true) },
+  reflect: {
+    overloads: [
+      ...genType('reflect', MASK_ALL, 0, [0, 0], true),
+      ...genType('reflect', MASK_WEBGPU, 4, [4, 4], true)
+    ]
+  },
+  refract: {
+    overloads: [
+      ...genType('refract', MASK_ALL, 0, [0, 0, typeinfo.typeF32], true),
+      ...genType('refract', MASK_WEBGPU, 4, [4, 4, typeinfo.typeF16], true)
+    ]
+  },
   frexp: {
     overloads: [
       ...genType('frexp', MASK_WEBGPU, typeinfo.typeFrexpResult, [typeinfo.typeF32]),
@@ -591,7 +690,8 @@ const builtinFunctionsAll = {
     overloads: [
       ...genType('lessThan', MASK_ALL, 3, [0, 0]),
       ...genType('lessThan', MASK_ALL, 3, [1, 1]),
-      ...genType('lessThan', MASK_ALL, 3, [2, 2])
+      ...genType('lessThan', MASK_ALL, 3, [2, 2]),
+      ...genType('lessThan', MASK_WEBGPU, 3, [4, 4])
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
@@ -607,7 +707,8 @@ const builtinFunctionsAll = {
     overloads: [
       ...genType('lessThanEqual', MASK_ALL, 3, [0, 0]),
       ...genType('lessThanEqual', MASK_ALL, 3, [1, 1]),
-      ...genType('lessThanEqual', MASK_ALL, 3, [2, 2])
+      ...genType('lessThanEqual', MASK_ALL, 3, [2, 2]),
+      ...genType('lessThanEqual', MASK_WEBGPU, 3, [4, 4])
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
@@ -623,7 +724,8 @@ const builtinFunctionsAll = {
     overloads: [
       ...genType('greaterThan', MASK_ALL, 3, [0, 0]),
       ...genType('greaterThan', MASK_ALL, 3, [1, 1]),
-      ...genType('greaterThan', MASK_ALL, 3, [2, 2])
+      ...genType('greaterThan', MASK_ALL, 3, [2, 2]),
+      ...genType('greaterThan', MASK_WEBGPU, 3, [4, 4])
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
@@ -639,7 +741,8 @@ const builtinFunctionsAll = {
     overloads: [
       ...genType('greaterThanEqual', MASK_ALL, 3, [0, 0]),
       ...genType('greaterThanEqual', MASK_ALL, 3, [1, 1]),
-      ...genType('greaterThanEqual', MASK_ALL, 3, [2, 2])
+      ...genType('greaterThanEqual', MASK_ALL, 3, [2, 2]),
+      ...genType('greaterThanEqual', MASK_WEBGPU, 3, [4, 4])
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
@@ -656,7 +759,8 @@ const builtinFunctionsAll = {
       ...genType('equal', MASK_ALL, 3, [0, 0]),
       ...genType('equal', MASK_ALL, 3, [1, 1]),
       ...genType('equal', MASK_ALL, 3, [2, 2]),
-      ...genType('equal', MASK_ALL, 3, [3, 3])
+      ...genType('equal', MASK_ALL, 3, [3, 3]),
+      ...genType('equal', MASK_WEBGPU, 3, [4, 4])
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
@@ -673,7 +777,8 @@ const builtinFunctionsAll = {
       ...genType('notEqual', MASK_ALL, 3, [0, 0]),
       ...genType('notEqual', MASK_ALL, 3, [1, 1]),
       ...genType('notEqual', MASK_ALL, 3, [2, 2]),
-      ...genType('notEqual', MASK_ALL, 3, [3, 3])
+      ...genType('notEqual', MASK_ALL, 3, [3, 3]),
+      ...genType('notEqual', MASK_WEBGPU, 3, [4, 4])
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
@@ -690,7 +795,8 @@ const builtinFunctionsAll = {
       ...genType('equal', MASK_ALL, typeinfo.typeBool, [0, 0]),
       ...genType('equal', MASK_ALL, typeinfo.typeBool, [1, 1]),
       ...genType('equal', MASK_ALL, typeinfo.typeBool, [2, 2]),
-      ...genType('equal', MASK_ALL, typeinfo.typeBool, [3, 3])
+      ...genType('equal', MASK_ALL, typeinfo.typeBool, [3, 3]),
+      ...genType('equal', MASK_WEBGPU, typeinfo.typeBool, [4, 4])
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
@@ -707,7 +813,8 @@ const builtinFunctionsAll = {
       ...genType('notEqual', MASK_ALL, typeinfo.typeBool, [0, 0]),
       ...genType('notEqual', MASK_ALL, typeinfo.typeBool, [1, 1]),
       ...genType('notEqual', MASK_ALL, typeinfo.typeBool, [2, 2]),
-      ...genType('notEqual', MASK_ALL, typeinfo.typeBool, [3, 3])
+      ...genType('notEqual', MASK_ALL, typeinfo.typeBool, [3, 3]),
+      ...genType('notEqual', MASK_WEBGPU, typeinfo.typeBool, [4, 4])
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
@@ -734,7 +841,11 @@ const builtinFunctionsAll = {
     }
   },
   neg: {
-    overloads: [...genType('neg', MASK_ALL, 0, [0]), ...genType('neg', MASK_ALL, 1, [1])],
+    overloads: [
+      ...genType('neg', MASK_ALL, 0, [0]),
+      ...genType('neg', MASK_ALL, 1, [1]),
+      ...genType('neg', MASK_WEBGPU, 4, [4])
+    ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
       const matchResult = matchFunctionOverloadings(pb, name, ...args);
       return unaryFunc(matchResult[1][0], '-', matchResult[0].returnType!);
@@ -861,6 +972,8 @@ const builtinFunctionsAll = {
       ...genType('select', MASK_WEBGPU, 1, [1, 1, 3], true),
       ...genType('select', MASK_WEBGPU, 2, [2, 2, 3], true),
       ...genType('select', MASK_WEBGPU, 3, [3, 3, 3], true),
+      ...genType('select', MASK_WEBGPU, 4, [4, 4, typeinfo.typeBool]),
+      ...genType('select', MASK_WEBGPU, 4, [4, 4, 3], true),
       ...genType('mix', MASK_WEBGL, 0, [0, 0, 3]),
       ...genType('mix', MASK_WEBGL, 1, [1, 1, 3]),
       ...genType('mix', MASK_WEBGL, 2, [2, 2, 3])

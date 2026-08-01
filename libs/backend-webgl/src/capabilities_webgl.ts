@@ -247,6 +247,7 @@ export class WebGLShaderCaps implements ShaderCaps {
   supportStandardDerivatives: boolean;
   supportShaderTextureLod: boolean;
   supportHighPrecisionFloat: boolean;
+  supportShaderF16: boolean;
   maxUniformBufferSize: number;
   uniformBufferOffsetAlignment: number;
   maxStorageBufferSize: number;
@@ -255,6 +256,7 @@ export class WebGLShaderCaps implements ShaderCaps {
     this._extFragDepth = null;
     this._extStandardDerivatives = null;
     this._extShaderTextureLod = null;
+    this.supportShaderF16 = false;
     this.maxStorageBufferSize = 0;
     this.storageBufferOffsetAlignment = 0;
     if (isWebGL2(gl)) {

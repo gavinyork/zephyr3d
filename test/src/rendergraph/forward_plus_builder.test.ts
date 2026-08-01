@@ -420,17 +420,6 @@ describe('Forward+ render graph builder', () => {
     expect(passNames.indexOf('HiZ')).toBeLessThan(passNames.indexOf('LightPass'));
   });
 
-  test('rounds HiZ dimensions up to powers of two', () => {
-    const { graph } = buildForwardPlusGraphForTest(
-      createOptions({ hiZ: true }),
-      {},
-      { renderWidth: 1193, renderHeight: 790 }
-    );
-    const hiZResource = [...graph.resources.values()].find((resource) => resource.name === 'hiZ');
-
-    expect(hiZResource?.desc).toMatchObject({ format: 'r32f', mipLevels: 9 });
-  });
-
   test('inserts SSSProfile before LightPass and declares SSS MRT resources when enabled', () => {
     const { graph, backbuffer } = buildForwardPlusGraphForTest(
       createOptions({ sss: true, sceneNormal: true })

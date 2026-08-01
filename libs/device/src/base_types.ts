@@ -2296,6 +2296,8 @@ export interface ShaderCaps {
   supportShaderTextureLod: boolean;
   /** True if the device supports high precison float number for shader programs */
   supportHighPrecisionFloat: boolean;
+  /** True if the device supports f16 type in shader programs (WebGPU shader-f16 feature) */
+  supportShaderF16: boolean;
   /** The maximum number of bytes of uniform buffer */
   maxUniformBufferSize: number;
   /** The uniform buffer offset alignment */

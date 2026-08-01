@@ -237,6 +237,10 @@ const primitiveTypeMapWGSL = {
   [PBPrimitiveType.F32VEC2]: 'vec2<f32>',
   [PBPrimitiveType.F32VEC3]: 'vec3<f32>',
   [PBPrimitiveType.F32VEC4]: 'vec4<f32>',
+  [PBPrimitiveType.F16]: 'f16',
+  [PBPrimitiveType.F16VEC2]: 'vec2<f16>',
+  [PBPrimitiveType.F16VEC3]: 'vec3<f16>',
+  [PBPrimitiveType.F16VEC4]: 'vec4<f16>',
   [PBPrimitiveType.BOOL]: 'bool',
   [PBPrimitiveType.BVEC2]: 'vec2<bool>',
   [PBPrimitiveType.BVEC3]: 'vec3<bool>',
@@ -604,6 +608,10 @@ export abstract class PBTypeInfo<DetailType extends TypeDetailInfo = TypeDetailI
   haveAtomicMembers(): boolean {
     return false;
   }
+  /** Whether this type contains f16 scalar or vector types */
+  haveF16Members(): boolean {
+    return false;
+  }
   /** returns true if this is a struct type */
   isStructType(): this is PBStructTypeInfo {
     return false;
@@ -773,6 +781,9 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
         result.push(
           new PBFunctionTypeInfo(name, typeinfo, [{ type: this.getCachedTypeInfo(PBPrimitiveType.BOOL) }])
         );
+        result.push(
+          new PBFunctionTypeInfo(name, typeinfo, [{ type: this.getCachedTypeInfo(PBPrimitiveType.F16) }])
+        );
       } else if (typeinfo.isVectorType()) {
         const scalarTypeInfo = { type: this.getCachedTypeInfo(typeinfo.scalarType) };
         const vec2TypeInfo = { type: this.getCachedTypeInfo(typeinfo.resizeType(1, 2)) };
@@ -785,6 +796,7 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
             result.push(new PBFunctionTypeInfo(name, typeinfo, [{ type: typeI32Vec2 }]));
             result.push(new PBFunctionTypeInfo(name, typeinfo, [{ type: typeU32Vec2 }]));
             result.push(new PBFunctionTypeInfo(name, typeinfo, [{ type: typeBVec2 }]));
+            result.push(new PBFunctionTypeInfo(name, typeinfo, [{ type: typeF16Vec2 }]));
             break;
           case 3:
             result.push(
@@ -796,6 +808,7 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
             result.push(new PBFunctionTypeInfo(name, typeinfo, [{ type: typeI32Vec3 }]));
             result.push(new PBFunctionTypeInfo(name, typeinfo, [{ type: typeU32Vec3 }]));
             result.push(new PBFunctionTypeInfo(name, typeinfo, [{ type: typeBVec3 }]));
+            result.push(new PBFunctionTypeInfo(name, typeinfo, [{ type: typeF16Vec3 }]));
             break;
           case 4:
             result.push(
@@ -822,6 +835,7 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
             result.push(new PBFunctionTypeInfo(name, typeinfo, [{ type: typeI32Vec4 }]));
             result.push(new PBFunctionTypeInfo(name, typeinfo, [{ type: typeU32Vec4 }]));
             result.push(new PBFunctionTypeInfo(name, typeinfo, [{ type: typeBVec4 }]));
+            result.push(new PBFunctionTypeInfo(name, typeinfo, [{ type: typeF16Vec4 }]));
         }
       } else if (typeinfo.isMatrixType()) {
         const colType = this.getCachedTypeInfo(typeinfo.resizeType(1, typeinfo.cols));
@@ -859,6 +873,14 @@ export class PBPrimitiveTypeInfo extends PBTypeInfo<PrimitiveTypeDetail> {
       st === I32_BITMASK ||
       st === U32_BITMASK
     );
+  }
+  /** Whether the type is half float (f16) scalar or vector */
+  isF16() {
+    return (this.primitiveType & SCALAR_TYPE_BITMASK) === F16_BITMASK;
+  }
+  /** {@inheritDoc PBTypeInfo.haveF16Members} */
+  haveF16Members(): boolean {
+    return this.isF16();
   }
   /** Get the scalar type */
   get scalarType() {
@@ -1034,6 +1056,15 @@ export class PBStructTypeInfo extends PBTypeInfo<StructTypeDetail> {
         return true;
       } else {
         return member.type.isAtomicI32() || member.type.isAtomicU32();
+      }
+    }
+    return false;
+  }
+  /** {@inheritDoc PBTypeInfo.haveF16Members} */
+  haveF16Members(): boolean {
+    for (const member of this.structMembers) {
+      if (member.type.haveF16Members()) {
+        return true;
       }
     }
     return false;
@@ -1240,6 +1271,10 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
       return this.elementType.isAtomicI32() || this.elementType.isAtomicU32();
     }
   }
+  /** {@inheritDoc PBTypeInfo.haveF16Members} */
+  haveF16Members(): boolean {
+    return this.elementType.haveF16Members();
+  }
   /** {@inheritDoc PBTypeInfo.isArrayType} */
   isArrayType(): this is PBArrayTypeInfo {
     return true;
@@ -1354,6 +1389,10 @@ export class PBPointerTypeInfo extends PBTypeInfo<PointerTypeDetail> {
   /** {@inheritDoc PBTypeInfo.haveAtomicMembers} */
   haveAtomicMembers(): boolean {
     return this.pointerType.haveAtomicMembers();
+  }
+  /** {@inheritDoc PBTypeInfo.haveF16Members} */
+  haveF16Members(): boolean {
+    return this.pointerType.haveF16Members();
   }
   /** {@inheritDoc PBTypeInfo.isPointerType} */
   isPointerType(): this is PBPointerTypeInfo {

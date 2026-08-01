@@ -271,6 +271,16 @@ export interface ProgramBuilder {
     ptr: ShaderTypeFunc;
     [dim: number]: ShaderTypeFunc;
   };
+  /** half (f16) type variable constructors, requires WebGPU shader-f16 feature */
+  half: {
+    (): PBShaderExp;
+    (rhs: number): PBShaderExp;
+    (rhs: boolean): PBShaderExp;
+    (rhs: PBShaderExp): PBShaderExp;
+    (name: string): PBShaderExp;
+    ptr: ShaderTypeFunc;
+    [dim: number]: ShaderTypeFunc;
+  };
   /** int type variable constructors */
   int: {
     (): PBShaderExp;
@@ -294,6 +304,14 @@ export interface ProgramBuilder {
   };
   /** vec2 type variable constructors */
   vec2: {
+    (): PBShaderExp;
+    (rhs: number | PBShaderExp | string): PBShaderExp;
+    (x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
+    ptr: ShaderTypeFunc;
+    [dim: number]: ShaderTypeFunc;
+  };
+  /** hvec2 (f16) type variable constructors, requires WebGPU shader-f16 feature */
+  hvec2: {
     (): PBShaderExp;
     (rhs: number | PBShaderExp | string): PBShaderExp;
     (x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
@@ -326,6 +344,17 @@ export interface ProgramBuilder {
   };
   /** vec3 type variable constructors */
   vec3: {
+    (): PBShaderExp;
+    (name: string): PBShaderExp;
+    (x: number | PBShaderExp): PBShaderExp;
+    (x: number | PBShaderExp, y: number | PBShaderExp, z: number | PBShaderExp): PBShaderExp;
+    (x: number | PBShaderExp, yz: PBShaderExp): PBShaderExp;
+    (xy: PBShaderExp, z: number | PBShaderExp): PBShaderExp;
+    ptr: ShaderTypeFunc;
+    [dim: number]: ShaderTypeFunc;
+  };
+  /** hvec3 (f16) type variable constructors, requires WebGPU shader-f16 feature */
+  hvec3: {
     (): PBShaderExp;
     (name: string): PBShaderExp;
     (x: number | PBShaderExp): PBShaderExp;
@@ -370,6 +399,26 @@ export interface ProgramBuilder {
   };
   /** vec4 type variable constructors */
   vec4: {
+    (): PBShaderExp;
+    (name: string): PBShaderExp;
+    (x: number | PBShaderExp): PBShaderExp;
+    (
+      x: number | PBShaderExp,
+      y: number | PBShaderExp,
+      z: number | PBShaderExp,
+      w: number | PBShaderExp
+    ): PBShaderExp;
+    (x: number | PBShaderExp, y: number | PBShaderExp, zw: PBShaderExp): PBShaderExp;
+    (x: number | PBShaderExp, yz: PBShaderExp, w: number | PBShaderExp): PBShaderExp;
+    (x: number | PBShaderExp, yzw: PBShaderExp): PBShaderExp;
+    (xy: PBShaderExp, z: number | PBShaderExp, w: number | PBShaderExp): PBShaderExp;
+    (xy: PBShaderExp, zw: PBShaderExp): PBShaderExp;
+    (xyz: PBShaderExp, w: number | PBShaderExp): PBShaderExp;
+    ptr: ShaderTypeFunc;
+    [dim: number]: ShaderTypeFunc;
+  };
+  /** hvec4 (f16) type variable constructors, requires WebGPU shader-f16 feature */
+  hvec4: {
     (): PBShaderExp;
     (name: string): PBShaderExp;
     (x: number | PBShaderExp): PBShaderExp;
@@ -1075,6 +1124,8 @@ export class ProgramBuilder {
   _autoStructureTypeIndex: number;
   /** @internal */
   _nameMap: Record<string, string>[];
+  /** @internal */
+  _f16Used: boolean;
   /**
    * Creates a program builder for given device
    * @param device - The device
@@ -1098,6 +1149,15 @@ export class ProgramBuilder {
     this._reflection = new PBReflection(this);
     this._autoStructureTypeIndex = 0;
     this._nameMap = [];
+    this._f16Used = false;
+  }
+  /**
+   * Marks that the f16 type is used by current shader, so that the
+   * 'enable f16;' directive will be emitted for WGSL
+   * @internal
+   */
+  $markF16Used(): void {
+    this._f16Used = true;
   }
   /** Get last error */
   get lastError(): Nullable<string> {
@@ -1168,6 +1228,7 @@ export class ProgramBuilder {
     this._reflection = new PBReflection(this);
     this._autoStructureTypeIndex = 0;
     this._nameMap = [];
+    this._f16Used = false;
   }
   /**
    * Query the global variable by the name
@@ -1969,12 +2030,17 @@ export class ProgramBuilder {
       this._inputScope = new PBInputScope();
       this._outputScope = new PBOutputScope();
       this._reflection.clear();
+      this._f16Used = false;
       this.generate(options.compute);
+      const computeF16Used = this._f16Used;
       this.mergeUniformsCompute(this._globalScope);
       this.updateUniformBindings([this._globalScope], [ShaderType.Compute]);
       const bindGroupLayouts = this.createBindGroupLayouts(options.label);
       this.reportSamplerUsage(bindGroupLayouts, options.label);
-      return [this.generateComputeSource(this._globalScope, this._builtinScope), bindGroupLayouts] as const;
+      return [
+        this.generateComputeSource(this._globalScope, this._builtinScope, computeF16Used),
+        bindGroupLayouts
+      ] as const;
     } catch (err) {
       if (err instanceof errors.PBError) {
         this._lastError = err.getMessage(this._device.type);
@@ -2005,11 +2071,13 @@ export class ProgramBuilder {
       this._inputScope = new PBInputScope();
       this._outputScope = new PBOutputScope();
       this._reflection.clear();
+      this._f16Used = false;
       this.generate(options.vertex);
       const vertexScope = this._globalScope;
       const vertexBuiltinScope = this._builtinScope;
       const vertexInputs = this._inputs;
       const vertexOutputs = this._outputs;
+      const vertexF16Used = this._f16Used;
 
       this._shaderType = ShaderType.Fragment;
       this._scopeStack = [];
@@ -2020,6 +2088,12 @@ export class ProgramBuilder {
       this._inputScope = new PBInputScope();
       this._outputScope = new PBOutputScope();
       this._reflection.clear();
+      // f16 varyings flow into the fragment stage without going through
+      // a half constructor, so propagate the flag from the vertex outputs
+      this._f16Used = vertexOutputs.some((val) => {
+        const type = val[1].value.getType();
+        return type.isPrimitiveType() && type.isF16();
+      });
       vertexOutputs.forEach((val, index) => {
         this.in(
           index,
@@ -2032,6 +2106,7 @@ export class ProgramBuilder {
       const fragBuiltinScope = this._builtinScope;
       const fragInputs = this._inputs;
       const fragOutputs = this._outputs;
+      const fragF16Used = this._f16Used;
 
       this.mergeUniforms(vertexScope, fragScope);
       this.updateUniformBindings([vertexScope, fragScope], [ShaderType.Vertex, ShaderType.Fragment]);
@@ -2044,14 +2119,16 @@ export class ProgramBuilder {
           vertexScope,
           vertexBuiltinScope,
           vertexInputs.map((val) => val[1]),
-          vertexOutputs.map((val) => val[1])
+          vertexOutputs.map((val) => val[1]),
+          vertexF16Used
         )!,
         this.generateRenderSource(
           ShaderType.Fragment,
           fragScope,
           fragBuiltinScope,
           fragInputs.map((val) => val[1]),
-          fragOutputs.map((val) => val[1])
+          fragOutputs.map((val) => val[1]),
+          fragF16Used
         )!,
         bindGroupLayouts,
         this._vertexAttributes,
@@ -2098,13 +2175,14 @@ export class ProgramBuilder {
     scope: PBGlobalScope,
     builtinScope: PBBuiltinScope,
     inputs: AST.ShaderAST[],
-    outputs: AST.ShaderAST[]
+    outputs: AST.ShaderAST[],
+    f16Used: boolean
   ): Nullable<string> {
     const context = {
       type: shaderType,
       mrt: shaderType === ShaderType.Fragment && outputs.length > 1,
       defines: [],
-      extensions: new Set<string>(),
+      extensions: new Set<string>(this._device.type === 'webgpu' && f16Used ? ['f16'] : []),
       builtins: [...builtinScope.$_usedBuiltins],
       types: this._structInfo[shaderType]?.types || [],
       typeReplacement: new Map(),
@@ -2158,12 +2236,12 @@ export class ProgramBuilder {
     }
   }
   /** @internal */
-  private generateComputeSource(scope: PBGlobalScope, builtinScope: PBBuiltinScope) {
+  private generateComputeSource(scope: PBGlobalScope, builtinScope: PBBuiltinScope, f16Used: boolean) {
     const context = {
       type: ShaderType.Compute,
       mrt: false,
       defines: [],
-      extensions: new Set<string>(),
+      extensions: new Set<string>(f16Used ? ['f16'] : []),
       builtins: [...builtinScope.$_usedBuiltins],
       types: this._structInfo[ShaderType.Compute]?.types || [],
       typeReplacement: null,
@@ -3009,6 +3087,12 @@ export class PBScope extends Proxiable<PBScope> {
       if (!(this instanceof PBGlobalScope)) {
         throw new Error(`uniform or storage variables can only be declared within global scope: ${name}`);
       }
+      if (variable.$typeinfo.haveF16Members()) {
+        throw new errors.PBASTError(
+          variable.$ast,
+          'f16 types are not allowed in uniform or storage buffer layout'
+        );
+      }
       if (
         variable.$declareType === AST.DeclareType.DECLARE_TYPE_UNIFORM &&
         !variable.$typeinfo.isTextureType() &&
@@ -3374,7 +3458,12 @@ export class PBInputScope extends PBScope {
         throw new Error(`invalid shader input variable declaration: "${prop}"`);
       }
       const type = value.$ast.getType();
-      if (!type.isPrimitiveType() || type.isMatrixType() || type.primitiveType === PBPrimitiveType.BOOL) {
+      if (
+        !type.isPrimitiveType() ||
+        type.isMatrixType() ||
+        type.primitiveType === PBPrimitiveType.BOOL ||
+        type.isF16()
+      ) {
         throw new Error(`type cannot be used as pipeline input/output: ${prop}`);
       }
       this.$_names[value.$attrib!] = prop;

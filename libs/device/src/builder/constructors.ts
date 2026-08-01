@@ -41,6 +41,12 @@ function vec_n(
       throw new errors.PBDeviceNotSupport('non-square matrix type');
     }
   }
+  if (vecType.isF16()) {
+    if (!this.getDevice().getDeviceCaps().shaderCaps.supportShaderF16) {
+      throw new errors.PBDeviceNotSupport('f16 shader type (requires WebGPU shader-f16 feature)');
+    }
+    this.$markF16Used();
+  }
 
   if (args.length === 1 && typeof args[0] === 'string') {
     return new PBShaderExp(args[0], vecType);
@@ -72,6 +78,10 @@ const primitiveCtors = {
   int: typeinfo.typeI32,
   uint: typeinfo.typeU32,
   bool: typeinfo.typeBool,
+  half: typeinfo.typeF16,
+  hvec2: typeinfo.typeF16Vec2,
+  hvec3: typeinfo.typeF16Vec3,
+  hvec4: typeinfo.typeF16Vec4,
   vec2: typeinfo.typeF32Vec2,
   ivec2: typeinfo.typeI32Vec2,
   uvec2: typeinfo.typeU32Vec2,

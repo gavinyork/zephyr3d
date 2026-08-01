@@ -595,7 +595,10 @@ export class ASTGlobalScope extends ASTScope {
     ctx.types = ctx.types.filter(
       (val) => !(val instanceof ASTStructDefine) || val.type.structMembers.length > 0
     );
+    // enable directives must precede all declarations
+    const enableDirectives = ctx.extensions.has('f16') ? `${indent}enable f16;\n` : '';
     return (
+      enableDirectives +
       ctx.types.map((val) => val.toWGSL(indent, ctx)).join('') +
       this.uniforms.map((uniform) => uniform.toWGSL(indent, ctx)).join('') +
       super.toWGSL(indent, ctx)
@@ -1049,6 +1052,8 @@ export class ASTScalar extends ASTExpression {
     switch (this.type.primitiveType) {
       case PBPrimitiveType.F32:
         return toFixed(this.value as number);
+      case PBPrimitiveType.F16:
+        return `${toFixed(this.value as number)}h`;
       case PBPrimitiveType.I32:
         return toInt(this.value as number);
       case PBPrimitiveType.U32:
@@ -1698,10 +1703,13 @@ export class ASTAssignment extends ShaderAST {
     }
     let rhs: string;
     if (typeof this.rvalue === 'number' || typeof this.rvalue === 'boolean') {
+      const rvaluePrimitiveType = (rtype as PBPrimitiveTypeInfo).primitiveType;
       rhs =
-        (rtype as PBPrimitiveTypeInfo).primitiveType === PBPrimitiveType.F32
+        rvaluePrimitiveType === PBPrimitiveType.F32
           ? toFixed(this.rvalue as number)
-          : String(this.rvalue);
+          : rvaluePrimitiveType === PBPrimitiveType.F16
+            ? `${toFixed(this.rvalue as number)}h`
+            : String(this.rvalue);
     } else {
       rhs = unbracket(this.rvalue.toWGSL(indent, ctx));
     }
@@ -1732,6 +1740,8 @@ export class ASTAssignment extends ShaderAST {
         case PBPrimitiveType.BOOL:
           return isBool ? targetType : isInt ? typeI32 : isUint ? typeU32 : typeF32;
         case PBPrimitiveType.F32:
+          return isFloat ? targetType : typeBool;
+        case PBPrimitiveType.F16:
           return isFloat ? targetType : typeBool;
         case PBPrimitiveType.I32:
           return isInt ? targetType : isBool ? typeBool : isUint ? typeU32 : typeF32;

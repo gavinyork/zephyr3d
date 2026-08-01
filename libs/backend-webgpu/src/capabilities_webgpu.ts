@@ -72,6 +72,7 @@ export class WebGPUShaderCaps implements ShaderCaps {
   supportStandardDerivatives: boolean;
   supportShaderTextureLod: boolean;
   supportHighPrecisionFloat: boolean;
+  supportShaderF16: boolean;
   maxUniformBufferSize: number;
   uniformBufferOffsetAlignment: number;
   maxStorageBufferSize: number;
@@ -81,6 +82,7 @@ export class WebGPUShaderCaps implements ShaderCaps {
     this.supportStandardDerivatives = true;
     this.supportShaderTextureLod = true;
     this.supportHighPrecisionFloat = true;
+    this.supportShaderF16 = device.device.features.has('shader-f16');
     this.maxUniformBufferSize = device.device.limits.maxUniformBufferBindingSize || 65536;
     this.uniformBufferOffsetAlignment = device.device.limits.minUniformBufferOffsetAlignment || 256;
     this.maxStorageBufferSize = device.device.limits.maxStorageBufferBindingSize || 128 * 1024 * 1024;
