@@ -785,7 +785,7 @@ export class SSGI extends AbstractPostEffect {
           this.historyRejectParams = pb.vec2().uniform(0);
         }
         if (useHiZ) {
-          // Hi-Z is stored as rg32f. It is only read with a nearest sampler,
+          // Hi-Z is stored as r32f. It is only read with a nearest sampler,
           // so use the unfilterable sample type for adapters without the
           // optional float32-filterable feature (notably some AMD iGPUs).
           this.hizTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);

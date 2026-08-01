@@ -816,7 +816,11 @@ const HiZModule: RenderModule<FrameGraphContext> = {
         builder.read(preLightTransmissionDepthToken);
       }
       hiZHandle = builder.createTexture({
-        format: 'rg32f',
+        // Single-channel furthest-depth pyramid (max reduction); the UE5-style
+        // tracer no longer needs the closest depth. r16f would not be enough:
+        // standard-Z clusters far depth near 1.0 where half floats only
+        // resolve ~5e-4.
+        format: 'r32f',
         label: 'hiZ',
         mipLevels: getFullMipLevelCount(ctx.renderWidth, ctx.renderHeight),
         allocationKey: 'ForwardPlus.HiZ'

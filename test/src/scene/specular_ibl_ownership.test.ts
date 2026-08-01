@@ -19,13 +19,12 @@ import { MaterialVaryingFlags } from '../../../libs/scene/src/values';
  * revert to the `else if (outRoughness)` form that caused the defect.
  */
 describe('Indirect specular ownership between SSR and SSGI', () => {
-  const sources = [
-    'material/mixins/pbr/common.ts',
-    'material/mixins/lightmodel/pbrblueprintmixin.ts'
-  ].map((rel) => ({
-    rel,
-    text: fs.readFileSync(path.join(__dirname, '../../../libs/scene/src', rel), 'utf8')
-  }));
+  const sources = ['material/mixins/pbr/common.ts', 'material/mixins/lightmodel/pbrblueprintmixin.ts'].map(
+    (rel) => ({
+      rel,
+      text: fs.readFileSync(path.join(__dirname, '../../../libs/scene/src', rel), 'utf8')
+    })
+  );
 
   test.each(sources.map((s) => [s.rel, s.text] as const))(
     '%s gates the specular IBL on the roughness flag, not on the MRT parameter',

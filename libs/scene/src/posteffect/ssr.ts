@@ -1214,7 +1214,7 @@ export class SSR extends AbstractPostEffect {
         this.ssrStrengthMode = pb.int().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
         if (ctx.HiZTexture) {
-          // Hi-Z is rg32f and is sampled with a nearest sampler. Do not
+          // Hi-Z is r32f and is sampled with a nearest sampler. Do not
           // require the optional float32-filterable feature just to bind it.
           this.hizTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           this.depthMipLevels = pb.int().uniform(0);
@@ -1316,9 +1316,18 @@ export class SSR extends AbstractPostEffect {
                   SSR_interleavedGradientNoise(this, this.$builtins.fragCoord.xy, this.ssrFrameIndex),
                   0.5
                 );
+                // Nudge the ray origin off the surface along the normal so the
+                // grazing-angle march does not self-intersect the reflector's
+                // quantized depth staircase (regular stripe artifacts). Scales
+                // with view distance to track depth precision; same idea as the
+                // SSGI ray-origin bias.
+                this.$l.ssrRayOrigin = pb.add(
+                  this.viewPos,
+                  pb.mul(pb.normalize(this.viewNormal), pb.max(0.01, pb.mul(pb.neg(this.viewPos.z), 0.002)))
+                );
                 this.hitInfo = screenSpaceRayTracing_HiZ(
                   this,
-                  this.viewPos,
+                  this.ssrRayOrigin,
                   this.reflectVec,
                   this.viewMatrix,
                   this.projMatrix,

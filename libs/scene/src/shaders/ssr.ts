@@ -522,9 +522,7 @@ export function SSR_interleavedGradientNoise(
   const pb = scope.$builder;
   pb.func('SSR_IGN', [pb.vec2('uv'), pb.float('frameId')], function () {
     this.$l.p = pb.add(this.uv, pb.mul(pb.vec2(47, 17), 0.695, this.frameId));
-    this.$return(
-      pb.fract(pb.mul(52.9829189, pb.fract(pb.dot(this.p, pb.vec2(0.06711056, 0.00583715)))))
-    );
+    this.$return(pb.fract(pb.mul(52.9829189, pb.fract(pb.dot(this.p, pb.vec2(0.06711056, 0.00583715))))));
   });
   return scope.SSR_IGN(uv, frameId);
 }
@@ -541,8 +539,14 @@ export function SSR_interleavedGradientNoise(
  * - UE is reversed-Z (larger = closer); we use standard Z, so every depth
  *   difference is mirrored (`Diff = SampleDepth - SampleZ`).
  * - UE view space has +z forward; ours has -z forward.
- * - UE's HZB is a half-res pow2 pyramid; ours is full-res at mip0, so
- *   START_MIP = 1 gives a comparable sampling density to UE's StartMipLevel=1.
+ * - UE's HZB is a half-res pow2 pyramid and starts marching at its mip 1;
+ *   ours is full-res at mip0 and marches from START_MIP = 0, because under
+ *   standard-Z the coarse furthest-depth blocks quantize into a staircase
+ *   that grazing rays periodically self-intersect, showing up as regular
+ *   stripes TAA cannot converge. Marching at full resolution removes the
+ *   staircase at the same sample count (the mip only affects texture cache
+ *   efficiency); rough reflections still climb the pyramid via the
+ *   roughness mip ramp.
  *
  * `maxIterations` is the number of linear samples along the ray (UE NumSteps,
  * typically 8..64), no longer the traversal iteration cap of the previous
@@ -568,14 +572,11 @@ export function screenSpaceRayTracing_HiZ(
   stepOffset?: PBShaderExp | number
 ) {
   const pb = scope.$builder;
+  // The r32f pyramid stores the furthest depth (max reduction; mip0 is the
+  // raw depth). Matches UE5 marching against the FurthestHZBTexture (UE is
+  // reversed-Z, so its furthest pyramid is the min reduction instead).
   pb.func('SSR_loadDepth', [pb.vec2('uv'), pb.float('level')], function () {
     this.$return(pb.textureSampleLevel(HiZTexture, this.uv, this.level).r);
-  });
-  // Furthest depth (max channel). Matches UE5 marching against the
-  // FurthestHZBTexture (UE is reversed-Z, so its furthest pyramid is the min
-  // reduction; in standard Z the furthest depth is the max channel).
-  pb.func('SSR_loadFurthestDepth', [pb.vec2('uv'), pb.float('level')], function () {
-    this.$return(pb.textureSampleLevel(HiZTexture, this.uv, this.level).g);
   });
   pb.func('invProjectPosition', [pb.vec3('p'), pb.mat4('mat')], function () {
     this.$l.c = pb.sub(pb.mul(this.p, 2), pb.vec3(1));
@@ -624,10 +625,7 @@ export function screenSpaceRayTracing_HiZ(
       // surface view depth (UE: min(-0.95 * SceneDepth / ViewDirZ, TMax)).
       this.$l.rayLength = this.$choice(
         pb.greaterThan(this.rayDirection.z, 0),
-        pb.min(
-          this.maxDistance,
-          pb.div(pb.mul(-0.95, this.viewPos.z), pb.max(this.rayDirection.z, 1e-6))
-        ),
+        pb.min(this.maxDistance, pb.div(pb.mul(-0.95, this.viewPos.z), pb.max(this.rayDirection.z, 1e-6))),
         this.maxDistance
       );
       this.$l.rayEnd = pb.add(this.viewPos, pb.mul(this.rayDirection, this.rayLength));
@@ -659,7 +657,10 @@ export function screenSpaceRayTracing_HiZ(
   // Port of UE5 CastScreenSpaceRay: NumSteps uniform samples in batches of 4,
   // mip level ramped by roughness, tolerance-window hit test, uncertainty
   // tracking and line-segment hit refinement.
-  const START_MIP = 1;
+  // 0 instead of UE's StartMipLevel=1: see the convention notes above --
+  // coarse-mip depth staircases cause grazing-angle stripe artifacts under
+  // standard Z.
+  const START_MIP = 0;
   pb.func(
     'SSR_castScreenSpaceRay',
     [
@@ -710,18 +711,12 @@ export function screenSpaceRayTracing_HiZ(
         this.level = pb.add(this.level, pb.mul(this.mipInc, 2));
         for (let j = 0; j < 4; j++) {
           this.$l[`sampleT${j}`] = pb.add(this.marchBase, j + 1);
-          this.$l[`sampleUV${j}`] = pb.add(
-            this.rayUVz.xy,
-            pb.mul(this.rayStepUVz.xy, this[`sampleT${j}`])
-          );
-          this.$l[`sampleZ${j}`] = pb.add(
-            this.rayUVz.z,
-            pb.mul(this.rayStepUVz.z, this[`sampleT${j}`])
-          );
+          this.$l[`sampleUV${j}`] = pb.add(this.rayUVz.xy, pb.mul(this.rayStepUVz.xy, this[`sampleT${j}`]));
+          this.$l[`sampleZ${j}`] = pb.add(this.rayUVz.z, pb.mul(this.rayStepUVz.z, this[`sampleT${j}`]));
           // Standard-Z mirror of UE's `SamplesZ - SampleDepth`: negative when
           // the ray is behind the surface, hit window is (-2T, 0).
           this[`diff${j}`] = pb.sub(
-            this.SSR_loadFurthestDepth(this[`sampleUV${j}`], j < 2 ? this.mip01 : this.mip23),
+            this.SSR_loadDepth(this[`sampleUV${j}`], j < 2 ? this.mip01 : this.mip23),
             this[`sampleZ${j}`]
           );
           this[`hit${j}`] = pb.lessThan(

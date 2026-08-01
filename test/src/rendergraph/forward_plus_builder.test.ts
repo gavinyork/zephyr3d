@@ -428,7 +428,7 @@ describe('Forward+ render graph builder', () => {
     );
     const hiZResource = [...graph.resources.values()].find((resource) => resource.name === 'hiZ');
 
-    expect(hiZResource?.desc).toMatchObject({ format: 'rg32f', mipLevels: 9 });
+    expect(hiZResource?.desc).toMatchObject({ format: 'r32f', mipLevels: 9 });
   });
 
   test('inserts SSSProfile before LightPass and declares SSS MRT resources when enabled', () => {
