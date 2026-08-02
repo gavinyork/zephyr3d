@@ -309,6 +309,22 @@ if (!headlessConfig) {
   app.setPath('sessionData', headlessSessionDir);
   app.setAppLogsPath(logsDir);
 }
+
+// Compile WebGPU shaders with DXC instead of FXC on the Dawn D3D12 backend.
+// Chrome enables this via server-side field trials, which Electron never
+// receives, and FXC generates markedly slower code for loop-heavy shaders
+// (measured: SSGI trace pass 70ms with FXC vs ~35ms with DXC on RDNA3).
+// Dawn ignores the toggle on GPUs without DXIL/SM6 support. Merged with any
+// user-provided --enable-dawn-features value instead of overriding it.
+{
+  const userDawnFeatures = app.commandLine.getSwitchValue('enable-dawn-features');
+  const dawnFeatures = userDawnFeatures
+    ? userDawnFeatures.split(',').includes('use_dxc')
+      ? userDawnFeatures
+      : `${userDawnFeatures},use_dxc`
+    : 'use_dxc';
+  app.commandLine.appendSwitch('enable-dawn-features', dawnFeatures);
+}
 writeStderrLine(
   `[app:boot] pid=${process.pid} ppid=${process.ppid} lock=${hasSingleInstanceLock} packaged=${app.isPackaged} execPath=${process.execPath} argv=${JSON.stringify(process.argv)}`
 );
