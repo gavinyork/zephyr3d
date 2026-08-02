@@ -1,5 +1,6 @@
 **/.DS_Store
 **/.temp
+**/.tmp
 **/.vitepress/cache
 .claude
 .agents

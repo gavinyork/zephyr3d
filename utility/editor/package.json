@@ -51,7 +51,8 @@
     "electron:pack:mac": "rush build -t editor && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --dir --mac",
     "electron:dist:win": "rush build -t editor && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --win",
     "electron:dist:linux": "rush build -t editor && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --linux",
-    "electron:dist:mac": "rush build -t editor && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --mac"
+    "electron:dist:mac": "rush build -t editor && npm run electron:prepare && electron-builder --projectDir .electron-app --config ../electron-builder.json --mac",
+    "e2e": "node e2e/run-e2e.mjs"
   },
   "engines": {
     "node": ">=16.18.0"
