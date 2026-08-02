@@ -70,6 +70,12 @@ contextBridge.exposeInMainWorld('zephyrEditorDesktop', {
       invokeSettings('approveAssistantToolCall', { sessionId, callId, scopeId }),
     rejectAssistantToolCall: (sessionId, callId, scopeId) =>
       invokeSettings('rejectAssistantToolCall', { sessionId, callId, scopeId }),
+    renameAssistantSession: (sessionId, title, scopeId) =>
+      invokeSettings('renameAssistantSession', { sessionId, title, scopeId }),
+    deleteAssistantSession: (sessionId, scopeId) =>
+      invokeSettings('deleteAssistantSession', { sessionId, scopeId }),
+    readClipboardImage: () => invokeSettings('readClipboardImage', {}),
+    listLlmModels: (provider, baseUrl) => invokeSettings('listLlmModels', { provider, baseUrl }),
     onAssistantEvent: (listener) => {
       if (typeof listener !== 'function') {
         return () => {};

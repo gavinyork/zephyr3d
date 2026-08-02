@@ -971,6 +971,95 @@ async function saveCurrentScene(editor: Editor): Promise<any> {
   return getStatus(editor);
 }
 
+const SCENE_CHECKPOINT_DIR = '/assets/.assistant-checkpoints';
+const MAX_SCENE_CHECKPOINTS = 3;
+
+type SceneCheckpointEntry = {
+  id: string;
+  path: string;
+  scenePath: string;
+  label: string;
+  createdAt: string;
+};
+
+// Session-scoped rollback points for AI-driven edits. Snapshots live under a
+// dot-directory in the project VFS; only the newest MAX_SCENE_CHECKPOINTS are
+// kept on disk.
+const sceneCheckpoints: SceneCheckpointEntry[] = [];
+
+async function checkpointCurrentScene(editor: Editor, params: any): Promise<any> {
+  if (!editor.currentProject) {
+    return { checkpoint: null, err: 'No project is currently opened' };
+  }
+  const controller = getSceneController(editor);
+  const scene = getScene(editor);
+  if (!controller || !scene) {
+    return { checkpoint: null, err: 'Scene module is not active' };
+  }
+  if (ProjectService.VFS.readOnly) {
+    return { checkpoint: null, err: 'Project VFS is read-only; cannot write a scene checkpoint' };
+  }
+  const id = `ckpt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const path = `${SCENE_CHECKPOINT_DIR}/${id}.zscn`;
+  if (!(await ProjectService.VFS.exists(SCENE_CHECKPOINT_DIR))) {
+    await ProjectService.VFS.makeDirectory(SCENE_CHECKPOINT_DIR, true);
+  }
+  await getEngine().resourceManager.saveScene(scene, path);
+  const entry: SceneCheckpointEntry = {
+    id,
+    path,
+    scenePath: controller.scenePath ?? '',
+    label: typeof params?.label === 'string' ? params.label.trim() : '',
+    createdAt: new Date().toISOString()
+  };
+  sceneCheckpoints.push(entry);
+  while (sceneCheckpoints.length > MAX_SCENE_CHECKPOINTS) {
+    const removed = sceneCheckpoints.shift()!;
+    try {
+      await ProjectService.VFS.deleteFile(removed.path);
+    } catch {
+      // best-effort cleanup; a stale snapshot file is harmless
+    }
+  }
+  return {
+    checkpoint: { ...entry },
+    checkpoints: sceneCheckpoints.map((checkpoint) => ({ ...checkpoint })),
+    err: null
+  };
+}
+
+async function restoreSceneCheckpoint(editor: Editor, params: any): Promise<any> {
+  const id = typeof params?.id === 'string' && params.id.trim() ? params.id.trim() : '';
+  const entry = id
+    ? sceneCheckpoints.find((checkpoint) => checkpoint.id === id)
+    : sceneCheckpoints[sceneCheckpoints.length - 1];
+  if (!entry) {
+    return {
+      restored: null,
+      err: id ? `Unknown scene checkpoint id: ${id}` : 'No scene checkpoint has been created in this session'
+    };
+  }
+  if (!editor.currentProject) {
+    return { restored: null, err: 'No project is currently opened' };
+  }
+  const controller = getSceneController(editor);
+  if (!controller) {
+    return { restored: null, err: 'Scene module is not active' };
+  }
+  const scene = await getEngine().resourceManager.loadScene(entry.path);
+  if (!scene) {
+    return { restored: null, err: `Failed to load scene checkpoint from ${entry.path}` };
+  }
+  // Swap the live scene without going through openScene(), which would
+  // repoint scenePath/lastEditScene at the checkpoint file. The restored
+  // state is marked unsaved so a regular save persists it to the original
+  // scene path.
+  (controller as any).reset(scene, false);
+  (controller as any)._sceneChanged = true;
+  eventBus.dispatchEvent('scene_changed');
+  return { restored: { ...entry }, err: null };
+}
+
 async function closeCurrentProject(editor: Editor, params: any): Promise<string | null> {
   const err = await prepareProjectChange(editor, params);
   if (err) {
@@ -3987,6 +4076,10 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     }
     case 'saveScene':
       return await saveCurrentScene(editor);
+    case 'sceneCheckpoint':
+      return await checkpointCurrentScene(editor, params);
+    case 'sceneRestore':
+      return await restoreSceneCheckpoint(editor, params);
     case 'screenshot':
       // Per-frame engine state (history ping-pong, frame counter, motion vector
       // matrices) is non-idempotent, so never inject an extra render here;

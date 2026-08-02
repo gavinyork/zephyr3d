@@ -57,13 +57,22 @@ Use the in-editor ImGui menu instead:
 
 - `Editor > Editor Settings...`
 
-The service binds to `127.0.0.1` only. The default URL is:
+The service binds to `127.0.0.1` only and requires a per-installation bearer token.
+The full URL (including the token) is shown in the editor settings dialog and copied
+by the "Copy MCP URL" action. The default URL shape is:
 
 ```text
-http://127.0.0.1:47231/mcp
+http://127.0.0.1:47231/mcp?token=<token>
 ```
 
-MCP enablement and port changes persist under Electron `app.getPath('userData')`.
+The token is accepted either as the `token` query parameter or as an
+`Authorization: Bearer <token>` header. Set `ZEPHYR_EDITOR_MCP_TOKEN` to pin the
+token for automation (headless/CI agent workflows).
+
+The raw-bridge escape hatches `editor_call` and `editor_eval` are rejected by
+`tools/call` unless the editor is started with `EDITOR_MCP_ENABLE_UNSAFE_TOOLS=1`.
+
+MCP enablement, port, and token changes persist under Electron `app.getPath('userData')`.
 
 ## Claude Desktop Example
 
@@ -73,11 +82,13 @@ If the client supports URL-based MCP servers, point it at the local editor endpo
 {
   "mcpServers": {
     "zephyr-editor": {
-      "url": "http://127.0.0.1:47231/mcp"
+      "url": "http://127.0.0.1:47231/mcp?token=<token>"
     }
   }
 }
 ```
+
+Copy the exact URL (with the token) from `Editor > Editor Settings...`.
 
 ## Codex Example
 
@@ -85,13 +96,13 @@ If the client supports URL-based MCP servers, point it at the local editor endpo
 
 ```toml
 [mcp_servers.zephyr-editor]
-url = "http://127.0.0.1:47231/mcp"
+url = "http://127.0.0.1:47231/mcp?token=<token>"
 ```
 
 Equivalent CLI registration:
 
 ```sh
-codex mcp add zephyr-editor --url http://127.0.0.1:47231/mcp
+codex mcp add zephyr-editor --url "http://127.0.0.1:47231/mcp?token=<token>"
 ```
 
 If the user changes the port in editor settings, the MCP client config must be updated to match.

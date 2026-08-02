@@ -17,6 +17,9 @@ export class DlgEditorSettings extends DialogRenderer<EditorGlobalSettings> {
   private _apiKey: [string];
   private _apiKeyChanged: boolean;
   private _clearApiKey: boolean;
+  private _modelList: string[];
+  private _modelListStatus: string;
+  private _fetchingModels: boolean;
 
   public static async editEditorSettings(
     title: string,
@@ -49,6 +52,31 @@ export class DlgEditorSettings extends DialogRenderer<EditorGlobalSettings> {
     this._apiKey = [''];
     this._apiKeyChanged = false;
     this._clearApiKey = false;
+    this._modelList = [];
+    this._modelListStatus = '';
+    this._fetchingModels = false;
+  }
+
+  private async fetchModelList() {
+    if (!this._settings.llm || this._fetchingModels) {
+      return;
+    }
+    this._fetchingModels = true;
+    this._modelListStatus = 'Fetching model list...';
+    try {
+      this._modelList = await EditorSettingsService.listLlmModels(
+        this._settings.llm.provider,
+        this._settings.llm.baseUrl
+      );
+      this._modelListStatus = this._modelList.length
+        ? `${this._modelList.length} models available.`
+        : 'Provider returned no models.';
+    } catch (err) {
+      this._modelList = [];
+      this._modelListStatus = `Fetch models failed: ${err instanceof Error ? err.message : err}`;
+    } finally {
+      this._fetchingModels = false;
+    }
   }
 
   doRender(): void {
@@ -100,7 +128,17 @@ export class DlgEditorSettings extends DialogRenderer<EditorGlobalSettings> {
       );
       const selectedProviderIndex = [providerIndex] as [number];
       if (ImGui.Combo('Provider', selectedProviderIndex, DlgEditorSettings.LLM_PROVIDER_LABELS)) {
-        this._settings.llm.provider = DlgEditorSettings.LLM_PROVIDER_VALUES[selectedProviderIndex[0]];
+        const nextProvider = DlgEditorSettings.LLM_PROVIDER_VALUES[selectedProviderIndex[0]];
+        if (nextProvider !== this._settings.llm.provider) {
+          this._settings.llm.provider = nextProvider;
+          // Clear provider-specific fields so the main process fills in the
+          // new provider's defaults on save, instead of carrying over the
+          // previous provider's endpoint/model.
+          this._settings.llm.baseUrl = '';
+          this._settings.llm.model = '';
+          this._modelList = [];
+          this._modelListStatus = '';
+        }
       }
 
       const baseUrl = [this._settings.llm.baseUrl ?? ''] as [string];
@@ -111,6 +149,23 @@ export class DlgEditorSettings extends DialogRenderer<EditorGlobalSettings> {
       const model = [this._settings.llm.model ?? ''] as [string];
       if (customTextInput('Model', model)) {
         this._settings.llm.model = model[0];
+      }
+      ImGui.SameLine();
+      if (ImGui.SmallButton(this._fetchingModels ? 'Fetching...' : 'Fetch') && !this._fetchingModels) {
+        void this.fetchModelList();
+      }
+      if (this._modelList.length > 0) {
+        const modelIndex = [this._modelList.indexOf(this._settings.llm.model)] as [number];
+        ImGui.SetNextItemWidth(-1);
+        if (ImGui.Combo('##LlmModelPick', modelIndex, this._modelList)) {
+          const picked = this._modelList[modelIndex[0]];
+          if (picked) {
+            this._settings.llm.model = picked;
+          }
+        }
+      }
+      if (this._modelListStatus) {
+        ImGui.TextDisabled(this._modelListStatus);
       }
 
       const temperature = [this._settings.llm.temperature ?? 0.2] as [number];
@@ -154,6 +209,14 @@ export class DlgEditorSettings extends DialogRenderer<EditorGlobalSettings> {
           ? 'API key is configured.'
           : 'API key is not configured.'
       );
+
+      if (this._settings.llm.apiKeyStorageSecure === false) {
+        ImGui.PushStyleColor(ImGui.Col.Text, new ImGui.ImVec4(1.0, 0.6, 0.2, 1.0));
+        ImGui.TextWrapped(
+          'Warning: OS-level secret encryption is unavailable on this system; API keys will be stored in plaintext.'
+        );
+        ImGui.PopStyleColor();
+      }
 
       if (customTextInput('API Key', this._apiKey, '', CustomInputTextFlags.Password)) {
         this._apiKeyChanged = true;

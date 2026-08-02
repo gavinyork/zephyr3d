@@ -86,6 +86,8 @@ export type DesktopLlmSettings = {
   baseUrl: string;
   model: string;
   apiKeyConfigured: boolean;
+  /** False when OS-level secret encryption is unavailable and keys fall back to plaintext storage. */
+  apiKeyStorageSecure?: boolean;
   temperature: number;
   maxOutputTokens: number;
   maxToolSteps: number | null;
@@ -123,12 +125,29 @@ export type DesktopAssistantMessage = {
   attachments?: DesktopAssistantAttachment[];
   createdAt: string;
   status?: 'pending' | 'complete' | 'error';
+  /** Injected by the assistant runtime (e.g. tool screenshot fed back to the model), not typed by the user. */
+  synthetic?: boolean;
+  /** OpenAI-style tool calls issued by this assistant message (persisted for context replay). */
+  toolCalls?: {
+    id: string;
+    type: 'function';
+    function: { name: string; arguments: string };
+  }[];
+  /** For tool-role messages: the tool call this message responds to. */
+  toolCallId?: string;
+  /** For tool-role messages: the tool name that produced this result. */
+  toolName?: string;
 };
 
 export type DesktopAssistantEvent =
   | {
       type: 'session_updated';
       session: DesktopAssistantSessionSummary;
+    }
+  | {
+      type: 'session_deleted';
+      sessionId: string;
+      scopeId: string | null;
     }
   | {
       type: 'message_started';
@@ -254,6 +273,14 @@ export type ZephyrEditorDesktopAPI = {
     cancelAssistantRun(sessionId: string, scopeId?: string | null): Promise<boolean>;
     approveAssistantToolCall(sessionId: string, callId: string, scopeId?: string | null): Promise<boolean>;
     rejectAssistantToolCall(sessionId: string, callId: string, scopeId?: string | null): Promise<boolean>;
+    renameAssistantSession(
+      sessionId: string,
+      title: string,
+      scopeId?: string | null
+    ): Promise<DesktopAssistantSessionSummary>;
+    deleteAssistantSession(sessionId: string, scopeId?: string | null): Promise<boolean>;
+    readClipboardImage(): Promise<{ mimeType: string; dataBase64: string } | null>;
+    listLlmModels(provider: DesktopLlmProvider, baseUrl: string): Promise<string[]>;
     onAssistantEvent(listener: (event: DesktopAssistantEvent) => void): () => void;
   };
   headless?: {

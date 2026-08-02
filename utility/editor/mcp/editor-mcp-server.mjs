@@ -1603,7 +1603,6 @@ const BASE_TOOLS = [
       }
     }
   },
-  /*
   {
     name: 'asset_read_file',
     description:
@@ -1640,7 +1639,6 @@ const BASE_TOOLS = [
       }
     }
   },
-  */
   {
     name: 'node_attach_script',
     description:
@@ -2440,7 +2438,7 @@ const BASE_TOOLS = [
   {
     name: 'editor_call',
     description:
-      'Advanced escape hatch: call a raw browser bridge method. Prefer the typed tools such as editor_create_scene, editor_open_scene, editor_save_scene, editor_screenshot, editor_console_logs, and editor_sample_pixels when available.',
+      'Advanced escape hatch: call a raw browser bridge method. Prefer the typed tools such as editor_create_scene, editor_open_scene, editor_save_scene, editor_screenshot, and editor_console_logs when available.',
     inputSchema: {
       type: 'object',
       required: ['method'],
@@ -2484,38 +2482,93 @@ const BASE_TOOLS = [
         limit: { type: 'number', default: 100 }
       }
     }
+  },
+  {
+    name: 'scene_checkpoint',
+    description:
+      'Snapshot the current scene to a session checkpoint so it can be rolled back later with scene_restore. Keeps the 3 most recent checkpoints. Returns { checkpoint, checkpoints, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        label: { type: 'string', description: 'Optional human-readable label for the checkpoint.' },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'scene_restore',
+    description:
+      'Restore the current scene from a checkpoint created by scene_checkpoint. Defaults to the most recent checkpoint when id is omitted. The restored state is loaded in-memory and marked unsaved; call editor_save_scene to persist it. Returns { restored, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Checkpoint id returned by scene_checkpoint. Defaults to the latest checkpoint.' },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
   }
 ];
 
 const HIDDEN_TOOL_NAMES = new Set(['editor_connect_info', 'editor_call', 'editor_eval']);
 
+// editor_call (raw bridge access) and editor_eval (arbitrary JS in the editor
+// page) are rejected by tools/call unless explicitly opted in, since any
+// local process able to reach the MCP endpoint could otherwise execute code
+// in the renderer.
+const UNSAFE_TOOL_NAMES = new Set(['editor_call', 'editor_eval']);
+const UNSAFE_TOOLS_ENABLED =
+  process.env.EDITOR_MCP_ENABLE_UNSAFE_TOOLS === '1' || workerData?.enableUnsafeTools === true;
+
+// Single source of truth for which tools have no side effects. Published to
+// clients through the MCP-standard annotations.readOnlyHint on tools/list;
+// the embedded assistant derives its auto-approval whitelist from it.
+const READONLY_TOOL_NAMES = new Set([
+  'editor_connect_info',
+  'editor_wait_ready',
+  'editor_status',
+  'editor_screenshot',
+  'editor_console_logs',
+  'project_list',
+  'project_get_current',
+  'asset_get_root',
+  'asset_get_builtin_primitives',
+  'asset_get_builtin_materials',
+  'asset_read_directory',
+  'asset_read_file',
+  'material_get_classes',
+  'material_get_property_list',
+  'material_get_properties',
+  'mesh_get_material',
+  'mesh_get_primitive',
+  'node_get_classes',
+  'node_get_class',
+  'node_get_property_list',
+  'node_get_properties',
+  'node_get_local_transform',
+  'node_get_parent',
+  'node_get_children',
+  'scene_get_property_list',
+  'scene_get_properties',
+  'scene_get_root_node',
+  'scene_get_selected_nodes',
+  'scene_checkpoint',
+  'camera_get_active',
+  'docs_search_types',
+  'docs_get_type_symbol',
+  'docs_read_type_file',
+  'script_get_context',
+  'script_list_attachments',
+  'script_read_source',
+  'script_diagnostics',
+  'model_generate_status'
+]);
+
 function cloneSchema(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
-function toSnakeCase(value) {
-  return String(value)
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .replace(/[\s-]+/g, '_')
-    .toLowerCase();
-}
-
 function toCamelCase(value) {
   return String(value).replace(/[_-]([a-z])/g, (_match, ch) => ch.toUpperCase());
-}
-
-function normalizeResultKeysToSnakeCase(value) {
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeResultKeysToSnakeCase(item));
-  }
-  if (value && typeof value === 'object') {
-    const normalized = {};
-    for (const [key, childValue] of Object.entries(value)) {
-      normalized[toSnakeCase(key)] = normalizeResultKeysToSnakeCase(childValue);
-    }
-    return normalized;
-  }
-  return value;
 }
 
 function normalizeGeneratedModelSpec(value, key = '') {
@@ -2608,7 +2661,11 @@ function buildToolCatalog() {
     if (!HIDDEN_TOOL_NAMES.has(tool.name)) {
       publicTools.push({
         ...tool,
-        inputSchema: cloneSchema(tool.inputSchema ?? { type: 'object', properties: {} })
+        inputSchema: cloneSchema(tool.inputSchema ?? { type: 'object', properties: {} }),
+        annotations: {
+          ...(tool.annotations ?? {}),
+          readOnlyHint: READONLY_TOOL_NAMES.has(tool.name)
+        }
       });
     }
   }
@@ -3312,6 +3369,12 @@ const handlers = {
   async scene_get_root_node(args) {
     return bridge.send('getSceneRootNode', {}, Number(args.timeout_ms ?? 10000));
   },
+  async scene_checkpoint(args) {
+    return bridge.send('sceneCheckpoint', { label: args.label }, Number(args.timeout_ms ?? 30000));
+  },
+  async scene_restore(args) {
+    return bridge.send('sceneRestore', { id: args.id }, Number(args.timeout_ms ?? 30000));
+  },
   async node_get_parent(args) {
     const id = typeof args.id === 'string' ? args.id.trim() : '';
     if (!id) {
@@ -3692,6 +3755,11 @@ async function dispatchRpc(method, params) {
     case 'tools/call': {
       const name = params.name;
       const args = params.arguments ?? {};
+      if (UNSAFE_TOOL_NAMES.has(name) && !UNSAFE_TOOLS_ENABLED) {
+        throw new Error(
+          `Tool ${name} is disabled. Set EDITOR_MCP_ENABLE_UNSAFE_TOOLS=1 to allow raw bridge access and script evaluation.`
+        );
+      }
       const handler = handlers[name];
       if (!handler) {
         throw new Error(`Unknown tool: ${name}`);

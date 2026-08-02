@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, net, protocol, safeStorage, shell } = require('electron');
 const { execFile } = require('child_process');
+const crypto = require('crypto');
 const http = require('http');
 const fs = require('fs/promises');
 const fsSync = require('fs');
@@ -29,6 +30,9 @@ const PORTABLE_USER_DATA_DIR = 'userdata';
 const DEFAULT_LLM_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_LLM_MODEL = 'gpt-4.1-mini';
 const DEFAULT_OPENAI_COMPAT_CHAT_PATH = '/chat/completions';
+const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com';
+const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5';
+const ANTHROPIC_API_VERSION = '2023-06-01';
 const DEFAULT_MAX_ASSISTANT_TOOL_STEPS = Math.max(
   1,
   Number.parseInt(
@@ -37,66 +41,73 @@ const DEFAULT_MAX_ASSISTANT_TOOL_STEPS = Math.max(
   ) || 32
 );
 const MAX_ASSISTANT_IMAGE_BYTES = 10 * 1024 * 1024;
-const SCRIPTING_ASSISTANT_SYSTEM_PROMPT = [
-  'You are assisting with Zephyr3D scene editing and runtime scripting.',
-  'Before any mutating action, first inspect the current target with read-only tools as needed, then reply with a concise Plan, and wait for explicit user confirmation before executing changes.',
-  'Do not call any mutating tool, create files, modify files, attach scripts, or change scene data until the user has approved the Plan.',
-  'For scene editing tasks, prefer the simplest non-script solution.',
-  'If the goal can be achieved by changing existing scene, node, light, camera, material, mesh, or component property values, you must choose property edits instead of writing a script.',
-  'Treat new or modified scripts as the last resort unless the user explicitly asks for a script or the task genuinely requires runtime behavior such as per-frame updates, event handling, conditional logic, or stateful interactions.',
-  'When a script is proposed, the Plan must explain why property edits are insufficient.',
-  'Before creating, modifying, or attaching a script, inspect the current target with script_get_context or script_list_attachments.',
-  'When you are unsure about a Zephyr3D API name, signature, or usage pattern, query the bundled declaration docs with docs_search_types and docs_get_type_symbol before guessing.',
-  'Prefer declaration entries whose package is @zephyr3d/scene or @zephyr3d/base unless the task clearly needs another Zephyr3D package.',
-  'Treat script_template_source returned by script_get_context as the canonical reference for lifecycle hooks, RuntimeScript usage, host binding, and scriptProp usage.',
-  'Follow the patterns already used in script_template_source unless the user explicitly asks for something different.',
-  'Prefer imports from @zephyr3d/scene and @zephyr3d/base instead of guessing local globals.',
-  'Before modifying an existing script file, read it first with script_read_source.',
-  'After creating or modifying a script file, run script_diagnostics on it before attaching it or concluding that the script is ready.',
-  'If script_diagnostics reports errors, fix them before attaching the script or finishing the task.',
-  'Do not call script_write_source and node_attach_script or scene_attach_script in the same tool batch; wait for script_diagnostics first.',
-  'Use script_write_source to create or update script assets under /assets, then use node_attach_script or scene_attach_script to attach them.',
-  'If script_get_context reports multiple selected nodes or another ambiguity, do not guess.'
-].join('\n');
-const ASSISTANT_READONLY_TOOLS = new Set([
-  'editor_connect_info',
-  'editor_wait_ready',
-  'editor_status',
-  'project_list',
-  'project_get_current',
-  'asset_get_root',
-  'asset_get_builtin_primitives',
-  'asset_get_builtin_materials',
-  'asset_read_directory',
-  'asset_read_file',
-  'material_get_classes',
-  'material_get_property_list',
-  'material_get_properties',
-  'mesh_get_material',
-  'mesh_get_primitive',
-  'node_get_classes',
-  'scene_get_property_list',
-  'scene_get_properties',
-  'node_get_property_list',
-  'node_get_properties',
-  'node_get_class',
-  'node_get_local_transform',
-  'scene_get_root_node',
-  'node_get_parent',
-  'node_get_children',
-  'scene_get_selected_nodes',
-  'camera_get_active',
-  'docs_search_types',
-  'docs_get_type_symbol',
-  'docs_read_type_file',
-  'script_get_context',
-  'script_list_attachments',
-  'script_read_source',
-  'script_diagnostics',
-  'model_generate_status',
-  'editor_screenshot',
-  'editor_console_logs'
-]);
+// Pending tool approvals auto-reject after this long so an unattended
+// approval prompt cannot hang a run forever.
+const ASSISTANT_TOOL_APPROVAL_TIMEOUT_MS = Math.max(
+  10000,
+  Number.parseInt(process.env.ZEPHYR_EDITOR_ASSISTANT_APPROVAL_TIMEOUT_MS || '300000', 10) || 300000
+);
+// Max tool-produced screenshots kept as images in the LLM context; older ones
+// collapse to text placeholders so multi-step visual runs do not exhaust the
+// provider context window with stale base64 payloads.
+const MAX_ASSISTANT_CONTEXT_SCREENSHOTS = 2;
+const ASSISTANT_SCREENSHOT_OMITTED_TEXT =
+  '[An earlier editor screenshot was omitted here to save context. Take a new screenshot if you need to re-inspect the scene.]';
+// Symbol-keyed marker survives on in-memory chat entries but is invisible to
+// JSON.stringify, so request payloads stay clean.
+const ASSISTANT_SYNTHETIC_IMAGE_KEY = Symbol('assistantSyntheticImageEntry');
+// Per-tool-result cap when replaying persisted history into LLM context.
+const MAX_ASSISTANT_TOOL_RESULT_CHARS = 4000;
+// Rough context budget (chars/4 heuristic + flat image estimate). Oldest
+// conversation blocks are collapsed once the estimate exceeds this.
+const ASSISTANT_CONTEXT_TOKEN_BUDGET = Math.max(
+  8000,
+  Number.parseInt(process.env.ZEPHYR_EDITOR_ASSISTANT_CONTEXT_TOKENS || '80000', 10) || 80000
+);
+const ASSISTANT_IMAGE_TOKEN_ESTIMATE = 1100;
+function buildAssistantSystemPrompt(settings) {
+  const lines = [
+    'You are the embedded AI assistant of the Zephyr3D editor. You help the user inspect and edit the open project: scene graph, nodes, materials, meshes, cameras, assets, procedural models, and runtime scripts.',
+    '',
+    'Workflow:',
+    'Inspect first: use read-only tools (scene_get_root_node, node_get_children, node_get_properties, scene_get_selected_nodes, camera_get_active, asset_read_directory, material_get_properties) to ground yourself before changing anything.',
+    'Then act with the most direct tool for the job: node/scene property edits, material edits (clone built-ins first, they are read-only), shape_create_node or mesh_create for primitives, model_generate_begin for procedural geometry, camera_look_at to frame targets.',
+    'Then verify: after completing a batch of mutating scene changes, call editor_screenshot and visually confirm the result before concluding.',
+    'A scene checkpoint is taken automatically before your first mutating call in each run; if your edits go wrong, call scene_restore to roll the scene back to that checkpoint (or scene_checkpoint to snapshot manually before risky changes).',
+    'Screenshot images are delivered to you as follow-up user messages containing the image; inspect them and correct any visual discrepancies (wrong color, position, scale, missing objects) instead of assuming the change worked.',
+    'Only the most recent screenshots stay in context as images; take a fresh editor_screenshot rather than referring back to an omitted one.',
+    '',
+    'Scene editing rules:',
+    'Prefer the simplest non-script solution. If the goal can be achieved by changing existing scene, node, light, camera, material, mesh, or component property values, choose property edits instead of writing a script.',
+    'Treat new or modified scripts as the last resort unless the user explicitly asks for a script or the task genuinely requires runtime behavior such as per-frame updates, event handling, conditional logic, or stateful interactions.',
+    'If the current selection or target is ambiguous, ask the user instead of guessing.',
+    '',
+    'Scripting rules (when a script is genuinely needed):',
+    'Before creating, modifying, or attaching a script, inspect the current target with script_get_context or script_list_attachments.',
+    'When unsure about a Zephyr3D API name, signature, or usage pattern, query the bundled declaration docs with docs_search_types and docs_get_type_symbol before guessing; prefer entries from @zephyr3d/scene or @zephyr3d/base.',
+    'Treat script_template_source returned by script_get_context as the canonical reference for lifecycle hooks, RuntimeScript usage, host binding, and scriptProp usage, and follow its patterns.',
+    'Prefer imports from @zephyr3d/scene and @zephyr3d/base instead of guessing local globals.',
+    'Before modifying an existing script file, read it first with script_read_source.',
+    'After creating or modifying a script file, run script_diagnostics on it and fix any errors before attaching it or concluding.',
+    'Do not call script_write_source and node_attach_script or scene_attach_script in the same tool batch; wait for script_diagnostics first.',
+    'Use script_write_source to create or update script assets under /assets, then attach with node_attach_script or scene_attach_script.',
+    ''
+  ];
+  if (settings?.requireToolApproval) {
+    lines.push(
+      'Mutating tool calls require explicit user approval in the editor UI. Before your first mutating call for a task, state a concise plan of what you will change so the user can approve the calls confidently. Read-only inspection needs no approval or plan.'
+    );
+  } else {
+    lines.push(
+      'Tool approval is disabled, so your mutating calls execute immediately. Be conservative: state briefly what you are about to change, make changes in small verifiable batches, and check the result with read-only tools and editor_screenshot.'
+    );
+  }
+  return lines.join('\n');
+}
+// Auto-approval whitelist for the embedded assistant. Derived at runtime from
+// the MCP tool catalog's annotations.readOnlyHint (single source of truth in
+// editor-mcp-server.mjs); tools without the hint require approval.
+let assistantReadonlyToolNames = new Set();
 const IMAGE_FILE_MIME_TYPES = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -512,13 +523,31 @@ function rejectPendingRpcRequests(error) {
   pendingRpcRequests.clear();
 }
 
+const MCP_WORKER_RPC_TIMEOUT_MS = 180000;
+
 function sendRpcToMcpWorker(message) {
   if (!mcpWorker) {
     return Promise.reject(new Error('Embedded MCP worker is not running'));
   }
   const requestId = nextRpcRequestId++;
   return new Promise((resolve, reject) => {
-    pendingRpcRequests.set(requestId, { resolve, reject });
+    // Bound the main<->worker leg so a hung worker cannot stall HTTP MCP
+    // requests (and assistant tool calls) forever.
+    const timer = setTimeout(() => {
+      if (pendingRpcRequests.delete(requestId)) {
+        reject(new Error(`Embedded MCP worker request timed out: ${message?.method ?? 'rpc'}`));
+      }
+    }, MCP_WORKER_RPC_TIMEOUT_MS);
+    pendingRpcRequests.set(requestId, {
+      resolve: (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      reject: (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
     mcpWorker.postMessage({
       type: 'rpc',
       requestId,
@@ -546,16 +575,29 @@ function mcpConfigPath() {
   return path.join(app.getPath('userData'), MCP_CONFIG_FILE);
 }
 
+function sanitizeMcpServiceToken(value) {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  return /^[A-Za-z0-9_-]{16,128}$/.test(normalized) ? normalized : '';
+}
+
 async function loadMcpServiceConfig() {
   const filePath = mcpConfigPath();
   const loaded = await fs
     .readFile(filePath, 'utf8')
     .then((text) => JSON.parse(text))
     .catch(() => null);
+  // Env override pins the token for automation (headless/CI agents);
+  // otherwise a persisted per-installation token is generated once.
+  const envToken = sanitizeMcpServiceToken(process.env.ZEPHYR_EDITOR_MCP_TOKEN);
+  const token = envToken || sanitizeMcpServiceToken(loaded?.token);
   mcpServiceConfig = {
     enabled: typeof loaded?.enabled === 'boolean' ? loaded.enabled : true,
-    port: sanitizeMcpServicePort(loaded?.port)
+    port: sanitizeMcpServicePort(loaded?.port),
+    token: token || crypto.randomBytes(16).toString('hex')
   };
+  if (!envToken && !sanitizeMcpServiceToken(loaded?.token)) {
+    await saveMcpServiceConfig().catch(() => {});
+  }
 }
 
 async function saveMcpServiceConfig() {
@@ -575,7 +617,12 @@ function sanitizeLlmProvider(value) {
 }
 
 function sanitizeLlmBaseUrl(value, provider = 'openai') {
-  const fallback = provider === 'openai' ? DEFAULT_LLM_BASE_URL : '';
+  const fallback =
+    provider === 'openai'
+      ? DEFAULT_LLM_BASE_URL
+      : provider === 'anthropic'
+        ? DEFAULT_ANTHROPIC_BASE_URL
+        : '';
   const normalized = typeof value === 'string' ? value.trim() : '';
   if (!normalized) {
     return fallback;
@@ -588,9 +635,12 @@ function sanitizeLlmBaseUrl(value, provider = 'openai') {
   }
 }
 
-function sanitizeLlmModel(value) {
+function sanitizeLlmModel(value, provider = 'openai') {
   const normalized = typeof value === 'string' ? value.trim() : '';
-  return normalized || DEFAULT_LLM_MODEL;
+  if (normalized) {
+    return normalized;
+  }
+  return provider === 'anthropic' ? DEFAULT_ANTHROPIC_MODEL : DEFAULT_LLM_MODEL;
 }
 
 function sanitizeLlmTemperature(value) {
@@ -625,7 +675,7 @@ function sanitizeLlmSettings(value) {
   return {
     provider,
     baseUrl: sanitizeLlmBaseUrl(value?.baseUrl, provider),
-    model: sanitizeLlmModel(value?.model),
+    model: sanitizeLlmModel(value?.model, provider),
     temperature: sanitizeLlmTemperature(value?.temperature),
     maxOutputTokens: sanitizeLlmMaxOutputTokens(value?.maxOutputTokens),
     maxToolSteps: sanitizeLlmMaxToolSteps(value?.maxToolSteps),
@@ -821,20 +871,60 @@ function sanitizeAssistantAttachment(value) {
   };
 }
 
+function sanitizeAssistantToolCalls(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const calls = [];
+  for (const item of value) {
+    const id = typeof item?.id === 'string' ? item.id.trim() : '';
+    const name = typeof item?.function?.name === 'string' ? item.function.name.trim() : '';
+    if (!id || !name) {
+      continue;
+    }
+    calls.push({
+      id,
+      type: 'function',
+      function: {
+        name,
+        arguments:
+          typeof item.function.arguments === 'string'
+            ? item.function.arguments
+            : JSON.stringify(item.function.arguments ?? {})
+      }
+    });
+  }
+  return calls;
+}
+
 function sanitizeAssistantMessage(value) {
   const role = ['system', 'user', 'assistant', 'tool'].includes(value?.role) ? value.role : 'assistant';
   const status = ['pending', 'complete', 'error'].includes(value?.status) ? value.status : 'complete';
   const attachments = Array.isArray(value?.attachments)
     ? value.attachments.map(sanitizeAssistantAttachment).filter(Boolean)
     : [];
-  return {
+  const toolCalls = role === 'assistant' ? sanitizeAssistantToolCalls(value?.toolCalls) : [];
+  const toolCallId = role === 'tool' && typeof value?.toolCallId === 'string' ? value.toolCallId.trim() : '';
+  const toolName = role === 'tool' && typeof value?.toolName === 'string' ? value.toolName.trim() : '';
+  const message = {
     id: typeof value?.id === 'string' ? value.id : `msg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
     role,
     content: typeof value?.content === 'string' ? value.content : String(value?.content ?? ''),
     attachments,
     createdAt: typeof value?.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
-    status
+    status,
+    synthetic: !!value?.synthetic
   };
+  if (toolCalls.length) {
+    message.toolCalls = toolCalls;
+  }
+  if (toolCallId) {
+    message.toolCallId = toolCallId;
+  }
+  if (toolName) {
+    message.toolName = toolName;
+  }
+  return message;
 }
 
 async function loadAssistantSessions() {
@@ -951,12 +1041,47 @@ async function listAssistantSessions(scopeId) {
   return assistantSessions.filter((session) => (session.scopeId ?? null) === normalizedScopeId);
 }
 
+async function renameAssistantSession(sessionId, title, scopeId) {
+  const session = findAssistantSession(sessionId, scopeId);
+  if (!session) {
+    throw new Error(`Unknown assistant session: ${sessionId}`);
+  }
+  const normalizedTitle = typeof title === 'string' ? title.trim() : '';
+  if (normalizedTitle) {
+    session.title = normalizedTitle.slice(0, 120);
+    session.updatedAt = new Date().toISOString();
+    await saveAssistantSessions();
+    sendAssistantEvent({ type: 'session_updated', session });
+  }
+  return session;
+}
+
+async function deleteAssistantSession(sessionId, scopeId) {
+  const session = findAssistantSession(sessionId, scopeId);
+  if (!session) {
+    return false;
+  }
+  if (session.active || getAssistantRun(session.id)) {
+    throw new Error('Cannot delete a session while a run is active; cancel the run first');
+  }
+  assistantSessions = assistantSessions.filter((item) => item.id !== session.id);
+  await saveAssistantSessions();
+  await fs.rm(assistantSessionMessagesPath(session.id), { force: true }).catch(() => {});
+  sendAssistantEvent({
+    type: 'session_deleted',
+    sessionId: session.id,
+    scopeId: session.scopeId ?? null
+  });
+  return true;
+}
+
 function createAssistantMessage(role, content, status = 'complete', options = {}) {
   const normalizedContent = typeof content === 'string' ? content : String(content ?? '');
   const attachments = Array.isArray(options.attachments)
     ? options.attachments.map(sanitizeAssistantAttachment).filter(Boolean)
     : [];
-  if (!normalizedContent.trim() && !attachments.length && status !== 'pending') {
+  const toolCalls = sanitizeAssistantToolCalls(options.toolCalls);
+  if (!normalizedContent.trim() && !attachments.length && !toolCalls.length && status !== 'pending') {
     throw new Error('Assistant message content must not be empty');
   }
   return sanitizeAssistantMessage({
@@ -965,7 +1090,11 @@ function createAssistantMessage(role, content, status = 'complete', options = {}
     content: normalizedContent,
     attachments,
     createdAt: options.createdAt,
-    status
+    status,
+    synthetic: options.synthetic,
+    toolCalls,
+    toolCallId: options.toolCallId,
+    toolName: options.toolName
   });
 }
 
@@ -1021,9 +1150,6 @@ function assertAssistantRunActive(run, sessionId) {
 
 function getOpenAiCompatibleChatUrl(provider, baseUrl) {
   const normalizedProvider = sanitizeLlmProvider(provider);
-  if (normalizedProvider === 'anthropic') {
-    throw new Error('Anthropic provider is not implemented yet in the embedded assistant');
-  }
   const normalizedBaseUrl = sanitizeLlmBaseUrl(baseUrl, normalizedProvider);
   if (!normalizedBaseUrl) {
     throw new Error('LLM base URL is not configured');
@@ -1049,7 +1175,11 @@ async function callEmbeddedMcp(method, params) {
 async function listAssistantMcpTools() {
   const result = await callEmbeddedMcp('tools/list', {});
   const tools = Array.isArray(result?.tools) ? result.tools : [];
-  return tools.filter((tool) => typeof tool?.name === 'string' && tool.name.trim());
+  const validTools = tools.filter((tool) => typeof tool?.name === 'string' && tool.name.trim());
+  assistantReadonlyToolNames = new Set(
+    validTools.filter((tool) => tool?.annotations?.readOnlyHint === true).map((tool) => tool.name)
+  );
+  return validTools;
 }
 
 function convertMcpToolToOpenAiTool(tool) {
@@ -1065,12 +1195,24 @@ function convertMcpToolToOpenAiTool(tool) {
 
 async function waitForAssistantToolApproval(sessionId, callId, tool, args) {
   return await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const pending = clearPendingAssistantToolApproval(callId, false, true);
+      if (pending) {
+        resolve(false);
+      }
+    }, ASSISTANT_TOOL_APPROVAL_TIMEOUT_MS);
     assistantPendingToolApprovals.set(callId, {
       sessionId,
       tool,
       args,
-      resolve,
-      reject
+      resolve: (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      reject: (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
     });
     sendAssistantEvent({
       type: 'tool_call_approval_requested',
@@ -1098,7 +1240,7 @@ async function callAssistantTool(sessionId, run, name, rawArguments, settings) {
     parsedArguments = rawArguments;
   }
   const callId = `tool_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  if (settings.requireToolApproval && !ASSISTANT_READONLY_TOOLS.has(normalizedName)) {
+  if (settings.requireToolApproval && !assistantReadonlyToolNames.has(normalizedName)) {
     const approved = await waitForAssistantToolApproval(sessionId, callId, normalizedName, parsedArguments);
     assertAssistantRunActive(run, sessionId);
     if (!approved) {
@@ -1129,41 +1271,240 @@ async function callAssistantTool(sessionId, run, name, rawArguments, settings) {
   return result;
 }
 
-function normalizeAssistantHistoryToChatMessages(messages) {
-  return messages
-    .filter(
-      (message) =>
-        ['system', 'user', 'assistant'].includes(message.role) &&
-        (message.content || message.attachments?.length)
-    )
-    .map((message) => {
-      const attachments = Array.isArray(message.attachments) ? message.attachments : [];
-      if (message.role === 'user' && attachments.length) {
-        const content = [];
-        if (message.content) {
-          content.push({
-            type: 'text',
-            text: message.content
-          });
+function truncateAssistantToolContent(content) {
+  const normalized = typeof content === 'string' ? content : String(content ?? '');
+  if (normalized.length <= MAX_ASSISTANT_TOOL_RESULT_CHARS) {
+    return normalized;
+  }
+  const omitted = normalized.length - MAX_ASSISTANT_TOOL_RESULT_CHARS;
+  return `${normalized.slice(0, MAX_ASSISTANT_TOOL_RESULT_CHARS)}\n…[tool result truncated, ${omitted} characters omitted]`;
+}
+
+// Guarantees the OpenAI-compatible pairing invariant on replayed history:
+// every assistant tool_call id gets exactly one tool response before the next
+// assistant message, and tool messages never appear without a matching call
+// (cancelled runs and legacy sessions violate both).
+function repairAssistantToolCallPairing(chat) {
+  const result = [];
+  let openIds = new Map();
+  const closeOpenIds = () => {
+    for (const [id, toolName] of openIds) {
+      result.push({
+        role: 'tool',
+        tool_call_id: id,
+        content: `[No result was recorded for tool call ${toolName || id}; the run may have been cancelled.]`
+      });
+    }
+    openIds = new Map();
+  };
+  for (const entry of chat) {
+    if (entry.role === 'assistant') {
+      closeOpenIds();
+      result.push(entry);
+      if (Array.isArray(entry.tool_calls)) {
+        for (const call of entry.tool_calls) {
+          openIds.set(call.id, call.function?.name || '');
         }
-        for (const attachment of attachments) {
-          content.push({
-            type: 'image_url',
-            image_url: {
-              url: attachment.dataUrl
-            }
-          });
-        }
-        return {
-          role: message.role,
-          content
-        };
       }
-      return {
+      continue;
+    }
+    if (entry.role === 'tool') {
+      if (openIds.has(entry.tool_call_id)) {
+        openIds.delete(entry.tool_call_id);
+        result.push(entry);
+      } else if (typeof entry.content === 'string' && entry.content.trim()) {
+        result.push({
+          role: 'system',
+          content: `Earlier tool result:\n${entry.content}`
+        });
+      }
+      continue;
+    }
+    result.push(entry);
+  }
+  closeOpenIds();
+  return result;
+}
+
+function normalizeAssistantHistoryToChatMessages(messages) {
+  const chat = [];
+  for (const message of messages) {
+    if (message.role === 'tool') {
+      const content = truncateAssistantToolContent(message.content);
+      if (message.toolCallId) {
+        chat.push({
+          role: 'tool',
+          tool_call_id: message.toolCallId,
+          content
+        });
+      } else if (content.trim()) {
+        // Legacy sessions stored tool output without call ids; replay as a
+        // system note so the evidence survives even without strict pairing.
+        chat.push({
+          role: 'system',
+          content: `Earlier tool result${message.toolName ? ` (${message.toolName})` : ''}:\n${content}`
+        });
+      }
+      continue;
+    }
+    if (!['system', 'user', 'assistant'].includes(message.role)) {
+      continue;
+    }
+    const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+    const toolCalls = Array.isArray(message.toolCalls) ? message.toolCalls : [];
+    if (!message.content && !attachments.length && !toolCalls.length) {
+      continue;
+    }
+    if (message.role === 'user' && attachments.length) {
+      const content = [];
+      if (message.content) {
+        content.push({
+          type: 'text',
+          text: message.content
+        });
+      }
+      for (const attachment of attachments) {
+        content.push({
+          type: 'image_url',
+          image_url: {
+            url: attachment.dataUrl
+          }
+        });
+      }
+      const entry = {
         role: message.role,
-        content: message.content
+        content
       };
+      if (message.synthetic) {
+        entry[ASSISTANT_SYNTHETIC_IMAGE_KEY] = true;
+      }
+      chat.push(entry);
+      continue;
+    }
+    if (message.role === 'assistant' && toolCalls.length) {
+      chat.push({
+        role: 'assistant',
+        content: message.content || '',
+        tool_calls: toolCalls
+      });
+      continue;
+    }
+    chat.push({
+      role: message.role,
+      content: message.content
     });
+  }
+  return repairAssistantToolCallPairing(chat);
+}
+
+function extractToolResultImageAttachments(toolName, toolResult) {
+  const blocks = Array.isArray(toolResult?.content) ? toolResult.content : [];
+  const attachments = [];
+  for (const block of blocks) {
+    if (block?.type !== 'image' || typeof block.data !== 'string' || !block.data) {
+      continue;
+    }
+    const mimeType = typeof block.mimeType === 'string' && block.mimeType.startsWith('image/')
+      ? block.mimeType
+      : 'image/png';
+    attachments.push({
+      name: `${toolName}_${attachments.length + 1}.${mimeType.split('/')[1] || 'png'}`,
+      mimeType,
+      dataUrl: `data:${mimeType};base64,${block.data}`
+    });
+  }
+  return attachments;
+}
+
+function buildSyntheticScreenshotChatEntry(text, attachments) {
+  const entry = {
+    role: 'user',
+    content: [
+      { type: 'text', text },
+      ...attachments.map((attachment) => ({
+        type: 'image_url',
+        image_url: { url: attachment.dataUrl }
+      }))
+    ]
+  };
+  entry[ASSISTANT_SYNTHETIC_IMAGE_KEY] = true;
+  return entry;
+}
+
+function enforceAssistantScreenshotBudget(conversation, maxImages = MAX_ASSISTANT_CONTEXT_SCREENSHOTS) {
+  const imageEntries = conversation.filter(
+    (entry) => entry?.[ASSISTANT_SYNTHETIC_IMAGE_KEY] && Array.isArray(entry.content)
+  );
+  const excess = imageEntries.length - maxImages;
+  for (let i = 0; i < excess; i++) {
+    imageEntries[i].content = ASSISTANT_SCREENSHOT_OMITTED_TEXT;
+  }
+}
+
+function estimateAssistantChatEntryTokens(entry) {
+  let tokens = 8;
+  if (typeof entry?.content === 'string') {
+    tokens += Math.ceil(entry.content.length / 4);
+  } else if (Array.isArray(entry?.content)) {
+    for (const item of entry.content) {
+      if (item?.type === 'text' && typeof item.text === 'string') {
+        tokens += Math.ceil(item.text.length / 4);
+      } else if (item?.type === 'image_url') {
+        tokens += ASSISTANT_IMAGE_TOKEN_ESTIMATE;
+      }
+    }
+  }
+  if (Array.isArray(entry?.tool_calls)) {
+    for (const call of entry.tool_calls) {
+      tokens += Math.ceil(
+        ((call?.function?.name?.length ?? 0) + (call?.function?.arguments?.length ?? 0)) / 4 + 8
+      );
+    }
+  }
+  return tokens;
+}
+
+// Collapses the oldest conversation blocks into a single truncation notice
+// when the estimated token count exceeds the budget. A block starts at a real
+// user message or an assistant message and carries its trailing tool results,
+// synthetic screenshots, and injected system notes, so dropping whole blocks
+// can never orphan a tool_call pairing. Index 0 (system prompt) is always kept.
+function enforceAssistantContextBudget(conversation, budgetTokens = ASSISTANT_CONTEXT_TOKEN_BUDGET) {
+  let total = 0;
+  for (const entry of conversation) {
+    total += estimateAssistantChatEntryTokens(entry);
+  }
+  if (total <= budgetTokens) {
+    return;
+  }
+  const blocks = [];
+  for (let i = 1; i < conversation.length; i++) {
+    const entry = conversation[i];
+    const startsBlock =
+      entry.role === 'assistant' || (entry.role === 'user' && !entry[ASSISTANT_SYNTHETIC_IMAGE_KEY]);
+    if (startsBlock || !blocks.length) {
+      blocks.push({ start: i, end: i + 1, tokens: 0 });
+    } else {
+      blocks[blocks.length - 1].end = i + 1;
+    }
+    blocks[blocks.length - 1].tokens += estimateAssistantChatEntryTokens(entry);
+  }
+  let droppedEntries = 0;
+  let droppedBlocks = 0;
+  // Always keep at least the last two blocks (latest user request + reply).
+  while (blocks.length - droppedBlocks > 2 && total > budgetTokens) {
+    const block = blocks[droppedBlocks];
+    total -= block.tokens;
+    droppedEntries += block.end - block.start;
+    droppedBlocks++;
+  }
+  if (!droppedEntries) {
+    return;
+  }
+  conversation.splice(1, droppedEntries, {
+    role: 'system',
+    content: `[Context truncated: ${droppedEntries} earlier messages were omitted to fit the context window. Re-inspect the scene with read-only tools if you need details from before this point.]`
+  });
 }
 
 function extractOpenAiTextDelta(content) {
@@ -1334,6 +1675,360 @@ async function invokeOpenAiCompatibleChat(settings, messages, tools, signal, cal
   return choice;
 }
 
+function getAnthropicMessagesUrl(baseUrl) {
+  const normalized = sanitizeLlmBaseUrl(baseUrl, 'anthropic') || DEFAULT_ANTHROPIC_BASE_URL;
+  return normalized.endsWith('/v1/messages') ? normalized : `${normalized}/v1/messages`;
+}
+
+function convertMcpToolToAnthropicTool(tool) {
+  return {
+    name: tool.name,
+    description: tool.description ?? '',
+    input_schema: tool.inputSchema ?? { type: 'object', properties: {} }
+  };
+}
+
+function dataUrlToAnthropicImageBlock(url) {
+  const match = /^data:([^;,]+);base64,(.*)$/s.exec(typeof url === 'string' ? url : '');
+  if (!match || !match[2]) {
+    return null;
+  }
+  return {
+    type: 'image',
+    source: { type: 'base64', media_type: match[1], data: match[2] }
+  };
+}
+
+function convertChatContentToAnthropicBlocks(content) {
+  if (typeof content === 'string') {
+    return content ? [{ type: 'text', text: content }] : [];
+  }
+  const blocks = [];
+  if (Array.isArray(content)) {
+    for (const item of content) {
+      if (item?.type === 'text' && typeof item.text === 'string' && item.text) {
+        blocks.push({ type: 'text', text: item.text });
+      } else if (item?.type === 'image_url') {
+        const image = dataUrlToAnthropicImageBlock(item.image_url?.url);
+        if (image) {
+          blocks.push(image);
+        }
+      }
+    }
+  }
+  return blocks;
+}
+
+function parseAssistantToolCallInput(argsText) {
+  if (typeof argsText !== 'string' || !argsText.trim()) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(argsText);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+// Converts the loop's OpenAI-style conversation into Anthropic Messages API
+// shape. Index-0 system becomes the top-level system prompt; interleaved
+// system notes become user-side <system-note> text (portable across models
+// that lack mid-conversation system role support). Consecutive same-role
+// entries merge, and tool_result blocks are hoisted to the front of their
+// user message as the API requires.
+function buildAnthropicRequestMessages(conversation) {
+  const systemBlocks = [];
+  const messages = [];
+  const pushBlocks = (role, blocks) => {
+    if (!blocks.length) {
+      return;
+    }
+    const last = messages[messages.length - 1];
+    if (last && last.role === role) {
+      last.content.push(...blocks);
+    } else {
+      messages.push({ role, content: [...blocks] });
+    }
+  };
+  conversation.forEach((entry, index) => {
+    if (entry.role === 'system') {
+      const text = typeof entry.content === 'string' ? entry.content : String(entry.content ?? '');
+      if (index === 0) {
+        systemBlocks.push({ type: 'text', text });
+      } else if (text) {
+        pushBlocks('user', [{ type: 'text', text: `<system-note>\n${text}\n</system-note>` }]);
+      }
+      return;
+    }
+    if (entry.role === 'assistant') {
+      const blocks = convertChatContentToAnthropicBlocks(entry.content);
+      if (Array.isArray(entry.tool_calls)) {
+        for (const call of entry.tool_calls) {
+          blocks.push({
+            type: 'tool_use',
+            id: call.id,
+            name: call.function?.name || '',
+            input: parseAssistantToolCallInput(call.function?.arguments)
+          });
+        }
+      }
+      pushBlocks('assistant', blocks);
+      return;
+    }
+    if (entry.role === 'tool') {
+      pushBlocks('user', [
+        {
+          type: 'tool_result',
+          tool_use_id: entry.tool_call_id,
+          content: typeof entry.content === 'string' ? entry.content : JSON.stringify(entry.content ?? null)
+        }
+      ]);
+      return;
+    }
+    pushBlocks('user', convertChatContentToAnthropicBlocks(entry.content));
+  });
+  for (const message of messages) {
+    if (message.role === 'user' && message.content.some((block) => block.type === 'tool_result')) {
+      message.content = [
+        ...message.content.filter((block) => block.type === 'tool_result'),
+        ...message.content.filter((block) => block.type !== 'tool_result')
+      ];
+    }
+  }
+  if (messages.length && messages[0].role !== 'user') {
+    messages.unshift({ role: 'user', content: [{ type: 'text', text: '(session resumed)' }] });
+  }
+  // Prompt caching: one breakpoint after tools+system, one on the newest turn
+  // so each loop step reuses the previous step's prefix.
+  if (systemBlocks.length) {
+    systemBlocks[systemBlocks.length - 1].cache_control = { type: 'ephemeral' };
+  }
+  const lastMessage = messages[messages.length - 1];
+  if (lastMessage?.content.length) {
+    lastMessage.content[lastMessage.content.length - 1].cache_control = { type: 'ephemeral' };
+  }
+  return { system: systemBlocks, messages };
+}
+
+function processAnthropicStreamEventBlock(block, state, callbacks) {
+  const normalized = block.replace(/\r/g, '');
+  const dataLines = normalized
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trim());
+  if (!dataLines.length) {
+    return false;
+  }
+  const data = dataLines.join('\n');
+  if (!data) {
+    return false;
+  }
+  const payload = JSON.parse(data);
+  switch (payload?.type) {
+    case 'content_block_start': {
+      const contentBlock = payload.content_block;
+      state.blocks[payload.index] =
+        contentBlock?.type === 'tool_use'
+          ? { type: 'tool_use', id: contentBlock.id || '', name: contentBlock.name || '', inputJson: '' }
+          : { type: contentBlock?.type || 'text' };
+      break;
+    }
+    case 'content_block_delta': {
+      const delta = payload.delta;
+      if (delta?.type === 'text_delta' && typeof delta.text === 'string' && delta.text) {
+        state.content += delta.text;
+        callbacks?.onTextDelta?.(delta.text, state.content);
+      } else if (delta?.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
+        const blockState = state.blocks[payload.index];
+        if (blockState?.type === 'tool_use') {
+          blockState.inputJson += delta.partial_json;
+        }
+      }
+      break;
+    }
+    case 'message_delta':
+      if (payload.delta?.stop_reason) {
+        state.stopReason = payload.delta.stop_reason;
+      }
+      break;
+    case 'message_stop':
+      return true;
+    case 'error':
+      throw new Error(payload.error?.message || 'Anthropic stream error');
+  }
+  return false;
+}
+
+function finalizeAnthropicStreamState(state) {
+  return {
+    role: 'assistant',
+    content: state.content,
+    tool_calls: Object.keys(state.blocks)
+      .map((key) => state.blocks[key])
+      .filter((block) => block.type === 'tool_use' && block.name)
+      .map((block) => ({
+        id: block.id,
+        type: 'function',
+        function: { name: block.name, arguments: block.inputJson || '{}' }
+      })),
+    stop_reason: state.stopReason
+  };
+}
+
+async function readAnthropicChatStream(response, callbacks) {
+  const reader = response.body?.getReader?.();
+  if (!reader) {
+    throw new Error('Streaming response body is not readable');
+  }
+  const decoder = new TextDecoder();
+  const state = { content: '', blocks: {}, stopReason: null };
+  let buffer = '';
+  let finished = false;
+  while (!finished) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    let boundary = buffer.search(/\r?\n\r?\n/);
+    while (boundary >= 0) {
+      const block = buffer.slice(0, boundary);
+      const separatorLength = buffer.startsWith('\r\n\r\n', boundary) ? 4 : 2;
+      buffer = buffer.slice(boundary + separatorLength);
+      finished = processAnthropicStreamEventBlock(block, state, callbacks);
+      if (finished) {
+        break;
+      }
+      boundary = buffer.search(/\r?\n\r?\n/);
+    }
+  }
+  buffer += decoder.decode();
+  const tail = buffer.trim();
+  if (tail && !finished) {
+    processAnthropicStreamEventBlock(tail, state, callbacks);
+  }
+  return finalizeAnthropicStreamState(state);
+}
+
+function normalizeAnthropicMessageToChatMessage(payload) {
+  const blocks = Array.isArray(payload?.content) ? payload.content : [];
+  let text = '';
+  const toolCalls = [];
+  for (const block of blocks) {
+    if (block?.type === 'text' && typeof block.text === 'string') {
+      text += block.text;
+    } else if (block?.type === 'tool_use') {
+      toolCalls.push({
+        id: block.id || '',
+        type: 'function',
+        function: { name: block.name || '', arguments: JSON.stringify(block.input ?? {}) }
+      });
+    }
+  }
+  return { role: 'assistant', content: text, tool_calls: toolCalls, stop_reason: payload?.stop_reason };
+}
+
+async function invokeAnthropicChat(settings, conversation, mcpTools, signal, callbacks) {
+  const rawApiKey = getLlmApiKey('anthropic');
+  if (!rawApiKey) {
+    throw new Error('No API key configured for provider anthropic');
+  }
+  const apiKey = normalizeLlmApiKey(rawApiKey);
+  const { system, messages } = buildAnthropicRequestMessages(conversation);
+  const tools = settings.toolCalling ? mcpTools.map(convertMcpToolToAnthropicTool) : [];
+  if (tools.length) {
+    tools[tools.length - 1].cache_control = { type: 'ephemeral' };
+  }
+  // Current Anthropic models reject `temperature`; `thinking` is intentionally
+  // omitted (defaults to adaptive on models that support it).
+  const response = await fetch(getAnthropicMessagesUrl(settings.baseUrl), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': ANTHROPIC_API_VERSION
+    },
+    body: JSON.stringify({
+      model: settings.model,
+      max_tokens: settings.maxOutputTokens,
+      system: system.length ? system : undefined,
+      messages,
+      stream: true,
+      tools: tools.length ? tools : undefined
+    }),
+    signal
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const message =
+      payload?.error?.message ||
+      payload?.message ||
+      `LLM request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+  const contentType = response.headers.get('content-type') || '';
+  const message = contentType.includes('text/event-stream')
+    ? await readAnthropicChatStream(response, callbacks)
+    : normalizeAnthropicMessageToChatMessage(await response.json().catch(() => null));
+  if (message.stop_reason === 'refusal') {
+    message.tool_calls = [];
+    if (!message.content?.trim()) {
+      message.content =
+        'The model declined this request (safety refusal). Please rephrase the request or try a different approach.';
+    }
+  }
+  return message;
+}
+
+// Lists model ids from the configured provider (GET /models for
+// OpenAI-compatible endpoints, GET /v1/models for Anthropic) using the stored
+// API key for that provider.
+async function listLlmModels(providerRaw, baseUrlRaw) {
+  const provider = sanitizeLlmProvider(providerRaw);
+  const rawApiKey = getLlmApiKey(provider);
+  if (!rawApiKey) {
+    throw new Error(`No API key configured for provider ${provider}; save the API key first`);
+  }
+  const apiKey = normalizeLlmApiKey(rawApiKey);
+  let url;
+  let headers;
+  if (provider === 'anthropic') {
+    const baseUrl = sanitizeLlmBaseUrl(baseUrlRaw, 'anthropic') || DEFAULT_ANTHROPIC_BASE_URL;
+    url = `${baseUrl.replace(/\/$/, '')}/v1/models?limit=100`;
+    headers = { 'x-api-key': apiKey, 'anthropic-version': ANTHROPIC_API_VERSION };
+  } else {
+    const baseUrl = sanitizeLlmBaseUrl(baseUrlRaw, provider);
+    if (!baseUrl) {
+      throw new Error('LLM base URL is not configured');
+    }
+    url = `${baseUrl.replace(/\/$/, '')}/models`;
+    headers = { Authorization: `Bearer ${apiKey}` };
+  }
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(
+      payload?.error?.message ||
+        payload?.message ||
+        `Model list request failed with status ${response.status}`
+    );
+  }
+  const payload = await response.json().catch(() => null);
+  return (Array.isArray(payload?.data) ? payload.data : [])
+    .map((model) => (typeof model?.id === 'string' ? model.id.trim() : ''))
+    .filter(Boolean)
+    .sort();
+}
+
+async function invokeAssistantChat(settings, conversation, mcpTools, signal, callbacks) {
+  if (settings.provider === 'anthropic') {
+    return await invokeAnthropicChat(settings, conversation, mcpTools, signal, callbacks);
+  }
+  const openAiTools = settings.toolCalling ? mcpTools.map(convertMcpToolToOpenAiTool) : [];
+  return await invokeOpenAiCompatibleChat(settings, conversation, openAiTools, signal, callbacks);
+}
+
 function extractAssistantTextContent(content) {
   if (typeof content === 'string') {
     return content.trim();
@@ -1370,6 +2065,75 @@ function getScriptDiagnosticsErrorCount(toolResult) {
   return Number.isFinite(count) ? count : 0;
 }
 
+async function tryCollectAssistantContextTool(name, args = {}) {
+  try {
+    const result = await callEmbeddedMcp('tools/call', {
+      name,
+      arguments: { timeout_ms: 3000, ...args }
+    });
+    if (result?.isError) {
+      return null;
+    }
+    return result?.structuredContent ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function compactJsonForAssistantContext(value, maxChars = 1200) {
+  try {
+    const text = JSON.stringify(value);
+    if (typeof text !== 'string') {
+      return '';
+    }
+    return text.length > maxChars ? `${text.slice(0, maxChars)}…` : text;
+  } catch {
+    return '';
+  }
+}
+
+// Collects a compact editor-state snapshot at run start so the model does not
+// spend tool steps rediscovering basics. Every probe is best-effort: when the
+// editor bridge is not ready (no window, no project) the section is skipped.
+async function buildAssistantEditorContextEntry() {
+  const sections = [];
+  const [status, project, selected, camera, root] = await Promise.all([
+    tryCollectAssistantContextTool('editor_status'),
+    tryCollectAssistantContextTool('project_get_current'),
+    tryCollectAssistantContextTool('scene_get_selected_nodes'),
+    tryCollectAssistantContextTool('camera_get_active'),
+    tryCollectAssistantContextTool('scene_get_root_node')
+  ]);
+  if (status) {
+    sections.push(`editor_status: ${compactJsonForAssistantContext(status)}`);
+  }
+  if (project) {
+    sections.push(`current_project: ${compactJsonForAssistantContext(project)}`);
+  }
+  if (root?.node?.id) {
+    sections.push(`scene_root: ${compactJsonForAssistantContext(root.node)}`);
+    const children = await tryCollectAssistantContextTool('node_get_children', {
+      parent: root.node.id
+    });
+    if (children?.subNodes) {
+      sections.push(`scene_root_children: ${compactJsonForAssistantContext(children.subNodes, 2000)}`);
+    }
+  }
+  if (selected) {
+    sections.push(`selected_nodes: ${compactJsonForAssistantContext(selected)}`);
+  }
+  if (camera) {
+    sections.push(`active_camera: ${compactJsonForAssistantContext(camera)}`);
+  }
+  if (!sections.length) {
+    return null;
+  }
+  return {
+    role: 'system',
+    content: `Editor state snapshot, auto-collected when this run started (it changes as you edit; re-query with read-only tools when in doubt):\n${sections.join('\n')}`
+  };
+}
+
 async function runAssistantLoop(sessionId, run) {
   const session = findAssistantSession(sessionId);
   if (!session) {
@@ -1377,27 +2141,36 @@ async function runAssistantLoop(sessionId, run) {
   }
   const settings = sanitizeLlmSettings(editorGlobalConfig.llm);
   const tools = settings.toolCalling ? await listAssistantMcpTools() : [];
-  const openAiTools = tools.map(convertMcpToolToOpenAiTool);
   const history = await readAssistantSessionMessages(sessionId);
   const conversation = [
     {
       role: 'system',
-      content: SCRIPTING_ASSISTANT_SYSTEM_PROMPT
+      content: buildAssistantSystemPrompt(settings)
     },
     ...normalizeAssistantHistoryToChatMessages(history)
   ];
+  if (settings.toolCalling && tools.length) {
+    // Appended after history (not at index 1) so context-budget truncation of
+    // old blocks never drops the fresh snapshot.
+    const contextEntry = await buildAssistantEditorContextEntry();
+    if (contextEntry) {
+      conversation.push(contextEntry);
+    }
+  }
   const maxToolSteps = settings.maxToolSteps;
   for (let step = 0; maxToolSteps === null || step < maxToolSteps; step++) {
     assertAssistantRunActive(run, sessionId);
+    enforceAssistantScreenshotBudget(conversation);
+    enforceAssistantContextBudget(conversation);
     const streamedMessage = createAssistantMessage('assistant', '', 'pending');
     let hasStreamedText = false;
     let streamedContent = '';
     let message;
     try {
-      message = await invokeOpenAiCompatibleChat(
+      message = await invokeAssistantChat(
         settings,
         conversation,
-        openAiTools,
+        tools,
         run.abortController.signal,
         {
           onTextDelta(delta, content) {
@@ -1417,33 +2190,58 @@ async function runAssistantLoop(sessionId, run) {
       throw err;
     }
     const textContent = extractAssistantTextContent(message.content);
+    const toolCalls = (Array.isArray(message.tool_calls) ? message.tool_calls : [])
+      .filter((toolCall) => toolCall?.function?.name)
+      .map((toolCall, index) =>
+        toolCall.id ? toolCall : { ...toolCall, id: `call_${streamedMessage.id}_${index}` }
+      );
     if (textContent) {
       if (!hasStreamedText) {
         emitAssistantMessageStarted(sessionId, streamedMessage);
         emitAssistantMessageDelta(sessionId, streamedMessage.id, textContent, textContent);
       }
       emitAssistantMessageCompleted(sessionId, streamedMessage.id, textContent, 'complete');
+    }
+    if (textContent || toolCalls.length) {
       await appendAssistantMessage(sessionId, 'assistant', textContent, 'complete', {
         id: streamedMessage.id,
-        createdAt: streamedMessage.createdAt
+        createdAt: streamedMessage.createdAt,
+        toolCalls
       });
-      conversation.push({ role: 'assistant', content: textContent });
+      // A single conversation entry carries both the text and the tool calls;
+      // pushing them separately would duplicate the text in later requests.
+      conversation.push(
+        toolCalls.length
+          ? { role: 'assistant', content: textContent || '', tool_calls: toolCalls }
+          : { role: 'assistant', content: textContent }
+      );
     }
-    const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
     if (!toolCalls.length) {
       return;
     }
-    conversation.push({
-      role: 'assistant',
-      content: textContent || '',
-      tool_calls: toolCalls
-    });
     for (let toolIndex = 0; toolIndex < toolCalls.length; toolIndex++) {
       const toolCall = toolCalls[toolIndex];
       assertAssistantRunActive(run, sessionId);
       const toolName = toolCall?.function?.name;
       if (!toolName) {
         throw new Error('LLM tool call is missing function name');
+      }
+      if (
+        !run.sceneCheckpointTaken &&
+        assistantReadonlyToolNames.size &&
+        !assistantReadonlyToolNames.has(toolName)
+      ) {
+        // Best-effort rollback point before this run's first mutating call;
+        // scene_restore reverts to it if the edits go wrong.
+        run.sceneCheckpointTaken = true;
+        try {
+          await callEmbeddedMcp('tools/call', {
+            name: 'scene_checkpoint',
+            arguments: { label: 'auto: before assistant edits', timeout_ms: 15000 }
+          });
+        } catch {
+          // No project/scene open or checkpoint failed — proceed without one.
+        }
       }
       const toolResult = await callAssistantTool(
         sessionId,
@@ -1453,12 +2251,31 @@ async function runAssistantLoop(sessionId, run) {
         settings
       );
       const toolContent = JSON.stringify(toolResult?.structuredContent ?? toolResult ?? null, null, 2);
-      await appendAssistantMessage(sessionId, 'tool', `[${toolName}]\n${toolContent}`, toolResult?.isError ? 'error' : 'complete');
+      await appendAssistantMessage(sessionId, 'tool', toolContent, toolResult?.isError ? 'error' : 'complete', {
+        toolCallId: toolCall.id,
+        toolName
+      });
       conversation.push({
         role: 'tool',
         tool_call_id: toolCall.id,
         content: toolContent
       });
+      if (!toolResult?.isError) {
+        const imageAttachments = extractToolResultImageAttachments(toolName, toolResult);
+        if (imageAttachments.length) {
+          // OpenAI-compatible tool messages are text-only, so tool-produced
+          // images (e.g. editor_screenshot) ride a synthetic user message the
+          // model can actually see. The persisted copy is flagged synthetic so
+          // the UI does not present it as something the user typed.
+          const screenshotText = `[Image result of tool call ${toolName}]`;
+          await appendAssistantMessage(sessionId, 'user', screenshotText, 'complete', {
+            attachments: imageAttachments,
+            synthetic: true
+          });
+          conversation.push(buildSyntheticScreenshotChatEntry(screenshotText, imageAttachments));
+          enforceAssistantScreenshotBudget(conversation);
+        }
+      }
       if (toolName === 'script_write_source' && !toolResult?.isError) {
         const path = getScriptWritePathFromToolResult(toolResult);
         if (path) {
@@ -1596,7 +2413,8 @@ async function sendAssistantMessage(sessionId, content, attachments, scopeId) {
 }
 
 function getConfiguredMcpServiceUrl(port = mcpServiceConfig.port) {
-  return `http://127.0.0.1:${port}${MCP_HTTP_PATH}`;
+  const token = mcpServiceConfig.token ? `?token=${mcpServiceConfig.token}` : '';
+  return `http://127.0.0.1:${port}${MCP_HTTP_PATH}${token}`;
 }
 
 function isMcpServiceRunning() {
@@ -1614,7 +2432,8 @@ function getGlobalSettingsPayload() {
     defaultRHI: sanitizeEditorRHI(editorGlobalConfig.defaultRHI),
     llm: {
       ...sanitizeLlmSettings(editorGlobalConfig.llm),
-      apiKeyConfigured: hasLlmApiKeyConfigured(editorGlobalConfig.llm?.provider)
+      apiKeyConfigured: hasLlmApiKeyConfigured(editorGlobalConfig.llm?.provider),
+      apiKeyStorageSecure: safeStorage.isEncryptionAvailable()
     }
   };
 }
@@ -1631,7 +2450,8 @@ async function applyMcpServiceConfig(nextConfig) {
   const enabledChanged = nextEnabled !== mcpServiceConfig.enabled;
   mcpServiceConfig = {
     enabled: nextEnabled,
-    port: nextPort
+    port: nextPort,
+    token: sanitizeMcpServiceToken(mcpServiceConfig.token) || crypto.randomBytes(16).toString('hex')
   };
   await saveMcpServiceConfig();
   if (!nextEnabled) {
@@ -1822,6 +2642,26 @@ async function dispatchMcpHttpMessage(message, headers) {
   }
 }
 
+function timingSafeEqualStrings(a, b) {
+  const bufA = Buffer.from(String(a ?? ''), 'utf8');
+  const bufB = Buffer.from(String(b ?? ''), 'utf8');
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+}
+
+// Loopback + Origin checks stop browsers, but any local process could still
+// reach the endpoint; the bearer token (also accepted as ?token= for MCP
+// clients that cannot send headers) gates those callers.
+function isAuthorizedMcpRequest(req, requestUrl) {
+  const token = sanitizeMcpServiceToken(mcpServiceConfig.token);
+  if (!token) {
+    return true;
+  }
+  const authorization = typeof req.headers.authorization === 'string' ? req.headers.authorization : '';
+  const bearer = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+  const queryToken = requestUrl.searchParams.get('token') || '';
+  return timingSafeEqualStrings(bearer, token) || timingSafeEqualStrings(queryToken, token);
+}
+
 async function handleMcpHttpRequest(req, res) {
   const origin = typeof req.headers.origin === 'string' ? req.headers.origin : null;
   const requestUrl = new URL(req.url || '/', 'http://127.0.0.1');
@@ -1855,6 +2695,10 @@ async function handleMcpHttpRequest(req, res) {
     writeMcpEmptyResponse(res, 405, null, origin, {
       Allow: 'POST, GET, OPTIONS'
     });
+    return;
+  }
+  if (!isAuthorizedMcpRequest(req, requestUrl)) {
+    writeMcpEmptyResponse(res, 401, null, origin);
     return;
   }
   const contentType = req.headers['content-type'];
@@ -3047,6 +3891,27 @@ ipcMain.handle(SETTINGS_CHANNEL, async (_event, payload) => {
         payload.args.callId,
         payload.args.scopeId
       );
+    case 'renameAssistantSession':
+      return await renameAssistantSession(
+        payload.args.sessionId,
+        payload.args.title,
+        payload.args.scopeId
+      );
+    case 'deleteAssistantSession':
+      return await deleteAssistantSession(payload.args.sessionId, payload.args.scopeId);
+    case 'listLlmModels':
+      return await listLlmModels(payload.args.provider, payload.args.baseUrl);
+    case 'readClipboardImage': {
+      const image = clipboard.readImage();
+      if (!image || image.isEmpty()) {
+        return null;
+      }
+      const pngBuffer = image.toPNG();
+      if (!pngBuffer?.length || pngBuffer.length > MAX_ASSISTANT_IMAGE_BYTES) {
+        return null;
+      }
+      return { mimeType: 'image/png', dataBase64: pngBuffer.toString('base64') };
+    }
     default:
       throw new Error(`Unknown settings operation: ${payload.operation}`);
   }

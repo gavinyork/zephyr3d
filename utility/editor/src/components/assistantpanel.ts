@@ -2,6 +2,7 @@ import { Disposable } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
 import { customTextInput, CustomInputTextFlags } from './textinput';
 import { AssistantService } from '../core/services/assistant';
+import { EditorSettingsService } from '../core/services/editorsettings';
 import type {
   DesktopAssistantAttachment,
   DesktopAssistantEvent,
@@ -56,6 +57,12 @@ export class AssistantPanel extends Disposable {
   private _pendingConversationScrollRevision: number | null;
   private _messageLayoutCache: Map<string, VirtualItemLayout>;
   private _timelineLayoutCache: Map<string, VirtualItemLayout>;
+  private _renameInput: [string];
+  private _confirmDeleteSessionId: string;
+  private _expandedMessageIds: Set<string>;
+  private _llmModel: string;
+  private _llmModels: string[];
+  private _llmModelBusy: boolean;
 
   constructor() {
     super();
@@ -74,6 +81,12 @@ export class AssistantPanel extends Disposable {
     this._pendingConversationScrollRevision = null;
     this._messageLayoutCache = new Map();
     this._timelineLayoutCache = new Map();
+    this._renameInput = [''];
+    this._confirmDeleteSessionId = '';
+    this._expandedMessageIds = new Set();
+    this._llmModel = '';
+    this._llmModels = [];
+    this._llmModelBusy = false;
     if (AssistantService.isAvailable()) {
       this._unsubscribe = AssistantService.onEvent((event) => {
         void this.handleAssistantEvent(event);
@@ -146,6 +159,64 @@ export class AssistantPanel extends Disposable {
     if (!this._selectedSessionId && this._sessions.length > 0) {
       await this.selectSession(this._sessions[0].id);
     }
+    void this.refreshLlmModel();
+  }
+
+  private async refreshLlmModel() {
+    try {
+      const settings = await EditorSettingsService.getGlobalSettings();
+      this._llmModel = settings.llm?.model ?? '';
+    } catch {
+      this._llmModel = '';
+    }
+  }
+
+  private async loadLlmModels() {
+    if (this._llmModelBusy) {
+      return;
+    }
+    this._llmModelBusy = true;
+    try {
+      const settings = await EditorSettingsService.getGlobalSettings();
+      this._llmModel = settings.llm?.model ?? '';
+      if (!settings.llm) {
+        this._status = 'LLM settings are not available in this runtime.';
+        return;
+      }
+      this._llmModels = await EditorSettingsService.listLlmModels(
+        settings.llm.provider,
+        settings.llm.baseUrl
+      );
+      if (!this._llmModels.length) {
+        this._status = 'Provider returned no models.';
+      }
+    } catch (err) {
+      this._status = `Load models failed: ${err instanceof Error ? err.message : err}`;
+    } finally {
+      this._llmModelBusy = false;
+    }
+  }
+
+  private async applyLlmModel(model: string) {
+    if (!model || model === this._llmModel || this._llmModelBusy) {
+      return;
+    }
+    this._llmModelBusy = true;
+    try {
+      const settings = await EditorSettingsService.getGlobalSettings();
+      if (!settings.llm) {
+        return;
+      }
+      const saved = await EditorSettingsService.saveGlobalSettings({
+        llm: { ...settings.llm, model }
+      });
+      this._llmModel = saved.llm?.model ?? model;
+      this._status = `Model switched to ${this._llmModel} (takes effect on the next run).`;
+    } catch (err) {
+      this._status = `Switch model failed: ${err instanceof Error ? err.message : err}`;
+    } finally {
+      this._llmModelBusy = false;
+    }
   }
 
   private async handleScopeChanged() {
@@ -174,6 +245,8 @@ export class AssistantPanel extends Disposable {
     this._selectedSessionId = sessionId;
     this._messages = await AssistantService.getSessionMessages(sessionId);
     this._pendingAttachments = [];
+    this._confirmDeleteSessionId = '';
+    this._renameInput[0] = this._sessions.find((session) => session.id === sessionId)?.title ?? '';
     this.markConversationContentAppended(sessionId);
   }
 
@@ -189,6 +262,87 @@ export class AssistantPanel extends Disposable {
     const active = this.currentSession?.active;
     if (ImGui.Button('Cancel Run') && active) {
       void this.cancelCurrentRun();
+    }
+    if (this._selectedSessionId) {
+      ImGui.SameLine();
+      ImGui.SetNextItemWidth(180);
+      customTextInput('##AssistantSessionTitle', this._renameInput, 'Session title');
+      ImGui.SameLine();
+      if (ImGui.Button('Rename')) {
+        void this.renameCurrentSession();
+      }
+      ImGui.SameLine();
+      if (this._confirmDeleteSessionId === this._selectedSessionId) {
+        if (ImGui.Button('Confirm Delete')) {
+          void this.deleteCurrentSession();
+        }
+        ImGui.SameLine();
+        if (ImGui.Button('Keep')) {
+          this._confirmDeleteSessionId = '';
+        }
+      } else if (ImGui.Button('Delete')) {
+        this._confirmDeleteSessionId = this._selectedSessionId;
+      }
+    }
+    ImGui.AlignTextToFramePadding();
+    ImGui.Text(`Model: ${this._llmModel || '(not configured)'}`);
+    ImGui.SameLine();
+    if (this._llmModels.length > 0) {
+      ImGui.SetNextItemWidth(260);
+      const modelIndex = [this._llmModels.indexOf(this._llmModel)] as [number];
+      if (ImGui.Combo('##AssistantModelSwitch', modelIndex, this._llmModels)) {
+        void this.applyLlmModel(this._llmModels[modelIndex[0]]);
+      }
+      ImGui.SameLine();
+      if (ImGui.SmallButton(this._llmModelBusy ? 'Loading...' : 'Reload Models') && !this._llmModelBusy) {
+        void this.loadLlmModels();
+      }
+    } else if (ImGui.SmallButton(this._llmModelBusy ? 'Loading...' : 'Load Models') && !this._llmModelBusy) {
+      void this.loadLlmModels();
+    }
+  }
+
+  private async renameCurrentSession() {
+    if (!this._selectedSessionId) {
+      return;
+    }
+    try {
+      await AssistantService.renameSession(this._selectedSessionId, this._renameInput[0]);
+      await this.reloadSessions();
+    } catch (err) {
+      this._status = `Rename session failed: ${err}`;
+    }
+  }
+
+  private async deleteCurrentSession() {
+    const sessionId = this._selectedSessionId;
+    this._confirmDeleteSessionId = '';
+    if (!sessionId) {
+      return;
+    }
+    try {
+      await AssistantService.deleteSession(sessionId);
+      this._selectedSessionId = '';
+      this._messages = [];
+      await this.reloadSessions();
+      if (this._sessions.length > 0) {
+        await this.selectSession(this._sessions[0].id);
+      }
+    } catch (err) {
+      this._status = `Delete session failed: ${err}`;
+    }
+  }
+
+  private async pasteClipboardImage() {
+    try {
+      const attachment = await AssistantService.pickClipboardImageAttachment();
+      if (attachment) {
+        this._pendingAttachments = [...this._pendingAttachments, attachment];
+      } else {
+        this._status = 'No image found in the clipboard.';
+      }
+    } catch (err) {
+      this._status = `Paste image failed: ${err}`;
     }
   }
 
@@ -271,6 +425,10 @@ export class AssistantPanel extends Disposable {
     ImGui.SameLine();
     if (ImGui.Button('Attach Image')) {
       void this.pickImageAttachment();
+    }
+    ImGui.SameLine();
+    if (ImGui.Button('Paste Image')) {
+      void this.pasteClipboardImage();
     }
     ImGui.SameLine();
     if (ImGui.Button('Send') || (submitted && canSend)) {
@@ -383,6 +541,17 @@ export class AssistantPanel extends Disposable {
           this._sessions[index] = event.session;
         } else {
           this._sessions.unshift(event.session);
+        }
+        break;
+      }
+      case 'session_deleted': {
+        this._sessions = this._sessions.filter((session) => session.id !== event.sessionId);
+        if (event.sessionId === this._selectedSessionId) {
+          this._selectedSessionId = '';
+          this._messages = [];
+          if (this._sessions.length > 0) {
+            void this.selectSession(this._sessions[0].id);
+          }
         }
         break;
       }
@@ -567,11 +736,12 @@ export class AssistantPanel extends Disposable {
   }
 
   private shouldHideConversationMessage(message: DesktopAssistantMessage) {
-    return (
-      message.role === 'assistant' &&
-      message.status === 'pending' &&
-      !this.getMessageRenderText(message).trim()
-    );
+    if (message.synthetic) {
+      return true;
+    }
+    // Hides both streaming placeholders and persisted tool-call-only turns
+    // (no prose); the Tool Timeline already surfaces the calls themselves.
+    return message.role === 'assistant' && !this.getMessageRenderText(message).trim();
   }
 
   private renderMessageItem(message: DesktopAssistantMessage) {
@@ -580,6 +750,24 @@ export class AssistantPanel extends Disposable {
       ImGui.Separator();
       ImGui.AlignTextToFramePadding();
       ImGui.Text(`${message.role}${message.status === 'error' ? ' (error)' : ''}`);
+      ImGui.SameLine();
+      if (ImGui.SmallButton(`Copy##AssistantMessageCopy_${message.id}`)) {
+        ImGui.SetClipboardText(message.content ?? '');
+      }
+      if ((message.content?.length ?? 0) > AssistantPanel.MAX_RENDER_TEXT_CHARS) {
+        ImGui.SameLine();
+        const expanded = this._expandedMessageIds.has(message.id);
+        if (
+          ImGui.SmallButton(`${expanded ? 'Collapse' : 'Show Full'}##AssistantMessageExpand_${message.id}`)
+        ) {
+          if (expanded) {
+            this._expandedMessageIds.delete(message.id);
+          } else {
+            this._expandedMessageIds.add(message.id);
+          }
+          this.invalidateMessageLayout(this._selectedSessionId, message.id);
+        }
+      }
       this.renderReadOnlyTextBlock(`##AssistantMessage_${message.id}`, text, message.role);
     }
   }
@@ -762,7 +950,8 @@ export class AssistantPanel extends Disposable {
     for (const attachment of message.attachments ?? []) {
       parts.push(`[Image] ${attachment.name}`);
     }
-    return this.truncateRenderText(parts.join('\n'));
+    const joined = parts.join('\n');
+    return this._expandedMessageIds.has(message.id) ? joined : this.truncateRenderText(joined);
   }
 
   private getRenderJson(value: unknown) {

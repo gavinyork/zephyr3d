@@ -82,6 +82,40 @@ export class AssistantService {
     };
   }
 
+  static async renameSession(
+    sessionId: string,
+    title: string
+  ): Promise<DesktopAssistantSessionSummary | null> {
+    const desktop = getDesktopAPI();
+    return desktop?.settings
+      ? await desktop.settings.renameAssistantSession(sessionId, title, this.currentScopeId())
+      : null;
+  }
+
+  static async deleteSession(sessionId: string): Promise<boolean> {
+    const desktop = getDesktopAPI();
+    return desktop?.settings
+      ? await desktop.settings.deleteAssistantSession(sessionId, this.currentScopeId())
+      : false;
+  }
+
+  static async pickClipboardImageAttachment(): Promise<DesktopAssistantAttachment | null> {
+    const desktop = getDesktopAPI();
+    if (!desktop?.settings?.readClipboardImage) {
+      return null;
+    }
+    const image = await desktop.settings.readClipboardImage();
+    if (!image) {
+      return null;
+    }
+    return {
+      id: `att_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+      name: `clipboard_${new Date().toISOString().replace(/[:.]/g, '-')}.png`,
+      mimeType: image.mimeType,
+      dataUrl: `data:${image.mimeType};base64,${image.dataBase64}`
+    };
+  }
+
   static async cancelRun(sessionId: string): Promise<boolean> {
     const desktop = getDesktopAPI();
     return desktop?.settings
@@ -122,6 +156,10 @@ export class AssistantService {
     if (event.type === 'session_updated') {
       this.rememberSessionScope(event.session);
       return (event.session.scopeId ?? null) === this.currentScopeId();
+    }
+    if (event.type === 'session_deleted') {
+      this._sessionScopes.delete(event.sessionId);
+      return (event.scopeId ?? null) === this.currentScopeId();
     }
     const scopeId = this._sessionScopes.get(event.sessionId);
     return scopeId !== undefined && scopeId === this.currentScopeId();

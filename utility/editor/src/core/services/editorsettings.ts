@@ -38,4 +38,12 @@ export class EditorSettingsService {
     const desktop = getDesktopAPI();
     return desktop?.settings ? await desktop.settings.clearLlmApiKey(provider) : false;
   }
+
+  static async listLlmModels(
+    provider: NonNullable<EditorGlobalSettings['llm']>['provider'],
+    baseUrl: string
+  ): Promise<string[]> {
+    const desktop = getDesktopAPI();
+    return desktop?.settings ? await desktop.settings.listLlmModels(provider, baseUrl) : [];
+  }
 }
