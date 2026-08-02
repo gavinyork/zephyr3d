@@ -2,7 +2,16 @@ import type { Editor } from '../core/editor';
 import type { Camera } from '@zephyr3d/scene';
 import type { PropertyValue, Material } from '@zephyr3d/scene';
 import type { Primitive } from '@zephyr3d/scene';
-import { Mesh, Scene, SceneNode, DirectionalLight, ScriptAttachment } from '@zephyr3d/scene';
+import {
+  Mesh,
+  Scene,
+  SceneNode,
+  DirectionalLight,
+  PointLight,
+  SpotLight,
+  RectLight,
+  ScriptAttachment
+} from '@zephyr3d/scene';
 import { getDevice, getEngine, OrthoCamera, PerspectiveCamera } from '@zephyr3d/scene';
 import { BlobReader, BlobWriter, configure, ZipWriter } from '@zip.js/zip.js';
 import {
@@ -1814,8 +1823,28 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
             err: parent.err
           };
         }
-        const node = new SceneNode(scene);
+        const creatableNodeClasses: Record<string, new (scene: Scene) => SceneNode> = {
+          SceneNode,
+          DirectionalLight,
+          PointLight,
+          SpotLight,
+          RectLight
+        };
+        const nodeClass =
+          typeof params.class === 'string' && params.class.trim() ? params.class.trim() : 'SceneNode';
+        const ctor = creatableNodeClasses[nodeClass];
+        if (!ctor) {
+          return {
+            node_id: null,
+            err: `node_create \`class\` must be one of ${Object.keys(creatableNodeClasses).join(', ')}`
+          };
+        }
+        const node = new ctor(scene);
         node.parent = parent.node;
+        if (typeof params.name === 'string' && params.name.trim()) {
+          node.name = params.name.trim();
+        }
+        eventBus.dispatchEvent('scene_changed');
         return {
           node_id: node.persistentId,
           err: null
@@ -4076,6 +4105,54 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     }
     case 'saveScene':
       return await saveCurrentScene(editor);
+    case 'nodeGetWorldBounds': {
+      const id = typeof params?.id === 'string' ? params.id.trim() : '';
+      if (!id) {
+        return { bounds: null, err: 'node_get_world_bounds requires `id`, a persistent scene node id' };
+      }
+      const resolved = getNode(editor, id);
+      if (resolved.err) {
+        return { bounds: null, err: resolved.err };
+      }
+      const min = [Infinity, Infinity, Infinity];
+      const max = [-Infinity, -Infinity, -Infinity];
+      let found = false;
+      // Group nodes have no bounding volume of their own; aggregate the
+      // subtree so bounds work for compound objects assembled under a parent.
+      const visit = (node: SceneNode) => {
+        const aabb = node.getWorldBoundingVolume()?.toAABB();
+        if (aabb) {
+          found = true;
+          const lo = aabb.minPoint;
+          const hi = aabb.maxPoint;
+          min[0] = Math.min(min[0], lo.x);
+          min[1] = Math.min(min[1], lo.y);
+          min[2] = Math.min(min[2], lo.z);
+          max[0] = Math.max(max[0], hi.x);
+          max[1] = Math.max(max[1], hi.y);
+          max[2] = Math.max(max[2], hi.z);
+        }
+        for (const child of node.children) {
+          visit(child);
+        }
+      };
+      visit(resolved.node);
+      if (!found) {
+        return {
+          bounds: null,
+          err: 'Node subtree has no bounding volume (empty groups and lights have no bounds)'
+        };
+      }
+      return {
+        bounds: {
+          min,
+          max,
+          center: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2],
+          size: [max[0] - min[0], max[1] - min[1], max[2] - min[2]]
+        },
+        err: null
+      };
+    }
     case 'sceneCheckpoint':
       return await checkpointCurrentScene(editor, params);
     case 'sceneRestore':

@@ -201,6 +201,18 @@ async function phaseA() {
     const childrenBefore = structured(await callTool('node_get_children', { parent: rootId }));
     const countBefore = (childrenBefore?.sub_nodes ?? childrenBefore?.subNodes)?.length ?? -1;
 
+    const boxNode = ((childrenBefore?.sub_nodes ?? childrenBefore?.subNodes) ?? []).find((node) =>
+      /box/i.test(node.name ?? '')
+    );
+    const bounds = boxNode
+      ? structured(await callTool('node_get_world_bounds', { id: boxNode.id }))
+      : null;
+    const boundsOk =
+      !!bounds?.bounds &&
+      bounds.bounds.min.every((v, i) => Number.isFinite(v) && v < bounds.bounds.max[i]) &&
+      bounds.bounds.size.every((v) => v > 0);
+    check('A: node_get_world_bounds returns sane AABB', boundsOk, JSON.stringify(bounds));
+
     const checkpoint = structured(await callTool('scene_checkpoint', { label: 'e2e' }));
     check('A: scene_checkpoint succeeded', !checkpoint?.err && !!checkpoint?.checkpoint?.id, JSON.stringify(checkpoint));
 
@@ -229,6 +241,84 @@ async function phaseA() {
       'A: editor_screenshot returned image block',
       !!imageBlock?.data && imageBlock.data.length > 1000,
       `blocks=${JSON.stringify((shot.content ?? []).map((b) => b.type))}`
+    );
+
+    check(
+      'A: asset_create_material recommends PBR first',
+      byName.get('asset_create_material')?.inputSchema?.properties?.class?.enum?.[0] ===
+        'PBRMetallicRoughnessMaterial'
+    );
+    check('A: asset_import_from_url published', byName.has('asset_import_from_url'));
+    const badImport = structured(
+      await callTool('asset_import_from_url', { url: 'not-a-url', path: '/assets/textures/x.png' })
+    );
+    check('A: asset_import_from_url rejects invalid url', !!badImport?.err, JSON.stringify(badImport));
+
+    const light = structured(await callTool('node_create', { class: 'PointLight', name: 'E2ELight' }));
+    check('A: node_create can create a PointLight', !light?.err && !!light?.node_id, JSON.stringify(light));
+    if (light?.node_id) {
+      const lightClass = structured(await callTool('node_get_class', { id: light.node_id }));
+      check(
+        'A: created light reports PointLight class',
+        (lightClass?.node_class ?? lightClass?.nodeClass) === 'PointLight',
+        JSON.stringify(lightClass)
+      );
+    }
+
+    // Regression: script-type generator nodes used to fail to compile with
+    // "Unexpected eval or arguments in strict mode" because the sandbox
+    // wrapper tried to shadow `eval` under "use strict".
+    const scriptJob = structured(
+      await callTool('model_generate_begin', {
+        dest_path: '/assets/generated/e2e_script_tri.zmsh',
+        create_node: false,
+        spec: {
+          version: 1,
+          nodes: [
+            {
+              type: 'script',
+              script: {
+                source: [
+                  'function generate(api, input) {',
+                  '  const mesh = api.mesh();',
+                  '  // Exercises Math members beyond the old whitelist (exp/tanh) plus the',
+                  '  // modeling helpers (rng/noise/vec3/curve) as regressions.',
+                  '  const rand = api.rng(42);',
+                  '  const h = Math.tanh(Math.exp(0) - 1) + api.noise.fbm3(0.3, 0.7, 0.1, 7) * 0.01 + rand.range(0, 0.001);',
+                  '  api.assert(rand.int(1, 3) >= 1, "rng.int out of range");',
+                  '  const n = api.vec3.normalize([0, 2, 0]);',
+                  '  const p = api.curve.bezier([[0, h, 0], [0.5, h, 0.2], [1, h, 0]], 0.5);',
+                  '  mesh.addVertex([0, h, 0], n, [0, 0]);',
+                  '  mesh.addVertex(p, n, [1, 0]);',
+                  '  mesh.addVertex([0, h, 1], n, [0, 1]);',
+                  '  mesh.addTriangle(0, 1, 2);',
+                  '  return mesh.build();',
+                  '}'
+                ].join('\n')
+              }
+            }
+          ]
+        }
+      })
+    );
+    const scriptJobId = scriptJob?.job?.id ?? scriptJob?.job_id;
+    check('A: script model job started', !scriptJob?.err && !!scriptJobId, JSON.stringify(scriptJob));
+    let scriptJobStatus = null;
+    if (scriptJobId) {
+      const jobDeadline = Date.now() + 30000;
+      while (Date.now() < jobDeadline) {
+        await sleep(1000);
+        const statusResult = structured(await callTool('model_generate_status', { job_id: scriptJobId }));
+        scriptJobStatus = statusResult?.job ?? null;
+        if (scriptJobStatus && scriptJobStatus.status !== 'pending' && scriptJobStatus.status !== 'running') {
+          break;
+        }
+      }
+    }
+    check(
+      'A: script model generation completed (strict-mode sandbox regression)',
+      scriptJobStatus?.status === 'completed',
+      JSON.stringify(scriptJobStatus)
     );
   } finally {
     await stopEditor(instance);

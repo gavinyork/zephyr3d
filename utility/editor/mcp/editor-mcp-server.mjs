@@ -517,12 +517,14 @@ if (IPC_TRANSPORT) {
   });
 }
 
+// PBR classes are listed first on purpose: they are the recommended default
+// for realistic surfaces, and enum ordering measurably biases LLM tool calls.
 const MATERIAL_CLASSES = [
+  'PBRMetallicRoughnessMaterial',
+  'PBRSpecularGlossinessMaterial',
   'UnlitMaterial',
   'LambertMaterial',
   'BlinnMaterial',
-  'PBRMetallicRoughnessMaterial',
-  'PBRSpecularGlossinessMaterial',
   'StandardSpriteMaterial'
 ];
 
@@ -944,7 +946,7 @@ function createScriptNodeSchema() {
       script: {
         type: 'object',
         description:
-          'Restricted JavaScript. The script must define an entry function, defaulting to generate(api, input), and return either { positions, indices, normals?, uvs? } or api.mesh().build(). Available API: api.mesh(), api.math, api.assert(), api.check(), api.progress(). No network, filesystem, DOM, Node.js, eval, or dynamic imports are available.',
+          'Restricted JavaScript. The script must define an entry function, defaulting to generate(api, input), and return either { positions, indices, normals?, uvs? } or api.mesh().build(). Available API: api.mesh(); api.math (full standard Math surface except random, plus TAU/clamp/lerp/inverseLerp/remap/fract/mod/step/smoothstep/smootherstep/degToRad/radToDeg/hash; the Math global inside the script is aliased to it); api.rng(seed) -> { next(), range(min,max), int(min,max) } deterministic seeded PRNG; api.noise { value2, value3, fbm2, fbm3 } deterministic value noise for organic displacement (rocks, terrain, surface detail); api.vec3 { add, sub, scale, dot, cross, normalize, length, distance, lerp }; api.curve { catmullRom(p0,p1,p2,p3,t), bezier(points,t) }; api.assert(); api.check(); api.progress(). All randomness is seeded and deterministic - the same spec always regenerates identical geometry. No network, filesystem, DOM, Node.js, eval, or dynamic imports are available.',
         properties: {
           language: {
             type: 'string',
@@ -1719,7 +1721,7 @@ const BASE_TOOLS = [
   {
     name: 'asset_create_material',
     description:
-      'Create a material asset in a project asset directory from a built-in material class. Returns { path, err }.',
+      'Create a material asset in a project asset directory from a built-in material class. PBRMetallicRoughnessMaterial is the recommended default for realistic surfaces (set baseColor/metallic/roughness with material_set_properties afterwards); use UnlitMaterial only for effects/markers, and Lambert/Blinn only when a stylized or performance-first look is explicitly wanted. Returns { path, err }.',
     inputSchema: {
       type: 'object',
       required: ['directory', 'class', 'name'],
@@ -1731,7 +1733,8 @@ const BASE_TOOLS = [
         class: {
           type: 'string',
           enum: MATERIAL_CLASSES,
-          description: 'Built-in material class to copy from.'
+          description:
+            'Built-in material class to copy from. PBRMetallicRoughnessMaterial is the recommended default for realistic surfaces.'
         },
         name: {
           type: 'string',
@@ -2079,7 +2082,7 @@ const BASE_TOOLS = [
   {
     name: 'shape_create_node',
     description:
-      'Create a built-in primitive mesh node in the current scene. Supports optional parent, name, and local transform.',
+      'Create a built-in primitive mesh node in the current scene (defaults to a PBR metallic-roughness material). Best for placeholders and genuinely simple geometry; for anything more detailed or organic, prefer model_generate_begin with revolve/surface/curve/csg nodes and higher segment counts. Supports optional parent, name, and local transform.',
     inputSchema: {
       type: 'object',
       required: ['shape'],
@@ -2206,13 +2209,23 @@ const BASE_TOOLS = [
   },
   {
     name: 'node_create',
-    description: 'Create a scene node in the current scene. Returns { node_id, err }.',
+    description:
+      'Create a scene node in the current scene. Pass `class` to create a light (DirectionalLight, PointLight, SpotLight, RectLight) or a plain SceneNode group; configure light color/intensity/range afterwards with node_set_properties. Good lighting is essential for PBR materials to read well. Returns { node_id, err }.',
     inputSchema: {
       type: 'object',
       properties: {
         parent_id: {
           type: 'string',
           description: 'Optional persistent id of the parent scene node. Defaults to the scene root.'
+        },
+        class: {
+          type: 'string',
+          enum: ['SceneNode', 'DirectionalLight', 'PointLight', 'SpotLight', 'RectLight'],
+          description: 'Node class to instantiate. Defaults to SceneNode (an empty group node).'
+        },
+        name: {
+          type: 'string',
+          description: 'Optional display name for the created node.'
         },
         timeout_ms: { type: 'number', default: 10000 }
       }
@@ -2347,7 +2360,7 @@ const BASE_TOOLS = [
   {
     name: 'model_generate_begin',
     description:
-      'Start an editor-side worker job that tessellates a compact procedural model spec into a .zmsh mesh asset and optionally creates a mesh node in the current scene. Use this for LLM-generated geometry instead of sending large raw vertex buffers through MCP. The schema includes concrete examples for box, revolve, and CSG workflows.',
+      'Start an editor-side worker job that tessellates a compact procedural model spec into a .zmsh mesh asset and optionally creates a mesh node in the current scene. This is the preferred tool for any non-trivial model: combine multiple nodes (revolve/surface/curve/csg/script) into one spec to build compound objects, and raise segment counts well above the low defaults for curved surfaces (e.g. revolve segments 64-128, sphere/cylinder segments 48-64, surface segments_u/v 24-48) - the bundled examples are intentionally minimal and should not be treated as a quality bar. Use this instead of sending large raw vertex buffers through MCP.',
     inputSchema: {
       type: 'object',
       required: ['spec', 'dest_path'],
@@ -2484,6 +2497,36 @@ const BASE_TOOLS = [
     }
   },
   {
+    name: 'node_get_world_bounds',
+    description:
+      'Get the world-space axis-aligned bounding box of a scene node, aggregated over its whole subtree. Returns { bounds: { min, max, center, size }, err }. Use this to verify part placement numerically when assembling compound objects (e.g. a wing should touch the body: wing.min/max should meet the body bounds) instead of judging alignment from screenshots alone.',
+    inputSchema: {
+      type: 'object',
+      required: ['id'],
+      properties: {
+        id: { type: 'string', description: 'Persistent id of the scene node.' },
+        timeout_ms: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'asset_import_from_url',
+    description:
+      'Download a file over HTTP(S) and store it as a project asset under /assets (textures, glTF models, etc.). Use this to bring in texture maps for PBR materials, then assign them with material_set_properties. Returns { path, bytes, content_type, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['url', 'path'],
+      properties: {
+        url: { type: 'string', description: 'HTTP or HTTPS URL to download.' },
+        path: {
+          type: 'string',
+          description: 'Destination asset VFS path under /assets, e.g. /assets/textures/wood_albedo.jpg.'
+        },
+        timeout_ms: { type: 'number', default: 60000 }
+      }
+    }
+  },
+  {
     name: 'scene_checkpoint',
     description:
       'Snapshot the current scene to a session checkpoint so it can be rolled back later with scene_restore. Keeps the 3 most recent checkpoints. Returns { checkpoint, checkpoints, err }.',
@@ -2545,6 +2588,7 @@ const READONLY_TOOL_NAMES = new Set([
   'node_get_property_list',
   'node_get_properties',
   'node_get_local_transform',
+  'node_get_world_bounds',
   'node_get_parent',
   'node_get_children',
   'scene_get_property_list',
@@ -3372,6 +3416,64 @@ const handlers = {
   async scene_checkpoint(args) {
     return bridge.send('sceneCheckpoint', { label: args.label }, Number(args.timeout_ms ?? 30000));
   },
+  async node_get_world_bounds(args) {
+    return bridge.send('nodeGetWorldBounds', { id: args.id }, Number(args.timeout_ms ?? 10000));
+  },
+  async asset_import_from_url(args) {
+    // Download happens here in the Node worker (no renderer CORS limits);
+    // the bytes are then written into the project VFS through the existing
+    // asset_write_file bridge method.
+    const url = typeof args.url === 'string' ? args.url.trim() : '';
+    if (!/^https?:\/\//i.test(url)) {
+      return { path: null, bytes: 0, content_type: null, err: 'asset_import_from_url requires an http(s) `url`' };
+    }
+    const destPath = typeof args.path === 'string' ? args.path.trim() : '';
+    if (!destPath.startsWith('/assets/') || destPath.startsWith('/assets/@builtins')) {
+      return {
+        path: null,
+        bytes: 0,
+        content_type: null,
+        err: 'asset_import_from_url `path` must be under /assets and outside /assets/@builtins'
+      };
+    }
+    const timeoutMs = Number(args.timeout_ms ?? 60000);
+    const MAX_IMPORT_BYTES = 64 * 1024 * 1024;
+    try {
+      const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(timeoutMs) });
+      if (!response.ok) {
+        return {
+          path: null,
+          bytes: 0,
+          content_type: null,
+          err: `Download failed with status ${response.status}`
+        };
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (!buffer.length) {
+        return { path: null, bytes: 0, content_type: null, err: 'Downloaded file is empty' };
+      }
+      if (buffer.length > MAX_IMPORT_BYTES) {
+        return {
+          path: null,
+          bytes: buffer.length,
+          content_type: null,
+          err: `Downloaded file exceeds the ${MAX_IMPORT_BYTES} byte import limit`
+        };
+      }
+      const contentType = response.headers.get('content-type');
+      const writeResult = await bridge.send(
+        'asset_write_file',
+        { path: destPath, encoding: 'binary', content: buffer.toString('base64') },
+        Math.max(timeoutMs, 30000)
+      );
+      if (writeResult?.err) {
+        return { path: null, bytes: buffer.length, content_type: contentType, err: writeResult.err };
+      }
+      return { path: destPath, bytes: buffer.length, content_type: contentType, err: null };
+    } catch (err) {
+      return { path: null, bytes: 0, content_type: null, err: String(err?.message ?? err) };
+    }
+  },
   async scene_restore(args) {
     return bridge.send('sceneRestore', { id: args.id }, Number(args.timeout_ms ?? 30000));
   },
@@ -3384,6 +3486,12 @@ const handlers = {
   },
   async node_create(args) {
     const params = {};
+    if (typeof args.class === 'string' && args.class.trim()) {
+      params.class = args.class.trim();
+    }
+    if (typeof args.name === 'string' && args.name.trim()) {
+      params.name = args.name.trim();
+    }
     if (typeof args.parent_id === 'string' && args.parent_id.trim()) {
       params.parent_id = args.parent_id.trim();
     }

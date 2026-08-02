@@ -1331,6 +1331,11 @@ function tessellateScript(node: ScriptNode, deadlineAt: number): MeshData {
   }
   const api = createScriptApi(deadlineAt);
   let output: unknown;
+  // The shadowing consts below are best-effort hardening, not a security
+  // boundary (the worker itself has no privileged APIs). `eval` deliberately
+  // has no shadow: strict mode forbids binding that identifier, and adding
+  // `const eval = ...` makes every script fail to compile with
+  // "Unexpected eval or arguments in strict mode".
   try {
     output = new Function(
       'api',
@@ -1351,7 +1356,6 @@ const importScripts = undefined;
 const postMessage = undefined;
 const close = undefined;
 const Function = undefined;
-const eval = undefined;
 const setTimeout = undefined;
 const setInterval = undefined;
 const queueMicrotask = undefined;
@@ -1376,33 +1380,248 @@ return ${entry}(api, input);`
   });
 }
 
+// Same algorithm as PRNG in @zephyr3d/base (libs/base/src/prng.ts); inlined
+// because this worker is deliberately dependency-free.
+function createMulberry32(seed: number): () => number {
+  let state = seed;
+  return () => {
+    let t = (state += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const scriptHashF64 = new Float64Array(1);
+const scriptHashU32 = new Uint32Array(scriptHashF64.buffer);
+
+// Deterministic [0,1) hash of arbitrary numbers (float-bit mixing, so small
+// fractional differences produce distinct values).
+function scriptHashNumbers(values: number[]): number {
+  let h = 0x9e3779b9 >>> 0;
+  for (const value of values) {
+    scriptHashF64[0] = value;
+    h = Math.imul(h ^ scriptHashU32[0], 0x85ebca6b) >>> 0;
+    h = Math.imul((h ^ (h >>> 13) ^ scriptHashU32[1]) >>> 0, 0xc2b2ae35) >>> 0;
+  }
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x45d9f3b) >>> 0;
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+function scriptSmootherstep01(t: number): number {
+  const x = Math.min(1, Math.max(0, t));
+  return x * x * x * (x * (x * 6 - 15) + 10);
+}
+
+function scriptValueNoise2(x: number, y: number, seed: number): number {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const tx = scriptSmootherstep01(x - xi);
+  const ty = scriptSmootherstep01(y - yi);
+  const c00 = scriptHashNumbers([xi, yi, seed]);
+  const c10 = scriptHashNumbers([xi + 1, yi, seed]);
+  const c01 = scriptHashNumbers([xi, yi + 1, seed]);
+  const c11 = scriptHashNumbers([xi + 1, yi + 1, seed]);
+  return lerp(lerp(c00, c10, tx), lerp(c01, c11, tx), ty);
+}
+
+function scriptValueNoise3(x: number, y: number, z: number, seed: number): number {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const zi = Math.floor(z);
+  const tx = scriptSmootherstep01(x - xi);
+  const ty = scriptSmootherstep01(y - yi);
+  const tz = scriptSmootherstep01(z - zi);
+  const c000 = scriptHashNumbers([xi, yi, zi, seed]);
+  const c100 = scriptHashNumbers([xi + 1, yi, zi, seed]);
+  const c010 = scriptHashNumbers([xi, yi + 1, zi, seed]);
+  const c110 = scriptHashNumbers([xi + 1, yi + 1, zi, seed]);
+  const c001 = scriptHashNumbers([xi, yi, zi + 1, seed]);
+  const c101 = scriptHashNumbers([xi + 1, yi, zi + 1, seed]);
+  const c011 = scriptHashNumbers([xi, yi + 1, zi + 1, seed]);
+  const c111 = scriptHashNumbers([xi + 1, yi + 1, zi + 1, seed]);
+  const bottom = lerp(lerp(c000, c100, tx), lerp(c010, c110, tx), ty);
+  const top = lerp(lerp(c001, c101, tx), lerp(c011, c111, tx), ty);
+  return lerp(bottom, top, tz);
+}
+
+function scriptFbm(
+  sample: (fx: number, fy: number, fz: number, seed: number) => number,
+  x: number,
+  y: number,
+  z: number,
+  seed: number,
+  octaves: number,
+  lacunarity: number,
+  gain: number
+): number {
+  const steps = Math.max(1, Math.min(8, Math.floor(octaves)));
+  let amplitude = 1;
+  let frequency = 1;
+  let total = 0;
+  let norm = 0;
+  for (let i = 0; i < steps; i++) {
+    total += amplitude * sample(x * frequency, y * frequency, z * frequency, seed + i * 101);
+    norm += amplitude;
+    amplitude *= gain;
+    frequency *= lacunarity;
+  }
+  return norm > 0 ? total / norm : 0;
+}
+
+function asVec3(value: unknown, name: string): Vec3 {
+  if (!isVec3(value)) {
+    throw new Error(`${name} expects [x, y, z] arrays of finite numbers`);
+  }
+  return value;
+}
+
+function createScriptVec3Api() {
+  return Object.freeze({
+    add: (a: unknown, b: unknown): Vec3 => {
+      const va = asVec3(a, 'vec3.add');
+      const vb = asVec3(b, 'vec3.add');
+      return [va[0] + vb[0], va[1] + vb[1], va[2] + vb[2]];
+    },
+    sub: (a: unknown, b: unknown): Vec3 => {
+      const va = asVec3(a, 'vec3.sub');
+      const vb = asVec3(b, 'vec3.sub');
+      return [va[0] - vb[0], va[1] - vb[1], va[2] - vb[2]];
+    },
+    scale: (a: unknown, s: number): Vec3 => {
+      const va = asVec3(a, 'vec3.scale');
+      return [va[0] * s, va[1] * s, va[2] * s];
+    },
+    dot: (a: unknown, b: unknown): number => {
+      const va = asVec3(a, 'vec3.dot');
+      const vb = asVec3(b, 'vec3.dot');
+      return va[0] * vb[0] + va[1] * vb[1] + va[2] * vb[2];
+    },
+    cross: (a: unknown, b: unknown): Vec3 => {
+      const va = asVec3(a, 'vec3.cross');
+      const vb = asVec3(b, 'vec3.cross');
+      return [va[1] * vb[2] - va[2] * vb[1], va[2] * vb[0] - va[0] * vb[2], va[0] * vb[1] - va[1] * vb[0]];
+    },
+    length: (a: unknown): number => {
+      const va = asVec3(a, 'vec3.length');
+      return Math.hypot(va[0], va[1], va[2]);
+    },
+    distance: (a: unknown, b: unknown): number => {
+      const va = asVec3(a, 'vec3.distance');
+      const vb = asVec3(b, 'vec3.distance');
+      return Math.hypot(va[0] - vb[0], va[1] - vb[1], va[2] - vb[2]);
+    },
+    normalize: (a: unknown): Vec3 => {
+      const va = asVec3(a, 'vec3.normalize');
+      const len = Math.hypot(va[0], va[1], va[2]) || 1;
+      return [va[0] / len, va[1] / len, va[2] / len];
+    },
+    lerp: (a: unknown, b: unknown, t: number): Vec3 => {
+      const va = asVec3(a, 'vec3.lerp');
+      const vb = asVec3(b, 'vec3.lerp');
+      return [lerp(va[0], vb[0], t), lerp(va[1], vb[1], t), lerp(va[2], vb[2], t)];
+    }
+  });
+}
+
+function createScriptCurveApi() {
+  return Object.freeze({
+    catmullRom: (p0: unknown, p1: unknown, p2: unknown, p3: unknown, t: number): Vec3 => {
+      const a = asVec3(p0, 'curve.catmullRom');
+      const b = asVec3(p1, 'curve.catmullRom');
+      const c = asVec3(p2, 'curve.catmullRom');
+      const d = asVec3(p3, 'curve.catmullRom');
+      const t2 = t * t;
+      const t3 = t2 * t;
+      const out: Vec3 = [0, 0, 0];
+      for (let i = 0; i < 3; i++) {
+        out[i] =
+          0.5 *
+          (2 * b[i] +
+            (c[i] - a[i]) * t +
+            (2 * a[i] - 5 * b[i] + 4 * c[i] - d[i]) * t2 +
+            (3 * b[i] - a[i] - 3 * c[i] + d[i]) * t3);
+      }
+      return out;
+    },
+    bezier: (points: unknown, t: number): Vec3 => {
+      if (!Array.isArray(points) || points.length < 2) {
+        throw new Error('curve.bezier expects an array of at least 2 control points');
+      }
+      let level: Vec3[] = points.map((p, i) => [...asVec3(p, `curve.bezier[${i}]`)] as Vec3);
+      while (level.length > 1) {
+        const next: Vec3[] = [];
+        for (let i = 0; i < level.length - 1; i++) {
+          next.push([
+            lerp(level[i][0], level[i + 1][0], t),
+            lerp(level[i][1], level[i + 1][1], t),
+            lerp(level[i][2], level[i + 1][2], t)
+          ]);
+        }
+        level = next;
+      }
+      return level[0];
+    }
+  });
+}
+
 function createScriptApi(deadlineAt: number) {
+  // Expose the full standard Math surface (the script body shadows the Math
+  // global with this object). Only `random` is excluded so regenerating the
+  // same spec always produces identical geometry.
   const math = Object.freeze({
-    PI: Math.PI,
+    ...(Object.fromEntries(
+      Object.getOwnPropertyNames(Math)
+        .filter((key) => key !== 'random')
+        .map((key) => [key, Math[key as keyof typeof Math]])
+    ) as Record<string, unknown>),
     TAU: Math.PI * 2,
-    E: Math.E,
-    abs: Math.abs,
-    acos: Math.acos,
-    asin: Math.asin,
-    atan2: Math.atan2,
-    ceil: Math.ceil,
-    cos: Math.cos,
-    floor: Math.floor,
-    hypot: Math.hypot,
-    log: Math.log,
-    max: Math.max,
-    min: Math.min,
-    pow: Math.pow,
-    round: Math.round,
-    sign: Math.sign,
-    sin: Math.sin,
-    sqrt: Math.sqrt,
-    tan: Math.tan,
     clamp: (value: number, min: number, max: number) => Math.min(max, Math.max(min, value)),
-    lerp: (a: number, b: number, t: number) => lerp(a, b, t)
+    lerp: (a: number, b: number, t: number) => lerp(a, b, t),
+    inverseLerp: (a: number, b: number, value: number) => (a === b ? 0 : (value - a) / (b - a)),
+    remap: (value: number, inMin: number, inMax: number, outMin: number, outMax: number) =>
+      inMin === inMax ? outMin : outMin + ((value - inMin) / (inMax - inMin)) * (outMax - outMin),
+    fract: (value: number) => value - Math.floor(value),
+    // Euclidean modulo: always returns a value with the sign of the divisor.
+    mod: (value: number, divisor: number) => ((value % divisor) + divisor) % divisor,
+    step: (edge: number, value: number) => (value < edge ? 0 : 1),
+    smoothstep: (edge0: number, edge1: number, value: number) => {
+      const t = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0 || 1)));
+      return t * t * (3 - 2 * t);
+    },
+    smootherstep: (edge0: number, edge1: number, value: number) =>
+      scriptSmootherstep01((value - edge0) / (edge1 - edge0 || 1)),
+    degToRad: (degrees: number) => (degrees * Math.PI) / 180,
+    radToDeg: (radians: number) => (radians * 180) / Math.PI,
+    hash: (...values: number[]) => scriptHashNumbers(values)
+  });
+  const noise = Object.freeze({
+    value2: (x: number, y: number, seed = 0) => scriptValueNoise2(x, y, seed),
+    value3: (x: number, y: number, z: number, seed = 0) => scriptValueNoise3(x, y, z, seed),
+    fbm2: (x: number, y: number, seed = 0, octaves = 4, lacunarity = 2, gain = 0.5) =>
+      scriptFbm((fx, fy, _fz, s) => scriptValueNoise2(fx, fy, s), x, y, 0, seed, octaves, lacunarity, gain),
+    fbm3: (x: number, y: number, z: number, seed = 0, octaves = 4, lacunarity = 2, gain = 0.5) =>
+      scriptFbm((fx, fy, fz, s) => scriptValueNoise3(fx, fy, fz, s), x, y, z, seed, octaves, lacunarity, gain)
   });
   return Object.freeze({
     math,
+    noise,
+    vec3: createScriptVec3Api(),
+    curve: createScriptCurveApi(),
+    rng: (seed = 0) => {
+      const next = createMulberry32(Number(seed) || 0);
+      return Object.freeze({
+        next,
+        range: (min: number, max: number) => min + next() * (max - min),
+        int: (min: number, max: number) => {
+          const lo = Math.ceil(min);
+          const hi = Math.floor(max);
+          return hi < lo ? lo : lo + Math.floor(next() * (hi - lo + 1));
+        }
+      });
+    },
     mesh: () => createScriptMeshBuilder(deadlineAt),
     assert: (condition: unknown, message?: string) => {
       if (!condition) {
