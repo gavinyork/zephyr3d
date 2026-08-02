@@ -138,9 +138,9 @@ export type SSGIResolvedSettings = {
 };
 
 const SSGI_QUALITY_PRESET_SETTINGS: Record<Exclude<SSGIQualityPreset, 'custom'>, SSGIResolvedSettings> = {
-  quality: { halfRes: false, raysPerPixel: 2, maxSteps: 64, denoisePasses: 3 },
-  balanced: { halfRes: true, raysPerPixel: 1, maxSteps: 48, denoisePasses: 2 },
-  performance: { halfRes: true, raysPerPixel: 1, maxSteps: 24, denoisePasses: 1 }
+  quality: { halfRes: false, raysPerPixel: 2, maxSteps: 64, denoisePasses: 4 },
+  balanced: { halfRes: true, raysPerPixel: 1, maxSteps: 48, denoisePasses: 4 },
+  performance: { halfRes: true, raysPerPixel: 1, maxSteps: 24, denoisePasses: 4 }
 };
 
 type SSSDefaultSettings = {

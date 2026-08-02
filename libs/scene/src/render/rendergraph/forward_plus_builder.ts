@@ -362,7 +362,6 @@ export function deriveForwardPlusOptions(
     camera.HDR &&
     camera.ssgiIntensity > 0 &&
     scene.env.light.type === 'ibl' &&
-    scene.env.light.allowSSGI &&
     !!scene.env.light.envLight?.hasRadiance() &&
     !!scene.env.light.envLight?.hasIrradiance();
   const sss = camera.SSS && renderQueueHasActiveSSS(renderQueue);

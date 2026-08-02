@@ -214,23 +214,6 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
-          name: 'EnvLightAllowSSGI',
-          description: 'Allow SSGI to replace diffuse IBL irradiance for this environment light',
-          type: 'bool',
-          phase: 1,
-          options: {
-            label: 'AllowSSGI',
-            group: 'Environment/IBL'
-          },
-          default: false,
-          get(this: Scene, value) {
-            value.bool[0] = this.env.light.allowSSGI;
-          },
-          set(this: Scene, value) {
-            this.env.light.allowSSGI = value.bool[0];
-          }
-        },
-        {
           name: 'SHWindowWeights',
           description: 'Window weights for SH lighting',
           type: 'vec3',

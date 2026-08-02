@@ -635,7 +635,6 @@ describe('Forward+ render graph builder', () => {
       env: {
         light: {
           type: 'ibl',
-          allowSSGI: true,
           envLight
         }
       }
@@ -659,11 +658,6 @@ describe('Forward+ render graph builder', () => {
     expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).ssgi).toBe(
       true
     );
-    scene.env.light.allowSSGI = false;
-    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).ssgi).toBe(
-      false
-    );
-    scene.env.light.allowSSGI = true;
     camera.HDR = false;
     expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).ssgi).toBe(
       false

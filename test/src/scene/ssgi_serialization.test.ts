@@ -213,18 +213,4 @@ describe('SSGI configuration and serialization', () => {
       denoisePasses: 2
     });
   });
-
-  test('round-trips the IBL allowSSGI opt-in independently from the camera', async () => {
-    const manager = new ResourceManager(new MemoryFS());
-    const scene = new Scene();
-    scene.env.light.type = 'ibl';
-    scene.env.light.allowSSGI = true;
-
-    const serialized = await manager.serializeObject(scene);
-    const restored = (await manager.deserializeObject<Scene>(null, serialized))!;
-
-    expect(serialized.Object).toMatchObject({ EnvLightAllowSSGI: true });
-    expect(restored.env.light.type).toBe('ibl');
-    expect(restored.env.light.allowSSGI).toBe(true);
-  });
 });

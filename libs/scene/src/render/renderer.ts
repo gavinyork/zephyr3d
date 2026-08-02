@@ -53,7 +53,6 @@ export class SceneRenderer {
           camera.HDR &&
           camera.ssgiIntensity > 0 &&
           scene.env.light.type === 'ibl' &&
-          scene.env.light.allowSSGI &&
           !!scene.env.light.envLight?.hasRadiance() &&
           !!scene.env.light.envLight?.hasIrradiance();
         const SSS = camera.SSS;

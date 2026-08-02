@@ -25,7 +25,6 @@ export class EnvLightWrapper extends Disposable {
   private _strength: number;
   private _intensity: number;
   private _specularStrength: number;
-  private _allowSSGI: boolean;
   /** @internal Invalidates the owning Environment's cached sky bake. */
   private _invalidateBake: Nullable<() => void>;
   /** @internal */
@@ -57,7 +56,6 @@ export class EnvLightWrapper extends Disposable {
     // Filament's IndirectLight default intensity, in lux.
     this._intensity = 30000;
     this._specularStrength = 1;
-    this._allowSSGI = false;
     this._invalidateBake = null;
   }
   /**
@@ -150,16 +148,6 @@ export class EnvLightWrapper extends Disposable {
   }
   set specularStrength(val) {
     this._specularStrength = val;
-  }
-  /**
-   * Whether this IBL may be replaced by screen-space diffuse irradiance.
-   * This option has no effect for non-IBL environment light types.
-   */
-  get allowSSGI() {
-    return this._allowSSGI;
-  }
-  set allowSSGI(val) {
-    this._allowSSGI = !!val;
   }
   /** Ambient light color for environment light type constant */
   get ambientColor(): Vector4 {
