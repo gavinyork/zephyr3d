@@ -5,6 +5,8 @@ import { Editor } from './core/editor';
 import { initLeakDetector } from './helpers/leakdetector';
 import { initEmojiMapping } from './helpers/emoji';
 import { installEditorMCPBridge } from './helpers/mcpbridge';
+import { flushPendingCaptures } from './helpers/capture';
+import { runHeadlessCapture } from './helpers/headless';
 import type { ProjectSettings } from './core/services/project';
 import { ProjectService } from './core/services/project';
 import { isDesktopApp } from './core/services/desktop';
@@ -18,6 +20,37 @@ const project = searchParams.get('project');
 const open = searchParams.get('open') !== null;
 const remote = searchParams.get('remote') !== null;
 const previewScene = searchParams.get('scene');
+// One-shot headless capture mode (driven by `electron . --headless --screenshot ...`):
+// preview mode with a manually stepped, fixed-timestep frame loop instead of run().
+const headless = searchParams.get('headless') !== null;
+const headlessFrames = Number(searchParams.get('frames')) || 64;
+const headlessFixedDtParam = searchParams.get('fixedDt');
+const headlessFixedDt =
+  headlessFixedDtParam === null
+    ? 1000 / 60
+    : Number(headlessFixedDtParam) > 0
+      ? Number(headlessFixedDtParam)
+      : null;
+const headlessDpr = Number(searchParams.get('dpr')) > 0 ? Number(searchParams.get('dpr')) : 1;
+// During headless boot, any uncaught error (module top-level throws included,
+// e.g. a bad project id) must fail the run fast instead of hitting the main
+// process watchdog. The guards are removed once the controlled capture path
+// takes over error handling.
+let headlessBootFailed = false;
+const reportHeadlessBootFailure = (err: unknown) => {
+  if (headlessBootFailed) {
+    return;
+  }
+  headlessBootFailed = true;
+  const error = err instanceof Error ? (err.stack ?? err.message) : String(err);
+  void window.zephyrEditorDesktop?.headless?.reportResult({ ok: false, error: `boot failed: ${error}` });
+};
+const onHeadlessBootError = (ev: ErrorEvent) => reportHeadlessBootFailure(ev.error ?? ev.message);
+const onHeadlessBootRejection = (ev: PromiseRejectionEvent) => reportHeadlessBootFailure(ev.reason);
+if (headless) {
+  window.addEventListener('error', onHeadlessBootError);
+  window.addEventListener('unhandledrejection', onHeadlessBootRejection);
+}
 let rhiList: string[] = [];
 let settings: Nullable<ProjectSettings> = null;
 let editorMode: EditorMode;
@@ -53,6 +86,12 @@ if (project && !open) {
     throw new Error('Get project settings failed');
   }
   rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
+  if (headless) {
+    const deviceType = searchParams.get('device');
+    if (deviceType) {
+      rhiList = [deviceType.toLowerCase()];
+    }
+  }
   document.title = settings.title ?? info.name;
   if (settings.favicon) {
     const content = (await ProjectService.VFS.readFile(settings.favicon, {
@@ -103,7 +142,9 @@ const editorApp = new Application({
   backend,
   canvas: document.querySelector('#canvas')!,
   enableMSAA: !!settings?.enableMSAA,
-  pixelRatio: renderScale <= 0 ? undefined : renderScale,
+  // In headless mode the pixel ratio is pinned (default 1) so the canvas
+  // backing store exactly matches the requested window content size.
+  pixelRatio: headless ? headlessDpr : renderScale <= 0 ? undefined : renderScale,
   runtimeOptions: {
     VFS: ProjectService.VFS,
     scriptsRoot: '/assets',
@@ -173,6 +214,11 @@ editorApp.ready().then(async () => {
     editorApp.on('tick', () => {
       editor.update(device.frameInfo.elapsedFrame);
       editor.render();
+      // Serve queued screenshot requests in the same JS task as the frame's
+      // final draw. The editor registers no Engine renderables, so
+      // editor.render() above is the last draw of this frame; if that ever
+      // changes, move this flush to a post-frame hook.
+      flushPendingCaptures(device.canvas as HTMLCanvasElement);
     });
 
     if (project) {
@@ -182,6 +228,25 @@ editorApp.ready().then(async () => {
         await editor.openProject(project);
       }
     }
+  } else if (headless) {
+    // One-shot headless capture: await startup (scene graph + attached runtime
+    // scripts ready), render exactly N deterministic frames via stepFrame(),
+    // then report the capture back to the Electron main process. The run loop
+    // is intentionally never started. Splash screen is skipped for determinism.
+    window.removeEventListener('error', onHeadlessBootError);
+    window.removeEventListener('unhandledrejection', onHeadlessBootRejection);
+    try {
+      await getEngine().startup(previewScene ?? settings!.startupScene, null, settings!.startupScript);
+      const result = await runHeadlessCapture(editorApp, {
+        frames: headlessFrames,
+        fixedDt: headlessFixedDt
+      });
+      await window.zephyrEditorDesktop?.headless?.reportResult({ ok: true, ...result });
+    } catch (err) {
+      const error = err instanceof Error ? (err.stack ?? err.message) : String(err);
+      await window.zephyrEditorDesktop?.headless?.reportResult({ ok: false, error });
+    }
+    return;
   } else {
     // start engine
     getEngine().startup(
@@ -190,5 +255,19 @@ editorApp.ready().then(async () => {
       settings!.startupScript
     );
   }
-  editorApp.run();
+  if (headless) {
+    // Persistent headless (hidden window): rAF never fires for windows that
+    // were never shown (~1Hz fallback), so pace the frame loop with timers
+    // instead. backgroundThrottling:false keeps timers running at full speed
+    // in hidden windows, and stepFrame() preserves the exact
+    // beginFrame/frame/endFrame sequence of the regular run loop.
+    const stepMs = 1000 / 60;
+    const loop = () => {
+      editorApp.stepFrame();
+      window.setTimeout(loop, stepMs);
+    };
+    loop();
+  } else {
+    editorApp.run();
+  }
 });

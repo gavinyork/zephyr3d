@@ -5,6 +5,7 @@ const FS_EVENT_CHANNEL = 'zephyr-editor:fs-event';
 const LOG_CHANNEL = 'zephyr-editor:log';
 const SETTINGS_CHANNEL = 'zephyr-editor:settings';
 const ASSISTANT_EVENT_CHANNEL = 'zephyr-editor:assistant-event';
+const HEADLESS_CHANNEL = 'zephyr-editor:headless';
 
 function invokeFS(operation, args) {
   return ipcRenderer.invoke(FS_CHANNEL, { operation, args });
@@ -79,6 +80,9 @@ contextBridge.exposeInMainWorld('zephyrEditorDesktop', {
         ipcRenderer.removeListener(ASSISTANT_EVENT_CHANNEL, handler);
       };
     }
+  },
+  headless: {
+    reportResult: (payload) => ipcRenderer.invoke(HEADLESS_CHANNEL, { operation: 'result', args: payload })
   }
 });
 

@@ -96,6 +96,55 @@ codex mcp add zephyr-editor --url http://127.0.0.1:47231/mcp
 
 If the user changes the port in editor settings, the MCP client config must be updated to match.
 
+## Headless Mode
+
+Two headless modes are available for automation and agent workflows:
+
+### One-shot capture (automated testing / golden images)
+
+```sh
+electron . --headless --project <id> --screenshot <out.png> [options]
+```
+
+Boots a hidden window, opens the project in preview mode (runtime scripts enabled),
+renders exactly N deterministic frames with a fixed timestep, writes the PNG and exits.
+
+Options: `--scene <vfs-path>` (default: project startup scene), `--frames <N>` (default 64),
+`--fixed-dt <ms>` (default 16.6667; `0` = wall clock), `--width`/`--height` (default 1280x720),
+`--device webgpu|webgl2|webgl`, `--timeout <ms>` (default 120000).
+
+Exit codes: `0` success, `1` failure, `2` usage error, `4` timeout, `5` renderer crash/load failure.
+A sidecar log is written to `<out.png>.log` (unless `ZEPHYR_EDITOR_LOG_PATH` is set).
+This supersedes the `ZEPHYR_EDITOR_SCREENSHOT_PATH` smoke-test flow for capture purposes.
+
+In dev mode the same flags pass through the dev runner:
+
+```sh
+npm run electron:dev -- --headless --project <id> --frames 64 --screenshot out.png
+```
+
+### Persistent headless MCP service (agent workflows)
+
+```sh
+electron . --headless [--mcp-port <port>] [--width <px>] [--height <px>] [--device <rhi>]
+```
+
+Runs the full editor with a hidden window; all MCP tools work exactly as in interactive
+mode. With `--mcp-port` the TCP MCP service is force-enabled on that port and startup
+fails hard (exit 1) if the port is taken. The hidden window's frame loop is paced by
+timers (~60fps) because rAF never fires for windows that were never shown.
+
+Notes:
+
+- Headless runs skip the single-instance lock and can execute beside an interactive
+  editor (Chromium session data is isolated per run). Concurrent writes to the same
+  project from two instances are unsupported.
+- Screenshots ride the next real frame; per-frame engine state (history ping-pong,
+  frame counter) advances exactly once per frame, never extra for a capture.
+- Deterministic captures are near-pixel-identical across runs on the same machine
+  (async asset arrival can leave sub-LSB temporal residue at edges); golden-image
+  comparison should use per-machine baselines with a small tolerance.
+
 ## Optional Environment Variables
 
 - `ZEPHYR_EDITOR_DEVICE=webgl2|webgpu`

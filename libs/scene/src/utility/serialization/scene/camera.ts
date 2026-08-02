@@ -720,7 +720,7 @@ export function getCameraClass(): SerializableClass {
           name: 'SSGIDenoisePasses',
           type: 'int',
           phase: 2,
-          default: 3,
+          default: 4,
           options: {
             label: 'DenoisePasses',
             group: 'PostProcessing/SSGI',

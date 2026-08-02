@@ -2502,6 +2502,23 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   pool: Pool;
   /** vSync */
   vSync: boolean;
+  /**
+   * The fixed per-frame time step in milliseconds, or null when using wall-clock timing.
+   * See {@link AbstractDevice.setFixedFrameTime}.
+   */
+  fixedFrameTime: Nullable<number>;
+  /**
+   * Sets a fixed per-frame time step in milliseconds for deterministic playback,
+   * or null to restore wall-clock timing. Default is null.
+   *
+   * @remarks
+   * Affects frameInfo.elapsedFrame/elapsedOverall/frameTimestamp only; frame
+   * scheduling is unchanged. While enabled, FPS and CPU time statistics are
+   * derived from the synthetic clock and no longer reflect wall-clock time.
+   *
+   * @param ms - Fixed frame time in milliseconds, or null to disable.
+   */
+  setFixedFrameTime(ms: Nullable<number>): void;
   /** Check if a pool with given key exists */
   poolExists(key: string | symbol): boolean;
   /** Get the pool with given key, or create a new one if not exists */

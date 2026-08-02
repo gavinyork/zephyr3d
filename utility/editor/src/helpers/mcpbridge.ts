@@ -26,6 +26,7 @@ import { eventBus } from '../core/eventbus';
 import { EditorCameraController } from './editorcontroller';
 import { shapePrimitivePaths, type ShapePrimitiveType } from './shapeprimitives';
 import { buildPrimitiveGlbFromZmshContent } from './primitiveglb';
+import { captureOnNextFrame } from './capture';
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
@@ -79,7 +80,6 @@ interface ConsoleEntry {
 const MAX_LOGS = 400;
 const MAX_SERIALIZE_DEPTH = 5;
 const DEFAULT_MCP_PORT = '47231';
-const SCREENSHOT_TIMEOUT_MS = 5000;
 const DEFAULT_GENERATED_MODEL_TIMEOUT_MS = 60000;
 
 type GeneratedModelJobStatus =
@@ -256,14 +256,6 @@ function toJson(value: any, depth = MAX_SERIALIZE_DEPTH, seen = new WeakSet<obje
     return out;
   }
   return String(value);
-}
-
-function getCanvas(): HTMLCanvasElement {
-  const canvas = document.querySelector<HTMLCanvasElement>('#canvas');
-  if (!canvas) {
-    throw new Error('Editor canvas element #canvas was not found; make sure the editor page is loaded');
-  }
-  return canvas;
 }
 
 function getSceneController(editor: Editor) {
@@ -3995,18 +3987,12 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     }
     case 'saveScene':
       return await saveCurrentScene(editor);
-    case 'screenshot': {
-      const canvas = getCanvas();
-      // GPU-backed canvases, especially WebGPU, may not remain serializable once the
-      // render task has completed. Re-render immediately before capture so screenshot
-      // encoding happens in the same task as drawing.
-      editor.render();
-      return {
-        width: canvas.width,
-        height: canvas.height,
-        dataUrl: await canvasToDataUrl(canvas, params?.mime_type ?? 'image/png', params?.quality)
-      };
-    }
+    case 'screenshot':
+      // Per-frame engine state (history ping-pong, frame counter, motion vector
+      // matrices) is non-idempotent, so never inject an extra render here;
+      // capture rides the next real frame instead (flushed from the tick
+      // listener in the same JS task as the frame's final draw).
+      return await captureOnNextFrame(params?.mime_type ?? 'image/png', params?.quality);
     case 'consoleLogs': {
       const limit = Math.max(1, Math.min(Number(params?.limit ?? 100), MAX_LOGS));
       return consoleEntries.slice(-limit);
@@ -4016,39 +4002,6 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     default:
       throw new Error(`Unknown editor bridge method: ${method}`);
   }
-}
-
-async function canvasToDataUrl(
-  canvas: HTMLCanvasElement,
-  mimeType: string,
-  quality?: number
-): Promise<string> {
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    const timer = window.setTimeout(
-      () => reject(new Error('Canvas screenshot timed out')),
-      SCREENSHOT_TIMEOUT_MS
-    );
-    canvas.toBlob(
-      (value) => {
-        window.clearTimeout(timer);
-        if (value) {
-          resolve(value);
-        } else {
-          reject(new Error('Canvas screenshot failed: canvas.toBlob returned null'));
-        }
-      },
-      mimeType,
-      typeof quality === 'number' ? quality : undefined
-    );
-  });
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener('load', () => resolve(String(reader.result)));
-    reader.addEventListener('error', () =>
-      reject(reader.error ?? new Error('Failed to read screenshot blob'))
-    );
-    reader.readAsDataURL(blob);
-  });
 }
 
 function getStatus(editor: Editor) {

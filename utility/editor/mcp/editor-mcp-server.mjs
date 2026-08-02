@@ -3504,10 +3504,12 @@ function formatToolResultText(result) {
 }
 
 function buildToolResultEnvelope(name, result) {
-  if (name === 'editor_screenshot' && typeof result?.dataUrl === 'string') {
-    const comma = result.dataUrl.indexOf(',');
-    const mime = /^data:([^;]+);base64,/.exec(result.dataUrl)?.[1] || 'image/png';
-    const data = comma >= 0 ? result.dataUrl.slice(comma + 1) : result.dataUrl;
+  // The renderer bridge snake-cases result keys, so the wire key is data_url.
+  const screenshotDataUrl = result?.data_url ?? result?.dataUrl;
+  if (name === 'editor_screenshot' && typeof screenshotDataUrl === 'string') {
+    const comma = screenshotDataUrl.indexOf(',');
+    const mime = /^data:([^;]+);base64,/.exec(screenshotDataUrl)?.[1] || 'image/png';
+    const data = comma >= 0 ? screenshotDataUrl.slice(comma + 1) : screenshotDataUrl;
     return {
       structuredContent: {
         width: result.width,

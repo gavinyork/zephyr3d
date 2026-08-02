@@ -274,6 +274,30 @@ export class Application extends Observable<appEventMap> {
     }
   }
   /**
+   * Advances exactly one frame outside the run loop.
+   *
+   * @remarks
+   * Uses the same `beginFrame()`/`frame()`/`endFrame()` sequence as the run
+   * loop, so per-frame non-idempotent state (history buffer ping-pong, frame
+   * counter, motion vector matrices) advances exactly once. Must not be called
+   * while the run loop started by {@link Application.run} is active.
+   *
+   * @returns true if the frame was rendered; false if the device skipped it
+   * (e.g. the rendering context is lost).
+   */
+  stepFrame(): boolean {
+    if (this.device.isRendering) {
+      console.error('Application.stepFrame(): can not be called while the run loop is active');
+      return false;
+    }
+    if (this.device.beginFrame()) {
+      this.frame();
+      this.device.endFrame();
+      return true;
+    }
+    return false;
+  }
+  /**
    * Start the application's render loop.
    *
    * Uses the device's internal scheduling (`device.runLoop`) to repeatedly call `frame()`.

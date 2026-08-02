@@ -256,7 +256,15 @@ export type ZephyrEditorDesktopAPI = {
     rejectAssistantToolCall(sessionId: string, callId: string, scopeId?: string | null): Promise<boolean>;
     onAssistantEvent(listener: (event: DesktopAssistantEvent) => void): () => void;
   };
+  headless?: {
+    reportResult(payload: DesktopHeadlessResult): Promise<void>;
+  };
 };
+
+/** Result payload reported by the renderer at the end of a one-shot headless run. */
+export type DesktopHeadlessResult =
+  | { ok: true; width: number; height: number; dataUrl: string }
+  | { ok: false; error: string };
 
 declare global {
   interface Window {

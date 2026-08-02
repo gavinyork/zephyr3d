@@ -3,6 +3,7 @@ const { execFile } = require('child_process');
 const http = require('http');
 const fs = require('fs/promises');
 const fsSync = require('fs');
+const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { Worker } = require('worker_threads');
@@ -12,6 +13,7 @@ const FS_EVENT_CHANNEL = 'zephyr-editor:fs-event';
 const LOG_CHANNEL = 'zephyr-editor:log';
 const SETTINGS_CHANNEL = 'zephyr-editor:settings';
 const ASSISTANT_EVENT_CHANNEL = 'zephyr-editor:assistant-event';
+const HEADLESS_CHANNEL = 'zephyr-editor:headless';
 const EDITOR_PROTOCOL = 'zephyr-editor';
 const MCP_HTTP_PATH = '/mcp';
 const DEFAULT_MCP_SERVICE_PORT = Number(process.env.ZEPHYR_EDITOR_MCP_SERVER_PORT || 47231);
@@ -177,9 +179,135 @@ function configurePortableAppPaths() {
 
 configurePortableAppPaths();
 
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
-if (!hasSingleInstanceLock) {
-  app.quit();
+const HEADLESS_USAGE = [
+  'Usage:',
+  '  electron . --headless [--width <px>] [--height <px>] [--device <rhi>] [--mcp-port <port>]',
+  '      Run the editor as a persistent headless MCP service (hidden window).',
+  '  electron . --headless --project <id> --screenshot <out.png> [options]',
+  '      One-shot capture: open the project in preview mode, render N deterministic',
+  '      frames, write the screenshot and exit.',
+  '',
+  'One-shot options:',
+  '  --project <id>       project id (required)',
+  '  --scene <vfs-path>   scene to open; defaults to the project startup scene',
+  '  --frames <N>         frames to render before capture (default 64)',
+  '  --fixed-dt <ms>      fixed timestep in milliseconds; 0 = wall clock (default 16.6667)',
+  '  --width <px>         content width (default 1280)',
+  '  --height <px>        content height (default 720)',
+  '  --device <rhi>       webgpu | webgl2 | webgl',
+  '  --screenshot <path>  output PNG path (presence selects one-shot mode)',
+  '  --timeout <ms>       whole-run watchdog (default 120000)',
+  '',
+  'Exit codes: 0 success, 1 failure, 2 usage error, 4 timeout, 5 renderer crash/load failure.'
+].join('\n');
+
+function parseHeadlessCli(argv) {
+  if (!argv.includes('--headless')) {
+    return null;
+  }
+  const fail = (message) => {
+    writeStderrLine(`[headless] ${message}`);
+    writeStderrLine(HEADLESS_USAGE);
+    app.exit(2);
+    return { valid: false };
+  };
+  const readString = (flag) => {
+    const index = argv.indexOf(flag);
+    if (index < 0) {
+      return null;
+    }
+    const value = argv[index + 1];
+    if (typeof value !== 'string' || value.startsWith('--')) {
+      throw new Error(`missing value for ${flag}`);
+    }
+    return value;
+  };
+  const readNumber = (flag, fallback, { min = -Infinity } = {}) => {
+    const raw = readString(flag);
+    if (raw === null) {
+      return fallback;
+    }
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < min) {
+      throw new Error(`invalid value for ${flag}: ${raw}`);
+    }
+    return value;
+  };
+  try {
+    const screenshotPath = readString('--screenshot');
+    const oneShot = screenshotPath !== null;
+    const project = readString('--project');
+    if (oneShot && !project) {
+      return fail('--screenshot requires --project');
+    }
+    const device = readString('--device');
+    if (device && !SUPPORTED_EDITOR_RHIS.has(device.toLowerCase())) {
+      return fail(`unsupported --device: ${device}`);
+    }
+    const config = {
+      valid: true,
+      oneShot,
+      project,
+      scene: readString('--scene'),
+      frames: Math.floor(readNumber('--frames', 64, { min: 1 })),
+      fixedDt: readNumber('--fixed-dt', 1000 / 60, { min: 0 }),
+      width: Math.floor(readNumber('--width', oneShot ? 1280 : 1440, { min: 16 })),
+      height: Math.floor(readNumber('--height', oneShot ? 720 : 960, { min: 16 })),
+      device: device ? device.toLowerCase() : null,
+      screenshotPath: oneShot ? path.resolve(screenshotPath) : null,
+      timeoutMs: Math.floor(readNumber('--timeout', 120000, { min: 1000 })),
+      mcpPort: readString('--mcp-port') !== null ? Math.floor(readNumber('--mcp-port', 0, { min: 1 })) : null
+    };
+    if (config.mcpPort !== null && (config.mcpPort < 1 || config.mcpPort > 65535)) {
+      return fail(`invalid --mcp-port: ${config.mcpPort}`);
+    }
+    if (config.device) {
+      // getConfiguredEditorRHI() gives the env var priority, so this covers
+      // both the launch URL and the persistent-mode window.
+      process.env.ZEPHYR_EDITOR_DEVICE = config.device;
+    }
+    if (config.oneShot && !process.env.ZEPHYR_EDITOR_LOG_PATH) {
+      // Free sidecar log: writeDiagnosticLog() and the renderer console
+      // forwarding already write to this path.
+      process.env.ZEPHYR_EDITOR_LOG_PATH = `${config.screenshotPath}.log`;
+    }
+    return config;
+  } catch (err) {
+    return fail(err instanceof Error ? err.message : String(err));
+  }
+}
+
+const headlessConfig = parseHeadlessCli(process.argv);
+let headlessWatchdog = null;
+let headlessSessionDir = null;
+
+if (headlessConfig?.valid) {
+  // backgroundThrottling:false alone is not enough: Chromium also throttles
+  // rAF for occluded/hidden windows at the browser-process level, and on
+  // Windows the native occlusion tracker marks hidden windows as occluded,
+  // which drops rAF to ~1Hz.
+  app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+  app.commandLine.appendSwitch('disable-renderer-backgrounding');
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+}
+
+let hasSingleInstanceLock = true;
+if (!headlessConfig) {
+  hasSingleInstanceLock = app.requestSingleInstanceLock();
+  if (!hasSingleInstanceLock) {
+    app.quit();
+  }
+} else if (headlessConfig.valid) {
+  // Share userData (projects live in userData/editor-storage) but isolate
+  // Chromium's lock-sensitive session data in a per-run temp dir so a headless
+  // run can execute beside an interactive editor without the single-instance
+  // lock. Concurrent writes to the same project from two instances are
+  // unsupported.
+  headlessSessionDir = fsSync.mkdtempSync(path.join(os.tmpdir(), 'zephyr-headless-'));
+  const logsDir = path.join(headlessSessionDir, 'logs');
+  fsSync.mkdirSync(logsDir, { recursive: true });
+  app.setPath('sessionData', headlessSessionDir);
+  app.setAppLogsPath(logsDir);
 }
 writeStderrLine(
   `[app:boot] pid=${process.pid} ppid=${process.ppid} lock=${hasSingleInstanceLock} packaged=${app.isPackaged} execPath=${process.execPath} argv=${JSON.stringify(process.argv)}`
@@ -2136,15 +2264,24 @@ protocol.registerSchemesAsPrivileged([
   }
 ]);
 
-function createWindow() {
+function createWindow(options = {}) {
+  const hidden = !!options.hidden;
+  const webPreferences = editorWebPreferences();
+  if (hidden) {
+    // Hidden windows get their renderer throttled by default, which would
+    // stall the rAF-driven render loop and any canvas capture.
+    webPreferences.backgroundThrottling = false;
+  }
   const mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 960,
+    width: options.width ?? 1440,
+    height: options.height ?? 960,
     minWidth: 960,
     minHeight: 640,
+    show: !hidden,
+    useContentSize: hidden,
     backgroundColor: '#1f1f1f',
     icon: editorIconPath(),
-    webPreferences: editorWebPreferences()
+    webPreferences
   });
   mainWindowRef = mainWindow;
   mainWindow.on('closed', () => {
@@ -2152,7 +2289,9 @@ function createWindow() {
       mainWindowRef = null;
     }
   });
-  mainWindow.maximize();
+  if (!hidden) {
+    mainWindow.maximize();
+  }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (isInternalEditorUrl(url)) {
@@ -2170,15 +2309,21 @@ function createWindow() {
     writeStderrLine(lineText);
     writeDiagnosticLog(lineText);
   });
-  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
     const lineText = `[renderer:load-failed] ${errorCode} ${errorDescription}: ${validatedURL}`;
     writeStderrLine(lineText);
     writeDiagnosticLog(lineText);
+    if (headlessConfig?.oneShot && isMainFrame && errorCode !== -3 /* ERR_ABORTED */) {
+      headlessExit(5);
+    }
   });
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     const lineText = `[renderer:gone] ${details.reason} exitCode=${details.exitCode}`;
     writeStderrLine(lineText);
     writeDiagnosticLog(lineText);
+    if (headlessConfig) {
+      headlessExit(5);
+    }
   });
   mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
     const lineText = `[renderer:preload-error] ${preloadPath}: ${error?.stack || error}`;
@@ -2220,17 +2365,49 @@ function createWindow() {
     }, 3000);
   });
 
-  const devUrl = process.env.ZEPHYR_EDITOR_ELECTRON_URL;
-  const device = getConfiguredEditorRHI();
-  if (devUrl) {
-    mainWindow.loadURL(buildEditorLaunchUrl(devUrl, device));
+  if (options.url) {
+    mainWindow.loadURL(options.url);
   } else {
-    mainWindow.loadURL(buildEditorLaunchUrl(`${EDITOR_PROTOCOL}://app/index.html`, device));
+    const devUrl = process.env.ZEPHYR_EDITOR_ELECTRON_URL;
+    const device = getConfiguredEditorRHI();
+    if (devUrl) {
+      mainWindow.loadURL(buildEditorLaunchUrl(devUrl, device));
+    } else {
+      mainWindow.loadURL(buildEditorLaunchUrl(`${EDITOR_PROTOCOL}://app/index.html`, device));
+    }
   }
 
   if (process.env.ZEPHYR_EDITOR_DEVTOOLS === '1') {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
+}
+
+function buildHeadlessPersistentUrl() {
+  // Same URL as the interactive editor (embedded MCP worker is running, so
+  // mcp/mcpToken params are included) plus the headless flag, which makes the
+  // renderer pace its frame loop with timers instead of rAF (rAF stays at
+  // ~1Hz for windows that were never shown).
+  const base = process.env.ZEPHYR_EDITOR_ELECTRON_URL || `${EDITOR_PROTOCOL}://app/index.html`;
+  const url = new URL(buildEditorLaunchUrl(base, getConfiguredEditorRHI()));
+  url.searchParams.set('headless', '1');
+  return url.toString();
+}
+
+function buildHeadlessOneShotUrl(config) {
+  // The embedded MCP worker is not started in one-shot mode, so
+  // buildEditorLaunchUrl emits no mcp/mcpToken params and the preview page
+  // runs without the MCP bridge (matching the preview-window policy).
+  const base = process.env.ZEPHYR_EDITOR_ELECTRON_URL || `${EDITOR_PROTOCOL}://app/index.html`;
+  const url = new URL(buildEditorLaunchUrl(base, getConfiguredEditorRHI()));
+  url.searchParams.set('project', config.project);
+  if (config.scene) {
+    url.searchParams.set('scene', config.scene);
+  }
+  url.searchParams.set('headless', '1');
+  url.searchParams.set('frames', String(config.frames));
+  url.searchParams.set('fixedDt', String(config.fixedDt));
+  url.searchParams.set('dpr', '1');
+  return url.toString();
 }
 
 function createPreviewWindow(url) {
@@ -2865,33 +3042,133 @@ ipcMain.on(LOG_CHANNEL, (_event, payload) => {
   writeDiagnosticLog(lineText);
 });
 
-if (hasSingleInstanceLock) {
+ipcMain.handle(HEADLESS_CHANNEL, async (event, payload) => {
+  if (!headlessConfig?.oneShot || event.sender !== mainWindowRef?.webContents) {
+    return;
+  }
+  if (payload?.operation !== 'result') {
+    return;
+  }
+  if (headlessWatchdog) {
+    clearTimeout(headlessWatchdog);
+    headlessWatchdog = null;
+  }
+  const result = payload.args ?? {};
+  try {
+    if (result.ok && typeof result.dataUrl === 'string') {
+      const comma = result.dataUrl.indexOf(',');
+      await fs.mkdir(path.dirname(headlessConfig.screenshotPath), { recursive: true });
+      await fs.writeFile(
+        headlessConfig.screenshotPath,
+        Buffer.from(result.dataUrl.slice(comma + 1), 'base64')
+      );
+      const line = `[headless] wrote ${headlessConfig.screenshotPath} (${result.width}x${result.height})`;
+      writeStderrLine(line);
+      await writeDiagnosticLog(line);
+      headlessExit(0);
+    } else {
+      const line = `[headless] renderer failed: ${result.error ?? 'unknown error'}`;
+      writeStderrLine(line);
+      await writeDiagnosticLog(line);
+      headlessExit(1);
+    }
+  } catch (err) {
+    const line = `[headless] failed to write screenshot: ${err?.stack || err}`;
+    writeStderrLine(line);
+    await writeDiagnosticLog(line);
+    headlessExit(1);
+  }
+});
+
+if (headlessConfig?.oneShot && headlessConfig.valid) {
+  app.whenReady()
+    .then(async () => {
+      await loadEditorGlobalConfig();
+      registerEditorProtocol();
+      // No embedded MCP worker, no local MCP TCP service, no app menu:
+      // the renderer reports the capture result over the headless IPC channel.
+      createWindow({
+        hidden: true,
+        width: headlessConfig.width,
+        height: headlessConfig.height,
+        url: buildHeadlessOneShotUrl(headlessConfig)
+      });
+      headlessWatchdog = setTimeout(() => {
+        const line = `[headless] timed out after ${headlessConfig.timeoutMs}ms`;
+        writeStderrLine(line);
+        void writeDiagnosticLog(line);
+        headlessExit(4);
+      }, headlessConfig.timeoutMs);
+    })
+    .catch((err) => {
+      writeStderrLine(`[app:startup-failed] ${err?.stack || err}`);
+      void writeDiagnosticLog(`[app:startup-failed] ${err?.stack || err}`);
+      headlessExit(1);
+    });
+
+  app.on('window-all-closed', () => {
+    // The window closed before the capture result arrived.
+    headlessExit(1);
+  });
+
+  app.on('will-quit', () => {
+    cleanupHeadlessSessionDir();
+  });
+} else if (hasSingleInstanceLock && (!headlessConfig || headlessConfig.valid)) {
+  const persistentHeadless = !!headlessConfig;
   app.whenReady()
     .then(async () => {
       await loadMcpServiceConfig();
+      if (persistentHeadless && headlessConfig.mcpPort !== null) {
+        // In-memory override only; never persisted to mcp-config.json.
+        mcpServiceConfig.port = headlessConfig.mcpPort;
+        mcpServiceConfig.enabled = true;
+      }
       await loadEditorGlobalConfig();
       await loadLlmSecrets();
       await loadAssistantSessions();
       registerEditorProtocol();
       await startEmbeddedMcpWorker();
       rebuildApplicationMenu();
-      createWindow();
-      if (mcpServiceConfig.enabled) {
-        await startLocalMcpService({ persistEnabled: false, interactive: true }).catch(() => undefined);
+      createWindow(
+        persistentHeadless
+          ? {
+              hidden: true,
+              width: headlessConfig.width,
+              height: headlessConfig.height,
+              url: buildHeadlessPersistentUrl()
+            }
+          : {}
+      );
+      if (persistentHeadless && headlessConfig.mcpPort !== null) {
+        // A headless MCP service with a dead TCP endpoint is useless to
+        // agents; fail hard instead of silently continuing.
+        await startLocalMcpService({ persistEnabled: false, interactive: false }).catch((err) => {
+          writeStderrLine(`[headless] MCP service failed to start: ${err?.message || err}`);
+          headlessExit(1);
+        });
+      } else if (mcpServiceConfig.enabled) {
+        await startLocalMcpService({ persistEnabled: false, interactive: !persistentHeadless }).catch(
+          () => undefined
+        );
       }
 
       app.on('activate', async () => {
         if (BrowserWindow.getAllWindows().length === 0) {
           await startEmbeddedMcpWorker();
           rebuildApplicationMenu();
-          createWindow();
+          createWindow(
+            persistentHeadless
+              ? { hidden: true, width: headlessConfig.width, height: headlessConfig.height }
+              : {}
+          );
         }
       });
     })
     .catch((err) => {
       writeStderrLine(`[app:startup-failed] ${err?.stack || err}`);
       void writeDiagnosticLog(`[app:startup-failed] ${err?.stack || err}`);
-      app.exit(1);
+      headlessExit(1);
     });
 
   app.on('before-quit', () => {
@@ -2904,9 +3181,31 @@ if (hasSingleInstanceLock) {
     }
   });
 
+  app.on('will-quit', () => {
+    cleanupHeadlessSessionDir();
+  });
+
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
+    if (process.platform !== 'darwin' || persistentHeadless) {
       app.quit();
     }
   });
+}
+
+function cleanupHeadlessSessionDir() {
+  if (!headlessSessionDir) {
+    return;
+  }
+  try {
+    fsSync.rmSync(headlessSessionDir, { recursive: true, force: true });
+  } catch {
+    // Best effort: Chromium may still hold files on some platforms.
+  }
+  headlessSessionDir = null;
+}
+
+// app.exit() skips before-quit/will-quit, so clean the temp session dir here.
+function headlessExit(code) {
+  cleanupHeadlessSessionDir();
+  app.exit(code);
 }

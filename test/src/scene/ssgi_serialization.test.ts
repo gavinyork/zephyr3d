@@ -12,7 +12,7 @@ describe('SSGI configuration and serialization', () => {
       halfRes: false,
       raysPerPixel: 2,
       maxSteps: 64,
-      denoisePasses: 3
+      denoisePasses: 4
     });
     expect(camera.ssgiIntensity).toBeCloseTo(0.7);
     // Below 1 on purpose: SSGI irradiance already has sky occlusion subtracted,
@@ -33,7 +33,7 @@ describe('SSGI configuration and serialization', () => {
     expect(camera.ssgiHalfResolution).toBe(false);
     expect(camera.ssgiRaysPerPixel).toBe(2);
     expect(camera.ssgiMaxSteps).toBe(64);
-    expect(camera.ssgiDenoisePasses).toBe(3);
+    expect(camera.ssgiDenoisePasses).toBe(4);
 
     // Lighting is pre-exposed on the CPU, so the firefly clamp is mode-independent.
     scene.lightingMode = 'physical';
@@ -77,7 +77,7 @@ describe('SSGI configuration and serialization', () => {
       halfRes: false,
       raysPerPixel: 2,
       maxSteps: 64,
-      denoisePasses: 3
+      denoisePasses: 4
     });
   });
 

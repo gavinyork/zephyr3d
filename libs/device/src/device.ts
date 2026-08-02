@@ -234,6 +234,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   protected _disposeObjectList: GPUObject[];
   protected _beginFrameTime: number;
   protected _endFrameTime: number;
+  protected _fixedFrameTime: Nullable<number>;
+  protected _fixedFrameClock: number;
   protected _frameInfo: FrameInfo;
   protected _cpuTimer: CPUTimer;
   protected _gpuTimer: Nullable<ITimer>;
@@ -271,6 +273,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._disposeObjectList = [];
     this._beginFrameTime = 0;
     this._endFrameTime = 0;
+    this._fixedFrameTime = null;
+    this._fixedFrameClock = 0;
     this._runLoopFunc = null;
     this._frameInfo = {
       frameCounter: 0,
@@ -485,6 +489,17 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   }
   set vSync(val) {
     this._vSync = !!val;
+  }
+  get fixedFrameTime() {
+    return this._fixedFrameTime;
+  }
+  setFixedFrameTime(ms: Nullable<number>): void {
+    const value = typeof ms === 'number' && Number.isFinite(ms) && ms > 0 ? ms : null;
+    this._fixedFrameTime = value;
+    // Seed the synthetic clock from the last frame timestamp so timing stays
+    // continuous when enabled mid-run and starts at a reproducible epoch (0)
+    // on a fresh device.
+    this._fixedFrameClock = value !== null ? this._frameInfo.frameTimestamp : 0;
   }
   get pool() {
     return this._poolMap.get(this._defaultPoolKey)!;
@@ -896,7 +911,11 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   private updateFrameInfo() {
     this._frameInfo.drawCalls = 0;
     this._frameInfo.computeCalls = 0;
-    const now = this._beginFrameTime;
+    let now = this._beginFrameTime;
+    if (this._fixedFrameTime !== null) {
+      this._fixedFrameClock += this._fixedFrameTime;
+      now = this._fixedFrameClock;
+    }
     if (this._frameInfo.frameTimestamp === 0) {
       this._frameInfo.frameTimestamp = now;
       this._frameInfo.elapsedTimeCPU = 0;
