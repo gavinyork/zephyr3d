@@ -2,13 +2,13 @@
  * Routes Jest snapshots into a per-depth-convention directory so the
  * standard-Z and reverse-Z test runs maintain independent snapshot sets:
  *
+ *   <testdir>/__snapshots__/reverse/<testfile>.snap   (default)
  *   <testdir>/__snapshots__/standard/<testfile>.snap
- *   <testdir>/__snapshots__/reverse/<testfile>.snap
  */
 
 const path = require('path');
 
-const convention = process.env.Z_CONVENTION === 'reverse' ? 'reverse' : 'standard';
+const convention = process.env.Z_CONVENTION === 'standard' ? 'standard' : 'reverse';
 
 module.exports = {
   resolveSnapshotPath(testPath, snapshotExtension) {

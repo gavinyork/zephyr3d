@@ -5,7 +5,8 @@
  * the injected value.
  *
  * Select with the Z_CONVENTION environment variable:
- *   Z_CONVENTION=reverse  -> reverse-Z
- *   anything else / unset -> standard-Z
+ *   Z_CONVENTION=standard -> standard-Z
+ *   anything else / unset  -> reverse-Z
  */
-(globalThis as Record<string, unknown>).__ZEPHYR3D_REVERSE_Z__ = process.env.Z_CONVENTION === 'reverse';
+const zConvention = process.env.Z_CONVENTION;
+(globalThis as Record<string, unknown>).__ZEPHYR3D_REVERSE_Z__ = zConvention !== 'standard';

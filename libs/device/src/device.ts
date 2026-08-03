@@ -1,5 +1,5 @@
 import type { Immutable, Nullable, Rect, Vector3 } from '@zephyr3d/base';
-import { type Vector4, type TypedArray, type IEventTarget, Observable } from '@zephyr3d/base';
+import { type Vector4, type TypedArray, type IEventTarget, Observable, Z_CONVENTION } from '@zephyr3d/base';
 import type { ITimer } from './timer';
 import { CPUTimer } from './timer';
 import type {
@@ -68,6 +68,8 @@ import type {
 } from './base_types';
 import { DrawText } from './helpers';
 import { Pool } from './pool';
+
+let _loggedZConvention = false;
 
 /**
  * The device backend interface
@@ -253,6 +255,10 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   private readonly _stateStack: DeviceState[];
   constructor(cvs: HTMLCanvasElement, backend: DeviceBackend, dpr?: number) {
     super();
+    if (!_loggedZConvention) {
+      _loggedZConvention = true;
+      console.info(`[Zephyr3D] Z Convention: ${Z_CONVENTION}`);
+    }
     this._dpr = dpr ?? window.devicePixelRatio ?? 1;
     this._backend = backend;
     this._gpuObjectList = {

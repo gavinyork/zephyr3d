@@ -3099,9 +3099,10 @@ function buildEditorLaunchUrl(rawUrl, device) {
   const url = new URL(rawUrl);
   url.searchParams.set('desktop', 'electron');
   url.searchParams.set('device', device);
-  // Run the editor with the reverse-Z depth convention (picked up by the
-  // pre-module bootstrap script in index.html).
-  if (process.env.ZEPHYR_EDITOR_REVERSE_Z || process.argv.includes('--reverse-z')) {
+  // Keep the default reverse-Z convention unless the caller explicitly opts out.
+  if (process.env.ZEPHYR_EDITOR_STANDARD_Z || process.argv.includes('--standard-z')) {
+    url.searchParams.set('standardZ', '1');
+  } else if (process.env.ZEPHYR_EDITOR_REVERSE_Z || process.argv.includes('--reverse-z')) {
     url.searchParams.set('reverseZ', '1');
   }
   if (mcpBridgeInfo?.port) {

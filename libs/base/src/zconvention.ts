@@ -5,8 +5,8 @@
  *
  * The engine supports two depth conventions selected at load time:
  *
- * - Standard-Z (default): device depth 0 at the near plane, 1 at the far plane.
- * - Reverse-Z: device depth 1 at the near plane, 0 at the far plane. With a
+ * - Standard-Z: device depth 0 at the near plane, 1 at the far plane.
+ * - Reverse-Z (default): device depth 1 at the near plane, 0 at the far plane. With a
  *   floating point depth buffer this yields a nearly uniform depth error
  *   distribution and greatly reduces far-distance z-fighting.
  *
@@ -17,7 +17,7 @@
  *    can be eliminated by the minifier.
  * 2. Runtime global: `globalThis.__ZEPHYR3D_REVERSE_Z__`, which must be set
  *    before the first import of any `@zephyr3d/*` module.
- * 3. Default: Standard-Z.
+ * 3. Default: Reverse-Z.
  *
  * The convention is fixed for the lifetime of the process. All engine code
  * must consume the derived constants below instead of hard-coding depth
@@ -37,8 +37,8 @@ function resolveReverseZ(): boolean {
   if (typeof g.__ZEPHYR3D_REVERSE_Z__ !== 'undefined') {
     return !!g.__ZEPHYR3D_REVERSE_Z__;
   }
-  // 3) Default: Standard-Z
-  return false;
+  // 3) Default: Reverse-Z
+  return true;
 }
 
 /**

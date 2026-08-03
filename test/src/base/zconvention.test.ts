@@ -1,7 +1,7 @@
 /**
  * Tests for the depth convention constant module: resolution precedence of
  * the REVERSE_Z switch and the exact legacy values of every derived constant
- * under the standard-Z convention.
+ * under both conventions.
  */
 
 const MODULE_PATH = '../../../libs/base/src/zconvention';
@@ -33,10 +33,10 @@ function loadWithGlobal(value: boolean | undefined): ZConventionModule {
 }
 
 describe('zconvention resolution precedence', () => {
-  test('defaults to standard-Z when nothing is injected', () => {
+  test('defaults to reverse-Z when nothing is injected', () => {
     const mod = loadWithGlobal(undefined);
-    expect(mod.REVERSE_Z).toBe(false);
-    expect(mod.Z_CONVENTION).toBe('standard');
+    expect(mod.REVERSE_Z).toBe(true);
+    expect(mod.Z_CONVENTION).toBe('reverse');
   });
 
   test('globalThis.__ZEPHYR3D_REVERSE_Z__ = true selects reverse-Z', () => {
@@ -48,6 +48,7 @@ describe('zconvention resolution precedence', () => {
   test('globalThis.__ZEPHYR3D_REVERSE_Z__ = false selects standard-Z explicitly', () => {
     const mod = loadWithGlobal(false);
     expect(mod.REVERSE_Z).toBe(false);
+    expect(mod.Z_CONVENTION).toBe('standard');
   });
 });
 

@@ -30,8 +30,12 @@
     </section>
     <script>
       // Select the engine depth convention before any engine module loads.
-      // Append ?reverseZ to the URL to run this demo with reverse-Z.
-      globalThis.__ZEPHYR3D_REVERSE_Z__ = new URLSearchParams(location.search).has("reverseZ");
+      const params = new URLSearchParams(location.search);
+      if (params.has('standardZ')) {
+        globalThis.__ZEPHYR3D_REVERSE_Z__ = false;
+      } else if (params.has('reverseZ')) {
+        globalThis.__ZEPHYR3D_REVERSE_Z__ = true;
+      }
     </script>
     <script type="module" src="js/main.js"></script>
   </body>

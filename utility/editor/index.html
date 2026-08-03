@@ -38,8 +38,12 @@ __ZEPHYR3D_IMPORT_MAP__
     <canvas id="canvas"></canvas>
     <script>
       // Select the engine depth convention before any engine module loads.
-      // Append ?reverseZ to the URL to run the editor with reverse-Z.
-      globalThis.__ZEPHYR3D_REVERSE_Z__ = new URLSearchParams(location.search).has('reverseZ');
+      const params = new URLSearchParams(location.search);
+      if (params.has('standardZ')) {
+        globalThis.__ZEPHYR3D_REVERSE_Z__ = false;
+      } else if (params.has('reverseZ')) {
+        globalThis.__ZEPHYR3D_REVERSE_Z__ = true;
+      }
     </script>
     <script src="/vendor/typescript.js"></script>
     <script src="/vendor/draco_decoder.js"></script>
