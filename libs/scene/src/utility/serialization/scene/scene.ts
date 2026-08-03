@@ -28,9 +28,9 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           phase: 0,
           default: 'legacy',
           options: {
-            group: 'Rendering/Physical',
+            group: 'Rendering',
             enum: {
-              labels: ['Legacy', 'Physical'],
+              labels: ['Legacy', 'Physical (experimental)'],
               values: ['legacy', 'physical']
             }
           },
@@ -48,7 +48,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           phase: 0,
           default: 1,
           options: {
-            group: 'Rendering/Physical',
+            group: 'Rendering',
             minValue: 0.000001
           },
           get(this: Scene, value) {
@@ -56,6 +56,9 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Scene, value) {
             this.metersPerUnit = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.lightingMode === 'physical';
           }
         },
         {

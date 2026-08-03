@@ -93,10 +93,15 @@ function getTargetES6(example, generateIndex) {
     onwarn(warning, warn) {
       if (warning.code === 'CIRCULAR_DEPENDENCY') {
         console.error(warning.message);
+      } else {
+        console.warn(warning.message);
       }
     },
     plugins: [
-      nodeResolve(),
+      nodeResolve({
+        rootDir: __dirname,
+        dedupe: (importee) => importee.startsWith('@zephyr3d/')
+      }),
       swc({
         sourceMaps: true,
         inlineSourcesContent: false

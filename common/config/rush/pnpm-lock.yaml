@@ -992,6 +992,12 @@ importers:
       '@zephyr3d/imgui':
         specifier: workspace:^0.2.6
         version: link:../libs/imgui
+      '@zephyr3d/loaders':
+        specifier: workspace:^0.1.4
+        version: link:../libs/loaders
+      '@zephyr3d/scene':
+        specifier: workspace:^0.9.22
+        version: link:../libs/scene
       diff:
         specifier: ^5.0.0
         version: 5.2.2
