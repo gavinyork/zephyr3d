@@ -66,6 +66,40 @@ function mergeHydratedUniformTexture(
   };
 }
 
+function inheritUniformTextureMetadata(parent: BluePrintUniformTexture, override: BluePrintUniformTexture) {
+  return {
+    ...override,
+    type: parent.type,
+    exposed: parent.exposed,
+    sRGB: parent.sRGB,
+    wrapS: parent.wrapS,
+    wrapT: parent.wrapT,
+    minFilter: parent.minFilter,
+    magFilter: parent.magFilter,
+    mipFilter: parent.mipFilter,
+    inVertexShader: parent.inVertexShader,
+    inFragmentShader: parent.inFragmentShader,
+    finalSampler: parent.finalSampler
+  };
+}
+
+function mergeUniformTextureOverride(
+  parent: BluePrintUniformTexture,
+  override: BluePrintUniformTexture,
+  runtime: Nullable<BluePrintUniformTexture>
+) {
+  const hydratedOverride = override.finalTexture
+    ? override
+    : runtime?.texture === override.texture
+      ? runtime
+      : null;
+  return inheritUniformTextureMetadata(parent, {
+    ...override,
+    finalTexture: hydratedOverride?.finalTexture ?? parent.finalTexture,
+    params: hydratedOverride?.params ?? parent.params
+  });
+}
+
 function uniformValueEquals(a: BluePrintUniformValue, b: BluePrintUniformValue) {
   if (a.type !== b.type || a.value.length !== b.value.length) {
     return false;
@@ -79,17 +113,7 @@ function uniformValueEquals(a: BluePrintUniformValue, b: BluePrintUniformValue) 
 }
 
 function uniformTextureEquals(a: BluePrintUniformTexture, b: BluePrintUniformTexture) {
-  return (
-    a.type === b.type &&
-    a.texture === b.texture &&
-    (a.exposed ?? true) === (b.exposed ?? true) &&
-    a.sRGB === b.sRGB &&
-    a.wrapS === b.wrapS &&
-    a.wrapT === b.wrapT &&
-    a.minFilter === b.minFilter &&
-    a.magFilter === b.magFilter &&
-    a.mipFilter === b.mipFilter
-  );
+  return a.type === b.type && a.texture === b.texture;
 }
 
 function valuesEqual(a: unknown, b: unknown) {
@@ -261,7 +285,10 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
           const parent = parentTextureMap.get(v.name);
           return !parent || !uniformTextureEquals(v, parent);
         })
-        .map((v) => [v.name, v])
+        .map((v) => {
+          const parent = parentTextureMap.get(v.name);
+          return [v.name, parent ? inheritUniformTextureMetadata(parent, v) : v] as const;
+        })
     );
     this.syncInheritedUniforms();
   }
@@ -276,12 +303,17 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
   }
 
   getOverrideUniformTextures() {
-    return [...this._overrideUniformTextures.values()].map((v) => ({
-      ...v,
-      params: cloneTextureParams(v.params),
-      finalTexture: undefined,
-      finalSampler: undefined
-    }));
+    const parentTextureMap = new Map((this._parentMaterial?.uniformTextures ?? []).map((v) => [v.name, v]));
+    return [...this._overrideUniformTextures.values()].map((v) => {
+      const parent = parentTextureMap.get(v.name);
+      const normalized = parent ? inheritUniformTextureMetadata(parent, v) : v;
+      return {
+        ...normalized,
+        params: cloneTextureParams(normalized.params),
+        finalTexture: undefined,
+        finalSampler: undefined
+      };
+    });
   }
 
   getDiscardedOverridesForParent(
@@ -508,13 +540,12 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
           : v;
       }
     );
-    this.uniformTextures = cloneUniformTextures(parentMaterial.uniformTextures).map(
-      (v) =>
-        mergeHydratedUniformTexture(
-          this._overrideUniformTextures.get(v.name) ?? v,
-          this._overrideUniformTextures.get(v.name) ?? runtimeTextureMap.get(v.name) ?? null
-        )
-    );
+    this.uniformTextures = cloneUniformTextures(parentMaterial.uniformTextures).map((v) => {
+      const override = this._overrideUniformTextures.get(v.name);
+      return override
+        ? mergeUniformTextureOverride(v, override, runtimeTextureMap.get(v.name) ?? null)
+        : mergeHydratedUniformTexture(v, runtimeTextureMap.get(v.name) ?? null);
+    });
   }
 
   protected override onDispose() {

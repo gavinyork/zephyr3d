@@ -379,6 +379,86 @@ describe('Blueprint scalar parameter range', () => {
     expect(instance.getOverrideUniformTextures()[0].texture).toBe('/materials/override.png');
   });
 
+  test('Blueprint material instance texture overrides should inherit sampler settings from parent', () => {
+    const parentTextureRef = { id: 'parent-texture' } as any;
+    const overrideTextureRef = { id: 'override-texture' } as any;
+    const parentSampler = { id: 'parent-sampler' } as any;
+    const updatedParentSampler = { id: 'updated-parent-sampler' } as any;
+    const parent = new PBRBluePrintMaterial();
+    parent.uniformTextures = [
+      {
+        name: 'u_BaseColor',
+        type: 'tex2D',
+        texture: '/materials/base.png',
+        sRGB: true,
+        wrapS: 'repeat',
+        wrapT: 'repeat',
+        minFilter: 'linear',
+        magFilter: 'linear',
+        mipFilter: 'linear',
+        inVertexShader: false,
+        inFragmentShader: true,
+        finalTexture: new DRef(parentTextureRef),
+        finalSampler: parentSampler,
+        params: { clone: () => ({ id: 'parent-params' }) } as any
+      } as any
+    ];
+
+    const instance = new PBRBluePrintMaterialInstance(parent, '/materials/parent.zmat');
+    instance.setOverrides(
+      [],
+      [
+        {
+          name: 'u_BaseColor',
+          type: 'tex2D',
+          texture: '/materials/override.png',
+          sRGB: false,
+          wrapS: 'clamp',
+          wrapT: 'clamp',
+          minFilter: 'nearest',
+          magFilter: 'nearest',
+          mipFilter: 'nearest',
+          inVertexShader: true,
+          inFragmentShader: false,
+          finalTexture: new DRef(overrideTextureRef),
+          finalSampler: { id: 'stale-instance-sampler' } as any,
+          params: { clone: () => ({ id: 'override-params' }) } as any
+        } as any
+      ]
+    );
+
+    expect(instance.uniformTextures[0]).toMatchObject({
+      texture: '/materials/override.png',
+      sRGB: true,
+      wrapS: 'repeat',
+      wrapT: 'repeat',
+      minFilter: 'linear',
+      magFilter: 'linear',
+      mipFilter: 'linear',
+      inVertexShader: false,
+      inFragmentShader: true,
+      finalSampler: parentSampler
+    });
+    expect(instance.uniformTextures[0].finalTexture?.get()).toBe(overrideTextureRef);
+
+    parent.uniformTextures[0].wrapS = 'mirrored-repeat';
+    parent.uniformTextures[0].mipFilter = 'none';
+    parent.uniformTextures[0].finalSampler = updatedParentSampler;
+    instance.syncInheritedUniforms(parent);
+
+    expect(instance.uniformTextures[0].texture).toBe('/materials/override.png');
+    expect(instance.uniformTextures[0].wrapS).toBe('mirrored-repeat');
+    expect(instance.uniformTextures[0].mipFilter).toBe('none');
+    expect(instance.uniformTextures[0].finalSampler).toBe(updatedParentSampler);
+    expect(instance.uniformTextures[0].finalTexture?.get()).toBe(overrideTextureRef);
+    expect(instance.getOverrideUniformTextures()[0]).toMatchObject({
+      texture: '/materials/override.png',
+      wrapS: 'mirrored-repeat',
+      mipFilter: 'none',
+      finalSampler: undefined
+    });
+  });
+
   test('Blueprint material instance should preserve hydrated inherited textures after parent sync', () => {
     const hiddenParentTexture = { id: 'hidden-parent-texture' } as any;
     const visibleParentTexture = { id: 'visible-parent-texture' } as any;
