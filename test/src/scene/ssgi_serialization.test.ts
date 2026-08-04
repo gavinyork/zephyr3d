@@ -44,14 +44,14 @@ describe('SSGI configuration and serialization', () => {
       halfRes: true,
       raysPerPixel: 1,
       maxSteps: 48,
-      denoisePasses: 2
+      denoisePasses: 4
     });
     camera.ssgiQualityPreset = 'performance';
     expect(camera.ssgiResolvedSettings).toEqual({
       halfRes: true,
       raysPerPixel: 1,
       maxSteps: 24,
-      denoisePasses: 1
+      denoisePasses: 4
     });
   });
 

@@ -155,8 +155,8 @@ Use with your preferred bundler (Vite / Webpack / Rollup).
 
 The engine supports two depth conventions, selected once at load time:
 
-- **Standard-Z** (default): device depth 0 at the near plane, 1 at the far plane.
-- **Reverse-Z**: device depth 1 at the near plane, 0 at the far plane. With a floating
+- **Standard-Z**: device depth 0 at the near plane, 1 at the far plane.
+- **Reverse-Z** (default): device depth 1 at the near plane, 0 at the far plane. With a floating
   point depth buffer (`d32f` / `d32fs8`, the default on WebGPU and WebGL2) this yields a
   nearly uniform depth error distribution and greatly reduces far-distance z-fighting.
 
