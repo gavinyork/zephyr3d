@@ -102,7 +102,6 @@ export interface ShadowConfig {
   nearClip?: number;
 }
 
-// const zeroPosition = Vector3.zero();
 /**
  * The shadow map generator
  * @public

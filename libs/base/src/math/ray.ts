@@ -4,7 +4,6 @@ import type { AABB } from './aabb';
 import type { Plane } from './plane';
 import { CubeFace } from './types';
 
-// reduce GC
 const tmpV0 = new Vector3();
 const tmpV1 = new Vector3();
 const tmpV2 = new Vector3();

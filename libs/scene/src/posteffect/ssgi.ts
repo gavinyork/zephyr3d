@@ -14,23 +14,14 @@ import type { PostEffectSetupContext } from './posteffect';
 const IRRADIANCE_FORMAT = 'rgba16f' as const;
 const SURFACE_FORMAT = 'rgba16f' as const;
 const MOMENTS_FORMAT = 'rgba16f' as const;
-// Ambient occlusion is a single scalar. SSGI already requires a half float color
-// buffer for the irradiance targets, so this format is available wherever the
-// effect runs at all.
+// AO is scalar; r16f is available wherever SSGI runs.
 const AO_FORMAT = 'r16f' as const;
 const HALF_FLOAT_MAX = 65504;
-// Moments are also rgba16f, so the squared luminance must remain below
-// HALF_FLOAT_MAX. 255^2 = 65025 leaves a small rounding margin.
+// Keep squared luminance below the rgba16f range.
 const MOMENT_LUMINANCE_MAX = 255;
 
 /**
  * Screen-space diffuse global illumination.
- *
- * The effect traces diffuse irradiance, temporally accumulates it,
- * performs variance-guided cross-bilateral a-trous filtering, and publishes
- * the result as history. The next opaque light pass consumes that irradiance
- * through the material BRDF; this pass deliberately does not add irradiance
- * directly to SceneColor.
  *
  * @public
  */

@@ -1,4 +1,4 @@
-// Collision detection & response - direct port of SPCRJointDynamicsJob.cs Collision class
+// Collision routines ported from SPCRJointDynamicsJob.cs.
 
 import { Vector3 } from '@zephyr3d/base';
 import type { ColliderR, ColliderRW, PointR } from './types';
@@ -225,8 +225,6 @@ function writeNearestPointsResult(
   return out;
 }
 
-// Pushout (keep point outside collider)
-
 /**
  * Pushes a point out of a sphere collider.
  *
@@ -315,8 +313,6 @@ export function pushoutFromCapsule(
   return writeCollisionResult(out, false, point, !out);
 }
 
-// PushIn (keep point inside collider - inverse mode)
-
 /**
  * Pulls a point inside a sphere collider.
  *
@@ -399,8 +395,6 @@ export function pushInFromCapsule(
   }
   return writeCollisionResult(out, false, point, !out);
 }
-
-// Line segment vs collider detection
 
 /**
  * Performs sphere collision detection.
@@ -519,8 +513,6 @@ export function pushInCollisionDetection(
   return res;
 }
 
-// Nearest points between two line segments
-
 /**
  * Computes the nearest points between two segments.
  *
@@ -555,8 +547,6 @@ export function computeNearestPoints(
   const diff = Vector3.sub(pointOnQ, pointOnP, _nearestPointDiff);
   return writeNearestPointsResult(out, tP, tQ, pointOnP, pointOnQ, diff.magnitudeSq, !out);
 }
-
-// Surface collision (triangle-based)
 
 /**
  * Checks triangle-surface collision against a collider.
@@ -690,8 +680,6 @@ export function checkSurfaceCollision(
     !out
   );
 }
-
-// Helpers
 
 function raycast(normal: Vector3, planeDist: number, origin: Vector3, direction: Vector3): number | null {
   const vdot = Vector3.dot(direction, normal);

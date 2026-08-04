@@ -991,9 +991,7 @@ type SceneCheckpointEntry = {
   createdAt: string;
 };
 
-// Session-scoped rollback points for AI-driven edits. Snapshots live under a
-// dot-directory in the project VFS; only the newest MAX_SCENE_CHECKPOINTS are
-// kept on disk.
+// Session-scoped AI rollback points; keep only the newest checkpoints.
 const sceneCheckpoints: SceneCheckpointEntry[] = [];
 
 async function checkpointCurrentScene(editor: Editor, params: any): Promise<any> {
@@ -2270,7 +2268,6 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       }
     }
     case 'asset_clone_material': {
-      // It is not possibly modifying a builtin material, unless you clone the material
       try {
         const info = await ProjectService.getCurrentProjectInfo();
         if (!info) {
@@ -2450,7 +2447,6 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       }
     }
     case 'material_get_properties': {
-      // Get property values from a material by vfs path
       const info = await ProjectService.getCurrentProjectInfo();
       if (!info) {
         return {
@@ -2553,7 +2549,6 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       }
     }
     case 'material_set_properties': {
-      // Load material from file and modify properties and then save it
       const materialRef = new DRef<Material>();
       try {
         const info = await ProjectService.getCurrentProjectInfo();
@@ -3417,7 +3412,6 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         err: null
       };
     }
-    // project related tools
     case 'getProjectList': {
       try {
         const list = await ProjectService.listProjects();

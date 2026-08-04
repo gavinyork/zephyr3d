@@ -20,8 +20,7 @@ const project = searchParams.get('project');
 const open = searchParams.get('open') !== null;
 const remote = searchParams.get('remote') !== null;
 const previewScene = searchParams.get('scene');
-// One-shot headless capture mode (driven by `electron . --headless --screenshot ...`):
-// preview mode with a manually stepped, fixed-timestep frame loop instead of run().
+// Headless capture uses a fixed-timestep preview loop.
 const headless = searchParams.get('headless') !== null;
 const headlessFrames = Number(searchParams.get('frames')) || 64;
 const headlessFixedDtParam = searchParams.get('fixedDt');
@@ -32,10 +31,7 @@ const headlessFixedDt =
       ? Number(headlessFixedDtParam)
       : null;
 const headlessDpr = Number(searchParams.get('dpr')) > 0 ? Number(searchParams.get('dpr')) : 1;
-// During headless boot, any uncaught error (module top-level throws included,
-// e.g. a bad project id) must fail the run fast instead of hitting the main
-// process watchdog. The guards are removed once the controlled capture path
-// takes over error handling.
+// Fail fast on uncaught headless boot errors; controlled capture handles later errors.
 let headlessBootFailed = false;
 const reportHeadlessBootFailure = (err: unknown) => {
   if (headlessBootFailed) {
@@ -248,7 +244,6 @@ editorApp.ready().then(async () => {
     }
     return;
   } else {
-    // start engine
     getEngine().startup(
       previewScene ?? settings!.startupScene,
       settings!.splashScreen,

@@ -1,6 +1,5 @@
 import { ImGui } from '@zephyr3d/imgui';
 
-// LogView.ts
 type LogLevel = 'log' | 'info' | 'warn' | 'error' | 'debug' | 'trace';
 interface LogItem {
   ts: number;

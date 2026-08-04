@@ -1,4 +1,3 @@
-// worker.ts
 import type { FileEntry } from '@zip.js/zip.js';
 import { ZipWriter, BlobWriter, BlobReader, ZipReader } from '@zip.js/zip.js';
 

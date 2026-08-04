@@ -22,7 +22,6 @@ export type GrassInstanceInfo = {
   /** Rotation angle of the blade */
   angle: number;
 };
-// Two floats
 const INSTANCE_BYTES = 4 * 4;
 
 /**

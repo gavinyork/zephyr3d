@@ -145,7 +145,6 @@ const MASK_WEBGPU = 1 << 2;
 const MASK_WEBGL = MASK_WEBGL1 | MASK_WEBGL2;
 const MASK_ALL = MASK_WEBGL | MASK_WEBGPU;
 
-// scalar-vector mixed overloads of f16 type for binary operators (WebGPU only)
 function genTypeF16ScalarVec(name: string) {
   return [
     ...genType(name, MASK_WEBGPU, typeinfo.typeF16Vec2, [typeinfo.typeF16, typeinfo.typeF16Vec2]),

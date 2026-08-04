@@ -1,4 +1,4 @@
-// High-level orchestrator - SPCRJointDynamicsController API
+// High-level SPCR joint-dynamics controller.
 
 import {
   EPSILON,
@@ -271,11 +271,9 @@ export class JointDynamicsSystemController {
     this._colliderTransforms = colliders.map((c) => c.transform);
     this._grabberTransforms = grabbers.map((g) => g.transform);
 
-    // Build constraints
     this._rebuildConstraints();
     this._baseConstraintLengths = this._constraints.map((constraint) => constraint.length);
 
-    // Flatten bone hierarchy to point list, build parent map
     const allPoints: BoneNode[] = [];
     const visitedPoints = new Set<number>();
     this._parentMap = new Map<number, number>(); // child index -> parent index
@@ -298,19 +296,16 @@ export class JointDynamicsSystemController {
     this._allPoints = allPoints;
     this._maxPointDepth = allPoints.length > 0 ? Math.max(...allPoints.map((p) => p.depth)) : 0;
 
-    // Compute boneAxis from transforms: local-space direction to first child
-    // This is critical for correct bone rotation in skinned meshes
+    // Derive each missing bone axis in parent-local space for skinning.
     for (const p of allPoints) {
       if (!p.boneAxis && p.children.length > 0) {
         const childPos = pointTransforms[p.children[0].index].getWorldPosition();
         const parentPos = pointTransforms[p.index].getWorldPosition();
-        // InverseTransformPoint: convert child world pos to parent local space
         const parentRot = pointTransforms[p.index].getWorldRotation();
         const parentScale = pointTransforms[p.index].getLocalScale();
         const diff = Vector3.sub(childPos, parentPos);
         const invRot = Quaternion.inverse(parentRot);
         const localDir = invRot.transform(diff);
-        // Apply inverse scale
         const unscaled = new Vector3(
           parentScale.x !== 0 ? localDir.x / parentScale.x : 0,
           parentScale.y !== 0 ? localDir.y / parentScale.y : 0,
@@ -320,20 +315,17 @@ export class JointDynamicsSystemController {
       }
     }
 
-    // Build PointR/RW arrays
     this._pointsR = allPoints.map((p) => this._createPointR(p));
     this._basePointParentLengths = this._pointsR.map((point) => point.parentLength);
     this._pointsRW = allPoints.map(() => this._createPointRW());
     this._positionsToTransform = new Array(allPoints.length).fill(Vector3.zero());
     this._clearOutputTransformCache();
 
-    // Initialize colliders
     this._collidersR = colliders.map((c) => c.r);
     this._collidersRW = colliders.map((c) => this._createColliderRW(c.transform));
     this._colliderHandleIds = this._collidersR.map(() => this._nextColliderHandleId++);
     this._rebuildColliderHandleMap();
 
-    // Initialize grabbers
     this._grabbersR = grabbers.map((g) => g.r);
     this._grabbersRW = grabbers.map((g) => ({
       enabled: g.enabled ? 1 : 0,
@@ -342,7 +334,6 @@ export class JointDynamicsSystemController {
     this._grabberHandleIds = this._grabbersR.map(() => this._nextGrabberHandleId++);
     this._rebuildGrabberHandleMap();
 
-    // Flat planes
     this._flatPlanes = flatPlanes.map((fp) => ({
       normal: Vector3.normalize(fp.up),
       distance: -Vector3.dot(Vector3.normalize(fp.up), fp.position)
@@ -352,7 +343,6 @@ export class JointDynamicsSystemController {
     this._flatPlaneHandleIds = this._flatPlaneAll.map(() => this._nextFlatPlaneHandleId++);
     this._rebuildFlatPlaneHandleMap();
 
-    // Capture initial state
     this._previousRootPosition = rootTransform.getWorldPosition();
     this._previousRootRotation = rootTransform.getWorldRotation();
 
@@ -384,7 +374,6 @@ export class JointDynamicsSystemController {
       return;
     }
 
-    // Update fade
     if (this._fadeState !== 'none') {
       this._fadeTimer += deltaTime;
       if (this._fadeTimer >= this._fadeDuration) {
@@ -398,7 +387,6 @@ export class JointDynamicsSystemController {
     const rootSlideLimit =
       this._config.rootSlideLimit < 0 ? -1 : this._config.rootSlideLimit * this._currentSystemScale;
 
-    // Capture current transforms
     const rootPos = this._rootTransform.getWorldPosition();
     const rootRot = this._rootTransform.getWorldRotation();
 
@@ -427,7 +415,6 @@ export class JointDynamicsSystemController {
       this._grabbersRW[i].position = this._grabberTransforms[i].getWorldPosition();
     }
 
-    // Run simulation
     const params: SimulationParams = {
       isPaused: this._isPaused,
       stepTime: deltaTime,
@@ -468,12 +455,10 @@ export class JointDynamicsSystemController {
     this._positionsToTransform = result.positionsToTransform;
     this._fakeWaveCounter = result.fakeWaveCounter;
 
-    // Angle limits
     if (this._config.angleLimitConfig.angleLimit >= 0) {
       applyAngleLimits(this._pointsR, this._pointsRW, this._config.angleLimitConfig);
     }
 
-    // Apply results
     const transformRots = this._pointTransforms.map((t) => t.getWorldRotation());
     const transformLocalRots = inputLocalRotations;
     const sceneParentRots = this._pointTransforms.map((t) => this._getSceneParentWorldRotation(t));
@@ -1308,16 +1293,13 @@ export class JointDynamicsSystemController {
     const parentIdx = this._parentMap.get(node.index) ?? -1;
     const childIdx = node.children.length > 0 ? node.children[0].index : -1;
 
-    // Capture initial local transform for rotation blending
     const t = this._pointTransforms[node.index];
     const initLocalPos = t.getLocalPosition();
     const initLocalRot = t.getLocalRotation();
     const initLocalScale = t.getLocalScale();
 
-    // BoneAxis: local-space direction to first child (computed in initialize)
     const boneAxis = node.boneAxis ?? new Vector3(0, -1, 0);
 
-    // ParentLength: distance to parent
     let parentLength = 0;
     if (parentIdx !== -1) {
       const pPos = this._pointTransforms[parentIdx].getWorldPosition();

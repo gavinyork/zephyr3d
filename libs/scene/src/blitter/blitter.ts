@@ -18,7 +18,7 @@ import { Primitive } from '../render/primitive';
 import { linearToGamma } from '../shaders/misc';
 import { getDevice } from '../app/api';
 
-// TODO: multi-pass support for filter
+// TODO: support multi-pass filters.
 
 /**
  * Blit type

@@ -92,8 +92,6 @@ export const QUEUE_OPAQUE = 1;
  */
 export const QUEUE_TRANSPARENT = 2;
 
-// Morph target attributes
-
 /** @public */
 export const MORPH_TARGET_POSITION = 0;
 /** @public */

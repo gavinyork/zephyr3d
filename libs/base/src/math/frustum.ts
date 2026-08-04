@@ -4,12 +4,10 @@ import { BoxSide } from './types';
 import { REVERSE_Z } from '../zconvention';
 import type { Immutable } from '../utils';
 
-// NDC z of the near/far plane in the active clip space convention:
-// GL [-1,1] under standard-Z, reverse ZO [0,1] (near -> 1) under reverse-Z.
+// Near/far NDC z values for the active depth convention.
 const NDC_NEAR_Z = REVERSE_Z ? 1 : -1;
 const NDC_FAR_Z = REVERSE_Z ? 0 : 1;
 
-// Corner order matches the Frustum.CORNER_* bit layout: bit0 = near/far.
 const nnn = [-1, -1, NDC_NEAR_Z];
 const nnp = [-1, -1, NDC_FAR_Z];
 const npn = [-1, 1, NDC_NEAR_Z];

@@ -85,8 +85,6 @@ export type DiffOpArr = { kind: 'arr'; path: DiffPath; ops: (DiffArrIns | DiffAr
  */
 export type DiffPatch = (DiffOpSet | DiffOpDel | DiffOpArr)[];
 
-// ---------- Utils ----------
-
 function isObject(x: any): x is DiffObject {
   return x !== null && typeof x === 'object' && !Array.isArray(x);
 }
@@ -112,8 +110,6 @@ function cloneDeep<T extends DiffValue>(v: T): T {
   }
   return v;
 }
-
-// ---------- Diff ----------
 
 /**
  * Compute a patch that transforms `base` into `target`.
@@ -188,7 +184,6 @@ function diffArray(baseArr: DiffArray, targetArr: DiffArray, path: DiffPath, out
   const ops: (DiffArrIns | DiffArrDel | DiffArrSet)[] = [];
   const minLen = Math.min(baseArr.length, targetArr.length);
 
-  // sort prefix
   for (let i = 0; i < minLen; i++) {
     const b = baseArr[i];
     const t = targetArr[i];
@@ -235,8 +230,6 @@ function diffArray(baseArr: DiffArray, targetArr: DiffArray, path: DiffPath, out
     out.push({ kind: 'arr', path, ops });
   }
 }
-
-// ---------- Apply ----------
 
 function getAt(root: any, path: DiffPath) {
   let cur = root;

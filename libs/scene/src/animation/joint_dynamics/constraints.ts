@@ -1,4 +1,4 @@
-// Constraint creation utilities — port of SPCRJointDynamicsController constraint building
+// Constraint builders ported from SPCRJointDynamicsController.
 
 import { Vector3 } from '@zephyr3d/base';
 import { ConstraintType, type Constraint, type BoneNode } from './types';
@@ -46,8 +46,6 @@ function constraintLength(a: BoneNode, b: BoneNode): number {
   return Vector3.distance(a.position, b.position);
 }
 
-// ── Structural Vertical: parent→child chains ──
-
 function createStructuralVertical(node: BoneNode, out: RawConstraint[]) {
   for (const child of node.children) {
     out.push({
@@ -59,8 +57,6 @@ function createStructuralVertical(node: BoneNode, out: RawConstraint[]) {
     createStructuralVertical(child, out);
   }
 }
-
-// ── Structural Horizontal: same-depth siblings across chains ──
 
 function createHorizontal(
   a: BoneNode | null,
@@ -99,8 +95,6 @@ function createHorizontal(
   }
 }
 
-// ── Shear: diagonal cross-bracing ──
-
 function createShear(a: BoneNode | null, b: BoneNode | null, out: RawConstraint[]) {
   if (!a || !b || a === b) {
     return;
@@ -135,8 +129,6 @@ function createShear(a: BoneNode | null, b: BoneNode | null, out: RawConstraint[
   createShear(cA, cB, out);
 }
 
-// ── Bending Vertical: skip-one (grandparent→grandchild) ──
-
 function createBendingVertical(node: BoneNode, out: RawConstraint[]) {
   if (node.children.length !== 1) {
     return;
@@ -155,8 +147,6 @@ function createBendingVertical(node: BoneNode, out: RawConstraint[]) {
   });
   createBendingVertical(childA, out);
 }
-
-// ── Constraint grouping (no shared point indices per group) ──
 
 function findSameIndex(group: Constraint[], c: Constraint): boolean {
   for (const g of group) {
@@ -177,8 +167,6 @@ function pushToGroups(groups: Constraint[][], c: Constraint) {
   groups.push([c]);
 }
 
-// ── Surface faces (quads → 2 triangles of 3 indices) ──
-
 function createSurfaceFaces(a: BoneNode | null, b: BoneNode | null, out: number[]) {
   if (!a || !b || a === b) {
     return;
@@ -192,14 +180,12 @@ function createSurfaceFaces(a: BoneNode | null, b: BoneNode | null, out: number[
       cA.useForSurfaceCollision !== false &&
       cB.useForSurfaceCollision !== false
     ) {
-      // Quad ABCD → triangles ABC, CDA
+      // Quad ABCD becomes triangles ABC and CDA.
       out.push(a.index, b.index, cB.index, cB.index, cA.index, a.index);
     }
     createSurfaceFaces(cA, cB, out);
   }
 }
-
-// ── Public API ──
 
 /**
  * Builds solver constraints from the supplied root chains.
@@ -223,7 +209,6 @@ export function buildConstraints(rootPoints: BoneNode[], options: ConstraintBuil
     }
   };
 
-  // Bending Horizontal
   if (options.bendingHorizontal) {
     const raw: RawConstraint[] = [];
     const pairs = options.isLoop
@@ -235,7 +220,6 @@ export function buildConstraints(rootPoints: BoneNode[], options: ConstraintBuil
     addRaw(raw, false);
   }
 
-  // Bending Vertical
   if (options.bendingVertical) {
     const raw: RawConstraint[] = [];
     for (const root of rootPoints) {
@@ -244,7 +228,6 @@ export function buildConstraints(rootPoints: BoneNode[], options: ConstraintBuil
     addRaw(raw, false);
   }
 
-  // Shear
   if (options.shear) {
     const raw: RawConstraint[] = [];
     const pairs = options.isLoop
@@ -256,7 +239,6 @@ export function buildConstraints(rootPoints: BoneNode[], options: ConstraintBuil
     addRaw(raw, options.enableSurfaceCollision || options.collideShear);
   }
 
-  // Structural Horizontal
   if (options.structuralHorizontal) {
     const raw: RawConstraint[] = [];
     const pairs = options.isLoop
@@ -268,7 +250,6 @@ export function buildConstraints(rootPoints: BoneNode[], options: ConstraintBuil
     addRaw(raw, options.enableSurfaceCollision || options.collideStructuralHorizontal);
   }
 
-  // Structural Vertical
   if (options.structuralVertical) {
     const raw: RawConstraint[] = [];
     for (const root of rootPoints) {
@@ -277,7 +258,6 @@ export function buildConstraints(rootPoints: BoneNode[], options: ConstraintBuil
     addRaw(raw, options.enableSurfaceCollision || options.collideStructuralVertical);
   }
 
-  // Flatten groups into single array
   return groups.flat();
 }
 
@@ -371,8 +351,6 @@ export function sortRootPointsByProximity(
   return sorted;
 }
 
-// ── Helpers ──
-
 function distXYZ(a: Vector3, b: Vector3, ignoreY: boolean): number {
   const dx = a.x - b.x,
     dz = a.z - b.z;
@@ -380,7 +358,6 @@ function distXYZ(a: Vector3, b: Vector3, ignoreY: boolean): number {
   return dx * dx + dy * dy + dz * dz;
 }
 
-// Walk all nodes to find if a given index is fixed
 function isBoneFixed(roots: BoneNode[], index: number): boolean {
   function find(node: BoneNode): boolean {
     if (node.index === index) {

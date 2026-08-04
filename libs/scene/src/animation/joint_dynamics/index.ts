@@ -1,5 +1,3 @@
-// Public API barrel export
-
 export * from './types';
 export * from './collision';
 export * from './solver';

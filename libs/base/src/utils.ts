@@ -202,40 +202,30 @@ type HasFunctionProperty<T> = T extends object
   : false;
 
 /**
- * Deep Partial
+ * Recursively makes properties optional.
  *
  * @typeParam T - The target type to make partially optional.
  * @typeParam Depth - The maximum recursion depth. Defaults to `5`.
  *
  * @public
  */
-export type DeepPartial<T, Depth extends number = 5> =
-  // Depth limitation reached
-  Depth extends 0
+export type DeepPartial<T, Depth extends number = 5> = Depth extends 0
+  ? T
+  : T extends Builtin
     ? T
-    : // builtin / leaf types
-      T extends Builtin
-      ? T
-      : // array
-        T extends Array<infer U>
-        ? Array<DeepPartial<U, Decrement<Depth>>>
-        : // readonly array
-          T extends ReadonlyArray<infer U>
-          ? ReadonlyArray<DeepPartial<U, Decrement<Depth>>>
-          : // class instance-like objects are preserved to avoid turning methods into optional members
-            HasFunctionProperty<T> extends true
-            ? T
-            : // plain object
-              T extends object
-              ? {
-                  [K in keyof T]?: T[K] extends (...args: any[]) => any
-                    ? T[K]
-                    : DeepPartial<T[K], Decrement<Depth>>;
-                }
-              : // primitive
-                T;
-
-//type X = DeepPartial<{ m: URL }>;
+    : T extends Array<infer U>
+      ? Array<DeepPartial<U, Decrement<Depth>>>
+      : T extends ReadonlyArray<infer U>
+        ? ReadonlyArray<DeepPartial<U, Decrement<Depth>>>
+        : HasFunctionProperty<T> extends true
+          ? T
+          : T extends object
+            ? {
+                [K in keyof T]?: T[K] extends (...args: any[]) => any
+                  ? T[K]
+                  : DeepPartial<T[K], Decrement<Depth>>;
+              }
+            : T;
 
 /**
  * Make optional properties as required
@@ -532,7 +522,6 @@ export function splitStringByGraphemes(text: string): string[] {
     let grapheme = '';
     const codePoint = text.codePointAt(i)!;
 
-    // Add primary character
     if (codePoint >= 0x10000) {
       grapheme += text.slice(i, i + 2);
       i += 2;
@@ -541,7 +530,6 @@ export function splitStringByGraphemes(text: string): string[] {
       i += 1;
     }
 
-    // Add modifiers
     while (i < text.length && isModifier(text.codePointAt(i)!)) {
       const modifierCodePoint = text.codePointAt(i)!;
       if (modifierCodePoint >= 0x10000) {
@@ -713,7 +701,7 @@ export function parseColor(input: string) {
   if (!v || Number.isNaN(v.r) || Number.isNaN(v.g) || Number.isNaN(v.b) || Number.isNaN(v.a)) {
     throw new Error(`parseColor(): invalid color '${input}'`);
   }
-  // the RGB color values in CSS are in sRGB color space, convert them to linear color space
+  // CSS RGB values are sRGB; convert them to linear space.
   v.r = Math.pow(Math.min(1, v.r), 2.2);
   v.g = Math.pow(Math.min(1, v.g), 2.2);
   v.b = Math.pow(Math.min(1, v.b), 2.2);
@@ -776,16 +764,7 @@ interface FormatToken {
   explicitIndex?: number; // n$ style index (1-based)
 }
 
-// Capture groups:
-//  1: i$           -> explicit value index for the whole conversion
-//  2: flagsStr
-//  3: starWidth    -> '*' width specifier
-//  4: widthIndex$  -> explicit width index, e.g. the 3 in `*3$`
-//  5: widthNum     -> numeric width, e.g. `10`
-//  6: starPrec     -> '*' precision specifier
-//  7: precIndex$   -> explicit precision index, e.g. the 4 in `*4$`
-//  8: precNum      -> numeric precision, e.g. `.2`
-//  9: type
+// Captures value index, flags, width, precision, and type.
 const formatRegex =
   /%(?:(\d+)\$)?([-+ 0#]*)(?:(\*)(?:(\d+)\$)?|(\d+))?(?:\.(?:(\*)(?:(\d+)\$)?|(\d+)))?([%sdifuoxXc])/g;
 
@@ -887,7 +866,6 @@ export function formatString(format: string, ...args: SprintfArg[]) {
         token.explicitIndex = parseInt(i$, 10);
       }
 
-      // flags
       for (const ch of flagsStr || '') {
         switch (ch) {
           case '-':
@@ -908,7 +886,6 @@ export function formatString(format: string, ...args: SprintfArg[]) {
         }
       }
 
-      // width
       if (starWidth) {
         token.widthFromArg = true;
         if (widthIndex$) {
@@ -918,7 +895,6 @@ export function formatString(format: string, ...args: SprintfArg[]) {
         token.width = parseInt(widthNum, 10);
       }
 
-      // precision
       if (starPrec) {
         token.precisionFromArg = true;
         if (precIndex$) {
@@ -931,7 +907,6 @@ export function formatString(format: string, ...args: SprintfArg[]) {
       const render = (): string => {
         const readIndex = (idx?: number): SprintfArg => readArg(idx);
 
-        // read * parameter of width/precision
         if (token.widthFromArg) {
           const wArg = readIndex(token.widthIndex ?? token.explicitIndex);
           token.width = parseNumber(wArg, 'width');
@@ -947,7 +922,6 @@ export function formatString(format: string, ...args: SprintfArg[]) {
         const t = token.type;
 
         if (t === '%') {
-          // literal %
           return '%';
         }
 
@@ -995,7 +969,6 @@ export function formatString(format: string, ...args: SprintfArg[]) {
           case 's': {
             body = String(raw ?? '');
             if (token.precision != null) {
-              // precision: max length
               body = body.slice(0, token.precision);
             }
             break;

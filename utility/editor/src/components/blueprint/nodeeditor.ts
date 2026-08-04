@@ -63,7 +63,6 @@ interface LinkControlPointSelectionInfo extends LinkControlPointInfo {
   key: string;
 }
 
-// Traversal Result
 interface TraversalResult {
   order: number[];
   levels: number[][];
@@ -222,7 +221,6 @@ export class NodeEditor extends Observable<{
     }
   }
 
-  // Rebuild graph structure
   private rebuildGraphStructure() {
     if (!this.structureDirty) {
       return;
@@ -231,13 +229,11 @@ export class NodeEditor extends Observable<{
     this.graphStructure.outgoing = {};
     this.graphStructure.incoming = {};
 
-    // Initialize adjacency lists
     for (const nodeId of this.nodes.keys()) {
       this.graphStructure.outgoing[nodeId] = [];
       this.graphStructure.incoming[nodeId] = [];
     }
 
-    // Fill with links
     for (const link of this.links) {
       const outConnection: NodeConnection = {
         targetNodeId: link.endNodeId,
@@ -258,11 +254,9 @@ export class NodeEditor extends Observable<{
     this.structureDirty = false;
   }
 
-  // Test for cycling links
   private wouldCreateCycle(startNodeId: number, endNodeId: number): boolean {
     this.rebuildGraphStructure();
 
-    // Check if startNodeId can be reached from endNodeId by using DFS
     const visited = new Set<number>();
     const stack = [endNodeId];
 
@@ -270,7 +264,7 @@ export class NodeEditor extends Observable<{
       const currentId = stack.pop()!;
 
       if (currentId === startNodeId) {
-        return true; // cycle found
+        return true;
       }
 
       if (visited.has(currentId)) {
@@ -278,7 +272,6 @@ export class NodeEditor extends Observable<{
       }
       visited.add(currentId);
 
-      // Add successors to stack
       const outgoing = this.graphStructure.outgoing[currentId] || [];
       for (const conn of outgoing) {
         if (!visited.has(conn.targetNodeId)) {
@@ -330,7 +323,7 @@ export class NodeEditor extends Observable<{
       const u = q.shift()!;
       const ins = this.graphStructure.incoming[u] || [];
       for (const conn of ins) {
-        const v = conn.targetNodeId; // 前驱
+        const v = conn.targetNodeId;
         if (!reachable.has(v)) {
           reachable.add(v);
           q.push(v);
@@ -373,9 +366,7 @@ export class NodeEditor extends Observable<{
   public async loadState(state: NodeEditorState) {
     const emit = this.emitChange;
     this.emitChange = false;
-    // clear
     this.clear(true);
-    // load nodes
     let maxId = 0;
     for (const node of state.nodes) {
       const impl = await getEngine().resourceManager.deserializeObject<IGraphNode>(null, node.node);
@@ -397,24 +388,19 @@ export class NodeEditor extends Observable<{
       }
     }
     this.nodeId = maxId + 1;
-    // load links
     for (const link of state.links) {
       this.addLink(link.startNodeId, link.startSlotId, link.endNodeId, link.endSlotId, link.reroutePoints);
     }
-    // apply canvas states
     this.canvasOffset.x = state.canvasOffset ? state.canvasOffset[0] : 0;
     this.canvasOffset.y = state.canvasOffset ? state.canvasOffset[1] : 0;
     this.canvasScale = state.canvasScale ?? 1;
-    //
     this.emitChange = emit;
     this.invalidateStructure();
   }
   public clear(force: boolean): boolean {
     let changed = false;
     if (this.nodes.size > 0) {
-      // clear interaction states
       this.clearInteractionState();
-      // clear nodes
       const nodes = [...this.nodes.values()];
       for (const node of nodes) {
         changed ||= this.deleteNode(node.id, force);

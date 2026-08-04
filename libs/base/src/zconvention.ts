@@ -1,43 +1,29 @@
 /// <reference path="./zconvention.env.d.ts" />
 
 /**
- * Depth (Z) convention of the engine.
- *
- * The engine supports two depth conventions selected at load time:
+ * Engine depth convention selected at load time.
  *
  * - Standard-Z: device depth 0 at the near plane, 1 at the far plane.
- * - Reverse-Z (default): device depth 1 at the near plane, 0 at the far plane. With a
- *   floating point depth buffer this yields a nearly uniform depth error
- *   distribution and greatly reduces far-distance z-fighting.
+ * - Reverse-Z (default): device depth 1 at the near plane, 0 at the far plane,
+ *   improving floating-point precision at long distances.
  *
- * Selection precedence:
- *
- * 1. Build-time define: bundlers may replace the bare identifier
- *    `__ZEPHYR3D_REVERSE_Z__` with a boolean literal so the unused code path
- *    can be eliminated by the minifier.
- * 2. Runtime global: `globalThis.__ZEPHYR3D_REVERSE_Z__`, which must be set
- *    before the first import of any `@zephyr3d/*` module.
+ * Selection order:
+ * 1. Build-time `__ZEPHYR3D_REVERSE_Z__` define.
+ * 2. `globalThis.__ZEPHYR3D_REVERSE_Z__`, set before importing engine modules.
  * 3. Default: Reverse-Z.
  *
- * The convention is fixed for the lifetime of the process. All engine code
- * must consume the derived constants below instead of hard-coding depth
- * values or comparison directions.
- *
- * The two conventions are related by the exact invariant
- * `standardDepth + reverseDepth === 1` for the same eye-space position.
+ * The convention is process-wide and immutable. For the same eye-space position,
+ * `standardDepth + reverseDepth === 1`.
  */
 
 function resolveReverseZ(): boolean {
-  // 1) Build-time define injected by the application bundler
   if (typeof __ZEPHYR3D_REVERSE_Z__ !== 'undefined') {
     return !!__ZEPHYR3D_REVERSE_Z__;
   }
-  // 2) Runtime global fallback (must be set before engine modules load)
   const g = globalThis as Record<string, unknown>;
   if (typeof g.__ZEPHYR3D_REVERSE_Z__ !== 'undefined') {
     return !!g.__ZEPHYR3D_REVERSE_Z__;
   }
-  // 3) Default: Reverse-Z
   return true;
 }
 

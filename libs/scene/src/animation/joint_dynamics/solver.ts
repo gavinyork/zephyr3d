@@ -1,4 +1,4 @@
-// Core physics simulation - direct port of JobExecuteSimulation from SPCRJointDynamicsJob.cs
+// Core simulation ported from JobExecuteSimulation in SPCRJointDynamicsJob.cs.
 
 import {
   Quaternion,
@@ -122,7 +122,6 @@ export function simulate(
 
   let fakeWaveFreq = params.fakeWaveCounter;
 
-  // Root slide offset
   let rootSlideOffset = Vector3.zero();
   const rootDeltaSlide = Vector3.sub(params.rootPosition, params.previousRootPosition);
   const rootDeltaSlideLen = rootDeltaSlide.magnitude;
@@ -133,7 +132,6 @@ export function simulate(
     );
   }
 
-  // Root rotation offset
   let rootRotationOffset = Quaternion.identity();
   const rootDeltaRot = Quaternion.multiply(
     params.rootRotation,
@@ -145,7 +143,7 @@ export function simulate(
   }
 
   if (params.rootRotateLimit >= 0 && Math.abs(rotateAngle) > params.rootRotateLimit) {
-    // Extract the rotation axis from the delta quaternion
+    // Extract the rotation axis from the delta quaternion.
     const sinHalf = Math.sqrt(Math.max(0, 1 - rootDeltaRot.w * rootDeltaRot.w));
     let rotateAxis: Vector3;
     if (sinHalf > 0.0001) {
@@ -195,15 +193,7 @@ export function simulate(
         surfaceCollision(pointsRW, collidersR, collidersRW, params.surfaceConstraints);
       }
 
-      // Push fixed points out of colliders before constraint solving.
-      // Fixed points follow animation and cannot be moved by the solver, but if
-      // their animated position is inside a collider, the distance constraint will
-      // pull free children inward through the surface �?causing the characteristic
-      // "hair flipping outward" artifact at the back of the head.
-      // By temporarily clamping fixed-point positionCurrent to the collider surface
-      // before each substep's constraint pass, we ensure constraints operate from
-      // a geometrically valid anchor.  The original animated position is restored
-      // at the start of the next substep via positionCurrentTransform.
+      // Clamp animated fixed points before solving to avoid pulling children through colliders.
       fixedPointColliderPushout(pointsR, pointsRW, collidersR, collidersRW);
 
       for (let iRelax = params.relaxation - 1; iRelax >= 0; --iRelax) {
@@ -218,11 +208,7 @@ export function simulate(
         );
       }
 
-      // After all constraint/collision iterations are done, cancel any residual
-      // normal velocity that would push points back into colliders next frame.
-      // We compare the final positionCurrent (guaranteed outside all colliders)
-      // against positionPrevious (the Verlet integration start point) and zero
-      // out the component pointing into each collider.
+      // Remove inward normal velocity left by collision resolution.
       postCollisionVelocityFix(pointsR, pointsRW, collidersR, collidersRW);
     }
 
@@ -263,8 +249,7 @@ function colliderUpdate(collidersR: readonly ColliderR[], collidersRW: ColliderR
   for (let i = 0; i < collidersR.length; i++) {
     const colR = collidersR[i];
     const colRW = collidersRW[i];
-    // Scale radius by the uniform world scale of the collider node.
-    // Use the average of x/y/z components to handle non-uniform scale gracefully.
+    // Approximate non-uniform scale with its component average.
     const ws = colRW.worldScale;
     const worldScaleUniform = (ws.x + ws.y + ws.z) / 3;
     colRW.radius = colR.radius * worldScaleUniform;
@@ -285,7 +270,6 @@ function colliderUpdate(collidersR: readonly ColliderR[], collidersRW: ColliderR
       colRW.boundsRadius = colRW.radius;
     }
 
-    // Update local bounds
     Vector3.scale(VEC3_ONE, colR.radius, corner);
     colRW.worldToLocal.transformPointAffine(colRW.positionCurrent, center);
     Vector3.sub(center, corner, colRW.localBoundsMin);
@@ -343,8 +327,6 @@ function segmentMayCollideBroadPhase(point1: Vector3, point2: Vector3, colRW: Co
   const delta = Vector3.sub(colRW.boundsCenter, closestPoint, _broadPhaseDelta);
   return delta.magnitudeSq <= colRW.boundsRadius * colRW.boundsRadius;
 }
-
-// Core physics simulation - direct port of JobExecuteSimulation from SPCRJointDynamicsJob.cs
 
 function pointUpdatePass1(
   pointsR: readonly PointR[],
@@ -408,10 +390,7 @@ function pointUpdatePass1(
         Vector3.add(ptR.gravity, extForce, extForce);
         Vector3.scale(extForce, stepTime_x2_half, extForce);
 
-        // Clamp the per-step force displacement to half the bone's rest length.
-        // Without this, large gravity values (e.g. -50 in world space) produce a
-        // per-step displacement comparable to the bone spacing, which exceeds what
-        // the constraint relaxation can correct in one pass and causes surface jitter.
+        // Limit force displacement to keep constraint relaxation stable.
         if (ptR.parentLength > EPSILON) {
           const maxForceDisp = ptR.parentLength * 0.5;
           const forceDispSq = extForce.magnitudeSq;
@@ -420,17 +399,11 @@ function pointUpdatePass1(
           }
         }
 
-        // Apply resistance (damping) only to the velocity term, not to external forces.
-        // Applying resistance to gravity would incorrectly attenuate acceleration each frame,
-        // causing energy errors and instability under high gravity.
+        // Damping applies to velocity, not external forces.
         Vector3.scale(moveDir, ptR.resistance, moveDir);
         Vector3.scale(moveDir, 1.0 - clamp01(ptRW.friction * ptR.frictionScale), moveDir);
 
-        // Clamp per-step velocity to a multiple of bone rest length.
-        // During fast root rotations the Verlet velocity can become very large,
-        // overwhelming the constraint solver and causing the hair to lose shape.
-        // Limiting velocity keeps the simulation stable regardless of how fast
-        // the root moves, while still allowing natural large-amplitude swings.
+        // Limit velocity so fast root motion cannot destabilize constraints.
         if (ptR.parentLength > EPSILON) {
           const maxVelDisp = ptR.parentLength * 2.0;
           const velDispSq = moveDir.magnitudeSq;
@@ -447,19 +420,15 @@ function pointUpdatePass1(
       ptRW.friction = 0;
 
       if (!isPaused) {
-        // Hardness restore
         if (ptR.hardness > 0) {
           Vector3.sub(currentTransformPos, ptRW.positionCurrent, restore);
           Vector3.scale(restore, ptR.hardness, restore);
           Vector3.add(ptRW.positionCurrent, restore, ptRW.positionCurrent);
         }
-        // Force fade ratio
         if (ptR.forceFadeRatio > 0) {
           Vector3.lerp(ptRW.positionCurrent, currentTransformPos, ptR.forceFadeRatio, ptRW.positionCurrent);
         }
-        // Push out of colliders immediately after hardness/fade pulls the point
-        // toward the animated position (which may be inside a collider).
-        // This prevents the hardness↔collision tug-of-war that causes jitter.
+        // Reapply collision after hardness/fade to avoid interpenetration jitter.
         for (let ci = 0; ci < collidersR.length; ci++) {
           const colRci = collidersR[ci];
           const colRWci = collidersRW[ci];
@@ -479,7 +448,6 @@ function pointUpdatePass1(
             ptRW.positionCurrent.set(hRes.point);
           }
         }
-        // Grabber
         if (ptRW.grabberIndex !== -1) {
           const grR = grabbersR[ptRW.grabberIndex];
           const grRW = grabbersRW[ptRW.grabberIndex];
@@ -512,7 +480,6 @@ function pointUpdatePass1(
             ptRW.grabberDistance = Math.sqrt(sqrNearRange) / 2.0;
           }
         }
-        // Movable limit
         if (ptR.movableLimitIndex !== -1) {
           const target = movableLimitTargets[ptR.movableLimitIndex];
           const move = Vector3.sub(ptRW.positionCurrent, target, tempVec0);
@@ -524,7 +491,6 @@ function pointUpdatePass1(
         }
       }
 
-      // Flat plane collision
       for (let i = 0; i < flatPlanes.length; i++) {
         const fp = flatPlanes[i];
         const dist = Vector3.dot(fp.normal, ptRW.positionCurrent) + fp.distance;
@@ -537,8 +503,6 @@ function pointUpdatePass1(
     }
   }
 }
-
-// Core physics simulation - direct port of JobExecuteSimulation from SPCRJointDynamicsJob.cs
 
 function surfaceCollision(
   pointsRW: PointRW[],
@@ -848,7 +812,6 @@ function constraintUpdate(
       Vector3.sub(rwB.positionCurrent, scaledDisp, rwB.positionCurrent);
     }
 
-    // Per-constraint collision
     if (c.isCollision !== 0) {
       let friction = 0;
       for (let i = 0; i < collidersR.length; i++) {
@@ -961,7 +924,6 @@ function constraintUpdate(
           }
         }
 
-        // Line segment collision
         if (!colR.isInverseCollider && canLine) {
           const lineRes = collisionDetection(
             colR,
@@ -1035,7 +997,6 @@ function pointUpdatePass2(
       const A = pointsRW[ptR.parent].positionToTransform;
       const B = ptRW.positionToTransform;
       const mAxis = Matrix4x4.lookAt(A, B, AXIS_Y);
-      // Column 1 = up axis of the look-at matrix
       const col1 = mAxis.getCol(1).xyz();
       Vector3.lerp(ptRW.fakeWindDirection, col1, 0.5, ptRW.fakeWindDirection);
 
@@ -1147,7 +1108,6 @@ export function applyResult(
   pointsRW: PointRW[],
   positionsToTransform: readonly Vector3[],
   blendRatio: number,
-  // Current transform rotations (world and local) read from engine
   transformRotations: readonly Quaternion[],
   transformLocalRotations: readonly Quaternion[],
   preserveTwist: boolean,
@@ -1162,7 +1122,6 @@ export function applyResult(
     let localRot = transformLocalRotations[index];
 
     if (ptR.weight >= EPSILON) {
-      // Dynamic point
       if (ptR.parent !== -1) {
         const direction = Vector3.sub(ptRW.positionToTransform, positionsToTransform[ptR.parent]);
         const realLen = direction.magnitude;
@@ -1173,14 +1132,9 @@ export function applyResult(
         }
       }
       const pos = ptRW.positionToTransform;
-      // SetRotation with blendRatio=0 for dynamic points
-      // Step 1: Reset localRotation to initialLocalRotation (blendRatio = 0 means fully initial)
       localRot = ptR.initialLocalRotation.clone();
 
-      // Step 2: Recompute worldRot from the new localRot
-      // In C#, setting localRotation immediately updates the world rotation.
-      // worldRot = parentWorldRot * localRot
-      // We approximate: the parent's current world rotation is in transformRotations[ptR.parent]
+      // Recompute world rotation from the parent and initial local rotation.
       const parentRot = getPointParentWorldRotation(
         index,
         ptR,
@@ -1191,7 +1145,7 @@ export function applyResult(
       );
       worldRot = Quaternion.multiply(parentRot, localRot);
 
-      // Step 3: Aim toward child (simple shortest-arc, no twist correction here)
+      // Aim toward the child with a shortest-arc rotation.
       if (ptR.child !== -1) {
         const childDir = Vector3.sub(positionsToTransform[ptR.child], ptRW.positionToTransform);
         if (childDir.magnitudeSq > EPSILON) {
@@ -1211,8 +1165,6 @@ export function applyResult(
         ptR.child !== -1 ? Math.max(pointsR[ptR.child].forceFadeRatio, blendRatio) : blendRatio;
 
       // Use the caller-provided local rotation as the fixed-joint baseline.
-      // The controller sanitizes this value when the transform still contains
-      // the previous physics output instead of a fresh animation pose.
       const parentRot = getPointParentWorldRotation(
         index,
         ptR,
@@ -1224,7 +1176,7 @@ export function applyResult(
       localRot = transformLocalRotations[index].clone();
       worldRot = Quaternion.multiply(parentRot, localRot);
 
-      // Aim toward simulated child position, blended back toward the animated direction.
+      // Aim toward the simulated child, blended toward the animated direction.
       if (ptR.child !== -1) {
         const childDir = Vector3.sub(positionsToTransform[ptR.child], ptRW.positionToTransform);
         if (childDir.magnitudeSq > EPSILON) {
@@ -1242,7 +1194,7 @@ export function applyResult(
     }
   }
 
-  // Post-process: twist correction pass (parent �?child order).
+  // Post-process twist correction in parent-to-child order.
   if (preserveTwist) {
     for (let index = 0; index < pointsR.length; index++) {
       const ptR = pointsR[index];

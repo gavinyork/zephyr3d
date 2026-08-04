@@ -78,10 +78,8 @@ function hasRawQuery(spec: string) {
 type ScriptModuleType = 'js' | 'ts';
 
 /**
- * Realm-global storage for shared script module registries, keyed by
- * registry namespace. Bundles built by the same `ScriptRegistry` share one
- * module registry so a module evaluates once and its exports (including
- * module-level singletons) are identical across entry bundles.
+ * Realm-global key for per-registry module stores. Modules evaluate once per
+ * registry, preserving shared exports and singletons across entry bundles.
  * @internal
  */
 const SCRIPT_MODULES_GLOBAL_KEY = '__z3dScriptModules';
@@ -93,18 +91,13 @@ function nextScriptRegistryNamespace() {
 }
 
 /**
- * Monotonic serial stamped into each built bundle. The shared runtime uses it
- * to ignore registrations coming from bundles older than the one that already
- * registered a module, so late imports of stale bundles cannot downgrade a
- * module record.
+ * Build serial preventing stale bundles from replacing newer module records.
  * @internal
  */
 let scriptBuildSerialCounter = 0;
 
 /**
- * FNV-1a hash of module code, used to version shared module records.
- * Rebuilding an unchanged module keeps its already-evaluated instance;
- * changed content replaces the record so the next load re-evaluates.
+ * FNV-1a content version for shared module records.
  * @internal
  */
 function hashModuleCode(text: string) {
@@ -126,34 +119,17 @@ type ScriptModuleInfo = {
 };
 
 /**
- * Resolves, builds, and serves runtime modules using a VFS.
- *
- * Responsibilities:
- * - Resolve logical module IDs to physical paths or URLs.
- * - In editor mode, bundle local script modules into a single data URL after transpile.
- * - Transpile TypeScript to JavaScript on the fly (requires `window.ts` TypeScript runtime).
- * - Gather static and dynamic import dependencies for tooling.
- *
- * Modes:
- * - Editor mode (`editorMode === true`): local script graphs are bundled to data URLs.
- * - Runtime mode (`editorMode === false`): returns .js/.mjs URLs directly (with .ts -\> .js mapping).
- *
- * Caching:
- * - Built bundles are memoized in `_built` map keyed by canonical source path.
- * - At runtime, all bundles built by the same registry share one realm-global
- *   module registry (keyed by a per-registry namespace): a local module is
- *   evaluated once no matter how many entry bundles inline it, so module-level
- *   singletons are identical across entries. Module records are versioned by a
- *   content hash — rebuilding an unchanged module reuses its evaluated
- *   instance, while changed content replaces the record so the next load
- *   re-evaluates the new code.
+ * Resolves and builds VFS scripts. Editor mode transpiles TypeScript and bundles
+ * local graphs into data URLs; runtime mode returns script URLs directly. Bundles
+ * from one registry share module instances, while content-derived versions
+ * preserve unchanged instances and invalidate changed dependency graphs.
  *
  * @public
  */
 export class ScriptRegistry {
   private _vfs: VFS;
   private _scriptsRoot: string;
-  private _built: Map<string, string>; // logicalId -> dataURL
+  private _built: Map<string, string>;
   private _building: Map<string, Promise<string>>;
   private _builtDeps: Map<string, Set<string>>;
   private _namespace: string;
@@ -185,8 +161,7 @@ export class ScriptRegistry {
       this._built.clear();
       this._building.clear();
       this._builtDeps.clear();
-      // Rotate the shared module registry namespace: modules from the old VFS
-      // must not be reused as instances for same-named modules of the new VFS.
+      // A new VFS must not reuse same-named module instances from the old VFS.
       const root = (globalThis as Record<string, unknown>)[SCRIPT_MODULES_GLOBAL_KEY] as
         | Map<string, unknown>
         | undefined;
@@ -414,9 +389,7 @@ export class ScriptRegistry {
     if (!entry) {
       return '';
     }
-    // Replace content hashes with Merkle-style effective versions so that a
-    // module whose (transitive) dependencies changed is re-registered and
-    // re-evaluated even when its own source is unchanged.
+    // Include transitive dependencies in versions so their changes trigger re-evaluation.
     this.applyEffectiveVersions(modules);
 
     const serial = ++scriptBuildSerialCounter;
@@ -558,7 +531,7 @@ export class ScriptRegistry {
     const res = ts.transpileModule(code, {
       compilerOptions: {
         allowJs: true,
-        // Keep modern syntax such as async generators, class fields, and private fields intact.
+        // Preserve syntax supported by the runtime.
         target: ts.ScriptTarget.ES2022,
         module: ts.ModuleKind.System,
         esModuleInterop: true,
@@ -583,31 +556,26 @@ export class ScriptRegistry {
     let last = 0;
 
     for (const im of list) {
-      // Skip import.meta entries reported by es-module-lexer.
-      // Their "specifier" span points to the whole "import.meta" expression,
-      // which must remain untouched.
+      // es-module-lexer reports import.meta spans, which must not be rewritten.
       if (im.d === -2) {
         continue;
       }
-      // must have quotes
       const hasQuote = im.ss != null && im.se != null;
       if (!hasQuote || im.se <= im.ss) {
         continue;
       }
-      // must have contents
       if (im.e <= im.s) {
         continue;
       }
-      // append [last, s)
       out += code.slice(last, im.s);
 
-      const spec = code.slice(im.s, im.e); // original spec
+      const spec = code.slice(im.s, im.e);
       const resolved = await this.resolveImportTarget(spec, String(fromId));
       const replacement = resolved.id ?? spec;
       if (resolved.id) {
         deps.add(resolved.id);
       }
-      out += replacement; // Do not wrap in quotes
+      out += replacement;
       last = im.e;
     }
     out += code.slice(last);
@@ -659,11 +627,7 @@ const System = {
   }
 };
 function __z3dRegister(id, version, serial, factory) {
-  // The module registry is shared across bundles: a module already registered
-  // by another bundle with the same effective version is reused (so
-  // module-level singletons stay unique), while changed content replaces the
-  // record so the next load re-evaluates the new code. A record from a newer
-  // build or one that is currently executing is never replaced.
+  // Reuse matching modules; replace changed ones unless newer or executing.
   const existing = __z3dRegistry.get(id);
   if (existing && (existing.version === version || existing.state === 1 || existing.serial > serial)) {
     if (serial > existing.serial) {
@@ -776,8 +740,7 @@ async function __z3dLoad(spec, parentId = '') {
     } else if (baseSpec.startsWith('/')) {
       return `${baseSpec.replace(/^\/+/, '/')}${suffix}`;
     } else if (getApp().editorMode !== 'none') {
-      const libRoot = '/'; //this._vfs.normalizePath(this._scriptsRoot || '/');
-      // naked module, checking if it is a installed module in editor mode
+      const libRoot = '/';
       let depsLockPath = this._vfs.normalizePath(this._vfs.join(libRoot, 'libs/deps.lock.json'));
       let depsExists = await this._vfs.exists(depsLockPath);
       if (depsExists) {

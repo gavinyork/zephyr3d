@@ -1,4 +1,3 @@
-// readers/PythonHttpServerReader.ts
 import type { HttpDirectoryReader, HttpDirectoryReaderContext } from './reader';
 import type { FileMetadata } from '../vfs';
 

@@ -6,10 +6,7 @@ import { ShadowMapper } from '../shadow/shadowmapper';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT, LIGHT_TYPE_RECT } from '../values';
 import type { Scene } from './scene';
 
-// Illuminance (lux) at which an auto-ranged physical light is considered to no longer contribute.
-// This bounds the light's influence radius for clustered culling. 0.25 lux (~civil-twilight /
-// full-moon level) keeps the radius practical: a 100 cd point light reaches ~20 units instead of
-// ~100 at 0.01 lux, cutting clustered-cull cost with no perceptible difference under normal exposure.
+// Cutoff for auto-ranged physical lights; bounds clustered-culling radius.
 const PHYSICAL_LIGHT_CUTOFF_LUX = 0.25;
 
 /**
@@ -277,7 +274,6 @@ export class PunctualLight extends BaseLight {
   protected _onTransformChanged(invalidateLocal: boolean) {
     super._onTransformChanged(invalidateLocal);
     this.invalidateUniforms();
-    // this._transformCallback(true, false);
   }
   /** Disposes the punctual light node */
   protected onDispose() {

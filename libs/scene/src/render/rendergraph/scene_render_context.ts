@@ -9,7 +9,7 @@ import { LightPass } from '../lightpass';
 import { DepthPass } from '../depthpass';
 import type { RGExecuteContext } from './types';
 
-// The facade uses a single-color target, so disable surface MRT outputs.
+// The facade renders to a single color target.
 const SURFACE_MRT_FLAGS =
   MaterialVaryingFlags.SCENE_STORE_ROUGHNESS |
   MaterialVaryingFlags.SSS_STORE_PROFILE |
@@ -18,7 +18,6 @@ const SURFACE_MRT_FLAGS =
   MaterialVaryingFlags.SSS_STORE_TRANSMISSION |
   MaterialVaryingFlags.SKIN_SSS_STORE;
 
-// Keep facade state isolated from the built-in Forward+ passes.
 const _sceneLightPass = new LightPass();
 const _sceneDepthPass = new DepthPass();
 

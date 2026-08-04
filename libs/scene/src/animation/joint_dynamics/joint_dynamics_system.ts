@@ -60,7 +60,7 @@ export function createTransformAccess(obj: SceneNode, exposeNode = true): Transf
       }
     },
     setWorldRotation(q: Quaternion): void {
-      // Convert world rotation to local: localRot = inverse(parentWorldRot) * worldRot
+      // Convert world rotation to local space.
       if (obj.parent) {
         obj.parent.worldMatrix.decompose(null, _quat, null);
         Quaternion.multiply(Quaternion.inverse(_quat), q, obj.rotation);
@@ -519,9 +519,7 @@ export class JointDynamicsSystem {
    * @param deltaTime - Frame time step in seconds. Values larger than 0.033 are clamped for stability.
    */
   update(deltaTime: number): void {
-    // Clamp deltaTime to prevent instability
     const dt = Math.min(deltaTime, 0.033); // Max 30 FPS
-    // simulation
     this._controller.step(dt);
   }
   /** @internal */

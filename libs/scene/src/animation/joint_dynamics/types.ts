@@ -1,4 +1,4 @@
-// Data structure definitions — direct port of C# structs from SPCRJointDynamicsJob.cs
+// Data structures ported from SPCRJointDynamicsJob.cs.
 
 import type { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { SceneNode } from '../../scene';
@@ -10,7 +10,6 @@ import type { SceneNode } from '../../scene';
  */
 export const EPSILON = 0.001;
 
-/** Constraint topology type */
 /**
  * Constraint topology type.
  *
@@ -29,7 +28,6 @@ export const enum ConstraintType {
   Bending_Horizontal = 4
 }
 
-/** Collider surface force direction (used for surface/triangle collision) */
 /**
  * Collider surface force direction used for surface and triangle collision.
  *
@@ -45,12 +43,8 @@ export const enum ColliderForce {
 }
 
 /**
- * Read-only per-point physics parameters.
- * Set once at initialization, immutable during simulation.
- * Constraint scale values are pre-multiplied by 0.5 (summed between two points in solver).
- */
-/**
- * Read-only per-point physics parameters.
+ * Read-only per-point physics parameters. Constraint scales are halved because
+ * the solver sums values from both points.
  *
  * @public
  */
