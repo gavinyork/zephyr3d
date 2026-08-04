@@ -1,8 +1,33 @@
 # Screen Space Global Illumination (SSGI)
 
-SSGI estimates diffuse indirect lighting from screen-space depth, normals, and the opaque linear-HDR SceneColor. It stores incoming irradiance; material albedo, metallic and Fresnel remain in the next frame's Lighting/BRDF, so no SceneAlbedo MRT is required.
+## Overview
 
-A ray reports its outcome as occluded, escaped, or indeterminate. Occlusion and radiance are tracked separately: a hit removes the sky for that direction (see `ssgiSkyOcclusion`) and independently adds the blocker's screen colour as its outgoing radiance, so a hit can never subtract sky without contributing its own bounce. The marcher only ever stops on-screen, so that colour is always available; the screen-border, near-self and backface vetoes that bound reflection artifacts do not apply to diffuse transport and therefore do not gate occlusion. A hit whose reprojection into the previous frame fails falls back to this frame's colour rather than to unoccluded IBL. Rays whose outcome the depth buffer cannot resolve — they left the screen or ran out of iterations behind geometry — are excluded from the average instead of counted as unoccluded sky.
+**Screen Space Global Illumination** (SSGI) is a real-time technique that simulates indirect lighting effects using screen-space data.  
+It analyzes **depth, normals, and scene color** from the current framebuffer to estimate how light bounces between surfaces, adding ambient occlusion and color bleeding effects to create more realistic lighting.
+
+Unlike traditional **Image-Based Lighting (IBL)** alone, which provides static environment lighting, SSGI dynamically captures light bouncing from visible geometry in the scene. This means a red wall can cast a reddish tint onto nearby white surfaces, or bright objects can illuminate their surroundings — all computed in real time from what's visible on screen.
+
+---
+
+## Advantages
+
+- **Dynamic indirect lighting**: Captures light bouncing between surfaces based on their actual colors and positions in the current frame
+- **No pre-baking required**: Works with fully dynamic scenes without needing lightmap baking or precomputation
+- **Ambient occlusion**: Naturally darkens areas where geometry blocks ambient light
+- **Color bleeding**: Surfaces pick up color tints from nearby objects, enhancing realism
+- **Performance**: Relatively efficient compared to full ray-traced global illumination
+
+---
+
+## Limitations
+
+- **Screen-space only**: Can only use information visible in the current frame — objects outside the view or behind the camera cannot contribute lighting
+- **Missing geometry**: Occluded or off-screen surfaces don't affect the result, which can cause lighting to "pop" as the camera moves
+- **Limited ray distance**: Traces are limited to a maximum distance to maintain performance, so large-scale indirect lighting may be incomplete
+- **Noise and artifacts**: The technique uses sampling and approximations, requiring temporal and spatial filtering to reduce noise
+- **Performance cost**: Still computationally expensive compared to static IBL, requiring careful tuning for different hardware
+
+---
 
 ## Enabling SSGI
 
@@ -10,15 +35,20 @@ Both the camera and the IBL environment must opt in:
 
 ```ts
 scene.env.light.type = 'ibl';
-scene.env.light.allowSSGI = true;
 camera.SSGI = true;
 ```
 
-The camera must use HDR, SSGI intensity must be greater than zero, and the IBL must provide both radiance and irradiance data. The device must also support renderable half-float textures, at least two draw buffers, and a 16-byte-per-sample color-attachment budget. WebGPU uses motion vectors, Hi-Z, historical SceneColor and the full temporal filter. WebGL uses linear marching, IBL miss fallback, spatial filtering and same-pixel depth/normal history validation without the motion-vector temporal filter.
+The camera must use HDR, SSGI intensity must be greater than zero, and the IBL must provide both radiance and irradiance data. The device must also support renderable half-float textures, at least two draw buffers, and a 16-byte-per-sample color-attachment budget. 
 
-## Quality presets
+**Backend differences:**
+- **WebGPU**: Uses motion vectors, Hi-Z acceleration, historical scene color and full temporal filtering for higher quality
+- **WebGL**: Uses linear ray marching with spatial filtering and same-pixel history validation
 
-| Preset | Resolution | Rays/pixel | Max steps | A-trous passes |
+---
+
+## Quality Presets
+
+| Preset | Resolution | Rays/pixel | Max steps | Denoise passes |
 | --- | --- | ---: | ---: | ---: |
 | `quality` | Full | 2 | 64 | 3 |
 | `balanced` | Half | 1 | 48 | 2 |
@@ -29,7 +59,7 @@ The camera must use HDR, SSGI intensity must be greater than zero, and the IBL m
 camera.ssgiQualityPreset = 'quality';
 ```
 
-The `custom` preset exposes trace resolution, SPP, maximum steps and denoise passes independently:
+The `custom` preset exposes trace resolution, samples per pixel (SPP), maximum steps and denoise passes independently:
 
 ```ts
 camera.ssgiQualityPreset = 'custom';
@@ -39,20 +69,31 @@ camera.ssgiMaxSteps = 48;
 camera.ssgiDenoisePasses = 2;
 ```
 
-Changing any custom setting through the API also switches the preset to `custom` automatically.
+Changing any custom setting through the API automatically switches the preset to `custom`.
+
+---
 
 ## Controls
 
 | Property | Default | Purpose |
 | --- | ---: | --- |
-| `ssgiIntensity` | `0.7` | Strength of screen-space hits relative to IBL, and the upper bound on how far sky occlusion can darken a pixel; misses preserve IBL |
-| `ssgiSkyOcclusion` | `1` | How much environment irradiance an occluding hit removes. `1` is physically complete occlusion; lower values dim the sky less than the geometry implies. Only the removal is scaled — bounce light measured at the hit is always kept, so lowering this brightens without discarding indirect light |
-| `ssgiMaxDistance` | `32` | Maximum view-space trace distance |
-| `ssgiThickness` | `0.5` | Depth-intersection thickness |
-| `ssgiStride` | `1` | Pixel stride for the linear marcher |
-| `ssgiMaxRayIntensity` | `10` | Firefly clamp on screen-space radiance before the control-variate correction |
-| `ssgiTemporal` | `true` | Enables temporal accumulation |
-| `ssgiTemporalWeight` | `0.94` | Maximum valid-history weight after warm-up |
-| `ssgiDepthReject` | `0.5` | Reprojection depth threshold in scene units |
-| `ssgiNormalReject` | `0.75` | Reprojection normal-dot threshold |
+| `ssgiIntensity` | `0.7` | Strength of screen-space indirect lighting relative to IBL. Controls how much SSGI affects the final image |
+| `ssgiSkyOcclusion` | `1` | How much occluding geometry blocks environment light. `1` is full physical occlusion; lower values reduce darkening |
+| `ssgiMaxDistance` | `32` | Maximum view-space trace distance. Larger values capture more distant bounces but cost more performance |
+| `ssgiThickness` | `0.5` | Depth intersection thickness for ray hits |
+| `ssgiStride` | `1` | Pixel stride for linear ray marching (WebGL only) |
+| `ssgiMaxRayIntensity` | `10` | Clamps overly bright samples to reduce firefly artifacts |
+| `ssgiTemporal` | `true` | Enables temporal accumulation to reduce noise |
+| `ssgiTemporalWeight` | `0.94` | Maximum history weight for temporal filtering after stabilization |
+| `ssgiDepthReject` | `0.5` | Depth threshold for rejecting invalid temporal reprojection |
+| `ssgiNormalReject` | `0.75` | Normal similarity threshold for temporal reprojection |
 
+---
+
+## Performance Tips
+
+- Start with the **`balanced`** preset and adjust from there
+- Use **half resolution** (`ssgiHalfResolution = true`) for significant performance gains with minimal visual loss
+- Enable **Hi-Z** (`camera.HiZ = true`) on WebGPU for faster ray tracing
+- Reduce `ssgiRaysPerPixel` if you have strong temporal filtering
+- Lower `ssgiMaxSteps` in scenes with simple geometry or limited depth complexity
