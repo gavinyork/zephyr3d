@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Improve LLM/MCP",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}

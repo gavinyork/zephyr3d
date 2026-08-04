@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Add reverse-z support",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

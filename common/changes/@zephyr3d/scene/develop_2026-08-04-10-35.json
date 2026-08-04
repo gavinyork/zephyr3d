@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "use UE-style hiz tracer",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

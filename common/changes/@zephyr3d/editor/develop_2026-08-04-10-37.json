@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "",
+      "type": "none"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}
