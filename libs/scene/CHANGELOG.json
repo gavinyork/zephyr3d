@@ -2,6 +2,41 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.23",
+      "tag": "@zephyr3d/scene_v0.9.23",
+      "date": "Tue, 04 Aug 2026 10:43:23 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Optimize SSS shadow when shadowmask is enabled"
+          },
+          {
+            "comment": "Add reverse-z support"
+          },
+          {
+            "comment": "use UE-style hiz tracer"
+          },
+          {
+            "comment": "Add experimental physical lighting mode support"
+          },
+          {
+            "comment": "Add experimental SSGI support"
+          },
+          {
+            "comment": "support adding module to render pipeline by specifying dependent resources"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.8` to `0.2.9`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.16` to `0.2.17`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.22",
       "tag": "@zephyr3d/scene_v0.9.22",
       "date": "Tue, 21 Jul 2026 11:48:52 GMT",

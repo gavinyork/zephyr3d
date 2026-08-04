@@ -1,6 +1,14 @@
 # Change Log - @zephyr3d/backend-webgpu
 
-This log was last generated on Sun, 19 Jul 2026 16:11:50 GMT and should not be manually modified.
+This log was last generated on Tue, 04 Aug 2026 10:43:23 GMT and should not be manually modified.
+
+## 0.1.20
+Tue, 04 Aug 2026 10:43:23 GMT
+
+### Patches
+
+- Add reverse-z support
+- Add shader-f16 support
 
 ## 0.1.19
 Sun, 19 Jul 2026 16:11:50 GMT

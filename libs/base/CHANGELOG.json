@@ -2,6 +2,18 @@
   "name": "@zephyr3d/base",
   "entries": [
     {
+      "version": "0.2.9",
+      "tag": "@zephyr3d/base_v0.2.9",
+      "date": "Tue, 04 Aug 2026 10:43:23 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add reverse-z support for matrix math"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.8",
       "tag": "@zephyr3d/base_v0.2.8",
       "date": "Tue, 30 Jun 2026 20:07:17 GMT",

@@ -2,6 +2,38 @@
   "name": "@zephyr3d/editor",
   "entries": [
     {
+      "version": "0.3.13",
+      "tag": "@zephyr3d/editor_v0.3.13",
+      "date": "Tue, 04 Aug 2026 10:43:23 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Improve LLM/MCP"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.8` to `0.2.9`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.16` to `0.2.17`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/scene\" from `^0.9.22` to `0.9.23`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/imgui\" from `^0.2.6` to `0.2.7`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/backend-webgl\" from `^0.1.15` to `0.1.16`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/backend-webgpu\" from `^0.1.19` to `0.1.20`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.3.12",
       "tag": "@zephyr3d/editor_v0.3.12",
       "date": "Sun, 19 Jul 2026 16:11:50 GMT",

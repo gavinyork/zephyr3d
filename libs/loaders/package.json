@@ -74,8 +74,8 @@
   "dependencies": {
     "@types/draco3d": "^1.4.9",
     "@webgpu/types": "^0.1.65",
-    "@zephyr3d/base": "workspace:^0.2.8",
-    "@zephyr3d/scene": "workspace:^0.9.22",
-    "@zephyr3d/device": "workspace:^0.2.16"
+    "@zephyr3d/base": "workspace:^0.2.9",
+    "@zephyr3d/scene": "workspace:^0.9.23",
+    "@zephyr3d/device": "workspace:^0.2.17"
   }
 }

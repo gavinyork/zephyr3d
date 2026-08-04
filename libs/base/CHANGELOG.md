@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/base
 
-This log was last generated on Tue, 30 Jun 2026 20:07:17 GMT and should not be manually modified.
+This log was last generated on Tue, 04 Aug 2026 10:43:23 GMT and should not be manually modified.
+
+## 0.2.9
+Tue, 04 Aug 2026 10:43:23 GMT
+
+### Patches
+
+- Add reverse-z support for matrix math
 
 ## 0.2.8
 Tue, 30 Jun 2026 20:07:17 GMT

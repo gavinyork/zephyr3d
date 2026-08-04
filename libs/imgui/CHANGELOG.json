@@ -2,6 +2,26 @@
   "name": "@zephyr3d/imgui",
   "entries": [
     {
+      "version": "0.2.7",
+      "tag": "@zephyr3d/imgui_v0.2.7",
+      "date": "Tue, 04 Aug 2026 10:43:23 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add reverse-z support"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.8` to `0.2.9`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.16` to `0.2.17`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.6",
       "tag": "@zephyr3d/imgui_v0.2.6",
       "date": "Thu, 16 Jul 2026 10:58:45 GMT",

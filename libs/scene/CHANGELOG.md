@@ -1,6 +1,18 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Tue, 21 Jul 2026 11:48:52 GMT and should not be manually modified.
+This log was last generated on Tue, 04 Aug 2026 10:43:23 GMT and should not be manually modified.
+
+## 0.9.23
+Tue, 04 Aug 2026 10:43:23 GMT
+
+### Patches
+
+- Optimize SSS shadow when shadowmask is enabled
+- Add reverse-z support
+- use UE-style hiz tracer
+- Add experimental physical lighting mode support
+- Add experimental SSGI support
+- support adding module to render pipeline by specifying dependent resources
 
 ## 0.9.22
 Tue, 21 Jul 2026 11:48:52 GMT

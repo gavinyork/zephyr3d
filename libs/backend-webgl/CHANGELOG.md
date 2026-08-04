@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/backend-webgl
 
-This log was last generated on Sun, 19 Jul 2026 16:11:50 GMT and should not be manually modified.
+This log was last generated on Tue, 04 Aug 2026 10:43:23 GMT and should not be manually modified.
+
+## 0.1.16
+Tue, 04 Aug 2026 10:43:23 GMT
+
+### Patches
+
+- Add reverse-z support
 
 ## 0.1.15
 Sun, 19 Jul 2026 16:11:50 GMT
