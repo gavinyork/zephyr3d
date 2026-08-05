@@ -1,4 +1,4 @@
-import { Matrix4x4, Quaternion, Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Matrix4x4, Quaternion, Vector4 } from '@zephyr3d/base';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import type { DeviceBackend, RenderBundle } from '@zephyr3d/device';
@@ -117,7 +117,7 @@ import { DrawText } from '@zephyr3d/device';
       Matrix4x4.perspective(1.5, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 50)
     );
 
-    device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
+    device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), DEPTH_CLEAR_VALUE, 0);
     if (!renderBundle) {
       device.beginCapture();
       device.setProgram(program);

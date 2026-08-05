@@ -124,7 +124,7 @@ Once all the necessary states are set, we can initiate the rendering call.
 // parameter 1: RGBA for clearing color buffers，if null, color buffers will not been cleared.
 // parameter 2: Clear value of depth buffer，if null, depth buffer will not be cleared
 // parameter 3: Clear value of stencil buffer，if null, stencil buffer will no be cleared
-device.clearFrameBuffer(new Vector4(0, 0, 1, 1), 1, 0);
+device.clearFrameBuffer(new Vector4(0, 0, 1, 1), DEPTH_CLEAR_VALUE, 0);
 
 // Draw triangles
 // parameter 1：vertex topologic, possible values: 'triangle-list','triangle-strip','triangle-fan','line-list','line-strip','point-list'

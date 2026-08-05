@@ -1,4 +1,4 @@
-import { Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
 import { Application } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -21,7 +21,7 @@ myApp.ready().then(function () {
   // Frame event handler
   myApp.on('tick', function () {
     // Clears the frame buffer
-    myApp.device.clearFrameBuffer(clearColor, 1, 0);
+    myApp.device.clearFrameBuffer(clearColor, DEPTH_CLEAR_VALUE, 0);
     // Render some text onto the screen
     myApp.device.drawText(str, 30, 30, '#ffff00');
   });

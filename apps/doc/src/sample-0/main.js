@@ -1,4 +1,4 @@
-import { Vector4 } from '@zephyr3d/base';
+import { Vector4, DEPTH_CLEAR_VALUE } from '@zephyr3d/base';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 (async function () {
@@ -53,7 +53,7 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
   // Start rendering loop
   device.runLoop((device) => {
     // Clear frame buffers
-    device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
+    device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), DEPTH_CLEAR_VALUE, 0);
     // Set current shader
     device.setProgram(program);
     // Set vertex input

@@ -124,7 +124,7 @@ const scissor = device.getScissor();
 // 参数1: 清除色RGBA，为null则不清除颜色缓冲
 // 参数2: 深度值，为null则不清除深度缓冲
 // 参数3: 模板值，为null则不清除模板缓冲
-device.clearFrameBuffer(new Vector4(0, 0, 1, 1), 1, 0);
+device.clearFrameBuffer(new Vector4(0, 0, 1, 1), DEPTH_CLEAR_VALUE, 0);
 
 // 渲染三角列表
 // 参数1：顶点拓扑类型

@@ -1,4 +1,4 @@
-import { Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import type { DeviceBackend, Texture2D } from '@zephyr3d/device';
@@ -26,7 +26,7 @@ const RENDER_TARGET_SIZE = 512;
   const framebufferCaps = device.getDeviceCaps().framebufferCaps;
   if (!framebufferCaps.supportPerTargetBlending || framebufferCaps.maxDrawBuffers < 2) {
     device.runLoop((device) => {
-      device.clearFrameBuffer(new Vector4(0.025, 0.025, 0.03, 1), 1, 0);
+      device.clearFrameBuffer(new Vector4(0.025, 0.025, 0.03, 1), DEPTH_CLEAR_VALUE, 0);
       DrawText.drawText(
         device,
         'Per-target blending is not supported by this backend/device',
@@ -153,7 +153,7 @@ const RENDER_TARGET_SIZE = 512;
   function drawMRT(elapsedMs: number) {
     const t = elapsedMs * 0.001;
     device.setFramebuffer(mrtFramebuffer);
-    device.clearFrameBuffer(new Vector4(0.01, 0.01, 0.012, 1), 1, 0);
+    device.clearFrameBuffer(new Vector4(0.01, 0.01, 0.012, 1), DEPTH_CLEAR_VALUE, 0);
     device.setProgram(mrtProgram);
     device.setVertexLayout(quadVertexLayout);
     device.setBindGroup(0, mrtBindGroup);
@@ -182,7 +182,7 @@ const RENDER_TARGET_SIZE = 512;
     drawMRT(device.frameInfo.elapsedOverall);
 
     device.setFramebuffer(null);
-    device.clearFrameBuffer(new Vector4(0.025, 0.025, 0.03, 1), 1, 0);
+    device.clearFrameBuffer(new Vector4(0.025, 0.025, 0.03, 1), DEPTH_CLEAR_VALUE, 0);
     device.setProgram(presentProgram);
     device.setVertexLayout(quadVertexLayout);
     device.setRenderStates(presentRenderStates);

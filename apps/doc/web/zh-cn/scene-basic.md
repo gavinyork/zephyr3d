@@ -57,7 +57,7 @@ myApp.ready().then(function(){
   myApp.on('tick', function(){
     // device是渲染设备，我们调用其clearFrameBuffer方法把屏幕清为绿色
     // 其中，第一个参数为清除颜色缓冲区的RGBA颜色，第二个参数指定深度缓冲区的清除值，第三个指定模板缓冲区的清除值。
-    myApp.device.clearFrameBuffer(new Vector4(0, 1, 0, 1), 1, 0);
+    myApp.device.clearFrameBuffer(new Vector4(0, 1, 0, 1), DEPTH_CLEAR_VALUE, 0);
   });
   // 应用已经初始化完成，开始渲染循环
   myApp.run();
@@ -98,7 +98,7 @@ myApp.ready().then(function () {
   myApp.on('tick', function () {
     // device是渲染设备，我们调用其clearFrameBuffer方法把屏幕清为绿色
     // 其中，第一个参数为清除颜色缓冲区的RGBA颜色，第二个参数指定深度缓冲区的清除值，第三个指定模板缓冲区的清除值。
-    myApp.device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
+    myApp.device.clearFrameBuffer(new Vector4(0, 0, 0, 1), DEPTH_CLEAR_VALUE, 0);
     // 调用device的drawText方法在屏幕上渲染文字
     myApp.device.drawText(str, 30, 30, '#ffff00');
   });

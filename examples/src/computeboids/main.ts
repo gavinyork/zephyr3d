@@ -1,4 +1,4 @@
-import { Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
 import type { StructuredBuffer, BindGroup, VertexLayout } from '@zephyr3d/device';
 import { DrawText } from '@zephyr3d/device';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
@@ -176,7 +176,7 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
     device.setBindGroup(0, particleBindGroups[t % 2]);
     device.compute(Math.ceil(numParticles / 64), 1, 1);
 
-    device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
+    device.clearFrameBuffer(new Vector4(0, 0, 0, 1), DEPTH_CLEAR_VALUE, 0);
     device.setProgram(spriteProgram);
     primitives[(t + 1) % 2].drawInstanced('triangle-list', 0, 3, numParticles);
     t++;

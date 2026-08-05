@@ -61,7 +61,7 @@ myApp.ready().then(function () {
     // 'device' is the rendering device.
     // clearFrameBuffer clears the screen — 
     // first argument: RGBA color, second: depth clear value, third: stencil clear value
-    myApp.device.clearFrameBuffer(new Vector4(0, 1, 0, 1), 1, 0);
+    myApp.device.clearFrameBuffer(new Vector4(0, 1, 0, 1), DEPTH_CLEAR_VALUE, 0);
   });
 
   // Start the render loop
@@ -100,7 +100,7 @@ myApp.ready().then(function () {
   // Frame event handler
   myApp.on('tick', function () {
     // Clear framebuffer to black
-    myApp.device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
+    myApp.device.clearFrameBuffer(new Vector4(0, 0, 0, 1), DEPTH_CLEAR_VALUE, 0);
     // Draw text on the screen
     myApp.device.drawText(str, 30, 30, '#ffff00');
   });

@@ -1,5 +1,5 @@
 // 引入Vector4
-import { Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
 import { Application } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
@@ -17,7 +17,7 @@ myApp.ready().then(function () {
   // Frame event handler
   myApp.on('tick', function () {
     // device is the rendering device, and we call its clearFrameBuffer method to clear the screen to green
-    myApp.device.clearFrameBuffer(new Vector4(0, 1, 0, 1), 1, 0);
+    myApp.device.clearFrameBuffer(new Vector4(0, 1, 0, 1), DEPTH_CLEAR_VALUE, 0);
   });
   // The app has been initialized and the rendering loop begins
   myApp.run();

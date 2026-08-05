@@ -1,4 +1,4 @@
-import { Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
 import { DrawText } from '@zephyr3d/device';
 import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
@@ -66,7 +66,7 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
   // start render loop
   device.runLoop((device) => {
-    device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
+    device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), DEPTH_CLEAR_VALUE, 0);
     device.setProgram(program);
     device.setVertexLayout(vertexLayout);
     device.draw('triangle-list', 0, 3);

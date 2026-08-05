@@ -1,4 +1,4 @@
-import { Matrix4x4, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Matrix4x4, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 (async function () {
@@ -138,7 +138,7 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
     );
     bindGroup1.setValue('worldMatrix', Matrix4x4.translateLeft(rotateMatrix, new Vector3(0, 0, -4)));
 
-    device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
+    device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), DEPTH_CLEAR_VALUE, 0);
     device.setProgram(program);
     device.setVertexLayout(vertexLayout);
     device.setBindGroup(0, bindGroup0);

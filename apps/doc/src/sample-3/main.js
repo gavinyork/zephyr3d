@@ -1,4 +1,4 @@
-import { Matrix4x4, Quaternion, Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Matrix4x4, Quaternion, Vector4 } from '@zephyr3d/base';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 (async function () {
@@ -104,7 +104,7 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
       Matrix4x4.perspective(1.5, device.getDrawingBufferWidth() / device.getDrawingBufferHeight(), 1, 50)
     );
 
-    device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), 1, 0);
+    device.clearFrameBuffer(new Vector4(0, 0, 0.5, 1), DEPTH_CLEAR_VALUE, 0);
     device.setProgram(program);
     device.setVertexLayout(vertexLayout);
     device.setBindGroup(0, bindGroup);

@@ -1,4 +1,4 @@
-import { Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { DrawText } from '@zephyr3d/device';
 import { ImGui, imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
@@ -194,7 +194,7 @@ import { ImGui, imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from
       device.setBindGroup(1, computeBindGroup1);
       device.compute(Math.ceil(texture.height / blockDim), Math.ceil(texture.width / batch[1]), 1);
     }
-    device.clearFrameBuffer(new Vector4(0, 0, 0, 1), 1, 0);
+    device.clearFrameBuffer(new Vector4(0, 0, 0, 1), DEPTH_CLEAR_VALUE, 0);
     device.setProgram(fullScreenQuadProgram);
     device.setBindGroup(0, resultBindGroup);
     device.setVertexLayout(null);
