@@ -2,6 +2,23 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.24",
+      "tag": "@zephyr3d/scene_v0.9.24",
+      "date": "Wed, 05 Aug 2026 08:50:14 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "fix WebGL1 reverse-Z PCF and PCSS shadows"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.17` to `0.2.18`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.23",
       "tag": "@zephyr3d/scene_v0.9.23",
       "date": "Tue, 04 Aug 2026 10:43:23 GMT",

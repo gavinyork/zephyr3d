@@ -2,6 +2,18 @@
   "name": "@zephyr3d/device",
   "entries": [
     {
+      "version": "0.2.18",
+      "tag": "@zephyr3d/device_v0.2.18",
+      "date": "Wed, 05 Aug 2026 08:50:14 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Fix wrong ClipSpaceCorrection flag"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.17",
       "tag": "@zephyr3d/device_v0.2.17",
       "date": "Tue, 04 Aug 2026 10:43:23 GMT",

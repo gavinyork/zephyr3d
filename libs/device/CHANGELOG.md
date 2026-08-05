@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/device
 
-This log was last generated on Tue, 04 Aug 2026 10:43:23 GMT and should not be manually modified.
+This log was last generated on Wed, 05 Aug 2026 08:50:14 GMT and should not be manually modified.
+
+## 0.2.18
+Wed, 05 Aug 2026 08:50:14 GMT
+
+### Patches
+
+- Fix wrong ClipSpaceCorrection flag
 
 ## 0.2.17
 Tue, 04 Aug 2026 10:43:23 GMT
