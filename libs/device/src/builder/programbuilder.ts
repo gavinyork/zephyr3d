@@ -1135,8 +1135,6 @@ export class ProgramBuilder {
   /** @internal */
   _vertexAttributes: number[];
   /** @internal */
-  _clipSpaceCorrection: ClipSpaceCorrection;
-  /** @internal */
   _emulateDepthClamp: boolean;
   /** @internal */
   _lastError: Nullable<string>;
@@ -1165,7 +1163,6 @@ export class ProgramBuilder {
     this._inputs = [];
     this._outputs = [];
     this._vertexAttributes = [];
-    this._clipSpaceCorrection = resolveClipSpaceCorrection(device);
     this._emulateDepthClamp = false;
     this._lastError = null;
     this._reflection = new PBReflection(this);
@@ -1217,14 +1214,14 @@ export class ProgramBuilder {
   }
   /** @internal */
   get depthRangeCorrection(): boolean {
-    return this._clipSpaceCorrection === 'gl2zo';
+    return this.clipSpaceCorrection === 'gl2zo';
   }
   /**
    * Clip-space depth correction applied at the end of the vertex shader.
    * @internal
    */
   get clipSpaceCorrection(): ClipSpaceCorrection {
-    return this._clipSpaceCorrection;
+    return resolveClipSpaceCorrection(this._device);
   }
   get emulateDepthClamp(): boolean {
     return this._emulateDepthClamp;
@@ -1253,7 +1250,6 @@ export class ProgramBuilder {
     this._inputs = [];
     this._outputs = [];
     this._vertexAttributes = [];
-    this._clipSpaceCorrection = resolveClipSpaceCorrection(this._device);
     this._reflection = new PBReflection(this);
     this._autoStructureTypeIndex = 0;
     this._nameMap = [];

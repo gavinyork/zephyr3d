@@ -464,10 +464,6 @@
       "shouldPublish": true
     },
     {
-      "packageName": "@zephyr3d/examples",
-      "projectFolder": "examples"
-    },
-    {
       "packageName": "@zephyr3d/test",
       "projectFolder": "test"
     },
@@ -498,6 +494,10 @@
     {
       "packageName": "@zephyr3d/scene-render-demo",
       "projectFolder": "apps/scene-render-demo"
+    },
+    {
+      "packageName": "zephyr3d-example-animation-controller",
+      "projectFolder": "apps/animation-controller"
     },
     {
       "packageName": "@zephyr3d/outline-demo",

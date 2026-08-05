@@ -5,6 +5,18 @@ import { isDeviceDepthShadow } from '../shaders/shadow';
 import { getDevice } from '../app/api';
 
 /** @internal */
+export function getShadowMapFarthestDepth(lightType: number) {
+  return REVERSE_Z && isDeviceDepthShadow(lightType) ? 0 : 1;
+}
+
+/** @internal */
+export function getPackedShadowMapClearColor(lightType: number) {
+  // The RGBA8 decoder assigns the alpha channel a weight of 1, so the
+  // normalized depth endpoints are represented by transparent/opaque black.
+  return new Vector4(0, 0, 0, getShadowMapFarthestDepth(lightType));
+}
+
+/** @internal */
 export abstract class ShadowImpl {
   protected _resourceDirty: boolean;
   constructor() {
@@ -22,11 +34,11 @@ export abstract class ShadowImpl {
     const colorAttachment = shadowMapParams.shadowMapFramebuffer?.getColorAttachments()[0];
     // Empty texels must read as "farthest": under reverse-Z that is 0 for
     // device-encoded directional/rect maps, 1 for linear point/spot maps.
-    const farthest = REVERSE_Z && isDeviceDepthShadow(shadowMapParams.lightType) ? 0 : 1;
+    const farthest = getShadowMapFarthestDepth(shadowMapParams.lightType);
     return colorAttachment
       ? colorAttachment.isFloatFormat()
         ? new Vector4(farthest, farthest, farthest, 1)
-        : new Vector4(0, 0, 0, 1)
+        : getPackedShadowMapClearColor(shadowMapParams.lightType)
       : null;
   }
   /**

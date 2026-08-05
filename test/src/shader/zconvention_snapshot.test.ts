@@ -1,7 +1,10 @@
 import type { AbstractDevice } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import { ShaderHelper } from '../../../libs/scene/src/material/shader/helper';
-import { computeShadowMapDepth } from '../../../libs/scene/src/shaders/shadow';
+import {
+  computeShadowMapDepth,
+  getProgressivePoissonDiscSample
+} from '../../../libs/scene/src/shaders/shadow';
 
 /**
  * Depth-convention status-quo snapshots.
@@ -13,7 +16,7 @@ import { computeShadowMapDepth } from '../../../libs/scene/src/shaders/shadow';
  * keep these snapshots byte-identical.
  */
 
-function createMockDevice(type: 'webgpu' | 'webgl2', clipSpaceZeroToOne?: boolean): AbstractDevice {
+function createMockDevice(type: 'webgpu' | 'webgl2' | 'webgl', clipSpaceZeroToOne?: boolean): AbstractDevice {
   return {
     type,
     clipSpaceZeroToOne: clipSpaceZeroToOne ?? type === 'webgpu',
@@ -49,6 +52,27 @@ function buildMinimalRender(deviceType: (typeof DEVICE_TYPES)[number], emulateDe
 }
 
 describe('depth convention status-quo shader snapshots', () => {
+  test('WebGL1 PCSS Poisson samples avoid array construction and dynamic indexing', () => {
+    const pb = new ProgramBuilder(createMockDevice('webgl'));
+    const ret = pb.buildRender({
+      vertex(pb) {
+        this.$inputs.pos = pb.vec2().attrib('position');
+        pb.main(function () {
+          this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+        });
+      },
+      fragment(pb) {
+        this.$outputs.color = pb.vec4();
+        pb.main(function () {
+          this.$outputs.color = pb.vec4(getProgressivePoissonDiscSample(this, pb.int(7)), 0, 1);
+        });
+      }
+    });
+    expect(ret).not.toBeNull();
+    expect(ret![1]).toContain('lib_getProgressivePoissonDiscSampleWebGL1');
+    expect(ret![1]).not.toContain('PCSSpdSamples');
+  });
+
   test.each([...DEVICE_TYPES])('depth range correction: minimal vertex/fragment (%s)', (deviceType) => {
     const ret = buildMinimalRender(deviceType, false);
     expect(ret).not.toBeNull();

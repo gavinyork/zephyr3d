@@ -1,6 +1,6 @@
 import type { Nullable } from '@zephyr3d/base';
 import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
-import { MAX_CLUSTERED_LIGHTS, MAX_SHADOW_MASK_LIGHTS } from '../values';
+import { MAX_SHADOW_MASK_LIGHTS } from '../values';
 import type {
   AbstractDevice,
   BindGroup,
@@ -40,7 +40,7 @@ export class ClusteredLight {
     this._tileCountX = 16;
     this._tileCountY = 16;
     this._tileCountZ = 32;
-    this._lights = new Float32Array(16 * (MAX_CLUSTERED_LIGHTS + 1));
+    this._lights = new Float32Array(16 * (ShaderHelper.getMaxClusterLights() + 1));
     this._lightIndexTexture = null;
     this._lightIndexFramebuffer = null;
     this._lightIndexProgram = null;
@@ -115,7 +115,7 @@ export class ClusteredLight {
         this.sizeParam = pb.vec4().uniform(0);
         this.countParam = pb.ivec4().uniform(0);
         this[ShaderHelper.getLightBufferUniformName()] =
-          pb.vec4[(MAX_CLUSTERED_LIGHTS + 1) * 4]().uniformBuffer(0);
+          pb.vec4[(ShaderHelper.getMaxClusterLights() + 1) * 4]().uniformBuffer(0);
         pb.func('lineIntersectionToZPlane', [pb.vec3('a'), pb.vec3('b'), pb.float('zDistance')], function () {
           this.$l.normal = pb.vec3(0, 0, 1);
           this.$l.ab = pb.sub(this.b, this.a);
@@ -438,14 +438,21 @@ export class ClusteredLight {
     let numShadow = 0;
     let slot = 0;
     if (useShadowMask) {
-      numShadow = Math.min(renderQueue.shadowedLights.length, MAX_SHADOW_MASK_LIGHTS, MAX_CLUSTERED_LIGHTS);
+      numShadow = Math.min(
+        renderQueue.shadowedLights.length,
+        MAX_SHADOW_MASK_LIGHTS,
+        ShaderHelper.getMaxClusterLights()
+      );
       for (let i = 1; i <= numShadow; i++) {
         writeLight(renderQueue.shadowedLights[i - 1], i);
       }
       slot = numShadow;
     }
     // Unshadowed lights fill the region after the mask-backed shadow lights.
-    const numUnshadowed = Math.min(renderQueue.unshadowedLights.length, MAX_CLUSTERED_LIGHTS - slot);
+    const numUnshadowed = Math.min(
+      renderQueue.unshadowedLights.length,
+      ShaderHelper.getMaxClusterLights() - slot
+    );
     for (let j = 0; j < numUnshadowed; j++) {
       writeLight(renderQueue.unshadowedLights[j], slot + j + 1);
     }
@@ -455,7 +462,7 @@ export class ClusteredLight {
     // they are still lit — without a mask sample, i.e. degraded to no shadow.
     if (useShadowMask && renderQueue.shadowedLights.length > numShadow) {
       const overflow = renderQueue.shadowedLights.length - numShadow;
-      const numOverflow = Math.min(overflow, MAX_CLUSTERED_LIGHTS - slot);
+      const numOverflow = Math.min(overflow, ShaderHelper.getMaxClusterLights() - slot);
       for (let k = 0; k < numOverflow; k++) {
         writeLight(renderQueue.shadowedLights[numShadow + k], slot + k + 1);
       }

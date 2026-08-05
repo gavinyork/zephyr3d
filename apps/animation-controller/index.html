@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Animation Controller</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --panel-bg: rgba(18, 20, 22, 0.86);
+        --panel-border: rgba(255, 255, 255, 0.12);
+        --text: #f1f3f4;
+        --muted: #a9b0b4;
+        --button: #2b3033;
+        --button-hover: #363d41;
+        --active: #1f8f64;
+        --accent: #d9a441;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #161819;
+        color: var(--text);
+        font:
+          13px/1.4 system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+      }
+
+      canvas {
+        display: block;
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      #ui {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        z-index: 10;
+        width: min(380px, calc(100vw - 24px));
+        padding: 12px;
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        background: var(--panel-bg);
+        box-shadow: 0 14px 36px rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(10px);
+      }
+
+      .title {
+        margin-bottom: 10px;
+        font-weight: 650;
+        letter-spacing: 0;
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+
+      button {
+        min-width: 64px;
+        padding: 6px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 6px;
+        background: var(--button);
+        color: var(--text);
+        cursor: pointer;
+      }
+
+      button:hover:not(:disabled) {
+        background: var(--button-hover);
+      }
+
+      button.active {
+        border-color: rgba(255, 255, 255, 0.24);
+        background: var(--active);
+      }
+
+      button.action {
+        min-width: 76px;
+      }
+
+      button:disabled {
+        color: #747b80;
+        cursor: default;
+      }
+
+      .readout {
+        display: grid;
+        grid-template-columns: 72px 1fr;
+        gap: 4px 10px;
+        padding-top: 2px;
+        color: var(--muted);
+      }
+
+      .readout span:nth-child(even) {
+        color: var(--text);
+      }
+
+      #event-log {
+        margin-top: 10px;
+        display: grid;
+        gap: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .log-line {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .log-line strong {
+        color: var(--accent);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <div id="ui">
+      <div class="title">Animation Controller</div>
+      <div class="row">
+        <button id="btn-idle" disabled>Idle</button>
+        <button id="btn-walk" disabled>Walk</button>
+        <button id="btn-run" disabled>Run</button>
+      </div>
+      <div class="row">
+        <button id="btn-shoot" class="action" disabled>Shoot</button>
+        <button id="btn-attack" class="action" disabled>Attack</button>
+        <button id="btn-reset" class="action" disabled>Reset</button>
+      </div>
+      <div class="readout">
+        <span>State</span>
+        <span id="state-value">loading</span>
+        <span>Event</span>
+        <span id="event-value">none</span>
+        <span>Policy</span>
+        <span id="policy-value">none</span>
+      </div>
+      <div id="event-log"></div>
+    </div>
+    <script>
+      // Select the engine depth convention before any engine module loads.
+      const params = new URLSearchParams(location.search);
+      if (params.has('standardZ')) {
+        globalThis.__ZEPHYR3D_REVERSE_Z__ = false;
+      } else if (params.has('reverseZ')) {
+        globalThis.__ZEPHYR3D_REVERSE_Z__ = true;
+      }
+    </script>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

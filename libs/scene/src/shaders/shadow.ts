@@ -178,6 +178,34 @@ const PCF_POISSON_DISC = [
   [0.863832, -0.4072]
 ];
 
+/** @internal */
+export function getProgressivePoissonDiscSample(
+  scope: PBInsideFunctionScope,
+  index: PBShaderExp
+): PBShaderExp {
+  const pb = scope.$builder;
+  if (pb.getDevice().type === 'webgl') {
+    const funcName = 'lib_getProgressivePoissonDiscSampleWebGL1';
+    pb.func(funcName, [pb.int('index')], function () {
+      for (let i = 0; i < PCF_POISSON_DISC.length; i++) {
+        const sample = PCF_POISSON_DISC[(i * 19) % PCF_POISSON_DISC.length];
+        this.$if(pb.equal(this.index, i), function () {
+          this.$return(pb.vec2(sample[0], sample[1]));
+        });
+      }
+      this.$return(pb.vec2(PCF_POISSON_DISC[0][0], PCF_POISSON_DISC[0][1]));
+    });
+    return pb.getGlobalScope()[funcName](index) as PBShaderExp;
+  }
+
+  if (!pb.getGlobalScope().PCSSpdSamples) {
+    pb.getGlobalScope().PCSSpdSamples = PCF_POISSON_DISC.map((sample) => pb.vec2(sample[0], sample[1]));
+  }
+  return pb
+    .getGlobalScope()
+    .PCSSpdSamples.at(pb.mod(pb.mul(index, 19), PCF_POISSON_DISC.length)) as PBShaderExp;
+}
+
 function getPCSSRotationMatrix(
   scope: PBInsideFunctionScope,
   sampleCoord: PBShaderExp,
@@ -722,6 +750,7 @@ function findBlockerPCSS(
     REVERSE_Z && deviceEncoded ? '_rev' : ''
   }`;
   const pb = scope.$builder;
+  const webgl1 = pb.getDevice().type === 'webgl';
   pb.func(
     funcName,
     [
@@ -740,12 +769,14 @@ function findBlockerPCSS(
       this.$l.sampleCoord = pb.vec2();
       this.$l.sampleDepth = pb.float();
       this.$l.blockerWeight = pb.float();
-      this.$for(pb.float('i'), 0, this.tapCount, function () {
+      this.$for(pb.float('i'), 0, webgl1 ? PCF_POISSON_DISC.length : this.tapCount, function () {
+        if (webgl1) {
+          this.$if(pb.greaterThanEqual(this.i, this.tapCount), function () {
+            this.$break();
+          });
+        }
         this.duv = pb.mul(
-          pb.mul(
-            this.matrix,
-            this.PCSSpdSamples.at(pb.mod(pb.mul(pb.int(this.i), 19), PCF_POISSON_DISC.length))
-          ),
+          pb.mul(this.matrix, getProgressivePoissonDiscSample(this, pb.int(this.i))),
           this.searchRadius
         );
         this.sampleCoord = pb.add(this.texCoord.xy, this.duv);
@@ -805,6 +836,7 @@ function findPointBlockerPCSS(
 ) {
   const funcName = `lib_findPointBlockerPCSS_${shadowMapFormat}`;
   const pb = scope.$builder;
+  const webgl1 = pb.getDevice().type === 'webgl';
   pb.func(
     funcName,
     [
@@ -824,12 +856,14 @@ function findPointBlockerPCSS(
       this.$l.sampleDir = pb.vec3();
       this.$l.sampleDepth = pb.float();
       this.$l.blockerWeight = pb.float();
-      this.$for(pb.float('i'), 0, this.tapCount, function () {
+      this.$for(pb.float('i'), 0, webgl1 ? PCF_POISSON_DISC.length : this.tapCount, function () {
+        if (webgl1) {
+          this.$if(pb.greaterThanEqual(this.i, this.tapCount), function () {
+            this.$break();
+          });
+        }
         this.duv = pb.mul(
-          pb.mul(
-            this.matrix,
-            this.PCSSpdSamples.at(pb.mod(pb.mul(pb.int(this.i), 19), PCF_POISSON_DISC.length))
-          ),
+          pb.mul(this.matrix, getProgressivePoissonDiscSample(this, pb.int(this.i))),
           this.searchRadius
         );
         this.sampleDir = pb.normalize(
@@ -1585,6 +1619,7 @@ export function filterShadowPCSS(
 ) {
   const funcNameFilterShadowPCSS = `lib_filterShadowPCSS_${lightType}_${shadowMapFormat}_${receiverPlaneDepthBias ? 1 : 0}_${cascade ? 1 : 0}_${temporalJitter ? 1 : 0}_${numCascades}`;
   const pb = scope.$builder;
+  const webgl1 = pb.getDevice().type === 'webgl';
   pb.func(
     funcNameFilterShadowPCSS,
     [
@@ -1602,10 +1637,6 @@ export function filterShadowPCSS(
         pb.max(this.PCSSlightRadius, this.PCSSmaxFilterRadius),
         0
       );
-
-      if (!pb.getGlobalScope().PCSSpdSamples) {
-        pb.getGlobalScope().PCSSpdSamples = PCF_POISSON_DISC.map((s) => pb.vec2(s[0], s[1]));
-      }
 
       if (lightType === LIGHT_TYPE_POINT) {
         this.$l.lightDepth = this.texCoord.w;
@@ -1654,33 +1685,40 @@ export function filterShadowPCSS(
         this.$l.shadow = pb.float(0);
         this.$l.duv = pb.vec2();
         this.$l.samplePointDir = pb.vec3();
-        this.$for(pb.float('i'), 0, this.PCSSfilterSampleCount, function () {
-          this.duv = pb.mul(
-            pb.mul(
-              this.matrix,
-              this.PCSSpdSamples.at(pb.mod(pb.mul(pb.int(this.i), 19), PCF_POISSON_DISC.length))
-            ),
-            this.filterRadius
-          );
-          this.samplePointDir = pb.normalize(
-            pb.add(
-              this.sampleDir,
-              pb.add(pb.mul(this.tangent, this.duv.x), pb.mul(this.bitangent, this.duv.y))
-            )
-          );
-          this.shadow = pb.add(
-            this.shadow,
-            samplePointShadowPCFPCSS(
-              this,
-              shadowMapFormat,
-              this.samplePointDir,
-              this.lightDepth,
-              this.shadowMapTexelSize,
-              this.tangent,
-              this.bitangent
-            )
-          );
-        });
+        this.$for(
+          pb.float('i'),
+          0,
+          webgl1 ? PCF_POISSON_DISC.length : this.PCSSfilterSampleCount,
+          function () {
+            if (webgl1) {
+              this.$if(pb.greaterThanEqual(this.i, this.PCSSfilterSampleCount), function () {
+                this.$break();
+              });
+            }
+            this.duv = pb.mul(
+              pb.mul(this.matrix, getProgressivePoissonDiscSample(this, pb.int(this.i))),
+              this.filterRadius
+            );
+            this.samplePointDir = pb.normalize(
+              pb.add(
+                this.sampleDir,
+                pb.add(pb.mul(this.tangent, this.duv.x), pb.mul(this.bitangent, this.duv.y))
+              )
+            );
+            this.shadow = pb.add(
+              this.shadow,
+              samplePointShadowPCFPCSS(
+                this,
+                shadowMapFormat,
+                this.samplePointDir,
+                this.lightDepth,
+                this.shadowMapTexelSize,
+                this.tangent,
+                this.bitangent
+              )
+            );
+          }
+        );
         this.shadow = pb.div(this.shadow, this.PCSSfilterSampleCount);
         this.$return(this.shadow);
         return;
@@ -1759,12 +1797,14 @@ export function filterShadowPCSS(
       this.$l.duv = pb.vec2();
       this.$l.sampleCoord = pb.vec2();
       this.$l.compareDepth = pb.float();
-      this.$for(pb.float('i'), 0, this.PCSSfilterSampleCount, function () {
+      this.$for(pb.float('i'), 0, webgl1 ? PCF_POISSON_DISC.length : this.PCSSfilterSampleCount, function () {
+        if (webgl1) {
+          this.$if(pb.greaterThanEqual(this.i, this.PCSSfilterSampleCount), function () {
+            this.$break();
+          });
+        }
         this.duv = pb.mul(
-          pb.mul(
-            this.matrix,
-            this.PCSSpdSamples.at(pb.mod(pb.mul(pb.int(this.i), 19), PCF_POISSON_DISC.length))
-          ),
+          pb.mul(this.matrix, getProgressivePoissonDiscSample(this, pb.int(this.i))),
           this.filterRadius
         );
         this.sampleCoord = pb.add(this.texCoord.xy, this.duv);
