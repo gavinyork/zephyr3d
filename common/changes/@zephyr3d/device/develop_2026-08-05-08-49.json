@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Fix wrong ClipSpaceCorrection flag",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}
