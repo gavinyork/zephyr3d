@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Store terrain grass as density maps instead of per-instance data",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
