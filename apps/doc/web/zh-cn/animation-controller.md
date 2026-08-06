@@ -539,6 +539,10 @@ controller.addState('layeredRun', {
 
 <div class="showcase" case="tut-63"></div>
 
+全身插播则采取相反的思路：不是精确替换某一层，而是用带 `onActive: { fadeOut }` 的 response 把整个分层状态淡出，切换到播放全身动作片段的状态（例如闪避），并通过 `returnTo: true` 在播放完成后自动回到分层循环。
+
+<div class="showcase" case="tut-64"></div>
+
 ---
 
 ## 9. 常用规则速查

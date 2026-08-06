@@ -16,6 +16,10 @@
 
 <div class="showcase" case="sample-3"></div>
 
+## Stencil outline
+
+<div class="showcase" case="sample-5"></div>
+
 ## Compute shader
 
 <div class="showcase" case="sample-4"></div>

@@ -276,6 +276,8 @@ function resetIntro() {
 
 Result: when `intro` starts, the node begins spinning with `rotate`; after 0.4 seconds, `wave` starts as well. After both branches finish, `intro-finished` is emitted and the `statecomplete` listener switches the controller to looping `idle`. A Reset button only needs to call `resetIntro()` to force the demo to start from `intro` again.
 
+<div class="showcase" case="tut-59"></div>
+
 ---
 
 ## 5. Emit Events Inside an Action
@@ -533,6 +535,10 @@ controller.addState('layeredRun', {
 Result: `shoot` does not restart or stop `run_lower`. It emits `shoot-fire` mid-action, then restores `pistol_upper` at the current `run_lower` phase. The easy detail to miss is `id: 'upperLoop'` on the restoring play step: without reusing that id, the next `shoot` cannot find the new upper-body loop with `target: 'upperLoop'`.
 
 <div class="showcase" case="tut-63"></div>
+
+The full-body variant takes the opposite approach: instead of surgically replacing one layer, a response with `onActive: { fadeOut }` fades out the whole layered state, switches to a state that plays a full-body clip (a dodge, for example), and uses `returnTo: true` to come back to the layered loops when it completes.
+
+<div class="showcase" case="tut-64"></div>
 
 ---
 

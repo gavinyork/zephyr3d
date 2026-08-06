@@ -78,29 +78,40 @@ The available debug modes are defined by `TerrainDebugMode`: `none`, `vertex_nor
 
 Each terrain owns a `grassRenderer`. Grass is stored in layers, and each layer can have its own blade size and albedo texture.
 
+Grass distribution is authored as a per-layer **density map** — one byte per texel (0 = no grass, 255 = full density) covering the whole terrain region. Individual blade instances are derived data: the engine generates them from the density map with a deterministic hash, so the same density data always produces the same blade placement, and blades follow the terrain height automatically.
+
 ```ts
 const grassTexture = await getEngine().resourceManager.fetchTexture('/terrain/grass-blade.png');
-const layer = terrain.grassRenderer.addLayer(0.12, 0.8, grassTexture);
+const layerIndex = terrain.grassRenderer.addLayer(0.12, 0.8, grassTexture);
+const layer = terrain.grassRenderer.getLayer(layerIndex);
 
-terrain.grassRenderer.addInstances(0, [
-  { x: 1, y: 2, angle: 0.2 },
-  { x: 2, y: 3, angle: 1.1 }
-]);
+// Paint density directly into the density map, then regenerate the affected region
+const w = layer.densityMapWidth;
+const h = layer.densityMapHeight;
+for (let z = 10; z < 20; z++) {
+  for (let x = 10; x < 20; x++) {
+    layer.densityMap[z * w + x] = 255;
+  }
+}
+layer.updateDensityRegion(10, 10, 20, 20);
 ```
 
-Grass instances are organized spatially for culling. Use batches when adding or removing instances; avoid changing single blades every frame.
+Only the tiles overlapping the updated region are regenerated, so incremental edits are cheap. Batch your density writes and call `updateDensityRegion()` once per edit; avoid full-map updates every frame.
 
 Common methods:
 
-| Method | Use |
+| Method / property | Use |
 | --- | --- |
 | `addLayer(width, height, texture)` | Add a grass layer |
 | `setGrassTexture(layer, texture)` | Change a layer texture |
 | `setBladeSize(layer, width, height)` | Change blade geometry |
-| `addInstances(layer, instances)` | Add grass instances |
-| `removeInstances(layer, minX, minZ, maxX, maxZ, count)` | Remove grass instances in a region |
+| `getLayer(index).densityMap` | Density data, one byte per texel |
+| `getLayer(index).densityMapWidth/Height` | Density map dimensions |
+| `getLayer(index).cellsPerTexel` | Placement cells per texel per axis; max blades per texel is its square |
+| `getLayer(index).updateDensityRegion(x0, z0, x1, z1)` | Regenerate blades for a texel region after editing the density map |
+| `getLayer(index).setDensityData(w, h, cells, data)` | Replace the whole density map |
 
-Grass instance fields are `x`, `y`, and `angle`; the `y` field is the terrain-plane Z coordinate.
+Density map texel (x, z) covers the normalized terrain region `[x/w..(x+1)/w, z/h..(z+1)/h]`; blade world positions and rotations are derived deterministically from the density.
 
 ## Serialization
 

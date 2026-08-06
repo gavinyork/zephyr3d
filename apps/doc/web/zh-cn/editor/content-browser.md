@@ -39,7 +39,7 @@
   您的浏览器不支持 video 标签。
 </video>
 
-** 删除`npm`包**:
+**删除`npm`包**：
 1. 在`Project`菜单中选择`Project Settings`
 2. 右键单击`npm`包列表中要删除的项，然后点击`Remove`
 

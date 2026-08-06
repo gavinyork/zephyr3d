@@ -20,6 +20,7 @@ Open `Project -> Plugin Manager...`, then use one of the following actions:
 
 - `Install...` to install a packaged plugin from a `.zip` file
 - `Install Folder...` to install an unpacked plugin folder
+- `Link...` to link a plugin root folder directly into the editor for development (desktop editor only)
 - `New Template...` to generate a starter plugin package inside the editor
 
 After a plugin is installed you can:
@@ -29,6 +30,12 @@ After a plugin is installed you can:
 - Open `Install Package...` to add a third-party npm dependency
 - Open `Settings...` if the plugin exposes a settings schema
 - Remove the plugin from the editor
+
+Notes:
+
+- `Install...` and `Install Folder...` are intended for regular installation and distribution
+- `Link...` is for the desktop development workflow only and is not available in the browser editor
+- `Link...` links the plugin root folder, not `src/` and not `dist/`
 
 ---
 
@@ -64,6 +71,91 @@ Manifest fields:
 - `entry`: required, relative path to the plugin entry module
 - `name`, `version`, `description`: optional but recommended
 - `dependencies`: optional third-party packages used by the plugin
+
+---
+
+## Desktop Development Mode
+
+In the desktop editor, development mode lets the editor load plugin sources directly, without building `dist` and reinstalling after each change.
+
+Recommended folder layout:
+
+```text
+my-editor-plugin/
+  plugin.dev.json
+  plugin.json
+  src/
+    index.ts
+  libs/
+    deps.lock.json
+    deps/
+  dist/
+    index.js
+    plugin.json
+```
+
+Where:
+
+- `plugin.dev.json`: development manifest, used by the desktop `Link...` action
+- `plugin.json`: release manifest, used by installable packages or the `dist` output
+- `src/`: plugin source entry
+- `libs/deps/`: third-party dependencies cached by the editor for linked plugins
+- `dist/`: built release output
+
+Example development manifest `plugin.dev.json`:
+
+```json
+{
+  "id": "com.example.demo-plugin",
+  "name": "Demo Plugin",
+  "version": "0.1.0",
+  "description": "Example editor plugin for Zephyr3d.",
+  "entry": "src/index.ts",
+  "dependencies": {
+    "nanoid": "^5.0.0"
+  }
+}
+```
+
+Development workflow:
+
+1. Start the desktop editor development environment
+2. Open `Project -> Plugin Manager...`
+3. Click `Link...`
+4. Select the plugin root folder
+5. After changing the sources, click `Refresh` manually
+
+Development mode characteristics:
+
+- The editor loads sources under `src` directly; running `npm install` first is not required
+- If `plugin.dev.json` declares third-party packages in `dependencies`, the editor downloads and caches them into `libs/deps/` on first use
+- Subsequent refreshes reuse the local `libs/deps` cache and `libs/deps.lock.json`
+- A development-mode `Refresh` only revalidates `plugin.dev.json` and the entry dependency graph; it does not rescan the whole plugin folder
+
+Caveats:
+
+- Third-party packages used in development mode must be declared in `plugin.dev.json.dependencies`
+- Source changes are not hot-reloaded after `Link...`; click `Refresh` manually
+- If the first dependency download happens offline and there is no local `libs/deps` cache, plugin loading fails
+
+---
+
+## Release Mode
+
+For distribution, use the regular package/build output workflow.
+
+Release workflow:
+
+1. Install the plugin build dependencies
+2. Run the build to produce `dist/`
+3. Verify that `dist/plugin.json`, `dist/index.js` and other outputs are complete
+4. Install the `.zip` package with `Install...`, or install the release folder with `Install Folder...`
+
+Release mode characteristics:
+
+- Uses built JavaScript output, which usually loads faster than development-mode sources
+- Better suited for distributing to other users or delivering stable versions
+- `plugin.json` should describe the release entry, for example `dist/index.js` or the entry file inside the release folder
 
 ---
 
@@ -239,4 +331,10 @@ import { nanoid } from 'nanoid';
 ```
 
 Installed package versions are tracked in `plugin.json` under `dependencies`.
+
+For desktop development-mode (linked) plugins:
+
+- Declare `dependencies` in `plugin.dev.json` instead
+- When you click `Refresh`, the editor automatically syncs missing dependencies into `libs/deps/`
+- Running `npm install` manually is generally not needed
 

@@ -111,10 +111,12 @@ Before painting grass, you need to add grass textures.
 - Adjust appropriate brush size, strength, and other parameters;
 - Use the mouse to paint grass on the terrain;
 
+The grass brush paints **density** onto the selected grass layer: each stroke raises the local grass density, and the engine derives the actual grass blades from the density map deterministically. Brush `Strength` controls how fast the density builds up, and the `Density` slider sets the layer's maximum blade count per area — increase it for lusher grass at full density.
+
 <video src="https://cdn.zephyr3d.org/doc/assets/videos/grass-brush.mp4" controls width="640">
   Your browser does not support the video tag.
 </video>
 
 ### Erase Grass Brush
 
-If the grass is painted too densely, you can use the `erase grass` brush to remove it. The operation method is the same as the `grass` brush.
+If the grass is painted too densely, you can use the `erase grass` brush to remove it. The operation method is the same as the `grass` brush — it lowers the painted density instead of raising it.

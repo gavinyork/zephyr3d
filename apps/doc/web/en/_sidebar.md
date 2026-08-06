@@ -57,6 +57,12 @@
     - [Overview](en/picking.md)
   - Geometry Instancing
     - [Overview](en/instancing-intro.md)
+  - Custom Materials
+    - [Overview](en/user-material.md)
+    - [Unlit Material](en/user-material-unlit.md)
+    - [Lit Material](en/user-material-lit.md)
+    - [Multi-pass Material](en/user-material-multipass.md)
+    - [Shader Variants](en/user-material-var.md)
   - Order-independent Transparency Rendering
     - [Overview](en/oit.md)
   - Multi-view Rendering
@@ -100,5 +106,3 @@
     - [Live Preview](en/editor/preview.md)
     - [Deployment](en/editor/build-deploy.md)
 
-  - Other Topics
-    - [FAQ](en/editor/faq.md)

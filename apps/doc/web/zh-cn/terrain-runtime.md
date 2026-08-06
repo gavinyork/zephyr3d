@@ -78,29 +78,40 @@ terrain.material.debugMode = 'vertex_normal';
 
 每个地形都有一个 `grassRenderer`。草地按 layer 保存，每个 layer 可以有自己的草叶尺寸和 albedo 贴图。
 
+草地分布通过每层一张**密度图**来描述——每 texel 一个字节（0 表示无草，255 表示最大密度），覆盖整个地形区域。每株草的实例是派生数据：引擎使用确定性 hash 从密度图生成草叶实例，因此相同的密度数据总是产生完全相同的草叶分布，草叶也会自动贴合地形高度。
+
 ```ts
 const grassTexture = await getEngine().resourceManager.fetchTexture('/terrain/grass-blade.png');
-const layer = terrain.grassRenderer.addLayer(0.12, 0.8, grassTexture);
+const layerIndex = terrain.grassRenderer.addLayer(0.12, 0.8, grassTexture);
+const layer = terrain.grassRenderer.getLayer(layerIndex);
 
-terrain.grassRenderer.addInstances(0, [
-  { x: 1, y: 2, angle: 0.2 },
-  { x: 2, y: 3, angle: 1.1 }
-]);
+// 直接向密度图写入密度，然后重新生成受影响的区域
+const w = layer.densityMapWidth;
+const h = layer.densityMapHeight;
+for (let z = 10; z < 20; z++) {
+  for (let x = 10; x < 20; x++) {
+    layer.densityMap[z * w + x] = 255;
+  }
+}
+layer.updateDensityRegion(10, 10, 20, 20);
 ```
 
-草实例会按空间结构组织以便裁剪。添加或删除实例时应尽量批量操作，避免每帧频繁修改单根草。
+只有与更新区域相交的 tile 会重新生成，因此增量编辑开销很小。建议批量修改密度后调用一次 `updateDensityRegion()`，避免每帧做全图更新。
 
 常用方法：
 
-| 方法 | 用途 |
+| 方法/属性 | 用途 |
 | --- | --- |
 | `addLayer(width, height, texture)` | 添加草地层 |
 | `setGrassTexture(layer, texture)` | 修改 layer 贴图 |
 | `setBladeSize(layer, width, height)` | 修改草叶几何尺寸 |
-| `addInstances(layer, instances)` | 批量添加草实例 |
-| `removeInstances(layer, minX, minZ, maxX, maxZ, count)` | 删除区域内的草实例 |
+| `getLayer(index).densityMap` | 密度数据，每 texel 一个字节 |
+| `getLayer(index).densityMapWidth/Height` | 密度图尺寸 |
+| `getLayer(index).cellsPerTexel` | 每 texel 每轴的撒点 cell 数；每 texel 最大草叶数为其平方 |
+| `getLayer(index).updateDensityRegion(x0, z0, x1, z1)` | 修改密度图后重新生成指定 texel 区域的草叶 |
+| `getLayer(index).setDensityData(w, h, cells, data)` | 整体替换密度图 |
 
-草实例字段是 `x`、`y` 和 `angle`；其中 `y` 表示地形平面上的 Z 坐标。
+密度图 texel (x, z) 覆盖归一化地形区域 `[x/w..(x+1)/w, z/h..(z+1)/h]`；草叶的世界位置和朝向由密度确定性派生。
 
 ## 序列化
 

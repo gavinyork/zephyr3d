@@ -14,6 +14,16 @@ light.castShadow = true;
 
 ```
 
+Meshes can also be configured to cast shadows or not.
+
+```javascript
+
+// Allow this mesh to cast shadows
+// Default value is true
+mesh.castShadow = true;
+
+```
+
 ## Shadows of directional light：
 
 <div class="showcase" case="tut-16"></div>

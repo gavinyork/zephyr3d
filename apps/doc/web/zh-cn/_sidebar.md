@@ -57,6 +57,12 @@
     - [概述](zh-cn/picking.md)
   - 几何体实例化
     - [概述](zh-cn/instancing-intro.md)
+  - 自定义材质
+    - [概述](zh-cn/user-material.md)
+    - [无光照材质](zh-cn/user-material-unlit.md)
+    - [受光照材质](zh-cn/user-material-lit.md)
+    - [多 Pass 材质](zh-cn/user-material-multipass.md)
+    - [Shader 变体](zh-cn/user-material-var.md)
   - 顺序无关的透明度渲染
     - [概述](zh-cn/oit.md)
   - 多视口渲染
@@ -100,5 +106,3 @@
     - [实时预览](zh-cn/editor/preview.md)
     - [构建与部署](zh-cn/editor/build-deploy.md)
 
-  - 其它
-    - [FAQ](zh-cn/editor/faq.md)

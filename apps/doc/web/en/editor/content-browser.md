@@ -47,6 +47,6 @@ You can import assets by dragging files directly from your operating system into
 1. Open **Project → Project Settings** from the menu.  
 2. In the npm package list, right‑click the package you want to remove and choose **Remove**.
 
-<video src="https://cdn.zephyr3d.org/doc/assets/videos/remove-package-1080p.mp4" controls width="640">
+<video src="https://cdn.zephyr3d.org/doc/assets/videos/remove-package.mp4" controls width="640">
   Your browser does not support the video tag.
 </video>
