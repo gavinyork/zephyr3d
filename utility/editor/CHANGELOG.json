@@ -2,6 +2,23 @@
   "name": "@zephyr3d/editor",
   "entries": [
     {
+      "version": "0.3.14",
+      "tag": "@zephyr3d/editor_v0.3.14",
+      "date": "Thu, 06 Aug 2026 08:52:56 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Store terrain grass as density maps instead of per-instance data"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/scene\" from `^0.9.24` to `0.9.25`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.3.13",
       "tag": "@zephyr3d/editor_v0.3.13",
       "date": "Tue, 04 Aug 2026 10:43:23 GMT",

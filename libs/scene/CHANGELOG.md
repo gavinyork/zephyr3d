@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Wed, 05 Aug 2026 08:50:14 GMT and should not be manually modified.
+This log was last generated on Thu, 06 Aug 2026 08:52:56 GMT and should not be manually modified.
+
+## 0.9.25
+Thu, 06 Aug 2026 08:52:56 GMT
+
+### Patches
+
+- Store terrain grass as density maps instead of per-instance data
 
 ## 0.9.24
 Wed, 05 Aug 2026 08:50:14 GMT

@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/editor
 
-This log was last generated on Tue, 04 Aug 2026 10:43:23 GMT and should not be manually modified.
+This log was last generated on Thu, 06 Aug 2026 08:52:56 GMT and should not be manually modified.
+
+## 0.3.14
+Thu, 06 Aug 2026 08:52:56 GMT
+
+### Patches
+
+- Store terrain grass as density maps instead of per-instance data
 
 ## 0.3.13
 Tue, 04 Aug 2026 10:43:23 GMT

@@ -2,6 +2,18 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.25",
+      "tag": "@zephyr3d/scene_v0.9.25",
+      "date": "Thu, 06 Aug 2026 08:52:56 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Store terrain grass as density maps instead of per-instance data"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.24",
       "tag": "@zephyr3d/scene_v0.9.24",
       "date": "Wed, 05 Aug 2026 08:50:14 GMT",
