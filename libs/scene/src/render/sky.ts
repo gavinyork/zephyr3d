@@ -114,6 +114,14 @@ export class SkyRenderer extends Disposable {
    * Sunny-16 equivalence: 38,400 = 1 / exposure(f/16, 1/125s, ISO 100).
    */
   static readonly FOG_PHYSICAL_LUMINANCE = 38400;
+  /**
+   * @internal
+   *
+   * Direct-sun transmittance floor under full cloud cover. Heavy overcast leaves only a few
+   * percent of direct sunlight; keeping a small non-zero floor lets shadows fade out smoothly
+   * instead of snapping off.
+   */
+  static readonly CLOUD_SUN_MIN_TRANSMITTANCE = 0.05;
   private static readonly _skyCamera = (() => {
     return new PerspectiveCamera(null, Math.PI * 0.5, 1, 20, 1);
   })();
@@ -708,8 +716,15 @@ export class SkyRenderer extends Disposable {
       this.updateBakedSkyMap(ctx);
       this.renderSkyDistantLut(ctx, this._bakedSkyboxTexture.get()!);
     }
+    // Atmosphere extinction times cloud occlusion. The cloud term intentionally applies only to
+    // the scene's directional light, not to the sky bake: the clouds in the cubemap are lit by
+    // the unoccluded sun above the layer, and the bake is where their scattered share of the
+    // energy re-enters as ambient.
     const newSunLight = oldSunLight
-      ? Vector3.mul(ctx.sunLight!.color.xyz(), this.sunTransmittance(ctx.sunLight!))
+      ? Vector3.mul(
+          Vector3.mul(ctx.sunLight!.color.xyz(), this.sunTransmittance(ctx.sunLight!)),
+          this.cloudSunTransmittance(sunDir)
+        )
       : Vector3.zero();
     if (oldSunLight) {
       ctx.sunLight!.setColor(newSunLight);
@@ -1133,6 +1148,32 @@ export class SkyRenderer extends Disposable {
     const t1 = SH - PH;
     const t2 = SH + PH;
     return t1 < 0 ? t2 : t1;
+  }
+  /**
+   * Transmittance of the cloud layer along the sun direction.
+   *
+   * @remarks
+   * Energy-conservation counterpart of the clouds baked into the environment map: the light the
+   * cloud layer scatters into the sky dome has to be removed from the direct sun, otherwise
+   * raising cloud density only ever adds energy. This method is the seam where a future cloud
+   * renderer plugs in; a volumetric implementation should replace it with the transmittance
+   * ray-marched toward the sun (spectral, hence a Vector3).
+   *
+   * The procedural 2D cloud has no real optical depth, so the sun direction is unused and the
+   * result is a gray-scale estimate from coverage alone. In the scatter shader, cloud opacity is
+   * `smoothStep(1, 1 + cloudy, noise + cloudy)`: by `cloudy = 1` the whole 0..1-ish fbm noise
+   * range falls inside the ramp, i.e. the sky is visually fully covered. `cloudy` (clamped to
+   * 0..1) is therefore used directly as the sky coverage. Squaring it accounts for thin/partial
+   * clouds at low coverage barely attenuating the sun, while full cover drops to the
+   * heavy-overcast floor {@link SkyRenderer.CLOUD_SUN_MIN_TRANSMITTANCE}.
+   */
+  cloudSunTransmittance(_sunDir: Immutable<Vector3>): Vector3 {
+    if (this._skyType !== 'scatter') {
+      return Vector3.one();
+    }
+    const coverage = Math.min(1, Math.max(0, this._cloudy));
+    const t = 1 - coverage * coverage * (1 - SkyRenderer.CLOUD_SUN_MIN_TRANSMITTANCE);
+    return new Vector3(t, t, t);
   }
   /** @internal */
   sunTransmittance(sunLight: DirectionalLight) {
