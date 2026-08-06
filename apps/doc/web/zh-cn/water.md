@@ -36,6 +36,8 @@ water.waveGenerator = waves;
 
 `Water` 会根据节点变换计算水平区域。移动节点可改变水面中心，缩放 X/Z 可改变覆盖范围。
 
+<div class="showcase" case="tut-66"></div>
+
 ## 材质控制
 
 水面材质可通过 `water.material` 访问。

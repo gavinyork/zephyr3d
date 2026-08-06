@@ -58,6 +58,10 @@ This approach is suitable for most transparent surfaces such as **glass, water, 
 > Tip  
 > When Weighted Blended OIT is enabled, **manual sorting of transparent objects is not required**.
 
+The following demo shows intersecting transparent objects; toggle OIT off to see the blend-order artifacts:
+
+<div class="showcase" case="tut-67"></div>
+
 ---
 
 ## Per‑Pixel Linked List OIT (ABuffer OIT)

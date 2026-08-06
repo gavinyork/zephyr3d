@@ -36,6 +36,8 @@ water.waveGenerator = waves;
 
 `Water` derives its horizontal region from the node transform. Move the node to move the center of the water area, and scale X/Z to change its coverage.
 
+<div class="showcase" case="tut-66"></div>
+
 ## Material Controls
 
 The water material is available through `water.material`.

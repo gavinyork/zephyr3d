@@ -113,6 +113,10 @@ layer.updateDensityRegion(10, 10, 20, 20);
 
 密度图 texel (x, z) 覆盖归一化地形区域 `[x/w..(x+1)/w, z/h..(z+1)/h]`；草叶的世界位置和朝向由密度确定性派生。
 
+下面的演示程序化生成地形，并通过密度图铺设草地（草只生长在高度上限以下的缓坡上）：
+
+<div class="showcase" case="tut-69"></div>
+
 ## 序列化
 
 `ClipmapTerrain`、它的材质、高度图 asset id、splat map asset id 和草地 asset id 都属于序列化系统的一部分。这也是编辑器中编辑后的地形可以随场景保存和恢复的原因。

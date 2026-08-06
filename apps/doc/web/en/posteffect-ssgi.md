@@ -40,6 +40,8 @@ camera.SSGI = true;
 
 The camera must use HDR, SSGI intensity must be greater than zero, and the IBL must provide both radiance and irradiance data. The device must also support renderable half-float textures, at least two draw buffers, and a 16-byte-per-sample color-attachment budget. 
 
+<div class="showcase" case="tut-68"></div>
+
 **Backend differences:**
 - **WebGPU**: Uses motion vectors, Hi-Z acceleration, historical scene color and full temporal filtering for higher quality
 - **WebGL**: Uses linear ray marching with spatial filtering and same-pixel history validation

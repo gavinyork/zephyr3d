@@ -113,6 +113,10 @@ Common methods:
 
 Density map texel (x, z) covers the normalized terrain region `[x/w..(x+1)/w, z/h..(z+1)/h]`; blade world positions and rotations are derived deterministically from the density.
 
+The following demo builds a procedural terrain and authors grass through the density map (grass grows on gentle slopes below a height limit):
+
+<div class="showcase" case="tut-69"></div>
+
 ## Serialization
 
 `ClipmapTerrain`, its material, height-map asset id, splat-map asset id, and grass asset id are part of the serialization system. This is why terrain edited in the editor can be saved and restored as part of a scene.

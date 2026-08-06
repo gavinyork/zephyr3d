@@ -55,6 +55,10 @@ camera.oit = new WeightedBlendedOIT();
 > 提示  
 > 在启用 Weighted Blended OIT 时，无需进行透明物体的排序处理。
 
+下面的演示展示了多个相互穿插的透明物体；关闭 OIT 可以看到混合顺序错误产生的瑕疵：
+
+<div class="showcase" case="tut-67"></div>
+
 ---
 
 ## Per‑Pixel Linked List OIT（ABuffer OIT）

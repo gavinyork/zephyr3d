@@ -40,6 +40,8 @@ camera.SSGI = true;
 
 相机必须启用 HDR，SSGI 强度必须大于 0，且 IBL 必须同时提供 radiance 和 irradiance 数据。设备还必须支持可渲染的半浮点纹理、至少 2 个 draw buffers 以及 16 字节/采样的颜色附件预算。
 
+<div class="showcase" case="tut-68"></div>
+
 **后端差异：**
 - **WebGPU**：使用运动矢量、Hi-Z 加速、历史场景颜色和完整的时域过滤，质量更高
 - **WebGL**：使用线性光线步进、空间过滤和同像素历史验证
