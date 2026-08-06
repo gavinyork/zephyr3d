@@ -1181,8 +1181,7 @@ export class AssetManager {
     textures: BluePrintUniformTexture[],
     vfs?: VFS
   ): Promise<BluePrintUniformTexture[]> {
-    const uniformTextures: BluePrintUniformTexture[] = [];
-    for (const v of textures ?? []) {
+    return Promise.all((textures ?? []).map(async (v) => {
       let tex: Nullable<BaseTexture> = null;
       if (v.texture) {
         try {
@@ -1195,7 +1194,7 @@ export class AssetManager {
         }
       }
       tex = tex ?? getDefaultTexture2D();
-      uniformTextures.push({
+      return {
         ...v,
         exposed: v.exposed ?? true,
         finalTexture: new DRef(tex),
@@ -1207,9 +1206,8 @@ export class AssetManager {
           mipFilter: v.mipFilter as TextureFilterMode
         }),
         params: tex ? new Vector4(tex.width, tex.height, tex.depth, tex.mipLevelCount) : Vector4.zero()
-      });
-    }
-    return uniformTextures;
+      };
+    }));
   }
   private rebuildGraphStructure(
     nodes: Record<number, IGraphNode>,
@@ -1355,11 +1353,16 @@ export class AssetManager {
         const roots: number[] = [];
         const nodeMap: Record<number, IGraphNode> = {};
         const state = states[k];
-        for (const node of state.nodes) {
-          const impl = await this._resourceManager.deserializeObject<IGraphNode>(null, node.node);
-          nodeMap[node.id] = impl!;
+        const nodes = await Promise.all(
+          state.nodes.map(async (node) => ({
+            id: node.id,
+            impl: await this._resourceManager.deserializeObject<IGraphNode>(null, node.node)
+          }))
+        );
+        for (const { id, impl } of nodes) {
+          nodeMap[id] = impl!;
           if (impl!.outputs.length === 0) {
-            roots.push(node.id);
+            roots.push(id);
           }
         }
         const dag = await this.createBluePrintDAG(nodeMap, roots, state.links);

@@ -1543,17 +1543,25 @@ export class ResourceManager {
               case 'object_array':
                 tmpVal.object = [];
                 if (Array.isArray(v)) {
-                  for (const p of v) {
-                    if (typeof p === 'string' && p) {
-                      tmpVal.str[0] = p;
+                  const values = await Promise.all(
+                    v.map(async (p) =>
+                      typeof p === 'string' && p
+                        ? { kind: 'ref' as const, ref: p }
+                        : {
+                            kind: 'value' as const,
+                            value: p
+                              ? this.isSerializedObjectEnvelope(p)
+                                ? ((await this.deserializeObject<any>(obj, p)) ?? null)
+                                : p
+                              : null
+                          }
+                    )
+                  );
+                  for (const value of values) {
+                    if (value.kind === 'ref') {
+                      tmpVal.str[0] = value.ref;
                     } else {
-                      tmpVal.object.push(
-                        p
-                          ? this.isSerializedObjectEnvelope(p)
-                            ? ((await this.deserializeObject<any>(obj, p)) ?? null)
-                            : p
-                          : null
-                      );
+                      tmpVal.object.push(value.value);
                     }
                   }
                 }
