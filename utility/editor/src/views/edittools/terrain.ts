@@ -1,4 +1,4 @@
-import type { ClipmapTerrain, GrassInstanceInfo } from '@zephyr3d/scene';
+import type { ClipmapTerrain } from '@zephyr3d/scene';
 import UPNG from 'upng-js';
 import { ClipmapTerrainMaterial, CopyBlitter, fetchSampler, getDevice, getEngine } from '@zephyr3d/scene';
 import type { EditTool } from './edittool';
@@ -33,6 +33,31 @@ import { ThermalErosionBrush } from './brushes/thermalerosion';
 import { HydraulicErosionBrush } from './brushes/hydraulicerosion';
 
 const blitter = new CopyBlitter();
+
+/** Density change per brush stamp at full strength, in 1/255 units */
+const GRASS_DENSITY_PER_STAMP = 24;
+
+type BrushMaskData = { width: number; height: number; data: Float32Array };
+
+function sampleBrushMask(mask: BrushMaskData, u: number, v: number): number {
+  const w = mask.width;
+  const h = mask.height;
+  const x = u * w - 0.5;
+  const z = v * h - 0.5;
+  const ix = Math.floor(x);
+  const iz = Math.floor(z);
+  const fx = x - ix;
+  const fz = z - iz;
+  const x0 = Math.min(Math.max(ix, 0), w - 1);
+  const x1 = Math.min(Math.max(ix + 1, 0), w - 1);
+  const z0 = Math.min(Math.max(iz, 0), h - 1);
+  const z1 = Math.min(Math.max(iz + 1, 0), h - 1);
+  const d = mask.data;
+  const a = d[z0 * w + x0] + (d[z0 * w + x1] - d[z0 * w + x0]) * fx;
+  const b = d[z1 * w + x0] + (d[z1 * w + x1] - d[z1 * w + x0]) * fx;
+  return a + (b - a) * fz;
+}
+
 export class TerrainEditTool extends Disposable implements EditTool {
   private static readonly defaultBrush: DRef<Texture2D> = new DRef();
   private readonly _editor: Editor;
@@ -52,6 +77,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
   private readonly _splatMapCopy: DRef<Texture2DArray | Texture2D>;
   private readonly _heightMapCopy: DRef<Texture2D>;
   private _heightDirty: boolean;
+  private readonly _brushMaskCache: Map<Texture2D, BrushMaskData | 'pending'>;
   constructor(editor: Editor, terrain: ClipmapTerrain) {
     super();
     this._terrain = new DRef(terrain);
@@ -146,6 +172,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
     }
     this._brushImageList.selected = 0;
     this._heightDirty = false;
+    this._brushMaskCache = new Map();
     const splatMap = this._terrain.get().material.getSplatMap();
     const splatMapCopy =
       getDevice().type === 'webgl'
@@ -292,22 +319,16 @@ export class TerrainEditTool extends Disposable implements EditTool {
           }
           break;
         case 'grass':
-          if (this._grassAlbedo.selected >= 0) {
-            this.applyGrassBrush(
-              this._hitPos,
-              this._brushSize,
-              this._brushStrength,
-              this._grassAlbedo.selected
-            );
-          }
-          break;
         case 'erase grass':
           if (this._grassAlbedo.selected >= 0) {
-            this.applyGrassEraseBrush(
+            this.applyGrassBrush(
+              texture,
               this._hitPos,
               this._brushSize,
+              angle,
               this._brushStrength,
-              this._grassAlbedo.selected
+              this._grassAlbedo.selected,
+              this._editList[this._editSelected] === 'erase grass'
             );
           }
           break;
@@ -316,78 +337,106 @@ export class TerrainEditTool extends Disposable implements EditTool {
       }
     }
   }
-  applyGrassEraseBrush(hitPos: Vector2, brushSize: number, brushStrength: number, grassIndex: number) {
-    const region = this._terrain.get().worldRegion;
-    const posMinX = Math.max(hitPos.x - brushSize, region.x);
-    const posMaxX = Math.min(hitPos.x + brushSize, region.z);
-    const posMinZ = Math.max(hitPos.y - brushSize, region.y);
-    const posMaxZ = Math.min(hitPos.y + brushSize, region.w);
-    const area = (posMaxZ - posMinZ) * (posMaxX - posMinX);
-    const regionWidthInv = 1 / (region.z - region.x);
-    const regionHeightInv = 1 / (region.w - region.y);
-    const numInstances = Math.ceil(area * brushStrength * 0.1);
-    this._terrain
-      .get()
-      .grassRenderer.removeInstances(
-        grassIndex,
-        (posMinX - region.x) * regionWidthInv,
-        (posMinZ - region.y) * regionHeightInv,
-        (posMaxX - region.x) * regionWidthInv,
-        (posMaxZ - region.y) * regionHeightInv,
-        numInstances
-      );
-    eventBus.dispatchEvent('scene_changed');
-  }
-  applyGrassBrush(hitPos: Vector2, brushSize: number, brushStrength: number, grassIndex: number) {
-    const region = this._terrain.get().worldRegion;
-    const posMinX = hitPos.x - brushSize;
-    const posMaxX = hitPos.x + brushSize;
-    const posMinZ = hitPos.y - brushSize;
-    const posMaxZ = hitPos.y + brushSize;
-    const area = (posMaxZ - posMinZ) * (posMaxX - posMinX);
-    const regionWidthInv = 1 / (region.z - region.x);
-    const regionHeightInv = 1 / (region.w - region.y);
-    const numInstances = Math.ceil(area * brushStrength * 0.02);
-    /*
-    const instances: GrassInstanceInfo[] = Array.from({ length: numInstances }).map(() => ({
-      x: (posMinX + Math.random() * (posMaxX - posMinX) - region.x) * regionWidthInv,
-      y: (posMinZ + Math.random() * (posMaxZ - posMinZ) - region.y) * regionHeightInv,
-      angle: Math.random() * Math.PI * 2
-    }));
-    */
-    const centerX = (posMinX + posMaxX) * 0.5;
-    const centerZ = (posMinZ + posMaxZ) * 0.5;
-    const radius = Math.min(posMaxX - centerX, posMaxZ - centerZ);
-    const instances: GrassInstanceInfo[] = Array.from({ length: numInstances })
-      .map(() => {
-        let r: number;
-        const sigma = 0.4;
-        do {
-          let u = 0;
-          let v = 0;
-          while (u === 0) {
-            u = Math.random();
-          }
-          while (v === 0) {
-            v = Math.random();
-          }
-          const z0 = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-          r = Math.abs(z0 * sigma);
-        } while (r > 1);
-        const theta = Math.random() * 2 * Math.PI;
-        const x = r * Math.cos(theta) * radius + centerX;
-        const y = r * Math.sin(theta) * radius + centerZ;
-        return {
-          x: (x - region.x) * regionWidthInv,
-          y: (y - region.y) * regionHeightInv,
-          angle: Math.random() * Math.PI * 2
-        };
+  /**
+   * Fetches the CPU-side copy of a brush mask texture, kicking off an async
+   * readback on first use. Returns null while the readback is in flight.
+   */
+  private getBrushMask(texture: Texture2D): BrushMaskData | null {
+    const cached = this._brushMaskCache.get(texture);
+    if (cached) {
+      return cached === 'pending' ? null : cached;
+    }
+    this._brushMaskCache.set(texture, 'pending');
+    const width = texture.width;
+    const height = texture.height;
+    const pixels = new Uint8Array(width * height * 4);
+    texture
+      .readPixels(0, 0, width, height, 0, 0, pixels)
+      .then(() => {
+        const data = new Float32Array(width * height);
+        for (let i = 0; i < data.length; i++) {
+          data[i] = pixels[i * 4] / 255;
+        }
+        this._brushMaskCache.set(texture, { width, height, data });
       })
-      .filter((v) => {
-        return v.x >= 0 && v.x <= 1 && v.y >= 0 && v.y <= 1;
+      .catch((err) => {
+        console.error(`Read brush texture failed: ${err}`);
+        this._brushMaskCache.set(texture, { width: 1, height: 1, data: new Float32Array([1]) });
       });
-    this._terrain.get().grassRenderer.addInstances(grassIndex, instances);
-    eventBus.dispatchEvent('scene_changed');
+    return null;
+  }
+  /**
+   * Paints grass density onto the selected layer's density map and regenerates
+   * the affected blade instances. Erasing is painting with negative strength.
+   */
+  applyGrassBrush(
+    brushTexture: Texture2D,
+    hitPos: Vector2,
+    brushSize: number,
+    angle: number,
+    brushStrength: number,
+    grassIndex: number,
+    erase: boolean
+  ) {
+    const layer = this._terrain.get().grassRenderer.getLayer(grassIndex);
+    if (!layer || brushSize <= 0 || brushStrength <= 0) {
+      return;
+    }
+    const mask = this.getBrushMask(brushTexture);
+    if (!mask) {
+      return;
+    }
+    const region = this._terrain.get().worldRegion;
+    const regionW = region.z - region.x;
+    const regionH = region.w - region.y;
+    if (regionW <= 0 || regionH <= 0) {
+      return;
+    }
+    const dw = layer.densityMapWidth;
+    const dh = layer.densityMapHeight;
+    const density = layer.densityMap;
+    const tx0 = Math.max(0, Math.floor(((hitPos.x - brushSize - region.x) / regionW) * dw));
+    const tx1 = Math.min(dw, Math.ceil(((hitPos.x + brushSize - region.x) / regionW) * dw));
+    const tz0 = Math.max(0, Math.floor(((hitPos.y - brushSize - region.y) / regionH) * dh));
+    const tz1 = Math.min(dh, Math.ceil(((hitPos.y + brushSize - region.y) / regionH) * dh));
+    if (tx1 <= tx0 || tz1 <= tz0) {
+      return;
+    }
+    // The GPU brushes stamp a rotated quad whose corners lie at distance
+    // brushSize from the center, so the stamp half extent is brushSize/sqrt(2)
+    const halfExtent = brushSize * Math.SQRT1_2;
+    const s = Math.sin(angle);
+    const c = Math.cos(angle);
+    const amount = brushStrength * GRASS_DENSITY_PER_STAMP;
+    const sign = erase ? -1 : 1;
+    let changed = false;
+    for (let iz = tz0; iz < tz1; iz++) {
+      const wz = region.y + ((iz + 0.5) / dh) * regionH - hitPos.y;
+      for (let ix = tx0; ix < tx1; ix++) {
+        const wx = region.x + ((ix + 0.5) / dw) * regionW - hitPos.x;
+        // inverse-rotate into brush space
+        const u = (c * wx + s * wz) / (2 * halfExtent) + 0.5;
+        const v = (c * wz - s * wx) / (2 * halfExtent) + 0.5;
+        if (u < 0 || u > 1 || v < 0 || v > 1) {
+          continue;
+        }
+        const m = sampleBrushMask(mask, u, v);
+        if (m <= 0) {
+          continue;
+        }
+        const index = iz * dw + ix;
+        const step = sign * Math.max(1, Math.round(amount * m));
+        const val = Math.min(255, Math.max(0, density[index] + step));
+        if (val !== density[index]) {
+          density[index] = val;
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      layer.updateDensityRegion(tx0, tz0, tx1, tz1);
+      eventBus.dispatchEvent('scene_changed');
+    }
   }
   applyTextureBrush(
     brush: TerrainTextureBrush,
@@ -787,5 +836,6 @@ export class TerrainEditTool extends Disposable implements EditTool {
     this._detailNormal = null;
     this._splatMapCopy.dispose();
     this._heightMapCopy.dispose();
+    this._brushMaskCache.clear();
   }
 }

@@ -1,66 +1,92 @@
-import type { GrassInstanceInfo } from '../../../scene';
 import { GraphNode, type SceneNode } from '../../../scene';
 import { defineProps, type SerializableClass } from '../types';
 import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
 import type { Texture2D } from '@zephyr3d/device';
-import type { Nullable, TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
 import type { ResourceManager } from '../manager';
 import { JSONArray } from '../json';
 import { getDevice } from '../../../app/api';
 
-function mergeTypedArrays<T extends TypedArray>(ctor: TypedArrayConstructor<T>, arrays: T[]): T {
-  const totalLength = arrays.reduce((acc, arr) => acc + arr.length, 0);
-  const result = new ctor(totalLength);
-  let offset = 0;
-  for (const array of arrays) {
-    result.set(array, offset);
-    offset += array.length;
-  }
-  return result;
-}
+// 'GRAS' in little endian. The legacy per-instance format starts with the
+// layer count, so any realistic legacy file can not collide with this magic.
+const GRASS_DATA_MAGIC = 0x53415247;
+const GRASS_DATA_VERSION = 1;
 
-async function getTerrainGrassContent(terrain: ClipmapTerrain): Promise<ArrayBuffer> {
+function getTerrainGrassContent(terrain: ClipmapTerrain): ArrayBuffer {
   const grassRenderer = terrain.grassRenderer;
-  const layerDatas: Uint8Array<ArrayBuffer>[] = [];
-  let dataSize = 4 + 4 * grassRenderer.numLayers;
-  for (let i = 0; i < grassRenderer.numLayers; i++) {
-    const promises: Promise<Uint8Array<ArrayBuffer>>[] = [];
-    const layer = grassRenderer.getLayer(i);
-    const queue = [layer.quadtree];
-    while (queue.length > 0) {
-      const quadtreeNode = queue.shift()!;
-      if (quadtreeNode.children) {
-        queue.push(...quadtreeNode.children);
-      }
-      const grassInstances = quadtreeNode.grassInstances!;
-      if (grassInstances.numInstances > 0) {
-        const instanceBuffer = grassInstances.instanceBuffer;
-        const P = instanceBuffer.getBufferSubData(null, 0, grassInstances.numInstances * 4 * 4);
-        promises.push(P);
-      }
-    }
-    if (promises.length > 0) {
-      const data = await Promise.all(promises);
-      const merged = mergeTypedArrays(Uint8Array, data) as Uint8Array<ArrayBuffer>;
-      dataSize += merged.length;
-      layerDatas.push(merged);
-    } else {
-      layerDatas.push(new Uint8Array());
-    }
+  const numLayers = grassRenderer.numLayers;
+  let dataSize = 3 * 4;
+  for (let i = 0; i < numLayers; i++) {
+    dataSize += 4 * 4 + grassRenderer.getLayer(i).densityMap.length;
   }
   const data = new DataView(new ArrayBuffer(dataSize));
-  const view = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  const view = new Uint8Array(data.buffer);
   let offset = 0;
-  data.setUint32(offset, grassRenderer.numLayers, true);
+  data.setUint32(offset, GRASS_DATA_MAGIC, true);
   offset += 4;
-  for (let i = 0; i < grassRenderer.numLayers; i++) {
-    data.setUint32(offset, layerDatas[i].length, true);
+  data.setUint32(offset, GRASS_DATA_VERSION, true);
+  offset += 4;
+  data.setUint32(offset, numLayers, true);
+  offset += 4;
+  for (let i = 0; i < numLayers; i++) {
+    const layer = grassRenderer.getLayer(i);
+    data.setUint32(offset, layer.densityMapWidth, true);
     offset += 4;
-    view.set(layerDatas[i], offset);
-    offset += layerDatas[i].length;
+    data.setUint32(offset, layer.densityMapHeight, true);
+    offset += 4;
+    data.setUint32(offset, layer.cellsPerTexel, true);
+    offset += 4;
+    data.setUint32(offset, layer.densityMap.length, true);
+    offset += 4;
+    view.set(layer.densityMap, offset);
+    offset += layer.densityMap.length;
   }
   return data.buffer;
+}
+
+/**
+ * Imports grass data saved by the legacy per-instance format by baking the
+ * blade instances into the per-layer density maps. Blade positions will be
+ * re-derived from the density, so they will not match the original ones
+ * exactly, but the local density is preserved.
+ */
+function importLegacyGrassInstances(terrain: ClipmapTerrain, dataView: DataView): boolean {
+  const grassRenderer = terrain.grassRenderer;
+  const numLayers = dataView.getUint32(0, true);
+  if (numLayers !== grassRenderer.numLayers) {
+    console.error('Number of grass layers mismatch');
+    return false;
+  }
+  let offset = 4;
+  for (let i = 0; i < numLayers; i++) {
+    const dataSize = dataView.getUint32(offset, true);
+    offset += 4;
+    if (dataSize > 0) {
+      const layer = grassRenderer.getLayer(i);
+      const w = layer.densityMapWidth;
+      const h = layer.densityMapHeight;
+      const counts = new Uint32Array(w * h);
+      // legacy instance layout: x, y, sin(angle), cos(angle) as floats
+      const floats = new Float32Array(dataView.buffer, dataView.byteOffset + offset, dataSize >> 2);
+      const numInstances = floats.length >> 2;
+      for (let j = 0; j < numInstances; j++) {
+        const x = Math.min(Math.max(Math.floor(floats[j * 4 + 0] * w), 0), w - 1);
+        const z = Math.min(Math.max(Math.floor(floats[j * 4 + 1] * h), 0), h - 1);
+        counts[z * w + x]++;
+      }
+      const density = layer.densityMap;
+      const maxPerTexel = layer.cellsPerTexel * layer.cellsPerTexel;
+      for (let t = 0; t < counts.length; t++) {
+        if (counts[t] > 0) {
+          density[t] = Math.min(255, Math.round((counts[t] / maxPerTexel) * 255));
+        }
+      }
+      layer.updateDensityRegion(0, 0, w, h);
+      offset += dataSize;
+    }
+  }
+  return true;
 }
 
 async function getTerrainHeightMapContent(terrain: ClipmapTerrain): Promise<ArrayBuffer> {
@@ -373,35 +399,31 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
             if (value.str[0]) {
               const path = value.str[0];
               const data = (await manager.VFS.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
-              if (!data) {
+              if (!data || data.byteLength < 4) {
                 console.error('Load grass data failed');
                 return;
               }
               const dataView = new DataView(data);
-              let offset = 0;
-              const numLayers = dataView.getUint32(offset, true);
-              if (numLayers !== this.grassRenderer.numLayers) {
-                console.error('Number of grass layers mismatch');
-                return;
-              }
-              offset += 4;
-              for (let i = 0; i < numLayers; i++) {
-                const dataSize = dataView.getUint32(offset, true);
-                offset += 4;
-                if (dataSize > 0) {
-                  const data = new Float32Array(dataView.buffer, dataView.byteOffset + offset, dataSize >> 2);
-                  const numInstances = data.length >> 2;
-                  const instances: GrassInstanceInfo[] = [];
-                  for (let i = 0; i < numInstances; i++) {
-                    instances.push({
-                      x: data[i * 4 + 0],
-                      y: data[i * 4 + 1],
-                      angle: Math.atan2(data[i * 4 + 2], data[i * 4 + 3])
-                    });
-                  }
-                  this.grassRenderer.addInstances(i, instances);
-                  offset += dataSize;
+              if (dataView.getUint32(0, true) === GRASS_DATA_MAGIC) {
+                // density map format, version at offset 4 is currently always 1
+                const numLayers = dataView.getUint32(8, true);
+                if (numLayers !== this.grassRenderer.numLayers) {
+                  console.error('Number of grass layers mismatch');
+                  return;
                 }
+                let offset = 12;
+                for (let i = 0; i < numLayers; i++) {
+                  const width = dataView.getUint32(offset, true);
+                  const height = dataView.getUint32(offset + 4, true);
+                  const cellsPerTexel = dataView.getUint32(offset + 8, true);
+                  const byteLength = dataView.getUint32(offset + 12, true);
+                  offset += 16;
+                  const densityData = new Uint8Array(data, offset, byteLength).slice();
+                  offset += byteLength;
+                  this.grassRenderer.getLayer(i).setDensityData(width, height, cellsPerTexel, densityData);
+                }
+              } else if (!importLegacyGrassInstances(this, dataView)) {
+                return;
               }
               this.grassAssetId = value.str[0];
             }
