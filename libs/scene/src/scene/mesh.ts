@@ -80,6 +80,9 @@ export interface MorphTargetSourceData {
 const MORPH_WEIGHT_CAPACITY = MORPH_WEIGHTS_VECTOR_COUNT * 4;
 const MORPH_ATTRIBUTE_CAPACITY = MORPH_ATTRIBUTE_VECTOR_COUNT * 4;
 const MORPH_INFO_DATA_LENGTH = 4 + MORPH_WEIGHT_CAPACITY + MORPH_ATTRIBUTE_CAPACITY;
+const MORPH_RENDER_INDEX_OFFSET = 4 + MORPH_WEIGHT_CAPACITY;
+const MORPH_RENDER_ATTRIBUTE_OFFSET = MORPH_RENDER_INDEX_OFFSET + MORPH_WEIGHT_CAPACITY;
+const MORPH_RENDER_INFO_DATA_LENGTH = MORPH_RENDER_ATTRIBUTE_OFFSET + MORPH_ATTRIBUTE_CAPACITY;
 const ACTIVE_MORPH_WEIGHT_EPSILON = 1e-5;
 
 function normalizeMorphInfoData(data: MorphInfo['data']) {
@@ -110,7 +113,7 @@ function createMorphInfoBuffer(data: Float32Array) {
       name: ShaderHelper.getMorphInfoUniformName(),
       type: new PBArrayTypeInfo(
         new PBPrimitiveTypeInfo(PBPrimitiveType.F32VEC4),
-        1 + MORPH_WEIGHTS_VECTOR_COUNT + MORPH_ATTRIBUTE_VECTOR_COUNT
+        1 + MORPH_WEIGHTS_VECTOR_COUNT * 2 + MORPH_ATTRIBUTE_VECTOR_COUNT
       )
     }
   ]);
@@ -164,6 +167,10 @@ export class Mesh extends MeshBase implements BatchDrawable {
   /** @internal */
   protected _activeMorphTargetIndices: Uint32Array<ArrayBuffer>;
   /** @internal */
+  protected _compactMorphData: boolean;
+  /** @internal */
+  protected _activeMorphCandidates: { index: number; weight: number }[];
+  /** @internal */
   protected _morphDirty: boolean;
   /** @internal */
   protected _instanceHash: Nullable<string>;
@@ -203,6 +210,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._morphSource = null;
     this._morphSourceData = null;
     this._activeMorphTargetIndices = new Uint32Array(0);
+    this._compactMorphData = false;
+    this._activeMorphCandidates = [];
     this._morphDirty = false;
     this._instanceHash = null;
     this._pickTarget = { node: this };
@@ -469,6 +478,9 @@ export class Mesh extends MeshBase implements BatchDrawable {
       this._ensureWebGLVertexIndexAttribute('morphing');
       this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
+      if (this._morphInfo && !this._morphSourceData) {
+        this.updateRenderMorphInfo(this.collectActiveMorphTargetIndices(), false);
+      }
     }
   }
   /**
@@ -515,11 +527,14 @@ export class Mesh extends MeshBase implements BatchDrawable {
   setMorphSourceData(data: Nullable<MorphTargetSourceData>) {
     this._morphSourceData = data ?? null;
     this._activeMorphTargetIndices = new Uint32Array(0);
+    this._compactMorphData = false;
     this._morphDirty = true;
     if (!data) {
       this.setMorphData(null);
       this.setRenderMorphInfo(null);
     } else if (this._morphInfo) {
+      this.setMorphData(null);
+      this.setRenderMorphInfo(null);
       this.rebuildActiveMorphData();
       this._morphDirty = false;
     }
@@ -536,6 +551,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
       this.setMorphData(null);
       this.setRenderMorphInfo(null);
       this._activeMorphTargetIndices = new Uint32Array(0);
+      this._compactMorphData = false;
       this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
     } else {
@@ -558,7 +574,13 @@ export class Mesh extends MeshBase implements BatchDrawable {
       this._morphInfo.names = names;
       this._morphDirty = true;
       if (this._morphSourceData) {
+        this.setMorphData(null);
+        this.setRenderMorphInfo(null);
         this.rebuildActiveMorphData();
+        this._morphDirty = false;
+      } else if (this._morphData) {
+        this.setRenderMorphInfo(null);
+        this.updateRenderMorphInfo(this.collectActiveMorphTargetIndices(), false);
         this._morphDirty = false;
       }
       this.refreshAnimatedBoundingBox();
@@ -608,19 +630,38 @@ export class Mesh extends MeshBase implements BatchDrawable {
     if (activeLimit <= 0) {
       return new Uint32Array(0);
     }
-    const weighted: { index: number; weight: number }[] = [];
+    const weighted = this._activeMorphCandidates;
+    let weightedCount = 0;
     for (let i = 0; i < count; i++) {
       const weight = this._morphInfo.data[4 + i];
       if (Math.abs(weight) > ACTIVE_MORPH_WEIGHT_EPSILON) {
-        weighted.push({ index: i, weight: Math.abs(weight) });
+        const candidate = weighted[weightedCount] ?? { index: i, weight: 0 };
+        candidate.index = i;
+        candidate.weight = Math.abs(weight);
+        weighted[weightedCount] = candidate;
+        weightedCount++;
       }
     }
-    if (weighted.length > activeLimit) {
+    weighted.length = weightedCount;
+    let selectedCount = weightedCount;
+    if (weightedCount > activeLimit) {
       weighted.sort((a, b) => b.weight - a.weight);
-      weighted.length = activeLimit;
+      selectedCount = activeLimit;
     }
-    weighted.sort((a, b) => a.index - b.index);
-    return new Uint32Array(weighted.map((item) => item.index));
+    for (let i = 1; i < selectedCount; i++) {
+      const candidate = weighted[i];
+      let targetIndex = i;
+      while (targetIndex > 0 && weighted[targetIndex - 1].index > candidate.index) {
+        weighted[targetIndex] = weighted[targetIndex - 1];
+        targetIndex--;
+      }
+      weighted[targetIndex] = candidate;
+    }
+    const activeIndices = new Uint32Array(selectedCount);
+    for (let i = 0; i < selectedCount; i++) {
+      activeIndices[i] = weighted[i].index;
+    }
+    return activeIndices;
   }
   /** @internal */
   private rebuildActiveMorphData() {
@@ -628,36 +669,52 @@ export class Mesh extends MeshBase implements BatchDrawable {
       this.setMorphData(null);
       this.setRenderMorphInfo(null);
       this._activeMorphTargetIndices = new Uint32Array(0);
+      this._compactMorphData = false;
       return;
     }
     const activeIndices = this.collectActiveMorphTargetIndices();
-    if (activeIndices.length === 0) {
-      this.setMorphData(null);
-      this.setRenderMorphInfo(null);
-      this._activeMorphTargetIndices = activeIndices;
-      return;
-    }
     const sameActiveSet =
       this._activeMorphTargetIndices.length === activeIndices.length &&
       this._activeMorphTargetIndices.every((value, index) => value === activeIndices[index]);
-    if (sameActiveSet && this._renderMorphInfo && this._morphData) {
-      this._renderMorphInfo.data[3] = activeIndices.length;
-      for (let slot = 0; slot < activeIndices.length; slot++) {
-        this._renderMorphInfo.data[4 + slot] = this._morphInfo.data[4 + activeIndices[slot]];
-      }
-      for (let slot = activeIndices.length; slot < MORPH_WEIGHT_CAPACITY; slot++) {
-        this._renderMorphInfo.data[4 + slot] = 0;
-      }
+    if (this._morphData && (!this._compactMorphData || sameActiveSet)) {
+      this.updateRenderMorphInfo(activeIndices, this._compactMorphData);
       this._activeMorphTargetIndices = activeIndices;
       return;
     }
     const attributes = Object.keys(this._morphSourceData.targets)
       .map((key) => Number(key))
-      .filter((value) => Number.isInteger(value) && value >= 0)
+      .filter((value) => Number.isInteger(value) && value >= 0 && value < MORPH_ATTRIBUTE_CAPACITY)
       .sort((a, b) => a - b);
     const numVertices = this._morphSourceData.numVertices;
-    const textureSize = Math.ceil(Math.sqrt(numVertices * attributes.length * activeIndices.length));
-    if (textureSize > getDevice().getDeviceCaps().textureCaps.maxTextureSize) {
+    const textureTargetCount = Math.min(this.getNumMorphTargets(), this._morphSourceData.numTargets);
+    if (numVertices <= 0 || attributes.length === 0 || textureTargetCount <= 0) {
+      this.setMorphData(null);
+      this.setRenderMorphInfo(null);
+      this._activeMorphTargetIndices = new Uint32Array(0);
+      this._compactMorphData = false;
+      return;
+    }
+    const maxTextureSize = getDevice().getDeviceCaps().textureCaps.maxTextureSize;
+    const fullTextureSize = Math.ceil(Math.sqrt(numVertices * attributes.length * textureTargetCount));
+    let textureTargetIndices: Uint32Array<ArrayBuffer>;
+    if (fullTextureSize <= maxTextureSize) {
+      textureTargetIndices = new Uint32Array(textureTargetCount);
+      for (let i = 0; i < textureTargetCount; i++) {
+        textureTargetIndices[i] = i;
+      }
+      this._compactMorphData = false;
+    } else if (activeIndices.length > 0) {
+      textureTargetIndices = activeIndices;
+      this._compactMorphData = true;
+    } else {
+      this.setMorphData(null);
+      this.setRenderMorphInfo(null);
+      this._activeMorphTargetIndices = activeIndices;
+      this._compactMorphData = true;
+      return;
+    }
+    const textureSize = Math.ceil(Math.sqrt(numVertices * attributes.length * textureTargetIndices.length));
+    if (textureSize > maxTextureSize) {
       console.warn(
         `Active morph target texture too large for mesh "${this.name ?? ''}": ${textureSize} exceeds device limit`
       );
@@ -667,16 +724,9 @@ export class Mesh extends MeshBase implements BatchDrawable {
       return;
     }
     const textureData = new Float32Array(textureSize * textureSize * 4);
-    const infoData = new Float32Array(4 + MORPH_WEIGHT_CAPACITY + MORPH_ATTRIBUTE_CAPACITY);
+    const attributeOffsets = new Float32Array(MORPH_ATTRIBUTE_CAPACITY);
     for (let i = 0; i < MORPH_ATTRIBUTE_CAPACITY; i++) {
-      infoData[4 + MORPH_WEIGHT_CAPACITY + i] = -1;
-    }
-    infoData[0] = textureSize;
-    infoData[1] = textureSize;
-    infoData[2] = numVertices;
-    infoData[3] = activeIndices.length;
-    for (let slot = 0; slot < activeIndices.length; slot++) {
-      infoData[4 + slot] = this._morphInfo.data[4 + activeIndices[slot]];
+      attributeOffsets[i] = -1;
     }
     let offset = 0;
     for (const attrib of attributes) {
@@ -684,9 +734,9 @@ export class Mesh extends MeshBase implements BatchDrawable {
       if (!source) {
         continue;
       }
-      infoData[4 + MORPH_WEIGHT_CAPACITY + attrib] = offset >> 2;
-      for (let slot = 0; slot < activeIndices.length; slot++) {
-        const targetIndex = activeIndices[slot];
+      attributeOffsets[attrib] = offset >> 2;
+      for (let slot = 0; slot < textureTargetIndices.length; slot++) {
+        const targetIndex = textureTargetIndices[slot];
         const targetData = source.data[targetIndex];
         const sparseIndices = source.indices?.[targetIndex];
         const baseOffset = offset + slot * numVertices * 4;
@@ -706,18 +756,47 @@ export class Mesh extends MeshBase implements BatchDrawable {
           }
         }
       }
-      offset += numVertices * 4 * activeIndices.length;
-    }
-    const names: Record<string, number> = {};
-    for (const [name, index] of Object.entries(this._morphInfo.names ?? {})) {
-      const slot = activeIndices.indexOf(index);
-      if (slot >= 0) {
-        names[name] = slot;
-      }
+      offset += numVertices * 4 * textureTargetIndices.length;
     }
     this.setMorphData({ width: textureSize, height: textureSize, data: textureData });
-    this.setRenderMorphInfo({ data: infoData, names });
+    this.updateRenderMorphInfo(activeIndices, this._compactMorphData, attributeOffsets);
     this._activeMorphTargetIndices = activeIndices;
+  }
+  /** @internal */
+  private updateRenderMorphInfo(
+    activeIndices: Uint32Array<ArrayBuffer>,
+    useCompactSlots: boolean,
+    attributeOffsets?: Float32Array<ArrayBuffer>
+  ) {
+    if (!this._morphInfo || !this._morphData) {
+      this.setRenderMorphInfo(null);
+      return;
+    }
+    const infoData = this._renderMorphInfo?.data instanceof Float32Array &&
+      this._renderMorphInfo.data.length === MORPH_RENDER_INFO_DATA_LENGTH
+      ? this._renderMorphInfo.data
+      : new Float32Array(MORPH_RENDER_INFO_DATA_LENGTH);
+    infoData[0] = this._morphData.width;
+    infoData[1] = this._morphData.height;
+    infoData[2] = this._morphSourceData?.numVertices ?? (Number(this._morphInfo.data[2]) || 0);
+    infoData[3] = activeIndices.length;
+    infoData.fill(0, 4, MORPH_RENDER_ATTRIBUTE_OFFSET);
+    for (let slot = 0; slot < activeIndices.length; slot++) {
+      const targetIndex = activeIndices[slot];
+      infoData[4 + slot] = this._morphInfo.data[4 + targetIndex];
+      infoData[MORPH_RENDER_INDEX_OFFSET + slot] = useCompactSlots ? slot : targetIndex;
+    }
+    if (attributeOffsets) {
+      infoData.fill(-1, MORPH_RENDER_ATTRIBUTE_OFFSET);
+      infoData.set(attributeOffsets, MORPH_RENDER_ATTRIBUTE_OFFSET);
+    } else if (!this._renderMorphInfo) {
+      infoData.fill(-1, MORPH_RENDER_ATTRIBUTE_OFFSET);
+      for (let attrib = 0; attrib < MORPH_ATTRIBUTE_CAPACITY; attrib++) {
+        infoData[MORPH_RENDER_ATTRIBUTE_OFFSET + attrib] =
+          this._morphInfo.data[4 + MORPH_WEIGHT_CAPACITY + attrib] ?? -1;
+      }
+    }
+    this.setRenderMorphInfo({ data: infoData, names: this._renderMorphInfo?.names ?? {} });
   }
   /** @internal */
   resolveAnimatedBoundingBox(morphBoundingBox?: Nullable<BoundingBox>) {
@@ -779,8 +858,9 @@ export class Mesh extends MeshBase implements BatchDrawable {
    */
   setMorphWeightByIndex(index: number, weight: number) {
     if (index >= 0 && index < this.getNumMorphTargets()) {
-      if (this._morphInfo!.data[4 + index] !== weight) {
-        this._morphInfo!.data[4 + index] = weight;
+      const normalizedWeight = Math.fround(weight);
+      if (this._morphInfo!.data[4 + index] !== normalizedWeight) {
+        this._morphInfo!.data[4 + index] = normalizedWeight;
         this._morphDirty = true;
         this.refreshAnimatedBoundingBox();
         this.scene!.queueUpdateNode(this);
@@ -809,8 +889,16 @@ export class Mesh extends MeshBase implements BatchDrawable {
    */
   updateMorphWeights(weight: ArrayLike<number>) {
     if (this._morphInfo && weight && weight.length <= this.getNumMorphTargets()) {
+      let changed = false;
       for (let i = 0; i < weight.length; i++) {
-        this._morphInfo.data[4 + i] = weight[i] ?? 0;
+        const normalizedWeight = Math.fround(weight[i] ?? 0);
+        if (this._morphInfo.data[4 + i] !== normalizedWeight) {
+          this._morphInfo.data[4 + i] = normalizedWeight;
+          changed = true;
+        }
+      }
+      if (!changed) {
+        return;
       }
       this._morphDirty = true;
       this.refreshAnimatedBoundingBox();
@@ -901,14 +989,12 @@ export class Mesh extends MeshBase implements BatchDrawable {
   /** @internal */
   private updateMorphState() {
     if (this._morphInfo && this._morphDirty) {
-      this.rebuildActiveMorphData();
-      if (this._renderMorphInfo?.buffer?.get()) {
-        this._renderMorphInfo.buffer.get()!.bufferSubData(
-          4 * 4,
-          this._renderMorphInfo.data,
-          4,
-          this._activeMorphTargetIndices.length
-        );
+      if (this._morphSourceData) {
+        this.rebuildActiveMorphData();
+      } else if (this._morphData) {
+        const activeIndices = this.collectActiveMorphTargetIndices();
+        this.updateRenderMorphInfo(activeIndices, false);
+        this._activeMorphTargetIndices = activeIndices;
       }
       this.refreshAnimatedBoundingBox();
       this._morphDirty = false;

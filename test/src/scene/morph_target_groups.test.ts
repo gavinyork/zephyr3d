@@ -589,6 +589,54 @@ describe('morph target groups', () => {
     expect(() => restored.update(1, 0, 0)).not.toThrow();
   });
 
+  test('does not queue morph updates when Float32 weights are unchanged', () => {
+    const scene = new Scene();
+    const mesh = new Mesh(scene);
+    setMorphInfo(mesh, ['smile'], [0.1]);
+    const queueUpdateNode = jest.spyOn(scene, 'queueUpdateNode');
+
+    mesh.updateMorphWeights([0.1]);
+    mesh.setMorphWeightByIndex(0, 0.1);
+
+    expect(queueUpdateNode).not.toHaveBeenCalled();
+
+    mesh.updateMorphWeights([0.2]);
+    expect(queueUpdateNode).toHaveBeenCalledTimes(1);
+  });
+
+  test('keeps the full morph texture stable when the active target set changes', () => {
+    const scene = new Scene();
+    const mesh = new Mesh(scene);
+    setMorphInfo(mesh, ['smile', 'blink'], [0.5, 0]);
+    mesh.setMorphSourceData({
+      numTargets: 2,
+      numVertices: 1,
+      targets: {
+        0: {
+          numComponents: 3,
+          data: [new Float32Array([1, 2, 3]), new Float32Array([4, 5, 6])]
+        }
+      }
+    });
+
+    const morphData = mesh.getMorphData()!;
+    const morphTexture = morphData.texture!.get() as any;
+    expect(Array.from(morphData.data.slice(0, 8))).toEqual([1, 2, 3, 0, 4, 5, 6, 0]);
+    expect(morphTexture.update).toHaveBeenCalledTimes(1);
+
+    mesh.updateMorphWeights([0, 0.75]);
+    mesh.update(1, 0, 0);
+
+    expect(mesh.getMorphData()).toBe(morphData);
+    expect(mesh.getMorphData()!.texture!.get()).toBe(morphTexture);
+    expect(morphTexture.update).toHaveBeenCalledTimes(1);
+    const renderInfo = mesh.getRenderMorphInfo()!;
+    expect(renderInfo.data[3]).toBe(1);
+    expect(renderInfo.data[4]).toBe(0.75);
+    expect(renderInfo.data[4 + MAX_MORPH_TARGETS]).toBe(1);
+    expect(renderInfo.data[4 + MAX_MORPH_TARGETS * 2]).toBe(0);
+  });
+
   test('keeps combined animated bounds stable when skinning and morphing are both active', () => {
     const scene = new Scene();
     const root = new SceneNode(scene);
