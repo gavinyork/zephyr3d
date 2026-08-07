@@ -82,7 +82,7 @@ myApp.ready().then(function () {
       if (useShadowAA) {
         dirLight.shadow.vsmDarkness = 0.1;
         dirLight.shadow.vsmBlurKernelSize = 9;
-        dirLight.shadow.vsmBlurRadius = 2;
+        dirLight.shadow.vsmBlurRadius = 4;
       }
     }
   });

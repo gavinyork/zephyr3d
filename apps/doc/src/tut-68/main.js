@@ -10,35 +10,26 @@ import {
   SphereShape,
   TorusShape,
   PBRMetallicRoughnessMaterial,
-  panoramaToCubemap,
   getInput,
   getEngine
 } from '@zephyr3d/scene';
+import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
-  backend: backendWebGL2,
+  backend: (await backendWebGPU.supported()) ? backendWebGPU : backendWebGL2,
   canvas: document.querySelector('#my-canvas')
 });
 
 myApp.ready().then(async function () {
   const scene = new Scene();
-
-  // SSGI requires IBL environment lighting with both radiance and irradiance data
-  const panorama = await getEngine().resourceManager.fetchTexture(
-    'https://cdn.zephyr3d.org/doc/assets/images/Wide_Street.hdr'
-  );
-  const skyMap = myApp.device.createCubeTexture('rgba16f', 512);
-  panoramaToCubemap(/** @type {import('@zephyr3d/device').Texture2D} */ (panorama), skyMap);
-  scene.env.sky.skyType = 'skybox';
-  scene.env.sky.skyboxTexture = skyMap;
-  scene.env.sky.fogType = 'none';
-  scene.env.light.type = 'ibl';
+  scene.env.sky.atmosphereExposure = 2;
 
   // Keep direct lighting weak so the indirect bounce is clearly visible
   const light = new DirectionalLight(scene);
   light.rotation.fromEulerAngle(-Math.PI / 3, Math.PI / 4, 0);
-  light.color = new Vector4(0.3, 0.3, 0.3, 1);
+  light.color = new Vector4(1, 1, 1, 1);
+  light.intensity = 5;
 
   // An open box with strongly colored walls: with SSGI enabled, the red and
   // green walls bleed color onto the white floor and the objects inside.
@@ -77,7 +68,7 @@ myApp.ready().then(async function () {
 
   // Enable SSGI
   scene.mainCamera.SSGI = true;
-  scene.mainCamera.ssgiQualityPreset = 'balanced';
+  scene.mainCamera.ssgiQualityPreset = 'quality';
 
   const btnOff = document.querySelector('#btn-off');
   const btnOn = document.querySelector('#btn-on');
