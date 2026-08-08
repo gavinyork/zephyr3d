@@ -2025,7 +2025,7 @@ export class SharedModel extends Disposable {
           meshNode.position = instance.t;
           meshNode.scale = instance.s;
           meshNode.rotation = instance.r;
-          meshNode.name = subMesh.name;
+          meshNode.name = subMesh.primitive?.name?.trim() || subMesh.name;
           meshNode.clipTestEnabled = true;
           meshNode.showState = 'inherit';
           if (!this._primitiveMap.get(subMesh.primitive!)) {
