@@ -51,6 +51,12 @@ import type { PropertyAccessor } from '@zephyr3d/scene';
 import { AssetThumbnailService, ImageAssetThumbnailProvider } from './assetthumbnail';
 import { getDesktopAPI, isDesktopApp } from '../core/services/desktop';
 import { ElectronFS } from '../core/services/electronfs';
+import {
+  mayContainPathRewriteTarget,
+  rewriteJsonPathValues,
+  rewritePathString,
+  type PathRewriteRule
+} from '../helpers/assetreference';
 
 type BlueprintNodeState = {
   id: number;
@@ -116,12 +122,6 @@ export type VFSRendererAssetPickerPayload = {
 export type VFSRendererSceneNodeDropPayload = {
   type: 'scene-node';
   node: SceneNode;
-};
-
-type PathRewriteRule = {
-  oldPath: string;
-  newPath: string;
-  isDirectory: boolean;
 };
 
 type AssetMovePlanItem = {
@@ -3290,14 +3290,14 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       const file = targetFiles[index];
       try {
         const text = (await this._vfs.readFile(file, { encoding: 'utf8' })) as string;
-        if (!this.mayContainRewriteTarget(text, deduplicated)) {
+        if (!mayContainPathRewriteTarget(text, deduplicated)) {
           if (progress) {
             progress.setSubProgress(index + 1, Math.max(targetFiles.length, 1));
           }
           continue;
         }
         const json = JSON.parse(text);
-        if (this.rewriteJsonPathValues(json, deduplicated)) {
+        if (rewriteJsonPathValues(json, deduplicated)) {
           await this._vfs.writeFile(file, JSON.stringify(json, null, 2), {
             encoding: 'utf8',
             create: true
@@ -3318,7 +3318,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       includeHidden: true,
       recursive: true
     });
-    return entries.some((entry) => entry.type === 'file' && this.isReferenceCandidatePath(entry.path));
+    return entries.some((entry) => entry.type === 'file');
   }
 
   private prepareRewriteRules(rules: PathRewriteRule[]): PathRewriteRule[] {
@@ -3336,65 +3336,6 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       });
     }
     return [...map.values()].sort((a, b) => b.oldPath.length - a.oldPath.length);
-  }
-
-  private rewriteJsonPathValues(node: unknown, rules: PathRewriteRule[]): boolean {
-    let changed = false;
-    if (Array.isArray(node)) {
-      for (let i = 0; i < node.length; i++) {
-        const value = node[i];
-        if (typeof value === 'string') {
-          const rewritten = this.rewritePathString(value, rules);
-          if (rewritten !== value) {
-            node[i] = rewritten;
-            changed = true;
-          }
-        } else if (value && typeof value === 'object') {
-          changed = this.rewriteJsonPathValues(value, rules) || changed;
-        }
-      }
-      return changed;
-    }
-    if (!node || typeof node !== 'object') {
-      return false;
-    }
-    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
-      if (typeof value === 'string') {
-        const rewritten = this.rewritePathString(value, rules);
-        if (rewritten !== value) {
-          (node as Record<string, unknown>)[key] = rewritten;
-          changed = true;
-        }
-      } else if (value && typeof value === 'object') {
-        changed = this.rewriteJsonPathValues(value, rules) || changed;
-      }
-    }
-    return changed;
-  }
-
-  private rewritePathString(value: string, rules: PathRewriteRule[]): string {
-    for (const rule of rules) {
-      if (rule.isDirectory) {
-        if (value === rule.oldPath) {
-          return rule.newPath;
-        }
-        if (value.startsWith(`${rule.oldPath}/`)) {
-          return `${rule.newPath}${value.slice(rule.oldPath.length)}`;
-        }
-      } else if (value === rule.oldPath) {
-        return rule.newPath;
-      }
-    }
-    return value;
-  }
-
-  private mayContainRewriteTarget(text: string, rules: PathRewriteRule[]): boolean {
-    for (const rule of rules) {
-      if (text.includes(rule.oldPath)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private getReferenceRootPath() {
@@ -3490,7 +3431,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     }
     const nextPaths = new Set<string>();
     for (const path of this._referenceCandidatePaths) {
-      const rewrittenPath = this.rewritePathString(path, preparedRules);
+      const rewrittenPath = rewritePathString(path, preparedRules);
       if (this.isReferenceCandidatePath(rewrittenPath)) {
         nextPaths.add(this._vfs.normalizePath(rewrittenPath));
       }
@@ -3515,14 +3456,14 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       return;
     }
     if (this._selectedDirPath) {
-      this._selectedDirPath = this.rewritePathString(this._selectedDirPath, preparedRules);
+      this._selectedDirPath = rewritePathString(this._selectedDirPath, preparedRules);
     }
     if (this._pendingRevealAssetPath) {
-      this._pendingRevealAssetPath = this.rewritePathString(this._pendingRevealAssetPath, preparedRules);
+      this._pendingRevealAssetPath = rewritePathString(this._pendingRevealAssetPath, preparedRules);
     }
     const selectionPaths =
       this._selectionRestorePaths?.slice() ??
       [...new Set(this.getSelectedItemPaths().map((path) => this._vfs.normalizePath(path)))];
-    this._selectionRestorePaths = selectionPaths.map((path) => this.rewritePathString(path, preparedRules));
+    this._selectionRestorePaths = selectionPaths.map((path) => rewritePathString(path, preparedRules));
   }
 }
