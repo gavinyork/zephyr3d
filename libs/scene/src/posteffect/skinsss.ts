@@ -12,9 +12,10 @@ import { AbstractPostEffect, PostEffectLayer } from './posteffect';
  *
  * @remarks
  * This is intentionally separate from the profile-based {@link SSS} pass. It follows the simpler
- * depth-aware blur used by many character renderers: a skin material writes a lighting multiplier
- * into a side buffer, then this pass performs a fixed 9x9 depth-aware blur and composites it back
- * over the opaque color.
+ * depth-aware blur used by many character renderers: a skin material writes an additive scatter
+ * irradiance term into a side buffer, then this pass performs a fixed 9x9 depth-aware blur and
+ * adds the blurred term back over the opaque color. Because the composite is additive, scattered
+ * light bleeds into regions where the base lighting is dark (the far side of the terminator).
  *
  * @public
  */
@@ -50,7 +51,7 @@ export class SkinSSS extends AbstractPostEffect {
     this._strength = Math.max(0, val ?? 0);
   }
 
-  /** Bias subtracted from the blurred skin mask before compositing. */
+  /** Skin mask coverage threshold. Scattering fades in as the blurred mask coverage exceeds this. */
   get opacity() {
     return this._opacity;
   }
