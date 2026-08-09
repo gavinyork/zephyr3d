@@ -15,6 +15,8 @@ describe('Skin material serialization', () => {
     material.scatterColor = new Vector4(0.98, 0.34, 0.22, 1);
     material.transmissionStrength = 0.8;
     material.transmissionPower = 6;
+    material.shadowTint = new Vector4(0.86, 0.45, 0.6, 1);
+    material.brightening = 0.25;
     material.albedoColor = new Vector4(0.8, 0.55, 0.48, 1);
     material.cullMode = 'none';
     material.vertexTangent = true;
@@ -34,6 +36,7 @@ describe('Skin material serialization', () => {
       ScatterStrength: 0.91,
       TransmissionStrength: 0.8,
       TransmissionPower: 6,
+      Brightening: 0.25,
       vertexTangent: true,
       doubleSidedLighting: false
     });
@@ -54,6 +57,10 @@ describe('Skin material serialization', () => {
     expect(restored.scatterStrength).toBeCloseTo(0.91);
     expect(restored.transmissionStrength).toBeCloseTo(0.8);
     expect(restored.transmissionPower).toBeCloseTo(6);
+    expect(restored.shadowTint.x).toBeCloseTo(0.86);
+    expect(restored.shadowTint.y).toBeCloseTo(0.45);
+    expect(restored.shadowTint.z).toBeCloseTo(0.6);
+    expect(restored.brightening).toBeCloseTo(0.25);
     expect(restored.scatterColor.x).toBeCloseTo(0.98);
     expect(restored.scatterColor.y).toBeCloseTo(0.34);
     expect(restored.scatterColor.z).toBeCloseTo(0.22);
@@ -75,6 +82,7 @@ describe('Skin material serialization', () => {
     camera.skinSSSOpacity = 0.12;
     camera.skinSSSSampleStep = 2.5;
     camera.skinSSSScatterRadius = 0.03;
+    camera.skinSSSSmoothness = 0.6;
     camera.skinSSSDepthScale = 96;
     camera.skinSSSColorBoost = 1.1;
 
@@ -87,6 +95,7 @@ describe('Skin material serialization', () => {
       SkinSSSOpacity: 0.12,
       SkinSSSSampleStep: 2.5,
       SkinSSSScatterRadius: 0.03,
+      SkinSSSSmoothness: 0.6,
       SkinSSSDepthScale: 96,
       SkinSSSColorBoost: 1.1
     });
@@ -95,6 +104,7 @@ describe('Skin material serialization', () => {
     expect(restored.skinSSSOpacity).toBeCloseTo(0.12);
     expect(restored.skinSSSSampleStep).toBeCloseTo(2.5);
     expect(restored.skinSSSScatterRadius).toBeCloseTo(0.03);
+    expect(restored.skinSSSSmoothness).toBeCloseTo(0.6);
     expect(restored.skinSSSDepthScale).toBeCloseTo(96);
     expect(restored.skinSSSColorBoost).toBeCloseTo(1.1);
   });

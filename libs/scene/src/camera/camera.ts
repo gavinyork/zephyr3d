@@ -424,6 +424,8 @@ export class Camera extends SceneNode {
   protected _skinSSSSampleStep: number;
   /** @internal Skin SSS world-space scatter radius. */
   protected _skinSSSScatterRadius: number;
+  /** @internal Skin SSS smoothing ("beauty filter") amount. */
+  protected _skinSSSSmoothness: number;
   /** @internal Skin SSS depth rejection scale. */
   protected _skinSSSDepthScale: number;
   /** @internal Skin SSS blurred multiplier boost. */
@@ -599,6 +601,7 @@ export class Camera extends SceneNode {
     this._skinSSSOpacity = 0.18;
     this._skinSSSSampleStep = 2;
     this._skinSSSScatterRadius = 0.02;
+    this._skinSSSSmoothness = 0;
     this._skinSSSDepthScale = 80;
     this._skinSSSColorBoost = 1;
     this._SSAO = false;
@@ -1408,6 +1411,16 @@ export class Camera extends SceneNode {
       this._postEffectSkinSSS.get()!.scatterRadius = this._skinSSSScatterRadius;
     }
   }
+  /** Skin smoothing ("beauty filter") amount for the dedicated Skin SSS post effect. */
+  get skinSSSSmoothness() {
+    return this._skinSSSSmoothness;
+  }
+  set skinSSSSmoothness(val) {
+    this._skinSSSSmoothness = Math.max(0, Math.min(1, val ?? 0));
+    if (this._postEffectSkinSSS.get()) {
+      this._postEffectSkinSSS.get()!.smoothness = this._skinSSSSmoothness;
+    }
+  }
   /** Depth rejection scale. The reference shader uses 80. */
   get skinSSSDepthScale() {
     return this._skinSSSDepthScale;
@@ -1940,6 +1953,7 @@ export class Camera extends SceneNode {
       skinSSS.opacity = this._skinSSSOpacity;
       skinSSS.sampleStep = this._skinSSSSampleStep;
       skinSSS.scatterRadius = this._skinSSSScatterRadius;
+      skinSSS.smoothness = this._skinSSSSmoothness;
       skinSSS.depthScale = this._skinSSSDepthScale;
       skinSSS.colorBoost = this._skinSSSColorBoost;
       this._postEffectSkinSSS.set(skinSSS);

@@ -1572,6 +1572,27 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'SkinSSSSmoothness',
+          type: 'float',
+          phase: 0,
+          default: 0,
+          options: {
+            label: 'Smoothness',
+            group: 'PostProcessing/SkinSSS',
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.skinSSSSmoothness;
+          },
+          set(this: Camera, value) {
+            this.skinSSSSmoothness = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.skinSSS;
+          }
+        },
+        {
           name: 'SkinSSSDepthScale',
           type: 'float',
           phase: 0,

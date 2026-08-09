@@ -37,5 +37,8 @@ describe('SkinSSS shader generation', () => {
     // reach the final add.
     expect(program.fragmentSource).toContain('encodeScale');
     expect(program.fragmentSource).toContain('coverage');
+    // Skin smoothing blends toward the mask-weighted blurred color.
+    expect(program.fragmentSource).toContain('smoothedBase');
+    expect(program.fragmentSource).toContain('colorWeightSum');
   });
 });

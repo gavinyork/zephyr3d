@@ -2323,7 +2323,7 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
             name: 'SpecularStrength',
             description: 'Direct specular strength for restrained skin highlights',
             type: 'float',
-            default: 0.22,
+            default: 1,
             options: {
               animatable: true,
               minValue: 0,
@@ -2401,9 +2401,9 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
           },
           {
             name: 'ScatterStrength',
-            description: 'Strength of the lighting multiplier written to the Skin SSS side buffer',
+            description: 'Strength of the scatter irradiance written to the Skin SSS side buffer',
             type: 'float',
-            default: 0.7,
+            default: 1.5,
             options: {
               animatable: true,
               minValue: 0,
@@ -2444,11 +2444,55 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
             }
           },
           {
-            name: 'TransmissionStrength',
-            type: 'float',
-            phase: 0,
+            name: 'ShadowTint',
+            description: 'NPR shadow tint the dark end of the diffuse ramp lifts toward (black is neutral)',
+            type: 'rgba',
+            default: [0, 0, 0, 1],
             options: {
-              label: 'TransmissionStrength',
+              animatable: true,
+              minValue: 0,
+              maxValue: 1
+            },
+            get(this: SkinMaterial, value) {
+              value.num[0] = this.shadowTint.x;
+              value.num[1] = this.shadowTint.y;
+              value.num[2] = this.shadowTint.z;
+              value.num[3] = this.shadowTint.w;
+            },
+            set(this: SkinMaterial, value) {
+              this.shadowTint = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+            },
+            getDefaultValue(this: SkinMaterial) {
+              const color = this.$isInstance ? this.coreMaterial.shadowTint : new Vector4(0, 0, 0, 1);
+              return [color.x, color.y, color.z, color.w];
+            }
+          },
+          {
+            name: 'Brightening',
+            description: 'Whitening gain applied to the whole diffuse response',
+            type: 'float',
+            default: 0,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 2
+            },
+            get(this: SkinMaterial, value) {
+              value.num[0] = this.brightening;
+            },
+            set(this: SkinMaterial, value) {
+              this.brightening = value.num[0];
+            },
+            getDefaultValue(this: SkinMaterial) {
+              return this.$isInstance ? this.coreMaterial.brightening : 0;
+            }
+          },
+          {
+            name: 'TransmissionStrength',
+            description: 'Back-lit transmission strength (needs thickness in subsurface texture B)',
+            type: 'float',
+            default: 0,
+            options: {
               animatable: true,
               minValue: 0,
               maxValue: 4
@@ -2465,10 +2509,10 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
           },
           {
             name: 'TransmissionPower',
+            description: 'Exponent of the back-lit transmission falloff',
             type: 'float',
-            phase: 0,
+            default: 4,
             options: {
-              label: 'TransmissionPower',
               animatable: true,
               minValue: 1,
               maxValue: 16

@@ -27,6 +27,7 @@ export class SkinSSS extends AbstractPostEffect {
   private _depthScale: number;
   private _colorBoost: number;
   private _scatterRadius: number;
+  private _smoothness: number;
 
   constructor() {
     super();
@@ -38,6 +39,7 @@ export class SkinSSS extends AbstractPostEffect {
     this._depthScale = 80;
     this._colorBoost = 1;
     this._scatterRadius = 0.02;
+    this._smoothness = 0;
   }
 
   /** Final blend strength. */
@@ -70,6 +72,19 @@ export class SkinSSS extends AbstractPostEffect {
   }
   set scatterRadius(val) {
     this._scatterRadius = Math.max(0, val ?? 0);
+  }
+
+  /**
+   * Skin smoothing amount ("beauty filter"). Blends the lit color toward a
+   * mask- and depth-weighted blur of itself on skin pixels, removing pores and
+   * shading noise while facial features stay sharp wherever the skin mask
+   * excludes them (eyes, brows, lips). 0 disables smoothing.
+   */
+  get smoothness() {
+    return this._smoothness;
+  }
+  set smoothness(val) {
+    this._smoothness = Math.max(0, Math.min(1, val ?? 0));
   }
 
   /** Depth rejection scale. The reference shader uses 80. */
@@ -139,6 +154,7 @@ export class SkinSSS extends AbstractPostEffect {
       'encodeScale',
       ctx.SkinSSSTexture.format === 'rgba8unorm' ? SKIN_SSS_LDR_ENCODE_RANGE : 1
     );
+    this._bindGroup.setValue('smoothness', this._smoothness);
     this._bindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     this._bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
     device.setProgram(program);
@@ -173,6 +189,7 @@ export class SkinSSS extends AbstractPostEffect {
         this.depthScale = pb.float().uniform(0);
         this.colorBoost = pb.float().uniform(0);
         this.encodeScale = pb.float().uniform(0);
+        this.smoothness = pb.float().uniform(0);
         this.srgbOut = pb.int().uniform(0);
         this.$outputs.outColor = pb.vec4();
         pb.func('readDepth01', [pb.vec2('uv')], function () {
@@ -206,6 +223,8 @@ export class SkinSSS extends AbstractPostEffect {
               );
               this.$l.sum = pb.vec4(0);
               this.$l.weightSum = pb.float(0);
+              this.$l.colorSum = pb.vec3(0);
+              this.$l.colorWeightSum = pb.float(0);
               this.$for(pb.int('y'), -4, 5, function () {
                 this.$for(pb.int('x'), -4, 5, function () {
                   this.$l.fx = pb.float(this.x);
@@ -248,6 +267,16 @@ export class SkinSSS extends AbstractPostEffect {
                   this.$l.tapWeight = pb.mul(this.depthWeight, this.spatialWeight);
                   this.sum = pb.add(this.sum, pb.mul(this.skinSample, this.tapWeight));
                   this.weightSum = pb.add(this.weightSum, this.tapWeight);
+                  // Skin smoothing accumulates the lit color with the sample
+                  // mask as an extra edge stop, so eyes/brows/lips (mask 0)
+                  // never bleed onto the skin. Uniform branch: costs nothing
+                  // when smoothing is disabled.
+                  this.$if(pb.greaterThan(this.smoothness, 0), function () {
+                    this.$l.colorWeight = pb.mul(this.tapWeight, this.skinSample.a);
+                    this.$l.colorSample = pb.textureSampleLevel(this.colorTex, this.sampleUV, 0);
+                    this.colorSum = pb.add(this.colorSum, pb.mul(this.colorSample.rgb, this.colorWeight));
+                    this.colorWeightSum = pb.add(this.colorWeightSum, this.colorWeight);
+                  });
                 });
               });
               this.$if(pb.greaterThan(this.weightSum, 1e-4), function () {
@@ -261,8 +290,18 @@ export class SkinSSS extends AbstractPostEffect {
                   pb.add(this.opacity, 0.35),
                   this.blurredSkin.a
                 );
+                // Skin smoothing: blend toward the mask-weighted blurred color
+                // before adding the scatter term.
+                this.$l.smoothedBase = this.baseColor.rgb;
+                this.$if(pb.greaterThan(this.colorWeightSum, 1e-4), function () {
+                  this.smoothedBase = pb.mix(
+                    this.baseColor.rgb,
+                    pb.div(this.colorSum, this.colorWeightSum),
+                    pb.mul(this.smoothness, this.coverage, this.centerSkin.a)
+                  );
+                });
                 this.result = pb.add(
-                  this.baseColor.rgb,
+                  this.smoothedBase,
                   pb.mul(
                     this.blurredSkin.rgb,
                     this.encodeScale,

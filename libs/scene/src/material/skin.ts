@@ -47,6 +47,8 @@ export class SkinMaterial
   private readonly _scatterColor: Vector4;
   private _transmissionStrength: number;
   private _transmissionPower: number;
+  private readonly _shadowTint: Vector4;
+  private _brightening: number;
 
   constructor() {
     super();
@@ -59,6 +61,8 @@ export class SkinMaterial
     this._scatterColor = new Vector4(1, 0.42, 0.28, 1);
     this._transmissionStrength = 0;
     this._transmissionPower = 4;
+    this._shadowTint = new Vector4(0, 0, 0, 1);
+    this._brightening = 0;
     this.useFeature(SkinMaterial.FEATURE_VERTEX_NORMAL, true);
   }
 
@@ -86,6 +90,8 @@ export class SkinMaterial
     this.scatterColor = other.scatterColor;
     this.transmissionStrength = other.transmissionStrength;
     this.transmissionPower = other.transmissionPower;
+    this.shadowTint = other.shadowTint;
+    this.brightening = other.brightening;
   }
 
   /** true if vertex normal attribute presents */
@@ -214,6 +220,33 @@ export class SkinMaterial
     }
   }
 
+  /**
+   * NPR-style shadow tint: the dark end of the diffuse ramp lifts toward this
+   * color instead of black (black, the default, reproduces plain wrapped
+   * lambert). A rosy/lavender tint gives the stylized beauty-shot shadow look.
+   */
+  get shadowTint(): Immutable<Vector4> {
+    return this._shadowTint;
+  }
+  set shadowTint(val: Immutable<Vector4>) {
+    if (!val.equalsTo(this._shadowTint)) {
+      this._shadowTint.set(val);
+      this.uniformChanged();
+    }
+  }
+
+  /** Whitening gain applied to the whole diffuse response. 0 (the default) is neutral. */
+  get brightening() {
+    return this._brightening;
+  }
+  set brightening(val) {
+    const next = Math.max(0, val ?? 0);
+    if (next !== this._brightening) {
+      this._brightening = next;
+      this.uniformChanged();
+    }
+  }
+
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
@@ -253,6 +286,8 @@ export class SkinMaterial
         scope.zSkinScatterWrap = pb.float().uniform(2);
         scope.zSkinScatterStrength = pb.float().uniform(2);
         scope.zSkinScatterColor = pb.vec4().uniform(2);
+        scope.zSkinShadowTint = pb.vec4().uniform(2);
+        scope.zSkinBrightening = pb.float().uniform(2);
         // Encodes HDR scatter irradiance into the SkinSSS buffer range when the
         // render graph falls back to rgba8unorm (see getSSSLightingTextureFormat).
         scope.zSkinScatterEncodeScale = pb.float().uniform(2);
@@ -356,17 +391,23 @@ export class SkinMaterial
             pb.div(this.zSkinShininess, pb.add(1, pb.mul(this.sourceRadiusFactor, 32))),
             1
           );
-          this.$l.hardDiffuse = pb.mul(this.lightColor, this.NoL, this.diffuseScale, 1 / Math.PI);
-          this.$l.softDiffuse = pb.mul(this.lightColor, this.NoLWrap, this.diffuseScale, 1 / Math.PI);
           this.$l.softness = pb.clamp(
             pb.add(this.zSkinDiffuseSoftness, pb.mul(this.skinSoftness, 0.35)),
             0,
             1
           );
+          this.$l.NoLVis = pb.mix(this.NoL, this.NoLWrap, this.softness);
+          // NPR-style diffuse ramp: the dark end lifts toward the shadow tint
+          // instead of black. A black tint reproduces plain wrapped lambert.
+          this.$l.diffuseRamp = pb.mix(this.zSkinShadowTint.rgb, pb.vec3(1), this.NoLVis);
           this.diffuseLighting = pb.add(
             this.diffuseLighting,
-            pb.mix(this.hardDiffuse, this.softDiffuse, this.softness)
+            pb.mul(this.diffuseLightColor, this.diffuseRamp, this.diffuseScale, 1 / Math.PI)
           );
+          // Difference between the wide scatter wrap and the visible diffuse:
+          // nonzero only in the transition band around the terminator, which is
+          // where the blurred red bleed should appear.
+          this.$l.scatterFalloff = pb.max(pb.sub(this.NoLScatter, this.NoLVis), 0);
           this.scatterLighting = pb.add(
             this.scatterLighting,
             pb.mul(
@@ -408,6 +449,8 @@ export class SkinMaterial
           );
           this.specularLighting = pb.add(this.specularLighting, this.specular);
         });
+        // Whitening: lift the whole diffuse response (direct and ambient).
+        scope.diffuseLighting = pb.mul(scope.diffuseLighting, pb.add(1, scope.zSkinBrightening));
         scope.$l.litColor = pb.add(pb.mul(scope.albedo.rgb, scope.diffuseLighting), scope.specularLighting);
         scope.$l.scatterMultiplier = pb.add(
           baseLightPass ? pb.vec3(1) : pb.vec3(0),
@@ -474,6 +517,8 @@ export class SkinMaterial
       bindGroup.setValue('zSkinScatterWrap', this._scatterWrap);
       bindGroup.setValue('zSkinScatterStrength', this._scatterStrength);
       bindGroup.setValue('zSkinScatterColor', this._scatterColor);
+      bindGroup.setValue('zSkinShadowTint', this._shadowTint);
+      bindGroup.setValue('zSkinBrightening', this._brightening);
       const ldrSkinSSS = ctx.SkinSSSTexture && ctx.SkinSSSTexture.format === 'rgba8unorm';
       bindGroup.setValue('zSkinScatterEncodeScale', ldrSkinSSS ? 1 / SKIN_SSS_LDR_ENCODE_RANGE : 1);
       if (this.subsurfaceTexture) {
