@@ -1551,6 +1551,27 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'SkinSSSScatterRadius',
+          type: 'float',
+          phase: 0,
+          default: 0.02,
+          options: {
+            label: 'ScatterRadius',
+            group: 'PostProcessing/SkinSSS',
+            minValue: 0,
+            maxValue: 0.2
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.skinSSSScatterRadius;
+          },
+          set(this: Camera, value) {
+            this.skinSSSScatterRadius = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.skinSSS;
+          }
+        },
+        {
           name: 'SkinSSSDepthScale',
           type: 'float',
           phase: 0,

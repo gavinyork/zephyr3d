@@ -2,6 +2,7 @@ import { DEPTH_FARTHEST, Vector2, Vector4 } from '@zephyr3d/base';
 import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { ShaderHelper } from '../material';
+import { SKIN_SSS_LDR_ENCODE_RANGE } from '../material/skin';
 import { linearToGamma } from '../shaders/misc';
 import { fetchSampler } from '../utility/misc';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
@@ -25,6 +26,7 @@ export class SkinSSS extends AbstractPostEffect {
   private _sampleStep: number;
   private _depthScale: number;
   private _colorBoost: number;
+  private _scatterRadius: number;
 
   constructor() {
     super();
@@ -35,6 +37,7 @@ export class SkinSSS extends AbstractPostEffect {
     this._sampleStep = 2;
     this._depthScale = 80;
     this._colorBoost = 1;
+    this._scatterRadius = 0.02;
   }
 
   /** Final blend strength. */
@@ -53,12 +56,20 @@ export class SkinSSS extends AbstractPostEffect {
     this._opacity = Math.max(0, Math.min(1, val ?? 0));
   }
 
-  /** Pixel spacing between blur taps. The reference shader uses 2. */
+  /** Maximum pixel spacing between blur taps. Caps the projected scatter radius for close-ups. */
   get sampleStep() {
     return this._sampleStep;
   }
   set sampleStep(val) {
     this._sampleStep = Math.max(0.25, val ?? 0.25);
+  }
+
+  /** World-space scatter radius. The blur width shrinks with distance to keep this constant. */
+  get scatterRadius() {
+    return this._scatterRadius;
+  }
+  set scatterRadius(val) {
+    this._scatterRadius = Math.max(0, val ?? 0);
   }
 
   /** Depth rejection scale. The reference shader uses 80. */
@@ -69,7 +80,7 @@ export class SkinSSS extends AbstractPostEffect {
     this._depthScale = Math.max(0, val ?? 0);
   }
 
-  /** Multiplier applied to the blurred skin lighting multiplier before compositing. */
+  /** Multiplier applied to the blurred scatter irradiance before compositing. */
   get colorBoost() {
     return this._colorBoost;
   }
@@ -114,8 +125,20 @@ export class SkinSSS extends AbstractPostEffect {
     this._bindGroup.setValue('strength', this._strength);
     this._bindGroup.setValue('opacity', this._opacity);
     this._bindGroup.setValue('sampleStep', this._sampleStep);
+    // Pixels per world unit (at unit view depth for perspective cameras). The
+    // shader divides by the view depth so the blur footprint stays a constant
+    // world-space radius; the kernel reaches 4 taps from the center.
+    const projScale = 0.5 * inputColorTexture.height * ctx.camera.getProjectionMatrix().m11;
+    this._bindGroup.setValue(
+      'radiusParams',
+      new Vector2((this._scatterRadius * projScale) / 4, ctx.camera.isPerspective() ? 1 : 0)
+    );
     this._bindGroup.setValue('depthScale', this._depthScale);
     this._bindGroup.setValue('colorBoost', this._colorBoost);
+    this._bindGroup.setValue(
+      'encodeScale',
+      ctx.SkinSSSTexture.format === 'rgba8unorm' ? SKIN_SSS_LDR_ENCODE_RANGE : 1
+    );
     this._bindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     this._bindGroup.setValue('srgbOut', srgbOutput ? 1 : 0);
     device.setProgram(program);
@@ -146,8 +169,10 @@ export class SkinSSS extends AbstractPostEffect {
         this.strength = pb.float().uniform(0);
         this.opacity = pb.float().uniform(0);
         this.sampleStep = pb.float().uniform(0);
+        this.radiusParams = pb.vec2().uniform(0);
         this.depthScale = pb.float().uniform(0);
         this.colorBoost = pb.float().uniform(0);
+        this.encodeScale = pb.float().uniform(0);
         this.srgbOut = pb.int().uniform(0);
         this.$outputs.outColor = pb.vec4();
         pb.func('readDepth01', [pb.vec2('uv')], function () {
@@ -158,60 +183,97 @@ export class SkinSSS extends AbstractPostEffect {
           this.$l.baseColor = pb.textureSampleLevel(this.colorTex, this.uv, 0);
           this.$l.result = this.baseColor.rgb;
           this.$l.centerDepth01 = this.readDepth01(this.uv);
-          this.$if(pb.lessThan(this.centerDepth01, 1), function () {
-            this.$l.centerDepth = pb.max(pb.mul(this.centerDepth01, this.cameraNearFar.y), 1e-4);
-            this.$l.sum = pb.vec4(0);
-            this.$l.weightSum = pb.float(0);
-            this.$for(pb.int('y'), -4, 5, function () {
-              this.$for(pb.int('x'), -4, 5, function () {
-                this.$l.offsetPx = pb.mul(pb.vec2(pb.float(this.x), pb.float(this.y)), this.sampleStep);
-                this.$l.sampleUV = pb.clamp(
-                  pb.add(this.uv, pb.div(this.offsetPx, this.targetSize.xy)),
-                  pb.vec2(0),
-                  pb.vec2(1)
-                );
-                this.$l.skinSample = pb.textureSampleLevel(this.skinTex, this.sampleUV, 0);
-                this.$if(pb.lessThanEqual(this.skinSample.a, 1e-4), function () {
-                  this.skinSample = pb.vec4(0, 0, 0, this.opacity);
+          // Early out on non-skin pixels: scattering is additive irradiance
+          // masked by skin coverage, so pixels with no skin coverage never
+          // receive a contribution. This skips the 9x9 blur for most of the
+          // screen and keeps neighboring non-skin surfaces (collars, hair)
+          // free of skin tint.
+          this.$l.centerSkin = pb.textureSampleLevel(this.skinTex, this.uv, 0);
+          this.$if(
+            pb.and(pb.lessThan(this.centerDepth01, 1), pb.greaterThan(this.centerSkin.a, 1e-4)),
+            function () {
+              this.$l.centerDepth = pb.max(pb.mul(this.centerDepth01, this.cameraNearFar.y), 1e-4);
+              // Project the world-space scatter radius to a per-pixel tap
+              // spacing (radiusParams.y is 1 for perspective cameras, 0 for
+              // orthographic). sampleStep caps the spacing for close-ups.
+              this.$l.stepPx = pb.clamp(
+                pb.div(
+                  this.radiusParams.x,
+                  pb.max(pb.mix(pb.float(1), this.centerDepth, this.radiusParams.y), 1e-4)
+                ),
+                0,
+                this.sampleStep
+              );
+              this.$l.sum = pb.vec4(0);
+              this.$l.weightSum = pb.float(0);
+              this.$for(pb.int('y'), -4, 5, function () {
+                this.$for(pb.int('x'), -4, 5, function () {
+                  this.$l.fx = pb.float(this.x);
+                  this.$l.fy = pb.float(this.y);
+                  this.$l.offsetPx = pb.mul(pb.vec2(this.fx, this.fy), this.stepPx);
+                  this.$l.sampleUV = pb.clamp(
+                    pb.add(this.uv, pb.div(this.offsetPx, this.targetSize.xy)),
+                    pb.vec2(0),
+                    pb.vec2(1)
+                  );
+                  this.$l.skinSample = pb.textureSampleLevel(this.skinTex, this.sampleUV, 0);
+                  // Non-skin pixels contribute nothing; their zero alpha also
+                  // lowers the coverage used to gate the composite below.
+                  this.$if(pb.lessThanEqual(this.skinSample.a, 1e-4), function () {
+                    this.skinSample = pb.vec4(0);
+                  });
+                  this.$l.sampleDepth01 = this.readDepth01(this.sampleUV);
+                  this.$l.sampleDepth = pb.max(pb.mul(this.sampleDepth01, this.cameraNearFar.y), 1e-4);
+                  this.$l.depthWeight = pb.clamp(
+                    pb.sub(
+                      1,
+                      pb.div(
+                        pb.mul(pb.abs(pb.sub(this.centerDepth, this.sampleDepth)), this.depthScale),
+                        this.centerDepth
+                      )
+                    ),
+                    0,
+                    1
+                  );
+                  this.depthWeight = pb.mul(
+                    this.depthWeight,
+                    this.depthWeight,
+                    pb.sub(3, pb.mul(this.depthWeight, 2))
+                  );
+                  // Gaussian falloff (sigma = 2 taps) removes the boxy look of
+                  // uniformly weighted samples.
+                  this.$l.spatialWeight = pb.exp(
+                    pb.mul(pb.add(pb.mul(this.fx, this.fx), pb.mul(this.fy, this.fy)), -0.125)
+                  );
+                  this.$l.tapWeight = pb.mul(this.depthWeight, this.spatialWeight);
+                  this.sum = pb.add(this.sum, pb.mul(this.skinSample, this.tapWeight));
+                  this.weightSum = pb.add(this.weightSum, this.tapWeight);
                 });
-                this.$l.sampleDepth01 = this.readDepth01(this.sampleUV);
-                this.$l.sampleDepth = pb.max(pb.mul(this.sampleDepth01, this.cameraNearFar.y), 1e-4);
-                this.$l.depthWeight = pb.clamp(
-                  pb.sub(
-                    1,
-                    pb.div(
-                      pb.mul(pb.abs(pb.sub(this.centerDepth, this.sampleDepth)), this.depthScale),
-                      this.centerDepth
-                    )
-                  ),
-                  0,
-                  1
-                );
-                this.depthWeight = pb.mul(
-                  this.depthWeight,
-                  this.depthWeight,
-                  pb.sub(3, pb.mul(this.depthWeight, 2))
-                );
-                this.sum = pb.add(this.sum, pb.mul(this.skinSample, this.depthWeight));
-                this.weightSum = pb.add(this.weightSum, this.depthWeight);
               });
-            });
-            this.$if(pb.greaterThan(this.weightSum, 1e-4), function () {
-              this.$l.blurredSkin = pb.div(this.sum, this.weightSum);
-              this.$l.alphaDelta = pb.sub(this.blurredSkin.a, this.opacity);
-              this.$l.referenceLit = pb.mul(
-                this.baseColor.rgb,
-                pb.add(
-                  pb.vec3(pb.sub(1, this.alphaDelta)),
-                  pb.mul(this.blurredSkin.rgb, pb.max(pb.sub(1, this.opacity), 0), this.colorBoost)
-                )
-              );
-              this.result = pb.add(
-                this.baseColor.rgb,
-                pb.mul(pb.sub(this.referenceLit, this.baseColor.rgb), this.strength)
-              );
-            });
-          });
+              this.$if(pb.greaterThan(this.weightSum, 1e-4), function () {
+                this.$l.blurredSkin = pb.div(this.sum, this.weightSum);
+                // Additive composite: the blurred scatter irradiance is added on
+                // top of the base lighting so light bleeds into dark regions.
+                // Coverage gating keeps nearby non-skin pixels (collars, hair)
+                // from being tinted by neighboring skin samples.
+                this.$l.coverage = pb.smoothStep(
+                  this.opacity,
+                  pb.add(this.opacity, 0.35),
+                  this.blurredSkin.a
+                );
+                this.result = pb.add(
+                  this.baseColor.rgb,
+                  pb.mul(
+                    this.blurredSkin.rgb,
+                    this.encodeScale,
+                    this.colorBoost,
+                    this.coverage,
+                    this.strength
+                  )
+                );
+              });
+            }
+          );
           this.$if(pb.equal(this.srgbOut, 0), function () {
             this.$outputs.outColor = pb.vec4(this.result, this.baseColor.a);
           }).$else(function () {

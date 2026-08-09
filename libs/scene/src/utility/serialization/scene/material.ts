@@ -2443,6 +2443,46 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
               return [color.x, color.y, color.z, color.w];
             }
           },
+          {
+            name: 'TransmissionStrength',
+            type: 'float',
+            phase: 0,
+            options: {
+              label: 'TransmissionStrength',
+              animatable: true,
+              minValue: 0,
+              maxValue: 4
+            },
+            get(this: SkinMaterial, value) {
+              value.num[0] = this.transmissionStrength;
+            },
+            set(this: SkinMaterial, value) {
+              this.transmissionStrength = value.num[0];
+            },
+            getDefaultValue(this: SkinMaterial) {
+              return this.$isInstance ? this.coreMaterial.transmissionStrength : 0;
+            }
+          },
+          {
+            name: 'TransmissionPower',
+            type: 'float',
+            phase: 0,
+            options: {
+              label: 'TransmissionPower',
+              animatable: true,
+              minValue: 1,
+              maxValue: 16
+            },
+            get(this: SkinMaterial, value) {
+              value.num[0] = this.transmissionPower;
+            },
+            set(this: SkinMaterial, value) {
+              this.transmissionPower = value.num[0];
+            },
+            getDefaultValue(this: SkinMaterial) {
+              return this.$isInstance ? this.coreMaterial.transmissionPower : 4;
+            }
+          },
           ...getTextureProps<SkinMaterial>(manager, 'subsurfaceTexture', '2D', false, 1),
           ...getLitMaterialProps(manager)
         ]);

@@ -420,8 +420,10 @@ export class Camera extends SceneNode {
   protected _skinSSSStrength: number;
   /** @internal Skin SSS mask opacity bias. */
   protected _skinSSSOpacity: number;
-  /** @internal Skin SSS blur tap spacing in pixels. */
+  /** @internal Skin SSS maximum blur tap spacing in pixels. */
   protected _skinSSSSampleStep: number;
+  /** @internal Skin SSS world-space scatter radius. */
+  protected _skinSSSScatterRadius: number;
   /** @internal Skin SSS depth rejection scale. */
   protected _skinSSSDepthScale: number;
   /** @internal Skin SSS blurred multiplier boost. */
@@ -596,6 +598,7 @@ export class Camera extends SceneNode {
     this._skinSSSStrength = 1;
     this._skinSSSOpacity = 0.18;
     this._skinSSSSampleStep = 2;
+    this._skinSSSScatterRadius = 0.02;
     this._skinSSSDepthScale = 80;
     this._skinSSSColorBoost = 1;
     this._SSAO = false;
@@ -1385,7 +1388,7 @@ export class Camera extends SceneNode {
       this._postEffectSkinSSS.get()!.opacity = this._skinSSSOpacity;
     }
   }
-  /** Pixel spacing between blur taps. The reference shader uses 2. */
+  /** Maximum pixel spacing between blur taps. Caps the projected scatter radius for close-ups. */
   get skinSSSSampleStep() {
     return this._skinSSSSampleStep;
   }
@@ -1393,6 +1396,16 @@ export class Camera extends SceneNode {
     this._skinSSSSampleStep = Math.max(0.25, val ?? 0.25);
     if (this._postEffectSkinSSS.get()) {
       this._postEffectSkinSSS.get()!.sampleStep = this._skinSSSSampleStep;
+    }
+  }
+  /** World-space scatter radius. The blur width shrinks with distance to keep this constant. */
+  get skinSSSScatterRadius() {
+    return this._skinSSSScatterRadius;
+  }
+  set skinSSSScatterRadius(val) {
+    this._skinSSSScatterRadius = Math.max(0, val ?? 0);
+    if (this._postEffectSkinSSS.get()) {
+      this._postEffectSkinSSS.get()!.scatterRadius = this._skinSSSScatterRadius;
     }
   }
   /** Depth rejection scale. The reference shader uses 80. */
@@ -1926,6 +1939,7 @@ export class Camera extends SceneNode {
       skinSSS.strength = this._skinSSSStrength;
       skinSSS.opacity = this._skinSSSOpacity;
       skinSSS.sampleStep = this._skinSSSSampleStep;
+      skinSSS.scatterRadius = this._skinSSSScatterRadius;
       skinSSS.depthScale = this._skinSSSDepthScale;
       skinSSS.colorBoost = this._skinSSSColorBoost;
       this._postEffectSkinSSS.set(skinSSS);
