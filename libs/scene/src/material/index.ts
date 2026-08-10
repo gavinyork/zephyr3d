@@ -7,6 +7,7 @@ export * from './subsurfaceprofile';
 export * from './skin';
 export * from './material';
 export * from './meshmaterial';
+export * from './hair';
 export * from './grassmaterial';
 export * from './terrain-cm';
 export * from './pbrmr';

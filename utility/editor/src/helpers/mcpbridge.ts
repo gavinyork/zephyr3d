@@ -61,6 +61,7 @@ type MaterialClass =
   | 'UnlitMaterial'
   | 'LambertMaterial'
   | 'BlinnMaterial'
+  | 'HairMaterial'
   | 'PBRMetallicRoughnessMaterial'
   | 'PBRSpecularGlossinessMaterial'
   | 'StandardSpriteMaterial';
@@ -69,6 +70,7 @@ const builtinMaterials: Record<MaterialClass, string> = {
   UnlitMaterial: '/assets/@builtins/materials/unlit.zmtl',
   LambertMaterial: '/assets/@builtins/materials/lambert.zmtl',
   BlinnMaterial: '/assets/@builtins/materials/blinnphong.zmtl',
+  HairMaterial: '/assets/@builtins/materials/hair.zmtl',
   StandardSpriteMaterial: '/assets/@builtins/materials/sprite_std.zmtl',
   PBRMetallicRoughnessMaterial: '/assets/@builtins/materials/pbr_metallic_roughness.zmtl',
   PBRSpecularGlossinessMaterial: '/assets/@builtins/materials/pbr_specular_glossiness.zmtl'
@@ -2118,6 +2120,11 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
               path: '/assets/@builtins/materials/unlit.zmtl',
               type: 'unlit',
               immutable: true
+            },
+            {
+              path: '/assets/@builtins/materials/hair.zmtl',
+              type: 'hair',
+              immutable: true
             }
           ],
           err: null
@@ -3554,6 +3561,7 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         'UnlitMaterial',
         'LambertMaterial',
         'BlinnMaterial',
+        'HairMaterial',
         'StandardSpriteMaterial',
         'PBRMetallicRoughnessMaterial',
         'PBRSpecularGlossinessMaterial'

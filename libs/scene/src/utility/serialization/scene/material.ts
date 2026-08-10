@@ -2,6 +2,7 @@
 import type { BlendMode } from '../../../material';
 import {
   BlinnMaterial,
+  HairMaterial,
   LambertMaterial,
   MeshMaterial,
   MToonMaterial,
@@ -15,7 +16,8 @@ import {
   type MToonOutlineWidthMode,
   type SubsurfaceProfilePreset,
   SpriteBlueprintMaterial,
-  UnlitMaterial
+  UnlitMaterial,
+  type HairStrandDirection
 } from '../../../material';
 import type { PBRBlueprintOutputName } from '../../../material/pbrblueprint';
 import { defineProps, type PropertyAccessor, type SerializableClass } from '../types';
@@ -29,7 +31,7 @@ import { StandardSpriteMaterial } from '../../../material/sprite_std';
 import type { PBRReflectionMode } from '../../../material/mixins/lightmodel/pbrmetallicroughness';
 
 type PBRMaterial = PBRMetallicRoughnessMaterial | PBRSpecularGlossinessMaterial;
-type LitPropTypes = LambertMaterial | BlinnMaterial | SkinMaterial | PBRMaterial;
+type LitPropTypes = LambertMaterial | BlinnMaterial | SkinMaterial | HairMaterial | PBRMaterial;
 type UnlitPropTypes = UnlitMaterial | LitPropTypes;
 
 function createBlueprintOutputHiddenPredicate(_outputs: readonly PBRBlueprintOutputName[]) {
@@ -2027,6 +2029,264 @@ export function getBlinnMaterialClass(manager: ResourceManager): SerializableCla
       }
     },
     getMeshMaterialInstanceUniformsClass(BlinnMaterial)
+  ];
+}
+
+/** @internal */
+export function getHairMaterialClass(manager: ResourceManager): SerializableClass[] {
+  return [
+    {
+      ctor: HairMaterial,
+      parent: MeshMaterial,
+      name: 'HairMaterial',
+      getProps() {
+        return defineProps([
+          {
+            name: 'Specular1Color',
+            description: 'Color of the primary (sharp, near-white) specular lobe',
+            type: 'rgb',
+            default: [0.35, 0.35, 0.35],
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 1
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.specular1Color.x;
+              value.num[1] = this.specular1Color.y;
+              value.num[2] = this.specular1Color.z;
+            },
+            set(this: HairMaterial, value) {
+              this.specular1Color = new Vector3(value.num[0], value.num[1], value.num[2]);
+            }
+          },
+          {
+            name: 'Specular1Power',
+            description: 'Exponent of the primary specular lobe',
+            type: 'float',
+            default: 160,
+            options: {
+              animatable: true,
+              minValue: 1,
+              maxValue: 1024
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.specular1Power;
+            },
+            set(this: HairMaterial, value) {
+              this.specular1Power = value.num[0];
+            }
+          },
+          {
+            name: 'Specular1Shift',
+            description: 'Shift of the primary specular lobe along the strand',
+            type: 'float',
+            default: -0.15,
+            options: {
+              animatable: true,
+              minValue: -1,
+              maxValue: 1
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.specular1Shift;
+            },
+            set(this: HairMaterial, value) {
+              this.specular1Shift = value.num[0];
+            }
+          },
+          {
+            name: 'Specular2Color',
+            description: 'Color of the secondary (broad, hair-tinted) specular lobe',
+            type: 'rgb',
+            default: [0.5, 0.45, 0.4],
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 1
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.specular2Color.x;
+              value.num[1] = this.specular2Color.y;
+              value.num[2] = this.specular2Color.z;
+            },
+            set(this: HairMaterial, value) {
+              this.specular2Color = new Vector3(value.num[0], value.num[1], value.num[2]);
+            }
+          },
+          {
+            name: 'Specular2Power',
+            description: 'Exponent of the secondary specular lobe',
+            type: 'float',
+            default: 40,
+            options: {
+              animatable: true,
+              minValue: 1,
+              maxValue: 1024
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.specular2Power;
+            },
+            set(this: HairMaterial, value) {
+              this.specular2Power = value.num[0];
+            }
+          },
+          {
+            name: 'Specular2Shift',
+            description: 'Shift of the secondary specular lobe along the strand',
+            type: 'float',
+            default: 0.1,
+            options: {
+              animatable: true,
+              minValue: -1,
+              maxValue: 1
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.specular2Shift;
+            },
+            set(this: HairMaterial, value) {
+              this.specular2Shift = value.num[0];
+            }
+          },
+          {
+            name: 'StrandDirection',
+            description: 'Which TBN axis runs along the hair strands in the card atlas',
+            type: 'string',
+            default: 'binormal',
+            options: {
+              enum: {
+                labels: ['Tangent (U)', 'Binormal (V)'],
+                values: ['tangent', 'binormal']
+              }
+            },
+            get(this: HairMaterial, value) {
+              value.str[0] = this.strandDirection;
+            },
+            set(this: HairMaterial, value) {
+              this.strandDirection = value.str[0] as HairStrandDirection;
+            },
+            isValid(this: HairMaterial) {
+              return !this.$isInstance;
+            }
+          },
+          {
+            name: 'ShiftMapScale',
+            description: 'Scale applied to the per-strand shift texture',
+            type: 'float',
+            phase: 1,
+            default: 1,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 4
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.shiftMapScale;
+            },
+            set(this: HairMaterial, value) {
+              this.shiftMapScale = value.num[0];
+            },
+            isValid(this: HairMaterial) {
+              return !this.$isInstance && !!this.specularShiftTexture;
+            }
+          },
+          ...getTextureProps<HairMaterial>(manager, 'specularShiftTexture', '2D', false, 0),
+          {
+            name: 'DiffuseWrap',
+            description: 'Wrap diffuse amount that softens the terminator across thin cards',
+            type: 'float',
+            default: 0.5,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 1
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.diffuseWrap;
+            },
+            set(this: HairMaterial, value) {
+              this.diffuseWrap = value.num[0];
+            }
+          },
+          {
+            name: 'TransmissionColor',
+            description: 'Tint color of the backlit transmission term',
+            type: 'rgb',
+            default: [0.9, 0.65, 0.45],
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 1
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.transmissionColor.x;
+              value.num[1] = this.transmissionColor.y;
+              value.num[2] = this.transmissionColor.z;
+            },
+            set(this: HairMaterial, value) {
+              this.transmissionColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+            }
+          },
+          {
+            name: 'TransmissionIntensity',
+            description: 'Intensity of the backlit transmission term, 0 disables it',
+            type: 'float',
+            default: 0,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 4
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.transmissionIntensity;
+            },
+            set(this: HairMaterial, value) {
+              this.transmissionIntensity = value.num[0];
+            }
+          },
+          {
+            name: 'TransmissionPower',
+            description: 'View-alignment exponent of the transmission term',
+            type: 'float',
+            default: 6,
+            options: {
+              animatable: true,
+              minValue: 1,
+              maxValue: 64
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.transmissionPower;
+            },
+            set(this: HairMaterial, value) {
+              this.transmissionPower = value.num[0];
+            }
+          },
+          {
+            name: 'OcclusionStrength',
+            description: 'Strength of the baked occlusion (root darkening) texture',
+            type: 'float',
+            phase: 1,
+            default: 1,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 1
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.occlusionStrength;
+            },
+            set(this: HairMaterial, value) {
+              this.occlusionStrength = value.num[0];
+            },
+            isValid(this: HairMaterial) {
+              return !this.$isInstance && !!this.occlusionTexture;
+            }
+          },
+          ...getTextureProps<HairMaterial>(manager, 'occlusionTexture', '2D', false, 0),
+          ...getLitMaterialProps(manager)
+        ]);
+      }
+    },
+    getMeshMaterialInstanceUniformsClass(HairMaterial)
   ];
 }
 
