@@ -409,6 +409,24 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
           const mimeType = this.renderer.VFS.guessMIMEType(item.meta.path);
           if (mimeType === 'application/vnd.zephyr3d.material+json') {
             ImGui.Separator();
+            if (ImGui.MenuItem('Clone Material...')) {
+              DlgSaveFile.saveFile(
+                'Clone Material',
+                this.renderer.VFS,
+                '/assets',
+                'Material (*.zmtl)|*.zmtl',
+                500,
+                400
+              ).then((name) => {
+                if (name) {
+                  if (!name.endsWith('.zmtl')) {
+                    name = `${name}.zmtl`;
+                  }
+                  this.renderer.copyFile(item.meta.path, name, 'prompt');
+                }
+              });
+            }
+            ImGui.Separator();
             if (ImGui.MenuItem('Create Material Instance...')) {
               DlgSaveFile.saveFile(
                 'Create Material Instance',
@@ -426,6 +444,7 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
                 }
               });
             }
+            ImGui.Separator();
             if (ImGui.MenuItem('Convert To Blueprint Material...')) {
               void this.renderer.convertMaterialToBlueprint(item.meta.path);
             }
