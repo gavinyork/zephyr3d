@@ -1578,7 +1578,8 @@ export class SkinBinding extends Disposable {
       [HumanoidBodyRig.LeftFoot]: sideJointPatterns('left', [{ all: ['foot'], none: ['toe'] }]),
       [HumanoidBodyRig.LeftToes]: sideJointPatterns('left', [
         { all: ['toe', '0'] },
-        { all: ['toe'], none: ['end'] }
+        { all: ['toe'], none: ['end'] },
+        { all: ['ball'] }
       ]),
       [HumanoidBodyRig.RightUpperLeg]: sideJointPatterns('right', [
         { all: ['thigh'] },
@@ -1593,7 +1594,8 @@ export class SkinBinding extends Disposable {
       [HumanoidBodyRig.RightFoot]: sideJointPatterns('right', [{ all: ['foot'], none: ['toe'] }]),
       [HumanoidBodyRig.RightToes]: sideJointPatterns('right', [
         { all: ['toe', '0'] },
-        { all: ['toe'], none: ['end'] }
+        { all: ['toe'], none: ['end'] },
+        { all: ['ball'] }
       ])
     };
   }

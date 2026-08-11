@@ -416,6 +416,32 @@ function buildBipedBodyOnlySkeleton() {
   return root;
 }
 
+function buildMetaHumanBodySkeleton(prefix = '') {
+  const root = new SceneNode(null);
+  root.name = `${prefix}root`;
+
+  const hips = appendNode(root, `${prefix}pelvis`);
+  let spine = hips;
+  for (let i = 1; i <= 5; i++) {
+    spine = appendNode(spine, `${prefix}spine_${String(i).padStart(2, '0')}`);
+  }
+  const neck = appendNode(spine, `${prefix}neck_01`);
+  appendNode(appendNode(neck, `${prefix}neck_02`), `${prefix}head`);
+
+  for (const side of ['l', 'r'] as const) {
+    const upperLeg = appendNode(hips, `${prefix}thigh_${side}`);
+    const lowerLeg = appendNode(upperLeg, `${prefix}calf_${side}`);
+    const foot = appendNode(lowerLeg, `${prefix}foot_${side}`);
+    appendNode(foot, `${prefix}ball_${side}`);
+    const shoulder = appendNode(spine, `${prefix}clavicle_${side}`);
+    const upperArm = appendNode(shoulder, `${prefix}upperarm_${side}`);
+    const lowerArm = appendNode(upperArm, `${prefix}lowerarm_${side}`);
+    appendNode(lowerArm, `${prefix}hand_${side}`);
+  }
+
+  return root;
+}
+
 function expectHumanoidExtraction(
   root: SceneNode,
   expected: {
@@ -560,6 +586,18 @@ describe('Skeleton.tryExtractHumanoidBones', () => {
     expect(result!.body[HumanoidBodyRig.RightHand].name).toBe('Bip001 R Hand_23');
     expect(result!.leftHand).toBeUndefined();
     expect(result!.rightHand).toBeUndefined();
+  });
+
+  test('extracts MetaHuman body bones with optional namespace prefixes', () => {
+    for (const prefix of ['', 'MHBody:']) {
+      const result = Skeleton.tryExtractHumanoidJoints(buildMetaHumanBodySkeleton(prefix));
+      expect(result).not.toBeNull();
+      expect(result!.body[HumanoidBodyRig.Hips].name).toBe(`${prefix}pelvis`);
+      expect(result!.body[HumanoidBodyRig.Spine].name).toBe(`${prefix}spine_01`);
+      expect(result!.body[HumanoidBodyRig.UpperChest].name).toBe(`${prefix}spine_05`);
+      expect(result!.body[HumanoidBodyRig.LeftToes].name).toBe(`${prefix}ball_l`);
+      expect(result!.body[HumanoidBodyRig.RightToes].name).toBe(`${prefix}ball_r`);
+    }
   });
 
   test('prefers the torso chain that is hierarchy-consistent with the limbs', () => {
