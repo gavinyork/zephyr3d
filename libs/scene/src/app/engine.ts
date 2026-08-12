@@ -2,11 +2,11 @@ import type { GenericConstructor, IDisposable, Nullable, ReadOptions } from '@ze
 import { MemoryFS, objectEntries } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import { HttpFS, type VFS } from '@zephyr3d/base';
-import { ScriptingSystem } from './scriptingsystem';
+import { createDeclarativeScriptSignature, ScriptingSystem } from './scriptingsystem';
 import type { Host } from './scriptingsystem';
 import type { RuntimeScript, RuntimeScriptConfig } from './runtimescript';
 import { ResourceManager } from '../utility/serialization/manager';
-import type { Scene } from '../scene';
+import type { Scene, SceneNode } from '../scene';
 import {
   BoxShape,
   CapsuleShape,
@@ -235,6 +235,27 @@ export class Engine {
     return this._enabled ? await this._scriptingSystem.attachScript(host, module, config) : null;
   }
   /**
+   * Attaches all serialized script declarations on a scene node subtree.
+   *
+   * The operation is explicit and idempotent. Repeated or concurrent calls reuse
+   * instances already attached for the same declaration, while duplicate declarations
+   * within one host remain distinct.
+   *
+   * @param root - Root node whose own declarations and descendants are processed.
+   * @returns Script instances in host/declaration order. Failed declarations are omitted.
+   */
+  async attachScriptsInSubtree(root: SceneNode) {
+    if (!this._enabled) {
+      return [];
+    }
+    const nodes: SceneNode[] = [];
+    root.iterate((node) => {
+      nodes.push(node);
+    });
+    const results = await Promise.all(nodes.map((node) => this.attachDeclaredScripts(node)));
+    return results.flat();
+  }
+  /**
    * Detaches a script from a host, by module ID or instance, if enabled.
    *
    * No-op when disabled.
@@ -449,61 +470,48 @@ export class Engine {
     try {
       const scene = await this._resourceManager.loadScene(path);
       if (scene) {
-        const sceneScripts =
-          scene.scripts.length > 0
-            ? scene.scripts
-            : scene.script
-              ? [{ script: scene.script, config: scene.scriptConfig }]
-              : [];
-        for (const attachment of sceneScripts) {
-          if (!attachment.script) {
-            continue;
-          }
-          try {
-            await this.attachScript(
-              scene,
-              attachment.script,
-              (attachment.config ?? null) as RuntimeScriptConfig | null
-            );
-          } catch (err) {
-            console.error(`Attach script failed: ${err}`);
-          }
-        }
-        const nodes: (typeof scene.rootNode)[] = [];
-        scene.rootNode.iterate((node) => {
-          nodes.push(node);
-        });
-        const attachTasks = nodes.map(async (node) => {
-          const attachments =
-            node.scripts.length > 0
-              ? node.scripts
-              : node.script
-                ? [{ script: node.script, config: node.scriptConfig }]
-                : [];
-          for (const attachment of attachments) {
-            if (!attachment.script) {
-              continue;
-            }
-            try {
-              await this.attachScript(
-                node,
-                attachment.script,
-                (attachment.config ?? null) as RuntimeScriptConfig | null
-              );
-            } catch (err) {
-              console.error(`Attach script failed: ${err}`);
-            }
-          }
-        });
-        if (attachTasks.length > 0) {
-          await Promise.allSettled(attachTasks);
-        }
+        await this.attachDeclaredScripts(scene);
+        await this.attachScriptsInSubtree(scene.rootNode);
       }
       return scene;
     } catch (err) {
       console.error(`Load scene from '${path}' failed: ${err}`);
       return null;
     }
+  }
+  private async attachDeclaredScripts<
+    T extends Host & {
+      scripts: { script: string; config: unknown }[];
+      script: string;
+      scriptConfig: unknown;
+    }
+  >(host: T) {
+    const attachments =
+      host.scripts.length > 0
+        ? host.scripts
+        : host.script
+          ? [{ script: host.script, config: host.scriptConfig }]
+          : [];
+    const occurrences = new Map<string, number>();
+    const declarationKeys = new Set<string>();
+    const requests = attachments
+      .filter((attachment) => !!attachment.script)
+      .map((attachment) => {
+        const config = (attachment.config ?? null) as RuntimeScriptConfig | null;
+        const signature = createDeclarativeScriptSignature(attachment.script, config);
+        const occurrence = occurrences.get(signature) ?? 0;
+        occurrences.set(signature, occurrence + 1);
+        declarationKeys.add(`${signature}\n${occurrence}`);
+        return this._scriptingSystem
+          .attachDeclarativeScript(host, attachment.script, config, occurrence)
+          .catch((err) => {
+            console.error(`Attach script '${attachment.script}' failed: ${err}`);
+            return null;
+          });
+      });
+    this._scriptingSystem.synchronizeDeclarativeScripts(host, declarationKeys);
+    const instances = await Promise.all(requests);
+    return instances.filter((instance): instance is RuntimeScript<T> => !!instance);
   }
 }
 

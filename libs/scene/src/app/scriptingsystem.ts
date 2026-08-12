@@ -71,6 +71,35 @@ export interface IAttachedScript {
   instance: RuntimeScript<any>;
 }
 
+function stableSerializeScriptConfig(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value) ?? String(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableSerializeScriptConfig(item)).join(',')}]`;
+  }
+  return `{${Object.keys(value as Record<string, unknown>)
+    .sort()
+    .map(
+      (key) =>
+        `${JSON.stringify(key)}:${stableSerializeScriptConfig((value as Record<string, unknown>)[key])}`
+    )
+    .join(',')}}`;
+}
+
+function createDeclarativeScriptKey(
+  module: string,
+  config: Nullable<RuntimeScriptConfig>,
+  occurrence: number
+) {
+  return `${module}\n${stableSerializeScriptConfig(config ?? null)}\n${occurrence}`;
+}
+
+/** @internal */
+export function createDeclarativeScriptSignature(module: string, config: Nullable<RuntimeScriptConfig>) {
+  return `${module}\n${stableSerializeScriptConfig(config ?? null)}`;
+}
+
 /**
  * Script system that resolves, loads, and manages lifecycle of runtime scripts.
  *
@@ -93,6 +122,9 @@ export class ScriptingSystem {
   private _registry: ScriptRegistry;
   private _hostScripts: Map<Nullable<Host>, IAttachedScript[]>;
   private _scriptHosts: Map<RuntimeScript<any>, Nullable<Host>[]>;
+  private _declarativeScripts: Map<Nullable<Host>, Map<string, RuntimeScript<any>>>;
+  private _pendingDeclarativeScripts: Map<Nullable<Host>, Map<string, Promise<Nullable<RuntimeScript<any>>>>>;
+  private _activeDeclarativeKeys: Map<Nullable<Host>, ReadonlySet<string>>;
   private _onLoadError?: (e: unknown, id: string) => void;
   private _importComment?: string;
 
@@ -105,6 +137,9 @@ export class ScriptingSystem {
     this._registry = new ScriptRegistry(opts.VFS ?? new HttpFS('./'), opts.scriptsRoot ?? '/');
     this._hostScripts = new Map();
     this._scriptHosts = new Map();
+    this._declarativeScripts = new Map();
+    this._pendingDeclarativeScripts = new Map();
+    this._activeDeclarativeKeys = new Map();
     this._importComment = opts.importComment;
     this._onLoadError = opts.onLoadError;
   }
@@ -216,7 +251,9 @@ export class ScriptingSystem {
         this._hostScripts.set(host, list);
         if (host) {
           host.on('dispose', () => {
+            this._activeDeclarativeKeys.set(host, new Set());
             this.detachScript(host);
+            this.cleanupDeclarativeHost(host);
           });
         }
       }
@@ -259,6 +296,88 @@ export class ScriptingSystem {
   }
 
   /**
+   * Attaches a serialized script declaration once for a host.
+   *
+   * Repeated or concurrent calls with the same module, configuration and occurrence
+   * return the existing instance. The occurrence distinguishes duplicate declarations
+   * that intentionally appear more than once on the same host.
+   *
+   * @param host - Host object to attach the script to.
+   * @param module - Logical script module identifier.
+   * @param config - Serialized script configuration.
+   * @param occurrence - Zero-based occurrence among equivalent declarations on the host.
+   */
+  async attachDeclarativeScript<T extends Host>(
+    host: Nullable<T>,
+    module: string,
+    config?: Nullable<RuntimeScriptConfig>,
+    occurrence = 0
+  ): Promise<Nullable<RuntimeScript<T>>> {
+    const key = createDeclarativeScriptKey(module, config ?? null, occurrence);
+    const attached = this._declarativeScripts.get(host)?.get(key);
+    if (attached) {
+      return attached as RuntimeScript<T>;
+    }
+    const pending = this._pendingDeclarativeScripts.get(host)?.get(key);
+    if (pending) {
+      return (await pending) as Nullable<RuntimeScript<T>>;
+    }
+
+    let hostPending = this._pendingDeclarativeScripts.get(host);
+    if (!hostPending) {
+      hostPending = new Map();
+      this._pendingDeclarativeScripts.set(host, hostPending);
+    }
+    const request = this.attachScript(host, module, config).then((instance) => {
+      if (instance) {
+        const activeKeys = this._activeDeclarativeKeys.get(host);
+        if (activeKeys && !activeKeys.has(key)) {
+          this.detachScript(host as T, instance);
+          return null;
+        }
+        let hostAttached = this._declarativeScripts.get(host);
+        if (!hostAttached) {
+          hostAttached = new Map();
+          this._declarativeScripts.set(host, hostAttached);
+        }
+        hostAttached.set(key, instance);
+      }
+      return instance;
+    });
+    hostPending.set(key, request);
+    try {
+      return await request;
+    } finally {
+      if (hostPending.get(key) === request) {
+        hostPending.delete(key);
+      }
+      if (hostPending.size === 0) {
+        this._pendingDeclarativeScripts.delete(host);
+        this.cleanupDeclarativeHost(host);
+      }
+    }
+  }
+
+  /**
+   * Detaches declarative script instances whose keys are no longer present on a host.
+   *
+   * @param host - Host whose serialized declarations changed.
+   * @param activeKeys - Complete set of declaration keys currently present on the host.
+   */
+  synchronizeDeclarativeScripts<T extends Host>(host: Nullable<T>, activeKeys: ReadonlySet<string>) {
+    this._activeDeclarativeKeys.set(host, new Set(activeKeys));
+    const declarative = this._declarativeScripts.get(host);
+    if (!declarative) {
+      return;
+    }
+    for (const [key, instance] of declarative) {
+      if (!activeKeys.has(key)) {
+        this.detachScript(host as T, instance as RuntimeScript<T>);
+      }
+    }
+  }
+
+  /**
    * Detaches script(s) from a host.
    *
    * Behavior:
@@ -272,7 +391,7 @@ export class ScriptingSystem {
    * @param host - The host to detach from.
    * @param idOrInstance - Optional module ID or script instance to target.
    */
-  detachScript<T extends Host>(host: T, idOrInstance?: string | RuntimeScript<T>) {
+  detachScript<T extends Host>(host: Nullable<T>, idOrInstance?: string | RuntimeScript<T>) {
     const list = this._hostScripts.get(host);
     if (!list || list.length === 0) {
       return;
@@ -280,13 +399,12 @@ export class ScriptingSystem {
     for (let i = list.length - 1; i >= 0; i--) {
       const it = list[i];
       const hit =
-        !idOrInstance || typeof idOrInstance === 'string'
-          ? it.id === idOrInstance
-          : it.instance === idOrInstance;
+        !idOrInstance ||
+        (typeof idOrInstance === 'string' ? it.id === idOrInstance : it.instance === idOrInstance);
       if (hit) {
         list.splice(i, 1);
         try {
-          it.instance.onDetached(host);
+          it.instance.onDetached(host as T);
         } catch (err) {
           console.error(`Error occured at onDetach() of module '${it.id}': ${err}`);
         }
@@ -312,6 +430,18 @@ export class ScriptingSystem {
     if (list.length === 0) {
       this._hostScripts.delete(host);
     }
+    const declarative = this._declarativeScripts.get(host);
+    if (declarative) {
+      for (const [key, instance] of declarative) {
+        if (!this._scriptHosts.get(instance)?.includes(host)) {
+          declarative.delete(key);
+        }
+      }
+      if (declarative.size === 0) {
+        this._declarativeScripts.delete(host);
+      }
+    }
+    this.cleanupDeclarativeHost(host);
   }
 
   /**
@@ -356,12 +486,23 @@ export class ScriptingSystem {
    * Iteratively calls {@link ScriptingSystem.detachScript} on each host until no attachments remain.
    */
   detachAllScripts() {
+    for (const host of this._activeDeclarativeKeys.keys()) {
+      this._activeDeclarativeKeys.set(host, new Set());
+    }
     while (this._hostScripts.size > 0) {
-      for (const entry of this._hostScripts) {
-        if (entry[0]) {
-          this.detachScript(entry[0]);
-        }
+      for (const [host] of this._hostScripts) {
+        this.detachScript(host);
       }
+    }
+  }
+
+  private cleanupDeclarativeHost(host: Nullable<Host>) {
+    if (
+      !this._hostScripts.has(host) &&
+      !this._declarativeScripts.has(host) &&
+      !this._pendingDeclarativeScripts.has(host)
+    ) {
+      this._activeDeclarativeKeys.delete(host);
     }
   }
 }
