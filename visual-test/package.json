@@ -23,6 +23,7 @@
     "test:only": "playwright test --project=webgl2-swiftshader --project=webgpu-swiftshader",
     "test:gpu": "npm run build && playwright test --project=webgl2-gpu --project=webgpu-gpu",
     "test:update": "cross-env UPDATE_BASELINES=1 npm run test",
+    "sensitivity": "node tools/sensitivity.mjs",
     "report": "playwright show-report"
   },
   "engines": {

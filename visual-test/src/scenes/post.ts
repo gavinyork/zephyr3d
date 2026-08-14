@@ -30,7 +30,10 @@ export const postToneMapBloom: VisualScene = {
 
     camera.toneMap = true;
     camera.bloom = true;
-    camera.bloomThreshold = 0.8;
+    // Threshold deliberately left at the engine default. It happens to be the
+    // 0.8 this scene wants anyway, so inheriting it costs nothing visually and
+    // buys sensitivity to the default drifting - setting it explicitly made the
+    // scene immune to exactly that, which tools/sensitivity.mjs caught.
     camera.bloomIntensity = 1.2;
     placeCamera(camera, new Vector3(0, 0, 7));
   }
@@ -63,15 +66,25 @@ export const postFxaa: VisualScene = {
  * baseline here proves that `stepFrame()` really is advancing per-frame state
  * exactly once and that history ping-pong is not leaking between scenes.
  *
- * Eight frames rather than two so the Halton sequence actually cycles; the
- * tolerance is looser than default because temporal accumulation compounds
- * per-frame floating-point differences.
+ * Eight frames rather than two, so the Halton sequence actually cycles.
+ *
+ * Runs on the default tolerance, deliberately. It originally carried a loosened
+ * one, on the plausible-sounding assumption that temporal accumulation would
+ * compound per-frame floating-point differences into flakiness. That assumption
+ * was never measured, and it was wrong twice over: the scene is byte-stable
+ * across repeated runs on both backends, and the loosened per-pixel threshold
+ * was silently swallowing real regressions - a 1.5x change to the TAA jitter
+ * amplitude registered as 4.0% of pixels at the default threshold but only 0.15%
+ * at the loosened one, which slipped under the budget and passed.
+ *
+ * The general lesson, since it will come up again: loosen a tolerance only after
+ * observing flakiness, never in anticipation of it, and re-run
+ * tools/sensitivity.mjs afterwards to see what the slack cost.
  */
 export const taaMultiframe: VisualScene = {
   name: 'taa-multiframe',
   description: 'TAA resolved over 8 stepped frames. Also proves frame-state advance and history isolation.',
   frames: 8,
-  tolerance: { threshold: 0.05, maxDiffPixelRatio: 0.004 },
   setup({ scene, camera }) {
     bareScene(scene);
     keyLight(scene);

@@ -82,6 +82,25 @@ export class SceneCapturer {
       });
 
       device.setFixedFrameTime(FIXED_DT_MS);
+      // Rewind the frame counter, so every scene is captured from frame 0.
+      //
+      // Without this the harness's central promise - that scenes are independent
+      // and order does not matter - is quietly false. The counter is per-device
+      // and monotonic across the whole page session, while the device is shared
+      // by every scene in a worker; anything indexed by it therefore depends on
+      // how many scenes ran first. TAA is exactly that: jitter is
+      // `Camera._halton23[frameCounter % 16]`, so eight frames starting at 1 and
+      // eight starting at 137 sample different points of the sequence.
+      //
+      // Found by tools/sensitivity.mjs, via a route worth recording: the scene
+      // passed in isolation, failed in the full suite, and had been shipped with
+      // a loosened tolerance that was wide enough to hide the difference.
+      //
+      // `frameInfo` is a public getter over a mutable record, so this is a
+      // supported reach rather than a private one - but it is still the harness
+      // asserting something about engine state, and if FrameInfo ever gains
+      // fields derived from the counter they will need resetting here too.
+      device.frameInfo.frameCounter = 0;
       let stalls = 0;
       for (let i = 0; i < frames; i++) {
         // Yield a macrotask between frames so in-flight promise chains (lazily

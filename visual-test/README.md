@@ -86,6 +86,45 @@ The `taa-multiframe` scene is the check on all three: it accumulates across 8
 stepped frames, so a stable baseline there means frame state really is advancing
 once per frame and history is not leaking between scenes.
 
+## Is the harness still working? (`npm run sensitivity`)
+
+A visual suite can die without ever turning red — by staying green while quietly
+ceasing to exercise the code it claims to cover. Green and dead look identical
+from outside.
+
+`tools/sensitivity.mjs` tests the tests. Each entry is a small edit to engine
+source with a known blast radius; the script applies it, rebuilds, runs the
+suite, and asserts the scenes that *should* notice actually do. An entry that
+stops failing is a coverage hole that has opened up.
+
+```bash
+npm run sensitivity                  # all entries (minutes - one rebuild each)
+node tools/sensitivity.mjs --list
+node tools/sensitivity.mjs --only shadow-default-depth-bias
+```
+
+It is not a PR gate. Run it on a schedule, and by hand after anything that
+changes baselines, tolerances, or shared scene helpers. It restores engine source
+via `git checkout --` in a `finally`, and refuses to start if the files it
+patches have uncommitted changes.
+
+This is not a hypothetical safeguard — the four entries currently in it found
+three real defects on their first run:
+
+| Found | What it was |
+|---|---|
+| `post-tonemap-bloom` was blind to the default bloom threshold | The scene set the threshold explicitly to the same value as the default, so the default could drift freely. Now inherited. |
+| `taa-multiframe` was blind to TAA jitter changes | It shipped with a loosened tolerance, added in anticipation of flakiness that was never measured and does not exist. A 1.5x jitter change showed as 4.0% of pixels at the default threshold but 0.15% at the loosened one. |
+| Scenes were **not** order-independent | Chasing the above: `device.frameInfo.frameCounter` is per-device and monotonic across a whole page session, and TAA jitter indexes it, so `taa-multiframe` rendered differently depending on how many scenes ran before it. `capture.ts` now rewinds the counter per scene. The loosened tolerance had been hiding this too. |
+
+Two habits fall out of that, both worth keeping:
+
+- **Never loosen a tolerance in anticipation.** Loosen only after observing real
+  flakiness, per scene, with the reason written down — then re-run this script to
+  see what the slack cost.
+- **Adding an entry means running it.** An expectation that has never been
+  observed is exactly the comfortable fiction this script exists to destroy.
+
 ## Shadow scenes: a deliberate split
 
 `shadow-defaults` looks far worse than the other shadow scenes — heavy diagonal
