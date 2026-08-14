@@ -631,6 +631,67 @@ export class NodeEditor extends Observable<{
     return node;
   }
 
+  private async duplicateSelection() {
+    if (this.selectedNodes.length === 0) {
+      return false;
+    }
+    const selectedIds = [...new Set(this.selectedNodes)].filter((id) => this.nodes.has(id));
+    if (selectedIds.length === 0) {
+      return false;
+    }
+
+    const selectedSet = new Set(selectedIds);
+    const idMap = new Map<number, number>();
+    const duplicatedNodes: GNode[] = [];
+    const worldOffset = (this.gridSizePx * 2) / Math.max(this.canvasScale, 1e-6);
+
+    for (const sourceId of selectedIds) {
+      const source = this.nodes.get(sourceId);
+      if (!source) {
+        continue;
+      }
+      const serialized = await getEngine().resourceManager.serializeObject(source.impl);
+      const impl = await getEngine().resourceManager.deserializeObject<IGraphNode>(null, serialized);
+      ASSERT(!!impl, 'Failed to duplicate node');
+      const duplicated = new GNode(
+        this,
+        new ImGui.ImVec2(source.position.x + worldOffset, source.position.y + worldOffset),
+        impl
+      );
+      duplicated.title = source.title;
+      duplicated.locked = source.locked;
+      if (duplicated.locked) {
+        duplicated.titleBg = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.5, 0.5, 0.28, 1));
+        duplicated.titleTextCol = ImGui.ColorConvertFloat4ToU32(new ImGui.ImVec4(0.1, 0.1, 0.1, 1));
+      }
+      this.addNode(duplicated);
+      idMap.set(sourceId, duplicated.id);
+      duplicatedNodes.push(duplicated);
+    }
+
+    for (const link of this.links.slice()) {
+      if (!selectedSet.has(link.startNodeId) || !selectedSet.has(link.endNodeId)) {
+        continue;
+      }
+      const newStartId = idMap.get(link.startNodeId);
+      const newEndId = idMap.get(link.endNodeId);
+      if (newStartId === undefined || newEndId === undefined) {
+        continue;
+      }
+      const reroutePoints = link.reroutePoints.map(
+        (point) => new ImGui.ImVec2(point.x + worldOffset, point.y + worldOffset)
+      );
+      this.addLink(newStartId, link.startSlotId, newEndId, link.endSlotId, reroutePoints);
+    }
+
+    this.selectedLinkControlPoints.clear();
+    this.setSelection(duplicatedNodes.map((node) => node.id));
+    if (duplicatedNodes.length > 0) {
+      this.emitChanged();
+    }
+    return duplicatedNodes.length > 0;
+  }
+
   private deleteLink(index: number) {
     const link = this.links[index];
     const node = this.nodes.get(link.endNodeId)!.impl;
@@ -2019,5 +2080,9 @@ export class NodeEditor extends Observable<{
   snapWorldToScreenGrid(pos: ImGui.ImVec2, canvasScale: number): ImGui.ImVec2 {
     const gWorld = this.gridSizePx / Math.max(1e-6, canvasScale);
     return new ImGui.ImVec2(Math.round(pos.x / gWorld) * gWorld, Math.round(pos.y / gWorld) * gWorld);
+  }
+
+  public async duplicateSelectedNodes() {
+    return this.duplicateSelection();
   }
 }

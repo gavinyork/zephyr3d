@@ -5,6 +5,7 @@ import { ProjectService } from '../../core/services/project';
 import { MaterialFunctionEditor } from '../../components/blueprint/material/func';
 
 export class DlgMaterialFunctionEditor extends DialogRenderer<void> {
+  private static _focusedInstance: DlgMaterialFunctionEditor | null = null;
   private readonly editor: MaterialFunctionEditor;
   private readonly path: string;
   constructor(id: string, width: number, height: number, path: string) {
@@ -38,10 +39,22 @@ export class DlgMaterialFunctionEditor extends DialogRenderer<void> {
     this.editor.open();
   }
   close(): void {
+    if (DlgMaterialFunctionEditor._focusedInstance === this) {
+      DlgMaterialFunctionEditor._focusedInstance = null;
+    }
     this.editor.close();
     super.close();
   }
+  public static duplicateFocusedSelection() {
+    return this._focusedInstance?.editor.duplicateActiveSelection() ?? false;
+  }
   public doRender(): void {
+    const focused = ImGui.IsWindowFocused(ImGui.FocusedFlags.RootAndChildWindows);
+    if (focused) {
+      DlgMaterialFunctionEditor._focusedInstance = this;
+    } else if (DlgMaterialFunctionEditor._focusedInstance === this) {
+      DlgMaterialFunctionEditor._focusedInstance = null;
+    }
     if (
       ImGui.BeginChild(
         'NodeEditorContainer',

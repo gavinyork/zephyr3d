@@ -1,7 +1,14 @@
 import type { Matrix4x4, Nullable } from '@zephyr3d/base';
 import { applyMixins, DRef, Quaternion, Vector2, Vector3 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
-import type { RenderPass, BatchDrawable, DrawContext, PickTarget, RenderQueue } from '../render';
+import type {
+  RenderPass,
+  BatchDrawable,
+  DrawContext,
+  PickTarget,
+  RenderQueue,
+  SkinInfluenceData
+} from '../render';
 import { Primitive } from '../render';
 import type { RenderBundle } from '@zephyr3d/device';
 import type { Scene } from './scene';
@@ -229,6 +236,12 @@ export class BaseSprite<M extends SpriteMaterial>
    * {@inheritDoc Drawable.getBoneMatrices}
    */
   getBoneMatrices() {
+    return null;
+  }
+  /**
+   * {@inheritDoc Drawable.getSkinInfluenceData}
+   */
+  getSkinInfluenceData(): Nullable<SkinInfluenceData> {
     return null;
   }
   /**

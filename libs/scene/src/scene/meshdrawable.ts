@@ -12,7 +12,9 @@ import type {
   Primitive,
   RenderQueue
 } from '../render';
-import type { Mesh, SceneNode } from '.';
+import type { SceneNode } from './scene_node';
+import type { Mesh } from './mesh';
+import type { SkinInfluenceData } from '../render';
 import { mixinDrawable } from '../render/drawable_mixin';
 import type { Texture2D } from '@zephyr3d/device';
 import type { Camera } from '../camera';
@@ -51,6 +53,9 @@ export class ProxyDrawableBase<T extends Disposable & Drawable = Mesh> extends D
   }
   getMorphInfo(): Nullable<MorphInfo> {
     return this._host.get()?.getMorphInfo() ?? null;
+  }
+  getSkinInfluenceData(): Nullable<SkinInfluenceData> {
+    return this._host.get()?.getSkinInfluenceData() ?? null;
   }
   getSortDistance(camera: Camera): number {
     return this._host.get()?.getSortDistance(camera) ?? 0;
@@ -156,6 +161,9 @@ export class MeshDrawable<M extends MeshMaterial>
     return { node: this.getNode() };
   }
   getBoneMatrices(): Nullable<Texture2D> {
+    return null;
+  }
+  getSkinInfluenceData(): Nullable<SkinInfluenceData> {
     return null;
   }
   getMorphData(): Nullable<MorphData> {

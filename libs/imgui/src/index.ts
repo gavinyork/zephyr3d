@@ -158,3 +158,7 @@ export function imGuiSetCharCodeMap(map: Record<number, string>) {
 export function imGuiWantCaptureKeyboard(capture: boolean) {
   ImGui_Impl.captureKeyboard(capture);
 }
+
+export function getLastPointerInputType() {
+  return ImGui_Impl.getLastPointerInputType();
+}

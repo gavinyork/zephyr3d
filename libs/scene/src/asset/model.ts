@@ -20,7 +20,7 @@ import type {
   VertexSemantic
 } from '@zephyr3d/device';
 import { getVertexFormatComponentCount } from '@zephyr3d/device';
-import { Mesh } from '../scene/mesh';
+import { Mesh, type MorphSourceDescriptor, type MorphTargetSourceData } from '../scene/mesh';
 import { BoundingBox } from '../utility/bounding_volume';
 import type { ColliderR } from '../animation/joint_dynamics/types';
 import type { ControllerConfig } from '../animation/joint_dynamics/controller';
@@ -48,7 +48,7 @@ import {
   NodeTranslationTrack,
   PCAGeometryCacheTrack
 } from '../animation';
-import { MAX_MORPH_ATTRIBUTES, MAX_MORPH_TARGETS } from '../values';
+import { getMorphTargetLimit, MAX_MORPH_ATTRIBUTES, MAX_MORPH_TARGETS, MAX_SKIN_INFLUENCES } from '../values';
 import { getDevice } from '../app/api';
 import { Primitive } from '../render/primitive';
 import type { MeshMaterial } from '../material/meshmaterial';
@@ -72,6 +72,35 @@ export class NamedObject {
   constructor(name: string) {
     this.name = name;
   }
+}
+
+function normalizeAssetNodePath(path: string) {
+  return path.replace(/\\/g, '/').split('/').filter(Boolean).join('/');
+}
+
+function getSkinBindingKey(rig: SkeletonRig, joints: SceneNode[], inverseBindMatrices: Matrix4x4[]) {
+  const matrixKey = inverseBindMatrices
+    .map((matrix) => {
+      const elements: number[] = [];
+      for (let i = 0; i < 16; i++) {
+        elements.push(matrix[i]);
+      }
+      return elements.join(',');
+    })
+    .join('|');
+  return `${rig.persistentId}|${joints.map((joint) => joint.persistentId).join('|')}|${matrixKey}`;
+}
+
+function getAssetNodePath(node: Nullable<AssetHierarchyNode>) {
+  const segments: string[] = [];
+  let current = node;
+  while (current) {
+    if (current.name) {
+      segments.push(current.name);
+    }
+    current = current.parent;
+  }
+  return normalizeAssetNodePath(segments.reverse().join('/'));
 }
 
 /**
@@ -315,9 +344,10 @@ export interface AssetSubMeshData {
   rawPositions: Nullable<Float32Array>;
   rawBlendIndices: Nullable<TypedArray>;
   rawJointWeights: Nullable<TypedArray>;
+  rawSkinInfluenceCount?: number;
   name: string;
   numTargets: number;
-  targets?: Partial<Record<number, { numComponents: number; data: Float32Array[] }>>;
+  targets?: Partial<Record<number, { numComponents: number; data: Float32Array[]; indices?: Uint32Array[] }>>;
   targetBox?: BoundingBox[];
   morphAttribCount?: number;
 }
@@ -827,6 +857,7 @@ export type SaveOptions = {
 
 type PreprocessOptions = {
   rebuildMaterial?: boolean;
+  sourceMorphReferenceAssetPath?: string;
 };
 
 type SharedModelWithPreprocessOptions = SharedModel & {
@@ -1358,17 +1389,28 @@ export class SharedModel extends Disposable {
             usedPaths,
             `${destName}_texture_${i}`
           ));
-        if (img.uri) {
-          img.data = new Uint8Array((await srcVFS.readFile(img.uri, { encoding: 'binary' })) as ArrayBuffer);
+        try {
+          if (img.uri) {
+            img.data = new Uint8Array(
+              (await srcVFS.readFile(img.uri, { encoding: 'binary' })) as ArrayBuffer
+            );
+          }
+          await dstVFS.writeFile(
+            path,
+            img.data!.buffer.slice(img.data!.byteOffset, img.data!.byteOffset + img.data!.byteLength),
+            { encoding: 'binary', create: true }
+          );
+          img.uri = path;
+          img.data = undefined;
+          img.mimeType = '';
+        } catch (err) {
+          console.warn(
+            `Skip missing or unreadable texture during import: ${img.uri || img.name || `${destName}_texture_${i}`}: ${String(err)}`
+          );
+          img.uri = undefined;
+          img.data = undefined;
+          img.mimeType = '';
         }
-        await dstVFS.writeFile(
-          path,
-          img.data!.buffer.slice(img.data!.byteOffset, img.data!.byteOffset + img.data!.byteLength),
-          { encoding: 'binary', create: true }
-        );
-        img.uri = path;
-        img.data = undefined;
-        img.mimeType = '';
       }
     }
     const materialKeys = Object.keys(this._materialList);
@@ -1670,6 +1712,7 @@ export class SharedModel extends Disposable {
           }
         }
         const rigMap = new Map<string, SkeletonRig>();
+        const bindingMap = new Map<string, SkinBinding>();
         for (const v of skeletonMeshMap) {
           const sk = v[0];
           const joints = sk.joints.map((val) => {
@@ -1692,7 +1735,13 @@ export class SharedModel extends Disposable {
             rigMap.set(rigKey, rig);
             group.animationSet.rigs.push(new DRef(rig));
           }
-          const binding = new SkinBinding(rig, sk.inverseBindMatrices, joints);
+          const bindingKey = getSkinBindingKey(rig, joints, sk.inverseBindMatrices);
+          let binding = bindingMap.get(bindingKey);
+          if (!binding) {
+            binding = new SkinBinding(rig, sk.inverseBindMatrices, joints);
+            bindingMap.set(bindingKey, binding);
+            group.animationSet.skeletons.push(new DRef(binding));
+          }
           const nodes = skeletonMeshMap.get(sk);
           if (nodes) {
             if (!nodes.binding) {
@@ -1702,14 +1751,14 @@ export class SharedModel extends Disposable {
                 const v = {
                   positions: nodes.bounding[i].rawPositions!,
                   blendIndices: nodes.bounding[i].rawBlendIndices!,
-                  weights: nodes.bounding[i].rawJointWeights!
+                  weights: nodes.bounding[i].rawJointWeights!,
+                  influenceCount: nodes.bounding[i].rawSkinInfluenceCount ?? 4
                 };
                 mesh.setSkinnedBoundingInfo(nodes.binding.getBoundingInfo(v));
                 mesh.skeletonName = nodes.binding.persistentId;
               }
             }
           }
-          group.animationSet.skeletons.push(new DRef(nodes!.binding));
         }
       }
       if (saveAnimations) {
@@ -1748,9 +1797,10 @@ export class SharedModel extends Disposable {
             } else if (track.type === 'weights') {
               for (const m of track.node.mesh!.subMeshes) {
                 const mesh = meshMap.get(m)!;
-                if (track.interpolator.stride > MAX_MORPH_TARGETS) {
+                const morphTargetLimit = getMorphTargetLimit();
+                if (track.interpolator.stride > morphTargetLimit) {
                   console.error(
-                    `Morph target too large: ${track.interpolator.stride}, the maximum is ${MAX_MORPH_TARGETS}`
+                    `Morph target too large: ${track.interpolator.stride}, the project limit is ${morphTargetLimit}`
                   );
                 } else {
                   const morphTrack = new MorphTargetTrack(
@@ -2048,6 +2098,8 @@ export class SharedModel extends Disposable {
     node.rotation.set(assetNode.rotation);
     node.scale.set(assetNode.scaling);
     if (saveMeshes && assetNode.mesh) {
+      const sourceMorphReferenceAssetPath =
+        (this as SharedModelWithPreprocessOptions)._preprocessOptions?.sourceMorphReferenceAssetPath ?? null;
       const meshData = assetNode.mesh;
       const skeleton = saveSkeletons ? assetNode.skeleton : null;
       for (const subMesh of meshData.subMeshes) {
@@ -2059,7 +2111,7 @@ export class SharedModel extends Disposable {
           meshNode.position = instance.t;
           meshNode.scale = instance.s;
           meshNode.rotation = instance.r;
-          meshNode.name = subMesh.name;
+          meshNode.name = subMesh.primitive?.name?.trim() || subMesh.name;
           meshNode.clipTestEnabled = true;
           meshNode.showState = 'inherit';
           if (!this._primitiveMap.get(subMesh.primitive!)) {
@@ -2081,12 +2133,29 @@ export class SharedModel extends Disposable {
           meshNode.parent = node;
           meshMap.set(subMesh, meshNode);
           setSceneMeshAssetBinding(meshNode, { node: assetNode, mesh: meshData, subMesh });
+          const morphSource: MorphSourceDescriptor | null =
+            sourceMorphReferenceAssetPath && subMesh.numTargets > 0
+              ? (() => {
+                  const nodePath = getAssetNodePath(assetNode);
+                  const subMeshName = subMesh.name;
+                  if (!nodePath || !subMeshName) {
+                    return null;
+                  }
+                  return {
+                    sourcePath: sourceMorphReferenceAssetPath,
+                    nodePath,
+                    subMeshName
+                  };
+                })()
+              : null;
           processMorphData(
             subMesh,
             meshNode,
             assetNode.weights ?? meshData.morphWeights,
-            meshData.morphNames
+            meshData.morphNames,
+            morphSource
           );
+          applyMeshSkinInfluenceData(subMesh, meshNode);
           if (skeleton) {
             if (!skeletonMeshMap.has(skeleton)) {
               skeletonMeshMap.set(skeleton, { mesh: [meshNode], bounding: [subMesh] });
@@ -2634,17 +2703,21 @@ export class SharedModel extends Disposable {
   }
 }
 
-/** @internal */
-function processMorphData(
+export function applyMeshMorphMetadata(
   subMesh: AssetSubMeshData,
   mesh: Mesh,
   morphWeights?: Nullable<number[]>,
   morphNames?: Nullable<string[]>
 ) {
-  const device = getDevice();
   const numTargets = subMesh.numTargets;
-  if (numTargets === 0) {
+  if (numTargets === 0 || !subMesh.targets || !subMesh.targetBox) {
     return;
+  }
+  const supportedNumTargets = Math.min(numTargets, getMorphTargetLimit());
+  if (supportedNumTargets !== numTargets) {
+    console.warn(
+      `Morph target count truncated from ${numTargets} to ${supportedNumTargets} for mesh "${subMesh.name ?? mesh.name ?? ''}"`
+    );
   }
   const attributes = Object.getOwnPropertyNames(subMesh.targets);
   const positionInfo = subMesh.primitive!.vertices['position'];
@@ -2652,20 +2725,15 @@ function processMorphData(
     ? (positionInfo.data.length / getVertexFormatComponentCount(positionInfo.format)) >> 0
     : 0;
   const weightsAndOffsets = new Float32Array(4 + MAX_MORPH_TARGETS + MAX_MORPH_ATTRIBUTES);
-  for (let i = 0; i < numTargets; i++) {
+  for (let i = 0; i < supportedNumTargets; i++) {
     weightsAndOffsets[4 + i] = morphWeights?.[i] ?? 0;
   }
   const textureSize = Math.ceil(Math.sqrt(numVertices * attributes.length * numTargets));
-  if (textureSize > device.getDeviceCaps().textureCaps.maxTextureSize) {
-    // TODO: reduce morph attributes
-    throw new Error(`Morph target data too large`);
-  }
   weightsAndOffsets[0] = textureSize;
   weightsAndOffsets[1] = textureSize;
   weightsAndOffsets[2] = numVertices;
-  weightsAndOffsets[3] = numTargets;
+  weightsAndOffsets[3] = supportedNumTargets;
   let offset = 0;
-  const textureData = new Float32Array(textureSize * textureSize * 4);
   for (let attrib = 0; attrib < MAX_MORPH_ATTRIBUTES; attrib++) {
     const index = attributes.indexOf(String(attrib));
     if (index < 0) {
@@ -2678,35 +2746,135 @@ function processMorphData(
       console.error(`Invalid morph target data`);
       return;
     }
-    for (let t = 0; t < numTargets; t++) {
-      const data = info.data[t];
-      for (let i = 0; i < numVertices; i++) {
-        for (let j = 0; j < 4; j++) {
-          textureData[offset++] = j < info.numComponents ? data[i * info.numComponents + j] : 1;
-        }
-      }
-    }
+    offset += numVertices * 4 * numTargets;
   }
-  const morphBoundingBox = new BoundingBox();
-  calculateMorphBoundingBox(
-    morphBoundingBox,
-    subMesh.targetBox!,
-    weightsAndOffsets.subarray(4, 4 + MAX_MORPH_TARGETS),
-    numTargets
-  );
-  const meshAABB = mesh.getBoundingVolume()!.toAABB();
-  morphBoundingBox.minPoint.addBy(meshAABB.minPoint);
-  morphBoundingBox.maxPoint.addBy(meshAABB.maxPoint);
 
   const names: Record<string, number> = {};
-  for (let i = 0; i < numTargets; i++) {
+  for (let i = 0; i < supportedNumTargets; i++) {
     const name = morphNames?.[i] ?? `Target${i}`;
     names[name] = i;
   }
-  mesh.setMorphData({ width: textureSize, height: textureSize, data: textureData });
   mesh.setMorphInfo({ data: weightsAndOffsets, names });
-  mesh.setMorphBoundingInfo({ targetBoxes: subMesh.targetBox!, originBox: new BoundingBox(meshAABB) });
-  mesh.setAnimatedBoundingBox(morphBoundingBox);
+  mesh.setMorphBoundingInfo({
+    targetBoxes: subMesh.targetBox!.slice(0, supportedNumTargets),
+    originBox: new BoundingBox(mesh.getBoundingVolume()!.toAABB())
+  });
+}
+
+export function createMorphSourceDataFromSubMesh(subMesh: AssetSubMeshData): Nullable<MorphTargetSourceData> {
+  const numTargets = Math.min(subMesh.numTargets, getMorphTargetLimit());
+  if (numTargets === 0 || !subMesh.targets) {
+    return null;
+  }
+  const positionInfo = subMesh.primitive!.vertices['position'];
+  const numVertices = positionInfo
+    ? (positionInfo.data.length / getVertexFormatComponentCount(positionInfo.format)) >> 0
+    : 0;
+  const targets: MorphTargetSourceData['targets'] = {};
+  for (const [attribKey, info] of Object.entries(subMesh.targets)) {
+    const attrib = Number(attribKey);
+    if (!info || !Number.isInteger(attrib) || attrib < 0) {
+      continue;
+    }
+    if (info.data.length < numTargets) {
+      console.error(`Invalid morph target data`);
+      return null;
+    }
+    targets[attrib] = {
+      numComponents: info.numComponents,
+      data: info.data.slice(0, numTargets),
+      indices: info.indices?.slice(0, numTargets)
+    };
+  }
+  return {
+    numTargets,
+    numVertices,
+    targets
+  };
+}
+
+export function applyMeshMorphData(subMesh: AssetSubMeshData, mesh: Mesh) {
+  const sourceData = createMorphSourceDataFromSubMesh(subMesh);
+  if (!sourceData) {
+    mesh.setMorphData(null);
+    mesh.setMorphSourceData(null);
+    return;
+  }
+  mesh.setMorphSourceData(sourceData);
+}
+
+function createSkinInfluenceDataFromSubMesh(subMesh: AssetSubMeshData) {
+  // Preserve the influence count captured at import time so runtime settings do not silently
+  // degrade already-imported assets when a project lowers the import limit later on.
+  const influenceCount = Math.max(
+    0,
+    Math.min(
+      subMesh.rawSkinInfluenceCount ?? 4,
+      MAX_SKIN_INFLUENCES,
+      Math.floor(
+        (subMesh.rawJointWeights?.length ?? 0) / Math.max(1, (subMesh.rawPositions?.length ?? 0) / 3)
+      )
+    )
+  );
+  if (
+    influenceCount <= 4 ||
+    !subMesh.rawPositions ||
+    !subMesh.rawBlendIndices ||
+    !subMesh.rawJointWeights ||
+    subMesh.rawPositions.length < 3
+  ) {
+    return null;
+  }
+  const numVertices = Math.floor(subMesh.rawPositions.length / 3);
+  if (numVertices <= 0) {
+    return null;
+  }
+  const extraInfluenceCount = influenceCount - 4;
+  const pairCount = Math.ceil(extraInfluenceCount / 2);
+  const textureSize = Math.ceil(Math.sqrt(numVertices * pairCount));
+  const textureData = new Float32Array(textureSize * textureSize * 4);
+  for (let vertexIndex = 0; vertexIndex < numVertices; vertexIndex++) {
+    const baseOffset = vertexIndex * influenceCount + 4;
+    for (let pairIndex = 0; pairIndex < pairCount; pairIndex++) {
+      const sourceIndex = baseOffset + pairIndex * 2;
+      const texelOffset = (vertexIndex * pairCount + pairIndex) * 4;
+      textureData[texelOffset] = Number(subMesh.rawBlendIndices[sourceIndex] ?? 0);
+      textureData[texelOffset + 1] = Number(subMesh.rawJointWeights[sourceIndex] ?? 0);
+      textureData[texelOffset + 2] = Number(subMesh.rawBlendIndices[sourceIndex + 1] ?? 0);
+      textureData[texelOffset + 3] = Number(subMesh.rawJointWeights[sourceIndex + 1] ?? 0);
+    }
+  }
+  return {
+    width: textureSize,
+    height: textureSize,
+    influenceCount,
+    data: textureData
+  };
+}
+
+export function applyMeshSkinInfluenceData(subMesh: AssetSubMeshData, mesh: Mesh) {
+  mesh.setSkinInfluenceData(createSkinInfluenceDataFromSubMesh(subMesh));
+}
+
+/** @internal */
+function processMorphData(
+  subMesh: AssetSubMeshData,
+  mesh: Mesh,
+  morphWeights?: Nullable<number[]>,
+  morphNames?: Nullable<string[]>,
+  morphSource?: Nullable<MorphSourceDescriptor>
+) {
+  if (subMesh.numTargets === 0) {
+    return;
+  }
+  applyMeshMorphMetadata(subMesh, mesh, morphWeights, morphNames);
+  mesh.setMorphSource(morphSource ?? null);
+  if (morphSource) {
+    mesh.setMorphSourceData(null);
+    mesh.setMorphData(null);
+  } else {
+    applyMeshMorphData(subMesh, mesh);
+  }
 }
 
 /** @internal */
@@ -2715,31 +2883,10 @@ function getAssetMeshMorphTargetCount(mesh: AssetMeshData): number {
   for (const subMesh of mesh.subMeshes) {
     count = Math.max(count, subMesh.numTargets);
   }
-  return count;
+  return Math.min(count, getMorphTargetLimit());
 }
 
 /** @internal */
 function getAssetMeshMorphTargetName(mesh: AssetMeshData, index: number): string {
   return mesh.morphNames?.[index] ?? `Target${index}`;
-}
-
-/** @internal */
-function calculateMorphBoundingBox(
-  morphBoundingBox: BoundingBox,
-  keyframeBoundingBox: BoundingBox[],
-  weights: Float32Array,
-  numTargets: number
-) {
-  morphBoundingBox.minPoint.setXYZ(0, 0, 0);
-  morphBoundingBox.maxPoint.setXYZ(0, 0, 0);
-  for (let i = 0; i < numTargets; i++) {
-    const weight = weights[i];
-    const keyframeBox = keyframeBoundingBox[i];
-    morphBoundingBox.minPoint.x += keyframeBox.minPoint.x * weight;
-    morphBoundingBox.minPoint.y += keyframeBox.minPoint.y * weight;
-    morphBoundingBox.minPoint.z += keyframeBox.minPoint.z * weight;
-    morphBoundingBox.maxPoint.x += keyframeBox.maxPoint.x * weight;
-    morphBoundingBox.maxPoint.y += keyframeBox.maxPoint.y * weight;
-    morphBoundingBox.maxPoint.z += keyframeBox.maxPoint.z * weight;
-  }
 }

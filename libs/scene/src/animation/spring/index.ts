@@ -14,7 +14,11 @@ export { SpringSystem } from './spring_system';
 export type { SpringSystemOptions } from './spring_system';
 
 export { MultiChainSpringSystem } from './multi_chain_spring_system';
-export type { MultiChainSpringSystemOptions, InterChainConstraint } from './multi_chain_spring_system';
+export type {
+  MultiChainSpringSystemOptions,
+  InterChainConstraint,
+  SpringPoseReinitializeOptions
+} from './multi_chain_spring_system';
 
 export type { SpringCollider, SphereCollider, CapsuleCollider, PlaneCollider } from './spring_collider';
 export {

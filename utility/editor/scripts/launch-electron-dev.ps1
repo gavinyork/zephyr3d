@@ -19,6 +19,8 @@ if (-not $nodeCommand) {
 }
 
 try {
+  # Enable preview-window DevTools for the development desktop shortcut only.
+  $env:ZEPHYR_PREVIEW_DEVTOOLS = '1'
   $process = Start-Process -FilePath $nodeCommand.Source -ArgumentList @($launcherPath) -WorkingDirectory $editorRoot -WindowStyle Hidden -PassThru
   $process.WaitForExit()
   if ($process.ExitCode -ne 0) {

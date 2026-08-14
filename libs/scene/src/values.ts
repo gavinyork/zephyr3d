@@ -104,11 +104,82 @@ export const MORPH_TARGET_TEX3 = 7;
 /** @public */
 export const MAX_MORPH_ATTRIBUTES = 8;
 /** @public */
-export const MAX_MORPH_TARGETS = 256;
+export const DEFAULT_MORPH_TARGET_LIMIT = 256;
+/** @public */
+export const DEFAULT_ACTIVE_MORPH_TARGET_LIMIT = 64;
+/** @public */
+export const MAX_MORPH_TARGETS = 1024;
+/** @public */
+export const DEFAULT_SKIN_INFLUENCE_LIMIT = 4;
+/** @public */
+export const MAX_SKIN_INFLUENCES = 12;
+/** @public */
+export const MAX_SKIN_EXTRA_INFLUENCE_PAIRS = Math.ceil(Math.max(0, MAX_SKIN_INFLUENCES - 4) / 2);
 /** @public */
 export const MORPH_WEIGHTS_VECTOR_COUNT = (MAX_MORPH_TARGETS + 3) >> 2;
 /** @public */
 export const MORPH_ATTRIBUTE_VECTOR_COUNT = (MAX_MORPH_ATTRIBUTES + 3) >> 2;
+
+let morphTargetLimit = DEFAULT_MORPH_TARGET_LIMIT;
+let activeMorphTargetLimit = DEFAULT_ACTIVE_MORPH_TARGET_LIMIT;
+let skinInfluenceLimit = DEFAULT_SKIN_INFLUENCE_LIMIT;
+
+/** @public */
+export function normalizeMorphTargetLimit(value: number | null | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_MORPH_TARGET_LIMIT;
+  }
+  return Math.min(MAX_MORPH_TARGETS, Math.max(1, Math.trunc(value)));
+}
+
+/** @public */
+export function getMorphTargetLimit(): number {
+  return morphTargetLimit;
+}
+
+/** @public */
+export function setMorphTargetLimit(value: number | null | undefined): number {
+  morphTargetLimit = normalizeMorphTargetLimit(value);
+  return morphTargetLimit;
+}
+
+/** @public */
+export function normalizeActiveMorphTargetLimit(value: number | null | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_ACTIVE_MORPH_TARGET_LIMIT;
+  }
+  return Math.min(MAX_MORPH_TARGETS, Math.max(1, Math.trunc(value)));
+}
+
+/** @public */
+export function getActiveMorphTargetLimit(): number {
+  return activeMorphTargetLimit;
+}
+
+/** @public */
+export function setActiveMorphTargetLimit(value: number | null | undefined): number {
+  activeMorphTargetLimit = normalizeActiveMorphTargetLimit(value);
+  return activeMorphTargetLimit;
+}
+
+/** @public */
+export function normalizeSkinInfluenceLimit(value: number | null | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_SKIN_INFLUENCE_LIMIT;
+  }
+  return Math.min(MAX_SKIN_INFLUENCES, Math.max(1, Math.trunc(value)));
+}
+
+/** @public */
+export function getSkinInfluenceLimit(): number {
+  return skinInfluenceLimit;
+}
+
+/** @public */
+export function setSkinInfluenceLimit(value: number | null | undefined): number {
+  skinInfluenceLimit = normalizeSkinInfluenceLimit(value);
+  return skinInfluenceLimit;
+}
 
 /** @public */
 export const MAX_TERRAIN_MIPMAP_LEVELS = 64;

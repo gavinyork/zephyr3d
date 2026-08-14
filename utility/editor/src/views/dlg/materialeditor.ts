@@ -7,9 +7,11 @@ import type { GenericConstructor } from '@zephyr3d/base';
 import type { MeshMaterial } from '@zephyr3d/scene';
 
 export class DlgPBRMaterialEditor extends DialogRenderer<void> {
+  private static _focusedInstance: DlgPBRMaterialEditor | null = null;
   private readonly editor: PBRMaterialEditor;
   private path: string;
   private type: GenericConstructor<MeshMaterial>;
+  private _showPreview: boolean;
   constructor(
     id: string,
     width: number,
@@ -22,6 +24,7 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
     this.path = path;
     this.type = type;
     this.editor = new PBRMaterialEditor(id, outputName);
+    this._showPreview = true;
   }
   public static async editPBRMaterial(
     title: string,
@@ -53,12 +56,23 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
     this.editor.open();
   }
   close(): void {
+    if (DlgPBRMaterialEditor._focusedInstance === this) {
+      DlgPBRMaterialEditor._focusedInstance = null;
+    }
     this.editor.close();
     super.close();
+  }
+  public static duplicateFocusedSelection() {
+    return this._focusedInstance?.editor.duplicateActiveSelection() ?? false;
   }
   public doRender(): void {
     const io = ImGui.GetIO();
     const focused = ImGui.IsWindowFocused(ImGui.FocusedFlags.RootAndChildWindows);
+    if (focused) {
+      DlgPBRMaterialEditor._focusedInstance = this;
+    } else if (DlgPBRMaterialEditor._focusedInstance === this) {
+      DlgPBRMaterialEditor._focusedInstance = null;
+    }
     const cmdDown = io.KeyCtrl || io.KeySuper;
     if (focused && cmdDown && ImGui.IsKeyPressed(ImGui.GetKeyIndex(ImGui.Key.Z)) && this.editor.canUndo()) {
       this.editor.undo();
@@ -70,6 +84,10 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
     ) {
       this.editor.redo();
     }
+    const showPreview = [this._showPreview] as [boolean];
+    if (ImGui.Checkbox('Show Preview', showPreview)) {
+      this._showPreview = showPreview[0];
+    }
     if (
       ImGui.BeginChild(
         'NodeEditorContainer',
@@ -78,7 +96,7 @@ export class DlgPBRMaterialEditor extends DialogRenderer<void> {
         ImGui.WindowFlags.NoScrollbar | ImGui.WindowFlags.NoScrollWithMouse
       )
     ) {
-      this.editor.render();
+      this.editor.render(this._showPreview);
     }
     ImGui.EndChild();
     if (ImGui.Button('Save')) {

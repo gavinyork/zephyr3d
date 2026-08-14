@@ -174,6 +174,20 @@ describe('diff/applyPatch round-trip tests', () => {
     roundTrip({}, { a: null });
     roundTrip({ a: {} }, { a: { b: [] } });
     roundTrip({ a: { b: [] } }, { a: {} });
+    roundTrip(
+      { modifiers: [] },
+      {
+        modifiers: [
+          {
+            init: {
+              sourceId: 'spring:test',
+              anchorNode: undefined as any,
+              interChainConstraints: undefined as any
+            }
+          }
+        ]
+      }
+    );
   });
 
   test('idempotence and empty patch behavior', () => {

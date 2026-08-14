@@ -4,6 +4,34 @@ import { defineProps } from '../../serialization/types';
 import { BaseGraphNode } from '../node';
 import type { MaterialBlueprintIR } from './ir';
 
+const materialFunctionValueTypes = ['float', 'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4'] as const;
+const materialFunctionInputTypes = [...materialFunctionValueTypes, 'tex2D'] as const;
+
+type MaterialFunctionInterfaceEntry<T extends FunctionInputNode | FunctionOutputNode> = {
+  index: number;
+  slotId: number;
+  node: T;
+};
+
+function compareMaterialFunctionInterfaceEntries(
+  a: MaterialFunctionInterfaceEntry<FunctionInputNode | FunctionOutputNode>,
+  b: MaterialFunctionInterfaceEntry<FunctionInputNode | FunctionOutputNode>
+) {
+  const aHasOrder = a.node.order >= 0;
+  const bHasOrder = b.node.order >= 0;
+  if (aHasOrder !== bHasOrder) {
+    return aHasOrder ? -1 : 1;
+  }
+  if (aHasOrder && a.node.order !== b.node.order) {
+    return a.node.order - b.node.order;
+  }
+  const nameOrder = a.node.name.localeCompare(b.node.name, 'en', {
+    numeric: true,
+    sensitivity: 'base'
+  });
+  return nameOrder || a.index - b.index;
+}
+
 /**
  * Function call node for material blueprint functions
  *
@@ -50,9 +78,9 @@ export class FunctionCallNode extends BaseGraphNode {
   /** The intermediate representation (compiled graph) of the function */
   private _IR: MaterialBlueprintIR;
   /** Function input parameters with their indices, names, and types */
-  private _args: { index: number; name: string; type: string }[];
+  private _args: { index: number; slotId: number; name: string; type: string }[];
   /** Function output values with their indices, names, and types */
-  private _outs: { index: number; name: string; type: string }[];
+  private _outs: { index: number; slotId: number; name: string; type: string }[];
   /**
    * Creates a new function call node
    *
@@ -66,8 +94,9 @@ export class FunctionCallNode extends BaseGraphNode {
    * 2. Find all FunctionOutputNode instances and create output slots
    * 3. Extract parameter names and types for validation
    *
-   * Input/output slots are created in the order they appear in the nodeMap,
-   * using either custom names or auto-generated names like 'arg_N' or 'out_N'.
+   * Input/output slots use explicit interface order when present and otherwise
+   * sort naturally by name. Slot IDs retain their legacy nodeMap order so saved
+   * graph connections remain compatible.
    */
   constructor(path: string, name: string, IR: MaterialBlueprintIR) {
     super();
@@ -78,33 +107,49 @@ export class FunctionCallNode extends BaseGraphNode {
     this._outs = [];
     this._inputs = [];
     this._outputs = [];
+    const inputs: MaterialFunctionInterfaceEntry<FunctionInputNode>[] = [];
+    const outputs: MaterialFunctionInterfaceEntry<FunctionOutputNode>[] = [];
     for (const k of objectKeys(this._IR.DAG.nodeMap)) {
       const node = this._IR.DAG.nodeMap[k];
       if (node instanceof FunctionInputNode) {
-        const name = node.name || `arg_${k}`;
-        this._args.push({
-          index: Number(k),
-          name,
-          type: node.type
-        });
-        this._inputs.push({
-          id: this._inputs.length + 1,
-          name,
-          type: [node.type]
-        });
+        inputs.push({ index: Number(k), slotId: inputs.length + 1, node });
       } else if (node instanceof FunctionOutputNode) {
-        const name = node.name || `out_${k}`;
-        this._outs.push({
-          index: Number(k),
-          name,
-          type: node.type
-        });
-        this._outputs.push({
-          id: this._outputs.length + 1,
-          name,
-          swizzle: name
-        });
+        outputs.push({ index: Number(k), slotId: outputs.length + 1, node });
       }
+    }
+    inputs.sort(compareMaterialFunctionInterfaceEntries);
+    outputs.sort(compareMaterialFunctionInterfaceEntries);
+    for (const input of inputs) {
+      const name = input.node.name || `arg_${input.index}`;
+      this._args.push({
+        index: input.index,
+        slotId: input.slotId,
+        name,
+        type: input.node.type
+      });
+      this._inputs.push({
+        id: input.slotId,
+        name,
+        type: [input.node.type]
+      });
+    }
+    for (const output of outputs) {
+      const name = output.node.name || `out_${output.index}`;
+      this._outs.push({
+        index: output.index,
+        slotId: output.slotId,
+        name,
+        type: output.node.type
+      });
+      this._outputs.push({
+        id: output.slotId,
+        name
+      });
+    }
+    if (!(this._outs.length === 1 && this._outs[0].type === 'tex2D')) {
+      this._outputs.forEach((output, index) => {
+        output.swizzle = this._outs[index].name;
+      });
     }
   }
   /**
@@ -218,7 +263,7 @@ export class FunctionCallNode extends BaseGraphNode {
    * in the function's blueprint.
    */
   protected getType(id: number) {
-    return this._outs[id - 1].type;
+    return this._outs.find((output) => output.slotId === id)!.type;
   }
 }
 
@@ -232,7 +277,8 @@ export class FunctionCallNode extends BaseGraphNode {
  *
  * Each FunctionInputNode:
  * - Has a name (parameter name)
- * - Has a type (float, vec2, vec3, vec4, mat2, mat3, or mat4)
+ * - Has a type (float, vec2, vec3, vec4, mat2, mat3, mat4, or tex2D)
+ * - Has an optional explicit interface order (-1 sorts automatically by name)
  * - Produces one output that provides the parameter value within the function
  * - Has no inputs (it receives its value from the calling context)
  *
@@ -260,6 +306,8 @@ export class FunctionInputNode extends BaseGraphNode {
   static argId = 1;
   /** The data type of this parameter */
   private _type: string;
+  /** Explicit interface order, or -1 to sort automatically by name */
+  private _order: number;
   /**
    * Creates a new function input node
    *
@@ -272,12 +320,13 @@ export class FunctionInputNode extends BaseGraphNode {
   constructor() {
     super();
     this._type = 'vec4';
+    this._order = -1;
     this._outputs = [{ id: 1, name: `arg_${FunctionInputNode.argId++}` }];
   }
   /**
    * Gets the parameter type
    *
-   * @returns The data type (float, vec2, vec3, vec4, mat2, mat3, or mat4)
+   * @returns The data type (float, vec2, vec3, vec4, mat2, mat3, mat4, or tex2D)
    */
   get type() {
     return this._type;
@@ -295,13 +344,24 @@ export class FunctionInputNode extends BaseGraphNode {
       this._outputs[0].name = val;
     }
   }
+  /** Gets the explicit interface order, or -1 when automatic name sorting is used. */
+  get order() {
+    return this._order;
+  }
+  set order(val: number) {
+    const order = Number.isFinite(val) ? Math.max(-1, Math.trunc(val)) : -1;
+    if (this._order !== order) {
+      this._order = order;
+      this.dispatchEvent('changed');
+    }
+  }
   /**
    * Gets the serialization descriptor for this node type
    *
    * @returns Serialization class descriptor
    *
    * @remarks
-   * Serializes the parameter type and name. The type has an enumeration
+   * Serializes the parameter type, name, and interface order. The type has an enumeration
    * constraint limited to valid shader types.
    */
   static getSerializationCls() {
@@ -315,8 +375,8 @@ export class FunctionInputNode extends BaseGraphNode {
             type: 'string',
             options: {
               enum: {
-                labels: ['float', 'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4'],
-                values: ['float', 'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4']
+                labels: [...materialFunctionInputTypes],
+                values: [...materialFunctionInputTypes]
               }
             },
             get(this: FunctionInputNode, value) {
@@ -335,6 +395,22 @@ export class FunctionInputNode extends BaseGraphNode {
             set(this: FunctionInputNode, value) {
               this.name = value.str[0];
               this.dispatchEvent('changed');
+            }
+          },
+          {
+            name: 'order',
+            type: 'int',
+            default: -1,
+            description: 'Interface order. Use -1 to sort automatically by name.',
+            options: {
+              minValue: -1,
+              speed: 1
+            },
+            get(this: FunctionInputNode, value) {
+              value.num[0] = this._order;
+            },
+            set(this: FunctionInputNode, value) {
+              this.order = value.num[0];
             }
           }
         ]);
@@ -380,6 +456,7 @@ export class FunctionInputNode extends BaseGraphNode {
  *
  * Each FunctionOutputNode:
  * - Has a name (output value name)
+ * - Has an optional explicit interface order (-1 sorts automatically by name)
  * - Has one input that must be connected to compute the output value
  * - Automatically determines its type from the connected input
  * - Has no outputs (it provides its value to the calling context)
@@ -411,22 +488,25 @@ export class FunctionInputNode extends BaseGraphNode {
 export class FunctionOutputNode extends BaseGraphNode {
   /** Static counter for auto-generating unique output names */
   static outId = 1;
+  /** Explicit interface order, or -1 to sort automatically by name */
+  private _order: number;
   /**
    * Creates a new function output node
    *
    * @remarks
    * Initializes with:
    * - Auto-generated name: out_N (where N is an incrementing counter)
-   * - One input slot that accepts any standard shader type
+   * - One input slot that accepts numeric/matrix values and tex2D
    * - Type is inferred from the connected input node
    */
   constructor() {
     super();
+    this._order = -1;
     this._inputs = [
       {
         id: 1,
         name: `out_${FunctionOutputNode.outId++}`,
-        type: ['float', 'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4']
+        type: [...materialFunctionInputTypes]
       }
     ];
   }
@@ -441,6 +521,17 @@ export class FunctionOutputNode extends BaseGraphNode {
   set name(val: string) {
     if (val) {
       this._inputs[0].name = val;
+    }
+  }
+  /** Gets the explicit interface order, or -1 when automatic name sorting is used. */
+  get order() {
+    return this._order;
+  }
+  set order(val: number) {
+    const order = Number.isFinite(val) ? Math.max(-1, Math.trunc(val)) : -1;
+    if (this._order !== order) {
+      this._order = order;
+      this.dispatchEvent('changed');
     }
   }
   /**
@@ -460,7 +551,7 @@ export class FunctionOutputNode extends BaseGraphNode {
    * @returns Serialization class descriptor
    *
    * @remarks
-   * Only serializes the output name. The type is inferred at runtime
+   * Serializes the output name and interface order. The type is inferred at runtime
    * from the connected input node.
    */
   static getSerializationCls() {
@@ -478,6 +569,22 @@ export class FunctionOutputNode extends BaseGraphNode {
             set(this: FunctionOutputNode, value) {
               this.name = value.str[0];
               this.dispatchEvent('changed');
+            }
+          },
+          {
+            name: 'order',
+            type: 'int',
+            default: -1,
+            description: 'Interface order. Use -1 to sort automatically by name.',
+            options: {
+              minValue: -1,
+              speed: 1
+            },
+            get(this: FunctionOutputNode, value) {
+              value.num[0] = this._order;
+            },
+            set(this: FunctionOutputNode, value) {
+              this.order = value.num[0];
             }
           }
         ]);

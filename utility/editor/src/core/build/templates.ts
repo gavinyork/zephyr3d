@@ -173,8 +173,9 @@ export default plugin;
 
 export function generateIndexTS(settings: ProjectSettings) {
   const rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
-  return `import { Application, getEngine } from '@zephyr3d/scene';
+  return `import { Application, getEngine, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
+import { FBXImporter, GLTFImporter } from '@zephyr3d/loaders';
 import type { DeviceBackend } from '@zephyr3d/device';
 let backend: DeviceBackend = null;
 ${
@@ -208,6 +209,17 @@ if (!backend) {
   throw new Error('No supported rendering device found');
 }
 
+const morphTargetLimit = ${settings.morphTargetLimit ?? 'undefined'};
+const activeMorphTargetLimit =
+  typeof ${settings.activeMorphTargetLimit ?? 'undefined'} === 'number'
+    ? Math.min(${settings.activeMorphTargetLimit ?? 'undefined'}, morphTargetLimit ?? ${settings.activeMorphTargetLimit ?? 'undefined'})
+    : undefined;
+const skinInfluenceLimit = ${settings.skinInfluenceLimit ?? 'undefined'};
+
+setMorphTargetLimit(morphTargetLimit);
+setActiveMorphTargetLimit(activeMorphTargetLimit);
+setSkinInfluenceLimit(skinInfluenceLimit);
+
 const application = new Application({
   backend,
   canvas: document.querySelector('#canvas'),
@@ -218,14 +230,18 @@ const application = new Application({
   }
 });
 application.ready().then(async () => {
+  getEngine().resourceManager.setModelLoader('model/gltf+json', new GLTFImporter());
+  getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
+  getEngine().resourceManager.setModelLoader('model/fbx', new FBXImporter());
   getEngine().startup('${settings.startupScene ?? ''}', '${settings.splashScreen ?? ''}', '${settings.startupScript ?? ''}');
   application.run();
 });
 `;
 }
 
-export const templateIndex = `import { Application, getEngine } from '@zephyr3d/scene';
+export const templateIndex = `import { Application, getEngine, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
+import { FBXImporter, GLTFImporter } from '@zephyr3d/loaders';
 import type { DeviceBackend } from '@zephyr3d/device';
 const VFS = new HttpFS('./');
 const settingsJson = await VFS.readFile('/${projectFileName}', { encoding: 'utf8' }) as string;
@@ -255,6 +271,17 @@ if (!backend) {
   throw new Error('No supported rendering device found');
 }
 
+const morphTargetLimit = typeof settings.morphTargetLimit === 'number' ? settings.morphTargetLimit : undefined;
+const activeMorphTargetLimit =
+  typeof settings.activeMorphTargetLimit === 'number'
+    ? Math.min(settings.activeMorphTargetLimit, morphTargetLimit ?? settings.activeMorphTargetLimit)
+    : undefined;
+const skinInfluenceLimit = typeof settings.skinInfluenceLimit === 'number' ? settings.skinInfluenceLimit : undefined;
+
+setMorphTargetLimit(morphTargetLimit);
+setActiveMorphTargetLimit(activeMorphTargetLimit);
+setSkinInfluenceLimit(skinInfluenceLimit);
+
 const application = new Application({
   backend,
   canvas: document.querySelector('#canvas'),
@@ -266,6 +293,9 @@ const application = new Application({
   }
 });
 application.ready().then(async () => {
+  getEngine().resourceManager.setModelLoader('model/gltf+json', new GLTFImporter());
+  getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
+  getEngine().resourceManager.setModelLoader('model/fbx', new FBXImporter());
   getEngine().startup(settings.startupScene ?? '', settings.splashScreen, settings.startupScript);
   application.run();
 });

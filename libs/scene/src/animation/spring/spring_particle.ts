@@ -25,6 +25,10 @@ export interface SpringParticle {
   fixed: boolean;
   /** Associated scene node (optional) */
   node: Nullable<SceneNode>;
+  /** Optional alternate anchor node used as the fixed-position source */
+  anchorNode?: Nullable<SceneNode>;
+  /** Optional local-space offset evaluated from anchorNode */
+  anchorOffset?: Nullable<Vector3>;
   /** Previous frame position (used to calculate velocity for inertial forces) */
   lastFramePosition: Vector3;
   /** Position history for rotation center estimation (for fixed particles) */
@@ -43,6 +47,8 @@ export function createSpringParticle(
     damping?: number;
     fixed?: boolean;
     node?: SceneNode;
+    anchorNode?: SceneNode;
+    anchorOffset?: Vector3;
     originalRotation?: Quaternion;
   }
 ): SpringParticle {
@@ -56,6 +62,8 @@ export function createSpringParticle(
     damping: options?.damping ?? 0.95,
     fixed: options?.fixed ?? false,
     node: options?.node ?? null,
+    anchorNode: options?.anchorNode ?? null,
+    anchorOffset: options?.anchorOffset?.clone() ?? null,
     lastFramePosition: position.clone()
   };
 }

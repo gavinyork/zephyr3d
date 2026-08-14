@@ -73,6 +73,7 @@ let hiddenTextarea: HTMLTextAreaElement | null = null;
 let activeControlId: number | null = null;
 let selectionVisibleControlId: number | null = null;
 let lastProcessedFrame = -1;
+let pendingFocusControlId: number | null = null;
 
 function normalizeText(text: string) {
   return (text ?? '').replace(/\r\n/g, '\n');
@@ -294,6 +295,10 @@ function focusHiddenTextarea(value: string, selectionStart: number, selectionEnd
   } catch {
     textarea.focus();
   }
+}
+
+export function requestCustomTextInputFocus(label: string) {
+  pendingFocusControlId = ImGui.GetID(label);
 }
 
 function insertTextIntoTextarea(text: string) {
@@ -743,6 +748,24 @@ export function customTextInput(
   state.submitRequested = false;
   if (active) {
     changed = syncActiveValue(content, state) || changed;
+  }
+
+  if (pendingFocusControlId === id && !active) {
+    activeControlId = id;
+    selectionVisibleControlId = id;
+    state.dragging = false;
+    state.dragAnchor = content[0].length;
+    state.lastSelectionStart = content[0].length;
+    state.lastSelectionEnd = content[0].length;
+    state.blinkStartTime = ImGui.GetTime();
+    if (autoSelectAll && content[0].length > 0) {
+      state.lastSelectionStart = 0;
+      state.lastSelectionEnd = content[0].length;
+      focusHiddenTextarea(content[0], 0, content[0].length);
+    } else {
+      focusHiddenTextarea(content[0], content[0].length, content[0].length);
+    }
+    pendingFocusControlId = null;
   }
 
   const layout = getTextLayout(state, content[0], lineHeight, flags);

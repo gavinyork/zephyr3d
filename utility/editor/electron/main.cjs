@@ -3302,6 +3302,9 @@ function createPreviewWindow(url) {
     return { action: 'deny' };
   });
   previewWindow.loadURL(stripMcpQueryParams(url));
+  if (process.env.ZEPHYR_PREVIEW_DEVTOOLS === '1') {
+    previewWindow.webContents.openDevTools({ mode: 'detach' });
+  }
 }
 
 app.on('second-instance', () => {

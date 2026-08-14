@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "skipLibCheck": true,
+    "baseUrl": ".",
     "moduleResolution": "bundler",
     "target": "ESNext",
     "module": "ESNext",
@@ -20,7 +21,7 @@
     "paths": {
       "@zephyr3d/editor/editor-plugin": ["./src/editor-plugin"]
     },
-    "typeRoots": ["./node_modules/@webgpu/types"]
+    "typeRoots": ["./node_modules/@types", "./node_modules/@webgpu/types"]
   },
   "include": ["./src"],
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts", "common/temp", "**/common/temp"]

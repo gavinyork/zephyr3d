@@ -24,7 +24,7 @@ import { ShaderHelper } from './shader/helper';
 import type { Clonable, Immutable, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4, applyMixins, DRef } from '@zephyr3d/base';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
-import { getDevice } from '../app/api';
+import { getDevice, getEngine } from '../app/api';
 
 /**
  * Blending mode for mesh materials.
@@ -498,6 +498,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       }
     }
     Object.setPrototypeOf(instance, that);
+    getEngine().resourceManager.trackMaterialReference(
+      instance as this,
+      getEngine().resourceManager.getAssetId(that.coreMaterial)
+    );
     return instance as this;
   }
   /**
@@ -906,6 +910,9 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   protected _applyUniforms(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     this.applyUniformValues(bindGroup, ctx, pass);
   }
+  protected isMaterialTextureEnabled(_name: string) {
+    return true;
+  }
   /**
    * Whether the fragment shader needs to compute color.
    * Returns true for LIGHT pass, or when alpha test or alpha-to-coverage is enabled.
@@ -940,8 +947,9 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       ShaderHelper.prepareSkinAnimation(scope);
     }
     if (
-      this.drawContext.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION &&
-      this.drawContext.device.type === 'webgl'
+      this.drawContext.device.type === 'webgl' &&
+      this.drawContext.materialFlags &
+        (MaterialVaryingFlags.SKIN_ANIMATION | MaterialVaryingFlags.MORPH_ANIMATION)
     ) {
       scope.$inputs.zFakeVertexID = pb.float().attrib('texCoord7');
     }

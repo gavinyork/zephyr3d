@@ -11,6 +11,7 @@ import {
   type SphereCollider,
   updateColliderFromNode
 } from './spring_collider';
+import { SpringNodePoseTracker } from './spring_node_pose_tracker';
 
 /**
  * Options for creating a SpringSystem
@@ -114,6 +115,7 @@ export class SpringSystem {
   private _smoothedSphereCenters: WeakMap<SphereCollider, Vector3>;
   private _smoothedCapsuleEndpoints: WeakMap<CapsuleCollider, { start: Vector3; end: Vector3 }>;
   private _smoothedPlaneData: WeakMap<PlaneCollider, { point: Vector3; normal: Vector3 }>;
+  private _nodePoseTracker: SpringNodePoseTracker;
 
   constructor(chain: SpringChain, options?: SpringSystemOptions) {
     this._chain = chain;
@@ -137,6 +139,7 @@ export class SpringSystem {
     this._smoothedSphereCenters = new WeakMap();
     this._smoothedCapsuleEndpoints = new WeakMap();
     this._smoothedPlaneData = new WeakMap();
+    this._nodePoseTracker = new SpringNodePoseTracker();
   }
 
   /**
@@ -144,6 +147,7 @@ export class SpringSystem {
    * @param deltaTime - Time step in seconds
    */
   update(deltaTime: number): void {
+    this._nodePoseTracker.restoreInputPose();
     const frameDt = Math.min(Math.max(Number(deltaTime) || 0, 0), MAX_ACCUMULATED_SIMULATION_TIME);
     if (frameDt <= 0) {
       return;
@@ -249,11 +253,13 @@ export class SpringSystem {
   private updateFixedParticles(deltaTime: number): void {
     const blend = this.getTemporalBlendFactor(deltaTime, DEFAULT_PARTICLE_TARGET_SMOOTHING_TIME);
     for (const particle of this._chain.particles) {
-      if (!particle.node) {
+      const sourceNode = particle.anchorNode ?? particle.node;
+      if (!sourceNode) {
         continue;
       }
-      const worldMatrix = particle.node.worldMatrix;
-      const worldPos = new Vector3(worldMatrix.m03, worldMatrix.m13, worldMatrix.m23);
+      const worldPos = particle.anchorOffset
+        ? sourceNode.worldMatrix.transformPointAffine(particle.anchorOffset)
+        : new Vector3(sourceNode.worldMatrix.m03, sourceNode.worldMatrix.m13, sourceNode.worldMatrix.m23);
       const smoothedTarget = this.getSmoothedParticleTarget(particle, worldPos, blend);
       particle.animPosition.set(smoothedTarget);
       if (particle.fixed) {
@@ -727,6 +733,7 @@ export class SpringSystem {
 
       // Convert world rotation to local rotation (relative to parent)
       const parent = node.parent;
+      const inputRotation = node.rotation.clone();
       if (parent) {
         const parentWorldRotation = new Quaternion();
         parent.worldMatrix.decompose(null, parentWorldRotation, null);
@@ -736,9 +743,11 @@ export class SpringSystem {
         const localRotation = Quaternion.multiply(parentInvRotation, worldRotation, new Quaternion());
 
         node.rotation = localRotation;
+        this._nodePoseTracker.recordAppliedRotation(node, inputRotation, localRotation);
       } else {
         // Root node has no parent, world rotation is local rotation
         node.rotation = worldRotation;
+        this._nodePoseTracker.recordAppliedRotation(node, inputRotation, worldRotation);
       }
     }
   }
@@ -747,6 +756,7 @@ export class SpringSystem {
    * Resets the simulation to initial state
    */
   reset(): void {
+    this._nodePoseTracker.clear(true);
     this._chain.reset();
     for (const particle of this._chain.particles) {
       particle.animPosition.set(particle.originalPosition);

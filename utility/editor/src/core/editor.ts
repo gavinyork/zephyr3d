@@ -12,7 +12,13 @@ import {
   formatGrowthAnalysis,
   getGPUObjectStatistics
 } from '../helpers/leakdetector';
-import type { FileMetadata, HttpDirectoryReader, HttpDirectoryReaderContext, Nullable } from '@zephyr3d/base';
+import type {
+  FileMetadata,
+  HttpDirectoryReader,
+  HttpDirectoryReaderContext,
+  Nullable,
+  VFS
+} from '@zephyr3d/base';
 import { DRef, HttpFS, MemoryFS, PathUtils } from '@zephyr3d/base';
 import type { ProjectInfo, ProjectSettings } from './services/project';
 import { ProjectService } from './services/project';
@@ -40,6 +46,8 @@ import {
 } from './services/systemplugin';
 import { isDesktopApp } from './services/desktop';
 import type { SceneView } from '../views/sceneview';
+import { clearScriptPropertyAccessorCache } from '../helpers/scriptprops';
+import type { EditorProjectAssetChange } from './pluginapi';
 
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
 
@@ -119,6 +127,9 @@ export class Editor {
   private _extraLibs: Record<string, Monaco.IDisposable>;
   private readonly _plugins: EditorPluginManager;
   private readonly _systemPluginRegistrations: Map<string, SystemPluginRecord>;
+  private _projectVFS: VFS;
+  private readonly _pendingScriptAssetChanges: Map<string, EditorProjectAssetChange>;
+  private _scriptAssetChangeTimer: ReturnType<typeof setTimeout>;
   constructor() {
     Editor._current = this;
     this._moduleManager = new ModuleManager();
@@ -130,6 +141,9 @@ export class Editor {
     this._extraLibs = {};
     this._plugins = new EditorPluginManager(this);
     this._systemPluginRegistrations = new Map();
+    this._projectVFS = null;
+    this._pendingScriptAssetChanges = new Map();
+    this._scriptAssetChangeTimer = null;
   }
   static get current() {
     return this._current;
@@ -139,6 +153,96 @@ export class Editor {
   }
   get plugins() {
     return this._plugins;
+  }
+  private notifyProjectOpened(project: ProjectInfo) {
+    this.bindProjectVFS(ProjectService.VFS);
+    this._plugins.dispatchEvent('projectOpened', project);
+  }
+  private bindProjectVFS(vfs: VFS) {
+    if (vfs === this._projectVFS) {
+      return;
+    }
+    this._projectVFS?.off('changed', this.handleProjectAssetChanged, this);
+    if (this._scriptAssetChangeTimer) {
+      clearTimeout(this._scriptAssetChangeTimer);
+      this._scriptAssetChangeTimer = null;
+    }
+    this._pendingScriptAssetChanges.clear();
+    this._projectVFS = vfs;
+    clearScriptPropertyAccessorCache();
+    this._projectVFS?.on('changed', this.handleProjectAssetChanged, this);
+  }
+  private handleProjectAssetChanged(
+    type: 'created' | 'deleted' | 'moved' | 'modified',
+    path: string,
+    itemType: 'file' | 'directory',
+    oldPath?: string
+  ) {
+    const normalizedPath = this._projectVFS.normalizePath(path);
+    const normalizedOldPath = oldPath ? this._projectVFS.normalizePath(oldPath) : undefined;
+    const change: EditorProjectAssetChange = {
+      type,
+      path: normalizedPath,
+      itemType,
+      oldPath: normalizedOldPath
+    };
+    this._plugins.dispatchEvent('projectAssetChanged', change);
+    this.queueScriptAssetChange(change);
+  }
+  private queueScriptAssetChange(change: EditorProjectAssetChange) {
+    const isSameOrChild = (path: string, parent: string) =>
+      path === parent || path.startsWith(parent.endsWith('/') ? parent : `${parent}/`);
+    const changePaths = (value: EditorProjectAssetChange) =>
+      value.oldPath ? [value.path, value.oldPath] : [value.path];
+    for (const [key, pending] of [...this._pendingScriptAssetChanges]) {
+      if (pending.itemType === 'directory') {
+        const pendingPaths = changePaths(pending);
+        if (changePaths(change).every((path) => pendingPaths.some((parent) => isSameOrChild(path, parent)))) {
+          return;
+        }
+      }
+      if (change.itemType === 'directory') {
+        const nextPaths = changePaths(change);
+        if (changePaths(pending).every((path) => nextPaths.some((parent) => isSameOrChild(path, parent)))) {
+          this._pendingScriptAssetChanges.delete(key);
+        }
+      }
+    }
+    const key =
+      change.type === 'moved'
+        ? `moved\0${change.oldPath ?? ''}\0${change.path}`
+        : `${change.itemType}\0${change.path}`;
+    this._pendingScriptAssetChanges.set(key, change);
+    if (!this._scriptAssetChangeTimer) {
+      this._scriptAssetChangeTimer = setTimeout(() => this.flushScriptAssetChanges(), 25);
+    }
+  }
+  private flushScriptAssetChanges() {
+    this._scriptAssetChangeTimer = null;
+    const changes = [...this._pendingScriptAssetChanges.values()];
+    this._pendingScriptAssetChanges.clear();
+    const scriptPaths = new Set<string>();
+    let invalidateAllScripts = false;
+    for (const change of changes) {
+      if (change.itemType === 'directory' || (change.type === 'moved' && !change.oldPath)) {
+        invalidateAllScripts = true;
+        break;
+      }
+      for (const path of change.oldPath ? [change.path, change.oldPath] : [change.path]) {
+        if (/\.(?:[cm]?[jt]s|[jt]sx)$/i.test(path)) {
+          scriptPaths.add(path);
+        }
+      }
+    }
+    if (invalidateAllScripts) {
+      getEngine().scriptingSystem.registry.invalidate();
+      clearScriptPropertyAccessorCache();
+    } else {
+      for (const path of scriptPaths) {
+        getEngine().scriptingSystem.registry.invalidate(path);
+        clearScriptPropertyAccessorCache(path);
+      }
+    }
   }
   registerPlugin(plugin: EditorPlugin) {
     this._plugins.registerPlugin(plugin);
@@ -314,6 +418,7 @@ export class Editor {
   async saveProjectSettings(settings: ProjectSettings) {
     if (this._currentProject) {
       await ProjectService.saveCurrentProjectSettings(settings);
+      ProjectService.applyRuntimeSettings(settings);
     }
   }
   isProjectReadOnly() {
@@ -625,6 +730,7 @@ export class Editor {
       this._currentProject.lastEditScene = lastScenePath ?? '';
       await this.saveProject();
       this._moduleManager.activate('');
+      this.bindProjectVFS(null);
       await ProjectService.closeCurrentProject();
       this._currentProject = null;
       return null;
@@ -738,7 +844,7 @@ export class Editor {
         const project = await ProjectService.openProject(uuid);
         const settings = await ProjectService.getCurrentProjectSettings();
         this._currentProject = project;
-        this._plugins.dispatchEvent('projectOpened', project);
+        this.notifyProjectOpened(project);
         let scene = settings.startupScene ?? project.lastEditScene ?? '';
         if (!scene) {
           const sceneFiles = await ProjectService.VFS.glob('/**/*.zscn', {
@@ -805,7 +911,7 @@ export class Editor {
         }
         const project = await ProjectService.openProject(uuid);
         this._currentProject = project;
-        this._plugins.dispatchEvent('projectOpened', project);
+        this.notifyProjectOpened(project);
         this._moduleManager.activate('Scene', '');
         return this._currentProject.uuid;
       } catch (err) {
@@ -838,7 +944,8 @@ export class Editor {
         this._isRemoteProject = true;
         updateProgress(3, 5, 'Loading project settings...');
         const settings = await ProjectService.getCurrentProjectSettings();
-        this._plugins.dispatchEvent('projectOpened', project);
+        ProjectService.applyRuntimeSettings(settings);
+        this.notifyProjectOpened(project);
         updateProgress(4, 5, 'Loading script type hints...');
         await this.loadDepTypes();
         updateProgress(5, 5, 'Opening startup scene...');
@@ -877,7 +984,8 @@ export class Editor {
           this._currentProject = project;
           updateProgress(2, 5, 'Loading project settings...');
           const settings = await ProjectService.getCurrentProjectSettings();
-          this._plugins.dispatchEvent('projectOpened', project);
+          ProjectService.applyRuntimeSettings(settings);
+          this.notifyProjectOpened(project);
           updateProgress(3, 5, 'Checking project dependencies...');
           await this.ensureProjectDependenciesInstalled(id as string, settings, (message) => {
             updateProgress(3, 5, message);
@@ -1261,6 +1369,11 @@ export class Editor {
   }
 
   async removeSystemPlugin(id: string) {
+    const plugin = this._plugins.hasPlugin(id) ? this._plugins.getPlugin(id) : null;
+    if (plugin) {
+      const context = this._plugins.createPluginContextForLifecycle(plugin);
+      await plugin.uninstall?.(context);
+    }
     if (this._plugins.hasPlugin(id) && this._plugins.isPluginActive(id)) {
       await this._plugins.deactivatePlugin(id);
     }

@@ -92,6 +92,8 @@ export type PropertyAccessorOptions = {
   label?: string;
   /** Logical grouping/category in UI. */
   group?: string;
+  /** Whether the inspector group should be expanded by default. */
+  defaultOpen?: boolean;
   /** Editor presentation hint (e.g., quaternion gizmo, animation track). */
   edit?: PropEdit;
   /** Minimum numeric value (for sliders/spinners). */

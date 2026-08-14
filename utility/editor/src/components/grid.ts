@@ -28,7 +28,7 @@ import { eventBus } from '../core/eventbus';
 import type { SceneHierarchyNodePickerPayload } from './scenehierarchy';
 import type { VFSRendererAssetPickerPayload } from './vfsrenderer';
 import { matchesMimeType } from '../helpers/mimematch';
-import { CustomInputTextFlags, customTextInput } from './textinput';
+import { CustomInputTextFlags, customTextInput, requestCustomTextInputFocus } from './textinput';
 
 interface Property<T extends {}> {
   objectPath: string;
@@ -99,6 +99,7 @@ class PropertyGroup {
   property: Nullable<Property<any>>;
   currentType: number;
   opened: boolean;
+  defaultOpen: Nullable<boolean>;
   objectTypes: Nullable<Nullable<SerializableClass>[]>;
   prop: Nullable<PropertyAccessor<any>>;
   properties: (PropertyGroup | { name: string; property: Property<any> })[];
@@ -119,6 +120,7 @@ class PropertyGroup {
     this.prop = null;
     this.currentType = -1;
     this.opened = true;
+    this.defaultOpen = null;
     this.objectTypes = null;
     this.properties = [];
     this.rawProperties = [];
@@ -165,7 +167,7 @@ class PropertyGroup {
       return;
     }
     if (value.options?.group) {
-      group = this.findOrAddGroup(value.options.group);
+      group = this.findOrAddGroup(value.options.group, value.options.defaultOpen);
     }
     const tmpProperty = {
       num: [0, 0, 0, 0],
@@ -216,7 +218,7 @@ class PropertyGroup {
     this.subgroups.push(group);
     return group;
   }
-  findOrAddGroup(name: string) {
+  findOrAddGroup(name: string, defaultOpen?: boolean) {
     const parts = name.split('/');
     const firstPart = parts.shift()!;
     let parent = this.properties.find(
@@ -227,7 +229,10 @@ class PropertyGroup {
       parent.parent = this;
       parent.path = this.path;
       parent.statePath = `${this.statePath}/${firstPart}`;
+      parent.defaultOpen = defaultOpen ?? null;
       this.properties.push(parent);
+    } else if (defaultOpen !== undefined && parent.defaultOpen == null) {
+      parent.defaultOpen = defaultOpen;
     }
     let group = parent;
     while (parts.length > 0) {
@@ -362,6 +367,13 @@ export class PropertyEditor extends Observable<{
     (object: any) => PropertyAccessor<any>[] | Promise<PropertyAccessor<any>[]>
   >;
   private _extraPropertiesVersion: number;
+  private static readonly HDR_COLOR_EDIT_FLAGS =
+    ImGui.ColorEditFlags.Float |
+    ImGui.ColorEditFlags.HDR |
+    ImGui.ColorEditFlags.DisplayRGB |
+    ImGui.ColorEditFlags.InputRGB |
+    ImGui.ColorEditFlags.AlphaPreviewHalf |
+    ImGui.ColorEditFlags.NoOptions;
   constructor(labelPercent: number) {
     super();
     this._rootGroup = new PropertyGroup('Root', this);
@@ -493,6 +505,23 @@ export class PropertyEditor extends Observable<{
   }
   private inspectGroup(group: PropertyGroup) {
     this._inspectedGroup = this.getNearestObjectGroup(group);
+  }
+  private setGroupOpenStateRecursive(group: PropertyGroup, opened: boolean) {
+    let changed = false;
+    if (group !== this._rootGroup) {
+      changed = group.opened !== opened || this._groupOpenStates.get(group.statePath) !== opened || changed;
+      group.opened = opened;
+      this._groupOpenStates.set(group.statePath, opened);
+    }
+    for (const property of group.properties) {
+      if (property instanceof PropertyGroup) {
+        changed = this.setGroupOpenStateRecursive(property, opened) || changed;
+      }
+    }
+    for (const subgroup of group.subgroups) {
+      changed = this.setGroupOpenStateRecursive(subgroup, opened) || changed;
+    }
+    return changed;
   }
   private getNearestObjectGroup(group: PropertyGroup) {
     let current: Nullable<PropertyGroup> = group;
@@ -723,6 +752,7 @@ export class PropertyEditor extends Observable<{
     const opened = this._groupOpenStates.get(group.statePath);
     group.opened =
       opened ??
+      group.defaultOpen ??
       (isScriptArrayElementObject(group.value.object?.[0])
         ? true
         : this.getNearestObjectGroup(group) === this._rootGroup);
@@ -828,9 +858,16 @@ export class PropertyEditor extends Observable<{
         ImGui.TextDisabled(this.getGroupLabel(group));
       }
     } else {
-      opened = ImGui.TreeNodeEx(this.getGroupLabel(group), 0);
+      let recursiveChanged = false;
+      opened = ImGui.TreeNodeEx(this.getGroupLabel(group), ImGui.TreeNodeFlags.OpenOnArrow);
       if (ImGui.IsItemClicked(ImGui.MouseButton.Left) || ImGui.IsItemActivated()) {
         this.inspectGroup(group);
+      }
+      if (ImGui.IsItemToggledOpen() && ImGui.GetIO().KeyShift) {
+        recursiveChanged = this.setGroupOpenStateRecursive(group, opened);
+      }
+      if (recursiveChanged) {
+        this.invalidateRows();
       }
     }
     if (group.opened !== opened) {
@@ -1295,9 +1332,16 @@ export class PropertyEditor extends Observable<{
     }
     if (changed && value.set) {
       this.inspectGroup(group);
-      value.set.call(object, tmpProperty);
-      this.invalidateRows();
-      this.dispatchEvent('object_property_changed', object, value);
+      const result = value.set.call(object, tmpProperty);
+      const onChanged = () => {
+        this.invalidateRows();
+        this.dispatchEvent('object_property_changed', object, value);
+      };
+      if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
+        Promise.resolve(result).then(onChanged);
+      } else {
+        onChanged();
+      }
     }
     return true;
   }
@@ -1471,12 +1515,18 @@ export class PropertyEditor extends Observable<{
       }
       case 'rgb': {
         const val = tmpProperty.num as [number, number, number];
-        changed = ImGui.ColorEdit3('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined);
+        const flags =
+          PropertyEditor.HDR_COLOR_EDIT_FLAGS |
+          (readonly ? ImGui.ColorEditFlags.NoInputs : ImGui.ColorEditFlags.None);
+        changed = ImGui.ColorEdit3('##value', val, flags);
         break;
       }
       case 'rgba': {
         const val = tmpProperty.num as [number, number, number, number];
-        changed = ImGui.ColorEdit4('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined);
+        const flags =
+          PropertyEditor.HDR_COLOR_EDIT_FLAGS |
+          (readonly ? ImGui.ColorEditFlags.NoInputs : ImGui.ColorEditFlags.None);
+        changed = ImGui.ColorEdit4('##value', val, flags);
         break;
       }
     }
@@ -1488,17 +1538,17 @@ export class PropertyEditor extends Observable<{
       this.dispatchEvent('object_property_changed', null, value);
     }
   }
-  private linearToSRGB(x: number): number {
+  public linearToSRGB(_x: number): number {
     // 线性 -> sRGB（2.2 近似）
-    const srgb = Math.pow(Math.max(0, Math.min(1, x)), 1 / 2.2);
+    const srgb = Math.pow(Math.max(0, Math.min(1, _x)), 1 / 2.2);
     // 量化到 0-255 再还原到 0-1，避免无限精度
     const q = Math.round(srgb * 255);
     return q / 255;
   }
 
-  private sRGBToLinear(x: number): number {
+  public sRGBToLinear(_x: number): number {
     // sRGB -> 线性
-    return Math.pow(Math.max(0, Math.min(1, x)), 2.2);
+    return Math.pow(Math.max(0, Math.min(1, _x)), 2.2);
   }
   private revealAsset(path: string) {
     if (!path || !path.startsWith('/')) {
@@ -1700,7 +1750,7 @@ export class PropertyEditor extends Observable<{
             if (stringEditorActive) {
               ImGui.SetNextItemWidth(fieldWidth);
               if (this._pendingStringEditorFocus === editSessionKey) {
-                ImGui.SetKeyboardFocusHere();
+                requestCustomTextInputFocus('##value');
                 this._pendingStringEditorFocus = null;
               }
               changed = value.options?.multiline
@@ -1897,33 +1947,19 @@ export class PropertyEditor extends Observable<{
           break;
         }
         case 'rgb': {
-          const val = [
-            this.linearToSRGB(tmpProperty.num[0]),
-            this.linearToSRGB(tmpProperty.num[1]),
-            this.linearToSRGB(tmpProperty.num[2])
-          ] as [number, number, number];
-          if (ImGui.ColorEdit3('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined)) {
-            changed = true;
-            tmpProperty.num[0] = this.sRGBToLinear(val[0]);
-            tmpProperty.num[1] = this.sRGBToLinear(val[1]);
-            tmpProperty.num[2] = this.sRGBToLinear(val[2]);
-          }
+          const val = tmpProperty.num as [number, number, number];
+          const flags =
+            PropertyEditor.HDR_COLOR_EDIT_FLAGS |
+            (readonly ? ImGui.ColorEditFlags.NoInputs : ImGui.ColorEditFlags.None);
+          changed = ImGui.ColorEdit3('##value', val, flags);
           break;
         }
         case 'rgba': {
-          const val = [
-            this.linearToSRGB(tmpProperty.num[0]),
-            this.linearToSRGB(tmpProperty.num[1]),
-            this.linearToSRGB(tmpProperty.num[2]),
-            tmpProperty.num[3]
-          ] as [number, number, number, number];
-          if (ImGui.ColorEdit4('##value', val, readonly ? ImGui.ColorEditFlags.NoInputs : undefined)) {
-            changed = true;
-            tmpProperty.num[0] = this.sRGBToLinear(val[0]);
-            tmpProperty.num[1] = this.sRGBToLinear(val[1]);
-            tmpProperty.num[2] = this.sRGBToLinear(val[2]);
-            tmpProperty.num[3] = val[3];
-          }
+          const val = tmpProperty.num as [number, number, number, number];
+          const flags =
+            PropertyEditor.HDR_COLOR_EDIT_FLAGS |
+            (readonly ? ImGui.ColorEditFlags.NoInputs : ImGui.ColorEditFlags.None);
+          changed = ImGui.ColorEdit4('##value', val, flags);
           break;
         }
         case 'command': {
@@ -2010,12 +2046,15 @@ export class PropertyEditor extends Observable<{
       */
       if (changed && value.set) {
         this.inspectGroup(owner);
-        value.set.call(object, tmpProperty);
-        this.invalidateRows();
-        this.dispatchEvent('object_property_changed', object, value);
-
-        if (needRefresh) {
-          this.refresh();
+        const result = value.set.call(object, tmpProperty);
+        const onChanged = () => {
+          this.invalidateRows();
+          this.dispatchEvent('object_property_changed', object, value);
+        };
+        if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
+          Promise.resolve(result).then(onChanged);
+        } else {
+          onChanged();
         }
       }
       if (value.set && ImGui.IsItemActivated()) {
@@ -2047,6 +2086,9 @@ export class PropertyEditor extends Observable<{
         if (this._activeStringEditors.has(editSessionKey) && !ImGui.GetIO().MouseDown[0]) {
           this.deactivateStringEditor(editSessionKey);
         }
+      }
+      if (needRefresh) {
+        this.refresh();
       }
     }
     ImGui.PopID();

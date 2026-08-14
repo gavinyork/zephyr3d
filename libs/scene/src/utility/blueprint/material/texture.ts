@@ -38,7 +38,7 @@ const defaultTexture2DArray: DRef<Texture2DArray> = new DRef();
  *
  * @returns A 1x1 white Texture2D instance
  *
- * @internal
+ * @public
  */
 export function getDefaultTexture2D(): Texture2D {
   if (!defaultTexture2D.get()) {
@@ -60,7 +60,7 @@ export function getDefaultTexture2D(): Texture2D {
  *
  * @returns A 1x1x1 white Texture2DArray instance
  *
- * @internal
+ * @public
  */
 export function getDefaultTexture2DArray(): Texture2DArray {
   if (!defaultTexture2DArray.get()) {
@@ -82,7 +82,7 @@ export function getDefaultTexture2DArray(): Texture2DArray {
  *
  * @returns A 1x1 white TextureCube instance
  *
- * @internal
+ * @public
  */
 export function getDefaultTextureCube(): TextureCube {
   if (!defaultTextureCube.get()) {
@@ -129,6 +129,23 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
         } else {
           this.paramName = `u_${value.str[0]}`;
         }
+      }
+    },
+    {
+      name: 'Expose',
+      type: 'bool',
+      default: true,
+      options: {
+        label: 'Expose'
+      },
+      get(this: BaseTextureNode, value) {
+        value.bool[0] = this.expose;
+      },
+      set(this: BaseTextureNode, value) {
+        this.expose = value.bool[0];
+      },
+      isHidden(this: BaseTextureNode) {
+        return this instanceof TextureSampleNode && !!(this as TextureSampleNode).inputs[0]?.inputNode;
       }
     },
     {
@@ -278,6 +295,8 @@ const textureNodeProps = (function getTextureNodeProps(): PropertyAccessor<BaseT
 export abstract class BaseTextureNode extends BaseGraphNode {
   /** The shader parameter name for this texture uniform */
   private _paramName: string;
+  /** Whether this texture uniform should be exposed to material instances */
+  private _expose: boolean;
   /** Whether this texture should be loaded in sRGB color space */
   sRGB: boolean;
   /** Horizontal texture coordinate wrapping mode */
@@ -306,6 +325,7 @@ export abstract class BaseTextureNode extends BaseGraphNode {
   constructor() {
     super();
     this._paramName = getParamName();
+    this._expose = true;
     this.sRGB = true;
     this.addressU = 'clamp';
     this.addressV = 'clamp';
@@ -325,6 +345,18 @@ export abstract class BaseTextureNode extends BaseGraphNode {
   set paramName(val: string) {
     if (this._paramName !== val) {
       this._paramName = val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Whether this texture parameter should be exposed to material instances.
+   */
+  get expose() {
+    return this._expose;
+  }
+  set expose(val: boolean) {
+    if (this._expose !== val) {
+      this._expose = val;
       this.dispatchEvent('changed');
     }
   }
@@ -965,6 +997,8 @@ export class TextureSampleNode extends BaseGraphNode {
   samplerType: 'Color' | 'Normal';
   /** The shader parameter name for fallback texture uniform */
   private _paramName: string;
+  /** Whether fallback texture parameter should be exposed to material instances */
+  private _expose: boolean;
   /** Asset ID for fallback texture (used when texture input is not connected) */
   textureId: string;
   /** Whether fallback texture should be loaded in sRGB color space */
@@ -992,6 +1026,7 @@ export class TextureSampleNode extends BaseGraphNode {
     super();
     this.samplerType = 'Color';
     this._paramName = getParamName();
+    this._expose = true;
     this.textureId = '';
     this.sRGB = true;
     this.addressU = 'clamp';
@@ -1060,6 +1095,21 @@ export class TextureSampleNode extends BaseGraphNode {
   set paramName(val: string) {
     if (this._paramName !== val) {
       this._paramName = val;
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Whether fallback texture parameter should be exposed to material instances.
+   *
+   * @remarks
+   * Only meaningful when the texture input is not connected.
+   */
+  get expose() {
+    return this._expose;
+  }
+  set expose(val: boolean) {
+    if (this._expose !== val) {
+      this._expose = val;
       this.dispatchEvent('changed');
     }
   }
@@ -1190,6 +1240,778 @@ export class TextureSampleNode extends BaseGraphNode {
     } else {
       return 'float';
     }
+  }
+}
+
+/**
+ * Texture property query node
+ *
+ * @remarks
+ * Queries metadata derived from a texture object, similar to Unreal Engine's
+ * `TextureProperty` material expression.
+ *
+ * Supported properties:
+ * - `TextureSize`: returns the texture dimensions as a vec2
+ * - `TexelSize`: returns `1 / textureDimensions` as a vec2
+ *
+ * Inputs:
+ * - Input 1: Texture sampler (tex2D, tex2DArray, or texCube)
+ *
+ * Outputs:
+ * - Output 1: Full property value (vec2)
+ * - Output 2: X component (float)
+ * - Output 3: Y component (float)
+ *
+ * @public
+ */
+export class TexturePropertyNode extends BaseGraphNode {
+  /** The queried texture property */
+  property: 'TextureSize' | 'TexelSize';
+  /**
+   * Creates a new texture property node
+   *
+   * @remarks
+   * Initializes with:
+   * - One required texture input
+   * - One vec2 output and two scalar swizzled outputs
+   * - `TexelSize` as default property
+   */
+  constructor() {
+    super();
+    this.property = 'TexelSize';
+    this._outputs = [
+      {
+        id: 1,
+        name: ''
+      },
+      {
+        id: 2,
+        name: 'x',
+        swizzle: 'x'
+      },
+      {
+        id: 3,
+        name: 'y',
+        swizzle: 'y'
+      }
+    ];
+    this._inputs = [
+      {
+        id: 1,
+        name: 'texture',
+        type: ['tex2D', 'tex2DArray', 'texCube'],
+        required: true
+      }
+    ];
+  }
+  /**
+   * Gets the serialization descriptor for this node type
+   *
+   * @returns Serialization class descriptor
+   */
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: TexturePropertyNode,
+      name: 'TexturePropertyNode',
+      getProps(): PropertyAccessor<TexturePropertyNode>[] {
+        return defineProps([
+          {
+            name: 'Property',
+            type: 'string',
+            options: {
+              enum: {
+                labels: ['TextureSize', 'TexelSize'],
+                values: ['TextureSize', 'TexelSize']
+              }
+            },
+            get(this: TexturePropertyNode, value) {
+              value.str[0] = this.property;
+            },
+            set(this: TexturePropertyNode, value) {
+              this.property = value.str[0] as TexturePropertyNode['property'];
+            }
+          }
+        ]);
+      }
+    };
+  }
+  /**
+   * Generates a string representation of this node
+   *
+   * @returns `textureProperty`
+   */
+  toString(): string {
+    return 'textureProperty';
+  }
+  /**
+   * Validates the node state and input type compatibility
+   *
+   * @returns Error message if invalid, empty string if valid
+   */
+  protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    const textureInput = this._inputs[0];
+    const textureType = textureInput.inputNode?.getOutputType(textureInput.inputId!);
+    if (!textureType) {
+      return `Cannot determine type of argument \`${textureInput.name}\``;
+    }
+    if (!textureInput.type.includes(textureType)) {
+      return `Invalid input type of argument \`${textureInput.name}\`: ${textureType}`;
+    }
+    return '';
+  }
+  /**
+   * Gets the output type
+   */
+  protected getType(id: number): string {
+    const err = this.validate();
+    if (err) {
+      return '';
+    }
+    return id === 1 ? 'vec2' : 'float';
+  }
+}
+
+/**
+ * Channel SDF mask evaluation node
+ *
+ * @remarks
+ * Samples a channel-packed SDF texture and reconstructs a feathered mask
+ * by decoding the stored value back into signed distance space.
+ *
+ * Inputs:
+ * - `texture`: source SDF texture
+ * - `coord`: UV coordinates, defaults to vertex UV when disconnected
+ * - `sizeOffset`: positive expands, negative shrinks, in SDF distance units
+ * - `feather`: transition width around the boundary, in SDF distance units
+ * - `spread`: encode range used when baking the SDF texture
+ * - `edgeCurve`: edge response curve, `1` keeps linear behavior, `>1` softens, `<1` hardens
+ * - `channelMask`: channel selector mask, defaults to R
+ *
+ * Output:
+ * - `Result`: scalar mask in `[0, 1]`
+ *
+ * @public
+ */
+export class ChannelSDFMaskNode extends BaseGraphNode {
+  private _paramName: string;
+  private _expose: boolean;
+  textureId: string;
+  sRGB: boolean;
+  addressU: TextureAddressMode;
+  addressV: TextureAddressMode;
+  filterMin: TextureFilterMode;
+  filterMag: TextureFilterMode;
+  filterMip: TextureFilterMode;
+  constructor() {
+    super();
+    this._paramName = getParamName();
+    this._expose = true;
+    this.textureId = '';
+    this.sRGB = true;
+    this.addressU = 'clamp';
+    this.addressV = 'clamp';
+    this.filterMin = 'linear';
+    this.filterMag = 'linear';
+    this.filterMip = 'nearest';
+    this._inputs = [
+      {
+        id: 1,
+        name: 'texture',
+        type: ['tex2D'],
+        required: false
+      },
+      {
+        id: 2,
+        name: 'coord',
+        type: ['vec2'],
+        required: false
+      },
+      {
+        id: 3,
+        name: 'sizeOffset',
+        type: ['float'],
+        required: false,
+        defaultValue: [0]
+      },
+      {
+        id: 4,
+        name: 'feather',
+        type: ['float'],
+        required: false,
+        defaultValue: [0]
+      },
+      {
+        id: 5,
+        name: 'spread',
+        type: ['float'],
+        required: false,
+        defaultValue: [16]
+      },
+      {
+        id: 6,
+        name: 'edgeCurve',
+        type: ['float'],
+        required: false,
+        defaultValue: [1]
+      },
+      {
+        id: 7,
+        name: 'channelMask',
+        type: ['vec4'],
+        required: false,
+        defaultValue: [1, 0, 0, 0]
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: 'Result'
+      }
+    ];
+  }
+  get isUniform() {
+    return !this._inputs[0].inputNode;
+  }
+  get paramName() {
+    return this._paramName;
+  }
+  set paramName(val: string) {
+    if (this._paramName !== val) {
+      this._paramName = val;
+      this.dispatchEvent('changed');
+    }
+  }
+  get expose() {
+    return this._expose;
+  }
+  set expose(val: boolean) {
+    if (this._expose !== val) {
+      this._expose = val;
+      this.dispatchEvent('changed');
+    }
+  }
+  get sizeOffset() {
+    return this._inputs[2].defaultValue?.[0] ?? 0;
+  }
+  set sizeOffset(val: number) {
+    if (this.sizeOffset !== val) {
+      this._inputs[2].defaultValue = [val];
+      this.dispatchEvent('changed');
+    }
+  }
+  get feather() {
+    return this._inputs[3].defaultValue?.[0] ?? 0;
+  }
+  set feather(val: number) {
+    if (this.feather !== val) {
+      this._inputs[3].defaultValue = [val];
+      this.dispatchEvent('changed');
+    }
+  }
+  get spread() {
+    return this._inputs[4].defaultValue?.[0] ?? 16;
+  }
+  set spread(val: number) {
+    if (this.spread !== val) {
+      this._inputs[4].defaultValue = [val];
+      this.dispatchEvent('changed');
+    }
+  }
+  get edgeCurve() {
+    return this._inputs[5].defaultValue?.[0] ?? 1;
+  }
+  set edgeCurve(val: number) {
+    if (this.edgeCurve !== val) {
+      this._inputs[5].defaultValue = [val];
+      this.dispatchEvent('changed');
+    }
+  }
+  get channelMask() {
+    return [...(this._inputs[6].defaultValue ?? [1, 0, 0, 0])];
+  }
+  set channelMask(val: number[]) {
+    const next = [val[0] ?? 0, val[1] ?? 0, val[2] ?? 0, val[3] ?? 0];
+    const prev = this.channelMask;
+    if (prev.some((v, i) => v !== next[i])) {
+      this._inputs[6].defaultValue = next;
+      this.dispatchEvent('changed');
+    }
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: ChannelSDFMaskNode,
+      name: 'ChannelSDFMaskNode',
+      getProps(): PropertyAccessor<ChannelSDFMaskNode>[] {
+        return defineProps([
+          ...(textureNodeProps as unknown as PropertyAccessor<ChannelSDFMaskNode>[]),
+          {
+            name: 'Texture',
+            type: 'object',
+            default: null,
+            options: {
+              mimeTypes: [
+                'image/jpeg',
+                'image/png',
+                'image/tga',
+                'image/vnd.radiance',
+                'image/x-dds',
+                'image/webp'
+              ]
+            },
+            isNullable() {
+              return true;
+            },
+            get(this: ChannelSDFMaskNode, value) {
+              value.str[0] = this.textureId;
+            },
+            async set(this: ChannelSDFMaskNode, value) {
+              const path = value?.str?.[0];
+              this.textureId = typeof path === 'string' ? path : '';
+            }
+          },
+          {
+            name: 'SizeOffset',
+            type: 'float',
+            description: 'Used when the sizeOffset pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.sizeOffset;
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              this.sizeOffset = value.num[0];
+            }
+          },
+          {
+            name: 'Feather',
+            type: 'float',
+            description: 'Used when the feather pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.feather;
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              this.feather = value.num[0];
+            }
+          },
+          {
+            name: 'Spread',
+            type: 'float',
+            description: 'Used when the spread pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.spread;
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              this.spread = value.num[0];
+            }
+          },
+          {
+            name: 'EdgeCurve',
+            type: 'float',
+            description: 'Used when the edgeCurve pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.edgeCurve;
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              this.edgeCurve = value.num[0];
+            }
+          },
+          {
+            name: 'ChannelMaskR',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.channelMask[0];
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              const next = this.channelMask;
+              next[0] = value.num[0];
+              this.channelMask = next;
+            }
+          },
+          {
+            name: 'ChannelMaskG',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.channelMask[1];
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              const next = this.channelMask;
+              next[1] = value.num[0];
+              this.channelMask = next;
+            }
+          },
+          {
+            name: 'ChannelMaskB',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.channelMask[2];
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              const next = this.channelMask;
+              next[2] = value.num[0];
+              this.channelMask = next;
+            }
+          },
+          {
+            name: 'ChannelMaskA',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: ChannelSDFMaskNode, value) {
+              value.num[0] = this.channelMask[3];
+            },
+            set(this: ChannelSDFMaskNode, value) {
+              const next = this.channelMask;
+              next[3] = value.num[0];
+              this.channelMask = next;
+            }
+          }
+        ]);
+      }
+    };
+  }
+  toString(): string {
+    return 'ChannelSDFMask';
+  }
+  protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    const textureInput = this._inputs[0];
+    const textureType = textureInput.inputNode
+      ? textureInput.inputNode.getOutputType(textureInput.inputId!)
+      : 'tex2D';
+    if (textureInput.inputNode) {
+      if (!textureType) {
+        return `Cannot determine type of argument \`${textureInput.name}\``;
+      }
+      if (textureType !== 'tex2D') {
+        return 'Texture input must be tex2D';
+      }
+    } else if (!this.textureId) {
+      return 'Texture not specified';
+    }
+    const coordType = this._inputs[1].inputNode?.getOutputType(this._inputs[1].inputId!);
+    if (coordType && coordType !== 'vec2') {
+      return 'Texture coordinate type should be vec2';
+    }
+    const sizeType = this._inputs[2].inputNode?.getOutputType(this._inputs[2].inputId!);
+    if (sizeType && sizeType !== 'float') {
+      return 'Size offset type should be float';
+    }
+    const featherType = this._inputs[3].inputNode?.getOutputType(this._inputs[3].inputId!);
+    if (featherType && featherType !== 'float') {
+      return 'Feather type should be float';
+    }
+    const spreadType = this._inputs[4].inputNode?.getOutputType(this._inputs[4].inputId!);
+    if (spreadType && spreadType !== 'float') {
+      return 'Spread type should be float';
+    }
+    const edgeCurveType = this._inputs[5].inputNode?.getOutputType(this._inputs[5].inputId!);
+    if (edgeCurveType && edgeCurveType !== 'float') {
+      return 'Edge curve type should be float';
+    }
+    const maskType = this._inputs[6].inputNode?.getOutputType(this._inputs[6].inputId!);
+    if (maskType && maskType !== 'vec4') {
+      return 'Channel mask type should be vec4';
+    }
+    return '';
+  }
+  protected getType(): string {
+    return this.validate() ? '' : 'float';
+  }
+}
+
+/**
+ * Morph + blur node
+ *
+ * @remarks
+ * Applies channel morphology and Gaussian blur in a single node. The node
+ * short-circuits internally so that when one radius is zero it falls back to
+ * the corresponding single-stage path instead of always paying for the full
+ * combined cost.
+ *
+ * Inputs:
+ * - `texture`: source mask texture
+ * - `coord`: UV coordinates, defaults to vertex UV when disconnected
+ * - `morphRadius`: positive expands, negative shrinks, zero disables morph
+ * - `blurRadius`: blur radius in texel units, zero disables blur
+ * - `channelMask`: channel selector mask, defaults to R
+ *
+ * Output:
+ * - `Result`: scalar sampled value
+ *
+ * @public
+ */
+export class MorphBlurNode extends BaseGraphNode {
+  private _paramName: string;
+  private _expose: boolean;
+  textureId: string;
+  sRGB: boolean;
+  addressU: TextureAddressMode;
+  addressV: TextureAddressMode;
+  filterMin: TextureFilterMode;
+  filterMag: TextureFilterMode;
+  filterMip: TextureFilterMode;
+  constructor() {
+    super();
+    this._paramName = getParamName();
+    this._expose = true;
+    this.textureId = '';
+    this.sRGB = true;
+    this.addressU = 'clamp';
+    this.addressV = 'clamp';
+    this.filterMin = 'linear';
+    this.filterMag = 'linear';
+    this.filterMip = 'nearest';
+    this._inputs = [
+      {
+        id: 1,
+        name: 'texture',
+        type: ['tex2D'],
+        required: false
+      },
+      {
+        id: 2,
+        name: 'coord',
+        type: ['vec2'],
+        required: false
+      },
+      {
+        id: 3,
+        name: 'morphRadius',
+        type: ['float'],
+        required: false,
+        defaultValue: [0]
+      },
+      {
+        id: 4,
+        name: 'blurRadius',
+        type: ['float'],
+        required: false,
+        defaultValue: [0]
+      },
+      {
+        id: 5,
+        name: 'channelMask',
+        type: ['vec4'],
+        required: false,
+        defaultValue: [1, 0, 0, 0]
+      }
+    ];
+    this._outputs = [
+      {
+        id: 1,
+        name: 'Result'
+      }
+    ];
+  }
+  get isUniform() {
+    return !this._inputs[0].inputNode;
+  }
+  get paramName() {
+    return this._paramName;
+  }
+  set paramName(val: string) {
+    if (this._paramName !== val) {
+      this._paramName = val;
+      this.dispatchEvent('changed');
+    }
+  }
+  get expose() {
+    return this._expose;
+  }
+  set expose(val: boolean) {
+    if (this._expose !== val) {
+      this._expose = val;
+      this.dispatchEvent('changed');
+    }
+  }
+  get morphRadius() {
+    return this._inputs[2].defaultValue?.[0] ?? 0;
+  }
+  set morphRadius(val: number) {
+    if (this.morphRadius !== val) {
+      this._inputs[2].defaultValue = [val];
+      this.dispatchEvent('changed');
+    }
+  }
+  get blurRadius() {
+    return this._inputs[3].defaultValue?.[0] ?? 0;
+  }
+  set blurRadius(val: number) {
+    if (this.blurRadius !== val) {
+      this._inputs[3].defaultValue = [val];
+      this.dispatchEvent('changed');
+    }
+  }
+  get channelMask() {
+    return [...(this._inputs[4].defaultValue ?? [1, 0, 0, 0])];
+  }
+  set channelMask(val: number[]) {
+    const next = [val[0] ?? 0, val[1] ?? 0, val[2] ?? 0, val[3] ?? 0];
+    const prev = this.channelMask;
+    if (prev.some((v, i) => v !== next[i])) {
+      this._inputs[4].defaultValue = next;
+      this.dispatchEvent('changed');
+    }
+  }
+  static getSerializationCls(): SerializableClass {
+    return {
+      ctor: MorphBlurNode,
+      name: 'MorphBlurNode',
+      getProps(): PropertyAccessor<MorphBlurNode>[] {
+        return defineProps([
+          ...(textureNodeProps as unknown as PropertyAccessor<MorphBlurNode>[]),
+          {
+            name: 'Texture',
+            type: 'object',
+            default: null,
+            options: {
+              mimeTypes: [
+                'image/jpeg',
+                'image/png',
+                'image/tga',
+                'image/vnd.radiance',
+                'image/x-dds',
+                'image/webp'
+              ]
+            },
+            isNullable() {
+              return true;
+            },
+            get(this: MorphBlurNode, value) {
+              value.str[0] = this.textureId;
+            },
+            async set(this: MorphBlurNode, value) {
+              const path = value?.str?.[0];
+              this.textureId = typeof path === 'string' ? path : '';
+            }
+          },
+          {
+            name: 'MorphRadius',
+            type: 'float',
+            description: 'Used when the morphRadius pin is not connected.',
+            get(this: MorphBlurNode, value) {
+              value.num[0] = this.morphRadius;
+            },
+            set(this: MorphBlurNode, value) {
+              this.morphRadius = value.num[0];
+            }
+          },
+          {
+            name: 'BlurRadius',
+            type: 'float',
+            description: 'Used when the blurRadius pin is not connected.',
+            get(this: MorphBlurNode, value) {
+              value.num[0] = this.blurRadius;
+            },
+            set(this: MorphBlurNode, value) {
+              this.blurRadius = value.num[0];
+            }
+          },
+          {
+            name: 'ChannelMaskR',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: MorphBlurNode, value) {
+              value.num[0] = this.channelMask[0];
+            },
+            set(this: MorphBlurNode, value) {
+              const next = this.channelMask;
+              next[0] = value.num[0];
+              this.channelMask = next;
+            }
+          },
+          {
+            name: 'ChannelMaskG',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: MorphBlurNode, value) {
+              value.num[0] = this.channelMask[1];
+            },
+            set(this: MorphBlurNode, value) {
+              const next = this.channelMask;
+              next[1] = value.num[0];
+              this.channelMask = next;
+            }
+          },
+          {
+            name: 'ChannelMaskB',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: MorphBlurNode, value) {
+              value.num[0] = this.channelMask[2];
+            },
+            set(this: MorphBlurNode, value) {
+              const next = this.channelMask;
+              next[2] = value.num[0];
+              this.channelMask = next;
+            }
+          },
+          {
+            name: 'ChannelMaskA',
+            type: 'float',
+            description: 'Used when the channelMask pin is not connected.',
+            get(this: MorphBlurNode, value) {
+              value.num[0] = this.channelMask[3];
+            },
+            set(this: MorphBlurNode, value) {
+              const next = this.channelMask;
+              next[3] = value.num[0];
+              this.channelMask = next;
+            }
+          }
+        ]);
+      }
+    };
+  }
+  toString(): string {
+    return 'MorphBlur';
+  }
+  protected validate(): string {
+    const err = super.validate();
+    if (err) {
+      return err;
+    }
+    const textureInput = this._inputs[0];
+    const textureType = textureInput.inputNode
+      ? textureInput.inputNode.getOutputType(textureInput.inputId!)
+      : 'tex2D';
+    if (textureInput.inputNode) {
+      if (!textureType) {
+        return `Cannot determine type of argument \`${textureInput.name}\``;
+      }
+      if (textureType !== 'tex2D') {
+        return 'Texture input must be tex2D';
+      }
+    } else if (!this.textureId) {
+      return 'Texture not specified';
+    }
+    const coordType = this._inputs[1].inputNode?.getOutputType(this._inputs[1].inputId!);
+    if (coordType && coordType !== 'vec2') {
+      return 'Texture coordinate type should be vec2';
+    }
+    const morphType = this._inputs[2].inputNode?.getOutputType(this._inputs[2].inputId!);
+    if (morphType && morphType !== 'float') {
+      return 'Morph radius type should be float';
+    }
+    const blurType = this._inputs[3].inputNode?.getOutputType(this._inputs[3].inputId!);
+    if (blurType && blurType !== 'float') {
+      return 'Blur radius type should be float';
+    }
+    const maskType = this._inputs[4].inputNode?.getOutputType(this._inputs[4].inputId!);
+    if (maskType && maskType !== 'vec4') {
+      return 'Channel mask type should be vec4';
+    }
+    return '';
+  }
+  protected getType(): string {
+    return this.validate() ? '' : 'float';
   }
 }
 

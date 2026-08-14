@@ -488,8 +488,14 @@ export class ListView<P extends EventMap, T = unknown> extends Observable<P> {
     return false;
   }
   protected onSelectionChanged() {}
+  protected shouldAutoScrollWhileDragging(): boolean {
+    return true;
+  }
   private handleAutoScrollWhileDragging() {
     if (!this._draggingItem) {
+      return;
+    }
+    if (!this.shouldAutoScrollWhileDragging()) {
       return;
     }
 

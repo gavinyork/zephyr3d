@@ -289,16 +289,17 @@ export class ScriptRegistry {
    */
   async resolveRuntimeUrl(entryId: string) {
     const id = await this.resolveLogicalId(entryId);
-    if (id.startsWith('/assets/@builtins/')) {
+    const { path, suffix } = splitSpecifierQuery(String(id));
+    if (path.startsWith('/assets/@builtins/')) {
       return await this.build(String(id));
     }
     return getApp().editorMode !== 'none'
       ? await this.build(String(id))
       : id.endsWith('.js') || id.endsWith('.mjs')
-        ? id
+        ? `${id}${suffix}`
         : id.endsWith('.ts')
-          ? `${id.slice(0, -3)}.js`
-          : `${id}.js`;
+          ? `${id.slice(0, -3)}.js${suffix}`
+          : `${id}.js${suffix}`;
   }
 
   /**

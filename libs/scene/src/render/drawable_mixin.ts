@@ -1,6 +1,6 @@
 import type { Disposable, GenericConstructor, Immutable, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector4 } from '@zephyr3d/base';
-import type { AbstractDevice } from '@zephyr3d/device';
+import type { AbstractDevice, Texture2D } from '@zephyr3d/device';
 import type { BindGroup } from '@zephyr3d/device';
 import type { BatchDrawable, DrawContext, Drawable } from './drawable';
 import { ShaderHelper } from '../material';
@@ -24,6 +24,8 @@ export interface IMixinDrawable {
 
 let _drawableId = 0;
 const boneTextureSize = new Vector2();
+const skinInfluenceInfo = new Vector4();
+let defaultSkinInfluenceTexture: Nullable<Texture2D> = null;
 
 const instanceBindGroupTransfromTags = new WeakMap<DrawableInstanceInfo, number>();
 const drawableBindGroupTransfromTags = new WeakMap<BindGroup, number>();
@@ -61,6 +63,23 @@ function releaseBindGroup(bindGroup: Nullable<BindGroup>) {
       bindGroup.dispose();
     }
   }
+}
+
+function getDefaultSkinInfluenceTexture() {
+  let texture = defaultSkinInfluenceTexture;
+  if (!texture) {
+    texture = getDevice().createTexture2D('rgba32f', 1, 1, {
+      mipmapping: false,
+      samplerOptions: {
+        minFilter: 'nearest',
+        magFilter: 'nearest',
+        mipFilter: 'none'
+      }
+    })!;
+    texture.update(new Float32Array(4), 0, 0, 1, 1);
+    defaultSkinInfluenceTexture = texture;
+  }
+  return texture;
 }
 
 export function mixinDrawable<
@@ -236,6 +255,7 @@ export function mixinDrawable<
       }
       if (ctx.materialFlags & MaterialVaryingFlags.SKIN_ANIMATION) {
         const boneTexture = (this as unknown as Mesh).getBoneMatrices()!;
+        const skinData = (this as unknown as Mesh).getSkinInfluenceData();
         drawableBindGroup.setTexture(ShaderHelper.getBoneMatricesUniformName(), boneTexture);
         drawableBindGroup.setValue(
           ShaderHelper.getBoneInvBindMatrixUniformName(),
@@ -243,10 +263,21 @@ export function mixinDrawable<
         );
         boneTextureSize.setXY(boneTexture.width, boneTexture.height);
         drawableBindGroup.setValue(ShaderHelper.getBoneTextureSizeUniformName(), boneTextureSize);
+        drawableBindGroup.setTexture(
+          ShaderHelper.getSkinInfluenceDataUniformName(),
+          skinData?.texture?.get() ?? getDefaultSkinInfluenceTexture()
+        );
+        skinInfluenceInfo.setXYZW(
+          skinData?.width ?? 1,
+          skinData?.height ?? 1,
+          skinData?.influenceCount ?? 4,
+          skinData ? Math.ceil(Math.max(0, skinData.influenceCount - 4) / 2) : 0
+        );
+        drawableBindGroup.setValue(ShaderHelper.getSkinInfluenceInfoUniformName(), skinInfluenceInfo);
       }
       if (ctx.materialFlags & MaterialVaryingFlags.MORPH_ANIMATION) {
         const morphData = (this as unknown as Mesh).getMorphData()!;
-        const morphInfo = (this as unknown as Mesh).getMorphInfo()!;
+        const morphInfo = (this as unknown as Mesh).getRenderMorphInfo()!;
         drawableBindGroup.setTexture(ShaderHelper.getMorphDataUniformName(), morphData.texture!.get()!);
         drawableBindGroup.setBuffer(ShaderHelper.getMorphInfoUniformName(), morphInfo.buffer!.get()!);
       }

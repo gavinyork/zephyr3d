@@ -781,7 +781,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
       const roughness = this.calculateRoughness(scope, albedo, normal);
       const specularFactor = this.calculateSpecularFactor(scope, albedo, normal);
       const reflectionMode = this.calculateReflectionMode(scope) as PBShaderExp;
-      if (this.metallicRoughnessTexture) {
+      if (this.hasMetallicRoughnessTexture()) {
         scope.$l.metallicRoughnessSample = this.sampleMetallicRoughnessTexture(scope);
         data.metallic = pb.mul(metallic, scope.metallicRoughnessSample.z);
         data.roughness = pb.mul(roughness, scope.metallicRoughnessSample.y);
@@ -790,12 +790,12 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
         data.roughness = roughness;
       }
       data.roughness = pb.mul(data.roughness, ShaderHelper.getCameraRoughnessFactor(scope));
-      if (this.specularColorTexture) {
+      if (this.hasSpecularColorTexture()) {
         scope.$l.specularColor = pb.mul(specularFactor.rgb, this.sampleSpecularColorTexture(scope).rgb);
       } else {
         scope.$l.specularColor = specularFactor.rgb;
       }
-      if (this.specularTexture) {
+      if (this.hasSpecularTexture()) {
         data.specularWeight = pb.mul(specularFactor.a, this.sampleSpecularTexture(scope).a);
       } else {
         data.specularWeight = specularFactor.a;

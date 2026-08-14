@@ -2,6 +2,7 @@ import { DRef, Vector4 } from '@zephyr3d/base';
 import { type BluePrintUniformTexture, type BluePrintUniformValue } from '../utility/blueprint/material/ir';
 import { SpriteBlockNode } from '../utility/blueprint/material/pbr';
 import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
+import { getDefaultTexture2D } from '../utility/blueprint/material/texture';
 import { SpriteMaterial } from './sprite';
 import type { BindGroup, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
@@ -89,6 +90,7 @@ export class SpriteBlueprintMaterial extends SpriteMaterial {
     val = val ?? [];
     if (val !== this._uniformTextures) {
       const newUniforms = val.map((v) => ({
+        exposed: v.exposed ?? true,
         finalTexture: new DRef(v.finalTexture!.get()),
         finalSampler: v.finalSampler,
         name: v.name,
@@ -147,7 +149,7 @@ export class SpriteBlueprintMaterial extends SpriteMaterial {
         bindGroup.setValue(u.name, u.finalValue!);
       }
       for (const u of this._uniformTextures) {
-        bindGroup.setTexture(u.name, u.finalTexture!.get()!, u.finalSampler);
+        bindGroup.setTexture(u.name, u.finalTexture?.get() ?? getDefaultTexture2D(), u.finalSampler);
       }
     }
   }
@@ -168,6 +170,13 @@ export class SpriteBlueprintMaterial extends SpriteMaterial {
    */
   protected calcFragmentColor(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
+    for (const u of this._uniformTextures) {
+      if (!pb.getGlobalScope()[u.name]) {
+        // @ts-ignore dynamic shader type constructor
+        const exp = pb[u.type]().uniform(2);
+        pb.getGlobalScope()[u.name] = exp;
+      }
+    }
     const that = this;
     pb.func('zCalcSpriteColor', [pb.vec3('zWorldPos'), pb.vec2('zVertexUV')], function () {
       const outputs = that._irFrag.create(pb)!;

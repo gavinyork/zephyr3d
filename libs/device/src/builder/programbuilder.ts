@@ -1002,6 +1002,8 @@ export interface ProgramBuilder {
   textureNumSamples(tex: PBShaderExp): PBShaderExp;
   /** Same as textureSample builtin function in WebGPU and texture/texture2D/textureCube builtin function in GLSL */
   textureSample(tex: PBShaderExp, coords: number | PBShaderExp): PBShaderExp;
+  /** Same as textureSample builtin function in WebGPU with explicit sampler */
+  textureSample(tex: PBShaderExp, sampler: PBShaderExp, coords: number | PBShaderExp): PBShaderExp;
   /** Same as textureSample builtin function in WebGPU and texture builtin function in GLSL, only valid for WebGL2 and WebGPU device */
   textureArraySample(tex: PBShaderExp, coords: PBShaderExp, arrayIndex: number | PBShaderExp): PBShaderExp;
   /** Same as textureSampleBias builtin function in WebGPU and texture/texture2D/textureCube builtin function in GLSL */
@@ -1321,19 +1323,20 @@ export class ProgramBuilder {
    */
   buildRenderProgram(options: PBRenderOptions): Nullable<GPUProgram> {
     const ret = this.buildRender(options);
-    return ret
-      ? this._device.createGPUProgram({
-          type: 'render',
-          label: options.label,
-          params: {
-            vs: ret[0],
-            fs: ret[1],
-            fragmentOutputCount: ret[4],
-            bindGroupLayouts: ret[2],
-            vertexAttributes: ret[3]
-          }
-        })
-      : null;
+    if (!ret) {
+      return null;
+    }
+    return this._device.createGPUProgram({
+      type: 'render',
+      label: options.label,
+      params: {
+        vs: ret[0],
+        fs: ret[1],
+        fragmentOutputCount: ret[4],
+        bindGroupLayouts: ret[2],
+        vertexAttributes: ret[3]
+      }
+    });
   }
   /**
    * Creates a shader program for compute
@@ -2175,7 +2178,6 @@ export class ProgramBuilder {
       }
     }
   }
-  /** @internal */
   private generate(body?: (this: PBGlobalScope, pb: ProgramBuilder) => void): void {
     this.pushScope(this._globalScope!);
     if (this._emulateDepthClamp && this._shaderType === ShaderType.Vertex) {

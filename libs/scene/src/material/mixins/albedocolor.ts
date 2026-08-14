@@ -65,7 +65,7 @@ function mixinAlbedoColor<T extends typeof MeshMaterial>(BaseCls: T) {
         return pb.vec4(1);
       }
       let color = this.getUniformValueAlbedoColor(scope);
-      if (this.albedoTexture) {
+      if (this.hasAlbedoTexture()) {
         color = pb.mul(color, this.sampleAlbedoTexture(scope, uv));
       }
       return color;

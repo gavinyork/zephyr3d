@@ -257,6 +257,7 @@ async function startDevServer() {
       {
         cwd: projectRoot,
         stdio: ['inherit', 'pipe', 'pipe'],
+        windowsHide: true,
         env: {
           ...process.env,
           BROWSER: 'none'

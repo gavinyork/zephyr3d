@@ -241,7 +241,7 @@ export function mixinPBRSpecularGlossness<T extends typeof MeshMaterial>(BaseCls
       const instancing = !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING);
       const specularFactor = instancing ? scope.$inputs.zSpecularFactor : scope.zSpecularFactor;
       const glossinessFactor = instancing ? scope.$inputs.zGlossinessFactor : scope.zGlossinessFactor;
-      if (this.specularTexture) {
+      if (this.hasSpecularTexture()) {
         scope.$l.specularTextureSample = this.sampleSpecularTexture(scope);
         data.roughness = pb.sub(1, pb.mul(glossinessFactor, scope.specularTextureSample.a));
         data.f0 = pb.vec4(pb.mul(scope.specularTextureSample.rgb, specularFactor), this.getF0(scope).a);

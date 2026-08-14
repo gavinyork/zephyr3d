@@ -33,14 +33,20 @@ export interface FbxObjectMap {
   [type: string]: Map<number, FbxNode>;
 }
 
+export interface FbxGlobalSettings {
+  unitScaleFactor?: number;
+}
+
 export interface FbxDocument {
   version: number;
   root: FbxNode;
   objects: FbxObjectMap;
   connections: FbxConnection[];
+  globalSettings: FbxGlobalSettings;
 }
 
 export interface FbxLayerElementData<T extends Float32Array | Int32Array | Uint32Array> {
+  name?: string;
   mapping: string;
   reference: string;
   data: T;
@@ -114,6 +120,22 @@ export interface FbxSkinData {
   clusters: FbxClusterData[];
 }
 
+export interface FbxShapeData {
+  id: number;
+  name: string;
+  indices: Int32Array;
+  vertices: Float64Array;
+  normals?: Float64Array | null;
+}
+
+export interface FbxBlendShapeChannelData {
+  id: number;
+  name: string;
+  fullWeights: number[];
+  deformPercent: number;
+  shape: FbxShapeData | null;
+}
+
 export interface FbxModelData {
   id: number;
   name: string;
@@ -121,6 +143,31 @@ export interface FbxModelData {
   parentId: number | null;
   children: number[];
   transform: FbxTransformData;
+}
+
+export interface FbxAnimStackData {
+  id: number;
+  name: string;
+}
+
+export interface FbxAnimLayerData {
+  id: number;
+  name: string;
+}
+
+export interface FbxAnimCurveData {
+  id: number;
+  name: string;
+  keyTimes: number[];
+  keyValues: number[];
+}
+
+export interface FbxAnimCurveNodeData {
+  id: number;
+  name: string;
+  targetModelId: number | null;
+  targetProperty: string;
+  curveIds: [number | null, number | null, number | null];
 }
 
 export interface FbxGeometryData {
@@ -134,6 +181,7 @@ export interface FbxGeometryData {
   uvLayers: FbxLayerElementData<Float32Array>[];
   materialLayer?: FbxLayerElementData<Int32Array> | null;
   skin?: FbxSkinData | null;
+  morphTargets?: FbxBlendShapeChannelData[] | null;
 }
 
 export interface FbxPrimitiveBuildData {
@@ -145,6 +193,11 @@ export interface FbxPrimitiveBuildData {
   rawPositions: Float32Array;
   rawBlendIndices?: Uint16Array | null;
   rawJointWeights?: Float32Array | null;
+  rawSkinInfluenceCount?: number;
   materialIndex: number;
   name: string;
+  numTargets?: number;
+  targets?: Partial<Record<number, { numComponents: number; data: Float32Array[]; indices?: Uint32Array[] }>>;
+  targetBox?: { min: [number, number, number]; max: [number, number, number] }[];
+  morphAttribCount?: number;
 }

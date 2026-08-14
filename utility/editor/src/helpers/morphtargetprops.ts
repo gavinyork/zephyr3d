@@ -15,6 +15,7 @@ export function getMorphTargetGroupPropertyAccessors(object: unknown): PropertyA
       type: 'float',
       options: {
         group: 'Morph Target Groups',
+        defaultOpen: false,
         minValue: 0,
         maxValue: 1,
         speed: 0.01

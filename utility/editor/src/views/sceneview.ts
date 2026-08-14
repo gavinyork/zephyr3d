@@ -44,7 +44,7 @@ import type { ToolBarItem } from '../components/toolbar';
 import { FontGlyph } from '../core/fontglyph';
 import type { AABB, GenericConstructor, Interpolator, Nullable } from '@zephyr3d/base';
 import { mimeTypeOf, Vector4 } from '@zephyr3d/base';
-import { DRef, HttpFS } from '@zephyr3d/base';
+import { DRef, HttpFS, PathUtils } from '@zephyr3d/base';
 import { ASSERT, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { TRS } from '../types';
 import { Dialog } from './dlg/dlg';
@@ -60,6 +60,7 @@ import {
   AddChildCommand,
   AddPrefabCommand,
   AddShapeCommand,
+  BatchNodeDeleteCommand,
   PropertyEditCommand,
   NodeCloneCommand,
   NodeDeleteCommand,
@@ -84,7 +85,10 @@ import { DialogRenderer } from '../components/modal';
 import { DlgEditColorTrack } from './dlg/editcolortrackdlg';
 import { DlgCurveEditor } from './dlg/curveeditordlg';
 import { BottomView } from '../components/bottomview';
-import type { VFSRendererAssetPickerPayload } from '../components/vfsrenderer';
+import type {
+  VFSRendererAssetPickerPayload,
+  VFSRendererSceneNodeDropPayload
+} from '../components/vfsrenderer';
 import { ProjectService } from '../core/services/project';
 import type { SceneController } from '../controllers/scenecontroller';
 import { EditorCameraController } from '../helpers/editorcontroller';
@@ -179,6 +183,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _springBone: JointDynamicsModifier;
   private _propGridScrollTopFrames: number;
   private _assetPlacementLoadingCount: number;
+  private _busyTaskCount: number;
+  private _busyStatusText: string;
   constructor(controller: SceneController) {
     super(controller);
     this._cmdManager = new CommandManager();
@@ -210,6 +216,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._springBone = null;
     this._propGridScrollTopFrames = 0;
     this._assetPlacementLoadingCount = 0;
+    this._busyTaskCount = 0;
+    this._busyStatusText = '';
     this._currentEditTool = new DRef();
     this._cameraAnimationEyeFrom = new Vector3();
     this._cameraAnimationTargetFrom = new Vector3();
@@ -291,7 +299,21 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     return this._cmdManager;
   }
   get busy() {
-    return this._cmdManager.busy || this._assetPlacementLoadingCount > 0;
+    return this._cmdManager.busy || this._assetPlacementLoadingCount > 0 || this._busyTaskCount > 0;
+  }
+  beginBusyTask(statusText: string) {
+    this._busyTaskCount++;
+    this._busyStatusText = statusText?.trim() ?? '';
+    this._statusbar.setStatus(this._busyStatusText);
+  }
+  endBusyTask(statusText?: string) {
+    this._busyTaskCount = Math.max(0, this._busyTaskCount - 1);
+    if (this._busyTaskCount === 0) {
+      this._busyStatusText = '';
+    } else if (statusText !== undefined) {
+      this._busyStatusText = statusText?.trim() ?? this._busyStatusText;
+    }
+    this._statusbar.setStatus(this._busyStatusText);
   }
   get editToolContext() {
     return this._editToolContext;
@@ -1593,11 +1615,15 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this.registerShortcut('Ctrl+D', () => {
       return this.handleDuplicateShortcut();
     });
+    this.registerShortcut('F2', () => {
+      return this.handleAssetRenameShortcut();
+    });
     this._toolbar.on('action', this.handleSceneAction, this);
     this.editor.plugins.on('pluginContributionsChanged', this.refreshPluginContributions, this);
     eventBus.on('refresh_properties', this.handleRefreshProperties, this);
     this._assetView.renderer.on('selection_changed', this.handleAssetSelectionChanged, this);
     this._assetView.renderer.on('asset_picker_drop', this.handleAssetPickerDrop, this);
+    this._assetView.renderer.on('scene_node_drop', this.handleSceneNodeDropToAssets, this);
     this._propGrid.on('object_property_changed', this.handleObjectPropertyChanged, this);
     this._propGrid.on('object_property_edit_finished', this.handleObjectPropertyEditFinished, this);
     this._propGrid.on('request_edit_aabb', this.editAABB, this);
@@ -1622,6 +1648,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     super.onDeactivate();
     this._assetView?.renderer.off('selection_changed', this.handleAssetSelectionChanged, this);
     this._assetView?.renderer.off('asset_picker_drop', this.handleAssetPickerDrop, this);
+    this._assetView?.renderer.off('scene_node_drop', this.handleSceneNodeDropToAssets, this);
     this._assetView?.dispose();
     this._assetView = null;
     this._menubar.unregisterShortcuts(this);
@@ -2562,11 +2589,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       return;
     }
     const commands: NodeDeleteCommand[] = [];
+    const preparedNodes: SceneNode[] = [];
     for (const node of selectedNodes) {
       if (node?.parent) {
         const command = this.prepareDeleteNodeCommand(node);
         if (command) {
           commands.push(command);
+          preparedNodes.push(node);
         }
       }
     }
@@ -2576,7 +2605,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (commands.length === 1) {
       await this._cmdManager.execute(commands[0]);
     } else {
-      await this._cmdManager.execute(new CompositeCommand('Delete nodes', commands));
+      await this._cmdManager.execute(new BatchNodeDeleteCommand(preparedNodes));
     }
     eventBus.dispatchEvent('scene_changed');
   }
@@ -2853,6 +2882,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
   }
   private handleDuplicateShortcut(): boolean {
+    if (Dialog.duplicateFocusedBlueprintSelection()) {
+      return true;
+    }
     const selectedNodes = this.getSelectedSceneNodes();
     const assetRenderer = this._assetView?.renderer;
     if (this._lastDuplicateTarget === 'asset' && assetRenderer) {
@@ -2874,6 +2906,17 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       return true;
     }
     return false;
+  }
+  private handleAssetRenameShortcut(): boolean {
+    if (ImGui.GetIO().WantTextInput) {
+      return false;
+    }
+    const assetRenderer = this._assetView?.renderer;
+    if (!assetRenderer || assetRenderer.selectedItems.size !== 1) {
+      return false;
+    }
+    assetRenderer.renameSelectedItem();
+    return true;
   }
   private handleNodeDragDrop(src: SceneNode, dst: SceneNode) {
     const dragNodes = this.getHierarchyDragSelection(src, dst);
@@ -2921,6 +2964,19 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._propGrid.refresh();
       this.handleObjectPropertyChanged(payload.object, payload.prop);
     });
+  }
+  private handleSceneNodeDropToAssets(payload: VFSRendererSceneNodeDropPayload, targetDir: string) {
+    const node = payload?.node ?? null;
+    if (!node || !targetDir) {
+      return;
+    }
+    const rawName = (node.name || 'Prefab').trim() || 'Prefab';
+    const sanitizedName = PathUtils.sanitizeFilename(rawName);
+    if (!sanitizedName) {
+      DlgMessage.messageBox('Error', 'Invalid prefab name');
+      return;
+    }
+    void this.savePrefabNodeToDirectory(node, targetDir, sanitizedName, false);
   }
   private handleNodeDoubleClicked(node: SceneNode) {
     this.lookAt(this.controller.model.scene.mainCamera!, node);
@@ -3023,18 +3079,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     });
   }
   private handleSavePrefab(node: SceneNode) {
-    let hasTerrain = false;
-    node.iterate((node) => {
-      if (node.isClipmapTerrain()) {
-        hasTerrain = true;
-        return true;
-      }
-      return false;
-    });
-    if (hasTerrain) {
-      DlgMessage.messageBox('Error', 'Terrain node cannot be saved as prefab');
-      return;
-    }
     DlgSaveFile.saveFile(
       'Save Prefab',
       getEngine().VFS,
@@ -3044,14 +3088,50 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       400
     ).then((name) => {
       if (name) {
-        ResourceService.savePrefabNode(
+        void this.savePrefabNodeToDirectory(
           node,
-          getEngine().resourceManager,
           getEngine().VFS.dirname(name),
-          getEngine().VFS.basename(name)
+          getEngine().VFS.basename(name),
+          true
         );
       }
     });
+  }
+  private hasTerrainInNode(node: SceneNode) {
+    let hasTerrain = false;
+    node.iterate((child) => {
+      if (child.isClipmapTerrain()) {
+        hasTerrain = true;
+        return true;
+      }
+      return false;
+    });
+    return hasTerrain;
+  }
+  private async savePrefabNodeToDirectory(
+    node: SceneNode,
+    targetDir: string,
+    name: string,
+    preserveUserName: boolean
+  ) {
+    if (this.hasTerrainInNode(node)) {
+      DlgMessage.messageBox('Error', 'Terrain node cannot be saved as prefab');
+      return;
+    }
+    const finalName = preserveUserName
+      ? name
+      : name.toLowerCase().endsWith('.zprefab')
+        ? name
+        : `${name}.zprefab`;
+    this.beginBusyTask('Creating prefab...');
+    try {
+      await ResourceService.savePrefabNode(node, getEngine().resourceManager, targetDir, finalName);
+      eventBus.dispatchEvent('reveal_asset', ProjectService.VFS.join(targetDir, finalName));
+    } catch (err) {
+      DlgMessage.messageBox('Error', `Create prefab failed: ${err}`);
+    } finally {
+      this.endBusyTask();
+    }
   }
   private handleNodeRemoved(node: SceneNode) {
     this._sceneHierarchy?.refreshStructure();

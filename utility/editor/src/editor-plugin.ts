@@ -24,6 +24,7 @@ export type {
   EditorPluginPanelLocation,
   EditorPluginContext,
   EditorProjectInfo,
+  EditorProjectAssetChange,
   EditorSceneContext,
   EditorPluginBooleanSetting,
   EditorPluginNumberSetting,

@@ -78,16 +78,19 @@ export enum HumanoidHandRig {
  */
 export interface SkinnedBoundingBox {
   /**
+   * Number of influences stored per representative vertex.
+   */
+  influenceCount?: number;
+  /**
    * Representative vertices used to bound a skinned mesh (extreme points along axes).
    */
   boundingVertices: Vector3[];
   /**
-   * Joint indices (up to 4 per vertex) for each representative vertex, flattened.
-   * Layout: [i0_0, i0_1, i0_2, i0_3, i1_0, ...] for 6 vertices.
+   * Joint indices for each representative vertex, flattened.
    */
   boundingVertexBlendIndices: Float32Array;
   /**
-   * Corresponding joint weights (up to 4 per vertex) for each representative vertex, flattened.
+   * Corresponding joint weights for each representative vertex, flattened.
    * Layout matches `boundingVertexBlendIndices`.
    */
   boundingVertexJointWeights: Float32Array;
@@ -99,8 +102,6 @@ export interface SkinnedBoundingBox {
 
 const tmpV0 = new Vector3();
 const tmpV1 = new Vector3();
-const tmpV2 = new Vector3();
-const tmpV3 = new Vector3();
 
 /**
  * Humanoid joint mapping
@@ -629,20 +630,25 @@ export class SkinBinding extends Disposable {
    */
   computeBoundingBox(info: SkinnedBoundingBox, invWorldMatrix: Matrix4x4) {
     info.boundingBox.beginExtend();
+    const influenceCount = Math.max(1, info.influenceCount ?? 4);
     for (let i = 0; i < info.boundingVertices.length; i++) {
-      this._jointMatrices[info.boundingVertexBlendIndices[i * 4 + 0] + this._jointOffsets[0] - 1]
-        .transformPointAffine(info.boundingVertices[i], tmpV0)
-        .scaleBy(info.boundingVertexJointWeights[i * 4 + 0]);
-      this._jointMatrices[info.boundingVertexBlendIndices[i * 4 + 1] + this._jointOffsets[0] - 1]
-        .transformPointAffine(info.boundingVertices[i], tmpV1)
-        .scaleBy(info.boundingVertexJointWeights[i * 4 + 1]);
-      this._jointMatrices[info.boundingVertexBlendIndices[i * 4 + 2] + this._jointOffsets[0] - 1]
-        .transformPointAffine(info.boundingVertices[i], tmpV2)
-        .scaleBy(info.boundingVertexJointWeights[i * 4 + 2]);
-      this._jointMatrices[info.boundingVertexBlendIndices[i * 4 + 3] + this._jointOffsets[0] - 1]
-        .transformPointAffine(info.boundingVertices[i], tmpV3)
-        .scaleBy(info.boundingVertexJointWeights[i * 4 + 3]);
-      tmpV0.addBy(tmpV1).addBy(tmpV2).addBy(tmpV3);
+      tmpV0.setXYZ(0, 0, 0);
+      const base = i * influenceCount;
+      for (let j = 0; j < influenceCount; j++) {
+        const weight = Number(info.boundingVertexJointWeights[base + j]) || 0;
+        if (weight <= 0) {
+          continue;
+        }
+        const matrix =
+          this._jointMatrices[
+            (Number(info.boundingVertexBlendIndices[base + j]) || 0) + this._jointOffsets[0] - 1
+          ];
+        if (!matrix) {
+          continue;
+        }
+        matrix.transformPointAffine(info.boundingVertices[i], tmpV1).scaleBy(weight);
+        tmpV0.addBy(tmpV1);
+      }
       invWorldMatrix.transformPointAffine(tmpV0, tmpV0);
       info.boundingBox.extend(tmpV0);
     }
@@ -711,7 +717,12 @@ export class SkinBinding extends Disposable {
    * @param meshData - Raw submesh attributes (positions, blend indices, weights).
    * @returns Skinned bounding box info used during per-frame updates.
    */
-  getBoundingInfo(data: { positions: Float32Array; blendIndices: TypedArray; weights: TypedArray }) {
+  getBoundingInfo(data: {
+    positions: Float32Array;
+    blendIndices: TypedArray;
+    weights: TypedArray;
+    influenceCount?: number;
+  }) {
     const indices = [0, 0, 0, 0, 0, 0];
     let minx = Number.MAX_VALUE;
     let maxx = -Number.MAX_VALUE;
@@ -723,24 +734,25 @@ export class SkinBinding extends Disposable {
     const vert = new Vector3();
     const tmpV0 = new Vector3();
     const tmpV1 = new Vector3();
-    const tmpV2 = new Vector3();
-    const tmpV3 = new Vector3();
     const numVertices = Math.floor(v.length / 3);
+    const influenceCount = Math.max(1, data.influenceCount ?? 4);
     for (let i = 0; i < numVertices; i++) {
       vert.setXYZ(v[i * 3], v[i * 3 + 1], v[i * 3 + 2]);
-      this._jointMatrices[data.blendIndices[i * 4 + 0] + this._jointOffsets[0] - 1]
-        .transformPointAffine(vert, tmpV0)
-        .scaleBy(data.weights[i * 4 + 0]);
-      this._jointMatrices[data.blendIndices[i * 4 + 1] + this._jointOffsets[0] - 1]
-        .transformPointAffine(vert, tmpV1)
-        .scaleBy(data.weights[i * 4 + 1]);
-      this._jointMatrices[data.blendIndices[i * 4 + 2] + this._jointOffsets[0] - 1]
-        .transformPointAffine(vert, tmpV2)
-        .scaleBy(data.weights[i * 4 + 2]);
-      this._jointMatrices[data.blendIndices[i * 4 + 3] + this._jointOffsets[0] - 1]
-        .transformPointAffine(vert, tmpV3)
-        .scaleBy(data.weights[i * 4 + 3]);
-      tmpV0.addBy(tmpV1).addBy(tmpV2).addBy(tmpV3);
+      tmpV0.setXYZ(0, 0, 0);
+      const base = i * influenceCount;
+      for (let j = 0; j < influenceCount; j++) {
+        const weight = Number(data.weights[base + j]) || 0;
+        if (weight <= 0) {
+          continue;
+        }
+        const matrix =
+          this._jointMatrices[(Number(data.blendIndices[base + j]) || 0) + this._jointOffsets[0] - 1];
+        if (!matrix) {
+          continue;
+        }
+        matrix.transformPointAffine(vert, tmpV1).scaleBy(weight);
+        tmpV0.addBy(tmpV1);
+      }
       if (tmpV0.x < minx) {
         minx = tmpV0.x;
         indices[0] = i;
@@ -767,13 +779,22 @@ export class SkinBinding extends Disposable {
       }
     }
     const info: SkinnedBoundingBox = {
+      influenceCount,
       boundingVertexBlendIndices: new Float32Array(
-        Array.from({ length: 6 * 4 }).map(
-          (val, index) => data.blendIndices[indices[index >> 2] * 4 + (index % 4)]
+        Array.from({ length: 6 * influenceCount }).map(
+          (val, index) =>
+            data.blendIndices[
+              indices[Math.floor(index / influenceCount)] * influenceCount + (index % influenceCount)
+            ]
         )
       ),
       boundingVertexJointWeights: new Float32Array(
-        Array.from({ length: 6 * 4 }).map((val, index) => data.weights[indices[index >> 2] * 4 + (index % 4)])
+        Array.from({ length: 6 * influenceCount }).map(
+          (val, index) =>
+            data.weights[
+              indices[Math.floor(index / influenceCount)] * influenceCount + (index % influenceCount)
+            ]
+        )
       ),
       boundingVertices: Array.from({ length: 6 }).map(
         (val, index) =>
@@ -806,10 +827,16 @@ export class SkinBinding extends Disposable {
     blendIndices: ArrayLike<number>,
     weights: ArrayLike<number>,
     invWorldMatrix: Matrix4x4,
-    out?: Float32Array<ArrayBuffer>
+    out?: Float32Array<ArrayBuffer>,
+    influenceCount?: number
   ) {
     const result = out && out.length === positions.length ? out : new Float32Array(positions.length);
     const matrixOffset = this._jointOffsets[0] - 1;
+    const effectiveInfluenceCount = Math.max(
+      1,
+      influenceCount ??
+        Math.max(1, Math.floor(weights.length / Math.max(1, Math.floor(positions.length / 3))))
+    );
     for (let i = 0; i + 2 < positions.length; i += 3) {
       const vertexIndex = (i / 3) >> 0;
       const x = positions[i];
@@ -819,12 +846,13 @@ export class SkinBinding extends Disposable {
       let skinnedY = 0;
       let skinnedZ = 0;
       let weightSum = 0;
-      for (let j = 0; j < 4; j++) {
-        const weight = Number(weights[vertexIndex * 4 + j]) || 0;
+      const base = vertexIndex * effectiveInfluenceCount;
+      for (let j = 0; j < effectiveInfluenceCount; j++) {
+        const weight = Number(weights[base + j]) || 0;
         if (weight <= 0) {
           continue;
         }
-        const jointIndex = (Number(blendIndices[vertexIndex * 4 + j]) || 0) + matrixOffset;
+        const jointIndex = (Number(blendIndices[base + j]) || 0) + matrixOffset;
         const matrix = this._jointMatrices[jointIndex];
         if (!matrix) {
           continue;
@@ -1569,7 +1597,8 @@ export class SkinBinding extends Disposable {
       [HumanoidBodyRig.LeftFoot]: sideJointPatterns('left', [{ all: ['foot'], none: ['toe'] }]),
       [HumanoidBodyRig.LeftToes]: sideJointPatterns('left', [
         { all: ['toe', '0'] },
-        { all: ['toe'], none: ['end'] }
+        { all: ['toe'], none: ['end'] },
+        { all: ['ball'] }
       ]),
       [HumanoidBodyRig.RightUpperLeg]: sideJointPatterns('right', [
         { all: ['thigh'] },
@@ -1584,7 +1613,8 @@ export class SkinBinding extends Disposable {
       [HumanoidBodyRig.RightFoot]: sideJointPatterns('right', [{ all: ['foot'], none: ['toe'] }]),
       [HumanoidBodyRig.RightToes]: sideJointPatterns('right', [
         { all: ['toe', '0'] },
-        { all: ['toe'], none: ['end'] }
+        { all: ['toe'], none: ['end'] },
+        { all: ['ball'] }
       ])
     };
   }

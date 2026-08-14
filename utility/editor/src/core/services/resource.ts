@@ -10,15 +10,50 @@ export type SaveOptions = {
   importJointDynamics: boolean;
   rebuildPrefab?: boolean;
   rebuildMaterial?: boolean;
+  sourceReference?: boolean;
+  sourceModelPath?: string;
 };
 
 type SharedModelWithPreprocessOptions = SharedModel & {
   _preprocessOptions?: {
     rebuildMaterial?: boolean;
+    sourceMorphReferenceAssetPath?: string;
   };
 };
 
 export class ResourceService {
+  private static modelHasMorphTargets(model: SharedModel) {
+    return model.nodes.some((node) => node.mesh?.subMeshes?.some((subMesh) => subMesh.numTargets > 0));
+  }
+  private static async prepareSourceMorphReference(
+    model: SharedModel,
+    manager: ResourceManager,
+    path: string,
+    srcVFS: VFS,
+    saveOptions?: SaveOptions
+  ) {
+    if (
+      !saveOptions?.sourceReference ||
+      !saveOptions.sourceModelPath ||
+      !ResourceService.modelHasMorphTargets(model)
+    ) {
+      return null;
+    }
+    const sourceModelPath = saveOptions.sourceModelPath;
+    const mimeType = srcVFS.guessMIMEType(sourceModelPath);
+    if (mimeType !== 'model/gltf-binary' && mimeType !== 'model/fbx') {
+      console.info(
+        `Skip source morph reference for ${sourceModelPath}: only single-file GLB/VRM/FBX sources are supported`
+      );
+      return null;
+    }
+    const targetSourcePath = manager.VFS.join(path, PathUtils.basename(sourceModelPath));
+    await srcVFS.copyFile(sourceModelPath, targetSourcePath, {
+      overwrite: true,
+      targetVFS: manager.VFS
+    });
+    return manager.VFS.normalizePath(targetSourcePath);
+  }
   static async importModel(srcVFS: VFS, path: string): Promise<SharedModel> {
     const mimeType = srcVFS.guessMIMEType(path);
     let loader: AbstractModelImporter = null;
@@ -72,45 +107,56 @@ export class ResourceService {
     srcVFS: VFS,
     saveOptions?: SaveOptions
   ) {
+    const sourceMorphReferenceAssetPath = await ResourceService.prepareSourceMorphReference(
+      model,
+      manager,
+      path,
+      srcVFS,
+      saveOptions
+    );
     const modelWithOptions = model as SharedModelWithPreprocessOptions;
     modelWithOptions._preprocessOptions = {
-      rebuildMaterial: saveOptions?.rebuildMaterial ?? true
+      rebuildMaterial: saveOptions?.rebuildMaterial ?? true,
+      sourceMorphReferenceAssetPath: sourceMorphReferenceAssetPath ?? undefined
     };
     try {
       await model.preprocess(manager, name, path, srcVFS, getEngine().resourceManager.VFS);
+      const prefabName = name.endsWith('.zprefab') ? name : `${name}.zprefab`;
+      const prefabPath = manager.VFS.join(path, prefabName);
+      if (!saveOptions?.rebuildPrefab && (await manager.VFS.exists(prefabPath))) {
+        console.info(
+          `Prefab already exists, keep existing prefab and refresh referenced assets only: ${prefabPath}`
+        );
+        return;
+      }
+      const saveMeshes = saveOptions?.importMeshes ?? true;
+      const saveSkeletons = saveOptions?.importSkeletons ?? true;
+      const saveAnimations = saveOptions?.importAnimations ?? true;
+      const saveJointDynamics = saveOptions?.importJointDynamics ?? true;
+      const tmpScene = new Scene();
+      try {
+        const node = await model.createSceneNode(
+          manager,
+          tmpScene,
+          false,
+          saveMeshes,
+          saveSkeletons,
+          saveAnimations,
+          saveJointDynamics,
+          getEngine().resourceManager.VFS
+        );
+        const numSkeletons = node.animationSet?.skeletons?.length ?? 0;
+        const numAnimations = node.animationSet?.getAnimationNames().length ?? 0;
+        await ResourceService.saveNodeToPrefab(node, manager, path, name);
+        console.info(
+          `Successfully created prefab with ${numSkeletons} skeletons and ${numAnimations} animations: ${path}`
+        );
+      } finally {
+        tmpScene.dispose();
+      }
     } finally {
       delete modelWithOptions._preprocessOptions;
     }
-    const prefabName = name.endsWith('.zprefab') ? name : `${name}.zprefab`;
-    const prefabPath = manager.VFS.join(path, prefabName);
-    if (!saveOptions?.rebuildPrefab && (await manager.VFS.exists(prefabPath))) {
-      console.info(
-        `Prefab already exists, keep existing prefab and refresh referenced assets only: ${prefabPath}`
-      );
-      return;
-    }
-    const saveMeshes = saveOptions?.importMeshes ?? true;
-    const saveSkeletons = saveOptions?.importSkeletons ?? true;
-    const saveAnimations = saveOptions?.importAnimations ?? true;
-    const saveJointDynamics = saveOptions?.importJointDynamics ?? true;
-    const tmpScene = new Scene();
-    const node = await model.createSceneNode(
-      manager,
-      tmpScene,
-      false,
-      saveMeshes,
-      saveSkeletons,
-      saveAnimations,
-      saveJointDynamics,
-      getEngine().resourceManager.VFS
-    );
-    const numSkeletons = node.animationSet?.skeletons?.length ?? 0;
-    const numAnimations = node.animationSet?.getAnimationNames().length ?? 0;
-    await ResourceService.saveNodeToPrefab(node, manager, path, name);
-    tmpScene.dispose();
-    console.info(
-      `Successfully created prefab with ${numSkeletons} skeletons and ${numAnimations} animations: ${path}`
-    );
   }
   static async saveNodeToPrefab(
     node: SceneNode,

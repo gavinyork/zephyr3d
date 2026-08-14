@@ -33,7 +33,12 @@ import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
 import { getDevice, getEngine } from '../app/api';
-import { Material, PBRBluePrintMaterial, SpriteBlueprintMaterial } from '../material';
+import {
+  Material,
+  PBRBluePrintMaterial,
+  PBRBluePrintMaterialInstance,
+  SpriteBlueprintMaterial
+} from '../material';
 import type {
   BluePrintEditorState,
   BluePrintUniformTexture,
@@ -45,6 +50,7 @@ import type {
 } from '../utility';
 import { BoundingBox } from '../utility/bounding_volume';
 import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
+import { getDefaultTexture2D } from '../utility/blueprint/material/texture';
 import type { Skeleton } from '../animation';
 import { Primitive } from '../render';
 import { FontAsset } from '../text';
@@ -174,6 +180,18 @@ export interface ModelLoader {
   loadModel(path: string, vfs?: VFS): Promise<SharedModel>;
 }
 
+type AssetCacheKind =
+  | 'texture'
+  | 'model'
+  | 'binary'
+  | 'font'
+  | 'text'
+  | 'blueprint'
+  | 'material'
+  | 'primitive'
+  | 'skeleton'
+  | 'json';
+
 /**
  * Centralized asset manager for loading and caching resources.
  *
@@ -250,6 +268,10 @@ export class AssetManager {
     [url: string]: Promise<any>;
   };
   /** @internal */
+  private readonly _cacheKeysByPath: Map<string, Set<string>>;
+  /** @internal */
+  private readonly _cachePathByKey: Map<string, string>;
+  /** @internal */
   private readonly _resourceManager: ResourceManager;
   /**
    * Creates an instance of AssetManager
@@ -266,6 +288,8 @@ export class AssetManager {
     this._fontAssets = {};
     this._textDatas = {};
     this._jsonDatas = {};
+    this._cacheKeysByPath = new Map();
+    this._cachePathByKey = new Map();
   }
   /**
    * VFS used to read resources (files, URLs, virtual mounts).
@@ -282,45 +306,154 @@ export class AssetManager {
    *   if no other owners are holding them.
    */
   clearCache() {
-    for (const k in Object.keys(this._textures)) {
-      const v = this._textures[k];
-      if (v instanceof DWeakRef) {
-        v.dispose();
-      }
-    }
+    this.clearCacheEntries(this._textures);
     this._textures = {};
-    for (const k in Object.keys(this._models)) {
-      const v = this._models[k];
-      if (v instanceof DWeakRef) {
-        v.dispose();
-      }
-    }
+    this.clearCacheEntries(this._models);
     this._models = {};
-    for (const k in Object.keys(this._materials)) {
-      const v = this._materials[k];
-      if (v instanceof DWeakRef) {
-        v.dispose();
-      }
-    }
+    this.clearCacheEntries(this._materials);
     this._materials = {};
-    for (const k in Object.keys(this._primitives)) {
-      const v = this._primitives[k];
-      if (v instanceof DWeakRef) {
-        v.dispose();
-      }
-    }
+    this.clearCacheEntries(this._primitives);
     this._primitives = {};
-    for (const k in Object.keys(this._skeletons)) {
-      const v = this._skeletons[k];
-      if (v instanceof DWeakRef) {
-        v.dispose();
-      }
-    }
+    this.clearCacheEntries(this._skeletons);
     this._skeletons = {};
+    this._bluePrints = {};
     this._fontAssets = {};
     this._binaryDatas = {};
     this._textDatas = {};
     this._jsonDatas = {};
+    this._cacheKeysByPath.clear();
+    this._cachePathByKey.clear();
+  }
+  /**
+   * Evicts cached data loaded from a VFS path.
+   *
+   * Existing scene objects keep their current resources. Subsequent loads read the asset again.
+   *
+   * @param path - Changed VFS file or directory path.
+   * @param recursive - Whether entries below a directory path should also be evicted.
+   * @returns Number of cache entries removed.
+   */
+  invalidateAsset(path: string, recursive = false) {
+    const normalizedPath = this.vfs.normalizePath(path);
+    let removed = 0;
+    const indexedPaths = recursive
+      ? [...this._cacheKeysByPath.keys()].filter((sourcePath) =>
+          this.cachePathMatches(sourcePath, normalizedPath, true)
+        )
+      : [normalizedPath];
+    for (const sourcePath of indexedPaths) {
+      const tokens = this._cacheKeysByPath.get(sourcePath);
+      if (!tokens) {
+        continue;
+      }
+      for (const token of [...tokens]) {
+        const separator = token.indexOf('\0');
+        const kind = token.slice(0, separator) as AssetCacheKind;
+        const key = token.slice(separator + 1);
+        if (this.removeCacheEntry(kind, key)) {
+          removed++;
+        }
+      }
+    }
+    return removed;
+  }
+  private clearCacheEntries<T>(cache: Record<string, T>, matches: (key: string) => boolean = () => true) {
+    let removed = 0;
+    for (const key of Object.keys(cache)) {
+      if (!matches(key)) {
+        continue;
+      }
+      const cached = cache[key];
+      if (cached instanceof DWeakRef) {
+        cached.dispose();
+      }
+      delete cache[key];
+      removed++;
+    }
+    return removed;
+  }
+  private cachePathMatches(cachePath: string, normalizedPath: string, recursive: boolean) {
+    return (
+      cachePath === normalizedPath ||
+      (recursive &&
+        cachePath.startsWith(normalizedPath.endsWith('/') ? normalizedPath : `${normalizedPath}/`))
+    );
+  }
+  private normalizeAssetSourcePath(path: string) {
+    return /^(?:[a-z]+:)?\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:')
+      ? path
+      : this.vfs.normalizePath(path);
+  }
+  private getCache(kind: AssetCacheKind): Record<string, unknown> {
+    switch (kind) {
+      case 'texture':
+        return this._textures;
+      case 'model':
+        return this._models;
+      case 'binary':
+        return this._binaryDatas;
+      case 'font':
+        return this._fontAssets;
+      case 'text':
+        return this._textDatas;
+      case 'blueprint':
+        return this._bluePrints;
+      case 'material':
+        return this._materials;
+      case 'primitive':
+        return this._primitives;
+      case 'skeleton':
+        return this._skeletons;
+      case 'json':
+        return this._jsonDatas;
+    }
+  }
+  private getCacheToken(kind: AssetCacheKind, key: string) {
+    return `${kind}\0${key}`;
+  }
+  private trackCacheEntry(kind: AssetCacheKind, key: string, sourcePath: string) {
+    const token = this.getCacheToken(kind, key);
+    const normalizedSourcePath = this.normalizeAssetSourcePath(sourcePath);
+    const previousPath = this._cachePathByKey.get(token);
+    if (previousPath === normalizedSourcePath) {
+      return;
+    }
+    if (previousPath) {
+      const previousKeys = this._cacheKeysByPath.get(previousPath);
+      previousKeys?.delete(token);
+      if (previousKeys?.size === 0) {
+        this._cacheKeysByPath.delete(previousPath);
+      }
+    }
+    let keys = this._cacheKeysByPath.get(normalizedSourcePath);
+    if (!keys) {
+      keys = new Set();
+      this._cacheKeysByPath.set(normalizedSourcePath, keys);
+    }
+    keys.add(token);
+    this._cachePathByKey.set(token, normalizedSourcePath);
+  }
+  private removeCacheEntry(kind: AssetCacheKind, key: string) {
+    const cache = this.getCache(kind);
+    const existed = key in cache;
+    if (existed) {
+      const cached = cache[key];
+      if (cached instanceof DWeakRef) {
+        cached.dispose();
+      }
+      delete cache[key];
+    }
+    const token = this.getCacheToken(kind, key);
+    const sourcePath = this._cachePathByKey.get(token);
+    if (sourcePath) {
+      const keys = this._cacheKeysByPath.get(sourcePath);
+      keys?.delete(token);
+      if (keys?.size === 0) {
+        this._cacheKeysByPath.delete(sourcePath);
+      }
+      this._cachePathByKey.delete(token);
+    }
+    return existed;
   }
   /**
    * Removes a cached font asset entry by URL.
@@ -331,11 +464,16 @@ export class AssetManager {
    * @returns `true` if a cache entry existed and was removed.
    */
   releaseFontAsset(url: string) {
-    if (url in this._fontAssets) {
-      delete this._fontAssets[url];
-      return true;
-    }
-    return false;
+    return this.removeCacheEntry('font', url);
+  }
+  /**
+   * Remove one material entry from cache.
+   *
+   * @param url - Material asset path.
+   * @returns `true` if an entry existed and was removed.
+   */
+  invalidateMaterial(url: string) {
+    return this.removeCacheEntry('material', url);
   }
   /**
    * Register a texture loader (highest priority first).
@@ -380,6 +518,7 @@ export class AssetManager {
     if (!P) {
       P = this.loadTextData(url, postProcess, options?.overrideVFS);
       this._textDatas[hash] = P;
+      this.trackCacheEntry('text', hash, url);
     }
     return P;
   }
@@ -405,6 +544,7 @@ export class AssetManager {
     if (!P) {
       P = this.loadJsonData<T>(url, postProcess, options?.overrideVFS);
       this._jsonDatas[hash] = P;
+      this.trackCacheEntry('json', hash, url);
     }
     return P;
   }
@@ -429,6 +569,7 @@ export class AssetManager {
     if (!P) {
       P = this.loadBinaryData(url, postProcess, options?.overrideVFS);
       this._binaryDatas[hash] = P;
+      this.trackCacheEntry('binary', hash, url);
     }
     return P;
   }
@@ -459,6 +600,7 @@ export class AssetManager {
           });
       });
       this._fontAssets[hash] = P;
+      this.trackCacheEntry('font', hash, url);
     }
     return P;
   }
@@ -477,6 +619,7 @@ export class AssetManager {
     if (!P) {
       P = this.loadBluePrint(url, options?.overrideVFS);
       this._bluePrints[hash] = P;
+      this.trackCacheEntry('blueprint', hash, url);
     }
     return P;
   }
@@ -498,9 +641,10 @@ export class AssetManager {
     } else if (!P || P instanceof DWeakRef) {
       P = this.loadMaterial<T>(url, false, options?.overrideVFS);
       this._materials[hash] = P;
+      this.trackCacheEntry('material', hash, url);
     }
     const material = await P;
-    if (this._materials[hash] instanceof Promise) {
+    if (this._materials[hash] === P) {
       this._materials[hash] = new DWeakRef<Material>(material);
     }
     return material;
@@ -523,9 +667,10 @@ export class AssetManager {
     } else if (!P || P instanceof DWeakRef) {
       P = this.loadPrimitive<T>(url, options?.overrideVFS);
       this._primitives[hash] = P;
+      this.trackCacheEntry('primitive', hash, url);
     }
     const primitive = await P;
-    if (this._primitives[hash] instanceof Promise) {
+    if (this._primitives[hash] === P) {
       this._primitives[hash] = new DWeakRef<Primitive>(primitive);
     }
     return primitive;
@@ -569,9 +714,10 @@ export class AssetManager {
           options?.overrideVFS
         ) as Promise<T>;
         this._textures[hash] = P;
+        this.trackCacheEntry('texture', hash, url);
       }
       const tex: T = await P;
-      if (this._textures[hash] instanceof Promise) {
+      if (this._textures[hash] === P) {
         this._textures[hash] = new DWeakRef<T>(tex);
       }
       return tex;
@@ -596,9 +742,10 @@ export class AssetManager {
     } else if (!P || P instanceof DWeakRef) {
       P = this.loadModel(url, options, options?.overrideVFS);
       this._models[hash] = P;
+      this.trackCacheEntry('model', hash, url);
     }
     const sharedModel = await P;
-    if (this._models[hash] instanceof Promise) {
+    if (this._models[hash] === P) {
       this._models[hash] = new DWeakRef<SharedModel>(sharedModel);
     }
     return sharedModel;
@@ -783,16 +930,88 @@ export class AssetManager {
       }
     }
     const materials = await Promise.all(promises);
+    const knownPaths = new Set(paths);
+    for (const assetId of this._resourceManager.getTrackedMaterialAssetIds()) {
+      if (knownPaths.has(assetId)) {
+        continue;
+      }
+      const refs = this._resourceManager.getMaterialRefsByAssetId(assetId);
+      for (const ref of refs ?? []) {
+        const material = ref.get();
+        if (material instanceof PBRBluePrintMaterial && !material.disposed) {
+          materials.push(material);
+          paths.push(assetId);
+          knownPaths.add(assetId);
+          break;
+        }
+      }
+    }
+
+    // Reload blueprint parents first so dependent instances always resync against the latest parent state.
     for (let i = 0; i < materials.length; i++) {
       const m = materials[i];
-      if (m instanceof PBRBluePrintMaterial && (!filter || filter(m))) {
+      if (
+        m instanceof PBRBluePrintMaterial &&
+        !(m instanceof PBRBluePrintMaterialInstance) &&
+        (!filter || filter(m))
+      ) {
+        const content = JSON.parse(
+          (await this.readFileFromVFS(paths[i], { encoding: 'utf8' })) as string
+        ) as {
+          type: string;
+          props?: Record<string, unknown>;
+        };
         const data = await this.loadBluePrintMaterialData(paths[i], true);
         if (data) {
           m.fragmentIR = data.irFragment!;
           m.vertexIR = data.irVertex!;
           m.uniformValues = data.uniformValues;
           m.uniformTextures = data.uniformTextures;
+          if (content.type === 'PBRBluePrintMaterial' && content.props) {
+            await this._resourceManager.deserializeObjectProps(m, content.props);
+          }
+          this._resourceManager.syncMaterialReferences(m);
         }
+      }
+    }
+
+    // Then reload instances from disk so override maps stay in sync with the refreshed parent materials.
+    for (let i = 0; i < materials.length; i++) {
+      const m = materials[i];
+      if (m instanceof PBRBluePrintMaterialInstance && (!filter || filter(m))) {
+        const content = JSON.parse(
+          (await this.readFileFromVFS(paths[i], { encoding: 'utf8' })) as string
+        ) as {
+          type: string;
+          data?: {
+            parent?: string;
+            uniformValues?: BluePrintUniformValue[];
+            uniformTextures?: BluePrintUniformTexture[];
+          };
+        };
+        if (content.type !== 'PBRBluePrintMaterialInstance' || !content.data?.parent) {
+          continue;
+        }
+        const parent = await this.fetchMaterial<PBRBluePrintMaterial>(content.data.parent);
+        if (!(parent instanceof PBRBluePrintMaterial)) {
+          continue;
+        }
+        m.setParentMaterial(parent, content.data.parent);
+        m.setOverrides(
+          content.data.uniformValues ?? [],
+          await this.hydrateBluePrintUniformTextures(content.data.uniformTextures ?? [])
+        );
+        const instanceContent = JSON.parse(
+          (await this.readFileFromVFS(paths[i], { encoding: 'utf8' })) as string
+        ) as {
+          type: string;
+          props?: Record<string, unknown>;
+        };
+        if (instanceContent.type === 'PBRBluePrintMaterialInstance' && instanceContent.props) {
+          await this._resourceManager.deserializeObjectProps(m, instanceContent.props);
+        }
+        m.setMaterialPropertyOverrides(Object.keys(instanceContent.props ?? {}));
+        this._resourceManager.syncMaterialReferences(m);
       }
     }
   }
@@ -813,14 +1032,44 @@ export class AssetManager {
         const data = (await this.readFileFromVFS(url, { encoding: 'utf8' }, vfs)) as string;
         const content = JSON.parse(data) as { type: string; data: any };
         ASSERT(
-          content.type === 'PBRBluePrintMaterial' || content.type === 'SpriteBluePrintMaterial',
+          content.type === 'PBRBluePrintMaterial' ||
+            content.type === 'PBRBluePrintMaterialInstance' ||
+            content.type === 'SpriteBluePrintMaterial',
           `Unsupported material type: ${content.type}`
         );
-        irData = content.data as {
-          IR: string;
-          uniformValues: BluePrintUniformValue[];
-          uniformTextures: BluePrintUniformTexture[];
-        };
+        if (content.type === 'PBRBluePrintMaterialInstance') {
+          const parentPath = content.data.parent as string;
+          ASSERT(
+            typeof parentPath === 'string' && !!parentPath,
+            'Blueprint material instance requires parent'
+          );
+          const parentContent = JSON.parse(
+            (await this.readFileFromVFS(parentPath, { encoding: 'utf8' }, vfs)) as string
+          ) as {
+            type: string;
+            data?: {
+              IR?: string;
+              uniformValues?: BluePrintUniformValue[];
+              uniformTextures?: BluePrintUniformTexture[];
+            };
+          };
+          ASSERT(
+            parentContent.type === 'PBRBluePrintMaterial',
+            `Invalid parent blueprint material: ${parentPath}`
+          );
+          irData = {
+            IR: parentContent.data?.IR ?? content.data.IR ?? '',
+            uniformValues: content.data.uniformValues ?? parentContent.data?.uniformValues ?? [],
+            uniformTextures: content.data.uniformTextures ?? parentContent.data?.uniformTextures ?? []
+          };
+          ASSERT(!!irData.IR, `Parent blueprint material missing IR path: ${parentPath}`);
+        } else {
+          irData = content.data as {
+            IR: string;
+            uniformValues: BluePrintUniformValue[];
+            uniformTextures: BluePrintUniformTexture[];
+          };
+        }
       } else {
         irData = url;
       }
@@ -831,26 +1080,7 @@ export class AssetManager {
         ...v,
         finalValue: v.value.length === 1 ? v.value[0] : new Float32Array(v.value)
       }));
-      const uniformTextures: BluePrintUniformTexture[] = [];
-      const textures = irData.uniformTextures;
-      for (const v of textures) {
-        const tex = await this.fetchTexture(v.texture, {
-          linearColorSpace: !v.sRGB,
-          overrideVFS: vfs
-        });
-        uniformTextures.push({
-          ...v,
-          finalTexture: new DRef(tex),
-          finalSampler: getDevice().createSampler({
-            addressU: v.wrapS as TextureAddressMode,
-            addressV: v.wrapT as TextureAddressMode,
-            minFilter: v.minFilter as TextureFilterMode,
-            magFilter: v.magFilter as TextureFilterMode,
-            mipFilter: v.mipFilter as TextureFilterMode
-          }),
-          params: tex ? new Vector4(tex.width, tex.height, tex.depth, tex.mipLevelCount) : Vector4.zero()
-        });
-      }
+      const uniformTextures = await this.hydrateBluePrintUniformTextures(irData.uniformTextures, vfs);
       return {
         irFragment: ir?.['fragment'] ?? null,
         irVertex: ir?.['vertex'] ?? null,
@@ -882,6 +1112,7 @@ export class AssetManager {
       const content = JSON.parse(data) as { type: string; props: any; data: any };
       ASSERT(
         content.type === 'PBRBluePrintMaterial' ||
+          content.type === 'PBRBluePrintMaterialInstance' ||
           content.type === 'SpriteBluePrintMaterial' ||
           content.type === 'Default',
         `Unsupported material type: ${content.type}`
@@ -903,6 +1134,21 @@ export class AssetManager {
           data.uniformValues,
           data.uniformTextures
         ) as unknown as T;
+      } else if (content.type === 'PBRBluePrintMaterialInstance') {
+        const parentMaterial = await this.fetchMaterial<PBRBluePrintMaterial>(
+          content.data.parent,
+          vfs ? { overrideVFS: vfs } : undefined
+        );
+        ASSERT(
+          parentMaterial instanceof PBRBluePrintMaterial,
+          `Invalid parent blueprint material: ${content.data.parent}`
+        );
+        const instance = new PBRBluePrintMaterialInstance(parentMaterial, content.data.parent);
+        instance.setOverrides(
+          content.data.uniformValues ?? [],
+          await this.hydrateBluePrintUniformTextures(content.data.uniformTextures ?? [], vfs)
+        );
+        mat = instance as unknown as T;
       } else if (content.type === 'SpriteBluePrintMaterial') {
         const data = (await this.loadBluePrintMaterialData(
           content.data as {
@@ -931,11 +1177,50 @@ export class AssetManager {
       if (mat && content.props) {
         await this._resourceManager.deserializeObjectProps(mat, content.props);
       }
+      if (mat instanceof PBRBluePrintMaterialInstance) {
+        mat.setMaterialPropertyOverrides(Object.keys(content.props ?? {}));
+        mat.syncInheritedUniforms();
+      }
       return mat;
     } catch (err) {
       console.error(`Load material failed: ${err}`);
       return null;
     }
+  }
+
+  private async hydrateBluePrintUniformTextures(
+    textures: BluePrintUniformTexture[],
+    vfs?: VFS
+  ): Promise<BluePrintUniformTexture[]> {
+    return Promise.all(
+      (textures ?? []).map(async (v) => {
+        let tex: Nullable<BaseTexture> = null;
+        if (v.texture) {
+          try {
+            tex = await this.fetchTexture(v.texture, {
+              linearColorSpace: !v.sRGB,
+              overrideVFS: vfs
+            });
+          } catch (err) {
+            console.warn(`Load blueprint texture failed: ${v.texture}: ${String(err)}`);
+          }
+        }
+        tex = tex ?? getDefaultTexture2D();
+        return {
+          ...v,
+          exposed: v.exposed ?? true,
+          finalTexture: new DRef(tex),
+          finalSampler: getDevice().createSampler({
+            addressU: v.wrapS as TextureAddressMode,
+            addressV: v.wrapT as TextureAddressMode,
+            minFilter: v.minFilter as TextureFilterMode,
+            magFilter: v.magFilter as TextureFilterMode,
+            mipFilter: v.mipFilter as TextureFilterMode
+          }),
+          params: tex ? new Vector4(tex.width, tex.height, tex.depth, tex.mipLevelCount) : Vector4.zero()
+        };
+      })
+    );
   }
   private rebuildGraphStructure(
     nodes: Record<number, IGraphNode>,
@@ -1062,7 +1347,7 @@ export class AssetManager {
     };
   }
   invalidateBluePrint(path: string) {
-    delete this._bluePrints[path];
+    this.removeCacheEntry('blueprint', path);
   }
   async loadBluePrint(path: string, vfs?: VFS) {
     try {
@@ -1081,11 +1366,16 @@ export class AssetManager {
         const roots: number[] = [];
         const nodeMap: Record<number, IGraphNode> = {};
         const state = states[k];
-        for (const node of state.nodes) {
-          const impl = await this._resourceManager.deserializeObject<IGraphNode>(null, node.node);
-          nodeMap[node.id] = impl!;
+        const nodes = await Promise.all(
+          state.nodes.map(async (node) => ({
+            id: node.id,
+            impl: await this._resourceManager.deserializeObject<IGraphNode>(null, node.node)
+          }))
+        );
+        for (const { id, impl } of nodes) {
+          nodeMap[id] = impl!;
           if (impl!.outputs.length === 0) {
-            roots.push(node.id);
+            roots.push(id);
           }
         }
         const dag = await this.createBluePrintDAG(nodeMap, roots, state.links);

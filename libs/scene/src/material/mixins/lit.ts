@@ -21,6 +21,7 @@ import { ShaderHelper } from '../shader/helper';
  */
 export type IMixinLight = {
   normalScale: number;
+  normalFlipY: boolean;
   normalMapMode: 'tangent-space' | 'object-space';
   doubleSidedLighting: boolean;
   needCalculateEnvLight(): boolean;
@@ -105,14 +106,17 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
   const cls = class extends S {
     static readonly lightMixed = true;
     private _normalScale: number;
+    private _normalFlipY: boolean;
     constructor() {
       super();
       this._normalScale = 1;
+      this._normalFlipY = false;
       this.useFeature(FEATURE_DOUBLE_SIDED_LIGHTING, true);
     }
     copyFrom(other: this) {
       super.copyFrom(other);
       this.normalScale = other.normalScale;
+      this.normalFlipY = other.normalFlipY;
       this.normalMapMode = other.normalMapMode;
       this.doubleSidedLighting = other.doubleSidedLighting;
     }
@@ -122,6 +126,16 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     set normalScale(val) {
       if (val !== this._normalScale) {
         this._normalScale = val;
+        this.uniformChanged();
+      }
+    }
+    get normalFlipY() {
+      return this._normalFlipY;
+    }
+    set normalFlipY(val) {
+      const flip = !!val;
+      if (flip !== this._normalFlipY) {
+        this._normalFlipY = flip;
         this.uniformChanged();
       }
     }
@@ -189,9 +203,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         }
       }
       pb.func(funcName, params, function () {
-        this.$l.uv = that.normalTexture
+        this.$l.uv = that.hasNormalTexture()
           ? (that.getNormalTexCoord(this) ?? pb.vec2(0))
-          : that.albedoTexture
+          : that.hasAlbedoTexture()
             ? (that.getAlbedoTexCoord(this) ?? pb.vec2(0))
             : pb.vec2(0);
         this.$l.TBN = that.calculateTBN(
@@ -201,20 +215,26 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.worldTangent,
           this.worldBinormal
         );
-        if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
+        if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && that.hasNormalTexture()) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
               pb.vec3(1)
             );
-            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.zNormalScale).xx, 1));
+            const normalTex = pb.mul(
+              pixel,
+              pb.vec3(this.zNormalScale, pb.mul(this.zNormalScale, this.zNormalYSign), 1)
+            );
             this.$return(pb.normalize(normalTex));
           } else {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
               pb.vec3(1)
             );
-            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.zNormalScale).xx, 1));
+            const normalTex = pb.mul(
+              pixel,
+              pb.vec3(this.zNormalScale, pb.mul(this.zNormalScale, this.zNormalYSign), 1)
+            );
             this.$return(pb.normalize(pb.mul(this.TBN, normalTex)));
           }
         } else {
@@ -260,9 +280,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         }
       }
       pb.func(funcName, params, function () {
-        this.$l.uv = that.normalTexture
+        this.$l.uv = that.hasNormalTexture()
           ? (that.getNormalTexCoord(this) ?? pb.vec2(0))
-          : that.albedoTexture
+          : that.hasAlbedoTexture()
             ? (that.getAlbedoTexCoord(this) ?? pb.vec2(0))
             : pb.vec2(0);
         this.$l.TBN = that.calculateTBN(
@@ -272,20 +292,26 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           this.worldTangent,
           this.worldBinormal
         );
-        if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && that.normalTexture) {
+        if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT && that.hasNormalTexture()) {
           if (that.normalMapMode === 'object-space') {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
               pb.vec3(1)
             );
-            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.zNormalScale).xx, 1));
+            const normalTex = pb.mul(
+              pixel,
+              pb.vec3(this.zNormalScale, pb.mul(this.zNormalScale, this.zNormalYSign), 1)
+            );
             this.$return(NormalStruct(this.TBN, pb.normalize(normalTex)));
           } else {
             const pixel = pb.sub(
               pb.mul(pb.textureSample(that.getNormalTextureUniform(this), this.uv).rgb, 2),
               pb.vec3(1)
             );
-            const normalTex = pb.mul(pixel, pb.vec3(pb.vec3(this.zNormalScale).xx, 1));
+            const normalTex = pb.mul(
+              pixel,
+              pb.vec3(this.zNormalScale, pb.mul(this.zNormalScale, this.zNormalYSign), 1)
+            );
             this.$return(NormalStruct(this.TBN, pb.normalize(pb.mul(this.TBN, normalTex))));
           }
         } else {
@@ -324,9 +350,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       }
       pb.func(funcName, params, function () {
         const posW = this.worldPos;
-        this.$l.uv = that.normalTexture
+        this.$l.uv = that.hasNormalTexture()
           ? (that.getNormalTexCoord(this) ?? pb.vec2(0))
-          : that.albedoTexture
+          : that.hasAlbedoTexture()
             ? (that.getAlbedoTexCoord(this) ?? pb.vec2(0))
             : pb.vec2(0);
         this.$l.TBN = pb.mat3();
@@ -404,8 +430,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
     applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
       super.applyUniformValues(bindGroup, ctx, pass);
       if (ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
-        if (this.normalTexture) {
+        if (this.hasNormalTexture()) {
           bindGroup.setValue('zNormalScale', this._normalScale);
+          bindGroup.setValue('zNormalYSign', this._normalFlipY ? -1 : 1);
         }
       }
     }
@@ -760,8 +787,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       super.fragmentShader(scope);
       const pb = scope.$builder;
       if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
-        if (this.normalTexture) {
+        if (this.hasNormalTexture()) {
           scope.zNormalScale = pb.float().uniform(2);
+          scope.zNormalYSign = pb.float().uniform(2);
         }
       }
     }

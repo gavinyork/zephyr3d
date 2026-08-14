@@ -1,5 +1,13 @@
 import type { Nullable, RequireOptionals } from '@zephyr3d/base';
-import { ASSERT, DRef, randomUUID, type GenericConstructor, type TypedArray, type VFS } from '@zephyr3d/base';
+import {
+  ASSERT,
+  DRef,
+  DWeakRef,
+  randomUUID,
+  type GenericConstructor,
+  type TypedArray,
+  type VFS
+} from '@zephyr3d/base';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
 import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
@@ -24,6 +32,7 @@ import {
   getPBRSpecularGlossinessMaterialClass,
   getParticleMaterialClass,
   getPBRBluePrintMaterialClass,
+  getPBRBluePrintMaterialInstanceClass,
   getSpriteMaterialClass,
   getSpriteBlueprintMaterialClass,
   getStandardSpriteMaterialClass
@@ -49,6 +58,7 @@ import {
   getFixedGeometryCacheTrackClass,
   getInterpolatorClass,
   getJointDynamicsModifierClass,
+  getSpringModifierClass,
   getMorphTrackClass,
   getMorphTargetGroupTrackClass,
   getPCAGeometryCacheTrackClass,
@@ -88,10 +98,13 @@ import {
   ConstantVec4Node
 } from '../blueprint/common/constants';
 import {
+  ChannelSDFMaskNode,
+  MorphBlurNode,
   ConstantTexture2DArrayNode,
   ConstantTexture2DNode,
   ConstantTextureCubeNode,
   PannerNode,
+  TexturePropertyNode,
   TextureSampleNode
 } from '../blueprint/material/texture';
 import {
@@ -193,7 +206,8 @@ import {
 } from '../blueprint/material/inputs';
 import { PBRBlockNode, SpriteBlockNode, VertexBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
-import type { Material, MeshMaterial, PBRBluePrintMaterial } from '../../material';
+import { Material } from '../../material';
+import type { MeshMaterial, PBRBluePrintMaterial } from '../../material';
 import type { Primitive } from '../../render';
 import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
 import { getSpriteClass } from './scene/sprite';
@@ -251,6 +265,8 @@ export class ResourceManager {
   private readonly _assetManager: AssetManager;
   private readonly _editorMode: boolean;
   private _allocated: WeakMap<any, string>;
+  private _materialsByAssetId: Map<string, Set<DWeakRef<Material>>>;
+  private _prefabContentCache: Map<string, Promise<Nullable<{ type: string; data: object }>>> | null;
   /**
    * Create a ResourceManager bound to a virtual file system.
    *
@@ -260,6 +276,8 @@ export class ResourceManager {
     this._vfs = vfs;
     this._editorMode = editorMode;
     this._allocated = new WeakMap();
+    this._materialsByAssetId = new Map();
+    this._prefabContentCache = null;
     this._assetManager = new AssetManager(this);
     this._propMap = {};
     this._propNameMap = new Map();
@@ -280,6 +298,7 @@ export class ResourceManager {
         getSkeletonRigClass(),
         getSkinBindingClass(),
         getJointDynamicsModifierClass(),
+        getSpringModifierClass(),
         getAnimationClass(this),
         getPropTrackClass(this),
         getNodeRotationTrackClass(),
@@ -292,7 +311,7 @@ export class ResourceManager {
         getMorphTargetGroupTrackClass(),
         getSceneNodeClass(this),
         getGraphNodeClass(),
-        getMeshClass(),
+        getMeshClass(this),
         getSpriteClass(),
         getTextSpriteClass(),
         getMSDFTextSpriteClass(),
@@ -315,6 +334,7 @@ export class ResourceManager {
         getSubsurfaceProfileClass(),
         ...getMeshMaterialClass(),
         ...getPBRBluePrintMaterialClass(),
+        ...getPBRBluePrintMaterialInstanceClass(),
         ...getSpriteBlueprintMaterialClass(),
         ...getUnlitMaterialClass(this),
         ...getMToonMaterialClass(this),
@@ -442,16 +462,21 @@ export class ResourceManager {
         FunctionInputNode.getSerializationCls(),
         FunctionOutputNode.getSerializationCls(),
         FunctionCallNode.getSerializationCls(this),
+        ChannelSDFMaskNode.getSerializationCls(),
+        MorphBlurNode.getSerializationCls(),
         PannerNode.getSerializationCls(),
         TextureSampleNode.getSerializationCls(),
         VertexOutputNode.getSerializationCls(),
         VertexIndexNode.getSerializationCls(),
-        InstanceIndexNode.getSerializationCls()
+        InstanceIndexNode.getSerializationCls(),
+        TexturePropertyNode.getSerializationCls(),
+        TextureSampleNode.getSerializationCls()
       ].map((val) => [val.ctor, val])
     );
     for (const k of this._classMap) {
       this.registerProps(k[1]);
     }
+    this._vfs.on('changed', this.handleVFSChanged, this);
   }
   /**
    * The virtual file system used by this manager.
@@ -463,7 +488,12 @@ export class ResourceManager {
     return this._vfs;
   }
   set VFS(vfs: VFS) {
-    this._vfs = vfs;
+    if (vfs !== this._vfs) {
+      this._vfs?.off('changed', this.handleVFSChanged, this);
+      this._vfs = vfs;
+      this.clearCache();
+      this._vfs?.on('changed', this.handleVFSChanged, this);
+    }
   }
   /**
    * Wethether editor mode is enabled
@@ -638,11 +668,166 @@ export class ResourceManager {
    */
   setAssetId(asset: unknown, id?: Nullable<string>) {
     if (asset) {
+      const material = asset instanceof Material ? asset : null;
+      const prevId = material ? this.getAssetId(material) : null;
+      if (material && prevId && prevId !== id) {
+        this.unregisterMaterialReference(prevId, material);
+      }
       if (id) {
         this._allocated.set(asset, id);
+        if (material) {
+          this.registerMaterialReference(id, material);
+        }
       } else {
         this._allocated.delete(asset);
       }
+    }
+  }
+  getMaterialRefsByAssetId(id: string) {
+    return this._materialsByAssetId.get(id) ?? null;
+  }
+  /** @internal */
+  getTrackedMaterialAssetIds() {
+    const ids: string[] = [];
+    for (const [id, refs] of this._materialsByAssetId) {
+      for (const ref of [...refs]) {
+        const material = ref.get();
+        if (!material || material.disposed) {
+          ref.dispose();
+          refs.delete(ref);
+        }
+      }
+      if (refs.size === 0) {
+        this._materialsByAssetId.delete(id);
+      } else {
+        ids.push(id);
+      }
+    }
+    return ids;
+  }
+  syncMaterialReferences(source: Material) {
+    const id = this.getAssetId(source);
+    if (!id) {
+      return;
+    }
+    const refs = this._materialsByAssetId.get(id);
+    if (!refs) {
+      return;
+    }
+    for (const ref of [...refs]) {
+      const material = ref.get();
+      if (!material || material.disposed) {
+        ref.dispose();
+        refs.delete(ref);
+      } else if (material !== source && material.constructor === source.constructor) {
+        const instance = material as Material & {
+          $isInstance?: boolean;
+          coreMaterial?: Material;
+          getInstancedUniforms?: () => Array<{ prop: string }>;
+        };
+        if (instance.$isInstance && instance.getInstancedUniforms) {
+          const coreMaterial = instance.coreMaterial;
+          if (coreMaterial && coreMaterial !== source && coreMaterial.constructor === source.constructor) {
+            coreMaterial.copyFrom(source as typeof coreMaterial);
+          }
+          for (const { prop } of instance.getInstancedUniforms()) {
+            (instance as any)[prop] = (source as any)[prop];
+          }
+        } else {
+          material.copyFrom(source as typeof material);
+        }
+      }
+    }
+    if (refs.size === 0) {
+      this._materialsByAssetId.delete(id);
+    }
+  }
+  async syncMaterialPropertyReferences(source: Material, prop: PropertyAccessor) {
+    const id = this.getAssetId(source);
+    const refs = id ? this._materialsByAssetId.get(id) : null;
+    if (!refs || !prop.get || !prop.set) {
+      return;
+    }
+    const sourceValue: RequireOptionals<PropertyValue> = {
+      num: [0, 0, 0, 0],
+      str: [''],
+      bool: [false],
+      object: [null]
+    };
+    (prop as PropertyAccessor<any, 'DUMMY'>).get.call(source, sourceValue);
+    const tasks: Promise<void>[] = [];
+    for (const ref of [...refs]) {
+      const material = ref.get();
+      if (!material || material.disposed) {
+        ref.dispose();
+        refs.delete(ref);
+        continue;
+      }
+      if (material === source || material.constructor !== source.constructor) {
+        continue;
+      }
+      const instance = material as Material & {
+        $isInstance?: boolean;
+        coreMaterial?: Material;
+        getInstancedUniforms?: () => Array<{ name: string }>;
+      };
+      const isInstanceUniform =
+        !!instance.$isInstance &&
+        !!instance.getInstancedUniforms?.().some((uniform) => uniform.name === prop.name);
+      const target = instance.$isInstance && !isInstanceUniform ? instance.coreMaterial : material;
+      if (!target || target === source || target.constructor !== source.constructor) {
+        continue;
+      }
+      const value: RequireOptionals<PropertyValue> = {
+        num: [...sourceValue.num],
+        str: [...sourceValue.str],
+        bool: [...sourceValue.bool],
+        object: [...sourceValue.object]
+      };
+      tasks.push(Promise.resolve((prop as PropertyAccessor<any, 'DUMMY'>).set!.call(target, value)));
+    }
+    await Promise.all(tasks);
+    if (refs.size === 0) {
+      this._materialsByAssetId.delete(id!);
+    }
+  }
+  trackMaterialReference(material: Nullable<Material>, id?: Nullable<string>) {
+    if (!material || !id) {
+      return;
+    }
+    this.setAssetId(material, id);
+  }
+  private registerMaterialReference(id: string, material: Material) {
+    let refs = this._materialsByAssetId.get(id);
+    if (!refs) {
+      refs = new Set();
+      this._materialsByAssetId.set(id, refs);
+    }
+    for (const ref of [...refs]) {
+      const obj = ref.get();
+      if (!obj) {
+        ref.dispose();
+        refs.delete(ref);
+      } else if (obj === material) {
+        return;
+      }
+    }
+    refs.add(new DWeakRef(material));
+  }
+  private unregisterMaterialReference(id: string, material: Material) {
+    const refs = this._materialsByAssetId.get(id);
+    if (!refs) {
+      return;
+    }
+    for (const ref of [...refs]) {
+      const obj = ref.get();
+      if (!obj || obj === material) {
+        ref.dispose();
+        refs.delete(ref);
+      }
+    }
+    if (refs.size === 0) {
+      this._materialsByAssetId.delete(id);
     }
   }
   /**
@@ -865,9 +1050,17 @@ export class ResourceManager {
   async fetchMaterial<T extends Material = MeshMaterial>(id: string, options?: { overrideVFS?: VFS }) {
     const material = await this._assetManager.fetchMaterial<T>(id, options);
     if (material) {
-      this._allocated.set(material, id);
+      this.setAssetId(material, id);
     }
     return material;
+  }
+  /**
+   * Remove one material from the asset cache.
+   *
+   * @param id - Material identifier or path.
+   */
+  invalidateMaterial(id: string) {
+    this._assetManager.invalidateMaterial(id);
   }
   /**
    * Reload specific blue print materials
@@ -935,14 +1128,23 @@ export class ResourceManager {
    * @returns A Promise resolving to the prefab json object, or `null` on failure.
    */
   async loadPrefabContent(path: string): Promise<Nullable<{ type: string; data: object }>> {
-    try {
-      const content = (await this._vfs.readFile(path, { encoding: 'utf8' })) as string;
-      const json = JSON.parse(content) as { type: string; data: object };
-      return json;
-    } catch (err) {
-      console.error(`Failed to load prefab from ${path}:`, err);
-      return null;
+    const normalizedPath = this._vfs.normalizePath(path);
+    const cached = this._prefabContentCache?.get(normalizedPath);
+    if (cached) {
+      return cached;
     }
+    const loadTask = (async () => {
+      try {
+        const content = (await this._vfs.readFile(normalizedPath, { encoding: 'utf8' })) as string;
+        const json = JSON.parse(content) as { type: string; data: object };
+        return json;
+      } catch (err) {
+        console.error(`Failed to load prefab from ${normalizedPath}:`, err);
+        return null;
+      }
+    })();
+    this._prefabContentCache?.set(normalizedPath, loadTask);
+    return loadTask;
   }
   /**
    * Instantiate a prefab from a JSON file via VFS.
@@ -999,12 +1201,20 @@ export class ResourceManager {
    */
   async saveScene(scene: Scene, filename: string): Promise<void> {
     const asyncTasks: Promise<unknown>[] = [];
-    const content = await this.serializeObject(scene, null, asyncTasks);
-    await Promise.all(asyncTasks);
-    await this._vfs.writeFile(filename, JSON.stringify(content, null, 2), {
-      encoding: 'utf8',
-      create: true
-    });
+    const previousPrefabContentCache = this._prefabContentCache;
+    if (!previousPrefabContentCache) {
+      this._prefabContentCache = new Map();
+    }
+    try {
+      const content = await this.serializeObject(scene, null, asyncTasks);
+      await Promise.all(asyncTasks);
+      await this._vfs.writeFile(filename, JSON.stringify(content, null, 2), {
+        encoding: 'utf8',
+        create: true
+      });
+    } finally {
+      this._prefabContentCache = previousPrefabContentCache;
+    }
   }
   private rebuildGraphStructure(
     nodes: Record<number, IGraphNode>,
@@ -1148,7 +1358,49 @@ export class ResourceManager {
    */
   clearCache() {
     this._allocated = new WeakMap();
+    this._prefabContentCache?.clear();
     this._assetManager.clearCache();
+  }
+  private handleVFSChanged(
+    type: 'created' | 'deleted' | 'moved' | 'modified',
+    path: string,
+    itemType: 'file' | 'directory',
+    oldPath?: string
+  ) {
+    if (type === 'moved') {
+      if (!oldPath) {
+        this._prefabContentCache?.clear();
+        this._assetManager.clearCache();
+        return;
+      }
+      const normalizedOldPath = this._vfs.normalizePath(oldPath);
+      const normalizedPath = this._vfs.normalizePath(path);
+      const recursive = itemType === 'directory';
+      this._assetManager.invalidateAsset(normalizedOldPath, recursive);
+      this._assetManager.invalidateAsset(normalizedPath, recursive);
+      this.invalidatePrefabContent(normalizedOldPath, recursive);
+      this.invalidatePrefabContent(normalizedPath, recursive);
+      return;
+    }
+    const normalizedPath = this._vfs.normalizePath(path);
+    const recursive = itemType === 'directory';
+    this._assetManager.invalidateAsset(normalizedPath, recursive);
+    this.invalidatePrefabContent(normalizedPath, recursive);
+  }
+  private invalidatePrefabContent(path: string, recursive: boolean) {
+    if (!this._prefabContentCache) {
+      return;
+    }
+    if (recursive) {
+      const prefix = path.endsWith('/') ? path : `${path}/`;
+      for (const key of [...this._prefabContentCache.keys()]) {
+        if (key === path || key.startsWith(prefix)) {
+          this._prefabContentCache.delete(key);
+        }
+      }
+    } else {
+      this._prefabContentCache.delete(path);
+    }
   }
   private static readonly _pathPattern = /^([^\][]+)(?:\[(\d+)\])?$/;
   private static parsePropertyPath(str: string) {
@@ -1275,82 +1527,102 @@ export class ResourceManager {
         continue;
       }
       const k = prop.name;
-      const v = json[k] ?? this.getDefaultValue(obj, prop);
-      const tmpVal: RequireOptionals<PropertyValue> = {
-        num: [0, 0, 0, 0],
-        str: [''],
-        bool: [false],
-        object: [null]
-      };
-      switch (prop.type) {
-        case 'object':
-          if (typeof v === 'string' && v) {
-            tmpVal.str[0] = v;
-          } else {
-            tmpVal.object[0] = v
-              ? Array.isArray(v)
-                ? v
-                : this.isSerializedObjectEnvelope(v)
-                  ? ((await this.deserializeObject<any>(obj, v)) ?? null)
-                  : v
-              : null;
-          }
-          break;
-        case 'object_array':
-          tmpVal.object = [];
-          if (Array.isArray(v)) {
-            for (const p of v) {
-              if (typeof p === 'string' && p) {
-                tmpVal.str[0] = p;
-              } else {
-                tmpVal.object.push(
-                  p
-                    ? this.isSerializedObjectEnvelope(p)
-                      ? ((await this.deserializeObject<any>(obj, p)) ?? null)
-                      : p
-                    : null
-                );
-              }
+      promises.push(
+        (async () => {
+          try {
+            const v = json[k] ?? this.getDefaultValue(obj, prop);
+            const tmpVal: RequireOptionals<PropertyValue> = {
+              num: [0, 0, 0, 0],
+              str: [''],
+              bool: [false],
+              object: [null]
+            };
+            switch (prop.type) {
+              case 'object':
+                if (typeof v === 'string' && v) {
+                  tmpVal.str[0] = v;
+                } else {
+                  tmpVal.object[0] = v
+                    ? Array.isArray(v)
+                      ? v
+                      : this.isSerializedObjectEnvelope(v)
+                        ? ((await this.deserializeObject<any>(obj, v)) ?? null)
+                        : v
+                    : null;
+                }
+                break;
+              case 'object_array':
+                tmpVal.object = [];
+                if (Array.isArray(v)) {
+                  const values = await Promise.all(
+                    v.map(async (p) =>
+                      typeof p === 'string' && p
+                        ? { kind: 'ref' as const, ref: p }
+                        : {
+                            kind: 'value' as const,
+                            value: p
+                              ? this.isSerializedObjectEnvelope(p)
+                                ? ((await this.deserializeObject<any>(obj, p)) ?? null)
+                                : p
+                              : null
+                          }
+                    )
+                  );
+                  for (const value of values) {
+                    if (value.kind === 'ref') {
+                      tmpVal.str[0] = value.ref;
+                    } else {
+                      tmpVal.object.push(value.value);
+                    }
+                  }
+                }
+                break;
+              case 'embedded':
+                if (typeof v === 'string' && v) {
+                  tmpVal.str[0] = v;
+                }
+                break;
+              case 'float':
+              case 'int':
+                tmpVal.num[0] = v;
+                break;
+              case 'string':
+                tmpVal.str[0] = v;
+                break;
+              case 'bool':
+                tmpVal.bool[0] = v;
+                break;
+              case 'vec2':
+              case 'int2':
+                tmpVal.num[0] = v[0];
+                tmpVal.num[1] = v[1];
+                break;
+              case 'vec3':
+              case 'int3':
+              case 'rgb':
+                tmpVal.num[0] = v[0];
+                tmpVal.num[1] = v[1];
+                tmpVal.num[2] = v[2];
+                break;
+              case 'vec4':
+              case 'int4':
+              case 'rgba':
+                tmpVal.num[0] = v[0];
+                tmpVal.num[1] = v[1];
+                tmpVal.num[2] = v[2];
+                tmpVal.num[3] = v[3];
+                break;
             }
+            if (prop.set) {
+              await Promise.resolve(prop.set.call(obj, tmpVal, -1));
+            }
+          } catch (err) {
+            console.warn(
+              `Deserialize property failed: ${cls.name}.${k} on ${obj?.constructor?.name ?? 'UnknownObject'}: ${String(err)}`
+            );
           }
-          break;
-        case 'embedded':
-          if (typeof v === 'string' && v) {
-            tmpVal.str[0] = v;
-          }
-          break;
-        case 'float':
-        case 'int':
-          tmpVal.num[0] = v;
-          break;
-        case 'string':
-          tmpVal.str[0] = v;
-          break;
-        case 'bool':
-          tmpVal.bool[0] = v;
-          break;
-        case 'vec2':
-        case 'int2':
-          tmpVal.num[0] = v[0];
-          tmpVal.num[1] = v[1];
-          break;
-        case 'vec3':
-        case 'int3':
-        case 'rgb':
-          tmpVal.num[0] = v[0];
-          tmpVal.num[1] = v[1];
-          tmpVal.num[2] = v[2];
-          break;
-        case 'vec4':
-        case 'int4':
-        case 'rgba':
-          tmpVal.num[0] = v[0];
-          tmpVal.num[1] = v[1];
-          tmpVal.num[2] = v[2];
-          tmpVal.num[3] = v[3];
-          break;
-      }
-      promises.push(Promise.resolve(prop.set.call(obj, tmpVal, -1)));
+        })()
+      );
     }
     if (promises.length > 0) {
       await Promise.all(promises);

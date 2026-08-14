@@ -80,6 +80,63 @@ export function createTransformAccess(obj: SceneNode, exposeNode = true): Transf
   };
 }
 
+function createOffsetTransformAccess(
+  obj: SceneNode,
+  localOffset: Vector3,
+  exposeNode = true
+): TransformAccess {
+  const offset = localOffset.clone();
+  return {
+    ...(exposeNode ? { node: obj } : {}),
+    getWorldPosition(): Vector3 {
+      return obj.worldMatrix.transformPointAffine(offset);
+    },
+    getWorldRotation(): Quaternion {
+      const q = new Quaternion();
+      obj.worldMatrix.decompose(null, q, null);
+      return q;
+    },
+    getWorldScale(): Vector3 {
+      const s = new Vector3();
+      obj.worldMatrix.decompose(s, null, null);
+      return s;
+    },
+    getLocalPosition(): Vector3 {
+      return obj.position.clone();
+    },
+    getLocalRotation(): Quaternion {
+      return obj.rotation.clone();
+    },
+    getLocalScale(): Vector3 {
+      return obj.scale.clone();
+    },
+    setWorldPosition(p: Vector3): void {
+      if (obj.parent) {
+        obj.position = obj.parent.invWorldMatrix.transformPointAffine(p);
+      } else {
+        obj.position.set(p);
+      }
+    },
+    setWorldRotation(q: Quaternion): void {
+      if (obj.parent) {
+        obj.parent.worldMatrix.decompose(null, _quat, null);
+        Quaternion.multiply(Quaternion.inverse(_quat), q, obj.rotation);
+      } else {
+        obj.rotation.set(q);
+      }
+    },
+    setLocalPosition(p: Vector3): void {
+      obj.position.set(p);
+    },
+    setLocalRotation(q: Quaternion): void {
+      obj.rotation.set(q);
+    },
+    setLocalScale(s: Vector3): void {
+      obj.scale.set(s);
+    }
+  };
+}
+
 /**
  * Describes the bone chains simulated by a JointDynamicsSystem.
  *
@@ -92,7 +149,14 @@ export type JointChainConfig = {
   /** Root transform used for root motion compensation. */
   systemRoot: SceneNode;
   /** Bone chains to simulate. */
-  chains: { start: SceneNode; end: SceneNode }[];
+  chains: {
+    start: SceneNode;
+    end: SceneNode;
+    startAnchor?: SceneNode;
+    endAnchor?: SceneNode;
+    startAnchorOffset?: Vector3;
+    endAnchorOffset?: Vector3;
+  }[];
 };
 
 /**
@@ -140,13 +204,21 @@ export class JointDynamicsSystem {
   ) {
     this._chainConfig = {
       systemRoot: config.chainConfig.systemRoot,
-      chains: config.chainConfig.chains.map((chain) => ({ start: chain.start, end: chain.end }))
+      chains: config.chainConfig.chains.map((chain) => ({
+        start: chain.start,
+        end: chain.end,
+        startAnchor: chain.startAnchor,
+        endAnchor: chain.endAnchor,
+        startAnchorOffset: chain.startAnchorOffset?.clone(),
+        endAnchorOffset: chain.endAnchorOffset?.clone()
+      }))
     };
     this._bindPose = new WeakMap();
     const rootPoints: BoneNode[] = [];
     const boneNodes: BoneNode[] = [];
     const boneToNode = new Map<BoneNode, SceneNode>();
     const pointTransforms: TransformAccess[] = [];
+    const pointSourceTransforms = new Map<BoneNode, TransformAccess>();
     const nodeToBone = new Map<SceneNode, BoneNode>();
     const nodeToDepth = new Map<SceneNode, number>();
     for (const chain of config.chainConfig.chains) {
@@ -154,6 +226,14 @@ export class JointDynamicsSystem {
       let previous: BoneNode | null = null;
       for (let i = 0; i < chainNodes.length; i++) {
         const node = chainNodes[i];
+        const isChainStart = i === 0;
+        const isChainEnd = i === chainNodes.length - 1;
+        const sourceNode =
+          (isChainStart ? chain.startAnchor : null) ?? (isChainEnd ? chain.endAnchor : null) ?? node;
+        const sourceOffset =
+          (isChainStart ? chain.startAnchorOffset : null) ??
+          (isChainEnd ? chain.endAnchorOffset : null) ??
+          null;
         let boneNode = nodeToBone.get(node);
         if (!boneNode) {
           this._bindPose.set(node, {
@@ -165,20 +245,41 @@ export class JointDynamicsSystem {
             index: boneNodes.length,
             position: node.getWorldPosition(),
             children: [],
-            isFixed: i === 0,
+            isFixed: isChainStart || !!(isChainEnd && chain.endAnchor),
             depth: i
           };
           nodeToBone.set(node, boneNode);
           nodeToDepth.set(node, i);
           boneNodes.push(boneNode);
           boneToNode.set(boneNode, node);
+          pointSourceTransforms.set(
+            boneNode,
+            sourceOffset
+              ? createOffsetTransformAccess(sourceNode, sourceOffset)
+              : createTransformAccess(sourceNode)
+          );
         } else {
           const depth = nodeToDepth.get(node) ?? boneNode.depth;
           if (i < depth) {
             boneNode.depth = i;
             nodeToDepth.set(node, i);
           }
-          boneNode.isFixed = boneNode.isFixed || i === 0;
+          boneNode.isFixed = boneNode.isFixed || isChainStart || !!(isChainEnd && chain.endAnchor);
+          const existingSource =
+            pointSourceTransforms.get(boneNode)?.node ?? boneToNode.get(boneNode) ?? null;
+          if (existingSource && existingSource !== sourceNode) {
+            throw new Error(
+              `Conflicting anchor assignment for joint dynamics node '${node.name || node.persistentId}'.`
+            );
+          }
+          if (!existingSource) {
+            pointSourceTransforms.set(
+              boneNode,
+              sourceOffset
+                ? createOffsetTransformAccess(sourceNode, sourceOffset)
+                : createTransformAccess(sourceNode)
+            );
+          }
         }
         if (previous && !previous.children.includes(boneNode)) {
           previous.children.push(boneNode);
@@ -211,6 +312,9 @@ export class JointDynamicsSystem {
     boneNodes.length = 0;
     boneNodes.push(...orderedBoneNodes);
     pointTransforms.push(...boneNodes.map((boneNode) => createTransformAccess(boneToNode.get(boneNode)!)));
+    const pointInputTransforms = boneNodes.map(
+      (boneNode) => pointSourceTransforms.get(boneNode) ?? createTransformAccess(boneToNode.get(boneNode)!)
+    );
     const systemRoot = createTransformAccess(config.chainConfig.systemRoot);
     const defaultConfig = this.getDefaultControllerConfig();
     const controllerConfig: ControllerConfig = {
@@ -224,7 +328,15 @@ export class JointDynamicsSystem {
       }
     };
     this._controller = new JointDynamicsSystemController(controllerConfig);
-    this._controller.initialize(systemRoot, rootPoints, pointTransforms, colliders, grabbers, flatPlanes);
+    this._controller.initialize(
+      systemRoot,
+      rootPoints,
+      pointTransforms,
+      pointInputTransforms,
+      colliders,
+      grabbers,
+      flatPlanes
+    );
   }
 
   /**
@@ -244,7 +356,14 @@ export class JointDynamicsSystem {
   get chainConfig(): JointChainConfig {
     return {
       systemRoot: this._chainConfig.systemRoot,
-      chains: this._chainConfig.chains.map((chain) => ({ start: chain.start, end: chain.end }))
+      chains: this._chainConfig.chains.map((chain) => ({
+        start: chain.start,
+        end: chain.end,
+        startAnchor: chain.startAnchor,
+        endAnchor: chain.endAnchor,
+        startAnchorOffset: chain.startAnchorOffset?.clone(),
+        endAnchorOffset: chain.endAnchorOffset?.clone()
+      }))
     };
   }
 

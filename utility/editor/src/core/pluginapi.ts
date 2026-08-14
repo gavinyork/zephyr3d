@@ -23,6 +23,13 @@ export type EditorProjectInfo = {
   lastEditScene?: string;
 };
 
+export type EditorProjectAssetChange = {
+  type: 'created' | 'deleted' | 'moved' | 'modified';
+  path: string;
+  itemType: 'file' | 'directory';
+  oldPath?: string;
+};
+
 export type EditorHost = {
   currentProject: EditorProjectInfo | null;
 };
@@ -186,6 +193,7 @@ export type EditorEditToolFactoryContext = {
 
 export type EditorEventMap = {
   projectOpened: [project: EditorProjectInfo];
+  projectAssetChanged: [change: EditorProjectAssetChange];
   sceneOpening: [path: string];
   sceneOpened: [scene: unknown, path: string];
   sceneCreated: [scene: unknown, path: string];
@@ -326,10 +334,12 @@ export type EditorPluginDefinition = Partial<EditorPluginMetadata> & {
   settings?: EditorPluginSettingsSchema;
   activate: (ctx: EditorPluginContext) => void | Promise<void>;
   deactivate?: (ctx: EditorPluginContext) => void | Promise<void>;
+  uninstall?: (ctx: EditorPluginContext) => void | Promise<void>;
 };
 
 export type EditorPlugin = EditorPluginMetadata & {
   settings?: EditorPluginSettingsSchema;
   activate: (ctx: EditorPluginContext) => void | Promise<void>;
   deactivate?: (ctx: EditorPluginContext) => void | Promise<void>;
+  uninstall?: (ctx: EditorPluginContext) => void | Promise<void>;
 };

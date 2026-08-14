@@ -37,6 +37,9 @@ export class GraphEditor
   getNodeEditor(tab: string) {
     return this._nodeEditor[tab];
   }
+  get activeNodeEditor() {
+    return this.getNodeEditor(this._activeTab);
+  }
   get propEditor() {
     return this._propGrid;
   }
@@ -50,7 +53,10 @@ export class GraphEditor
     this._nodeEditor[label] = new NodeEditor(this);
     return this._nodeEditor[label];
   }
-  render() {
+  async duplicateActiveSelection() {
+    return this._nodeEditor[this._activeTab]?.duplicateSelectedNodes() ?? false;
+  }
+  render(showRightPanel = true) {
     const editor = this.getNodeEditor(this._activeTab);
     if (editor) {
       let propertySelection: Nullable<IGraphNode> = null;
@@ -73,21 +79,23 @@ export class GraphEditor
     const width = regionAvail.x;
     const height = regionAvail.y;
 
-    this._rightPanel.left = width - this._rightPanel.width;
-    this._rightPanel.top = cursorPos.y;
-    this._rightPanel.height = height;
-    if (
-      this._rightPanel.beginChild(
-        '##NodeProperies',
-        this._readonly ? ImGui.WindowFlags.NoMouseInputs : undefined
-      )
-    ) {
-      this.renderRightPanel();
+    if (showRightPanel) {
+      this._rightPanel.left = width - this._rightPanel.width;
+      this._rightPanel.top = cursorPos.y;
+      this._rightPanel.height = height;
+      if (
+        this._rightPanel.beginChild(
+          '##NodeProperies',
+          this._readonly ? ImGui.WindowFlags.NoMouseInputs : undefined
+        )
+      ) {
+        this.renderRightPanel();
+      }
+      this._rightPanel.endChild();
     }
-    this._rightPanel.endChild();
 
     ImGui.SetCursorPos(cursorPos);
-    const nodeEditorWidth = this._rightPanel.left - cursorPos.x;
+    const nodeEditorWidth = showRightPanel ? this._rightPanel.left - cursorPos.x : width;
     const nodeEditorHeight = height;
     if (nodeEditorWidth > 0 && nodeEditorHeight > 0) {
       ImGui.BeginChild(

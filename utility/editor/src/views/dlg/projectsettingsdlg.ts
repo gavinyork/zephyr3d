@@ -1,5 +1,15 @@
 import type { VFS } from '@zephyr3d/base';
 import { ImGui } from '@zephyr3d/imgui';
+import {
+  DEFAULT_ACTIVE_MORPH_TARGET_LIMIT,
+  DEFAULT_MORPH_TARGET_LIMIT,
+  DEFAULT_SKIN_INFLUENCE_LIMIT,
+  MAX_MORPH_TARGETS,
+  MAX_SKIN_INFLUENCES,
+  normalizeActiveMorphTargetLimit,
+  normalizeMorphTargetLimit,
+  normalizeSkinInfluenceLimit
+} from '@zephyr3d/scene';
 import { ListView, ListViewData } from '../../components/listview';
 import { renderMultiSelectedCombo } from '../../components/multicombo';
 import { DialogRenderer } from '../../components/modal';
@@ -256,6 +266,56 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     const selectedRenderScaleIndex = [renderScaleIndex] as [number];
     if (ImGui.Combo('Render Scale', selectedRenderScaleIndex, DlgProjectSettings.RENDER_SCALE_LABELS)) {
       this._settings.renderScale = DlgProjectSettings.RENDER_SCALE_ITEMS[selectedRenderScaleIndex[0]];
+    }
+
+    const morphTargetLimit = [this._settings.morphTargetLimit ?? DEFAULT_MORPH_TARGET_LIMIT] as [number];
+    if (ImGui.InputInt('Morph Target Limit', morphTargetLimit, 32, 128)) {
+      this._settings.morphTargetLimit = normalizeMorphTargetLimit(morphTargetLimit[0]);
+      this._settings.activeMorphTargetLimit = Math.min(
+        this._settings.activeMorphTargetLimit ?? DEFAULT_ACTIVE_MORPH_TARGET_LIMIT,
+        this._settings.morphTargetLimit
+      );
+    }
+    ImGui.TextDisabled(
+      `Default ${DEFAULT_MORPH_TARGET_LIMIT}, range 1-${MAX_MORPH_TARGETS}. Reimport models after raising this limit.`
+    );
+
+    const activeMorphTargetLimit = [
+      this._settings.activeMorphTargetLimit ?? DEFAULT_ACTIVE_MORPH_TARGET_LIMIT
+    ] as [number];
+    if (ImGui.InputInt('Active Morph Upload Limit', activeMorphTargetLimit, 8, 32)) {
+      this._settings.activeMorphTargetLimit = Math.min(
+        normalizeActiveMorphTargetLimit(activeMorphTargetLimit[0]),
+        this._settings.morphTargetLimit ?? DEFAULT_MORPH_TARGET_LIMIT
+      );
+    }
+    ImGui.TextDisabled(
+      `Default ${DEFAULT_ACTIVE_MORPH_TARGET_LIMIT}, effective range 1-${this._settings.morphTargetLimit ?? DEFAULT_MORPH_TARGET_LIMIT}. Controls how many active morphs are uploaded per frame; no reimport needed.`
+    );
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip(
+        'This limit only affects per-frame active morph uploads.\n' +
+          'It does not change the total morph count preserved by Morph Target Limit.\n' +
+          'MetaHuman-style facial rigs usually benefit from 64-128.'
+      );
+    }
+
+    const skinInfluenceLimit = [this._settings.skinInfluenceLimit ?? DEFAULT_SKIN_INFLUENCE_LIMIT] as [
+      number
+    ];
+    if (ImGui.InputInt('Max Skin Influences', skinInfluenceLimit, 2, 4)) {
+      this._settings.skinInfluenceLimit = normalizeSkinInfluenceLimit(skinInfluenceLimit[0]);
+    }
+    ImGui.TextDisabled(
+      `Default ${DEFAULT_SKIN_INFLUENCE_LIMIT}, range 1-${MAX_SKIN_INFLUENCES}. Reimport skinned models after raising this limit to preserve more weights.`
+    );
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip(
+        'Controls how many skinning influences are preserved per vertex during import.\n' +
+          'Values above 4 require the runtime extra-influence texture path.\n' +
+          'Lowering this setting does not strip influences that were already imported.\n' +
+          'MetaHuman head rigs typically need 8-12 to avoid facial binding loss.'
+      );
     }
 
     if (ImGui.BeginChild('ListBox', new ImGui.ImVec2(0, 100), true)) {

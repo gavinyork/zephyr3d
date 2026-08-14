@@ -9,6 +9,15 @@ import {
   FixedGeometryCacheTrack,
   JointDynamicsModifier,
   JointDynamicsSystem,
+  MultiChainSpringSystem,
+  SpringChain,
+  SpringModifier,
+  SpringSystem,
+  createCapsuleCollider,
+  createPlaneCollider,
+  createSphereCollider,
+  createSpringConstraint,
+  createSpringParticle,
   createTransformAccess,
   PCAGeometryCacheTrack,
   MorphTargetTrack,
@@ -21,6 +30,14 @@ import {
 } from '../../../animation';
 import type { ControllerConfig, ControllerConfigUpdate } from '../../../animation/joint_dynamics/controller';
 import type { ColliderR, GrabberR, JointDynamicSystemConfig } from '../../../animation/joint_dynamics';
+import type {
+  CapsuleCollider,
+  InterChainConstraint,
+  PlaneCollider,
+  SphereCollider,
+  SpringCollider,
+  SpringSystemOptions
+} from '../../../animation/spring';
 import type { ResourceManager } from '../manager';
 import { defineProps, type PropertyValue, type SerializableClass } from '../types';
 import { SceneNode } from '../../../scene';
@@ -59,7 +76,14 @@ type SerializedJointDynamicsGrabber = {
 type SerializedJointDynamicsModifier = {
   skeleton: string;
   systemRoot: string;
-  chains: { start: string; end: string }[];
+  chains: {
+    start: string;
+    end: string;
+    startAnchor?: string;
+    endAnchor?: string;
+    startAnchorOffset?: number[];
+    endAnchorOffset?: number[];
+  }[];
   controllerConfig?: SerializedControllerConfig;
   colliders?: SerializedJointDynamicsCollider[];
   flatPlanes?: SerializedJointDynamicsFlatPlane[];
@@ -67,7 +91,80 @@ type SerializedJointDynamicsModifier = {
   enabled?: boolean;
 };
 
+type SerializedSpringParticle = {
+  node?: string;
+  anchorNode?: string;
+  anchorOffset?: number[];
+  originalPosition: number[];
+  originalRotation?: number[];
+  mass: number;
+  damping: number;
+  fixed: boolean;
+};
+
+type SerializedSpringChain = {
+  particles: SerializedSpringParticle[];
+  constraints: {
+    particleA: number;
+    particleB: number;
+    restLength: number;
+    stiffness: number;
+    compliance: number;
+  }[];
+};
+
+type SerializedSpringCollider =
+  | {
+      type: 'sphere';
+      node?: string;
+      enabled: boolean;
+      center: number[];
+      radius: number;
+      localRadius?: number;
+      localRadiusScaleRef?: number;
+      localOffset?: number[];
+    }
+  | {
+      type: 'capsule';
+      node?: string;
+      enabled: boolean;
+      start: number[];
+      end: number[];
+      radius: number;
+      localRadius?: number;
+      localRadiusScaleRef?: number;
+      localStartOffset?: number[];
+      localEndOffset?: number[];
+    }
+  | {
+      type: 'plane';
+      node?: string;
+      enabled: boolean;
+      point: number[];
+      normal: number[];
+      localPointOffset?: number[];
+      localNormal?: number[];
+    };
+
+type SerializedSpringSystemOptions = Omit<SpringSystemOptions, 'gravity' | 'wind'> & {
+  gravity: number[];
+  wind: number[];
+};
+
+type SerializedSpringModifier = {
+  skeleton: string;
+  sourceId?: string;
+  systemType: 'single' | 'multi';
+  options: SerializedSpringSystemOptions;
+  chains: SerializedSpringChain[];
+  interChainConstraints?: Omit<InterChainConstraint, 'lambda'>[];
+  colliders?: SerializedSpringCollider[];
+  enabled?: boolean;
+  weight?: number;
+};
+
 const jointDynamicsModifierSkeletons = new WeakMap<JointDynamicsModifier, SkeletonRig>();
+const springModifierSkeletons = new WeakMap<SpringModifier, SkeletonRig>();
 
 function encodeSkeletonBindPose(bindPose: SkeletonBindPose): string {
   return uint8ArrayToBase64(
@@ -92,6 +189,226 @@ function vectorFromArray(value: number[] | undefined, defaultValue = Vector3.zer
   return Array.isArray(value)
     ? new Vector3(value[0] ?? 0, value[1] ?? 0, value[2] ?? 0)
     : defaultValue.clone();
+}
+
+function quaternionToArray(value: Quaternion): number[] {
+  return [value.x, value.y, value.z, value.w];
+}
+
+function quaternionFromArray(value: number[] | undefined): Quaternion | undefined {
+  return Array.isArray(value)
+    ? new Quaternion(value[0] ?? 0, value[1] ?? 0, value[2] ?? 0, value[3] ?? 1)
+    : undefined;
+}
+
+function serializeSpringChain(chain: SpringChain): SerializedSpringChain {
+  return {
+    particles: chain.particles.map((particle) => ({
+      ...(particle.node ? { node: particle.node.persistentId } : {}),
+      ...(particle.anchorNode ? { anchorNode: particle.anchorNode.persistentId } : {}),
+      ...(particle.anchorOffset ? { anchorOffset: vectorToArray(particle.anchorOffset) } : {}),
+      originalPosition: vectorToArray(particle.originalPosition),
+      ...(particle.originalRotation
+        ? { originalRotation: quaternionToArray(particle.originalRotation) }
+        : {}),
+      mass: particle.mass,
+      damping: particle.damping,
+      fixed: particle.fixed
+    })),
+    constraints: chain.constraints.map((constraint) => ({
+      particleA: constraint.particleA,
+      particleB: constraint.particleB,
+      restLength: constraint.restLength,
+      stiffness: constraint.stiffness,
+      compliance: constraint.compliance
+    }))
+  };
+}
+
+function deserializeSpringChain(ctx: SceneNode, data: SerializedSpringChain): SpringChain | null {
+  const chain = new SpringChain();
+  for (const item of data.particles ?? []) {
+    const node = findSerializedNode(ctx, item.node);
+    const anchorNode = findSerializedNode(ctx, item.anchorNode);
+    if ((item.node && !node) || (item.anchorNode && !anchorNode)) {
+      return null;
+    }
+    const position = node
+      ? new Vector3(node.worldMatrix.m03, node.worldMatrix.m13, node.worldMatrix.m23)
+      : vectorFromArray(item.originalPosition);
+    let originalRotation = quaternionFromArray(item.originalRotation);
+    if (node) {
+      originalRotation = new Quaternion();
+      node.worldMatrix.decompose(null, originalRotation, null);
+    }
+    chain.addParticle(
+      createSpringParticle(position, {
+        mass: item.mass,
+        damping: item.damping,
+        fixed: item.fixed,
+        node: node ?? undefined,
+        anchorNode: anchorNode ?? undefined,
+        anchorOffset: item.anchorOffset ? vectorFromArray(item.anchorOffset) : undefined,
+        originalRotation
+      })
+    );
+  }
+  for (const item of data.constraints ?? []) {
+    if (
+      item.particleA < 0 ||
+      item.particleB < 0 ||
+      item.particleA >= chain.particles.length ||
+      item.particleB >= chain.particles.length
+    ) {
+      return null;
+    }
+    chain.addConstraint(
+      createSpringConstraint(item.particleA, item.particleB, item.restLength, item.stiffness, item.compliance)
+    );
+  }
+  return chain.particles.length > 0 ? chain : null;
+}
+
+function serializeSpringCollider(collider: SpringCollider): SerializedSpringCollider {
+  switch (collider.type) {
+    case 'sphere': {
+      const sphere = collider as SphereCollider;
+      return {
+        type: 'sphere',
+        ...(sphere.node ? { node: sphere.node.persistentId } : {}),
+        enabled: sphere.enabled,
+        center: vectorToArray(sphere.center),
+        radius: sphere.radius,
+        ...(sphere.localRadius !== undefined ? { localRadius: sphere.localRadius } : {}),
+        ...(sphere.localRadiusScaleRef !== undefined
+          ? { localRadiusScaleRef: sphere.localRadiusScaleRef }
+          : {}),
+        ...(sphere.localOffset ? { localOffset: vectorToArray(sphere.localOffset) } : {})
+      };
+    }
+    case 'capsule': {
+      const capsule = collider as CapsuleCollider;
+      return {
+        type: 'capsule',
+        ...(capsule.node ? { node: capsule.node.persistentId } : {}),
+        enabled: capsule.enabled,
+        start: vectorToArray(capsule.start),
+        end: vectorToArray(capsule.end),
+        radius: capsule.radius,
+        ...(capsule.localRadius !== undefined ? { localRadius: capsule.localRadius } : {}),
+        ...(capsule.localRadiusScaleRef !== undefined
+          ? { localRadiusScaleRef: capsule.localRadiusScaleRef }
+          : {}),
+        ...(capsule.localStartOffset ? { localStartOffset: vectorToArray(capsule.localStartOffset) } : {}),
+        ...(capsule.localEndOffset ? { localEndOffset: vectorToArray(capsule.localEndOffset) } : {})
+      };
+    }
+    case 'plane': {
+      const plane = collider as PlaneCollider;
+      return {
+        type: 'plane',
+        ...(plane.node ? { node: plane.node.persistentId } : {}),
+        enabled: plane.enabled,
+        point: vectorToArray(plane.point),
+        normal: vectorToArray(plane.normal),
+        ...(plane.localPointOffset ? { localPointOffset: vectorToArray(plane.localPointOffset) } : {}),
+        ...(plane.localNormal ? { localNormal: vectorToArray(plane.localNormal) } : {})
+      };
+    }
+  }
+}
+
+function restoreSpringColliderRadiusScale(
+  collider: SphereCollider | CapsuleCollider,
+  data: Extract<SerializedSpringCollider, { type: 'sphere' | 'capsule' }>
+): void {
+  const createdScaleRef = collider.localRadiusScaleRef;
+  if (data.localRadiusScaleRef !== undefined) {
+    collider.localRadiusScaleRef = data.localRadiusScaleRef;
+  } else if (
+    data.localRadius !== undefined &&
+    createdScaleRef !== undefined &&
+    Number.isFinite(data.localRadius) &&
+    Number.isFinite(data.radius) &&
+    Math.abs(data.radius) > 1e-6
+  ) {
+    // Older serialized modifiers omitted the authored scale reference. Recover it
+    // from the stored world radius and the node scale captured by the constructor.
+    const inferredScaleRef = (data.localRadius * createdScaleRef) / data.radius;
+    if (Number.isFinite(inferredScaleRef) && Math.abs(inferredScaleRef) > 1e-6) {
+      collider.localRadiusScaleRef = Math.abs(inferredScaleRef);
+    }
+  }
+  collider.radius = data.radius;
+}
+
+function deserializeSpringCollider(ctx: SceneNode, data: SerializedSpringCollider): SpringCollider | null {
+  const node = findSerializedNode(ctx, data.node);
+  if (data.node && !node) {
+    return null;
+  }
+  let collider: SpringCollider;
+  switch (data.type) {
+    case 'sphere': {
+      const sphere = createSphereCollider(
+        node && data.localOffset ? vectorFromArray(data.localOffset) : vectorFromArray(data.center),
+        node ? (data.localRadius ?? data.radius) : data.radius,
+        node ?? undefined
+      );
+      restoreSpringColliderRadiusScale(sphere, data);
+      collider = sphere;
+      break;
+    }
+    case 'capsule': {
+      const capsule = createCapsuleCollider(
+        node && data.localStartOffset ? vectorFromArray(data.localStartOffset) : vectorFromArray(data.start),
+        node && data.localEndOffset ? vectorFromArray(data.localEndOffset) : vectorFromArray(data.end),
+        node ? (data.localRadius ?? data.radius) : data.radius,
+        node ?? undefined
+      );
+      restoreSpringColliderRadiusScale(capsule, data);
+      collider = capsule;
+      break;
+    }
+    case 'plane':
+      collider = createPlaneCollider(
+        node && data.localPointOffset ? vectorFromArray(data.localPointOffset) : vectorFromArray(data.point),
+        node && data.localNormal ? vectorFromArray(data.localNormal) : vectorFromArray(data.normal),
+        node ?? undefined
+      );
+      break;
+  }
+  collider.enabled = data.enabled;
+  return collider;
+}
+
+function getSpringSystemOptions(
+  system: SpringSystem | MultiChainSpringSystem
+): SerializedSpringSystemOptions {
+  return {
+    iterations: system.iterations,
+    gravity: vectorToArray(system.gravity),
+    wind: vectorToArray(system.wind),
+    enableInertialForces: system.enableInertialForces,
+    centrifugalScale: system.centrifugalScale,
+    coriolisScale: system.coriolisScale,
+    solver: system.solver,
+    poseFollow: system.poseFollow,
+    poseFollowRoot: system.poseFollowRoot,
+    poseFollowTip: system.poseFollowTip,
+    poseFollowExponent: system.poseFollowExponent,
+    maxPoseOffset: system.maxPoseOffset,
+    maxPoseOffsetRoot: system.maxPoseOffsetRoot,
+    maxPoseOffsetTip: system.maxPoseOffsetTip
+  };
+}
+
+function deserializeSpringSystemOptions(options: SerializedSpringSystemOptions): SpringSystemOptions {
+  return {
+    ...options,
+    gravity: vectorFromArray(options.gravity, new Vector3(0, -9.8, 0)),
+    wind: vectorFromArray(options.wind)
+  };
 }
 
 function serializeScalarCurve(value: InterpolatorScalar): SerializedScalarCurve {
@@ -201,6 +518,16 @@ export function setJointDynamicsModifierSkeleton(
 
 export function getJointDynamicsModifierSkeleton(modifier: JointDynamicsModifier): SkeletonRig | null {
   return jointDynamicsModifierSkeletons.get(modifier) ?? null;
+}
+
+/** @internal */
+export function setSpringModifierSkeleton(modifier: SpringModifier, skeleton: SkeletonRig): void {
+  springModifierSkeletons.set(modifier, skeleton);
+}
+
+/** @internal */
+export function getSpringModifierSkeleton(modifier: SpringModifier): SkeletonRig | null {
+  return springModifierSkeletons.get(modifier) ?? null;
 }
 
 type JointDynamicsNumberConfigKey = {
@@ -446,6 +773,133 @@ function createJointDynamicsCurveProp(
 }
 
 /** @internal */
+export function getSpringModifierClass(): SerializableClass {
+  return {
+    ctor: SpringModifier,
+    name: 'SpringModifier',
+    createFunc(ctx: SceneNode, init: SerializedSpringModifier) {
+      const skeleton =
+        ctx.findSkeletonRigById(init.skeleton) ?? ctx.findSkeletonById(init.skeleton)?.rig ?? null;
+      if (!skeleton || !Array.isArray(init.chains) || init.chains.length === 0) {
+        return { obj: null, loadProps: false };
+      }
+      const chains = init.chains.map((chain) => deserializeSpringChain(ctx, chain));
+      if (chains.some((chain) => !chain)) {
+        return { obj: null, loadProps: false };
+      }
+      const options = deserializeSpringSystemOptions(init.options);
+      let system: SpringSystem | MultiChainSpringSystem;
+      if (init.systemType === 'single') {
+        system = new SpringSystem(chains[0]!, options);
+      } else {
+        const multiChainSystem = new MultiChainSpringSystem(options);
+        for (const chain of chains) {
+          multiChainSystem.addChain(chain!);
+        }
+        for (const constraint of init.interChainConstraints ?? []) {
+          if (
+            constraint.chainAIndex < 0 ||
+            constraint.chainBIndex < 0 ||
+            constraint.chainAIndex >= chains.length ||
+            constraint.chainBIndex >= chains.length
+          ) {
+            continue;
+          }
+          multiChainSystem.addInterChainConstraint({ ...constraint, lambda: 0 });
+        }
+        system = multiChainSystem;
+      }
+      for (const colliderData of init.colliders ?? []) {
+        const collider = deserializeSpringCollider(ctx, colliderData);
+        if (collider) {
+          system.addCollider(collider);
+        }
+      }
+      const modifier = new SpringModifier(system as unknown as SpringSystem, init.weight ?? 1);
+      modifier.sourceId = init.sourceId ?? '';
+      modifier.enabled = init.enabled ?? true;
+      setSpringModifierSkeleton(modifier, skeleton);
+      return { obj: modifier, loadProps: false };
+    },
+    getInitParams(obj: SpringModifier) {
+      const skeleton = getSpringModifierSkeleton(obj);
+      const system = obj.springSystem as unknown as SpringSystem | MultiChainSpringSystem;
+      const isMultiChain = system instanceof MultiChainSpringSystem;
+      if (!isMultiChain && !(system instanceof SpringSystem)) {
+        throw new Error('Serialize SpringModifier failed: Unsupported spring system type');
+      }
+      const chains = isMultiChain ? system.chains : [system.chain];
+      const init: SerializedSpringModifier = {
+        skeleton: skeleton?.persistentId ?? '',
+        sourceId: obj.sourceId,
+        systemType: isMultiChain ? 'multi' : 'single',
+        options: getSpringSystemOptions(system),
+        chains: chains.map(serializeSpringChain),
+        ...(isMultiChain
+          ? {
+              interChainConstraints: system.interChainConstraints.map(
+                ({ lambda: _lambda, ...constraint }) => constraint
+              )
+            }
+          : {}),
+        colliders: system.colliders.map(serializeSpringCollider),
+        enabled: obj.enabled,
+        weight: obj.weight
+      };
+      return init;
+    },
+    getProps() {
+      return defineProps([
+        {
+          name: 'Commands',
+          description: 'Reset spring modifier state',
+          type: 'command',
+          command(this: SpringModifier) {
+            this.reset();
+            return false;
+          },
+          get(value) {
+            value.str[0] = 'Reset';
+          }
+        },
+        {
+          name: 'Enabled',
+          description: 'Whether this spring modifier is active',
+          type: 'bool',
+          isPersistent() {
+            return false;
+          },
+          get(this: SpringModifier, value) {
+            value.bool[0] = this.enabled;
+          },
+          set(this: SpringModifier, value) {
+            this.enabled = value.bool[0];
+          }
+        },
+        {
+          name: 'Weight',
+          description: 'Physics blend weight. 0 uses animation only, 1 uses full spring physics',
+          type: 'float',
+          options: {
+            minValue: 0,
+            maxValue: 1
+          },
+          isPersistent() {
+            return false;
+          },
+          get(this: SpringModifier, value) {
+            value.num[0] = this.weight;
+          },
+          set(this: SpringModifier, value) {
+            this.weight = value.num[0];
+          }
+        }
+      ]);
+    }
+  };
+}
+
+/** @internal */
 export function getJointDynamicsModifierClass(): SerializableClass {
   return {
     ctor: JointDynamicsModifier,
@@ -458,12 +912,25 @@ export function getJointDynamicsModifierClass(): SerializableClass {
         return { obj: null, loadProps: false };
       }
       const chains = (init.chains ?? [])
-        .map((chain) => {
+        .map((chain): JointDynamicSystemConfig['chainConfig']['chains'][number] | null => {
           const start = findSerializedNode(ctx, chain.start);
           const end = findSerializedNode(ctx, chain.end);
-          return start && end ? { start, end } : null;
+          const startAnchor = findSerializedNode(ctx, chain.startAnchor);
+          const endAnchor = findSerializedNode(ctx, chain.endAnchor);
+          return start && end
+            ? {
+                start,
+                end,
+                startAnchor: startAnchor ?? undefined,
+                endAnchor: endAnchor ?? undefined,
+                startAnchorOffset: chain.startAnchorOffset
+                  ? vectorFromArray(chain.startAnchorOffset)
+                  : undefined,
+                endAnchorOffset: chain.endAnchorOffset ? vectorFromArray(chain.endAnchorOffset) : undefined
+              }
+            : null;
         })
-        .filter((chain): chain is { start: SceneNode; end: SceneNode } => {
+        .filter((chain): chain is JointDynamicSystemConfig['chainConfig']['chains'][number] => {
           return !!chain && chain.start.isParentOf(chain.end);
         });
       if (chains.length === 0) {
@@ -538,7 +1005,11 @@ export function getJointDynamicsModifierClass(): SerializableClass {
         systemRoot: chainConfig.systemRoot.persistentId,
         chains: chainConfig.chains.map((chain) => ({
           start: chain.start.persistentId,
-          end: chain.end.persistentId
+          end: chain.end.persistentId,
+          startAnchor: chain.startAnchor?.persistentId,
+          endAnchor: chain.endAnchor?.persistentId,
+          startAnchorOffset: chain.startAnchorOffset ? vectorToArray(chain.startAnchorOffset) : undefined,
+          endAnchorOffset: chain.endAnchorOffset ? vectorToArray(chain.endAnchorOffset) : undefined
         })),
         controllerConfig: serializeControllerConfig(controllerConfig),
         colliders: obj.jointDynamicsSystem.getColliderSnapshots().map((item) => ({

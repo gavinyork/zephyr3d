@@ -1,6 +1,18 @@
 import type { HttpDirectoryReader, Immutable, VFS } from '@zephyr3d/base';
 import { HttpFS, MemoryFS, PathUtils, randomUUID } from '@zephyr3d/base';
-import { getEngine, tryGetApp } from '@zephyr3d/scene';
+import {
+  DEFAULT_ACTIVE_MORPH_TARGET_LIMIT,
+  DEFAULT_MORPH_TARGET_LIMIT,
+  DEFAULT_SKIN_INFLUENCE_LIMIT,
+  getEngine,
+  normalizeActiveMorphTargetLimit,
+  normalizeMorphTargetLimit,
+  normalizeSkinInfluenceLimit,
+  setActiveMorphTargetLimit,
+  setMorphTargetLimit,
+  setSkinInfluenceLimit,
+  tryGetApp
+} from '@zephyr3d/scene';
 import { fileListFileName, libDir, projectFileName } from '../build/templates';
 import { DlgMessage } from '../../views/dlg/messagedlg';
 import { installDeps } from '../build/dep';
@@ -23,13 +35,19 @@ export type ProjectSettings = {
   preferredRHI?: string[];
   enableMSAA?: boolean;
   renderScale?: number;
+  morphTargetLimit?: number;
+  activeMorphTargetLimit?: number;
+  skinInfluenceLimit?: number;
   dependencies?: { [name: string]: string };
 };
 
 const defaultProjectSettings: Immutable<ProjectSettings> = {
   preferredRHI: ['WebGL', 'WebGL2', 'WebGPU'],
   enableMSAA: false,
-  renderScale: 0
+  renderScale: 0,
+  morphTargetLimit: DEFAULT_MORPH_TARGET_LIMIT,
+  activeMorphTargetLimit: DEFAULT_ACTIVE_MORPH_TARGET_LIMIT,
+  skinInfluenceLimit: DEFAULT_SKIN_INFLUENCE_LIMIT
 };
 
 function normalizeRenderScale(scale: number): number {
@@ -47,12 +65,21 @@ function normalizeRenderScale(scale: number): number {
 
 function normalizeProjectSettings(settings: ProjectSettings): ProjectSettings {
   const preferredRHI = settings?.preferredRHI ?? defaultProjectSettings.preferredRHI;
+  const morphTargetLimit = normalizeMorphTargetLimit(settings?.morphTargetLimit);
+  const activeMorphTargetLimit = Math.min(
+    normalizeActiveMorphTargetLimit(settings?.activeMorphTargetLimit),
+    morphTargetLimit
+  );
+  const skinInfluenceLimit = normalizeSkinInfluenceLimit(settings?.skinInfluenceLimit);
   return {
     ...defaultProjectSettings,
     ...settings,
     preferredRHI: preferredRHI ? [...preferredRHI] : undefined,
     enableMSAA: !!settings?.enableMSAA,
-    renderScale: normalizeRenderScale(settings?.renderScale)
+    renderScale: normalizeRenderScale(settings?.renderScale),
+    morphTargetLimit,
+    activeMorphTargetLimit,
+    skinInfluenceLimit
   };
 }
 
@@ -132,6 +159,13 @@ export class ProjectService {
   }
   static get currentProjectStorageId() {
     return this._currentProjectInfo ? getProjectStorageId(this._currentProjectInfo) : '';
+  }
+  static applyRuntimeSettings(settings?: ProjectSettings | null) {
+    const morphTargetLimit = setMorphTargetLimit(settings?.morphTargetLimit);
+    setActiveMorphTargetLimit(
+      Math.min(settings?.activeMorphTargetLimit ?? DEFAULT_ACTIVE_MORPH_TARGET_LIMIT, morphTargetLimit)
+    );
+    setSkinInfluenceLimit(settings?.skinInfluenceLimit);
   }
   static async listProjects(): Promise<ProjectInfo[]> {
     const manifest = await this.readManifest(true);

@@ -14,6 +14,12 @@ export class ConstantScalarNode extends BaseGraphNode {
   private _isUniform: boolean;
   /** The uniform parameter name (only used when isUniform is true) */
   private _paramName: string;
+  /** Whether the scalar uniform should expose a value range in editor UI */
+  private _useRange: boolean;
+  /** The minimum allowed value when range limiting is enabled */
+  private _minValue: number;
+  /** The maximum allowed value when range limiting is enabled */
+  private _maxValue: number;
   /**
    * Creates a new constant scalar node
    *
@@ -25,7 +31,22 @@ export class ConstantScalarNode extends BaseGraphNode {
     this._value = 0;
     this._isUniform = true;
     this._paramName = getParamName();
+    this._useRange = false;
+    this._minValue = 0;
+    this._maxValue = 1;
     this._outputs = [{ id: 1, name: '' }];
+  }
+  private clampValue(val: number) {
+    if (!this._useRange) {
+      return val;
+    }
+    return Math.min(this._maxValue, Math.max(this._minValue, val));
+  }
+  private normalizeRange() {
+    if (this._minValue > this._maxValue) {
+      this._maxValue = this._minValue;
+    }
+    this._value = this.clampValue(this._value);
   }
   /**
    * Generates a string representation of this node
@@ -80,11 +101,62 @@ export class ConstantScalarNode extends BaseGraphNode {
           {
             name: 'x',
             type: 'float',
+            options: {
+              label: 'DefaultValue'
+            },
             get(this: ConstantScalarNode, value) {
               value.num[0] = this.x;
             },
             set(this: ConstantScalarNode, value) {
               this.x = value.num[0];
+            }
+          },
+          {
+            name: 'useRange',
+            type: 'bool',
+            options: {
+              label: 'UseRange'
+            },
+            get(this: ConstantScalarNode, value) {
+              value.bool[0] = this.useRange;
+            },
+            set(this: ConstantScalarNode, value) {
+              this.useRange = value.bool[0];
+            },
+            isHidden(this: ConstantScalarNode) {
+              return !this.isUniform;
+            }
+          },
+          {
+            name: 'minValue',
+            type: 'float',
+            options: {
+              label: 'MinValue'
+            },
+            get(this: ConstantScalarNode, value) {
+              value.num[0] = this.minValue;
+            },
+            set(this: ConstantScalarNode, value) {
+              this.minValue = value.num[0];
+            },
+            isHidden(this: ConstantScalarNode) {
+              return !this.isUniform || !this.useRange;
+            }
+          },
+          {
+            name: 'maxValue',
+            type: 'float',
+            options: {
+              label: 'MaxValue'
+            },
+            get(this: ConstantScalarNode, value) {
+              value.num[0] = this.maxValue;
+            },
+            set(this: ConstantScalarNode, value) {
+              this.maxValue = value.num[0];
+            },
+            isHidden(this: ConstantScalarNode) {
+              return !this.isUniform || !this.useRange;
             }
           }
         ]);
@@ -118,14 +190,58 @@ export class ConstantScalarNode extends BaseGraphNode {
     }
   }
   /**
+   * Gets whether the scalar parameter uses editor range limits
+   */
+  get useRange() {
+    return this._useRange;
+  }
+  set useRange(val: boolean) {
+    const next = !!val;
+    if (this._useRange !== next) {
+      this._useRange = next;
+      this._value = this.clampValue(this._value);
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Gets the minimum value for this scalar parameter
+   */
+  get minValue() {
+    return this._minValue;
+  }
+  set minValue(val: number) {
+    if (val !== this._minValue) {
+      this._minValue = val;
+      this.normalizeRange();
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
+   * Gets the maximum value for this scalar parameter
+   */
+  get maxValue() {
+    return this._maxValue;
+  }
+  set maxValue(val: number) {
+    if (val !== this._maxValue) {
+      this._maxValue = val;
+      if (this._maxValue < this._minValue) {
+        this._minValue = this._maxValue;
+      }
+      this._value = this.clampValue(this._value);
+      this.dispatchEvent('changed');
+    }
+  }
+  /**
    * Gets the scalar value
    */
   get x() {
     return this._value;
   }
   set x(val: number) {
-    if (val !== this._value) {
-      this._value = val;
+    const next = this.clampValue(val);
+    if (next !== this._value) {
+      this._value = next;
       this.dispatchEvent('changed');
     }
   }

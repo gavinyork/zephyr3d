@@ -317,12 +317,17 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
       console.error(msg);
       await DlgMessage.messageBox('Error', msg);
     } else {
-      this._editor.plugins.dispatchEvent('sceneSaving', this.model.scene, this._scenePath);
-      await getEngine().resourceManager.saveScene(this.model.scene, this._scenePath);
-      this._editor.currentProject.lastEditScene = this._scenePath;
-      await this._editor.saveProject();
-      this._sceneChanged = false;
-      this._editor.plugins.dispatchEvent('sceneSaved', this.model.scene, this._scenePath);
+      this._view.beginBusyTask('Saving scene...');
+      try {
+        this._editor.plugins.dispatchEvent('sceneSaving', this.model.scene, this._scenePath);
+        await getEngine().resourceManager.saveScene(this.model.scene, this._scenePath);
+        this._editor.currentProject.lastEditScene = this._scenePath;
+        await this._editor.saveProject();
+        this._sceneChanged = false;
+        this._editor.plugins.dispatchEvent('sceneSaved', this.model.scene, this._scenePath);
+      } finally {
+        this._view.endBusyTask();
+      }
     }
   }
   async loadScene(path: string): Promise<Scene> {

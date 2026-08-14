@@ -14,6 +14,7 @@ import type {
 } from '@zephyr3d/scene';
 import {
   CopyBlitter,
+  getDefaultTexture2D,
   MaterialBlueprintIR,
   Sprite,
   SpriteBlueprintMaterial,
@@ -137,6 +138,9 @@ export class PBRMaterialEditor extends GraphEditor {
   private _blitter: CopyBlitter;
   private _version: number;
   private _irChanged: boolean;
+  private _editRevision: number;
+  private _previewBuildGeneration: number;
+  private _saveChain: Promise<void>;
   private _outputName: string;
   private _blueprintPath: string;
   private readonly _cmdManager: CommandManager;
@@ -152,6 +156,9 @@ export class PBRMaterialEditor extends GraphEditor {
     this._outputName = outputName;
     this._version = 0;
     this._irChanged = false;
+    this._editRevision = 0;
+    this._previewBuildGeneration = 0;
+    this._saveChain = Promise.resolve();
     this._previewScene = new DRef();
     this._previewMesh = new DRef();
     this._defaultMaterial = new DRef();
@@ -204,6 +211,7 @@ export class PBRMaterialEditor extends GraphEditor {
     //getApp().inputManager.useFirst(this.handleEvent, this);
   }
   close() {
+    this._previewBuildGeneration++;
     getApp().inputManager.unuse(this.handleEvent, this);
     this._previewScene.dispose();
     this._previewMesh.dispose();
@@ -272,6 +280,8 @@ export class PBRMaterialEditor extends GraphEditor {
                 name: u.name,
                 type: u.type,
                 value: u.value?.slice() ?? null,
+                minValue: u.minValue,
+                maxValue: u.maxValue,
                 inFragmentShader: u.inFragmentShader,
                 inVertexShader: u.inVertexShader,
                 finalValue: typeof u.finalValue === 'number' ? u.finalValue : (u.finalValue?.slice() ?? null)
@@ -282,6 +292,7 @@ export class PBRMaterialEditor extends GraphEditor {
         mat instanceof PBRBluePrintMaterial || mat instanceof SpriteBlueprintMaterial
           ? (mat.uniformTextures?.map((u) => {
               return {
+                exposed: u.exposed ?? true,
                 name: u.name,
                 params: u.params?.clone() ?? null,
                 sRGB: u.sRGB,
@@ -301,21 +312,96 @@ export class PBRMaterialEditor extends GraphEditor {
           : null
     };
   }
-  async save(path: string) {
+  private sanitizeBlueprintMaterialProps(
+    mat: PBRBluePrintMaterial | SpriteBlueprintMaterial,
+    props: Record<string, unknown>
+  ) {
+    if (!(mat instanceof PBRBluePrintMaterial)) {
+      return props;
+    }
+    const sanitized = { ...props };
+    for (const name of [
+      'vertexColor',
+      'AlbedoColor',
+      'AlbedoTexture',
+      'AlbedoTexCoordScale',
+      'AlbedoTexCoordAddressU',
+      'AlbedoTexCoordAddressV',
+      'AlbedoTexCoordIndex',
+      'Opacity',
+      'Metallic',
+      'Roughness',
+      'MetallicRoughnessTexture',
+      'MetallicRoughnessTexCoordScale',
+      'MetallicRoughnessTexCoordAddressU',
+      'MetallicRoughnessTexCoordAddressV',
+      'MetallicRoughnessTexCoordIndex',
+      'SpecularFactor',
+      'SpecularColorTexture',
+      'SpecularColorTexCoordScale',
+      'SpecularColorTexCoordAddressU',
+      'SpecularColorTexCoordAddressV',
+      'SpecularColorTexCoordIndex',
+      'SpecularTexture',
+      'SpecularTexCoordScale',
+      'SpecularTexCoordAddressU',
+      'SpecularTexCoordAddressV',
+      'SpecularTexCoordIndex',
+      'EmissiveColor',
+      'EmissiveStrength',
+      'EmissiveTexture',
+      'EmissiveTexCoordScale',
+      'EmissiveTexCoordAddressU',
+      'EmissiveTexCoordAddressV',
+      'EmissiveTexCoordIndex',
+      'vertexNormal',
+      'vertexTangent',
+      'NormalScale',
+      'NormalTexture',
+      'NormalTexCoordScale',
+      'NormalTexCoordAddressU',
+      'NormalTexCoordAddressV',
+      'NormalTexCoordIndex',
+      'OcclusionStrength',
+      'OcclusionTexture',
+      'OcclusionTexCoordScale',
+      'OcclusionTexCoordAddressU',
+      'OcclusionTexCoordAddressV',
+      'OcclusionTexCoordIndex'
+    ]) {
+      delete sanitized[name];
+    }
+    return sanitized;
+  }
+  save(path: string) {
+    const task = this._saveChain.then(() => this.saveInternal(path));
+    this._saveChain = task.catch(() => undefined);
+    return task;
+  }
+  private async saveInternal(path: string) {
     if (path) {
       const VFS = ProjectService.VFS;
       const mat = this._editMaterial.get();
       if (!mat) {
         return;
       }
+      const saveRevision = this._editRevision;
       if (mat instanceof PBRBluePrintMaterial || mat instanceof SpriteBlueprintMaterial) {
+        // Save from a freshly compiled graph snapshot, not a possibly stale preview IR.
+        ++this._previewBuildGeneration;
+        this._irChanged = false;
+        const irFrag = await this.createIR(this.fragmentEditor);
+        const irVert = mat instanceof PBRBluePrintMaterial ? await this.createIR(this.vertexEditor) : null;
+        if (!irFrag || (mat instanceof PBRBluePrintMaterial && !irVert)) {
+          Dialog.messageBox('Error', 'Save material failed: material graph contains errors');
+          return;
+        }
         const bpPath =
           this._blueprintPath ||
           VFS.normalizePath(VFS.join(VFS.dirname(path), `${VFS.basename(path, VFS.extname(path))}.zbpt`));
         // Save blueprint
-        const fragmentState = await this.fragmentEditor.saveState();
-        const vertexState =
-          mat instanceof PBRBluePrintMaterial ? await this.vertexEditor.saveState() : undefined;
+        const fragmentState = irFrag.editorState;
+        const vertexState = mat instanceof PBRBluePrintMaterial ? irVert!.editorState : undefined;
         try {
           await VFS.writeFile(
             bpPath,
@@ -340,10 +426,7 @@ export class PBRMaterialEditor extends GraphEditor {
           return;
         }
         // Save material
-        const uniforms = this.getUniforms(
-          mat.fragmentIR,
-          mat instanceof PBRBluePrintMaterial ? mat.vertexIR : null
-        );
+        const uniforms = this.getUniforms(irFrag, irVert);
         const content: {
           type: string;
           props: any;
@@ -354,7 +437,13 @@ export class PBRMaterialEditor extends GraphEditor {
           };
         } = {
           type: mat instanceof PBRBluePrintMaterial ? 'PBRBluePrintMaterial' : 'SpriteBluePrintMaterial',
-          props: await getEngine().resourceManager.serializeObjectProps(this._editMaterial.get()),
+          props: this.sanitizeBlueprintMaterialProps(
+            mat,
+            (await getEngine().resourceManager.serializeObjectProps(this._editMaterial.get())) as Record<
+              string,
+              unknown
+            >
+          ),
           data: {
             IR: bpPath,
             uniformValues: uniforms.uniformValues,
@@ -370,6 +459,7 @@ export class PBRMaterialEditor extends GraphEditor {
           const msg = `Save material failed: ${err}`;
           console.error(msg);
           Dialog.messageBox('Error', msg);
+          return;
         }
         await getEngine().resourceManager.reloadBluePrintMaterials();
       } else if (mat) {
@@ -383,10 +473,12 @@ export class PBRMaterialEditor extends GraphEditor {
           const msg = `Save material failed: ${err}`;
           console.error(msg);
           Dialog.messageBox('Error', msg);
+          return;
         }
-        await getEngine().resourceManager.reloadBluePrintMaterials();
       }
-      this._version = 0;
+      if (this._editRevision === saveRevision) {
+        this._version = 0;
+      }
       this._savedState = await this.getSavedState(mat);
     }
   }
@@ -412,6 +504,8 @@ export class PBRMaterialEditor extends GraphEditor {
           name: u.name,
           type: u.type,
           value: typeof u.value === 'number' ? [u.value] : [...u.value],
+          minValue: u.minValue,
+          maxValue: u.maxValue,
           inVertexShader: ir === vertexIR,
           inFragmentShader: ir === fragmentIR
         });
@@ -422,6 +516,7 @@ export class PBRMaterialEditor extends GraphEditor {
           ASSERT(
             exists.type === u.type &&
               exists.texture === u.texture &&
+              exists.exposed === (u.exposed ?? true) &&
               exists.wrapS === u.wrapS &&
               exists.wrapT === u.wrapT &&
               exists.minFilter === u.minFilter &&
@@ -437,6 +532,7 @@ export class PBRMaterialEditor extends GraphEditor {
           continue;
         }
         uniformTextures.push({
+          exposed: u.exposed ?? true,
           name: u.name,
           type: u.type,
           texture: u.texture,
@@ -550,7 +646,10 @@ export class PBRMaterialEditor extends GraphEditor {
   renderNodeEditor() {
     if (this._irChanged) {
       this._irChanged = false;
-      this.applyPreviewMaterial();
+      const generation = ++this._previewBuildGeneration;
+      void this.applyPreviewMaterial(generation).catch((err) => {
+        console.error(`Build material preview failed: ${err}`);
+      });
     }
     const mat = this._editMaterial.get();
     if (mat instanceof PBRBluePrintMaterial || mat instanceof SpriteBlueprintMaterial) {
@@ -574,15 +673,25 @@ export class PBRMaterialEditor extends GraphEditor {
   protected renderRightPanel() {
     const mat = this._editMaterial.get();
     if (mat instanceof PBRBluePrintMaterial || mat instanceof SpriteBlueprintMaterial) {
-      const v = ImGui.GetContentRegionAvail();
-      v.y >>= 1;
-      if (ImGui.BeginChild('##BluePrintNodeProps', v, true)) {
+      const region = ImGui.GetContentRegionAvail();
+      const spacing = ImGui.GetStyle().ItemSpacing.y;
+      const previewPanelHeight = Math.max(180, Math.min(region.x, region.y));
+      const propsHeight = Math.max(120, region.y - previewPanelHeight - spacing);
+      if (ImGui.BeginChild('##BluePrintNodeProps', new ImGui.ImVec2(-1, propsHeight), true)) {
         super.renderRightPanel();
       }
       ImGui.EndChild();
-      if (ImGui.BeginChild('##BluePrintMaterialPreview', new ImGui.ImVec2(-1, -1), true)) {
-        ImGui.GetContentRegionAvail(v);
-        this.renderPreviewScene(v);
+      if (ImGui.BeginChild('##BluePrintMaterialPreview', new ImGui.ImVec2(-1, previewPanelHeight), true)) {
+        const previewAvail = ImGui.GetContentRegionAvail();
+        const previewSize = new ImGui.ImVec2(
+          Math.max(1, Math.min(previewAvail.x, previewAvail.y)),
+          Math.max(1, Math.min(previewAvail.x, previewAvail.y))
+        );
+        const cursorPos = ImGui.GetCursorPos();
+        const offsetX = Math.max(0, (previewAvail.x - previewSize.x) * 0.5);
+        const offsetY = Math.max(0, (previewAvail.y - previewSize.y) * 0.5);
+        ImGui.SetCursorPos(new ImGui.ImVec2(cursorPos.x + offsetX, cursorPos.y + offsetY));
+        this.renderPreviewScene(previewSize);
       }
       ImGui.EndChild();
     } else {
@@ -691,11 +800,14 @@ export class PBRMaterialEditor extends GraphEditor {
     }
     camera.updateController();
   }
-  private async applyPreviewMaterial() {
+  private async applyPreviewMaterial(generation: number) {
     const mat = this._editMaterial.get();
     if (mat instanceof PBRBluePrintMaterial || mat instanceof SpriteBlueprintMaterial) {
       const irFrag = await this.createIR(this.fragmentEditor);
       const irVert = this.vertexEditor ? await this.createIR(this.vertexEditor) : null;
+      if (generation !== this._previewBuildGeneration) {
+        return;
+      }
       if (!irFrag || (mat instanceof PBRBluePrintMaterial && !irVert)) {
         (this._previewMesh.get() as Mesh | Sprite).material = this._defaultMaterial.get();
       } else {
@@ -726,9 +838,12 @@ export class PBRMaterialEditor extends GraphEditor {
           u.finalValue = u.value.length === 1 ? u.value[0] : new Float32Array(u.value);
         }
         for (const u of uniforms.uniformTextures) {
-          const tex = await getEngine().resourceManager.fetchTexture(u.texture, {
-            linearColorSpace: !u.sRGB
-          });
+          const tex =
+            (u.texture
+              ? await getEngine().resourceManager.fetchTexture(u.texture, {
+                  linearColorSpace: !u.sRGB
+                })
+              : null) ?? getDefaultTexture2D();
           u.finalTexture?.dispose();
           u.finalTexture = new DRef(tex);
           u.finalSampler = getDevice().createSampler({
@@ -738,6 +853,12 @@ export class PBRMaterialEditor extends GraphEditor {
             magFilter: u.magFilter as TextureFilterMode,
             mipFilter: u.mipFilter as TextureFilterMode
           });
+        }
+        if (generation !== this._previewBuildGeneration) {
+          for (const u of uniforms.uniformTextures) {
+            u.finalTexture?.dispose();
+          }
+          return;
         }
         mat.fragmentIR = irFrag;
         if (mat instanceof PBRBluePrintMaterial) {
@@ -805,6 +926,7 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   private markDirty() {
     this._version = -1;
+    this._editRevision++;
   }
   private shouldRefreshMaterialInspector(prop: Nullable<PropertyAccessor>) {
     const name = prop?.name ?? '';
@@ -812,6 +934,17 @@ export class PBRMaterialEditor extends GraphEditor {
   }
   private handleMaterialPropertyChanged(prop: Nullable<PropertyAccessor>) {
     this.markDirty();
+    const material = this._editMaterial.get();
+    if (
+      material &&
+      prop &&
+      !(material instanceof PBRBluePrintMaterial) &&
+      !(material instanceof SpriteBlueprintMaterial)
+    ) {
+      void getEngine()
+        .resourceManager.syncMaterialPropertyReferences(material, prop)
+        .catch((err) => console.error(`Sync material property failed: ${err}`));
+    }
     if (this.shouldRefreshMaterialInspector(prop)) {
       this.propEditor.refresh();
     }
