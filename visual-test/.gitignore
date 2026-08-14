@@ -1,0 +1,11 @@
+dist/
+test-results/
+playwright-report/
+.tsbuildinfo
+
+# Real-adapter baselines are per-machine by nature: the Step 0 spike measured a
+# 1/255 difference between SwiftShader and a real GPU on a plain clear colour,
+# so these can never be a shared authority. Each developer generates their own
+# on first run (UPDATE_BASELINES=1 npm run test:gpu) and gets local regression
+# detection from them. Only the -swiftshader baselines are committed.
+baselines/*-gpu/

@@ -28,3 +28,70 @@ jobs:
 
       - name: Rush Build
         run: node common/scripts/install-run-rush.js rebuild --verbose
+
+      # The jest suites were never actually run in CI before this. They cover
+      # maths, render-graph topology and shader codegen, and cost well under a
+      # minute.
+      #
+      # continue-on-error is a deliberate, temporary concession: two assertions in
+      # test/src/scene/lab_blueprint_material_instance.test.ts fail at HEAD, on a
+      # clean tree, independently of this workflow (subsurface profiles are shared
+      # where the test expects them cloned, and the observed profile slot varies
+      # with suite ordering - so there is cross-test pollution behind it).
+      # Gating on a suite that is already red would just block every PR. Remove
+      # this line once those two are fixed; the step is here now so the failure
+      # stays visible instead of staying unrun.
+      - name: Unit tests
+        continue-on-error: true
+        run: node common/scripts/install-run-rush.js test
+
+  visual:
+    # Pixel regression against committed SwiftShader baselines. Split from the
+    # build job because it needs a browser download and produces artifacts, and
+    # because a pixel diff should be readable on its own rather than buried in a
+    # build log.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
+
+      - name: Rush Update
+        run: node common/scripts/install-run-rush.js update
+
+      - name: Build engine and harness
+        run: node common/scripts/install-run-rush.js build -t @zephyr3d/visual-test --verbose
+
+      # `channel: 'chromium'` in playwright.config.ts needs the full Chromium
+      # build: the default headless-shell exposes navigator.gpu but its
+      # requestAdapter() always resolves to null, so WebGPU is unusable there.
+      - name: Install Chromium
+        run: npm run install-browser --prefix ./visual-test
+
+      # test:only rather than test - the harness bundle was already built by the
+      # rush step above, and rebuilding it here would just be slower.
+      - name: Visual regression (SwiftShader gate)
+        run: npm run test:only --prefix ./visual-test
+
+      # Uploaded on failure only, and this is the whole point of the job: the
+      # report embeds the expected/actual/diff PNGs per failing scene.
+      - name: Upload diff report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-report
+          path: |
+            visual-test/playwright-report
+            visual-test/test-results
+          retention-days: 14

@@ -468,6 +468,10 @@
       "projectFolder": "test"
     },
     {
+      "packageName": "@zephyr3d/visual-test",
+      "projectFolder": "visual-test"
+    },
+    {
       "packageName": "@zephyr3d/doc",
       "projectFolder": "apps/doc"
     },

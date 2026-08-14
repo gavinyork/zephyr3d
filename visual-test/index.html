@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Zephyr3D Visual Regression Harness</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #000;
+      }
+      /* The canvas is never the capture source - scenes render into an offscreen
+         framebuffer of a fixed size (see src/capture.ts). It exists only because
+         the device needs one, and is kept at a fixed CSS size so nothing about
+         layout or DPR can influence what gets captured. */
+      canvas {
+        display: block;
+        width: 512px;
+        height: 512px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas" width="512" height="512"></canvas>
+    <script>
+      // Select the engine depth convention before any engine module loads - the
+      // REVERSE_Z constant is captured at module evaluation time. Mirrors what
+      // test/src/setupEnv.ts does for the jest suites.
+      const params = new URLSearchParams(location.search);
+      globalThis.__ZEPHYR3D_REVERSE_Z__ = params.get('convention') !== 'standard';
+    </script>
+    <script type="module" src="js/harness.js"></script>
+  </body>
+</html>
