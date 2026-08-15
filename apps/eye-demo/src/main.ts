@@ -69,42 +69,34 @@ const scleraParams: ScleraParams = { ...DEFAULT_SCLERA };
 const TEX_SIZE = 512;
 let irisTex: Texture2D | null = null;
 let scleraTex: Texture2D | null = null;
-let lastIrisData: Uint8Array<ArrayBuffer> | null = null;
-let lastScleraData: Uint8Array<ArrayBuffer> | null = null;
 
 function rebuildIris() {
-  lastIrisData = generateIris(irisParams, TEX_SIZE);
+  const data = generateIris(irisParams, TEX_SIZE);
   if (!irisTex) {
     irisTex = device.createTexture2D('rgba8unorm-srgb', TEX_SIZE, TEX_SIZE)!;
     material.irisTexture = irisTex;
   }
-  irisTex.update(lastIrisData, 0, 0, TEX_SIZE, TEX_SIZE);
+  irisTex.update(data, 0, 0, TEX_SIZE, TEX_SIZE);
 }
 
 function rebuildSclera() {
-  lastScleraData = generateSclera(scleraParams, TEX_SIZE);
+  const data = generateSclera(scleraParams, TEX_SIZE);
   if (!scleraTex) {
     scleraTex = device.createTexture2D('rgba8unorm-srgb', TEX_SIZE, TEX_SIZE)!;
     material.scleraTexture = scleraTex;
   }
-  scleraTex.update(lastScleraData, 0, 0, TEX_SIZE, TEX_SIZE);
+  scleraTex.update(data, 0, 0, TEX_SIZE, TEX_SIZE);
 }
 
-/**
- * Writes a generated map out as a PNG.
- *
- * The point of the demo is to reach a look before production textures exist, so
- * whatever is on screen has to be handed to an artist as a starting layer -
- * otherwise the tuning has to be redone from scratch once real maps arrive.
- */
-function downloadTexture(data: Uint8Array<ArrayBuffer> | null, filename: string) {
-  if (!data) {
-    return;
-  }
+/** Export resolutions. The preview stays at TEX_SIZE so the sliders stay responsive. */
+const EXPORT_SIZES = [512, 1024, 2048] as const;
+let exportSizeIndex = 1;
+
+function savePng(data: Uint8Array<ArrayBuffer>, size: number, filename: string) {
   const cvs = document.createElement('canvas');
-  cvs.width = cvs.height = TEX_SIZE;
+  cvs.width = cvs.height = size;
   const ctx = cvs.getContext('2d')!;
-  const img = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+  const img = ctx.createImageData(size, size);
   img.data.set(data);
   ctx.putImageData(img, 0, 0);
   cvs.toBlob((blob) => {
@@ -115,9 +107,41 @@ function downloadTexture(data: Uint8Array<ArrayBuffer> | null, filename: string)
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
+    // Attached before clicking: a detached anchor is ignored by some browsers,
+    // and the failure is silent - no download, no error.
+    document.body.appendChild(a);
     a.click();
+    a.remove();
     URL.revokeObjectURL(url);
   }, 'image/png');
+}
+
+/**
+ * Writes the current maps out as PNGs for an artist to work from.
+ *
+ * Regenerates at the export resolution rather than upscaling the preview. The
+ * generators are resolution-independent, so a 2048 export carries genuinely
+ * finer fibres and vessels; handing over an upscaled 512 would defeat the
+ * purpose, since the detail is exactly what the artist needs to paint over.
+ *
+ * The seed goes in the filename because it is what makes an export
+ * reproducible - the same seed and parameters regenerate the same map later.
+ */
+function exportMaps(which: 'iris' | 'sclera' | 'both') {
+  const size = EXPORT_SIZES[exportSizeIndex];
+  const jobs: (() => void)[] = [];
+  if (which === 'iris' || which === 'both') {
+    jobs.push(() => savePng(generateIris(irisParams, size), size, `iris_${size}_seed${irisParams.seed}.png`));
+  }
+  if (which === 'sclera' || which === 'both') {
+    jobs.push(() =>
+      savePng(generateSclera(scleraParams, size), size, `sclera_${size}_seed${scleraParams.seed}.png`)
+    );
+  }
+  // Spaced out rather than fired together: browsers suppress a second download
+  // triggered from the same user gesture, so back-to-back calls silently
+  // deliver only the first file.
+  jobs.forEach((job, i) => setTimeout(job, i * 700));
 }
 
 /** Replaces a generated map with a real one, so production art can be dropped in. */
@@ -130,11 +154,12 @@ async function loadCustomTexture(file: File, target: 'iris' | 'sclera') {
   // Copy rather than alias the ImageData buffer: its type is ArrayBufferLike,
   // and the texture upload path requires a plain ArrayBuffer.
   const data = new Uint8Array(ctx.getImageData(0, 0, TEX_SIZE, TEX_SIZE).data);
+  // Only the GPU texture is replaced. Export still runs the generators, which
+  // is the intent: a loaded map came from the artist in the first place, so
+  // writing it back out would be a round trip through a lossy resize.
   if (target === 'iris') {
-    lastIrisData = data;
     irisTex!.update(data, 0, 0, TEX_SIZE, TEX_SIZE);
   } else {
-    lastScleraData = data;
     scleraTex!.update(data, 0, 0, TEX_SIZE, TEX_SIZE);
   }
 }
@@ -223,6 +248,28 @@ function drawUI() {
     ImGui.NewLine();
   }
 
+  // Kept at the top level rather than tucked inside the texture sections:
+  // handing the maps to an artist is a main purpose of this demo, and a button
+  // under a collapsed header reads as if the feature does not exist.
+  if (ImGui.CollapsingHeader('Export maps for the artist', ImGui.TreeNodeFlags.DefaultOpen)) {
+    const idx = [exportSizeIndex] as [number];
+    if (ImGui.Combo('Resolution', idx, EXPORT_SIZES.map(String))) {
+      exportSizeIndex = idx[0];
+    }
+    if (ImGui.Button('Export both')) {
+      exportMaps('both');
+    }
+    ImGui.SameLine();
+    if (ImGui.Button('Iris only')) {
+      exportMaps('iris');
+    }
+    ImGui.SameLine();
+    if (ImGui.Button('Sclera only')) {
+      exportMaps('sclera');
+    }
+    ImGui.TextDisabled('Regenerated at full res, not upscaled');
+  }
+
   if (ImGui.CollapsingHeader('Cornea & parallax', ImGui.TreeNodeFlags.DefaultOpen)) {
     slider('Iris depth', material.irisDepth, 0, 0.2, (v) => (material.irisDepth = v));
     slider('IOR', material.ior, 1, 1.8, (v) => (material.ior = v));
@@ -280,10 +327,6 @@ function drawUI() {
       irisParams.seed = (irisParams.seed * 1664525 + 1013904223) >>> 0;
       rebuildIris();
     }
-    ImGui.SameLine();
-    if (ImGui.Button('Export iris PNG')) {
-      downloadTexture(lastIrisData, 'iris.png');
-    }
   }
 
   if (ImGui.CollapsingHeader('Sclera texture')) {
@@ -299,10 +342,6 @@ function drawUI() {
     if (ImGui.Button('Re-roll sclera')) {
       scleraParams.seed = (scleraParams.seed * 1664525 + 1013904223) >>> 0;
       rebuildSclera();
-    }
-    ImGui.SameLine();
-    if (ImGui.Button('Export sclera PNG')) {
-      downloadTexture(lastScleraData, 'sclera.png');
     }
   }
 

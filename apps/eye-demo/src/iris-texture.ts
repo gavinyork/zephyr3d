@@ -64,8 +64,11 @@ export const DEFAULT_IRIS: IrisParams = {
 export const DEFAULT_SCLERA: ScleraParams = {
   seed: 91,
   color: [0.93, 0.9, 0.87],
-  vesselCount: 14,
-  vesselStrength: 0.5,
+  // Tuned against continuous strokes. The previous values were set while the
+  // renderer was accidentally laying down dotted trails, so they compensated
+  // for coverage that was never there.
+  vesselCount: 10,
+  vesselStrength: 0.18,
   vesselInnerRadius: 0.42
 };
 
@@ -160,15 +163,29 @@ export function generateIris(params: IrisParams, size = 512): Uint8Array<ArrayBu
         continue;
       }
 
-      // Angular jitter so fibres are not perfectly straight spokes.
-      const wobble = (noise(angle / (Math.PI * 2), r) - 0.5) * 0.06;
-      const fibreIndex = Math.floor(((angle / (Math.PI * 2) + wobble) * n + n) % n);
-      const fi = ((fibreIndex % n) + n) % n;
+      // Angular jitter so fibres are not perfectly straight spokes. Scaled to
+      // the width of one fibre: as a fixed angular amount it was ~8 fibres wide
+      // at the default density, which shuffles neighbouring fibres into each
+      // other and dissolves the radial structure into marbling. That reads as
+      // acceptable noise at preview size and falls apart at export resolution.
+      const wobble = (noise(angle / (Math.PI * 2), r) - 0.5) * (1.5 / n);
+      const fpos = ((angle / (Math.PI * 2) + wobble) * n + n) % n;
+      const i0 = Math.floor(fpos) % n;
+      const i1 = (i0 + 1) % n;
 
-      // A fibre only reaches inward as far as its own length allows.
-      const fibreReach = params.collaretteRadius + (1 - params.collaretteRadius) * (1 - fibreLength[fi]);
-      const fibreMask = smoothstep(fibreReach - 0.12, fibreReach + 0.05, r);
-      const fibre = 1 + (fibreBright[fi] - 0.5) * 2 * params.fibreContrast * fibreMask;
+      // Each fibre only reaches inward as far as its own length allows. The two
+      // neighbouring fibres are blended rather than picked by nearest index:
+      // a hard index boundary is invisible at preview size but staircases
+      // badly once exported at 1k or 2k, and the artist would have to clean it.
+      const reach0 = params.collaretteRadius + (1 - params.collaretteRadius) * (1 - fibreLength[i0]);
+      const reach1 = params.collaretteRadius + (1 - params.collaretteRadius) * (1 - fibreLength[i1]);
+      const f0 =
+        1 + (fibreBright[i0] - 0.5) * 2 * params.fibreContrast * smoothstep(reach0 - 0.12, reach0 + 0.05, r);
+      const f1 =
+        1 + (fibreBright[i1] - 0.5) * 2 * params.fibreContrast * smoothstep(reach1 - 0.12, reach1 + 0.05, r);
+      const blend = fpos - Math.floor(fpos);
+      const t = blend * blend * (3 - 2 * blend);
+      const fibre = f0 * (1 - t) + f1 * t;
 
       // Pupillary zone inside the collarette, ciliary zone outside.
       const zone = smoothstep(params.collaretteRadius - 0.08, params.collaretteRadius + 0.08, r);
@@ -239,8 +256,7 @@ export function generateSclera(params: ScleraParams, size = 512): Uint8Array<Arr
     }
   }
 
-  // Vessels, painted over the base with a soft brush.
-  const paint = (px: number, py: number, width: number, strength: number) => {
+  const dab = (px: number, py: number, width: number, strength: number) => {
     const rad = Math.ceil(width);
     for (let oy = -rad; oy <= rad; oy++) {
       for (let ox = -rad; ox <= rad; ox++) {
@@ -263,31 +279,89 @@ export function generateSclera(params: ScleraParams, size = 512): Uint8Array<Arr
     }
   };
 
-  const walk = (angle: number, radius: number, dir: number, width: number, life: number, depth: number) => {
+  /**
+   * Strokes a segment rather than stamping isolated dabs.
+   *
+   * Stamping once per walk step makes continuity depend on the step never
+   * exceeding the brush width - a relationship that has to hold across every
+   * resolution, brush taper and branch depth, and did not: exports came out as
+   * dotted trails. Filling the span between consecutive points removes the
+   * dependency entirely, so the vessel is a line by construction.
+   */
+  const stroke = (x0: number, y0: number, x1: number, y1: number, width: number, strength: number) => {
+    const dist = Math.hypot(x1 - x0, y1 - y0);
+    // One dab per pixel, not more: each dab multiplies the destination by its
+    // alpha, so oversampling compounds the darkening and turns a vessel into a
+    // saturated red cord.
+    const steps = Math.max(1, Math.ceil(dist));
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      dab(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, width, strength);
+    }
+  };
+
+  // Everything below is authored against a 512 map and scaled from there, so a
+  // vessel traces the same path at any resolution.
+  //
+  // Getting this wrong is not a subtle quality loss: brush width was in pixels
+  // while the walk stepped in normalised radius, so at 1k the dabs no longer
+  // overlapped and the vessels came out as scattered dots. Both quantities have
+  // to scale together.
+  const pxScale = size / 512;
+
+  /** Normalised distance a vessel travels before it runs out. */
+  const VESSEL_LENGTH = 1.1;
+  /** Reference step at 512, used to keep the per-step wander rates meaningful. */
+  const REF_STEP = 0.005;
+
+  const walk = (
+    angle: number,
+    radius: number,
+    dir: number,
+    width: number,
+    travelLeft: number,
+    depth: number
+  ) => {
     let a = angle;
     let rr = radius;
-    let w = width;
-    for (let step = 0; step < life; step++) {
+    let w = width * pxScale;
+    const minWidth = 0.6 * pxScale;
+    let travelled = 0;
+    let turn = 0;
+    let prevX = c + Math.cos(a) * rr * c;
+    let prevY = c + Math.sin(a) * rr * c;
+    while (travelled < travelLeft) {
       const px = c + Math.cos(a) * rr * c;
       const py = c + Math.sin(a) * rr * c;
       // Fade toward the centre so vessels never reach the cornea.
       const fade = smoothstep(params.vesselInnerRadius - 0.12, params.vesselInnerRadius + 0.15, rr);
-      paint(px, py, w, params.vesselStrength * fade);
-      a += (rng.get() - 0.5) * 0.22;
-      rr += dir * (0.004 + rng.get() * 0.006);
-      w = Math.max(0.6, w * 0.985);
+      stroke(prevX, prevY, px, py, w, params.vesselStrength * fade);
+      prevX = px;
+      prevY = py;
+
+      // Never advance less than a pixel, for the same compounding reason.
+      const stepNorm = Math.max(0.4 * w, 1) / c;
+      const rate = stepNorm / REF_STEP;
+      // Turn rate carries momentum instead of the angle being jittered
+      // directly. A memoryless walk zigzags; real vessels curve, and the
+      // difference is what separates "vasculature" from "scribble".
+      turn = turn * 0.88 + (rng.get() - 0.5) * 0.09 * rate;
+      a += turn;
+      rr += dir * stepNorm * (0.8 + rng.get() * 0.4);
+      w = Math.max(minWidth, w * Math.pow(0.985, rate));
+      travelled += stepNorm;
       if (rr < params.vesselInnerRadius - 0.15 || rr > 1.02) {
         break;
       }
       // Branch occasionally, which is what makes vasculature read as organic.
-      if (depth < 2 && rng.get() < 0.03) {
-        walk(a + (rng.get() - 0.5) * 1.2, rr, dir, w * 0.65, life - step, depth + 1);
+      if (depth < 2 && rng.get() < 0.03 * rate) {
+        walk(a + (rng.get() - 0.5) * 1.2, rr, dir, (w * 0.65) / pxScale, travelLeft - travelled, depth + 1);
       }
     }
   };
 
   for (let i = 0; i < params.vesselCount; i++) {
-    walk(rng.get() * Math.PI * 2, 1.0, -1, 1.6 + rng.get() * 1.6, 220, 0);
+    walk(rng.get() * Math.PI * 2, 1.0, -1, 1.6 + rng.get() * 1.6, VESSEL_LENGTH, 0);
   }
   return data;
 }
