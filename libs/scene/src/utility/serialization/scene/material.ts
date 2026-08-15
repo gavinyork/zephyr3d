@@ -11,6 +11,7 @@ import {
   PBRBluePrintMaterialInstance,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
+  EyeMaterial,
   SkinMaterial,
   SubsurfaceProfile,
   type MToonOutlineWidthMode,
@@ -2539,6 +2540,303 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
       }
     },
     getMeshMaterialInstanceUniformsClass(SkinMaterial)
+  ];
+}
+
+/**
+ * Serialization for {@link EyeMaterial}.
+ *
+ * Every `getDefaultValue()` non-instance branch below must return exactly what
+ * the constructor sets. The serializer uses this both to decide whether a
+ * property can be omitted when saving and to fill it in when it is absent on
+ * load, so a mismatch silently rewrites assets - which is what a mismatched
+ * `doubleSidedLighting` default did before it was found.
+ */
+export function getEyeMaterialClass(manager: ResourceManager): SerializableClass[] {
+  return [
+    {
+      ctor: EyeMaterial,
+      parent: MeshMaterial,
+      name: 'EyeMaterial',
+      getProps() {
+        return defineProps([
+          {
+            name: 'IrisCenter',
+            description: 'UV coordinate of the pupil centre on the eyeball mesh',
+            type: 'vec2',
+            default: [0.5, 0.5],
+            options: { minValue: 0, maxValue: 1 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.irisCenter.x;
+              value.num[1] = this.irisCenter.y;
+            },
+            set(this: EyeMaterial, value) {
+              this.irisCenter = new Vector4(value.num[0], value.num[1], 0, 0);
+            },
+            getDefaultValue(this: EyeMaterial) {
+              const c = this.$isInstance ? this.coreMaterial.irisCenter : new Vector4(0.5, 0.5, 0, 0);
+              return [c.x, c.y];
+            }
+          },
+          {
+            name: 'IrisRadius',
+            description: 'Iris disc radius in UV units',
+            type: 'float',
+            default: 0.22,
+            options: { animatable: true, minValue: 0.001, maxValue: 0.5 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.irisRadius;
+            },
+            set(this: EyeMaterial, value) {
+              this.irisRadius = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.irisRadius : 0.22;
+            }
+          },
+          {
+            name: 'IrisDepth',
+            description: 'Depth of the iris plane below the cornea; 0 disables parallax',
+            type: 'float',
+            default: 0.06,
+            options: { animatable: true, minValue: 0, maxValue: 0.5 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.irisDepth;
+            },
+            set(this: EyeMaterial, value) {
+              this.irisDepth = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.irisDepth : 0.06;
+            }
+          },
+          {
+            name: 'IOR',
+            description: 'Index of refraction of the cornea (1.376 is physical)',
+            type: 'float',
+            default: 1.376,
+            options: { animatable: true, minValue: 1, maxValue: 2 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.ior;
+            },
+            set(this: EyeMaterial, value) {
+              this.ior = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.ior : 1.376;
+            }
+          },
+          {
+            name: 'PupilRadius',
+            description: 'Pupil radius as a fraction of the iris radius',
+            type: 'float',
+            default: 0.35,
+            options: { animatable: true, minValue: 0.01, maxValue: 0.95 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.pupilRadius;
+            },
+            set(this: EyeMaterial, value) {
+              this.pupilRadius = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.pupilRadius : 0.35;
+            }
+          },
+          {
+            name: 'PupilDilation',
+            description: 'Pupil dilation from -1 (constricted) to 1 (dilated)',
+            type: 'float',
+            default: 0,
+            options: { animatable: true, minValue: -1, maxValue: 1 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.pupilDilation;
+            },
+            set(this: EyeMaterial, value) {
+              this.pupilDilation = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.pupilDilation : 0;
+            }
+          },
+          {
+            name: 'IrisColor',
+            description: 'Tint multiplied over the iris texture',
+            type: 'rgba',
+            default: [1, 1, 1, 1],
+            options: { animatable: true, minValue: 0, maxValue: 4 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.irisColor.x;
+              value.num[1] = this.irisColor.y;
+              value.num[2] = this.irisColor.z;
+              value.num[3] = this.irisColor.w;
+            },
+            set(this: EyeMaterial, value) {
+              this.irisColor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+            },
+            getDefaultValue(this: EyeMaterial) {
+              const c = this.$isInstance ? this.coreMaterial.irisColor : new Vector4(1, 1, 1, 1);
+              return [c.x, c.y, c.z, c.w];
+            }
+          },
+          {
+            name: 'IrisBrightness',
+            description: 'Internal scattering that keeps the iris from crushing to black in shadow',
+            type: 'float',
+            default: 0.15,
+            options: { animatable: true, minValue: 0, maxValue: 2 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.irisBrightness;
+            },
+            set(this: EyeMaterial, value) {
+              this.irisBrightness = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.irisBrightness : 0.15;
+            }
+          },
+          {
+            name: 'LimbalRingWidth',
+            description: 'Width of the dark ring at the iris edge, in UV units',
+            type: 'float',
+            default: 0.05,
+            options: { animatable: true, minValue: 0, maxValue: 0.25 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.limbalRingWidth;
+            },
+            set(this: EyeMaterial, value) {
+              this.limbalRingWidth = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.limbalRingWidth : 0.05;
+            }
+          },
+          {
+            name: 'LimbalRingStrength',
+            description: 'How dark the limbal ring gets; 0 disables it',
+            type: 'float',
+            default: 0.7,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.limbalRingStrength;
+            },
+            set(this: EyeMaterial, value) {
+              this.limbalRingStrength = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.limbalRingStrength : 0.7;
+            }
+          },
+          {
+            name: 'ScleraColor',
+            description: 'Base sclera colour; pure white reads as plastic',
+            type: 'rgba',
+            default: [0.9, 0.88, 0.86, 1],
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.scleraColor.x;
+              value.num[1] = this.scleraColor.y;
+              value.num[2] = this.scleraColor.z;
+              value.num[3] = this.scleraColor.w;
+            },
+            set(this: EyeMaterial, value) {
+              this.scleraColor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+            },
+            getDefaultValue(this: EyeMaterial) {
+              const c = this.$isInstance ? this.coreMaterial.scleraColor : new Vector4(0.9, 0.88, 0.86, 1);
+              return [c.x, c.y, c.z, c.w];
+            }
+          },
+          {
+            name: 'ScleraWrap',
+            description: 'Diffuse wrap for the sclera, standing in for its subsurface softness',
+            type: 'float',
+            default: 0.35,
+            options: { animatable: true, minValue: 0, maxValue: 2 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.scleraWrap;
+            },
+            set(this: EyeMaterial, value) {
+              this.scleraWrap = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.scleraWrap : 0.35;
+            }
+          },
+          {
+            name: 'ScleraEdgeTint',
+            description: 'Vasculature colour bled into the sclera away from the iris; alpha is its strength',
+            type: 'rgba',
+            default: [0.55, 0.22, 0.18, 1],
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.scleraEdgeTint.x;
+              value.num[1] = this.scleraEdgeTint.y;
+              value.num[2] = this.scleraEdgeTint.z;
+              value.num[3] = this.scleraEdgeTint.w;
+            },
+            set(this: EyeMaterial, value) {
+              this.scleraEdgeTint = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
+            },
+            getDefaultValue(this: EyeMaterial) {
+              const c = this.$isInstance
+                ? this.coreMaterial.scleraEdgeTint
+                : new Vector4(0.55, 0.22, 0.18, 1);
+              return [c.x, c.y, c.z, c.w];
+            }
+          },
+          {
+            name: 'CorneaSpecularStrength',
+            description: 'Strength of the corneal highlight - the main cue that an eye is wet',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 4 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.corneaSpecularStrength;
+            },
+            set(this: EyeMaterial, value) {
+              this.corneaSpecularStrength = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.corneaSpecularStrength : 1;
+            }
+          },
+          {
+            name: 'CorneaRoughness',
+            description: 'Corneal roughness; the cornea is close to a mirror, so keep this very low',
+            type: 'float',
+            default: 0.05,
+            options: { animatable: true, minValue: 0.001, maxValue: 1 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.corneaRoughness;
+            },
+            set(this: EyeMaterial, value) {
+              this.corneaRoughness = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.corneaRoughness : 0.05;
+            }
+          },
+          {
+            name: 'vertexTangent',
+            description: 'Whether the mesh supplies tangents; without them refraction is disabled',
+            type: 'bool',
+            default: false,
+            get(this: EyeMaterial, value) {
+              value.bool[0] = this.vertexTangent;
+            },
+            set(this: EyeMaterial, value) {
+              this.vertexTangent = value.bool[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.vertexTangent : false;
+            }
+          },
+          ...getTextureProps<EyeMaterial>(manager, 'irisTexture', '2D', true, 0),
+          ...getTextureProps<EyeMaterial>(manager, 'scleraTexture', '2D', true, 0)
+        ]);
+      }
+    },
+    getMeshMaterialInstanceUniformsClass(EyeMaterial)
   ];
 }
 

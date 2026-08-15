@@ -99,7 +99,10 @@ const SCENE_NAMES = [
   'post-fxaa',
   'taa-multiframe',
   'skin-sss',
-  'hair'
+  'hair',
+  'eye-frontal',
+  'eye-angled',
+  'eye-pupil-dilated'
 ];
 
 test('scene registry matches the harness page', async ({ harness }) => {

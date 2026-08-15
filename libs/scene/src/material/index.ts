@@ -5,6 +5,7 @@ export * from './unlit';
 export * from './particle';
 export * from './subsurfaceprofile';
 export * from './skin';
+export * from './eye';
 export * from './material';
 export * from './meshmaterial';
 export * from './hair';

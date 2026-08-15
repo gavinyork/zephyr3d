@@ -14,6 +14,7 @@ import {
 import { clusterManyLights, spotShadow } from './scenes/lighting';
 import { oitABuffer, oitDualDepth, oitWeighted } from './scenes/oit';
 import { postFxaa, postToneMapBloom, taaMultiframe } from './scenes/post';
+import { eyeAngled, eyeFrontal, eyePupilDilated } from './scenes/eye';
 
 /**
  * Every scene, in a fixed order.
@@ -53,7 +54,10 @@ export const SCENES: VisualScene[] = [
   taaMultiframe,
   // Digital-human materials.
   skinSss,
-  hair
+  hair,
+  eyeFrontal,
+  eyeAngled,
+  eyePupilDilated
 ];
 
 export function findScene(name: string): VisualScene | undefined {

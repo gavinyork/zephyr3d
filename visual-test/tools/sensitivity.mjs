@@ -79,6 +79,15 @@ const MUTATIONS = [
     expect: ['post-tonemap-bloom']
   },
   {
+    id: 'eye-parallax-disabled',
+    description:
+      'Flatten the iris onto the corneal surface by zeroing the default parallax depth. Only an off-axis view can see this: head-on the refracted ray barely bends, which is why eye-frontal is not in the expected set.',
+    file: 'libs/scene/src/material/eye.ts',
+    find: 'this._irisDepth = 0.06;',
+    replace: 'this._irisDepth = 0;',
+    expect: ['eye-angled']
+  },
+  {
     id: 'taa-jitter-amplitude',
     description:
       'Change the sub-pixel jitter amplitude the camera applies for TAA. Only a scene that steps several frames can see this, since the jitter is indexed by frame counter.',
