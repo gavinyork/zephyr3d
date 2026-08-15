@@ -451,6 +451,23 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
           }
           if (item.meta.path.endsWith('.zmsh')) {
             ImGui.Separator();
+            if (ImGui.MenuItem('Clone Primitive...')) {
+              DlgSaveFile.saveFile(
+                'Clone Primitive',
+                this.renderer.VFS,
+                '/assets',
+                'Primitive (*.zmsh)|*.zmsh',
+                500,
+                400
+              ).then((name) => {
+                if (name) {
+                  if (!name.endsWith('.zmsh')) {
+                    name = `${name}.zmsh`;
+                  }
+                  this.renderer.copyFile(item.meta.path, name, 'prompt');
+                }
+              });
+            }
             if (ImGui.MenuItem('Export as GLB')) {
               this.renderer.exportPrimitiveAsGlb(item.meta.path);
             }
