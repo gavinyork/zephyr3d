@@ -468,6 +468,7 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
                 }
               });
             }
+            ImGui.Separator();
             if (ImGui.MenuItem('Export as GLB')) {
               this.renderer.exportPrimitiveAsGlb(item.meta.path);
             }
