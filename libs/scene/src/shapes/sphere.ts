@@ -15,6 +15,18 @@ export interface SphereCreationOptions extends ShapeCreationOptions {
   verticalDetail?: number;
   /** The horizonal detail level, default 20 */
   horizonalDetail?: number;
+  /**
+   * Generate UVs and tangents for {@link EyeMaterial}.
+   *
+   * When enabled, the UVs are a planar projection along +Z with the centre of
+   * the front of the sphere at (0.5, 0.5), and the tangent follows +U. The
+   * sphere topology is unchanged, so this option remains compatible with the
+   * analytical raycast and with existing sphere consumers. The material must
+   * still opt into the tangent frame with `EyeMaterial.vertexTangent = true`.
+   *
+   * @defaultValue `false`
+   */
+  eyeCompatible?: boolean;
 }
 
 /**
@@ -26,7 +38,8 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
     ...Shape._defaultOptions,
     radius: 1,
     verticalDetail: 20,
-    horizonalDetail: 20
+    horizonalDetail: 20,
+    eyeCompatible: false
   };
   /**
    * Creates an instance of sphere shape
@@ -88,8 +101,10 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
     const radius = options.radius ?? 1;
     const verticalDetail = options.verticalDetail ?? 20;
     const horizonalDetail = options.horizonalDetail ?? 20;
+    const eyeCompatible = options.eyeCompatible ?? false;
     const vTheta = Math.PI / verticalDetail;
     const hTheta = (Math.PI * 2) / horizonalDetail;
+    const invR = 1 / radius;
     for (let i = 0; i <= verticalDetail; i++) {
       const v = i * vTheta;
       const sinV = Math.sin(v);
@@ -103,15 +118,40 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
         const y = radius * cosV;
         const z = radius * sinV * cosH;
         vertices.push(x, y, z);
-        uvs?.push(j / horizonalDetail, i / verticalDetail);
+        if (eyeCompatible) {
+          // Planar projection along +Z. This keeps the iris neighbourhood
+          // isotropic in UV space and puts the gaze point at (0.5, 0.5).
+          uvs?.push(0.5 + x * invR * 0.5, 0.5 + y * invR * 0.5);
+        } else {
+          uvs?.push(j / horizonalDetail, i / verticalDetail);
+        }
         if (normals) {
-          const invR = 1 / radius;
           normals.push(x * invR, y * invR, z * invR);
         }
         if (tangents) {
           const w = 1;
           let tx: number, ty: number, tz: number;
-          if (sinV > 1e-6) {
+          if (eyeCompatible) {
+            // Project +X onto the local tangent plane. This is the +U
+            // direction of the planar eye projection; an azimuth tangent
+            // would rotate the refraction frame around the iris.
+            const nx = x * invR;
+            const ny = y * invR;
+            const nz = z * invR;
+            tx = 1 - nx * nx;
+            ty = -ny * nx;
+            tz = -nz * nx;
+            const len = Math.hypot(tx, ty, tz);
+            if (len > 1e-8) {
+              tx /= len;
+              ty /= len;
+              tz /= len;
+            } else {
+              tx = 1;
+              ty = 0;
+              tz = 0;
+            }
+          } else if (sinV > 1e-6) {
             tx = cosH;
             ty = 0.0;
             tz = -sinH;
@@ -139,7 +179,7 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
         indices.push(stripIndices[i], stripIndices[i + 2], stripIndices[i + 1]);
       }
     }
-    Shape._transform(options.transform, vertices, normals, start);
+    Shape._transform(options.transform, vertices, normals, start, tangents);
     if (bbox) {
       for (let i = start; i < vertices.length - 2; i += 3) {
         if (bbox) {

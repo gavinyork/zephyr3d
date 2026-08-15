@@ -160,12 +160,14 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
   protected static _transform(
     matrix: Nullable<Matrix4x4> | undefined,
     vertices: number[],
-    normals: number[],
-    offset: number
+    normals: Nullable<number[]>,
+    offset: number,
+    tangents?: Nullable<number[]>
   ) {
     if (matrix) {
       const tmpVec = new Vector3();
-      for (let i = offset; i < vertices.length - 2; i += 3) {
+      const tangentOffset = (offset / 3) * 4;
+      for (let i = offset, tangentIndex = tangentOffset; i < vertices.length - 2; i += 3, tangentIndex += 4) {
         tmpVec.setXYZ(vertices[i], vertices[i + 1], vertices[i + 2]);
         matrix.transformPointAffine(tmpVec, tmpVec);
         vertices[i] = tmpVec.x;
@@ -178,6 +180,14 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
           normals[i] = tmpVec.x;
           normals[i + 1] = tmpVec.y;
           normals[i + 2] = tmpVec.z;
+        }
+        if (tangents) {
+          tmpVec.setXYZ(tangents[tangentIndex], tangents[tangentIndex + 1], tangents[tangentIndex + 2]);
+          matrix.transformVectorAffine(tmpVec, tmpVec);
+          tmpVec.inplaceNormalize();
+          tangents[tangentIndex] = tmpVec.x;
+          tangents[tangentIndex + 1] = tmpVec.y;
+          tangents[tangentIndex + 2] = tmpVec.z;
         }
       }
     }
