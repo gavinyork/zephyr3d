@@ -32,9 +32,10 @@ const app = new Application({
 await app.ready();
 const device = getDevice();
 await imGuiInit(device);
-for (const ev of ['pointerdown', 'pointerup', 'pointermove', 'wheel', 'keydown', 'keyup', 'keypress']) {
-  device.canvas.addEventListener(ev, (e) => imGuiInjectEvent(e));
-}
+// for (const ev of ['pointerdown', 'pointerup', 'pointermove', 'wheel', 'keydown', 'keyup', 'keypress']) {
+//   device.canvas.addEventListener(ev, (e) => imGuiInjectEvent(e));
+// }
+getInput().use(imGuiInjectEvent);
 
 const scene = new Scene();
 scene.env.sky.skyType = 'none';
