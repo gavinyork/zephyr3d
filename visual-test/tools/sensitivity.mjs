@@ -81,7 +81,7 @@ const MUTATIONS = [
   {
     id: 'eye-parallax-disabled',
     description:
-      'Flatten the iris onto the corneal surface by zeroing the default parallax depth. Only an off-axis view can see this: head-on the refracted ray barely bends, which is why eye-frontal is not in the expected set.',
+      'Flatten the iris onto the corneal surface by zeroing the default parallax depth. Measured to be caught by all three eye scenes, not just the off-axis one: only the exact centre of a domed eye views along its own normal, so even head-on the iris periphery refracts. eye-angled is listed because it is where the displacement is largest and most diagnostic.',
     file: 'libs/scene/src/material/eye.ts',
     find: 'this._irisDepth = 0.06;',
     replace: 'this._irisDepth = 0;',

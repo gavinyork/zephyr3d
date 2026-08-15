@@ -150,9 +150,11 @@ function eyeball(scene: Scene, configure?: (m: EyeMaterial) => void) {
  * Straight-on view. Pins the resting appearance: iris colour, limbal ring,
  * sclera tint and the corneal highlight.
  *
- * On its own this scene cannot detect a parallax regression - at normal
- * incidence the refracted ray barely bends, so the iris offset is near zero.
- * That is what `eye-angled` is for.
+ * This scene does register a parallax regression, contrary to what seems
+ * obvious - only the exact centre of a domed eye is viewed along its own
+ * normal, so the iris periphery still refracts even head-on. It is a weaker
+ * signal than `eye-angled` though, and it was assumed rather than measured
+ * until tools/sensitivity.mjs said otherwise.
  */
 export const eyeFrontal: VisualScene = {
   name: 'eye-frontal',
@@ -172,9 +174,9 @@ export const eyeFrontal: VisualScene = {
  *
  * Viewed well off-axis, the refracted ray has to travel a long way across the
  * iris plane, so the iris visibly shifts against the limbal ring and the pupil
- * stops being concentric with the cornea. Set `irisDepth` to 0 and this image
- * changes substantially; the frontal view barely moves. That asymmetry is the
- * whole point, and it is what tools/sensitivity.mjs asserts.
+ * stops being concentric with the cornea. All three eye scenes notice
+ * `irisDepth` going to zero, but this is where the displacement is largest and
+ * where a subtly wrong refraction - as opposed to none at all - shows up.
  */
 export const eyeAngled: VisualScene = {
   name: 'eye-angled',
