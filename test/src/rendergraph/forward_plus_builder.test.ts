@@ -1615,6 +1615,25 @@ describe('Forward+ pipeline customization', () => {
     }
   });
 
+  test('TransparentPass reads ShadowMask so it outlives LightPass', () => {
+    // Transparent geometry samples the mask through the same clustered-light
+    // bind group as the opaque pass. Resource lifetimes are derived purely from
+    // declared reads (RenderGraph.compile) and the executor hands a texture back
+    // to the pool at lastUse, so an undeclared read here would let the mask be
+    // recycled after LightPass while TransparentPass is still sampling it.
+    // Inheriting ctx.shadowMaskTexture from LightPass's execute made that
+    // invisible - it happened to hold the right texture, so nothing looked wrong.
+    const { graph } = buildForwardPlusGraphForTest(
+      createOptions({ shadowMask: true, needSceneColor: true }),
+      { needSceneColor: true, shadowedLights: [{}] }
+    );
+
+    const reads = graph.passes
+      .find((pass) => pass.name === 'TransparentPass')
+      ?.reads.map((resource) => resource.name);
+    expect(reads).toContain('shadowMask');
+  });
+
   test('CompositeTail consumes a SceneColor version written after LightPass', () => {
     const customModule: RenderModule = {
       type: 'SceneColorOverride',

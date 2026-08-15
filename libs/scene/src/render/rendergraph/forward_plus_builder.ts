@@ -1292,6 +1292,7 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'CompositeTail');
     const hiZHandle = blackboard.get(FrameResources.HiZ);
     const sceneColorCopyHandle = blackboard.get(FrameResources.SceneColorCopy);
+    const shadowMaskHandle = blackboard.get(FrameResources.ShadowMask);
     const lightPassResult = requireBuildState(fg, 'lightPass', 'LightPass', 'CompositeTail');
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     const useFinalFramebufferAsIntermediate = fg.state.useFinalFramebufferAsIntermediate;
@@ -1354,9 +1355,23 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
       if (sceneColorCopyHandle) {
         builder.read(sceneColorCopyHandle);
       }
+      if (shadowMaskHandle) {
+        // Transparent geometry goes through the same clustered-light bind group
+        // as the opaque pass, which binds ctx.shadowMaskTexture whenever
+        // screenSpaceShadowMask is on (ShaderHelper, UNIFORM_NAME_SHADOW_MASK).
+        // Declaring the read is what keeps the mask alive: the executor derives
+        // each resource's lastUse from declared reads and returns the texture to
+        // the pool immediately after, so without this the mask would be recycled
+        // after LightPass while this pass is still sampling it.
+        builder.read(shadowMaskHandle);
+      }
       builder.read(opaqueChainResult.color);
       const out = builder.write(opaqueChainResult.color);
       builder.setExecute((rgCtx) => {
+        // Pulled here rather than inherited from LightPass's execute. The value
+        // is the same, but relying on the leftover would make this pass depend
+        // on execution order instead of on its own declared inputs.
+        ctx.shadowMaskTexture = shadowMaskHandle ? rgCtx.getTexture<Texture2DArray>(shadowMaskHandle) : null;
         renderTransparentScenePass(
           frame,
           rgCtx,
