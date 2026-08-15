@@ -492,6 +492,10 @@
       "projectFolder": "apps/depth-viz-demo"
     },
     {
+      "packageName": "@zephyr3d/eye-demo",
+      "projectFolder": "apps/eye-demo"
+    },
+    {
       "packageName": "@zephyr3d/nonlinear-depth-demo",
       "projectFolder": "apps/nonlinear-depth-demo"
     },

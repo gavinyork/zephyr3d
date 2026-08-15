@@ -2696,10 +2696,10 @@ export function getEyeMaterialClass(manager: ResourceManager): SerializableClass
           },
           {
             name: 'LimbalRingWidth',
-            description: 'Width of the dark ring at the iris edge, in UV units',
+            description: 'Width of the dark ring at the iris edge, as a fraction of the iris radius',
             type: 'float',
-            default: 0.05,
-            options: { animatable: true, minValue: 0, maxValue: 0.25 },
+            default: 0.15,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
             get(this: EyeMaterial, value) {
               value.num[0] = this.limbalRingWidth;
             },
@@ -2707,7 +2707,7 @@ export function getEyeMaterialClass(manager: ResourceManager): SerializableClass
               this.limbalRingWidth = value.num[0];
             },
             getDefaultValue(this: EyeMaterial) {
-              return this.$isInstance ? this.coreMaterial.limbalRingWidth : 0.05;
+              return this.$isInstance ? this.coreMaterial.limbalRingWidth : 0.15;
             }
           },
           {

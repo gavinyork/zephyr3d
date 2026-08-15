@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zephyr3D Eye Material Demo</title>
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #0e1013;
+        color: #e9edf2;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+
+      canvas {
+        display: block;
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      #io {
+        position: absolute;
+        right: 12px;
+        bottom: 12px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 12px;
+        background: rgba(20, 24, 30, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 6px;
+        backdrop-filter: blur(8px);
+        font-size: 13px;
+      }
+
+      #io label {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        color: #9aa6b2;
+      }
+
+      #io input[type='file'] {
+        max-width: 190px;
+        font-size: 12px;
+        color: #cdd6e0;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <!-- Kept out of ImGui: file pickers need a real DOM element to open the
+         browser dialog, and this is also where production maps get dropped in
+         once they exist. -->
+    <div id="io">
+      <label>Iris map <input id="iris-file" type="file" accept="image/*" /></label>
+      <label>Sclera map <input id="sclera-file" type="file" accept="image/*" /></label>
+    </div>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

@@ -138,7 +138,7 @@ function eyeball(scene: Scene, configure?: (m: EyeMaterial) => void) {
   // them sensitive to that default drifting - setting it explicitly is exactly
   // what made post-tonemap-bloom blind to its own threshold.
   material.irisColor = new Vector4(1.1, 1, 0.95, 1);
-  material.limbalRingWidth = 0.035;
+  material.limbalRingWidth = 0.2;
   material.limbalRingStrength = 0.8;
   material.scleraColor = new Vector4(0.92, 0.9, 0.88, 1);
   configure?.(material);

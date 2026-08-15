@@ -83,7 +83,7 @@ export class EyeMaterial
     this._pupilDilation = 0;
     this._irisColor = new Vector4(1, 1, 1, 1);
     this._irisBrightness = 0.15;
-    this._limbalRingWidth = 0.05;
+    this._limbalRingWidth = 0.15;
     this._limbalRingStrength = 0.7;
     this._scleraColor = new Vector4(0.9, 0.88, 0.86, 1);
     this._scleraWrap = 0.35;
@@ -255,12 +255,20 @@ export class EyeMaterial
     }
   }
 
-  /** Width of the dark ring at the iris edge, in UV units. */
+  /**
+   * Width of the dark ring at the iris edge, as a fraction of
+   * {@link EyeMaterial.irisRadius}.
+   *
+   * @remarks
+   * Relative rather than absolute so that resizing the iris keeps the ring in
+   * proportion. As a UV distance it silently became a much heavier ring on a
+   * small iris than on a large one.
+   */
   get limbalRingWidth() {
     return this._limbalRingWidth;
   }
   set limbalRingWidth(val) {
-    const next = Math.max(0, val ?? 0);
+    const next = Math.min(1, Math.max(0, val ?? 0));
     if (next !== this._limbalRingWidth) {
       this._limbalRingWidth = next;
       this.uniformChanged();
@@ -536,8 +544,11 @@ export class EyeMaterial
         scope.irisAlbedo = pb.mul(scope.irisAlbedo, this.sampleIrisTexture(scope, scope.irisUV).rgb);
       }
       // Limbal ring, keyed off the surface radius so refraction cannot smear it.
+      // The width is a fraction of the iris radius rather than an absolute UV
+      // distance, so resizing the iris keeps the ring in proportion.
+      scope.$l.limbalWidth = pb.mul(scope.zEyeIrisRadius, scope.zEyeLimbalRingWidth);
       scope.$l.limbal = pb.smoothStep(
-        pb.sub(scope.zEyeIrisRadius, scope.zEyeLimbalRingWidth),
+        pb.sub(scope.zEyeIrisRadius, scope.limbalWidth),
         scope.zEyeIrisRadius,
         scope.surfaceDist
       );
