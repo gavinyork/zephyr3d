@@ -469,7 +469,6 @@ export class ResourceManager {
         ChannelSDFMaskNode.getSerializationCls(),
         MorphBlurNode.getSerializationCls(),
         PannerNode.getSerializationCls(),
-        TextureSampleNode.getSerializationCls(),
         VertexOutputNode.getSerializationCls(),
         VertexIndexNode.getSerializationCls(),
         InstanceIndexNode.getSerializationCls(),

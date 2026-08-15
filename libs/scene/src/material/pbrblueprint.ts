@@ -256,10 +256,24 @@ export class PBRBluePrintMaterial
       scope.$outputs.zVertexUV = scope.zVertexUV;
     }
 
-    for (const u of [...this._uniformValues, ...this._uniformTextures]) {
+    for (const u of this._uniformValues) {
       if (u.inVertexShader) {
         // @ts-ignore dynamic shader type constructor
         const exp = pb[u.type]().uniform(2);
+        pb.getGlobalScope()[u.name] = exp;
+      }
+    }
+
+    for (const u of this._uniformTextures) {
+      if (u.inVertexShader) {
+        // @ts-ignore dynamic shader type constructor
+        const exp = (pb[u.type]() as PBShaderExp).uniform(2).withSampler({
+          addressU: u.wrapS as any,
+          addressV: u.wrapT as any,
+          minFilter: u.minFilter as any,
+          magFilter: u.magFilter as any,
+          mipFilter: u.mipFilter as any
+        });
         pb.getGlobalScope()[u.name] = exp;
       }
     }

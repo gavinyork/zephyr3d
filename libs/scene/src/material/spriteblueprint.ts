@@ -173,7 +173,13 @@ export class SpriteBlueprintMaterial extends SpriteMaterial {
     for (const u of this._uniformTextures) {
       if (!pb.getGlobalScope()[u.name]) {
         // @ts-ignore dynamic shader type constructor
-        const exp = pb[u.type]().uniform(2);
+        const exp = (pb[u.type]() as PBShaderExp).uniform(2).withSampler({
+          addressU: u.wrapS as any,
+          addressV: u.wrapT as any,
+          minFilter: u.minFilter as any,
+          magFilter: u.magFilter as any,
+          mipFilter: u.mipFilter as any
+        });
         pb.getGlobalScope()[u.name] = exp;
       }
     }
