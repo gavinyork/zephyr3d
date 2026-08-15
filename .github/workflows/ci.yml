@@ -30,19 +30,17 @@ jobs:
         run: node common/scripts/install-run-rush.js rebuild --verbose
 
       # The jest suites were never actually run in CI before this. They cover
-      # maths, render-graph topology and shader codegen, and cost well under a
-      # minute.
+      # maths, render-graph topology, serialization and shader codegen - 70
+      # suites, ~1500 assertions, well under a minute.
       #
-      # continue-on-error is a deliberate, temporary concession: two assertions in
-      # test/src/scene/lab_blueprint_material_instance.test.ts fail at HEAD, on a
-      # clean tree, independently of this workflow (subsurface profiles are shared
-      # where the test expects them cloned, and the observed profile slot varies
-      # with suite ordering - so there is cross-test pollution behind it).
-      # Gating on a suite that is already red would just block every PR. Remove
-      # this line once those two are fixed; the step is here now so the failure
-      # stays visible instead of staying unrun.
+      # Gating, not advisory. This step first ran against four pre-existing
+      # failures, all of which turned out to be worth having found: a
+      # doubleSidedLighting default that silently loaded legacy materials as
+      # single-sided, two assertions still pinned to the hard morph-target
+      # ceiling after a configurable limit was introduced below it, and morph
+      # displacement being dropped from the bounds of meshes that are both
+      # skinned and morphed.
       - name: Unit tests
-        continue-on-error: true
         run: node common/scripts/install-run-rush.js test
 
   visual:

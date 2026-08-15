@@ -806,7 +806,31 @@ export class Mesh extends MeshBase implements BatchDrawable {
         ? this._skinnedBoundingInfo.boundingBox
         : null;
     if (skinnedBoundingBox && morphBoundingBox) {
-      return skinnedBoundingBox.clone();
+      // Skinning and morphing both active. The two boxes live in different
+      // frames: the skinned box already reflects where the geometry actually
+      // ended up, while the morph box is still expressed around the rest pose.
+      // Unioning them therefore spans the gap between rest and posed positions
+      // and produces a wildly oversized box - which is why that union was
+      // removed. But dropping the morph side entirely loses the displacement,
+      // since the skinned box is built from rest-pose representative vertices
+      // (SkinBinding.computeBoundingBox) and never sees morph offsets - so a
+      // large facial expression could reach outside its own bounds and be
+      // culled.
+      //
+      // Transfer only what is frame-independent: the displacement. Clamped so
+      // it can only grow the box, because a morph that pushes geometry one way
+      // must not be allowed to shrink the opposite side.
+      const box = skinnedBoundingBox.clone();
+      const displacement = this.calculateMorphDisplacement();
+      if (displacement) {
+        const min = box.minPoint;
+        const max = box.maxPoint;
+        const dmin = displacement.minPoint;
+        const dmax = displacement.maxPoint;
+        min.setXYZ(min.x + Math.min(0, dmin.x), min.y + Math.min(0, dmin.y), min.z + Math.min(0, dmin.z));
+        max.setXYZ(max.x + Math.max(0, dmax.x), max.y + Math.max(0, dmax.y), max.z + Math.max(0, dmax.z));
+      }
+      return box;
     }
     return skinnedBoundingBox?.clone() ?? morphBoundingBox ?? null;
   }
@@ -965,7 +989,19 @@ export class Mesh extends MeshBase implements BatchDrawable {
     return this.material?.needSceneDepth() ?? false;
   }
   /** @internal */
-  private calculateMorphBoundingBox(): Nullable<BoundingBox> {
+  /**
+   * Weighted morph displacement, relative to the rest pose - i.e. how far the
+   * active morph targets push geometry beyond `originBox`, not where that
+   * geometry ends up.
+   *
+   * Kept separate from {@link calculateMorphBoundingBox} because the two are
+   * useful in different frames of reference: the absolute box is meaningful for
+   * an unskinned mesh, while for a skinned one only the displacement transfers -
+   * the rest-space position is superseded by the skinning result.
+   *
+   * @internal
+   */
+  private calculateMorphDisplacement(): Nullable<BoundingBox> {
     if (!this._morphInfo || !this._morphBoundingInfo) {
       return null;
     }
@@ -979,8 +1015,16 @@ export class Mesh extends MeshBase implements BatchDrawable {
         : new Float32Array(Array.from(this._morphInfo.data.subarray(4, 4 + numTargets)));
     const bbox = new BoundingBox();
     calculateMorphBoundingBox(bbox, this._morphBoundingInfo.targetBoxes, weights, numTargets);
-    bbox.minPoint.addBy(this._morphBoundingInfo.originBox.minPoint);
-    bbox.maxPoint.addBy(this._morphBoundingInfo.originBox.maxPoint);
+    return bbox;
+  }
+  /** @internal */
+  private calculateMorphBoundingBox(): Nullable<BoundingBox> {
+    const bbox = this.calculateMorphDisplacement();
+    if (!bbox) {
+      return null;
+    }
+    bbox.minPoint.addBy(this._morphBoundingInfo!.originBox.minPoint);
+    bbox.maxPoint.addBy(this._morphBoundingInfo!.originBox.maxPoint);
     return bbox;
   }
   /** @internal */

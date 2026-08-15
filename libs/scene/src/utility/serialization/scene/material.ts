@@ -969,9 +969,15 @@ function getLitMaterialProps(manager: ResourceManager): PropertyAccessor<LitProp
       },
       getDefaultValue(this: LitPropTypes) {
         if (this instanceof PBRBluePrintMaterialInstance) {
-          return this.parentMaterial?.doubleSidedLighting ?? false;
+          return this.parentMaterial?.doubleSidedLighting ?? true;
         }
-        return this.$isInstance ? this.coreMaterial.doubleSidedLighting : false;
+        // Must match what the constructor actually sets - mixinLight enables
+        // FEATURE_DOUBLE_SIDED_LIGHTING - because this value is used both to
+        // decide whether to omit the property when saving and to fill it in
+        // when it is absent on load. Returning false here made every asset
+        // written before this accessor existed (all of which omitted the key,
+        // since true was then the assumed default) load as single-sided.
+        return this.$isInstance ? this.coreMaterial.doubleSidedLighting : true;
       }
     },
     {

@@ -11,7 +11,7 @@ import {
   type AssetMeshData,
   type AssetSubMeshData
 } from '../../../libs/scene/src';
-import { MAX_MORPH_ATTRIBUTES, MAX_MORPH_TARGETS } from '../../../libs/scene/src/values';
+import { getMorphTargetLimit, MAX_MORPH_ATTRIBUTES, MAX_MORPH_TARGETS } from '../../../libs/scene/src/values';
 
 let mockResourceManager: ResourceManager | null = null;
 
@@ -106,18 +106,23 @@ describe('morph target groups', () => {
   });
 
   test('limits generated morph target groups to the runtime morph target capacity', () => {
+    // The cap is the *runtime* limit (getMorphTargetLimit, 256 by default and
+    // project-configurable), not the hard ceiling MAX_MORPH_TARGETS (1024) that
+    // only sizes the buffer layout. This test asserted the ceiling, which was
+    // correct until a configurable limit was introduced below it.
+    const limit = getMorphTargetLimit();
     const model = new SharedModel();
     const assetNode = new AssetHierarchyNode('face', model);
     assetNode.mesh = createAssetMesh(
       'face-0',
-      Array.from({ length: MAX_MORPH_TARGETS + 4 }, (_, index) => `Target${index}`)
+      Array.from({ length: limit + 4 }, (_, index) => `Target${index}`)
     );
 
     model.buildMorphTargetGroupsByName();
 
-    expect(model.morphTargetGroups).toHaveLength(MAX_MORPH_TARGETS);
-    expect(model.getMorphTargetGroup(`Target${MAX_MORPH_TARGETS - 1}`)).not.toBeNull();
-    expect(model.getMorphTargetGroup(`Target${MAX_MORPH_TARGETS}`)).toBeNull();
+    expect(model.morphTargetGroups).toHaveLength(limit);
+    expect(model.getMorphTargetGroup(`Target${limit - 1}`)).not.toBeNull();
+    expect(model.getMorphTargetGroup(`Target${limit}`)).toBeNull();
   });
 
   test('initializes runtime group weight from mesh morph weights', () => {
@@ -585,13 +590,17 @@ describe('morph target groups', () => {
       })
     });
 
+    // Clamped to the runtime limit, not the buffer-layout ceiling. The payload
+    // above is deliberately laid out with MAX_MORPH_TARGETS stride (that part is
+    // the wire format) while the restored target count follows the limit.
+    const limit = getMorphTargetLimit();
     expect(fetchModelDataSpy).toHaveBeenCalledWith('/assets/test/head.glb');
     expect(restored.getMorphData()).not.toBeNull();
-    expect(restored.getNumMorphTargets()).toBe(MAX_MORPH_TARGETS);
-    expect(restored.getMorphTargetName(MAX_MORPH_TARGETS - 1)).toBe(`Target${MAX_MORPH_TARGETS - 1}`);
-    expect(restored.getMorphTargetIndexByName(`Target${MAX_MORPH_TARGETS}`)).toBe(-1);
+    expect(restored.getNumMorphTargets()).toBe(limit);
+    expect(restored.getMorphTargetName(limit - 1)).toBe(`Target${limit - 1}`);
+    expect(restored.getMorphTargetIndexByName(`Target${limit}`)).toBe(-1);
 
-    restored.setMorphWeightByIndex(MAX_MORPH_TARGETS - 1, 0.5);
+    restored.setMorphWeightByIndex(limit - 1, 0.5);
     expect(() => restored.update(1, 0, 0)).not.toThrow();
   });
 
@@ -662,6 +671,13 @@ describe('morph target groups', () => {
     });
     (mesh as any).refreshAnimatedBoundingBox();
 
-    expectBoundingBox(mesh.getAnimatedBoundingBox(), [-0.5, -1, -1.5], [11, 11, 11]);
+    // The skinned box, grown by the morph *displacement* - not unioned with the
+    // rest-space morph box, which would span the gap between the rest pose and
+    // the posed skeleton and give a hugely oversized box.
+    //
+    // weight 0.5 over target [-1,-2,-3]..[2,3,4] gives a displacement of
+    // [-0.5,-1,-1.5]..[1,1.5,2], applied to the skinned box [10,10,10]..[11,11,11]
+    // and clamped so it only ever grows.
+    expectBoundingBox(mesh.getAnimatedBoundingBox(), [9.5, 9, 8.5], [12, 12.5, 13]);
   });
 });
