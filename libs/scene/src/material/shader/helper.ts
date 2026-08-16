@@ -748,6 +748,20 @@ export class ShaderHelper {
     }
   }
   /**
+   * Gets the skinning matrix in the vertex shader, if the mesh being drawn is skinned.
+   *
+   * @remarks
+   * Lets a material apply the same skinning transform to its own uniform-supplied
+   * object-space vectors that {@link ShaderHelper.resolveVertexNormal} applies to
+   * the normal attribute, so such vectors stay attached to the deforming mesh.
+   *
+   * @param scope - Current shader scope, must be vertex stage
+   * @returns The skinning matrix of type mat4, or null when the mesh is not skinned
+   */
+  static getSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp | null {
+    return (scope[this.SKIN_MATRIX_NAME] as PBShaderExp) ?? null;
+  }
+  /**
    * Calculates the normal vector of type vec3 in object space
    *
    * @param scope - Current shader scope

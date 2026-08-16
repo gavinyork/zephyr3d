@@ -61,6 +61,9 @@ fill.color = new Vector4(0.35, 0.4, 0.5, 1);
 const material = new EyeMaterial();
 material.vertexTangent = true;
 material.irisRadius = 0.16;
+// On by default here: the demo eyeball floats with no face around it, so the
+// socket occlusion is the only cue that it sits in a head at all.
+material.socketOcclusion = true;
 new Mesh(scene, createEyeballPrimitive(), material);
 
 // --- procedural textures ----------------------------------------------------
@@ -294,6 +297,28 @@ function drawUI() {
     const t = material.scleraEdgeTint;
     slider('Vein tint strength', t.w, 0, 1, (v) => {
       material.scleraEdgeTint = new Vector4(t.x, t.y, t.z, v);
+    });
+  }
+
+  if (ImGui.CollapsingHeader('Socket occlusion', ImGui.TreeNodeFlags.DefaultOpen)) {
+    const enabled = [material.socketOcclusion] as [boolean];
+    if (ImGui.Checkbox('Enabled', enabled)) {
+      material.socketOcclusion = enabled[0];
+    }
+    slider('Strength', material.socketOcclusionStrength, 0, 1, (v) => {
+      material.socketOcclusionStrength = v;
+    });
+    slider('Upper lid angle', material.upperLidAngle, 5, 90, (v) => (material.upperLidAngle = v));
+    slider('Lower lid angle', material.lowerLidAngle, 5, 90, (v) => (material.lowerLidAngle = v));
+    slider('Softness', material.socketOcclusionSoftness, 1, 45, (v) => {
+      material.socketOcclusionSoftness = v;
+    });
+    const r = material.socketRotation;
+    slider('Tilt (deg)', r.x, -45, 45, (v) => {
+      material.socketRotation = new Vector4(v, r.y, r.z, 0);
+    });
+    slider('Roll (deg)', r.z, -45, 45, (v) => {
+      material.socketRotation = new Vector4(r.x, r.y, v, 0);
     });
   }
 

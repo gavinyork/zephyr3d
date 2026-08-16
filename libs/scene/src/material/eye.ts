@@ -1,6 +1,6 @@
 import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import type { Clonable, Immutable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinLight } from './mixins/lit';
 import { mixinPBRBRDF } from './mixins/pbr/brdf';
@@ -56,6 +56,7 @@ export class EyeMaterial
 {
   private static readonly FEATURE_VERTEX_NORMAL = this.defineFeature();
   private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
+  private static readonly FEATURE_SOCKET_OCCLUSION = this.defineFeature();
 
   private readonly _irisCenter: Vector4;
   private _irisRadius: number;
@@ -72,6 +73,15 @@ export class EyeMaterial
   private readonly _scleraEdgeTint: Vector4;
   private _corneaSpecularStrength: number;
   private _corneaRoughness: number;
+  private readonly _socketRotation: Vector4;
+  private _upperLidAngle: number;
+  private _lowerLidAngle: number;
+  private _socketOcclusionSoftness: number;
+  private _socketOcclusionStrength: number;
+  // Derived from _socketRotation; never serialized or exposed.
+  private readonly _socketUp: Vector4;
+  private readonly _socketForward: Vector4;
+  private readonly _socketCos: Vector4;
 
   constructor() {
     super();
@@ -90,6 +100,14 @@ export class EyeMaterial
     this._scleraEdgeTint = new Vector4(0.55, 0.22, 0.18, 1);
     this._corneaSpecularStrength = 1;
     this._corneaRoughness = 0.05;
+    this._socketRotation = new Vector4(0, 0, 0, 0);
+    this._upperLidAngle = 50;
+    this._lowerLidAngle = 65;
+    this._socketOcclusionSoftness = 15;
+    this._socketOcclusionStrength = 0.65;
+    this._socketUp = new Vector4(0, 1, 0, 0);
+    this._socketForward = new Vector4(0, 0, 1, 0);
+    this._socketCos = new Vector4();
     this.useFeature(EyeMaterial.FEATURE_VERTEX_NORMAL, true);
     // Initialised explicitly rather than left unset: featureUsed() returns
     // undefined for a feature that was never touched, which would make
@@ -97,6 +115,7 @@ export class EyeMaterial
     // declares, and a descriptor whose default does not match the constructor
     // is how assets silently change on load.
     this.useFeature(EyeMaterial.FEATURE_VERTEX_TANGENT, false);
+    this.useFeature(EyeMaterial.FEATURE_SOCKET_OCCLUSION, false);
   }
 
   clone() {
@@ -124,6 +143,12 @@ export class EyeMaterial
     this.scleraEdgeTint = other.scleraEdgeTint;
     this.corneaSpecularStrength = other.corneaSpecularStrength;
     this.corneaRoughness = other.corneaRoughness;
+    this.socketOcclusion = other.socketOcclusion;
+    this.socketRotation = other.socketRotation;
+    this.upperLidAngle = other.upperLidAngle;
+    this.lowerLidAngle = other.lowerLidAngle;
+    this.socketOcclusionSoftness = other.socketOcclusionSoftness;
+    this.socketOcclusionStrength = other.socketOcclusionStrength;
   }
 
   /** true if vertex normal attribute presents */
@@ -345,6 +370,127 @@ export class EyeMaterial
     }
   }
 
+  /**
+   * Enables eye-socket occlusion - the soft shadowing of the eyeball by the
+   * eyelids and socket that keeps the eye from reading as a ball glued onto the
+   * face.
+   *
+   * @remarks
+   * The occlusion is analytic: an asymmetric aperture defined by
+   * {@link EyeMaterial.upperLidAngle} and {@link EyeMaterial.lowerLidAngle}
+   * around an axis fixed in the *object space* of the eyeball mesh (rotatable
+   * via {@link EyeMaterial.socketRotation}). It darkens ambient diffuse,
+   * ambient specular and direct lights whose direction falls outside the
+   * aperture. No mask texture, extra pass or per-frame scripting is needed.
+   *
+   * Object space is deliberate. The socket vectors ride the exact transform
+   * chain the vertex normals take - skinning included - so head motion is
+   * always correct; horizontal gaze (a rotation about the socket's own up axis)
+   * leaves the occlusion untouched; and vertical gaze drags the occlusion with
+   * the eye, which approximates how real upper lids follow vertical gaze.
+   */
+  get socketOcclusion() {
+    return this.featureUsed<boolean>(EyeMaterial.FEATURE_SOCKET_OCCLUSION);
+  }
+  set socketOcclusion(val) {
+    this.useFeature(EyeMaterial.FEATURE_SOCKET_OCCLUSION, !!val);
+  }
+
+  /**
+   * Euler rotation (degrees, xyz) applied to the canonical socket frame.
+   *
+   * @remarks
+   * At (0, 0, 0) the frame matches the documented asset convention: +Y towards
+   * the upper lid, +Z along the gaze. Exposed as angles rather than as the
+   * up/forward unit vectors themselves because angles are the editable form -
+   * a unit-vector triplet cannot be dragged in an inspector without
+   * renormalisation fighting the user.
+   */
+  get socketRotation(): Immutable<Vector4> {
+    return this._socketRotation;
+  }
+  set socketRotation(val: Immutable<Vector4>) {
+    if (val && !this._socketRotation.equalsTo(val)) {
+      this._socketRotation.set(val);
+      this.updateSocketFrame();
+      this.uniformChanged();
+    }
+  }
+
+  /** Aperture half-angle towards the upper lid, in degrees from the socket up axis. */
+  get upperLidAngle() {
+    return this._upperLidAngle;
+  }
+  set upperLidAngle(val) {
+    const next = Math.min(90, Math.max(5, val ?? 5));
+    if (next !== this._upperLidAngle) {
+      this._upperLidAngle = next;
+      this.uniformChanged();
+    }
+  }
+
+  /**
+   * Aperture half-angle towards the lower lid, in degrees.
+   *
+   * @remarks
+   * Defaults wider than {@link EyeMaterial.upperLidAngle}: the upper lid
+   * shadows more of a real eye than the lower one, and that asymmetry is a
+   * large part of what makes the occlusion read as an eye socket.
+   */
+  get lowerLidAngle() {
+    return this._lowerLidAngle;
+  }
+  set lowerLidAngle(val) {
+    const next = Math.min(90, Math.max(5, val ?? 5));
+    if (next !== this._lowerLidAngle) {
+      this._lowerLidAngle = next;
+      this.uniformChanged();
+    }
+  }
+
+  /** Width of the lit-to-shadowed transition, in degrees. */
+  get socketOcclusionSoftness() {
+    return this._socketOcclusionSoftness;
+  }
+  set socketOcclusionSoftness(val) {
+    const next = Math.min(45, Math.max(1, val ?? 1));
+    if (next !== this._socketOcclusionSoftness) {
+      this._socketOcclusionSoftness = next;
+      this.uniformChanged();
+    }
+  }
+
+  /** Overall socket occlusion strength, 0 to 1. */
+  get socketOcclusionStrength() {
+    return this._socketOcclusionStrength;
+  }
+  set socketOcclusionStrength(val) {
+    const next = Math.min(1, Math.max(0, val ?? 0));
+    if (next !== this._socketOcclusionStrength) {
+      this._socketOcclusionStrength = next;
+      this.uniformChanged();
+    }
+  }
+
+  /**
+   * Recomputes the object-space socket up/forward vectors from
+   * {@link EyeMaterial.socketRotation}.
+   *
+   * @internal
+   */
+  private updateSocketFrame() {
+    const d2r = Math.PI / 180;
+    const rot = Quaternion.fromEulerAngle(
+      this._socketRotation.x * d2r,
+      this._socketRotation.y * d2r,
+      this._socketRotation.z * d2r
+    ).toMatrix3x3();
+    const up = rot.transformVector(new Vector3(0, 1, 0));
+    const forward = rot.transformVector(new Vector3(0, 0, 1));
+    this._socketUp.setXYZW(up.x, up.y, up.z, 0);
+    this._socketForward.setXYZW(forward.x, forward.y, forward.z, 0);
+  }
+
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
@@ -368,7 +514,79 @@ export class EyeMaterial
           scope.oTangent.w
         );
       }
+      if (this.socketOcclusion && this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
+        // The socket axes are object-space constants carried through the same
+        // transform chain as the normal attribute - skin matrix first, then
+        // normal matrix - so the occlusion stays attached to the eye through
+        // both node motion and skeletal animation. This is what makes the
+        // frame a static, hand-tunable material property rather than a value
+        // someone has to feed from the head bone every frame.
+        scope.zEyeSocketUp = pb.vec4().uniform(2);
+        scope.zEyeSocketForward = pb.vec4().uniform(2);
+        const skinMatrix = ShaderHelper.getSkinMatrix(scope);
+        scope.$l.oSocketUp = skinMatrix
+          ? pb.mul(skinMatrix, pb.vec4(scope.zEyeSocketUp.xyz, 0)).xyz
+          : scope.zEyeSocketUp.xyz;
+        scope.$l.oSocketForward = skinMatrix
+          ? pb.mul(skinMatrix, pb.vec4(scope.zEyeSocketForward.xyz, 0)).xyz
+          : scope.zEyeSocketForward.xyz;
+        scope.$outputs.wSocketUp = pb.mul(
+          ShaderHelper.getNormalMatrix(scope),
+          pb.vec4(scope.oSocketUp, 0)
+        ).xyz;
+        scope.$outputs.wSocketForward = pb.mul(
+          ShaderHelper.getNormalMatrix(scope),
+          pb.vec4(scope.oSocketForward, 0)
+        ).xyz;
+      }
     }
+  }
+
+  /**
+   * Fractional visibility of a world-space direction through the socket
+   * aperture: 1 fully visible, approaching 0 towards the lids.
+   *
+   * @remarks
+   * One function evaluated on three different directions - the surface normal
+   * for ambient diffuse, the reflection vector for ambient specular, the light
+   * direction for direct lights - so all lighting terms agree on where the
+   * lids are.
+   *
+   * The rear-hemisphere falloff (`forLight`) applies to light directions only.
+   * A light shining from behind the head genuinely is blocked, but darkening
+   * *surface* normals that face backwards paints the whole rear of the eyeball
+   * dark - invisible inside a head, yet the first thing anyone orbiting a bare
+   * eyeball sees, and it reads as the occlusion being on the wrong side.
+   *
+   * @internal
+   */
+  private socketAperture(scope: PBInsideFunctionScope, dir: PBShaderExp, forLight: boolean) {
+    const pb = scope.$builder;
+    const funcName = forLight ? 'Z_eyeSocketApertureLight' : 'Z_eyeSocketApertureSurface';
+    pb.func(funcName, [pb.vec3('dir'), pb.vec4('lidCos'), pb.float('strength')], function () {
+      this.$l.up = pb.normalize(this.$inputs.wSocketUp);
+      this.$l.lat = pb.dot(this.dir, this.up);
+      // lidCos packs cos(angle +/- softness) per lid, precomputed on the CPU:
+      // (upper outer, upper inner, lower outer, lower inner). cos falls as the
+      // angle grows, so the smoothstep edges arrive already ordered.
+      this.$l.occUpper = pb.smoothStep(this.lidCos.x, this.lidCos.y, this.lat);
+      this.$l.occLower = pb.smoothStep(this.lidCos.z, this.lidCos.w, pb.neg(this.lat));
+      this.$l.visibility = pb.sub(1, pb.max(this.occUpper, this.occLower));
+      if (forLight) {
+        // Light arriving from behind the eye's equator is blocked by the head
+        // itself. The ramp straddles zero so the dimming eases in a little
+        // before the light passes behind.
+        this.$l.forward = pb.normalize(this.$inputs.wSocketForward);
+        this.visibility = pb.mul(
+          this.visibility,
+          pb.smoothStep(-0.4, 0.25, pb.dot(this.dir, this.forward))
+        );
+      }
+      this.$return(pb.mix(pb.float(1), this.visibility, this.strength));
+    });
+    return pb
+      .getGlobalScope()
+      [funcName](dir, scope.zEyeSocketCos, scope.zEyeSocketStrength) as PBShaderExp;
   }
 
   /**
@@ -484,6 +702,10 @@ export class EyeMaterial
         scope.zEyeScleraEdgeTint = pb.vec4().uniform(2);
         scope.zEyeCorneaSpecularStrength = pb.float().uniform(2);
         scope.zEyeCorneaRoughness = pb.float().uniform(2);
+        if (this.socketOcclusion && this.vertexNormal) {
+          scope.zEyeSocketCos = pb.vec4().uniform(2);
+          scope.zEyeSocketStrength = pb.float().uniform(2);
+        }
       }
       if (!litPass) {
         // Depth/shadow style passes only need coverage, not shading.
@@ -576,22 +798,35 @@ export class EyeMaterial
       scope.$l.F0 = pb.vec3(0.04);
       scope.$l.F90 = pb.vec3(1);
 
+      const socketOcc = !!this.socketOcclusion && !!this.vertexNormal;
       const baseLightPass = !this.drawContext.lightBlending;
       if (this.needCalculateEnvLight() && baseLightPass) {
-        scope.diffuseLighting = pb.add(
-          scope.diffuseLighting,
-          this.getEnvLightIrradiance(scope, scope.normal)
-        );
+        // Ambient occlusion by the socket: irradiance keyed off the surface
+        // normal, radiance off the reflection vector - a reflection ray aimed
+        // at the eyelid must dim even where the surface itself is open, or the
+        // corneal highlight keeps mirroring the sky in shadow.
+        scope.$l.envIrradiance = this.getEnvLightIrradiance(scope, scope.normal);
+        if (socketOcc) {
+          scope.envIrradiance = pb.mul(
+            scope.envIrradiance,
+            this.socketAperture(scope, scope.normal, false)
+          );
+        }
+        scope.diffuseLighting = pb.add(scope.diffuseLighting, scope.envIrradiance);
         scope.$l.reflectVec = this.calculateReflectionVector(scope, scope.normal, scope.viewVec);
         scope.$l.envFresnel = this.fresnelSchlick(scope, scope.NoV, scope.F0, scope.F90);
-        scope.specularLighting = pb.add(
-          scope.specularLighting,
-          pb.mul(
-            this.getEnvLightRadiance(scope, scope.reflectVec, scope.zEyeCorneaRoughness),
-            scope.envFresnel,
-            scope.zEyeCorneaSpecularStrength
-          )
+        scope.$l.envRadiance = pb.mul(
+          this.getEnvLightRadiance(scope, scope.reflectVec, scope.zEyeCorneaRoughness),
+          scope.envFresnel,
+          scope.zEyeCorneaSpecularStrength
         );
+        if (socketOcc) {
+          scope.envRadiance = pb.mul(
+            scope.envRadiance,
+            this.socketAperture(scope, scope.reflectVec, false)
+          );
+        }
+        scope.specularLighting = pb.add(scope.specularLighting, scope.envRadiance);
       }
 
       this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
@@ -625,6 +860,13 @@ export class EyeMaterial
           ? that.calculateShadow(this, this.$inputs.worldPos, pb.max(this.NoL, 1e-5))
           : pb.float(1);
         this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.shadowTerm);
+        if (socketOcc) {
+          // A light whose direction arrives from outside the lid aperture is
+          // blocked by the lids before it reaches the eyeball. This is the
+          // contact shadow a shadow map cannot deliver here: the lid sits
+          // millimetres from the surface, inside any workable depth bias.
+          this.lightColor = pb.mul(this.lightColor, that.socketAperture(this, this.lightDir, true));
+        }
         // Wrapped diffuse only for the sclera; the iris is lit through the
         // cornea and stays comparatively crisp.
         this.$l.NoLWrap = pb.clamp(
@@ -688,6 +930,22 @@ export class EyeMaterial
       bindGroup.setValue('zEyeScleraEdgeTint', this._scleraEdgeTint);
       bindGroup.setValue('zEyeCorneaSpecularStrength', this._corneaSpecularStrength);
       bindGroup.setValue('zEyeCorneaRoughness', this._corneaRoughness);
+      if (this.socketOcclusion && this.vertexNormal) {
+        const d2r = Math.PI / 180;
+        const softness = this._socketOcclusionSoftness;
+        // (upper outer, upper inner, lower outer, lower inner) - see
+        // socketAperture. Clamped so the smoothstep edges never coincide.
+        this._socketCos.setXYZW(
+          Math.cos(Math.min(this._upperLidAngle + softness, 179) * d2r),
+          Math.cos(Math.max(this._upperLidAngle - softness, 1) * d2r),
+          Math.cos(Math.min(this._lowerLidAngle + softness, 179) * d2r),
+          Math.cos(Math.max(this._lowerLidAngle - softness, 1) * d2r)
+        );
+        bindGroup.setValue('zEyeSocketUp', this._socketUp);
+        bindGroup.setValue('zEyeSocketForward', this._socketForward);
+        bindGroup.setValue('zEyeSocketCos', this._socketCos);
+        bindGroup.setValue('zEyeSocketStrength', this._socketOcclusionStrength);
+      }
     }
   }
 }

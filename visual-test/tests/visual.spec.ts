@@ -102,7 +102,8 @@ const SCENE_NAMES = [
   'hair',
   'eye-frontal',
   'eye-angled',
-  'eye-pupil-dilated'
+  'eye-pupil-dilated',
+  'eye-socket-occlusion'
 ];
 
 test('scene registry matches the harness page', async ({ harness }) => {

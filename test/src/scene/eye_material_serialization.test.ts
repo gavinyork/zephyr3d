@@ -22,6 +22,12 @@ describe('Eye material serialization', () => {
     material.corneaSpecularStrength = 1.4;
     material.corneaRoughness = 0.03;
     material.vertexTangent = true;
+    material.socketOcclusion = true;
+    material.socketRotation = new Vector4(4, -6, 1.5, 0);
+    material.upperLidAngle = 46;
+    material.lowerLidAngle = 71;
+    material.socketOcclusionSoftness = 12;
+    material.socketOcclusionStrength = 0.8;
 
     const serialized = await manager.serializeObject(material);
     const restored = (await manager.deserializeObject<EyeMaterial>(null, serialized))!;
@@ -35,7 +41,10 @@ describe('Eye material serialization', () => {
       PupilDilation: 0.6,
       LimbalRingStrength: 0.85,
       CorneaSpecularStrength: 1.4,
-      vertexTangent: true
+      vertexTangent: true,
+      SocketOcclusion: true,
+      UpperLidAngle: 46,
+      LowerLidAngle: 71
     });
 
     expect(restored).toBeInstanceOf(EyeMaterial);
@@ -59,6 +68,14 @@ describe('Eye material serialization', () => {
     expect(restored.corneaSpecularStrength).toBeCloseTo(1.4);
     expect(restored.corneaRoughness).toBeCloseTo(0.03);
     expect(restored.vertexTangent).toBe(true);
+    expect(restored.socketOcclusion).toBe(true);
+    expect(restored.socketRotation.x).toBeCloseTo(4);
+    expect(restored.socketRotation.y).toBeCloseTo(-6);
+    expect(restored.socketRotation.z).toBeCloseTo(1.5);
+    expect(restored.upperLidAngle).toBeCloseTo(46);
+    expect(restored.lowerLidAngle).toBeCloseTo(71);
+    expect(restored.socketOcclusionSoftness).toBeCloseTo(12);
+    expect(restored.socketOcclusionStrength).toBeCloseTo(0.8);
   });
 
   test('a material left at its defaults round-trips unchanged', async () => {
@@ -88,5 +105,11 @@ describe('Eye material serialization', () => {
     expect(restored.scleraColor.x).toBeCloseTo(fresh.scleraColor.x);
     expect(restored.scleraEdgeTint.x).toBeCloseTo(fresh.scleraEdgeTint.x);
     expect(restored.irisColor.x).toBeCloseTo(fresh.irisColor.x);
+    expect(restored.socketOcclusion).toBe(fresh.socketOcclusion);
+    expect(restored.socketRotation.x).toBeCloseTo(fresh.socketRotation.x);
+    expect(restored.upperLidAngle).toBeCloseTo(fresh.upperLidAngle);
+    expect(restored.lowerLidAngle).toBeCloseTo(fresh.lowerLidAngle);
+    expect(restored.socketOcclusionSoftness).toBeCloseTo(fresh.socketOcclusionSoftness);
+    expect(restored.socketOcclusionStrength).toBeCloseTo(fresh.socketOcclusionStrength);
   });
 });
