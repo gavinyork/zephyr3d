@@ -1,3 +1,12 @@
+import { uint8ArrayToBase64 } from '@zephyr3d/base';
+import {
+  getVertexAttribFormat,
+  PBPrimitiveType,
+  type VertexAttribFormat,
+  type VertexSemantic
+} from '@zephyr3d/device';
+import { getEngine, Primitive } from '@zephyr3d/scene';
+
 type GltfAccessorType = 'SCALAR' | 'VEC2' | 'VEC3' | 'VEC4';
 
 type GltfAttributeInfo = {
@@ -9,27 +18,43 @@ type GltfAttributeInfo = {
   normalized?: boolean;
 };
 
+type PrimitiveAssetData = {
+  vertices: Record<string, { format: string; data: string }>;
+  indices?: string;
+  indexType?: 'u16' | 'u32';
+  indexCount?: number;
+  type?: string;
+  boxMin?: number[];
+  boxMax?: number[];
+};
+
 const GLB_MAGIC = 0x46546c67;
 const GLB_JSON_CHUNK_TYPE = 0x4e4f534a;
 const GLB_BIN_CHUNK_TYPE = 0x004e4942;
 const GLTF_ARRAY_BUFFER = 34962;
 const GLTF_ELEMENT_ARRAY_BUFFER = 34963;
 
-export function buildPrimitiveGlbFromZmshContent(
+export async function buildPrimitiveGlbFromZmshContent(
   content: string | unknown,
   name: string,
   srcPath = '<memory>'
-): ArrayBuffer {
-  const primitive = parsePrimitiveAssetForGlb(
+): Promise<ArrayBuffer> {
+  const primitive = await parsePrimitiveAssetForGlb(
     typeof content === 'string' ? JSON.parse(content) : content,
     srcPath
   );
   return buildPrimitiveGlb(primitive, name);
 }
 
-function parsePrimitiveAssetForGlb(content: any, srcPath: string) {
-  if (!content || typeof content !== 'object' || content.type !== 'Primitive') {
+async function parsePrimitiveAssetForGlb(content: any, srcPath: string): Promise<PrimitiveAssetData> {
+  if (!content || typeof content !== 'object') {
     throw new Error(`Unsupported primitive asset type in ${srcPath}: ${content?.type ?? '<missing>'}`);
+  }
+  if (content.type === 'Default') {
+    return deserializeDefaultPrimitiveForGlb(content.data, srcPath);
+  }
+  if (content.type !== 'Primitive') {
+    throw new Error(`Unsupported primitive asset type in ${srcPath}: ${content.type ?? '<missing>'}`);
   }
   const data = content.data;
   if (!data || typeof data !== 'object') {
@@ -44,21 +69,193 @@ function parsePrimitiveAssetForGlb(content: any, srcPath: string) {
   if (data.indices && data.indexType !== 'u16' && data.indexType !== 'u32') {
     throw new Error(`Invalid primitive index type in ${srcPath}: ${data.indexType}`);
   }
-  return data as {
-    vertices: Record<string, { format: string; data: string }>;
-    indices?: string;
-    indexType?: 'u16' | 'u32';
-    indexCount?: number;
-    type?: string;
-    boxMin?: number[];
-    boxMax?: number[];
-  };
+  return data as PrimitiveAssetData;
 }
 
-function buildPrimitiveGlb(
-  primitive: ReturnType<typeof parsePrimitiveAssetForGlb>,
-  name: string
-): ArrayBuffer {
+async function deserializeDefaultPrimitiveForGlb(
+  data: unknown,
+  srcPath: string
+): Promise<PrimitiveAssetData> {
+  if (!data || typeof data !== 'object') {
+    throw new Error(`Invalid default primitive asset data in ${srcPath}`);
+  }
+  let primitive: Primitive | null = null;
+  try {
+    try {
+      primitive = await getEngine().resourceManager.deserializeObject<Primitive>(
+        null,
+        data as Record<string, unknown>
+      );
+    } catch (err) {
+      throw new Error(
+        `Failed to deserialize default primitive in ${srcPath}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+    if (!(primitive instanceof Primitive)) {
+      throw new Error(`Default primitive data does not deserialize to a Primitive in ${srcPath}`);
+    }
+    return await primitiveToAssetData(primitive, srcPath);
+  } finally {
+    primitive?.dispose();
+  }
+}
+
+const primitiveVertexSemantics: VertexSemantic[] = [
+  'position',
+  'normal',
+  'tangent',
+  'diffuse',
+  'blendIndices',
+  'blendWeights',
+  'texCoord0',
+  'texCoord1',
+  'texCoord2',
+  'texCoord3',
+  'texCoord4',
+  'texCoord5',
+  'texCoord6',
+  'texCoord7'
+];
+
+async function primitiveToAssetData(primitive: Primitive, srcPath: string): Promise<PrimitiveAssetData> {
+  const vertices: PrimitiveAssetData['vertices'] = {};
+  let vertexCount: number | null = null;
+  for (const semantic of primitiveVertexSemantics) {
+    const info = primitive.getVertexBufferInfo(semantic);
+    if (!info || info.stepMode !== 'vertex') {
+      continue;
+    }
+    if (!info.type.isPrimitiveType() || info.type.rows !== 1) {
+      throw new Error(`Unsupported ${semantic} vertex type in default primitive ${srcPath}`);
+    }
+    const format = getVertexAttribFormat(
+      semantic,
+      getVertexDataType(info.type.scalarType, semantic, srcPath),
+      info.type.cols
+    ) as VertexAttribFormat | null;
+    if (!format) {
+      throw new Error(
+        `Unsupported ${semantic} vertex format in default primitive ${srcPath}: ${info.type.primitiveType}`
+      );
+    }
+    const sourceBytes = await info.buffer.getBufferSubData();
+    const elementSize = getVertexScalarByteSize(info.type.scalarType, semantic, srcPath) * info.type.cols;
+    const availableBytes = sourceBytes.byteLength - info.drawOffset;
+    const count = info.stride > 0 ? Math.floor(availableBytes / info.stride) : 0;
+    if (count <= 0 || elementSize <= 0 || info.offset + elementSize > info.stride) {
+      throw new Error(`Invalid ${semantic} vertex buffer in default primitive ${srcPath}`);
+    }
+    if (semantic === 'position') {
+      vertexCount = count;
+    } else if (vertexCount !== null && count !== vertexCount) {
+      throw new Error(
+        `Vertex buffer ${semantic} count ${count} does not match position count ${vertexCount} in ${srcPath}`
+      );
+    }
+    const packedBytes = new Uint8Array(count * elementSize);
+    for (let i = 0; i < count; i++) {
+      const sourceOffset = info.drawOffset + i * info.stride + info.offset;
+      packedBytes.set(sourceBytes.subarray(sourceOffset, sourceOffset + elementSize), i * elementSize);
+    }
+    vertices[semantic] = {
+      format,
+      data: uint8ArrayToBase64(packedBytes)
+    };
+  }
+  if (vertexCount === null) {
+    throw new Error(`Default primitive requires a position vertex buffer: ${srcPath}`);
+  }
+
+  const result: PrimitiveAssetData = {
+    vertices,
+    type: primitive.primitiveType,
+    indexCount: primitive.indexCount
+  };
+  const aabb = primitive.getBoundingVolume()?.toAABB();
+  if (aabb) {
+    result.boxMin = [aabb.minPoint.x, aabb.minPoint.y, aabb.minPoint.z];
+    result.boxMax = [aabb.maxPoint.x, aabb.maxPoint.y, aabb.maxPoint.z];
+  }
+
+  const indexBuffer = primitive.getIndexBuffer();
+  if (indexBuffer) {
+    const indexType = indexBuffer.indexType.primitiveType;
+    const indexSize = indexType === PBPrimitiveType.U16 ? 2 : indexType === PBPrimitiveType.U32 ? 4 : 0;
+    if (!indexSize) {
+      throw new Error(`Unsupported index type in default primitive ${srcPath}`);
+    }
+    const indexBytes = await indexBuffer.getBufferSubData();
+    const indexStart = primitive.indexStart;
+    const indexCount = primitive.indexCount;
+    const byteStart = indexStart * indexSize;
+    const byteEnd = byteStart + indexCount * indexSize;
+    if (byteStart < 0 || byteEnd > indexBytes.byteLength) {
+      throw new Error(`Invalid index range in default primitive ${srcPath}`);
+    }
+    result.indices = uint8ArrayToBase64(indexBytes.slice(byteStart, byteEnd));
+    result.indexType = indexType === PBPrimitiveType.U16 ? 'u16' : 'u32';
+  }
+  return result;
+}
+
+function getVertexScalarByteSize(scalarType: number, semantic: VertexSemantic, srcPath: string): number {
+  switch (scalarType) {
+    case PBPrimitiveType.U8:
+    case PBPrimitiveType.U8_NORM:
+    case PBPrimitiveType.I8:
+    case PBPrimitiveType.I8_NORM:
+      return 1;
+    case PBPrimitiveType.U16:
+    case PBPrimitiveType.U16_NORM:
+    case PBPrimitiveType.I16:
+    case PBPrimitiveType.I16_NORM:
+    case PBPrimitiveType.F16:
+      return 2;
+    case PBPrimitiveType.U32:
+    case PBPrimitiveType.I32:
+    case PBPrimitiveType.F32:
+      return 4;
+    default:
+      throw new Error(`Unsupported ${semantic} vertex scalar type in default primitive ${srcPath}`);
+  }
+}
+
+function getVertexDataType(
+  scalarType: number,
+  semantic: VertexSemantic,
+  srcPath: string
+): 'u8' | 'u8norm' | 'i8' | 'i8norm' | 'u16' | 'u16norm' | 'i16' | 'i16norm' | 'u32' | 'i32' | 'f16' | 'f32' {
+  switch (scalarType) {
+    case PBPrimitiveType.U8:
+      return 'u8';
+    case PBPrimitiveType.U8_NORM:
+      return 'u8norm';
+    case PBPrimitiveType.I8:
+      return 'i8';
+    case PBPrimitiveType.I8_NORM:
+      return 'i8norm';
+    case PBPrimitiveType.U16:
+      return 'u16';
+    case PBPrimitiveType.U16_NORM:
+      return 'u16norm';
+    case PBPrimitiveType.I16:
+      return 'i16';
+    case PBPrimitiveType.I16_NORM:
+      return 'i16norm';
+    case PBPrimitiveType.U32:
+      return 'u32';
+    case PBPrimitiveType.I32:
+      return 'i32';
+    case PBPrimitiveType.F16:
+      return 'f16';
+    case PBPrimitiveType.F32:
+      return 'f32';
+    default:
+      throw new Error(`Unsupported ${semantic} vertex scalar type in default primitive ${srcPath}`);
+  }
+}
+
+function buildPrimitiveGlb(primitive: PrimitiveAssetData, name: string): ArrayBuffer {
   const bufferViews: any[] = [];
   const accessors: any[] = [];
   const attributes: Record<string, number> = {};

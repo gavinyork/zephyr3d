@@ -2110,7 +2110,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     try {
       const content = (await this._vfs.readFile(path, { encoding: 'utf8' })) as string;
       const filename = `${PathUtils.basename(path, '.zmsh')}.glb`;
-      const glb = buildPrimitiveGlbFromZmshContent(content, PathUtils.basename(path, '.zmsh'), path);
+      const glb = await buildPrimitiveGlbFromZmshContent(content, PathUtils.basename(path, '.zmsh'), path);
       exportFile(glb, filename);
     } catch (err) {
       DlgMessage.messageBox('Error', `Export GLB failed: ${err}`);

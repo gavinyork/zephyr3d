@@ -1593,7 +1593,11 @@ async function exportPrimitiveGlb(
       };
     }
     const content = (await ProjectService.VFS.readFile(srcPath, { encoding: 'utf8' })) as string;
-    const glb = buildPrimitiveGlbFromZmshContent(content, PathUtils.basename(destPath, '.glb'), srcPath);
+    const glb = await buildPrimitiveGlbFromZmshContent(
+      content,
+      PathUtils.basename(destPath, '.glb'),
+      srcPath
+    );
     const dir = ProjectService.VFS.dirname(destPath);
     if (!(await ProjectService.VFS.exists(dir))) {
       await ProjectService.VFS.makeDirectory(dir, true);
