@@ -57,6 +57,8 @@ import { BaseView } from './baseview';
 import { CommandManager, CompositeCommand, type Command } from '../core/command';
 import {
   AddAssetCommand,
+  AddMeshCommand,
+  BUILTIN_LAMBERT_MATERIAL_PATH,
   AddChildCommand,
   AddPrefabCommand,
   AddShapeCommand,
@@ -137,7 +139,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _workspaceDragging: boolean;
   private _renderDropZone: boolean;
   private readonly _nodeToBePlaced: DRef<SceneNode>;
-  private _typeToBePlaced: 'shape' | 'asset' | 'prefab' | 'node' | 'none';
+  private _typeToBePlaced: 'shape' | 'asset' | 'mesh' | 'prefab' | 'node' | 'none';
   private _ctorToBePlaced: Nullable<{ new (scene: Scene): SceneNode }>;
   private _descToBePlaced: Nullable<string>;
   private _assetToBeAdded: Nullable<string>;
@@ -1419,6 +1421,21 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                     eventBus.dispatchEvent('scene_changed');
                   });
                 break;
+              case 'mesh':
+                this._cmdManager
+                  .execute(
+                    new AddMeshCommand(
+                      this.controller.model.scene,
+                      this._assetToBeAdded!,
+                      pos,
+                      placeNode instanceof Mesh ? placeNode : null
+                    )
+                  )
+                  .then((node) => {
+                    this._sceneHierarchy!.selectNode(node);
+                    eventBus.dispatchEvent('scene_changed');
+                  });
+                break;
               case 'prefab':
                 this._cmdManager
                   .execute(
@@ -2644,7 +2661,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   private handleWorkspaceDragEnter(_type: string, payload: { isDir: boolean; path: string }) {
     const mimeType = getEngine().VFS.guessMIMEType(payload.path);
-    if (mimeType === 'model/gltf-binary' || mimeType === 'model/gltf+json' || mimeType === 'model/fbx') {
+    if (mimeType === mimeTypeOf('.zmsh')) {
+      this.handleAddMesh(payload.path);
+    } else if (
+      mimeType === 'model/gltf-binary' ||
+      mimeType === 'model/gltf+json' ||
+      mimeType === 'model/fbx'
+    ) {
       this.handleAddAsset(payload.path);
     } else if (mimeType === mimeTypeOf('.zprefab')) {
       this.handleAddPrefab(payload.path);
@@ -2687,9 +2710,16 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       placeNode.parent = null;
       this._nodeToBePlaced.dispose();
       const command =
-        this._typeToBePlaced === 'asset'
-          ? new AddAssetCommand(this.controller.model.scene, this._assetToBeAdded!, pos, placeNode)
-          : new AddPrefabCommand(this.controller.model.scene, this._assetToBeAdded!, pos, placeNode);
+        this._typeToBePlaced === 'mesh'
+          ? new AddMeshCommand(
+              this.controller.model.scene,
+              this._assetToBeAdded!,
+              pos,
+              placeNode instanceof Mesh ? placeNode : null
+            )
+          : this._typeToBePlaced === 'asset'
+            ? new AddAssetCommand(this.controller.model.scene, this._assetToBeAdded!, pos, placeNode)
+            : new AddPrefabCommand(this.controller.model.scene, this._assetToBeAdded!, pos, placeNode);
       this._cmdManager.execute(command).then((node) => {
         this._sceneHierarchy!.selectNode(node);
         eventBus.dispatchEvent('scene_changed');
@@ -3001,6 +3031,39 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     };
     this._typeToBePlaced = 'shape';
     this._ctorToBePlaced = null;
+  }
+  private async handleAddMesh(meshPath: string) {
+    const placeNode = this._nodeToBePlaced.get();
+    if (placeNode) {
+      placeNode.remove();
+      this._nodeToBePlaced.dispose();
+      this._typeToBePlaced = 'none';
+    }
+    this._assetPlacementLoadingCount++;
+    try {
+      const [primitive, material] = await Promise.all([
+        getEngine().resourceManager.fetchPrimitive(meshPath),
+        getEngine().resourceManager.fetchMaterial<MeshMaterial>(BUILTIN_LAMBERT_MATERIAL_PATH)
+      ]);
+      if (!primitive) {
+        throw new Error(`Primitive not found: ${meshPath}`);
+      }
+      if (!material) {
+        throw new Error(`Material not found: ${BUILTIN_LAMBERT_MATERIAL_PATH}`);
+      }
+      const mesh = new Mesh(this.controller.model.scene, primitive, material);
+      mesh.parent = null;
+      mesh.gpuPickable = false;
+      ensureNodeDefaultName(mesh, getDefaultNodeNameFromAssetPath(meshPath));
+      this._nodeToBePlaced.set(mesh);
+      this._assetToBeAdded = meshPath;
+      this._typeToBePlaced = 'mesh';
+      this._ctorToBePlaced = null;
+    } catch (err) {
+      Dialog.messageBox('Error', `${err}`);
+    } finally {
+      this._assetPlacementLoadingCount = Math.max(0, this._assetPlacementLoadingCount - 1);
+    }
   }
   private handleAddNode<T extends SceneNode>(ctor: { new (scene: Scene): T }, desc: string) {
     const placeNode = this._nodeToBePlaced.get();
