@@ -74,7 +74,12 @@ export type IMixinLight = {
     posRange: PBShaderExp,
     dirCutoff: PBShaderExp
   ): PBShaderExp;
-  calculateShadow(scope: PBInsideFunctionScope, worldPos: PBShaderExp, NoL: PBShaderExp): PBShaderExp;
+  calculateShadow(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    worldNormal: PBShaderExp,
+    NoL: PBShaderExp
+  ): PBShaderExp;
   forEachLight(
     scope: PBInsideFunctionScope,
     callback: (
@@ -505,16 +510,26 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * Calculates shadow of current fragment
      *
      * @param scope - Shader scope
+     * @param worldPos - World space position of current fragment
+     * @param worldNormal - World space normal of current fragment, used for normal
+     * offset bias. Pass the interpolated vertex normal rather than the normal
+     * mapped shading normal: a normal map would push the shadow lookup along
+     * high frequency directions and reintroduce the noise the offset removes.
      * @param NoL - NdotL vector
      * @returns Shadow of current fragment, 1 means no shadow and 0 means full shadowed.
      */
-    calculateShadow(scope: PBInsideFunctionScope, worldPos: PBShaderExp, NoL: PBShaderExp) {
+    calculateShadow(
+      scope: PBInsideFunctionScope,
+      worldPos: PBShaderExp,
+      worldNormal: PBShaderExp,
+      NoL: PBShaderExp
+    ) {
       const pb = scope.$builder;
       if (!this.needCalculateShadow()) {
         console.warn('calculateShadow(): No need to calculate shadow');
         return pb.float(1);
       }
-      return ShaderHelper.calculateShadow(scope, worldPos, NoL, this.drawContext);
+      return ShaderHelper.calculateShadow(scope, worldPos, worldNormal, NoL, this.drawContext);
     }
     private getClusterIndex(scope: PBInsideFunctionScope, fragCoord: PBShaderExp) {
       const pb = scope.$builder;

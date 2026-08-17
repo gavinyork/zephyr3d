@@ -487,7 +487,8 @@ export class MToonMaterial extends ToonMaterialBase {
     normal: PBShaderExp,
     baseColor: PBShaderExp,
     shadeColor: PBShaderExp,
-    shadingShift: PBShaderExp
+    shadingShift: PBShaderExp,
+    geometricNormal: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
@@ -499,7 +500,8 @@ export class MToonMaterial extends ToonMaterialBase {
         pb.vec3('normal'),
         pb.vec3('baseColor'),
         pb.vec3('shadeColor'),
-        pb.float('shadingShift')
+        pb.float('shadingShift'),
+        pb.vec3('geometricNormal')
       ],
       function () {
         this.$l.directColor = pb.vec3(0);
@@ -526,7 +528,12 @@ export class MToonMaterial extends ToonMaterialBase {
           );
           this.$l.lightDiffuse = pb.mix(this.shadeColor, this.baseColor, this.shading);
           if (shadow) {
-            this.$l.shadowValue = that.calculateShadow(this, this.worldPos, pb.clamp(this.NoL, 0, 1));
+            this.$l.shadowValue = that.calculateShadow(
+              this,
+              this.worldPos,
+              this.geometricNormal,
+              pb.clamp(this.NoL, 0, 1)
+            );
             this.lightDiffuse = pb.mix(this.shadeColor, this.lightDiffuse, this.shadowValue);
           }
           this.directColor = pb.add(this.directColor, pb.mul(this.lightDiffuse, this.lightColor));
@@ -534,7 +541,9 @@ export class MToonMaterial extends ToonMaterialBase {
         this.$return(this.directColor);
       }
     );
-    return pb.getGlobalScope()[funcName](worldPos, normal, baseColor, shadeColor, shadingShift);
+    return pb
+      .getGlobalScope()
+      [funcName](worldPos, normal, baseColor, shadeColor, shadingShift, geometricNormal);
   }
   private calculateMToonGI(
     scope: PBInsideFunctionScope,
@@ -764,7 +773,8 @@ export class MToonMaterial extends ToonMaterialBase {
             scope.normal,
             scope.albedo.rgb,
             scope.shadeColor,
-            scope.shadingShift
+            scope.shadingShift,
+            pb.normalize(scope.$inputs.wNorm)
           );
           scope.$l.giLighting = this.calculateMToonGI(scope, scope.normal, scope.albedo.rgb);
           scope.$l.lighting = pb.max(scope.directLighting, scope.giLighting);

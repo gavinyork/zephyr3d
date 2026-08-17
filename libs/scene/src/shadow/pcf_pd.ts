@@ -145,7 +145,6 @@ export class PCFPD extends ShadowImpl {
             shadowMapParams.shadowMap!.format,
             kernelSize,
             this.shadowCoord,
-            undefined,
             this.split
           );
         });

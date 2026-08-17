@@ -1,12 +1,13 @@
 import type { VisualScene } from './types';
 import { sanityOrientation } from './scenes/sanity-orientation';
-import { hair, pbrMetalRoughGrid, skinSss, unlitTextured } from './scenes/materials';
+import { hair, pbrMetalRoughGrid, skinShadow, skinSss, unlitTextured } from './scenes/materials';
 import { pbrIbl, skyAtmosphere } from './scenes/env';
 import {
   shadowCsm,
   shadowDefaults,
   shadowEsm,
   shadowHard,
+  shadowNormalOffset,
   shadowPcf,
   shadowPcss,
   shadowVsm
@@ -41,6 +42,7 @@ export const SCENES: VisualScene[] = [
   shadowEsm,
   shadowCsm,
   shadowDefaults,
+  shadowNormalOffset,
   // Lighting paths.
   clusterManyLights,
   spotShadow,
@@ -54,6 +56,7 @@ export const SCENES: VisualScene[] = [
   taaMultiframe,
   // Digital-human materials.
   skinSss,
+  skinShadow,
   hair,
   eyeFrontal,
   eyeAngled,

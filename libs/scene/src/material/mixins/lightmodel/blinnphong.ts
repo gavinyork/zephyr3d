@@ -18,13 +18,20 @@ export type IMixinBlinnPhong = {
   scatterWrap: number;
   scatterWidth: number;
   scatterColor: Vector4;
+  /**
+   * @param geometricNormal - Interpolated vertex normal, used for shadow normal
+   * offset bias. Defaults to `normal`; pass the pre-normal-map normal (such as
+   * `TBN[2]`) when the material has one, so the shadow lookup is not displaced
+   * along normal map detail.
+   */
   blinnPhongLight(
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp,
     normal: PBShaderExp,
     viewVec: PBShaderExp,
     albedo: PBShaderExp,
-    outRoughness?: PBShaderExp
+    outRoughness?: PBShaderExp,
+    geometricNormal?: PBShaderExp
   ): PBShaderExp;
 } & IMixinLight;
 
@@ -138,7 +145,8 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
       normal: PBShaderExp,
       viewVec: PBShaderExp,
       albedo: PBShaderExp,
-      outRoughness?: PBShaderExp
+      outRoughness?: PBShaderExp,
+      geometricNormal?: PBShaderExp
     ) {
       const pb = scope.$builder;
       const funcName = 'Z_blinnPhongLight';
@@ -151,6 +159,7 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
           pb.vec3('normal'),
           pb.vec3('viewVec'),
           pb.vec4('albedo'),
+          pb.vec3('geometricNormal'),
           ...(outRoughness ? [pb.vec4('outRoughness').out()] : [])
         ],
         function () {
@@ -223,7 +232,9 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
               }
               if (shadow) {
                 this.$if(pb.greaterThan(this.NoL, 0), function () {
-                  this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));
+                  this.$l.shadow = pb.vec3(
+                    that.calculateShadow(this, this.worldPos, this.geometricNormal, this.NoL)
+                  );
                   this.diffuse = pb.mul(this.diffuse, this.shadow);
                   this.specular = pb.mul(this.specular, this.shadow);
                 });
@@ -243,10 +254,11 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
           }
         }
       );
+      const gn = geometricNormal ?? normal;
       return (
         outRoughness
-          ? pb.getGlobalScope()[funcName](worldPos, normal, viewVec, albedo, outRoughness)
-          : pb.getGlobalScope()[funcName](worldPos, normal, viewVec, albedo)
+          ? pb.getGlobalScope()[funcName](worldPos, normal, viewVec, albedo, gn, outRoughness)
+          : pb.getGlobalScope()[funcName](worldPos, normal, viewVec, albedo, gn)
       ) as PBShaderExp;
     }
   } as unknown as T & { new (...args: any[]): IMixinBlinnPhong };

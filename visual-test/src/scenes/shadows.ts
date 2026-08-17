@@ -69,11 +69,16 @@ export const shadowEsm = shadowScene(
  * none of them afterwards.
  *
  * So this scene reconstructs the worst case on purpose: engine defaults (no
- * quality preset, so 1024 map / shadowDistance 2000 / depthBias 0.003 /
- * normalBias 0.2), a grazing light ~47 deg off vertical, and a ground plane far
- * larger than the subject. Every one of those choices makes the shadow map
- * sparser and the acne heavier, and together they make the frame sensitive to
- * exactly the constants the other scenes override.
+ * quality preset, so 1024 map / shadowDistance 2000 / depthBias 0.003), a
+ * grazing light ~47 deg off vertical, and a ground plane far larger than the
+ * subject. Every one of those choices makes the shadow map sparser and the acne
+ * heavier, and together they make the frame sensitive to exactly the constants
+ * the other scenes override.
+ *
+ * `normalBias` is pinned to 0 so this stays a *depth* bias sentinel. Normal
+ * offset bias exists precisely to remove this acne, so leaving it on would
+ * clean up the frame and destroy the sensitivity the scene is here for. The
+ * companion `shadow-normal-offset` scene covers that path instead.
  *
  * The heavy diagonal striping in this baseline is therefore the point, not a
  * defect - do not "fix" it. If it ever needs regenerating, check that it still
@@ -82,13 +87,41 @@ export const shadowEsm = shadowScene(
 export const shadowDefaults: VisualScene = {
   name: 'shadow-defaults',
   description:
-    'Depth-bias sentinel: engine defaults, grazing light, oversized ground. Deliberately acne-heavy, because acne shifting is what makes bias regressions visible. The other shadow scenes trade this sensitivity away for filter legibility.',
+    'Depth-bias sentinel: engine defaults, grazing light, oversized ground, normal offset disabled. Deliberately acne-heavy, because acne shifting is what makes bias regressions visible. The other shadow scenes trade this sensitivity away for filter legibility.',
   setup({ scene, camera }) {
     bareScene(scene);
     shadowStage(scene, 16);
     const light = shadowKeyLight(scene, 'pcf', 1, false);
+    light.shadow.normalBias = 0;
     // ~47 deg off vertical: shallow enough that the depth slope across the
     // ground is large, which is what produces the bias-sensitive striping.
+    light.lookAt(new Vector3(4, 6, 5), Vector3.zero(), Vector3.axisPY());
+    placeCamera(camera, EYE, TARGET);
+    camera.far = 100;
+  }
+};
+
+/**
+ * The normal-offset counterpart to `shadow-defaults`.
+ *
+ * Identical setup - same grazing light, same oversized ground, same engine
+ * defaults - except that `normalBias` is left at its default instead of being
+ * zeroed. Side by side the two baselines are the before/after of normal offset
+ * bias, and this one is what regresses if the offset is scaled wrongly, applied
+ * with the shading normal instead of the geometric one, or dropped from a
+ * material's `calculateShadow` call.
+ *
+ * Unlike its sibling, this baseline is supposed to look clean. Acne appearing
+ * here is a real regression.
+ */
+export const shadowNormalOffset: VisualScene = {
+  name: 'shadow-normal-offset',
+  description:
+    'Normal-offset sentinel: same grazing light and oversized ground as shadow-defaults, but with normal offset bias active. Pins the terminator staying free of self-shadow acne.',
+  setup({ scene, camera }) {
+    bareScene(scene);
+    shadowStage(scene, 16);
+    const light = shadowKeyLight(scene, 'pcf', 1, false);
     light.lookAt(new Vector3(4, 6, 5), Vector3.zero(), Vector3.axisPY());
     placeCamera(camera, EYE, TARGET);
     camera.far = 100;
@@ -113,13 +146,15 @@ export const shadowCsm: VisualScene = {
     // stage never fills and the far ground picks up moire. Matching it to the
     // stage puts the texels where the geometry actually is.
     light.shadow.shadowDistance = 28;
-    // Four cascades over a receding plane need more bias than the preset's
-    // single-cascade default: each cascade is fitted tightly, and the bias is
-    // applied in that cascade's normalised depth, so a tighter cascade means a
-    // smaller world-space offset. The engine does scale bias per cascade
+    // Four cascades over a receding plane need more depth bias than the
+    // preset's single-cascade default: each cascade is fitted tightly, and the
+    // bias is applied in that cascade's normalised depth, so a tighter cascade
+    // means a smaller world-space offset. The engine does scale bias per cascade
     // (calcDepthBiasParams is called per split), but the starting value is still
     // tuned for one cascade covering the whole range.
-    light.shadow.normalBias = 0.7;
+    //
+    // normalBias needs no such bump: it is expressed in texels and scaled by the
+    // same per-cascade ratio, so it already tracks the cascade's texel size.
     light.shadow.depthBias = 0.008;
     // Looking down at the stage rather than along it. A near-horizontal view
     // over a large flat plane is the worst case for perspective aliasing - one

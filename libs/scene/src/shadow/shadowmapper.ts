@@ -35,7 +35,6 @@ import type { Scene } from '../scene/scene';
 import type { ShadowImpl } from './shadow_impl';
 import type { DrawContext } from '../render';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_NONE, LIGHT_TYPE_POINT } from '../values';
-import { ShaderHelper } from '../material/shader/helper';
 import { getDevice } from '../app/api';
 import { ShadowRegion } from './shadow_region';
 
@@ -183,7 +182,7 @@ export class ShadowMapper extends Disposable {
       numCascades: 1,
       splitLambda: 0.5,
       depthBias: 0.003,
-      normalBias: 0.2,
+      normalBias: 1.5,
       nearClip: 1
     };
     this._resourceDirty = true;
@@ -307,7 +306,20 @@ export class ShadowMapper extends Disposable {
   set depthBias(val) {
     this._config.depthBias = val;
   }
-  /** Normal bias for the shadow map */
+  /**
+   * Normal offset bias, in shadow map texels.
+   *
+   * @remarks
+   * Before sampling, the receiver is moved along its normal by this many texel
+   * widths, scaled by `sin(theta)` between the normal and the light so the
+   * offset is zero facing the light and largest at grazing incidence. This is
+   * what removes grazing-angle self-shadowing acne; {@link depthBias} alone
+   * cannot, because the depth error over one texel grows without bound as the
+   * surface turns away from the light.
+   *
+   * Useful values are roughly 1 to 4. Too little leaves acne on curved surfaces
+   * near the terminator; too much detaches contact shadows from thin geometry.
+   */
   get normalBias() {
     return this._config.normalBias;
   }
@@ -353,7 +365,7 @@ export class ShadowMapper extends Disposable {
       this.shadowDistance = 120;
       this.splitLambda = 0.75;
       this.depthBias = 0.005;
-      this.normalBias = 0.3;
+      this.normalBias = 2;
       this.nearClip = 0.2;
       this.pcfKernelSize = 5;
       this.numShadowCascades = this._light.isDirectionLight() ? 3 : 1;
@@ -364,7 +376,7 @@ export class ShadowMapper extends Disposable {
     this.shadowDistance = 800;
     this.splitLambda = 0.6;
     this.depthBias = 0.0035;
-    this.normalBias = 0.22;
+    this.normalBias = 1.5;
     this.nearClip = 1;
     this.pcfKernelSize = 3;
     this.numShadowCascades = this._light.isDirectionLight() ? 4 : 1;
@@ -629,43 +641,6 @@ export class ShadowMapper extends Disposable {
       }
       ctx.shadowMapInfo = null;
     }
-  }
-  /** @internal */
-  static computeShadowBias(
-    shadowMapParams: ShadowMapParams,
-    scope: PBInsideFunctionScope,
-    z: PBShaderExp,
-    NdotL: PBShaderExp,
-    linear: boolean
-  ) {
-    const pb = scope.$builder;
-    const depthBiasParam = ShaderHelper.getDepthBiasValues(scope);
-    if (shadowMapParams.lightType === LIGHT_TYPE_DIRECTIONAL) {
-      return pb.dot(pb.mul(depthBiasParam.xy, pb.vec2(1, pb.sub(1, NdotL))), pb.vec2(1, 1));
-    } else {
-      const nearFar = ShaderHelper.getShadowCameraParams(scope).xy;
-      const linearDepth = linear ? z : ShaderHelper.nonLinearDepthToLinearNormalized(scope, z, nearFar);
-      const biasScaleFactor = pb.mix(1, depthBiasParam.w, linearDepth);
-      return pb.dot(pb.mul(depthBiasParam.xy, pb.vec2(1, pb.sub(1, NdotL)), biasScaleFactor), pb.vec2(1, 1));
-    }
-  }
-  /** @internal */
-  static computeShadowBiasCSM(
-    shadowMapParams: ShadowMapParams,
-    scope: PBInsideFunctionScope,
-    NdotL: PBShaderExp,
-    split: PBShaderExp
-  ) {
-    const pb = scope.$builder;
-    const depthBiasParam = ShaderHelper.getDepthBiasValues(scope);
-    const splitFlags = pb.vec4(
-      pb.float(pb.equal(split, 0)),
-      pb.float(pb.equal(split, 1)),
-      pb.float(pb.equal(split, 2)),
-      pb.float(pb.equal(split, 3))
-    );
-    const depthBiasScale = pb.dot(ShaderHelper.getDepthBiasScales(scope), splitFlags);
-    return pb.dot(pb.mul(depthBiasParam.xy, pb.vec2(1, pb.sub(1, NdotL)), depthBiasScale), pb.vec2(1, 1));
   }
   /** @internal */
   protected isTextureInvalid(
@@ -1068,8 +1043,20 @@ export class ShadowMapper extends Disposable {
       camera.getProjectionMatrix().getFarPlaneWidth(),
       camera.getProjectionMatrix().getFarPlaneHeight()
     );
-    const scaleFactor = (sizeNear / shadowMapSize) * 2;
-    result.setXYZW(depthBias * scaleFactor, normalBias * 0.0001, depthScale, sizeFar / sizeNear);
+    // World-space size of one shadow map texel at the near plane. Both bias
+    // terms are expressed in multiples of it, so a tighter cascade automatically
+    // gets a proportionally smaller offset.
+    const texelWorldSize = sizeNear / shadowMapSize;
+    result.setXYZW(
+      depthBias * texelWorldSize * 2,
+      // Normal offset distance in world units. Unlike a depth bias this moves
+      // the receiver sideways out of the texel that produces grazing-angle
+      // acne, which no amount of depth bias can fix (the required depth offset
+      // diverges as NdotL approaches zero).
+      normalBias * texelWorldSize,
+      depthScale,
+      sizeFar / sizeNear
+    );
   }
   /** @internal */
   protected postRenderShadowMap(shadowMapParams: ShadowMapParams) {

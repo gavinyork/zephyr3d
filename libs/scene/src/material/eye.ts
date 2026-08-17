@@ -919,13 +919,16 @@ export class EyeMaterial
         return;
       }
 
-      scope.$l.normal = this.calculateNormal(
+      // TBN[2] is the pre-normal-map geometric normal, needed for shadow normal
+      // offset bias.
+      scope.$l.normalInfo = this.calculateNormalAndTBN(
         scope,
         scope.$inputs.worldPos,
         scope.$inputs.wNorm,
         scope.$inputs.wTangent,
         scope.$inputs.wBinormal
       );
+      scope.$l.normal = scope.normalInfo.normal;
       scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
       scope.$l.NoV = pb.clamp(pb.dot(scope.normal, scope.viewVec), 0.001, 1);
 
@@ -1060,7 +1063,7 @@ export class EyeMaterial
         // permits in uniform control flow - so this must never sit inside a
         // dynamic branch.
         this.$l.shadowTerm = shadow
-          ? that.calculateShadow(this, this.$inputs.worldPos, pb.max(this.NoL, 1e-5))
+          ? that.calculateShadow(this, this.$inputs.worldPos, scope.normalInfo.TBN[2], pb.max(this.NoL, 1e-5))
           : pb.float(1);
         this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.shadowTerm);
         if (socketOcc) {

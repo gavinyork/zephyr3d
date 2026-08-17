@@ -4,7 +4,6 @@ import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import {
   applyShadowDepthBias,
   computeShadowMapDepth,
-  computeReceiverPlaneDepthBias,
   filterShadowPCF,
   ndcToShadowCoord,
   shadowCoordDepthInRange
@@ -111,7 +110,6 @@ export class PCFOPT extends ShadowImpl {
           )
         );
         this.$l.shadow = pb.float(1);
-        this.$l.receiverPlaneDepthBias = computeReceiverPlaneDepthBias(this, this.shadowCoord);
         this.$if(this.inShadow, function () {
           this.$l.shadowBias = computeShadowBiasCSM(this, this.NdotL, this.split);
           this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.shadowBias, true);
@@ -121,7 +119,6 @@ export class PCFOPT extends ShadowImpl {
             shadowMapParams.shadowMap!.format,
             that._kernelSize,
             this.shadowCoord,
-            this.receiverPlaneDepthBias,
             this.split
           );
         });
@@ -185,7 +182,6 @@ export class PCFOPT extends ShadowImpl {
           )
         );
         this.$l.shadow = pb.float(1);
-        this.$l.receiverPlaneDepthBias = computeReceiverPlaneDepthBias(this, this.shadowCoord);
         this.$if(this.inShadow, function () {
           this.$l.shadowBias = computeShadowBias(
             shadowMapParams.lightType,
@@ -200,8 +196,7 @@ export class PCFOPT extends ShadowImpl {
             shadowMapParams.lightType,
             shadowMapParams.shadowMap!.format,
             that._kernelSize,
-            this.shadowCoord,
-            this.receiverPlaneDepthBias
+            this.shadowCoord
           );
         });
         this.$return(this.shadow);

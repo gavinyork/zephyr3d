@@ -569,7 +569,12 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
               if (shadow) {
                 this.$l.rectL = pb.normalize(pb.sub(posRange.xyz, this.worldPos));
                 this.$l.rectNoL = pb.clamp(pb.dot(this.normal, this.rectL), 0, 1);
-                this.$l.rectShadow = that.calculateShadow(this, this.worldPos, pb.max(this.rectNoL, 1e-5));
+                this.$l.rectShadow = that.calculateShadow(
+                  this,
+                  this.worldPos,
+                  this.TBN[2],
+                  pb.max(this.rectNoL, 1e-5)
+                );
                 this.rectColorIntensity = pb.vec4(
                   colorIntensity.rgb,
                   pb.mul(colorIntensity.a, this.rectShadow)
@@ -615,7 +620,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
               if (shadow) {
                 this.lightColor = pb.mul(
                   this.lightColor,
-                  that.calculateShadow(this, this.worldPos, this.NoL)
+                  that.calculateShadow(this, this.worldPos, this.TBN[2], this.NoL)
                 );
               }
               if (outSSSDiffuse) {

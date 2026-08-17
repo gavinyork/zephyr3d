@@ -10,11 +10,18 @@ import { LIGHT_TYPE_POINT } from '../../../values';
  * @public
  */
 export type IMixinLambert = {
+  /**
+   * @param geometricNormal - Interpolated vertex normal, used for shadow normal
+   * offset bias. Defaults to `normal`; pass the pre-normal-map normal (such as
+   * `TBN[2]`) when the material has one, so the shadow lookup is not displaced
+   * along normal map detail.
+   */
   lambertLight(
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp,
     normal: PBShaderExp,
-    albedo: PBShaderExp
+    albedo: PBShaderExp,
+    geometricNormal?: PBShaderExp
   ): PBShaderExp;
 } & IMixinLight;
 
@@ -38,54 +45,63 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
       scope: PBInsideFunctionScope,
       worldPos: PBShaderExp,
       normal: PBShaderExp,
-      albedo: PBShaderExp
+      albedo: PBShaderExp,
+      geometricNormal?: PBShaderExp
     ) {
       const pb = scope.$builder;
       const funcName = 'Z_lambertLight';
       const that = this;
       const baseLightPass = !that.drawContext.lightBlending;
-      pb.func(funcName, [pb.vec3('worldPos'), pb.vec3('normal'), pb.vec4('albedo')], function () {
-        if (!that.needFragmentColor()) {
-          this.$return(this.albedo.rgb);
-        } else {
-          if (that.needCalculateEnvLight() && baseLightPass) {
-            this.$l.diffuseColor = that.getEnvLightIrradiance(this, this.normal);
+      pb.func(
+        funcName,
+        [pb.vec3('worldPos'), pb.vec3('normal'), pb.vec4('albedo'), pb.vec3('geometricNormal')],
+        function () {
+          if (!that.needFragmentColor()) {
+            this.$return(this.albedo.rgb);
           } else {
-            this.$l.diffuseColor = pb.vec3(0);
-          }
-          that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
-            this.$l.diffuseScale = pb.float(1);
-            this.$if(pb.equal(type, LIGHT_TYPE_POINT), function () {
-              this.diffuseScale = extra.x;
-            });
-            this.$l.lightAtten = that.calculateLightAttenuation(
-              this,
-              type,
-              this.worldPos,
-              posRange,
-              dirCutoff,
-              extra
-            );
-            this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
-            this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
-            this.$l.lightColor = pb.mul(
-              colorIntensity.rgb,
-              colorIntensity.a,
-              this.lightAtten,
-              this.diffuseScale
-            );
-            this.$l.diffuse = pb.mul(this.lightColor, 1 / Math.PI, this.NoL);
-            if (shadow) {
-              this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));
-              this.diffuse = pb.mul(this.diffuse, this.shadow);
+            if (that.needCalculateEnvLight() && baseLightPass) {
+              this.$l.diffuseColor = that.getEnvLightIrradiance(this, this.normal);
+            } else {
+              this.$l.diffuseColor = pb.vec3(0);
             }
-            this.diffuseColor = pb.add(this.diffuseColor, this.diffuse);
-          });
-          this.$l.litColor = pb.mul(this.albedo.rgb, this.diffuseColor);
-          this.$return(this.litColor);
+            that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
+              this.$l.diffuseScale = pb.float(1);
+              this.$if(pb.equal(type, LIGHT_TYPE_POINT), function () {
+                this.diffuseScale = extra.x;
+              });
+              this.$l.lightAtten = that.calculateLightAttenuation(
+                this,
+                type,
+                this.worldPos,
+                posRange,
+                dirCutoff,
+                extra
+              );
+              this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
+              this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
+              this.$l.lightColor = pb.mul(
+                colorIntensity.rgb,
+                colorIntensity.a,
+                this.lightAtten,
+                this.diffuseScale
+              );
+              this.$l.diffuse = pb.mul(this.lightColor, 1 / Math.PI, this.NoL);
+              if (shadow) {
+                this.$l.shadow = pb.vec3(
+                  that.calculateShadow(this, this.worldPos, this.geometricNormal, this.NoL)
+                );
+                this.diffuse = pb.mul(this.diffuse, this.shadow);
+              }
+              this.diffuseColor = pb.add(this.diffuseColor, this.diffuse);
+            });
+            this.$l.litColor = pb.mul(this.albedo.rgb, this.diffuseColor);
+            this.$return(this.litColor);
+          }
         }
-      });
-      return pb.getGlobalScope()[funcName](worldPos, normal, albedo) as PBShaderExp;
+      );
+      return pb
+        .getGlobalScope()
+        [funcName](worldPos, normal, albedo, geometricNormal ?? normal) as PBShaderExp;
     }
   } as unknown as T & { new (...args: any[]): IMixinLambert };
 }

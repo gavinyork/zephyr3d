@@ -304,13 +304,17 @@ export class SkinMaterial
       }
       if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         const baseLightPass = !this.drawContext.lightBlending;
-        scope.$l.normal = this.calculateNormal(
+        // TBN[2] is the pre-normal-map geometric normal, needed for shadow
+        // normal offset bias. Feeding the normal mapped shading normal instead
+        // would displace the shadow lookup along pore detail.
+        scope.$l.normalInfo = this.calculateNormalAndTBN(
           scope,
           scope.$inputs.worldPos,
           scope.$inputs.wNorm,
           scope.$inputs.wTangent,
           scope.$inputs.wBinormal
         );
+        scope.$l.normal = scope.normalInfo.normal;
         scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
         scope.$l.roughness = pb.sqrt(pb.div(2, pb.add(scope.zSkinShininess, 2)));
         scope.$l.skinMask = pb.float(1);
@@ -389,19 +393,23 @@ export class SkinMaterial
           // calculateShadow() samples with implicit derivatives (dpdx); WGSL
           // requires the call to stay in uniform control flow, so never wrap
           // it in a dynamic branch such as NoLWrap > 0.
+          //
+          // Diffuse and specular share this term unmodified. An earlier version
+          // faded it toward 1 around the terminator to hide shadow map acne
+          // there, but that released the shadow in the wrong band (only ~9% at
+          // NdotL = 0, by which point the acne is at its worst) and made cast
+          // shadows dissolve wherever a surface turned away from the light.
+          // Normal offset bias removes the acne at the source instead.
           this.$l.shadowTerm = shadow
-            ? that.calculateShadow(this, this.$inputs.worldPos, pb.max(this.NoL, 1e-5))
+            ? that.calculateShadow(
+                this,
+                this.$inputs.worldPos,
+                scope.normalInfo.TBN[2],
+                pb.max(this.NoL, 1e-5)
+              )
             : pb.float(1);
-          // Fade the shadow toward 1 around the terminator so wrapped lighting
-          // is not hard-clipped by the shadow map (which would reintroduce the
-          // sharp cut that the wrap is meant to remove).
-          this.$l.shadowFade = pb.mix(
-            pb.float(1),
-            this.shadowTerm,
-            pb.smoothStep(pb.neg(this.zSkinScatterWrap), 0.15, this.rawNoL)
-          );
           this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
-          this.$l.diffuseLightColor = pb.mul(this.lightColor, this.shadowFade);
+          this.$l.diffuseLightColor = pb.mul(this.lightColor, this.shadowTerm);
           this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
           this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
           this.$l.LoH = pb.clamp(pb.dot(this.lightDir, this.halfVec), 0, 1);
@@ -439,8 +447,14 @@ export class SkinMaterial
           if (that.subsurfaceTexture) {
             // Back-lit transmission: thin regions (B channel of the subsurface
             // texture) glow when the light faces the camera through the
-            // surface. shadowFade already releases the shadow term on the
-            // back-facing side, so the glow is not killed by self shadowing.
+            // surface.
+            //
+            // This deliberately uses the unshadowed lightColor. A back-lit
+            // fragment is self-shadowed by definition - its own front face is
+            // the occluder - so multiplying by the shadow term would cancel
+            // exactly the case the term exists to model. The cost is that an
+            // external caster does not block the glow, which a shadow map
+            // cannot distinguish from self occlusion anyway.
             this.$l.transmission = pb.mul(
               pb.pow(
                 pb.clamp(pb.dot(pb.neg(this.lightDir), this.viewVec), 0, 1),
@@ -451,7 +465,7 @@ export class SkinMaterial
             );
             this.scatterLighting = pb.add(
               this.scatterLighting,
-              pb.mul(this.diffuseLightColor, this.transmission, this.diffuseScale, 1 / Math.PI)
+              pb.mul(this.lightColor, this.transmission, this.diffuseScale, 1 / Math.PI)
             );
           }
           // Normalized Blinn with Schlick Fresnel (skin F0 = 0.028). Specular

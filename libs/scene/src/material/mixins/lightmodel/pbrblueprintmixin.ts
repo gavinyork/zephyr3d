@@ -212,7 +212,12 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
                 if (shadow) {
                   this.$l.rectL = pb.normalize(pb.sub(this.center, this.worldPos));
                   this.$l.rectNoL = pb.clamp(pb.dot(this.pbrData.normal, this.rectL), 0, 1);
-                  this.rectShadow = that.calculateShadow(this, this.worldPos, pb.max(this.rectNoL, 1e-5));
+                  this.rectShadow = that.calculateShadow(
+                    this,
+                    this.worldPos,
+                    this.pbrData.TBN[2],
+                    pb.max(this.rectNoL, 1e-5)
+                  );
                 }
                 this.$l.samplePos = pb.vec3();
                 this.$l.Lvec = pb.vec3();
@@ -306,7 +311,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
               if (shadow) {
                 this.lightColor = pb.mul(
                   this.lightColor,
-                  that.calculateShadow(this, this.worldPos, this.NoL)
+                  that.calculateShadow(this, this.worldPos, this.pbrData.TBN[2], this.NoL)
                 );
               }
               if (outSSSDiffuse) {

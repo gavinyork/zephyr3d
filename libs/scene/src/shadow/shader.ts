@@ -1,38 +1,7 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
-import { ShaderHelper } from '../material';
-import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
-
-function getShadowReceiverBiasFactors(scope: PBInsideFunctionScope) {
-  const pb = scope.$builder;
-  const alphaCutoff = (scope as PBInsideFunctionScope & { zAlphaCutoff?: PBShaderExp }).zAlphaCutoff;
-  if (alphaCutoff) {
-    // Thin masked geometry such as layered hair cards needs a tighter receiver bias,
-    // otherwise nearby layers lose self-shadow before the shadow map is even sampled.
-    const cutoff = pb.clamp(alphaCutoff, 0, 1);
-    return pb.vec2(pb.mix(0.22, 0.4, cutoff), pb.mix(0.05, 0.16, cutoff)) as PBShaderExp;
-  }
-  return pb.vec2(1, 1) as PBShaderExp;
-}
-
-function isMaskedPerspectiveShadowLight(scope: PBInsideFunctionScope, lightType: number) {
-  const alphaCutoff = (scope as PBInsideFunctionScope & { zAlphaCutoff?: PBShaderExp }).zAlphaCutoff;
-  return !!alphaCutoff && (lightType === LIGHT_TYPE_SPOT || lightType === LIGHT_TYPE_POINT);
-}
-
-function getShadowReceiverNoL(scope: PBInsideFunctionScope, NdotL: PBShaderExp, lightType?: number) {
-  const pb = scope.$builder;
-  const alphaCutoff = (scope as PBInsideFunctionScope & { zAlphaCutoff?: PBShaderExp }).zAlphaCutoff;
-  if (alphaCutoff) {
-    // Layered masked cards should not explode slope bias at grazing angles.
-    // This is especially visible for back / rim spot lights on hair cards.
-    const cutoff = pb.clamp(alphaCutoff, 0, 1);
-    if (lightType != null && isMaskedPerspectiveShadowLight(scope, lightType)) {
-      return pb.max(NdotL, pb.mix(0.85, 0.95, cutoff)) as PBShaderExp;
-    }
-    return pb.max(NdotL, pb.mix(0.45, 0.65, cutoff)) as PBShaderExp;
-  }
-  return NdotL as PBShaderExp;
-}
+import { ShaderHelper } from '../material/shader/helper';
+import { LIGHT_TYPE_DIRECTIONAL } from '../values';
+import { getShadowReceiverBiasFactor, isMaskedPerspectiveShadowLight } from './receiver_bias';
 
 function getShadowReceiverPerspectiveBiasScale(
   scope: PBInsideFunctionScope,
@@ -52,40 +21,41 @@ function getShadowReceiverPerspectiveBiasScale(
   return pb.mix(1, farNearRatio, linearDepth) as PBShaderExp;
 }
 
-export function computeShadowBiasCSM(scope: PBInsideFunctionScope, NdotL: PBShaderExp, split: PBShaderExp) {
+/**
+ * Constant depth bias for a cascaded directional shadow.
+ *
+ * @remarks
+ * The slope-scaled term that used to occupy `depthBiasValues.y` is gone: `.y`
+ * now carries the normal offset distance, and normal offsetting (see
+ * `ShaderHelper.applyShadowNormalOffset`) is what handles receiver slope. A
+ * depth bias cannot, because the depth spanned by one texel diverges as the
+ * surface turns away from the light.
+ */
+export function computeShadowBiasCSM(scope: PBInsideFunctionScope, _NdotL: PBShaderExp, split: PBShaderExp) {
   const pb = scope.$builder;
-  const depthBiasParam = ShaderHelper.getDepthBiasValues(scope);
-  const splitFlags = pb.vec4(
-    pb.float(pb.equal(split, 0)),
-    pb.float(pb.equal(split, 1)),
-    pb.float(pb.equal(split, 2)),
-    pb.float(pb.equal(split, 3))
-  );
-  const depthBiasScale = pb.dot(ShaderHelper.getDepthBiasScales(scope), splitFlags);
-  const receiverBiasFactors = getShadowReceiverBiasFactors(scope);
-  const receiverNoL = getShadowReceiverNoL(scope, NdotL);
-  return pb.dot(
-    pb.mul(depthBiasParam.xy, receiverBiasFactors, pb.vec2(1, pb.sub(1, receiverNoL)), depthBiasScale),
-    pb.vec2(1, 1)
+  return pb.mul(
+    ShaderHelper.getDepthBiasValues(scope).x,
+    getShadowReceiverBiasFactor(scope),
+    ShaderHelper.getShadowCascadeBiasScale(scope, split)
   );
 }
 
+/**
+ * Constant depth bias for a single-cascade shadow. See {@link computeShadowBiasCSM}
+ * for why there is no slope-scaled term.
+ */
 export function computeShadowBias(
   lightType: number,
   scope: PBInsideFunctionScope,
   z: PBShaderExp,
-  NdotL: PBShaderExp,
+  _NdotL: PBShaderExp,
   linear: boolean
 ) {
   const pb = scope.$builder;
   const depthBiasParam = ShaderHelper.getDepthBiasValues(scope);
-  const receiverBiasFactors = getShadowReceiverBiasFactors(scope);
-  const receiverNoL = getShadowReceiverNoL(scope, NdotL, lightType);
+  const receiverBiasFactor = getShadowReceiverBiasFactor(scope);
   if (lightType === LIGHT_TYPE_DIRECTIONAL) {
-    return pb.dot(
-      pb.mul(depthBiasParam.xy, receiverBiasFactors, pb.vec2(1, pb.sub(1, receiverNoL))),
-      pb.vec2(1, 1)
-    );
+    return pb.mul(depthBiasParam.x, receiverBiasFactor);
   } else {
     const nearFar = ShaderHelper.getShadowCameraParams(scope).xy;
     const linearDepth = linear ? z : ShaderHelper.nonLinearDepthToLinearNormalized(scope, z, nearFar);
@@ -95,10 +65,7 @@ export function computeShadowBias(
       linearDepth,
       depthBiasParam.w
     );
-    let bias = pb.dot(
-      pb.mul(depthBiasParam.xy, receiverBiasFactors, pb.vec2(1, pb.sub(1, receiverNoL)), biasScaleFactor),
-      pb.vec2(1, 1)
-    );
+    let bias = pb.mul(depthBiasParam.x, receiverBiasFactor, biasScaleFactor) as PBShaderExp;
     if (isMaskedPerspectiveShadowLight(scope, lightType)) {
       const alphaCutoff = (scope as PBInsideFunctionScope & { zAlphaCutoff?: PBShaderExp }).zAlphaCutoff!;
       bias = pb.mul(bias, pb.mix(0.12, 0.22, pb.clamp(alphaCutoff, 0, 1))) as PBShaderExp;
