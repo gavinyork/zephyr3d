@@ -1,6 +1,13 @@
 import type { VisualScene } from './types';
 import { sanityOrientation } from './scenes/sanity-orientation';
-import { hair, pbrMetalRoughGrid, skinShadow, skinSss, unlitTextured } from './scenes/materials';
+import {
+  hair,
+  pbrMetalRoughGrid,
+  skinDiffusionJade,
+  skinShadow,
+  skinSss,
+  unlitTextured
+} from './scenes/materials';
 import { pbrIbl, skyAtmosphere } from './scenes/env';
 import {
   shadowCsm,
@@ -56,6 +63,7 @@ export const SCENES: VisualScene[] = [
   taaMultiframe,
   // Digital-human materials.
   skinSss,
+  skinDiffusionJade,
   skinShadow,
   hair,
   eyeFrontal,

@@ -100,6 +100,7 @@ const SCENE_NAMES = [
   'post-fxaa',
   'taa-multiframe',
   'skin-sss',
+  'skin-diffusion-jade',
   'skin-shadow',
   'hair',
   'eye-frontal',

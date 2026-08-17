@@ -52,30 +52,101 @@ export const pbrMetalRoughGrid: VisualScene = {
 /**
  * Subsurface skin, the material the digital-human work leans on hardest.
  *
- * Lit from behind-left as well as front so both the diffuse wrap and the
- * transmission term contribute; a front-only key light would leave transmission
- * untested and its regressions invisible.
+ * `camera.skinSSS` has to be switched on explicitly - it defaults to false, and
+ * without it this scene renders SkinMaterial's direct lighting only and the
+ * entire SkinSSS pass is a no-op. That is what the scene did for its whole
+ * history despite its name, so the diffusion went unpinned.
+ *
+ * Back-lit transmission is *not* covered here, and the scene should not claim to
+ * be: the term is gated on `subsurfaceTexture`, whose B channel carries the
+ * thickness it needs, and this scene sets no such texture. `transmissionStrength`
+ * is left at a nonzero value only so a regression that ungates the term shows up
+ * as a diff rather than silently doing nothing.
  */
 export const skinSss: VisualScene = {
   name: 'skin-sss',
   description:
-    'SkinMaterial sphere with front key and rim light. Pins diffuse wrap, scatter and transmission.',
+    'SkinMaterial sphere under a grazing key with SkinSSS enabled. Pins the diffuse wrap and the channel-dependent diffusion across a wide terminator.',
   setup({ scene, camera }) {
     bareScene(scene);
-    keyLight(scene);
+    // Grazing key from the left, so the terminator runs down the middle of the
+    // sphere and is wide enough to read. The original pair of near-frontal
+    // lights left almost no terminator at all - the diffusion had nothing to
+    // act on and the scene could not see it working.
+    const key = keyLight(scene);
+    key.lookAt(new Vector3(-5, 0.8, 1.6), Vector3.zero(), Vector3.axisPY());
+    // Dim warm rim from behind, to keep the unlit side from crushing to black
+    // so that light diffusing into it stays measurable.
     const rim = keyLight(scene);
-    rim.lookAt(new Vector3(-3, 1.5, -5), Vector3.zero(), Vector3.axisPY());
-    rim.color = new Vector4(0.9, 0.6, 0.55, 1);
+    rim.lookAt(new Vector3(1.5, 1, -5), Vector3.zero(), Vector3.axisPY());
+    rim.color = new Vector4(0.35, 0.22, 0.2, 1);
 
     const material = new SkinMaterial();
     material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
-    material.scatterColor = new Vector4(0.75, 0.28, 0.2, 1);
-    material.scatterStrength = 0.8;
     material.transmissionStrength = 0.6;
     material.diffuseWrap = 0.5;
     const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
     head.position.setXYZ(0, 0, 0);
     placeCamera(camera, new Vector3(0, 0, 5.5));
+
+    camera.skinSSS = true;
+    // Tap spacing has to keep up with the projected radius or the kernel is
+    // clamped short and the scene silently stops testing the far tail.
+    camera.skinSSSSampleStep = 5;
+    // The sphere is 1.5 units across on screen, so a human-scale 2 cm radius
+    // would be invisible here; this is scaled to the stand-in geometry.
+    camera.skinSSSScatterRadius = 0.35;
+  }
+};
+
+/**
+ * The stylization range of the diffusion, and the evidence that grounding it in
+ * a physical model did not cost any.
+ *
+ * Identical to `skin-sss` in geometry and lighting; the only difference is the
+ * subsurface profile driving the per-channel scatter radii. Jade is the furthest
+ * thing from skin the presets offer - green travels furthest instead of red - so
+ * a diff against `skin-sss` isolates exactly what the channel ratios contribute.
+ *
+ * The profile is a property of the pass rather than of a material, so the
+ * contrast has to live across two scenes instead of across three spheres in one.
+ * Per-material profiles are the profile-slot path used by `SSS`.
+ *
+ * This is the scene that fails if the channels ever collapse back to a shared
+ * radius: it would converge on `skin-sss` and both would read as flat haze.
+ */
+export const skinDiffusionJade: VisualScene = {
+  name: 'skin-diffusion-jade',
+  description:
+    'The skin-sss setup diffused with the jade profile instead of skin. Pins the per-channel scatter radii and the stylization range the presets provide.',
+  setup({ scene, camera }) {
+    bareScene(scene);
+    // Grazing key from the left, so the terminator runs down the middle of the
+    // sphere and is wide enough to read. The original pair of near-frontal
+    // lights left almost no terminator at all - the diffusion had nothing to
+    // act on and the scene could not see it working.
+    const key = keyLight(scene);
+    key.lookAt(new Vector3(-5, 0.8, 1.6), Vector3.zero(), Vector3.axisPY());
+    // Dim warm rim from behind, to keep the unlit side from crushing to black
+    // so that light diffusing into it stays measurable.
+    const rim = keyLight(scene);
+    rim.lookAt(new Vector3(1.5, 1, -5), Vector3.zero(), Vector3.axisPY());
+    rim.color = new Vector4(0.35, 0.22, 0.2, 1);
+
+    const material = new SkinMaterial();
+    material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
+    material.transmissionStrength = 0.6;
+    material.diffuseWrap = 0.5;
+    const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
+    head.position.setXYZ(0, 0, 0);
+    placeCamera(camera, new Vector3(0, 0, 5.5));
+
+    camera.skinSSS = true;
+    // Tap spacing has to keep up with the projected radius or the kernel is
+    // clamped short and the scene silently stops testing the far tail.
+    camera.skinSSSSampleStep = 5;
+    camera.skinSSSScatterRadius = 0.35;
+    camera.skinSSSProfilePreset = 'jade_soft';
   }
 };
 
