@@ -131,6 +131,8 @@ type HumanoidJointPattern = {
 
 type HumanoidJointProfile<T extends string> = Record<T, HumanoidJointPattern[]>;
 
+const humanoidHelperJointTokens = new Set(['end', 'nub', 'socket']);
+
 type HumanoidJointNodeInfo<T extends { name: string; children: T[] }> = {
   node: T;
   depth: number;
@@ -887,6 +889,7 @@ export class SkinBinding extends Disposable {
   }
   private static normalizeHumanoidJointName(name: string) {
     return name
+      .slice(name.lastIndexOf(':') + 1)
       .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
       .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
       .replace(/([a-zA-Z])(\d+)/g, '$1 $2')
@@ -930,7 +933,7 @@ export class SkinBinding extends Disposable {
         return false;
       }
       const tokens = normalizedName.split(' ').filter(Boolean);
-      if (!tokens.length) {
+      if (!tokens.length || tokens.some((token) => humanoidHelperJointTokens.has(token))) {
         return false;
       }
       nodes.push({
