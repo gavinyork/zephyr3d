@@ -2930,6 +2930,102 @@ export function getEyeMaterialClass(manager: ResourceManager): SerializableClass
               return this.$isInstance ? this.coreMaterial.socketOcclusionStrength : 0.65;
             }
           },
+          {
+            name: 'ContactAO',
+            description:
+              'Enables screen-space contact occlusion of the eyeball by the eyelid, read from the depth prepass',
+            type: 'bool',
+            default: false,
+            get(this: EyeMaterial, value) {
+              value.bool[0] = this.contactAO;
+            },
+            set(this: EyeMaterial, value) {
+              this.contactAO = value.bool[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.contactAO : false;
+            }
+          },
+          {
+            name: 'ContactAORadius',
+            description: 'Radius of the contact occlusion disc, in world units',
+            type: 'float',
+            default: 0.006,
+            options: { animatable: true, minValue: 0.0001, maxValue: 0.1 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.contactAORadius;
+            },
+            set(this: EyeMaterial, value) {
+              this.contactAORadius = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.contactAORadius : 0.006;
+            }
+          },
+          {
+            name: 'ContactAOMinDistance',
+            description: 'Smallest depth step counted as an occluder, in world units',
+            type: 'float',
+            default: 0.0004,
+            options: { animatable: true, minValue: 0.00001, maxValue: 0.02 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.contactAOMinDistance;
+            },
+            set(this: EyeMaterial, value) {
+              this.contactAOMinDistance = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.contactAOMinDistance : 0.0004;
+            }
+          },
+          {
+            name: 'ContactAOMaxDistance',
+            description: 'Largest depth step counted as an occluder, in world units',
+            type: 'float',
+            default: 0.006,
+            options: { animatable: true, minValue: 0.00001, maxValue: 0.2 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.contactAOMaxDistance;
+            },
+            set(this: EyeMaterial, value) {
+              this.contactAOMaxDistance = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.contactAOMaxDistance : 0.006;
+            }
+          },
+          {
+            name: 'ContactAOStrength',
+            description: 'Overall contact occlusion strength',
+            type: 'float',
+            default: 0.7,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.contactAOStrength;
+            },
+            set(this: EyeMaterial, value) {
+              this.contactAOStrength = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.contactAOStrength : 0.7;
+            }
+          },
+          {
+            name: 'ContactAOTemporalJitter',
+            description:
+              'Advances the contact occlusion noise pattern every frame so TAA can integrate it away; enable only with temporal anti-aliasing',
+            type: 'bool',
+            default: false,
+            get(this: EyeMaterial, value) {
+              value.bool[0] = this.contactAOTemporalJitter;
+            },
+            set(this: EyeMaterial, value) {
+              this.contactAOTemporalJitter = value.bool[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.contactAOTemporalJitter : false;
+            }
+          },
           ...getTextureProps<EyeMaterial>(manager, 'irisTexture', '2D', true, 0),
           ...getTextureProps<EyeMaterial>(manager, 'scleraTexture', '2D', true, 0)
         ]);

@@ -6,8 +6,34 @@ import { mixinLight } from './mixins/lit';
 import { mixinPBRBRDF } from './mixins/pbr/brdf';
 import { mixinTextureProps } from './mixins/texture';
 import { ShaderHelper } from './shader/helper';
+import { SSR_interleavedGradientNoise } from '../shaders/ssr';
 import type { DrawContext } from '../render';
 import { LIGHT_TYPE_POINT, RENDER_PASS_TYPE_LIGHT } from '../values';
+
+/**
+ * Taps in the contact-occlusion disc.
+ *
+ * @remarks
+ * 16 rather than 8: in a close-up the disc can span a hundred pixels, and 8
+ * taps over that area leave visible variance even with per-pixel rotation.
+ * With the directional bias towards the outer rim (sqrt spread + 1-0.75t
+ * falloff) the extra taps go exactly where the lid signal lives.
+ */
+const CONTACT_AO_SAMPLES = 16;
+/**
+ * Cap on the on-screen radius of the contact-occlusion disc, in pixels.
+ *
+ * @remarks
+ * A close-up projects the world-space radius to hundreds of pixels, which both
+ * starves the disc of samples - the variance shows up as grain over the whole
+ * sclera - and lets every fragment on the eyeball reach the surrounding skin,
+ * so the grain is not even confined to the lid. Capping the on-screen radius
+ * trades a shorter world-space reach in extreme close-up (where the contact
+ * shadow is a border effect anyway) for a usable sample density.
+ */
+const CONTACT_AO_MAX_PIXEL_RADIUS = 48;
+/** Golden angle, in radians. Spreads the disc taps without any table. */
+const GOLDEN_ANGLE = 2.399963229728653;
 
 /**
  * Realtime eye material for realistic and semi-realistic characters.
@@ -57,6 +83,8 @@ export class EyeMaterial
   private static readonly FEATURE_VERTEX_NORMAL = this.defineFeature();
   private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
   private static readonly FEATURE_SOCKET_OCCLUSION = this.defineFeature();
+  private static readonly FEATURE_CONTACT_AO = this.defineFeature();
+  private static readonly FEATURE_CONTACT_AO_JITTER = this.defineFeature();
 
   private readonly _irisCenter: Vector4;
   private _irisRadius: number;
@@ -78,10 +106,16 @@ export class EyeMaterial
   private _lowerLidAngle: number;
   private _socketOcclusionSoftness: number;
   private _socketOcclusionStrength: number;
+  private _contactAORadius: number;
+  private _contactAOMinDistance: number;
+  private _contactAOMaxDistance: number;
+  private _contactAOStrength: number;
   // Derived from _socketRotation; never serialized or exposed.
   private readonly _socketUp: Vector4;
   private readonly _socketForward: Vector4;
   private readonly _socketCos: Vector4;
+  // Derived from the contact AO distances; never serialized or exposed.
+  private readonly _contactAORange: Vector4;
 
   constructor() {
     super();
@@ -105,9 +139,19 @@ export class EyeMaterial
     this._lowerLidAngle = 65;
     this._socketOcclusionSoftness = 15;
     this._socketOcclusionStrength = 0.65;
+    // Metric defaults, quoted against a human eyeball of ~12mm radius in a
+    // one-unit-per-metre scene: a 6mm disc reaches roughly half the eyeball,
+    // the lid margin stands 1-2mm off the surface, and the eyeball's own
+    // curvature deviates from its tangent plane by well under 0.4mm over that
+    // disc. Assets authored at a different world scale must scale all three.
+    this._contactAORadius = 0.006;
+    this._contactAOMinDistance = 0.0004;
+    this._contactAOMaxDistance = 0.006;
+    this._contactAOStrength = 0.7;
     this._socketUp = new Vector4(0, 1, 0, 0);
     this._socketForward = new Vector4(0, 0, 1, 0);
     this._socketCos = new Vector4();
+    this._contactAORange = new Vector4();
     this.useFeature(EyeMaterial.FEATURE_VERTEX_NORMAL, true);
     // Initialised explicitly rather than left unset: featureUsed() returns
     // undefined for a feature that was never touched, which would make
@@ -116,6 +160,8 @@ export class EyeMaterial
     // is how assets silently change on load.
     this.useFeature(EyeMaterial.FEATURE_VERTEX_TANGENT, false);
     this.useFeature(EyeMaterial.FEATURE_SOCKET_OCCLUSION, false);
+    this.useFeature(EyeMaterial.FEATURE_CONTACT_AO, false);
+    this.useFeature(EyeMaterial.FEATURE_CONTACT_AO_JITTER, false);
   }
 
   clone() {
@@ -149,6 +195,12 @@ export class EyeMaterial
     this.lowerLidAngle = other.lowerLidAngle;
     this.socketOcclusionSoftness = other.socketOcclusionSoftness;
     this.socketOcclusionStrength = other.socketOcclusionStrength;
+    this.contactAO = other.contactAO;
+    this.contactAORadius = other.contactAORadius;
+    this.contactAOMinDistance = other.contactAOMinDistance;
+    this.contactAOMaxDistance = other.contactAOMaxDistance;
+    this.contactAOStrength = other.contactAOStrength;
+    this.contactAOTemporalJitter = other.contactAOTemporalJitter;
   }
 
   /** true if vertex normal attribute presents */
@@ -473,6 +525,146 @@ export class EyeMaterial
   }
 
   /**
+   * Enables screen-space contact occlusion of the eyeball by whatever sits in
+   * front of it - in practice the eyelid margin and the lashes.
+   *
+   * @remarks
+   * Complements {@link EyeMaterial.socketOcclusion} rather than replacing it.
+   * The socket aperture is a *model* of the lids: it is evaluated on a
+   * direction, so under a directional light it resolves to a single value for
+   * the whole eyeball and produces no shadow shape at all. This term reads the
+   * depth prepass instead, so it varies over the eyeball and follows the real
+   * lid mesh - blinks, asymmetry and all - without anyone driving the lid
+   * angles.
+   *
+   * Dims the ambient terms - environment irradiance and radiance - and the
+   * diffuse response of direct lights, whose shadow maps cannot resolve the
+   * millimetre gap between lid and eyeball. Direct specular is deliberately
+   * left untouched so the corneal highlight survives; see
+   * {@link EyeMaterial.corneaSpecularStrength} for why that matters. It is also
+   * why this lives in the material and not in a post effect, which could only
+   * darken the already-composited colour.
+   *
+   * Requires a depth prepass. Forward+ always runs one; where none is bound the
+   * term silently resolves to no occlusion.
+   */
+  get contactAO() {
+    return this.featureUsed<boolean>(EyeMaterial.FEATURE_CONTACT_AO);
+  }
+  set contactAO(val) {
+    this.useFeature(EyeMaterial.FEATURE_CONTACT_AO, !!val);
+  }
+
+  /**
+   * Radius of the contact occlusion disc, in world units.
+   *
+   * @remarks
+   * How far from the lid the darkening reaches. Unlike every other knob on this
+   * material this is a world-space distance, not an angle or a UV fraction, so
+   * it has to be rescaled for assets that are not authored at one unit per
+   * metre. Roughly half the eyeball radius is a good starting point.
+   */
+  get contactAORadius() {
+    return this._contactAORadius;
+  }
+  set contactAORadius(val) {
+    const next = Math.max(1e-6, val ?? 1e-6);
+    if (next !== this._contactAORadius) {
+      this._contactAORadius = next;
+      this.uniformChanged();
+    }
+  }
+
+  /**
+   * Smallest depth step that counts as an occluder, in world units.
+   *
+   * @remarks
+   * Raise it until the eyeball stops shading itself. The comparison is made
+   * against the eyeball's own tangent plane rather than against raw depth, so
+   * what has to clear this threshold is only the residual *curvature* over
+   * {@link EyeMaterial.contactAORadius} - not the surface's slope, which would
+   * otherwise make the right value depend on where the camera is. On a convex
+   * sphere that residual has the wrong sign to register as an occluder at all;
+   * what this actually rejects is depth quantization and the concave sulcus at
+   * the limbus.
+   */
+  get contactAOMinDistance() {
+    return this._contactAOMinDistance;
+  }
+  set contactAOMinDistance(val) {
+    const next = Math.max(1e-6, val ?? 1e-6);
+    if (next !== this._contactAOMinDistance) {
+      this._contactAOMinDistance = next;
+      this.uniformChanged();
+    }
+  }
+
+  /**
+   * Largest depth step that counts as an occluder, in world units.
+   *
+   * @remarks
+   * Anything further in front of the eyeball than this is unrelated geometry
+   * that merely overlaps it on screen - a hand, a strand of hair, a doorframe -
+   * and must not be allowed to paint a shadow onto the eye. Keep it at the
+   * order of the lid-to-eyeball gap, not at the order of the scene.
+   *
+   * Forced to at least four times {@link EyeMaterial.contactAOMinDistance} when
+   * uploaded, because the two thresholds drive opposing smoothstep ramps and an
+   * overlap would invert the acceptance window instead of narrowing it.
+   */
+  get contactAOMaxDistance() {
+    return this._contactAOMaxDistance;
+  }
+  set contactAOMaxDistance(val) {
+    const next = Math.max(1e-6, val ?? 1e-6);
+    if (next !== this._contactAOMaxDistance) {
+      this._contactAOMaxDistance = next;
+      this.uniformChanged();
+    }
+  }
+
+  /**
+   * Overall contact occlusion strength, 0 to 1.
+   *
+   * @remarks
+   * Calibrated so that 1 drives the ambient terms to zero right at the
+   * contact line - a lid edge covering half the sampling disc counts as full
+   * occlusion, since the other half of the disc is always the eyeball itself.
+   */
+  get contactAOStrength() {
+    return this._contactAOStrength;
+  }
+  set contactAOStrength(val) {
+    const next = Math.min(1, Math.max(0, val ?? 0));
+    if (next !== this._contactAOStrength) {
+      this._contactAOStrength = next;
+      this.uniformChanged();
+    }
+  }
+
+  /**
+   * Advances the contact-occlusion noise pattern every frame, for TAA.
+   *
+   * @remarks
+   * The disc taps are rotated per pixel by interleaved gradient noise; by
+   * default that rotation is static, so the residual variance shows as a
+   * fixed grain. With this enabled the rotation also advances with the
+   * framestamp, turning the grain into temporal noise that TAA integrates
+   * away - effectively multiplying the tap count by the TAA history length.
+   *
+   * Opt-in rather than default because without TAA (or another temporal
+   * accumulator) an advancing pattern reads as per-frame flicker, which is
+   * worse than the static grain it replaces. Enable it if and only if the
+   * pipeline resolves temporally.
+   */
+  get contactAOTemporalJitter() {
+    return this.featureUsed<boolean>(EyeMaterial.FEATURE_CONTACT_AO_JITTER);
+  }
+  set contactAOTemporalJitter(val) {
+    this.useFeature(EyeMaterial.FEATURE_CONTACT_AO_JITTER, !!val);
+  }
+
+  /**
    * Recomputes the object-space socket up/forward vectors from
    * {@link EyeMaterial.socketRotation}.
    *
@@ -577,16 +769,168 @@ export class EyeMaterial
         // itself. The ramp straddles zero so the dimming eases in a little
         // before the light passes behind.
         this.$l.forward = pb.normalize(this.$inputs.wSocketForward);
-        this.visibility = pb.mul(
-          this.visibility,
-          pb.smoothStep(-0.4, 0.25, pb.dot(this.dir, this.forward))
-        );
+        this.visibility = pb.mul(this.visibility, pb.smoothStep(-0.4, 0.25, pb.dot(this.dir, this.forward)));
       }
       this.$return(pb.mix(pb.float(1), this.visibility, this.strength));
     });
-    return pb
-      .getGlobalScope()
-      [funcName](dir, scope.zEyeSocketCos, scope.zEyeSocketStrength) as PBShaderExp;
+    return pb.getGlobalScope()[funcName](dir, scope.zEyeSocketCos, scope.zEyeSocketStrength) as PBShaderExp;
+  }
+
+  /**
+   * Fraction of the ambient hemisphere still reaching this fragment once the
+   * geometry standing in front of the eyeball is accounted for: 1 open, 0 fully
+   * buried under the lid.
+   *
+   * @remarks
+   * Samples the depth prepass in a disc around the fragment and counts the taps
+   * that sit in front of the eyeball's own local tangent plane. Comparing
+   * against that plane rather than against raw depth is the whole trick: it
+   * cancels the eyeball's slope and its foreshortening, which is what lets
+   * {@link EyeMaterial.contactAOMinDistance} and
+   * {@link EyeMaterial.contactAOMaxDistance} be plain world-space distances.
+   * Thresholding a raw depth gradient instead would put them in world units per
+   * pixel, and a value tuned for a close-up would be wrong the moment the
+   * camera pulled back.
+   *
+   * Must be called from uniform control flow - it takes screen-space
+   * derivatives, which WGSL only permits there. That is also why it is
+   * evaluated once up front rather than per light: the term is view-dependent
+   * but not light-dependent, so there would be nothing to gain anyway.
+   *
+   * @internal
+   */
+  private contactAOTerm(scope: PBInsideFunctionScope) {
+    const pb = scope.$builder;
+    if (!ShaderHelper.getLinearDepthTexture(scope)) {
+      // No depth prepass bound for this pass. Forward+ always runs one, but a
+      // material must not assume the pipeline it is drawn by.
+      return pb.float(1);
+    }
+    const funcName = 'Z_eyeContactAO';
+    const temporalJitter = !!this.contactAOTemporalJitter;
+    pb.func(
+      funcName,
+      [pb.vec3('worldPos'), pb.vec4('range'), pb.float('radius'), pb.float('strength')],
+      function () {
+        this.$l.renderSize = ShaderHelper.getRenderSize(this);
+        this.$l.viewPos = pb.mul(ShaderHelper.getViewMatrix(this), pb.vec4(this.worldPos, 1)).xyz;
+        // Distance along the view axis, which is what the depth prepass writes
+        // once scaled back up by the far plane.
+        this.$l.centerZ = pb.neg(this.viewPos.z);
+        // Derivatives first: the fade below returns early, and everything after
+        // that early return is non-uniform control flow.
+        this.$l.dzdx = pb.dpdx(this.centerZ);
+        this.$l.dzdy = pb.dpdy(this.centerZ);
+        // The radius arrives in world units, so project it instead of reading
+        // it off the projection matrix diagonal - that keeps an off-centre or
+        // oblique projection correct for free.
+        this.$l.projMatrix = ShaderHelper.getProjectionMatrix(this);
+        this.$l.h0 = pb.mul(this.projMatrix, pb.vec4(this.viewPos, 1));
+        this.$l.h1 = pb.mul(this.projMatrix, pb.vec4(pb.add(this.viewPos, pb.vec3(this.radius, 0, 0)), 1));
+        this.$l.pixelRadius = pb.min(
+          pb.length(
+            pb.mul(pb.sub(pb.div(this.h1.xy, this.h1.w), pb.div(this.h0.xy, this.h0.w)), 0.5, this.renderSize)
+          ),
+          CONTACT_AO_MAX_PIXEL_RADIUS
+        );
+        // Once the disc shrinks to a couple of pixels every tap lands on the
+        // centre texel and the term is pure noise, which on a distant face
+        // crawls from frame to frame. Fade it out rather than sample it.
+        this.$l.fade = pb.smoothStep(1.5, 4, this.pixelRadius);
+        this.$if(pb.lessThanEqual(this.fade, 0), function () {
+          this.$return(pb.float(1));
+        });
+        this.$l.screenUV = pb.div(this.$builtins.fragCoord.xy, this.renderSize);
+        this.$l.far = ShaderHelper.getCameraParams(this).y;
+        // Per-pixel rotation of the spiral, breaking up the banding the taps
+        // would otherwise leave. Static by default: TAA is not guaranteed to
+        // be on, and an unresolved per-frame rotation reads as flicker - worse
+        // than the fixed pattern it replaces. With temporal jitter opted in
+        // the rotation advances with the framestamp so TAA can integrate the
+        // pattern away; wrapped to a short cycle to keep the IGN math inside
+        // float precision no matter how long the app has been running.
+        this.$l.frameId = temporalJitter
+          ? pb.mod(pb.float(ShaderHelper.getFramestamp(this)), 64)
+          : pb.float(0);
+        this.$l.rotation = pb.mul(
+          SSR_interleavedGradientNoise(this, this.$builtins.fragCoord.xy, this.frameId),
+          Math.PI * 2
+        );
+        this.$l.occlusion = pb.float(0);
+        this.$l.weightSum = pb.float(0);
+        this.$for(pb.int('i'), 0, CONTACT_AO_SAMPLES, function () {
+          this.$l.t = pb.div(pb.add(pb.float(this.i), 0.5), CONTACT_AO_SAMPLES);
+          this.$l.angle = pb.add(this.rotation, pb.mul(pb.float(this.i), GOLDEN_ANGLE));
+          // sqrt spreads the taps evenly over the disc. Without it they pile up
+          // at the centre and the outer half of the radius goes unsampled.
+          this.$l.offset = pb.mul(
+            pb.vec2(pb.cos(this.angle), pb.sin(this.angle)),
+            pb.mul(pb.sqrt(this.t), this.pixelRadius)
+          );
+          this.$l.sampleZ = pb.mul(
+            ShaderHelper.sampleLinearDepth(
+              this,
+              ShaderHelper.getLinearDepthTexture(this),
+              pb.add(this.screenUV, pb.div(this.offset, this.renderSize)),
+              0
+            ),
+            this.far
+          );
+          // Where the eyeball itself would be at this tap.
+          this.$l.predicted = pb.add(
+            this.centerZ,
+            pb.mul(this.dzdx, this.offset.x),
+            pb.mul(this.dzdy, this.offset.y)
+          );
+          this.$l.delta = pb.sub(this.predicted, this.sampleZ);
+          // range packs (min in, min out, max in, max out), ordered on the CPU.
+          // Under the near pair the step is the eyeball shading itself - depth
+          // quantization, the quad granularity of the derivatives, and the
+          // genuinely concave sulcus where the corneal bulge meets the sclera,
+          // which is the one place tangent-plane extrapolation puts the surface
+          // behind where it really is. Over the far pair it is unrelated
+          // geometry that happens to overlap the eye on screen - a hand, a
+          // strand of hair - and must not paint a shadow onto it.
+          this.$l.accept = pb.mul(
+            pb.smoothStep(this.range.x, this.range.y, this.delta),
+            pb.sub(1, pb.smoothStep(this.range.z, this.range.w, this.delta))
+          );
+          // Nearer taps occlude more. This is what turns the lid edge into a
+          // gradient that fades away from it instead of a hard band. The slope
+          // is deliberately gentle: the lid usually stands to one *side* of the
+          // fragment, so its taps land on the outer rim of the disc, and a
+          // steeper falloff would discount exactly the taps that carry the
+          // occlusion.
+          this.$l.falloff = pb.sub(1, pb.mul(this.t, 0.75));
+          this.occlusion = pb.add(this.occlusion, pb.mul(this.accept, this.falloff));
+          this.weightSum = pb.add(this.weightSum, this.falloff);
+        });
+        // Semi-disc calibration. A lid edge running right through the fragment
+        // covers at most half the disc - the other half is always the eyeball
+        // itself, which the range window rejects by design - so the raw
+        // coverage tops out near 0.5. Doubling maps "half the disc occluded"
+        // to full occlusion, which is what strength = 1 should mean at a
+        // contact line; without it the term can never darken past 50% no
+        // matter how the knobs are set. The smoothstep's low edge then discards
+        // what a lone stray tap can produce: with a dithered disc that is pure
+        // per-pixel grain, and a material has no denoise pass to spend on it.
+        // The high edge still saturates well before the contact line.
+        this.$l.coverage = pb.smoothStep(
+          0.1,
+          0.9,
+          pb.mul(pb.div(this.occlusion, pb.max(this.weightSum, 1e-4)), 2)
+        );
+        this.$l.ao = pb.sub(1, pb.mul(this.coverage, this.strength));
+        this.$return(pb.mix(pb.float(1), this.ao, this.fade));
+      }
+    );
+    const globalScope = pb.getGlobalScope();
+    return globalScope[funcName](
+      scope.$inputs.worldPos,
+      scope.zEyeContactAORange,
+      scope.zEyeContactAORadius,
+      scope.zEyeContactAOStrength
+    ) as PBShaderExp;
   }
 
   /**
@@ -706,6 +1050,11 @@ export class EyeMaterial
           scope.zEyeSocketCos = pb.vec4().uniform(2);
           scope.zEyeSocketStrength = pb.float().uniform(2);
         }
+        if (this.contactAO) {
+          scope.zEyeContactAORange = pb.vec4().uniform(2);
+          scope.zEyeContactAORadius = pb.float().uniform(2);
+          scope.zEyeContactAOStrength = pb.float().uniform(2);
+        }
       }
       if (!litPass) {
         // Depth/shadow style passes only need coverage, not shading.
@@ -800,6 +1149,11 @@ export class EyeMaterial
 
       const socketOcc = !!this.socketOcclusion && !!this.vertexNormal;
       const baseLightPass = !this.drawContext.lightBlending;
+      // Evaluated once, at function scope, outside any shader-side branch: it
+      // takes screen-space derivatives, and it depends on the view but not on
+      // any light. It dims direct diffuse as well as the ambient terms, so it
+      // is needed even in additive light passes that skip the env block.
+      scope.$l.contactAO = this.contactAO ? this.contactAOTerm(scope) : pb.float(1);
       if (this.needCalculateEnvLight() && baseLightPass) {
         // Ambient occlusion by the socket: irradiance keyed off the surface
         // normal, radiance off the reflection vector - a reflection ray aimed
@@ -807,11 +1161,9 @@ export class EyeMaterial
         // corneal highlight keeps mirroring the sky in shadow.
         scope.$l.envIrradiance = this.getEnvLightIrradiance(scope, scope.normal);
         if (socketOcc) {
-          scope.envIrradiance = pb.mul(
-            scope.envIrradiance,
-            this.socketAperture(scope, scope.normal, false)
-          );
+          scope.envIrradiance = pb.mul(scope.envIrradiance, this.socketAperture(scope, scope.normal, false));
         }
+        scope.envIrradiance = pb.mul(scope.envIrradiance, scope.contactAO);
         scope.diffuseLighting = pb.add(scope.diffuseLighting, scope.envIrradiance);
         scope.$l.reflectVec = this.calculateReflectionVector(scope, scope.normal, scope.viewVec);
         scope.$l.envFresnel = this.fresnelSchlick(scope, scope.NoV, scope.F0, scope.F90);
@@ -821,11 +1173,11 @@ export class EyeMaterial
           scope.zEyeCorneaSpecularStrength
         );
         if (socketOcc) {
-          scope.envRadiance = pb.mul(
-            scope.envRadiance,
-            this.socketAperture(scope, scope.reflectVec, false)
-          );
+          scope.envRadiance = pb.mul(scope.envRadiance, this.socketAperture(scope, scope.reflectVec, false));
         }
+        // The lid occludes the sky the cornea mirrors just as much as the sky it
+        // diffuses, and the socket aperture already dims both the same way.
+        scope.envRadiance = pb.mul(scope.envRadiance, scope.contactAO);
         scope.specularLighting = pb.add(scope.specularLighting, scope.envRadiance);
       }
 
@@ -875,9 +1227,14 @@ export class EyeMaterial
           1
         );
         this.$l.diffuseTerm = pb.mix(this.NoLWrap, this.NoL, this.irisMask);
+        // The contact term dims direct diffuse too: a shadow map cannot
+        // resolve the millimetre gap between lid and eyeball, so without this
+        // the contact shadow vanishes in scenes lit mainly by direct lights.
+        // Direct specular is deliberately left out - if the light itself is
+        // visible from the fragment, its highlight should be as well.
         this.diffuseLighting = pb.add(
           this.diffuseLighting,
-          pb.mul(this.lightColor, this.diffuseTerm, this.diffuseScale)
+          pb.mul(this.lightColor, this.diffuseTerm, this.diffuseScale, this.contactAO)
         );
 
         this.$l.halfVec = pb.normalize(pb.add(this.lightDir, this.viewVec));
@@ -900,7 +1257,13 @@ export class EyeMaterial
 
       // Light that has entered the iris and bounced around inside it. Without
       // this the iris crushes to black in shadow and the eye reads as a hole.
-      scope.$l.internal = pb.mul(scope.albedo, scope.zEyeIrisBrightness, scope.irisMask);
+      // This is fed by environment irradiance (or zero in pure direct-light
+      // scenes), scaled by irisBrightness to control how much scatters back out.
+      // The contact term applies too: an iris glowing inside the lid's contact
+      // shadow would read as emissive rather than scattered ambient.
+      scope.$l.irisEnvLight =
+        baseLightPass && this.needCalculateEnvLight() ? scope.envIrradiance : pb.vec3(0);
+      scope.$l.internal = pb.mul(scope.albedo, scope.irisEnvLight, scope.zEyeIrisBrightness, scope.irisMask);
       scope.$l.litColor = pb.add(
         pb.mul(scope.albedo, scope.diffuseLighting),
         scope.internal,
@@ -945,6 +1308,23 @@ export class EyeMaterial
         bindGroup.setValue('zEyeSocketForward', this._socketForward);
         bindGroup.setValue('zEyeSocketCos', this._socketCos);
         bindGroup.setValue('zEyeSocketStrength', this._socketOcclusionStrength);
+      }
+      if (this.contactAO) {
+        const minD = this._contactAOMinDistance;
+        // The near pair ramps a tap in as an occluder, the far pair ramps it
+        // back out as unrelated geometry. Widening the outer distance is the
+        // only way to keep the two ramps from crossing; clamping the inner one
+        // instead would silently disable the self-occlusion rejection that is
+        // the whole reason the near pair exists.
+        const maxD = Math.max(this._contactAOMaxDistance, minD * 4);
+        // The far ramp starts at 0.75x rather than halfway: everything under
+        // maxD is by definition lid-distance geometry, and ramping it out
+        // early was discounting the thicker parts of the lid margin - a large
+        // share of the occlusion this term exists to capture.
+        this._contactAORange.setXYZW(minD, minD * 2, maxD * 0.75, maxD);
+        bindGroup.setValue('zEyeContactAORange', this._contactAORange);
+        bindGroup.setValue('zEyeContactAORadius', this._contactAORadius);
+        bindGroup.setValue('zEyeContactAOStrength', this._contactAOStrength);
       }
     }
   }
