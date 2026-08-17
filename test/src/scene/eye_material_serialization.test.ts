@@ -28,6 +28,11 @@ describe('Eye material serialization', () => {
     material.lowerLidAngle = 71;
     material.socketOcclusionSoftness = 12;
     material.socketOcclusionStrength = 0.8;
+    material.contactAO = true;
+    material.contactAORadius = 0.0075;
+    material.contactAOMinDistance = 0.0006;
+    material.contactAOMaxDistance = 0.009;
+    material.contactAOStrength = 0.55;
 
     const serialized = await manager.serializeObject(material);
     const restored = (await manager.deserializeObject<EyeMaterial>(null, serialized))!;
@@ -44,7 +49,9 @@ describe('Eye material serialization', () => {
       vertexTangent: true,
       SocketOcclusion: true,
       UpperLidAngle: 46,
-      LowerLidAngle: 71
+      LowerLidAngle: 71,
+      ContactAO: true,
+      ContactAOStrength: 0.55
     });
 
     expect(restored).toBeInstanceOf(EyeMaterial);
@@ -76,6 +83,13 @@ describe('Eye material serialization', () => {
     expect(restored.lowerLidAngle).toBeCloseTo(71);
     expect(restored.socketOcclusionSoftness).toBeCloseTo(12);
     expect(restored.socketOcclusionStrength).toBeCloseTo(0.8);
+    expect(restored.contactAO).toBe(true);
+    // Millimetre-scale world distances, so the default two-decimal tolerance
+    // would pass against literally any small number.
+    expect(restored.contactAORadius).toBeCloseTo(0.0075, 6);
+    expect(restored.contactAOMinDistance).toBeCloseTo(0.0006, 6);
+    expect(restored.contactAOMaxDistance).toBeCloseTo(0.009, 6);
+    expect(restored.contactAOStrength).toBeCloseTo(0.55);
   });
 
   test('a material left at its defaults round-trips unchanged', async () => {
@@ -111,5 +125,10 @@ describe('Eye material serialization', () => {
     expect(restored.lowerLidAngle).toBeCloseTo(fresh.lowerLidAngle);
     expect(restored.socketOcclusionSoftness).toBeCloseTo(fresh.socketOcclusionSoftness);
     expect(restored.socketOcclusionStrength).toBeCloseTo(fresh.socketOcclusionStrength);
+    expect(restored.contactAO).toBe(fresh.contactAO);
+    expect(restored.contactAORadius).toBeCloseTo(fresh.contactAORadius, 6);
+    expect(restored.contactAOMinDistance).toBeCloseTo(fresh.contactAOMinDistance, 6);
+    expect(restored.contactAOMaxDistance).toBeCloseTo(fresh.contactAOMaxDistance, 6);
+    expect(restored.contactAOStrength).toBeCloseTo(fresh.contactAOStrength);
   });
 });
