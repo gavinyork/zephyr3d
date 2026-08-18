@@ -100,7 +100,8 @@ describe('Eye material contact occlusion codegen', () => {
     });
   }
 
-  test('the term is omitted entirely when no depth prepass is bound', () => {    const pb = new ProgramBuilder(createMockDevice('webgpu'));
+  test('the term is omitted entirely when no depth prepass is bound', () => {
+    const pb = new ProgramBuilder(createMockDevice('webgpu'));
     const material = new EyeMaterial();
     material.contactAO = true;
     const [, fs] = pb.buildRender({
