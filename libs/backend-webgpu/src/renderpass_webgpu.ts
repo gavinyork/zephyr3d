@@ -23,6 +23,13 @@ import { WebGPUClearQuad } from './utils_webgpu';
 const VALIDATION_NEED_NEW_PASS = 1 << 0;
 const VALIDATION_FAILED = 1 << 1;
 
+/** @internal */
+export type WebGPUIndirectDrawParams = {
+  buffer: GPUBuffer;
+  offset: number;
+  indexed: boolean;
+};
+
 const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);
 
 function getFrameBufferClearColor(
@@ -275,6 +282,44 @@ export class WebGPURenderPass {
       numInstances
     );
   }
+  drawIndirect(
+    program: WebGPUProgram,
+    vertexData: Nullable<WebGPUVertexLayout>,
+    stateSet: WebGPURenderStateSet,
+    bindGroups: WebGPUBindGroup[],
+    bindGroupOffsets: Nullable<Nullable<Iterable<number>>[]>,
+    primitiveType: PrimitiveType,
+    indirect: WebGPUIndirectDrawParams
+  ) {
+    const validation = this.validateDraw(program, bindGroups, stateSet, primitiveType, 0, 0, 1);
+    if (validation & VALIDATION_FAILED) {
+      return;
+    }
+    if (this.hasDeferredMipmapsForBindGroups(bindGroups)) {
+      this.end();
+      this.flushDeferredMipmapsForBindGroups(bindGroups);
+    }
+    if (validation & VALIDATION_NEED_NEW_PASS) {
+      this.end();
+    }
+    if (!this.active) {
+      this.begin();
+    }
+    this.drawInternal(
+      this._renderPassEncoder!,
+      program,
+      vertexData,
+      stateSet,
+      bindGroups,
+      bindGroupOffsets,
+      primitiveType,
+      0,
+      0,
+      1,
+      undefined,
+      indirect
+    );
+  }
   clear(color: FrameBufferClearColors, depth: Nullable<number>, stencil: Nullable<number>) {
     validateFrameBufferClearColors(color, this._frameBufferInfo.colorFormats.length);
     if (
@@ -517,7 +562,8 @@ export class WebGPURenderPass {
     first: number,
     count: number,
     numInstances: number,
-    renderBundleEncoder?: GPURenderBundleEncoder
+    renderBundleEncoder?: GPURenderBundleEncoder,
+    indirect?: WebGPUIndirectDrawParams
   ) {
     if (
       this.setBindGroupsForRender(
@@ -558,17 +604,47 @@ export class WebGPURenderPass {
               indexBuffer.object!,
               indexBuffer.indexType === typeU16 ? 'uint16' : 'uint32'
             );
-            renderPassEncoder.drawIndexed(count, numInstances, first);
-            renderBundleEncoder?.drawIndexed(count, numInstances, first);
+            if (indirect) {
+              this.drawIndirectInternal(renderPassEncoder, renderBundleEncoder, indirect, true);
+            } else {
+              renderPassEncoder.drawIndexed(count, numInstances, first);
+              renderBundleEncoder?.drawIndexed(count, numInstances, first);
+            }
+          } else if (indirect) {
+            this.drawIndirectInternal(renderPassEncoder, renderBundleEncoder, indirect, false);
           } else {
             renderPassEncoder.draw(count, numInstances, first);
             renderBundleEncoder?.draw(count, numInstances, first);
           }
+        } else if (indirect) {
+          this.drawIndirectInternal(renderPassEncoder, renderBundleEncoder, indirect, false);
         } else {
           renderPassEncoder.draw(count, numInstances, first);
           renderBundleEncoder?.draw(count, numInstances, first);
         }
       }
+    }
+  }
+  private drawIndirectInternal(
+    renderPassEncoder: GPURenderPassEncoder,
+    renderBundleEncoder: Nullable<GPURenderBundleEncoder> | undefined,
+    indirect: WebGPUIndirectDrawParams,
+    hasIndexBuffer: boolean
+  ) {
+    if (indirect.indexed !== hasIndexBuffer) {
+      console.error(
+        indirect.indexed
+          ? 'drawIndexedIndirect() requires the current vertex layout to have an index buffer'
+          : 'drawIndirect() must not be used with a vertex layout that has an index buffer, use drawIndexedIndirect() instead'
+      );
+      return;
+    }
+    if (indirect.indexed) {
+      renderPassEncoder.drawIndexedIndirect(indirect.buffer, indirect.offset);
+      renderBundleEncoder?.drawIndexedIndirect(indirect.buffer, indirect.offset);
+    } else {
+      renderPassEncoder.drawIndirect(indirect.buffer, indirect.offset);
+      renderBundleEncoder?.drawIndirect(indirect.buffer, indirect.offset);
     }
   }
   private validateDraw(

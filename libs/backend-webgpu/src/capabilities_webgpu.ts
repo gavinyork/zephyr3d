@@ -55,6 +55,7 @@ export class WebGPUMiscCaps implements MiscCaps {
   support32BitIndex: boolean;
   supportDepthClamp: boolean;
   supportClipControl: boolean;
+  supportDrawIndirect: boolean;
   maxBindGroups: number;
   maxTexCoordIndex: number;
   supportTimestampQuery: boolean;
@@ -65,6 +66,7 @@ export class WebGPUMiscCaps implements MiscCaps {
     this.supportDepthClamp = device.device.features.has('depth-clip-control');
     // WebGPU clip space is natively zero-to-one
     this.supportClipControl = true;
+    this.supportDrawIndirect = true;
     this.maxBindGroups = 4;
     this.maxTexCoordIndex = 8;
     this.supportTimestampQuery = device.device.features.has('timestamp-query');

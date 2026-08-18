@@ -689,7 +689,15 @@ export type TextureColorSpace = 'srgb' | 'linear';
  * Buffer usage type
  * @public
  */
-export type BufferUsage = 'vertex' | 'index' | 'uniform' | 'read' | 'write' | 'pack-pixel' | 'unpack-pixel';
+export type BufferUsage =
+  | 'vertex'
+  | 'index'
+  | 'uniform'
+  | 'read'
+  | 'write'
+  | 'pack-pixel'
+  | 'unpack-pixel'
+  | 'indirect';
 
 /**
  * Common options for createing texture or buffer
@@ -742,7 +750,8 @@ export enum GPUResourceUsageFlags {
   BF_PACK_PIXEL = 1 << 11,
   BF_UNPACK_PIXEL = 1 << 12,
   DYNAMIC = 1 << 13,
-  MANAGED = 1 << 14
+  MANAGED = 1 << 14,
+  BF_INDIRECT = 1 << 15
 }
 
 /**

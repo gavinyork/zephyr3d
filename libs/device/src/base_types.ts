@@ -2283,6 +2283,8 @@ export interface MiscCaps {
   supportTimestampQuery: boolean;
   /** True if the device can switch the clip-space depth range to [0, 1] (EXT_clip_control on WebGL, always true on WebGPU) */
   supportClipControl: boolean;
+  /** True if the device supports indirect draw calls (WebGPU only) */
+  supportDrawIndirect: boolean;
 }
 
 /**
@@ -3060,6 +3062,36 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param numInstances - How many instances to be drawn
    */
   drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number): void;
+  /**
+   * Draw primitives, reading the draw arguments from a GPU buffer
+   *
+   * @remarks
+   * Requires {@link MiscCaps.supportDrawIndirect}. The buffer must be created with
+   * the 'indirect' usage and contain a tightly packed group of 4 uint32 values:
+   * vertexCount, instanceCount, firstVertex, firstInstance.
+   *
+   * @param primitiveType - The primitive type
+   * @param indirectBuffer - The buffer holding the draw arguments
+   * @param indirectOffset - Byte offset of the draw arguments within the buffer, must be a multiple of 4
+   */
+  drawIndirect(primitiveType: PrimitiveType, indirectBuffer: GPUDataBuffer, indirectOffset?: number): void;
+  /**
+   * Draw indexed primitives, reading the draw arguments from a GPU buffer
+   *
+   * @remarks
+   * Requires {@link MiscCaps.supportDrawIndirect}. The buffer must be created with
+   * the 'indirect' usage and contain a tightly packed group of 5 uint32 values:
+   * indexCount, instanceCount, firstIndex, baseVertex, firstInstance.
+   *
+   * @param primitiveType - The primitive type
+   * @param indirectBuffer - The buffer holding the draw arguments
+   * @param indirectOffset - Byte offset of the draw arguments within the buffer, must be a multiple of 4
+   */
+  drawIndexedIndirect(
+    primitiveType: PrimitiveType,
+    indirectBuffer: GPUDataBuffer,
+    indirectOffset?: number
+  ): void;
   /**
    * Dispatches a compute task to the GPU
    *
