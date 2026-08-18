@@ -2848,8 +2848,7 @@ export function getEyeMaterialClass(manager: ResourceManager): SerializableClass
           },
           {
             name: 'SocketRotation',
-            description:
-              'Euler rotation in degrees of the socket frame; zero matches +Y up, +Z gaze assets',
+            description: 'Euler rotation in degrees of the socket frame; zero matches +Y up, +Z gaze assets',
             type: 'vec3',
             default: [0, 0, 0],
             options: { minValue: -180, maxValue: 180 },

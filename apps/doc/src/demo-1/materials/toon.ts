@@ -504,7 +504,12 @@ export class ToonMaterial extends ToonMaterialBase {
           );
           this.$l.lightDiffuse = pb.mix(this.shadeColor, this.baseColor, this.shading);
           if (shadow) {
-            this.$l.shadowValue = that.calculateShadow(this, this.worldPos, pb.clamp(this.NoL, 0, 1));
+            this.$l.shadowValue = that.calculateShadow(
+              this,
+              this.worldPos,
+              this.normal,
+              pb.clamp(this.NoL, 0, 1)
+            );
             this.lightDiffuse = pb.mix(this.shadeColor, this.lightDiffuse, this.shadowValue);
           }
           this.directColor = pb.add(this.directColor, pb.mul(this.lightDiffuse, this.lightColor));
