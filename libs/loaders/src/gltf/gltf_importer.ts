@@ -1847,15 +1847,19 @@ export class GLTFImporter extends AbstractModelImporter {
               COLOR_0: MORPH_TARGET_COLOR
             };
             const morphAttribSet = new Set<number>();
-            for (const target of p.targets) {
-              for (const k in target) {
+            for (let targetIndex = 0; targetIndex < p.targets.length; targetIndex++) {
+              const target = p.targets[targetIndex] as Record<string, number>;
+              for (const k of Object.keys(target)) {
                 const t = targetMap[k as keyof typeof targetMap];
                 if (t !== undefined) {
                   targets[t] = targets[t] ?? { numComponents: 0, data: [] };
                   const accessorIndex = target[k] as number;
                   const accessor = gltf._accessors[accessorIndex];
                   targets[t].numComponents = accessor.getComponentCount(accessor.type);
-                  targets[t].data.push(accessor.getNormalizedDeinterlacedView(gltf) as Float32Array);
+                  // Keep each attribute array indexed by the morph target. A
+                  // target may omit optional attributes such as NORMAL; using
+                  // push() here would shift every following target's data.
+                  targets[t].data[targetIndex] = accessor.getNormalizedDeinterlacedView(gltf) as Float32Array;
                   if (k === 'POSITION') {
                     const min = accessor.min
                       ? new Vector3(accessor.min[0], accessor.min[1], accessor.min[2])
@@ -1863,7 +1867,7 @@ export class GLTFImporter extends AbstractModelImporter {
                     const max = accessor.max
                       ? new Vector3(accessor.max[0], accessor.max[1], accessor.max[2])
                       : Vector3.zero();
-                    targetBox.push(new BoundingBox(min, max));
+                    targetBox[targetIndex] = new BoundingBox(min, max);
                   }
                   morphAttribSet.add(t);
                 }
@@ -1871,6 +1875,12 @@ export class GLTFImporter extends AbstractModelImporter {
             }
             subMeshData.numTargets = p.targets.length;
             subMeshData.targets = targets;
+            // POSITION is required by the usual morph-target path, but keep
+            // the bounding-box array aligned as well when malformed or sparse
+            // assets omit it for a target.
+            for (let i = 0; i < p.targets.length; i++) {
+              targetBox[i] ??= new BoundingBox(Vector3.zero(), Vector3.zero());
+            }
             subMeshData.targetBox = targetBox;
             subMeshData.morphAttribCount = morphAttribSet.size;
           }

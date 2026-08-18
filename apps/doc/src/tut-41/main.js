@@ -106,7 +106,9 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
         this.$l.diffuse = pb.mul(this.lightColor, this.NoL);
         // 如果光线投射阴影则需要计算阴影
         if (shadow) {
-          this.$l.shadow = pb.vec3(that.calculateShadow(this, this.$inputs.worldPos, this.NoL));
+          this.$l.shadow = pb.vec3(
+            that.calculateShadow(this, this.$inputs.worldPos, this.$inputs.worldNorm, this.NoL)
+          );
           this.diffuse = pb.mul(this.diffuse, this.shadow);
         }
         // 累积该光源的贡献

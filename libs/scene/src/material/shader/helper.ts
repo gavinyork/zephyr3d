@@ -92,6 +92,7 @@ export class ShaderHelper {
   private static readonly SKIN_MATRIX_NAME = 'Z_SkinMatrix';
   private static readonly SKIN_PREV_MATRIX_NAME = 'Z_PrevSkinMatrix';
   private static readonly SKIN_BONE_OFFSET = 'Z_boneOffset';
+  private static readonly RESOLVED_VERTEX_NORMAL_NAME = 'Z_ResolvedVertexNormal';
   /** @internal */
   private static _drawableBindGroupLayouts: Record<string, BindGroupLayout> = {};
   /** @internal */
@@ -584,6 +585,196 @@ export class ShaderHelper {
     const offset = scope[this.getMorphInfoUniformName()][pos][comp];
     return scope[funcName](pb.int(offset)) as PBShaderExp;
   }
+  /**
+   * Normalize a morphed direction without allowing cancellation between
+   * multiple morph targets to turn a valid base direction into NaN/noise.
+   *
+   * Morph normal/tangent data is additive. When two targets cancel the base
+   * direction, the zero-length result is not a meaningful direction, so the
+   * authored vertex direction is the least surprising fallback.
+   * @internal
+   */
+  private static defineNormalizeMorphedDirection(scope: PBInsideFunctionScope): string {
+    const pb = scope.$builder;
+    const funcName = 'Z_normalizeMorphedDirection';
+    pb.func(funcName, [pb.vec3('base'), pb.vec3('delta')], function () {
+      this.$l.morphed = pb.add(this.base, this.delta);
+      this.$l.lengthSquared = pb.dot(this.morphed, this.morphed);
+      this.$if(pb.greaterThan(this.lengthSquared, 1e-6), function () {
+        this.$return(pb.mul(this.morphed, pb.inverseSqrt(this.lengthSquared)));
+      });
+      this.$l.baseLengthSquared = pb.dot(this.base, this.base);
+      this.$if(pb.greaterThan(this.baseLengthSquared, 1e-6), function () {
+        this.$return(pb.mul(this.base, pb.inverseSqrt(this.baseLengthSquared)));
+      });
+      this.$return(pb.vec3(0, 0, 1));
+    });
+    return funcName;
+  }
+  /**
+   * Mixes morph directions according to the amount of positional deformation
+   * contributed by each active target. This avoids letting a target with a
+   * large authored normal delta dominate a target that actually moves the
+   * surface much farther at the current vertex.
+   *
+   * The additive result remains the fallback for assets without position
+   * morph data, and for vertices whose position deltas are all zero.
+   * @internal
+   */
+  private static calculateMorphDirectionByDisplacement(
+    scope: PBInsideFunctionScope,
+    base: PBShaderExp,
+    attrib: number
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    const isWebGL1 = pb.getDevice().type === 'webgl';
+    if (pb.shaderKind !== 'vertex') {
+      throw new Error(`ShaderHelper.calculateMorphDirectionByDisplacement(): must be called at vertex stage`);
+    }
+    const that = this;
+    const funcName = 'Z_calculateMorphDirectionByDisplacement';
+    const normalizeName = this.defineNormalizeMorphedDirection(scope);
+    pb.func(funcName, [pb.vec3('base'), pb.int('directionOffset'), pb.int('positionOffset')], function () {
+      this.$l.vertexIndex = isWebGL1
+        ? pb.int(scope.$inputs.zFakeVertexID)
+        : pb.int(scope.$builtins.vertexIndex);
+      const morphInfo = scope[that.getMorphInfoUniformName()];
+      this.$l.metaData = pb.ivec4(morphInfo[0]);
+      this.$l.texWidth = pb.float(this.metaData.x);
+      this.$l.texHeight = pb.float(this.metaData.y);
+      this.$l.numVertices = this.metaData.z;
+      this.$l.numTargets = this.metaData.w;
+      this.$l.directionDelta = pb.vec3(0);
+      this.$l.weightedDirection = pb.vec3(0);
+      this.$l.weightSum = pb.float(0);
+
+      const accumulateTarget = (targetScope: PBInsideFunctionScope) => {
+        targetScope.$if(pb.notEqual(targetScope.weight, 0), function () {
+          this.$l.targetIndex = pb.int(targetScope['targetIndex']);
+          this.$l.positionValue = pb.vec3(0);
+          this.$l.directionValue = pb.vec3(0);
+          this.$if(pb.greaterThanEqual(targetScope['directionOffset'], 0), function () {
+            this.$l.pixelIndex = pb.float(
+              pb.add(
+                targetScope['directionOffset'],
+                pb.mul(this.targetIndex, targetScope['numVertices']),
+                targetScope['vertexIndex']
+              )
+            );
+            this.$l.xIndex = pb.mod(this.pixelIndex, targetScope['texWidth']);
+            this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, targetScope['texWidth']));
+            this.$l.u = pb.div(pb.add(this.xIndex, 0.5), targetScope['texWidth']);
+            this.$l.v = pb.div(pb.add(this.yIndex, 0.5), targetScope['texHeight']);
+            this.directionValue = pb.textureSampleLevel(
+              scope[that.getMorphDataUniformName()],
+              pb.vec2(this.u, this.v),
+              0
+            ).xyz;
+          });
+          this.$if(pb.greaterThanEqual(targetScope['positionOffset'], 0), function () {
+            this.$l.pixelIndex = pb.float(
+              pb.add(
+                targetScope['positionOffset'],
+                pb.mul(this.targetIndex, targetScope['numVertices']),
+                targetScope['vertexIndex']
+              )
+            );
+            this.$l.xIndex = pb.mod(this.pixelIndex, targetScope['texWidth']);
+            this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, targetScope['texWidth']));
+            this.$l.u = pb.div(pb.add(this.xIndex, 0.5), targetScope['texWidth']);
+            this.$l.v = pb.div(pb.add(this.yIndex, 0.5), targetScope['texHeight']);
+            this.positionValue = pb.textureSampleLevel(
+              scope[that.getMorphDataUniformName()],
+              pb.vec2(this.u, this.v),
+              0
+            ).xyz;
+          });
+          this.directionDelta = pb.add(this.directionDelta, pb.mul(this.directionValue, targetScope.weight));
+          this.$l.targetDirection = scope.$g[normalizeName](
+            this.base,
+            pb.mul(this.directionValue, targetScope.weight)
+          );
+          this.$l.displacementWeight = pb.mul(
+            pb.abs(targetScope.weight),
+            pb.sqrt(pb.dot(this.positionValue, this.positionValue))
+          );
+          this.weightedDirection = pb.add(
+            this.weightedDirection,
+            pb.mul(this.targetDirection, this.displacementWeight)
+          );
+          this.weightSum = pb.add(this.weightSum, this.displacementWeight);
+        });
+      };
+
+      if (isWebGL1) {
+        this.$for(pb.int('i'), 0, MORPH_WEIGHTS_VECTOR_COUNT, function () {
+          this.$for(pb.int('j'), 0, 4, function () {
+            this.$l.index = pb.add(pb.mul(this.i, 4), this.j);
+            this.$if(pb.greaterThanEqual(this.index, this.numTargets), function () {
+              this.$break();
+            });
+            this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
+            this.$l.targetIndex = pb.int(
+              morphInfo.at(pb.add(1 + MORPH_WEIGHTS_VECTOR_COUNT, this.i)).at(this.j)
+            );
+            accumulateTarget(this);
+          });
+        });
+      } else {
+        this.$for(pb.int('t'), 0, this.numTargets, function () {
+          this.$l.i = pb.sar(this.t, 2);
+          this.$l.j = pb.compAnd(this.t, 3);
+          this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
+          this.$l.targetIndex = pb.int(
+            morphInfo.at(pb.add(1 + MORPH_WEIGHTS_VECTOR_COUNT, this.i)).at(this.j)
+          );
+          accumulateTarget(this);
+        });
+      }
+
+      this.$l.fallback = scope.$g[normalizeName](this.base, this.directionDelta);
+      this.$if(pb.lessThan(this.weightSum, 1e-6), function () {
+        this.$return(this.fallback);
+      });
+      this.$l.weightedLengthSquared = pb.dot(this.weightedDirection, this.weightedDirection);
+      this.$if(pb.greaterThan(this.weightedLengthSquared, 1e-6), function () {
+        this.$return(pb.mul(this.weightedDirection, pb.inverseSqrt(this.weightedLengthSquared)));
+      });
+      this.$return(this.fallback);
+    });
+    const directionPos = 1 + MORPH_WEIGHTS_VECTOR_COUNT * 2 + (attrib >> 2);
+    const directionComp = attrib & 3;
+    const positionPos = 1 + MORPH_WEIGHTS_VECTOR_COUNT * 2 + (MORPH_TARGET_POSITION >> 2);
+    const positionComp = MORPH_TARGET_POSITION & 3;
+    const morphInfo = scope[this.getMorphInfoUniformName()];
+    return scope.$g[funcName](
+      base.xyz,
+      pb.int(morphInfo[directionPos][directionComp]),
+      pb.int(morphInfo[positionPos][positionComp])
+    ) as PBShaderExp;
+  }
+  /** @internal */
+  private static orthogonalizeMorphedTangent(
+    scope: PBInsideFunctionScope,
+    normal: PBShaderExp,
+    tangent: PBShaderExp
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    const funcName = 'Z_orthogonalizeMorphedTangent';
+    pb.func(funcName, [pb.vec3('normal'), pb.vec3('tangent')], function () {
+      this.$l.normalLengthSquared = pb.dot(this.normal, this.normal);
+      this.$if(pb.greaterThan(this.normalLengthSquared, 1e-6), function () {
+        this.$l.n = pb.mul(this.normal, pb.inverseSqrt(this.normalLengthSquared));
+        this.$l.projected = pb.sub(this.tangent, pb.mul(this.n, pb.dot(this.n, this.tangent)));
+        this.$l.tangentLengthSquared = pb.dot(this.projected, this.projected);
+        this.$if(pb.greaterThan(this.tangentLengthSquared, 1e-6), function () {
+          this.$return(pb.mul(this.projected, pb.inverseSqrt(this.tangentLengthSquared)));
+        });
+      });
+      this.$return(this.tangent);
+    });
+    return scope.$g[funcName](normal.xyz, tangent.xyz) as PBShaderExp;
+  }
   /** @internal */
   static prepareSkinAnimation(scope: PBInsideFunctionScope) {
     if (!this.hasSkinning(scope)) {
@@ -780,6 +971,10 @@ export class ShaderHelper {
     if (!funcScope || !funcScope.$isMain()) {
       throw new Error(`ShaderHelper.resolveVertexNormal(): must be called at entry function`);
     }
+    const useVertexAttrib = !normal;
+    if (useVertexAttrib && scope[this.RESOLVED_VERTEX_NORMAL_NAME]) {
+      return scope[this.RESOLVED_VERTEX_NORMAL_NAME] as PBShaderExp;
+    }
     if (!normal) {
       if (!scope.$getVertexAttrib('normal')) {
         scope.$inputs.Z_normal = pb.vec3().attrib('normal');
@@ -787,13 +982,17 @@ export class ShaderHelper {
       normal = scope.$getVertexAttrib('normal')!;
     }
     if (this.hasMorphing(scope)) {
-      normal = pb.normalize(pb.add(normal, this.calculateMorphDelta(scope, MORPH_TARGET_NORMAL).xyz));
+      normal = this.calculateMorphDirectionByDisplacement(scope, normal, MORPH_TARGET_NORMAL);
     }
+    let resolvedNormal = normal;
     if (scope[this.SKIN_MATRIX_NAME]) {
-      return pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(normal, 0)).xyz as PBShaderExp;
-    } else {
-      return normal;
+      resolvedNormal = pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(normal, 0)).xyz as PBShaderExp;
     }
+    if (useVertexAttrib) {
+      scope.$l[this.RESOLVED_VERTEX_NORMAL_NAME] = resolvedNormal;
+      resolvedNormal = scope[this.RESOLVED_VERTEX_NORMAL_NAME];
+    }
+    return resolvedNormal;
   }
   /**
    * Calculates the tangent vector of type vec3 in object space
@@ -819,18 +1018,22 @@ export class ShaderHelper {
       tangent = scope.$getVertexAttrib('tangent')!;
     }
     if (this.hasMorphing(scope)) {
-      tangent = pb.normalize(
-        pb.add(tangent, pb.vec4(this.calculateMorphDelta(scope, MORPH_TARGET_TANGENT).xyz, 0))
+      tangent = pb.vec4(
+        this.calculateMorphDirectionByDisplacement(scope, tangent.xyz, MORPH_TARGET_TANGENT),
+        tangent.w
       );
     }
     if (scope[this.SKIN_MATRIX_NAME]) {
-      return pb.vec4(
+      tangent = pb.vec4(
         pb.mul(scope[this.SKIN_MATRIX_NAME], pb.vec4(tangent.xyz, 0)).xyz,
         tangent.w
       ) as PBShaderExp;
-    } else {
-      return tangent;
     }
+    if (this.hasMorphing(scope) && scope.$getVertexAttrib('normal')) {
+      const resolvedNormal = scope[this.RESOLVED_VERTEX_NORMAL_NAME] ?? this.resolveVertexNormal(scope);
+      tangent = pb.vec4(this.orthogonalizeMorphedTangent(scope, resolvedNormal, tangent.xyz), tangent.w);
+    }
+    return tangent;
   }
   /**
    * Gets the uniform variable of type mat4 which holds the world matrix of current object to be drawn
