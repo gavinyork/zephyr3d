@@ -75,13 +75,16 @@ export class LambertMaterial
       }
       if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         scope.$l.color = pb.vec3(0);
-        scope.$l.normal = this.calculateNormal(
+        // TBN[2] is the pre-normal-map geometric normal, needed for shadow
+        // normal offset bias.
+        scope.$l.normalInfo = this.calculateNormalAndTBN(
           scope,
           scope.$inputs.worldPos,
           scope.$inputs.wNorm,
           scope.$inputs.wTangent,
           scope.$inputs.wBinormal
         );
+        scope.$l.normal = scope.normalInfo.normal;
         if (this.needCalculateEnvLight()) {
           scope.color = pb.add(scope.color, this.getEnvLightIrradiance(scope, scope.normal));
         }
@@ -110,7 +113,9 @@ export class LambertMaterial
             1 / Math.PI
           );
           if (shadow) {
-            this.$l.shadow = pb.vec3(that.calculateShadow(this, scope.$inputs.worldPos, this.NoL));
+            this.$l.shadow = pb.vec3(
+              that.calculateShadow(this, scope.$inputs.worldPos, scope.normalInfo.TBN[2], this.NoL)
+            );
             this.lightContrib = pb.mul(this.lightContrib, this.shadow);
           }
           this.color = pb.add(this.color, this.lightContrib);

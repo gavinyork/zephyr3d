@@ -20,7 +20,8 @@ import {
   RENDER_PASS_TYPE_DEPTH,
   RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_OBJECT_COLOR,
-  RENDER_PASS_TYPE_SHADOWMAP
+  RENDER_PASS_TYPE_SHADOWMAP,
+  LIGHT_TYPE_DIRECTIONAL
 } from '../../values';
 import type {
   AbstractDevice,
@@ -44,6 +45,7 @@ import type { HeightFogParams } from '../../shaders/fog';
 import { calculateFog, getDefaultHeightFogParams, getHeightFogParamsStruct } from '../../shaders/fog';
 import { getDevice } from '../../app/api';
 import type { Camera } from '../../camera';
+import { getShadowReceiverBiasFactor, getShadowReceiverNoL } from '../../shadow/receiver_bias';
 
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
 const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
@@ -746,6 +748,20 @@ export class ShaderHelper {
       scope.$outputs.zMotionVectorPosCurrent = pb.mul(unjitteredVPMatrix, pb.vec4(worldPos.xyz, 1));
       scope.$outputs.zMotionVectorPosPrev = pb.mul(prevUnjitteredVPMatrix, pb.vec4(prevWorldPos.xyz, 1));
     }
+  }
+  /**
+   * Gets the skinning matrix in the vertex shader, if the mesh being drawn is skinned.
+   *
+   * @remarks
+   * Lets a material apply the same skinning transform to its own uniform-supplied
+   * object-space vectors that {@link ShaderHelper.resolveVertexNormal} applies to
+   * the normal attribute, so such vectors stay attached to the deforming mesh.
+   *
+   * @param scope - Current shader scope, must be vertex stage
+   * @returns The skinning matrix of type mat4, or null when the mesh is not skinned
+   */
+  static getSkinMatrix(scope: PBInsideFunctionScope): PBShaderExp | null {
+    return (scope[this.SKIN_MATRIX_NAME] as PBShaderExp) ?? null;
   }
   /**
    * Calculates the normal vector of type vec3 in object space
@@ -1679,6 +1695,72 @@ export class ShaderHelper {
     return scope[UNIFORM_NAME_SHADOW_MAP];
   }
   /**
+   * Per-cascade scale for both bias terms.
+   *
+   * @remarks
+   * Only `depthBiasValues[0]` is uploaded; every cascade's value is recovered by
+   * multiplying with this ratio. It is derived from the `.x` components, but
+   * since `.x` and the normal offset `.y` are both proportional to the cascade's
+   * texel world size, the same ratio applies to either.
+   * @internal
+   */
+  static getShadowCascadeBiasScale(scope: PBInsideFunctionScope, split: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    const splitFlags = pb.vec4(
+      pb.float(pb.equal(split, 0)),
+      pb.float(pb.equal(split, 1)),
+      pb.float(pb.equal(split, 2)),
+      pb.float(pb.equal(split, 3))
+    );
+    return pb.dot(this.getDepthBiasScales(scope), splitFlags) as PBShaderExp;
+  }
+  /**
+   * Moves the receiver along its normal before the shadow lookup.
+   *
+   * @remarks
+   * Grazing-angle self-shadowing cannot be fixed with a depth bias: the depth
+   * spanned by one shadow texel is `texelWorldSize * tan(theta)`, which diverges
+   * as NdotL approaches zero. Offsetting the sample position sideways moves it
+   * out of the offending texel instead, and the required distance is bounded.
+   *
+   * `depthBiasValues.y` carries the world-space distance of one `normalBias`
+   * unit (see `ShadowMapper.calcDepthBiasParams`).
+   * @internal
+   */
+  static applyShadowNormalOffset(
+    lightType: number,
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    worldNormal: PBShaderExp,
+    NdotL: PBShaderExp,
+    cascadeScale?: PBShaderExp
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    const depthBiasParam = this.getDepthBiasValues(scope);
+    const receiverNoL = getShadowReceiverNoL(scope, NdotL, lightType);
+    // sin(theta): 0 when facing the light, 1 at grazing incidence.
+    const sinTheta = pb.sqrt(pb.clamp(pb.sub(1, pb.mul(receiverNoL, receiverNoL)), 0, 1));
+    let offset = pb.mul(depthBiasParam.y, getShadowReceiverBiasFactor(scope), sinTheta) as PBShaderExp;
+    if (cascadeScale) {
+      offset = pb.mul(offset, cascadeScale) as PBShaderExp;
+    }
+    if (lightType !== LIGHT_TYPE_DIRECTIONAL) {
+      // Perspective shadow cameras: one texel covers more world space further
+      // from the light. depthBiasValues.w is the far/near footprint ratio.
+      const posRange = this.getLightPositionAndRangeForShadow(scope);
+      const linearDepth = pb.clamp(
+        pb.div(pb.distance(worldPos, posRange.xyz), pb.max(posRange.w, 1e-6)),
+        0,
+        1
+      );
+      offset = pb.mul(offset, pb.mix(1, depthBiasParam.w, linearDepth)) as PBShaderExp;
+    }
+    // Guard against a degenerate interpolated normal rather than normalize()ing
+    // a possibly-zero vector into NaN.
+    const unitNormal = pb.mul(worldNormal, pb.div(1, pb.max(pb.length(worldNormal), 1e-6)));
+    return pb.add(worldPos, pb.mul(unitNormal, offset)) as PBShaderExp;
+  }
+  /**
    * Calculates shadow of current fragment
    *
    * @param scope - Shader scope
@@ -1688,6 +1770,7 @@ export class ShaderHelper {
   static calculateShadow(
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp,
+    worldNormal: PBShaderExp,
     NoL: PBShaderExp,
     ctx: DrawContext
   ): PBShaderExp {
@@ -1695,7 +1778,7 @@ export class ShaderHelper {
     const that = this;
     const shadowMapParams = ctx.shadowMapInfo!.get(ctx.currentShadowLight!)!;
     const funcName = 'Z_calculateShadow';
-    pb.func(funcName, [pb.vec3('worldPos'), pb.float('NoL')], function () {
+    pb.func(funcName, [pb.vec3('worldPos'), pb.vec3('worldNormal'), pb.float('NoL')], function () {
       if (shadowMapParams.numShadowCascades > 1) {
         this.$l.shadowCascades = this.light.shadowCascades;
         this.$l.shadowBound = pb.vec4(0, 0, 1, 1);
@@ -1709,22 +1792,36 @@ export class ShaderHelper {
           pb.float(pb.greaterThan(this.shadowCascades, 3))
         );
         this.$l.split = pb.int(pb.dot(this.comparison, this.cascadeFlags));
+        // Normal offset bias: move the receiver out of the shadow texel that
+        // would self-occlude it before projecting into shadow space. Scaled per
+        // cascade, because each cascade has its own texel world size.
+        this.$l.biasedPos = that.applyShadowNormalOffset(
+          shadowMapParams.lightType,
+          this,
+          this.worldPos,
+          this.worldNormal,
+          this.NoL,
+          that.getShadowCascadeBiasScale(this, this.split)
+        );
         if (ctx.device.type === 'webgl') {
           this.$l.shadowVertex = pb.vec4();
           this.$for(pb.int('cascade'), 0, 4, function () {
             this.$if(pb.equal(this.cascade, this.split), function () {
               this.shadowVertex = that.calculateShadowSpaceVertex(
                 this,
-                pb.vec4(this.worldPos, 1),
+                pb.vec4(this.biasedPos, 1),
                 this.cascade
               );
               this.$break();
             });
           });
         } else {
-          this.$l.shadowVertex = that.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1), this.split);
+          this.$l.shadowVertex = that.calculateShadowSpaceVertex(
+            this,
+            pb.vec4(this.biasedPos, 1),
+            this.split
+          );
         }
-        const shadowMapParams = ctx.shadowMapInfo!.get(ctx.currentShadowLight!)!;
         this.$l.shadow = shadowMapParams.impl!.computeShadowCSM(
           shadowMapParams,
           this,
@@ -1750,8 +1847,15 @@ export class ShaderHelper {
         });
         this.$return(this.shadow);
       } else {
-        this.$l.shadowVertex = that.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1));
-        const shadowMapParams = ctx.shadowMapInfo!.get(ctx.currentShadowLight!)!;
+        // Normal offset bias - see the cascaded branch above.
+        this.$l.biasedPos = that.applyShadowNormalOffset(
+          shadowMapParams.lightType,
+          this,
+          this.worldPos,
+          this.worldNormal,
+          this.NoL
+        );
+        this.$l.shadowVertex = that.calculateShadowSpaceVertex(this, pb.vec4(this.biasedPos, 1));
         this.$l.shadow = shadowMapParams.impl!.computeShadow(
           shadowMapParams,
           this,
@@ -1774,7 +1878,7 @@ export class ShaderHelper {
         this.$return(this.shadow);
       }
     });
-    return pb.getGlobalScope()[funcName](worldPos, NoL);
+    return pb.getGlobalScope()[funcName](worldPos, worldNormal, NoL);
   }
   static applyFog(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp, ctx: DrawContext) {
     const pb = scope.$builder;

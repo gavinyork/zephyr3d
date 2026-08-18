@@ -14,7 +14,7 @@ import type { PunctualLight } from '../scene/light';
 import type { ShadowMapParams } from '../shadow/shadowmapper';
 import { ShaderHelper } from '../material/shader/helper';
 import { drawFullscreenQuad } from './fullscreenquad';
-import { MAX_SHADOW_MASK_LIGHTS } from '../values';
+import { LIGHT_TYPE_DIRECTIONAL, MAX_SHADOW_MASK_LIGHTS } from '../values';
 import { fetchSampler } from '../utility/misc';
 
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
@@ -55,6 +55,7 @@ export class ShadowMaskRenderer {
   /** One render state per RGBA channel (color mask selects the target channel). */
   private _channelStates: Nullable<RenderStateSet[]>;
   private readonly _nearFar: Vector2;
+  private readonly _invRenderSize: Vector2;
   private readonly _cameraPosition: Vector4;
   private readonly _cameraParams: Vector4;
 
@@ -63,6 +64,7 @@ export class ShadowMaskRenderer {
     this._bindGroups = new Map();
     this._channelStates = null;
     this._nearFar = new Vector2();
+    this._invRenderSize = new Vector2();
     this._cameraPosition = new Vector4();
     this._cameraParams = new Vector4();
   }
@@ -221,6 +223,9 @@ export class ShadowMaskRenderer {
     });
     bindGroup.setValue('invViewProjMatrix', camera.invViewProjectionMatrix);
     bindGroup.setValue('cameraNearFar', this._nearFar);
+    // Neighbour tap spacing for the depth-based normal reconstruction.
+    this._invRenderSize.setXY(1 / depthTexture.width, 1 / depthTexture.height);
+    bindGroup.setValue('invRenderSize', this._invRenderSize);
     bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
     bindGroup.setTexture('depthTex', depthTexture, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setTexture(
@@ -242,6 +247,7 @@ export class ShadowMaskRenderer {
   private createProgram(ctx: DrawContext, shadowMapParams: ShadowMapParams): GPUProgram {
     const device = ctx.device;
     const numCascades = shadowMapParams.numShadowCascades;
+    const lightType = shadowMapParams.lightType;
     const shadowMap = shadowMapParams.shadowMap!;
     const program = device.buildRenderProgram({
       label: 'ShadowMask',
@@ -309,12 +315,89 @@ export class ShadowMaskRenderer {
         this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.invViewProjMatrix = pb.mat4().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
+        this.invRenderSize = pb.vec2().uniform(0);
         this.$outputs.color = pb.vec4();
+        /**
+         * Geometric normal recovered from the depth prepass.
+         *
+         * The opaque queue takes its shadows from this mask rather than from
+         * each material's calculateShadow, so this is the only place the normal
+         * offset can be applied on that path - and a fullscreen pass has no
+         * interpolated normal to use.
+         *
+         * Naive cross(dpdx, dpdy) spans depth discontinuities and produces a
+         * wild normal along every silhouette. Taking the nearer neighbour on
+         * each axis keeps the basis on one surface instead.
+         */
+        pb.func('zReconstructNormal', [pb.vec2('uv'), pb.vec4('center')], function () {
+          this.$l.dx = pb.vec2(this.invRenderSize.x, 0);
+          this.$l.dy = pb.vec2(0, this.invRenderSize.y);
+          this.$l.right = ShaderHelper.samplePositionFromDepth(
+            this,
+            this.depthTex,
+            pb.add(this.uv, this.dx),
+            this.invViewProjMatrix,
+            this.cameraNearFar
+          );
+          this.$l.left = ShaderHelper.samplePositionFromDepth(
+            this,
+            this.depthTex,
+            pb.sub(this.uv, this.dx),
+            this.invViewProjMatrix,
+            this.cameraNearFar
+          );
+          this.$l.up = ShaderHelper.samplePositionFromDepth(
+            this,
+            this.depthTex,
+            pb.add(this.uv, this.dy),
+            this.invViewProjMatrix,
+            this.cameraNearFar
+          );
+          this.$l.down = ShaderHelper.samplePositionFromDepth(
+            this,
+            this.depthTex,
+            pb.sub(this.uv, this.dy),
+            this.invViewProjMatrix,
+            this.cameraNearFar
+          );
+          this.$l.edgeX = pb.sub(this.right.xyz, this.center.xyz);
+          this.$if(
+            pb.lessThan(
+              pb.abs(pb.sub(this.left.w, this.center.w)),
+              pb.abs(pb.sub(this.right.w, this.center.w))
+            ),
+            function () {
+              this.edgeX = pb.sub(this.center.xyz, this.left.xyz);
+            }
+          );
+          this.$l.edgeY = pb.sub(this.up.xyz, this.center.xyz);
+          this.$if(
+            pb.lessThan(pb.abs(pb.sub(this.down.w, this.center.w)), pb.abs(pb.sub(this.up.w, this.center.w))),
+            function () {
+              this.edgeY = pb.sub(this.center.xyz, this.down.xyz);
+            }
+          );
+          this.$l.n = pb.cross(this.edgeX, this.edgeY);
+          this.$l.len = pb.length(this.n);
+          // Degenerate footprint (flat depth, or a pixel with no geometry):
+          // report a zero normal, which yields a zero offset downstream.
+          this.$if(pb.lessThan(this.len, 1e-12), function () {
+            this.$return(pb.vec3(0));
+          });
+          this.n = pb.div(this.n, this.len);
+          // The cross product's sign depends on which neighbours were picked, so
+          // orient it towards the camera rather than tracking that.
+          this.$l.toEye = pb.sub(this.camera.position.xyz, this.center.xyz);
+          this.$if(pb.lessThan(pb.dot(this.n, this.toEye), 0), function () {
+            this.n = pb.neg(this.n);
+          });
+          this.$return(this.n);
+        });
         // Explicit-depth cascade selection (fragCoord.z is invalid in a fullscreen
         // pass). Mirrors posteffect/sss.ts calculateTransmissionShadow.
         pb.func(
           'zShadowMaskFactor',
-          [pb.vec3('worldPos'), pb.float('depth01'), pb.float('NoL')],
+          [pb.vec3('worldPos'), pb.float('depth01'), pb.float('NoL'), pb.vec3('worldNormal')],
           function () {
             if (numCascades > 1) {
               this.$l.linearDepth = pb.mul(this.depth01, this.camera.params.y);
@@ -327,13 +410,21 @@ export class ShadowMaskRenderer {
                 pb.float(pb.greaterThan(this.light.shadowCascades, 3))
               );
               this.$l.split = pb.int(pb.dot(this.comparison, this.cascadeFlags));
+              this.$l.biasedPos = ShaderHelper.applyShadowNormalOffset(
+                shadowMapParams.lightType,
+                this,
+                this.worldPos,
+                this.worldNormal,
+                this.NoL,
+                ShaderHelper.getShadowCascadeBiasScale(this, this.split)
+              );
               if (device.type === 'webgl') {
                 this.$l.shadowVertex = pb.vec4();
                 this.$for(pb.int('cascade'), 0, 4, function () {
                   this.$if(pb.equal(this.cascade, this.split), function () {
                     this.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(
                       this,
-                      pb.vec4(this.worldPos, 1),
+                      pb.vec4(this.biasedPos, 1),
                       this.cascade
                     );
                     this.$break();
@@ -342,7 +433,7 @@ export class ShadowMaskRenderer {
               } else {
                 this.$l.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(
                   this,
-                  pb.vec4(this.worldPos, 1),
+                  pb.vec4(this.biasedPos, 1),
                   this.split
                 );
               }
@@ -366,7 +457,17 @@ export class ShadowMaskRenderer {
               this.shadow = pb.mix(1, this.shadow, this.light.shadowStrength);
               this.$return(pb.clamp(this.shadow, 0, 1));
             } else {
-              this.$l.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1));
+              this.$l.biasedPos = ShaderHelper.applyShadowNormalOffset(
+                shadowMapParams.lightType,
+                this,
+                this.worldPos,
+                this.worldNormal,
+                this.NoL
+              );
+              this.$l.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(
+                this,
+                pb.vec4(this.biasedPos, 1)
+              );
               this.$l.shadow = shadowMapParams.impl!.computeShadow(
                 shadowMapParams,
                 this,
@@ -396,9 +497,22 @@ export class ShadowMaskRenderer {
             this.invViewProjMatrix,
             this.cameraNearFar
           );
-          // NoL is unavailable in a fullscreen pass (no geometric normal); it only
-          // feeds normal-offset bias, so a conservative 1.0 is used.
-          this.$l.factor = this.zShadowMaskFactor(this.pos.xyz, this.pos.w, pb.float(1));
+          // The normal is recovered from the depth prepass rather than
+          // interpolated, because this pass is where the opaque queue's shadows
+          // are decided and normal offset bias needs one.
+          this.$l.normal = this.zReconstructNormal(this.$inputs.uv, this.pos);
+          this.$l.lightDir =
+            lightType === LIGHT_TYPE_DIRECTIONAL
+              ? pb.neg(this.light.directionAndCutoff.xyz)
+              : pb.normalize(pb.sub(this.light.positionAndRange.xyz, this.pos.xyz));
+          // A zero normal (degenerate reconstruction) gives NoL 0, hence the
+          // largest offset. Clamp to 1 there instead so those pixels fall back to
+          // the unoffset behaviour rather than being pushed the furthest.
+          this.$l.NoL = pb.float(1);
+          this.$if(pb.greaterThan(pb.dot(this.normal, this.normal), 0.5), function () {
+            this.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
+          });
+          this.$l.factor = this.zShadowMaskFactor(this.pos.xyz, this.pos.w, this.NoL, this.normal);
           this.$outputs.color = pb.vec4(this.factor);
         });
       }

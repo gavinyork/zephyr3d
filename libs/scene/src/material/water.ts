@@ -448,7 +448,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten)
           );
           if (shadow) {
-            this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));
+            // Water is a horizontal clipmap, so +Y is the geometric normal. The
+            // wave normal would jitter the shadow lookup per-pixel.
+            this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, pb.vec3(0, 1, 0), this.NoL));
             this.lightContrib = pb.mul(this.lightContrib, this.shadow);
           }
           this.finalColor = pb.add(this.finalColor, this.lightContrib);

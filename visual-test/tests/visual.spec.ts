@@ -90,6 +90,7 @@ const SCENE_NAMES = [
   'shadow-esm',
   'shadow-csm',
   'shadow-defaults',
+  'shadow-normal-offset',
   'cluster-many-lights',
   'spot-shadow',
   'oit-weighted',
@@ -99,10 +100,12 @@ const SCENE_NAMES = [
   'post-fxaa',
   'taa-multiframe',
   'skin-sss',
+  'skin-shadow',
   'hair',
   'eye-frontal',
   'eye-angled',
-  'eye-pupil-dilated'
+  'eye-pupil-dilated',
+  'eye-socket-occlusion'
 ];
 
 test('scene registry matches the harness page', async ({ harness }) => {

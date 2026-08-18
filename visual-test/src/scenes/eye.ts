@@ -210,3 +210,30 @@ export const eyePupilDilated: VisualScene = {
     placeCamera(camera, new Vector3(0, 0, 3.2));
   }
 };
+
+/**
+ * Socket occlusion at full strength, framed identically to `eye-frontal` so
+ * the two baselines differ only by the occlusion itself.
+ *
+ * What this pins, top to bottom: the upper band darker than the lower one (the
+ * asymmetric lid apertures), the corner falloff at the equator, and the key
+ * light dimming where its direction leaves the aperture. `eye-frontal` staying
+ * unchanged is the other half of the test - it proves the feature defaults to
+ * off and old assets keep their appearance.
+ */
+export const eyeSocketOcclusion: VisualScene = {
+  name: 'eye-socket-occlusion',
+  description:
+    'Eyeball with analytic eyelid/socket occlusion enabled. Pins the asymmetric lid darkening and corner falloff.',
+  setup({ scene, camera }) {
+    bareScene(scene);
+    scene.env.light.type = 'constant';
+    scene.env.light.ambientColor = new Vector4(0.16, 0.17, 0.2, 1);
+    keyLight(scene);
+    eyeball(scene, (m) => {
+      m.socketOcclusion = true;
+      m.socketOcclusionStrength = 1;
+    });
+    placeCamera(camera, new Vector3(0, 0, 3.2));
+  }
+};

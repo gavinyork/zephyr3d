@@ -308,21 +308,28 @@ export function computeReceiverPlaneDepthBias(scope: PBInsideFunctionScope, texC
   pb.func(funcNameComputeReceiverPlaneDepthBias, [pb.vec4('coords')], function () {
     this.$l.dx = pb.dpdx(this.coords);
     this.$l.dy = pb.dpdy(this.coords);
-    this.$l.biasMultiply = pb.float(1);
     this.$l.uv = pb.vec2(
       pb.sub(pb.mul(this.dy.y, this.dx.z), pb.mul(this.dx.y, this.dy.z)),
       pb.sub(pb.mul(this.dx.x, this.dy.z), pb.mul(this.dy.x, this.dx.z))
     );
-    this.$l.uv = pb.mul(
-      this.$l.uv,
-      pb.div(this.biasMultiply, pb.sub(pb.mul(this.dx.x, this.dy.y), pb.mul(this.dx.y, this.dy.x)))
-    );
-    // from unity shader
-    this.$l.minFractionalError = pb.float(0.01);
-    this.$l.fractionalSamplingError = pb.dot(pb.vec2(getShadowMapTexelSize(this)), pb.abs(this.$l.uv));
-    this.$l.staticBias = pb.min(this.$l.fractionalSamplingError, this.$l.minFractionalError);
-    // return
-    this.$return(pb.vec3(this.$l.uv, this.$l.staticBias));
+    // At grazing incidence the shadow-space footprint of a pixel collapses and
+    // this determinant tends to zero, so the gradient blows up (and flips sign
+    // across neighbouring pixels). Rather than clamp the fallout downstream,
+    // report "no usable plane" and let the caller fall back to the constant
+    // depth bias plus normal offset.
+    this.$l.det = pb.sub(pb.mul(this.dx.x, this.dy.y), pb.mul(this.dx.y, this.dy.x));
+    this.$if(pb.lessThan(pb.abs(this.det), 1e-8), function () {
+      this.$return(pb.vec3(0));
+    });
+    this.uv = pb.div(this.uv, this.det);
+    // `.z` used to carry a scalar "static bias" capped at a hardcoded 0.01.
+    // That constant came from a Unity shader operating on perspective (non
+    // linear) shadow depth; for a directional light's orthographic camera the
+    // depth is linear, so 0.01 means 1% of the whole depth range - metres of
+    // world-space push on a typical scene, which is what produced the light
+    // leaks around the terminator. Constant depth bias plus normal offset cover
+    // this properly now, so only the plane gradient survives.
+    this.$return(pb.vec3(this.uv, 0));
   });
   return pb.getGlobalScope()[funcNameComputeReceiverPlaneDepthBias](texCoord) as PBShaderExp;
 }
@@ -1071,32 +1078,33 @@ export function filterShadowESM(
     ](shadowVertex, ...(cascade ? [cascade] : []), ...(depthBias ? [depthBias] : [])) as PBShaderExp;
 }
 
-/** @internal */
+/**
+ * Fixed-kernel PCF.
+ *
+ * @remarks
+ * Unlike {@link filterShadowPCSS} and {@link filterShadowPoissonDisc}, this
+ * filter never applied the receiver plane depth gradient per tap - it only used
+ * the scalar `.z` guard, which has been removed (see
+ * {@link computeReceiverPlaneDepthBias}). Over a kernel this narrow the plane
+ * correction is worth little, and the constant depth bias plus normal offset
+ * cover the receiver slope, so the parameter is gone rather than left inert.
+ * @internal
+ */
 export function filterShadowPCF(
   scope: PBInsideFunctionScope,
   lightType: number,
   shadowMapFormat: TextureFormat,
   kernelSize: number,
   texCoord: PBShaderExp,
-  receiverPlaneDepthBias?: PBShaderExp,
   cascade?: PBShaderExp
 ) {
   const funcNameFilterShadowPCF = `lib_filterShadowPCF${kernelSize}x${kernelSize}`;
   const pb = scope.$builder;
   pb.func(
     funcNameFilterShadowPCF,
-    [
-      pb.vec4('texCoord'),
-      ...(receiverPlaneDepthBias ? [pb.vec3('receiverPlaneDepthBias')] : []),
-      ...(cascade ? [pb.int('cascade')] : [])
-    ],
+    [pb.vec4('texCoord'), ...(cascade ? [pb.int('cascade')] : [])],
     function () {
       this.$l.lightDepth = this.texCoord.z;
-      if (receiverPlaneDepthBias) {
-        this.lightDepth = REVERSE_Z
-          ? pb.add(this.lightDepth, this.receiverPlaneDepthBias.z)
-          : pb.sub(this.lightDepth, this.receiverPlaneDepthBias.z);
-      }
       const shadowMapTexelSize = getShadowMapTexelSize(this);
       this.$l.uv = pb.add(pb.mul(this.texCoord.xy, pb.vec2(getShadowMapSize(this))), pb.vec2(0));
       this.$l.st = pb.fract(this.uv);
@@ -1599,11 +1607,7 @@ export function filterShadowPCF(
       this.$return(this.shadow);
     }
   );
-  return pb
-    .getGlobalScope()
-    [
-      funcNameFilterShadowPCF
-    ](texCoord, ...(receiverPlaneDepthBias ? [receiverPlaneDepthBias] : []), ...(cascade ? [cascade] : [])) as PBShaderExp;
+  return pb.getGlobalScope()[funcNameFilterShadowPCF](texCoord, ...(cascade ? [cascade] : [])) as PBShaderExp;
 }
 
 /** @internal */
@@ -1728,12 +1732,8 @@ export function filterShadowPCSS(
       // spot receivers and their stored depth use a linear encoding.
       const deviceEncoded = isDeviceDepthShadow(lightType);
       this.$l.lightDepth = this.texCoord.z;
-      if (receiverPlaneDepthBias) {
-        this.lightDepth =
-          REVERSE_Z && deviceEncoded
-            ? pb.add(this.lightDepth, this.receiverPlaneDepthBias.z)
-            : pb.sub(this.lightDepth, this.receiverPlaneDepthBias.z);
-      }
+      // The scalar `.z` guard is gone (see computeReceiverPlaneDepthBias); the
+      // per-tap plane gradient below is the part that was ever load bearing.
       this.$l.sampleBounds = pb.vec4(0, 0, 1, 1);
       if (cascade && getDevice().type === 'webgl' && numCascades > 1) {
         const numCols = numCascades > 1 ? 2 : 1;
@@ -1858,11 +1858,8 @@ export function filterShadowPoissonDisc(
     ],
     function () {
       this.$l.lightDepth = this.texCoord.z;
-      if (receiverPlaneDepthBias) {
-        this.lightDepth = REVERSE_Z
-          ? pb.add(this.lightDepth, this.receiverPlaneDepthBias.z)
-          : pb.sub(this.lightDepth, this.receiverPlaneDepthBias.z);
-      }
+      // The scalar `.z` guard is gone (see computeReceiverPlaneDepthBias); the
+      // per-tap plane gradient below is the part that was ever load bearing.
       this.$l.duv = pb.vec2();
       this.$l.sampleCoord = pb.vec2();
       this.$l.sampleInside = pb.bool();

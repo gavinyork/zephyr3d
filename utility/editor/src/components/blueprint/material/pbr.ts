@@ -14,6 +14,7 @@ import type {
 } from '@zephyr3d/scene';
 import {
   CopyBlitter,
+  EyeMaterial,
   getDefaultTexture2D,
   MaterialBlueprintIR,
   Sprite,
@@ -199,7 +200,14 @@ export class PBRMaterialEditor extends GraphEditor {
       const previewMesh = new Sprite(this._previewScene.get()!, mat);
       this._previewMesh.set(previewMesh);
     } else {
-      const sphere = new SphereShape({ radius: 4, horizonalDetail: 50, verticalDetail: 50 });
+      const sphere = new SphereShape({
+        radius: 4,
+        horizonalDetail: 50,
+        verticalDetail: 50,
+        // EyeMaterial's analytic iris mask expects a planar front-facing UV
+        // layout and +U tangents; the ordinary sphere UVs are equirectangular.
+        eyeCompatible: mat instanceof EyeMaterial
+      });
       const defaultMat = new UnlitMaterial();
       defaultMat.albedoColor = new Vector4(1, 0, 1, 1);
       this._defaultMaterial = new DRef(defaultMat);

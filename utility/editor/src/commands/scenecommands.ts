@@ -15,6 +15,9 @@ import {
 
 export type CommandExecuteResult<T> = T extends AddAssetCommand ? SceneNode : void;
 
+/** Built-in material used when a primitive is dropped into the scene. */
+export const BUILTIN_LAMBERT_MATERIAL_PATH = '/assets/@builtins/materials/lambert.zmtl';
+
 function findNodesByPath(parentNode: SceneNode, path: string): SceneNode[] {
   const parts = path.split('/').filter((p) => !!p);
   const result: SceneNode[] = [parentNode];
@@ -181,6 +184,80 @@ export class AddAssetCommand extends Command<Nullable<SceneNode>> {
     }
   }
 }
+
+/**
+ * Adds a mesh node backed by a serialized .zmsh primitive.
+ *
+ * The optional preview node is used by the scene viewport while an asset is
+ * being positioned. Keeping it on the command avoids loading the primitive and
+ * material a second time when the drop is committed.
+ */
+export class AddMeshCommand extends Command<Nullable<Mesh>> {
+  private readonly _scene: Scene;
+  private readonly _primitivePath: string;
+  private readonly _materialPath: string;
+  private readonly _position: Vector3;
+  private _nodeId: string;
+  private _previewNodeRef: Nullable<DRef<Mesh>>;
+
+  constructor(
+    scene: Scene,
+    primitivePath: string,
+    position: Vector3,
+    previewNode?: Nullable<Mesh>,
+    materialPath = BUILTIN_LAMBERT_MATERIAL_PATH
+  ) {
+    super('Add mesh');
+    this._scene = scene;
+    this._primitivePath = primitivePath;
+    this._materialPath = materialPath;
+    this._position = position.clone();
+    this._nodeId = '';
+    this._previewNodeRef = previewNode ? new DRef(previewNode) : null;
+  }
+
+  async execute() {
+    let mesh = this._previewNodeRef?.get() ?? null;
+    if (!mesh) {
+      try {
+        const primitive = await getEngine().resourceManager.fetchPrimitive(this._primitivePath);
+        const material = await getEngine().resourceManager.fetchMaterial<MeshMaterial>(this._materialPath);
+        if (primitive && material) {
+          mesh = new Mesh(this._scene, primitive, material);
+        }
+      } catch (err) {
+        console.error(`Load mesh failed: ${this._primitivePath}: ${err}`);
+      }
+    }
+    if (!mesh) {
+      this._nodeId = '';
+      this._previewNodeRef?.dispose();
+      this._previewNodeRef = null;
+      return null;
+    }
+
+    mesh.parent = this._scene.rootNode;
+    mesh.position.set(this._position);
+    ensureNodeDefaultName(mesh, getDefaultNodeNameFromAssetPath(this._primitivePath));
+    mesh.gpuPickable = true;
+    if (this._nodeId) {
+      mesh.persistentId = this._nodeId.split('/').at(-1)!;
+    } else {
+      this._nodeId = getNodePath(mesh);
+    }
+    this._previewNodeRef?.dispose();
+    this._previewNodeRef = null;
+    return mesh;
+  }
+
+  async undo() {
+    if (this._nodeId) {
+      const node = findNodeByPath(this._scene.rootNode, this._nodeId);
+      node.remove();
+    }
+  }
+}
+
 export class AddChildCommand<T extends SceneNode = SceneNode> extends Command<Nullable<T>> {
   private readonly _parentId: string;
   private readonly _position: Nullable<Vector3>;

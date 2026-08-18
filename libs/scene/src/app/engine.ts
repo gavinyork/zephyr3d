@@ -18,6 +18,7 @@ import {
 } from '../shapes';
 import {
   BlinnMaterial,
+  EyeMaterial,
   LambertMaterial,
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
@@ -448,7 +449,8 @@ export class Engine {
       '/materials/pbr_specular_glossiness.zmtl': PBRSpecularGlossinessMaterial,
       '/materials/sprite_std.zmtl': StandardSpriteMaterial,
       '/materials/skin.zmtl': SkinMaterial,
-      '/materials/hair.zmtl': HairMaterial
+      '/materials/hair.zmtl': HairMaterial,
+      '/materials/eye.zmtl': EyeMaterial
     } as const;
     for (const [key] of objectEntries(shapeClsMap)) {
       const obj = new shapeClsMap[key]();

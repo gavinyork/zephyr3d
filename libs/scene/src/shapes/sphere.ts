@@ -15,6 +15,20 @@ export interface SphereCreationOptions extends ShapeCreationOptions {
   verticalDetail?: number;
   /** The horizonal detail level, default 20 */
   horizonalDetail?: number;
+  /**
+   * Generate UVs and tangents for {@link EyeMaterial}.
+   *
+   * When enabled, the sphere's polar axis follows Z and the front hemisphere
+   * uses a planar projection along +Z, with its centre at (0.5, 0.5). The rear
+   * hemisphere is unwrapped outside that front disc so it cannot produce a
+   * second iris at -Z. The tangent follows +U. The sphere topology is otherwise
+   * unchanged, so this option remains compatible with the analytical raycast
+   * and with existing sphere consumers. The material must still opt into the
+   * tangent frame with `EyeMaterial.vertexTangent = true`.
+   *
+   * @defaultValue `false`
+   */
+  eyeCompatible?: boolean;
 }
 
 /**
@@ -26,7 +40,8 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
     ...Shape._defaultOptions,
     radius: 1,
     verticalDetail: 20,
-    horizonalDetail: 20
+    horizonalDetail: 20,
+    eyeCompatible: false
   };
   /**
    * Creates an instance of sphere shape
@@ -88,8 +103,10 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
     const radius = options.radius ?? 1;
     const verticalDetail = options.verticalDetail ?? 20;
     const horizonalDetail = options.horizonalDetail ?? 20;
+    const eyeCompatible = options.eyeCompatible ?? false;
     const vTheta = Math.PI / verticalDetail;
     const hTheta = (Math.PI * 2) / horizonalDetail;
+    const invR = 1 / radius;
     for (let i = 0; i <= verticalDetail; i++) {
       const v = i * vTheta;
       const sinV = Math.sin(v);
@@ -99,19 +116,57 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
         const sinH = Math.sin(h);
         const cosH = Math.cos(h);
 
-        const x = radius * sinV * sinH;
-        const y = radius * cosV;
-        const z = radius * sinV * cosH;
+        // Eye UVs are centred on +Z, so put the mesh poles on the gaze axis as
+        // well. Besides giving the rear projection a proper seam at -Z, this
+        // keeps the vertex rings concentric with the iris instead of placing
+        // its centre on the legacy longitude seam.
+        const x = radius * sinV * (eyeCompatible ? cosH : sinH);
+        const y = eyeCompatible ? radius * sinV * sinH : radius * cosV;
+        const z = eyeCompatible ? radius * cosV : radius * sinV * cosH;
         vertices.push(x, y, z);
-        uvs?.push(j / horizonalDetail, i / verticalDetail);
+        if (eyeCompatible) {
+          // Preserve the planar projection over the visible hemisphere. On
+          // the rear hemisphere, continue from the equator into an outer
+          // annulus rather than folding back to (0.5, 0.5); the old fold was
+          // what produced a second iris and pupil at -Z.
+          const uvRadius = cosV >= 0 ? sinV * 0.5 : 1 - sinV * 0.5;
+          uvs?.push(0.5 + cosH * uvRadius, 0.5 + sinH * uvRadius);
+        } else {
+          uvs?.push(j / horizonalDetail, i / verticalDetail);
+        }
         if (normals) {
-          const invR = 1 / radius;
           normals.push(x * invR, y * invR, z * invR);
         }
         if (tangents) {
-          const w = 1;
+          let w = 1;
           let tx: number, ty: number, tz: number;
-          if (sinV > 1e-6) {
+          if (eyeCompatible) {
+            // Project +X onto the local tangent plane. This is the +U
+            // direction of the planar eye projection; an azimuth tangent
+            // would rotate the refraction frame around the iris.
+            const nx = x * invR;
+            const ny = y * invR;
+            const nz = z * invR;
+            tx = 1 - nx * nx;
+            ty = -ny * nx;
+            tz = -nz * nx;
+            const len = Math.hypot(tx, ty, tz);
+            if (len > 1e-8) {
+              tx /= len;
+              ty /= len;
+              tz /= len;
+            } else {
+              // At +/-X the projected +X direction degenerates. Use its
+              // limiting direction from the front hemisphere instead of a
+              // vector parallel to the normal.
+              tx = 0;
+              ty = 0;
+              tz = nx >= 0 ? -1 : 1;
+            }
+            // The rear annulus reverses its radial direction, so its tangent
+            // frame has the opposite handedness.
+            w = cosV >= 0 ? 1 : -1;
+          } else if (sinV > 1e-6) {
             tx = cosH;
             ty = 0.0;
             tz = -sinH;
@@ -139,7 +194,7 @@ export class SphereShape extends Shape<SphereCreationOptions> implements Clonabl
         indices.push(stripIndices[i], stripIndices[i + 2], stripIndices[i + 1]);
       }
     }
-    Shape._transform(options.transform, vertices, normals, start);
+    Shape._transform(options.transform, vertices, normals, start, tangents);
     if (bbox) {
       for (let i = start; i < vertices.length - 2; i += 3) {
         if (bbox) {

@@ -231,6 +231,7 @@ export class WebGLMiscCaps implements MiscCaps {
   support32BitIndex: boolean;
   supportDepthClamp: boolean;
   supportClipControl: boolean;
+  supportDrawIndirect: boolean;
   maxBindGroups: number;
   maxTexCoordIndex: number;
   supportTimestampQuery: boolean;
@@ -252,6 +253,7 @@ export class WebGLMiscCaps implements MiscCaps {
     // contexts where implemented (Chromium 121+).
     this._extClipControl = gl.getExtension('EXT_clip_control') as Nullable<EXTClipControl>;
     this.supportClipControl = !!this._extClipControl;
+    this.supportDrawIndirect = false;
     this.maxBindGroups = 4;
     this.maxTexCoordIndex = 8;
     this.supportTimestampQuery = false;

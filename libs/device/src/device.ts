@@ -467,6 +467,16 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     count: number,
     numInstances: number
   ): void;
+  protected abstract _drawIndirect(
+    primitiveType: PrimitiveType,
+    indirectBuffer: GPUDataBuffer,
+    indirectOffset: number
+  ): void;
+  protected abstract _drawIndexedIndirect(
+    primitiveType: PrimitiveType,
+    indirectBuffer: GPUDataBuffer,
+    indirectOffset: number
+  ): void;
   protected abstract _compute(
     workgroupCountX: number,
     workgroupCountY: number,
@@ -728,6 +738,14 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number) {
     this._frameInfo.drawCalls++;
     this._drawInstanced(primitiveType, first, count, numInstances);
+  }
+  drawIndirect(primitiveType: PrimitiveType, indirectBuffer: GPUDataBuffer, indirectOffset = 0) {
+    this._frameInfo.drawCalls++;
+    this._drawIndirect(primitiveType, indirectBuffer, indirectOffset);
+  }
+  drawIndexedIndirect(primitiveType: PrimitiveType, indirectBuffer: GPUDataBuffer, indirectOffset = 0) {
+    this._frameInfo.drawCalls++;
+    this._drawIndexedIndirect(primitiveType, indirectBuffer, indirectOffset);
   }
   executeRenderBundle(renderBundle: RenderBundle): void {
     this._frameInfo.drawCalls += this._executeRenderBundle(renderBundle);
@@ -1063,6 +1081,10 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
         break;
       case 'unpack-pixel':
         usageFlag = GPUResourceUsageFlags.BF_UNPACK_PIXEL;
+        options.managed = false;
+        break;
+      case 'indirect':
+        usageFlag = GPUResourceUsageFlags.BF_INDIRECT;
         options.managed = false;
         break;
       default:

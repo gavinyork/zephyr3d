@@ -451,6 +451,24 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
           }
           if (item.meta.path.endsWith('.zmsh')) {
             ImGui.Separator();
+            if (ImGui.MenuItem('Clone Primitive...')) {
+              DlgSaveFile.saveFile(
+                'Clone Primitive',
+                this.renderer.VFS,
+                '/assets',
+                'Primitive (*.zmsh)|*.zmsh',
+                500,
+                400
+              ).then((name) => {
+                if (name) {
+                  if (!name.endsWith('.zmsh')) {
+                    name = `${name}.zmsh`;
+                  }
+                  this.renderer.copyFile(item.meta.path, name, 'prompt');
+                }
+              });
+            }
+            ImGui.Separator();
             if (ImGui.MenuItem('Export as GLB')) {
               this.renderer.exportPrimitiveAsGlb(item.meta.path);
             }
@@ -2092,7 +2110,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
     try {
       const content = (await this._vfs.readFile(path, { encoding: 'utf8' })) as string;
       const filename = `${PathUtils.basename(path, '.zmsh')}.glb`;
-      const glb = buildPrimitiveGlbFromZmshContent(content, PathUtils.basename(path, '.zmsh'), path);
+      const glb = await buildPrimitiveGlbFromZmshContent(content, PathUtils.basename(path, '.zmsh'), path);
       exportFile(glb, filename);
     } catch (err) {
       DlgMessage.messageBox('Error', `Export GLB failed: ${err}`);

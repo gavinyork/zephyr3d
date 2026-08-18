@@ -1,5 +1,6 @@
 import type { Immutable, Nullable } from '@zephyr3d/base';
 import { WebGPURenderPass } from './renderpass_webgpu';
+import type { WebGPUIndirectDrawParams } from './renderpass_webgpu';
 import { WebGPUComputePass } from './computepass_webgpu';
 import type { PrimitiveType, DeviceViewport, FrameBufferClearColors } from '@zephyr3d/device';
 import type { WebGPUDevice } from './device';
@@ -217,6 +218,29 @@ export class CommandQueueImmediate {
       first,
       count,
       numInstances
+    );
+    const segment = this.getOrCreateCurrentSegment();
+    segment.hasBodyCommands = true;
+  }
+  drawIndirect(
+    program: WebGPUProgram,
+    vertexData: Nullable<WebGPUVertexLayout>,
+    stateSet: WebGPURenderStateSet,
+    bindGroups: WebGPUBindGroup[],
+    bindGroupOffsets: Nullable<Nullable<Iterable<number>>[]>,
+    primitiveType: PrimitiveType,
+    indirect: WebGPUIndirectDrawParams
+  ) {
+    this.ensureRenderBodyReady();
+    this._drawcallCounter++;
+    this._renderPass.drawIndirect(
+      program,
+      vertexData,
+      stateSet,
+      bindGroups,
+      bindGroupOffsets,
+      primitiveType,
+      indirect
     );
     const segment = this.getOrCreateCurrentSegment();
     segment.hasBodyCommands = true;

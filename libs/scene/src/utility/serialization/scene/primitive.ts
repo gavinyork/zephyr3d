@@ -530,6 +530,18 @@ export function getSphereShapeClass(): SerializableClass {
           set(this: SphereShape, value) {
             this.options = { ...this.options, horizonalDetail: Math.max(2, Math.min(value.num[0], 100)) };
           }
+        },
+        {
+          name: 'EyeCompatible',
+          description: 'Generate planar UVs and +U tangents for EyeMaterial',
+          type: 'bool',
+          default: false,
+          get(this: SphereShape, value) {
+            value.bool[0] = this.options.eyeCompatible;
+          },
+          set(this: SphereShape, value) {
+            this.options = { ...this.options, eyeCompatible: value.bool[0] };
+          }
         }
       ]);
     }

@@ -347,7 +347,8 @@ export class HairMaterial
           scope.viewVec,
           scope.albedo,
           scope.shiftVal,
-          scope.hairAO
+          scope.hairAO,
+          scope.normalInfo.TBN[2]
         );
         if (
           this.drawContext.materialFlags &
@@ -452,6 +453,10 @@ export class HairMaterial
    * specular and optional transmission.
    * @internal
    */
+  /**
+   * @param geometricNormal - Interpolated vertex normal, used for shadow normal
+   * offset bias. Defaults to `normal`.
+   */
   hairLight(
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp,
@@ -460,7 +465,8 @@ export class HairMaterial
     viewVec: PBShaderExp,
     albedo: PBShaderExp,
     shiftVal: PBShaderExp,
-    ao: PBShaderExp
+    ao: PBShaderExp,
+    geometricNormal?: PBShaderExp
   ) {
     const pb = scope.$builder;
     const funcName = 'Z_hairLight';
@@ -476,7 +482,8 @@ export class HairMaterial
         pb.vec3('viewVec'),
         pb.vec4('albedo'),
         pb.float('shiftVal'),
-        pb.float('ao')
+        pb.float('ao'),
+        pb.vec3('geometricNormal')
       ],
       function () {
         if (!that.needFragmentColor()) {
@@ -558,7 +565,12 @@ export class HairMaterial
               this.$l.transmission = pb.vec3(0);
             }
             if (shadow) {
-              this.$l.shadow = that.calculateShadow(this, this.worldPos, pb.max(this.NoL, 0));
+              this.$l.shadow = that.calculateShadow(
+                this,
+                this.worldPos,
+                this.geometricNormal,
+                pb.max(this.NoL, 0)
+              );
               this.diffuse = pb.mul(this.diffuse, this.shadow);
               this.specular = pb.mul(this.specular, this.shadow);
               this.transmission = pb.mul(this.transmission, this.shadow);
@@ -575,6 +587,8 @@ export class HairMaterial
     );
     return pb
       .getGlobalScope()
-      [funcName](worldPos, normal, strandT, viewVec, albedo, shiftVal, ao) as PBShaderExp;
+      [
+        funcName
+      ](worldPos, normal, strandT, viewVec, albedo, shiftVal, ao, geometricNormal ?? normal) as PBShaderExp;
   }
 }

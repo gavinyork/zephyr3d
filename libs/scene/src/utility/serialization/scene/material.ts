@@ -2831,6 +2831,201 @@ export function getEyeMaterialClass(manager: ResourceManager): SerializableClass
               return this.$isInstance ? this.coreMaterial.vertexTangent : false;
             }
           },
+          {
+            name: 'SocketOcclusion',
+            description: 'Enables analytic shadowing of the eyeball by the eyelids and socket',
+            type: 'bool',
+            default: false,
+            get(this: EyeMaterial, value) {
+              value.bool[0] = this.socketOcclusion;
+            },
+            set(this: EyeMaterial, value) {
+              this.socketOcclusion = value.bool[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.socketOcclusion : false;
+            }
+          },
+          {
+            name: 'SocketRotation',
+            description:
+              'Euler rotation in degrees of the socket frame; zero matches +Y up, +Z gaze assets',
+            type: 'vec3',
+            default: [0, 0, 0],
+            options: { minValue: -180, maxValue: 180 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.socketRotation.x;
+              value.num[1] = this.socketRotation.y;
+              value.num[2] = this.socketRotation.z;
+            },
+            set(this: EyeMaterial, value) {
+              this.socketRotation = new Vector4(value.num[0], value.num[1], value.num[2], 0);
+            },
+            getDefaultValue(this: EyeMaterial) {
+              const r = this.$isInstance ? this.coreMaterial.socketRotation : new Vector4(0, 0, 0, 0);
+              return [r.x, r.y, r.z];
+            }
+          },
+          {
+            name: 'UpperLidAngle',
+            description: 'Aperture half-angle towards the upper lid, in degrees',
+            type: 'float',
+            default: 50,
+            options: { animatable: true, minValue: 5, maxValue: 90 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.upperLidAngle;
+            },
+            set(this: EyeMaterial, value) {
+              this.upperLidAngle = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.upperLidAngle : 50;
+            }
+          },
+          {
+            name: 'LowerLidAngle',
+            description: 'Aperture half-angle towards the lower lid, in degrees',
+            type: 'float',
+            default: 65,
+            options: { animatable: true, minValue: 5, maxValue: 90 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.lowerLidAngle;
+            },
+            set(this: EyeMaterial, value) {
+              this.lowerLidAngle = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.lowerLidAngle : 65;
+            }
+          },
+          {
+            name: 'SocketOcclusionSoftness',
+            description: 'Width of the lit-to-shadowed transition, in degrees',
+            type: 'float',
+            default: 15,
+            options: { animatable: true, minValue: 1, maxValue: 45 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.socketOcclusionSoftness;
+            },
+            set(this: EyeMaterial, value) {
+              this.socketOcclusionSoftness = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.socketOcclusionSoftness : 15;
+            }
+          },
+          {
+            name: 'SocketOcclusionStrength',
+            description: 'Overall socket occlusion strength',
+            type: 'float',
+            default: 0.65,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.socketOcclusionStrength;
+            },
+            set(this: EyeMaterial, value) {
+              this.socketOcclusionStrength = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.socketOcclusionStrength : 0.65;
+            }
+          },
+          {
+            name: 'ContactAO',
+            description:
+              'Enables screen-space contact occlusion of the eyeball by the eyelid, read from the depth prepass',
+            type: 'bool',
+            default: false,
+            get(this: EyeMaterial, value) {
+              value.bool[0] = this.contactAO;
+            },
+            set(this: EyeMaterial, value) {
+              this.contactAO = value.bool[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.contactAO : false;
+            }
+          },
+          {
+            name: 'ContactAORadius',
+            description: 'Radius of the contact occlusion disc, in world units',
+            type: 'float',
+            default: 0.006,
+            options: { animatable: true, minValue: 0.0001, maxValue: 0.1 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.contactAORadius;
+            },
+            set(this: EyeMaterial, value) {
+              this.contactAORadius = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.contactAORadius : 0.006;
+            }
+          },
+          {
+            name: 'ContactAOMinDistance',
+            description: 'Smallest depth step counted as an occluder, in world units',
+            type: 'float',
+            default: 0.0004,
+            options: { animatable: true, minValue: 0.00001, maxValue: 0.02 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.contactAOMinDistance;
+            },
+            set(this: EyeMaterial, value) {
+              this.contactAOMinDistance = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.contactAOMinDistance : 0.0004;
+            }
+          },
+          {
+            name: 'ContactAOMaxDistance',
+            description: 'Largest depth step counted as an occluder, in world units',
+            type: 'float',
+            default: 0.006,
+            options: { animatable: true, minValue: 0.00001, maxValue: 0.2 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.contactAOMaxDistance;
+            },
+            set(this: EyeMaterial, value) {
+              this.contactAOMaxDistance = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.contactAOMaxDistance : 0.006;
+            }
+          },
+          {
+            name: 'ContactAOStrength',
+            description: 'Overall contact occlusion strength',
+            type: 'float',
+            default: 0.7,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            get(this: EyeMaterial, value) {
+              value.num[0] = this.contactAOStrength;
+            },
+            set(this: EyeMaterial, value) {
+              this.contactAOStrength = value.num[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.contactAOStrength : 0.7;
+            }
+          },
+          {
+            name: 'ContactAOTemporalJitter',
+            description:
+              'Advances the contact occlusion noise pattern every frame so TAA can integrate it away; enable only with temporal anti-aliasing',
+            type: 'bool',
+            default: false,
+            get(this: EyeMaterial, value) {
+              value.bool[0] = this.contactAOTemporalJitter;
+            },
+            set(this: EyeMaterial, value) {
+              this.contactAOTemporalJitter = value.bool[0];
+            },
+            getDefaultValue(this: EyeMaterial) {
+              return this.$isInstance ? this.coreMaterial.contactAOTemporalJitter : false;
+            }
+          },
           ...getTextureProps<EyeMaterial>(manager, 'irisTexture', '2D', true, 0),
           ...getTextureProps<EyeMaterial>(manager, 'scleraTexture', '2D', true, 0)
         ]);
