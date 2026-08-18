@@ -416,7 +416,10 @@ function buildBipedBodyOnlySkeleton() {
   return root;
 }
 
-function buildMetaHumanBodySkeleton(prefix = '') {
+function buildMetaHumanBodySkeleton(
+  prefix = '',
+  options: { headName?: string; leftHandName?: string; includeDecoys?: boolean } = {}
+) {
   const root = new SceneNode(null);
   root.name = `${prefix}root`;
 
@@ -426,7 +429,13 @@ function buildMetaHumanBodySkeleton(prefix = '') {
     spine = appendNode(spine, `${prefix}spine_${String(i).padStart(2, '0')}`);
   }
   const neck = appendNode(spine, `${prefix}neck_01`);
-  appendNode(appendNode(neck, `${prefix}neck_02`), `${prefix}head`);
+  const head = appendNode(appendNode(neck, `${prefix}neck_02`), options.headName ?? `${prefix}head`);
+  if (options.includeDecoys) {
+    appendNode(head, 'HeadAux');
+    appendNode(head, 'HeadSocket');
+    appendNode(head, 'Head_End');
+    appendNode(head, 'HeadNub');
+  }
 
   for (const side of ['l', 'r'] as const) {
     const upperLeg = appendNode(hips, `${prefix}thigh_${side}`);
@@ -436,7 +445,16 @@ function buildMetaHumanBodySkeleton(prefix = '') {
     const shoulder = appendNode(spine, `${prefix}clavicle_${side}`);
     const upperArm = appendNode(shoulder, `${prefix}upperarm_${side}`);
     const lowerArm = appendNode(upperArm, `${prefix}lowerarm_${side}`);
-    appendNode(lowerArm, `${prefix}hand_${side}`);
+    const hand = appendNode(
+      lowerArm,
+      side === 'l' ? (options.leftHandName ?? `${prefix}hand_${side}`) : `${prefix}hand_${side}`
+    );
+    if (options.includeDecoys) {
+      const sideName = side === 'l' ? 'Left' : 'Right';
+      appendNode(hand, `${sideName}HandSocket`);
+      appendNode(hand, `${sideName}Hand_End`);
+      appendNode(hand, `${sideName}HandNub`);
+    }
   }
 
   return root;
@@ -590,14 +608,31 @@ describe('Skeleton.tryExtractHumanoidBones', () => {
 
   test('extracts MetaHuman body bones with optional namespace prefixes', () => {
     for (const prefix of ['', 'MHBody:']) {
-      const result = Skeleton.tryExtractHumanoidJoints(buildMetaHumanBodySkeleton(prefix));
+      const result = Skeleton.tryExtractHumanoidJoints(
+        buildMetaHumanBodySkeleton(prefix, { includeDecoys: true })
+      );
       expect(result).not.toBeNull();
       expect(result!.body[HumanoidBodyRig.Hips].name).toBe(`${prefix}pelvis`);
       expect(result!.body[HumanoidBodyRig.Spine].name).toBe(`${prefix}spine_01`);
       expect(result!.body[HumanoidBodyRig.UpperChest].name).toBe(`${prefix}spine_05`);
+      expect(result!.body[HumanoidBodyRig.Head].name).toBe(`${prefix}head`);
+      expect(result!.body[HumanoidBodyRig.LeftHand].name).toBe(`${prefix}hand_l`);
+      expect(result!.body[HumanoidBodyRig.RightHand].name).toBe(`${prefix}hand_r`);
       expect(result!.body[HumanoidBodyRig.LeftToes].name).toBe(`${prefix}ball_l`);
       expect(result!.body[HumanoidBodyRig.RightToes].name).toBe(`${prefix}ball_r`);
     }
+  });
+
+  test.each([
+    ['HeadSocket', { headName: 'HeadSocket' }],
+    ['Head_End', { headName: 'Head_End' }],
+    ['HeadNub', { headName: 'HeadNub' }],
+    ['LeftHandSocket', { leftHandName: 'LeftHandSocket' }],
+    ['LeftHand_End', { leftHandName: 'LeftHand_End' }],
+    ['LeftHandNub', { leftHandName: 'LeftHandNub' }]
+  ])('rejects helper-only humanoid joint candidate %s', (_name, options) => {
+    const result = Skeleton.tryExtractHumanoidJoints(buildMetaHumanBodySkeleton('MHBody:', options));
+    expect(result).toBeNull();
   });
 
   test('prefers the torso chain that is hierarchy-consistent with the limbs', () => {
