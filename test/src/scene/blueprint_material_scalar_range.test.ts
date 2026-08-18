@@ -187,6 +187,78 @@ describe('Blueprint scalar parameter range', () => {
     expect(sceneMaterial.uniformValues[0].finalValue).toBe(0.8);
   });
 
+  test('Blueprint material instance full sync should restore parent and override bookkeeping', () => {
+    const manager = new ResourceManager(new MemoryFS());
+    const instancePath = '/materials/instance.zmtl';
+    const createParent = (value: number) => {
+      const parent = new PBRBluePrintMaterial();
+      parent.uniformValues = [
+        {
+          name: 'u_scalar',
+          type: 'float',
+          value: [value],
+          inVertexShader: false,
+          inFragmentShader: true,
+          finalValue: value
+        }
+      ];
+      return parent;
+    };
+    const savedParent = createParent(0.25);
+    const editedParent = createParent(0.5);
+    const restored = new PBRBluePrintMaterialInstance(savedParent, '/materials/saved-parent.zmtl');
+    restored.setOverrides(
+      [
+        {
+          ...savedParent.uniformValues[0],
+          value: [0.4],
+          finalValue: 0.4
+        }
+      ],
+      []
+    );
+    restored.normalScale = 0.6;
+    restored.markMaterialPropertyOverridden('NormalScale');
+
+    const sceneMaterial = new PBRBluePrintMaterialInstance(editedParent, '/materials/edited-parent.zmtl');
+    sceneMaterial.setOverrides(
+      [
+        {
+          ...editedParent.uniformValues[0],
+          value: [0.9],
+          finalValue: 0.9
+        }
+      ],
+      []
+    );
+    sceneMaterial.normalScale = 1.5;
+    sceneMaterial.markMaterialPropertyOverridden('NormalScale');
+    sceneMaterial.markMaterialPropertyOverridden('RectSpecularScale');
+    manager.setAssetId(restored, instancePath);
+    manager.trackMaterialReference(sceneMaterial, instancePath);
+
+    const baseCopyFrom = jest.spyOn(Material.prototype, 'copyFrom').mockImplementation(() => undefined);
+    try {
+      manager.syncMaterialReferences(restored);
+    } finally {
+      baseCopyFrom.mockRestore();
+    }
+
+    expect(sceneMaterial.parentMaterial).toBe(savedParent);
+    expect(sceneMaterial.parentMaterialId).toBe('/materials/saved-parent.zmtl');
+    expect(sceneMaterial.uniformValues[0].value).toEqual([0.4]);
+    expect(sceneMaterial.getOverrideUniformValues()).toEqual([
+      expect.objectContaining({ name: 'u_scalar', value: [0.4] })
+    ]);
+    expect(sceneMaterial.normalScale).toBeCloseTo(0.6);
+    expect(sceneMaterial.getMaterialPropertyOverrides()).toEqual(['NormalScale']);
+
+    savedParent.uniformValues[0].value = [0.1];
+    savedParent.uniformValues[0].finalValue = 0.1;
+    sceneMaterial.syncInheritedUniforms();
+    expect(sceneMaterial.uniformValues[0].value).toEqual([0.4]);
+  });
+
   test('Blueprint material instance should migrate only compatible overrides when changing parent', () => {
     const texture = (
       name: string,
