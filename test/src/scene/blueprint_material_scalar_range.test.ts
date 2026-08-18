@@ -150,7 +150,7 @@ describe('Blueprint scalar parameter range', () => {
     expect(instance.uniformValues[0].maxValue).toBe(2);
   });
 
-  test('Blueprint material instance parameter changes should sync to tracked scene materials immediately', () => {
+  test('Blueprint material instance parameter changes should sync without clearing scene material GPU state', () => {
     const manager = new ResourceManager(new MemoryFS());
     const instancePath = '/materials/instance.zmtl';
     const parent = new PBRBluePrintMaterial();
@@ -173,9 +173,13 @@ describe('Blueprint scalar parameter range', () => {
     source.uniformValues[0].finalValue = 0.8;
     source.setOverrides(source.uniformValues, source.uniformTextures);
     const baseCopyFrom = jest.spyOn(Material.prototype, 'copyFrom').mockImplementation(() => undefined);
+    const clearCache = jest.spyOn(sceneMaterial, 'clearCache');
     try {
-      manager.syncMaterialReferences(source);
+      manager.syncMaterialUniformReferences(source);
+      expect(baseCopyFrom).not.toHaveBeenCalled();
+      expect(clearCache).not.toHaveBeenCalled();
     } finally {
+      clearCache.mockRestore();
       baseCopyFrom.mockRestore();
     }
 

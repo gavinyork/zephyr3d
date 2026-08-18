@@ -162,7 +162,12 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
   private handlePropChanged(object: object | null, prop: PropertyAccessor) {
     const material = this._material.get();
     if (material) {
-      if (object === material && prop?.name) {
+      const isBlueprintParameter =
+        object === material &&
+        !!prop?.name &&
+        (material.uniformValues.some((uniform) => uniform.name === prop.name) ||
+          material.uniformTextures.some((uniform) => uniform.name === prop.name));
+      if (object === material && prop?.name && !isBlueprintParameter) {
         material.markMaterialPropertyOverridden(prop.name);
       }
       material.setOverrides(
@@ -170,7 +175,11 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
         material.uniformTextures as BluePrintUniformTexture[]
       );
       material.uniformChanged();
-      getEngine().resourceManager.syncMaterialReferences(material);
+      if (isBlueprintParameter) {
+        getEngine().resourceManager.syncMaterialUniformReferences(material);
+      } else {
+        getEngine().resourceManager.syncMaterialReferences(material);
+      }
     }
     this._propEditor.refresh();
     this._version = -1;
