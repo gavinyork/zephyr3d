@@ -28,7 +28,7 @@ import type {
   FrameBufferClearColors,
   RenderBundle
 } from '@zephyr3d/device';
-import { getTextureFormatBlockSize, BaseDevice } from '@zephyr3d/device';
+import { getTextureFormatBlockSize, BaseDevice, GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUProgram } from './gpuprogram_webgpu';
 import { WebGPUBindGroup } from './bindgroup_webgpu';
 import { WebGPUTexture2D } from './texture2d_webgpu';
@@ -957,6 +957,67 @@ export class WebGPUDevice extends BaseDevice {
         numInstances
       );
     }
+  }
+  /** @internal */
+  protected _drawIndirect(
+    primitiveType: PrimitiveType,
+    indirectBuffer: GPUDataBuffer,
+    indirectOffset: number
+  ) {
+    this.drawIndirectInternal(primitiveType, indirectBuffer, indirectOffset, false);
+  }
+  /** @internal */
+  protected _drawIndexedIndirect(
+    primitiveType: PrimitiveType,
+    indirectBuffer: GPUDataBuffer,
+    indirectOffset: number
+  ) {
+    this.drawIndirectInternal(primitiveType, indirectBuffer, indirectOffset, true);
+  }
+  /** @internal */
+  private drawIndirectInternal(
+    primitiveType: PrimitiveType,
+    indirectBuffer: GPUDataBuffer,
+    indirectOffset: number,
+    indexed: boolean
+  ) {
+    const buffer = indirectBuffer as unknown as WebGPUBuffer;
+    if (!(indirectBuffer.usage & GPUResourceUsageFlags.BF_INDIRECT)) {
+      console.error(
+        `${indexed ? 'drawIndexedIndirect' : 'drawIndirect'}(): indirect buffer must be created with 'indirect' usage`
+      );
+      return;
+    }
+    if (indirectOffset % 4 !== 0) {
+      console.error(
+        `${indexed ? 'drawIndexedIndirect' : 'drawIndirect'}(): indirect offset must be a multiple of 4`
+      );
+      return;
+    }
+    const requiredSize = indirectOffset + (indexed ? 20 : 16);
+    if (requiredSize > indirectBuffer.byteLength) {
+      console.error(
+        `${indexed ? 'drawIndexedIndirect' : 'drawIndirect'}(): indirect buffer too small, requires ${requiredSize} bytes but buffer is ${indirectBuffer.byteLength} bytes`
+      );
+      return;
+    }
+    const object = buffer.object;
+    if (!object) {
+      return;
+    }
+    if (this._captureRenderBundle) {
+      console.error('Indirect draw calls can not be captured into a render bundle');
+      return;
+    }
+    this._commandQueue.drawIndirect(
+      this._currentProgram!,
+      this._currentVertexData!,
+      this._currentStateSet!,
+      this._currentBindGroups,
+      this._currentBindGroupOffsets,
+      primitiveType,
+      { buffer: object, offset: indirectOffset, indexed }
+    );
   }
   /** @internal */
   protected _compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number) {

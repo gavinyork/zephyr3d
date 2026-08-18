@@ -1256,6 +1256,14 @@ export class WebGLDevice extends BaseDevice {
     }
   }
   /** @internal */
+  protected _drawIndirect() {
+    throw new Error('WebGL device does not support indirect draw');
+  }
+  /** @internal */
+  protected _drawIndexedIndirect() {
+    throw new Error('WebGL device does not support indirect draw');
+  }
+  /** @internal */
   protected _compute() {
     throw new Error('WebGL device does not support compute shader');
   }
