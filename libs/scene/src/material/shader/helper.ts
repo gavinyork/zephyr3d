@@ -424,6 +424,7 @@ export class ShaderHelper {
     }
     const pb = scope.$builder;
     const isWebGL = pb.getDevice().type === 'webgl';
+    const supportsTextureLoad = !isWebGL;
     const funcNameGetBoneMatrixFromTexture = 'Z_getBoneMatrixFromTexture';
     pb.func(funcNameGetBoneMatrixFromTexture, [pb.int('boneIndex')], function () {
       const boneTexture = this[UNIFORM_NAME_BONE_MATRICES];
@@ -468,23 +469,30 @@ export class ShaderHelper {
         this.$l.vertexIndex = isWebGL
           ? pb.int(scope.$inputs.zFakeVertexID)
           : pb.int(scope.$builtins.vertexIndex);
-        this.$l.texWidth = this.skinInfo.x;
-        this.$l.texHeight = this.skinInfo.y;
+        this.$l.texWidth = pb.int(this.skinInfo.x);
         this.$l.pairCount = pb.int(this.skinInfo.w);
         this.$for(pb.int('pairIndex'), 0, MAX_SKIN_EXTRA_INFLUENCE_PAIRS, function () {
           this.$if(pb.greaterThanEqual(this.pairIndex, this.pairCount), function () {
             this.$break();
           });
-          this.$l.pixelIndex = pb.float(pb.add(pb.mul(this.vertexIndex, this.pairCount), this.pairIndex));
+          this.$l.pixelIndex = pb.add(pb.mul(this.vertexIndex, this.pairCount), this.pairIndex);
           this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
-          this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.texWidth));
-          this.$l.u = pb.div(pb.add(this.xIndex, 0.5), this.texWidth);
-          this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.texHeight);
-          this.$l.extra = pb.textureSampleLevel(
-            this[UNIFORM_NAME_SKIN_INFLUENCE_DATA],
-            pb.vec2(this.u, this.v),
-            0
-          );
+          this.$l.yIndex = pb.div(this.pixelIndex, this.texWidth);
+          if (supportsTextureLoad) {
+            this.$l.extra = pb.textureLoad(
+              this[UNIFORM_NAME_SKIN_INFLUENCE_DATA],
+              pb.ivec2(this.xIndex, this.yIndex),
+              0
+            );
+          } else {
+            this.$l.u = pb.div(pb.add(pb.float(this.xIndex), 0.5), this.skinInfo.x);
+            this.$l.v = pb.div(pb.add(pb.float(this.yIndex), 0.5), this.skinInfo.y);
+            this.$l.extra = pb.textureSampleLevel(
+              this[UNIFORM_NAME_SKIN_INFLUENCE_DATA],
+              pb.vec2(this.u, this.v),
+              0
+            );
+          }
           this.$if(pb.greaterThan(this.extra.y, 0), function () {
             this.m = pb.add(
               this.m,
@@ -783,6 +791,7 @@ export class ShaderHelper {
     const that = this;
     const pb = scope.$builder;
     const isWebGL = pb.getDevice().type === 'webgl';
+    const supportsTextureLoad = !isWebGL;
     const funcNameGetBoneMatrixFromTexture = 'Z_getBoneMatrixFromTexture';
     pb.func(funcNameGetBoneMatrixFromTexture, [pb.float('boneIndex'), pb.float('boneOffset')], function () {
       const boneTexture = this[UNIFORM_NAME_BONE_MATRICES];
@@ -821,23 +830,30 @@ export class ShaderHelper {
         this.$l.vertexIndex = isWebGL
           ? pb.int(scope.$inputs.zFakeVertexID)
           : pb.int(scope.$builtins.vertexIndex);
-        this.$l.texWidth = this.skinInfo.x;
-        this.$l.texHeight = this.skinInfo.y;
+        this.$l.texWidth = pb.int(this.skinInfo.x);
         this.$l.pairCount = pb.int(this.skinInfo.w);
         this.$for(pb.int('pairIndex'), 0, MAX_SKIN_EXTRA_INFLUENCE_PAIRS, function () {
           this.$if(pb.greaterThanEqual(this.pairIndex, this.pairCount), function () {
             this.$break();
           });
-          this.$l.pixelIndex = pb.float(pb.add(pb.mul(this.vertexIndex, this.pairCount), this.pairIndex));
+          this.$l.pixelIndex = pb.add(pb.mul(this.vertexIndex, this.pairCount), this.pairIndex);
           this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
-          this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.texWidth));
-          this.$l.u = pb.div(pb.add(this.xIndex, 0.5), this.texWidth);
-          this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.texHeight);
-          this.$l.extra = pb.textureSampleLevel(
-            this[UNIFORM_NAME_SKIN_INFLUENCE_DATA],
-            pb.vec2(this.u, this.v),
-            0
-          );
+          this.$l.yIndex = pb.div(this.pixelIndex, this.texWidth);
+          if (supportsTextureLoad) {
+            this.$l.extra = pb.textureLoad(
+              this[UNIFORM_NAME_SKIN_INFLUENCE_DATA],
+              pb.ivec2(this.xIndex, this.yIndex),
+              0
+            );
+          } else {
+            this.$l.u = pb.div(pb.add(pb.float(this.xIndex), 0.5), this.skinInfo.x);
+            this.$l.v = pb.div(pb.add(pb.float(this.yIndex), 0.5), this.skinInfo.y);
+            this.$l.extra = pb.textureSampleLevel(
+              this[UNIFORM_NAME_SKIN_INFLUENCE_DATA],
+              pb.vec2(this.u, this.v),
+              0
+            );
+          }
           this.$if(pb.greaterThan(this.extra.y, 0), function () {
             this.m = pb.add(
               this.m,

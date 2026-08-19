@@ -2733,7 +2733,7 @@ export class GLTFImporter extends AbstractModelImporter {
     if (setIndices.length === 0) {
       return;
     }
-    const limit = Math.max(1, getSkinInfluenceLimit());
+    const configuredLimit = Math.max(1, getSkinInfluenceLimit());
     const sets = setIndices.map((setIndex) => {
       const jointAccessor = gltf._accessors[attributes[`JOINTS_${setIndex}`]];
       const weightAccessor = gltf._accessors[attributes[`WEIGHTS_${setIndex}`]];
@@ -2749,10 +2749,10 @@ export class GLTFImporter extends AbstractModelImporter {
     if (numVertices <= 0) {
       return;
     }
-    const rawBlendIndices = new Uint16Array(numVertices * limit);
-    const rawJointWeights = new Float32Array(numVertices * limit);
-    const vertexBlendIndices = new Float32Array(numVertices * 4);
-    const vertexBlendWeights = new Float32Array(numVertices * 4);
+    // The project setting is a cap, not the per-vertex storage stride. Keeping
+    // trailing empty slots makes every mesh use the worst-case texture layout.
+    const influencesByVertex: { joint: number; weight: number }[][] = [];
+    let limit = 1;
     for (let vertexIndex = 0; vertexIndex < numVertices; vertexIndex++) {
       const influences: { joint: number; weight: number }[] = [];
       for (const set of sets) {
@@ -2771,7 +2771,16 @@ export class GLTFImporter extends AbstractModelImporter {
         }
       }
       influences.sort((a, b) => b.weight - a.weight);
-      const selected = influences.slice(0, limit);
+      const selected = influences.slice(0, configuredLimit);
+      influencesByVertex.push(selected);
+      limit = Math.max(limit, selected.length);
+    }
+    const rawBlendIndices = new Uint16Array(numVertices * limit);
+    const rawJointWeights = new Float32Array(numVertices * limit);
+    const vertexBlendIndices = new Float32Array(numVertices * 4);
+    const vertexBlendWeights = new Float32Array(numVertices * 4);
+    for (let vertexIndex = 0; vertexIndex < numVertices; vertexIndex++) {
+      const selected = influencesByVertex[vertexIndex];
       let totalWeight = 0;
       for (const influence of selected) {
         totalWeight += influence.weight;
