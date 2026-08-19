@@ -212,6 +212,29 @@ export class PBRBluePrintMaterialInstance extends PBRBluePrintMaterial {
     }
   }
 
+  copyFrom(other: this) {
+    super.copyFrom(other);
+    if (other instanceof PBRBluePrintMaterialInstance) {
+      const overrideUniformValues = cloneUniformValues([...other._overrideUniformValues.values()]);
+      const overrideUniformTextures = cloneUniformTextures([...other._overrideUniformTextures.values()]);
+      const subsurfaceProfileOverride = this.copySubsurfaceProfile(other._subsurfaceProfileOverride);
+      for (const uniform of this._overrideUniformTextures.values()) {
+        uniform.finalTexture?.dispose();
+      }
+      this._parentMaterial = other._parentMaterial;
+      this._parentMaterialId = other._parentMaterialId;
+      this._overrideUniformValues = new Map(overrideUniformValues.map((uniform) => [uniform.name, uniform]));
+      this._overrideUniformTextures = new Map(
+        overrideUniformTextures.map((uniform) => [uniform.name, uniform])
+      );
+      this._reflectionModeOverridden = other._reflectionModeOverridden;
+      this._overrideMaterialProps = new Set(other._overrideMaterialProps);
+      this._subsurfaceProfileOverride?.dispose();
+      this._subsurfaceProfileOverride = subsurfaceProfileOverride;
+      this.syncInheritedUniforms();
+    }
+  }
+
   get parentMaterialId() {
     return this._parentMaterialId;
   }

@@ -82,11 +82,12 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
   private _version: number;
   private _editRevision: number;
   private _saveChain: Promise<void>;
-  private _savedProps: Record<string, unknown>;
   private readonly _propChangeHandler: (object: object | null, prop: PropertyAccessor) => void;
   private _previewDragging: boolean;
   private _showPreview: boolean;
   private _changingParent: boolean;
+  private _textureEditEpoch: number;
+  private readonly _textureEditVersions: Map<string, number>;
 
   constructor(id: string, width: number, height: number, path: string) {
     super(id, width, height, false, false, false, false);
@@ -105,10 +106,11 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     this._version = 0;
     this._editRevision = 0;
     this._saveChain = Promise.resolve();
-    this._savedProps = {};
     this._previewDragging = false;
     this._showPreview = true;
     this._changingParent = false;
+    this._textureEditEpoch = 0;
+    this._textureEditVersions = new Map();
     this._propChangeHandler = this.handlePropChanged.bind(this);
     this._propEditor.on('object_property_changed', this._propChangeHandler, this);
     this._propEditor.setExtraPropertiesProvider('blueprint-params', (object) =>
@@ -146,12 +148,12 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     }
     this._material.set(material);
     this._parent.set(parent);
-    this._savedProps = (content.props as Record<string, unknown>) ?? {};
     this._propEditor.object = material;
     this.initPreview(material);
   }
 
   override close(): void {
+    this.cancelPendingTextureEdits();
     this._propEditor.off('object_property_changed', this._propChangeHandler, this);
     this.disposePreview();
     this._material.dispose();
@@ -162,7 +164,12 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
   private handlePropChanged(object: object | null, prop: PropertyAccessor) {
     const material = this._material.get();
     if (material) {
-      if (object === material && prop?.name) {
+      const isBlueprintParameter =
+        object === material &&
+        !!prop?.name &&
+        (material.uniformValues.some((uniform) => uniform.name === prop.name) ||
+          material.uniformTextures.some((uniform) => uniform.name === prop.name));
+      if (object === material && prop?.name && !isBlueprintParameter) {
         material.markMaterialPropertyOverridden(prop.name);
       }
       material.setOverrides(
@@ -170,7 +177,11 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
         material.uniformTextures as BluePrintUniformTexture[]
       );
       material.uniformChanged();
-      getEngine().resourceManager.syncMaterialReferences(material);
+      if (isBlueprintParameter) {
+        getEngine().resourceManager.syncMaterialUniformReferences(material);
+      } else {
+        getEngine().resourceManager.syncMaterialReferences(material);
+      }
     }
     this._propEditor.refresh();
     this._version = -1;
@@ -241,12 +252,31 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     });
   }
 
+  private beginTextureEdit(name: string) {
+    const version = (this._textureEditVersions.get(name) ?? 0) + 1;
+    this._textureEditVersions.set(name, version);
+    return { epoch: this._textureEditEpoch, version };
+  }
+
+  private isTextureEditCurrent(name: string, request: { epoch: number; version: number }) {
+    return (
+      request.epoch === this._textureEditEpoch && request.version === this._textureEditVersions.get(name)
+    );
+  }
+
+  private cancelPendingTextureEdits() {
+    this._textureEditEpoch++;
+    this._textureEditVersions.clear();
+  }
+
   private getBlueprintParameterProps(): PropertyAccessor[] {
     const material = this._material.get();
     if (!material) {
       return [];
     }
     const createTextureSampler = this.createTextureSampler.bind(this);
+    const beginTextureEdit = this.beginTextureEdit.bind(this);
+    const isTextureEditCurrent = this.isTextureEditCurrent.bind(this);
     const props: PropertyAccessor[] = [];
     for (const uniform of material.uniformValues) {
       const type = this.getUniformDisplayType(uniform);
@@ -294,6 +324,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
           value.str[0] = target.texture ?? '';
         },
         async set(value: any) {
+          const request = beginTextureEdit(uniform.name);
           const target = material.uniformTextures.find((v) => v.name === uniform.name);
           if (!target) {
             return;
@@ -312,6 +343,9 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
             linearColorSpace: !target.sRGB,
             overrideVFS: ProjectService.VFS
           });
+          if (!isTextureEditCurrent(uniform.name, request)) {
+            return;
+          }
           target.finalTexture?.dispose();
           target.finalTexture = new DRef(tex);
           target.finalSampler = createTextureSampler(target);
@@ -465,7 +499,6 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     material.setOverrides(material.uniformValues, material.uniformTextures);
     await getEngine().resourceManager.deserializeObjectProps(material, overrideProps);
     material.setMaterialPropertyOverrides(Object.keys(overrideProps));
-    this._savedProps = overrideProps;
     if (this._editRevision === saveRevision) {
       this._version = 0;
     }
@@ -476,20 +509,17 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     if (!material) {
       return;
     }
-    (getEngine().resourceManager as any).invalidateMaterial(this._path);
-    const reloaded = (await getEngine().resourceManager.fetchMaterial(this._path, {
+    this.cancelPendingTextureEdits();
+    const resourceManager = getEngine().resourceManager;
+    resourceManager.invalidateMaterial(this._path);
+    const reloaded = (await resourceManager.fetchMaterial(this._path, {
       overrideVFS: ProjectService.VFS
     })) as PBRBluePrintMaterialInstanceLike | null;
     if (!reloaded) {
       throw new Error(`Reload material instance failed: ${this._path}`);
     }
+    resourceManager.syncMaterialReferences(reloaded);
     this._parent.set(reloaded.parentMaterial);
-    material.setMaterialPropertyOverrides(Object.keys(this._savedProps));
-    material.setParentMaterial(reloaded.parentMaterial, reloaded.parentMaterialId);
-    material.uniformValues = reloaded.uniformValues;
-    material.uniformTextures = reloaded.uniformTextures;
-    await getEngine().resourceManager.deserializeObjectProps(material, this._savedProps);
-    material.setMaterialPropertyOverrides(Object.keys(this._savedProps));
     this._propEditor.object = material;
     this._version = 0;
   }
@@ -660,7 +690,11 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
                 DlgMessage.messageBox('Error', `Save material instance failed: ${err}`);
               });
           } else if (value === 'No') {
-            this.restoreState().then(() => this.close());
+            this.restoreState()
+              .then(() => this.close())
+              .catch((err) => {
+                DlgMessage.messageBox('Error', `Restore material instance failed: ${err}`);
+              });
           }
         });
       } else {

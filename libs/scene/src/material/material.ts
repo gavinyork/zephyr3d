@@ -16,6 +16,11 @@ type MaterialState = {
   materialTag: number;
 };
 
+type ProgramCacheEntry = {
+  program: GPUProgram;
+  refCount: number;
+};
+
 /**
  * Base class for all materials.
  *
@@ -71,7 +76,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
   /**
    * Global program cache keyed by global hash
    */
-  private static _programCache: { [hash: string]: GPUProgram } = {};
+  private static _programCache: { [hash: string]: ProgramCacheEntry } = {};
   /**
    * Per-material state cache keyed by global hash (material + context + pass).
    * @internal
@@ -284,7 +289,8 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
       const hash = this.calcGlobalHash(ctx, pass);
       let state = this._states[hash];
       if (!state) {
-        let program = Material._programCache[hash];
+        let programEntry = Material._programCache[hash];
+        let program = programEntry?.program;
         if (!program) {
           program = this.createProgram(ctx, pass) ?? null;
           if (!program) {
@@ -310,8 +316,10 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
             return false;
           }
           program.name = `@${this.constructor.name}_program_${this._nextProgramId++}`;
-          Material._programCache[hash] = program;
+          programEntry = { program, refCount: 0 };
+          Material._programCache[hash] = programEntry;
         }
+        programEntry!.refCount++;
         const bindGroup =
           program.bindGroupLayouts.length > 2
             ? ctx.device.createBindGroup(program.bindGroupLayouts[2])
@@ -441,10 +449,22 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
     }
   }
   clearCache() {
-    for (const k in this._states) {
-      this._states[k]?.bindGroup?.dispose();
-      Material._programCache[k]?.dispose();
-      delete Material._programCache[k];
+    const hashes = Object.keys(this._states);
+    if (hashes.length > 0) {
+      this._changeTag++;
+      RenderBundleWrapper.materialChanged(this.coreMaterial);
+    }
+    for (const k of hashes) {
+      const state = this._states[k];
+      state?.bindGroup?.dispose();
+      const programEntry = Material._programCache[k];
+      if (state?.program && programEntry?.program === state.program) {
+        programEntry.refCount--;
+        if (programEntry.refCount <= 0) {
+          programEntry.program.dispose();
+          delete Material._programCache[k];
+        }
+      }
     }
     this._states = {};
   }

@@ -208,8 +208,8 @@ import {
 } from '../blueprint/material/inputs';
 import { PBRBlockNode, SpriteBlockNode, VertexBlockNode } from '../blueprint/material/pbr';
 import type { BlueprintDAG, GraphStructure, IGraphNode, NodeConnection } from '../blueprint/node';
-import { Material } from '../../material';
-import type { MeshMaterial, PBRBluePrintMaterial } from '../../material';
+import { Material, PBRBluePrintMaterial } from '../../material';
+import type { MeshMaterial } from '../../material';
 import type { Primitive } from '../../render';
 import { FunctionCallNode, FunctionInputNode, FunctionOutputNode } from '../blueprint/material/func';
 import { getSpriteClass } from './scene/sprite';
@@ -740,6 +740,56 @@ export class ResourceManager {
           material.copyFrom(source as typeof material);
         }
       }
+    }
+    if (refs.size === 0) {
+      this._materialsByAssetId.delete(id);
+    }
+  }
+  syncMaterialUniformReferences(source: PBRBluePrintMaterial) {
+    const id = this.getAssetId(source);
+    if (!id) {
+      return;
+    }
+    const refs = this._materialsByAssetId.get(id);
+    if (!refs) {
+      return;
+    }
+    const synced = new Set<Material>();
+    for (const ref of [...refs]) {
+      const material = ref.get();
+      if (!material || material.disposed) {
+        ref.dispose();
+        refs.delete(ref);
+        continue;
+      }
+      const runtimeInstance = material as Material & {
+        $isInstance?: boolean;
+        coreMaterial?: Material;
+      };
+      const target = runtimeInstance.$isInstance ? runtimeInstance.coreMaterial : material;
+      if (
+        !target ||
+        target === source ||
+        synced.has(target) ||
+        !(target instanceof PBRBluePrintMaterial) ||
+        target.constructor !== source.constructor
+      ) {
+        continue;
+      }
+      synced.add(target);
+      const targetWithOverrides = target as PBRBluePrintMaterial & {
+        setOverrides?: (
+          uniformValues: PBRBluePrintMaterial['uniformValues'],
+          uniformTextures: PBRBluePrintMaterial['uniformTextures']
+        ) => void;
+      };
+      if (targetWithOverrides.setOverrides) {
+        targetWithOverrides.setOverrides(source.uniformValues, source.uniformTextures);
+      } else {
+        target.uniformValues = source.uniformValues;
+        target.uniformTextures = source.uniformTextures;
+      }
+      target.uniformChanged();
     }
     if (refs.size === 0) {
       this._materialsByAssetId.delete(id);
