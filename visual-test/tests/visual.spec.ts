@@ -13,6 +13,8 @@ interface SceneInfo {
   name: string;
   description: string;
   frames: number;
+  /** False when the scene's own predicate rules out the live backend. */
+  supported: boolean;
 }
 
 interface Harness {
@@ -105,6 +107,7 @@ const SCENE_NAMES = [
   'hair-strands-helix',
   'hair-strands-fan',
   'hair-strands-width',
+  'hair-strands-gpu-helix',
   'eye-frontal',
   'eye-angled',
   'eye-pupil-dilated',
@@ -118,6 +121,12 @@ test('scene registry matches the harness page', async ({ harness }) => {
 for (const sceneName of SCENE_NAMES) {
   test(sceneName, async ({ harness }, testInfo) => {
     const meta = testInfo.project.metadata as { convention: string };
+    // A scene may declare a backend it cannot run on - vertex-stage storage
+    // buffers, for one, are WebGPU-only. Skipping is not the same as passing: a
+    // skipped scene is visible in the report, so a feature silently losing its
+    // only backend does not look like coverage.
+    const info = harness.scenes.find((s) => s.name === sceneName);
+    test.skip(info?.supported === false, `${sceneName} is unsupported on ${harness.backend}`);
     const result = await harness.page.evaluate(
       (name) => (globalThis as any).__zephyrHarness.runScene(name),
       sceneName

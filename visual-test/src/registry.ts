@@ -16,7 +16,12 @@ import { clusterManyLights, spotShadow } from './scenes/lighting';
 import { oitABuffer, oitDualDepth, oitWeighted } from './scenes/oit';
 import { postFxaa, postToneMapBloom, taaMultiframe } from './scenes/post';
 import { eyeAngled, eyeFrontal, eyePupilDilated, eyeSocketOcclusion } from './scenes/eye';
-import { hairStrandsFan, hairStrandsHelix, hairStrandsWidth } from './scenes/hair-strands';
+import {
+  hairStrandsFan,
+  hairStrandsGpuHelix,
+  hairStrandsHelix,
+  hairStrandsWidth
+} from './scenes/hair-strands';
 
 /**
  * Every scene, in a fixed order.
@@ -63,6 +68,7 @@ export const SCENES: VisualScene[] = [
   hairStrandsHelix,
   hairStrandsFan,
   hairStrandsWidth,
+  hairStrandsGpuHelix,
   eyeFrontal,
   eyeAngled,
   eyePupilDilated,
