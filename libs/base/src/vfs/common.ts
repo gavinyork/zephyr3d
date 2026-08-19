@@ -23,6 +23,7 @@ const mimeTypes: Record<string, string> = {
   '.mp4': 'video/mp4',
   '.zip': 'application/zip',
   '.fbx': 'model/fbx',
+  '.abc': 'model/alembic',
   '.obj': 'model/obj',
   '.gltf': 'model/gltf+json',
   '.glb': 'model/gltf-binary',
