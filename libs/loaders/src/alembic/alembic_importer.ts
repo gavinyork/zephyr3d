@@ -309,12 +309,7 @@ function tessellateStrands(curve: AlembicCurveObject, opt: ResolvedOptions): Nul
  * Writes the two triangles of each ribbon segment.
  * @internal
  */
-function emitQuads(
-  indices: Uint16Array | Uint32Array,
-  start: number,
-  baseVertex: number,
-  segments: number
-) {
+function emitQuads(indices: Uint16Array | Uint32Array, start: number, baseVertex: number, segments: number) {
   let iCursor = start;
   for (let s = 0; s < segments; s++) {
     const a = baseVertex + s * 2;
