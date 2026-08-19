@@ -28,8 +28,25 @@ export type HairStrandSource = {
   uv?: Nullable<Float32Array>;
   /** Width used where the source provides none. Defaults to 0.0001. */
   defaultWidth?: number;
-  /** Uniform scale applied to positions and widths. Defaults to 1. */
+  /**
+   * Uniform scale applied to control points, positions and widths alike.
+   *
+   * @remarks
+   * Width is stored in the same linear unit as position, so both convert
+   * together. The sample XGen archive is authored in centimetres and carries
+   * widths of 0.0008 to 0.0159, which is 8 to 159 microns once scaled - the range
+   * real hair occupies. Leaving width unscaled makes strands a hundred times too
+   * thick, which reads as broad ribbons rather than hair.
+   */
   scale?: number;
+  /**
+   * Extra multiplier applied to width only.
+   *
+   * @remarks
+   * Separate from `scale` so thickness can be exaggerated for art direction
+   * without disturbing the unit conversion. Defaults to 1.
+   */
+  widthScale?: number;
 };
 
 /**
@@ -73,6 +90,7 @@ export class HairStrandData extends Disposable {
     super();
     const device = getDevice();
     const scale = source.scale ?? 1;
+    const widthScale = source.widthScale ?? 1;
     const defaultWidth = source.defaultWidth ?? 0.0001;
     const counts = source.pointCounts;
     const strandCount = counts.length;
@@ -121,7 +139,7 @@ export class HairStrandData extends Disposable {
         if (widths) {
           w = widthPerStrand ? widths[s] : widths[first + i];
         }
-        points[dst + 3] = w * scale;
+        points[dst + 3] = w * scale * widthScale;
       }
       const h = s * WORDS_PER_HEADER;
       headers[h] = first;

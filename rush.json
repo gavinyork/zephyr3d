@@ -496,6 +496,10 @@
       "projectFolder": "apps/eye-demo"
     },
     {
+      "packageName": "@zephyr3d/hair-demo",
+      "projectFolder": "apps/hair-demo"
+    },
+    {
       "packageName": "@zephyr3d/nonlinear-depth-demo",
       "projectFolder": "apps/nonlinear-depth-demo"
     },
