@@ -16,6 +16,7 @@ import { clusterManyLights, spotShadow } from './scenes/lighting';
 import { oitABuffer, oitDualDepth, oitWeighted } from './scenes/oit';
 import { postFxaa, postToneMapBloom, taaMultiframe } from './scenes/post';
 import { eyeAngled, eyeFrontal, eyePupilDilated, eyeSocketOcclusion } from './scenes/eye';
+import { hairStrandsFan, hairStrandsHelix, hairStrandsWidth } from './scenes/hair-strands';
 
 /**
  * Every scene, in a fixed order.
@@ -58,6 +59,10 @@ export const SCENES: VisualScene[] = [
   skinSss,
   skinShadow,
   hair,
+  // Strand hair: the Alembic import path, from container bytes to ribbons.
+  hairStrandsHelix,
+  hairStrandsFan,
+  hairStrandsWidth,
   eyeFrontal,
   eyeAngled,
   eyePupilDilated,
