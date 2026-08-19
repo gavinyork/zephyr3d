@@ -13,12 +13,13 @@ const CAPTURE_SIZE = 512;
 
 interface HarnessApi {
   init(backend: BackendId): Promise<{ backend: BackendId; adapter: string }>;
-  listScenes(): { name: string; description: string; frames: number }[];
+  listScenes(): { name: string; description: string; frames: number; supported: boolean }[];
   runScene(name: string): Promise<CaptureResult>;
 }
 
 let app: Application | null = null;
 let capturer: SceneCapturer | null = null;
+let activeBackend: BackendId | null = null;
 
 async function init(backend: BackendId) {
   if (app) {
@@ -36,6 +37,7 @@ async function init(backend: BackendId) {
   await app.ready();
   const device = getDevice();
   capturer = new SceneCapturer(app, backend, CAPTURE_SIZE);
+  activeBackend = backend;
   return { backend, adapter: describeAdapter(device) };
 }
 
@@ -88,7 +90,15 @@ function unmaskedWebglRenderer(device: ReturnType<typeof getDevice>): string | n
 
 const api: HarnessApi = {
   init,
-  listScenes: () => SCENES.map((s) => ({ name: s.name, description: s.description, frames: s.frames ?? 1 })),
+  // `supported` is resolved here rather than in the Node runner, because a scene's
+  // predicate takes the backend and only the page knows which one is live.
+  listScenes: () =>
+    SCENES.map((s) => ({
+      name: s.name,
+      description: s.description,
+      frames: s.frames ?? 1,
+      supported: activeBackend ? (s.supports?.(activeBackend) ?? true) : true
+    })),
   async runScene(name: string) {
     const def = findScene(name);
     if (!def) {

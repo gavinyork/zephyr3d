@@ -9,6 +9,8 @@ export * from './eye';
 export * from './material';
 export * from './meshmaterial';
 export * from './hair';
+export * from './hairstrand';
+export * from './hairstrand_data';
 export * from './grassmaterial';
 export * from './terrain-cm';
 export * from './pbrmr';
