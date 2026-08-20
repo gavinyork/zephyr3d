@@ -108,6 +108,8 @@ const SCENE_NAMES = [
   'hair-strands-fan',
   'hair-strands-width',
   'hair-strands-gpu-helix',
+  'hair-shadow-pcf',
+  'hair-shadow-dom',
   'eye-frontal',
   'eye-angled',
   'eye-pupil-dilated',

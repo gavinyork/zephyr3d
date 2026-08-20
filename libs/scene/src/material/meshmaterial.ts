@@ -798,6 +798,14 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     if (ctx.oit) {
       ctx.oit.setRenderStates(stateSet);
     }
+    if (ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP) {
+      // Gives the shadow implementation the last say, the same way OIT gets it on
+      // the transparent pass. Single-pass techniques leave the states alone; an
+      // accumulating one (deep opacity maps) needs blending on and depth write
+      // off, which the branches above would otherwise never produce for a caster.
+      const shadowMapParams = ctx.shadowMapInfo?.get((ctx.renderPass as ShadowMapPass).light!);
+      shadowMapParams?.impl?.setCasterRenderStates(shadowMapParams, stateSet);
+    }
   }
   /**
    * Submit material uniforms/resources to the material bind group (set 2).

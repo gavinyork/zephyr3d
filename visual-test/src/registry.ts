@@ -17,6 +17,8 @@ import { oitABuffer, oitDualDepth, oitWeighted } from './scenes/oit';
 import { postFxaa, postToneMapBloom, taaMultiframe } from './scenes/post';
 import { eyeAngled, eyeFrontal, eyePupilDilated, eyeSocketOcclusion } from './scenes/eye';
 import {
+  hairShadowDom,
+  hairShadowPcf,
   hairStrandsFan,
   hairStrandsGpuHelix,
   hairStrandsHelix,
@@ -69,6 +71,9 @@ export const SCENES: VisualScene[] = [
   hairStrandsFan,
   hairStrandsWidth,
   hairStrandsGpuHelix,
+  // Hair self-shadowing: the deep opacity map and its depth-based control.
+  hairShadowPcf,
+  hairShadowDom,
   eyeFrontal,
   eyeAngled,
   eyePupilDilated,

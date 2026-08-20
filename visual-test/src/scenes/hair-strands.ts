@@ -11,8 +11,9 @@ import {
 import { AlembicHairImporter, type AlembicHairImportOptions } from '@zephyr3d/loaders';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { PrimitiveType, VertexAttribFormat } from '@zephyr3d/device';
+import type { ShadowMode } from '@zephyr3d/scene';
 import type { SceneContext, VisualScene } from '../types';
-import { bareScene, keyLight, placeCamera } from './common';
+import { bareScene, keyLight, placeCamera, shadowFloor, shadowKeyLight } from './common';
 import { buildAlembicArchive, combCurves, fanCurves, helixCurves } from './alembic-fixture';
 import type { SyntheticCurveSet } from './alembic-fixture';
 
@@ -264,3 +265,67 @@ export const hairStrandsWidth: VisualScene = {
     placeCamera(ctx.camera, new Vector3(0.35, 0.15, 3.1));
   }
 };
+
+/**
+ * Dense strands over a floor, once per shadow mode.
+ *
+ * @remarks
+ * Deep opacity maps only differ from a depth-based filter where light passes
+ * *through* the caster, so the scene is built to make that the dominant feature:
+ * a thick helix lit from above-left, with a floor to catch what gets through and
+ * enough strands that the interior is genuinely occluded rather than merely
+ * edge-lit.
+ *
+ * Two things separate the `dom` baseline from the `pcf` one, and both are the
+ * point of the technique. The floor under the groom picks up a graded shadow
+ * instead of a solid blocked region, because transmittance falls off with how
+ * much hair the light actually crossed. And the strands themselves shade from
+ * lit at the outside to dark in the middle, where a binary test makes every
+ * strand behind the first one equally black.
+ *
+ * WebGPU only, following the GPU strand path and `dom` itself.
+ */
+function hairShadowScene(mode: ShadowMode, note: string): VisualScene {
+  return {
+    name: `hair-shadow-${mode}`,
+    description: note,
+    supports: (backend) => backend === 'webgpu',
+    setup(ctx) {
+      bareScene(ctx.scene);
+      const light = shadowKeyLight(ctx.scene, mode);
+      // The preset fits a 2048 map to a 120-unit shadow distance, which over a
+      // groom this size leaves the layers far too coarse to resolve anything.
+      light.shadow.shadowDistance = 12;
+      if (mode === 'dom') {
+        // The helix is 1.6 units deep and the shadow camera spans 12, so the
+        // hair occupies about an eighth of the depth range; the layers want to
+        // cover roughly that much and no more.
+        light.shadow.domLayerDistance = 0.14;
+        light.shadow.domDensity = 2.5;
+      }
+      const material = new HairStrandMaterial();
+      material.albedoColor = new Vector4(0.3, 0.19, 0.13, 1);
+      material.specular1Color = new Vector3(0.4, 0.4, 0.4);
+      material.specular2Color = new Vector3(0.5, 0.36, 0.27);
+      material.segmentsPerStrand = 16;
+      material.minStrandWidth = 0;
+      material.strandWidthScale = 0.4;
+      // Many more strands than the expansion scene uses: a sparse groom has no
+      // interior to shadow, and this scene is about what happens inside one.
+      addGPUStrands(ctx, toStrandSource(helixCurves(96, 24)), material);
+      shadowFloor(ctx.scene);
+      placeCamera(ctx.camera, new Vector3(2.1, 1.3, 2.8), new Vector3(0, 0.05, 0));
+      ctx.camera.far = 40;
+    }
+  };
+}
+
+export const hairShadowDom = hairShadowScene(
+  'dom',
+  'Deep opacity map over dense strands: pins graded transmittance through hair, both onto the floor and within the groom itself.'
+);
+
+export const hairShadowPcf = hairShadowScene(
+  'pcf',
+  'The same dense strands under a depth-based filter, as the control for hair-shadow-dom. Its solid black groom interior and hard floor shadow are what the deep opacity map replaces.'
+);

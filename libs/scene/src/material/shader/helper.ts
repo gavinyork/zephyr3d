@@ -45,6 +45,7 @@ import type { HeightFogParams } from '../../shaders/fog';
 import { calculateFog, getDefaultHeightFogParams, getHeightFogParamsStruct } from '../../shaders/fog';
 import { getDevice } from '../../app/api';
 import type { Camera } from '../../camera';
+import type { ShadowMapPass } from '../../render/shadowmap_pass';
 import { getShadowReceiverBiasFactor, getShadowReceiverNoL } from '../../shadow/receiver_bias';
 
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
@@ -242,10 +243,22 @@ export class ShaderHelper {
         pb.vec4('directionCutoff'),
         pb.mat4('viewMatrix'),
         pb.vec4('depthBias'),
+        // Same slot the lighting pass exposes through getShadowImplParams. A
+        // caster normally has no use for it, but one that encodes something
+        // beyond depth - deep opacity map layers - needs the same parameters the
+        // receiver will decode with.
+        pb.vec4('implParams'),
         pb.int('lightType')
       ]);
       scope.camera = cameraStruct().uniform(0);
       scope.light = lightStruct().uniform(0);
+      // Lets the shadow implementation add its own caster inputs. Only deep
+      // opacity maps use this, to read the frontmost depth its first pass wrote.
+      const shadowLight = (ctx.renderPass as ShadowMapPass).light;
+      const casterParams = shadowLight ? ctx.shadowMapInfo?.get(shadowLight) : null;
+      if (casterParams) {
+        casterParams.impl?.declareCasterUniforms(scope, casterParams);
+      }
     } else if (
       ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH ||
       ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR
@@ -1242,8 +1255,10 @@ export class ShaderHelper {
         directionCutoff: light.directionAndCutoff,
         viewMatrix: light.viewMatrix,
         depthBias: shadowMapParams.depthBiasValues[0],
+        implParams: shadowMapParams.impl!.getParams(this._lightUniformShadow.implParams),
         lightType: light.lightType
       });
+      shadowMapParams.impl?.applyCasterUniforms(bindGroup, shadowMapParams);
     }
   }
   /** @internal */

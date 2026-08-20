@@ -29,6 +29,7 @@ import { VSM } from './vsm';
 import type { PCFPD } from './pcf_pd';
 import { PCFOPT } from './pcf_opt';
 import { PCSS } from './pcss';
+import { DOM } from './dom';
 import type { PointLight, PunctualLight, RectLight, SpotLight } from '../scene/light';
 import type { ShadowMapPass } from '../render/shadowmap_pass';
 import type { Scene } from '../scene/scene';
@@ -51,6 +52,11 @@ export type ShadowMode =
   | 'esm'
   | 'pcf'
   | 'pcss'
+  /**
+   * Deep opacity map. Fractional occlusion through hair rather than a binary
+   * blocked/unblocked test. WebGPU only.
+   */
+  | 'dom'
   /** @deprecated Use `pcf` instead. */
   | 'pcf-pd'
   /** @deprecated Use `pcf` instead. */
@@ -151,6 +157,10 @@ export class ShadowMapper extends Disposable {
   /** @internal */
   protected _pcssTemporalJitter: boolean;
   /** @internal */
+  protected _domLayerDistance: number;
+  /** @internal */
+  protected _domDensity: number;
+  /** @internal */
   protected _vsmBlurKernelSize: number;
   /** @internal */
   protected _vsmBlurRadius: number;
@@ -197,6 +207,8 @@ export class ShadowMapper extends Disposable {
     this._pcssFilterSampleCount = 32;
     this._pcssMaxFilterRadius = 32;
     this._pcssTemporalJitter = true;
+    this._domLayerDistance = 0.02;
+    this._domDensity = 1;
     this._vsmBlurKernelSize = 5;
     this._vsmBlurRadius = 4;
     this._vsmDarkness = 0.3;
@@ -440,6 +452,49 @@ export class ShadowMapper extends Disposable {
       const pcss = this.asPCSS();
       if (pcss) {
         pcss.lightRadius = this._pcssLightRadius;
+      }
+    }
+  }
+  /**
+   * Depth spanned by the deep opacity map's layers, as a fraction of the shadow
+   * camera's range. Only meaningful when the shadow mode is `dom`.
+   *
+   * @remarks
+   * Set it to roughly the depth of the hair along the light direction. Too small
+   * and everything past the outer strands saturates the last layer, which is a
+   * hard shadow again; too large and all four layers fall inside the first strand,
+   * leaving the interior unshadowed.
+   */
+  get domLayerDistance() {
+    return this._domLayerDistance;
+  }
+  set domLayerDistance(val) {
+    val = Math.max(0.0001, Number(val) || 0);
+    if (val !== this._domLayerDistance) {
+      this._domLayerDistance = val;
+      const dom = this.asDOM();
+      if (dom) {
+        dom.layerDistance = this._domLayerDistance;
+      }
+    }
+  }
+  /**
+   * How strongly accumulated hair coverage attenuates light. Only meaningful when
+   * the shadow mode is `dom`.
+   *
+   * @remarks
+   * Raise it to darken the interior of a groom without moving the layers.
+   */
+  get domDensity() {
+    return this._domDensity;
+  }
+  set domDensity(val) {
+    val = Math.max(0, Number(val) || 0);
+    if (val !== this._domDensity) {
+      this._domDensity = val;
+      const dom = this.asDOM();
+      if (dom) {
+        dom.density = this._domDensity;
       }
     }
   }
@@ -1071,7 +1126,9 @@ export class ShadowMapper extends Disposable {
     shadowMapParams.impl = this._impl;
     shadowMapParams.lightType = this.light.lightType;
     shadowMapParams.numShadowCascades =
-      shadowMapParams.lightType === LIGHT_TYPE_DIRECTIONAL ? (this._config.numCascades ?? 1) : 1;
+      shadowMapParams.lightType === LIGHT_TYPE_DIRECTIONAL && this._impl!.supportsCascades()
+        ? (this._config.numCascades ?? 1)
+        : 1;
     ctx.shadowMapInfo.set(this.light, shadowMapParams);
     const scene = ctx.scene;
     const camera = ctx.camera;
@@ -1083,6 +1140,32 @@ export class ShadowMapper extends Disposable {
     shadowMapParams.depthClampEnabled = false;
     renderPass.clearColor = this._impl!.getShadowMapClearColor(shadowMapParams);
     const depthScale = this._impl!.getDepthScale();
+    const geometryPassCount = Math.max(1, this._impl!.getGeometryPassCount(shadowMapParams) >> 0);
+    // Repeats the caster draw for implementations that need more than one look at
+    // the geometry (deep opacity maps). Single-pass implementations - every one
+    // but DOM - take the `pass === 0` path once and behave exactly as before.
+    const renderGeometry = (renderCamera: Camera, cullCamera?: Camera) => {
+      if (geometryPassCount === 1) {
+        renderPass.render(ctx, renderCamera, cullCamera);
+        return;
+      }
+      // Culling depends only on the camera, so the extra passes reuse the first
+      // pass's queue rather than walking the scene graph again per pass.
+      const renderQueue = renderPass.cullScene(ctx, cullCamera ?? renderCamera);
+      try {
+        for (let pass = 0; pass < geometryPassCount; pass++) {
+          this._impl!.beginGeometryPass(shadowMapParams, pass);
+          // The emitted caster shader differs between passes, and the shadow pass
+          // keys its programs on this hash, so it has to be refreshed per pass
+          // rather than computed once up front.
+          shadowMapParams.shaderHash = this.getShaderHash(shadowMapParams);
+          renderPass.clearColor = this._impl!.getShadowMapClearColor(shadowMapParams);
+          renderPass.render(ctx, renderCamera, cullCamera, renderQueue);
+        }
+      } finally {
+        renderQueue.dispose();
+      }
+    };
     const directionalShadowRegion = this._shadowRegion.region;
     const shadowRegion =
       this._light.isDirectionLight() && directionalShadowRegion?.isValid()
@@ -1111,16 +1194,20 @@ export class ShadowMapper extends Disposable {
         shadowMapRenderCamera.lookAtCubeFace(face);
         fb.setColorAttachmentCubeFace(0, face);
         fb.setDepthAttachmentCubeFace(face);
-        renderPass.render(ctx, shadowMapRenderCamera);
+        renderGeometry(shadowMapRenderCamera);
       }
       shadowMapParams.shadowMatrices.set(Matrix4x4.identity());
       ShadowMapper.releaseCamera(shadowMapRenderCamera);
     } else {
-      if (this._config.numCascades > 1) {
+      // Reads the resolved count, not the configured one: an implementation that
+      // cannot store cascades has already collapsed it to a single split, and the
+      // cascade path would index array layers its shadow map does not have.
+      const numCascades = shadowMapParams.numShadowCascades;
+      if (numCascades > 1) {
         const distances = this.calcSplitDistances(
           camera.getNearPlane(),
           Math.min(this._shadowDistance, camera.getFarPlane()),
-          this._config.numCascades
+          numCascades
         );
         const cascadeCamera = ShadowMapper.fetchCameraForScene(scene);
         const shadowMapRenderCamera = ShadowMapper.fetchCameraForScene(scene);
@@ -1128,7 +1215,7 @@ export class ShadowMapper extends Disposable {
         shadowMapCullCamera.clipMask = AABB.ClipLeft | AABB.ClipRight | AABB.ClipBottom | AABB.ClipTop;
         cascadeCamera.parent = camera;
         shadowMapParams.depthClampEnabled = getDevice().getDeviceCaps().shaderCaps.supportFragmentDepth;
-        for (let split = 0; split < this._config.numCascades; split++) {
+        for (let split = 0; split < numCascades; split++) {
           cascadeCamera.setPerspective(
             camera.getFOV(),
             camera.getAspect(),
@@ -1174,8 +1261,8 @@ export class ShadowMapper extends Disposable {
             fb.setColorAttachmentLayer(0, split);
             fb.setDepthAttachmentLayer(split);
           } else {
-            const numRows = this._config.numCascades > 2 ? 2 : 1;
-            const numCols = this._config.numCascades > 1 ? 2 : 1;
+            const numRows = numCascades > 2 ? 2 : 1;
+            const numCols = numCascades > 1 ? 2 : 1;
             const adjMatrix = new Matrix4x4();
             const col = split % 2;
             const row = split >> 1;
@@ -1207,7 +1294,7 @@ export class ShadowMapper extends Disposable {
           }
           device.setFramebuffer(fb);
           device.setScissor(scissor);
-          renderPass.render(ctx, shadowMapRenderCamera, shadowMapCullCamera);
+          renderGeometry(shadowMapRenderCamera, shadowMapCullCamera);
           shadowMapParams.shadowMatrices.set(
             Matrix4x4.transpose(shadowMapRenderCamera.viewProjectionMatrix),
             split * 16
@@ -1253,7 +1340,7 @@ export class ShadowMapper extends Disposable {
         shadowMapRenderCamera.setProjectionMatrix(
           Matrix4x4.multiply(snapMatrix, shadowMapRenderCamera.getProjectionMatrix())
         );
-        renderPass.render(ctx, shadowMapRenderCamera);
+        renderGeometry(shadowMapRenderCamera);
         shadowMapParams.shadowMatrices.set(Matrix4x4.transpose(shadowMapRenderCamera.viewProjectionMatrix));
         ShadowMapper.releaseCamera(shadowMapRenderCamera);
       }
@@ -1269,9 +1356,18 @@ export class ShadowMapper extends Disposable {
       mode !== 'pcf' &&
       mode !== 'pcf-pd' &&
       mode !== 'pcf-opt' &&
-      mode !== 'pcss'
+      mode !== 'pcss' &&
+      mode !== 'dom'
     ) {
       console.error(`ShadowMapper.setShadowMode() failed: invalid mode: ${mode}`);
+      return;
+    }
+    if (mode === 'dom' && getDevice().type !== 'webgpu') {
+      // The strand geometry this mode exists to shadow is WebGPU only, so the
+      // WebGL paths were never built. Falling back keeps a scene authored with it
+      // renderable rather than failing to produce a shadow map at all.
+      console.warn(`ShadowMapper.setShadowMode(): 'dom' requires WebGPU, falling back to 'pcf'`);
+      this.applyMode('pcf');
       return;
     }
     this._impl = null;
@@ -1286,6 +1382,8 @@ export class ShadowMapper extends Disposable {
       esm.logSpace = this._esmLogSpace;
     } else if (mode === 'pcf' || mode === 'pcf-opt' || mode === 'pcf-pd') {
       this._impl = new PCFOPT(this._pcfKernelSize);
+    } else if (mode === 'dom') {
+      this._impl = new DOM(this._domLayerDistance, this._domDensity);
     } else if (mode === 'pcss') {
       this._impl = new PCSS(
         this._pcssLightRadius,
@@ -1299,6 +1397,10 @@ export class ShadowMapper extends Disposable {
   /** @internal */
   private asVSM() {
     return this._impl?.getType() === 'vsm' ? (this._impl as VSM) : null;
+  }
+  /** @internal */
+  private asDOM() {
+    return this._impl?.getType() === 'dom' ? (this._impl as DOM) : null;
   }
   /** @internal */
   private asESM() {
