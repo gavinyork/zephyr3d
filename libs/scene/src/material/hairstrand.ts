@@ -32,6 +32,8 @@ import type { HairStrandData } from './hairstrand_data';
  * @public
  */
 export class HairStrandMaterial extends HairMaterial implements Clonable<HairStrandMaterial> {
+  /** @internal Enables per-strand distance decimation in the vertex shader. */
+  private static readonly FEATURE_STRAND_LOD = this.defineFeature();
   /** @internal */
   private _strands: Nullable<HairStrandData>;
   /** @internal Ribbon segments generated per strand. */
@@ -42,8 +44,12 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
   private _minStrandWidth: number;
   /** @internal Lower bound on ribbon width, in pixels. */
   private _minPixelWidth: number;
+  /** @internal Floor on the fraction of strands distance decimation keeps. */
+  private _minStrandLODRatio: number;
   /** @internal Scratch vector, so applying uniforms allocates nothing. */
   private readonly _strandScratch: Vector4;
+  /** @internal Scratch vector for the LOD uniform. */
+  private readonly _lodScratch: Vector4;
   /**
    * Creates a GPU strand material.
    */
@@ -54,7 +60,10 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     this._strandWidthScale = 1;
     this._minStrandWidth = 0;
     this._minPixelWidth = 1.4;
+    this._minStrandLODRatio = 0.05;
     this._strandScratch = new Vector4();
+    this._lodScratch = new Vector4();
+    this.useFeature(HairStrandMaterial.FEATURE_STRAND_LOD, false);
     // The quad is built facing the camera, so there is no back face to cull.
     this.cullMode = 'none';
     // Strand geometry carries no vertex attributes at all: the frame is derived
@@ -74,6 +83,8 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     this.strandWidthScale = other.strandWidthScale;
     this.minStrandWidth = other.minStrandWidth;
     this.minPixelWidth = other.minPixelWidth;
+    this.strandLOD = other.strandLOD;
+    this.minStrandLODRatio = other.minStrandLODRatio;
   }
   /** GPU-resident strand geometry. */
   get strands(): Nullable<HairStrandData> {
@@ -141,6 +152,54 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     const v = val < 0 ? 0 : val;
     if (v !== this._minPixelWidth) {
       this._minPixelWidth = v;
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Trades strand count for strand opacity with distance.
+   *
+   * @remarks
+   * Past the point where a strand is thinner than a pixel, {@link minPixelWidth}
+   * widens it and pays the widening back as alpha, so a distant groom is drawn as
+   * tens of thousands of ribbons each contributing a few percent of a pixel. That
+   * is correct on average and unstable in practice: any per-fragment stochastic
+   * alpha - `alphaDither`, alpha-to-coverage - is sampling a five percent event
+   * once per pixel per frame, and the variance reads as pixel-level crawl that a
+   * temporal filter's short history cannot average away.
+   *
+   * This moves the randomness from the fragment to the strand. Each strand is
+   * kept with a probability equal to the coverage it would have been drawn at and
+   * the survivors are drawn at full coverage, which puts the same quantity of hair
+   * on screen: `N` strands at alpha `a` and `N*a` strands at alpha 1 integrate to
+   * the same image. The difference is that the draw is decided once per strand
+   * from a fixed seed rather than once per fragment per frame, so the result is
+   * stable across frames, and the culled strands cost no fragments at all.
+   *
+   * Off by default: it changes which strands are drawn, so it is opted into
+   * rather than applied to existing grooms silently.
+   */
+  get strandLOD() {
+    return this.featureUsed<boolean>(HairStrandMaterial.FEATURE_STRAND_LOD);
+  }
+  set strandLOD(val: boolean) {
+    this.useFeature(HairStrandMaterial.FEATURE_STRAND_LOD, !!val);
+  }
+  /**
+   * Floor on the fraction of strands {@link strandLOD} keeps.
+   *
+   * @remarks
+   * Decimation follows coverage, and coverage falls without bound as the groom
+   * recedes, so an unclamped ratio eventually culls every strand and the hair
+   * disappears. This is the point past which thinning stops and the remaining
+   * strands simply fade instead. Defaults to 0.05.
+   */
+  get minStrandLODRatio() {
+    return this._minStrandLODRatio;
+  }
+  set minStrandLODRatio(val) {
+    const v = val < 0 ? 0 : val > 1 ? 1 : val;
+    if (v !== this._minStrandLODRatio) {
+      this._minStrandLODRatio = v;
       this.uniformChanged();
     }
   }
@@ -222,6 +281,9 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
         pixelFactor
       )
     );
+    if (this.strandLOD) {
+      bindGroup.setValue('zStrandLOD', this._lodScratch.setXYZW(this._minStrandLODRatio, 0, 0, 0));
+    }
   }
   /**
    * Declares the strand storage buffers and expansion parameters.
@@ -235,6 +297,9 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     scope.zStrandHeaders = pb.uint[0]().storageBufferReadonly(2);
     scope.zStrandPoints = pb.float[0]().storageBufferReadonly(2);
     scope.zStrandParams = pb.vec4().uniform(2);
+    if (this.strandLOD) {
+      scope.zStrandLOD = pb.vec4().uniform(2);
+    }
   }
   /**
    * Samples a strand's control polygon at parameter `t`.
@@ -416,6 +481,40 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
           this.halfW = this.floorHalf;
         });
       });
+
+      if (that.strandLOD) {
+        // Taken from the root control point rather than from this ring: both the
+        // view distance and the tapered width vary along a strand, so a
+        // ring-local threshold would fall between two rings on strands near the
+        // cut-off and lop them off partway down their length.
+        const points = this.zStrandPoints;
+        this.$l.rootBase = pb.mul(this.firstPoint, 4);
+        this.$l.rootPos = pb.vec3(
+          points.at(this.rootBase),
+          points.at(pb.add(this.rootBase, 1)),
+          points.at(pb.add(this.rootBase, 2))
+        );
+        this.$l.rootHalf = pb.mul(points.at(pb.add(this.rootBase, 3)), 0.5, this.zStrandParams.y);
+        this.$l.rootFloor = pb.mul(this.zStrandParams.w, pb.distance(this.camPos, this.rootPos));
+        this.$l.keep = pb.float(1);
+        this.$if(pb.greaterThan(this.rootFloor, 0), function () {
+          this.keep = pb.clamp(pb.div(this.rootHalf, this.rootFloor), this.zStrandLOD.x, 1);
+        });
+        // The per-strand seed the importer hashed into the header. Stored as
+        // float bits in a uint buffer, hence the bitcast.
+        this.$l.seed = pb.uintBitsToFloat(this.zStrandHeaders.at(pb.add(this.hBase, 3)));
+        // Survivors absorb the coverage of the strands dropped alongside them,
+        // which is what leaves the total amount of hair unchanged. At the ratio
+        // floor this stops reaching 1 and the strands fade instead.
+        this.coverage = pb.min(pb.div(this.coverage, this.keep), 1);
+        this.$if(pb.greaterThanEqual(this.seed, this.keep), function () {
+          // Collapse the strand onto a single point: every triangle it would
+          // have produced becomes zero-area and is dropped before rasterisation,
+          // so a culled strand costs no fragments at all.
+          this.centre = this.rootPos;
+          this.halfW = pb.float(0);
+        });
+      }
 
       this.$l.offset = pb.mul(this.side, this.halfW, pb.sub(pb.mul(this.sideSel, 2), 1));
       this.$l.result = StrandVertex();

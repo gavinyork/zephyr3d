@@ -59,8 +59,9 @@ scene.env.light.ambientColor = new Vector4(0.06, 0.07, 0.09, 1);
 const camera = new PerspectiveCamera(scene, Math.PI / 5, 0.05, 50);
 camera.position.setXYZ(0, 1.55, 0.75);
 camera.controller = new OrbitCameraController({ center: new Vector3(0, 1.52, 0) });
-camera.oitMode = 'dual-depth';
-camera.oitDualDepthPeels = 3;
+camera.TAA = true;
+//camera.oitMode = 'weighted'; // 'dual-depth';
+//camera.oitDualDepthPeels = 1;
 scene.mainCamera = camera;
 getInput().use(camera.handleEvent, camera);
 getEngine().setRenderable(scene, 0);
@@ -96,7 +97,9 @@ material.minPixelWidth = 1.3;
 // pixel floor and scales alpha by how much it widened. That alpha only means
 // something if the material actually blends: left opaque, every strand paints a
 // full pixel and the groom reads as a solid shell rather than as hair.
-material.blendMode = 'blend';
+material.blendMode = 'none';
+material.alphaCutoff = 0.01;
+material.alphaDither = true;
 
 /** Everything the UI needs to know about the loaded groom. */
 type LoadStats = {
@@ -412,6 +415,11 @@ function drawUI() {
     }
     slider('Width scale', material.strandWidthScale, 0.1, 20, (v) => (material.strandWidthScale = v));
     slider('Min pixel width', material.minPixelWidth, 0, 4, (v) => (material.minPixelWidth = v));
+    const lod: [boolean] = [material.strandLOD];
+    if (ImGui.Checkbox('Strand LOD (distance decimation)', lod)) {
+      material.strandLOD = lod[0];
+    }
+    slider('LOD min ratio', material.minStrandLODRatio, 0, 1, (v) => (material.minStrandLODRatio = v));
     const blend: [boolean] = [material.blendMode === 'blend'];
     if (ImGui.Checkbox('Blend (use coverage alpha)', blend)) {
       material.blendMode = blend[0] ? 'blend' : 'none';
