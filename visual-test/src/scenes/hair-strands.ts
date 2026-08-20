@@ -1,5 +1,6 @@
 import {
   BoundingBox,
+  BoxShape,
   HairMaterial,
   HairStrandData,
   HairStrandMaterial,
@@ -13,7 +14,7 @@ import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { PrimitiveType, VertexAttribFormat } from '@zephyr3d/device';
 import type { ShadowMode } from '@zephyr3d/scene';
 import type { SceneContext, VisualScene } from '../types';
-import { bareScene, keyLight, placeCamera, shadowFloor, shadowKeyLight } from './common';
+import { bareScene, keyLight, lambert, placeCamera, shadowFloor, shadowKeyLight } from './common';
 import { buildAlembicArchive, combCurves, fanCurves, helixCurves } from './alembic-fixture';
 import type { SyntheticCurveSet } from './alembic-fixture';
 
@@ -298,9 +299,10 @@ function hairShadowScene(mode: ShadowMode, note: string): VisualScene {
       light.shadow.shadowDistance = 12;
       if (mode === 'dom') {
         // The helix is about 1.1 units across, so the layers span roughly the
-        // thickness of hair the light actually has to cross.
+        // thickness of hair the light actually has to cross. Density is left at
+        // the physically exact 1 so the baseline pins the technique rather than a
+        // taste setting layered on top of it.
         light.shadow.domLayerDistance = 1.1;
-        light.shadow.domDensity = 2.5;
       }
       const material = new HairStrandMaterial();
       material.albedoColor = new Vector4(0.3, 0.19, 0.13, 1);
@@ -309,10 +311,31 @@ function hairShadowScene(mode: ShadowMode, note: string): VisualScene {
       material.segmentsPerStrand = 16;
       material.minStrandWidth = 0;
       material.strandWidthScale = 0.4;
+      // Puts real fractional coverage into the shadow pass. Without a cutoff the
+      // material reports no fragment colour to a caster, every strand is recorded
+      // as fully opaque, and the scene stops exercising the partial absorption
+      // that is the entire point of the technique.
+      material.alphaCutoff = 0.01;
+      material.minPixelWidth = 1.3;
       // Many more strands than the expansion scene uses: a sparse groom has no
       // interior to shadow, and this scene is about what happens inside one.
       addGPUStrands(ctx, toStrandSource(helixCurves(96, 24)), material);
       shadowFloor(ctx.scene);
+      // A solid caster beside the hair. Deep opacity maps record absorption
+      // rather than occlusion, and an implementation that stores raw coverage
+      // cannot push a single opaque surface past exp(-1) - a 37% grey. This box
+      // is here so that failure is a baseline diff rather than a subtlety nobody
+      // looks for; its shadow belongs as black as the one PCF casts.
+      const box = new Mesh(
+        ctx.scene,
+        new BoxShape({ sizeX: 0.4, sizeY: 1.1, sizeZ: 0.4 }),
+        lambert(new Vector4(0.75, 0.72, 0.66, 1))
+      );
+      // Front-left, and tall. The key light throws shadows towards +x and -z, so
+      // a short box anywhere further back drops its shadow behind itself or under
+      // the groom's - the two places it cannot be read. Here it falls across clean
+      // lit floor to the left of the hair.
+      box.position.setXYZ(-1.45, -0.3, 0.95);
       placeCamera(ctx.camera, new Vector3(2.1, 1.3, 2.8), new Vector3(0, 0.05, 0));
       ctx.camera.far = 40;
     }
@@ -321,10 +344,10 @@ function hairShadowScene(mode: ShadowMode, note: string): VisualScene {
 
 export const hairShadowDom = hairShadowScene(
   'dom',
-  'Deep opacity map over dense strands: pins graded transmittance through hair, both onto the floor and within the groom itself.'
+  'Deep opacity map over dense strands: pins graded transmittance through hair, both onto the floor and within the groom itself, and the solid box beside it staying fully shadowed.'
 );
 
 export const hairShadowPcf = hairShadowScene(
   'pcf',
-  'The same dense strands under a depth-based filter, as the control for hair-shadow-dom. Its solid black groom interior and hard floor shadow are what the deep opacity map replaces.'
+  'The same casters under a depth-based filter, as the control for hair-shadow-dom. Its solid black groom interior and hard floor shadow are what the deep opacity map replaces; the box should shadow identically under both.'
 );

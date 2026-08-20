@@ -29,6 +29,14 @@ const DOM_LAYER_COUNT = 3;
 /** @internal Caster-pass uniform holding the frontmost depth from geometry pass 0. */
 const UNIFORM_NAME_DOM_FRONT_DEPTH = 'Z_domFrontDepth';
 
+/**
+ * Transmittance a fully opaque caster is recorded as, since zero has no finite
+ * optical depth to blend. Dark enough to read as black, and small enough in the
+ * exponent that several opaque layers can stack without saturating half floats.
+ * @internal
+ */
+const DOM_MIN_TRANSMITTANCE = 0.001;
+
 /** @internal */
 type DOMImplData = {
   /**
@@ -37,7 +45,7 @@ type DOMImplData = {
    * target and a sampled resource in the same pass.
    */
   frontDepth: Texture2D;
-  /** RGB = cumulative opacity per layer, A = the depth those layers start at. */
+  /** RGB = cumulative optical depth per layer, A = the depth those layers start at. */
   result: Texture2D;
   /** Targets {@link DOMImplData.frontDepth}, reusing the shared depth attachment. */
   depthFramebuffer: FrameBuffer;
@@ -58,11 +66,15 @@ type DOMImplData = {
  *
  * A deep opacity map (Yuksel & Keyser 2008) records the attenuation instead of
  * the boundary. Geometry pass 0 writes the frontmost caster depth `z0` per texel.
- * Pass 1 rasterises the casters again and each fragment adds its coverage to
- * every layer lying behind it, giving cumulative opacity sampled at three depths
- * measured *from `z0`* rather than from the light. Because the layers follow the
- * hair surface, three of them resolve what a plain opacity shadow map needs
- * dozens of uniformly spaced ones to match.
+ * Pass 1 rasterises the casters again and each fragment adds its optical depth to
+ * every layer lying behind it, giving cumulative absorption sampled at three
+ * depths measured *from `z0`* rather than from the light. Because the layers
+ * follow the hair surface, three of them resolve what a plain opacity shadow map
+ * needs dozens of uniformly spaced ones to match.
+ *
+ * Recording optical depth rather than coverage is what keeps it exact for solid
+ * casters as well as thin ones, so a scene does not have to reserve this mode for
+ * its hair: see the caster output for why the two differ.
  *
  * WebGPU only, and deliberately so: the strand geometry this exists to shadow is
  * itself WebGPU only, so supporting the WebGL fallbacks - cascade atlases instead
@@ -122,10 +134,12 @@ export class DOM extends ShadowImpl {
     this._layerDistance = val > 0 ? val : 0.0001;
   }
   /**
-   * Scales accumulated coverage into optical depth.
+   * Artistic multiplier on the absorption the casters actually recorded.
    *
    * @remarks
-   * Raise it to darken the interior of a groom without moving the layers.
+   * One reproduces alpha compositing exactly and is the right default. Raise it
+   * to deepen the interior of a groom without moving the layers, lower it to let
+   * more light through than the geometry strictly would.
    */
   get density() {
     return this._density;
@@ -169,11 +183,11 @@ export class DOM extends ShadowImpl {
     return false;
   }
   clipsCasterAlpha() {
-    // Neither pass wants the clip. Pass 1 integrates coverage, and clipping is
+    // Neither pass wants the clip. Pass 1 integrates the alpha, and clipping is
     // destructive to it in both of the forms the material applies: a dithered
-    // caster survives with probability alpha and then contributes alpha, which
-    // accumulates the square, and a hard cutoff drops the sub-pixel strands that
-    // carry most of a groom's transmittance.
+    // caster survives with probability alpha and then contributes the absorption
+    // of that same alpha, counting it twice, and a hard cutoff drops the sub-pixel
+    // strands that carry most of a groom's transmittance.
     //
     // Pass 0 skips it for a different reason. Its job is to find the frontmost
     // strand, and under dithering the clip makes that choice per-pixel random -
@@ -203,8 +217,8 @@ export class DOM extends ShadowImpl {
     // Every strand between z0 and the last layer has to contribute, so the pass
     // must not depth-test against the frontmost surface pass 0 resolved, and must
     // not write depth of its own - its framebuffer has no depth attachment at all.
-    // Coverage sums across the three layer channels; alpha instead carries z0,
-    // which every fragment reads from the same texel, so replacing is correct
+    // Optical depth sums across the three layer channels; alpha instead carries
+    // z0, which every fragment reads from the same texel, so replacing is correct
     // where summing would multiply it by the number of overlapping strands.
     stateSet
       .useBlendingState()
@@ -243,7 +257,7 @@ export class DOM extends ShadowImpl {
   }
   /**
    * Format for both targets. Half float covers a normalized depth and three
-   * coverage sums, and halves the bandwidth of the accumulation pass.
+   * absorption sums, and halves the bandwidth of the accumulation pass.
    * @internal
    */
   private colorFormat(): TextureFormat {
@@ -335,9 +349,9 @@ export class DOM extends ShadowImpl {
   /**
    * Caster output.
    *
-   * Pass 0 writes the frontmost depth. Pass 1 writes this fragment's coverage into
-   * the layers behind it, for additive blending to sum, and carries z0 through
-   * alpha so the receiver can find where the layers start.
+   * Pass 0 writes the frontmost depth. Pass 1 writes this fragment's optical depth
+   * into the layers behind it, for additive blending to sum, and carries z0
+   * through alpha so the receiver can find where the layers start.
    */
   computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,
@@ -366,14 +380,28 @@ export class DOM extends ShadowImpl {
         // contributes to each layer whose far boundary it precedes. step() gives
         // that mask without branching.
         this.$l.mask = pb.vec3(pb.step(this.t, 1 / 3), pb.step(this.t, 2 / 3), pb.step(this.t, 1));
-        // Opaque casters cover fully; a masked or blended one has already had its
-        // alpha clipped by the time this runs.
-        this.$l.coverage = pb.float(1);
+        // A caster with no alpha to give covers fully.
+        this.$l.alpha = pb.float(1);
         const alpha = that.casterAlpha(this);
         if (alpha) {
-          this.coverage = alpha;
+          this.alpha = alpha;
         }
-        this.$return(pb.vec4(pb.mul(this.mask, this.coverage), this.z0));
+        // Optical depth rather than raw coverage, because what has to be additive
+        // here is the exponent, not the alpha. Compositing N layers multiplies
+        // their transmittances - prod(1 - a) - and blending can only sum, so each
+        // fragment contributes -log(1 - a) and the receiver's exp(-sum) reproduces
+        // that product exactly.
+        //
+        // Summing alpha instead makes exp(-sum) an approximation that only holds
+        // while alpha is small, which is true of a sub-pixel strand and false of
+        // anything solid: a single opaque caster would sum to 1 and shadow to
+        // exp(-1), a 37% grey rather than black.
+        //
+        // The floor bounds what alpha = 1 encodes. It has to be finite to blend,
+        // and 0.001 transmittance is already black; it also leaves room for
+        // several opaque layers to stack without leaving half precision.
+        this.$l.opticalDepth = pb.neg(pb.log(pb.max(pb.sub(1, this.alpha), DOM_MIN_TRANSMITTANCE)));
+        this.$return(pb.vec4(pb.mul(this.mask, this.opticalDepth), this.z0));
       }
     });
     return pb.getGlobalScope()[funcName](worldPos) as PBShaderExp;
@@ -486,11 +514,15 @@ export class DOM extends ShadowImpl {
         this.near = this.layers.x;
         this.far = this.layers.y;
       });
-      this.$l.opacity = pb.mix(this.near, this.far, this.frac);
-      // Beer-Lambert on the accumulated coverage. Coverage is a sum of alphas, so
-      // it grows past one inside a dense groom; exponentiating keeps that finite
-      // and gives an interior falloff that a clamp would flatten.
-      this.$return(pb.exp(pb.neg(pb.mul(this.opacity, this.density))));
+      // Optical depth is what accumulates linearly through a medium, so the lerp
+      // between two layer readings is meaningful in a way that lerping stored
+      // alphas would not have been.
+      this.$l.absorption = pb.mix(this.near, this.far, this.frac);
+      // Beer-Lambert. With the casters recording -log(1 - alpha) this is exactly
+      // prod(1 - alpha) over everything crossed, so a solid caster reaches black
+      // and a stack of thin strands reaches the same value alpha compositing them
+      // would have.
+      this.$return(pb.exp(pb.neg(pb.mul(this.absorption, this.density))));
     });
     return pb.getGlobalScope()[funcName](shadowCoord) as PBShaderExp;
   }

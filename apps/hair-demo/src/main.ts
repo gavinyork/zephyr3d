@@ -573,11 +573,12 @@ function drawUI() {
       slider('Layer span (m)', key.shadow.domLayerDistance, 0.01, 1.5, (v) => {
         key.shadow.domLayerDistance = v;
       });
-      slider('Density', key.shadow.domDensity, 0, 8, (v) => (key.shadow.domDensity = v));
+      slider('Density', key.shadow.domDensity, 0, 4, (v) => (key.shadow.domDensity = v));
       // Both knobs fail in ways that look like the technique is broken rather
       // than mistuned, so name the symptoms next to the sliders.
       ImGui.TextDisabled('Span: roughly how deep the hair is.');
       ImGui.TextDisabled('Too small reads hard, too large reads unlit.');
+      ImGui.TextDisabled('Density 1 matches alpha blending; above is taste.');
     } else if (shadowMode === 'pcf' && webgpuOK) {
       ImGui.TextDisabled('Binary test: no gradient through the groom.');
     }
