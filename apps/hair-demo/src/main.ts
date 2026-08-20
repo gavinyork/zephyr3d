@@ -51,17 +51,23 @@ await imGuiInit(device);
 getInput().use(imGuiInjectEvent);
 
 const scene = new Scene();
+/*
 scene.env.sky.skyType = 'none';
-scene.env.sky.fogType = 'none';
 scene.env.light.type = 'constant';
 scene.env.light.ambientColor = new Vector4(0.06, 0.07, 0.09, 1);
+*/
+scene.env.sky.fogType = 'none';
 
 const camera = new PerspectiveCamera(scene, Math.PI / 5, 0.05, 50);
 camera.position.setXYZ(0, 1.55, 0.75);
 camera.controller = new OrbitCameraController({ center: new Vector3(0, 1.52, 0) });
 camera.TAA = true;
-//camera.oitMode = 'weighted'; // 'dual-depth';
-//camera.oitDualDepthPeels = 1;
+// Only consulted when the material is actually transparent: the opaque and
+// dither blend modes put the hair in the opaque queue, which no OIT pass runs
+// over. Set up front so switching to alpha-blend in the UI lands on peeling
+// rather than on whatever happened to be default.
+camera.oitMode = 'dual-depth';
+camera.oitDualDepthPeels = 3;
 scene.mainCamera = camera;
 getInput().use(camera.handleEvent, camera);
 getEngine().setRenderable(scene, 0);
@@ -71,7 +77,6 @@ getEngine().setRenderable(scene, 0);
 const key = new DirectionalLight(scene);
 key.lookAt(new Vector3(2, 3.4, 2.6), new Vector3(0, 1.5, 0), Vector3.axisPY());
 key.color = new Vector4(1, 0.97, 0.92, 1);
-key.intensity = 3;
 
 const fill = new DirectionalLight(scene);
 fill.lookAt(new Vector3(-2.6, 1.8, 1.4), new Vector3(0, 1.5, 0), Vector3.axisPY());
@@ -93,13 +98,50 @@ material.transmissionColor = new Vector3(0.55, 0.26, 0.12);
 material.transmissionIntensity = 0.35;
 material.segmentsPerStrand = 8;
 material.minPixelWidth = 1.3;
-// A real strand is far thinner than a pixel, so the shader widens it to the
-// pixel floor and scales alpha by how much it widened. That alpha only means
-// something if the material actually blends: left opaque, every strand paints a
-// full pixel and the groom reads as a solid shell rather than as hair.
-material.blendMode = 'none';
-material.alphaCutoff = 0.01;
-material.alphaDither = true;
+
+/** How the demo resolves strand coverage into pixels. */
+type BlendModeName = 'opaque' | 'alpha-dither' | 'alpha-blend';
+const BLEND_MODES: BlendModeName[] = ['opaque', 'alpha-dither', 'alpha-blend'];
+/** Which OIT algorithm resolves the transparent queue, for `alpha-blend`. */
+type OitModeName = 'ddp' | 'weighted';
+const OIT_MODES: OitModeName[] = ['ddp', 'weighted'];
+
+/**
+ * Kept outside the material so switching away from dithering and back does not
+ * lose the value - the other two modes need the cutoff at zero.
+ */
+let ditherCutoff = 0.01;
+let blendModeIndex = BLEND_MODES.indexOf('alpha-dither');
+let oitModeIndex = OIT_MODES.indexOf('ddp');
+
+/**
+ * Applies a coverage resolution strategy to the material.
+ *
+ * @remarks
+ * A real strand is far thinner than a pixel, so the shader widens it to the
+ * pixel floor and scales alpha by how much it widened. What happens to that
+ * alpha is the whole choice here:
+ *
+ * - `opaque` discards it. Every strand paints a full pixel and the groom reads
+ *   as a solid shell rather than as hair - useful mainly as a reference.
+ * - `alpha-dither` spends it as a stochastic per-fragment discard, resolved
+ *   over time by TAA. Stays in the opaque queue, so it keeps depth writes and
+ *   early-Z and never runs an OIT pass.
+ * - `alpha-blend` spends it as real transparency, which moves the hair into the
+ *   transparent queue and hands ordering to whichever OIT mode is selected.
+ */
+function applyBlendMode(mode: BlendModeName) {
+  material.blendMode = mode === 'alpha-blend' ? 'blend' : 'none';
+  material.alphaDither = mode === 'alpha-dither';
+  // Only dithering consumes a cutoff; the other two want every fragment kept.
+  material.alphaCutoff = mode === 'alpha-dither' ? ditherCutoff : 0;
+}
+
+function applyOitMode(mode: OitModeName) {
+  camera.oitMode = mode === 'ddp' ? 'dual-depth' : 'weighted';
+}
+
+applyBlendMode(BLEND_MODES[blendModeIndex]);
 
 /** Everything the UI needs to know about the loaded groom. */
 type LoadStats = {
@@ -420,9 +462,48 @@ function drawUI() {
       material.strandLOD = lod[0];
     }
     slider('LOD min ratio', material.minStrandLODRatio, 0, 1, (v) => (material.minStrandLODRatio = v));
-    const blend: [boolean] = [material.blendMode === 'blend'];
-    if (ImGui.Checkbox('Blend (use coverage alpha)', blend)) {
-      material.blendMode = blend[0] ? 'blend' : 'none';
+  }
+
+  if (ImGui.CollapsingHeader('Transparency', ImGui.TreeNodeFlags.DefaultOpen)) {
+    const blendRef: [number] = [blendModeIndex];
+    if (ImGui.Combo('Blend', blendRef, BLEND_MODES)) {
+      blendModeIndex = blendRef[0];
+      applyBlendMode(BLEND_MODES[blendModeIndex]);
+    }
+    const blendMode = BLEND_MODES[blendModeIndex];
+    if (blendMode === 'alpha-dither') {
+      const cutoff: [number] = [ditherCutoff];
+      if (ImGui.InputFloat('Alpha cutoff', cutoff, 0.005, 0.05, '%.3f')) {
+        ditherCutoff = Math.min(Math.max(cutoff[0], 0), 1);
+        material.alphaCutoff = ditherCutoff;
+      }
+    }
+    const taa: [boolean] = [camera.TAA];
+    if (ImGui.Checkbox('TAA', taa)) {
+      camera.TAA = taa[0];
+    }
+    // Dithering spends coverage as a per-fragment coin flip and leaves the
+    // averaging to the temporal filter, so without one the groom is raw noise
+    // rather than a slightly noisy groom. Worth saying out loud, because the
+    // failure looks like the dither is broken rather than like a missing pass.
+    if (blendMode === 'alpha-dither' && !camera.TAA) {
+      ImGui.TextDisabled('alpha-dither needs TAA to resolve');
+    }
+    // OIT resolves the transparent queue, which the other two modes never reach.
+    if (blendMode === 'alpha-blend') {
+      const oitRef: [number] = [oitModeIndex];
+      if (ImGui.Combo('OIT', oitRef, OIT_MODES)) {
+        oitModeIndex = oitRef[0];
+        applyOitMode(OIT_MODES[oitModeIndex]);
+      }
+      if (OIT_MODES[oitModeIndex] === 'ddp') {
+        const peels: [number] = [camera.oitDualDepthPeels];
+        if (ImGui.InputInt('DDP peels', peels)) {
+          camera.oitDualDepthPeels = Math.min(Math.max(peels[0], 1), 16);
+        }
+      }
+    } else {
+      ImGui.TextDisabled('OIT applies to alpha-blend only');
     }
   }
 
