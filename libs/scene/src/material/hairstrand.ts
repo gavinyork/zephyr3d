@@ -229,6 +229,25 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     // vector is already perpendicular to the strand and to the shading normal.
     scope.$outputs.wBinormal = scope.strand.side;
     scope.$outputs.zStrandCoverage = scope.strand.coverage;
+    // Without this the inherited path reports zero motion for every pixel - it
+    // emits motion vectors from resolveVertexPosition, which reads the vertex
+    // attribute this material does not have. A temporal filter then reprojects
+    // rotating hair onto the pixel it used to occupy, rejects the mismatched
+    // history and falls back to the raw frame, which on dithered strands is
+    // visible as noise that only settles once the camera stops.
+    //
+    // Both ends use the current world position on purpose. The control points
+    // are already world space and no world matrix is applied, so a static groom
+    // does not move between frames; all that differs is the camera-facing offset,
+    // whose per-frame change is the ribbon half-width times the per-frame camera
+    // rotation - hundredths of a pixel even while orbiting quickly. Re-running
+    // the expansion against the previous camera to recover that would double the
+    // control point fetches for a sub-pixel correction.
+    //
+    // This does assume the control points are static. A simulation pass writing
+    // the point buffer in place would invalidate it, and would need the previous
+    // frame's points kept alongside the current ones to fix properly.
+    ShaderHelper.resolveMotionVector(scope, scope.strand.worldPos, scope.strand.worldPos);
     ShaderHelper.setClipSpacePosition(
       scope,
       pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.strand.worldPos, 1))
