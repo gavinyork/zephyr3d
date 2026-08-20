@@ -149,6 +149,19 @@ const SHADOW_MODES: ShadowModeName[] = ['off', 'pcf', 'dom'];
 const shadowModeChoices: ShadowModeName[] = webgpuOK ? SHADOW_MODES : ['off', 'pcf'];
 let shadowModeIndex = shadowModeChoices.indexOf(webgpuOK ? 'dom' : 'pcf');
 
+/**
+ * Kernel widths the deep opacity map accepts, and how they read on screen.
+ *
+ * @remarks
+ * Worth having as a control rather than a constant: this is the axis along which
+ * the technique is *not* automatically better than a depth-based filter. Its own
+ * gradation runs along the light, so a single tap leaves the silhouette of the
+ * groom as hard as an unfiltered shadow map, and the difference between 1 and 5
+ * here is the difference people notice first.
+ */
+const DOM_FILTERS = [1, 3, 5, 7];
+const DOM_FILTER_LABELS = ['1 (hard)', '3', '5', '7 (soft)'];
+
 function applyShadowMode(mode: ShadowModeName) {
   key.castShadow = mode !== 'off';
   if (mode !== 'off') {
@@ -574,6 +587,12 @@ function drawUI() {
         key.shadow.domLayerDistance = v;
       });
       slider('Density', key.shadow.domDensity, 0, 4, (v) => (key.shadow.domDensity = v));
+      // Only 1/3/5/7 are accepted; the kernel is unrolled into the shader, so a
+      // change here rebuilds the receiver programs.
+      const filterRef: [number] = [DOM_FILTERS.indexOf(key.shadow.domFilterSize)];
+      if (ImGui.Combo('Filter', filterRef, DOM_FILTER_LABELS)) {
+        key.shadow.domFilterSize = DOM_FILTERS[filterRef[0]];
+      }
       // Both knobs fail in ways that look like the technique is broken rather
       // than mistuned, so name the symptoms next to the sliders.
       ImGui.TextDisabled('Span: roughly how deep the hair is.');

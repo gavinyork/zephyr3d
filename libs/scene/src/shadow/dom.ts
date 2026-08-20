@@ -11,7 +11,8 @@ import type {
 import { ShadowImpl } from './shadow_impl';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
 import { LIGHT_TYPE_POINT } from '../values';
-import { ndcToShadowCoord3, shadowCoordDepthInRange } from '../shaders/shadow';
+import { applyShadowDepthBias, ndcToShadowCoord3, shadowCoordDepthInRange } from '../shaders/shadow';
+import { computeShadowBias } from './shader';
 import { ShaderHelper } from '../material/shader/helper';
 import { getDevice } from '../app/api';
 import { fetchSampler } from '../utility/misc';
@@ -88,6 +89,8 @@ export class DOM extends ShadowImpl {
   private _layerDistance: number;
   /** @internal */
   private _density: number;
+  /** @internal Width of the sampling kernel in texels; 1 disables filtering. */
+  private _filterSize: number;
   /** @internal */
   private readonly _paramsScratch: Vector4;
   /**
@@ -105,13 +108,37 @@ export class DOM extends ShadowImpl {
    * are the world depth divided by exactly this.
    */
   private _depthRange: number;
-  constructor(layerDistance = 0.25, density = 1) {
+  constructor(layerDistance = 0.25, density = 1, filterSize = 5) {
     super();
     this._layerDistance = layerDistance;
     this._density = density;
+    this._filterSize = DOM.clampFilterSize(filterSize);
     this._paramsScratch = new Vector4();
     this._geometryPass = 0;
     this._depthRange = 1;
+  }
+  /** @internal */
+  private static clampFilterSize(val: number) {
+    return val !== 1 && val !== 3 && val !== 5 && val !== 7 ? 5 : val;
+  }
+  /**
+   * Width of the sampling kernel, in shadow map texels. One of 1, 3, 5 or 7.
+   *
+   * @remarks
+   * The graded transmittance this technique records runs along the light, not
+   * across the map, so at the silhouette of a groom - where the change is one of
+   * coverage rather than of depth - a single tap is as abrupt as an unfiltered
+   * shadow map. This is the kernel that softens that edge, and it is the same
+   * knob PCF's kernel size is, with the difference that each tap here costs a
+   * layer lookup rather than a depth comparison.
+   *
+   * Set to 1 to sample once, which is measurably cheaper and visibly harder.
+   */
+  get filterSize() {
+    return this._filterSize;
+  }
+  set filterSize(val) {
+    this._filterSize = DOM.clampFilterSize(val);
   }
   /**
    * Depth the layers span, in world units along the light direction.
@@ -154,7 +181,9 @@ export class DOM extends ShadowImpl {
     return this._resourceDirty;
   }
   getShadowMapBorder() {
-    return 0;
+    // Margin so the kernel's outer taps still land inside the map at the edges of
+    // the shadow region, matching what the PCF implementations reserve.
+    return this._filterSize;
   }
   getDepthScale() {
     return 1;
@@ -300,8 +329,9 @@ export class DOM extends ShadowImpl {
   postRenderShadowMap(_shadowMapParams: ShadowMapParams) {}
   getShaderHash() {
     // The two geometry passes emit different caster fragments and the shadow pass
-    // keys its programs on this hash, so the pass index has to appear in it.
-    return `${DOM_LAYER_COUNT}_${this._geometryPass}`;
+    // keys its programs on this hash, so the pass index has to appear in it. The
+    // kernel is unrolled into the receiver, so it belongs here too.
+    return `${DOM_LAYER_COUNT}_${this._geometryPass}_${this._filterSize}`;
   }
   declareCasterUniforms(scope: PBGlobalScope, _shadowMapParams: ShadowMapParams) {
     if (this._geometryPass !== 1) {
@@ -432,7 +462,7 @@ export class DOM extends ShadowImpl {
     return pb.emulateDepthClamp ? pb.clamp(scope.$inputs.clamppedDepth, 0, 1) : scope.$builtins.fragCoord.z;
   }
   computeShadow(
-    _shadowMapParams: ShadowMapParams,
+    shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,
     shadowVertex: PBShaderExp,
     NdotL: PBShaderExp
@@ -458,6 +488,23 @@ export class DOM extends ShadowImpl {
       );
       this.$l.shadow = pb.float(1);
       this.$if(this.inRange, function () {
+        // A single tap needs no bias: it reads the texel the receiver itself
+        // wrote, so its own surface sits exactly at z0 and contributes nothing.
+        // A kernel breaks that. Neighbouring texels record the frontmost surface
+        // at their own position, which on anything sloped is nearer the light
+        // than the receiver, and the receiver then reads itself as being behind a
+        // caster. On a solid surface that is the full jump from no absorption to
+        // all of it, so it shows up as the banding an unbiased shadow map has.
+        if (that._filterSize > 1) {
+          this.$l.bias = computeShadowBias(
+            shadowMapParams.lightType,
+            this,
+            this.shadowCoord.z,
+            this.NdotL,
+            false
+          );
+          this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.bias, true);
+        }
         this.shadow = that.transmittance(this, this.shadowCoord);
       });
       this.$return(this.shadow);
@@ -477,20 +524,65 @@ export class DOM extends ShadowImpl {
     return this.computeShadow(shadowMapParams, scope, shadowVertex, NdotL);
   }
   /**
-   * Fraction of light surviving the hair in front of the receiver.
+   * Fraction of light surviving the hair in front of the receiver, averaged over
+   * the filter kernel.
+   *
+   * @remarks
+   * The averaging is over transmittance, one value per tap, rather than over the
+   * stored texels. Blending the texels first would interpolate `z0` across the
+   * silhouette of the groom, where one side holds a real strand depth and the
+   * other the empty-texel sentinel, and the depth halfway between them describes
+   * nothing - every layer reading taken against it would be measured from the
+   * wrong origin. Averaging the results instead asks a well-posed question of
+   * each texel and combines only the answers, which is also what makes this an
+   * antialiased edge rather than a blurred one.
    * @internal
    */
   private transmittance(scope: PBInsideFunctionScope, shadowCoord: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
-    const funcName = 'lib_domTransmittance';
+    const size = this._filterSize;
+    const funcName = `lib_domTransmittance_${size}`;
     pb.func(funcName, [pb.vec3('shadowCoord')], function () {
-      this.$l.texel = pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.shadowCoord.xy, 0);
+      if (size <= 1) {
+        this.$return(that.tapTransmittance(this, this.shadowCoord.xy, this.shadowCoord.z));
+      } else {
+        // cameraParams.z carries the shadow map size, and this implementation
+        // never splits into cascades, so the map is exactly that wide.
+        this.$l.texelSize = pb.div(1, ShaderHelper.getShadowCameraParams(this).z);
+        this.$l.sum = pb.float(0);
+        this.$l.tapUV = pb.vec2();
+        const radius = (size - 1) / 2;
+        for (let y = -radius; y <= radius; y++) {
+          for (let x = -radius; x <= radius; x++) {
+            this.tapUV = pb.add(this.shadowCoord.xy, pb.mul(pb.vec2(x, y), this.texelSize));
+            this.sum = pb.add(this.sum, that.tapTransmittance(this, this.tapUV, this.shadowCoord.z));
+          }
+        }
+        this.$return(pb.div(this.sum, size * size));
+      }
+    });
+    return pb.getGlobalScope()[funcName](shadowCoord) as PBShaderExp;
+  }
+  /**
+   * Transmittance from a single shadow map texel.
+   * @internal
+   */
+  private tapTransmittance(
+    scope: PBInsideFunctionScope,
+    uv: PBShaderExp,
+    receiverDepth: PBShaderExp
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    const that = this;
+    const funcName = 'lib_domTap';
+    pb.func(funcName, [pb.vec2('uv'), pb.float('receiverDepth')], function () {
+      this.$l.texel = pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.uv, 0);
       this.$l.layers = this.texel.rgb;
       this.$l.z0 = this.texel.a;
       this.$l.layerSpan = ShaderHelper.getShadowImplParams(this).x;
       this.$l.density = ShaderHelper.getShadowImplParams(this).y;
-      this.$l.t = that.layerCoord(this, this.shadowCoord.z, this.z0, this.layerSpan);
+      this.$l.t = that.layerCoord(this, this.receiverDepth, this.z0, this.layerSpan);
       // The layers are cumulative, so opacity at an arbitrary depth is a lerp
       // between the two bracketing layer values. Scaling t by the layer count puts
       // the integer part on the near layer and the fraction between the pair.
@@ -518,6 +610,6 @@ export class DOM extends ShadowImpl {
       // would have.
       this.$return(pb.exp(pb.neg(pb.mul(this.absorption, this.density))));
     });
-    return pb.getGlobalScope()[funcName](shadowCoord) as PBShaderExp;
+    return pb.getGlobalScope()[funcName](uv, receiverDepth) as PBShaderExp;
   }
 }

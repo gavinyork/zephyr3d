@@ -161,6 +161,8 @@ export class ShadowMapper extends Disposable {
   /** @internal */
   protected _domDensity: number;
   /** @internal */
+  protected _domFilterSize: number;
+  /** @internal */
   protected _vsmBlurKernelSize: number;
   /** @internal */
   protected _vsmBlurRadius: number;
@@ -209,6 +211,7 @@ export class ShadowMapper extends Disposable {
     this._pcssTemporalJitter = true;
     this._domLayerDistance = 0.25;
     this._domDensity = 1;
+    this._domFilterSize = 5;
     this._vsmBlurKernelSize = 5;
     this._vsmBlurRadius = 4;
     this._vsmDarkness = 0.3;
@@ -495,6 +498,29 @@ export class ShadowMapper extends Disposable {
       const dom = this.asDOM();
       if (dom) {
         dom.density = this._domDensity;
+      }
+    }
+  }
+  /**
+   * Width of the deep opacity map's sampling kernel in texels: 1, 3, 5 or 7. Only
+   * meaningful when the shadow mode is `dom`.
+   *
+   * @remarks
+   * The technique's own gradation runs along the light rather than across the
+   * map, so without a kernel the silhouette of a groom is as hard an edge as an
+   * unfiltered shadow map gives. This is what softens it, at one layer lookup per
+   * tap. Defaults to 5.
+   */
+  get domFilterSize() {
+    return this._domFilterSize;
+  }
+  set domFilterSize(val) {
+    val = val !== 1 && val !== 3 && val !== 5 && val !== 7 ? 5 : val;
+    if (val !== this._domFilterSize) {
+      this._domFilterSize = val;
+      const dom = this.asDOM();
+      if (dom) {
+        dom.filterSize = this._domFilterSize;
       }
     }
   }
@@ -1383,7 +1409,7 @@ export class ShadowMapper extends Disposable {
     } else if (mode === 'pcf' || mode === 'pcf-opt' || mode === 'pcf-pd') {
       this._impl = new PCFOPT(this._pcfKernelSize);
     } else if (mode === 'dom') {
-      this._impl = new DOM(this._domLayerDistance, this._domDensity);
+      this._impl = new DOM(this._domLayerDistance, this._domDensity, this._domFilterSize);
     } else if (mode === 'pcss') {
       this._impl = new PCSS(
         this._pcssLightRadius,
