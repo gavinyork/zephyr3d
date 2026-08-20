@@ -255,38 +255,32 @@ export class DOM extends ShadowImpl {
     const width = sharedDepth.width;
     const height = sharedDepth.height;
     const format = this.colorFormat();
-    const previous = shadowMapParams.implData as DOMImplData;
-    const reusable =
-      previous &&
-      !previous.result.disposed &&
-      !previous.frontDepth.disposed &&
-      !previous.depthFramebuffer.disposed &&
-      !previous.opacityFramebuffer.disposed &&
-      previous.result.width === width &&
-      previous.result.height === height &&
-      previous.result.format === format &&
-      previous.depthFramebuffer.getDepthAttachment() === sharedDepth;
-    if (!reusable) {
-      previous?.depthFramebuffer.dispose();
-      previous?.opacityFramebuffer.dispose();
-      previous?.frontDepth.dispose();
-      previous?.result.dispose();
-      const frontDepth = device.createTexture2D(format, width, height, { mipmapping: false })!;
-      const result = device.createTexture2D(format, width, height, { mipmapping: false })!;
-      shadowMapParams.implData = {
-        frontDepth,
-        result,
-        // Pass 0 keeps the shared depth attachment so the hardware depth test
-        // resolves the frontmost strand for it.
-        depthFramebuffer: device.createFrameBuffer([frontDepth], sharedDepth),
-        // Pass 1 has none, which is what frees the depth texture and lets the
-        // pass sample `frontDepth` while writing `result`.
-        opacityFramebuffer: device.createFrameBuffer([result], null)
-      } satisfies DOMImplData;
-    }
-    const implData = shadowMapParams.implData as DOMImplData;
-    shadowMapParams.shadowMap = implData.result;
-    shadowMapParams.shadowMapSampler = implData.result.getDefaultSampler(false);
+    // Everything here is pooled, per frame, the way the blur targets of VSM and
+    // ESM are. `implData` cannot cache across frames even though it looks like it
+    // could: it lives on a ShadowMapParams that is recycled between every light
+    // and cleared at the end of each frame, so holding directly-created textures
+    // in it leaks them at whatever rate the scene renders.
+    const frontDepth = device.pool.fetchTemporalTexture2D(false, format, width, height, false);
+    const result = device.pool.fetchTemporalTexture2D(false, format, width, height, false);
+    // Pass 0 borrows the shadow map's own depth attachment, which is otherwise
+    // unused - this implementation asks for no colour there - so the hardware
+    // depth test resolves the frontmost strand for it. Pass 1 gets no depth,
+    // which is both what stops it testing and what frees `frontDepth` to be
+    // sampled while `result` is written.
+    const depthFramebuffer = device.pool.createTemporalFramebuffer(true, [frontDepth], sharedDepth);
+    const opacityFramebuffer = device.pool.createTemporalFramebuffer(true, [result], null);
+    // The framebuffers hold the references now; these drop the fetch counts so
+    // both textures return to the pool when the frame ends.
+    device.pool.releaseTexture(frontDepth);
+    device.pool.releaseTexture(result);
+    shadowMapParams.implData = {
+      frontDepth,
+      result,
+      depthFramebuffer,
+      opacityFramebuffer
+    } satisfies DOMImplData;
+    shadowMapParams.shadowMap = result;
+    shadowMapParams.shadowMapSampler = result.getDefaultSampler(false);
     this._resourceDirty = false;
   }
   postRenderShadowMap(_shadowMapParams: ShadowMapParams) {}
