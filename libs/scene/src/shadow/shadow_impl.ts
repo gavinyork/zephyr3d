@@ -145,6 +145,23 @@ export abstract class ShadowImpl {
    * @param shadowMapParams - Current shadow map state.
    */
   applyCasterUniforms(_bindGroup: BindGroup, _shadowMapParams: ShadowMapParams): void {}
+  /**
+   * Whether casters should still be alpha-clipped before their shadow output.
+   *
+   * A depth-recording technique wants the clip: a fragment that fails it is not
+   * there, and letting it write depth would block light with geometry the eye
+   * never sees. A technique that records coverage instead wants the raw alpha,
+   * because the clip destroys exactly the quantity it is accumulating - a
+   * dithered caster survives with probability alpha and then contributes alpha,
+   * which accumulates alpha squared, and a cutoff drops the thin strands that
+   * carry most of a groom's transmittance.
+   *
+   * @param shadowMapParams - Current shadow map state.
+   * @returns True unless overridden.
+   */
+  clipsCasterAlpha(_shadowMapParams: ShadowMapParams): boolean {
+    return true;
+  }
   abstract getShadowMap(shadowMapParams: ShadowMapParams): ShadowMapType;
   abstract postRenderShadowMap(shadowMapParams: ShadowMapParams): void;
   abstract getDepthScale(): number;

@@ -77,6 +77,16 @@ getEngine().setRenderable(scene, 0);
 const key = new DirectionalLight(scene);
 key.lookAt(new Vector3(2, 3.4, 2.6), new Vector3(0, 1.5, 0), Vector3.axisPY());
 key.color = new Vector4(1, 0.97, 0.92, 1);
+// Only the key casts. Hair self-shadowing is the thing being shown, and three
+// shadow-casting lights would overlay three grooms' worth of it and make none of
+// them readable - besides costing three shadow map renders of 70k strands.
+key.castShadow = true;
+key.shadow.shadowMapSize = 2048;
+// The engine default is 2000, fitted over a groom about a third of a metre
+// across. Every unit of that range is depth precision spent on empty space, and
+// for the deep opacity map it is also what the layer span is measured against.
+key.shadow.shadowDistance = 6;
+key.shadow.numShadowCascades = 1;
 
 const fill = new DirectionalLight(scene);
 fill.lookAt(new Vector3(-2.6, 1.8, 1.4), new Vector3(0, 1.5, 0), Vector3.axisPY());
@@ -98,6 +108,13 @@ material.transmissionColor = new Vector3(0.55, 0.26, 0.12);
 material.transmissionIntensity = 0.35;
 material.segmentsPerStrand = 8;
 material.minPixelWidth = 1.3;
+// Without this the transparent queue never reaches the shadow pass, so switching
+// the blend mode to alpha-blend would silently drop the groom out of its own
+// shadow map. The deep opacity map ignores the cutoff - it integrates coverage
+// rather than testing it - but a depth-based mode still needs one, and a low
+// value keeps the sub-pixel strands that carry most of the transmittance.
+material.transparentShadowCaster = true;
+material.shadowAlphaCutoff = 0.01;
 
 /** How the demo resolves strand coverage into pixels. */
 type BlendModeName = 'opaque' | 'alpha-dither' | 'alpha-blend';
@@ -113,6 +130,33 @@ const OIT_MODES: OitModeName[] = ['ddp', 'weighted'];
 let ditherCutoff = 0.01;
 let blendModeIndex = BLEND_MODES.indexOf('alpha-dither');
 let oitModeIndex = OIT_MODES.indexOf('ddp');
+
+/**
+ * How the key light shadows the groom.
+ *
+ * @remarks
+ * `dom` is a deep opacity map: it records how much hair the light crossed rather
+ * than whether it was blocked, so the groom shades from lit at the surface to
+ * dark in the middle. `pcf` is the ordinary depth-based filter, kept next to it
+ * as the comparison - it can only answer blocked or not, which on hair means
+ * everything behind the first strand is equally black. `off` isolates how much
+ * of the shape is coming from the specular lobes alone.
+ */
+type ShadowModeName = 'off' | 'pcf' | 'dom';
+const SHADOW_MODES: ShadowModeName[] = ['off', 'pcf', 'dom'];
+// Deep opacity maps need storage the WebGL path never grew, matching the strand
+// expansion itself; on a WebGL2 fallback the demo offers the other two.
+const shadowModeChoices: ShadowModeName[] = webgpuOK ? SHADOW_MODES : ['off', 'pcf'];
+let shadowModeIndex = shadowModeChoices.indexOf(webgpuOK ? 'dom' : 'pcf');
+
+function applyShadowMode(mode: ShadowModeName) {
+  key.castShadow = mode !== 'off';
+  if (mode !== 'off') {
+    key.shadow.mode = mode;
+  }
+}
+
+applyShadowMode(shadowModeChoices[shadowModeIndex]);
 
 /**
  * Applies a coverage resolution strategy to the material.
@@ -158,7 +202,18 @@ let stats: LoadStats | null = null;
 let strandData: HairStrandData | null = null;
 let mesh: Mesh | null = null;
 /** Fraction of strands kept, so a dense groom can be thinned for framerate. */
-let strandFraction = 1;
+/**
+ * Fraction of the archive's strands actually built.
+ *
+ * @remarks
+ * Seeded from `?strands=` so the demo can be opened at a density a weaker
+ * machine can drive - the full sample is 69k strands and 1.1M triangles, which
+ * software rasterisation cannot keep up with. Clamped to a whole strand.
+ */
+let strandFraction = (() => {
+  const raw = Number(new URLSearchParams(location.search).get('strands'));
+  return Number.isFinite(raw) && raw > 0 && raw <= 1 ? raw : 1;
+})();
 let lastCurves: AlembicCurveObject[] | null = null;
 /** Set once a local file is picked, so the in-flight sample download is dropped. */
 let sampleSuperseded = false;
@@ -505,6 +560,33 @@ function drawUI() {
     } else {
       ImGui.TextDisabled('OIT applies to alpha-blend only');
     }
+  }
+
+  if (ImGui.CollapsingHeader('Shadows', ImGui.TreeNodeFlags.DefaultOpen)) {
+    const shadowRef: [number] = [shadowModeIndex];
+    if (ImGui.Combo('Mode', shadowRef, shadowModeChoices)) {
+      shadowModeIndex = shadowRef[0];
+      applyShadowMode(shadowModeChoices[shadowModeIndex]);
+    }
+    const shadowMode = shadowModeChoices[shadowModeIndex];
+    if (shadowMode === 'dom') {
+      slider('Layer span (m)', key.shadow.domLayerDistance, 0.01, 1.5, (v) => {
+        key.shadow.domLayerDistance = v;
+      });
+      slider('Density', key.shadow.domDensity, 0, 8, (v) => (key.shadow.domDensity = v));
+      // Both knobs fail in ways that look like the technique is broken rather
+      // than mistuned, so name the symptoms next to the sliders.
+      ImGui.TextDisabled('Span: roughly how deep the hair is.');
+      ImGui.TextDisabled('Too small reads hard, too large reads unlit.');
+    } else if (shadowMode === 'pcf' && webgpuOK) {
+      ImGui.TextDisabled('Binary test: no gradient through the groom.');
+    }
+    if (!webgpuOK) {
+      ImGui.TextDisabled('dom needs WebGPU');
+    }
+    slider('Shadow strength', key.shadow.shadowStrength, 0, 1, (v) => {
+      key.shadow.shadowStrength = v;
+    });
   }
 
   if (ImGui.CollapsingHeader('Shading', ImGui.TreeNodeFlags.DefaultOpen)) {

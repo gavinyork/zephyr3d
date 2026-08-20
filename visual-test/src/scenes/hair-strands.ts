@@ -297,10 +297,9 @@ function hairShadowScene(mode: ShadowMode, note: string): VisualScene {
       // groom this size leaves the layers far too coarse to resolve anything.
       light.shadow.shadowDistance = 12;
       if (mode === 'dom') {
-        // The helix is 1.6 units deep and the shadow camera spans 12, so the
-        // hair occupies about an eighth of the depth range; the layers want to
-        // cover roughly that much and no more.
-        light.shadow.domLayerDistance = 0.14;
+        // The helix is about 1.1 units across, so the layers span roughly the
+        // thickness of hair the light actually has to cross.
+        light.shadow.domLayerDistance = 1.1;
         light.shadow.domDensity = 2.5;
       }
       const material = new HairStrandMaterial();

@@ -1281,14 +1281,16 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           );
         }
       } /*if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ else {
-        if (color) {
+        const shadowMapParams = that.drawContext.shadowMapInfo!.get(
+          (that.drawContext.renderPass as ShadowMapPass).light!
+        )!;
+        // Coverage-accumulating implementations read the alpha rather than test
+        // it, and clipping first would consume the very quantity they integrate.
+        if (color && shadowMapParams.impl!.clipsCasterAlpha(shadowMapParams)) {
           this.$if(pb.getGlobalScope()[alphaClipFuncName](this.outColor.a, this.zAlphaCutoff), function () {
             pb.discard();
           });
         }
-        const shadowMapParams = that.drawContext.shadowMapInfo!.get(
-          (that.drawContext.renderPass as ShadowMapPass).light!
-        )!;
         this.$outputs.zFragmentOutput = shadowMapParams.impl!.computeShadowMapDepth(
           shadowMapParams,
           this,

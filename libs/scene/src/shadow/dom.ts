@@ -85,21 +85,35 @@ export class DOM extends ShadowImpl {
    * params, and the hash must separate the two passes or they share a program.
    */
   private _geometryPass: number;
-  constructor(layerDistance = 0.02, density = 1) {
+  /**
+   * @internal
+   * Depth the shadow camera spans, captured when the map is rendered. Needed to
+   * express {@link DOM.layerDistance} in world units: the shader compares device
+   * depths, and for the orthographic projection a directional light uses those
+   * are the world depth divided by exactly this.
+   */
+  private _depthRange: number;
+  constructor(layerDistance = 0.25, density = 1) {
     super();
     this._layerDistance = layerDistance;
     this._density = density;
     this._paramsScratch = new Vector4();
     this._geometryPass = 0;
+    this._depthRange = 1;
   }
   /**
-   * Depth the layers span, as a fraction of the shadow camera's range.
+   * Depth the layers span, in world units along the light direction.
    *
    * @remarks
-   * Set it to roughly the depth of the hair along the light direction. Too small
-   * and everything past the outer strands saturates the last layer, which is a
-   * hard shadow again; too large and all three layers land inside the first
-   * strand, leaving the interior unshadowed.
+   * Set it to roughly the thickness of the hair. Too small and everything past
+   * the outer strands saturates the last layer, which is a hard shadow again;
+   * too large and all three layers land inside the first strand, leaving the
+   * interior unshadowed.
+   *
+   * Exact for directional lights, whose orthographic projection makes device
+   * depth a linear function of world depth. Spot and point lights project
+   * perspectively, so there the value is only accurate near the middle of the
+   * shadow camera's range - which is where hair lit by one usually sits.
    */
   get layerDistance() {
     return this._layerDistance;
@@ -132,10 +146,18 @@ export class DOM extends ShadowImpl {
     return 1;
   }
   setDepthScale(_val: number) {}
-  /** Layer geometry and density for the receiver. `z` and `w` are unused. */
+  /**
+   * Layer geometry and density, for both the caster and the receiver. `z` and
+   * `w` are unused.
+   *
+   * @remarks
+   * `x` is the layer span converted from world units into the device-depth
+   * difference the shaders actually compare, using the range captured when the
+   * map was rendered.
+   */
   getParams(out?: Vector4) {
     const result = out ?? this._paramsScratch;
-    result.setXYZW(this._layerDistance, this._density, 0, 0);
+    result.setXYZW(this._layerDistance / this._depthRange, this._density, 0, 0);
     return result;
   }
   getGeometryPassCount() {
@@ -146,9 +168,32 @@ export class DOM extends ShadowImpl {
     // the one texture the receiver can bind.
     return false;
   }
+  clipsCasterAlpha() {
+    // Neither pass wants the clip. Pass 1 integrates coverage, and clipping is
+    // destructive to it in both of the forms the material applies: a dithered
+    // caster survives with probability alpha and then contributes alpha, which
+    // accumulates the square, and a hard cutoff drops the sub-pixel strands that
+    // carry most of a groom's transmittance.
+    //
+    // Pass 0 skips it for a different reason. Its job is to find the frontmost
+    // strand, and under dithering the clip makes that choice per-pixel random -
+    // the layers would then start at a depth that flickers between strands, and
+    // every opacity reading behind it inherits the jitter.
+    //
+    // The case this gives up is a caster whose alpha is a real mask rather than a
+    // coverage value, such as a hair card with cut-out texels: pass 0 will place
+    // z0 on the card's surface even where it is fully transparent. Strand
+    // geometry, which is what this technique is for, has no such texels.
+    return false;
+  }
   beginGeometryPass(shadowMapParams: ShadowMapParams, pass: number) {
     const implData = shadowMapParams.implData as DOMImplData;
     this._geometryPass = pass;
+    // The light camera is finalised by the time the casters are drawn, so this is
+    // where the world-to-device depth scale becomes known. It stays valid for the
+    // lighting pass that follows, which reads the same converted params back.
+    const range = shadowMapParams.cameraParams.y - shadowMapParams.cameraParams.x;
+    this._depthRange = range > 1e-6 ? range : 1;
     getDevice().setFramebuffer(pass === 0 ? implData.depthFramebuffer : implData.opacityFramebuffer);
   }
   setCasterRenderStates(_shadowMapParams: ShadowMapParams, stateSet: RenderStateSet) {

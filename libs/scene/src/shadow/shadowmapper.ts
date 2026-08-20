@@ -207,7 +207,7 @@ export class ShadowMapper extends Disposable {
     this._pcssFilterSampleCount = 32;
     this._pcssMaxFilterRadius = 32;
     this._pcssTemporalJitter = true;
-    this._domLayerDistance = 0.02;
+    this._domLayerDistance = 0.25;
     this._domDensity = 1;
     this._vsmBlurKernelSize = 5;
     this._vsmBlurRadius = 4;
@@ -456,14 +456,14 @@ export class ShadowMapper extends Disposable {
     }
   }
   /**
-   * Depth spanned by the deep opacity map's layers, as a fraction of the shadow
-   * camera's range. Only meaningful when the shadow mode is `dom`.
+   * Depth spanned by the deep opacity map's layers, in world units along the
+   * light direction. Only meaningful when the shadow mode is `dom`.
    *
    * @remarks
-   * Set it to roughly the depth of the hair along the light direction. Too small
-   * and everything past the outer strands saturates the last layer, which is a
-   * hard shadow again; too large and all four layers fall inside the first strand,
-   * leaving the interior unshadowed.
+   * Set it to roughly the thickness of the hair. Too small and everything past
+   * the outer strands saturates the last layer, which is a hard shadow again;
+   * too large and all three layers fall inside the first strand, leaving the
+   * interior unshadowed.
    */
   get domLayerDistance() {
     return this._domLayerDistance;
