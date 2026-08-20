@@ -20,6 +20,7 @@ import { Material } from './material';
 import type { DepthPass } from '../render';
 import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders/misc';
+import { interleavedGradientNoise } from '../shaders/noise';
 import { ShaderHelper } from './shader/helper';
 import type { Clonable, Immutable, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4, applyMixins, DRef } from '@zephyr3d/base';
@@ -1136,12 +1137,33 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         that.featureUsed<boolean>(FEATURE_ALPHADITHER) &&
         !that.isTransparentPass(that.pass, that.drawContext)
       ) {
-        this.$l.frame = pb.float(ShaderHelper.getFramestamp(this));
+        // Interleaved gradient noise rather than the fract(sin(dot(...)))
+        // hash it replaced. That hash feeds its dot product straight into
+        // sin(), and at 1080p the fragCoord term alone reaches ~1e5 - past
+        // the range where GPU sin() stays accurate - so it degraded into a
+        // fixed hatch pattern that TAA then faithfully preserved instead of
+        // averaging away. IGN wraps its accumulator in fract() before the
+        // magnifying multiply, so it stays well conditioned at any
+        // resolution, and it is what UE5 uses for exactly this job.
+        //
+        // The frame index is wrapped for the same reason: it is unbounded
+        // (device.frameInfo.frameCounter), and left raw it would walk the
+        // noise input back out of that well-conditioned range within a
+        // minute. 64 matches the wrap the eye material already applies.
+        this.$l.frameId = pb.mod(pb.float(ShaderHelper.getFramestamp(this)), 64);
+        // Decorrelate overlapping layers by depth, for the same reason the
+        // shadow dither above does it: the noise is a function of the pixel,
+        // so without this every fragment stacked on one texel draws the same
+        // value and they all pass or all fail together. That collapses the
+        // visible coverage of N layers from 1-(1-a)^N down to a - on dense
+        // hair seen from far enough that each strand is thin, an order of
+        // magnitude too dark. The 131.37 scale matches the shadow path.
+        this.$l.layerJitter = pb.fract(pb.mul(this.$builtins.fragCoord.z, 131.37));
         this.$l.phase = pb.add(
           this.$builtins.fragCoord.xy,
-          pb.vec2(this.frame, pb.mul(this.frame, 0.754877666))
+          pb.add(pb.mul(pb.vec2(47, 17), 0.695, this.frameId), pb.mul(pb.vec2(13.7, 29.3), this.layerJitter))
         );
-        this.$l.noise = pb.fract(pb.mul(pb.sin(pb.dot(this.phase, pb.vec2(12.9898, 78.233))), 43758.5453));
+        this.$l.noise = interleavedGradientNoise(this, this.phase);
         this.$l.coverage = pb.clamp(
           pb.div(pb.sub(this.alpha, this.cutoff), pb.max(pb.sub(1, this.cutoff), 1e-4)),
           0,
