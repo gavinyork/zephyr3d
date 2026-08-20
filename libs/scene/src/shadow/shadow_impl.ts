@@ -169,10 +169,26 @@ export abstract class ShadowImpl {
   abstract resourceDirty(): boolean;
   abstract doUpdateResources(shadowMapParams: ShadowMapParams): void;
   abstract getShaderHash(): string;
+  /**
+   * Fragment output for a shadow caster.
+   *
+   * @param shadowMapParams - Current shadow map state.
+   * @param scope - Caster fragment scope.
+   * @param worldPos - World position of the fragment.
+   * @param alpha - The material's own alpha, or null when it computes no fragment
+   * colour and the fragment is therefore fully opaque. Depth-recording techniques
+   * ignore it - by the time this runs the fragment has already survived whatever
+   * alpha test applies - but one that records absorption needs the value itself.
+   * It must be passed rather than read out of `scope`, because the caller's
+   * `outColor` is local to the material's own shader function and defaults to a
+   * zero vector when no colour was computed, which is indistinguishable from a
+   * genuinely transparent fragment.
+   */
   abstract computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,
-    worldPos: PBShaderExp
+    worldPos: PBShaderExp,
+    alpha: Nullable<PBShaderExp>
   ): PBShaderExp;
   abstract computeShadow(
     shadowMapParams: ShadowMapParams,

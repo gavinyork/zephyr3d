@@ -1294,7 +1294,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         this.$outputs.zFragmentOutput = shadowMapParams.impl!.computeShadowMapDepth(
           shadowMapParams,
           this,
-          this.worldPos
+          this.worldPos,
+          // Null, not a zero alpha, when no colour was computed: `outColor` is a
+          // zero vector in that case, and a technique that reads alpha as coverage
+          // would take it for a fully transparent fragment.
+          color ? this.outColor.a : null
         );
       }
     });

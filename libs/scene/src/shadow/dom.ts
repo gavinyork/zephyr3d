@@ -15,7 +15,7 @@ import { ndcToShadowCoord3, shadowCoordDepthInRange } from '../shaders/shadow';
 import { ShaderHelper } from '../material/shader/helper';
 import { getDevice } from '../app/api';
 import { fetchSampler } from '../utility/misc';
-import { REVERSE_Z, Vector4 } from '@zephyr3d/base';
+import { REVERSE_Z, Vector4, type Nullable } from '@zephyr3d/base';
 
 /**
  * Opacity layers, which is three rather than four because the fourth channel of
@@ -356,13 +356,20 @@ export class DOM extends ShadowImpl {
   computeShadowMapDepth(
     shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,
-    worldPos: PBShaderExp
+    worldPos: PBShaderExp,
+    alpha: Nullable<PBShaderExp>
   ) {
     const pb = scope.$builder;
     const that = this;
     const geometryPass = this._geometryPass;
-    const funcName = `lib_domCasterOutput_${geometryPass}`;
-    pb.func(funcName, [pb.vec3('worldPos')], function () {
+    // Alpha travels as a parameter. Reaching into the caller's scope for its
+    // `outColor` would be reading a local of a different shader function, and the
+    // two cases that matter - an opaque caster and a fully transparent one - are
+    // the same value there.
+    const hasAlpha = geometryPass === 1 && !!alpha;
+    const funcName = `lib_domCasterOutput_${geometryPass}_${hasAlpha ? 'a' : 'o'}`;
+    const params = hasAlpha ? [pb.vec3('worldPos'), pb.float('alpha')] : [pb.vec3('worldPos')];
+    pb.func(funcName, params, function () {
       this.$l.depth = that.casterDepth(shadowMapParams, this, this.worldPos);
       if (geometryPass === 0) {
         this.$return(pb.vec4(this.depth, 0, 0, 1));
@@ -380,12 +387,8 @@ export class DOM extends ShadowImpl {
         // contributes to each layer whose far boundary it precedes. step() gives
         // that mask without branching.
         this.$l.mask = pb.vec3(pb.step(this.t, 1 / 3), pb.step(this.t, 2 / 3), pb.step(this.t, 1));
-        // A caster with no alpha to give covers fully.
-        this.$l.alpha = pb.float(1);
-        const alpha = that.casterAlpha(this);
-        if (alpha) {
-          this.alpha = alpha;
-        }
+        // A caster that computes no fragment colour covers fully.
+        this.$l.casterAlpha = hasAlpha ? this.alpha : pb.float(1);
         // Optical depth rather than raw coverage, because what has to be additive
         // here is the exponent, not the alpha. Compositing N layers multiplies
         // their transmittances - prod(1 - a) - and blending can only sum, so each
@@ -400,21 +403,12 @@ export class DOM extends ShadowImpl {
         // The floor bounds what alpha = 1 encodes. It has to be finite to blend,
         // and 0.001 transmittance is already black; it also leaves room for
         // several opaque layers to stack without leaving half precision.
-        this.$l.opticalDepth = pb.neg(pb.log(pb.max(pb.sub(1, this.alpha), DOM_MIN_TRANSMITTANCE)));
+        this.$l.opticalDepth = pb.neg(pb.log(pb.max(pb.sub(1, this.casterAlpha), DOM_MIN_TRANSMITTANCE)));
         this.$return(pb.vec4(pb.mul(this.mask, this.opticalDepth), this.z0));
       }
     });
-    return pb.getGlobalScope()[funcName](worldPos) as PBShaderExp;
-  }
-  /**
-   * Alpha of the caster fragment, when the material has one to give.
-   * @internal
-   */
-  private casterAlpha(scope: PBInsideFunctionScope): PBShaderExp | null {
-    // The caster fragment function receives the shaded colour only when the
-    // material needs it; opaque casters have none and count as full coverage.
-    const outColor = (scope as unknown as Record<string, PBShaderExp | undefined>).outColor;
-    return outColor ? outColor.a : null;
+    const global = pb.getGlobalScope();
+    return (hasAlpha ? global[funcName](worldPos, alpha!) : global[funcName](worldPos)) as PBShaderExp;
   }
   /**
    * Normalized light-space depth of a caster fragment, in the encoding the
