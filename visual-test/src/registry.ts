@@ -17,6 +17,8 @@ import { oitABuffer, oitDualDepth, oitWeighted } from './scenes/oit';
 import { postFxaa, postToneMapBloom, taaMultiframe } from './scenes/post';
 import { eyeAngled, eyeFrontal, eyePupilDilated, eyeSocketOcclusion } from './scenes/eye';
 import {
+  hairScatterOff,
+  hairScatterOn,
   hairShadowDom,
   hairShadowPcf,
   hairStrandsFan,
@@ -74,6 +76,9 @@ export const SCENES: VisualScene[] = [
   // Hair self-shadowing: the deep opacity map and its depth-based control.
   hairShadowPcf,
   hairShadowDom,
+  // Multiple scattering: the same groom with the term off and on.
+  hairScatterOff,
+  hairScatterOn,
   eyeFrontal,
   eyeAngled,
   eyePupilDilated,

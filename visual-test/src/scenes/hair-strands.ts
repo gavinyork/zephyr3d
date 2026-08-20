@@ -286,9 +286,9 @@ export const hairStrandsWidth: VisualScene = {
  *
  * WebGPU only, following the GPU strand path and `dom` itself.
  */
-function hairShadowScene(mode: ShadowMode, note: string): VisualScene {
+function hairShadowScene(mode: ShadowMode, note: string, scatter?: 'on' | 'off'): VisualScene {
   return {
-    name: `hair-shadow-${mode}`,
+    name: scatter ? `hair-scatter-${scatter}` : `hair-shadow-${mode}`,
     description: note,
     supports: (backend) => backend === 'webgpu',
     setup(ctx) {
@@ -317,6 +317,15 @@ function hairShadowScene(mode: ShadowMode, note: string): VisualScene {
       // that is the entire point of the technique.
       material.alphaCutoff = 0.01;
       material.minPixelWidth = 1.3;
+      if (scatter) {
+        // Pale hair for both halves of the pair, because multiple scattering is
+        // what separates blonde from black: the term is modulated by the hair's
+        // own colour, so on the dark brown the other scenes use it would be
+        // present and nearly invisible. Only the intensity differs between the
+        // two, which is what makes their diff the term itself.
+        material.albedoColor = new Vector4(0.62, 0.5, 0.36, 1);
+        material.scatterIntensity = scatter === 'on' ? 1 : 0;
+      }
       // Many more strands than the expansion scene uses: a sparse groom has no
       // interior to shadow, and this scene is about what happens inside one.
       addGPUStrands(ctx, toStrandSource(helixCurves(96, 24)), material);
@@ -350,4 +359,27 @@ export const hairShadowDom = hairShadowScene(
 export const hairShadowPcf = hairShadowScene(
   'pcf',
   'The same casters under a depth-based filter, as the control for hair-shadow-dom. Its solid black groom interior and hard floor shadow are what the deep opacity map replaces; the box should shadow identically under both.'
+);
+
+/**
+ * Multiple scattering, on and off over an otherwise identical pale groom.
+ *
+ * @remarks
+ * Absorption alone drives the inside of a groom to black, which is what it
+ * physically does and not what hair looks like. These two baselines differ only
+ * in `scatterIntensity`, so the diff between them is the light that reaches a
+ * point after bouncing off neighbouring fibres - brightest exactly where the
+ * direct beam is fully blocked, and tinted by the hair, which is why the pair
+ * uses a pale colour where the effect is legible at all.
+ */
+export const hairScatterOff = hairShadowScene(
+  'dom',
+  'Pale groom with multiple scattering disabled: the control for hair-scatter-on, showing what absorption alone leaves in the shadowed interior.',
+  'off'
+);
+
+export const hairScatterOn = hairShadowScene(
+  'dom',
+  'The same pale groom with multiple scattering enabled: pins the global and local scattering terms filling the interior that absorption empties.',
+  'on'
 );

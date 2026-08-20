@@ -53,6 +53,8 @@ export class HairMaterial
   private static readonly FEATURE_STRAND_DIRECTION = this.defineFeature();
   /** @internal */
   private static readonly FEATURE_TRANSMISSION = this.defineFeature();
+  /** @internal */
+  private static readonly FEATURE_SCATTER = this.defineFeature();
   /** @internal Primary lobe color (usually near-white). */
   private readonly _specular1Color: Vector3;
   /** @internal Primary lobe exponent. */
@@ -77,6 +79,14 @@ export class HairMaterial
   private _transmissionPower: number;
   /** @internal Occlusion map strength in [0, 1]. */
   private _occlusionStrength: number;
+  /** @internal Tint of multiply-scattered light. */
+  private readonly _scatterColor: Vector3;
+  /** @internal Multiple scattering intensity, 0 disables the term. */
+  private _scatterIntensity: number;
+  /** @internal Share of the scattering that survives where direct light does not. */
+  private _scatterLocal: number;
+  /** @internal Angular width of the forward-scattered lobe. */
+  private _scatterWrap: number;
   /** @internal Scratch vector for packing uniform values without per-frame allocation. */
   private readonly _uniformScratch: Vector4;
   /**
@@ -96,10 +106,15 @@ export class HairMaterial
     this._transmissionIntensity = 0;
     this._transmissionPower = 6;
     this._occlusionStrength = 1;
+    this._scatterColor = new Vector3(1, 0.85, 0.7);
+    this._scatterIntensity = 0;
+    this._scatterLocal = 0.5;
+    this._scatterWrap = 1;
     this._uniformScratch = new Vector4();
     this.useFeature(HairMaterial.FEATURE_VERTEX_NORMAL, true);
     this.useFeature(HairMaterial.FEATURE_STRAND_DIRECTION, 'binormal');
     this.useFeature(HairMaterial.FEATURE_TRANSMISSION, false);
+    this.useFeature(HairMaterial.FEATURE_SCATTER, false);
     // Hair cards are visible from both sides.
     this.cullMode = 'none';
   }
@@ -122,6 +137,10 @@ export class HairMaterial
     this.transmissionIntensity = other.transmissionIntensity;
     this.transmissionPower = other.transmissionPower;
     this.occlusionStrength = other.occlusionStrength;
+    this.scatterColor = other.scatterColor;
+    this.scatterIntensity = other.scatterIntensity;
+    this.scatterLocal = other.scatterLocal;
+    this.scatterWrap = other.scatterWrap;
   }
   /** true if vertex normal attribute presents */
   get vertexNormal() {
@@ -257,6 +276,99 @@ export class HairMaterial
       this.uniformChanged();
     }
   }
+  /**
+   * Tint of multiply-scattered light.
+   *
+   * @remarks
+   * Multiple scattering is strongly wavelength dependent - it is why blonde hair
+   * glows and black hair does not - and the tint is applied on top of the hair's
+   * own colour, which the term is already modulated by. Warm by default, since
+   * the light that survives several bounces through keratin has lost its blue.
+   */
+  get scatterColor(): Immutable<Vector3> {
+    return this._scatterColor;
+  }
+  set scatterColor(val: Immutable<Vector3>) {
+    if (!val.equalsTo(this._scatterColor)) {
+      this._scatterColor.set(val);
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Multiple scattering intensity. Zero disables the term, which is the default.
+   *
+   * @remarks
+   * Absorption alone makes the inside of a groom black, because that is what
+   * absorption does: past a few fibres essentially nothing of the direct beam
+   * survives. Real hair is not black there, and the difference is light that
+   * reached the point after bouncing off neighbouring fibres rather than
+   * travelling straight through.
+   *
+   * This adds an approximation of it in two parts, following the decomposition
+   * dual scattering makes: a global term, the light that came through the hair in
+   * front and arrives spread over a wide angle, and a local term, the light that
+   * did not come through but re-emerges after scattering nearby. The first fades
+   * with depth into the groom, the second does not, and it is the second that
+   * stops the interior going black.
+   *
+   * The forward transmittance both terms are built from is the shadow value, so
+   * this is at its most meaningful under a shadow mode that grades it - a deep
+   * opacity map. Under a binary filter the global term simply follows the shadow
+   * and the local term fills its complement.
+   *
+   * Off by default: it adds light the material did not previously emit, so it
+   * changes the look of any groom it is enabled on rather than refining it.
+   */
+  get scatterIntensity() {
+    return this._scatterIntensity;
+  }
+  set scatterIntensity(val) {
+    val = val < 0 ? 0 : val;
+    if (val !== this._scatterIntensity) {
+      this._scatterIntensity = val;
+      this.useFeature(HairMaterial.FEATURE_SCATTER, val > 0);
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Balance between the two scattering terms, in [0, 1].
+   *
+   * @remarks
+   * Zero keeps only the global term, so the scattering follows the light and
+   * vanishes deep in the groom. One keeps only the local term, which is brightest
+   * exactly where the direct light is blocked. The default splits them evenly;
+   * denser and lighter hair wants more local.
+   */
+  get scatterLocal() {
+    return this._scatterLocal;
+  }
+  set scatterLocal(val) {
+    val = val < 0 ? 0 : val > 1 ? 1 : val;
+    if (val !== this._scatterLocal) {
+      this._scatterLocal = val;
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Angular width of the forward-scattered lobe.
+   *
+   * @remarks
+   * Scattering spreads light as it crosses fibres, so the global term is not a
+   * cosine lobe but a much broader one; this is how far past the terminator it
+   * reaches. Larger than {@link HairMaterial.diffuseWrap} on purpose - that one
+   * softens a terminator, this one models a beam that has genuinely lost its
+   * direction.
+   */
+  get scatterWrap() {
+    return this._scatterWrap;
+  }
+  set scatterWrap(val) {
+    val = val < 0 ? 0 : val;
+    if (val !== this._scatterWrap) {
+      this._scatterWrap = val;
+      this.uniformChanged();
+    }
+  }
   /** Occlusion map strength in [0, 1] */
   get occlusionStrength() {
     return this._occlusionStrength;
@@ -307,6 +419,9 @@ export class HairMaterial
       scope.zHairParams = pb.vec4().uniform(2);
       if (this.featureUsed(HairMaterial.FEATURE_TRANSMISSION)) {
         scope.zHairTransmission = pb.vec4().uniform(2);
+      }
+      if (this.featureUsed(HairMaterial.FEATURE_SCATTER)) {
+        scope.zHairScatter = pb.vec4().uniform(2);
       }
     }
     if (this.needFragmentColorInput()) {
@@ -405,7 +520,12 @@ export class HairMaterial
       );
       bindGroup.setValue(
         'zHairParams',
-        scratch.setXYZW(this._transmissionPower, this._occlusionStrength, 0, 0)
+        scratch.setXYZW(
+          this._transmissionPower,
+          this._occlusionStrength,
+          this._scatterLocal,
+          this._scatterWrap
+        )
       );
       if (this.featureUsed(HairMaterial.FEATURE_TRANSMISSION)) {
         bindGroup.setValue(
@@ -418,7 +538,79 @@ export class HairMaterial
           )
         );
       }
+      if (this.featureUsed(HairMaterial.FEATURE_SCATTER)) {
+        bindGroup.setValue(
+          'zHairScatter',
+          scratch.setXYZW(
+            this._scatterColor.x,
+            this._scatterColor.y,
+            this._scatterColor.z,
+            this._scatterIntensity
+          )
+        );
+      }
     }
+  }
+  /**
+   * Approximates the light that reaches a point after bouncing off neighbouring
+   * fibres rather than travelling straight to it.
+   *
+   * @remarks
+   * Follows the split dual scattering makes, without its precomputation - the
+   * average forward and backward attenuations that theory derives from the fibre
+   * BCSDF are stand-in constants here, because this material's lighting is a
+   * phenomenological double lobe rather than a BCSDF to integrate.
+   *
+   * - **Global**, `throughput * wrapped(NoL)`: the beam that did cross the hair in
+   *   front, arriving spread out. Scattering randomises direction as it goes, so
+   *   the lobe is far wider than a cosine and reaches well past the terminator.
+   * - **Local**, `1 - throughput`: the beam that did not get through. Some of it
+   *   leaves the fibres it hit and re-emerges here, which is why it is brightest
+   *   exactly where the direct light is fully blocked, and why it does not fade
+   *   with depth the way the global term does.
+   *
+   * Both are modulated by the hair's own colour as well as the scatter tint,
+   * because light that has bounced several times has been filtered by keratin
+   * several times: it is the reason pale hair glows in shadow and dark hair
+   * stays dark, and multiplying by albedo is what carries that difference.
+   * @internal
+   */
+  hairScatter(
+    scope: PBInsideFunctionScope,
+    lightColor: PBShaderExp,
+    albedo: PBShaderExp,
+    NoL: PBShaderExp,
+    throughput: PBShaderExp,
+    ao: PBShaderExp
+  ) {
+    const pb = scope.$builder;
+    const funcName = 'Z_hairScatter';
+    pb.func(
+      funcName,
+      [pb.vec3('lightColor'), pb.vec3('albedo'), pb.float('NoL'), pb.float('throughput'), pb.float('ao')],
+      function () {
+        this.$l.localMix = this.zHairParams.z;
+        this.$l.wrap = pb.max(this.zHairParams.w, 1e-4);
+        // Wrapped well past the terminator, and never negative: a point facing
+        // away from the light still receives scattered light, which is the whole
+        // point of the term.
+        this.$l.spread = pb.clamp(pb.div(pb.add(this.NoL, this.wrap), pb.add(1, this.wrap)), 0, 1);
+        this.$l.global = pb.mul(this.throughput, this.spread);
+        this.$l.local = pb.sub(1, this.throughput);
+        this.$l.amount = pb.mix(this.global, this.local, this.localMix);
+        this.$return(
+          pb.mul(
+            this.lightColor,
+            this.albedo,
+            this.zHairScatter.rgb,
+            this.zHairScatter.a,
+            this.amount,
+            this.ao
+          )
+        );
+      }
+    );
+    return pb.getGlobalScope()[funcName](lightColor, albedo, NoL, throughput, ao) as PBShaderExp;
   }
   /**
    * Scheuermann-style anisotropic strand specular: shift the strand tangent along
@@ -473,6 +665,7 @@ export class HairMaterial
     const that = this;
     const baseLightPass = !that.drawContext.lightBlending;
     const useTransmission = that.featureUsed<boolean>(HairMaterial.FEATURE_TRANSMISSION);
+    const useScatter = that.featureUsed<boolean>(HairMaterial.FEATURE_SCATTER);
     pb.func(
       funcName,
       [
@@ -496,6 +689,7 @@ export class HairMaterial
           }
           this.$l.specularColor = pb.vec3(0);
           this.$l.transmissionColor = pb.vec3(0);
+          this.$l.scatterColor = pb.vec3(0);
           that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
             this.$l.diffuseScale = pb.float(1);
             this.$l.specularScale = pb.float(1);
@@ -564,6 +758,11 @@ export class HairMaterial
             } else {
               this.$l.transmission = pb.vec3(0);
             }
+            // Fraction of the beam that reached this point without being absorbed.
+            // Under a deep opacity map this grades with how much hair the light
+            // crossed, which is exactly what the scattering terms want; under a
+            // binary filter it is one or zero and they degrade to following it.
+            this.$l.throughput = pb.float(1);
             if (shadow) {
               this.$l.shadow = that.calculateShadow(
                 this,
@@ -571,16 +770,28 @@ export class HairMaterial
                 this.geometricNormal,
                 pb.max(this.NoL, 0)
               );
+              this.throughput = this.shadow;
               this.diffuse = pb.mul(this.diffuse, this.shadow);
               this.specular = pb.mul(this.specular, this.shadow);
               this.transmission = pb.mul(this.transmission, this.shadow);
+            }
+            if (useScatter) {
+              this.scatterColor = pb.add(
+                this.scatterColor,
+                that.hairScatter(this, this.lightColor, this.albedo.rgb, this.NoL, this.throughput, this.ao)
+              );
             }
             this.diffuseColor = pb.add(this.diffuseColor, this.diffuse);
             this.specularColor = pb.add(this.specularColor, this.specular);
             this.transmissionColor = pb.add(this.transmissionColor, this.transmission);
           });
           this.$return(
-            pb.add(pb.mul(this.albedo.rgb, this.diffuseColor), this.specularColor, this.transmissionColor)
+            pb.add(
+              pb.mul(this.albedo.rgb, this.diffuseColor),
+              this.specularColor,
+              this.transmissionColor,
+              this.scatterColor
+            )
           );
         }
       }

@@ -628,6 +628,23 @@ function drawUI() {
     });
   }
 
+  if (ImGui.CollapsingHeader('Multiple scattering', ImGui.TreeNodeFlags.DefaultOpen)) {
+    slider('Scatter', material.scatterIntensity, 0, 3, (v) => (material.scatterIntensity = v));
+    colorEdit('Scatter tint', material.scatterColor, (v) => (material.scatterColor = v));
+    slider('Local share', material.scatterLocal, 0, 1, (v) => (material.scatterLocal = v));
+    slider('Spread', material.scatterWrap, 0, 3, (v) => (material.scatterWrap = v));
+    // The term is multiplied by the hair's own colour, so on a near-black groom
+    // it is doing its job and showing almost nothing. Say so rather than let it
+    // read as a broken slider.
+    ImGui.TextDisabled('Scales with base colour: pale hair shows it,');
+    ImGui.TextDisabled('near-black hair barely can.');
+    if (shadowModeChoices[shadowModeIndex] !== 'dom') {
+      // Both terms are built from the shadow value, which only grades under a
+      // deep opacity map; elsewhere they just follow a binary in/out.
+      ImGui.TextDisabled('Graded only under dom shadows.');
+    }
+  }
+
   ImGui.Separator();
   ImGui.TextWrapped('Drag to orbit, wheel to zoom. Density changes need Apply.');
   ImGui.End();

@@ -2268,6 +2268,75 @@ export function getHairMaterialClass(manager: ResourceManager): SerializableClas
             }
           },
           {
+            name: 'ScatterColor',
+            description: 'Tint of multiply-scattered light',
+            type: 'rgb',
+            default: [1, 0.85, 0.7],
+            options: {
+              animatable: true
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.scatterColor.x;
+              value.num[1] = this.scatterColor.y;
+              value.num[2] = this.scatterColor.z;
+            },
+            set(this: HairMaterial, value) {
+              this.scatterColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+            }
+          },
+          {
+            name: 'ScatterIntensity',
+            description: 'Intensity of the multiple scattering term, 0 disables it',
+            type: 'float',
+            default: 0,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 4
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.scatterIntensity;
+            },
+            set(this: HairMaterial, value) {
+              this.scatterIntensity = value.num[0];
+            }
+          },
+          {
+            name: 'ScatterLocal',
+            description:
+              'Balance between scattering that follows the light and scattering that survives where it is blocked',
+            type: 'float',
+            default: 0.5,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 1
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.scatterLocal;
+            },
+            set(this: HairMaterial, value) {
+              this.scatterLocal = value.num[0];
+            }
+          },
+          {
+            name: 'ScatterWrap',
+            description: 'Angular width of the forward-scattered lobe',
+            type: 'float',
+            default: 1,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 4
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.scatterWrap;
+            },
+            set(this: HairMaterial, value) {
+              this.scatterWrap = value.num[0];
+            }
+          },
+          {
             name: 'OcclusionStrength',
             description: 'Strength of the baked occlusion (root darkening) texture',
             type: 'float',
