@@ -2836,12 +2836,17 @@ function createSkinInfluenceDataFromSubMesh(subMesh: AssetSubMeshData) {
   for (let vertexIndex = 0; vertexIndex < numVertices; vertexIndex++) {
     const baseOffset = vertexIndex * influenceCount + 4;
     for (let pairIndex = 0; pairIndex < pairCount; pairIndex++) {
+      const influenceIndex = 4 + pairIndex * 2;
       const sourceIndex = baseOffset + pairIndex * 2;
       const texelOffset = (vertexIndex * pairCount + pairIndex) * 4;
       textureData[texelOffset] = Number(subMesh.rawBlendIndices[sourceIndex] ?? 0);
       textureData[texelOffset + 1] = Number(subMesh.rawJointWeights[sourceIndex] ?? 0);
-      textureData[texelOffset + 2] = Number(subMesh.rawBlendIndices[sourceIndex + 1] ?? 0);
-      textureData[texelOffset + 3] = Number(subMesh.rawJointWeights[sourceIndex + 1] ?? 0);
+      // Odd influence counts leave the second half of the final texel empty.
+      // Do not read it from the next vertex's first influence.
+      if (influenceIndex + 1 < influenceCount) {
+        textureData[texelOffset + 2] = Number(subMesh.rawBlendIndices[sourceIndex + 1] ?? 0);
+        textureData[texelOffset + 3] = Number(subMesh.rawJointWeights[sourceIndex + 1] ?? 0);
+      }
     }
   }
   return {
