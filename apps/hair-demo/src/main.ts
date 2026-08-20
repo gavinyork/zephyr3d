@@ -59,6 +59,8 @@ scene.env.light.ambientColor = new Vector4(0.06, 0.07, 0.09, 1);
 const camera = new PerspectiveCamera(scene, Math.PI / 5, 0.05, 50);
 camera.position.setXYZ(0, 1.55, 0.75);
 camera.controller = new OrbitCameraController({ center: new Vector3(0, 1.52, 0) });
+camera.oitMode = 'dual-depth';
+camera.oitDualDepthPeels = 3;
 scene.mainCamera = camera;
 getInput().use(camera.handleEvent, camera);
 getEngine().setRenderable(scene, 0);
