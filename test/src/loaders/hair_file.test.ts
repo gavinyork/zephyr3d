@@ -154,9 +154,12 @@ describe('HAIR file parser', () => {
     // 2-byte boundary. A Float32Array view over the file buffer would throw
     // here; only a copy survives, which is what the parser does.
     const points = ramp(6, 3, 1);
-    const model = parseHairFile(buildHairFile({ strandCount: 3, pointCount: 6, segments: [1, 1, 1], points }), {
-      upAxis: 'y'
-    });
+    const model = parseHairFile(
+      buildHairFile({ strandCount: 3, pointCount: 6, segments: [1, 1, 1], points }),
+      {
+        upAxis: 'y'
+      }
+    );
     expect(Array.from(model.numVertices)).toEqual([2, 2, 2]);
     expect(Array.from(model.positions)).toEqual(points);
   });
@@ -190,10 +193,9 @@ describe('HAIR file parser', () => {
 
   it('leaves control points alone when the source is already Y-up', () => {
     const points = [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1];
-    const model = parseHairFile(
-      buildHairFile({ strandCount: 1, pointCount: 4, segments: [3], points }),
-      { upAxis: 'y' }
-    );
+    const model = parseHairFile(buildHairFile({ strandCount: 1, pointCount: 4, segments: [3], points }), {
+      upAxis: 'y'
+    });
     expect(model.sourceUpAxis).toBe('y');
     expect(Array.from(model.positions)).toEqual(points);
   });
