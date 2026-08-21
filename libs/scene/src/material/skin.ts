@@ -21,12 +21,20 @@ export const SKIN_SSS_LDR_ENCODE_RANGE = 4;
  * Stylized realtime skin material.
  *
  * @remarks
- * This material is designed for the {@link SkinSSS} post effect. It renders a regular lit color,
- * and when `camera.skinSSS` is enabled it also writes an additive scatter irradiance term into the
- * `SkinSSSTexture` MRT. The scatter term is the difference between a wide wrapped diffuse and the
- * visible diffuse, so it concentrates around the lighting terminator. The post effect blurs that
- * side buffer in screen space and adds it back over the opaque color, letting light bleed into
- * the dark side of the terminator for a soft character-skin look.
+ * This material is designed for the {@link SkinSSS} post effect. It renders a regular lit color
+ * and, when `camera.skinSSS` is enabled, writes the *diffusible* part of that color - the stylized
+ * diffuse ramp plus back-lit transmission, without specular - into the `SkinSSSTexture` MRT.
+ *
+ * The side buffer holds exactly the same term that is already in the lit color, untinted and
+ * unscaled. {@link SkinSSS} subtracts it and adds back a channel-dependent diffused version, so
+ * the redistribution is energy conserving by construction and disabling the effect leaves the
+ * image unchanged. Scatter tint, strength and radius therefore live on the post effect, not here.
+ *
+ * Stylization is split from diffusion on purpose. {@link SkinMaterial.diffuseWrap},
+ * {@link SkinMaterial.diffuseSoftness}, {@link SkinMaterial.shadowTint} and
+ * {@link SkinMaterial.brightening} shape the direct lighting ramp; the post effect then diffuses
+ * whatever ramp they produced. A stylized ramp stays stylized after scattering rather than being
+ * averaged away.
  *
  * The optional `subsurfaceTexture` uses R as skin mask, G as local softness and B as thickness
  * for the back-lit transmission term (thin regions such as ears and nostrils glow when lit from
@@ -160,7 +168,15 @@ export class SkinMaterial
     }
   }
 
-  /** Wider wrap used only for the post-process scattering source. */
+  /**
+   * Wider wrap that used to shape the post-process scattering source.
+   *
+   * @deprecated No longer has any effect. The side buffer now carries the real
+   * diffuse term rather than a hand-built difference that was nonzero only near
+   * the terminator, so there is nothing for a second wrap to shape. Use
+   * {@link SkinSSS.scatterRadius} and the profile's channel radii to control how
+   * far light travels, and {@link SkinMaterial.diffuseWrap} to shape the ramp.
+   */
   get scatterWrap() {
     return this._scatterWrap;
   }
@@ -172,7 +188,15 @@ export class SkinMaterial
     }
   }
 
-  /** Strength of the multiplier written into the SkinSSS side buffer. */
+  /**
+   * Strength of the multiplier written into the SkinSSS side buffer.
+   *
+   * @deprecated No longer has any effect. Scaling the side buffer would break
+   * the identity that makes the diffusion energy conserving - it must equal the
+   * diffusible term already present in the lit color. Use
+   * {@link SkinSSS.strength} for the overall amount and {@link SkinSSS.glow} for
+   * an additive, non-conserving bleed on top.
+   */
   get scatterStrength() {
     return this._scatterStrength;
   }
@@ -211,7 +235,15 @@ export class SkinMaterial
     }
   }
 
-  /** Warm tint for the blurred skin lighting contribution. */
+  /**
+   * Warm tint for the blurred skin lighting contribution.
+   *
+   * @deprecated No longer has any effect; moved to {@link SkinSSS.scatterTint}.
+   * Tinting here would tint the diffuse in the lit color too, which is what made
+   * the old look read as a red haze over the whole face. On the post effect the
+   * tint applies only to the light that actually moved, and per-channel scatter
+   * radii from the profile already produce the red bleed on their own.
+   */
   get scatterColor(): Immutable<Vector4> {
     return this._scatterColor;
   }
@@ -285,9 +317,6 @@ export class SkinMaterial
         scope.zSkinSpecularStrength = pb.float().uniform(2);
         scope.zSkinDiffuseWrap = pb.float().uniform(2);
         scope.zSkinDiffuseSoftness = pb.float().uniform(2);
-        scope.zSkinScatterWrap = pb.float().uniform(2);
-        scope.zSkinScatterStrength = pb.float().uniform(2);
-        scope.zSkinScatterColor = pb.vec4().uniform(2);
         scope.zSkinShadowTint = pb.vec4().uniform(2);
         scope.zSkinBrightening = pb.float().uniform(2);
         // Encodes HDR scatter irradiance into the SkinSSS buffer range when the
@@ -327,19 +356,12 @@ export class SkinMaterial
           scope.skinThickness = pb.clamp(scope.subsurfaceTexel.b, 0, 1);
         }
         scope.$l.diffuseLighting = pb.vec3(0);
-        scope.$l.scatterLighting = pb.vec3(0);
+        scope.$l.transmissionLighting = pb.vec3(0);
         scope.$l.specularLighting = pb.vec3(0);
         scope.$l.NoV = pb.clamp(pb.dot(scope.normal, scope.viewVec), 0, 1);
         if (this.needCalculateEnvLight() && baseLightPass) {
           scope.$l.envDiffuse = this.getEnvLightIrradiance(scope, scope.normal);
           scope.diffuseLighting = pb.add(scope.diffuseLighting, scope.envDiffuse);
-          // Ambient light is nearly directionless, so it carries almost no
-          // terminator information. Feed only a small fraction into the scatter
-          // buffer to avoid tinting the whole face uniformly.
-          scope.scatterLighting = pb.add(
-            scope.scatterLighting,
-            pb.mul(scope.envDiffuse, pb.mul(0.15, pb.add(1, scope.skinSoftness)))
-          );
           scope.$l.reflectVec = this.calculateReflectionVector(scope, scope.normal, scope.viewVec);
           scope.$l.envFresnel = pb.add(0.028, pb.mul(0.972, pb.pow(pb.sub(1, scope.NoV), 5)));
           scope.specularLighting = pb.add(
@@ -385,11 +407,6 @@ export class SkinMaterial
             0,
             1
           );
-          this.$l.NoLScatter = pb.clamp(
-            pb.div(pb.add(this.rawNoL, this.zSkinScatterWrap), pb.add(1, this.zSkinScatterWrap)),
-            0,
-            1
-          );
           // calculateShadow() samples with implicit derivatives (dpdx); WGSL
           // requires the call to stay in uniform control flow, so never wrap
           // it in a dynamic branch such as NoLWrap > 0.
@@ -430,20 +447,6 @@ export class SkinMaterial
             this.diffuseLighting,
             pb.mul(this.diffuseLightColor, this.diffuseRamp, this.diffuseScale, 1 / Math.PI)
           );
-          // Difference between the wide scatter wrap and the visible diffuse:
-          // nonzero only in the transition band around the terminator, which is
-          // where the blurred red bleed should appear.
-          this.$l.scatterFalloff = pb.max(pb.sub(this.NoLScatter, this.NoLVis), 0);
-          this.scatterLighting = pb.add(
-            this.scatterLighting,
-            pb.mul(
-              this.diffuseLightColor,
-              this.scatterFalloff,
-              pb.add(1, pb.mul(this.skinSoftness, 0.55)),
-              this.diffuseScale,
-              1 / Math.PI
-            )
-          );
           if (that.subsurfaceTexture) {
             // Back-lit transmission: thin regions (B channel of the subsurface
             // texture) glow when the light faces the camera through the
@@ -463,8 +466,8 @@ export class SkinMaterial
               this.skinThickness,
               this.zSkinTransmissionStrength
             );
-            this.scatterLighting = pb.add(
-              this.scatterLighting,
+            this.transmissionLighting = pb.add(
+              this.transmissionLighting,
               pb.mul(this.lightColor, this.transmission, this.diffuseScale, 1 / Math.PI)
             );
           }
@@ -486,19 +489,25 @@ export class SkinMaterial
         });
         // Whitening: lift the whole diffuse response (direct and ambient).
         scope.diffuseLighting = pb.mul(scope.diffuseLighting, pb.add(1, scope.zSkinBrightening));
-        scope.$l.litColor = pb.add(pb.mul(scope.albedo.rgb, scope.diffuseLighting), scope.specularLighting);
-        // Additive scatter irradiance for the SkinSSS post effect. Base and
-        // additive light passes both write the plain term; the additive blend
-        // (RGB one/one, alpha zero/one) accumulates RGB and keeps the mask
-        // written by the base pass in alpha.
-        scope.$l.scatterTerm = pb.mul(
+        // Everything that scatters through the surface: the stylized diffuse
+        // ramp plus back-lit transmission. Specular stays out - it reflects off
+        // the oil layer and never enters the skin.
+        scope.$l.diffusible = pb.mul(
           scope.albedo.rgb,
-          scope.scatterLighting,
-          scope.zSkinScatterColor.rgb,
-          scope.zSkinScatterStrength,
-          pb.add(0.75, pb.mul(scope.skinSoftness, 0.45))
+          pb.add(scope.diffuseLighting, scope.transmissionLighting)
         );
-        scope.$l.skinSSS = pb.vec4(pb.mul(scope.scatterTerm, scope.zSkinScatterEncodeScale), scope.skinMask);
+        scope.$l.litColor = pb.add(scope.diffusible, scope.specularLighting);
+        // The SkinSSS side buffer carries exactly the diffusible term that is
+        // also in litColor - untinted and unscaled. That identity is what lets
+        // the post effect subtract it and add back a diffused version, which is
+        // energy conserving by construction and leaves the image untouched when
+        // the effect is disabled. Tinting or scaling here would break it; those
+        // controls live on SkinSSS instead.
+        //
+        // Base and additive light passes both write their own contribution; the
+        // additive blend (RGB one/one, alpha zero/one) accumulates RGB and keeps
+        // the mask written by the base pass in alpha.
+        scope.$l.skinSSS = pb.vec4(pb.mul(scope.diffusible, scope.zSkinScatterEncodeScale), scope.skinMask);
         if (
           this.drawContext.materialFlags &
           (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
@@ -550,9 +559,6 @@ export class SkinMaterial
       bindGroup.setValue('zSkinSpecularStrength', this._specularStrength);
       bindGroup.setValue('zSkinDiffuseWrap', this._diffuseWrap);
       bindGroup.setValue('zSkinDiffuseSoftness', this._diffuseSoftness);
-      bindGroup.setValue('zSkinScatterWrap', this._scatterWrap);
-      bindGroup.setValue('zSkinScatterStrength', this._scatterStrength);
-      bindGroup.setValue('zSkinScatterColor', this._scatterColor);
       bindGroup.setValue('zSkinShadowTint', this._shadowTint);
       bindGroup.setValue('zSkinBrightening', this._brightening);
       const ldrSkinSSS = ctx.SkinSSSTexture && ctx.SkinSSSTexture.format === 'rgba8unorm';

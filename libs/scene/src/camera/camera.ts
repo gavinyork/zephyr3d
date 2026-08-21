@@ -32,6 +32,8 @@ import { SSGI } from '../posteffect/ssgi';
 import { SSR } from '../posteffect/ssr';
 import { SSS } from '../posteffect/sss';
 import { SkinSSS } from '../posteffect/skinsss';
+import { SubsurfaceProfile } from '../material/subsurfaceprofile';
+import type { SubsurfaceProfilePreset } from '../material/subsurfaceprofile';
 import { Tonemap } from '../posteffect/tonemap';
 import { FXAA } from '../posteffect/fxaa';
 import { Bloom } from '../posteffect/bloom';
@@ -430,6 +432,10 @@ export class Camera extends SceneNode {
   protected _skinSSSDepthScale: number;
   /** @internal Skin SSS blurred multiplier boost. */
   protected _skinSSSColorBoost: number;
+  protected _skinSSSGlow: number;
+  protected _skinSSSProfilePreset: SubsurfaceProfilePreset;
+  protected _skinSSSProfile: SubsurfaceProfile | null;
+  protected readonly _skinSSSScatterTint: Vector4;
   /** @internal SSAO enable flag (via post effect). */
   protected _SSAO: boolean;
   /** @internal SSAO post effect reference. */
@@ -604,6 +610,10 @@ export class Camera extends SceneNode {
     this._skinSSSSmoothness = 0;
     this._skinSSSDepthScale = 80;
     this._skinSSSColorBoost = 1;
+    this._skinSSSGlow = 0;
+    this._skinSSSProfilePreset = 'skin_default';
+    this._skinSSSProfile = null;
+    this._skinSSSScatterTint = new Vector4(1, 1, 1, 1);
     this._SSAO = false;
     this._postEffectSSAO = new DRef();
     this._SSAOScale = 10;
@@ -1441,6 +1451,80 @@ export class Camera extends SceneNode {
       this._postEffectSkinSSS.get()!.colorBoost = this._skinSSSColorBoost;
     }
   }
+  /**
+   * Additive, deliberately non-conserving bleed for the Skin SSS post effect.
+   *
+   * @remarks
+   * 0 (the default) keeps the effect energy conserving: light added to the dark
+   * side of the terminator is light removed from the lit side. Raising it adds
+   * the diffused term again without subtracting anything, for skin that reads as
+   * lit from within; around 1 approximates the look the effect had before it
+   * conserved energy.
+   */
+  get skinSSSGlow() {
+    return this._skinSSSGlow;
+  }
+  set skinSSSGlow(val) {
+    this._skinSSSGlow = Math.max(0, val ?? 0);
+    if (this._postEffectSkinSSS.get()) {
+      this._postEffectSkinSSS.get()!.glow = this._skinSSSGlow;
+    }
+  }
+  /**
+   * Subsurface profile preset driving the Skin SSS per-channel scatter radii.
+   *
+   * @remarks
+   * The ratio between the red, green and blue radii is what gives a scattering
+   * surface its character - red travels furthest in skin, which is the
+   * red-to-yellow gradient at the terminator. Switching presets changes that
+   * ratio, so `wax` and `jade` are the same code path rather than special cases;
+   * {@link Camera.skinSSSScatterRadius} still sets how far the light reaches.
+   *
+   * Applies to the whole pass. Per-material profiles need the profile-slot path
+   * used by {@link SSS} instead.
+   */
+  get skinSSSProfilePreset(): SubsurfaceProfilePreset {
+    return this._skinSSSProfilePreset;
+  }
+  set skinSSSProfilePreset(val: SubsurfaceProfilePreset) {
+    this._skinSSSProfilePreset = val ?? 'skin_default';
+    if (this._skinSSSProfile) {
+      this._skinSSSProfile.preset = this._skinSSSProfilePreset;
+    }
+    if (this._postEffectSkinSSS.get()) {
+      this._postEffectSkinSSS.get()!.profile = this.getSkinSSSProfile();
+    }
+  }
+  /**
+   * The profile object backing {@link Camera.skinSSSProfilePreset}, created on
+   * first use so that cameras which never enable Skin SSS do not consume one of
+   * the 255 global profile slots.
+   * @internal
+   */
+  protected getSkinSSSProfile() {
+    if (!this._skinSSSProfile) {
+      this._skinSSSProfile = new SubsurfaceProfile();
+      this._skinSSSProfile.preset = this._skinSSSProfilePreset;
+    }
+    return this._skinSSSProfile;
+  }
+  /**
+   * Tint applied to the light the Skin SSS post effect redistributes.
+   *
+   * @remarks
+   * White (the default) leaves the effect energy conserving. Because it
+   * multiplies only the difference between the diffused and original diffuse, a
+   * warm tint colors the terminator without washing the whole surface.
+   */
+  get skinSSSScatterTint(): Vector4 {
+    return this._skinSSSScatterTint;
+  }
+  set skinSSSScatterTint(val: Vector4) {
+    this._skinSSSScatterTint.set(val);
+    if (this._postEffectSkinSSS.get()) {
+      this._postEffectSkinSSS.get()!.scatterTint = this._skinSSSScatterTint;
+    }
+  }
   /** @internal */
   get ssrParams(): Immutable<Vector4> {
     return this._ssrParams;
@@ -1956,6 +2040,9 @@ export class Camera extends SceneNode {
       skinSSS.smoothness = this._skinSSSSmoothness;
       skinSSS.depthScale = this._skinSSSDepthScale;
       skinSSS.colorBoost = this._skinSSSColorBoost;
+      skinSSS.glow = this._skinSSSGlow;
+      skinSSS.profile = this.getSkinSSSProfile();
+      skinSSS.scatterTint = this._skinSSSScatterTint;
       this._postEffectSkinSSS.set(skinSSS);
       this._compositor.appendPostEffect(skinSSS);
     }
