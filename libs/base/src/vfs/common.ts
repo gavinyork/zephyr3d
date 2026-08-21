@@ -24,6 +24,7 @@ const mimeTypes: Record<string, string> = {
   '.zip': 'application/zip',
   '.fbx': 'model/fbx',
   '.abc': 'model/alembic',
+  '.hair': 'model/hair',
   '.obj': 'model/obj',
   '.gltf': 'model/gltf+json',
   '.glb': 'model/gltf-binary',

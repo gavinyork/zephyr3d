@@ -21,6 +21,7 @@ import {
   hairScatterOn,
   hairShadowDom,
   hairShadowPcf,
+  hairFileHelix,
   hairStrandsFan,
   hairStrandsGpuHelix,
   hairStrandsHelix,
@@ -68,8 +69,10 @@ export const SCENES: VisualScene[] = [
   skinSss,
   skinShadow,
   hair,
-  // Strand hair: the Alembic import path, from container bytes to ribbons.
+  // Strand hair: the curve import paths, from container bytes to ribbons.
   hairStrandsHelix,
+  // Same helix, same framing, read out of a HAIR file instead - compare the two.
+  hairFileHelix,
   hairStrandsFan,
   hairStrandsWidth,
   hairStrandsGpuHelix,
