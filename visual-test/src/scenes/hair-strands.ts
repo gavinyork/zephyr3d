@@ -1,6 +1,7 @@
 import {
   BoundingBox,
   BoxShape,
+  DirectionalLight,
   HairMaterial,
   HairStrandData,
   HairStrandMaterial,
@@ -448,3 +449,73 @@ export const hairScatterOn = hairShadowScene(
   'The same pale groom with multiple scattering enabled: pins the global and local scattering terms filling the interior that absorption empties.',
   'on'
 );
+
+/**
+ * A dense groom under the Marschner fibre model, lit from behind.
+ *
+ * @remarks
+ * Framed and lit to make the three fibre paths separable on real strand
+ * geometry, which is where the model is meant to be used and where the double
+ * lobe's shortcomings actually show.
+ *
+ * The key sits low behind the groom, opposite the camera. That is deliberate and
+ * it is the whole scene: it is the configuration the double lobe cannot render
+ * at all, because `specFade` in that path exists precisely to suppress specular
+ * where `N·L` is negative. Under Marschner the same geometry produces a bright
+ * rim - light that entered the far side of each fibre and came out the near one -
+ * and the strands nearest the silhouette glow while the interior stays dark.
+ *
+ * Mid-blonde, because both transmitted paths are tinted by absorbing the hair's
+ * own colour over the distance they cross. On the near-black hair the other
+ * strand scenes use, they are correct and invisible; the effect is the reason
+ * pale hair reads as translucent and dark hair does not.
+ *
+ * Multiple scattering is off, so the light in the shadowed interior is only what
+ * these three paths deliver and nothing is standing in for them.
+ *
+ * WebGPU only, following the strand expansion path.
+ */
+export const hairMarschnerStrands: VisualScene = {
+  name: 'hair-marschner-strands',
+  description:
+    'Back-lit blonde groom under the Marschner model: pins the transmitted rim the double lobe cannot produce, plus the tinted secondary highlight.',
+  supports: (backend) => backend === 'webgpu',
+  setup(ctx) {
+    bareScene(ctx.scene);
+    // The house key, in its usual place: front-left and above. This is what
+    // drives the two reflected paths and casts the deep opacity shadow.
+    const key = shadowKeyLight(ctx.scene, 'dom');
+    key.shadow.shadowDistance = 12;
+    key.shadow.domLayerDistance = 1.1;
+    // A second light behind and steeply above, for the transmitted path.
+    //
+    // Steeply, and that is the whole trick. Light coming from directly opposite
+    // the camera makes sin(theta) for the light the negative of the one for the
+    // view on *every* strand at once, which is exactly the condition the
+    // transmitted lobe peaks at - so the entire groom fires at its maximum
+    // together and, with no tone mapping in this harness, clips to flat white.
+    // That is not a bug in the model: the lobe is narrow, and its integral over
+    // all directions is one. It is what backlit hair genuinely does, and it is
+    // why photographs of it are usually exposed for the rim. Raising the light
+    // out of the camera's plane leaves only the strands whose direction happens
+    // to satisfy the condition lit, which is the rim this scene is here to pin.
+    const back = new DirectionalLight(ctx.scene);
+    back.lookAt(new Vector3(-1.1, 4.2, -3.4), new Vector3(0, 0.4, 0), Vector3.axisPY());
+    back.color = new Vector4(1, 0.95, 0.88, 1);
+    // Dimmer than the key. Two lights at full strength drive the floor past
+    // white, and the graded shadow across it is half of what this scene shows.
+    back.intensity = 0.6;
+    const material = new HairStrandMaterial();
+    material.shadingModel = 'marschner';
+    material.albedoColor = new Vector4(0.62, 0.5, 0.36, 1);
+    material.segmentsPerStrand = 16;
+    material.minStrandWidth = 0;
+    material.strandWidthScale = 0.4;
+    material.alphaCutoff = 0.01;
+    material.minPixelWidth = 1.3;
+    addGPUStrands(ctx, toStrandSource(helixCurves(96, 24)), material);
+    shadowFloor(ctx.scene);
+    placeCamera(ctx.camera, new Vector3(2.1, 1.3, 2.8), new Vector3(0, 0.05, 0));
+    ctx.camera.far = 40;
+  }
+};

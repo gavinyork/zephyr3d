@@ -3,6 +3,7 @@ import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinLight } from './mixins/lit';
 import { mixinVertexColor } from './mixins/vertexcolor';
 import { mixinTextureProps } from './mixins/texture';
+import { mixinPBRBRDF } from './mixins/pbr/brdf';
 import { ShaderHelper } from './shader/helper';
 import { LIGHT_TYPE_POINT, MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { DrawContext } from '../render';
@@ -17,6 +18,20 @@ import { Vector3, Vector4 } from '@zephyr3d/base';
  * @public
  */
 export type HairStrandDirection = 'tangent' | 'binormal';
+
+/**
+ * Which scattering model shades the hair.
+ *
+ * - `kajiya-kay`: the phenomenological double lobe. Every term is an art dial,
+ *   which makes it predictable and cheap, and is usually what a stylised hair
+ *   card wants.
+ * - `marschner`: the fibre model, splitting light into the three paths it can
+ *   take through a strand. Costs more and gives up some direct control, but the
+ *   secondary highlight takes the hair's own colour and backlit tips glow
+ *   because the model says they must, not because someone dialled it in.
+ * @public
+ */
+export type HairShadingModel = 'kajiya-kay' | 'marschner';
 
 /**
  * Hair-card material using a Kajiya-Kay style double-lobe anisotropic lighting model.
@@ -39,6 +54,7 @@ export class HairMaterial
   extends applyMaterialMixins(
     MeshMaterial,
     mixinLight,
+    mixinPBRBRDF,
     mixinVertexColor,
     mixinTextureProps('specularShift'),
     mixinTextureProps('occlusion')
@@ -55,6 +71,8 @@ export class HairMaterial
   private static readonly FEATURE_TRANSMISSION = this.defineFeature();
   /** @internal */
   private static readonly FEATURE_SCATTER = this.defineFeature();
+  /** @internal Selects the scattering model. Holds a {@link HairShadingModel}. */
+  private static readonly FEATURE_SHADING_MODEL = this.defineFeature();
   /** @internal Primary lobe color (usually near-white). */
   private readonly _specular1Color: Vector3;
   /** @internal Primary lobe exponent. */
@@ -79,6 +97,16 @@ export class HairMaterial
   private _transmissionPower: number;
   /** @internal Occlusion map strength in [0, 1]. */
   private _occlusionStrength: number;
+  /** @internal Marschner longitudinal shift of the R lobe, in sine units. */
+  private _marschnerShift: number;
+  /** @internal Marschner longitudinal roughness. */
+  private _marschnerRoughness: number;
+  /** @internal Refractive index of the fibre. */
+  private _marschnerIOR: number;
+  /** @internal Multiplier on the Beer-Lambert path length. */
+  private _marschnerAbsorption: number;
+  /** @internal Per-lobe intensities: R, TT, TRT. */
+  private readonly _marschnerLobes: Vector3;
   /** @internal Tint of multiply-scattered light. */
   private readonly _scatterColor: Vector3;
   /** @internal Multiple scattering intensity, 0 disables the term. */
@@ -106,6 +134,13 @@ export class HairMaterial
     this._transmissionIntensity = 0;
     this._transmissionPower = 6;
     this._occlusionStrength = 1;
+    // Marschner defaults follow the measured fibre: the cuticle scales tilt the
+    // surface by a few degrees, which is what separates the three lobes at all.
+    this._marschnerShift = 0.035;
+    this._marschnerRoughness = 0.3;
+    this._marschnerIOR = 1.55;
+    this._marschnerAbsorption = 1;
+    this._marschnerLobes = new Vector3(1, 1, 1);
     this._scatterColor = new Vector3(1, 0.85, 0.7);
     this._scatterIntensity = 0;
     this._scatterLocal = 0.5;
@@ -115,6 +150,7 @@ export class HairMaterial
     this.useFeature(HairMaterial.FEATURE_STRAND_DIRECTION, 'binormal');
     this.useFeature(HairMaterial.FEATURE_TRANSMISSION, false);
     this.useFeature(HairMaterial.FEATURE_SCATTER, false);
+    this.useFeature(HairMaterial.FEATURE_SHADING_MODEL, 'kajiya-kay');
     // Hair cards are visible from both sides.
     this.cullMode = 'none';
   }
@@ -141,6 +177,12 @@ export class HairMaterial
     this.scatterIntensity = other.scatterIntensity;
     this.scatterLocal = other.scatterLocal;
     this.scatterWrap = other.scatterWrap;
+    this.shadingModel = other.shadingModel;
+    this.marschnerShift = other.marschnerShift;
+    this.marschnerRoughness = other.marschnerRoughness;
+    this.marschnerIOR = other.marschnerIOR;
+    this.marschnerAbsorption = other.marschnerAbsorption;
+    this.marschnerLobes = other.marschnerLobes;
   }
   /** true if vertex normal attribute presents */
   get vertexNormal() {
@@ -369,6 +411,122 @@ export class HairMaterial
       this.uniformChanged();
     }
   }
+  /**
+   * Which scattering model shades the hair. Defaults to `kajiya-kay`.
+   *
+   * @remarks
+   * Switching to `marschner` changes the look of any hair it is enabled on
+   * rather than refining it, so it is opted into. See {@link HairShadingModel}
+   * for what the two models are; the `marschner*` properties are inert under
+   * `kajiya-kay` and the specular lobe properties are inert under `marschner`.
+   *
+   * Two existing properties overlap with it and should be left alone when it is
+   * on: {@link HairMaterial.transmissionIntensity}, whose whole job is faking the
+   * backlit glow that Marschner's TT path produces for real, and - on
+   * `HairStrandMaterial` - `strandRoundness`, whose bent normal no longer reaches
+   * the highlight, because Marschner already integrates across the fibre.
+   */
+  get shadingModel() {
+    return this.featureUsed<HairShadingModel>(HairMaterial.FEATURE_SHADING_MODEL);
+  }
+  set shadingModel(val: HairShadingModel) {
+    this.useFeature(HairMaterial.FEATURE_SHADING_MODEL, val);
+  }
+  /**
+   * Longitudinal shift of the Marschner lobes, in sine units.
+   *
+   * @remarks
+   * Hair is not a smooth cylinder: overlapping cuticle scales tilt its surface
+   * by a few degrees toward the tip. That tilt is the only reason the three
+   * lobes sit at different angles instead of on top of one another, so this is
+   * what makes them read as separate highlights at all. The three shifts are
+   * derived from it in the ratio the measurements give, R getting `-2x` and TRT
+   * `4x`, so one dial moves the whole set consistently.
+   *
+   * Defaults to 0.035, roughly the measured 2 degrees.
+   */
+  get marschnerShift() {
+    return this._marschnerShift;
+  }
+  set marschnerShift(val) {
+    if (val !== this._marschnerShift) {
+      this._marschnerShift = val;
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Longitudinal roughness of the Marschner lobes, in (0, 1].
+   *
+   * @remarks
+   * The angular width of the highlight bands. Per-lobe widths are derived from
+   * it - TT half, TRT double - which is the ordering real fibres show: light
+   * that only passes through stays tight, light that has bounced inside spreads.
+   */
+  get marschnerRoughness() {
+    return this._marschnerRoughness;
+  }
+  set marschnerRoughness(val) {
+    const v = val < 0.005 ? 0.005 : val > 1 ? 1 : val;
+    if (v !== this._marschnerRoughness) {
+      this._marschnerRoughness = v;
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Refractive index of the fibre. Defaults to the measured 1.55 for keratin.
+   *
+   * @remarks
+   * Sets how much light reflects at the surface rather than entering, and how
+   * sharply it bends once inside - so it moves the balance between the white R
+   * highlight and the two coloured paths. Rarely worth changing from the
+   * measured value, but exposed because it is a real physical quantity.
+   */
+  get marschnerIOR() {
+    return this._marschnerIOR;
+  }
+  set marschnerIOR(val) {
+    const v = val < 1.01 ? 1.01 : val;
+    if (v !== this._marschnerIOR) {
+      this._marschnerIOR = v;
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Multiplier on how far light travels through the fibre before leaving.
+   *
+   * @remarks
+   * The transmitted paths are tinted by absorbing the hair's own colour over the
+   * distance they cross, so raising this deepens the colour of TT and TRT
+   * without touching the white surface reflection. It is the dial for "how
+   * strongly pigmented", separate from which colour the pigment is.
+   */
+  get marschnerAbsorption() {
+    return this._marschnerAbsorption;
+  }
+  set marschnerAbsorption(val) {
+    const v = val < 0 ? 0 : val;
+    if (v !== this._marschnerAbsorption) {
+      this._marschnerAbsorption = v;
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Per-path intensities as `(R, TT, TRT)`, all 1 by default.
+   *
+   * @remarks
+   * Art override on top of the physics, and the fastest way to see what each
+   * path contributes: zero two of them and the third is on its own. R is the
+   * white surface highlight, TT the backlit glow, TRT the coloured secondary.
+   */
+  get marschnerLobes(): Immutable<Vector3> {
+    return this._marschnerLobes;
+  }
+  set marschnerLobes(val: Immutable<Vector3>) {
+    if (!val.equalsTo(this._marschnerLobes)) {
+      this._marschnerLobes.set(val);
+      this.uniformChanged();
+    }
+  }
   /** Occlusion map strength in [0, 1] */
   get occlusionStrength() {
     return this._occlusionStrength;
@@ -422,6 +580,10 @@ export class HairMaterial
       }
       if (this.featureUsed(HairMaterial.FEATURE_SCATTER)) {
         scope.zHairScatter = pb.vec4().uniform(2);
+      }
+      if (this.shadingModel === 'marschner') {
+        scope.zHairMarschner1 = pb.vec4().uniform(2);
+        scope.zHairMarschner2 = pb.vec4().uniform(2);
       }
     }
     if (this.needFragmentColorInput()) {
@@ -549,6 +711,24 @@ export class HairMaterial
           )
         );
       }
+      if (this.shadingModel === 'marschner') {
+        bindGroup.setValue(
+          'zHairMarschner1',
+          scratch.setXYZW(
+            this._marschnerShift,
+            this._marschnerRoughness,
+            this._marschnerIOR,
+            this._marschnerAbsorption
+          )
+        );
+        // Normal-incidence reflectance from the index, folded here because it
+        // does not vary per fragment. 1.55 gives roughly 0.046.
+        const f0 = (this._marschnerIOR - 1) / (this._marschnerIOR + 1);
+        bindGroup.setValue(
+          'zHairMarschner2',
+          scratch.setXYZW(this._marschnerLobes.x, this._marschnerLobes.y, this._marschnerLobes.z, f0 * f0)
+        );
+      }
     }
   }
   /**
@@ -627,6 +807,199 @@ export class HairMaterial
     return pb.getGlobalScope()[funcName](lightColor, albedo, NoL, throughput, ao) as PBShaderExp;
   }
   /**
+   * Normalised longitudinal lobe: a unit-integral Gaussian of width `width`.
+   *
+   * @remarks
+   * Stands in for the exact longitudinal term, which involves a Bessel function
+   * and, in the energy-conserving formulation, `cosh` - and `cosh` is not
+   * available on WebGL1 in this shader builder. The Gaussian is the
+   * approximation Marschner's own paper offers and is what real-time
+   * implementations use.
+   * @internal
+   */
+  private hairLongitudinal(scope: PBInsideFunctionScope, width: PBShaderExp, offset: PBShaderExp) {
+    const pb = scope.$builder;
+    const funcName = 'Z_hairLongitudinal';
+    pb.func(funcName, [pb.float('width'), pb.float('offset')], function () {
+      this.$l.b = pb.max(this.width, 0.0001);
+      this.$l.t = pb.div(this.offset, this.b);
+      this.$return(pb.div(pb.exp(pb.mul(this.t, this.t, -0.5)), pb.mul(this.b, Math.sqrt(2 * Math.PI))));
+    });
+    return pb.getGlobalScope()[funcName](width, offset) as PBShaderExp;
+  }
+  /**
+   * Marschner fibre scattering: the three paths light can take through a strand.
+   *
+   * @remarks
+   * Treats the strand as a translucent dielectric cylinder and adds up what
+   * leaves it, split by how many times the light crossed a surface:
+   *
+   * - **R** bounces straight off the outside. It never meets the pigment, so it
+   *   is the colour of the light - the white sheen on dark hair.
+   * - **TT** goes in one side and out the other, crossing the pigment twice. It
+   *   leaves roughly opposite where it entered, so it is what you see when the
+   *   light is behind the head, and it carries the deepest colour.
+   * - **TRT** goes in, reflects off the far inside wall, and comes back out. It
+   *   emerges near the side it entered, so it reads as a second highlight
+   *   alongside R - but having crossed the pigment three times it is tinted,
+   *   which is why the secondary highlight of real hair is hair-coloured. The
+   *   double lobe has to be told that; here it falls out.
+   *
+   * Each path is a longitudinal lobe `M` in the angle up the fibre times an
+   * azimuthal lobe `N` in the angle around it, over `cos²θd` to convert the
+   * fibre's scattering into a BCSDF. `M` is a Gaussian, offset per path by the
+   * tilt of the cuticle scales - which is the entire reason the three appear at
+   * different angles rather than on top of each other.
+   *
+   * `N` is where the original model is expensive: solving it exactly means
+   * finding the roots of the exit-angle equation, a cubic for TRT. These are the
+   * published analytic fits to those solutions, which is the standard real-time
+   * trade - it costs the sharp caustic glint that a true root solve produces,
+   * and keeps everything else.
+   *
+   * Deliberately never touches the shading normal: the fibre frame is the
+   * tangent plus the two directions, and the round cross-section is already
+   * integrated into `N`. That makes it immune to the flat-ribbon normal problem
+   * that `HairStrandMaterial.strandRoundness` exists to work around.
+   * @internal
+   */
+  private hairMarschner(
+    scope: PBInsideFunctionScope,
+    strandT: PBShaderExp,
+    lightDir: PBShaderExp,
+    viewVec: PBShaderExp,
+    albedo: PBShaderExp,
+    shiftVal: PBShaderExp
+  ) {
+    const pb = scope.$builder;
+    const that = this;
+    const funcName = 'Z_hairMarschner';
+    pb.func(
+      funcName,
+      [pb.vec3('T'), pb.vec3('L'), pb.vec3('V'), pb.vec3('albedo'), pb.float('shiftVal')],
+      function () {
+        // Longitudinal angles, measured off the plane perpendicular to the fibre.
+        this.$l.sinThetaL = pb.clamp(pb.dot(this.T, this.L), -1, 1);
+        this.$l.sinThetaV = pb.clamp(pb.dot(this.T, this.V), -1, 1);
+        // The difference angle. Every path length inside the fibre scales with
+        // it, because a ray that enters obliquely has further to travel.
+        this.$l.thetaD = pb.mul(pb.abs(pb.sub(pb.asin(this.sinThetaV), pb.asin(this.sinThetaL))), 0.5);
+        this.$l.cosThetaD = pb.max(pb.cos(this.thetaD), 0.001);
+        // Azimuth, from the two directions projected onto the fibre's cross
+        // section. cos(phi) alone is enough: every N below is symmetric about
+        // the plane through the light, so the sign of phi never matters.
+        this.$l.Lp = pb.sub(this.L, pb.mul(this.T, this.sinThetaL));
+        this.$l.Vp = pb.sub(this.V, pb.mul(this.T, this.sinThetaV));
+        this.$l.cosPhi = pb.clamp(
+          pb.mul(
+            pb.dot(this.Lp, this.Vp),
+            pb.inverseSqrt(pb.add(pb.mul(pb.dot(this.Lp, this.Lp), pb.dot(this.Vp, this.Vp)), 1e-5))
+          ),
+          -1,
+          1
+        );
+        this.$l.cosHalfPhi = pb.sqrt(pb.clamp(pb.add(pb.mul(this.cosPhi, 0.5), 0.5), 0, 1));
+
+        this.$l.ior = pb.max(this.zHairMarschner1.z, 1.01);
+        // F0 is a function of the index alone, so it is folded on the CPU.
+        this.$l.f0 = pb.vec3(this.zHairMarschner2.w);
+        this.$l.f90 = pb.vec3(1);
+        // Bravais' virtual index. A ray crossing the fibre at a slant refracts as
+        // though the material had a different index; this is that index. The
+        // widely used `1.19/cosThetaD + 0.36*cosThetaD` is a fit to this
+        // expression for one particular value of the index, and would ignore the
+        // index entirely - which would quietly make an exposed IOR do nothing.
+        // The exact form costs one sqrt and keeps the parameter meaningful.
+        this.$l.nPrime = pb.div(
+          pb.sqrt(
+            pb.max(pb.add(pb.mul(this.ior, this.ior), pb.mul(this.cosThetaD, this.cosThetaD), -1), 0.01)
+          ),
+          this.cosThetaD
+        );
+
+        // Cuticle tilt. The ratios between the three are what the measurements
+        // give; the shift map perturbs all three together, per strand.
+        this.$l.shift = pb.add(this.zHairMarschner1.x, this.shiftVal);
+        this.$l.beta = pb.max(this.zHairMarschner1.y, 0.005);
+        this.$l.width = pb.mul(this.beta, this.beta);
+        this.$l.theta = pb.add(this.sinThetaL, this.sinThetaV);
+        this.$l.absorb = this.zHairMarschner1.w;
+        // Guards pow() against a zero base, which is legal but not uniformly
+        // well behaved across drivers.
+        this.$l.tint = pb.max(this.albedo, pb.vec3(0.0001));
+
+        // --- R: off the surface, uncoloured.
+        this.$l.mR = that.hairLongitudinal(this, this.width, pb.sub(this.theta, pb.mul(this.shift, -2)));
+        this.$l.nR = pb.mul(this.cosHalfPhi, 0.25);
+        this.$l.fR = that.fresnelSchlick(
+          this,
+          pb.sqrt(pb.clamp(pb.add(pb.mul(pb.dot(this.V, this.L), 0.5), 0.5), 0, 1)),
+          this.f0,
+          this.f90
+        );
+        this.$l.sR = pb.mul(this.fR, this.mR, this.nR, this.zHairMarschner2.x);
+
+        // --- TT: in one side, out the other. Two pigment crossings.
+        this.$l.mTT = that.hairLongitudinal(this, pb.mul(this.width, 0.5), pb.sub(this.theta, this.shift));
+        this.$l.a = pb.div(1, this.nPrime);
+        // Where across the fibre the ray that reaches the eye entered. The fit
+        // stands in for inverting the refraction, and drives both how much
+        // reflects away and how far the rest travels through the pigment.
+        this.$l.h = pb.clamp(
+          pb.mul(this.cosHalfPhi, pb.add(1, pb.mul(this.a, pb.sub(0.6, pb.mul(this.cosPhi, 0.8))))),
+          -1,
+          1
+        );
+        this.$l.fTT = that.fresnelSchlick(
+          this,
+          pb.mul(this.cosThetaD, pb.sqrt(pb.max(pb.sub(1, pb.mul(this.h, this.h)), 0))),
+          this.f0,
+          this.f90
+        );
+        this.$l.oneMinusFTT = pb.sub(pb.vec3(1), this.fTT);
+        this.$l.ha = pb.mul(this.h, this.a);
+        this.$l.pathTT = pb.div(
+          pb.mul(pb.sqrt(pb.max(pb.sub(1, pb.mul(this.ha, this.ha)), 0)), 0.5),
+          this.cosThetaD
+        );
+        this.$l.tTT = pb.pow(this.tint, pb.vec3(pb.mul(this.pathTT, this.absorb)));
+        this.$l.nTT = pb.exp(pb.sub(pb.mul(this.cosPhi, -3.65), 3.98));
+        this.$l.sTT = pb.mul(
+          this.oneMinusFTT,
+          this.oneMinusFTT,
+          this.tTT,
+          this.mTT,
+          this.nTT,
+          this.zHairMarschner2.y
+        );
+
+        // --- TRT: in, off the far wall, back out. Three pigment crossings, so
+        // this is the lobe that carries the hair's colour into the highlight.
+        this.$l.mTRT = that.hairLongitudinal(
+          this,
+          pb.mul(this.width, 2),
+          pb.sub(this.theta, pb.mul(this.shift, 4))
+        );
+        this.$l.fTRT = that.fresnelSchlick(this, pb.mul(this.cosThetaD, 0.5), this.f0, this.f90);
+        this.$l.oneMinusFTRT = pb.sub(pb.vec3(1), this.fTRT);
+        this.$l.tTRT = pb.pow(this.tint, pb.vec3(pb.mul(pb.div(0.8, this.cosThetaD), this.absorb)));
+        this.$l.nTRT = pb.exp(pb.sub(pb.mul(this.cosPhi, 17), 16.78));
+        this.$l.sTRT = pb.mul(
+          this.oneMinusFTRT,
+          this.oneMinusFTRT,
+          this.fTRT,
+          this.tTRT,
+          this.mTRT,
+          this.nTRT,
+          this.zHairMarschner2.z
+        );
+
+        this.$return(pb.div(pb.add(this.sR, this.sTT, this.sTRT), pb.mul(this.cosThetaD, this.cosThetaD)));
+      }
+    );
+    return pb.getGlobalScope()[funcName](strandT, lightDir, viewVec, albedo, shiftVal) as PBShaderExp;
+  }
+  /**
    * Scheuermann-style anisotropic strand specular: shift the strand tangent along
    * the normal, then raise sin(T', H) to the lobe exponent with a directional fade.
    * @internal
@@ -680,6 +1053,7 @@ export class HairMaterial
     const baseLightPass = !that.drawContext.lightBlending;
     const useTransmission = that.featureUsed<boolean>(HairMaterial.FEATURE_TRANSMISSION);
     const useScatter = that.featureUsed<boolean>(HairMaterial.FEATURE_SCATTER);
+    const useMarschner = that.shadingModel === 'marschner';
     pb.func(
       funcName,
       [
@@ -721,36 +1095,52 @@ export class HairMaterial
             );
             this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
             this.$l.NoL = pb.dot(this.normal, this.lightDir);
-            this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
             this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
             // Wrap diffuse softens the terminator across thin cards.
             this.$l.wrap = this.zHairShift.w;
             this.$l.diffFactor = pb.clamp(pb.div(pb.add(this.NoL, this.wrap), pb.add(1, this.wrap)), 0, 1);
-            this.$l.spec1 = that.hairStrandSpecular(
-              this,
-              this.strandT,
-              this.normal,
-              this.halfVec,
-              pb.add(this.zHairShift.x, this.shiftVal),
-              this.zHairSpec1.w
-            );
-            this.$l.spec2 = that.hairStrandSpecular(
-              this,
-              this.strandT,
-              this.normal,
-              this.halfVec,
-              pb.add(this.zHairShift.y, this.shiftVal),
-              this.zHairSpec2.w
-            );
-            // Fade specular out on the fully unlit side to avoid glowing shadows.
-            this.$l.specFade = pb.smoothStep(-0.35, 0.15, this.NoL);
-            this.$l.specTerm = pb.mul(
-              pb.add(
-                pb.mul(this.zHairSpec1.rgb, this.spec1),
-                pb.mul(this.zHairSpec2.rgb, this.albedo.rgb, this.spec2)
-              ),
-              this.specFade
-            );
+            if (useMarschner) {
+              // No half vector and no specular fade here. The fade exists to stop
+              // the double lobe glowing where no light reaches; Marschner's TT
+              // path is light that genuinely came through the fibre from behind,
+              // so fading it out on the unlit side would delete the one thing the
+              // model offers that the double lobe cannot produce at all.
+              this.$l.specTerm = that.hairMarschner(
+                this,
+                this.strandT,
+                this.lightDir,
+                this.viewVec,
+                this.albedo.rgb,
+                this.shiftVal
+              );
+            } else {
+              this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
+              this.$l.spec1 = that.hairStrandSpecular(
+                this,
+                this.strandT,
+                this.normal,
+                this.halfVec,
+                pb.add(this.zHairShift.x, this.shiftVal),
+                this.zHairSpec1.w
+              );
+              this.$l.spec2 = that.hairStrandSpecular(
+                this,
+                this.strandT,
+                this.normal,
+                this.halfVec,
+                pb.add(this.zHairShift.y, this.shiftVal),
+                this.zHairSpec2.w
+              );
+              // Fade specular out on the fully unlit side to avoid glowing shadows.
+              this.$l.specFade = pb.smoothStep(-0.35, 0.15, this.NoL);
+              this.$l.specTerm = pb.mul(
+                pb.add(
+                  pb.mul(this.zHairSpec1.rgb, this.spec1),
+                  pb.mul(this.zHairSpec2.rgb, this.albedo.rgb, this.spec2)
+                ),
+                this.specFade
+              );
+            }
             this.$l.diffuse = pb.mul(
               this.lightColor,
               1 / Math.PI,

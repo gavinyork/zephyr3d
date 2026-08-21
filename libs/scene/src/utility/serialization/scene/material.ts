@@ -18,7 +18,8 @@ import {
   type SubsurfaceProfilePreset,
   SpriteBlueprintMaterial,
   UnlitMaterial,
-  type HairStrandDirection
+  type HairStrandDirection,
+  type HairShadingModel
 } from '../../../material';
 import type { PBRBlueprintOutputName } from '../../../material/pbrblueprint';
 import { defineProps, type PropertyAccessor, type SerializableClass } from '../types';
@@ -2049,6 +2050,28 @@ export function getHairMaterialClass(manager: ResourceManager): SerializableClas
       getProps() {
         return defineProps([
           {
+            name: 'ShadingModel',
+            description:
+              'Which scattering model shades the hair. Marschner derives the lobes from the fibre; Kajiya-Kay is the art-directed double lobe',
+            type: 'string',
+            default: 'kajiya-kay',
+            options: {
+              enum: {
+                labels: ['Kajiya-Kay (double lobe)', 'Marschner (fibre)'],
+                values: ['kajiya-kay', 'marschner']
+              }
+            },
+            get(this: HairMaterial, value) {
+              value.str[0] = this.shadingModel;
+            },
+            set(this: HairMaterial, value) {
+              this.shadingModel = value.str[0] as HairShadingModel;
+            },
+            isValid(this: HairMaterial) {
+              return !this.$isInstance;
+            }
+          },
+          {
             name: 'Specular1Color',
             description: 'Color of the primary (sharp, near-white) specular lobe',
             type: 'rgb',
@@ -2170,6 +2193,113 @@ export function getHairMaterialClass(manager: ResourceManager): SerializableClas
             },
             set(this: HairMaterial, value) {
               this.strandDirection = value.str[0] as HairStrandDirection;
+            },
+            isValid(this: HairMaterial) {
+              return !this.$isInstance;
+            }
+          },
+          // The Marschner parameters are deliberately not gated on ShadingModel.
+          // An invalid property is skipped on both save and load, so gating them
+          // would drop one model's tuning every time the material was saved under
+          // the other - and switching back and forth is exactly what comparing
+          // two models involves.
+          {
+            name: 'MarschnerShift',
+            description: 'Cuticle tilt that separates the three Marschner lobes, in sine units',
+            type: 'float',
+            default: 0.035,
+            options: {
+              animatable: true,
+              minValue: -0.2,
+              maxValue: 0.2
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.marschnerShift;
+            },
+            set(this: HairMaterial, value) {
+              this.marschnerShift = value.num[0];
+            },
+            isValid(this: HairMaterial) {
+              return !this.$isInstance;
+            }
+          },
+          {
+            name: 'MarschnerRoughness',
+            description: 'Longitudinal width of the Marschner lobes',
+            type: 'float',
+            default: 0.3,
+            options: {
+              animatable: true,
+              minValue: 0.005,
+              maxValue: 1
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.marschnerRoughness;
+            },
+            set(this: HairMaterial, value) {
+              this.marschnerRoughness = value.num[0];
+            },
+            isValid(this: HairMaterial) {
+              return !this.$isInstance;
+            }
+          },
+          {
+            name: 'MarschnerIOR',
+            description: 'Refractive index of the fibre. 1.55 is the measured value for keratin',
+            type: 'float',
+            default: 1.55,
+            options: {
+              animatable: true,
+              minValue: 1.01,
+              maxValue: 2.5
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.marschnerIOR;
+            },
+            set(this: HairMaterial, value) {
+              this.marschnerIOR = value.num[0];
+            },
+            isValid(this: HairMaterial) {
+              return !this.$isInstance;
+            }
+          },
+          {
+            name: 'MarschnerAbsorption',
+            description: 'How strongly the transmitted Marschner paths take on the hair colour',
+            type: 'float',
+            default: 1,
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 4
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.marschnerAbsorption;
+            },
+            set(this: HairMaterial, value) {
+              this.marschnerAbsorption = value.num[0];
+            },
+            isValid(this: HairMaterial) {
+              return !this.$isInstance;
+            }
+          },
+          {
+            name: 'MarschnerLobes',
+            description: 'Per-path intensities of the Marschner model as (R, TT, TRT)',
+            type: 'vec3',
+            default: [1, 1, 1],
+            options: {
+              animatable: true,
+              minValue: 0,
+              maxValue: 4
+            },
+            get(this: HairMaterial, value) {
+              value.num[0] = this.marschnerLobes.x;
+              value.num[1] = this.marschnerLobes.y;
+              value.num[2] = this.marschnerLobes.z;
+            },
+            set(this: HairMaterial, value) {
+              this.marschnerLobes = new Vector3(value.num[0], value.num[1], value.num[2]);
             },
             isValid(this: HairMaterial) {
               return !this.$isInstance;

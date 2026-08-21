@@ -10,6 +10,7 @@ import {
   getInput,
   HairStrandData,
   HairStrandMaterial,
+  type HairShadingModel,
   Mesh,
   OrbitCameraController,
   PerspectiveCamera,
@@ -127,6 +128,15 @@ material.minPixelWidth = 1.3;
 // value keeps the sub-pixel strands that carry most of the transmittance.
 material.transparentShadowCaster = true;
 material.shadowAlphaCutoff = 0.01;
+
+/**
+ * Scattering models the demo can switch between.
+ *
+ * @remarks
+ * Ordered so the array index doubles as the ImGui combo selection. The double
+ * lobe is first because it is the material default.
+ */
+const SHADING_MODELS: HairShadingModel[] = ['kajiya-kay', 'marschner'];
 
 /** How the demo resolves strand coverage into pixels. */
 type BlendModeName = 'opaque' | 'alpha-dither' | 'alpha-blend';
@@ -740,20 +750,47 @@ function drawUI() {
     if (ImGui.ColorEdit3('Base colour', ref)) {
       material.albedoColor = new Vector4(ref[0], ref[1], ref[2], albedo.w);
     }
-    // At 0 the quad shades as the flat ribbon it is, which is what this material
-    // did before the cylinder normal existed; the slider is the A/B for it.
-    slider('Roundness', material.strandRoundness, 0, 1, (v) => (material.strandRoundness = v));
-    colorEdit('Primary lobe', material.specular1Color, (v) => (material.specular1Color = v));
-    slider('Primary power', material.specular1Power, 8, 400, (v) => (material.specular1Power = v));
-    slider('Primary shift', material.specular1Shift, -0.5, 0.5, (v) => (material.specular1Shift = v));
-    colorEdit('Secondary lobe', material.specular2Color, (v) => (material.specular2Color = v));
-    slider('Secondary power', material.specular2Power, 4, 200, (v) => (material.specular2Power = v));
-    slider('Secondary shift', material.specular2Shift, -0.5, 0.5, (v) => (material.specular2Shift = v));
+    const modelRef: [number] = [SHADING_MODELS.indexOf(material.shadingModel)];
+    if (ImGui.Combo('Model', modelRef, SHADING_MODELS)) {
+      material.shadingModel = SHADING_MODELS[modelRef[0]];
+    }
+    if (material.shadingModel === 'marschner') {
+      slider('Shift', material.marschnerShift, -0.15, 0.15, (v) => (material.marschnerShift = v));
+      slider('Roughness', material.marschnerRoughness, 0.02, 1, (v) => (material.marschnerRoughness = v));
+      slider('IOR', material.marschnerIOR, 1.05, 2.2, (v) => (material.marschnerIOR = v));
+      slider('Absorption', material.marschnerAbsorption, 0, 4, (v) => (material.marschnerAbsorption = v));
+      const lobes = material.marschnerLobes;
+      slider('R (surface)', lobes.x, 0, 3, (v) => {
+        material.marschnerLobes = new Vector3(v, lobes.y, lobes.z);
+      });
+      slider('TT (through)', lobes.y, 0, 3, (v) => {
+        material.marschnerLobes = new Vector3(lobes.x, v, lobes.z);
+      });
+      slider('TRT (internal)', lobes.z, 0, 3, (v) => {
+        material.marschnerLobes = new Vector3(lobes.x, lobes.y, v);
+      });
+      ImGui.TextDisabled('Zero two lobes to see the third alone.');
+      ImGui.TextDisabled('TT needs a light behind the hair.');
+    } else {
+      // At 0 the quad shades as the flat ribbon it is, which is what this
+      // material did before the cylinder normal existed; the slider is the A/B
+      // for it. Marschner integrates across the fibre itself, so it is only
+      // offered here.
+      slider('Roundness', material.strandRoundness, 0, 1, (v) => (material.strandRoundness = v));
+      colorEdit('Primary lobe', material.specular1Color, (v) => (material.specular1Color = v));
+      slider('Primary power', material.specular1Power, 8, 400, (v) => (material.specular1Power = v));
+      slider('Primary shift', material.specular1Shift, -0.5, 0.5, (v) => (material.specular1Shift = v));
+      colorEdit('Secondary lobe', material.specular2Color, (v) => (material.specular2Color = v));
+      slider('Secondary power', material.specular2Power, 4, 200, (v) => (material.specular2Power = v));
+      slider('Secondary shift', material.specular2Shift, -0.5, 0.5, (v) => (material.specular2Shift = v));
+      colorEdit('Transmission', material.transmissionColor, (v) => (material.transmissionColor = v));
+      // Hidden under Marschner: it fakes what the TT path computes, and running
+      // both would count the same light twice.
+      slider('Transmission', material.transmissionIntensity, 0, 2, (v) => {
+        material.transmissionIntensity = v;
+      });
+    }
     slider('Diffuse wrap', material.diffuseWrap, 0, 1, (v) => (material.diffuseWrap = v));
-    colorEdit('Transmission', material.transmissionColor, (v) => (material.transmissionColor = v));
-    slider('Transmission', material.transmissionIntensity, 0, 2, (v) => {
-      material.transmissionIntensity = v;
-    });
   }
 
   if (ImGui.CollapsingHeader('Multiple scattering', ImGui.TreeNodeFlags.DefaultOpen)) {

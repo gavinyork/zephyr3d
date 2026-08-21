@@ -113,6 +113,8 @@ const SCENE_NAMES = [
   'hair-shadow-dom',
   'hair-scatter-off',
   'hair-scatter-on',
+  'hair-marschner',
+  'hair-marschner-strands',
   'eye-frontal',
   'eye-angled',
   'eye-pupil-dilated',

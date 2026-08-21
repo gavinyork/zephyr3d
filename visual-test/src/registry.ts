@@ -1,6 +1,13 @@
 import type { VisualScene } from './types';
 import { sanityOrientation } from './scenes/sanity-orientation';
-import { hair, pbrMetalRoughGrid, skinShadow, skinSss, unlitTextured } from './scenes/materials';
+import {
+  hair,
+  hairMarschner,
+  pbrMetalRoughGrid,
+  skinShadow,
+  skinSss,
+  unlitTextured
+} from './scenes/materials';
 import { pbrIbl, skyAtmosphere } from './scenes/env';
 import {
   shadowCsm,
@@ -22,6 +29,7 @@ import {
   hairShadowDom,
   hairShadowPcf,
   hairFileHelix,
+  hairMarschnerStrands,
   hairStrandsFan,
   hairStrandsGpuHelix,
   hairStrandsHelix,
@@ -82,6 +90,10 @@ export const SCENES: VisualScene[] = [
   // Multiple scattering: the same groom with the term off and on.
   hairScatterOff,
   hairScatterOn,
+  // The Marschner fibre model, on a card and on strands. Both are back-lit,
+  // which is the configuration the double lobe cannot render.
+  hairMarschner,
+  hairMarschnerStrands,
   eyeFrontal,
   eyeAngled,
   eyePupilDilated,
