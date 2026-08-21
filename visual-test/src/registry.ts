@@ -17,6 +17,7 @@ import { oitABuffer, oitDualDepth, oitWeighted } from './scenes/oit';
 import { postFxaa, postToneMapBloom, taaMultiframe } from './scenes/post';
 import { eyeAngled, eyeFrontal, eyePupilDilated, eyeSocketOcclusion } from './scenes/eye';
 import {
+  hairFileHelix,
   hairStrandsFan,
   hairStrandsGpuHelix,
   hairStrandsHelix,
@@ -64,8 +65,10 @@ export const SCENES: VisualScene[] = [
   skinSss,
   skinShadow,
   hair,
-  // Strand hair: the Alembic import path, from container bytes to ribbons.
+  // Strand hair: the curve import paths, from container bytes to ribbons.
   hairStrandsHelix,
+  // Same helix, same framing, read out of a HAIR file instead - compare the two.
+  hairFileHelix,
   hairStrandsFan,
   hairStrandsWidth,
   hairStrandsGpuHelix,

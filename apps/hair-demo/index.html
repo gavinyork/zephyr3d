@@ -79,10 +79,11 @@
     <canvas id="canvas"></canvas>
     <div id="status">Loading&hellip;</div>
     <!-- Kept out of ImGui: a file picker needs a real DOM element to open the
-         browser dialog. Dropping in a local .abc avoids the CDN round trip when
-         iterating on a specific groom. -->
+         browser dialog. Dropping in a local groom avoids the CDN round trip when
+         iterating on a specific one. The format is detected from the file's
+         signature, so the accept list is only a hint to the dialog. -->
     <div id="io">
-      <label>Alembic (.abc) <input id="abc-file" type="file" accept=".abc" /></label>
+      <label>Groom (.abc / .hair) <input id="groom-file" type="file" accept=".abc,.hair" /></label>
     </div>
     <script type="module" src="js/main.js"></script>
   </body>

@@ -105,6 +105,7 @@ const SCENE_NAMES = [
   'skin-shadow',
   'hair',
   'hair-strands-helix',
+  'hair-file-helix',
   'hair-strands-fan',
   'hair-strands-width',
   'hair-strands-gpu-helix',

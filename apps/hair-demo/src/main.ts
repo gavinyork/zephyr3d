@@ -16,7 +16,7 @@ import {
   Primitive,
   Scene
 } from '@zephyr3d/scene';
-import { parseAlembicCurves, type AlembicCurveObject } from '@zephyr3d/loaders';
+import { parseAlembicCurves, parseHairFile, type StrandCurveSet } from '@zephyr3d/loaders';
 import { ImGui, imGuiEndFrame, imGuiInit, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 
 /** Where the sample groom lives when no local file is supplied. */
@@ -29,6 +29,18 @@ const SAMPLE_URL = 'https://cdn.zephyr3d.org/misc/hair.abc';
  * head would be if the character were standing on the origin.
  */
 const CM_TO_M = 0.01;
+/**
+ * Largest extent a unit-less groom is scaled to, in metres.
+ *
+ * @remarks
+ * Alembic comes out of Maya, so its unit is known. A HAIR file records none at
+ * all, and the published models are authored at whatever size suited their
+ * author - some span a couple of units, others a couple of hundred - so a fixed
+ * conversion cannot work for them. Fitting the largest extent to a head-sized
+ * box is not a unit conversion and does not pretend to be one; it just puts the
+ * model in front of the camera.
+ */
+const UNITLESS_TARGET_EXTENT = 0.35;
 
 const statusEl = document.querySelector<HTMLDivElement>('#status')!;
 function setStatus(text: string, isError = false) {
@@ -151,7 +163,10 @@ type LoadStats = {
   gpuBytes: number;
   parseMs: number;
   uploadMs: number;
-  application: string;
+  /** Format plus whatever the file says about its writer. */
+  source: string;
+  /** Set when the groom carried no unit and was fitted to the view instead. */
+  autoScaled: boolean;
 };
 
 let stats: LoadStats | null = null;
@@ -159,7 +174,9 @@ let strandData: HairStrandData | null = null;
 let mesh: Mesh | null = null;
 /** Fraction of strands kept, so a dense groom can be thinned for framerate. */
 let strandFraction = 1;
-let lastCurves: AlembicCurveObject[] | null = null;
+let lastCurves: StrandCurveSet[] | null = null;
+/** Source-to-metre conversion for the groom currently loaded. */
+let unitScale = CM_TO_M;
 /** Set once a local file is picked, so the in-flight sample download is dropped. */
 let sampleSuperseded = false;
 
@@ -169,11 +186,12 @@ let sampleSuperseded = false;
  * @remarks
  * XGen writes one object per spline description - hair, brows, lashes - and the
  * demo renders them as a single draw, because they share a material and nothing
- * here needs to address them separately. `keepFraction` drops whole strands
- * evenly rather than shortening them, since thinning a groom is what an LOD
- * would do and truncating strands is not.
+ * here needs to address them separately. A HAIR file is always a single set, so
+ * for that format this is a copy with thinning. `keepFraction` drops whole
+ * strands evenly rather than shortening them, since thinning a groom is what an
+ * LOD would do and truncating strands is not.
  */
-function mergeCurves(curves: AlembicCurveObject[], keepFraction: number) {
+function mergeCurves(curves: StrandCurveSet[], keepFraction: number) {
   const stride = keepFraction >= 1 ? 1 : Math.max(1, Math.round(1 / keepFraction));
   let strandTotal = 0;
   let pointTotal = 0;
@@ -260,8 +278,15 @@ function boundsOf(positions: Float32Array, widths: Float32Array, scale: number) 
   return new BoundingBox(min, max);
 }
 
-/** Rebuilds the GPU buffers and the mesh from the currently loaded curves. */
-function rebuildStrands() {
+/**
+ * Rebuilds the GPU buffers and the mesh from the currently loaded curves.
+ *
+ * @param reframe - Point the camera at the result. Wanted for a newly loaded
+ * groom, whose size and position are not known in advance, and not for a density
+ * change, which leaves the groom where it was and should not throw away the view
+ * the user had arranged.
+ */
+function rebuildStrands(reframe = false) {
   if (!lastCurves) {
     return;
   }
@@ -273,7 +298,7 @@ function rebuildStrands() {
     pointCounts: merged.pointCounts,
     widths: merged.widths,
     uv: merged.uv,
-    scale: CM_TO_M
+    scale: unitScale
   });
   material.strands = strandData;
 
@@ -283,7 +308,7 @@ function rebuildStrands() {
   primitive.createAndSetVertexBuffer('position_f32x3', new Float32Array(3));
   primitive.indexCount = material.vertexCount;
   primitive.primitiveType = 'triangle-list';
-  primitive.setBoundingVolume(boundsOf(merged.positions, merged.widths, CM_TO_M));
+  primitive.setBoundingVolume(boundsOf(merged.positions, merged.widths, unitScale));
   mesh = new Mesh(scene, primitive, material);
 
   const uploadMs = performance.now() - t0;
@@ -293,13 +318,45 @@ function rebuildStrands() {
     stats.gpuBytes = strandData.byteLength;
     stats.uploadMs = uploadMs;
   }
-  const centre = mesh.getWorldBoundingVolume()?.toAABB();
-  if (centre) {
-    const mid = centre.center;
-    camera.controller = new OrbitCameraController({ center: new Vector3(mid.x, mid.y, mid.z) });
-    getInput().use(camera.handleEvent, camera);
+  if (reframe) {
+    frameCamera(mesh);
   }
   setStatus(describeStats());
+}
+
+/**
+ * Points the orbit camera at the loaded groom.
+ *
+ * @remarks
+ * Both the centre and the distance are taken from the mesh bounds. Recentring
+ * alone is not enough once the groom's size is not known in advance: a HAIR
+ * model fitted to {@link UNITLESS_TARGET_EXTENT} is a different size from the
+ * XGen sample, and a camera left at the sample's distance would show it as a
+ * speck or as a wall of strands.
+ *
+ * The viewing direction is kept, so loading a second groom shows it from the
+ * angle the first one was left at rather than snapping back to a default.
+ *
+ * The controller reads the camera's position when it is attached, so the
+ * position is set first and the controller rebuilt around it.
+ */
+function frameCamera(target: Mesh) {
+  const bounds = target.getWorldBoundingVolume()?.toAABB();
+  if (!bounds) {
+    return;
+  }
+  const mid = bounds.center;
+  const radius = Math.max(bounds.diagonalLength * 0.5, 1e-4);
+  // Keep whichever direction the user is currently looking from, so reloading a
+  // groom or changing density does not also swing the camera around.
+  const offset = Vector3.sub(camera.position, mid);
+  if (offset.magnitude < 1e-6) {
+    offset.setXYZ(0, 0, 1);
+  }
+  offset.inplaceNormalize().scaleBy(radius * 2.6);
+  camera.position.setXYZ(mid.x + offset.x, mid.y + offset.y, mid.z + offset.z);
+  camera.controller = new OrbitCameraController({ center: new Vector3(mid.x, mid.y, mid.z) });
+  getInput().use(camera.handleEvent, camera);
 }
 
 function describeStats() {
@@ -307,34 +364,102 @@ function describeStats() {
     return '';
   }
   const mb = (n: number) => `${(n / 1048576).toFixed(1)} MB`;
+  const scaleNote = stats.autoScaled ? `, auto-scaled x${unitScale.toPrecision(3)}` : '';
   return [
-    `${stats.application || 'Alembic'} - ${stats.objects} curve object(s)`,
+    `${stats.source} - ${stats.objects} curve object(s)${scaleNote}`,
     `${stats.strands.toLocaleString()} strands, ${stats.points.toLocaleString()} control points`,
     `GPU ${mb(stats.gpuBytes)} - parse ${stats.parseMs.toFixed(0)} ms, upload ${stats.uploadMs.toFixed(0)} ms`,
     `Triangles ${(material.vertexCount / 3).toLocaleString()} at ${material.segmentsPerStrand} segments/strand`
   ].join('\n');
 }
 
-/** Parses an archive and swaps it in. */
-function loadArchive(buffer: ArrayBuffer) {
-  const t0 = performance.now();
-  const archive = parseAlembicCurves(buffer);
-  const parseMs = performance.now() - t0;
-  if (archive.curves.length === 0) {
-    setStatus('Archive contains no curve objects.', true);
+/**
+ * Identifies the groom format from its leading bytes.
+ *
+ * @remarks
+ * Both formats are self-identifying, so the file name is never consulted: a
+ * groom exported under the wrong extension still loads, and one that is neither
+ * format fails with a specific message rather than deep inside a parser.
+ */
+function detectFormat(buffer: ArrayBuffer) {
+  const magic = new Uint8Array(buffer, 0, Math.min(5, buffer.byteLength));
+  let text = '';
+  for (let i = 0; i < magic.length; i++) {
+    text += String.fromCharCode(magic[i]);
+  }
+  if (text.startsWith('HAIR')) {
+    return 'hair' as const;
+  }
+  if (text.startsWith('Ogawa')) {
+    return 'alembic' as const;
+  }
+  return null;
+}
+
+/**
+ * Scale that brings a unit-less groom to {@link UNITLESS_TARGET_EXTENT}.
+ * @returns The scale, or 1 for a degenerate groom.
+ */
+function fitScale(positions: Float32Array) {
+  const min = [Infinity, Infinity, Infinity];
+  const max = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < positions.length; i += 3) {
+    for (let axis = 0; axis < 3; axis++) {
+      const v = positions[i + axis];
+      if (v < min[axis]) {
+        min[axis] = v;
+      }
+      if (v > max[axis]) {
+        max[axis] = v;
+      }
+    }
+  }
+  const extent = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+  return extent > 1e-6 ? UNITLESS_TARGET_EXTENT / extent : 1;
+}
+
+/** Parses a groom of either supported format and swaps it in. */
+function loadGroom(buffer: ArrayBuffer) {
+  const format = detectFormat(buffer);
+  if (!format) {
+    setStatus('Not a groom this demo can read: expected an Alembic (.abc) or HAIR (.hair) file.', true);
     return;
   }
-  lastCurves = archive.curves;
+  const t0 = performance.now();
+  let curves: StrandCurveSet[];
+  let source: string;
+  let autoScaled: boolean;
+  if (format === 'hair') {
+    const hair = parseHairFile(buffer);
+    curves = [hair];
+    source = hair.header.info ? `HAIR - ${hair.header.info}` : 'HAIR';
+    // The format states no unit, so the groom is fitted rather than converted.
+    unitScale = fitScale(hair.positions);
+    autoScaled = true;
+  } else {
+    const archive = parseAlembicCurves(buffer);
+    if (archive.curves.length === 0) {
+      setStatus('Archive contains no curve objects.', true);
+      return;
+    }
+    curves = archive.curves;
+    source = archive.application || 'Alembic';
+    unitScale = CM_TO_M;
+    autoScaled = false;
+  }
+  const parseMs = performance.now() - t0;
+  lastCurves = curves;
   stats = {
-    objects: archive.curves.length,
+    objects: curves.length,
     strands: 0,
     points: 0,
     gpuBytes: 0,
     parseMs,
     uploadMs: 0,
-    application: archive.application
+    source,
+    autoScaled
   };
-  rebuildStrands();
+  rebuildStrands(true);
 }
 
 async function loadSample() {
@@ -357,7 +482,7 @@ async function loadSample() {
     const reader = res.body?.getReader();
     if (!reader) {
       setStatus('Parsing archive...');
-      loadArchive(await res.arrayBuffer());
+      loadGroom(await res.arrayBuffer());
       return;
     }
     const chunks: Uint8Array[] = [];
@@ -390,13 +515,13 @@ async function loadSample() {
     if (sampleSuperseded) {
       return;
     }
-    loadArchive(buffer.buffer);
+    loadGroom(buffer.buffer);
   } catch (err) {
     setStatus(`Failed to load sample: ${err instanceof Error ? err.message : String(err)}`, true);
   }
 }
 
-document.querySelector<HTMLInputElement>('#abc-file')!.addEventListener('change', async (ev) => {
+document.querySelector<HTMLInputElement>('#groom-file')!.addEventListener('change', async (ev) => {
   const file = (ev.target as HTMLInputElement).files?.[0];
   if (!file) {
     return;
@@ -406,7 +531,7 @@ document.querySelector<HTMLInputElement>('#abc-file')!.addEventListener('change'
   sampleSuperseded = true;
   setStatus(`Parsing ${file.name}...`);
   try {
-    loadArchive(await file.arrayBuffer());
+    loadGroom(await file.arrayBuffer());
   } catch (err) {
     setStatus(`Failed to parse: ${err instanceof Error ? err.message : String(err)}`, true);
   }

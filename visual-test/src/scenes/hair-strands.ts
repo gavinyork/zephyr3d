@@ -8,25 +8,32 @@ import {
   SharedModel,
   type HairStrandSource
 } from '@zephyr3d/scene';
-import { AlembicHairImporter, type AlembicHairImportOptions } from '@zephyr3d/loaders';
+import {
+  AlembicHairImporter,
+  HairFileImporter,
+  type AlembicHairImportOptions,
+  type HairFileImportOptions
+} from '@zephyr3d/loaders';
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { PrimitiveType, VertexAttribFormat } from '@zephyr3d/device';
 import type { SceneContext, VisualScene } from '../types';
 import { bareScene, keyLight, placeCamera } from './common';
 import { buildAlembicArchive, combCurves, fanCurves, helixCurves } from './alembic-fixture';
 import type { SyntheticCurveSet } from './alembic-fixture';
+import { buildHairFile } from './hair-fixture';
 
 /**
  * Hair strand import scenes.
  *
- * These pin the Alembic curve path end to end: fixture bytes go through the real
- * {@link AlembicHairImporter}, including the Ogawa container reader and the
- * structural property identification, and the ribbon geometry it produces is
+ * These pin the curve import paths end to end: fixture bytes go through the real
+ * importers - {@link AlembicHairImporter} with its Ogawa container reader and
+ * structural property identification, {@link HairFileImporter} with its
+ * positional cyHairFile layout - and the ribbon geometry they produce is
  * rendered and compared. A numeric unit test can show that the arrays are
  * self-consistent; only a picture shows that the strands actually run the way the
  * control points said they should.
  *
- * The three fixtures fail in different ways on purpose - see the doc comments in
+ * The fixtures fail in different ways on purpose - see the doc comments in
  * `alembic-fixture.ts` for what each one is sensitive to.
  */
 
@@ -50,9 +57,36 @@ async function addImportedStrands(
   const bytes = buildAlembicArchive(sets);
   const model = new SharedModel();
   await new AlembicHairImporter(options).import(new Blob([bytes]), model, '');
-  if (model.primitives.length !== sets.length) {
+  addModelPrimitives(ctx, model, material, sets.length);
+}
+
+/**
+ * Runs the HAIR importer over synthetic file bytes and adds the result.
+ *
+ * @remarks
+ * A HAIR file is always a single strand set, so this takes one curve set rather
+ * than a list.
+ */
+async function addImportedHairFile(
+  ctx: SceneContext,
+  set: SyntheticCurveSet,
+  options: HairFileImportOptions,
+  material: HairMaterial
+) {
+  const bytes = buildHairFile(set);
+  const model = new SharedModel();
+  await new HairFileImporter(options).import(new Blob([bytes]), model, '');
+  addModelPrimitives(ctx, model, material, 1);
+}
+
+/**
+ * Turns every primitive an importer produced into a mesh.
+ * @internal
+ */
+function addModelPrimitives(ctx: SceneContext, model: SharedModel, material: HairMaterial, expected: number) {
+  if (model.primitives.length !== expected) {
     throw new Error(
-      `hair fixture import produced ${model.primitives.length} primitives, expected ${sets.length}`
+      `hair fixture import produced ${model.primitives.length} primitives, expected ${expected}`
     );
   }
   for (const info of model.primitives) {
@@ -174,6 +208,31 @@ export const hairStrandsHelix: VisualScene = {
     bareScene(ctx.scene);
     keyLight(ctx.scene);
     await addImportedStrands(ctx, [helixCurves()], { widthScale: 1, minWidth: 0.004 }, strandMaterial());
+    placeCamera(ctx.camera, new Vector3(1.9, 1.1, 2.5));
+  }
+};
+
+/**
+ * The same helix, delivered as a HAIR file instead of an Alembic archive.
+ *
+ * @remarks
+ * Framed identically to `hair-strands-helix` and fed from the same generator, so
+ * the two baselines should be indistinguishable: both formats carry the same
+ * control points, the same per-point widths and the same UVs, and both go
+ * through the same ribbon tessellator once their container has been read. A
+ * difference between the two pictures is a container-reading bug, and it is
+ * legible as one - which no single HAIR baseline could tell you.
+ *
+ * HAIR files record no unit, so no scale is applied here; the fixture is written
+ * in the same coordinates the Alembic one is.
+ */
+export const hairFileHelix: VisualScene = {
+  name: 'hair-file-helix',
+  description: 'HAIR helix through the real importer: pins the cyHairFile reader against the Alembic one.',
+  async setup(ctx) {
+    bareScene(ctx.scene);
+    keyLight(ctx.scene);
+    await addImportedHairFile(ctx, helixCurves(), { widthScale: 1, minWidth: 0.004 }, strandMaterial());
     placeCamera(ctx.camera, new Vector3(1.9, 1.1, 2.5));
   }
 };
