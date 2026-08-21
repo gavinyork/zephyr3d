@@ -437,7 +437,7 @@ export class HairMaterial
           scope.$inputs.wTangent,
           scope.$inputs.wBinormal
         );
-        scope.$l.normal = scope.normalInfo.normal;
+        scope.$l.normal = this.calculateShadingNormal(scope, scope.normalInfo);
         scope.$l.strandT =
           this.strandDirection === 'tangent' ? scope.normalInfo.TBN[0] : scope.normalInfo.TBN[1];
         scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
@@ -550,6 +550,20 @@ export class HairMaterial
         );
       }
     }
+  }
+  /**
+   * Shading normal for the current fragment.
+   *
+   * @remarks
+   * Split out from the interpolated frame so a subclass whose polygons stand in
+   * for a different surface can say what that surface is. A hair card really is
+   * the flat sheet it is drawn as, so the frame's own normal is right here;
+   * {@link HairStrandMaterial} overrides this, because its quads stand in for
+   * round fibres and shading them flat is the difference between hair and tape.
+   * @internal
+   */
+  protected calculateShadingNormal(scope: PBInsideFunctionScope, normalInfo: PBShaderExp): PBShaderExp {
+    return normalInfo.normal;
   }
   /**
    * Approximates the light that reaches a point after bouncing off neighbouring

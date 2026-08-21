@@ -192,6 +192,12 @@ function strandMaterial() {
   const material = new HairMaterial();
   material.albedoColor = new Vector4(0.24, 0.14, 0.1, 1);
   material.vertexTangent = true;
+  // The ribbon tessellator writes the curve direction into the tangent attribute,
+  // not the binormal. The material's default suits a hair card, whose atlas runs
+  // strands along V - left at it, the anisotropic lobes measure the highlight
+  // against the ribbon's width instead of its length and the scenes pin a sheen
+  // rather than the band they are here to check.
+  material.strandDirection = 'tangent';
   material.specular1Color = new Vector3(0.45, 0.45, 0.45);
   material.specular2Color = new Vector3(0.55, 0.4, 0.3);
   return material;

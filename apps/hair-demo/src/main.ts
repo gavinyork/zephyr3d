@@ -740,6 +740,9 @@ function drawUI() {
     if (ImGui.ColorEdit3('Base colour', ref)) {
       material.albedoColor = new Vector4(ref[0], ref[1], ref[2], albedo.w);
     }
+    // At 0 the quad shades as the flat ribbon it is, which is what this material
+    // did before the cylinder normal existed; the slider is the A/B for it.
+    slider('Roundness', material.strandRoundness, 0, 1, (v) => (material.strandRoundness = v));
     colorEdit('Primary lobe', material.specular1Color, (v) => (material.specular1Color = v));
     slider('Primary power', material.specular1Power, 8, 400, (v) => (material.specular1Power = v));
     slider('Primary shift', material.specular1Shift, -0.5, 0.5, (v) => (material.specular1Shift = v));

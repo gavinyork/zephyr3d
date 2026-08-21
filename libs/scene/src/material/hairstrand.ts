@@ -46,10 +46,14 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
   private _minPixelWidth: number;
   /** @internal Floor on the fraction of strands distance decimation keeps. */
   private _minStrandLODRatio: number;
+  /** @internal How far the shading normal bends across the ribbon, in [0, 1]. */
+  private _strandRoundness: number;
   /** @internal Scratch vector, so applying uniforms allocates nothing. */
   private readonly _strandScratch: Vector4;
   /** @internal Scratch vector for the LOD uniform. */
   private readonly _lodScratch: Vector4;
+  /** @internal Scratch vector for the shape uniform. */
+  private readonly _shapeScratch: Vector4;
   /**
    * Creates a GPU strand material.
    */
@@ -61,8 +65,10 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     this._minStrandWidth = 0;
     this._minPixelWidth = 1.4;
     this._minStrandLODRatio = 0.05;
+    this._strandRoundness = 1;
     this._strandScratch = new Vector4();
     this._lodScratch = new Vector4();
+    this._shapeScratch = new Vector4();
     this.useFeature(HairStrandMaterial.FEATURE_STRAND_LOD, false);
     // The quad is built facing the camera, so there is no back face to cull.
     this.cullMode = 'none';
@@ -70,6 +76,16 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     // from the curve, so the inherited attribute paths must stay off.
     this.vertexNormal = false;
     this.vertexTangent = false;
+    // The inherited default is 'binormal', which is right for a hair card: its
+    // atlas runs strands along V, and V is the binormal. This material builds its
+    // own frame and puts the curve direction in the tangent, so the anisotropic
+    // lobes have to be told to look there. Left at the default they measure the
+    // highlight against the ribbon's side vector instead - and the side vector is
+    // perpendicular to the view by construction, so sin(T,H) sits near one over
+    // the whole groom and the lobes degenerate into a flat sheen with no band in
+    // it. That is the single largest difference between this reading as hair and
+    // reading as wet plastic, so it is set here rather than left to the caller.
+    this.strandDirection = 'tangent';
   }
   clone() {
     const other = new HairStrandMaterial();
@@ -85,6 +101,7 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     this.minPixelWidth = other.minPixelWidth;
     this.strandLOD = other.strandLOD;
     this.minStrandLODRatio = other.minStrandLODRatio;
+    this.strandRoundness = other.strandRoundness;
   }
   /** GPU-resident strand geometry. */
   get strands(): Nullable<HairStrandData> {
@@ -204,6 +221,36 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     }
   }
   /**
+   * How far the shading normal bends across the ribbon, in [0, 1].
+   *
+   * @remarks
+   * The quad is a stand-in for a cylinder, and this is how much it is shaded like
+   * one. At 1 the normal sweeps a full half turn about the curve tangent between
+   * the two edges, as the visible surface of a fibre does; at 0 it stays the
+   * quad's own normal and every fragment across the width shades identically,
+   * which is the flat ribbon this material drew before.
+   *
+   * It matters more than its size suggests. A flat ribbon has one normal, so the
+   * specular lobes either fire across the strand's whole width or not at all, and
+   * a groom becomes a field of uniformly bright or uniformly dull tape. Bending
+   * the normal puts a narrow highlight down the length of each strand and lets the
+   * edges fall off, which is most of what separates strands from one another when
+   * they are all the same colour.
+   *
+   * Values below 1 keep the highlight but widen it, which reads as a softer,
+   * thicker fibre; artists after a stylised look sometimes want that.
+   */
+  get strandRoundness() {
+    return this._strandRoundness;
+  }
+  set strandRoundness(val) {
+    const v = val < 0 ? 0 : val > 1 ? 1 : val;
+    if (v !== this._strandRoundness) {
+      this._strandRoundness = v;
+      this.uniformChanged();
+    }
+  }
+  /**
    * Vertex count needed to draw the current strand set.
    *
    * @remarks
@@ -229,6 +276,13 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     // vector is already perpendicular to the strand and to the shading normal.
     scope.$outputs.wBinormal = scope.strand.side;
     scope.$outputs.zStrandCoverage = scope.strand.coverage;
+    // Where across the ribbon this vertex sits, as the sine of the angle round the
+    // fibre it stands for: -1 and +1 at the edges, 0 down the middle. The fragment
+    // stage rebuilds the cylinder normal from it. Carrying the sine rather than the
+    // angle is what makes it safe to interpolate - it is linear in the offset from
+    // the centre, which is exactly what the rasteriser interpolates - and the
+    // roundness dial is already folded in, so no fragment-stage uniform is needed.
+    scope.$outputs.zStrandRound = scope.strand.across;
     // Without this the inherited path reports zero motion for every pixel - it
     // emits motion vectors from resolveVertexPosition, which reads the vertex
     // attribute this material does not have. A temporal filter then reprojects
@@ -272,6 +326,43 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     }
     return pb.vec4(albedo.rgb, pb.mul(albedo.a, coverage));
   }
+  /**
+   * Rebuilds the cylinder normal the flat quad stands for.
+   *
+   * @remarks
+   * The quad's own normal points at the camera everywhere on it, so every fragment
+   * across a strand's width shades the same and the strand reads as tape. A real
+   * fibre presents a curved surface: at the centre of the visible side its normal
+   * faces the viewer, and by the silhouette edges it has turned a quarter turn to
+   * lie perpendicular to the view. With `a` the interpolated sine of that angle,
+   * the normal is `side * a + faceNormal * cos`, and `cos = sqrt(1 - a * a)`.
+   *
+   * Built from the varyings rather than from the interpolated TBN on purpose. The
+   * TBN may be flipped for back faces, and the sine carried alongside it would not
+   * be, which would turn the fibre inside out; the varyings need no flip, because
+   * a camera-facing quad's normal already points at the camera by construction.
+   * @internal
+   */
+  protected calculateShadingNormal(scope: PBInsideFunctionScope, normalInfo: PBShaderExp) {
+    const pb = scope.$builder;
+    const across = scope.$inputs.zStrandRound;
+    const faceNormal = scope.$inputs.wNorm;
+    const side = scope.$inputs.wBinormal;
+    if (!across || !faceNormal || !side) {
+      return normalInfo.normal;
+    }
+    const funcName = 'Z_strandShadingNormal';
+    pb.func(funcName, [pb.float('across'), pb.vec3('faceNormal'), pb.vec3('side')], function () {
+      // Interpolating between two unit vectors shortens them, so both are
+      // renormalised before they are combined rather than trusting the varyings.
+      this.$l.n = pb.normalize(this.faceNormal);
+      this.$l.s = pb.normalize(this.side);
+      this.$l.sinA = pb.clamp(this.across, -1, 1);
+      this.$l.cosA = pb.sqrt(pb.max(pb.sub(1, pb.mul(this.sinA, this.sinA)), 0));
+      this.$return(pb.normalize(pb.add(pb.mul(this.s, this.sinA), pb.mul(this.n, this.cosA))));
+    });
+    return pb.getGlobalScope()[funcName](across, faceNormal, side) as PBShaderExp;
+  }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     const strands = this._strands;
@@ -300,6 +391,7 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
         pixelFactor
       )
     );
+    bindGroup.setValue('zStrandShape', this._shapeScratch.setXYZW(this._strandRoundness, 0, 0, 0));
     if (this.strandLOD) {
       bindGroup.setValue('zStrandLOD', this._lodScratch.setXYZW(this._minStrandLODRatio, 0, 0, 0));
     }
@@ -316,84 +408,125 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     scope.zStrandHeaders = pb.uint[0]().storageBufferReadonly(2);
     scope.zStrandPoints = pb.float[0]().storageBufferReadonly(2);
     scope.zStrandParams = pb.vec4().uniform(2);
+    scope.zStrandShape = pb.vec4().uniform(2);
     if (this.strandLOD) {
       scope.zStrandLOD = pb.vec4().uniform(2);
     }
   }
   /**
-   * Samples a strand's control polygon at parameter `t`.
-   *
-   * @remarks
-   * Returns position in xyz and width in w. Linear interpolation along the
-   * control polygon is enough: strands carry tens of points over a few
-   * centimetres, so the polygon and the spline through it differ by far less than
-   * a pixel.
+   * Reads one control point as position in xyz and width in w.
    * @internal
    */
-  private sampleStrand(
-    scope: PBInsideFunctionScope,
-    firstPoint: PBShaderExp,
-    pointCount: PBShaderExp,
-    t: PBShaderExp
-  ) {
+  private fetchStrandPoint(scope: PBInsideFunctionScope, index: PBShaderExp) {
     const pb = scope.$builder;
-    const funcName = 'Z_strandSample';
-    pb.func(funcName, [pb.uint('firstPoint'), pb.uint('pointCount'), pb.float('t')], function () {
+    const funcName = 'Z_strandPoint';
+    pb.func(funcName, [pb.uint('index')], function () {
       const points = this.zStrandPoints;
-      this.$l.last = pb.sub(this.pointCount, 1);
-      this.$l.f = pb.mul(this.t, pb.float(this.last));
-      this.$l.i0 = pb.min(pb.uint(pb.floor(this.f)), pb.sub(this.last, 1));
-      this.$l.frac = pb.sub(this.f, pb.float(this.i0));
-      this.$l.a = pb.mul(pb.add(this.firstPoint, this.i0), 4);
-      this.$l.b = pb.add(this.a, 4);
-      this.$l.pa = pb.vec4(
-        points.at(this.a),
-        points.at(pb.add(this.a, 1)),
-        points.at(pb.add(this.a, 2)),
-        points.at(pb.add(this.a, 3))
+      this.$l.base = pb.mul(this.index, 4);
+      this.$return(
+        pb.vec4(
+          points.at(this.base),
+          points.at(pb.add(this.base, 1)),
+          points.at(pb.add(this.base, 2)),
+          points.at(pb.add(this.base, 3))
+        )
       );
-      this.$l.pbv = pb.vec4(
-        points.at(this.b),
-        points.at(pb.add(this.b, 1)),
-        points.at(pb.add(this.b, 2)),
-        points.at(pb.add(this.b, 3))
-      );
-      this.$return(pb.mix(this.pa, this.pbv, this.frac));
     });
-    return pb.getGlobalScope()[funcName](firstPoint, pointCount, t) as PBShaderExp;
+    return pb.getGlobalScope()[funcName](index) as PBShaderExp;
   }
   /**
-   * Unit tangent of a strand at parameter `t`.
+   * Evaluates a strand at parameter `t`, returning position, width and tangent.
    *
    * @remarks
-   * Taken as a forward difference between adjacent control points rather than
-   * from the interpolated sample, so it stays defined at the endpoints.
+   * A Catmull-Rom spline through the control points, not the control polygon
+   * itself, and both quantities come from the same curve: the sample is the
+   * spline's value, the tangent its analytic derivative.
+   *
+   * The reason is the tangent. A polyline's derivative is constant within a span
+   * and jumps at every control point, and the anisotropic lobes are a function of
+   * that direction raised to a large power, so what is a slight kink in the
+   * silhouette becomes a hard step in the highlight - each span of a strand shading
+   * as its own uniformly bright or dark facet. Interpolating the position more
+   * accurately is the lesser half of the change.
+   *
+   * The curve matters too once {@link segmentsPerStrand} is below the control
+   * point count, which is the normal case: the default draws 8 segments from
+   * strands carrying 30 points, so a polyline reading cuts the corner across three
+   * points at a time and quietly straightens out every curl in the groom. A spline
+   * sampled at the same rate keeps the bend.
+   *
+   * Costs four control point fetches against the three the polyline reading of
+   * position and tangent needed between them.
    * @internal
    */
-  private strandTangent(
+  private evaluateStrand(
     scope: PBInsideFunctionScope,
     firstPoint: PBShaderExp,
     pointCount: PBShaderExp,
     t: PBShaderExp
   ) {
     const pb = scope.$builder;
-    const funcName = 'Z_strandTangent';
+    const that = this;
+    const funcName = 'Z_strandEvaluate';
+    const StrandSample = pb.defineStruct([pb.vec4('sample'), pb.vec3('tangent')]);
     pb.func(funcName, [pb.uint('firstPoint'), pb.uint('pointCount'), pb.float('t')], function () {
-      const points = this.zStrandPoints;
       this.$l.last = pb.sub(this.pointCount, 1);
       this.$l.f = pb.mul(this.t, pb.float(this.last));
-      this.$l.i0 = pb.min(pb.uint(pb.floor(this.f)), pb.sub(this.last, 1));
-      this.$l.a = pb.mul(pb.add(this.firstPoint, this.i0), 4);
-      this.$l.b = pb.add(this.a, 4);
-      this.$l.dir = pb.sub(
-        pb.vec3(points.at(this.b), points.at(pb.add(this.b, 1)), points.at(pb.add(this.b, 2))),
-        pb.vec3(points.at(this.a), points.at(pb.add(this.a, 1)), points.at(pb.add(this.a, 2)))
+      this.$l.i1 = pb.min(pb.uint(pb.floor(this.f)), pb.sub(this.last, 1));
+      this.$l.s = pb.clamp(pb.sub(this.f, pb.float(this.i1)), 0, 1);
+      // The span is p1..p2, with p0 and p3 as the neighbours that set its
+      // curvature. Both ends duplicate rather than wrap: max(i,1)-1 gives i-1
+      // without underflowing at the root, and the tip clamps to the last point,
+      // which is the usual way to end a Catmull-Rom without inventing points.
+      this.$l.p0 = that.fetchStrandPoint(this, pb.add(this.firstPoint, pb.sub(pb.max(this.i1, 1), 1)));
+      this.$l.p1 = that.fetchStrandPoint(this, pb.add(this.firstPoint, this.i1));
+      this.$l.p2 = that.fetchStrandPoint(this, pb.add(this.firstPoint, pb.add(this.i1, 1)));
+      this.$l.p3 = that.fetchStrandPoint(
+        this,
+        pb.add(this.firstPoint, pb.min(pb.add(this.i1, 2), this.last))
       );
-      this.$l.len = pb.length(this.dir);
+      // Uniform Catmull-Rom in Hermite form: the span p1..p2 with the endpoint
+      // tangents each spline segment inherits from its neighbours. Kept in this
+      // form rather than as a collected cubic so the value and the derivative are
+      // visibly the same polynomial, and so the endpoint conditions - value p1 and
+      // slope m1 at s = 0, value p2 and slope m2 at s = 1 - can be read off.
+      this.$l.m1 = pb.mul(pb.sub(this.p2, this.p0), 0.5);
+      this.$l.m2 = pb.mul(pb.sub(this.p3, this.p1), 0.5);
+      this.$l.d = pb.sub(this.p2, this.p1);
+      this.$l.a2 = pb.sub(pb.mul(this.d, 3), pb.add(pb.mul(this.m1, 2), this.m2));
+      this.$l.a3 = pb.add(pb.mul(this.d, -2), this.m1, this.m2);
+      this.$l.s2 = pb.mul(this.s, this.s);
+      this.$l.value = pb.add(
+        this.p1,
+        pb.mul(this.m1, this.s),
+        pb.mul(this.a2, this.s2),
+        pb.mul(this.a3, pb.mul(this.s2, this.s))
+      );
+      this.$l.deriv = pb.add(
+        this.m1.xyz,
+        pb.mul(this.a2.xyz, pb.mul(this.s, 2)),
+        pb.mul(this.a3.xyz, pb.mul(this.s2, 3))
+      );
+      this.$l.out = StrandSample();
+      // A spline can undershoot between control points, and a negative width
+      // would flip the quad inside out, so the width is floored at zero.
+      this.out.sample = pb.vec4(this.value.xyz, pb.max(this.value.w, 0));
+      this.$l.len = pb.length(this.deriv);
       this.$if(pb.greaterThan(this.len, 0.000001), function () {
-        this.$return(pb.div(this.dir, this.len));
+        this.out.tangent = pb.div(this.deriv, this.len);
+      }).$else(function () {
+        // Coincident control points leave the derivative undefined; fall back to
+        // the chord across the span, and to an arbitrary axis if that is degenerate
+        // too, so a duplicated point cannot produce a NaN frame.
+        this.$l.chord = pb.sub(this.p2.xyz, this.p1.xyz);
+        this.$l.chordLen = pb.length(this.chord);
+        this.$if(pb.greaterThan(this.chordLen, 0.000001), function () {
+          this.out.tangent = pb.div(this.chord, this.chordLen);
+        }).$else(function () {
+          this.out.tangent = pb.vec3(0, 1, 0);
+        });
       });
-      this.$return(pb.vec3(0, 1, 0));
+      this.$return(this.out);
     });
     return pb.getGlobalScope()[funcName](firstPoint, pointCount, t) as PBShaderExp;
   }
@@ -416,7 +549,8 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
       pb.vec3('normal'),
       pb.vec3('tangent'),
       pb.vec3('side'),
-      pb.float('coverage')
+      pb.float('coverage'),
+      pb.float('across')
     ]);
     pb.func(funcName, [], function () {
       this.$l.vid = pb.uint(this.$builtins.vertexIndex);
@@ -462,10 +596,10 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
       this.$l.pointCount = pb.max(this.zStrandHeaders.at(pb.add(this.hBase, 1)), 2);
 
       this.$l.t = pb.div(pb.float(this.ring), pb.float(this.segCount));
-      this.$l.sample = that.sampleStrand(this, this.firstPoint, this.pointCount, this.t);
-      this.$l.centre = this.sample.xyz;
-      this.$l.tangent = that.strandTangent(this, this.firstPoint, this.pointCount, this.t);
-      this.$l.halfWidth = pb.mul(this.sample.w, 0.5, this.zStrandParams.y);
+      this.$l.curve = that.evaluateStrand(this, this.firstPoint, this.pointCount, this.t);
+      this.$l.centre = this.curve.sample.xyz;
+      this.$l.tangent = this.curve.tangent;
+      this.$l.halfWidth = pb.mul(this.curve.sample.w, 0.5, this.zStrandParams.y);
 
       // Camera-facing side vector: perpendicular to the strand and to the view
       // ray, so the ribbon always presents its full width.
@@ -535,7 +669,8 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
         });
       }
 
-      this.$l.offset = pb.mul(this.side, this.halfW, pb.sub(pb.mul(this.sideSel, 2), 1));
+      this.$l.acrossSign = pb.sub(pb.mul(this.sideSel, 2), 1);
+      this.$l.offset = pb.mul(this.side, this.halfW, this.acrossSign);
       this.$l.result = StrandVertex();
       this.result.worldPos = pb.add(this.centre, this.offset);
       // On a cylinder seen from outside, the visible surface points back along the
@@ -544,6 +679,7 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
       this.result.tangent = this.tangent;
       this.result.side = this.side;
       this.result.coverage = this.coverage;
+      this.result.across = pb.mul(this.acrossSign, this.zStrandShape.x);
       this.$return(this.result);
     });
     return pb.getGlobalScope()[funcName]() as PBShaderExp;
