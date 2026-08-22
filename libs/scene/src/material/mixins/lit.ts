@@ -371,12 +371,34 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
               this.uv_dy = pb.vec3(0, 1, 0);
             }
           );
-          this.$l.t_ = pb.div(
+          // t is normalized below, so any positive scale on t_ is irrelevant.
+          // Multiplying by sign(det) instead of dividing by det yields the same
+          // direction while staying finite when the screen space UV jacobian
+          // degenerates (silhouettes, folds, collapsed UV shells), where the
+          // division used to produce Inf and then NaN through the subtraction.
+          this.$l.det = pb.sub(pb.mul(this.uv_dx.x, this.uv_dy.y), pb.mul(this.uv_dx.y, this.uv_dy.x));
+          this.$l.t_ = pb.mul(
             pb.sub(pb.mul(pb.dpdx(posW), this.uv_dy.y), pb.mul(pb.dpdy(posW), this.uv_dx.y)),
-            pb.sub(pb.mul(this.uv_dx.x, this.uv_dy.y), pb.mul(this.uv_dx.y, this.uv_dy.x))
+            pb.sign(this.det)
           );
           this.$l.ng = pb.normalize(pb.cross(pb.dpdx(posW), pb.dpdy(posW)));
-          this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
+          // Normalize before the gram-schmidt step so the degeneracy test below
+          // is scale independent: the rejection length is then sin(angle) of t_
+          // against the normal.
+          this.$l.tn = pb.div(this.t_, pb.max(pb.length(this.t_), 1e-20));
+          this.$l.tRaw = pb.sub(this.tn, pb.mul(this.ng, pb.dot(this.ng, this.tn)));
+          this.$l.tAxis = pb.vec3(1, 0, 0);
+          this.$if(pb.greaterThan(pb.abs(this.ng.x), 0.9), function () {
+            this.tAxis = pb.vec3(0, 1, 0);
+          });
+          this.$if(pb.lessThan(pb.dot(this.tRaw, this.tRaw), 1e-8), function () {
+            // t_ vanished or is parallel to the normal: no tangent can be
+            // recovered from the derivatives, so pick an arbitrary orthogonal
+            // one. The normal map detail is misoriented on those few pixels,
+            // but the frame stays finite instead of turning the fragment black.
+            this.tRaw = pb.sub(this.tAxis, pb.mul(this.ng, pb.dot(this.ng, this.tAxis)));
+          });
+          this.$l.t = pb.normalize(this.tRaw);
           this.$l.b = pb.cross(this.ng, this.t);
           if (that.doubleSidedLighting && that.cullMode !== 'back') {
             this.$if(pb.not(this.$builtins.frontFacing), function () {
@@ -396,12 +418,25 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
               this.uv_dy = pb.vec3(0, 1, 0);
             }
           );
-          this.$l.t_ = pb.div(
+          // See the comment in the branch above: sign(det) replaces the
+          // unguarded division that produced NaN tangents on degenerate screen
+          // space UV jacobians.
+          this.$l.det = pb.sub(pb.mul(this.uv_dx.x, this.uv_dy.y), pb.mul(this.uv_dx.y, this.uv_dy.x));
+          this.$l.t_ = pb.mul(
             pb.sub(pb.mul(pb.dpdx(posW), this.uv_dy.y), pb.mul(pb.dpdy(posW), this.uv_dx.y)),
-            pb.sub(pb.mul(this.uv_dx.x, this.uv_dy.y), pb.mul(this.uv_dx.y, this.uv_dy.x))
+            pb.sign(this.det)
           );
           this.$l.ng = pb.normalize(this.worldNormal);
-          this.$l.t = pb.normalize(pb.sub(this.t_, pb.mul(this.ng, pb.dot(this.ng, this.t_))));
+          this.$l.tn = pb.div(this.t_, pb.max(pb.length(this.t_), 1e-20));
+          this.$l.tRaw = pb.sub(this.tn, pb.mul(this.ng, pb.dot(this.ng, this.tn)));
+          this.$l.tAxis = pb.vec3(1, 0, 0);
+          this.$if(pb.greaterThan(pb.abs(this.ng.x), 0.9), function () {
+            this.tAxis = pb.vec3(0, 1, 0);
+          });
+          this.$if(pb.lessThan(pb.dot(this.tRaw, this.tRaw), 1e-8), function () {
+            this.tRaw = pb.sub(this.tAxis, pb.mul(this.ng, pb.dot(this.ng, this.tAxis)));
+          });
+          this.$l.t = pb.normalize(this.tRaw);
           this.$l.b = pb.cross(this.ng, this.t);
           if (that.doubleSidedLighting && that.cullMode !== 'back') {
             this.$if(pb.not(this.$builtins.frontFacing), function () {
