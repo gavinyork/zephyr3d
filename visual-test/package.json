@@ -64,6 +64,7 @@
     "@zephyr3d/backend-webgpu": "workspace:^0.1.20",
     "@zephyr3d/base": "workspace:^0.2.9",
     "@zephyr3d/device": "workspace:^0.2.18",
+    "@zephyr3d/loaders": "workspace:^0.1.4",
     "@zephyr3d/scene": "workspace:^0.9.25"
   }
 }

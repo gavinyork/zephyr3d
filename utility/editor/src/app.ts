@@ -13,7 +13,7 @@ import { isDesktopApp } from './core/services/desktop';
 import type { Nullable } from '@zephyr3d/base';
 import { GenericHtmlDirectoryReader } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
-import { FBXImporter, GLTFImporter } from '@zephyr3d/loaders';
+import { AlembicHairImporter, FBXImporter, GLTFImporter, HairFileImporter } from '@zephyr3d/loaders';
 
 const searchParams = new URL(window.location.href).searchParams;
 const project = searchParams.get('project');
@@ -170,6 +170,19 @@ editorApp.ready().then(async () => {
   getEngine().resourceManager.setModelLoader('model/gltf+json', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/fbx', new FBXImporter());
+  // Alembic archives from XGen are authored in centimetres and hold far more
+  // strands than a CPU-tessellated ribbon mesh should carry, so thin them out.
+  getEngine().resourceManager.setModelLoader(
+    'model/alembic',
+    new AlembicHairImporter({ scale: 0.01, strandStride: 8, segmentsPerStrand: 12, minWidth: 0.0004 })
+  );
+  // HAIR files get the same thinning, but no unit conversion: the format records
+  // no unit, so scaling on import would only be a guess. Scale the imported node
+  // instead, where the number is visible and adjustable.
+  getEngine().resourceManager.setModelLoader(
+    'model/hair',
+    new HairFileImporter({ strandStride: 8, segmentsPerStrand: 12 })
+  );
   if (editorMode === 'editor') {
     await initLeakDetector();
     const device = getDevice();

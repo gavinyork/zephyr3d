@@ -2,8 +2,9 @@ import type { VisualScene } from './types';
 import { sanityOrientation } from './scenes/sanity-orientation';
 import {
   hair,
-  pbrMetalRoughGrid,
   skinDiffusionJade,
+  hairMarschner,
+  pbrMetalRoughGrid,
   skinShadow,
   skinSss,
   unlitTextured
@@ -23,6 +24,18 @@ import { clusterManyLights, spotShadow } from './scenes/lighting';
 import { oitABuffer, oitDualDepth, oitWeighted } from './scenes/oit';
 import { postFxaa, postToneMapBloom, taaMultiframe } from './scenes/post';
 import { eyeAngled, eyeFrontal, eyePupilDilated, eyeSocketOcclusion } from './scenes/eye';
+import {
+  hairScatterOff,
+  hairScatterOn,
+  hairShadowDom,
+  hairShadowPcf,
+  hairFileHelix,
+  hairMarschnerStrands,
+  hairStrandsFan,
+  hairStrandsGpuHelix,
+  hairStrandsHelix,
+  hairStrandsWidth
+} from './scenes/hair-strands';
 
 /**
  * Every scene, in a fixed order.
@@ -66,6 +79,23 @@ export const SCENES: VisualScene[] = [
   skinDiffusionJade,
   skinShadow,
   hair,
+  // Strand hair: the curve import paths, from container bytes to ribbons.
+  hairStrandsHelix,
+  // Same helix, same framing, read out of a HAIR file instead - compare the two.
+  hairFileHelix,
+  hairStrandsFan,
+  hairStrandsWidth,
+  hairStrandsGpuHelix,
+  // Hair self-shadowing: the deep opacity map and its depth-based control.
+  hairShadowPcf,
+  hairShadowDom,
+  // Multiple scattering: the same groom with the term off and on.
+  hairScatterOff,
+  hairScatterOn,
+  // The Marschner fibre model, on a card and on strands. Both are back-lit,
+  // which is the configuration the double lobe cannot render.
+  hairMarschner,
+  hairMarschnerStrands,
   eyeFrontal,
   eyeAngled,
   eyePupilDilated,

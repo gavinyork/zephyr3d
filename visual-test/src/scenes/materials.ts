@@ -1,5 +1,13 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { HairMaterial, Mesh, PlaneShape, SkinMaterial, SphereShape, UnlitMaterial } from '@zephyr3d/scene';
+import {
+  DirectionalLight,
+  HairMaterial,
+  Mesh,
+  PlaneShape,
+  SkinMaterial,
+  SphereShape,
+  UnlitMaterial
+} from '@zephyr3d/scene';
 import type { VisualScene } from '../types';
 import { bareScene, keyLight, pbr, placeCamera, proceduralTexture } from './common';
 
@@ -232,6 +240,64 @@ export const hair: VisualScene = {
     material.albedoColor = new Vector4(0.22, 0.13, 0.09, 1);
     material.transmissionColor = new Vector3(0.5, 0.22, 0.12);
     material.transmissionIntensity = 0.7;
+    const mesh = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
+    mesh.position.setXYZ(0, 0, 0);
+    placeCamera(camera, new Vector3(2.6, 1.4, 4.6));
+  }
+};
+
+/**
+ * The same hair card sphere under the Marschner fibre model.
+ *
+ * @remarks
+ * Two jobs, and the second is the reason it is a card scene rather than another
+ * strand one.
+ *
+ * It pins all three fibre paths at once, which needs a light behind the sphere:
+ * the key alone sits beside the camera, and from there the transmitted path that
+ * leaves the far side of a fibre points away from the viewer and contributes
+ * essentially nothing. With a back light there is a bright rim that the double
+ * lobe cannot produce at any setting, a broad hair-coloured highlight from the
+ * path that reflects once inside, and a narrow white one straight off the
+ * surface. Each is a different lobe, so a change to any one of them is legible
+ * as a change in a specific place rather than an overall shift.
+ *
+ * And it runs on both backends. The strand path needs storage buffers in the
+ * vertex stage, so every scene that uses it is WebGPU-only; this is the only
+ * coverage the model gets against the WebGL2 shader generator.
+ *
+ * `transmissionIntensity` is left at zero on purpose even though the sibling
+ * `hair` scene raises it. That parameter fakes exactly what the TT path here
+ * computes, and running both would double it.
+ */
+export const hairMarschner: VisualScene = {
+  name: 'hair-marschner',
+  description: 'HairMaterial sphere under the Marschner model, back-lit so the R, TT and TRT paths separate.',
+  setup({ scene, camera }) {
+    bareScene(scene);
+    keyLight(scene);
+    // Behind and slightly above, opposite the key. This is what makes TT visible.
+    const back = new DirectionalLight(scene);
+    back.lookAt(new Vector3(-3, 2.5, -5), Vector3.zero(), Vector3.axisPY());
+    back.color = new Vector4(1, 0.94, 0.86, 1);
+    // Held below the key. The transmitted path is a narrow lobe with a tall peak,
+    // and on a smooth sphere a large band of the surface satisfies its condition
+    // at once; at equal strength it floods the whole silhouette and buries the
+    // two reflected paths this scene also has to show.
+    back.intensity = 0.5;
+    const material = new HairMaterial();
+    material.shadingModel = 'marschner';
+    // Dark brown, and measured rather than picked: at a mid-brown the diffuse
+    // term buries all three paths. Diffuse scales with this colour directly,
+    // while the surface path does not depend on it at all and the two transmitted
+    // paths only take a root of it, so darkening the base suppresses the flat
+    // component far faster than the structure - which is also why real hair reads
+    // as its highlights rather than as its colour.
+    material.albedoColor = new Vector4(0.16, 0.09, 0.05, 1);
+    // The wrap exists to soften a terminator across a thin card. Here it spreads
+    // both lights most of the way round the sphere, which is the other half of
+    // what was flattening the frame.
+    material.diffuseWrap = 0.15;
     const mesh = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
     mesh.position.setXYZ(0, 0, 0);
     placeCamera(camera, new Vector3(2.6, 1.4, 4.6));

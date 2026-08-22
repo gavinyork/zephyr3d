@@ -146,6 +146,22 @@ export function shadowStage(scene: Scene, groundSize = 9) {
 }
 
 /**
+ * Just the ground plane from {@link shadowStage}, for scenes whose subject is
+ * their own and that only need a surface to catch the shadow.
+ */
+export function shadowFloor(scene: Scene, groundSize = 4, y = -0.85) {
+  const ground = new Mesh(
+    scene,
+    new PlaneShape({ size: groundSize }),
+    lambert(new Vector4(0.62, 0.63, 0.66, 1))
+  );
+  // PlaneShape centres itself on the origin, so this only moves it down under
+  // the subject rather than positioning it in the plane.
+  ground.position.setXYZ(0, y, 0);
+  return ground;
+}
+
+/**
  * Procedural checker + gradient texture, built on the CPU from a fixed formula.
  *
  * Generated rather than loaded so the harness needs no binary fixtures, and so
