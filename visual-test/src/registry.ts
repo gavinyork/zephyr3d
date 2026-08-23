@@ -35,6 +35,8 @@ import {
   hairStrandsGpuHelix,
   hairNodeTransform,
   hairSimulation,
+  hairShadowReceive,
+  hairShadowDomDeep,
   hairStrandsHelix,
   hairStrandsWidth
 } from './scenes/hair-strands';
@@ -90,6 +92,8 @@ export const SCENES: VisualScene[] = [
   hairStrandsGpuHelix,
   hairNodeTransform,
   hairSimulation,
+  hairShadowReceive,
+  hairShadowDomDeep,
   // Hair self-shadowing: the deep opacity map and its depth-based control.
   hairShadowPcf,
   hairShadowDom,

@@ -6,6 +6,7 @@ import {
   HairStrandData,
   HairStrandMaterial,
   HairNode,
+  SphereShape,
   Mesh,
   Primitive,
   SharedModel,
@@ -441,6 +442,99 @@ function curtainStrands(): HairStrandSource {
   }
   return { positions, pointCounts, widths, widthPerStrand: false };
 }
+
+/**
+ * A groom with an opaque occluder buried in it, lit from behind.
+ *
+ * @remarks
+ * Backlighting is where a groom is least forgiving: the Marschner transmitted
+ * lobe is narrow and normalised, so a light opposite the camera fires every
+ * strand at once and the whole head clips to white. That is the model behaving
+ * correctly - see {@link hairMarschnerStrands} - but it also means a shadow that
+ * fails to reach the strands is invisible against everything else being blown
+ * out, which is why it needs a scene of its own.
+ *
+ * The sphere stands in for a head inside the hair. What this pins is that the
+ * strands it occludes stay dark: shadow reaching strand geometry is the only
+ * thing separating a lit rim from a uniform white blob.
+ *
+ * WebGPU only: the vertex shader reads storage buffers.
+ */
+export const hairShadowReceive: VisualScene = {
+  name: 'hair-shadow-receive',
+  description: 'Backlit groom around an occluder: pins that strand geometry receives shadow.',
+  supports: (backend) => backend === 'webgpu',
+  setup(ctx) {
+    bareScene(ctx.scene);
+    // Behind the groom and only slightly above, so the occluder throws its
+    // shadow forward through the hair rather than over the top of it.
+    const back = shadowKeyLight(ctx.scene, 'pcf');
+    back.lookAt(new Vector3(0.4, 1.6, -4), new Vector3(0, 0.4, 0), Vector3.axisPY());
+    back.color = new Vector4(1, 0.96, 0.9, 1);
+    // The head. Opaque, shadow casting, and large enough to occlude a good part
+    // of the groom from the light behind it.
+    const occluder = new Mesh(
+      ctx.scene,
+      new SphereShape({ radius: 0.42 }),
+      lambert(new Vector4(0.25, 0.25, 0.27, 1))
+    );
+    occluder.position.setXYZ(0, 0.55, 0);
+    occluder.castShadow = true;
+
+    const node = new HairNode(ctx.scene);
+    node.albedoColor = new Vector4(0.82, 0.68, 0.45, 1);
+    node.shadingModel = 'marschner';
+    node.segmentsPerStrand = 12;
+    node.minStrandWidth = 0;
+    node.strandWidthScale = 0.3;
+    node.setStrands(toStrandSource(helixCurves(28, 20)));
+    placeCamera(ctx.camera, new Vector3(0.1, 1.2, 3.2), new Vector3(0, 0.45, 0));
+  }
+};
+
+/**
+ * A backlit groom under a deep opacity map whose layer span is a fraction of the
+ * groom's depth.
+ *
+ * @remarks
+ * The regression this pins: a caster deeper than `z0 + domLayerDistance` used to
+ * be written to no layer at all, so the map held only the absorption of the thin
+ * front slice nearest the light. Every receiver deeper than the span read that
+ * slice and nothing else, and wherever the slice happened to be sparse the
+ * middle of a dense backlit groom came out fully lit, in blotches. The last
+ * layer now extends to the end of the caster volume, so the camera side of this
+ * groom must render dark under the light behind it.
+ *
+ * The span is set to a tenth of the groom's depth on purpose - the failure only
+ * exists when casters overflow it, which is why the tuned spans of the other DOM
+ * scenes never caught it.
+ *
+ * WebGPU only: DOM and the strand path both require it.
+ */
+export const hairShadowDomDeep: VisualScene = {
+  name: 'hair-shadow-dom-deep',
+  description:
+    'Backlit groom overflowing the DOM layer span: pins deep casters clamping into the last layer.',
+  supports: (backend) => backend === 'webgpu',
+  setup(ctx) {
+    bareScene(ctx.scene);
+    const back = shadowKeyLight(ctx.scene, 'dom');
+    back.lookAt(new Vector3(0.3, 1.2, -4), new Vector3(0, 0.4, 0), Vector3.axisPY());
+    back.shadow.shadowDistance = 12;
+    // The helix is about a unit deep along this light; a tenth of that leaves
+    // ninety percent of the casters beyond the span.
+    back.shadow.domLayerDistance = 0.1;
+
+    const node = new HairNode(ctx.scene);
+    node.albedoColor = new Vector4(0.85, 0.75, 0.55, 1);
+    node.shadingModel = 'marschner';
+    node.segmentsPerStrand = 12;
+    node.minStrandWidth = 0;
+    node.strandWidthScale = 0.35;
+    node.setStrands(toStrandSource(helixCurves(32, 20)));
+    placeCamera(ctx.camera, new Vector3(0.1, 1.1, 3.0), new Vector3(0, 0.45, 0));
+  }
+};
 
 export const hairStrandsWidth: VisualScene = {
   name: 'hair-strands-width',

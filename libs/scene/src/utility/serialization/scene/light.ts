@@ -71,8 +71,19 @@ export function getPunctualLightClass(): SerializableClass {
           default: 'hard',
           options: {
             enum: {
-              labels: ['Hard', 'PCF', 'PCSS', 'VSM', 'ESM', 'PCF-OPT (deprecated)', 'PCF-PD (deprecated)'],
-              values: ['hard', 'pcf', 'pcss', 'vsm', 'esm', 'pcf-opt', 'pcf-pd']
+              labels: [
+                'Hard',
+                'PCF',
+                'PCSS',
+                'VSM',
+                'ESM',
+                // Fractional occlusion through hair rather than a binary blocked
+                // test. WebGPU only, and only meaningful with hair in the scene.
+                'DOM (hair)',
+                'PCF-OPT (deprecated)',
+                'PCF-PD (deprecated)'
+              ],
+              values: ['hard', 'pcf', 'pcss', 'vsm', 'esm', 'dom', 'pcf-opt', 'pcf-pd']
             }
           },
           get(this: PunctualLight, value) {
@@ -266,6 +277,64 @@ export function getPunctualLightClass(): SerializableClass {
           },
           isValid(this: PunctualLight) {
             return !!this.castShadow;
+          }
+        },
+        {
+          name: 'DOMLayerDistance',
+          description:
+            'Depth spanned by the deep opacity map layers, in world units along the light. Set it to roughly the thickness of the hair',
+          phase: 2,
+          type: 'float',
+          default: 0.25,
+          options: { minValue: 0.0001, maxValue: 10 },
+          get(this: PunctualLight, value) {
+            value.num[0] = this.shadow.domLayerDistance;
+          },
+          set(this: PunctualLight, value) {
+            this.shadow.domLayerDistance = value.num[0];
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow && this.shadow.mode === 'dom';
+          }
+        },
+        {
+          name: 'DOMDensity',
+          description:
+            'How strongly accumulated hair coverage attenuates light. Raise it to darken the interior of a groom without moving the layers',
+          phase: 2,
+          type: 'float',
+          default: 1,
+          options: { minValue: 0, maxValue: 16 },
+          get(this: PunctualLight, value) {
+            value.num[0] = this.shadow.domDensity;
+          },
+          set(this: PunctualLight, value) {
+            this.shadow.domDensity = value.num[0];
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow && this.shadow.mode === 'dom';
+          }
+        },
+        {
+          name: 'DOMFilterSize',
+          description: 'Width of the deep opacity map sampling kernel, in texels',
+          phase: 2,
+          type: 'int',
+          default: 5,
+          options: {
+            enum: {
+              labels: ['1x1 (off)', '3x3', '5x5', '7x7'],
+              values: [1, 3, 5, 7]
+            }
+          },
+          get(this: PunctualLight, value) {
+            value.num[0] = this.shadow.domFilterSize;
+          },
+          set(this: PunctualLight, value) {
+            this.shadow.domFilterSize = value.num[0];
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow && this.shadow.mode === 'dom';
           }
         },
         {

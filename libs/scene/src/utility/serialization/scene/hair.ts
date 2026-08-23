@@ -132,6 +132,36 @@ export function getHairNodeClass(): SerializableClass {
           }
         },
         {
+          name: 'RootOcclusion',
+          description:
+            'Darkens ambient light on strands near the root, standing in for the occlusion of being buried in the groom. Environment light is not shadowed, so without this a dense hairstyle is as bright inside as out. Direct light is left to the shadow map',
+          type: 'float',
+          default: 0.5,
+          options: { group: 'Shading', animatable: true, minValue: 0, maxValue: 1 },
+          get(this: HairNode, value) {
+            value.num[0] = this.rootOcclusion;
+          },
+          set(this: HairNode, value) {
+            this.rootOcclusion = value.num[0];
+          }
+        },
+        {
+          name: 'RootOcclusionRange',
+          description: 'Fraction of a strand length over which the root occlusion fades out',
+          type: 'float',
+          default: 0.6,
+          options: { group: 'Shading', minValue: 0.001, maxValue: 1 },
+          isHidden(this: HairNode) {
+            return this.rootOcclusion <= 0;
+          },
+          get(this: HairNode, value) {
+            value.num[0] = this.rootOcclusionRange;
+          },
+          set(this: HairNode, value) {
+            this.rootOcclusionRange = value.num[0];
+          }
+        },
+        {
           name: 'StrandLOD',
           description: 'Drop strands with distance, redistributing their coverage to the survivors',
           type: 'bool',

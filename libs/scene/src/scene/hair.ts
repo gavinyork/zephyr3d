@@ -482,6 +482,39 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
   set strandRoundness(value: number) {
     this.material.strandRoundness = value;
   }
+  /**
+   * Strength of the root-depth ambient occlusion, in [0, 1].
+   *
+   * @remarks
+   * Environment irradiance is not attenuated by anything - a shadow map answers
+   * for one light, not for the sky - so without this every strand of a groom
+   * receives the full sky and a dense hairstyle is lit as brightly in its
+   * interior as on its surface, which reads as a flat silhouette with no volume.
+   * Most obvious on pale hair, where there is little pigment to darken the
+   * interior instead. Set to 0 to disable.
+   *
+   * Ambient light only: direct light is already attenuated by the shadow map,
+   * and under DOM by a graded transmittance, so it is left alone.
+   */
+  get rootOcclusion() {
+    return this.material.rootOcclusion;
+  }
+  set rootOcclusion(value: number) {
+    this.material.rootOcclusion = value;
+  }
+  /**
+   * How far along a strand the root occlusion reaches, in (0, 1].
+   *
+   * @remarks
+   * Short for a groom whose strands leave the scalp quickly, longer for one
+   * where they lie against each other most of their length.
+   */
+  get rootOcclusionRange() {
+    return this.material.rootOcclusionRange;
+  }
+  set rootOcclusionRange(value: number) {
+    this.material.rootOcclusionRange = value;
+  }
   /** Drop strands with distance, redistributing their coverage to the survivors. */
   get strandLOD() {
     return this.material.strandLOD;

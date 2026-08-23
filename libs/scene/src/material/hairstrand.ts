@@ -52,6 +52,10 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
   private _minStrandLODRatio: number;
   /** @internal How far the shading normal bends across the ribbon, in [0, 1]. */
   private _strandRoundness: number;
+  /** @internal Strength of the root-depth ambient occlusion, in [0, 1]. */
+  private _rootOcclusion: number;
+  /** @internal How far along a strand the root occlusion reaches, in (0, 1]. */
+  private _rootOcclusionRange: number;
   /** @internal Scratch vector, so applying uniforms allocates nothing. */
   private readonly _strandScratch: Vector4;
   /** @internal Scratch vector for the LOD uniform. */
@@ -70,6 +74,8 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     this._minPixelWidth = 1.4;
     this._minStrandLODRatio = 0.05;
     this._strandRoundness = 1;
+    this._rootOcclusion = 0.5;
+    this._rootOcclusionRange = 0.6;
     this._strandScratch = new Vector4();
     this._lodScratch = new Vector4();
     this._shapeScratch = new Vector4();
@@ -106,6 +112,8 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     this.strandLOD = other.strandLOD;
     this.minStrandLODRatio = other.minStrandLODRatio;
     this.strandRoundness = other.strandRoundness;
+    this.rootOcclusion = other.rootOcclusion;
+    this.rootOcclusionRange = other.rootOcclusionRange;
   }
   /** GPU-resident strand geometry. */
   get strands(): Nullable<HairStrandData> {
@@ -255,6 +263,57 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     }
   }
   /**
+   * Strength of the root-depth ambient occlusion, in [0, 1].
+   *
+   * @remarks
+   * Environment irradiance is not attenuated by anything - a shadow map answers
+   * for one light, not for the sky - so without this every strand of a groom
+   * receives the full sky, and a dense hairstyle lights up as brightly in its
+   * interior as on its surface. That reads as a flat silhouette with no volume,
+   * and it is most obvious on pale hair, where there is little pigment to darken
+   * the interior instead.
+   *
+   * Real occlusion would need to know how much hair sits between a fibre and the
+   * sky. This approximates that by where along the strand the fragment is: roots
+   * grow from the scalp, buried under everything above them, while tips are on
+   * the outside. It is only an approximation - a tip tucked under a fringe is
+   * treated as exposed - but it is free, it needs no texture coordinates, which
+   * this material has none of, and it captures the dominant effect. Set to 0 to
+   * disable.
+   *
+   * Applied to ambient light and the scatter term only. Direct light keeps its
+   * own answer - the shadow map, or DOM's graded transmittance - and multiplying
+   * this on top would count the same blockage twice.
+   */
+  get rootOcclusion() {
+    return this._rootOcclusion;
+  }
+  set rootOcclusion(val) {
+    const v = val < 0 ? 0 : val > 1 ? 1 : val;
+    if (v !== this._rootOcclusion) {
+      this._rootOcclusion = v;
+      this.uniformChanged();
+    }
+  }
+  /**
+   * How far along a strand the root occlusion reaches, in (0, 1].
+   *
+   * @remarks
+   * The fraction of the strand's length over which occlusion fades from full at
+   * the root to none. Short for a groom whose strands leave the scalp quickly,
+   * longer for one where they lie against each other most of their length.
+   */
+  get rootOcclusionRange() {
+    return this._rootOcclusionRange;
+  }
+  set rootOcclusionRange(val) {
+    const v = val < 0.001 ? 0.001 : val > 1 ? 1 : val;
+    if (v !== this._rootOcclusionRange) {
+      this._rootOcclusionRange = v;
+      this.uniformChanged();
+    }
+  }
+  /**
    * Vertex count needed to draw the current strand set.
    *
    * @remarks
@@ -301,6 +360,7 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     // the centre, which is exactly what the rasteriser interpolates - and the
     // roundness dial is already folded in, so no fragment-stage uniform is needed.
     scope.$outputs.zStrandRound = scope.strand.across;
+    scope.$outputs.zStrandAO = scope.strand.occlusion;
     // Without this the inherited path reports zero motion for every pixel - it
     // emits motion vectors from resolveVertexPosition, which reads the vertex
     // attribute this material does not have. A temporal filter then reprojects
@@ -348,6 +408,33 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
    * a camera-facing quad's normal already points at the camera by construction.
    * @internal
    */
+  /**
+   * Ambient occlusion from how deep in the groom the fragment sits.
+   *
+   * @remarks
+   * Stands in for the occlusion map the inherited path uses, which this material
+   * cannot sample: it emits no texture coordinates. See
+   * {@link HairStrandMaterial.rootOcclusion} for why an approximation is worth
+   * having at all.
+   *
+   * Only the ambient hook is overridden. The inherited direct hook resolves to
+   * one here - there is no occlusion map - which is correct: the geometric term
+   * describes being buried in the groom, and for direct light that is exactly
+   * what the shadow map already measures.
+   * @internal
+   */
+  protected calculateHairOcclusion(scope: PBInsideFunctionScope): PBShaderExp {
+    const pb = scope.$builder;
+    // Evaluated at the vertex stage and interpolated, the same way the roundness
+    // dial is: the expansion parameters live in a vertex-stage uniform block, and
+    // the term is smooth along a strand, so nothing is gained by computing it per
+    // fragment.
+    const occlusion = scope.$inputs.zStrandAO;
+    if (!occlusion) {
+      return super.calculateHairOcclusion(scope);
+    }
+    return pb.mul(super.calculateHairOcclusion(scope), occlusion);
+  }
   protected calculateShadingNormal(scope: PBInsideFunctionScope, normalInfo: PBShaderExp) {
     const pb = scope.$builder;
     const across = scope.$inputs.zStrandRound;
@@ -376,15 +463,31 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     }
     bindGroup.setBuffer('zStrandHeaders', strands.headerBuffer);
     bindGroup.setBuffer('zStrandPoints', strands.pointBuffer);
-    // The pixel floor is folded into a single per-distance factor: half a pixel
-    // subtends tan(fovY/2)/renderHeight radians, so multiplying by the view
-    // distance in the shader yields the world-space half-width floor.
+    // The pixel floor, in the form the rendering camera calls for. Perspective:
+    // half a pixel subtends tan(fovY/2)/renderHeight radians, so a per-distance
+    // factor multiplied by view distance in the shader yields the world-space
+    // half-width. Orthographic - which is what a directional light's shadow pass
+    // uses - has no notion of subtended angle: a pixel is a constant world size,
+    // read off the projection matrix, and the floor is a constant half-width.
+    // Exactly one of the two is non-zero, and the shader adds them.
     let pixelFactor = 0;
-    if (this._minPixelWidth > 0) {
-      const height = ctx.renderHeight;
-      const tanHalfFov = ctx.camera?.getTanHalfFovy() ?? 0;
-      if (height > 0 && tanHalfFov > 0) {
-        pixelFactor = (this._minPixelWidth * tanHalfFov) / height;
+    let pixelFloorWorld = 0;
+    const camera = ctx.camera;
+    if (this._minPixelWidth > 0 && camera && ctx.renderHeight > 0) {
+      if (camera.isPerspective()) {
+        const tanHalfFov = camera.getTanHalfFovy();
+        if (tanHalfFov > 0) {
+          pixelFactor = (this._minPixelWidth * tanHalfFov) / ctx.renderHeight;
+        }
+      } else {
+        // m11 of an orthographic projection is 2 / frustumHeight, so a texel is
+        // frustumHeight / renderHeight world units tall and the half-width floor
+        // follows. Keeping shadow-pass strands at roughly a texel matches what
+        // the view pass does per pixel, so caster and receiver agree on width.
+        const m11 = camera.getProjectionMatrix()[5];
+        if (Number.isFinite(m11) && m11 > 0) {
+          pixelFloorWorld = this._minPixelWidth / m11 / ctx.renderHeight;
+        }
       }
     }
     bindGroup.setValue(
@@ -396,7 +499,15 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
         pixelFactor
       )
     );
-    bindGroup.setValue('zStrandShape', this._shapeScratch.setXYZW(this._strandRoundness, 0, 0, 0));
+    bindGroup.setValue(
+      'zStrandShape',
+      this._shapeScratch.setXYZW(
+        this._strandRoundness,
+        this._rootOcclusion,
+        this._rootOcclusionRange,
+        pixelFloorWorld
+      )
+    );
     if (this.strandLOD) {
       bindGroup.setValue('zStrandLOD', this._lodScratch.setXYZW(this._minStrandLODRatio, 0, 0, 0));
     }
@@ -588,7 +699,8 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
       pb.float('coverage'),
       pb.float('across'),
       pb.vec3('localCentre'),
-      pb.vec3('offset')
+      pb.vec3('offset'),
+      pb.float('occlusion')
     ]);
     pb.func(funcName, [], function () {
       this.$l.vid = pb.uint(this.$builtins.vertexIndex);
@@ -679,12 +791,19 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
       // the quad was widened so the fragment stage can pay it back in alpha.
       this.$l.halfW = pb.max(this.halfWidth, pb.mul(this.zStrandParams.z, 0.5));
       this.$l.coverage = pb.float(1);
-      this.$if(pb.greaterThan(this.zStrandParams.w, 0), function () {
-        // zStrandParams.w already holds minPixelWidth * tan(fovY/2) / renderHeight,
-        // so one multiply by view distance gives the world-space floor. Folding the
-        // projection terms on the CPU avoids needing a viewport uniform here, which
-        // the shader library does not otherwise expose.
-        this.$l.floorHalf = pb.mul(this.zStrandParams.w, this.viewDist);
+      // The pixel floor has two forms because a pixel has two meanings. Under a
+      // perspective camera its world size grows with distance: zStrandParams.w
+      // holds minPixelWidth * tan(fovY/2) / renderHeight and one multiply by view
+      // distance gives the floor - folding the projection terms on the CPU avoids
+      // needing a viewport uniform here. Under an orthographic camera - a
+      // directional light's shadow pass - a pixel is the same world size
+      // everywhere, so zStrandShape.w carries the floor as a constant. The CPU
+      // fills exactly one of the two, so their sum is whichever applies; without
+      // the ortho term, sub-texel strands leave no footprint in the shadow map at
+      // all and the deep opacity map under-counts the very hair it exists to
+      // shadow.
+      this.$l.floorHalf = pb.add(pb.mul(this.zStrandParams.w, this.viewDist), this.zStrandShape.w);
+      this.$if(pb.greaterThan(this.floorHalf, 0), function () {
         this.$if(pb.lessThan(this.halfW, this.floorHalf), function () {
           this.coverage = pb.div(this.halfW, this.floorHalf);
           this.halfW = this.floorHalf;
@@ -713,7 +832,10 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
           this.zStrandParams.y,
           this.worldScale
         );
-        this.$l.rootFloor = pb.mul(this.zStrandParams.w, pb.distance(this.camPos, this.rootPos));
+        this.$l.rootFloor = pb.add(
+          pb.mul(this.zStrandParams.w, pb.distance(this.camPos, this.rootPos)),
+          this.zStrandShape.w
+        );
         this.$l.keep = pb.float(1);
         this.$if(pb.greaterThan(this.rootFloor, 0), function () {
           this.keep = pb.clamp(pb.div(this.rootHalf, this.rootFloor), this.zStrandLOD.x, 1);
@@ -750,6 +872,12 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
       // frame's world matrix without re-running the expansion.
       this.result.localCentre = this.localCentre;
       this.result.offset = this.offset;
+      // How deep in the groom this vertex sits, stood in for by where along the
+      // strand it is: full occlusion at the root, fading to none once the strand
+      // has climbed `range` of its length clear. Smoothstep rather than a linear
+      // ramp so the transition leaves no visible edge across a dense groom.
+      this.$l.aoDepth = pb.sub(1, pb.smoothStep(0, pb.max(this.zStrandShape.z, 0.001), this.t));
+      this.result.occlusion = pb.clamp(pb.sub(1, pb.mul(this.aoDepth, this.zStrandShape.y)), 0, 1);
       this.$return(this.result);
     });
     return pb.getGlobalScope()[funcName]() as PBShaderExp;

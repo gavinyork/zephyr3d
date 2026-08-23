@@ -285,12 +285,32 @@ export class DOM extends ShadowImpl {
     return (shadowMapParams.implData as DOMImplData).result as ShadowMapType;
   }
   /**
-   * Format for both targets. Half float covers a normalized depth and three
-   * absorption sums, and halves the bandwidth of the accumulation pass.
+   * Format for both targets.
+   *
+   * @remarks
+   * Full float wherever the accumulation pass can blend into it, and the reason
+   * is the anchor depth, not the absorption sums. `z0` is stored absolute, in
+   * units of the shadow camera's whole depth range, and every layer coordinate
+   * on both sides of the technique is a difference against it divided by the
+   * layer span. At half precision its quantisation step is about 2^-11 of the
+   * stored value - roughly `0.0005 * depthRange` in world units - which for a
+   * shadow camera spanning a large scene is comparable to the depth of the hair
+   * itself. The error is independent per texel, so it does not read as bias but
+   * as blotches: patches of a backlit groom whose receivers land in front of
+   * their quantised `z0` and come out fully lit. A layer span large enough to
+   * drown the noise hides it, but throws away the graded falloff the technique
+   * exists for.
+   *
+   * Half float remains the fallback for devices whose blending cannot target
+   * full float; there the practical mitigation is a tight shadow distance.
    * @internal
    */
   private colorFormat(): TextureFormat {
-    return getDevice().getDeviceCaps().textureCaps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba32f';
+    const caps = getDevice().getDeviceCaps().textureCaps;
+    if (caps.supportFloatColorBuffer && caps.supportFloatBlending) {
+      return 'rgba32f';
+    }
+    return caps.supportHalfFloatColorBuffer ? 'rgba16f' : 'rgba32f';
   }
   doUpdateResources(shadowMapParams: ShadowMapParams) {
     const device = getDevice();
@@ -413,10 +433,16 @@ export class DOM extends ShadowImpl {
         // Distance behind the frontmost strand, in layer-span units. A fragment at
         // or in front of z0 lands at zero and fills every layer.
         this.$l.t = that.layerCoord(this, this.depth, this.z0, this.layerSpan);
-        // Layer k spans everything nearer than (k+1)/3 of the span, so a fragment
-        // contributes to each layer whose far boundary it precedes. step() gives
-        // that mask without branching.
-        this.$l.mask = pb.vec3(pb.step(this.t, 1 / 3), pb.step(this.t, 2 / 3), pb.step(this.t, 1));
+        // Layer k's far boundary sits at (k+1)/3 of the span, and a fragment
+        // contributes to every layer whose boundary lies behind it. The last
+        // layer has no far boundary: it extends to the end of the caster volume,
+        // so a fragment deeper than the span still lands in it and the third
+        // layer holds the cumulative absorption of *everything* behind z0.
+        // Dropping deep fragments instead - step(t, 1) - deletes the hair behind
+        // the front slice from the map entirely, and any receiver deeper than
+        // the span reads only that slice: wherever it happens to be sparse, the
+        // middle of a dense backlit groom comes out fully lit in blotches.
+        this.$l.mask = pb.vec3(pb.step(this.t, 1 / 3), pb.step(this.t, 2 / 3), 1);
         // A caster that computes no fragment colour covers fully.
         this.$l.casterAlpha = hasAlpha ? this.alpha : pb.float(1);
         // Optical depth rather than raw coverage, because what has to be additive

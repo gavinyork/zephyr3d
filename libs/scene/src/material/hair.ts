@@ -590,11 +590,8 @@ export class HairMaterial
         } else {
           scope.$l.shiftVal = pb.float(0);
         }
-        if (this.occlusionTexture) {
-          scope.$l.hairAO = pb.mix(pb.float(1), this.sampleOcclusionTexture(scope).r, scope.zHairParams.y);
-        } else {
-          scope.$l.hairAO = pb.float(1);
-        }
+        scope.$l.hairAO = this.calculateHairOcclusion(scope);
+        scope.$l.hairDirectAO = this.calculateHairDirectOcclusion(scope);
         scope.$l.litColor = this.hairLight(
           scope,
           scope.$inputs.worldPos,
@@ -604,6 +601,7 @@ export class HairMaterial
           scope.albedo,
           scope.shiftVal,
           scope.hairAO,
+          scope.hairDirectAO,
           scope.normalInfo.TBN[2]
         );
         if (
@@ -749,6 +747,52 @@ export class HairMaterial
     return normalInfo.normal;
   }
   /**
+   * Ambient occlusion for the current fragment.
+   *
+   * @remarks
+   * Applied to the light that no shadow query answers for: environment
+   * irradiance and the multiple-scattering term. On a dense groom this is the
+   * only thing that keeps the strands buried inside it from receiving the full
+   * sky, which is what gives the hairstyle its volume.
+   *
+   * For a hair card that is the occlusion map's job, which is what this does.
+   * {@link HairStrandMaterial} has no texture coordinates to sample one with and
+   * overrides this with a geometric approximation instead.
+   * @internal
+   */
+  protected calculateHairOcclusion(scope: PBInsideFunctionScope): PBShaderExp {
+    return this.sampleBaseOcclusion(scope);
+  }
+  /**
+   * Occlusion applied to direct (per-light) shading.
+   *
+   * @remarks
+   * Direct light already carries its own occlusion answer - the shadow map, or
+   * under DOM a graded transmittance - so an ambient term multiplied on top
+   * counts the same blockage twice: the map says thirty percent of the beam got
+   * through, and the AO halves it again. That is why this is a separate hook
+   * rather than one value for everything.
+   *
+   * The card path deliberately keeps the occlusion map here as well: a card
+   * groom's map is authored as the look of the whole stack and its cards rarely
+   * self-shadow credibly, so dimming direct light is part of what the author
+   * painted. The strand path's geometric term makes the opposite choice and
+   * leaves direct light to the shadow map - see
+   * {@link HairStrandMaterial.rootOcclusion}.
+   * @internal
+   */
+  protected calculateHairDirectOcclusion(scope: PBInsideFunctionScope): PBShaderExp {
+    return this.sampleBaseOcclusion(scope);
+  }
+  /** The occlusion map contribution both hooks share. @internal */
+  private sampleBaseOcclusion(scope: PBInsideFunctionScope): PBShaderExp {
+    const pb = scope.$builder;
+    if (this.occlusionTexture) {
+      return pb.mix(pb.float(1), this.sampleOcclusionTexture(scope).r, scope.zHairParams.y);
+    }
+    return pb.float(1);
+  }
+  /**
    * Approximates the light that reaches a point after bouncing off neighbouring
    * fibres rather than travelling straight to it.
    *
@@ -887,7 +931,14 @@ export class HairMaterial
         // The difference angle. Every path length inside the fibre scales with
         // it, because a ray that enters obliquely has further to travel.
         this.$l.thetaD = pb.mul(pb.abs(pb.sub(pb.asin(this.sinThetaV), pb.asin(this.sinThetaL))), 0.5);
-        this.$l.cosThetaD = pb.max(pb.cos(this.thetaD), 0.001);
+        // Floored well above zero because the model divides by its square at the
+        // end. The degenerate case is real: viewing straight down a fibre that is
+        // lit straight up it puts thetaD at ninety degrees, and while the tinted
+        // paths kill themselves there through Beer-Lambert, R does not - Fresnel
+        // goes to one and M sits at its peak, so a 0.001 floor lets a single tip
+        // pointing at the camera flash at a million times the light's intensity.
+        // 0.2 keeps the gain within the range the azimuthal fits were made for.
+        this.$l.cosThetaD = pb.max(pb.cos(this.thetaD), 0.2);
         // Azimuth, from the two directions projected onto the fibre's cross
         // section. cos(phi) alone is enough: every N below is symmetric about
         // the plane through the light, so the sign of phi never matters.
@@ -1036,6 +1087,11 @@ export class HairMaterial
    * @internal
    */
   /**
+   * @param ao - Ambient occlusion, applied to environment irradiance and the
+   * scatter term - the light no shadow query answers for.
+   * @param aoDirect - Occlusion applied to per-light shading, whose direct
+   * blockage the shadow map already accounts for. See
+   * {@link HairMaterial.calculateHairDirectOcclusion}.
    * @param geometricNormal - Interpolated vertex normal, used for shadow normal
    * offset bias. Defaults to `normal`.
    */
@@ -1048,6 +1104,7 @@ export class HairMaterial
     albedo: PBShaderExp,
     shiftVal: PBShaderExp,
     ao: PBShaderExp,
+    aoDirect: PBShaderExp,
     geometricNormal?: PBShaderExp
   ) {
     const pb = scope.$builder;
@@ -1067,6 +1124,7 @@ export class HairMaterial
         pb.vec4('albedo'),
         pb.float('shiftVal'),
         pb.float('ao'),
+        pb.float('aoDirect'),
         pb.vec3('geometricNormal')
       ],
       function () {
@@ -1148,10 +1206,10 @@ export class HairMaterial
               this.lightColor,
               1 / Math.PI,
               this.diffFactor,
-              this.ao,
+              this.aoDirect,
               this.diffuseScale
             );
-            this.$l.specular = pb.mul(this.lightColor, this.specTerm, this.ao, this.specularScale);
+            this.$l.specular = pb.mul(this.lightColor, this.specTerm, this.aoDirect, this.specularScale);
             if (useTransmission) {
               this.$l.transDir = pb.normalize(pb.add(this.lightDir, pb.mul(this.normal, 0.3)));
               this.$l.VoL = pb.clamp(pb.dot(this.viewVec, pb.neg(this.transDir)), 0, 1);
@@ -1160,7 +1218,7 @@ export class HairMaterial
                 this.lightColor,
                 this.zHairTransmission.rgb,
                 this.transFactor,
-                this.ao
+                this.aoDirect
               );
             } else {
               this.$l.transmission = pb.vec3(0);
@@ -1207,6 +1265,6 @@ export class HairMaterial
       .getGlobalScope()
       [
         funcName
-      ](worldPos, normal, strandT, viewVec, albedo, shiftVal, ao, geometricNormal ?? normal) as PBShaderExp;
+      ](worldPos, normal, strandT, viewVec, albedo, shiftVal, ao, aoDirect, geometricNormal ?? normal) as PBShaderExp;
   }
 }
